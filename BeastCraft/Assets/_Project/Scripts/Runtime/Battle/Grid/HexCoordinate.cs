@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace BeastCraft.Battle.Grid
 {
@@ -15,6 +16,19 @@ namespace BeastCraft.Battle.Grid
     {
         /// <summary>The origin tile, at the centre of a hexagon-shaped board.</summary>
         public static readonly HexCoordinate Zero = new HexCoordinate(0, 0);
+
+        // The six axial direction vectors, in a fixed order. Order is arbitrary geometrically but
+        // deliberately stable: it is what makes neighbour iteration -- and therefore any search
+        // that walks neighbours -- produce the same result run to run.
+        private static readonly HexCoordinate[] Directions =
+        {
+            new HexCoordinate(1, 0),
+            new HexCoordinate(1, -1),
+            new HexCoordinate(0, -1),
+            new HexCoordinate(-1, 0),
+            new HexCoordinate(-1, 1),
+            new HexCoordinate(0, 1)
+        };
 
         public HexCoordinate(int q, int r)
         {
@@ -43,6 +57,21 @@ namespace BeastCraft.Battle.Grid
             int deltaQ = Q - other.Q;
             int deltaR = R - other.R;
             return (Math.Abs(deltaQ) + Math.Abs(deltaQ + deltaR) + Math.Abs(deltaR)) / 2;
+        }
+
+        /// <summary>
+        /// The six tiles one step away, in a fixed order. Pure coordinate math: it knows nothing
+        /// about board bounds, terrain or occupancy, so callers must filter the results themselves.
+        /// </summary>
+        public IReadOnlyList<HexCoordinate> Neighbors()
+        {
+            HexCoordinate[] neighbors = new HexCoordinate[Directions.Length];
+            for (int i = 0; i < Directions.Length; i++)
+            {
+                neighbors[i] = this + Directions[i];
+            }
+
+            return neighbors;
         }
 
         /// <summary>Component-wise sum, for offsetting a tile by a direction vector.</summary>
