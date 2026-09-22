@@ -13,6 +13,13 @@ namespace BeastCraft.Battle.Grid
     /// <see cref="IsPassable"/> is the query that combines them.
     /// </para>
     /// <para>
+    /// Also owns which tiles each side may deploy onto before the fight starts — see
+    /// <see cref="IsInDeploymentZone"/>. That sits here rather than in a type of its own because it
+    /// is the same kind of fact as terrain blocking and occupancy: a per-tile property of this
+    /// board, derived from this board's own <see cref="Radius"/>, that several callers need to ask
+    /// about without carrying a second object around.
+    /// </para>
+    /// <para>
     /// Scaffolding only: this is the board's state and its bounds/occupancy/terrain queries. Per-
     /// tile movement cost, line of sight and elevation are all deliberately absent — every step
     /// costs 1, which is what <see cref="HexPathfinder"/> assumes — and land in a later pass.
@@ -37,10 +44,17 @@ namespace BeastCraft.Battle.Grid
         private readonly Dictionary<HexCoordinate, string> _occupantsByTile;
         private readonly Dictionary<string, HexCoordinate> _tilesByOccupant;
 
+        // Smallest |R| that still counts as a deployment row. Derived from DeploymentZoneDepth and
+        // held because every zone query tests against it. Floored at 1 so the two zones can never
+        // meet in the middle and share the R == 0 row, whatever Radius turns out to be.
+        private readonly int _deploymentRowThreshold;
+
         public HexGrid(ArenaSize size)
         {
             Size = size;
             Radius = RadiusFor(size);
+            DeploymentZoneDepth = Math.Max(1, (Radius + 1) / 2);
+            _deploymentRowThreshold = Math.Max(1, (Radius - DeploymentZoneDepth) + 1);
 
             _tiles = new HashSet<HexCoordinate>();
             _blockedTiles = new HashSet<HexCoordinate>();
@@ -55,6 +69,22 @@ namespace BeastCraft.Battle.Grid
 
         /// <summary>Distance in hex steps from the centre tile to the outermost ring.</summary>
         public int Radius { get; }
+
+        /// <summary>
+        /// How many rows deep each side's deployment zone reaches in from its own edge of the
+        /// board, counted in whole <c>R</c> rows. The remaining <c>2 * (Radius -
+        /// DeploymentZoneDepth) + 1</c> rows in the middle are a neutral no-deploy band that
+        /// belongs to neither side.
+        /// <para>
+        /// TUNABLE IMPLEMENTATION DEFAULT, NOT CONFIRMED BALANCE — exactly like the radius
+        /// constants above, and for the same reason. Nothing about deployment geometry has been
+        /// through encounter design; what is settled (decision 2) is only how many beasts a format
+        /// deploys, not where they may stand. This is <c>ceil(Radius / 2)</c>, picked so roughly
+        /// half the board is contested ground and each side still has real depth to arrange itself
+        /// in. Expect it to move once encounter design gives it something to be balanced against.
+        /// </para>
+        /// </summary>
+        public int DeploymentZoneDepth { get; }
 
         /// <summary>Total number of legal tiles on the board.</summary>
         public int TileCount
@@ -244,6 +274,89 @@ namespace BeastCraft.Battle.Grid
         public void ClearBlocked()
         {
             _blockedTiles.Clear();
+        }
+
+        /// <summary>
+        /// True when a tile is one this team may deploy onto before the fight starts.
+        /// <para>
+        /// The board is split into three bands along the axial <c>R</c> axis:
+        /// <see cref="BattleTeam.Player"/> owns the <see cref="DeploymentZoneDepth"/> rows with the
+        /// most positive <c>R</c>, <see cref="BattleTeam.Enemy"/> owns the mirror-image rows with
+        /// the most negative <c>R</c>, and the rows between them are neutral and belong to nobody.
+        /// </para>
+        /// <para>
+        /// <strong>Why <c>R</c>.</strong> All three cube axes split a hexagon into two congruent
+        /// regions — negating every cube component is a 180° rotation that maps the board onto
+        /// itself and each zone exactly onto the other — so symmetry does not pick between them.
+        /// <c>R</c> is chosen because it is the axis <see cref="HexCoordinate"/> already calls the
+        /// "row" axis: a constant-<c>R</c> band is a single straight run of tiles across the board,
+        /// so the front line reads as a straight line and "your half / their half" is legible
+        /// without a diagram. Splitting on <c>Q</c> or the implied <c>S</c> is geometrically
+        /// identical but lands the front line on a diagonal, which is harder to read and harder to
+        /// describe to a player.
+        /// </para>
+        /// <para>
+        /// A pure shape query, like <see cref="GetTilesInRange"/>: terrain and occupancy are
+        /// ignored, because a blocked or taken tile is still on this side of the board. Off-board
+        /// tiles are in nobody's zone. Any <paramref name="team"/> value other than
+        /// <see cref="BattleTeam.Player"/> is read as the enemy side, matching how
+        /// <see cref="RadiusFor"/> handles an unrecognised enum.
+        /// </para>
+        /// </summary>
+        public bool IsInDeploymentZone(HexCoordinate coordinate, BattleTeam team)
+        {
+            if (!IsInBounds(coordinate))
+            {
+                return false;
+            }
+
+            if (team == BattleTeam.Player)
+            {
+                return coordinate.R >= _deploymentRowThreshold;
+            }
+
+            return coordinate.R <= -_deploymentRowThreshold;
+        }
+
+        /// <summary>
+        /// Every tile <paramref name="team"/> may deploy onto, ordered by row and then along the
+        /// row so the result is stable run to run — unlike <see cref="Tiles"/>, which is a set.
+        /// Built from <see cref="IsInDeploymentZone"/>'s rule and carries all of its caveats:
+        /// terrain and occupancy are ignored, so a caller that wants only the tiles a unit could
+        /// actually stand on must filter this itself.
+        /// <para>
+        /// Sizing, against the radii the presets actually use (row <c>R</c> of a hexagon of radius
+        /// <c>n</c> holds <c>2n + 1 - |R|</c> tiles): Small (radius 3, depth 2) gives 9 tiles per
+        /// side, Medium (radius 5, depth 3) gives 21, Large (radius 7, depth 4) gives 38. The
+        /// smallest of those still seats <see cref="BattleFormat.LargeGroup"/>'s six beasts with
+        /// three tiles to spare, so every format fits on every arena preset.
+        /// </para>
+        /// </summary>
+        public IReadOnlyList<HexCoordinate> GetDeploymentZone(BattleTeam team)
+        {
+            List<HexCoordinate> results = new List<HexCoordinate>();
+            int lowestRow = team == BattleTeam.Player ? _deploymentRowThreshold : -Radius;
+            int highestRow = team == BattleTeam.Player ? Radius : -_deploymentRowThreshold;
+
+            for (int r = lowestRow; r <= highestRow; r++)
+            {
+                // A hexagon centred on the origin is symmetric under swapping the two axial axes,
+                // so the clamp that bounds r for a given q bounds q for a given r unchanged.
+                int lowerQ;
+                int upperQ;
+                RingRowBounds(Radius, r, out lowerQ, out upperQ);
+
+                for (int q = lowerQ; q <= upperQ; q++)
+                {
+                    HexCoordinate candidate = new HexCoordinate(q, r);
+                    if (IsInBounds(candidate))
+                    {
+                        results.Add(candidate);
+                    }
+                }
+            }
+
+            return results;
         }
 
         /// <summary>

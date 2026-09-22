@@ -402,6 +402,89 @@ revisited when balance work starts.
 Resource cost is still not spent, per the open question above; effect application does not gate on
 it.
 
+## Pre-battle placement — DATA MODEL AND VALIDATION ONLY
+
+Decision 2 settles that beasts are pieces placed on the grid before the fight, and the "Core loop"
+section above calls placement the one point where the player moves a piece by hand. Nothing until
+now defined what a *legal* starting layout actually is. This pass answers that and only that: which
+tiles each side may deploy onto, and whether a proposed set of starting positions is allowed.
+
+### Deployment zones — TUNABLE DEFAULT, NOT CONFIRMED BALANCE
+
+The board is split into three bands along the axial **`R` axis**. The player owns the
+`HexGrid.DeploymentZoneDepth` rows with the most positive `R`, the enemy owns the mirror-image rows
+with the most negative `R`, and the rows between them are a **neutral no-deploy band** belonging to
+neither side. Depth is `ceil(Radius / 2)`, so it scales with the arena preset rather than being
+fixed:
+
+| Preset | Radius | Depth | Tiles per zone | Neutral band |
+| --- | --- | --- | --- | --- |
+| Small | 3 | 2 | 9 | 19 |
+| Medium | 5 | 3 | 21 | 49 |
+| Large | 7 | 4 | 38 | 93 |
+
+The smallest of those seats `BattleFormat.LargeGroup`'s six beasts with three tiles to spare, so
+**every format fits on every arena preset** — checked against the radii the presets actually use
+(row `R` of a hexagon of radius `n` holds `2n + 1 - |R|` tiles), not assumed.
+
+**Why `R`.** All three cube axes split a hexagon into two congruent regions — negating every cube
+component is a 180° rotation that maps the board onto itself and each zone exactly onto the other —
+so symmetry alone does not pick between `Q`, `R` and the implied `S`. `R` wins because it is the
+axis `HexCoordinate` already calls the "row" axis: a constant-`R` band is a single straight run of
+tiles across the board, so the front line reads as a straight line and "your half / their half" is
+legible without a diagram. `Q` or `S` would be geometrically identical but would land the front line
+on a diagonal, which is harder to read and harder to describe to a player.
+
+**This is a tunable implementation default, exactly like the hex radii backing each arena preset,
+and for the same reason.** Nothing about deployment geometry has been through encounter design. What
+the producer confirmed (decision 2) is how many beasts a format deploys, not where they may stand.
+The three-band split and the half-the-board depth were picked so roughly half the board is contested
+ground and each side still has real depth to arrange itself in; expect both to move once encounter
+design gives them something to be balanced against. A zone query is deliberately a **pure shape
+query** like `HexGrid.GetTilesInRange` — terrain and occupancy are ignored, because a blocked or
+taken tile is still on its own side of the board.
+
+### Validation
+
+`PlacementValidator.Validate` answers whether a proposed layout for one team is legal against a
+grid and a `BattleFormat`, checking every rule against every position rather than stopping at the
+first failure: count within 1..`MaxPartySize` inclusive (a range, not an exact match — decision 2
+says "up to 4" and "up to 6"), no tile repeated within the proposal, every tile in bounds, not
+terrain-blocked, inside the validating team's own zone, and not colliding with a tile already
+spoken for.
+
+Results follow the same rich-result pattern as `BattleSkillOutcome` / `BattleResult`: a
+`PlacementValidationResult` carrying a batch-level `PlacementCountStatus` and one `PlacementOutcome`
+per proposed position, valid ones included, so a caller can line them up index for index with what
+it drew. The per-position `PlacementStatus` is a **flags** enum rather than a single value — unlike
+`BattleSkillStatus`, whose arms describe genuinely exclusive situations, one tile really can be in
+the wrong half *and* buried under terrain *and* already taken at once, and a layout is only worth
+validating if it hands back every reason it was rejected. The one exception is off-board tiles,
+which report `OutOfBounds` alone because "also blocked" and "also outside the zone" are not
+additional facts there.
+
+**Validation never touches the board**, so it is safe to call on every drag of a marker. Committing
+is the separate `PlacementValidator.TryPlaceAll`, which validates first and is all-or-nothing: a
+batch with one illegal tile places nobody rather than seating the legal five. It takes
+`PlacementRequest` (unit id plus tile) rather than bare coordinates, because `HexGrid.TryPlaceUnit`
+is keyed by unit id — a list of tiles says where somebody should stand but not who. Validation
+itself needs no ids, which is why the coordinate-only `Validate` overload remains: a placement UI
+wants to ask "is this layout legal" long before it has decided which beast fills which slot.
+
+### There is no placement UI, and building one is a different kind of task
+
+This pass is **validation only**. It checks a proposal; it does not generate one, and there is no
+placement AI here or anywhere else. There is no UI, no scene, no MonoBehaviour and no input
+handling — consistent with every pass so far, all of which have been data structures and algorithms
+validated through the CI compile/format stub.
+
+That is worth stating explicitly because the UI is not simply the next increment of this work. Every
+system built so far is plain C# that a headless compile can fully exercise. A placement screen is
+not: it is real Unity scene and prefab work, hex-tile hit-testing and screen-to-axial conversion,
+drag-and-drop input, zone and validity highlighting, and it can only genuinely be tested by opening
+the project in the Editor. It is a **separate, later, and materially different** task, and it should
+be scoped as one rather than treated as the tail end of this one.
+
 ## Next steps
 
 The grid and turn-manager scaffolding landed against decisions 1–3: a `BeastCraft.Battle.Grid`
@@ -464,12 +547,19 @@ generous maximum-round cap (`BattleTurnExecutor.DefaultMaxRounds`) that reports 
 a **safety net against a hang**, not a designed time limit, and encounter balance must not lean on
 it.
 
+Pre-battle placement (the section above) adds deployment zones on `HexGrid`
+(`DeploymentZoneDepth`, `IsInDeploymentZone`, `GetDeploymentZone`) and a
+`BeastCraft.Battle.Placement` namespace holding `PlacementValidator` and its result types —
+`PlacementStatus`, `PlacementCountStatus`, `PlacementRequest`, `PlacementOutcome` and
+`PlacementValidationResult`. Validation is non-mutating; `TryPlaceAll` is the separate, atomic
+commit step.
+
 Every pass so far is deliberately **data structures and algorithms only** — no MonoBehaviours, no
 scene or prefab wiring, and no authored `.asset` instances. The hex radii backing each arena preset
 are placeholder implementation defaults chosen to be tunable, not producer-confirmed balance
-numbers, and the effect rules above are the same kind of default. Still to come: where `MoveRange`
-gets its value from, the damage formula and stat scaling on top of flat magnitudes, the
-status-effect system behind `ApplyStatus`, resource gating on top of cooldowns, lifting defeated
-units off the grid so they stop obstructing movement, the pre-battle placement system and its UI,
-the encounter definition that selects an arena preset and a battle format, and the presentation
-layer.
+numbers, and the deployment-zone split and the effect rules above are the same kind of default.
+Still to come: where `MoveRange` gets its value from, the damage formula and stat scaling on top of
+flat magnitudes, the status-effect system behind `ApplyStatus`, resource gating on top of cooldowns,
+lifting defeated units off the grid so they stop obstructing movement, the placement UI (a Unity
+Editor task, not a continuation of the placement validation that just landed), the encounter
+definition that selects an arena preset and a battle format, and the presentation layer.
