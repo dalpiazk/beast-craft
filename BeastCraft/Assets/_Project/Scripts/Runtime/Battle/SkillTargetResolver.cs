@@ -19,6 +19,14 @@ namespace BeastCraft.Battle
     /// a beast's equipped skills fires this turn. Those are separate passes.
     /// </para>
     /// <para>
+    /// Two entry points, one rule. <see cref="ResolveTargets"/> answers "who does this skill hit
+    /// from where the caster stands", which is range-limited and is what actually resolves a cast.
+    /// <see cref="PickFocusIgnoringRange"/> answers "who is the best candidate for this skill
+    /// anywhere on the board", which is what a caster about to <em>move</em> needs in order to know
+    /// whether it has somewhere worth going. Both run the same side/criterion/order selection; the
+    /// second simply skips the distance filter.
+    /// </para>
+    /// <para>
     /// <strong>Scaffold assumptions.</strong> The producer confirmed that a skill aims from the
     /// caster and authors its own side and pick rule; the per-shape rules below (which shapes
     /// exclude the caster's own tile, that <see cref="SkillTargetShape.AllEnemies"/> and
@@ -126,7 +134,7 @@ namespace BeastCraft.Battle
                     return CollectSide(living, caster, SkillTargetSide.Ally);
 
                 case SkillTargetShape.SingleTarget:
-                    BattleUnit single = PickFocus(skill, caster, living, rng);
+                    BattleUnit single = PickFocus(skill, caster, living, rng, true);
                     if (single != null)
                     {
                         results.Add(single);
@@ -228,9 +236,62 @@ namespace BeastCraft.Battle
         }
 
         /// <summary>
-        /// The single unit a picking shape settles on: the eligible units of the skill's side
-        /// within <c>Range</c> steps of the caster, narrowed by the skill's criterion and order.
-        /// Returns <c>null</c> when nothing is eligible.
+        /// The single unit a picking shape would settle on if <c>Range</c> did not exist: the
+        /// eligible units of the skill's side anywhere on the board, narrowed by the skill's
+        /// criterion and order. Returns <c>null</c> when nothing is eligible.
+        /// <para>
+        /// This is the "is there anything worth chasing at all" question, and it is the one thing a
+        /// mover needs that plain <see cref="ResolveTargets"/> cannot answer: that method is
+        /// range-limited by construction, so a caster with a target two steps too far away and a
+        /// caster with no target on the board both get an empty list back from it, and those two
+        /// situations call for completely different behaviour — close the distance, or do not move
+        /// at all. <see cref="BattleTurnExecutor"/> is the caller, and it is the only one expected
+        /// to be.
+        /// </para>
+        /// <para>
+        /// Meaningful for <see cref="SkillTargetShape.SingleTarget"/> and
+        /// <see cref="SkillTargetShape.Line"/>, the two shapes that pick a focus. Nothing here
+        /// rejects another shape — the skill's side, criterion and order are read the same way
+        /// whatever its shape says — but the answer is not useful for one, because the other five
+        /// shapes have no focus to approach in the first place.
+        /// </para>
+        /// <para>
+        /// <strong>This picks; it does not promise.</strong> What the skill actually lands on is
+        /// whatever <see cref="ResolveTargets"/> says once the caster has stopped moving, which is
+        /// re-asked from the final position and may legitimately differ — a <c>Line</c> sweeps
+        /// everyone on its beam rather than just the focus, and a shorter-ranged look at the same
+        /// roster can prefer a different candidate under a <c>Distance</c> criterion. The resolver
+        /// stays the single source of truth for who gets hit.
+        /// </para>
+        /// <para>
+        /// Non-throwing on the same terms as <see cref="ResolveTargets"/>: a null skill or caster, a
+        /// defeated caster, and a null roster all yield <c>null</c>. Takes no
+        /// <see cref="HexGrid"/>, because picking a focus never needed one.
+        /// </para>
+        /// </summary>
+        public static BattleUnit PickFocusIgnoringRange(SkillSO skill, BattleUnit caster, IEnumerable<BattleUnit> allUnits, Random rng)
+        {
+            if (skill == null || caster == null || caster.IsDefeated)
+            {
+                return null;
+            }
+
+            return PickFocus(skill, caster, CollectLiving(allUnits), rng, false);
+        }
+
+        /// <summary>
+        /// The single unit a picking shape settles on: the eligible units of the skill's side,
+        /// optionally narrowed to those within <c>Range</c> steps of the caster, then narrowed by
+        /// the skill's criterion and order. Returns <c>null</c> when nothing is eligible.
+        /// <para>
+        /// <paramref name="limitToRange"/> is the only difference between the two entry points into
+        /// this: normal target resolution passes <c>true</c>, and
+        /// <see cref="PickFocusIgnoringRange"/> passes <c>false</c>. The side/criterion/order
+        /// selection below is deliberately written once — a second copy of it for the range-free
+        /// case would be two implementations of the same producer-confirmed rule, free to drift
+        /// apart, and the drift would show up as a beast walking toward one unit and then hitting a
+        /// different one.
+        /// </para>
         /// <para>
         /// Ties are broken by taking the first candidate in id order — the comparison below only
         /// displaces the incumbent on a strict win. That is deliberately the same rule whatever the
@@ -239,14 +300,14 @@ namespace BeastCraft.Battle
         /// picks the same unit instead of inheriting whatever order the roster was built in.
         /// </para>
         /// </summary>
-        private static BattleUnit PickFocus(SkillSO skill, BattleUnit caster, List<BattleUnit> living, Random rng)
+        private static BattleUnit PickFocus(SkillSO skill, BattleUnit caster, List<BattleUnit> living, Random rng, bool limitToRange)
         {
             List<BattleUnit> candidates = new List<BattleUnit>();
 
             for (int i = 0; i < living.Count; i++)
             {
                 if (IsOnSide(living[i], caster, skill.TargetSide)
-                    && caster.Position.Distance(living[i].Position) <= skill.Range)
+                    && (!limitToRange || caster.Position.Distance(living[i].Position) <= skill.Range))
                 {
                     candidates.Add(living[i]);
                 }
@@ -314,7 +375,7 @@ namespace BeastCraft.Battle
                 return results;
             }
 
-            BattleUnit focus = PickFocus(skill, caster, living, rng);
+            BattleUnit focus = PickFocus(skill, caster, living, rng, true);
             if (focus == null)
             {
                 return results;

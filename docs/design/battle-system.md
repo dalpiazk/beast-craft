@@ -35,11 +35,15 @@ one, whose area skills will catch which cluster, which flank a slow bruiser can 
 Once the battle starts there is **no player action menu**. Combatants take turns in the speed-stat
 initiative queue (decision 3), one unit at a time, and on its own turn each beast:
 
-1. **Moves**, up to its own move range, measured in grid steps.
-2. **Fires whichever of its equipped skills come off cooldown this turn** — which may be none, one,
+1. **Fires whichever of its equipped skills come off cooldown this turn** — which may be none, one,
    or several at once — with targeting resolved automatically from each skill's own authored rules
    (decision 4). Nothing chooses *between* the equipped skills: the beast's skill stack is a fixed
    rotation driven by per-skill cooldown counters (decision 5).
+2. **Moves only as far as those skills need it to**, out of a single move-range budget shared by the
+   whole turn (decision 7). Movement is not a separate step taken before the skills: a beast whose
+   targets are already in reach does not move at all, and a skill that cannot reach anything even
+   after spending the budget does not fire *and does not reset its cooldown* — it tries again next
+   turn.
 
 The player's leverage over that is the build and the placement, not a per-turn command. This suits
 the game's shape: the story is the spine, and a fight that resolves from a good team composition and
@@ -48,18 +52,20 @@ puzzle every encounter.
 
 ### What is not settled yet
 
-- **Move range does not exist in code.** `StatBlock` has no move-range stat, and nothing implements
-  movement during a battle. `HexPathfinder` can already produce the route; what is missing is the
-  stat that budgets it and the rule for where a beast chooses to move (toward the nearest enemy? to
-  the nearest tile from which its equipped skill reaches something? away when hurt?). All of that
-  is open.
+- **Where a beast's move range comes from.** The *rule* for spending it is settled and implemented
+  (decision 7), and `BattleUnit.MoveRange` is the budget it spends. What that number is sourced
+  from is not: `StatBlock` still has no move-range stat, and whether move range is a species stat, a
+  gear-modifiable one, a flat constant or something a status can change is open. `MoveRange` is
+  therefore a settable field defaulting to 0, filled in by the pass that assembles a unit from its
+  creature instance — which does not exist yet either.
 - **Resource gating.** `SkillSO.ResourceCost` is authored but nothing spends it, and the resource
   itself ("mana" / "focus" / "stamina") is still unnamed. The cooldown rotation (decision 5) is now
   settled and implemented; how — or whether — a resource pool gates it on top is not. A skill that
-  comes off cooldown currently always fires.
-- **The turn executor.** Nothing yet drives `TurnManager` end to end: movement execution, the
-  cooldown tick, and effect application each exist or don't as separate pieces, and the loop that
-  orders them within a single beast's turn is a later integration pass.
+  comes off cooldown and can reach a target currently always fires.
+- **Tactical AI beyond reaching a target.** A beast moves for exactly one reason: to get a ready
+  skill's target into range. It does not retreat when hurt, spread out against area skills, screen
+  an ally or hold a choke point, and none of that has been designed. Adding any of it would be a
+  real design decision, not an implementation detail.
 - **The basic attack.** Earlier drafts listed "a basic attack, a skill, or an item" as the turn's
   options. With no player menu, whether a beast has a fallback attack at all — or simply always has
   at least one short-cooldown skill in its rotation — is open, and items in battle are out of scope
@@ -212,8 +218,10 @@ The rule, in full:
 - **Tick.** Every time it becomes the caster's own turn in the initiative queue (decision 3), *all*
   of its equipped skills' counters tick down by 1, clamped at 0 — never negative.
 - **Fire and reset.** Any skill whose counter is exactly 0 after that tick fires this turn and
-  immediately resets to its authored `Cooldown` to start counting down again. Firing and re-arming
-  are a single step.
+  immediately resets to its authored `Cooldown` to start counting down again. **Amended by decision
+  7:** reaching 0 is an *offer*, not a guarantee. A skill that needs a target in range and cannot
+  reach one does not fire and does not reset — it keeps its 0 and is offered again next turn. Only
+  actually firing re-arms. Every skill that does fire still resets in the same step.
 - **Multi-fire.** More than one equipped skill may fire on the same turn when more than one counter
   reaches 0 together. They are fired in **authored stack order** (list order), which is what makes a
   multi-skill turn deterministic and reproducible.
@@ -279,10 +287,55 @@ Two consequences of that representation, both deliberate:
   no rule in the design by which a commander could be defeated, and nothing can write the flag on a
   unit it cannot target.
 
-**The timing half is still not wired to anything.** The rotation engine that landed for decision 5
-is deliberately owner-agnostic (it ticks a list of skills and knows nothing about the board or the
-roster), so it drives the avatar unchanged — but nothing calls it on the avatar yet. Ticking the
-avatar once per player-side beast-turn is part of the turn-executor pass.
+**The timing half is now wired up.** `BattleTurnExecutor` ticks the avatar's loadout at the end of
+every player-side beast's turn, exactly as this section describes: not on enemy turns, and not once
+per round. The rotation engine that landed for decision 5 is deliberately owner-agnostic, so it
+drives the avatar unchanged.
+
+### 7. Movement during a turn — DECIDED
+
+**Movement is spent per skill, as needed, out of one budget shared by the whole turn.** This closes
+the question decisions 4 and 5 left open — what a beast does with its move range — and it closes it
+without an AI: the skills themselves decide where the beast goes.
+
+The rule, in full, in the producer's own terms:
+
+- **Movement serves the skill, not the other way round.** There is no up-front "walk toward the
+  nearest enemy" step. Each skill that comes off cooldown is attempted in stack order, and the beast
+  moves only if *that* skill needs it to reach a target. A beast whose targets are all already in
+  range does not move at all.
+- **The budget is per turn, not per skill.** A beast starts its turn with its full move range and
+  every approach spends out of the same pool. Using three quarters of it getting the first skill into
+  range leaves one quarter for everything after it.
+- **A skill that cannot reach keeps its cooldown at 0.** If a ready skill has an eligible target but
+  cannot get within range of it even after spending everything left in the budget — or has no
+  eligible target anywhere at all — it does not fire, and **it does not reset**. Its counter stays at
+  0 and it is offered again, with a fresh full budget, on that beast's next turn. This is the one
+  place the decision-5 rule "firing and re-arming are a single step" no longer holds: coming off
+  cooldown is now an *offer*, and only actually firing re-arms.
+- **Only the two picking shapes are affected.** `SingleTarget` and `Line` choose a single focus
+  target (decision 4) and so are the only shapes with something concrete to walk toward, and the only
+  ones that can end a turn stuck at 0. `Self`, `AllAllies`, `AllEnemies`, `Cross` and `AreaBurst` all
+  resolve from wherever the caster already stands, so they fire the moment they are ready and never
+  consult the movement budget. A `Cross` or `AreaBurst` that catches nobody is a whiff that still
+  fires and still re-arms, exactly as before — it was never gated on reaching anyone.
+
+*Background.* The alternative shapes this could have taken are all worse fits for an auto-battler
+whose decisions live in the build. Moving first and then seeing what happens to be in range makes
+the move range and the skill ranges interact by accident rather than by design. Moving toward the
+nearest enemy regardless of what is equipped punishes a long-range build for no reason a player could
+read. And a scoring pass over "best tile to stand on" is an AI, with the authoring, tuning and
+legibility costs decision 5 already rejected. Tying movement to the skill that needs it means a
+beast's positioning is a direct, readable consequence of its loadout — a short-range bruiser closes,
+a long-range caster stays put — with no extra tuning surface. The cost is that a beast can walk into
+a bad spot to land one skill; that is the same trade auto-resolution has made everywhere else.
+
+*Scaffold details, not confirmed balance.* Two implementation choices sit underneath this and are
+cheap to revisit. A beast that cannot afford the whole approach **stays where it is** rather than
+walking part of the way, because a partial approach spends the budget to accomplish nothing and
+leaves the rest of the stack worse off. And the route is the cheapest one that reaches *any* tile
+within range of the target, found by pathing at the tiles around the target (the target's own tile is
+occupied, so nothing can path onto it) and stopping at the first tile on that route that is in range.
 
 ## Effect application — SCAFFOLD ASSUMPTIONS, NOT CONFIRMED BALANCE
 
@@ -368,26 +421,55 @@ counter per *slot*, so the same skill equipped twice runs two independent counte
 (a fired skill paired with the units it landed on), a `Skills` loadout on `BattleUnit`, and
 `SkillLoadout.TickAndResolve`, which ticks the rotation and runs each ready skill through
 `SkillTargetResolver` in stack order. `SkillLoadout.Tick()` is deliberately separable and touches no
-targeting at all, which is what keeps it usable for the avatar (decision 6) later.
+targeting at all, which is what keeps it usable for the avatar (decision 6) and for the movement
+rule (decision 7), neither of which it knows anything about.
 
 Decision 6's targeting half adds `BattleAvatar`, a one-method factory that builds the avatar as an
 ordinary `BattleUnit` — player team, zero stats, a placeholder position the confirmed shape
 restriction guarantees nothing reads, and its authored support loadout. It is a caster only and is
-not added to the roster or the initiative queue. Nothing ticks it yet; the once-per-player-beast-turn
-timing is the turn executor's job.
+not added to the roster or the initiative queue.
 
 Effect application (the section above) adds `SkillEffectApplier`, which resolves an activation into
 state changes, a `CurrentHp` and an `ActiveStatModifiers` list on `BattleUnit`, and the
-`ActiveStatModifier` record behind timed buffs. Nothing calls either `Apply` or `TickModifiers` yet;
-both are mechanism waiting on the turn executor.
+`ActiveStatModifier` record behind timed buffs.
+
+Decision 7 adds the turn executor, which is also the pass that finally connects everything above to
+everything else:
+
+- `BattleUnit.MoveRange`, the per-turn movement budget. Not on `StatBlock`, for the reason under
+  "what is not settled yet" — where the number comes from is still open.
+- `SkillLoadout.Tick()` now reports ready **slot indices** and no longer re-arms them;
+  `SkillLoadout.MarkFired(slotIndex)` is the explicit re-arm. A slot offered and never marked fired
+  simply stays at 0 and is offered again next turn, which is decision 7's "stuck skill" rule falling
+  out of the clamp rather than being special-cased. `TickAndResolve` survives as the fire-everything
+  path, which is still exactly right for the avatar's position-free kit.
+- `SkillTargetResolver.PickFocusIgnoringRange`, the range-free half of the focus pick the resolver
+  already did, so a beast can tell "no target anywhere" from "target too far away" — two situations
+  that call for opposite behaviour. Same selection rule, one implementation, no change to how
+  targeting resolves.
+- `BattleTurnExecutor`, which owns one beast's turn (expire timed modifiers, tick the rotation,
+  attempt each ready slot in stack order with the shared movement budget, then tick the avatar if the
+  beast is player-side) and the loop that drives `TurnManager` from the first turn to the last. It is
+  the one type allowed to know about the board, the roster, the rotation, the targeting and the
+  effects at once, and it is what finally calls `SkillEffectApplier.Apply` and
+  `TickModifiers`. Its results are reported as `BattleTurnResult` / `BattleSkillOutcome` /
+  `BattleSkillStatus` per turn and `BattleResult` / `BattleOutcome` per battle.
+
+Two things in that loop are worth calling out as engineering decisions rather than design ones. The
+win condition is **"living units remain on more than one team"**, deliberately *not*
+`TurnManager.IsComplete`: that property is true only once every unit in the roster is defeated, which
+is the turn manager answering "is there anybody left to hand a turn to" — a battle won with survivors
+still standing leaves it `false`, so a loop built on it would never stop. And the loop carries a
+generous maximum-round cap (`BattleTurnExecutor.DefaultMaxRounds`) that reports a stalemate; that is
+a **safety net against a hang**, not a designed time limit, and encounter balance must not lean on
+it.
 
 Every pass so far is deliberately **data structures and algorithms only** — no MonoBehaviours, no
 scene or prefab wiring, and no authored `.asset` instances. The hex radii backing each arena preset
 are placeholder implementation defaults chosen to be tunable, not producer-confirmed balance
-numbers, and the effect rules above are the same kind of default. Still to come: the move-range stat
-and movement during battle, the turn executor that drives `TurnManager` end to end and calls the
-rotation and the effect applier at the right points, the damage formula and stat scaling on top of
-flat magnitudes, the status-effect system behind `ApplyStatus`, resource gating on top of cooldowns,
-the avatar's once-per-player-beast-turn tick (decision 6), the pre-battle placement system and its
-UI, the encounter definition that selects an arena preset and a battle format, and the presentation
+numbers, and the effect rules above are the same kind of default. Still to come: where `MoveRange`
+gets its value from, the damage formula and stat scaling on top of flat magnitudes, the
+status-effect system behind `ApplyStatus`, resource gating on top of cooldowns, lifting defeated
+units off the grid so they stop obstructing movement, the pre-battle placement system and its UI,
+the encounter definition that selects an arena preset and a battle format, and the presentation
 layer.

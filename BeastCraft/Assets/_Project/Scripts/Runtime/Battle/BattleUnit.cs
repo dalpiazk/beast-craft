@@ -87,13 +87,46 @@ namespace BeastCraft.Battle
         /// <summary>
         /// The tile this unit stands on. Kept in step with <see cref="Grid.HexGrid"/> occupancy by
         /// whatever moves the unit; the grid remains the authority on which tile is taken.
+        /// <para>
+        /// <see cref="BattleTurnExecutor"/> is the one thing that moves a unit today, and it writes
+        /// both halves together: the grid placement first, this property only once the grid has
+        /// accepted it.
+        /// </para>
         /// </summary>
         public HexCoordinate Position { get; set; }
 
         /// <summary>
-        /// The unit's equipped skill stack and its live cooldown counters. Tick it once per turn
-        /// through <see cref="SkillLoadout.TickAndResolve"/> to get the skills that fire and what
-        /// they land on.
+        /// How many hex steps this unit may move on one of its own turns, as a whole-turn budget
+        /// spent across every skill it attempts that turn (see <see cref="BattleTurnExecutor"/>).
+        /// <para>
+        /// Not read from <see cref="Stats"/>, because there is no move-range stat to read.
+        /// <see cref="StatBlock"/> models the six combat axes and nothing else, and adding a seventh
+        /// would change the shape of every authored species asset for a number the design has not
+        /// settled yet — whether move range comes from the species, from gear, from a status, or is
+        /// simply flat. So it lives here, on the battle-side unit, where the pass that assembles a
+        /// unit from its creature instance can set it from whatever source that answer turns out to
+        /// name.
+        /// </para>
+        /// <para>
+        /// Settable rather than a constructor parameter for the same reason
+        /// <see cref="CurrentHp"/> is settable: the assembling pass does not exist yet. Unlike
+        /// <c>CurrentHp</c>, though, there is nothing on <see cref="Stats"/> to seed it from, so it
+        /// is not taken at construction at all.
+        /// </para>
+        /// <para>
+        /// Defaults to 0, which means "does not move" and is the honest default rather than a
+        /// guessed one: every code path that consults it treats 0 as a unit that must already be in
+        /// range to act, so nothing moves until a caller deliberately says how far it may. A
+        /// negative value is treated as 0 by the executor rather than corrected here — this stays a
+        /// passive record.
+        /// </para>
+        /// </summary>
+        public int MoveRange { get; set; }
+
+        /// <summary>
+        /// The unit's equipped skill stack and its live cooldown counters. Driven once per turn by
+        /// <see cref="BattleTurnExecutor"/>, which ticks it, works out which of the ready slots can
+        /// actually reach something, and marks those fired.
         /// <para>
         /// Settable for the same reason <see cref="Stats"/> is: the pass that assembles a unit from
         /// its creature instance and its learned skills does not exist yet, so a loadout may need to
