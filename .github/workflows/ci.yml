@@ -1,0 +1,73 @@
+# ---------------------------------------------------------------------------
+# TODO: Unity Test Runner (GameCI) is intentionally NOT part of this workflow.
+#
+# Running the real EditMode/PlayMode suites needs a Unity Editor image and a
+# `UNITY_LICENSE` repository secret, neither of which exists yet. Until that
+# secret is provisioned, the only automated C# validation is the stub-based
+# compile + format check below (see Tooling/CiStubs/README.md for how that
+# works and what it does and does not prove).
+#
+# When a Unity job is eventually added, it must follow this repo's CI-budget
+# discipline: a Unity Editor runner is an order of magnitude more expensive in
+# Actions minutes than this job. CI is a final gate, never a test loop --
+# everything must be green locally first, one push per PR, and no per-commit
+# fan-out. Mobile build matrices remain out of scope for this workflow.
+# ---------------------------------------------------------------------------
+
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  # Deliberately NOT `push` on every branch: feature-branch commits are
+  # validated when their PR opens/updates, not once per commit. This repo is
+  # cost-conscious about Actions minutes.
+  push:
+    branches: [main]
+
+# A superseded push to the same PR or branch cancels the run it replaced
+# instead of burning minutes on a result nobody will read.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # Single job, no matrix: Unity Editor tests and mobile builds are out of
+  # scope here. This compiles the real game scripts against the hand-written
+  # UnityEngine stub in Tooling/CiStubs, which needs no Unity install.
+  lint-and-compile:
+    name: Lint and compile (C#)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Art/audio LFS objects are irrelevant to a C# compile; skipping the
+          # smudge keeps checkout fast and off the LFS bandwidth quota.
+          lfs: false
+
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+          # These projects carry no PackageReferences and therefore no lock
+          # file, so the NuGet cache is keyed on the project files themselves.
+          cache: true
+          cache-dependency-path: |
+            Tooling/CiStubs/CiLint/CiLint.csproj
+            Tooling/CiStubs/UnityStub/UnityStub.csproj
+
+      - name: Format check (dotnet format)
+        run: >-
+          dotnet format Tooling/CiStubs/CiLint/CiLint.csproj
+          --verify-no-changes
+          --verbosity diagnostic
+
+      - name: Compile check (dotnet build)
+        run: >-
+          dotnet build Tooling/CiStubs/CiLint/CiLint.csproj
+          --configuration Release

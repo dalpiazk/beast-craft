@@ -92,6 +92,17 @@ Pipeline/**/tmp/
 Pipeline/**/_scratch/
 
 # ---------------------------------------------------------------------------
+# Tooling/CiStubs -- the CI compile/format harness.
+#
+# These are hand-written, permanent projects (NOT Unity-generated), so they
+# must survive the blanket `*.csproj` rule above. Their build output is not
+# covered by the Unity rules -- `[Oo]bj/` already catches obj/, but bin/ needs
+# an explicit entry.
+# ---------------------------------------------------------------------------
+!Tooling/CiStubs/**/*.csproj
+Tooling/CiStubs/**/bin/
+
+# ---------------------------------------------------------------------------
 # OS cruft
 # ---------------------------------------------------------------------------
 .DS_Store
