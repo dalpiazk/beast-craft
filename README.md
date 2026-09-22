@@ -24,6 +24,8 @@ beast-craft/
 │   ├── Packages/           package manifest
 │   └── ProjectSettings/    editor version pin; Unity fills in the rest on first open
 ├── Pipeline/       OFFLINE, build-time-only asset generation. Never runs at runtime.
+├── Tooling/        CiStubs/: hand-written UnityEngine stub + csproj so CI compiles
+│                   the game scripts without a Unity install. Never shipped.
 ├── docs/           design/ and architecture/ notes
 └── .github/        CI workflows
 ```
@@ -82,10 +84,29 @@ rules and the asset naming contract.
 
 ## Status
 
-**Early scaffolding.** This repo currently contains the directory skeleton,
-Unity project stub (version pin + package manifest), git/LFS configuration, and
-the offline asset-pipeline structure and conventions. There is no gameplay code,
-no ScriptableObject schemas, no scenes and no CI workflow yet — those land in
-later steps. The Unity project has never been opened by the Editor, so the
-generated `ProjectSettings/` YAML, `Library/` and solution files do not exist
-yet; that is expected.
+**Early scaffolding — data and tooling, no gameplay yet.**
+
+What exists today:
+
+- The directory skeleton, Unity project stub (version pin + package manifest),
+  assembly definitions, git/LFS configuration, and the offline asset-pipeline
+  structure and conventions.
+- **ScriptableObject data schemas** under
+  `BeastCraft/Assets/_Project/Scripts/Runtime/` — creature species (stats,
+  growth curves, skill learn tables, evolution requirements), skills, gear, and
+  the shared avatar + creature customization framework. These are data
+  definitions only; nothing consumes them yet, and no `.asset` instances have
+  been authored.
+- **CI** (`.github/workflows/ci.yml`) — a format and compile check that builds
+  the real game scripts against the hand-written UnityEngine stub in
+  `Tooling/CiStubs/`. It needs no Unity install and runs no Unity tests, so it
+  proves the scripts parse, type-check and are formatted — nothing about
+  whether the project opens or behaves correctly.
+- A **battle-system design proposal** ([`docs/design/battle-system.md`](docs/design/battle-system.md))
+  whose open questions are still awaiting producer confirmation.
+
+What does not exist yet: any gameplay or runtime behaviour code — no
+compositor, no battle, narrative or idle systems — no scenes, no prefabs, and
+no UGS integration. The Unity project has also never been opened by an actual
+Editor, so the generated `ProjectSettings/` YAML, `Library/` and solution files
+do not exist yet; that is expected.
