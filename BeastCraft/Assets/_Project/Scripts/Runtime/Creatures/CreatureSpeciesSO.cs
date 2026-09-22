@@ -38,10 +38,14 @@ namespace BeastCraft.Creatures
         /// <summary>Skills this species learns, with the level each becomes available.</summary>
         public List<SkillLearnEntry> LearnableSkills = new List<SkillLearnEntry>();
 
-        // Plain string tags rather than an enum: the element list is a game-design decision that is
-        // not finalized, and a string[] avoids prematurely locking it into code.
-        /// <summary>Element affinity tags, e.g. "Fire", "Water".</summary>
-        public string[] ElementTags = new string[0];
+        /// <summary>
+        /// This species' elemental affinities, read when it is on the receiving end of an
+        /// elemental skill (see <c>BeastCraft.Battle.ElementChart</c>). The element list is now
+        /// finalized as the <see cref="Element"/> enum. Usually one entry, occasionally two; a
+        /// dual-element species takes the product of both multipliers. Empty (or
+        /// <see cref="Element.None"/>) means no affinity, which is neutral to everything.
+        /// </summary>
+        public Element[] Elements = new Element[0];
 
         /// <summary>
         /// The species' stat on the given axis at the given level. Falls back to the unscaled base

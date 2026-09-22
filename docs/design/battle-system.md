@@ -78,7 +78,8 @@ The authored data this combat model needs is already committed as ScriptableObje
 
 - **`SkillSO`** — target shape (`SingleTarget`, `Line`, `Cross`, `AreaBurst`, `AllEnemies`,
   `AllAllies`, `Self`), range, resource cost, cooldown, a list of effects, and the targeting fields
-  added by decision 4 (side, criterion, order, targeting stat).
+  added by decision 4 (side, criterion, order, targeting stat), and the attacking `Element` (see
+  "Element system" below).
 - **`GearSO`** — slot, stat modifiers, rarity tier, and minimum creature level.
 
 These were deliberately authored at an abstract level. Range is an integer count of grid steps and
@@ -347,9 +348,10 @@ revisited when balance work starts.
 
 - **Damage and healing are flat. There is no damage formula.** `SkillEffect.Magnitude` is applied
   as a plain number straight against HP: no Attack-versus-Defense math, no stat scaling, no crit
-  chance, no type chart, no variance. Designing that formula is a separate balancing pass, and it
-  is deliberately not being guessed at here — a placeholder formula would be harder to displace
-  later than no formula at all. `BattleUnit` gained a `CurrentHp` alongside its `StatBlock` (whose
+  chance, no variance. Designing that formula is a separate balancing pass, and it is deliberately
+  not being guessed at here — a placeholder formula would be harder to displace later than no
+  formula at all. The one thing layered on top is the element multiplier (see "Element system"
+  below), which scales a damage magnitude but is not itself a formula. `BattleUnit` gained a `CurrentHp` alongside its `StatBlock` (whose
   `Hp` is now explicitly the *maximum*); every unit starts a battle at full health, since there is
   no persistent creature-instance model to carry damage in from a previous fight. Both damage and
   healing hold `0 <= CurrentHp <= Stats.Hp`.
@@ -401,6 +403,54 @@ revisited when balance work starts.
 
 Resource cost is still not spent, per the open question above; effect application does not gate on
 it.
+
+## Element system — TUNABLE STARTING CHART, NOT CONFIRMED BALANCE
+
+Species and skills now carry real elements. The element *list* is settled and is the
+`BeastCraft.Creatures.Element` enum: `None`, `Fire`, `Water`, `Earth`, `Air`, `Lightning`, `Ice`,
+`Nature`, `Metal`, `Light`, `Dark`. Its values are explicit and serialized into assets by number, so
+they are never renamed or renumbered after ship. `CreatureSpeciesSO.Elements` (an `Element[]`)
+replaces the old free-text `ElementTags`, which were strings only because the list had not been
+decided yet.
+
+**Where the elements come from.**
+
+- **The attacking element is the skill's**, `SkillSO.Element`. A Fire beast can carry a neutral or
+  off-element skill, and the caster's own elements play no part in the damage it deals. The default,
+  `None`, is a neutral skill.
+- **The defending elements are the target's**, `BattleUnit.Elements` — normally its species'
+  `Elements`, handed to the `BattleUnit` constructor (an optional parameter, defaulting to no
+  affinity) and fixed for the battle. Nothing assembles units from species yet, so today a caller
+  passes them explicitly.
+
+**How the multiplier applies.** `ElementChart.GetMultiplier(attack, defenders)` is the product of
+the attack's single matchup against each defending element, so a dual-element target that is weak
+twice takes 4x and strong-plus-weak cancels to 1x. `None` on either side is always 1x. The result
+multiplies a `Damage` effect's flat `Magnitude` *before* it is truncated to whole HP, and applies to
+**damage only** — heals, buffs and debuffs are never scaled. It sits on top of the flat magnitudes
+described under "Effect application"; it does not introduce stat-based damage math.
+
+**The chart is attacker-side.** Each row is read from the attacking element's point of view and is
+only ever looked up in that direction; it is not forced to be symmetric. `2x` is strong, `0.5x` is
+weak, and every pair not listed is `1x`:
+
+| Attack | Strong against (2x) | Weak against (0.5x) |
+| --- | --- | --- |
+| Fire | Nature, Metal | Water, Earth |
+| Water | Fire, Earth | Lightning, Nature |
+| Earth | Lightning, Metal | Water, Air |
+| Air | Earth, Nature | Ice, Lightning |
+| Lightning | Water, Air | Earth, Metal |
+| Ice | Nature, Air | Fire, Metal |
+| Nature | Water, Earth, Dark | Fire, Ice |
+| Metal | Ice, Light | Fire, Lightning |
+| Light | Dark | — |
+| Dark | Light | — |
+
+**These values are a tunable starting default, not producer-confirmed balance** — the same standing
+as the arena radii and the deployment-zone split. The set of elements is fixed; which pairs are
+strong or weak, and whether 2x / 0.5x are the right sizes, are expected to move once balance work
+has real fights to measure. `ElementChart` is the single place to change them.
 
 ## Pre-battle placement — DATA MODEL AND VALIDATION ONLY
 
@@ -554,10 +604,16 @@ Pre-battle placement (the section above) adds deployment zones on `HexGrid`
 `PlacementValidationResult`. Validation is non-mutating; `TryPlaceAll` is the separate, atomic
 commit step.
 
+The element system (the section above) adds the `Element` enum, `CreatureSpeciesSO.Elements`,
+`SkillSO.Element`, `BattleUnit.Elements` and the static `ElementChart`, and makes
+`SkillEffectApplier`'s damage arm scale by the chart. The first EditMode tests land with it, covering
+the chart and the damage multiplier.
+
 Every pass so far is deliberately **data structures and algorithms only** — no MonoBehaviours, no
 scene or prefab wiring, and no authored `.asset` instances. The hex radii backing each arena preset
 are placeholder implementation defaults chosen to be tunable, not producer-confirmed balance
-numbers, and the deployment-zone split and the effect rules above are the same kind of default.
+numbers, and the deployment-zone split, the effect rules and the element chart above are the same
+kind of default.
 Still to come: where `MoveRange` gets its value from, the damage formula and stat scaling on top of
 flat magnitudes, the status-effect system behind `ApplyStatus`, resource gating on top of cooldowns,
 lifting defeated units off the grid so they stop obstructing movement, the placement UI (a Unity

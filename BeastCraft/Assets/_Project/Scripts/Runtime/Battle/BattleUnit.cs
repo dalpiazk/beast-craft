@@ -40,8 +40,15 @@ namespace BeastCraft.Battle
         /// enters a battle at full health. Carrying damage in from a previous fight would need a
         /// persistent creature-instance model, which does not exist yet.
         /// </para>
+        /// <para>
+        /// <paramref name="elements"/> is the unit's elemental affinity, normally its species'
+        /// <c>CreatureSpeciesSO.Elements</c>. Leaving it off gives an empty list — no affinity,
+        /// neutral to every element — rather than a null one. The list is copied, so later edits
+        /// to the caller's array (or the species asset) do not reach a unit already in battle.
+        /// </para>
         /// </summary>
-        public BattleUnit(string id, BattleTeam team, StatBlock stats, HexCoordinate position, SkillLoadout skills = null)
+        public BattleUnit(string id, BattleTeam team, StatBlock stats, HexCoordinate position, SkillLoadout skills = null,
+                          IReadOnlyList<Element> elements = null)
         {
             Id = id;
             Team = team;
@@ -50,6 +57,7 @@ namespace BeastCraft.Battle
             Position = position;
             Skills = skills ?? new SkillLoadout(null);
             ActiveStatModifiers = new List<ActiveStatModifier>();
+            Elements = CopyElements(elements);
         }
 
         /// <summary>
@@ -156,9 +164,41 @@ namespace BeastCraft.Battle
         public List<ActiveStatModifier> ActiveStatModifiers { get; }
 
         /// <summary>
+        /// The unit's elemental affinities, consulted when it is <em>hit</em> by a damaging skill:
+        /// <see cref="SkillEffectApplier"/> scales the damage by
+        /// <see cref="ElementChart.GetMultiplier(Element, IReadOnlyList{Element})"/> of the
+        /// skill's <see cref="SkillSO.Element"/> against this list. The unit's own elements play no
+        /// part in the damage it <em>deals</em> — the skill carries the attacking element.
+        /// <para>
+        /// Read-only and fixed at construction: an element is what a creature <em>is</em>, not a
+        /// battle state, and nothing in the design changes it mid-fight. This is the minimal
+        /// stand-in for the link back to <c>CreatureSpeciesSO</c> the real creature-instance model
+        /// will carry. Never <c>null</c>; empty means no affinity.
+        /// </para>
+        /// </summary>
+        public IReadOnlyList<Element> Elements { get; }
+
+        /// <summary>
         /// True once the unit is out of the fight. Defeated units are skipped by the turn order and
         /// are expected to be lifted off the grid by the caller.
         /// </summary>
         public bool IsDefeated { get; set; }
+
+        private static Element[] CopyElements(IReadOnlyList<Element> elements)
+        {
+            if (elements == null || elements.Count == 0)
+            {
+                return new Element[0];
+            }
+
+            Element[] copy = new Element[elements.Count];
+
+            for (int i = 0; i < copy.Length; i++)
+            {
+                copy[i] = elements[i];
+            }
+
+            return copy;
+        }
     }
 }

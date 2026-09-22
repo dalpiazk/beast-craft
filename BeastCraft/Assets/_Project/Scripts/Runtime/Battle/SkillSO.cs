@@ -98,6 +98,20 @@ namespace BeastCraft.Battle
         /// </summary>
         public StatType TargetingStat = StatType.HP;
 
+        /// <summary>
+        /// The element this skill's damage is dealt in. The <em>skill</em>, not the caster,
+        /// decides the attacking element, so a Fire beast can carry a neutral or off-element
+        /// skill.
+        /// <para>
+        /// Read only for <see cref="SkillEffectType.Damage"/> effects, where
+        /// <see cref="SkillEffectApplier"/> scales the flat magnitude by
+        /// <see cref="ElementChart.GetMultiplier(Element, IReadOnlyList{Element})"/> against the
+        /// target's elements. Heals and stat changes ignore it. The default,
+        /// <see cref="Element.None"/>, is neutral: a 1x multiplier against everything.
+        /// </para>
+        /// </summary>
+        public Element Element = Element.None;
+
         /// <summary>Everything this skill applies to each affected unit.</summary>
         public List<SkillEffect> Effects = new List<SkillEffect>();
     }
