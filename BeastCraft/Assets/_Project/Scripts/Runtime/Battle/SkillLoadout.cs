@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using BeastCraft.Battle.Grid;
 
@@ -31,9 +32,8 @@ namespace BeastCraft.Battle
     /// </summary>
     public class SkillLoadout
     {
-        private readonly List<SkillSO> _skills;
-        private readonly List<int> _authoredCooldowns;
-        private readonly List<int> _counters;
+        private readonly List<Slot> _slots;
+        private readonly SlotSkillView _skills;
 
         /// <summary>
         /// Builds a loadout from an ordered stack of skills. Each slot's counter starts at that
@@ -58,9 +58,8 @@ namespace BeastCraft.Battle
         /// </summary>
         public SkillLoadout(IEnumerable<SkillSO> skills)
         {
-            _skills = new List<SkillSO>();
-            _authoredCooldowns = new List<int>();
-            _counters = new List<int>();
+            _slots = new List<Slot>();
+            _skills = new SlotSkillView(_slots);
 
             if (skills == null)
             {
@@ -74,11 +73,7 @@ namespace BeastCraft.Battle
                     continue;
                 }
 
-                int cooldown = skill.Cooldown < 0 ? 0 : skill.Cooldown;
-
-                _skills.Add(skill);
-                _authoredCooldowns.Add(cooldown);
-                _counters.Add(cooldown);
+                _slots.Add(new Slot(skill, skill.Cooldown < 0 ? 0 : skill.Cooldown));
             }
         }
 
@@ -94,7 +89,7 @@ namespace BeastCraft.Battle
         /// <summary>How many slots are equipped. Zero is legal; an empty loadout simply never fires.</summary>
         public int Count
         {
-            get { return _skills.Count; }
+            get { return _slots.Count; }
         }
 
         /// <summary>
@@ -107,7 +102,7 @@ namespace BeastCraft.Battle
         /// </summary>
         public int RemainingCooldown(int slotIndex)
         {
-            return slotIndex >= 0 && slotIndex < _counters.Count ? _counters[slotIndex] : 0;
+            return slotIndex >= 0 && slotIndex < _slots.Count ? _slots[slotIndex].Counter : 0;
         }
 
         /// <summary>
@@ -133,17 +128,18 @@ namespace BeastCraft.Battle
         {
             List<SkillSO> ready = new List<SkillSO>();
 
-            for (int i = 0; i < _skills.Count; i++)
+            for (int i = 0; i < _slots.Count; i++)
             {
-                int counter = _counters[i] > 0 ? _counters[i] - 1 : 0;
+                Slot slot = _slots[i];
+                int counter = slot.Counter > 0 ? slot.Counter - 1 : 0;
 
                 if (counter == 0)
                 {
-                    ready.Add(_skills[i]);
-                    counter = _authoredCooldowns[i];
+                    ready.Add(slot.Skill);
+                    counter = slot.AuthoredCooldown;
                 }
 
-                _counters[i] = counter;
+                slot.Counter = counter;
             }
 
             return ready;
@@ -198,6 +194,82 @@ namespace BeastCraft.Battle
             }
 
             return activations;
+        }
+
+        /// <summary>
+        /// One equipped slot: the skill in it, the cooldown that skill was authored with, and how
+        /// many turns are left on this slot's own live counter.
+        /// <para>
+        /// The three used to be three index-aligned lists walked in lockstep, which only stayed
+        /// correct so long as every loop remembered to touch all three. Holding them together means
+        /// a slot cannot half-exist and a counter cannot drift onto the wrong skill. Keyed by slot,
+        /// not by <see cref="SkillSO"/>, because the same skill may be equipped more than once and
+        /// each copy runs its own counter.
+        /// </para>
+        /// <para>
+        /// A reference type on purpose: <see cref="Tick"/> writes <see cref="Counter"/> in place, and
+        /// a struct in a <see cref="List{T}"/> would hand out copies that silently swallowed the
+        /// write. <see cref="Skill"/> and <see cref="AuthoredCooldown"/> are fixed at construction —
+        /// the stack does not change mid-battle, and the authored value is captured rather than
+        /// re-read for the reason the constructor documents.
+        /// </para>
+        /// </summary>
+        private sealed class Slot
+        {
+            public Slot(SkillSO skill, int authoredCooldown)
+            {
+                Skill = skill;
+                AuthoredCooldown = authoredCooldown;
+                Counter = authoredCooldown;
+            }
+
+            /// <summary>The skill equipped in this slot.</summary>
+            public SkillSO Skill { get; }
+
+            /// <summary>The cooldown this slot resets to when it fires, clamped at 0.</summary>
+            public int AuthoredCooldown { get; }
+
+            /// <summary>Turns left before this slot fires again.</summary>
+            public int Counter { get; set; }
+        }
+
+        /// <summary>
+        /// A read-only projection of the slot list onto just its skills, so <see cref="Skills"/> can
+        /// keep its published <see cref="IReadOnlyList{T}"/> shape without a second list being kept
+        /// in step with the first — which is the very thing collapsing the slots was meant to stop.
+        /// Built once per loadout and backed live by the slots, so it costs nothing per read.
+        /// </summary>
+        private sealed class SlotSkillView : IReadOnlyList<SkillSO>
+        {
+            private readonly List<Slot> _backing;
+
+            public SlotSkillView(List<Slot> backing)
+            {
+                _backing = backing;
+            }
+
+            public int Count
+            {
+                get { return _backing.Count; }
+            }
+
+            public SkillSO this[int index]
+            {
+                get { return _backing[index].Skill; }
+            }
+
+            public IEnumerator<SkillSO> GetEnumerator()
+            {
+                for (int i = 0; i < _backing.Count; i++)
+                {
+                    yield return _backing[i].Skill;
+                }
+            }
+
+            IEnumerator IEnumerable.GetEnumerator()
+            {
+                return GetEnumerator();
+            }
         }
     }
 }

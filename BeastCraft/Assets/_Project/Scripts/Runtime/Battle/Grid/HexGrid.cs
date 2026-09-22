@@ -263,8 +263,9 @@ namespace BeastCraft.Battle.Grid
 
             for (int q = -range; q <= range; q++)
             {
-                int lowerR = Math.Max(-range, -q - range);
-                int upperR = Math.Min(range, -q + range);
+                int lowerR;
+                int upperR;
+                RingRowBounds(range, q, out lowerR, out upperR);
 
                 for (int r = lowerR; r <= upperR; r++)
                 {
@@ -288,14 +289,33 @@ namespace BeastCraft.Battle.Grid
         {
             for (int q = -Radius; q <= Radius; q++)
             {
-                int lowerR = Math.Max(-Radius, -q - Radius);
-                int upperR = Math.Min(Radius, -q + Radius);
+                int lowerR;
+                int upperR;
+                RingRowBounds(Radius, q, out lowerR, out upperR);
 
                 for (int r = lowerR; r <= upperR; r++)
                 {
                     _tiles.Add(new HexCoordinate(q, r));
                 }
             }
+        }
+
+        /// <summary>
+        /// The inclusive r-range to walk for one q-column of a hexagon of
+        /// <paramref name="radius"/> rings centred on the origin.
+        /// <para>
+        /// Sweeping q from <c>-radius</c> to <c>+radius</c> and r across the whole of that same
+        /// span would trace a rhombus; clamping r against the implied third cube axis
+        /// (<c>-q - r</c>, which must also stay within the radius) is what shears the rhombus back
+        /// into a hexagon. Shared by <see cref="GenerateTiles"/> and
+        /// <see cref="GetTilesInRange"/>, which describe the same shape at different radii, so the
+        /// board's own bounds and a range query can never disagree about what a hexagon is.
+        /// </para>
+        /// </summary>
+        private static void RingRowBounds(int radius, int q, out int lowerR, out int upperR)
+        {
+            lowerR = Math.Max(-radius, -q - radius);
+            upperR = Math.Min(radius, -q + radius);
         }
     }
 }

@@ -115,16 +115,15 @@ namespace BeastCraft.Battle
         }
 
         /// <summary>
-        /// Initiative comparison: fastest first, ties broken by ordinal comparison of
-        /// <see cref="BattleUnit.Id"/>.
+        /// Initiative comparison: fastest first, ties broken by
+        /// <see cref="BattleUnitOrder.CompareById"/>.
         /// <para>
         /// The id tie-break is chosen over "stable by input order" deliberately.
         /// <see cref="List{T}.Sort(System.Comparison{T})"/> is an unstable sort, so input order is
         /// not actually preserved for equal keys without extra bookkeeping — and more importantly,
-        /// input order is a property of however the roster happened to be assembled. Keying on the
-        /// id instead makes the order a pure function of the roster's contents, so re-sorting
-        /// mid-battle cannot silently reshuffle equal-speed units, and a client and a
-        /// server-authoritative re-simulation of the same battle agree.
+        /// input order is a property of however the roster happened to be assembled. See
+        /// <see cref="BattleUnitOrder"/> for the full rationale, which
+        /// <see cref="SkillTargetResolver"/> shares.
         /// </para>
         /// </summary>
         private static int CompareInitiative(BattleUnit a, BattleUnit b)
@@ -135,7 +134,7 @@ namespace BeastCraft.Battle
                 return bySpeed;
             }
 
-            return string.CompareOrdinal(a.Id, b.Id);
+            return BattleUnitOrder.CompareById(a, b);
         }
 
         /// <summary>

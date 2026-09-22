@@ -156,8 +156,10 @@ namespace BeastCraft.Battle
         /// resolver deterministic. It fixes which candidate a
         /// <see cref="SkillTargetingCriterion.Random"/> draw maps onto, it fixes the tie-break for
         /// the comparing criteria, and it fixes the order of the returned list — none of which
-        /// should depend on however the roster happened to be assembled. Same reasoning, and the
-        /// same key, as <see cref="TurnManager"/>'s initiative tie-break, so the two agree.
+        /// should depend on however the roster happened to be assembled. It sorts on the shared
+        /// <see cref="BattleUnitOrder.CompareById"/>, which is the same key
+        /// <see cref="TurnManager"/>'s initiative tie-break falls back on, so the two agree by
+        /// construction rather than by coincidence.
         /// </para>
         /// </summary>
         private static List<BattleUnit> CollectLiving(IEnumerable<BattleUnit> allUnits)
@@ -177,13 +179,8 @@ namespace BeastCraft.Battle
                 }
             }
 
-            living.Sort(CompareById);
+            living.Sort(BattleUnitOrder.CompareById);
             return living;
-        }
-
-        private static int CompareById(BattleUnit a, BattleUnit b)
-        {
-            return string.CompareOrdinal(a.Id, b.Id);
         }
 
         /// <summary>
@@ -407,8 +404,8 @@ namespace BeastCraft.Battle
         /// prefer different axes.
         /// </para>
         /// <para>
-        /// Ties go to the earlier axis in <see cref="HexCoordinate.Neighbors"/>'s fixed order,
-        /// which that method documents as stable precisely so results reproduce. A degenerate
+        /// Ties go to the earlier axis in <see cref="HexCoordinate.AxialDirections"/>'s fixed order,
+        /// which that table documents as stable precisely so results reproduce. A degenerate
         /// focus — the caster having picked itself, only possible under
         /// <see cref="SkillTargetSide.Ally"/> — ties all six axes and so fires along the first;
         /// the caster's own tile is not on the beam either way.
@@ -437,14 +434,15 @@ namespace BeastCraft.Battle
         }
 
         /// <summary>
-        /// The six axial direction vectors, in <see cref="HexCoordinate"/>'s fixed order. Taken as
-        /// the neighbours of the origin, which are exactly the direction vectors, so the table
-        /// stays owned by <see cref="HexCoordinate"/> and is not duplicated here where the two
-        /// copies could drift apart.
+        /// The six axial direction vectors, in <see cref="HexCoordinate"/>'s fixed order. Read
+        /// straight off <see cref="HexCoordinate.AxialDirections"/>, so the table stays owned by
+        /// <see cref="HexCoordinate"/> rather than being duplicated here where the two copies could
+        /// drift apart — and so that a cast never gets a chance to rewrite it, since what comes back
+        /// is a read-only view of the shared table rather than a copy.
         /// </summary>
         private static IReadOnlyList<HexCoordinate> AxialDirections()
         {
-            return HexCoordinate.Zero.Neighbors();
+            return HexCoordinate.AxialDirections;
         }
     }
 }

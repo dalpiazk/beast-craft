@@ -41,6 +41,18 @@ namespace BeastCraft.Battle.Grid
         /// A start equal to the goal yields a single-element list holding it, which is the
         /// "already there, zero steps" answer rather than a failure.
         /// </para>
+        /// <para>
+        /// <strong>One narrow consistency check, not validation.</strong> When
+        /// <paramref name="movingUnitId"/> names a unit the grid <em>does</em> have on the board,
+        /// and that unit is recorded on some tile other than <paramref name="start"/>, this returns
+        /// an empty list: the caller has asked to route a unit from where it is not, and the answer
+        /// would be a path the mover could never actually walk. A unit the grid has never heard of
+        /// is a different thing entirely and is explicitly allowed — a hypothetical or preview query
+        /// ("where would this unit go if it stood here?") has nothing to be inconsistent with, and
+        /// so is searched normally. Nothing beyond that is checked: this is not a guarantee that the
+        /// caller's world state is coherent, only a refusal of the one incoherence that is cheap to
+        /// spot and certain to produce a wrong answer.
+        /// </para>
         /// </summary>
         public static IReadOnlyList<HexCoordinate> FindPath(HexGrid grid, HexCoordinate start, HexCoordinate goal, string movingUnitId)
         {
@@ -49,6 +61,18 @@ namespace BeastCraft.Battle.Grid
             if (grid == null || !grid.IsInBounds(start) || !grid.IsInBounds(goal))
             {
                 return path;
+            }
+
+            // The mover claims to be standing on `start`; if the grid has it on record somewhere
+            // else, the two disagree and every tile after the first would be fiction. A unit with
+            // no record at all is not a disagreement -- see the remarks on preview queries.
+            if (!string.IsNullOrEmpty(movingUnitId))
+            {
+                HexCoordinate recorded;
+                if (grid.TryGetPosition(movingUnitId, out recorded) && recorded != start)
+                {
+                    return path;
+                }
             }
 
             if (start == goal)
@@ -88,10 +112,13 @@ namespace BeastCraft.Battle.Grid
                 closed.Add(current);
                 int stepsToCurrent = costFromStart[current];
 
-                IReadOnlyList<HexCoordinate> neighbors = current.Neighbors();
-                for (int i = 0; i < neighbors.Count; i++)
+                // Walks the shared direction table and offsets in place rather than calling
+                // HexCoordinate.Neighbors(), which would allocate a six-element array on every
+                // single node expansion. Same six tiles, same fixed order.
+                IReadOnlyList<HexCoordinate> directions = HexCoordinate.AxialDirections;
+                for (int i = 0; i < directions.Count; i++)
                 {
-                    HexCoordinate neighbor = neighbors[i];
+                    HexCoordinate neighbor = current + directions[i];
                     if (closed.Contains(neighbor) || !grid.IsPassable(neighbor, movingUnitId))
                     {
                         continue;
