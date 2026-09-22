@@ -4,29 +4,65 @@ Beast Craft is a narrative story-adventure with creature-collection and battle p
 draws its gameplay-depth inspiration from Sword x Staff's class/promotion/build systems and its
 idle progression, but reframes all of it around a narrative core rather than a live-service idle
 grind: the story is the spine, and the systems exist to give that story mechanical weight. This
-document describes the **tactical grid-based combat** approach for that battle layer, how it sits on
-top of the ScriptableObject data schemas already committed to the project, and the three
-foundational decisions the producer has now confirmed. Those three decisions are settled; the first
-runtime scaffolding built against them lands alongside this revision of the document.
+document describes the **grid-based auto-battle** approach for that battle layer, how it sits on top
+of the ScriptableObject data schemas already committed to the project, and the foundational
+decisions the producer has now confirmed. Those decisions are settled; the runtime scaffolding built
+against them lands alongside each revision of this document.
 
 ## Core loop
 
-The player's avatar **does not fight directly**. The avatar is a non-combatant commander: it selects
-which creatures are deployed, and issues their actions each turn. The creatures do the fighting on
-the grid. This matches the framing already baked into the project spec, where the avatar and the
-creature systems are built and customized separately — avatar items are cosmetic, while gear and
-combat stats live entirely on creatures.
+The player's avatar **does not fight directly**. The avatar is a non-combatant commander; the
+creatures do the fighting on the grid. This matches the framing already baked into the project spec,
+where the avatar and the creature systems are built and customized separately — avatar items are
+cosmetic, while gear and combat stats live entirely on creatures.
 
-Within a turn, a creature follows a standard tactics-game action economy:
+Battles are an **auto-battler**, not a manual per-turn tactics game. The player's input is
+front-loaded into two places — the build and the deployment — and the fight itself then plays out on
+its own.
 
-1. **Move** — up to that unit's own move range, measured in grid steps.
-2. **Act** — one action: a basic attack, a skill, or an item. The action is constrained by that
-   skill's own range and target shape.
+### Phase 1 — Placement (the player's turn to act)
 
-One action per unit per turn, move-then-act ordering. This is deliberately conventional: it is the
-action economy players already understand from the tactics genre, it tutorializes in a single
-encounter, and it keeps the first playable slice small enough that the narrative content around it
-stays the focus.
+Before the fight starts, the player **positions the deployed beasts on the grid**. This is the only
+point at which the player moves a piece by hand. Party size is fixed by the battle format (1 / up to
+4 / up to 6, see decision 2 below) and the board by the arena preset (see decision 1).
+
+Positioning is therefore a real decision with real consequences, because everything afterwards is
+resolved from where the beasts are standing: which enemies a short-range beast can reach on turn
+one, whose area skills will catch which cluster, which flank a slow bruiser can actually cover.
+
+### Phase 2 — Auto-resolution (the fight runs itself)
+
+Once the battle starts there is **no player action menu**. Combatants take turns in the speed-stat
+initiative queue (decision 3), one unit at a time, and on its own turn each beast:
+
+1. **Moves**, up to its own move range, measured in grid steps.
+2. **Uses a skill**, chosen from what its build has equipped, with targeting resolved automatically
+   from the skill's own authored rules (decision 4).
+
+The player's leverage over that is the build and the placement, not a per-turn command. This suits
+the game's shape: the story is the spine, and a fight that resolves from a good team composition and
+a good deployment keeps the narrative pacing intact rather than interrupting it with a tactics
+puzzle every encounter.
+
+### What is not settled yet
+
+- **Move range does not exist in code.** `StatBlock` has no move-range stat, and nothing implements
+  movement during a battle. `HexPathfinder` can already produce the route; what is missing is the
+  stat that budgets it and the rule for where a beast chooses to move (toward the nearest enemy? to
+  the nearest tile from which its equipped skill reaches something? away when hurt?). All of that
+  is open.
+- **Skill selection within a beast's own turn is the next open question, and is deliberately not
+  answered here.** When a beast has several equipped skills, something must decide which one fires:
+  a fixed priority order the player authors, a first-usable-in-list rule, a per-skill condition, or
+  a scoring pass over the candidate targets. Cooldown (`SkillSO.Cooldown`) and resource gating
+  (`SkillSO.ResourceCost`, whose resource is itself still unnamed) both feed into that decision, and
+  neither is implemented. This is the single biggest gap between the current scaffolding and a
+  playable auto-battle, and it should be decided on its own rather than inferred from the targeting
+  work.
+- **The basic attack.** Earlier drafts listed "a basic attack, a skill, or an item" as the turn's
+  options. With no player menu, whether a beast has a fallback attack at all — or simply always has
+  at least one always-available skill — is open, and items in battle are out of scope until there is
+  a mechanism that would use them.
 
 ## Data-driven foundation already in place
 
@@ -34,7 +70,8 @@ The authored data this combat model needs is already committed as ScriptableObje
 `BeastCraft/Assets/_Project/Scripts/Runtime/Battle/`:
 
 - **`SkillSO`** — target shape (`SingleTarget`, `Line`, `Cross`, `AreaBurst`, `AllEnemies`,
-  `AllAllies`, `Self`), range, resource cost, cooldown, and a list of effects.
+  `AllAllies`, `Self`), range, resource cost, cooldown, a list of effects, and the targeting fields
+  added by decision 4 (side, criterion, order, targeting stat).
 - **`GearSO`** — slot, stat modifiers, rarity tier, and minimum creature level.
 
 These were deliberately authored at an abstract level. Range is an integer count of grid steps and
@@ -65,8 +102,8 @@ creature data rather than requiring new systems:
 
 ## Confirmed design decisions
 
-The three questions this document previously left open have been **decided by the producer**. Each
-is recorded below with the decision first and the original tradeoff analysis retained underneath as
+The questions this document previously left open have been **decided by the producer**. Each is
+recorded below with the decision first and the original tradeoff analysis retained underneath as
 background — the rationale is still useful when these systems are revisited, but none of it is an
 open choice any more.
 
@@ -115,16 +152,66 @@ tutorial work, and it makes failure states harder for a new player to parse. Pha
 stays open as a *later* evolution if playtesting says the combat wants more depth; it is not part of
 the first playable slice.
 
+### 4. Battle flow and skill targeting — DECIDED
+
+**Battles are auto-resolved.** The player places beasts before the fight; during the fight each
+beast moves and uses skills on its own, with no per-turn action menu. The full flow is written up
+under "Core loop" above.
+
+Two consequences for how skills are authored follow directly, and both are now settled:
+
+- **A skill always aims from the caster's own live position.** There is no player- or AI-picked aim
+  point anywhere in the model, so the origin of every target shape is simply the tile the caster is
+  standing on when the skill fires. This resolves the question `SkillSO` previously left open as a
+  TODO: **`Range` gates the whole footprint**, measured out from the caster, because with the origin
+  pinned to the caster there is nothing else for it to be relative to.
+- **Each skill authors its own targeting.** A skill declares which side it may land on
+  (`SkillTargetSide`: `Enemy` or `Ally`, judged against the *caster's* team so one authored asset
+  works for whichever side casts it) and how it picks among the candidates it is eligible to hit.
+  That pick is split into two orthogonal fields, the same way `SkillEffect` splits its effect type
+  from its affected stat:
+  - `SkillTargetingCriterion` — *what* to compare by: `Random`, `Stat`, or `Distance`.
+  - `SkillTargetingOrder` — *which extreme* wins: `Lowest` or `Highest`.
+
+  `Stat` compares one specific authored `StatType` (`SkillSO.TargetingStat`) — not current HP, not
+  an aggregate of the stat block — so "hit the slowest enemy" is `Enemy` + `Stat` + `Lowest` +
+  `Speed`, and "buff the ally with the highest Attack" is `Ally` + `Stat` + `Highest` + `Attack`.
+  `Distance` compares hex steps from the caster, so `Lowest` is nearest and `Highest` is farthest.
+  `Random` compares nothing and ignores both the order and the targeting stat.
+
+  Not every shape consults every field: `Self`, `AllEnemies` and `AllAllies` ignore most or all of
+  them, and the sweeping shapes (`Line`'s beam, `Cross`, `AreaBurst`) hit everything eligible in
+  their footprint rather than picking one unit. `SkillTargetResolver`'s own documentation is the
+  authority on which field each shape actually reads.
+
+*Background.* The alternative — manual per-turn control with an action menu — is the conventional
+tactics-game shape, and it is what earlier drafts of this document assumed. It gives the player more
+moment-to-moment agency, but it costs a full action UI, a target picker, and a tutorial for both, on
+every encounter in a game whose centre of gravity is its story. Auto-resolution moves the player's
+decisions to team building and deployment, which are the decisions the creature-collection and gear
+systems already exist to serve, and keeps encounters short enough to sit inside narrative pacing.
+The cost is that skill authoring now carries the tactical intent that a player would otherwise
+supply live — which is exactly why targeting is authored per skill rather than being one global AI
+rule.
+
 ## Next steps
 
-With the three decisions above confirmed, the grid and turn-manager runtime scaffolding lands in
-this same change: a `BeastCraft.Battle.Grid` namespace holding the arena-size presets, axial hex
-coordinates and a hexagon-shaped board with occupancy tracking, plus a `BattleFormat` enum for the
-Solo/4/6 party sizes, a minimal `BattleUnit`, and a speed-sorted `TurnManager`.
+The grid and turn-manager scaffolding landed against decisions 1–3: a `BeastCraft.Battle.Grid`
+namespace holding the arena-size presets, axial hex coordinates, a hexagon-shaped board with
+occupancy tracking and A* pathfinding over it, plus a `BattleFormat` enum for the Solo/4/6 party
+sizes, a minimal `BattleUnit`, and a speed-sorted `TurnManager`.
 
-That pass is deliberately **data structures and algorithms only** — no MonoBehaviours, no scene or
-prefab wiring, no AI, no damage or skill resolution, and no authored `.asset` instances. The hex
-radii backing each arena preset are placeholder implementation defaults chosen to be tunable, not
-producer-confirmed balance numbers. Subsequent passes pick up movement/pathfinding over the hex
-grid, skill targeting against `SkillTargetShape`, the encounter definition that selects an arena
-preset and a battle format, and the presentation layer.
+Decision 4 adds the targeting data model and its resolver: `SkillTargetSide`,
+`SkillTargetingCriterion` and `SkillTargetingOrder`, the matching fields on `SkillSO`, and
+`SkillTargetResolver`, which turns a skill plus a caster plus a roster into the list of units it
+lands on. Its per-shape rules beyond the confirmed decisions above — which shapes exclude the
+caster's own tile, that the global shapes ignore range, how a `Line` snaps its direction onto an
+axis — are documented in that class as engineering defaults, not confirmed balance.
+
+Every pass so far is deliberately **data structures and algorithms only** — no MonoBehaviours, no
+scene or prefab wiring, no damage application, and no authored `.asset` instances. The hex radii
+backing each arena preset are placeholder implementation defaults chosen to be tunable, not
+producer-confirmed balance numbers. Still to come: the move-range stat and movement during battle,
+the rule that picks which equipped skill a beast fires on its turn (with cooldown and resource
+gating), the pre-battle placement system and its UI, effect application and damage, the encounter
+definition that selects an arena preset and a battle format, and the presentation layer.
