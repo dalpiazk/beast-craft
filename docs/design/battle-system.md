@@ -234,29 +234,55 @@ player can reason about it while building, and it needs no runtime decision-maki
 is that a beast can fire a skill at a moment when a human player wouldn't have — which is the same
 trade auto-resolution already made everywhere else.
 
-### 6. The avatar's skill loadout — DECIDED (timing), NOT YET IMPLEMENTED
+### 6. The avatar's skill loadout — DECIDED (timing and targeting)
 
 **The avatar has skills too, on the same rotation mechanic**, intended to support and buff the
 player's own beasts rather than to attack. Per decision 2 the avatar is **not a piece on the grid**
-and has no `HexCoordinate` position, and it correspondingly gets **no slot of its own in the
-initiative queue**.
+and has no meaningful `HexCoordinate` position, and it correspondingly gets **no slot of its own in
+the initiative queue**.
 
 **Confirmed timing:** the avatar's loadout **ticks once every time one of the player's own beasts
 takes its turn.** Not on enemy turns, and not once per round — once per player-side beast-turn. With
 three player beasts deployed, the avatar's counters therefore tick three times per round, and an
 avatar skill on a 3-turn cooldown fires roughly once a round rather than once every three.
 
-**This is not implemented.** The blocker is not the timing but the targeting: every position-dependent
-target shape (`SingleTarget`, `Line`, `Cross`, `AreaBurst`) is anchored on `caster.Position`, and a
-position-less avatar has nothing to anchor on. That question is genuinely open — plausible answers
-include restricting avatar skills to the position-free shapes (`Self`, `AllAllies`, `AllEnemies`),
-anchoring the avatar on a designated beast, or giving avatar skills a separate party-wide target
-model — and it should be decided on its own rather than worked around. Parking the avatar on a fake
-origin tile is explicitly **not** the answer.
+**Confirmed targeting:** **avatar skills are restricted to the position-free target shapes —
+`Self`, `AllAllies`, `AllEnemies`.** This closes the question this section previously left open.
+The problem was that every position-dependent shape (`SingleTarget`, `Line`, `Cross`, `AreaBurst`)
+anchors its footprint on `caster.Position`, and a position-less avatar had nothing to anchor on; the
+answer is that an avatar skill is simply never authored with one of those shapes, which suits the
+supporting role the avatar was given anyway. The restriction is a **content-authoring convention,
+not a runtime check** — this codebase trusts internally-authored data rather than defensively
+validating it, so authoring a `Line` on an avatar skill is a content bug to be caught in content
+review, not an exception at runtime.
 
-The rotation engine that landed for decision 5 is deliberately owner-agnostic (it ticks a list of
-skills and knows nothing about the board or the roster), so it will drive the avatar unchanged once
-the targeting question is settled.
+Because of that restriction, **the avatar is represented as an ordinary `BattleUnit` with a
+placeholder position** (`HexCoordinate.Zero`), built by the `BattleAvatar.Create` factory. Earlier
+drafts of this section refused to park the avatar on a fake origin tile, and that refusal was
+correct *at the time*: with position-dependent shapes still on the table, a fake tile would have
+silently produced real, wrong footprints measured from the middle of the board. The shape
+restriction removes that failure mode entirely — the placeholder is not a value that happens to be
+unused, it is a value nothing the avatar casts can reach. Reusing `BattleUnit` rather than inventing
+a parallel avatar type means the rotation, the resolver and the effect applier all take the avatar
+unchanged.
+
+Two consequences of that representation, both deliberate:
+
+- **The avatar is a caster, not a member of the roster.** It is passed as the `caster` argument and
+  is *not* added to the `allUnits` roster or to `TurnManager`. That is what makes it a non-combatant
+  in practice: it takes no initiative turn, an enemy `AllEnemies` sweep cannot reach it, and its own
+  `AllAllies` buff lands on the player's beasts. A `Self` skill still works, since the resolver
+  returns the caster directly without consulting the roster.
+- **The avatar has no stats and cannot be defeated.** Its `StatBlock` is all zeros, which is the
+  honest value rather than a placeholder — the project spec puts combat stats entirely on creatures
+  and makes avatar items cosmetic. `IsDefeated` stays `false` for the life of the battle; there is
+  no rule in the design by which a commander could be defeated, and nothing can write the flag on a
+  unit it cannot target.
+
+**The timing half is still not wired to anything.** The rotation engine that landed for decision 5
+is deliberately owner-agnostic (it ticks a list of skills and knows nothing about the board or the
+roster), so it drives the avatar unchanged — but nothing calls it on the avatar yet. Ticking the
+avatar once per player-side beast-turn is part of the turn-executor pass.
 
 ## Effect application — SCAFFOLD ASSUMPTIONS, NOT CONFIRMED BALANCE
 
@@ -344,6 +370,12 @@ counter per *slot*, so the same skill equipped twice runs two independent counte
 `SkillTargetResolver` in stack order. `SkillLoadout.Tick()` is deliberately separable and touches no
 targeting at all, which is what keeps it usable for the avatar (decision 6) later.
 
+Decision 6's targeting half adds `BattleAvatar`, a one-method factory that builds the avatar as an
+ordinary `BattleUnit` — player team, zero stats, a placeholder position the confirmed shape
+restriction guarantees nothing reads, and its authored support loadout. It is a caster only and is
+not added to the roster or the initiative queue. Nothing ticks it yet; the once-per-player-beast-turn
+timing is the turn executor's job.
+
 Effect application (the section above) adds `SkillEffectApplier`, which resolves an activation into
 state changes, a `CurrentHp` and an `ActiveStatModifiers` list on `BattleUnit`, and the
 `ActiveStatModifier` record behind timed buffs. Nothing calls either `Apply` or `TickModifiers` yet;
@@ -356,5 +388,6 @@ numbers, and the effect rules above are the same kind of default. Still to come:
 and movement during battle, the turn executor that drives `TurnManager` end to end and calls the
 rotation and the effect applier at the right points, the damage formula and stat scaling on top of
 flat magnitudes, the status-effect system behind `ApplyStatus`, resource gating on top of cooldowns,
-the avatar targeting question behind decision 6, the pre-battle placement system and its UI, the
-encounter definition that selects an arena preset and a battle format, and the presentation layer.
+the avatar's once-per-player-beast-turn tick (decision 6), the pre-battle placement system and its
+UI, the encounter definition that selects an arena preset and a battle format, and the presentation
+layer.

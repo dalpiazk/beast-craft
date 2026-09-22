@@ -18,11 +18,12 @@ namespace BeastCraft.Battle
     /// </para>
     /// <para>
     /// Deliberately owner-agnostic. <see cref="Tick"/> knows nothing about the board, the roster or
-    /// even <see cref="BattleUnit"/>, so the player's avatar — which is not a grid piece and has no
-    /// <see cref="HexCoordinate"/> — can drive the identical rotation once its timing is wired up.
-    /// The confirmed rule for that is that the avatar's loadout ticks once per <em>player-side
-    /// beast turn</em> (three player beasts means three avatar ticks per round), which is not
-    /// implemented here; see the battle-system design doc.
+    /// even <see cref="BattleUnit"/>, so the player's avatar — which is not a grid piece and whose
+    /// <see cref="HexCoordinate"/> is a placeholder nothing reads, see <see cref="BattleAvatar"/> —
+    /// drives the identical rotation once its timing is wired up. The confirmed rule for that is
+    /// that the avatar's loadout ticks once per <em>player-side beast turn</em> (three player beasts
+    /// means three avatar ticks per round), which is not implemented here; see the battle-system
+    /// design doc.
     /// </para>
     /// <para>
     /// Cooldowns only. This does not spend <see cref="SkillSO.ResourceCost"/>, apply
