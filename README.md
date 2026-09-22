@@ -16,7 +16,7 @@ beast-craft/
 │   ├── Assets/_Project/    all first-party content, namespaced under _Project/
 │   │   ├── Art/            sprites, backdrops, UI, key art (Characters/Creatures/Environments/UI/KeyArt)
 │   │   ├── Audio/          Music/, Ambient/, SFX/
-│   │   ├── Data/           ScriptableObject .asset instances (creatures, skills, gear, customization)
+│   │   ├── Data/           ScriptableObject .asset instances (creatures, skills, gear, avatar gear, customization)
 │   │   ├── Prefabs/
 │   │   ├── Scenes/
 │   │   └── Scripts/        Runtime/ (Core, Services, Narrative, Battle, Creatures,
@@ -93,10 +93,11 @@ What exists today:
   structure and conventions.
 - **ScriptableObject data schemas** under
   `BeastCraft/Assets/_Project/Scripts/Runtime/` — creature species (stats,
-  growth curves, skill learn tables, evolution requirements), skills, gear, and
-  the shared avatar + creature customization framework. These are data
-  definitions only; nothing consumes them yet, and no `.asset` instances have
-  been authored.
+  growth curves, skill learn tables, evolution requirements), skills, beast gear,
+  avatar stats and avatar stat gear (never rendered; separate from the purely
+  cosmetic customization), and the shared avatar + creature customization
+  framework. These are data definitions only; nothing consumes them yet, and no
+  `.asset` instances have been authored.
 - **CI** (`.github/workflows/ci.yml`) — a format and compile check that builds
   the real game scripts against the hand-written UnityEngine stub in
   `Tooling/CiStubs/`. It needs no Unity install and runs no Unity tests, so it

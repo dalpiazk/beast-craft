@@ -4,8 +4,14 @@ using UnityEngine;
 namespace BeastCraft.Battle
 {
     /// <summary>
-    /// Authored definition of an equippable piece of gear. Gear equips onto creatures and affects
-    /// their combat stats; player-avatar items are cosmetic and live in the customization system.
+    /// Authored definition of an equippable piece of beast gear. Gear equips onto creatures and
+    /// affects their combat stats.
+    /// <para>
+    /// Creature-only. The player avatar has its own stat gear, <c>BeastCraft.Avatar.AvatarGearSO</c>,
+    /// a separate type with its own slots so the two can never be cross-equipped. Neither kind of
+    /// gear has anything to do with the avatar's appearance: avatar cosmetics live in the
+    /// customization system and carry no stats.
+    /// </para>
     /// </summary>
     [CreateAssetMenu(menuName = "Beast Craft/Battle/Gear", fileName = "NewGear")]
     public class GearSO : ScriptableObject

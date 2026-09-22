@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using BeastCraft.Avatar;
 using BeastCraft.Creatures;
 using UnityEngine;
 
@@ -38,6 +39,13 @@ namespace BeastCraft.Battle
     /// folds those into <see cref="BattleUnit.Stats"/> during the fight and takes them back out
     /// again, on top of whatever this produced. Nor is it a damage formula — skill magnitudes are
     /// still flat, and nothing here changes that.
+    /// </para>
+    /// <para>
+    /// The player avatar goes through the same steps 2 to 4 from an authored base instead of a
+    /// species: <see cref="BattleAvatar"/> calls the <see cref="StatBlock"/> overload of
+    /// <see cref="ComputeStats(StatBlock, IEnumerable{StatModifier})"/> with the modifiers
+    /// <see cref="CollectModifiers(IEnumerable{AvatarGearSO})"/> gathers from its
+    /// <see cref="AvatarGearSO"/>.
     /// </para>
     /// <para>
     /// Pure and static, like <see cref="SkillTargetResolver"/> and
@@ -91,8 +99,9 @@ namespace BeastCraft.Battle
         /// The same assembly starting from an explicit <paramref name="baseStats"/> instead of a
         /// species — steps 2 to 4 of the order this class documents, applied to
         /// <paramref name="modifiers"/>. For a participant with a stat block but no species behind
-        /// it; <see cref="CollectModifiers"/> turns an equipped gear list into the modifier list this
-        /// takes, with the same minimum-level rule.
+        /// it, such as the avatar. <see cref="CollectModifiers(IEnumerable{GearSO}, int)"/> turns an
+        /// equipped gear list into the modifier list this takes, with the same minimum-level rule;
+        /// <see cref="CollectModifiers(IEnumerable{AvatarGearSO})"/> does the same for avatar gear.
         /// </summary>
         public static StatBlock ComputeStats(StatBlock baseStats, IEnumerable<StatModifier> modifiers)
         {
@@ -174,6 +183,43 @@ namespace BeastCraft.Battle
             foreach (GearSO gear in equipped)
             {
                 if (gear == null || gear.MinimumLevel > level || gear.Modifiers == null)
+                {
+                    continue;
+                }
+
+                for (int i = 0; i < gear.Modifiers.Count; i++)
+                {
+                    if (gear.Modifiers[i] != null)
+                    {
+                        modifiers.Add(gear.Modifiers[i]);
+                    }
+                }
+            }
+
+            return modifiers;
+        }
+
+        /// <summary>
+        /// The avatar counterpart of <see cref="CollectModifiers(IEnumerable{GearSO}, int)"/>:
+        /// every non-null modifier on every non-null piece of <paramref name="equipped"/>. There is
+        /// no level gate, because <see cref="AvatarGearSO"/> has no minimum level (the avatar has no
+        /// level). Nor is there a slot check — two pieces in the same <see cref="AvatarGearSlot"/>
+        /// both count; keeping one item per slot is the equipment screen's job, exactly as it is for
+        /// beast gear. A null list yields an empty one, and the modifiers are the gear's own
+        /// instances, never written to.
+        /// </summary>
+        public static List<StatModifier> CollectModifiers(IEnumerable<AvatarGearSO> equipped)
+        {
+            List<StatModifier> modifiers = new List<StatModifier>();
+
+            if (equipped == null)
+            {
+                return modifiers;
+            }
+
+            foreach (AvatarGearSO gear in equipped)
+            {
+                if (gear == null || gear.Modifiers == null)
                 {
                     continue;
                 }

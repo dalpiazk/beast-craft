@@ -12,9 +12,11 @@ against them lands alongside each revision of this document.
 ## Core loop
 
 The player's avatar **does not fight directly**. The avatar is a non-combatant commander; the
-creatures do the fighting on the grid. This matches the framing already baked into the project spec,
-where the avatar and the creature systems are built and customized separately — avatar items are
-cosmetic, while gear and combat stats live entirely on creatures.
+creatures do the fighting on the grid. The avatar and the creature systems are built and customized
+separately. The avatar's **appearance** is purely cosmetic and carries no stats; separately from
+that, the avatar has **stats of its own** and equips non-cosmetic avatar gear that raises them, and
+that gear is never drawn on the avatar (decision 6, amended). Beasts equip their own, separate kind
+of gear.
 
 Battles are an **auto-battler**, not a manual per-turn tactics game. The player's input is
 front-loaded into two places — the build and the deployment — and the fight itself then plays out on
@@ -64,6 +66,9 @@ puzzle every encounter.
   options. With no player menu, whether a beast has a fallback attack at all — or simply always has
   at least one short-cooldown skill in its rotation — is open, and items in battle are out of scope
   until there is a mechanism that would use them.
+- **Avatar progression.** The avatar now has stats (decision 6, amended), but no level and no
+  growth: its base is a flat authored block and only avatar gear moves it. Whether and how the
+  avatar levels up is undesigned.
 
 ## Data-driven foundation already in place
 
@@ -74,7 +79,10 @@ The authored data this combat model needs is already committed as ScriptableObje
   `AllAllies`, `Self`), range, resource cost, cooldown, a list of effects, and the targeting fields
   added by decision 4 (side, criterion, order, targeting stat), and the attacking `Element` (see
   "Element system" below).
-- **`GearSO`** — slot, stat modifiers, rarity tier, and minimum creature level.
+- **`GearSO`** — slot, stat modifiers, rarity tier, and minimum creature level. Beast gear only.
+- **`AvatarGearSO`** / **`AvatarStatsSO`** (under `Runtime/Avatar/`, namespace `BeastCraft.Avatar`)
+  — the avatar's own stat gear (slot, stat modifiers, rarity; no visuals) and its authored base
+  stats. See decision 6.
 
 These were deliberately authored at an abstract level. Range is an integer count of grid steps and
 target shapes are named by their tactical intent rather than by a concrete tile layout, so the data
@@ -237,7 +245,7 @@ player can reason about it while building, and it needs no runtime decision-maki
 is that a beast can fire a skill at a moment when a human player wouldn't have — which is the same
 trade auto-resolution already made everywhere else.
 
-### 6. The avatar's skill loadout — DECIDED (timing and targeting)
+### 6. The avatar's skill loadout — DECIDED (timing and targeting); stats AMENDED
 
 **The avatar has skills too, on the same rotation mechanic**, intended to support and buff the
 player's own beasts rather than to attack. Per decision 2 the avatar is **not a piece on the grid**
@@ -276,16 +284,41 @@ Two consequences of that representation, both deliberate:
   in practice: it takes no initiative turn, an enemy `AllEnemies` sweep cannot reach it, and its own
   `AllAllies` buff lands on the player's beasts. A `Self` skill still works, since the resolver
   returns the caster directly without consulting the roster.
-- **The avatar has no stats and cannot be defeated.** Its `StatBlock` is all zeros, which is the
-  honest value rather than a placeholder — the project spec puts combat stats entirely on creatures
-  and makes avatar items cosmetic. `IsDefeated` stays `false` for the life of the battle; there is
-  no rule in the design by which a commander could be defeated, and nothing can write the flag on a
-  unit it cannot target.
+- **The avatar cannot be defeated.** `IsDefeated` stays `false` for the life of the battle; there
+  is no rule in the design by which a commander could be defeated, and nothing can write the flag on
+  a unit it cannot target. (This bullet originally also said the avatar had no stats — superseded,
+  see below.)
 
 **The timing half is now wired up.** `BattleTurnExecutor` ticks the avatar's loadout at the end of
 every player-side beast's turn, exactly as this section describes: not on enemy turns, and not once
 per round. The rotation engine that landed for decision 5 is deliberately owner-agnostic, so it
 drives the avatar unchanged.
+
+**Amendment — the avatar has stats and stat gear (supersedes "the avatar has no stats").** This
+section previously decided that the avatar's `StatBlock` is all zeros because avatar items are
+cosmetic. The producer has reversed that, and the rule is now two separate things:
+
+- **Avatar cosmetics stay purely cosmetic.** The customization system (`AvatarCustomizationSchema`)
+  is unchanged: it decides what the avatar looks like and grants no stats.
+- **The avatar has real stats, raised by non-cosmetic avatar gear that is never rendered.** Its
+  base is authored on an `AvatarStatsSO` (a flat `StatBlock`; there is no avatar level). Gear is
+  `AvatarGearSO` — a stable `AvatarGearId`, display name, description, inventory icon, an
+  `AvatarGearSlot` (`Weapon`, `Armor`, `Trinket`), a `StatModifier` list and a rarity tier, and no
+  visual fields at all. It is a separate type from the beasts' `GearSO`, with its own slot enum, so
+  beast gear and avatar gear cannot be cross-equipped. `BattleAvatar.Create(skills, baseStats,
+  equipped)` assembles the avatar's stats through `StatCalculator` exactly like beast gear (flat,
+  then summed percent, rounded, every stat at least 0 and `HP` at least 1); null gear and null
+  modifiers are skipped, and one-item-per-slot is left to the equipment screen, as for beasts. The
+  original `BattleAvatar.Create(skills)` still builds an all-zero avatar for callers with no stats
+  authored.
+
+Everything else above is unchanged: the avatar is still off the grid, still takes no initiative
+turn, still ticks on player-beast turns, is still a caster outside the roster, and still cannot be
+defeated. **Nothing reads the avatar's stats yet.** Skill magnitudes are flat (see "Effect
+application"), so an avatar buff lands the same whatever the avatar's stats are. The stats become
+meaningful with the stat-based damage and effect formula, which is planned to apply to beasts and
+the avatar alike (see "Next steps"). Avatar leveling is out of scope and open (see "What is not
+settled yet").
 
 ### 7. Movement during a turn — DECIDED
 
@@ -482,7 +515,9 @@ Gear whose `MinimumLevel` is above the creature's level contributes nothing; ref
 the equipment screen's job, but an under-levelled item never grants stats whatever state a loadout
 arrives in. Null gear and null modifiers are skipped. A second overload takes an explicit base
 `StatBlock` plus a modifier list (with `CollectModifiers` turning a gear list into one) for a
-participant with no species behind it.
+participant with no species behind it — which is how the avatar's stats are assembled from its
+`AvatarStatsSO` base and its `AvatarGearSO` (decision 6, amended). Avatar gear has no minimum level,
+because the avatar has no level.
 
 `BattleUnitFactory.CreateBeast` is the pass that assembles a battle-ready `BattleUnit` from a
 creature: stats from `StatCalculator`, elements copied from the species, and the equipped skill
@@ -598,10 +633,14 @@ counter per *slot*, so the same skill equipped twice runs two independent counte
 targeting at all, which is what keeps it usable for the avatar (decision 6) and for the movement
 rule (decision 7), neither of which it knows anything about.
 
-Decision 6's targeting half adds `BattleAvatar`, a one-method factory that builds the avatar as an
-ordinary `BattleUnit` — player team, zero stats, a placeholder position the confirmed shape
-restriction guarantees nothing reads, and its authored support loadout. It is a caster only and is
-not added to the roster or the initiative queue.
+Decision 6's targeting half adds `BattleAvatar`, a factory that builds the avatar as an ordinary
+`BattleUnit` — player team, a placeholder position the confirmed shape restriction guarantees
+nothing reads, and its authored support loadout. It is a caster only and is not added to the roster
+or the initiative queue. It originally gave the avatar zero stats; the amendment to decision 6 adds
+the `BeastCraft.Avatar` namespace (`AvatarGearSO`, `AvatarGearSlot`, `AvatarStatsSO`), a
+`StatCalculator.CollectModifiers` overload for avatar gear, and a `BattleAvatar.Create` overload that
+takes base stats and equipped avatar gear. The zero-stat overload remains. EditMode tests cover the
+avatar's stat assembly and that a statful avatar is still never hit or defeated.
 
 Effect application (the section above) adds `SkillEffectApplier`, which resolves an activation into
 state changes, a `CurrentHp` and an `ActiveStatModifiers` list on `BattleUnit`, and the
@@ -662,7 +701,8 @@ are placeholder implementation defaults chosen to be tunable, not producer-confi
 numbers, and the deployment-zone split, the effect rules and the element chart above are the same
 kind of default.
 Still to come: the damage formula and stat scaling on top of
-flat magnitudes, the status-effect system behind `ApplyStatus`, resource gating on top of cooldowns,
+flat magnitudes — the planned next work stream, applying to beasts and the avatar alike, together
+with a headless balance simulator to tune it — the status-effect system behind `ApplyStatus`, resource gating on top of cooldowns,
 lifting defeated units off the grid so they stop obstructing movement, the placement UI (a Unity
 Editor task, not a continuation of the placement validation that just landed), the encounter
 definition that selects an arena preset and a battle format, and the presentation layer.
