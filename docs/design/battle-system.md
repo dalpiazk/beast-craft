@@ -36,8 +36,10 @@ Once the battle starts there is **no player action menu**. Combatants take turns
 initiative queue (decision 3), one unit at a time, and on its own turn each beast:
 
 1. **Moves**, up to its own move range, measured in grid steps.
-2. **Uses a skill**, chosen from what its build has equipped, with targeting resolved automatically
-   from the skill's own authored rules (decision 4).
+2. **Fires whichever of its equipped skills come off cooldown this turn** — which may be none, one,
+   or several at once — with targeting resolved automatically from each skill's own authored rules
+   (decision 4). Nothing chooses *between* the equipped skills: the beast's skill stack is a fixed
+   rotation driven by per-skill cooldown counters (decision 5).
 
 The player's leverage over that is the build and the placement, not a per-turn command. This suits
 the game's shape: the story is the spine, and a fight that resolves from a good team composition and
@@ -51,18 +53,17 @@ puzzle every encounter.
   stat that budgets it and the rule for where a beast chooses to move (toward the nearest enemy? to
   the nearest tile from which its equipped skill reaches something? away when hurt?). All of that
   is open.
-- **Skill selection within a beast's own turn is the next open question, and is deliberately not
-  answered here.** When a beast has several equipped skills, something must decide which one fires:
-  a fixed priority order the player authors, a first-usable-in-list rule, a per-skill condition, or
-  a scoring pass over the candidate targets. Cooldown (`SkillSO.Cooldown`) and resource gating
-  (`SkillSO.ResourceCost`, whose resource is itself still unnamed) both feed into that decision, and
-  neither is implemented. This is the single biggest gap between the current scaffolding and a
-  playable auto-battle, and it should be decided on its own rather than inferred from the targeting
-  work.
+- **Resource gating.** `SkillSO.ResourceCost` is authored but nothing spends it, and the resource
+  itself ("mana" / "focus" / "stamina") is still unnamed. The cooldown rotation (decision 5) is now
+  settled and implemented; how — or whether — a resource pool gates it on top is not. A skill that
+  comes off cooldown currently always fires.
+- **The turn executor.** Nothing yet drives `TurnManager` end to end: movement execution, the
+  cooldown tick, and effect application each exist or don't as separate pieces, and the loop that
+  orders them within a single beast's turn is a later integration pass.
 - **The basic attack.** Earlier drafts listed "a basic attack, a skill, or an item" as the turn's
   options. With no player menu, whether a beast has a fallback attack at all — or simply always has
-  at least one always-available skill — is open, and items in battle are out of scope until there is
-  a mechanism that would use them.
+  at least one short-cooldown skill in its rotation — is open, and items in battle are out of scope
+  until there is a mechanism that would use them.
 
 ## Data-driven foundation already in place
 
@@ -194,6 +195,69 @@ The cost is that skill authoring now carries the tactical intent that a player w
 supply live — which is exactly why targeting is authored per skill rather than being one global AI
 rule.
 
+### 5. Equipped-skill rotation and cooldowns — DECIDED
+
+**A caster equips several skills in a fixed, authored order — a "stack" — and does not choose
+between them at runtime.** Each equipped skill carries its own cooldown counter, and the counters
+alone decide what fires. This closes the question decision 4 deliberately left open ("which of a
+beast's equipped skills fires this turn"), and it closes it *without* a priority rule, a per-skill
+condition, or a target-scoring pass: the authored order and the authored cooldowns are the whole
+answer.
+
+The rule, in full:
+
+- **Starting state.** At battle start every equipped skill's counter is set to that skill's own
+  `SkillSO.Cooldown`. Nothing fires before it has counted down at least once, so there is no
+  turn-one alpha strike.
+- **Tick.** Every time it becomes the caster's own turn in the initiative queue (decision 3), *all*
+  of its equipped skills' counters tick down by 1, clamped at 0 — never negative.
+- **Fire and reset.** Any skill whose counter is exactly 0 after that tick fires this turn and
+  immediately resets to its authored `Cooldown` to start counting down again. Firing and re-arming
+  are a single step.
+- **Multi-fire.** More than one equipped skill may fire on the same turn when more than one counter
+  reaches 0 together. They are fired in **authored stack order** (list order), which is what makes a
+  multi-skill turn deterministic and reproducible.
+- **Cooldown 0 and 1 both mean "every turn."** A `Cooldown` of 0 starts already at zero; a
+  `Cooldown` of 1 reaches zero on the first tick. Both then fire on every subsequent tick. This is
+  intended behaviour and is not special-cased — it is how an always-available skill (the basic-attack
+  role) is authored.
+- **A defeated caster does not tick.** A unit that is out of the fight takes no turn, so its rotation
+  does not advance and it produces no activations.
+
+*Background.* The alternatives all put a decision back into the fight that this model has
+deliberately moved out of it. A priority list ("fire the first usable skill") collapses the build to
+its top entry most turns; per-skill firing conditions are a scripting language in disguise and a
+tuning surface the player can't see; a scoring pass over candidate targets is an AI, with all the
+authoring, tuning and legibility cost that implies. A cooldown rotation instead makes the *loadout
+itself* the expressive choice: a stack of 2-turn and 5-turn skills has a readable rhythm, the
+player can reason about it while building, and it needs no runtime decision-making at all. The cost
+is that a beast can fire a skill at a moment when a human player wouldn't have — which is the same
+trade auto-resolution already made everywhere else.
+
+### 6. The avatar's skill loadout — DECIDED (timing), NOT YET IMPLEMENTED
+
+**The avatar has skills too, on the same rotation mechanic**, intended to support and buff the
+player's own beasts rather than to attack. Per decision 2 the avatar is **not a piece on the grid**
+and has no `HexCoordinate` position, and it correspondingly gets **no slot of its own in the
+initiative queue**.
+
+**Confirmed timing:** the avatar's loadout **ticks once every time one of the player's own beasts
+takes its turn.** Not on enemy turns, and not once per round — once per player-side beast-turn. With
+three player beasts deployed, the avatar's counters therefore tick three times per round, and an
+avatar skill on a 3-turn cooldown fires roughly once a round rather than once every three.
+
+**This is not implemented.** The blocker is not the timing but the targeting: every position-dependent
+target shape (`SingleTarget`, `Line`, `Cross`, `AreaBurst`) is anchored on `caster.Position`, and a
+position-less avatar has nothing to anchor on. That question is genuinely open — plausible answers
+include restricting avatar skills to the position-free shapes (`Self`, `AllAllies`, `AllEnemies`),
+anchoring the avatar on a designated beast, or giving avatar skills a separate party-wide target
+model — and it should be decided on its own rather than worked around. Parking the avatar on a fake
+origin tile is explicitly **not** the answer.
+
+The rotation engine that landed for decision 5 is deliberately owner-agnostic (it ticks a list of
+skills and knows nothing about the board or the roster), so it will drive the avatar unchanged once
+the targeting question is settled.
+
 ## Next steps
 
 The grid and turn-manager scaffolding landed against decisions 1–3: a `BeastCraft.Battle.Grid`
@@ -208,10 +272,18 @@ lands on. Its per-shape rules beyond the confirmed decisions above — which sha
 caster's own tile, that the global shapes ignore range, how a `Line` snaps its direction onto an
 axis — are documented in that class as engineering defaults, not confirmed balance.
 
+Decision 5 adds the rotation engine: `SkillLoadout` (an ordered skill stack plus one live cooldown
+counter per *slot*, so the same skill equipped twice runs two independent counters), `SkillActivation`
+(a fired skill paired with the units it landed on), a `Skills` loadout on `BattleUnit`, and
+`SkillLoadout.TickAndResolve`, which ticks the rotation and runs each ready skill through
+`SkillTargetResolver` in stack order. `SkillLoadout.Tick()` is deliberately separable and touches no
+targeting at all, which is what keeps it usable for the avatar (decision 6) later.
+
 Every pass so far is deliberately **data structures and algorithms only** — no MonoBehaviours, no
 scene or prefab wiring, no damage application, and no authored `.asset` instances. The hex radii
 backing each arena preset are placeholder implementation defaults chosen to be tunable, not
 producer-confirmed balance numbers. Still to come: the move-range stat and movement during battle,
-the rule that picks which equipped skill a beast fires on its turn (with cooldown and resource
-gating), the pre-battle placement system and its UI, effect application and damage, the encounter
-definition that selects an arena preset and a battle format, and the presentation layer.
+the turn executor that drives `TurnManager` end to end and calls the rotation at the right point,
+resource gating on top of cooldowns, the avatar targeting question behind decision 6, the pre-battle
+placement system and its UI, effect application and damage, the encounter definition that selects an
+arena preset and a battle format, and the presentation layer.
