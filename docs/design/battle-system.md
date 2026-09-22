@@ -52,12 +52,6 @@ puzzle every encounter.
 
 ### What is not settled yet
 
-- **Where a beast's move range comes from.** The *rule* for spending it is settled and implemented
-  (decision 7), and `BattleUnit.MoveRange` is the budget it spends. What that number is sourced
-  from is not: `StatBlock` still has no move-range stat, and whether move range is a species stat, a
-  gear-modifiable one, a flat constant or something a status can change is open. `MoveRange` is
-  therefore a settable field defaulting to 0, filled in by the pass that assembles a unit from its
-  creature instance — which does not exist yet either.
 - **Resource gating.** `SkillSO.ResourceCost` is authored but nothing spends it, and the resource
   itself ("mana" / "focus" / "stamina") is still unnamed. The cooldown rotation (decision 5) is now
   settled and implemented; how — or whether — a resource pool gates it on top is not. A skill that
@@ -388,10 +382,9 @@ revisited when balance work starts.
   is deliberately measured in **the affected unit's** turns, not the caster's: a fast unit debuffing
   a slow one means the two clocks genuinely differ.
 
-  **That tick hook is not wired to anything.** No turn executor exists yet to call it (see "What is
-  not settled yet" above), so today a timed modifier applies and never expires. The mechanism is
-  provided now so the duration half of the effect model is complete; connecting it is part of the
-  turn-executor pass, and it must be called once per turn of the unit passed in.
+  `BattleTurnExecutor` calls that tick hook as the first step of each unit's own turn, before the
+  turn reads any stat — the movement budget included — so a modifier on its last turn has already
+  expired by the time that turn acts.
 
 - **`ApplyStatus` is unimplemented and does nothing.** There is no status-effect system anywhere in
   the data model — no poison, stun or burn, and no field on `SkillEffect` naming *which* status,
@@ -420,8 +413,8 @@ decided yet.
   `None`, is a neutral skill.
 - **The defending elements are the target's**, `BattleUnit.Elements` — normally its species'
   `Elements`, handed to the `BattleUnit` constructor (an optional parameter, defaulting to no
-  affinity) and fixed for the battle. Nothing assembles units from species yet, so today a caller
-  passes them explicitly.
+  affinity) and fixed for the battle. `BattleUnitFactory` (see "Stat assembly and move range"
+  below) copies them from the species when it builds a beast.
 
 **How the multiplier applies.** `ElementChart.GetMultiplier(attack, defenders)` is the product of
 the attack's single matchup against each defending element, so a dual-element target that is weak
@@ -451,6 +444,54 @@ weak, and every pair not listed is `1x`:
 as the arena radii and the deployment-zone split. The set of elements is fixed; which pairs are
 strong or weak, and whether 2x / 0.5x are the right sizes, are expected to move once balance work
 has real fights to measure. `ElementChart` is the single place to change them.
+
+## Stat assembly and move range
+
+**Move range is a stat — DECIDED.** `StatType.MoveRange` (value 6, appended; the existing axes are
+never renumbered) and `StatBlock.MoveRange` sit alongside the six combat axes. Each species authors a
+base move range in its `BaseStats`, and from there it behaves like any other stat with one
+exception:
+
+- **It does not scale with level.** `CreatureSpeciesSO.GetStatAtLevel(MoveRange, level)` returns the
+  authored base at every level. Growth curves are normalized from roughly 0 at level 1 to 1 at max
+  level, which suits stats in the tens and hundreds but would round a small integer like 3 down to 0
+  for most of the early game. Move range is a tactical constant of the species, not something that
+  grows.
+- **Gear modifies it.** A `StatModifier` on `MoveRange` adds to it (flat and percent) like any other
+  axis — boots that grant +1 movement are ordinary gear data.
+- **Buffs and debuffs modify it.** `BuffStat` / `DebuffStat` with `AffectedStat = MoveRange` move it
+  mid-battle, timed or instant, through exactly the same path as any other stat, including the clamp
+  at 0 and the revert on the affected unit's own turns.
+
+`BattleUnit.MoveRange` is no longer an independent settable number: it is a read-only view of
+`Stats.MoveRange`. Timed buffs are folded straight into `BattleUnit.Stats` (there is no separate
+overlay), so that one field is always the effective value. `BattleTurnExecutor` reads it as the
+turn's movement budget *after* expiring timed modifiers, and still treats a negative value as 0.
+
+**Stat assembly — engineering default, not confirmed balance.** `StatCalculator` builds a unit's
+starting stat block from its species, level and equipped gear. Per stat axis, in order:
+
+1. **Base at level** — `CreatureSpeciesSO.GetStatAtLevel` (growth-curve scaled, except `MoveRange`).
+2. **Plus every `FlatBonus`** on that axis, summed across all equipped gear.
+3. **Times `1 + (the sum of every PercentBonus)`** on that axis, applied once. Percentages add rather
+   than compound (two +10% items are +20%), so gear order never matters, and they apply after the
+   flat bonuses, so a percentage also scales what gear added.
+4. **Rounded to the nearest integer and clamped** — every stat at least 0, `HP` at least 1.
+
+Gear whose `MinimumLevel` is above the creature's level contributes nothing; refusing the equip is
+the equipment screen's job, but an under-levelled item never grants stats whatever state a loadout
+arrives in. Null gear and null modifiers are skipped. A second overload takes an explicit base
+`StatBlock` plus a modifier list (with `CollectModifiers` turning a gear list into one) for a
+participant with no species behind it.
+
+`BattleUnitFactory.CreateBeast` is the pass that assembles a battle-ready `BattleUnit` from a
+creature: stats from `StatCalculator`, elements copied from the species, and the equipped skill
+loadout, id, team and position passed through. It takes species, level and gear directly because
+there is still no persistent creature-instance type; when one exists, it is the natural input. The
+battle then layers timed buffs and debuffs on top of the assembled block as before.
+
+This is stat assembly only. It changes nothing about damage: skill magnitudes remain flat, and
+there is still no damage formula (see "Effect application").
 
 ## Pre-battle placement — DATA MODEL AND VALIDATION ONLY
 
@@ -569,8 +610,8 @@ state changes, a `CurrentHp` and an `ActiveStatModifiers` list on `BattleUnit`, 
 Decision 7 adds the turn executor, which is also the pass that finally connects everything above to
 everything else:
 
-- `BattleUnit.MoveRange`, the per-turn movement budget. Not on `StatBlock`, for the reason under
-  "what is not settled yet" — where the number comes from is still open.
+- `BattleUnit.MoveRange`, the per-turn movement budget. Since the stat-assembly pass it reads
+  `Stats.MoveRange` rather than being set independently (see "Stat assembly and move range").
 - `SkillLoadout.Tick()` now reports ready **slot indices** and no longer re-arms them;
   `SkillLoadout.MarkFired(slotIndex)` is the explicit re-arm. A slot offered and never marked fired
   simply stays at 0 and is offered again next turn, which is decision 7's "stuck skill" rule falling
@@ -609,12 +650,18 @@ The element system (the section above) adds the `Element` enum, `CreatureSpecies
 `SkillEffectApplier`'s damage arm scale by the chart. The first EditMode tests land with it, covering
 the chart and the damage multiplier.
 
+Stat assembly (the section above) adds `StatType.MoveRange` / `StatBlock.MoveRange`, makes
+`BattleUnit.MoveRange` a read-through of `Stats`, and adds the static `StatCalculator` (species base
+at level, then gear flat, then gear percent) and `BattleUnitFactory`, which builds a beast from its
+species, level and gear. EditMode tests cover the stat block, the level-scaling exemption, the
+assembly order, the factory, and move range under buffs.
+
 Every pass so far is deliberately **data structures and algorithms only** — no MonoBehaviours, no
 scene or prefab wiring, and no authored `.asset` instances. The hex radii backing each arena preset
 are placeholder implementation defaults chosen to be tunable, not producer-confirmed balance
 numbers, and the deployment-zone split, the effect rules and the element chart above are the same
 kind of default.
-Still to come: where `MoveRange` gets its value from, the damage formula and stat scaling on top of
+Still to come: the damage formula and stat scaling on top of
 flat magnitudes, the status-effect system behind `ApplyStatus`, resource gating on top of cooldowns,
 lifting defeated units off the grid so they stop obstructing movement, the placement UI (a Unity
 Editor task, not a continuation of the placement validation that just landed), the encounter

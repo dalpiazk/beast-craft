@@ -13,9 +13,10 @@ namespace BeastCraft.Battle
     /// reads and writes its HP and stats lives here rather than on it.
     /// </para>
     /// <para>
-    /// <strong>Not wired to anything.</strong> Nothing in this codebase calls
-    /// <see cref="Apply"/> or <see cref="TickModifiers"/> yet — the turn executor that would is a
-    /// later pass. This provides the mechanism; the wiring is somebody else's deliverable.
+    /// <strong>Driven by <see cref="BattleTurnExecutor"/>.</strong> The executor calls
+    /// <see cref="TickModifiers"/> at the start of each unit's own turn and <see cref="Apply"/>
+    /// for every skill that fires in it, the avatar's included. This class supplies the mechanism
+    /// and decides nothing about when it runs.
     /// </para>
     /// <para>
     /// <strong>Scaffold assumptions.</strong> The rules below are reasonable engineering defaults
@@ -145,10 +146,9 @@ namespace BeastCraft.Battle
         /// the turn executor's choice, as long as it is consistent; nothing here depends on it.
         /// </para>
         /// <para>
-        /// <strong>Nothing calls this.</strong> No turn executor exists yet to drive it — that is
-        /// a later pass. This is the hook that pass will need, provided now so the duration half
-        /// of <see cref="SkillEffectType.BuffStat"/> is a complete mechanism rather than a
-        /// half-built one. Until it is wired up, timed modifiers apply and simply never expire.
+        /// <see cref="BattleTurnExecutor.ExecuteTurn"/> calls this as the first step of every
+        /// unit's turn, before that turn reads the unit's <see cref="BattleUnit.MoveRange"/> or
+        /// fires anything, so a modifier on its last turn has already expired by then.
         /// </para>
         /// <para>
         /// A modifier with <see cref="ActiveStatModifier.RemainingTurns"/> of 2 survives one call
@@ -343,6 +343,11 @@ namespace BeastCraft.Battle
         /// <c>CurrentHp &lt;= Stats.Hp</c> invariant; the reverse is not true, since a unit whose
         /// max HP goes up does not get the difference handed to it as healing. Reaching 0 max HP
         /// does not defeat a unit — defeat is <see cref="ApplyDamage"/>'s call and only its call.
+        /// </para>
+        /// <para>
+        /// Every axis goes through here, <see cref="StatType.MoveRange"/> included, so a move-range
+        /// buff or debuff changes <see cref="BattleUnit.MoveRange"/> (which reads
+        /// <see cref="BattleUnit.Stats"/>) with no special case.
         /// </para>
         /// <para>
         /// <see cref="StatBlock"/> is a struct, so the copy has to be written back to

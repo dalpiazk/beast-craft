@@ -23,7 +23,11 @@ namespace BeastCraft.Creatures
         /// <summary>Roster / codex icon.</summary>
         public Sprite Icon;
 
-        /// <summary>Unscaled level-1 reference stats. Scaled by <see cref="GrowthRate"/>.</summary>
+        /// <summary>
+        /// Unscaled level-1 reference stats. Scaled by <see cref="GrowthRate"/>, except for
+        /// <see cref="StatBlock.MoveRange"/>, which is authored here as the species' per-turn
+        /// movement and used as-is at every level (see <see cref="GetStatAtLevel"/>).
+        /// </summary>
         public StatBlock BaseStats;
 
         /// <summary>Shared leveling curve this species uses.</summary>
@@ -51,10 +55,22 @@ namespace BeastCraft.Creatures
         /// The species' stat on the given axis at the given level. Falls back to the unscaled base
         /// stat (with an error) when no growth curve is assigned, so a half-authored species still
         /// produces usable numbers instead of a null reference.
+        /// <para>
+        /// <see cref="StatType.MoveRange"/> is exempt from the curve and always returns the
+        /// authored base. A growth curve is normalized to run from about 0 at level 1 up to 1 at
+        /// max level, which suits stats in the tens or hundreds but would round a move range of 3
+        /// down to 0 for most of the early game. Move range is a small tactical integer, not a
+        /// quantity that grows with level; gear and buffs are what change it.
+        /// </para>
         /// </summary>
         public int GetStatAtLevel(StatType type, int level)
         {
             int baseStat = BaseStats.GetStat(type);
+
+            if (type == StatType.MoveRange)
+            {
+                return baseStat;
+            }
 
             if (GrowthRate == null)
             {

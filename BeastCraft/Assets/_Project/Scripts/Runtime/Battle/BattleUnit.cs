@@ -22,6 +22,12 @@ namespace BeastCraft.Battle
     /// either grow into it or be replaced by it.
     /// </para>
     /// <para>
+    /// A beast is built from its species, level and gear by <see cref="BattleUnitFactory"/>, which
+    /// assembles <see cref="Stats"/> through <see cref="StatCalculator"/>. The constructor stays
+    /// public for anything that already has a finished stat block, such as the avatar
+    /// (<see cref="BattleAvatar"/>) and tests.
+    /// </para>
+    /// <para>
     /// A passive data record: it holds battle state but runs no battle logic. Nothing here
     /// computes, decides or reacts — no setter has a side effect, so
     /// <see cref="CurrentHp"/> hitting zero does <em>not</em> quietly flip
@@ -39,6 +45,11 @@ namespace BeastCraft.Battle
         /// <see cref="CurrentHp"/> starts at <paramref name="stats"/>'s <c>Hp</c>: every unit
         /// enters a battle at full health. Carrying damage in from a previous fight would need a
         /// persistent creature-instance model, which does not exist yet.
+        /// </para>
+        /// <para>
+        /// <paramref name="stats"/> is also where <see cref="MoveRange"/> comes from — its
+        /// <see cref="StatBlock.MoveRange"/> — so a unit built from a bare six-axis block does not
+        /// move.
         /// </para>
         /// <para>
         /// <paramref name="elements"/> is the unit's elemental affinity, normally its species'
@@ -70,8 +81,14 @@ namespace BeastCraft.Battle
         public BattleTeam Team { get; }
 
         /// <summary>
-        /// The unit's effective combat stats. Settable because later passes layer gear and
-        /// buff/debuff modifiers on top of the base block; no such logic exists yet.
+        /// The unit's effective combat stats, move range included.
+        /// <para>
+        /// Starts as the assembled block — species base at level plus gear, see
+        /// <see cref="StatCalculator"/> — and is settable because timed buffs and debuffs are
+        /// folded straight into it: <see cref="SkillEffectApplier"/> writes the moved stat back
+        /// here and records the delta in <see cref="ActiveStatModifiers"/> so it can take it back
+        /// out on expiry. There is no separate overlay, so this is always the number to read.
+        /// </para>
         /// </summary>
         public StatBlock Stats { get; set; }
 
@@ -79,9 +96,10 @@ namespace BeastCraft.Battle
         /// Live health. <see cref="Stats"/>'s <c>Hp</c> is the <em>maximum</em>; this is what is
         /// left of it, and it is what damage spends and healing restores.
         /// <para>
-        /// Settable for the same reason <see cref="Stats"/> and <see cref="Position"/> are: the
-        /// pass that assembles a unit from its creature instance does not exist yet, so a caller
-        /// may need to seed or correct this after construction.
+        /// Settable because damage and healing write it (through <see cref="SkillEffectApplier"/>),
+        /// and so that a caller can seed it after construction — a unit is always built at full
+        /// health, and there is still no persistent creature-instance model to carry damage in
+        /// from a previous fight.
         /// </para>
         /// <para>
         /// A plain number with no behaviour attached. It does not clamp itself to
@@ -107,38 +125,37 @@ namespace BeastCraft.Battle
         /// How many hex steps this unit may move on one of its own turns, as a whole-turn budget
         /// spent across every skill it attempts that turn (see <see cref="BattleTurnExecutor"/>).
         /// <para>
-        /// Not read from <see cref="Stats"/>, because there is no move-range stat to read.
-        /// <see cref="StatBlock"/> models the six combat axes and nothing else, and adding a seventh
-        /// would change the shape of every authored species asset for a number the design has not
-        /// settled yet — whether move range comes from the species, from gear, from a status, or is
-        /// simply flat. So it lives here, on the battle-side unit, where the pass that assembles a
-        /// unit from its creature instance can set it from whatever source that answer turns out to
-        /// name.
+        /// Read straight from <see cref="Stats"/>: move range is a stat
+        /// (<see cref="StatType.MoveRange"/>). The species authors a base that does not scale with
+        /// level, gear modifiers add to it like any other stat when <see cref="StatCalculator"/>
+        /// assembles the unit, and a <see cref="SkillEffectType.BuffStat"/> or
+        /// <see cref="SkillEffectType.DebuffStat"/> on <see cref="StatType.MoveRange"/> moves it
+        /// mid-battle — timed ones reverting on the unit's own turns — because those are folded
+        /// into <see cref="Stats"/> directly. Keeping it a read-through rather than a copy means
+        /// there is exactly one number to change and nothing to keep in step with it.
         /// </para>
         /// <para>
-        /// Settable rather than a constructor parameter for the same reason
-        /// <see cref="CurrentHp"/> is settable: the assembling pass does not exist yet. Unlike
-        /// <c>CurrentHp</c>, though, there is nothing on <see cref="Stats"/> to seed it from, so it
-        /// is not taken at construction at all.
+        /// Read-only for the same reason: to change a unit's move range, change its
+        /// <see cref="Stats"/>. It is kept as its own property because the movement budget is read
+        /// in several places and "the unit's move range" is the clearer name for it.
         /// </para>
         /// <para>
-        /// Defaults to 0, which means "does not move" and is the honest default rather than a
-        /// guessed one: every code path that consults it treats 0 as a unit that must already be in
-        /// range to act, so nothing moves until a caller deliberately says how far it may. A
-        /// negative value is treated as 0 by the executor rather than corrected here — this stays a
-        /// passive record.
+        /// 0 means "does not move": the unit must already be in range to act. Debuffs clamp stats
+        /// at 0, so it cannot go negative through the effect path, but a hand-built
+        /// <see cref="StatBlock"/> could hold a negative value; the executor reads that as 0
+        /// rather than correcting it here — this stays a passive record.
         /// </para>
         /// </summary>
-        public int MoveRange { get; set; }
+        public int MoveRange => Stats.MoveRange;
 
         /// <summary>
         /// The unit's equipped skill stack and its live cooldown counters. Driven once per turn by
         /// <see cref="BattleTurnExecutor"/>, which ticks it, works out which of the ready slots can
         /// actually reach something, and marks those fired.
         /// <para>
-        /// Settable for the same reason <see cref="Stats"/> is: the pass that assembles a unit from
-        /// its creature instance and its learned skills does not exist yet, so a loadout may need to
-        /// be swapped in after construction. Expected to hold an empty loadout rather than
+        /// Settable so a loadout can be swapped in after construction: the equipped stack is a
+        /// player choice that neither the species nor <see cref="BattleUnitFactory"/> derives, so
+        /// it is passed in rather than assembled. Expected to hold an empty loadout rather than
         /// <c>null</c>.
         /// </para>
         /// </summary>

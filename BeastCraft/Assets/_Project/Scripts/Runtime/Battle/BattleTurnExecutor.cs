@@ -94,7 +94,9 @@ namespace BeastCraft.Battle
         /// <see cref="SkillEffectApplier.TickModifiers"/> on the unit, since a timed buff is counted
         /// in the affected unit's <em>own</em> turns and this is one of them. Done first so a
         /// modifier with one turn left has already expired before this turn's skills read the stat,
-        /// rather than lingering for one cast longer than it was authored to.
+        /// rather than lingering for one cast longer than it was authored to. That includes the
+        /// movement budget: it is taken from <see cref="BattleUnit.MoveRange"/> only after this
+        /// step, so an expiring move-range buff does not pay for one more turn of walking.
         /// </description></item>
         /// <item><description>
         /// <see cref="SkillLoadout.Tick"/>, which counts every slot down and reports the ones now at
@@ -143,10 +145,13 @@ namespace BeastCraft.Battle
             }
 
             HexCoordinate start = unit.Position;
-            int budget = unit.MoveRange < 0 ? 0 : unit.MoveRange;
-            int remaining = budget;
 
             SkillEffectApplier.TickModifiers(unit);
+
+            // Read after the tick, not before: move range is a stat, so a move-range buff that
+            // expires on this tick must already be gone from this turn's budget.
+            int budget = unit.MoveRange < 0 ? 0 : unit.MoveRange;
+            int remaining = budget;
 
             SkillLoadout loadout = unit.Skills;
             IReadOnlyList<int> ready = loadout == null ? new List<int>() : loadout.Tick();
