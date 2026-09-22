@@ -13,21 +13,27 @@ namespace BeastCraft.Battle
     /// <summary>
     /// A combatant occupying a tile in an active battle.
     /// <para>
-    /// Intentionally minimal: just the identity, allegiance, stats and position that the grid and
-    /// the turn manager need to reference. This is NOT the final creature-instance runtime model —
-    /// the real one will carry level, current HP, equipped gear, learned skills, status effects and
-    /// a link back to its <c>CreatureSpeciesSO</c>, and this type will either grow into it or be
-    /// replaced by it.
+    /// Intentionally minimal: the identity, allegiance, stats and position that the grid and the
+    /// turn manager need to reference, plus the equipped skill stack the rotation ticks. This is
+    /// NOT the final creature-instance runtime model — the real one will carry level, current HP,
+    /// equipped gear, status effects and a link back to its <c>CreatureSpeciesSO</c>, and this type
+    /// will either grow into it or be replaced by it.
     /// </para>
     /// </summary>
     public class BattleUnit
     {
-        public BattleUnit(string id, BattleTeam team, StatBlock stats, HexCoordinate position)
+        /// <summary>
+        /// Builds a combatant. <paramref name="skills"/> is the authored skill stack this unit
+        /// rotates through; leaving it off gives the unit an empty loadout rather than a null one,
+        /// so <see cref="Skills"/> is always safe to tick.
+        /// </summary>
+        public BattleUnit(string id, BattleTeam team, StatBlock stats, HexCoordinate position, SkillLoadout skills = null)
         {
             Id = id;
             Team = team;
             Stats = stats;
             Position = position;
+            Skills = skills ?? new SkillLoadout(null);
         }
 
         /// <summary>
@@ -50,6 +56,19 @@ namespace BeastCraft.Battle
         /// whatever moves the unit; the grid remains the authority on which tile is taken.
         /// </summary>
         public HexCoordinate Position { get; set; }
+
+        /// <summary>
+        /// The unit's equipped skill stack and its live cooldown counters. Tick it once per turn
+        /// through <see cref="SkillLoadout.TickAndResolve"/> to get the skills that fire and what
+        /// they land on.
+        /// <para>
+        /// Settable for the same reason <see cref="Stats"/> is: the pass that assembles a unit from
+        /// its creature instance and its learned skills does not exist yet, so a loadout may need to
+        /// be swapped in after construction. Expected to hold an empty loadout rather than
+        /// <c>null</c>.
+        /// </para>
+        /// </summary>
+        public SkillLoadout Skills { get; set; }
 
         /// <summary>
         /// True once the unit is out of the fight. Defeated units are skipped by the turn order and
