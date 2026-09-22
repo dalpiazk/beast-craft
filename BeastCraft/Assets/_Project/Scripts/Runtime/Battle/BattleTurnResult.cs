@@ -1,0 +1,94 @@
+using System.Collections.Generic;
+using BeastCraft.Battle.Grid;
+
+namespace BeastCraft.Battle
+{
+    /// <summary>
+    /// Everything one unit's turn did: where it started and finished, what its movement budget was
+    /// and how much of it went, what each ready skill slot made of its chance, and — on a player
+    /// beast's turn only — what the avatar's rotation fired alongside it.
+    /// <para>
+    /// The return shape of <see cref="BattleTurnExecutor.ExecuteTurn"/>. A turn is no longer a
+    /// single list of activations, because a skill can now come up ready and decline to go off, and
+    /// because movement is spent inside the turn rather than before it — so the interesting facts
+    /// are per slot and per turn, not per activation.
+    /// </para>
+    /// <para>
+    /// Purely a record for callers, logs and tests. Reading it changes nothing; the state changes
+    /// all landed on the units themselves while the turn ran.
+    /// </para>
+    /// </summary>
+    public class BattleTurnResult
+    {
+        public BattleTurnResult(
+            BattleUnit unit,
+            HexCoordinate startPosition,
+            HexCoordinate endPosition,
+            int movementBudget,
+            int movementSpent,
+            IReadOnlyList<BattleSkillOutcome> skillOutcomes,
+            IReadOnlyList<SkillActivation> avatarActivations)
+        {
+            Unit = unit;
+            StartPosition = startPosition;
+            EndPosition = endPosition;
+            MovementBudget = movementBudget;
+            MovementSpent = movementSpent;
+            SkillOutcomes = skillOutcomes ?? new List<BattleSkillOutcome>();
+            AvatarActivations = avatarActivations ?? new List<SkillActivation>();
+        }
+
+        /// <summary>The unit whose turn this was.</summary>
+        public BattleUnit Unit { get; }
+
+        /// <summary>The tile it stood on when the turn opened.</summary>
+        public HexCoordinate StartPosition { get; }
+
+        /// <summary>
+        /// The tile it stands on now. Equal to <see cref="StartPosition"/> whenever the turn spent
+        /// no movement, which is the common case.
+        /// </summary>
+        public HexCoordinate EndPosition { get; }
+
+        /// <summary>
+        /// The movement the turn started with: the unit's <see cref="BattleUnit.MoveRange"/>, with a
+        /// negative value read as 0.
+        /// </summary>
+        public int MovementBudget { get; }
+
+        /// <summary>
+        /// Hex steps actually walked, summed across every skill that had to close the distance.
+        /// Never more than <see cref="MovementBudget"/>, because the budget is shared by the whole
+        /// turn rather than refreshed per skill.
+        /// </summary>
+        public int MovementSpent { get; }
+
+        /// <summary>
+        /// Movement left over. Of interest mainly because it is what a later skill in the same turn
+        /// had to work with.
+        /// </summary>
+        public int MovementRemaining
+        {
+            get { return MovementBudget - MovementSpent; }
+        }
+
+        /// <summary>
+        /// One entry per slot that <see cref="SkillLoadout.Tick"/> offered this turn, in stack
+        /// order — including the ones that did not fire, each carrying why. Never <c>null</c>;
+        /// empty when nothing came off cooldown.
+        /// </summary>
+        public IReadOnlyList<BattleSkillOutcome> SkillOutcomes { get; }
+
+        /// <summary>
+        /// What the player's avatar cast off the back of this turn, per the confirmed rule that its
+        /// loadout ticks once per player-side beast turn. Always empty on an enemy beast's turn, and
+        /// when no avatar was supplied. Never <c>null</c>.
+        /// <para>
+        /// Plain <see cref="SkillActivation"/>s rather than <see cref="BattleSkillOutcome"/>s
+        /// because the avatar's kit cannot fail to reach: every ready slot of its fires, so there is
+        /// no status to report and no movement to account for.
+        /// </para>
+        /// </summary>
+        public IReadOnlyList<SkillActivation> AvatarActivations { get; }
+    }
+}
