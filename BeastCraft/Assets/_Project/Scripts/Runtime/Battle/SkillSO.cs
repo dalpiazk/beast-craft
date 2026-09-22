@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using BeastCraft.Creatures;
 using UnityEngine;
 
 namespace BeastCraft.Battle
@@ -30,14 +31,72 @@ namespace BeastCraft.Battle
         /// <summary>Turns that must pass before this skill can be used again. 0 means no cooldown.</summary>
         public int Cooldown;
 
-        /// <summary>The footprint this skill covers.</summary>
+        /// <summary>The footprint this skill covers, always anchored on the caster's own tile.</summary>
         public SkillTargetShape TargetShape = SkillTargetShape.SingleTarget;
 
-        // TODO: Range and TargetShape semantics (tile distance metric, whether Range gates the
-        // origin tile or the whole footprint) are finalized alongside the battle-system design doc,
-        // which still has open questions on grid topology, party size and action economy.
-        /// <summary>Reach in abstract grid steps from the caster.</summary>
+        /// <summary>
+        /// Reach in hex steps, measured with <see cref="Grid.HexCoordinate.Distance"/> from the
+        /// caster's live position.
+        /// <para>
+        /// Range gates the whole footprint, not just an origin tile: the origin <em>is</em> the
+        /// caster's tile (a skill is never aimed at a picked point), so there is nothing else for
+        /// it to gate. A <see cref="SkillTargetShape.SingleTarget"/> skill can only reach units
+        /// within this many steps; a <see cref="SkillTargetShape.Line"/> or
+        /// <see cref="SkillTargetShape.Cross"/> extends this many steps outward along its
+        /// direction(s); an <see cref="SkillTargetShape.AreaBurst"/> covers the disc of this
+        /// radius. <see cref="SkillTargetShape.Self"/>,
+        /// <see cref="SkillTargetShape.AllEnemies"/> and <see cref="SkillTargetShape.AllAllies"/>
+        /// ignore it entirely — they are not distance-limited.
+        /// </para>
+        /// </summary>
         public int Range = 1;
+
+        /// <summary>
+        /// Which side of the fight this skill may land on, relative to the caster's own
+        /// <see cref="BattleTeam"/>.
+        /// <para>
+        /// Consulted by <see cref="SkillTargetShape.SingleTarget"/>,
+        /// <see cref="SkillTargetShape.Line"/>, <see cref="SkillTargetShape.Cross"/> and
+        /// <see cref="SkillTargetShape.AreaBurst"/>. Ignored by
+        /// <see cref="SkillTargetShape.Self"/> (which always hits the caster) and by
+        /// <see cref="SkillTargetShape.AllEnemies"/> / <see cref="SkillTargetShape.AllAllies"/>
+        /// (whose names already fix the side).
+        /// </para>
+        /// </summary>
+        public SkillTargetSide TargetSide = SkillTargetSide.Enemy;
+
+        /// <summary>
+        /// What this skill compares candidates by when the shape makes it pick just one of them.
+        /// <para>
+        /// Consulted only by <see cref="SkillTargetShape.SingleTarget"/> and by
+        /// <see cref="SkillTargetShape.Line"/> (which uses it to choose the focus target that sets
+        /// the beam's direction). Every other shape hits its entire footprint, so it never picks
+        /// and never reads this.
+        /// </para>
+        /// </summary>
+        public SkillTargetingCriterion TargetingCriterion = SkillTargetingCriterion.Random;
+
+        /// <summary>
+        /// Which extreme of <see cref="TargetingCriterion"/>'s compared value wins.
+        /// <para>
+        /// Meaningful only where <see cref="TargetingCriterion"/> is, and additionally ignored when
+        /// that is <see cref="SkillTargetingCriterion.Random"/>, which does not compare anything.
+        /// </para>
+        /// </summary>
+        public SkillTargetingOrder TargetingOrder = SkillTargetingOrder.Lowest;
+
+        /// <summary>
+        /// The stat axis <see cref="SkillTargetingCriterion.Stat"/> compares candidates on, read
+        /// through <c>StatBlock.GetStat</c>.
+        /// <para>
+        /// Consulted <em>only</em> when <see cref="TargetingCriterion"/> is
+        /// <see cref="SkillTargetingCriterion.Stat"/>. It is ignored under
+        /// <see cref="SkillTargetingCriterion.Random"/> and
+        /// <see cref="SkillTargetingCriterion.Distance"/>, and — like the rest of the targeting
+        /// fields — by every shape that does not pick a single candidate.
+        /// </para>
+        /// </summary>
+        public StatType TargetingStat = StatType.HP;
 
         /// <summary>Everything this skill applies to each affected unit.</summary>
         public List<SkillEffect> Effects = new List<SkillEffect>();
