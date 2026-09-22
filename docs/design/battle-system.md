@@ -258,6 +258,71 @@ The rotation engine that landed for decision 5 is deliberately owner-agnostic (i
 skills and knows nothing about the board or the roster), so it will drive the avatar unchanged once
 the targeting question is settled.
 
+## Effect application — SCAFFOLD ASSUMPTIONS, NOT CONFIRMED BALANCE
+
+`SkillEffect`s are now actually applied: `SkillEffectApplier` takes a `SkillActivation` (the fired
+skill plus the units it landed on) and resolves it into real state changes. Unlike decisions 1–6
+above, **none of the rules in this section were confirmed by the producer.** They are engineering
+defaults chosen so the system is complete rather than half-built, and they are expected to be
+revisited when balance work starts.
+
+- **Damage and healing are flat. There is no damage formula.** `SkillEffect.Magnitude` is applied
+  as a plain number straight against HP: no Attack-versus-Defense math, no stat scaling, no crit
+  chance, no type chart, no variance. Designing that formula is a separate balancing pass, and it
+  is deliberately not being guessed at here — a placeholder formula would be harder to displace
+  later than no formula at all. `BattleUnit` gained a `CurrentHp` alongside its `StatBlock` (whose
+  `Hp` is now explicitly the *maximum*); every unit starts a battle at full health, since there is
+  no persistent creature-instance model to carry damage in from a previous fight. Both damage and
+  healing hold `0 <= CurrentHp <= Stats.Hp`.
+
+- **Defeat is set explicitly by the code that spends the HP.** `BattleUnit` stays a passive data
+  record: `CurrentHp` reaching 0 does not quietly flip `IsDefeated` from inside a setter. The
+  applier writes the flag as a visible step at the one place it can happen.
+
+- **A target defeated mid-skill is skipped for the rest of that skill's effect list — so healing
+  cannot revive.** A skill authored as damage-then-heal that kills its target does not then heal it
+  back up; the heal, and any buff after it, simply do not land on that target. Other targets in the
+  same activation are unaffected. This extends the rule `SkillTargetResolver` already applies at
+  selection time (only living units are eligible) to a unit that dies half a step later. The
+  deciding argument is that **there is no revival mechanic in the design**: reviving is a real
+  combat rule with real balance weight, and it should not fall out by accident from whatever order
+  effects happen to be authored in. If revival is wanted later it should be designed as its own
+  thing, not inherited from this.
+
+- **`BuffStat` / `DebuffStat` carry the sign in the effect type, not in the magnitude.** Both are
+  authored as *positive* numbers — a "-5 Attack" debuff is `DebuffStat` with a `Magnitude` of 5 —
+  which is what splitting buff and debuff into two enum arms already implies. (The gear path
+  differs: `StatModifier.FlatBonus` is a genuinely signed int with no accompanying type to carry
+  the sign, so a cursed item authors a negative bonus directly. The two encode the same thing in
+  different places and are not in conflict.) Stats are held at or above 0, so a debuff larger than
+  the stat it drains takes it to 0 rather than negative.
+
+- **Timed buffs/debuffs revert on the affected unit's own turns.** Per `SkillEffect.DurationTurns`,
+  `0` means an instant, permanent change with nothing to track. Greater than 0 records an
+  `ActiveStatModifier` on the affected unit — the stat, the signed delta *actually* applied, and
+  the turns remaining — and `SkillEffectApplier.TickModifiers(unit)` counts it down and subtracts
+  the delta back out when it runs out. Storing the applied delta rather than the authored magnitude
+  is what stops a clamped debuff handing out free stats when it expires. Each modifier runs its own
+  clock, so two buffs on the same stat with different durations expire independently. The countdown
+  is deliberately measured in **the affected unit's** turns, not the caster's: a fast unit debuffing
+  a slow one means the two clocks genuinely differ.
+
+  **That tick hook is not wired to anything.** No turn executor exists yet to call it (see "What is
+  not settled yet" above), so today a timed modifier applies and never expires. The mechanism is
+  provided now so the duration half of the effect model is complete; connecting it is part of the
+  turn-executor pass, and it must be called once per turn of the unit passed in.
+
+- **`ApplyStatus` is unimplemented and does nothing.** There is no status-effect system anywhere in
+  the data model — no poison, stun or burn, and no field on `SkillEffect` naming *which* status,
+  because the set of statuses has never been designed. Implementing the effect would mean inventing
+  that design inside the effect applier, which is the wrong place for it. The switch arm exists and
+  is documented as a deliberate gap rather than silently falling through: authoring an `ApplyStatus`
+  effect today is a no-op. It is pending an actual status-effect design, at which point that arm is
+  where it plugs in.
+
+Resource cost is still not spent, per the open question above; effect application does not gate on
+it.
+
 ## Next steps
 
 The grid and turn-manager scaffolding landed against decisions 1–3: a `BeastCraft.Battle.Grid`
@@ -279,11 +344,17 @@ counter per *slot*, so the same skill equipped twice runs two independent counte
 `SkillTargetResolver` in stack order. `SkillLoadout.Tick()` is deliberately separable and touches no
 targeting at all, which is what keeps it usable for the avatar (decision 6) later.
 
+Effect application (the section above) adds `SkillEffectApplier`, which resolves an activation into
+state changes, a `CurrentHp` and an `ActiveStatModifiers` list on `BattleUnit`, and the
+`ActiveStatModifier` record behind timed buffs. Nothing calls either `Apply` or `TickModifiers` yet;
+both are mechanism waiting on the turn executor.
+
 Every pass so far is deliberately **data structures and algorithms only** — no MonoBehaviours, no
-scene or prefab wiring, no damage application, and no authored `.asset` instances. The hex radii
-backing each arena preset are placeholder implementation defaults chosen to be tunable, not
-producer-confirmed balance numbers. Still to come: the move-range stat and movement during battle,
-the turn executor that drives `TurnManager` end to end and calls the rotation at the right point,
-resource gating on top of cooldowns, the avatar targeting question behind decision 6, the pre-battle
-placement system and its UI, effect application and damage, the encounter definition that selects an
-arena preset and a battle format, and the presentation layer.
+scene or prefab wiring, and no authored `.asset` instances. The hex radii backing each arena preset
+are placeholder implementation defaults chosen to be tunable, not producer-confirmed balance
+numbers, and the effect rules above are the same kind of default. Still to come: the move-range stat
+and movement during battle, the turn executor that drives `TurnManager` end to end and calls the
+rotation and the effect applier at the right points, the damage formula and stat scaling on top of
+flat magnitudes, the status-effect system behind `ApplyStatus`, resource gating on top of cooldowns,
+the avatar targeting question behind decision 6, the pre-battle placement system and its UI, the
+encounter definition that selects an arena preset and a battle format, and the presentation layer.
