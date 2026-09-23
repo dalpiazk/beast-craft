@@ -53,6 +53,18 @@ namespace BeastCraft.Battle
         /// <c>SkillSO.TargetingStat</c> is ignored. Appended after <see cref="Distance"/>: the
         /// values are serialized into assets, so they are never renumbered.
         /// </summary>
-        CurrentHp = 3
+        CurrentHp = 3,
+
+        /// <summary>
+        /// Compare each candidate's live HP as a fraction of its maximum
+        /// (<see cref="BattleUnit.CurrentHp"/> / <c>Stats.Hp</c>). <see cref="SkillTargetingOrder.Lowest"/>
+        /// on an <see cref="SkillTargetSide.Ally"/> skill is the "heal whoever is worst off" rule,
+        /// which <see cref="CurrentHp"/> gets wrong when the team's maximums differ. Compared exactly
+        /// in integers by cross-multiplying (<c>a.Current * b.Max</c> against
+        /// <c>b.Current * a.Max</c>), never as a float; a maximum of 0 or below reads as a fraction
+        /// of 0. Ties break on <see cref="BattleUnitOrder.CompareById"/> like every other criterion.
+        /// <c>SkillSO.TargetingStat</c> is ignored. Appended: never renumbered.
+        /// </summary>
+        HpFraction = 4
     }
 }

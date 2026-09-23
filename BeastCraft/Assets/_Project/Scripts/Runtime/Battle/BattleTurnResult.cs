@@ -29,7 +29,9 @@ namespace BeastCraft.Battle
             int movementSpent,
             IReadOnlyList<BattleSkillOutcome> skillOutcomes,
             IReadOnlyList<SkillActivation> avatarActivations,
-            int retreatSteps = 0)
+            int retreatSteps = 0,
+            bool stunned = false,
+            int statusDamage = 0)
         {
             Unit = unit;
             StartPosition = startPosition;
@@ -39,6 +41,8 @@ namespace BeastCraft.Battle
             SkillOutcomes = skillOutcomes ?? new List<BattleSkillOutcome>();
             AvatarActivations = avatarActivations ?? new List<SkillActivation>();
             RetreatSteps = retreatSteps;
+            Stunned = stunned;
+            StatusDamage = statusDamage;
         }
 
         /// <summary>The unit whose turn this was.</summary>
@@ -75,6 +79,18 @@ namespace BeastCraft.Battle
         /// <see cref="CombatStance.Vanguard"/>, and whenever the unit stayed where it was.
         /// </summary>
         public int RetreatSteps { get; }
+
+        /// <summary>
+        /// True when the unit began this turn under a <see cref="StatusType.Stun"/>: it did not move,
+        /// fired nothing and its cooldowns did not tick (see <see cref="BattleTurnExecutor.ExecuteTurn"/>).
+        /// </summary>
+        public bool Stunned { get; }
+
+        /// <summary>
+        /// HP the unit lost to its own <see cref="StatusType.DamageOverTime"/> stacks as this turn
+        /// began (after any shield). 0 with none. A unit they defeat takes no further part in the turn.
+        /// </summary>
+        public int StatusDamage { get; }
 
         /// <summary>
         /// Movement left over. Of interest mainly because it is what a later skill in the same turn

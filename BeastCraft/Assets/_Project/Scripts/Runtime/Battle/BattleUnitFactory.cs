@@ -57,11 +57,24 @@ namespace BeastCraft.Battle
         public static BattleUnit CreateBeast(string id, BattleTeam team, CreatureSpeciesSO species, int level,
                                              IEnumerable<GearSO> equipped, HexCoordinate position, SkillLoadout skills = null)
         {
+            return CreateBeast(id, team, species, level, equipped, position, skills, 0);
+        }
+
+        /// <summary>
+        /// <see cref="CreateBeast(string, BattleTeam, CreatureSpeciesSO, int, IEnumerable{GearSO}, HexCoordinate, SkillLoadout)"/>
+        /// with a <see cref="BattleUnit.StatusResist"/> (percent, clamped into [0, 100] by the unit):
+        /// how much of every hostile non-damage effect's chance the beast shrugs off. The species
+        /// carries no resistance of its own; a caller that wants a resistant unit — the balance
+        /// simulator's bosses — passes it here.
+        /// </summary>
+        public static BattleUnit CreateBeast(string id, BattleTeam team, CreatureSpeciesSO species, int level,
+                                             IEnumerable<GearSO> equipped, HexCoordinate position, SkillLoadout skills, int statusResist)
+        {
             StatBlock stats = StatCalculator.ComputeStats(species, level, equipped);
             Element[] elements = species == null ? null : species.Elements;
             CombatStance stance = species == null ? CombatStance.Vanguard : species.Stance;
 
-            return new BattleUnit(id, team, stats, position, skills, elements, level, stance);
+            return new BattleUnit(id, team, stats, position, skills, elements, level, stance, statusResist);
         }
 
         /// <summary>

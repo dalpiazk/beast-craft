@@ -145,13 +145,27 @@ cooldown 2 weighted `Attack` about twice as heavily.
     maximum HP.
 
   Each enemy has a `Stance` (a `CombatStance` name; missing = `Vanguard`), and each skill an optional
-  `Targeting` (`Distance`, the default, `Stat` or `CurrentHp`; `Random` is refused so battles never
+  `Targeting` (`Distance`, the default, `Stat`, `CurrentHp` or `HpFraction`; `Random` is refused so battles never
   draw targets from the rng), `TargetingOrder` (default `Lowest`) and `TargetingStat` (default `HP`,
   read only by `Stat`). `Stat` + `HP` compares the stat block, i.e. **maximum** HP; `CurrentHp`
   compares the HP a beast has left, so `CurrentHp` + `Lowest` is "pick off the weakest"
   (`SkillTargetResolver`). The loader rejects a Ranged enemy without a `SingleTarget` skill of range
   2 or more (a Ranged unit never walks into melee), an enemy without a `SingleTarget` skill (the only
   shape that walks), move 0, and a composition that cannot fit its deployment zone.
+
+  The advanced effect fields are optional, and every one is inert when missing. See "Status effects
+  and advanced skill effects" in `docs/design/battle-system.md`.
+  - Per enemy: `StatusResist` (0–100, `BattleUnit.StatusResist`).
+  - Per skill: `HitCount`, `ExecuteBonusPercent`, `InitialCooldown` (−1 means the ordinary
+    cooldown) and `MaxUsesPerBattle`.
+  - Per skill: `Effects`, a list of further `SkillEffect`s applied after the damage effect. Each
+    entry has `Type`, `Status`, `Stat`, `Magnitude`, `DurationTurns`, `Chance`, `MaxStacks`,
+    `IsPercent`, `HitCount` and `ExecuteBonusPercent`. The enum-valued fields take the runtime enum
+    names.
+  - `Targeting` also accepts `HpFraction`.
+
+  The bosses (giant, champion and the fixed colossus) carry `StatusResist` 50. No fixture skill uses
+  the other fields yet, so the reports are unchanged.
 - **Placement.** Each side takes the front-most tiles of its own deployment zone (front row first,
   then outward from the centre line). Enemies are placed in fixture order; the team is committed
   through `PlacementValidator.TryPlaceAll`. Which member gets which slot is a fixed seeded shuffle

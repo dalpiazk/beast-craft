@@ -52,7 +52,12 @@ namespace BeastCraft.Tooling.BalanceSim
             };
         }
 
-        /// <summary>An enemy kit from its fixture definition: every skill in the given element, with its authored targeting.</summary>
+        /// <summary>
+        /// An enemy kit from its fixture definition: every skill in the given element, with its
+        /// authored targeting, its optional advanced fields (hit count, execute bonus, initial
+        /// cooldown, use limit) and any extra effects after the damage effect. The extra effects are
+        /// shared, read-only <see cref="SkillEffect"/> instances, like the skills themselves.
+        /// </summary>
         public static SkillSO[] BuildEnemyKit(IReadOnlyList<EnemySkillData> skills, Element element)
         {
             SkillSO[] kit = new SkillSO[skills.Count];
@@ -63,6 +68,18 @@ namespace BeastCraft.Tooling.BalanceSim
                 kit[i].TargetingCriterion = data.ParsedTargeting;
                 kit[i].TargetingOrder = data.ParsedTargetingOrder;
                 kit[i].TargetingStat = data.ParsedTargetingStat;
+                kit[i].InitialCooldown = data.InitialCooldown;
+                kit[i].MaxUsesPerBattle = data.MaxUsesPerBattle;
+                kit[i].Effects[0].HitCount = data.HitCount;
+                kit[i].Effects[0].ExecuteBonusPercent = data.ExecuteBonusPercent;
+
+                foreach (EnemyEffectData extra in data.Effects ?? new EnemyEffectData[0])
+                {
+                    if (extra.Parsed != null)
+                    {
+                        kit[i].Effects.Add(extra.Parsed);
+                    }
+                }
             }
 
             return kit;

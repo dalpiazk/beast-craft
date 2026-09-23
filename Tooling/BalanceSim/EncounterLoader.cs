@@ -59,6 +59,12 @@ namespace BeastCraft.Tooling.BalanceSim
         /// </summary>
         public string Stance;
 
+        /// <summary>
+        /// <see cref="BattleUnit.StatusResist"/>: percent (0-100) knocked off the chance of every
+        /// hostile non-damage effect (debuff, status, knockback) aimed at this enemy. Missing = 0.
+        /// </summary>
+        public int StatusResist;
+
         [System.Text.Json.Serialization.JsonIgnore]
         public CombatStance ParsedStance;
     }
@@ -160,6 +166,27 @@ namespace BeastCraft.Tooling.BalanceSim
         /// </summary>
         public string TargetingStat;
 
+        /// <summary><see cref="SkillEffect.HitCount"/> of the skill's damage effect; missing = 1.</summary>
+        public int HitCount = 1;
+
+        /// <summary><see cref="SkillEffect.ExecuteBonusPercent"/> of the skill's damage effect; missing = 0.</summary>
+        public int ExecuteBonusPercent;
+
+        /// <summary>
+        /// <see cref="SkillSO.InitialCooldown"/>; missing = -1, the ordinary cooldown. 0 fires on the
+        /// unit's first turn.
+        /// </summary>
+        public int InitialCooldown = SkillSO.UseCooldownAsInitial;
+
+        /// <summary><see cref="SkillSO.MaxUsesPerBattle"/>; missing = 0, unlimited.</summary>
+        public int MaxUsesPerBattle;
+
+        /// <summary>
+        /// Further effects applied after the damage effect, in order (buffs, debuffs, statuses).
+        /// Missing = none. Each lands on the skill's own targets.
+        /// </summary>
+        public EnemyEffectData[] Effects = new EnemyEffectData[0];
+
         [System.Text.Json.Serialization.JsonIgnore]
         public DamageCategory ParsedCategory;
 
@@ -174,6 +201,34 @@ namespace BeastCraft.Tooling.BalanceSim
 
         [System.Text.Json.Serialization.JsonIgnore]
         public StatType ParsedTargetingStat = StatType.HP;
+    }
+
+    /// <summary>
+    /// One extra <see cref="SkillEffect"/> on an enemy skill, after its damage effect. Names are
+    /// enum names; every field but <see cref="Type"/> is optional and defaults as the runtime field
+    /// does.
+    /// </summary>
+    public class EnemyEffectData
+    {
+        /// <summary>A <see cref="SkillEffectType"/> name: <c>Damage</c>, <c>Heal</c>, <c>BuffStat</c>, <c>DebuffStat</c> or <c>ApplyStatus</c>.</summary>
+        public string Type;
+
+        /// <summary>A <see cref="StatusType"/> name, read by <c>ApplyStatus</c>.</summary>
+        public string Status;
+
+        /// <summary>A <see cref="StatType"/> name, read by <c>BuffStat</c> / <c>DebuffStat</c>; missing = Attack.</summary>
+        public string Stat;
+
+        public float Magnitude;
+        public int DurationTurns;
+        public int Chance = SkillEffect.AlwaysChance;
+        public int MaxStacks = 1;
+        public bool IsPercent;
+        public int HitCount = 1;
+        public int ExecuteBonusPercent;
+
+        [System.Text.Json.Serialization.JsonIgnore]
+        public SkillEffect Parsed;
     }
 
     /// <summary>Which encounters a run fights (<c>--encounter-set</c>).</summary>
@@ -194,6 +249,10 @@ namespace BeastCraft.Tooling.BalanceSim
         public string GroupDisplayName;
         public Element Element;
         public double Threat;
+
+        /// <summary>The type's <see cref="EnemyTypeData.StatusResist"/>, handed to the unit.</summary>
+        public int StatusResist;
+
         public CreatureSpeciesSO Species;
         public SkillSO[] ElementalKit;
         public SkillSO[] NeutralKit;
@@ -449,6 +508,11 @@ namespace BeastCraft.Tooling.BalanceSim
                 errors.Add(where + ": Stance '" + type.Stance + "' is not Vanguard, Ranged or Skirmisher.");
             }
 
+            if (type.StatusResist < 0 || type.StatusResist > 100)
+            {
+                errors.Add(where + ": StatusResist must be between 0 and 100.");
+            }
+
             if (type.Skills == null || type.Skills.Length == 0)
             {
                 errors.Add(where + ": no skills.");
@@ -471,6 +535,7 @@ namespace BeastCraft.Tooling.BalanceSim
                 }
 
                 ParseTargeting(skill, skillWhere, errors);
+                ParseAdvanced(skill, skillWhere, errors);
 
                 if (skill.Shape == "SingleTarget")
                 {
@@ -651,7 +716,7 @@ namespace BeastCraft.Tooling.BalanceSim
                 (!Enum.IsDefined(typeof(SkillTargetingCriterion), skill.Targeting) || !Enum.TryParse(skill.Targeting, false, out skill.ParsedTargeting) ||
                  skill.ParsedTargeting == SkillTargetingCriterion.Random))
             {
-                errors.Add(skillWhere + ": Targeting '" + skill.Targeting + "' must be Distance, Stat or CurrentHp.");
+                errors.Add(skillWhere + ": Targeting '" + skill.Targeting + "' must be Distance, Stat, CurrentHp or HpFraction.");
             }
 
             if (!string.IsNullOrEmpty(skill.TargetingOrder) &&
@@ -664,6 +729,65 @@ namespace BeastCraft.Tooling.BalanceSim
                 (!Enum.IsDefined(typeof(StatType), skill.TargetingStat) || !Enum.TryParse(skill.TargetingStat, false, out skill.ParsedTargetingStat)))
             {
                 errors.Add(skillWhere + ": TargetingStat '" + skill.TargetingStat + "' is not a StatType name.");
+            }
+        }
+
+        /// <summary>
+        /// Validates a skill's optional advanced fields (hit count, execute bonus, initial cooldown,
+        /// use limit) and parses its extra <see cref="EnemySkillData.Effects"/> into runtime
+        /// <see cref="SkillEffect"/>s. All optional; missing values reproduce the plain fixture skill.
+        /// </summary>
+        private static void ParseAdvanced(EnemySkillData skill, string skillWhere, List<string> errors)
+        {
+            if (skill.HitCount < 1 || skill.ExecuteBonusPercent < 0 || skill.MaxUsesPerBattle < 0 || skill.InitialCooldown < SkillSO.UseCooldownAsInitial)
+            {
+                errors.Add(skillWhere + ": needs HitCount >= 1, ExecuteBonusPercent >= 0, MaxUsesPerBattle >= 0 and InitialCooldown >= -1.");
+            }
+
+            foreach (EnemyEffectData data in skill.Effects ?? new EnemyEffectData[0])
+            {
+                string effectWhere = skillWhere + " effect '" + data.Type + "'";
+                SkillEffect effect = new SkillEffect
+                {
+                    Magnitude = data.Magnitude,
+                    DurationTurns = data.DurationTurns,
+                    Chance = data.Chance,
+                    MaxStacks = data.MaxStacks,
+                    IsPercent = data.IsPercent,
+                    HitCount = data.HitCount,
+                    ExecuteBonusPercent = data.ExecuteBonusPercent
+                };
+
+                if (string.IsNullOrEmpty(data.Type) || !Enum.IsDefined(typeof(SkillEffectType), data.Type) ||
+                    !Enum.TryParse(data.Type, false, out effect.EffectType))
+                {
+                    errors.Add(effectWhere + ": Type must be a SkillEffectType name.");
+                }
+
+                if (!string.IsNullOrEmpty(data.Status) &&
+                    (!Enum.IsDefined(typeof(StatusType), data.Status) || !Enum.TryParse(data.Status, false, out effect.Status)))
+                {
+                    errors.Add(effectWhere + ": Status '" + data.Status + "' is not a StatusType name.");
+                }
+
+                if (effect.EffectType == SkillEffectType.ApplyStatus && effect.Status == StatusType.None)
+                {
+                    errors.Add(effectWhere + ": ApplyStatus needs a Status.");
+                }
+
+                if (!string.IsNullOrEmpty(data.Stat) &&
+                    (!Enum.IsDefined(typeof(StatType), data.Stat) || !Enum.TryParse(data.Stat, false, out effect.AffectedStat)))
+                {
+                    errors.Add(effectWhere + ": Stat '" + data.Stat + "' is not a StatType name.");
+                }
+
+                if (data.Chance < 1 || data.Chance > SkillEffect.AlwaysChance || data.MaxStacks < 1 || data.HitCount < 1 || data.DurationTurns < 0 ||
+                    data.ExecuteBonusPercent < 0)
+                {
+                    errors.Add(effectWhere + ": needs Chance 1-100, MaxStacks >= 1, HitCount >= 1, DurationTurns >= 0 and ExecuteBonusPercent >= 0.");
+                }
+
+                data.Parsed = effect;
             }
         }
 
@@ -740,6 +864,7 @@ namespace BeastCraft.Tooling.BalanceSim
                 GroupDisplayName = type.DisplayName,
                 Element = element,
                 Threat = type.Threat,
+                StatusResist = type.StatusResist,
                 Species = species,
                 ElementalKit = _kits[type][element],
                 NeutralKit = neutral

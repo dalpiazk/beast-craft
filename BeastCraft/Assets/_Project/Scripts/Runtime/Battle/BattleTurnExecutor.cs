@@ -110,10 +110,17 @@ namespace BeastCraft.Battle
     /// With a null grid nothing moves, whatever the stance.
     /// </para>
     /// <para>
+    /// <strong>Statuses.</strong> The executor frames every turn with the status engine
+    /// (<see cref="StatusEffects.BeginTurn"/> as it opens, <see cref="StatusEffects.EndTurn"/> as
+    /// it closes): damage-over-time lands first and can end the turn, and a
+    /// <see cref="StatusType.Stun"/> skips it. A <see cref="StatusType.Taunt"/> needs no code
+    /// here — <see cref="SkillTargetResolver"/> makes the taunter the focus, so the ordinary
+    /// approach walks toward it — and a <see cref="StatusType.Knockback"/> moves its target
+    /// through the grid this passes to <see cref="SkillEffectApplier"/>.
+    /// </para>
+    /// <para>
     /// <strong>Still not built here.</strong> <c>SkillSO.ResourceCost</c> is not spent (deferred by
-    /// the producer), no status-effect system exists for
-    /// <see cref="SkillEffectType.ApplyStatus"/> to hang off, and nothing in this file is a
-    /// MonoBehaviour or knows a scene exists. Beyond the stances there is no AI: a unit does not
+    /// the producer), and nothing in this file is a MonoBehaviour or knows a scene exists. Beyond the stances there is no AI: a unit does not
     /// retreat when hurt, spread out against area skills, hold a choke point or coordinate a focus,
     /// because none of that has been designed.
     /// </para>
@@ -160,6 +167,15 @@ namespace BeastCraft.Battle
         /// step, so an expiring move-range buff does not pay for one more turn of walking.
         /// </description></item>
         /// <item><description>
+        /// <see cref="StatusEffects.BeginTurn"/>: this turn is counted off every status the unit
+        /// carries and its damage-over-time stacks deal their damage (shield first). A unit they
+        /// defeat stops here — no movement, no skills, and no avatar tick, since it took no turn.
+        /// A unit that began the turn <see cref="StatusType.Stun">stunned</see> skips the next three
+        /// steps: it does not move, fires nothing, and its cooldowns do <em>not</em> tick (a stun
+        /// delays the rotation rather than burning it). Its gauge was spent as normal by
+        /// <see cref="TurnManager"/>, and the avatar still ticks on a stunned player beast's turn.
+        /// </description></item>
+        /// <item><description>
         /// <see cref="SkillLoadout.Tick"/>, which counts every slot down and reports the ones now at
         /// 0 without re-arming any of them.
         /// </description></item>
@@ -185,6 +201,9 @@ namespace BeastCraft.Battle
         /// instead fill a gauge of its own from its own Speed is an open design item (battle-system
         /// design doc, §6), and the rule is unchanged until it is decided.
         /// </description></item>
+        /// <item><description>
+        /// <see cref="StatusEffects.EndTurn"/>: statuses with no turns left come off.
+        /// </description></item>
         /// </list>
         /// </para>
         /// <para>
@@ -200,8 +219,10 @@ namespace BeastCraft.Battle
         /// </para>
         /// <para>
         /// <strong>The rng.</strong> <paramref name="rng"/> is the battle's one random stream.
-        /// Targeting draws from it (only for <see cref="SkillTargetingCriterion.Random"/>), and every
-        /// damage effect that lands draws its crit roll then its variance roll from it, in the order
+        /// Targeting draws from it (only for <see cref="SkillTargetingCriterion.Random"/>, and not at
+        /// all when a taunt decides the pick), every damage hit that lands draws its crit roll then
+        /// its variance roll from it, and a non-damage effect whose chance is below 100 draws its
+        /// chance check (see <see cref="SkillEffectApplier"/>), all in the order
         /// the turn fires skills — the unit's ready slots in stack order, then the avatar's — and
         /// within each skill in <see cref="SkillEffectApplier"/>'s target-major, authored-effect
         /// order. A null rng is the deterministic fallback: no variance, no crits (see
@@ -231,13 +252,24 @@ namespace BeastCraft.Battle
 
             SkillEffectApplier.TickModifiers(unit);
 
+            bool stunned;
+            int statusDamage = StatusEffects.BeginTurn(unit, out stunned);
+
+            if (unit.IsDefeated)
+            {
+                // Its own damage-over-time finished it as the turn opened: there is no turn to take.
+                LiftDefeated(allUnits, grid);
+                return new BattleTurnResult(unit, start, unit.Position, 0, 0, outcomes, avatarActivations, 0, stunned, statusDamage);
+            }
+
             // Read after the tick, not before: move range is a stat, so a move-range buff that
             // expires on this tick must already be gone from this turn's budget.
             int budget = unit.MoveRange < 0 ? 0 : unit.MoveRange;
             int remaining = budget;
 
+            // A stunned unit's rotation does not advance: nothing is offered, so nothing fires.
             SkillLoadout loadout = unit.Skills;
-            IReadOnlyList<int> ready = loadout == null ? new List<int>() : loadout.Tick();
+            IReadOnlyList<int> ready = loadout == null || stunned ? new List<int>() : loadout.Tick();
 
             for (int i = 0; i < ready.Count; i++)
             {
@@ -310,7 +342,7 @@ namespace BeastCraft.Battle
 
             // Leftover budget: a Ranged or Skirmisher unit backs away; a Vanguard keeps its ground.
             int retreatSteps = 0;
-            if (!unit.IsDefeated && remaining > 0 && RetreatsWithLeftover(unit.Stance))
+            if (!stunned && !unit.IsDefeated && remaining > 0 && RetreatsWithLeftover(unit.Stance))
             {
                 retreatSteps = Retreat(unit, allUnits, grid, remaining);
                 remaining -= retreatSteps;
@@ -322,13 +354,16 @@ namespace BeastCraft.Battle
 
                 for (int i = 0; i < cast.Count; i++)
                 {
-                    SkillEffectApplier.Apply(cast[i], avatar, rng);
+                    SkillEffectApplier.Apply(cast[i], avatar, rng, grid);
                     LiftDefeated(allUnits, grid);
                     avatarActivations.Add(cast[i]);
                 }
             }
 
-            return new BattleTurnResult(unit, start, unit.Position, budget, budget - remaining, outcomes, avatarActivations, retreatSteps);
+            StatusEffects.EndTurn(unit);
+
+            return new BattleTurnResult(unit, start, unit.Position, budget, budget - remaining, outcomes, avatarActivations, retreatSteps, stunned,
+                                        statusDamage);
         }
 
         /// <summary>
@@ -444,7 +479,7 @@ namespace BeastCraft.Battle
             IReadOnlyList<BattleUnit> targets = SkillTargetResolver.ResolveTargets(skill, caster, allUnits, grid, rng);
             SkillActivation activation = new SkillActivation(loadout.GetInstance(slotIndex), targets);
 
-            SkillEffectApplier.Apply(activation, caster, rng);
+            SkillEffectApplier.Apply(activation, caster, rng, grid);
             LiftDefeated(allUnits, grid);
             loadout.MarkFired(slotIndex);
 

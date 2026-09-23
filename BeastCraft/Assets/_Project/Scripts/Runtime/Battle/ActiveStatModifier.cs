@@ -25,12 +25,20 @@ namespace BeastCraft.Battle
     /// </summary>
     public class ActiveStatModifier
     {
-        public ActiveStatModifier(StatType stat, int delta, int remainingTurns)
+        public ActiveStatModifier(StatType stat, int delta, int remainingTurns, SkillEffect origin = null)
         {
             Stat = stat;
             Delta = delta;
             RemainingTurns = remainingTurns;
+            Origin = origin;
         }
+
+        /// <summary>
+        /// The authored effect that applied this modifier, or <c>null</c> when it was built by hand.
+        /// Stacks are counted per origin against <see cref="SkillEffect.MaxStacks"/>: two different
+        /// effects on the same stat never share a cap.
+        /// </summary>
+        public SkillEffect Origin { get; }
 
         /// <summary>The stat axis this modifier moved.</summary>
         public StatType Stat { get; }

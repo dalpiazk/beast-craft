@@ -365,7 +365,7 @@ namespace BeastCraft.Tooling.BalanceSim
             {
                 EnemySlot slot = encounter.Enemies[i];
                 BattleUnit enemy = BattleUnitFactory.CreateBeast(enemyPrefix + slot.UnitId, BattleTeam.Enemy, slot.Species, level, null, enemyTiles[i],
-                                                                 Kit.Loadout(slot.KitFor(mode)));
+                                                                 Kit.Loadout(slot.KitFor(mode)), slot.StatusResist);
                 enemy.Stats = Scale(enemy.Stats, multiplier);
                 enemy.CurrentHp = enemy.Stats.Hp;
 

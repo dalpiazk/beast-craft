@@ -32,6 +32,27 @@ namespace BeastCraft.Battle
         /// <summary>Turns that must pass before this skill can be used again. 0 means no cooldown.</summary>
         public int Cooldown;
 
+        /// <summary>The <see cref="InitialCooldown"/> value that means "start at the ordinary cooldown".</summary>
+        public const int UseCooldownAsInitial = -1;
+
+        /// <summary>
+        /// What this skill's counter starts the battle at, when it should differ from
+        /// <see cref="Cooldown"/>. The default, <see cref="UseCooldownAsInitial"/> (any negative
+        /// value), starts it at the ordinary cooldown — the instance's
+        /// <see cref="SkillInstance.EffectiveCooldown"/> — exactly as before this field existed.
+        /// <c>0</c> fires on the owner's first turn; any other value is taken as authored (a tier's
+        /// cooldown reduction does not touch it). Counters tick before they are read, so 0 and 1
+        /// both fire on the first turn. See <see cref="SkillLoadout"/>.
+        /// </summary>
+        public int InitialCooldown = UseCooldownAsInitial;
+
+        /// <summary>
+        /// How many times this skill may fire in one battle; 0 (the default) or below is unlimited.
+        /// Counted per equipped slot by <see cref="SkillLoadout"/>: once a slot has fired this many
+        /// times it is spent and never offered again that battle.
+        /// </summary>
+        public int MaxUsesPerBattle;
+
         /// <summary>The footprint this skill covers, always anchored on the caster's own tile.</summary>
         public SkillTargetShape TargetShape = SkillTargetShape.SingleTarget;
 

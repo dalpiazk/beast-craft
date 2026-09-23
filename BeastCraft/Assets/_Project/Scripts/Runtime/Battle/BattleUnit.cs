@@ -16,9 +16,9 @@ namespace BeastCraft.Battle
     /// <para>
     /// Intentionally minimal: the identity, allegiance, stats and position that the grid and the
     /// turn manager need to reference, plus the equipped skill stack the rotation ticks, the live
-    /// HP pool effects spend against, the timed stat modifiers riding on the unit, and the level
-    /// the damage formula reads. This is NOT the final creature-instance runtime model — the real
-    /// one will carry equipped gear, status effects and a link back to its
+    /// HP pool effects spend against, the timed stat modifiers and statuses riding on the unit, and
+    /// the level the damage formula reads. This is NOT the final creature-instance runtime model —
+    /// the real one will carry equipped gear and a link back to its
     /// <c>CreatureSpeciesSO</c>, and this type will either grow into it or be replaced by it.
     /// </para>
     /// <para>
@@ -68,9 +68,15 @@ namespace BeastCraft.Battle
         /// <c>CreatureSpeciesSO.Stance</c>. It defaults to <see cref="CombatStance.Vanguard"/>, whose
         /// movement is the plain approach rule, so every existing call site keeps its behaviour.
         /// </para>
+        /// <para>
+        /// <paramref name="statusResist"/> is the unit's <see cref="StatusResist"/>, clamped into
+        /// [0, 100]. It defaults to 0 — no resistance — so every existing call site keeps its
+        /// behaviour.
+        /// </para>
         /// </summary>
         public BattleUnit(string id, BattleTeam team, StatBlock stats, HexCoordinate position, SkillLoadout skills = null,
-                          IReadOnlyList<Element> elements = null, int level = 1, CombatStance stance = CombatStance.Vanguard)
+                          IReadOnlyList<Element> elements = null, int level = 1, CombatStance stance = CombatStance.Vanguard,
+                          int statusResist = 0)
         {
             Id = id;
             Team = team;
@@ -82,7 +88,11 @@ namespace BeastCraft.Battle
             Elements = CopyElements(elements);
             Level = level < 1 ? 1 : level;
             Stance = stance;
+            StatusResist = statusResist < 0 ? 0 : statusResist > 100 ? 100 : statusResist;
+            _statuses = new List<ActiveStatus>();
         }
+
+        private readonly List<ActiveStatus> _statuses;
 
         /// <summary>
         /// Stable identifier for this combatant, unique within a single battle. This is the key the
@@ -244,6 +254,36 @@ namespace BeastCraft.Battle
         /// </para>
         /// </summary>
         public CombatStance Stance { get; }
+
+        /// <summary>
+        /// Percent (0-100) knocked off the chance of every <em>hostile</em> non-damage effect that
+        /// targets this unit — a debuff, a status or a knockback cast by the other team:
+        /// the effective chance is <c>SkillEffect.Chance * (100 - StatusResist) / 100</c>. Effects
+        /// from the unit's own side (heals, buffs, shields) ignore it. See
+        /// <see cref="SkillEffectApplier"/>.
+        /// <para>
+        /// Read-only and fixed at construction, like <see cref="Stance"/>: a trait of what the unit
+        /// is (the balance simulator gives its bosses resistance), not a battle state.
+        /// </para>
+        /// </summary>
+        public int StatusResist { get; }
+
+        /// <summary>
+        /// The statuses currently riding on this unit (<see cref="StatusType"/>), in the order they
+        /// were applied. A read-only view: <see cref="StatusEffects"/> is the only writer, applying
+        /// them through <see cref="SkillEffectApplier"/> and ticking them on the unit's own turns
+        /// from <see cref="BattleTurnExecutor"/>. Never <c>null</c>; empty is the normal state.
+        /// </summary>
+        public IReadOnlyList<ActiveStatus> Statuses
+        {
+            get { return _statuses; }
+        }
+
+        /// <summary>The mutable status list behind <see cref="Statuses"/>, for <see cref="StatusEffects"/> only.</summary>
+        internal List<ActiveStatus> StatusList
+        {
+            get { return _statuses; }
+        }
 
         /// <summary>
         /// True once the unit is out of the fight. Defeated units are skipped by the turn order and

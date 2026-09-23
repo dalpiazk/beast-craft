@@ -669,16 +669,180 @@ revisited when balance work starts.
   turn reads any stat — the movement budget included — so a modifier on its last turn has already
   expired by the time that turn acts.
 
-- **`ApplyStatus` is unimplemented and does nothing.** There is no status-effect system anywhere in
-  the data model — no poison, stun or burn, and no field on `SkillEffect` naming *which* status,
-  because the set of statuses has never been designed. Implementing the effect would mean inventing
-  that design inside the effect applier, which is the wrong place for it. The switch arm exists and
-  is documented as a deliberate gap rather than silently falling through: authoring an `ApplyStatus`
-  effect today is a no-op. It is pending an actual status-effect design, at which point that arm is
-  where it plugs in.
+- **`ApplyStatus` applies a status.** It used to be a documented no-op, for want of a status
+  design. `SkillEffect.Status` now names which `StatusType` it applies, and the rules are in
+  "Status effects and advanced skill effects" below. An `ApplyStatus` effect left at
+  `StatusType.None` still does nothing.
+
+- **Re-applying the same timed buff or debuff refreshes it instead of stacking.** Each timed
+  modifier remembers the authored effect it came from. `SkillEffect.MaxStacks` (default 1) caps how
+  many copies of *that effect* a unit carries. At the cap, the copy with the fewest turns left is
+  reverted and replaced. Before this, re-applying the same effect stacked without limit. No content
+  relied on that. Two *different* effects on the same stat still stack independently, as before.
 
 Resource cost is still not spent, per the open question above; effect application does not gate on
 it.
+
+## Status effects and advanced skill effects — TUNABLE STARTING DEFAULTS, NOT CONFIRMED BALANCE
+
+This is the effect engine the per-beast skill kits need. It follows the user's reference, Sword x
+Staff: chance-based taunt, multi-hit with per-hit rolls, stacking debuffs with a stack cap,
+Defense-based shields, knockback, heal targeting by HP fraction, execute scaling and skills that
+fire on turn one. **Every new field is inert at its default.** A skill authored before this pass
+behaves, rolls and replays exactly as it did. The simulator's report is byte-identical. No content
+uses any of this yet: authoring the per-beast kits is the next deliverable.
+
+**New data** (explicit enum values, never renumbered):
+
+- `SkillEffect.Status` (`StatusType`: `None = 0`, `Taunt = 1`, `Stun = 2`, `Shield = 3`,
+  `DamageOverTime = 4`, `Knockback = 5`), `Chance` (percent, default 100), `MaxStacks` (default 1),
+  `IsPercent` (default false), `HitCount` (default 1) and `ExecuteBonusPercent` (default 0). Unity
+  zero-fills a list entry added in the inspector, so a `Chance`, `MaxStacks` or `HitCount` of 0 or
+  below reads as its default. A freshly authored effect lands once, always. It never silently lands
+  zero times.
+- `SkillTargetingCriterion.HpFraction = 4`.
+- `SkillSO.InitialCooldown` (default −1, meaning the ordinary cooldown) and
+  `SkillSO.MaxUsesPerBattle` (default 0, meaning unlimited).
+- `BattleUnit.StatusResist`: percent, 0–100, default 0, fixed at construction. There is a
+  `BattleUnitFactory.CreateBeast` overload that takes it. `BattleUnit.Statuses` is a read-only view
+  of the statuses on the unit.
+- `BattleTurnResult.Stunned` and `StatusDamage`, and `DamageHit.Absorbed`.
+- `StatusEffects`, the status engine. `SkillEffectApplier.GetEffectiveChance` and `RollChance`.
+  `DamageFormula.GetExecuteMultiplier` and a `Roll` / `Compute` overload with a bonus multiplier.
+
+**Chance and resistance.** Every non-damage effect (heal, buff, debuff, status, knockback) rolls
+its `Chance` separately for each target. Damage always lands. A hostile application, meaning one
+onto a unit of the other team, is reduced by the target's resistance:
+`effective = Chance × (100 − StatusResist) / 100`, in integers and truncated. So an 85% taunt on a
+50%-resistant boss has a 42% chance. Effects on the caster's own side are never resisted. The roll
+is `rng.Next(100) < effective`. It draws once, **and only when the effective chance is below 100**.
+An effect that always lands draws nothing, which keeps existing content's draw sequence unchanged.
+A null rng (the deterministic fallback) lands only certain effects. There is no luck either way,
+just as the fallback never crits.
+
+**The rng draw order** stays target-major and in authored effect order. Within that:
+
+- A damage effect draws crit, then variance, for each hit in turn. It draws nothing for hits that
+  never happen because the target fell.
+- A non-damage effect draws its single chance roll, if it needs one, before it applies.
+- Nothing else draws: not the statuses themselves, not a damage-over-time snapshot, not a
+  knockback, and not a taunt-forced pick.
+
+For example, `[Damage, 50% debuff]` on one target draws crit, variance, then chance.
+
+**Statuses** live on the affected unit. Their durations count **the affected unit's own turns**, as
+timed modifiers do, and mean "in force for this many of its turns":
+
+- `StatusEffects.BeginTurn` counts the current turn off every status present as the turn opens.
+- `StatusEffects.EndTurn` removes the statuses with nothing left when the turn closes.
+- So a status applied during the unit's own turn (a self-shield) does not lose that turn.
+- A `DurationTurns` below 1 reads as 1 for a stored status.
+
+The turn order is:
+
+1. Lift the defeated.
+2. Tick the timed modifiers.
+3. `BeginTurn`: damage-over-time lands, and the stun is read.
+4. Skills, movement and retreat, unless stunned.
+5. The avatar tick.
+6. `EndTurn`.
+
+The statuses:
+
+- **Taunt.** The taunted unit's enemy-side picking skills (`SingleTarget`, `Line`) must pick the
+  taunter while it is alive and on the other team. The range-limited pick takes it when it is in
+  range. The range-free focus pick always takes it, so `BattleTurnExecutor` walks toward it through
+  the ordinary approach and fires once it is in range. While the taunter is out of reach, the
+  range-limited pick falls back to the ordinary rule. The taunt decides the pick before any
+  criterion, so a `Random` skill draws nothing when taunted. Ally-side skills are never taunted. A
+  unit carries one taunt, and the latest replaces the earlier one. A taunt whose source has fallen
+  forces nothing. The reference's "100% against non-character units" is expressed through
+  resistance rather than a special case.
+- **Stun** (also used for Freeze). A unit that begins its turn stunned skips it. It does not move,
+  fires nothing, does not retreat, and **its cooldowns do not tick**: a stun delays the rotation
+  rather than burning it. Its timed modifiers and statuses still tick, and its gauge is spent as
+  normal. The avatar still ticks on a stunned player beast's turn. Stuns do not stack. A new stun
+  keeps whichever of the two has more turns left.
+- **Shield.** It absorbs damage before HP. It is worth `Magnitude`% of the **caster's** `Defense`
+  (`StatusEffects.ShieldPercentDivisor`), level-scaled like every magnitude and truncated. Every
+  damage hit and every damage-over-time tick is taken from the shield first. A shield brought to 0
+  is removed, and one that outlasts its duration expires. A unit holds one shield: **the larger
+  one wins**. On a tie the existing shield is kept and its duration is not refreshed.
+- **Damage over time** (also used for Burn and Poison). At application it snapshots
+  `DamageFormula` with `Magnitude` as the power: the caster's attacking stat against the target's
+  defending stat (by the skill's category), with the element, no crit, no variance and a floor of
+  1. Later buffs do not change it. The damage is dealt at the start of each of the affected unit's
+  own turns, through its shield. A unit its stacks defeat takes no turn: no skills, and no avatar
+  tick. `MaxStacks` copies per authored effect ride at once, each on its own clock. At the cap, the
+  copy with the fewest turns left is replaced, so the default of 1 refreshes.
+- **Knockback.** It pushes the target `Magnitude` whole hexes away from the caster, one tile at a
+  time. The distance uses the authored magnitude and is not level-scaled. It stops at the first
+  off-board, blocked or occupied tile. "Directly away" is the axial direction with the largest
+  Cartesian dot product with the caster-to-target vector, computed exactly in integers as
+  `2·q1·q2 + q1·r2 + r1·q2 + 2·r1·r2`. Ties go to the earlier direction. It needs the grid, which
+  the executor passes to `SkillEffectApplier.Apply`. With no grid it does nothing. It is never
+  stored.
+
+**Stacking stat buffs and debuffs.** `MaxStacks` caps the timed copies of one authored effect on a
+unit, and each copy expires on its own clock. At the cap, the copy with the fewest turns left (the
+oldest on a tie) is reverted and replaced. Instant changes (`DurationTurns` 0) are permanent and
+uncapped, as before. With `IsPercent`, the change is `Magnitude`% of the unit's **current** value of
+the stat at the moment it lands, truncated. That keeps the rule simple: `BattleUnit` holds no
+separate base block. It also means percent stacks compound: two +10% buffs on 100 Attack give 121.
+The applied delta is stored and reverted exactly, like any modifier.
+
+**Multi-hit.** A damage effect with `HitCount` greater than 1 runs the whole pipeline once per hit:
+its own crit and variance rolls, the execute bonus at the HP the target has at that moment, shield
+absorption and the defeat check. It stops as soon as the target falls. Each hit is recorded in
+`SkillActivation.Hits`.
+
+**Execute.** Damage is multiplied by `1 + ExecuteBonusPercent / 100 × (max − current) / max`. The
+multiplier is applied after the element, crit and variance, and before the single truncation. The
+curve is linear in missing HP:
+
+- ×1 at full health.
+- ×1.5 at half HP for a 100% bonus.
+- ×(1 + bonus/100) at 0 HP. A living target approaches this but never quite reaches it.
+
+A multiplier of exactly 1 is skipped rather than multiplied, so it is bit-exact.
+
+**Heal targeting.** `HpFraction` compares `CurrentHp / Stats.Hp` exactly by cross-multiplying in
+64-bit integers (`a.cur × b.max` against `b.cur × a.max`), never as a float. It uses the same
+id-order tie-break as every criterion. Use it with `Ally` and `Lowest` to heal whoever is worst off.
+`CurrentHp` gets this wrong when maximums differ.
+
+**Skill-level limits.**
+
+- `InitialCooldown` below 0 (the default, −1) starts the counter at the ordinary cooldown, the
+  instance's effective cooldown, exactly as before. A value of 0 or more is taken as authored, and a
+  tier's cooldown reduction does not touch it. `0` fires on the owner's first turn.
+- `MaxUsesPerBattle` is counted per slot by `SkillLoadout.MarkFired`. A slot that reaches it is
+  spent (`IsSpent`, `UsesThisBattle`): its counter still ticks, but it is never offered again that
+  battle. 0 means unlimited.
+- Per-effect proc cooldowns for triggered passives come with the passives (next deliverable).
+
+**Simulator.** `encounters.json` can now express all of this for future content:
+
+- `StatusResist` per enemy type.
+- Per skill: `HitCount`, `ExecuteBonusPercent`, `InitialCooldown`, `MaxUsesPerBattle` and an
+  `Effects` list of further effects after the damage effect, with names from the runtime enums. The
+  loader validates them.
+- `HpFraction` targeting.
+
+The bosses (giant, champion and the fixed colossus) carry `StatusResist` 50. No fixture skill
+applies a status, so the report is unchanged.
+
+**Open questions.**
+
+- Whether resistance should also shorten durations, as in some references, rather than only gating
+  the chance.
+- Whether a shield should scale off the caster's `Defense` or the target's.
+- Whether damage over time should be able to crit.
+- Whether taunt should also force area skills' positioning.
+- Whether knockback into a unit should deal collision damage.
+- Whether a stun should also freeze the gauge.
+- The simulator attributes damage to the unit whose turn it is. Once content applies
+  damage-over-time, that attribution will need the source recorded.
 
 ## Element system — TUNABLE STARTING CHART, NOT CONFIRMED BALANCE
 
@@ -1510,6 +1674,20 @@ with the right and wrong material tier, magnitude scaling in real damage, heals 
 cooldown reduction and bonus effects in a battle turn, the equip rules, species acquisition, the
 factory's slot order, and use counts read back from `RunBattle`.
 
+The effect engine for per-beast kits has landed, as described in "Status effects and advanced skill
+effects" above. It adds:
+
+- Chance and `StatusResist`.
+- `StatusType` statuses: taunt, stun, shield, damage over time and knockback.
+- Stacking and percent stat changes.
+- Multi-hit and execute.
+- `HpFraction` targeting.
+- `InitialCooldown` and `MaxUsesPerBattle`.
+
+Every new field is inert at its default, so the simulator's report is unchanged. `encounters.json`
+can express all of it, and the bosses carry 50% resistance. EditMode tests cover each rule,
+including the draw order and seeded reproducibility.
+
 Every pass so far is deliberately **data structures and algorithms only** — no MonoBehaviours, no
 scene or prefab wiring, and no committed `.asset` instances (the roster's are generated in-Editor). The hex radii backing each arena preset
 are placeholder implementation defaults chosen to be tunable, not producer-confirmed balance
@@ -1520,7 +1698,8 @@ element chart), deciding the design questions it raised above — a design decis
 rather than make — and extending the simulator once authored skills, real encounters and the avatar
 give it more than a standard kit and fixture enemies to measure; multi-hex large creatures, an open
 item under "Encounter direction" above; stat-scaled healing; the starter roster's skills (none are
-authored yet), the status-effect system behind `ApplyStatus`, resource gating on top of cooldowns,
+authored yet — the effect engine they need, statuses included, has landed), triggered passives and
+their proc caps, resource gating on top of cooldowns,
 the placement UI (a Unity
 Editor task, not a continuation of the placement validation that just landed), the encounter
 definition that selects an arena preset and a battle format, and the presentation layer.

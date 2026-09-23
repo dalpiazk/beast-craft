@@ -59,7 +59,8 @@ namespace BeastCraft.Battle
         /// <summary>
         /// Builds a loadout from an ordered stack of skills. Each slot's counter starts at that
         /// skill's own <see cref="SkillSO.Cooldown"/>, so nothing fires before it has counted down
-        /// at least once — there is no turn-one alpha strike.
+        /// at least once — there is no turn-one alpha strike — unless the skill sets a
+        /// <see cref="SkillSO.InitialCooldown"/> (0 fires on the first turn).
         /// <para>
         /// A <c>Cooldown</c> of 0 and a <c>Cooldown</c> of 1 both end up firing every turn (0 starts
         /// already at zero, 1 reaches zero on the first tick). That is intended, not a degenerate
@@ -169,6 +170,25 @@ namespace BeastCraft.Battle
         }
 
         /// <summary>
+        /// How many times one slot has fired this battle (counted by <see cref="MarkFired"/>). 0 for
+        /// an out-of-range index.
+        /// </summary>
+        public int UsesThisBattle(int slotIndex)
+        {
+            return slotIndex >= 0 && slotIndex < _slots.Count ? _slots[slotIndex].Uses : 0;
+        }
+
+        /// <summary>
+        /// Whether one slot has fired its skill's <see cref="SkillSO.MaxUsesPerBattle"/> times and
+        /// so will never be offered again this battle. Always false for an unlimited skill (a limit
+        /// of 0 or below) and for an out-of-range index.
+        /// </summary>
+        public bool IsSpent(int slotIndex)
+        {
+            return slotIndex >= 0 && slotIndex < _slots.Count && _slots[slotIndex].IsSpent;
+        }
+
+        /// <summary>
         /// Advances the whole rotation by one turn and reports which slots are ready as a result.
         /// <strong>Does not fire or re-arm anything</strong> — see <see cref="MarkFired"/>.
         /// <para>
@@ -199,6 +219,10 @@ namespace BeastCraft.Battle
         /// Returns an empty list — never <c>null</c> — when nothing is ready, including for an empty
         /// loadout. Pure cooldown bookkeeping: no targeting, no board, no roster.
         /// </para>
+        /// <para>
+        /// A slot that has used up its skill's <see cref="SkillSO.MaxUsesPerBattle"/> is
+        /// <see cref="IsSpent">spent</see>: its counter still ticks, but it is never offered again.
+        /// </para>
         /// </summary>
         public IReadOnlyList<int> Tick()
         {
@@ -213,7 +237,7 @@ namespace BeastCraft.Battle
                     slot.Counter -= 1;
                 }
 
-                if (slot.Counter == 0)
+                if (slot.Counter == 0 && !slot.IsSpent)
                 {
                     ready.Add(i);
                 }
@@ -237,6 +261,10 @@ namespace BeastCraft.Battle
         /// That is the intended "every turn" skill, unchanged from before the split.
         /// </para>
         /// <para>
+        /// Also counts the use (<see cref="UsesThisBattle"/>); the use that reaches the skill's
+        /// <see cref="SkillSO.MaxUsesPerBattle"/> spends the slot.
+        /// </para>
+        /// <para>
         /// Out-of-range indices are ignored rather than throwing, matching
         /// <see cref="RemainingCooldown"/> and the rest of this namespace's non-throwing stance.
         /// </para>
@@ -248,7 +276,9 @@ namespace BeastCraft.Battle
                 return;
             }
 
-            _slots[slotIndex].Counter = _slots[slotIndex].AuthoredCooldown;
+            Slot slot = _slots[slotIndex];
+            slot.Counter = slot.AuthoredCooldown;
+            slot.Uses += 1;
         }
 
         /// <summary>
@@ -350,7 +380,31 @@ namespace BeastCraft.Battle
             {
                 Instance = instance;
                 AuthoredCooldown = instance.EffectiveCooldown;
-                Counter = AuthoredCooldown;
+                Counter = InitialCounter(instance, AuthoredCooldown);
+                MaxUses = instance.Skill == null || instance.Skill.MaxUsesPerBattle < 0 ? 0 : instance.Skill.MaxUsesPerBattle;
+            }
+
+            /// <summary>
+            /// Where the counter starts: the skill's <see cref="SkillSO.InitialCooldown"/> when it is
+            /// set (0 or more), otherwise <paramref name="cooldown"/> — the ordinary cooldown, which
+            /// is how every loadout started before the field existed.
+            /// </summary>
+            private static int InitialCounter(SkillInstance instance, int cooldown)
+            {
+                SkillSO skill = instance.Skill;
+                return skill == null || skill.InitialCooldown < 0 ? cooldown : skill.InitialCooldown;
+            }
+
+            /// <summary>The skill's <see cref="SkillSO.MaxUsesPerBattle"/>, captured; 0 is unlimited.</summary>
+            public int MaxUses { get; }
+
+            /// <summary>Times this slot has fired this battle.</summary>
+            public int Uses { get; set; }
+
+            /// <summary>Whether the slot has used up its <see cref="MaxUses"/>.</summary>
+            public bool IsSpent
+            {
+                get { return MaxUses > 0 && Uses >= MaxUses; }
             }
 
             /// <summary>The leveled skill equipped in this slot.</summary>

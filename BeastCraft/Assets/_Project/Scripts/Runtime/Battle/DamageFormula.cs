@@ -200,6 +200,17 @@ namespace BeastCraft.Battle
         /// </summary>
         public static DamageRoll Roll(BattleUnit caster, BattleUnit target, SkillSO skill, float power, System.Random rng)
         {
+            return Roll(caster, target, skill, power, rng, 1.0);
+        }
+
+        /// <summary>
+        /// <see cref="Roll(BattleUnit, BattleUnit, SkillSO, float, System.Random)"/> with an extra
+        /// multiplier applied last, before truncation — the execute bonus (see
+        /// <see cref="GetExecuteMultiplier"/>). Exactly 1 is the identity and is not multiplied at
+        /// all, so it reproduces the plain roll bit for bit. Same draws, in the same order.
+        /// </summary>
+        public static DamageRoll Roll(BattleUnit caster, BattleUnit target, SkillSO skill, float power, System.Random rng, double bonusMultiplier)
+        {
             if (caster == null || target == null || skill == null)
             {
                 return new DamageRoll(0, false, NeutralVariancePercent);
@@ -212,7 +223,33 @@ namespace BeastCraft.Battle
             int defense = GetDefenseStat(target.Stats, skill.Category);
             float multiplier = ElementChart.GetMultiplier(skill.Element, target.Elements);
 
-            return new DamageRoll(Compute(power, attack, defense, multiplier, variancePercent, isCrit), isCrit, variancePercent);
+            return new DamageRoll(Compute(power, attack, defense, multiplier, variancePercent, isCrit, bonusMultiplier), isCrit, variancePercent);
+        }
+
+        /// <summary>
+        /// The execute multiplier for a hit carrying <paramref name="executeBonusPercent"/> against a
+        /// target at <paramref name="currentHp"/> of <paramref name="maxHp"/>:
+        /// <c>1 + bonus / 100 * (maxHp - currentHp) / maxHp</c>. Linear in missing HP — 1 at full
+        /// health, <c>1 + bonus/100</c> at 0 HP (a 100% bonus is ×1.5 at half HP, ×2 at 0 HP; a
+        /// living target never quite reaches the maximum). Exactly 1 (the identity) when the bonus is 0 or below, the maximum
+        /// is 0 or below, or the target is at full health; current HP is clamped into [0, max].
+        /// </summary>
+        public static double GetExecuteMultiplier(int executeBonusPercent, int currentHp, int maxHp)
+        {
+            if (executeBonusPercent <= 0 || maxHp <= 0)
+            {
+                return 1.0;
+            }
+
+            int current = currentHp < 0 ? 0 : currentHp > maxHp ? maxHp : currentHp;
+            int missing = maxHp - current;
+
+            if (missing == 0)
+            {
+                return 1.0;
+            }
+
+            return 1.0 + ((double)executeBonusPercent * missing / (100.0 * maxHp));
         }
 
         /// <summary>
@@ -238,6 +275,17 @@ namespace BeastCraft.Battle
         /// </summary>
         public static int Compute(float power, int attack, int defense, float elementMultiplier, int variancePercent, bool isCrit)
         {
+            return Compute(power, attack, defense, elementMultiplier, variancePercent, isCrit, 1.0);
+        }
+
+        /// <summary>
+        /// <see cref="Compute(float, int, int, float, int, bool)"/> with
+        /// <paramref name="bonusMultiplier"/> (the execute bonus) applied after the variance roll and
+        /// before truncation. Exactly 1 is not multiplied at all, so it is bit-exact with the
+        /// six-argument form; a negative value is treated as 0.
+        /// </summary>
+        public static int Compute(float power, int attack, int defense, float elementMultiplier, int variancePercent, bool isCrit, double bonusMultiplier)
+        {
             if (power <= 0f)
             {
                 return 0;
@@ -253,6 +301,11 @@ namespace BeastCraft.Battle
             if (variancePercent != NeutralVariancePercent)
             {
                 scaled = scaled * (variancePercent < 0 ? 0 : variancePercent) / 100.0;
+            }
+
+            if (bonusMultiplier != 1.0)
+            {
+                scaled *= bonusMultiplier < 0.0 ? 0.0 : bonusMultiplier;
             }
 
             int damage = (int)scaled;
