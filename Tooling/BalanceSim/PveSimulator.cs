@@ -12,12 +12,20 @@ namespace BeastCraft.Tooling.BalanceSim
     public class PveBattle
     {
         public BattleOutcome Outcome;
-        public int Rounds;
+
+        /// <summary><see cref="BattleResult.ElapsedTicks"/>: when the last turn was taken, in gauge ticks.</summary>
+        public long ElapsedTicks;
+
+        /// <summary>Turns taken by every unit on both sides.</summary>
+        public int Actions;
 
         /// <summary>Per team member, in the team's roster order (not slot order).</summary>
         public int[] DamageDealt;
         public int[] DamageTaken;
         public bool[] Alive;
+
+        /// <summary>Per team member: turns it took.</summary>
+        public int[] MemberActions;
 
         public int StrikeFires;
         public int BlastFires;
@@ -27,6 +35,12 @@ namespace BeastCraft.Tooling.BalanceSim
         public bool Cleared
         {
             get { return Outcome == BattleOutcome.PlayerVictory; }
+        }
+
+        /// <summary>Normalized battle time (<see cref="BattleResult.Time"/>): 1.0 = one turn of a Speed-100 unit.</summary>
+        public double Time
+        {
+            get { return (double)ElapsedTicks / TurnManager.TicksPerTimeUnit; }
         }
     }
 
@@ -89,17 +103,19 @@ namespace BeastCraft.Tooling.BalanceSim
 
         /// <summary>
         /// Per team, which member stands in which deployment slot (and so gets which unit id). A
-        /// fixed, seeded shuffle per team: slot and id decide the speed-tie break between team
-        /// members and which beast an enemy picks between equidistant targets (both break ties on
-        /// the ordinal id), so pinning them to roster order would systematically expose the first
-        /// species in the roster.
+        /// fixed, seeded shuffle per team: slot and id decide the initiative tie break between team
+        /// members (equal gauge and equal Speed) and which beast an enemy picks between equidistant
+        /// targets (both break ties on the ordinal id), so pinning them to roster order would
+        /// systematically expose the first species in the roster.
         /// </summary>
         public int[][] SlotOrders { get; }
 
         /// <summary>
-        /// Id prefixes that neutralise the speed tie between the two sides. <see cref="TurnManager"/>
-        /// breaks equal Speed on the ordinal unit id, and the raw ids (<c>e01</c>... for enemies,
-        /// <c>p1</c>... for the team) would hand every cross-side tie to the enemies. Each battle
+        /// Id prefixes that neutralise the initiative tie between the two sides.
+        /// <see cref="TurnManager"/> breaks a tie between equally full, equally fast gauges on the
+        /// ordinal unit id (under the ATB gauge, units of equal Speed fill in lockstep, so this is
+        /// every turn they share), and the raw ids (<c>e01</c>... for enemies, <c>p1</c>... for the
+        /// team) would hand every cross-side tie to the enemies. Each battle
         /// instead prefixes one side with <see cref="TieWinnerPrefix"/> and the other with
         /// <see cref="TieLoserPrefix"/>; which side wins is decided by <see cref="PlayersWinTies"/>,
         /// an exact half of the teams in every (kit mode, encounter, level) cell. A prefix shared by
@@ -219,7 +235,7 @@ namespace BeastCraft.Tooling.BalanceSim
         }
 
         /// <summary>
-        /// Per team index, whether the team wins cross-side speed ties in this (kit mode, level,
+        /// Per team index, whether the team wins cross-side initiative ties in this (kit mode, level,
         /// encounter) cell. A seeded shuffle of the team indices, first half true: exactly half the
         /// teams (the extra one of an odd count goes to the enemies), independent of the difficulty
         /// multiplier so calibration compares like with like. A pure function of the inputs.
@@ -253,8 +269,9 @@ namespace BeastCraft.Tooling.BalanceSim
 
         /// <summary>
         /// One battle. The loop below is <see cref="BattleTurnExecutor.RunBattle"/>'s loop reproduced
-        /// statement for statement, with an HP snapshot around each turn so damage can be attributed
-        /// to the unit whose turn it was (the only actor: no avatar is fielded). With
+        /// statement for statement (the ATB time cap, the last-turn timestamp and all), with an HP
+        /// snapshot around each turn so damage can be attributed to the unit whose turn it was (the
+        /// only actor: no avatar is fielded), and a per-member turn count. With
         /// <paramref name="useRunBattle"/> the real RunBattle is called instead, which is what the
         /// self-check compares against. Everything else — lifting the defeated off the grid, the
         /// partial approach — is the Runtime's own rule, applied inside
@@ -316,19 +333,22 @@ namespace BeastCraft.Tooling.BalanceSim
             {
                 DamageDealt = new int[team.Length],
                 DamageTaken = new int[team.Length],
-                Alive = new bool[team.Length]
+                Alive = new bool[team.Length],
+                MemberActions = new int[team.Length]
             };
 
             TurnManager turnManager = new TurnManager(units);
             Random rng = new Random(DeriveSeed(_options.Seed, mode, level, encounter.Id, teamIndex));
             BattleOutcome outcome;
-            int rounds;
+            long elapsedTicks;
+            int actions;
 
             if (useRunBattle)
             {
-                BattleResult result = BattleTurnExecutor.RunBattle(turnManager, units, grid, rng, null, _options.MaxRounds);
+                BattleResult result = BattleTurnExecutor.RunBattle(turnManager, units, grid, rng, null, _options.MaxTime);
                 outcome = result.Outcome;
-                rounds = result.Rounds;
+                elapsedTicks = result.ElapsedTicks;
+                actions = result.ActionCount;
             }
             else
             {
@@ -339,7 +359,9 @@ namespace BeastCraft.Tooling.BalanceSim
                 }
 
                 int[] before = new int[units.Count];
-                int cap = _options.MaxRounds < 1 ? 1 : _options.MaxRounds;
+                long capTicks = (long)(_options.MaxTime < 1 ? 1 : _options.MaxTime) * TurnManager.TicksPerTimeUnit;
+                long lastTurnTicks = 0;
+                actions = 0;
 
                 while (true)
                 {
@@ -348,7 +370,7 @@ namespace BeastCraft.Tooling.BalanceSim
                         break;
                     }
 
-                    if (turnManager.Round > cap)
+                    if (turnManager.ElapsedTicks > capTicks)
                     {
                         outcome = BattleOutcome.Stalemate;
                         break;
@@ -368,7 +390,9 @@ namespace BeastCraft.Tooling.BalanceSim
                             before[u] = units[u].CurrentHp;
                         }
 
+                        lastTurnTicks = turnManager.ElapsedTicks;
                         BattleTurnResult turn = BattleTurnExecutor.ExecuteTurn(current, units, grid, rng, null);
+                        actions++;
 
                         bool actorIsMember = memberIndex.TryGetValue(current, out int actor);
                         for (int u = 0; u < units.Count; u++)
@@ -392,6 +416,7 @@ namespace BeastCraft.Tooling.BalanceSim
 
                         if (actorIsMember)
                         {
+                            battle.MemberActions[actor]++;
                             CountFires(battle, turn);
                         }
                     }
@@ -399,12 +424,12 @@ namespace BeastCraft.Tooling.BalanceSim
                     turnManager.AdvanceTurn();
                 }
 
-                rounds = turnManager.Round;
+                elapsedTicks = lastTurnTicks;
             }
 
-            // A capped battle reports the round it stopped at opening (cap + 1); count rounds played.
             battle.Outcome = outcome;
-            battle.Rounds = Math.Min(rounds, _options.MaxRounds);
+            battle.ElapsedTicks = elapsedTicks;
+            battle.Actions = actions;
             for (int m = 0; m < members.Length; m++)
             {
                 battle.Alive[m] = !members[m].IsDefeated;
@@ -473,8 +498,10 @@ namespace BeastCraft.Tooling.BalanceSim
 
         /// <summary>
         /// The difficulty knob: HP, Attack, Defense, SpecialAttack and SpecialDefense scale by the
-        /// multiplier (rounded, floored at 1). Speed and MoveRange do not: scaling Speed would
-        /// reshuffle turn order in steps, and move range is a small tactical integer.
+        /// multiplier (rounded, floored at 1). Speed and MoveRange do not: under the ATB gauge Speed
+        /// is how many turns a unit gets, so scaling it would make the knob change the enemies'
+        /// action economy rather than just their toughness and punch, and move range is a small
+        /// tactical integer.
         /// </summary>
         public static StatBlock Scale(StatBlock stats, double multiplier)
         {

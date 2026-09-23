@@ -9,6 +9,12 @@ are untouched.
 - **After:** [`tuned-report.md`](tuned-report.md) — the default run on the tuned stats
   (`dotnet run --project Tooling/BalanceSim -c Release -- --out docs/balance/tuned-report.md`).
 
+**Measured under the old round-based turn order.** Every number in this log, and the committed
+`baseline-report.md`, predates the ATB speed gauge (design doc, decision 3, amended): battles were
+counted in rounds and every living unit acted once per round. `tuned-report.md` has since been
+regenerated under ATB and no longer shows the "after" numbers quoted here; see "After the ATB
+turn-order change" at the end.
+
 This is still **not confirmed balance**. It makes the roster even under the simulator's current
 assumptions (one standard kit, fixture enemies, nearest-enemy targeting, no skills), and every number
 is expected to move again once real skills and encounters exist.
@@ -207,3 +213,31 @@ inside the targets over one that was only inside on the default seed. "Out" list
   Frost Wyrm high Def / SpD (120 / 115); Treant high HP / SpD (130 / 120) and low Speed (50);
   Tarasque the highest Attack (140) with high Defense (130); Kirin high SpA / SpD (135 / 120) and the
   lowest Attack; Basilisk the highest SpA (150) with Move 5 and low Defense.
+
+## After the ATB turn-order change
+
+The turn order moved from a round-based initiative queue (everyone once per round, fastest first) to
+an ATB speed gauge (fill by Speed, act at 1000, overflow carried), so twice the Speed is now twice
+the turns. The roster was **not** re-tuned; `tuned-report.md` was regenerated with the same stats,
+kit, fixtures and seed. Overall marginal clear rate, levels and encounters averaged (points):
+
+| Beast | Spe | `elemental` before | `elemental` ATB | `neutral` before | `neutral` ATB |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Thunderbird | 120 | −1.6 | +6.0 | −8.0 | +2.4 |
+| Griffin | 115 | +0.6 | +14.8 | −7.4 | +9.7 |
+| Basilisk | 110 | +2.1 | +17.4 | +0.8 | +13.4 |
+| Phoenix | 100 | −0.7 | +13.2 | +3.7 | +14.1 |
+| Kirin | 95 | +1.7 | +12.3 | −0.3 | +17.2 |
+| Frost Wyrm | 80 | +3.4 | +2.9 | +4.8 | +0.7 |
+| Tarasque | 75 | −2.3 | +2.0 | +3.2 | +1.8 |
+| Leviathan | 55 | +1.7 | −15.4 | +2.3 | −15.4 |
+| Treant | 50 | −1.0 | −17.6 | +0.4 | −14.6 |
+| Golem | 40 | −3.8 | −35.5 | +0.6 | −29.3 |
+
+The swing follows Speed almost monotonically: the five fastest beasts gain, the three slowest lose
+15–35 points (in `elemental` mode all three are bottom three against every encounter: no niche). The "fastest fragile beast
+takes the pack's focus" finding above no longer dominates: Thunderbird and Griffin rose out of the
+`neutral` penalty. The caveat above that Speed was cheap has come true in reverse — Speed is now the
+most valuable stat, and the ±5% budget does not price it. Re-pricing Speed (for example a smaller
+Speed spread, or charging it more of the budget) is the next tuning question; it is deliberately
+not done in the change that introduced the gauge.

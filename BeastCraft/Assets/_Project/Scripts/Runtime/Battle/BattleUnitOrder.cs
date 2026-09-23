@@ -4,8 +4,9 @@ namespace BeastCraft.Battle
     /// The one tie-break every deterministic ordering in a battle falls back on: ordinal comparison
     /// of <see cref="BattleUnit.Id"/>.
     /// <para>
-    /// Both orderings that need it — <see cref="TurnManager"/>'s initiative sort and
-    /// <see cref="SkillTargetResolver"/>'s roster sort — must agree on it, so it lives in one place
+    /// Both orderings that need it — <see cref="TurnManager"/>'s readiness order (which of several
+    /// units with a full gauge acts first) and <see cref="SkillTargetResolver"/>'s roster sort —
+    /// must agree on it, so it lives in one place
     /// rather than being hand-rolled twice. The rationale is the same in both cases and is worth
     /// stating once, here: keying on the id makes an order a pure function of the roster's
     /// <em>contents</em>, never of however the roster happened to be assembled or of an unstable
@@ -16,8 +17,8 @@ namespace BeastCraft.Battle
     /// <para>
     /// Ordinal, not culture-aware: ids are opaque keys, not display text, so the comparison must not
     /// shift with the machine's locale. It is deliberately <em>only</em> the tie-break primitive —
-    /// callers that rank on something else first (speed, a targeting stat) keep that logic to
-    /// themselves and defer here just for the last word.
+    /// callers that rank on something else first (gauge and speed, a targeting stat) keep that
+    /// logic to themselves and defer here just for the last word.
     /// </para>
     /// </summary>
     internal static class BattleUnitOrder

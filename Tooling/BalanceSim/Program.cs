@@ -180,7 +180,7 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <summary>
         /// Replays the first and last team of every (mode, encounter, level) at multiplier 1 through
         /// the real <see cref="BattleTurnExecutor.RunBattle"/> and through the simulator's own loop,
-        /// and demands the same outcome, round count, final HP and position for every unit. The
+        /// and demands the same outcome, battle time, turn count, final HP and position for every unit. The
         /// simulator's loop adds no rules of its own, so the two must agree exactly.
         /// </summary>
         private static List<string> CheckLoopParity(SimOptions options, List<CreatureSpeciesSO> species, List<Encounter> encounters)
@@ -203,7 +203,8 @@ namespace BeastCraft.Tooling.BalanceSim
                         {
                             PveBattle ours = pve.RunBattle(mode, level, encounter, 1.0, team, false, ties[team], out List<BattleUnit> ourUnits);
                             PveBattle real = pve.RunBattle(mode, level, encounter, 1.0, team, true, ties[team], out List<BattleUnit> realUnits);
-                            bool same = ours.Outcome == real.Outcome && ours.Rounds == real.Rounds && ourUnits.Count == realUnits.Count;
+                            bool same = ours.Outcome == real.Outcome && ours.ElapsedTicks == real.ElapsedTicks && ours.Actions == real.Actions &&
+                                        ourUnits.Count == realUnits.Count;
                             for (int u = 0; same && u < ourUnits.Count; u++)
                             {
                                 same = ourUnits[u].Id == realUnits[u].Id && ourUnits[u].CurrentHp == realUnits[u].CurrentHp &&
@@ -213,7 +214,8 @@ namespace BeastCraft.Tooling.BalanceSim
                             if (!same)
                             {
                                 problems.Add(SimOptions.ModeName(mode) + "/" + encounter.Id + "/L" + level + " team " + team + ": " + ours.Outcome + " in " +
-                                             ours.Rounds + " vs RunBattle " + real.Outcome + " in " + real.Rounds + ".");
+                                             ours.ElapsedTicks + " ticks / " + ours.Actions + " turns vs RunBattle " + real.Outcome + " in " +
+                                             real.ElapsedTicks + " ticks / " + real.Actions + " turns.");
                             }
                         }
                     }

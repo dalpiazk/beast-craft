@@ -22,8 +22,14 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <summary>Percent of its battles it was still standing at the end.</summary>
         public double Survival;
 
-        /// <summary>Mean rounds of the clears it took part in; NaN when it took part in none.</summary>
-        public double RoundsToClear = double.NaN;
+        /// <summary>Mean normalized time of the clears it took part in; NaN when it took part in none.</summary>
+        public double TimeToClear = double.NaN;
+
+        /// <summary>
+        /// Its turns per unit of normalized time over all its battles (total turns / total battle
+        /// time): about Speed / 100 while it stands, less when it falls early. NaN with no time.
+        /// </summary>
+        public double TurnsPerTime = double.NaN;
     }
 
     /// <summary>
@@ -47,7 +53,9 @@ namespace BeastCraft.Tooling.BalanceSim
                 double takenSum = 0.0;
                 int takenCount = 0;
                 int alive = 0;
-                long clearRounds = 0;
+                long clearTicks = 0;
+                long turns = 0;
+                long battleTicks = 0;
 
                 for (int t = 0; t < teams.Count; t++)
                 {
@@ -62,10 +70,12 @@ namespace BeastCraft.Tooling.BalanceSim
 
                     with++;
                     alive += battle.Alive[member] ? 1 : 0;
+                    turns += battle.MemberActions[member];
+                    battleTicks += battle.ElapsedTicks;
                     if (battle.Cleared)
                     {
                         withCleared++;
-                        clearRounds += battle.Rounds;
+                        clearTicks += battle.ElapsedTicks;
                     }
 
                     int dealt = Sum(battle.DamageDealt);
@@ -90,7 +100,8 @@ namespace BeastCraft.Tooling.BalanceSim
                     DamageShare = shareCount == 0 ? 0.0 : shareSum / shareCount,
                     TakenShare = takenCount == 0 ? 0.0 : takenSum / takenCount,
                     Survival = with == 0 ? 0.0 : (100.0 * alive) / with,
-                    RoundsToClear = withCleared == 0 ? double.NaN : (double)clearRounds / withCleared
+                    TimeToClear = withCleared == 0 ? double.NaN : (double)clearTicks / TurnManager.TicksPerTimeUnit / withCleared,
+                    TurnsPerTime = battleTicks == 0 ? double.NaN : (double)turns * TurnManager.TicksPerTimeUnit / battleTicks
                 };
                 m.Marginal = without == 0 ? 0.0 : m.ClearWith - m.ClearWithout;
                 metrics[b] = m;
@@ -99,12 +110,14 @@ namespace BeastCraft.Tooling.BalanceSim
             return metrics;
         }
 
-        /// <summary>Unweighted mean of several cells' metrics (NaN rounds skipped).</summary>
+        /// <summary>Unweighted mean of several cells' metrics (NaN times and rates skipped).</summary>
         public static BeastMetrics Average(List<BeastMetrics> items)
         {
             BeastMetrics average = new BeastMetrics();
-            double rounds = 0.0;
-            int roundsCount = 0;
+            double time = 0.0;
+            int timeCount = 0;
+            double rate = 0.0;
+            int rateCount = 0;
             foreach (BeastMetrics m in items)
             {
                 average.Marginal += m.Marginal;
@@ -113,10 +126,16 @@ namespace BeastCraft.Tooling.BalanceSim
                 average.DamageShare += m.DamageShare;
                 average.TakenShare += m.TakenShare;
                 average.Survival += m.Survival;
-                if (!double.IsNaN(m.RoundsToClear))
+                if (!double.IsNaN(m.TimeToClear))
                 {
-                    rounds += m.RoundsToClear;
-                    roundsCount++;
+                    time += m.TimeToClear;
+                    timeCount++;
+                }
+
+                if (!double.IsNaN(m.TurnsPerTime))
+                {
+                    rate += m.TurnsPerTime;
+                    rateCount++;
                 }
             }
 
@@ -127,7 +146,8 @@ namespace BeastCraft.Tooling.BalanceSim
             average.DamageShare /= n;
             average.TakenShare /= n;
             average.Survival /= n;
-            average.RoundsToClear = roundsCount == 0 ? double.NaN : rounds / roundsCount;
+            average.TimeToClear = timeCount == 0 ? double.NaN : time / timeCount;
+            average.TurnsPerTime = rateCount == 0 ? double.NaN : rate / rateCount;
             return average;
         }
 
@@ -280,10 +300,11 @@ namespace BeastCraft.Tooling.BalanceSim
                               " (enemy kits are `None` in `neutral` mode, so an elementless encounter reads the same in both modes)");
             report.AppendLine("- Placement: each side takes the front-most tiles of its own deployment zone (front row first, then outward from");
             report.AppendLine("  the centre line); enemies in fixture order, the team through `PlacementValidator.TryPlaceAll`. Which team member");
-            report.AppendLine("  gets which slot (and unit id, the speed-tie and target-tie break within the team) is a fixed seeded shuffle per team.");
-            report.AppendLine("- Speed ties between the sides: `TurnManager` breaks equal Speed on the ordinal unit id, so each battle prefixes one");
-            report.AppendLine("  side's ids so that it wins cross-side ties; in every (kit mode, encounter, level) cell exactly half the teams win");
-            report.AppendLine("  them (a seeded shuffle of the team indices). The prefix is side-wide, so ties within a side are unchanged.");
+            report.AppendLine("  gets which slot (and unit id, the initiative-tie and target-tie break within the team) is a fixed seeded shuffle per team.");
+            report.AppendLine("- Initiative ties between the sides: `TurnManager` breaks equally full, equally fast gauges on the ordinal unit id,");
+            report.AppendLine("  so each battle prefixes one side's ids so that it wins cross-side ties; in every (kit mode, encounter, level) cell");
+            report.AppendLine("  exactly half the teams win them (a seeded shuffle of the team indices). The prefix is side-wide, so ties within a");
+            report.AppendLine("  side are unchanged.");
             report.AppendLine("- Difficulty: HP, Atk, Def, SpA and SpD of every enemy are scaled by one multiplier per (kit mode, encounter,");
             report.AppendLine("  level); Speed and Move are not. Calibration starts at x1, doubles or halves until the " +
                               SimOptions.Format(options.TargetClearRate) + "% target is bracketed");
@@ -293,11 +314,17 @@ namespace BeastCraft.Tooling.BalanceSim
             report.AppendLine("- Movement rules are the Runtime's own (`BattleTurnExecutor`), with no simulator-side emulation: a defeated unit");
             report.AppendLine("  leaves the grid the moment it falls, and a unit that cannot reach range this turn makes a partial approach");
             report.AppendLine("  (walks its remaining move toward the target and holds the skill).");
-            report.AppendLine("- Max rounds: " + options.MaxRounds + " (a battle reaching it is a stalemate and counts as not cleared); base seed: " + options.Seed);
+            report.AppendLine("- Turn order: the Runtime's ATB gauge (`TurnManager`): every unit fills a gauge by its Speed and acts at " +
+                              TurnManager.ActionThreshold + ", so twice the");
+            report.AppendLine("  Speed is twice the turns. Battle time is normalized: 1.0 = one turn of a Speed-" + TurnManager.ReferenceSpeed +
+                              " unit. Speed scales with level, so the");
+            report.AppendLine("  same fight reads longer at low levels; compare times within a level, not across levels.");
+            report.AppendLine("- Max time: " + options.MaxTime + " (a battle reaching it is a stalemate and counts as not cleared); base seed: " + options.Seed);
             report.AppendLine("- Metrics: **marginal** = clear rate of teams containing the beast minus teams without it (points; the primary");
             report.AppendLine("  number). **Dmg share** / **Taken share** = the beast's share of its team's damage dealt / taken (HP actually");
-            report.AppendLine("  removed, so overkill is not counted), averaged over its teams. **Survival** = standing at the end. **Rounds to");
-            report.AppendLine("  clear** = mean length of the clears it took part in. \"Overall\" averages every encounter and level equally.");
+            report.AppendLine("  removed, so overkill is not counted), averaged over its teams. **Survival** = standing at the end. **Time to");
+            report.AppendLine("  clear** = mean length of the clears it took part in (normalized time). **Turns / time** = the beast's turns per");
+            report.AppendLine("  unit of time over its battles (Speed / 100 while standing). \"Overall\" averages every encounter and level equally.");
             report.AppendLine();
         }
 
@@ -381,16 +408,16 @@ namespace BeastCraft.Tooling.BalanceSim
         {
             report.AppendLine("### Calibrated difficulty");
             report.AppendLine();
-            report.AppendLine("| Kit mode | Encounter | Level | Multiplier | Clear rate | Evaluations | Avg rounds | Stalemates | Lead enemy HP / Atk / Def |");
+            report.AppendLine("| Kit mode | Encounter | Level | Multiplier | Clear rate | Evaluations | Avg time | Stalemates | Lead enemy HP / Atk / Def |");
             report.AppendLine("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |");
 
             foreach (PveCell cell in cells)
             {
-                long rounds = 0;
+                double time = 0.0;
                 int stalemates = 0;
                 foreach (PveBattle battle in cell.Battles)
                 {
-                    rounds += battle.Rounds;
+                    time += battle.Time;
                     stalemates += battle.Outcome == BattleOutcome.Stalemate ? 1 : 0;
                 }
 
@@ -400,7 +427,7 @@ namespace BeastCraft.Tooling.BalanceSim
 
                 report.AppendLine("| `" + SimOptions.ModeName(cell.Mode) + "` | `" + cell.Encounter.Id + "` | " + cell.Level + " | x" +
                                   SimOptions.FormatMultiplier(cell.Multiplier) + " | " + SimOptions.Format(cell.ClearRate) + "%" + miss + " | " +
-                                  cell.Evaluations.Count + " | " + SimOptions.Format((double)rounds / cell.Battles.Length) + " | " + stalemates + " | " +
+                                  cell.Evaluations.Count + " | " + SimOptions.Format(time / cell.Battles.Length) + " | " + stalemates + " | " +
                                   stats.Hp + " / " + stats.Attack + " / " + stats.Defense + " |");
             }
 
@@ -642,15 +669,16 @@ namespace BeastCraft.Tooling.BalanceSim
             {
                 report.AppendLine("#### Role metrics: `" + encounters[e].Id + "` (levels averaged)");
                 report.AppendLine();
-                report.AppendLine("| Beast | Marginal | Clear with | Clear without | Dmg share | Taken share | Survival | Rounds to clear |");
-                report.AppendLine("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |");
+                report.AppendLine("| Beast | Marginal | Clear with | Clear without | Dmg share | Taken share | Survival | Time to clear | Turns / time |");
+                report.AppendLine("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |");
                 foreach (int b in summary.Ranking[e])
                 {
                     BeastMetrics m = summary.ByEncounter[e][b];
                     report.AppendLine("| " + species[b].DisplayName + " | " + Marked(options, m.Marginal) + " | " + SimOptions.Format(m.ClearWith) + "% | " +
                                       SimOptions.Format(m.ClearWithout) + "% | " + SimOptions.Format(m.DamageShare) + "% | " +
                                       SimOptions.Format(m.TakenShare) + "% | " + SimOptions.Format(m.Survival) + "% | " +
-                                      (double.IsNaN(m.RoundsToClear) ? "-" : SimOptions.Format(m.RoundsToClear)) + " |");
+                                      (double.IsNaN(m.TimeToClear) ? "-" : SimOptions.Format(m.TimeToClear)) + " | " +
+                                      (double.IsNaN(m.TurnsPerTime) ? "-" : m.TurnsPerTime.ToString("0.00", CultureInfo.InvariantCulture)) + " |");
                 }
 
                 report.AppendLine();

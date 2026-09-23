@@ -25,8 +25,8 @@ namespace BeastCraft.Battle
         MutualDefeat = 2,
 
         /// <summary>
-        /// The battle was stopped without resolving: the round cap was reached (see
-        /// <see cref="BattleTurnExecutor.DefaultMaxRounds"/>), or the turn order ran out of units to
+        /// The battle was stopped without resolving: the time cap was reached (see
+        /// <see cref="BattleTurnExecutor.DefaultMaxTime"/>), or the turn order ran out of units to
         /// act while both sides still had living members. Both mean the fight was not going to end
         /// on its own, and neither is a designed game rule.
         /// </summary>

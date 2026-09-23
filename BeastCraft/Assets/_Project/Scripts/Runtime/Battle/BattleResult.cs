@@ -13,10 +13,10 @@ namespace BeastCraft.Battle
     /// </summary>
     public class BattleResult
     {
-        public BattleResult(BattleOutcome outcome, int rounds, IReadOnlyList<BattleTurnResult> turns)
+        public BattleResult(BattleOutcome outcome, long elapsedTicks, IReadOnlyList<BattleTurnResult> turns)
         {
             Outcome = outcome;
-            Rounds = rounds;
+            ElapsedTicks = elapsedTicks < 0 ? 0 : elapsedTicks;
             Turns = turns ?? new List<BattleTurnResult>();
         }
 
@@ -24,15 +24,32 @@ namespace BeastCraft.Battle
         public BattleOutcome Outcome { get; }
 
         /// <summary>
-        /// <see cref="TurnManager.Round"/> as it stood when the loop stopped, counting from 1. Under
-        /// <see cref="BattleOutcome.Stalemate"/> from the round cap this is one past the cap, since
-        /// the cap is tested at the top of a round that then never runs.
+        /// The battle's length in <see cref="TurnManager"/> ticks: the moment the last executed turn
+        /// was taken (for a won battle, the turn that decided it), or 0 when no turn was taken. Never
+        /// past the time cap — under <see cref="BattleOutcome.Stalemate"/> from the cap it is the time
+        /// of the last turn that still fitted under it.
         /// </summary>
-        public int Rounds { get; }
+        public long ElapsedTicks { get; }
+
+        /// <summary>
+        /// <see cref="ElapsedTicks"/> in normalized time: 1.0 is one turn of a
+        /// <see cref="TurnManager.ReferenceSpeed"/> unit (<see cref="TurnManager.TicksPerTimeUnit"/>
+        /// ticks). For reporting; the battle itself only ever reasons in ticks.
+        /// </summary>
+        public double Time
+        {
+            get { return (double)ElapsedTicks / TurnManager.TicksPerTimeUnit; }
+        }
+
+        /// <summary>How many turns were executed: <see cref="Turns"/>' count.</summary>
+        public int ActionCount
+        {
+            get { return Turns.Count; }
+        }
 
         /// <summary>
         /// Every turn that was executed, in the order they were taken. Never <c>null</c>. Bounded by
-        /// the round cap, so this cannot grow without limit even on a battle that never resolves.
+        /// the time cap, so this cannot grow without limit even on a battle that never resolves.
         /// </summary>
         public IReadOnlyList<BattleTurnResult> Turns { get; }
 

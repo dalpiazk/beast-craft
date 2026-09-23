@@ -34,8 +34,9 @@ one, whose area skills will catch which cluster, which flank a slow bruiser can 
 
 ### Phase 2 — Auto-resolution (the fight runs itself)
 
-Once the battle starts there is **no player action menu**. Combatants take turns in the speed-stat
-initiative queue (decision 3), one unit at a time, and on its own turn each beast:
+Once the battle starts there is **no player action menu**. Combatants take turns off the ATB
+speed gauge (decision 3), one unit at a time, faster units more often, and on its own turn each
+beast:
 
 1. **Fires whichever of its equipped skills come off cooldown this turn** — which may be none, one,
    or several at once — with targeting resolved automatically from each skill's own authored rules
@@ -66,6 +67,11 @@ puzzle every encounter.
   options. With no player menu, whether a beast has a fallback attack at all — or simply always has
   at least one short-cooldown skill in its rotation — is open, and items in battle are out of scope
   until there is a mechanism that would use them.
+- **Does the avatar get its own gauge?** The avatar still ticks once per player-beast turn
+  (decision 6). Under the ATB gauge (decision 3) that ties its cadence to how fast the player's
+  beasts are: a fast team cycles its avatar faster. The alternative is an avatar gauge filled by
+  the avatar's own Speed, which would make that stat (currently unused) matter and decouple the
+  avatar from team composition. Open; the rule is unchanged until it is decided.
 - **Avatar progression.** The avatar now has stats (decision 6, amended), but no progression
   level and no growth: its base is a flat authored block and only avatar gear moves it. Whether and
   how the avatar levels up is undesigned. The damage formula still needs a caster level for it, so
@@ -193,20 +199,71 @@ composition and role play at the cost of turn length. Supporting all three forma
 picking one size means the encounter designer can choose the pacing per fight — a tight duel, a
 standard squad fight, or a full set-piece — instead of the whole game being tuned to a single shape.
 
-### 3. Turn order model — DECIDED
+### 3. Turn order model — DECIDED — AMENDED: ATB speed gauge
 
-**Turn order is a speed-stat initiative queue.** All combatants are sorted by `StatType.Speed`
-(already present on `StatBlock` as `public int Speed`) into a single order, and **one unit acts at a
-time**. This was the recommendation this document made, and it is confirmed.
+**Turn order is an ATB-style speed gauge.** Every combatant fills its own gauge at a rate equal to
+its current `StatType.Speed` and takes a turn each time the gauge reaches a fixed threshold, so
+**a unit twice as fast as another acts about twice as often**. Units still act **one at a time**,
+and everything else about a turn is unchanged. This amends the original decision, a speed-sorted
+initiative queue (everyone acts once per round, fastest first); the amendment is the producer's.
 
-*Background.* The initiative queue is classic JRPG/tactics pacing, it is the simplest thing to
-build, and it is by far the easiest to tutorialize — the player always knows exactly whose turn it
-is and what happens next. The alternative, a **simultaneous declare-then-resolve** model where both
-sides choose all their units' actions up front each round and resolve them together, is meaningfully
-more strategic (reads, baits, committed positioning) but costs significantly more in UI, AI, and
-tutorial work, and it makes failure states harder for a new player to parse. Phase-based resolution
-stays open as a *later* evolution if playtesting says the combat wants more depth; it is not part of
-the first playable slice.
+*Why it changed.* Under the round queue Speed only decided *order* within a round: a Speed-120 beast
+got exactly as many turns as a Speed-40 one, it merely took them earlier. The balance simulator
+showed what that does to the stat (see "Starter roster" and the tuning log): Speed bought little
+beyond reaching the enemy first and taking its focus, so it was cheap, and the first tuning pass
+spent the fragile beasts' Speed on bulk. With a gauge Speed is an action economy — more turns — and
+has to be priced as one.
+
+The rule, as built in `TurnManager` (all integer arithmetic, so a client and a server-authoritative
+re-simulation always agree):
+
+- **Gauge and threshold.** Every unit starts the battle at gauge 0. `TurnManager.ActionThreshold`
+  is **1000**. A unit's fill rate is its live `Stats.Speed`, **clamped to at least 1** so nothing can
+  stall forever. It is read at every step, so a speed buff or debuff changes the unit's cadence
+  from the moment it lands.
+- **Event-driven time.** The next turn is found without stepping tick by tick: for every living
+  unit, ticks needed = `ceil((1000 − gauge) / speed)` (0 when already full); time advances by the
+  smallest of those, and every living unit's gauge gains `speed × elapsed`.
+- **One unit acts per step.** Of the units now at or above the threshold, the actor is the one with
+  the **highest gauge (most overflow)**, then the **higher Speed**, then the ordinal unit id (the
+  shared `BattleUnitOrder` tie-break). Other full units act on the following steps, with no time
+  passing in between.
+- **Overflow carries.** After the actor's turn, 1000 is subtracted from its gauge and the remainder
+  counts toward its next turn. That is what keeps the long-run rate exact when 1000 is not a multiple
+  of the unit's Speed (a Speed-120 unit gets exactly 3× the turns of a Speed-40 one).
+- **Defeated units** never fill and are never handed a turn.
+- **Per-turn counters are unchanged.** Cooldowns (decision 5), timed buffs and the movement budget
+  (decision 7) were always counted in the unit's *own* turns, so a faster unit simply cycles them
+  faster. The avatar is the exception still being discussed; see decision 6.
+
+*Time.* There are no rounds any more. Battle time is counted in integer ticks
+(`TurnManager.ElapsedTicks`) and reported **normalized**: 1.0 = one turn of a Speed-100 unit
+(`TurnManager.ReferenceSpeed` = 100, so 10 ticks). Speed scales with level through the growth curve,
+so the same fight takes longer in normalized time at low levels; compare times within a level.
+`BattleResult` reports `ElapsedTicks` / `Time` (when the last turn was taken) and `ActionCount`
+(turns executed). `TurnManager.PredictNextActors(n)` forecasts the next *n* turns assuming no speed
+change or defeat, which is what a turn-order UI would show.
+
+*Worked example.* Speeds 100 (a), 150 (b), 50 (c). b fills first (t = 7, gauge 1050, carries 50);
+a at t = 10; b at t = 14 (1100, carries 100); at t = 20 all three are at exactly 1000, so the faster
+goes first: b, a, c. t = 20 is the full cycle — six turns in the ratio 3 : 2 : 1 — and t = 27
+repeats t = 7.
+
+*The time cap* (`BattleTurnExecutor.DefaultMaxTime` = 2000 normalized) is still a scaffold safety
+net against a battle that cannot end, not a game rule. It replaced the 200-round cap and is sized so
+the net survives low levels: 2000 is 200 turns of a Speed-10 unit (about a level-1 beast).
+
+*Tunable defaults, not balance.* The threshold only sets the gauge's resolution; the reference speed
+is a reporting convention. Neither changes who acts how often: only the ratios between speeds do.
+Starting every gauge at 0 (rather than, say, a random or Speed-scaled head start) is also a default.
+
+*Background, from the original decision.* A single, one-at-a-time order is classic JRPG/tactics
+pacing, simple to build and easy to teach: the player always knows whose turn it is and, with the
+forecast, what comes next. The alternative, a **simultaneous declare-then-resolve** model where both
+sides choose all their units' actions up front and resolve them together, is more strategic (reads,
+baits, committed positioning) but costs much more in UI, AI and tutorial work, and it makes failure
+states harder for a new player to parse. Phase-based resolution stays open as a *later* evolution
+if playtesting says the combat wants more depth; it is not part of the first playable slice.
 
 ### 4. Battle flow and skill targeting — DECIDED
 
@@ -264,7 +321,7 @@ The rule, in full:
 - **Starting state.** At battle start every equipped skill's counter is set to that skill's own
   `SkillSO.Cooldown`. Nothing fires before it has counted down at least once, so there is no
   turn-one alpha strike.
-- **Tick.** Every time it becomes the caster's own turn in the initiative queue (decision 3), *all*
+- **Tick.** Every time it becomes the caster's own turn in the turn order (decision 3), *all*
   of its equipped skills' counters tick down by 1, clamped at 0 — never negative.
 - **Fire and reset.** Any skill whose counter is exactly 0 after that tick fires this turn and
   immediately resets to its authored `Cooldown` to start counting down again. **Amended by decision
@@ -295,13 +352,18 @@ trade auto-resolution already made everywhere else.
 
 **The avatar has skills too, on the same rotation mechanic**, intended to support and buff the
 player's own beasts rather than to attack. Per decision 2 the avatar is **not a piece on the grid**
-and has no meaningful `HexCoordinate` position, and it correspondingly gets **no slot of its own in
-the initiative queue**.
+and has no meaningful `HexCoordinate` position, and it correspondingly gets **no turn of its own in
+the turn order** (no gauge — but see the open item below).
 
 **Confirmed timing:** the avatar's loadout **ticks once every time one of the player's own beasts
-takes its turn.** Not on enemy turns, and not once per round — once per player-side beast-turn. With
-three player beasts deployed, the avatar's counters therefore tick three times per round, and an
-avatar skill on a 3-turn cooldown fires roughly once a round rather than once every three.
+takes its turn.** Not on enemy turns — once per player-side beast-turn. With three player beasts
+deployed, the avatar's counters therefore tick three times for every turn a typical one of them
+takes, and an avatar skill on a 3-turn cooldown fires about as often as one beast acts.
+
+**Open item since the ATB amendment (decision 3).** Rounds are gone, so "once per player-beast turn"
+now also means the avatar cycles faster the faster the player's beasts are. Whether the avatar
+should instead fill a gauge of its own from its own Speed is undecided (listed under "What is not
+settled yet"); until then the rule above stands and is what `BattleTurnExecutor` does.
 
 **Confirmed targeting:** **avatar skills are restricted to the position-free target shapes —
 `Self`, `AllAllies`, `AllEnemies`.** This closes the question this section previously left open.
@@ -336,8 +398,8 @@ Two consequences of that representation, both deliberate:
   see below.)
 
 **The timing half is now wired up.** `BattleTurnExecutor` ticks the avatar's loadout at the end of
-every player-side beast's turn, exactly as this section describes: not on enemy turns, and not once
-per round. The rotation engine that landed for decision 5 is deliberately owner-agnostic, so it
+every player-side beast's turn, exactly as this section describes: not on enemy turns, and not on a
+clock of its own. The rotation engine that landed for decision 5 is deliberately owner-agnostic, so it
 drives the avatar unchanged.
 
 **Amendment — the avatar has stats and stat gear (supersedes "the avatar has no stats").** This
@@ -784,10 +846,12 @@ simulator. The drafting rules:
   Kirin, Frost Wyrm) and the fragile ones (Phoenix, Thunderbird, Basilisk) and Golem up to 630. If
   the simulator later gives some beasts a slower curve, whether they deserve a larger budget as
   payoff for a weak early game is a balance question for it, not something this pass assumes.
-- **Speed is ordered, not spent.** In the simulator, acting first mostly means reaching the enemy
-  first and taking its focus, so the tuning pass kept the speed *order* the archetypes call for
-  (Thunderbird > Griffin > Basilisk > Phoenix > Kirin > … > Golem) with smaller gaps, and moved the
-  freed points into the fragile beasts' HP and defences. They remain the least bulky beasts.
+- **Speed is ordered, not spent** — *under the old round-based turn order*. In the simulator,
+  acting first mostly meant reaching the enemy first and taking its focus, so the tuning pass kept
+  the speed *order* the archetypes call for (Thunderbird > Griffin > Basilisk > Phoenix > Kirin > …
+  > Golem) with smaller gaps, and moved the freed points into the fragile beasts' HP and defences.
+  They remain the least bulky beasts. The ATB gauge (decision 3) has since made Speed an action
+  economy, and the roster has **not** been re-tuned for it; see the tuned report and tuning log.
 - **Move range in a small band (2–5)**, outside the budget. Griffin and Basilisk are the mobile
   ends (5); Golem is the only 2. "Range" in the archetypes means move range, the per-turn hex
   movement budget — skill reach is authored per skill.
@@ -857,7 +921,8 @@ the ten approved species ids.
 The grid and turn-manager scaffolding landed against decisions 1–3: a `BeastCraft.Battle.Grid`
 namespace holding the arena-size presets, axial hex coordinates, a hexagon-shaped board with
 occupancy tracking and A* pathfinding over it, plus a `BattleFormat` enum for the Solo/4/6 party
-sizes, a minimal `BattleUnit`, and a speed-sorted `TurnManager`.
+sizes, a minimal `BattleUnit`, and a speed-sorted `TurnManager` (since replaced by the ATB gauge,
+decision 3 amended).
 
 Decision 4 adds the targeting data model and its resolver: `SkillTargetSide`,
 `SkillTargetingCriterion` and `SkillTargetingOrder`, the matching fields on `SkillSO`, and
@@ -914,7 +979,8 @@ win condition is **"living units remain on more than one team"**, deliberately *
 `TurnManager.IsComplete`: that property is true only once every unit in the roster is defeated, which
 is the turn manager answering "is there anybody left to hand a turn to" — a battle won with survivors
 still standing leaves it `false`, so a loop built on it would never stop. And the loop carries a
-generous maximum-round cap (`BattleTurnExecutor.DefaultMaxRounds`) that reports a stalemate; that is
+generous time cap (`BattleTurnExecutor.DefaultMaxTime`, a round cap before the ATB amendment) that
+reports a stalemate; that is
 a **safety net against a hang**, not a designed time limit, and encounter balance must not lean on
 it.
 
@@ -980,7 +1046,7 @@ small biters and stingers on a Large arena) and `pack` (three melee direwolves a
 wisps). Each encounter's enemy stats are scaled by a multiplier calibrated per level and kit mode
 so the average team clears it about half the time. Each beast is scored by its **marginal clear
 rate** (clear rate of teams with it minus teams without it), with damage share, damage taken,
-survival and rounds to clear alongside. The old 1v1 round-robin survives as a secondary
+survival, time to clear and turns per unit of time alongside. The old 1v1 round-robin survives as a secondary
 `--mode pvp` section.
 
 The committed report at [`docs/balance/baseline-report.md`](../balance/baseline-report.md) is the
@@ -1014,6 +1080,15 @@ low-attack wall — a taunt or guard mechanic would change that. The measurement
 (about ±3 points overall) is close to the size of the target. These are inputs to the roster
 discussion, not decisions. They depend on the simulator's assumptions listed in its README, above
 all the fixture enemies, the one standard kit and nearest-enemy targeting.
+
+**The turn order has since changed to the ATB gauge (decision 3), and the roster was not re-tuned
+for it.** The baseline report and the tuning log's numbers were measured under the old round-based
+queue (battle lengths in rounds); `tuned-report.md` has been regenerated under ATB and is the current
+state (battle lengths in normalized time). As expected with Speed spanning 40–120 at max level (up
+to 3× the turns), the marginals swung hard toward the fast beasts: in `elemental` mode the overall
+range is now −35.5 … +17.4 (Basilisk, Griffin, Phoenix and Kirin +12 or more; Golem −35.5, Treant
+−17.6 and Leviathan −15.4, all bottom three against every encounter), and `neutral` is similar
+(−29.3 … +17.2). Pricing Speed as an action economy is the next roster question.
 
 Every pass so far is deliberately **data structures and algorithms only** — no MonoBehaviours, no
 scene or prefab wiring, and no committed `.asset` instances (the roster's are generated in-Editor). The hex radii backing each arena preset

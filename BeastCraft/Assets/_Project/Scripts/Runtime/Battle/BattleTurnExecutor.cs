@@ -92,23 +92,28 @@ namespace BeastCraft.Battle
     public static class BattleTurnExecutor
     {
         /// <summary>
-        /// The round at which <see cref="RunBattle"/> gives up and reports
-        /// <see cref="BattleOutcome.Stalemate"/>.
+        /// The battle time, in normalized units (see <see cref="TurnManager.Time"/>), past which
+        /// <see cref="RunBattle"/> gives up and reports <see cref="BattleOutcome.Stalemate"/>.
         /// <para>
         /// <strong>A scaffold safety net, not a game rule.</strong> Nothing in the design says a
-        /// battle ends after some number of rounds, and this must not be read as a timer that
+        /// battle ends after some amount of time, and this must not be read as a timer that
         /// encounter balance is allowed to lean on. It exists because a battle genuinely can be
         /// unable to end — two units whose skills can never reach each other across blocked terrain,
         /// a loadout of nothing but out-of-range skills, or a pair of healers out-healing each
         /// other — and a loop that cannot end is a hang, not a gameplay outcome.
         /// </para>
         /// <para>
-        /// Deliberately generous rather than tuned. A real fight resolves in a handful of rounds, so
-        /// this is far out of the way of anything that is actually going to finish; picking a
-        /// tighter number would be a balance decision, and this is not one.
+        /// Deliberately generous rather than tuned. It replaced a 200-<em>round</em> cap when turn
+        /// order moved to the ATB gauge, and is sized to keep that net at every level: 2000 is 200
+        /// turns of a Speed-10 unit (about the speed of a level-1 beast; Speed scales with level,
+        /// and normalized time does not), and 2000 turns of a Speed-100 one. A real fight is over
+        /// long before either, so this is far out of the way of anything that is actually going to
+        /// finish; picking a tighter number would be a balance decision, and this is not one. An
+        /// integer, so the cap converts to ticks exactly (<see cref="TurnManager.TicksPerTimeUnit"/>
+        /// per unit) and the stopping point never depends on floating-point rounding.
         /// </para>
         /// </summary>
-        public const int DefaultMaxRounds = 200;
+        public const int DefaultMaxTime = 2000;
 
         /// <summary>
         /// Runs one unit's whole turn: expire its timed modifiers, tick its rotation, then attempt
@@ -141,7 +146,10 @@ namespace BeastCraft.Battle
         /// <item><description>
         /// On a <see cref="BattleTeam.Player"/> unit's turn only, the avatar's loadout is ticked and
         /// resolved through <see cref="SkillLoadout.TickAndResolve"/>, per the confirmed rule that
-        /// it ticks once per player-side beast turn. Its effects are applied too.
+        /// it ticks once per player-side beast turn. Its effects are applied too. Under the ATB
+        /// gauge this means a faster team also cycles its avatar faster; whether the avatar should
+        /// instead fill a gauge of its own from its own Speed is an open design item (battle-system
+        /// design doc, §6), and the rule is unchanged until it is decided.
         /// </description></item>
         /// </list>
         /// </para>
@@ -275,7 +283,7 @@ namespace BeastCraft.Battle
         /// nobody left to hand a turn to", which is all the turn manager has any business knowing.
         /// A battle, though, is over the moment one <em>side</em> is wiped out, and at that moment
         /// the winners are all still standing, so <c>IsComplete</c> is emphatically <c>false</c>.
-        /// Looping on it would march the victors around an empty board for as long as the round cap
+        /// Looping on it would march the victors around an empty board for as long as the time cap
         /// allowed and then report a stalemate. So the win condition lives here, where the concept
         /// of a side belongs, and is exactly "do living units remain on more than one team". The two
         /// are not redundant and neither should be rewritten in terms of the other:
@@ -283,11 +291,18 @@ namespace BeastCraft.Battle
         /// battle continuing.
         /// </para>
         /// <para>
-        /// <strong>The round cap.</strong> <paramref name="maxRounds"/> stops a battle that cannot
-        /// end — see <see cref="DefaultMaxRounds"/>, which explains why it is a safety net against a
+        /// <strong>The time cap.</strong> <paramref name="maxTime"/> stops a battle that cannot
+        /// end — see <see cref="DefaultMaxTime"/>, which explains why it is a safety net against a
         /// hang rather than a designed time limit. It is tested at the top of each iteration against
-        /// <see cref="TurnManager.Round"/>, so the battle plays rounds 1 through
-        /// <paramref name="maxRounds"/> inclusive and stops as the next one opens.
+        /// <see cref="TurnManager.ElapsedTicks"/> (the moment the next turn would be taken), so every
+        /// turn that falls at or before <paramref name="maxTime"/> is played and the battle stops at
+        /// the first one scheduled after it. Values below 1 are treated as 1.
+        /// </para>
+        /// <para>
+        /// <strong>What the result reports.</strong> <see cref="BattleResult.ElapsedTicks"/> is the
+        /// time of the last turn actually executed — for a decided battle, the turn that decided it —
+        /// rather than wherever the turn manager had advanced to when the loop noticed, which would
+        /// overshoot by one wait.
         /// </para>
         /// <para>
         /// <paramref name="allUnits"/> is the roster: the beasts on both sides, and not the avatar,
@@ -302,11 +317,12 @@ namespace BeastCraft.Battle
         /// failing.
         /// </para>
         /// </summary>
-        public static BattleResult RunBattle(TurnManager turnManager, IEnumerable<BattleUnit> allUnits, HexGrid grid, Random rng, BattleUnit avatar, int maxRounds = DefaultMaxRounds)
+        public static BattleResult RunBattle(TurnManager turnManager, IEnumerable<BattleUnit> allUnits, HexGrid grid, Random rng, BattleUnit avatar, int maxTime = DefaultMaxTime)
         {
             List<BattleUnit> roster = CopyRoster(allUnits);
             List<BattleTurnResult> turns = new List<BattleTurnResult>();
-            int cap = maxRounds < 1 ? 1 : maxRounds;
+            long capTicks = (long)(maxTime < 1 ? 1 : maxTime) * TurnManager.TicksPerTimeUnit;
+            long lastTurnTicks = 0;
             BattleOutcome outcome;
 
             while (true)
@@ -316,7 +332,7 @@ namespace BeastCraft.Battle
                     break;
                 }
 
-                if (turnManager == null || turnManager.Round > cap)
+                if (turnManager == null || turnManager.ElapsedTicks > capTicks)
                 {
                     outcome = BattleOutcome.Stalemate;
                     break;
@@ -332,13 +348,14 @@ namespace BeastCraft.Battle
 
                 if (!current.IsDefeated)
                 {
+                    lastTurnTicks = turnManager.ElapsedTicks;
                     turns.Add(ExecuteTurn(current, roster, grid, rng, avatar));
                 }
 
                 turnManager.AdvanceTurn();
             }
 
-            return new BattleResult(outcome, turnManager == null ? 0 : turnManager.Round, turns);
+            return new BattleResult(outcome, lastTurnTicks, turns);
         }
 
         /// <summary>

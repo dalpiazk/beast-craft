@@ -49,9 +49,10 @@ namespace BeastCraft.Tooling.BalanceSim
         //     half lands the blow.
         // Burst (2 x power 20, radius 2, cooldown 2) is lower power and longer cooldown than the
         // single-target pair: a periodic spike that only pays off when several enemies are close,
-        // i.e. against swarms and packs. Cooldown 2 rather than 3 so it comes up in round 2 —
-        // fights at calibrated difficulty last 3-7 rounds, and at cooldown 3 the swarm was mostly
-        // dead before the first Burst.
+        // i.e. against swarms and packs. Cooldown 2 rather than 3 so it comes up on the beast's
+        // second turn — fights at calibrated difficulty last a handful of turns per beast, and at
+        // cooldown 3 the swarm was mostly dead before the first Burst (measured under the old
+        // round-based turn order; cooldowns count the beast's own turns under ATB as well).
         //
         // AreaBurst semantics (SkillTargetResolver): the disc of radius Range around the caster's
         // own tile at the moment it fires; it never moves the caster. A Burst that catches nobody
@@ -81,7 +82,7 @@ namespace BeastCraft.Tooling.BalanceSim
         // ------------------------------------------------------------------------------------
         public const ArenaSize PvpArena = ArenaSize.Medium;
 
-        /// <summary>Unit ids per side. Speed ties break on ordinal id, so every pairing is also run side-swapped.</summary>
+        /// <summary>Unit ids per side. Initiative ties break on ordinal id, so every pairing is also run side-swapped.</summary>
         public const string PlayerUnitId = "p";
         public const string EnemyUnitId = "e";
 
@@ -132,7 +133,7 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <summary>Null = the elements authored in encounters.json; otherwise every enemy gets this element.</summary>
         public Element? EnemyElementOverride;
 
-        public int MaxRounds = BattleTurnExecutor.DefaultMaxRounds;
+        public int MaxTime = BattleTurnExecutor.DefaultMaxTime;
         public int Seed = DefaultSeed;
         public int MatrixLevel = DefaultMatrixLevel;
         public string OutPath;
@@ -155,7 +156,7 @@ namespace BeastCraft.Tooling.BalanceSim
             "  --target-clear <pct>       Clear rate the difficulty calibration aims for (default 50).\n" +
             "  --marginal-threshold <x>   Flag a beast whose overall marginal clear rate is outside +/-x points (default 5).\n" +
             "  --enemy-element <e>        authored | None | <Element> (default authored): override every enemy's element.\n" +
-            "  --max-rounds <n>           Round cap before a battle is a stalemate (default 200).\n" +
+            "  --max-time <n>             Battle-time cap before a battle is a stalemate, in turns of a Speed-100 unit (default 2000).\n" +
             "  --seed <n>                 Base seed; each battle derives its own (default 12345).\n" +
             "  --matrix-level <n>         Level the PvP win matrix and stat table are drawn at (default 50, else the highest level).\n" +
             "  --roster <path>            beast-roster.json (default: found by walking up from the working directory).\n" +
@@ -276,8 +277,8 @@ namespace BeastCraft.Tooling.BalanceSim
                         }
 
                         break;
-                    case "--max-rounds":
-                        if (!TryNextInt(args, ref i, arg, 1, out options.MaxRounds, out error))
+                    case "--max-time":
+                        if (!TryNextInt(args, ref i, arg, 1, out options.MaxTime, out error))
                         {
                             return null;
                         }

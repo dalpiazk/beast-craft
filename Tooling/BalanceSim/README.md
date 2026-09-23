@@ -37,7 +37,7 @@ dotnet run --project Tooling/BalanceSim -c Release -- [options]
 | `--target-clear <pct>` | `50` | Clear rate the difficulty calibration aims for. |
 | `--marginal-threshold <x>` | `5` | Flag a beast whose overall marginal clear rate is outside +/-x points. |
 | `--enemy-element <e>` | `authored` | `authored`, `None` or an element name: override every enemy's element. |
-| `--max-rounds <n>` | `200` | Round cap; a battle that reaches it is a stalemate. |
+| `--max-time <n>` | `2000` | Battle-time cap (normalized, see below); a battle that reaches it is a stalemate. |
 | `--seed <n>` | `12345` | Base seed; each battle derives its own seed from it. |
 | `--matrix-level <n>` | `50` | Level of the PvP win matrix and the stat table (falls back to the highest simulated level). |
 | `--roster <path>` | found by walking up | Path to `beast-roster.json`. |
@@ -54,9 +54,11 @@ three levels, three encounters) takes about 15 s on an 8-thread machine (about 3
 Two reports are committed, both the default arguments:
 
 - `docs/balance/baseline-report.md` — the "before" picture, on the roster's first-draft stats. It is
-  kept as a record and is **not** regenerated (a fresh run now reads the tuned roster).
+  kept as a record and is **not** regenerated (a fresh run now reads the tuned roster). It predates
+  the ATB turn order, so its battle lengths are in rounds.
 - `docs/balance/tuned-report.md` — the current roster after the first tuning pass (see
-  `docs/balance/tuning-log.md`). Regenerate it whenever the roster, fixtures or simulator change:
+  `docs/balance/tuning-log.md`), under the current Runtime (the ATB turn order). Regenerate it
+  whenever the roster, fixtures, simulator or Runtime change:
 
 ```sh
 dotnet run --project Tooling/BalanceSim -c Release -- --out docs/balance/tuned-report.md
@@ -92,7 +94,8 @@ The first baseline did not manage that: Strike at cooldown 1 against Blast at co
   physical half fires first, but that does not bias outcomes: a target dies iff the two halves
   together deal its HP, whichever one lands the blow. Burst has lower power and a longer cooldown
   than the single-target pair, so it only pays off when several enemies are close (swarms, packs).
-  Cooldown 2 brings it up in round 2; at cooldown 3 the swarm was mostly dead before it fired.
+  Cooldown 2 brings it up on the beast's second turn; at cooldown 3 the swarm was mostly dead before
+  it fired (measured under the old round-based turn order).
   `AreaBurst` is a disc around the caster's own tile and never moves the caster, so Burst sits last
   in the fire order and goes off from the tile Strike just walked the beast to.
 - **Kit modes.** `elemental` gives every kit skill the beast's first element; `neutral` makes them
@@ -120,13 +123,13 @@ The first baseline did not manage that: Strike at cooldown 1 against Blast at co
 - **Placement.** Each side takes the front-most tiles of its own deployment zone (front row first,
   then outward from the centre line). Enemies are placed in fixture order; the team is committed
   through `PlacementValidator.TryPlaceAll`. Which member gets which slot is a fixed seeded shuffle
-  per team, because the slot fixes the unit id, and ids break speed ties and equal-distance target
+  per team, because the slot fixes the unit id, and ids break initiative ties and equal-distance target
   ties within the team. Pinning slots to roster order would always expose the first species.
-  (Speed ties *between* the sides are split separately; see below.) Placing all 24 swarm enemies is
+  (Initiative ties *between* the sides are split separately; see below.) Placing all 24 swarm enemies is
   checked on every battle, and the loader rejects an encounter that does not fit its zone.
 - **Difficulty calibration.** One multiplier per (kit mode, encounter, level) scales every enemy's
-  HP, Atk, Def, SpA and SpD. Speed and Move stay unscaled, since scaling Speed would reshuffle turn
-  order in steps. The multiplier starts at 1 and doubles or halves until the target clear rate is
+  HP, Atk, Def, SpA and SpD. Speed and Move stay unscaled: Speed is how many turns a unit gets, so
+  scaling it would change the enemies' action economy, not just their toughness. The multiplier starts at 1 and doubles or halves until the target clear rate is
   bracketed (between 1/64 and 64), then bisects 8 times. The evaluated multiplier closest to the
   target wins (first evaluated on a tie). The process is deterministic because each clear rate is.
   Where a step in the clear-rate curve cannot be split (for example level 1, where enemy stats
@@ -136,7 +139,9 @@ The first baseline did not manage that: Strike at cooldown 1 against Blast at co
     teams without it, in points.
   - **Damage share / taken share**: the beast's share of its team's damage dealt and taken (HP
     actually removed, so overkill is not counted).
-  - **Survival** (standing at the end) and **rounds to clear**.
+  - **Survival** (standing at the end), **time to clear** (normalized time of the clears it was
+    in) and **turns / time** (its turns per unit of time over its battles: Speed / 100 while it
+    stands).
   - Per encounter, per level, and overall (every encounter and level weighted equally), plus a
     per-encounter ranking that shows niches.
 - **Flags.** Overall marginal outside +/-5 points; **no niche** (bottom 3 in every encounter);
@@ -144,7 +149,7 @@ The first baseline did not manage that: Strike at cooldown 1 against Blast at co
 - **Battle loop.** The PvE loop reproduces `BattleTurnExecutor.RunBattle` statement for statement,
   with an HP snapshot around each `ExecuteTurn` so damage can be attributed to the acting unit.
   `--self-check` replays sample battles through the real `RunBattle` and requires identical
-  outcomes, rounds, HP and positions. The loop adds no rules of its own.
+  outcomes, battle time, turn counts, HP and positions. The loop adds no rules of its own.
 
 ### Runtime rules that shape the PvE numbers
 
@@ -166,8 +171,15 @@ to be simulator-side workarounds before they became Runtime rules:
 
 The default run has no stalemates, PvE or PvP.
 
-- **Speed ties between the sides are split evenly.** `TurnManager` breaks equal Speed on the
-  ordinal unit id, and with raw ids (`e01`... against `p1`...) every cross-side tie went to the
+- **Turn order is the Runtime's ATB gauge.** `TurnManager` fills every unit's gauge by its Speed
+  and hands a turn to whoever reaches 1000, overflow carried, so twice the Speed is twice the turns.
+  There are no rounds: battle length is **normalized time**, 1.0 = one turn of a Speed-100 unit.
+  Speed scales with level, so the same fight takes longer at level 1 than at level 100; compare
+  times within a level. The cap (`--max-time`, default 2000, `BattleTurnExecutor.DefaultMaxTime`)
+  is a hang guard, not a game rule.
+- **Initiative ties between the sides are split evenly.** `TurnManager` breaks a tie between equally
+  full, equally fast gauges on the ordinal unit id (units of equal Speed fill in lockstep, so that is
+  every turn they share), and with raw ids (`e01`... against `p1`...) every cross-side tie went to the
   enemies. Each battle now prefixes one side's ids with `a` and the other's with `b`; in every
   (kit mode, encounter, level) cell a seeded shuffle of the team indices picks exactly half the teams
   to win ties (`PveSimulator.PlayersWinTies`). The prefix is side-wide, so the order within a side,
@@ -177,9 +189,9 @@ The default run has no stalemates, PvE or PvP.
 
 Every pair of distinct species is played twice per level and kit mode with the sides swapped, on a
 Medium board, one beast per side: the most central tile of the player zone against its point
-mirror. Mirror matches are skipped. `TurnManager` breaks speed ties on the ordinal unit id, and the
-ids are fixed per side (`p` / `e`), so playing each pairing both ways gives each beast the tie-break
-exactly once. Stalemates and mutual defeats count as games but not wins.
+mirror. Mirror matches are skipped. `TurnManager` breaks initiative ties on the ordinal unit id,
+and the ids are fixed per side (`p` / `e`), so playing each pairing both ways gives each beast the
+tie-break exactly once. Battle length is reported in normalized time and total turns. Stalemates and mutual defeats count as games but not wins.
 
 ## Determinism
 

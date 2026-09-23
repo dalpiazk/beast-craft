@@ -102,6 +102,9 @@ namespace BeastCraft.Tooling.BalanceSim
             report.AppendLine("- Win rate = wins / games; mutual defeats and stalemates count as games but not wins. Flags: win rate above " +
                               SimOptions.Format(SimOptions.HighWinRate) + "% or below " + SimOptions.Format(SimOptions.LowWinRate) +
                               "%, a swing of more than " + SimOptions.Format(SimOptions.MaxLevelSwing) + " points across levels, and any stalemate.");
+            report.AppendLine("- Turn order: the Runtime's ATB gauge (`TurnManager`: each unit acts every " + TurnManager.ActionThreshold +
+                              " / Speed ticks). Battle length is normalized time, 1.0 = one turn of a Speed-" + TurnManager.ReferenceSpeed +
+                              " unit, so it reads longer at low levels, where Speed is lower; max time " + options.MaxTime + ".");
             report.AppendLine();
         }
 
@@ -266,15 +269,16 @@ namespace BeastCraft.Tooling.BalanceSim
         {
             report.AppendLine("#### Battle length by level");
             report.AppendLine();
-            report.AppendLine("| Level | Battles | Avg rounds | Min | Max | Stalemates | Mutual defeats |");
-            report.AppendLine("| ---: | ---: | ---: | ---: | ---: | ---: | ---: |");
+            report.AppendLine("| Level | Battles | Avg time | Min | Max | Avg turns | Stalemates | Mutual defeats |");
+            report.AppendLine("| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |");
 
             foreach (int level in options.Levels)
             {
                 int battles = 0;
-                long roundSum = 0;
-                int min = int.MaxValue;
-                int max = 0;
+                double timeSum = 0.0;
+                double min = double.MaxValue;
+                double max = 0.0;
+                long actionSum = 0;
                 int stalemates = 0;
                 int mutual = 0;
 
@@ -286,16 +290,18 @@ namespace BeastCraft.Tooling.BalanceSim
                     }
 
                     battles++;
-                    roundSum += record.Rounds;
-                    min = Math.Min(min, record.Rounds);
-                    max = Math.Max(max, record.Rounds);
+                    timeSum += record.Time;
+                    actionSum += record.Actions;
+                    min = Math.Min(min, record.Time);
+                    max = Math.Max(max, record.Time);
                     stalemates += record.Outcome == BattleOutcome.Stalemate ? 1 : 0;
                     mutual += record.Outcome == BattleOutcome.MutualDefeat ? 1 : 0;
                 }
 
-                double average = battles == 0 ? 0.0 : (double)roundSum / battles;
-                report.AppendLine("| " + level + " | " + battles + " | " + SimOptions.Format(average) + " | " + (battles == 0 ? 0 : min) + " | " + max +
-                                  " | " + stalemates + " | " + mutual + " |");
+                double average = battles == 0 ? 0.0 : timeSum / battles;
+                double turns = battles == 0 ? 0.0 : (double)actionSum / battles;
+                report.AppendLine("| " + level + " | " + battles + " | " + SimOptions.Format(average) + " | " + SimOptions.Format(battles == 0 ? 0.0 : min) +
+                                  " | " + SimOptions.Format(max) + " | " + SimOptions.Format(turns) + " | " + stalemates + " | " + mutual + " |");
             }
 
             report.AppendLine();
@@ -379,7 +385,7 @@ namespace BeastCraft.Tooling.BalanceSim
                 if (record.Mode == mode && record.Outcome == BattleOutcome.Stalemate)
                 {
                     report.AppendLine("- L" + record.Level + ": " + species[record.PlayerIndex].DisplayName + " (player) vs " +
-                                      species[record.EnemyIndex].DisplayName + " (enemy), " + record.Rounds + " rounds");
+                                      species[record.EnemyIndex].DisplayName + " (enemy), " + SimOptions.Format(record.Time) + " time");
                     any = true;
                 }
             }

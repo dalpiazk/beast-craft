@@ -19,7 +19,12 @@ namespace BeastCraft.Tooling.BalanceSim
         public int EnemyIndex;
 
         public BattleOutcome Outcome;
-        public int Rounds;
+
+        /// <summary>Normalized battle time (<see cref="BattleResult.Time"/>): 1.0 = one turn of a Speed-100 unit.</summary>
+        public double Time;
+
+        /// <summary>Turns taken by both sides together.</summary>
+        public int Actions;
 
         /// <summary>Species index of the winner, or -1 for a mutual defeat or a stalemate.</summary>
         public int WinnerIndex = -1;
@@ -38,7 +43,8 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <summary>
         /// Every unordered pair of distinct species, at every level and mode, played twice with the
         /// sides swapped (A as player vs B as enemy, then B as player vs A as enemy). The ids per side
-        /// stay fixed, so the ordinal-id speed-tie break favours each beast exactly once per pairing.
+        /// stay fixed, so the ordinal-id tie break between equally full, equally fast gauges favours each
+        /// beast exactly once per pairing.
         /// Mirror matches are skipped.
         /// </summary>
         public static List<BattleRecord> Run(SimOptions options, IReadOnlyList<CreatureSpeciesSO> species)
@@ -84,7 +90,7 @@ namespace BeastCraft.Tooling.BalanceSim
             BattleUnit[] units = { player, enemy };
             TurnManager turnManager = new TurnManager(units);
             System.Random rng = new System.Random(DeriveSeed(options.Seed, mode, level, playerIndex, enemyIndex));
-            BattleResult result = BattleTurnExecutor.RunBattle(turnManager, units, grid, rng, null, options.MaxRounds);
+            BattleResult result = BattleTurnExecutor.RunBattle(turnManager, units, grid, rng, null, options.MaxTime);
 
             BattleRecord record = new BattleRecord
             {
@@ -93,9 +99,8 @@ namespace BeastCraft.Tooling.BalanceSim
                 PlayerIndex = playerIndex,
                 EnemyIndex = enemyIndex,
                 Outcome = result.Outcome,
-
-                // A capped battle reports the round it stopped at opening (cap + 1); count rounds played.
-                Rounds = Math.Min(result.Rounds, options.MaxRounds)
+                Time = result.Time,
+                Actions = result.ActionCount
             };
 
             if (result.Outcome == BattleOutcome.PlayerVictory)
