@@ -118,8 +118,10 @@ What exists today:
 - A **headless balance simulator** ([`Tooling/BalanceSim/`](Tooling/BalanceSim/README.md))
   — local-only, not a CI job — that runs the real battle code outside Unity
   and writes a Markdown report. Its primary mode is PvE: every 4-beast team of
-  the starter roster fights boss, swarm and pack encounters at calibrated
-  difficulty; a 1v1 round-robin is kept as a secondary PvP section. The
+  the starter roster fights randomly generated mixed encounters in four shapes
+  (solo, elite, squad, horde) with varied enemy types and elements, at
+  calibrated difficulty (the hand-authored boss, swarm and pack encounters remain
+  available via `--encounter-set fixed`); a 1v1 round-robin is kept as a secondary PvP section. The
   committed reports are [`docs/balance/baseline-report.md`](docs/balance/baseline-report.md)
   (first-draft stats, the "before") and [`docs/balance/tuned-report.md`](docs/balance/tuned-report.md)
   (the tuned roster); their numbers are inputs to design decisions, not applied automatically.
