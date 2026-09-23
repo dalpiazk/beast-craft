@@ -271,6 +271,8 @@ namespace BeastCraft.Tests.EditMode
             AssertDefaultsInclude(library, "leviathan", e => e.Status == "Taunt");
             AssertDefaultsInclude(library, "leviathan", e => e.Status == "Shield" || e.EffectType == "Heal");
             Assert.IsTrue(HasSkill(library, "leviathan", s => DealsDamage(s) && s.TargetShape != "SingleTarget"));
+            Assert.AreEqual(3, Skill(library, "undertow").Range, "Retuned from 2 (niche pass), like the Golem's Stone Challenge: the taunt reaches ranged enemies.");
+            Assert.AreEqual(65f, Skill(library, "deep_shell").Effects[0].Magnitude, "Retuned from 50 (niche pass).");
         }
 
         [Test]
@@ -313,6 +315,10 @@ namespace BeastCraft.Tests.EditMode
             Assert.IsTrue(HasSkill(library, "thunderbird", s => s.TargetShape == "AreaBurst" && Array.Exists(s.Effects, e => e.HitCount >= 3)));
             Assert.IsNotNull(FindEffect(library, "thunderbird", e => e.EffectType == "BuffStat" && e.AffectedStat == "CritChance"));
             Assert.IsTrue(HasSkill(library, "thunderbird", s => s.InitialCooldown == 0 && s.MaxUsesPerBattle > 0 && DealsDamage(s)));
+
+            // The niche pass put the opener in the default loadout in place of Static Charge
+            // (still learnable at level 3), and moved its learn level from 8 to 5.
+            CollectionAssert.AreEqual(new[] { "thunder_talons", "chain_lightning", "storm_dive" }, Kit(library, "thunderbird").DefaultLoadout);
         }
 
         [Test]
@@ -345,6 +351,7 @@ namespace BeastCraft.Tests.EditMode
             Assert.IsTrue(HasSkill(library, "kirin", s => s.TargetShape == "AllAllies" && Array.Exists(s.Effects, e => e.AffectedStat == "SpecialAttack")));
             Assert.IsTrue(HasSkill(library, "kirin", s => s.TargetShape == "SingleTarget" && Array.Exists(s.Effects, e => e.EffectType == "Damage" && e.Magnitude >= 150f)));
             Assert.IsTrue(HasSkill(library, "kirin", s => s.TargetShape == "AllAllies" && Array.Exists(s.Effects, e => e.Status == "Shield")));
+            Assert.AreEqual(66f, Skill(library, "radiant_bolt").Effects[0].Magnitude, "Retuned from 62 (niche pass): 0.94x the range-2+ budget.");
         }
 
         [Test]
@@ -450,12 +457,17 @@ namespace BeastCraft.Tests.EditMode
             SkillSO talons = BuildSkill(Skill(library, "thunder_talons"));
             SkillSO coup = BuildSkill(Skill(library, "coup_de_grace"));
 
+            SkillSO chain = BuildSkill(Skill(library, "chain_lightning"));
+
             Assert.AreEqual(0, dive.InitialCooldown);
             Assert.AreEqual(1, dive.MaxUsesPerBattle);
+            Assert.AreEqual(120f, dive.Effects[0].Magnitude, "Retuned from 230 (niche pass): a default-loadout opener, not a learned nuke.");
             Assert.AreEqual(3, talons.Effects[0].HitCount);
             Assert.AreEqual(2, talons.Range, "Retuned from 1 (Thunderbird range vs move): it fires from outside melee and can retreat.");
-            Assert.AreEqual(28f, talons.Effects[0].Magnitude, "Retuned from 36 at range 1: 28 x 3 = 84 is 1.2x the range-2+ budget.");
+            Assert.AreEqual(26f, talons.Effects[0].Magnitude, "Retuned from 28 (niche pass): 26 x 3 = 78 is 1.11x the range-2+ budget.");
+            Assert.AreEqual(22f, chain.Effects[0].Magnitude, "Retuned from 28 (niche pass): 22 x 3 at radius 2, cooldown 2 = 66, 0.94x the range-2+ budget.");
             Assert.AreEqual(60, coup.Effects[0].ExecuteBonusPercent, "Retuned from 50 (the authored-kits retune).");
+            Assert.AreEqual(115f, coup.Effects[0].Magnitude, "Retuned from 105 (niche pass): 115 x 1.3 / 2 = 74.75, 1.07x the range-2+ budget.");
             Assert.AreEqual(SkillTargetingCriterion.HpFraction, coup.TargetingCriterion);
             Assert.AreEqual(DamageCategory.Special, coup.Category);
         }

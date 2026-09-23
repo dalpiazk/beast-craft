@@ -166,9 +166,9 @@
     {
       "SkillId": "undertow",
       "DisplayName": "Undertow",
-      "Description": "Churns the water into a whirlpool: enemies within two hexes are drawn to the Leviathan (taunted) and slowed.",
+      "Description": "Churns the water into a whirlpool: enemies within three hexes are drawn to the Leviathan (taunted) and slowed.",
       "TargetShape": "AreaBurst",
-      "Range": 2,
+      "Range": 3,
       "Cooldown": 3,
       "Element": "Water",
       "Category": "Special",
@@ -189,13 +189,13 @@
     {
       "SkillId": "deep_shell",
       "DisplayName": "Deep Shell",
-      "Description": "Coils behind its scales and closes its wounds: a shield worth half its Defense and a small heal.",
+      "Description": "Coils behind its scales and closes its wounds: a shield worth about two-thirds of its Defense and a small heal.",
       "TargetShape": "Self",
       "Range": 0,
       "Cooldown": 3,
       "Element": "Water",
       "Effects": [
-        { "EffectType": "ApplyStatus", "Status": "Shield", "Magnitude": 50, "DurationTurns": 3 },
+        { "EffectType": "ApplyStatus", "Status": "Shield", "Magnitude": 65, "DurationTurns": 3 },
         { "EffectType": "Heal", "Magnitude": 24 }
       ],
       "Progression": {
@@ -447,7 +447,7 @@
       "Element": "Metal",
       "Category": "Physical",
       "Effects": [
-        { "EffectType": "Damage", "Magnitude": 148 }
+        { "EffectType": "Damage", "Magnitude": 160 }
       ],
       "Progression": {
         "MaxLevel": 20,
@@ -559,7 +559,7 @@
       "Element": "Ice",
       "Category": "Special",
       "Effects": [
-        { "EffectType": "Damage", "Magnitude": 48 },
+        { "EffectType": "Damage", "Magnitude": 52 },
         { "EffectType": "DebuffStat", "AffectedStat": "Speed", "Magnitude": 8, "DurationTurns": 3, "MaxStacks": 3, "IsPercent": true }
       ],
       "Progression": {
@@ -697,7 +697,7 @@
       "Element": "Lightning",
       "Category": "Physical",
       "Effects": [
-        { "EffectType": "Damage", "Magnitude": 28, "HitCount": 3 }
+        { "EffectType": "Damage", "Magnitude": 26, "HitCount": 3 }
       ],
       "Progression": {
         "MaxLevel": 20,
@@ -719,7 +719,7 @@
       "Element": "Lightning",
       "Category": "Special",
       "Effects": [
-        { "EffectType": "Damage", "Magnitude": 28, "HitCount": 3 }
+        { "EffectType": "Damage", "Magnitude": 22, "HitCount": 3 }
       ],
       "Progression": {
         "MaxLevel": 20,
@@ -756,7 +756,7 @@
     {
       "SkillId": "storm_dive",
       "DisplayName": "Storm Dive",
-      "Description": "Opens the fight with a single dive from the clouds: one devastating hit, once per battle.",
+      "Description": "Opens the fight with a single dive from the clouds: one heavy hit, once per battle.",
       "TargetShape": "SingleTarget",
       "Range": 3,
       "Cooldown": 4,
@@ -765,7 +765,7 @@
       "Element": "Lightning",
       "Category": "Physical",
       "Effects": [
-        { "EffectType": "Damage", "Magnitude": 230 }
+        { "EffectType": "Damage", "Magnitude": 120 }
       ],
       "Progression": {
         "MaxLevel": 20,
@@ -967,7 +967,7 @@
       "Element": "Fire",
       "Category": "Special",
       "Effects": [
-        { "EffectType": "Damage", "Magnitude": 55 },
+        { "EffectType": "Damage", "Magnitude": 60 },
         { "EffectType": "ApplyStatus", "Status": "DamageOverTime", "Magnitude": 14, "DurationTurns": 3, "MaxStacks": 3 }
       ],
       "Progression": {
@@ -1147,7 +1147,7 @@
       "Element": "Light",
       "Category": "Special",
       "Effects": [
-        { "EffectType": "Damage", "Magnitude": 62 }
+        { "EffectType": "Damage", "Magnitude": 66 }
       ],
       "Progression": {
         "MaxLevel": 20,
@@ -1252,7 +1252,7 @@
     {
       "SkillId": "coup_de_grace",
       "DisplayName": "Coup de Grace",
-      "Description": "Finds the most wounded enemy in reach and finishes it: up to +50% damage against a nearly dead target.",
+      "Description": "Finds the most wounded enemy in reach and finishes it: up to +60% damage against a nearly dead target.",
       "TargetShape": "SingleTarget",
       "Range": 3,
       "Cooldown": 2,
@@ -1261,7 +1261,7 @@
       "Element": "Dark",
       "Category": "Special",
       "Effects": [
-        { "EffectType": "Damage", "Magnitude": 105, "ExecuteBonusPercent": 60 }
+        { "EffectType": "Damage", "Magnitude": 115, "ExecuteBonusPercent": 60 }
       ],
       "Progression": {
         "MaxLevel": 20,
@@ -1761,11 +1761,11 @@
         { "Level": 1, "SkillId": "thunder_talons" },
         { "Level": 1, "SkillId": "chain_lightning" },
         { "Level": 3, "SkillId": "static_charge" },
-        { "Level": 8, "SkillId": "storm_dive" },
+        { "Level": 5, "SkillId": "storm_dive" },
         { "Level": 25, "SkillId": "thunderclap" },
         { "Level": 50, "SkillId": "plasma_barrage" }
       ],
-      "DefaultLoadout": [ "thunder_talons", "chain_lightning", "static_charge" ]
+      "DefaultLoadout": [ "thunder_talons", "chain_lightning", "storm_dive" ]
     },
     {
       "SpeciesId": "griffin",

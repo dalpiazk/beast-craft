@@ -68,7 +68,7 @@ Two reports are committed, both the default arguments:
   the ATB turn order, so its battle lengths are in rounds.
 - `docs/balance/tuned-report.md` — the current roster and skill library after the third tuning pass
   and its element chart v2 follow-up (see `docs/balance/tuning-log.md`, "Retune with authored kits,
-  avatar passives, sqrt speed and mitigation", "Element chart v2" and "Thunderbird range vs move"), under the real game setup (every beast's authored default loadout, the library
+  avatar passives, sqrt speed and mitigation", "Element chart v2", "Thunderbird range vs move" and "Niche pass: Thunderbird opener, Phoenix/Frost Wyrm lifts, remaining negatives"), under the real game setup (every beast's authored default loadout, the library
   avatar with its passives, skill level 1), the current Runtime (the square-root ATB turn order, the
   mitigation damage formula, `SpecialAttack`-scaled heals, combat stances, variance and crits) and
   the generated encounters. Regenerate it whenever the roster, the skill library, fixtures, simulator

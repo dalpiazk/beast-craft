@@ -1748,3 +1748,203 @@ top-3 shape** (best 6th in `squad`, 2.6 points short), as in A.
   range-2+ budget (84 ≤ 84).
 - `docs/design/battle-system.md`: roster table (Move 4), move-range note, budget note and the
   Thunderbird kit table. `tuned-report.md` is regenerated from the default run (seed 12345).
+
+## Niche pass: Thunderbird opener, Phoenix/Frost Wyrm lifts, remaining negatives
+
+A read-only analysis of the "Thunderbird range vs move" result over five seeds (12345 / 777 /
+4242 / 2024 / 99) found every beast inside ±5 `elemental` but several without a shape they are
+reliably good at. The Thunderbird had none: its third default slot, Static Charge (+25 crit
+chance, +10% Speed), was dead weight, and at range 2 it parked inside the enemy's radius-2 area
+attacks. Phoenix, Frost Wyrm, Leviathan and Thunderbird were the four negatives. This pass
+applies three user-approved changes, then makes small skill-only moves for the rest. **No roster
+stat changes**: six-stat totals, Move, Speed (turn ratio 1.118) and crit are untouched, and every
+signature skill is kept.
+
+Setup as in "Element chart v2": library kits and avatar at skill level 1, generated encounters,
+levels 1 / 50 / 100, both element modes. Iterations used seeds 12345 / 777 / 4242; the final
+tables are the **mean of five seeds** (the three plus 2024 and 99). A beast has a **robust niche**
+in a shape when it is top 3 there in at least 4 of the 5 seeds.
+
+### Changes
+
+User-approved:
+
+| Skill | Before | After | DPT / budget (70 at range 2+, 90 at range 1) |
+| --- | --- | --- | --- |
+| Thunderbird default loadout | Talons, Chain Lightning, Static Charge | Talons, Chain Lightning, **Storm Dive** | Static Charge stays learnable (level 3) |
+| Storm Dive (learn level) | 8 | **5** | defaults must be learnable by level 5 |
+| Storm Dive (power, once per battle, first turn) | 230 | **120** | opener, exempt (30 per cooldown turn) |
+| Thunder Talons | 28 × 3 | **26 × 3** | 78 / 70 = 1.11× (was 1.2×) |
+| Phoenix Ember Shot | 55; DoT 14 3t | **60**; DoT 14 3t | 81 / 70 = 1.16× (was 1.09×) |
+| Frost Wyrm Rime Bolt | 48; −8% Speed | **52**; −8% Speed | 52 / 70 = 0.74× |
+
+Measured follow-ups (this pass):
+
+| Skill | Before | After | DPT / budget | Why |
+| --- | --- | --- | --- | --- |
+| Chain Lightning | 28 × 3 | **22 × 3** | 66 / 70 = 0.94× (was 1.2×) | the planned lever when Talons 26 left the Thunderbird's `neutral` above +7 (+9.1); 24 still measured +7.0–7.1 |
+| Leviathan Undertow (taunt + slow) | radius 2 | **radius 3** | utility | the Golem's Stone Challenge fix: the taunt reaches the squad's archers and casters |
+| Leviathan Deep Shell | Shield 50% Def 3t; Heal 24 | Shield **65%** Def 3t; Heal 24 | utility | sustain lift for the tank with the lowest damage share |
+| Tarasque Iron Crush | 148 | **160** | 80 / 90 = 0.89× | the Thunderbird's rise pushed the Tarasque's `neutral` to −6.5; a heavier single hit lifts it against the big targets |
+| Basilisk Coup de Grace | 105, execute +60% | **115**, execute +60% | 75 / 70 = 1.07× | its assassin role: a better finisher in `solo` / `elite` |
+| Kirin Radiant Bolt | 62 | **66** | 66 / 70 = 0.94× | the Kirin had fallen out of every `elemental` top 3 (4th in `elite` and `horde`) |
+
+Descriptions follow the numbers (Undertow "three hexes", Deep Shell "about two-thirds of its
+Defense", Storm Dive "one heavy hit"; Coup de Grace's stale "+50%" now says +60%). Every
+unlimited damage skill is still at or below 1.2× its budget.
+
+### Iteration log (3-seed means unless noted)
+
+| Run | Change on top of the previous | TB `elem` / `neutral` | Range `elemental` | Range `neutral` | `elemental` top-3 coverage | Notes |
+| --- | --- | --- | --- | --- | ---: | --- |
+| Baseline | "Thunderbird range vs move" C | −2.9 / −2.6 | −2.9 … +3.1 | −5.8 … +4.3 | 9 / 10 | Thunderbird has no shape |
+| V1 | the approved changes | +2.3 / **+9.1** | −2.6 … +2.3 | −6.5 … +9.1 | 9 / 10 | TB `neutral` over +7 (squad +21.1); Tarasque `neutral` −6.5 |
+| V2 | V1 + Undertow radius 3 | +2.3 / +8.8 | −2.5 … +2.3 | −6.6 … +8.8 | 10 / 10 | Leviathan +0.5 (squad +0.9, horde +1.2) |
+| V3 | V2 + Chain Lightning 24 | +1.4 / +7.0 | −2.2 … +1.7 | −6.3 … +7.0 | 10 / 10 | still on the +7 line |
+| V4 | V2 + Chain Lightning 26 + Deep Shell 65 | +1.7 / +8.2 | −2.1 … +1.7 | −6.7 … +8.2 | 10 / 10 | Deep Shell: Leviathan +0.8 / +1.4 |
+| V5 | V2 + CL 24 + Deep Shell 65 + Iron Crush 160 + Coup 115 | +1.2 / +7.1 | −2.3 … +1.5 | −5.9 … +7.1 | 9 / 10 | Kirin drops out (4th in `elite`) |
+| V6 | V5 with Chain Lightning 22 | +0.5 / +6.0 | −2.2 … +1.5 | −5.7 … +6.0 | 9 / 10 | 5 seeds: Kirin still no top 3 (`elite` +1.9 vs Golem +3.1) |
+| **V7** | V6 + Radiant Bolt 66 | +0.5 / +6.1 | −2.3 … +2.0 | −6.0 … +6.1 | 9 / 10 | **5 seeds: 10 / 10** (below); chosen |
+
+Four three-seed rounds (two variants each in the first three) and the five-seed confirmation of V7.
+
+### Results (mean of 5 seeds: 12345 / 777 / 4242 / 2024 / 99)
+
+Before = "Thunderbird range vs move" C; after = V7. Overall is the marginal clear rate (levels and
+shapes averaged) ± its standard deviation across the five seeds; (n) is the rank within the shape on
+the mean, `=n` a tie. The last column counts the seeds in which the beast is top 3 in `solo` /
+`elite` / `squad` / `horde`.
+
+#### `elemental` (primary): overall and per shape, before → after (rank in shape)
+
+| Beast | Overall before | Overall after | `solo` | `elite` | `squad` | `horde` | Top-3 seeds s/e/q/h, after |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | :---: |
+| Kirin | +2.6 ± 1.2 | **+2.6** ± 1.2 | +0.4 (5) → +0.3 (5) | +2.9 (3) → +2.9 (=3) | +4.3 (4) → +4.7 (4) | +2.7 (4) → +2.4 (4) | 1/1/2/1 |
+| Tarasque | +2.3 ± 3.3 | **+1.5** ± 3.1 | −0.3 (6) → −0.5 (7) | +4.3 (1) → +3.6 (2) | +10.2 (1) → +9.5 (1) | −4.8 (9) → −6.3 (10) | 1/3/4/0 |
+| Thunderbird | −2.1 ± 2.7 | **+1.3** ± 2.9 | −3.7 (8) → −0.4 (6) | −5.1 (9) → −2.7 (=8) | +2.6 (5) → +7.6 (2) | −2.2 (7) → +0.8 (5) | 2/1/4/2 |
+| Griffin | +2.3 ± 1.8 | **+0.8** ± 2.1 | +6.0 (1) → +3.8 (1) | +0.9 (6) → −1.4 (6) | +5.2 (3) → +4.4 (5) | −3.1 (8) → −3.8 (8) | 4/1/2/2 |
+| Basilisk | +0.2 ± 1.3 | **−0.1** ± 1.1 | +3.5 (3) → +2.6 (3) | +1.4 (5) → +1.1 (5) | +2.4 (6) → +1.8 (6) | −6.4 (10) → −6.1 (9) | 1/2/0/0 |
+| Golem | +0.5 ± 2.3 | **−0.3** ± 2.7 | −1.3 (7) → −1.2 (8) | +3.9 (2) → +2.9 (=3) | −5.0 (8) → −6.1 (8) | +4.3 (3) → +3.2 (3) | 1/4/0/2 |
+| Phoenix | −1.3 ± 3.1 | **−0.7** ± 3.5 | −5.3 (10) → −4.7 (10) | −5.4 (10) → −5.2 (10) | +6.3 (2) → +6.8 (3) | −0.7 (5) → +0.3 (7) | 0/0/3/1 |
+| Leviathan | −2.1 ± 2.0 | **−1.2** ± 2.4 | +0.8 (4) → +0.9 (4) | +2.1 (4) → +4.0 (1) | −10.2 (9) → −10.1 (9) | −1.1 (6) → +0.4 (6) | 2/3/0/1 |
+| Frost Wyrm | −1.8 ± 1.6 | **−1.8** ± 1.3 | −4.6 (9) → −3.8 (9) | −3.3 (8) → −2.5 (7) | −4.5 (7) → −5.7 (7) | +5.4 (2) → +4.7 (1) | 0/0/0/4 |
+| Treant | −0.6 ± 2.5 | **−2.1** ± 2.1 | +4.5 (2) → +3.0 (2) | −1.7 (7) → −2.7 (=8) | −11.2 (10) → −12.9 (10) | +5.9 (1) → +4.4 (2) | 3/0/0/2 |
+
+Range: −2.1 … +2.6 → −2.1 … +2.6.
+
+Niche map `elemental` (after): mean top 3 per shape; **bold** = top 3 in ≥ 4 of 5 seeds
+
+| Shape | Top 3 (ties included) |
+| --- | --- |
+| `solo` | **Griffin** +3.8 (4/5), Treant +3.0 (3/5), Basilisk +2.6 (1/5) |
+| `elite` | Leviathan +4.0 (3/5), Tarasque +3.6 (3/5), Kirin +2.9 (1/5), **Golem** +2.9 (4/5) |
+| `squad` | **Tarasque** +9.5 (4/5), **Thunderbird** +7.6 (4/5), Phoenix +6.8 (3/5) |
+| `horde` | **Frost Wyrm** +4.7 (4/5), Treant +4.4 (2/5), Golem +3.2 (2/5) |
+
+Beasts with a robust niche, before: 4 (Griffin `solo`; Golem `elite` and `horde`; Tarasque `squad`; Treant `horde`); after: **5** (Griffin, Golem, Tarasque, Thunderbird, Frost Wyrm).
+
+Survival / damage share `elemental` (mean of shapes), before → after
+
+| Beast | Damage share | Survival |
+| --- | ---: | ---: |
+| Thunderbird | 27.6% → 32.6% | 23.6% → 30.9% |
+| Phoenix | 32.5% → 32.8% | 43.4% → 43.8% |
+| Frost Wyrm | 22.8% → 22.4% | 31.0% → 30.2% |
+| Leviathan | 16.2% → 15.4% | 30.7% → 30.6% |
+| Tarasque | 26.5% → 26.2% | 27.5% → 27.0% |
+| Basilisk | 30.3% → 29.5% | 38.2% → 37.5% |
+| Kirin | 32.5% → 32.4% | 46.0% → 45.6% |
+
+#### `neutral` (secondary): overall and per shape, before → after (rank in shape)
+
+| Beast | Overall before | Overall after | `solo` | `elite` | `squad` | `horde` | Top-3 seeds s/e/q/h, after |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | :---: |
+| Thunderbird | −2.5 ± 1.4 | **+5.8** ± 1.5 | −11.0 (8) → +2.5 (6) | −6.2 (9) → +0.0 (6) | +10.0 (1) → +16.5 (1) | −2.6 (7) → +4.3 (2) | 0/0/5/3 |
+| Kirin | +4.0 ± 0.9 | **+4.0** ± 0.7 | +4.4 (6) → +4.3 (5) | +6.1 (2) → +6.4 (2) | +3.0 (5) → +3.0 (=4) | +2.6 (3) → +2.0 (5) | 0/5/1/0 |
+| Leviathan | +2.4 ± 0.6 | **+3.6** ± 0.7 | +13.9 (1) → +14.2 (1) | +7.0 (1) → +9.6 (1) | −12.3 (9) → −12.6 (9) | +1.2 (5) → +3.3 (3) | 5/5/0/2 |
+| Golem | +3.4 ± 1.3 | **+2.2** ± 2.4 | +6.9 (5) → +6.8 (4) | +3.7 (4) → +2.2 (4) | −4.5 (8) → −6.3 (8) | +7.6 (1) → +6.1 (1) | 2/2/0/5 |
+| Basilisk | +2.3 ± 0.3 | **+1.6** ± 0.3 | +8.9 (3) → +7.9 (2) | +5.0 (3) → +5.1 (3) | +0.7 (6) → +0.1 (6) | −5.3 (10) → −6.8 (9) | 4/3/0/0 |
+| Treant | +0.6 ± 1.1 | **−0.9** ± 0.9 | +9.9 (2) → +7.6 (3) | +3.2 (5) → +1.8 (5) | −13.4 (10) → −14.6 (10) | +2.7 (2) → +1.5 (6) | 4/0/0/3 |
+| Griffin | +1.8 ± 3.4 | **−2.0** ± 3.0 | +7.3 (4) → +0.1 (7) | +1.0 (6) → −3.5 (7) | +4.0 (3) → +3.0 (=4) | −5.1 (9) → −7.5 (10) | 0/0/1/1 |
+| Frost Wyrm | −2.4 ± 1.0 | **−3.4** ± 0.7 | −6.0 (7) → −8.7 (8) | −4.5 (8) → −5.1 (9) | −0.0 (7) → −0.3 (7) | +1.1 (6) → +0.5 (7) | 0/0/0/0 |
+| Phoenix | −6.0 ± 0.7 | **−4.7** ± 1.2 | −16.4 (9) → −13.7 (9) | −13.2 (10) → −11.6 (10) | +3.9 (4) → +4.2 (3) | +1.8 (4) → +2.2 (4) | 0/0/4/1 |
+| Tarasque | −3.9 ± 0.9 | **−6.1** ± 0.8 | −17.9 (10) → −21.1 (10) | −2.1 (7) → −4.9 (8) | +8.7 (2) → +7.1 (2) | −4.2 (8) → −5.6 (8) | 0/0/4/0 |
+
+Range: −6.0 … +4.0 → −6.1 … +5.8.
+
+Niche map `neutral` (after): mean top 3 per shape; **bold** = top 3 in ≥ 4 of 5 seeds
+
+| Shape | Top 3 (ties included) |
+| --- | --- |
+| `solo` | **Leviathan** +14.2 (5/5), **Basilisk** +7.9 (4/5), **Treant** +7.6 (4/5) |
+| `elite` | **Leviathan** +9.6 (5/5), **Kirin** +6.4 (5/5), Basilisk +5.1 (3/5) |
+| `squad` | **Thunderbird** +16.5 (5/5), **Tarasque** +7.1 (4/5), **Phoenix** +4.2 (4/5) |
+| `horde` | **Golem** +6.1 (5/5), Thunderbird +4.3 (3/5), Leviathan +3.3 (2/5) |
+
+Beasts with a robust niche, before: 7; after: 8 (Leviathan, Kirin, Basilisk, Treant, Thunderbird, Tarasque, Phoenix, Golem).
+
+Survival / damage share `neutral` (mean of shapes), before → after
+
+| Beast | Damage share | Survival |
+| --- | ---: | ---: |
+| Thunderbird | 29.6% → 36.2% | 22.0% → 33.0% |
+| Phoenix | 32.3% → 32.5% | 41.1% → 41.7% |
+| Frost Wyrm | 23.3% → 22.6% | 29.2% → 27.5% |
+| Leviathan | 16.1% → 15.3% | 30.9% → 30.0% |
+| Tarasque | 24.5% → 24.0% | 22.8% → 21.1% |
+| Basilisk | 29.8% → 28.7% | 40.5% → 39.0% |
+| Kirin | 31.0% → 30.9% | 47.2% → 45.9% |
+
+### Targets: met and missed (5-seed means, final)
+
+| Target | Before | After | |
+| --- | --- | --- | --- |
+| Every beast `elemental` overall within ±4 | −2.1 … +2.6 | −2.1 … +2.6 | met |
+| Every beast `neutral` overall within ±7 | −6.0 … +4.0 | −6.1 … +5.8 | met (Tarasque −6.1 and Thunderbird +5.8 are the edges) |
+| Every beast top 3 in ≥ 1 shape, `elemental` mean | 8 / 10 (not Leviathan, Thunderbird) | **10 / 10** | met, but Kirin only on a tie: `elite` +2.9 = Golem +2.9 |
+| Robust niches (top 3 in ≥ 4 / 5 seeds), `elemental` | 4 beasts | **5 beasts** | Griffin `solo`, Golem `elite`, Tarasque and Thunderbird `squad`, Frost Wyrm `horde` |
+| No beast top 3 in every shape | none | none | met (most: two shapes, Tarasque, Treant and Golem counting the tie) |
+| Turn ratio 1.10–1.15, six-stat totals 570–630, Move 2–5, crit | unchanged | unchanged | met (no roster edits) |
+| Budget rule (≤ 1.2× for unlimited damage skills) | met | met | highest now Ember Shot 1.16× |
+
+`neutral` top-3 coverage is 8 / 10 (not Griffin, Frost Wyrm; before: 8 / 10, not Frost Wyrm,
+Phoenix), with 8 robust niches (7 before).
+
+### What moved, and what did not
+
+- **Thunderbird**: the opener works. `elemental` −2.1 → +1.3, `neutral` −2.5 → +5.8, survival
+  23.6% → 30.9% and damage share 27.6% → 32.6% (`elemental`). It is now robustly 2nd in `squad`
+  (4 / 5 seeds) and best in `neutral` `squad` (5 / 5). Storm Dive at 120 on turn one removes a
+  target or most of one before the Thunderbird is focused; with both multi-hit skills still at the
+  1.2× ceiling (V1) it became the strongest `neutral` beast, hence Talons 26 and Chain Lightning 22.
+  It is the most positive `neutral` beast still, and its `neutral` solo / elite are only 6th.
+- **Leviathan**: `elemental` −2.1 → −1.2, `neutral` +2.4 → +3.6, now 1st on the mean in `elite`
+  (3 / 5 seeds, not robust). The squad hole is **not** fixed (−10.2 → −10.1): the radius-3 taunt
+  catches more of the squad but the Leviathan's own damage share (15%) is the lowest in the roster,
+  so what it contributes against 4–6 spread enemies is the taunt window. Closing it would need a
+  damage change (e.g. Tidal Wave in the defaults), which the signature tests rule out without
+  dropping Deep Shell or Serpent Bite; not attempted.
+- **Phoenix**: −1.3 → −0.7 `elemental`, −6.0 → −4.7 `neutral`; still robust only in `neutral`
+  `squad`. **Frost Wyrm**: −1.8 → −1.8 `elemental` (the Rime Bolt lift absorbed the predicted
+  drop when the Thunderbird improved) and now a robust `horde` niche (4 / 5, was 3 / 5); `neutral`
+  −2.4 → −3.4 with no top-3 shape.
+- **Basilisk**: overall unchanged (+0.2 → −0.1 `elemental`) and 3rd in `solo` on the mean, but
+  top 3 there in only 1 of 5 seeds, so its `elemental` niche stays weak; in `neutral` it is robust
+  in `solo` (4 / 5). The Coup de Grace lift roughly offset the Thunderbird's gain.
+- **Tarasque** `neutral` −3.9 → −6.1 even with Iron Crush 160 (`neutral` `solo` −21.1, last): the
+  slow melee brick loses most to the Thunderbird's stronger opener. Still inside ±7.
+- **Griffin** and **Treant** lost ground to the Thunderbird (Griffin `neutral` +1.8 → −2.0,
+  Treant `elemental` −0.6 → −2.1) but keep their niches (Griffin `solo` robust; Treant 2nd in
+  `solo` and `horde` on the mean).
+
+### Caveats
+
+- Kirin's `elemental` top-3 is a tie with the Golem in `elite` (both +2.9 over five seeds, Kirin
+  top 3 in 1 of 5 seeds). A sixth seed could drop it to 4th; the Kirin is otherwise the most
+  consistent beast (overall +2.6 ± 1.2).
+- Per-shape standard deviations across seeds run 1–11 points (Tarasque `elite` 10.6, Griffin
+  `horde` 9.8); the overall means are within about ±1.5 of the truth.
+- Everything is skill level 1 with default loadouts; Storm Dive's opener matters most at low skill
+  levels, before the other slots grow.
+- `tuned-report.md` is regenerated from the default run (seed 12345); its PvE marginals equal the
+  V7 seed-12345 run.

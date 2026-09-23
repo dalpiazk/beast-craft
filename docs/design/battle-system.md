@@ -1701,7 +1701,7 @@ and can be outlived.
   a DoT) sits around 0.75× its budget; one with hard control (stun ≥ 30%) or a taunt around 0.3–0.5×;
   pure utility (heal, shield, buff, taunt) carries no damage.
 - **Limited-use openers** (`MaxUsesPerBattle` > 0, often `InitialCooldown` 0) may exceed the per-turn
-  budget per use (Storm Dive is 230 power once), since they cannot repeat.
+  budget per use (Storm Dive is 120 power once), since they cannot repeat.
 - **Tiers stay modest:** gates at levels 5 / 10 / 15 needing material tiers 1 / 2 / 3; the level-10
   gate adds a small bonus effect and the level-15 gate either takes 1 off a cooldown of 3 or more or
   adds another small effect (never −1 on a cooldown-2 damage skill, which would double it). Levels
@@ -1718,13 +1718,16 @@ role-scaled guide, deliberately:
   v2). The slowest beast with Move 2 lands it less often than any other melee skill, and at 75 the
   Golem was bottom three in every shape.
 - **Leviathan's Serpent Bite** is 86 (0.96×, above a tank's ≈ 0.8×; 82 before chart v2).
-- **Thunderbird's Thunder Talons** is 28 × 3 = 84 at range 2 and **Chain Lightning** 28 × 3 at
-  radius 2, cooldown 2 = 84: both exactly at the 1.2× ceiling of the range-2+ budget (70). Talons
-  was 36 × 3 = 108 at range 1 (1.2× the melee budget) until "Thunderbird range vs move"; the
-  rule's own burst-striker figure at range 2 would be 1.1 × 70 = 77 (26 × 3), which measured
-  0.6 points worse. Chart v2 took
-  away most of the Thunderbird's elemental edge (Metal now hits Lightning for 2x), which had been
-  hiding a weak neutral line; see the tuning log.
+- **Thunderbird's Thunder Talons** is 26 × 3 = 78 at range 2 (1.11×, the rule's burst-striker
+  figure) and **Chain Lightning** 22 × 3 at radius 2, cooldown 2 = 66 (0.94×). Both were 28 × 3 =
+  84 (the 1.2× ceiling) until the niche pass, which put the once-per-battle **Storm Dive** (120,
+  was 230) in the default loadout in place of Static Charge; with a real third slot the ceiling
+  numbers made the Thunderbird the strongest `neutral` beast, so both came down. Talons was
+  36 × 3 = 108 at range 1 until "Thunderbird range vs move". See the tuning log, "Niche pass".
+- **Tarasque's Iron Crush** is 160 on cooldown 2 (80, 0.89× the melee budget; 148 before the
+  niche pass), **Basilisk's Coup de Grace** 115 with a 60% execute (75, 1.07×; 105 before), and
+  **Kirin's Radiant Bolt** 66 (0.94×, above a support's ≈ 0.8×; 62 before): small lifts from the
+  niche pass, each well inside the ceiling.
 
 Two utility numbers moved past the first-draft guideline, both paid for in damage: Basilisk's
 Petrifying Gaze stuns at 45% (hard control on 45 power at cooldown 3, 0.21× the ranged budget), and
@@ -1735,14 +1738,15 @@ turns (70% before element chart v2; the shield carries the tank's value, see the
 
 **Default loadouts** follow the role: tanks = damage (the approach skill, first so the others fire
 from the tile it walked to) + taunt + mitigation; supports = heal + buff/shield + damage; damage
-dealers = two damage skills + one utility. Learn levels spread from 1 to 60; every default is
+dealers = two damage skills + one utility (the Thunderbird's third slot is its once-per-battle
+Storm Dive opener instead, since the niche pass). Learn levels spread from 1 to 60; every default is
 learnable by level 5.
 
 #### Phoenix — Fire, Ranged
 
 | Skill | Learn | Default | Shape | Cat. | Cd | Effects | Dmg/turn | Tier bonuses |
 | --- | ---: | :---: | --- | --- | ---: | --- | ---: | --- |
-| Ember Shot `ember_shot` | 1 | slot 1 | SingleTarget r3 | Special | 1 | Damage 55; DoT 14 3t, stacks x3 | 76 | L10: adds -5% SpecialDefense 2t; L15: adds Damage 15 |
+| Ember Shot `ember_shot` | 1 | slot 1 | SingleTarget r3 | Special | 1 | Damage 60; DoT 14 3t, stacks x3 | 81 | L10: adds -5% SpecialDefense 2t; L15: adds Damage 15 |
 | Flame Wave `flame_wave` | 1 | slot 2 | Line r4 | Special | 2 | Damage 90; DoT 10 2t (50%) | 62 | L10: adds -8% SpecialDefense 2t; L15: adds DoT 10 2t |
 | Rebirth Flame `rebirth_flame` | 4 | slot 3 | Self | - | 4 (1/battle) | Heal 44; Shield 80% Def 3t | - | L10: adds +15% SpecialAttack 3t; L15: adds +10% Speed 3t |
 | Blaze Bolt `blaze_bolt` | 12 |  | SingleTarget r4 | Special | 2 | Damage 150 | 75 | L10: adds DoT 15 2t; L15: adds -10% SpecialDefense 2t |
@@ -1754,8 +1758,8 @@ learnable by level 5.
 | Skill | Learn | Default | Shape | Cat. | Cd | Effects | Dmg/turn | Tier bonuses |
 | --- | ---: | :---: | --- | --- | ---: | --- | ---: | --- |
 | Serpent Bite `serpent_bite` | 1 | slot 1 | SingleTarget r1 | Physical | 1 | Damage 86 | 86 | L10: adds -8% Attack 2t; L15: adds DoT 10 2t |
-| Undertow `undertow` | 1 | slot 2 | AreaBurst r2 | - | 3 | Taunt 2t (85%); -10% Speed 2t | - | L10: adds -10% SpecialAttack 2t; L15: -1 cd |
-| Deep Shell `deep_shell` | 3 | slot 3 | Self | - | 3 | Shield 50% Def 3t; Heal 24 | - | L10: adds +15% SpecialDefense 3t; L15: -1 cd |
+| Undertow `undertow` | 1 | slot 2 | AreaBurst r3 | - | 3 | Taunt 2t (85%); -10% Speed 2t | - | L10: adds -10% SpecialAttack 2t; L15: -1 cd |
+| Deep Shell `deep_shell` | 3 | slot 3 | Self | - | 3 | Shield 65% Def 3t; Heal 24 | - | L10: adds +15% SpecialDefense 3t; L15: -1 cd |
 | Tidal Wave `tidal_wave` | 8 |  | Line r3 | Special | 2 | Damage 90; Knockback 1 hex (50%) | 58 | L10: adds -10% Speed 2t; L15: adds -8% SpecialDefense 2t |
 | Maelstrom `maelstrom` | 30 |  | AreaBurst r2 | Special | 3 | Damage 70; -15% SpecialDefense 2t | 47 | L10: adds DoT 10 2t; L15: -1 cd |
 | Tidal Renewal `tidal_renewal` | 50 |  | AreaBurst (ally) r2 | - | 4 | Heal 29; +10% Defense 2t | - | L10: adds Shield 20% Def 2t; L15: -1 cd |
@@ -1786,10 +1790,10 @@ learnable by level 5.
 
 | Skill | Learn | Default | Shape | Cat. | Cd | Effects | Dmg/turn | Tier bonuses |
 | --- | ---: | :---: | --- | --- | ---: | --- | ---: | --- |
-| Thunder Talons `thunder_talons` | 1 | slot 1 | SingleTarget r2 | Physical | 1 | Damage 28 x3 hits | 84 | L10: adds -5% Defense 2t, stacks x3; L15: adds Damage 25 |
-| Chain Lightning `chain_lightning` | 1 | slot 2 | AreaBurst r2 | Special | 2 | Damage 28 x3 hits | 84 | L10: adds Stun 1t (10%); L15: adds -8% SpecialDefense 2t |
-| Static Charge `static_charge` | 3 | slot 3 | Self | - | 4 | +25 CritChance 3t; +10% Speed 3t | - | L10: adds +10% Attack 3t; L15: -1 cd |
-| Storm Dive `storm_dive` | 8 |  | SingleTarget r3 | Physical | 4 (first turn, 1/battle) | Damage 230 | 58 | L10: adds Stun 1t (25%); L15: adds -15% Defense 2t |
+| Thunder Talons `thunder_talons` | 1 | slot 1 | SingleTarget r2 | Physical | 1 | Damage 26 x3 hits | 78 | L10: adds -5% Defense 2t, stacks x3; L15: adds Damage 25 |
+| Chain Lightning `chain_lightning` | 1 | slot 2 | AreaBurst r2 | Special | 2 | Damage 22 x3 hits | 66 | L10: adds Stun 1t (10%); L15: adds -8% SpecialDefense 2t |
+| Static Charge `static_charge` | 3 |  | Self | - | 4 | +25 CritChance 3t; +10% Speed 3t | - | L10: adds +10% Attack 3t; L15: -1 cd |
+| Storm Dive `storm_dive` | 5 | slot 3 | SingleTarget r3 | Physical | 4 (first turn, 1/battle) | Damage 120 | 30 | L10: adds Stun 1t (25%); L15: adds -15% Defense 2t |
 | Thunderclap `thunderclap` | 25 |  | AreaBurst r1 | Special | 3 | Damage 70; Stun 1t (20%) | 35 | L10: adds -10% Speed 2t; L15: -1 cd |
 | Plasma Barrage `plasma_barrage` | 50 |  | Line r4 | Special | 2 | Damage 26 x4 hits | 68 | L10: adds -8% Defense 2t; L15: adds -8% SpecialDefense 2t |
 
@@ -1797,7 +1801,7 @@ learnable by level 5.
 
 | Skill | Learn | Default | Shape | Cat. | Cd | Effects | Dmg/turn | Tier bonuses |
 | --- | ---: | :---: | --- | --- | ---: | --- | ---: | --- |
-| Rime Bolt `rime_bolt` | 1 | slot 1 | SingleTarget r2 | Special | 1 | Damage 48; -8% Speed 3t, stacks x3 | 48 | L10: adds -5% SpecialDefense 2t; L15: adds Stun 1t (10%) |
+| Rime Bolt `rime_bolt` | 1 | slot 1 | SingleTarget r2 | Special | 1 | Damage 52; -8% Speed 3t, stacks x3 | 52 | L10: adds -5% SpecialDefense 2t; L15: adds Stun 1t (10%) |
 | Deep Freeze `deep_freeze` | 1 | slot 2 | SingleTarget r2 | Special | 3 | Damage 60; Stun 1t (35%) | 20 | L10: adds -10% Speed 2t; L15: -1 cd |
 | Frost Breath `frost_breath` | 3 | slot 3 | AreaBurst r2 | Special | 2 | Damage 46; -10% Speed 2t (50%), stacks x3 | 46 | L10: adds Stun 1t (10%); L15: adds -8% SpecialDefense 2t |
 | Blizzard `blizzard` | 18 |  | Cross r3 | Special | 3 | Damage 90; -10% Speed 2t | 45 | L10: adds Stun 1t (15%); L15: -1 cd |
@@ -1820,7 +1824,7 @@ learnable by level 5.
 | Skill | Learn | Default | Shape | Cat. | Cd | Effects | Dmg/turn | Tier bonuses |
 | --- | ---: | :---: | --- | --- | ---: | --- | ---: | --- |
 | Sunder `sunder` | 1 | slot 1 | SingleTarget r1 | Physical | 1 | Damage 65; -12% Defense 3t, stacks x3 | 65 | L10: adds -8% SpecialDefense 3t; L15: adds DoT 10 2t |
-| Iron Crush `iron_crush` | 1 | slot 2 | SingleTarget r1 | Physical | 2 | Damage 148 | 74 | L10: adds Stun 1t (15%); L15: adds -10% Defense 2t |
+| Iron Crush `iron_crush` | 1 | slot 2 | SingleTarget r1 | Physical | 2 | Damage 160 | 80 | L10: adds Stun 1t (15%); L15: adds -10% Defense 2t |
 | Iron Fortress `iron_fortress` | 4 | slot 3 | Self | - | 4 | +30% Defense 3t; +15% Attack 3t | - | L10: adds Shield 30% Def 2t; L15: -1 cd |
 | Spiked Carapace `spiked_carapace` | 15 |  | Self | - | 3 | Shield 40% Def 2t; +20% SpecialDefense 2t | - | L10: adds +10% Attack 2t; L15: -1 cd |
 | Shrapnel Burst `shrapnel_burst` | 30 |  | AreaBurst r1 | Physical | 2 | Damage 85; -8% Defense 2t (50%) | 64 | L10: adds DoT 10 2t; L15: adds -10% Speed 2t |
@@ -1832,7 +1836,7 @@ learnable by level 5.
 | --- | ---: | :---: | --- | --- | ---: | --- | ---: | --- |
 | Sacred Spring `sacred_spring` | 1 | slot 1 | AllAllies | - | 3 | Heal 20 | - | L10: adds +8% SpecialDefense 2t; L15: -1 cd |
 | Blessing `blessing` | 1 | slot 2 | AllAllies | - | 4 | +12% SpecialAttack 2t; +12% SpecialDefense 2t | - | L10: adds +5 CritChance 2t; L15: -1 cd |
-| Radiant Bolt `radiant_bolt` | 3 | slot 3 | SingleTarget r3 | Special | 1 | Damage 62 | 62 | L10: adds -5% SpecialDefense 2t; L15: adds Damage 15 |
+| Radiant Bolt `radiant_bolt` | 3 | slot 3 | SingleTarget r3 | Special | 1 | Damage 66 | 66 | L10: adds -5% SpecialDefense 2t; L15: adds Damage 15 |
 | Judgment `judgment` | 15 |  | SingleTarget r4 | Special | 3 | Damage 190 | 63 | L10: adds Stun 1t (15%); L15: -1 cd |
 | Purifying Ward `purifying_ward` | 30 |  | AllAllies | - | 4 | Shield 25% Def 2t; +10% SpecialDefense 2t | - | L10: adds Heal 7; L15: -1 cd |
 | Halo `halo` | 50 |  | AreaBurst (ally) r2 | - | 3 | Heal 19; +10% Defense 2t | - | L10: adds Shield 20% Def 2t; L15: -1 cd |
@@ -1842,7 +1846,7 @@ learnable by level 5.
 | Skill | Learn | Default | Shape | Cat. | Cd | Effects | Dmg/turn | Tier bonuses |
 | --- | ---: | :---: | --- | --- | ---: | --- | ---: | --- |
 | Venom Spit `venom_spit` | 1 | slot 1 | SingleTarget r3 | Special | 1 | Damage 45; DoT 15 3t, stacks x3 | 68 | L10: adds -5% SpecialDefense 2t, stacks x3; L15: adds Damage 15 |
-| Coup de Grace `coup_de_grace` | 1 | slot 2 | SingleTarget r3, lowest HP% | Special | 2 | Damage 105, execute +60% | 68 | L10: adds DoT 15 2t; L15: adds -10% Defense 2t |
+| Coup de Grace `coup_de_grace` | 1 | slot 2 | SingleTarget r3, lowest HP% | Special | 2 | Damage 115, execute +60% | 75 | L10: adds DoT 15 2t; L15: adds -10% Defense 2t |
 | Petrifying Gaze `petrifying_gaze` | 4 | slot 3 | SingleTarget r3 | Special | 3 | Damage 45; Stun 1t (45%) | 15 | L10: adds -15% Speed 2t; L15: -1 cd |
 | Eclipse Fang `eclipse_fang` | 12 |  | SingleTarget r3 | Special | 2 | Damage 32 x4 hits | 64 | L10: adds -8% SpecialDefense 2t; L15: adds Damage 20 |
 | Predator Focus `predator_focus` | 25 |  | Self | - | 4 | +20 CritChance 3t; +10% SpecialAttack 3t | - | L10: adds +10% Speed 3t; L15: -1 cd |
@@ -2180,7 +2184,10 @@ seeds) narrowed from −8.9 … +12.5 to −4.3 … +3.8 on the unchanged roster
 −7.2 `elemental` (its old edge had hidden a weak neutral line), so a light retune followed (four
 stat lines, nine skill numbers, six three-seed iterations); `tuned-report.md` is regenerated and the
 tuning log's "Element chart v2" section has the tables. A follow-up experiment ("Thunderbird range
-vs move") then gave Thunder Talons range 2 at 28 × 3 and restored the Thunderbird's Move 4.
+vs move") then gave Thunder Talons range 2 at 28 × 3 and restored the Thunderbird's Move 4. A
+"niche pass" then swapped Storm Dive (now 120) into the Thunderbird's defaults for Static Charge,
+trimmed Talons / Chain Lightning to 26 / 22 × 3, and made small lifts to Phoenix, Frost Wyrm,
+Leviathan, Tarasque, Basilisk and Kirin skills (skill numbers only; the roster is unchanged).
 
 Every pass so far is deliberately **data structures and algorithms only** — no MonoBehaviours, no
 scene or prefab wiring, and no committed `.asset` instances (the roster's are generated in-Editor). The hex radii backing each arena preset
