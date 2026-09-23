@@ -48,7 +48,7 @@
       "Elements": [ "Water" ],
       "GrowthCurveId": "medium",
       "Stance": "Vanguard",
-      "BaseStats": { "Hp": 122, "Attack": 86, "Defense": 126, "SpecialAttack": 86, "SpecialDefense": 100, "Speed": 94, "MoveRange": 3, "CritChance": 3 }
+      "BaseStats": { "Hp": 132, "Attack": 86, "Defense": 126, "SpecialAttack": 86, "SpecialDefense": 100, "Speed": 94, "MoveRange": 3, "CritChance": 3 }
     },
     {
       "SpeciesId": "golem",
@@ -75,7 +75,7 @@
       "Elements": [ "Lightning" ],
       "GrowthCurveId": "medium",
       "Stance": "Skirmisher",
-      "BaseStats": { "Hp": 110, "Attack": 117, "Defense": 88, "SpecialAttack": 114, "SpecialDefense": 91, "Speed": 110, "MoveRange": 4, "CritChance": 15 }
+      "BaseStats": { "Hp": 116, "Attack": 117, "Defense": 88, "SpecialAttack": 108, "SpecialDefense": 91, "Speed": 110, "MoveRange": 3, "CritChance": 15 }
     },
     {
       "SpeciesId": "frost_wyrm",
@@ -111,7 +111,7 @@
       "Elements": [ "Light" ],
       "GrowthCurveId": "medium",
       "Stance": "Ranged",
-      "BaseStats": { "Hp": 115, "Attack": 51, "Defense": 90, "SpecialAttack": 149, "SpecialDefense": 124, "Speed": 101, "MoveRange": 4, "CritChance": 5 }
+      "BaseStats": { "Hp": 115, "Attack": 51, "Defense": 90, "SpecialAttack": 140, "SpecialDefense": 124, "Speed": 101, "MoveRange": 4, "CritChance": 5 }
     },
     {
       "SpeciesId": "basilisk",
@@ -120,7 +120,7 @@
       "Elements": [ "Dark" ],
       "GrowthCurveId": "medium",
       "Stance": "Ranged",
-      "BaseStats": { "Hp": 103, "Attack": 94, "Defense": 79, "SpecialAttack": 117, "SpecialDefense": 94, "Speed": 105, "MoveRange": 5, "CritChance": 12 }
+      "BaseStats": { "Hp": 103, "Attack": 94, "Defense": 79, "SpecialAttack": 110, "SpecialDefense": 94, "Speed": 105, "MoveRange": 5, "CritChance": 12 }
     }
   ]
 }

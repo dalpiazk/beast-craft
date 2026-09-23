@@ -145,8 +145,8 @@ namespace BeastCraft.Battle
         /// <summary>
         /// The least any positive-power hit deals, after truncation and the element multiplier.
         /// Because the floor is applied <em>after</em> the multiplier, a 0x "immune" matchup would
-        /// still deal this much. <see cref="ElementChart"/> only returns 2x, 0.5x and 1x today; if
-        /// an immunity is ever added, <see cref="Compute(float, int, int, float, int, bool)"/>
+        /// still deal this much. <see cref="ElementChart"/> only returns 2x, 1.25x, 0.5x and 1x
+        /// today; if an immunity is ever added, <see cref="Compute(float, int, int, float, int, bool)"/>
         /// must special-case a zero multiplier to return 0 (a crit or a high roll must not lift it
         /// off 0 either).
         /// </summary>

@@ -17,7 +17,7 @@
       "Element": "Earth",
       "Category": "Physical",
       "Effects": [
-        { "EffectType": "Damage", "Magnitude": 85 }
+        { "EffectType": "Damage", "Magnitude": 90 }
       ],
       "Progression": {
         "MaxLevel": 20,
@@ -61,7 +61,7 @@
       "TargetSide": "Ally",
       "Element": "Earth",
       "Effects": [
-        { "EffectType": "ApplyStatus", "Status": "Shield", "Magnitude": 70, "DurationTurns": 2 }
+        { "EffectType": "ApplyStatus", "Status": "Shield", "Magnitude": 85, "DurationTurns": 2 }
       ],
       "Progression": {
         "MaxLevel": 20,
@@ -151,7 +151,7 @@
       "Element": "Water",
       "Category": "Physical",
       "Effects": [
-        { "EffectType": "Damage", "Magnitude": 82 }
+        { "EffectType": "Damage", "Magnitude": 86 }
       ],
       "Progression": {
         "MaxLevel": 20,
@@ -173,7 +173,7 @@
       "Element": "Water",
       "Category": "Special",
       "Effects": [
-        { "EffectType": "ApplyStatus", "Status": "Taunt", "Magnitude": 0, "DurationTurns": 2, "Chance": 70 },
+        { "EffectType": "ApplyStatus", "Status": "Taunt", "Magnitude": 0, "DurationTurns": 2, "Chance": 85 },
         { "EffectType": "DebuffStat", "AffectedStat": "Speed", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true }
       ],
       "Progression": {
@@ -447,7 +447,7 @@
       "Element": "Metal",
       "Category": "Physical",
       "Effects": [
-        { "EffectType": "Damage", "Magnitude": 155 }
+        { "EffectType": "Damage", "Magnitude": 148 }
       ],
       "Progression": {
         "MaxLevel": 20,
@@ -605,7 +605,7 @@
       "Element": "Ice",
       "Category": "Special",
       "Effects": [
-        { "EffectType": "Damage", "Magnitude": 42 },
+        { "EffectType": "Damage", "Magnitude": 46 },
         { "EffectType": "DebuffStat", "AffectedStat": "Speed", "Magnitude": 10, "DurationTurns": 2, "Chance": 50, "MaxStacks": 3, "IsPercent": true }
       ],
       "Progression": {
@@ -697,7 +697,7 @@
       "Element": "Lightning",
       "Category": "Physical",
       "Effects": [
-        { "EffectType": "Damage", "Magnitude": 33, "HitCount": 3 }
+        { "EffectType": "Damage", "Magnitude": 36, "HitCount": 3 }
       ],
       "Progression": {
         "MaxLevel": 20,
@@ -719,7 +719,7 @@
       "Element": "Lightning",
       "Category": "Special",
       "Effects": [
-        { "EffectType": "Damage", "Magnitude": 25, "HitCount": 3 }
+        { "EffectType": "Damage", "Magnitude": 28, "HitCount": 3 }
       ],
       "Progression": {
         "MaxLevel": 20,
@@ -734,13 +734,13 @@
     {
       "SkillId": "static_charge",
       "DisplayName": "Static Charge",
-      "Description": "Builds a charge in its feathers: +15 crit chance and more Speed for three turns.",
+      "Description": "Builds a charge in its feathers: +25 crit chance and more Speed for three turns.",
       "TargetShape": "Self",
       "Range": 0,
       "Cooldown": 4,
       "Element": "Lightning",
       "Effects": [
-        { "EffectType": "BuffStat", "AffectedStat": "CritChance", "Magnitude": 15, "DurationTurns": 3 },
+        { "EffectType": "BuffStat", "AffectedStat": "CritChance", "Magnitude": 25, "DurationTurns": 3 },
         { "EffectType": "BuffStat", "AffectedStat": "Speed", "Magnitude": 10, "DurationTurns": 3, "IsPercent": true }
       ],
       "Progression": {

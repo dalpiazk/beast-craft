@@ -893,26 +893,65 @@ applies to **damage only** — heals, buffs and debuffs are never scaled. (It wa
 damage was still a flat magnitude; the formula now sits underneath it — see "Damage formula".)
 
 **The chart is attacker-side.** Each row is read from the attacking element's point of view and is
-only ever looked up in that direction; it is not forced to be symmetric. `2x` is strong, `0.5x` is
-weak, and every pair not listed is `1x`:
+only ever looked up in that direction; it is not forced to be symmetric. `2x` is strong, `1.25x`
+(`ElementChart.Mild`) is a mild edge, `0.5x` is weak, and every pair not listed is `1x`. This is
+**chart v2** (element chart v2, user-approved):
 
-| Attack | Strong against (2x) | Weak against (0.5x) |
-| --- | --- | --- |
-| Fire | Nature, Metal | Water, Earth |
-| Water | Fire, Earth | Lightning, Nature |
-| Earth | Lightning, Metal | Water, Air |
-| Air | Earth, Nature | Ice, Lightning |
-| Lightning | Water, Air | Earth, Metal |
-| Ice | Nature, Air | Fire, Metal |
-| Nature | Water, Earth, Dark | Fire, Ice |
-| Metal | Ice, Light | Fire, Lightning |
-| Light | Dark | — |
-| Dark | Light | — |
+| Attack | Strong against (2x) | Mild against (1.25x) | Weak against (0.5x) |
+| --- | --- | --- | --- |
+| Fire | Nature, Metal | — | Water, Earth |
+| Water | Fire, Metal | — | Lightning, Nature |
+| Earth | Lightning, Ice | — | Water, Air |
+| Air | Fire, Earth | — | Ice, Nature |
+| Lightning | Water, Air | — | Earth, Metal, Light |
+| Ice | Nature, Air | — | Fire, Metal |
+| Nature | Water, Earth, Dark | — | Lightning, Ice |
+| Metal | Lightning, Ice, Light | — | Fire, Air, Dark |
+| Light | Dark | Water, Air, Ice, Earth | — |
+| Dark | Light | Fire, Lightning, Nature, Metal | — |
+
+**The main eight are normalized.** Among Fire, Water, Earth, Air, Lightning, Ice, Nature and Metal,
+every attacking row is 2x against exactly two and 0.5x against exactly two, and every defending
+column takes 2x from exactly two and 0.5x from exactly two (`ElementChartTests` pins this). No main
+element is better or worse than another on offence or defence by count alone; which matchups come
+up in a fight is what separates them.
+
+**Light and Dark are generalists, not counters.** Each is 2x into the other and a mild 1.25x into
+four main elements (Light: Water, Air, Ice, Earth; Dark: Fire, Lightning, Nature, Metal — the two
+sets split the main eight), and never 0.5x on offence. Defensively each takes one 2x and one 0.5x
+from the main eight: Nature 2x and Metal 0.5x into Dark, Metal 2x and Lightning 0.5x into Light.
+
+**Why v2.** v1 was uneven on defence: within the main eight, Earth and Nature each took 2x from
+three elements while Fire, Lightning and Ice took 2x from only one (and Metal's row had one 2x
+target); Light and Dark each hit only the other. In the simulator (the `elemental` minus the
+`neutral` overall marginal, three seeds) the element system gave the Lightning beast +12.5 points and
+Fire, Metal and Ice +2 to +4, and cost Dark −8.9, Light −5.2 and Nature −4.0; under v2 every beast
+is within −4.3 … +3.8 on the same roster (see `docs/balance/tuning-log.md`, "Element chart v2"). The user wanted Light and Dark as generalists and balanced defensive counts.
+The changes from v1, each with its theme:
+
+| Matchup | v1 | v2 | Why |
+| --- | ---: | ---: | --- |
+| Air → Fire | 1x | 2x | A gust snuffs flame |
+| Water → Metal | 1x | 2x | Rust |
+| Earth → Ice | 1x | 2x | Rock shatters ice |
+| Metal → Lightning | 0.5x | 2x | The lightning rod (Lightning → Metal stays 0.5x) |
+| Nature → Lightning | 1x | 0.5x | Wood insulates |
+| Air → Nature | 2x | 0.5x | Forests withstand wind |
+| Metal → Air | 1x | 0.5x | A blade can't cut wind |
+| Metal → Dark | 1x | 0.5x | Dark resists Metal |
+| Lightning → Light | 1x | 0.5x | Light resists Lightning |
+| Light → Water, Air, Ice, Earth | 1x | 1.25x | Light as a generalist |
+| Dark → Fire, Lightning, Nature, Metal | 1x | 1.25x | Dark as a generalist |
+| Water → Earth | 2x | 1x | Now neutral |
+| Earth → Metal | 2x | 1x | Now neutral |
+| Air → Lightning | 0.5x | 1x | Now neutral |
+| Nature → Fire | 0.5x | 1x | Now neutral |
 
 **These values are a tunable starting default, not producer-confirmed balance** — the same standing
 as the arena radii and the deployment-zone split. The set of elements is fixed; which pairs are
-strong or weak, and whether 2x / 0.5x are the right sizes, are expected to move once balance work
-has real fights to measure. `ElementChart` is the single place to change them.
+strong, mild or weak, and whether 2x / 1.25x / 0.5x are the right sizes, may still move as balance
+work measures real fights. `ElementChart` (`Strong`, `Mild`, `Weak` and its rows) is the single
+place to change them.
 
 ## Damage formula — TUNABLE STARTING DEFAULTS, NOT CONFIRMED BALANCE
 
@@ -1236,22 +1275,23 @@ re-tuned for the ATB gauge, combat stances, variance and crits and the generated
 and then re-tuned a third time, together with the skill numbers, against the real game setup: each
 beast's authored skill kit, the library avatar with its passives, the square-root speed gauge and
 the mitigation damage formula, with base Speed widened so the fastest beast gets 10–15% more turns
-than the slowest (see [`docs/balance/tuning-log.md`](../balance/tuning-log.md), which has the first
-draft and every pass). Nothing here is confirmed balance; the numbers are expected to move again
+than the slowest. A light follow-up pass re-fit it to element chart v2 (four stat lines and nine
+skill numbers; see [`docs/balance/tuning-log.md`](../balance/tuning-log.md), which has the first
+draft and every pass, "Element chart v2" last). Nothing here is confirmed balance; the numbers are expected to move again
 once real encounters exist.
 
 | SpeciesId | Beast | Element | Archetype | Stance | Curve | HP | ATK | DEF | SpA | SpD | SPE | Six-stat total | Move | Crit |
 | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | `phoenix` | Phoenix | Fire | Glass cannon | Ranged | medium | 92 | 102 | 70 | 120 | 85 | 104 | 573 | 4 | 10% |
-| `leviathan` | Leviathan | Water | Tank | Vanguard | medium | 122 | 86 | 126 | 86 | 100 | 94 | 614 | 3 | 3% |
+| `leviathan` | Leviathan | Water | Tank | Vanguard | medium | 132 | 86 | 126 | 86 | 100 | 94 | 624 | 3 | 3% |
 | `golem` | Golem | Earth | Pure wall | Vanguard | medium | 150 | 109 | 137 | 50 | 96 | 88 | 630 | 2 | 2% |
 | `griffin` | Griffin | Air | Fast skirmisher | Skirmisher | medium | 116 | 118 | 97 | 85 | 91 | 108 | 615 | 5 | 8% |
-| `thunderbird` | Thunderbird | Lightning | Burst striker | Skirmisher | medium | 110 | 117 | 88 | 114 | 91 | 110 | 630 | 4 | 15% |
+| `thunderbird` | Thunderbird | Lightning | Burst striker | Skirmisher | medium | 116 | 117 | 88 | 108 | 91 | 110 | 630 | 3 | 15% |
 | `frost_wyrm` | Frost Wyrm | Ice | Control / attrition | Vanguard | medium | 98 | 74 | 124 | 103 | 118 | 99 | 616 | 3 | 5% |
 | `treant` | Treant | Nature | Support-tank | Vanguard | medium | 134 | 77 | 98 | 105 | 124 | 92 | 630 | 3 | 3% |
 | `tarasque` | Tarasque | Metal | Armored bruiser | Vanguard | medium | 112 | 130 | 127 | 54 | 78 | 97 | 598 | 3 | 6% |
-| `kirin` | Kirin | Light | Support caster | Ranged | medium | 115 | 51 | 90 | 149 | 124 | 101 | 630 | 4 | 5% |
-| `basilisk` | Basilisk | Dark | Ranged assassin | Ranged | medium | 103 | 94 | 79 | 117 | 94 | 105 | 592 | 5 | 12% |
+| `kirin` | Kirin | Light | Support caster | Ranged | medium | 115 | 51 | 90 | 140 | 124 | 101 | 621 | 4 | 5% |
+| `basilisk` | Basilisk | Dark | Ranged assassin | Ranged | medium | 103 | 94 | 79 | 110 | 94 | 105 | 585 | 5 | 12% |
 
 Stats are max-level values (curve scale 1). **All ten beasts share the `medium` growth curve for
 now, by user decision**; differentiating curves per beast is deferred to the headless balance
@@ -1260,9 +1300,10 @@ simulator. The drafting rules:
 - **Shared budget.** Every beast's six combat stats sum to a shared budget of 600, and the roster
   tests allow ±5% (570–630). Archetype comes from how the budget is *distributed*, not from raw
   power. The first draft put every beast at exactly 600; every tuning pass used the ±5% band as a
-  balance lever. After the third (authored kits), totals run from 573 (Phoenix, whose kit and
-  Ranged stance carry it) and 592 (Basilisk, whose power now comes from its kit: execute, poison and
-  a 45% petrify) to 630 (Thunderbird, Kirin, Treant and Golem on the ceiling). Stats a beast's kit
+  balance lever. After the third (authored kits) and the element chart v2 follow-up, totals run
+  from 573 (Phoenix, whose kit and Ranged stance carry it) and 585 (Basilisk, whose power now comes
+  from its kit: execute, poison and a 45% petrify) to 630 (Thunderbird, Treant and Golem on the
+  ceiling). Stats a beast's kit
   never reads are no longer free budget either: Golem's and Tarasque's `SpecialAttack` and Phoenix's
   `Attack` are unused by their default kits, while every heal now reads the caster's
   `SpecialAttack`. If
@@ -1290,7 +1331,9 @@ simulator. The drafting rules:
   Speed-stat band test with the turn-ratio test above; the order test is unchanged (Golem strictly
   slowest), so widening or reordering either is a deliberate design change.
 - **Move range in a small band (2–5)**, outside the budget. Griffin and Basilisk are the mobile
-  ends (5); Golem is the only 2.
+  ends (5); Golem is the only 2. Thunderbird moved from 4 to 3 in the element chart v2 follow-up:
+  as the fastest beast with Move 4 it reached the enemy alone and took its focus (see the tuning
+  log); it still acts first.
 - **Crit chance in a small band (0–25%)**, also outside the budget and not level-scaled (user-approved
   values; see "Variance and critical hits"). The roster tests pin the ten values and the band; the
   validator only requires a percent (0–100). "Range" in the archetypes means move range, the per-turn hex
@@ -1665,18 +1708,23 @@ and can be outlived.
 The test `Library_UnlimitedDamageSkillsStayWithinTheFirstDraftPowerBudget` holds every unlimited
 damage skill at or below 1.2× its budget. The "Dmg/turn" column below is this DPT.
 
-**After the retune** the rule's numbers are unchanged, and every unlimited damage skill still sits at
-or below 1.2× its budget. Two defaults now sit above their role-scaled guide, deliberately:
+**After the retune** (and the element chart v2 follow-up) the rule's numbers are unchanged, and
+every unlimited damage skill still sits at or below 1.2× its budget. These defaults sit above their
+role-scaled guide, deliberately:
 
-- **Golem's Boulder Slam** is 85 (0.94× the melee budget, above a tank's ≈ 0.8×). The slowest beast
-  with Move 2 lands it less often than any other melee skill, and at 75 the Golem was bottom three
-  in every shape.
-- **Thunderbird's Thunder Talons** is 33 × 3 = 99, exactly the burst striker's 1.1×.
+- **Golem's Boulder Slam** is 90 (1.0× the melee budget, above a tank's ≈ 0.8×; 85 before chart
+  v2). The slowest beast with Move 2 lands it less often than any other melee skill, and at 75 the
+  Golem was bottom three in every shape.
+- **Leviathan's Serpent Bite** is 86 (0.96×, above a tank's ≈ 0.8×; 82 before chart v2).
+- **Thunderbird's Thunder Talons** is 36 × 3 = 108 and **Chain Lightning** 28 × 3 at radius 2,
+  cooldown 2 = 84: both exactly at the 1.2× ceiling (1.1× and 1.07× before chart v2). Chart v2 took
+  away most of the Thunderbird's elemental edge (Metal now hits Lightning for 2x), which had been
+  hiding a weak neutral line; see the tuning log.
 
 Two utility numbers moved past the first-draft guideline, both paid for in damage: Basilisk's
 Petrifying Gaze stuns at 45% (hard control on 45 power at cooldown 3, 0.21× the ranged budget), and
-Golem's Granite Bulwark shields every ally within 2 hexes for 70% of the Golem's Defense every 3
-turns (the shield carries the tank's value, see the tuning log).
+Golem's Granite Bulwark shields every ally within 2 hexes for 85% of the Golem's Defense every 3
+turns (70% before element chart v2; the shield carries the tank's value, see the tuning log).
 
 ### Kits
 
@@ -1700,8 +1748,8 @@ learnable by level 5.
 
 | Skill | Learn | Default | Shape | Cat. | Cd | Effects | Dmg/turn | Tier bonuses |
 | --- | ---: | :---: | --- | --- | ---: | --- | ---: | --- |
-| Serpent Bite `serpent_bite` | 1 | slot 1 | SingleTarget r1 | Physical | 1 | Damage 82 | 82 | L10: adds -8% Attack 2t; L15: adds DoT 10 2t |
-| Undertow `undertow` | 1 | slot 2 | AreaBurst r2 | - | 3 | Taunt 2t (70%); -10% Speed 2t | - | L10: adds -10% SpecialAttack 2t; L15: -1 cd |
+| Serpent Bite `serpent_bite` | 1 | slot 1 | SingleTarget r1 | Physical | 1 | Damage 86 | 86 | L10: adds -8% Attack 2t; L15: adds DoT 10 2t |
+| Undertow `undertow` | 1 | slot 2 | AreaBurst r2 | - | 3 | Taunt 2t (85%); -10% Speed 2t | - | L10: adds -10% SpecialAttack 2t; L15: -1 cd |
 | Deep Shell `deep_shell` | 3 | slot 3 | Self | - | 3 | Shield 50% Def 3t; Heal 24 | - | L10: adds +15% SpecialDefense 3t; L15: -1 cd |
 | Tidal Wave `tidal_wave` | 8 |  | Line r3 | Special | 2 | Damage 90; Knockback 1 hex (50%) | 58 | L10: adds -10% Speed 2t; L15: adds -8% SpecialDefense 2t |
 | Maelstrom `maelstrom` | 30 |  | AreaBurst r2 | Special | 3 | Damage 70; -15% SpecialDefense 2t | 47 | L10: adds DoT 10 2t; L15: -1 cd |
@@ -1711,9 +1759,9 @@ learnable by level 5.
 
 | Skill | Learn | Default | Shape | Cat. | Cd | Effects | Dmg/turn | Tier bonuses |
 | --- | ---: | :---: | --- | --- | ---: | --- | ---: | --- |
-| Boulder Slam `boulder_slam` | 1 | slot 1 | SingleTarget r1 | Physical | 1 | Damage 85 | 85 | L10: adds -10% Speed 2t (50%); L15: adds Knockback 1 hex |
+| Boulder Slam `boulder_slam` | 1 | slot 1 | SingleTarget r1 | Physical | 1 | Damage 90 | 90 | L10: adds -10% Speed 2t (50%); L15: adds Knockback 1 hex |
 | Stone Challenge `stone_challenge` | 1 | slot 2 | AreaBurst r3 | - | 3 | Taunt 3t (90%) | - | L10: adds -10% Attack 2t; L15: -1 cd |
-| Granite Bulwark `granite_bulwark` | 3 | slot 3 | AreaBurst (ally) r2 | - | 3 | Shield 70% Def 2t | - | L10: adds +10% SpecialDefense 2t; L15: -1 cd |
+| Granite Bulwark `granite_bulwark` | 3 | slot 3 | AreaBurst (ally) r2 | - | 3 | Shield 85% Def 2t | - | L10: adds +10% SpecialDefense 2t; L15: -1 cd |
 | Tectonic Shove `tectonic_shove` | 12 |  | SingleTarget r1 | Physical | 2 | Damage 70; Knockback 2 hex | 35 | L10: adds -10% Defense 2t; L15: adds Stun 1t (10%) |
 | Quake `quake` | 25 |  | AreaBurst r2 | Physical | 3 | Damage 80; -15% Speed 2t (40%) | 53 | L10: adds Stun 1t (10%); L15: -1 cd |
 | Stoneskin `stoneskin` | 40 |  | Self | - | 4 | +25% Defense 3t; +25% SpecialDefense 3t | - | L10: adds Shield 30% Def 2t; L15: -1 cd |
@@ -1733,9 +1781,9 @@ learnable by level 5.
 
 | Skill | Learn | Default | Shape | Cat. | Cd | Effects | Dmg/turn | Tier bonuses |
 | --- | ---: | :---: | --- | --- | ---: | --- | ---: | --- |
-| Thunder Talons `thunder_talons` | 1 | slot 1 | SingleTarget r1 | Physical | 1 | Damage 33 x3 hits | 99 | L10: adds -5% Defense 2t, stacks x3; L15: adds Damage 25 |
-| Chain Lightning `chain_lightning` | 1 | slot 2 | AreaBurst r2 | Special | 2 | Damage 25 x3 hits | 75 | L10: adds Stun 1t (10%); L15: adds -8% SpecialDefense 2t |
-| Static Charge `static_charge` | 3 | slot 3 | Self | - | 4 | +15 CritChance 3t; +10% Speed 3t | - | L10: adds +10% Attack 3t; L15: -1 cd |
+| Thunder Talons `thunder_talons` | 1 | slot 1 | SingleTarget r1 | Physical | 1 | Damage 36 x3 hits | 108 | L10: adds -5% Defense 2t, stacks x3; L15: adds Damage 25 |
+| Chain Lightning `chain_lightning` | 1 | slot 2 | AreaBurst r2 | Special | 2 | Damage 28 x3 hits | 84 | L10: adds Stun 1t (10%); L15: adds -8% SpecialDefense 2t |
+| Static Charge `static_charge` | 3 | slot 3 | Self | - | 4 | +25 CritChance 3t; +10% Speed 3t | - | L10: adds +10% Attack 3t; L15: -1 cd |
 | Storm Dive `storm_dive` | 8 |  | SingleTarget r3 | Physical | 4 (first turn, 1/battle) | Damage 230 | 58 | L10: adds Stun 1t (25%); L15: adds -15% Defense 2t |
 | Thunderclap `thunderclap` | 25 |  | AreaBurst r1 | Special | 3 | Damage 70; Stun 1t (20%) | 35 | L10: adds -10% Speed 2t; L15: -1 cd |
 | Plasma Barrage `plasma_barrage` | 50 |  | Line r4 | Special | 2 | Damage 26 x4 hits | 68 | L10: adds -8% Defense 2t; L15: adds -8% SpecialDefense 2t |
@@ -1746,7 +1794,7 @@ learnable by level 5.
 | --- | ---: | :---: | --- | --- | ---: | --- | ---: | --- |
 | Rime Bolt `rime_bolt` | 1 | slot 1 | SingleTarget r2 | Special | 1 | Damage 48; -8% Speed 3t, stacks x3 | 48 | L10: adds -5% SpecialDefense 2t; L15: adds Stun 1t (10%) |
 | Deep Freeze `deep_freeze` | 1 | slot 2 | SingleTarget r2 | Special | 3 | Damage 60; Stun 1t (35%) | 20 | L10: adds -10% Speed 2t; L15: -1 cd |
-| Frost Breath `frost_breath` | 3 | slot 3 | AreaBurst r2 | Special | 2 | Damage 42; -10% Speed 2t (50%), stacks x3 | 42 | L10: adds Stun 1t (10%); L15: adds -8% SpecialDefense 2t |
+| Frost Breath `frost_breath` | 3 | slot 3 | AreaBurst r2 | Special | 2 | Damage 46; -10% Speed 2t (50%), stacks x3 | 46 | L10: adds Stun 1t (10%); L15: adds -8% SpecialDefense 2t |
 | Blizzard `blizzard` | 18 |  | Cross r3 | Special | 3 | Damage 90; -10% Speed 2t | 45 | L10: adds Stun 1t (15%); L15: -1 cd |
 | Ice Armor `ice_armor` | 35 |  | Self | - | 4 | Shield 45% Def 3t; +15% SpecialDefense 3t | - | L10: adds +10% Defense 3t; L15: -1 cd |
 | Absolute Zero `absolute_zero` | 60 |  | AllEnemies | Special | 5 (1/battle) | Damage 50; Stun 1t (20%) | 25 | L10: adds -15% Speed 2t; L15: adds -10% SpecialDefense 2t |
@@ -1767,7 +1815,7 @@ learnable by level 5.
 | Skill | Learn | Default | Shape | Cat. | Cd | Effects | Dmg/turn | Tier bonuses |
 | --- | ---: | :---: | --- | --- | ---: | --- | ---: | --- |
 | Sunder `sunder` | 1 | slot 1 | SingleTarget r1 | Physical | 1 | Damage 65; -12% Defense 3t, stacks x3 | 65 | L10: adds -8% SpecialDefense 3t; L15: adds DoT 10 2t |
-| Iron Crush `iron_crush` | 1 | slot 2 | SingleTarget r1 | Physical | 2 | Damage 155 | 78 | L10: adds Stun 1t (15%); L15: adds -10% Defense 2t |
+| Iron Crush `iron_crush` | 1 | slot 2 | SingleTarget r1 | Physical | 2 | Damage 148 | 74 | L10: adds Stun 1t (15%); L15: adds -10% Defense 2t |
 | Iron Fortress `iron_fortress` | 4 | slot 3 | Self | - | 4 | +30% Defense 3t; +15% Attack 3t | - | L10: adds Shield 30% Def 2t; L15: -1 cd |
 | Spiked Carapace `spiked_carapace` | 15 |  | Self | - | 3 | Shield 40% Def 2t; +20% SpecialDefense 2t | - | L10: adds +10% Attack 2t; L15: -1 cd |
 | Shrapnel Burst `shrapnel_burst` | 30 |  | AreaBurst r1 | Physical | 2 | Damage 85; -8% Defense 2t (50%) | 64 | L10: adds DoT 10 2t; L15: adds -10% Speed 2t |
@@ -2118,6 +2166,15 @@ effects" above. It adds:
 Every new field is inert at its default, so the simulator's report is unchanged. `encounters.json`
 can express all of it, and the bosses carry 50% resistance. EditMode tests cover each rule,
 including the draw order and seeded reproducibility.
+
+**Element chart v2 has since replaced the first chart** (user-approved; see "Element system"):
+the main eight are normalized to two 2x and two 0.5x per row and per column, Light and Dark became
+generalists with a 1.25x `ElementChart.Mild` tier, and `ElementChartTests` pins all 121 pairs and the
+normalization. The per-beast element effect (`elemental` minus `neutral` overall marginal, three
+seeds) narrowed from −8.9 … +12.5 to −4.3 … +3.8 on the unchanged roster. That left Thunderbird at
+−7.2 `elemental` (its old edge had hidden a weak neutral line), so a light retune followed (four
+stat lines, nine skill numbers, six three-seed iterations); `tuned-report.md` is regenerated and the
+tuning log's "Element chart v2" section has the tables.
 
 Every pass so far is deliberately **data structures and algorithms only** — no MonoBehaviours, no
 scene or prefab wiring, and no committed `.asset` instances (the roster's are generated in-Editor). The hex radii backing each arena preset

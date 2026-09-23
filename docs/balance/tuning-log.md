@@ -1393,3 +1393,253 @@ Four quick filters (one seed, four compositions per shape) and ten three-seed co
   stats come from `AvatarStatsSO` and its gear, not authored yet.
 - Only the default loadouts were measured, at skill levels 1 and 10. The 30 non-default skills and
   the seven non-default passives keep their first-draft numbers (heals rescaled only).
+
+## Element chart v2
+
+The element chart was replaced by a user-approved **v2** (see `docs/design/battle-system.md`,
+"Element system"), and the roster and kits were then lightly re-fit to it. Setup as in the
+previous section: library kits and avatar at skill level 1, generated encounters, levels 1 / 50 /
+100, **mean of seeds 12345 / 777 / 4242**. `tuned-report.md` is regenerated from the default run
+(seed 12345).
+
+### The chart change
+
+Attacker-side, as before. The main eight (Fire through Metal) are now **normalized**: every row is
+2x against exactly two and 0.5x against exactly two of them, and every column takes 2x from exactly
+two and 0.5x from exactly two (`ElementChartTests.MainEight_AreNormalized_TwoStrongTwoWeak_ByRowAndColumn`).
+In v1, within the main eight, Earth and Nature each took 2x from three elements while Fire,
+Lightning and Ice took 2x from one, and Metal's row had a single 2x target. Light and Dark become
+generalists through a new **1.25x** tier (`ElementChart.Mild`).
+
+| Matchup | v1 | v2 | Why |
+| --- | ---: | ---: | --- |
+| Air → Fire | 1x | 2x | A gust snuffs flame |
+| Water → Metal | 1x | 2x | Rust |
+| Earth → Ice | 1x | 2x | Rock shatters ice |
+| Metal → Lightning | 0.5x | 2x | The lightning rod |
+| Nature → Lightning | 1x | 0.5x | Wood insulates |
+| Air → Nature | 2x | 0.5x | Forests withstand wind |
+| Metal → Air | 1x | 0.5x | A blade can't cut wind |
+| Metal → Dark | 1x | 0.5x | Dark resists Metal |
+| Lightning → Light | 1x | 0.5x | Light resists Lightning |
+| Light → Water, Air, Ice, Earth | 1x | 1.25x | Light as a generalist |
+| Dark → Fire, Lightning, Nature, Metal | 1x | 1.25x | Dark as a generalist |
+| Water → Earth | 2x | 1x | Now neutral |
+| Earth → Metal | 2x | 1x | Now neutral |
+| Air → Lightning | 0.5x | 1x | Now neutral |
+| Nature → Fire | 0.5x | 1x | Now neutral |
+
+### Element effect, v1 → v2
+
+The **element effect** is a beast's `elemental` overall marginal minus its `neutral` overall
+marginal (three-seed means): how much the element system helps or hurts it. The `neutral` mode
+forces every skill to `Element.None`, so it does not depend on the chart. **v1** is the committed
+roster under v1 (identical to the previous section's "after" tables); **v2, same roster** is only
+the chart change; **v2, final** is after the light retune below (which moves both modes).
+
+| Beast | Element | v1 `elemental` | v1 `neutral` | **v1 effect** | v2 `elemental` (same roster) | **v2 effect (same roster)** | Final `elemental` | Final `neutral` | **Final effect** |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Thunderbird | Lightning | +2.4 | −10.1 | **+12.5** | −7.2 | **+3.0** | −2.2 | −0.5 | **−1.6** |
+| Phoenix | Fire | +0.2 | −3.9 | **+4.0** | −0.1 | **+3.8** | −1.2 | −5.1 | **+3.9** |
+| Tarasque | Metal | +2.7 | −1.0 | **+3.7** | +1.5 | **+2.5** | +2.7 | −0.6 | **+3.3** |
+| Frost Wyrm | Ice | −0.1 | −2.6 | **+2.4** | −1.7 | **+0.9** | −1.8 | −1.7 | **−0.1** |
+| Leviathan | Water | −2.7 | −2.0 | **−0.7** | −3.2 | **−1.2** | +0.1 | +2.3 | **−2.3** |
+| Golem | Earth | −1.3 | +0.6 | **−1.9** | −1.2 | **−1.7** | −0.1 | +3.4 | **−3.5** |
+| Griffin | Air | +1.0 | +3.0 | **−2.1** | +3.6 | **+0.6** | +0.7 | −2.3 | **+3.0** |
+| Treant | Nature | −2.9 | +1.1 | **−4.0** | +0.1 | **−1.1** | −0.4 | −0.7 | **+0.3** |
+| Kirin | Light | +0.7 | +5.9 | **−5.2** | +3.4 | **−2.6** | +2.0 | +4.4 | **−2.4** |
+| Basilisk | Dark | +0.1 | +9.0 | **−8.9** | +4.7 | **−4.3** | +0.1 | +0.8 | **−0.7** |
+
+- **v1:** −8.9 … +12.5 (spread 21.4, mean absolute 4.5).
+- **v2, same roster:** −4.3 … +3.8 (spread 8.1, mean absolute 2.2).
+- **Final:** −3.5 … +3.9 (spread 7.4, mean absolute 2.1).
+
+The chart alone cut the spread of element effects from 21.4 to 8.1 points. Lightning's +12.5 was
+the outlier: in v1 Metal and Air attacks were 0.5x into it, in v2 Metal is 2x and Air 1x (and Dark
+1.25x), with only Nature newly 0.5x. Dark's −8.9 and Light's −5.2 were the other end (each hit only
+the other). Nature's loss shrinks (−4.0 → −1.1 on the same roster); Earth's barely moves (−1.9 →
+−1.7). Fire (+3.8) and Metal (+2.5) keep a small edge; after the retune the largest effects are
+Phoenix +3.9 and Golem −3.5. Each element is one beast, so an element's effect is also that beast's
+kit and stance meeting the encounter pool (every enemy is dealt from a shuffled deck of all ten elements).
+
+### Marginal clear rate under v2, same roster (before the retune)
+
+Points of clear rate, levels averaged, then averaged over the three seeds; (n) = rank within the
+shape on the mean. `neutral` is identical to v1 (it does not read the chart).
+
+**v2, same roster, `elemental`:**
+
+| Beast | `solo` | `elite` | `squad` | `horde` | Overall | Top-3 shapes |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Basilisk | +5.5 (3) | +7.0 (1) | +8.0 (3) | −1.6 (8) | +4.7 (1) | 3 |
+| Griffin | +5.9 (1) | +4.1 (2) | +5.7 (4) | −1.2 (7) | +3.6 (2) | 2 |
+| Kirin | +1.3 (5) | +3.6 (3) | +5.0 (5) | +3.8 (2) | +3.4 (3) | 2 |
+| Tarasque | +3.0 (4) | −0.5 (6) | +10.0 (1) | −6.4 (9) | +1.5 (4) | 1 |
+| Treant | +5.7 (2) | −2.0 (8) | −9.4 (9) | +6.0 (1) | +0.1 (5) | 2 |
+| Phoenix | −5.1 (8) | −4.0 (9) | +8.4 (2) | +0.4 (6) | −0.1 (6) | 1 |
+| Golem | −0.6 (6) | −0.1 (5) | −5.8 (7) | +1.8 (4) | −1.2 (7) | 0 |
+| Frost Wyrm | −7.0 (10) | −1.4 (7) | −1.7 (6) | +3.1 (3) | −1.7 (8) | 1 |
+| Leviathan | −3.0 (7) | +1.2 (4) | −12.1 (10) | +1.1 (5) | −3.2 (9) | 0 |
+| Thunderbird | −5.7 (9) | −7.9 (10) | −8.1 (8) | −7.0 (10) | −7.2 (10) | 0 |
+
+Per single seed the overall ranges −9.9 (Thunderbird, 777) … +6.5 (Basilisk, 777).
+
+**v2, same roster, `neutral`:**
+
+| Beast | `solo` | `elite` | `squad` | `horde` | Overall | Top-3 shapes |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Basilisk | +16.9 (1) | +12.9 (1) | +7.9 (1) | −1.8 (6) | +9.0 (1) | 3 |
+| Kirin | +2.6 (6) | +9.3 (2) | +6.3 (4) | +5.4 (2) | +5.9 (2) | 2 |
+| Griffin | +7.5 (3) | +7.3 (3) | +4.9 (5) | −7.6 (10) | +3.0 (3) | 2 |
+| Treant | +8.7 (2) | +3.0 (4) | −11.3 (9) | +4.0 (4) | +1.1 (4) | 1 |
+| Golem | +6.0 (4) | −1.7 (6) | −7.9 (8) | +5.9 (1) | +0.6 (5) | 1 |
+| Tarasque | −6.0 (7) | −2.2 (7) | +6.8 (2) | −2.6 (8) | −1.0 (6) | 1 |
+| Leviathan | +5.2 (5) | +1.6 (5) | −14.9 (10) | 0.0 (5) | −2.0 (7) | 0 |
+| Frost Wyrm | −7.2 (8) | −4.9 (8) | +3.8 (6) | −1.9 (7) | −2.6 (8) | 0 |
+| Phoenix | −16.2 (9) | −10.2 (9) | +6.7 (3) | +4.3 (3) | −3.9 (9) | 2 |
+| Thunderbird | −17.7 (10) | −15.0 (10) | −2.3 (7) | −5.6 (9) | −10.1 (10) | 0 |
+
+Per single seed the overall ranges −13.1 (Thunderbird, 12345) … +9.5 (Basilisk, 4242).
+
+### Marginal clear rate after the light retune (final)
+
+Same measurement, final roster and kits (the committed data).
+
+**Final, `elemental`:**
+
+| Beast | `solo` | `elite` | `squad` | `horde` | Overall | Top-3 shapes |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Tarasque | +3.3 (3) | +1.1 (6) | +12.7 (1) | −6.2 (9) | +2.7 (1) | 2 |
+| Kirin | +0.2 (7) | +2.3 (3) | +4.0 (3) | +1.6 (5) | +2.0 (2) | 2 |
+| Griffin | +5.0 (1) | +1.6 (4) | +1.4 (5) | −5.3 (8) | +0.7 (3) | 1 |
+| Basilisk | +2.3 (4) | +2.5 (2) | +3.4 (4) | −7.9 (10) | +0.1 (4) | 1 |
+| Leviathan | +0.8 (5) | +3.6 (1) | −9.1 (9) | +4.9 (3) | +0.1 (5) | 2 |
+| Golem | +0.7 (6) | +1.5 (5) | −5.2 (8) | +2.8 (4) | −0.1 (6) | 0 |
+| Treant | +4.7 (2) | −2.1 (8) | −9.6 (10) | +5.4 (1) | −0.4 (7) | 2 |
+| Phoenix | −5.5 (9) | −5.2 (10) | +6.1 (2) | −0.2 (7) | −1.2 (8) | 1 |
+| Frost Wyrm | −7.0 (10) | −2.0 (7) | −3.0 (7) | +5.0 (2) | −1.8 (9) | 1 |
+| Thunderbird | −4.4 (8) | −3.3 (9) | −0.7 (6) | −0.1 (6) | −2.2 (10) | 0 |
+
+Per single seed the overall ranges −5.1 (Treant, 777) … +6.0 (Tarasque, 777).
+
+**Final, `neutral`:**
+
+| Beast | `solo` | `elite` | `squad` | `horde` | Overall | Top-3 shapes |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Kirin | +3.0 (6) | +6.7 (1) | +5.6 (3) | +2.4 (5) | +4.4 (1) | 2 |
+| Golem | +7.2 (3) | +4.3 (4) | −4.8 (8) | +7.1 (1) | +3.4 (2) | 2 |
+| Leviathan | +11.2 (1) | +5.9 (2) | −11.1 (9) | +3.4 (2) | +2.3 (3) | 3 |
+| Basilisk | +7.2 (2) | +4.8 (3) | +1.5 (6) | −10.4 (9) | +0.8 (4) | 2 |
+| Thunderbird | −5.4 (7) | −7.0 (9) | +7.3 (2) | +3.0 (3) | −0.5 (5) | 2 |
+| Tarasque | −9.8 (9) | −1.7 (7) | +9.6 (1) | −0.6 (8) | −0.6 (6) | 1 |
+| Treant | +4.0 (5) | +3.4 (5) | −12.1 (10) | +2.0 (7) | −0.7 (7) | 0 |
+| Frost Wyrm | −6.7 (8) | −4.8 (8) | +1.8 (5) | +2.9 (4) | −1.7 (8) | 0 |
+| Griffin | +6.0 (4) | −1.3 (6) | −2.0 (7) | −12.2 (10) | −2.3 (9) | 0 |
+| Phoenix | −16.6 (10) | −10.1 (10) | +4.2 (4) | +2.4 (6) | −5.1 (10) | 0 |
+
+Per single seed the overall ranges −6.2 (Phoenix, 777) … +5.7 (Kirin, 12345).
+
+### Why a retune, and its limits
+
+On the same roster v2 missed the primary target once: **Thunderbird −7.2 `elemental`** (from +2.4).
+Its v1 edge had been hiding the weakest `neutral` line on the roster (−10.1), the previous
+section's caveat. Golem, Leviathan and Thunderbird also had no top-3 shape. A light retune followed
+under the previous pass's rules: small stat and skill-number moves only, at most six three-seed
+iterations, turn ratio 1.10–1.15 in the approved Speed order, six-stat totals 570–630, Move 2–5,
+crit chances unchanged (they are user-approved values, pinned by `BeastRosterTests`), signature
+skills kept, every unlimited damage skill at or below 1.2× its budget.
+
+### Stats, before → after
+
+| Beast | HP | Atk | Def | SpA | SpD | Spe | Total | Move | Crit |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Thunderbird | 110 → **116** | 117 | 88 | 114 → **108** | 91 | 110 | 630 | 4 → **3** | 15% |
+| Leviathan | 122 → **132** | 86 | 126 | 86 | 100 | 94 | 614 → **624** | 3 | 3% |
+| Kirin | 115 | 51 | 90 | 149 → **140** | 124 | 101 | 630 → **621** | 4 | 5% |
+| Basilisk | 103 | 94 | 79 | 117 → **110** | 94 | 105 | 592 → **585** | 5 | 12% |
+
+Speed did not change, so the turn ratio is still **1.118** (Speed 88–110) in the approved order.
+Archetypes hold: Kirin is still the highest SpA (140, next Phoenix 120); Leviathan is still third in
+HP (132, behind Golem 150 and Treant 134) and Defense; Thunderbird is still the fastest with the
+highest crit.
+
+- **Thunderbird Move 4 → 3** was the one lever that moved it. As the fastest beast with Move 4 it
+  reached the enemy alone and took its focus (the first pass's "fastest fragile beast walks in
+  first" finding). A quick filter (seed 12345, four compositions) put Move 3 at +5.3 `elemental` and
+  +5.7 `neutral` against the same data at Move 4, and **+4 Speed (114, SpD −4) made it worse**
+  (−8.3 `elemental` over three seeds, the horde −12.6). It still acts first; it now arrives with
+  its team. **HP +6 / SpA −6** is a little more bulk from the stat its default kit reads less (+2.3
+  in the same quick filter).
+- **Leviathan +10 HP** (total 624): the elite and horde tank had lost its elite slot under v2.
+- **Kirin −9 SpA** and **Basilisk −7 SpA**: after the Thunderbird and Leviathan buffs Kirin was
+  first overall and top 3 in three shapes, Basilisk third and top 3 in two; the cuts free elite,
+  squad and horde slots. Kirin's heals and shields scale with its SpA, so they fall by the same 6%.
+
+### Skill changes
+
+| Skill | Owner (slot) | Change | DPT / budget | Why |
+| --- | --- | --- | --- | --- |
+| Thunder Talons `thunder_talons` | Thunderbird (1) | 33 → **36** × 3 hits | 108 / 90 = 1.2× | Thunderbird −7.2 |
+| Chain Lightning `chain_lightning` | Thunderbird (2) | 25 → **28** × 3 hits | 84 / 70 = 1.2× | Same |
+| Static Charge `static_charge` | Thunderbird (3) | +15 → **+25** CritChance 3t | – | Same (in place of the approved base crit) |
+| Serpent Bite `serpent_bite` | Leviathan (1) | 82 → **86** | 86 / 90 = 0.96× | Leviathan −3.2 |
+| Undertow `undertow` | Leviathan (2) | Taunt 70% → **85%** | – | Same; moved `neutral` a little, not `elemental` |
+| Boulder Slam `boulder_slam` | Golem (1) | 85 → **90** | 90 / 90 = 1.0× | Golem had no top-3 shape |
+| Granite Bulwark `granite_bulwark` | Golem (3) | Shield 70% → **85%** Def | – | Same; the Golem's biggest lever again |
+| Frost Breath `frost_breath` | Frost Wyrm (3) | 42 → **46** | 46 / 70 = 0.66× | Frost Wyrm lost its horde slot at r3–r4 |
+| Iron Crush `iron_crush` | Tarasque (2) | 155 → **148** | 74 / 90 = 0.82× | Tarasque held three top-3 shapes at r5 |
+
+Thunder Talons and Chain Lightning now sit exactly on the budget rule's 1.2× ceiling (they were
+1.1× and 1.07×); nothing is above it, and the rule's numbers did not move. The design doc's kit
+tables and budget note are updated.
+
+### Targets: met and missed (on the 3-seed mean, final)
+
+| # | Target | Result |
+| --- | --- | --- |
+| 1 | `elemental` overall within ±5 | **Met**: −2.2 … +2.7 (spread 4.9; v1 −2.9 … +2.7, spread 5.6; v2 before the retune −7.2 … +4.7). |
+| 1 | `neutral` overall within about ±7 | **Met**: −5.1 … +4.4 (spread 9.5). v1 missed it by two beasts (Basilisk +9.0, Thunderbird −10.1; spread 19.1). |
+| 2 | Every beast top 3 in ≥ 1 shape (`elemental`) | **Missed by two**: Thunderbird (best: 6th in `squad` and `horde`, 4.7 and 5.0 points short) and Golem (4th in `horde` by 2.1, 5th in `elite` by 0.8). Eight of ten; v1 was ten of ten with no slack, v2 before the retune seven of ten. |
+| 2 | Same, `neutral` (secondary) | Six of ten (Griffin, Treant, Frost Wyrm and Phoenix have none; Thunderbird now has two). |
+| 3 | No beast top 3 in every shape | **Met** in both modes (the most is Leviathan, three shapes in `neutral`). |
+| – | Turn ratio 1.10–1.15 | **Met**: 1.118, unchanged. |
+| – | Element effect: no element systematically helped or hurt | **Much improved, not zero**: spread 21.4 → 7.4 (8.1 from the chart alone). Fire keeps about +4 and Metal +3; Earth −3.5 after the retune (−1.7 from the chart alone). |
+| – | Hard constraints | **Met**: totals 573–630, Move 2–5, crit unchanged, signature skills and default loadouts kept, every unlimited damage skill ≤ 1.2× its budget. |
+
+### Iteration log
+
+Six three-seed iterations (about 11 minutes each) and one set of quick filters:
+
+- **r1:** Thunder Talons 35, Chain Lightning 28, Serpent Bite 86, Basilisk SpA 113. Thunderbird
+  −7.2 → −6.3; skill numbers barely move it.
+- **r2:** Talons 36, Static Charge +25 crit, Thunderbird Speed 114 / SpD 87, Bulwark 75, Undertow
+  85%. Thunderbird **worse** (−8.3; horde −12.6): more Speed walks it in sooner. (A base crit of 20
+  was tried first and withdrawn before the run: base crit chances are user-approved values.)
+- **Quick filters q0–q3** (one seed, four compositions, paired on the same seed): Speed back to 110
+  (q0); Move 3 (q1: +5.3 `elemental`, +5.7 `neutral` over q0); HP +6 / SpA −6 (q2: +2.3); HP +6 /
+  Atk −6 (q3: +1.9).
+- **r3:** Thunderbird Move 3, Leviathan HP 132. Every beast inside ±5 (−4.0 … +3.8) and ±7 in
+  `neutral`; Golem, Thunderbird and Frost Wyrm without a top-3 shape.
+- **r4:** Thunderbird HP 116 / SpA 108, Kirin SpA 143, Boulder Slam 90. `elemental` −2.9 … +2.7;
+  Kirin top 3 in three shapes, Golem, Thunderbird and Frost Wyrm in none.
+- **r5:** Kirin SpA 137, Bulwark 80, Frost Breath 46. Frost Wyrm took the horde's third place;
+  Kirin lost all of its slots (overshoot); Tarasque held three.
+- **r6 (final):** Kirin SpA 140, Basilisk SpA 110, Iron Crush 148, Bulwark 85. Eight of ten with a
+  top-3 shape; the iteration budget is spent.
+
+### Caveats
+
+- **Target 2 is at noise level, as before.** Golem is 0.8 points from the elite's third place, and
+  a shape cell moves by several points between seeds. Thunderbird is further off: its best shapes
+  are 5 points short, its skills are on the budget ceiling, and Move 3 only partly fixed it being
+  focused first; closing the rest likely needs a kit or behaviour change rather than numbers.
+- **Undertow 70% → 85% is probably inert** for the primary mode (r2 showed no `elemental` change for
+  Leviathan's elite); it stayed because each later iteration was measured with it.
+- **Single seeds still stray**: per seed the final `elemental` overall runs −5.1 (Treant, 777) …
+  +6.0 (Tarasque, 777), so a single-seed report such as the committed `tuned-report.md` can show a
+  beast just outside ±5.
+- **Skill level 10 was not re-measured** in this pass (the previous pass's sanity check is on the v1
+  chart).
+- The mild tier is only on Light and Dark attacks: the player side gets it through Kirin's and
+  Basilisk's elemental skills, and the enemy side through Light and Dark enemies dealt from the same
+  deck, so it cuts both ways for every beast.

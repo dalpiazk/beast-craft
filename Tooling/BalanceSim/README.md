@@ -67,8 +67,8 @@ Two reports are committed, both the default arguments:
   kept as a record and is **not** regenerated (a fresh run now reads the tuned roster). It predates
   the ATB turn order, so its battle lengths are in rounds.
 - `docs/balance/tuned-report.md` — the current roster and skill library after the third tuning pass
-  (see `docs/balance/tuning-log.md`, "Retune with authored kits, avatar passives, sqrt speed and
-  mitigation"), under the real game setup (every beast's authored default loadout, the library
+  and its element chart v2 follow-up (see `docs/balance/tuning-log.md`, "Retune with authored kits,
+  avatar passives, sqrt speed and mitigation" and "Element chart v2"), under the real game setup (every beast's authored default loadout, the library
   avatar with its passives, skill level 1), the current Runtime (the square-root ATB turn order, the
   mitigation damage formula, `SpecialAttack`-scaled heals, combat stances, variance and crits) and
   the generated encounters. Regenerate it whenever the roster, the skill library, fixtures, simulator
