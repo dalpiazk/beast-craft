@@ -7,12 +7,18 @@ namespace BeastCraft.Creatures.Roster
     /// Structural integrity checks for <see cref="BeastRosterData"/>: the rules every roster file
     /// must satisfy to import at all (ids present, unique and well-formed, elements that parse,
     /// curve references that resolve, curves that start above 0 and end at 1, stats that are
-    /// usable, stances that parse). Balance guidelines — stat budgets, move-range bands, one beast per element — are
+    /// usable, a crit chance that is a percent, stances that parse). Balance guidelines — stat budgets, move-range bands, one beast per element — are
     /// deliberately NOT here; they are tests over the current starter roster, and the balance
     /// simulator is free to move them.
     /// </summary>
     public static class BeastRosterValidator
     {
+        /// <summary>The least <see cref="StatBlock.CritChance"/> a species may author: 0, never crits.</summary>
+        public const int MinCritChance = 0;
+
+        /// <summary>The most <see cref="StatBlock.CritChance"/> a species may author: 100, always crits.</summary>
+        public const int MaxCritChance = 100;
+
         /// <summary>Returns every problem found; an empty list means the roster is importable.</summary>
         public static List<string> Validate(BeastRosterData roster)
         {
@@ -261,6 +267,14 @@ namespace BeastCraft.Creatures.Roster
                     {
                         errors.Add(label + ": BaseStats." + names[v] + " is " + values[v] + "; it must be at least 1.");
                     }
+                }
+
+                // CritChance is a percent chance, not a combat stat: 0 ("never crits") is legal, and
+                // anything outside 0-100 cannot be a chance. The balance band lives in the tests.
+                if (stats.CritChance < MinCritChance || stats.CritChance > MaxCritChance)
+                {
+                    errors.Add(label + ": BaseStats.CritChance is " + stats.CritChance + "; it must be between " + MinCritChance + " and " +
+                               MaxCritChance + " (a percent chance).");
                 }
             }
         }

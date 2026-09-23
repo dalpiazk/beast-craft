@@ -14,8 +14,9 @@ namespace BeastCraft.Battle
     /// </para>
     /// <para>
     /// <strong>Driven by <see cref="BattleTurnExecutor"/>.</strong> The executor calls
-    /// <see cref="TickModifiers"/> at the start of each unit's own turn and <see cref="Apply"/>
-    /// for every skill that fires in it, the avatar's included. This class supplies the mechanism
+    /// <see cref="TickModifiers"/> at the start of each unit's own turn and
+    /// <see cref="Apply(SkillActivation, BattleUnit, System.Random)"/> for every skill that fires
+    /// in it, the avatar's included, passing the battle's rng. This class supplies the mechanism
     /// and decides nothing about when it runs.
     /// </para>
     /// <para>
@@ -28,14 +29,17 @@ namespace BeastCraft.Battle
     /// <em>power</em>, fed to <see cref="DamageFormula"/> with the caster's level and attacking
     /// stat, the target's defending stat (the pair picked by <see cref="SkillSO.Category"/>) and
     /// the element chart — the fired skill's <see cref="SkillSO.Element"/> against the target's
-    /// <see cref="BattleUnit.Elements"/>. No crit, no variance, no same-element bonus; see
-    /// <see cref="DamageFormula"/> for why those are deferred. Heals are still applied flat, and
-    /// buffs and debuffs still move a stat by exactly their magnitude: stat-scaled healing is
-    /// deferred to the balance pass, and neither is ever scaled by element.
+    /// <see cref="BattleUnit.Elements"/> — then a crit roll off the caster's
+    /// <see cref="StatBlock.CritChance"/> and a variance roll, both drawn from the battle's rng (see
+    /// <see cref="DamageFormula"/> for the rolls, their fixed draw order and the null-rng
+    /// deterministic fallback). No same-element bonus yet. Heals are still applied flat with no
+    /// variance, and buffs and debuffs still move a stat by exactly their magnitude: stat-scaled
+    /// healing is deferred to the balance pass, and neither is ever scaled by element or rolled.
     /// </description></item>
     /// <item><description>
     /// <strong>A defeated target takes nothing further.</strong> Once a target's HP reaches 0 it
-    /// is skipped for every remaining effect in the same activation. See <see cref="Apply"/>.
+    /// is skipped for every remaining effect in the same activation. See
+    /// <see cref="Apply(SkillActivation, BattleUnit, System.Random)"/>.
     /// </description></item>
     /// <item><description>
     /// <strong><see cref="SkillEffectType.ApplyStatus"/> does nothing.</strong> There is no
@@ -90,8 +94,16 @@ namespace BeastCraft.Battle
         /// <see cref="SkillActivation"/>'s own contract: the skill fired, it reset its cooldown,
         /// and it changed nothing.
         /// </para>
+        /// <para>
+        /// <strong>Randomness.</strong> Every damage effect that lands draws its crit roll and
+        /// then its variance roll from <paramref name="rng"/> (see <see cref="DamageFormula.Roll"/>),
+        /// in the target-major, authored-effect order above, and is recorded in
+        /// <see cref="SkillActivation.Hits"/>. An effect skipped because its target is already
+        /// defeated draws nothing. A null <paramref name="rng"/> is the deterministic fallback: no
+        /// variance, no crit.
+        /// </para>
         /// </summary>
-        public static void Apply(SkillActivation activation, BattleUnit caster)
+        public static void Apply(SkillActivation activation, BattleUnit caster, System.Random rng)
         {
             if (activation == null || activation.Skill == null || caster == null || caster.IsDefeated)
             {
@@ -126,10 +138,20 @@ namespace BeastCraft.Battle
 
                     if (effects[e] != null)
                     {
-                        ApplyEffect(activation.Skill, caster, target, effects[e]);
+                        ApplyEffect(activation, caster, target, effects[e], rng);
                     }
                 }
             }
+        }
+
+        /// <summary>
+        /// <see cref="Apply(SkillActivation, BattleUnit, System.Random)"/> on the deterministic
+        /// fallback (no rng: every hit at a 100% roll, never a crit). For callers and tests that want
+        /// exact, roll-free numbers; the battle loop always passes its rng.
+        /// </summary>
+        public static void Apply(SkillActivation activation, BattleUnit caster)
+        {
+            Apply(activation, caster, null);
         }
 
         /// <summary>
@@ -193,16 +215,16 @@ namespace BeastCraft.Battle
 
         /// <summary>
         /// Routes one effect to its handler. The whole of the effect vocabulary.
-        /// <paramref name="skill"/> (for its element and damage category) and
-        /// <paramref name="caster"/> (for its level and attacking stat) are needed only by the
-        /// damage arm.
+        /// <paramref name="activation"/> (for its skill's element and damage category, and to record
+        /// the hit), <paramref name="caster"/> (for its level, attacking stat and crit chance) and
+        /// <paramref name="rng"/> are needed only by the damage arm.
         /// </summary>
-        private static void ApplyEffect(SkillSO skill, BattleUnit caster, BattleUnit target, SkillEffect effect)
+        private static void ApplyEffect(SkillActivation activation, BattleUnit caster, BattleUnit target, SkillEffect effect, System.Random rng)
         {
             switch (effect.EffectType)
             {
                 case SkillEffectType.Damage:
-                    ApplyDamage(skill, caster, target, effect);
+                    ApplyDamage(activation, caster, target, effect, rng);
                     break;
 
                 case SkillEffectType.Heal:
@@ -245,15 +267,17 @@ namespace BeastCraft.Battle
 
         /// <summary>
         /// Spends HP. The amount is
-        /// <see cref="DamageFormula.Compute(BattleUnit, BattleUnit, SkillSO, float)"/> of
+        /// <see cref="DamageFormula.Roll(BattleUnit, BattleUnit, SkillSO, float, System.Random)"/> of
         /// <paramref name="caster"/> against <paramref name="target"/>, with the effect's
-        /// <see cref="SkillEffect.Magnitude"/> as the power, and the result is clamped into
+        /// <see cref="SkillEffect.Magnitude"/> as the power and <paramref name="rng"/> for the crit
+        /// and variance rolls; the roll is recorded on <paramref name="activation"/>
+        /// (<see cref="SkillActivation.Hits"/>), and the amount is clamped into
         /// <c>[0, Stats.Hp]</c>, so an overkill hit lands the unit on exactly 0 rather than in
         /// negative territory that a later heal would have to climb out of.
         /// <para>
-        /// All of the arithmetic — stat selection, the element multiplier, and the single
-        /// truncation to whole HP after it — lives in <see cref="DamageFormula"/>; this method only
-        /// spends what it returns. A zero or negative power deals nothing, so a damage effect can
+        /// All of the arithmetic — stat selection, the element multiplier, the crit and variance
+        /// rolls, and the single truncation to whole HP after them — lives in
+        /// <see cref="DamageFormula"/>; this method only spends what it returns. A zero or negative power deals nothing, so a damage effect can
         /// no longer read as a heal.
         /// </para>
         /// <para>
@@ -263,9 +287,11 @@ namespace BeastCraft.Battle
         /// it can happen — not a hidden consequence of a setter.
         /// </para>
         /// </summary>
-        private static void ApplyDamage(SkillSO skill, BattleUnit caster, BattleUnit target, SkillEffect effect)
+        private static void ApplyDamage(SkillActivation activation, BattleUnit caster, BattleUnit target, SkillEffect effect, System.Random rng)
         {
-            SetCurrentHp(target, target.CurrentHp - DamageFormula.Compute(caster, target, skill, effect.Magnitude));
+            DamageRoll roll = DamageFormula.Roll(caster, target, activation.Skill, effect.Magnitude, rng);
+            activation.RecordHit(new DamageHit(target, roll));
+            SetCurrentHp(target, target.CurrentHp - roll.Amount);
 
             if (target.CurrentHp <= 0)
             {
@@ -282,7 +308,7 @@ namespace BeastCraft.Battle
         /// damage formula.
         /// </para>
         /// <para>
-        /// Healing a <em>defeated</em> unit never reaches here: <see cref="Apply"/> skips a
+        /// Healing a <em>defeated</em> unit never reaches here: <c>Apply</c> skips a
         /// defeated target before the effect runs, so a heal cannot revive. That follows from
         /// there being no revival mechanic anywhere in the design — reviving would be a real
         /// combat rule with real balance weight, and having it fall out as a side effect of any
@@ -347,9 +373,12 @@ namespace BeastCraft.Battle
         /// does not defeat a unit — defeat is <see cref="ApplyDamage"/>'s call and only its call.
         /// </para>
         /// <para>
-        /// Every axis goes through here, <see cref="StatType.MoveRange"/> included, so a move-range
-        /// buff or debuff changes <see cref="BattleUnit.MoveRange"/> (which reads
-        /// <see cref="BattleUnit.Stats"/>) with no special case.
+        /// Every axis goes through here, <see cref="StatType.MoveRange"/> and
+        /// <see cref="StatType.CritChance"/> included, so a move-range buff or debuff changes
+        /// <see cref="BattleUnit.MoveRange"/> (which reads <see cref="BattleUnit.Stats"/>), and a
+        /// crit buff changes the chance <see cref="DamageFormula.RollCrit"/> reads, with no special
+        /// case. Crit chance is held at 0 like every other stat but is not capped at 100 here: a
+        /// buff past 100 is kept in full and simply clamped when rolled, so its reversion is exact.
         /// </para>
         /// <para>
         /// <see cref="StatBlock"/> is a struct, so the copy has to be written back to

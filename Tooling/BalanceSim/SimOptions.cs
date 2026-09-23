@@ -119,6 +119,14 @@ namespace BeastCraft.Tooling.BalanceSim
         public static readonly int[] DefaultLevels = { 1, 50, 100 };
         public const int DefaultMatrixLevel = 50;
         public const int DefaultSeed = 12345;
+
+        /// <summary>
+        /// Battles per (team, encounter, level, kit mode) in PvE, and per side-swapped pairing in
+        /// PvP, each with its own seed. Damage variance and crits make a battle random, so one
+        /// battle per team is a single draw; 5 keeps the default run about two minutes on 8 cores
+        /// while every per-beast PvE aggregate (overall marginal) rests on thousands of battles.
+        /// </summary>
+        public const int DefaultSamples = 5;
         public const double DefaultMarginalThreshold = 5.0;
 
         public List<int> Levels = new List<int>(DefaultLevels);
@@ -135,6 +143,7 @@ namespace BeastCraft.Tooling.BalanceSim
 
         public int MaxTime = BattleTurnExecutor.DefaultMaxTime;
         public int Seed = DefaultSeed;
+        public int Samples = DefaultSamples;
         public int MatrixLevel = DefaultMatrixLevel;
         public string OutPath;
         public string RosterPath;
@@ -158,6 +167,8 @@ namespace BeastCraft.Tooling.BalanceSim
             "  --enemy-element <e>        authored | None | <Element> (default authored): override every enemy's element.\n" +
             "  --max-time <n>             Battle-time cap before a battle is a stalemate, in turns of a Speed-100 unit (default 2000).\n" +
             "  --seed <n>                 Base seed; each battle derives its own (default 12345).\n" +
+            "  --samples <n>              Battles per team and fight (PvE) and per pairing (PvP), each with its own seed:\n" +
+            "                             damage variance and crits make battles random (default 5).\n" +
             "  --matrix-level <n>         Level the PvP win matrix and stat table are drawn at (default 50, else the highest level).\n" +
             "  --roster <path>            beast-roster.json (default: found by walking up from the working directory).\n" +
             "  --encounters-file <path>   encounters.json (default: Tooling/BalanceSim/encounters.json, found the same way).\n" +
@@ -286,6 +297,13 @@ namespace BeastCraft.Tooling.BalanceSim
                         break;
                     case "--seed":
                         if (!TryNextInt(args, ref i, arg, int.MinValue, out options.Seed, out error))
+                        {
+                            return null;
+                        }
+
+                        break;
+                    case "--samples":
+                        if (!TryNextInt(args, ref i, arg, 1, out options.Samples, out error))
                         {
                             return null;
                         }

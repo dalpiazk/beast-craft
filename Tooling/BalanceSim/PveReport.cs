@@ -7,7 +7,10 @@ using BeastCraft.Creatures;
 
 namespace BeastCraft.Tooling.BalanceSim
 {
-    /// <summary>One beast's numbers in one (mode, level, encounter) cell, or averaged over several.</summary>
+    /// <summary>
+    /// One beast's numbers in one (mode, level, encounter) cell, or averaged over several. Every
+    /// sample of every team counts as its own battle.
+    /// </summary>
     public class BeastMetrics
     {
         /// <summary>Clear rate of teams containing the beast minus teams without it, in points.</summary>
@@ -57,10 +60,11 @@ namespace BeastCraft.Tooling.BalanceSim
                 long turns = 0;
                 long battleTicks = 0;
 
-                for (int t = 0; t < teams.Count; t++)
+                int samples = cell.Samples < 1 ? 1 : cell.Samples;
+                for (int i = 0; i < cell.Battles.Length; i++)
                 {
-                    PveBattle battle = cell.Battles[t];
-                    int member = Array.IndexOf(teams[t], b);
+                    PveBattle battle = cell.Battles[i];
+                    int member = Array.IndexOf(teams[i / samples], b);
                     if (member < 0)
                     {
                         without++;
@@ -193,6 +197,7 @@ namespace BeastCraft.Tooling.BalanceSim
             AppendEncounters(report, encounters);
             AppendCalibration(report, options, cells);
             AppendParity(report, options, encounters, cells);
+            AppendRolls(report, species, simulator, cells);
             AppendFlags(report, options, species, encounters, cells, summaries);
 
             foreach (ModeSummary summary in summaries)
@@ -292,6 +297,13 @@ namespace BeastCraft.Tooling.BalanceSim
             report.AppendLine();
             report.AppendLine("- Teams: every combination of " + options.TeamSize + " distinct beasts (" + simulator.Teams.Count + " teams, format " +
                               SimOptions.FormatForTeamSize(options.TeamSize) + "); each beast is in " + TeamsWith(simulator) + " of them");
+            report.AppendLine("- Samples: damage variance (" + DamageFormula.VarianceMinPercent + "-" + DamageFormula.VarianceMaxPercent +
+                              "%) and crits make a battle random, so every team fights every calibration step " + simulator.Samples +
+                              " times with distinct seeds");
+            report.AppendLine("  (" + (simulator.Teams.Count * simulator.Samples) + " battles per evaluation; a beast's per-cell metrics rest on " +
+                              (TeamsWith(simulator) * simulator.Samples) + " battles with it and " +
+                              ((simulator.Teams.Count - TeamsWith(simulator)) * simulator.Samples) + " without). Seeds exclude the multiplier, so");
+            report.AppendLine("  calibration compares multipliers on the same rolls; the clear rate is over every sample.");
             report.AppendLine("- Levels: " + SimOptions.Join(options.Levels) + " (beasts and enemies at the same level); kit modes: " +
                               PvpReport.ModeList(options.Modes) + "; no gear; no avatar");
             report.AppendLine("- Encounters: `" + EncounterLoader.RepoRelativePath + "`" +
@@ -348,11 +360,11 @@ namespace BeastCraft.Tooling.BalanceSim
             report.AppendLine("### Encounters (simulator fixtures, not game content)");
             report.AppendLine();
             report.AppendLine("Base stats are max-level values scaled by the roster's growth curve, like a beast's, before the difficulty");
-            report.AppendLine("multiplier. Kit entries are category, shape, range, power, cooldown and whom the skill aims at (`nearest`, or a stat");
+            report.AppendLine("multiplier (Move and Crit are exempt from both). Kit entries are category, shape, range, power, cooldown and whom the skill aims at (`nearest`, or a stat");
             report.AppendLine("extreme such as `lowest HP`, which compares maximum HP).");
             report.AppendLine();
-            report.AppendLine("| Encounter | Arena | Enemy | Count | Stance | Elements | HP | Atk | Def | SpA | SpD | Spe | Move | Kit |");
-            report.AppendLine("| --- | --- | --- | ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |");
+            report.AppendLine("| Encounter | Arena | Enemy | Count | Stance | Elements | HP | Atk | Def | SpA | SpD | Spe | Move | Crit | Kit |");
+            report.AppendLine("| --- | --- | --- | ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |");
 
             foreach (Encounter encounter in encounters)
             {
@@ -377,7 +389,7 @@ namespace BeastCraft.Tooling.BalanceSim
                     StatBlock s = group.BaseStats;
                     report.AppendLine("| `" + encounter.Id + "` | " + encounter.Data.ParsedArena + " | " + group.DisplayName + " | " + group.Count + " | " +
                                       group.ParsedStance + " | " + Compress(elements) + " | " + s.Hp + " | " + s.Attack + " | " + s.Defense + " | " + s.SpecialAttack + " | " +
-                                      s.SpecialDefense + " | " + s.Speed + " | " + s.MoveRange + " | " + string.Join("; ", kit) + " |");
+                                      s.SpecialDefense + " | " + s.Speed + " | " + s.MoveRange + " | " + s.CritChance + "% | " + string.Join("; ", kit) + " |");
                 }
             }
 
@@ -494,6 +506,59 @@ namespace BeastCraft.Tooling.BalanceSim
                                       (physical + special == 0.0 ? "-" : SimOptions.Format((100.0 * physical) / (physical + special)) + "%") + " | " + burst + " | " +
                                       (burst == 0 ? "-" : ((double)burstTargets / burst).ToString("0.00", CultureInfo.InvariantCulture)) + " |");
                 }
+            }
+
+            report.AppendLine();
+        }
+
+        /// <summary>
+        /// Per beast, over every PvE battle at calibrated difficulty (both kit modes, every
+        /// encounter, level and sample): how often its hits crit against its authored chance, and
+        /// the average random multiplier its hits got. Expected = <c>1 + (CritMultiplier - 1) *
+        /// chance</c>, since the variance roll averages 100%.
+        /// </summary>
+        private static void AppendRolls(StringBuilder report, IReadOnlyList<CreatureSpeciesSO> species, PveSimulator simulator, List<PveCell> cells)
+        {
+            long[] hits = new long[species.Count];
+            long[] crits = new long[species.Count];
+            double[] multiplier = new double[species.Count];
+
+            foreach (PveCell cell in cells)
+            {
+                int samples = cell.Samples < 1 ? 1 : cell.Samples;
+                for (int i = 0; i < cell.Battles.Length; i++)
+                {
+                    PveBattle battle = cell.Battles[i];
+                    int[] team = simulator.Teams[i / samples];
+                    for (int m = 0; m < team.Length; m++)
+                    {
+                        hits[team[m]] += battle.MemberHits[m];
+                        crits[team[m]] += battle.MemberCrits[m];
+                        multiplier[team[m]] += battle.MemberRollMultiplier[m];
+                    }
+                }
+            }
+
+            report.AppendLine("### Critical hits and damage rolls (beast kit, calibrated difficulty, all modes, levels and samples)");
+            report.AppendLine();
+            report.AppendLine("Each damage effect that lands rolls crit (x" + DamageFormula.CritMultiplier.ToString("0.0#", CultureInfo.InvariantCulture) +
+                              ", chance = the beast's `CritChance`) then variance (uniform " + DamageFormula.VarianceMinPercent + "-" +
+                              DamageFormula.VarianceMaxPercent + "%). **Avg roll** = mean");
+            report.AppendLine("of `(crit ? " + DamageFormula.CritMultiplier.ToString("0.0#", CultureInfo.InvariantCulture) +
+                              " : 1) x variance` over the beast's hits; expected = `1 + " +
+                              (DamageFormula.CritMultiplier - 1f).ToString("0.0#", CultureInfo.InvariantCulture) + " x chance`.");
+            report.AppendLine();
+            report.AppendLine("| Beast | Crit chance | Hits | Crits | Observed crit rate | Avg roll | Expected avg roll |");
+            report.AppendLine("| --- | ---: | ---: | ---: | ---: | ---: | ---: |");
+
+            for (int b = 0; b < species.Count; b++)
+            {
+                int chance = DamageFormula.ClampCritChance(species[b].BaseStats.CritChance);
+                double expected = 1.0 + ((DamageFormula.CritMultiplier - 1.0) * chance / 100.0);
+                report.AppendLine("| " + species[b].DisplayName + " | " + chance + "% | " + hits[b] + " | " + crits[b] + " | " +
+                                  (hits[b] == 0 ? "-" : SimOptions.Format((100.0 * crits[b]) / hits[b]) + "%") + " | " +
+                                  (hits[b] == 0 ? "-" : (multiplier[b] / hits[b]).ToString("0.000", CultureInfo.InvariantCulture)) + " | " +
+                                  expected.ToString("0.000", CultureInfo.InvariantCulture) + " |");
             }
 
             report.AppendLine();

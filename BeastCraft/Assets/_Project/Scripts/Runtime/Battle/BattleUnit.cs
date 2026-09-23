@@ -191,7 +191,7 @@ namespace BeastCraft.Battle
         /// <para>
         /// A plain mutable list, and deliberately so: the unit owns the storage but none of the
         /// logic. <see cref="SkillEffectApplier"/> is the only writer — it fills the list in
-        /// <see cref="SkillEffectApplier.Apply"/> and drains it in
+        /// <see cref="SkillEffectApplier.Apply(SkillActivation, BattleUnit, System.Random)"/> and drains it in
         /// <see cref="SkillEffectApplier.TickModifiers"/>. Never <c>null</c>; empty is the normal
         /// state, and an instant (<c>DurationTurns == 0</c>) modifier never appears here at all.
         /// </para>

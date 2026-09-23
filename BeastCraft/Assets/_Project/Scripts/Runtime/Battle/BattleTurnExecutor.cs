@@ -199,6 +199,15 @@ namespace BeastCraft.Battle
         /// are simply not attempted, and they keep their 0 like any other slot that did not fire.
         /// </para>
         /// <para>
+        /// <strong>The rng.</strong> <paramref name="rng"/> is the battle's one random stream.
+        /// Targeting draws from it (only for <see cref="SkillTargetingCriterion.Random"/>), and every
+        /// damage effect that lands draws its crit roll then its variance roll from it, in the order
+        /// the turn fires skills — the unit's ready slots in stack order, then the avatar's — and
+        /// within each skill in <see cref="SkillEffectApplier"/>'s target-major, authored-effect
+        /// order. A null rng is the deterministic fallback: no variance, no crits (see
+        /// <see cref="DamageFormula"/>).
+        /// </para>
+        /// <para>
         /// Non-throwing, like the rest of the namespace: a null or defeated unit takes no turn at
         /// all (and, deliberately, does not tick — a unit out of the fight must not advance its own
         /// rotation behind its back), and a null grid simply means nothing can move.
@@ -313,7 +322,7 @@ namespace BeastCraft.Battle
 
                 for (int i = 0; i < cast.Count; i++)
                 {
-                    SkillEffectApplier.Apply(cast[i], avatar);
+                    SkillEffectApplier.Apply(cast[i], avatar, rng);
                     LiftDefeated(allUnits, grid);
                     avatarActivations.Add(cast[i]);
                 }
@@ -435,7 +444,7 @@ namespace BeastCraft.Battle
             IReadOnlyList<BattleUnit> targets = SkillTargetResolver.ResolveTargets(skill, caster, allUnits, grid, rng);
             SkillActivation activation = new SkillActivation(skill, targets);
 
-            SkillEffectApplier.Apply(activation, caster);
+            SkillEffectApplier.Apply(activation, caster, rng);
             LiftDefeated(allUnits, grid);
             loadout.MarkFired(slotIndex);
 

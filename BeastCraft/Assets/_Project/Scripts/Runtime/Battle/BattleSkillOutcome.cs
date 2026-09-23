@@ -14,7 +14,7 @@ namespace BeastCraft.Battle
     /// and the slot is what a caller has to name to reason about the cooldown that stayed at 0 —
     /// the same skill may be equipped twice. So this wraps an activation rather than replacing it:
     /// when the skill fired, <see cref="Activation"/> is exactly what the resolver produced and what
-    /// <see cref="SkillEffectApplier.Apply"/> was handed.
+    /// <see cref="SkillEffectApplier.Apply(SkillActivation, BattleUnit, System.Random)"/> was handed.
     /// </para>
     /// <para>
     /// A record of what happened, not a handle to change it. Everything here is already done by the

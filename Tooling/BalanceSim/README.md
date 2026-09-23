@@ -39,6 +39,7 @@ dotnet run --project Tooling/BalanceSim -c Release -- [options]
 | `--enemy-element <e>` | `authored` | `authored`, `None` or an element name: override every enemy's element. |
 | `--max-time <n>` | `2000` | Battle-time cap (normalized, see below); a battle that reaches it is a stalemate. |
 | `--seed <n>` | `12345` | Base seed; each battle derives its own seed from it. |
+| `--samples <n>` | `5` | Battles per PvE team and fight (every calibration step) and per PvP game, each with its own seed. Damage variance and crits make battles random; see "Sampling" below. |
 | `--matrix-level <n>` | `50` | Level of the PvP win matrix and the stat table (falls back to the highest simulated level). |
 | `--roster <path>` | found by walking up | Path to `beast-roster.json`. |
 | `--encounters-file <path>` | found by walking up | Path to `encounters.json`. |
@@ -48,8 +49,9 @@ dotnet run --project Tooling/BalanceSim -c Release -- [options]
 Exit codes: `0` success, `1` bad arguments, `2` missing or invalid roster or encounters (the roster
 is checked with `BeastRosterValidator` first, exactly as the Editor importer does), `3` a self-check
 failed. The run time goes to stderr, never into the report. The default run (both modes, both kits,
-three levels, three encounters) takes about 15 s on an 8-thread machine (about 35 s with
-`--self-check`). PvE battles run in parallel, and the output is identical whatever the thread count.
+three levels, three encounters, 5 samples) takes about 130 s on an 8-thread machine (about 25 s per
+sample; about 4.5 minutes with `--self-check`, which runs everything twice). PvE battles run in
+parallel, and the output is identical whatever the thread count.
 
 Two reports are committed, both the default arguments:
 
@@ -146,6 +148,7 @@ The first baseline did not manage that: Strike at cooldown 1 against Blast at co
   scaling it would change the enemies' action economy, not just their toughness. The multiplier starts at 1 and doubles or halves until the target clear rate is
   bracketed (between 1/64 and 64), then bisects 8 times. The evaluated multiplier closest to the
   target wins (first evaluated on a tie). The process is deterministic because each clear rate is.
+  Each clear rate is over every team's `--samples` battles (1050 per evaluation at the defaults).
   Where a step in the clear-rate curve cannot be split (for example level 1, where enemy stats
   round to 1-2), the closest rate is reported; a miss beyond 10 points is flagged.
 - **Metrics**, all at the calibrated multiplier:
@@ -162,8 +165,9 @@ The first baseline did not manage that: Strike at cooldown 1 against Blast at co
   **no weakness** (top 3 in every encounter); stalemates; calibration misses.
 - **Battle loop.** The PvE loop reproduces `BattleTurnExecutor.RunBattle` statement for statement,
   with an HP snapshot around each `ExecuteTurn` so damage can be attributed to the acting unit.
-  `--self-check` replays sample battles through the real `RunBattle` and requires identical
-  outcomes, battle time, turn counts, HP and positions. The loop adds no rules of its own.
+  `--self-check` replays sample battles (sample 0, same seed) through the real `RunBattle` and
+  requires identical outcomes, battle time, turn counts, HP and positions — damage rolls included.
+  The loop adds no rules of its own.
 
 ### Runtime rules that shape the PvE numbers
 
@@ -209,17 +213,32 @@ The default run has no stalemates, PvE or PvP.
 
 ## PvP: 1v1 round-robin (secondary)
 
-Every pair of distinct species is played twice per level and kit mode with the sides swapped, on a
+Every pair of distinct species is played twice per level and kit mode with the sides swapped (each
+game `--samples` times), on a
 Medium board, one beast per side: the most central tile of the player zone against its point
 mirror. Mirror matches are skipped. `TurnManager` breaks initiative ties on the ordinal unit id,
 and the ids are fixed per side (`p` / `e`), so playing each pairing both ways gives each beast the
 tie-break exactly once. Battle length is reported in normalized time and total turns. Stalemates and mutual defeats count as games but not wins.
 
+## Sampling
+
+Damage has a uniform 90-110% variance roll and each beast (and fixture enemy) a crit chance
+(`CritChance`, x1.5), both drawn from the battle's rng (design doc, "Variance and critical hits"),
+so one battle per team is a single draw. Every PvE team fights every encounter, at every calibration
+step, `--samples` times, and every PvP game is played `--samples` times, each with its own seed
+(the sample index is part of the seed). At the default 5, one PvE evaluation is 1050 battles, a
+beast's metrics in one cell rest on 420 battles with it (84 teams x 5), and its overall marginal on
+3780. The report's "Critical hits and damage rolls" table checks the plumbing: each beast's observed
+crit rate and average roll multiplier against its authored chance. Noise: rerunning with another
+`--seed` moves a beast's overall marginal by up to about 3 points (see the tuning log); raise
+`--samples` to shrink it, at about 25 s per sample.
+
 ## Determinism
 
 Every battle gets its own `System.Random`, seeded from the base seed and the battle's inputs (never
-from the calibration multiplier). The kits target by distance or by a stat, never at random, so the
-rng is not consulted for targeting. Parallel results are stored by team index and aggregated in a fixed order. The report
+from the calibration multiplier), and the sample index. The kits target by distance or by a stat,
+never at random, so the rng is consulted only for damage rolls: crit then variance, two draws per
+damage effect that lands, in the Runtime's fixed order. Parallel results are stored by team index and aggregated in a fixed order. The report
 contains no timestamps, machine paths or timings, and always uses LF line endings. The same roster,
 fixtures, code and arguments produce a byte-identical report.
 

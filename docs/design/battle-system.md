@@ -577,10 +577,11 @@ revisited when balance work starts.
 
 - **Damage is stat-based; healing is flat.** A `Damage` effect's `SkillEffect.Magnitude` is its
   *power*, and the HP it takes comes from `DamageFormula` — caster level, caster attacking stat
-  against target defending stat, and the element multiplier (see "Damage formula" below). This
-  superseded the original rule, which applied every magnitude flat and deferred the formula to a
-  balancing pass. Heals are still applied flat, and buffs and debuffs still move a stat by exactly
-  their magnitude; whether and how healing should scale is deferred to the balance pass.
+  against target defending stat, the element multiplier, then a crit roll and a variance roll (see
+  "Damage formula" below). This superseded the original rule, which applied every magnitude flat and
+  deferred the formula to a balancing pass. Heals are still applied flat with no variance, and buffs
+  and debuffs still move a stat by exactly their magnitude; whether and how healing should scale is
+  deferred to the balance pass.
   `BattleUnit` gained a `CurrentHp` alongside its `StatBlock` (whose
   `Hp` is now explicitly the *maximum*); every unit starts a battle at full health, since there is
   no persistent creature-instance model to carry damage in from a previous fight. Both damage and
@@ -697,7 +698,9 @@ The category belongs to the skill as a whole, like its element.
 
 ```
 base   = ((2 * Level / 5 + 2) * Power * A / D) / 50 + 2
-damage = truncate(base * ElementChart multiplier)
+damage = max(1, truncate(base * ElementChart multiplier * crit * roll / 100))
+crit   = 1.5 on a critical hit, else 1
+roll   = a whole percent, uniform on [90, 110]
 ```
 
 - `Level` is the caster's `BattleUnit.Level`; `Power` is the `Damage` effect's `SkillEffect.Magnitude`;
@@ -705,12 +708,13 @@ damage = truncate(base * ElementChart multiplier)
   moment the effect lands, so buffs and debuffs move damage.
 - The element multiplier is the skill's element against the target's elements, exactly as before,
   and applies to the whole of `base` (the +2 included). The caster's own elements still do nothing.
-- **Float math, truncated once at the end**, after the multiplier — the same truncation stance the
-  applier always had.
+- **Float math, truncated once at the end**, after the element, crit and variance multipliers (in
+  that order) — the same truncation stance the applier always had. Crits and rolls are covered
+  under "Variance and critical hits" below.
 - **Guards:** `Power <= 0` deals 0 (so a negative damage magnitude no longer reads as a heal); any
   positive `Power` deals at least 1; `D <= 0` is treated as 1; `A < 0` as 0; `Level < 1` as 1.
-- The constants (`2`, `5`, `+2`, `/50`, `+2`, minimum 1) are named on `DamageFormula` so the balance
-  simulator can tune them in one place.
+- The constants (`2`, `5`, `+2`, `/50`, `+2`, minimum 1, and the crit and variance constants below)
+  are named on `DamageFormula` so the balance simulator can tune them in one place.
 
 **Why the level term.** Between two equally levelled beasts on the same curve, `A / D` does not
 change with level, but HP does. The `(2 * Level / 5 + 2)` term scales damage up with level so that a
@@ -721,9 +725,9 @@ at level 1, 19 of 57 (33%) at level 50 and 35 of 100 (35%) at level 100 — HP g
 the curve while the level term grows 17.5x, and the +2 floor dominates at level 1. An EditMode test
 pins that loose band; tightening it is a balance-simulator question.
 
-**Worked examples (starter roster, `medium` curve, Power 40).** Phoenix (Fire) hitting Golem
-(Earth) with a Fire skill — Fire is weak against Earth (0.5x) — with the same hit from a neutral
-skill in brackets:
+**Worked examples (starter roster, `medium` curve, Power 40; a 100% roll and no crit, i.e. the
+deterministic fallback).** Phoenix (Fire) hitting Golem (Earth) with a Fire skill — Fire is weak
+against Earth (0.5x) — with the same hit from a neutral skill in brackets:
 
 | Level | Phoenix → Golem, physical | Phoenix → Golem, special | Golem HP |
 | --- | --- | --- | --- |
@@ -748,15 +752,81 @@ defaulting to 1, so existing call sites are unaffected). `BattleUnitFactory.Crea
 level it assembled the stats at. The avatar has no progression level, so the statful
 `BattleAvatar.Create` takes a per-battle level (default 1) — see "What is not settled yet".
 
-**Deliberately deferred:** random variance, critical hits and a same-element attack bonus (STAB).
-Variance and crits would make a battle non-deterministic, and the headless balance simulator needs a
-fixed roster and seed to give the same result every run; STAB is a balance lever to add once there
-are fights to measure it against. Stat-scaled healing is deferred likewise — heals stay flat.
+**Still deferred:** a same-element attack bonus (STAB), a balance lever to add once there are
+fights to measure it against, and stat-scaled healing — heals stay flat, with no variance. Random
+variance and critical hits were deferred here at first, because they make a battle random and the
+balance simulator needed a fixed answer per seed; they are now in, reproducible from the battle's
+seed (below).
+
+### Variance and critical hits — DECIDED (user); the numbers are TUNABLE DEFAULTS
+
+**User decisions:** hit damage is random with modest variance, and every beast has a
+critical-hit chance of its own that skills and gear can raise. The numbers are lead defaults backed
+by desk research — [`docs/balance/research-crit-variance-speed.md`](../balance/research-crit-variance-speed.md)
+(variance and crit conventions in comparable games, expected-value and sample-size notes, and the
+decisions taken for Beast Craft) — and are named constants on `DamageFormula`:
+
+| Constant | Value | Meaning |
+| --- | --- | --- |
+| `VarianceMinPercent` / `VarianceMaxPercent` | 90 / 110 | The variance roll: a whole percent, uniform, both ends inclusive (`rng.Next(90, 111)`). Tighter than Pokémon's 85–100%, so a player can still plan on lethal thresholds. |
+| `CritMultiplier` | 1.5 | What a critical hit multiplies the hit by. |
+| `MinCritChance` / `MaxCritChance` | 0 / 100 | The crit chance is clamped into this range when it is rolled. |
+
+- **Order of operations:** `base × element × crit × roll / 100`, truncated once, then floored at
+  `MinimumDamage` (1). `Power <= 0` still deals 0 whatever the rolls. A 100% roll is applied as no
+  multiplication at all, so the deterministic numbers are bit-exact. The 0x-immunity note above
+  still holds: if an immunity is ever added, it must return 0 before the floor, and neither a crit
+  nor a high roll may lift it.
+- **Crit chance is a stat.** `StatType.CritChance` (value 7, appended; nothing renumbered) and
+  `StatBlock.CritChance`, an integer percent. The roll is `rng.Next(100) < chance`, with the
+  caster's *current effective* chance clamped into [0, 100], so 0 never crits and 100 (or more)
+  always does. The target plays no part — there is no crit resistance.
+- **It does not scale with level**, exactly like `MoveRange` (`GetStatAtLevel` returns the authored
+  base): a chance authored in single digits would round to 0 or 1 under a 0.15 level-1 scale.
+- **Skills and gear raise it through the existing paths.** `BuffStat` / `DebuffStat` with
+  `AffectedStat = CritChance` move it like any stat (timed or instant, clamped at 0, reverted on the
+  affected unit's own turns). A `StatModifier` on `CritChance` adds flat then percent in
+  `StatCalculator`, with the ordinary 0 floor (not the HP floor of 1) and no ceiling — a block may
+  hold more than 100, and the excess is simply wasted when the chance is clamped at roll time, which
+  also keeps a timed buff's reversion exact.
+- **Crit damage is not a stat** (deferred; if added, gear- and skill-only, per the research).
+- **Heals, buffs and debuffs never roll.** Variance and crits apply to damage only.
+
+**The rng and the draw order.** The battle's one `System.Random` — the `rng` `BattleTurnExecutor`
+already carries for `ExecuteTurn` / `RunBattle` — is threaded through
+`SkillEffectApplier.Apply(activation, caster, rng)` into `DamageFormula.Roll(caster, target, skill,
+power, rng)`. Each damage effect that lands on a target draws **exactly two numbers, crit first,
+then variance**, always both — even at a 0% or 100% chance or zero power — so the number of draws
+never depends on stats. Draws happen in the order the battle fires skills: the unit's ready slots in
+stack order, then the avatar's activations; within a skill, target-major and then in authored effect
+order; an effect skipped because its target is already defeated draws nothing. Targeting draws from
+the same stream only for `SkillTargetingCriterion.Random`. A battle is therefore random but
+reproducible: the same seed replays it exactly.
+
+**The deterministic fallback.** A `null` rng means a 100% roll and no crit, and draws nothing.
+`DamageFormula.Compute(caster, target, skill, power)`, the raw `Compute(level, power, attack,
+defense, element)` and the two-argument `SkillEffectApplier.Apply(activation, caster)` are that
+fallback, so every exact-number example in this document and every existing exact-number test still
+holds. Tests pin specific rolls with `Compute(level, power, attack, defense, element,
+variancePercent, isCrit)`.
+
+**Reporting.** `DamageFormula.Roll` returns a `DamageRoll` (amount, `IsCrit`, `VariancePercent`),
+and `SkillEffectApplier` records one `DamageHit` (target plus roll) per landed damage effect on
+`SkillActivation.Hits`, so a battle log or the simulator can tell a crit from an ordinary hit. It is a
+record on the activation, not an event system.
+
+**Roster values** (user-approved; `BaseStats.CritChance` in `beast-roster.json`): Thunderbird 15,
+Basilisk 12, Phoenix 10, Griffin 8, Tarasque 6, Kirin 5, Frost Wyrm 5, Leviathan 3, Treant 3,
+Golem 2 — the fast strikers and casters high, the tanks low. Crit chance is **outside** the six-stat
+budget, like move range. At these values crits add 1–7.5% to a beast's average damage
+(`1 + 0.5 × chance`); the variance roll averages 100% and adds none.
 
 ## Stat assembly and move range
 
 **Move range is a stat — DECIDED.** `StatType.MoveRange` (value 6, appended; the existing axes are
-never renumbered) and `StatBlock.MoveRange` sit alongside the six combat axes. Each species authors a
+never renumbered) and `StatBlock.MoveRange` sit alongside the six combat axes. (`StatType.CritChance`,
+value 7, follows the same pattern — exempt from level scaling, moved by gear and buffs; see "Damage
+formula".) Each species authors a
 base move range in its `BaseStats`, and from there it behaves like any other stat with one
 exception:
 
@@ -779,12 +849,15 @@ turn's movement budget *after* expiring timed modifiers, and still treats a nega
 **Stat assembly — engineering default, not confirmed balance.** `StatCalculator` builds a unit's
 starting stat block from its species, level and equipped gear. Per stat axis, in order:
 
-1. **Base at level** — `CreatureSpeciesSO.GetStatAtLevel` (growth-curve scaled, except `MoveRange`).
+1. **Base at level** — `CreatureSpeciesSO.GetStatAtLevel` (growth-curve scaled, except `MoveRange`
+   and `CritChance`).
 2. **Plus every `FlatBonus`** on that axis, summed across all equipped gear.
 3. **Times `1 + (the sum of every PercentBonus)`** on that axis, applied once. Percentages add rather
    than compound (two +10% items are +20%), so gear order never matters, and they apply after the
    flat bonuses, so a percentage also scales what gear added.
 4. **Rounded to the nearest integer and clamped** — every stat at least 0, `HP` at least 1.
+   `CritChance` has no ceiling here; it is clamped to 100 when rolled (see "Variance and critical
+   hits").
 
 Gear whose `MinimumLevel` is above the creature's level contributes nothing; refusing the equip is
 the equipment screen's job, but an under-levelled item never grants stats whatever state a loadout
@@ -895,18 +968,18 @@ express each archetype: they were tuned by hand against the headless balance sim
 draft alongside). Nothing here is confirmed balance; the numbers are expected to move again once
 skills and real encounters exist.
 
-| SpeciesId | Beast | Element | Archetype | Stance | Curve | HP | ATK | DEF | SpA | SpD | SPE | Six-stat total | Move |
-| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `phoenix` | Phoenix | Fire | Glass cannon | Ranged | medium | 100 | 125 | 75 | 140 | 90 | 100 | 630 | 4 |
-| `leviathan` | Leviathan | Water | Tank | Vanguard | medium | 125 | 85 | 125 | 85 | 95 | 55 | 570 | 3 |
-| `golem` | Golem | Earth | Pure wall | Vanguard | medium | 160 | 105 | 150 | 70 | 105 | 40 | 630 | 2 |
-| `griffin` | Griffin | Air | Fast skirmisher | Skirmisher | medium | 105 | 115 | 90 | 90 | 90 | 115 | 605 | 5 |
-| `thunderbird` | Thunderbird | Lightning | Burst striker | Skirmisher | medium | 100 | 125 | 80 | 120 | 85 | 120 | 630 | 4 |
-| `frost_wyrm` | Frost Wyrm | Ice | Control / attrition | Vanguard | medium | 95 | 75 | 120 | 100 | 115 | 80 | 585 | 3 |
-| `treant` | Treant | Nature | Support-tank | Vanguard | medium | 130 | 85 | 95 | 90 | 120 | 50 | 570 | 3 |
-| `tarasque` | Tarasque | Metal | Armored bruiser | Vanguard | medium | 115 | 140 | 130 | 55 | 80 | 75 | 595 | 3 |
-| `kirin` | Kirin | Light | Support caster | Ranged | medium | 100 | 50 | 80 | 135 | 120 | 95 | 580 | 4 |
-| `basilisk` | Basilisk | Dark | Ranged assassin | Ranged | medium | 100 | 95 | 80 | 150 | 95 | 110 | 630 | 5 |
+| SpeciesId | Beast | Element | Archetype | Stance | Curve | HP | ATK | DEF | SpA | SpD | SPE | Six-stat total | Move | Crit |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `phoenix` | Phoenix | Fire | Glass cannon | Ranged | medium | 100 | 125 | 75 | 140 | 90 | 100 | 630 | 4 | 10% |
+| `leviathan` | Leviathan | Water | Tank | Vanguard | medium | 125 | 85 | 125 | 85 | 95 | 55 | 570 | 3 | 3% |
+| `golem` | Golem | Earth | Pure wall | Vanguard | medium | 160 | 105 | 150 | 70 | 105 | 40 | 630 | 2 | 2% |
+| `griffin` | Griffin | Air | Fast skirmisher | Skirmisher | medium | 105 | 115 | 90 | 90 | 90 | 115 | 605 | 5 | 8% |
+| `thunderbird` | Thunderbird | Lightning | Burst striker | Skirmisher | medium | 100 | 125 | 80 | 120 | 85 | 120 | 630 | 4 | 15% |
+| `frost_wyrm` | Frost Wyrm | Ice | Control / attrition | Vanguard | medium | 95 | 75 | 120 | 100 | 115 | 80 | 585 | 3 | 5% |
+| `treant` | Treant | Nature | Support-tank | Vanguard | medium | 130 | 85 | 95 | 90 | 120 | 50 | 570 | 3 | 3% |
+| `tarasque` | Tarasque | Metal | Armored bruiser | Vanguard | medium | 115 | 140 | 130 | 55 | 80 | 75 | 595 | 3 | 6% |
+| `kirin` | Kirin | Light | Support caster | Ranged | medium | 100 | 50 | 80 | 135 | 120 | 95 | 580 | 4 | 5% |
+| `basilisk` | Basilisk | Dark | Ranged assassin | Ranged | medium | 100 | 95 | 80 | 150 | 95 | 110 | 630 | 5 | 12% |
 
 Stats are max-level values (curve scale 1). **All ten beasts share the `medium` growth curve for
 now, by user decision**; differentiating curves per beast is deferred to the headless balance
@@ -926,7 +999,10 @@ simulator. The drafting rules:
   They remain the least bulky beasts. The ATB gauge (decision 3) has since made Speed an action
   economy, and the roster has **not** been re-tuned for it; see the tuned report and tuning log.
 - **Move range in a small band (2–5)**, outside the budget. Griffin and Basilisk are the mobile
-  ends (5); Golem is the only 2. "Range" in the archetypes means move range, the per-turn hex
+  ends (5); Golem is the only 2.
+- **Crit chance in a small band (0–25%)**, also outside the budget and not level-scaled (user-approved
+  values; see "Variance and critical hits"). The roster tests pin the ten values and the band; the
+  validator only requires a percent (0–100). "Range" in the archetypes means move range, the per-turn hex
   movement budget — skill reach is authored per skill.
 - **Telling the defensive beasts apart.** Golem absorbs (the highest HP and Defense, the lowest Speed
   and move range); Tarasque absorbs and hits back (Defense *and* the highest Attack); Leviathan
@@ -947,7 +1023,8 @@ level-1 stat 0 (the fresh-asset default still does exactly that), so authored cu
 
 - **scale at max level is exactly 1** — `BaseStats` are the species' *max-level* stats;
 - **scale at level 1 is a sensible fraction above 0** (0.10–0.20), so a level-1 beast is a weak but
-  real version of its adult self; the roster tests check every stat is at least 1 at level 1;
+  real version of its adult self; the roster tests check every stat is at least 1 at level 1
+  (crit chance may be 0);
 - scale never decreases, and the curve is **piecewise-linear** between its authored points (the
   importer sets linear tangents, so Unity evaluates exactly the numbers in the JSON).
 
@@ -960,7 +1037,8 @@ in the file, unused, as ready-made shapes for the balance simulator to assign:
 | `medium` | Linear | 0 → 0.15, 1 → 1 | All ten beasts |
 | `slow` | Back-loaded: weak early, surges late | 0 → 0.10, 0.5 → 0.40, 0.75 → 0.65, 1 → 1 | — (unused) |
 
-`MoveRange` is exempt from curves (see "Stat assembly and move range").
+`MoveRange` and `CritChance` are exempt from curves (see "Stat assembly and move range" and
+"Variance and critical hits").
 
 ### JSON is the source of truth; Unity assets are generated
 
@@ -972,10 +1050,11 @@ this repo does not track, and cannot be verified without an Editor.
 
 The file holds `GrowthCurves` (`CurveId`, `MaxLevel`, `Keys` of `Progress`/`Scale`) and `Species`
 (`SpeciesId`, `DisplayName`, `Description`, `Elements` as enum names, `GrowthCurveId`, `Stance` as a
-`CombatStance` name — missing means Vanguard — and `BaseStats` including `MoveRange`). Its C# shape is `BeastCraft.Creatures.Roster.BeastRosterData` in the Runtime
+`CombatStance` name — missing means Vanguard — and `BaseStats` including `MoveRange` and
+`CritChance`). Its C# shape is `BeastCraft.Creatures.Roster.BeastRosterData` in the Runtime
 assembly, and `BeastRosterValidator` holds the structural rules (well-formed unique snake_case ids,
-parseable elements, resolvable curve ids, curve sanity, every stat at least 1, a stance that is a
-`CombatStance` name if given).
+parseable elements, resolvable curve ids, curve sanity, every stat at least 1 except `CritChance`,
+which must be a percent from 0 to 100, and a stance that is a `CombatStance` name if given).
 
 **Workflow:** edit the JSON, then open the project in Unity and run **Beast Craft → Data → Import
 Beast Roster**. The importer (`BeastCraft.Editor.Data.BeastRosterImporter`):
@@ -1180,6 +1259,21 @@ three Ranged beasts fall from the top of the ATB table to around zero (the stand
 most of what they gave up), Griffin leads (+24.6 / +23.2 overall), Golem remains last but closer
 (−25.0 / −15.8), and the `elemental` spread is −25.0 … +24.6; the tuning log has the before/after
 tables and why the pack encounter's new lowest-HP targeting exaggerates Griffin and Thunderbird.
+
+**Damage variance and critical hits have since been added** (user decision; "Variance and critical
+hits" under "Damage formula"), again without re-tuning beyond the new crit values: `StatType.CritChance`
+/ `StatBlock.CritChance` (curve-exempt, raised by `BuffStat` and gear), the variance and crit
+constants and `Roll` / `RollCrit` / `RollVariance` / `ClampCritChance` on `DamageFormula`, the
+`DamageRoll` and `DamageHit` records and `SkillActivation.Hits`, and the rng threaded from
+`BattleTurnExecutor` through `SkillEffectApplier.Apply(activation, caster, rng)`; the two-argument
+`Apply` and the rng-free `Compute` overloads remain as the deterministic fallback. The roster and
+the simulator fixtures gained `CritChance`. Battles are now random but seeded, so the simulator runs
+each team and fight `--samples` times (default 5) with distinct seeds and calibrates on the sampled
+clear rate; its report adds a per-beast crit table (observed crit rates match the authored chances).
+EditMode tests cover the explicit-roll formula, the order of operations and the floor, the null-rng
+fallback, the two-draw order, clamping, the growth-curve exemption, crit buffs, debuffs and gear,
+hit recording, flat heals and seeded determinism. The marginal clear rates move by less than the
+seed-to-seed noise; the tuning log has the tables.
 
 Every pass so far is deliberately **data structures and algorithms only** — no MonoBehaviours, no
 scene or prefab wiring, and no committed `.asset` instances (the roster's are generated in-Editor). The hex radii backing each arena preset

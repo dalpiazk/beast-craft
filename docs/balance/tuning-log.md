@@ -330,3 +330,86 @@ Thunderbird +2.1 / +1.4, Griffin +14.0 / +8.9, Basilisk +2.6 / −2.2, Phoenix �
 −10.8, Golem −18.6 / −13.6. No PvE battle stalemates in either run, and none in PvP. Re-tuning for stances (and
 re-deriving `StrikePower`, or giving Ranged beasts a kit of their own) is the next tuning question
 and is not part of this change.
+
+## After variance and crits
+
+Damage gained a uniform 90–110% variance roll and a per-beast critical-hit chance (x1.5), by user
+decision (design doc, "Variance and critical hits"; research in
+[`research-crit-variance-speed.md`](research-crit-variance-speed.md)). The only stat change is the
+new, user-approved `CritChance` on every species (Thunderbird 15, Basilisk 12, Phoenix 10, Griffin 8,
+Tarasque 6, Kirin 5, Frost Wyrm 5, Leviathan 3, Treant 3, Golem 2) and on the fixtures (5 each, the
+direwolves 8); the six combat stats, kit, fixtures otherwise, and seed are unchanged, and nothing was
+re-tuned. Battles are now random but seeded, so the simulator runs every team and fight 5 times
+(`--samples 5`, 1050 battles per calibration step, about 130 s for the default run on 8 threads)
+and calibrates on the sampled clear rate. `tuned-report.md` was regenerated; its new crit table
+shows every beast's observed crit rate within 0.1 points of its authored chance and its average roll
+multiplier on `1 + 0.5 x chance` (1.009 for Golem to 1.075 for Thunderbird).
+
+Overall marginal clear rate, levels and encounters averaged (points; "stances" is the previous
+section's "stances" column, one deterministic battle per team; "+ crits" is the mean over 5 seeded
+samples per team):
+
+| Beast | Stance | Crit | `elemental` stances | `elemental` + crits | `neutral` stances | `neutral` + crits |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| Thunderbird | Skirmisher | 15% | +1.6 | +3.8 | −2.4 | +0.6 |
+| Griffin | Skirmisher | 8% | +24.6 | +26.3 | +23.2 | +22.6 |
+| Basilisk | Ranged | 12% | +3.8 | +4.1 | −0.2 | +0.1 |
+| Phoenix | Ranged | 10% | −0.4 | −1.4 | +2.2 | +0.6 |
+| Kirin | Ranged | 5% | +4.7 | +2.8 | +3.4 | +5.6 |
+| Frost Wyrm | Vanguard | 5% | +13.3 | +11.5 | +11.7 | +9.3 |
+| Tarasque | Vanguard | 6% | +0.1 | −0.4 | +5.8 | +3.5 |
+| Leviathan | Vanguard | 3% | −7.2 | −9.7 | −12.7 | −12.3 |
+| Treant | Vanguard | 3% | −15.6 | −14.1 | −15.2 | −11.6 |
+| Golem | Vanguard | 2% | −25.0 | −22.8 | −15.8 | −18.5 |
+
+Per encounter, levels averaged:
+
+`elemental`:
+
+| Beast | `boss` stances | `boss` + crits | `swarm` stances | `swarm` + crits | `pack` stances | `pack` + crits |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Thunderbird | +18.0 | +20.7 | +12.3 | +8.1 | −25.4 | −17.5 |
+| Griffin | +15.3 | +18.1 | +16.3 | +19.7 | +42.1 | +41.1 |
+| Basilisk | +8.7 | +9.6 | −1.6 | +0.7 | +4.4 | +2.1 |
+| Phoenix | −0.5 | −0.4 | −2.9 | −2.4 | +2.4 | −1.2 |
+| Kirin | +2.8 | −0.4 | −1.6 | −2.4 | +13.0 | +11.2 |
+| Frost Wyrm | +12.0 | +3.8 | +16.9 | +19.3 | +11.0 | +11.3 |
+| Tarasque | +11.4 | +7.0 | −9.5 | −5.6 | −1.6 | −2.5 |
+| Leviathan | −24.3 | −22.5 | +11.0 | +4.2 | −8.2 | −10.9 |
+| Treant | −25.7 | −22.0 | −15.5 | −13.4 | −5.6 | −6.9 |
+| Golem | −17.7 | −13.7 | −25.4 | −28.1 | −32.0 | −26.7 |
+
+`neutral`:
+
+| Beast | `boss` stances | `boss` + crits | `swarm` stances | `swarm` + crits | `pack` stances | `pack` + crits |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Thunderbird | +18.0 | +17.7 | −11.5 | −6.3 | −13.6 | −9.5 |
+| Griffin | +15.3 | +22.8 | +27.5 | +26.6 | +26.7 | +18.4 |
+| Basilisk | +8.7 | +8.9 | −12.8 | −12.4 | +3.6 | +3.8 |
+| Phoenix | −0.5 | −1.1 | −6.2 | −6.2 | +13.5 | +9.0 |
+| Kirin | +2.8 | −0.2 | −1.6 | +1.7 | +8.9 | +15.4 |
+| Frost Wyrm | +12.0 | +4.6 | +18.3 | +16.5 | +4.9 | +6.8 |
+| Tarasque | +11.4 | +5.8 | −2.9 | −2.9 | +8.9 | +7.7 |
+| Leviathan | −24.3 | −21.3 | +3.7 | +2.9 | −17.6 | −18.3 |
+| Treant | −25.7 | −21.3 | −4.9 | −3.4 | −14.9 | −10.0 |
+| Golem | −17.7 | −15.8 | −9.5 | −16.4 | −20.2 | −23.4 |
+
+**Noise.** Rerunning the new build with a second base seed (`--seed 777`, same 5 samples) moves a
+beast's overall marginal by 2.1 points on average and at most 3.7 (Treant, `elemental`) and 4.8
+(Griffin, `neutral`); single encounter cells move by up to 8.9. (A different base seed also
+reshuffles team slots and which half of the teams wins initiative ties, so this is an upper bound on
+roll noise alone.) Every before → after change in the overall table is within that band (largest
+3.6: Treant `neutral`, Golem `elemental` +2.2), so **variance and crits at these values do not
+measurably move the roster's balance**; the ranking and the main flags (Griffin and Frost Wyrm high;
+Golem, Treant and Leviathan low; Golem no niche, Griffin no weakness) are the same as with stances
+alone. Only threshold flags changed: Frost Wyrm is no longer top 3 against every encounter in
+`elemental` mode (its `boss` marginal +12.0 → +3.8), and in `neutral` mode Tarasque (+5.8 → +3.5)
+drops under the ±5 flag while Kirin (+3.4 → +5.6) crosses it. Sampling also removed the one
+calibration miss (`neutral` `pack` L1, 39.0% before): with 5 samples per team the clear-rate curve
+has no step that a multiplier cannot split. That is the expected size: the highest crit chance adds 7.5% to Thunderbird's
+average damage, about what one or two points of `Attack` share do, and the variance roll averages
+out. The one visible effect is on the Thunderbird / Leviathan–Treant tails of single encounter cells
+(for example Thunderbird's `pack` −25.4 → −17.5 `elemental`), which is within the per-cell noise.
+PvP 1v1 moves no more than a few points per beast (`neutral`: Thunderbird 88.9% → 90.0%, Griffin
+92.6% → 89.3%); no PvE or PvP battle stalemates. The standard kit's physical share is unchanged
+(37–46%).

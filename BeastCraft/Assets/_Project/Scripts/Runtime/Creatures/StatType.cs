@@ -23,6 +23,15 @@ namespace BeastCraft.Creatures
         /// <see cref="CreatureSpeciesSO.GetStatAtLevel"/>), but that gear modifiers and
         /// buff/debuff effects move like any other stat.
         /// </summary>
-        MoveRange = 6
+        MoveRange = 6,
+
+        /// <summary>
+        /// The percent chance (0-100) that a damage effect this unit lands is a critical hit (see
+        /// <see cref="BeastCraft.Battle.DamageFormula.CritMultiplier"/>). A species-authored base
+        /// that, like <see cref="MoveRange"/>, does <em>not</em> scale with level, but that gear
+        /// modifiers and buff/debuff effects move like any other stat. Values outside 0-100 are
+        /// legal in a stat block and are clamped only when the chance is rolled.
+        /// </summary>
+        CritChance = 7
     }
 }

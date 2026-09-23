@@ -12,6 +12,9 @@ namespace BeastCraft.Tooling.BalanceSim
         public KitMode Mode;
         public int Level;
 
+        /// <summary>Which of the pairing's <c>--samples</c> repeats this is (its seed differs).</summary>
+        public int Sample;
+
         /// <summary>Species index (into the loaded roster) fielded on the player side.</summary>
         public int PlayerIndex;
 
@@ -45,7 +48,8 @@ namespace BeastCraft.Tooling.BalanceSim
         /// sides swapped (A as player vs B as enemy, then B as player vs A as enemy). The ids per side
         /// stay fixed, so the ordinal-id tie break between equally full, equally fast gauges favours each
         /// beast exactly once per pairing.
-        /// Mirror matches are skipped.
+        /// Mirror matches are skipped. Each of those games is played <see cref="SimOptions.Samples"/>
+        /// times with distinct seeds, since damage variance and crits make a battle random.
         /// </summary>
         public static List<BattleRecord> Run(SimOptions options, IReadOnlyList<CreatureSpeciesSO> species)
         {
@@ -59,8 +63,11 @@ namespace BeastCraft.Tooling.BalanceSim
                     {
                         for (int b = a + 1; b < species.Count; b++)
                         {
-                            records.Add(RunOne(options, species, mode, level, a, b));
-                            records.Add(RunOne(options, species, mode, level, b, a));
+                            for (int s = 0; s < options.Samples; s++)
+                            {
+                                records.Add(RunOne(options, species, mode, level, a, b, s));
+                                records.Add(RunOne(options, species, mode, level, b, a, s));
+                            }
                         }
                     }
                 }
@@ -69,7 +76,8 @@ namespace BeastCraft.Tooling.BalanceSim
             return records;
         }
 
-        private static BattleRecord RunOne(SimOptions options, IReadOnlyList<CreatureSpeciesSO> species, KitMode mode, int level, int playerIndex, int enemyIndex)
+        private static BattleRecord RunOne(SimOptions options, IReadOnlyList<CreatureSpeciesSO> species, KitMode mode, int level, int playerIndex, int enemyIndex,
+                                           int sample)
         {
             HexGrid grid = new HexGrid(SimOptions.PvpArena);
             FindStartTiles(grid, out HexCoordinate playerTile, out HexCoordinate enemyTile);
@@ -89,13 +97,14 @@ namespace BeastCraft.Tooling.BalanceSim
 
             BattleUnit[] units = { player, enemy };
             TurnManager turnManager = new TurnManager(units);
-            System.Random rng = new System.Random(DeriveSeed(options.Seed, mode, level, playerIndex, enemyIndex));
+            System.Random rng = new System.Random(DeriveSeed(options.Seed, mode, level, playerIndex, enemyIndex, sample));
             BattleResult result = BattleTurnExecutor.RunBattle(turnManager, units, grid, rng, null, options.MaxTime);
 
             BattleRecord record = new BattleRecord
             {
                 Mode = mode,
                 Level = level,
+                Sample = sample,
                 PlayerIndex = playerIndex,
                 EnemyIndex = enemyIndex,
                 Outcome = result.Outcome,
@@ -153,7 +162,7 @@ namespace BeastCraft.Tooling.BalanceSim
         /// A per-battle seed that is a pure function of the inputs (never <c>string.GetHashCode</c>,
         /// which is randomised per process), so every battle's RNG is reproducible in isolation.
         /// </summary>
-        private static int DeriveSeed(int seed, KitMode mode, int level, int playerIndex, int enemyIndex)
+        private static int DeriveSeed(int seed, KitMode mode, int level, int playerIndex, int enemyIndex, int sample)
         {
             unchecked
             {
@@ -162,6 +171,7 @@ namespace BeastCraft.Tooling.BalanceSim
                 hash = (hash * 486187739) + level;
                 hash = (hash * 486187739) + playerIndex;
                 hash = (hash * 486187739) + enemyIndex;
+                hash = (hash * 486187739) + sample;
                 return hash;
             }
         }

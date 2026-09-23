@@ -284,6 +284,13 @@ namespace BeastCraft.Tooling.BalanceSim
                     errors.Add(groupWhere + ": BaseStats needs Hp >= 1 and MoveRange >= 1.");
                 }
 
+                // Same structural rule the roster validator applies: a crit chance is a percent.
+                if (group.BaseStats.CritChance < BeastRosterValidator.MinCritChance || group.BaseStats.CritChance > BeastRosterValidator.MaxCritChance)
+                {
+                    errors.Add(groupWhere + ": BaseStats.CritChance must be between " + BeastRosterValidator.MinCritChance + " and " +
+                               BeastRosterValidator.MaxCritChance + ".");
+                }
+
                 if (group.Skills == null || group.Skills.Length == 0)
                 {
                     errors.Add(groupWhere + ": no skills.");

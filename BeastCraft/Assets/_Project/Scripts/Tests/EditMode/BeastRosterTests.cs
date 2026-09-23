@@ -12,8 +12,9 @@ namespace BeastCraft.Tests.EditMode
     /// Checks the authored starter roster (<c>Data/Creatures/beast-roster.json</c>) straight from the
     /// JSON, so it runs without the imported assets existing. Structural rules come from
     /// <see cref="BeastRosterValidator"/>; the roster-shape and first-draft balance guidelines
-    /// (ten beasts, one per element, the stat budget band, the move-range band) live here, where
-    /// the balance pass can deliberately move them.
+    /// (ten beasts, one per element, the stat budget band, the move-range band, the crit-chance
+    /// band) live here, where the balance pass can deliberately move them. The six-stat budget is
+    /// the six combat stats only: <c>MoveRange</c> and <c>CritChance</c> sit outside it.
     /// </summary>
     public class BeastRosterTests
     {
@@ -22,6 +23,8 @@ namespace BeastCraft.Tests.EditMode
         private const float BudgetTolerance = 0.05f;
         private const int MinMoveRange = 2;
         private const int MaxMoveRange = 5;
+        private const int MinCritChance = 0;
+        private const int MaxCritChance = 25;
 
         private readonly List<ScriptableObject> _created = new List<ScriptableObject>();
 
@@ -97,6 +100,55 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
+        public void Roster_CritChanceStaysInBand()
+        {
+            foreach (SpeciesData species in LoadRoster().Species)
+            {
+                Assert.That(species.BaseStats.CritChance, Is.InRange(MinCritChance, MaxCritChance), species.SpeciesId);
+            }
+        }
+
+        [Test]
+        public void Roster_CritChancesMatchTheApprovedValues()
+        {
+            // User decision: crit chance varies per beast, highest on the fast strikers and casters.
+            Dictionary<string, int> expected = new Dictionary<string, int>
+            {
+                { "thunderbird", 15 },
+                { "basilisk", 12 },
+                { "phoenix", 10 },
+                { "griffin", 8 },
+                { "tarasque", 6 },
+                { "kirin", 5 },
+                { "frost_wyrm", 5 },
+                { "leviathan", 3 },
+                { "treant", 3 },
+                { "golem", 2 }
+            };
+
+            foreach (SpeciesData species in LoadRoster().Species)
+            {
+                Assert.AreEqual(expected[species.SpeciesId], species.BaseStats.CritChance, species.SpeciesId);
+            }
+        }
+
+        [Test]
+        public void Validator_RejectsCritChanceOutsideAPercent_AndAcceptsZero()
+        {
+            BeastRosterData roster = LoadRoster();
+            roster.Species[0].BaseStats.CritChance = -1;
+            roster.Species[1].BaseStats.CritChance = 101;
+            roster.Species[2].BaseStats.CritChance = 0;
+            roster.Species[3].BaseStats.CritChance = 100;
+
+            List<string> errors = BeastRosterValidator.Validate(roster);
+
+            Assert.AreEqual(2, errors.Count, string.Join("\n", errors));
+            Assert.IsTrue(errors.Exists(e => e.Contains("CritChance is -1")), string.Join("\n", errors));
+            Assert.IsTrue(errors.Exists(e => e.Contains("CritChance is 101")), string.Join("\n", errors));
+        }
+
+        [Test]
         public void Roster_AllSpeciesShareTheMediumCurveForNow()
         {
             // User decision: one shared curve until the balance simulator differentiates them.
@@ -145,7 +197,9 @@ namespace BeastCraft.Tests.EditMode
 
                 foreach (StatType stat in (StatType[])Enum.GetValues(typeof(StatType)))
                 {
-                    Assert.That(species.GetStatAtLevel(stat, 1), Is.GreaterThanOrEqualTo(1), data.SpeciesId + " " + stat + " at level 1");
+                    // CritChance is a chance, not a combat stat: 0 is legal (see the crit band test).
+                    int floor = stat == StatType.CritChance ? 0 : 1;
+                    Assert.That(species.GetStatAtLevel(stat, 1), Is.GreaterThanOrEqualTo(floor), data.SpeciesId + " " + stat + " at level 1");
                     Assert.AreEqual(data.BaseStats.GetStat(stat), species.GetStatAtLevel(stat, curveData.MaxLevel), data.SpeciesId + " " + stat + " at max level");
                 }
             }

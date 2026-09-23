@@ -13,7 +13,9 @@ namespace BeastCraft.Avatar
     /// damage formula's caster level for the avatar is a per-battle input to
     /// <c>BattleAvatar.Create</c>, not something stored here.) <see cref="StatBlock.MoveRange"/>
     /// and <see cref="StatBlock.Speed"/> are carried for completeness but mean nothing for a
-    /// participant that is off the grid and takes no initiative turn.
+    /// participant that is off the grid and takes no initiative turn. <see cref="StatBlock.CritChance"/>
+    /// does apply: the avatar's damage effects roll crits off it like a beast's (0 by default, so
+    /// an avatar crits only if its base or its gear gives it a chance).
     /// </para>
     /// <para>
     /// Namespace note: <c>BeastCraft.Avatar</c> hides <c>UnityEngine.Avatar</c> (Mecanim's rig

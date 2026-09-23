@@ -13,8 +13,8 @@ namespace BeastCraft.Battle
     /// <list type="number">
     /// <item><description>
     /// Base at level — <see cref="CreatureSpeciesSO.GetStatAtLevel"/>, which scales every axis by
-    /// the species' growth curve except <see cref="StatType.MoveRange"/>, which it returns as
-    /// authored.
+    /// the species' growth curve except <see cref="StatType.MoveRange"/> and
+    /// <see cref="StatType.CritChance"/>, which it returns as authored.
     /// </description></item>
     /// <item><description>
     /// Plus the sum of every <see cref="StatModifier.FlatBonus"/> on that axis.
@@ -29,7 +29,9 @@ namespace BeastCraft.Battle
     /// Rounded to the nearest whole number (<see cref="Mathf.RoundToInt"/>, the same rounding
     /// the growth curve uses), then clamped: every stat at least 0, and <see cref="StatType.HP"/>
     /// at least 1, so no amount of cursed gear can field a unit that enters a battle already at
-    /// 0 HP.
+    /// 0 HP. <see cref="StatType.CritChance"/> takes the ordinary 0 floor and no ceiling here: a
+    /// block may carry more than 100, and <see cref="DamageFormula.RollCrit"/> clamps the chance
+    /// into 0-100 when it rolls, so stacking crit gear past 100 is wasted rather than an error.
     /// </description></item>
     /// </list>
     /// </para>
@@ -71,7 +73,8 @@ namespace BeastCraft.Battle
             StatType.SpecialAttack,
             StatType.SpecialDefense,
             StatType.Speed,
-            StatType.MoveRange
+            StatType.MoveRange,
+            StatType.CritChance
         };
 
         /// <summary>
