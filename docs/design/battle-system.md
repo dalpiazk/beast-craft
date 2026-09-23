@@ -752,8 +752,8 @@ in the file, unused, as ready-made shapes for the balance simulator to assign:
 ### JSON is the source of truth; Unity assets are generated
 
 The roster lives in **`BeastCraft/Assets/_Project/Data/Creatures/beast-roster.json`**, not in
-hand-authored `.asset` files. A plain JSON file is readable and diffable outside Unity — the future
-headless balance simulator will read it directly with `System.Text.Json` (`IncludeFields = true`;
+hand-authored `.asset` files. A plain JSON file is readable and diffable outside Unity — the
+headless balance simulator (`Tooling/BalanceSim`) reads it directly with `System.Text.Json` (`IncludeFields = true`;
 keys are the C# field names exactly) — whereas `.asset` YAML references its scripts by `.meta` GUIDs
 this repo does not track, and cannot be verified without an Editor.
 
@@ -878,14 +878,34 @@ importer (the first Editor script, and the first `UnityEditor` stubs in `Tooling
 EditMode tests that check the JSON directly: structure, the ten pinned ids, one beast per element,
 the stat-budget and move-range bands, and the curve semantics.
 
+The headless balance simulator (`Tooling/BalanceSim/`, see its README) is **local-only tooling, not a
+CI job**. It compiles the `Runtime` scripts against the committed UnityStub, reads
+`beast-roster.json` with `System.Text.Json`, and runs a deterministic 1v1 round-robin of the roster
+through the real `BattleUnitFactory` / `TurnManager` / `BattleTurnExecutor.RunBattle` on a Medium
+`HexGrid`, every pairing played twice with the sides swapped so the ordinal-id speed-tie break
+favours neither beast. Because no skills are authored yet, every beast fights with the same standard
+kit (Blast: special, power 40, range 3, cooldown 2; Strike: physical, power 40, range 1, cooldown 1),
+in an `elemental` mode (kit in the beast's element) and a `neutral` mode (kit `Element.None`, which
+isolates the stat lines from the chart). The committed baseline at
+[`docs/balance/baseline-report.md`](../balance/baseline-report.md) (levels 1/25/50/100) is an input to
+the roster discussion, not a decision. In short: fights are short (about four rounds at every level
+in both modes) with no stalemates, win rates are almost flat across levels, and the bulky beasts
+dominate — in `neutral` mode Leviathan wins 96%, Golem 89% and Treant 82%, while Thunderbird (11%),
+Phoenix (17%), Basilisk (19%) and Kirin (31%) sit far below the 40% line; the element chart
+compresses that spread in `elemental` mode (Leviathan 78%, Basilisk 19%) but does not change who is
+on top. How much of this is the stat lines and how much is the 1v1, standard-kit setup (which rewards
+raw bulk, and weights `Attack` about twice as heavily as `SpecialAttack` because Strike fires twice as
+often as Blast) is itself a design question the report is meant to prompt.
+
 Every pass so far is deliberately **data structures and algorithms only** — no MonoBehaviours, no
 scene or prefab wiring, and no committed `.asset` instances (the roster's are generated in-Editor). The hex radii backing each arena preset
 are placeholder implementation defaults chosen to be tunable, not producer-confirmed balance
 numbers, and the deployment-zone split, the effect rules and the element chart above are the same
 kind of default, as is the damage formula.
-Still to come: a headless balance simulator that reads `beast-roster.json` directly, measures the
-damage formula and element chart against it, and replaces the roster's first-draft numbers with tuned
-ones; stat-scaled healing; the starter roster's skills (none are authored yet), the status-effect system behind `ApplyStatus`, resource gating on top of cooldowns,
+Still to come: tuning the roster's first-draft numbers (and, if needed, the damage formula and
+element chart) against the balance simulator's baseline — a design decision the report informs
+rather than makes — and extending the simulator once authored skills, parties and the avatar give it
+more than a standard-kit 1v1 to measure; stat-scaled healing; the starter roster's skills (none are authored yet), the status-effect system behind `ApplyStatus`, resource gating on top of cooldowns,
 lifting defeated units off the grid so they stop obstructing movement, the placement UI (a Unity
 Editor task, not a continuation of the placement validation that just landed), the encounter
 definition that selects an arena preset and a battle format, and the presentation layer.

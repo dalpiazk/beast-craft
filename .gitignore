@@ -103,6 +103,14 @@ Pipeline/**/_scratch/
 Tooling/CiStubs/**/bin/
 
 # ---------------------------------------------------------------------------
+# Tooling/BalanceSim -- the local-only headless balance simulator. Same story
+# as CiStubs: a hand-written csproj that must survive `*.csproj`, and a bin/
+# the Unity rules do not cover (obj/ is already caught by `[Oo]bj/`).
+# ---------------------------------------------------------------------------
+!Tooling/BalanceSim/**/*.csproj
+Tooling/BalanceSim/**/bin/
+
+# ---------------------------------------------------------------------------
 # OS cruft
 # ---------------------------------------------------------------------------
 .DS_Store
