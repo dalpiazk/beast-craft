@@ -592,13 +592,14 @@ skill in brackets:
 
 | Level | Phoenix → Golem, physical | Phoenix → Golem, special | Golem HP |
 | --- | --- | --- | --- |
-| 1 | 1 (neutral: 3) | 2 (neutral: 4) | 22 |
-| 50 | 7 (neutral: 15) | 10 (neutral: 21) | 86 |
-| 100 | 13 (neutral: 27) | 19 (neutral: 39) | 150 |
+| 1 | 1 (neutral: 3) | 2 (neutral: 4) | 24 |
+| 50 | 8 (neutral: 16) | 12 (neutral: 25) | 91 |
+| 100 | 15 (neutral: 30) | 23 (neutral: 46) | 160 |
 
-The reverse, Golem hitting Phoenix with a neutral skill: 4 / 28 / 50 physical and 3 / 12 / 21 special
-at levels 1 / 50 / 100, against Phoenix's 10 / 40 / 70 HP — the glass cannon and the wall reading as
-intended, and a good first thing for the simulator to measure.
+The reverse, Golem hitting Phoenix with a neutral skill: 4 / 26 / 49 physical and 3 / 15 / 28 special
+at levels 1 / 50 / 100, against Phoenix's 15 / 57 / 100 HP — the glass cannon and the wall still
+reading as intended. These are the tuned roster's numbers; `DamageFormulaTests` pins the Fire
+examples.
 
 **A zero attacking stat deals the floor.** With `A = 0`, `base` is exactly the +2 constant, so a
 unit with no attacking stat deals 2 × the element multiplier per damage effect regardless of power.
@@ -750,38 +751,48 @@ drag-and-drop input, zone and validity highlighting, and it can only genuinely b
 the project in the Editor. It is a **separate, later, and materially different** task, and it should
 be scoped as one rather than treated as the tail end of this one.
 
-## Starter roster — FIRST-DRAFT DATA, NOT CONFIRMED BALANCE
+## Starter roster — SIMULATOR-TUNED DATA, NOT CONFIRMED BALANCE
 
 The first ten beasts, one per element, are authored as data. Names, elements and archetypes are
-approved; **every number below is a first draft** chosen to express the archetype, and is expected to
-be corrected by the headless balance simulator (see "Next steps"). Nothing here is confirmed balance.
+approved. **The numbers below are the first simulator-tuned pass** of first-draft stats chosen to
+express each archetype: they were tuned by hand against the headless balance simulator's PvE mode
+(see "Next steps" and [`docs/balance/tuning-log.md`](../balance/tuning-log.md), which has the first
+draft alongside). Nothing here is confirmed balance; the numbers are expected to move again once
+skills and real encounters exist.
 
 | SpeciesId | Beast | Element | Archetype | Curve | HP | ATK | DEF | SpA | SpD | SPE | Six-stat total | Move |
 | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `phoenix` | Phoenix | Fire | Glass cannon | medium | 70 | 130 | 55 | 140 | 70 | 135 | 600 | 4 |
-| `leviathan` | Leviathan | Water | Tank | medium | 150 | 90 | 130 | 90 | 95 | 45 | 600 | 3 |
-| `golem` | Golem | Earth | Pure wall | medium | 150 | 80 | 170 | 40 | 125 | 35 | 600 | 2 |
-| `griffin` | Griffin | Air | Fast skirmisher | medium | 95 | 110 | 85 | 85 | 85 | 140 | 600 | 5 |
-| `thunderbird` | Thunderbird | Lightning | Burst striker | medium | 65 | 140 | 55 | 125 | 60 | 155 | 600 | 4 |
-| `frost_wyrm` | Frost Wyrm | Ice | Control / attrition | medium | 95 | 75 | 125 | 100 | 125 | 80 | 600 | 3 |
-| `treant` | Treant | Nature | Support-tank | medium | 160 | 80 | 100 | 85 | 130 | 45 | 600 | 3 |
-| `tarasque` | Tarasque | Metal | Armored bruiser | medium | 110 | 140 | 145 | 50 | 80 | 75 | 600 | 3 |
-| `kirin` | Kirin | Light | Support caster | medium | 100 | 50 | 80 | 140 | 135 | 95 | 600 | 4 |
-| `basilisk` | Basilisk | Dark | Ranged assassin | medium | 80 | 95 | 55 | 145 | 90 | 135 | 600 | 5 |
+| `phoenix` | Phoenix | Fire | Glass cannon | medium | 100 | 125 | 75 | 140 | 90 | 100 | 630 | 4 |
+| `leviathan` | Leviathan | Water | Tank | medium | 125 | 85 | 125 | 85 | 95 | 55 | 570 | 3 |
+| `golem` | Golem | Earth | Pure wall | medium | 160 | 105 | 150 | 70 | 105 | 40 | 630 | 2 |
+| `griffin` | Griffin | Air | Fast skirmisher | medium | 105 | 115 | 90 | 90 | 90 | 115 | 605 | 5 |
+| `thunderbird` | Thunderbird | Lightning | Burst striker | medium | 100 | 125 | 80 | 120 | 85 | 120 | 630 | 4 |
+| `frost_wyrm` | Frost Wyrm | Ice | Control / attrition | medium | 95 | 75 | 120 | 100 | 115 | 80 | 585 | 3 |
+| `treant` | Treant | Nature | Support-tank | medium | 130 | 85 | 95 | 90 | 120 | 50 | 570 | 3 |
+| `tarasque` | Tarasque | Metal | Armored bruiser | medium | 115 | 140 | 130 | 55 | 80 | 75 | 595 | 3 |
+| `kirin` | Kirin | Light | Support caster | medium | 100 | 50 | 80 | 135 | 120 | 95 | 580 | 4 |
+| `basilisk` | Basilisk | Dark | Ranged assassin | medium | 100 | 95 | 80 | 150 | 95 | 110 | 630 | 5 |
 
 Stats are max-level values (curve scale 1). **All ten beasts share the `medium` growth curve for
 now, by user decision**; differentiating curves per beast is deferred to the headless balance
 simulator. The drafting rules:
 
-- **Shared budget.** Every beast's six combat stats sum to the same budget (600), and the roster
-  tests allow ±5%. Archetype comes from how the budget is *distributed*, not from raw power. If the
-  simulator later gives some beasts a slower curve, whether they deserve a larger budget as payoff
-  for a weak early game is a balance question for it, not something this draft assumes.
+- **Shared budget.** Every beast's six combat stats sum to a shared budget of 600, and the roster
+  tests allow ±5% (570–630). Archetype comes from how the budget is *distributed*, not from raw
+  power. The first draft put every beast at exactly 600; the tuning pass used the ±5% band as a
+  balance lever, taking the beasts that carried their teams down to 570–585 (Leviathan, Treant,
+  Kirin, Frost Wyrm) and the fragile ones (Phoenix, Thunderbird, Basilisk) and Golem up to 630. If
+  the simulator later gives some beasts a slower curve, whether they deserve a larger budget as
+  payoff for a weak early game is a balance question for it, not something this pass assumes.
+- **Speed is ordered, not spent.** In the simulator, acting first mostly means reaching the enemy
+  first and taking its focus, so the tuning pass kept the speed *order* the archetypes call for
+  (Thunderbird > Griffin > Basilisk > Phoenix > Kirin > … > Golem) with smaller gaps, and moved the
+  freed points into the fragile beasts' HP and defences. They remain the least bulky beasts.
 - **Move range in a small band (2–5)**, outside the budget. Griffin and Basilisk are the mobile
   ends (5); Golem is the only 2. "Range" in the archetypes means move range, the per-turn hex
   movement budget — skill reach is authored per skill.
-- **Telling the defensive beasts apart.** Golem only absorbs (the highest Defense, the lowest Speed
-  and move range, low attack); Tarasque absorbs and hits back (Defense *and* Attack high); Leviathan
+- **Telling the defensive beasts apart.** Golem absorbs (the highest HP and Defense, the lowest Speed
+  and move range); Tarasque absorbs and hits back (Defense *and* the highest Attack); Leviathan
   is the physically bulky all-rounder; Treant's bulk is HP and Special Defense for a support role;
   Frost Wyrm splits its bulk evenly across Defense and Special Defense.
 - **Skills, evolutions and customization are empty.** No skills have been authored yet, so every
@@ -983,18 +994,35 @@ encounter in both modes (no niche), with Basilisk (−12.6 / −16.0) close behi
 is the best beast against the boss (+33.9) but roughly neutral against the swarm (+4.8 / +0.1), and
 Golem is the worst against the boss (−29.6) but third best against the swarm in `neutral` mode
 (+14.7). No PvE or PvP battle stalemates. The PvP section, on the same kit, still rewards bulk
-(`neutral`: Golem 89%; Leviathan, Griffin and Treant 78%). These are inputs to the roster discussion,
-not decisions. They depend on the simulator's assumptions listed in its README, above all the
-fixture enemies, the one standard kit and nearest-enemy targeting.
+(`neutral`: Golem 89%; Leviathan, Griffin and Treant 78%).
+
+The roster has since had **its first simulator-tuned pass** (base stats only; kit, fixtures,
+formula, element chart and Runtime unchanged). The "after" picture is
+[`docs/balance/tuned-report.md`](../balance/tuned-report.md), and
+[`docs/balance/tuning-log.md`](../balance/tuning-log.md) has the stat changes, per-encounter
+marginals before and after, the iteration log and the caveats. In `elemental` mode every beast's
+overall marginal is now within ±5 points (−3.8 … +3.4, from −23.4 … +17.4), and in `neutral` mode
+eight of ten are (−8.0 … +4.8, from −31.9 … +21.6). Roles still show per encounter: Tarasque, Kirin
+and Frost Wyrm lead against the boss, where the slow tanks Leviathan and Treant are worst but lead
+against the swarm and the pack. Three findings are design questions rather than stat problems:
+the goal "every beast top-3 against some encounter" cannot hold for ten beasts and three encounters
+(nine slots); in `neutral` mode the fastest fragile beast on a team walks into the pack first and
+takes its focus, which leaves Thunderbird (−8.0) and Griffin (−7.4) just outside ±7 because their
+approved identities make them the fastest; and a pure wall has no way to matter under
+nearest-enemy targeting, so Golem's Attack rose from 80 to 105 rather than it staying a
+low-attack wall — a taunt or guard mechanic would change that. The measurement noise between seeds
+(about ±3 points overall) is close to the size of the target. These are inputs to the roster
+discussion, not decisions. They depend on the simulator's assumptions listed in its README, above
+all the fixture enemies, the one standard kit and nearest-enemy targeting.
 
 Every pass so far is deliberately **data structures and algorithms only** — no MonoBehaviours, no
 scene or prefab wiring, and no committed `.asset` instances (the roster's are generated in-Editor). The hex radii backing each arena preset
 are placeholder implementation defaults chosen to be tunable, not producer-confirmed balance
 numbers, and the deployment-zone split, the effect rules and the element chart above are the same
 kind of default, as is the damage formula.
-Still to come: tuning the roster's first-draft numbers (and, if needed, the damage formula and
-element chart) against the balance simulator's PvE baseline — a design decision the report informs
-rather than makes — and extending the simulator once authored skills, real encounters and the avatar
+Still to come: confirming or revising the first tuning pass (and, if needed, the damage formula and
+element chart), deciding the design questions it raised above — a design decision the reports inform
+rather than make — and extending the simulator once authored skills, real encounters and the avatar
 give it more than a standard kit and fixture enemies to measure; multi-hex large creatures, an open
 item under "Encounter direction" above; stat-scaled healing; the starter roster's skills (none are
 authored yet), the status-effect system behind `ApplyStatus`, resource gating on top of cooldowns,

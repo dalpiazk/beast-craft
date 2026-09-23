@@ -276,8 +276,8 @@ namespace BeastCraft.Tests.EditMode
         /// roster.
         /// </summary>
         [TestCase(1, 1, 2)]
-        [TestCase(50, 7, 10)]
-        [TestCase(100, 13, 19)]
+        [TestCase(50, 8, 12)]
+        [TestCase(100, 15, 23)]
         public void Roster_PhoenixIntoGolem_MatchesTheDesignDocExamples(int level, int physical, int special)
         {
             BeastRosterData roster = BeastRosterTests.LoadRoster();

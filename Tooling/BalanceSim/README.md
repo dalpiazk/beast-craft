@@ -51,10 +51,15 @@ failed. The run time goes to stderr, never into the report. The default run (bot
 three levels, three encounters) takes about 15 s on an 8-thread machine (about 35 s with
 `--self-check`). PvE battles run in parallel, and the output is identical whatever the thread count.
 
-The committed baseline, `docs/balance/baseline-report.md`, is the default arguments:
+Two reports are committed, both the default arguments:
+
+- `docs/balance/baseline-report.md` — the "before" picture, on the roster's first-draft stats. It is
+  kept as a record and is **not** regenerated (a fresh run now reads the tuned roster).
+- `docs/balance/tuned-report.md` — the current roster after the first tuning pass (see
+  `docs/balance/tuning-log.md`). Regenerate it whenever the roster, fixtures or simulator change:
 
 ```sh
-dotnet run --project Tooling/BalanceSim -c Release -- --out docs/balance/baseline-report.md
+dotnet run --project Tooling/BalanceSim -c Release -- --out docs/balance/tuned-report.md
 ```
 
 ## The standard kit

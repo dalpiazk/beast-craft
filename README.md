@@ -106,8 +106,9 @@ What exists today:
   simulator); the Unity assets are generated from it by opening the project and
   running **Beast Craft → Data → Import Beast Roster**, which creates or updates
   them in place by id. No `.asset` files are committed yet. The numbers are a
-  first draft, not confirmed balance — see "Starter roster" in the
-  [battle-system design doc](docs/design/battle-system.md).
+  first simulator-tuned pass, not confirmed balance — see "Starter roster" in the
+  [battle-system design doc](docs/design/battle-system.md) and
+  [`docs/balance/tuning-log.md`](docs/balance/tuning-log.md).
 - **CI** (`.github/workflows/ci.yml`) — a format and compile check that builds
   the real game scripts against the hand-written UnityEngine stub in
   `Tooling/CiStubs/`. It needs no Unity install and runs no Unity tests, so it
@@ -116,8 +117,9 @@ What exists today:
 - A **headless balance simulator** ([`Tooling/BalanceSim/`](Tooling/BalanceSim/README.md))
   — local-only, not a CI job — that runs the real battle code outside Unity
   over a round-robin of the starter roster and writes a Markdown report. The
-  committed baseline is [`docs/balance/baseline-report.md`](docs/balance/baseline-report.md);
-  its numbers are inputs to design decisions, not applied automatically.
+  committed reports are [`docs/balance/baseline-report.md`](docs/balance/baseline-report.md)
+  (first-draft stats, the "before") and [`docs/balance/tuned-report.md`](docs/balance/tuned-report.md)
+  (the tuned roster); their numbers are inputs to design decisions, not applied automatically.
 - A **battle-system design proposal** ([`docs/design/battle-system.md`](docs/design/battle-system.md))
   whose open questions are still awaiting producer confirmation.
 
