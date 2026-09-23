@@ -34,11 +34,14 @@ namespace BeastCraft.Tooling.BalanceSim
         //   - Range is the one asymmetry the brief fixes (Strike 1, Blast 3): Strike needs the
         //     beast to reach a free tile next to its target, so it fires less often — while
         //     closing, and when the target is crowded. Measured over the default PvE run with
-        //     equal power 40, Strike fired 0.74x as often as Blast (0.71 boss, 0.76 swarm, 0.74
-        //     pack). Strike's power is therefore 54 (= 40 / 0.74), so fires x power, and with it
-        //     the weight of Attack vs SpecialAttack, is even: the report's kit parity table shows
-        //     the physical share of single-target power (49-51% per encounter at the defaults).
-        //     Re-derive StrikePower if the kit, the fixtures or the movement rules change.
+        //     equal power 40, under the Runtime's current movement rules (defeated units leave the
+        //     grid, partial approach) and the fixtures' current move ranges, Strike fired 0.73x as
+        //     often as Blast (0.70 boss, 0.75-0.77 swarm, 0.72-0.76 pack). Strike's power is
+        //     therefore 55 (= 40 / 0.731, rounded), so fires x power, and with it the weight of
+        //     Attack vs SpecialAttack, is even: the report's kit parity table shows the physical
+        //     share of single-target power (49-51% per encounter, 50.1% overall, at the defaults;
+        //     54 gave 49.7%). Re-derive StrikePower if the kit, the fixtures or the movement rules
+        //     change.
         //   - The AoE ("Burst") is split into a Physical half and a Special half with the same
         //     power, radius and cooldown, fired together, physical first. A single-category Burst
         //     would re-open the bias this kit exists to close. Firing order does not bias the
@@ -63,7 +66,7 @@ namespace BeastCraft.Tooling.BalanceSim
 
         public const string StrikeId = "sim_strike";
         public const DamageCategory StrikeCategory = DamageCategory.Physical;
-        public const float StrikePower = 54f;
+        public const float StrikePower = 55f;
         public const int StrikeRange = 1;
         public const int StrikeCooldown = BlastCooldown;
 
@@ -129,12 +132,6 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <summary>Null = the elements authored in encounters.json; otherwise every enemy gets this element.</summary>
         public Element? EnemyElementOverride;
 
-        /// <summary>
-        /// PvE only: take defeated units off the grid after each turn (a simulator-side emulation of
-        /// a rule battle-system.md lists as still to come). Without it, corpses wall off swarms.
-        /// </summary>
-        public bool LiftDefeated = true;
-
         public int MaxRounds = BattleTurnExecutor.DefaultMaxRounds;
         public int Seed = DefaultSeed;
         public int MatrixLevel = DefaultMatrixLevel;
@@ -158,8 +155,6 @@ namespace BeastCraft.Tooling.BalanceSim
             "  --target-clear <pct>       Clear rate the difficulty calibration aims for (default 50).\n" +
             "  --marginal-threshold <x>   Flag a beast whose overall marginal clear rate is outside +/-x points (default 5).\n" +
             "  --enemy-element <e>        authored | None | <Element> (default authored): override every enemy's element.\n" +
-            "  --keep-defeated            PvE: leave defeated units on the grid, as the Runtime does today (default: the\n" +
-            "                             simulator lifts them off after each turn, emulating the planned rule).\n" +
             "  --max-rounds <n>           Round cap before a battle is a stalemate (default 200).\n" +
             "  --seed <n>                 Base seed; each battle derives its own (default 12345).\n" +
             "  --matrix-level <n>         Level the PvP win matrix and stat table are drawn at (default 50, else the highest level).\n" +
@@ -190,9 +185,6 @@ namespace BeastCraft.Tooling.BalanceSim
                         break;
                     case "--self-check":
                         options.SelfCheck = true;
-                        break;
-                    case "--keep-defeated":
-                        options.LiftDefeated = false;
                         break;
                     case "--levels":
                         if (!TryNext(args, ref i, arg, out text, out error) || !TryParseLevels(text, options.Levels, out error))

@@ -89,11 +89,27 @@ namespace BeastCraft.Tooling.BalanceSim
 
         /// <summary>
         /// Per team, which member stands in which deployment slot (and so gets which unit id). A
-        /// fixed, seeded shuffle per team: slot and id decide the speed-tie break and which beast an
-        /// enemy picks between equidistant targets (both break ties on the ordinal id), so pinning
-        /// them to roster order would systematically expose the first species in the roster.
+        /// fixed, seeded shuffle per team: slot and id decide the speed-tie break between team
+        /// members and which beast an enemy picks between equidistant targets (both break ties on
+        /// the ordinal id), so pinning them to roster order would systematically expose the first
+        /// species in the roster.
         /// </summary>
         public int[][] SlotOrders { get; }
+
+        /// <summary>
+        /// Id prefixes that neutralise the speed tie between the two sides. <see cref="TurnManager"/>
+        /// breaks equal Speed on the ordinal unit id, and the raw ids (<c>e01</c>... for enemies,
+        /// <c>p1</c>... for the team) would hand every cross-side tie to the enemies. Each battle
+        /// instead prefixes one side with <see cref="TieWinnerPrefix"/> and the other with
+        /// <see cref="TieLoserPrefix"/>; which side wins is decided by <see cref="PlayersWinTies"/>,
+        /// an exact half of the teams in every (kit mode, encounter, level) cell. A prefix shared by
+        /// a whole side leaves the order <em>within</em> the side (and so every targeting tie, which
+        /// only ever compares units of one side) exactly as it was.
+        /// </summary>
+        public const string TieWinnerPrefix = "a";
+
+        /// <summary>See <see cref="TieWinnerPrefix"/>.</summary>
+        public const string TieLoserPrefix = "b";
 
         /// <summary>
         /// Calibrates the encounter's difficulty for this level and mode, then returns the battles at
@@ -192,19 +208,47 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <summary>Every team against the encounter at one multiplier; parallel, results stored by team index.</summary>
         public PveBattle[] RunAllTeams(KitMode mode, int level, Encounter encounter, double multiplier)
         {
-            return RunAllTeams(mode, level, encounter, multiplier, _options.LiftDefeated);
-        }
-
-        /// <summary>As above, with the lift-defeated emulation chosen explicitly.</summary>
-        public PveBattle[] RunAllTeams(KitMode mode, int level, Encounter encounter, double multiplier, bool liftDefeated)
-        {
             PveBattle[] battles = new PveBattle[Teams.Count];
+            bool[] playersWinTies = PlayersWinTies(mode, level, encounter.Id);
             Parallel.For(0, Teams.Count, t =>
             {
-                battles[t] = RunBattle(mode, level, encounter, multiplier, t, false, liftDefeated, out _);
+                battles[t] = RunBattle(mode, level, encounter, multiplier, t, false, playersWinTies[t], out _);
             });
 
             return battles;
+        }
+
+        /// <summary>
+        /// Per team index, whether the team wins cross-side speed ties in this (kit mode, level,
+        /// encounter) cell. A seeded shuffle of the team indices, first half true: exactly half the
+        /// teams (the extra one of an odd count goes to the enemies), independent of the difficulty
+        /// multiplier so calibration compares like with like. A pure function of the inputs.
+        /// </summary>
+        public bool[] PlayersWinTies(KitMode mode, int level, string encounterId)
+        {
+            int count = Teams.Count;
+            int[] order = new int[count];
+            for (int i = 0; i < count; i++)
+            {
+                order[i] = i;
+            }
+
+            Random rng = new Random(DeriveSeed(_options.Seed, mode, level, encounterId, -1));
+            for (int i = count - 1; i > 0; i--)
+            {
+                int j = rng.Next(i + 1);
+                int swap = order[i];
+                order[i] = order[j];
+                order[j] = swap;
+            }
+
+            bool[] wins = new bool[count];
+            for (int i = 0; i < count / 2; i++)
+            {
+                wins[order[i]] = true;
+            }
+
+            return wins;
         }
 
         /// <summary>
@@ -212,35 +256,27 @@ namespace BeastCraft.Tooling.BalanceSim
         /// statement for statement, with an HP snapshot around each turn so damage can be attributed
         /// to the unit whose turn it was (the only actor: no avatar is fielded). With
         /// <paramref name="useRunBattle"/> the real RunBattle is called instead, which is what the
-        /// self-check compares against.
+        /// self-check compares against. Everything else — lifting the defeated off the grid, the
+        /// partial approach — is the Runtime's own rule, applied inside
+        /// <see cref="BattleTurnExecutor.ExecuteTurn"/>; the loop adds no rules of its own.
+        /// <paramref name="playersWinTies"/> picks the id prefixes (see <see cref="TieWinnerPrefix"/>).
         /// </summary>
-        public PveBattle RunBattle(KitMode mode, int level, Encounter encounter, double multiplier, int teamIndex, bool useRunBattle,
-                                   out List<BattleUnit> finalUnits)
-        {
-            return RunBattle(mode, level, encounter, multiplier, teamIndex, useRunBattle, _options.LiftDefeated && !useRunBattle, out finalUnits);
-        }
-
-        /// <summary>
-        /// As above, with the lift-defeated emulation chosen explicitly. With <paramref name="liftDefeated"/>
-        /// every unit defeated during a turn is taken off the <see cref="HexGrid"/> right after that
-        /// turn, so it stops blocking movement. The Runtime does not do this yet (battle-system.md
-        /// lists it as still to come); this is a simulator-side emulation of that planned rule, not
-        /// a change to it, and the only point where this loop departs from RunBattle.
-        /// </summary>
-        public PveBattle RunBattle(KitMode mode, int level, Encounter encounter, double multiplier, int teamIndex, bool useRunBattle, bool liftDefeated,
+        public PveBattle RunBattle(KitMode mode, int level, Encounter encounter, double multiplier, int teamIndex, bool useRunBattle, bool playersWinTies,
                                    out List<BattleUnit> finalUnits)
         {
             int[] team = Teams[teamIndex];
             int[] slots = SlotOrders[teamIndex];
             HexGrid grid = new HexGrid(encounter.Data.ParsedArena);
             List<BattleUnit> units = new List<BattleUnit>();
+            string playerPrefix = playersWinTies ? TieWinnerPrefix : TieLoserPrefix;
+            string enemyPrefix = playersWinTies ? TieLoserPrefix : TieWinnerPrefix;
 
             // Enemies: front-most tiles of the enemy zone, in fixture order.
             List<HexCoordinate> enemyTiles = FrontTiles(grid, BattleTeam.Enemy, encounter.Enemies.Count);
             for (int i = 0; i < encounter.Enemies.Count; i++)
             {
                 EnemySlot slot = encounter.Enemies[i];
-                BattleUnit enemy = BattleUnitFactory.CreateBeast(slot.UnitId, BattleTeam.Enemy, slot.Species, level, null, enemyTiles[i],
+                BattleUnit enemy = BattleUnitFactory.CreateBeast(enemyPrefix + slot.UnitId, BattleTeam.Enemy, slot.Species, level, null, enemyTiles[i],
                                                                  Kit.Loadout(slot.KitFor(mode)));
                 enemy.Stats = Scale(enemy.Stats, multiplier);
                 enemy.CurrentHp = enemy.Stats.Hp;
@@ -262,7 +298,7 @@ namespace BeastCraft.Tooling.BalanceSim
                 int member = slots[s];
                 int speciesIndex = team[member];
                 SkillSO[] kit = mode == KitMode.Elemental ? _elementalKits[speciesIndex] : _neutralKits[speciesIndex];
-                string id = "p" + (s + 1).ToString(System.Globalization.CultureInfo.InvariantCulture);
+                string id = playerPrefix + "p" + (s + 1).ToString(System.Globalization.CultureInfo.InvariantCulture);
                 members[member] = BattleUnitFactory.CreateBeast(id, BattleTeam.Player, _species[speciesIndex], level, null, playerTiles[s],
                                                                 Kit.Loadout(kit));
                 requests.Add(new PlacementRequest(id, playerTiles[s]));
@@ -334,11 +370,6 @@ namespace BeastCraft.Tooling.BalanceSim
 
                         BattleTurnResult turn = BattleTurnExecutor.ExecuteTurn(current, units, grid, rng, null);
 
-                        if (liftDefeated)
-                        {
-                            LiftDefeated(units, grid);
-                        }
-
                         bool actorIsMember = memberIndex.TryGetValue(current, out int actor);
                         for (int u = 0; u < units.Count; u++)
                         {
@@ -381,17 +412,6 @@ namespace BeastCraft.Tooling.BalanceSim
 
             finalUnits = units;
             return battle;
-        }
-
-        private static void LiftDefeated(List<BattleUnit> units, HexGrid grid)
-        {
-            foreach (BattleUnit unit in units)
-            {
-                if (unit.IsDefeated)
-                {
-                    grid.RemoveUnit(unit.Id);
-                }
-            }
         }
 
         private static void CountFires(PveBattle battle, BattleTurnResult turn)

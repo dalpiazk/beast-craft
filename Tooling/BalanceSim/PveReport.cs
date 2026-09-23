@@ -280,26 +280,19 @@ namespace BeastCraft.Tooling.BalanceSim
                               " (enemy kits are `None` in `neutral` mode, so an elementless encounter reads the same in both modes)");
             report.AppendLine("- Placement: each side takes the front-most tiles of its own deployment zone (front row first, then outward from");
             report.AppendLine("  the centre line); enemies in fixture order, the team through `PlacementValidator.TryPlaceAll`. Which team member");
-            report.AppendLine("  gets which slot (and unit id, the speed-tie and target-tie break) is a fixed seeded shuffle per team.");
+            report.AppendLine("  gets which slot (and unit id, the speed-tie and target-tie break within the team) is a fixed seeded shuffle per team.");
+            report.AppendLine("- Speed ties between the sides: `TurnManager` breaks equal Speed on the ordinal unit id, so each battle prefixes one");
+            report.AppendLine("  side's ids so that it wins cross-side ties; in every (kit mode, encounter, level) cell exactly half the teams win");
+            report.AppendLine("  them (a seeded shuffle of the team indices). The prefix is side-wide, so ties within a side are unchanged.");
             report.AppendLine("- Difficulty: HP, Atk, Def, SpA and SpD of every enemy are scaled by one multiplier per (kit mode, encounter,");
             report.AppendLine("  level); Speed and Move are not. Calibration starts at x1, doubles or halves until the " +
                               SimOptions.Format(options.TargetClearRate) + "% target is bracketed");
             report.AppendLine("  (x" + SimOptions.FormatMultiplier(SimOptions.MinMultiplier) + " to x" + SimOptions.FormatMultiplier(SimOptions.MaxMultiplier) +
                               "), then bisects " + SimOptions.CalibrationBisections + " times; the evaluated multiplier whose clear rate is closest to the");
             report.AppendLine("  target wins (first evaluated on a tie). Every metric below is measured at that multiplier.");
-            if (options.LiftDefeated)
-            {
-                report.AppendLine("- Defeated units: **lifted off the grid after each turn, a simulator emulation, not Runtime behaviour.** The");
-                report.AppendLine("  Runtime leaves them on the board, where they block movement (battle-system.md lists lifting them as still to");
-                report.AppendLine("  come); under that rule the swarm walls itself off with its own dead and nearly every swarm battle stalemates");
-                report.AppendLine("  (`--keep-defeated` reproduces it).");
-            }
-            else
-            {
-                report.AppendLine("- Defeated units: left on the grid, as the Runtime does today (`--keep-defeated`). They block movement, so");
-                report.AppendLine("  expect swarm stalemates.");
-            }
-
+            report.AppendLine("- Movement rules are the Runtime's own (`BattleTurnExecutor`), with no simulator-side emulation: a defeated unit");
+            report.AppendLine("  leaves the grid the moment it falls, and a unit that cannot reach range this turn makes a partial approach");
+            report.AppendLine("  (walks its remaining move toward the target and holds the skill).");
             report.AppendLine("- Max rounds: " + options.MaxRounds + " (a battle reaching it is a stalemate and counts as not cleared); base seed: " + options.Seed);
             report.AppendLine("- Metrics: **marginal** = clear rate of teams containing the beast minus teams without it (points; the primary");
             report.AppendLine("  number). **Dmg share** / **Taken share** = the beast's share of its team's damage dealt / taken (HP actually");

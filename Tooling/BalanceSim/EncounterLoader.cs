@@ -213,7 +213,6 @@ namespace BeastCraft.Tooling.BalanceSim
 
             HexGrid grid = new HexGrid(encounter.ParsedArena);
             int zoneSize = grid.GetDeploymentZone(BattleTeam.Enemy).Count;
-            int gap = FrontGap(grid);
             int total = 0;
 
             foreach (EnemyGroupData group in encounter.Groups)
@@ -242,9 +241,13 @@ namespace BeastCraft.Tooling.BalanceSim
 
                 group.ParsedElements = elements.ToArray();
 
-                if (group.BaseStats.Hp < 1 || group.BaseStats.MoveRange < 0)
+                // MoveRange >= 1: BattleTurnExecutor's partial approach lets any mobile unit close any
+                // distance over several turns, but a unit with move 0 never leaves its deployment
+                // tile, and a whole encounter of them against a team that cannot reach them either is
+                // a round-cap stalemate.
+                if (group.BaseStats.Hp < 1 || group.BaseStats.MoveRange < 1)
                 {
-                    errors.Add(groupWhere + ": BaseStats needs Hp >= 1 and MoveRange >= 0.");
+                    errors.Add(groupWhere + ": BaseStats needs Hp >= 1 and MoveRange >= 1.");
                 }
 
                 if (group.Skills == null || group.Skills.Length == 0)
@@ -253,7 +256,7 @@ namespace BeastCraft.Tooling.BalanceSim
                     continue;
                 }
 
-                int longestReach = -1;
+                bool hasSingleTarget = false;
                 foreach (EnemySkillData skill in group.Skills)
                 {
                     string skillWhere = groupWhere + " skill '" + skill.SkillId + "'";
@@ -270,7 +273,7 @@ namespace BeastCraft.Tooling.BalanceSim
                     if (skill.Shape == "SingleTarget")
                     {
                         skill.ParsedShape = SkillTargetShape.SingleTarget;
-                        longestReach = Math.Max(longestReach, skill.Range);
+                        hasSingleTarget = true;
                     }
                     else if (skill.Shape == "AreaBurst")
                     {
@@ -282,19 +285,12 @@ namespace BeastCraft.Tooling.BalanceSim
                     }
                 }
 
-                // BattleTurnExecutor only moves a unit when this turn's budget reaches a tile in range
-                // of its target (no partial approach). An enemy that cannot cover the gap between the
-                // two deployment zones' front rows in one turn never advances on its own, and a team
-                // that cannot either produces a standoff that ends as a round-cap stalemate.
-                if (longestReach < 0)
+                // SingleTarget is the only fixture shape BattleTurnExecutor walks a unit for (it
+                // approaches, partially if need be, only to bring a picked focus into range), so a
+                // group without one would never leave its deployment tiles.
+                if (!hasSingleTarget)
                 {
                     errors.Add(groupWhere + ": needs at least one SingleTarget skill (the only shape that moves the unit).");
-                }
-                else if (group.BaseStats.MoveRange + longestReach < gap)
-                {
-                    errors.Add(groupWhere + ": MoveRange " + group.BaseStats.MoveRange + " + longest single-target range " + longestReach +
-                               " is below the " + encounter.ParsedArena + " arena's front-row gap of " + gap +
-                               "; with no partial approach it would never engage.");
                 }
             }
 
@@ -307,21 +303,6 @@ namespace BeastCraft.Tooling.BalanceSim
             {
                 errors.Add(where + ": more than 99 enemies (unit ids are two digits).");
             }
-        }
-
-        /// <summary>The smallest hex distance between any player-zone tile and any enemy-zone tile.</summary>
-        public static int FrontGap(HexGrid grid)
-        {
-            int best = int.MaxValue;
-            foreach (HexCoordinate player in grid.GetDeploymentZone(BattleTeam.Player))
-            {
-                foreach (HexCoordinate enemy in grid.GetDeploymentZone(BattleTeam.Enemy))
-                {
-                    best = Math.Min(best, player.Distance(enemy));
-                }
-            }
-
-            return best;
         }
 
         private static Encounter Build(EncounterData data, GrowthRateCurve curve, SimOptions options)

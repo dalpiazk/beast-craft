@@ -45,7 +45,8 @@ namespace BeastCraft.Battle
     /// </para>
     /// <para>
     /// Effects only. This does not spend <see cref="SkillSO.ResourceCost"/> (still deferred), does
-    /// not lift a defeated unit off the grid, does not check whether the battle has now been won,
+    /// not lift a defeated unit off the grid (it has no board; <see cref="BattleTurnExecutor"/> does
+    /// that right after each application), does not check whether the battle has now been won,
     /// and does not decide when any of this happens. Non-throwing throughout, matching the rest of
     /// the namespace: null activations, null skills, null effects, null targets and an empty
     /// target list are all quiet no-ops rather than errors.

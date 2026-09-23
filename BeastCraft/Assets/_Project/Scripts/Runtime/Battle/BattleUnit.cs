@@ -125,6 +125,11 @@ namespace BeastCraft.Battle
         /// both halves together: the grid placement first, this property only once the grid has
         /// accepted it.
         /// </para>
+        /// <para>
+        /// Once the unit is defeated the executor lifts it off the grid, but this keeps the tile it
+        /// fell on, for logs and results. From then on it is a record, not occupancy: the tile may
+        /// be taken by someone else, and nothing reads a defeated unit's position for play.
+        /// </para>
         /// </summary>
         public HexCoordinate Position { get; set; }
 
@@ -222,7 +227,8 @@ namespace BeastCraft.Battle
 
         /// <summary>
         /// True once the unit is out of the fight. Defeated units are skipped by the turn order and
-        /// are expected to be lifted off the grid by the caller.
+        /// by targeting, and <see cref="BattleTurnExecutor"/> lifts them off the grid as soon as
+        /// they fall (their <see cref="Position"/> is kept as a record).
         /// </summary>
         public bool IsDefeated { get; set; }
 

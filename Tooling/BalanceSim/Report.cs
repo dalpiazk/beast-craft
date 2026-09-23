@@ -63,7 +63,7 @@ namespace BeastCraft.Tooling.BalanceSim
             report.AppendLine("| Burst (special half) | " + DamageCategory.Special + " | AreaBurst (radius " + SimOptions.BurstRadius + " around the caster) | " +
                               SimOptions.BurstRadius + " | " + Number(SimOptions.BurstPower) + " | " + SimOptions.BurstCooldown + " |");
             report.AppendLine();
-            report.AppendLine("Strike and Blast share a cooldown; Strike's higher power offsets its range-1 handicap (it fires about 0.74x as");
+            report.AppendLine("Strike and Blast share a cooldown; Strike's higher power offsets its range-1 handicap (it fires about 0.73x as");
             report.AppendLine("often as Blast), and Burst is split into equal physical and special halves, so `Attack` and `SpecialAttack` (and");
             report.AppendLine("`Defense` / `SpecialDefense` on the receiving end) carry about equal weight; the PvE kit parity table checks it.");
             report.AppendLine("Burst goes last so it fires from the tile the beast has just walked to. `elemental` mode: every kit skill carries");

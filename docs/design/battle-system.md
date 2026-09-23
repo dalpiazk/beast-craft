@@ -101,18 +101,16 @@ What that implies for balance and for the systems:
   surrounded by six attackers. Multi-hex units would touch occupancy, pathfinding (a footprint has to
   fit along the route), targeting (distance to a footprint, not a point) and area-skill overlap.
   Not designed or implemented; listed so encounter design does not assume it exists.
-- **Two current movement rules break large PvE fights — open items.** Both are documented scaffold
-  choices, and the simulator shows what they do at encounter scale:
-  - *Defeated units are not lifted off the grid* (listed under "Still to come"). A fallen unit keeps
-    blocking its tile, so a swarm's front rank dies next to the beasts and walls off the rest: under
-    the current rule almost every simulated swarm battle ends as a round-cap stalemate. The
-    simulator emulates lifting them (on by default; `--keep-defeated` shows today's behaviour).
-  - *No partial approach* (decision 7, "scaffold details"). A unit that cannot reach a tile in range
-    of its target this turn does not move at all, so two sides whose move plus range falls short of
-    the gap between them wait forever. On a Large board the deployment zones are 8 hexes apart, more
-    than most beasts' move plus Blast range. The simulator's fixture enemies are given board-spanning
-    movement to keep fights engaged; real encounters will need a partial approach, enemy behaviour
-    that closes the distance, or arenas and placements chosen around the rule.
+- **Two movement rules large PvE fights need — now built (were open items).** The simulator showed
+  both gaps at encounter scale, and both are now Runtime rules in `BattleTurnExecutor` (see
+  decision 7, "scaffold details"), so the simulator no longer works around either:
+  - *Defeated units leave the grid* the moment they fall. Before, a fallen unit kept blocking its
+    tile, a swarm's front rank died next to the beasts and walled off the rest, and almost every
+    simulated swarm battle ended as a round-cap stalemate.
+  - *Partial approach.* A unit that cannot reach range of its target this turn still walks its
+    remaining move toward it. Before, it did not move at all, so two sides whose move plus range fell
+    short of the gap between them (8 hexes between the zones on a Large board) waited forever, and
+    the simulator's fixture enemies needed board-spanning movement. They now move like beasts.
 - **Everything the simulator fields targets the nearest enemy.** Whoever stands in front takes the
   hits, so front-line bulk and placement matter a great deal; that interacts with the tactical-AI
   item above.
@@ -408,12 +406,31 @@ beast's positioning is a direct, readable consequence of its loadout — a short
 a long-range caster stays put — with no extra tuning surface. The cost is that a beast can walk into
 a bad spot to land one skill; that is the same trade auto-resolution has made everywhere else.
 
-*Scaffold details, not confirmed balance.* Two implementation choices sit underneath this and are
-cheap to revisit. A beast that cannot afford the whole approach **stays where it is** rather than
-walking part of the way, because a partial approach spends the budget to accomplish nothing and
-leaves the rest of the stack worse off. And the route is the cheapest one that reaches *any* tile
-within range of the target, found by pathing at the tiles around the target (the target's own tile is
-occupied, so nothing can path onto it) and stopping at the first tile on that route that is in range.
+*Scaffold details, not confirmed balance.* Three implementation choices sit underneath this and are
+cheap to revisit (the first two are lead engineering decisions made once the balance simulator
+showed what their absence did to large PvE fights):
+
+- **Partial approach.** A beast that cannot afford the whole approach **advances as far as its
+  remaining budget allows** along the same cheapest route it would have taken, spending all of it,
+  and the skill is held exactly as above: it does not fire, its cooldown stays at 0, and it is
+  offered again next turn from the closer tile (`BattleSkillStatus.OutOfMovement`, with the steps
+  walked in the outcome's `MovementSpent`). Only a beast with **no route at all** — walled off by
+  terrain or bodies — stays where it is (`Unreachable`). The earlier rule stood still instead, on
+  the grounds that a partial walk "spends the budget to accomplish nothing"; in practice standing
+  still meant two sides whose move plus range fell short of the gap between them never engaged. With
+  several ready slots the shared budget still goes in stack order: the earliest skill that cannot
+  reach spends what is left walking, and later skills are attempted from the new tile with nothing
+  left to walk with — one whose target is now in range fires, and shapes that need no approach fire
+  regardless. Deterministic: the route and its tie-breaks are the full approach's.
+- **Defeated units leave the grid** the moment they fall: after every skill that fires and every
+  avatar activation that is applied, the executor lifts each defeated unit off the board, so a later
+  skill in the same turn, and every later turn, can walk through or stand on its tile. (The effect
+  applier has no board, so this sits in the executor.) The fallen unit keeps its `Position` — where it
+  fell — for logs and results; nothing reads it for play, since targeting and the turn order already
+  ignore the defeated.
+- **The route** is the cheapest one that reaches *any* tile within range of the target, found by
+  pathing at the tiles around the target (the target's own tile is occupied, so nothing can path onto
+  it) and stopping at the first tile on that route that is in range.
 
 ## Effect application — SCAFFOLD ASSUMPTIONS, NOT CONFIRMED BALANCE
 
@@ -923,13 +940,23 @@ importer (the first Editor script, and the first `UnityEditor` stubs in `Tooling
 EditMode tests that check the JSON directly: structure, the ten pinned ids, one beast per element,
 the stat-budget and move-range bands, and the curve semantics.
 
+Two movement rules the simulator showed large PvE fights need are now built into
+`BattleTurnExecutor` (decision 7, "scaffold details"): **defeated units leave the grid** the moment
+they fall (lifted with `HexGrid.RemoveUnit` after every fired skill and applied avatar activation,
+keeping their `Position` as a record), and a unit that cannot afford its whole approach makes a
+**partial approach**, walking its remaining budget along the same route and holding the skill
+(`OutOfMovement`, with the steps in `MovementSpent`). EditMode tests cover a freed tile being walked
+onto in the same turn, a choke reopening for later turns, avatar kills, a partial approach walking
+exactly the budget and firing a turn later, a fully blocked unit staying put, the shared budget
+across slots, and a null grid.
+
 The headless balance simulator (`Tooling/BalanceSim/`, see its README) is **local-only tooling, not a
 CI job**. It compiles the `Runtime` scripts against the committed UnityStub, reads
 `beast-roster.json` with `System.Text.Json`, and fights through the real `BattleUnitFactory`,
 `PlacementValidator`, `TurnManager` and `BattleTurnExecutor` on real `HexGrid`s. No skills are
 authored yet, so every beast fights with the same standard kit, rebalanced so `Attack` and
 `SpecialAttack` weigh the same: Blast (special, power 40, range 3, cooldown 1), Strike (physical,
-power 54, range 1, cooldown 1; the extra power offsets range 1 firing about 0.74x as often as
+power 55, range 1, cooldown 1; the extra power offsets range 1 firing about 0.73x as often as
 Blast) and a Burst split into equal physical and special halves (area, radius 2, power 20 each,
 cooldown 2). It runs in an `elemental` mode (kit in the beast's element) and a `neutral` mode (kit
 `Element.None`).
@@ -946,17 +973,19 @@ survival and rounds to clear alongside. The old 1v1 round-robin survives as a se
 `--mode pvp` section.
 
 The committed report at [`docs/balance/baseline-report.md`](../balance/baseline-report.md) is the
-"before" picture for roster tuning, on the unchanged first-draft stats (levels 1/50/100). In short:
-the bulky sustain beasts carry their teams. Leviathan (+15.5 / +14.1 points overall, `elemental` /
-`neutral`) and Treant (+14.6 / +15.8) are positive against every encounter and top three against
-two of the three. The glass cannons drag their teams down: Phoenix (−15.2 / −20.1) and Thunderbird
-(−12.3 / −21.0), with Thunderbird bottom three against all three encounters in `neutral` mode (no
-niche). Niches do show: Kirin is the best beast against the boss (+28.2) but slightly negative
-against the swarm, and Golem is the worst against the boss (−41.9) but second best against the
-swarm. The PvP section, on the same kit, still rewards bulk (`neutral`: Golem 89%; Leviathan,
-Griffin and Treant 78%). These are inputs to the roster discussion, not decisions. They depend on
-the simulator's assumptions listed in its README, above all the lifted-corpse emulation, the
-fixture enemies and nearest-enemy targeting.
+"before" picture for roster tuning, on the unchanged first-draft stats (levels 1/50/100), regenerated
+under the Runtime's own movement rules (defeated units leave the grid, partial approach), fixture
+enemies that move like beasts, and speed ties split evenly between the sides. In short: the bulky
+sustain beasts and Kirin carry their teams. Kirin (+17.4 / +21.6 points overall, `elemental` /
+`neutral`), Leviathan (+16.9 / +13.3) and Treant (+14.1 / +21.4) lead. The glass cannons drag their
+teams down: Thunderbird (−23.4 / −31.9) and Phoenix (−16.8 / −21.1) are bottom three against every
+encounter in both modes (no niche), with Basilisk (−12.6 / −16.0) close behind. Niches do show: Kirin
+is the best beast against the boss (+33.9) but roughly neutral against the swarm (+4.8 / +0.1), and
+Golem is the worst against the boss (−29.6) but third best against the swarm in `neutral` mode
+(+14.7). No PvE or PvP battle stalemates. The PvP section, on the same kit, still rewards bulk
+(`neutral`: Golem 89%; Leviathan, Griffin and Treant 78%). These are inputs to the roster discussion,
+not decisions. They depend on the simulator's assumptions listed in its README, above all the
+fixture enemies, the one standard kit and nearest-enemy targeting.
 
 Every pass so far is deliberately **data structures and algorithms only** — no MonoBehaviours, no
 scene or prefab wiring, and no committed `.asset` instances (the roster's are generated in-Editor). The hex radii backing each arena preset
@@ -966,10 +995,9 @@ kind of default, as is the damage formula.
 Still to come: tuning the roster's first-draft numbers (and, if needed, the damage formula and
 element chart) against the balance simulator's PvE baseline — a design decision the report informs
 rather than makes — and extending the simulator once authored skills, real encounters and the avatar
-give it more than a standard kit and fixture enemies to measure; multi-hex large creatures and a
-partial-approach (or enemy closing) rule for large PvE fights, both open items under "Encounter
-direction" above; stat-scaled healing; the starter roster's skills (none are authored yet), the status-effect system behind `ApplyStatus`, resource gating on top of cooldowns,
-lifting defeated units off the grid so they stop obstructing movement (large PvE fights need it; the
-simulator emulates it), the placement UI (a Unity
+give it more than a standard kit and fixture enemies to measure; multi-hex large creatures, an open
+item under "Encounter direction" above; stat-scaled healing; the starter roster's skills (none are
+authored yet), the status-effect system behind `ApplyStatus`, resource gating on top of cooldowns,
+the placement UI (a Unity
 Editor task, not a continuation of the placement validation that just landed), the encounter
 definition that selects an arena preset and a battle format, and the presentation layer.

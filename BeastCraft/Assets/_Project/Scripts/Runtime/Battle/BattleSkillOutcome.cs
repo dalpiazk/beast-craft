@@ -53,8 +53,11 @@ namespace BeastCraft.Battle
 
         /// <summary>
         /// Hex steps this one attempt took out of the turn's shared movement budget. 0 whenever the
-        /// caster was already in range, whenever the shape needed no approach, and for every
-        /// outcome that did not fire — a failed approach is never half-walked.
+        /// caster was already in range, whenever the shape needed no approach, and for
+        /// <see cref="BattleSkillStatus.NoCandidate"/> and <see cref="BattleSkillStatus.Unreachable"/>.
+        /// For <see cref="BattleSkillStatus.OutOfMovement"/> it is the partial approach: every step
+        /// the turn had left, walked toward a target the skill still could not reach — the one case
+        /// in which a slot that did not fire spent movement.
         /// </summary>
         public int MovementSpent { get; }
 

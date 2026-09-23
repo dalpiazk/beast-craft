@@ -37,7 +37,6 @@ dotnet run --project Tooling/BalanceSim -c Release -- [options]
 | `--target-clear <pct>` | `50` | Clear rate the difficulty calibration aims for. |
 | `--marginal-threshold <x>` | `5` | Flag a beast whose overall marginal clear rate is outside +/-x points. |
 | `--enemy-element <e>` | `authored` | `authored`, `None` or an element name: override every enemy's element. |
-| `--keep-defeated` | off | PvE: leave defeated units on the grid, as the Runtime does today (see below). |
 | `--max-rounds <n>` | `200` | Round cap; a battle that reaches it is a stalemate. |
 | `--seed <n>` | `12345` | Base seed; each battle derives its own seed from it. |
 | `--matrix-level <n>` | `50` | Level of the PvP win matrix and the stat table (falls back to the highest simulated level). |
@@ -49,7 +48,7 @@ dotnet run --project Tooling/BalanceSim -c Release -- [options]
 Exit codes: `0` success, `1` bad arguments, `2` missing or invalid roster or encounters (the roster
 is checked with `BeastRosterValidator` first, exactly as the Editor importer does), `3` a self-check
 failed. The run time goes to stderr, never into the report. The default run (both modes, both kits,
-three levels, three encounters) takes about 9 s on an 8-thread machine (about 20 s with
+three levels, three encounters) takes about 15 s on an 8-thread machine (about 35 s with
 `--self-check`). PvE battles run in parallel, and the output is identical whatever the thread count.
 
 The committed baseline, `docs/balance/baseline-report.md`, is the default arguments:
@@ -66,7 +65,7 @@ measured. Fire priority is Blast, Strike, then Burst. Everything aims at the nea
 | Skill | Category | Shape | Range | Power | Cooldown |
 | --- | --- | --- | ---: | ---: | ---: |
 | Blast | Special | SingleTarget | 3 | 40 | 1 |
-| Strike | Physical | SingleTarget | 1 | 54 | 1 |
+| Strike | Physical | SingleTarget | 1 | 55 | 1 |
 | Burst, physical half | Physical | AreaBurst, radius 2 around the caster | 2 | 20 | 2 |
 | Burst, special half | Special | AreaBurst, radius 2 around the caster | 2 | 20 | 2 |
 
@@ -77,10 +76,12 @@ The first baseline did not manage that: Strike at cooldown 1 against Blast at co
 - **Same cooldown.** Strike and Blast both fire every turn once the beast is in melee.
 - **Power offsets range.** Strike needs a free tile next to its target, so it fires less often than
   Blast: while the beast is still closing, and when the target is crowded. With equal power, Strike
-  fired 0.74x as often as Blast across the default PvE run (0.71 boss, 0.76 swarm, 0.74 pack), so
-  Strike's power is 40 / 0.74 = 54. The report's **kit parity** table checks the result: the
-  physical share of single-target power delivered is 49-51% in every encounter. Re-derive
-  `StrikePower` if the kit, the fixtures or the movement rules change.
+  fired 0.73x as often as Blast across the default PvE run (0.70 boss, 0.75-0.77 swarm, 0.72-0.76
+  pack), so Strike's power is 40 / 0.731 = 55 (rounded). The report's **kit parity** table checks
+  the result: the physical share of single-target power delivered is 49-51% in every encounter and
+  50.1% overall (54 gave 49.7%). This was re-derived when the Runtime gained its defeated-unit and
+  partial-approach rules and the fixtures' move ranges came down (it was 54 before). Re-derive
+  `StrikePower` again if the kit, the fixtures or the movement rules change.
 - **Burst is split.** It is two skills, a physical and a special half, with the same power, radius
   and cooldown, fired together. A single-category area skill would reintroduce the bias. The
   physical half fires first, but that does not bias outcomes: a target dies iff the two halves
@@ -105,9 +106,9 @@ The first baseline did not manage that: Strike at cooldown 1 against Blast at co
 
   | Id | Arena | Enemies |
   | --- | --- | --- |
-  | `boss` | Medium | 1 Colossus: HP 1600 base, Physical and Special hits of power 70 every turn (ranges 1 and 3), and a physical plus special area slam (radius 2, power 35 each, cooldown 3). Elementless by default. |
-  | `swarm` | Large | 12 Biters (Physical bite) + 12 Stingers (Special sting): HP 30, weak range-1 attacks of power 30. Elements cycle through all ten. |
-  | `pack` | Medium | 3 Direwolves (Physical melee, power 45) in front, 3 Wisps (Special, range 3, power 45) behind. Six different elements. |
+  | `boss` | Medium | 1 Colossus: HP 1600 base, Physical and Special hits of power 70 every turn (ranges 1 and 3), and a physical plus special area slam (radius 2, power 35 each, cooldown 3). Move 3. Elementless by default. |
+  | `swarm` | Large | 12 Biters (Physical bite) + 12 Stingers (Special sting): HP 30, weak range-1 attacks of power 30. Move 4. Elements cycle through all ten. |
+  | `pack` | Medium | 3 Direwolves (Physical melee, power 45) in front, 3 Wisps (Special, range 3, power 45) behind. Move 4 / 3. Six different elements. |
 
   Physical and special pressure is balanced within each encounter, so neither `Defense` nor
   `SpecialDefense` is favoured.
@@ -115,9 +116,9 @@ The first baseline did not manage that: Strike at cooldown 1 against Blast at co
   then outward from the centre line). Enemies are placed in fixture order; the team is committed
   through `PlacementValidator.TryPlaceAll`. Which member gets which slot is a fixed seeded shuffle
   per team, because the slot fixes the unit id, and ids break speed ties and equal-distance target
-  ties. Pinning slots to roster order would always expose the first species. Placing all 24 swarm
-  enemies is checked on every battle, and the loader rejects an encounter that does not fit its
-  zone.
+  ties within the team. Pinning slots to roster order would always expose the first species.
+  (Speed ties *between* the sides are split separately; see below.) Placing all 24 swarm enemies is
+  checked on every battle, and the loader rejects an encounter that does not fit its zone.
 - **Difficulty calibration.** One multiplier per (kit mode, encounter, level) scales every enemy's
   HP, Atk, Def, SpA and SpD. Speed and Move stay unscaled, since scaling Speed would reshuffle turn
   order in steps. The multiplier starts at 1 and doubles or halves until the target clear rate is
@@ -138,25 +139,34 @@ The first baseline did not manage that: Strike at cooldown 1 against Blast at co
 - **Battle loop.** The PvE loop reproduces `BattleTurnExecutor.RunBattle` statement for statement,
   with an HP snapshot around each `ExecuteTurn` so damage can be attributed to the acting unit.
   `--self-check` replays sample battles through the real `RunBattle` and requires identical
-  outcomes, rounds, HP and positions.
+  outcomes, rounds, HP and positions. The loop adds no rules of its own.
 
 ### Runtime rules that shape the PvE numbers
 
-Two current Runtime behaviours make large PvE fights degenerate. The simulator works around them in
-the open rather than changing game rules:
+The simulator emulates nothing: every movement rule is the Runtime's own, inside
+`BattleTurnExecutor.ExecuteTurn`. Two of them matter a great deal at encounter scale, and both used
+to be simulator-side workarounds before they became Runtime rules:
 
-- **Defeated units stay on the grid.** They block their tile (battle-system.md lists lifting them as
-  still to come), so a swarm's front rank dies next to the beasts and walls off the rest. With the
-  current rule (`--keep-defeated`), 206 of 210 `neutral` swarm battles at level 50 stalemate, and
-  calibration cannot fix it: the clear rate stays near 2% even at a 1/64 multiplier. By default the
-  simulator **lifts defeated units off the grid after each turn**. That is a simulator-side emulation
-  of the planned rule, and the loop's only departure from `RunBattle`.
-- **No partial approach.** A unit that cannot reach a tile in range of its target this turn does not
-  move at all. On a Large board the deployment zones are 8 hexes apart, more than most beasts' move
-  plus Blast range, so back ranks wait forever. The fixture enemies therefore get board-spanning
-  movement (boss 7, direwolves 9, wisps 7, swarm 13). The loader rejects any group whose move plus
-  longest single-target range is below the arena's front-row gap. With both measures, the default
-  run has no stalemates.
+- **Defeated units leave the grid** the moment they fall, so a swarm's front rank no longer walls
+  off the rest with its own dead. (Before this rule, 206 of 210 `neutral` swarm battles at level 50
+  stalemated, and no difficulty multiplier could fix it; the simulator used to lift the dead itself,
+  with a `--keep-defeated` flag to show the old behaviour. Both are gone.)
+- **Partial approach.** A unit that cannot reach range of its target this turn still walks its
+  remaining move along the cheapest route toward it and holds the skill (no fire, cooldown kept).
+  Without it, sides whose move plus range fell short of the gap between the deployment zones (8 hexes
+  on a Large board) waited forever, and the fixture enemies had to be given board-spanning movement
+  (boss 7, direwolves 9, wisps 7, swarm 13). They now move like beasts (roster band 2-5): boss 3,
+  direwolves 4, wisps 3, biters and stingers 4. The loader only requires move >= 1 and at least one
+  `SingleTarget` skill, the only shape that walks.
+
+The default run has no stalemates, PvE or PvP.
+
+- **Speed ties between the sides are split evenly.** `TurnManager` breaks equal Speed on the
+  ordinal unit id, and with raw ids (`e01`... against `p1`...) every cross-side tie went to the
+  enemies. Each battle now prefixes one side's ids with `a` and the other's with `b`; in every
+  (kit mode, encounter, level) cell a seeded shuffle of the team indices picks exactly half the teams
+  to win ties (`PveSimulator.PlayersWinTies`). The prefix is side-wide, so the order within a side,
+  and every targeting tie (targeting only ever compares units of one side), is unchanged.
 
 ## PvP: 1v1 round-robin (secondary)
 

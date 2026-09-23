@@ -35,7 +35,8 @@ namespace BeastCraft.Battle
         /// <summary>
         /// A candidate exists, but no route reaches a tile within the skill's range of it: the
         /// approach is walled off by terrain or bodies, or the grid is missing. The distance the
-        /// unit could have afforded never came into it. No movement was spent.
+        /// unit could have afforded never came into it. No movement was spent: with no route at all
+        /// there is nothing to make a partial approach along.
         /// </summary>
         Unreachable = 2,
 
@@ -43,9 +44,11 @@ namespace BeastCraft.Battle
         /// A candidate exists and a route to within range of it exists, but it is longer than the
         /// movement this unit has left this turn — either because an earlier skill in the same turn
         /// already spent the budget, or because the unit's <see cref="BattleUnit.MoveRange"/> was
-        /// never enough on its own. The unit stays put: it does not walk part of the way, because a
-        /// partial approach spends the rest of the turn's budget to accomplish nothing and leaves
-        /// the later skills in the stack worse off than standing still.
+        /// never enough on its own. The unit makes a <strong>partial approach</strong>: it walks that
+        /// cheapest route for exactly the movement it has left (possibly none, if an earlier skill
+        /// spent it all), recorded as the outcome's <see cref="BattleSkillOutcome.MovementSpent"/>,
+        /// and then holds. Next turn it is that much closer. Later slots in the stack are still
+        /// attempted from the tile it stopped on, with nothing left to walk with.
         /// </summary>
         OutOfMovement = 3
     }
