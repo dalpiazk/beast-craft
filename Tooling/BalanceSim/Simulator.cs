@@ -3,11 +3,10 @@ using System.Collections.Generic;
 using BeastCraft.Battle;
 using BeastCraft.Battle.Grid;
 using BeastCraft.Creatures;
-using UnityEngine;
 
 namespace BeastCraft.Tooling.BalanceSim
 {
-    /// <summary>The result of one simulated 1v1 battle.</summary>
+    /// <summary>The result of one simulated 1v1 (PvP round-robin) battle.</summary>
     public class BattleRecord
     {
         public KitMode Mode;
@@ -30,7 +29,7 @@ namespace BeastCraft.Tooling.BalanceSim
     }
 
     /// <summary>
-    /// Runs the round-robin with the real Runtime battle code: <see cref="BattleUnitFactory"/>,
+    /// The secondary, 1v1 mode (<c>--mode pvp</c>). Runs the round-robin with the real Runtime battle code: <see cref="BattleUnitFactory"/>,
     /// <see cref="TurnManager"/> and <see cref="BattleTurnExecutor.RunBattle"/> on a real
     /// <see cref="HexGrid"/>, so movement and approach behave exactly as in game.
     /// </summary>
@@ -66,13 +65,13 @@ namespace BeastCraft.Tooling.BalanceSim
 
         private static BattleRecord RunOne(SimOptions options, IReadOnlyList<CreatureSpeciesSO> species, KitMode mode, int level, int playerIndex, int enemyIndex)
         {
-            HexGrid grid = new HexGrid(SimOptions.Arena);
+            HexGrid grid = new HexGrid(SimOptions.PvpArena);
             FindStartTiles(grid, out HexCoordinate playerTile, out HexCoordinate enemyTile);
 
             BattleUnit player = BattleUnitFactory.CreateBeast(SimOptions.PlayerUnitId, BattleTeam.Player, species[playerIndex], level, null,
-                                                              playerTile, BuildLoadout(species[playerIndex], mode));
+                                                              playerTile, Kit.Loadout(Kit.BuildBeastKit(species[playerIndex], mode)));
             BattleUnit enemy = BattleUnitFactory.CreateBeast(SimOptions.EnemyUnitId, BattleTeam.Enemy, species[enemyIndex], level, null,
-                                                             enemyTile, BuildLoadout(species[enemyIndex], mode));
+                                                             enemyTile, Kit.Loadout(Kit.BuildBeastKit(species[enemyIndex], mode)));
 
             if (!grid.TryPlaceUnit(player.Id, playerTile) || !grid.TryPlaceUnit(enemy.Id, enemyTile))
             {
@@ -143,41 +142,6 @@ namespace BeastCraft.Tooling.BalanceSim
             {
                 throw new InvalidOperationException("Mirrored enemy start tile " + enemyTile + " is outside the enemy deployment zone.");
             }
-        }
-
-        /// <summary>The standard kit, in fire-priority order: Blast, then Strike.</summary>
-        public static SkillLoadout BuildLoadout(CreatureSpeciesSO species, KitMode mode)
-        {
-            Element element = Element.None;
-            if (mode == KitMode.Elemental && species.Elements != null && species.Elements.Length > 0)
-            {
-                element = species.Elements[0];
-            }
-
-            SkillSO blast = BuildSkill(SimOptions.BlastId, SimOptions.BlastCategory, SimOptions.BlastPower, SimOptions.BlastRange,
-                                       SimOptions.BlastCooldown, element);
-            SkillSO strike = BuildSkill(SimOptions.StrikeId, SimOptions.StrikeCategory, SimOptions.StrikePower, SimOptions.StrikeRange,
-                                        SimOptions.StrikeCooldown, element);
-
-            return new SkillLoadout(new[] { blast, strike });
-        }
-
-        private static SkillSO BuildSkill(string id, DamageCategory category, float power, int range, int cooldown, Element element)
-        {
-            SkillSO skill = ScriptableObject.CreateInstance<SkillSO>();
-            skill.name = id;
-            skill.SkillId = id;
-            skill.DisplayName = id;
-            skill.TargetShape = SkillTargetShape.SingleTarget;
-            skill.Range = range;
-            skill.TargetSide = SkillTargetSide.Enemy;
-            skill.TargetingCriterion = SkillTargetingCriterion.Distance;
-            skill.TargetingOrder = SkillTargetingOrder.Lowest;
-            skill.Cooldown = cooldown;
-            skill.Element = element;
-            skill.Category = category;
-            skill.Effects.Add(new SkillEffect { EffectType = SkillEffectType.Damage, Magnitude = power });
-            return skill;
         }
 
         /// <summary>

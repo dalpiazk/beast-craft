@@ -1,0 +1,84 @@
+{
+  "_readme": "SIMULATOR FIXTURES, NOT GAME CONTENT. Synthetic enemies for Tooling/BalanceSim's PvE mode, so the roster can be measured against PvE-shaped fights (one huge enemy, a swarm, a mixed pack). They are not roster beasts, no game code reads this file, and nothing here is a design decision about real encounters. BaseStats are max-level values scaled by the roster growth curve named in GrowthCurveId (as a beast's are); the simulator then calibrates one difficulty multiplier per encounter, level and kit mode, so only the ratios inside a stat line matter. Elements are cycled over a group's units. Every group's MoveRange + longest SingleTarget range must cover the arena's front-row gap (Medium 6, Large 8), because BattleTurnExecutor never makes a partial approach; the fixtures go further and span the whole board so back ranks engage too. See Tooling/BalanceSim/README.md.",
+  "SchemaVersion": 1,
+  "GrowthCurveId": "medium",
+  "Encounters": [
+    {
+      "EncounterId": "boss",
+      "DisplayName": "Colossus",
+      "Description": "One huge enemy: very high HP, heavy single-target hits in both categories every turn, and a periodic area slam. Elementless by default so the boss measures stat lines; use --enemy-element for an elemental variant.",
+      "Arena": "Medium",
+      "Groups": [
+        {
+          "EnemyId": "colossus",
+          "DisplayName": "Colossus",
+          "Count": 1,
+          "Elements": [],
+          "BaseStats": { "Hp": 1600, "Attack": 120, "Defense": 110, "SpecialAttack": 120, "SpecialDefense": 110, "Speed": 70, "MoveRange": 7 },
+          "Skills": [
+            { "SkillId": "crush", "Category": "Physical", "Shape": "SingleTarget", "Power": 70, "Range": 1, "Cooldown": 1 },
+            { "SkillId": "gaze", "Category": "Special", "Shape": "SingleTarget", "Power": 70, "Range": 3, "Cooldown": 1 },
+            { "SkillId": "quake", "Category": "Physical", "Shape": "AreaBurst", "Power": 35, "Range": 2, "Cooldown": 3 },
+            { "SkillId": "roar", "Category": "Special", "Shape": "AreaBurst", "Power": 35, "Range": 2, "Cooldown": 3 }
+          ]
+        }
+      ]
+    },
+    {
+      "EncounterId": "swarm",
+      "DisplayName": "Swarm",
+      "Description": "Twenty-four small enemies with low HP and weak melee: half bite (Physical), half sting (Special), so neither defence is favoured. Elements cycle through all ten. Move 13 spans the Large board: its zones are 8 apart, the back rank is further, and there is no partial approach.",
+      "Arena": "Large",
+      "Groups": [
+        {
+          "EnemyId": "biter",
+          "DisplayName": "Biter",
+          "Count": 12,
+          "Elements": [ "Fire", "Water", "Earth", "Air", "Lightning", "Ice", "Nature", "Metal", "Light", "Dark" ],
+          "BaseStats": { "Hp": 30, "Attack": 60, "Defense": 40, "SpecialAttack": 30, "SpecialDefense": 40, "Speed": 100, "MoveRange": 13 },
+          "Skills": [
+            { "SkillId": "bite", "Category": "Physical", "Shape": "SingleTarget", "Power": 30, "Range": 1, "Cooldown": 1 }
+          ]
+        },
+        {
+          "EnemyId": "stinger",
+          "DisplayName": "Stinger",
+          "Count": 12,
+          "Elements": [ "Earth", "Air", "Lightning", "Ice", "Nature", "Metal", "Light", "Dark", "Fire", "Water" ],
+          "BaseStats": { "Hp": 30, "Attack": 30, "Defense": 40, "SpecialAttack": 60, "SpecialDefense": 40, "Speed": 100, "MoveRange": 13 },
+          "Skills": [
+            { "SkillId": "sting", "Category": "Special", "Shape": "SingleTarget", "Power": 30, "Range": 1, "Cooldown": 1 }
+          ]
+        }
+      ]
+    },
+    {
+      "EncounterId": "pack",
+      "DisplayName": "Hunting pack",
+      "Description": "Six mid-size enemies: three fast Physical melee hunters in front, three Special casters behind them at range 3. Six different elements.",
+      "Arena": "Medium",
+      "Groups": [
+        {
+          "EnemyId": "direwolf",
+          "DisplayName": "Direwolf",
+          "Count": 3,
+          "Elements": [ "Fire", "Earth", "Metal" ],
+          "BaseStats": { "Hp": 110, "Attack": 110, "Defense": 90, "SpecialAttack": 50, "SpecialDefense": 80, "Speed": 110, "MoveRange": 9 },
+          "Skills": [
+            { "SkillId": "maul", "Category": "Physical", "Shape": "SingleTarget", "Power": 45, "Range": 1, "Cooldown": 1 }
+          ]
+        },
+        {
+          "EnemyId": "wisp",
+          "DisplayName": "Wisp",
+          "Count": 3,
+          "Elements": [ "Water", "Air", "Dark" ],
+          "BaseStats": { "Hp": 80, "Attack": 50, "Defense": 70, "SpecialAttack": 110, "SpecialDefense": 100, "Speed": 90, "MoveRange": 7 },
+          "Skills": [
+            { "SkillId": "bolt", "Category": "Special", "Shape": "SingleTarget", "Power": 45, "Range": 3, "Cooldown": 1 }
+          ]
+        }
+      ]
+    }
+  ]
+}

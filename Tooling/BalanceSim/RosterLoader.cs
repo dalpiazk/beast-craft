@@ -31,21 +31,30 @@ namespace BeastCraft.Tooling.BalanceSim
         /// </summary>
         public static string ResolvePath(string explicitPath)
         {
+            return ResolveFile(explicitPath, RepoRelativePath);
+        }
+
+        /// <summary>
+        /// The explicit path when given, otherwise the first match for <paramref name="repoRelativePath"/>
+        /// walking up from the working directory, then from the executable's directory.
+        /// </summary>
+        public static string ResolveFile(string explicitPath, string repoRelativePath)
+        {
             if (!string.IsNullOrEmpty(explicitPath))
             {
                 return Path.GetFullPath(explicitPath);
             }
 
-            string found = WalkUp(Directory.GetCurrentDirectory());
-            return found ?? WalkUp(AppContext.BaseDirectory);
+            string found = WalkUp(Directory.GetCurrentDirectory(), repoRelativePath);
+            return found ?? WalkUp(AppContext.BaseDirectory, repoRelativePath);
         }
 
-        private static string WalkUp(string start)
+        private static string WalkUp(string start, string repoRelativePath)
         {
             DirectoryInfo directory = new DirectoryInfo(start);
             while (directory != null)
             {
-                string candidate = Path.Combine(directory.FullName, RepoRelativePath);
+                string candidate = Path.Combine(directory.FullName, repoRelativePath);
                 if (File.Exists(candidate))
                 {
                     return candidate;
@@ -60,10 +69,12 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <summary>
         /// Parses and validates the roster, then builds one <see cref="CreatureSpeciesSO"/> per
         /// species in file order. Returns null and fills <paramref name="errors"/> when the file
-        /// does not parse or fails <see cref="BeastRosterValidator.Validate"/>.
+        /// does not parse or fails <see cref="BeastRosterValidator.Validate"/>. The growth curves are
+        /// returned by id too, so the encounter fixtures can scale on the same curves.
         /// </summary>
-        public static List<CreatureSpeciesSO> Load(string path, List<string> errors)
+        public static List<CreatureSpeciesSO> Load(string path, List<string> errors, out Dictionary<string, GrowthRateCurve> curves)
         {
+            curves = null;
             BeastRosterData roster;
             try
             {
@@ -82,7 +93,7 @@ namespace BeastCraft.Tooling.BalanceSim
                 return null;
             }
 
-            Dictionary<string, GrowthRateCurve> curves = new Dictionary<string, GrowthRateCurve>(StringComparer.Ordinal);
+            curves = new Dictionary<string, GrowthRateCurve>(StringComparer.Ordinal);
             foreach (GrowthCurveData curveData in roster.GrowthCurves)
             {
                 GrowthRateCurve curve = ScriptableObject.CreateInstance<GrowthRateCurve>();

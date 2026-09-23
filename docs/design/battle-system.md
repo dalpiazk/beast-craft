@@ -72,6 +72,51 @@ puzzle every encounter.
   `BattleAvatar.Create` takes a per-battle level (default 1) that the battle setup is expected to
   pick sensibly, e.g. the player team's level — a stopgap input, not a design for progression.
 
+## Encounter direction: PvE, not PvP — DIRECTION, NOT YET A CONFIRMED DECISION
+
+**The game is expected to be PvE.** The player builds a team of beasts and fights **enemies that are
+not the roster beasts**. An enemy side can be anything from **one large creature** to **two dozen
+small ones**, with mixed mid-size groups in between. Beast-versus-beast (PvP) play is not the
+target, so a beast's 1v1 record against the other roster beasts is at most a secondary signal. This
+is the user's stated direction, recorded here so balance work targets it; it has not been through
+the producer's confirmed-decision process yet.
+
+What that implies for balance and for the systems:
+
+- **Balance targets team contribution against encounters, not duels.** The useful question is how
+  much a beast raises its team's chance of clearing a fight, and against which kinds of fight — not
+  whether it beats another beast one on one. The balance simulator's primary mode now measures
+  exactly that (see "Next steps").
+- **Different encounter shapes reward different stat lines, and that is the point.** Against a
+  **swarm**, area damage and bulk matter: many weak hits land on whoever is in front, and a
+  single-target skill spends much of its power as overkill on small enemies. Against **one huge
+  enemy**, sustained single-target damage and the bulk to survive its heavy hits matter, and area
+  damage is mostly wasted. Mixed **packs** sit in between. A beast that is weak everywhere, or best
+  everywhere, is the real balance problem; a beast that is best against one shape and middling
+  elsewhere has a niche.
+- **Area skills need something to hit.** `AreaBurst` is centred on the caster and never moves it, so
+  in a skill stack it wants to come after something that walks the beast into the enemy cluster.
+- **Large creatures are single-tile today — open item.** `HexGrid` tracks exactly one tile per unit;
+  there is no multi-hex footprint, so a "huge" enemy occupies one hex like everything else and can be
+  surrounded by six attackers. Multi-hex units would touch occupancy, pathfinding (a footprint has to
+  fit along the route), targeting (distance to a footprint, not a point) and area-skill overlap.
+  Not designed or implemented; listed so encounter design does not assume it exists.
+- **Two current movement rules break large PvE fights — open items.** Both are documented scaffold
+  choices, and the simulator shows what they do at encounter scale:
+  - *Defeated units are not lifted off the grid* (listed under "Still to come"). A fallen unit keeps
+    blocking its tile, so a swarm's front rank dies next to the beasts and walls off the rest: under
+    the current rule almost every simulated swarm battle ends as a round-cap stalemate. The
+    simulator emulates lifting them (on by default; `--keep-defeated` shows today's behaviour).
+  - *No partial approach* (decision 7, "scaffold details"). A unit that cannot reach a tile in range
+    of its target this turn does not move at all, so two sides whose move plus range falls short of
+    the gap between them wait forever. On a Large board the deployment zones are 8 hexes apart, more
+    than most beasts' move plus Blast range. The simulator's fixture enemies are given board-spanning
+    movement to keep fights engaged; real encounters will need a partial approach, enemy behaviour
+    that closes the distance, or arenas and placements chosen around the rule.
+- **Everything the simulator fields targets the nearest enemy.** Whoever stands in front takes the
+  hits, so front-line bulk and placement matter a great deal; that interacts with the tactical-AI
+  item above.
+
 ## Data-driven foundation already in place
 
 The authored data this combat model needs is already committed as ScriptableObject schemas under
@@ -880,22 +925,38 @@ the stat-budget and move-range bands, and the curve semantics.
 
 The headless balance simulator (`Tooling/BalanceSim/`, see its README) is **local-only tooling, not a
 CI job**. It compiles the `Runtime` scripts against the committed UnityStub, reads
-`beast-roster.json` with `System.Text.Json`, and runs a deterministic 1v1 round-robin of the roster
-through the real `BattleUnitFactory` / `TurnManager` / `BattleTurnExecutor.RunBattle` on a Medium
-`HexGrid`, every pairing played twice with the sides swapped so the ordinal-id speed-tie break
-favours neither beast. Because no skills are authored yet, every beast fights with the same standard
-kit (Blast: special, power 40, range 3, cooldown 2; Strike: physical, power 40, range 1, cooldown 1),
-in an `elemental` mode (kit in the beast's element) and a `neutral` mode (kit `Element.None`, which
-isolates the stat lines from the chart). The committed baseline at
-[`docs/balance/baseline-report.md`](../balance/baseline-report.md) (levels 1/25/50/100) is an input to
-the roster discussion, not a decision. In short: fights are short (about four rounds at every level
-in both modes) with no stalemates, win rates are almost flat across levels, and the bulky beasts
-dominate — in `neutral` mode Leviathan wins 96%, Golem 89% and Treant 82%, while Thunderbird (11%),
-Phoenix (17%), Basilisk (19%) and Kirin (31%) sit far below the 40% line; the element chart
-compresses that spread in `elemental` mode (Leviathan 78%, Basilisk 19%) but does not change who is
-on top. How much of this is the stat lines and how much is the 1v1, standard-kit setup (which rewards
-raw bulk, and weights `Attack` about twice as heavily as `SpecialAttack` because Strike fires twice as
-often as Blast) is itself a design question the report is meant to prompt.
+`beast-roster.json` with `System.Text.Json`, and fights through the real `BattleUnitFactory`,
+`PlacementValidator`, `TurnManager` and `BattleTurnExecutor` on real `HexGrid`s. No skills are
+authored yet, so every beast fights with the same standard kit, rebalanced so `Attack` and
+`SpecialAttack` weigh the same: Blast (special, power 40, range 3, cooldown 1), Strike (physical,
+power 54, range 1, cooldown 1; the extra power offsets range 1 firing about 0.74x as often as
+Blast) and a Burst split into equal physical and special halves (area, radius 2, power 20 each,
+cooldown 2). It runs in an `elemental` mode (kit in the beast's element) and a `neutral` mode (kit
+`Element.None`).
+
+Its **primary mode is PvE, team versus encounter**, following the direction above. Every 4-beast
+combination of the roster (210 teams) fights three synthetic encounters defined in
+`Tooling/BalanceSim/encounters.json`. These are simulator fixtures, not game content: `boss` (one
+Colossus with very high HP, heavy hits in both categories and a periodic area slam), `swarm` (24
+small biters and stingers on a Large arena) and `pack` (three melee direwolves and three ranged
+wisps). Each encounter's enemy stats are scaled by a multiplier calibrated per level and kit mode
+so the average team clears it about half the time. Each beast is scored by its **marginal clear
+rate** (clear rate of teams with it minus teams without it), with damage share, damage taken,
+survival and rounds to clear alongside. The old 1v1 round-robin survives as a secondary
+`--mode pvp` section.
+
+The committed report at [`docs/balance/baseline-report.md`](../balance/baseline-report.md) is the
+"before" picture for roster tuning, on the unchanged first-draft stats (levels 1/50/100). In short:
+the bulky sustain beasts carry their teams. Leviathan (+15.5 / +14.1 points overall, `elemental` /
+`neutral`) and Treant (+14.6 / +15.8) are positive against every encounter and top three against
+two of the three. The glass cannons drag their teams down: Phoenix (−15.2 / −20.1) and Thunderbird
+(−12.3 / −21.0), with Thunderbird bottom three against all three encounters in `neutral` mode (no
+niche). Niches do show: Kirin is the best beast against the boss (+28.2) but slightly negative
+against the swarm, and Golem is the worst against the boss (−41.9) but second best against the
+swarm. The PvP section, on the same kit, still rewards bulk (`neutral`: Golem 89%; Leviathan,
+Griffin and Treant 78%). These are inputs to the roster discussion, not decisions. They depend on
+the simulator's assumptions listed in its README, above all the lifted-corpse emulation, the
+fixture enemies and nearest-enemy targeting.
 
 Every pass so far is deliberately **data structures and algorithms only** — no MonoBehaviours, no
 scene or prefab wiring, and no committed `.asset` instances (the roster's are generated in-Editor). The hex radii backing each arena preset
@@ -903,9 +964,12 @@ are placeholder implementation defaults chosen to be tunable, not producer-confi
 numbers, and the deployment-zone split, the effect rules and the element chart above are the same
 kind of default, as is the damage formula.
 Still to come: tuning the roster's first-draft numbers (and, if needed, the damage formula and
-element chart) against the balance simulator's baseline — a design decision the report informs
-rather than makes — and extending the simulator once authored skills, parties and the avatar give it
-more than a standard-kit 1v1 to measure; stat-scaled healing; the starter roster's skills (none are authored yet), the status-effect system behind `ApplyStatus`, resource gating on top of cooldowns,
-lifting defeated units off the grid so they stop obstructing movement, the placement UI (a Unity
+element chart) against the balance simulator's PvE baseline — a design decision the report informs
+rather than makes — and extending the simulator once authored skills, real encounters and the avatar
+give it more than a standard kit and fixture enemies to measure; multi-hex large creatures and a
+partial-approach (or enemy closing) rule for large PvE fights, both open items under "Encounter
+direction" above; stat-scaled healing; the starter roster's skills (none are authored yet), the status-effect system behind `ApplyStatus`, resource gating on top of cooldowns,
+lifting defeated units off the grid so they stop obstructing movement (large PvE fights need it; the
+simulator emulates it), the placement UI (a Unity
 Editor task, not a continuation of the placement validation that just landed), the encounter
 definition that selects an arena preset and a battle format, and the presentation layer.
