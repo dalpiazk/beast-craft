@@ -95,7 +95,13 @@ namespace BeastCraft.Battle
         /// <summary>Added to every hit before the element multiplier; the floor a zero-attack hit lands at.</summary>
         public const float BaseOffset = 2f;
 
-        /// <summary>The least any positive-power hit deals, after truncation and the element multiplier.</summary>
+        /// <summary>
+        /// The least any positive-power hit deals, after truncation and the element multiplier.
+        /// Because the floor is applied <em>after</em> the multiplier, a 0x "immune" matchup would
+        /// still deal this much. <see cref="ElementChart"/> only returns 2x, 0.5x and 1x today; if
+        /// an immunity is ever added, <see cref="Compute(int, float, int, int, float)"/> must
+        /// special-case a zero multiplier to return 0.
+        /// </summary>
         public const int MinimumDamage = 1;
 
         /// <summary>
