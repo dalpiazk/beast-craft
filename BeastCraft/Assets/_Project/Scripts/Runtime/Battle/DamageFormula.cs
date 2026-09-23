@@ -111,8 +111,9 @@ namespace BeastCraft.Battle
     /// powers were rescaled so a neutral hit between two average level-50 roster beasts removes the
     /// same share of HP as under the previous formula (see the tuning log). <strong>Still
     /// deferred:</strong> a same-element bonus (STAB), flat skill damage, damage boost/resistance
-    /// and a crit-damage stat. Healing is still flat and takes no variance, and stat changes still
-    /// move stats by their authored magnitude; neither goes through here.
+    /// and a crit-damage stat. Healing scales with the caster's <c>SpecialAttack</c> but takes no
+    /// defense, crit or variance, and stat changes still move stats by their authored magnitude;
+    /// neither goes through here (see <see cref="SkillEffectApplier.HealScale"/>).
     /// </para>
     /// <para>
     /// Pure and static, like <see cref="ElementChart"/> and <see cref="StatCalculator"/>: a

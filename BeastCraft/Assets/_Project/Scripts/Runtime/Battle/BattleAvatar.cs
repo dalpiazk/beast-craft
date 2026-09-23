@@ -70,8 +70,9 @@ namespace BeastCraft.Battle
     /// customization system. <strong>The avatar's stats and level feed
     /// <see cref="DamageFormula"/> exactly as a beast's do</strong>: a damaging avatar skill (say an
     /// <see cref="SkillTargetShape.AllEnemies"/> strike) uses the avatar's <c>Attack</c> or
-    /// <c>SpecialAttack</c> and its <see cref="BattleUnit.Level"/>. Its heals and buffs are still
-    /// flat, as everyone's are, so for those its stats change nothing yet.
+    /// <c>SpecialAttack</c> and its <see cref="BattleUnit.Level"/>. Its heals (its passives' included)
+    /// are a percent of its <c>SpecialAttack</c>, as everyone's are (see
+    /// <see cref="SkillEffectApplier.HealScale"/>); its buffs are still flat.
     /// </para>
     /// <para>
     /// <strong>Level.</strong> The avatar itself has no XP and no level anywhere in the data. The
@@ -131,8 +132,9 @@ namespace BeastCraft.Battle
         /// attacking stat exactly its +2 constant: every damage effect it lands deals 2 times the
         /// element multiplier (truncated, at least 1), whatever the authored power. Before the
         /// damage formula it dealt the authored magnitude flat; a caller relying on an avatar
-        /// strike landing hard must now give the avatar stats through the other overload. Heals and
-        /// buffs it casts are unchanged, since those are still flat.
+        /// strike landing hard must now give the avatar stats through the other overload. The same goes
+        /// for heals, which scale with <c>SpecialAttack</c>: this avatar's heals restore nothing. Buffs
+        /// it casts are unchanged, since those are still flat.
         /// </para>
         /// <para>
         /// <see cref="BattleUnit.IsDefeated"/> is left <c>false</c> and stays that way: there is no

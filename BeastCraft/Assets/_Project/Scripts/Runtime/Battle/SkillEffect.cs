@@ -32,7 +32,7 @@ namespace BeastCraft.Battle
 
         /// <summary>
         /// Effect strength. Interpretation depends on <see cref="EffectType"/>: damage power (a
-        /// percent of the attacking stat), heal amount, stat change (flat, or a percent when
+        /// percent of the attacking stat), heal (a percent of the caster's <c>SpecialAttack</c>), stat change (flat, or a percent when
         /// <see cref="IsPercent"/>), and for <see cref="SkillEffectType.ApplyStatus"/> the status's
         /// potency — a shield's percent of the caster's <c>Defense</c>, a damage-over-time stack's
         /// power, a knockback's distance in hexes. Scaled by the skill's level

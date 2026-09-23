@@ -31,6 +31,9 @@ namespace BeastCraft.Tests.EditMode
         /// <summary>How far over its budget an unlimited damage skill may sit in this first draft.</summary>
         private const double BudgetCeiling = 1.2;
 
+        /// <summary>How far, in points of HP, a beast heal's share of its own HP may drift between levels 1, 50 and 100.</summary>
+        private const double HealShareTolerance = 5.0;
+
         private readonly List<ScriptableObject> _created = new List<ScriptableObject>();
 
         [TearDown]
@@ -189,6 +192,52 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
+        public void Library_BeastHealsRestoreAboutTheSameShareOfHpAtEveryLevel()
+        {
+            // Heals are a percent of the caster's SpecialAttack, which grows on the same curve as HP,
+            // so a beast's heal on itself restores about the same share of its HP at level 1, 50 and
+            // 100 (the flat heals it replaced restored ~5x more of it at level 1 than at level 100).
+            // Only whole-HP rounding at level 1 (HP 14-22) moves it.
+            SkillLibraryData library = LoadLibrary();
+            BeastRosterData roster = BeastRosterTests.LoadRoster();
+            int checkedHeals = 0;
+
+            foreach (SpeciesKitData kit in library.SpeciesKits)
+            {
+                SpeciesData species = Array.Find(roster.Species, s => s.SpeciesId == kit.SpeciesId);
+                GrowthCurveData curve = Array.Find(roster.GrowthCurves, c => c.CurveId == species.GrowthCurveId);
+                foreach (LearnEntryData entry in kit.LearnableSkills)
+                {
+                    foreach (EffectData effect in Skill(library, entry.SkillId).Effects)
+                    {
+                        if (effect.EffectType != "Heal")
+                        {
+                            continue;
+                        }
+
+                        double low = double.MaxValue;
+                        double high = double.MinValue;
+                        foreach (int level in new[] { 1, 50, 100 })
+                        {
+                            float scale = BeastRosterValidator.ScaleAtLevel(curve, level);
+                            int hp = Mathf.RoundToInt(species.BaseStats.Hp * scale);
+                            BattleUnit caster = new BattleUnit("c", BattleTeam.Player,
+                                                               new StatBlock(hp, 1, 1, Mathf.RoundToInt(species.BaseStats.SpecialAttack * scale), 1, 1), BeastCraft.Battle.Grid.HexCoordinate.Zero);
+                            double share = 100.0 * SkillEffectApplier.GetHealAmount(caster, effect.Magnitude) / hp;
+                            low = Math.Min(low, share);
+                            high = Math.Max(high, share);
+                        }
+
+                        Assert.That(high - low, Is.LessThanOrEqualTo(HealShareTolerance), kit.SpeciesId + " " + entry.SkillId + " heal share " + low + "-" + high + "% of HP");
+                        checkedHeals++;
+                    }
+                }
+            }
+
+            Assert.That(checkedHeals, Is.GreaterThan(0));
+        }
+
+        [Test]
         public void Library_EveryDefaultLoadoutDealsDamage()
         {
             SkillLibraryData library = LoadLibrary();
@@ -203,12 +252,12 @@ namespace BeastCraft.Tests.EditMode
         // ----------------------------------------------------------------------------------------
 
         [Test]
-        public void Golem_TauntsAt85Percent_ShieldsAndKnocksBack()
+        public void Golem_TauntsAt90Percent_ShieldsAndKnocksBack()
         {
             SkillLibraryData library = LoadLibrary();
             EffectData taunt = FindEffect(library, "golem", e => e.Status == "Taunt");
             Assert.IsNotNull(taunt);
-            Assert.AreEqual(85, taunt.Chance);
+            Assert.AreEqual(90, taunt.Chance, "Retuned from 85 (the authored-kits retune).");
             Assert.IsNotNull(FindEffect(library, "golem", e => e.Status == "Shield"));
             Assert.IsNotNull(FindEffect(library, "golem", e => e.Status == "Knockback"));
             AssertDefaultsInclude(library, "golem", e => e.Status == "Taunt");
@@ -306,7 +355,9 @@ namespace BeastCraft.Tests.EditMode
                                                              Array.Exists(s.Effects, e => e.ExecuteBonusPercent >= 50)));
             EffectData gaze = FindEffect(library, "basilisk", e => e.Status == "Stun");
             Assert.IsNotNull(gaze);
-            Assert.That(gaze.Chance, Is.LessThanOrEqualTo(30));
+            // Retuned from 25% to 45% (the authored-kits retune): a real petrify on a Ranged assassin,
+            // paid for under the budget rule's hard-control band (45 power on cooldown 3).
+            Assert.That(gaze.Chance, Is.LessThanOrEqualTo(50));
             Assert.IsNotNull(FindEffect(library, "basilisk", e => e.Status == "DamageOverTime"));
             Assert.IsTrue(HasSkill(library, "basilisk", s => Array.Exists(s.Effects, e => e.HitCount >= 3) ||
                                                              Array.Exists(s.Effects, e => e.AffectedStat == "CritChance")));
@@ -372,7 +423,7 @@ namespace BeastCraft.Tests.EditMode
 
             Assert.AreEqual("stone_challenge", skill.SkillId);
             Assert.AreEqual(SkillTargetShape.AreaBurst, skill.TargetShape);
-            Assert.AreEqual(2, skill.Range);
+            Assert.AreEqual(3, skill.Range, "Retuned from 2 to 3 so the taunt reaches more of an encounter.");
             Assert.AreEqual(3, skill.Cooldown);
             Assert.AreEqual(SkillSO.UseCooldownAsInitial, skill.InitialCooldown);
             Assert.AreEqual(SkillTargetSide.Enemy, skill.TargetSide);
@@ -381,7 +432,7 @@ namespace BeastCraft.Tests.EditMode
             Assert.AreEqual(1, skill.Effects.Count);
             Assert.AreEqual(SkillEffectType.ApplyStatus, skill.Effects[0].EffectType);
             Assert.AreEqual(StatusType.Taunt, skill.Effects[0].Status);
-            Assert.AreEqual(85, skill.Effects[0].Chance);
+            Assert.AreEqual(90, skill.Effects[0].Chance, "Retuned from 85.");
             Assert.AreEqual(3, skill.Progression.Tiers.Count);
 
             SkillInstance mastered = new SkillInstance(skill, 16, SkillLibraryBuilder.TierForLevel(skill.Progression, 16));
@@ -402,7 +453,7 @@ namespace BeastCraft.Tests.EditMode
             Assert.AreEqual(0, dive.InitialCooldown);
             Assert.AreEqual(1, dive.MaxUsesPerBattle);
             Assert.AreEqual(3, talons.Effects[0].HitCount);
-            Assert.AreEqual(50, coup.Effects[0].ExecuteBonusPercent);
+            Assert.AreEqual(60, coup.Effects[0].ExecuteBonusPercent, "Retuned from 50 (the authored-kits retune).");
             Assert.AreEqual(SkillTargetingCriterion.HpFraction, coup.TargetingCriterion);
             Assert.AreEqual(DamageCategory.Special, coup.Category);
         }

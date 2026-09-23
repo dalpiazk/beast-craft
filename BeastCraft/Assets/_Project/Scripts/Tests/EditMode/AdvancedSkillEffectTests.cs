@@ -389,6 +389,48 @@ namespace BeastCraft.Tests.EditMode
             Assert.AreEqual(4, new SkillLoadout(new[] { skill }).RemainingCooldown(0));
         }
 
+        // ------------------------------------------------------------------ heal scaling
+
+        [Test]
+        public void Heal_IsAPercentOfTheCastersSpecialAttack_NotTheTargets()
+        {
+            BattleUnit caster = new BattleUnit("p0", BattleTeam.Player, new StatBlock(100, 10, 10, 80, 10, 10), HexCoordinate.Zero);
+            BattleUnit target = Hurt(new BattleUnit("p1", BattleTeam.Player, new StatBlock(100, 10, 10, 0, 10, 10), HexCoordinate.Zero), 40);
+            SkillSO heal = Skill(new SkillEffect { EffectType = SkillEffectType.Heal, Magnitude = 25f });
+
+            SkillEffectApplier.Apply(new SkillActivation(heal, new[] { target }), caster);
+
+            Assert.AreEqual(60, target.CurrentHp, "25% of the caster's SpecialAttack 80 is 20");
+        }
+
+        [Test]
+        public void HealAmount_RoundsAndScalesWithHealScale_AndANullCasterHealsNothing()
+        {
+            BattleUnit caster = new BattleUnit("p0", BattleTeam.Player, new StatBlock(100, 10, 10, 15, 10, 10), HexCoordinate.Zero);
+
+            Assert.AreEqual((int)System.Math.Round(10.0 * 15 * SkillEffectApplier.HealScale / 100.0, System.MidpointRounding.AwayFromZero),
+                            SkillEffectApplier.GetHealAmount(caster, 10f));
+            Assert.AreEqual(2, SkillEffectApplier.GetHealAmount(caster, 10f), "1.5 rounds half away from zero to 2 at HealScale 1");
+            Assert.AreEqual(1, SkillEffectApplier.GetHealAmount(caster, 9f), "1.35 rounds to 1");
+            Assert.AreEqual(0, SkillEffectApplier.GetHealAmount(null, 10f));
+        }
+
+        [Test]
+        public void Heal_ReadsTheCastersLiveSpecialAttack()
+        {
+            BattleUnit caster = new BattleUnit("p0", BattleTeam.Player, new StatBlock(100, 10, 10, 50, 10, 10), HexCoordinate.Zero);
+            BattleUnit target = Hurt(new BattleUnit("p1", BattleTeam.Player, new StatBlock(100, 10, 10, 10, 10, 10), HexCoordinate.Zero), 10);
+            SkillSO heal = Skill(new SkillEffect { EffectType = SkillEffectType.Heal, Magnitude = 20f });
+            SkillSO buff = Skill(new SkillEffect { EffectType = SkillEffectType.BuffStat, AffectedStat = StatType.SpecialAttack, Magnitude = 50f, DurationTurns = 2 });
+
+            SkillEffectApplier.Apply(new SkillActivation(heal, new[] { target }), caster);
+            Assert.AreEqual(20, target.CurrentHp, "20% of 50");
+
+            SkillEffectApplier.Apply(new SkillActivation(buff, new[] { caster }), caster);
+            SkillEffectApplier.Apply(new SkillActivation(heal, new[] { target }), caster);
+            Assert.AreEqual(40, target.CurrentHp, "20% of the buffed 100");
+        }
+
         // ------------------------------------------------------------------ helpers
 
         private static SkillEffect Debuff(StatType stat, float magnitude, int duration, int maxStacks)
@@ -405,7 +447,8 @@ namespace BeastCraft.Tests.EditMode
 
         private SkillSO HealSkill(SkillTargetingCriterion criterion, SkillTargetingOrder order)
         {
-            SkillSO skill = Skill(new SkillEffect { EffectType = SkillEffectType.Heal, Magnitude = 10f });
+            // 100% of the healer's SpecialAttack (10 in Unit below): a 10 HP heal.
+            SkillSO skill = Skill(new SkillEffect { EffectType = SkillEffectType.Heal, Magnitude = 100f });
             skill.TargetShape = SkillTargetShape.SingleTarget;
             skill.TargetSide = SkillTargetSide.Ally;
             skill.TargetingCriterion = criterion;

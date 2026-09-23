@@ -240,7 +240,8 @@ namespace BeastCraft.Tests.EditMode
             skill.Effects.Add(new SkillEffect { EffectType = SkillEffectType.Heal, Magnitude = 10f });
             skill.Effects.Add(new SkillEffect { EffectType = SkillEffectType.BuffStat, AffectedStat = StatType.Attack, Magnitude = 10f, DurationTurns = 2 });
 
-            BattleUnit unit = new BattleUnit("u", BattleTeam.Player, new StatBlock(100, 50, 0, 0, 0, 10), HexCoordinate.Zero);
+            // SpecialAttack 100, so the heal's percent reads as HP: 10 x 1.3 = 13.
+            BattleUnit unit = new BattleUnit("u", BattleTeam.Player, new StatBlock(100, 50, 0, 100, 0, 10), HexCoordinate.Zero);
             unit.CurrentHp = 50;
 
             SkillEffectApplier.Apply(new SkillActivation(new SkillInstance(skill, 11), new[] { unit }), unit);

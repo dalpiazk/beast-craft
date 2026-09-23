@@ -17,13 +17,13 @@ namespace BeastCraft.Tooling.BalanceSim
         Neutral = 1
     }
 
-    /// <summary>Which skills the beasts fight with (<c>--kit standard|library</c>).</summary>
+    /// <summary>Which skills the beasts fight with (<c>--skill-kit standard|library</c>).</summary>
     public enum KitSource
     {
-        /// <summary>The standard kit (<see cref="Kit.BuildBeastKit"/>): every beast the same, so stats are what is measured. The default.</summary>
+        /// <summary>The standard kit (<see cref="Kit.BuildBeastKit"/>): every beast the same, so stats are what is measured.</summary>
         Standard = 0,
 
-        /// <summary>Each beast's authored default loadout from <c>skill-library.json</c> (<see cref="SkillLibraryKits"/>).</summary>
+        /// <summary>Each beast's authored default loadout from <c>skill-library.json</c> (<see cref="SkillLibraryKits"/>). The default: the real game setup.</summary>
         Library = 1
     }
 
@@ -218,11 +218,11 @@ namespace BeastCraft.Tooling.BalanceSim
         public bool SelfCheck;
         public bool ShowHelp;
 
-        /// <summary>The PvE avatar preset (<c>--avatar</c>); <see cref="AvatarPresets.None"/> fields no avatar.</summary>
-        public string AvatarPreset = AvatarPresets.None;
+        /// <summary>The PvE avatar preset (<c>--avatar</c>); the library avatar by default, <see cref="AvatarPresets.None"/> fields none.</summary>
+        public string AvatarPreset = AvatarPresets.Library;
 
-        /// <summary>Which skills the beasts fight with (<c>--kit standard|library</c>); standard is the committed report's setting.</summary>
-        public KitSource KitSource = KitSource.Standard;
+        /// <summary>Which skills the beasts fight with (<c>--skill-kit standard|library</c>); library is the committed report's setting.</summary>
+        public KitSource KitSource = KitSource.Library;
 
         /// <summary>The skill level library skills and passives are fielded at (<c>--skill-level</c>).</summary>
         public int SkillLevel = 1;
@@ -231,7 +231,7 @@ namespace BeastCraft.Tooling.BalanceSim
         public string SkillLibraryPath;
 
         /// <summary>
-        /// The loaded skill library, when the run needs it (<c>--kit library</c> or
+        /// The loaded skill library, when the run needs it (<c>--skill-kit library</c> or
         /// <c>--avatar library</c>). Set by <see cref="Program"/> after parsing, not a CLI option.
         /// </summary>
         public SkillLibraryKits Library;
@@ -249,10 +249,11 @@ namespace BeastCraft.Tooling.BalanceSim
             "\n" +
             "  --mode <m>                 pve | pvp | both (default both). pve = team vs encounter (primary);\n" +
             "                             pvp = the 1v1 round-robin (secondary).\n" +
-            "  --kit <k>                  elemental | neutral | both (default both): the element axis. Also standard |\n" +
-            "                             library (default standard): the skill axis; pass --kit twice to set both. standard =\n" +
-            "                             the same kit for every beast; library = each beast's DefaultLoadout from\n" +
-            "                             skill-library.json (neutral forces those skills' elements to None).\n" +
+            "  --kit <k>                  elemental | neutral | both (default both): the element axis. neutral forces every\n" +
+            "                             beast and enemy skill's element to None.\n" +
+            "  --skill-kit <k>            library | standard (default library): the skill axis. library = each beast's\n" +
+            "                             DefaultLoadout from skill-library.json (the real game setup); standard = the same\n" +
+            "                             kit for every beast, so stat lines are what is measured (adds the kit parity table).\n" +
             "  --skill-level <n>          Skill level for library skills and avatar passives, 1-20 (default 1); the tier is\n" +
             "                             the gates below that level (16+ = every gate passed).\n" +
             "  --skill-library <path>     skill-library.json (default: found by walking up from the working directory).\n" +
@@ -275,10 +276,10 @@ namespace BeastCraft.Tooling.BalanceSim
             "  --matrix-level <n>         Level the PvP win matrix and stat table are drawn at (default 50, else the highest level).\n" +
             "  --roster <path>            beast-roster.json (default: found by walking up from the working directory).\n" +
             "  --encounters-file <path>   encounters.json (default: Tooling/BalanceSim/encounters.json, found the same way).\n" +
-            "  --avatar <preset>          none | support | library (default none). PvE only: field an avatar beside the player\n" +
-            "                             team (see AvatarPresets): support = a passive-only fixture; library = the library's\n" +
-            "                             default loadout (first 3 actives + AvatarDefaultPassives) at --skill-level. none is\n" +
-            "                             the committed report's setting.\n" +
+            "  --avatar <preset>          library | support | none (default library). PvE only: field an avatar beside the\n" +
+            "                             player team (see AvatarPresets): library = the library's default loadout (first 3\n" +
+            "                             actives + AvatarDefaultPassives) at --skill-level, the committed report's setting;\n" +
+            "                             support = a passive-only fixture; none = no avatar.\n" +
             "  --out <path>               Also write the Markdown report to this file.\n" +
             "  --self-check               Run everything twice and fail unless both reports are identical; also checks the\n" +
             "                             PvE battle loop against BattleTurnExecutor.RunBattle.\n" +
@@ -321,6 +322,13 @@ namespace BeastCraft.Tooling.BalanceSim
 
                         break;
                     case "--kit":
+                        if (!TryNext(args, ref i, arg, out text, out error) || !TryParseKit(text, options.Modes, out error))
+                        {
+                            return null;
+                        }
+
+                        break;
+                    case "--skill-kit":
                         if (!TryNext(args, ref i, arg, out text, out error))
                         {
                             return null;
@@ -334,8 +342,9 @@ namespace BeastCraft.Tooling.BalanceSim
                         {
                             options.KitSource = KitSource.Library;
                         }
-                        else if (!TryParseKit(text, options.Modes, out error))
+                        else
                         {
+                            error = "--skill-kit expects library or standard, got '" + text + "'.";
                             return null;
                         }
 
@@ -657,7 +666,8 @@ namespace BeastCraft.Tooling.BalanceSim
                     modes.Add(KitMode.Neutral);
                     return true;
                 default:
-                    error = "--kit expects elemental, neutral, both, standard or library, got '" + text + "'.";
+                    error = "--kit expects elemental, neutral or both, got '" + text + "'" +
+                            (text == "standard" || text == "library" ? " (the skill axis is now --skill-kit)." : ".");
                     return false;
             }
         }

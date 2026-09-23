@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using BeastCraft.Battle;
 using BeastCraft.Creatures;
 using BeastCraft.Creatures.Roster;
 using NUnit.Framework;
@@ -25,7 +26,8 @@ namespace BeastCraft.Tests.EditMode
         private const int MaxMoveRange = 5;
         private const int MinCritChance = 0;
         private const int MaxCritChance = 25;
-        private const float MaxSpeedSpread = 1.15f;
+        private const double MinTurnRateSpread = 1.10;
+        private const double MaxTurnRateSpread = 1.15;
 
         private readonly List<ScriptableObject> _created = new List<ScriptableObject>();
 
@@ -101,21 +103,24 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
-        public void Roster_BaseSpeedsStayWithinTheSpreadBand()
+        public void Roster_TurnRateSpreadStaysInBand()
         {
-            // User decision (ATB retune): under the ATB gauge Speed is turns per unit of time, so the
-            // fastest beast's base Speed stays within 15% of the slowest's. Widening it is a design
-            // change, not a tuning move.
+            // User decision (authored-kits retune): the fastest beast gets 10-15% more turns than the
+            // slowest. Turns come from the ATB fill rate, which grows with sqrt(Speed), so this is
+            // checked on TurnManager.FillRateForSpeed of the base Speeds, not on Speed itself (a
+            // 10-15% turn spread is a roughly 21-32% base Speed spread). Every species shares the
+            // growth curve, so the ratio holds at every level up to rounding.
             int slowest = int.MaxValue;
             int fastest = int.MinValue;
             foreach (SpeciesData species in LoadRoster().Species)
             {
-                slowest = Math.Min(slowest, species.BaseStats.Speed);
-                fastest = Math.Max(fastest, species.BaseStats.Speed);
+                Assert.That(species.BaseStats.Speed, Is.GreaterThan(0), species.SpeciesId);
+                slowest = Math.Min(slowest, TurnManager.FillRateForSpeed(species.BaseStats.Speed));
+                fastest = Math.Max(fastest, TurnManager.FillRateForSpeed(species.BaseStats.Speed));
             }
 
-            Assert.That(slowest, Is.GreaterThan(0));
-            Assert.That((float)fastest / slowest, Is.LessThanOrEqualTo(MaxSpeedSpread), "fastest " + fastest + " / slowest " + slowest);
+            double ratio = (double)fastest / slowest;
+            Assert.That(ratio, Is.InRange(MinTurnRateSpread, MaxTurnRateSpread), "fastest fill rate " + fastest + " / slowest " + slowest);
         }
 
         [Test]

@@ -31,9 +31,10 @@ dotnet run --project Tooling/BalanceSim -c Release -- [options]
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `--mode <m>` | `both` | `pve`, `pvp` or `both`. |
-| `--kit <k>` | `both`, `standard` | Two axes on one flag; pass it twice to set both. Element axis: `elemental`, `neutral` or `both` (see below). Skill axis: `standard` (the standard kit, the committed report's setting) or `library` (each beast's authored `DefaultLoadout` from `skill-library.json`; see "Library kits"). |
+| `--kit <k>` | `both` | The element axis: `elemental`, `neutral` or `both` (see below). |
+| `--skill-kit <k>` | `library` | The skill axis: `library` (each beast's authored `DefaultLoadout` from `skill-library.json`, the real game setup and the committed report's setting; see "Library kits") or `standard` (the same standard kit for every beast, so the stat lines are what is measured; see "The standard kit"). Before the authored-kits retune this was `--kit standard|library`; `--kit` now takes only the element axis. |
 | `--skill-level <n>` | `1` | Skill level (1-20) for library skills and library avatar skills; the tier is the gates below that level (16+ = all three passed). |
-| `--skill-library <path>` | found by walking up | Path to `skill-library.json` (read only with `--kit library` or `--avatar library`). |
+| `--skill-library <path>` | found by walking up | Path to `skill-library.json` (read only with `--skill-kit library` or `--avatar library`, i.e. by default). |
 | `--levels <list>` | `1,50,100` | Comma-separated levels; beasts and enemies fight at the same level. |
 | `--encounter-set <s>` | `generated` | `generated`: random compositions per shape (see "Generated encounters"). `fixed`: the three hand-authored encounters (`boss`, `swarm`, `pack`). |
 | `--compositions <n>` | `8` | Generated compositions per shape. |
@@ -48,15 +49,15 @@ dotnet run --project Tooling/BalanceSim -c Release -- [options]
 | `--matrix-level <n>` | `50` | Level of the PvP win matrix and the stat table (falls back to the highest simulated level). |
 | `--roster <path>` | found by walking up | Path to `beast-roster.json`. |
 | `--encounters-file <path>` | found by walking up | Path to `encounters.json`. |
-| `--avatar <preset>` | `none` | PvE only. `none` fields no avatar (the committed report's setting). `support` fields a fixture avatar with three passive skills beside every player team (`AvatarPresets.cs`; not authored content). `library` fields the skill library's default avatar: its first three actives and `AvatarDefaultPassives`, at `--skill-level`. Either adds an "Avatar passives" section with firings per battle. See `docs/design/battle-system.md`, "Avatar passives" and "Beast skill kits". |
+| `--avatar <preset>` | `library` | PvE only. `library` (the committed report's setting) fields the skill library's default avatar: its first three actives and `AvatarDefaultPassives`, at `--skill-level`. `support` fields a fixture avatar with three passive skills beside every player team (`AvatarPresets.cs`; not authored content). `none` fields no avatar. `library` and `support` add an "Avatar passives" section with firings per battle. See `docs/design/battle-system.md`, "Avatar passives" and "Beast skill kits". |
 | `--out <path>` | none | Also write the report to this file (it always goes to stdout). |
 | `--self-check` | off | Run everything twice and fail unless both reports are identical; also replay sample PvE battles through `BattleTurnExecutor.RunBattle` and fail if the simulator's loop disagrees. |
 
 Exit codes: `0` success, `1` bad arguments, `2` missing or invalid roster, skill library or encounters
 (the roster is checked with `BeastRosterValidator` and the library with `SkillLibraryValidator`
-first, exactly as the Editor importers do), `3` a self-check failed. The run time goes to stderr, never into the report. The default run (both modes, both kits,
+first, exactly as the Editor importers do), `3` a self-check failed. The run time goes to stderr, never into the report. The default run (PvE and PvP, both element modes,
 three levels, four shapes x 8 compositions, 1 sample per team and composition) takes about
-150 s on an 8-thread machine (about 5.5 minutes with `--self-check`, which runs
+215 s on an 8-thread machine (about 8 minutes with `--self-check`, which runs
 everything twice and replays two teams per composition through `RunBattle`). PvE battles run in
 parallel, and the output is identical whatever the thread count.
 
@@ -65,12 +66,13 @@ Two reports are committed, both the default arguments:
 - `docs/balance/baseline-report.md` — the "before" picture, on the roster's first-draft stats. It is
   kept as a record and is **not** regenerated (a fresh run now reads the tuned roster). It predates
   the ATB turn order, so its battle lengths are in rounds.
-- `docs/balance/tuned-report.md` — the current roster after the second tuning pass (see
-  `docs/balance/tuning-log.md`, "Retune for ATB + stances + crits + mixed encounters"), under the
-  current Runtime (the square-root ATB turn order, the mitigation damage formula, combat stances,
-  variance and crits) and the generated encounters. It was regenerated after the formula change on
-  the **unchanged** roster, so it shows the balance shift the next retune has to absorb. Regenerate it
-  whenever the roster, fixtures, simulator or Runtime change:
+- `docs/balance/tuned-report.md` — the current roster and skill library after the third tuning pass
+  (see `docs/balance/tuning-log.md`, "Retune with authored kits, avatar passives, sqrt speed and
+  mitigation"), under the real game setup (every beast's authored default loadout, the library
+  avatar with its passives, skill level 1), the current Runtime (the square-root ATB turn order, the
+  mitigation damage formula, `SpecialAttack`-scaled heals, combat stances, variance and crits) and
+  the generated encounters. Regenerate it whenever the roster, the skill library, fixtures, simulator
+  or Runtime change:
 
 ```sh
 dotnet run --project Tooling/BalanceSim -c Release -- --out docs/balance/tuned-report.md
@@ -78,27 +80,31 @@ dotnet run --project Tooling/BalanceSim -c Release -- --out docs/balance/tuned-r
 
 ## Library kits
 
-`--kit library` replaces the standard kit with each beast's authored `DefaultLoadout` from
+The default, `--skill-kit library`, fields each beast's authored `DefaultLoadout` from
 `BeastCraft/Assets/_Project/Data/Skills/skill-library.json` (`SkillLibraryLoader.cs`), built through
 `SkillLibraryBuilder` — the same DTO-to-`SkillSO` mapping as the Editor importer — and fielded as
 `SkillInstance`s at `--skill-level` and the tier that level implies. In `neutral` mode every library
-skill's element is forced to `None`. The report then shows a "Library beast kits" table in place of
-the standard kit and drops the kit parity table (it measures the standard kit's Strike / Shot / Blast
-balance; library kits differ by design). PvP uses the library kits too. `--avatar library` fields the
-library's default avatar (first three actives, `AvatarDefaultPassives`) on the same skill level; the
-avatar's stats are the same level-scaled fixture block as `support`'s.
+skill's element is forced to `None`. The report shows a "Library beast kits" table in place of the
+standard kit and has no kit parity table (it measures the standard kit's Strike / Shot / Blast
+balance; library kits differ by design). PvP uses the library kits too. The default `--avatar
+library` fields the library's default avatar (first three actives, `AvatarDefaultPassives`) on the
+same skill level. The avatar's stats (either preset) are a fixture block: 100 in every combat stat
+at max level, scaled by the roster's growth curve like a beast's (15 at level 1, 57 at level 50), so
+its shields (a percent of its Defense) and heals (a percent of its SpecialAttack) are the same share
+of a beast's HP at every level.
 
-The default stays `--kit standard --avatar none`, so the committed report is unchanged until the
-retune that adopts the library kits. For a quick check:
+This is the real game setup and the committed report's. `--skill-level 10` is the sanity run the
+tuning log reports beside it. For a quick check:
 
 ```sh
-dotnet run --project Tooling/BalanceSim -c Release -- --kit library --avatar library --self-check --mode pve --levels 50 --compositions 2
+dotnet run --project Tooling/BalanceSim -c Release -- --self-check --mode pve --levels 50 --compositions 2
 ```
 
 ## The standard kit
 
-With the default `--kit standard`, every beast fights with the same kit, and its stat line is what gets
-measured. Fire priority is Blast, the physical single-target skill, then Burst. Every beast skill
+With `--skill-kit standard` (add `--avatar none` for the pre-retune setting), every beast fights
+with the same kit, and its stat line is what gets measured. This was the default until the
+authored-kits retune; the kit parity table and the power derivation below apply only to it. Fire priority is Blast, the physical single-target skill, then Burst. Every beast skill
 aims at the nearest enemy. The physical skill depends on the beast's combat stance (see "Runtime
 rules" below): Vanguard and Skirmisher beasts carry Strike (range 1), which walks them into melee;
 Ranged beasts, which never walk into melee, carry Shot (range 3) instead.
@@ -152,7 +158,8 @@ cooldown 2 weighted `Attack` about twice as heavily.
 ## PvE: team vs encounter
 
 - **Teams.** Every combination of `--team-size` distinct beasts (210 teams of 4, format
-  `SmallGroup`; each beast is in 84). No gear, no avatar.
+  `SmallGroup`; each beast is in 84). No gear; the `--avatar` preset (by default the library avatar)
+  fights beside every team.
 - **Encounters.** `encounters.json` beside this file. **These are simulator fixtures, not game
   content:** synthetic enemies that are not roster beasts, and no game code reads them. Each enemy
   becomes an in-memory `CreatureSpeciesSO` on the roster's `medium` growth curve, so it is built by
@@ -360,8 +367,9 @@ beast's observed crit rate and average roll multiplier against its authored chan
 
 **Noise.** Rerunning the default PvE run with `--seed 777` (which also draws different compositions,
 so it measures composition sampling as well as roll noise) moves a beast's overall marginal by
-2.0 points on average and at most 4.8 (`elemental`; 1.2 and 3.2 in `neutral`), and a single
-shape cell by up to 12.6 (`elemental`, where the drawn elements matter most); see the tuning log. Raise `--compositions` or
+2.2 points on average and at most 4.2 (`elemental`; 2.0 and 6.2 in `neutral`), and a single
+shape cell by up to 16.5 (library setup, after the authored-kits retune; the standard kit measured
+2.0 / 4.8 / 12.6); see the tuning log. Raise `--compositions` or
 `--samples` to shrink it (the run time grows in proportion).
 
 ## Determinism
@@ -377,8 +385,10 @@ fixtures, code and arguments produce a byte-identical report.
 
 ## Design assumptions (and what they bias)
 
-- **One kit for everyone.** Real beasts will have authored skills. A special attacker is no longer
-  under-rated relative to a physical one, but no beast is played to its strengths either.
+- **Default loadouts only.** Every beast fields its three authored default skills at one skill level
+  (default 1) for the whole run; the other learnable skills and passives are never fielded, and the
+  player's loadout choices are not modelled. (With `--skill-kit standard`, one kit for everyone: no
+  beast is played to its strengths.)
 - **Simple targeting, stance-only tactics.** Beasts and most enemies hit the nearest enemy, so
   whoever is in front takes most of the hits; the stalker, the caster, the champion's hex (and, in
   the fixed set, the wisps and stingers) pick off the beast with the least current HP. Beyond the
@@ -390,7 +400,8 @@ fixtures, code and arguments produce a byte-identical report.
   pool is small and hand-made: which types exist, and how often each is drawn, is itself a bias.
 - **Large creatures are one hex.** `HexGrid` has no multi-hex footprint, so the boss can be
   surrounded by six attackers. This is an open item in the design doc.
-- **No gear, no avatar,** and only species base stats, the growth curve and the level.
+- **No gear,** a fixture avatar stat block, and only species base stats, the growth curve and the
+  level.
 
 All tunables (kit numbers, calibration bounds, flag thresholds, element-scheme weights, CLI
 defaults) are constants at the top of `SimOptions.cs`; enemy types, shapes and the fixed encounters

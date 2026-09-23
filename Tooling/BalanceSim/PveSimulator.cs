@@ -132,7 +132,8 @@ namespace BeastCraft.Tooling.BalanceSim
         {
             _options = options;
             _species = species;
-            Avatar = new AvatarPresets(options.AvatarPreset, options.Library);
+            // Every species shares the medium curve; the avatar's fixture stats follow it too.
+            Avatar = new AvatarPresets(options.AvatarPreset, options.Library, species.Count > 0 ? species[0].GrowthRate : null);
             _elementalKits = new SkillSO[species.Count][];
             _neutralKits = new SkillSO[species.Count][];
             for (int i = 0; i < species.Count; i++)
@@ -557,7 +558,7 @@ namespace BeastCraft.Tooling.BalanceSim
 
         /// <summary>
         /// A fresh loadout for a player beast: the standard kit (the default), or with
-        /// <c>--kit library</c> its authored default loadout at <c>--skill-level</c>.
+        /// <c>--skill-kit library</c> its authored default loadout at <c>--skill-level</c>.
         /// </summary>
         private SkillLoadout BeastLoadout(int speciesIndex, KitMode mode)
         {

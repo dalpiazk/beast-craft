@@ -409,7 +409,7 @@ namespace BeastCraft.Tests.EditMode
 
                 if (h % 2 == 0)
                 {
-                    // The heal between the two damage effects: flat, no roll.
+                    // The heal between the two damage effects: 3% of the caster's SpecialAttack 100, no roll.
                     if (h < 2)
                     {
                         expectedFirst += 3;
@@ -427,9 +427,10 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
-        public void Heal_IsFlatWithAnRng()
+        public void Heal_ScalesWithSpecialAttack_AndTakesNoDraws()
         {
-            BattleUnit target = Unit("t", new StatBlock(100, 1, 1, 1, 1, 1), 1);
+            // SpecialAttack 200: a magnitude-7 heal is 7% of 200 = 14 HP.
+            BattleUnit target = Unit("t", new StatBlock(100, 1, 1, 200, 1, 1), 1);
             target.CurrentHp = 50;
             SkillSO heal = ScriptableObject.CreateInstance<SkillSO>();
             heal.Effects.Add(new SkillEffect { EffectType = SkillEffectType.Heal, Magnitude = 7f });
@@ -439,7 +440,7 @@ namespace BeastCraft.Tests.EditMode
 
             SkillEffectApplier.Apply(new SkillActivation(heal, new[] { target }), target, rng);
 
-            Assert.AreEqual(57, target.CurrentHp);
+            Assert.AreEqual(64, target.CurrentHp);
             Assert.AreEqual(mirror.Next(), rng.Next(), "a heal takes no draws");
         }
 

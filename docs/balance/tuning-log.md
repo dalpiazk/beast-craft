@@ -1014,6 +1014,9 @@ points.
 
 ### TODO for the retune deliverable
 
+Done in "Retune with authored kits, avatar passives, sqrt speed and mitigation" below (against the
+library kits rather than the standard kit, so Strike / Shot parity was not re-derived).
+
 - **Replace the speed-band roster test.** `BeastRosterTests` still pins base Speed to fastest /
   slowest ≤ 1.15 (the stat). Under the square-root gauge that constrains the wrong quantity. Replace
   it with a **turn-ratio** test: `FillRateForSpeed(fastest) / FillRateForSpeed(slowest)` in
@@ -1070,3 +1073,323 @@ Read-outs for the retune (first impressions, one seed):
 - **Avatar passives:** Keen Eye and Opening Ward fire once per battle as designed; Last Stand fires
   2.98 times per battle on average (40% threshold, cooldown 2) — likely the strongest default
   passive per slot.
+
+## Retune with authored kits, avatar passives, sqrt speed and mitigation
+
+The third tuning pass, and the first against the real game setup: every beast fights with its
+authored `DefaultLoadout` from `skill-library.json`, beside the library avatar (its three default
+actives and passives), at skill level 1, under the square-root ATB gauge and the `A²/(A+D)`
+mitigation formula. This is now the **simulator's default** (`--skill-kit library --avatar
+library`), and `tuned-report.md` is regenerated from it. Both the roster's base stats and the skill
+numbers were tuned. Stances, growth curves, elements, formulas, the encounter generator and enemy
+pool, skill identities and default loadouts did not change.
+
+Three engine and tooling changes came first:
+
+- **Heals scale.** A `Heal` restores `Magnitude / 100 × caster SpecialAttack × HealScale`
+  (`SkillEffectApplier.HealScale` = 1.0), rounded to whole HP, scaled by skill level, with no defense,
+  crit or variance (and so no rng draws). Passive heals read the avatar's `SpecialAttack`. Every
+  heal magnitude was first rescaled to restore what it did at level 50 for its caster
+  (`new = old × 100 / caster's level-50 SpA`), then tuned (see "Heal scaling check" below).
+- **The avatar fixture follows the growth curve.** The sim's avatar stat block was `10 + level` in
+  every stat; it is now `round(100 × medium scale)` (15 / 57 / 100 at levels 1 / 50 / 100), so its
+  shields and heals are the same share of a beast's HP at every level.
+- **`--skill-kit standard|library`** replaces the overloaded `--kit standard|library`; `--kit` is
+  only the element axis again. The defaults flipped to `--skill-kit library --avatar library`
+  (`--skill-level 1`). The standard kit and its kit parity table remain available with
+  `--skill-kit standard`.
+
+**The speed rule is now in turns.** The fastest beast gets 10–15% more turns than the slowest
+(user). Turns grow with `sqrt(Speed)`, so the old 1.14× Speed band (92–105) was only 1.069× turns.
+Base Speed now spans **88–110 (1.25×), a 1.118× turn ratio** (`FillRateForSpeed` 1049 / 938), in
+the approved order. `BeastRosterTests.Roster_TurnRateSpreadStaysInBand` replaces the Speed-stat band
+test and pins the fill-rate ratio to 1.10–1.15; the order test is unchanged.
+
+### Targets
+
+As in the second pass, on the **mean of three base seeds** (12345, 777, 4242), generated set,
+levels 1 / 50 / 100, both modes, library setup:
+
+1. Overall marginal within ±5 for every beast in `elemental`; aim for ±7 in `neutral`.
+2. Every beast top 3 in at least one shape (`elemental` primary).
+3. No beast top 3 in every shape.
+4. Tanks (Golem, Leviathan) should find a niche beyond hordes thanks to taunt.
+5. At `--skill-level 10` the spread should not blow up.
+
+Hard constraints: turn ratio 1.10–1.15 with the approved order; six-stat totals 570–630; Move 2–5;
+Crit 0–25 (glass cannons and assassins high, tanks low); archetypes and signature skills kept; the
+skill budget rule as the guide.
+
+### Stats, before → after
+
+Max-level base stats. **Turn rate** is `FillRateForSpeed(Spe) / 1000`, turns per unit of normalized
+time relative to a Speed-100 unit. Move and Crit did not change.
+
+| Beast | HP | Atk | Def | SpA | SpD | Spe | Total | Turn rate | Move | Crit |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Thunderbird | 110 | 117 | 88 | 114 | 91 | 105 → **110** | 625 → **630** | 1.025 → **1.049** | 4 | 15% |
+| Griffin | 106 → **116** | 112 → **118** | 91 → **97** | 91 → **85** | 91 | 104 → **108** | 595 → **615** | 1.020 → **1.039** | 5 | 8% |
+| Basilisk | 103 | 94 | 79 | 153 → **117** | 94 | 102 → **105** | 625 → **592** | 1.010 → **1.025** | 5 | 12% |
+| Phoenix | 92 | 102 | 70 | 120 | 85 | 101 → **104** | 570 → **573** | 1.005 → **1.020** | 4 | 10% |
+| Kirin | 115 | 51 | 90 | 150 → **149** | 124 | 100 → **101** | 630 | 1.000 → **1.005** | 4 | 5% |
+| Frost Wyrm | 98 | 74 | 124 | 103 | 118 | 98 → **99** | 615 → **616** | 0.990 → **0.995** | 3 | 5% |
+| Tarasque | 112 | 137 → **130** | 127 | 54 | 78 | 97 | 605 → **598** | 0.985 → **0.985** | 3 | 6% |
+| Leviathan | 122 | 86 | 126 | 86 | 100 | 95 → **94** | 615 → **614** | 0.975 → **0.970** | 3 | 3% |
+| Treant | 134 | 87 → **77** | 98 | 93 → **105** | 124 | 94 → **92** | 630 | 0.970 → **0.959** | 3 | 3% |
+| Golem | 146 → **150** | 95 → **109** | 137 | 64 → **50** | 96 | 92 → **88** | 630 | 0.959 → **0.938** | 2 | 2% |
+
+- **Speed widened** to reach the turn ratio: +5 Thunderbird, +4 Griffin, +3 Basilisk and Phoenix,
+  +1 Kirin and Frost Wyrm, −1 Leviathan, −2 Treant, −4 Golem.
+- **Basilisk −36 SpA** (153 → 117). It was +15.9 `elemental` / +30.1 `neutral` and top in every
+  shape: execute, stacking poison and the highest SpA compounded. Its power now lives in its kit
+  (execute, poison, a 45% petrify), so it is no longer the highest-SpA beast (Kirin is), and its
+  total fell to 592. It keeps low Def (79), Move 5 and the second-highest crit.
+- **Unused stats moved to used ones.** Golem's `SpecialAttack` (no special skill in its kit) went
+  into Attack (95 → 109, SpA 64 → 50); Treant's Attack (no physical skill) into SpA (87 → 77,
+  93 → 105), which now also powers its heals; Griffin's SpA into HP, Attack and Defense (total
+  595 → 615).
+- **Tarasque −7 Atk** (137 → 130): it was top 3 in three shapes; it is still the highest Atk.
+- Archetypes hold: Golem highest HP and Def, slowest, Move 2; Tarasque highest Atk and
+  second-highest Def; Leviathan third in HP and Def; Treant second-highest HP and joint-highest SpD;
+  Thunderbird fastest with the highest crit; Griffin second-fastest, Move 5; Kirin highest SpA and
+  lowest Atk; Phoenix lowest HP and Def and the lowest total.
+
+### Skill changes
+
+Magnitudes at skill level 1 (before level scaling). "Heal rescale" is the mechanical conversion to
+`SpecialAttack`-scaled heals; the rest is this pass's tuning.
+
+| Skill | Owner (slot) | Change | Why |
+| --- | --- | --- | --- |
+| Deep Shell `deep_shell` | Leviathan (3) | Heal 12 → 24 | Heal rescale |
+| Tidal Renewal `tidal_renewal` | Leviathan (–) | Heal 14 → 29 | Heal rescale |
+| Verdant Mend `verdant_mend` | Treant (2) | Heal 18 → 34 → **40** | Heal rescale, then tuned: Treant was −6.3 |
+| Bark Ward `bark_ward` | Treant (3) | L10 bonus Heal 6 → 11 | Heal rescale |
+| Lifebloom `lifebloom` | Treant (–) | Heal 10 → 19 | Heal rescale |
+| Rebirth Flame `rebirth_flame` | Phoenix (3) | Heal 30 → 44 | Heal rescale |
+| Sacred Spring `sacred_spring` | Kirin (1) | Heal 12 → 14 → **20** | Heal rescale, then tuned: Kirin had no top-3 shape |
+| Purifying Ward `purifying_ward` | Kirin (–) | L10 bonus Heal 6 → 7 | Heal rescale |
+| Halo `halo` | Kirin (–) | Heal 16 → 19 | Heal rescale |
+| Mending Light `mending_light` | Avatar active (2) | Heal 8 → 13 | Heal rescale (the old fixture's SpA 60 at level 50) |
+| Verdant Pulse `verdant_pulse` | Avatar passive (–) | Heal 3 → 5 | Heal rescale |
+| Boulder Slam `boulder_slam` | Golem (1) | Damage 75 → **85** | Golem was bottom 3 everywhere; see the budget note in the design doc |
+| Stone Challenge `stone_challenge` | Golem (2) | Range 2 → **3**, Taunt 2t → **3t**, 85% → **90%** | The taunt is the tank's niche; at radius 2 it caught too little of an encounter |
+| Granite Bulwark `granite_bulwark` | Golem (3) | Range 1 → **2**, Shield 35% → **70%** Def | The Golem's biggest single lever (a sensitivity run at 70% and cooldown 2 took it from −12 to −1 `elemental`); settled at cooldown 3 |
+| Serpent Bite `serpent_bite` | Leviathan (1) | Damage 75 → **82** | Leviathan's squad weakness |
+| Iron Crush `iron_crush` | Tarasque (2) | Damage 180 → **155** | Tarasque held three top-3 shapes, +5 overall |
+| Rime Bolt `rime_bolt` | Frost Wyrm (1) | Damage 50 → **48** | Frost Wyrm crowding the elite and horde slots |
+| Frost Breath `frost_breath` | Frost Wyrm (3) | Damage 45 → **42** | Same |
+| Thunder Talons `thunder_talons` | Thunderbird (1) | 32 → **33** × 3 hits | `neutral` −9.5 (DPT 99 = 1.1× the melee budget) |
+| Chain Lightning `chain_lightning` | Thunderbird (2) | 22 → **25** × 3 hits | Same |
+| Gale Talon `gale_talon` | Griffin (2) | Damage 88 → 92 → **89** | Griffin was −5.8; backed off once its bulk rose |
+| Wind Lance `wind_lance` | Griffin (1) | Damage 105 → **110** | Griffin had no top-3 shape |
+| Gust `gust` | Griffin (3) | Damage 45 → **55** | Griffin's horde −11 |
+| Flame Wave `flame_wave` | Phoenix (2) | Damage 95 → **90** | Free a horde slot for Kirin |
+| Radiant Bolt `radiant_bolt` | Kirin (3) | Damage 58 → **62** | Kirin had no top-3 shape |
+| Venom Spit `venom_spit` | Basilisk (1) | DoT 18 → **15** | Basilisk +30 `neutral` |
+| Coup de Grace `coup_de_grace` | Basilisk (2) | Damage 110 → 95 → **105**, execute +50% → **+60%** | Cut with the SpA, then partly restored so the assassin keeps a niche |
+| Petrifying Gaze `petrifying_gaze` | Basilisk (3) | Stun 25% → **45%** | Basilisk's elite niche (a real petrify on the boss), paid for under the hard-control band |
+
+Every unlimited damage skill stays at or below 1.2× its budget, and the rule's numbers did not move
+(the budget test is unchanged). Golem's Boulder Slam (85, above a tank's ≈ 0.8×) and Thunder Talons
+(99, exactly 1.1×) are the two defaults above their role-scaled guide; the design doc justifies
+both. `SkillLibraryTests` pins that moved: Stone Challenge range 3 and chance 90, Coup de Grace
+execute 60, and the Basilisk petrify bound (≤ 30% → ≤ 50%).
+
+### Marginal clear rate, before → after (mean of 3 seeds, generated set, library setup)
+
+Points of clear rate, levels 1 / 50 / 100 averaged, then averaged over seeds 12345 / 777 / 4242;
+(n) = rank within the shape on the mean. **Before** = the roster and kits at the start of this pass
+with heal scaling applied (and the old `10 + level` avatar fixture), library setup.
+
+**Before, `elemental`:**
+
+| Beast | `solo` | `elite` | `squad` | `horde` | Overall | Top-3 shapes |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Basilisk | +14.2 (1) | +19.0 (1) | +17.8 (1) | +12.4 (1) | +15.9 (1) | 4 |
+| Tarasque | +9.5 (2) | +2.0 (3) | +12.3 (2) | −7.9 (9) | +4.0 (2) | 3 |
+| Thunderbird | +7.4 (3) | −7.7 (10) | +3.4 (4) | +2.7 (4) | +1.5 (3) | 1 |
+| Phoenix | −6.2 (10) | −2.4 (6) | +7.6 (3) | +1.5 (5) | +0.1 (4) | 1 |
+| Frost Wyrm | −6.1 (9) | +1.8 (4) | −3.6 (7) | +3.6 (3) | −1.1 (5) | 1 |
+| Griffin | −4.5 (6) | −3.9 (7) | −1.7 (6) | +5.1 (2) | −1.2 (6) | 1 |
+| Kirin | −3.6 (5) | −1.1 (5) | −1.0 (5) | −2.1 (7) | −1.9 (7) | 0 |
+| Leviathan | −5.3 (7) | +2.0 (2) | −10.4 (8) | −0.5 (6) | −3.6 (8) | 1 |
+| Treant | +0.4 (4) | −5.8 (9) | −13.4 (10) | −6.5 (8) | −6.3 (9) | 0 |
+| Golem | −6.0 (8) | −3.9 (8) | −10.9 (9) | −8.2 (10) | −7.2 (10) | 0 |
+
+**Before, `neutral`:**
+
+| Beast | `solo` | `elite` | `squad` | `horde` | Overall | Top-3 shapes |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Basilisk | +40.9 (1) | +36.3 (1) | +25.5 (1) | +17.9 (1) | +30.1 (1) | 4 |
+| Griffin | +1.8 (2) | −2.4 (7) | +1.5 (4) | +4.6 (2) | +1.4 (2) | 2 |
+| Tarasque | +0.2 (4) | +2.0 (2) | +9.7 (2) | −6.9 (10) | +1.2 (3) | 2 |
+| Kirin | 0.0 (5) | +0.8 (4) | +1.1 (5) | +0.5 (4) | +0.6 (4) | 0 |
+| Frost Wyrm | −4.2 (7) | −1.5 (6) | −2.0 (7) | −0.8 (5) | −2.1 (5) | 0 |
+| Phoenix | −13.1 (9) | −8.7 (8) | +2.4 (3) | +3.7 (3) | −3.9 (6) | 2 |
+| Leviathan | −2.7 (6) | +1.1 (3) | −11.4 (8) | −4.0 (7) | −4.3 (7) | 1 |
+| Treant | +1.0 (3) | −1.3 (5) | −13.8 (10) | −5.4 (8) | −4.9 (8) | 1 |
+| Golem | −7.8 (8) | −11.2 (9) | −12.3 (9) | −3.6 (6) | −8.7 (9) | 0 |
+| Thunderbird | −15.9 (10) | −15.0 (10) | −0.8 (6) | −6.1 (9) | −9.5 (10) | 0 |
+
+**After, `elemental` (primary):**
+
+| Beast | `solo` | `elite` | `squad` | `horde` | Overall | Top-3 shapes |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Tarasque | +4.6 (2) | −0.3 (7) | +10.1 (1) | −3.7 (8) | +2.7 (1) | 2 |
+| Thunderbird | +8.5 (1) | −5.3 (10) | +2.9 (4) | +3.6 (2) | +2.4 (2) | 2 |
+| Griffin | +2.5 (4) | +2.3 (4) | +3.7 (3) | −4.6 (10) | +1.0 (3) | 1 |
+| Kirin | −2.0 (7) | +1.1 (5) | +1.5 (7) | +2.2 (3) | +0.7 (4) | 1 |
+| Phoenix | −7.0 (10) | −3.7 (8) | +9.8 (2) | +1.5 (4) | +0.2 (5) | 1 |
+| Basilisk | −0.2 (6) | +2.9 (2) | +1.8 (5) | −4.1 (9) | +0.1 (6) | 1 |
+| Frost Wyrm | −6.7 (9) | +0.5 (6) | +1.6 (6) | +4.0 (1) | −0.1 (7) | 1 |
+| Golem | 0.0 (5) | +2.4 (3) | −7.1 (8) | −0.6 (7) | −1.3 (8) | 1 |
+| Leviathan | −3.8 (8) | +4.2 (1) | −12.5 (10) | +1.2 (5) | −2.7 (9) | 1 |
+| Treant | +4.0 (3) | −3.9 (9) | −11.8 (9) | +0.3 (6) | −2.9 (10) | 1 |
+
+**After, `neutral`:**
+
+| Beast | `solo` | `elite` | `squad` | `horde` | Overall | Top-3 shapes |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Basilisk | +16.9 (1) | +12.9 (1) | +7.9 (1) | −1.8 (6) | +9.0 (1) | 3 |
+| Kirin | +2.6 (6) | +9.3 (2) | +6.3 (4) | +5.4 (2) | +5.9 (2) | 2 |
+| Griffin | +7.5 (3) | +7.3 (3) | +4.9 (5) | −7.6 (10) | +3.0 (3) | 2 |
+| Treant | +8.7 (2) | +3.0 (4) | −11.3 (9) | +4.0 (4) | +1.1 (4) | 1 |
+| Golem | +6.0 (4) | −1.7 (6) | −7.9 (8) | +5.9 (1) | +0.6 (5) | 1 |
+| Tarasque | −6.0 (7) | −2.2 (7) | +6.8 (2) | −2.6 (8) | −1.0 (6) | 1 |
+| Leviathan | +5.2 (5) | +1.6 (5) | −14.9 (10) | 0.0 (5) | −2.0 (7) | 0 |
+| Frost Wyrm | −7.2 (8) | −4.9 (8) | +3.8 (6) | −1.9 (7) | −2.6 (8) | 0 |
+| Phoenix | −16.2 (9) | −10.2 (9) | +6.7 (3) | +4.3 (3) | −3.9 (9) | 2 |
+| Thunderbird | −17.7 (10) | −15.0 (10) | −2.3 (7) | −5.6 (9) | −10.1 (10) | 0 |
+
+Per single seed the `elemental` overall ranges −5.4 (Treant, seed 777) … +4.6 (Thunderbird,
+12345), and `neutral` −13.1 (Thunderbird, 12345) … +9.5 (Basilisk, 4242). The committed
+`tuned-report.md` is seed 12345 alone.
+
+### Targets: met and missed (on the 3-seed mean)
+
+| # | Target | Result |
+| --- | --- | --- |
+| 1 | `elemental` overall within ±5 | **Met**: −2.9 … +2.7 (spread 5.6, from 23.1). |
+| 1 | `neutral` overall within about ±7 | **Missed by two beasts**: Basilisk +9.0 and Thunderbird −10.1; the other eight are −3.9 … +5.9 (spread 19.1, from 39.6). |
+| 2 | Every beast top 3 in ≥ 1 shape (`elemental`) | **Met on the mean**, ten of ten, with no slack: Golem holds the elite's 3rd place at +2.4 against Griffin's +2.3. Per single seed two beasts miss each time (12345: Treant, Basilisk; 777: Kirin, Griffin; 4242: Kirin, Leviathan). |
+| 2 | Same, `neutral` (secondary) | Eight of ten; Leviathan and Frost Wyrm have none. |
+| 3 | No beast top 3 in every shape | **Met** in both modes (the most is Basilisk, three shapes in `neutral`). |
+| 4 | Tanks find a niche beyond hordes | **Yes, the elite.** `elemental`: Leviathan is 1st against the elite (+4.2; it was already 2nd before this pass) and Golem 3rd (+2.4, from 8th). `neutral`: Golem is 1st against the horde and 4th against the giant (+6.0); Leviathan 5th against the giant. Taunt plus the Golem's area shield is what does it. Both stay in the bottom three against the squad (−7.1 and −12.5 `elemental`, with Treant), whose archers and casters stay out of taunt range. |
+| 5 | Skill level 10 does not blow up | **Met**; see below. |
+| – | Hard constraints | **Met**: turn ratio 1.118 (Speed 88–110), order as approved, totals 573–630, Move and Crit unchanged, signature skills kept. |
+
+### Skill level 10 sanity check
+
+The final data at `--skill-level 10` (every skill and passive at ×1.27 magnitude, the level-5 and
+level-10 tier gates passed), same seeds:
+
+**`elemental`:**
+
+| Beast | `solo` | `elite` | `squad` | `horde` | Overall | Top-3 shapes |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Tarasque | +8.3 (1) | −0.3 (7) | +9.5 (2) | −3.7 (8) | +3.5 (1) | 2 |
+| Phoenix | −5.3 (9) | −0.9 (8) | +11.8 (1) | +2.8 (3) | +2.1 (2) | 2 |
+| Thunderbird | +6.8 (2) | −3.7 (9) | +3.1 (4) | +2.0 (4) | +2.1 (3) | 1 |
+| Kirin | +1.0 (4) | +1.5 (4) | +2.8 (5) | +2.8 (2) | +2.0 (4) | 1 |
+| Frost Wyrm | −8.1 (10) | +1.4 (5) | +1.2 (6) | +8.3 (1) | +0.7 (5) | 1 |
+| Griffin | −0.7 (7) | +2.2 (2) | +4.1 (3) | −5.2 (10) | +0.1 (6) | 2 |
+| Basilisk | +0.7 (5) | +1.6 (3) | −0.3 (7) | −4.9 (9) | −0.7 (7) | 1 |
+| Golem | −0.6 (6) | +3.3 (1) | −7.1 (8) | −0.6 (6) | −1.2 (8) | 1 |
+| Leviathan | −4.1 (8) | +0.3 (6) | −12.4 (9) | −0.5 (5) | −4.2 (9) | 0 |
+| Treant | +2.0 (3) | −5.3 (10) | −12.8 (10) | −1.1 (7) | −4.3 (10) | 1 |
+
+**`neutral`:**
+
+| Beast | `solo` | `elite` | `squad` | `horde` | Overall | Top-3 shapes |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Basilisk | +10.1 (3) | +11.9 (1) | +5.6 (4) | −0.8 (6) | +6.7 (1) | 2 |
+| Kirin | +5.7 (4) | +7.2 (2) | +6.6 (3) | +5.2 (2) | +6.2 (2) | 3 |
+| Griffin | +19.0 (1) | +2.0 (4) | +7.1 (2) | −6.9 (10) | +5.3 (3) | 2 |
+| Golem | +11.2 (2) | −0.5 (6) | −8.5 (8) | +4.9 (3) | +1.8 (4) | 2 |
+| Frost Wyrm | −7.0 (8) | +0.6 (5) | +4.4 (6) | +8.4 (1) | +1.6 (5) | 1 |
+| Treant | +4.2 (5) | +5.3 (3) | −11.9 (9) | +3.0 (5) | +0.1 (6) | 1 |
+| Tarasque | −3.1 (6) | −3.3 (8) | +5.0 (5) | −5.9 (8) | −1.8 (7) | 0 |
+| Phoenix | −14.3 (9) | −7.8 (9) | +7.3 (1) | +3.7 (4) | −2.8 (8) | 1 |
+| Leviathan | −6.6 (7) | −2.2 (7) | −14.1 (10) | −4.7 (7) | −6.9 (9) | 0 |
+| Thunderbird | −19.1 (10) | −13.2 (10) | −1.4 (7) | −6.8 (9) | −10.2 (10) | 0 |
+
+The spread holds: `elemental` −4.3 … +3.5 (spread 7.8 against 5.6 at level 1) with every beast
+still inside ±5. Leviathan loses its elite slot (to Golem, Griffin and Basilisk), so it has no
+top-3 shape, the only target-2 miss. `neutral` is −10.2 … +6.7. The level-10 tier bonuses (mostly
+small debuffs, shields and heals) favour Kirin and Phoenix slightly and cost Leviathan and Treant.
+
+### Heal scaling check
+
+A beast's heal cast on itself, as a share of its own HP at levels 1 / 50 / 100 (heal / HP in
+parentheses); the avatar's heals against the roster's mean HP. **Before** (flat HP, start of the
+pass):
+
+| Heal | Caster | Magnitude | L1 | L50 | L100 |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Deep Shell | leviathan | 12 | 67% (12/18) | 17% (12/70) | 10% (12/122) |
+| Tidal Renewal | leviathan | 14 | 78% (14/18) | 20% (14/70) | 11% (14/122) |
+| Verdant Mend | treant | 18 | 90% (18/20) | 24% (18/76) | 13% (18/134) |
+| Lifebloom | treant | 10 | 50% (10/20) | 13% (10/76) | 7% (10/134) |
+| Rebirth Flame | phoenix | 30 | 214% (30/14) | 57% (30/53) | 33% (30/92) |
+| Sacred Spring | kirin | 12 | 71% (12/17) | 18% (12/66) | 10% (12/115) |
+| Halo | kirin | 16 | 94% (16/17) | 24% (16/66) | 14% (16/115) |
+| Mending Light | avatar (sim fixture), vs mean beast HP | 8 | 47% (8/17) | 12% (8/65) | 7% (8/114) |
+| Verdant Pulse | avatar (sim fixture), vs mean beast HP | 3 | 18% (3/17) | 5% (3/65) | 3% (3/114) |
+
+**After** (`SpecialAttack`-scaled, final numbers; the avatar is the curve-following fixture):
+
+| Heal | Caster | Magnitude | L1 | L50 | L100 |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Deep Shell | leviathan | 24 | 17% (3/18) | 17% (12/70) | 17% (21/122) |
+| Tidal Renewal | leviathan | 29 | 22% (4/18) | 20% (14/70) | 20% (25/122) |
+| Verdant Mend | treant | 40 | 30% (6/20) | 32% (24/76) | 31% (42/134) |
+| Lifebloom | treant | 19 | 15% (3/20) | 14% (11/76) | 15% (20/134) |
+| Rebirth Flame | phoenix | 44 | 57% (8/14) | 57% (30/53) | 58% (53/92) |
+| Sacred Spring | kirin | 20 | 24% (4/17) | 26% (17/66) | 26% (30/115) |
+| Halo | kirin | 19 | 24% (4/17) | 24% (16/66) | 24% (28/115) |
+| Mending Light | avatar (sim fixture), vs mean beast HP | 13 | 12% (2/17) | 11% (7/66) | 11% (13/115) |
+| Verdant Pulse | avatar (sim fixture), vs mean beast HP | 5 | 6% (1/17) | 5% (3/66) | 4% (5/115) |
+
+Every heal is now flat across levels to within 2 points (whole-HP rounding at level 1, where HP is
+14–22). `SkillLibraryTests.Library_BeastHealsRestoreAboutTheSameShareOfHpAtEveryLevel` holds a
+beast heal's drift under 5 points. With the old `10 + level` avatar block, Mending Light would have
+been 6% at level 1 against 12% at level 50.
+
+### Iteration log
+
+Four quick filters (one seed, four compositions per shape) and ten three-seed confirmations (about
+12 minutes each):
+
+- **q1–q4:** the speed spread and a first Basilisk cut (SpA 153 → 118, poison, execute power), then
+  the unused-stat swaps for Golem and Treant. Golem barely moved (−13 → −12) until a sensitivity run
+  of its shield (70% at cooldown 2, range 2) and a 3-turn taunt took it to −1 `elemental` and +14
+  `neutral`: the tank's value is its team-wide shield, not its stats.
+- **f1:** the shield back to 60% at cooldown 3. `elemental` spread 23 → 11; Tarasque +5.4, Griffin
+  −5.8.
+- **f2–f3:** Griffin rebuilt (SpA into bulk, Gust up), Basilisk at 115 SpA, Tarasque and Frost Wyrm
+  trimmed, Kirin and Golem nudged: every beast inside ±4.4, three without a top-3 shape.
+- **f4–f8:** chasing the last niches. Griffin's elite and squad slots came from +4 HP and +5 Def;
+  Kirin's from a larger team heal; Basilisk's from execute +60% and a 45% petrify. Each move that
+  gave one beast an elite slot took it from another (Golem, Basilisk and Griffin within 0.5 points).
+- **f9:** Thunderbird's Static Charge speed buff 10% → 20% moved nothing and was reverted; Basilisk
+  SpA 115 → 117.
+- **f10 (final):** Granite Bulwark 65% → 70% gave Golem the elite slot back.
+
+### Caveats
+
+- **Target 2 is at noise level.** The elite's third slot is decided by 0.1 points on the mean, and
+  every single seed has two beasts without a top-3 shape. A shape cell moves by several points
+  between seeds, so fitting ranks this closely is partly fitting noise.
+- **The `neutral` misses are the element chart.** Thunderbird is +2.4 `elemental` and −10.1
+  `neutral` (Lightning is strong against Water and Air, and its sub-40-power hits lean on the 2×);
+  Basilisk is +0.1 and +9.0 (Dark is strong only against Light, and weak defensively to Nature and
+  Light). Closing one mode opens the other; `elemental` was held as the primary target.
+- **Tanks are squad-weak by construction.** The taunt reaches 3 hexes and the squad's archers and
+  casters stay out of it; nothing in the kits addresses that (a ranged taunt would).
+- **Calibration miss:** `neutral` `solo` level 1 (62.9% at the closest multiplier): the single
+  giant's level-1 stats round too coarsely to split, as in the exploratory run.
+- **The avatar is a fixture:** 100 in every stat at max level on the medium curve. The real avatar's
+  stats come from `AvatarStatsSO` and its gear, not authored yet.
+- Only the default loadouts were measured, at skill levels 1 and 10. The 30 non-default skills and
+  the seven non-default passives keep their first-draft numbers (heals rescaled only).

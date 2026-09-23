@@ -422,7 +422,7 @@ namespace BeastCraft.Tests.EditMode
             big.CurrentHp = 500;
             List<BattleUnit> roster = new List<BattleUnit> { e2, big, e1, small };
 
-            IReadOnlyList<PassiveActivation> fired = BattleTurnExecutor.BeginBattle(roster, null, null, MakeAvatar(), Loadout(allies, enemies, lowest));
+            IReadOnlyList<PassiveActivation> fired = BattleTurnExecutor.BeginBattle(roster, null, null, MakeAvatar(HealerStats), Loadout(allies, enemies, lowest));
 
             Assert.AreEqual(3, fired.Count);
             CollectionAssert.AreEqual(new[] { small, big }, fired[0].Activation.Targets, "living allies in id order");
@@ -449,7 +449,8 @@ namespace BeastCraft.Tests.EditMode
             List<BattleUnit> roster = new List<BattleUnit> { player, Beast("e", BattleTeam.Enemy) };
             PassiveInstance leveled = new PassiveInstance(aura, 11);
 
-            BattleTurnExecutor.BeginBattle(roster, null, null, MakeAvatar(), new PassiveLoadout(new[] { leveled }));
+            // Heals are a percent of the caster's SpecialAttack; the avatar is the caster.
+            BattleTurnExecutor.BeginBattle(roster, null, null, MakeAvatar(HealerStats), new PassiveLoadout(new[] { leveled }));
 
             Assert.AreEqual(11, leveled.Level);
             Assert.AreEqual(1.3, leveled.Skill.MagnitudeMultiplier, 1e-9, "3% per level above 1 by default");
@@ -775,6 +776,9 @@ namespace BeastCraft.Tests.EditMode
         {
             return new BattleUnit(id, team, new StatBlock(1000, 100, 100, 0, 0, 10), team == BattleTeam.Player ? HexCoordinate.Zero : new HexCoordinate(4, 0));
         }
+
+        /// <summary>An avatar stat block with SpecialAttack 100, so a heal of magnitude m restores m HP.</summary>
+        private static readonly StatBlock HealerStats = new StatBlock(1, 0, 0, 100, 0, 0);
 
         private static BattleUnit MakeAvatar(StatBlock stats = default(StatBlock))
         {

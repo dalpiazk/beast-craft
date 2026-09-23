@@ -107,7 +107,8 @@ What exists today:
   simulator); the Unity assets are generated from it by opening the project and
   running **Beast Craft → Data → Import Beast Roster**, which creates or updates
   them in place by id. No `.asset` files are committed yet. The numbers are a
-  second simulator-tuned pass (base Speed held to a 15% band), not confirmed
+  third simulator-tuned pass (against the authored skill kits; base Speed
+  spread so the fastest beast gets 10-15% more turns), not confirmed
   balance — see "Starter roster" in the
   [battle-system design doc](docs/design/battle-system.md) and
   [`docs/balance/tuning-log.md`](docs/balance/tuning-log.md).
@@ -119,8 +120,9 @@ What exists today:
   roster: the JSON is the source of truth, checked by `SkillLibraryValidator`,
   and **Beast Craft → Data → Import Skill Library** (after the roster import)
   generates the `SkillSO` / `PassiveSkillSO` / `SkillMaterialSO` assets and
-  wires each species' `LearnableSkills` and `DefaultLoadout`. A first draft
-  against a documented power budget, not tuned yet — see "Beast skill kits" in
+  wires each species' `LearnableSkills` and `DefaultLoadout`. Drafted against
+  a documented power budget and tuned with the roster against the balance
+  simulator (default loadouts), not confirmed — see "Beast skill kits" in
   the [battle-system design doc](docs/design/battle-system.md).
 - **CI** (`.github/workflows/ci.yml`) — a format and compile check that builds
   the real game scripts against the hand-written UnityEngine stub in

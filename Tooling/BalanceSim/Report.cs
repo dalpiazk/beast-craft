@@ -32,14 +32,18 @@ namespace BeastCraft.Tooling.BalanceSim
                               (options.RunPve && options.RunPvp ? "; " : string.Empty) + (options.RunPvp ? "PvP 1v1 round-robin (secondary)" : string.Empty));
             if (options.RunPve && pve != null && pve.Avatar.Enabled)
             {
-                report.AppendLine("- Avatar (PvE only): the `" + pve.Avatar.Preset + "` " + (pve.Avatar.IsAuthored ? "preset (the skill library's default loadout" : "fixture preset (") +
+                report.AppendLine("- Avatar (PvE only): the `" + pve.Avatar.Preset + "` " + (pve.Avatar.IsAuthored ? "preset (the skill library's default loadout, " : "fixture preset (") +
                                   "`--avatar`), fielded beside every player team; see \"Avatar passives\"");
             }
 
             if (options.KitSource == KitSource.Library)
             {
-                report.AppendLine("- Kit: `library` (`--kit library`): each beast's authored default loadout from `" + SkillLibraryKits.RepoRelativePath +
-                                  "` at skill level " + options.SkillLevel + " (`--skill-level`)");
+                report.AppendLine("- Skill kit: `library` (`--skill-kit library`, the default): each beast's authored default loadout from `" +
+                                  SkillLibraryKits.RepoRelativePath + "` at skill level " + options.SkillLevel + " (`--skill-level`)");
+            }
+            else
+            {
+                report.AppendLine("- Skill kit: `standard` (`--skill-kit standard`): the same kit for every beast, so the stat lines are what is measured");
             }
 
             report.AppendLine();
@@ -102,7 +106,7 @@ namespace BeastCraft.Tooling.BalanceSim
         }
 
         /// <summary>
-        /// The <c>--kit library</c> replacement for the standard kit table: each beast's default
+        /// The <c>--skill-kit library</c> replacement for the standard kit table: each beast's default
         /// loadout in fire-priority order, with each skill's shape, range, cooldown and effects as
         /// fielded (at the run's skill level and implied tier).
         /// </summary>

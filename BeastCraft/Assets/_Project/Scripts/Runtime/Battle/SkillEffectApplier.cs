@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using BeastCraft.Battle.Grid;
 using BeastCraft.Creatures;
@@ -25,7 +26,7 @@ namespace BeastCraft.Battle
     /// for a first pass, not producer-confirmed balance, and are cheap to revisit:
     /// <list type="bullet">
     /// <item><description>
-    /// <strong>Damage is stat-based; everything else is flat.</strong> A
+    /// <strong>Damage and heals are stat-based; stat changes are flat.</strong> A
     /// <see cref="SkillEffectType.Damage"/> effect's <see cref="SkillEffect.Magnitude"/> is its
     /// <em>power</em>, fed to <see cref="DamageFormula"/> with the caster's level and attacking
     /// stat, the target's defending stat (the pair picked by <see cref="SkillSO.Category"/>) and
@@ -33,10 +34,12 @@ namespace BeastCraft.Battle
     /// <see cref="BattleUnit.Elements"/> — then a crit roll off the caster's
     /// <see cref="StatBlock.CritChance"/> and a variance roll, both drawn from the battle's rng (see
     /// <see cref="DamageFormula"/> for the rolls, their fixed draw order and the null-rng
-    /// deterministic fallback). No same-element bonus yet. Heals are still applied flat with no
-    /// variance, and buffs and debuffs still move a stat by exactly their magnitude (flat, or with
-    /// <see cref="SkillEffect.IsPercent"/> that percent of the stat's current value): stat-scaled
-    /// healing is deferred to the balance pass, and neither is ever scaled by element or rolled.
+    /// deterministic fallback). No same-element bonus yet. A <see cref="SkillEffectType.Heal"/>'s
+    /// magnitude is a percent of the caster's current <c>SpecialAttack</c>, times
+    /// <see cref="HealScale"/> (see <see cref="ApplyHeal"/>): no defense, no crit, no variance. Buffs
+    /// and debuffs still move a stat by exactly their magnitude (flat, or with
+    /// <see cref="SkillEffect.IsPercent"/> that percent of the stat's current value). Neither heals
+    /// nor stat changes are ever scaled by element or rolled.
     /// </description></item>
     /// <item><description>
     /// <strong>A defeated target takes nothing further.</strong> Once a target's HP reaches 0 it
@@ -66,6 +69,13 @@ namespace BeastCraft.Battle
     /// </summary>
     public static class SkillEffectApplier
     {
+        /// <summary>
+        /// The tunable multiplier on every heal: a heal restores
+        /// <c>Magnitude / 100 x caster SpecialAttack x HealScale</c> HP. One place to move the whole
+        /// heal curve without re-authoring every heal magnitude. See <see cref="ApplyHeal"/>.
+        /// </summary>
+        public const double HealScale = 1.0;
+
         /// <summary>
         /// Applies every <see cref="SkillSO.Effects"/> entry of the fired skill to every unit in
         /// <see cref="SkillActivation.Targets"/>.
@@ -103,7 +113,8 @@ namespace BeastCraft.Battle
         /// (<see cref="BattleUnit.Stats"/>, read as each damage effect lands, so a buff applied
         /// earlier in the fight counts). The attacking <em>element</em> still comes from the skill
         /// (<see cref="SkillSO.Element"/>), not from the caster's own
-        /// <see cref="BattleUnit.Elements"/>. Heals and stat changes do not read the caster.
+        /// <see cref="BattleUnit.Elements"/>. A heal reads the caster's current <c>SpecialAttack</c>;
+        /// stat changes do not read the caster.
         /// </para>
         /// <para>
         /// An activation with no targets is a legal whiff, per
@@ -302,7 +313,7 @@ namespace BeastCraft.Battle
             switch (effect.EffectType)
             {
                 case SkillEffectType.Heal:
-                    ApplyHeal(target, magnitude);
+                    ApplyHeal(caster, target, magnitude);
                     break;
 
                 case SkillEffectType.BuffStat:
@@ -433,12 +444,24 @@ namespace BeastCraft.Battle
         }
 
         /// <summary>
-        /// Restores HP, flat and clamped at <c>Stats.Hp</c> so healing cannot overfill a unit.
+        /// Restores <c>Magnitude / 100 x caster.Stats.SpecialAttack x </c><see cref="HealScale"/> HP,
+        /// rounded to the nearest whole HP and clamped at <c>Stats.Hp</c> so healing cannot
+        /// overfill a unit. <paramref name="magnitude"/> is already level-scaled
+        /// (<see cref="SkillInstance.ScaleMagnitude"/>), so a heal grows with its skill level too.
         /// <para>
-        /// Flat on purpose, for now: healing does not go through <see cref="DamageFormula"/> and
-        /// reads neither the caster's stats nor its level. Whether heals should scale — and off
-        /// which stat — is deferred to the balance pass, rather than guessed at by mirroring the
-        /// damage formula.
+        /// <strong>Why SpecialAttack, and why nothing else.</strong> A flat heal was huge at level 1
+        /// and negligible at level 100, because HP grows with level and the heal did not. The
+        /// caster's <c>SpecialAttack</c> grows on the same growth curve as the target's HP, so a heal
+        /// restores roughly the same <em>share</em> of HP at every level. The avatar is the caster of
+        /// its passives, so a passive heal reads the avatar's <c>SpecialAttack</c>. There is no
+        /// defense term (the target is a friend), and no crit and no variance roll: a heal takes no
+        /// rng draws, so adding stat scaling did not change any battle's draw sequence.
+        /// </para>
+        /// <para>
+        /// <strong>Rounded, not truncated</strong> (unlike damage and shields): at level 1 a beast's
+        /// HP is 14-22 and a heal a handful of points, so truncation would cost a heal up to a whole
+        /// HP, several percent of the target, and the heal's share of HP would no longer be the same
+        /// at every level. Rounding keeps that error to half a point either way.
         /// </para>
         /// <para>
         /// Healing a <em>defeated</em> unit never reaches here: <c>Apply</c> skips a
@@ -449,9 +472,25 @@ namespace BeastCraft.Battle
         /// accident. Defeated stays defeated until something is designed to undo it.
         /// </para>
         /// </summary>
-        private static void ApplyHeal(BattleUnit target, float magnitude)
+        private static void ApplyHeal(BattleUnit caster, BattleUnit target, float magnitude)
         {
-            SetCurrentHp(target, target.CurrentHp + ToAmount(magnitude));
+            SetCurrentHp(target, target.CurrentHp + GetHealAmount(caster, magnitude));
+        }
+
+        /// <summary>
+        /// The HP a heal of (level-scaled) <paramref name="magnitude"/> cast by
+        /// <paramref name="caster"/> restores: <c>Magnitude / 100 x SpecialAttack x </c>
+        /// <see cref="HealScale"/>, rounded to the nearest whole HP (halves away from zero). A null
+        /// caster heals nothing.
+        /// </summary>
+        public static int GetHealAmount(BattleUnit caster, float magnitude)
+        {
+            if (caster == null)
+            {
+                return 0;
+            }
+
+            return (int)Math.Round(magnitude * (double)caster.Stats.SpecialAttack * HealScale / 100.0, MidpointRounding.AwayFromZero);
         }
 
         /// <summary>
@@ -617,7 +656,7 @@ namespace BeastCraft.Battle
 
         /// <summary>
         /// The whole-number amount an authored <see cref="SkillEffect.Magnitude"/> is worth to a
-        /// heal or a stat change. HP and stats are integers while magnitude is a float, so authoring
+        /// stat change. HP and stats are integers while magnitude is a float, so authoring
         /// a 7.9 heal is worth 7: it truncates toward zero rather than rounding, which keeps a
         /// fractional magnitude from quietly buying a point it did not author. Damage does not come
         /// through here; <see cref="DamageFormula"/> applies the same truncation once, at the end

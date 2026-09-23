@@ -1,5 +1,5 @@
 {
-  "_readme": "Source of truth for every authored skill: beast skills, the avatar's active skills and passives, the skill-training materials, and each species' learnable skills and default loadout. A FIRST DRAFT for the balance simulator to correct, not confirmed balance. Edit here, then in Unity run Beast Craft/Data/Import Skill Library (after Import Beast Roster). Enums are member names (case-sensitive). Missing fields take the DTO defaults in SkillLibraryData.cs; note a missing TargetingCriterion means Distance (nearest), not Random. Damage Magnitude is power, a percent of the attacking stat; Heal is flat HP; a Shield is a percent of the caster's Defense; a DamageOverTime is a per-turn power; a Knockback is whole hexes. DefaultLoadout order is fire priority. The first 3 AvatarActives are the avatar's default actives. See docs/design/battle-system.md, 'Beast skill kits'.",
+  "_readme": "Source of truth for every authored skill: beast skills, the avatar's active skills and passives, the skill-training materials, and each species' learnable skills and default loadout. Drafted against a power budget and tuned with the roster against the balance simulator (default loadouts; see docs/balance/tuning-log.md), not confirmed balance. Edit here, then in Unity run Beast Craft/Data/Import Skill Library (after Import Beast Roster). Enums are member names (case-sensitive). Missing fields take the DTO defaults in SkillLibraryData.cs; note a missing TargetingCriterion means Distance (nearest), not Random. Damage Magnitude is power, a percent of the attacking stat; Heal is a percent of the caster's SpecialAttack (x HealScale, the avatar's for its skills and passives); a Shield is a percent of the caster's Defense; a DamageOverTime is a per-turn power; a Knockback is whole hexes. DefaultLoadout order is fire priority. The first 3 AvatarActives are the avatar's default actives. See docs/design/battle-system.md, 'Beast skill kits'.",
   "SchemaVersion": 1,
   "Materials": [
     { "MaterialId": "essence_shard", "DisplayName": "Essence Shard", "Description": "A sliver of crystallised battle essence. Feeds a skill a little XP; opens its first breakthrough (level 5).", "Tier": 1, "XpValue": 250 },
@@ -17,7 +17,7 @@
       "Element": "Earth",
       "Category": "Physical",
       "Effects": [
-        { "EffectType": "Damage", "Magnitude": 75 }
+        { "EffectType": "Damage", "Magnitude": 85 }
       ],
       "Progression": {
         "MaxLevel": 20,
@@ -32,14 +32,14 @@
     {
       "SkillId": "stone_challenge",
       "DisplayName": "Stone Challenge",
-      "Description": "The Golem plants itself and bellows; enemies within two hexes find they cannot look away.",
+      "Description": "The Golem plants itself and bellows; enemies within three hexes find they cannot look away.",
       "TargetShape": "AreaBurst",
-      "Range": 2,
+      "Range": 3,
       "Cooldown": 3,
       "Element": "Earth",
       "Category": "Physical",
       "Effects": [
-        { "EffectType": "ApplyStatus", "Status": "Taunt", "Magnitude": 0, "DurationTurns": 2, "Chance": 85 }
+        { "EffectType": "ApplyStatus", "Status": "Taunt", "Magnitude": 0, "DurationTurns": 3, "Chance": 90 }
       ],
       "Progression": {
         "MaxLevel": 20,
@@ -54,14 +54,14 @@
     {
       "SkillId": "granite_bulwark",
       "DisplayName": "Granite Bulwark",
-      "Description": "Raises slabs of granite around itself and its neighbours: a shield worth part of the Golem's Defense.",
+      "Description": "Raises slabs of granite around itself and every ally within two hexes: a shield worth part of the Golem's Defense.",
       "TargetShape": "AreaBurst",
-      "Range": 1,
+      "Range": 2,
       "Cooldown": 3,
       "TargetSide": "Ally",
       "Element": "Earth",
       "Effects": [
-        { "EffectType": "ApplyStatus", "Status": "Shield", "Magnitude": 35, "DurationTurns": 2 }
+        { "EffectType": "ApplyStatus", "Status": "Shield", "Magnitude": 70, "DurationTurns": 2 }
       ],
       "Progression": {
         "MaxLevel": 20,
@@ -151,7 +151,7 @@
       "Element": "Water",
       "Category": "Physical",
       "Effects": [
-        { "EffectType": "Damage", "Magnitude": 75 }
+        { "EffectType": "Damage", "Magnitude": 82 }
       ],
       "Progression": {
         "MaxLevel": 20,
@@ -196,7 +196,7 @@
       "Element": "Water",
       "Effects": [
         { "EffectType": "ApplyStatus", "Status": "Shield", "Magnitude": 50, "DurationTurns": 3 },
-        { "EffectType": "Heal", "Magnitude": 12 }
+        { "EffectType": "Heal", "Magnitude": 24 }
       ],
       "Progression": {
         "MaxLevel": 20,
@@ -264,7 +264,7 @@
       "TargetSide": "Ally",
       "Element": "Water",
       "Effects": [
-        { "EffectType": "Heal", "Magnitude": 14 },
+        { "EffectType": "Heal", "Magnitude": 29 },
         { "EffectType": "BuffStat", "AffectedStat": "Defense", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true }
       ],
       "Progression": {
@@ -312,7 +312,7 @@
       "TargetingOrder": "Lowest",
       "Element": "Nature",
       "Effects": [
-        { "EffectType": "Heal", "Magnitude": 18 }
+        { "EffectType": "Heal", "Magnitude": 40 }
       ],
       "Progression": {
         "MaxLevel": 20,
@@ -341,7 +341,7 @@
         "MagnitudeGrowthPerLevel": 3,
         "Tiers": [
           { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
-          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "Heal", "Magnitude": 6 } ] },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "Heal", "Magnitude": 11 } ] },
           { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "CooldownReduction": 1 }
         ]
       }
@@ -401,7 +401,7 @@
       "Cooldown": 4,
       "Element": "Nature",
       "Effects": [
-        { "EffectType": "Heal", "Magnitude": 10 },
+        { "EffectType": "Heal", "Magnitude": 19 },
         { "EffectType": "BuffStat", "AffectedStat": "Defense", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true }
       ],
       "Progression": {
@@ -447,7 +447,7 @@
       "Element": "Metal",
       "Category": "Physical",
       "Effects": [
-        { "EffectType": "Damage", "Magnitude": 180 }
+        { "EffectType": "Damage", "Magnitude": 155 }
       ],
       "Progression": {
         "MaxLevel": 20,
@@ -559,7 +559,7 @@
       "Element": "Ice",
       "Category": "Special",
       "Effects": [
-        { "EffectType": "Damage", "Magnitude": 50 },
+        { "EffectType": "Damage", "Magnitude": 48 },
         { "EffectType": "DebuffStat", "AffectedStat": "Speed", "Magnitude": 8, "DurationTurns": 3, "MaxStacks": 3, "IsPercent": true }
       ],
       "Progression": {
@@ -605,7 +605,7 @@
       "Element": "Ice",
       "Category": "Special",
       "Effects": [
-        { "EffectType": "Damage", "Magnitude": 45 },
+        { "EffectType": "Damage", "Magnitude": 42 },
         { "EffectType": "DebuffStat", "AffectedStat": "Speed", "Magnitude": 10, "DurationTurns": 2, "Chance": 50, "MaxStacks": 3, "IsPercent": true }
       ],
       "Progression": {
@@ -697,7 +697,7 @@
       "Element": "Lightning",
       "Category": "Physical",
       "Effects": [
-        { "EffectType": "Damage", "Magnitude": 32, "HitCount": 3 }
+        { "EffectType": "Damage", "Magnitude": 33, "HitCount": 3 }
       ],
       "Progression": {
         "MaxLevel": 20,
@@ -719,7 +719,7 @@
       "Element": "Lightning",
       "Category": "Special",
       "Effects": [
-        { "EffectType": "Damage", "Magnitude": 22, "HitCount": 3 }
+        { "EffectType": "Damage", "Magnitude": 25, "HitCount": 3 }
       ],
       "Progression": {
         "MaxLevel": 20,
@@ -832,7 +832,7 @@
       "Element": "Air",
       "Category": "Physical",
       "Effects": [
-        { "EffectType": "Damage", "Magnitude": 88 }
+        { "EffectType": "Damage", "Magnitude": 89 }
       ],
       "Progression": {
         "MaxLevel": 20,
@@ -854,7 +854,7 @@
       "Element": "Air",
       "Category": "Physical",
       "Effects": [
-        { "EffectType": "Damage", "Magnitude": 105 }
+        { "EffectType": "Damage", "Magnitude": 110 }
       ],
       "Progression": {
         "MaxLevel": 20,
@@ -876,7 +876,7 @@
       "Element": "Air",
       "Category": "Physical",
       "Effects": [
-        { "EffectType": "Damage", "Magnitude": 45 },
+        { "EffectType": "Damage", "Magnitude": 55 },
         { "EffectType": "ApplyStatus", "Status": "Knockback", "Magnitude": 2, "DurationTurns": 0 }
       ],
       "Progression": {
@@ -990,7 +990,7 @@
       "Element": "Fire",
       "Category": "Special",
       "Effects": [
-        { "EffectType": "Damage", "Magnitude": 95 },
+        { "EffectType": "Damage", "Magnitude": 90 },
         { "EffectType": "ApplyStatus", "Status": "DamageOverTime", "Magnitude": 10, "DurationTurns": 2, "Chance": 50 }
       ],
       "Progression": {
@@ -1013,7 +1013,7 @@
       "MaxUsesPerBattle": 1,
       "Element": "Fire",
       "Effects": [
-        { "EffectType": "Heal", "Magnitude": 30 },
+        { "EffectType": "Heal", "Magnitude": 44 },
         { "EffectType": "ApplyStatus", "Status": "Shield", "Magnitude": 80, "DurationTurns": 3 }
       ],
       "Progression": {
@@ -1103,7 +1103,7 @@
       "Cooldown": 3,
       "Element": "Light",
       "Effects": [
-        { "EffectType": "Heal", "Magnitude": 12 }
+        { "EffectType": "Heal", "Magnitude": 20 }
       ],
       "Progression": {
         "MaxLevel": 20,
@@ -1147,7 +1147,7 @@
       "Element": "Light",
       "Category": "Special",
       "Effects": [
-        { "EffectType": "Damage", "Magnitude": 58 }
+        { "EffectType": "Damage", "Magnitude": 62 }
       ],
       "Progression": {
         "MaxLevel": 20,
@@ -1198,7 +1198,7 @@
         "MagnitudeGrowthPerLevel": 3,
         "Tiers": [
           { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
-          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "Heal", "Magnitude": 6 } ] },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "Heal", "Magnitude": 7 } ] },
           { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "CooldownReduction": 1 }
         ]
       }
@@ -1213,7 +1213,7 @@
       "TargetSide": "Ally",
       "Element": "Light",
       "Effects": [
-        { "EffectType": "Heal", "Magnitude": 16 },
+        { "EffectType": "Heal", "Magnitude": 19 },
         { "EffectType": "BuffStat", "AffectedStat": "Defense", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true }
       ],
       "Progression": {
@@ -1237,7 +1237,7 @@
       "Category": "Special",
       "Effects": [
         { "EffectType": "Damage", "Magnitude": 45 },
-        { "EffectType": "ApplyStatus", "Status": "DamageOverTime", "Magnitude": 18, "DurationTurns": 3, "MaxStacks": 3 }
+        { "EffectType": "ApplyStatus", "Status": "DamageOverTime", "Magnitude": 15, "DurationTurns": 3, "MaxStacks": 3 }
       ],
       "Progression": {
         "MaxLevel": 20,
@@ -1261,7 +1261,7 @@
       "Element": "Dark",
       "Category": "Special",
       "Effects": [
-        { "EffectType": "Damage", "Magnitude": 110, "ExecuteBonusPercent": 50 }
+        { "EffectType": "Damage", "Magnitude": 105, "ExecuteBonusPercent": 60 }
       ],
       "Progression": {
         "MaxLevel": 20,
@@ -1284,7 +1284,7 @@
       "Category": "Special",
       "Effects": [
         { "EffectType": "Damage", "Magnitude": 45 },
-        { "EffectType": "ApplyStatus", "Status": "Stun", "Magnitude": 0, "DurationTurns": 1, "Chance": 25 }
+        { "EffectType": "ApplyStatus", "Status": "Stun", "Magnitude": 0, "DurationTurns": 1, "Chance": 45 }
       ],
       "Progression": {
         "MaxLevel": 20,
@@ -1394,7 +1394,7 @@
       "Range": 0,
       "Cooldown": 3,
       "Effects": [
-        { "EffectType": "Heal", "Magnitude": 8 }
+        { "EffectType": "Heal", "Magnitude": 13 }
       ],
       "Progression": {
         "MaxLevel": 20,
@@ -1659,7 +1659,7 @@
       "ProcChance": 50,
       "TargetScope": "TriggeringUnit",
       "Effects": [
-        { "EffectType": "Heal", "Magnitude": 3 }
+        { "EffectType": "Heal", "Magnitude": 5 }
       ],
       "Progression": {
         "MaxLevel": 20,

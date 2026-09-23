@@ -76,7 +76,7 @@ namespace BeastCraft.Tooling.BalanceSim
             return records;
         }
 
-        /// <summary>The standard kit, or with <c>--kit library</c> the species' authored default loadout.</summary>
+        /// <summary>The standard kit, or with <c>--skill-kit library</c> the species' authored default loadout.</summary>
         private static SkillLoadout BeastLoadout(SimOptions options, CreatureSpeciesSO species, KitMode mode)
         {
             return options.KitSource == KitSource.Library

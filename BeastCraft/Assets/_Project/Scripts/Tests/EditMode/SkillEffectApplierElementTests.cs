@@ -103,7 +103,8 @@ namespace BeastCraft.Tests.EditMode
             BattleUnit target = Unit("target", 100, Element.Nature);
             target.CurrentHp = 50;
 
-            Fire(Skill(Element.Fire, SkillEffectType.Heal, 10f), target);
+            // 50% of the caster's SpecialAttack (CombatStat 20) is 10, Fire into Nature or not.
+            Fire(Skill(Element.Fire, SkillEffectType.Heal, 50f), target);
 
             Assert.AreEqual(60, target.CurrentHp);
         }
