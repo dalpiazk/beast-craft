@@ -30,8 +30,8 @@
 
   <!--
     Paths are relative to this csproj: Tooling/CiStubs/CiLint -> repo root is three levels up.
-    The Editor glob currently matches nothing (that folder holds only an .asmdef); it is wired up
-    now so that the first Editor script added is covered without touching CI.
+    The Editor glob covers the Editor-only scripts (e.g. the beast-roster importer); the UnityEditor
+    APIs they use are stubbed in UnityStub/UnityEditor.cs.
   -->
   <ItemGroup>
     <Compile Include="..\..\..\BeastCraft\Assets\_Project\Scripts\Runtime\**\*.cs">

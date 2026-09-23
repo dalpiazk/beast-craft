@@ -4,11 +4,23 @@ namespace BeastCraft.Creatures
 {
     /// <summary>
     /// A shared, reusable leveling curve ("Fast", "Medium", "Slow", ... — the names are data, not
-    /// code). Maps normalized level progress (0-1) to normalized stat-scale progress (0-1).
+    /// code). Maps normalized level progress (0-1) to a stat scale (0-1).
+    /// <para>
+    /// Authored curves (imported from <c>beast-roster.json</c>) start above 0 at level 1 — roughly
+    /// 0.10-0.20 — and reach exactly 1 at max level, so a species' <c>BaseStats</c> are its
+    /// max-level stats and level 1 is a sensible fraction of them. The default below (0 at level 1)
+    /// is only the fresh-asset placeholder; a curve that starts at 0 makes every level-1 stat 0.
+    /// </para>
     /// </summary>
     [CreateAssetMenu(menuName = "Beast Craft/Creatures/Growth Rate", fileName = "NewGrowthRate")]
     public class GrowthRateCurve : ScriptableObject
     {
+        /// <summary>
+        /// Stable key species data refers to this curve by (see <c>beast-roster.json</c>); the roster
+        /// importer matches existing assets on it. Never rename after ship.
+        /// </summary>
+        public string CurveId;
+
         /// <summary>Normalized level progress on X (0 = level 1, 1 = MaxLevel) to stat scale on Y.</summary>
         public AnimationCurve Curve = AnimationCurve.Linear(0f, 0f, 1f, 1f);
 
@@ -27,15 +39,25 @@ namespace BeastCraft.Creatures
                 return 1f;
             }
 
-            if (MaxLevel <= 1)
+            return EvaluateScale(Curve, MaxLevel, level);
+        }
+
+        /// <summary>
+        /// The level-to-scale mapping behind <see cref="GetScaleAtLevel"/>, usable without an asset
+        /// (the roster validator evaluates JSON-authored curves with it). <paramref name="curve"/>
+        /// must not be null.
+        /// </summary>
+        public static float EvaluateScale(AnimationCurve curve, int maxLevel, int level)
+        {
+            if (maxLevel <= 1)
             {
                 // Single-level curve: there is no progress axis, so the level-1 value is the answer.
-                return Curve.Evaluate(0f);
+                return curve.Evaluate(0f);
             }
 
-            int clampedLevel = Mathf.Clamp(level, 1, MaxLevel);
-            float progress = (clampedLevel - 1f) / (MaxLevel - 1f);
-            return Curve.Evaluate(progress);
+            int clampedLevel = Mathf.Clamp(level, 1, maxLevel);
+            float progress = (clampedLevel - 1f) / (maxLevel - 1f);
+            return curve.Evaluate(progress);
         }
 
         private void OnValidate()

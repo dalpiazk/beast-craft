@@ -16,7 +16,7 @@ beast-craft/
 │   ├── Assets/_Project/    all first-party content, namespaced under _Project/
 │   │   ├── Art/            sprites, backdrops, UI, key art (Characters/Creatures/Environments/UI/KeyArt)
 │   │   ├── Audio/          Music/, Ambient/, SFX/
-│   │   ├── Data/           ScriptableObject .asset instances (creatures, skills, gear, avatar gear, customization)
+│   │   ├── Data/           authored data: Creatures/beast-roster.json (source of truth) + generated .asset instances
 │   │   ├── Prefabs/
 │   │   ├── Scenes/
 │   │   └── Scripts/        Runtime/ (Core, Services, Narrative, Battle, Creatures,
@@ -96,8 +96,15 @@ What exists today:
   growth curves, skill learn tables, evolution requirements), skills, beast gear,
   avatar stats and avatar stat gear (never rendered; separate from the purely
   cosmetic customization), and the shared avatar + creature customization
-  framework. These are data definitions only; nothing consumes them yet, and no
-  `.asset` instances have been authored.
+  framework.
+- **Starter roster data** — ten beasts, one per element, plus three growth curves,
+  in `BeastCraft/Assets/_Project/Data/Creatures/beast-roster.json`. The JSON is the
+  source of truth (readable outside Unity, e.g. by a future headless balance
+  simulator); the Unity assets are generated from it by opening the project and
+  running **Beast Craft → Data → Import Beast Roster**, which creates or updates
+  them in place by id. No `.asset` files are committed yet. The numbers are a
+  first draft, not confirmed balance — see "Starter roster" in the
+  [battle-system design doc](docs/design/battle-system.md).
 - **CI** (`.github/workflows/ci.yml`) — a format and compile check that builds
   the real game scripts against the hand-written UnityEngine stub in
   `Tooling/CiStubs/`. It needs no Unity install and runs no Unity tests, so it

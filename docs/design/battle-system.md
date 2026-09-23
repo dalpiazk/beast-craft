@@ -486,9 +486,9 @@ base move range in its `BaseStats`, and from there it behaves like any other sta
 exception:
 
 - **It does not scale with level.** `CreatureSpeciesSO.GetStatAtLevel(MoveRange, level)` returns the
-  authored base at every level. Growth curves are normalized from roughly 0 at level 1 to 1 at max
-  level, which suits stats in the tens and hundreds but would round a small integer like 3 down to 0
-  for most of the early game. Move range is a tactical constant of the species, not something that
+  authored base at every level. Growth curves run from a small fraction at level 1 (0.10-0.20 for
+  the authored curves; see "Starter roster") to 1 at max level, which suits stats in the tens and
+  hundreds but would round a small integer like 3 down to 0 or 1 for much of the early game. Move range is a tactical constant of the species, not something that
   grows.
 - **Gear modifies it.** A `StatModifier` on `MoveRange` adds to it (flat and percent) like any other
   axis — boots that grant +1 movement are ordinary gear data.
@@ -611,6 +611,95 @@ drag-and-drop input, zone and validity highlighting, and it can only genuinely b
 the project in the Editor. It is a **separate, later, and materially different** task, and it should
 be scoped as one rather than treated as the tail end of this one.
 
+## Starter roster — FIRST-DRAFT DATA, NOT CONFIRMED BALANCE
+
+The first ten beasts, one per element, are authored as data. Names, elements and archetypes are
+approved; **every number below is a first draft** chosen to express the archetype, and is expected to
+be corrected by the headless balance simulator (see "Next steps"). Nothing here is confirmed balance.
+
+| SpeciesId | Beast | Element | Archetype | Curve | HP | ATK | DEF | SpA | SpD | SPE | Six-stat total | Move |
+| --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `phoenix` | Phoenix | Fire | Glass cannon | fast | 70 | 130 | 55 | 140 | 70 | 135 | 600 | 4 |
+| `leviathan` | Leviathan | Water | Tank | slow | 150 | 90 | 130 | 90 | 95 | 45 | 600 | 3 |
+| `golem` | Golem | Earth | Pure wall | slow | 150 | 80 | 170 | 40 | 125 | 35 | 600 | 2 |
+| `griffin` | Griffin | Air | Fast skirmisher | fast | 95 | 110 | 85 | 85 | 85 | 140 | 600 | 5 |
+| `thunderbird` | Thunderbird | Lightning | Burst striker | fast | 65 | 140 | 55 | 125 | 60 | 155 | 600 | 4 |
+| `frost_wyrm` | Frost Wyrm | Ice | Control / attrition | medium | 95 | 75 | 125 | 100 | 125 | 80 | 600 | 3 |
+| `treant` | Treant | Nature | Support-tank | slow | 160 | 80 | 100 | 85 | 130 | 45 | 600 | 3 |
+| `tarasque` | Tarasque | Metal | Armored bruiser | medium | 110 | 140 | 145 | 50 | 80 | 75 | 600 | 3 |
+| `kirin` | Kirin | Light | Support caster | medium | 100 | 50 | 80 | 140 | 135 | 95 | 600 | 4 |
+| `basilisk` | Basilisk | Dark | Ranged assassin | medium | 80 | 95 | 55 | 145 | 90 | 135 | 600 | 5 |
+
+Stats are max-level values (curve scale 1). The drafting rules:
+
+- **Shared budget.** Every beast's six combat stats sum to the same budget (600), and the roster
+  tests allow ±5%. Archetype comes from how the budget is *distributed*, not from raw power. Whether
+  the slow-curve beasts deserve a larger budget as payoff for their weak early game is a balance
+  question for the simulator, not something this draft assumes.
+- **Move range in a small band (2–5)**, outside the budget. Griffin and Basilisk are the mobile
+  ends (5); Golem is the only 2. "Range" in the archetypes means move range, the per-turn hex
+  movement budget — skill reach is authored per skill.
+- **Telling the defensive beasts apart.** Golem only absorbs (the highest Defense, the lowest Speed
+  and move range, low attack); Tarasque absorbs and hits back (Defense *and* Attack high); Leviathan
+  is the physically bulky all-rounder; Treant's bulk is HP and Special Defense for a support role;
+  Frost Wyrm splits its bulk evenly across Defense and Special Defense.
+- **Skills, evolutions and customization are empty.** No skills have been authored yet, so every
+  species' `LearnableSkills` and `EvolutionOptions` are empty and `CustomizationSchema` and `Icon`
+  are unset. The importer never touches those fields, so authoring them on the assets later is safe.
+
+### Growth-curve semantics — DECIDED FOR AUTHORED DATA
+
+`CreatureSpeciesSO.GetStatAtLevel` returns `round(BaseStats × curve scale)`, and a curve maps level
+progress (0 at level 1, 1 at `MaxLevel`) to a scale. A curve that starts at 0 would make every
+level-1 stat 0 (the fresh-asset default still does exactly that), so authored curves obey:
+
+- **scale at max level is exactly 1** — `BaseStats` are the species' *max-level* stats;
+- **scale at level 1 is a sensible fraction above 0** (0.10–0.20), so a level-1 beast is a weak but
+  real version of its adult self; the roster tests check every stat is at least 1 at level 1;
+- scale never decreases, and the curve is **piecewise-linear** between its authored points (the
+  importer sets linear tangents, so Unity evaluates exactly the numbers in the JSON).
+
+All three curves have `MaxLevel` 100:
+
+| Curve | Shape | Key points (progress → scale) | Used by |
+| --- | --- | --- | --- |
+| `fast` | Front-loaded: strong early, flattens late | 0 → 0.20, 0.25 → 0.60, 0.5 → 0.85, 1 → 1 | Phoenix, Griffin, Thunderbird |
+| `medium` | Linear | 0 → 0.15, 1 → 1 | Frost Wyrm, Tarasque, Kirin, Basilisk |
+| `slow` | Back-loaded: weak early, surges late | 0 → 0.10, 0.5 → 0.40, 0.75 → 0.65, 1 → 1 | Leviathan, Golem, Treant |
+
+The fragile strikers level fast and the walls level slow, so early fights favour speed and damage
+and bulk pays off late. `MoveRange` is exempt from curves (see "Stat assembly and move range").
+
+### JSON is the source of truth; Unity assets are generated
+
+The roster lives in **`BeastCraft/Assets/_Project/Data/Creatures/beast-roster.json`**, not in
+hand-authored `.asset` files. A plain JSON file is readable and diffable outside Unity — the future
+headless balance simulator will read it directly with `System.Text.Json` (`IncludeFields = true`;
+keys are the C# field names exactly) — whereas `.asset` YAML references its scripts by `.meta` GUIDs
+this repo does not track, and cannot be verified without an Editor.
+
+The file holds `GrowthCurves` (`CurveId`, `MaxLevel`, `Keys` of `Progress`/`Scale`) and `Species`
+(`SpeciesId`, `DisplayName`, `Description`, `Elements` as enum names, `GrowthCurveId`, `BaseStats`
+including `MoveRange`). Its C# shape is `BeastCraft.Creatures.Roster.BeastRosterData` in the Runtime
+assembly, and `BeastRosterValidator` holds the structural rules (well-formed unique snake_case ids,
+parseable elements, resolvable curve ids, curve sanity, every stat at least 1).
+
+**Workflow:** edit the JSON, then open the project in Unity and run **Beast Craft → Data → Import
+Beast Roster**. The importer (`BeastCraft.Editor.Data.BeastRosterImporter`):
+
+- validates first and imports nothing if the file is invalid (all-or-nothing);
+- creates or **updates in place** a `GrowthRateCurve` per curve under `Data/Creatures/GrowthRates/`,
+  matched by its new `CurveId` field, and a `CreatureSpeciesSO` per species under `Data/Creatures/`,
+  matched by `SpeciesId` — searched across the whole project, so a moved or renamed asset is still
+  found and never duplicated, and its GUID (and every reference to it) survives;
+- owns only the fields the JSON carries; icon, skills, evolutions and customization schema on the
+  asset are left alone;
+- never deletes: a species dropped from the JSON keeps its asset and is logged.
+
+The generated assets (and their `.meta` files) are produced on the first Editor run; none are
+committed yet. `SpeciesId` and `CurveId` follow the never-rename-after-ship rule; the roster tests pin
+the ten approved species ids.
+
 ## Next steps
 
 The grid and turn-manager scaffolding landed against decisions 1–3: a `BeastCraft.Battle.Grid`
@@ -695,14 +784,21 @@ at level, then gear flat, then gear percent) and `BattleUnitFactory`, which buil
 species, level and gear. EditMode tests cover the stat block, the level-scaling exemption, the
 assembly order, the factory, and move range under buffs.
 
+The starter roster (the section above) adds `beast-roster.json`, the `BeastCraft.Creatures.Roster`
+data types and validator, `GrowthRateCurve.CurveId` and `GrowthRateCurve.EvaluateScale`, the Editor
+importer (the first Editor script, and the first `UnityEditor` stubs in `Tooling/CiStubs`), and
+EditMode tests that check the JSON directly: structure, the ten pinned ids, one beast per element,
+the stat-budget and move-range bands, and the curve semantics.
+
 Every pass so far is deliberately **data structures and algorithms only** — no MonoBehaviours, no
-scene or prefab wiring, and no authored `.asset` instances. The hex radii backing each arena preset
+scene or prefab wiring, and no committed `.asset` instances (the roster's are generated in-Editor). The hex radii backing each arena preset
 are placeholder implementation defaults chosen to be tunable, not producer-confirmed balance
 numbers, and the deployment-zone split, the effect rules and the element chart above are the same
 kind of default.
 Still to come: the damage formula and stat scaling on top of
 flat magnitudes — the planned next work stream, applying to beasts and the avatar alike, together
-with a headless balance simulator to tune it — the status-effect system behind `ApplyStatus`, resource gating on top of cooldowns,
+with a headless balance simulator that reads `beast-roster.json` directly and replaces the roster's
+first-draft numbers with tuned ones — the starter roster's skills (none are authored yet), the status-effect system behind `ApplyStatus`, resource gating on top of cooldowns,
 lifting defeated units off the grid so they stop obstructing movement, the placement UI (a Unity
 Editor task, not a continuation of the placement validation that just landed), the encounter
 definition that selects an arena preset and a battle format, and the presentation layer.
