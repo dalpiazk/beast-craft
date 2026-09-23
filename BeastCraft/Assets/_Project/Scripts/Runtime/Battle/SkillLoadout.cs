@@ -38,6 +38,15 @@ namespace BeastCraft.Battle
     /// is an open design item (battle-system design doc, §6).
     /// </para>
     /// <para>
+    /// <strong>Levels.</strong> Each slot holds a <see cref="SkillInstance"/> — the skill plus the
+    /// level and breakthrough tier its owner has brought it to. The plain constructor puts every
+    /// skill in at level 1, tier 0, which is the authored skill exactly;
+    /// <see cref="FromInstances"/> builds a leveled stack (see
+    /// <see cref="BattleUnitFactory.BuildLoadout"/>). A slot's cooldown is its instance's
+    /// <see cref="SkillInstance.EffectiveCooldown"/>, and what it fires carries the instance so the
+    /// level reaches the effects.
+    /// </para>
+    /// <para>
     /// Cooldowns only. This does not spend <see cref="SkillSO.ResourceCost"/>, apply
     /// <see cref="SkillSO.Effects"/>, move anybody, or decide when a turn happens.
     /// </para>
@@ -85,8 +94,41 @@ namespace BeastCraft.Battle
                     continue;
                 }
 
-                _slots.Add(new Slot(skill, skill.Cooldown < 0 ? 0 : skill.Cooldown));
+                _slots.Add(new Slot(new SkillInstance(skill)));
             }
+        }
+
+        /// <summary>
+        /// Builds a loadout from an ordered stack of leveled skills: the same rules as the
+        /// <see cref="SkillSO"/> constructor, except each slot keeps its instance's level and tier
+        /// and starts at (and re-arms to) its <see cref="SkillInstance.EffectiveCooldown"/>, so a
+        /// tier's cooldown reduction applies from the first countdown. Null stacks, null instances
+        /// and instances with no skill are skipped.
+        /// <para>
+        /// A static factory rather than a second constructor so that the existing
+        /// <c>new SkillLoadout(null)</c> call sites stay unambiguous.
+        /// </para>
+        /// </summary>
+        public static SkillLoadout FromInstances(IEnumerable<SkillInstance> instances)
+        {
+            SkillLoadout loadout = new SkillLoadout(null);
+
+            if (instances == null)
+            {
+                return loadout;
+            }
+
+            foreach (SkillInstance instance in instances)
+            {
+                if (instance == null || instance.Skill == null)
+                {
+                    continue;
+                }
+
+                loadout._slots.Add(new Slot(instance));
+            }
+
+            return loadout;
         }
 
         /// <summary>
@@ -96,6 +138,15 @@ namespace BeastCraft.Battle
         public IReadOnlyList<SkillSO> Skills
         {
             get { return _skills; }
+        }
+
+        /// <summary>
+        /// The leveled skill in one slot, or <c>null</c> for an out-of-range index. Keyed by slot
+        /// index for the same reason as <see cref="RemainingCooldown"/>.
+        /// </summary>
+        public SkillInstance GetInstance(int slotIndex)
+        {
+            return slotIndex >= 0 && slotIndex < _slots.Count ? _slots[slotIndex].Instance : null;
         }
 
         /// <summary>How many slots are equipped. Zero is legal; an empty loadout simply never fires.</summary>
@@ -265,10 +316,10 @@ namespace BeastCraft.Battle
 
             for (int i = 0; i < ready.Count; i++)
             {
-                SkillSO skill = _slots[ready[i]].Skill;
-                IReadOnlyList<BattleUnit> targets = SkillTargetResolver.ResolveTargets(skill, caster, allUnits, grid, rng);
+                SkillInstance instance = _slots[ready[i]].Instance;
+                IReadOnlyList<BattleUnit> targets = SkillTargetResolver.ResolveTargets(instance.Skill, caster, allUnits, grid, rng);
 
-                activations.Add(new SkillActivation(skill, targets));
+                activations.Add(new SkillActivation(instance, targets));
                 MarkFired(ready[i]);
             }
 
@@ -295,17 +346,27 @@ namespace BeastCraft.Battle
         /// </summary>
         private sealed class Slot
         {
-            public Slot(SkillSO skill, int authoredCooldown)
+            public Slot(SkillInstance instance)
             {
-                Skill = skill;
-                AuthoredCooldown = authoredCooldown;
-                Counter = authoredCooldown;
+                Instance = instance;
+                AuthoredCooldown = instance.EffectiveCooldown;
+                Counter = AuthoredCooldown;
             }
 
-            /// <summary>The skill equipped in this slot.</summary>
-            public SkillSO Skill { get; }
+            /// <summary>The leveled skill equipped in this slot.</summary>
+            public SkillInstance Instance { get; }
 
-            /// <summary>The cooldown this slot resets to when it fires, clamped at 0.</summary>
+            /// <summary>The skill equipped in this slot.</summary>
+            public SkillSO Skill
+            {
+                get { return Instance.Skill; }
+            }
+
+            /// <summary>
+            /// The cooldown this slot resets to when it fires: the instance's
+            /// <see cref="SkillInstance.EffectiveCooldown"/> (the authored cooldown less any tier
+            /// reduction), clamped at 0.
+            /// </summary>
             public int AuthoredCooldown { get; }
 
             /// <summary>Turns left before this slot fires again.</summary>

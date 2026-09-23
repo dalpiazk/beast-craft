@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using BeastCraft.Creatures;
+using BeastCraft.Progression;
 using UnityEngine;
 
 namespace BeastCraft.Battle
@@ -127,7 +128,21 @@ namespace BeastCraft.Battle
         /// </summary>
         public DamageCategory Category = DamageCategory.Physical;
 
-        /// <summary>Everything this skill applies to each affected unit.</summary>
+        /// <summary>
+        /// Everything this skill applies to each affected unit, at level 1 and tier 0. A leveled
+        /// skill scales every magnitude and may append tier bonus effects; see
+        /// <see cref="SkillInstance.Effects"/>.
+        /// </summary>
         public List<SkillEffect> Effects = new List<SkillEffect>();
+
+        /// <summary>
+        /// How this skill grows as its owner uses it: max level, magnitude growth per level and
+        /// the breakthrough gates with their bonuses. See <see cref="SkillProgressionDefinition"/>
+        /// and the battle-system design doc, "Skill progression". A battle reads it only through a
+        /// <see cref="SkillInstance"/>; a skill built without a level (the plain
+        /// <see cref="SkillLoadout(IEnumerable{SkillSO})"/> path) is level 1, tier 0, which is
+        /// exactly this asset's authored numbers.
+        /// </summary>
+        public SkillProgressionDefinition Progression = new SkillProgressionDefinition();
     }
 }

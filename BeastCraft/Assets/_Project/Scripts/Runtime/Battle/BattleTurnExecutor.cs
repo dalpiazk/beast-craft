@@ -442,7 +442,7 @@ namespace BeastCraft.Battle
         private static BattleSkillOutcome Fire(SkillLoadout loadout, int slotIndex, SkillSO skill, BattleUnit caster, IEnumerable<BattleUnit> allUnits, HexGrid grid, Random rng, int movementSpent)
         {
             IReadOnlyList<BattleUnit> targets = SkillTargetResolver.ResolveTargets(skill, caster, allUnits, grid, rng);
-            SkillActivation activation = new SkillActivation(skill, targets);
+            SkillActivation activation = new SkillActivation(loadout.GetInstance(slotIndex), targets);
 
             SkillEffectApplier.Apply(activation, caster, rng);
             LiftDefeated(allUnits, grid);

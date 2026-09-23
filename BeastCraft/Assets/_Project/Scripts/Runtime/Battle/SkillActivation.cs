@@ -26,14 +26,35 @@ namespace BeastCraft.Battle
     /// </summary>
     public class SkillActivation
     {
+        /// <summary>
+        /// An activation of <paramref name="skill"/> at level 1, tier 0 — the authored skill
+        /// exactly. <see cref="Instance"/> is <c>null</c> when <paramref name="skill"/> is.
+        /// </summary>
         public SkillActivation(SkillSO skill, IReadOnlyList<BattleUnit> targets)
+            : this(skill == null ? null : new SkillInstance(skill), targets)
         {
-            Skill = skill;
+        }
+
+        /// <summary>
+        /// An activation of a leveled skill: <see cref="SkillEffectApplier"/> applies
+        /// <paramref name="instance"/>'s <see cref="SkillInstance.Effects"/> with its magnitudes
+        /// scaled by its level. A null instance is tolerated (no skill, nothing applied).
+        /// </summary>
+        public SkillActivation(SkillInstance instance, IReadOnlyList<BattleUnit> targets)
+        {
+            Instance = instance;
+            Skill = instance == null ? null : instance.Skill;
             Targets = targets ?? new List<BattleUnit>();
         }
 
         /// <summary>The skill that came up ready and fired.</summary>
         public SkillSO Skill { get; }
+
+        /// <summary>
+        /// The fired skill at the level and tier it fired at. <c>null</c> only when
+        /// <see cref="Skill"/> is.
+        /// </summary>
+        public SkillInstance Instance { get; }
 
         /// <summary>
         /// The units the skill landed on, exactly as <see cref="SkillTargetResolver.ResolveTargets"/>

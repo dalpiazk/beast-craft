@@ -1170,6 +1170,90 @@ The generated assets (and their `.meta` files) are produced on the first Editor 
 committed yet. `SpeciesId` and `CurveId` follow the never-rename-after-ship rule; the roster tests pin
 the ten approved species ids.
 
+## Skill progression — TUNABLE STARTING DEFAULTS, NOT CONFIRMED BALANCE
+
+**Decided by the user:** a beast equips **3 skills** chosen from a growing pool of skills it has
+**acquired**, and the lineup can be changed between battles. Skills **improve slowly** through play,
+by two routes together: **practice XP** from using the skill in battle, on a slow curve, and rarer
+**materials** that add XP and are required to pass **tier breakthroughs**. The same model is meant
+for the avatar's passive skills later, so it is built generically. The numbers below are
+engineering defaults, all constants or authored fields, and cheap to retune.
+
+**Data model.** Everything generic lives in the `BeastCraft.Progression` namespace:
+
+- `SkillProgressionDefinition` (serializable, embedded in `SkillSO.Progression`): `MaxLevel`
+  (default 20), `MagnitudeGrowthPerLevel` (percent, default 3) and `Tiers`, a list of
+  `SkillTierDefinition` gates in ascending order (defaults: levels 5 / 10 / 15 needing material tiers
+  1 / 2 / 3). Each gate has a `ThresholdLevel`, a `RequiredMaterialTier`, and optional bonuses:
+  `CooldownReduction` (turns) and `BonusEffects` (extra `SkillEffect`s). It is a separate block
+  rather than loose fields on `SkillSO` so any skill-definition type can carry one and reuse the
+  same rules.
+- `SkillProgress` (serializable save data, like the roster DTOs): `SkillId`, `Level`, `Xp`, `Tier`
+  (gates passed).
+- `SkillMaterialSO` (asset): `MaterialId` (never rename after ship), `DisplayName`, `Description`,
+  `Icon`, `Tier`, `XpValue`.
+- `BeastSkillBook` (serializable save data): `Known` (one `SkillProgress` per acquired skill) and
+  `Equipped`, `EquipSlotCount = 3` skill ids by slot. **Slot order is fire priority.**
+- `SkillProgression` (static rules), `SkillBreakthroughResult` and `SkillEquipResult` (explicit enum
+  values, never renumbered).
+
+**The XP curve.** `XpToNextLevel(level) = round(100 × level^1.5)`: 100 XP for level 1→2, 800 for
+4→5, 3,162 for 10→11, 8,282 for 19→20. Cumulative, reaching level 5 takes 1,703 XP, level 10
+11,106 XP and level 20 67,135 XP. Practice is a flat **10 XP per use**, where a use is a slot that
+**fired** (whiffs count, held slots do not), with at most **20 uses credited per award**. Callers
+award once per battle, so that is a per-battle cap that stops a long fight with a cooldown-0 skill
+being farmed. On practice alone that is 171 uses to level 5, 1,111 to level 10 and 6,714 to level
+20. That is deliberately slow, and materials are the accelerator. `SkillProgression.ApplyMaterial` adds
+a material's `XpValue`; any tier of material can be fed.
+
+**Gates.** A skill levels while its XP covers the next level, up to its **level cap**: the next
+unpassed gate's threshold, or `MaxLevel` once every gate is passed. At a gate the skill stops. XP
+keeps banking there but only up to one level's worth (`XpToNextLevel(level)`), and the rest is
+discarded. That way practice done while waiting on a material is not wholly lost, but it cannot be
+stockpiled. At `MaxLevel` XP is held at 0. `SkillProgression.TryBreakthrough(progress, definition,
+material)` passes the gate when the skill is at its threshold and the material's tier is at least
+the gate's `RequiredMaterialTier` (a higher tier also works). The tier then goes up by one and the
+bank immediately buys the next level if it is full. A breakthrough does not add the material's XP.
+On failure (`NoTierRemaining`, `BelowThreshold`, `MaterialTierTooLow`, `MissingInput`) nothing
+changes and the caller keeps the material. A gate authored at or past `MaxLevel` blocks nothing but
+still grants its bonuses: a "mastery" gate.
+
+**Acquisition and equipping.** `BeastSkillBook.Learn(skill)` acquires a skill at level 1, tier 0
+(re-learning never resets progress). `LearnAvailable(species, beastLevel)` learns every
+`CreatureSpeciesSO.LearnableSkills` entry at or below the beast's level, which is the level-up
+source. Drops and rewards will call `Learn` directly later. `Equip(slot, skillId)` refuses an
+out-of-range slot, an unknown skill, or a skill already in another slot (a skill occupies at most one
+slot). `Unequip` empties a slot, `SwapSlots` reorders priority, and slots may be empty.
+
+**How a level reaches the battle.** `SkillInstance` (in `BeastCraft.Battle`) is a skill at a level
+and tier. It is immutable, clamped to the definition, and captured when the loadout is built.
+`SkillLoadout` slots hold instances, `SkillActivation.Instance` carries one, and
+`SkillEffectApplier` reads its `Effects` (the authored effects, then each passed gate's
+`BonusEffects`) and scales every magnitude by
+`1 + MagnitudeGrowthPerLevel / 100 × (level − 1)` before use. That scaled number is the power handed
+to `DamageFormula` (so a level-11 skill at the defaults hits for 1.3× the power, and 1.57× at level
+20), the heal amount, or the buff/debuff size. Durations are not scaled. A slot's cooldown is the
+authored `Cooldown` less every passed gate's `CooldownReduction`, clamped at 0.
+`BattleUnitFactory.BuildLoadout(book, skillLookup)` and a `CreateBeast` overload build the loadout
+from a skill book. Equipped slots come in slot order at their recorded level and tier, and empty or
+unresolvable slots close up. **Level 1, tier 0 is the authored skill exactly**: the plain
+`new SkillLoadout(SkillSO[])` path and `new SkillActivation(skill, targets)` still build level-1
+instances, and the multiplier is not applied at all at level 1. Existing behaviour, tests and the
+simulator (which still fights level-1 kits) are therefore unchanged.
+
+**After a battle.** `BattleSkillUsage.CountFiredSkills(result, avatar)` reads a `BattleResult` into
+unit id → skill id → uses. Only fired slots count. The avatar's casts are counted under its id only
+when the avatar is passed in, because avatar activations carry no caster. `CountFiredSkillsFor(result,
+unitId)` returns one unit's counts, and `BeastSkillBook.AwardPractice(uses, skillLookup)` credits them
+to the book's known skills.
+
+**Open questions.** Whether practice should need a hit (or scale with damage dealt) rather than a
+fire. Whether enemy-side or defeated beasts earn practice. The material economy (drop rates, how
+material XP compares with practice). Whether stat changes should scale per level like damage (they
+truncate to whole points, so small buffs grow in steps). Whether the slow curve suits the narrative
+pacing. There is no inventory yet, so consuming a material is the caller's job. No UI, no save
+system and no authored materials or tier bonuses exist yet.
+
 ## Next steps
 
 The grid and turn-manager scaffolding landed against decisions 1–3: a `BeastCraft.Battle.Grid`
@@ -1413,6 +1497,18 @@ and enemy powers were rescaled to the new "percent of the attacking stat" meanin
 shifted and a full retune (including widening base Speed for the turn-based 10–15% target) is the
 next deliverable. The tuning log's "Sqrt speed + mitigation formula" section has the before/after
 marginals and the per-beast turn rates.
+
+**Skill progression has since been added** (the section above, by user decision): the
+`BeastCraft.Progression` namespace (`SkillProgressionDefinition`, `SkillTierDefinition`,
+`SkillProgress`, `SkillMaterialSO`, `BeastSkillBook`, `SkillProgression`, `SkillBreakthroughResult`,
+`SkillEquipResult`), `SkillSO.Progression`, `SkillInstance` carried by `SkillLoadout` and
+`SkillActivation` into `SkillEffectApplier`, `SkillLoadout.FromInstances` / `GetInstance`,
+`BattleUnitFactory.BuildLoadout` with a skill-book `CreateBeast` overload, and `BattleSkillUsage`.
+Level 1, tier 0 is the authored skill exactly, so the simulator and its reports are unchanged.
+EditMode tests cover the curve, practice and material XP, gate blocking and banking, breakthroughs
+with the right and wrong material tier, magnitude scaling in real damage, heals and buffs, tier
+cooldown reduction and bonus effects in a battle turn, the equip rules, species acquisition, the
+factory's slot order, and use counts read back from `RunBattle`.
 
 Every pass so far is deliberately **data structures and algorithms only** — no MonoBehaviours, no
 scene or prefab wiring, and no committed `.asset` instances (the roster's are generated in-Editor). The hex radii backing each arena preset

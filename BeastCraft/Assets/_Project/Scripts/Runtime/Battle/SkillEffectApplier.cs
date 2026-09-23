@@ -62,6 +62,14 @@ namespace BeastCraft.Battle
         /// Applies every <see cref="SkillSO.Effects"/> entry of the fired skill to every unit in
         /// <see cref="SkillActivation.Targets"/>.
         /// <para>
+        /// <strong>Skill level.</strong> The effect list and magnitudes come from the activation's
+        /// <see cref="SkillActivation.Instance"/>: <see cref="SkillInstance.Effects"/> (the authored
+        /// effects plus any passed tier's bonus effects), each magnitude scaled by
+        /// <see cref="SkillInstance.ScaleMagnitude"/> before it is used — as the damage power handed
+        /// to <see cref="DamageFormula"/>, as the heal amount, or as the stat change. At level 1,
+        /// tier 0 both are the authored values untouched.
+        /// </para>
+        /// <para>
         /// Iteration is target-major: each target runs the whole effect list in authored order
         /// before the next target starts. Authored order is the only thing sequencing a
         /// multi-effect skill, exactly as stack order is the only thing sequencing a multi-skill
@@ -110,7 +118,8 @@ namespace BeastCraft.Battle
                 return;
             }
 
-            List<SkillEffect> effects = activation.Skill.Effects;
+            SkillInstance instance = activation.Instance ?? new SkillInstance(activation.Skill);
+            IReadOnlyList<SkillEffect> effects = instance.Effects;
             IReadOnlyList<BattleUnit> targets = activation.Targets;
 
             if (effects == null || effects.Count == 0 || targets == null)
@@ -138,7 +147,7 @@ namespace BeastCraft.Battle
 
                     if (effects[e] != null)
                     {
-                        ApplyEffect(activation, caster, target, effects[e], rng);
+                        ApplyEffect(activation, caster, target, effects[e], instance.ScaleMagnitude(effects[e].Magnitude), rng);
                     }
                 }
             }
@@ -217,26 +226,28 @@ namespace BeastCraft.Battle
         /// Routes one effect to its handler. The whole of the effect vocabulary.
         /// <paramref name="activation"/> (for its skill's element and damage category, and to record
         /// the hit), <paramref name="caster"/> (for its level, attacking stat and crit chance) and
-        /// <paramref name="rng"/> are needed only by the damage arm.
+        /// <paramref name="rng"/> are needed only by the damage arm. <paramref name="magnitude"/> is the
+        /// effect's <see cref="SkillEffect.Magnitude"/> already scaled for the skill's level; the
+        /// handlers read it instead of the authored field.
         /// </summary>
-        private static void ApplyEffect(SkillActivation activation, BattleUnit caster, BattleUnit target, SkillEffect effect, System.Random rng)
+        private static void ApplyEffect(SkillActivation activation, BattleUnit caster, BattleUnit target, SkillEffect effect, float magnitude, System.Random rng)
         {
             switch (effect.EffectType)
             {
                 case SkillEffectType.Damage:
-                    ApplyDamage(activation, caster, target, effect, rng);
+                    ApplyDamage(activation, caster, target, magnitude, rng);
                     break;
 
                 case SkillEffectType.Heal:
-                    ApplyHeal(target, effect);
+                    ApplyHeal(target, magnitude);
                     break;
 
                 case SkillEffectType.BuffStat:
-                    ApplyStatChange(target, effect, 1);
+                    ApplyStatChange(target, effect, magnitude, 1);
                     break;
 
                 case SkillEffectType.DebuffStat:
-                    ApplyStatChange(target, effect, -1);
+                    ApplyStatChange(target, effect, magnitude, -1);
                     break;
 
                 case SkillEffectType.ApplyStatus:
@@ -268,8 +279,9 @@ namespace BeastCraft.Battle
         /// <summary>
         /// Spends HP. The amount is
         /// <see cref="DamageFormula.Roll(BattleUnit, BattleUnit, SkillSO, float, System.Random)"/> of
-        /// <paramref name="caster"/> against <paramref name="target"/>, with the effect's
-        /// <see cref="SkillEffect.Magnitude"/> as the power and <paramref name="rng"/> for the crit
+        /// <paramref name="caster"/> against <paramref name="target"/>, with <paramref name="power"/>
+        /// (the effect's <see cref="SkillEffect.Magnitude"/> scaled for the skill's level, see
+        /// <see cref="SkillInstance.ScaleMagnitude"/>) as the power and <paramref name="rng"/> for the crit
         /// and variance rolls; the roll is recorded on <paramref name="activation"/>
         /// (<see cref="SkillActivation.Hits"/>), and the amount is clamped into
         /// <c>[0, Stats.Hp]</c>, so an overkill hit lands the unit on exactly 0 rather than in
@@ -287,9 +299,9 @@ namespace BeastCraft.Battle
         /// it can happen — not a hidden consequence of a setter.
         /// </para>
         /// </summary>
-        private static void ApplyDamage(SkillActivation activation, BattleUnit caster, BattleUnit target, SkillEffect effect, System.Random rng)
+        private static void ApplyDamage(SkillActivation activation, BattleUnit caster, BattleUnit target, float power, System.Random rng)
         {
-            DamageRoll roll = DamageFormula.Roll(caster, target, activation.Skill, effect.Magnitude, rng);
+            DamageRoll roll = DamageFormula.Roll(caster, target, activation.Skill, power, rng);
             activation.RecordHit(new DamageHit(target, roll));
             SetCurrentHp(target, target.CurrentHp - roll.Amount);
 
@@ -316,9 +328,9 @@ namespace BeastCraft.Battle
         /// accident. Defeated stays defeated until something is designed to undo it.
         /// </para>
         /// </summary>
-        private static void ApplyHeal(BattleUnit target, SkillEffect effect)
+        private static void ApplyHeal(BattleUnit target, float magnitude)
         {
-            SetCurrentHp(target, target.CurrentHp + ToAmount(effect.Magnitude));
+            SetCurrentHp(target, target.CurrentHp + ToAmount(magnitude));
         }
 
         /// <summary>
@@ -349,9 +361,9 @@ namespace BeastCraft.Battle
         /// up moving the stat by nothing, since reverting zero is a no-op.
         /// </para>
         /// </summary>
-        private static void ApplyStatChange(BattleUnit target, SkillEffect effect, int sign)
+        private static void ApplyStatChange(BattleUnit target, SkillEffect effect, float magnitude, int sign)
         {
-            int applied = AddToStat(target, effect.AffectedStat, sign * ToAmount(effect.Magnitude));
+            int applied = AddToStat(target, effect.AffectedStat, sign * ToAmount(magnitude));
 
             if (applied != 0 && effect.DurationTurns > 0)
             {
