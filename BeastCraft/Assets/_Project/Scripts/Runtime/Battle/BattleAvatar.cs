@@ -127,10 +127,10 @@ namespace BeastCraft.Battle
         /// for the same reason.
         /// </para>
         /// <para>
-        /// <strong>Its damage is the formula's floor.</strong> This avatar is level 1 with zero
-        /// <c>Attack</c> and <c>SpecialAttack</c>, and <see cref="DamageFormula"/> gives a zero
-        /// attacking stat exactly its +2 constant: every damage effect it lands deals 2 times the
-        /// element multiplier (truncated, at least 1), whatever the authored power. Before the
+        /// <strong>Its damage is the formula's floor.</strong> This avatar has zero
+        /// <c>Attack</c> and <c>SpecialAttack</c>, so every damage effect it lands deals exactly
+        /// <see cref="DamageFormula.MinimumDamage"/> (1), whatever the authored power and whatever
+        /// the element. Before the
         /// damage formula it dealt the authored magnitude flat; a caller relying on an avatar
         /// strike landing hard must now give the avatar stats through the other overload. The same goes
         /// for heals, which scale with <c>SpecialAttack</c>: this avatar's heals restore nothing. Buffs

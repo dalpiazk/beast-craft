@@ -482,6 +482,48 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
+        public void InstancesOfOnePassive_ShareOneCarrier_ButKeepTheirOwnLevelAndBattleState()
+        {
+            PassiveSkillSO aura = Passive("aura", PassiveTrigger.Aura, PassiveTarget.AllAllies, Buff(StatType.Attack, 10));
+            PassiveSkillSO other = Passive("other", PassiveTrigger.Aura, PassiveTarget.AllAllies, Buff(StatType.Attack, 10));
+            PassiveInstance first = new PassiveInstance(aura, 1);
+            PassiveInstance second = new PassiveInstance(aura, 11);
+            PassiveInstance third = new PassiveInstance(other);
+
+            Assert.AreSame(first.Skill.Skill, second.Skill.Skill, "one carrier per passive asset");
+            Assert.AreNotSame(first.Skill.Skill, third.Skill.Skill);
+            Assert.AreSame(aura.Effects, first.Skill.Skill.Effects);
+
+            // Level lives on the wrapper, battle state on the instance: neither leaks across.
+            Assert.AreEqual(1.0, first.Skill.MagnitudeMultiplier, 1e-9);
+            Assert.AreEqual(1.3, second.Skill.MagnitudeMultiplier, 1e-9);
+            BattleUnit p1 = Beast("p1", BattleTeam.Player);
+            BattleUnit p2 = Beast("p2", BattleTeam.Player);
+            BattleTurnExecutor.BeginBattle(new List<BattleUnit> { p1 }, null, null, MakeAvatar(), new PassiveLoadout(new[] { first }));
+            BattleTurnExecutor.BeginBattle(new List<BattleUnit> { p2 }, null, null, MakeAvatar(), new PassiveLoadout(new[] { second }));
+
+            Assert.AreEqual(110, p1.Stats.Attack);
+            Assert.AreEqual(113, p2.Stats.Attack);
+            Assert.AreEqual(1, first.TriggerCount);
+            Assert.AreEqual(1, second.TriggerCount);
+            Assert.AreEqual(0, new PassiveInstance(aura).TriggerCount, "a new battle's instance starts fresh on the shared carrier");
+        }
+
+        [Test]
+        public void SeededBattleWithPassives_ReplaysIdentically_WhenCarriersAreReused()
+        {
+            PassiveSkillSO aura = Passive("aura", PassiveTrigger.Aura, PassiveTarget.AllAllies, Buff(StatType.CritChance, 30));
+            PassiveSkillSO coin = Passive("coin", PassiveTrigger.AllyCrit, PassiveTarget.AllEnemies, Damage(15f));
+            coin.ProcChance = 50;
+
+            string first = ReusedPassiveTrace(aura, coin, 91);
+            string second = ReusedPassiveTrace(aura, coin, 91);
+
+            Assert.AreEqual(first, second);
+            StringAssert.Contains("coin", first, "the trace exercised a chance passive");
+        }
+
+        [Test]
         public void PassiveSkill_ProgressesOnTheSharedRules()
         {
             PassiveSkillSO aura = Passive("aura", PassiveTrigger.Aura, PassiveTarget.AllAllies, Buff(StatType.Attack, 10));
@@ -697,6 +739,36 @@ namespace BeastCraft.Tests.EditMode
 
             BattleResult result = BattleTurnExecutor.RunBattle(new TurnManager(roster), roster, null, new System.Random(seed), avatar,
                                                                Loadout(aura, coin, rescue));
+
+            System.Text.StringBuilder trace = new System.Text.StringBuilder();
+            trace.Append(result.Outcome).Append(' ').Append(result.ElapsedTicks).Append('\n');
+            AppendPassives(trace, result.OpeningPassiveActivations);
+            foreach (BattleTurnResult turn in result.Turns)
+            {
+                trace.Append(turn.Unit.Id).Append(':');
+                AppendPassives(trace, turn.PassiveActivations);
+            }
+
+            foreach (BattleUnit unit in roster)
+            {
+                trace.Append(unit.Id).Append('=').Append(unit.CurrentHp).Append(' ');
+            }
+
+            return trace.ToString();
+        }
+
+        /// <summary>A seeded battle built from the given passive assets, so repeated calls reuse their cached carriers.</summary>
+        private string ReusedPassiveTrace(PassiveSkillSO aura, PassiveSkillSO coin, int seed)
+        {
+            SkillSO strike = Skill("strike", SkillTargetShape.AllEnemies, 1, Damage(40f));
+            List<BattleUnit> roster = new List<BattleUnit>
+            {
+                new BattleUnit("p1", BattleTeam.Player, new StatBlock(400, 60, 40, 0, 0, 12), HexCoordinate.Zero, new SkillLoadout(new[] { strike })),
+                new BattleUnit("e1", BattleTeam.Enemy, new StatBlock(600, 60, 40, 0, 0, 11), new HexCoordinate(3, 0), new SkillLoadout(new[] { strike })),
+            };
+            BattleUnit avatar = BattleAvatar.Create(null, new StatBlock(1, 50, 20, 0, 0, 0), null);
+
+            BattleResult result = BattleTurnExecutor.RunBattle(new TurnManager(roster), roster, null, new System.Random(seed), avatar, Loadout(aura, coin));
 
             System.Text.StringBuilder trace = new System.Text.StringBuilder();
             trace.Append(result.Outcome).Append(' ').Append(result.ElapsedTicks).Append('\n');

@@ -77,7 +77,7 @@ puzzle every encounter.
 - **Avatar level.** The avatar has stats (decision 6, amended) and its *skills* now progress —
   its active skills and its passives level on the beast-skill model (see "Avatar passives") — but
   the avatar itself still has no level and no stat growth: its base is a flat authored block and
-  only avatar gear moves it. The damage formula still needs a caster level for it, so
+  only avatar gear moves it. It has no level or XP progression of its own; the statful
   `BattleAvatar.Create` takes a per-battle level (default 1) that the battle setup is expected to
   pick sensibly, e.g. the player team's level — a stopgap input, not a design for progression.
 
@@ -490,8 +490,8 @@ Everything else above is unchanged: the avatar is still off the grid, still take
 turn, still ticks on player-beast turns, is still a caster outside the roster, and still cannot be
 defeated. **The avatar's stats now feed the damage formula** exactly as a beast's do (see "Damage
 formula"): a damaging avatar skill uses the avatar's `Attack` or `SpecialAttack`. Heals
-and buffs are still flat for everyone, so an avatar buff still lands the same whatever the avatar's
-stats are. Avatar leveling is out of scope and open (see "What is not settled yet"); the statful
+scale with the caster's `SpecialAttack`, the avatar's included; buffs are still flat for everyone,
+so an avatar buff still lands the same whatever the avatar's stats are. Avatar leveling is out of scope and open (see "What is not settled yet"); the statful
 `BattleAvatar.Create` takes a per-battle level (default 1), recorded on the unit (the damage formula
 no longer reads level). The zero-stat `Create(skills)` avatar has no attacking stat, so every damage
 effect it lands deals the formula's `MinimumDamage` floor of 1 — see "Damage formula".

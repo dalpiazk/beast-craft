@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using BeastCraft.Avatar;
 using BeastCraft.Progression;
 using UnityEngine;
@@ -21,9 +22,20 @@ namespace BeastCraft.Battle
     /// avatar as the caster. So level scaling, tier bonus effects, damage, crits, chance and
     /// statuses all behave for a passive exactly as they do for a skill, with no second copy of
     /// any rule. The carrier's targeting fields are set so <see cref="SkillTargetResolver"/> resolves
-    /// the passive's <see cref="PassiveSkillSO.TargetScope"/>. The carrier is created with
-    /// <see cref="ScriptableObject.CreateInstance{T}"/> and never saved; in Unity it is reclaimed by
-    /// the next <c>Resources.UnloadUnusedAssets</c> once the battle is dropped.
+    /// the passive's <see cref="PassiveSkillSO.TargetScope"/>.
+    /// </para>
+    /// <para>
+    /// <strong>One carrier per passive asset.</strong> The carrier is created with
+    /// <see cref="ScriptableObject.CreateInstance{T}"/> the first time a given
+    /// <see cref="PassiveSkillSO"/> is put into a battle and then cached, weakly keyed by that asset,
+    /// so every later <see cref="PassiveInstance"/> of the same asset — across battles too — shares
+    /// it, and rebuilding the loadout every battle does not pile up native objects in a player. The
+    /// carrier is stateless: level and tier live on the <see cref="SkillInstance"/> wrapper, and
+    /// trigger count, cooldown and threshold latches live on this instance. Because it is built
+    /// once, an edit to a <see cref="PassiveSkillSO"/>'s id, name, element, category, target scope,
+    /// or the <see cref="PassiveSkillSO.Effects"/> / <see cref="PassiveSkillSO.Progression"/>
+    /// references themselves made at runtime is not reflected until the asset is reloaded (the lists
+    /// are shared, so edits inside them are). A carrier Unity has destroyed is rebuilt on next use.
     /// </para>
     /// <para>
     /// The authored gating values are captured at construction (clamped: proc chance into
@@ -34,6 +46,9 @@ namespace BeastCraft.Battle
     /// </summary>
     public sealed class PassiveInstance
     {
+        private static readonly object CarrierLock = new object();
+        private static readonly ConditionalWeakTable<PassiveSkillSO, SkillSO> Carriers = new ConditionalWeakTable<PassiveSkillSO, SkillSO>();
+
         private readonly HashSet<BattleUnit> _belowThreshold = new HashSet<BattleUnit>();
 
         /// <summary>
@@ -50,7 +65,7 @@ namespace BeastCraft.Battle
                 return;
             }
 
-            Skill = new SkillInstance(BuildCarrier(passive), level, tier);
+            Skill = new SkillInstance(CarrierFor(passive), level, tier);
             Trigger = passive.Trigger;
             TargetScope = passive.TargetScope;
             HpThresholdPercent = passive.HpThresholdPercent;
@@ -193,6 +208,33 @@ namespace BeastCraft.Battle
 
                 default:
                     return none;
+            }
+        }
+
+        /// <summary>
+        /// The cached carrier for <paramref name="passive"/>, building and caching it on first use
+        /// or when Unity has destroyed the cached one. Locked, since the balance sim runs battles
+        /// in parallel; the cache holds its keys weakly, so it never keeps an asset alive.
+        /// </summary>
+        private static SkillSO CarrierFor(PassiveSkillSO passive)
+        {
+            lock (CarrierLock)
+            {
+                SkillSO carrier;
+                if (Carriers.TryGetValue(passive, out carrier))
+                {
+                    // Unity's overloaded == reports a destroyed native object as null.
+                    if (carrier != null)
+                    {
+                        return carrier;
+                    }
+
+                    Carriers.Remove(passive);
+                }
+
+                carrier = BuildCarrier(passive);
+                Carriers.Add(passive, carrier);
+                return carrier;
             }
         }
 
