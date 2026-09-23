@@ -23,18 +23,15 @@ namespace BeastCraft.Battle
     /// for a first pass, not producer-confirmed balance, and are cheap to revisit:
     /// <list type="bullet">
     /// <item><description>
-    /// <strong>No damage formula.</strong> <see cref="SkillEffect.Magnitude"/> is applied flat,
-    /// straight against HP. No Attack-versus-Defense math, no stat scaling, no crit, no variance.
-    /// That is a distinct balancing pass.
-    /// </description></item>
-    /// <item><description>
-    /// <strong>The one exception is the element chart.</strong> A
-    /// <see cref="SkillEffectType.Damage"/> magnitude is multiplied by
-    /// <see cref="ElementChart.GetMultiplier(Element, IReadOnlyList{Element})"/> — the fired
-    /// skill's <see cref="SkillSO.Element"/> against the target's
-    /// <see cref="BattleUnit.Elements"/> — before it is truncated to whole HP. It is a multiplier
-    /// on top of the flat magnitude, not a formula: a neutral skill or an unaligned target still
-    /// takes exactly the authored number. Heals and stat changes are never scaled.
+    /// <strong>Damage is stat-based; everything else is flat.</strong> A
+    /// <see cref="SkillEffectType.Damage"/> effect's <see cref="SkillEffect.Magnitude"/> is its
+    /// <em>power</em>, fed to <see cref="DamageFormula"/> with the caster's level and attacking
+    /// stat, the target's defending stat (the pair picked by <see cref="SkillSO.Category"/>) and
+    /// the element chart — the fired skill's <see cref="SkillSO.Element"/> against the target's
+    /// <see cref="BattleUnit.Elements"/>. No crit, no variance, no same-element bonus; see
+    /// <see cref="DamageFormula"/> for why those are deferred. Heals are still applied flat, and
+    /// buffs and debuffs still move a stat by exactly their magnitude: stat-scaled healing is
+    /// deferred to the balance pass, and neither is ever scaled by element.
     /// </description></item>
     /// <item><description>
     /// <strong>A defeated target takes nothing further.</strong> Once a target's HP reaches 0 it
@@ -77,16 +74,15 @@ namespace BeastCraft.Battle
         /// Other targets in the same activation are unaffected — the skip is per target.
         /// </para>
         /// <para>
-        /// <paramref name="caster"/> is checked and otherwise unread. A null or defeated caster
-        /// applies nothing, which is the same stance
-        /// <see cref="SkillLoadout.TickAndResolve"/> and
+        /// <paramref name="caster"/> is checked first: a null or defeated caster applies nothing,
+        /// which is the same stance <see cref="SkillLoadout.TickAndResolve"/> and
         /// <see cref="SkillTargetResolver.ResolveTargets"/> already take — a unit that is out of
-        /// the fight does not land skills. Beyond that guard the caster still contributes nothing:
-        /// the attacking element comes from the <em>skill</em>
+        /// the fight does not land skills. Past that guard it feeds the damage formula: its
+        /// <see cref="BattleUnit.Level"/> and its current attacking stat
+        /// (<see cref="BattleUnit.Stats"/>, read as each damage effect lands, so a buff applied
+        /// earlier in the fight counts). The attacking <em>element</em> still comes from the skill
         /// (<see cref="SkillSO.Element"/>), not from the caster's own
-        /// <see cref="BattleUnit.Elements"/>, and there is no stat-based damage formula for it to
-        /// feed. It stays on the signature so that adding one does not have to churn every call
-        /// site.
+        /// <see cref="BattleUnit.Elements"/>. Heals and stat changes do not read the caster.
         /// </para>
         /// <para>
         /// An activation with no targets is a legal whiff, per
@@ -129,7 +125,7 @@ namespace BeastCraft.Battle
 
                     if (effects[e] != null)
                     {
-                        ApplyEffect(activation.Skill, target, effects[e]);
+                        ApplyEffect(activation.Skill, caster, target, effects[e]);
                     }
                 }
             }
@@ -196,15 +192,16 @@ namespace BeastCraft.Battle
 
         /// <summary>
         /// Routes one effect to its handler. The whole of the effect vocabulary.
-        /// <paramref name="skill"/> is the skill that fired, needed only by the damage arm for its
-        /// element.
+        /// <paramref name="skill"/> (for its element and damage category) and
+        /// <paramref name="caster"/> (for its level and attacking stat) are needed only by the
+        /// damage arm.
         /// </summary>
-        private static void ApplyEffect(SkillSO skill, BattleUnit target, SkillEffect effect)
+        private static void ApplyEffect(SkillSO skill, BattleUnit caster, BattleUnit target, SkillEffect effect)
         {
             switch (effect.EffectType)
             {
                 case SkillEffectType.Damage:
-                    ApplyDamage(skill, target, effect);
+                    ApplyDamage(skill, caster, target, effect);
                     break;
 
                 case SkillEffectType.Heal:
@@ -246,17 +243,17 @@ namespace BeastCraft.Battle
         }
 
         /// <summary>
-        /// Spends HP. The magnitude is applied flat — there is no formula, per this class's
-        /// scaffold assumptions — scaled only by the element multiplier of
-        /// <paramref name="skill"/>'s <see cref="SkillSO.Element"/> against the target's
-        /// <see cref="BattleUnit.Elements"/>, and the result is clamped into
+        /// Spends HP. The amount is
+        /// <see cref="DamageFormula.Compute(BattleUnit, BattleUnit, SkillSO, float)"/> of
+        /// <paramref name="caster"/> against <paramref name="target"/>, with the effect's
+        /// <see cref="SkillEffect.Magnitude"/> as the power, and the result is clamped into
         /// <c>[0, Stats.Hp]</c>, so an overkill hit lands the unit on exactly 0 rather than in
         /// negative territory that a later heal would have to climb out of.
         /// <para>
-        /// The multiplier is applied to the float magnitude <em>before</em>
-        /// <see cref="ToAmount"/> truncates it, so 5 damage at 0.5x is worth 2 (2.5, truncated).
-        /// At the chart's current values (powers of two) a whole-number magnitude can only lose a
-        /// fraction on the weak side.
+        /// All of the arithmetic — stat selection, the element multiplier, and the single
+        /// truncation to whole HP after it — lives in <see cref="DamageFormula"/>; this method only
+        /// spends what it returns. A zero or negative power deals nothing, so a damage effect can
+        /// no longer read as a heal.
         /// </para>
         /// <para>
         /// Setting <see cref="BattleUnit.IsDefeated"/> is an explicit step here, on purpose.
@@ -265,11 +262,9 @@ namespace BeastCraft.Battle
         /// it can happen — not a hidden consequence of a setter.
         /// </para>
         /// </summary>
-        private static void ApplyDamage(SkillSO skill, BattleUnit target, SkillEffect effect)
+        private static void ApplyDamage(SkillSO skill, BattleUnit caster, BattleUnit target, SkillEffect effect)
         {
-            float multiplier = ElementChart.GetMultiplier(skill.Element, target.Elements);
-
-            SetCurrentHp(target, target.CurrentHp - ToAmount(effect.Magnitude * multiplier));
+            SetCurrentHp(target, target.CurrentHp - DamageFormula.Compute(caster, target, skill, effect.Magnitude));
 
             if (target.CurrentHp <= 0)
             {
@@ -279,6 +274,12 @@ namespace BeastCraft.Battle
 
         /// <summary>
         /// Restores HP, flat and clamped at <c>Stats.Hp</c> so healing cannot overfill a unit.
+        /// <para>
+        /// Flat on purpose, for now: healing does not go through <see cref="DamageFormula"/> and
+        /// reads neither the caster's stats nor its level. Whether heals should scale — and off
+        /// which stat — is deferred to the balance pass, rather than guessed at by mirroring the
+        /// damage formula.
+        /// </para>
         /// <para>
         /// Healing a <em>defeated</em> unit never reaches here: <see cref="Apply"/> skips a
         /// defeated target before the effect runs, so a heal cannot revive. That follows from
@@ -382,7 +383,7 @@ namespace BeastCraft.Battle
         /// The single place <see cref="BattleUnit.CurrentHp"/> is written, holding
         /// <c>0 &lt;= CurrentHp &lt;= Stats.Hp</c> on every path into it. Routing both damage and
         /// healing through one clamp means neither can break the invariant on its own, including
-        /// under a negative authored magnitude that makes damage read as a heal or vice versa.
+        /// under a negative authored heal magnitude that makes the heal read as damage.
         /// </summary>
         private static void SetCurrentHp(BattleUnit unit, int value)
         {
@@ -401,12 +402,12 @@ namespace BeastCraft.Battle
         }
 
         /// <summary>
-        /// The whole-number amount an authored <see cref="SkillEffect.Magnitude"/> is worth. HP and
-        /// stats are integers while magnitude is a float, so authoring 7.9 damage is worth 7: it
-        /// truncates toward zero rather than rounding, which keeps a fractional magnitude from
-        /// quietly buying a point it did not author. The same truncation applies after the element
-        /// multiplier (see <see cref="ApplyDamage"/>), so a weak-side hit rounds down too. When a
-        /// real damage formula lands, this is where rounding gets decided properly.
+        /// The whole-number amount an authored <see cref="SkillEffect.Magnitude"/> is worth to a
+        /// heal or a stat change. HP and stats are integers while magnitude is a float, so authoring
+        /// a 7.9 heal is worth 7: it truncates toward zero rather than rounding, which keeps a
+        /// fractional magnitude from quietly buying a point it did not author. Damage does not come
+        /// through here; <see cref="DamageFormula"/> applies the same truncation once, at the end
+        /// of its own float math.
         /// </summary>
         private static int ToAmount(float magnitude)
         {

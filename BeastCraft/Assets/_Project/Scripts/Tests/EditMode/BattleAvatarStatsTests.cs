@@ -134,7 +134,18 @@ namespace BeastCraft.Tests.EditMode
             Assert.AreEqual(0, avatar.CurrentHp);
             Assert.AreEqual(HexCoordinate.Zero, avatar.Position);
             Assert.AreSame(loadout, avatar.Skills);
+            Assert.AreEqual(1, avatar.Level);
             Assert.IsFalse(avatar.IsDefeated);
+        }
+
+        [Test]
+        public void Create_Level_DefaultsToOneAndIsRecorded()
+        {
+            StatBlock baseStats = new StatBlock(40, 6, 0, 0, 0, 0);
+
+            Assert.AreEqual(1, BattleAvatar.Create(null, baseStats, null).Level);
+            Assert.AreEqual(30, BattleAvatar.Create(null, baseStats, null, BattleAvatar.DefaultId, 30).Level);
+            Assert.AreEqual(1, BattleAvatar.Create(null, baseStats, null, BattleAvatar.DefaultId, 0).Level);
         }
 
         [Test]
@@ -147,7 +158,8 @@ namespace BeastCraft.Tests.EditMode
             _created.Add(sweep);
 
             BattleUnit player = new BattleUnit("p1", BattleTeam.Player, new StatBlock(10, 0, 0, 0, 0, 1), new HexCoordinate(0, 1));
-            BattleUnit enemy = new BattleUnit("e1", BattleTeam.Enemy, new StatBlock(10, 0, 0, 0, 0, 5), new HexCoordinate(0, -1),
+            // Attack 10 against Defense 0 (treated as 1) at power 1000 is one-shot damage.
+            BattleUnit enemy = new BattleUnit("e1", BattleTeam.Enemy, new StatBlock(10, 10, 0, 0, 0, 5), new HexCoordinate(0, -1),
                                               new SkillLoadout(new[] { sweep }));
             AvatarGearSO armor = Gear(AvatarGearSlot.Armor, new StatModifier { Stat = StatType.HP, FlatBonus = 10 });
             BattleUnit avatar = BattleAvatar.Create(null, new StatBlock(40, 0, 0, 0, 0, 0), new[] { armor });

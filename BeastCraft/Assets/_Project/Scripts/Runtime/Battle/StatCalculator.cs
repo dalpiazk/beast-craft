@@ -37,8 +37,9 @@ namespace BeastCraft.Battle
     /// This is stat assembly only, and it produces the <em>starting</em> block a unit enters a
     /// battle with. Timed buffs and debuffs are not part of it: <see cref="SkillEffectApplier"/>
     /// folds those into <see cref="BattleUnit.Stats"/> during the fight and takes them back out
-    /// again, on top of whatever this produced. Nor is it a damage formula — skill magnitudes are
-    /// still flat, and nothing here changes that.
+    /// again, on top of whatever this produced. Nor is it the damage formula — that is
+    /// <see cref="DamageFormula"/>, which reads the block this produces (as buffed or debuffed
+    /// since) when a damage effect lands.
     /// </para>
     /// <para>
     /// The player avatar goes through the same steps 2 to 4 from an authored base instead of a

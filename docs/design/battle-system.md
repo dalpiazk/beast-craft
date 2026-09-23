@@ -66,9 +66,11 @@ puzzle every encounter.
   options. With no player menu, whether a beast has a fallback attack at all — or simply always has
   at least one short-cooldown skill in its rotation — is open, and items in battle are out of scope
   until there is a mechanism that would use them.
-- **Avatar progression.** The avatar now has stats (decision 6, amended), but no level and no
-  growth: its base is a flat authored block and only avatar gear moves it. Whether and how the
-  avatar levels up is undesigned.
+- **Avatar progression.** The avatar now has stats (decision 6, amended), but no progression
+  level and no growth: its base is a flat authored block and only avatar gear moves it. Whether and
+  how the avatar levels up is undesigned. The damage formula still needs a caster level for it, so
+  `BattleAvatar.Create` takes a per-battle level (default 1) that the battle setup is expected to
+  pick sensibly, e.g. the player team's level — a stopgap input, not a design for progression.
 
 ## Data-driven foundation already in place
 
@@ -77,8 +79,9 @@ The authored data this combat model needs is already committed as ScriptableObje
 
 - **`SkillSO`** — target shape (`SingleTarget`, `Line`, `Cross`, `AreaBurst`, `AllEnemies`,
   `AllAllies`, `Self`), range, resource cost, cooldown, a list of effects, and the targeting fields
-  added by decision 4 (side, criterion, order, targeting stat), and the attacking `Element` (see
-  "Element system" below).
+  added by decision 4 (side, criterion, order, targeting stat), the attacking `Element` (see
+  "Element system" below), and the damage `Category`, physical or special (see "Damage formula"
+  below).
 - **`GearSO`** — slot, stat modifiers, rarity tier, and minimum creature level. Beast gear only.
 - **`AvatarGearSO`** / **`AvatarStatsSO`** (under `Runtime/Avatar/`, namespace `BeastCraft.Avatar`)
   — the avatar's own stat gear (slot, stat modifiers, rarity; no visuals) and its authored base
@@ -314,11 +317,13 @@ cosmetic. The producer has reversed that, and the rule is now two separate thing
 
 Everything else above is unchanged: the avatar is still off the grid, still takes no initiative
 turn, still ticks on player-beast turns, is still a caster outside the roster, and still cannot be
-defeated. **Nothing reads the avatar's stats yet.** Skill magnitudes are flat (see "Effect
-application"), so an avatar buff lands the same whatever the avatar's stats are. The stats become
-meaningful with the stat-based damage and effect formula, which is planned to apply to beasts and
-the avatar alike (see "Next steps"). Avatar leveling is out of scope and open (see "What is not
-settled yet").
+defeated. **The avatar's stats now feed the damage formula** exactly as a beast's do (see "Damage
+formula"): a damaging avatar skill uses the avatar's `Attack` or `SpecialAttack` and its level. Heals
+and buffs are still flat for everyone, so an avatar buff still lands the same whatever the avatar's
+stats are. Avatar leveling is out of scope and open (see "What is not settled yet"); the statful
+`BattleAvatar.Create` takes a per-battle level (default 1) for the formula to read in the meantime.
+The zero-stat `Create(skills)` avatar is level 1 with no attacking stat, so every damage effect it
+lands deals the formula's floor of 2 (times the element multiplier) — see "Damage formula".
 
 ### 7. Movement during a turn — DECIDED
 
@@ -373,12 +378,13 @@ above, **none of the rules in this section were confirmed by the producer.** The
 defaults chosen so the system is complete rather than half-built, and they are expected to be
 revisited when balance work starts.
 
-- **Damage and healing are flat. There is no damage formula.** `SkillEffect.Magnitude` is applied
-  as a plain number straight against HP: no Attack-versus-Defense math, no stat scaling, no crit
-  chance, no variance. Designing that formula is a separate balancing pass, and it is deliberately
-  not being guessed at here — a placeholder formula would be harder to displace later than no
-  formula at all. The one thing layered on top is the element multiplier (see "Element system"
-  below), which scales a damage magnitude but is not itself a formula. `BattleUnit` gained a `CurrentHp` alongside its `StatBlock` (whose
+- **Damage is stat-based; healing is flat.** A `Damage` effect's `SkillEffect.Magnitude` is its
+  *power*, and the HP it takes comes from `DamageFormula` — caster level, caster attacking stat
+  against target defending stat, and the element multiplier (see "Damage formula" below). This
+  superseded the original rule, which applied every magnitude flat and deferred the formula to a
+  balancing pass. Heals are still applied flat, and buffs and debuffs still move a stat by exactly
+  their magnitude; whether and how healing should scale is deferred to the balance pass.
+  `BattleUnit` gained a `CurrentHp` alongside its `StatBlock` (whose
   `Hp` is now explicitly the *maximum*); every unit starts a battle at full health, since there is
   no persistent creature-instance model to carry damage in from a previous fight. Both damage and
   healing hold `0 <= CurrentHp <= Stats.Hp`.
@@ -452,9 +458,9 @@ decided yet.
 **How the multiplier applies.** `ElementChart.GetMultiplier(attack, defenders)` is the product of
 the attack's single matchup against each defending element, so a dual-element target that is weak
 twice takes 4x and strong-plus-weak cancels to 1x. `None` on either side is always 1x. The result
-multiplies a `Damage` effect's flat `Magnitude` *before* it is truncated to whole HP, and applies to
-**damage only** — heals, buffs and debuffs are never scaled. It sits on top of the flat magnitudes
-described under "Effect application"; it does not introduce stat-based damage math.
+multiplies the stat-based damage `DamageFormula` computes *before* it is truncated to whole HP, and
+applies to **damage only** — heals, buffs and debuffs are never scaled. (It was introduced when
+damage was still a flat magnitude; the formula now sits underneath it — see "Damage formula".)
 
 **The chart is attacker-side.** Each row is read from the attacking element's point of view and is
 only ever looked up in that direction; it is not forced to be symmetric. `2x` is strong, `0.5x` is
@@ -477,6 +483,77 @@ weak, and every pair not listed is `1x`:
 as the arena radii and the deployment-zone split. The set of elements is fixed; which pairs are
 strong or weak, and whether 2x / 0.5x are the right sizes, are expected to move once balance work
 has real fights to measure. `ElementChart` is the single place to change them.
+
+## Damage formula — TUNABLE STARTING DEFAULTS, NOT CONFIRMED BALANCE
+
+Damage is now stat-based, for beasts and the avatar alike. The formula's shape and constants are
+lead engineering decisions made so the headless balance simulator has something real to measure;
+**none of them are producer-confirmed balance**, and every number below is expected to move.
+
+**Physical and special — `DamageCategory`.** Each skill carries a `SkillSO.Category`
+(`DamageCategory.Physical = 0`, `Special = 1`; explicit values, serialized by number, never renamed
+or renumbered — append only). Physical damage reads the caster's `Attack` against the target's
+`Defense`; special damage reads `SpecialAttack` against `SpecialDefense`. The default is `Physical`.
+The category belongs to the skill as a whole, like its element.
+
+**The formula** (the static, pure `DamageFormula`, one place to tune):
+
+```
+base   = ((2 * Level / 5 + 2) * Power * A / D) / 50 + 2
+damage = truncate(base * ElementChart multiplier)
+```
+
+- `Level` is the caster's `BattleUnit.Level`; `Power` is the `Damage` effect's `SkillEffect.Magnitude`;
+  `A` / `D` are the category's stats, read from the units' **current effective** `Stats` at the
+  moment the effect lands, so buffs and debuffs move damage.
+- The element multiplier is the skill's element against the target's elements, exactly as before,
+  and applies to the whole of `base` (the +2 included). The caster's own elements still do nothing.
+- **Float math, truncated once at the end**, after the multiplier — the same truncation stance the
+  applier always had.
+- **Guards:** `Power <= 0` deals 0 (so a negative damage magnitude no longer reads as a heal); any
+  positive `Power` deals at least 1; `D <= 0` is treated as 1; `A < 0` as 0; `Level < 1` as 1.
+- The constants (`2`, `5`, `+2`, `/50`, `+2`, minimum 1) are named on `DamageFormula` so the balance
+  simulator can tune them in one place.
+
+**Why the level term.** Between two equally levelled beasts on the same curve, `A / D` does not
+change with level, but HP does. The `(2 * Level / 5 + 2)` term scales damage up with level so that a
+hit between evenly matched beasts takes a *roughly* similar share of HP at level 1 and level 100 and
+fights do not lengthen as the roster levels. With the authored `medium` curve it holds only loosely:
+a Power-40 neutral hit between two identical 600-total (100-per-stat) beasts takes 3 of 15 HP (20%)
+at level 1, 19 of 57 (33%) at level 50 and 35 of 100 (35%) at level 100 — HP grows about 6.7x across
+the curve while the level term grows 17.5x, and the +2 floor dominates at level 1. An EditMode test
+pins that loose band; tightening it is a balance-simulator question.
+
+**Worked examples (starter roster, `medium` curve, Power 40).** Phoenix (Fire) hitting Golem
+(Earth) with a Fire skill — Fire is weak against Earth (0.5x) — with the same hit from a neutral
+skill in brackets:
+
+| Level | Phoenix → Golem, physical | Phoenix → Golem, special | Golem HP |
+| --- | --- | --- | --- |
+| 1 | 1 (neutral: 3) | 2 (neutral: 4) | 22 |
+| 50 | 7 (neutral: 15) | 10 (neutral: 21) | 86 |
+| 100 | 13 (neutral: 27) | 19 (neutral: 39) | 150 |
+
+The reverse, Golem hitting Phoenix with a neutral skill: 4 / 28 / 50 physical and 3 / 12 / 21 special
+at levels 1 / 50 / 100, against Phoenix's 10 / 40 / 70 HP — the glass cannon and the wall reading as
+intended, and a good first thing for the simulator to measure.
+
+**A zero attacking stat deals the floor.** With `A = 0`, `base` is exactly the +2 constant, so a
+unit with no attacking stat deals 2 × the element multiplier per damage effect regardless of power.
+This matters for the zero-stat `BattleAvatar.Create(skills)` avatar: before the formula its damage
+effects dealt their authored magnitude flat; now they deal 2 (4 on a strong matchup, 1 on a weak
+one). That is deliberate — no special case in the formula — and an avatar meant to hit hard should be
+built with stats via the statful overload.
+
+**Levels.** `BattleUnit` now carries a `Level` (at least 1; an optional constructor argument
+defaulting to 1, so existing call sites are unaffected). `BattleUnitFactory.CreateBeast` records the
+level it assembled the stats at. The avatar has no progression level, so the statful
+`BattleAvatar.Create` takes a per-battle level (default 1) — see "What is not settled yet".
+
+**Deliberately deferred:** random variance, critical hits and a same-element attack bonus (STAB).
+Variance and crits would make a battle non-deterministic, and the headless balance simulator needs a
+fixed roster and seed to give the same result every run; STAB is a balance lever to add once there
+are fights to measure it against. Stat-scaled healing is deferred likewise — heals stay flat.
 
 ## Stat assembly and move range
 
@@ -517,7 +594,7 @@ arrives in. Null gear and null modifiers are skipped. A second overload takes an
 `StatBlock` plus a modifier list (with `CollectModifiers` turning a gear list into one) for a
 participant with no species behind it — which is how the avatar's stats are assembled from its
 `AvatarStatsSO` base and its `AvatarGearSO` (decision 6, amended). Avatar gear has no minimum level,
-because the avatar has no level.
+because the avatar has no progression level.
 
 `BattleUnitFactory.CreateBeast` is the pass that assembles a battle-ready `BattleUnit` from a
 creature: stats from `StatCalculator`, elements copied from the species, and the equipped skill
@@ -525,8 +602,8 @@ loadout, id, team and position passed through. It takes species, level and gear 
 there is still no persistent creature-instance type; when one exists, it is the natural input. The
 battle then layers timed buffs and debuffs on top of the assembled block as before.
 
-This is stat assembly only. It changes nothing about damage: skill magnitudes remain flat, and
-there is still no damage formula (see "Effect application").
+This is stat assembly only. Damage is computed separately, by `DamageFormula`, from the block this
+produces as buffed or debuffed since (see "Damage formula").
 
 ## Pre-battle placement — DATA MODEL AND VALIDATION ONLY
 
@@ -786,6 +863,15 @@ at level, then gear flat, then gear percent) and `BattleUnitFactory`, which buil
 species, level and gear. EditMode tests cover the stat block, the level-scaling exemption, the
 assembly order, the factory, and move range under buffs.
 
+The damage formula (the section above) adds `DamageCategory`, `SkillSO.Category`, `BattleUnit.Level`
+(set by `BattleUnitFactory.CreateBeast` and by an optional level on the statful
+`BattleAvatar.Create`) and the static `DamageFormula`, and threads the caster through
+`SkillEffectApplier`'s damage arm so damage reads the caster's level and stats. EditMode tests cover
+hand-computed values, physical/special stat selection, the element multiplier applied after the base,
+the guards (minimum 1, zero or negative power, zero defence, negative attack), level scaling, buffs
+and debuffs moving damage, avatar damage, and the loose level-invariance band against the roster's
+`medium` curve; the existing element and avatar tests were rewritten against the formula.
+
 The starter roster (the section above) adds `beast-roster.json`, the `BeastCraft.Creatures.Roster`
 data types and validator, `GrowthRateCurve.CurveId` and `GrowthRateCurve.EvaluateScale`, the Editor
 importer (the first Editor script, and the first `UnityEditor` stubs in `Tooling/CiStubs`), and
@@ -796,11 +882,10 @@ Every pass so far is deliberately **data structures and algorithms only** — no
 scene or prefab wiring, and no committed `.asset` instances (the roster's are generated in-Editor). The hex radii backing each arena preset
 are placeholder implementation defaults chosen to be tunable, not producer-confirmed balance
 numbers, and the deployment-zone split, the effect rules and the element chart above are the same
-kind of default.
-Still to come: the damage formula and stat scaling on top of
-flat magnitudes — the planned next work stream, applying to beasts and the avatar alike, together
-with a headless balance simulator that reads `beast-roster.json` directly and replaces the roster's
-first-draft numbers with tuned ones — the starter roster's skills (none are authored yet), the status-effect system behind `ApplyStatus`, resource gating on top of cooldowns,
+kind of default, as is the damage formula.
+Still to come: a headless balance simulator that reads `beast-roster.json` directly, measures the
+damage formula and element chart against it, and replaces the roster's first-draft numbers with tuned
+ones; stat-scaled healing; the starter roster's skills (none are authored yet), the status-effect system behind `ApplyStatus`, resource gating on top of cooldowns,
 lifting defeated units off the grid so they stop obstructing movement, the placement UI (a Unity
 Editor task, not a continuation of the placement validation that just landed), the encounter
 definition that selects an arena preset and a battle format, and the presentation layer.
