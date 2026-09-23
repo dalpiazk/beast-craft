@@ -23,7 +23,12 @@ namespace BeastCraft.Creatures
         /// <summary>Roster / codex icon.</summary>
         public Sprite Icon;
 
-        /// <summary>Unscaled level-1 reference stats. Scaled by <see cref="GrowthRate"/>.</summary>
+        /// <summary>
+        /// Unscaled reference stats: the stats at growth-curve scale 1, which for authored curves is
+        /// max level (see <see cref="GrowthRateCurve"/>). Scaled by <see cref="GrowthRate"/>, except for
+        /// <see cref="StatBlock.MoveRange"/>, which is authored here as the species' per-turn
+        /// movement and used as-is at every level (see <see cref="GetStatAtLevel"/>).
+        /// </summary>
         public StatBlock BaseStats;
 
         /// <summary>Shared leveling curve this species uses.</summary>
@@ -38,19 +43,36 @@ namespace BeastCraft.Creatures
         /// <summary>Skills this species learns, with the level each becomes available.</summary>
         public List<SkillLearnEntry> LearnableSkills = new List<SkillLearnEntry>();
 
-        // Plain string tags rather than an enum: the element list is a game-design decision that is
-        // not finalized, and a string[] avoids prematurely locking it into code.
-        /// <summary>Element affinity tags, e.g. "Fire", "Water".</summary>
-        public string[] ElementTags = new string[0];
+        /// <summary>
+        /// This species' elemental affinities, read when it is on the receiving end of an
+        /// elemental skill (see <c>BeastCraft.Battle.ElementChart</c>). The element list is now
+        /// finalized as the <see cref="Element"/> enum. Usually one entry, occasionally two; a
+        /// dual-element species takes the product of both multipliers. Empty (or
+        /// <see cref="Element.None"/>) means no affinity, which is neutral to everything.
+        /// </summary>
+        public Element[] Elements = new Element[0];
 
         /// <summary>
         /// The species' stat on the given axis at the given level. Falls back to the unscaled base
         /// stat (with an error) when no growth curve is assigned, so a half-authored species still
         /// produces usable numbers instead of a null reference.
+        /// <para>
+        /// <see cref="StatType.MoveRange"/> is exempt from the curve and always returns the
+        /// authored base. A growth curve runs from a small fraction (0.10-0.20 for the authored
+        /// curves, 0 for the default) at level 1 up to 1 at max level, which suits stats in the tens
+        /// or hundreds but would round a move range of 3 down to 0 or 1 for much of the early game.
+        /// Move range is a small tactical integer, not a quantity that grows with level; gear and
+        /// buffs are what change it.
+        /// </para>
         /// </summary>
         public int GetStatAtLevel(StatType type, int level)
         {
             int baseStat = BaseStats.GetStat(type);
+
+            if (type == StatType.MoveRange)
+            {
+                return baseStat;
+            }
 
             if (GrowthRate == null)
             {

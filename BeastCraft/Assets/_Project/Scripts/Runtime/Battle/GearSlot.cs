@@ -1,9 +1,10 @@
 namespace BeastCraft.Battle
 {
     /// <summary>
-    /// Equipment slots on a creature. Gear equips onto creatures, not onto the player avatar
-    /// (avatar items are purely cosmetic), so the names are worded to read sensibly for a beast as
-    /// well as for conventional equipment.
+    /// Equipment slots on a creature, for <see cref="GearSO"/>. The names are worded to read
+    /// sensibly for a beast as well as for conventional equipment. The player avatar does not use
+    /// these: its stat gear has its own slot set, <c>BeastCraft.Avatar.AvatarGearSlot</c>, and its
+    /// cosmetics (which carry no stats) live in the customization system.
     /// </summary>
     public enum GearSlot
     {

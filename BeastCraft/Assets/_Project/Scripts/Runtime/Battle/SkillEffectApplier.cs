@@ -13,9 +13,10 @@ namespace BeastCraft.Battle
     /// reads and writes its HP and stats lives here rather than on it.
     /// </para>
     /// <para>
-    /// <strong>Not wired to anything.</strong> Nothing in this codebase calls
-    /// <see cref="Apply"/> or <see cref="TickModifiers"/> yet — the turn executor that would is a
-    /// later pass. This provides the mechanism; the wiring is somebody else's deliverable.
+    /// <strong>Driven by <see cref="BattleTurnExecutor"/>.</strong> The executor calls
+    /// <see cref="TickModifiers"/> at the start of each unit's own turn and <see cref="Apply"/>
+    /// for every skill that fires in it, the avatar's included. This class supplies the mechanism
+    /// and decides nothing about when it runs.
     /// </para>
     /// <para>
     /// <strong>Scaffold assumptions.</strong> The rules below are reasonable engineering defaults
@@ -23,9 +24,17 @@ namespace BeastCraft.Battle
     /// <list type="bullet">
     /// <item><description>
     /// <strong>No damage formula.</strong> <see cref="SkillEffect.Magnitude"/> is applied flat,
-    /// straight against HP. No Attack-versus-Defense math, no stat scaling, no crit, no type
-    /// chart, no variance. That is a distinct balancing pass, and it is the reason
-    /// <see cref="Apply"/> still takes a caster it barely reads.
+    /// straight against HP. No Attack-versus-Defense math, no stat scaling, no crit, no variance.
+    /// That is a distinct balancing pass.
+    /// </description></item>
+    /// <item><description>
+    /// <strong>The one exception is the element chart.</strong> A
+    /// <see cref="SkillEffectType.Damage"/> magnitude is multiplied by
+    /// <see cref="ElementChart.GetMultiplier(Element, IReadOnlyList{Element})"/> — the fired
+    /// skill's <see cref="SkillSO.Element"/> against the target's
+    /// <see cref="BattleUnit.Elements"/> — before it is truncated to whole HP. It is a multiplier
+    /// on top of the flat magnitude, not a formula: a neutral skill or an unaligned target still
+    /// takes exactly the authored number. Heals and stat changes are never scaled.
     /// </description></item>
     /// <item><description>
     /// <strong>A defeated target takes nothing further.</strong> Once a target's HP reaches 0 it
@@ -72,10 +81,12 @@ namespace BeastCraft.Battle
         /// applies nothing, which is the same stance
         /// <see cref="SkillLoadout.TickAndResolve"/> and
         /// <see cref="SkillTargetResolver.ResolveTargets"/> already take — a unit that is out of
-        /// the fight does not land skills. Beyond that guard the caster contributes nothing today
-        /// because there is no damage formula for it to contribute to; it is on the signature so
-        /// that adding one does not have to churn every call site, and the turn executor that will
-        /// call this has the caster in hand anyway.
+        /// the fight does not land skills. Beyond that guard the caster still contributes nothing:
+        /// the attacking element comes from the <em>skill</em>
+        /// (<see cref="SkillSO.Element"/>), not from the caster's own
+        /// <see cref="BattleUnit.Elements"/>, and there is no stat-based damage formula for it to
+        /// feed. It stays on the signature so that adding one does not have to churn every call
+        /// site.
         /// </para>
         /// <para>
         /// An activation with no targets is a legal whiff, per
@@ -118,7 +129,7 @@ namespace BeastCraft.Battle
 
                     if (effects[e] != null)
                     {
-                        ApplyEffect(target, effects[e]);
+                        ApplyEffect(activation.Skill, target, effects[e]);
                     }
                 }
             }
@@ -135,10 +146,9 @@ namespace BeastCraft.Battle
         /// the turn executor's choice, as long as it is consistent; nothing here depends on it.
         /// </para>
         /// <para>
-        /// <strong>Nothing calls this.</strong> No turn executor exists yet to drive it — that is
-        /// a later pass. This is the hook that pass will need, provided now so the duration half
-        /// of <see cref="SkillEffectType.BuffStat"/> is a complete mechanism rather than a
-        /// half-built one. Until it is wired up, timed modifiers apply and simply never expire.
+        /// <see cref="BattleTurnExecutor.ExecuteTurn"/> calls this as the first step of every
+        /// unit's turn, before that turn reads the unit's <see cref="BattleUnit.MoveRange"/> or
+        /// fires anything, so a modifier on its last turn has already expired by then.
         /// </para>
         /// <para>
         /// A modifier with <see cref="ActiveStatModifier.RemainingTurns"/> of 2 survives one call
@@ -184,13 +194,17 @@ namespace BeastCraft.Battle
             }
         }
 
-        /// <summary>Routes one effect to its handler. The whole of the effect vocabulary.</summary>
-        private static void ApplyEffect(BattleUnit target, SkillEffect effect)
+        /// <summary>
+        /// Routes one effect to its handler. The whole of the effect vocabulary.
+        /// <paramref name="skill"/> is the skill that fired, needed only by the damage arm for its
+        /// element.
+        /// </summary>
+        private static void ApplyEffect(SkillSO skill, BattleUnit target, SkillEffect effect)
         {
             switch (effect.EffectType)
             {
                 case SkillEffectType.Damage:
-                    ApplyDamage(target, effect);
+                    ApplyDamage(skill, target, effect);
                     break;
 
                 case SkillEffectType.Heal:
@@ -233,9 +247,17 @@ namespace BeastCraft.Battle
 
         /// <summary>
         /// Spends HP. The magnitude is applied flat — there is no formula, per this class's
-        /// scaffold assumptions — and the result is clamped into <c>[0, Stats.Hp]</c>, so an
-        /// overkill hit lands the unit on exactly 0 rather than in negative territory that a later
-        /// heal would have to climb out of.
+        /// scaffold assumptions — scaled only by the element multiplier of
+        /// <paramref name="skill"/>'s <see cref="SkillSO.Element"/> against the target's
+        /// <see cref="BattleUnit.Elements"/>, and the result is clamped into
+        /// <c>[0, Stats.Hp]</c>, so an overkill hit lands the unit on exactly 0 rather than in
+        /// negative territory that a later heal would have to climb out of.
+        /// <para>
+        /// The multiplier is applied to the float magnitude <em>before</em>
+        /// <see cref="ToAmount"/> truncates it, so 5 damage at 0.5x is worth 2 (2.5, truncated).
+        /// At the chart's current values (powers of two) a whole-number magnitude can only lose a
+        /// fraction on the weak side.
+        /// </para>
         /// <para>
         /// Setting <see cref="BattleUnit.IsDefeated"/> is an explicit step here, on purpose.
         /// <see cref="BattleUnit.CurrentHp"/> is a plain property with no side effects, so defeat
@@ -243,9 +265,11 @@ namespace BeastCraft.Battle
         /// it can happen — not a hidden consequence of a setter.
         /// </para>
         /// </summary>
-        private static void ApplyDamage(BattleUnit target, SkillEffect effect)
+        private static void ApplyDamage(SkillSO skill, BattleUnit target, SkillEffect effect)
         {
-            SetCurrentHp(target, target.CurrentHp - ToAmount(effect.Magnitude));
+            float multiplier = ElementChart.GetMultiplier(skill.Element, target.Elements);
+
+            SetCurrentHp(target, target.CurrentHp - ToAmount(effect.Magnitude * multiplier));
 
             if (target.CurrentHp <= 0)
             {
@@ -321,6 +345,11 @@ namespace BeastCraft.Battle
         /// does not defeat a unit — defeat is <see cref="ApplyDamage"/>'s call and only its call.
         /// </para>
         /// <para>
+        /// Every axis goes through here, <see cref="StatType.MoveRange"/> included, so a move-range
+        /// buff or debuff changes <see cref="BattleUnit.MoveRange"/> (which reads
+        /// <see cref="BattleUnit.Stats"/>) with no special case.
+        /// </para>
+        /// <para>
         /// <see cref="StatBlock"/> is a struct, so the copy has to be written back to
         /// <see cref="BattleUnit.Stats"/> explicitly; mutating the property's value in place would
         /// not compile, and mutating a local copy without the write-back would compile and do
@@ -375,9 +404,9 @@ namespace BeastCraft.Battle
         /// The whole-number amount an authored <see cref="SkillEffect.Magnitude"/> is worth. HP and
         /// stats are integers while magnitude is a float, so authoring 7.9 damage is worth 7: it
         /// truncates toward zero rather than rounding, which keeps a fractional magnitude from
-        /// quietly buying a point it did not author. Fractions have no meaning until there is a
-        /// damage formula to multiply them into, at which point this is where rounding gets
-        /// decided properly.
+        /// quietly buying a point it did not author. The same truncation applies after the element
+        /// multiplier (see <see cref="ApplyDamage"/>), so a weak-side hit rounds down too. When a
+        /// real damage formula lands, this is where rounding gets decided properly.
         /// </summary>
         private static int ToAmount(float magnitude)
         {

@@ -7,7 +7,7 @@ scripts **without a Unity Editor install or a Unity licence**.
 
 | Project | Purpose |
 | --- | --- |
-| `UnityStub/` | A tiny fake `UnityEngine` assembly — just enough API surface (`Object`, `ScriptableObject`, `Sprite`, `Color`, `Mathf`, `AnimationCurve`, `Debug`, and the inspector attributes) for the game scripts to compile. |
+| `UnityStub/` | A tiny fake `UnityEngine` assembly — just enough API surface (`Object`, `ScriptableObject`, `Sprite`, `Color`, `Mathf`, `AnimationCurve`, `JsonUtility`, `Debug`, the inspector attributes, and a few `UnityEditor` types) for the game scripts to compile. |
 | `CiLint/` | A source-less project that globs in `BeastCraft/Assets/_Project/Scripts/{Runtime,Editor}/**/*.cs` and compiles them against `UnityStub`. This is the project CI builds and formats. |
 
 Neither project is part of the Unity project (they live entirely outside `BeastCraft/`), neither is
@@ -43,8 +43,12 @@ Two rules when adding surface:
    `AnimationCurve.Evaluate` do), implement genuine, correct math. A stub that throws or logs makes
    the compile check pass while quietly lying about semantics; that is worse than no stub.
 
-There are currently no `UnityEditor` stubs because no Editor scripts exist yet. Add a
-`UnityEditorStub` (or a second namespace inside `UnityStub`) when the first one lands.
+`UnityStub/UnityEditor.cs` holds the `UnityEditor` surface (`MenuItem`, `AssetDatabase`,
+`EditorUtility`) used by the roster importer, as a second namespace in the same assembly. Those
+members, and `JsonUtility`, cannot be honestly implemented without an Editor (or, for JSON, a
+package reference), and CI never executes them, so they throw `NotSupportedException` if called
+rather than pretending to succeed. One consequence of sharing the assembly: CiLint would not flag a
+Runtime script that wrongly uses `UnityEditor`; Unity's assembly definitions still do.
 
 ## Future: real Unity tests
 

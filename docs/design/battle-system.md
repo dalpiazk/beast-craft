@@ -12,9 +12,11 @@ against them lands alongside each revision of this document.
 ## Core loop
 
 The player's avatar **does not fight directly**. The avatar is a non-combatant commander; the
-creatures do the fighting on the grid. This matches the framing already baked into the project spec,
-where the avatar and the creature systems are built and customized separately — avatar items are
-cosmetic, while gear and combat stats live entirely on creatures.
+creatures do the fighting on the grid. The avatar and the creature systems are built and customized
+separately. The avatar's **appearance** is purely cosmetic and carries no stats; separately from
+that, the avatar has **stats of its own** and equips non-cosmetic avatar gear that raises them, and
+that gear is never drawn on the avatar (decision 6, amended). Beasts equip their own, separate kind
+of gear.
 
 Battles are an **auto-battler**, not a manual per-turn tactics game. The player's input is
 front-loaded into two places — the build and the deployment — and the fight itself then plays out on
@@ -52,12 +54,6 @@ puzzle every encounter.
 
 ### What is not settled yet
 
-- **Where a beast's move range comes from.** The *rule* for spending it is settled and implemented
-  (decision 7), and `BattleUnit.MoveRange` is the budget it spends. What that number is sourced
-  from is not: `StatBlock` still has no move-range stat, and whether move range is a species stat, a
-  gear-modifiable one, a flat constant or something a status can change is open. `MoveRange` is
-  therefore a settable field defaulting to 0, filled in by the pass that assembles a unit from its
-  creature instance — which does not exist yet either.
 - **Resource gating.** `SkillSO.ResourceCost` is authored but nothing spends it, and the resource
   itself ("mana" / "focus" / "stamina") is still unnamed. The cooldown rotation (decision 5) is now
   settled and implemented; how — or whether — a resource pool gates it on top is not. A skill that
@@ -70,6 +66,9 @@ puzzle every encounter.
   options. With no player menu, whether a beast has a fallback attack at all — or simply always has
   at least one short-cooldown skill in its rotation — is open, and items in battle are out of scope
   until there is a mechanism that would use them.
+- **Avatar progression.** The avatar now has stats (decision 6, amended), but no level and no
+  growth: its base is a flat authored block and only avatar gear moves it. Whether and how the
+  avatar levels up is undesigned.
 
 ## Data-driven foundation already in place
 
@@ -78,8 +77,12 @@ The authored data this combat model needs is already committed as ScriptableObje
 
 - **`SkillSO`** — target shape (`SingleTarget`, `Line`, `Cross`, `AreaBurst`, `AllEnemies`,
   `AllAllies`, `Self`), range, resource cost, cooldown, a list of effects, and the targeting fields
-  added by decision 4 (side, criterion, order, targeting stat).
-- **`GearSO`** — slot, stat modifiers, rarity tier, and minimum creature level.
+  added by decision 4 (side, criterion, order, targeting stat), and the attacking `Element` (see
+  "Element system" below).
+- **`GearSO`** — slot, stat modifiers, rarity tier, and minimum creature level. Beast gear only.
+- **`AvatarGearSO`** / **`AvatarStatsSO`** (under `Runtime/Avatar/`, namespace `BeastCraft.Avatar`)
+  — the avatar's own stat gear (slot, stat modifiers, rarity; no visuals) and its authored base
+  stats. See decision 6.
 
 These were deliberately authored at an abstract level. Range is an integer count of grid steps and
 target shapes are named by their tactical intent rather than by a concrete tile layout, so the data
@@ -242,7 +245,7 @@ player can reason about it while building, and it needs no runtime decision-maki
 is that a beast can fire a skill at a moment when a human player wouldn't have — which is the same
 trade auto-resolution already made everywhere else.
 
-### 6. The avatar's skill loadout — DECIDED (timing and targeting)
+### 6. The avatar's skill loadout — DECIDED (timing and targeting); stats AMENDED
 
 **The avatar has skills too, on the same rotation mechanic**, intended to support and buff the
 player's own beasts rather than to attack. Per decision 2 the avatar is **not a piece on the grid**
@@ -281,16 +284,41 @@ Two consequences of that representation, both deliberate:
   in practice: it takes no initiative turn, an enemy `AllEnemies` sweep cannot reach it, and its own
   `AllAllies` buff lands on the player's beasts. A `Self` skill still works, since the resolver
   returns the caster directly without consulting the roster.
-- **The avatar has no stats and cannot be defeated.** Its `StatBlock` is all zeros, which is the
-  honest value rather than a placeholder — the project spec puts combat stats entirely on creatures
-  and makes avatar items cosmetic. `IsDefeated` stays `false` for the life of the battle; there is
-  no rule in the design by which a commander could be defeated, and nothing can write the flag on a
-  unit it cannot target.
+- **The avatar cannot be defeated.** `IsDefeated` stays `false` for the life of the battle; there
+  is no rule in the design by which a commander could be defeated, and nothing can write the flag on
+  a unit it cannot target. (This bullet originally also said the avatar had no stats — superseded,
+  see below.)
 
 **The timing half is now wired up.** `BattleTurnExecutor` ticks the avatar's loadout at the end of
 every player-side beast's turn, exactly as this section describes: not on enemy turns, and not once
 per round. The rotation engine that landed for decision 5 is deliberately owner-agnostic, so it
 drives the avatar unchanged.
+
+**Amendment — the avatar has stats and stat gear (supersedes "the avatar has no stats").** This
+section previously decided that the avatar's `StatBlock` is all zeros because avatar items are
+cosmetic. The producer has reversed that, and the rule is now two separate things:
+
+- **Avatar cosmetics stay purely cosmetic.** The customization system (`AvatarCustomizationSchema`)
+  is unchanged: it decides what the avatar looks like and grants no stats.
+- **The avatar has real stats, raised by non-cosmetic avatar gear that is never rendered.** Its
+  base is authored on an `AvatarStatsSO` (a flat `StatBlock`; there is no avatar level). Gear is
+  `AvatarGearSO` — a stable `AvatarGearId`, display name, description, inventory icon, an
+  `AvatarGearSlot` (`Weapon`, `Armor`, `Trinket`), a `StatModifier` list and a rarity tier, and no
+  visual fields at all. It is a separate type from the beasts' `GearSO`, with its own slot enum, so
+  beast gear and avatar gear cannot be cross-equipped. `BattleAvatar.Create(skills, baseStats,
+  equipped)` assembles the avatar's stats through `StatCalculator` exactly like beast gear (flat,
+  then summed percent, rounded, every stat at least 0 and `HP` at least 1); null gear and null
+  modifiers are skipped, and one-item-per-slot is left to the equipment screen, as for beasts. The
+  original `BattleAvatar.Create(skills)` still builds an all-zero avatar for callers with no stats
+  authored.
+
+Everything else above is unchanged: the avatar is still off the grid, still takes no initiative
+turn, still ticks on player-beast turns, is still a caster outside the roster, and still cannot be
+defeated. **Nothing reads the avatar's stats yet.** Skill magnitudes are flat (see "Effect
+application"), so an avatar buff lands the same whatever the avatar's stats are. The stats become
+meaningful with the stat-based damage and effect formula, which is planned to apply to beasts and
+the avatar alike (see "Next steps"). Avatar leveling is out of scope and open (see "What is not
+settled yet").
 
 ### 7. Movement during a turn — DECIDED
 
@@ -347,9 +375,10 @@ revisited when balance work starts.
 
 - **Damage and healing are flat. There is no damage formula.** `SkillEffect.Magnitude` is applied
   as a plain number straight against HP: no Attack-versus-Defense math, no stat scaling, no crit
-  chance, no type chart, no variance. Designing that formula is a separate balancing pass, and it
-  is deliberately not being guessed at here — a placeholder formula would be harder to displace
-  later than no formula at all. `BattleUnit` gained a `CurrentHp` alongside its `StatBlock` (whose
+  chance, no variance. Designing that formula is a separate balancing pass, and it is deliberately
+  not being guessed at here — a placeholder formula would be harder to displace later than no
+  formula at all. The one thing layered on top is the element multiplier (see "Element system"
+  below), which scales a damage magnitude but is not itself a formula. `BattleUnit` gained a `CurrentHp` alongside its `StatBlock` (whose
   `Hp` is now explicitly the *maximum*); every unit starts a battle at full health, since there is
   no persistent creature-instance model to carry damage in from a previous fight. Both damage and
   healing hold `0 <= CurrentHp <= Stats.Hp`.
@@ -386,10 +415,9 @@ revisited when balance work starts.
   is deliberately measured in **the affected unit's** turns, not the caster's: a fast unit debuffing
   a slow one means the two clocks genuinely differ.
 
-  **That tick hook is not wired to anything.** No turn executor exists yet to call it (see "What is
-  not settled yet" above), so today a timed modifier applies and never expires. The mechanism is
-  provided now so the duration half of the effect model is complete; connecting it is part of the
-  turn-executor pass, and it must be called once per turn of the unit passed in.
+  `BattleTurnExecutor` calls that tick hook as the first step of each unit's own turn, before the
+  turn reads any stat — the movement budget included — so a modifier on its last turn has already
+  expired by the time that turn acts.
 
 - **`ApplyStatus` is unimplemented and does nothing.** There is no status-effect system anywhere in
   the data model — no poison, stun or burn, and no field on `SkillEffect` naming *which* status,
@@ -401,6 +429,104 @@ revisited when balance work starts.
 
 Resource cost is still not spent, per the open question above; effect application does not gate on
 it.
+
+## Element system — TUNABLE STARTING CHART, NOT CONFIRMED BALANCE
+
+Species and skills now carry real elements. The element *list* is settled and is the
+`BeastCraft.Creatures.Element` enum: `None`, `Fire`, `Water`, `Earth`, `Air`, `Lightning`, `Ice`,
+`Nature`, `Metal`, `Light`, `Dark`. Its values are explicit and serialized into assets by number, so
+they are never renamed or renumbered after ship. `CreatureSpeciesSO.Elements` (an `Element[]`)
+replaces the old free-text `ElementTags`, which were strings only because the list had not been
+decided yet.
+
+**Where the elements come from.**
+
+- **The attacking element is the skill's**, `SkillSO.Element`. A Fire beast can carry a neutral or
+  off-element skill, and the caster's own elements play no part in the damage it deals. The default,
+  `None`, is a neutral skill.
+- **The defending elements are the target's**, `BattleUnit.Elements` — normally its species'
+  `Elements`, handed to the `BattleUnit` constructor (an optional parameter, defaulting to no
+  affinity) and fixed for the battle. `BattleUnitFactory` (see "Stat assembly and move range"
+  below) copies them from the species when it builds a beast.
+
+**How the multiplier applies.** `ElementChart.GetMultiplier(attack, defenders)` is the product of
+the attack's single matchup against each defending element, so a dual-element target that is weak
+twice takes 4x and strong-plus-weak cancels to 1x. `None` on either side is always 1x. The result
+multiplies a `Damage` effect's flat `Magnitude` *before* it is truncated to whole HP, and applies to
+**damage only** — heals, buffs and debuffs are never scaled. It sits on top of the flat magnitudes
+described under "Effect application"; it does not introduce stat-based damage math.
+
+**The chart is attacker-side.** Each row is read from the attacking element's point of view and is
+only ever looked up in that direction; it is not forced to be symmetric. `2x` is strong, `0.5x` is
+weak, and every pair not listed is `1x`:
+
+| Attack | Strong against (2x) | Weak against (0.5x) |
+| --- | --- | --- |
+| Fire | Nature, Metal | Water, Earth |
+| Water | Fire, Earth | Lightning, Nature |
+| Earth | Lightning, Metal | Water, Air |
+| Air | Earth, Nature | Ice, Lightning |
+| Lightning | Water, Air | Earth, Metal |
+| Ice | Nature, Air | Fire, Metal |
+| Nature | Water, Earth, Dark | Fire, Ice |
+| Metal | Ice, Light | Fire, Lightning |
+| Light | Dark | — |
+| Dark | Light | — |
+
+**These values are a tunable starting default, not producer-confirmed balance** — the same standing
+as the arena radii and the deployment-zone split. The set of elements is fixed; which pairs are
+strong or weak, and whether 2x / 0.5x are the right sizes, are expected to move once balance work
+has real fights to measure. `ElementChart` is the single place to change them.
+
+## Stat assembly and move range
+
+**Move range is a stat — DECIDED.** `StatType.MoveRange` (value 6, appended; the existing axes are
+never renumbered) and `StatBlock.MoveRange` sit alongside the six combat axes. Each species authors a
+base move range in its `BaseStats`, and from there it behaves like any other stat with one
+exception:
+
+- **It does not scale with level.** `CreatureSpeciesSO.GetStatAtLevel(MoveRange, level)` returns the
+  authored base at every level. Growth curves run from a small fraction at level 1 (0.10-0.20 for
+  the authored curves; see "Starter roster") to 1 at max level, which suits stats in the tens and
+  hundreds but would round a small integer like 3 down to 0 or 1 for much of the early game. Move range is a tactical constant of the species, not something that
+  grows.
+- **Gear modifies it.** A `StatModifier` on `MoveRange` adds to it (flat and percent) like any other
+  axis — boots that grant +1 movement are ordinary gear data.
+- **Buffs and debuffs modify it.** `BuffStat` / `DebuffStat` with `AffectedStat = MoveRange` move it
+  mid-battle, timed or instant, through exactly the same path as any other stat, including the clamp
+  at 0 and the revert on the affected unit's own turns.
+
+`BattleUnit.MoveRange` is no longer an independent settable number: it is a read-only view of
+`Stats.MoveRange`. Timed buffs are folded straight into `BattleUnit.Stats` (there is no separate
+overlay), so that one field is always the effective value. `BattleTurnExecutor` reads it as the
+turn's movement budget *after* expiring timed modifiers, and still treats a negative value as 0.
+
+**Stat assembly — engineering default, not confirmed balance.** `StatCalculator` builds a unit's
+starting stat block from its species, level and equipped gear. Per stat axis, in order:
+
+1. **Base at level** — `CreatureSpeciesSO.GetStatAtLevel` (growth-curve scaled, except `MoveRange`).
+2. **Plus every `FlatBonus`** on that axis, summed across all equipped gear.
+3. **Times `1 + (the sum of every PercentBonus)`** on that axis, applied once. Percentages add rather
+   than compound (two +10% items are +20%), so gear order never matters, and they apply after the
+   flat bonuses, so a percentage also scales what gear added.
+4. **Rounded to the nearest integer and clamped** — every stat at least 0, `HP` at least 1.
+
+Gear whose `MinimumLevel` is above the creature's level contributes nothing; refusing the equip is
+the equipment screen's job, but an under-levelled item never grants stats whatever state a loadout
+arrives in. Null gear and null modifiers are skipped. A second overload takes an explicit base
+`StatBlock` plus a modifier list (with `CollectModifiers` turning a gear list into one) for a
+participant with no species behind it — which is how the avatar's stats are assembled from its
+`AvatarStatsSO` base and its `AvatarGearSO` (decision 6, amended). Avatar gear has no minimum level,
+because the avatar has no level.
+
+`BattleUnitFactory.CreateBeast` is the pass that assembles a battle-ready `BattleUnit` from a
+creature: stats from `StatCalculator`, elements copied from the species, and the equipped skill
+loadout, id, team and position passed through. It takes species, level and gear directly because
+there is still no persistent creature-instance type; when one exists, it is the natural input. The
+battle then layers timed buffs and debuffs on top of the assembled block as before.
+
+This is stat assembly only. It changes nothing about damage: skill magnitudes remain flat, and
+there is still no damage formula (see "Effect application").
 
 ## Pre-battle placement — DATA MODEL AND VALIDATION ONLY
 
@@ -485,6 +611,97 @@ drag-and-drop input, zone and validity highlighting, and it can only genuinely b
 the project in the Editor. It is a **separate, later, and materially different** task, and it should
 be scoped as one rather than treated as the tail end of this one.
 
+## Starter roster — FIRST-DRAFT DATA, NOT CONFIRMED BALANCE
+
+The first ten beasts, one per element, are authored as data. Names, elements and archetypes are
+approved; **every number below is a first draft** chosen to express the archetype, and is expected to
+be corrected by the headless balance simulator (see "Next steps"). Nothing here is confirmed balance.
+
+| SpeciesId | Beast | Element | Archetype | Curve | HP | ATK | DEF | SpA | SpD | SPE | Six-stat total | Move |
+| --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `phoenix` | Phoenix | Fire | Glass cannon | medium | 70 | 130 | 55 | 140 | 70 | 135 | 600 | 4 |
+| `leviathan` | Leviathan | Water | Tank | medium | 150 | 90 | 130 | 90 | 95 | 45 | 600 | 3 |
+| `golem` | Golem | Earth | Pure wall | medium | 150 | 80 | 170 | 40 | 125 | 35 | 600 | 2 |
+| `griffin` | Griffin | Air | Fast skirmisher | medium | 95 | 110 | 85 | 85 | 85 | 140 | 600 | 5 |
+| `thunderbird` | Thunderbird | Lightning | Burst striker | medium | 65 | 140 | 55 | 125 | 60 | 155 | 600 | 4 |
+| `frost_wyrm` | Frost Wyrm | Ice | Control / attrition | medium | 95 | 75 | 125 | 100 | 125 | 80 | 600 | 3 |
+| `treant` | Treant | Nature | Support-tank | medium | 160 | 80 | 100 | 85 | 130 | 45 | 600 | 3 |
+| `tarasque` | Tarasque | Metal | Armored bruiser | medium | 110 | 140 | 145 | 50 | 80 | 75 | 600 | 3 |
+| `kirin` | Kirin | Light | Support caster | medium | 100 | 50 | 80 | 140 | 135 | 95 | 600 | 4 |
+| `basilisk` | Basilisk | Dark | Ranged assassin | medium | 80 | 95 | 55 | 145 | 90 | 135 | 600 | 5 |
+
+Stats are max-level values (curve scale 1). **All ten beasts share the `medium` growth curve for
+now, by user decision**; differentiating curves per beast is deferred to the headless balance
+simulator. The drafting rules:
+
+- **Shared budget.** Every beast's six combat stats sum to the same budget (600), and the roster
+  tests allow ±5%. Archetype comes from how the budget is *distributed*, not from raw power. If the
+  simulator later gives some beasts a slower curve, whether they deserve a larger budget as payoff
+  for a weak early game is a balance question for it, not something this draft assumes.
+- **Move range in a small band (2–5)**, outside the budget. Griffin and Basilisk are the mobile
+  ends (5); Golem is the only 2. "Range" in the archetypes means move range, the per-turn hex
+  movement budget — skill reach is authored per skill.
+- **Telling the defensive beasts apart.** Golem only absorbs (the highest Defense, the lowest Speed
+  and move range, low attack); Tarasque absorbs and hits back (Defense *and* Attack high); Leviathan
+  is the physically bulky all-rounder; Treant's bulk is HP and Special Defense for a support role;
+  Frost Wyrm splits its bulk evenly across Defense and Special Defense.
+- **Skills, evolutions and customization are empty.** No skills have been authored yet, so every
+  species' `LearnableSkills` and `EvolutionOptions` are empty and `CustomizationSchema` and `Icon`
+  are unset. The importer never touches those fields, so authoring them on the assets later is safe.
+
+### Growth-curve semantics — DECIDED FOR AUTHORED DATA
+
+`CreatureSpeciesSO.GetStatAtLevel` returns `round(BaseStats × curve scale)`, and a curve maps level
+progress (0 at level 1, 1 at `MaxLevel`) to a scale. A curve that starts at 0 would make every
+level-1 stat 0 (the fresh-asset default still does exactly that), so authored curves obey:
+
+- **scale at max level is exactly 1** — `BaseStats` are the species' *max-level* stats;
+- **scale at level 1 is a sensible fraction above 0** (0.10–0.20), so a level-1 beast is a weak but
+  real version of its adult self; the roster tests check every stat is at least 1 at level 1;
+- scale never decreases, and the curve is **piecewise-linear** between its authored points (the
+  importer sets linear tangents, so Unity evaluates exactly the numbers in the JSON).
+
+Three curves are defined, all with `MaxLevel` 100. Only `medium` is in use; `fast` and `slow` stay
+in the file, unused, as ready-made shapes for the balance simulator to assign:
+
+| Curve | Shape | Key points (progress → scale) | Used by |
+| --- | --- | --- | --- |
+| `fast` | Front-loaded: strong early, flattens late | 0 → 0.20, 0.25 → 0.60, 0.5 → 0.85, 1 → 1 | — (unused) |
+| `medium` | Linear | 0 → 0.15, 1 → 1 | All ten beasts |
+| `slow` | Back-loaded: weak early, surges late | 0 → 0.10, 0.5 → 0.40, 0.75 → 0.65, 1 → 1 | — (unused) |
+
+`MoveRange` is exempt from curves (see "Stat assembly and move range").
+
+### JSON is the source of truth; Unity assets are generated
+
+The roster lives in **`BeastCraft/Assets/_Project/Data/Creatures/beast-roster.json`**, not in
+hand-authored `.asset` files. A plain JSON file is readable and diffable outside Unity — the future
+headless balance simulator will read it directly with `System.Text.Json` (`IncludeFields = true`;
+keys are the C# field names exactly) — whereas `.asset` YAML references its scripts by `.meta` GUIDs
+this repo does not track, and cannot be verified without an Editor.
+
+The file holds `GrowthCurves` (`CurveId`, `MaxLevel`, `Keys` of `Progress`/`Scale`) and `Species`
+(`SpeciesId`, `DisplayName`, `Description`, `Elements` as enum names, `GrowthCurveId`, `BaseStats`
+including `MoveRange`). Its C# shape is `BeastCraft.Creatures.Roster.BeastRosterData` in the Runtime
+assembly, and `BeastRosterValidator` holds the structural rules (well-formed unique snake_case ids,
+parseable elements, resolvable curve ids, curve sanity, every stat at least 1).
+
+**Workflow:** edit the JSON, then open the project in Unity and run **Beast Craft → Data → Import
+Beast Roster**. The importer (`BeastCraft.Editor.Data.BeastRosterImporter`):
+
+- validates first and imports nothing if the file is invalid (all-or-nothing);
+- creates or **updates in place** a `GrowthRateCurve` per curve under `Data/Creatures/GrowthRates/`,
+  matched by its new `CurveId` field, and a `CreatureSpeciesSO` per species under `Data/Creatures/`,
+  matched by `SpeciesId` — searched across the whole project, so a moved or renamed asset is still
+  found and never duplicated, and its GUID (and every reference to it) survives;
+- owns only the fields the JSON carries; icon, skills, evolutions and customization schema on the
+  asset are left alone;
+- never deletes: a species dropped from the JSON keeps its asset and is logged.
+
+The generated assets (and their `.meta` files) are produced on the first Editor run; none are
+committed yet. `SpeciesId` and `CurveId` follow the never-rename-after-ship rule; the roster tests pin
+the ten approved species ids.
+
 ## Next steps
 
 The grid and turn-manager scaffolding landed against decisions 1–3: a `BeastCraft.Battle.Grid`
@@ -507,10 +724,14 @@ counter per *slot*, so the same skill equipped twice runs two independent counte
 targeting at all, which is what keeps it usable for the avatar (decision 6) and for the movement
 rule (decision 7), neither of which it knows anything about.
 
-Decision 6's targeting half adds `BattleAvatar`, a one-method factory that builds the avatar as an
-ordinary `BattleUnit` — player team, zero stats, a placeholder position the confirmed shape
-restriction guarantees nothing reads, and its authored support loadout. It is a caster only and is
-not added to the roster or the initiative queue.
+Decision 6's targeting half adds `BattleAvatar`, a factory that builds the avatar as an ordinary
+`BattleUnit` — player team, a placeholder position the confirmed shape restriction guarantees
+nothing reads, and its authored support loadout. It is a caster only and is not added to the roster
+or the initiative queue. It originally gave the avatar zero stats; the amendment to decision 6 adds
+the `BeastCraft.Avatar` namespace (`AvatarGearSO`, `AvatarGearSlot`, `AvatarStatsSO`), a
+`StatCalculator.CollectModifiers` overload for avatar gear, and a `BattleAvatar.Create` overload that
+takes base stats and equipped avatar gear. The zero-stat overload remains. EditMode tests cover the
+avatar's stat assembly and that a statful avatar is still never hit or defeated.
 
 Effect application (the section above) adds `SkillEffectApplier`, which resolves an activation into
 state changes, a `CurrentHp` and an `ActiveStatModifiers` list on `BattleUnit`, and the
@@ -519,8 +740,8 @@ state changes, a `CurrentHp` and an `ActiveStatModifiers` list on `BattleUnit`, 
 Decision 7 adds the turn executor, which is also the pass that finally connects everything above to
 everything else:
 
-- `BattleUnit.MoveRange`, the per-turn movement budget. Not on `StatBlock`, for the reason under
-  "what is not settled yet" — where the number comes from is still open.
+- `BattleUnit.MoveRange`, the per-turn movement budget. Since the stat-assembly pass it reads
+  `Stats.MoveRange` rather than being set independently (see "Stat assembly and move range").
 - `SkillLoadout.Tick()` now reports ready **slot indices** and no longer re-arms them;
   `SkillLoadout.MarkFired(slotIndex)` is the explicit re-arm. A slot offered and never marked fired
   simply stays at 0 and is offered again next turn, which is decision 7's "stuck skill" rule falling
@@ -554,12 +775,32 @@ Pre-battle placement (the section above) adds deployment zones on `HexGrid`
 `PlacementValidationResult`. Validation is non-mutating; `TryPlaceAll` is the separate, atomic
 commit step.
 
+The element system (the section above) adds the `Element` enum, `CreatureSpeciesSO.Elements`,
+`SkillSO.Element`, `BattleUnit.Elements` and the static `ElementChart`, and makes
+`SkillEffectApplier`'s damage arm scale by the chart. The first EditMode tests land with it, covering
+the chart and the damage multiplier.
+
+Stat assembly (the section above) adds `StatType.MoveRange` / `StatBlock.MoveRange`, makes
+`BattleUnit.MoveRange` a read-through of `Stats`, and adds the static `StatCalculator` (species base
+at level, then gear flat, then gear percent) and `BattleUnitFactory`, which builds a beast from its
+species, level and gear. EditMode tests cover the stat block, the level-scaling exemption, the
+assembly order, the factory, and move range under buffs.
+
+The starter roster (the section above) adds `beast-roster.json`, the `BeastCraft.Creatures.Roster`
+data types and validator, `GrowthRateCurve.CurveId` and `GrowthRateCurve.EvaluateScale`, the Editor
+importer (the first Editor script, and the first `UnityEditor` stubs in `Tooling/CiStubs`), and
+EditMode tests that check the JSON directly: structure, the ten pinned ids, one beast per element,
+the stat-budget and move-range bands, and the curve semantics.
+
 Every pass so far is deliberately **data structures and algorithms only** — no MonoBehaviours, no
-scene or prefab wiring, and no authored `.asset` instances. The hex radii backing each arena preset
+scene or prefab wiring, and no committed `.asset` instances (the roster's are generated in-Editor). The hex radii backing each arena preset
 are placeholder implementation defaults chosen to be tunable, not producer-confirmed balance
-numbers, and the deployment-zone split and the effect rules above are the same kind of default.
-Still to come: where `MoveRange` gets its value from, the damage formula and stat scaling on top of
-flat magnitudes, the status-effect system behind `ApplyStatus`, resource gating on top of cooldowns,
+numbers, and the deployment-zone split, the effect rules and the element chart above are the same
+kind of default.
+Still to come: the damage formula and stat scaling on top of
+flat magnitudes — the planned next work stream, applying to beasts and the avatar alike, together
+with a headless balance simulator that reads `beast-roster.json` directly and replaces the roster's
+first-draft numbers with tuned ones — the starter roster's skills (none are authored yet), the status-effect system behind `ApplyStatus`, resource gating on top of cooldowns,
 lifting defeated units off the grid so they stop obstructing movement, the placement UI (a Unity
 Editor task, not a continuation of the placement validation that just landed), the encounter
 definition that selects an arena preset and a battle format, and the presentation layer.

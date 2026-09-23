@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using BeastCraft.Avatar;
 using BeastCraft.Battle.Grid;
 using BeastCraft.Creatures;
 
@@ -9,7 +11,8 @@ namespace BeastCraft.Battle
     /// The avatar is a non-combatant commander: it does not fight, it is not a piece on the grid,
     /// and it has no slot in the initiative queue (design decision 2). What it does have is a
     /// <see cref="SkillLoadout"/> of support skills on the same cooldown rotation every beast uses
-    /// (decision 6), which is the entire reason it needs to exist at runtime at all.
+    /// (decision 6), which is the main reason it needs to exist at runtime at all — plus, since
+    /// decision 6 was amended, a stat block of its own (see "Stats" below).
     /// </para>
     /// <para>
     /// <strong>It is an ordinary <see cref="BattleUnit"/>, not a parallel type.</strong> Everything
@@ -52,17 +55,26 @@ namespace BeastCraft.Battle
     /// works, because the resolver returns the caster directly without consulting the roster.
     /// </para>
     /// <para>
-    /// <strong>Not wired to anything.</strong> The confirmed timing — the avatar's loadout ticks
-    /// once every time one of the <em>player's own</em> beasts takes its turn, not on enemy turns
-    /// and not once per round — is the turn executor's job, and no turn executor exists yet. This
-    /// makes the avatar representable; driving it is a later pass.
+    /// <strong>Driven by the turn executor.</strong> The confirmed timing — the avatar's loadout
+    /// ticks once every time one of the <em>player's own</em> beasts takes its turn, not on enemy
+    /// turns and not once per round — lives in <see cref="BattleTurnExecutor.ExecuteTurn"/>, which
+    /// takes the avatar as its own argument. This class only builds it.
+    /// </para>
+    /// <para>
+    /// <strong>Stats (design decision 6, amended).</strong> The avatar has real stats: an authored
+    /// base (<see cref="AvatarStatsSO"/>) raised by equipped <see cref="AvatarGearSO"/>, assembled
+    /// by <see cref="StatCalculator"/> exactly as beast gear is. That gear is never rendered, and it
+    /// is independent of the avatar's appearance, which stays purely cosmetic and statless in the
+    /// customization system. <em>Nothing reads the avatar's stats yet</em>: skill magnitudes are
+    /// still flat, so a buff the avatar casts lands the same whatever its stats are. A stat-based
+    /// damage formula covering beasts and the avatar alike is the planned follow-up.
     /// </para>
     /// </summary>
     public static class BattleAvatar
     {
         /// <summary>
-        /// The id <see cref="Create"/> uses by default. A battle holds exactly one avatar, so a
-        /// well-known id is enough to make one without the caller inventing a name, and it keeps
+        /// The id both <c>Create</c> overloads use by default. A battle holds exactly one avatar, so
+        /// a well-known id is enough to make one without the caller inventing a name, and it keeps
         /// the avatar distinguishable in a log next to the beasts' own ids.
         /// </summary>
         public const string DefaultId = "avatar";
@@ -85,12 +97,14 @@ namespace BeastCraft.Battle
         /// would buff the wrong half of the board.
         /// </para>
         /// <para>
-        /// Stats are all zero, and that is the honest value rather than a placeholder: the project
-        /// spec puts combat stats entirely on creatures and makes avatar items cosmetic, so the
-        /// avatar has no stat block to give. Nothing reads them either — it takes no turn, so its
-        /// <c>Speed</c> never sorts anything, and it is not in the roster, so nothing targets its
-        /// HP. A zero <c>Hp</c> means <see cref="BattleUnit.CurrentHp"/> also starts at 0, which is
-        /// harmless for the same reason.
+        /// This overload gives the avatar an all-zero stat block, unclamped, exactly as it always
+        /// has; it is the "no stats authored" path and is kept so existing callers are unaffected.
+        /// Use <see cref="Create(SkillLoadout, StatBlock, IEnumerable{AvatarGearSO}, string)"/>
+        /// to give the avatar its base stats and gear. Zero is harmless here because nothing reads
+        /// the avatar's stats — it takes no turn, so its <c>Speed</c> never sorts anything, and it
+        /// is not in the roster, so nothing targets its HP. A zero <c>Hp</c> means
+        /// <see cref="BattleUnit.CurrentHp"/> also starts at 0, which is harmless for the same
+        /// reason.
         /// </para>
         /// <para>
         /// <see cref="BattleUnit.IsDefeated"/> is left <c>false</c> and stays that way: there is no
@@ -104,6 +118,33 @@ namespace BeastCraft.Battle
         public static BattleUnit Create(SkillLoadout skills, string id = DefaultId)
         {
             return new BattleUnit(id, BattleTeam.Player, default(StatBlock), PlaceholderPosition, skills);
+        }
+
+        /// <summary>
+        /// Builds the avatar with real stats: <paramref name="baseStats"/> (normally
+        /// <see cref="AvatarStatsSO.BaseStats"/>) raised by every modifier on
+        /// <paramref name="equipped"/>, through
+        /// <see cref="StatCalculator.ComputeStats(StatBlock, IEnumerable{StatModifier})"/> — flat
+        /// bonuses, then summed percentages, then rounding and the floors (every stat at least 0,
+        /// <c>Hp</c> at least 1). Everything else is identical to
+        /// <see cref="Create(SkillLoadout, string)"/>: player team, placeholder position, a caster
+        /// and never a member of the roster, never defeated.
+        /// <para>
+        /// A null <paramref name="equipped"/> list, null pieces and null modifiers are skipped. One
+        /// item per <see cref="AvatarGearSlot"/> is <em>not</em> enforced — two pieces in the same
+        /// slot both count. That is the equipment screen's rule to keep, as it is for beast gear.
+        /// </para>
+        /// <para>
+        /// The 1 HP floor applies on this path only, because it is <see cref="StatCalculator"/>'s
+        /// floor; it gives the avatar a nonzero <see cref="BattleUnit.CurrentHp"/> but changes
+        /// nothing about its role, since nothing targets it. As the class documents, nothing reads
+        /// these stats yet either.
+        /// </para>
+        /// </summary>
+        public static BattleUnit Create(SkillLoadout skills, StatBlock baseStats, IEnumerable<AvatarGearSO> equipped, string id = DefaultId)
+        {
+            StatBlock stats = StatCalculator.ComputeStats(baseStats, StatCalculator.CollectModifiers(equipped));
+            return new BattleUnit(id, BattleTeam.Player, stats, PlaceholderPosition, skills);
         }
     }
 }

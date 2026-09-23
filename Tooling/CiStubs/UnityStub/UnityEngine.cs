@@ -31,11 +31,19 @@ namespace UnityEngine
     }
 
     /// <summary>
-    /// Stand-in for <c>UnityEngine.ScriptableObject</c>. Nothing in the codebase calls
-    /// <c>ScriptableObject.CreateInstance&lt;T&gt;()</c>, so that helper is deliberately absent.
+    /// Stand-in for <c>UnityEngine.ScriptableObject</c>. <see cref="CreateInstance{T}"/> is used
+    /// by the Editor roster importer.
     /// </summary>
     public class ScriptableObject : Object
     {
+        /// <summary>
+        /// Plain construction. Real Unity also registers the native object; nothing CI compiles
+        /// depends on that.
+        /// </summary>
+        public static T CreateInstance<T>() where T : ScriptableObject
+        {
+            return (T)Activator.CreateInstance(typeof(T));
+        }
     }
 
     /// <summary>Marker stand-in for <c>UnityEngine.Sprite</c>; only used as a field type.</summary>
@@ -279,17 +287,32 @@ namespace UnityEngine
         }
     }
 
-    /// <summary>A single keyframe on an <see cref="AnimationCurve"/>.</summary>
+    /// <summary>
+    /// A single keyframe on an <see cref="AnimationCurve"/>. Tangents are stored (the roster
+    /// importer sets linear ones) but, as noted on <see cref="AnimationCurve"/>, not evaluated.
+    /// </summary>
     [Serializable]
     public struct Keyframe
     {
         public float time;
         public float value;
+        public float inTangent;
+        public float outTangent;
 
         public Keyframe(float time, float value)
         {
             this.time = time;
             this.value = value;
+            inTangent = 0f;
+            outTangent = 0f;
+        }
+
+        public Keyframe(float time, float value, float inTangent, float outTangent)
+        {
+            this.time = time;
+            this.value = value;
+            this.inTangent = inTangent;
+            this.outTangent = outTangent;
         }
     }
 
@@ -429,6 +452,21 @@ namespace UnityEngine
         public static void LogError(string message, Object context)
         {
             Console.Error.WriteLine(message + (context == null ? string.Empty : " (context: " + context.name + ")"));
+        }
+    }
+
+    /// <summary>
+    /// Stand-in for <c>UnityEngine.JsonUtility</c>, used by the Editor roster importer and the
+    /// roster EditMode test. netstandard2.1 has no built-in JSON serializer and this project takes
+    /// no package references, so this is a compile-only surface and throws if actually called: CI
+    /// only compiles, it never runs. The roster file is exercised for real by the EditMode test in
+    /// Unity (and, outside Unity, with System.Text.Json, which reads the same field names).
+    /// </summary>
+    public static class JsonUtility
+    {
+        public static T FromJson<T>(string json)
+        {
+            throw new NotSupportedException("UnityStub.JsonUtility is compile-only; parse JSON in Unity or with System.Text.Json.");
         }
     }
 
