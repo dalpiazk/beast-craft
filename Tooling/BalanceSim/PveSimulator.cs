@@ -8,7 +8,7 @@ using BeastCraft.Creatures;
 
 namespace BeastCraft.Tooling.BalanceSim
 {
-    /// <summary>One team's battle against one encounter at one difficulty.</summary>
+    /// <summary>One team's battle against one encounter (composition) at one difficulty.</summary>
     public class PveBattle
     {
         public BattleOutcome Outcome;
@@ -27,8 +27,13 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <summary>Per team member: turns it took.</summary>
         public int[] MemberActions;
 
-        public int StrikeFires;
-        public int BlastFires;
+        /// <summary>
+        /// Per team member: fires of its physical single-target skill (Strike, or Shot for a Ranged
+        /// beast) and of Blast. The kit parity table weighs them by power, per stance.
+        /// </summary>
+        public int[] MemberPhysicalFires;
+        public int[] MemberSpecialFires;
+
         public int BurstFires;
         public int BurstTargets;
 
@@ -64,25 +69,42 @@ namespace BeastCraft.Tooling.BalanceSim
         public double ClearRate;
     }
 
-    /// <summary>Every team against one encounter at one level and kit mode, at the calibrated difficulty.</summary>
+    /// <summary>
+    /// Every team against every composition of one shape (or one fixed encounter) at one level and
+    /// kit mode, at the calibrated difficulty.
+    /// </summary>
     public class PveCell
     {
         public KitMode Mode;
         public int Level;
-        public Encounter Encounter;
+        public EncounterShape Shape;
         public double Multiplier;
         public double ClearRate;
         public List<CalibrationPoint> Evaluations = new List<CalibrationPoint>();
 
         /// <summary>
-        /// Every battle at the calibrated multiplier: <see cref="Samples"/> per team, team-major, so
-        /// team <c>t</c>'s sample <c>s</c> is at <c>t * Samples + s</c> (see
-        /// <see cref="PveSimulator.BattleIndex"/>).
+        /// Every battle at the calibrated multiplier: composition-major, then team, then sample, so
+        /// composition <c>c</c>, team <c>t</c>, sample <c>s</c> is at
+        /// <c>((c * TeamCount) + t) * Samples + s</c> (see <see cref="PveSimulator.BattleIndex"/>).
         /// </summary>
         public PveBattle[] Battles;
 
-        /// <summary>Battles per team: each is the same fight with a different seed (damage rolls differ).</summary>
+        /// <summary>Battles per team and composition: each is the same fight with a different seed (damage rolls differ).</summary>
         public int Samples;
+
+        public int TeamCount;
+
+        /// <summary>The team index of battle <paramref name="index"/>.</summary>
+        public int TeamOf(int index)
+        {
+            return (index / Samples) % TeamCount;
+        }
+
+        /// <summary>The composition index (into <see cref="EncounterShape.Compositions"/>) of battle <paramref name="index"/>.</summary>
+        public int CompositionOf(int index)
+        {
+            return index / (Samples * TeamCount);
+        }
     }
 
     /// <summary>
@@ -138,7 +160,7 @@ namespace BeastCraft.Tooling.BalanceSim
         /// team) would hand every cross-side tie to the enemies. Each battle
         /// instead prefixes one side with <see cref="TieWinnerPrefix"/> and the other with
         /// <see cref="TieLoserPrefix"/>; which side wins is decided by <see cref="PlayersWinTies"/>,
-        /// an exact half of the teams in every (kit mode, encounter, level) cell. A prefix shared by
+        /// an exact half of the teams against every composition in every (kit mode, level) cell. A prefix shared by
         /// a whole side leaves the order <em>within</em> the side (and so every targeting tie, which
         /// only ever compares units of one side) exactly as it was.
         /// </summary>
@@ -147,36 +169,36 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <summary>See <see cref="TieWinnerPrefix"/>.</summary>
         public const string TieLoserPrefix = "b";
 
-        /// <summary>Battles per team per evaluation (<c>--samples</c>).</summary>
+        /// <summary>Battles per team per composition per evaluation (<see cref="SimOptions.PveSamples"/>).</summary>
         public int Samples
         {
-            get { return _options.Samples; }
+            get { return _options.PveSamples; }
         }
 
-        /// <summary>Where team <paramref name="teamIndex"/>'s sample <paramref name="sample"/> sits in a battle array.</summary>
-        public int BattleIndex(int teamIndex, int sample)
+        /// <summary>Where composition <paramref name="composition"/>, team <paramref name="teamIndex"/>, sample <paramref name="sample"/> sits in a battle array.</summary>
+        public int BattleIndex(int composition, int teamIndex, int sample)
         {
-            return (teamIndex * Samples) + sample;
+            return (((composition * Teams.Count) + teamIndex) * Samples) + sample;
         }
 
         /// <summary>
-        /// Calibrates the encounter's difficulty for this level and mode, then returns the battles at
-        /// the calibrated multiplier. Deterministic: every battle's rng is seeded from the inputs
+        /// Calibrates the shape's difficulty for this level and mode (one multiplier over all its
+        /// compositions), then returns the battles at the calibrated multiplier. Deterministic: every battle's rng is seeded from the inputs
         /// (never the multiplier), so the clear rates, and with them the evaluated multipliers,
         /// depend only on the inputs. Battles are random (damage variance and crits), so each team
-        /// fights <see cref="Samples"/> times with distinct seeds and the clear rate is over all of
-        /// them.
+        /// fights each composition <see cref="Samples"/> times with distinct seeds and the clear rate
+        /// is over all of them.
         /// </summary>
-        public PveCell RunCell(KitMode mode, int level, Encounter encounter)
+        public PveCell RunCell(KitMode mode, int level, EncounterShape shape)
         {
-            PveCell cell = new PveCell { Mode = mode, Level = level, Encounter = encounter, Samples = Samples };
+            PveCell cell = new PveCell { Mode = mode, Level = level, Shape = shape, Samples = Samples, TeamCount = Teams.Count };
             double target = _options.TargetClearRate;
             PveBattle[] best = null;
             double bestGap = double.MaxValue;
 
             double Evaluate(double multiplier)
             {
-                PveBattle[] battles = RunAllTeams(mode, level, encounter, multiplier);
+                PveBattle[] battles = RunAllTeams(mode, level, shape, multiplier);
                 int cleared = 0;
                 foreach (PveBattle battle in battles)
                 {
@@ -257,26 +279,33 @@ namespace BeastCraft.Tooling.BalanceSim
         }
 
         /// <summary>
-        /// Every team against the encounter at one multiplier, <see cref="Samples"/> times each;
-        /// parallel, results stored at <see cref="BattleIndex"/>.
+        /// Every team against every composition of the shape at one multiplier, <see cref="Samples"/>
+        /// times each; parallel, results stored at <see cref="BattleIndex"/>.
         /// </summary>
-        public PveBattle[] RunAllTeams(KitMode mode, int level, Encounter encounter, double multiplier)
+        public PveBattle[] RunAllTeams(KitMode mode, int level, EncounterShape shape, double multiplier)
         {
             int samples = Samples;
-            PveBattle[] battles = new PveBattle[Teams.Count * samples];
-            bool[] playersWinTies = PlayersWinTies(mode, level, encounter.Id);
+            int teams = Teams.Count;
+            PveBattle[] battles = new PveBattle[shape.Compositions.Count * teams * samples];
+            bool[][] playersWinTies = new bool[shape.Compositions.Count][];
+            for (int c = 0; c < shape.Compositions.Count; c++)
+            {
+                playersWinTies[c] = PlayersWinTies(mode, level, shape.Compositions[c].Id);
+            }
+
             Parallel.For(0, battles.Length, i =>
             {
-                int t = i / samples;
-                battles[i] = RunBattle(mode, level, encounter, multiplier, t, i % samples, false, playersWinTies[t], out _);
+                int t = (i / samples) % teams;
+                int c = i / (samples * teams);
+                battles[i] = RunBattle(mode, level, shape.Compositions[c], multiplier, t, i % samples, false, playersWinTies[c][t], out _);
             });
 
             return battles;
         }
 
         /// <summary>
-        /// Per team index, whether the team wins cross-side initiative ties in this (kit mode, level,
-        /// encounter) cell. A seeded shuffle of the team indices, first half true: exactly half the
+        /// Per team index, whether the team wins cross-side initiative ties against this encounter
+        /// (composition) at this kit mode and level. A seeded shuffle of the team indices, first half true: exactly half the
         /// teams (the extra one of an odd count goes to the enemies), independent of the difficulty
         /// multiplier so calibration compares like with like. A pure function of the inputs.
         /// </summary>
@@ -325,7 +354,7 @@ namespace BeastCraft.Tooling.BalanceSim
         {
             int[] team = Teams[teamIndex];
             int[] slots = SlotOrders[teamIndex];
-            HexGrid grid = new HexGrid(encounter.Data.ParsedArena);
+            HexGrid grid = new HexGrid(encounter.Arena);
             List<BattleUnit> units = new List<BattleUnit>();
             string playerPrefix = playersWinTies ? TieWinnerPrefix : TieLoserPrefix;
             string enemyPrefix = playersWinTies ? TieLoserPrefix : TieWinnerPrefix;
@@ -379,7 +408,9 @@ namespace BeastCraft.Tooling.BalanceSim
                 MemberActions = new int[team.Length],
                 MemberHits = new int[team.Length],
                 MemberCrits = new int[team.Length],
-                MemberRollMultiplier = new double[team.Length]
+                MemberRollMultiplier = new double[team.Length],
+                MemberPhysicalFires = new int[team.Length],
+                MemberSpecialFires = new int[team.Length]
             };
 
             TurnManager turnManager = new TurnManager(units);
@@ -462,7 +493,7 @@ namespace BeastCraft.Tooling.BalanceSim
                         if (actorIsMember)
                         {
                             battle.MemberActions[actor]++;
-                            CountFires(battle, turn);
+                            CountFires(battle, turn, actor);
                             CountRolls(battle, turn, actor);
                         }
                     }
@@ -485,7 +516,7 @@ namespace BeastCraft.Tooling.BalanceSim
             return battle;
         }
 
-        private static void CountFires(PveBattle battle, BattleTurnResult turn)
+        private static void CountFires(PveBattle battle, BattleTurnResult turn, int actor)
         {
             foreach (BattleSkillOutcome outcome in turn.SkillOutcomes)
             {
@@ -494,13 +525,13 @@ namespace BeastCraft.Tooling.BalanceSim
                     continue;
                 }
 
-                if (Kit.IsStrike(outcome.Skill))
+                if (Kit.IsPhysicalSingle(outcome.Skill))
                 {
-                    battle.StrikeFires++;
+                    battle.MemberPhysicalFires[actor]++;
                 }
                 else if (Kit.IsBlast(outcome.Skill))
                 {
-                    battle.BlastFires++;
+                    battle.MemberSpecialFires[actor]++;
                 }
                 else if (Kit.IsBurstUse(outcome.Skill))
                 {

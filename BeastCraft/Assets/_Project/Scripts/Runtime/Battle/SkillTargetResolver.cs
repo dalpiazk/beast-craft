@@ -345,7 +345,8 @@ namespace BeastCraft.Battle
 
         /// <summary>
         /// The number a comparing criterion ranks a candidate by. Distance is measured from the
-        /// caster's live position, like everything else a skill does.
+        /// caster's live position, like everything else a skill does; current HP is the
+        /// candidate's live HP at the moment of the pick, not its stat block's maximum.
         /// </summary>
         private static int CriterionValue(SkillSO skill, BattleUnit caster, BattleUnit candidate)
         {
@@ -355,6 +356,8 @@ namespace BeastCraft.Battle
                     return candidate.Stats.GetStat(skill.TargetingStat);
                 case SkillTargetingCriterion.Distance:
                     return caster.Position.Distance(candidate.Position);
+                case SkillTargetingCriterion.CurrentHp:
+                    return candidate.CurrentHp;
                 default:
                     // Random does not compare, so it never reaches here; a flat 0 keeps any future
                     // criterion that forgets an arm harmless rather than crashing mid-battle.

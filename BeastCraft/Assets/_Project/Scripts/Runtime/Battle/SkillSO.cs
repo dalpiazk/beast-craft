@@ -91,8 +91,9 @@ namespace BeastCraft.Battle
         /// <para>
         /// Consulted <em>only</em> when <see cref="TargetingCriterion"/> is
         /// <see cref="SkillTargetingCriterion.Stat"/>. It is ignored under
-        /// <see cref="SkillTargetingCriterion.Random"/> and
-        /// <see cref="SkillTargetingCriterion.Distance"/>, and — like the rest of the targeting
+        /// <see cref="SkillTargetingCriterion.Random"/>,
+        /// <see cref="SkillTargetingCriterion.Distance"/> and
+        /// <see cref="SkillTargetingCriterion.CurrentHp"/>, and — like the rest of the targeting
         /// fields — by every shape that does not pick a single candidate.
         /// </para>
         /// </summary>

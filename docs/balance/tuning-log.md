@@ -413,3 +413,148 @@ out. The one visible effect is on the Thunderbird / Leviathan–Treant tails of 
 PvP 1v1 moves no more than a few points per beast (`neutral`: Thunderbird 88.9% → 90.0%, Griffin
 92.6% → 89.3%); no PvE or PvP battle stalemates. The standard kit's physical share is unchanged
 (37–46%).
+
+## After mixed encounters + CurrentHp targeting + fair ranged kit
+
+Three changes, none of them a roster change (stats, stances and crit chances are as in the previous
+section; nothing was re-tuned):
+
+- **Runtime: `SkillTargetingCriterion.CurrentHp`** (appended, value 3). It compares the HP a unit has
+  left, honours `SkillTargetingOrder`, breaks ties on the unit id and works in both the range-limited
+  pick and `PickFocusIgnoringRange` (design doc, decision 4). `Stat` + `HP` compared the stat block's
+  maximum, so a "lowest HP" enemy never tracked damage taken: with four beasts at exactly 100 max HP,
+  Griffin (105) was focused only on the 4 of its 84 teams without them. Every "pick off the weakest"
+  fixture skill now uses `CurrentHp` + `Lowest` (the fixed set's wisps and stingers; the generated
+  stalker, caster and champion hex).
+- **Fair standard kit for Ranged beasts.** A Ranged beast never walks into melee, so it only fired
+  Strike at an enemy already adjacent, and the physical share of single-target power had fallen to
+  37-47%. Ranged beasts now carry **Shot** (Physical, range 3, Blast's cooldown) instead of Strike,
+  and both physical powers were re-derived from fire ratios measured over the new default run
+  (Strike 55 → 57, Shot 41; see the simulator README). Kit parity, physical share of single-target
+  power (every shape and level):
+
+  | Kit mode | Vanguard (Strike) | Skirmisher (Strike) | Ranged (Shot) | All |
+  | --- | ---: | ---: | ---: | ---: |
+  | `elemental` | 50.2% | 50.2% | 49.7% | 50.0% |
+  | `neutral` | 50.1% | 50.6% | 49.7% | 50.0% |
+
+  Per shape it is 49.2-51.9%; on the fixed set (`--encounter-set fixed`) 49.9-52.0% per stance.
+- **Mixed random encounters.** The default PvE run no longer fights the three fixed encounters but
+  4 shapes x 8 generated compositions: `solo` (one giant), `elite` (a giant + 2 escorts, or 2
+  champions + 1-2 escorts), `squad` (4-6 mixed standard enemies) and `horde` (16-24: 14-20 swarm +
+  2-4 archers / casters), drawn from a pool of nine enemy types under a per-shape threat budget, with
+  per-composition element schemes (one element, per type, per unit, none) dealt from a shuffled deck
+  so all ten elements appear. Enemy speeds are 95-105. One sample per team and composition (8
+  battles per team per shape, against 5 per encounter before); the default run takes about 150 s on
+  8 threads. The simulator README has the pool, shapes and generator rules; the report lists every
+  composition.
+
+Overall marginal clear rate, levels and encounters/shapes averaged (points). **Previous** = the
+previous section's "+ crits" column (fixed encounters, old kit, max-HP targeting). **Fixed, new** =
+the fixed encounters with the Shot kit and `CurrentHp` targeting (a separate run, not committed), so
+the first step isolates the kit and targeting and the second the encounters. **Generated** = the new
+default, committed in `tuned-report.md`.
+
+| Beast | Stance | `elemental` previous | `elemental` fixed, new | `elemental` generated | `neutral` previous | `neutral` fixed, new | `neutral` generated |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Phoenix | Ranged | −1.4 | +11.1 | **+16.2** | +0.6 | +14.1 | **+20.1** |
+| Basilisk | Ranged | +4.1 | +17.0 | +4.1 | +0.1 | +13.6 | **+10.0** |
+| Kirin | Ranged | +2.8 | −0.3 | +2.4 | +5.6 | +2.4 | +4.5 |
+| Thunderbird | Skirmisher | +3.8 | +3.9 | **+6.9** | +0.6 | −1.1 | +2.1 |
+| Griffin | Skirmisher | +26.3 | +12.8 | +3.1 | +22.6 | +10.0 | **+10.1** |
+| Frost Wyrm | Vanguard | +11.5 | +7.9 | **+5.3** | +9.3 | +6.4 | +3.6 |
+| Tarasque | Vanguard | −0.4 | −2.2 | +0.7 | +3.5 | −0.4 | +3.2 |
+| Leviathan | Vanguard | −9.7 | −11.1 | **−9.7** | −12.3 | −14.7 | **−15.0** |
+| Treant | Vanguard | −14.1 | −14.3 | **−13.8** | −11.6 | −12.3 | **−16.8** |
+| Golem | Vanguard | −22.8 | −24.7 | **−15.2** | −18.5 | −18.0 | **−21.8** |
+
+Bold = outside the ±5 flag in the committed report. Spread: `elemental` −15.2 … +16.2 (from −22.8 …
++26.3), `neutral` −21.8 … +20.1 (from −18.5 … +22.6).
+
+Per shape, levels averaged (generated, committed report):
+
+`elemental`:
+
+| Beast | `solo` | `elite` | `squad` | `horde` | Overall |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Phoenix | +15.3 | +18.2 | +21.2 | +10.0 | +16.2 |
+| Thunderbird | +19.5 | +8.9 | +4.3 | −5.0 | +6.9 |
+| Frost Wyrm | −6.0 | +0.8 | +10.4 | +15.8 | +5.3 |
+| Basilisk | +4.4 | +6.2 | +5.7 | +0.4 | +4.1 |
+| Griffin | +7.7 | +5.1 | +3.7 | −4.2 | +3.1 |
+| Kirin | +0.9 | +1.0 | +3.4 | +4.1 | +2.4 |
+| Tarasque | −5.3 | −8.7 | +5.5 | +11.4 | +0.7 |
+| Leviathan | −8.7 | −5.8 | −18.8 | −5.6 | −9.7 |
+| Treant | −13.4 | −15.0 | −16.8 | −9.8 | −13.8 |
+| Golem | −14.3 | −10.7 | −18.6 | −17.1 | −15.2 |
+
+`neutral`:
+
+| Beast | `solo` | `elite` | `squad` | `horde` | Overall |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Phoenix | +17.2 | +25.3 | +25.5 | +12.3 | +20.1 |
+| Griffin | +22.1 | +5.8 | +11.2 | +1.3 | +10.1 |
+| Basilisk | +14.4 | +13.7 | +6.7 | +5.4 | +10.0 |
+| Kirin | +3.9 | +6.4 | +0.6 | +7.1 | +4.5 |
+| Frost Wyrm | −5.4 | +0.4 | +11.5 | +7.7 | +3.6 |
+| Tarasque | −4.1 | −3.6 | +4.4 | +16.2 | +3.2 |
+| Thunderbird | +13.9 | +11.1 | −0.1 | −16.7 | +2.1 |
+| Leviathan | −23.3 | −17.1 | −13.2 | −6.2 | −15.0 |
+| Treant | −18.7 | −17.8 | −16.9 | −13.9 | −16.8 |
+| Golem | −19.9 | −24.2 | −29.7 | −13.3 | −21.8 |
+
+Flags in the committed report: Phoenix no weakness (top 3 in every shape) in both modes; Golem and
+Treant no niche (bottom 3 in every shape) in both modes. No stalemates, no calibration misses, no
+kit-parity miss.
+
+What moved, and why:
+
+- **The Ranged beasts regained what stances took from them, and Phoenix overshot.** With Shot,
+  a Ranged beast's `Attack` counts again. Phoenix has the roster's highest combined offence (Atk 125,
+  SpA 140) and was paying for Atk it could not use; it is now first overall in both modes and top 3
+  in every shape. Basilisk (Atk 95, SpA 150) gains in both modes on the fixed set; on the generated
+  set it gains in `neutral` only (+0.1 → +10.0); in `elemental` mode it is flat (+4.1), which this
+  run does not explain (its Dark kit is resisted by nothing, and is super-effective against the
+  dominant element of only one composition per level; the per-shape noise is up to 12.6 points). Kirin (Atk 50) gains nothing, as expected: the
+  fix gives weight to `Attack`, and Kirin has little.
+- **Griffin's lead was mostly the max-HP targeting threshold.** With `CurrentHp`, the wisps and
+  stingers no longer skip Griffin for whichever beast was built with 100 HP, and its fixed-set
+  overall falls +26.3 → +12.8 (`elemental`); against generated compositions it is +3.1 / +10.1.
+  Thunderbird, its mirror image under max-HP targeting, recovers against the fixed pack (−17.5 →
+  −13.2) but stays weak against the horde (−5.0 / −16.7): a fast, fragile Skirmisher that dives into
+  twenty small melee enemies.
+- **The slow Vanguards are still the problem.** Golem, Treant and Leviathan are bottom three almost
+  everywhere; they have the lowest speeds (40-55 against 75-120) and, in `elemental` mode, lose most
+  where their element is resisted. That is the Speed question the next deliverable (re-tuning with a
+  speed spread of about 15%) addresses; this change does not touch it.
+- **Shapes show niches.** Frost Wyrm and Tarasque lead against the horde and squad but are below zero
+  against the giant; Thunderbird and Griffin lead against the giant and fall off against the horde.
+  That is the direction's "different shapes reward different stat lines".
+- **Elements now matter per battle.** The `elemental` element-matchup view (report, "Element
+  matchups") shows every beast gaining a great deal where its element is strong against a
+  composition's dominant element (Phoenix +59.9, Griffin +47.2, Thunderbird +45.1 on 3-5
+  compositions per level and mode) and losing where it is resisted (Leviathan −33.0, Treant −33.8,
+  Golem −30.1). The buckets are small, so this is direction rather than measurement, but it is the
+  first time the simulator exercises the element chart against varied enemy elements: the fixed
+  boss was elementless and the fixed swarm cycled all ten.
+
+**Compositions.** Per shape and level, a single composition's clear rate at its shape's calibrated
+multiplier ranges from about 15% to 80% (most within 30-70%); `solo` in `neutral` mode is 47-56%,
+since its compositions differ only in the giant's element. The threat weights were fitted to
+per-composition clear rates (logit fit on type counts, `neutral`, level 50, 24 compositions per
+shape): the first pool had a weak stalker (about half a standard enemy) and champions far weaker than
+their weight, so the stalker (HP 100 → 125, power 48 → 55) and champion (HP 600 → 800) were raised
+and the brute's threat set to 2.75. The elite shape went from 2-3 escorts to 2 (a giant) or 1-2 (two
+champions), since the third escort was worth about 0.8 logit on its own. The swarm is two single-skill
+types (swarmling, physical; stingling, special) because a two-skill swarm unit doubled the
+damage-floor hits and the level-1 horde could not be calibrated below 35% clear even at the minimum
+multiplier.
+
+**Noise.** Rerunning the default PvE run with `--seed 777` (which also draws different compositions,
+so it measures composition sampling as well as roll noise) moves a beast's overall marginal by 2.0
+points on average and at most 4.8 (Phoenix +16.2 → +21.0) in `elemental` mode, and by 1.2 on average
+and at most 3.2 (Treant) in `neutral`. Single shape cells move by 4.2 on average and up to 12.6 in
+`elemental` (where which elements are drawn matters most) and 2.0 / 5.8 in `neutral`. That is about
+the previous fixed-encounter run's overall noise (2.1 mean, 4.8 max) with 1 sample per composition
+instead of 5 per encounter; raise `--compositions` for tighter per-shape and element-matchup
+numbers. Every change in the overall table above larger than about 5 points is outside the noise.

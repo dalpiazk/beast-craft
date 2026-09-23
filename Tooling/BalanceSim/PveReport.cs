@@ -8,8 +8,8 @@ using BeastCraft.Creatures;
 namespace BeastCraft.Tooling.BalanceSim
 {
     /// <summary>
-    /// One beast's numbers in one (mode, level, encounter) cell, or averaged over several. Every
-    /// sample of every team counts as its own battle.
+    /// One beast's numbers in one (mode, level, shape) cell, or averaged over several. Every
+    /// sample of every team against every composition counts as its own battle.
     /// </summary>
     public class BeastMetrics
     {
@@ -41,6 +41,9 @@ namespace BeastCraft.Tooling.BalanceSim
     /// </summary>
     public static class PveReport
     {
+        /// <summary>A physical share further than this from 50% is flagged as a kit parity miss.</summary>
+        public const double ParityTolerance = 5.0;
+
         /// <summary>Per-beast metrics for one cell.</summary>
         public static BeastMetrics[] Compute(PveCell cell, List<int[]> teams, int speciesCount)
         {
@@ -60,11 +63,10 @@ namespace BeastCraft.Tooling.BalanceSim
                 long turns = 0;
                 long battleTicks = 0;
 
-                int samples = cell.Samples < 1 ? 1 : cell.Samples;
                 for (int i = 0; i < cell.Battles.Length; i++)
                 {
                     PveBattle battle = cell.Battles[i];
-                    int member = Array.IndexOf(teams[i / samples], b);
+                    int member = Array.IndexOf(teams[cell.TeamOf(i)], b);
                     if (member < 0)
                     {
                         without++;
@@ -160,70 +162,103 @@ namespace BeastCraft.Tooling.BalanceSim
         {
             public KitMode Mode;
 
-            /// <summary>[encounter][level][beast].</summary>
+            /// <summary>[shape][level][beast].</summary>
             public BeastMetrics[][][] ByCell;
 
-            /// <summary>[encounter][beast], levels averaged.</summary>
-            public BeastMetrics[][] ByEncounter;
+            /// <summary>[shape][beast], levels averaged.</summary>
+            public BeastMetrics[][] ByShape;
 
-            /// <summary>[beast], every encounter and level averaged.</summary>
+            /// <summary>[beast], every shape and level averaged.</summary>
             public BeastMetrics[] Overall;
 
-            /// <summary>[encounter] beast indices, best marginal first.</summary>
+            /// <summary>[shape] beast indices, best marginal first.</summary>
             public List<int>[] Ranking;
 
             public List<int> OverallOrder;
         }
 
-        public static void AppendSection(StringBuilder report, SimOptions options, IReadOnlyList<CreatureSpeciesSO> species, List<Encounter> encounters,
+        public static void AppendSection(StringBuilder report, SimOptions options, IReadOnlyList<CreatureSpeciesSO> species, EncounterCatalog catalog,
                                          PveSimulator simulator, List<PveCell> cells)
         {
+            List<EncounterShape> shapes = catalog.Shapes;
             List<ModeSummary> summaries = new List<ModeSummary>();
             foreach (KitMode mode in options.Modes)
             {
-                summaries.Add(Summarize(options, species, encounters, simulator, cells, mode));
+                summaries.Add(Summarize(options, species, shapes, simulator, cells, mode));
             }
 
+            bool generated = catalog.Set == EncounterSet.Generated;
             report.AppendLine("## PvE: team vs encounter (primary)");
             report.AppendLine();
             report.AppendLine("The expected shape of the game: the player fields a team of beasts against enemies that are not roster beasts,");
-            report.AppendLine("from one huge creature to a couple of dozen small ones. Every team is fielded against every encounter, each");
-            report.AppendLine("encounter's difficulty is calibrated so the average team clears it about " + SimOptions.Format(options.TargetClearRate) +
-                              "% of the time (where a beast's");
-            report.AppendLine("presence moves the outcome most), and each beast is judged by how much it moves its team's clear rate.");
+            report.AppendLine("from one huge creature to a couple of dozen small ones. " +
+                              (generated
+                                  ? "Encounters are generated: for each shape (solo giant, elite, squad, horde) the"
+                                  : "Encounters are the fixed set (`--encounter-set fixed`): every"));
+            if (generated)
+            {
+                report.AppendLine("simulator draws " + options.Compositions + " random compositions of mixed enemy types with varied elements; every team fights every");
+                report.AppendLine("composition, each shape's difficulty is calibrated so the average team clears its compositions about " +
+                                  SimOptions.Format(options.TargetClearRate) + "% of the");
+                report.AppendLine("time (where a beast's presence moves the outcome most), and each beast is judged by how much it moves its team's");
+                report.AppendLine("clear rate.");
+            }
+            else
+            {
+                report.AppendLine("team is fielded against every encounter, each encounter's difficulty is calibrated so the average team clears it");
+                report.AppendLine("about " + SimOptions.Format(options.TargetClearRate) + "% of the time (where a beast's presence moves the outcome most), and each beast is judged");
+                report.AppendLine("by how much it moves its team's clear rate.");
+            }
+
             report.AppendLine();
 
-            AppendConfiguration(report, options, simulator);
-            AppendEncounters(report, encounters);
+            AppendConfiguration(report, options, simulator, catalog);
+            if (generated)
+            {
+                AppendTypes(report, catalog);
+                AppendShapes(report, catalog);
+                AppendCompositions(report, options, catalog, cells);
+                AppendElementDistribution(report, catalog);
+            }
+            else
+            {
+                AppendFixedEncounters(report, catalog);
+            }
+
             AppendCalibration(report, options, cells);
-            AppendParity(report, options, encounters, cells);
+            AppendParity(report, options, species, simulator, shapes, cells);
             AppendRolls(report, species, simulator, cells);
-            AppendFlags(report, options, species, encounters, cells, summaries);
+            AppendFlags(report, options, species, simulator, shapes, cells, summaries);
 
             foreach (ModeSummary summary in summaries)
             {
-                AppendMode(report, options, species, encounters, summary);
+                AppendMode(report, options, species, shapes, summary);
+                if (summary.Mode == KitMode.Elemental)
+                {
+                    AppendElementMatchups(report, options, species, simulator, cells);
+                }
             }
         }
 
-        private static ModeSummary Summarize(SimOptions options, IReadOnlyList<CreatureSpeciesSO> species, List<Encounter> encounters,
+        private static ModeSummary Summarize(SimOptions options, IReadOnlyList<CreatureSpeciesSO> species, List<EncounterShape> shapes,
                                              PveSimulator simulator, List<PveCell> cells, KitMode mode)
         {
             ModeSummary summary = new ModeSummary
             {
                 Mode = mode,
-                ByCell = new BeastMetrics[encounters.Count][][],
-                ByEncounter = new BeastMetrics[encounters.Count][],
+                ByCell = new BeastMetrics[shapes.Count][][],
+                ByShape = new BeastMetrics[shapes.Count][],
                 Overall = new BeastMetrics[species.Count],
-                Ranking = new List<int>[encounters.Count]
+                Ranking = new List<int>[shapes.Count]
             };
 
-            for (int e = 0; e < encounters.Count; e++)
+            for (int e = 0; e < shapes.Count; e++)
             {
                 summary.ByCell[e] = new BeastMetrics[options.Levels.Count][];
+                summary.ByShape[e] = new BeastMetrics[species.Count];
                 for (int l = 0; l < options.Levels.Count; l++)
                 {
-                    PveCell cell = Find(cells, mode, options.Levels[l], encounters[e]);
+                    PveCell cell = Find(cells, mode, options.Levels[l], shapes[e]);
                     summary.ByCell[e][l] = Compute(cell, simulator.Teams, species.Count);
                 }
             }
@@ -231,7 +266,7 @@ namespace BeastCraft.Tooling.BalanceSim
             for (int b = 0; b < species.Count; b++)
             {
                 List<BeastMetrics> all = new List<BeastMetrics>();
-                for (int e = 0; e < encounters.Count; e++)
+                for (int e = 0; e < shapes.Count; e++)
                 {
                     List<BeastMetrics> levels = new List<BeastMetrics>();
                     for (int l = 0; l < options.Levels.Count; l++)
@@ -240,20 +275,15 @@ namespace BeastCraft.Tooling.BalanceSim
                         all.Add(summary.ByCell[e][l][b]);
                     }
 
-                    if (summary.ByEncounter[e] == null)
-                    {
-                        summary.ByEncounter[e] = new BeastMetrics[species.Count];
-                    }
-
-                    summary.ByEncounter[e][b] = Average(levels);
+                    summary.ByShape[e][b] = Average(levels);
                 }
 
                 summary.Overall[b] = Average(all);
             }
 
-            for (int e = 0; e < encounters.Count; e++)
+            for (int e = 0; e < shapes.Count; e++)
             {
-                BeastMetrics[] row = summary.ByEncounter[e];
+                BeastMetrics[] row = summary.ByShape[e];
                 summary.Ranking[e] = Order(species.Count, b => row[b].Marginal);
             }
 
@@ -278,47 +308,69 @@ namespace BeastCraft.Tooling.BalanceSim
             return order;
         }
 
-        public static PveCell Find(List<PveCell> cells, KitMode mode, int level, Encounter encounter)
+        public static PveCell Find(List<PveCell> cells, KitMode mode, int level, EncounterShape shape)
         {
             foreach (PveCell cell in cells)
             {
-                if (cell.Mode == mode && cell.Level == level && cell.Encounter == encounter)
+                if (cell.Mode == mode && cell.Level == level && cell.Shape == shape)
                 {
                     return cell;
                 }
             }
 
-            throw new InvalidOperationException("Missing PvE cell " + mode + "/" + level + "/" + encounter.Id + ".");
+            throw new InvalidOperationException("Missing PvE cell " + mode + "/" + level + "/" + shape.Id + ".");
         }
 
-        private static void AppendConfiguration(StringBuilder report, SimOptions options, PveSimulator simulator)
+        private static void AppendConfiguration(StringBuilder report, SimOptions options, PveSimulator simulator, EncounterCatalog catalog)
         {
+            bool generated = catalog.Set == EncounterSet.Generated;
+            int compositions = catalog.AllCompositions.Count;
             report.AppendLine("### PvE configuration");
             report.AppendLine();
             report.AppendLine("- Teams: every combination of " + options.TeamSize + " distinct beasts (" + simulator.Teams.Count + " teams, format " +
                               SimOptions.FormatForTeamSize(options.TeamSize) + "); each beast is in " + TeamsWith(simulator) + " of them");
+            if (generated)
+            {
+                report.AppendLine("- Encounters: generated (`--encounter-set generated`, the default): " + catalog.Shapes.Count + " shapes x " +
+                                  options.Compositions + " compositions (`--compositions`) = " + compositions + " compositions, drawn from the");
+                report.AppendLine("  enemy type pool in `" + EncounterLoader.RepoRelativePath + "` (simulator fixtures, not game content) by a generator seeded from");
+                report.AppendLine("  `--seed` alone. Each draw picks a shape variant, a count per slot and each unit's type, and is kept only inside");
+                report.AppendLine("  the shape's threat budget and with enough distinct types; each composition's element scheme is drawn too (one");
+                report.AppendLine("  element for the whole team " + SimOptions.SchemeWeightUniform + "%, one per type " + SimOptions.SchemeWeightPerType +
+                                  "%, one per unit " + SimOptions.SchemeWeightPerUnit + "%, none " + SimOptions.SchemeWeightNone +
+                                  "%), with elements dealt from a shuffled");
+                report.AppendLine("  deck of the ten so every element is dealt before any repeats. Enemy elements: " +
+                                  (options.EnemyElementOverride.HasValue ? "all overridden to `" + options.EnemyElementOverride.Value + "`" : "as generated") +
+                                  " (enemy kits are `None` in `neutral` mode).");
+            }
+            else
+            {
+                report.AppendLine("- Encounters: the fixed set (`--encounter-set fixed`) in `" + EncounterLoader.RepoRelativePath + "`" +
+                                  " — simulator fixtures, not game content; enemy elements: " +
+                                  (options.EnemyElementOverride.HasValue ? "all overridden to `" + options.EnemyElementOverride.Value + "`" : "as authored") +
+                                  " (enemy kits are `None` in `neutral` mode, so an elementless encounter reads the same in both modes)");
+            }
+
+            int perCell = compositions == 0 ? 0 : simulator.Teams.Count * simulator.Samples;
             report.AppendLine("- Samples: damage variance (" + DamageFormula.VarianceMinPercent + "-" + DamageFormula.VarianceMaxPercent +
-                              "%) and crits make a battle random, so every team fights every calibration step " + simulator.Samples +
-                              " times with distinct seeds");
-            report.AppendLine("  (" + (simulator.Teams.Count * simulator.Samples) + " battles per evaluation; a beast's per-cell metrics rest on " +
-                              (TeamsWith(simulator) * simulator.Samples) + " battles with it and " +
-                              ((simulator.Teams.Count - TeamsWith(simulator)) * simulator.Samples) + " without). Seeds exclude the multiplier, so");
-            report.AppendLine("  calibration compares multipliers on the same rolls; the clear rate is over every sample.");
+                              "%) and crits make a battle random, so every team fights every " + (generated ? "composition " : "encounter ") +
+                              simulator.Samples + " time(s) per calibration step");
+            report.AppendLine("  with distinct seeds (`--samples`; " + perCell + " battles per " + (generated ? "composition" : "encounter") +
+                              " per evaluation). Seeds exclude the multiplier, so calibration compares");
+            report.AppendLine("  multipliers on the same rolls; the clear rate is over every battle of the " + (generated ? "shape" : "encounter") + ".");
             report.AppendLine("- Levels: " + SimOptions.Join(options.Levels) + " (beasts and enemies at the same level); kit modes: " +
                               PvpReport.ModeList(options.Modes) + "; no gear; no avatar");
-            report.AppendLine("- Encounters: `" + EncounterLoader.RepoRelativePath + "`" +
-                              " — simulator fixtures, not game content; enemy elements: " +
-                              (options.EnemyElementOverride.HasValue ? "all overridden to `" + options.EnemyElementOverride.Value + "`" : "as authored") +
-                              " (enemy kits are `None` in `neutral` mode, so an elementless encounter reads the same in both modes)");
             report.AppendLine("- Placement: each side takes the front-most tiles of its own deployment zone (front row first, then outward from");
-            report.AppendLine("  the centre line); enemies in fixture order, the team through `PlacementValidator.TryPlaceAll`. Which team member");
-            report.AppendLine("  gets which slot (and unit id, the initiative-tie and target-tie break within the team) is a fixed seeded shuffle per team.");
+            report.AppendLine("  the centre line); enemies front-to-back in composition order (Vanguard, then Skirmisher, then Ranged types), the");
+            report.AppendLine("  team through `PlacementValidator.TryPlaceAll`. Which team member gets which slot (and unit id, the initiative-tie");
+            report.AppendLine("  and target-tie break within the team) is a fixed seeded shuffle per team.");
             report.AppendLine("- Initiative ties between the sides: `TurnManager` breaks equally full, equally fast gauges on the ordinal unit id,");
-            report.AppendLine("  so each battle prefixes one side's ids so that it wins cross-side ties; in every (kit mode, encounter, level) cell");
-            report.AppendLine("  exactly half the teams win them (a seeded shuffle of the team indices). The prefix is side-wide, so ties within a");
-            report.AppendLine("  side are unchanged.");
-            report.AppendLine("- Difficulty: HP, Atk, Def, SpA and SpD of every enemy are scaled by one multiplier per (kit mode, encounter,");
-            report.AppendLine("  level); Speed and Move are not. Calibration starts at x1, doubles or halves until the " +
+            report.AppendLine("  so each battle prefixes one side's ids so that it wins cross-side ties; against every composition, at every kit");
+            report.AppendLine("  mode and level, exactly half the teams win them (a seeded shuffle of the team indices). The prefix is side-wide,");
+            report.AppendLine("  so ties within a side are unchanged.");
+            report.AppendLine("- Difficulty: HP, Atk, Def, SpA and SpD of every enemy are scaled by one multiplier per (kit mode, " +
+                              (generated ? "shape" : "encounter") + ", level)" + (generated ? ", shared by all" : string.Empty));
+            report.AppendLine("  " + (generated ? "of the shape's compositions; " : string.Empty) + "Speed and Move are not. Calibration starts at x1, doubles or halves until the " +
                               SimOptions.Format(options.TargetClearRate) + "% target is bracketed");
             report.AppendLine("  (x" + SimOptions.FormatMultiplier(SimOptions.MinMultiplier) + " to x" + SimOptions.FormatMultiplier(SimOptions.MaxMultiplier) +
                               "), then bisects " + SimOptions.CalibrationBisections + " times; the evaluated multiplier whose clear rate is closest to the");
@@ -328,8 +380,8 @@ namespace BeastCraft.Tooling.BalanceSim
             report.AppendLine("  (walks its remaining move toward the target and holds the skill).");
             report.AppendLine("- Combat stances are the Runtime's too (`CombatStance`, from the roster and the fixtures): a Vanguard approaches");
             report.AppendLine("  as above and prefers stop tiles that screen its Ranged / Skirmisher allies; a Ranged unit never walks into melee");
-            report.AppendLine("  (Strike fires only on an adjacent target); Ranged and Skirmisher units prefer stop tiles with fewer adjacent");
-            report.AppendLine("  enemies and spend leftover movement backing away, keeping the nearest enemy within their longest reach.");
+            report.AppendLine("  (so Ranged beasts carry Shot, range 3, instead of Strike); Ranged and Skirmisher units prefer stop tiles with");
+            report.AppendLine("  fewer adjacent enemies and spend leftover movement backing away, keeping the nearest enemy within their longest reach.");
             report.AppendLine("- Turn order: the Runtime's ATB gauge (`TurnManager`): every unit fills a gauge by its Speed and acts at " +
                               TurnManager.ActionThreshold + ", so twice the");
             report.AppendLine("  Speed is twice the turns. Battle time is normalized: 1.0 = one turn of a Speed-" + TurnManager.ReferenceSpeed +
@@ -338,9 +390,10 @@ namespace BeastCraft.Tooling.BalanceSim
             report.AppendLine("- Max time: " + options.MaxTime + " (a battle reaching it is a stalemate and counts as not cleared); base seed: " + options.Seed);
             report.AppendLine("- Metrics: **marginal** = clear rate of teams containing the beast minus teams without it (points; the primary");
             report.AppendLine("  number). **Dmg share** / **Taken share** = the beast's share of its team's damage dealt / taken (HP actually");
-            report.AppendLine("  removed, so overkill is not counted), averaged over its teams. **Survival** = standing at the end. **Time to");
+            report.AppendLine("  removed, so overkill is not counted), averaged over its battles. **Survival** = standing at the end. **Time to");
             report.AppendLine("  clear** = mean length of the clears it took part in (normalized time). **Turns / time** = the beast's turns per");
-            report.AppendLine("  unit of time over its battles (Speed / 100 while standing). \"Overall\" averages every encounter and level equally.");
+            report.AppendLine("  unit of time over its battles (Speed / 100 while standing). \"Overall\" averages every " + (generated ? "shape" : "encounter") +
+                              " and level equally.");
             report.AppendLine();
         }
 
@@ -355,57 +408,303 @@ namespace BeastCraft.Tooling.BalanceSim
             return count;
         }
 
-        private static void AppendEncounters(StringBuilder report, List<Encounter> encounters)
+        private static void AppendTypes(StringBuilder report, EncounterCatalog catalog)
         {
-            report.AppendLine("### Encounters (simulator fixtures, not game content)");
+            report.AppendLine("### Enemy types (simulator fixtures, not game content)");
             report.AppendLine();
             report.AppendLine("Base stats are max-level values scaled by the roster's growth curve, like a beast's, before the difficulty");
-            report.AppendLine("multiplier (Move and Crit are exempt from both). Kit entries are category, shape, range, power, cooldown and whom the skill aims at (`nearest`, or a stat");
-            report.AppendLine("extreme such as `lowest HP`, which compares maximum HP).");
+            report.AppendLine("multiplier (Move and Crit are exempt from both). Threat is the type's weight in a shape's budget. Kit entries are");
+            report.AppendLine("category, shape, range, power, cooldown and whom the skill aims at (`nearest`, or `lowest current HP` = the beast");
+            report.AppendLine("with the least HP left).");
             report.AppendLine();
-            report.AppendLine("| Encounter | Arena | Enemy | Count | Stance | Elements | HP | Atk | Def | SpA | SpD | Spe | Move | Crit | Kit |");
-            report.AppendLine("| --- | --- | --- | ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |");
-
-            foreach (Encounter encounter in encounters)
+            report.AppendLine("| Type | Role | Threat | Stance | HP | Atk | Def | SpA | SpD | Spe | Move | Crit | Kit |");
+            report.AppendLine("| --- | --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |");
+            foreach (EnemyTypeData type in catalog.Types)
             {
-                foreach (EnemyGroupData group in encounter.Data.Groups)
+                StatBlock s = type.BaseStats;
+                report.AppendLine("| " + type.DisplayName + " | " + type.Role + " | " + Number(type.Threat) + " | " + type.ParsedStance + " | " + s.Hp + " | " + s.Attack +
+                                  " | " + s.Defense + " | " + s.SpecialAttack + " | " + s.SpecialDefense + " | " + s.Speed + " | " + s.MoveRange + " | " +
+                                  s.CritChance + "% | " + KitText(type.Skills) + " |");
+            }
+
+            report.AppendLine();
+        }
+
+        private static void AppendShapes(StringBuilder report, EncounterCatalog catalog)
+        {
+            report.AppendLine("### Encounter shapes");
+            report.AppendLine();
+            report.AppendLine("| Shape | Arena | Threat budget | Min types | Variants (weight: slots, count range from types) |");
+            report.AppendLine("| --- | --- | --- | ---: | --- |");
+            foreach (EncounterShape shape in catalog.Shapes)
+            {
+                List<string> variants = new List<string>();
+                foreach (ShapeVariantData variant in shape.Data.Variants)
                 {
-                    List<string> elements = new List<string>();
-                    foreach (EnemySlot slot in encounter.Enemies)
+                    List<string> slots = new List<string>();
+                    foreach (ShapeSlotData slot in variant.Slots)
                     {
-                        if (slot.GroupDisplayName == group.DisplayName)
+                        slots.Add((slot.Min == slot.Max ? slot.Min.ToString(CultureInfo.InvariantCulture) : slot.Min + "-" + slot.Max) + " from " +
+                                  string.Join("/", slot.Types));
+                    }
+
+                    variants.Add(variant.Label + " (" + variant.Weight + ": " + string.Join(" + ", slots) + ")");
+                }
+
+                report.AppendLine("| `" + shape.Id + "` | " + shape.Arena + " | " + Number(shape.Data.ThreatBudget[0]) + "-" + Number(shape.Data.ThreatBudget[1]) +
+                                  " | " + shape.Data.MinDistinctTypes + " | " + string.Join("; ", variants) + " |");
+            }
+
+            report.AppendLine();
+        }
+
+        /// <summary>
+        /// Every generated composition, with its clear rate at its shape's calibrated difficulty
+        /// (levels averaged), so the threat budget can be checked: a composition far from its
+        /// shape's target is easier or harder than its threat says.
+        /// </summary>
+        private static void AppendCompositions(StringBuilder report, SimOptions options, EncounterCatalog catalog, List<PveCell> cells)
+        {
+            report.AppendLine("### Generated compositions");
+            report.AppendLine();
+            report.AppendLine("Enemies front-to-back. Elements per type, in unit order. Dominant = the element carrying at least " +
+                              SimOptions.Format(100.0 * SimOptions.DominantElementShare) + "% of the");
+            report.AppendLine("composition's threat (`-` = none does). Clear = the composition's clear rate at its shape's calibrated difficulty,");
+            report.AppendLine("levels averaged, per kit mode.");
+            report.AppendLine();
+
+            StringBuilder header = new StringBuilder("| Composition | Enemies | Scheme | Elements | Dominant | Threat |");
+            StringBuilder rule = new StringBuilder("| --- | --- | --- | --- | --- | ---: |");
+            foreach (KitMode mode in options.Modes)
+            {
+                header.Append(" Clear `" + SimOptions.ModeName(mode) + "` |");
+                rule.Append(" ---: |");
+            }
+
+            report.AppendLine(header.ToString());
+            report.AppendLine(rule.ToString());
+
+            foreach (EncounterShape shape in catalog.Shapes)
+            {
+                for (int c = 0; c < shape.Compositions.Count; c++)
+                {
+                    Encounter encounter = shape.Compositions[c];
+                    Element? dominant = DominantElement(encounter);
+                    StringBuilder row = new StringBuilder("| `" + encounter.Id + "` | " + EnemiesText(encounter) + " | " + encounter.ElementScheme + " | " +
+                                                          ElementsText(encounter) + " | " + (dominant.HasValue ? dominant.Value.ToString() : "-") + " | " +
+                                                          Number(encounter.Threat) + " |");
+                    foreach (KitMode mode in options.Modes)
+                    {
+                        double sum = 0.0;
+                        foreach (int level in options.Levels)
                         {
-                            elements.Add(slot.Element.ToString());
+                            sum += CompositionClearRate(Find(cells, mode, level, shape), c);
                         }
+
+                        row.Append(" " + SimOptions.Format(sum / options.Levels.Count) + "% |");
                     }
 
-                    List<string> kit = new List<string>();
-                    foreach (EnemySkillData skill in group.Skills)
-                    {
-                        kit.Add(skill.SkillId + " (" + skill.ParsedCategory + ", " + skill.ParsedShape + ", r" + skill.Range + ", p" +
-                                skill.Power.ToString(CultureInfo.InvariantCulture) + ", cd" + skill.Cooldown + ", " + TargetingLabel(skill) + ")");
-                    }
-
-                    StatBlock s = group.BaseStats;
-                    report.AppendLine("| `" + encounter.Id + "` | " + encounter.Data.ParsedArena + " | " + group.DisplayName + " | " + group.Count + " | " +
-                                      group.ParsedStance + " | " + Compress(elements) + " | " + s.Hp + " | " + s.Attack + " | " + s.Defense + " | " + s.SpecialAttack + " | " +
-                                      s.SpecialDefense + " | " + s.Speed + " | " + s.MoveRange + " | " + s.CritChance + "% | " + string.Join("; ", kit) + " |");
+                    report.AppendLine(row.ToString());
                 }
             }
 
             report.AppendLine();
         }
 
-        /// <summary>Whom a fixture skill aims at: "nearest", "farthest", or "lowest HP" / "highest Speed" and so on.</summary>
+        private static void AppendElementDistribution(StringBuilder report, EncounterCatalog catalog)
+        {
+            int[] units = new int[(int)Element.Dark + 1];
+            int[] compositions = new int[(int)Element.Dark + 1];
+            Dictionary<string, int> schemes = new Dictionary<string, int>(StringComparer.Ordinal);
+            List<string> schemeOrder = new List<string>();
+            List<Encounter> all = catalog.AllCompositions;
+            foreach (Encounter encounter in all)
+            {
+                bool[] seen = new bool[units.Length];
+                foreach (EnemySlot slot in encounter.Enemies)
+                {
+                    units[(int)slot.Element]++;
+                    seen[(int)slot.Element] = true;
+                }
+
+                for (int e = 0; e < seen.Length; e++)
+                {
+                    compositions[e] += seen[e] ? 1 : 0;
+                }
+
+                if (!schemes.ContainsKey(encounter.ElementScheme))
+                {
+                    schemes[encounter.ElementScheme] = 0;
+                    schemeOrder.Add(encounter.ElementScheme);
+                }
+
+                schemes[encounter.ElementScheme]++;
+            }
+
+            report.AppendLine("### Enemy element distribution (all compositions)");
+            report.AppendLine();
+            List<string> schemeParts = new List<string>();
+            foreach (string scheme in schemeOrder)
+            {
+                schemeParts.Add(scheme + " " + schemes[scheme]);
+            }
+
+            report.AppendLine("Element schemes over " + all.Count + " compositions: " + string.Join(", ", schemeParts) + ".");
+            report.AppendLine();
+            report.AppendLine("| Element | Units | Compositions with it |");
+            report.AppendLine("| --- | ---: | ---: |");
+            for (int e = 0; e < units.Length; e++)
+            {
+                report.AppendLine("| " + (Element)e + " | " + units[e] + " | " + compositions[e] + " |");
+            }
+
+            report.AppendLine();
+        }
+
+        private static void AppendFixedEncounters(StringBuilder report, EncounterCatalog catalog)
+        {
+            report.AppendLine("### Encounters (simulator fixtures, not game content)");
+            report.AppendLine();
+            report.AppendLine("Base stats are max-level values scaled by the roster's growth curve, like a beast's, before the difficulty");
+            report.AppendLine("multiplier (Move and Crit are exempt from both). Kit entries are category, shape, range, power, cooldown and whom the");
+            report.AppendLine("skill aims at (`nearest`, or `lowest current HP` = the beast with the least HP left).");
+            report.AppendLine();
+            report.AppendLine("| Encounter | Arena | Enemy | Count | Stance | Elements | HP | Atk | Def | SpA | SpD | Spe | Move | Crit | Kit |");
+            report.AppendLine("| --- | --- | --- | ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |");
+
+            foreach (EncounterShape shape in catalog.Shapes)
+            {
+                Encounter encounter = shape.Compositions[0];
+                foreach (EnemyGroupData group in encounter.FixedData.Groups)
+                {
+                    List<string> elements = new List<string>();
+                    foreach (EnemySlot slot in encounter.Enemies)
+                    {
+                        if (slot.TypeId == group.EnemyId)
+                        {
+                            elements.Add(slot.Element.ToString());
+                        }
+                    }
+
+                    StatBlock s = group.BaseStats;
+                    report.AppendLine("| `" + encounter.Id + "` | " + encounter.Arena + " | " + group.DisplayName + " | " + group.Count + " | " +
+                                      group.ParsedStance + " | " + Compress(elements) + " | " + s.Hp + " | " + s.Attack + " | " + s.Defense + " | " + s.SpecialAttack + " | " +
+                                      s.SpecialDefense + " | " + s.Speed + " | " + s.MoveRange + " | " + s.CritChance + "% | " + KitText(group.Skills) + " |");
+                }
+            }
+
+            report.AppendLine();
+        }
+
+        private static string KitText(EnemySkillData[] skills)
+        {
+            List<string> kit = new List<string>();
+            foreach (EnemySkillData skill in skills)
+            {
+                kit.Add(skill.SkillId + " (" + skill.ParsedCategory + ", " + skill.ParsedShape + ", r" + skill.Range + ", p" +
+                        skill.Power.ToString(CultureInfo.InvariantCulture) + ", cd" + skill.Cooldown +
+                        (skill.ParsedShape == SkillTargetShape.SingleTarget ? ", " + TargetingLabel(skill) : string.Empty) + ")");
+            }
+
+            return string.Join("; ", kit);
+        }
+
+        /// <summary>Whom a fixture skill aims at: "nearest", "farthest", "lowest current HP", or a stat extreme such as "lowest HP" (maximum).</summary>
         private static string TargetingLabel(EnemySkillData skill)
         {
             bool lowest = skill.ParsedTargetingOrder == SkillTargetingOrder.Lowest;
-            if (skill.ParsedTargeting == SkillTargetingCriterion.Distance)
+            switch (skill.ParsedTargeting)
             {
-                return lowest ? "nearest" : "farthest";
+                case SkillTargetingCriterion.Distance:
+                    return lowest ? "nearest" : "farthest";
+                case SkillTargetingCriterion.CurrentHp:
+                    return (lowest ? "lowest" : "highest") + " current HP";
+                default:
+                    return (lowest ? "lowest " : "highest ") + "max " + skill.ParsedTargetingStat;
+            }
+        }
+
+        /// <summary>"Giant x1, Archer x2" in placement order.</summary>
+        private static string EnemiesText(Encounter encounter)
+        {
+            List<string> names = new List<string>();
+            foreach (EnemySlot slot in encounter.Enemies)
+            {
+                names.Add(slot.GroupDisplayName);
             }
 
-            return (lowest ? "lowest " : "highest ") + skill.ParsedTargetingStat;
+            List<string> order = new List<string>();
+            Dictionary<string, int> counts = new Dictionary<string, int>(StringComparer.Ordinal);
+            foreach (string name in names)
+            {
+                if (!counts.ContainsKey(name))
+                {
+                    counts[name] = 0;
+                    order.Add(name);
+                }
+
+                counts[name]++;
+            }
+
+            List<string> parts = new List<string>();
+            foreach (string name in order)
+            {
+                parts.Add(name + " x" + counts[name]);
+            }
+
+            return string.Join(", ", parts);
+        }
+
+        /// <summary>"Giant: Fire; Archer: Water, Dark x2" in placement order.</summary>
+        private static string ElementsText(Encounter encounter)
+        {
+            List<string> order = new List<string>();
+            Dictionary<string, List<string>> byType = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+            foreach (EnemySlot slot in encounter.Enemies)
+            {
+                if (!byType.ContainsKey(slot.GroupDisplayName))
+                {
+                    byType[slot.GroupDisplayName] = new List<string>();
+                    order.Add(slot.GroupDisplayName);
+                }
+
+                byType[slot.GroupDisplayName].Add(slot.Element.ToString());
+            }
+
+            List<string> parts = new List<string>();
+            foreach (string type in order)
+            {
+                parts.Add(type + ": " + Compress(byType[type]));
+            }
+
+            return string.Join("; ", parts);
+        }
+
+        /// <summary>
+        /// The element carrying at least <see cref="SimOptions.DominantElementShare"/> of the
+        /// composition's threat (fixed encounters weigh every unit 1), or null when none does or
+        /// that element is <c>None</c>.
+        /// </summary>
+        public static Element? DominantElement(Encounter encounter)
+        {
+            double[] weight = new double[(int)Element.Dark + 1];
+            double total = 0.0;
+            foreach (EnemySlot slot in encounter.Enemies)
+            {
+                double w = slot.Threat > 0.0 ? slot.Threat : 1.0;
+                weight[(int)slot.Element] += w;
+                total += w;
+            }
+
+            for (int e = 1; e < weight.Length; e++)
+            {
+                if (total > 0.0 && weight[e] / total >= SimOptions.DominantElementShare - 1e-9)
+                {
+                    return (Element)e;
+                }
+            }
+
+            return null;
         }
 
         /// <summary>"Fire x3, Water x2" in first-seen order.</summary>
@@ -433,12 +732,24 @@ namespace BeastCraft.Tooling.BalanceSim
             return string.Join(", ", parts);
         }
 
+        private static double CompositionClearRate(PveCell cell, int composition)
+        {
+            int per = cell.TeamCount * cell.Samples;
+            int cleared = 0;
+            for (int i = composition * per; i < (composition + 1) * per; i++)
+            {
+                cleared += cell.Battles[i].Cleared ? 1 : 0;
+            }
+
+            return per == 0 ? 0.0 : (100.0 * cleared) / per;
+        }
+
         private static void AppendCalibration(StringBuilder report, SimOptions options, List<PveCell> cells)
         {
             report.AppendLine("### Calibrated difficulty");
             report.AppendLine();
-            report.AppendLine("| Kit mode | Encounter | Level | Multiplier | Clear rate | Evaluations | Avg time | Stalemates | Lead enemy HP / Atk / Def |");
-            report.AppendLine("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |");
+            report.AppendLine("| Kit mode | Shape | Level | Multiplier | Clear rate | Composition clear range | Evaluations | Battles | Avg time | Stalemates |");
+            report.AppendLine("| --- | --- | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: |");
 
             foreach (PveCell cell in cells)
             {
@@ -450,71 +761,177 @@ namespace BeastCraft.Tooling.BalanceSim
                     stalemates += battle.Outcome == BattleOutcome.Stalemate ? 1 : 0;
                 }
 
-                EnemySlot lead = cell.Encounter.Enemies[0];
-                StatBlock stats = PveSimulator.Scale(StatCalculator.ComputeStats(lead.Species, cell.Level, null), cell.Multiplier);
-                string miss = Math.Abs(cell.ClearRate - options.TargetClearRate) > SimOptions.CalibrationTolerance ? " !" : string.Empty;
+                double low = double.MaxValue;
+                double high = double.MinValue;
+                for (int c = 0; c < cell.Shape.Compositions.Count; c++)
+                {
+                    double rate = CompositionClearRate(cell, c);
+                    low = Math.Min(low, rate);
+                    high = Math.Max(high, rate);
+                }
 
-                report.AppendLine("| `" + SimOptions.ModeName(cell.Mode) + "` | `" + cell.Encounter.Id + "` | " + cell.Level + " | x" +
+                string miss = Math.Abs(cell.ClearRate - options.TargetClearRate) > SimOptions.CalibrationTolerance ? " !" : string.Empty;
+                report.AppendLine("| `" + SimOptions.ModeName(cell.Mode) + "` | `" + cell.Shape.Id + "` | " + cell.Level + " | x" +
                                   SimOptions.FormatMultiplier(cell.Multiplier) + " | " + SimOptions.Format(cell.ClearRate) + "%" + miss + " | " +
-                                  cell.Evaluations.Count + " | " + SimOptions.Format(time / cell.Battles.Length) + " | " + stalemates + " | " +
-                                  stats.Hp + " / " + stats.Attack + " / " + stats.Defense + " |");
+                                  SimOptions.Format(low) + "-" + SimOptions.Format(high) + "% | " + cell.Evaluations.Count + " | " + cell.Battles.Length + " | " +
+                                  SimOptions.Format(time / cell.Battles.Length) + " | " + stalemates + " |");
             }
 
             report.AppendLine();
             report.AppendLine("`!` = the closest clear rate calibration found is more than " + SimOptions.Format(SimOptions.CalibrationTolerance) +
                               " points off target (a step in the");
-            report.AppendLine("clear-rate curve that no multiplier splits). Lead enemy = the encounter's first enemy, at that level and multiplier.");
+            report.AppendLine("clear-rate curve that no multiplier splits). Composition clear range = lowest and highest clear rate of a single");
+            report.AppendLine("composition at the shape's multiplier.");
             report.AppendLine();
         }
 
-        private static void AppendParity(StringBuilder report, SimOptions options, List<Encounter> encounters, List<PveCell> cells)
+        /// <summary>Single-target fire totals for the parity table.</summary>
+        private class FireTotals
+        {
+            public long Physical;
+            public long Special;
+            public double PhysicalPower;
+            public long Burst;
+            public long BurstTargets;
+
+            public double SpecialPower
+            {
+                get { return Special * (double)SimOptions.BlastPower; }
+            }
+
+            public double PhysicalShare
+            {
+                get { return PhysicalPower + SpecialPower == 0.0 ? double.NaN : (100.0 * PhysicalPower) / (PhysicalPower + SpecialPower); }
+            }
+        }
+
+        private static void AddFires(FireTotals totals, PveCell cell, PveSimulator simulator, IReadOnlyList<CreatureSpeciesSO> species, CombatStance? stance)
+        {
+            for (int i = 0; i < cell.Battles.Length; i++)
+            {
+                PveBattle battle = cell.Battles[i];
+                int[] team = simulator.Teams[cell.TeamOf(i)];
+                for (int m = 0; m < team.Length; m++)
+                {
+                    CombatStance memberStance = species[team[m]].Stance;
+                    if (stance.HasValue && memberStance != stance.Value)
+                    {
+                        continue;
+                    }
+
+                    totals.Physical += battle.MemberPhysicalFires[m];
+                    totals.Special += battle.MemberSpecialFires[m];
+                    totals.PhysicalPower += battle.MemberPhysicalFires[m] * (double)Kit.PhysicalSinglePower(memberStance);
+                }
+
+                if (!stance.HasValue)
+                {
+                    totals.Burst += battle.BurstFires;
+                    totals.BurstTargets += battle.BurstTargets;
+                }
+            }
+        }
+
+        private static List<CombatStance> StancesIn(IReadOnlyList<CreatureSpeciesSO> species)
+        {
+            List<CombatStance> stances = new List<CombatStance>();
+            foreach (CombatStance stance in new[] { CombatStance.Vanguard, CombatStance.Skirmisher, CombatStance.Ranged })
+            {
+                foreach (CreatureSpeciesSO beast in species)
+                {
+                    if (beast.Stance == stance)
+                    {
+                        stances.Add(stance);
+                        break;
+                    }
+                }
+            }
+
+            return stances;
+        }
+
+        private static FireTotals StanceTotals(List<PveCell> cells, KitMode mode, PveSimulator simulator, IReadOnlyList<CreatureSpeciesSO> species, CombatStance? stance)
+        {
+            FireTotals totals = new FireTotals();
+            foreach (PveCell cell in cells)
+            {
+                if (cell.Mode == mode)
+                {
+                    AddFires(totals, cell, simulator, species, stance);
+                }
+            }
+
+            return totals;
+        }
+
+        private static void AppendParity(StringBuilder report, SimOptions options, IReadOnlyList<CreatureSpeciesSO> species, PveSimulator simulator,
+                                         List<EncounterShape> shapes, List<PveCell> cells)
         {
             report.AppendLine("### Kit parity (beast skill fires at calibrated difficulty, all levels)");
             report.AppendLine();
-            report.AppendLine("Strike (Physical, range 1) fires less often than Blast (Special, range 3): it needs the beast to reach a free");
-            report.AppendLine("tile next to its target, and a Ranged beast only fires it at an enemy already adjacent. Strike's higher power");
-            report.AppendLine("compensates; **physical share** = Strike fires x Strike power as a share of all single-target power delivered,");
-            report.AppendLine("and 50% means `Attack` and `SpecialAttack` weigh the same. Burst uses count once per pair of halves; targets =");
-            report.AppendLine("enemies inside the radius when the first half fires.");
+            report.AppendLine("The physical single-target skill is Strike (range 1, power " + Number(SimOptions.StrikePower) + ") for Vanguard and Skirmisher beasts and");
+            report.AppendLine("Shot (range 3, power " + Number(SimOptions.ShotPower) + ") for Ranged beasts, which never walk into melee; Blast (special, range 3, power " +
+                              Number(SimOptions.BlastPower) + ") is");
+            report.AppendLine("shared. **Physical share** = physical fires x their power as a share of all single-target power delivered; 50%");
+            report.AppendLine("means `Attack` and `SpecialAttack` weigh the same. Burst uses count once per pair of halves; targets = enemies");
+            report.AppendLine("inside the radius when the first half fires.");
             report.AppendLine();
-            report.AppendLine("| Kit mode | Encounter | Strike fires | Blast fires | Strike / Blast | Physical share | Burst uses | Avg targets per Burst |");
-            report.AppendLine("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |");
-
+            report.AppendLine("By stance (every shape and level):");
+            report.AppendLine();
+            report.AppendLine("| Kit mode | Stance | Physical fires | Blast fires | Physical / Blast | Physical share |");
+            report.AppendLine("| --- | --- | ---: | ---: | ---: | ---: |");
             foreach (KitMode mode in options.Modes)
             {
-                foreach (Encounter encounter in encounters)
+                foreach (CombatStance stance in StancesIn(species))
                 {
-                    long strike = 0;
-                    long blast = 0;
-                    long burst = 0;
-                    long burstTargets = 0;
+                    FireTotals t = StanceTotals(cells, mode, simulator, species, stance);
+                    report.AppendLine("| `" + SimOptions.ModeName(mode) + "` | " + stance + " (" + (stance == CombatStance.Ranged ? "Shot" : "Strike") + ") | " +
+                                      t.Physical + " | " + t.Special + " | " + Ratio(t.Physical, t.Special) + " | " + Share(t.PhysicalShare) + " |");
+                }
+
+                FireTotals all = StanceTotals(cells, mode, simulator, species, null);
+                report.AppendLine("| `" + SimOptions.ModeName(mode) + "` | all | " + all.Physical + " | " + all.Special + " | " + Ratio(all.Physical, all.Special) +
+                                  " | " + Share(all.PhysicalShare) + " |");
+            }
+
+            report.AppendLine();
+            report.AppendLine("By shape (every stance and level):");
+            report.AppendLine();
+            report.AppendLine("| Kit mode | Shape | Physical fires | Blast fires | Physical / Blast | Physical share | Burst uses | Avg targets per Burst |");
+            report.AppendLine("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |");
+            foreach (KitMode mode in options.Modes)
+            {
+                foreach (EncounterShape shape in shapes)
+                {
+                    FireTotals t = new FireTotals();
                     foreach (int level in options.Levels)
                     {
-                        foreach (PveBattle battle in Find(cells, mode, level, encounter).Battles)
-                        {
-                            strike += battle.StrikeFires;
-                            blast += battle.BlastFires;
-                            burst += battle.BurstFires;
-                            burstTargets += battle.BurstTargets;
-                        }
+                        AddFires(t, Find(cells, mode, level, shape), simulator, species, null);
                     }
 
-                    double physical = (double)strike * SimOptions.StrikePower;
-                    double special = (double)blast * SimOptions.BlastPower;
-                    report.AppendLine("| `" + SimOptions.ModeName(mode) + "` | `" + encounter.Id + "` | " + strike + " | " + blast + " | " +
-                                      (blast == 0 ? "-" : ((double)strike / blast).ToString("0.00", CultureInfo.InvariantCulture)) + " | " +
-                                      (physical + special == 0.0 ? "-" : SimOptions.Format((100.0 * physical) / (physical + special)) + "%") + " | " + burst + " | " +
-                                      (burst == 0 ? "-" : ((double)burstTargets / burst).ToString("0.00", CultureInfo.InvariantCulture)) + " |");
+                    report.AppendLine("| `" + SimOptions.ModeName(mode) + "` | `" + shape.Id + "` | " + t.Physical + " | " + t.Special + " | " + Ratio(t.Physical, t.Special) +
+                                      " | " + Share(t.PhysicalShare) + " | " + t.Burst + " | " +
+                                      (t.Burst == 0 ? "-" : ((double)t.BurstTargets / t.Burst).ToString("0.00", CultureInfo.InvariantCulture)) + " |");
                 }
             }
 
             report.AppendLine();
         }
 
+        private static string Ratio(long a, long b)
+        {
+            return b == 0 ? "-" : ((double)a / b).ToString("0.00", CultureInfo.InvariantCulture);
+        }
+
+        private static string Share(double share)
+        {
+            return double.IsNaN(share) ? "-" : SimOptions.Format(share) + "%";
+        }
+
         /// <summary>
         /// Per beast, over every PvE battle at calibrated difficulty (both kit modes, every
-        /// encounter, level and sample): how often its hits crit against its authored chance, and
-        /// the average random multiplier its hits got. Expected = <c>1 + (CritMultiplier - 1) *
+        /// shape, composition, level and sample): how often its hits crit against its authored
+        /// chance, and the average random multiplier its hits got. Expected = <c>1 + (CritMultiplier - 1) *
         /// chance</c>, since the variance roll averages 100%.
         /// </summary>
         private static void AppendRolls(StringBuilder report, IReadOnlyList<CreatureSpeciesSO> species, PveSimulator simulator, List<PveCell> cells)
@@ -525,11 +942,10 @@ namespace BeastCraft.Tooling.BalanceSim
 
             foreach (PveCell cell in cells)
             {
-                int samples = cell.Samples < 1 ? 1 : cell.Samples;
                 for (int i = 0; i < cell.Battles.Length; i++)
                 {
                     PveBattle battle = cell.Battles[i];
-                    int[] team = simulator.Teams[i / samples];
+                    int[] team = simulator.Teams[cell.TeamOf(i)];
                     for (int m = 0; m < team.Length; m++)
                     {
                         hits[team[m]] += battle.MemberHits[m];
@@ -564,8 +980,8 @@ namespace BeastCraft.Tooling.BalanceSim
             report.AppendLine();
         }
 
-        private static void AppendFlags(StringBuilder report, SimOptions options, IReadOnlyList<CreatureSpeciesSO> species, List<Encounter> encounters,
-                                        List<PveCell> cells, List<ModeSummary> summaries)
+        private static void AppendFlags(StringBuilder report, SimOptions options, IReadOnlyList<CreatureSpeciesSO> species, PveSimulator simulator,
+                                        List<EncounterShape> shapes, List<PveCell> cells, List<ModeSummary> summaries)
         {
             report.AppendLine("### PvE flagged outliers");
             report.AppendLine();
@@ -586,13 +1002,13 @@ namespace BeastCraft.Tooling.BalanceSim
                     }
                 }
 
-                if (encounters.Count > 1)
+                if (shapes.Count > 1)
                 {
                     for (int b = 0; b < species.Count; b++)
                     {
                         bool bottomEverywhere = true;
                         bool topEverywhere = true;
-                        for (int e = 0; e < encounters.Count; e++)
+                        for (int e = 0; e < shapes.Count; e++)
                         {
                             int rank = summary.Ranking[e].IndexOf(b);
                             bottomEverywhere &= rank >= species.Count - band;
@@ -601,15 +1017,26 @@ namespace BeastCraft.Tooling.BalanceSim
 
                         if (bottomEverywhere)
                         {
-                            report.AppendLine("- " + mode + " " + species[b].DisplayName + ": NO NICHE (bottom " + band + " in every encounter)");
+                            report.AppendLine("- " + mode + " " + species[b].DisplayName + ": NO NICHE (bottom " + band + " in every shape)");
                             any = true;
                         }
 
                         if (topEverywhere)
                         {
-                            report.AppendLine("- " + mode + " " + species[b].DisplayName + ": NO WEAKNESS (top " + band + " in every encounter)");
+                            report.AppendLine("- " + mode + " " + species[b].DisplayName + ": NO WEAKNESS (top " + band + " in every shape)");
                             any = true;
                         }
+                    }
+                }
+
+                foreach (CombatStance stance in StancesIn(species))
+                {
+                    double share = StanceTotals(cells, summary.Mode, simulator, species, stance).PhysicalShare;
+                    if (!double.IsNaN(share) && Math.Abs(share - 50.0) > ParityTolerance)
+                    {
+                        report.AppendLine("- " + mode + " kit parity: " + stance + " physical share " + SimOptions.Format(share) + "% (outside 50 +/- " +
+                                          SimOptions.Format(ParityTolerance) + ")");
+                        any = true;
                     }
                 }
             }
@@ -622,7 +1049,7 @@ namespace BeastCraft.Tooling.BalanceSim
                     stalemates += battle.Outcome == BattleOutcome.Stalemate ? 1 : 0;
                 }
 
-                string where = "`" + SimOptions.ModeName(cell.Mode) + "` `" + cell.Encounter.Id + "` L" + cell.Level;
+                string where = "`" + SimOptions.ModeName(cell.Mode) + "` `" + cell.Shape.Id + "` L" + cell.Level;
                 if (stalemates > 0)
                 {
                     report.AppendLine("- " + where + ": " + stalemates + " of " + cell.Battles.Length + " battles stalemated at the calibrated difficulty");
@@ -644,21 +1071,21 @@ namespace BeastCraft.Tooling.BalanceSim
             report.AppendLine();
         }
 
-        private static void AppendMode(StringBuilder report, SimOptions options, IReadOnlyList<CreatureSpeciesSO> species, List<Encounter> encounters,
+        private static void AppendMode(StringBuilder report, SimOptions options, IReadOnlyList<CreatureSpeciesSO> species, List<EncounterShape> shapes,
                                        ModeSummary summary)
         {
             string name = SimOptions.ModeName(summary.Mode);
             report.AppendLine("### PvE mode: `" + name + "`");
             report.AppendLine();
 
-            // Marginal by encounter.
-            report.AppendLine("#### Marginal clear rate by encounter (levels averaged)");
+            // Marginal by shape.
+            report.AppendLine("#### Marginal clear rate by shape (levels averaged)");
             report.AppendLine();
-            StringBuilder header = new StringBuilder("| Beast | Element |");
-            StringBuilder rule = new StringBuilder("| --- | --- |");
-            foreach (Encounter encounter in encounters)
+            StringBuilder header = new StringBuilder("| Beast | Element | Stance |");
+            StringBuilder rule = new StringBuilder("| --- | --- | --- |");
+            foreach (EncounterShape shape in shapes)
             {
-                header.Append(" `" + encounter.Id + "` |");
+                header.Append(" `" + shape.Id + "` |");
                 rule.Append(" ---: |");
             }
 
@@ -669,10 +1096,10 @@ namespace BeastCraft.Tooling.BalanceSim
 
             foreach (int b in summary.OverallOrder)
             {
-                StringBuilder row = new StringBuilder("| " + species[b].DisplayName + " | " + PvpReport.ElementsOf(species[b]) + " |");
-                for (int e = 0; e < encounters.Count; e++)
+                StringBuilder row = new StringBuilder("| " + species[b].DisplayName + " | " + PvpReport.ElementsOf(species[b]) + " | " + species[b].Stance + " |");
+                for (int e = 0; e < shapes.Count; e++)
                 {
-                    row.Append(" " + Marked(options, summary.ByEncounter[e][b].Marginal) + " (" + (summary.Ranking[e].IndexOf(b) + 1) + ") |");
+                    row.Append(" " + Marked(options, summary.ByShape[e][b].Marginal) + " (" + (summary.Ranking[e].IndexOf(b) + 1) + ") |");
                 }
 
                 row.Append(" " + Marked(options, summary.Overall[b].Marginal) + " |");
@@ -680,20 +1107,20 @@ namespace BeastCraft.Tooling.BalanceSim
             }
 
             report.AppendLine();
-            report.AppendLine("Points of clear rate; (n) = rank within that encounter. Sorted by overall. **Bold** = above +" +
+            report.AppendLine("Points of clear rate; (n) = rank within that shape. Sorted by overall. **Bold** = above +" +
                               SimOptions.Format(options.MarginalThreshold) + ", _italic_ = below -" + SimOptions.Format(options.MarginalThreshold) + ".");
             report.AppendLine();
 
-            // Marginal by encounter and level.
-            report.AppendLine("#### Marginal clear rate by encounter and level");
+            // Marginal by shape and level.
+            report.AppendLine("#### Marginal clear rate by shape and level");
             report.AppendLine();
             header = new StringBuilder("| Beast |");
             rule = new StringBuilder("| --- |");
-            foreach (Encounter encounter in encounters)
+            foreach (EncounterShape shape in shapes)
             {
                 foreach (int level in options.Levels)
                 {
-                    header.Append(" `" + encounter.Id + "` L" + level + " |");
+                    header.Append(" `" + shape.Id + "` L" + level + " |");
                     rule.Append(" ---: |");
                 }
             }
@@ -703,7 +1130,7 @@ namespace BeastCraft.Tooling.BalanceSim
             foreach (int b in summary.OverallOrder)
             {
                 StringBuilder row = new StringBuilder("| " + species[b].DisplayName + " |");
-                for (int e = 0; e < encounters.Count; e++)
+                for (int e = 0; e < shapes.Count; e++)
                 {
                     for (int l = 0; l < options.Levels.Count; l++)
                     {
@@ -717,13 +1144,13 @@ namespace BeastCraft.Tooling.BalanceSim
             report.AppendLine();
 
             // Niches.
-            report.AppendLine("#### Ranking per encounter (niches)");
+            report.AppendLine("#### Ranking per shape (niches)");
             report.AppendLine();
             header = new StringBuilder("| Rank |");
             rule = new StringBuilder("| ---: |");
-            foreach (Encounter encounter in encounters)
+            foreach (EncounterShape shape in shapes)
             {
-                header.Append(" `" + encounter.Id + "` |");
+                header.Append(" `" + shape.Id + "` |");
                 rule.Append(" --- |");
             }
 
@@ -734,10 +1161,10 @@ namespace BeastCraft.Tooling.BalanceSim
             for (int r = 0; r < species.Count; r++)
             {
                 StringBuilder row = new StringBuilder("| " + (r + 1) + " |");
-                for (int e = 0; e < encounters.Count; e++)
+                for (int e = 0; e < shapes.Count; e++)
                 {
                     int b = summary.Ranking[e][r];
-                    row.Append(" " + species[b].DisplayName + " " + SimOptions.Signed(summary.ByEncounter[e][b].Marginal) + " |");
+                    row.Append(" " + species[b].DisplayName + " " + SimOptions.Signed(summary.ByShape[e][b].Marginal) + " |");
                 }
 
                 int o = summary.OverallOrder[r];
@@ -748,15 +1175,15 @@ namespace BeastCraft.Tooling.BalanceSim
             report.AppendLine();
 
             // Role metrics.
-            for (int e = 0; e < encounters.Count; e++)
+            for (int e = 0; e < shapes.Count; e++)
             {
-                report.AppendLine("#### Role metrics: `" + encounters[e].Id + "` (levels averaged)");
+                report.AppendLine("#### Role metrics: `" + shapes[e].Id + "` (levels averaged)");
                 report.AppendLine();
                 report.AppendLine("| Beast | Marginal | Clear with | Clear without | Dmg share | Taken share | Survival | Time to clear | Turns / time |");
                 report.AppendLine("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |");
                 foreach (int b in summary.Ranking[e])
                 {
-                    BeastMetrics m = summary.ByEncounter[e][b];
+                    BeastMetrics m = summary.ByShape[e][b];
                     report.AppendLine("| " + species[b].DisplayName + " | " + Marked(options, m.Marginal) + " | " + SimOptions.Format(m.ClearWith) + "% | " +
                                       SimOptions.Format(m.ClearWithout) + "% | " + SimOptions.Format(m.DamageShare) + "% | " +
                                       SimOptions.Format(m.TakenShare) + "% | " + SimOptions.Format(m.Survival) + "% | " +
@@ -771,6 +1198,137 @@ namespace BeastCraft.Tooling.BalanceSim
             report.AppendLine();
         }
 
+        /// <summary>Clear counts for one beast in one matchup bucket.</summary>
+        private class MatchupTally
+        {
+            public long With;
+            public long WithCleared;
+            public long Without;
+            public long WithoutCleared;
+            public int Compositions;
+
+            public string Marginal
+            {
+                get
+                {
+                    if (With == 0 || Without == 0)
+                    {
+                        return "-";
+                    }
+
+                    return SimOptions.Signed((100.0 * WithCleared / With) - (100.0 * WithoutCleared / Without));
+                }
+            }
+        }
+
+        /// <summary>
+        /// Elemental mode only: each beast's marginal clear rate split by how its kit element fares
+        /// against the composition's dominant element (strong = super-effective, weak = resisted),
+        /// pooled over every shape and level. Cheap: a regrouping of battles already run.
+        /// </summary>
+        private static void AppendElementMatchups(StringBuilder report, SimOptions options, IReadOnlyList<CreatureSpeciesSO> species, PveSimulator simulator,
+                                                  List<PveCell> cells)
+        {
+            const int Strong = 0;
+            const int Neutral = 1;
+            const int Weak = 2;
+            const int Mixed = 3;
+            MatchupTally[][] tallies = new MatchupTally[species.Count][];
+            for (int b = 0; b < species.Count; b++)
+            {
+                tallies[b] = new MatchupTally[4];
+                for (int k = 0; k < 4; k++)
+                {
+                    tallies[b][k] = new MatchupTally();
+                }
+            }
+
+            bool anyCell = false;
+            foreach (PveCell cell in cells)
+            {
+                if (cell.Mode != KitMode.Elemental)
+                {
+                    continue;
+                }
+
+                anyCell = true;
+                int[][] bucket = new int[cell.Shape.Compositions.Count][];
+                for (int c = 0; c < cell.Shape.Compositions.Count; c++)
+                {
+                    Element? dominant = DominantElement(cell.Shape.Compositions[c]);
+                    bucket[c] = new int[species.Count];
+                    for (int b = 0; b < species.Count; b++)
+                    {
+                        bucket[c][b] = Bucket(species[b], dominant, Strong, Neutral, Weak, Mixed);
+                        if (cell.Level == options.Levels[0])
+                        {
+                            tallies[b][bucket[c][b]].Compositions++;
+                        }
+                    }
+                }
+
+                for (int i = 0; i < cell.Battles.Length; i++)
+                {
+                    PveBattle battle = cell.Battles[i];
+                    int[] team = simulator.Teams[cell.TeamOf(i)];
+                    int c = cell.CompositionOf(i);
+                    for (int b = 0; b < species.Count; b++)
+                    {
+                        MatchupTally t = tallies[b][bucket[c][b]];
+                        if (Array.IndexOf(team, b) >= 0)
+                        {
+                            t.With++;
+                            t.WithCleared += battle.Cleared ? 1 : 0;
+                        }
+                        else
+                        {
+                            t.Without++;
+                            t.WithoutCleared += battle.Cleared ? 1 : 0;
+                        }
+                    }
+                }
+            }
+
+            if (!anyCell)
+            {
+                return;
+            }
+
+            report.AppendLine("#### Element matchups (`elemental`, every shape and level pooled)");
+            report.AppendLine();
+            report.AppendLine("Each beast's marginal clear rate over the compositions whose dominant element (at least " +
+                              SimOptions.Format(100.0 * SimOptions.DominantElementShare) + "% of the threat) its kit");
+            report.AppendLine("element hits super-effectively (strong), neutrally, or resisted (weak), and over the compositions with no dominant");
+            report.AppendLine("element or a `None` one (mixed). (n) = compositions in the bucket per level and kit mode. Small buckets are noisy.");
+            report.AppendLine();
+            report.AppendLine("| Beast | Element | Strong | Neutral | Weak | Mixed / none |");
+            report.AppendLine("| --- | --- | ---: | ---: | ---: | ---: |");
+            for (int b = 0; b < species.Count; b++)
+            {
+                StringBuilder row = new StringBuilder("| " + species[b].DisplayName + " | " + PvpReport.ElementsOf(species[b]) + " |");
+                for (int k = 0; k < 4; k++)
+                {
+                    row.Append(" " + tallies[b][k].Marginal + " (" + tallies[b][k].Compositions + ") |");
+                }
+
+                report.AppendLine(row.ToString());
+            }
+
+            report.AppendLine();
+        }
+
+        private static int Bucket(CreatureSpeciesSO beast, Element? dominant, int strong, int neutral, int weak, int mixed)
+        {
+            if (!dominant.HasValue)
+            {
+                return mixed;
+            }
+
+            Element attack = beast.Elements != null && beast.Elements.Length > 0 ? beast.Elements[0] : Element.None;
+            float multiplier = ElementChart.GetMultiplier(attack, dominant.Value);
+            return multiplier > 1f ? strong : multiplier < 1f ? weak : neutral;
+        }
+
         private static string Marked(SimOptions options, double marginal)
         {
             string text = SimOptions.Signed(marginal);
@@ -780,6 +1338,11 @@ namespace BeastCraft.Tooling.BalanceSim
             }
 
             return marginal < -options.MarginalThreshold ? "_" + text + "_" : text;
+        }
+
+        private static string Number(double value)
+        {
+            return value.ToString("0.##", CultureInfo.InvariantCulture);
         }
 
         private static int Sum(int[] values)

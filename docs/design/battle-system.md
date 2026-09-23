@@ -119,11 +119,22 @@ What that implies for balance and for the systems:
     remaining move toward it. Before, it did not move at all, so two sides whose move plus range fell
     short of the gap between them (8 hexes between the zones on a Large board) waited forever, and
     the simulator's fixture enemies needed board-spanning movement. They now move like beasts.
+- **Encounters mix enemy types, and enemy elements vary — now simulated.** The user's direction is
+  that encounters should mix enemy types, and that enemy elements should vary across battles and
+  sometimes within one enemy team. The balance simulator's default PvE run now reflects that: it
+  draws random compositions per encounter shape — `solo` (one giant), `elite` (a giant or two
+  champions with an escort), `squad` (4-6 mixed standard enemies) and `horde` (16-24, mostly swarm
+  with a few archers and casters) — from a pool of simulator-only enemy types (giant, champion,
+  brute, stalker, archer, caster, shaman, two swarm types), under a per-shape threat budget, and
+  gives each composition an element scheme (one element for the whole team, one per type, one per
+  unit, or none) so all ten elements appear. These are simulator fixtures, not game content or
+  encounter design; the pool, shapes and generator rules are in `Tooling/BalanceSim/README.md`.
 - **Most of what the simulator fields targets the nearest enemy.** Whoever stands in front takes
-  most of the hits, so front-line bulk and placement matter a great deal. Since combat stances
-  (decision 8) the fixture wisps and stingers instead aim at the beast with the lowest maximum HP,
-  and each fixture group has a stance of its own (wisps Ranged, stingers Skirmisher, the rest
-  Vanguard); the boss still hits the nearest beast.
+  most of the hits, so front-line bulk and placement matter a great deal. The simulator's "pick off
+  the weakest" enemies (stalker, caster and the champion's hex; the fixed set's wisps and stingers)
+  aim at the beast with the least **current** HP (`SkillTargetingCriterion.CurrentHp`, decision 4);
+  before that criterion existed they compared maximum HP, which never tracks damage taken. Every
+  enemy type has a stance of its own (decision 8).
 
 ## Data-driven foundation already in place
 
@@ -287,14 +298,26 @@ Two consequences for how skills are authored follow directly, and both are now s
   works for whichever side casts it) and how it picks among the candidates it is eligible to hit.
   That pick is split into two orthogonal fields, the same way `SkillEffect` splits its effect type
   from its affected stat:
-  - `SkillTargetingCriterion` — *what* to compare by: `Random`, `Stat`, or `Distance`.
+  - `SkillTargetingCriterion` — *what* to compare by: `Random`, `Stat`, `Distance`, or `CurrentHp`.
   - `SkillTargetingOrder` — *which extreme* wins: `Lowest` or `Highest`.
 
   `Stat` compares one specific authored `StatType` (`SkillSO.TargetingStat`) — not current HP, not
   an aggregate of the stat block — so "hit the slowest enemy" is `Enemy` + `Stat` + `Lowest` +
   `Speed`, and "buff the ally with the highest Attack" is `Ally` + `Stat` + `Highest` + `Attack`.
   `Distance` compares hex steps from the caster, so `Lowest` is nearest and `Highest` is farthest.
+  `CurrentHp` compares the HP each candidate has left *right now* (`BattleUnit.CurrentHp`, damage
+  taken included), so "pick off the weakest" is `Enemy` + `CurrentHp` + `Lowest` and "heal the most
+  wounded ally" would be `Ally` + `CurrentHp` + `Lowest`; `Highest` goes for the healthiest. It was
+  added because `Stat` + `HP` compares the stat block's *maximum* HP, which never moves as a unit takes
+  damage: a "lowest HP" skill kept hitting whichever beast was built with the least HP, however hurt
+  the others were (the balance simulator showed a 105-max-HP beast almost never focused behind four
+  at 100). `CurrentHp` ignores the targeting stat, is re-read at every pick (so the choice tracks
+  damage as the battle goes), and is appended to the enum as value 3 (the existing values keep their
+  numbers, since they are serialized into assets).
   `Random` compares nothing and ignores both the order and the targeting stat.
+  Every comparing criterion breaks ties the same way, on the ordinal unit id
+  (`BattleUnitOrder.CompareById`), and runs identically in both the range-limited pick that resolves a
+  cast and the board-wide `PickFocusIgnoringRange` that decides where a mover walks.
 
   Not every shape consults every field: `Self`, `AllEnemies` and `AllAllies` ignore most or all of
   them, and the sweeping shapes (`Line`'s beam, `Cross`, `AreaBurst`) hit everything eligible in
@@ -1195,12 +1218,13 @@ cooldown 2). It runs in an `elemental` mode (kit in the beast's element) and a `
 `Element.None`).
 
 Its **primary mode is PvE, team versus encounter**, following the direction above. Every 4-beast
-combination of the roster (210 teams) fights three synthetic encounters defined in
-`Tooling/BalanceSim/encounters.json`. These are simulator fixtures, not game content: `boss` (one
-Colossus with very high HP, heavy hits in both categories and a periodic area slam), `swarm` (24
-small biters and stingers on a Large arena) and `pack` (three melee direwolves and three ranged
-wisps). Each encounter's enemy stats are scaled by a multiplier calibrated per level and kit mode
-so the average team clears it about half the time. Each beast is scored by its **marginal clear
+combination of the roster (210 teams) fights synthetic encounters defined in
+`Tooling/BalanceSim/encounters.json`. These are simulator fixtures, not game content. Until the
+mixed-encounter change below they were three fixed encounters: `boss` (one Colossus with very high
+HP, heavy hits in both categories and a periodic area slam), `swarm` (24 small biters and stingers on
+a Large arena) and `pack` (three melee direwolves and three ranged wisps), still available as
+`--encounter-set fixed`. Each encounter's enemy stats are scaled by a multiplier calibrated per level
+and kit mode so the average team clears it about half the time. Each beast is scored by its **marginal clear
 rate** (clear rate of teams with it minus teams without it), with damage share, damage taken,
 survival, time to clear and turns per unit of time alongside. The old 1v1 round-robin survives as a secondary
 `--mode pvp` section.
@@ -1274,6 +1298,22 @@ EditMode tests cover the explicit-roll formula, the order of operations and the 
 fallback, the two-draw order, clamping, the growth-curve exemption, crit buffs, debuffs and gear,
 hit recording, flat heals and seeded determinism. The marginal clear rates move by less than the
 seed-to-seed noise; the tuning log has the tables.
+
+**Mixed encounters, `CurrentHp` targeting and a fair Ranged kit have since been added**, again
+without re-tuning the roster. The Runtime gained `SkillTargetingCriterion.CurrentHp` (decision 4),
+with EditMode tests for both orders, the id tie-break, both pick entry points, damage tracking and the
+ignored targeting stat. The simulator's standard kit gives Ranged beasts **Shot** (Physical, range 3)
+instead of Strike, which they never walked in for, and re-derives the physical powers (Strike 57,
+Shot 41) so the physical share of single-target power is 49.7-50.6% in every stance (it had fallen
+to 37-47%). Its default PvE run now fights generated mixed compositions with varied elements (see
+"Encounter direction"): 4 shapes x 8 compositions, one multiplier calibrated per shape, level and kit
+mode, 1 battle per team and composition, about 150 s on 8 threads; the report lists every composition
+and adds per-stance kit parity and an element-matchup view. In the regenerated tuned report Phoenix
+leads (+16.2 / +20.1 overall, `elemental` / `neutral`; Shot lets its Atk 125 count), Griffin's lead
+is gone (+3.1 / +10.1, down from +26.3 / +22.6: most of it was the max-HP targeting threshold), and
+the slow Vanguards remain last (Golem −15.2 / −21.8, Treant −13.8 / −16.8, Leviathan −9.7 / −15.0);
+seed-to-seed noise is about 2 points overall. The tuning log has the tables and the split between
+the kit and targeting change and the encounter change.
 
 Every pass so far is deliberately **data structures and algorithms only** — no MonoBehaviours, no
 scene or prefab wiring, and no committed `.asset` instances (the roster's are generated in-Editor). The hex radii backing each arena preset

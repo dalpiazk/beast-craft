@@ -10,18 +10,21 @@ namespace BeastCraft.Tooling.BalanceSim
     /// same one, so stats are what is measured) and the enemy kits authored in
     /// <c>encounters.json</c>. Every beast skill aims at the nearest eligible unit
     /// (<see cref="SkillTargetingCriterion.Distance"/> / <see cref="SkillTargetingOrder.Lowest"/>);
-    /// an enemy skill uses its fixture's targeting (nearest by default, or a stat extreme such as
-    /// lowest maximum HP). Neither ever uses <see cref="SkillTargetingCriterion.Random"/>, so no
-    /// battle consumes the rng for targeting.
+    /// an enemy skill uses its fixture's targeting (nearest by default, the least current HP, or a
+    /// stat extreme). Neither ever uses <see cref="SkillTargetingCriterion.Random"/>, so no battle
+    /// consumes the rng for targeting.
     /// </summary>
     public static class Kit
     {
         /// <summary>
-        /// The standard beast kit in fire-priority order: Blast, Strike, then the two Burst halves.
-        /// Blast fires first from wherever the beast stands (range 3); Strike then walks the beast
-        /// into melee; the Burst halves fire last so they go off from the beast's post-move tile,
-        /// where the enemies it just closed on are. The kit's element is the beast's first element
-        /// in <see cref="KitMode.Elemental"/> and <c>Element.None</c> in <see cref="KitMode.Neutral"/>.
+        /// The standard beast kit in fire-priority order: Blast, the physical single-target skill,
+        /// then the two Burst halves. Blast fires first from wherever the beast stands (range 3).
+        /// The physical skill is Strike (range 1), which walks a Vanguard or Skirmisher into melee,
+        /// or, for a <see cref="CombatStance.Ranged"/> beast, which never walks into melee, Shot
+        /// (range 3, like Blast). The Burst halves fire last so they go off from the beast's
+        /// post-move tile, where the enemies it just closed on are. The kit's element is the beast's
+        /// first element in <see cref="KitMode.Elemental"/> and <c>Element.None</c> in
+        /// <see cref="KitMode.Neutral"/>.
         /// </summary>
         public static SkillSO[] BuildBeastKit(CreatureSpeciesSO species, KitMode mode)
         {
@@ -31,12 +34,17 @@ namespace BeastCraft.Tooling.BalanceSim
                 element = species.Elements[0];
             }
 
+            SkillSO physical = species.Stance == CombatStance.Ranged
+                ? BuildSkill(SimOptions.ShotId, SimOptions.ShotCategory, SkillTargetShape.SingleTarget, SimOptions.ShotPower, SimOptions.ShotRange,
+                             SimOptions.ShotCooldown, element)
+                : BuildSkill(SimOptions.StrikeId, SimOptions.StrikeCategory, SkillTargetShape.SingleTarget, SimOptions.StrikePower,
+                             SimOptions.StrikeRange, SimOptions.StrikeCooldown, element);
+
             return new[]
             {
                 BuildSkill(SimOptions.BlastId, SimOptions.BlastCategory, SkillTargetShape.SingleTarget, SimOptions.BlastPower,
                            SimOptions.BlastRange, SimOptions.BlastCooldown, element),
-                BuildSkill(SimOptions.StrikeId, SimOptions.StrikeCategory, SkillTargetShape.SingleTarget, SimOptions.StrikePower,
-                           SimOptions.StrikeRange, SimOptions.StrikeCooldown, element),
+                physical,
                 BuildSkill(SimOptions.BurstPhysicalId, DamageCategory.Physical, SkillTargetShape.AreaBurst, SimOptions.BurstPower,
                            SimOptions.BurstRadius, SimOptions.BurstCooldown, element),
                 BuildSkill(SimOptions.BurstSpecialId, DamageCategory.Special, SkillTargetShape.AreaBurst, SimOptions.BurstPower,
@@ -66,9 +74,16 @@ namespace BeastCraft.Tooling.BalanceSim
             return new SkillLoadout(kit);
         }
 
-        public static bool IsStrike(SkillSO skill)
+        /// <summary>The kit's physical single-target skill: Strike, or Shot for a Ranged beast.</summary>
+        public static bool IsPhysicalSingle(SkillSO skill)
         {
-            return skill != null && skill.SkillId == SimOptions.StrikeId;
+            return skill != null && (skill.SkillId == SimOptions.StrikeId || skill.SkillId == SimOptions.ShotId);
+        }
+
+        /// <summary>The power of the physical single-target skill a beast of this stance carries.</summary>
+        public static float PhysicalSinglePower(CombatStance stance)
+        {
+            return stance == CombatStance.Ranged ? SimOptions.ShotPower : SimOptions.StrikePower;
         }
 
         public static bool IsBlast(SkillSO skill)
