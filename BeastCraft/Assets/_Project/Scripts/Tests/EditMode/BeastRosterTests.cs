@@ -13,7 +13,7 @@ namespace BeastCraft.Tests.EditMode
     /// JSON, so it runs without the imported assets existing. Structural rules come from
     /// <see cref="BeastRosterValidator"/>; the roster-shape and first-draft balance guidelines
     /// (ten beasts, one per element, the stat budget band, the move-range band, the crit-chance
-    /// band) live here, where the balance pass can deliberately move them. The six-stat budget is
+    /// band, the speed band and order) live here, where the balance pass can deliberately move them. The six-stat budget is
     /// the six combat stats only: <c>MoveRange</c> and <c>CritChance</c> sit outside it.
     /// </summary>
     public class BeastRosterTests
@@ -25,6 +25,7 @@ namespace BeastCraft.Tests.EditMode
         private const int MaxMoveRange = 5;
         private const int MinCritChance = 0;
         private const int MaxCritChance = 25;
+        private const float MaxSpeedSpread = 1.15f;
 
         private readonly List<ScriptableObject> _created = new List<ScriptableObject>();
 
@@ -97,6 +98,41 @@ namespace BeastCraft.Tests.EditMode
             {
                 Assert.That(species.BaseStats.MoveRange, Is.InRange(MinMoveRange, MaxMoveRange), species.SpeciesId);
             }
+        }
+
+        [Test]
+        public void Roster_BaseSpeedsStayWithinTheSpreadBand()
+        {
+            // User decision (ATB retune): under the ATB gauge Speed is turns per unit of time, so the
+            // fastest beast's base Speed stays within 15% of the slowest's. Widening it is a design
+            // change, not a tuning move.
+            int slowest = int.MaxValue;
+            int fastest = int.MinValue;
+            foreach (SpeciesData species in LoadRoster().Species)
+            {
+                slowest = Math.Min(slowest, species.BaseStats.Speed);
+                fastest = Math.Max(fastest, species.BaseStats.Speed);
+            }
+
+            Assert.That(slowest, Is.GreaterThan(0));
+            Assert.That((float)fastest / slowest, Is.LessThanOrEqualTo(MaxSpeedSpread), "fastest " + fastest + " / slowest " + slowest);
+        }
+
+        [Test]
+        public void Roster_BaseSpeedsKeepTheApprovedOrder()
+        {
+            // The archetypes' speed order, fastest first (ties allowed): Thunderbird, Griffin, Basilisk,
+            // Phoenix, Kirin, Frost Wyrm, Tarasque, Leviathan, Treant, and Golem strictly the slowest.
+            string[] order = { "thunderbird", "griffin", "basilisk", "phoenix", "kirin", "frost_wyrm", "tarasque", "leviathan", "treant", "golem" };
+            BeastRosterData roster = LoadRoster();
+            int[] speeds = Array.ConvertAll(order, id => Array.Find(roster.Species, s => s.SpeciesId == id).BaseStats.Speed);
+
+            for (int i = 1; i < order.Length; i++)
+            {
+                Assert.That(speeds[i - 1], Is.GreaterThanOrEqualTo(speeds[i]), order[i - 1] + " should be at least as fast as " + order[i]);
+            }
+
+            Assert.That(speeds[order.Length - 2], Is.GreaterThan(speeds[order.Length - 1]), "golem should be the slowest beast");
         }
 
         [Test]

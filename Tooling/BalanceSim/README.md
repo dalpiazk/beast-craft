@@ -62,9 +62,9 @@ Two reports are committed, both the default arguments:
 - `docs/balance/baseline-report.md` — the "before" picture, on the roster's first-draft stats. It is
   kept as a record and is **not** regenerated (a fresh run now reads the tuned roster). It predates
   the ATB turn order, so its battle lengths are in rounds.
-- `docs/balance/tuned-report.md` — the current roster after the first tuning pass (see
-  `docs/balance/tuning-log.md`), under the current Runtime (the ATB turn order, combat stances,
-  variance and crits; the roster has not been re-tuned for any of them) and the generated
+- `docs/balance/tuned-report.md` — the current roster after the second tuning pass (see
+  `docs/balance/tuning-log.md`, "Retune for ATB + stances + crits + mixed encounters"), under the
+  current Runtime (the ATB turn order, combat stances, variance and crits) and the generated
   encounters. Regenerate it
   whenever the roster, fixtures, simulator or Runtime change:
 

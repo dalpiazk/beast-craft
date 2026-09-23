@@ -754,13 +754,13 @@ against Earth (0.5x) — with the same hit from a neutral skill in brackets:
 
 | Level | Phoenix → Golem, physical | Phoenix → Golem, special | Golem HP |
 | --- | --- | --- | --- |
-| 1 | 1 (neutral: 3) | 2 (neutral: 4) | 24 |
-| 50 | 8 (neutral: 16) | 12 (neutral: 25) | 91 |
-| 100 | 15 (neutral: 30) | 23 (neutral: 46) | 160 |
+| 1 | 1 (neutral: 3) | 2 (neutral: 4) | 22 |
+| 50 | 7 (neutral: 15) | 11 (neutral: 23) | 83 |
+| 100 | 13 (neutral: 27) | 22 (neutral: 44) | 146 |
 
-The reverse, Golem hitting Phoenix with a neutral skill: 4 / 26 / 49 physical and 3 / 15 / 28 special
-at levels 1 / 50 / 100, against Phoenix's 15 / 57 / 100 HP — the glass cannon and the wall still
-reading as intended. These are the tuned roster's numbers; `DamageFormulaTests` pins the Fire
+The reverse, Golem hitting Phoenix with a neutral skill: 4 / 25 / 47 physical and 3 / 15 / 27 special
+at levels 1 / 50 / 100, against Phoenix's 14 / 53 / 92 HP — the glass cannon and the wall still
+reading as intended. These are the second tuning pass's numbers; `DamageFormulaTests` pins the Fire
 examples.
 
 **A zero attacking stat deals the floor.** With `A = 0`, `base` is exactly the +2 constant, so a
@@ -985,24 +985,26 @@ be scoped as one rather than treated as the tail end of this one.
 ## Starter roster — SIMULATOR-TUNED DATA, NOT CONFIRMED BALANCE
 
 The first ten beasts, one per element, are authored as data. Names, elements and archetypes are
-approved. **The numbers below are the first simulator-tuned pass** of first-draft stats chosen to
-express each archetype: they were tuned by hand against the headless balance simulator's PvE mode
-(see "Next steps" and [`docs/balance/tuning-log.md`](../balance/tuning-log.md), which has the first
-draft alongside). Nothing here is confirmed balance; the numbers are expected to move again once
-skills and real encounters exist.
+approved. **The numbers below are the second simulator-tuned pass**: first-draft stats chosen to
+express each archetype were tuned by hand against the headless balance simulator's PvE mode, then
+re-tuned for the ATB gauge, combat stances, variance and crits and the generated mixed encounters,
+with base Speed held to a 15% band (see "Next steps" and
+[`docs/balance/tuning-log.md`](../balance/tuning-log.md), which has the first draft and both passes).
+Nothing here is confirmed balance; the numbers are expected to move again once skills and real
+encounters exist.
 
 | SpeciesId | Beast | Element | Archetype | Stance | Curve | HP | ATK | DEF | SpA | SpD | SPE | Six-stat total | Move | Crit |
 | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `phoenix` | Phoenix | Fire | Glass cannon | Ranged | medium | 100 | 125 | 75 | 140 | 90 | 100 | 630 | 4 | 10% |
-| `leviathan` | Leviathan | Water | Tank | Vanguard | medium | 125 | 85 | 125 | 85 | 95 | 55 | 570 | 3 | 3% |
-| `golem` | Golem | Earth | Pure wall | Vanguard | medium | 160 | 105 | 150 | 70 | 105 | 40 | 630 | 2 | 2% |
-| `griffin` | Griffin | Air | Fast skirmisher | Skirmisher | medium | 105 | 115 | 90 | 90 | 90 | 115 | 605 | 5 | 8% |
-| `thunderbird` | Thunderbird | Lightning | Burst striker | Skirmisher | medium | 100 | 125 | 80 | 120 | 85 | 120 | 630 | 4 | 15% |
-| `frost_wyrm` | Frost Wyrm | Ice | Control / attrition | Vanguard | medium | 95 | 75 | 120 | 100 | 115 | 80 | 585 | 3 | 5% |
-| `treant` | Treant | Nature | Support-tank | Vanguard | medium | 130 | 85 | 95 | 90 | 120 | 50 | 570 | 3 | 3% |
-| `tarasque` | Tarasque | Metal | Armored bruiser | Vanguard | medium | 115 | 140 | 130 | 55 | 80 | 75 | 595 | 3 | 6% |
-| `kirin` | Kirin | Light | Support caster | Ranged | medium | 100 | 50 | 80 | 135 | 120 | 95 | 580 | 4 | 5% |
-| `basilisk` | Basilisk | Dark | Ranged assassin | Ranged | medium | 100 | 95 | 80 | 150 | 95 | 110 | 630 | 5 | 12% |
+| `phoenix` | Phoenix | Fire | Glass cannon | Ranged | medium | 92 | 102 | 70 | 120 | 85 | 101 | 570 | 4 | 10% |
+| `leviathan` | Leviathan | Water | Tank | Vanguard | medium | 122 | 86 | 126 | 86 | 100 | 95 | 615 | 3 | 3% |
+| `golem` | Golem | Earth | Pure wall | Vanguard | medium | 146 | 95 | 137 | 64 | 96 | 92 | 630 | 2 | 2% |
+| `griffin` | Griffin | Air | Fast skirmisher | Skirmisher | medium | 106 | 112 | 91 | 91 | 91 | 104 | 595 | 5 | 8% |
+| `thunderbird` | Thunderbird | Lightning | Burst striker | Skirmisher | medium | 110 | 117 | 88 | 114 | 91 | 105 | 625 | 4 | 15% |
+| `frost_wyrm` | Frost Wyrm | Ice | Control / attrition | Vanguard | medium | 98 | 74 | 124 | 103 | 118 | 98 | 615 | 3 | 5% |
+| `treant` | Treant | Nature | Support-tank | Vanguard | medium | 134 | 87 | 98 | 93 | 124 | 94 | 630 | 3 | 3% |
+| `tarasque` | Tarasque | Metal | Armored bruiser | Vanguard | medium | 112 | 137 | 127 | 54 | 78 | 97 | 605 | 3 | 6% |
+| `kirin` | Kirin | Light | Support caster | Ranged | medium | 115 | 51 | 90 | 150 | 124 | 100 | 630 | 4 | 5% |
+| `basilisk` | Basilisk | Dark | Ranged assassin | Ranged | medium | 103 | 94 | 79 | 153 | 94 | 102 | 625 | 5 | 12% |
 
 Stats are max-level values (curve scale 1). **All ten beasts share the `medium` growth curve for
 now, by user decision**; differentiating curves per beast is deferred to the headless balance
@@ -1010,17 +1012,26 @@ simulator. The drafting rules:
 
 - **Shared budget.** Every beast's six combat stats sum to a shared budget of 600, and the roster
   tests allow ±5% (570–630). Archetype comes from how the budget is *distributed*, not from raw
-  power. The first draft put every beast at exactly 600; the tuning pass used the ±5% band as a
-  balance lever, taking the beasts that carried their teams down to 570–585 (Leviathan, Treant,
-  Kirin, Frost Wyrm) and the fragile ones (Phoenix, Thunderbird, Basilisk) and Golem up to 630. If
+  power. The first draft put every beast at exactly 600; both tuning passes used the ±5% band as a
+  balance lever. After the second, Phoenix sits on the 570 floor (its Fire kit and Ranged stance
+  carry it; see the tuning log), Griffin is at 595 and the others at 605–630 (Kirin, Treant and
+  Golem on the ceiling). If
   the simulator later gives some beasts a slower curve, whether they deserve a larger budget as
   payoff for a weak early game is a balance question for it, not something this pass assumes.
-- **Speed is ordered, not spent** — *under the old round-based turn order*. In the simulator,
-  acting first mostly meant reaching the enemy first and taking its focus, so the tuning pass kept
-  the speed *order* the archetypes call for (Thunderbird > Griffin > Basilisk > Phoenix > Kirin > …
-  > Golem) with smaller gaps, and moved the freed points into the fragile beasts' HP and defences.
-  They remain the least bulky beasts. The ATB gauge (decision 3) has since made Speed an action
-  economy, and the roster has **not** been re-tuned for it; see the tuned report and tuning log.
+- **Speed is a narrow band (user decision): the fastest base Speed is at most 1.15× the slowest.**
+  Under the ATB gauge (decision 3) Speed is an action economy (twice the Speed is twice the turns),
+  so the first pass's 40–120 spread gave Thunderbird three turns for each of Golem's, and no amount
+  of bulk made up for it: the slow Vanguards were bottom three nearly everywhere. The user expects
+  the fastest and slowest beasts to differ by about 10–15%; the roster uses 92–105 (1.14×). This
+  replaces the lead default in
+  [`docs/balance/research-crit-variance-speed.md`](../balance/research-crit-variance-speed.md) §5
+  ("target ~2.5–3× slowest:fastest"), which that research marked unsourced (no source gives a target
+  ratio) and left for the simulator to validate. The simulator did not bear it out, and the genre's
+  answer for slow tanks is taunt/threat and damage reduction rather than speed (same research, §4).
+  Within the band the archetypes keep their **order** (Thunderbird 105 > Griffin 104 > Basilisk 102
+  > Phoenix 101 > Kirin 100 > Frost Wyrm 98 > Tarasque 97 > Leviathan 95 > Treant 94 > Golem 92),
+  and the budget Speed no longer takes went into the slow beasts' other stats. The roster tests pin
+  the band and the order (Golem strictly slowest), so widening either is a deliberate design change.
 - **Move range in a small band (2–5)**, outside the budget. Griffin and Basilisk are the mobile
   ends (5); Golem is the only 2.
 - **Crit chance in a small band (0–25%)**, also outside the budget and not level-scaled (user-approved
@@ -1029,7 +1040,8 @@ simulator. The drafting rules:
   movement budget — skill reach is authored per skill.
 - **Telling the defensive beasts apart.** Golem absorbs (the highest HP and Defense, the lowest Speed
   and move range); Tarasque absorbs and hits back (Defense *and* the highest Attack); Leviathan
-  is the physically bulky all-rounder; Treant's bulk is HP and Special Defense for a support role;
+  is the physically bulky all-rounder (the next-highest Defense after Golem and Tarasque, the
+  third-highest HP); Treant's bulk is HP and Special Defense for a support role;
   Frost Wyrm splits its bulk evenly across Defense and Special Defense.
 - **Stances follow the archetypes** (decision 8): the artillery-style casters (Phoenix, Kirin,
   Basilisk) are Ranged, the fast strikers (Thunderbird, Griffin) Skirmishers, and the five tanks and
@@ -1315,12 +1327,27 @@ the slow Vanguards remain last (Golem −15.2 / −21.8, Treant −13.8 / −16.
 seed-to-seed noise is about 2 points overall. The tuning log has the tables and the split between
 the kit and targeting change and the encounter change.
 
+**The roster has since been re-tuned for the ATB gauge, stances, crits and mixed encounters**
+(base stats only; stances, curves, crit chances, move ranges, kit, encounters, formula and Runtime
+unchanged). By user decision base Speed now spans 92–105 (at most 1.15× from slowest to fastest,
+down from 3×), with the archetypes' speed order kept; the roster tests pin both (see "Starter
+roster"). On the mean of three base seeds (each seed also redraws the compositions), every beast's
+overall marginal is within ±2.9 points in `elemental` mode (from −16.8 … +19.8) and ±5.8 in
+`neutral` (from −22.6 … +19.4); no beast is top 3 in every shape; and nine of ten are top 3 in at
+least one shape in `elemental` mode. The tenth, Treant, is fourth against the horde by 0.4 points,
+well inside the noise; on any single seed one to three beasts miss, so the niche assignment is not
+yet robust. What binds is structural: without a taunt or threat mechanic the four bulk
+beasts (Leviathan, Golem, Treant and Griffin) earn their place almost only against the horde, which
+has three top-3 slots. Thunderbird is the most polarized beast (first against the giant, last
+against the horde). The tuning log has the before/after stats, the multi-seed tables, the fixed-set
+sanity check and the iteration log.
+
 Every pass so far is deliberately **data structures and algorithms only** — no MonoBehaviours, no
 scene or prefab wiring, and no committed `.asset` instances (the roster's are generated in-Editor). The hex radii backing each arena preset
 are placeholder implementation defaults chosen to be tunable, not producer-confirmed balance
 numbers, and the deployment-zone split, the effect rules and the element chart above are the same
 kind of default, as is the damage formula.
-Still to come: confirming or revising the first tuning pass (and, if needed, the damage formula and
+Still to come: confirming or revising the second tuning pass (and, if needed, the damage formula and
 element chart), deciding the design questions it raised above — a design decision the reports inform
 rather than make — and extending the simulator once authored skills, real encounters and the avatar
 give it more than a standard kit and fixture enemies to measure; multi-hex large creatures, an open

@@ -106,7 +106,8 @@ What exists today:
   simulator); the Unity assets are generated from it by opening the project and
   running **Beast Craft → Data → Import Beast Roster**, which creates or updates
   them in place by id. No `.asset` files are committed yet. The numbers are a
-  first simulator-tuned pass, not confirmed balance — see "Starter roster" in the
+  second simulator-tuned pass (base Speed held to a 15% band), not confirmed
+  balance — see "Starter roster" in the
   [battle-system design doc](docs/design/battle-system.md) and
   [`docs/balance/tuning-log.md`](docs/balance/tuning-log.md).
 - **CI** (`.github/workflows/ci.yml`) — a format and compile check that builds
