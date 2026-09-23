@@ -214,13 +214,25 @@ composition and role play at the cost of turn length. Supporting all three forma
 picking one size means the encounter designer can choose the pacing per fight — a tight duel, a
 standard squad fight, or a full set-piece — instead of the whole game being tuned to a single shape.
 
-### 3. Turn order model — DECIDED — AMENDED: ATB speed gauge
+### 3. Turn order model — DECIDED — AMENDED: ATB speed gauge, square-root fill
 
-**Turn order is an ATB-style speed gauge.** Every combatant fills its own gauge at a rate equal to
-its current `StatType.Speed` and takes a turn each time the gauge reaches a fixed threshold, so
-**a unit twice as fast as another acts about twice as often**. Units still act **one at a time**,
-and everything else about a turn is unchanged. This amends the original decision, a speed-sorted
-initiative queue (everyone acts once per round, fastest first); the amendment is the producer's.
+**Turn order is an ATB-style speed gauge.** Every combatant fills its own gauge at a rate that grows
+with the **square root** of its current `StatType.Speed` and takes a turn each time the gauge
+reaches a fixed threshold, so **a unit four times as fast as another acts twice as often**, and
++21% Speed buys +10% turns. Units still act **one at a time**, and everything else about a turn is
+unchanged. This amends the original decision, a speed-sorted initiative queue (everyone acts once
+per round, fastest first); the amendment is the producer's.
+
+*Second amendment: square-root fill (user-approved).* The first gauge filled at a rate equal to
+Speed, so turns were linear in Speed. It now fills at `round(100 × sqrt(Speed))`, adopted from Sword
+x Staff, whose turn interval is `100000 / sqrt(SPD × scale)` (see
+[`docs/balance/research-sword-x-staff.md`](../balance/research-sword-x-staff.md)). Stacked Speed now
+has diminishing returns: a Speed buff or Speed gear buys fewer extra turns the more Speed a unit
+already has, so Speed is harder to snowball. **User decision:** the roster's "10–15% speed spread"
+target now applies to **turns**, not to the Speed stat: the fastest beast should take about 10–15%
+more turns than the slowest, which under the square root lets base Speed spread by about 20–30%.
+The current roster (base Speed 92–105, a 14% stat spread) therefore spreads turns by only about 7%;
+widening base Speed is left to the next roster retune (see the tuning log).
 
 *Why it changed.* Under the round queue Speed only decided *order* within a round: a Speed-120 beast
 got exactly as many turns as a Speed-40 one, it merely took them earlier. The balance simulator
@@ -233,19 +245,24 @@ The rule, as built in `TurnManager` (all integer arithmetic, so a client and a s
 re-simulation always agree):
 
 - **Gauge and threshold.** Every unit starts the battle at gauge 0. `TurnManager.ActionThreshold`
-  is **1000**. A unit's fill rate is its live `Stats.Speed`, **clamped to at least 1** so nothing can
-  stall forever. It is read at every step, so a speed buff or debuff changes the unit's cadence
-  from the moment it lands.
+  is **100000**. A unit's fill rate is `TurnManager.FillRateForSpeed(Speed)` =
+  `round(FillScale × sqrt(max(1, Speed)))` with `FillScale` = **100**, computed **exactly in
+  integers** (the integer square root of `Speed × 100²`, rounded half up; no floating point, so every
+  platform agrees). Speed 100 fills 1000 per tick, Speed 1 (the floor, so nothing can stall forever)
+  100. The rate is read from the live `Stats.Speed` at every step, so a speed buff or debuff changes
+  the unit's cadence from the moment it lands. The rate rises strictly with Speed up to Speed 2500,
+  so the rounding never merges two speeds in any plausible range.
 - **Event-driven time.** The next turn is found without stepping tick by tick: for every living
-  unit, ticks needed = `ceil((1000 − gauge) / speed)` (0 when already full); time advances by the
-  smallest of those, and every living unit's gauge gains `speed × elapsed`.
+  unit, ticks needed = `ceil((100000 − gauge) / rate)` (0 when already full); time advances by the
+  smallest of those, and every living unit's gauge gains `rate × elapsed`.
 - **One unit acts per step.** Of the units now at or above the threshold, the actor is the one with
-  the **highest gauge (most overflow)**, then the **higher Speed**, then the ordinal unit id (the
-  shared `BattleUnitOrder` tie-break). Other full units act on the following steps, with no time
-  passing in between.
-- **Overflow carries.** After the actor's turn, 1000 is subtracted from its gauge and the remainder
-  counts toward its next turn. That is what keeps the long-run rate exact when 1000 is not a multiple
-  of the unit's Speed (a Speed-120 unit gets exactly 3× the turns of a Speed-40 one).
+  the **highest gauge (most overflow)**, then the **higher fill rate** (the higher Speed), then the
+  ordinal unit id (the shared `BattleUnitOrder` tie-break). Other full units act on the following
+  steps, with no time passing in between.
+- **Overflow carries.** After the actor's turn, 100000 is subtracted from its gauge and the
+  remainder counts toward its next turn. That is what keeps the long-run rate exact when the
+  threshold is not a multiple of the unit's rate (a Speed-225 unit gets exactly 3× the turns of a
+  Speed-25 one).
 - **Defeated units** never fill and are never handed a turn.
 - **Per-turn counters are unchanged.** Cooldowns (decision 5), timed buffs and the movement budget
   (decision 7) were always counted in the unit's *own* turns, so a faster unit simply cycles them
@@ -253,23 +270,29 @@ re-simulation always agree):
 
 *Time.* There are no rounds any more. Battle time is counted in integer ticks
 (`TurnManager.ElapsedTicks`) and reported **normalized**: 1.0 = one turn of a Speed-100 unit
-(`TurnManager.ReferenceSpeed` = 100, so 10 ticks). Speed scales with level through the growth curve,
-so the same fight takes longer in normalized time at low levels; compare times within a level.
+(`TurnManager.ReferenceSpeed` = 100, whose rate is `ReferenceFillRate` = 1000, so
+`TicksPerTimeUnit` = 100 ticks). Speed scales with level through the growth curve, so the same fight
+takes longer in normalized time at low levels (less so than under the linear gauge: a level-1 beast
+at Speed 15 now takes 0.39 turns per unit of time, not 0.15); compare times within a level.
 `BattleResult` reports `ElapsedTicks` / `Time` (when the last turn was taken) and `ActionCount`
 (turns executed). `TurnManager.PredictNextActors(n)` forecasts the next *n* turns assuming no speed
 change or defeat, which is what a turn-order UI would show.
 
-*Worked example.* Speeds 100 (a), 150 (b), 50 (c). b fills first (t = 7, gauge 1050, carries 50);
-a at t = 10; b at t = 14 (1100, carries 100); at t = 20 all three are at exactly 1000, so the faster
-goes first: b, a, c. t = 20 is the full cycle — six turns in the ratio 3 : 2 : 1 — and t = 27
-repeats t = 7.
+*Worked example.* Speeds 100 (a, rate 1000), 225 (b, rate 1500), 49 (c, rate 700) — the speeds
+are 1 : 2.25 : 0.49, the turn rates 1 : 1.5 : 0.7. b fills first (t = 67, gauge 100500, carries
+500); a at t = 100; b at t = 134 (101000, carries 1000); c at t = 143 (100100); at t = 200 a and b
+are both at exactly 100000, so the faster goes first: b, then a; b again at t = 267.
+`TurnManagerTests` pins this sequence.
 
 *The time cap* (`BattleTurnExecutor.DefaultMaxTime` = 2000 normalized) is still a scaffold safety
 net against a battle that cannot end, not a game rule. It replaced the 200-round cap and is sized so
-the net survives low levels: 2000 is 200 turns of a Speed-10 unit (about a level-1 beast).
+the net survives low levels: 2000 is about 630 turns of a Speed-10 unit (rate 316; about a level-1
+beast), up from 200 under the linear gauge.
 
-*Tunable defaults, not balance.* The threshold only sets the gauge's resolution; the reference speed
-is a reporting convention. Neither changes who acts how often: only the ratios between speeds do.
+*Tunable defaults, not balance.* The threshold and `FillScale` only set the gauge's resolution
+(rounding the rate to a whole number moves a roster-band unit's turn rate by at most about 0.05%);
+the reference speed is a reporting convention. None of them changes who acts how often: only the
+ratios between the square roots of the speeds do.
 Starting every gauge at 0 (rather than, say, a random or Speed-scaled head start) is also a default.
 
 *Background, from the original decision.* A single, one-at-a-time order is classic JRPG/tactics
@@ -450,12 +473,12 @@ cosmetic. The producer has reversed that, and the rule is now two separate thing
 Everything else above is unchanged: the avatar is still off the grid, still takes no initiative
 turn, still ticks on player-beast turns, is still a caster outside the roster, and still cannot be
 defeated. **The avatar's stats now feed the damage formula** exactly as a beast's do (see "Damage
-formula"): a damaging avatar skill uses the avatar's `Attack` or `SpecialAttack` and its level. Heals
+formula"): a damaging avatar skill uses the avatar's `Attack` or `SpecialAttack`. Heals
 and buffs are still flat for everyone, so an avatar buff still lands the same whatever the avatar's
 stats are. Avatar leveling is out of scope and open (see "What is not settled yet"); the statful
-`BattleAvatar.Create` takes a per-battle level (default 1) for the formula to read in the meantime.
-The zero-stat `Create(skills)` avatar is level 1 with no attacking stat, so every damage effect it
-lands deals the formula's floor of 2 (times the element multiplier) — see "Damage formula".
+`BattleAvatar.Create` takes a per-battle level (default 1), recorded on the unit (the damage formula
+no longer reads level). The zero-stat `Create(skills)` avatar has no attacking stat, so every damage
+effect it lands deals the formula's `MinimumDamage` floor of 1 — see "Damage formula".
 
 ### 7. Movement during a turn — DECIDED
 
@@ -717,66 +740,98 @@ or renumbered — append only). Physical damage reads the caster's `Attack` agai
 `Defense`; special damage reads `SpecialAttack` against `SpecialDefense`. The default is `Physical`.
 The category belongs to the skill as a whole, like its element.
 
-**The formula** (the static, pure `DamageFormula`, one place to tune):
+**The formula** (the static, pure `DamageFormula`, one place to tune) — **AMENDED: adopted from
+Sword x Staff** (user-approved; see
+[`docs/balance/research-sword-x-staff.md`](../balance/research-sword-x-staff.md)). It replaces the
+first, Pokémon-style level-term formula:
 
 ```
-base   = ((2 * Level / 5 + 2) * Power * A / D) / 50 + 2
-damage = max(1, truncate(base * ElementChart multiplier * crit * roll / 100))
-crit   = 1.5 on a critical hit, else 1
+base   = Power / 100 × A × A / (A + DefenseWeight × D) × GlobalScale
+damage = max(1, truncate(base × ElementChart multiplier × crit × roll / 100))
+crit   = max(MinCritMultiplier, CritMultiplier) = 1.5 on a critical hit, else 1
 roll   = a whole percent, uniform on [90, 110]
 ```
 
-- `Level` is the caster's `BattleUnit.Level`; `Power` is the `Damage` effect's `SkillEffect.Magnitude`;
-  `A` / `D` are the category's stats, read from the units' **current effective** `Stats` at the
-  moment the effect lands, so buffs and debuffs move damage.
-- The element multiplier is the skill's element against the target's elements, exactly as before,
-  and applies to the whole of `base` (the +2 included). The caster's own elements still do nothing.
-- **Float math, truncated once at the end**, after the element, crit and variance multipliers (in
-  that order) — the same truncation stance the applier always had. Crits and rolls are covered
-  under "Variance and critical hits" below.
-- **Guards:** `Power <= 0` deals 0 (so a negative damage magnitude no longer reads as a heal); any
-  positive `Power` deals at least 1; `D <= 0` is treated as 1; `A < 0` as 0; `Level < 1` as 1.
-- The constants (`2`, `5`, `+2`, `/50`, `+2`, minimum 1, and the crit and variance constants below)
-  are named on `DamageFormula` so the balance simulator can tune them in one place.
+- **`Power` is a percent of the attacking stat.** It is the `Damage` effect's
+  `SkillEffect.Magnitude`: Power 120 means 120% of the caster's `Attack` (physical) or
+  `SpecialAttack` (special) before mitigation — the reference's "skill base = stat × skill
+  coefficient". `A` / `D` are the category's stats, read from the units' **current effective**
+  `Stats` at the moment the effect lands, so buffs and debuffs move damage.
+- **Mitigation is `A / (A + DefenseWeight × D)`**, the reference's armor term: a share of the hit,
+  never a subtraction. Defense has smooth diminishing returns — against Attack 100, Defense 0, 100,
+  200, 300 lets through 100%, 50%, 33%, 25% — and never negates a hit. `A` appears twice (base and
+  mitigation), so Attack is worth slightly more than linear: doubling Attack against equal Defense
+  multiplies the hit by 2.67.
+- **Level is not in the formula.** Stats already scale with level through the growth curve, and with
+  `A`, `D` and HP on the same curve a hit between two equally levelled beasts takes the same share of
+  HP at every level, up to integer rounding. (The old `(2 × Level / 5 + 2)` term only held that
+  loosely: 20% at level 1 against 35% at level 100.) `BattleUnit.Level` is kept — it is recorded and
+  other systems may read it — but `DamageFormula` ignores it, and the raw overloads no longer take a
+  level: `Compute(power, attack, defense, element[, variancePercent, isCrit])` and
+  `ComputeBase(power, attack, defense)`.
+- The element multiplier is the skill's element against the target's elements, exactly as before.
+  The caster's own elements still do nothing.
+- **Arithmetic.** The base is computed in double precision (basic IEEE operations only, one division
+  last, so an exactly whole hit never truncates to one less) and truncated once at the end, after the
+  element, crit and variance multipliers (in that order). Crits and rolls are covered under
+  "Variance and critical hits" below.
+- **Guards:** `Power <= 0` deals 0 (so a negative damage magnitude never reads as a heal); any
+  positive `Power` deals at least 1; `A <= 0` makes the base exactly 0 (so the hit lands on the floor
+  of 1); `D < 0` is treated as 0 (no mitigation, and no division by zero while `A > 0`).
 
-**Why the level term.** Between two equally levelled beasts on the same curve, `A / D` does not
-change with level, but HP does. The `(2 * Level / 5 + 2)` term scales damage up with level so that a
-hit between evenly matched beasts takes a *roughly* similar share of HP at level 1 and level 100 and
-fights do not lengthen as the roster levels. With the authored `medium` curve it holds only loosely:
-a Power-40 neutral hit between two identical 600-total (100-per-stat) beasts takes 3 of 15 HP (20%)
-at level 1, 19 of 57 (33%) at level 50 and 35 of 100 (35%) at level 100 — HP grows about 6.7x across
-the curve while the level term grows 17.5x, and the +2 floor dominates at level 1. An EditMode test
-pins that loose band; tightening it is a balance-simulator question.
+| Constant | Value | Meaning |
+| --- | --- | --- |
+| `PowerPercent` | 100 | Power is authored in percent of the attacking stat. |
+| `DefenseWeight` | 1.0 | Weight of `D` in the mitigation term: at 1, equal Attack and Defense halve a hit. |
+| `GlobalScale` | 1.0 | A uniform multiplier on every hit, the lever for overall fight length. |
+| `MinimumDamage` | 1 | The floor for any positive-power hit. |
+| `CritMultiplier` / `MinCritMultiplier` | 1.5 / 1.3 | See "Variance and critical hits". |
 
-**Worked examples (starter roster, `medium` curve, Power 40; a 100% roll and no crit, i.e. the
+**How the constants were chosen.** `DefenseWeight` and `GlobalScale` start at 1, as in the
+reference, and the balance simulator's kit and enemy powers were **rescaled instead** so that a
+neutral hit between two average level-50 roster beasts removes the same share of HP as under the old
+formula. For the sim's Blast (special, old Power 40, new Power 68) between two average roster beasts:
+
+| Level | Old damage / HP | New damage / HP |
+| --- | --- | --- |
+| 1 | 3 / 17 (17.6%) | 5 / 17 (29.4%) |
+| 50 | 20 / 65 (30.8%) | 20 / 65 (30.8%) |
+| 100 | 36 / 114 (31.6%) | 35 / 114 (30.7%) |
+
+Level 50 and 100 match; level 1 rises to the same share as every other level, because the old level
+term under-scaled low-level damage. The old formula's powers map to new ones by
+`P' ≈ 1.52 × P + 7` (matching `0.44 × P + 2` against `P' / 100 × A / 2` at `A = D ≈ 58`); the tuning
+log lists every rescaled power.
+
+**Worked examples (starter roster, `medium` curve, Power 100; a 100% roll and no crit, i.e. the
 deterministic fallback).** Phoenix (Fire) hitting Golem (Earth) with a Fire skill — Fire is weak
 against Earth (0.5x) — with the same hit from a neutral skill in brackets:
 
 | Level | Phoenix → Golem, physical | Phoenix → Golem, special | Golem HP |
 | --- | --- | --- | --- |
-| 1 | 1 (neutral: 3) | 2 (neutral: 4) | 22 |
-| 50 | 7 (neutral: 15) | 11 (neutral: 23) | 83 |
-| 100 | 13 (neutral: 27) | 22 (neutral: 44) | 146 |
+| 1 | 3 (neutral: 6) | 5 (neutral: 10) | 22 |
+| 50 | 12 (neutral: 24) | 18 (neutral: 37) | 83 |
+| 100 | 21 (neutral: 43) | 33 (neutral: 66) | 146 |
 
-The reverse, Golem hitting Phoenix with a neutral skill: 4 / 25 / 47 physical and 3 / 15 / 27 special
-at levels 1 / 50 / 100, against Phoenix's 14 / 53 / 92 HP — the glass cannon and the wall still
-reading as intended. These are the second tuning pass's numbers; `DamageFormulaTests` pins the Fire
-examples.
+The reverse, Golem hitting Phoenix with a neutral Power-100 skill: 8 / 31 / 54 physical and
+4 / 15 / 27 special at levels 1 / 50 / 100, against Phoenix's 14 / 53 / 92 HP — the glass cannon and
+the wall still reading as intended. `DamageFormulaTests` pins the Fire examples.
 
-**A zero attacking stat deals the floor.** With `A = 0`, `base` is exactly the +2 constant, so a
-unit with no attacking stat deals 2 × the element multiplier per damage effect regardless of power.
-This matters for the zero-stat `BattleAvatar.Create(skills)` avatar: before the formula its damage
-effects dealt their authored magnitude flat; now they deal 2 (4 on a strong matchup, 1 on a weak
-one). That is deliberate — no special case in the formula — and an avatar meant to hit hard should be
-built with stats via the statful overload.
+**A zero attacking stat deals the floor.** With `A = 0` the base is exactly 0, so a unit with no
+attacking stat deals `MinimumDamage` (1) per damage effect regardless of power or element. This
+matters for the zero-stat `BattleAvatar.Create(skills)` avatar, which under the old formula chipped
+the +2 offset (2, or 4 on a strong matchup). An avatar meant to hit hard should be built with stats
+via the statful overload.
 
-**Levels.** `BattleUnit` now carries a `Level` (at least 1; an optional constructor argument
-defaulting to 1, so existing call sites are unaffected). `BattleUnitFactory.CreateBeast` records the
-level it assembled the stats at. The avatar has no progression level, so the statful
-`BattleAvatar.Create` takes a per-battle level (default 1) — see "What is not settled yet".
+**Levels.** `BattleUnit` carries a `Level` (at least 1; an optional constructor argument defaulting
+to 1). `BattleUnitFactory.CreateBeast` records the level it assembled the stats at. The avatar has no
+progression level, so the statful `BattleAvatar.Create` takes a per-battle level (default 1) — see
+"What is not settled yet". None of these feed damage any more; level reaches damage only through the
+stats it assembled.
 
 **Still deferred:** a same-element attack bonus (STAB), a balance lever to add once there are
-fights to measure it against, and stat-scaled healing — heals stay flat, with no variance. Random
+fights to measure it against; the reference's flat skill damage, damage boost / damage resistance and
+skill damage reduction terms; and stat-scaled healing — heals stay flat, with no variance. Random
 variance and critical hits were deferred here at first, because they make a battle random and the
 balance simulator needed a fixed answer per seed; they are now in, reproducible from the battle's
 seed (below).
@@ -793,6 +848,7 @@ decisions taken for Beast Craft) — and are named constants on `DamageFormula`:
 | --- | --- | --- |
 | `VarianceMinPercent` / `VarianceMaxPercent` | 90 / 110 | The variance roll: a whole percent, uniform, both ends inclusive (`rng.Next(90, 111)`). Tighter than Pokémon's 85–100%, so a player can still plan on lethal thresholds. |
 | `CritMultiplier` | 1.5 | What a critical hit multiplies the hit by. |
+| `MinCritMultiplier` | 1.3 | Floor of the crit multiplier, from the reference's `max(1.3, 1 + critDamage − critDamageReduction)`. `DamageFormula.GetCritMultiplier(reduction)` = `max(1.3, 1.5 − reduction)`; the formula passes 0 today, so the floor never binds until a crit-damage or crit-resist stat exists. |
 | `MinCritChance` / `MaxCritChance` | 0 / 100 | The crit chance is clamped into this range when it is rolled. |
 
 - **Order of operations:** `base × element × crit × roll / 100`, truncated once, then floored at
@@ -812,7 +868,10 @@ decisions taken for Beast Craft) — and are named constants on `DamageFormula`:
   `StatCalculator`, with the ordinary 0 floor (not the HP floor of 1) and no ceiling — a block may
   hold more than 100, and the excess is simply wasted when the chance is clamped at roll time, which
   also keeps a timed buff's reversion exact.
-- **Crit damage is not a stat** (deferred; if added, gear- and skill-only, per the research).
+- **Crit damage is not a stat** (deferred; if added, gear- and skill-only, per the research). When a
+  crit-damage bonus or a crit-damage reduction arrives, it goes through
+  `DamageFormula.GetCritMultiplier`, whose 1.3 floor (`MinCritMultiplier`) is already in place, so no
+  amount of reduction can make a crit worth less than +30%.
 - **Heals, buffs and debuffs never roll.** Variance and crits apply to damage only.
 
 **The rng and the draw order.** The battle's one `System.Random` — the `rng` `BattleTurnExecutor`
@@ -827,11 +886,10 @@ the same stream only for `SkillTargetingCriterion.Random`. A battle is therefore
 reproducible: the same seed replays it exactly.
 
 **The deterministic fallback.** A `null` rng means a 100% roll and no crit, and draws nothing.
-`DamageFormula.Compute(caster, target, skill, power)`, the raw `Compute(level, power, attack,
-defense, element)` and the two-argument `SkillEffectApplier.Apply(activation, caster)` are that
-fallback, so every exact-number example in this document and every existing exact-number test still
-holds. Tests pin specific rolls with `Compute(level, power, attack, defense, element,
-variancePercent, isCrit)`.
+`DamageFormula.Compute(caster, target, skill, power)`, the raw `Compute(power, attack, defense,
+element)` and the two-argument `SkillEffectApplier.Apply(activation, caster)` are that fallback, so
+every exact-number example in this document and every exact-number test holds. Tests pin specific
+rolls with `Compute(power, attack, defense, element, variancePercent, isCrit)`.
 
 **Reporting.** `DamageFormula.Roll` returns a `DamageRoll` (amount, `IsCrit`, `VariancePercent`),
 and `SkillEffectApplier` records one `DamageHit` (target plus roll) per landed damage effect on
@@ -1032,6 +1090,11 @@ simulator. The drafting rules:
   > Phoenix 101 > Kirin 100 > Frost Wyrm 98 > Tarasque 97 > Leviathan 95 > Treant 94 > Golem 92),
   and the budget Speed no longer takes went into the slow beasts' other stats. The roster tests pin
   the band and the order (Golem strictly slowest), so widening either is a deliberate design change.
+  **Superseded in part by the square-root gauge (decision 3, second amendment):** the 10–15% target
+  now applies to *turns*, which grow with `sqrt(Speed)`, so the 1.14× Speed band above gives only
+  about 1.07× turns, and a 1.10–1.15× turn spread needs roughly a 1.21–1.32× Speed spread. The
+  roster test still pins the Speed stat band; replacing it with a turn-ratio test is part of the next
+  roster retune (tracked in the tuning log), not of the formula change.
 - **Move range in a small band (2–5)**, outside the budget. Griffin and Basilisk are the mobile
   ends (5); Golem is the only 2.
 - **Crit chance in a small band (0–25%)**, also outside the budget and not level-scaled (user-approved
@@ -1341,6 +1404,15 @@ beasts (Leviathan, Golem, Treant and Griffin) earn their place almost only again
 has three top-3 slots. Thunderbird is the most polarized beast (first against the giant, last
 against the horde). The tuning log has the before/after stats, the multi-seed tables, the fixed-set
 sanity check and the iteration log.
+
+**Square-root speed and the mitigation damage formula (Sword x Staff) have since replaced the linear
+gauge and the level-term formula** (decision 3 and "Damage formula"; research in
+[`docs/balance/research-sword-x-staff.md`](../balance/research-sword-x-staff.md)). The simulator's kit
+and enemy powers were rescaled to the new "percent of the attacking stat" meaning (Blast 68, Strike
+93, Shot 70, Burst 37), and the tuned report was regenerated on the **unchanged** roster; balance
+shifted and a full retune (including widening base Speed for the turn-based 10–15% target) is the
+next deliverable. The tuning log's "Sqrt speed + mitigation formula" section has the before/after
+marginals and the per-beast turn rates.
 
 Every pass so far is deliberately **data structures and algorithms only** — no MonoBehaviours, no
 scene or prefab wiring, and no committed `.asset` instances (the roster's are generated in-Editor). The hex radii backing each arena preset

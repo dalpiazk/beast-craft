@@ -3,22 +3,25 @@ using BeastCraft.Creatures;
 namespace BeastCraft.Battle
 {
     /// <summary>
-    /// How much HP one <see cref="SkillEffectType.Damage"/> effect takes off one target: a
-    /// Pokémon-style formula of the caster's level, the effect's power, the caster's attacking stat
-    /// against the target's defending stat, and the element chart.
+    /// How much HP one <see cref="SkillEffectType.Damage"/> effect takes off one target: the
+    /// effect's power as a percentage of the caster's attacking stat, mitigated by
+    /// <c>A / (A + D)</c> against the target's defending stat, then the element chart, crit and
+    /// variance. Adopted from Sword x Staff's damage pipeline; see
+    /// <c>docs/balance/research-sword-x-staff.md</c> and the design doc, "Damage formula".
     /// <para>
     /// <strong>The formula, in full:</strong>
     /// <code>
-    /// base   = ((2 * Level / 5 + 2) * Power * A / D) / 50 + 2
+    /// base   = Power / 100 * A * A / (A + DefenseWeight * D) * GlobalScale
     /// damage = max(MinimumDamage, truncate(base * element * crit * roll / 100))
     /// </code>
-    /// where <c>crit</c> is <see cref="CritMultiplier"/> on a critical hit and 1 otherwise, and
+    /// where <c>crit</c> is <see cref="GetCritMultiplier"/> on a critical hit and 1 otherwise, and
     /// <c>roll</c> is a whole percent drawn uniformly from
     /// [<see cref="VarianceMinPercent"/>, <see cref="VarianceMaxPercent"/>].
     /// <list type="bullet">
     /// <item><description>
-    /// <c>Level</c> is the caster's <see cref="BattleUnit.Level"/>. <c>Power</c> is the authored
-    /// <see cref="SkillEffect.Magnitude"/> of the damage effect.
+    /// <c>Power</c> is the authored <see cref="SkillEffect.Magnitude"/> of the damage effect, read
+    /// as <strong>a percentage of the attacking stat</strong>: Power 120 is 120% of the caster's
+    /// <c>Attack</c> (or <c>SpecialAttack</c>) before mitigation.
     /// </description></item>
     /// <item><description>
     /// <c>A</c> and <c>D</c> are picked by the skill's <see cref="SkillSO.Category"/>:
@@ -29,19 +32,32 @@ namespace BeastCraft.Battle
     /// into them by <see cref="SkillEffectApplier"/> moves the damage.
     /// </description></item>
     /// <item><description>
+    /// <strong>Mitigation</strong> is <c>A / (A + DefenseWeight * D)</c>: a share of the hit in
+    /// (0, 1], never a subtraction, so defence has smooth diminishing returns (doubling Defense
+    /// against an equal Attack takes the share from 1/2 to 1/3, not to zero) and a hit is never
+    /// negated outright. <c>A</c> therefore appears twice — as the base and in the mitigation
+    /// term — so Attack is worth a little more than linear, as in the reference.
+    /// </description></item>
+    /// <item><description>
+    /// <strong>Level is not in the formula.</strong> Stats already scale with level through the
+    /// growth curve, and with <c>A</c>, <c>D</c> and HP all on the same curve, a hit between two
+    /// equally levelled beasts takes the same share of HP at every level (up to integer
+    /// rounding). <see cref="BattleUnit.Level"/> is kept — other systems read it — but the damage
+    /// formula ignores it.
+    /// </description></item>
+    /// <item><description>
     /// The element multiplier is
     /// <see cref="ElementChart.GetMultiplier(Element, System.Collections.Generic.IReadOnlyList{Element})"/>
     /// of the skill's <see cref="SkillSO.Element"/> against the target's
-    /// <see cref="BattleUnit.Elements"/>, applied to the whole of <c>base</c> (the +2 included).
-    /// The caster's own elements still play no part.
+    /// <see cref="BattleUnit.Elements"/>. The caster's own elements still play no part.
     /// </description></item>
     /// <item><description>
     /// <strong>Critical hit.</strong> The caster's <see cref="StatBlock.CritChance"/> (current
     /// effective, so a <see cref="SkillEffectType.BuffStat"/> on
     /// <see cref="StatType.CritChance"/> or crit gear counts), clamped into [0, 100], is the percent
     /// chance that <c>rng.Next(100) &lt; chance</c>; see <see cref="RollCrit"/>. A crit multiplies
-    /// the hit by <see cref="CritMultiplier"/>. The target plays no part (there is no crit
-    /// resistance yet).
+    /// the hit by <see cref="GetCritMultiplier"/>, which is <see cref="CritMultiplier"/> today. The
+    /// target plays no part (there is no crit-damage or crit-resist stat yet).
     /// </description></item>
     /// <item><description>
     /// <strong>Variance.</strong> Every hit is then scaled by a whole-percent roll,
@@ -63,50 +79,40 @@ namespace BeastCraft.Battle
     /// <para>
     /// <strong>The deterministic fallback.</strong> A <c>null</c> rng means no variance (a 100%
     /// roll) and no crit, and takes no draws. That is what
-    /// <see cref="Compute(BattleUnit, BattleUnit, SkillSO, float)"/> and the raw five-argument
-    /// <see cref="Compute(int, float, int, int, float)"/> compute, what
+    /// <see cref="Compute(BattleUnit, BattleUnit, SkillSO, float)"/> and the raw four-argument
+    /// <see cref="Compute(float, int, int, float)"/> compute, what
     /// <see cref="SkillEffectApplier.Apply(SkillActivation, BattleUnit)"/> uses, and what tests
     /// needing exact numbers rely on. Tests that need a specific roll pass it explicitly through
-    /// <see cref="Compute(int, float, int, int, float, int, bool)"/>.
+    /// <see cref="Compute(float, int, int, float, int, bool)"/>.
     /// </para>
     /// <para>
-    /// <strong>Why the level term.</strong> <c>A / D</c> is level-invariant between two equally
-    /// levelled beasts — both sides' stats grow along the same curve — while HP grows with level.
-    /// The <c>(2 * Level / 5 + 2)</c> term grows damage alongside it, so that a hit between evenly
-    /// matched beasts takes a roughly similar fraction of HP at level 1 and at level 100, and a
-    /// fight does not get longer just because both sides levelled. It holds only loosely with the
-    /// authored <c>medium</c> curve (HP grows about 6.7x from level 1 to 100, the level term 17.5x,
-    /// and the +2 floor dominates at level 1); pinning it down is the balance simulator's job.
+    /// <strong>Arithmetic.</strong> The base is computed in double precision (IEEE basic
+    /// operations only, so it is reproducible) and truncated toward zero to whole HP once, at the
+    /// very end, after the element, crit and variance multipliers (in that order), so a fractional
+    /// result never buys a point it did not earn. The guards: a <c>Power</c> of 0 or less deals 0 (a
+    /// zero-power damage effect is a no-op, and a negative one never reads as a heal); any positive
+    /// <c>Power</c> deals at least <see cref="MinimumDamage"/>, so a resisted hit is never worth
+    /// nothing; a negative <c>A</c> or <c>D</c> is treated as 0. A <c>D</c> of 0 needs no guard
+    /// (the mitigation is then exactly 1), and <c>A = 0</c> makes the base exactly 0 without
+    /// dividing. Stats are clamped at 0 on every path that writes them, so the stat guards are for
+    /// hand-built blocks.
     /// </para>
     /// <para>
-    /// <strong>Arithmetic.</strong> Everything is float math, truncated toward zero to whole HP
-    /// once, at the very end, after the element, crit and variance multipliers (in that order) — the
-    /// same truncation stance
-    /// <see cref="SkillEffectApplier"/> has always taken, so a fractional result never buys a point
-    /// it did not earn. The guards: a <c>Power</c> of 0 or less deals 0 (a zero-power damage effect
-    /// is a no-op, and a negative one no longer reads as a heal); any positive <c>Power</c> deals at
-    /// least <see cref="MinimumDamage"/>, so a resisted hit is never worth nothing;
-    /// <c>D &lt;= 0</c> is treated as 1 so a zero-defence target cannot divide by zero; and a
-    /// negative <c>A</c> is treated as 0. <c>Level</c> below 1 is treated as 1. Stats are clamped
-    /// at 0 on every path that writes them, so the two stat guards are for hand-built blocks.
+    /// <strong>A zero attacking stat deals the <see cref="MinimumDamage"/> floor.</strong> With
+    /// <c>A = 0</c> the base is 0, so a unit with no attacking stat — notably the avatar built by the
+    /// zero-stat <see cref="BattleAvatar.Create(SkillLoadout, string)"/> — deals exactly
+    /// <see cref="MinimumDamage"/> per positive-power damage effect, whatever the element. (The old
+    /// level-term formula's +2 offset let it chip 2, times the element.) An avatar meant to hit
+    /// harder should be given stats.
     /// </para>
     /// <para>
-    /// <strong>A zero attacking stat still deals the +2 floor.</strong> With <c>A = 0</c> the
-    /// first term vanishes and <c>base</c> is exactly 2, so a unit with no attacking stat — notably
-    /// the avatar built by the zero-stat <see cref="BattleAvatar.Create(SkillLoadout, string)"/> —
-    /// deals 2 times the element multiplier per damage effect whatever the authored power. That is
-    /// deliberate: it keeps the formula free of special cases, and a chip of 2 is the honest
-    /// reading of "no attacking stat". An avatar meant to hit harder should be given stats.
-    /// </para>
-    /// <para>
-    /// <strong>Tunable starting default, not confirmed balance.</strong> The shape and every
-    /// constant below are first-pass engineering defaults for the balance simulator to measure
-    /// against. Variance and crits are in (a user decision; see
-    /// <c>docs/balance/research-crit-variance-speed.md</c> for the research behind the numbers).
-    /// A battle is now random, but reproducible from its seed, which is what the balance simulator
-    /// relies on. <strong>Still deferred:</strong> a same-element bonus (STAB), a balance lever to
-    /// add once there are fights to measure it on. Healing is still flat and takes no variance, and
-    /// stat changes still move stats by their authored magnitude; neither goes through here.
+    /// <strong>Tunable starting default, not confirmed balance.</strong> The shape follows the
+    /// reference; <see cref="DefenseWeight"/> and <see cref="GlobalScale"/> start at 1 and the kit
+    /// powers were rescaled so a neutral hit between two average level-50 roster beasts removes the
+    /// same share of HP as under the previous formula (see the tuning log). <strong>Still
+    /// deferred:</strong> a same-element bonus (STAB), flat skill damage, damage boost/resistance
+    /// and a crit-damage stat. Healing is still flat and takes no variance, and stat changes still
+    /// move stats by their authored magnitude; neither goes through here.
     /// </para>
     /// <para>
     /// Pure and static, like <see cref="ElementChart"/> and <see cref="StatCalculator"/>: a
@@ -116,26 +122,30 @@ namespace BeastCraft.Battle
     /// </summary>
     public static class DamageFormula
     {
-        /// <summary>Multiplier on the caster's level in the level term (the <c>2</c> in <c>2 * Level / 5</c>).</summary>
-        public const float LevelScale = 2f;
+        /// <summary>
+        /// Divisor that turns <c>Power</c> into a fraction of the attacking stat: Power is authored
+        /// in percent, so Power 100 is 100% of <c>A</c>.
+        /// </summary>
+        public const double PowerPercent = 100.0;
 
-        /// <summary>Divisor of the level term (the <c>5</c> in <c>2 * Level / 5</c>).</summary>
-        public const float LevelDivisor = 5f;
+        /// <summary>
+        /// Weight of the defending stat in the mitigation term <c>A / (A + DefenseWeight * D)</c>.
+        /// At 1, equal Attack and Defense halve a hit. Raising it makes Defense worth more against
+        /// every Attack. Must stay non-negative.
+        /// </summary>
+        public const double DefenseWeight = 1.0;
 
-        /// <summary>Added to the level term, so a level-1 caster's term is 2.4 rather than 0.4.</summary>
-        public const float LevelOffset = 2f;
-
-        /// <summary>Divisor applied to <c>level term * Power * A / D</c>.</summary>
-        public const float PowerDivisor = 50f;
-
-        /// <summary>Added to every hit before the element multiplier; the floor a zero-attack hit lands at.</summary>
-        public const float BaseOffset = 2f;
+        /// <summary>
+        /// Uniform multiplier on every hit, the lever for overall fight length without touching
+        /// every skill's power. 1 today: the kit powers themselves were rescaled instead.
+        /// </summary>
+        public const double GlobalScale = 1.0;
 
         /// <summary>
         /// The least any positive-power hit deals, after truncation and the element multiplier.
         /// Because the floor is applied <em>after</em> the multiplier, a 0x "immune" matchup would
         /// still deal this much. <see cref="ElementChart"/> only returns 2x, 0.5x and 1x today; if
-        /// an immunity is ever added, <see cref="Compute(int, float, int, int, float, int, bool)"/>
+        /// an immunity is ever added, <see cref="Compute(float, int, int, float, int, bool)"/>
         /// must special-case a zero multiplier to return 0 (a crit or a high roll must not lift it
         /// off 0 either).
         /// </summary>
@@ -153,6 +163,16 @@ namespace BeastCraft.Battle
         /// <summary>What a critical hit multiplies the hit by, after the element multiplier.</summary>
         public const float CritMultiplier = 1.5f;
 
+        /// <summary>
+        /// The floor of the crit multiplier, from the reference's
+        /// <c>max(1.3, 1 + critDamage - critDamageReduction)</c>: however much crit-damage
+        /// reduction a target stacks, a crit is always worth at least this. There is no crit-damage
+        /// or crit-damage-reduction stat yet, so today the floor never binds; it is here so that
+        /// when one lands, it lands through <see cref="GetCritMultiplier"/> with the floor already
+        /// in place.
+        /// </summary>
+        public const float MinCritMultiplier = 1.3f;
+
         /// <summary>The crit chance is clamped to at least this (percent) when rolled.</summary>
         public const int MinCritChance = 0;
 
@@ -163,8 +183,8 @@ namespace BeastCraft.Battle
         /// The damage <paramref name="caster"/> deals to <paramref name="target"/> with one damage
         /// effect of <paramref name="power"/> belonging to <paramref name="skill"/>, on the
         /// deterministic fallback: no variance and no crit. The stats are picked by
-        /// <see cref="SkillSO.Category"/>, the level is the caster's, and the element multiplier is
-        /// the skill's element against the target's. A null caster, target or skill deals 0.
+        /// <see cref="SkillSO.Category"/> and the element multiplier is the skill's element against
+        /// the target's. A null caster, target or skill deals 0.
         /// </summary>
         public static int Compute(BattleUnit caster, BattleUnit target, SkillSO skill, float power)
         {
@@ -192,7 +212,7 @@ namespace BeastCraft.Battle
             int defense = GetDefenseStat(target.Stats, skill.Category);
             float multiplier = ElementChart.GetMultiplier(skill.Element, target.Elements);
 
-            return new DamageRoll(Compute(caster.Level, power, attack, defense, multiplier, variancePercent, isCrit), isCrit, variancePercent);
+            return new DamageRoll(Compute(power, attack, defense, multiplier, variancePercent, isCrit), isCrit, variancePercent);
         }
 
         /// <summary>
@@ -201,43 +221,78 @@ namespace BeastCraft.Battle
         /// <paramref name="elementMultiplier"/> has been applied to <see cref="ComputeBase"/> and the
         /// result truncated.
         /// </summary>
-        public static int Compute(int level, float power, int attack, int defense, float elementMultiplier)
+        public static int Compute(float power, int attack, int defense, float elementMultiplier)
         {
-            return Compute(level, power, attack, defense, elementMultiplier, NeutralVariancePercent, false);
+            return Compute(power, attack, defense, elementMultiplier, NeutralVariancePercent, false);
         }
 
         /// <summary>
         /// The formula on raw numbers with explicit rolls: the deterministic path tests use to pin
         /// a specific variance roll or crit. Order of operations:
-        /// <c>base * elementMultiplier * (isCrit ? CritMultiplier : 1) * variancePercent / 100</c>,
+        /// <c>base * elementMultiplier * (isCrit ? GetCritMultiplier(0) : 1) * variancePercent / 100</c>,
         /// then truncated, then floored at <see cref="MinimumDamage"/>; a <paramref name="power"/>
         /// of 0 or less deals 0 before any of it. <paramref name="variancePercent"/> is taken as
         /// given (it is not clamped into the roll range, so a test can probe outside it), except
         /// that a negative value is treated as 0; exactly <see cref="NeutralVariancePercent"/> is
         /// the identity, applied as no multiplication at all so it is bit-exact.
         /// </summary>
-        public static int Compute(int level, float power, int attack, int defense, float elementMultiplier, int variancePercent, bool isCrit)
+        public static int Compute(float power, int attack, int defense, float elementMultiplier, int variancePercent, bool isCrit)
         {
             if (power <= 0f)
             {
                 return 0;
             }
 
-            float scaled = ComputeBase(level, power, attack, defense) * elementMultiplier;
+            double scaled = ComputeBase(power, attack, defense) * elementMultiplier;
 
             if (isCrit)
             {
-                scaled *= CritMultiplier;
+                scaled *= GetCritMultiplier(0f);
             }
 
             if (variancePercent != NeutralVariancePercent)
             {
-                scaled = scaled * (variancePercent < 0 ? 0 : variancePercent) / 100f;
+                scaled = scaled * (variancePercent < 0 ? 0 : variancePercent) / 100.0;
             }
 
             int damage = (int)scaled;
 
             return damage < MinimumDamage ? MinimumDamage : damage;
+        }
+
+        /// <summary>
+        /// The un-truncated base, before the element multiplier:
+        /// <c>Power / 100 * A * A / (A + DefenseWeight * D) * GlobalScale</c>. Exposed so the
+        /// balance simulator and tests can read the curve without re-deriving it. Applies the
+        /// attack and defense guards (negative reads as 0; <c>A = 0</c> is exactly 0) but not the
+        /// power guard, which belongs to the final amount (see
+        /// <see cref="Compute(float, int, int, float, int, bool)"/>).
+        /// </summary>
+        public static double ComputeBase(float power, int attack, int defense)
+        {
+            if (attack <= 0)
+            {
+                return 0.0;
+            }
+
+            double a = attack;
+            double d = defense < 0 ? 0.0 : defense;
+
+            // One division, last: with integral stats and power every product is exact in a double,
+            // so a hit whose true value is a whole number never truncates to one less.
+            return power * a * a * GlobalScale / ((a + (DefenseWeight * d)) * PowerPercent);
+        }
+
+        /// <summary>
+        /// The multiplier a critical hit applies: <c>max(MinCritMultiplier, CritMultiplier -
+        /// critDamageReduction)</c>, the reference's <c>max(1.3, 1 + critDamage - reduction)</c>
+        /// with today's fixed crit damage. Nothing supplies a reduction yet, so the formula always
+        /// passes 0 and a crit is exactly <see cref="CritMultiplier"/>.
+        /// </summary>
+        public static float GetCritMultiplier(float critDamageReduction)
+        {
+            float multiplier = CritMultiplier - critDamageReduction;
+            return multiplier < MinCritMultiplier ? MinCritMultiplier : multiplier;
         }
 
         /// <summary>
@@ -278,23 +333,6 @@ namespace BeastCraft.Battle
         public static int RollVariance(System.Random rng)
         {
             return rng == null ? NeutralVariancePercent : rng.Next(VarianceMinPercent, VarianceMaxPercent + 1);
-        }
-
-        /// <summary>
-        /// The un-truncated <c>base</c> term, before the element multiplier. Exposed so the
-        /// balance simulator and tests can read the curve without re-deriving it. Applies the
-        /// level, attack and defense guards but not the power guard, which belongs to the final
-        /// amount (see <see cref="Compute(int, float, int, int, float, int, bool)"/>).
-        /// </summary>
-        public static float ComputeBase(int level, float power, int attack, int defense)
-        {
-            float l = level < 1 ? 1f : level;
-            float a = attack < 0 ? 0f : attack;
-            float d = defense <= 0 ? 1f : defense;
-
-            float levelTerm = (LevelScale * l / LevelDivisor) + LevelOffset;
-
-            return (levelTerm * power * a / d / PowerDivisor) + BaseOffset;
         }
 
         /// <summary>

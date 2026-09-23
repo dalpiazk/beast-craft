@@ -75,6 +75,9 @@ namespace BeastCraft.Tooling.BalanceSim
             report.AppendLine("`SpecialDefense` on the receiving end) carry about equal weight in every stance; the PvE kit parity table checks it.");
             report.AppendLine("Burst goes last so it fires from the tile the beast has just walked to. `elemental` mode: every kit skill carries");
             report.AppendLine("the beast's first element; `neutral`: all are `None`, isolating the stat lines from the element chart.");
+            report.AppendLine("Power is a percent of the attacking stat: a hit is `Power / 100 x A x A / (A + " +
+                              DamageFormula.DefenseWeight.ToString("0.##", CultureInfo.InvariantCulture) + " x D) x " +
+                              DamageFormula.GlobalScale.ToString("0.##", CultureInfo.InvariantCulture) + "`, then element, crit and variance (`DamageFormula`).");
             report.AppendLine();
         }
 
@@ -82,16 +85,20 @@ namespace BeastCraft.Tooling.BalanceSim
         {
             report.AppendLine("## Assembled stats at level " + options.MatrixLevel);
             report.AppendLine();
-            report.AppendLine("From `StatCalculator.ComputeStats` with no gear — what each beast actually fought with at that level.");
+            report.AppendLine("From `StatCalculator.ComputeStats` with no gear — what each beast actually fought with at that level. **Turn rate**");
+            report.AppendLine("= `TurnManager.FillRateForSpeed(Spe)` / the Speed-" + TurnManager.ReferenceSpeed + " rate: its turns per unit of normalized time (about sqrt(Spe / " +
+                              TurnManager.ReferenceSpeed + ")).");
             report.AppendLine();
-            report.AppendLine("| Beast | Element | Stance | HP | Atk | Def | SpA | SpD | Spe | Move | Crit |");
-            report.AppendLine("| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |");
+            report.AppendLine("| Beast | Element | Stance | HP | Atk | Def | SpA | SpD | Spe | Turn rate | Move | Crit |");
+            report.AppendLine("| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |");
 
             foreach (CreatureSpeciesSO beast in species)
             {
                 StatBlock stats = StatCalculator.ComputeStats(beast, options.MatrixLevel, null);
                 report.AppendLine("| " + beast.DisplayName + " | " + PvpReport.ElementsOf(beast) + " | " + beast.Stance + " | " + stats.Hp + " | " + stats.Attack + " | " + stats.Defense +
-                                  " | " + stats.SpecialAttack + " | " + stats.SpecialDefense + " | " + stats.Speed + " | " + stats.MoveRange + " | " +
+                                  " | " + stats.SpecialAttack + " | " + stats.SpecialDefense + " | " + stats.Speed + " | " +
+                                  ((double)TurnManager.FillRateForSpeed(stats.Speed) / TurnManager.ReferenceFillRate).ToString("0.000", CultureInfo.InvariantCulture) +
+                                  " | " + stats.MoveRange + " | " +
                                   stats.CritChance + "% |");
             }
         }

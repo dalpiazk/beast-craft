@@ -9,10 +9,10 @@ namespace BeastCraft.Tests.EditMode
 {
     /// <summary>
     /// The element multiplier as applied by <see cref="SkillEffectApplier"/>, on top of
-    /// <see cref="DamageFormula"/>. Every unit here is level 10 with 20 in each of the four combat
-    /// stats, so the level term is exactly 6 and <c>A / D</c> is exactly 1: a neutral hit of power
-    /// <c>P</c> is <c>6 * P / 50 + 2</c> — power 50 deals 8, power 25 deals 5 — and the element
-    /// multiplier scales that.
+    /// <see cref="DamageFormula"/>. Every unit here has 20 in each of the four combat stats, so the
+    /// mitigation <c>A / (A + D)</c> is exactly 1/2: a neutral hit of power <c>P</c> is
+    /// <c>P / 100 * 20 * 1/2 = P / 10</c> — power 80 deals 8, power 50 deals 5 — and the element
+    /// multiplier scales that. (The units are level 10; level plays no part in the formula.)
     /// </summary>
     public class SkillEffectApplierElementTests
     {
@@ -37,7 +37,7 @@ namespace BeastCraft.Tests.EditMode
         {
             BattleUnit target = Unit("target", 100, Element.Nature);
 
-            Fire(Skill(Element.Fire, SkillEffectType.Damage, 50f), target);
+            Fire(Skill(Element.Fire, SkillEffectType.Damage, 80f), target);
 
             // Base 8, x2.
             Assert.AreEqual(84, target.CurrentHp);
@@ -48,7 +48,7 @@ namespace BeastCraft.Tests.EditMode
         {
             BattleUnit target = Unit("target", 100, Element.Water);
 
-            Fire(Skill(Element.Fire, SkillEffectType.Damage, 25f), target);
+            Fire(Skill(Element.Fire, SkillEffectType.Damage, 50f), target);
 
             // Base 5 * 0.5 = 2.5, truncated to 2.
             Assert.AreEqual(98, target.CurrentHp);
@@ -59,7 +59,7 @@ namespace BeastCraft.Tests.EditMode
         {
             BattleUnit target = Unit("target", 100, Element.Nature, Element.Metal);
 
-            Fire(Skill(Element.Fire, SkillEffectType.Damage, 50f), target);
+            Fire(Skill(Element.Fire, SkillEffectType.Damage, 80f), target);
 
             // Base 8, x2 x2.
             Assert.AreEqual(68, target.CurrentHp);
@@ -70,7 +70,7 @@ namespace BeastCraft.Tests.EditMode
         {
             BattleUnit target = Unit("target", 100, Element.Nature);
 
-            Fire(Skill(Element.None, SkillEffectType.Damage, 50f), target);
+            Fire(Skill(Element.None, SkillEffectType.Damage, 80f), target);
 
             Assert.AreEqual(92, target.CurrentHp);
         }
@@ -80,7 +80,7 @@ namespace BeastCraft.Tests.EditMode
         {
             BattleUnit target = Unit("target", 100);
 
-            Fire(Skill(Element.Fire, SkillEffectType.Damage, 50f), target);
+            Fire(Skill(Element.Fire, SkillEffectType.Damage, 80f), target);
 
             Assert.AreEqual(92, target.CurrentHp);
         }
@@ -91,7 +91,7 @@ namespace BeastCraft.Tests.EditMode
             BattleUnit target = Unit("target", 15, Element.Nature);
 
             // 16 damage against 15 HP.
-            Fire(Skill(Element.Fire, SkillEffectType.Damage, 50f), target);
+            Fire(Skill(Element.Fire, SkillEffectType.Damage, 80f), target);
 
             Assert.AreEqual(0, target.CurrentHp);
             Assert.IsTrue(target.IsDefeated);
@@ -128,7 +128,7 @@ namespace BeastCraft.Tests.EditMode
 
             // The skill is neutral; the caster being Fire must not make it a Fire hit.
             SkillEffectApplier.Apply(
-                new SkillActivation(Skill(Element.None, SkillEffectType.Damage, 50f), new[] { target }),
+                new SkillActivation(Skill(Element.None, SkillEffectType.Damage, 80f), new[] { target }),
                 fireCaster);
 
             Assert.AreEqual(92, target.CurrentHp);

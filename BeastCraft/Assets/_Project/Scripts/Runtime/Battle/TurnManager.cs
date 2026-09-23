@@ -3,33 +3,39 @@ using System.Collections.Generic;
 namespace BeastCraft.Battle
 {
     /// <summary>
-    /// The speed-stat initiative gauge (ATB): every combatant fills its own gauge at a rate equal to
-    /// its current <c>Stats.Speed</c> and takes a turn each time the gauge reaches
-    /// <see cref="ActionThreshold"/>, so a unit twice as fast as another acts twice as often.
+    /// The speed-stat initiative gauge (ATB): every combatant fills its own gauge at a rate that
+    /// grows with the <em>square root</em> of its current <c>Stats.Speed</c> and takes a turn each
+    /// time the gauge reaches <see cref="ActionThreshold"/>, so a unit four times as fast as another
+    /// acts twice as often.
     /// <para>
     /// This replaced the original round-based queue (everyone acts once per round, fastest first),
     /// under which Speed only decided <em>order</em> within a round and a Speed-120 beast got exactly
-    /// as many turns as a Speed-40 one. See the design doc, §3 "Turn order model".
+    /// as many turns as a Speed-40 one. The first ATB gauge filled linearly in Speed; the square
+    /// root (adopted from Sword x Staff, whose turn interval is <c>100000 / sqrt(SPD x scale)</c>)
+    /// gives stacked Speed diminishing returns. See the design doc, §3 "Turn order model", and
+    /// <c>docs/balance/research-sword-x-staff.md</c>.
     /// </para>
     /// <para>
     /// <strong>The model.</strong> Pure integer arithmetic, so a client and a server-authoritative
     /// re-simulation always agree:
     /// <list type="bullet">
     /// <item><description>
-    /// Every unit starts at gauge 0. Its fill rate is its live <c>Stats.Speed</c>, clamped to at
-    /// least 1 so nothing can stall forever — read at every step, so a speed buff or debuff changes
-    /// the unit's cadence from the moment it lands.
+    /// Every unit starts at gauge 0. Its fill rate is <see cref="FillRateForSpeed"/> of its live
+    /// <c>Stats.Speed</c>: <c>round(FillScale x sqrt(max(1, Speed)))</c>, computed with an exact
+    /// integer square root (no floating point), so nothing can stall forever. It is read at every
+    /// step, so a speed buff or debuff changes the unit's cadence from the moment it lands.
     /// </description></item>
     /// <item><description>
     /// Time advances by events, not by stepping: the next actor is found by computing, for every
-    /// living unit, the ticks it still needs, <c>ceil((ActionThreshold - gauge) / speed)</c> (0 when
-    /// already full); time jumps by the smallest of those and every living unit's gauge gains
-    /// <c>speed x elapsed</c>.
+    /// living unit, the ticks it still needs, <c>ceil((ActionThreshold - gauge) / fillRate)</c> (0
+    /// when already full); time jumps by the smallest of those and every living unit's gauge gains
+    /// <c>fillRate x elapsed</c>.
     /// </description></item>
     /// <item><description>
     /// Of the units now at or above the threshold, exactly one acts: the highest gauge (most
-    /// overflow) first, then the higher Speed, then <see cref="BattleUnitOrder.CompareById"/>. The
-    /// others act on the following steps with zero elapsed time.
+    /// overflow) first, then the higher fill rate (the higher Speed), then
+    /// <see cref="BattleUnitOrder.CompareById"/>. The others act on the following steps with zero
+    /// elapsed time.
     /// </description></item>
     /// <item><description>
     /// When the actor's turn is over (<see cref="AdvanceTurn"/>), <see cref="ActionThreshold"/> is
@@ -50,11 +56,19 @@ namespace BeastCraft.Battle
     public class TurnManager
     {
         /// <summary>
-        /// The gauge value at which a unit acts. A tunable default, not a balance number in itself:
-        /// only the ratio between speeds decides who acts how often, and this only sets the
-        /// resolution of the integer gauge (a Speed-1 unit needs this many ticks per turn).
+        /// Multiplier on <c>sqrt(Speed)</c> in <see cref="FillRateForSpeed"/>: the resolution of the
+        /// fill rate. At 100 a Speed-100 unit fills 1000 per tick and a Speed-1 unit 100; rounding
+        /// to a whole rate moves a roster-band unit's turn rate by at most about 0.05%.
         /// </summary>
-        public const int ActionThreshold = 1000;
+        public const int FillScale = 100;
+
+        /// <summary>
+        /// The gauge value at which a unit acts. A tunable default, not a balance number in itself:
+        /// only the ratio between fill rates decides who acts how often, and this only sets the
+        /// resolution of the integer time line. Chosen with <see cref="FillScale"/> so that
+        /// <see cref="TicksPerTimeUnit"/> is a whole 100 (a Speed-1 unit waits 1000 ticks per turn).
+        /// </summary>
+        public const int ActionThreshold = 100000;
 
         /// <summary>
         /// The Speed whose turn defines one unit of <see cref="Time"/>: a unit at this Speed acts
@@ -64,10 +78,16 @@ namespace BeastCraft.Battle
         public const int ReferenceSpeed = 100;
 
         /// <summary>
-        /// Ticks per 1.0 of <see cref="Time"/>: <see cref="ActionThreshold"/> /
-        /// <see cref="ReferenceSpeed"/>, the ticks a Speed-100 unit waits for each turn.
+        /// The fill rate of a <see cref="ReferenceSpeed"/> unit, <c>FillScale x sqrt(100)</c> = 1000
+        /// (exact: 100 is a perfect square).
         /// </summary>
-        public const int TicksPerTimeUnit = ActionThreshold / ReferenceSpeed;
+        public const int ReferenceFillRate = FillScale * 10;
+
+        /// <summary>
+        /// Ticks per 1.0 of <see cref="Time"/>: <see cref="ActionThreshold"/> /
+        /// <see cref="ReferenceFillRate"/> = 100, the ticks a Speed-100 unit waits for each turn.
+        /// </summary>
+        public const int TicksPerTimeUnit = ActionThreshold / ReferenceFillRate;
 
         private readonly List<BattleUnit> _roster;
         private readonly Dictionary<BattleUnit, long> _gauges;
@@ -191,13 +211,65 @@ namespace BeastCraft.Battle
         }
 
         /// <summary>
-        /// The ticks <paramref name="unit"/> fills per tick of time: its live Speed, floored at 1.
+        /// The gauge <paramref name="unit"/> gains per tick: <see cref="FillRateForSpeed"/> of its
+        /// live Speed.
         /// </summary>
         public static int FillRate(BattleUnit unit)
         {
-            int speed = unit.Stats.Speed;
-            return speed < 1 ? 1 : speed;
+            return FillRateForSpeed(unit.Stats.Speed);
         }
+
+        /// <summary>
+        /// <c>round(FillScale x sqrt(max(1, speed)))</c>, exactly, in integers: the integer square
+        /// root of <c>speed x FillScale²</c>, rounded half up. No floating point, so every platform
+        /// computes the same rate. A speed below 1 fills as Speed 1, so nothing stalls forever.
+        /// Turns per unit of time therefore grow with <c>sqrt(Speed)</c>: four times the Speed is
+        /// twice the turns, and +21% Speed is +10% turns. Strictly increasing in Speed across the
+        /// whole plausible range (consecutive speeds differ by at least one whole rate up to Speed
+        /// 2500), so comparing rates is comparing speeds.
+        /// </summary>
+        public static int FillRateForSpeed(int speed)
+        {
+            long radicand = (long)(speed < 1 ? 1 : speed) * FillScale * FillScale;
+            long root = IntegerSqrt(radicand);
+
+            // sqrt(x) rounds up iff sqrt(x) >= root + 0.5, i.e. x >= root² + root + 0.25, which for
+            // integers is x - root² > root. (An exact half is impossible for an integer x.)
+            return (int)(radicand - (root * root) > root ? root + 1 : root);
+        }
+
+        /// <summary>
+        /// <c>floor(sqrt(value))</c> for a non-negative long, by integer bisection (0 for a negative
+        /// value). Integer-only so it is bit-identical on every platform.
+        /// </summary>
+        public static long IntegerSqrt(long value)
+        {
+            if (value < 2)
+            {
+                return value < 0 ? 0 : value;
+            }
+
+            // sqrt(long.MaxValue) < 3037000500, so the root lies in [1, 3037000499].
+            long low = 1;
+            long high = value < MaxLongSqrt ? value : MaxLongSqrt;
+            while (low < high)
+            {
+                long mid = low + ((high - low + 1) / 2);
+                if (mid <= value / mid)
+                {
+                    low = mid;
+                }
+                else
+                {
+                    high = mid - 1;
+                }
+            }
+
+            return low;
+        }
+
+        /// <summary>floor(sqrt(long.MaxValue)): the bisection's upper bound.</summary>
+        private const long MaxLongSqrt = 3037000499L;
 
         private BattleUnit SelectNextActor()
         {
@@ -229,7 +301,8 @@ namespace BeastCraft.Battle
                 }
 
                 long missing = ActionThreshold - gauges[unit];
-                long ticks = missing <= 0 ? 0 : (missing + FillRate(unit) - 1) / FillRate(unit);
+                int rate = FillRate(unit);
+                long ticks = missing <= 0 ? 0 : (missing + rate - 1) / rate;
                 if (ticks < wait)
                 {
                     wait = ticks;
@@ -265,7 +338,7 @@ namespace BeastCraft.Battle
 
         /// <summary>
         /// Readiness order among full units: highest gauge (most overflow) first, then the higher
-        /// Speed, ties broken by <see cref="BattleUnitOrder.CompareById"/>.
+        /// fill rate (the higher Speed; see <see cref="FillRateForSpeed"/>), ties broken by <see cref="BattleUnitOrder.CompareById"/>.
         /// <para>
         /// The id tie-break is chosen over "stable by input order" deliberately: input order is a
         /// property of however the roster happened to be assembled. See

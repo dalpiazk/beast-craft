@@ -30,7 +30,8 @@ namespace BeastCraft.Tooling.BalanceSim
 
         /// <summary>
         /// Its turns per unit of normalized time over all its battles (total turns / total battle
-        /// time): about Speed / 100 while it stands, less when it falls early. NaN with no time.
+        /// time): about sqrt(Speed / 100) while it stands (the ATB gauge fills with the square root
+        /// of Speed), less when it falls early. NaN with no time.
         /// </summary>
         public double TurnsPerTime = double.NaN;
     }
@@ -382,17 +383,17 @@ namespace BeastCraft.Tooling.BalanceSim
             report.AppendLine("  as above and prefers stop tiles that screen its Ranged / Skirmisher allies; a Ranged unit never walks into melee");
             report.AppendLine("  (so Ranged beasts carry Shot, range 3, instead of Strike); Ranged and Skirmisher units prefer stop tiles with");
             report.AppendLine("  fewer adjacent enemies and spend leftover movement backing away, keeping the nearest enemy within their longest reach.");
-            report.AppendLine("- Turn order: the Runtime's ATB gauge (`TurnManager`): every unit fills a gauge by its Speed and acts at " +
-                              TurnManager.ActionThreshold + ", so twice the");
-            report.AppendLine("  Speed is twice the turns. Battle time is normalized: 1.0 = one turn of a Speed-" + TurnManager.ReferenceSpeed +
-                              " unit. Speed scales with level, so the");
+            report.AppendLine("- Turn order: the Runtime's ATB gauge (`TurnManager`): every unit fills a gauge by round(" + TurnManager.FillScale +
+                              " x sqrt(Speed)) per tick and acts at " + TurnManager.ActionThreshold + ",");
+            report.AppendLine("  so turns grow with the square root of Speed (four times the Speed is twice the turns). Battle time is normalized:");
+            report.AppendLine("  1.0 = one turn of a Speed-" + TurnManager.ReferenceSpeed + " unit. Speed scales with level, so the");
             report.AppendLine("  same fight reads longer at low levels; compare times within a level, not across levels.");
             report.AppendLine("- Max time: " + options.MaxTime + " (a battle reaching it is a stalemate and counts as not cleared); base seed: " + options.Seed);
             report.AppendLine("- Metrics: **marginal** = clear rate of teams containing the beast minus teams without it (points; the primary");
             report.AppendLine("  number). **Dmg share** / **Taken share** = the beast's share of its team's damage dealt / taken (HP actually");
             report.AppendLine("  removed, so overkill is not counted), averaged over its battles. **Survival** = standing at the end. **Time to");
             report.AppendLine("  clear** = mean length of the clears it took part in (normalized time). **Turns / time** = the beast's turns per");
-            report.AppendLine("  unit of time over its battles (Speed / 100 while standing). \"Overall\" averages every " + (generated ? "shape" : "encounter") +
+            report.AppendLine("  unit of time over its battles (sqrt(Speed / 100) while standing). \"Overall\" averages every " + (generated ? "shape" : "encounter") +
                               " and level equally.");
             report.AppendLine();
         }

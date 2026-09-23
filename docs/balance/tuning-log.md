@@ -17,8 +17,10 @@ turn-order change" at the end.
 
 **Superseded by a second pass.** The roster has since been re-tuned for the ATB gauge, combat
 stances, variance and crits and the generated encounters, with base Speed held to a 15% band (user
-decision). See "Retune for ATB + stances + crits + mixed encounters" at the end; that section's
-stats are the current roster and `tuned-report.md` is its default-seed run.
+decision). See "Retune for ATB + stances + crits + mixed encounters" near the end; that section's
+stats are the current roster. `tuned-report.md` has since been regenerated once more, on the same
+roster, after the square-root speed gauge and the mitigation damage formula replaced the linear
+gauge and the level-term formula; see "Sqrt speed + mitigation formula" at the end.
 
 This is still **not confirmed balance**. It makes the roster even under the simulator's current
 assumptions (one standard kit, fixture enemies, nearest-enemy targeting, no skills), and every number
@@ -838,3 +840,186 @@ beasts, and each was judged on the 3-seed mean, never a single seed.
   Leviathan. It was not a target.
 - The `baseline-report.md` numbers and the first pass's tables above are historical. The committed
   `tuned-report.md` is this pass's default-seed run.
+
+## Sqrt speed + mitigation formula
+
+A Runtime formula change, **not a retune**. The roster (`beast-roster.json`) is unchanged, and so
+are the stances, crit chances, move ranges, the encounter pool and shapes, and the element chart.
+Two formulas were replaced. Both are adopted from Sword x Staff and user-approved; see
+[`research-sword-x-staff.md`](research-sword-x-staff.md) and the design doc (decision 3, "Damage
+formula"):
+
+- **Turn order: square-root gauge fill.** `TurnManager` now fills each unit's gauge at
+  `round(100 × sqrt(max(1, Speed)))` per tick against a threshold of 100000. The square root is an
+  exact integer square root, so every platform computes the same order. The old fill was `Speed`
+  against 1000. Turns now grow with sqrt(Speed): four times the Speed is twice the turns. One unit
+  of normalized time is still one turn of a Speed-100 unit (100 ticks).
+- **Damage: percent-of-stat power with `A / (A + D)` mitigation.**
+  `damage = Power / 100 × A × A / (A + DefenseWeight × D) × GlobalScale × element × crit × roll`,
+  truncated and floored at 1, with `DefenseWeight` = `GlobalScale` = 1. This replaces
+  `((2 × Level / 5 + 2) × Power × A / D) / 50 + 2`. Level no longer enters the formula. Crit is
+  `max(MinCritMultiplier 1.3, CritMultiplier 1.5)`; the 1.3 floor is there for a future crit-damage
+  reduction.
+
+`tuned-report.md` is regenerated with the default arguments. Because the roster is unchanged, the
+report shows the balance shift the next retune has to absorb.
+
+### Power rescale
+
+`Power` now means a percent of the attacking stat. Every power was rescaled so that a neutral hit
+between two average level-50 roster beasts takes the same share of HP as before. The average beast is
+the mean base stats: HP 113.8, Atk 95.5, Def 103, SpA 102.8, SpD 100.1. The rescale matches the old
+`0.44 × P + 2` (level 50, A ≈ D) against the new `P' / 100 × A / 2` at A ≈ D ≈ 58, which gives
+`P' ≈ 1.52 × P + 7`.
+
+| Skill | Old power | New power |
+| --- | ---: | ---: |
+| Blast (beast kit, special) | 40 | 68 |
+| Strike (beast kit, physical, Vanguard / Skirmisher) | 57 | 93 (parity, below) |
+| Shot (beast kit, physical, Ranged) | 41 | 70 (parity, below) |
+| Burst halves (beast kit) | 20 | 37 |
+| giant crush / gaze, colossus crush / gaze | 70 | 113 |
+| cleave, hex, shadow claw | 55 | 90 |
+| smash | 50 | 83 |
+| maul (direwolf) and bolt (wisp), both in the fixed set | 45 | 75 |
+| arrow, bolt (caster) | 42 | 71 |
+| quake / roar, staff | 35 | 60 |
+| shockwave, bite, sting (and the fixed-set swarm) | 30 | 52 |
+| storm | 28 | 49 |
+
+**HP share of one hit, average beast into average beast, 100% roll, no crit:**
+
+| Level | Skill | HP | Old damage (share) | New damage (share) |
+| --- | --- | ---: | ---: | ---: |
+| 1 | Blast | 17 | 3 (17.6%) | 5 (29.4%) |
+| 1 | Strike | 17 | 4 (23.5%) | 6 (35.3%) |
+| 50 | Blast | 65 | 20 (30.8%) | 20 (30.8%) |
+| 50 | Strike | 65 | 25 (38.5%) | 24 (36.9%) |
+| 100 | Blast | 114 | 36 (31.6%) | 35 (30.7%) |
+| 100 | Strike | 114 | 46 (40.4%) | 42 (36.8%) |
+
+The table uses the average beast's Atk 55 vs Def 59 at level 50 for Strike, and SpA 59 vs SpD 57
+for Blast.
+
+- **Levels 50 and 100 match.** Level 1 now takes the same share as every other level, because the
+  formula is level-invariant.
+- **The old level term under-scaled level-1 damage.** You can see it in the calibration:
+  - The per-shape difficulty multipliers are now nearly flat across levels. For example, `solo`
+    `elemental` is x0.805 / x0.787 / x0.787 at levels 1 / 50 / 100, where it was x0.844 / x0.773 /
+    x0.766 before.
+  - Level-1 battles are much shorter: 8.6–12.6 normalized time, down from 29–46. Part of that is the
+    square-root gauge giving level-1 units more turns per unit of time: a Speed-15 unit gets 0.39
+    turns instead of 0.15.
+- **Strike and Shot parity.** At Strike 97 / Shot 70, Strike fired 0.71–0.72× as often as Blast for
+  Vanguards and 0.81–0.82× for Skirmishers, 0.733× pooled over both stances. Shot fired 0.96×. So
+  Strike = 68 / 0.733 = **93**, and Shot stays 68 / 0.965 = **70**.
+- **Kit parity at the defaults.** The physical share is 49.2% / 49.6% for Vanguards, 52.5% / 52.8%
+  for Skirmishers and 49.8% for Ranged beasts (`elemental` / `neutral`), and 50.0% / 50.2% overall.
+  At Strike 97 the Skirmishers were 53.5–53.8%.
+
+### Turn rates by Speed
+
+The table shows turns per unit of normalized time relative to a Speed-100 unit: sqrt(Speed / 100)
+now, Speed / 100 before. **Turn share** is the beast's share of the turns in a hypothetical
+all-roster fight: each of the ten beasts once, all standing.
+
+| Beast | Base Speed | Turns vs Speed-100 (old → new) | Turn share (old → new) |
+| --- | ---: | ---: | ---: |
+| Thunderbird | 105 | 1.050 → 1.025 | 10.63% → 10.31% |
+| Griffin | 104 | 1.040 → 1.020 | 10.53% → 10.26% |
+| Basilisk | 102 | 1.020 → 1.010 | 10.32% → 10.16% |
+| Phoenix | 101 | 1.010 → 1.005 | 10.22% → 10.11% |
+| Kirin | 100 | 1.000 → 1.000 | 10.12% → 10.06% |
+| Frost Wyrm | 98 | 0.980 → 0.990 | 9.92% → 9.96% |
+| Tarasque | 97 | 0.970 → 0.985 | 9.82% → 9.91% |
+| Leviathan | 95 | 0.950 → 0.975 | 9.62% → 9.81% |
+| Treant | 94 | 0.940 → 0.970 | 9.51% → 9.76% |
+| Golem | 92 | 0.920 → 0.959 | 9.31% → 9.65% |
+
+**Fastest / slowest turn ratio.** The Speed ratio is 1.141 at level 100, 1.132 at level 50 and
+1.143 at level 1 (Speed 16 / 14 after rounding). The turn ratio is now:
+
+- **1.069** at level 100 (old 1.141).
+- **1.065** at level 50 (old 1.132).
+- **1.070** at level 1 (old 1.143).
+
+**User decision:** the 10–15% target now applies to **turns**. The current band gives about 7%, so
+the roster is under-spread for the new rule. To reach 1.10–1.15 in turns, the Speed spread must be
+1.21–1.32×.
+
+The report's per-beast **Turns / time** column averages levels 1, 50 and 100. It rises for every
+beast; for example, Kirin goes from 0.440 to 0.570 and Frost Wyrm from 0.320 to 0.392, averaged over
+shapes in `elemental` mode. That rise is mostly the level-1 effect above. The stat table at level 50
+now lists each beast's turn rate: 0.728 for Golem up to 0.775 for Thunderbird.
+
+### Marginal clear rate, before → after (default seed 12345, generated set)
+
+Before is the committed report at `424dff3` (the second tuning pass under the old formulas). After is
+this change on the same roster. Each shape column shows before → after; the change is in overall
+points.
+
+#### `elemental` (primary)
+
+| Beast | solo | elite | squad | horde | Overall before | Overall after | Change |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Basilisk | -1.2 → +2.6 | +2.0 → +6.1 | +2.6 → +11.2 | -1.0 → +5.4 | +0.6 | +6.3 | +5.7 |
+| Thunderbird | +12.1 → +22.9 | +0.5 → +1.5 | +3.0 → +4.6 | -17.2 → -16.4 | -0.4 | +3.1 | +3.5 |
+| Griffin | -3.9 → +1.1 | -1.4 → -0.6 | -3.0 → -0.8 | +1.1 → +5.2 | -1.8 | +1.2 | +3.0 |
+| Kirin | +1.8 → +4.4 | -1.7 → +0.3 | -4.1 → +1.2 | +0.6 → -1.5 | -0.8 | +1.1 | +1.9 |
+| Phoenix | +2.2 → +1.4 | -2.9 → +0.8 | -0.6 → +4.5 | -7.1 → -3.2 | -2.1 | +0.9 | +3.0 |
+| Frost Wyrm | -2.3 → -7.8 | +5.2 → +2.1 | +0.1 → -2.6 | +8.6 → +6.6 | +2.9 | -0.4 | -3.3 |
+| Leviathan | +6.0 → +0.1 | +7.4 → +4.2 | -9.3 → -12.1 | +6.3 → +4.9 | +2.6 | -0.7 | -3.3 |
+| Tarasque | -2.2 → -2.4 | -6.4 → -6.0 | +5.2 → +5.9 | -6.4 → -2.6 | -2.5 | -1.3 | +1.2 |
+| Treant | -2.6 → -8.9 | -5.5 → -8.3 | -2.2 → -7.6 | +12.3 → +9.4 | +0.5 | -3.8 | -4.3 |
+| Golem | -9.8 → -13.5 | +2.8 → -0.2 | +8.2 → -4.5 | +2.8 → -7.7 | +1.0 | -6.5 | -7.5 |
+
+#### `neutral` (secondary)
+
+| Beast | solo | elite | squad | horde | Overall before | Overall after | Change |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Basilisk | +8.5 → +9.4 | +13.6 → +17.6 | +2.0 → +12.0 | +1.4 → +7.5 | +6.4 | +11.6 | +5.2 |
+| Griffin | +5.0 → +14.0 | -0.4 → +0.6 | +2.5 → +7.6 | +0.1 → +5.3 | +1.8 | +6.9 | +5.1 |
+| Kirin | +10.2 → +7.8 | +5.0 → +7.4 | -5.6 → +0.4 | +0.5 → -1.7 | +2.5 | +3.5 | +1.0 |
+| Thunderbird | +11.0 → +28.3 | +4.8 → +7.3 | 0.0 → +4.2 | -29.7 → -29.1 | -3.5 | +2.7 | +6.2 |
+| Phoenix | +0.3 → -3.5 | -3.0 → +0.9 | -4.1 → +3.4 | -5.1 → +1.2 | -3.0 | +0.5 | +3.5 |
+| Tarasque | -2.7 → +0.5 | +2.3 → +2.4 | +3.4 → 0.0 | -4.0 → -1.4 | -0.3 | +0.4 | +0.7 |
+| Frost Wyrm | +2.1 → -4.2 | +2.6 → -1.5 | +2.4 → -4.7 | +0.2 → 0.0 | +1.8 | -2.6 | -4.4 |
+| Treant | -12.0 → -18.3 | -3.6 → -7.9 | -0.2 → -6.4 | +15.0 → +11.2 | -0.2 | -5.3 | -5.1 |
+| Leviathan | -5.8 → -16.3 | -5.0 → -9.3 | -0.4 → -6.4 | +6.4 → +5.4 | -1.2 | -6.7 | -5.5 |
+| Golem | -16.7 → -17.7 | -16.4 → -17.5 | -0.1 → -10.1 | +15.2 → +1.6 | -4.5 | -10.9 | -6.4 |
+
+**Flags after the change.** Before, only `neutral` Basilisk was flagged (+6.4).
+
+- **`elemental`:** Basilisk +6.3 (HIGH, and no weakness: top 3 in every shape) and Golem -6.5 (LOW).
+- **`neutral`:** Basilisk +11.6 (HIGH, no weakness), Griffin +6.9 (HIGH), Treant -5.3, Leviathan
+  -6.7 and Golem -10.9 (all LOW).
+- The `elemental` overall spread widens from -2.5 … +2.9 to -6.5 … +6.3.
+- There are no stalemates and no calibration misses.
+
+### Why balance moved
+
+- **Defense is worth less and Attack more.** Under `A / D`, a 1% change in either stat moved damage
+  by 1%. Under `A² / (A + D)` at A ≈ D, Defense moves damage by about 0.5% and Attack by about 1.5%.
+  - The tanks lose the most. Golem, Leviathan and Treant have the highest Def / SpD and the
+    lowest attacks.
+  - The high-attack beasts gain: Basilisk (SpA 153), Thunderbird and Griffin.
+  - This is the reference's intended "diminishing returns on defense". The retune has to price it:
+    bulk now has to come more from HP than from Def / SpD.
+- **Speed matters less.** The square root halves every speed gap in turns. That should help the
+  slow Vanguards, but the effect is small next to the mitigation shift (their turn share rises by
+  0.3 points at most).
+- **Thunderbird's giant specialism deepened.** On `solo` it went from +12.1 to +22.9 (`elemental`),
+  while the horde still punishes it. The mitigation term rewards its Atk 117 / SpA 114 split against
+  the giant's high Def / SpD.
+
+### TODO for the retune deliverable
+
+- **Replace the speed-band roster test.** `BeastRosterTests` still pins base Speed to fastest /
+  slowest ≤ 1.15 (the stat). Under the square-root gauge that constrains the wrong quantity. Replace
+  it with a **turn-ratio** test: `FillRateForSpeed(fastest) / FillRateForSpeed(slowest)` in
+  **1.10–1.15**, which is a Speed spread of about 1.21–1.32×. Keep the order test. This deliverable
+  deliberately left the test and the roster unchanged.
+- **Widen base Speed** to meet that turn ratio.
+- **Re-tune the six-stat lines** for the new Attack / Defense weighting, then re-derive Strike and
+  Shot parity once more.
+- **Re-run the multi-seed check** (seeds 12345, 777 and 4242) as in the second pass.

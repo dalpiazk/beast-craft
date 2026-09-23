@@ -46,8 +46,8 @@ namespace BeastCraft.Battle
         /// </para>
         /// <para>
         /// <paramref name="level"/> is recorded as <see cref="BattleUnit.Level"/> as well as used to
-        /// assemble the stats, so the damage formula's level term and the stats it divides always
-        /// come from the same level. A level below 1 is stored as 1 by the unit, the same floor
+        /// assemble the stats, so the recorded level and the stats always come from the same level
+        /// (the damage formula reads only the stats). A level below 1 is stored as 1 by the unit, the same floor
         /// the growth curve clamps to.
         /// </para>
         /// </summary>

@@ -29,69 +29,70 @@ namespace BeastCraft.Tests.EditMode
         }
 
         // ---------------------------------------------------------------------------------------
-        // The formula with explicit rolls. Level 50, power 40, A = D = 100: base = 19.6.
+        // The formula with explicit rolls. Power 39, A = D = 100: base = 0.39 * 100 * 100 / 200 = 19.5.
         // ---------------------------------------------------------------------------------------
 
-        [TestCase(100, false, 19)] // 19.6
-        [TestCase(90, false, 17)] // 17.64
-        [TestCase(110, false, 21)] // 21.56
-        [TestCase(100, true, 29)] // 29.4
-        [TestCase(90, true, 26)] // 26.46
-        [TestCase(110, true, 32)] // 32.34
+        [TestCase(100, false, 19)] // 19.5
+        [TestCase(90, false, 17)] // 17.55
+        [TestCase(110, false, 21)] // 21.45
+        [TestCase(100, true, 29)] // 29.25
+        [TestCase(90, true, 26)] // 26.325
+        [TestCase(110, true, 32)] // 32.175
         public void Compute_ExplicitRolls_KnownValues(int variancePercent, bool isCrit, int expected)
         {
-            Assert.AreEqual(expected, DamageFormula.Compute(50, 40f, 100, 100, ElementChart.Neutral, variancePercent, isCrit));
+            Assert.AreEqual(expected, DamageFormula.Compute(39f, 100, 100, ElementChart.Neutral, variancePercent, isCrit));
         }
 
         [Test]
         public void Compute_ElementCritAndVarianceMultiplyTogether()
         {
-            // 19.6 * 2 * 1.5 * 1.1 = 64.68.
-            Assert.AreEqual(64, DamageFormula.Compute(50, 40f, 100, 100, ElementChart.Strong, 110, true));
+            // 19.5 * 2 * 1.5 * 1.1 = 64.35.
+            Assert.AreEqual(64, DamageFormula.Compute(39f, 100, 100, ElementChart.Strong, 110, true));
 
-            // 19.6 * 0.5 * 0.9 = 8.82.
-            Assert.AreEqual(8, DamageFormula.Compute(50, 40f, 100, 100, ElementChart.Weak, 90, false));
+            // 19.5 * 0.5 * 0.9 = 8.775.
+            Assert.AreEqual(8, DamageFormula.Compute(39f, 100, 100, ElementChart.Weak, 90, false));
         }
 
         [Test]
         public void Compute_TruncatesOnceAtTheEnd()
         {
-            // base 3.92: 3.92 * 1.5 * 0.9 = 5.292 -> 5. Truncating after each step would give
-            // trunc(trunc(3.92) * 1.5) = 4, then trunc(4 * 0.9) = 3.
-            Assert.AreEqual(5, DamageFormula.Compute(1, 40f, 15, 15, ElementChart.Neutral, 90, true));
+            // base 0.49 * 16 * 16 / 32 = 3.92: 3.92 * 1.5 * 0.9 = 5.292 -> 5. Truncating after each
+            // step would give trunc(trunc(3.92) * 1.5) = 4, then trunc(4 * 0.9) = 3.
+            Assert.AreEqual(5, DamageFormula.Compute(49f, 16, 16, ElementChart.Neutral, 90, true));
         }
 
         [Test]
-        public void Compute_CritAndRollScaleTheZeroAttackFloorToo()
+        public void Compute_ZeroAttack_DealsTheFloorWhateverTheRolls()
         {
-            // A = 0: base is exactly 2; crit x1.5 = 3; x110% = 3.3.
-            Assert.AreEqual(3, DamageFormula.Compute(100, 500f, 0, 10, ElementChart.Neutral, 110, true));
+            // A = 0: base is exactly 0, so a crit, a high roll and a strong element all leave it at
+            // the MinimumDamage floor.
+            Assert.AreEqual(DamageFormula.MinimumDamage, DamageFormula.Compute(500f, 0, 10, ElementChart.Strong, 110, true));
         }
 
         [Test]
         public void Compute_MinimumDamageFloorIsAppliedAfterTheRolls()
         {
             // A heavily resisted hit at the lowest roll still deals the floor.
-            Assert.AreEqual(DamageFormula.MinimumDamage, DamageFormula.Compute(1, 1f, 1, 1000, ElementChart.Weak * ElementChart.Weak, DamageFormula.VarianceMinPercent, false));
+            Assert.AreEqual(DamageFormula.MinimumDamage, DamageFormula.Compute(1f, 1, 1000, ElementChart.Weak * ElementChart.Weak, DamageFormula.VarianceMinPercent, false));
         }
 
         [TestCase(0f)]
         [TestCase(-30f)]
         public void Compute_NonPositivePowerDealsNothingWhateverTheRolls(float power)
         {
-            Assert.AreEqual(0, DamageFormula.Compute(100, power, 500, 1, ElementChart.Strong, DamageFormula.VarianceMaxPercent, true));
+            Assert.AreEqual(0, DamageFormula.Compute(power, 500, 1, ElementChart.Strong, DamageFormula.VarianceMaxPercent, true));
         }
 
-        [TestCase(1, 40f, 15, 15)]
-        [TestCase(50, 40f, 100, 100)]
-        [TestCase(100, 40f, 130, 170)]
-        [TestCase(10, 50f, 20, 1)]
-        public void Compute_NeutralRollAndNoCrit_EqualsTheDeterministicOverload(int level, float power, int attack, int defense)
+        [TestCase(49f, 16, 16)]
+        [TestCase(39f, 100, 100)]
+        [TestCase(40f, 130, 170)]
+        [TestCase(50f, 20, 1)]
+        public void Compute_NeutralRollAndNoCrit_EqualsTheDeterministicOverload(float power, int attack, int defense)
         {
             foreach (float element in new[] { ElementChart.Weak, ElementChart.Neutral, ElementChart.Strong })
             {
-                Assert.AreEqual(DamageFormula.Compute(level, power, attack, defense, element),
-                                DamageFormula.Compute(level, power, attack, defense, element, DamageFormula.NeutralVariancePercent, false));
+                Assert.AreEqual(DamageFormula.Compute(power, attack, defense, element),
+                                DamageFormula.Compute(power, attack, defense, element, DamageFormula.NeutralVariancePercent, false));
             }
         }
 
@@ -101,6 +102,17 @@ namespace BeastCraft.Tests.EditMode
             Assert.AreEqual(90, DamageFormula.VarianceMinPercent);
             Assert.AreEqual(110, DamageFormula.VarianceMaxPercent);
             Assert.AreEqual(1.5f, DamageFormula.CritMultiplier);
+            Assert.AreEqual(1.3f, DamageFormula.MinCritMultiplier);
+        }
+
+        [Test]
+        public void CritMultiplier_IsFlooredAtMinCritMultiplier()
+        {
+            // max(1.3, 1.5 - reduction): no reduction exists yet, so the formula passes 0.
+            Assert.AreEqual(DamageFormula.CritMultiplier, DamageFormula.GetCritMultiplier(0f));
+            Assert.AreEqual(1.4f, DamageFormula.GetCritMultiplier(0.1f), 1e-6f);
+            Assert.AreEqual(DamageFormula.MinCritMultiplier, DamageFormula.GetCritMultiplier(0.5f));
+            Assert.AreEqual(DamageFormula.MinCritMultiplier, DamageFormula.GetCritMultiplier(10f));
         }
 
         // ---------------------------------------------------------------------------------------
@@ -112,14 +124,14 @@ namespace BeastCraft.Tests.EditMode
         {
             BattleUnit caster = Unit("c", new StatBlock(100, 100, 100, 100, 100, 100, 3, 100), 50);
             BattleUnit target = Unit("t", new StatBlock(1000, 100, 100, 100, 100, 100), 50);
-            SkillSO skill = DamageSkill(40f);
+            SkillSO skill = DamageSkill(39f);
 
-            DamageRoll roll = DamageFormula.Roll(caster, target, skill, 40f, null);
+            DamageRoll roll = DamageFormula.Roll(caster, target, skill, 39f, null);
 
             Assert.IsFalse(roll.IsCrit, "a 100% crit chance must not crit without an rng");
             Assert.AreEqual(DamageFormula.NeutralVariancePercent, roll.VariancePercent);
             Assert.AreEqual(19, roll.Amount);
-            Assert.AreEqual(19, DamageFormula.Compute(caster, target, skill, 40f));
+            Assert.AreEqual(19, DamageFormula.Compute(caster, target, skill, 39f));
             Assert.IsFalse(DamageFormula.RollCrit(100, null));
             Assert.AreEqual(DamageFormula.NeutralVariancePercent, DamageFormula.RollVariance(null));
         }
@@ -129,7 +141,7 @@ namespace BeastCraft.Tests.EditMode
         {
             BattleUnit caster = Unit("c", new StatBlock(100, 100, 100, 100, 100, 100, 3, 100), 50);
             BattleUnit target = Unit("t", new StatBlock(1000, 100, 100, 100, 100, 100), 50);
-            SkillActivation activation = new SkillActivation(DamageSkill(40f), new[] { target });
+            SkillActivation activation = new SkillActivation(DamageSkill(39f), new[] { target });
 
             SkillEffectApplier.Apply(activation, caster);
 
@@ -143,20 +155,20 @@ namespace BeastCraft.Tests.EditMode
         {
             BattleUnit caster = Unit("c", new StatBlock(100, 100, 100, 100, 100, 100, 3, 50), 50);
             BattleUnit target = Unit("t", new StatBlock(1000, 100, 100, 100, 100, 100), 50);
-            SkillSO skill = DamageSkill(40f);
+            SkillSO skill = DamageSkill(39f);
 
             for (int seed = 0; seed < 50; seed++)
             {
                 System.Random rng = new System.Random(seed);
                 System.Random mirror = new System.Random(seed);
 
-                DamageRoll roll = DamageFormula.Roll(caster, target, skill, 40f, rng);
+                DamageRoll roll = DamageFormula.Roll(caster, target, skill, 39f, rng);
 
                 bool expectedCrit = mirror.Next(100) < 50;
                 int expectedVariance = mirror.Next(DamageFormula.VarianceMinPercent, DamageFormula.VarianceMaxPercent + 1);
                 Assert.AreEqual(expectedCrit, roll.IsCrit, "seed " + seed);
                 Assert.AreEqual(expectedVariance, roll.VariancePercent, "seed " + seed);
-                Assert.AreEqual(DamageFormula.Compute(50, 40f, 100, 100, ElementChart.Neutral, expectedVariance, expectedCrit), roll.Amount, "seed " + seed);
+                Assert.AreEqual(DamageFormula.Compute(39f, 100, 100, ElementChart.Neutral, expectedVariance, expectedCrit), roll.Amount, "seed " + seed);
                 Assert.AreEqual(mirror.Next(), rng.Next(), "seed " + seed + ": the roll must take exactly two draws");
             }
         }
@@ -329,7 +341,7 @@ namespace BeastCraft.Tests.EditMode
 
             for (int i = 0; i < 200; i++)
             {
-                SkillActivation strike = new SkillActivation(DamageSkill(40f), new[] { target });
+                SkillActivation strike = new SkillActivation(DamageSkill(39f), new[] { target });
                 SkillEffectApplier.Apply(strike, caster, rng);
                 Assert.IsTrue(strike.Hits[0].Roll.IsCrit, "hit " + i);
             }
@@ -360,7 +372,7 @@ namespace BeastCraft.Tests.EditMode
             BattleUnit caster = Unit("c", new StatBlock(100, 100, 100, 100, 100, 100, 3, 30), 50);
             BattleUnit first = Unit("t1", new StatBlock(1000, 100, 100, 100, 100, 100), 50);
             BattleUnit second = Unit("t2", new StatBlock(1000, 100, 100, 100, 100, 100), 50);
-            SkillSO skill = DamageSkill(40f);
+            SkillSO skill = DamageSkill(39f);
             skill.Effects.Add(new SkillEffect { EffectType = SkillEffectType.Heal, Magnitude = 3f });
             skill.Effects.Add(new SkillEffect { EffectType = SkillEffectType.Damage, Magnitude = 20f });
             SkillActivation activation = new SkillActivation(skill, new[] { first, second });
@@ -381,8 +393,8 @@ namespace BeastCraft.Tests.EditMode
             {
                 bool crit = mirror.Next(100) < 30;
                 int variance = mirror.Next(DamageFormula.VarianceMinPercent, DamageFormula.VarianceMaxPercent + 1);
-                float power = h % 2 == 0 ? 40f : 20f;
-                int amount = DamageFormula.Compute(50, power, 100, 100, ElementChart.Neutral, variance, crit);
+                float power = h % 2 == 0 ? 39f : 20f;
+                int amount = DamageFormula.Compute(power, 100, 100, ElementChart.Neutral, variance, crit);
                 Assert.AreEqual(crit, activation.Hits[h].Roll.IsCrit, "hit " + h);
                 Assert.AreEqual(amount, activation.Hits[h].Roll.Amount, "hit " + h);
 
@@ -482,13 +494,13 @@ namespace BeastCraft.Tests.EditMode
         private double CritRateOf(BattleUnit caster, int hits, int seed)
         {
             BattleUnit target = Unit("t", new StatBlock(int.MaxValue, 100, 100, 100, 100, 100), 50);
-            SkillSO skill = DamageSkill(40f);
+            SkillSO skill = DamageSkill(39f);
             System.Random rng = new System.Random(seed);
             int crits = 0;
 
             for (int i = 0; i < hits; i++)
             {
-                crits += DamageFormula.Roll(caster, target, skill, 40f, rng).IsCrit ? 1 : 0;
+                crits += DamageFormula.Roll(caster, target, skill, 39f, rng).IsCrit ? 1 : 0;
             }
 
             return (100.0 * crits) / hits;
@@ -498,7 +510,7 @@ namespace BeastCraft.Tests.EditMode
         {
             BattleUnit caster = Unit("c", new StatBlock(100, 100, 100, 100, 100, 100, 3, 25), 50);
             BattleUnit target = Unit("t", new StatBlock(1000000, 100, 100, 100, 100, 100), 50);
-            SkillSO skill = DamageSkill(40f);
+            SkillSO skill = DamageSkill(39f);
             System.Random rng = new System.Random(seed);
             List<int> amounts = new List<int>();
 
@@ -524,7 +536,7 @@ namespace BeastCraft.Tests.EditMode
 
         private SkillSO MeleeSkill()
         {
-            SkillSO skill = DamageSkill(40f);
+            SkillSO skill = DamageSkill(39f);
             skill.TargetShape = SkillTargetShape.SingleTarget;
             skill.Range = 1;
             skill.Cooldown = 1;

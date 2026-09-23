@@ -58,8 +58,8 @@ namespace BeastCraft.Battle
         /// to the caller's array (or the species asset) do not reach a unit already in battle.
         /// </para>
         /// <para>
-        /// <paramref name="level"/> is the unit's <see cref="Level"/>, read by
-        /// <see cref="DamageFormula"/>. It defaults to 1 so every existing call site keeps
+        /// <paramref name="level"/> is the unit's <see cref="Level"/> (a record only: the damage
+        /// formula no longer reads it; see <see cref="Level"/>). It defaults to 1 so every existing call site keeps
         /// compiling; <see cref="BattleUnitFactory.CreateBeast"/> passes the beast's real level.
         /// Anything below 1 is stored as 1.
         /// </para>
@@ -214,8 +214,11 @@ namespace BeastCraft.Battle
         public IReadOnlyList<Element> Elements { get; }
 
         /// <summary>
-        /// The unit's level, always at least 1. Read by <see cref="DamageFormula"/> as the
-        /// caster's level in the level term, so a higher-level unit hits harder with the same stats.
+        /// The unit's level, always at least 1. <strong>Not</strong> part of
+        /// <see cref="DamageFormula"/>: the formula used to carry a Pokemon-style level term, but
+        /// stats already scale with level through the growth curve, so the level now reaches damage
+        /// only through the stats it assembled. Kept for everything else that asks a unit its level
+        /// (reporting, the avatar, future progression rules).
         /// <para>
         /// For a beast this is the level its stats were assembled at (see
         /// <see cref="BattleUnitFactory.CreateBeast"/>); it is only recorded here, and changing it
@@ -225,8 +228,7 @@ namespace BeastCraft.Battle
         /// <para>
         /// Read-only and fixed at construction, like <see cref="Elements"/>: nothing levels a unit
         /// mid-battle. The constructor stores anything below 1 as 1 — the one correction this
-        /// passive record makes, because a level-0 or negative caster has no meaning in the
-        /// formula.
+        /// passive record makes, because a level-0 or negative unit has no meaning.
         /// </para>
         /// </summary>
         public int Level { get; }

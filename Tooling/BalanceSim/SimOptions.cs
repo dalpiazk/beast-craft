@@ -38,11 +38,15 @@ namespace BeastCraft.Tooling.BalanceSim
         //     Ranged beasts only fired Strike at an enemy already adjacent and the physical share
         //     fell to 37-47%. Each physical skill's power is Blast's divided by how often it fires
         //     relative to Blast in its stances, measured over the default PvE run (generated
-        //     compositions, 3 levels, both kit modes) at Strike 55 / Shot 40: Strike fired 0.70x as
-        //     often as Blast for Vanguard and for Skirmisher beasts, Shot 0.965x for Ranged beasts
-        //     (it fires after Blast and loses the odd target Blast just felled). So Strike is 57
-        //     (= 40 / 0.70) and Shot 41 (= 40 / 0.965): fires x power, and with it the weight of
-        //     Attack vs SpecialAttack, is even per stance. The report's kit parity table shows the
+        //     compositions, 3 levels, both kit modes) after the sqrt-speed / mitigation-formula
+        //     change, at Strike 97 / Shot 70: Strike fired 0.71-0.72x as often as Blast for Vanguard
+        //     beasts and 0.81-0.82x for Skirmisher beasts (0.733x pooled over both, weighted by
+        //     fires), Shot 0.96x for Ranged beasts (it fires after Blast and loses the odd target
+        //     Blast just felled). So Strike is 93 (= 68 / 0.733) and Shot 70 (= 68 / 0.965): fires x
+        //     power, and with it the weight of Attack vs SpecialAttack, is even per stance. One
+        //     Strike serves two stances, so Vanguards sit a little under 50% and Skirmishers a little
+        //     over (they reach melee more often since the speed band was compressed). (Under the A / (A + D) formula damage is
+        //     exactly proportional to power, with no +2 offset, so power ratios are damage ratios.) The report's kit parity table shows the
         //     physical share of single-target power per stance and per shape, and flags a stance
         //     outside 50 +/- 5. Re-derive StrikePower / ShotPower if the kit, the enemies or the
         //     movement rules change.
@@ -51,7 +55,14 @@ namespace BeastCraft.Tooling.BalanceSim
         //     would re-open the bias this kit exists to close. Firing order does not bias the
         //     outcome: a target dies iff the two halves' damage together reaches its HP, whichever
         //     half lands the blow.
-        // Burst (2 x power 20, radius 2, cooldown 2) is lower power and longer cooldown than the
+        // Powers are percent of the attacking stat (DamageFormula: Power / 100 * A * A / (A + D)).
+        // They were rescaled from the old level-term formula (Blast 40, Strike 57, Shot 41,
+        // Burst 20) so a neutral hit between two average level-50 roster beasts takes the same
+        // share of HP as before: Blast 40 -> 68, Burst 20 -> 37 (old damage 0.44 P + 2 against
+        // new P' / 100 * A / 2 at A = D ~ 58), and Strike 93 / Shot 70 re-derived from Blast for
+        // parity (see above).
+        //
+        // Burst (2 x power 37, radius 2, cooldown 2) is lower power and longer cooldown than the
         // single-target pair: a periodic spike that only pays off when several enemies are close,
         // i.e. against swarms and packs. Cooldown 2 rather than 3 so it comes up on the beast's
         // second turn — fights at calibrated difficulty last a handful of turns per beast, and at
@@ -66,13 +77,13 @@ namespace BeastCraft.Tooling.BalanceSim
         // ------------------------------------------------------------------------------------
         public const string BlastId = "sim_blast";
         public const DamageCategory BlastCategory = DamageCategory.Special;
-        public const float BlastPower = 40f;
+        public const float BlastPower = 68f;
         public const int BlastRange = 3;
         public const int BlastCooldown = 1;
 
         public const string StrikeId = "sim_strike";
         public const DamageCategory StrikeCategory = DamageCategory.Physical;
-        public const float StrikePower = 57f;
+        public const float StrikePower = 93f;
         public const int StrikeRange = 1;
         public const int StrikeCooldown = BlastCooldown;
 
@@ -84,13 +95,13 @@ namespace BeastCraft.Tooling.BalanceSim
         /// </summary>
         public const string ShotId = "sim_shot";
         public const DamageCategory ShotCategory = DamageCategory.Physical;
-        public const float ShotPower = 41f;
+        public const float ShotPower = 70f;
         public const int ShotRange = BlastRange;
         public const int ShotCooldown = BlastCooldown;
 
         public const string BurstPhysicalId = "sim_burst_physical";
         public const string BurstSpecialId = "sim_burst_special";
-        public const float BurstPower = 20f;
+        public const float BurstPower = 37f;
         public const int BurstRadius = 2;
         public const int BurstCooldown = 2;
 

@@ -64,8 +64,9 @@ Two reports are committed, both the default arguments:
   the ATB turn order, so its battle lengths are in rounds.
 - `docs/balance/tuned-report.md` — the current roster after the second tuning pass (see
   `docs/balance/tuning-log.md`, "Retune for ATB + stances + crits + mixed encounters"), under the
-  current Runtime (the ATB turn order, combat stances, variance and crits) and the generated
-  encounters. Regenerate it
+  current Runtime (the square-root ATB turn order, the mitigation damage formula, combat stances,
+  variance and crits) and the generated encounters. It was regenerated after the formula change on
+  the **unchanged** roster, so it shows the balance shift the next retune has to absorb. Regenerate it
   whenever the roster, fixtures, simulator or Runtime change:
 
 ```sh
@@ -82,11 +83,18 @@ Ranged beasts, which never walk into melee, carry Shot (range 3) instead.
 
 | Skill | Category | Shape | Range | Power | Cooldown |
 | --- | --- | --- | ---: | ---: | ---: |
-| Blast | Special | SingleTarget | 3 | 40 | 1 |
-| Strike (Vanguard, Skirmisher) | Physical | SingleTarget | 1 | 57 | 1 |
-| Shot (Ranged) | Physical | SingleTarget | 3 | 41 | 1 |
-| Burst, physical half | Physical | AreaBurst, radius 2 around the caster | 2 | 20 | 2 |
-| Burst, special half | Special | AreaBurst, radius 2 around the caster | 2 | 20 | 2 |
+| Blast | Special | SingleTarget | 3 | 68 | 1 |
+| Strike (Vanguard, Skirmisher) | Physical | SingleTarget | 1 | 93 | 1 |
+| Shot (Ranged) | Physical | SingleTarget | 3 | 70 | 1 |
+| Burst, physical half | Physical | AreaBurst, radius 2 around the caster | 2 | 37 | 2 |
+| Burst, special half | Special | AreaBurst, radius 2 around the caster | 2 | 37 | 2 |
+
+**Power is a percent of the attacking stat** (`DamageFormula`: `Power / 100 x A x A / (A + D)`, then
+element, crit and variance; adopted from Sword x Staff, see
+`docs/balance/research-sword-x-staff.md`). The powers were rescaled from the old level-term formula
+(Blast 40, Strike 57, Shot 41, Burst 20) so a neutral hit between two average level-50 roster beasts
+takes the same share of HP as before; enemy powers in `encounters.json` were rescaled the same way
+(`P' = round(1.52 P + 7)`).
 
 The goal is that `Attack` and `SpecialAttack` (and `Defense` / `SpecialDefense`) carry equal weight
 for every stance. The first baseline did not manage that: Strike at cooldown 1 against Blast at
@@ -96,11 +104,12 @@ cooldown 2 weighted `Attack` about twice as heavily.
 - **Power offsets how often each fires.** Strike needs a free tile next to its target, so it fires
   less often than Blast: while the beast is still closing, and when the target is crowded. Shot has
   Blast's range but fires after it, so it occasionally finds that Blast has just felled the only
-  enemy in reach. Measured over the default PvE run at Strike 55 / Shot 40, Strike fired 0.70x as
-  often as Blast for both Vanguard and Skirmisher beasts and Shot 0.965x for Ranged beasts, so
-  Strike's power is 40 / 0.70 = 57 and Shot's 40 / 0.965 = 41. The report's **kit parity** table
-  checks the result per stance and per shape: the physical share of single-target power delivered
-  is 49.7-50.6% per stance (50.0% overall) at the defaults, and a stance outside 50 +/- 5 is flagged.
+  enemy in reach. Measured over the default PvE run after the square-root speed / mitigation formula
+  change, Strike fires 0.71-0.72x as often as Blast for Vanguard beasts and 0.81-0.82x for
+  Skirmishers (0.733x pooled, weighted by fires) and Shot about 0.965x for Ranged beasts, so
+  Strike's power is 68 / 0.733 = 93 and Shot's 68 / 0.965 = 70. One Strike serves two stances, so
+  Vanguards land a little under 50% and Skirmishers a little over. The report's **kit parity** table
+  checks the result per stance and per shape, and a stance outside 50 +/- 5 is flagged.
   **Why Shot:** before it, a Ranged beast only fired Strike at an enemy that was already adjacent,
   and the physical share fell to 37-47% (the tuning log's "After combat stances"), so `Attack` was
   under-weighted and the three Ranged beasts under-measured. Re-derive `StrikePower` / `ShotPower`
@@ -168,8 +177,8 @@ cooldown 2 weighted `Attack` about twice as heavily.
   - **Damage share / taken share**: the beast's share of its team's damage dealt and taken (HP
     actually removed, so overkill is not counted).
   - **Survival** (standing at the end), **time to clear** (normalized time of the clears it was
-    in) and **turns / time** (its turns per unit of time over its battles: Speed / 100 while it
-    stands).
+    in) and **turns / time** (its turns per unit of time over its battles: sqrt(Speed / 100) while
+    it stands). The stat table also lists each beast's **turn rate** at the matrix level.
   - Per shape, per level, and overall (every shape and level weighted equally), plus a per-shape
     ranking that shows niches, and the crit table.
   - **Element matchups** (`elemental` mode, every shape and level pooled): each beast's marginal over
@@ -208,9 +217,10 @@ encounter set simulates that.
 
 The shaman is a Vanguard: its storm is a disc around itself, so a Ranged shaman that keeps its
 distance would rarely catch anyone. The swarm is two single-skill types rather than one type with a
-physical and a special skill because every hit deals at least the damage formula's +2 floor: two
-hits per swarm unit doubled the floor damage, and at level 1 the horde could not be calibrated below
-35% clear even at the minimum multiplier.
+physical and a special skill because, under the old level-term formula, every hit dealt at least its
++2 offset: two hits per swarm unit doubled the floor damage, and at level 1 the horde could not be
+calibrated below 35% clear even at the minimum multiplier. (The current formula has no offset, only
+the 1-damage floor.)
 
 **Shapes** (`Shapes`):
 
@@ -274,8 +284,9 @@ to be simulator-side workarounds before they became Runtime rules:
 
 The default run has no stalemates, PvE or PvP.
 
-- **Turn order is the Runtime's ATB gauge.** `TurnManager` fills every unit's gauge by its Speed
-  and hands a turn to whoever reaches 1000, overflow carried, so twice the Speed is twice the turns.
+- **Turn order is the Runtime's ATB gauge.** `TurnManager` fills every unit's gauge by
+  `round(100 x sqrt(Speed))` per tick and hands a turn to whoever reaches 100000, overflow carried,
+  so turns grow with the square root of Speed (four times the Speed is twice the turns).
   There are no rounds: battle length is **normalized time**, 1.0 = one turn of a Speed-100 unit.
   Speed scales with level, so the same fight takes longer at level 1 than at level 100; compare
   times within a level. The cap (`--max-time`, default 2000, `BattleTurnExecutor.DefaultMaxTime`)
