@@ -1643,3 +1643,108 @@ Six three-seed iterations (about 11 minutes each) and one set of quick filters:
 - The mild tier is only on Light and Dark attacks: the player side gets it through Kirin's and
   Basilisk's elemental skills, and the enemy side through Light and Dark enemies dealt from the same
   deck, so it cuts both ways for every beast.
+
+## Thunderbird range vs move
+
+The element chart v2 retune cut the Thunderbird's Move 4 → 3 because, as the fastest beast, it
+reached the enemy alone and took its focus. The alternative (user suggestion): give it reach
+instead, so it does not have to walk deep into the fight. As a Skirmisher it retreats after firing
+with its leftover movement, capped to its longest enemy-side `SingleTarget` / `Line` range — with
+Thunder Talons at range 1 it could never actually retreat. Setup as in "Element chart v2": library
+kits and avatar at skill level 1, generated encounters, levels 1 / 50 / 100, **mean of seeds
+12345 / 777 / 4242**; only the Thunderbird's move range and Thunder Talons change. Chain Lightning
+(28 × 3, radius 2) is unchanged.
+
+| Variant | Move | Talons range | Talons power | DPT / budget |
+| --- | ---: | ---: | --- | --- |
+| **A** (element chart v2 final) | 3 | 1 | 36 × 3 = 108 | 108 / 90 = 1.2× (the ceiling) |
+| **B** (the budget rule's figure) | 4 | 2 | 26 × 3 = 78 | 78 / 70 = 1.11× (burst striker ≈ 1.1× → 77, rounded to whole hits) |
+| **C** (B at the ceiling) | 4 | 2 | 28 × 3 = 84 | 84 / 70 = 1.2× (the ceiling, like A) |
+
+### Results (3-seed means)
+
+| | A | B | **C (chosen)** |
+| --- | ---: | ---: | ---: |
+| Thunderbird `elemental` overall | −2.2 | −3.5 | **−2.9** |
+| Thunderbird `elemental` solo / elite / squad / horde | −4.4 (8) / −3.3 (9) / −0.7 (6) / −0.1 (6) | −4.3 (8) / −6.1 (10) / +1.6 (6) / −5.1 (8) | −3.4 (8) / −5.4 (10) / +2.2 (6) / −4.8 (8) |
+| Thunderbird `neutral` overall | −0.5 | −3.5 | −2.6 |
+| Thunderbird `neutral` solo / elite / squad / horde | −5.4 (7) / −7.0 (9) / +7.3 (2) / +3.0 (3) | −13.5 (8) / −8.4 (9) / +9.8 (1) / −2.1 (7) | −11.9 (8) / −7.3 (9) / +10.9 (1) / −1.9 (7) |
+| Thunderbird survival, `elemental` / `neutral` (mean of shapes) | 21.3% / 18.3% | 22.1% / 21.3% | 22.4% / 22.1% |
+| Thunderbird damage share, `elemental` / `neutral` | 26.4% / 27.5% | 26.5% / 29.2% | 27.1% / 30.0% |
+| All beasts, `elemental` overall (target ±5) | −2.2 … +2.7 (spread 4.9) | −3.5 … +3.0 (6.5) | −2.9 … +3.1 (6.0) |
+| All beasts, `neutral` overall (target ±7) | −5.1 … +4.4 (9.5) | −5.5 … +4.5 (10.0) | −5.8 … +4.3 (10.1) |
+| Top 3 in ≥ 1 shape, `elemental` | 8 / 10 (not Thunderbird, Golem) | 9 / 10 (not Thunderbird) | **9 / 10** (not Thunderbird) |
+| Top 3 in ≥ 1 shape, `neutral` | 6 / 10 | 8 / 10 | 7 / 10 |
+| Top 3 in every shape (either mode) | none | none | none |
+| Turn ratio | 1.118 | 1.118 | 1.118 |
+
+(n) = rank within the shape on the mean. Per single seed the Thunderbird's `elemental` overall runs
+−4.7 … +0.4 (A), −7.1 … −1.1 (B) and −6.6 … −0.4 (C); variant A reproduces the "Element chart v2"
+final tables exactly.
+
+**C, full `elemental`:**
+
+| Beast | `solo` | `elite` | `squad` | `horde` | Overall | Top-3 shapes |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Griffin | +5.4 (1) | +3.2 (2) | +5.0 (2) | −1.1 (7) | +3.1 | 3 |
+| Kirin | +1.0 (4) | +2.7 (3) | +3.6 (4) | +1.5 (5) | +2.2 | 1 |
+| Tarasque | +0.9 (5) | −0.3 (6) | +11.9 (1) | −6.2 (10) | +1.6 | 1 |
+| Basilisk | +3.1 (3) | +2.6 (4) | +3.0 (5) | −6.2 (9) | +0.6 | 1 |
+| Golem | +0.8 (6) | +1.7 (5) | −5.7 (8) | +4.1 (3) | +0.2 | 1 |
+| Treant | +5.1 (2) | −2.5 (8) | −10.6 (9) | +6.1 (1) | −0.5 | 2 |
+| Phoenix | −5.1 (9) | −4.1 (9) | +4.8 (3) | −0.3 (6) | −1.2 | 1 |
+| Leviathan | +0.1 (7) | +3.6 (1) | −10.7 (10) | +2.2 (4) | −1.2 | 1 |
+| Frost Wyrm | −7.7 (10) | −1.5 (7) | −3.6 (7) | +4.7 (2) | −2.0 | 1 |
+| Thunderbird | −3.4 (8) | −5.4 (10) | +2.2 (6) | −4.8 (8) | −2.9 | 0 |
+
+**C, full `neutral`:**
+
+| Beast | `solo` | `elite` | `squad` | `horde` | Overall | Top-3 shapes |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Kirin | +4.5 (6) | +6.2 (2) | +3.7 (3) | +2.8 (3) | +4.3 | 3 |
+| Golem | +6.9 (4) | +4.2 (4) | −5.4 (8) | +8.6 (1) | +3.6 | 1 |
+| Leviathan | +15.3 (1) | +7.4 (1) | −12.8 (10) | +1.6 (6) | +2.9 | 2 |
+| Basilisk | +9.7 (2) | +4.9 (3) | +1.6 (6) | −6.1 (9) | +2.5 | 2 |
+| Treant | +9.7 (3) | +3.6 (5) | −11.8 (9) | +3.2 (2) | +1.2 | 2 |
+| Griffin | +5.8 (5) | +1.4 (6) | +1.9 (5) | −9.3 (10) | −0.1 | 0 |
+| Frost Wyrm | −6.8 (7) | −5.6 (8) | +0.4 (7) | +2.7 (4) | −2.3 | 0 |
+| Thunderbird | −11.9 (8) | −7.3 (9) | +10.9 (1) | −1.9 (7) | −2.6 | 1 |
+| Tarasque | −16.8 (10) | −2.4 (7) | +8.4 (2) | −4.0 (8) | −3.7 | 1 |
+| Phoenix | −16.3 (9) | −12.3 (10) | +3.1 (4) | +2.3 (5) | −5.8 | 0 |
+
+### Decision: C
+
+The decision rule: keep the variant that best meets the targets, and prefer a range-2 variant
+(it keeps the Thunderbird's "fast" identity: the fastest beast with Move 4 again) if it is within
+about 1.5 points of A on the Thunderbird's `elemental` overall and breaks no target A meets.
+
+- **Both B and C qualify.** Every beast stays inside ±5 `elemental` and ±7 `neutral`, nobody is
+  top 3 everywhere, and the turn ratio does not move. The Thunderbird is 1.3 (B) and 0.7 (C) points
+  below A. Both **improve** the top-3 coverage in `elemental` from 8 to 9 of 10: the Golem takes the
+  horde's third place (+2.8 → +4.1, as Leviathan falls from +4.9 to +2.2), and Griffin moves up
+  to 2nd in `elite` and `squad` (from 4th and 5th).
+- **C over B:** closer to A on the Thunderbird (−2.9 vs −3.5 `elemental`, −2.6 vs −3.5 `neutral`),
+  a narrower `elemental` spread (6.0 vs 6.5) and a higher damage share. C puts Talons exactly where A
+  had it relative to its budget (1.2×, the ceiling); B's 1.1× would have been a quiet cut on top of
+  the reach change. B has one more `neutral` top-3 beast (8 vs 7; the secondary target).
+- **No follow-up tweak.** +2 per hit (30 × 3 = 90) would break the 1.2× ceiling (84) at range 2,
+  and −2 is B. Nothing else changed.
+
+What range 2 does: the Thunderbird survives more often (21.3% → 22.4% `elemental`, 18.3% → 22.1%
+`neutral`) and deals a larger share of its team's damage, and it becomes the best `neutral` squad
+beast (+10.9, 1st). It gets worse against the single big target and the horde (`elite` −3.3 → −5.4,
+`horde` −0.1 → −4.8 `elemental`): 84 per turn instead of 108 is less single-target damage, which
+the giant fight feels most; why the horde got worse was not isolated (this experiment only changed
+the two numbers). It still has **no `elemental`
+top-3 shape** (best 6th in `squad`, 2.6 points short), as in A.
+
+### Changes
+
+- `beast-roster.json`: Thunderbird `MoveRange` 3 → **4** (Speed unchanged, turn ratio 1.118).
+- `skill-library.json`: Thunder Talons `Range` 1 → **2**, power 36 → **28** × 3 hits (84 / 70 =
+  1.2× the range-2+ budget); description no longer says "rakes". Chain Lightning unchanged.
+- `SkillLibraryTests.Builder_MapsOpenersAndMultiHits` pins Talons' range 2 and 28 power;
+  `Library_UnlimitedDamageSkillsStayWithinTheFirstDraftPowerBudget` now checks Talons against the
+  range-2+ budget (84 ≤ 84).
+- `docs/design/battle-system.md`: roster table (Move 4), move-range note, budget note and the
+  Thunderbird kit table. `tuned-report.md` is regenerated from the default run (seed 12345).

@@ -690,14 +690,14 @@
     {
       "SkillId": "thunder_talons",
       "DisplayName": "Thunder Talons",
-      "Description": "Three quick electric rakes: many weak hits, each its own crit roll.",
+      "Description": "Three quick bolts loosed from its talons at two hexes: many weak hits, each its own crit roll.",
       "TargetShape": "SingleTarget",
-      "Range": 1,
+      "Range": 2,
       "Cooldown": 1,
       "Element": "Lightning",
       "Category": "Physical",
       "Effects": [
-        { "EffectType": "Damage", "Magnitude": 36, "HitCount": 3 }
+        { "EffectType": "Damage", "Magnitude": 28, "HitCount": 3 }
       ],
       "Progression": {
         "MaxLevel": 20,

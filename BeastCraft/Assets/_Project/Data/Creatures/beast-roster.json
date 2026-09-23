@@ -75,7 +75,7 @@
       "Elements": [ "Lightning" ],
       "GrowthCurveId": "medium",
       "Stance": "Skirmisher",
-      "BaseStats": { "Hp": 116, "Attack": 117, "Defense": 88, "SpecialAttack": 108, "SpecialDefense": 91, "Speed": 110, "MoveRange": 3, "CritChance": 15 }
+      "BaseStats": { "Hp": 116, "Attack": 117, "Defense": 88, "SpecialAttack": 108, "SpecialDefense": 91, "Speed": 110, "MoveRange": 4, "CritChance": 15 }
     },
     {
       "SpeciesId": "frost_wyrm",

@@ -453,6 +453,8 @@ namespace BeastCraft.Tests.EditMode
             Assert.AreEqual(0, dive.InitialCooldown);
             Assert.AreEqual(1, dive.MaxUsesPerBattle);
             Assert.AreEqual(3, talons.Effects[0].HitCount);
+            Assert.AreEqual(2, talons.Range, "Retuned from 1 (Thunderbird range vs move): it fires from outside melee and can retreat.");
+            Assert.AreEqual(28f, talons.Effects[0].Magnitude, "Retuned from 36 at range 1: 28 x 3 = 84 is 1.2x the range-2+ budget.");
             Assert.AreEqual(60, coup.Effects[0].ExecuteBonusPercent, "Retuned from 50 (the authored-kits retune).");
             Assert.AreEqual(SkillTargetingCriterion.HpFraction, coup.TargetingCriterion);
             Assert.AreEqual(DamageCategory.Special, coup.Category);

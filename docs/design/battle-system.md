@@ -1277,7 +1277,7 @@ beast's authored skill kit, the library avatar with its passives, the square-roo
 the mitigation damage formula, with base Speed widened so the fastest beast gets 10–15% more turns
 than the slowest. A light follow-up pass re-fit it to element chart v2 (four stat lines and nine
 skill numbers; see [`docs/balance/tuning-log.md`](../balance/tuning-log.md), which has the first
-draft and every pass, "Element chart v2" last). Nothing here is confirmed balance; the numbers are expected to move again
+draft and every pass, "Element chart v2" and its "Thunderbird range vs move" experiment last). Nothing here is confirmed balance; the numbers are expected to move again
 once real encounters exist.
 
 | SpeciesId | Beast | Element | Archetype | Stance | Curve | HP | ATK | DEF | SpA | SpD | SPE | Six-stat total | Move | Crit |
@@ -1286,7 +1286,7 @@ once real encounters exist.
 | `leviathan` | Leviathan | Water | Tank | Vanguard | medium | 132 | 86 | 126 | 86 | 100 | 94 | 624 | 3 | 3% |
 | `golem` | Golem | Earth | Pure wall | Vanguard | medium | 150 | 109 | 137 | 50 | 96 | 88 | 630 | 2 | 2% |
 | `griffin` | Griffin | Air | Fast skirmisher | Skirmisher | medium | 116 | 118 | 97 | 85 | 91 | 108 | 615 | 5 | 8% |
-| `thunderbird` | Thunderbird | Lightning | Burst striker | Skirmisher | medium | 116 | 117 | 88 | 108 | 91 | 110 | 630 | 3 | 15% |
+| `thunderbird` | Thunderbird | Lightning | Burst striker | Skirmisher | medium | 116 | 117 | 88 | 108 | 91 | 110 | 630 | 4 | 15% |
 | `frost_wyrm` | Frost Wyrm | Ice | Control / attrition | Vanguard | medium | 98 | 74 | 124 | 103 | 118 | 99 | 616 | 3 | 5% |
 | `treant` | Treant | Nature | Support-tank | Vanguard | medium | 134 | 77 | 98 | 105 | 124 | 92 | 630 | 3 | 3% |
 | `tarasque` | Tarasque | Metal | Armored bruiser | Vanguard | medium | 112 | 130 | 127 | 54 | 78 | 97 | 598 | 3 | 6% |
@@ -1331,9 +1331,11 @@ simulator. The drafting rules:
   Speed-stat band test with the turn-ratio test above; the order test is unchanged (Golem strictly
   slowest), so widening or reordering either is a deliberate design change.
 - **Move range in a small band (2–5)**, outside the budget. Griffin and Basilisk are the mobile
-  ends (5); Golem is the only 2. Thunderbird moved from 4 to 3 in the element chart v2 follow-up:
-  as the fastest beast with Move 4 it reached the enemy alone and took its focus (see the tuning
-  log); it still acts first.
+  ends (5); Golem is the only 2. Thunderbird moved from 4 to 3 in the element chart v2 follow-up
+  (as the fastest beast with Move 4 it reached the enemy alone and took its focus) and back to 4
+  when Thunder Talons went from range 1 to 2: at range 2 it fires from outside melee and, as a
+  Skirmisher, retreats to its reach with the leftover budget (see the tuning log, "Thunderbird range
+  vs move").
 - **Crit chance in a small band (0–25%)**, also outside the budget and not level-scaled (user-approved
   values; see "Variance and critical hits"). The roster tests pin the ten values and the band; the
   validator only requires a percent (0–100). "Range" in the archetypes means move range, the per-turn hex
@@ -1716,8 +1718,11 @@ role-scaled guide, deliberately:
   v2). The slowest beast with Move 2 lands it less often than any other melee skill, and at 75 the
   Golem was bottom three in every shape.
 - **Leviathan's Serpent Bite** is 86 (0.96×, above a tank's ≈ 0.8×; 82 before chart v2).
-- **Thunderbird's Thunder Talons** is 36 × 3 = 108 and **Chain Lightning** 28 × 3 at radius 2,
-  cooldown 2 = 84: both exactly at the 1.2× ceiling (1.1× and 1.07× before chart v2). Chart v2 took
+- **Thunderbird's Thunder Talons** is 28 × 3 = 84 at range 2 and **Chain Lightning** 28 × 3 at
+  radius 2, cooldown 2 = 84: both exactly at the 1.2× ceiling of the range-2+ budget (70). Talons
+  was 36 × 3 = 108 at range 1 (1.2× the melee budget) until "Thunderbird range vs move"; the
+  rule's own burst-striker figure at range 2 would be 1.1 × 70 = 77 (26 × 3), which measured
+  0.6 points worse. Chart v2 took
   away most of the Thunderbird's elemental edge (Metal now hits Lightning for 2x), which had been
   hiding a weak neutral line; see the tuning log.
 
@@ -1781,7 +1786,7 @@ learnable by level 5.
 
 | Skill | Learn | Default | Shape | Cat. | Cd | Effects | Dmg/turn | Tier bonuses |
 | --- | ---: | :---: | --- | --- | ---: | --- | ---: | --- |
-| Thunder Talons `thunder_talons` | 1 | slot 1 | SingleTarget r1 | Physical | 1 | Damage 36 x3 hits | 108 | L10: adds -5% Defense 2t, stacks x3; L15: adds Damage 25 |
+| Thunder Talons `thunder_talons` | 1 | slot 1 | SingleTarget r2 | Physical | 1 | Damage 28 x3 hits | 84 | L10: adds -5% Defense 2t, stacks x3; L15: adds Damage 25 |
 | Chain Lightning `chain_lightning` | 1 | slot 2 | AreaBurst r2 | Special | 2 | Damage 28 x3 hits | 84 | L10: adds Stun 1t (10%); L15: adds -8% SpecialDefense 2t |
 | Static Charge `static_charge` | 3 | slot 3 | Self | - | 4 | +25 CritChance 3t; +10% Speed 3t | - | L10: adds +10% Attack 3t; L15: -1 cd |
 | Storm Dive `storm_dive` | 8 |  | SingleTarget r3 | Physical | 4 (first turn, 1/battle) | Damage 230 | 58 | L10: adds Stun 1t (25%); L15: adds -15% Defense 2t |
@@ -2174,7 +2179,8 @@ normalization. The per-beast element effect (`elemental` minus `neutral` overall
 seeds) narrowed from −8.9 … +12.5 to −4.3 … +3.8 on the unchanged roster. That left Thunderbird at
 −7.2 `elemental` (its old edge had hidden a weak neutral line), so a light retune followed (four
 stat lines, nine skill numbers, six three-seed iterations); `tuned-report.md` is regenerated and the
-tuning log's "Element chart v2" section has the tables.
+tuning log's "Element chart v2" section has the tables. A follow-up experiment ("Thunderbird range
+vs move") then gave Thunder Talons range 2 at 28 × 3 and restored the Thunderbird's Move 4.
 
 Every pass so far is deliberately **data structures and algorithms only** — no MonoBehaviours, no
 scene or prefab wiring, and no committed `.asset` instances (the roster's are generated in-Editor). The hex radii backing each arena preset
