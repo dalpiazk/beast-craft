@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using BeastCraft.Battle;
 using BeastCraft.Customization.Creature;
 using UnityEngine;
 
@@ -43,6 +44,14 @@ namespace BeastCraft.Creatures
 
         /// <summary>Skills this species learns, with the level each becomes available.</summary>
         public List<SkillLearnEntry> LearnableSkills = new List<SkillLearnEntry>();
+
+        /// <summary>
+        /// The skills a fresh beast of this species takes into battle, in slot (fire-priority)
+        /// order: up to <c>BeastSkillBook.EquipSlotCount</c>, each also in
+        /// <see cref="LearnableSkills"/> at a low level. Generated from the skill library JSON with
+        /// <see cref="LearnableSkills"/>; a starting point for the equip screen, not a restriction.
+        /// </summary>
+        public List<SkillSO> DefaultLoadout = new List<SkillSO>();
 
         /// <summary>
         /// This species' elemental affinities, read when it is on the receiving end of an

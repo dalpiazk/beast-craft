@@ -9,7 +9,7 @@ using BeastCraft.Creatures;
 namespace BeastCraft.Tooling.BalanceSim
 {
     /// <summary>
-    /// Entry point. Exit codes: 0 success, 1 bad arguments, 2 invalid roster or encounters, 3 a self-check failed.
+    /// Entry point. Exit codes: 0 success, 1 bad arguments, 2 invalid roster, skill library or encounters, 3 a self-check failed.
     /// </summary>
     public static class Program
     {
@@ -51,6 +51,23 @@ namespace BeastCraft.Tooling.BalanceSim
             {
                 Console.Error.WriteLine("The roster needs at least two species.");
                 return 2;
+            }
+
+            if (options.NeedsLibrary)
+            {
+                string libraryPath = SkillLibraryKits.ResolvePath(options.SkillLibraryPath);
+                if (libraryPath == null || !File.Exists(libraryPath))
+                {
+                    Console.Error.WriteLine("Could not find " + SkillLibraryKits.RepoRelativePath +
+                                            "; run from inside the repo or pass --skill-library <path>.");
+                    return 2;
+                }
+
+                options.Library = SkillLibraryKits.Load(libraryPath, rosterPath, options.SkillLevel, errors);
+                if (options.Library == null)
+                {
+                    return Fail("Skill library '" + libraryPath + "' is invalid:", errors);
+                }
             }
 
             EncounterCatalog encounters = new EncounterCatalog();

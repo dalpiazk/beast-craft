@@ -1023,3 +1023,50 @@ points.
 - **Re-tune the six-stat lines** for the new Attack / Defense weighting, then re-derive Strike and
   Shot parity once more.
 - **Re-run the multi-seed check** (seeds 12345, 777 and 4242) as in the second pass.
+
+## Skill library: exploratory run (pre-retune)
+
+**Exploratory, not the tuned report.** The first authored kits (`skill-library.json`, see the design
+doc's "Beast skill kits") were fielded once with `--kit library --avatar library --mode pve` (skill
+level 1, default seed 12345, generated set, levels 1 / 50 / 100, both kit modes) on the **unchanged**
+roster, beside a standard-kit PvE run of the same code for comparison. The committed
+`tuned-report.md` still uses the standard kit; the next deliverable switches the default to the
+library kits and retunes the roster against them.
+
+Overall marginal clear rate (points), levels and shapes averaged:
+
+| Beast | Stance | Standard kit, `elemental` | Library kit, `elemental` | Library kit, `neutral` |
+| --- | --- | ---: | ---: | ---: |
+| Basilisk | Ranged | +6.3 | **+10.8** | **+26.1** |
+| Thunderbird | Skirmisher | +3.1 | **+5.4** | _-10.3_ |
+| Tarasque | Vanguard | -1.3 | +0.4 | +1.5 |
+| Phoenix | Ranged | +0.9 | -1.2 | -2.7 |
+| Kirin | Ranged | +1.1 | -1.2 | +2.4 |
+| Frost Wyrm | Vanguard | -0.4 | -1.4 | -2.7 |
+| Griffin | Skirmisher | +1.2 | -1.7 | -0.3 |
+| Leviathan | Vanguard | -0.7 | -1.8 | -3.4 |
+| Golem | Vanguard | _-6.5_ | -3.6 | _-6.5_ |
+| Treant | Vanguard | -3.8 | _-5.6_ | -4.0 |
+
+Library `elemental` by shape (solo / elite / squad / horde): Basilisk +7.1 / +10.7 / +15.7 / +9.5;
+Thunderbird +11.6 / -7.2 / +6.8 / +10.5 (its horde weakness, -16.4 on the standard kit, is gone:
+Chain Lightning does what it was designed to); Leviathan +3.3 / +8.4 / -14.6 / -4.2; Golem
+-3.2 / +2.9 / -4.0 / -10.2; Treant -2.4 / -4.6 / -10.1 / -5.5.
+
+Read-outs for the retune (first impressions, one seed):
+
+- **Basilisk is the outlier**, most of all in `neutral` (+26.1): Coup de Grace (execute +50%, picks
+  the lowest-HP% enemy in range) plus stacking poison finishes targets the team has already softened.
+  Its execute power or poison stack cap is the first knob.
+- **Thunderbird's element carries it**: +5.4 in `elemental`, -10.3 in `neutral`. The kit is three
+  sub-40-power hits per skill; without the Lightning multiplier its per-hit damage sinks under the
+  mitigation curve. Worth checking with the retune rather than raising power blindly.
+- **The tanks remain the weakest marginals** (Golem, Treant, Leviathan in squads): taunt and shields
+  keep the team alive but a clear-rate metric at calibrated difficulty rewards damage. The library
+  kits narrow Golem's gap (-6.5 → -3.6 elemental) but do not close it.
+- **Calibration moved** because the library avatar is fielded: solo / elite multipliers ~x0.86–0.98,
+  squad / horde ~x1.26–1.39 (standard kit, no avatar: see `tuned-report.md`). `neutral` / `solo` /
+  level 1 missed its clear-rate target (36.7%), the only calibration miss.
+- **Avatar passives:** Keen Eye and Opening Ward fire once per battle as designed; Last Stand fires
+  2.98 times per battle on average (40% threshold, cooldown 2) — likely the strongest default
+  passive per slot.

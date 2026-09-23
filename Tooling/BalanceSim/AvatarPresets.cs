@@ -10,8 +10,10 @@ namespace BeastCraft.Tooling.BalanceSim
     /// <summary>
     /// The avatar the PvE runs can field (<c>--avatar</c>). <see cref="None"/> (the default) fields
     /// no avatar at all, exactly as before avatar support existed, so the committed report is
-    /// unchanged. Any other preset is a <strong>simple fixture</strong> for exercising the passive
-    /// engine end to end — not authored content and not a balance claim: no avatar kit exists yet.
+    /// unchanged. <see cref="Support"/> is a <strong>simple fixture</strong> for exercising the
+    /// passive engine end to end — not authored content and not a balance claim.
+    /// <see cref="Library"/> is the authored avatar: the skill library's default loadout (its first
+    /// three actives and its <c>AvatarDefaultPassives</c>) at <c>--skill-level</c>.
     /// </summary>
     public sealed class AvatarPresets
     {
@@ -24,15 +26,30 @@ namespace BeastCraft.Tooling.BalanceSim
         /// </summary>
         public const string Support = "support";
 
+        /// <summary>The skill library's default avatar loadout (actives and passives) at <c>--skill-level</c>.</summary>
+        public const string Library = "library";
+
         /// <summary>Every accepted <c>--avatar</c> value, for parsing and usage text.</summary>
-        public static readonly string[] Names = { None, Support };
+        public static readonly string[] Names = { None, Support, Library };
 
         private readonly List<PassiveSkillSO> _passives = new List<PassiveSkillSO>();
+        private readonly List<SkillSO> _actives = new List<SkillSO>();
+        private readonly SkillLibraryKits _library;
 
-        /// <summary>Builds the preset's authored passives once; <see cref="None"/> has none.</summary>
-        public AvatarPresets(string preset)
+        /// <summary>
+        /// Builds the preset's passives (and, for <see cref="Library"/>, actives) once; <see cref="None"/>
+        /// has none. <paramref name="library"/> is required for <see cref="Library"/> and ignored otherwise.
+        /// </summary>
+        public AvatarPresets(string preset, SkillLibraryKits library = null)
         {
             Preset = preset ?? None;
+
+            if (Preset == Library)
+            {
+                _library = library ?? throw new ArgumentException("The library avatar preset needs the skill library.", nameof(library));
+                _passives.AddRange(library.AvatarPassives);
+                _actives.AddRange(library.AvatarActives);
+            }
 
             if (Preset == Support)
             {
@@ -74,6 +91,18 @@ namespace BeastCraft.Tooling.BalanceSim
             get { return _passives; }
         }
 
+        /// <summary>The preset's active skills in slot order (only <see cref="Library"/> has any).</summary>
+        public IReadOnlyList<SkillSO> Actives
+        {
+            get { return _actives; }
+        }
+
+        /// <summary>Whether the preset is authored content (<see cref="Library"/>) rather than a fixture.</summary>
+        public bool IsAuthored
+        {
+            get { return Preset == Library; }
+        }
+
         /// <summary>Whether <paramref name="name"/> is a known preset.</summary>
         public static bool IsKnown(string name)
         {
@@ -97,12 +126,24 @@ namespace BeastCraft.Tooling.BalanceSim
             List<PassiveInstance> instances = new List<PassiveInstance>();
             foreach (PassiveSkillSO passive in _passives)
             {
-                instances.Add(new PassiveInstance(passive));
+                instances.Add(_library == null ? new PassiveInstance(passive) : _library.PassiveInstance(passive));
             }
 
             passives = new PassiveLoadout(instances);
+            SkillLoadout actives = null;
+            if (_library != null)
+            {
+                List<SkillInstance> skills = new List<SkillInstance>();
+                foreach (SkillSO skill in _actives)
+                {
+                    skills.Add(_library.Instance(skill));
+                }
+
+                actives = SkillLoadout.FromInstances(skills);
+            }
+
             int stat = 10 + level;
-            return BattleAvatar.Create(null, new StatBlock(1, stat, stat, stat, stat, 0), null, BattleAvatar.DefaultId, level);
+            return BattleAvatar.Create(actives, new StatBlock(1, stat, stat, stat, stat, 0), null, BattleAvatar.DefaultId, level);
         }
 
         private static PassiveSkillSO Passive(string id, PassiveTrigger trigger, PassiveTarget scope, SkillEffect effect)

@@ -31,7 +31,9 @@ dotnet run --project Tooling/BalanceSim -c Release -- [options]
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `--mode <m>` | `both` | `pve`, `pvp` or `both`. |
-| `--kit <k>` | `both` | `elemental`, `neutral` or `both` (see below). |
+| `--kit <k>` | `both`, `standard` | Two axes on one flag; pass it twice to set both. Element axis: `elemental`, `neutral` or `both` (see below). Skill axis: `standard` (the standard kit, the committed report's setting) or `library` (each beast's authored `DefaultLoadout` from `skill-library.json`; see "Library kits"). |
+| `--skill-level <n>` | `1` | Skill level (1-20) for library skills and library avatar skills; the tier is the gates below that level (16+ = all three passed). |
+| `--skill-library <path>` | found by walking up | Path to `skill-library.json` (read only with `--kit library` or `--avatar library`). |
 | `--levels <list>` | `1,50,100` | Comma-separated levels; beasts and enemies fight at the same level. |
 | `--encounter-set <s>` | `generated` | `generated`: random compositions per shape (see "Generated encounters"). `fixed`: the three hand-authored encounters (`boss`, `swarm`, `pack`). |
 | `--compositions <n>` | `8` | Generated compositions per shape. |
@@ -46,13 +48,13 @@ dotnet run --project Tooling/BalanceSim -c Release -- [options]
 | `--matrix-level <n>` | `50` | Level of the PvP win matrix and the stat table (falls back to the highest simulated level). |
 | `--roster <path>` | found by walking up | Path to `beast-roster.json`. |
 | `--encounters-file <path>` | found by walking up | Path to `encounters.json`. |
-| `--avatar <preset>` | `none` | PvE only. `none` fields no avatar (the committed report's setting). `support` fields a fixture avatar with three passive skills beside every player team (`AvatarPresets.cs`; not authored content) and adds an "Avatar passives" section with firings per battle. See `docs/design/battle-system.md`, "Avatar passives". |
+| `--avatar <preset>` | `none` | PvE only. `none` fields no avatar (the committed report's setting). `support` fields a fixture avatar with three passive skills beside every player team (`AvatarPresets.cs`; not authored content). `library` fields the skill library's default avatar: its first three actives and `AvatarDefaultPassives`, at `--skill-level`. Either adds an "Avatar passives" section with firings per battle. See `docs/design/battle-system.md`, "Avatar passives" and "Beast skill kits". |
 | `--out <path>` | none | Also write the report to this file (it always goes to stdout). |
 | `--self-check` | off | Run everything twice and fail unless both reports are identical; also replay sample PvE battles through `BattleTurnExecutor.RunBattle` and fail if the simulator's loop disagrees. |
 
-Exit codes: `0` success, `1` bad arguments, `2` missing or invalid roster or encounters (the roster
-is checked with `BeastRosterValidator` first, exactly as the Editor importer does), `3` a self-check
-failed. The run time goes to stderr, never into the report. The default run (both modes, both kits,
+Exit codes: `0` success, `1` bad arguments, `2` missing or invalid roster, skill library or encounters
+(the roster is checked with `BeastRosterValidator` and the library with `SkillLibraryValidator`
+first, exactly as the Editor importers do), `3` a self-check failed. The run time goes to stderr, never into the report. The default run (both modes, both kits,
 three levels, four shapes x 8 compositions, 1 sample per team and composition) takes about
 150 s on an 8-thread machine (about 5.5 minutes with `--self-check`, which runs
 everything twice and replays two teams per composition through `RunBattle`). PvE battles run in
@@ -74,9 +76,28 @@ Two reports are committed, both the default arguments:
 dotnet run --project Tooling/BalanceSim -c Release -- --out docs/balance/tuned-report.md
 ```
 
+## Library kits
+
+`--kit library` replaces the standard kit with each beast's authored `DefaultLoadout` from
+`BeastCraft/Assets/_Project/Data/Skills/skill-library.json` (`SkillLibraryLoader.cs`), built through
+`SkillLibraryBuilder` — the same DTO-to-`SkillSO` mapping as the Editor importer — and fielded as
+`SkillInstance`s at `--skill-level` and the tier that level implies. In `neutral` mode every library
+skill's element is forced to `None`. The report then shows a "Library beast kits" table in place of
+the standard kit and drops the kit parity table (it measures the standard kit's Strike / Shot / Blast
+balance; library kits differ by design). PvP uses the library kits too. `--avatar library` fields the
+library's default avatar (first three actives, `AvatarDefaultPassives`) on the same skill level; the
+avatar's stats are the same level-scaled fixture block as `support`'s.
+
+The default stays `--kit standard --avatar none`, so the committed report is unchanged until the
+retune that adopts the library kits. For a quick check:
+
+```sh
+dotnet run --project Tooling/BalanceSim -c Release -- --kit library --avatar library --self-check --mode pve --levels 50 --compositions 2
+```
+
 ## The standard kit
 
-No skills are authored yet, so every beast fights with the same kit, and its stat line is what gets
+With the default `--kit standard`, every beast fights with the same kit, and its stat line is what gets
 measured. Fire priority is Blast, the physical single-target skill, then Burst. Every beast skill
 aims at the nearest enemy. The physical skill depends on the beast's combat stance (see "Runtime
 rules" below): Vanguard and Skirmisher beasts carry Strike (range 1), which walks them into melee;

@@ -1290,9 +1290,10 @@ simulator. The drafting rules:
 - **Stances follow the archetypes** (decision 8): the artillery-style casters (Phoenix, Kirin,
   Basilisk) are Ranged, the fast strikers (Thunderbird, Griffin) Skirmishers, and the five tanks and
   bruisers hold the line as Vanguards. The roster tests pin all ten.
-- **Skills, evolutions and customization are empty.** No skills have been authored yet, so every
-  species' `LearnableSkills` and `EvolutionOptions` are empty and `CustomizationSchema` and `Icon`
-  are unset. The importer never touches those fields, so authoring them on the assets later is safe.
+- **Evolutions and customization are empty.** Every species' `EvolutionOptions` is empty and
+  `CustomizationSchema` and `Icon` are unset. Skills are authored in the skill library (see "Beast
+  skill kits"), whose importer fills `LearnableSkills` and `DefaultLoadout`; the roster importer
+  never touches any of those fields.
 
 ### Growth-curve semantics — DECIDED FOR AUTHORED DATA
 
@@ -1444,8 +1445,8 @@ system and no authored materials or tier bonuses exist yet.
 (decision 6) and gains **3 passive slots**, which are its main role. Passives are acquired and
 leveled slowly through play on **the same progression model as beast skills** (practice XP,
 materials, tier breakthroughs), and so are the avatar's active skills. The trigger semantics, hook
-points, gating order and scopes below are engineering defaults chosen by the lead; no passive
-content exists yet (content is the next deliverable).
+points, gating order and scopes below are engineering defaults chosen by the lead. The first passive
+content (10 passives across every trigger) is in the skill library; see "Beast skill kits".
 
 **Data** (explicit enum values, never renumbered; ids never renamed after ship):
 
@@ -1550,7 +1551,8 @@ EditMode suite and the simulator's committed report are unchanged.
 credits both books on the ordinary rules: 10 XP per use, at most 20 uses per award. A passive's use
 is a time it fired; blocked triggers and failed proc rolls are not uses.
 
-**Simulator.** `--avatar none|support` (default `none`, so the committed report is unchanged).
+**Simulator.** `--avatar none|support|library` (default `none`, so the committed report is unchanged;
+`library` is the authored default avatar, see "Beast skill kits").
 `support` is a fixture, not content: a +5 crit aura, a two-turn Defense shield on a beast that
 drops below 40% (cooldown 2), and a 50% chance of a two-turn +10% Attack surge for the team on each
 enemy defeat, on an avatar whose flat stats grow with the battle level. The report then gains an
@@ -1563,7 +1565,251 @@ dealt the blow rather than the unit whose turn it is (they differ for damage-ove
 kills). Whether a failed proc roll should consume the threshold crossing. Whether internal cooldowns
 should run on the avatar's own clock if the avatar ever gets a gauge (decision 6's open item).
 How passives are acquired (drops, quests, avatar milestones) and the passive material economy. No
-passive content, UI or save system exists yet.
+passive UI or save system exists yet.
+
+## Beast skill kits — FIRST-DRAFT CONTENT, NOT CONFIRMED BALANCE
+
+Every authored skill lives in **`BeastCraft/Assets/_Project/Data/Skills/skill-library.json`**, the
+same JSON-as-source-of-truth pattern as the roster (see "JSON is the source of truth" above): 60 beast
+skills (six per beast), 6 avatar actives, 10 avatar passives, 3 skill materials, and per species its
+`LearnableSkills` (level → skill id) and `DefaultLoadout` (3 skill ids in slot, i.e. fire-priority,
+order). The numbers are a **first draft for the balance simulator to correct**: they follow the
+budget rule below, but nothing here has been tuned against the sim yet (the roster retune for
+authored kits is the next deliverable).
+
+**Data and tooling.** The C# shape is `BeastCraft.Skills.SkillLibraryData` (Runtime; enums written as
+member names; a missing `TargetingCriterion` means `Distance` — the nearest unit — not `SkillSO`'s
+`Random`, so authored skills never spend the rng on targeting, and the validator rejects `Random`).
+`SkillLibraryBuilder` is the one DTO → `SkillSO` / `PassiveSkillSO` / `SkillMaterialSO` mapping,
+shared by the Editor importer and the simulator. `SkillLibraryValidator` holds the structural rules:
+ids unique across the whole file and snake_case; every reference resolves; every enum parses;
+numbers in sane bands (power 0–400, chance 1–100, cooldown 0–10, hits 1–8, stacks 1–10, execute
+0–200, knockback 1–4 whole hexes, a timed status needs a duration, damage and heals are instant);
+avatar actives use only `Self` / `AllAllies` / `AllEnemies` and never knockback; tier gates rise
+and name an existing material tier; cooldown reductions never take a cooldown below 1; every
+species learns at least 5 skills, its 3 defaults are learnable by level 5, and at least one default is
+an enemy-side `SingleTarget` or `Line` skill (the only kind that walks a beast forward — a kit
+without one never moves). Given the roster it also checks that kits and species match one to one and
+that a **Ranged** beast's defaults hold no enemy-side positional skill of range 1 (it would never walk
+in to use it). The content guidelines — five or six skills per beast, each beast's signature
+mechanics, the tier pattern, the power budget — are EditMode tests (`SkillLibraryTests`), not
+validator rules, so the balance pass can move them.
+
+**Workflow:** edit the JSON, then in Unity run **Beast Craft → Data → Import Beast Roster** and then
+**Beast Craft → Data → Import Skill Library**. The importer
+(`BeastCraft.Editor.Data.SkillLibraryImporter`) validates first (all-or-nothing), creates or updates
+in place a `SkillSO` per beast skill (`Data/Skills/Beast/`) and avatar active
+(`Data/Skills/AvatarActive/`), a `PassiveSkillSO` per passive (`Data/Skills/AvatarPassive/`) and a
+`SkillMaterialSO` per material (`Data/Skills/Materials/`), matched by id anywhere in the project
+(GUIDs survive), and replaces each species asset's `LearnableSkills` and new `DefaultLoadout` list.
+It never touches an asset's `Icon` and never deletes. No generated assets are committed yet.
+
+**Honest mechanics.** Every effect uses only what the engine has. There is no revive, cleanse,
+evasion, pull or counter-attack mechanic, so the kits say so: Phoenix's "Rebirth Flame" is a
+once-per-battle self heal and large shield; Kirin's "Purifying Ward" is a team shield and Special
+Defense boost; Griffin's "evasion" is a Defense / Special Defense / MoveRange self-buff; Leviathan's
+"Undertow" pull is a taunt plus slow; Tarasque's "counter" stance is a Defense / Attack fortify.
+Freeze and root are `Stun`, Burn and Poison are `DamageOverTime`.
+
+**Heals are flat** (the engine applies `Heal` magnitude as raw HP, read by no stat). The heal
+numbers are sized for mid levels (a level-50 beast has roughly 55–85 HP), so they are relatively huge
+at level 1 and small at level 100 — a known engine limit the simulator will show; shields (a percent
+of the caster's `Defense`) and damage-over-time (a snapshotted power) scale with level and carry
+most of the sustain for that reason.
+
+### The power budget (first draft)
+
+Damage per cooldown turn, **DPT = Σ(power × hits × (1 + execute / 200)) + Σ(DoT power × turns × 0.5 ×
+chance), × shape factor, ÷ max(1, cooldown)**. Shape factor: `SingleTarget` 1.0, `Line` 1.3, `Cross`
+1.5, `AreaBurst` 1.5 at radius 1 and 2.0 at radius 2+, `AllEnemies` 2.5 (rough expected targets).
+The execute term assumes the target is on average half dead; DoT counts half because it is delayed
+and can be outlived.
+
+- **Budget per slot:** a pure damage skill aims at **DPT ≈ 90 at range 1** and **≈ 70 at range 2+**
+  — exactly the standard kit's Strike / Blast parity, so a library kit and the standard kit start in
+  the same place.
+- **Role scaling:** tanks and supports ≈ 0.8× (low damage by design), glass cannons and burst
+  strikers ≈ 1.1×.
+- **Utility trades damage:** a damage skill with a rider (a debuff, a knockback, a low-chance stun,
+  a DoT) sits around 0.75× its budget; one with hard control (stun ≥ 30%) or a taunt around 0.3–0.5×;
+  pure utility (heal, shield, buff, taunt) carries no damage.
+- **Limited-use openers** (`MaxUsesPerBattle` > 0, often `InitialCooldown` 0) may exceed the per-turn
+  budget per use (Storm Dive is 230 power once), since they cannot repeat.
+- **Tiers stay modest:** gates at levels 5 / 10 / 15 needing material tiers 1 / 2 / 3; the level-10
+  gate adds a small bonus effect and the level-15 gate either takes 1 off a cooldown of 3 or more or
+  adds another small effect (never −1 on a cooldown-2 damage skill, which would double it). Levels
+  add 3% magnitude each (1.57× at level 20), per the progression defaults.
+
+The test `Library_UnlimitedDamageSkillsStayWithinTheFirstDraftPowerBudget` holds every unlimited
+damage skill at or below 1.2× its budget. The "Dmg/turn" column below is this DPT.
+
+### Kits
+
+**Default loadouts** follow the role: tanks = damage (the approach skill, first so the others fire
+from the tile it walked to) + taunt + mitigation; supports = heal + buff/shield + damage; damage
+dealers = two damage skills + one utility. Learn levels spread from 1 to 60; every default is
+learnable by level 5.
+
+#### Phoenix — Fire, Ranged
+
+| Skill | Learn | Default | Shape | Cat. | Cd | Effects | Dmg/turn | Tier bonuses |
+| --- | ---: | :---: | --- | --- | ---: | --- | ---: | --- |
+| Ember Shot `ember_shot` | 1 | slot 1 | SingleTarget r3 | Special | 1 | Damage 55; DoT 14 3t, stacks x3 | 76 | L10: adds -5% SpecialDefense 2t; L15: adds Damage 15 |
+| Flame Wave `flame_wave` | 1 | slot 2 | Line r4 | Special | 2 | Damage 95; DoT 10 2t (50%) | 65 | L10: adds -8% SpecialDefense 2t; L15: adds DoT 10 2t |
+| Rebirth Flame `rebirth_flame` | 4 | slot 3 | Self | - | 4 (1/battle) | Heal 30; Shield 80% Def 3t | - | L10: adds +15% SpecialAttack 3t; L15: adds +10% Speed 3t |
+| Blaze Bolt `blaze_bolt` | 12 |  | SingleTarget r4 | Special | 2 | Damage 150 | 75 | L10: adds DoT 15 2t; L15: adds -10% SpecialDefense 2t |
+| Firestorm `firestorm` | 30 |  | AllEnemies | Special | 4 | Damage 40; DoT 12 2t, stacks x3 | 32 | L10: adds -8% SpecialDefense 2t; L15: -1 cd |
+| Sunfire Nova `sunfire_nova` | 55 |  | Cross r3 | Special | 3 | Damage 110; DoT 15 3t | 66 | L10: adds -10% SpecialDefense 2t; L15: -1 cd |
+
+#### Leviathan — Water, Vanguard
+
+| Skill | Learn | Default | Shape | Cat. | Cd | Effects | Dmg/turn | Tier bonuses |
+| --- | ---: | :---: | --- | --- | ---: | --- | ---: | --- |
+| Serpent Bite `serpent_bite` | 1 | slot 1 | SingleTarget r1 | Physical | 1 | Damage 75 | 75 | L10: adds -8% Attack 2t; L15: adds DoT 10 2t |
+| Undertow `undertow` | 1 | slot 2 | AreaBurst r2 | - | 3 | Taunt 2t (70%); -10% Speed 2t | - | L10: adds -10% SpecialAttack 2t; L15: -1 cd |
+| Deep Shell `deep_shell` | 3 | slot 3 | Self | - | 3 | Shield 50% Def 3t; Heal 12 | - | L10: adds +15% SpecialDefense 3t; L15: -1 cd |
+| Tidal Wave `tidal_wave` | 8 |  | Line r3 | Special | 2 | Damage 90; Knockback 1 hex (50%) | 58 | L10: adds -10% Speed 2t; L15: adds -8% SpecialDefense 2t |
+| Maelstrom `maelstrom` | 30 |  | AreaBurst r2 | Special | 3 | Damage 70; -15% SpecialDefense 2t | 47 | L10: adds DoT 10 2t; L15: -1 cd |
+| Tidal Renewal `tidal_renewal` | 50 |  | AreaBurst (ally) r2 | - | 4 | Heal 14; +10% Defense 2t | - | L10: adds Shield 20% Def 2t; L15: -1 cd |
+
+#### Golem — Earth, Vanguard
+
+| Skill | Learn | Default | Shape | Cat. | Cd | Effects | Dmg/turn | Tier bonuses |
+| --- | ---: | :---: | --- | --- | ---: | --- | ---: | --- |
+| Boulder Slam `boulder_slam` | 1 | slot 1 | SingleTarget r1 | Physical | 1 | Damage 75 | 75 | L10: adds -10% Speed 2t (50%); L15: adds Knockback 1 hex |
+| Stone Challenge `stone_challenge` | 1 | slot 2 | AreaBurst r2 | - | 3 | Taunt 2t (85%) | - | L10: adds -10% Attack 2t; L15: -1 cd |
+| Granite Bulwark `granite_bulwark` | 3 | slot 3 | AreaBurst (ally) r1 | - | 3 | Shield 35% Def 2t | - | L10: adds +10% SpecialDefense 2t; L15: -1 cd |
+| Tectonic Shove `tectonic_shove` | 12 |  | SingleTarget r1 | Physical | 2 | Damage 70; Knockback 2 hex | 35 | L10: adds -10% Defense 2t; L15: adds Stun 1t (10%) |
+| Quake `quake` | 25 |  | AreaBurst r2 | Physical | 3 | Damage 80; -15% Speed 2t (40%) | 53 | L10: adds Stun 1t (10%); L15: -1 cd |
+| Stoneskin `stoneskin` | 40 |  | Self | - | 4 | +25% Defense 3t; +25% SpecialDefense 3t | - | L10: adds Shield 30% Def 2t; L15: -1 cd |
+
+#### Griffin — Air, Skirmisher
+
+| Skill | Learn | Default | Shape | Cat. | Cd | Effects | Dmg/turn | Tier bonuses |
+| --- | ---: | :---: | --- | --- | ---: | --- | ---: | --- |
+| Gale Talon `gale_talon` | 1 | slot 2 | SingleTarget r1 | Physical | 1 | Damage 88 | 88 | L10: adds -8% Defense 2t; L15: adds Damage 20 |
+| Wind Lance `wind_lance` | 1 | slot 1 | Line r3 | Physical | 2 | Damage 105 | 68 | L10: adds Knockback 1 hex; L15: adds -10% Speed 2t |
+| Gust `gust` | 3 | slot 3 | AreaBurst r1 | Physical | 3 | Damage 45; Knockback 2 hex | 22 | L10: adds -10% Speed 2t; L15: -1 cd |
+| Tailwind `tailwind` | 12 |  | Self | - | 4 | +20% Defense 2t; +20% SpecialDefense 2t; +1 MoveRange 2t | - | L10: adds +10% Speed 2t; L15: -1 cd |
+| Updraft `updraft` | 28 |  | AllAllies | - | 5 | +10% Speed 2t; +1 MoveRange 2t | - | L10: adds +5% Attack 2t; L15: -1 cd |
+| Sky Rend `sky_rend` | 50 |  | SingleTarget r1 | Physical | 2 | Damage 175; -10% Defense 2t | 88 | L10: adds DoT 12 2t; L15: adds Stun 1t (10%) |
+
+#### Thunderbird — Lightning, Skirmisher
+
+| Skill | Learn | Default | Shape | Cat. | Cd | Effects | Dmg/turn | Tier bonuses |
+| --- | ---: | :---: | --- | --- | ---: | --- | ---: | --- |
+| Thunder Talons `thunder_talons` | 1 | slot 1 | SingleTarget r1 | Physical | 1 | Damage 32 x3 hits | 96 | L10: adds -5% Defense 2t, stacks x3; L15: adds Damage 25 |
+| Chain Lightning `chain_lightning` | 1 | slot 2 | AreaBurst r2 | Special | 2 | Damage 22 x3 hits | 66 | L10: adds Stun 1t (10%); L15: adds -8% SpecialDefense 2t |
+| Static Charge `static_charge` | 3 | slot 3 | Self | - | 4 | +15 CritChance 3t; +10% Speed 3t | - | L10: adds +10% Attack 3t; L15: -1 cd |
+| Storm Dive `storm_dive` | 8 |  | SingleTarget r3 | Physical | 4 (first turn, 1/battle) | Damage 230 | 58 | L10: adds Stun 1t (25%); L15: adds -15% Defense 2t |
+| Thunderclap `thunderclap` | 25 |  | AreaBurst r1 | Special | 3 | Damage 70; Stun 1t (20%) | 35 | L10: adds -10% Speed 2t; L15: -1 cd |
+| Plasma Barrage `plasma_barrage` | 50 |  | Line r4 | Special | 2 | Damage 26 x4 hits | 68 | L10: adds -8% Defense 2t; L15: adds -8% SpecialDefense 2t |
+
+#### Frost Wyrm — Ice, Vanguard
+
+| Skill | Learn | Default | Shape | Cat. | Cd | Effects | Dmg/turn | Tier bonuses |
+| --- | ---: | :---: | --- | --- | ---: | --- | ---: | --- |
+| Rime Bolt `rime_bolt` | 1 | slot 1 | SingleTarget r2 | Special | 1 | Damage 50; -8% Speed 3t, stacks x3 | 50 | L10: adds -5% SpecialDefense 2t; L15: adds Stun 1t (10%) |
+| Deep Freeze `deep_freeze` | 1 | slot 2 | SingleTarget r2 | Special | 3 | Damage 60; Stun 1t (35%) | 20 | L10: adds -10% Speed 2t; L15: -1 cd |
+| Frost Breath `frost_breath` | 3 | slot 3 | AreaBurst r2 | Special | 2 | Damage 45; -10% Speed 2t (50%), stacks x3 | 45 | L10: adds Stun 1t (10%); L15: adds -8% SpecialDefense 2t |
+| Blizzard `blizzard` | 18 |  | Cross r3 | Special | 3 | Damage 90; -10% Speed 2t | 45 | L10: adds Stun 1t (15%); L15: -1 cd |
+| Ice Armor `ice_armor` | 35 |  | Self | - | 4 | Shield 45% Def 3t; +15% SpecialDefense 3t | - | L10: adds +10% Defense 3t; L15: -1 cd |
+| Absolute Zero `absolute_zero` | 60 |  | AllEnemies | Special | 5 (1/battle) | Damage 50; Stun 1t (20%) | 25 | L10: adds -15% Speed 2t; L15: adds -10% SpecialDefense 2t |
+
+#### Treant — Nature, Vanguard
+
+| Skill | Learn | Default | Shape | Cat. | Cd | Effects | Dmg/turn | Tier bonuses |
+| --- | ---: | :---: | --- | --- | ---: | --- | ---: | --- |
+| Thorn Lash `thorn_lash` | 1 | slot 1 | SingleTarget r2 | Special | 1 | Damage 40; DoT 10 3t, stacks x3 | 55 | L10: adds -8% Speed 2t (50%); L15: adds -8% SpecialDefense 2t |
+| Verdant Mend `verdant_mend` | 1 | slot 2 | SingleTarget (ally) r3, lowest HP% | - | 2 | Heal 18 | - | L10: adds Shield 20% Def 2t; L15: adds +10% Defense 2t |
+| Bark Ward `bark_ward` | 3 | slot 3 | AreaBurst (ally) r2 | - | 3 | Shield 30% Def 2t | - | L10: adds Heal 6; L15: -1 cd |
+| Entangling Roots `entangling_roots` | 8 |  | SingleTarget r2 | Special | 3 | Damage 50; Stun 1t (25%) | 17 | L10: adds -15% Speed 2t; L15: -1 cd |
+| Spore Cloud `spore_cloud` | 20 |  | AreaBurst r2 | Special | 3 | DoT 25 3t; -10% Attack 2t | 25 | L10: adds -10% SpecialAttack 2t; L15: -1 cd |
+| Lifebloom `lifebloom` | 45 |  | AllAllies | - | 4 | Heal 10; +10% Defense 2t | - | L10: adds +10% SpecialDefense 2t; L15: -1 cd |
+
+#### Tarasque — Metal, Vanguard
+
+| Skill | Learn | Default | Shape | Cat. | Cd | Effects | Dmg/turn | Tier bonuses |
+| --- | ---: | :---: | --- | --- | ---: | --- | ---: | --- |
+| Sunder `sunder` | 1 | slot 1 | SingleTarget r1 | Physical | 1 | Damage 65; -12% Defense 3t, stacks x3 | 65 | L10: adds -8% SpecialDefense 3t; L15: adds DoT 10 2t |
+| Iron Crush `iron_crush` | 1 | slot 2 | SingleTarget r1 | Physical | 2 | Damage 180 | 90 | L10: adds Stun 1t (15%); L15: adds -10% Defense 2t |
+| Iron Fortress `iron_fortress` | 4 | slot 3 | Self | - | 4 | +30% Defense 3t; +15% Attack 3t | - | L10: adds Shield 30% Def 2t; L15: -1 cd |
+| Spiked Carapace `spiked_carapace` | 15 |  | Self | - | 3 | Shield 40% Def 2t; +20% SpecialDefense 2t | - | L10: adds +10% Attack 2t; L15: -1 cd |
+| Shrapnel Burst `shrapnel_burst` | 30 |  | AreaBurst r1 | Physical | 2 | Damage 85; -8% Defense 2t (50%) | 64 | L10: adds DoT 10 2t; L15: adds -10% Speed 2t |
+| Juggernaut Charge `juggernaut_charge` | 55 |  | Line r2 | Physical | 3 | Damage 150; Knockback 1 hex | 65 | L10: adds Stun 1t (20%); L15: -1 cd |
+
+#### Kirin — Light, Ranged
+
+| Skill | Learn | Default | Shape | Cat. | Cd | Effects | Dmg/turn | Tier bonuses |
+| --- | ---: | :---: | --- | --- | ---: | --- | ---: | --- |
+| Sacred Spring `sacred_spring` | 1 | slot 1 | AllAllies | - | 3 | Heal 12 | - | L10: adds +8% SpecialDefense 2t; L15: -1 cd |
+| Blessing `blessing` | 1 | slot 2 | AllAllies | - | 4 | +12% SpecialAttack 2t; +12% SpecialDefense 2t | - | L10: adds +5 CritChance 2t; L15: -1 cd |
+| Radiant Bolt `radiant_bolt` | 3 | slot 3 | SingleTarget r3 | Special | 1 | Damage 58 | 58 | L10: adds -5% SpecialDefense 2t; L15: adds Damage 15 |
+| Judgment `judgment` | 15 |  | SingleTarget r4 | Special | 3 | Damage 190 | 63 | L10: adds Stun 1t (15%); L15: -1 cd |
+| Purifying Ward `purifying_ward` | 30 |  | AllAllies | - | 4 | Shield 25% Def 2t; +10% SpecialDefense 2t | - | L10: adds Heal 6; L15: -1 cd |
+| Halo `halo` | 50 |  | AreaBurst (ally) r2 | - | 3 | Heal 16; +10% Defense 2t | - | L10: adds Shield 20% Def 2t; L15: -1 cd |
+
+#### Basilisk — Dark, Ranged
+
+| Skill | Learn | Default | Shape | Cat. | Cd | Effects | Dmg/turn | Tier bonuses |
+| --- | ---: | :---: | --- | --- | ---: | --- | ---: | --- |
+| Venom Spit `venom_spit` | 1 | slot 1 | SingleTarget r3 | Special | 1 | Damage 45; DoT 18 3t, stacks x3 | 72 | L10: adds -5% SpecialDefense 2t, stacks x3; L15: adds Damage 15 |
+| Coup de Grace `coup_de_grace` | 1 | slot 2 | SingleTarget r3, lowest HP% | Special | 2 | Damage 110, execute +50% | 69 | L10: adds DoT 15 2t; L15: adds -10% Defense 2t |
+| Petrifying Gaze `petrifying_gaze` | 4 | slot 3 | SingleTarget r3 | Special | 3 | Damage 45; Stun 1t (25%) | 15 | L10: adds -15% Speed 2t; L15: -1 cd |
+| Eclipse Fang `eclipse_fang` | 12 |  | SingleTarget r3 | Special | 2 | Damage 32 x4 hits | 64 | L10: adds -8% SpecialDefense 2t; L15: adds Damage 20 |
+| Predator Focus `predator_focus` | 25 |  | Self | - | 4 | +20 CritChance 3t; +10% SpecialAttack 3t | - | L10: adds +10% Speed 3t; L15: -1 cd |
+| Miasma `miasma` | 40 |  | Cross r3 | Special | 3 | DoT 22 3t, stacks x2; -10% SpecialDefense 2t | 16 | L10: adds -10% Attack 2t; L15: -1 cd |
+
+#### Avatar actives
+
+| Skill | Default | Shape | Cd | Effects | Tier bonuses |
+| --- | :---: | --- | ---: | --- | --- |
+| Rallying Cry `rallying_cry` | slot 1 | AllAllies | 4 | +10% Attack 2t; +10% SpecialAttack 2t | L10: adds +5% Speed 2t; L15: -1 cd |
+| Mending Light `mending_light` | slot 2 | AllAllies | 3 | Heal 8 | L10: adds +5% SpecialDefense 2t; L15: -1 cd |
+| Aegis `aegis` | slot 3 | AllAllies | 4 | Shield 30% Def 2t | L10: adds +5% Defense 2t; L15: -1 cd |
+| Hex of Frailty `hex_of_frailty` |  | AllEnemies | 4 | -10% Defense 2t; -10% SpecialDefense 2t | L10: adds -5% Attack 2t; L15: -1 cd |
+| Battle Focus `battle_focus` |  | AllAllies | 5 | +8 CritChance 2t | L10: adds +5% Attack 2t; L15: -1 cd |
+| Slowing Field `slowing_field` |  | AllEnemies | 5 | -12% Speed 2t | L10: adds -5% Attack 2t; L15: -1 cd |
+
+#### Avatar passives
+
+| Passive | Default | Trigger | Scope | Proc % | Max / battle | Int. cd | Effects | Tier bonuses |
+| --- | :---: | --- | --- | ---: | ---: | ---: | --- | --- |
+| Keen Eye `keen_eye` | slot 1 | Aura | AllAllies | 100 | - | 0 | +5 CritChance | L10: adds +2 CritChance; L15: adds +2 CritChance |
+| Iron Will `iron_will` |  | Aura | AllAllies | 100 | - | 0 | +5% Defense; +5% SpecialDefense | L10: adds +2% Defense; L15: adds +2% SpecialDefense |
+| Opening Ward `opening_ward` | slot 2 | BattleStart | AllAllies | 100 | - | 0 | Shield 40% Def 2t | L10: adds +5% Defense 2t; L15: adds +5% SpecialDefense 2t |
+| Battle Hymn `battle_hymn` |  | BattleStart | AllAllies | 100 | - | 0 | +10% Speed 2t | L10: adds +5% Attack 2t; L15: adds +5% SpecialAttack 2t |
+| Withering Curse `withering_curse` |  | BattleStart | AllEnemies | 100 | - | 0 | -10% Defense 3t; -10% SpecialDefense 3t | L10: adds -5% Speed 3t; L15: adds -5% Attack 3t |
+| Bloodlust `bloodlust` |  | EnemyDefeated | AllAllies | 50 | - | 2 | +10% Attack 2t; +10% SpecialAttack 2t | L10: adds +5% Speed 2t; L15: adds +5 CritChance 2t |
+| Vengeance `vengeance` |  | AllyDefeated | AllAllies | 100 | 2 | 0 | +15% Attack 3t; +15% SpecialAttack 3t | L10: adds Shield 20% Def 2t; L15: adds +10% Speed 3t |
+| Storm Call `storm_call` |  | AllyCrit | AllEnemies | 30 | - | 3 | Damage 25 | L10: adds -5% Speed 1t; L15: adds -5% Defense 1t |
+| Verdant Pulse `verdant_pulse` |  | AllyTurnStart | TriggeringUnit | 50 | - | 0 | Heal 3 | L10: adds +3% Defense 1t; L15: adds +3% SpecialDefense 1t |
+| Last Stand `last_stand` | slot 3 | AllyBelowHpPercent < 40% | TriggeringUnit | 100 | - | 2 | Shield 80% Def 2t | L10: adds +10% Defense 2t; L15: adds +10% SpecialDefense 2t |
+
+#### Materials
+
+| Material | Tier | XP | Opens |
+| --- | ---: | ---: | --- |
+| Essence Shard `essence_shard` | 1 | 250 | the level-5 gate (and any lower) |
+| Essence Crystal `essence_crystal` | 2 | 1000 | the level-10 gate (and any lower) |
+| Essence Core `essence_core` | 3 | 4000 | the level-15 gate (and any lower) |
+
+### Simulator
+
+`--kit library` fields each beast's `DefaultLoadout` instead of the standard kit, at
+`--skill-level` (default 1; the tier is the gates below that level, so 16+ has passed all three),
+in both kit modes (`neutral` forces the library skills' elements to `None`). `--avatar library`
+fields the library's default avatar — its first three actives and `AvatarDefaultPassives` — at the
+same skill level. The default stays `--kit standard --avatar none` in this deliverable, so the
+committed tuned report is unchanged; see `docs/balance/tuning-log.md`, "Skill library: exploratory
+run", for the first library-kit numbers (pre-retune).
+
+**Open questions.** Whether heals should scale (with the caster's `SpecialDefense`, or as a percent
+of the target's max HP) — the flat heal is the biggest level-scaling distortion in the kits. Whether
+taunt needs a resist or diminishing returns (the Golem's 85% area taunt lasts 2 of the enemy's
+turns every 3 of its own). Whether one skill should be allowed on several species (the library
+allows it; this draft gives every skill exactly one owner). The resource cost (`ResourceCost`) is
+0 everywhere until the resource itself is designed.
 
 ## Next steps
 
@@ -1679,8 +1925,9 @@ across slots, and a null grid.
 The headless balance simulator (`Tooling/BalanceSim/`, see its README) is **local-only tooling, not a
 CI job**. It compiles the `Runtime` scripts against the committed UnityStub, reads
 `beast-roster.json` with `System.Text.Json`, and fights through the real `BattleUnitFactory`,
-`PlacementValidator`, `TurnManager` and `BattleTurnExecutor` on real `HexGrid`s. No skills are
-authored yet, so every beast fights with the same standard kit, rebalanced so `Attack` and
+`PlacementValidator`, `TurnManager` and `BattleTurnExecutor` on real `HexGrid`s. By default every
+beast fights with the same standard kit (`--kit library` fields the authored kits instead; see "Beast
+skill kits"), rebalanced so `Attack` and
 `SpecialAttack` weigh the same: Blast (special, power 40, range 3, cooldown 1), Strike (physical,
 power 55, range 1, cooldown 1; the extra power offsets range 1 firing about 0.73x as often as
 Blast) and a Burst split into equal physical and special halves (area, radius 2, power 20 each,

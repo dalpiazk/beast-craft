@@ -16,7 +16,8 @@ beast-craft/
 │   ├── Assets/_Project/    all first-party content, namespaced under _Project/
 │   │   ├── Art/            sprites, backdrops, UI, key art (Characters/Creatures/Environments/UI/KeyArt)
 │   │   ├── Audio/          Music/, Ambient/, SFX/
-│   │   ├── Data/           authored data: Creatures/beast-roster.json (source of truth) + generated .asset instances
+│   │   ├── Data/           authored data: Creatures/beast-roster.json and Skills/skill-library.json
+│   │   │                   (sources of truth) + generated .asset instances
 │   │   ├── Prefabs/
 │   │   ├── Scenes/
 │   │   └── Scripts/        Runtime/ (Core, Services, Narrative, Battle, Creatures,
@@ -110,6 +111,17 @@ What exists today:
   balance — see "Starter roster" in the
   [battle-system design doc](docs/design/battle-system.md) and
   [`docs/balance/tuning-log.md`](docs/balance/tuning-log.md).
+- **Skill library data** — every authored skill in
+  `BeastCraft/Assets/_Project/Data/Skills/skill-library.json`: six skills per
+  beast (60), each species' learnable skills (level 1-60) and 3-skill default
+  loadout, 6 avatar active skills, 10 avatar passives and 3 skill-training
+  materials, all with level-5/10/15 breakthrough tiers. Same pattern as the
+  roster: the JSON is the source of truth, checked by `SkillLibraryValidator`,
+  and **Beast Craft → Data → Import Skill Library** (after the roster import)
+  generates the `SkillSO` / `PassiveSkillSO` / `SkillMaterialSO` assets and
+  wires each species' `LearnableSkills` and `DefaultLoadout`. A first draft
+  against a documented power budget, not tuned yet — see "Beast skill kits" in
+  the [battle-system design doc](docs/design/battle-system.md).
 - **CI** (`.github/workflows/ci.yml`) — a format and compile check that builds
   the real game scripts against the hand-written UnityEngine stub in
   `Tooling/CiStubs/`. It needs no Unity install and runs no Unity tests, so it

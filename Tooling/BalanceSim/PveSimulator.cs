@@ -125,18 +125,31 @@ namespace BeastCraft.Tooling.BalanceSim
         private readonly IReadOnlyList<CreatureSpeciesSO> _species;
         private readonly SkillSO[][] _elementalKits;
         private readonly SkillSO[][] _neutralKits;
+        private readonly SkillInstance[][] _elementalLibraryKits;
+        private readonly SkillInstance[][] _neutralLibraryKits;
 
         public PveSimulator(SimOptions options, IReadOnlyList<CreatureSpeciesSO> species)
         {
             _options = options;
             _species = species;
-            Avatar = new AvatarPresets(options.AvatarPreset);
+            Avatar = new AvatarPresets(options.AvatarPreset, options.Library);
             _elementalKits = new SkillSO[species.Count][];
             _neutralKits = new SkillSO[species.Count][];
             for (int i = 0; i < species.Count; i++)
             {
                 _elementalKits[i] = Kit.BuildBeastKit(species[i], KitMode.Elemental);
                 _neutralKits[i] = Kit.BuildBeastKit(species[i], KitMode.Neutral);
+            }
+
+            if (options.KitSource == KitSource.Library)
+            {
+                _elementalLibraryKits = new SkillInstance[species.Count][];
+                _neutralLibraryKits = new SkillInstance[species.Count][];
+                for (int i = 0; i < species.Count; i++)
+                {
+                    _elementalLibraryKits[i] = options.Library.BeastKit(species[i], KitMode.Elemental);
+                    _neutralLibraryKits[i] = options.Library.BeastKit(species[i], KitMode.Neutral);
+                }
             }
 
             Teams = Combinations(species.Count, options.TeamSize);
@@ -396,10 +409,9 @@ namespace BeastCraft.Tooling.BalanceSim
             {
                 int member = slots[s];
                 int speciesIndex = team[member];
-                SkillSO[] kit = mode == KitMode.Elemental ? _elementalKits[speciesIndex] : _neutralKits[speciesIndex];
                 string id = playerPrefix + "p" + (s + 1).ToString(System.Globalization.CultureInfo.InvariantCulture);
                 members[member] = BattleUnitFactory.CreateBeast(id, BattleTeam.Player, _species[speciesIndex], level, null, playerTiles[s],
-                                                                Kit.Loadout(kit));
+                                                                BeastLoadout(speciesIndex, mode));
                 requests.Add(new PlacementRequest(id, playerTiles[s]));
             }
 
@@ -541,6 +553,20 @@ namespace BeastCraft.Tooling.BalanceSim
 
             finalUnits = units;
             return battle;
+        }
+
+        /// <summary>
+        /// A fresh loadout for a player beast: the standard kit (the default), or with
+        /// <c>--kit library</c> its authored default loadout at <c>--skill-level</c>.
+        /// </summary>
+        private SkillLoadout BeastLoadout(int speciesIndex, KitMode mode)
+        {
+            if (_options.KitSource == KitSource.Library)
+            {
+                return SkillLoadout.FromInstances(mode == KitMode.Elemental ? _elementalLibraryKits[speciesIndex] : _neutralLibraryKits[speciesIndex]);
+            }
+
+            return Kit.Loadout(mode == KitMode.Elemental ? _elementalKits[speciesIndex] : _neutralKits[speciesIndex]);
         }
 
         private static void CountPassives(PveBattle battle, IReadOnlyList<PassiveActivation> activations)
