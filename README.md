@@ -25,8 +25,9 @@ beast-craft/
 │   └── ProjectSettings/    editor version pin; Unity fills in the rest on first open
 ├── Pipeline/       OFFLINE, build-time-only asset generation. Never runs at runtime.
 ├── Tooling/        CiStubs/: hand-written UnityEngine stub + csproj so CI compiles
-│                   the game scripts without a Unity install. Never shipped.
-├── docs/           design/ and architecture/ notes
+│                   the game scripts without a Unity install. BalanceSim/: local-only
+│                   headless balance simulator over the real battle code. Never shipped.
+├── docs/           design/, architecture/ and balance/ (simulator reports) notes
 └── .github/        CI workflows
 ```
 
@@ -101,17 +102,26 @@ What exists today:
   (all ten beasts currently share `medium`; `fast` and `slow` are kept for the
   balance simulator), in
   `BeastCraft/Assets/_Project/Data/Creatures/beast-roster.json`. The JSON is the
-  source of truth (readable outside Unity, e.g. by a future headless balance
+  source of truth (readable outside Unity, e.g. by the headless balance
   simulator); the Unity assets are generated from it by opening the project and
   running **Beast Craft → Data → Import Beast Roster**, which creates or updates
   them in place by id. No `.asset` files are committed yet. The numbers are a
-  first draft, not confirmed balance — see "Starter roster" in the
-  [battle-system design doc](docs/design/battle-system.md).
+  first simulator-tuned pass, not confirmed balance — see "Starter roster" in the
+  [battle-system design doc](docs/design/battle-system.md) and
+  [`docs/balance/tuning-log.md`](docs/balance/tuning-log.md).
 - **CI** (`.github/workflows/ci.yml`) — a format and compile check that builds
   the real game scripts against the hand-written UnityEngine stub in
   `Tooling/CiStubs/`. It needs no Unity install and runs no Unity tests, so it
   proves the scripts parse, type-check and are formatted — nothing about
   whether the project opens or behaves correctly.
+- A **headless balance simulator** ([`Tooling/BalanceSim/`](Tooling/BalanceSim/README.md))
+  — local-only, not a CI job — that runs the real battle code outside Unity
+  and writes a Markdown report. Its primary mode is PvE: every 4-beast team of
+  the starter roster fights boss, swarm and pack encounters at calibrated
+  difficulty; a 1v1 round-robin is kept as a secondary PvP section. The
+  committed reports are [`docs/balance/baseline-report.md`](docs/balance/baseline-report.md)
+  (first-draft stats, the "before") and [`docs/balance/tuned-report.md`](docs/balance/tuned-report.md)
+  (the tuned roster); their numbers are inputs to design decisions, not applied automatically.
 - A **battle-system design proposal** ([`docs/design/battle-system.md`](docs/design/battle-system.md))
   whose open questions are still awaiting producer confirmation.
 

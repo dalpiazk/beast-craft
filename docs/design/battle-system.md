@@ -66,9 +66,54 @@ puzzle every encounter.
   options. With no player menu, whether a beast has a fallback attack at all — or simply always has
   at least one short-cooldown skill in its rotation — is open, and items in battle are out of scope
   until there is a mechanism that would use them.
-- **Avatar progression.** The avatar now has stats (decision 6, amended), but no level and no
-  growth: its base is a flat authored block and only avatar gear moves it. Whether and how the
-  avatar levels up is undesigned.
+- **Avatar progression.** The avatar now has stats (decision 6, amended), but no progression
+  level and no growth: its base is a flat authored block and only avatar gear moves it. Whether and
+  how the avatar levels up is undesigned. The damage formula still needs a caster level for it, so
+  `BattleAvatar.Create` takes a per-battle level (default 1) that the battle setup is expected to
+  pick sensibly, e.g. the player team's level — a stopgap input, not a design for progression.
+
+## Encounter direction: PvE, not PvP — DIRECTION, NOT YET A CONFIRMED DECISION
+
+**The game is expected to be PvE.** The player builds a team of beasts and fights **enemies that are
+not the roster beasts**. An enemy side can be anything from **one large creature** to **two dozen
+small ones**, with mixed mid-size groups in between. Beast-versus-beast (PvP) play is not the
+target, so a beast's 1v1 record against the other roster beasts is at most a secondary signal. This
+is the user's stated direction, recorded here so balance work targets it; it has not been through
+the producer's confirmed-decision process yet.
+
+What that implies for balance and for the systems:
+
+- **Balance targets team contribution against encounters, not duels.** The useful question is how
+  much a beast raises its team's chance of clearing a fight, and against which kinds of fight — not
+  whether it beats another beast one on one. The balance simulator's primary mode now measures
+  exactly that (see "Next steps").
+- **Different encounter shapes reward different stat lines, and that is the point.** Against a
+  **swarm**, area damage and bulk matter: many weak hits land on whoever is in front, and a
+  single-target skill spends much of its power as overkill on small enemies. Against **one huge
+  enemy**, sustained single-target damage and the bulk to survive its heavy hits matter, and area
+  damage is mostly wasted. Mixed **packs** sit in between. A beast that is weak everywhere, or best
+  everywhere, is the real balance problem; a beast that is best against one shape and middling
+  elsewhere has a niche.
+- **Area skills need something to hit.** `AreaBurst` is centred on the caster and never moves it, so
+  in a skill stack it wants to come after something that walks the beast into the enemy cluster.
+- **Large creatures are single-tile today — open item.** `HexGrid` tracks exactly one tile per unit;
+  there is no multi-hex footprint, so a "huge" enemy occupies one hex like everything else and can be
+  surrounded by six attackers. Multi-hex units would touch occupancy, pathfinding (a footprint has to
+  fit along the route), targeting (distance to a footprint, not a point) and area-skill overlap.
+  Not designed or implemented; listed so encounter design does not assume it exists.
+- **Two movement rules large PvE fights need — now built (were open items).** The simulator showed
+  both gaps at encounter scale, and both are now Runtime rules in `BattleTurnExecutor` (see
+  decision 7, "scaffold details"), so the simulator no longer works around either:
+  - *Defeated units leave the grid* the moment they fall. Before, a fallen unit kept blocking its
+    tile, a swarm's front rank died next to the beasts and walled off the rest, and almost every
+    simulated swarm battle ended as a round-cap stalemate.
+  - *Partial approach.* A unit that cannot reach range of its target this turn still walks its
+    remaining move toward it. Before, it did not move at all, so two sides whose move plus range fell
+    short of the gap between them (8 hexes between the zones on a Large board) waited forever, and
+    the simulator's fixture enemies needed board-spanning movement. They now move like beasts.
+- **Everything the simulator fields targets the nearest enemy.** Whoever stands in front takes the
+  hits, so front-line bulk and placement matter a great deal; that interacts with the tactical-AI
+  item above.
 
 ## Data-driven foundation already in place
 
@@ -77,8 +122,9 @@ The authored data this combat model needs is already committed as ScriptableObje
 
 - **`SkillSO`** — target shape (`SingleTarget`, `Line`, `Cross`, `AreaBurst`, `AllEnemies`,
   `AllAllies`, `Self`), range, resource cost, cooldown, a list of effects, and the targeting fields
-  added by decision 4 (side, criterion, order, targeting stat), and the attacking `Element` (see
-  "Element system" below).
+  added by decision 4 (side, criterion, order, targeting stat), the attacking `Element` (see
+  "Element system" below), and the damage `Category`, physical or special (see "Damage formula"
+  below).
 - **`GearSO`** — slot, stat modifiers, rarity tier, and minimum creature level. Beast gear only.
 - **`AvatarGearSO`** / **`AvatarStatsSO`** (under `Runtime/Avatar/`, namespace `BeastCraft.Avatar`)
   — the avatar's own stat gear (slot, stat modifiers, rarity; no visuals) and its authored base
@@ -314,11 +360,13 @@ cosmetic. The producer has reversed that, and the rule is now two separate thing
 
 Everything else above is unchanged: the avatar is still off the grid, still takes no initiative
 turn, still ticks on player-beast turns, is still a caster outside the roster, and still cannot be
-defeated. **Nothing reads the avatar's stats yet.** Skill magnitudes are flat (see "Effect
-application"), so an avatar buff lands the same whatever the avatar's stats are. The stats become
-meaningful with the stat-based damage and effect formula, which is planned to apply to beasts and
-the avatar alike (see "Next steps"). Avatar leveling is out of scope and open (see "What is not
-settled yet").
+defeated. **The avatar's stats now feed the damage formula** exactly as a beast's do (see "Damage
+formula"): a damaging avatar skill uses the avatar's `Attack` or `SpecialAttack` and its level. Heals
+and buffs are still flat for everyone, so an avatar buff still lands the same whatever the avatar's
+stats are. Avatar leveling is out of scope and open (see "What is not settled yet"); the statful
+`BattleAvatar.Create` takes a per-battle level (default 1) for the formula to read in the meantime.
+The zero-stat `Create(skills)` avatar is level 1 with no attacking stat, so every damage effect it
+lands deals the formula's floor of 2 (times the element multiplier) — see "Damage formula".
 
 ### 7. Movement during a turn — DECIDED
 
@@ -358,12 +406,31 @@ beast's positioning is a direct, readable consequence of its loadout — a short
 a long-range caster stays put — with no extra tuning surface. The cost is that a beast can walk into
 a bad spot to land one skill; that is the same trade auto-resolution has made everywhere else.
 
-*Scaffold details, not confirmed balance.* Two implementation choices sit underneath this and are
-cheap to revisit. A beast that cannot afford the whole approach **stays where it is** rather than
-walking part of the way, because a partial approach spends the budget to accomplish nothing and
-leaves the rest of the stack worse off. And the route is the cheapest one that reaches *any* tile
-within range of the target, found by pathing at the tiles around the target (the target's own tile is
-occupied, so nothing can path onto it) and stopping at the first tile on that route that is in range.
+*Scaffold details, not confirmed balance.* Three implementation choices sit underneath this and are
+cheap to revisit (the first two are lead engineering decisions made once the balance simulator
+showed what their absence did to large PvE fights):
+
+- **Partial approach.** A beast that cannot afford the whole approach **advances as far as its
+  remaining budget allows** along the same cheapest route it would have taken, spending all of it,
+  and the skill is held exactly as above: it does not fire, its cooldown stays at 0, and it is
+  offered again next turn from the closer tile (`BattleSkillStatus.OutOfMovement`, with the steps
+  walked in the outcome's `MovementSpent`). Only a beast with **no route at all** — walled off by
+  terrain or bodies — stays where it is (`Unreachable`). The earlier rule stood still instead, on
+  the grounds that a partial walk "spends the budget to accomplish nothing"; in practice standing
+  still meant two sides whose move plus range fell short of the gap between them never engaged. With
+  several ready slots the shared budget still goes in stack order: the earliest skill that cannot
+  reach spends what is left walking, and later skills are attempted from the new tile with nothing
+  left to walk with — one whose target is now in range fires, and shapes that need no approach fire
+  regardless. Deterministic: the route and its tie-breaks are the full approach's.
+- **Defeated units leave the grid** the moment they fall: after every skill that fires and every
+  avatar activation that is applied, the executor lifts each defeated unit off the board, so a later
+  skill in the same turn, and every later turn, can walk through or stand on its tile. (The effect
+  applier has no board, so this sits in the executor.) The fallen unit keeps its `Position` — where it
+  fell — for logs and results; nothing reads it for play, since targeting and the turn order already
+  ignore the defeated.
+- **The route** is the cheapest one that reaches *any* tile within range of the target, found by
+  pathing at the tiles around the target (the target's own tile is occupied, so nothing can path onto
+  it) and stopping at the first tile on that route that is in range.
 
 ## Effect application — SCAFFOLD ASSUMPTIONS, NOT CONFIRMED BALANCE
 
@@ -373,12 +440,13 @@ above, **none of the rules in this section were confirmed by the producer.** The
 defaults chosen so the system is complete rather than half-built, and they are expected to be
 revisited when balance work starts.
 
-- **Damage and healing are flat. There is no damage formula.** `SkillEffect.Magnitude` is applied
-  as a plain number straight against HP: no Attack-versus-Defense math, no stat scaling, no crit
-  chance, no variance. Designing that formula is a separate balancing pass, and it is deliberately
-  not being guessed at here — a placeholder formula would be harder to displace later than no
-  formula at all. The one thing layered on top is the element multiplier (see "Element system"
-  below), which scales a damage magnitude but is not itself a formula. `BattleUnit` gained a `CurrentHp` alongside its `StatBlock` (whose
+- **Damage is stat-based; healing is flat.** A `Damage` effect's `SkillEffect.Magnitude` is its
+  *power*, and the HP it takes comes from `DamageFormula` — caster level, caster attacking stat
+  against target defending stat, and the element multiplier (see "Damage formula" below). This
+  superseded the original rule, which applied every magnitude flat and deferred the formula to a
+  balancing pass. Heals are still applied flat, and buffs and debuffs still move a stat by exactly
+  their magnitude; whether and how healing should scale is deferred to the balance pass.
+  `BattleUnit` gained a `CurrentHp` alongside its `StatBlock` (whose
   `Hp` is now explicitly the *maximum*); every unit starts a battle at full health, since there is
   no persistent creature-instance model to carry damage in from a previous fight. Both damage and
   healing hold `0 <= CurrentHp <= Stats.Hp`.
@@ -452,9 +520,9 @@ decided yet.
 **How the multiplier applies.** `ElementChart.GetMultiplier(attack, defenders)` is the product of
 the attack's single matchup against each defending element, so a dual-element target that is weak
 twice takes 4x and strong-plus-weak cancels to 1x. `None` on either side is always 1x. The result
-multiplies a `Damage` effect's flat `Magnitude` *before* it is truncated to whole HP, and applies to
-**damage only** — heals, buffs and debuffs are never scaled. It sits on top of the flat magnitudes
-described under "Effect application"; it does not introduce stat-based damage math.
+multiplies the stat-based damage `DamageFormula` computes *before* it is truncated to whole HP, and
+applies to **damage only** — heals, buffs and debuffs are never scaled. (It was introduced when
+damage was still a flat magnitude; the formula now sits underneath it — see "Damage formula".)
 
 **The chart is attacker-side.** Each row is read from the attacking element's point of view and is
 only ever looked up in that direction; it is not forced to be symmetric. `2x` is strong, `0.5x` is
@@ -477,6 +545,78 @@ weak, and every pair not listed is `1x`:
 as the arena radii and the deployment-zone split. The set of elements is fixed; which pairs are
 strong or weak, and whether 2x / 0.5x are the right sizes, are expected to move once balance work
 has real fights to measure. `ElementChart` is the single place to change them.
+
+## Damage formula — TUNABLE STARTING DEFAULTS, NOT CONFIRMED BALANCE
+
+Damage is now stat-based, for beasts and the avatar alike. The formula's shape and constants are
+lead engineering decisions made so the headless balance simulator has something real to measure;
+**none of them are producer-confirmed balance**, and every number below is expected to move.
+
+**Physical and special — `DamageCategory`.** Each skill carries a `SkillSO.Category`
+(`DamageCategory.Physical = 0`, `Special = 1`; explicit values, serialized by number, never renamed
+or renumbered — append only). Physical damage reads the caster's `Attack` against the target's
+`Defense`; special damage reads `SpecialAttack` against `SpecialDefense`. The default is `Physical`.
+The category belongs to the skill as a whole, like its element.
+
+**The formula** (the static, pure `DamageFormula`, one place to tune):
+
+```
+base   = ((2 * Level / 5 + 2) * Power * A / D) / 50 + 2
+damage = truncate(base * ElementChart multiplier)
+```
+
+- `Level` is the caster's `BattleUnit.Level`; `Power` is the `Damage` effect's `SkillEffect.Magnitude`;
+  `A` / `D` are the category's stats, read from the units' **current effective** `Stats` at the
+  moment the effect lands, so buffs and debuffs move damage.
+- The element multiplier is the skill's element against the target's elements, exactly as before,
+  and applies to the whole of `base` (the +2 included). The caster's own elements still do nothing.
+- **Float math, truncated once at the end**, after the multiplier — the same truncation stance the
+  applier always had.
+- **Guards:** `Power <= 0` deals 0 (so a negative damage magnitude no longer reads as a heal); any
+  positive `Power` deals at least 1; `D <= 0` is treated as 1; `A < 0` as 0; `Level < 1` as 1.
+- The constants (`2`, `5`, `+2`, `/50`, `+2`, minimum 1) are named on `DamageFormula` so the balance
+  simulator can tune them in one place.
+
+**Why the level term.** Between two equally levelled beasts on the same curve, `A / D` does not
+change with level, but HP does. The `(2 * Level / 5 + 2)` term scales damage up with level so that a
+hit between evenly matched beasts takes a *roughly* similar share of HP at level 1 and level 100 and
+fights do not lengthen as the roster levels. With the authored `medium` curve it holds only loosely:
+a Power-40 neutral hit between two identical 600-total (100-per-stat) beasts takes 3 of 15 HP (20%)
+at level 1, 19 of 57 (33%) at level 50 and 35 of 100 (35%) at level 100 — HP grows about 6.7x across
+the curve while the level term grows 17.5x, and the +2 floor dominates at level 1. An EditMode test
+pins that loose band; tightening it is a balance-simulator question.
+
+**Worked examples (starter roster, `medium` curve, Power 40).** Phoenix (Fire) hitting Golem
+(Earth) with a Fire skill — Fire is weak against Earth (0.5x) — with the same hit from a neutral
+skill in brackets:
+
+| Level | Phoenix → Golem, physical | Phoenix → Golem, special | Golem HP |
+| --- | --- | --- | --- |
+| 1 | 1 (neutral: 3) | 2 (neutral: 4) | 24 |
+| 50 | 8 (neutral: 16) | 12 (neutral: 25) | 91 |
+| 100 | 15 (neutral: 30) | 23 (neutral: 46) | 160 |
+
+The reverse, Golem hitting Phoenix with a neutral skill: 4 / 26 / 49 physical and 3 / 15 / 28 special
+at levels 1 / 50 / 100, against Phoenix's 15 / 57 / 100 HP — the glass cannon and the wall still
+reading as intended. These are the tuned roster's numbers; `DamageFormulaTests` pins the Fire
+examples.
+
+**A zero attacking stat deals the floor.** With `A = 0`, `base` is exactly the +2 constant, so a
+unit with no attacking stat deals 2 × the element multiplier per damage effect regardless of power.
+This matters for the zero-stat `BattleAvatar.Create(skills)` avatar: before the formula its damage
+effects dealt their authored magnitude flat; now they deal 2 (4 on a strong matchup, 1 on a weak
+one). That is deliberate — no special case in the formula — and an avatar meant to hit hard should be
+built with stats via the statful overload.
+
+**Levels.** `BattleUnit` now carries a `Level` (at least 1; an optional constructor argument
+defaulting to 1, so existing call sites are unaffected). `BattleUnitFactory.CreateBeast` records the
+level it assembled the stats at. The avatar has no progression level, so the statful
+`BattleAvatar.Create` takes a per-battle level (default 1) — see "What is not settled yet".
+
+**Deliberately deferred:** random variance, critical hits and a same-element attack bonus (STAB).
+Variance and crits would make a battle non-deterministic, and the headless balance simulator needs a
+fixed roster and seed to give the same result every run; STAB is a balance lever to add once there
+are fights to measure it against. Stat-scaled healing is deferred likewise — heals stay flat.
 
 ## Stat assembly and move range
 
@@ -517,7 +657,7 @@ arrives in. Null gear and null modifiers are skipped. A second overload takes an
 `StatBlock` plus a modifier list (with `CollectModifiers` turning a gear list into one) for a
 participant with no species behind it — which is how the avatar's stats are assembled from its
 `AvatarStatsSO` base and its `AvatarGearSO` (decision 6, amended). Avatar gear has no minimum level,
-because the avatar has no level.
+because the avatar has no progression level.
 
 `BattleUnitFactory.CreateBeast` is the pass that assembles a battle-ready `BattleUnit` from a
 creature: stats from `StatCalculator`, elements copied from the species, and the equipped skill
@@ -525,8 +665,8 @@ loadout, id, team and position passed through. It takes species, level and gear 
 there is still no persistent creature-instance type; when one exists, it is the natural input. The
 battle then layers timed buffs and debuffs on top of the assembled block as before.
 
-This is stat assembly only. It changes nothing about damage: skill magnitudes remain flat, and
-there is still no damage formula (see "Effect application").
+This is stat assembly only. Damage is computed separately, by `DamageFormula`, from the block this
+produces as buffed or debuffed since (see "Damage formula").
 
 ## Pre-battle placement — DATA MODEL AND VALIDATION ONLY
 
@@ -611,38 +751,48 @@ drag-and-drop input, zone and validity highlighting, and it can only genuinely b
 the project in the Editor. It is a **separate, later, and materially different** task, and it should
 be scoped as one rather than treated as the tail end of this one.
 
-## Starter roster — FIRST-DRAFT DATA, NOT CONFIRMED BALANCE
+## Starter roster — SIMULATOR-TUNED DATA, NOT CONFIRMED BALANCE
 
 The first ten beasts, one per element, are authored as data. Names, elements and archetypes are
-approved; **every number below is a first draft** chosen to express the archetype, and is expected to
-be corrected by the headless balance simulator (see "Next steps"). Nothing here is confirmed balance.
+approved. **The numbers below are the first simulator-tuned pass** of first-draft stats chosen to
+express each archetype: they were tuned by hand against the headless balance simulator's PvE mode
+(see "Next steps" and [`docs/balance/tuning-log.md`](../balance/tuning-log.md), which has the first
+draft alongside). Nothing here is confirmed balance; the numbers are expected to move again once
+skills and real encounters exist.
 
 | SpeciesId | Beast | Element | Archetype | Curve | HP | ATK | DEF | SpA | SpD | SPE | Six-stat total | Move |
 | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `phoenix` | Phoenix | Fire | Glass cannon | medium | 70 | 130 | 55 | 140 | 70 | 135 | 600 | 4 |
-| `leviathan` | Leviathan | Water | Tank | medium | 150 | 90 | 130 | 90 | 95 | 45 | 600 | 3 |
-| `golem` | Golem | Earth | Pure wall | medium | 150 | 80 | 170 | 40 | 125 | 35 | 600 | 2 |
-| `griffin` | Griffin | Air | Fast skirmisher | medium | 95 | 110 | 85 | 85 | 85 | 140 | 600 | 5 |
-| `thunderbird` | Thunderbird | Lightning | Burst striker | medium | 65 | 140 | 55 | 125 | 60 | 155 | 600 | 4 |
-| `frost_wyrm` | Frost Wyrm | Ice | Control / attrition | medium | 95 | 75 | 125 | 100 | 125 | 80 | 600 | 3 |
-| `treant` | Treant | Nature | Support-tank | medium | 160 | 80 | 100 | 85 | 130 | 45 | 600 | 3 |
-| `tarasque` | Tarasque | Metal | Armored bruiser | medium | 110 | 140 | 145 | 50 | 80 | 75 | 600 | 3 |
-| `kirin` | Kirin | Light | Support caster | medium | 100 | 50 | 80 | 140 | 135 | 95 | 600 | 4 |
-| `basilisk` | Basilisk | Dark | Ranged assassin | medium | 80 | 95 | 55 | 145 | 90 | 135 | 600 | 5 |
+| `phoenix` | Phoenix | Fire | Glass cannon | medium | 100 | 125 | 75 | 140 | 90 | 100 | 630 | 4 |
+| `leviathan` | Leviathan | Water | Tank | medium | 125 | 85 | 125 | 85 | 95 | 55 | 570 | 3 |
+| `golem` | Golem | Earth | Pure wall | medium | 160 | 105 | 150 | 70 | 105 | 40 | 630 | 2 |
+| `griffin` | Griffin | Air | Fast skirmisher | medium | 105 | 115 | 90 | 90 | 90 | 115 | 605 | 5 |
+| `thunderbird` | Thunderbird | Lightning | Burst striker | medium | 100 | 125 | 80 | 120 | 85 | 120 | 630 | 4 |
+| `frost_wyrm` | Frost Wyrm | Ice | Control / attrition | medium | 95 | 75 | 120 | 100 | 115 | 80 | 585 | 3 |
+| `treant` | Treant | Nature | Support-tank | medium | 130 | 85 | 95 | 90 | 120 | 50 | 570 | 3 |
+| `tarasque` | Tarasque | Metal | Armored bruiser | medium | 115 | 140 | 130 | 55 | 80 | 75 | 595 | 3 |
+| `kirin` | Kirin | Light | Support caster | medium | 100 | 50 | 80 | 135 | 120 | 95 | 580 | 4 |
+| `basilisk` | Basilisk | Dark | Ranged assassin | medium | 100 | 95 | 80 | 150 | 95 | 110 | 630 | 5 |
 
 Stats are max-level values (curve scale 1). **All ten beasts share the `medium` growth curve for
 now, by user decision**; differentiating curves per beast is deferred to the headless balance
 simulator. The drafting rules:
 
-- **Shared budget.** Every beast's six combat stats sum to the same budget (600), and the roster
-  tests allow ±5%. Archetype comes from how the budget is *distributed*, not from raw power. If the
-  simulator later gives some beasts a slower curve, whether they deserve a larger budget as payoff
-  for a weak early game is a balance question for it, not something this draft assumes.
+- **Shared budget.** Every beast's six combat stats sum to a shared budget of 600, and the roster
+  tests allow ±5% (570–630). Archetype comes from how the budget is *distributed*, not from raw
+  power. The first draft put every beast at exactly 600; the tuning pass used the ±5% band as a
+  balance lever, taking the beasts that carried their teams down to 570–585 (Leviathan, Treant,
+  Kirin, Frost Wyrm) and the fragile ones (Phoenix, Thunderbird, Basilisk) and Golem up to 630. If
+  the simulator later gives some beasts a slower curve, whether they deserve a larger budget as
+  payoff for a weak early game is a balance question for it, not something this pass assumes.
+- **Speed is ordered, not spent.** In the simulator, acting first mostly means reaching the enemy
+  first and taking its focus, so the tuning pass kept the speed *order* the archetypes call for
+  (Thunderbird > Griffin > Basilisk > Phoenix > Kirin > … > Golem) with smaller gaps, and moved the
+  freed points into the fragile beasts' HP and defences. They remain the least bulky beasts.
 - **Move range in a small band (2–5)**, outside the budget. Griffin and Basilisk are the mobile
   ends (5); Golem is the only 2. "Range" in the archetypes means move range, the per-turn hex
   movement budget — skill reach is authored per skill.
-- **Telling the defensive beasts apart.** Golem only absorbs (the highest Defense, the lowest Speed
-  and move range, low attack); Tarasque absorbs and hits back (Defense *and* Attack high); Leviathan
+- **Telling the defensive beasts apart.** Golem absorbs (the highest HP and Defense, the lowest Speed
+  and move range); Tarasque absorbs and hits back (Defense *and* the highest Attack); Leviathan
   is the physically bulky all-rounder; Treant's bulk is HP and Special Defense for a support role;
   Frost Wyrm splits its bulk evenly across Defense and Special Defense.
 - **Skills, evolutions and customization are empty.** No skills have been authored yet, so every
@@ -675,8 +825,8 @@ in the file, unused, as ready-made shapes for the balance simulator to assign:
 ### JSON is the source of truth; Unity assets are generated
 
 The roster lives in **`BeastCraft/Assets/_Project/Data/Creatures/beast-roster.json`**, not in
-hand-authored `.asset` files. A plain JSON file is readable and diffable outside Unity — the future
-headless balance simulator will read it directly with `System.Text.Json` (`IncludeFields = true`;
+hand-authored `.asset` files. A plain JSON file is readable and diffable outside Unity — the
+headless balance simulator (`Tooling/BalanceSim`) reads it directly with `System.Text.Json` (`IncludeFields = true`;
 keys are the C# field names exactly) — whereas `.asset` YAML references its scripts by `.meta` GUIDs
 this repo does not track, and cannot be verified without an Editor.
 
@@ -786,21 +936,96 @@ at level, then gear flat, then gear percent) and `BattleUnitFactory`, which buil
 species, level and gear. EditMode tests cover the stat block, the level-scaling exemption, the
 assembly order, the factory, and move range under buffs.
 
+The damage formula (the section above) adds `DamageCategory`, `SkillSO.Category`, `BattleUnit.Level`
+(set by `BattleUnitFactory.CreateBeast` and by an optional level on the statful
+`BattleAvatar.Create`) and the static `DamageFormula`, and threads the caster through
+`SkillEffectApplier`'s damage arm so damage reads the caster's level and stats. EditMode tests cover
+hand-computed values, physical/special stat selection, the element multiplier applied after the base,
+the guards (minimum 1, zero or negative power, zero defence, negative attack), level scaling, buffs
+and debuffs moving damage, avatar damage, and the loose level-invariance band against the roster's
+`medium` curve; the existing element and avatar tests were rewritten against the formula.
+
 The starter roster (the section above) adds `beast-roster.json`, the `BeastCraft.Creatures.Roster`
 data types and validator, `GrowthRateCurve.CurveId` and `GrowthRateCurve.EvaluateScale`, the Editor
 importer (the first Editor script, and the first `UnityEditor` stubs in `Tooling/CiStubs`), and
 EditMode tests that check the JSON directly: structure, the ten pinned ids, one beast per element,
 the stat-budget and move-range bands, and the curve semantics.
 
+Two movement rules the simulator showed large PvE fights need are now built into
+`BattleTurnExecutor` (decision 7, "scaffold details"): **defeated units leave the grid** the moment
+they fall (lifted with `HexGrid.RemoveUnit` after every fired skill and applied avatar activation,
+keeping their `Position` as a record), and a unit that cannot afford its whole approach makes a
+**partial approach**, walking its remaining budget along the same route and holding the skill
+(`OutOfMovement`, with the steps in `MovementSpent`). EditMode tests cover a freed tile being walked
+onto in the same turn, a choke reopening for later turns, avatar kills, a partial approach walking
+exactly the budget and firing a turn later, a fully blocked unit staying put, the shared budget
+across slots, and a null grid.
+
+The headless balance simulator (`Tooling/BalanceSim/`, see its README) is **local-only tooling, not a
+CI job**. It compiles the `Runtime` scripts against the committed UnityStub, reads
+`beast-roster.json` with `System.Text.Json`, and fights through the real `BattleUnitFactory`,
+`PlacementValidator`, `TurnManager` and `BattleTurnExecutor` on real `HexGrid`s. No skills are
+authored yet, so every beast fights with the same standard kit, rebalanced so `Attack` and
+`SpecialAttack` weigh the same: Blast (special, power 40, range 3, cooldown 1), Strike (physical,
+power 55, range 1, cooldown 1; the extra power offsets range 1 firing about 0.73x as often as
+Blast) and a Burst split into equal physical and special halves (area, radius 2, power 20 each,
+cooldown 2). It runs in an `elemental` mode (kit in the beast's element) and a `neutral` mode (kit
+`Element.None`).
+
+Its **primary mode is PvE, team versus encounter**, following the direction above. Every 4-beast
+combination of the roster (210 teams) fights three synthetic encounters defined in
+`Tooling/BalanceSim/encounters.json`. These are simulator fixtures, not game content: `boss` (one
+Colossus with very high HP, heavy hits in both categories and a periodic area slam), `swarm` (24
+small biters and stingers on a Large arena) and `pack` (three melee direwolves and three ranged
+wisps). Each encounter's enemy stats are scaled by a multiplier calibrated per level and kit mode
+so the average team clears it about half the time. Each beast is scored by its **marginal clear
+rate** (clear rate of teams with it minus teams without it), with damage share, damage taken,
+survival and rounds to clear alongside. The old 1v1 round-robin survives as a secondary
+`--mode pvp` section.
+
+The committed report at [`docs/balance/baseline-report.md`](../balance/baseline-report.md) is the
+"before" picture for roster tuning, on the unchanged first-draft stats (levels 1/50/100), regenerated
+under the Runtime's own movement rules (defeated units leave the grid, partial approach), fixture
+enemies that move like beasts, and speed ties split evenly between the sides. In short: the bulky
+sustain beasts and Kirin carry their teams. Kirin (+17.4 / +21.6 points overall, `elemental` /
+`neutral`), Leviathan (+16.9 / +13.3) and Treant (+14.1 / +21.4) lead. The glass cannons drag their
+teams down: Thunderbird (−23.4 / −31.9) and Phoenix (−16.8 / −21.1) are bottom three against every
+encounter in both modes (no niche), with Basilisk (−12.6 / −16.0) close behind. Niches do show: Kirin
+is the best beast against the boss (+33.9) but roughly neutral against the swarm (+4.8 / +0.1), and
+Golem is the worst against the boss (−29.6) but third best against the swarm in `neutral` mode
+(+14.7). No PvE or PvP battle stalemates. The PvP section, on the same kit, still rewards bulk
+(`neutral`: Golem 89%; Leviathan, Griffin and Treant 78%).
+
+The roster has since had **its first simulator-tuned pass** (base stats only; kit, fixtures,
+formula, element chart and Runtime unchanged). The "after" picture is
+[`docs/balance/tuned-report.md`](../balance/tuned-report.md), and
+[`docs/balance/tuning-log.md`](../balance/tuning-log.md) has the stat changes, per-encounter
+marginals before and after, the iteration log and the caveats. In `elemental` mode every beast's
+overall marginal is now within ±5 points (−3.8 … +3.4, from −23.4 … +17.4), and in `neutral` mode
+eight of ten are (−8.0 … +4.8, from −31.9 … +21.6). Roles still show per encounter: Tarasque, Kirin
+and Frost Wyrm lead against the boss, where the slow tanks Leviathan and Treant are worst but lead
+against the swarm and the pack. Three findings are design questions rather than stat problems:
+the goal "every beast top-3 against some encounter" cannot hold for ten beasts and three encounters
+(nine slots); in `neutral` mode the fastest fragile beast on a team walks into the pack first and
+takes its focus, which leaves Thunderbird (−8.0) and Griffin (−7.4) just outside ±7 because their
+approved identities make them the fastest; and a pure wall has no way to matter under
+nearest-enemy targeting, so Golem's Attack rose from 80 to 105 rather than it staying a
+low-attack wall — a taunt or guard mechanic would change that. The measurement noise between seeds
+(about ±3 points overall) is close to the size of the target. These are inputs to the roster
+discussion, not decisions. They depend on the simulator's assumptions listed in its README, above
+all the fixture enemies, the one standard kit and nearest-enemy targeting.
+
 Every pass so far is deliberately **data structures and algorithms only** — no MonoBehaviours, no
 scene or prefab wiring, and no committed `.asset` instances (the roster's are generated in-Editor). The hex radii backing each arena preset
 are placeholder implementation defaults chosen to be tunable, not producer-confirmed balance
 numbers, and the deployment-zone split, the effect rules and the element chart above are the same
-kind of default.
-Still to come: the damage formula and stat scaling on top of
-flat magnitudes — the planned next work stream, applying to beasts and the avatar alike, together
-with a headless balance simulator that reads `beast-roster.json` directly and replaces the roster's
-first-draft numbers with tuned ones — the starter roster's skills (none are authored yet), the status-effect system behind `ApplyStatus`, resource gating on top of cooldowns,
-lifting defeated units off the grid so they stop obstructing movement, the placement UI (a Unity
+kind of default, as is the damage formula.
+Still to come: confirming or revising the first tuning pass (and, if needed, the damage formula and
+element chart), deciding the design questions it raised above — a design decision the reports inform
+rather than make — and extending the simulator once authored skills, real encounters and the avatar
+give it more than a standard kit and fixture enemies to measure; multi-hex large creatures, an open
+item under "Encounter direction" above; stat-scaled healing; the starter roster's skills (none are
+authored yet), the status-effect system behind `ApplyStatus`, resource gating on top of cooldowns,
+the placement UI (a Unity
 Editor task, not a continuation of the placement validation that just landed), the encounter
 definition that selects an arena preset and a battle format, and the presentation layer.

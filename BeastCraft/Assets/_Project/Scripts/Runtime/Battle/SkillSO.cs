@@ -104,13 +104,27 @@ namespace BeastCraft.Battle
         /// skill.
         /// <para>
         /// Read only for <see cref="SkillEffectType.Damage"/> effects, where
-        /// <see cref="SkillEffectApplier"/> scales the flat magnitude by
+        /// <see cref="DamageFormula"/> scales the stat-based damage by
         /// <see cref="ElementChart.GetMultiplier(Element, IReadOnlyList{Element})"/> against the
         /// target's elements. Heals and stat changes ignore it. The default,
         /// <see cref="Element.None"/>, is neutral: a 1x multiplier against everything.
         /// </para>
         /// </summary>
         public Element Element = Element.None;
+
+        /// <summary>
+        /// Which stat pair this skill's damage is resolved with: <see cref="DamageCategory.Physical"/>
+        /// (the caster's <c>Attack</c> against the target's <c>Defense</c>) or
+        /// <see cref="DamageCategory.Special"/> (<c>SpecialAttack</c> against
+        /// <c>SpecialDefense</c>). See <see cref="DamageFormula"/>.
+        /// <para>
+        /// Read only for <see cref="SkillEffectType.Damage"/> effects; heals and stat changes ignore
+        /// it. It belongs to the skill rather than to each effect, as <see cref="Element"/> does: a
+        /// skill is a physical or a special attack as a whole. Defaults to
+        /// <see cref="DamageCategory.Physical"/>.
+        /// </para>
+        /// </summary>
+        public DamageCategory Category = DamageCategory.Physical;
 
         /// <summary>Everything this skill applies to each affected unit.</summary>
         public List<SkillEffect> Effects = new List<SkillEffect>();

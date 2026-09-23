@@ -65,9 +65,18 @@ namespace BeastCraft.Battle
     /// base (<see cref="AvatarStatsSO"/>) raised by equipped <see cref="AvatarGearSO"/>, assembled
     /// by <see cref="StatCalculator"/> exactly as beast gear is. That gear is never rendered, and it
     /// is independent of the avatar's appearance, which stays purely cosmetic and statless in the
-    /// customization system. <em>Nothing reads the avatar's stats yet</em>: skill magnitudes are
-    /// still flat, so a buff the avatar casts lands the same whatever its stats are. A stat-based
-    /// damage formula covering beasts and the avatar alike is the planned follow-up.
+    /// customization system. <strong>The avatar's stats and level feed
+    /// <see cref="DamageFormula"/> exactly as a beast's do</strong>: a damaging avatar skill (say an
+    /// <see cref="SkillTargetShape.AllEnemies"/> strike) uses the avatar's <c>Attack</c> or
+    /// <c>SpecialAttack</c> and its <see cref="BattleUnit.Level"/>. Its heals and buffs are still
+    /// flat, as everyone's are, so for those its stats change nothing yet.
+    /// </para>
+    /// <para>
+    /// <strong>Level.</strong> Avatar progression is still undesigned — there is no avatar XP and
+    /// no avatar level anywhere in the data. The damage formula needs a caster level all the same,
+    /// so the statful <c>Create</c> takes a <em>battle</em> level that the battle setup is expected
+    /// to choose sensibly (for example the level of the player's team), defaulting to 1. It is a
+    /// per-battle input, not a stored avatar attribute, until progression is designed.
     /// </para>
     /// </summary>
     public static class BattleAvatar
@@ -99,12 +108,20 @@ namespace BeastCraft.Battle
         /// <para>
         /// This overload gives the avatar an all-zero stat block, unclamped, exactly as it always
         /// has; it is the "no stats authored" path and is kept so existing callers are unaffected.
-        /// Use <see cref="Create(SkillLoadout, StatBlock, IEnumerable{AvatarGearSO}, string)"/>
-        /// to give the avatar its base stats and gear. Zero is harmless here because nothing reads
-        /// the avatar's stats — it takes no turn, so its <c>Speed</c> never sorts anything, and it
-        /// is not in the roster, so nothing targets its HP. A zero <c>Hp</c> means
-        /// <see cref="BattleUnit.CurrentHp"/> also starts at 0, which is harmless for the same
-        /// reason.
+        /// Use <see cref="Create(SkillLoadout, StatBlock, IEnumerable{AvatarGearSO}, string, int)"/>
+        /// to give the avatar its base stats and gear. It takes no turn, so its zero <c>Speed</c>
+        /// never sorts anything, and it is not in the roster, so nothing targets its HP. A zero
+        /// <c>Hp</c> means <see cref="BattleUnit.CurrentHp"/> also starts at 0, which is harmless
+        /// for the same reason.
+        /// </para>
+        /// <para>
+        /// <strong>Its damage is the formula's floor.</strong> This avatar is level 1 with zero
+        /// <c>Attack</c> and <c>SpecialAttack</c>, and <see cref="DamageFormula"/> gives a zero
+        /// attacking stat exactly its +2 constant: every damage effect it lands deals 2 times the
+        /// element multiplier (truncated, at least 1), whatever the authored power. Before the
+        /// damage formula it dealt the authored magnitude flat; a caller relying on an avatar
+        /// strike landing hard must now give the avatar stats through the other overload. Heals and
+        /// buffs it casts are unchanged, since those are still flat.
         /// </para>
         /// <para>
         /// <see cref="BattleUnit.IsDefeated"/> is left <c>false</c> and stays that way: there is no
@@ -130,6 +147,14 @@ namespace BeastCraft.Battle
         /// <see cref="Create(SkillLoadout, string)"/>: player team, placeholder position, a caster
         /// and never a member of the roster, never defeated.
         /// <para>
+        /// <paramref name="level"/> becomes the avatar's <see cref="BattleUnit.Level"/>, the
+        /// caster level <see cref="DamageFormula"/> reads for its damaging skills. It is a battle
+        /// level, not avatar progression (which is still open; see the class remarks): the battle
+        /// setup should pass something sensible such as the player team's level. It defaults to 1,
+        /// and anything below 1 is stored as 1. It is the last parameter so that existing callers,
+        /// including any passing <paramref name="id"/> positionally, are unaffected.
+        /// </para>
+        /// <para>
         /// A null <paramref name="equipped"/> list, null pieces and null modifiers are skipped. One
         /// item per <see cref="AvatarGearSlot"/> is <em>not</em> enforced — two pieces in the same
         /// slot both count. That is the equipment screen's rule to keep, as it is for beast gear.
@@ -137,14 +162,14 @@ namespace BeastCraft.Battle
         /// <para>
         /// The 1 HP floor applies on this path only, because it is <see cref="StatCalculator"/>'s
         /// floor; it gives the avatar a nonzero <see cref="BattleUnit.CurrentHp"/> but changes
-        /// nothing about its role, since nothing targets it. As the class documents, nothing reads
-        /// these stats yet either.
+        /// nothing about its role, since nothing targets it.
         /// </para>
         /// </summary>
-        public static BattleUnit Create(SkillLoadout skills, StatBlock baseStats, IEnumerable<AvatarGearSO> equipped, string id = DefaultId)
+        public static BattleUnit Create(SkillLoadout skills, StatBlock baseStats, IEnumerable<AvatarGearSO> equipped, string id = DefaultId,
+                                        int level = 1)
         {
             StatBlock stats = StatCalculator.ComputeStats(baseStats, StatCalculator.CollectModifiers(equipped));
-            return new BattleUnit(id, BattleTeam.Player, stats, PlaceholderPosition, skills);
+            return new BattleUnit(id, BattleTeam.Player, stats, PlaceholderPosition, skills, null, level);
         }
     }
 }

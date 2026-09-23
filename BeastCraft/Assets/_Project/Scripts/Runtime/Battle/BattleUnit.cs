@@ -16,10 +16,10 @@ namespace BeastCraft.Battle
     /// <para>
     /// Intentionally minimal: the identity, allegiance, stats and position that the grid and the
     /// turn manager need to reference, plus the equipped skill stack the rotation ticks, the live
-    /// HP pool effects spend against, and the timed stat modifiers riding on the unit. This is
-    /// NOT the final creature-instance runtime model — the real one will carry level, equipped
-    /// gear, status effects and a link back to its <c>CreatureSpeciesSO</c>, and this type will
-    /// either grow into it or be replaced by it.
+    /// HP pool effects spend against, the timed stat modifiers riding on the unit, and the level
+    /// the damage formula reads. This is NOT the final creature-instance runtime model — the real
+    /// one will carry equipped gear, status effects and a link back to its
+    /// <c>CreatureSpeciesSO</c>, and this type will either grow into it or be replaced by it.
     /// </para>
     /// <para>
     /// A beast is built from its species, level and gear by <see cref="BattleUnitFactory"/>, which
@@ -57,9 +57,15 @@ namespace BeastCraft.Battle
         /// neutral to every element — rather than a null one. The list is copied, so later edits
         /// to the caller's array (or the species asset) do not reach a unit already in battle.
         /// </para>
+        /// <para>
+        /// <paramref name="level"/> is the unit's <see cref="Level"/>, read by
+        /// <see cref="DamageFormula"/>. It defaults to 1 so every existing call site keeps
+        /// compiling; <see cref="BattleUnitFactory.CreateBeast"/> passes the beast's real level.
+        /// Anything below 1 is stored as 1.
+        /// </para>
         /// </summary>
         public BattleUnit(string id, BattleTeam team, StatBlock stats, HexCoordinate position, SkillLoadout skills = null,
-                          IReadOnlyList<Element> elements = null)
+                          IReadOnlyList<Element> elements = null, int level = 1)
         {
             Id = id;
             Team = team;
@@ -69,6 +75,7 @@ namespace BeastCraft.Battle
             Skills = skills ?? new SkillLoadout(null);
             ActiveStatModifiers = new List<ActiveStatModifier>();
             Elements = CopyElements(elements);
+            Level = level < 1 ? 1 : level;
         }
 
         /// <summary>
@@ -117,6 +124,11 @@ namespace BeastCraft.Battle
         /// <see cref="BattleTurnExecutor"/> is the one thing that moves a unit today, and it writes
         /// both halves together: the grid placement first, this property only once the grid has
         /// accepted it.
+        /// </para>
+        /// <para>
+        /// Once the unit is defeated the executor lifts it off the grid, but this keeps the tile it
+        /// fell on, for logs and results. From then on it is a record, not occupancy: the tile may
+        /// be taken by someone else, and nothing reads a defeated unit's position for play.
         /// </para>
         /// </summary>
         public HexCoordinate Position { get; set; }
@@ -182,7 +194,7 @@ namespace BeastCraft.Battle
 
         /// <summary>
         /// The unit's elemental affinities, consulted when it is <em>hit</em> by a damaging skill:
-        /// <see cref="SkillEffectApplier"/> scales the damage by
+        /// <see cref="DamageFormula"/> scales the damage by
         /// <see cref="ElementChart.GetMultiplier(Element, IReadOnlyList{Element})"/> of the
         /// skill's <see cref="SkillSO.Element"/> against this list. The unit's own elements play no
         /// part in the damage it <em>deals</em> — the skill carries the attacking element.
@@ -196,8 +208,27 @@ namespace BeastCraft.Battle
         public IReadOnlyList<Element> Elements { get; }
 
         /// <summary>
+        /// The unit's level, always at least 1. Read by <see cref="DamageFormula"/> as the
+        /// caster's level in the level term, so a higher-level unit hits harder with the same stats.
+        /// <para>
+        /// For a beast this is the level its stats were assembled at (see
+        /// <see cref="BattleUnitFactory.CreateBeast"/>); it is only recorded here, and changing it
+        /// would not re-assemble <see cref="Stats"/>. For the avatar, which has no progression yet,
+        /// it is whatever battle level <see cref="BattleAvatar"/> was given.
+        /// </para>
+        /// <para>
+        /// Read-only and fixed at construction, like <see cref="Elements"/>: nothing levels a unit
+        /// mid-battle. The constructor stores anything below 1 as 1 — the one correction this
+        /// passive record makes, because a level-0 or negative caster has no meaning in the
+        /// formula.
+        /// </para>
+        /// </summary>
+        public int Level { get; }
+
+        /// <summary>
         /// True once the unit is out of the fight. Defeated units are skipped by the turn order and
-        /// are expected to be lifted off the grid by the caller.
+        /// by targeting, and <see cref="BattleTurnExecutor"/> lifts them off the grid as soon as
+        /// they fall (their <see cref="Position"/> is kept as a record).
         /// </summary>
         public bool IsDefeated { get; set; }
 

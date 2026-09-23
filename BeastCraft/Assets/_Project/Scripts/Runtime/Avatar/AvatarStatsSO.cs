@@ -8,8 +8,10 @@ namespace BeastCraft.Avatar
     /// Pass <see cref="BaseStats"/> to <c>BattleAvatar.Create</c> together with the equipped avatar
     /// gear.
     /// <para>
-    /// A flat block with no growth curve: the avatar has no level, and avatar progression is an
-    /// open design question rather than something this asset pre-empts. <see cref="StatBlock.MoveRange"/>
+    /// A flat block with no growth curve: the avatar has no progression level, and avatar
+    /// progression is an open design question rather than something this asset pre-empts. (The
+    /// damage formula's caster level for the avatar is a per-battle input to
+    /// <c>BattleAvatar.Create</c>, not something stored here.) <see cref="StatBlock.MoveRange"/>
     /// and <see cref="StatBlock.Speed"/> are carried for completeness but mean nothing for a
     /// participant that is off the grid and takes no initiative turn.
     /// </para>

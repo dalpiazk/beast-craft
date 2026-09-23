@@ -39,6 +39,19 @@ namespace BeastCraft.Battle
     /// <see cref="SkillLoadout.Tick"/> no longer re-arms what it offers, and why
     /// <see cref="SkillLoadout.MarkFired"/> exists.
     /// </description></item>
+    /// <item><description>
+    /// <strong>Partial approach.</strong> When a route to within range exists but is longer than
+    /// what is left of the budget, the unit still <em>advances</em>: it walks that same cheapest
+    /// route (the one <see cref="TryPlanApproach"/> would have used, with the same tie-breaks) for
+    /// exactly the steps it has left, spending all of them, and the slot is held as above
+    /// (<see cref="BattleSkillStatus.OutOfMovement"/>: it does not fire, and its cooldown is not
+    /// spent). Next turn it starts that much closer. Only a unit with <em>no</em> route at all
+    /// (<see cref="BattleSkillStatus.Unreachable"/> — walled off by terrain or bodies, or no grid)
+    /// stays where it is. Because the budget is shared and slots are attempted in stack order, the
+    /// earliest held slot decides where the leftover movement goes; a later slot then has nothing
+    /// left to walk with, but it is still attempted from the new tile and fires if its focus is now
+    /// in range — and a shape that needs no approach fires regardless.
+    /// </description></item>
     /// </list>
     /// </para>
     /// <para>
@@ -54,10 +67,24 @@ namespace BeastCraft.Battle
     /// still re-arms.
     /// </para>
     /// <para>
+    /// <strong>Defeated units leave the grid.</strong> The moment a unit is defeated its tile is
+    /// freed: after every beast skill that fires and every avatar activation that is applied, each
+    /// defeated unit in the roster is lifted off the board with <see cref="HexGrid.RemoveUnit"/>
+    /// (and once more as each turn opens, which catches a unit defeated by anything outside this
+    /// type). So a later slot in the same turn, and every later turn, can path through or stand on
+    /// the tile a fallen unit held. It happens here rather than in
+    /// <see cref="SkillEffectApplier"/>, which deliberately has no board. The defeated unit
+    /// <em>keeps</em> its <see cref="BattleUnit.Position"/> — the tile it fell on — for logs and
+    /// results; that value is no longer backed by grid occupancy, and nothing reads it for play,
+    /// because <see cref="SkillTargetResolver"/> only ever considers living units and
+    /// <see cref="TurnManager"/> hands a defeated unit no turn. A null grid is tolerated as before:
+    /// there is simply nothing to lift anything off.
+    /// </para>
+    /// <para>
     /// <strong>Still not built here.</strong> <c>SkillSO.ResourceCost</c> is not spent (deferred by
     /// the producer), no status-effect system exists for
-    /// <see cref="SkillEffectType.ApplyStatus"/> to hang off, defeated units are not lifted off the
-    /// grid, and nothing in this file is a MonoBehaviour or knows a scene exists. There is also no
+    /// <see cref="SkillEffectType.ApplyStatus"/> to hang off, and nothing in this file is a
+    /// MonoBehaviour or knows a scene exists. There is also no
     /// AI beyond the rule above: the unit does not reposition for safety, kite, spread out or retreat,
     /// because none of that has been designed.
     /// </para>
@@ -106,8 +133,10 @@ namespace BeastCraft.Battle
         /// Each ready slot in turn. A shape that needs no approach resolves and fires immediately. A
         /// picking shape looks for its best candidate <em>ignoring range</em>
         /// (<see cref="SkillTargetResolver.PickFocusIgnoringRange"/>); with no candidate anywhere it
-        /// is left at 0 and no movement is attempted, and with one it either already reaches it, or
-        /// walks the cheapest route to a tile that does — if the turn's remaining budget covers it.
+        /// is left at 0 and no movement is attempted, and with one it either already reaches it,
+        /// walks the cheapest route to a tile that does if the turn's remaining budget covers it, or
+        /// — when the budget falls short — advances along that route by what is left and holds.
+        /// Every skill that fires is followed by lifting the newly defeated off the grid.
         /// </description></item>
         /// <item><description>
         /// On a <see cref="BattleTeam.Player"/> unit's turn only, the avatar's loadout is ticked and
@@ -145,6 +174,9 @@ namespace BeastCraft.Battle
             }
 
             HexCoordinate start = unit.Position;
+
+            // Anything defeated outside this type must not keep obstructing this turn's routes.
+            LiftDefeated(allUnits, grid);
 
             SkillEffectApplier.TickModifiers(unit);
 
@@ -191,9 +223,9 @@ namespace BeastCraft.Battle
                     continue;
                 }
 
-                HexCoordinate destination;
+                IReadOnlyList<HexCoordinate> route;
                 int steps;
-                if (!TryPlanApproach(unit, candidate, skill, grid, out destination, out steps))
+                if (!TryPlanApproach(unit, candidate, skill, grid, out route, out steps))
                 {
                     outcomes.Add(new BattleSkillOutcome(slotIndex, skill, BattleSkillStatus.Unreachable, null, 0));
                     continue;
@@ -201,11 +233,14 @@ namespace BeastCraft.Battle
 
                 if (steps > remaining)
                 {
-                    outcomes.Add(new BattleSkillOutcome(slotIndex, skill, BattleSkillStatus.OutOfMovement, null, 0));
+                    // Partial approach: close the distance by whatever is left, then hold the slot.
+                    int advanced = remaining > 0 && TryMove(unit, grid, route[remaining]) ? remaining : 0;
+                    remaining -= advanced;
+                    outcomes.Add(new BattleSkillOutcome(slotIndex, skill, BattleSkillStatus.OutOfMovement, null, advanced));
                     continue;
                 }
 
-                if (!TryMove(unit, grid, destination))
+                if (!TryMove(unit, grid, route[steps]))
                 {
                     outcomes.Add(new BattleSkillOutcome(slotIndex, skill, BattleSkillStatus.Unreachable, null, 0));
                     continue;
@@ -222,6 +257,7 @@ namespace BeastCraft.Battle
                 for (int i = 0; i < cast.Count; i++)
                 {
                     SkillEffectApplier.Apply(cast[i], avatar);
+                    LiftDefeated(allUnits, grid);
                     avatarActivations.Add(cast[i]);
                 }
             }
@@ -323,9 +359,10 @@ namespace BeastCraft.Battle
         }
 
         /// <summary>
-        /// Resolves one slot from where the caster is standing right now, applies what it does, and
-        /// re-arms the slot. The one place in a beast's turn that a cooldown is reset, so a skill
-        /// cannot be marked fired without having actually resolved.
+        /// Resolves one slot from where the caster is standing right now, applies what it does,
+        /// lifts anyone it defeated (the caster included) off the grid, and re-arms the slot. The
+        /// one place in a beast's turn that a cooldown is reset, so a skill cannot be marked fired
+        /// without having actually resolved.
         /// </summary>
         private static BattleSkillOutcome Fire(SkillLoadout loadout, int slotIndex, SkillSO skill, BattleUnit caster, IEnumerable<BattleUnit> allUnits, HexGrid grid, Random rng, int movementSpent)
         {
@@ -333,6 +370,7 @@ namespace BeastCraft.Battle
             SkillActivation activation = new SkillActivation(skill, targets);
 
             SkillEffectApplier.Apply(activation, caster);
+            LiftDefeated(allUnits, grid);
             loadout.MarkFired(slotIndex);
 
             return new BattleSkillOutcome(slotIndex, skill, BattleSkillStatus.Fired, activation, movementSpent);
@@ -340,8 +378,10 @@ namespace BeastCraft.Battle
 
         /// <summary>
         /// The cheapest walk that puts <paramref name="mover"/> within the skill's range of
-        /// <paramref name="candidate"/>: the tile to stop on and how many steps it takes. False when
-        /// no route reaches range at all.
+        /// <paramref name="candidate"/>: the route (start tile first) and how many steps along it the
+        /// first in-range tile is, so <c>route[steps]</c> is the tile to stop on. False when no route
+        /// reaches range at all. The whole route is returned rather than just the stop because a
+        /// partial approach walks a prefix of it.
         /// <para>
         /// <strong>Why it does not simply path to the candidate's tile.</strong> That tile is
         /// occupied — by the candidate — and <see cref="HexGrid.IsPassable"/> makes every other
@@ -371,12 +411,13 @@ namespace BeastCraft.Battle
         /// The budget is deliberately not passed in. Whether the walk is affordable is the caller's
         /// decision because the answer depends on what earlier skills in the same turn already
         /// spent, and a plan that is too expensive this turn is still worth reporting as a plan
-        /// rather than as "unreachable" — the two are different outcomes to the unit.
+        /// rather than as "unreachable" — the two are different outcomes to the unit: an
+        /// unaffordable plan is still walked part of the way, an unreachable one not at all.
         /// </para>
         /// </summary>
-        private static bool TryPlanApproach(BattleUnit mover, BattleUnit candidate, SkillSO skill, HexGrid grid, out HexCoordinate destination, out int steps)
+        private static bool TryPlanApproach(BattleUnit mover, BattleUnit candidate, SkillSO skill, HexGrid grid, out IReadOnlyList<HexCoordinate> route, out int steps)
         {
-            destination = mover.Position;
+            route = null;
             steps = 0;
 
             if (grid == null)
@@ -386,7 +427,7 @@ namespace BeastCraft.Battle
 
             bool found = false;
             int bestSteps = int.MaxValue;
-            HexCoordinate bestDestination = mover.Position;
+            IReadOnlyList<HexCoordinate> bestRoute = null;
             List<HexCoordinate> goals = ApproachGoals(grid, mover, candidate);
 
             for (int g = 0; g < goals.Count; g++)
@@ -403,7 +444,7 @@ namespace BeastCraft.Battle
                     if (step < bestSteps)
                     {
                         bestSteps = step;
-                        bestDestination = path[step];
+                        bestRoute = path;
                         found = true;
                     }
 
@@ -416,7 +457,7 @@ namespace BeastCraft.Battle
                 return false;
             }
 
-            destination = bestDestination;
+            route = bestRoute;
             steps = bestSteps;
             return true;
         }
@@ -471,6 +512,29 @@ namespace BeastCraft.Battle
 
             unit.Position = destination;
             return true;
+        }
+
+        /// <summary>
+        /// Takes every defeated unit in the roster off the board, freeing its tile for movement and
+        /// placement. Idempotent and cheap: a unit the grid does not hold (already lifted, or never
+        /// placed) is a no-op in <see cref="HexGrid.RemoveUnit"/>. <see cref="BattleUnit.Position"/>
+        /// is deliberately left alone, so a defeated unit still says where it fell. A null grid or
+        /// roster lifts nothing.
+        /// </summary>
+        private static void LiftDefeated(IEnumerable<BattleUnit> allUnits, HexGrid grid)
+        {
+            if (grid == null || allUnits == null)
+            {
+                return;
+            }
+
+            foreach (BattleUnit unit in allUnits)
+            {
+                if (unit != null && unit.IsDefeated)
+                {
+                    grid.RemoveUnit(unit.Id);
+                }
+            }
         }
 
         /// <summary>

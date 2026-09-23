@@ -43,6 +43,12 @@ namespace BeastCraft.Battle
         /// max HP), with no timed modifiers, and holds a copy of the species' elements, so later
         /// edits to the species asset do not reach it mid-battle.
         /// </para>
+        /// <para>
+        /// <paramref name="level"/> is recorded as <see cref="BattleUnit.Level"/> as well as used to
+        /// assemble the stats, so the damage formula's level term and the stats it divides always
+        /// come from the same level. A level below 1 is stored as 1 by the unit, the same floor
+        /// the growth curve clamps to.
+        /// </para>
         /// </summary>
         public static BattleUnit CreateBeast(string id, BattleTeam team, CreatureSpeciesSO species, int level,
                                              IEnumerable<GearSO> equipped, HexCoordinate position, SkillLoadout skills = null)
@@ -50,7 +56,7 @@ namespace BeastCraft.Battle
             StatBlock stats = StatCalculator.ComputeStats(species, level, equipped);
             Element[] elements = species == null ? null : species.Elements;
 
-            return new BattleUnit(id, team, stats, position, skills, elements);
+            return new BattleUnit(id, team, stats, position, skills, elements, level);
         }
     }
 }

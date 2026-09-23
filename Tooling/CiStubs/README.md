@@ -10,6 +10,12 @@ scripts **without a Unity Editor install or a Unity licence**.
 | `UnityStub/` | A tiny fake `UnityEngine` assembly — just enough API surface (`Object`, `ScriptableObject`, `Sprite`, `Color`, `Mathf`, `AnimationCurve`, `JsonUtility`, `Debug`, the inspector attributes, and a few `UnityEditor` types) for the game scripts to compile. |
 | `CiLint/` | A source-less project that globs in `BeastCraft/Assets/_Project/Scripts/{Runtime,Editor}/**/*.cs` and compiles them against `UnityStub`. This is the project CI builds and formats. |
 
+`UnityStub` has one other consumer: `Tooling/BalanceSim/`, the local-only headless balance simulator,
+which compiles the `Runtime` scripts against it and actually *executes* them. That is why the rule
+below about genuine behaviour matters beyond CI — `AnimationCurve.Evaluate`, `Mathf` and
+`ScriptableObject.CreateInstance` are run for real by the simulator. It is not a CI job; see its own
+README.
+
 Neither project is part of the Unity project (they live entirely outside `BeastCraft/`), neither is
 ever shipped, and game code must never reference them.
 

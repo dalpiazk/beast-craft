@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Headless balance simulator for Beast Craft. LOCAL-ONLY TOOLING: not a CI job, never shipped,
+    never referenced by game code. See README.md beside this file.
+
+    It runs the real battle code outside Unity: the game's Runtime scripts are pulled in by glob
+    (exactly as Tooling/CiStubs/CiLint does) and compiled against the committed UnityStub, whose
+    AnimationCurve / Mathf / ScriptableObject.CreateInstance carry genuine behaviour. Editor and
+    Tests scripts are deliberately NOT compiled here.
+  -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- .NET 10 is the installed LTS SDK. The UnityStub it references targets netstandard2.1. -->
+    <TargetFramework>net10.0</TargetFramework>
+    <!-- Mirrors CiLint: the Runtime scripts are Unity 6000.0 code, written for C# 9. The simulator's
+         own sources are held to the same version so one setting covers the whole compilation. -->
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <IsPackable>false</IsPackable>
+    <EnableNETAnalyzers>false</EnableNETAnalyzers>
+    <RootNamespace>BeastCraft.Tooling.BalanceSim</RootNamespace>
+    <AssemblyName>BalanceSim</AssemblyName>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CiStubs\UnityStub\UnityStub.csproj" />
+  </ItemGroup>
+
+  <!-- Paths are relative to this csproj: Tooling/BalanceSim -> repo root is two levels up. -->
+  <ItemGroup>
+    <Compile Include="..\..\BeastCraft\Assets\_Project\Scripts\Runtime\**\*.cs">
+      <Link>GameSource\Runtime\%(RecursiveDir)%(Filename)%(Extension)</Link>
+    </Compile>
+  </ItemGroup>
+
+</Project>

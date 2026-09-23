@@ -39,6 +39,7 @@ namespace BeastCraft.Tests.EditMode
             Assert.AreEqual(4, unit.Stats.MoveRange);
             Assert.AreEqual(4, unit.MoveRange);
             Assert.AreEqual(150, unit.CurrentHp);
+            Assert.AreEqual(6, unit.Level);
             Assert.AreEqual(0, unit.ActiveStatModifiers.Count);
             Assert.IsFalse(unit.IsDefeated);
             Assert.IsNotNull(unit.Skills);

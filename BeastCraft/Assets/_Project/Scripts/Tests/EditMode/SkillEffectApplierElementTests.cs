@@ -7,8 +7,18 @@ using UnityEngine;
 
 namespace BeastCraft.Tests.EditMode
 {
+    /// <summary>
+    /// The element multiplier as applied by <see cref="SkillEffectApplier"/>, on top of
+    /// <see cref="DamageFormula"/>. Every unit here is level 10 with 20 in each of the four combat
+    /// stats, so the level term is exactly 6 and <c>A / D</c> is exactly 1: a neutral hit of power
+    /// <c>P</c> is <c>6 * P / 50 + 2</c> — power 50 deals 8, power 25 deals 5 — and the element
+    /// multiplier scales that.
+    /// </summary>
     public class SkillEffectApplierElementTests
     {
+        private const int Level = 10;
+        private const int CombatStat = 20;
+
         private readonly List<SkillSO> _created = new List<SkillSO>();
 
         [TearDown]
@@ -27,9 +37,10 @@ namespace BeastCraft.Tests.EditMode
         {
             BattleUnit target = Unit("target", 100, Element.Nature);
 
-            Fire(Skill(Element.Fire, SkillEffectType.Damage, 10f), target);
+            Fire(Skill(Element.Fire, SkillEffectType.Damage, 50f), target);
 
-            Assert.AreEqual(80, target.CurrentHp);
+            // Base 8, x2.
+            Assert.AreEqual(84, target.CurrentHp);
         }
 
         [Test]
@@ -37,9 +48,9 @@ namespace BeastCraft.Tests.EditMode
         {
             BattleUnit target = Unit("target", 100, Element.Water);
 
-            Fire(Skill(Element.Fire, SkillEffectType.Damage, 5f), target);
+            Fire(Skill(Element.Fire, SkillEffectType.Damage, 25f), target);
 
-            // 5 * 0.5 = 2.5, truncated to 2.
+            // Base 5 * 0.5 = 2.5, truncated to 2.
             Assert.AreEqual(98, target.CurrentHp);
         }
 
@@ -48,29 +59,30 @@ namespace BeastCraft.Tests.EditMode
         {
             BattleUnit target = Unit("target", 100, Element.Nature, Element.Metal);
 
-            Fire(Skill(Element.Fire, SkillEffectType.Damage, 10f), target);
+            Fire(Skill(Element.Fire, SkillEffectType.Damage, 50f), target);
 
-            Assert.AreEqual(60, target.CurrentHp);
+            // Base 8, x2 x2.
+            Assert.AreEqual(68, target.CurrentHp);
         }
 
         [Test]
-        public void Damage_NeutralSkill_IsFlat()
+        public void Damage_NeutralSkill_IsUnscaled()
         {
             BattleUnit target = Unit("target", 100, Element.Nature);
 
-            Fire(Skill(Element.None, SkillEffectType.Damage, 10f), target);
+            Fire(Skill(Element.None, SkillEffectType.Damage, 50f), target);
 
-            Assert.AreEqual(90, target.CurrentHp);
+            Assert.AreEqual(92, target.CurrentHp);
         }
 
         [Test]
-        public void Damage_UnalignedTarget_IsFlat()
+        public void Damage_UnalignedTarget_IsUnscaled()
         {
             BattleUnit target = Unit("target", 100);
 
-            Fire(Skill(Element.Fire, SkillEffectType.Damage, 10f), target);
+            Fire(Skill(Element.Fire, SkillEffectType.Damage, 50f), target);
 
-            Assert.AreEqual(90, target.CurrentHp);
+            Assert.AreEqual(92, target.CurrentHp);
         }
 
         [Test]
@@ -78,7 +90,8 @@ namespace BeastCraft.Tests.EditMode
         {
             BattleUnit target = Unit("target", 15, Element.Nature);
 
-            Fire(Skill(Element.Fire, SkillEffectType.Damage, 10f), target);
+            // 16 damage against 15 HP.
+            Fire(Skill(Element.Fire, SkillEffectType.Damage, 50f), target);
 
             Assert.AreEqual(0, target.CurrentHp);
             Assert.IsTrue(target.IsDefeated);
@@ -104,7 +117,7 @@ namespace BeastCraft.Tests.EditMode
 
             Fire(skill, target);
 
-            Assert.AreEqual(20, target.Stats.Attack);
+            Assert.AreEqual(30, target.Stats.Attack);
         }
 
         [Test]
@@ -115,10 +128,10 @@ namespace BeastCraft.Tests.EditMode
 
             // The skill is neutral; the caster being Fire must not make it a Fire hit.
             SkillEffectApplier.Apply(
-                new SkillActivation(Skill(Element.None, SkillEffectType.Damage, 10f), new[] { target }),
+                new SkillActivation(Skill(Element.None, SkillEffectType.Damage, 50f), new[] { target }),
                 fireCaster);
 
-            Assert.AreEqual(90, target.CurrentHp);
+            Assert.AreEqual(92, target.CurrentHp);
         }
 
         [Test]
@@ -144,7 +157,8 @@ namespace BeastCraft.Tests.EditMode
 
         private static BattleUnit Unit(string id, int hp, params Element[] elements)
         {
-            return new BattleUnit(id, BattleTeam.Enemy, new StatBlock(hp, 10, 0, 0, 0, 0), HexCoordinate.Zero, null, elements);
+            StatBlock stats = new StatBlock(hp, CombatStat, CombatStat, CombatStat, CombatStat, 0);
+            return new BattleUnit(id, BattleTeam.Enemy, stats, HexCoordinate.Zero, null, elements, Level);
         }
 
         private static void Fire(SkillSO skill, BattleUnit target)
