@@ -1,5 +1,5 @@
 {
-  "_readme": "Source of truth for the starter roster. FIRST-DRAFT numbers, pending the headless balance simulator. Edit here, then in Unity run Beast Craft/Data/Import Beast Roster. See docs/design/battle-system.md, 'Starter roster'.",
+  "_readme": "Source of truth for the starter roster. FIRST-DRAFT numbers, pending the headless balance simulator. Edit here, then in Unity run Beast Craft/Data/Import Beast Roster. All species use the medium growth curve for now (user decision); fast and slow are kept, unused, for the balance simulator. See docs/design/battle-system.md, 'Starter roster'.",
   "SchemaVersion": 1,
   "GrowthCurves": [
     {
@@ -37,7 +37,7 @@
       "DisplayName": "Phoenix",
       "Description": "A bird of living flame that burns brightest just before it falls. It strikes hard and from afar, and has little to stand behind when the fire is returned.",
       "Elements": [ "Fire" ],
-      "GrowthCurveId": "fast",
+      "GrowthCurveId": "medium",
       "BaseStats": { "Hp": 70, "Attack": 130, "Defense": 55, "SpecialAttack": 140, "SpecialDefense": 70, "Speed": 135, "MoveRange": 4 }
     },
     {
@@ -45,7 +45,7 @@
       "DisplayName": "Leviathan",
       "Description": "A serpent of the deep whose coils could cradle a ship. Slow to rise and slower to fall, it outlasts whatever breaks against it.",
       "Elements": [ "Water" ],
-      "GrowthCurveId": "slow",
+      "GrowthCurveId": "medium",
       "BaseStats": { "Hp": 150, "Attack": 90, "Defense": 130, "SpecialAttack": 90, "SpecialDefense": 95, "Speed": 45, "MoveRange": 3 }
     },
     {
@@ -53,7 +53,7 @@
       "DisplayName": "Golem",
       "Description": "A hillside that learned to stand. It barely moves and rarely strikes, but nothing gets past it.",
       "Elements": [ "Earth" ],
-      "GrowthCurveId": "slow",
+      "GrowthCurveId": "medium",
       "BaseStats": { "Hp": 150, "Attack": 80, "Defense": 170, "SpecialAttack": 40, "SpecialDefense": 125, "Speed": 35, "MoveRange": 2 }
     },
     {
@@ -61,7 +61,7 @@
       "DisplayName": "Griffin",
       "Description": "Half eagle, half lion, all wind. It is across the field before the enemy has turned, and gone again before the blow lands.",
       "Elements": [ "Air" ],
-      "GrowthCurveId": "fast",
+      "GrowthCurveId": "medium",
       "BaseStats": { "Hp": 95, "Attack": 110, "Defense": 85, "SpecialAttack": 85, "SpecialDefense": 85, "Speed": 140, "MoveRange": 5 }
     },
     {
@@ -69,7 +69,7 @@
       "DisplayName": "Thunderbird",
       "Description": "Its wingbeat is the thunder and its dive is the lightning. Nothing acts before it, and little survives its first strike, though it cannot take one back.",
       "Elements": [ "Lightning" ],
-      "GrowthCurveId": "fast",
+      "GrowthCurveId": "medium",
       "BaseStats": { "Hp": 65, "Attack": 140, "Defense": 55, "SpecialAttack": 125, "SpecialDefense": 60, "Speed": 155, "MoveRange": 4 }
     },
     {
@@ -85,7 +85,7 @@
       "DisplayName": "Treant",
       "Description": "A patient forest guardian with roots older than kingdoms. It shelters its allies under its boughs and mends what the fight breaks.",
       "Elements": [ "Nature" ],
-      "GrowthCurveId": "slow",
+      "GrowthCurveId": "medium",
       "BaseStats": { "Hp": 160, "Attack": 80, "Defense": 100, "SpecialAttack": 85, "SpecialDefense": 130, "Speed": 45, "MoveRange": 3 }
     },
     {

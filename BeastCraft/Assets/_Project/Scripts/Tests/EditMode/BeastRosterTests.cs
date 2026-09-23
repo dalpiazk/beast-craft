@@ -97,6 +97,17 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
+        public void Roster_AllSpeciesShareTheMediumCurveForNow()
+        {
+            // User decision: one shared curve until the balance simulator differentiates them.
+            // fast and slow stay defined (and validated below) but unused.
+            foreach (SpeciesData species in LoadRoster().Species)
+            {
+                Assert.AreEqual("medium", species.GrowthCurveId, species.SpeciesId);
+            }
+        }
+
+        [Test]
         public void Curves_StartAboveZeroAtLevelOneAndReachOneAtMaxLevel()
         {
             BeastRosterData roster = LoadRoster();

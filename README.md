@@ -97,8 +97,10 @@ What exists today:
   avatar stats and avatar stat gear (never rendered; separate from the purely
   cosmetic customization), and the shared avatar + creature customization
   framework.
-- **Starter roster data** — ten beasts, one per element, plus three growth curves,
-  in `BeastCraft/Assets/_Project/Data/Creatures/beast-roster.json`. The JSON is the
+- **Starter roster data** — ten beasts, one per element, plus three growth curves
+  (all ten beasts currently share `medium`; `fast` and `slow` are kept for the
+  balance simulator), in
+  `BeastCraft/Assets/_Project/Data/Creatures/beast-roster.json`. The JSON is the
   source of truth (readable outside Unity, e.g. by a future headless balance
   simulator); the Unity assets are generated from it by opening the project and
   running **Beast Craft → Data → Import Beast Roster**, which creates or updates

@@ -13,6 +13,12 @@ namespace BeastCraft.Avatar
     /// and <see cref="StatBlock.Speed"/> are carried for completeness but mean nothing for a
     /// participant that is off the grid and takes no initiative turn.
     /// </para>
+    /// <para>
+    /// Namespace note: <c>BeastCraft.Avatar</c> hides <c>UnityEngine.Avatar</c> (Mecanim's rig
+    /// avatar) for any code inside <c>BeastCraft.*</c>, because the simple name <c>Avatar</c>
+    /// resolves to this namespace before the <c>using UnityEngine;</c> type. Code there that needs
+    /// Mecanim's type must write <c>UnityEngine.Avatar</c> fully qualified.
+    /// </para>
     /// </summary>
     [CreateAssetMenu(menuName = "Beast Craft/Avatar/Avatar Stats", fileName = "AvatarStats")]
     public class AvatarStatsSO : ScriptableObject

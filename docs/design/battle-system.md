@@ -619,23 +619,25 @@ be corrected by the headless balance simulator (see "Next steps"). Nothing here 
 
 | SpeciesId | Beast | Element | Archetype | Curve | HP | ATK | DEF | SpA | SpD | SPE | Six-stat total | Move |
 | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `phoenix` | Phoenix | Fire | Glass cannon | fast | 70 | 130 | 55 | 140 | 70 | 135 | 600 | 4 |
-| `leviathan` | Leviathan | Water | Tank | slow | 150 | 90 | 130 | 90 | 95 | 45 | 600 | 3 |
-| `golem` | Golem | Earth | Pure wall | slow | 150 | 80 | 170 | 40 | 125 | 35 | 600 | 2 |
-| `griffin` | Griffin | Air | Fast skirmisher | fast | 95 | 110 | 85 | 85 | 85 | 140 | 600 | 5 |
-| `thunderbird` | Thunderbird | Lightning | Burst striker | fast | 65 | 140 | 55 | 125 | 60 | 155 | 600 | 4 |
+| `phoenix` | Phoenix | Fire | Glass cannon | medium | 70 | 130 | 55 | 140 | 70 | 135 | 600 | 4 |
+| `leviathan` | Leviathan | Water | Tank | medium | 150 | 90 | 130 | 90 | 95 | 45 | 600 | 3 |
+| `golem` | Golem | Earth | Pure wall | medium | 150 | 80 | 170 | 40 | 125 | 35 | 600 | 2 |
+| `griffin` | Griffin | Air | Fast skirmisher | medium | 95 | 110 | 85 | 85 | 85 | 140 | 600 | 5 |
+| `thunderbird` | Thunderbird | Lightning | Burst striker | medium | 65 | 140 | 55 | 125 | 60 | 155 | 600 | 4 |
 | `frost_wyrm` | Frost Wyrm | Ice | Control / attrition | medium | 95 | 75 | 125 | 100 | 125 | 80 | 600 | 3 |
-| `treant` | Treant | Nature | Support-tank | slow | 160 | 80 | 100 | 85 | 130 | 45 | 600 | 3 |
+| `treant` | Treant | Nature | Support-tank | medium | 160 | 80 | 100 | 85 | 130 | 45 | 600 | 3 |
 | `tarasque` | Tarasque | Metal | Armored bruiser | medium | 110 | 140 | 145 | 50 | 80 | 75 | 600 | 3 |
 | `kirin` | Kirin | Light | Support caster | medium | 100 | 50 | 80 | 140 | 135 | 95 | 600 | 4 |
 | `basilisk` | Basilisk | Dark | Ranged assassin | medium | 80 | 95 | 55 | 145 | 90 | 135 | 600 | 5 |
 
-Stats are max-level values (curve scale 1). The drafting rules:
+Stats are max-level values (curve scale 1). **All ten beasts share the `medium` growth curve for
+now, by user decision**; differentiating curves per beast is deferred to the headless balance
+simulator. The drafting rules:
 
 - **Shared budget.** Every beast's six combat stats sum to the same budget (600), and the roster
-  tests allow ±5%. Archetype comes from how the budget is *distributed*, not from raw power. Whether
-  the slow-curve beasts deserve a larger budget as payoff for their weak early game is a balance
-  question for the simulator, not something this draft assumes.
+  tests allow ±5%. Archetype comes from how the budget is *distributed*, not from raw power. If the
+  simulator later gives some beasts a slower curve, whether they deserve a larger budget as payoff
+  for a weak early game is a balance question for it, not something this draft assumes.
 - **Move range in a small band (2–5)**, outside the budget. Griffin and Basilisk are the mobile
   ends (5); Golem is the only 2. "Range" in the archetypes means move range, the per-turn hex
   movement budget — skill reach is authored per skill.
@@ -659,16 +661,16 @@ level-1 stat 0 (the fresh-asset default still does exactly that), so authored cu
 - scale never decreases, and the curve is **piecewise-linear** between its authored points (the
   importer sets linear tangents, so Unity evaluates exactly the numbers in the JSON).
 
-All three curves have `MaxLevel` 100:
+Three curves are defined, all with `MaxLevel` 100. Only `medium` is in use; `fast` and `slow` stay
+in the file, unused, as ready-made shapes for the balance simulator to assign:
 
 | Curve | Shape | Key points (progress → scale) | Used by |
 | --- | --- | --- | --- |
-| `fast` | Front-loaded: strong early, flattens late | 0 → 0.20, 0.25 → 0.60, 0.5 → 0.85, 1 → 1 | Phoenix, Griffin, Thunderbird |
-| `medium` | Linear | 0 → 0.15, 1 → 1 | Frost Wyrm, Tarasque, Kirin, Basilisk |
-| `slow` | Back-loaded: weak early, surges late | 0 → 0.10, 0.5 → 0.40, 0.75 → 0.65, 1 → 1 | Leviathan, Golem, Treant |
+| `fast` | Front-loaded: strong early, flattens late | 0 → 0.20, 0.25 → 0.60, 0.5 → 0.85, 1 → 1 | — (unused) |
+| `medium` | Linear | 0 → 0.15, 1 → 1 | All ten beasts |
+| `slow` | Back-loaded: weak early, surges late | 0 → 0.10, 0.5 → 0.40, 0.75 → 0.65, 1 → 1 | — (unused) |
 
-The fragile strikers level fast and the walls level slow, so early fights favour speed and damage
-and bulk pays off late. `MoveRange` is exempt from curves (see "Stat assembly and move range").
+`MoveRange` is exempt from curves (see "Stat assembly and move range").
 
 ### JSON is the source of truth; Unity assets are generated
 
