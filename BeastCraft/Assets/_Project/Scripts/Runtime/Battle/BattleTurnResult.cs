@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using BeastCraft.Battle.Grid;
+using BeastCraft.Creatures;
 
 namespace BeastCraft.Battle
 {
@@ -27,7 +28,8 @@ namespace BeastCraft.Battle
             int movementBudget,
             int movementSpent,
             IReadOnlyList<BattleSkillOutcome> skillOutcomes,
-            IReadOnlyList<SkillActivation> avatarActivations)
+            IReadOnlyList<SkillActivation> avatarActivations,
+            int retreatSteps = 0)
         {
             Unit = unit;
             StartPosition = startPosition;
@@ -36,6 +38,7 @@ namespace BeastCraft.Battle
             MovementSpent = movementSpent;
             SkillOutcomes = skillOutcomes ?? new List<BattleSkillOutcome>();
             AvatarActivations = avatarActivations ?? new List<SkillActivation>();
+            RetreatSteps = retreatSteps;
         }
 
         /// <summary>The unit whose turn this was.</summary>
@@ -57,11 +60,21 @@ namespace BeastCraft.Battle
         public int MovementBudget { get; }
 
         /// <summary>
-        /// Hex steps actually walked, summed across every skill that had to close the distance.
-        /// Never more than <see cref="MovementBudget"/>, because the budget is shared by the whole
-        /// turn rather than refreshed per skill.
+        /// Hex steps actually walked, summed across every skill that had to close the distance plus
+        /// any <see cref="RetreatSteps"/>. Never more than <see cref="MovementBudget"/>, because the
+        /// budget is shared by the whole turn rather than refreshed per skill.
         /// </summary>
         public int MovementSpent { get; }
+
+        /// <summary>
+        /// Hex steps walked after every ready slot had been attempted, spending leftover budget to
+        /// back away from the enemy — only a <see cref="CombatStance.Ranged"/> or
+        /// <see cref="CombatStance.Skirmisher"/> unit does this (see
+        /// <see cref="BattleTurnExecutor"/>). Included in <see cref="MovementSpent"/> and not in
+        /// any <see cref="BattleSkillOutcome.MovementSpent"/>. 0 for a
+        /// <see cref="CombatStance.Vanguard"/>, and whenever the unit stayed where it was.
+        /// </summary>
+        public int RetreatSteps { get; }
 
         /// <summary>
         /// Movement left over. Of interest mainly because it is what a later skill in the same turn

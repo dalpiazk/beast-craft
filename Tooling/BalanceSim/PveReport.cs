@@ -314,6 +314,10 @@ namespace BeastCraft.Tooling.BalanceSim
             report.AppendLine("- Movement rules are the Runtime's own (`BattleTurnExecutor`), with no simulator-side emulation: a defeated unit");
             report.AppendLine("  leaves the grid the moment it falls, and a unit that cannot reach range this turn makes a partial approach");
             report.AppendLine("  (walks its remaining move toward the target and holds the skill).");
+            report.AppendLine("- Combat stances are the Runtime's too (`CombatStance`, from the roster and the fixtures): a Vanguard approaches");
+            report.AppendLine("  as above and prefers stop tiles that screen its Ranged / Skirmisher allies; a Ranged unit never walks into melee");
+            report.AppendLine("  (Strike fires only on an adjacent target); Ranged and Skirmisher units prefer stop tiles with fewer adjacent");
+            report.AppendLine("  enemies and spend leftover movement backing away, keeping the nearest enemy within their longest reach.");
             report.AppendLine("- Turn order: the Runtime's ATB gauge (`TurnManager`): every unit fills a gauge by its Speed and acts at " +
                               TurnManager.ActionThreshold + ", so twice the");
             report.AppendLine("  Speed is twice the turns. Battle time is normalized: 1.0 = one turn of a Speed-" + TurnManager.ReferenceSpeed +
@@ -344,10 +348,11 @@ namespace BeastCraft.Tooling.BalanceSim
             report.AppendLine("### Encounters (simulator fixtures, not game content)");
             report.AppendLine();
             report.AppendLine("Base stats are max-level values scaled by the roster's growth curve, like a beast's, before the difficulty");
-            report.AppendLine("multiplier. Kit entries are category, shape, range, power, cooldown; every enemy skill aims at the nearest beast.");
+            report.AppendLine("multiplier. Kit entries are category, shape, range, power, cooldown and whom the skill aims at (`nearest`, or a stat");
+            report.AppendLine("extreme such as `lowest HP`, which compares maximum HP).");
             report.AppendLine();
-            report.AppendLine("| Encounter | Arena | Enemy | Count | Elements | HP | Atk | Def | SpA | SpD | Spe | Move | Kit |");
-            report.AppendLine("| --- | --- | --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |");
+            report.AppendLine("| Encounter | Arena | Enemy | Count | Stance | Elements | HP | Atk | Def | SpA | SpD | Spe | Move | Kit |");
+            report.AppendLine("| --- | --- | --- | ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |");
 
             foreach (Encounter encounter in encounters)
             {
@@ -366,17 +371,29 @@ namespace BeastCraft.Tooling.BalanceSim
                     foreach (EnemySkillData skill in group.Skills)
                     {
                         kit.Add(skill.SkillId + " (" + skill.ParsedCategory + ", " + skill.ParsedShape + ", r" + skill.Range + ", p" +
-                                skill.Power.ToString(CultureInfo.InvariantCulture) + ", cd" + skill.Cooldown + ")");
+                                skill.Power.ToString(CultureInfo.InvariantCulture) + ", cd" + skill.Cooldown + ", " + TargetingLabel(skill) + ")");
                     }
 
                     StatBlock s = group.BaseStats;
                     report.AppendLine("| `" + encounter.Id + "` | " + encounter.Data.ParsedArena + " | " + group.DisplayName + " | " + group.Count + " | " +
-                                      Compress(elements) + " | " + s.Hp + " | " + s.Attack + " | " + s.Defense + " | " + s.SpecialAttack + " | " +
+                                      group.ParsedStance + " | " + Compress(elements) + " | " + s.Hp + " | " + s.Attack + " | " + s.Defense + " | " + s.SpecialAttack + " | " +
                                       s.SpecialDefense + " | " + s.Speed + " | " + s.MoveRange + " | " + string.Join("; ", kit) + " |");
                 }
             }
 
             report.AppendLine();
+        }
+
+        /// <summary>Whom a fixture skill aims at: "nearest", "farthest", or "lowest HP" / "highest Speed" and so on.</summary>
+        private static string TargetingLabel(EnemySkillData skill)
+        {
+            bool lowest = skill.ParsedTargetingOrder == SkillTargetingOrder.Lowest;
+            if (skill.ParsedTargeting == SkillTargetingCriterion.Distance)
+            {
+                return lowest ? "nearest" : "farthest";
+            }
+
+            return (lowest ? "lowest " : "highest ") + skill.ParsedTargetingStat;
         }
 
         /// <summary>"Fire x3, Water x2" in first-seen order.</summary>
@@ -443,9 +460,10 @@ namespace BeastCraft.Tooling.BalanceSim
             report.AppendLine("### Kit parity (beast skill fires at calibrated difficulty, all levels)");
             report.AppendLine();
             report.AppendLine("Strike (Physical, range 1) fires less often than Blast (Special, range 3): it needs the beast to reach a free");
-            report.AppendLine("tile next to its target. Strike's higher power compensates; **physical share** = Strike fires x Strike power as a");
-            report.AppendLine("share of all single-target power delivered, and 50% means `Attack` and `SpecialAttack` weigh the same. Burst");
-            report.AppendLine("uses count once per pair of halves; targets = enemies inside the radius when the first half fires.");
+            report.AppendLine("tile next to its target, and a Ranged beast only fires it at an enemy already adjacent. Strike's higher power");
+            report.AppendLine("compensates; **physical share** = Strike fires x Strike power as a share of all single-target power delivered,");
+            report.AppendLine("and 50% means `Attack` and `SpecialAttack` weigh the same. Burst uses count once per pair of halves; targets =");
+            report.AppendLine("enemies inside the radius when the first half fires.");
             report.AppendLine();
             report.AppendLine("| Kit mode | Encounter | Strike fires | Blast fires | Strike / Blast | Physical share | Burst uses | Avg targets per Burst |");
             report.AppendLine("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |");

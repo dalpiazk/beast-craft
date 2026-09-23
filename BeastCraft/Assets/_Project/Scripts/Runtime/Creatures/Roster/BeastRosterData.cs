@@ -118,5 +118,12 @@ namespace BeastCraft.Creatures.Roster
         /// curve and applies as-is at every level.
         /// </summary>
         public StatBlock BaseStats;
+
+        /// <summary>
+        /// A <see cref="CombatStance"/> name (<c>"Vanguard"</c>, <c>"Ranged"</c> or
+        /// <c>"Skirmisher"</c>), parsed case-sensitively. Missing or empty means
+        /// <see cref="CombatStance.Vanguard"/>, the species default.
+        /// </summary>
+        public string Stance;
     }
 }

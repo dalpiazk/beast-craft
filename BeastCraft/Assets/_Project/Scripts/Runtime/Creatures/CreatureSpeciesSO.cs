@@ -53,6 +53,14 @@ namespace BeastCraft.Creatures
         public Element[] Elements = new Element[0];
 
         /// <summary>
+        /// How beasts of this species position themselves in battle (see <see cref="CombatStance"/>).
+        /// Copied onto each unit by <c>BattleUnitFactory.CreateBeast</c>. Defaults to
+        /// <see cref="CombatStance.Vanguard"/>, the stance whose movement is the plain approach rule,
+        /// so a species authored before stances existed behaves exactly as it did.
+        /// </summary>
+        public CombatStance Stance = CombatStance.Vanguard;
+
+        /// <summary>
         /// The species' stat on the given axis at the given level. Falls back to the unscaled base
         /// stat (with an error) when no growth curve is assigned, so a half-authored species still
         /// produces usable numbers instead of a null reference.

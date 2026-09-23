@@ -77,13 +77,13 @@ namespace BeastCraft.Tooling.BalanceSim
             report.AppendLine();
             report.AppendLine("From `StatCalculator.ComputeStats` with no gear — what each beast actually fought with at that level.");
             report.AppendLine();
-            report.AppendLine("| Beast | Element | HP | Atk | Def | SpA | SpD | Spe | Move |");
-            report.AppendLine("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |");
+            report.AppendLine("| Beast | Element | Stance | HP | Atk | Def | SpA | SpD | Spe | Move |");
+            report.AppendLine("| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |");
 
             foreach (CreatureSpeciesSO beast in species)
             {
                 StatBlock stats = StatCalculator.ComputeStats(beast, options.MatrixLevel, null);
-                report.AppendLine("| " + beast.DisplayName + " | " + PvpReport.ElementsOf(beast) + " | " + stats.Hp + " | " + stats.Attack + " | " + stats.Defense +
+                report.AppendLine("| " + beast.DisplayName + " | " + PvpReport.ElementsOf(beast) + " | " + beast.Stance + " | " + stats.Hp + " | " + stats.Attack + " | " + stats.Defense +
                                   " | " + stats.SpecialAttack + " | " + stats.SpecialDefense + " | " + stats.Speed + " | " + stats.MoveRange + " |");
             }
         }

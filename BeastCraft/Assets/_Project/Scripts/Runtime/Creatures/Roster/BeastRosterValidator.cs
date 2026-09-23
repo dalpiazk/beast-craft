@@ -7,7 +7,7 @@ namespace BeastCraft.Creatures.Roster
     /// Structural integrity checks for <see cref="BeastRosterData"/>: the rules every roster file
     /// must satisfy to import at all (ids present, unique and well-formed, elements that parse,
     /// curve references that resolve, curves that start above 0 and end at 1, stats that are
-    /// usable). Balance guidelines — stat budgets, move-range bands, one beast per element — are
+    /// usable, stances that parse). Balance guidelines — stat budgets, move-range bands, one beast per element — are
     /// deliberately NOT here; they are tests over the current starter roster, and the balance
     /// simulator is free to move them.
     /// </summary>
@@ -43,6 +43,30 @@ namespace BeastCraft.Creatures.Roster
             }
 
             element = (Element)Enum.Parse(typeof(Element), name);
+            return true;
+        }
+
+        /// <summary>
+        /// Parses a species' <see cref="SpeciesData.Stance"/>: a <see cref="CombatStance"/> member
+        /// name exactly as written (case-sensitive, names only, like
+        /// <see cref="TryParseElement"/>). A null or empty string is the default,
+        /// <see cref="CombatStance.Vanguard"/>, and parses successfully.
+        /// </summary>
+        public static bool TryParseStance(string name, out CombatStance stance)
+        {
+            stance = CombatStance.Vanguard;
+
+            if (string.IsNullOrEmpty(name))
+            {
+                return true;
+            }
+
+            if (!Enum.IsDefined(typeof(CombatStance), name))
+            {
+                return false;
+            }
+
+            stance = (CombatStance)Enum.Parse(typeof(CombatStance), name);
             return true;
         }
 
@@ -221,6 +245,11 @@ namespace BeastCraft.Creatures.Roster
                 if (string.IsNullOrEmpty(s.GrowthCurveId) || !curveIds.Contains(s.GrowthCurveId))
                 {
                     errors.Add(label + ": GrowthCurveId '" + s.GrowthCurveId + "' does not match any growth curve.");
+                }
+
+                if (!TryParseStance(s.Stance, out CombatStance _))
+                {
+                    errors.Add(label + ": '" + s.Stance + "' is not a CombatStance name (Vanguard, Ranged or Skirmisher).");
                 }
 
                 StatBlock stats = s.BaseStats;

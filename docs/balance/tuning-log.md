@@ -241,3 +241,92 @@ takes the pack's focus" finding above no longer dominates: Thunderbird and Griff
 most valuable stat, and the ±5% budget does not price it. Re-pricing Speed (for example a smaller
 Speed spread, or charging it more of the budget) is the next tuning question; it is deliberately
 not done in the change that introduced the gauge.
+
+## After combat stances
+
+`BattleTurnExecutor` gained combat stances (design doc, "Combat stances"): every species is a
+Vanguard, Ranged or Skirmisher unit (Ranged: Phoenix, Kirin, Basilisk; Skirmisher: Thunderbird,
+Griffin; the five tanks and bruisers Vanguard). Ranged units never walk into melee (Strike fires only
+on an adjacent enemy), Ranged and Skirmisher units avoid crowded stop tiles and spend leftover
+movement backing off to the edge of their reach, and a Vanguard's equally short approaches prefer
+tiles next to its fragile allies. The fixtures changed with it: the wisps are Ranged and the stingers
+Skirmishers (their sting is range 1, which a Ranged unit would never walk in for), and the wisps' bolt
+and the stingers' sting now aim at the beast with the lowest maximum HP instead of the nearest one.
+The roster was **not** re-tuned; `tuned-report.md` was regenerated with the same stats, kit and seed.
+Overall marginal clear rate, levels and encounters averaged (points; "ATB" is the previous section's
+"ATB" column):
+
+| Beast | Stance | `elemental` ATB | `elemental` stances | `neutral` ATB | `neutral` stances |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Thunderbird | Skirmisher | +6.0 | +1.6 | +2.4 | −2.4 |
+| Griffin | Skirmisher | +14.8 | +24.6 | +9.7 | +23.2 |
+| Basilisk | Ranged | +17.4 | +3.8 | +13.4 | −0.2 |
+| Phoenix | Ranged | +13.2 | −0.4 | +14.1 | +2.2 |
+| Kirin | Ranged | +12.3 | +4.7 | +17.2 | +3.4 |
+| Frost Wyrm | Vanguard | +2.9 | +13.3 | +0.7 | +11.7 |
+| Tarasque | Vanguard | +2.0 | +0.1 | +1.8 | +5.8 |
+| Leviathan | Vanguard | −15.4 | −7.2 | −15.4 | −12.7 |
+| Treant | Vanguard | −17.6 | −15.6 | −14.6 | −15.2 |
+| Golem | Vanguard | −35.5 | −25.0 | −29.3 | −15.8 |
+
+Per encounter, levels averaged, `elemental`:
+
+| Beast | `boss` ATB | `boss` stances | `swarm` ATB | `swarm` stances | `pack` ATB | `pack` stances |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Thunderbird | +21.4 | +18.0 | +2.1 | +12.3 | −5.7 | −25.4 |
+| Griffin | +18.8 | +15.3 | +8.7 | +16.3 | +16.8 | +42.1 |
+| Basilisk | +15.5 | +8.7 | +8.7 | −1.6 | +28.0 | +4.4 |
+| Phoenix | +18.8 | −0.5 | +13.4 | −2.9 | +7.5 | +2.4 |
+| Kirin | +22.1 | +2.8 | +6.7 | −1.6 | +8.2 | +13.0 |
+| Frost Wyrm | −1.1 | +12.0 | +10.7 | +16.9 | −1.1 | +11.0 |
+| Tarasque | +1.6 | +11.4 | +2.8 | −9.5 | +1.6 | −1.6 |
+| Leviathan | −26.9 | −24.3 | −6.5 | +11.0 | −13.0 | −8.2 |
+| Treant | −27.5 | −25.7 | −14.4 | −15.5 | −11.0 | −5.6 |
+| Golem | −42.7 | −17.7 | −32.3 | −25.4 | −31.5 | −32.0 |
+
+`neutral`:
+
+| Beast | `boss` ATB | `boss` stances | `swarm` ATB | `swarm` stances | `pack` ATB | `pack` stances |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Thunderbird | +21.4 | +18.0 | −7.0 | −11.5 | −7.1 | −13.6 |
+| Griffin | +18.8 | +15.3 | +18.1 | +27.5 | −7.8 | +26.7 |
+| Basilisk | +15.5 | +8.7 | +2.2 | −12.8 | +22.6 | +3.6 |
+| Phoenix | +18.8 | −0.5 | +4.9 | −6.2 | +18.7 | +13.5 |
+| Kirin | +22.1 | +2.8 | +12.2 | −1.6 | +17.3 | +8.9 |
+| Frost Wyrm | −1.1 | +12.0 | +4.2 | +18.3 | −1.2 | +4.9 |
+| Tarasque | +1.6 | +11.4 | −3.7 | −2.9 | +7.4 | +8.9 |
+| Leviathan | −26.9 | −24.3 | −7.0 | +3.7 | −12.4 | −17.6 |
+| Treant | −27.5 | −25.7 | −1.7 | −4.9 | −14.4 | −14.9 |
+| Golem | −42.7 | −17.7 | −22.2 | −9.5 | −23.0 | −20.2 |
+
+The boss column changes only with the beasts' stances (the Colossus stays a nearest-target
+Vanguard). What moved:
+
+- **The three Ranged beasts lost most of their ATB lead** (overall +12.3 … +17.4 down to −0.4 … +4.7),
+  and the most against the boss (Phoenix +18.8 → −0.5, Kirin +22.1 → +2.8). With the standard kit a
+  Ranged beast gives up Strike, half its single-target damage, unless an enemy walks up to it, and
+  its Burst (radius 2) rarely reaches anyone from range 3. The kit-parity table shows it: the
+  physical share of single-target power fell from 49–52% to 37–47%, so `Attack` is now worth less
+  than `SpecialAttack` across the roster. That is a property of the one-kit simulator (a real Ranged
+  beast would carry ranged skills), and `StrikePower` was derived for a roster that always walks in.
+- **The spread narrowed.** `elemental` overall is −25.0 … +24.6 (from −35.5 … +17.4) and `neutral`
+  −15.8 … +23.2 (from −29.3 … +17.2). The slow tanks gained from Vanguard screening and from no
+  longer being the only ones in front (Golem +10.5 / +13.5, Leviathan +8.2 / +2.7); Frost Wyrm is now
+  top 3 against every encounter in `elemental` mode (no weakness).
+- **Griffin now leads** (+24.6 / +23.2). A Skirmisher still gets full value from Strike, then backs
+  out of reach, and it has the most movement for it (Move 5). Its `pack` jump (+16.8 → +42.1
+  `elemental`) is mostly the fixture's new targeting, not its stance: rerunning with the stances on
+  but the old fixtures (every enemy Vanguard, nearest-target) gives Griffin +14.0 / +8.9 overall and
+  +12.4 / +2.8 against the pack. The wisps now aim at the lowest *maximum* HP: Frost Wyrm (95)
+  first, then four beasts at exactly 100 (Phoenix, Thunderbird, Kirin, Basilisk; ties go by unit
+  id), so the pack's ranged focus lands on Griffin (105) only when none of those five is on the
+  team (4 of Griffin's 84 teams). Thunderbird is the mirror image (`pack` −5.7 → −25.4). That is a
+  threshold effect of stat targeting on a flat roster, and a reason to treat single encounter cells
+  with suspicion until authored encounters exist.
+
+Beast-only split (stances on, fixtures as before this change), overall `elemental` / `neutral`:
+Thunderbird +2.1 / +1.4, Griffin +14.0 / +8.9, Basilisk +2.6 / −2.2, Phoenix −2.3 / −0.8, Kirin
++0.1 / +4.7, Frost Wyrm +14.9 / +12.4, Tarasque +7.6 / +15.0, Leviathan −9.8 / −14.9, Treant −10.7 /
+−10.8, Golem −18.6 / −13.6. No PvE battle stalemates in either run, and none in PvP. Re-tuning for stances (and
+re-deriving `StrikePower`, or giving Ranged beasts a kit of their own) is the next tuning question
+and is not part of this change.

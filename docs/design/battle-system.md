@@ -59,10 +59,12 @@ puzzle every encounter.
   itself ("mana" / "focus" / "stamina") is still unnamed. The cooldown rotation (decision 5) is now
   settled and implemented; how — or whether — a resource pool gates it on top is not. A skill that
   comes off cooldown and can reach a target currently always fires.
-- **Tactical AI beyond reaching a target.** A beast moves for exactly one reason: to get a ready
-  skill's target into range. It does not retreat when hurt, spread out against area skills, screen
-  an ally or hold a choke point, and none of that has been designed. Adding any of it would be a
-  real design decision, not an implementation detail.
+- **Tactical AI beyond combat stances.** Positioning is now decided at the level of *combat
+  stances* (decision 8): each species is a Vanguard, Ranged or Skirmisher unit, which decides where
+  its approaches stop, whether it walks into melee and whether it spends leftover movement backing
+  off. Everything past that is still undesigned: a beast does not retreat *because it is hurt*,
+  spread out against area skills, hold a choke point, guard or taunt, or coordinate focus fire with
+  its team. Adding any of it would be a real design decision, not an implementation detail.
 - **The basic attack.** Earlier drafts listed "a basic attack, a skill, or an item" as the turn's
   options. With no player menu, whether a beast has a fallback attack at all — or simply always has
   at least one short-cooldown skill in its rotation — is open, and items in battle are out of scope
@@ -117,9 +119,11 @@ What that implies for balance and for the systems:
     remaining move toward it. Before, it did not move at all, so two sides whose move plus range fell
     short of the gap between them (8 hexes between the zones on a Large board) waited forever, and
     the simulator's fixture enemies needed board-spanning movement. They now move like beasts.
-- **Everything the simulator fields targets the nearest enemy.** Whoever stands in front takes the
-  hits, so front-line bulk and placement matter a great deal; that interacts with the tactical-AI
-  item above.
+- **Most of what the simulator fields targets the nearest enemy.** Whoever stands in front takes
+  most of the hits, so front-line bulk and placement matter a great deal. Since combat stances
+  (decision 8) the fixture wisps and stingers instead aim at the beast with the lowest maximum HP,
+  and each fixture group has a stance of its own (wisps Ranged, stingers Skirmisher, the rest
+  Vanguard); the boss still hits the nearest beast.
 
 ## Data-driven foundation already in place
 
@@ -467,6 +471,8 @@ legibility costs decision 5 already rejected. Tying movement to the skill that n
 beast's positioning is a direct, readable consequence of its loadout — a short-range bruiser closes,
 a long-range caster stays put — with no extra tuning surface. The cost is that a beast can walk into
 a bad spot to land one skill; that is the same trade auto-resolution has made everywhere else.
+(Decision 8 later adds a deliberately narrow positioning layer on top — combat stances — that
+changes tie-breaks, melee approaches and leftover movement, but not this rule.)
 
 *Scaffold details, not confirmed balance.* Three implementation choices sit underneath this and are
 cheap to revisit (the first two are lead engineering decisions made once the balance simulator
@@ -493,6 +499,73 @@ showed what their absence did to large PvE fights):
 - **The route** is the cheapest one that reaches *any* tile within range of the target, found by
   pathing at the tiles around the target (the target's own tile is occupied, so nothing can path onto
   it) and stopping at the first tile on that route that is in range.
+
+### 8. Combat stances — DECIDED (the three stances and their roles); the heuristics are SCAFFOLD
+
+**Every species has a combat stance — Vanguard, Ranged or Skirmisher — that decides how it
+positions itself.** It is authored per species (`CreatureSpeciesSO.Stance`, the roster JSON's
+`Stance`, default Vanguard), copied onto the unit by `BattleUnitFactory` (`BattleUnit.Stance`), and
+read by `BattleTurnExecutor`. `CombatStance` has explicit values (Vanguard 0, Ranged 1, Skirmisher 2)
+that must never be renumbered, since Unity serializes the field by value. This closes the
+"screen an ally" and "kite" parts of the old tactical-AI open item without an AI: a stance is one
+readable label on the species, and everything it does is a deterministic, integer tie-break or
+budget rule on top of decision 7, reusing the pathfinder.
+
+What each stance does:
+
+| Stance | Approach (SingleTarget / Line) | Melee (`Range <= 1`, enemy side) | Leftover budget | Crowds |
+| --- | --- | --- | --- | --- |
+| Vanguard (default) | Decision 7 exactly; among equally short routes, stop nearest a fragile ally | Walks in | Discarded | Ignored |
+| Ranged | Fewest steps, then farthest from the target within range | Never walks in: fires only if a target is already adjacent, otherwise holds (`HeldByStance`) | Retreat | Avoided |
+| Skirmisher | As Vanguard (melee included), with the crowd preference | Walks in | Retreat | Avoided |
+
+The rules in full:
+
+- **Decision 7 still holds for everyone.** One budget per turn, shared by the slots in stack order;
+  a skill that cannot reach keeps its 0; partial approach. A stance never makes a unit walk further
+  than the cheapest route to range — every stance preference below is a tie-break among routes of
+  the same length, except the melee rule and the retreat. `Self`, `AllAllies`, `AllEnemies`,
+  `Cross` and `AreaBurst` are unchanged: they fire from where the unit stands. A null grid still
+  means nothing moves.
+- **Anti-surround (Ranged and Skirmisher).** Among the in-range tiles the unit can reach in the
+  fewest steps (every such tile, not only those on the plain rule's seven goal routes), it prefers
+  the one farthest from the target, then the one with the fewest living enemies adjacent, then the
+  plain rule's own pick, then a fixed board order. A Vanguard does not avoid crowds.
+- **Ranged keeps its distance.** An already-in-range skill fires from where the unit stands, as
+  before. The "farthest in-range tile" preference is, in practice, a guarantee rather than a change:
+  a unit only approaches from out of range, one step changes a distance by at most one, so the
+  cheapest in-range tiles are at exactly the skill's `Range`. The real difference is melee: an
+  enemy-side `SingleTarget` or `Line` skill with `Range <= 1` is never walked for. It fires if an
+  enemy is already adjacent; otherwise the slot holds without moving (`BattleSkillStatus.HeldByStance`,
+  cooldown kept at 0, nothing spent) and later slots get the whole remaining budget. Ally-side
+  melee skills are exempt — stepping next to a friend is not walking into melee.
+- **Retreat with leftover budget (Ranged and Skirmisher).** Once every ready slot has been
+  attempted, whatever budget is left is spent moving to the tile, reachable within it, that is
+  farthest from the nearest living enemy — counting only tiles where that distance stays at most the
+  unit's longest enemy-side `SingleTarget` / `Line` range (whatever its cooldown), so the unit can
+  fire again next turn without moving. Ties: fewest adjacent enemies, then fewest steps (so a unit
+  already on a best tile stays), then breadth-first order. The unit's own tile always competes, so
+  a retreat never ends nearer the enemy than it started; a unit that is already beyond its reach
+  stays put (approaching is the skills' job). No retreat with no enemy left, no picking skill, a
+  null grid, or if the unit defeated itself. It happens before the avatar's activations, counts in
+  the turn's `MovementSpent`, and is reported as `BattleTurnResult.RetreatSteps`.
+- **Vanguard screens.** Among routes that reach range in the same number of steps, a Vanguard picks
+  the one whose end tile this turn (the in-range stop, or where a partial approach runs out) is
+  nearest its closest living Ranged or Skirmisher ally; then the plain rule's goal order. With no
+  such ally the result is exactly decision 7's, which is why every pre-stance movement test passes
+  unchanged. This is the simplest deterministic reading of "stand between the enemy and the back
+  line" on boards where both sides close head-on; it does not model a line or a threat zone.
+
+**Roster stances.** Ranged: Phoenix, Kirin, Basilisk. Skirmisher: Thunderbird, Griffin. Vanguard:
+Leviathan, Golem, Treant, Tarasque, Frost Wyrm (see "Starter roster").
+
+*Scaffold details, not confirmed balance.* The three stances and who is which are decided; the
+heuristics under them (the tie-break orders, the screening distance, the retreat cap at the longest
+single-target range, retreating before the avatar acts) are engineering defaults chosen to be
+deterministic and legible, and are cheap to revisit. The balance simulator's first look at them is
+in the tuning log ("After combat stances"): with the one-size standard kit, Ranged beasts lose
+Strike's damage and the physical/special parity the kit was tuned to, so the numbers say more about
+that kit than about the stances.
 
 ## Effect application — SCAFFOLD ASSUMPTIONS, NOT CONFIRMED BALANCE
 
@@ -822,18 +895,18 @@ express each archetype: they were tuned by hand against the headless balance sim
 draft alongside). Nothing here is confirmed balance; the numbers are expected to move again once
 skills and real encounters exist.
 
-| SpeciesId | Beast | Element | Archetype | Curve | HP | ATK | DEF | SpA | SpD | SPE | Six-stat total | Move |
-| --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `phoenix` | Phoenix | Fire | Glass cannon | medium | 100 | 125 | 75 | 140 | 90 | 100 | 630 | 4 |
-| `leviathan` | Leviathan | Water | Tank | medium | 125 | 85 | 125 | 85 | 95 | 55 | 570 | 3 |
-| `golem` | Golem | Earth | Pure wall | medium | 160 | 105 | 150 | 70 | 105 | 40 | 630 | 2 |
-| `griffin` | Griffin | Air | Fast skirmisher | medium | 105 | 115 | 90 | 90 | 90 | 115 | 605 | 5 |
-| `thunderbird` | Thunderbird | Lightning | Burst striker | medium | 100 | 125 | 80 | 120 | 85 | 120 | 630 | 4 |
-| `frost_wyrm` | Frost Wyrm | Ice | Control / attrition | medium | 95 | 75 | 120 | 100 | 115 | 80 | 585 | 3 |
-| `treant` | Treant | Nature | Support-tank | medium | 130 | 85 | 95 | 90 | 120 | 50 | 570 | 3 |
-| `tarasque` | Tarasque | Metal | Armored bruiser | medium | 115 | 140 | 130 | 55 | 80 | 75 | 595 | 3 |
-| `kirin` | Kirin | Light | Support caster | medium | 100 | 50 | 80 | 135 | 120 | 95 | 580 | 4 |
-| `basilisk` | Basilisk | Dark | Ranged assassin | medium | 100 | 95 | 80 | 150 | 95 | 110 | 630 | 5 |
+| SpeciesId | Beast | Element | Archetype | Stance | Curve | HP | ATK | DEF | SpA | SpD | SPE | Six-stat total | Move |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `phoenix` | Phoenix | Fire | Glass cannon | Ranged | medium | 100 | 125 | 75 | 140 | 90 | 100 | 630 | 4 |
+| `leviathan` | Leviathan | Water | Tank | Vanguard | medium | 125 | 85 | 125 | 85 | 95 | 55 | 570 | 3 |
+| `golem` | Golem | Earth | Pure wall | Vanguard | medium | 160 | 105 | 150 | 70 | 105 | 40 | 630 | 2 |
+| `griffin` | Griffin | Air | Fast skirmisher | Skirmisher | medium | 105 | 115 | 90 | 90 | 90 | 115 | 605 | 5 |
+| `thunderbird` | Thunderbird | Lightning | Burst striker | Skirmisher | medium | 100 | 125 | 80 | 120 | 85 | 120 | 630 | 4 |
+| `frost_wyrm` | Frost Wyrm | Ice | Control / attrition | Vanguard | medium | 95 | 75 | 120 | 100 | 115 | 80 | 585 | 3 |
+| `treant` | Treant | Nature | Support-tank | Vanguard | medium | 130 | 85 | 95 | 90 | 120 | 50 | 570 | 3 |
+| `tarasque` | Tarasque | Metal | Armored bruiser | Vanguard | medium | 115 | 140 | 130 | 55 | 80 | 75 | 595 | 3 |
+| `kirin` | Kirin | Light | Support caster | Ranged | medium | 100 | 50 | 80 | 135 | 120 | 95 | 580 | 4 |
+| `basilisk` | Basilisk | Dark | Ranged assassin | Ranged | medium | 100 | 95 | 80 | 150 | 95 | 110 | 630 | 5 |
 
 Stats are max-level values (curve scale 1). **All ten beasts share the `medium` growth curve for
 now, by user decision**; differentiating curves per beast is deferred to the headless balance
@@ -859,6 +932,9 @@ simulator. The drafting rules:
   and move range); Tarasque absorbs and hits back (Defense *and* the highest Attack); Leviathan
   is the physically bulky all-rounder; Treant's bulk is HP and Special Defense for a support role;
   Frost Wyrm splits its bulk evenly across Defense and Special Defense.
+- **Stances follow the archetypes** (decision 8): the artillery-style casters (Phoenix, Kirin,
+  Basilisk) are Ranged, the fast strikers (Thunderbird, Griffin) Skirmishers, and the five tanks and
+  bruisers hold the line as Vanguards. The roster tests pin all ten.
 - **Skills, evolutions and customization are empty.** No skills have been authored yet, so every
   species' `LearnableSkills` and `EvolutionOptions` are empty and `CustomizationSchema` and `Icon`
   are unset. The importer never touches those fields, so authoring them on the assets later is safe.
@@ -895,10 +971,11 @@ keys are the C# field names exactly) — whereas `.asset` YAML references its sc
 this repo does not track, and cannot be verified without an Editor.
 
 The file holds `GrowthCurves` (`CurveId`, `MaxLevel`, `Keys` of `Progress`/`Scale`) and `Species`
-(`SpeciesId`, `DisplayName`, `Description`, `Elements` as enum names, `GrowthCurveId`, `BaseStats`
-including `MoveRange`). Its C# shape is `BeastCraft.Creatures.Roster.BeastRosterData` in the Runtime
+(`SpeciesId`, `DisplayName`, `Description`, `Elements` as enum names, `GrowthCurveId`, `Stance` as a
+`CombatStance` name — missing means Vanguard — and `BaseStats` including `MoveRange`). Its C# shape is `BeastCraft.Creatures.Roster.BeastRosterData` in the Runtime
 assembly, and `BeastRosterValidator` holds the structural rules (well-formed unique snake_case ids,
-parseable elements, resolvable curve ids, curve sanity, every stat at least 1).
+parseable elements, resolvable curve ids, curve sanity, every stat at least 1, a stance that is a
+`CombatStance` name if given).
 
 **Workflow:** edit the JSON, then open the project in Unity and run **Beast Craft → Data → Import
 Beast Roster**. The importer (`BeastCraft.Editor.Data.BeastRosterImporter`):
@@ -908,8 +985,8 @@ Beast Roster**. The importer (`BeastCraft.Editor.Data.BeastRosterImporter`):
   matched by its new `CurveId` field, and a `CreatureSpeciesSO` per species under `Data/Creatures/`,
   matched by `SpeciesId` — searched across the whole project, so a moved or renamed asset is still
   found and never duplicated, and its GUID (and every reference to it) survives;
-- owns only the fields the JSON carries; icon, skills, evolutions and customization schema on the
-  asset are left alone;
+- owns only the fields the JSON carries (stance included); icon, skills, evolutions and
+  customization schema on the asset are left alone;
 - never deletes: a species dropped from the JSON keeps its asset and is logged.
 
 The generated assets (and their `.meta` files) are produced on the first Editor run; none are
@@ -1089,6 +1166,20 @@ to 3× the turns), the marginals swung hard toward the fast beasts: in `elementa
 range is now −35.5 … +17.4 (Basilisk, Griffin, Phoenix and Kirin +12 or more; Golem −35.5, Treant
 −17.6 and Leviathan −15.4, all bottom three against every encounter), and `neutral` is similar
 (−29.3 … +17.2). Pricing Speed as an action economy is the next roster question.
+
+**Combat stances (decision 8) have since been added**, again without re-tuning the roster:
+`CombatStance`, `CreatureSpeciesSO.Stance` / `BattleUnit.Stance` (set by `BattleUnitFactory`), the
+roster JSON's `Stance` with its validator and importer support, `BattleSkillStatus.HeldByStance`,
+`BattleTurnResult.RetreatSteps`, and the stance rules in `BattleTurnExecutor`; `ExecuteTurn` and
+`RunBattle` keep their signatures. The simulator's fixtures gained a `Stance` per enemy group and
+optional targeting per skill (wisps Ranged, stingers Skirmisher, both aiming at the lowest maximum
+HP; the boss, biters and direwolves Vanguard and nearest-first). EditMode tests cover the plumbing,
+the melee hold, the farthest in-range stop, retreats and their range cap, the crowd preference, the
+Vanguard's screening and indifference to crowds, and determinism. In the regenerated tuned report the
+three Ranged beasts fall from the top of the ATB table to around zero (the standard kit's Strike is
+most of what they gave up), Griffin leads (+24.6 / +23.2 overall), Golem remains last but closer
+(−25.0 / −15.8), and the `elemental` spread is −25.0 … +24.6; the tuning log has the before/after
+tables and why the pack encounter's new lowest-HP targeting exaggerates Griffin and Thunderbird.
 
 Every pass so far is deliberately **data structures and algorithms only** — no MonoBehaviours, no
 scene or prefab wiring, and no committed `.asset` instances (the roster's are generated in-Editor). The hex radii backing each arena preset

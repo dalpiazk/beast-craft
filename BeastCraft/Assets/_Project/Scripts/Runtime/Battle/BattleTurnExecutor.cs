@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using BeastCraft.Battle.Grid;
+using BeastCraft.Creatures;
 
 namespace BeastCraft.Battle
 {
@@ -55,7 +56,7 @@ namespace BeastCraft.Battle
     /// </list>
     /// </para>
     /// <para>
-    /// <strong>Only two shapes ever move.</strong> <see cref="SkillTargetShape.SingleTarget"/> and
+    /// <strong>Only two shapes ever approach.</strong> <see cref="SkillTargetShape.SingleTarget"/> and
     /// <see cref="SkillTargetShape.Line"/> pick a single focus and are therefore the only shapes
     /// with something concrete to walk toward, and the only ones that can end a turn stuck at 0.
     /// The other five (<see cref="SkillTargetShape.Self"/>,
@@ -64,7 +65,7 @@ namespace BeastCraft.Battle
     /// wherever the caster already stands, so they fire the moment they are ready and never consult
     /// the budget at all. A <c>Cross</c> or <c>AreaBurst</c> that catches nobody is a whiff, exactly
     /// as it was before this pass: it was never gated on reaching anyone, so it still fires and
-    /// still re-arms.
+    /// still re-arms. (A stance retreat, below, is movement too, but it belongs to no skill.)
     /// </para>
     /// <para>
     /// <strong>Defeated units leave the grid.</strong> The moment a unit is defeated its tile is
@@ -81,11 +82,39 @@ namespace BeastCraft.Battle
     /// there is simply nothing to lift anything off.
     /// </para>
     /// <para>
+    /// <strong>Combat stances.</strong> The rule above is the whole of a
+    /// <see cref="CombatStance.Vanguard"/>'s movement (the default stance), and every stance keeps
+    /// it: one budget, spent by slots in stack order. A unit's <see cref="BattleUnit.Stance"/> adds
+    /// only this, all of it deterministic, integer and board-derived:
+    /// <list type="bullet">
+    /// <item><description>
+    /// <strong>Where an approach stops</strong> among routes of equal length (never a longer one):
+    /// a Vanguard ends the turn nearest its closest living Ranged or Skirmisher ally, screening
+    /// it; a Ranged or Skirmisher unit prefers the in-range tile farthest from its target and then
+    /// the one with the fewest enemies adjacent (anti-surround). See <see cref="TryPlanApproach"/>.
+    /// </description></item>
+    /// <item><description>
+    /// <strong>A Ranged unit never walks into melee.</strong> An enemy-side picking slot with
+    /// <c>Range &lt;= 1</c> fires if a target is already adjacent and otherwise holds without
+    /// moving (<see cref="BattleSkillStatus.HeldByStance"/>), leaving the budget to later slots.
+    /// </description></item>
+    /// <item><description>
+    /// <strong>Leftover budget.</strong> What is left once every ready slot has been attempted is
+    /// discarded by a Vanguard, as it always was. A Ranged or Skirmisher unit spends it retreating:
+    /// to the reachable tile farthest from the nearest living enemy that still keeps that enemy
+    /// within its longest single-target reach, never closer than it already stands (see
+    /// <see cref="Retreat"/>; reported as <see cref="BattleTurnResult.RetreatSteps"/>). It
+    /// happens before the avatar's activations, and not at all for a unit that defeated itself.
+    /// </description></item>
+    /// </list>
+    /// With a null grid nothing moves, whatever the stance.
+    /// </para>
+    /// <para>
     /// <strong>Still not built here.</strong> <c>SkillSO.ResourceCost</c> is not spent (deferred by
     /// the producer), no status-effect system exists for
     /// <see cref="SkillEffectType.ApplyStatus"/> to hang off, and nothing in this file is a
-    /// MonoBehaviour or knows a scene exists. There is also no
-    /// AI beyond the rule above: the unit does not reposition for safety, kite, spread out or retreat,
+    /// MonoBehaviour or knows a scene exists. Beyond the stances there is no AI: a unit does not
+    /// retreat when hurt, spread out against area skills, hold a choke point or coordinate a focus,
     /// because none of that has been designed.
     /// </para>
     /// </summary>
@@ -141,7 +170,12 @@ namespace BeastCraft.Battle
         /// is left at 0 and no movement is attempted, and with one it either already reaches it,
         /// walks the cheapest route to a tile that does if the turn's remaining budget covers it, or
         /// — when the budget falls short — advances along that route by what is left and holds.
-        /// Every skill that fires is followed by lifting the newly defeated off the grid.
+        /// Every skill that fires is followed by lifting the newly defeated off the grid. A Ranged
+        /// unit's melee slot with no adjacent target holds without walking.
+        /// </description></item>
+        /// <item><description>
+        /// A Ranged or Skirmisher unit that is still standing spends any budget left over on a
+        /// retreat (see the stance notes on this class). A Vanguard's leftover is discarded.
         /// </description></item>
         /// <item><description>
         /// On a <see cref="BattleTeam.Player"/> unit's turn only, the avatar's loadout is ticked and
@@ -231,9 +265,16 @@ namespace BeastCraft.Battle
                     continue;
                 }
 
+                if (HoldsInsteadOfClosing(unit, skill))
+                {
+                    // A Ranged unit never walks into melee: the slot waits for a target to come to it.
+                    outcomes.Add(new BattleSkillOutcome(slotIndex, skill, BattleSkillStatus.HeldByStance, null, 0));
+                    continue;
+                }
+
                 IReadOnlyList<HexCoordinate> route;
                 int steps;
-                if (!TryPlanApproach(unit, candidate, skill, grid, out route, out steps))
+                if (!TryPlanApproach(unit, candidate, skill, allUnits, grid, remaining, out route, out steps))
                 {
                     outcomes.Add(new BattleSkillOutcome(slotIndex, skill, BattleSkillStatus.Unreachable, null, 0));
                     continue;
@@ -258,6 +299,14 @@ namespace BeastCraft.Battle
                 outcomes.Add(Fire(loadout, slotIndex, skill, unit, allUnits, grid, rng, steps));
             }
 
+            // Leftover budget: a Ranged or Skirmisher unit backs away; a Vanguard keeps its ground.
+            int retreatSteps = 0;
+            if (!unit.IsDefeated && remaining > 0 && RetreatsWithLeftover(unit.Stance))
+            {
+                retreatSteps = Retreat(unit, allUnits, grid, remaining);
+                remaining -= retreatSteps;
+            }
+
             if (unit.Team == BattleTeam.Player && avatar != null && avatar.Skills != null)
             {
                 IReadOnlyList<SkillActivation> cast = avatar.Skills.TickAndResolve(avatar, allUnits, grid, rng);
@@ -270,7 +319,7 @@ namespace BeastCraft.Battle
                 }
             }
 
-            return new BattleTurnResult(unit, start, unit.Position, budget, budget - remaining, outcomes, avatarActivations);
+            return new BattleTurnResult(unit, start, unit.Position, budget, budget - remaining, outcomes, avatarActivations, retreatSteps);
         }
 
         /// <summary>
@@ -419,20 +468,44 @@ namespace BeastCraft.Battle
         /// pathfinder and the resolver already follow.
         /// </para>
         /// <para>
+        /// <strong>Stance tie-breaks</strong> (see <see cref="CombatStance"/>). The number of steps
+        /// always decides first: a stance never makes a unit walk further to reach range.
+        /// <list type="bullet">
+        /// <item><description>
+        /// <see cref="CombatStance.Vanguard"/> — among goals that reach range in the same number of
+        /// steps, the one whose route ends this turn (at the in-range tile, or where a partial
+        /// approach runs out of <paramref name="remaining"/>) nearest the mover's closest living
+        /// <see cref="CombatStance.Ranged"/> or <see cref="CombatStance.Skirmisher"/> ally wins,
+        /// then the earlier goal. With no such ally there is nothing to compare and the result is
+        /// exactly the plain rule's. See <see cref="ScreeningDistance"/>.
+        /// </description></item>
+        /// <item><description>
+        /// <see cref="CombatStance.Ranged"/> and <see cref="CombatStance.Skirmisher"/> — the plain
+        /// plan is refined by <see cref="TryPickStandoffTile"/>, which looks at <em>every</em>
+        /// in-range tile the mover can reach at that lowest cost (not only the ones on the seven
+        /// goal routes) and prefers, in order, the one farthest from the candidate, then the one
+        /// with the fewest living enemies next to it, then the plain plan's own stop tile, then
+        /// <see cref="HexGrid.GetTilesInRange"/>' fixed order.
+        /// </description></item>
+        /// </list>
+        /// </para>
+        /// <para>
         /// The search starts at index 1 of each route: index 0 is the tile the mover is already on,
         /// and that tile is known to be out of range because the caller checked before asking. A
         /// route that never comes within range — possible for a <c>Range</c> of 0, which wants a
         /// tile nothing can stand on — contributes nothing.
         /// </para>
         /// <para>
-        /// The budget is deliberately not passed in. Whether the walk is affordable is the caller's
-        /// decision because the answer depends on what earlier skills in the same turn already
-        /// spent, and a plan that is too expensive this turn is still worth reporting as a plan
-        /// rather than as "unreachable" — the two are different outcomes to the unit: an
+        /// The budget decides nothing here — <paramref name="remaining"/> is read only to know which
+        /// tile a Vanguard's partial approach would stop on. Whether the walk is affordable is the
+        /// caller's decision because the answer depends on what earlier skills in the same turn
+        /// already spent, and a plan that is too expensive this turn is still worth reporting as a
+        /// plan rather than as "unreachable" — the two are different outcomes to the unit: an
         /// unaffordable plan is still walked part of the way, an unreachable one not at all.
         /// </para>
         /// </summary>
-        private static bool TryPlanApproach(BattleUnit mover, BattleUnit candidate, SkillSO skill, HexGrid grid, out IReadOnlyList<HexCoordinate> route, out int steps)
+        private static bool TryPlanApproach(BattleUnit mover, BattleUnit candidate, SkillSO skill, IEnumerable<BattleUnit> allUnits, HexGrid grid,
+                                            int remaining, out IReadOnlyList<HexCoordinate> route, out int steps)
         {
             route = null;
             steps = 0;
@@ -442,8 +515,12 @@ namespace BeastCraft.Battle
                 return false;
             }
 
+            List<BattleUnit> screened = mover.Stance == CombatStance.Vanguard ? FragileAllies(mover, allUnits) : null;
+            bool screening = screened != null && screened.Count > 0;
+
             bool found = false;
             int bestSteps = int.MaxValue;
+            int bestScreen = int.MaxValue;
             IReadOnlyList<HexCoordinate> bestRoute = null;
             List<HexCoordinate> goals = ApproachGoals(grid, mover, candidate);
 
@@ -458,14 +535,36 @@ namespace BeastCraft.Battle
                         continue;
                     }
 
-                    if (step < bestSteps)
+                    int screen = screening ? ScreeningDistance(path[Math.Min(step, Math.Max(remaining, 0))], screened) : 0;
+
+                    if (step < bestSteps || (step == bestSteps && screen < bestScreen))
                     {
                         bestSteps = step;
+                        bestScreen = screen;
                         bestRoute = path;
                         found = true;
                     }
 
                     break;
+                }
+            }
+
+            if (mover.Stance == CombatStance.Ranged || mover.Stance == CombatStance.Skirmisher)
+            {
+                HexCoordinate? plainStop = found ? bestRoute[bestSteps] : (HexCoordinate?)null;
+                HexCoordinate standoff;
+
+                if (TryPickStandoffTile(mover, candidate, skill, allUnits, grid, plainStop, out standoff)
+                    && (!plainStop.HasValue || standoff != plainStop.Value))
+                {
+                    IReadOnlyList<HexCoordinate> path = HexPathfinder.FindPath(grid, mover.Position, standoff, mover.Id);
+
+                    if (path.Count > 1)
+                    {
+                        bestRoute = path;
+                        bestSteps = path.Count - 1;
+                        found = true;
+                    }
                 }
             }
 
@@ -507,6 +606,343 @@ namespace BeastCraft.Battle
             }
 
             return goals;
+        }
+
+        /// <summary>
+        /// The approach stop a <see cref="CombatStance.Ranged"/> or
+        /// <see cref="CombatStance.Skirmisher"/> unit prefers: of every tile within the skill's range
+        /// of <paramref name="candidate"/> that the mover can walk to, the one it reaches in the
+        /// fewest steps; among those, the one <em>farthest</em> from the candidate; then the one with
+        /// the fewest living enemies adjacent to it (the anti-surround preference); then
+        /// <paramref name="plainStop"/>, the plain rule's own pick, so that when nothing separates
+        /// them the stance changes nothing; then the first in <see cref="HexGrid.GetTilesInRange"/>'
+        /// fixed order. False when no in-range tile is reachable at all.
+        /// <para>
+        /// <strong>Farthest, not nearest.</strong> A standoff unit wants to stand at the edge of its
+        /// reach, not step closer than it must. Because the caller only asks when the mover is out of
+        /// range, and one hex step changes a distance by at most one, the cheapest in-range tiles are
+        /// in practice always at exactly <c>Range</c> — so the key is a guarantee written down, not
+        /// usually a choice. The steps still come first: a stance never walks further to reach range.
+        /// </para>
+        /// <para>
+        /// Costs come from <see cref="ReachableTiles"/>, a breadth-first search over the same tiles
+        /// <see cref="HexPathfinder"/> may use, so a tile's cost here is exactly the length of the
+        /// route the pathfinder then returns to it.
+        /// </para>
+        /// </summary>
+        private static bool TryPickStandoffTile(BattleUnit mover, BattleUnit candidate, SkillSO skill, IEnumerable<BattleUnit> allUnits, HexGrid grid,
+                                                HexCoordinate? plainStop, out HexCoordinate pick)
+        {
+            pick = mover.Position;
+            Dictionary<HexCoordinate, int> costs = ReachableTiles(grid, mover, int.MaxValue, null);
+            List<BattleUnit> enemies = LivingEnemies(mover, allUnits);
+            IReadOnlyList<HexCoordinate> tiles = grid.GetTilesInRange(candidate.Position, skill.Range);
+
+            bool found = false;
+            int bestCost = 0;
+            int bestDistance = 0;
+            int bestCrowd = 0;
+            bool bestIsPlain = false;
+
+            for (int i = 0; i < tiles.Count; i++)
+            {
+                HexCoordinate tile = tiles[i];
+                int cost;
+
+                if (tile == mover.Position || !costs.TryGetValue(tile, out cost))
+                {
+                    continue;
+                }
+
+                int distance = tile.Distance(candidate.Position);
+                int crowd = AdjacentCount(tile, enemies);
+                bool isPlain = plainStop.HasValue && plainStop.Value == tile;
+
+                bool better = !found
+                    || cost < bestCost
+                    || (cost == bestCost && distance > bestDistance)
+                    || (cost == bestCost && distance == bestDistance && crowd < bestCrowd)
+                    || (cost == bestCost && distance == bestDistance && crowd == bestCrowd && isPlain && !bestIsPlain);
+
+                if (better)
+                {
+                    found = true;
+                    pick = tile;
+                    bestCost = cost;
+                    bestDistance = distance;
+                    bestCrowd = crowd;
+                    bestIsPlain = isPlain;
+                }
+            }
+
+            return found;
+        }
+
+        /// <summary>
+        /// Spends a <see cref="CombatStance.Ranged"/> or <see cref="CombatStance.Skirmisher"/>
+        /// unit's leftover movement, once every ready slot has been attempted, on backing away.
+        /// Returns the steps walked (0 when it stays).
+        /// <para>
+        /// The destination is the tile, among those reachable within <paramref name="budget"/>
+        /// steps (the unit's own tile included, at cost 0), that is <strong>farthest from the
+        /// nearest living enemy</strong> — but only counting tiles where that distance is still at
+        /// most the unit's longest enemy-side <see cref="SkillTargetShape.SingleTarget"/> or
+        /// <see cref="SkillTargetShape.Line"/> range (<see cref="LongestPickingRange"/>), so the unit
+        /// can fire again next turn without moving. Ties go to the fewest adjacent living enemies,
+        /// then the fewest steps (so a unit already on a best tile stays put), then breadth-first
+        /// discovery order, which is fixed by <see cref="HexCoordinate.AxialDirections"/>.
+        /// </para>
+        /// <para>
+        /// <strong>It never closes distance.</strong> The unit's own tile is always in the running,
+        /// whatever its distance, and nearest-enemy distance is the first key, so no tile nearer the
+        /// enemy can beat it: a unit already beyond its reach (say, one whose approach fell short)
+        /// stays where it is, and approaching remains the skills' job alone. Nothing happens with
+        /// no grid, no enemies left, or no enemy-side picking skill to keep in range of.
+        /// </para>
+        /// </summary>
+        private static int Retreat(BattleUnit unit, IEnumerable<BattleUnit> allUnits, HexGrid grid, int budget)
+        {
+            if (grid == null || budget <= 0)
+            {
+                return 0;
+            }
+
+            int cap = LongestPickingRange(unit.Skills);
+            List<BattleUnit> enemies = LivingEnemies(unit, allUnits);
+
+            if (cap < 1 || enemies.Count == 0)
+            {
+                return 0;
+            }
+
+            List<HexCoordinate> order = new List<HexCoordinate>();
+            Dictionary<HexCoordinate, int> costs = ReachableTiles(grid, unit, budget, order);
+
+            HexCoordinate best = unit.Position;
+            int bestNearest = NearestDistance(best, enemies);
+            int bestCrowd = AdjacentCount(best, enemies);
+            int bestCost = 0;
+
+            for (int i = 0; i < order.Count; i++)
+            {
+                HexCoordinate tile = order[i];
+
+                if (tile == unit.Position)
+                {
+                    continue;
+                }
+
+                int nearest = NearestDistance(tile, enemies);
+
+                if (nearest > cap)
+                {
+                    continue;
+                }
+
+                int crowd = AdjacentCount(tile, enemies);
+                int cost = costs[tile];
+
+                bool better = nearest > bestNearest
+                    || (nearest == bestNearest && crowd < bestCrowd)
+                    || (nearest == bestNearest && crowd == bestCrowd && cost < bestCost);
+
+                if (better)
+                {
+                    best = tile;
+                    bestNearest = nearest;
+                    bestCrowd = crowd;
+                    bestCost = cost;
+                }
+            }
+
+            if (best == unit.Position || !TryMove(unit, grid, best))
+            {
+                return 0;
+            }
+
+            return bestCost;
+        }
+
+        /// <summary>
+        /// Whether a unit declines to walk toward an out-of-range candidate for this skill: true
+        /// only for a <see cref="CombatStance.Ranged"/> unit and an enemy-side skill with
+        /// <c>Range &lt;= 1</c>. An ally-side skill is exempt — stepping next to a friend is not
+        /// walking into melee.
+        /// </summary>
+        private static bool HoldsInsteadOfClosing(BattleUnit unit, SkillSO skill)
+        {
+            return unit.Stance == CombatStance.Ranged && skill.TargetSide == SkillTargetSide.Enemy && skill.Range <= 1;
+        }
+
+        /// <summary>Whether a stance spends leftover movement retreating: Ranged and Skirmisher do, Vanguard does not.</summary>
+        private static bool RetreatsWithLeftover(CombatStance stance)
+        {
+            return stance == CombatStance.Ranged || stance == CombatStance.Skirmisher;
+        }
+
+        /// <summary>
+        /// Every tile <paramref name="mover"/> can walk to in at most <paramref name="maxSteps"/>
+        /// steps, with its step cost, the mover's own tile included at 0. Breadth-first over
+        /// <see cref="HexGrid.IsPassable"/> tiles (other units obstruct, as they do for the
+        /// pathfinder), expanding neighbours in <see cref="HexCoordinate.AxialDirections"/>' fixed
+        /// order; when <paramref name="order"/> is given it receives the tiles in discovery order.
+        /// </summary>
+        private static Dictionary<HexCoordinate, int> ReachableTiles(HexGrid grid, BattleUnit mover, int maxSteps, List<HexCoordinate> order)
+        {
+            Dictionary<HexCoordinate, int> costs = new Dictionary<HexCoordinate, int>();
+            Queue<HexCoordinate> frontier = new Queue<HexCoordinate>();
+            IReadOnlyList<HexCoordinate> directions = HexCoordinate.AxialDirections;
+
+            costs[mover.Position] = 0;
+            frontier.Enqueue(mover.Position);
+            order?.Add(mover.Position);
+
+            while (frontier.Count > 0)
+            {
+                HexCoordinate current = frontier.Dequeue();
+                int cost = costs[current];
+
+                if (cost >= maxSteps)
+                {
+                    continue;
+                }
+
+                for (int i = 0; i < directions.Count; i++)
+                {
+                    HexCoordinate next = current + directions[i];
+
+                    if (costs.ContainsKey(next) || !grid.IsPassable(next, mover.Id))
+                    {
+                        continue;
+                    }
+
+                    costs[next] = cost + 1;
+                    frontier.Enqueue(next);
+                    order?.Add(next);
+                }
+            }
+
+            return costs;
+        }
+
+        /// <summary>
+        /// The longest <c>Range</c> among the loadout's enemy-side
+        /// <see cref="SkillTargetShape.SingleTarget"/> and <see cref="SkillTargetShape.Line"/>
+        /// skills, whatever their cooldown: the reach a retreating unit keeps its nearest enemy
+        /// inside. 0 when it has none.
+        /// </summary>
+        private static int LongestPickingRange(SkillLoadout loadout)
+        {
+            int longest = 0;
+
+            if (loadout == null)
+            {
+                return longest;
+            }
+
+            for (int i = 0; i < loadout.Skills.Count; i++)
+            {
+                SkillSO skill = loadout.Skills[i];
+
+                if (skill != null && NeedsApproach(skill.TargetShape) && skill.TargetSide == SkillTargetSide.Enemy && skill.Range > longest)
+                {
+                    longest = skill.Range;
+                }
+            }
+
+            return longest;
+        }
+
+        /// <summary>The living units on the other team from <paramref name="unit"/>, in roster order.</summary>
+        private static List<BattleUnit> LivingEnemies(BattleUnit unit, IEnumerable<BattleUnit> allUnits)
+        {
+            List<BattleUnit> enemies = new List<BattleUnit>();
+
+            if (allUnits == null)
+            {
+                return enemies;
+            }
+
+            foreach (BattleUnit other in allUnits)
+            {
+                if (other != null && !other.IsDefeated && other.Team != unit.Team)
+                {
+                    enemies.Add(other);
+                }
+            }
+
+            return enemies;
+        }
+
+        /// <summary>
+        /// The living allies a <see cref="CombatStance.Vanguard"/> screens: every living unit on its
+        /// team, other than itself, whose stance is <see cref="CombatStance.Ranged"/> or
+        /// <see cref="CombatStance.Skirmisher"/>.
+        /// </summary>
+        private static List<BattleUnit> FragileAllies(BattleUnit unit, IEnumerable<BattleUnit> allUnits)
+        {
+            List<BattleUnit> allies = new List<BattleUnit>();
+
+            if (allUnits == null)
+            {
+                return allies;
+            }
+
+            foreach (BattleUnit other in allUnits)
+            {
+                if (other != null && other != unit && !other.IsDefeated && other.Team == unit.Team && other.Stance != CombatStance.Vanguard)
+                {
+                    allies.Add(other);
+                }
+            }
+
+            return allies;
+        }
+
+        /// <summary>
+        /// The Vanguard screening score of a tile: its hex distance to the nearest of
+        /// <paramref name="allies"/>, lower being better. Deliberately the simplest deterministic
+        /// reading of "stand in front of the back line": among equally short approaches, finish
+        /// the turn as close as possible to a fragile team-mate, which on a board where both sides
+        /// close head-on puts the Vanguard on that team-mate's side of the fight.
+        /// </summary>
+        private static int ScreeningDistance(HexCoordinate tile, List<BattleUnit> allies)
+        {
+            return NearestDistance(tile, allies);
+        }
+
+        /// <summary>The hex distance from a tile to the nearest of the given units (<c>int.MaxValue</c> when there are none).</summary>
+        private static int NearestDistance(HexCoordinate tile, List<BattleUnit> units)
+        {
+            int nearest = int.MaxValue;
+
+            for (int i = 0; i < units.Count; i++)
+            {
+                int distance = tile.Distance(units[i].Position);
+
+                if (distance < nearest)
+                {
+                    nearest = distance;
+                }
+            }
+
+            return nearest;
+        }
+
+        /// <summary>How many of the given units stand on a tile adjacent to <paramref name="tile"/>.</summary>
+        private static int AdjacentCount(HexCoordinate tile, List<BattleUnit> units)
+        {
+            int count = 0;
+
+            for (int i = 0; i < units.Count; i++)
+            {
+                if (tile.Distance(units[i].Position) == 1)
+                {
+                    count++;
+                }
+            }
+
+            return count;
         }
 
         /// <summary>

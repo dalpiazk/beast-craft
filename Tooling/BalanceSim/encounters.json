@@ -1,23 +1,24 @@
 {
-  "_readme": "SIMULATOR FIXTURES, NOT GAME CONTENT. Synthetic enemies for Tooling/BalanceSim's PvE mode, so the roster can be measured against PvE-shaped fights (one huge enemy, a swarm, a mixed pack). They are not roster beasts, no game code reads this file, and nothing here is a design decision about real encounters. BaseStats are max-level values scaled by the roster growth curve named in GrowthCurveId (as a beast's are); the simulator then calibrates one difficulty multiplier per encounter, level and kit mode, so only the ratios inside a stat line matter. Elements are cycled over a group's units. MoveRange sits inside the roster's own band (beasts move 2-5): BattleTurnExecutor makes a partial approach (a unit that cannot reach range this turn still walks its move toward the target), so no fixture needs board-spanning movement to engage; fights on the Large swarm arena simply take a turn or two to close. Heavy things move 3 (boss, and the wisps, which also have range 3), fast melee hunters 4 (direwolves, and the whole swarm, biters and stingers alike so neither damage category arrives first). The loader requires MoveRange >= 1 and at least one SingleTarget skill. See Tooling/BalanceSim/README.md.",
+  "_readme": "SIMULATOR FIXTURES, NOT GAME CONTENT. Synthetic enemies for Tooling/BalanceSim's PvE mode, so the roster can be measured against PvE-shaped fights (one huge enemy, a swarm, a mixed pack). They are not roster beasts, no game code reads this file, and nothing here is a design decision about real encounters. BaseStats are max-level values scaled by the roster growth curve named in GrowthCurveId (as a beast's are); the simulator then calibrates one difficulty multiplier per encounter, level and kit mode, so only the ratios inside a stat line matter. Elements are cycled over a group's units. MoveRange sits inside the roster's own band (beasts move 2-5): BattleTurnExecutor makes a partial approach (a unit that cannot reach range this turn still walks its move toward the target), so no fixture needs board-spanning movement to engage; fights on the Large swarm arena simply take a turn or two to close. Heavy things move 3 (boss, and the wisps, which also have range 3), fast melee hunters 4 (direwolves, and the whole swarm, biters and stingers alike so neither damage category arrives first). The loader requires MoveRange >= 1 and at least one SingleTarget skill. Stance is a CombatStance name (missing = Vanguard): the wisps are Ranged (they keep their distance and back off), the stingers Skirmisher (sting, then dart away: their sting has range 1, and a Ranged unit never walks into melee, so the loader requires a Ranged group to have a SingleTarget skill with Range >= 2), everything else Vanguard. Targeting is a SkillTargetingCriterion name (missing = Distance, i.e. nearest; Random is refused so battles never draw targets from the rng), with optional TargetingOrder (missing = Lowest) and TargetingStat (missing = HP; the stat block's maximum HP, not current HP). The boss, direwolves and biters go for the nearest beast; the wisps and stingers go for the one with the lowest maximum HP. See Tooling/BalanceSim/README.md.",
   "SchemaVersion": 1,
   "GrowthCurveId": "medium",
   "Encounters": [
     {
       "EncounterId": "boss",
       "DisplayName": "Colossus",
-      "Description": "One huge enemy: very high HP, heavy single-target hits in both categories every turn, and a periodic area slam. Elementless by default so the boss measures stat lines; use --enemy-element for an elemental variant.",
+      "Description": "One huge enemy: very high HP, heavy single-target hits in both categories every turn, and a periodic area slam. Vanguard, always hitting the nearest beast. Elementless by default so the boss measures stat lines; use --enemy-element for an elemental variant.",
       "Arena": "Medium",
       "Groups": [
         {
           "EnemyId": "colossus",
           "DisplayName": "Colossus",
           "Count": 1,
+          "Stance": "Vanguard",
           "Elements": [],
           "BaseStats": { "Hp": 1600, "Attack": 120, "Defense": 110, "SpecialAttack": 120, "SpecialDefense": 110, "Speed": 70, "MoveRange": 3 },
           "Skills": [
-            { "SkillId": "crush", "Category": "Physical", "Shape": "SingleTarget", "Power": 70, "Range": 1, "Cooldown": 1 },
-            { "SkillId": "gaze", "Category": "Special", "Shape": "SingleTarget", "Power": 70, "Range": 3, "Cooldown": 1 },
+            { "SkillId": "crush", "Category": "Physical", "Shape": "SingleTarget", "Power": 70, "Range": 1, "Cooldown": 1, "Targeting": "Distance" },
+            { "SkillId": "gaze", "Category": "Special", "Shape": "SingleTarget", "Power": 70, "Range": 3, "Cooldown": 1, "Targeting": "Distance" },
             { "SkillId": "quake", "Category": "Physical", "Shape": "AreaBurst", "Power": 35, "Range": 2, "Cooldown": 3 },
             { "SkillId": "roar", "Category": "Special", "Shape": "AreaBurst", "Power": 35, "Range": 2, "Cooldown": 3 }
           ]
@@ -27,27 +28,29 @@
     {
       "EncounterId": "swarm",
       "DisplayName": "Swarm",
-      "Description": "Twenty-four small enemies with low HP and weak melee: half bite (Physical), half sting (Special), so neither defence is favoured. Elements cycle through all ten. Move 4 for every unit: the Large board's zones are 8 apart, so the swarm closes over two turns by partial approach.",
+      "Description": "Twenty-four small enemies with low HP and weak melee: half bite (Physical), half sting (Special), so neither defence is favoured. Biters are Vanguard and bite the nearest beast; stingers are Skirmishers that go for the lowest-HP beast and dart back after stinging. Elements cycle through all ten. Move 4 for every unit: the Large board's zones are 8 apart, so the swarm closes over two turns by partial approach.",
       "Arena": "Large",
       "Groups": [
         {
           "EnemyId": "biter",
           "DisplayName": "Biter",
           "Count": 12,
+          "Stance": "Vanguard",
           "Elements": [ "Fire", "Water", "Earth", "Air", "Lightning", "Ice", "Nature", "Metal", "Light", "Dark" ],
           "BaseStats": { "Hp": 30, "Attack": 60, "Defense": 40, "SpecialAttack": 30, "SpecialDefense": 40, "Speed": 100, "MoveRange": 4 },
           "Skills": [
-            { "SkillId": "bite", "Category": "Physical", "Shape": "SingleTarget", "Power": 30, "Range": 1, "Cooldown": 1 }
+            { "SkillId": "bite", "Category": "Physical", "Shape": "SingleTarget", "Power": 30, "Range": 1, "Cooldown": 1, "Targeting": "Distance" }
           ]
         },
         {
           "EnemyId": "stinger",
           "DisplayName": "Stinger",
           "Count": 12,
+          "Stance": "Skirmisher",
           "Elements": [ "Earth", "Air", "Lightning", "Ice", "Nature", "Metal", "Light", "Dark", "Fire", "Water" ],
           "BaseStats": { "Hp": 30, "Attack": 30, "Defense": 40, "SpecialAttack": 60, "SpecialDefense": 40, "Speed": 100, "MoveRange": 4 },
           "Skills": [
-            { "SkillId": "sting", "Category": "Special", "Shape": "SingleTarget", "Power": 30, "Range": 1, "Cooldown": 1 }
+            { "SkillId": "sting", "Category": "Special", "Shape": "SingleTarget", "Power": 30, "Range": 1, "Cooldown": 1, "Targeting": "Stat", "TargetingStat": "HP", "TargetingOrder": "Lowest" }
           ]
         }
       ]
@@ -55,27 +58,29 @@
     {
       "EncounterId": "pack",
       "DisplayName": "Hunting pack",
-      "Description": "Six mid-size enemies: three fast Physical melee hunters in front, three Special casters behind them at range 3. Six different elements.",
+      "Description": "Six mid-size enemies: three fast Physical melee hunters in front (Vanguard, nearest beast), three Special casters behind them at range 3 (Ranged, lowest-HP beast). Six different elements.",
       "Arena": "Medium",
       "Groups": [
         {
           "EnemyId": "direwolf",
           "DisplayName": "Direwolf",
           "Count": 3,
+          "Stance": "Vanguard",
           "Elements": [ "Fire", "Earth", "Metal" ],
           "BaseStats": { "Hp": 110, "Attack": 110, "Defense": 90, "SpecialAttack": 50, "SpecialDefense": 80, "Speed": 110, "MoveRange": 4 },
           "Skills": [
-            { "SkillId": "maul", "Category": "Physical", "Shape": "SingleTarget", "Power": 45, "Range": 1, "Cooldown": 1 }
+            { "SkillId": "maul", "Category": "Physical", "Shape": "SingleTarget", "Power": 45, "Range": 1, "Cooldown": 1, "Targeting": "Distance" }
           ]
         },
         {
           "EnemyId": "wisp",
           "DisplayName": "Wisp",
           "Count": 3,
+          "Stance": "Ranged",
           "Elements": [ "Water", "Air", "Dark" ],
           "BaseStats": { "Hp": 80, "Attack": 50, "Defense": 70, "SpecialAttack": 110, "SpecialDefense": 100, "Speed": 90, "MoveRange": 3 },
           "Skills": [
-            { "SkillId": "bolt", "Category": "Special", "Shape": "SingleTarget", "Power": 45, "Range": 3, "Cooldown": 1 }
+            { "SkillId": "bolt", "Category": "Special", "Shape": "SingleTarget", "Power": 45, "Range": 3, "Cooldown": 1, "Targeting": "Stat", "TargetingStat": "HP", "TargetingOrder": "Lowest" }
           ]
         }
       ]

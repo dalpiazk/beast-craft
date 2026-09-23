@@ -57,7 +57,8 @@ Two reports are committed, both the default arguments:
   kept as a record and is **not** regenerated (a fresh run now reads the tuned roster). It predates
   the ATB turn order, so its battle lengths are in rounds.
 - `docs/balance/tuned-report.md` — the current roster after the first tuning pass (see
-  `docs/balance/tuning-log.md`), under the current Runtime (the ATB turn order). Regenerate it
+  `docs/balance/tuning-log.md`), under the current Runtime (the ATB turn order and combat stances;
+  the roster has not been re-tuned for either). Regenerate it
   whenever the roster, fixtures, simulator or Runtime change:
 
 ```sh
@@ -67,7 +68,9 @@ dotnet run --project Tooling/BalanceSim -c Release -- --out docs/balance/tuned-r
 ## The standard kit
 
 No skills are authored yet, so every beast fights with the same kit, and its stat line is what gets
-measured. Fire priority is Blast, Strike, then Burst. Everything aims at the nearest enemy.
+measured. Fire priority is Blast, Strike, then Burst. Every beast skill aims at the nearest enemy. How
+the kit is used depends on the beast's combat stance (see "Runtime rules" below): a Ranged beast
+never walks in for Strike, so it only fires Strike at an enemy that is already adjacent.
 
 | Skill | Category | Shape | Range | Power | Cooldown |
 | --- | --- | --- | ---: | ---: | ---: |
@@ -88,7 +91,9 @@ The first baseline did not manage that: Strike at cooldown 1 against Blast at co
   the result: the physical share of single-target power delivered is 49-51% in every encounter and
   50.1% overall (54 gave 49.7%). This was re-derived when the Runtime gained its defeated-unit and
   partial-approach rules and the fixtures' move ranges came down (it was 54 before). Re-derive
-  `StrikePower` again if the kit, the fixtures or the movement rules change.
+  `StrikePower` again if the kit, the fixtures or the movement rules change. **Combat stances broke
+  it and it has not been re-derived yet:** with three Ranged beasts that never walk in for Strike,
+  the physical share is now 37-47% per encounter (see the tuning log's "After combat stances").
 - **Burst is split.** It is two skills, a physical and a special half, with the same power, radius
   and cooldown, fired together. A single-category area skill would reintroduce the bias. The
   physical half fires first, but that does not bias outcomes: a target dies iff the two halves
@@ -114,9 +119,18 @@ The first baseline did not manage that: Strike at cooldown 1 against Blast at co
 
   | Id | Arena | Enemies |
   | --- | --- | --- |
-  | `boss` | Medium | 1 Colossus: HP 1600 base, Physical and Special hits of power 70 every turn (ranges 1 and 3), and a physical plus special area slam (radius 2, power 35 each, cooldown 3). Move 3. Elementless by default. |
-  | `swarm` | Large | 12 Biters (Physical bite) + 12 Stingers (Special sting): HP 30, weak range-1 attacks of power 30. Move 4. Elements cycle through all ten. |
-  | `pack` | Medium | 3 Direwolves (Physical melee, power 45) in front, 3 Wisps (Special, range 3, power 45) behind. Move 4 / 3. Six different elements. |
+  | `boss` | Medium | 1 Colossus (Vanguard): HP 1600 base, Physical and Special hits of power 70 every turn (ranges 1 and 3) at the nearest beast, and a physical plus special area slam (radius 2, power 35 each, cooldown 3). Move 3. Elementless by default. |
+  | `swarm` | Large | 12 Biters (Vanguard, Physical bite at the nearest beast) + 12 Stingers (Skirmisher, Special sting at the lowest-HP beast): HP 30, weak range-1 attacks of power 30. Move 4. Elements cycle through all ten. |
+  | `pack` | Medium | 3 Direwolves (Vanguard, Physical melee, power 45, nearest beast) in front, 3 Wisps (Ranged, Special, range 3, power 45, lowest-HP beast) behind. Move 4 / 3. Six different elements. |
+
+  Each group has a `Stance` (a `CombatStance` name; missing = `Vanguard`), and each skill an optional
+  `Targeting` (`Distance`, the default, or `Stat`; `Random` is refused so battles never draw targets
+  from the rng), `TargetingOrder` (default `Lowest`) and `TargetingStat` (default `HP`). "Lowest HP"
+  compares the stat block, i.e. **maximum** HP, not current HP (`SkillTargetResolver`'s `Stat`
+  criterion). The stingers are Skirmishers rather than Ranged because their sting is range 1: a
+  Ranged unit never walks into melee, so a Ranged stinger would never engage, and the loader rejects
+  a Ranged group without a `SingleTarget` skill of range 2 or more. The boss stays a nearest-target
+  Vanguard.
 
   Physical and special pressure is balanced within each encounter, so neither `Defense` nor
   `SpecialDefense` is favoured.
@@ -167,7 +181,15 @@ to be simulator-side workarounds before they became Runtime rules:
   on a Large board) waited forever, and the fixture enemies had to be given board-spanning movement
   (boss 7, direwolves 9, wisps 7, swarm 13). They now move like beasts (roster band 2-5): boss 3,
   direwolves 4, wisps 3, biters and stingers 4. The loader only requires move >= 1 and at least one
-  `SingleTarget` skill, the only shape that walks.
+  `SingleTarget` skill, the only shape that walks (of range 2 or more for a Ranged group).
+- **Combat stances** (`CombatStance`, per species in `beast-roster.json` and per group in
+  `encounters.json`). A Vanguard moves exactly as above, except that among equally short approaches
+  it stops nearest its closest Ranged or Skirmisher ally (screening it). A Ranged unit never walks
+  into melee (a range-1 slot fires only at an adjacent enemy, otherwise it holds without moving).
+  Ranged and Skirmisher units prefer stop tiles with fewer adjacent enemies and spend whatever
+  movement is left after their skills backing away from the nearest enemy, but never beyond their
+  longest single-target range. Roster stances: Ranged = Phoenix, Kirin, Basilisk; Skirmisher =
+  Thunderbird, Griffin; the rest Vanguard.
 
 The default run has no stalemates, PvE or PvP.
 
@@ -196,8 +218,8 @@ tie-break exactly once. Battle length is reported in normalized time and total t
 ## Determinism
 
 Every battle gets its own `System.Random`, seeded from the base seed and the battle's inputs (never
-from the calibration multiplier). The kits target by distance, so the rng is not consulted for
-targeting. Parallel results are stored by team index and aggregated in a fixed order. The report
+from the calibration multiplier). The kits target by distance or by a stat, never at random, so the
+rng is not consulted for targeting. Parallel results are stored by team index and aggregated in a fixed order. The report
 contains no timestamps, machine paths or timings, and always uses LF line endings. The same roster,
 fixtures, code and arguments produce a byte-identical report.
 
@@ -205,9 +227,12 @@ fixtures, code and arguments produce a byte-identical report.
 
 - **One kit for everyone.** Real beasts will have authored skills. A special attacker is no longer
   under-rated relative to a physical one, but no beast is played to its strengths either.
-- **Nearest-enemy targeting, no tactics.** Whoever is in front takes the hits. Fast beasts rush in
-  first, and slow ones (Golem, move 2) may arrive late. That is the Runtime's movement rule, not a
-  simulator choice, but it colours every number.
+- **Simple targeting, stance-only tactics.** Beasts, the boss, the biters and the direwolves hit the
+  nearest enemy, so whoever is in front takes most of the hits; the wisps and stingers pick the
+  lowest maximum HP, which on a roster where four beasts share HP 100 is a sharp threshold (see the
+  tuning log). Beyond the combat stances there is no AI: nobody retreats when hurt, spreads out
+  against area skills or focuses fire deliberately. Those are Runtime rules, not simulator choices,
+  but they colour every number.
 - **Fixture enemies.** Their stat ratios, kits and elements decide which beasts look good. The
   calibration removes overall difficulty, but not shape. The boss is elementless by default, so its
   `elemental` and `neutral` columns are identical; use `--enemy-element` for elemental variants.

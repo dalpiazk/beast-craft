@@ -169,6 +169,63 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
+        public void Roster_StancesMatchTheApprovedRoles()
+        {
+            // Ranged: the artillery casters; Skirmisher: the fast strikers; everyone else holds the line.
+            Dictionary<string, CombatStance> expected = new Dictionary<string, CombatStance>
+            {
+                { "phoenix", CombatStance.Ranged },
+                { "kirin", CombatStance.Ranged },
+                { "basilisk", CombatStance.Ranged },
+                { "thunderbird", CombatStance.Skirmisher },
+                { "griffin", CombatStance.Skirmisher },
+                { "leviathan", CombatStance.Vanguard },
+                { "golem", CombatStance.Vanguard },
+                { "treant", CombatStance.Vanguard },
+                { "tarasque", CombatStance.Vanguard },
+                { "frost_wyrm", CombatStance.Vanguard }
+            };
+
+            foreach (SpeciesData species in LoadRoster().Species)
+            {
+                Assert.IsFalse(string.IsNullOrEmpty(species.Stance), species.SpeciesId + " should author its stance explicitly.");
+                Assert.IsTrue(BeastRosterValidator.TryParseStance(species.Stance, out CombatStance stance), species.SpeciesId);
+                Assert.AreEqual(expected[species.SpeciesId], stance, species.SpeciesId);
+            }
+        }
+
+        [Test]
+        public void Validator_RejectsBadStance()
+        {
+            BeastRosterData roster = LoadRoster();
+            roster.Species[0].Stance = "Sniper";
+            roster.Species[1].Stance = "ranged";
+            roster.Species[2].Stance = "1";
+
+            List<string> errors = BeastRosterValidator.Validate(roster);
+
+            Assert.IsTrue(errors.Exists(e => e.Contains("'Sniper' is not a CombatStance name")), string.Join("\n", errors));
+            Assert.IsTrue(errors.Exists(e => e.Contains("'ranged' is not a CombatStance name")), string.Join("\n", errors));
+            Assert.IsTrue(errors.Exists(e => e.Contains("'1' is not a CombatStance name")), string.Join("\n", errors));
+        }
+
+        [Test]
+        public void Validator_ParsesStanceNames_AndMissingMeansVanguard()
+        {
+            Assert.IsTrue(BeastRosterValidator.TryParseStance("Skirmisher", out CombatStance stance));
+            Assert.AreEqual(CombatStance.Skirmisher, stance);
+            Assert.IsTrue(BeastRosterValidator.TryParseStance(null, out stance));
+            Assert.AreEqual(CombatStance.Vanguard, stance);
+            Assert.IsTrue(BeastRosterValidator.TryParseStance(string.Empty, out stance));
+            Assert.AreEqual(CombatStance.Vanguard, stance);
+            Assert.IsFalse(BeastRosterValidator.TryParseStance("vanguard", out _));
+
+            BeastRosterData roster = LoadRoster();
+            roster.Species[0].Stance = null;
+            Assert.IsEmpty(BeastRosterValidator.Validate(roster));
+        }
+
+        [Test]
         public void Validator_ParsesElementNamesOnly()
         {
             Assert.IsTrue(BeastRosterValidator.TryParseElement("Lightning", out Element element));

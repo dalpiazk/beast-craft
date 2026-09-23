@@ -8,9 +8,11 @@ namespace BeastCraft.Tooling.BalanceSim
     /// <summary>
     /// Builds the skills the simulator fights with: the standard beast kit (every beast gets the
     /// same one, so stats are what is measured) and the enemy kits authored in
-    /// <c>encounters.json</c>. Every skill aims at the nearest eligible unit
-    /// (<see cref="SkillTargetingCriterion.Distance"/> / <see cref="SkillTargetingOrder.Lowest"/>),
-    /// so no battle ever consumes the rng for targeting.
+    /// <c>encounters.json</c>. Every beast skill aims at the nearest eligible unit
+    /// (<see cref="SkillTargetingCriterion.Distance"/> / <see cref="SkillTargetingOrder.Lowest"/>);
+    /// an enemy skill uses its fixture's targeting (nearest by default, or a stat extreme such as
+    /// lowest maximum HP). Neither ever uses <see cref="SkillTargetingCriterion.Random"/>, so no
+    /// battle consumes the rng for targeting.
     /// </summary>
     public static class Kit
     {
@@ -42,7 +44,7 @@ namespace BeastCraft.Tooling.BalanceSim
             };
         }
 
-        /// <summary>An enemy kit from its fixture definition, every skill in the given element.</summary>
+        /// <summary>An enemy kit from its fixture definition: every skill in the given element, with its authored targeting.</summary>
         public static SkillSO[] BuildEnemyKit(IReadOnlyList<EnemySkillData> skills, Element element)
         {
             SkillSO[] kit = new SkillSO[skills.Count];
@@ -50,6 +52,9 @@ namespace BeastCraft.Tooling.BalanceSim
             {
                 EnemySkillData data = skills[i];
                 kit[i] = BuildSkill(data.SkillId, data.ParsedCategory, data.ParsedShape, data.Power, data.Range, data.Cooldown, element);
+                kit[i].TargetingCriterion = data.ParsedTargeting;
+                kit[i].TargetingOrder = data.ParsedTargetingOrder;
+                kit[i].TargetingStat = data.ParsedTargetingStat;
             }
 
             return kit;

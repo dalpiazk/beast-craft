@@ -1,5 +1,5 @@
 {
-  "_readme": "Source of truth for the starter roster. Numbers are the first simulator-tuned pass (see docs/balance/tuning-log.md), not confirmed balance. Edit here, then in Unity run Beast Craft/Data/Import Beast Roster. All species use the medium growth curve for now (user decision); fast and slow are kept, unused, for the balance simulator. See docs/design/battle-system.md, 'Starter roster'.",
+  "_readme": "Source of truth for the starter roster. Numbers are the first simulator-tuned pass (see docs/balance/tuning-log.md), not confirmed balance. Edit here, then in Unity run Beast Craft/Data/Import Beast Roster. All species use the medium growth curve for now (user decision); fast and slow are kept, unused, for the balance simulator. Stance is the species' CombatStance (Vanguard, Ranged or Skirmisher; missing means Vanguard), which decides how it positions itself in battle. See docs/design/battle-system.md, 'Starter roster' and 'Combat stances'.",
   "SchemaVersion": 1,
   "GrowthCurves": [
     {
@@ -38,6 +38,7 @@
       "Description": "A bird of living flame that burns brightest just before it falls. It strikes hard and from afar, and has little to stand behind when the fire is returned.",
       "Elements": [ "Fire" ],
       "GrowthCurveId": "medium",
+      "Stance": "Ranged",
       "BaseStats": { "Hp": 100, "Attack": 125, "Defense": 75, "SpecialAttack": 140, "SpecialDefense": 90, "Speed": 100, "MoveRange": 4 }
     },
     {
@@ -46,6 +47,7 @@
       "Description": "A serpent of the deep whose coils could cradle a ship. Slow to rise and slower to fall, it outlasts whatever breaks against it.",
       "Elements": [ "Water" ],
       "GrowthCurveId": "medium",
+      "Stance": "Vanguard",
       "BaseStats": { "Hp": 125, "Attack": 85, "Defense": 125, "SpecialAttack": 85, "SpecialDefense": 95, "Speed": 55, "MoveRange": 3 }
     },
     {
@@ -54,6 +56,7 @@
       "Description": "A hillside that learned to stand. It barely moves and rarely strikes, but nothing gets past it.",
       "Elements": [ "Earth" ],
       "GrowthCurveId": "medium",
+      "Stance": "Vanguard",
       "BaseStats": { "Hp": 160, "Attack": 105, "Defense": 150, "SpecialAttack": 70, "SpecialDefense": 105, "Speed": 40, "MoveRange": 2 }
     },
     {
@@ -62,6 +65,7 @@
       "Description": "Half eagle, half lion, all wind. It is across the field before the enemy has turned, and gone again before the blow lands.",
       "Elements": [ "Air" ],
       "GrowthCurveId": "medium",
+      "Stance": "Skirmisher",
       "BaseStats": { "Hp": 105, "Attack": 115, "Defense": 90, "SpecialAttack": 90, "SpecialDefense": 90, "Speed": 115, "MoveRange": 5 }
     },
     {
@@ -70,6 +74,7 @@
       "Description": "Its wingbeat is the thunder and its dive is the lightning. Nothing acts before it, and little survives its first strike, though it cannot take one back.",
       "Elements": [ "Lightning" ],
       "GrowthCurveId": "medium",
+      "Stance": "Skirmisher",
       "BaseStats": { "Hp": 100, "Attack": 125, "Defense": 80, "SpecialAttack": 120, "SpecialDefense": 85, "Speed": 120, "MoveRange": 4 }
     },
     {
@@ -78,6 +83,7 @@
       "Description": "An old dragon wrapped in rime. It does not hurry; it simply makes the battlefield colder, and waits for the cold to win.",
       "Elements": [ "Ice" ],
       "GrowthCurveId": "medium",
+      "Stance": "Vanguard",
       "BaseStats": { "Hp": 95, "Attack": 75, "Defense": 120, "SpecialAttack": 100, "SpecialDefense": 115, "Speed": 80, "MoveRange": 3 }
     },
     {
@@ -86,6 +92,7 @@
       "Description": "A patient forest guardian with roots older than kingdoms. It shelters its allies under its boughs and mends what the fight breaks.",
       "Elements": [ "Nature" ],
       "GrowthCurveId": "medium",
+      "Stance": "Vanguard",
       "BaseStats": { "Hp": 130, "Attack": 85, "Defense": 95, "SpecialAttack": 90, "SpecialDefense": 120, "Speed": 50, "MoveRange": 3 }
     },
     {
@@ -94,6 +101,7 @@
       "Description": "A river-beast in a shell of iron plates. Where the Golem only endures, the Tarasque endures and bites back.",
       "Elements": [ "Metal" ],
       "GrowthCurveId": "medium",
+      "Stance": "Vanguard",
       "BaseStats": { "Hp": 115, "Attack": 140, "Defense": 130, "SpecialAttack": 55, "SpecialDefense": 80, "Speed": 75, "MoveRange": 3 }
     },
     {
@@ -102,6 +110,7 @@
       "Description": "A gentle, luminous beast said to walk without bending the grass. It shuns claws and horns, and fights with light instead.",
       "Elements": [ "Light" ],
       "GrowthCurveId": "medium",
+      "Stance": "Ranged",
       "BaseStats": { "Hp": 100, "Attack": 50, "Defense": 80, "SpecialAttack": 135, "SpecialDefense": 120, "Speed": 95, "MoveRange": 4 }
     },
     {
@@ -110,6 +119,7 @@
       "Description": "A serpent-king whose gaze reaches farther than any fang. It slips through shadow to find the weakest foe, and cannot afford to be found in turn.",
       "Elements": [ "Dark" ],
       "GrowthCurveId": "medium",
+      "Stance": "Ranged",
       "BaseStats": { "Hp": 100, "Attack": 95, "Defense": 80, "SpecialAttack": 150, "SpecialDefense": 95, "Speed": 110, "MoveRange": 5 }
     }
   ]

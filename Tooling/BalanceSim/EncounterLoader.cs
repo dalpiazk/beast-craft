@@ -55,8 +55,18 @@ namespace BeastCraft.Tooling.BalanceSim
 
         public EnemySkillData[] Skills = new EnemySkillData[0];
 
+        /// <summary>
+        /// A <see cref="CombatStance"/> name; missing or empty = <c>Vanguard</c>. A <c>Ranged</c>
+        /// group needs a SingleTarget skill with Range &gt;= 2, since a Ranged unit never walks
+        /// into melee.
+        /// </summary>
+        public string Stance;
+
         [System.Text.Json.Serialization.JsonIgnore]
         public Element[] ParsedElements = new Element[0];
+
+        [System.Text.Json.Serialization.JsonIgnore]
+        public CombatStance ParsedStance;
     }
 
     public class EnemySkillData
@@ -73,11 +83,35 @@ namespace BeastCraft.Tooling.BalanceSim
         public int Range;
         public int Cooldown;
 
+        /// <summary>
+        /// A <see cref="SkillTargetingCriterion"/> name: <c>Distance</c> (the default when missing)
+        /// or <c>Stat</c>. <c>Random</c> is rejected so battles never consume the rng for targeting.
+        /// </summary>
+        public string Targeting;
+
+        /// <summary>A <see cref="SkillTargetingOrder"/> name; missing = <c>Lowest</c>.</summary>
+        public string TargetingOrder;
+
+        /// <summary>
+        /// A <see cref="StatType"/> name, read only when <see cref="Targeting"/> is <c>Stat</c>;
+        /// missing = <c>HP</c>. The resolver compares the stat block (maximum HP), not current HP.
+        /// </summary>
+        public string TargetingStat;
+
         [System.Text.Json.Serialization.JsonIgnore]
         public DamageCategory ParsedCategory;
 
         [System.Text.Json.Serialization.JsonIgnore]
         public SkillTargetShape ParsedShape;
+
+        [System.Text.Json.Serialization.JsonIgnore]
+        public SkillTargetingCriterion ParsedTargeting = SkillTargetingCriterion.Distance;
+
+        [System.Text.Json.Serialization.JsonIgnore]
+        public SkillTargetingOrder ParsedTargetingOrder = SkillTargetingOrder.Lowest;
+
+        [System.Text.Json.Serialization.JsonIgnore]
+        public StatType ParsedTargetingStat = StatType.HP;
     }
 
     /// <summary>One enemy on the board: its id, the species it is built from, and its kit per mode.</summary>
@@ -256,7 +290,13 @@ namespace BeastCraft.Tooling.BalanceSim
                     continue;
                 }
 
+                if (!BeastRosterValidator.TryParseStance(group.Stance, out group.ParsedStance))
+                {
+                    errors.Add(groupWhere + ": Stance '" + group.Stance + "' is not Vanguard, Ranged or Skirmisher.");
+                }
+
                 bool hasSingleTarget = false;
+                bool hasReach = false;
                 foreach (EnemySkillData skill in group.Skills)
                 {
                     string skillWhere = groupWhere + " skill '" + skill.SkillId + "'";
@@ -270,10 +310,13 @@ namespace BeastCraft.Tooling.BalanceSim
                         errors.Add(skillWhere + ": Category '" + skill.Category + "' is not Physical or Special.");
                     }
 
+                    ParseTargeting(skill, skillWhere, errors);
+
                     if (skill.Shape == "SingleTarget")
                     {
                         skill.ParsedShape = SkillTargetShape.SingleTarget;
                         hasSingleTarget = true;
+                        hasReach |= skill.Range >= 2;
                     }
                     else if (skill.Shape == "AreaBurst")
                     {
@@ -292,6 +335,13 @@ namespace BeastCraft.Tooling.BalanceSim
                 {
                     errors.Add(groupWhere + ": needs at least one SingleTarget skill (the only shape that moves the unit).");
                 }
+
+                // A Ranged unit never walks in for a Range <= 1 skill (BattleTurnExecutor), so a Ranged
+                // group with nothing longer would never leave its deployment tiles.
+                if (hasSingleTarget && group.ParsedStance == CombatStance.Ranged && !hasReach)
+                {
+                    errors.Add(groupWhere + ": a Ranged group needs a SingleTarget skill with Range >= 2 (Ranged units never walk into melee).");
+                }
             }
 
             if (total > zoneSize)
@@ -302,6 +352,33 @@ namespace BeastCraft.Tooling.BalanceSim
             if (total > 99)
             {
                 errors.Add(where + ": more than 99 enemies (unit ids are two digits).");
+            }
+        }
+
+        /// <summary>
+        /// Parses a skill's optional targeting fields. Missing values keep the original fixture
+        /// rule, nearest first (<c>Distance</c> / <c>Lowest</c>). <c>Random</c> is refused: every
+        /// fixture battle must stay independent of the rng's targeting draws.
+        /// </summary>
+        private static void ParseTargeting(EnemySkillData skill, string skillWhere, List<string> errors)
+        {
+            if (!string.IsNullOrEmpty(skill.Targeting) &&
+                (!Enum.IsDefined(typeof(SkillTargetingCriterion), skill.Targeting) || !Enum.TryParse(skill.Targeting, false, out skill.ParsedTargeting) ||
+                 skill.ParsedTargeting == SkillTargetingCriterion.Random))
+            {
+                errors.Add(skillWhere + ": Targeting '" + skill.Targeting + "' must be Distance or Stat.");
+            }
+
+            if (!string.IsNullOrEmpty(skill.TargetingOrder) &&
+                (!Enum.IsDefined(typeof(SkillTargetingOrder), skill.TargetingOrder) || !Enum.TryParse(skill.TargetingOrder, false, out skill.ParsedTargetingOrder)))
+            {
+                errors.Add(skillWhere + ": TargetingOrder '" + skill.TargetingOrder + "' must be Lowest or Highest.");
+            }
+
+            if (!string.IsNullOrEmpty(skill.TargetingStat) &&
+                (!Enum.IsDefined(typeof(StatType), skill.TargetingStat) || !Enum.TryParse(skill.TargetingStat, false, out skill.ParsedTargetingStat)))
+            {
+                errors.Add(skillWhere + ": TargetingStat '" + skill.TargetingStat + "' is not a StatType name.");
             }
         }
 
@@ -331,6 +408,7 @@ namespace BeastCraft.Tooling.BalanceSim
                         species.BaseStats = group.BaseStats;
                         species.GrowthRate = curve;
                         species.Elements = element == Element.None ? new Element[0] : new[] { element };
+                        species.Stance = group.ParsedStance;
                         speciesByElement[element] = species;
                         kitByElement[element] = Kit.BuildEnemyKit(group.Skills, element);
                     }
