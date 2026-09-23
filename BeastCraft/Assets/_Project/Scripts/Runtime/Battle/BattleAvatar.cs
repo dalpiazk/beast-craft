@@ -1,7 +1,9 @@
+using System;
 using System.Collections.Generic;
 using BeastCraft.Avatar;
 using BeastCraft.Battle.Grid;
 using BeastCraft.Creatures;
+using BeastCraft.Progression;
 
 namespace BeastCraft.Battle
 {
@@ -72,11 +74,20 @@ namespace BeastCraft.Battle
     /// flat, as everyone's are, so for those its stats change nothing yet.
     /// </para>
     /// <para>
-    /// <strong>Level.</strong> Avatar progression is still undesigned — there is no avatar XP and
-    /// no avatar level anywhere in the data. The damage formula needs a caster level all the same,
-    /// so the statful <c>Create</c> takes a <em>battle</em> level that the battle setup is expected
-    /// to choose sensibly (for example the level of the player's team), defaulting to 1. It is a
-    /// per-battle input, not a stored avatar attribute, until progression is designed.
+    /// <strong>Level.</strong> The avatar itself has no XP and no level anywhere in the data. The
+    /// damage formula needs a caster level all the same, so the statful <c>Create</c> takes a
+    /// <em>battle</em> level that the battle setup is expected to choose sensibly (for example the
+    /// level of the player's team), defaulting to 1. It is a per-battle input, not a stored avatar
+    /// attribute.
+    /// </para>
+    /// <para>
+    /// <strong>Skills and passives progress.</strong> What does progress is the avatar's skills:
+    /// its active skills and its passives are kept in an <see cref="AvatarSkillBook"/> and level on
+    /// the same practice-XP, material and breakthrough model as beast skills.
+    /// <see cref="Create(AvatarSkillBook, Func{string, SkillSO}, Func{string, PassiveSkillSO}, StatBlock, IEnumerable{AvatarGearSO}, int, out PassiveLoadout, string)"/>
+    /// builds the avatar from that book: its equipped actives become its <see cref="SkillLoadout"/>
+    /// (at their levels), and its equipped passives come back as the battle's
+    /// <see cref="PassiveLoadout"/>, to hand to <see cref="BattleTurnExecutor.RunBattle(TurnManager, IEnumerable{BattleUnit}, HexGrid, System.Random, BattleUnit, PassiveLoadout, int)"/>.
     /// </para>
     /// </summary>
     public static class BattleAvatar
@@ -170,6 +181,32 @@ namespace BeastCraft.Battle
         {
             StatBlock stats = StatCalculator.ComputeStats(baseStats, StatCalculator.CollectModifiers(equipped));
             return new BattleUnit(id, BattleTeam.Player, stats, PlaceholderPosition, skills, null, level);
+        }
+
+        /// <summary>
+        /// Builds the avatar from its <see cref="AvatarSkillBook"/>: exactly
+        /// <see cref="Create(SkillLoadout, StatBlock, IEnumerable{AvatarGearSO}, string, int)"/> with
+        /// the loadout <see cref="BattleUnitFactory.BuildLoadout"/> makes from the book's
+        /// <see cref="AvatarSkillBook.Actives"/> and <paramref name="activeLookup"/> (equipped slots
+        /// in slot order, at their recorded level and tier), and with
+        /// <paramref name="passives"/> set to <see cref="PassiveLoadout.FromBook"/> of the book's
+        /// <see cref="AvatarSkillBook.Passives"/> and <paramref name="passiveLookup"/>.
+        /// <para>
+        /// The passives are handed back rather than stored on the unit because
+        /// <see cref="BattleUnit"/> is a plain record shared with every beast, and a passive set is
+        /// per-battle state the executor drives; pass both to
+        /// <see cref="BattleTurnExecutor.RunBattle(TurnManager, IEnumerable{BattleUnit}, HexGrid, System.Random, BattleUnit, PassiveLoadout, int)"/>.
+        /// A null book or lookup gives an empty loadout on that side; never throws and never
+        /// returns a null <paramref name="passives"/>.
+        /// </para>
+        /// </summary>
+        public static BattleUnit Create(AvatarSkillBook skillBook, Func<string, SkillSO> activeLookup, Func<string, PassiveSkillSO> passiveLookup,
+                                        StatBlock baseStats, IEnumerable<AvatarGearSO> equipped, int level, out PassiveLoadout passives,
+                                        string id = DefaultId)
+        {
+            SkillLoadout skills = BattleUnitFactory.BuildLoadout(skillBook == null ? null : skillBook.Actives, activeLookup);
+            passives = PassiveLoadout.FromBook(skillBook == null ? null : skillBook.Passives, passiveLookup);
+            return Create(skills, baseStats, equipped, id, level);
         }
     }
 }

@@ -13,12 +13,21 @@ namespace BeastCraft.Battle
     /// </summary>
     public class BattleResult
     {
-        public BattleResult(BattleOutcome outcome, long elapsedTicks, IReadOnlyList<BattleTurnResult> turns)
+        public BattleResult(BattleOutcome outcome, long elapsedTicks, IReadOnlyList<BattleTurnResult> turns,
+                            IReadOnlyList<PassiveActivation> openingPassiveActivations = null)
         {
             Outcome = outcome;
             ElapsedTicks = elapsedTicks < 0 ? 0 : elapsedTicks;
             Turns = turns ?? new List<BattleTurnResult>();
+            OpeningPassiveActivations = openingPassiveActivations ?? new List<PassiveActivation>();
         }
+
+        /// <summary>
+        /// The avatar passives that fired as the battle began (<see cref="BattleTurnExecutor.BeginBattle"/>:
+        /// auras, then battle-start passives), before any turn. Later firings are on each turn's
+        /// <see cref="BattleTurnResult.PassiveActivations"/>. Never <c>null</c>.
+        /// </summary>
+        public IReadOnlyList<PassiveActivation> OpeningPassiveActivations { get; }
 
         /// <summary>Which side won, or that nobody did.</summary>
         public BattleOutcome Outcome { get; }

@@ -46,6 +46,7 @@ dotnet run --project Tooling/BalanceSim -c Release -- [options]
 | `--matrix-level <n>` | `50` | Level of the PvP win matrix and the stat table (falls back to the highest simulated level). |
 | `--roster <path>` | found by walking up | Path to `beast-roster.json`. |
 | `--encounters-file <path>` | found by walking up | Path to `encounters.json`. |
+| `--avatar <preset>` | `none` | PvE only. `none` fields no avatar (the committed report's setting). `support` fields a fixture avatar with three passive skills beside every player team (`AvatarPresets.cs`; not authored content) and adds an "Avatar passives" section with firings per battle. See `docs/design/battle-system.md`, "Avatar passives". |
 | `--out <path>` | none | Also write the report to this file (it always goes to stdout). |
 | `--self-check` | off | Run everything twice and fail unless both reports are identical; also replay sample PvE battles through `BattleTurnExecutor.RunBattle` and fail if the simulator's loop disagrees. |
 

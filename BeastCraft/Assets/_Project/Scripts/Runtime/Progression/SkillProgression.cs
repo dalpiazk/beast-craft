@@ -25,7 +25,7 @@ namespace BeastCraft.Progression
     /// </para>
     /// <para>
     /// <strong>Generic.</strong> Every function takes the <see cref="SkillProgressionDefinition"/>
-    /// rather than a skill asset, so beast skills and (later) avatar passives share it. A null
+    /// rather than a skill asset, so beast skills and avatar passives share it. A null
     /// definition reads as the defaults; a null progress is a no-op. Non-throwing throughout, like
     /// the battle namespace. Mutates only the <see cref="SkillProgress"/> it is handed.
     /// </para>

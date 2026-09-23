@@ -208,6 +208,9 @@ namespace BeastCraft.Tooling.BalanceSim
         public bool SelfCheck;
         public bool ShowHelp;
 
+        /// <summary>The PvE avatar preset (<c>--avatar</c>); <see cref="AvatarPresets.None"/> fields no avatar.</summary>
+        public string AvatarPreset = AvatarPresets.None;
+
         public const string Usage =
             "Beast Craft headless balance simulator (local-only tooling).\n" +
             "\n" +
@@ -235,6 +238,8 @@ namespace BeastCraft.Tooling.BalanceSim
             "  --matrix-level <n>         Level the PvP win matrix and stat table are drawn at (default 50, else the highest level).\n" +
             "  --roster <path>            beast-roster.json (default: found by walking up from the working directory).\n" +
             "  --encounters-file <path>   encounters.json (default: Tooling/BalanceSim/encounters.json, found the same way).\n" +
+            "  --avatar <preset>          none | support (default none). PvE only: field a fixture avatar with passive skills\n" +
+            "                             beside the player team (see AvatarPresets); none is the committed report's setting.\n" +
             "  --out <path>               Also write the Markdown report to this file.\n" +
             "  --self-check               Run everything twice and fail unless both reports are identical; also checks the\n" +
             "                             PvE battle loop against BattleTurnExecutor.RunBattle.\n" +
@@ -430,6 +435,21 @@ namespace BeastCraft.Tooling.BalanceSim
                             return null;
                         }
 
+                        break;
+                    case "--avatar":
+                        if (!TryNext(args, ref i, arg, out text, out error))
+                        {
+                            return null;
+                        }
+
+                        text = text.ToLowerInvariant();
+                        if (!AvatarPresets.IsKnown(text))
+                        {
+                            error = "--avatar expects " + string.Join(" or ", AvatarPresets.Names) + ", got '" + text + "'.";
+                            return null;
+                        }
+
+                        options.AvatarPreset = text;
                         break;
                     default:
                         error = "Unknown argument '" + arg + "'. Use --help for usage.";

@@ -30,6 +30,11 @@ namespace BeastCraft.Tooling.BalanceSim
             report.AppendLine("- Roster: `" + RosterLoader.RepoRelativePath + "` (" + species.Count + " species)");
             report.AppendLine("- Sections: " + (options.RunPve ? "PvE team vs encounter (primary)" : string.Empty) +
                               (options.RunPve && options.RunPvp ? "; " : string.Empty) + (options.RunPvp ? "PvP 1v1 round-robin (secondary)" : string.Empty));
+            if (options.RunPve && pve != null && pve.Avatar.Enabled)
+            {
+                report.AppendLine("- Avatar (PvE only): the `" + pve.Avatar.Preset + "` fixture preset (`--avatar`), fielded beside every player team; see \"Avatar passives\"");
+            }
+
             report.AppendLine();
 
             AppendKit(report);
@@ -37,6 +42,7 @@ namespace BeastCraft.Tooling.BalanceSim
             if (options.RunPve)
             {
                 PveReport.AppendSection(report, options, species, encounters, pve, cells);
+                AppendAvatar(report, pve, cells);
             }
 
             if (options.RunPvp)
@@ -78,6 +84,52 @@ namespace BeastCraft.Tooling.BalanceSim
             report.AppendLine("Power is a percent of the attacking stat: a hit is `Power / 100 x A x A / (A + " +
                               DamageFormula.DefenseWeight.ToString("0.##", CultureInfo.InvariantCulture) + " x D) x " +
                               DamageFormula.GlobalScale.ToString("0.##", CultureInfo.InvariantCulture) + "`, then element, crit and variance (`DamageFormula`).");
+            report.AppendLine();
+        }
+
+        /// <summary>
+        /// How often each of the fielded avatar's passives fired, averaged over every PvE battle at
+        /// the calibrated difficulty. Nothing at all without <c>--avatar</c>, so the default report
+        /// is unchanged.
+        /// </summary>
+        private static void AppendAvatar(StringBuilder report, PveSimulator pve, List<PveCell> cells)
+        {
+            if (pve == null || !pve.Avatar.Enabled)
+            {
+                return;
+            }
+
+            IReadOnlyList<BeastCraft.Avatar.PassiveSkillSO> passives = pve.Avatar.Passives;
+            long[] totals = new long[passives.Count];
+            long battles = 0;
+            foreach (PveCell cell in cells)
+            {
+                foreach (PveBattle battle in cell.Battles)
+                {
+                    battles++;
+                    for (int p = 0; p < totals.Length; p++)
+                    {
+                        totals[p] += battle.PassiveFirings[p];
+                    }
+                }
+            }
+
+            report.AppendLine("## Avatar passives");
+            report.AppendLine();
+            report.AppendLine("The `" + pve.Avatar.Preset + "` preset is a simulator fixture for exercising the passive engine, not authored content.");
+            report.AppendLine("Firings per battle are averaged over every PvE battle at its cell's calibrated difficulty (" + battles + " battles).");
+            report.AppendLine();
+            report.AppendLine("| Passive | Trigger | Scope | Proc % | Max / battle | Cooldown | Firings per battle |");
+            report.AppendLine("| --- | --- | --- | ---: | ---: | ---: | ---: |");
+            for (int p = 0; p < passives.Count; p++)
+            {
+                BeastCraft.Avatar.PassiveSkillSO passive = passives[p];
+                report.AppendLine("| " + passive.PassiveId + " | " + passive.Trigger + " | " + passive.TargetScope + " | " + passive.ProcChance + " | " +
+                                  (passive.MaxTriggersPerBattle > 0 ? passive.MaxTriggersPerBattle.ToString(CultureInfo.InvariantCulture) : "-") + " | " +
+                                  passive.InternalCooldown + " | " +
+                                  (battles == 0 ? 0.0 : (double)totals[p] / battles).ToString("0.00", CultureInfo.InvariantCulture) + " |");
+            }
+
             report.AppendLine();
         }
 

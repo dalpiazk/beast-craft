@@ -91,7 +91,8 @@ namespace BeastCraft.Battle
         }
 
         /// <summary>
-        /// The battle loadout for a skill book: each equipped slot, in slot order (slot order is
+        /// The battle loadout for a skill book — a beast's, or the avatar's active book
+        /// (<see cref="AvatarActiveSkillBook"/>): each equipped slot, in slot order (slot order is
         /// fire priority), resolved to its <see cref="SkillSO"/> by <paramref name="skillLookup"/>
         /// (skill id to asset) and put in at the level and tier its <see cref="SkillProgress"/>
         /// records (<see cref="SkillInstance.FromProgress"/>).
@@ -103,13 +104,13 @@ namespace BeastCraft.Battle
         /// throws, never returns <c>null</c>.
         /// </para>
         /// </summary>
-        public static SkillLoadout BuildLoadout(BeastSkillBook skillBook, Func<string, SkillSO> skillLookup)
+        public static SkillLoadout BuildLoadout(SkillBook skillBook, Func<string, SkillSO> skillLookup)
         {
             List<SkillInstance> instances = new List<SkillInstance>();
 
             if (skillBook != null && skillLookup != null)
             {
-                for (int slot = 0; slot < BeastSkillBook.EquipSlotCount; slot++)
+                for (int slot = 0; slot < skillBook.SlotCount; slot++)
                 {
                     string skillId = skillBook.GetEquipped(slot);
                     SkillProgress progress = skillBook.GetProgress(skillId);

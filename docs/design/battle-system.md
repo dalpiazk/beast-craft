@@ -74,9 +74,10 @@ puzzle every encounter.
   beasts are: a fast team cycles its avatar faster. The alternative is an avatar gauge filled by
   the avatar's own Speed, which would make that stat (currently unused) matter and decouple the
   avatar from team composition. Open; the rule is unchanged until it is decided.
-- **Avatar progression.** The avatar now has stats (decision 6, amended), but no progression
-  level and no growth: its base is a flat authored block and only avatar gear moves it. Whether and
-  how the avatar levels up is undesigned. The damage formula still needs a caster level for it, so
+- **Avatar level.** The avatar has stats (decision 6, amended) and its *skills* now progress —
+  its active skills and its passives level on the beast-skill model (see "Avatar passives") — but
+  the avatar itself still has no level and no stat growth: its base is a flat authored block and
+  only avatar gear moves it. The damage formula still needs a caster level for it, so
   `BattleAvatar.Create` takes a per-battle level (default 1) that the battle setup is expected to
   pick sensibly, e.g. the player team's level — a stopgap input, not a design for progression.
 
@@ -150,6 +151,8 @@ The authored data this combat model needs is already committed as ScriptableObje
 - **`AvatarGearSO`** / **`AvatarStatsSO`** (under `Runtime/Avatar/`, namespace `BeastCraft.Avatar`)
   — the avatar's own stat gear (slot, stat modifiers, rarity; no visuals) and its authored base
   stats. See decision 6.
+- **`PassiveSkillSO`** (also `Runtime/Avatar/`) — an avatar passive: trigger, gating, target scope
+  and an ordinary `SkillEffect` list. See "Avatar passives".
 
 These were deliberately authored at an abstract level. Range is an integer count of grid steps and
 target shapes are named by their tactical intent rather than by a concrete tile layout, so the data
@@ -398,10 +401,14 @@ player can reason about it while building, and it needs no runtime decision-maki
 is that a beast can fire a skill at a moment when a human player wouldn't have — which is the same
 trade auto-resolution already made everywhere else.
 
-### 6. The avatar's skill loadout — DECIDED (timing and targeting); stats AMENDED
+### 6. The avatar's skill loadout — DECIDED (timing and targeting); stats AMENDED; passives ADDED
 
 **The avatar has skills too, on the same rotation mechanic**, intended to support and buff the
-player's own beasts rather than to attack. Per decision 2 the avatar is **not a piece on the grid**
+player's own beasts rather than to attack. **Amended (user):** those active skills stay, but the
+avatar's *main* role is now its **3 passive slots** — passives that fire on battle events rather
+than on a rotation — and both its actives and its passives are acquired and leveled slowly through
+play on the same progression model as beast skills. See "Avatar passives" below for the passive
+rules; everything in this section about the active loadout still holds. Per decision 2 the avatar is **not a piece on the grid**
 and has no meaningful `HexCoordinate` position, and it correspondingly gets **no turn of its own in
 the turn order** (no gauge — but see the open item below).
 
@@ -469,6 +476,15 @@ cosmetic. The producer has reversed that, and the rule is now two separate thing
   modifiers are skipped, and one-item-per-slot is left to the equipment screen, as for beasts. The
   original `BattleAvatar.Create(skills)` still builds an all-zero avatar for callers with no stats
   authored.
+
+**Amendment — the avatar's skills progress, and it has passives.** The avatar's skills now live
+in an `AvatarSkillBook` (save data): `Actives` (its active support skills, **3 slots**,
+`AvatarSkillBook.ActiveSlotCount` — before this the avatar's loadout had no fixed size, and 3
+matches a beast's) and `Passives` (**3 slots**, `PassiveSlotCount`). Both are acquired and leveled
+exactly like beast skills (practice XP, materials, breakthroughs). `BattleAvatar.Create(book,
+activeLookup, passiveLookup, baseStats, gear, level, out passives)` builds the avatar with its
+equipped actives as its `SkillLoadout` (at their levels) and hands back its equipped passives as the
+battle's `PassiveLoadout`. The passives are the subject of "Avatar passives".
 
 Everything else above is unchanged: the avatar is still off the grid, still takes no initiative
 turn, still ticks on player-beast turns, is still a caster outside the roster, and still cannot be
@@ -819,7 +835,8 @@ id-order tie-break as every criterion. Use it with `Ally` and `Lowest` to heal w
 - `MaxUsesPerBattle` is counted per slot by `SkillLoadout.MarkFired`. A slot that reaches it is
   spent (`IsSpent`, `UsesThisBattle`): its counter still ticks, but it is never offered again that
   battle. 0 means unlimited.
-- Per-effect proc cooldowns for triggered passives come with the passives (next deliverable).
+- Proc chances, per-battle caps and internal cooldowns for triggered effects live on the avatar's
+  passives (see "Avatar passives"), not on individual effects.
 
 **Simulator.** `encounters.json` can now express all of this for future content:
 
@@ -1340,7 +1357,8 @@ the ten approved species ids.
 **acquired**, and the lineup can be changed between battles. Skills **improve slowly** through play,
 by two routes together: **practice XP** from using the skill in battle, on a slow curve, and rarer
 **materials** that add XP and are required to pass **tier breakthroughs**. The same model is meant
-for the avatar's passive skills later, so it is built generically. The numbers below are
+for the avatar's passive skills, so it is built generically (the avatar now uses it: see "Avatar
+passives"). The numbers below are
 engineering defaults, all constants or authored fields, and cheap to retune.
 
 **Data model.** Everything generic lives in the `BeastCraft.Progression` namespace:
@@ -1357,7 +1375,9 @@ engineering defaults, all constants or authored fields, and cheap to retune.
 - `SkillMaterialSO` (asset): `MaterialId` (never rename after ship), `DisplayName`, `Description`,
   `Icon`, `Tier`, `XpValue`.
 - `BeastSkillBook` (serializable save data): `Known` (one `SkillProgress` per acquired skill) and
-  `Equipped`, `EquipSlotCount = 3` skill ids by slot. **Slot order is fire priority.**
+  `Equipped`, `EquipSlotCount = 3` skill ids by slot. **Slot order is fire priority.** Its equip and
+  practice rules live on the abstract `SkillBook` base, which the avatar's `AvatarActiveSkillBook`
+  and `AvatarPassiveSkillBook` share (see "Avatar passives"); the saved fields are unchanged.
 - `SkillProgression` (static rules), `SkillBreakthroughResult` and `SkillEquipResult` (explicit enum
   values, never renumbered).
 
@@ -1417,6 +1437,133 @@ material XP compares with practice). Whether stat changes should scale per level
 truncate to whole points, so small buffs grow in steps). Whether the slow curve suits the narrative
 pacing. There is no inventory yet, so consuming a material is the caller's job. No UI, no save
 system and no authored materials or tier bonuses exist yet.
+
+## Avatar passives — TUNABLE STARTING DEFAULTS, NOT CONFIRMED BALANCE
+
+**Decided by the user:** the avatar does not fight on the grid. It keeps its active support skills
+(decision 6) and gains **3 passive slots**, which are its main role. Passives are acquired and
+leveled slowly through play on **the same progression model as beast skills** (practice XP,
+materials, tier breakthroughs), and so are the avatar's active skills. The trigger semantics, hook
+points, gating order and scopes below are engineering defaults chosen by the lead; no passive
+content exists yet (content is the next deliverable).
+
+**Data** (explicit enum values, never renumbered; ids never renamed after ship):
+
+- `PassiveSkillSO` (`Runtime/Avatar`, namespace `BeastCraft.Avatar`): `PassiveId` (stable save key),
+  `DisplayName`, `Description`, `Icon`, `Progression` (the shared `SkillProgressionDefinition`
+  block), `Trigger`, `HpThresholdPercent` (default 50), `ProcChance` (percent, default 100),
+  `MaxTriggersPerBattle` (0 = unlimited), `InternalCooldown` (avatar ticks), `TargetScope`,
+  `Element` and `Category` (for damage effects, as on `SkillSO`), and `Effects` (a
+  `List<SkillEffect>`: the whole effect engine).
+- `PassiveTrigger`: `Aura = 0`, `BattleStart = 1`, `EnemyDefeated = 2`, `AllyDefeated = 3`,
+  `AllyCrit = 4`, `AllyTurnStart = 5`, `AllyBelowHpPercent = 6`.
+- `PassiveTarget`: `AllAllies = 0`, `TriggeringUnit = 1`, `AllEnemies = 2`,
+  `LowestHpFractionAlly = 3`.
+- `AvatarSkillBook` (`BeastCraft.Progression`, save data): `Actives` (`AvatarActiveSkillBook`,
+  `ActiveSlotCount = 3`) and `Passives` (`AvatarPassiveSkillBook`, `PassiveSlotCount = 3`). Both
+  are `SkillBook`s, the abstract base `BeastSkillBook` now derives from, so the equip rules are
+  written once: only known ids, no duplicates, empty slots allowed, slot order is priority.
+- Battle: `PassiveInstance` (a passive at a level and tier, plus its per-battle trigger count,
+  cooldown and threshold latches), `PassiveLoadout` (the equipped passives in slot order, and the
+  trigger rules), `PassiveActivation` (one firing: passive, slot, trigger, triggering unit, and the
+  `SkillActivation` its effects went through). `BattleTurnResult.PassiveActivations` and
+  `BattleResult.OpeningPassiveActivations` record every firing.
+
+**One engine.** A passive is applied exactly like a fired skill. Its instance wraps a private
+carrier `SkillSO` (sharing the passive's effects, progression, element and category) in a
+`SkillInstance` at the passive's level and tier, and `SkillEffectApplier` applies it **with the
+avatar as the caster**: damage uses the avatar's attacking stat and crit chance, a shield the
+avatar's `Defense`. So every magnitude scales with the passive's level by the same
+`1 + MagnitudeGrowthPerLevel / 100 × (level − 1)`, each passed gate's `BonusEffects` are appended,
+and chance, resistance, statuses and multi-hit behave as they do for skills. A gate's
+`CooldownReduction` means nothing to a passive. Knockback on a passive pushes away from the
+avatar's placeholder tile and should not be authored (a content convention, not a runtime check).
+
+**Hook points** (in `BattleTurnExecutor`; nothing runs without an avatar and a non-empty loadout):
+
+1. **Battle start** (`BattleTurnExecutor.BeginBattle`, which `RunBattle` calls before the first
+   turn): every `Aura` passive in slot order, then every `BattleStart` passive in slot order. A
+   caller driving `ExecuteTurn` itself should call `BeginBattle` once; if it does not, the first
+   turn runs it.
+2. **Each turn**, after `StatusEffects.BeginTurn` (damage-over-time): the after-damage check. Then,
+   on a player beast's turn it survived (stunned or not), every `AllyTurnStart` passive with that
+   beast as the triggering unit, **before its skills**.
+3. **After every skill a beast fires**: the after-damage check, with that skill's hits.
+4. **The avatar tick** (player beasts' turns only, as before): every passive's internal cooldown
+   ticks down once, then the avatar's actives fire, each followed by the after-damage check.
+
+**The after-damage check** handles, in order, each trying its passives in slot order:
+
+- `AllyCrit`: once per critical hit landed by the player beast whose skill it was (the crit-landing
+  beast is the triggering unit). The avatar's own crits, active or passive, are not ally crits.
+- Defeats: every unit defeated since the last check, in roster order. `AllyDefeated` for a player
+  beast (the fallen beast is the triggering unit, so pair it with `AllAllies` or
+  `LowestHpFractionAlly`, not `TriggeringUnit`); `EnemyDefeated` for an enemy (the triggering unit is
+  the beast whose turn it is when that is a living player beast — it gets the credit, even for an
+  avatar active's kill — and otherwise none).
+- `AllyBelowHpPercent`: every living player beast, in roster order, **strictly below** the passive's
+  threshold (`CurrentHp × 100 < HpThresholdPercent × Stats.Hp`, integers). It fires **once per
+  crossing**: the passive latches that beast on the attempt (whether or not the attempt fires) and
+  re-arms it only when the beast is next seen at or above the threshold. Checking after every
+  application, on any side's turn, rather than only at the beast's turn start was chosen so an
+  emergency passive can answer the hit that caused the crossing.
+
+Passives therefore react on enemy turns too (an ally falling, an ally dropping low, an enemy dying
+to its own damage-over-time), but their cooldowns only tick on avatar ticks.
+
+**Gating**, checked in this order each time a passive's trigger happens: not spent
+(`MaxTriggersPerBattle`), off its internal cooldown, at least one target in its scope, then the
+`ProcChance` roll. A blocked or failed attempt changes nothing (no count, no cooldown). A firing
+counts toward the cap and sets the cooldown to `InternalCooldown`; each avatar tick takes one off.
+Because the tick comes at the end of each player beast's turn, a passive with cooldown `N` that
+fires at a player beast's turn start is ready again at the `N`-th player-beast turn start after
+that one (enemy turns in between do not count). `ProcChance` of 0 or below, or above 100, reads as 100, like
+`SkillEffect.Chance`.
+
+**No chaining.** A unit defeated by a passive's own effect is recorded silently: it never triggers
+`EnemyDefeated` or `AllyDefeated`, and a passive's crits are not `AllyCrit`s. That bounds the
+passives any one event can set off. (HP thresholds are state, not events, so a crossing caused by a
+passive is seen at the next check.)
+
+**Target scopes** are all position-free and draw-free: `AllAllies` and `AllEnemies` are the living
+units of that side in id order (the resolver's global shapes); `LowestHpFractionAlly` is the living
+player beast with the lowest `CurrentHp / Stats.Hp`, compared exactly by cross-multiplication with
+the id tie-break (the resolver's `HpFraction` pick); `TriggeringUnit` is the trigger's unit when it
+is alive. A passive with no one to land on does not fire.
+
+**"Lasts the battle."** An `Aura` is applied once, at battle start, before anything else. Its stat
+changes should be authored with `DurationTurns` 0: the effect engine applies such a change to the
+stat block permanently and never reverts it, which is how an aura lasts the whole battle (a
+"+5% crit to all allies" aura is `BuffStat` `CritChance` 5, duration 0, on `AllAllies`). A
+`BattleStart` passive is the same one-shot but meant for timed effects (an opening shield, a
+two-turn buff), which keep their authored durations.
+
+**The rng.** A passive adds exactly one draw, its `ProcChance` roll, and only when the chance is
+below 100 and every other check has passed; its effects then draw as any skill's would (crit and
+variance per damage hit, a chance roll per uncertain non-damage effect). Draws happen at the hook
+point, in the order above. With no passives nothing draws that did not before: existing battles, the
+EditMode suite and the simulator's committed report are unchanged.
+
+**Practice XP.** `BattleSkillUsage.CountPassiveTriggers(result)` counts firings per `PassiveId`
+(opening firings included) and `CountAvatarActiveUses(result)` counts the avatar's active casts per
+`SkillId`. `AvatarSkillBook.AwardPractice(activeUses, activeLookup, passiveTriggers, passiveLookup)`
+credits both books on the ordinary rules: 10 XP per use, at most 20 uses per award. A passive's use
+is a time it fired; blocked triggers and failed proc rolls are not uses.
+
+**Simulator.** `--avatar none|support` (default `none`, so the committed report is unchanged).
+`support` is a fixture, not content: a +5 crit aura, a two-turn Defense shield on a beast that
+drops below 40% (cooldown 2), and a 50% chance of a two-turn +10% Attack surge for the team on each
+enemy defeat, on an avatar whose flat stats grow with the battle level. The report then gains an
+"Avatar passives" section with firings per battle. The simulator's own loop calls `BeginBattle` and
+passes the passives to every turn, so `--self-check` still compares it against `RunBattle`.
+
+**Open questions.** Whether passive-caused defeats should chain (currently never). Whether the
+avatar's own crits should count as `AllyCrit`. Whether `EnemyDefeated` should credit the unit that
+dealt the blow rather than the unit whose turn it is (they differ for damage-over-time and avatar
+kills). Whether a failed proc roll should consume the threshold crossing. Whether internal cooldowns
+should run on the avatar's own clock if the avatar ever gets a gauge (decision 6's open item).
+How passives are acquired (drops, quests, avatar milestones) and the passive material economy. No
+passive content, UI or save system exists yet.
 
 ## Next steps
 
@@ -1698,8 +1845,8 @@ element chart), deciding the design questions it raised above — a design decis
 rather than make — and extending the simulator once authored skills, real encounters and the avatar
 give it more than a standard kit and fixture enemies to measure; multi-hex large creatures, an open
 item under "Encounter direction" above; stat-scaled healing; the starter roster's skills (none are
-authored yet — the effect engine they need, statuses included, has landed), triggered passives and
-their proc caps, resource gating on top of cooldowns,
+authored yet — the effect engine they need, statuses included, has landed), the avatar's passive
+content (the passive engine has landed, see "Avatar passives"), resource gating on top of cooldowns,
 the placement UI (a Unity
 Editor task, not a continuation of the placement validation that just landed), the encounter
 definition that selects an arena preset and a battle format, and the presentation layer.

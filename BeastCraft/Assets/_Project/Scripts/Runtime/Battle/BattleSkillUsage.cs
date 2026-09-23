@@ -20,6 +20,13 @@ namespace BeastCraft.Battle
     /// simply skipped. The avatar's casts are recorded on player beasts' turns without a caster, so
     /// they are counted only when the avatar is passed in, under its own id.
     /// </para>
+    /// <para>
+    /// <strong>The avatar's own book.</strong> <see cref="CountAvatarActiveUses"/> and
+    /// <see cref="CountPassiveTriggers"/> give the two maps
+    /// <c>AvatarSkillBook.AwardPractice</c> takes: its active skills' fires by skill id, and its
+    /// passives' firings by passive id (a passive's practice use is a time it fired; blocked
+    /// triggers and failed proc rolls are not uses).
+    /// </para>
     /// </summary>
     public static class BattleSkillUsage
     {
@@ -94,6 +101,89 @@ namespace BeastCraft.Battle
             }
 
             return new Dictionary<string, int>(StringComparer.Ordinal);
+        }
+
+        /// <summary>
+        /// The avatar's active-skill fires (every <see cref="BattleTurnResult.AvatarActivations"/>
+        /// entry), by <see cref="SkillSO.SkillId"/>. Needs no avatar unit: only the avatar's casts
+        /// are recorded there. Empty — never <c>null</c> — for a null result or an avatar that cast
+        /// nothing; skills with no id are not counted.
+        /// </summary>
+        public static Dictionary<string, int> CountAvatarActiveUses(BattleResult result)
+        {
+            Dictionary<string, int> uses = new Dictionary<string, int>(StringComparer.Ordinal);
+
+            if (result == null)
+            {
+                return uses;
+            }
+
+            for (int t = 0; t < result.Turns.Count; t++)
+            {
+                BattleTurnResult turn = result.Turns[t];
+
+                if (turn == null)
+                {
+                    continue;
+                }
+
+                for (int a = 0; a < turn.AvatarActivations.Count; a++)
+                {
+                    SkillActivation activation = turn.AvatarActivations[a];
+                    Increment(uses, activation == null || activation.Skill == null ? null : activation.Skill.SkillId);
+                }
+            }
+
+            return uses;
+        }
+
+        /// <summary>
+        /// How many times each avatar passive fired: <see cref="BattleResult.OpeningPassiveActivations"/>
+        /// plus every turn's <see cref="BattleTurnResult.PassiveActivations"/>, by
+        /// <see cref="BeastCraft.Avatar.PassiveSkillSO.PassiveId"/>. Empty — never <c>null</c> —
+        /// for a null result or no firings; passives with no id are not counted.
+        /// </summary>
+        public static Dictionary<string, int> CountPassiveTriggers(BattleResult result)
+        {
+            Dictionary<string, int> triggers = new Dictionary<string, int>(StringComparer.Ordinal);
+
+            if (result == null)
+            {
+                return triggers;
+            }
+
+            CountPassives(triggers, result.OpeningPassiveActivations);
+
+            for (int t = 0; t < result.Turns.Count; t++)
+            {
+                if (result.Turns[t] != null)
+                {
+                    CountPassives(triggers, result.Turns[t].PassiveActivations);
+                }
+            }
+
+            return triggers;
+        }
+
+        private static void CountPassives(Dictionary<string, int> triggers, IReadOnlyList<PassiveActivation> activations)
+        {
+            for (int i = 0; i < activations.Count; i++)
+            {
+                PassiveActivation activation = activations[i];
+                Increment(triggers, activation == null || activation.Passive == null ? null : activation.Passive.PassiveId);
+            }
+        }
+
+        private static void Increment(Dictionary<string, int> counts, string id)
+        {
+            if (string.IsNullOrEmpty(id))
+            {
+                return;
+            }
+
+            int current;
+            counts.TryGetValue(id, out current);
+            counts[id] = current + 1;
         }
 
         private static void Increment(Dictionary<string, Dictionary<string, int>> counts, string unitId, SkillSO skill)

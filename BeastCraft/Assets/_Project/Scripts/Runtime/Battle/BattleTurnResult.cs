@@ -31,7 +31,8 @@ namespace BeastCraft.Battle
             IReadOnlyList<SkillActivation> avatarActivations,
             int retreatSteps = 0,
             bool stunned = false,
-            int statusDamage = 0)
+            int statusDamage = 0,
+            IReadOnlyList<PassiveActivation> passiveActivations = null)
         {
             Unit = unit;
             StartPosition = startPosition;
@@ -43,6 +44,7 @@ namespace BeastCraft.Battle
             RetreatSteps = retreatSteps;
             Stunned = stunned;
             StatusDamage = statusDamage;
+            PassiveActivations = passiveActivations ?? new List<PassiveActivation>();
         }
 
         /// <summary>The unit whose turn this was.</summary>
@@ -119,5 +121,12 @@ namespace BeastCraft.Battle
         /// </para>
         /// </summary>
         public IReadOnlyList<SkillActivation> AvatarActivations { get; }
+
+        /// <summary>
+        /// Every avatar passive that fired during this turn, in the order it fired — on either
+        /// side's turn, since passives react to events rather than ticking (see
+        /// <see cref="PassiveLoadout"/>). Empty when no passives were supplied. Never <c>null</c>.
+        /// </summary>
+        public IReadOnlyList<PassiveActivation> PassiveActivations { get; }
     }
 }

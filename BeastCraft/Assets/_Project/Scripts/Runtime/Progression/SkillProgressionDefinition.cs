@@ -11,8 +11,8 @@ namespace BeastCraft.Progression
     /// <para>
     /// <strong>Generic on purpose.</strong> It is a plain serializable block rather than fields
     /// spread over <see cref="Battle.SkillSO"/>, so any skill-definition type can embed one and
-    /// reuse <see cref="SkillProgression"/> unchanged: beast skills do today
-    /// (<see cref="Battle.SkillSO.Progression"/>), and avatar passive skills are expected to.
+    /// reuse <see cref="SkillProgression"/> unchanged: beast skills do
+    /// (<see cref="Battle.SkillSO.Progression"/>), and so do avatar passives (<c>PassiveSkillSO.Progression</c>).
     /// </para>
     /// <para>
     /// <strong>Tunable starting defaults, not confirmed balance.</strong> Max level 20, 3% magnitude

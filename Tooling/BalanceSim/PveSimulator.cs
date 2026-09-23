@@ -44,6 +44,12 @@ namespace BeastCraft.Tooling.BalanceSim
         public int[] MemberCrits;
 
         /// <summary>
+        /// Per avatar passive, in the preset's slot order: how many times it fired this battle
+        /// (battle start included). <c>null</c> when no avatar was fielded.
+        /// </summary>
+        public int[] PassiveFirings;
+
+        /// <summary>
         /// Per team member: the sum over its hits of the random multiplier applied to each,
         /// <c>(crit ? CritMultiplier : 1) * variance / 100</c>. Divided by <see cref="MemberHits"/>
         /// it is the average damage multiplier the rolls gave the beast.
@@ -124,6 +130,7 @@ namespace BeastCraft.Tooling.BalanceSim
         {
             _options = options;
             _species = species;
+            Avatar = new AvatarPresets(options.AvatarPreset);
             _elementalKits = new SkillSO[species.Count][];
             _neutralKits = new SkillSO[species.Count][];
             for (int i = 0; i < species.Count; i++)
@@ -142,6 +149,9 @@ namespace BeastCraft.Tooling.BalanceSim
 
         /// <summary>Every combination of <c>TeamSize</c> distinct species, as ascending roster indices, in lexicographic order.</summary>
         public List<int[]> Teams { get; }
+
+        /// <summary>The avatar fielded beside every player team (<c>--avatar</c>); disabled by default.</summary>
+        public AvatarPresets Avatar { get; }
 
         /// <summary>
         /// Per team, which member stands in which deployment slot (and so gets which unit id). A
@@ -340,7 +350,8 @@ namespace BeastCraft.Tooling.BalanceSim
         /// One battle. The loop below is <see cref="BattleTurnExecutor.RunBattle"/>'s loop reproduced
         /// statement for statement (the ATB time cap, the last-turn timestamp and all), with an HP
         /// snapshot around each turn so damage can be attributed to the unit whose turn it was (the
-        /// only actor: no avatar is fielded), and a per-member turn count. With
+        /// avatar's passives, when one is fielded with <c>--avatar</c>, are credited to that unit
+        /// too; the battle-start ones to nobody), and a per-member turn count. With
         /// <paramref name="useRunBattle"/> the real RunBattle is called instead, which is what the
         /// self-check compares against. Everything else — lifting the defeated off the grid, the
         /// partial approach — is the Runtime's own rule, applied inside
@@ -410,21 +421,33 @@ namespace BeastCraft.Tooling.BalanceSim
                 MemberCrits = new int[team.Length],
                 MemberRollMultiplier = new double[team.Length],
                 MemberPhysicalFires = new int[team.Length],
-                MemberSpecialFires = new int[team.Length]
+                MemberSpecialFires = new int[team.Length],
+                PassiveFirings = Avatar.Enabled ? new int[Avatar.Passives.Count] : null
             };
 
             TurnManager turnManager = new TurnManager(units);
             Random rng = new Random(DeriveSeed(_options.Seed, mode, level, encounter.Id, teamIndex, sample));
+            BattleUnit avatar = Avatar.Build(level, out PassiveLoadout passives);
             BattleOutcome outcome;
             long elapsedTicks;
             int actions;
 
             if (useRunBattle)
             {
-                BattleResult result = BattleTurnExecutor.RunBattle(turnManager, units, grid, rng, null, _options.MaxTime);
+                BattleResult result = avatar == null
+                    ? BattleTurnExecutor.RunBattle(turnManager, units, grid, rng, null, _options.MaxTime)
+                    : BattleTurnExecutor.RunBattle(turnManager, units, grid, rng, avatar, passives, _options.MaxTime);
                 outcome = result.Outcome;
                 elapsedTicks = result.ElapsedTicks;
                 actions = result.ActionCount;
+                if (avatar != null)
+                {
+                    CountPassives(battle, result.OpeningPassiveActivations);
+                    foreach (BattleTurnResult turn in result.Turns)
+                    {
+                        CountPassives(battle, turn.PassiveActivations);
+                    }
+                }
             }
             else
             {
@@ -438,6 +461,9 @@ namespace BeastCraft.Tooling.BalanceSim
                 long capTicks = (long)(_options.MaxTime < 1 ? 1 : _options.MaxTime) * TurnManager.TicksPerTimeUnit;
                 long lastTurnTicks = 0;
                 actions = 0;
+
+                // RunBattle's battle-start hook; a no-op without an avatar.
+                CountPassives(battle, BattleTurnExecutor.BeginBattle(units, grid, rng, avatar, passives));
 
                 while (true)
                 {
@@ -467,8 +493,9 @@ namespace BeastCraft.Tooling.BalanceSim
                         }
 
                         lastTurnTicks = turnManager.ElapsedTicks;
-                        BattleTurnResult turn = BattleTurnExecutor.ExecuteTurn(current, units, grid, rng, null);
+                        BattleTurnResult turn = BattleTurnExecutor.ExecuteTurn(current, units, grid, rng, avatar, passives);
                         actions++;
+                        CountPassives(battle, turn.PassiveActivations);
 
                         bool actorIsMember = memberIndex.TryGetValue(current, out int actor);
                         for (int u = 0; u < units.Count; u++)
@@ -514,6 +541,19 @@ namespace BeastCraft.Tooling.BalanceSim
 
             finalUnits = units;
             return battle;
+        }
+
+        private static void CountPassives(PveBattle battle, IReadOnlyList<PassiveActivation> activations)
+        {
+            if (battle.PassiveFirings == null)
+            {
+                return;
+            }
+
+            foreach (PassiveActivation activation in activations)
+            {
+                battle.PassiveFirings[activation.SlotIndex]++;
+            }
         }
 
         private static void CountFires(PveBattle battle, BattleTurnResult turn, int actor)
