@@ -14,7 +14,8 @@ namespace BeastCraft.Tooling.BalanceSim
     /// Mirrors <c>BeastCraft.Editor.Data.BeastRosterImporter</c>'s field mapping (curves: CurveId,
     /// Curve from <see cref="GrowthCurveData.ToAnimationCurve"/>, MaxLevel; species: SpeciesId,
     /// DisplayName, Description, BaseStats, GrowthRate, Elements via
-    /// <see cref="BeastRosterValidator.TryParseElement"/>) so the simulator fights the same beasts
+    /// <see cref="BeastRosterValidator.TryParseElement"/>, Stance via
+    /// <see cref="BeastRosterValidator.TryParseStance"/>) so the simulator fights the same beasts
     /// the Editor would generate. <c>JsonUtility</c> is unavailable outside Unity, hence
     /// System.Text.Json with public fields included — the case the roster doc already names.
     /// </para>
@@ -122,6 +123,7 @@ namespace BeastCraft.Tooling.BalanceSim
                 }
 
                 beast.Elements = elements;
+                BeastRosterValidator.TryParseStance(speciesData.Stance, out beast.Stance);
                 species.Add(beast);
             }
 

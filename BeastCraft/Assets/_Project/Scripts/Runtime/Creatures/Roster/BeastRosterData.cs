@@ -114,9 +114,17 @@ namespace BeastCraft.Creatures.Roster
         public string GrowthCurveId;
 
         /// <summary>
-        /// Stats at curve scale 1 (max level). <see cref="StatBlock.MoveRange"/> is exempt from the
-        /// curve and applies as-is at every level.
+        /// Stats at curve scale 1 (max level). <see cref="StatBlock.MoveRange"/> and
+        /// <see cref="StatBlock.CritChance"/> are exempt from the curve and apply as-is at every
+        /// level; neither counts toward the six-stat budget.
         /// </summary>
         public StatBlock BaseStats;
+
+        /// <summary>
+        /// A <see cref="CombatStance"/> name (<c>"Vanguard"</c>, <c>"Ranged"</c> or
+        /// <c>"Skirmisher"</c>), parsed case-sensitively. Missing or empty means
+        /// <see cref="CombatStance.Vanguard"/>, the species default.
+        /// </summary>
+        public string Stance;
     }
 }

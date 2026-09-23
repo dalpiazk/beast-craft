@@ -12,8 +12,9 @@ namespace BeastCraft.Tests.EditMode
     /// Checks the authored starter roster (<c>Data/Creatures/beast-roster.json</c>) straight from the
     /// JSON, so it runs without the imported assets existing. Structural rules come from
     /// <see cref="BeastRosterValidator"/>; the roster-shape and first-draft balance guidelines
-    /// (ten beasts, one per element, the stat budget band, the move-range band) live here, where
-    /// the balance pass can deliberately move them.
+    /// (ten beasts, one per element, the stat budget band, the move-range band, the crit-chance
+    /// band, the speed band and order) live here, where the balance pass can deliberately move them. The six-stat budget is
+    /// the six combat stats only: <c>MoveRange</c> and <c>CritChance</c> sit outside it.
     /// </summary>
     public class BeastRosterTests
     {
@@ -22,6 +23,9 @@ namespace BeastCraft.Tests.EditMode
         private const float BudgetTolerance = 0.05f;
         private const int MinMoveRange = 2;
         private const int MaxMoveRange = 5;
+        private const int MinCritChance = 0;
+        private const int MaxCritChance = 25;
+        private const float MaxSpeedSpread = 1.15f;
 
         private readonly List<ScriptableObject> _created = new List<ScriptableObject>();
 
@@ -97,6 +101,90 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
+        public void Roster_BaseSpeedsStayWithinTheSpreadBand()
+        {
+            // User decision (ATB retune): under the ATB gauge Speed is turns per unit of time, so the
+            // fastest beast's base Speed stays within 15% of the slowest's. Widening it is a design
+            // change, not a tuning move.
+            int slowest = int.MaxValue;
+            int fastest = int.MinValue;
+            foreach (SpeciesData species in LoadRoster().Species)
+            {
+                slowest = Math.Min(slowest, species.BaseStats.Speed);
+                fastest = Math.Max(fastest, species.BaseStats.Speed);
+            }
+
+            Assert.That(slowest, Is.GreaterThan(0));
+            Assert.That((float)fastest / slowest, Is.LessThanOrEqualTo(MaxSpeedSpread), "fastest " + fastest + " / slowest " + slowest);
+        }
+
+        [Test]
+        public void Roster_BaseSpeedsKeepTheApprovedOrder()
+        {
+            // The archetypes' speed order, fastest first (ties allowed): Thunderbird, Griffin, Basilisk,
+            // Phoenix, Kirin, Frost Wyrm, Tarasque, Leviathan, Treant, and Golem strictly the slowest.
+            string[] order = { "thunderbird", "griffin", "basilisk", "phoenix", "kirin", "frost_wyrm", "tarasque", "leviathan", "treant", "golem" };
+            BeastRosterData roster = LoadRoster();
+            int[] speeds = Array.ConvertAll(order, id => Array.Find(roster.Species, s => s.SpeciesId == id).BaseStats.Speed);
+
+            for (int i = 1; i < order.Length; i++)
+            {
+                Assert.That(speeds[i - 1], Is.GreaterThanOrEqualTo(speeds[i]), order[i - 1] + " should be at least as fast as " + order[i]);
+            }
+
+            Assert.That(speeds[order.Length - 2], Is.GreaterThan(speeds[order.Length - 1]), "golem should be the slowest beast");
+        }
+
+        [Test]
+        public void Roster_CritChanceStaysInBand()
+        {
+            foreach (SpeciesData species in LoadRoster().Species)
+            {
+                Assert.That(species.BaseStats.CritChance, Is.InRange(MinCritChance, MaxCritChance), species.SpeciesId);
+            }
+        }
+
+        [Test]
+        public void Roster_CritChancesMatchTheApprovedValues()
+        {
+            // User decision: crit chance varies per beast, highest on the fast strikers and casters.
+            Dictionary<string, int> expected = new Dictionary<string, int>
+            {
+                { "thunderbird", 15 },
+                { "basilisk", 12 },
+                { "phoenix", 10 },
+                { "griffin", 8 },
+                { "tarasque", 6 },
+                { "kirin", 5 },
+                { "frost_wyrm", 5 },
+                { "leviathan", 3 },
+                { "treant", 3 },
+                { "golem", 2 }
+            };
+
+            foreach (SpeciesData species in LoadRoster().Species)
+            {
+                Assert.AreEqual(expected[species.SpeciesId], species.BaseStats.CritChance, species.SpeciesId);
+            }
+        }
+
+        [Test]
+        public void Validator_RejectsCritChanceOutsideAPercent_AndAcceptsZero()
+        {
+            BeastRosterData roster = LoadRoster();
+            roster.Species[0].BaseStats.CritChance = -1;
+            roster.Species[1].BaseStats.CritChance = 101;
+            roster.Species[2].BaseStats.CritChance = 0;
+            roster.Species[3].BaseStats.CritChance = 100;
+
+            List<string> errors = BeastRosterValidator.Validate(roster);
+
+            Assert.AreEqual(2, errors.Count, string.Join("\n", errors));
+            Assert.IsTrue(errors.Exists(e => e.Contains("CritChance is -1")), string.Join("\n", errors));
+            Assert.IsTrue(errors.Exists(e => e.Contains("CritChance is 101")), string.Join("\n", errors));
+        }
+
+        [Test]
         public void Roster_AllSpeciesShareTheMediumCurveForNow()
         {
             // User decision: one shared curve until the balance simulator differentiates them.
@@ -145,7 +233,9 @@ namespace BeastCraft.Tests.EditMode
 
                 foreach (StatType stat in (StatType[])Enum.GetValues(typeof(StatType)))
                 {
-                    Assert.That(species.GetStatAtLevel(stat, 1), Is.GreaterThanOrEqualTo(1), data.SpeciesId + " " + stat + " at level 1");
+                    // CritChance is a chance, not a combat stat: 0 is legal (see the crit band test).
+                    int floor = stat == StatType.CritChance ? 0 : 1;
+                    Assert.That(species.GetStatAtLevel(stat, 1), Is.GreaterThanOrEqualTo(floor), data.SpeciesId + " " + stat + " at level 1");
                     Assert.AreEqual(data.BaseStats.GetStat(stat), species.GetStatAtLevel(stat, curveData.MaxLevel), data.SpeciesId + " " + stat + " at max level");
                 }
             }
@@ -166,6 +256,63 @@ namespace BeastCraft.Tests.EditMode
             Assert.IsTrue(errors.Exists(e => e.Contains("'glacial' does not match")), string.Join("\n", errors));
             Assert.IsTrue(errors.Exists(e => e.Contains("duplicate SpeciesId")), string.Join("\n", errors));
             Assert.IsTrue(errors.Exists(e => e.Contains("level-1 scale")), string.Join("\n", errors));
+        }
+
+        [Test]
+        public void Roster_StancesMatchTheApprovedRoles()
+        {
+            // Ranged: the artillery casters; Skirmisher: the fast strikers; everyone else holds the line.
+            Dictionary<string, CombatStance> expected = new Dictionary<string, CombatStance>
+            {
+                { "phoenix", CombatStance.Ranged },
+                { "kirin", CombatStance.Ranged },
+                { "basilisk", CombatStance.Ranged },
+                { "thunderbird", CombatStance.Skirmisher },
+                { "griffin", CombatStance.Skirmisher },
+                { "leviathan", CombatStance.Vanguard },
+                { "golem", CombatStance.Vanguard },
+                { "treant", CombatStance.Vanguard },
+                { "tarasque", CombatStance.Vanguard },
+                { "frost_wyrm", CombatStance.Vanguard }
+            };
+
+            foreach (SpeciesData species in LoadRoster().Species)
+            {
+                Assert.IsFalse(string.IsNullOrEmpty(species.Stance), species.SpeciesId + " should author its stance explicitly.");
+                Assert.IsTrue(BeastRosterValidator.TryParseStance(species.Stance, out CombatStance stance), species.SpeciesId);
+                Assert.AreEqual(expected[species.SpeciesId], stance, species.SpeciesId);
+            }
+        }
+
+        [Test]
+        public void Validator_RejectsBadStance()
+        {
+            BeastRosterData roster = LoadRoster();
+            roster.Species[0].Stance = "Sniper";
+            roster.Species[1].Stance = "ranged";
+            roster.Species[2].Stance = "1";
+
+            List<string> errors = BeastRosterValidator.Validate(roster);
+
+            Assert.IsTrue(errors.Exists(e => e.Contains("'Sniper' is not a CombatStance name")), string.Join("\n", errors));
+            Assert.IsTrue(errors.Exists(e => e.Contains("'ranged' is not a CombatStance name")), string.Join("\n", errors));
+            Assert.IsTrue(errors.Exists(e => e.Contains("'1' is not a CombatStance name")), string.Join("\n", errors));
+        }
+
+        [Test]
+        public void Validator_ParsesStanceNames_AndMissingMeansVanguard()
+        {
+            Assert.IsTrue(BeastRosterValidator.TryParseStance("Skirmisher", out CombatStance stance));
+            Assert.AreEqual(CombatStance.Skirmisher, stance);
+            Assert.IsTrue(BeastRosterValidator.TryParseStance(null, out stance));
+            Assert.AreEqual(CombatStance.Vanguard, stance);
+            Assert.IsTrue(BeastRosterValidator.TryParseStance(string.Empty, out stance));
+            Assert.AreEqual(CombatStance.Vanguard, stance);
+            Assert.IsFalse(BeastRosterValidator.TryParseStance("vanguard", out _));
+
+            BeastRosterData roster = LoadRoster();
+            roster.Species[0].Stance = null;
+            Assert.IsEmpty(BeastRosterValidator.Validate(roster));
         }
 
         [Test]

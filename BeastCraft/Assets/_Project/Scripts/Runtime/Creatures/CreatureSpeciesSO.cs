@@ -26,8 +26,9 @@ namespace BeastCraft.Creatures
         /// <summary>
         /// Unscaled reference stats: the stats at growth-curve scale 1, which for authored curves is
         /// max level (see <see cref="GrowthRateCurve"/>). Scaled by <see cref="GrowthRate"/>, except for
-        /// <see cref="StatBlock.MoveRange"/>, which is authored here as the species' per-turn
-        /// movement and used as-is at every level (see <see cref="GetStatAtLevel"/>).
+        /// <see cref="StatBlock.MoveRange"/> and <see cref="StatBlock.CritChance"/>, which are
+        /// authored here as the species' per-turn movement and critical-hit chance and used as-is at
+        /// every level (see <see cref="GetStatAtLevel"/>).
         /// </summary>
         public StatBlock BaseStats;
 
@@ -53,6 +54,14 @@ namespace BeastCraft.Creatures
         public Element[] Elements = new Element[0];
 
         /// <summary>
+        /// How beasts of this species position themselves in battle (see <see cref="CombatStance"/>).
+        /// Copied onto each unit by <c>BattleUnitFactory.CreateBeast</c>. Defaults to
+        /// <see cref="CombatStance.Vanguard"/>, the stance whose movement is the plain approach rule,
+        /// so a species authored before stances existed behaves exactly as it did.
+        /// </summary>
+        public CombatStance Stance = CombatStance.Vanguard;
+
+        /// <summary>
         /// The species' stat on the given axis at the given level. Falls back to the unscaled base
         /// stat (with an error) when no growth curve is assigned, so a half-authored species still
         /// produces usable numbers instead of a null reference.
@@ -64,12 +73,17 @@ namespace BeastCraft.Creatures
         /// Move range is a small tactical integer, not a quantity that grows with level; gear and
         /// buffs are what change it.
         /// </para>
+        /// <para>
+        /// <see cref="StatType.CritChance"/> is exempt for the same reason: it is a percent chance
+        /// authored in single digits or low tens, which a 0.15 level-1 scale would round to 0 or 1.
+        /// A beast's crit chance is part of its identity at every level; gear and buffs raise it.
+        /// </para>
         /// </summary>
         public int GetStatAtLevel(StatType type, int level)
         {
             int baseStat = BaseStats.GetStat(type);
 
-            if (type == StatType.MoveRange)
+            if (type == StatType.MoveRange || type == StatType.CritChance)
             {
                 return baseStat;
             }

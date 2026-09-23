@@ -17,7 +17,7 @@ namespace BeastCraft.Battle
     /// <para>
     /// <strong>It is an ordinary <see cref="BattleUnit"/>, not a parallel type.</strong> Everything
     /// a caster is put through — <see cref="SkillLoadout.TickAndResolve"/>,
-    /// <see cref="SkillTargetResolver.ResolveTargets"/>, <see cref="SkillEffectApplier.Apply"/> —
+    /// <see cref="SkillTargetResolver.ResolveTargets"/>, <see cref="SkillEffectApplier.Apply(SkillActivation, BattleUnit, System.Random)"/> —
     /// already takes a <see cref="BattleUnit"/>, so a dedicated avatar type would have to be
     /// converted into one at every call site or be shadowed by a parallel set of overloads. Neither
     /// is worth it for a participant whose only difference from a beast is which fields of it are

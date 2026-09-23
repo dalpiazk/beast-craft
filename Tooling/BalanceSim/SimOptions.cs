@@ -33,15 +33,19 @@ namespace BeastCraft.Tooling.BalanceSim
         //     in melee both fire every turn.
         //   - Range is the one asymmetry the brief fixes (Strike 1, Blast 3): Strike needs the
         //     beast to reach a free tile next to its target, so it fires less often — while
-        //     closing, and when the target is crowded. Measured over the default PvE run with
-        //     equal power 40, under the Runtime's current movement rules (defeated units leave the
-        //     grid, partial approach) and the fixtures' current move ranges, Strike fired 0.73x as
-        //     often as Blast (0.70 boss, 0.75-0.77 swarm, 0.72-0.76 pack). Strike's power is
-        //     therefore 55 (= 40 / 0.731, rounded), so fires x power, and with it the weight of
-        //     Attack vs SpecialAttack, is even: the report's kit parity table shows the physical
-        //     share of single-target power (49-51% per encounter, 50.1% overall, at the defaults;
-        //     54 gave 49.7%). Re-derive StrikePower if the kit, the fixtures or the movement rules
-        //     change.
+        //     closing, and when the target is crowded. A Ranged beast never walks into melee, so
+        //     it carries Shot (Physical, range 3, Blast's cooldown) instead of Strike; before Shot,
+        //     Ranged beasts only fired Strike at an enemy already adjacent and the physical share
+        //     fell to 37-47%. Each physical skill's power is Blast's divided by how often it fires
+        //     relative to Blast in its stances, measured over the default PvE run (generated
+        //     compositions, 3 levels, both kit modes) at Strike 55 / Shot 40: Strike fired 0.70x as
+        //     often as Blast for Vanguard and for Skirmisher beasts, Shot 0.965x for Ranged beasts
+        //     (it fires after Blast and loses the odd target Blast just felled). So Strike is 57
+        //     (= 40 / 0.70) and Shot 41 (= 40 / 0.965): fires x power, and with it the weight of
+        //     Attack vs SpecialAttack, is even per stance. The report's kit parity table shows the
+        //     physical share of single-target power per stance and per shape, and flags a stance
+        //     outside 50 +/- 5. Re-derive StrikePower / ShotPower if the kit, the enemies or the
+        //     movement rules change.
         //   - The AoE ("Burst") is split into a Physical half and a Special half with the same
         //     power, radius and cooldown, fired together, physical first. A single-category Burst
         //     would re-open the bias this kit exists to close. Firing order does not bias the
@@ -49,14 +53,16 @@ namespace BeastCraft.Tooling.BalanceSim
         //     half lands the blow.
         // Burst (2 x power 20, radius 2, cooldown 2) is lower power and longer cooldown than the
         // single-target pair: a periodic spike that only pays off when several enemies are close,
-        // i.e. against swarms and packs. Cooldown 2 rather than 3 so it comes up in round 2 —
-        // fights at calibrated difficulty last 3-7 rounds, and at cooldown 3 the swarm was mostly
-        // dead before the first Burst.
+        // i.e. against swarms and packs. Cooldown 2 rather than 3 so it comes up on the beast's
+        // second turn — fights at calibrated difficulty last a handful of turns per beast, and at
+        // cooldown 3 the swarm was mostly dead before the first Burst (measured under the old
+        // round-based turn order; cooldowns count the beast's own turns under ATB as well).
         //
         // AreaBurst semantics (SkillTargetResolver): the disc of radius Range around the caster's
         // own tile at the moment it fires; it never moves the caster. A Burst that catches nobody
         // still fires and re-arms (battle-system.md, decision 7). It is last in the fire order so
-        // it goes off from the tile Strike just walked the beast to.
+        // it goes off from the tile Strike just walked the beast to (a Ranged beast's Burst goes
+        // off from wherever it stands, which is rarely next to anyone).
         // ------------------------------------------------------------------------------------
         public const string BlastId = "sim_blast";
         public const DamageCategory BlastCategory = DamageCategory.Special;
@@ -66,9 +72,21 @@ namespace BeastCraft.Tooling.BalanceSim
 
         public const string StrikeId = "sim_strike";
         public const DamageCategory StrikeCategory = DamageCategory.Physical;
-        public const float StrikePower = 55f;
+        public const float StrikePower = 57f;
         public const int StrikeRange = 1;
         public const int StrikeCooldown = BlastCooldown;
+
+        /// <summary>
+        /// A Ranged beast's physical single-target skill, in place of Strike: a Ranged unit never
+        /// walks into melee, so Strike only ever fired at an enemy that was already adjacent and
+        /// Ranged beasts under-used Attack. Same category as Strike, same range and cooldown as
+        /// Blast; its power is re-derived for parity like Strike's (see above).
+        /// </summary>
+        public const string ShotId = "sim_shot";
+        public const DamageCategory ShotCategory = DamageCategory.Physical;
+        public const float ShotPower = 41f;
+        public const int ShotRange = BlastRange;
+        public const int ShotCooldown = BlastCooldown;
 
         public const string BurstPhysicalId = "sim_burst_physical";
         public const string BurstSpecialId = "sim_burst_special";
@@ -81,7 +99,7 @@ namespace BeastCraft.Tooling.BalanceSim
         // ------------------------------------------------------------------------------------
         public const ArenaSize PvpArena = ArenaSize.Medium;
 
-        /// <summary>Unit ids per side. Speed ties break on ordinal id, so every pairing is also run side-swapped.</summary>
+        /// <summary>Unit ids per side. Initiative ties break on ordinal id, so every pairing is also run side-swapped.</summary>
         public const string PlayerUnitId = "p";
         public const string EnemyUnitId = "e";
 
@@ -102,6 +120,22 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <summary>A calibrated clear rate further than this from the target is reported as a calibration miss.</summary>
         public const double CalibrationTolerance = 10.0;
 
+        // ------------------------------------------------------------------------------------
+        // Generated encounters (EncounterGenerator). Compositions per shape, and the weights of
+        // the element schemes a composition is assigned (see ElementScheme).
+        // ------------------------------------------------------------------------------------
+        public const int DefaultCompositions = 8;
+        public const int SchemeWeightUniform = 30;
+        public const int SchemeWeightPerType = 30;
+        public const int SchemeWeightPerUnit = 25;
+        public const int SchemeWeightNone = 15;
+
+        /// <summary>
+        /// Element-matchup view: a composition counts as dominated by an element when enemies of
+        /// that element carry at least this share of its threat.
+        /// </summary>
+        public const double DominantElementShare = 0.5;
+
         /// <summary>How many places count as "top" / "bottom" for the niche flags.</summary>
         public const int NicheBand = 3;
 
@@ -118,6 +152,21 @@ namespace BeastCraft.Tooling.BalanceSim
         public static readonly int[] DefaultLevels = { 1, 50, 100 };
         public const int DefaultMatrixLevel = 50;
         public const int DefaultSeed = 12345;
+
+        /// <summary>
+        /// Battles per side-swapped pairing in PvP, and per (team, fixed encounter, level, kit mode)
+        /// in PvE with <c>--encounter-set fixed</c>, each with its own seed. Damage variance and
+        /// crits make a battle random, so one battle per team is a single draw.
+        /// </summary>
+        public const int DefaultSamples = 5;
+
+        /// <summary>
+        /// Battles per (team, generated composition, level, kit mode): the default run's PvE. The
+        /// compositions already vary the fight, so each team fights each of a shape's
+        /// <see cref="DefaultCompositions"/> compositions once: 8 battles per team per shape, more
+        /// than the fixed set's 5.
+        /// </summary>
+        public const int DefaultGeneratedSamples = 1;
         public const double DefaultMarginalThreshold = 5.0;
 
         public List<int> Levels = new List<int>(DefaultLevels);
@@ -132,8 +181,15 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <summary>Null = the elements authored in encounters.json; otherwise every enemy gets this element.</summary>
         public Element? EnemyElementOverride;
 
-        public int MaxRounds = BattleTurnExecutor.DefaultMaxRounds;
+        public int MaxTime = BattleTurnExecutor.DefaultMaxTime;
         public int Seed = DefaultSeed;
+        public int Samples = DefaultSamples;
+
+        /// <summary>PvE battles per team per composition: <c>--samples</c> when given, else the set's default.</summary>
+        public int PveSamples = DefaultGeneratedSamples;
+
+        public EncounterSet EncounterSet = EncounterSet.Generated;
+        public int Compositions = DefaultCompositions;
         public int MatrixLevel = DefaultMatrixLevel;
         public string OutPath;
         public string RosterPath;
@@ -150,13 +206,21 @@ namespace BeastCraft.Tooling.BalanceSim
             "                             pvp = the 1v1 round-robin (secondary).\n" +
             "  --kit <k>                  elemental | neutral | both (default both).\n" +
             "  --levels <list>            Comma-separated levels (default 1,50,100).\n" +
-            "  --encounters <list>        Comma-separated encounter ids from encounters.json (default all).\n" +
+            "  --encounter-set <s>        generated | fixed (default generated). generated = random compositions of the enemy\n" +
+            "                             type pool per shape (solo, elite, squad, horde); fixed = the hand-authored boss,\n" +
+            "                             swarm and pack encounters.\n" +
+            "  --compositions <n>         Generated compositions per shape (default 8).\n" +
+            "  --encounters <list>        Comma-separated shape ids (generated) or encounter ids (fixed) (default all).\n" +
             "  --team-size <n>            Beasts per player team, 1-6 (default 4); every combination is fielded.\n" +
             "  --target-clear <pct>       Clear rate the difficulty calibration aims for (default 50).\n" +
             "  --marginal-threshold <x>   Flag a beast whose overall marginal clear rate is outside +/-x points (default 5).\n" +
-            "  --enemy-element <e>        authored | None | <Element> (default authored): override every enemy's element.\n" +
-            "  --max-rounds <n>           Round cap before a battle is a stalemate (default 200).\n" +
+            "  --enemy-element <e>        authored | None | <Element> (default authored = as generated or authored):\n" +
+            "                             override every enemy's element.\n" +
+            "  --max-time <n>             Battle-time cap before a battle is a stalemate, in turns of a Speed-100 unit (default 2000).\n" +
             "  --seed <n>                 Base seed; each battle derives its own (default 12345).\n" +
+            "  --samples <n>              Battles per team and composition (PvE) and per pairing (PvP), each with its own\n" +
+            "                             seed: damage variance and crits make battles random (default: PvP 5; PvE 1 per\n" +
+            "                             generated composition, 5 per fixed encounter).\n" +
             "  --matrix-level <n>         Level the PvP win matrix and stat table are drawn at (default 50, else the highest level).\n" +
             "  --roster <path>            beast-roster.json (default: found by walking up from the working directory).\n" +
             "  --encounters-file <path>   encounters.json (default: Tooling/BalanceSim/encounters.json, found the same way).\n" +
@@ -170,6 +234,7 @@ namespace BeastCraft.Tooling.BalanceSim
         {
             SimOptions options = new SimOptions();
             bool matrixLevelGiven = false;
+            bool samplesGiven = false;
             error = null;
 
             for (int i = 0; i < args.Length; i++)
@@ -276,8 +341,8 @@ namespace BeastCraft.Tooling.BalanceSim
                         }
 
                         break;
-                    case "--max-rounds":
-                        if (!TryNextInt(args, ref i, arg, 1, out options.MaxRounds, out error))
+                    case "--max-time":
+                        if (!TryNextInt(args, ref i, arg, 1, out options.MaxTime, out error))
                         {
                             return null;
                         }
@@ -286,6 +351,42 @@ namespace BeastCraft.Tooling.BalanceSim
                     case "--seed":
                         if (!TryNextInt(args, ref i, arg, int.MinValue, out options.Seed, out error))
                         {
+                            return null;
+                        }
+
+                        break;
+                    case "--samples":
+                        if (!TryNextInt(args, ref i, arg, 1, out options.Samples, out error))
+                        {
+                            return null;
+                        }
+
+                        samplesGiven = true;
+                        break;
+                    case "--compositions":
+                        if (!TryNextInt(args, ref i, arg, 1, out options.Compositions, out error))
+                        {
+                            return null;
+                        }
+
+                        break;
+                    case "--encounter-set":
+                        if (!TryNext(args, ref i, arg, out text, out error))
+                        {
+                            return null;
+                        }
+
+                        if (string.Equals(text, "generated", StringComparison.OrdinalIgnoreCase))
+                        {
+                            options.EncounterSet = EncounterSet.Generated;
+                        }
+                        else if (string.Equals(text, "fixed", StringComparison.OrdinalIgnoreCase))
+                        {
+                            options.EncounterSet = EncounterSet.Fixed;
+                        }
+                        else
+                        {
+                            error = "--encounter-set expects generated or fixed, got '" + text + "'.";
                             return null;
                         }
 
@@ -324,6 +425,8 @@ namespace BeastCraft.Tooling.BalanceSim
                         return null;
                 }
             }
+
+            options.PveSamples = samplesGiven ? options.Samples : options.EncounterSet == EncounterSet.Generated ? DefaultGeneratedSamples : DefaultSamples;
 
             if (!options.Levels.Contains(options.MatrixLevel))
             {

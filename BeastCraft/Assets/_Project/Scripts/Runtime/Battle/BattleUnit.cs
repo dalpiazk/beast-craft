@@ -63,9 +63,14 @@ namespace BeastCraft.Battle
         /// compiling; <see cref="BattleUnitFactory.CreateBeast"/> passes the beast's real level.
         /// Anything below 1 is stored as 1.
         /// </para>
+        /// <para>
+        /// <paramref name="stance"/> is the unit's <see cref="Stance"/>, normally its species'
+        /// <c>CreatureSpeciesSO.Stance</c>. It defaults to <see cref="CombatStance.Vanguard"/>, whose
+        /// movement is the plain approach rule, so every existing call site keeps its behaviour.
+        /// </para>
         /// </summary>
         public BattleUnit(string id, BattleTeam team, StatBlock stats, HexCoordinate position, SkillLoadout skills = null,
-                          IReadOnlyList<Element> elements = null, int level = 1)
+                          IReadOnlyList<Element> elements = null, int level = 1, CombatStance stance = CombatStance.Vanguard)
         {
             Id = id;
             Team = team;
@@ -76,6 +81,7 @@ namespace BeastCraft.Battle
             ActiveStatModifiers = new List<ActiveStatModifier>();
             Elements = CopyElements(elements);
             Level = level < 1 ? 1 : level;
+            Stance = stance;
         }
 
         /// <summary>
@@ -185,7 +191,7 @@ namespace BeastCraft.Battle
         /// <para>
         /// A plain mutable list, and deliberately so: the unit owns the storage but none of the
         /// logic. <see cref="SkillEffectApplier"/> is the only writer — it fills the list in
-        /// <see cref="SkillEffectApplier.Apply"/> and drains it in
+        /// <see cref="SkillEffectApplier.Apply(SkillActivation, BattleUnit, System.Random)"/> and drains it in
         /// <see cref="SkillEffectApplier.TickModifiers"/>. Never <c>null</c>; empty is the normal
         /// state, and an instant (<c>DurationTurns == 0</c>) modifier never appears here at all.
         /// </para>
@@ -224,6 +230,18 @@ namespace BeastCraft.Battle
         /// </para>
         /// </summary>
         public int Level { get; }
+
+        /// <summary>
+        /// How this unit positions itself (see <see cref="CombatStance"/>), read by
+        /// <see cref="BattleTurnExecutor"/> when it picks where an approach stops, whether a melee
+        /// slot may walk, and whether leftover movement is spent retreating.
+        /// <para>
+        /// Read-only and fixed at construction, like <see cref="Elements"/>: it is a property of
+        /// what the creature is, copied from its species by <see cref="BattleUnitFactory"/>, and
+        /// nothing changes it mid-fight.
+        /// </para>
+        /// </summary>
+        public CombatStance Stance { get; }
 
         /// <summary>
         /// True once the unit is out of the fight. Defeated units are skipped by the turn order and

@@ -1,3 +1,5 @@
+using BeastCraft.Creatures;
+
 namespace BeastCraft.Battle
 {
     /// <summary>
@@ -9,10 +11,11 @@ namespace BeastCraft.Battle
     /// could not reach anything.
     /// </para>
     /// <para>
-    /// The three non-firing values are split rather than collapsed into one "did not fire" because
-    /// they are genuinely different situations to read in a log or a test — nothing to shoot at at
-    /// all, something to shoot at but no route to it, and a route that this turn could not afford —
-    /// and because the first of them never even consults the movement budget.
+    /// The non-firing values are split rather than collapsed into one "did not fire" because they
+    /// are genuinely different situations to read in a log or a test — nothing to shoot at at all,
+    /// something to shoot at but no route to it, a route that this turn could not afford, and a
+    /// walk the unit's stance declines — and because the first and last of them never consult the
+    /// movement budget.
     /// </para>
     /// </summary>
     public enum BattleSkillStatus
@@ -50,6 +53,16 @@ namespace BeastCraft.Battle
         /// and then holds. Next turn it is that much closer. Later slots in the stack are still
         /// attempted from the tile it stopped on, with nothing left to walk with.
         /// </summary>
-        OutOfMovement = 3
+        OutOfMovement = 3,
+
+        /// <summary>
+        /// A candidate exists but is out of reach, and the unit's <see cref="CombatStance"/> forbids
+        /// walking in for this skill: a <see cref="CombatStance.Ranged"/> unit never closes to melee
+        /// (an enemy-side picking skill with <c>Range &lt;= 1</c>). Nothing is spent and nothing is
+        /// walked; the slot keeps its 0 and fires on a later turn only if a target is then already
+        /// in range (for instance an enemy that walked up to it). Later slots are attempted as
+        /// usual with the whole remaining budget.
+        /// </summary>
+        HeldByStance = 4
     }
 }

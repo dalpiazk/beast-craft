@@ -40,8 +40,9 @@ namespace BeastCraft.Battle
         /// <see cref="StatCalculator"/>.
         /// <para>
         /// The unit enters at full health (<see cref="BattleUnit.CurrentHp"/> equals the assembled
-        /// max HP), with no timed modifiers, and holds a copy of the species' elements, so later
-        /// edits to the species asset do not reach it mid-battle.
+        /// max HP), with no timed modifiers, and holds a copy of the species' elements and its
+        /// <see cref="CreatureSpeciesSO.Stance"/>, so later edits to the species asset do not reach
+        /// it mid-battle. A null species gives the default <see cref="CombatStance.Vanguard"/>.
         /// </para>
         /// <para>
         /// <paramref name="level"/> is recorded as <see cref="BattleUnit.Level"/> as well as used to
@@ -55,8 +56,9 @@ namespace BeastCraft.Battle
         {
             StatBlock stats = StatCalculator.ComputeStats(species, level, equipped);
             Element[] elements = species == null ? null : species.Elements;
+            CombatStance stance = species == null ? CombatStance.Vanguard : species.Stance;
 
-            return new BattleUnit(id, team, stats, position, skills, elements, level);
+            return new BattleUnit(id, team, stats, position, skills, elements, level, stance);
         }
     }
 }

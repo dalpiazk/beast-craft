@@ -8,25 +8,57 @@ using BeastCraft.Creatures;
 
 namespace BeastCraft.Tooling.BalanceSim
 {
-    /// <summary>One team's battle against one encounter at one difficulty.</summary>
+    /// <summary>One team's battle against one encounter (composition) at one difficulty.</summary>
     public class PveBattle
     {
         public BattleOutcome Outcome;
-        public int Rounds;
+
+        /// <summary><see cref="BattleResult.ElapsedTicks"/>: when the last turn was taken, in gauge ticks.</summary>
+        public long ElapsedTicks;
+
+        /// <summary>Turns taken by every unit on both sides.</summary>
+        public int Actions;
 
         /// <summary>Per team member, in the team's roster order (not slot order).</summary>
         public int[] DamageDealt;
         public int[] DamageTaken;
         public bool[] Alive;
 
-        public int StrikeFires;
-        public int BlastFires;
+        /// <summary>Per team member: turns it took.</summary>
+        public int[] MemberActions;
+
+        /// <summary>
+        /// Per team member: fires of its physical single-target skill (Strike, or Shot for a Ranged
+        /// beast) and of Blast. The kit parity table weighs them by power, per stance.
+        /// </summary>
+        public int[] MemberPhysicalFires;
+        public int[] MemberSpecialFires;
+
         public int BurstFires;
         public int BurstTargets;
+
+        /// <summary>Per team member: damage effects it landed (<see cref="SkillActivation.Hits"/>).</summary>
+        public int[] MemberHits;
+
+        /// <summary>Per team member: how many of those were critical hits.</summary>
+        public int[] MemberCrits;
+
+        /// <summary>
+        /// Per team member: the sum over its hits of the random multiplier applied to each,
+        /// <c>(crit ? CritMultiplier : 1) * variance / 100</c>. Divided by <see cref="MemberHits"/>
+        /// it is the average damage multiplier the rolls gave the beast.
+        /// </summary>
+        public double[] MemberRollMultiplier;
 
         public bool Cleared
         {
             get { return Outcome == BattleOutcome.PlayerVictory; }
+        }
+
+        /// <summary>Normalized battle time (<see cref="BattleResult.Time"/>): 1.0 = one turn of a Speed-100 unit.</summary>
+        public double Time
+        {
+            get { return (double)ElapsedTicks / TurnManager.TicksPerTimeUnit; }
         }
     }
 
@@ -37,18 +69,42 @@ namespace BeastCraft.Tooling.BalanceSim
         public double ClearRate;
     }
 
-    /// <summary>Every team against one encounter at one level and kit mode, at the calibrated difficulty.</summary>
+    /// <summary>
+    /// Every team against every composition of one shape (or one fixed encounter) at one level and
+    /// kit mode, at the calibrated difficulty.
+    /// </summary>
     public class PveCell
     {
         public KitMode Mode;
         public int Level;
-        public Encounter Encounter;
+        public EncounterShape Shape;
         public double Multiplier;
         public double ClearRate;
         public List<CalibrationPoint> Evaluations = new List<CalibrationPoint>();
 
-        /// <summary>Indexed like <see cref="PveSimulator.Teams"/>.</summary>
+        /// <summary>
+        /// Every battle at the calibrated multiplier: composition-major, then team, then sample, so
+        /// composition <c>c</c>, team <c>t</c>, sample <c>s</c> is at
+        /// <c>((c * TeamCount) + t) * Samples + s</c> (see <see cref="PveSimulator.BattleIndex"/>).
+        /// </summary>
         public PveBattle[] Battles;
+
+        /// <summary>Battles per team and composition: each is the same fight with a different seed (damage rolls differ).</summary>
+        public int Samples;
+
+        public int TeamCount;
+
+        /// <summary>The team index of battle <paramref name="index"/>.</summary>
+        public int TeamOf(int index)
+        {
+            return (index / Samples) % TeamCount;
+        }
+
+        /// <summary>The composition index (into <see cref="EncounterShape.Compositions"/>) of battle <paramref name="index"/>.</summary>
+        public int CompositionOf(int index)
+        {
+            return index / (Samples * TeamCount);
+        }
     }
 
     /// <summary>
@@ -89,20 +145,22 @@ namespace BeastCraft.Tooling.BalanceSim
 
         /// <summary>
         /// Per team, which member stands in which deployment slot (and so gets which unit id). A
-        /// fixed, seeded shuffle per team: slot and id decide the speed-tie break between team
-        /// members and which beast an enemy picks between equidistant targets (both break ties on
-        /// the ordinal id), so pinning them to roster order would systematically expose the first
-        /// species in the roster.
+        /// fixed, seeded shuffle per team: slot and id decide the initiative tie break between team
+        /// members (equal gauge and equal Speed) and which beast an enemy picks between equidistant
+        /// targets (both break ties on the ordinal id), so pinning them to roster order would
+        /// systematically expose the first species in the roster.
         /// </summary>
         public int[][] SlotOrders { get; }
 
         /// <summary>
-        /// Id prefixes that neutralise the speed tie between the two sides. <see cref="TurnManager"/>
-        /// breaks equal Speed on the ordinal unit id, and the raw ids (<c>e01</c>... for enemies,
-        /// <c>p1</c>... for the team) would hand every cross-side tie to the enemies. Each battle
+        /// Id prefixes that neutralise the initiative tie between the two sides.
+        /// <see cref="TurnManager"/> breaks a tie between equally full, equally fast gauges on the
+        /// ordinal unit id (under the ATB gauge, units of equal Speed fill in lockstep, so this is
+        /// every turn they share), and the raw ids (<c>e01</c>... for enemies, <c>p1</c>... for the
+        /// team) would hand every cross-side tie to the enemies. Each battle
         /// instead prefixes one side with <see cref="TieWinnerPrefix"/> and the other with
         /// <see cref="TieLoserPrefix"/>; which side wins is decided by <see cref="PlayersWinTies"/>,
-        /// an exact half of the teams in every (kit mode, encounter, level) cell. A prefix shared by
+        /// an exact half of the teams against every composition in every (kit mode, level) cell. A prefix shared by
         /// a whole side leaves the order <em>within</em> the side (and so every targeting tie, which
         /// only ever compares units of one side) exactly as it was.
         /// </summary>
@@ -111,21 +169,36 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <summary>See <see cref="TieWinnerPrefix"/>.</summary>
         public const string TieLoserPrefix = "b";
 
-        /// <summary>
-        /// Calibrates the encounter's difficulty for this level and mode, then returns the battles at
-        /// the calibrated multiplier. Deterministic: the evaluated multipliers depend only on the
-        /// clear rates, which depend only on the inputs.
-        /// </summary>
-        public PveCell RunCell(KitMode mode, int level, Encounter encounter)
+        /// <summary>Battles per team per composition per evaluation (<see cref="SimOptions.PveSamples"/>).</summary>
+        public int Samples
         {
-            PveCell cell = new PveCell { Mode = mode, Level = level, Encounter = encounter };
+            get { return _options.PveSamples; }
+        }
+
+        /// <summary>Where composition <paramref name="composition"/>, team <paramref name="teamIndex"/>, sample <paramref name="sample"/> sits in a battle array.</summary>
+        public int BattleIndex(int composition, int teamIndex, int sample)
+        {
+            return (((composition * Teams.Count) + teamIndex) * Samples) + sample;
+        }
+
+        /// <summary>
+        /// Calibrates the shape's difficulty for this level and mode (one multiplier over all its
+        /// compositions), then returns the battles at the calibrated multiplier. Deterministic: every battle's rng is seeded from the inputs
+        /// (never the multiplier), so the clear rates, and with them the evaluated multipliers,
+        /// depend only on the inputs. Battles are random (damage variance and crits), so each team
+        /// fights each composition <see cref="Samples"/> times with distinct seeds and the clear rate
+        /// is over all of them.
+        /// </summary>
+        public PveCell RunCell(KitMode mode, int level, EncounterShape shape)
+        {
+            PveCell cell = new PveCell { Mode = mode, Level = level, Shape = shape, Samples = Samples, TeamCount = Teams.Count };
             double target = _options.TargetClearRate;
             PveBattle[] best = null;
             double bestGap = double.MaxValue;
 
             double Evaluate(double multiplier)
             {
-                PveBattle[] battles = RunAllTeams(mode, level, encounter, multiplier);
+                PveBattle[] battles = RunAllTeams(mode, level, shape, multiplier);
                 int cleared = 0;
                 foreach (PveBattle battle in battles)
                 {
@@ -205,22 +278,34 @@ namespace BeastCraft.Tooling.BalanceSim
             return cell;
         }
 
-        /// <summary>Every team against the encounter at one multiplier; parallel, results stored by team index.</summary>
-        public PveBattle[] RunAllTeams(KitMode mode, int level, Encounter encounter, double multiplier)
+        /// <summary>
+        /// Every team against every composition of the shape at one multiplier, <see cref="Samples"/>
+        /// times each; parallel, results stored at <see cref="BattleIndex"/>.
+        /// </summary>
+        public PveBattle[] RunAllTeams(KitMode mode, int level, EncounterShape shape, double multiplier)
         {
-            PveBattle[] battles = new PveBattle[Teams.Count];
-            bool[] playersWinTies = PlayersWinTies(mode, level, encounter.Id);
-            Parallel.For(0, Teams.Count, t =>
+            int samples = Samples;
+            int teams = Teams.Count;
+            PveBattle[] battles = new PveBattle[shape.Compositions.Count * teams * samples];
+            bool[][] playersWinTies = new bool[shape.Compositions.Count][];
+            for (int c = 0; c < shape.Compositions.Count; c++)
             {
-                battles[t] = RunBattle(mode, level, encounter, multiplier, t, false, playersWinTies[t], out _);
+                playersWinTies[c] = PlayersWinTies(mode, level, shape.Compositions[c].Id);
+            }
+
+            Parallel.For(0, battles.Length, i =>
+            {
+                int t = (i / samples) % teams;
+                int c = i / (samples * teams);
+                battles[i] = RunBattle(mode, level, shape.Compositions[c], multiplier, t, i % samples, false, playersWinTies[c][t], out _);
             });
 
             return battles;
         }
 
         /// <summary>
-        /// Per team index, whether the team wins cross-side speed ties in this (kit mode, level,
-        /// encounter) cell. A seeded shuffle of the team indices, first half true: exactly half the
+        /// Per team index, whether the team wins cross-side initiative ties against this encounter
+        /// (composition) at this kit mode and level. A seeded shuffle of the team indices, first half true: exactly half the
         /// teams (the extra one of an odd count goes to the enemies), independent of the difficulty
         /// multiplier so calibration compares like with like. A pure function of the inputs.
         /// </summary>
@@ -233,7 +318,7 @@ namespace BeastCraft.Tooling.BalanceSim
                 order[i] = i;
             }
 
-            Random rng = new Random(DeriveSeed(_options.Seed, mode, level, encounterId, -1));
+            Random rng = new Random(DeriveSeed(_options.Seed, mode, level, encounterId, -1, -1));
             for (int i = count - 1; i > 0; i--)
             {
                 int j = rng.Next(i + 1);
@@ -253,20 +338,23 @@ namespace BeastCraft.Tooling.BalanceSim
 
         /// <summary>
         /// One battle. The loop below is <see cref="BattleTurnExecutor.RunBattle"/>'s loop reproduced
-        /// statement for statement, with an HP snapshot around each turn so damage can be attributed
-        /// to the unit whose turn it was (the only actor: no avatar is fielded). With
+        /// statement for statement (the ATB time cap, the last-turn timestamp and all), with an HP
+        /// snapshot around each turn so damage can be attributed to the unit whose turn it was (the
+        /// only actor: no avatar is fielded), and a per-member turn count. With
         /// <paramref name="useRunBattle"/> the real RunBattle is called instead, which is what the
         /// self-check compares against. Everything else — lifting the defeated off the grid, the
         /// partial approach — is the Runtime's own rule, applied inside
         /// <see cref="BattleTurnExecutor.ExecuteTurn"/>; the loop adds no rules of its own.
         /// <paramref name="playersWinTies"/> picks the id prefixes (see <see cref="TieWinnerPrefix"/>).
+        /// <paramref name="sample"/> picks the seed: the same team and fight with a different stream
+        /// of damage rolls.
         /// </summary>
-        public PveBattle RunBattle(KitMode mode, int level, Encounter encounter, double multiplier, int teamIndex, bool useRunBattle, bool playersWinTies,
-                                   out List<BattleUnit> finalUnits)
+        public PveBattle RunBattle(KitMode mode, int level, Encounter encounter, double multiplier, int teamIndex, int sample, bool useRunBattle,
+                                   bool playersWinTies, out List<BattleUnit> finalUnits)
         {
             int[] team = Teams[teamIndex];
             int[] slots = SlotOrders[teamIndex];
-            HexGrid grid = new HexGrid(encounter.Data.ParsedArena);
+            HexGrid grid = new HexGrid(encounter.Arena);
             List<BattleUnit> units = new List<BattleUnit>();
             string playerPrefix = playersWinTies ? TieWinnerPrefix : TieLoserPrefix;
             string enemyPrefix = playersWinTies ? TieLoserPrefix : TieWinnerPrefix;
@@ -316,19 +404,27 @@ namespace BeastCraft.Tooling.BalanceSim
             {
                 DamageDealt = new int[team.Length],
                 DamageTaken = new int[team.Length],
-                Alive = new bool[team.Length]
+                Alive = new bool[team.Length],
+                MemberActions = new int[team.Length],
+                MemberHits = new int[team.Length],
+                MemberCrits = new int[team.Length],
+                MemberRollMultiplier = new double[team.Length],
+                MemberPhysicalFires = new int[team.Length],
+                MemberSpecialFires = new int[team.Length]
             };
 
             TurnManager turnManager = new TurnManager(units);
-            Random rng = new Random(DeriveSeed(_options.Seed, mode, level, encounter.Id, teamIndex));
+            Random rng = new Random(DeriveSeed(_options.Seed, mode, level, encounter.Id, teamIndex, sample));
             BattleOutcome outcome;
-            int rounds;
+            long elapsedTicks;
+            int actions;
 
             if (useRunBattle)
             {
-                BattleResult result = BattleTurnExecutor.RunBattle(turnManager, units, grid, rng, null, _options.MaxRounds);
+                BattleResult result = BattleTurnExecutor.RunBattle(turnManager, units, grid, rng, null, _options.MaxTime);
                 outcome = result.Outcome;
-                rounds = result.Rounds;
+                elapsedTicks = result.ElapsedTicks;
+                actions = result.ActionCount;
             }
             else
             {
@@ -339,7 +435,9 @@ namespace BeastCraft.Tooling.BalanceSim
                 }
 
                 int[] before = new int[units.Count];
-                int cap = _options.MaxRounds < 1 ? 1 : _options.MaxRounds;
+                long capTicks = (long)(_options.MaxTime < 1 ? 1 : _options.MaxTime) * TurnManager.TicksPerTimeUnit;
+                long lastTurnTicks = 0;
+                actions = 0;
 
                 while (true)
                 {
@@ -348,7 +446,7 @@ namespace BeastCraft.Tooling.BalanceSim
                         break;
                     }
 
-                    if (turnManager.Round > cap)
+                    if (turnManager.ElapsedTicks > capTicks)
                     {
                         outcome = BattleOutcome.Stalemate;
                         break;
@@ -368,7 +466,9 @@ namespace BeastCraft.Tooling.BalanceSim
                             before[u] = units[u].CurrentHp;
                         }
 
+                        lastTurnTicks = turnManager.ElapsedTicks;
                         BattleTurnResult turn = BattleTurnExecutor.ExecuteTurn(current, units, grid, rng, null);
+                        actions++;
 
                         bool actorIsMember = memberIndex.TryGetValue(current, out int actor);
                         for (int u = 0; u < units.Count; u++)
@@ -392,19 +492,21 @@ namespace BeastCraft.Tooling.BalanceSim
 
                         if (actorIsMember)
                         {
-                            CountFires(battle, turn);
+                            battle.MemberActions[actor]++;
+                            CountFires(battle, turn, actor);
+                            CountRolls(battle, turn, actor);
                         }
                     }
 
                     turnManager.AdvanceTurn();
                 }
 
-                rounds = turnManager.Round;
+                elapsedTicks = lastTurnTicks;
             }
 
-            // A capped battle reports the round it stopped at opening (cap + 1); count rounds played.
             battle.Outcome = outcome;
-            battle.Rounds = Math.Min(rounds, _options.MaxRounds);
+            battle.ElapsedTicks = elapsedTicks;
+            battle.Actions = actions;
             for (int m = 0; m < members.Length; m++)
             {
                 battle.Alive[m] = !members[m].IsDefeated;
@@ -414,7 +516,7 @@ namespace BeastCraft.Tooling.BalanceSim
             return battle;
         }
 
-        private static void CountFires(PveBattle battle, BattleTurnResult turn)
+        private static void CountFires(PveBattle battle, BattleTurnResult turn, int actor)
         {
             foreach (BattleSkillOutcome outcome in turn.SkillOutcomes)
             {
@@ -423,18 +525,41 @@ namespace BeastCraft.Tooling.BalanceSim
                     continue;
                 }
 
-                if (Kit.IsStrike(outcome.Skill))
+                if (Kit.IsPhysicalSingle(outcome.Skill))
                 {
-                    battle.StrikeFires++;
+                    battle.MemberPhysicalFires[actor]++;
                 }
                 else if (Kit.IsBlast(outcome.Skill))
                 {
-                    battle.BlastFires++;
+                    battle.MemberSpecialFires[actor]++;
                 }
                 else if (Kit.IsBurstUse(outcome.Skill))
                 {
                     battle.BurstFires++;
                     battle.BurstTargets += outcome.Activation == null || outcome.Activation.Targets == null ? 0 : outcome.Activation.Targets.Count;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Adds the actor's damage rolls this turn (every fired skill's <see cref="SkillActivation.Hits"/>)
+        /// to its hit, crit and roll-multiplier totals. Read-only over the turn result, so it cannot
+        /// change the battle.
+        /// </summary>
+        private static void CountRolls(PveBattle battle, BattleTurnResult turn, int actor)
+        {
+            foreach (BattleSkillOutcome outcome in turn.SkillOutcomes)
+            {
+                if (!outcome.Fired || outcome.Activation == null)
+                {
+                    continue;
+                }
+
+                foreach (DamageHit hit in outcome.Activation.Hits)
+                {
+                    battle.MemberHits[actor]++;
+                    battle.MemberCrits[actor] += hit.Roll.IsCrit ? 1 : 0;
+                    battle.MemberRollMultiplier[actor] += (hit.Roll.IsCrit ? DamageFormula.CritMultiplier : 1.0) * hit.Roll.VariancePercent / 100.0;
                 }
             }
         }
@@ -473,8 +598,11 @@ namespace BeastCraft.Tooling.BalanceSim
 
         /// <summary>
         /// The difficulty knob: HP, Attack, Defense, SpecialAttack and SpecialDefense scale by the
-        /// multiplier (rounded, floored at 1). Speed and MoveRange do not: scaling Speed would
-        /// reshuffle turn order in steps, and move range is a small tactical integer.
+        /// multiplier (rounded, floored at 1). Speed, MoveRange and CritChance do not: under the ATB
+        /// gauge Speed is how many turns a unit gets, so scaling it would make the knob change the
+        /// enemies' action economy rather than just their toughness and punch, move range is a small
+        /// tactical integer, and crit chance is a probability that the knob should not turn into
+        /// certainty.
         /// </summary>
         public static StatBlock Scale(StatBlock stats, double multiplier)
         {
@@ -569,8 +697,13 @@ namespace BeastCraft.Tooling.BalanceSim
             return order;
         }
 
-        /// <summary>A per-battle seed that is a pure function of the inputs (the multiplier deliberately excluded).</summary>
-        private static int DeriveSeed(int seed, KitMode mode, int level, string encounterId, int teamIndex)
+        /// <summary>
+        /// A per-battle seed that is a pure function of the inputs (the multiplier deliberately
+        /// excluded, so calibration compares every multiplier on the same damage rolls).
+        /// <paramref name="sample"/> separates a team's repeated battles; -1 (with team -1) is the
+        /// tie-shuffle seed.
+        /// </summary>
+        private static int DeriveSeed(int seed, KitMode mode, int level, string encounterId, int teamIndex, int sample)
         {
             unchecked
             {
@@ -584,6 +717,7 @@ namespace BeastCraft.Tooling.BalanceSim
                 }
 
                 hash = (hash * 486187739) + teamIndex;
+                hash = (hash * 486187739) + sample;
                 return hash;
             }
         }

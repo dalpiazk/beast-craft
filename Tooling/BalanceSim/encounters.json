@@ -1,23 +1,199 @@
 {
-  "_readme": "SIMULATOR FIXTURES, NOT GAME CONTENT. Synthetic enemies for Tooling/BalanceSim's PvE mode, so the roster can be measured against PvE-shaped fights (one huge enemy, a swarm, a mixed pack). They are not roster beasts, no game code reads this file, and nothing here is a design decision about real encounters. BaseStats are max-level values scaled by the roster growth curve named in GrowthCurveId (as a beast's are); the simulator then calibrates one difficulty multiplier per encounter, level and kit mode, so only the ratios inside a stat line matter. Elements are cycled over a group's units. MoveRange sits inside the roster's own band (beasts move 2-5): BattleTurnExecutor makes a partial approach (a unit that cannot reach range this turn still walks its move toward the target), so no fixture needs board-spanning movement to engage; fights on the Large swarm arena simply take a turn or two to close. Heavy things move 3 (boss, and the wisps, which also have range 3), fast melee hunters 4 (direwolves, and the whole swarm, biters and stingers alike so neither damage category arrives first). The loader requires MoveRange >= 1 and at least one SingleTarget skill. See Tooling/BalanceSim/README.md.",
-  "SchemaVersion": 1,
+  "_readme": "SIMULATOR FIXTURES, NOT GAME CONTENT. Synthetic enemies for Tooling/BalanceSim's PvE mode, so the roster can be measured against PvE-shaped fights. They are not roster beasts, no game code reads this file, and nothing here is a design decision about real encounters. Two sets. (1) The default, generated set: EnemyTypes is a pool of enemy types and Shapes the encounter shapes (solo, elite, squad, horde); the simulator draws --compositions random compositions per shape from its Variants (each slot draws a count in [Min, Max], then each unit's type uniformly from Types), keeps a draw only if its summed type Threat is inside ThreatBudget and it has at least MinDistinctTypes types, and assigns elements per composition by a random scheme (one element for the whole team, one per type, one per unit, or none), dealt from a shuffled deck of the ten elements. (2) FixedEncounters: the three hand-authored encounters of earlier runs (--encounter-set fixed), with per-group Count and Elements (cycled over the group). BaseStats are max-level values scaled by the roster growth curve named in GrowthCurveId (as a beast's are); the simulator then calibrates one difficulty multiplier per shape (or fixed encounter), level and kit mode, so only the ratios inside a stat line, and between the types that share a shape, matter. Threat is a hand-set estimate in 'standard enemy = 2' units that only keeps a shape's compositions comparably hard; the report lists each composition's clear rate at the shape's calibrated difficulty so the estimate can be checked. Speeds sit in a narrow 95-105 band, comparable to the planned roster band. MoveRange sits inside the roster's own band (beasts move 2-5): BattleTurnExecutor makes a partial approach, so no enemy needs board-spanning movement to engage. CritChance is a percent (0-100), exempt from the growth curve and from the difficulty multiplier. The loader requires MoveRange >= 1, CritChance 0-100 and at least one SingleTarget skill. Stance is a CombatStance name (missing = Vanguard); a Ranged enemy needs a SingleTarget skill with Range >= 2 (a Ranged unit never walks into melee). Targeting is a SkillTargetingCriterion name (missing = Distance, i.e. nearest; Random is refused so battles never draw targets from the rng), with optional TargetingOrder (missing = Lowest) and TargetingStat (missing = HP, only read by Stat, which compares the stat block's maximum). CurrentHp compares the HP a beast has left, so CurrentHp/Lowest is 'pick off the weakest'. See Tooling/BalanceSim/README.md.",
+  "SchemaVersion": 2,
   "GrowthCurveId": "medium",
-  "Encounters": [
+  "EnemyTypes": [
+    {
+      "EnemyId": "giant",
+      "DisplayName": "Giant",
+      "Role": "boss",
+      "Threat": 12,
+      "Stance": "Vanguard",
+      "BaseStats": { "Hp": 1600, "Attack": 120, "Defense": 110, "SpecialAttack": 120, "SpecialDefense": 110, "Speed": 95, "MoveRange": 3, "CritChance": 5 },
+      "Skills": [
+        { "SkillId": "crush", "Category": "Physical", "Shape": "SingleTarget", "Power": 70, "Range": 1, "Cooldown": 1, "Targeting": "Distance" },
+        { "SkillId": "gaze", "Category": "Special", "Shape": "SingleTarget", "Power": 70, "Range": 3, "Cooldown": 1, "Targeting": "Distance" },
+        { "SkillId": "quake", "Category": "Physical", "Shape": "AreaBurst", "Power": 35, "Range": 2, "Cooldown": 3 },
+        { "SkillId": "roar", "Category": "Special", "Shape": "AreaBurst", "Power": 35, "Range": 2, "Cooldown": 3 }
+      ]
+    },
+    {
+      "EnemyId": "champion",
+      "DisplayName": "Champion",
+      "Role": "mini-boss",
+      "Threat": 6,
+      "Stance": "Vanguard",
+      "BaseStats": { "Hp": 800, "Attack": 125, "Defense": 110, "SpecialAttack": 120, "SpecialDefense": 110, "Speed": 95, "MoveRange": 3, "CritChance": 6 },
+      "Skills": [
+        { "SkillId": "cleave", "Category": "Physical", "Shape": "SingleTarget", "Power": 55, "Range": 1, "Cooldown": 1, "Targeting": "Distance" },
+        { "SkillId": "hex", "Category": "Special", "Shape": "SingleTarget", "Power": 55, "Range": 2, "Cooldown": 2, "Targeting": "CurrentHp", "TargetingOrder": "Lowest" },
+        { "SkillId": "shockwave", "Category": "Special", "Shape": "AreaBurst", "Power": 30, "Range": 2, "Cooldown": 3 }
+      ]
+    },
+    {
+      "EnemyId": "brute",
+      "DisplayName": "Brute",
+      "Role": "melee tank",
+      "Threat": 2.75,
+      "Stance": "Vanguard",
+      "BaseStats": { "Hp": 190, "Attack": 105, "Defense": 125, "SpecialAttack": 40, "SpecialDefense": 95, "Speed": 95, "MoveRange": 3, "CritChance": 4 },
+      "Skills": [
+        { "SkillId": "smash", "Category": "Physical", "Shape": "SingleTarget", "Power": 50, "Range": 1, "Cooldown": 1, "Targeting": "Distance" }
+      ]
+    },
+    {
+      "EnemyId": "stalker",
+      "DisplayName": "Stalker",
+      "Role": "fast melee hunter",
+      "Threat": 2,
+      "Stance": "Skirmisher",
+      "BaseStats": { "Hp": 125, "Attack": 50, "Defense": 85, "SpecialAttack": 120, "SpecialDefense": 85, "Speed": 105, "MoveRange": 4, "CritChance": 10 },
+      "Skills": [
+        { "SkillId": "shadow_claw", "Category": "Special", "Shape": "SingleTarget", "Power": 55, "Range": 1, "Cooldown": 1, "Targeting": "CurrentHp", "TargetingOrder": "Lowest" }
+      ]
+    },
+    {
+      "EnemyId": "archer",
+      "DisplayName": "Archer",
+      "Role": "ranged physical",
+      "Threat": 2,
+      "Stance": "Ranged",
+      "BaseStats": { "Hp": 90, "Attack": 115, "Defense": 70, "SpecialAttack": 50, "SpecialDefense": 80, "Speed": 100, "MoveRange": 3, "CritChance": 8 },
+      "Skills": [
+        { "SkillId": "arrow", "Category": "Physical", "Shape": "SingleTarget", "Power": 42, "Range": 3, "Cooldown": 1, "Targeting": "Distance" }
+      ]
+    },
+    {
+      "EnemyId": "caster",
+      "DisplayName": "Caster",
+      "Role": "ranged special",
+      "Threat": 2,
+      "Stance": "Ranged",
+      "BaseStats": { "Hp": 85, "Attack": 45, "Defense": 70, "SpecialAttack": 120, "SpecialDefense": 95, "Speed": 100, "MoveRange": 3, "CritChance": 5 },
+      "Skills": [
+        { "SkillId": "bolt", "Category": "Special", "Shape": "SingleTarget", "Power": 42, "Range": 3, "Cooldown": 1, "Targeting": "CurrentHp", "TargetingOrder": "Lowest" }
+      ]
+    },
+    {
+      "EnemyId": "shaman",
+      "DisplayName": "Shaman",
+      "Role": "area special",
+      "Threat": 2,
+      "Stance": "Vanguard",
+      "BaseStats": { "Hp": 130, "Attack": 95, "Defense": 90, "SpecialAttack": 110, "SpecialDefense": 105, "Speed": 95, "MoveRange": 3, "CritChance": 5 },
+      "Skills": [
+        { "SkillId": "staff", "Category": "Physical", "Shape": "SingleTarget", "Power": 35, "Range": 1, "Cooldown": 1, "Targeting": "Distance" },
+        { "SkillId": "storm", "Category": "Special", "Shape": "AreaBurst", "Power": 28, "Range": 2, "Cooldown": 2 }
+      ]
+    },
+    {
+      "EnemyId": "swarmling",
+      "DisplayName": "Swarmling",
+      "Role": "swarm",
+      "Threat": 0.45,
+      "Stance": "Vanguard",
+      "BaseStats": { "Hp": 30, "Attack": 60, "Defense": 40, "SpecialAttack": 30, "SpecialDefense": 40, "Speed": 105, "MoveRange": 4, "CritChance": 5 },
+      "Skills": [
+        { "SkillId": "bite", "Category": "Physical", "Shape": "SingleTarget", "Power": 30, "Range": 1, "Cooldown": 1, "Targeting": "Distance" }
+      ]
+    },
+    {
+      "EnemyId": "stingling",
+      "DisplayName": "Stingling",
+      "Role": "swarm",
+      "Threat": 0.45,
+      "Stance": "Vanguard",
+      "BaseStats": { "Hp": 30, "Attack": 30, "Defense": 40, "SpecialAttack": 60, "SpecialDefense": 40, "Speed": 105, "MoveRange": 4, "CritChance": 5 },
+      "Skills": [
+        { "SkillId": "sting", "Category": "Special", "Shape": "SingleTarget", "Power": 30, "Range": 1, "Cooldown": 1, "Targeting": "Distance" }
+      ]
+    }
+  ],
+  "Shapes": [
+    {
+      "ShapeId": "solo",
+      "DisplayName": "Solo giant",
+      "Description": "One giant: huge HP, heavy single-target hits in both categories every turn and a periodic area slam in both. Compositions differ only in the giant's element.",
+      "Arena": "Medium",
+      "ThreatBudget": [ 12, 12 ],
+      "MinDistinctTypes": 1,
+      "Variants": [
+        { "Label": "giant", "Weight": 1, "Slots": [ { "Types": [ "giant" ], "Min": 1, "Max": 1 } ] }
+      ]
+    },
+    {
+      "ShapeId": "elite",
+      "DisplayName": "Elite",
+      "Description": "A boss with an escort: one giant and two standard enemies, or two champions (mini-bosses) and one or two standard enemies.",
+      "Arena": "Medium",
+      "ThreatBudget": [ 14, 17 ],
+      "MinDistinctTypes": 2,
+      "Variants": [
+        {
+          "Label": "giant + escort",
+          "Weight": 2,
+          "Slots": [
+            { "Types": [ "giant" ], "Min": 1, "Max": 1 },
+            { "Types": [ "brute", "stalker", "archer", "caster", "shaman" ], "Min": 2, "Max": 2 }
+          ]
+        },
+        {
+          "Label": "two champions + escort",
+          "Weight": 1,
+          "Slots": [
+            { "Types": [ "champion" ], "Min": 2, "Max": 2 },
+            { "Types": [ "brute", "stalker", "archer", "caster", "shaman" ], "Min": 1, "Max": 2 }
+          ]
+        }
+      ]
+    },
+    {
+      "ShapeId": "squad",
+      "DisplayName": "Squad",
+      "Description": "Four to six standard enemies of at least three types: melee tanks, hunters, archers, casters and shamans.",
+      "Arena": "Medium",
+      "ThreatBudget": [ 10, 12 ],
+      "MinDistinctTypes": 3,
+      "Variants": [
+        { "Label": "mixed", "Weight": 1, "Slots": [ { "Types": [ "brute", "stalker", "archer", "caster", "shaman" ], "Min": 4, "Max": 6 } ] }
+      ]
+    },
+    {
+      "ShapeId": "horde",
+      "DisplayName": "Horde",
+      "Description": "Sixteen to twenty-four enemies: mostly swarm (tiny melee: swarmlings bite, physical; stinglings sting, special; one skill each, since every hit deals at least the damage floor), with a few archers and casters behind them.",
+      "Arena": "Large",
+      "ThreatBudget": [ 12.5, 14 ],
+      "MinDistinctTypes": 3,
+      "Variants": [
+        {
+          "Label": "swarm + ranged support",
+          "Weight": 1,
+          "Slots": [
+            { "Types": [ "swarmling", "stingling" ], "Min": 14, "Max": 20 },
+            { "Types": [ "archer", "caster" ], "Min": 2, "Max": 4 }
+          ]
+        }
+      ]
+    }
+  ],
+  "FixedEncounters": [
     {
       "EncounterId": "boss",
       "DisplayName": "Colossus",
-      "Description": "One huge enemy: very high HP, heavy single-target hits in both categories every turn, and a periodic area slam. Elementless by default so the boss measures stat lines; use --enemy-element for an elemental variant.",
+      "Description": "One huge enemy: very high HP, heavy single-target hits in both categories every turn, and a periodic area slam. Vanguard, always hitting the nearest beast. Elementless by default so the boss measures stat lines; use --enemy-element for an elemental variant.",
       "Arena": "Medium",
       "Groups": [
         {
           "EnemyId": "colossus",
           "DisplayName": "Colossus",
           "Count": 1,
+          "Stance": "Vanguard",
           "Elements": [],
-          "BaseStats": { "Hp": 1600, "Attack": 120, "Defense": 110, "SpecialAttack": 120, "SpecialDefense": 110, "Speed": 70, "MoveRange": 3 },
+          "BaseStats": { "Hp": 1600, "Attack": 120, "Defense": 110, "SpecialAttack": 120, "SpecialDefense": 110, "Speed": 70, "MoveRange": 3, "CritChance": 5 },
           "Skills": [
-            { "SkillId": "crush", "Category": "Physical", "Shape": "SingleTarget", "Power": 70, "Range": 1, "Cooldown": 1 },
-            { "SkillId": "gaze", "Category": "Special", "Shape": "SingleTarget", "Power": 70, "Range": 3, "Cooldown": 1 },
+            { "SkillId": "crush", "Category": "Physical", "Shape": "SingleTarget", "Power": 70, "Range": 1, "Cooldown": 1, "Targeting": "Distance" },
+            { "SkillId": "gaze", "Category": "Special", "Shape": "SingleTarget", "Power": 70, "Range": 3, "Cooldown": 1, "Targeting": "Distance" },
             { "SkillId": "quake", "Category": "Physical", "Shape": "AreaBurst", "Power": 35, "Range": 2, "Cooldown": 3 },
             { "SkillId": "roar", "Category": "Special", "Shape": "AreaBurst", "Power": 35, "Range": 2, "Cooldown": 3 }
           ]
@@ -27,27 +203,29 @@
     {
       "EncounterId": "swarm",
       "DisplayName": "Swarm",
-      "Description": "Twenty-four small enemies with low HP and weak melee: half bite (Physical), half sting (Special), so neither defence is favoured. Elements cycle through all ten. Move 4 for every unit: the Large board's zones are 8 apart, so the swarm closes over two turns by partial approach.",
+      "Description": "Twenty-four small enemies with low HP and weak melee: half bite (Physical), half sting (Special), so neither defence is favoured. Biters are Vanguard and bite the nearest beast; stingers are Skirmishers that go for the beast with the least HP left and dart back after stinging. Elements cycle through all ten. Move 4 for every unit: the Large board's zones are 8 apart, so the swarm closes over two turns by partial approach.",
       "Arena": "Large",
       "Groups": [
         {
           "EnemyId": "biter",
           "DisplayName": "Biter",
           "Count": 12,
+          "Stance": "Vanguard",
           "Elements": [ "Fire", "Water", "Earth", "Air", "Lightning", "Ice", "Nature", "Metal", "Light", "Dark" ],
-          "BaseStats": { "Hp": 30, "Attack": 60, "Defense": 40, "SpecialAttack": 30, "SpecialDefense": 40, "Speed": 100, "MoveRange": 4 },
+          "BaseStats": { "Hp": 30, "Attack": 60, "Defense": 40, "SpecialAttack": 30, "SpecialDefense": 40, "Speed": 100, "MoveRange": 4, "CritChance": 5 },
           "Skills": [
-            { "SkillId": "bite", "Category": "Physical", "Shape": "SingleTarget", "Power": 30, "Range": 1, "Cooldown": 1 }
+            { "SkillId": "bite", "Category": "Physical", "Shape": "SingleTarget", "Power": 30, "Range": 1, "Cooldown": 1, "Targeting": "Distance" }
           ]
         },
         {
           "EnemyId": "stinger",
           "DisplayName": "Stinger",
           "Count": 12,
+          "Stance": "Skirmisher",
           "Elements": [ "Earth", "Air", "Lightning", "Ice", "Nature", "Metal", "Light", "Dark", "Fire", "Water" ],
-          "BaseStats": { "Hp": 30, "Attack": 30, "Defense": 40, "SpecialAttack": 60, "SpecialDefense": 40, "Speed": 100, "MoveRange": 4 },
+          "BaseStats": { "Hp": 30, "Attack": 30, "Defense": 40, "SpecialAttack": 60, "SpecialDefense": 40, "Speed": 100, "MoveRange": 4, "CritChance": 5 },
           "Skills": [
-            { "SkillId": "sting", "Category": "Special", "Shape": "SingleTarget", "Power": 30, "Range": 1, "Cooldown": 1 }
+            { "SkillId": "sting", "Category": "Special", "Shape": "SingleTarget", "Power": 30, "Range": 1, "Cooldown": 1, "Targeting": "CurrentHp", "TargetingOrder": "Lowest" }
           ]
         }
       ]
@@ -55,27 +233,29 @@
     {
       "EncounterId": "pack",
       "DisplayName": "Hunting pack",
-      "Description": "Six mid-size enemies: three fast Physical melee hunters in front, three Special casters behind them at range 3. Six different elements.",
+      "Description": "Six mid-size enemies: three fast Physical melee hunters in front (Vanguard, nearest beast), three Special casters behind them at range 3 (Ranged, the beast with the least HP left). Six different elements.",
       "Arena": "Medium",
       "Groups": [
         {
           "EnemyId": "direwolf",
           "DisplayName": "Direwolf",
           "Count": 3,
+          "Stance": "Vanguard",
           "Elements": [ "Fire", "Earth", "Metal" ],
-          "BaseStats": { "Hp": 110, "Attack": 110, "Defense": 90, "SpecialAttack": 50, "SpecialDefense": 80, "Speed": 110, "MoveRange": 4 },
+          "BaseStats": { "Hp": 110, "Attack": 110, "Defense": 90, "SpecialAttack": 50, "SpecialDefense": 80, "Speed": 110, "MoveRange": 4, "CritChance": 8 },
           "Skills": [
-            { "SkillId": "maul", "Category": "Physical", "Shape": "SingleTarget", "Power": 45, "Range": 1, "Cooldown": 1 }
+            { "SkillId": "maul", "Category": "Physical", "Shape": "SingleTarget", "Power": 45, "Range": 1, "Cooldown": 1, "Targeting": "Distance" }
           ]
         },
         {
           "EnemyId": "wisp",
           "DisplayName": "Wisp",
           "Count": 3,
+          "Stance": "Ranged",
           "Elements": [ "Water", "Air", "Dark" ],
-          "BaseStats": { "Hp": 80, "Attack": 50, "Defense": 70, "SpecialAttack": 110, "SpecialDefense": 100, "Speed": 90, "MoveRange": 3 },
+          "BaseStats": { "Hp": 80, "Attack": 50, "Defense": 70, "SpecialAttack": 110, "SpecialDefense": 100, "Speed": 90, "MoveRange": 3, "CritChance": 5 },
           "Skills": [
-            { "SkillId": "bolt", "Category": "Special", "Shape": "SingleTarget", "Power": 45, "Range": 3, "Cooldown": 1 }
+            { "SkillId": "bolt", "Category": "Special", "Shape": "SingleTarget", "Power": 45, "Range": 3, "Cooldown": 1, "Targeting": "CurrentHp", "TargetingOrder": "Lowest" }
           ]
         }
       ]

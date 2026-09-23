@@ -40,6 +40,19 @@ namespace BeastCraft.Battle
         /// follows the confirmed rule that everything a skill does anchors to where the caster is
         /// standing right now. <c>SkillSO.TargetingStat</c> is ignored.
         /// </summary>
-        Distance = 2
+        Distance = 2,
+
+        /// <summary>
+        /// Compare each candidate's live <see cref="BattleUnit.CurrentHp"/> — the HP it has left
+        /// right now, damage taken included — rather than its stat block's maximum. This is the
+        /// "pick off the weakest" rule: <see cref="SkillTargetingOrder.Lowest"/> finishes whoever is
+        /// closest to falling, <see cref="SkillTargetingOrder.Highest"/> goes for the healthiest.
+        /// <see cref="Stat"/> with <c>HP</c> cannot express this, because the stat block's HP is the
+        /// maximum and never moves as a unit takes damage. Ties break on
+        /// <see cref="BattleUnitOrder.CompareById"/> like every other criterion.
+        /// <c>SkillSO.TargetingStat</c> is ignored. Appended after <see cref="Distance"/>: the
+        /// values are serialized into assets, so they are never renumbered.
+        /// </summary>
+        CurrentHp = 3
     }
 }

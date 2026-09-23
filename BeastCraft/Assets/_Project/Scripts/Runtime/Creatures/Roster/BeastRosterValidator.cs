@@ -7,12 +7,18 @@ namespace BeastCraft.Creatures.Roster
     /// Structural integrity checks for <see cref="BeastRosterData"/>: the rules every roster file
     /// must satisfy to import at all (ids present, unique and well-formed, elements that parse,
     /// curve references that resolve, curves that start above 0 and end at 1, stats that are
-    /// usable). Balance guidelines — stat budgets, move-range bands, one beast per element — are
+    /// usable, a crit chance that is a percent, stances that parse). Balance guidelines — stat budgets, move-range bands, one beast per element — are
     /// deliberately NOT here; they are tests over the current starter roster, and the balance
     /// simulator is free to move them.
     /// </summary>
     public static class BeastRosterValidator
     {
+        /// <summary>The least <see cref="StatBlock.CritChance"/> a species may author: 0, never crits.</summary>
+        public const int MinCritChance = 0;
+
+        /// <summary>The most <see cref="StatBlock.CritChance"/> a species may author: 100, always crits.</summary>
+        public const int MaxCritChance = 100;
+
         /// <summary>Returns every problem found; an empty list means the roster is importable.</summary>
         public static List<string> Validate(BeastRosterData roster)
         {
@@ -43,6 +49,30 @@ namespace BeastCraft.Creatures.Roster
             }
 
             element = (Element)Enum.Parse(typeof(Element), name);
+            return true;
+        }
+
+        /// <summary>
+        /// Parses a species' <see cref="SpeciesData.Stance"/>: a <see cref="CombatStance"/> member
+        /// name exactly as written (case-sensitive, names only, like
+        /// <see cref="TryParseElement"/>). A null or empty string is the default,
+        /// <see cref="CombatStance.Vanguard"/>, and parses successfully.
+        /// </summary>
+        public static bool TryParseStance(string name, out CombatStance stance)
+        {
+            stance = CombatStance.Vanguard;
+
+            if (string.IsNullOrEmpty(name))
+            {
+                return true;
+            }
+
+            if (!Enum.IsDefined(typeof(CombatStance), name))
+            {
+                return false;
+            }
+
+            stance = (CombatStance)Enum.Parse(typeof(CombatStance), name);
             return true;
         }
 
@@ -223,6 +253,11 @@ namespace BeastCraft.Creatures.Roster
                     errors.Add(label + ": GrowthCurveId '" + s.GrowthCurveId + "' does not match any growth curve.");
                 }
 
+                if (!TryParseStance(s.Stance, out CombatStance _))
+                {
+                    errors.Add(label + ": '" + s.Stance + "' is not a CombatStance name (Vanguard, Ranged or Skirmisher).");
+                }
+
                 StatBlock stats = s.BaseStats;
                 int[] values = { stats.Hp, stats.Attack, stats.Defense, stats.SpecialAttack, stats.SpecialDefense, stats.Speed, stats.MoveRange };
                 string[] names = { "Hp", "Attack", "Defense", "SpecialAttack", "SpecialDefense", "Speed", "MoveRange" };
@@ -232,6 +267,14 @@ namespace BeastCraft.Creatures.Roster
                     {
                         errors.Add(label + ": BaseStats." + names[v] + " is " + values[v] + "; it must be at least 1.");
                     }
+                }
+
+                // CritChance is a percent chance, not a combat stat: 0 ("never crits") is legal, and
+                // anything outside 0-100 cannot be a chance. The balance band lives in the tests.
+                if (stats.CritChance < MinCritChance || stats.CritChance > MaxCritChance)
+                {
+                    errors.Add(label + ": BaseStats.CritChance is " + stats.CritChance + "; it must be between " + MinCritChance + " and " +
+                               MaxCritChance + " (a percent chance).");
                 }
             }
         }

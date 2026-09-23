@@ -17,8 +17,8 @@ namespace BeastCraft.Editor.Data
     /// only a missing one is created. Running it twice changes nothing the second time.
     /// </para>
     /// <para>
-    /// The JSON owns identity, text, elements, base stats and the growth-curve link on a species, and
-    /// the whole of a growth curve. It does NOT touch a species' icon, evolution options, learnable
+    /// The JSON owns identity, text, elements, base stats, stance and the growth-curve link on a
+    /// species, and the whole of a growth curve. It does NOT touch a species' icon, evolution options, learnable
     /// skills or customization schema — those are authored on the asset and survive a re-import.
     /// Nothing is ever deleted: a species removed from the JSON leaves its asset behind, logged.
     /// </para>
@@ -117,6 +117,7 @@ namespace BeastCraft.Editor.Data
                 }
 
                 species.Elements = elements;
+                BeastRosterValidator.TryParseStance(speciesData.Stance, out species.Stance);
                 EditorUtility.SetDirty(species);
                 imported.Add(speciesData.SpeciesId);
             }

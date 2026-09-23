@@ -60,6 +60,38 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
+        public void CreateBeast_CopiesSpeciesStance()
+        {
+            CreatureSpeciesSO species = Species(new StatBlock(10, 0, 0, 0, 0, 0, 2));
+            species.Stance = CombatStance.Skirmisher;
+
+            BattleUnit unit = BattleUnitFactory.CreateBeast("b1", BattleTeam.Player, species, 1, null, HexCoordinate.Zero);
+            species.Stance = CombatStance.Ranged;
+
+            Assert.AreEqual(CombatStance.Skirmisher, unit.Stance);
+        }
+
+        [Test]
+        public void Stance_DefaultsToVanguard_ForSpeciesUnitsAndNullSpecies()
+        {
+            CreatureSpeciesSO species = Species(new StatBlock(10, 0, 0, 0, 0, 0, 2));
+
+            Assert.AreEqual(CombatStance.Vanguard, species.Stance);
+            Assert.AreEqual(CombatStance.Vanguard, BattleUnitFactory.CreateBeast("b1", BattleTeam.Enemy, species, 1, null, HexCoordinate.Zero).Stance);
+            Assert.AreEqual(CombatStance.Vanguard, BattleUnitFactory.CreateBeast("b2", BattleTeam.Enemy, null, 1, null, HexCoordinate.Zero).Stance);
+            Assert.AreEqual(CombatStance.Vanguard, new BattleUnit("b3", BattleTeam.Enemy, new StatBlock(1, 0, 0, 0, 0, 0), HexCoordinate.Zero).Stance);
+        }
+
+        [Test]
+        public void CombatStance_ValuesAreExplicitAndStable()
+        {
+            // Serialized by value on species assets: never renumber.
+            Assert.AreEqual(0, (int)CombatStance.Vanguard);
+            Assert.AreEqual(1, (int)CombatStance.Ranged);
+            Assert.AreEqual(2, (int)CombatStance.Skirmisher);
+        }
+
+        [Test]
         public void CreateBeast_KeepsProvidedLoadout()
         {
             SkillLoadout loadout = new SkillLoadout(null);

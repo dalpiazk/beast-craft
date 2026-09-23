@@ -53,7 +53,7 @@ namespace BeastCraft.Tooling.BalanceSim
                 return 2;
             }
 
-            List<Encounter> encounters = new List<Encounter>();
+            EncounterCatalog encounters = new EncounterCatalog();
             if (options.RunPve)
             {
                 if (options.TeamSize > species.Count)
@@ -134,7 +134,7 @@ namespace BeastCraft.Tooling.BalanceSim
             return code;
         }
 
-        private static string RunOnce(SimOptions options, List<CreatureSpeciesSO> species, List<Encounter> encounters, out List<string> problems)
+        private static string RunOnce(SimOptions options, List<CreatureSpeciesSO> species, EncounterCatalog encounters, out List<string> problems)
         {
             problems = new List<string>();
             PveSimulator pve = null;
@@ -146,14 +146,14 @@ namespace BeastCraft.Tooling.BalanceSim
                 pve = new PveSimulator(options, species);
                 foreach (KitMode mode in options.Modes)
                 {
-                    foreach (Encounter encounter in encounters)
+                    foreach (EncounterShape shape in encounters.Shapes)
                     {
                         foreach (int level in options.Levels)
                         {
-                            PveCell cell = pve.RunCell(mode, level, encounter);
-                            if (cell.Battles == null || cell.Battles.Length != pve.Teams.Count)
+                            PveCell cell = pve.RunCell(mode, level, shape);
+                            if (cell.Battles == null || cell.Battles.Length != shape.Compositions.Count * pve.Teams.Count * pve.Samples)
                             {
-                                problems.Add("PvE " + SimOptions.ModeName(mode) + "/" + encounter.Id + "/L" + level + " did not field every team.");
+                                problems.Add("PvE " + SimOptions.ModeName(mode) + "/" + shape.Id + "/L" + level + " did not field every team against every composition.");
                             }
 
                             cells.Add(cell);
@@ -178,12 +178,13 @@ namespace BeastCraft.Tooling.BalanceSim
         }
 
         /// <summary>
-        /// Replays the first and last team of every (mode, encounter, level) at multiplier 1 through
+        /// Replays the first and last team against every composition of every shape, at every mode and level, at multiplier 1 through
         /// the real <see cref="BattleTurnExecutor.RunBattle"/> and through the simulator's own loop,
-        /// and demands the same outcome, round count, final HP and position for every unit. The
-        /// simulator's loop adds no rules of its own, so the two must agree exactly.
+        /// and demands the same outcome, battle time, turn count, final HP and position for every unit. The
+        /// simulator's loop adds no rules of its own and both are seeded alike (sample 0), so with
+        /// damage variance and crits drawn from that seed the two must still agree exactly.
         /// </summary>
-        private static List<string> CheckLoopParity(SimOptions options, List<CreatureSpeciesSO> species, List<Encounter> encounters)
+        private static List<string> CheckLoopParity(SimOptions options, List<CreatureSpeciesSO> species, EncounterCatalog encounters)
         {
             List<string> problems = new List<string>();
             if (!options.RunPve)
@@ -194,16 +195,17 @@ namespace BeastCraft.Tooling.BalanceSim
             PveSimulator pve = new PveSimulator(options, species);
             foreach (KitMode mode in options.Modes)
             {
-                foreach (Encounter encounter in encounters)
+                foreach (Encounter encounter in encounters.AllCompositions)
                 {
                     foreach (int level in options.Levels)
                     {
                         bool[] ties = pve.PlayersWinTies(mode, level, encounter.Id);
                         foreach (int team in new[] { 0, pve.Teams.Count - 1 })
                         {
-                            PveBattle ours = pve.RunBattle(mode, level, encounter, 1.0, team, false, ties[team], out List<BattleUnit> ourUnits);
-                            PveBattle real = pve.RunBattle(mode, level, encounter, 1.0, team, true, ties[team], out List<BattleUnit> realUnits);
-                            bool same = ours.Outcome == real.Outcome && ours.Rounds == real.Rounds && ourUnits.Count == realUnits.Count;
+                            PveBattle ours = pve.RunBattle(mode, level, encounter, 1.0, team, 0, false, ties[team], out List<BattleUnit> ourUnits);
+                            PveBattle real = pve.RunBattle(mode, level, encounter, 1.0, team, 0, true, ties[team], out List<BattleUnit> realUnits);
+                            bool same = ours.Outcome == real.Outcome && ours.ElapsedTicks == real.ElapsedTicks && ours.Actions == real.Actions &&
+                                        ourUnits.Count == realUnits.Count;
                             for (int u = 0; same && u < ourUnits.Count; u++)
                             {
                                 same = ourUnits[u].Id == realUnits[u].Id && ourUnits[u].CurrentHp == realUnits[u].CurrentHp &&
@@ -213,7 +215,8 @@ namespace BeastCraft.Tooling.BalanceSim
                             if (!same)
                             {
                                 problems.Add(SimOptions.ModeName(mode) + "/" + encounter.Id + "/L" + level + " team " + team + ": " + ours.Outcome + " in " +
-                                             ours.Rounds + " vs RunBattle " + real.Outcome + " in " + real.Rounds + ".");
+                                             ours.ElapsedTicks + " ticks / " + ours.Actions + " turns vs RunBattle " + real.Outcome + " in " +
+                                             real.ElapsedTicks + " ticks / " + real.Actions + " turns.");
                             }
                         }
                     }

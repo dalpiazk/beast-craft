@@ -16,10 +16,12 @@ namespace BeastCraft.Battle
     /// where <c>Item1</c>/<c>Item2</c> would not.
     /// </para>
     /// <para>
-    /// This records that the skill <em>fired</em>, not what it did. Applying
-    /// <see cref="SkillSO.Effects"/>, spending <see cref="SkillSO.ResourceCost"/> and animating any
-    /// of it are all later passes; an activation whose <see cref="Targets"/> is empty is a legal
-    /// whiff (the skill still fired and still reset its cooldown), not an error.
+    /// This records that the skill <em>fired</em>; applying <see cref="SkillSO.Effects"/> is
+    /// <see cref="SkillEffectApplier"/>'s job, and spending <see cref="SkillSO.ResourceCost"/> and
+    /// animating any of it are later passes. The one thing the applier writes back is
+    /// <see cref="Hits"/>, the damage rolls it made, so a crit can be reported. An activation whose
+    /// <see cref="Targets"/> is empty is a legal whiff (the skill still fired and still reset its
+    /// cooldown), not an error.
     /// </para>
     /// </summary>
     public class SkillActivation
@@ -39,5 +41,32 @@ namespace BeastCraft.Battle
         /// skill found nothing to hit.
         /// </summary>
         public IReadOnlyList<BattleUnit> Targets { get; }
+
+        /// <summary>
+        /// Every damage effect that landed, in the order it landed (target-major, then authored
+        /// effect order; see <see cref="SkillEffectApplier.Apply(SkillActivation, BattleUnit, System.Random)"/>).
+        /// Never <c>null</c>; empty until the activation is applied, and for a skill with no damage
+        /// effects or no targets. Heals and stat changes are not recorded.
+        /// </summary>
+        public IReadOnlyList<DamageHit> Hits
+        {
+            get { return (IReadOnlyList<DamageHit>)_hits ?? NoHits; }
+        }
+
+        private static readonly DamageHit[] NoHits = new DamageHit[0];
+
+        // Allocated on the first hit, so the many activations that deal no damage stay cheap.
+        private List<DamageHit> _hits;
+
+        /// <summary>Appends one landed damage effect. Called by <see cref="SkillEffectApplier"/> only.</summary>
+        internal void RecordHit(DamageHit hit)
+        {
+            if (_hits == null)
+            {
+                _hits = new List<DamageHit>();
+            }
+
+            _hits.Add(hit);
+        }
     }
 }

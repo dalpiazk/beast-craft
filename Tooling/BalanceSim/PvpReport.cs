@@ -41,7 +41,7 @@ namespace BeastCraft.Tooling.BalanceSim
         public static List<string> CheckGameCounts(SimOptions options, IReadOnlyList<CreatureSpeciesSO> species, List<BattleRecord> records)
         {
             List<string> problems = new List<string>();
-            int expected = 2 * (species.Count - 1);
+            int expected = 2 * (species.Count - 1) * options.Samples;
 
             foreach (KitMode mode in options.Modes)
             {
@@ -74,7 +74,7 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <summary>Appends the whole PvP section (heading, configuration, flags, one block per kit mode).</summary>
         public static void AppendSection(StringBuilder report, SimOptions options, IReadOnlyList<CreatureSpeciesSO> species, List<BattleRecord> records)
         {
-            int gamesPerBeast = 2 * (species.Count - 1);
+            int gamesPerBeast = 2 * (species.Count - 1) * options.Samples;
 
             report.AppendLine("## PvP: 1v1 round-robin (secondary)");
             report.AppendLine();
@@ -97,11 +97,15 @@ namespace BeastCraft.Tooling.BalanceSim
             report.AppendLine();
             report.AppendLine("- Levels: " + SimOptions.Join(options.Levels) + "; kit modes: " + ModeList(options.Modes) + "; no gear; no avatar");
             report.AppendLine("- Arena: " + SimOptions.PvpArena + ", 1v1, mirrored central start tiles in each deployment zone");
-            report.AppendLine("- Round-robin: every pair of distinct species, played twice per level and mode with sides swapped (" +
+            report.AppendLine("- Round-robin: every pair of distinct species, played twice per level and mode with sides swapped, each game " +
+                              options.Samples + " times with distinct seeds (damage variance and crits make battles random) (" +
                               gamesPerBeast + " games per beast per level per mode; mirror matches skipped); " + battles + " battles total");
             report.AppendLine("- Win rate = wins / games; mutual defeats and stalemates count as games but not wins. Flags: win rate above " +
                               SimOptions.Format(SimOptions.HighWinRate) + "% or below " + SimOptions.Format(SimOptions.LowWinRate) +
                               "%, a swing of more than " + SimOptions.Format(SimOptions.MaxLevelSwing) + " points across levels, and any stalemate.");
+            report.AppendLine("- Turn order: the Runtime's ATB gauge (`TurnManager`: each unit acts every " + TurnManager.ActionThreshold +
+                              " / Speed ticks). Battle length is normalized time, 1.0 = one turn of a Speed-" + TurnManager.ReferenceSpeed +
+                              " unit, so it reads longer at low levels, where Speed is lower; max time " + options.MaxTime + ".");
             report.AppendLine();
         }
 
@@ -266,15 +270,16 @@ namespace BeastCraft.Tooling.BalanceSim
         {
             report.AppendLine("#### Battle length by level");
             report.AppendLine();
-            report.AppendLine("| Level | Battles | Avg rounds | Min | Max | Stalemates | Mutual defeats |");
-            report.AppendLine("| ---: | ---: | ---: | ---: | ---: | ---: | ---: |");
+            report.AppendLine("| Level | Battles | Avg time | Min | Max | Avg turns | Stalemates | Mutual defeats |");
+            report.AppendLine("| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |");
 
             foreach (int level in options.Levels)
             {
                 int battles = 0;
-                long roundSum = 0;
-                int min = int.MaxValue;
-                int max = 0;
+                double timeSum = 0.0;
+                double min = double.MaxValue;
+                double max = 0.0;
+                long actionSum = 0;
                 int stalemates = 0;
                 int mutual = 0;
 
@@ -286,16 +291,18 @@ namespace BeastCraft.Tooling.BalanceSim
                     }
 
                     battles++;
-                    roundSum += record.Rounds;
-                    min = Math.Min(min, record.Rounds);
-                    max = Math.Max(max, record.Rounds);
+                    timeSum += record.Time;
+                    actionSum += record.Actions;
+                    min = Math.Min(min, record.Time);
+                    max = Math.Max(max, record.Time);
                     stalemates += record.Outcome == BattleOutcome.Stalemate ? 1 : 0;
                     mutual += record.Outcome == BattleOutcome.MutualDefeat ? 1 : 0;
                 }
 
-                double average = battles == 0 ? 0.0 : (double)roundSum / battles;
-                report.AppendLine("| " + level + " | " + battles + " | " + SimOptions.Format(average) + " | " + (battles == 0 ? 0 : min) + " | " + max +
-                                  " | " + stalemates + " | " + mutual + " |");
+                double average = battles == 0 ? 0.0 : timeSum / battles;
+                double turns = battles == 0 ? 0.0 : (double)actionSum / battles;
+                report.AppendLine("| " + level + " | " + battles + " | " + SimOptions.Format(average) + " | " + SimOptions.Format(battles == 0 ? 0.0 : min) +
+                                  " | " + SimOptions.Format(max) + " | " + SimOptions.Format(turns) + " | " + stalemates + " | " + mutual + " |");
             }
 
             report.AppendLine();
@@ -328,7 +335,8 @@ namespace BeastCraft.Tooling.BalanceSim
 
             report.AppendLine("#### Win matrix at level " + options.MatrixLevel);
             report.AppendLine();
-            report.AppendLine("Row vs column: row's wins-losses over the two side-swapped games; `+N` = N games that were a stalemate or mutual defeat.");
+            report.AppendLine("Row vs column: row's wins-losses over the two side-swapped games x " + options.Samples +
+                              " samples; `+N` = N games that were a stalemate or mutual defeat.");
             report.AppendLine();
 
             StringBuilder header = new StringBuilder("| vs |");
@@ -379,7 +387,7 @@ namespace BeastCraft.Tooling.BalanceSim
                 if (record.Mode == mode && record.Outcome == BattleOutcome.Stalemate)
                 {
                     report.AppendLine("- L" + record.Level + ": " + species[record.PlayerIndex].DisplayName + " (player) vs " +
-                                      species[record.EnemyIndex].DisplayName + " (enemy), " + record.Rounds + " rounds");
+                                      species[record.EnemyIndex].DisplayName + " (enemy), sample " + record.Sample + ", " + SimOptions.Format(record.Time) + " time");
                     any = true;
                 }
             }
