@@ -19,8 +19,15 @@ namespace BeastCraft.Progression
     /// <see cref="ParticipationXp"/>, won or lost, and also when it was knocked out. On a
     /// <see cref="BattleOutcome.PlayerVictory"/>, a fielded beast still standing at the end also
     /// earns the clear bonus <c>ClearBaseXp + ClearXpPerEnemyLevel × enemyLevel</c>; a beast knocked
-    /// out before the end earns participation only. Beasts left on the bench earn nothing — the
-    /// caller simply does not award them.
+    /// out before the end earns participation only. A beast left on the bench earns a share of what
+    /// a standing fielded beast earns (<see cref="BenchXp"/>): half at or above the enemy's level,
+    /// 7.5% more per level below it, all of it from 7 levels down — so a reserve settles a few levels
+    /// behind the team instead of falling ever further back.
+    /// </para>
+    /// <para>
+    /// <strong>Falloff and cap.</strong> Every award is cut by the level-gap falloff on the beast's
+    /// own level (<see cref="LevelGapXp"/>) and added under the campaign's beast level cap
+    /// (<see cref="AddXp(BeastProgress, int, int)"/>, <see cref="LevelCap"/>).
     /// </para>
     /// <para>
     /// <strong>The curve.</strong> A level costs <c>XpCurveBase + XpCurvePerLevel × level</c>. At an
@@ -54,6 +61,12 @@ namespace BeastCraft.Progression
 
         /// <summary>The clear bonus per enemy level.</summary>
         public const int ClearXpPerEnemyLevel = 4;
+
+        /// <summary>A benched beast's share of the battle's XP, in tenths of a percent, at or above the enemy's level (lead decision: 50%).</summary>
+        public const int BenchShareBasePermille = 500;
+
+        /// <summary>The bench share grows by this much (tenths of a percent) per level the benched beast is below the enemy (7.5%), up to all of it.</summary>
+        public const int BenchSharePerLevelPermille = 75;
 
         /// <summary>
         /// XP from <paramref name="level"/> to the next: <c>XpCurveBase + XpCurvePerLevel × level</c>,
@@ -95,17 +108,87 @@ namespace BeastCraft.Progression
             return ParticipationXp + ClearBaseXp + (ClearXpPerEnemyLevel * level);
         }
 
-        /// <summary>Credits one finished battle to a fielded beast (<see cref="BattleXp"/>). Returns the levels gained.</summary>
-        public static int AwardBattle(BeastProgress progress, BattleOutcome outcome, int enemyLevel, bool knockedOut)
+        /// <summary>
+        /// What one battle pays a fielded beast of <paramref name="beastLevel"/>:
+        /// <see cref="BattleXp(BattleOutcome, int, bool)"/> after the level-gap falloff
+        /// (<see cref="LevelGapXp"/>, on <paramref name="beastLevel"/> − <paramref name="enemyLevel"/>).
+        /// </summary>
+        public static int BattleXp(BattleOutcome outcome, int enemyLevel, bool knockedOut, int beastLevel)
         {
-            return AddXp(progress, BattleXp(outcome, enemyLevel, knockedOut));
+            return LevelGapXp.Apply(BattleXp(outcome, enemyLevel, knockedOut), LevelGapXp.Gap(beastLevel, enemyLevel));
         }
 
         /// <summary>
-        /// Adds XP (negative read as 0) and levels up while the bank covers the next level, up to
-        /// <see cref="MaxLevel"/>, where the bank is held at 0. Returns the levels gained.
+        /// Credits one finished battle to a fielded beast: <see cref="BattleXp(BattleOutcome, int, bool, int)"/>
+        /// at its level before the award, added under <paramref name="levelCap"/>
+        /// (<see cref="AddXp(BeastProgress, int, int)"/>; the default, <see cref="MaxLevel"/>, is no
+        /// cap). Returns the levels gained.
+        /// </summary>
+        public static int AwardBattle(BeastProgress progress, BattleOutcome outcome, int enemyLevel, bool knockedOut, int levelCap = MaxLevel)
+        {
+            if (progress == null)
+            {
+                return 0;
+            }
+
+            return AddXp(progress, BattleXp(outcome, enemyLevel, knockedOut, progress.Level), levelCap);
+        }
+
+        /// <summary>
+        /// The share of a battle's XP a beast left on the bench earns, in tenths of a percent:
+        /// <c>BenchShareBasePermille + BenchSharePerLevelPermille × levels below the enemy</c>, at
+        /// most 1000 (all of it). 500 at or above the enemy's level, 1000 from 7 levels below.
+        /// </summary>
+        public static int BenchSharePermille(int enemyLevel, int benchLevel)
+        {
+            int below = -LevelGapXp.Gap(benchLevel, enemyLevel);
+            int permille = BenchShareBasePermille + (BenchSharePerLevelPermille * (below < 0 ? 0 : below));
+            return permille > 1000 ? 1000 : permille;
+        }
+
+        /// <summary>
+        /// What one battle pays a beast of <paramref name="benchLevel"/> left on the bench:
+        /// <see cref="BenchSharePermille"/> of what a fielded beast still standing earns
+        /// (<see cref="BattleXp(BattleOutcome, int, bool)"/>, rounded down), then the level-gap
+        /// falloff on its own level. Never more than a standing fielded beast at the enemy's level.
+        /// </summary>
+        public static int BenchXp(BattleOutcome outcome, int enemyLevel, int benchLevel)
+        {
+            long share = (long)BattleXp(outcome, enemyLevel, false) * BenchSharePermille(enemyLevel, benchLevel) / 1000;
+            return LevelGapXp.Apply((int)share, LevelGapXp.Gap(benchLevel, enemyLevel));
+        }
+
+        /// <summary>Credits one finished battle to a benched beast (<see cref="BenchXp"/> at its level before the award) under <paramref name="levelCap"/>. Returns the levels gained.</summary>
+        public static int AwardBench(BeastProgress progress, BattleOutcome outcome, int enemyLevel, int levelCap = MaxLevel)
+        {
+            if (progress == null)
+            {
+                return 0;
+            }
+
+            return AddXp(progress, BenchXp(outcome, enemyLevel, progress.Level), levelCap);
+        }
+
+        /// <summary>
+        /// Adds XP (negative read as 0) with no level cap: <see cref="AddXp(BeastProgress, int, int)"/>
+        /// at <see cref="MaxLevel"/>. Returns the levels gained.
         /// </summary>
         public static int AddXp(BeastProgress progress, int xp)
+        {
+            return AddXp(progress, xp, MaxLevel);
+        }
+
+        /// <summary>
+        /// Adds XP (negative read as 0) under <paramref name="levelCap"/> (clamped to 1-<see cref="MaxLevel"/>).
+        /// The XP, anything already banked and the new XP are pooled; the beast levels up while it is
+        /// below the cap and the pool covers the next level. Below the cap the rest is its
+        /// <see cref="BeastProgress.Xp"/> (and the bank is empty). At or above the cap the pool is
+        /// held (<see cref="LevelCap"/>): at most the XP of <see cref="LevelCap.BankLevelLimit"/>
+        /// levels from its level (the excess is lost), <see cref="BeastProgress.Xp"/> filled to one
+        /// short of the next level and the rest in <see cref="BeastProgress.BankedXp"/>. At
+        /// <see cref="MaxLevel"/> both are 0. Returns the levels gained.
+        /// </summary>
+        public static int AddXp(BeastProgress progress, int xp, int levelCap)
         {
             if (progress == null)
             {
@@ -113,17 +196,41 @@ namespace BeastCraft.Progression
             }
 
             progress.Level = progress.Level < 1 ? 1 : progress.Level > MaxLevel ? MaxLevel : progress.Level;
-            long bank = (long)(progress.Xp < 0 ? 0 : progress.Xp) + (xp < 0 ? 0 : xp);
+            int cap = levelCap < 1 ? 1 : levelCap > MaxLevel ? MaxLevel : levelCap;
+            long pool = (long)(progress.Xp < 0 ? 0 : progress.Xp) + (progress.BankedXp < 0 ? 0 : progress.BankedXp) + (xp < 0 ? 0 : xp);
             int gained = 0;
 
-            while (progress.Level < MaxLevel && bank >= XpToNextLevel(progress.Level))
+            while (progress.Level < cap && pool >= XpToNextLevel(progress.Level))
             {
-                bank -= XpToNextLevel(progress.Level);
+                pool -= XpToNextLevel(progress.Level);
                 progress.Level++;
                 gained++;
             }
 
-            progress.Xp = progress.Level >= MaxLevel ? 0 : (int)bank;
+            if (progress.Level >= MaxLevel)
+            {
+                progress.Xp = 0;
+                progress.BankedXp = 0;
+                return gained;
+            }
+
+            if (progress.Level < cap)
+            {
+                progress.Xp = (int)pool;
+                progress.BankedXp = 0;
+                return gained;
+            }
+
+            int top = progress.Level + LevelCap.BankLevelLimit > MaxLevel ? MaxLevel : progress.Level + LevelCap.BankLevelLimit;
+            long limit = (long)TotalXpToReach(top) - TotalXpToReach(progress.Level);
+            if (pool > limit)
+            {
+                pool = limit;
+            }
+
+            long hold = XpToNextLevel(progress.Level) - 1;
+            progress.Xp = (int)(pool < hold ? pool : hold);
+            progress.BankedXp = (int)(pool - progress.Xp);
             return gained;
         }
     }

@@ -13,8 +13,10 @@ namespace BeastCraft.Progression
     /// <c>40 + 3.2 L</c> a battle; a level costs <c>XpCurveBase + XpCurvePerLevel × level</c>
     /// (<c>200 + 16 L</c>), so a player who wins four fights in five gains about one level per five
     /// battles — the pacing model's campaign, which raises the encounter level every five battles
-    /// (balance simulator <c>--mode pacing</c>, "Avatar level"). Fighting below one's level pays less,
-    /// so grinding easy content is slow. Tunable starting defaults, not confirmed balance.
+    /// (balance simulator <c>--mode pacing</c>, "Avatar level"). Fighting below one's level pays less
+    /// (the level-gap falloff, <see cref="LevelGapXp"/>: nothing from five levels down), so grinding
+    /// easy content is slow. There is no avatar level cap. Tunable starting defaults, not confirmed
+    /// balance.
     /// </para>
     /// <para>
     /// Non-throwing: a null progress is a no-op; level and XP are normalized on every write.
@@ -79,10 +81,28 @@ namespace BeastCraft.Progression
             return ParticipationXp + ClearBaseXp + (ClearXpPerEnemyLevel * level);
         }
 
-        /// <summary>Credits one finished battle (<see cref="BattleXp"/>). Returns the levels gained.</summary>
+        /// <summary>
+        /// What one battle pays an avatar of <paramref name="avatarLevel"/>:
+        /// <see cref="BattleXp(BattleOutcome, int)"/> after the level-gap falloff
+        /// (<see cref="LevelGapXp"/>, on <paramref name="avatarLevel"/> − <paramref name="enemyLevel"/>).
+        /// </summary>
+        public static int BattleXp(BattleOutcome outcome, int enemyLevel, int avatarLevel)
+        {
+            return LevelGapXp.Apply(BattleXp(outcome, enemyLevel), LevelGapXp.Gap(avatarLevel, enemyLevel));
+        }
+
+        /// <summary>
+        /// Credits one finished battle: <see cref="BattleXp(BattleOutcome, int, int)"/> at the
+        /// avatar's level before the award (the avatar has no level cap). Returns the levels gained.
+        /// </summary>
         public static int AwardBattle(AvatarProgress progress, BattleOutcome outcome, int enemyLevel)
         {
-            return AddXp(progress, BattleXp(outcome, enemyLevel));
+            if (progress == null)
+            {
+                return 0;
+            }
+
+            return AddXp(progress, BattleXp(outcome, enemyLevel, progress.Level));
         }
 
         /// <summary>
