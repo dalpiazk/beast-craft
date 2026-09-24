@@ -996,3 +996,18 @@ scripts and no tests.
 - `--mode campaign` includes the economy (`CampaignEconomyModel`: gold, drops, the Trader at trading
   posts and camps, a greedy shopper) on its own random stream, with its gates in the report's
   "Economy" section. See docs/design/economy-and-shop.md.
+
+## Idle rewards (`--mode campaign`'s idle model)
+
+`--mode campaign` also plays the idle (AFK) rewards (`CampaignIdleModel`): the game's
+`IdleRewardCalculator` and `idle-rewards.json` on the model's save, at a claim cadence. The player
+fights `--battles-per-day` (25) battles a day and is away `--idle-hours-per-day` (16, 0-24; 0 turns
+idle off) hours a day, claiming `--idle-claims-per-day` (2) times a day, evenly spaced: a claim every
+`battles / claims` battles, each crediting `hours / claims` hours (paid up to the data's 8-hour cap).
+The claim pays the fielded beasts as the party and the rest as the bench, and its gold, XP and
+materials feed back into the campaign. Every idle roll comes from the save's idle seed
+(`DeriveSeed(campaign seed, CampaignIdleModel.Stream)`), so idle never moves the campaign's own draws:
+with `--idle-hours-per-day 0` the report is the pre-idle report plus an "Idle rewards: off" line.
+The report's "Idle rewards" section gives the rates, idle's share of each region's income and the
+campaign gates: idle at most 15% of all gold and of all materials (by XP value) and at most 10% of all
+beast XP (p50; the lead / user ceilings). See docs/design/progression-and-saves.md, "Idle rewards".

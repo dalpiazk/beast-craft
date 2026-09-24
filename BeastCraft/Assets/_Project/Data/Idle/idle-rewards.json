@@ -1,0 +1,19 @@
+{
+  "_readme": "Idle (AFK) reward rates: what time away from the game pays, by the player's progress level (the level of the highest cleared map location, CampaignRules.ProgressLevel). A claim credits the real time since the last claim (wall clock, never more than the monotonic clock says passed; clock tampering is clamped silently) up to CapHours; time beyond the cap is not banked. Per idle hour: GoldPerHour gold; XpPerHour XP to each party beast and to the avatar (the avatar through its own falloff, no cap; the bench gets the bench share of it; the level-gap falloff on the beast's level against the progress level and the beast level cap apply); MaterialRollsPerHour rolls of the drop-tables.json cell (Shape, progress level) with every chance x MaterialChanceMultiplier and no pity or first-clear credit; and per claim one look roll from the battle-drop pool at CosmeticChancePer10k / 10000 x hours / CapHours. Tuned with the balance simulator (dotnet run --project Tooling/BalanceSim -c Release -- --mode campaign; see docs/balance/campaign-pacing-report.md, 'Idle rewards') under the lead / user ceilings (idle at most ~15% of gold and materials and ~10% of beast XP over a campaign) at 25 battles and two 8-hour claims a day: XP ~9% and materials ~13% of the campaign's; gold only ~6%, held there by the Trader's want-list affordability gate (more idle gold makes most Trader visits fully affordable). Rates are 0.1 x the squad gold curve (10 + 2L) and 0.2 x a standing beast's clear XP net of losses (34 + 2.8L), at each band's middle level. Tunable starting values, not confirmed balance. Edit here, then in Unity run Beast Craft/Data/Import Idle Rewards. See docs/design/progression-and-saves.md, 'Idle rewards'.",
+  "SchemaVersion": 1,
+  "CapHours": 8,
+  "Shape": "squad",
+  "MaterialRollsPerHour": 1.0,
+  "Bands": [
+    { "MinProgressLevel": 1, "MaxProgressLevel": 10, "XpPerHour": 10, "GoldPerHour": 2, "MaterialChanceMultiplier": 0.4, "CosmeticChancePer10k": 8 },
+    { "MinProgressLevel": 11, "MaxProgressLevel": 20, "XpPerHour": 15, "GoldPerHour": 4, "MaterialChanceMultiplier": 0.4, "CosmeticChancePer10k": 8 },
+    { "MinProgressLevel": 21, "MaxProgressLevel": 30, "XpPerHour": 21, "GoldPerHour": 6, "MaterialChanceMultiplier": 0.4, "CosmeticChancePer10k": 8 },
+    { "MinProgressLevel": 31, "MaxProgressLevel": 40, "XpPerHour": 27, "GoldPerHour": 8, "MaterialChanceMultiplier": 0.4, "CosmeticChancePer10k": 8 },
+    { "MinProgressLevel": 41, "MaxProgressLevel": 50, "XpPerHour": 32, "GoldPerHour": 10, "MaterialChanceMultiplier": 0.4, "CosmeticChancePer10k": 8 },
+    { "MinProgressLevel": 51, "MaxProgressLevel": 60, "XpPerHour": 38, "GoldPerHour": 12, "MaterialChanceMultiplier": 0.4, "CosmeticChancePer10k": 8 },
+    { "MinProgressLevel": 61, "MaxProgressLevel": 70, "XpPerHour": 43, "GoldPerHour": 14, "MaterialChanceMultiplier": 0.4, "CosmeticChancePer10k": 8 },
+    { "MinProgressLevel": 71, "MaxProgressLevel": 80, "XpPerHour": 49, "GoldPerHour": 16, "MaterialChanceMultiplier": 0.4, "CosmeticChancePer10k": 8 },
+    { "MinProgressLevel": 81, "MaxProgressLevel": 90, "XpPerHour": 55, "GoldPerHour": 18, "MaterialChanceMultiplier": 0.4, "CosmeticChancePer10k": 8 },
+    { "MinProgressLevel": 91, "MaxProgressLevel": 100, "XpPerHour": 60, "GoldPerHour": 20, "MaterialChanceMultiplier": 0.4, "CosmeticChancePer10k": 8 }
+  ]
+}

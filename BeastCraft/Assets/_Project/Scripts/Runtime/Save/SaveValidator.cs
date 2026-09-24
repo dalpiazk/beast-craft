@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using BeastCraft.Battle;
 using BeastCraft.Campaign;
+using BeastCraft.Idle;
 using BeastCraft.Progression;
 
 namespace BeastCraft.Save
@@ -85,7 +86,35 @@ namespace BeastCraft.Save
 
             ValidateMaterials(save.Materials, catalog, issues);
             ValidateCampaign(save.Campaign, catalog, issues);
+            ValidateIdle(save.Idle, issues);
             return issues;
+        }
+
+        /// <summary>The idle clock (schema 5): no negative time, count or seed-less started clock; a monotonic reading of −1 means "not available".</summary>
+        private static void ValidateIdle(IdleState idle, List<SaveIssue> issues)
+        {
+            if (idle == null)
+            {
+                return;
+            }
+
+            if (idle.LastClaimUtcTicks < 0 || idle.LastClaimUtcTicks > DateTime.MaxValue.Ticks)
+            {
+                issues.Add(new SaveIssue(SaveIssueKind.InvalidValue, "Idle.LastClaimUtcTicks", null, idle.LastClaimUtcTicks + " is not a time (0 = not started)"));
+            }
+
+            if (idle.LastClaimMonotonicMs < -1)
+            {
+                issues.Add(new SaveIssue(SaveIssueKind.InvalidValue, "Idle.LastClaimMonotonicMs", null, idle.LastClaimMonotonicMs + " is out of range (at least -1)"));
+            }
+
+            if (idle.HasStarted && idle.IdleSeed == 0)
+            {
+                issues.Add(new SaveIssue(SaveIssueKind.InvalidValue, "Idle.IdleSeed", null, "the clock has started but has no seed"));
+            }
+
+            CheckRange(issues, "Idle.ClaimIndex", idle.ClaimIndex, 0, int.MaxValue);
+            CheckRange(issues, "Idle.ClockClamps", idle.ClockClamps, 0, int.MaxValue);
         }
 
         private static void ValidateBeasts(List<OwnedBeast> beasts, ISaveContentCatalog catalog, List<SaveIssue> issues)

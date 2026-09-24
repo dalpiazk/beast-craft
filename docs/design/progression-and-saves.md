@@ -3,7 +3,7 @@
 How a player's progress is stored, how beasts and the avatar level up, the region campaign they
 play through, and the single entry point a scene calls to fight a battle from save data and pay it
 out. This covers the runtime code under
-`BeastCraft/Assets/_Project/Scripts/Runtime/{Save,Session,Progression,Campaign,Economy}` and the tooling that
+`BeastCraft/Assets/_Project/Scripts/Runtime/{Save,Session,Progression,Campaign,Economy,Idle}` and the tooling that
 tests it outside Unity. The battle rules themselves are in [battle-system.md](battle-system.md); the
 economy (gold, the Trader, gear, consumables, cosmetics) is in [economy-and-shop.md](economy-and-shop.md);
 pacing numbers come from [`docs/balance/campaign-pacing-report.md`](../balance/campaign-pacing-report.md)
@@ -18,13 +18,13 @@ Services integration yet.
 
 ## Save format
 
-### `PlayerSave` (schema 4)
+### `PlayerSave` (schema 5)
 
 One versioned aggregate per player (`BeastCraft.Save.PlayerSave`):
 
 | Field | Type | Contents |
 | --- | --- | --- |
-| `SchemaVersion` | `int` | The schema the data is in. `CurrentSchemaVersion` is **4**. 0 or missing is never valid. |
+| `SchemaVersion` | `int` | The schema the data is in. `CurrentSchemaVersion` is **5**. 0 or missing is never valid. |
 | `Beasts` | `List<OwnedBeast>` | The beast collection, in the order obtained. |
 | `Avatar` | `AvatarProgress` | The avatar's own level and XP. |
 | `AvatarSkills` | `AvatarSkillBook` | The avatar's active and passive skill books. |
@@ -37,6 +37,7 @@ One versioned aggregate per player (`BeastCraft.Save.PlayerSave`):
 | `Shops` | `List<ShopVisit>` | Each Trader's stock as first seen, frozen: `{NodeKey, Listings[] {Category, ItemId, Quantity, Price, Remaining}}`, the most recent 16 (schema 4). |
 | `Cosmetics` | `CosmeticCollection` | `Unlocked`: account-wide `"categoryId/optionId"` look unlocks (defaults and starter looks are free and never listed; schema 4). |
 | `AvatarAppearance` | `CustomizationSelection` | The avatar's chosen looks and colours; a category not listed reads as its default (schema 4). |
+| `Idle` | `IdleState` | The idle (AFK) reward clock: `{LastClaimUtcTicks, LastClaimMonotonicMs, IdleSeed, ClaimIndex, ClockClamps}` — the last claim's wall clock (UTC ticks; 0 = not started) and monotonic clock (ms since boot; −1 = not available), the claims' seed and count, and how many claims had a tampered clock clamped (schema 5; see "Idle rewards"). |
 
 `OwnedBeast` is one beast in the collection:
 
@@ -133,6 +134,7 @@ the load with a reason. The registered steps are `SaveMigrations.All()`:
 | `SaveMigrations.AddGear` (1 → 2) | A v1 save owns no gear: read it into the current type (the gear fields take their empty defaults), fill in anything missing, write it back. |
 | `SaveMigrations.AddCampaign` (2 → 3) | A v2 save has no campaign and no bank: read it into the current type (empty campaign, `BankedXp` 0), fill in anything missing, unlock `r01`, write it back. Beasts keep their levels — one above the starting cap (12) stays there and only banks until the cap passes it. |
 | `SaveMigrations.AddEconomy` (3 → 4) | A v3 save has no economy: read it into the current type (no gold, consumables, Trader visits or unlocks; every appearance at its defaults — starter looks are free anyway), fill in anything missing, write it back. Nothing else moves. |
+| `SaveMigrations.AddIdle` (4 → 5) | A v4 save has no idle clock: read it into the current type (the clock not started, no seed, no claims), fill in anything missing, write it back. The first claim after the upgrade starts the clock and pays nothing (no offline time can be proven). Nothing else moves. |
 
 Schema 3 was not yet shipped when the economy landed on top of it, so the map's location fields
 (`MapNode.Kind` / `X` / `Y` / `LabelKey`) were added to schema 3 directly rather than bumping it;
@@ -245,7 +247,8 @@ The economy catalog is `Economy.EconomyContent` (the consumable and cosmetic lib
 default again.
 
 Negative `BankedXp`, `StagesCleared`, run `Stage` / attempts and node levels outside 1-100 are
-`InvalidValue`s.
+`InvalidValue`s, as are (schema 5) a negative idle `LastClaimUtcTicks`, `ClaimIndex` or `ClockClamps`,
+a `LastClaimMonotonicMs` below −1, and a started idle clock without a seed.
 
 `SaveContentCatalog` is an `ISaveContentCatalog` over plain id sets; `SaveContentCatalog.FromData(roster, library)`
 builds it from the authored `beast-roster.json` and `skill-library.json`, and
@@ -280,15 +283,16 @@ the earner's level before the award minus the encounter level: 0 or below 100%, 
 +3 10%, +4 5%, +5 and above 0% (integer maths, rounding down). Old content cannot be farmed: in the
 campaign model, 25 won battles of region 1 after region 5's boss pay nothing, and 25 of region 5's
 second stage pay 0.00 levels (p90 0.02). It costs the fielded team about 14% of its battle XP along
-the way (the early rows of each stage sit below it).
+the way without idle rewards (the early rows of each stage sit below it), and about 22% with them
+(idle XP keeps the team a fraction of a level ahead; see "Idle rewards").
 
 **Bench share** (`BeastProgression.BenchXp` / `AwardBench`). A beast left on the bench earns
 `min(100%, 10% + 9% × levels below the enemy)` of what a standing fielded beast earns, then the
 falloff on its own level: 10% at or above the enemy's level, 55% five levels down, all of it from ten
 levels down. A reserve therefore settles a few levels behind the team instead of falling ever
-further back, and a new recruit catches up at the full rate. Campaign model: the bench is 5.0-6.0
-levels behind the fielded team at every boss from region 3; a level-1 recruit joining at region 5 is
-7.7 behind by the end of region 6.
+further back, and a new recruit catches up at the full rate. Campaign model (idle rewards included):
+the bench is 5.0-5.7 levels behind the fielded team at every boss from region 3; a level-1 recruit
+joining at region 5 is 6.3 behind by the end of region 6 (without idle: 5.0-6.0 and 7.7).
 
 > **Bench numbers retuned, pending lead/user review.** The lead's decision was 50% + 7.5% per level
 > (capped at 100%), chosen for its predicted outcome, "reserves ~6-7 levels behind". That estimate
@@ -411,6 +415,7 @@ keep their left-to-right order, so the paths read as routes across the region.
 | `Retreat(save)` | Abandons the expedition (stage progress already earned stays). |
 | `GrantSeal(save, regions, sealId)` | Adds the seal and releases every beast's bank at the new cap. Bosses call it; it is also the hook for future story-event seals. |
 | `BeastCap(save, regions)` | `LevelCaps.BeastCap(save.Campaign.Seals, regions)`. |
+| `ProgressLevel(save, regions)` | How far the player has got: the level of the highest cleared map location (a beaten boss's region max, else the pass of the last cleared stage, and any battle location cleared in the expedition in progress); 0 before the first clear. The idle rewards are paid at it. |
 
 ### Bosses (DRAFT)
 
@@ -429,8 +434,9 @@ merged combat rules (behaviour bonds, enemy statuses); see the tuning log, "Boss
 ### Pacing (`--mode campaign`)
 
 `dotnet run --project Tooling/BalanceSim -c Release -- --mode campaign [--runs n] [--seed(s)] [--out
-path] [--self-check] [--regions path]`: 1,000 Monte Carlo campaigns through the real save, maps and
-rules. The player fields 3 beasts (knocked out in 20% of battles each), benches 3, recruits a level-1
+path] [--self-check] [--regions path] [--battles-per-day n] [--idle-hours-per-day h]
+[--idle-claims-per-day n]`: 1,000 Monte Carlo campaigns through the real save, maps and rules, idle
+rewards included (25 battles and two 8-hour claims a day; see "Idle rewards"). The player fields 3 beasts (knocked out in 20% of battles each), benches 3, recruits a level-1
 beast when region 5 starts, takes an Elite when the team's mean level is at least its level (else a
 Battle, else Rest, Shop), camps the lowest bench beast, and retries every loss. Clear chance at equal
 level: squad / horde 80%, elite and gates 60%, solo and bosses 50% (the user's tiers: a generated
@@ -440,18 +446,174 @@ level gap along the design's table in log-odds (+1 level: 60% / 36% / 27%). Resu
 
 | Gate | Target | Result |
 | --- | --- | --- |
-| Battles, whole campaign | 400-600 (p50) | 541 (p10-p90 517-569); 52-54 per region, ~17 of them lost retries |
-| Fielded level at every gate and boss | p50 within 3 | within 0.3 of the node level everywhere |
-| Avatar level at every gate and boss | p50 within 3 | on the node level |
-| Bench | 5-8 behind, from region 3 | 5.0-6.0 |
-| Recruit | within 8 by the end of region 6 | 7.7 |
+| Battles, whole campaign | 400-600 (p50) | 507 (p10-p90 489-527); 50-51 per region, ~13 of them lost retries (without idle: 541, 52-54, ~17) |
+| Fielded level at every gate and boss | p50 within 3 | within 1 of the node level everywhere (up to 1 above: idle XP) |
+| Avatar level at every gate and boss | p50 within 3 | within 1 of the node level |
+| Bench | 5-8 behind, from region 3 | 5.0-5.7 |
+| Recruit | within 8 by the end of region 6 | 6.3 |
 | Level cap | never exceeded | 0 |
 | Banked levels at a seal | p50 ≤ 3 | 0 (the cap never binds for this player) |
 | Grind probe after r05's boss | < 0.05 levels (r01), < 0.5 (r05 stage 2) | 0.00, 0.00 |
-| Focus skill (`--mode pacing`'s gates) | L5 15-20, L10 70-90, L15 160-200, L20 295-325 | 17, 86, 190, 323 |
+| Focus skill (the economy design's gates) | L5 15-20, L10 72-88, L15 162-198, L20 270+ | 17, 77, 171, 297 |
+| Idle shares of the campaign (p50) | gold ≤ 15%, materials ≤ 15%, beast XP ≤ 10% | 5.6%, 13.4%, 9.3% |
 
 The clear-chance model is an assumption, not measured from fought battles; the tiered targets are
 what the encounter table is calibrated to for a scouting player at equal level.
+
+---
+
+## Idle rewards
+
+Time away from the game pays gold, beast XP, skill materials and, very rarely, a look (AFK rewards).
+Runtime code under `Runtime/Idle` (namespace `BeastCraft.Idle`); rates in
+`BeastCraft/Assets/_Project/Data/Idle/idle-rewards.json`; paced by `--mode campaign`
+([`docs/balance/campaign-pacing-report.md`](../balance/campaign-pacing-report.md), "Idle rewards").
+**Every rate is a tunable starting value; no UI yet.**
+
+The lead / user decisions this implements: an **8-hour accumulation cap**; idle is at most **~15% of
+gold and materials** and **~10% of beast XP** over a campaign; idle looks come from the **same pool as
+battle drops** (no idle-exclusive looks); idle XP goes to the **current party and the bench, through
+the battles' catch-up rule**; clock tampering is **clamped silently to the real elapsed time** (no
+message, no penalty); idle respects the **level cap and bank** and the **level-gap falloff**; it gives
+**no first-clear or pity credit**; the **avatar earns idle XP at the party's rate** through its own
+falloff (no cap).
+
+> **Local play only — the fairness choices rely on it.** Beast Craft is slated for **local,
+> single-player play** (not an MMO, no shared or competitive online play). The idle calculation's
+> fairness choices are acceptable only because no player's idle income is ever set against another's:
+> paying the whole period **at the rate of claim time**, a **larger idle share for lighter players**,
+> and **client-clock clamping without a server**. **If online, MMO or competitive play is ever added,
+> the idle calculation must be revisited** — server-authoritative time, rate-over-period accounting
+> (each hour paid at the progress level it was spent at) and tighter shares — because as it stands it
+> would come across as unfair.
+
+**Approved behaviour and current defaults.** Approved (user decisions): paying the whole claim at the
+progress level **at claim time** (clearing a higher location just before claiming pays the whole
+period at the new rate, as AFK games commonly do); idle's share **rising for lighter players** (below).
+Current defaults, tunable and open to review: idle gold held at ~6% by the Trader's affordability gate
+(below); the offline clock limits (a clock set forward across a reboot, cross-device claims; "No
+server clock"); the look chance scaled by `hours / CapHours`; material rolls from the `squad` cell;
+the first claim of a new or migrated save only starting the clock.
+
+### The claim (`IdleRewardCalculator.Claim(save, content, nowUtc, nowMonotonic, partyBeastIds)`)
+
+`IdleContent` holds the rates (`IdleRewards`, built from `idle-rewards.json` by `IdleRewardsBuilder`),
+the drop tables, the cosmetic library (null = no look roll) and the region library. The first claim of
+a save (new or migrated) only starts the clock and pays nothing. Every later claim:
+
+1. **Time.** Credits the real idle time since the last claim (`IdleRewardCalculator.Elapsed`, below),
+   at most `CapHours` (8). Time beyond the cap is **not banked**. **Capped** means one thing for the
+   claim and the preview: the idle time has reached the cap (at least `CapHours`), so waiting longer
+   earns nothing (`IdleClaimResult.Capped`; the UI's "capped" is `IdleRewardCalculator.Preview(...).Capped`,
+   which never changes the save).
+2. **Rates.** Reads the band of the **progress level** — `CampaignRules.ProgressLevel(save, regions)`,
+   the level of the highest cleared map location: a beaten boss's region max, else the pass of the last
+   cleared stage, and any battle location cleared in the expedition in progress; 0 before the first
+   clear, which pays nothing.
+3. **Gold**: `floor(hours × GoldPerHour)` into the `Wallet` (no first-clear bonus, no modifiers).
+4. **Materials**: `hours × MaterialRollsPerHour` rolls (stochastically rounded, so short claims lose
+   nothing on average) of the drop tables' cell for (`Shape` = `squad`, progress level), every chance
+   × the band's `MaterialChanceMultiplier` (`LootRoller.RollScaled`). **No pity, no first clear**: the
+   pity counters and cleared cells are never read or written.
+5. **Beast XP**: `floor(hours × XpPerHour)` to each beast of `partyBeastIds` (the current party; the
+   save does not store one, so the game passes it), cut by the level-gap falloff on the beast's level
+   against the progress level — idle cannot out-level the content or skip a seal. Every other beast
+   (the bench) earns `BeastProgression.BenchSharePermille(progressLevel, its level)` of it (10% at or
+   above, +9% per level below, all of it from ten below), then the falloff. All of it goes through
+   `BeastProgression.AddXp(progress, xp, cap)` under `CampaignRules.BeastCap`: at the cap it banks, at
+   most three levels' worth, and the rest is not granted (`IdleClaimResult.XpBanked` /
+   `XpLostAtCap`; the UI shows "banked at cap"). No clear bonus (not a battle).
+   **The avatar** (user decision) earns the party's rate, `floor(hours × XpPerHour)`, cut by the
+   falloff on its own level against the progress level, with no cap (`AvatarProgression.AddXp`; the
+   avatar has none): `IdleClaimResult.AvatarXpGained` / `AvatarFalloffPercent` / `AvatarLevelsGained`.
+6. **A look**: one roll, chance `CosmeticChancePer10k / 10,000 × hours / CapHours` (so claiming often
+   gains nothing), from the battle-drop pool (`CosmeticRules.PickDrop`, what `RollDrop` draws on a hit:
+   the progress level's region's `drop` looks not yet owned). Milestone looks the XP reaches unlock too.
+7. Re-anchors both clocks at the readings just used and counts the claim (`ClaimIndex`).
+
+**Deterministic.** Claim `n`'s rolls come from `LootRoller.DeriveSeed(IdleSeed, n)`: materials on
+stream 0, the look on stream 4 (the battle's cosmetic stream). `IdleSeed` is drawn from the first
+claim's clock when unset. Same save, clock readings and party, same claim. Non-throwing; a claim with
+no save or no rates is refused and changes nothing.
+
+### No server clock (the offline rule)
+
+This rule assumes **local-only play** (see the note above): with no shared or competitive play, a
+client-clamped clock only ever affects the player's own game. Online, MMO or competitive play would
+need server-authoritative time instead.
+
+The game is offline-first and has no trusted time source yet (Cloud Code is a later backend), so the
+claim trusts **the smaller of two clocks**: the wall clock (UTC, which the player can set) and a
+**monotonic clock** — time since the device booted, including sleep (Android `elapsedRealtime`, iOS
+continuous time), which the player cannot set but which resets on a reboot. The game passes both on
+every claim (`nowMonotonic` negative = not available). `Elapsed`:
+
+- **Same boot** (the monotonic reading has not gone back): the wall-clock time, never more than the
+  monotonic time; a wall clock set back reads as the monotonic time. A wall clock set back, or ahead by
+  more than 2 minutes (`ClockSlackMs`, room for NTP corrections), is a **clamp**.
+- **Rebooted in between** (the monotonic reading went back): at least the time since boot really
+  passed, so the wall-clock time, or the time since boot when that is more (a clamp).
+- **No monotonic reading**: the wall-clock time, or 0 when it went back (a clamp).
+
+A clamp is **silent** (lead / user decision): the player sees nothing, loses nothing that provably
+passed and gains nothing that did not; `IdleState.ClockClamps` counts them for diagnostics. The
+residual hole — a clock set forward across a reboot cannot be told apart from a real absence offline —
+is bounded by the 8-hour cap. A save moved to another device (Cloud Save) carries the old device's
+monotonic reading; the first claim there reads as a reboot. A server clock would close both.
+
+### `idle-rewards.json`
+
+`{SchemaVersion, CapHours, Shape, MaterialRollsPerHour, Bands[] {MinProgressLevel, MaxProgressLevel,
+XpPerHour, GoldPerHour, MaterialChanceMultiplier, CosmeticChancePer10k}}` — the usual Data / validator
+/ builder / SO pattern (`IdleRewardsData`, `IdleRewardsValidator`, `IdleRewardsBuilder`,
+`IdleRewardsSO`) and an Editor importer (Beast Craft/Data/Import Idle Rewards, validated against
+`drop-tables.json`, all or nothing). The validator requires schema 1, a cap of 1-24 hours, a drop-table
+shape, bands ascending and contiguous over 1-100, no negative rate, XP and gold per hour that never
+fall as the level rises, multipliers in 0-1 and a look chance of at most 1% per claim.
+
+| Progress levels | Gold / hour | XP / hour | Material chance | Look / full claim |
+| --- | ---: | ---: | ---: | ---: |
+| 1-10 | 2 | 10 | x0.4 | 0.08% |
+| 11-20 | 4 | 15 | x0.4 | 0.08% |
+| 21-30 | 6 | 21 | x0.4 | 0.08% |
+| 31-40 | 8 | 27 | x0.4 | 0.08% |
+| 41-50 | 10 | 32 | x0.4 | 0.08% |
+| 51-60 | 12 | 38 | x0.4 | 0.08% |
+| 61-70 | 14 | 43 | x0.4 | 0.08% |
+| 71-80 | 16 | 49 | x0.4 | 0.08% |
+| 81-90 | 18 | 55 | x0.4 | 0.08% |
+| 91-100 | 20 | 60 | x0.4 | 0.08% |
+
+Gold is 0.1 × the squad gold curve `G(L) = 10 + 2L` and XP 0.2 × a standing beast's clear XP net of
+losses (`34 + 2.8L`), each at the band's middle level; one material roll an hour. An 8-hour claim at
+progress level 50 pays 80 gold (about 0.7 of a squad clear's), 256 XP to each party beast (about 1.5
+average battles' worth, losses and knockouts included) and 8 rolls of the squad cell at 40% of its chances.
+
+### Pacing (`--mode campaign`)
+
+The campaign model claims with the game's calculator on its own save: 25 battles a day, away 16 hours a
+day, two claims a day (a claim every 12.5 battles, 8 hours each; `--battles-per-day`,
+`--idle-hours-per-day`, `--idle-claims-per-day`). About 40 claims (320 idle hours) per campaign.
+
+| Over the campaign (p50) | Ceiling | Result |
+| --- | --- | --- |
+| Idle gold / all gold (clears, gear sales, idle) | ≤ 15% | 5.6% (about 3,500 gold) |
+| Idle materials / all materials (by XP value) | ≤ 15% | 13.4% (p90 16.8%) |
+| Idle beast XP / all beast XP (battles, camps, idle) | ≤ 10% | 9.3% (p90 9.8%) |
+| Every earlier campaign gate | met | met (507 battles p50; want-list affordability 74%) |
+
+**Gold is held well under its ceiling by the Trader.** More idle gold pushes the economy's want-list
+affordability gate (p50 55-80%) to 100%: at 0.11 × G(L) (6.4% of all gold) it is 75%, at 0.12 × (6.9%)
+most visits are fully affordable. Reaching ~15% idle gold needs higher Trader prices or a gold sink
+first (producer item). The shares depend on the player's cadence: at 15 battles a day idle is 8.8% of
+gold, 20% of materials and 14% of XP (over the ceilings); at 40 a day 3.7%, 8.9% and 6.2%; with one
+claim a day (a 16-hour absence capped at 8) 3.0%, 7.4% and 5.0%. **A lighter player's larger idle
+share is accepted** (user decision; acceptable for local-only play). The avatar's idle XP is 8.7% of
+its XP (p50, not gated; it stays within 1 level of every gate and boss). With `--idle-hours-per-day 0` the
+report is the pre-idle one plus an "off" line.
+
+Reproduce: `dotnet run --project Tooling/BalanceSim -c Release -- --mode campaign --self-check --out
+docs/balance/campaign-pacing-report.md`.
 
 ---
 
@@ -677,5 +839,14 @@ its System.Text.Json twin here.
   needs a JavaScript `FS.syncfs` flush after each write to reach IndexedDB; `FileSaveStorage` does
   not flush (and the whole save path is untested on WebGL). A platform follow-up (a small `.jslib`
   called after `Save`/`Delete`, or a WebGL `ISaveStorage`) if WebGL is ever targeted.
+- **Idle rewards assume local-only play.** If online, MMO or competitive play is ever added, revisit
+  the idle calculation (server-authoritative time, rate-over-period accounting, tighter shares); see
+  "Idle rewards".
+- **Idle rewards have no UI and no server clock.** The claim, preview, "capped" and "banked at cap"
+  data are built and tested; the idle screen is not. The offline clock rule leaves a clock set forward
+  across a reboot (bounded by the 8-hour cap) and cross-device claims (Cloud Save) to a future server
+  time source. Idle gold sits at ~6% of all gold, under its 15% ceiling, because more breaks the
+  Trader's affordability gate; the idle shares also depend on the modelled 25 battles a day (see
+  "Idle rewards"). Pending producer review.
 - **Never run in Unity.** The project has not been opened in an Editor, so the save round trip has
   not yet been exercised against the real `JsonUtility`.

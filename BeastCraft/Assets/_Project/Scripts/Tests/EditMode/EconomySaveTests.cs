@@ -62,7 +62,7 @@ namespace BeastCraft.Tests.EditMode
             Assert.AreEqual(3, migrated.SourceVersion);
             Assert.IsEmpty(migrated.Issues, string.Join("\n", migrated.Issues));
             PlayerSave save = migrated.Save;
-            Assert.AreEqual(4, save.SchemaVersion);
+            Assert.AreEqual(PlayerSave.CurrentSchemaVersion, save.SchemaVersion, "3 -> 4 -> current");
             Assert.AreEqual(0, save.Gold);
             Assert.IsEmpty(save.Consumables);
             Assert.IsEmpty(save.Shops);

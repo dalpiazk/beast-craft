@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using BeastCraft.Campaign;
 using BeastCraft.Customization;
 using BeastCraft.Economy;
+using BeastCraft.Idle;
 using BeastCraft.Progression;
 
 namespace BeastCraft.Save
@@ -13,7 +14,8 @@ namespace BeastCraft.Save
     /// material inventory with its first-clear and pity state, the gear inventory with what each
     /// beast and the avatar wears (schema 2), the region campaign: seals, region progress and
     /// the expedition in progress (schema 3), and the economy: gold, consumables, the Traders' frozen
-    /// stock, cosmetic unlocks and the avatar's and every beast's appearance (schema 4).
+    /// stock, cosmetic unlocks and the avatar's and every beast's appearance (schema 4), and the idle
+    /// (AFK) reward clock (schema 5).
     /// <para>
     /// <strong>JsonUtility-compatible by construction.</strong> Every type reachable from here is
     /// <c>[Serializable]</c> with public fields, and every map is a list (<c>JsonUtility</c> drops
@@ -33,7 +35,7 @@ namespace BeastCraft.Save
     public class PlayerSave
     {
         /// <summary>The schema this code writes, and the newest it reads.</summary>
-        public const int CurrentSchemaVersion = 4;
+        public const int CurrentSchemaVersion = 5;
 
         /// <summary>The schema the data is in. 0 (or missing) is never valid.</summary>
         public int SchemaVersion = CurrentSchemaVersion;
@@ -88,6 +90,13 @@ namespace BeastCraft.Save
         /// <c>CosmeticRules</c>. Purely cosmetic, no stats. Added in schema 4.
         /// </summary>
         public CustomizationSelection AvatarAppearance = new CustomizationSelection();
+
+        /// <summary>
+        /// The idle (AFK) reward clock: the last claim's wall-clock and monotonic readings, the claims'
+        /// seed and count (<see cref="IdleState"/>; not started until the first claim). Change it
+        /// through <c>IdleRewardCalculator</c>. Added in schema 5.
+        /// </summary>
+        public IdleState Idle = new IdleState();
 
         /// <summary>
         /// A brand-new player: no beasts, avatar level 1, nothing learned or held, the starting
@@ -292,6 +301,13 @@ namespace BeastCraft.Save
             }
 
             repaired += RepairAppearance(ref AvatarAppearance);
+
+            if (Idle == null)
+            {
+                Idle = new IdleState();
+                repaired++;
+            }
+
             return repaired;
         }
 
