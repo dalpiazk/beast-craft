@@ -38,9 +38,10 @@ namespace BeastCraft.Tooling.BalanceSim
     /// </para>
     /// <para>
     /// <strong>Clear chance</strong> by tier (the user's tiered targets, the difficulty the
-    /// encounter table is calibrated to for a scouting player at equal level): squad and horde
-    /// <see cref="SquadClear"/>, elite (and generated gates) <see cref="EliteClear"/>, solo and the
-    /// boss templates <see cref="BossClear"/>. Across a level gap (node level − fielded mean) the
+    /// encounter table is calibrated to for a scouting player at equal level): a generated node (gates
+    /// included) clears at its shape's <c>TargetClear</c> in <c>encounter-library.json</c> (squad and
+    /// horde 80%, elite 60%, solo 50%), the boss templates at <see cref="BossClear"/> (the target their
+    /// <c>DifficultyOverride</c>s are calibrated to). Across a level gap (node level − fielded mean) the
     /// chance moves along <see cref="GapTable"/> (the design's table, whose 0 is 80%) in log-odds,
     /// shifted so gap 0 is the tier's target, interpolated for fractional gaps and clamped at its
     /// ends. A modelling assumption, not measured from the PvE simulation.
@@ -69,13 +70,11 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <summary>Share of battles each fielded beast is knocked out in (as <c>--mode pacing</c>).</summary>
         public const double KnockoutChance = 0.2;
 
-        /// <summary>Squad and horde clear chance at equal level.</summary>
-        public const double SquadClear = 0.80;
-
-        /// <summary>Elite (and generated gate) clear chance at equal level.</summary>
-        public const double EliteClear = 0.60;
-
-        /// <summary>Solo and boss-template clear chance at equal level.</summary>
+        /// <summary>
+        /// Boss-template clear chance at equal level: the target the templates' <c>DifficultyOverride</c>s
+        /// are calibrated to (docs/balance/tuning-log.md). Generated nodes read their shape's
+        /// <c>TargetClear</c> (<see cref="World.ShapeClear"/>).
+        /// </summary>
         public const double BossClear = 0.50;
 
         /// <summary>The design's clear chance by gap (node level − team level) from −2 to +4, for an 80% encounter.</summary>
@@ -260,6 +259,27 @@ namespace BeastCraft.Tooling.BalanceSim
             /// <summary>The economy's content and the Trader (<see cref="CampaignEconomyModel"/>).</summary>
             public CampaignEconomyModel.World Economy { get; set; }
 
+            /// <summary>
+            /// The equal-level clear chance of a generated encounter of <paramref name="shapeId"/>: the
+            /// library's <c>TargetClear</c> / 100 (the validator requires one on every shape).
+            /// </summary>
+            public double ShapeClear(string shapeId)
+            {
+                EncounterShapeData shape = Encounters.GetShape(shapeId);
+                if (shape == null)
+                {
+                    throw new InvalidOperationException("No encounter shape '" + shapeId + "' in the encounter library.");
+                }
+
+                return shape.TargetClear / 100.0;
+            }
+
+            /// <summary>The equal-level clear chance of <paramref name="node"/>: <see cref="BossClear"/> for a template (the bosses), else its shape's.</summary>
+            public double TierClear(MapNode node)
+            {
+                return !string.IsNullOrEmpty(node.TemplateId) || node.Type == MapNodeType.Boss ? BossClear : ShapeClear(node.ShapeId);
+            }
+
             /// <summary>The drop-table shape a node pays out from: its shape, or its template's.</summary>
             public string DropShape(MapNode node)
             {
@@ -383,17 +403,6 @@ namespace BeastCraft.Tooling.BalanceSim
         private static double Logit(double p)
         {
             return Math.Log(p / (1.0 - p));
-        }
-
-        /// <summary>The equal-level clear chance of <paramref name="node"/>.</summary>
-        public static double TierClear(MapNode node)
-        {
-            if (!string.IsNullOrEmpty(node.TemplateId) || node.Type == MapNodeType.Boss || node.ShapeId == "solo")
-            {
-                return BossClear;
-            }
-
-            return node.ShapeId == "elite" ? EliteClear : SquadClear;
         }
 
         /// <summary>Plays one campaign.</summary>
@@ -542,7 +551,7 @@ namespace BeastCraft.Tooling.BalanceSim
         {
             PlayerSave save = player.Save;
             int cap = CampaignRules.BeastCap(save, world.Regions);
-            double chance = ClearChance(TierClear(node), node.Level - player.FieldedMean());
+            double chance = ClearChance(world.TierClear(node), node.Level - player.FieldedMean());
             bool cleared = rng.NextDouble() < chance;
             BattleOutcome outcome = cleared ? BattleOutcome.PlayerVictory : BattleOutcome.EnemyVictory;
             int focusUses = PacingSimulator.FocusUsesMin + rng.Next(PacingSimulator.FocusUsesMax - PacingSimulator.FocusUsesMin + 1);
@@ -777,6 +786,31 @@ namespace BeastCraft.Tooling.BalanceSim
     /// <summary>The Markdown report of <c>--mode campaign</c> and its gates.</summary>
     internal static class CampaignReport
     {
+        /// <summary>
+        /// The report's clear tiers: squad / horde, elite / gate (generated gates are elites), solo /
+        /// boss, each pair merged when its two targets agree (split otherwise).
+        /// </summary>
+        private static List<KeyValuePair<string, double>> ClearTiers(CampaignPacingSimulator.World world)
+        {
+            List<KeyValuePair<string, double>> tiers = new List<KeyValuePair<string, double>>();
+            AddTier(tiers, "squad", world.ShapeClear("squad"), "horde", world.ShapeClear("horde"));
+            tiers.Add(new KeyValuePair<string, double>("elite / gate", world.ShapeClear("elite")));
+            AddTier(tiers, "solo", world.ShapeClear("solo"), "boss", CampaignPacingSimulator.BossClear);
+            return tiers;
+        }
+
+        private static void AddTier(List<KeyValuePair<string, double>> tiers, string first, double firstClear, string second, double secondClear)
+        {
+            if (firstClear == secondClear)
+            {
+                tiers.Add(new KeyValuePair<string, double>(first + " / " + second, firstClear));
+                return;
+            }
+
+            tiers.Add(new KeyValuePair<string, double>(first, firstClear));
+            tiers.Add(new KeyValuePair<string, double>(second, secondClear));
+        }
+
         public static string Build(SimOptions options, CampaignPacingSimulator.World world, List<int> seeds, List<CampaignPacingSimulator.Result> runs, out List<string> misses)
         {
             misses = new List<string>();
@@ -820,19 +854,20 @@ namespace BeastCraft.Tooling.BalanceSim
             sb.Append("  visited, as is any trading post taken (the game's `ShopService`; see \"Economy\")\n");
             sb.Append("- Team: fielded ").Append(string.Join(", ", CampaignEconomyModel.FieldedSpecies)).Append("; bench ").Append(string.Join(", ", CampaignEconomyModel.BenchSpecies))
               .Append("; recruit ").Append(CampaignEconomyModel.RecruitSpecies).Append(" (species only matter for skill tomes)\n");
-            sb.Append("- Clear chance at equal level: squad / horde ").Append(Pct(CampaignPacingSimulator.SquadClear * 100.0)).Append(", elite and generated gates ")
-              .Append(Pct(CampaignPacingSimulator.EliteClear * 100.0)).Append(", solo and bosses ").Append(Pct(CampaignPacingSimulator.BossClear * 100.0))
-              .Append("; across a gap (node level - fielded mean) it follows the table below in log-odds, interpolated, clamped at its ends\n");
+            List<KeyValuePair<string, double>> tiers = ClearTiers(world);
+            sb.Append("- Clear chance at equal level: ");
+            for (int t = 0; t < tiers.Count; t++)
+            {
+                sb.Append(t == 0 ? string.Empty : ", ").Append(tiers[t].Key.Replace("elite / gate", "elite and generated gates").Replace("solo / boss", "solo and bosses"))
+                  .Append(' ').Append(Pct(tiers[t].Value * 100.0));
+            }
+
+            sb.Append("; across a gap (node level - fielded mean) it follows the table below in log-odds, interpolated, clamped at its ends\n");
             sb.Append("- Focus skill fires ").Append(PacingSimulator.FocusUsesMin).Append('-').Append(PacingSimulator.FocusUsesMax)
               .Append(" times per battle, secondary the same; materials spent with `--mode pacing`'s policy\n\n");
 
             sb.Append("| Gap | -2 | -1 | 0 | +1 | +2 | +3 | +4 |\n| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n");
-            foreach (KeyValuePair<string, double> tier in new[]
-                     {
-                         new KeyValuePair<string, double>("squad / horde", CampaignPacingSimulator.SquadClear),
-                         new KeyValuePair<string, double>("elite / gate", CampaignPacingSimulator.EliteClear),
-                         new KeyValuePair<string, double>("solo / boss", CampaignPacingSimulator.BossClear)
-                     })
+            foreach (KeyValuePair<string, double> tier in tiers)
             {
                 sb.Append("| ").Append(tier.Key);
                 for (int gap = -2; gap <= 4; gap++)

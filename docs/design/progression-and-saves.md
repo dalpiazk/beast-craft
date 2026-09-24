@@ -432,7 +432,9 @@ path] [--self-check] [--regions path]`: 1,000 Monte Carlo campaigns through the 
 rules. The player fields 3 beasts (knocked out in 20% of battles each), benches 3, recruits a level-1
 beast when region 5 starts, takes an Elite when the team's mean level is at least its level (else a
 Battle, else Rest, Shop), camps the lowest bench beast, and retries every loss. Clear chance at equal
-level: squad / horde 80%, elite and gates 60%, solo and bosses 50% (the user's tiers), moved across a
+level: squad / horde 80%, elite and gates 60%, solo and bosses 50% (the user's tiers: a generated
+node reads its shape's `TargetClear` from `encounter-library.json`, the boss templates the 50% their
+`DifficultyOverride`s are calibrated to, `CampaignPacingSimulator.BossClear`), moved across a
 level gap along the design's table in log-odds (+1 level: 60% / 36% / 27%). Result (all gates met):
 
 | Gate | Target | Result |
