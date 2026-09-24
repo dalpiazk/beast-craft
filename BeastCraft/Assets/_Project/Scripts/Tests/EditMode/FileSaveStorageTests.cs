@@ -6,7 +6,6 @@ using System.Text;
 using System.Threading.Tasks;
 using BeastCraft.Save;
 using NUnit.Framework;
-using UnityEngine;
 
 namespace BeastCraft.Tests.EditMode
 {

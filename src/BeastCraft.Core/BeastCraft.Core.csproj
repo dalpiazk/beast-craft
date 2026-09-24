@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    BeastCraft.Core: the engine-neutral game runtime (battle, creatures, progression, campaign,
+    economy, saves). Plain C# with no engine references; a game host (the planned MonoGame shell)
+    draws it, and Tooling/EditModeTests and Tooling/BalanceSim reference it directly.
+
+    netstandard2.1 so any modern host can consume it (MonoGame's net8.0+ included). C# 9 is the
+    language version the code was written to (it was Unity 6000.0 code) and stays the floor.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <IsPackable>false</IsPackable>
+    <EnableNETAnalyzers>false</EnableNETAnalyzers>
+    <RootNamespace>BeastCraft</RootNamespace>
+    <AssemblyName>BeastCraft.Core</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- BeastCraft.FieldJson (saves, settings, data files). Not in netstandard2.1 itself. -->
+    <PackageReference Include="System.Text.Json" Version="10.0.7" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The tests and the balance simulator used to compile these sources into their own
+         assemblies and still reach a few internal members. -->
+    <InternalsVisibleTo Include="EditModeTests" />
+    <InternalsVisibleTo Include="BalanceSim" />
+  </ItemGroup>
+
+</Project>

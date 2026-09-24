@@ -3,7 +3,6 @@ using System.Collections;
 using System.Reflection;
 using BeastCraft.Progression;
 using NUnit.Framework;
-using UnityEngine;
 
 namespace BeastCraft.Tests.EditMode
 {

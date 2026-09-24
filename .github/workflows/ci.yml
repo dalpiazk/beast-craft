@@ -1,18 +1,13 @@
 # ---------------------------------------------------------------------------
-# TODO: Unity Test Runner (GameCI) is intentionally NOT part of this workflow.
+# The game runtime is engine-neutral C# (src/BeastCraft.Core, netstandard2.1);
+# the Unity project under BeastCraft/ is legacy and no longer built. This job
+# format-checks and compiles the runtime, then format-checks and runs the test
+# suite (Tooling/EditModeTests, NUnit). No engine install is needed.
 #
-# Running the real EditMode/PlayMode suites needs a Unity Editor image and a
-# `UNITY_LICENSE` repository secret, neither of which exists yet. Until that
-# secret is provisioned, the automated C# validation is stub-based: the
-# compile + format check of the game scripts, and the EditMode suite run with
-# NUnit outside Unity by Tooling/EditModeTests (see Tooling/CiStubs/README.md
-# for how both work and what they do and do not prove).
-#
-# When a Unity job is eventually added, it must follow this repo's CI-budget
-# discipline: a Unity Editor runner is an order of magnitude more expensive in
-# Actions minutes than this job. CI is a final gate, never a test loop --
+# CI-budget discipline applies: CI is a final gate, never a test loop --
 # everything must be green locally first, one push per PR, and no per-commit
-# fan-out. Mobile build matrices remain out of scope for this workflow.
+# fan-out. When the MonoGame host lands, add it to these same steps rather
+# than a new job or matrix.
 # ---------------------------------------------------------------------------
 
 name: CI
@@ -36,10 +31,7 @@ permissions:
   contents: read
 
 jobs:
-  # Single job, no matrix: Unity Editor tests and mobile builds are out of
-  # scope here. This compiles the real game scripts against the hand-written
-  # UnityEngine stub in Tooling/CiStubs, which needs no Unity install, and
-  # runs the EditMode suite against the same stub.
+  # Single job, no matrix.
   lint-and-compile:
     name: Lint and compile (C#)
     runs-on: ubuntu-latest
@@ -56,11 +48,10 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
-          # NuGet caching is intentionally disabled. CiLint and UnityStub
-          # declare no PackageReference; EditModeTests does (the test SDK and
-          # NUnit, three small packages restored in seconds), but no project
-          # commits a packages.lock.json, which setup-dotnet's cache keys on
-          # by default, and with CiLint alone `cache: true` failed the job in
+          # NuGet caching is intentionally disabled. The packages are few and
+          # small (System.Text.Json for the runtime; the test SDK and NUnit),
+          # but no project commits a packages.lock.json, which setup-dotnet's
+          # cache keys on by default, and `cache: true` once failed the job in
           # the post step ("Cache folder path is retrieved for .NET CLI but
           # doesn't exist on disk"). Re-enable it with a lock file (or an
           # explicit cache-dependency-path) if restores ever get slow.
@@ -68,20 +59,17 @@ jobs:
 
       - name: Format check (dotnet format)
         run: >-
-          dotnet format Tooling/CiStubs/CiLint/CiLint.csproj
+          dotnet format src/BeastCraft.Core/BeastCraft.Core.csproj
           --verify-no-changes
           --verbosity diagnostic
 
       - name: Compile check (dotnet build)
         run: >-
-          dotnet build Tooling/CiStubs/CiLint/CiLint.csproj
+          dotnet build src/BeastCraft.Core/BeastCraft.Core.csproj
           --configuration Release
 
-      # The EditMode suite, outside Unity: Tooling/EditModeTests compiles the
-      # Runtime, Editor and Tests/EditMode scripts against the UnityStub
-      # sources (with a real JsonUtility over System.Text.Json) and runs them
-      # with NUnit. Still no Unity install; Unity's Test Runner stays the
-      # authority on real serialization.
+      # The test suite: Tooling/EditModeTests references BeastCraft.Core and
+      # runs the tests with NUnit.
       - name: Format check (EditModeTests)
         run: >-
           dotnet format Tooling/EditModeTests

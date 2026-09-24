@@ -2,13 +2,12 @@
 # Beast Craft -- repo-wide editor / formatting conventions.
 #
 # Based on Microsoft's default C# .editorconfig conventions, trimmed to what
-# this repo actually needs and matched to the style already used in
-# BeastCraft/Assets/_Project/Scripts/** (4-space indent, Allman braces,
-# PascalCase public fields, explicit types rather than `var`, block-scoped
-# namespaces, System usings first).
+# this repo actually needs and matched to the style already used in the game
+# code (4-space indent, Allman braces, PascalCase public fields, explicit
+# types rather than `var`, block-scoped namespaces, System usings first).
 #
-# `dotnet format Tooling/CiStubs/CiLint/CiLint.csproj --verify-no-changes`
-# enforces this over the real game scripts in CI.
+# CI enforces this with `dotnet format --verify-no-changes` over
+# src/BeastCraft.Core and Tooling/EditModeTests.
 #
 # Note: end_of_line is deliberately unset. .gitattributes normalizes line
 # endings, so the working copy is CRLF on Windows and LF on the Linux CI

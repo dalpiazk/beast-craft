@@ -6,7 +6,6 @@ using BeastCraft.Encounters;
 using BeastCraft.Progression;
 using BeastCraft.Save;
 using NUnit.Framework;
-using UnityEngine;
 
 namespace BeastCraft.Tests.EditMode
 {

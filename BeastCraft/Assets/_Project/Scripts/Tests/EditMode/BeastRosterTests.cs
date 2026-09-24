@@ -5,7 +5,6 @@ using BeastCraft.Battle;
 using BeastCraft.Creatures;
 using BeastCraft.Creatures.Roster;
 using NUnit.Framework;
-using UnityEngine;
 
 namespace BeastCraft.Tests.EditMode
 {
@@ -77,8 +76,8 @@ namespace BeastCraft.Tests.EditMode
         [Test]
         public void Roster_SixStatTotalsStayWithinTheSharedBudgetBand()
         {
-            int min = Mathf.RoundToInt(SixStatBudget * (1f - BudgetTolerance));
-            int max = Mathf.RoundToInt(SixStatBudget * (1f + BudgetTolerance));
+            int min = MathUtil.RoundToInt(SixStatBudget * (1f - BudgetTolerance));
+            int max = MathUtil.RoundToInt(SixStatBudget * (1f + BudgetTolerance));
 
             foreach (SpeciesData species in LoadRoster().Species)
             {

@@ -1,6 +1,5 @@
 using BeastCraft.Encounters;
 using NUnit.Framework;
-using UnityEngine;
 
 namespace BeastCraft.Tests.EditMode
 {

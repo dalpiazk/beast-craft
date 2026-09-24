@@ -5,7 +5,6 @@ using BeastCraft.Battle.Grid;
 using BeastCraft.Creatures;
 using BeastCraft.Creatures.Roster;
 using NUnit.Framework;
-using UnityEngine;
 
 namespace BeastCraft.Tests.EditMode
 {
@@ -452,8 +451,8 @@ namespace BeastCraft.Tests.EditMode
                 Assert.That(shares[i], Is.InRange(0.45f, 0.5f), "level " + levels[i] + " hit share");
             }
 
-            float lowest = Mathf.Min(shares[0], Mathf.Min(shares[1], shares[2]));
-            float highest = Mathf.Max(shares[0], Mathf.Max(shares[1], shares[2]));
+            float lowest = MathUtil.Min(shares[0], MathUtil.Min(shares[1], shares[2]));
+            float highest = MathUtil.Max(shares[0], MathUtil.Max(shares[1], shares[2]));
             Assert.That(highest / lowest, Is.LessThanOrEqualTo(1.1f), "hit share should be flat across levels up to rounding");
         }
 

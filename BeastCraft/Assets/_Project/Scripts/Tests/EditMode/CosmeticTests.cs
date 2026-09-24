@@ -7,7 +7,6 @@ using BeastCraft.Economy;
 using BeastCraft.Progression;
 using BeastCraft.Save;
 using NUnit.Framework;
-using UnityEngine;
 
 namespace BeastCraft.Tests.EditMode
 {

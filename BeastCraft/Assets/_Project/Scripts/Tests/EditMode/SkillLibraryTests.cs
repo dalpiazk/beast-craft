@@ -8,7 +8,6 @@ using BeastCraft.Creatures.Roster;
 using BeastCraft.Progression;
 using BeastCraft.Skills;
 using NUnit.Framework;
-using UnityEngine;
 
 namespace BeastCraft.Tests.EditMode
 {
@@ -229,9 +228,9 @@ namespace BeastCraft.Tests.EditMode
                         foreach (int level in new[] { 1, 50, 100 })
                         {
                             float scale = BeastRosterValidator.ScaleAtLevel(curve, level);
-                            int hp = Mathf.RoundToInt(species.BaseStats.Hp * scale);
+                            int hp = MathUtil.RoundToInt(species.BaseStats.Hp * scale);
                             BattleUnit caster = new BattleUnit("c", BattleTeam.Player,
-                                                               new StatBlock(hp, 1, 1, Mathf.RoundToInt(species.BaseStats.SpecialAttack * scale), 1, 1), BeastCraft.Battle.Grid.HexCoordinate.Zero);
+                                                               new StatBlock(hp, 1, 1, MathUtil.RoundToInt(species.BaseStats.SpecialAttack * scale), 1, 1), BeastCraft.Battle.Grid.HexCoordinate.Zero);
                             double share = 100.0 * SkillEffectApplier.GetHealAmount(caster, effect.Magnitude) / hp;
                             low = Math.Min(low, share);
                             high = Math.Max(high, share);

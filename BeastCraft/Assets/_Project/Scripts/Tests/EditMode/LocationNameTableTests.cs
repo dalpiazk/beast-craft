@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using BeastCraft.Campaign;
 using NUnit.Framework;
-using UnityEngine;
 
 namespace BeastCraft.Tests.EditMode
 {

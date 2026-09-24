@@ -6,7 +6,6 @@ using BeastCraft.Bonds;
 using BeastCraft.Creatures;
 using BeastCraft.Skills;
 using NUnit.Framework;
-using UnityEngine;
 
 namespace BeastCraft.Tests.EditMode
 {

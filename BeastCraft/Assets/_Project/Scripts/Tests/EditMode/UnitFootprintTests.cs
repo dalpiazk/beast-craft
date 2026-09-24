@@ -5,7 +5,6 @@ using BeastCraft.Battle.Grid;
 using BeastCraft.Battle.Placement;
 using BeastCraft.Creatures;
 using NUnit.Framework;
-using UnityEngine;
 using Random = System.Random;
 
 namespace BeastCraft.Tests.EditMode

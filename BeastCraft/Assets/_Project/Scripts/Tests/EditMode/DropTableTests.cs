@@ -4,7 +4,6 @@ using System.IO;
 using BeastCraft.Progression;
 using BeastCraft.Skills;
 using NUnit.Framework;
-using UnityEngine;
 
 namespace BeastCraft.Tests.EditMode
 {
