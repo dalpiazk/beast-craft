@@ -39,8 +39,10 @@ namespace BeastCraft.Idle
     /// <see cref="Elapsed"/>: the wall-clock time, never more than the monotonic clock says really
     /// passed. A clock set back or forward is silently clamped to the real elapsed time (lead / user
     /// decision: no message, no penalty, no bonus). Then at most <see cref="IdleRewards.CapHours"/>
-    /// hours are paid; time beyond the cap is not banked (the UI shows "capped",
-    /// <see cref="IdleClaimPreview.Capped"/>).
+    /// hours are paid; time beyond the cap is not banked. "Capped" has one definition for the claim
+    /// and the preview: the idle time has reached the cap (at least <c>CapHours</c>), so waiting longer
+    /// earns nothing (<see cref="IdleClaimResult.Capped"/>, <see cref="IdleClaimPreview.Capped"/>; the
+    /// UI shows "capped").
     /// </para>
     /// <para>
     /// <strong>What an hour pays</strong> (the band of the progress level; nothing below level 1, i.e.
@@ -130,7 +132,7 @@ namespace BeastCraft.Idle
             long elapsedMs = Elapsed(state, nowTicks, nowMonoMs, out bool clamped);
             result.ClockClamped = clamped;
             result.ElapsedHours = elapsedMs / MsPerHour;
-            result.Capped = result.ElapsedHours > content.Rewards.CapHours;
+            result.Capped = result.ElapsedHours >= content.Rewards.CapHours;
             result.Hours = Math.Min(result.ElapsedHours, content.Rewards.CapHours);
 
             IdleBand band = content.Rewards.BandFor(result.ProgressLevel);
@@ -371,7 +373,11 @@ namespace BeastCraft.Idle
         /// <summary>The hours paid: <see cref="ElapsedHours"/>, at most the cap.</summary>
         public double Hours { get; internal set; }
 
-        /// <summary>Whether the idle time reached past the cap (the excess was not banked).</summary>
+        /// <summary>
+        /// Whether the accumulation cap was reached (<see cref="ElapsedHours"/> at least the cap), so
+        /// waiting longer would have earned nothing; any time past it was not banked. The same
+        /// definition as <see cref="IdleClaimPreview.Capped"/>.
+        /// </summary>
         public bool Capped { get; internal set; }
 
         /// <summary>Whether the wall clock was replaced by the real elapsed time (silent; see <see cref="IdleState.ClockClamps"/>).</summary>
@@ -443,7 +449,10 @@ namespace BeastCraft.Idle
         /// <summary>The accumulation cap in hours.</summary>
         public int CapHours { get; internal set; }
 
-        /// <summary>Whether the cap is reached (the UI shows "capped": more time adds nothing).</summary>
+        /// <summary>
+        /// Whether the accumulation cap has been reached (the idle time is at least the cap), so waiting
+        /// longer earns nothing; the UI shows "capped". The same definition as <see cref="IdleClaimResult.Capped"/>.
+        /// </summary>
         public bool Capped { get; internal set; }
 
         /// <summary>The progress level the rates are read at.</summary>

@@ -204,7 +204,7 @@ beast XP credited (battles, camps and idle).
 | Idle materials / all materials (by XP value) | at most 15.0% | 10.6% | 13.4% | 16.8% | ok |
 | Idle beast XP / all beast XP | at most 10.0% | 8.9% | 9.3% | 9.8% | ok |
 
-Per campaign (means): 40.0 claims (0.0 lost idle time past the cap), 319.8 idle hours paid, 3536 gold (p50), materials by tier 18.7 / 23.1 / 2.5 (clears: 97.0 / 113.3 / 25.6), 0.04 idle look drops; idle avatar XP 8.7% of the avatar's XP (p50; not gated).
+Per campaign (means): 40.0 claims (40.0 reached the cap), 319.8 idle hours paid, 3536 gold (p50), materials by tier 18.7 / 23.1 / 2.5 (clears: 97.0 / 113.3 / 25.6), 0.04 idle look drops; idle avatar XP 8.7% of the avatar's XP (p50; not gated).
 
 ## Focus skill
 

@@ -240,6 +240,26 @@ namespace BeastCraft.Tests.EditMode
             Assert.AreEqual(2, save.Idle.ClaimIndex, "a preview changes nothing");
         }
 
+        [TestCase(-60.0, false)]
+        [TestCase(0.0, true)]
+        [TestCase(60.0, true)]
+        public void Capped_MeansTheCapIsReached_ForClaimAndPreviewAlike(double offsetSeconds, bool capped)
+        {
+            PlayerSave save = ProgressedSave();
+            Start(save);
+            int cap = _content.Rewards.CapHours;
+            TimeSpan at = TimeSpan.FromHours(cap) + TimeSpan.FromSeconds(offsetSeconds);
+
+            IdleClaimPreview preview = IdleRewardCalculator.Preview(save, _content, T0 + at, M0 + at);
+            IdleClaimResult claim = ClaimAfter(save, at, at);
+
+            Assert.AreEqual(capped, preview.Capped, "preview");
+            Assert.AreEqual(capped, claim.Capped, "claim");
+            double paid = Math.Min(at.TotalHours, cap);
+            Assert.AreEqual(paid, preview.Hours, 1e-9);
+            Assert.AreEqual(paid, claim.Hours, 1e-9);
+        }
+
         [Test]
         public void ClockSetBack_IsClampedSilentlyToTheRealElapsedTime()
         {

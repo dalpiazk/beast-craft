@@ -502,8 +502,10 @@ the drop tables, the cosmetic library (null = no look roll) and the region libra
 a save (new or migrated) only starts the clock and pays nothing. Every later claim:
 
 1. **Time.** Credits the real idle time since the last claim (`IdleRewardCalculator.Elapsed`, below),
-   at most `CapHours` (8). Time beyond the cap is **not banked** (`IdleClaimResult.Capped`; the UI's
-   "capped" is `IdleRewardCalculator.Preview(...).Capped`, which never changes the save).
+   at most `CapHours` (8). Time beyond the cap is **not banked**. **Capped** means one thing for the
+   claim and the preview: the idle time has reached the cap (at least `CapHours`), so waiting longer
+   earns nothing (`IdleClaimResult.Capped`; the UI's "capped" is `IdleRewardCalculator.Preview(...).Capped`,
+   which never changes the save).
 2. **Rates.** Reads the band of the **progress level** — `CampaignRules.ProgressLevel(save, regions)`,
    the level of the highest cleared map location: a beaten boss's region max, else the pass of the last
    cleared stage, and any battle location cleared in the expedition in progress; 0 before the first

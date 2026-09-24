@@ -349,7 +349,7 @@ namespace BeastCraft.Tooling.BalanceSim
                 }
             }
 
-            sb.Append("\nPer campaign (means): ").Append(SimOptions.Format(claims)).Append(" claims (").Append(SimOptions.Format(capped)).Append(" lost idle time past the cap), ")
+            sb.Append("\nPer campaign (means): ").Append(SimOptions.Format(claims)).Append(" claims (").Append(SimOptions.Format(capped)).Append(" reached the cap), ")
               .Append(SimOptions.Format(Mean(runs.ConvertAll(run => run.Idle.Hours)))).Append(" idle hours paid, ").Append(Int(p(goldTotal, 50))).Append(" gold (p50), materials by tier ")
               .Append(SimOptions.Format(idleTiers[1] / runs.Count)).Append(" / ").Append(SimOptions.Format(idleTiers[2] / runs.Count)).Append(" / ")
               .Append(SimOptions.Format(idleTiers[3] / runs.Count)).Append(" (clears: ").Append(SimOptions.Format(activeTiers[1] / runs.Count)).Append(" / ")
