@@ -334,7 +334,7 @@ namespace BeastCraft.Skills
             return byId;
         }
 
-        private static void CheckEffects(EffectData[] effects, string label, string field, bool avatar, List<string> errors)
+        internal static void CheckEffects(EffectData[] effects, string label, string field, bool avatar, List<string> errors)
         {
             if (effects == null || effects.Length == 0)
             {
@@ -1012,7 +1012,7 @@ namespace BeastCraft.Skills
             }
         }
 
-        private static bool CheckEnum<T>(string name, string label, string field, List<string> errors) where T : struct
+        internal static bool CheckEnum<T>(string name, string label, string field, List<string> errors) where T : struct
         {
             if (TryParse(name, default(T), out T _))
             {
@@ -1023,7 +1023,7 @@ namespace BeastCraft.Skills
             return false;
         }
 
-        private static void CheckBand(int value, int min, int max, string label, string field, List<string> errors)
+        internal static void CheckBand(int value, int min, int max, string label, string field, List<string> errors)
         {
             if (value < min || value > max)
             {
