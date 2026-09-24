@@ -21,7 +21,7 @@ beast-craft/
 │   │   ├── Prefabs/
 │   │   ├── Scenes/
 │   │   └── Scripts/        Runtime/ (Battle, Bonds, Creatures, Avatar, Skills, Progression,
-│   │                       Save, Session, Customization; Core, Services, Narrative, Idle
+│   │                       Save, Session, Customization, Idle; Core, Services, Narrative
 │   │                       and IAP are empty placeholders), Editor/, Tests/
 │   ├── Packages/           package manifest
 │   └── ProjectSettings/    editor version pin; Unity fills in the rest on first open
@@ -185,7 +185,8 @@ The numbers are simulator-tuned starting points, not confirmed balance — see
   generator and its `Tooling/BalanceSim/encounters.json`.
 - Gear content — the gear schemas and save support exist, but `Data/Gear/` and
   `Data/AvatarGear/` are empty.
-- Narrative, idle, IAP and services code (those `Runtime/` folders are empty),
+- Narrative, IAP and services code (those `Runtime/` folders are empty; idle
+  rewards have their rules in `Runtime/Idle` but no UI),
   the offline art compositor, and any UGS integration.
 - PlayMode tests (the assembly exists, with no tests) and any Unity test run
   in CI.

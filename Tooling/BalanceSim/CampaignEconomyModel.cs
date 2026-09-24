@@ -206,6 +206,15 @@ namespace BeastCraft.Tooling.BalanceSim
             }
         }
 
+        /// <summary>Milestone looks unlocked outside a boss clear (an idle claim's XP reaching a milestone), counted by source.</summary>
+        public void OnMilestoneLooks(IEnumerable<string> keys)
+        {
+            foreach (string key in keys)
+            {
+                Count(_result.Cosmetics, _world.Content.Cosmetics.GetOption(key).Source);
+            }
+        }
+
         /// <summary>Before a battle: a den, pass or lair gets one consumable from the pack (spent win or lose).</summary>
         public void BeforeBattle(PlayerSave save, MapNode node, int regionIndex)
         {

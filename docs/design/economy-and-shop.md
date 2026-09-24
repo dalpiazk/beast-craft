@@ -12,8 +12,9 @@ The lead / user decisions this implements: campaign difficulty **assumes typical
 teach **own-species skills only**; **at most one consumable per battle** (each worth at most about
 +0.3 of a level); gear **sells back at 25%**, gear only; cosmetics are **per species** (not per body
 type) plus the avatar's; look sources are **starter, shop, boss-exclusive, milestone, low-chance
-battle drops**, with a **premium tier reserved** for future purchases and **idle (AFK) rewards** a
-future source.
+battle drops**, with a **premium tier reserved** for future purchases; **idle (AFK) rewards** (built
+since: [progression-and-saves.md](progression-and-saves.md), "Idle rewards") add a little gold and a
+very rare look **from the same battle-drop pool** (user decision: no idle-exclusive looks).
 
 ---
 
@@ -21,10 +22,10 @@ future source.
 
 | Earned by | Spent on |
 | --- | --- |
-| **Gold** on every clear (dens, passes and lairs pay more) and by selling gear | The **Trader**: gear, skill materials, skill tomes and avatar skills, consumables, looks |
+| **Gold** on every clear (dens, passes and lairs pay more), by selling gear and from idle rewards (~6%) | The **Trader**: gear, skill materials, skill tomes and avatar skills, consumables, looks |
 | **Gear** from battle drops, the Trader, and every pass's (a common) and lair's (rare or epic) first clear | Worn by beasts and the avatar (stats); sold back for 25% |
 | **Consumables** from the Trader | One per battle, used as it begins, spent win or lose |
-| **Looks** from starters, the Trader, lairs, milestones and rare battle drops | Worn by the avatar and each beast of the look's species; no stats |
+| **Looks** from starters, the Trader, lairs, milestones, rare battle drops and the idle rewards' rarer roll (same pool) | Worn by the avatar and each beast of the look's species; no stats |
 
 One currency (gold). Gold never buys power the difficulty does not already assume: the encounter
 table is calibrated for a player in **typical gear** (below), and consumables are small.
@@ -42,9 +43,10 @@ elite x1.5, squad x1.0, horde x1.1, first clear +5. The campaign's modifiers
 Paid on a player victory only (`PostBattleAward.AwardGold`, `BattleSession.ApplyRewards`), into
 `PlayerSave.Gold` through `Wallet` (held in [0, 9,999,999]; income past the ceiling is lost).
 
-Earned (campaign model, p50): **977** gold in region 1, **4,559** in region 5, **9,026** in region 10,
-**49,953** over the campaign, plus about 8,300 from selling replaced gear — **14% of all gold**
-(user target 10-15%) — (design targets ~0.9k / 4.4k / 8.8k / 55k).
+Earned (campaign model, p50, idle rewards included): **988** gold in region 1, **4,630** in region 5,
+**9,193** in region 10, **50,744** over the campaign, plus about 8,500 from selling replaced gear —
+**14% of the gold from clears and sales** (user target 10-15%) — and about 3,500 from idle rewards
+(5.6% of all gold) (design targets ~0.9k / 4.4k / 8.8k / 55k; without idle 977 / 4,559 / 9,026 / 49,953).
 
 ### Seed streams
 
@@ -202,7 +204,7 @@ its default).
 | shop | the Trader (from `MinRegion`) | common or rare price |
 | boss | a region lair's first clear (`UnlockId` = the region); never sold | at least one per region (each species' second part; avatar headwear, cape and outfit) |
 | milestone | `Milestones`: a beast of the species reaching level 25 / 50 / 75 / 100 (any beast for an avatar look), avatar level 50, the first boss, all ten bosses | species parts at 50 and 100 (the frost wyrm's tail at 25), avatar looks |
-| drop | a low chance per won battle (`drop-tables.json` `CosmeticDrops`: elite 2%, solo 1%, squad / horde 0.5%), a look not yet owned, stream 4 | two per species (three for the frost wyrm), three for the avatar |
+| drop | a low chance per won battle (`drop-tables.json` `CosmeticDrops`: elite 2%, solo 1%, squad / horde 0.5%), a look not yet owned, stream 4; also the idle rewards' roll (0.08% per full 8-hour claim, `CosmeticRules.PickDrop`: the same pool, no idle-exclusive looks) | two per species (three for the frost wyrm), three for the avatar |
 | premium | **reserved for future purchases; never obtainable with gold or play** | one per species' first part, avatar hair / outfit / headwear |
 
 `CosmeticRules`: `IsUsable` (free or unlocked), `TrySetOption` / `TrySetColor` (colours free),
@@ -212,9 +214,11 @@ unlock id, region, rarity and art key in `UnlockTags`; no art yet), the avatar's
 `CreatureCustomizationSchema` per species on its `CreatureSpeciesSO`. Campaign model: about 31 looks
 bought, 14 from lairs, 14 from milestones and 3 from drops per campaign.
 
-**Idle (AFK) rewards** are a future source (designed separately, built after this): the numbers
-leave room for them — gold held at every boss is under two Trader visits' income, looks and drops
-are unlocks rather than power.
+**Idle (AFK) rewards** (built; [progression-and-saves.md](progression-and-saves.md), "Idle rewards")
+are a source of gold (5.6% of all gold in the campaign model, held there by the want-list gate below)
+and, very rarely, of looks: one roll per claim at 0.08% per full 8-hour claim from **the battle-drop
+pool** (the progress level's region's `drop` looks not yet owned; user decision: no idle-exclusive
+looks), about 0.04 looks per campaign.
 
 ## Pacing (`--mode campaign`)
 
@@ -226,13 +230,13 @@ consumable at every den, pass and lair battle). Purchases do not change the clea
 
 | Gate | Target | Result |
 | --- | --- | --- |
-| Want-list affordability (spent / wanted per visit) | p50 55-80% | 63% (p10 5%, p90 100%) |
-| Gold from selling gear | about 10-15% of all gold | 14% (8,340 of ~58,300) |
+| Want-list affordability (spent / wanted per visit) | p50 55-80% | 74% (p10 8%, p90 100%); 63% without idle gold |
+| Gold from selling gear | about 10-15% of all gold | 14% (8,451 of ~59,200 from clears and sales; idle adds ~3,500) |
 | Visits where nothing meaningful in stock is affordable | < 5% | 0% |
-| Gold held at every boss | < 2 visits' income (p50) | 1.0-1.6 |
-| Focus skill L5 / L10 / L15 / L20 | 15-20 / 72-88 / 162-198 / >= 270 | 17 / 86 / 190 / 323 |
+| Gold held at every boss | < 2 visits' income (p50) | 1.1-1.7 (1.0-1.6 without idle gold) |
+| Focus skill L5 / L10 / L15 / L20 | 15-20 / 72-88 / 162-198 / >= 270 | 17 / 77 / 171 / 297 (idle materials included) |
 
-Every earlier campaign gate still holds (545 battles p50). The gate material is almost never wanted:
+Every earlier campaign gate still holds (507 battles p50 with idle rewards, 545 without). The gate material is almost never wanted:
 drops and pity deliver materials before a gate waits.
 
 ## Reproduce
@@ -250,4 +254,7 @@ dotnet run --project Tooling/BalanceSim -c Release -- --mode pve --seeds 12345,7
   (`ConsumableLibraryValidator` accepts an instant team `Cleanse` effect, but consumables are used
   as a battle begins, before anything can stun or burn the team, so one needs an in-battle use or
   a trigger first; no content yet).
-- Premium looks and idle rewards (future).
+- Premium looks (future).
+- Idle gold is held at ~6% of all gold, well under its 15% ceiling: more makes most Trader visits fully
+  affordable (the want-list gate, p50 55-80%, reads 100% from about 7%). Raising it needs higher prices
+  or a new gold sink first (progression-and-saves.md, "Idle rewards").

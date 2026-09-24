@@ -7,6 +7,7 @@ using System.Text.Json;
 using BeastCraft.Battle;
 using BeastCraft.Campaign;
 using BeastCraft.Encounters;
+using BeastCraft.Idle;
 using BeastCraft.Progression;
 using BeastCraft.Save;
 using BeastCraft.Skills;
@@ -34,7 +35,8 @@ namespace BeastCraft.Tooling.BalanceSim
     /// random). Camp trains the lowest-level bench beast. The focus skill and its materials follow
     /// <c>--mode pacing</c>'s feeding policy. The economy (gold, gear and look drops, pass and lair
     /// rewards, the Trader at trading posts and at every camp, a greedy shopper) is
-    /// <see cref="CampaignEconomyModel"/>'s, on its own random stream.
+    /// <see cref="CampaignEconomyModel"/>'s, on its own random stream. The idle (AFK) rewards (the
+    /// game's <c>IdleRewardCalculator</c> at a claim cadence) are <see cref="CampaignIdleModel"/>'s.
     /// </para>
     /// <para>
     /// <strong>Clear chance</strong> by tier (the user's tiered targets, the difficulty the
@@ -190,6 +192,27 @@ namespace BeastCraft.Tooling.BalanceSim
 
                 return 2;
             }
+
+            IdleRewards idle = CampaignIdleModel.Settings.Load(tables, errors);
+            if (idle == null)
+            {
+                Console.Error.WriteLine("The idle reward data is invalid:");
+                foreach (string error in errors)
+                {
+                    Console.Error.WriteLine("  " + error);
+                }
+
+                return 2;
+            }
+
+            world.Idle = new CampaignIdleModel.Settings
+            {
+                Content = new IdleContent { Rewards = idle, DropTable = world.Model.Table, Cosmetics = world.Economy.Content.Cosmetics, Regions = world.Regions },
+                IdleHoursPerDay = options.IdleHoursPerDay,
+                ClaimsPerDay = options.IdleClaimsPerDay,
+                BattlesPerDay = options.BattlesPerDay
+            };
+
             List<int> seeds = options.Seeds ?? new List<int> { options.Seed };
 
             DateTime start = DateTime.UtcNow;
@@ -258,6 +281,15 @@ namespace BeastCraft.Tooling.BalanceSim
 
             /// <summary>The economy's content and the Trader (<see cref="CampaignEconomyModel"/>).</summary>
             public CampaignEconomyModel.World Economy { get; set; }
+
+            /// <summary>The idle rewards' content and cadence (<see cref="CampaignIdleModel"/>).</summary>
+            public CampaignIdleModel.Settings Idle { get; set; }
+
+            /// <summary>A material's tier (0 when unknown).</summary>
+            public int TierOf(string materialId)
+            {
+                return Economy.MaterialTiers.TryGetValue(materialId, out int tier) ? tier : 0;
+            }
 
             /// <summary>
             /// The equal-level clear chance of a generated encounter of <paramref name="shapeId"/>: the
@@ -346,6 +378,9 @@ namespace BeastCraft.Tooling.BalanceSim
 
             /// <summary>The economy's measurements (<see cref="CampaignEconomyModel"/>).</summary>
             public CampaignEconomyModel.Result Econ;
+
+            /// <summary>The idle rewards' measurements (<see cref="CampaignIdleModel"/>).</summary>
+            public CampaignIdleModel.Result Idle;
         }
 
         private sealed class Player
@@ -358,6 +393,10 @@ namespace BeastCraft.Tooling.BalanceSim
             public SkillProgress Secondary = new SkillProgress("secondary");
             public SkillProgressionDefinition Definition = new SkillProgressionDefinition();
             public CampaignEconomyModel Economy;
+            public CampaignIdleModel Idle;
+
+            /// <summary>Every beast's total XP at the last boss (<see cref="CampaignIdleModel.OnRegionEnd"/>).</summary>
+            public long XpAtRegionEnd;
 
             public double FieldedMean()
             {
@@ -427,6 +466,9 @@ namespace BeastCraft.Tooling.BalanceSim
                 (i < FieldedCount ? player.Fielded : player.Bench).Add(beast);
             }
 
+            player.Idle = new CampaignIdleModel(world.Idle, player.Save, campaignSeed, regions.Regions.Count, world.Model.Materials);
+            result.Idle = player.Idle.Stats;
+
             int stageIndex = 0;
             for (int r = 0; r < regions.Regions.Count; r++)
             {
@@ -464,6 +506,13 @@ namespace BeastCraft.Tooling.BalanceSim
             RegionLibrary regions = world.Regions;
             while (save.Campaign.HasActiveRun)
             {
+                if (player.Idle.ClaimDue(save, player.Fielded, result.Battles, regionIndex, world.TierOf, player.Economy))
+                {
+                    MaterialSpending.Spend(world.Model, player.Focus, player.Definition, save.Materials, null);
+                    MaterialSpending.Spend(world.Model, player.Secondary, player.Definition, save.Materials, MaterialSpending.Reserve(world.Model, player.Focus, player.Definition));
+                    CheckCap(player, result, regions);
+                }
+
                 MapNode node = Choose(CampaignRules.Choices(save.Campaign.ActiveRun), player.FieldedMean(), rng);
                 if (node.Type == MapNodeType.Rest)
                 {
@@ -526,6 +575,7 @@ namespace BeastCraft.Tooling.BalanceSim
                     if (cleared && node.Type == MapNodeType.Boss)
                     {
                         player.Economy.OnRegionEnd(save, regionIndex, node.Level);
+                        player.Idle.OnRegionEnd(save, regionIndex, ref player.XpAtRegionEnd);
                     }
 
                     CheckCap(player, result, regions);
@@ -568,6 +618,7 @@ namespace BeastCraft.Tooling.BalanceSim
             {
                 LootResult loot = LootRoller.RollClear(world.Model.Table, world.DropShape(node), node.Level, save.Materials, rng);
                 player.Economy.OnClear(save, world.Model.Table, node, world.DropShape(node), loot.FirstClear, regionIndex);
+                player.Idle.OnLoot(loot, regionIndex, world.TierOf);
             }
 
             MaterialSpending.Spend(world.Model, player.Focus, player.Definition, save.Materials, null);
@@ -864,7 +915,11 @@ namespace BeastCraft.Tooling.BalanceSim
 
             sb.Append("; across a gap (node level - fielded mean) it follows the table below in log-odds, interpolated, clamped at its ends\n");
             sb.Append("- Focus skill fires ").Append(PacingSimulator.FocusUsesMin).Append('-').Append(PacingSimulator.FocusUsesMax)
-              .Append(" times per battle, secondary the same; materials spent with `--mode pacing`'s policy\n\n");
+              .Append(" times per battle, secondary the same; materials spent with `--mode pacing`'s policy\n");
+            sb.Append("- Idle rewards: ").Append(world.Idle.Enabled
+                                                     ? SimOptions.Format(world.Idle.BattlesPerDay) + " battles a day, " + SimOptions.Format(world.Idle.IdleHoursPerDay) + " hours away, " +
+                                                       world.Idle.ClaimsPerDay + " claims a day (see \"Idle rewards\")"
+                                                     : "off").Append("\n\n");
 
             sb.Append("| Gap | -2 | -1 | 0 | +1 | +2 | +3 | +4 |\n| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n");
             foreach (KeyValuePair<string, double> tier in tiers)
@@ -1048,6 +1103,7 @@ namespace BeastCraft.Tooling.BalanceSim
               .Append(Levels(CampaignPacingSimulator.GrindSameRegionMax)).Append(" | ").Append(sameOk ? "ok" : "**MISS**").Append(" |\n\n");
 
             CampaignEconomyModel.Report(sb, regions, runs, P, misses);
+            CampaignIdleModel.Report(sb, regions, world.Idle, runs, P, misses);
 
             // Skill.
             sb.Append("## Focus skill\n\n");

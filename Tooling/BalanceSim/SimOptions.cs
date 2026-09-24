@@ -524,6 +524,15 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <summary><c>--regions</c>: the campaign's regions.json, or null to find it by walking up.</summary>
         public string RegionsPath;
 
+        /// <summary><c>--idle-hours-per-day</c>: campaign: hours a day the player is away and the idle clock runs (0 = no idle rewards).</summary>
+        public double IdleHoursPerDay = CampaignIdleModel.DefaultIdleHoursPerDay;
+
+        /// <summary><c>--idle-claims-per-day</c>: campaign: idle claims a day, evenly spaced (each covers the day's idle hours / claims).</summary>
+        public int IdleClaimsPerDay = CampaignIdleModel.DefaultClaimsPerDay;
+
+        /// <summary><c>--battles-per-day</c>: campaign: battles fought a day, which sets how many battles lie between two idle claims.</summary>
+        public double BattlesPerDay = CampaignIdleModel.DefaultBattlesPerDay;
+
         /// <summary><c>--drop-tables</c>: the drop-table file, or null to find it by walking up.</summary>
         public string DropTablesPath;
 
@@ -647,6 +656,10 @@ namespace BeastCraft.Tooling.BalanceSim
             "  --battles <n>              pacing: battles per campaign (default 500).\n" +
             "  --runs <n>                 pacing / campaign: campaigns per base seed (default 1000; --seeds pools every seed's).\n" +
             "  --regions <path>           campaign: regions.json (default: found by walking up from the working directory).\n" +
+            "  --idle-hours-per-day <h>   campaign: hours a day the player is away and the idle clock runs, 0-24 (default 16;\n" +
+            "                             0 = no idle rewards). Each claim covers h / claims hours, paid up to the 8-hour cap.\n" +
+            "  --idle-claims-per-day <n>  campaign: idle claims a day, evenly spaced (default 2).\n" +
+            "  --battles-per-day <n>      campaign: battles fought a day (default 25); sets the battles between two claims.\n" +
             "  --drop-tables <path>       drop-tables.json (default: found by walking up from the working directory). Pacing\n" +
             "                             rolls it; PvE checks the encounter library's shape ids against it.\n" +
             "  --kit <k>                  elemental | neutral | both (default both): the element axis. neutral forces every\n" +
@@ -941,6 +954,39 @@ namespace BeastCraft.Tooling.BalanceSim
                     case "--regions":
                         if (!TryNext(args, ref i, arg, out options.RegionsPath, out error))
                         {
+                            return null;
+                        }
+
+                        break;
+                    case "--idle-hours-per-day":
+                        if (!TryNextDouble(args, ref i, arg, out options.IdleHoursPerDay, out error))
+                        {
+                            return null;
+                        }
+
+                        if (options.IdleHoursPerDay < 0.0 || options.IdleHoursPerDay > 24.0)
+                        {
+                            error = "--idle-hours-per-day must be between 0 and 24.";
+                            return null;
+                        }
+
+                        break;
+                    case "--idle-claims-per-day":
+                        if (!TryNextInt(args, ref i, arg, 1, out options.IdleClaimsPerDay, out error))
+                        {
+                            return null;
+                        }
+
+                        break;
+                    case "--battles-per-day":
+                        if (!TryNextDouble(args, ref i, arg, out options.BattlesPerDay, out error))
+                        {
+                            return null;
+                        }
+
+                        if (options.BattlesPerDay < 1.0)
+                        {
+                            error = "--battles-per-day must be at least 1.";
                             return null;
                         }
 

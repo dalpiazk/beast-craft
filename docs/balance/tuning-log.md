@@ -3372,3 +3372,52 @@ explained by the gear: the picked team clears 82.0% there at x1.188 in gear and 
 without, so the geared calibration landed a step lower on 128 battles per search step (+/-3.5 points
 at 80%); flagged for the next balance pass rather than hand-edited (the file is written, never
 edited). The `neutral` cells move the same way (0-5.5%, `horde` L100 -4.4%).
+
+## Idle (AFK) rewards (`--mode campaign`)
+
+New system (lead-approved design; user decisions: 8-hour cap, idle at most ~15% of gold and materials
+and ~10% of beast XP over a campaign, looks from the battle-drop pool, XP to the party and the bench
+through the catch-up rule, clock tampering clamped silently). `idle-rewards.json` rates were tuned in
+the campaign model with the game's `IdleRewardCalculator` claiming on the model's save at the default
+cadence: 25 battles a day, away 16 hours a day, two claims a day (8 hours each, exactly the cap).
+
+Shape of the rates: 10 bands of 10 progress levels; gold/hour = `kG x (10 + 2L)` and XP/hour =
+`kX x (34 + 2.8L)` at each band's middle level (the squad gold curve; a standing beast's clear XP net of
+losses); one material roll an hour of the `squad` cell at `m` x its chances; looks 0.08% per full claim.
+
+| kG | kX | m | Idle gold | Idle materials | Idle XP | Want-list affordability p50 | Verdict |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| 0.25 | 0.13 | 0.25 | 13.2% | 9.0% | 6.4% | 100% | **MISS** (affordability) |
+| 0.20 | 0.13 | 0.25 | 10.9% | | | 100% | **MISS** |
+| 0.15 | 0.13 | 0.25 | 8.4% | | | 100% | **MISS** |
+| 0.12 | 0.13 | 0.25 | 6.9% | | | 100% | **MISS** |
+| 0.11 | 0.13 | 0.25 | 6.4% | | | 75% | ok |
+| 0.10 | 0.13 | 0.35 | 5.8% | 12.1% | 6.4% | | ok |
+| 0.10 | 0.18 | 0.35 | 5.7% | 12.0% | 8.5% | | ok |
+| 0.10 | 0.21 | 0.45 | 5.4% | 14.9% | 9.8% (p90 10.3%) | 76% | ok (too close) |
+| **0.10** | **0.20** | **0.40** | **5.6%** | **13.4%** (p90 16.8%) | **9.3%** (p90 9.8%) | **74%** | **ok (shipped)** |
+| 0 (no idle gold) | 0.13 | 0.25 | 0% | | | 64% | ok |
+
+**Finding: the Trader caps idle gold, not the 15% ceiling.** The want-list affordability gate (p50
+55-80%; 63% without idle) flips to 100% once idle gold passes about 6.5% of all gold: the per-visit
+distribution is bimodal, and a little more gold makes most visits fully affordable. Idle gold ships at
+0.1 x G(L) (5.6%); reaching ~15% needs higher Trader prices or another gold sink first (producer item).
+XP and materials sit just under their ceilings.
+
+Effect on the campaign (every gate still met): battles 545 -> 507 p50 (idle XP keeps the team a
+fraction of a level ahead, so fewer losses: ~17 -> ~13 retries a region); fielded and avatar within 1
+of every gate and boss; the falloff's cut of fielded battle XP 13.7% -> 22.3%; bench 5.0-5.7 behind
+from region 3 (was 5.0-6.0; r03, r04 and r10 sit exactly at the 5.0 floor); recruit 7.7 -> 6.3 behind;
+gold held at a boss 1.1-1.7 visits' income (was 1.0-1.6); focus skill L10 86 -> 77, L15 190 -> 171,
+L20 323 -> 297 battles (idle materials). The cap never binds (banked levels at a seal 0; the falloff
+keyed on the progress level stops idle XP first). With `--idle-hours-per-day 0` the report is
+byte-identical to the pre-idle one apart from an "Idle rewards: off" line and section.
+
+Cadence sensitivity (shipped rates): 15 battles a day -> idle 8.8% of gold, 20.2% of materials, 14.4%
+of XP (over the ceilings, and affordability 100%); 40 a day -> 3.7%, 8.9%, 6.2%; one claim a day (16
+hours away, capped at 8) -> 3.0%, 7.4%, 5.0%; four claims a day -> 5.6%, 13.5%, 9.2% (claiming more
+often gains nothing). The ceilings hold for the modelled player, not for a light one; a producer call.
+
+Reproduce: `dotnet run --project Tooling/BalanceSim -c Release -- --mode campaign --self-check --out
+docs/balance/campaign-pacing-report.md` (add `--battles-per-day`, `--idle-hours-per-day`,
+`--idle-claims-per-day` for the sensitivity rows; the kG / kX / m rows by editing `idle-rewards.json`).
