@@ -72,6 +72,12 @@ namespace BeastCraft.Tooling.BalanceSim
                                   "% (the player scouts and counter-picks); the average team's no-scouting rate is reported beside it, see \"Calibrated difficulty\"");
             }
 
+            if (options.RunPve && options.LevelGaps != null)
+            {
+                report.AppendLine("- Level gap (PvE, `--level-gap`): every cell also replayed with the enemies " + SimOptions.Join(options.LevelGaps) +
+                                  " levels above the team at its calibrated multiplier; see \"PvE level gap\"");
+            }
+
             report.AppendLine();
 
             if (options.KitSource == KitSource.Library)

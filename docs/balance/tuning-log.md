@@ -2613,3 +2613,108 @@ overall, 3 seeds) at least 1.5 points above the value before this change.
 
 Reproduce: `dotnet run --project Tooling/BalanceSim -c Release -- --seeds 12345,777,4242 --out out/scaling.md`
 (about 30 s); before = the same at the previous commit.
+
+## Level-difference modifier
+
+Design decision (milestone 2, user): **an under-levelled team must not clear content** ("that makes
+levelling pointless; the curve levels out too much"). Chosen fix: a level-difference multiplier on
+every damage hit, caster level minus target level, both directions, the avatar at its own level
+(`DamageFormula.GetLevelMultiplier`; battle-system.md, "Damage formula"):
+
+```
+level multiplier = clamp(1 + k d + q d |d|, 1 - cap, 1 + cap),  d = caster level - target level
+k = 0.025 (LevelDifferencePerLevel), q = 0.005 (LevelDifferenceConvex), cap = 0.4 (LevelDifferenceCap)
+```
+
+It is the last multiplier before the single truncation (after element, crit, variance and execute),
+exactly 1 between equal levels and then not applied at all, so **every equal-level battle is
+bit-identical**: the committed `tuned-report.md` is byte-identical with the modifier in (`cmp`
+against the fresh default run), and so are all three seeds' reports and the aggregate of
+`--mode pve --seeds 12345,777,4242` against the previous commit (**balance guard: normalized
+per-beast marginals unchanged, identity**). Damage over time inherits it; heals, shields, stat
+changes, status chance and knockback do not; no random draws. No roster, skill, bond, avatar or
+enemy data changed.
+
+**Measuring it: `--level-gap`.** Every (kit mode, shape, level) cell is calibrated at equal levels
+as before (scouted pick at 50%), then replayed at the same multiplier with the enemies `g` levels
+above the team: the picked team 16 times per composition (the **scouted** rate) and a seeded 42 of
+210 teams once per composition (the **no-scouting** rate). The seed ignores the gap (common random
+numbers), so gap 0 is the calibration itself. The team and the avatar stay at the row's level; the
+enemies' stats follow their curve to their level. Report section "PvE level gap" (and "over seeds"
+with `--seeds`); committed as `docs/balance/level-gap-report.md` (`--mode pve --levels
+10,30,50,70,90 --level-gap -5..10`, seed 12345, about 58 s). Targets for the scouted rate: gap 0
+50 +/- 5, +2 and +3 in 20-35%, +5 and beyond under 10%, at every level band.
+
+**Sweep** (3 seeds 12345 / 777 / 4242, `elemental` (the game's mode), every shape averaged,
+scouted rate; `!` = misses its target; k = 0 is the stats alone, i.e. before this change). The
+design's grid is k in {0.025, 0.03, 0.035, 0.04} x cap in {0.3, 0.4}; the cap only binds past
+cap / k levels (7.5-16), so the cap-0.3 rows repeat the cap-0.4 ones exactly up to +7 (common random
+numbers) and are listed once:
+
+| k | cap | q | +2 at L10 / 30 / 50 / 70 / 90 | +3 | +5 | +7 | Targets met L30-90 | L10 |
+| ---: | ---: | ---: | --- | --- | --- | --- | ---: | ---: |
+| 0 | - | 0 | 33.7 / 39.0 ! / 37.7 ! / 41.9 ! / 41.9 ! | 25.3 / 36.4 ! / 35.4 ! / 41.5 ! / 38.6 ! | 19.0 ! / 25.8 ! / 32.2 ! / 36.1 ! / 34.6 ! | 10.7 / 22.7 / 26.7 / 35.0 / 34.9 | 0/12 | 2/3 |
+| 0.025 | 0.3, 0.4 | 0 | 26.6 / 29.9 / 29.8 / 31.3 / 30.0 | 18.4 ! / 26.8 / 24.9 / 28.8 / 26.8 | 10.5 ! / 11.6 ! / 16.3 ! / 19.7 ! / 18.6 ! | 2.7 / 8.5 / 10.5 / 13.7 / 11.5 | 8/12 | 1/3 |
+| 0.03 | 0.3, 0.4 | 0 | 25.2 / 28.9 / 27.9 / 29.8 / 27.9 | 16.7 ! / 24.6 / 23.6 / 27.0 / 25.4 | 8.9 / 11.1 ! / 13.8 ! / 17.1 ! / 15.9 ! | 2.2 / 5.9 / 8.9 / 10.5 / 9.6 | 8/12 | 2/3 |
+| 0.035 | 0.3, 0.4 | 0 | 23.8 / 27.2 / 26.2 / 27.9 / 26.8 | 15.6 ! / 23.0 / 22.3 / 25.3 / 23.8 | 7.0 / 9.4 / 12.2 ! / 15.4 ! / 12.9 ! | 1.2 / 4.4 / 7.2 / 8.0 / 7.2 | 9/12 | 2/3 |
+| 0.04 | 0.3, 0.4 | 0 | 22.7 / 26.0 / 24.7 / 27.1 / 25.8 | 14.3 ! / 20.6 / 21.0 / 24.4 / 22.3 | 5.5 / 8.3 / 11.0 ! / 13.2 ! / 10.7 ! | 1.0 / 3.1 / 6.2 / 7.0 / 6.1 | 9/12 | 2/3 |
+| 0.03 | 0.4 | 0.004 | 23.4 / 26.6 / 25.1 / 27.2 / 26.5 | 13.5 ! / 20.0 / 20.6 / 24.0 / 21.2 | 3.8 / 6.2 / 8.3 / 9.2 / 8.3 | 0.3 / 0.8 / 2.0 / 3.1 / 2.8 | 12/12 | 2/3 |
+| **0.025** | **0.4** | **0.005** | 23.8 / 27.2 / 26.2 / 27.9 / 26.8 | 14.3 ! / 20.6 / 21.0 / 24.4 / 22.3 | 3.8 / 6.2 / 8.3 / 9.2 / 8.3 | 0.3 / 0.8 / 2.0 / 3.1 / 2.8 | **12/12** | 2/3 |
+
+- **Stats alone (k = 0) do not do it**: 5 levels under, the scouted team still clears 26-36% at
+  levels 30-90 (at level 10, where a level is about 4% of stats rather than 1-2%, 19%).
+- **No linear k meets both ends.** "Under 10% at +5" needs a multiplier of about 1.25 at 5 levels,
+  which linearly (k = 0.05) would put 3 under at about 1.15 and below 20%. Every linear k from
+  0.025 to 0.04 misses +5 at levels 50-90 (11-20%) while +2 / +3 still sit comfortably inside the band.
+- **The convex term q (design fallback) fixes it**: 1 + k d + q d |d| is mild near 0 and steep
+  further out. k = 0.025, q = 0.005 gives x1.07 at 2 levels (= linear 0.035), x1.12 at 3
+  (= linear 0.04) and x1.25 at 5. **Chosen: k = 0.025, q = 0.005, cap = 0.4**, which meets all 12
+  targets at levels 30-90; k = 0.03 / q = 0.004 is equivalent except +3 at level 30 sits exactly
+  on the 20% edge. Cap 0.4 (not 0.3): with q the multiplier reaches 1.4 at 7 levels, where a clear
+  is already 1-3%; 0.3 would bind at 6 and flatten +6 / +7.
+- **Chosen setting, full table** (3-seed means, every shape averaged, `scouted (no scouting)` %):
+
+| Mode | Level | -5 | -4 | -3 | -2 | -1 | 0 | +1 | +2 | +3 | +4 | +5 | +6 | +7 | +8 | +9 | +10 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `elemental` | 10 | 100.0 (98.7) | 98.5 (92.5) | 93.3 (77.9) | 83.3 (59.3) | 66.9 (37.5) | 49.3 (21.9) | 34.3 (17.0) | 23.8 (9.5) | 14.3 (3.9) ! | 10.2 (2.1) | 3.8 (0.6) | 1.8 (0.1) | 0.3 (0.0) | 0.0 (0.0) | 0.0 (0.0) | 0.0 (0.0) |
+| `elemental` | 30 | 98.8 (91.0) | 93.3 (75.9) | 87.8 (60.5) | 71.7 (43.5) | 60.4 (31.7) | 50.3 (22.7) | 34.0 (16.9) | 27.2 (10.4) | 20.6 (6.1) | 12.5 (2.7) | 6.2 (1.3) | 2.7 (0.5) | 0.8 (0.1) | 0.7 (0.0) | 0.6 (0.0) | 0.6 (0.0) |
+| `elemental` | 50 | 96.9 (84.9) | 92.4 (70.1) | 80.9 (56.1) | 70.5 (40.9) | 64.4 (29.7) | 49.3 (23.4) | 35.6 (16.7) | 26.2 (11.0) | 21.0 (6.7) | 15.9 (3.8) | 8.3 (1.4) | 5.9 (0.8) | 2.0 (0.2) | 2.1 (0.2) | 2.1 (0.2) | 1.6 (0.1) |
+| `elemental` | 70 | 95.8 (81.5) | 90.6 (66.6) | 77.2 (52.1) | 72.7 (39.0) | 64.3 (28.6) | 50.1 (23.3) | 42.9 (19.7) | 27.9 (13.3) | 24.4 (9.2) | 16.9 (4.4) | 9.2 (1.9) | 6.7 (0.9) | 3.1 (0.4) | 2.9 (0.4) | 2.7 (0.3) | 2.4 (0.3) |
+| `elemental` | 90 | 93.9 (76.4) | 86.9 (62.0) | 74.7 (48.0) | 69.9 (35.6) | 57.2 (25.8) | 49.8 (21.9) | 38.5 (18.0) | 26.8 (11.5) | 22.3 (7.5) | 13.9 (4.2) | 8.3 (1.8) | 4.7 (0.9) | 2.8 (0.3) | 3.6 (0.4) | 2.9 (0.3) | 2.1 (0.2) |
+| `neutral` | 10 | 100.0 (100.0) | 99.9 (99.8) | 99.2 (98.8) | 95.6 (95.0) | 78.7 (73.0) | 50.5 (41.7) | 30.4 (24.7) | 16.1 (12.0) ! | 4.8 (3.3) ! | 2.1 (1.5) | 0.2 (0.1) | 0.0 (0.0) | 0.0 (0.0) | 0.0 (0.0) | 0.0 (0.0) | 0.0 (0.0) |
+| `neutral` | 30 | 99.5 (99.4) | 98.9 (98.9) | 97.8 (94.9) | 90.4 (81.6) | 71.9 (62.0) | 51.6 (42.0) | 31.5 (27.1) | 15.8 (14.2) ! | 9.1 (7.4) ! | 2.5 (2.3) | 0.4 (0.7) | 0.2 (0.1) | 0.0 (0.0) | 0.0 (0.0) | 0.0 (0.0) | 0.0 (0.0) |
+| `neutral` | 50 | 99.7 (99.3) | 98.0 (97.4) | 94.4 (91.0) | 83.7 (74.5) | 71.2 (56.9) | 49.7 (40.9) | 26.9 (24.9) | 16.3 (12.1) ! | 7.2 (5.7) ! | 2.5 (2.1) | 0.1 (0.4) | 0.0 (0.0) | 0.0 (0.0) | 0.1 (0.0) | 0.1 (0.0) | 0.0 (0.0) |
+| `neutral` | 70 | 99.2 (99.2) | 98.2 (96.9) | 94.1 (89.4) | 84.0 (74.3) | 70.8 (55.2) | 50.3 (41.6) | 32.4 (30.2) | 16.0 (17.1) ! | 10.1 (8.2) ! | 3.8 (3.8) | 0.4 (0.9) | 0.3 (0.1) | 0.0 (0.1) | 0.0 (0.0) | 0.0 (0.0) | 0.1 (0.0) |
+| `neutral` | 90 | 98.8 (99.0) | 98.0 (94.7) | 90.6 (85.9) | 81.2 (69.5) | 67.2 (53.0) | 50.1 (40.8) | 31.1 (30.8) | 15.8 (16.2) ! | 7.6 (8.3) ! | 5.9 (3.2) | 1.1 (1.0) | 0.1 (0.1) | 0.0 (0.0) | 0.0 (0.0) | 0.0 (0.0) | 0.0 (0.0) |
+
+**Targets, honestly:**
+- `elemental`, levels 30-90: **met everywhere** (gap 0 49-50%; 2 under 26-28%; 3 under 21-24%;
+  5 under 6-9%). The no-scouting player is at 10-13% two levels under and under 2% at five.
+- `elemental`, **level 10: 3 under is 14% (target 20-35%)** — the stats already move 4% per level
+  there, so the modifier stacks on a gap that is steep on its own (k = 0 gives 25%). 2 under (24%) and
+  5 under (4%) are in target. A level-dependent k could soften it; not done (level 10 is early game,
+  where levelling is fast).
+- `neutral` (the element-free control) is **steeper**: 2 under 16%, 3 under 5-10% at every level.
+  Without the chart a fight is decided by stats and the multiplier alone, and the picked team has no
+  counter-pick edge to spend; the targets are set on `elemental`, the game's mode.
+- **Per shape**, the boss shapes (`solo`, `elite`) fall fastest (3 under 3-22%, 5 under 0-7%),
+  `squad` and `horde` slowest (5 under 12-15% and 7-17% at levels 50-90, mostly over target; `horde`
+  keeps 6-9% even 8-10 under at levels 50-90). The All-shapes mean meets the targets; 156 of 180
+  shape cells do. A per-shape look (why hordes keep a residue) is left for stage D.
+- Above-level fights are, symmetrically, easy: 3 levels over clears 75-93%, 5 over 94-100%.
+- The committed single-seed `level-gap-report.md` (seed 12345) shows the same picture with seed noise
+  (All shapes, `elemental`: 41 of 45 targets met; misses L10 +3 11.9%, L30 +3 16.2%, L50 +5 10.9%,
+  L70 +5 10.7%).
+
+**Pacing** (`--mode pacing --self-check`): passes, report byte-identical (the pacing model draws
+clear rates, it does not simulate battles; the avatar stays within 0-1 levels of the encounter
+level, so the avatar's own level difference is small in practice).
+
+**Runtime.** Default run unchanged (about 11 s; no level-gap section by default: the default levels
+1 / 50 / 100 cannot show gaps above level 100, and the report stays byte-identical). Each nonzero
+gap adds about 128 + 336 battles per cell: `--mode pve --levels 10,30,50,70,90 --level-gap -5..10`
+takes about 58 s, three seeds about 155 s.
+
+Reproduce: `dotnet run --project Tooling/BalanceSim -c Release -- --mode pve --levels 10,30,50,70,90
+--level-gap -5..10 --seeds 12345,777,4242 --out out/levelgap.md` (about 155 s); each sweep row is the
+same run with the three `DamageFormula.LevelDifference*` constants edited.

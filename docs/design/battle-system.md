@@ -514,7 +514,7 @@ formula"): a damaging avatar skill uses the avatar's `Attack` or `SpecialAttack`
 scale with the caster's `SpecialAttack`, the avatar's included; buffs are still flat for everyone,
 so an avatar buff still lands the same whatever the avatar's stats are. The avatar's level is its own
 (`AvatarProgress.Level`, see "What is not settled yet"); the statful `BattleAvatar.Create` takes it
-(default 1) and records it on the unit (the damage formula no longer reads level). The zero-stat `Create(skills)` avatar has no attacking stat, so every damage
+(default 1) and records it on the unit, where the damage formula's level-difference term reads it. The zero-stat `Create(skills)` avatar has no attacking stat, so every damage
 effect it lands deals the formula's `MinimumDamage` floor of 1 — see "Damage formula".
 
 ### 7. Movement during a turn — DECIDED
@@ -754,8 +754,9 @@ defaults chosen so the system is complete rather than half-built, and they are e
 revisited when balance work starts.
 
 - **Damage and healing are stat-based.** A `Damage` effect's `SkillEffect.Magnitude` is its
-  *power*, and the HP it takes comes from `DamageFormula` — caster level, caster attacking stat
-  against target defending stat, the element multiplier, then a crit roll and a variance roll (see
+  *power*, and the HP it takes comes from `DamageFormula` — caster attacking stat against target
+  defending stat, the element multiplier, a crit roll and a variance roll, then the execute bonus and
+  the caster-vs-target level-difference multiplier (see
   "Damage formula" below). This superseded the original rule, which applied every magnitude flat and
   deferred the formula to a balancing pass. A `Heal` restores **`Magnitude / 100 × caster's
   SpecialAttack × HealScale`** HP (`SkillEffectApplier.HealScale`, a tunable constant, 1.0),
@@ -1140,9 +1141,11 @@ first, Pokémon-style level-term formula:
 
 ```
 base   = Power / 100 × A × A / (A + DefenseWeight × D) × GlobalScale
-damage = max(1, truncate(base × ElementChart multiplier × crit × roll / 100))
+damage = max(1, truncate(base × ElementChart multiplier × crit × roll / 100 × execute × level))
 crit   = max(MinCritMultiplier, CritMultiplier) = 1.5 on a critical hit, else 1
 roll   = a whole percent, uniform on [90, 110]
+level  = clamp(1 + k × d + q × d × |d|, 1 − cap, 1 + cap),  d = caster level − target level
+         (k = 0.025, q = 0.005, cap = 0.4; exactly 1 between equal levels)
 ```
 
 - **`Power` is a percent of the attacking stat.** It is the `Damage` effect's
@@ -1155,18 +1158,40 @@ roll   = a whole percent, uniform on [90, 110]
   200, 300 lets through 100%, 50%, 33%, 25% — and never negates a hit. `A` appears twice (base and
   mitigation), so Attack is worth slightly more than linear: doubling Attack against equal Defense
   multiplies the hit by 2.67.
-- **Level is not in the formula.** Stats already scale with level through the growth curve, and with
-  `A`, `D` and HP on the same curve a hit between two equally levelled beasts takes the same share of
-  HP at every level, up to integer rounding. (The old `(2 × Level / 5 + 2)` term only held that
-  loosely: 20% at level 1 against 35% at level 100.) `BattleUnit.Level` is kept — it is recorded and
-  other systems may read it — but `DamageFormula` ignores it, and the raw overloads no longer take a
-  level: `Compute(power, attack, defense, element[, variancePercent, isCrit])` and
-  `ComputeBase(power, attack, defense)`.
+- **Level difference — AMENDED (milestone 2, user decision: an under-levelled team must not clear
+  content).** Stats scale with level through the growth curve, and with `A`, `D` and HP on the same
+  curve a hit between two *equally* levelled units takes the same share of HP at every level, up to
+  integer rounding. (The old `(2 × Level / 5 + 2)` term only held that loosely: 20% at level 1
+  against 35% at level 100.) But the curve flattens: from level 30 up, a level is only about 1-2% of
+  stats, so on stats alone a team 5 levels under its encounters still cleared 26-36% of them
+  (against 50% at level; balance simulator, `--level-gap`), and levelling barely mattered. So every hit
+  now also carries a **level-difference multiplier** of the caster's level minus the target's,
+  `d`: `clamp(1 + k d + q d |d|, 1 − cap, 1 + cap)` (`DamageFormula.GetLevelMultiplier`). It
+  applies **both ways** (an under-levelled team hits softer *and* is hit harder), to beasts,
+  enemies and the avatar alike (the avatar at its own level, `AvatarProgress.Level`). The convex
+  `q` term keeps a small gap mild and makes a wide one decisive: ×1.03 / 1.07 / 1.12 / 1.25 / 1.4
+  (cap) at 1 / 2 / 3 / 5 / 7+ levels over, ×0.97 / 0.93 / 0.88 / 0.75 / 0.6 under. Equal levels
+  are exactly 1 and are **not multiplied at all**, so an equal-level battle is bit-identical to the
+  formula without the term (the committed balance report did not move). **Damage over time**
+  inherits it (its per-turn amount is computed through the formula when applied); **heals, shields,
+  stat changes, status chance and knockback do not** read level. It takes **no random draws**.
+  Raw overloads: `Compute(power, attack, defense, element[, variancePercent, isCrit[, execute[,
+  levelMultiplier]]])` (the eight-argument form takes the level multiplier; exactly 1 is the
+  identity) and `ComputeBase(power, attack, defense)`.
+- **How k, q and cap were chosen** (tuning log, "Level-difference modifier"). Calibrated on the
+  scouted pick at equal levels (50%), the targets were: 2-3 levels under ≈ 20-35%, 5+ under < 10%,
+  at every level band. A `--level-gap` sweep of linear `k` ∈ {0.025, 0.03, 0.035, 0.04} × cap ∈
+  {0.3, 0.4} missed "< 10% at 5 under" at levels 50-90 for every `k` that kept 3 under above 20%;
+  the convex term fixed it. Measured (3 seeds, `elemental`, every shape averaged, the scouted team):
+  2 under 26-28%, 3 under 21-24%, 5 under 6-9% at levels 30-90. **Level 10** is steeper (24% /
+  14% / 4%): there a level is a large share of stats, so the stats already do most of the work.
+  The `neutral` control mode is steeper throughout (2 under ≈ 16%). The cap only binds from 7
+  levels apart, where a clear is already rare (≤ 3%).
 - The element multiplier is the skill's element against the target's elements, exactly as before.
   The caster's own elements still do nothing.
 - **Arithmetic.** The base is computed in double precision (basic IEEE operations only, one division
   last, so an exactly whole hit never truncates to one less) and truncated once at the end, after the
-  element, crit and variance multipliers (in that order). Crits and rolls are covered under
+  element, crit, variance, execute and level multipliers (in that order). Crits and rolls are covered under
   "Variance and critical hits" below.
 - **Guards:** `Power <= 0` deals 0 (so a negative damage magnitude never reads as a heal); any
   positive `Power` deals at least 1; `A <= 0` makes the base exactly 0 (so the hit lands on the floor
@@ -1179,6 +1204,9 @@ roll   = a whole percent, uniform on [90, 110]
 | `GlobalScale` | 1.0 | A uniform multiplier on every hit, the lever for overall fight length. |
 | `MinimumDamage` | 1 | The floor for any positive-power hit. |
 | `CritMultiplier` / `MinCritMultiplier` | 1.5 / 1.3 | See "Variance and critical hits". |
+| `LevelDifferencePerLevel` (k) | 0.025 | Linear part of the level-difference multiplier, per level of difference. |
+| `LevelDifferenceConvex` (q) | 0.005 | Convex part: `q × d × |d|`, so a wide gap bites harder than a narrow one. |
+| `LevelDifferenceCap` | 0.4 | The level multiplier stays within [0.6, 1.4]. |
 
 **How the constants were chosen.** `DefenseWeight` and `GlobalScale` start at 1, as in the
 reference, and the balance simulator's kit and enemy powers were **rescaled instead** so that a
@@ -1219,8 +1247,8 @@ via the statful overload.
 **Levels.** `BattleUnit` carries a `Level` (at least 1; an optional constructor argument defaulting
 to 1). `BattleUnitFactory.CreateBeast` records the level it assembled the stats at. The statful
 `BattleAvatar.Create` takes the avatar's own level (`AvatarProgress.Level`, default 1) — see
-"What is not settled yet". None of these feed damage any more; level reaches damage only through the
-stats it assembled.
+"What is not settled yet". Level reaches damage through the stats it assembled and through the
+level-difference multiplier above (caster against target), which is exactly 1 between equal levels.
 
 **Still deferred:** a same-element attack bonus (STAB), a balance lever to add once there are
 fights to measure it against; the reference's flat skill damage, damage boost / damage resistance and

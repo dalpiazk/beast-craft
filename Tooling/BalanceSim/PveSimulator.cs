@@ -103,6 +103,32 @@ namespace BeastCraft.Tooling.BalanceSim
     }
 
     /// <summary>
+    /// One <c>--level-gap</c> replay of a cell: the team at the cell's level, the enemies
+    /// <see cref="Gap"/> levels above it (below when negative), at the cell's calibrated multiplier.
+    /// </summary>
+    public class LevelGapPoint
+    {
+        /// <summary>Enemy level minus team level.</summary>
+        public int Gap;
+
+        /// <summary>False when the cell's level plus the gap falls outside 1-100: nothing was run.</summary>
+        public bool InRange;
+
+        /// <summary>
+        /// The picked team's clear rate (the scouted player), over <see cref="PveCell.CalibrationSamples"/>
+        /// battles per composition; at gap 0 the calibrated rate itself. NaN with <c>--calibrate-on mean</c>
+        /// (no picks) or out of range.
+        /// </summary>
+        public double ScoutedClearRate = double.NaN;
+
+        /// <summary>
+        /// The no-scouting clear rate over the <c>--level-gap-teams</c> subset and every composition
+        /// (at gap 0, those teams' battles of the calibration's every-team run). NaN out of range.
+        /// </summary>
+        public double NoScoutClearRate = double.NaN;
+    }
+
+    /// <summary>
     /// Every team against every composition of one shape (or one fixed encounter) at one level and
     /// kit mode, at the calibrated difficulty.
     /// </summary>
@@ -150,6 +176,9 @@ namespace BeastCraft.Tooling.BalanceSim
         }
 
         public List<CalibrationPoint> Evaluations = new List<CalibrationPoint>();
+
+        /// <summary><c>--level-gap</c>: one point per gap, in <see cref="SimOptions.LevelGaps"/> order; null without the option.</summary>
+        public List<LevelGapPoint> LevelGaps;
 
         /// <summary>
         /// Every battle at the calibrated multiplier: composition-major, then team, then sample, so
@@ -224,6 +253,7 @@ namespace BeastCraft.Tooling.BalanceSim
             }
 
             CalibrationTeams = SampleTeams(options.Seed, Teams.Count, options.CalibrateSample);
+            LevelGapTeams = options.LevelGaps == null ? null : SampleTeams(unchecked(options.Seed + LevelGapSeedOffset), Teams.Count, options.LevelGapTeams);
             TeamBonds = new List<ActiveTeamBond>[Teams.Count];
             for (int t = 0; t < Teams.Count; t++)
             {
@@ -248,6 +278,16 @@ namespace BeastCraft.Tooling.BalanceSim
         /// seeded draw of n, that the difficulty search evaluates. Null = every team (the default).
         /// </summary>
         public int[] CalibrationTeams { get; }
+
+        /// <summary>
+        /// With <c>--level-gap</c>: the team indices, ascending, a seeded draw of
+        /// <c>--level-gap-teams</c>, whose no-scouting rate each nonzero gap measures. Null = every team
+        /// (the option covers them all) or no <c>--level-gap</c>.
+        /// </summary>
+        public int[] LevelGapTeams { get; }
+
+        /// <summary>Added to the base seed for the <see cref="LevelGapTeams"/> draw, so it is not the <c>--calibrate-sample</c> draw.</summary>
+        private const int LevelGapSeedOffset = 0x1e7e1;
 
         /// <summary>Every combination of <c>TeamSize</c> distinct species, as ascending roster indices, in lexicographic order.</summary>
         public List<int[]> Teams { get; }
@@ -481,13 +521,94 @@ namespace BeastCraft.Tooling.BalanceSim
         }
 
         /// <summary>
+        /// <c>--level-gap</c>: replays <paramref name="cell"/> (already calibrated at equal levels)
+        /// with the enemies each gap of <see cref="SimOptions.LevelGaps"/> above the team, at the
+        /// cell's multiplier, and stores one <see cref="LevelGapPoint"/> per gap in
+        /// <see cref="PveCell.LevelGaps"/>. Scouted: the cell's picks, <see cref="PveCell.CalibrationSamples"/>
+        /// battles per composition (<see cref="RunPicked"/>); no scouting: <see cref="LevelGapTeams"/>
+        /// against every composition (<see cref="RunTeams"/>). Every battle's seed is the equal-level
+        /// battle's (the gap is not in it), so the gaps share their damage-roll streams and gap 0 is
+        /// read straight from the calibration's own battles. A gap that puts the enemies outside
+        /// 1-<see cref="SimOptions.MaxLevel"/> is not run.
+        /// </summary>
+        public void RunLevelGaps(PveCell cell)
+        {
+            if (_options.LevelGaps == null)
+            {
+                return;
+            }
+
+            int[] teams = LevelGapTeams;
+            if (teams == null)
+            {
+                teams = new int[Teams.Count];
+                for (int t = 0; t < teams.Length; t++)
+                {
+                    teams[t] = t;
+                }
+            }
+
+            cell.LevelGaps = new List<LevelGapPoint>();
+            foreach (int gap in _options.LevelGaps)
+            {
+                int enemyLevel = cell.Level + gap;
+                LevelGapPoint point = new LevelGapPoint { Gap = gap, InRange = enemyLevel >= 1 && enemyLevel <= SimOptions.MaxLevel };
+                cell.LevelGaps.Add(point);
+                if (!point.InRange)
+                {
+                    continue;
+                }
+
+                if (gap == 0)
+                {
+                    point.ScoutedClearRate = cell.Picks == null ? double.NaN : cell.ScoutedClearRate;
+                    int cleared = 0;
+                    int count = 0;
+                    for (int c = 0; c < cell.Shape.Compositions.Count; c++)
+                    {
+                        foreach (int t in teams)
+                        {
+                            for (int s = 0; s < Samples; s++)
+                            {
+                                cleared += cell.Battles[BattleIndex(c, t, s)].Cleared ? 1 : 0;
+                                count++;
+                            }
+                        }
+                    }
+
+                    point.NoScoutClearRate = (100.0 * cleared) / count;
+                    continue;
+                }
+
+                if (cell.Picks != null)
+                {
+                    point.ScoutedClearRate = ClearRate(RunPicked(cell.Mode, cell.Level, cell.Shape, cell.Multiplier, cell.Picks, cell.CalibrationSamples, gap));
+                }
+
+                point.NoScoutClearRate = ClearRate(RunTeams(cell.Mode, cell.Level, cell.Shape, cell.Multiplier, teams, gap));
+            }
+        }
+
+        private static double ClearRate(PveBattle[] battles)
+        {
+            int cleared = 0;
+            foreach (PveBattle battle in battles)
+            {
+                cleared += battle.Cleared ? 1 : 0;
+            }
+
+            return (100.0 * cleared) / battles.Length;
+        }
+
+        /// <summary>
         /// The scouted-pick calibration's battles: against each composition <c>c</c> of the shape, the
         /// picked team <paramref name="picks"/>[c], <paramref name="samples"/> times (samples 0 to
         /// n-1), stored at <c>c * samples + s</c>. Each battle is the one <see cref="RunAllTeams"/>
         /// would play for that team and sample, seed and all, so sample 0 is exactly the all-teams
-        /// battle of the picked team.
+        /// battle of the picked team. <paramref name="levelGap"/> puts the enemies that many levels
+        /// above the team (see <see cref="RunLevelGaps"/>); 0, the default, is the equal-level fight.
         /// </summary>
-        public PveBattle[] RunPicked(KitMode mode, int level, EncounterShape shape, double multiplier, int[] picks, int samples)
+        public PveBattle[] RunPicked(KitMode mode, int level, EncounterShape shape, double multiplier, int[] picks, int samples, int levelGap = 0)
         {
             PveBattle[] battles = new PveBattle[shape.Compositions.Count * samples];
             bool[] playersWinTies = new bool[shape.Compositions.Count];
@@ -499,7 +620,7 @@ namespace BeastCraft.Tooling.BalanceSim
             Parallel.For(0, battles.Length, i =>
             {
                 int c = i / samples;
-                battles[i] = RunBattle(mode, level, shape.Compositions[c], multiplier, picks[c], i % samples, false, playersWinTies[c], out _);
+                battles[i] = RunBattle(mode, level, level + levelGap, shape.Compositions[c], multiplier, picks[c], i % samples, false, playersWinTies[c], out _);
             });
 
             return battles;
@@ -508,9 +629,10 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <summary>
         /// <see cref="RunAllTeams"/> for a subset of the teams only (<paramref name="teams"/>, team
         /// indices): composition-major, then the subset's order, then sample. Every battle is the one
-        /// <see cref="RunAllTeams"/> would play for that team, seed and all.
+        /// <see cref="RunAllTeams"/> would play for that team, seed and all. <paramref name="levelGap"/>
+        /// as in <see cref="RunPicked"/>.
         /// </summary>
-        public PveBattle[] RunTeams(KitMode mode, int level, EncounterShape shape, double multiplier, int[] teams)
+        public PveBattle[] RunTeams(KitMode mode, int level, EncounterShape shape, double multiplier, int[] teams, int levelGap = 0)
         {
             int samples = Samples;
             int count = teams.Length;
@@ -525,7 +647,7 @@ namespace BeastCraft.Tooling.BalanceSim
             {
                 int t = teams[(i / samples) % count];
                 int c = i / (samples * count);
-                battles[i] = RunBattle(mode, level, shape.Compositions[c], multiplier, t, i % samples, false, playersWinTies[c][t], out _);
+                battles[i] = RunBattle(mode, level, level + levelGap, shape.Compositions[c], multiplier, t, i % samples, false, playersWinTies[c][t], out _);
             });
 
             return battles;
@@ -692,6 +814,22 @@ namespace BeastCraft.Tooling.BalanceSim
         public PveBattle RunBattle(KitMode mode, int level, Encounter encounter, double multiplier, int teamIndex, int sample, bool useRunBattle,
                                    bool playersWinTies, out List<BattleUnit> finalUnits)
         {
+            return RunBattle(mode, level, level, encounter, multiplier, teamIndex, sample, useRunBattle, playersWinTies, out finalUnits);
+        }
+
+        /// <summary>
+        /// <see cref="RunBattle(KitMode, int, Encounter, double, int, int, bool, bool, out List{BattleUnit})"/>
+        /// with the two sides at different levels: the team's beasts (and the avatar, unless
+        /// <c>--avatar-level</c>) at <paramref name="teamLevel"/>, the enemies at
+        /// <paramref name="enemyLevel"/> (their stats on their curve, and their level in the damage
+        /// formula's level-difference term). The seed and the initiative tie split are the team
+        /// level's, so the level gap is not in them: the same battle at another gap draws the same
+        /// stream of rolls, and equal levels are exactly the one-level battle.
+        /// </summary>
+        public PveBattle RunBattle(KitMode mode, int teamLevel, int enemyLevel, Encounter encounter, double multiplier, int teamIndex, int sample,
+                                   bool useRunBattle, bool playersWinTies, out List<BattleUnit> finalUnits)
+        {
+            int level = teamLevel;
             int[] team = Teams[teamIndex];
             int[] slots = SlotOrders[teamIndex];
             HexGrid grid = new HexGrid(encounter.Arena);
@@ -707,7 +845,7 @@ namespace BeastCraft.Tooling.BalanceSim
             {
                 EnemySlot slot = encounter.Enemies[i];
                 HexCoordinate anchor = layout.Anchors[i];
-                BattleUnit enemy = BattleUnitFactory.CreateBeast(enemyPrefix + slot.UnitId, BattleTeam.Enemy, slot.Species, level, null, anchor,
+                BattleUnit enemy = BattleUnitFactory.CreateBeast(enemyPrefix + slot.UnitId, BattleTeam.Enemy, slot.Species, enemyLevel, null, anchor,
                                                                  Kit.Loadout(slot.KitFor(mode)), slot.StatusResist);
                 enemy.Stats = Scale(enemy.Stats, multiplier);
                 enemy.CurrentHp = enemy.Stats.Hp;

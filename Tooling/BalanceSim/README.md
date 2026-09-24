@@ -39,7 +39,7 @@ dotnet run --project Tooling/BalanceSim -c Release -- [options]
 | `--scouted <list>` | `all` | Scouted picking, the "PvE scouted picking" section: comma-separated `random`, `heuristic`, `bonds` (the bond-aware heuristic; bonds on only), `oracle` (also adds the held-out best team), or `all` / `none`. Post-processing of the battles already run: no extra battles, sub-second. `none` removes the section and its header line; the rest of the report is unchanged (the default calibration still uses the bond-aware picker, see `--calibrate-on`). See "Scouted picking". |
 | `--scouted-detail <d>` | `full` | What the heuristic pickers see of each composition (`ScoutingDetail`): `full`, `elements-only` or `dominant-element`. |
 | `--scouted-vanguard-min <n>` | `1` | Fewest Vanguards a heuristic pick fields, 0 to `--team-size`. |
-| `--levels <list>` | `1,50,100` | Comma-separated levels; beasts and enemies fight at the same level. |
+| `--levels <list>` | `1,50,100` | Comma-separated levels; beasts and enemies fight at the same level (see `--level-gap` for fights across a level gap). |
 | `--encounter-set <s>` | `generated` | `generated`: random compositions per shape (see "Generated encounters"). `fixed`: the three hand-authored encounters (`boss`, `swarm`, `pack`). |
 | `--compositions <n>` | `8` | Generated compositions per shape. |
 | `--encounters <list>` | all | Comma-separated shape ids (`solo`, `elite`, `squad`, `horde`) or, with `--encounter-set fixed`, encounter ids (`boss`, `swarm`, `pack`). |
@@ -47,6 +47,8 @@ dotnet run --project Tooling/BalanceSim -c Release -- [options]
 | `--target-clear <pct>` | `50` | Clear rate the difficulty calibration aims for (the scouted pick's by default; see `--calibrate-on`). |
 | `--calibrate-on <t>` | `bonds` | Whose clear rate the PvE difficulty is calibrated to `--target-clear`. `bonds`: the team the bond-aware scouted picker (heuristic + bonds) fields against each composition, i.e. the player scouts and counter-picks; falls back to `heuristic` when bonds are not active (`--bonds off`, `--skill-kit standard`). `heuristic`: the plain element counter-pick. `mean`: the mean of every team (the unscouted player), the calibration before scouting; it reproduces the pre-scouting report byte for byte. See "Difficulty calibration". |
 | `--calibrate-samples <n>` | `16` | Scouted-pick calibration only: battles per composition the picked team fights at each search step (8 compositions x 16 = 128 battles per step, a binomial SE of about 4.4 points at 50%). Raise it if a cell's search is non-monotone. |
+| `--level-gap <list>` | off | PvE only. Also replay every cell with the enemies `g` levels above the team (negative = below) at the cell's calibrated multiplier, and add the "PvE level gap" section (and "PvE level gap over seeds" with `--seeds`). Comma-separated gaps and inclusive ranges, e.g. `-5..10` or `0,2,3,5`. The team and the avatar (unless `--avatar-level`) stay at the row's level; the enemies' stats follow their curve to their level, and the damage formula's level-difference term applies. Each battle's seed ignores the gap, so gap 0 is the calibration itself (no extra battles). A gap that puts the enemies outside 1-100 is not run (`—`). Suggested with `--levels 10,30,50,70,90`. See "Level gap". |
+| `--level-gap-teams <n>` | `42` | `--level-gap` only: how many teams (a seeded subset of the 210) the **no-scouting** rate at each nonzero gap is measured over, against every composition (42 x 8 = 336 battles). The **scouted** rate always uses the picked team, `--calibrate-samples` battles per composition. |
 | `--marginal-threshold <x>` | `5` | Flag a beast whose overall marginal clear rate is outside +/-x points. |
 | `--enemy-element <e>` | `authored` | `authored` (as generated, or as authored in the fixed set), `None` or an element name: override every enemy's element. |
 | `--max-time <n>` | `2000` | Battle-time cap (normalized, see below); a battle that reaches it is a stalemate. |
@@ -453,6 +455,33 @@ The default run has no stalemates, PvE or PvP.
   (kit mode, composition, level) a seeded shuffle of the team indices picks exactly half the teams
   to win ties (`PveSimulator.PlayersWinTies`). The prefix is side-wide, so the order within a side,
   and every targeting tie (targeting only ever compares units of one side), is unchanged.
+
+## Level gap
+
+`--level-gap` answers "what does being under-levelled cost?". Every (kit mode, shape, level) cell is
+first calibrated as usual, at equal levels; then, at the cell's multiplier, it is replayed with the
+enemies `g` levels above the team (`PveSimulator.RunLevelGaps`, `RunBattle(mode, teamLevel,
+enemyLevel, ...)`): the picked team per composition `--calibrate-samples` times (the **scouted**
+rate, the one the targets read) and a seeded subset of `--level-gap-teams` teams once per
+composition (the **no-scouting** rate). The seed and the initiative tie split are the team level's,
+so the gaps replay the same damage-roll streams (common random numbers) and gap 0 is read from the
+calibration's own battles. Two things change with the gap: the enemies' stats (their growth curve at
+their own level) and the damage formula's level-difference multiplier on every hit, both ways
+(`DamageFormula.GetLevelMultiplier`; see `docs/design/battle-system.md`, "Damage formula").
+
+The section's table has one row per shape and level plus an **All shapes** mean per level, one
+column per gap, cells `scouted (no-scouting)`. Targets for the scouted rate (`SimOptions.LevelGap*`):
+gap 0 within 50 +/- 5, +2 and +3 in 20-35%, +5 and beyond under 10%; `!` marks a miss, and a line per
+mode counts the targets met. With `--self-check`, the loop-parity replay also runs each level at its
+widest in-range gap.
+
+```sh
+dotnet run --project Tooling/BalanceSim -c Release -- --mode pve --levels 10,30,50,70,90 --level-gap -5..10 --out docs/balance/level-gap-report.md
+```
+
+Cost: each nonzero gap adds about 128 + 336 battles per cell (a sixth of a calibration); the
+command above takes about a minute. The committed `docs/balance/level-gap-report.md` is that
+command's output; the default report has no level-gap section and is unchanged by the option.
 
 ## Scouted picking
 

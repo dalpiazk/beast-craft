@@ -37,6 +37,7 @@ namespace BeastCraft.Tooling.BalanceSim
             List<EncounterShape> shapes = catalogs[0].Shapes;
             string unit = options.EncounterSet == EncounterSet.Generated ? "shape" : "encounter";
             AppendCalibration(report, options, seeds, catalogs, cells);
+            LevelGapReport.AppendAggregate(report, options, seeds, cells);
             report.AppendLine("## PvE marginal clear rate over seeds");
             report.AppendLine();
             report.AppendLine("Points of clear rate, levels averaged, exactly as each seed's \"Marginal clear rate by shape\" table. Per " + unit +

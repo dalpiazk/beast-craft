@@ -163,6 +163,36 @@ namespace BeastCraft.Tooling.BalanceSim
         public const int DefaultCalibrateSamples = 16;
 
         /// <summary>
+        /// <c>--level-gap-teams</c> default: how many teams (a seeded subset) the no-scouting rate at
+        /// each nonzero level gap is measured over (42 of 210 x 8 compositions = 336 battles).
+        /// </summary>
+        public const int DefaultLevelGapTeams = 42;
+
+        /// <summary>The highest level a beast or enemy can be: a level gap that would put the enemies past it is not run.</summary>
+        public const int MaxLevel = 100;
+
+        /// <summary>Level-gap targets (<see cref="LevelGapReport"/>): at gap 0 the scouted rate is the calibration target, within +/- this.</summary>
+        public const double LevelGapEvenTolerance = 5.0;
+
+        /// <summary>Level-gap targets: the smallest and largest gap (enemies above the team) of the "a couple of levels under" band.</summary>
+        public const int LevelGapNearMin = 2;
+
+        /// <summary>See <see cref="LevelGapNearMin"/>.</summary>
+        public const int LevelGapNearMax = 3;
+
+        /// <summary>Level-gap targets: the scouted rate a couple of levels under should sit in [low, high]...</summary>
+        public const double LevelGapNearLow = 20.0;
+
+        /// <summary>... see <see cref="LevelGapNearLow"/>.</summary>
+        public const double LevelGapNearHigh = 35.0;
+
+        /// <summary>Level-gap targets: from this many levels under...</summary>
+        public const int LevelGapFarMin = 5;
+
+        /// <summary>... the scouted rate should be below this.</summary>
+        public const double LevelGapFarHigh = 10.0;
+
+        /// <summary>
         /// The balance guard on the multi-seed mean of each beast's normalized overall marginal
         /// (<see cref="PveReport.NormalizationFactor"/>): within +/- this in <c>elemental</c>...
         /// </summary>
@@ -273,6 +303,16 @@ namespace BeastCraft.Tooling.BalanceSim
 
         /// <summary><c>--calibrate-samples</c>: battles per composition per step of a scouted-pick calibration.</summary>
         public int CalibrateSamples = DefaultCalibrateSamples;
+
+        /// <summary>
+        /// <c>--level-gap</c>: the level gaps (enemy level minus team level; positive = the enemies
+        /// are above the team) the "PvE level gap" section replays every cell at, ascending; null
+        /// (the default) = no section and nothing extra run.
+        /// </summary>
+        public List<int> LevelGaps;
+
+        /// <summary><c>--level-gap-teams</c>: teams (a seeded subset) the no-scouting rate at a nonzero gap is measured over.</summary>
+        public int LevelGapTeams = DefaultLevelGapTeams;
 
         /// <summary>The PvE avatar preset (<c>--avatar</c>); the library avatar by default, <see cref="AvatarPresets.None"/> fields none.</summary>
         public string AvatarPreset = AvatarPresets.Library;
@@ -457,6 +497,14 @@ namespace BeastCraft.Tooling.BalanceSim
             "                             team (the unscouted player; the calibration before scouting).\n" +
             "  --calibrate-samples <n>    Scouted-pick calibration: battles per composition the picked team fights at each\n" +
             "                             search step (default 16). The chosen multiplier then runs once with every team.\n" +
+            "  --level-gap <list>         PvE: also replay every cell with the enemies this many levels above the team (negative =\n" +
+            "                             below), at the cell's calibrated multiplier, and report \"PvE level gap\". Comma-separated\n" +
+            "                             gaps and ranges, e.g. -5..10 or 0,2,3,5. The team (and the avatar, unless --avatar-level)\n" +
+            "                             stays at the row's level; each battle's seed ignores the gap, so gap 0 is the calibration\n" +
+            "                             itself. A gap that puts the enemies outside 1-100 is not run. Default: off.\n" +
+            "  --level-gap-teams <n>      --level-gap: teams (a seeded subset) the no-scouting rate at a nonzero gap is measured\n" +
+            "                             over (default 42; the scouted rate always uses the picked team, --calibrate-samples\n" +
+            "                             battles per composition).\n" +
             "  --calibrate-sample <n>     --calibrate-on mean only. Opt-in speed-up that CHANGES results: the difficulty search\n" +
             "                             evaluates a seeded subset of n teams (e.g. 50 of 210), then the chosen multiplier runs\n" +
             "                             once with every team; the report's numbers all come from that full run (default: off,\n" +
@@ -498,6 +546,20 @@ namespace BeastCraft.Tooling.BalanceSim
                         break;
                     case "--calibrate-samples":
                         if (!TryNextInt(args, ref i, arg, 1, out options.CalibrateSamples, out error))
+                        {
+                            return null;
+                        }
+
+                        break;
+                    case "--level-gap":
+                        if (!TryNext(args, ref i, arg, out text, out error) || !TryParseGaps(text, out options.LevelGaps, out error))
+                        {
+                            return null;
+                        }
+
+                        break;
+                    case "--level-gap-teams":
+                        if (!TryNextInt(args, ref i, arg, 1, out options.LevelGapTeams, out error))
                         {
                             return null;
                         }
@@ -954,6 +1016,42 @@ namespace BeastCraft.Tooling.BalanceSim
             }
 
             levels.Sort();
+            error = null;
+            return true;
+        }
+
+        /// <summary>
+        /// <c>--level-gap</c>: comma-separated integers and inclusive ranges <c>a..b</c> (either end
+        /// may be negative), each within +/-(<see cref="MaxLevel"/> - 1); duplicates are dropped and
+        /// the result is sorted ascending.
+        /// </summary>
+        private static bool TryParseGaps(string text, out List<int> gaps, out string error)
+        {
+            gaps = new List<int>();
+            error = "--level-gap expects comma-separated integers or ranges a..b between -" + (MaxLevel - 1) + " and " + (MaxLevel - 1) + ", got '" + text + "'.";
+            foreach (string raw in text.Split(','))
+            {
+                string part = raw.Trim();
+                int split = part.IndexOf("..", StringComparison.Ordinal);
+                string first = split < 0 ? part : part.Substring(0, split);
+                string last = split < 0 ? part : part.Substring(split + 2);
+                if (!int.TryParse(first.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int from) ||
+                    !int.TryParse(last.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int to) ||
+                    from > to || from < -(MaxLevel - 1) || to > MaxLevel - 1)
+                {
+                    return false;
+                }
+
+                for (int gap = from; gap <= to; gap++)
+                {
+                    if (!gaps.Contains(gap))
+                    {
+                        gaps.Add(gap);
+                    }
+                }
+            }
+
+            gaps.Sort();
             error = null;
             return true;
         }
