@@ -246,6 +246,18 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <summary><c>--skill-library</c>: the library file, or null to find it by walking up.</summary>
         public string SkillLibraryPath;
 
+        /// <summary><c>--mode pacing</c>: run the skill-progression pacing model (<see cref="PacingSimulator"/>) instead of PvE / PvP.</summary>
+        public bool RunPacing;
+
+        /// <summary><c>--battles</c>: battles per pacing campaign.</summary>
+        public int PacingBattles = PacingSimulator.DefaultBattles;
+
+        /// <summary><c>--runs</c>: pacing campaigns per base seed.</summary>
+        public int PacingRuns = PacingSimulator.DefaultRuns;
+
+        /// <summary><c>--drop-tables</c>: the drop-table file, or null to find it by walking up.</summary>
+        public string DropTablesPath;
+
         /// <summary>
         /// The loaded skill library, when the run needs it (<c>--skill-kit library</c> or
         /// <c>--avatar library</c>). Set by <see cref="Program"/> after parsing, not a CLI option.
@@ -272,8 +284,12 @@ namespace BeastCraft.Tooling.BalanceSim
             "\n" +
             "Usage: dotnet run --project Tooling/BalanceSim -c Release -- [options]\n" +
             "\n" +
-            "  --mode <m>                 pve | pvp | both (default both). pve = team vs encounter (primary);\n" +
-            "                             pvp = the 1v1 round-robin (secondary).\n" +
+            "  --mode <m>                 pve | pvp | both | pacing (default both). pve = team vs encounter (primary);\n" +
+            "                             pvp = the 1v1 round-robin (secondary); pacing = the skill-progression / material\n" +
+            "                             economy model (Monte Carlo campaigns; see README.md, \"Pacing\").\n" +
+            "  --battles <n>              pacing: battles per campaign (default 500).\n" +
+            "  --runs <n>                 pacing: campaigns per base seed (default 1000; --seeds pools every seed's).\n" +
+            "  --drop-tables <path>       pacing: drop-tables.json (default: found by walking up from the working directory).\n" +
             "  --kit <k>                  elemental | neutral | both (default both): the element axis. neutral forces every\n" +
             "                             beast and enemy skill's element to None.\n" +
             "  --skill-kit <k>            library | standard (default library): the skill axis. library = each beast's\n" +
@@ -403,6 +419,27 @@ namespace BeastCraft.Tooling.BalanceSim
                         if (options.SkillLevel > 20)
                         {
                             error = "--skill-level must be between 1 and 20 (the authored skills' max level).";
+                            return null;
+                        }
+
+                        break;
+                    case "--battles":
+                        if (!TryNextInt(args, ref i, arg, 1, out options.PacingBattles, out error))
+                        {
+                            return null;
+                        }
+
+                        break;
+                    case "--runs":
+                        if (!TryNextInt(args, ref i, arg, 1, out options.PacingRuns, out error))
+                        {
+                            return null;
+                        }
+
+                        break;
+                    case "--drop-tables":
+                        if (!TryNext(args, ref i, arg, out options.DropTablesPath, out error))
+                        {
                             return null;
                         }
 
@@ -719,8 +756,13 @@ namespace BeastCraft.Tooling.BalanceSim
                     options.RunPve = true;
                     options.RunPvp = true;
                     return true;
+                case "pacing":
+                    options.RunPve = false;
+                    options.RunPvp = false;
+                    options.RunPacing = true;
+                    return true;
                 default:
-                    error = "--mode expects pve, pvp or both, got '" + text + "'.";
+                    error = "--mode expects pve, pvp, both or pacing, got '" + text + "'.";
                     return false;
             }
         }
