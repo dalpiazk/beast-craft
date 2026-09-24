@@ -7,6 +7,7 @@ using BeastCraft.Battle.Grid;
 using BeastCraft.Battle.Placement;
 using BeastCraft.Creatures;
 using BeastCraft.Creatures.Roster;
+using BeastCraft.Encounters;
 using UnityEngine;
 
 namespace BeastCraft.Tooling.BalanceSim
@@ -676,7 +677,7 @@ namespace BeastCraft.Tooling.BalanceSim
                 // Worst case: every slot at its Max, each unit its slot's largest type, the largest
                 // placed first (the generator's order puts the Vanguard bosses first).
                 worst.Sort((a, b) => Footprints.TileCount(b).CompareTo(Footprints.TileCount(a)));
-                if (max > 99 || !Fits(shape.ParsedArena, worst))
+                if (max > 99 || !EncounterFit.Fits(shape.ParsedArena, worst))
                 {
                     errors.Add(variantWhere + ": up to " + max + " enemies (every slot at Max, each its slot's largest type) do not fit the " +
                                shape.ParsedArena + " enemy deployment zone (" + zoneSize + " tiles; large enemies need their whole footprint inside it) or exceed 99.");
@@ -742,7 +743,7 @@ namespace BeastCraft.Tooling.BalanceSim
                 }
             }
 
-            if (total <= 99 && !Fits(encounter.ParsedArena, footprints))
+            if (total <= 99 && !EncounterFit.Fits(encounter.ParsedArena, footprints))
             {
                 errors.Add(where + ": " + total + " enemies do not fit the " + encounter.ParsedArena + " enemy deployment zone (" + zoneSize +
                            " tiles; large enemies need their whole footprint inside it).");
@@ -772,16 +773,6 @@ namespace BeastCraft.Tooling.BalanceSim
             }
 
             return Enum.IsDefined(typeof(UnitFootprint), text) && Enum.TryParse(text, false, out footprint);
-        }
-
-        /// <summary>
-        /// The arena fit dry run: whether enemies of these footprints, packed in this order the way
-        /// every battle packs them (<see cref="DeploymentPacker.TryPack"/>), all fit an empty board's
-        /// enemy zone. A seven-tile enemy never fits a Small board (its zone is two rows deep).
-        /// </summary>
-        public static bool Fits(ArenaSize arena, IReadOnlyList<UnitFootprint> footprints)
-        {
-            return DeploymentPacker.TryPack(new HexGrid(arena), BattleTeam.Enemy, footprints, new List<HexCoordinate>(), new List<HexCoordinate>());
         }
 
         /// <summary>

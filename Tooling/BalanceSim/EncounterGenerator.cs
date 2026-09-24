@@ -3,25 +3,10 @@ using System.Collections.Generic;
 using System.Globalization;
 using BeastCraft.Battle.Grid;
 using BeastCraft.Creatures;
+using BeastCraft.Encounters;
 
 namespace BeastCraft.Tooling.BalanceSim
 {
-    /// <summary>How a generated composition's enemies got their elements.</summary>
-    public enum ElementScheme
-    {
-        /// <summary>The whole enemy team shares one element.</summary>
-        Uniform = 0,
-
-        /// <summary>Each enemy type in the composition gets its own element (units of a type share it).</summary>
-        PerType = 1,
-
-        /// <summary>Every unit gets its own element: fully mixed.</summary>
-        PerUnit = 2,
-
-        /// <summary>No enemy has an element.</summary>
-        None = 3
-    }
-
     /// <summary>
     /// Draws the default PvE run's encounters: for each shape in <c>encounters.json</c>,
     /// <c>--compositions</c> random compositions of enemy types under the shape's threat budget,
@@ -164,7 +149,7 @@ namespace BeastCraft.Tooling.BalanceSim
 
                 // Every draw must seat on the shape's arena (large enemies need room). The loader's
                 // worst-case check makes this pass for every draw of a valid file; it is a safety net.
-                if (!EncounterLoader.Fits(shape.ParsedArena, Footprints(sorted)))
+                if (!EncounterFit.Fits(shape.ParsedArena, Footprints(sorted)))
                 {
                     continue;
                 }
