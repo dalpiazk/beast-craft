@@ -48,7 +48,7 @@ namespace BeastCraft.Tooling.BalanceSim
     public static class PacingSimulator
     {
         /// <summary>The drop tables' path relative to the repo root.</summary>
-        public const string DropTablesRepoRelativePath = "BeastCraft/" + DropTableData.ProjectRelativePath;
+        public const string DropTablesRepoRelativePath = DropTableData.ProjectRelativePath;
 
         /// <summary>Battles per campaign (<c>--battles</c>): a 400-600-battle playthrough, levels 1-100 at <see cref="BattlesPerLevel"/>.</summary>
         public const int DefaultBattles = 500;

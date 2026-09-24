@@ -4,10 +4,15 @@ Usage (from the repo root; Pillow 12.3.0, see requirements.txt):
     python Tooling/PixelArt/build.py
 
 Reads palette.json and sprites/*.txt and writes the GAME ASSETS (committed):
-  BeastCraft/Assets/_Project/Art/Pixel/<name>.png          1x native; multi-frame = horizontal strip
-  BeastCraft/Assets/_Project/Art/Pixel/pixel-art-manifest.json
+  content/art/pixel/<name>.png                             1x native; multi-frame = horizontal strip
+  content/art/pixel/pixel-art-manifest.json
                                                         every sprite (file, frame size, frames,
                                                         frame ms, kind, ArtKey) + the palette
+The manifest is schema v2 (BeastCraft.Vfx.ArtManifestData): per sprite its frame size, pivot,
+PixelsPerUnit (32: one hex column step), Filter "point" and Premultiplied false (straight-alpha
+PNGs), plus optional Tint and Animations; illustrated art would list Filter "linear" and its own
+PixelsPerUnit in the same schema.
+
 and LOCAL PREVIEWS (git-ignored) under Tooling/PixelArt/preview/:
   <name>_x8.png, <name>.gif (multi-frame), <name>_tiled_x4.png (tiles), map_mock_x4.png,
   contact_sheet.png
@@ -25,13 +30,31 @@ Sprite file format (see STYLE.md):
   # noshade: yh                chars autoshade must leave alone (optional)
   # nooutline: Y               chars that never get an outline: glows, haze (optional)
   # frame_ms: 70               frame duration of a multi-frame sprite (optional)
-  # artkey: beast/phoenix/idle
+  # artkey: beast/phoenix         the key game data names this art by (species/enemy ArtKey)
+  # pivot: 16,24                 anchor in pixels from the top-left (optional; default: a beast or
+                                 enemy's feet, (w/2, 3h/4), which stand on the tile centre;
+                                 anything else, its centre)
+  # clip: idle beast_phoenix_idle
+                                 a named animation clip: every frame of that built strip, at its
+                                 frame_ms (optional; repeatable as clip2:, clip3:, ...)
   <grid rows, one char per pixel; short rows are padded with '.'>
   ---                          frame separator (optional)
+
+Alias sprites (no grid rows, no PNG): a placeholder that reuses another sprite's PNG under its
+own name and ArtKey, told apart by a tint (an enemy with no art of its own yet):
+  # alias: enemy_brute_gloamed   the built sprite whose PNG it reuses
+  # tint: l                      palette char the viewer multiplies it by (manifest: #rrggbb)
 
 Generated kinds (no grid rows; the header drives an integer-only generator):
   kind: fx      generator: burst, frames: N, ramp: <chars hot -> cold>, seed: <int>
                 an expanding, hollowing flame ring with ragged edges and late embers.
+  kind: fx      generator: ring, ramp: <chars outer -> inner>, thickness: <px>
+                a circle (or, for a non-square size, an ellipse) outline: shockwaves, ground auras.
+  kind: fx      generator: disc, ramp: <chars centre -> edge>
+                a filled disc in bands, its last band dithered: glows.
+  kind: fx      generator: blob, ramp: <chars centre -> edge>, seed: <int>
+                a ragged filled disc with a few specks: ground decals (scorch, frost, ooze).
+  These are drawn white/grey so the VFX data can tint them (tints multiply).
   kind: hex     a pointy-top hex (size 32x36; rows step 27 px, columns 32 px):
                 texture: <tile sprite>   fill the hex by tiling that sprite, or
                 fill: <char>             fill it with one colour, and/or
@@ -45,7 +68,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 ROOT = pathlib.Path(__file__).resolve().parent
 REPO = ROOT.parent.parent
-OUT = REPO / "BeastCraft" / "Assets" / "_Project" / "Art" / "Pixel"
+OUT = REPO / "content" / "art" / "pixel"
 PREVIEW = ROOT / "preview"
 MANIFEST = "pixel-art-manifest.json"
 TRANSPARENT = "."
@@ -207,6 +230,76 @@ def burst_frames(meta, w, h):
     return frames
 
 
+def ellipse_d2(x, y, w, h):
+    """Squared distance of pixel (x, y) from the centre, in doubled units scaled so the ellipse
+    through the frame's edges is d2 == w * w (a circle when w == h). Integer only."""
+    dx, dy = 2 * x + 1 - w, 2 * y + 1 - h
+    return dx * dx + (dy * w // h) * (dy * w // h)
+
+
+def ring_frames(meta, w, h):
+    ramp = meta["ramp"].split()
+    thick = int(meta.get("thickness", "2"))
+    outer = w - 1
+    inner = max(0, outer - 2 * thick * len(ramp))
+    grid = [[TRANSPARENT] * w for _ in range(h)]
+    for y in range(h):
+        for x in range(w):
+            d2 = ellipse_d2(x, y, w, h)
+            if inner * inner < d2 <= outer * outer:
+                band = 0
+                for j in range(1, len(ramp)):
+                    edge = outer - 2 * thick * j
+                    if d2 <= edge * edge:
+                        band = j
+                grid[y][x] = ramp[band]
+    return [grid]
+
+
+def disc_frames(meta, w, h):
+    ramp = meta["ramp"].split()
+    outer = w - 1
+    grid = [[TRANSPARENT] * w for _ in range(h)]
+    for y in range(h):
+        for x in range(w):
+            d2 = ellipse_d2(x, y, w, h)
+            if d2 > outer * outer:
+                continue
+            band = 0
+            for j in range(1, len(ramp)):
+                edge = outer * j // len(ramp)
+                if d2 > edge * edge:
+                    band = j
+            if band == len(ramp) - 1 and (x + y) % 2 == 1:
+                continue  # dither the outer band
+            grid[y][x] = ramp[band]
+    return [grid]
+
+
+def blob_frames(meta, w, h):
+    ramp = meta["ramp"].split()
+    seed = int(meta.get("seed", "1"))
+    speck = meta.get("speck")
+    outer = w - 3
+    grid = [[TRANSPARENT] * w for _ in range(h)]
+    for y in range(h):
+        for x in range(w):
+            d2 = ellipse_d2(x, y, w, h)
+            jitter = (hash32(seed, x // 3, y // 3) % 7) - 3        # coarse ragged edge, -3 .. +3
+            r = outer + 2 * jitter
+            if d2 > r * r:
+                continue
+            band = 0
+            for j in range(1, len(ramp)):
+                edge = r * j // len(ramp)
+                if d2 > edge * edge:
+                    band = j
+            grid[y][x] = ramp[band]
+            if speck and hash32(seed, x, y, 5) % 23 == 0:
+                grid[y][x] = speck
+    return [grid]
+
+
 def hex_inside(x, y, w, h):
     """Pointy-top hex through the pixel centres: |dx| <= w/2 and |dy| <= h/2 - |dx| * (h/4) / (w/2)."""
     dx, dy = abs(2 * x + 1 - w), abs(2 * y + 1 - h)
@@ -239,6 +332,9 @@ def hex_frame(meta, w, h, built):
 
 # ---------------------------------------------------------------------------------------------
 
+GENERATORS = {"ring": ring_frames, "disc": disc_frames, "blob": blob_frames}
+
+
 def to_image(grid, colors):
     h, w = len(grid), len(grid[0])
     img = Image.new("RGBA", (w, h))
@@ -263,14 +359,26 @@ def build():
     PREVIEW.mkdir(exist_ok=True)
 
     parsed = [parse_sprite(path, colors) for path in sorted((ROOT / "sprites").glob("*.txt"))]
-    # Derived sprites (hexes built from tiles) go after everything they may depend on.
-    parsed.sort(key=lambda p: (p[0]["kind"] == "hex", p[0]["name"]))
+    # Derived sprites (hexes built from tiles, aliases of built sprites) go after everything they
+    # may depend on.
+    parsed.sort(key=lambda p: (2 if "alias" in p[0] else 1 if p[0]["kind"] == "hex" else 0, p[0]["name"]))
 
     built = {}      # name -> final grid of frame 0 (what a hex's texture reads)
     sprites = []
     for meta, (w, h), frames in parsed:
+        if "alias" in meta:
+            source = next((s for s in sprites if s[0]["name"] == meta["alias"]), None)
+            if source is None:
+                sys.exit(f"{meta['name']}: alias {meta['alias']!r} is not a built sprite")
+            if meta.get("tint") not in colors or colors[meta["tint"]][3] == 0:
+                sys.exit(f"{meta['name']}: alias needs a tint (a palette colour)")
+            sprites.append((meta, source[1]))
+            print(f"alias {meta['name']:22s} -> {meta['alias']} tinted {meta['tint']}")
+            continue
         if meta["kind"] == "fx" and meta.get("generator") == "burst":
             frames = burst_frames(meta, w, h)
+        elif meta["kind"] == "fx" and meta.get("generator") in GENERATORS:
+            frames = GENERATORS[meta["generator"]](meta, w, h)
         elif meta["kind"] == "hex":
             frames = hex_frame(meta, w, h, built)
         if not frames:
@@ -319,29 +427,78 @@ def write_previews(meta, imgs, strip, w, h):
         scale(tiled, 4).save(PREVIEW / f"{name}_tiled_x4.png")
 
 
+PIXELS_PER_UNIT = 32  # one hex column step (HexLayout.ColumnStep) in placeholder pixels
+
+
+def pivot_of(m, w, h):
+    if "pivot" in m:
+        x, y = (int(v) for v in m["pivot"].split(","))
+        if not (0 <= x <= w and 0 <= y <= h):
+            sys.exit(f"{m['name']}: pivot {x},{y} is off its {w}x{h} frame")
+        return x, y
+    if m["kind"] in ("beast", "enemy"):
+        return w // 2, h * 3 // 4
+    return w // 2, h // 2
+
+
+def clips_of(m, by_name):
+    clips = []
+    for key in sorted(k for k in m if k == "clip" or (k.startswith("clip") and k[4:].isdigit())):
+        name, sheet = m[key].split()
+        if sheet not in by_name:
+            sys.exit(f"{m['name']}: clip {name!r} names {sheet!r}, which is not a built sprite")
+        sm, sims = by_name[sheet]
+        frame_ms = int(sm.get("frame_ms", "0")) or 125
+        clips.append({"Name": name, "Sheet": sheet, "Frames": list(range(len(sims))),
+                      "Fps": max(1, round(1000 / frame_ms)), "Loop": True})
+    return clips
+
+
+def sprite_entry(m, ims, palette, by_name):
+    w, h = ims[0].width, ims[0].height
+    px, py = pivot_of(m, w, h)
+    entry = {
+        "Name": m["name"],
+        "File": f"{m.get('alias', m['name'])}.png",
+        "Kind": "sprite",
+        "Category": m["kind"],
+        "Label": m["label"],
+        "ArtKey": m.get("artkey", ""),
+        "FrameWidth": w,
+        "FrameHeight": h,
+        "Frames": len(ims),
+        "FrameMs": int(m.get("frame_ms", "0")),
+        "PivotX": px,
+        "PivotY": py,
+        "PixelsPerUnit": PIXELS_PER_UNIT,
+        "Filter": "point",
+        "Premultiplied": False,
+    }
+    if "tint" in m:
+        entry["Tint"] = palette[m["tint"]]
+    clips = clips_of(m, by_name)
+    if clips:
+        entry["Animations"] = clips
+    return entry
+
+
 def write_manifest(data, sprites):
     """The game's index of the art: PascalCase fields like the rest of the game data."""
     palette = {ch: hexv for ch, hexv in data["colors"].items() if hexv is not None}
+    by_name = {m["name"]: (m, ims) for m, ims in sprites}
     manifest = {
-        "_readme": "GENERATED by Tooling/PixelArt/build.py -- do not edit. Every sprite: its PNG (a horizontal "
-                   "strip of Frames frames, each FrameWidth x FrameHeight), frame time, kind and ArtKey; plus "
-                   "the palette (char -> colour) that VFX colours are named from.",
-        "SchemaVersion": 1,
+        "_readme": "GENERATED by Tooling/PixelArt/build.py -- do not edit. Art manifest schema v2 "
+                   "(BeastCraft.Vfx.ArtManifestData). Every sprite: its PNG (a horizontal strip of Frames frames, "
+                   "each FrameWidth x FrameHeight), Kind (sprite; spine is reserved), Category, ArtKey (the key "
+                   "species and enemies name their art by; an alias entry reuses another sprite's File with a "
+                   "Tint), the pivot (PivotX/PivotY: pixels from the frame's top-left; a character's feet), "
+                   "PixelsPerUnit (source pixels per hex column step), Filter (point for this pixel art, linear "
+                   "for illustrated art), Premultiplied (false: straight alpha, premultiplied on load) and "
+                   "optional Animations (named clips); plus the palette (char -> colour) that VFX colours are "
+                   "named from.",
+        "SchemaVersion": 2,
         "Palette": palette,
-        "Sprites": [
-            {
-                "Name": m["name"],
-                "File": f"{m['name']}.png",
-                "FrameWidth": ims[0].width,
-                "FrameHeight": ims[0].height,
-                "Frames": len(ims),
-                "FrameMs": int(m.get("frame_ms", "0")),
-                "Kind": m["kind"],
-                "Label": m["label"],
-                "ArtKey": m.get("artkey", ""),
-            }
-            for m, ims in sprites
-        ],
+        "Sprites": [sprite_entry(m, ims, palette, by_name) for m, ims in sprites],
     }
     text = json.dumps(manifest, indent=2, ensure_ascii=True) + "\n"
     (OUT / MANIFEST).write_bytes(text.encode("ascii"))
@@ -378,6 +535,7 @@ SECTIONS = [
     ("Items 16x16", ("item",)),
     ("Map tiles 16x16 (2x2 tiled) + marker", ("tile", "marker")),
     ("Hex tiles 32x36 + particles", ("hex", "particle")),
+    ("VFX layers (rings, glows, decals, rays, glyphs) + status icons", ("fx", "icon")),
 ]
 
 

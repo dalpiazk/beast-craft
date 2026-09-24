@@ -23,6 +23,13 @@ namespace BeastCraft.Creatures
         public string Icon;
 
         /// <summary>
+        /// The key of the art the battle viewer draws this species with: a sprite's <c>ArtKey</c> in
+        /// the art manifest (<c>SpeciesData.ArtKey</c> / <c>EnemyData.ArtKey</c>). Presentation only;
+        /// null = none.
+        /// </summary>
+        public string ArtKey;
+
+        /// <summary>
         /// Unscaled reference stats: the stats at growth-curve scale 1, which for authored curves is
         /// max level (see <see cref="GrowthRateCurve"/>). Scaled by <see cref="GrowthRate"/>, except for
         /// <see cref="StatBlock.MoveRange"/> and <see cref="StatBlock.CritChance"/>, which are

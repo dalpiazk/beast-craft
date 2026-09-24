@@ -2,7 +2,7 @@
 
   <!--
     BeastCraft.Android: the MonoGame Android host. A thin activity (MainActivity) around the shared
-    viewer in src/BeastCraft.Game, full screen in landscape with touch controls; the content (data
+    viewer in src/BeastCraft.Game, full screen and locked to portrait with touch controls; the content (data
     JSON and pixel art) is packaged as APK assets under Content/ and read through MonoGame's
     TitleContainer (TitleContainerContentSource).
 
@@ -50,8 +50,8 @@
 
   <!-- The same content the desktop host copies beside its executable, as APK assets under Content/. -->
   <ItemGroup>
-    <AndroidAsset Include="..\..\BeastCraft\Assets\_Project\Data\**\*.json" Link="Assets\Content\Data\%(RecursiveDir)%(Filename)%(Extension)" />
-    <AndroidAsset Include="..\..\BeastCraft\Assets\_Project\Art\Pixel\*.png;..\..\BeastCraft\Assets\_Project\Art\Pixel\*.json" Link="Assets\Content\Art\Pixel\%(Filename)%(Extension)" />
+    <AndroidAsset Include="..\..\content\data\**\*.json" Link="Assets\Content\data\%(RecursiveDir)%(Filename)%(Extension)" />
+    <AndroidAsset Include="..\..\content\art\pixel\*.png;..\..\content\art\pixel\*.json" Link="Assets\Content\art\pixel\%(Filename)%(Extension)" />
   </ItemGroup>
 
 </Project>

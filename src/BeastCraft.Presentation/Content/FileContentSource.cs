@@ -4,7 +4,7 @@ namespace BeastCraft.Presentation.Content
 {
     /// <summary>
     /// Content as plain files under a folder: the desktop host's <c>Content/</c> beside the
-    /// executable, the repo's <c>BeastCraft/Assets/_Project</c>, or a <c>--content</c> folder.
+    /// executable, the repo's <c>content/</c> folder, or a <c>--content</c> folder.
     /// </summary>
     public sealed class FileContentSource : IContentSource
     {

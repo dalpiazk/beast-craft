@@ -3,7 +3,7 @@ using System;
 namespace BeastCraft.Campaign
 {
     /// <summary>
-    /// The plain-data shape of <c>Data/Campaign/regions.json</c>: the region campaign. Ten regions
+    /// The plain-data shape of <c>data/Campaign/regions.json</c>: the region campaign. Ten regions
     /// cover levels 1-100 in turn; each is played as <see cref="RegionData.Stages"/> expeditions,
     /// each a seeded node map (<see cref="NodeMapGenerator"/>) that ends at a Gate (every stage but
     /// the last) or at the region's Boss, whose clear grants a seal (<see cref="SealData"/>) that
@@ -19,8 +19,8 @@ namespace BeastCraft.Campaign
     [Serializable]
     public class RegionLibraryData
     {
-        /// <summary>Path of the file relative to the Unity project folder (<c>BeastCraft/</c>).</summary>
-        public const string ProjectRelativePath = "Assets/_Project/Data/Campaign/regions.json";
+        /// <summary>Path of the file relative to the repository root.</summary>
+        public const string ProjectRelativePath = "content/data/Campaign/regions.json";
 
         /// <summary>The only <see cref="SchemaVersion"/> this code reads.</summary>
         public const int CurrentSchemaVersion = 1;

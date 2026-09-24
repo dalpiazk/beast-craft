@@ -2,13 +2,64 @@ using System;
 using System.Collections.Generic;
 using BeastCraft.Battle;
 using BeastCraft.Battle.Grid;
+using BeastCraft.Creatures;
 using BeastCraft.Session;
+using BeastCraft.Vfx;
 
 namespace BeastCraft.Presentation.Playback
 {
+    /// <summary>One status on a unit at one moment (copied from its <see cref="ActiveStatus"/>).</summary>
+    public readonly struct StatusSnapshot
+    {
+        public StatusSnapshot(StatusType type, int remainingTurns, int amount, Element sourceElement)
+        {
+            Type = type;
+            RemainingTurns = remainingTurns;
+            Amount = amount;
+            SourceElement = sourceElement;
+        }
+
+        public StatusType Type { get; }
+
+        /// <summary>The affected unit's own turns it has left (see <see cref="ActiveStatus.RemainingTurns"/>).</summary>
+        public int RemainingTurns { get; }
+
+        public int Amount { get; }
+
+        /// <summary>The applying unit's first element (None without one): tells a burn from a poison.</summary>
+        public Element SourceElement { get; }
+
+        /// <summary>Its VFX key (<see cref="VfxEffectKey"/>), or null.</summary>
+        public string Key
+        {
+            get { return VfxLibrary.KeyOf(Type, SourceElement); }
+        }
+    }
+
+    /// <summary>One timed stat change on a unit at one moment (copied from its <see cref="ActiveStatModifier"/>).</summary>
+    public readonly struct ModifierSnapshot
+    {
+        public ModifierSnapshot(StatType stat, int delta, int remainingTurns)
+        {
+            Stat = stat;
+            Delta = delta;
+            RemainingTurns = remainingTurns;
+        }
+
+        public StatType Stat { get; }
+
+        /// <summary>Positive for a buff, negative for a debuff.</summary>
+        public int Delta { get; }
+
+        public int RemainingTurns { get; }
+    }
+
     /// <summary>One unit as it stood at one moment: what the viewer draws, copied so later turns cannot change it.</summary>
     public readonly struct UnitSnapshot
     {
+        private static readonly StatusSnapshot[] NoStatuses = new StatusSnapshot[0];
+        private static readonly ModifierSnapshot[] NoModifiers = new ModifierSnapshot[0];
+
         public UnitSnapshot(BattleUnit unit)
         {
             Id = unit.Id;
@@ -18,6 +69,39 @@ namespace BeastCraft.Presentation.Playback
             Hp = unit.CurrentHp;
             MaxHp = unit.Stats.Hp;
             Defeated = unit.IsDefeated;
+
+            StatusSnapshot[] statuses = unit.Statuses.Count == 0 ? NoStatuses : new StatusSnapshot[unit.Statuses.Count];
+            for (int i = 0; i < statuses.Length; i++)
+            {
+                ActiveStatus status = unit.Statuses[i];
+                Element source = status.Source != null && status.Source.Elements.Count > 0 ? status.Source.Elements[0] : Element.None;
+                statuses[i] = new StatusSnapshot(status.Type, status.RemainingTurns, status.Amount, source);
+            }
+
+            ModifierSnapshot[] modifiers = unit.ActiveStatModifiers.Count == 0 ? NoModifiers : new ModifierSnapshot[unit.ActiveStatModifiers.Count];
+            for (int i = 0; i < modifiers.Length; i++)
+            {
+                ActiveStatModifier modifier = unit.ActiveStatModifiers[i];
+                modifiers[i] = new ModifierSnapshot(modifier.Stat, modifier.Delta, modifier.RemainingTurns);
+            }
+
+            Statuses = statuses;
+            Modifiers = modifiers;
+        }
+
+        /// <summary>A snapshot from explicit values (tests, tools).</summary>
+        public UnitSnapshot(string id, BattleTeam team, HexCoordinate position, UnitFootprint footprint, int hp, int maxHp, bool defeated,
+                            IReadOnlyList<StatusSnapshot> statuses = null, IReadOnlyList<ModifierSnapshot> modifiers = null)
+        {
+            Id = id;
+            Team = team;
+            Position = position;
+            Footprint = footprint;
+            Hp = hp;
+            MaxHp = maxHp;
+            Defeated = defeated;
+            Statuses = statuses ?? NoStatuses;
+            Modifiers = modifiers ?? NoModifiers;
         }
 
         public string Id { get; }
@@ -33,6 +117,54 @@ namespace BeastCraft.Presentation.Playback
         public int MaxHp { get; }
 
         public bool Defeated { get; }
+
+        /// <summary>The statuses on the unit, in the order they were applied.</summary>
+        public IReadOnlyList<StatusSnapshot> Statuses { get; }
+
+        /// <summary>The timed stat buffs and debuffs on the unit.</summary>
+        public IReadOnlyList<ModifierSnapshot> Modifiers { get; }
+
+        /// <summary>
+        /// The lasting VFX keys the unit shows (auras and icons), each once, in
+        /// <see cref="VfxEffectKey.Lasting"/> order: its statuses', plus BuffStat / DebuffStat for
+        /// any timed stat change up / down. None for a defeated unit.
+        /// </summary>
+        public List<string> StatusKeys()
+        {
+            List<string> keys = new List<string>();
+            if (Defeated)
+            {
+                return keys;
+            }
+
+            HashSet<string> present = new HashSet<string>(StringComparer.Ordinal);
+            foreach (StatusSnapshot status in Statuses ?? NoStatuses)
+            {
+                string key = status.Key;
+                if (key != null)
+                {
+                    present.Add(key);
+                }
+            }
+
+            foreach (ModifierSnapshot modifier in Modifiers ?? NoModifiers)
+            {
+                if (modifier.Delta != 0)
+                {
+                    present.Add(modifier.Delta > 0 ? VfxEffectKey.BuffStat : VfxEffectKey.DebuffStat);
+                }
+            }
+
+            foreach (string key in VfxEffectKey.Lasting)
+            {
+                if (present.Contains(key))
+                {
+                    keys.Add(key);
+                }
+            }
+
+            return keys;
+        }
     }
 
     /// <summary>One played turn: the record, its skill beats, and every unit before and after it.</summary>

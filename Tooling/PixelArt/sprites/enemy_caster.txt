@@ -1,0 +1,6 @@
+# name: enemy_caster
+# label: Caster (alias of enemy_brute_gloamed, tinted)
+# kind: enemy
+# alias: enemy_brute_gloamed
+# tint: C
+# artkey: enemy/caster

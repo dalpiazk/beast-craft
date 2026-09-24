@@ -1,0 +1,10 @@
+# name: fx_aura_ring
+# label: Ground aura ring (ellipse at a unit's feet; white, tinted)
+# kind: fx
+# size: 40x20
+# outline: none
+# generator: ring
+# ramp: w 3
+# thickness: 1
+# pivot: 20,10
+# artkey: fx/layer/aura_ring

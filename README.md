@@ -18,62 +18,47 @@ beast-craft/
 │   │                       Campaign, Economy, Encounters, Save, Session, Customization, Idle,
 │   │                       Vfx data, Common)
 │   ├── BeastCraft.Presentation/  engine-neutral presentation: content loading, hex layout,
-│   │                       battle playback, VFX timeline/particles, pixel font (netstandard2.1)
-│   ├── BeastCraft.Game/    the shared MonoGame battle viewer (drawing, input, scaling; net10.0)
+│   │                       battle playback, VFX timeline/layers/auras, portrait layout, range
+│   │                       diagrams, pixel font (netstandard2.1)
+│   ├── BeastCraft.Game/    the shared MonoGame battle viewer (portrait canvas, drawing, input; net10.0)
 │   ├── BeastCraft.Desktop/ the MonoGame DesktopGL host (desktop spike, net10.0)
 │   └── BeastCraft.Android/ the MonoGame Android host (net10.0-android; local build, not in CI)
-├── BeastCraft/     LEGACY Unity project, no longer built (the game is moving to MonoGame).
-│   │               Still home to the authored data JSON and the test sources.
-│   ├── Assets/_Project/    all first-party content, namespaced under _Project/
-│   │   ├── Art/            sprites, backdrops, UI, key art (Characters/Creatures/Environments/UI/KeyArt);
-│   │   │                   Pixel/ = the generated placeholder pixel art + manifest (Tooling/PixelArt)
-│   │   ├── Audio/          Music/, Ambient/, SFX/
-│   │   ├── Data/           authored data: Creatures/beast-roster.json, Skills/skill-library.json
-│   │   │                   and Skills/drop-tables.json (sources of truth) + generated .asset instances;
-│   │   │                   Vfx/vfx-library.json (skill VFX, presentation only)
-│   │   ├── Prefabs/
-│   │   ├── Scenes/
-│   │   └── Scripts/        Tests/EditMode/ (the test suite, run by Tooling/EditModeTests);
-│   │                       Editor/ (Unity-only data importers, no longer compiled);
-│   │                       Runtime/ (only the old asmdef; the code is in src/BeastCraft.Core)
-│   ├── Packages/           package manifest
-│   └── ProjectSettings/    editor version pin; Unity fills in the rest on first open
+├── content/        the game's authored content, read by the hosts, the tests and the simulator
+│   ├── data/               JSON sources of truth: Creatures/beast-roster.json,
+│   │                       Skills/skill-library.json + drop-tables.json, Encounters/ (enemy and
+│   │                       encounter libraries, the generated difficulty table), Campaign/,
+│   │                       Items/, Economy/, Cosmetics/, Idle/, Vfx/vfx-library.json (skill VFX,
+│   │                       presentation only)
+│   └── art/pixel/          the generated placeholder pixel art (PNGs in Git LFS) + manifest
+│                           (written by Tooling/PixelArt)
 ├── Pipeline/       OFFLINE, build-time-only asset generation. Never runs at runtime.
 ├── Tooling/        BalanceSim/: local-only headless balance simulator over the real
-│                   battle code. EditModeTests/: the `dotnet test` runner for the test
-│                   suite (CI runs it). PixelArt/: text-grid sprites -> placeholder PNGs
-│                   (Python + Pillow). Never shipped.
+│                   battle code. EditModeTests/: the `dotnet test` runner and the test
+│                   suite (Tests/, Goldens/, Presentation/; CI runs it). PixelArt/: text-grid
+│                   sprites -> placeholder PNGs (Python + Pillow). Never shipped.
 ├── docs/           design/ and balance/ (simulator reports, tuning log, research) notes;
 │                   architecture/ is an empty placeholder
 └── .github/        CI workflows
 ```
 
-Third-party/store assets go in `Assets/` outside `_Project/`, so the boundary
-between "ours" and "imported" stays obvious in the Project window and in diffs.
+Every data file is addressed by its repo-relative path (`ProjectRelativePath`,
+e.g. `content/data/Creatures/beast-roster.json`). The hosts copy `content/` into
+a `Content/` folder beside the executable (desktop) or into the APK's assets
+(Android), keeping the same `data/` and `art/pixel/` layout.
 
 ---
 
 ## Stack
 
-> **Engine migration.** The game is moving from Unity to **MonoGame**. The runtime
-> (`src/BeastCraft.Core`) is already engine-neutral C#; the MonoGame host exists as
-> a desktop spike (`src/BeastCraft.Desktop`, see
-> [Running the game](#running-the-game-desktop-spike)) plus an Android host
-> (`src/BeastCraft.Android`, see [Running on Android](#running-on-android)), and the Unity project under `BeastCraft/` is legacy and no longer
-> builds (its Editor importers expect ScriptableObjects, which are now plain
-> classes). The Unity-specific lines below are the original plan.
-
-- **Engine:** Unity 6 LTS, URP with the **2D Renderer**
-- **Language:** C#
-- **Targets:** iOS and Android from one codebase
-- **Input:** Unity Input System
-- **Tests:** Unity Test Framework (EditMode + PlayMode)
-- **Backend — Unity Gaming Services:**
-  - Authentication — player identity, anonymous + platform sign-in
-  - Cloud Save — save state, cross-device continuity
-  - Economy — currencies, inventory, virtual purchases
-  - Cloud Code — server-authoritative logic for anything exploitable client-side
-  - Remote Config — tuning, feature flags, live events
+- **Engine:** [MonoGame](https://monogame.net/) 3.8.5 (NuGet packages; no content
+  pipeline). The runtime (`src/BeastCraft.Core`) and the presentation layer
+  (`src/BeastCraft.Presentation`) are engine-neutral C#; `src/BeastCraft.Game` is
+  the shared MonoGame viewer, hosted by `src/BeastCraft.Desktop` (DesktopGL) and
+  `src/BeastCraft.Android`.
+- **Language:** C# (.NET SDK 10; the runtime targets netstandard2.1, C# 9)
+- **Targets:** Android and iOS from one codebase (desktop for development)
+- **Tests:** NUnit via `dotnet test` (`Tooling/EditModeTests`)
+- **Play:** local only (saves on the device); no online backend
 
 ### No AI at runtime
 
@@ -87,28 +72,13 @@ rules and the asset naming contract.
 
 ## Getting started
 
-To build and test the game code you need only the .NET SDK (10.x) and
-`git lfs install`; see **Building and testing** under [Status](#status). The
-steps below are for the legacy Unity project, which no longer builds.
-
-1. Install **Unity 6 LTS** (any `6000.0.x` LTS patch) via Unity Hub, with the
-   **iOS** and **Android** build support modules.
-2. `git lfs install` — binary art and audio are tracked via Git LFS (see
-   `.gitattributes`).
-3. In Unity Hub, **Add project from disk** and select the **`BeastCraft/`**
-   folder, not the repo root.
-4. First open will take a while: Unity resolves packages from
-   `BeastCraft/Packages/manifest.json` and generates `Library/`, the remaining
-   `ProjectSettings/` files, and the `.sln`/`.csproj` files — all of which are
-   gitignored and are *supposed* to be absent from a fresh clone.
-
-> **Unity version caveat.** `BeastCraft/ProjectSettings/ProjectVersion.txt` is
-> pinned to `6000.0.35f1` as a **placeholder**. That exact patch is not
-> load-bearing — let Unity Hub auto-switch and re-resolve to whichever `6000.0`
-> LTS patch you actually have installed, and commit the resulting
-> `ProjectVersion.txt` change. Package versions in `manifest.json` are likewise
-> plausible starting points that Package Manager will resolve and update on
-> first open.
+1. Install the **.NET SDK 10**. Nothing else is needed to build, test or run the
+   desktop viewer.
+2. `git lfs install && git lfs pull` — binary art and audio are tracked via Git
+   LFS (see `.gitattributes`).
+3. Build and test with the commands under **Building and testing** in
+   [Status](#status), then see [Running the game](#running-the-game-desktop-spike)
+   (desktop) or [Running on Android](#running-on-android).
 
 ---
 
@@ -116,8 +86,8 @@ steps below are for the legacy Unity project, which no longer builds.
 
 **Pre-alpha: a headless, deterministic battle and progression core with its
 data and tooling, and a MonoGame desktop spike that renders one real battle
-with placeholder pixel art and skill VFX. No playable game yet, and the Unity
-project has never been opened in the Editor.**
+in portrait with throwaway pixel-art placeholders and layered skill VFX. No
+playable game yet.**
 
 ### What exists
 
@@ -157,16 +127,16 @@ references):
 See the [battle-system design doc](docs/design/battle-system.md) and
 [`docs/design/progression-and-saves.md`](docs/design/progression-and-saves.md).
 
-**Authored data** (JSON is the source of truth, readable outside Unity; the
-Unity `.asset` files are generated from it and none are committed yet):
+**Authored data** (`content/data/`; the JSON is the source of truth, loaded
+through the game's own validators and builders), for example:
 
-- `Data/Creatures/beast-roster.json` — ten starter beasts, one per element,
+- `content/data/Creatures/beast-roster.json` — ten starter beasts, one per element,
   with stances and three growth curves (all ten currently use `medium`; `fast`
   and `slow` are kept for the simulator).
-- `Data/Skills/skill-library.json` — 60 beast skills (six per beast) with each
+- `content/data/Skills/skill-library.json` — 60 beast skills (six per beast) with each
   species' learnable skills and 3-skill default loadout, 6 avatar active
   skills, 10 avatar passives, 3 skill-training materials and 11 team bonds.
-- `Data/Skills/drop-tables.json` — material drops by encounter shape x level
+- `content/data/Skills/drop-tables.json` — material drops by encounter shape x level
   band, with pity thresholds.
 
 The numbers are simulator-tuned starting points, not confirmed balance — see
@@ -187,8 +157,13 @@ The numbers are simulator-tuned starting points, not confirmed balance — see
   dotnet format Tooling/EditModeTests --verify-no-changes
   dotnet test   Tooling/EditModeTests --configuration Release
   ```
+
+  `BeastCraft.slnx` at the root holds every project except the Android host
+  (which needs the Android workload), so a bare `dotnet build`, `dotnet test`
+  or `dotnet format --verify-no-changes` from the root covers src/ and
+  Tooling/ in one go.
 - A **headless balance simulator** ([`Tooling/BalanceSim/`](Tooling/BalanceSim/README.md))
-  — local-only, not a CI job — that runs the real battle code outside Unity and
+  — local-only, not a CI job — that runs the real battle code headless and
   writes Markdown reports: PvE against generated mixed encounters (solo, elite,
   squad, horde; hand-authored ones via `--encounter-set fixed`), a secondary
   1v1 PvP round-robin, a `--level-gap` sweep and `--mode pacing`. Committed
@@ -196,7 +171,7 @@ The numbers are simulator-tuned starting points, not confirmed balance — see
   and pacing reports plus research notes); their numbers inform design
   decisions and are not applied automatically.
 - The **test runner** (`Tooling/EditModeTests/`) references
-  `src/BeastCraft.Core` and runs the suite in `BeastCraft/Assets/_Project/Scripts/Tests/EditMode`
+  `src/BeastCraft.Core` and runs the suite in `Tooling/EditModeTests/Tests`
   plus its own golden-value tests (`Tooling/EditModeTests/Goldens`: growth-curve
   samples and schema 1-5 save fixtures that must stay byte-identical;
   `BEASTCRAFT_UPDATE_GOLDENS=1` rewrites them for a reviewed behaviour change).
@@ -206,60 +181,68 @@ The numbers are simulator-tuned starting points, not confirmed balance — see
 
 - Anything the player sees or touches beyond the spike's battle viewer (desktop
   and Android): no menus, map, team building or audio; the spike's art is
-  placeholder (`Scenes/` and `Prefabs/` are empty, and no runtime script is a
-  MonoBehaviour).
+  placeholder.
 - Encounters as game data — the only encounters are the balance simulator's
   generator and its `Tooling/BalanceSim/encounters.json`.
-- Gear content — the gear schemas and save support exist, but `Data/Gear/` and
-  `Data/AvatarGear/` are empty.
-- Narrative, IAP and services code (only empty placeholder folders in the
-  legacy Unity `Runtime/`; idle rewards have their rules in
-  `src/BeastCraft.Core/Idle` but no UI),
-  the offline art compositor, and any UGS integration.
-- PlayMode tests (the assembly exists, with no tests) and any Unity test run
-  in CI.
+- Gear content — the gear schemas and save support exist, but `content/data/Gear/` and
+  `content/data/AvatarGear/` are empty.
+- Narrative and IAP code (idle rewards have their rules in
+  `src/BeastCraft.Core/Idle` but no UI), and the offline art compositor.
+- Tests that drive the MonoGame viewer itself (the suite covers the core and
+  the engine-neutral presentation layer).
 
 ### Running the game (desktop spike)
 
 `src/BeastCraft.Desktop` is a MonoGame DesktopGL app (MonoGame 3.8.5.1, net10.0;
 Windows first, and it builds on Linux). It fights one real PvE battle through the
-game's own session code — Phoenix, Golem and Kirin (level 20) against the Hollow
-Warden encounter (a champion and two brutes, level 10), seed 20260924 — and
-draws it pixel-perfect: a 640x360 frame scaled up by a whole number.
+game's own session code — Phoenix, Golem, Kirin and Frost Wyrm (level 20) against
+the Hollow Warden encounter (a champion and two brutes, level 10), seed 20260933 —
+and draws it in **portrait**: a fixed 1080x1920 canvas scaled to the window and
+letterboxed (the window opens at 540x960 and can be resized). The art is
+throwaway pixel placeholders; the final art is illustrated.
 
 ```
-git lfs install && git lfs pull          # the pixel art is in Git LFS
+git lfs install && git lfs pull          # the placeholder art is in Git LFS
 dotnet run --project src/BeastCraft.Desktop -c Release
 ```
 
 **Space** plays the next turn (or finishes the one playing), **A** toggles
-auto-play, **Esc** quits. Each fired skill plays its VFX from
-`Data/Vfx/vfx-library.json`; Phoenix's Ember Shot and Flame Wave are fully
-authored, every other skill uses its element's default.
+auto-play, **1**/**2**/**3** set the speed, **S** skips to the result, **Tab**
+cycles the selected skill, **Esc** quits; the on-screen PLAY/PAUSE, x1/x2/x3 and
+SKIP buttons do the same, and hovering or clicking a skill card shows its range
+diagram. Each fired skill plays its VFX from `content/data/Vfx/vfx-library.json`
+(schema v2: layered effects, per-effect-type defaults with status auras and icons);
+Phoenix's Ember Shot, Flame Wave and Rebirth Flame carry the full layer stack.
 
 Screenshot mode renders one frame to a PNG and exits (it still opens a window
 briefly, for the graphics device):
 
 ```
 dotnet run --project src/BeastCraft.Desktop -c Release -- --screenshot shot.png --turns 1 --skill ember_shot
+dotnet run --project src/BeastCraft.Desktop -c Release -- --screenshot diagram.png --skill flame_wave --select-skill 1
 ```
 
 `--turns N` plays N turns and shows the Nth; `--skill ID` then carries on to the
 first turn that fires that skill; `--at MS` picks the moment inside that turn
-(default: the skill's VFX mid-play); `--scale K` (default 2), `--seed S`,
-`--level L`, `--enemy-level L` and `--content DIR` adjust the rest. The design,
-the VFX schema and the art pipeline are in
+(default: the skill's VFX mid-play); `--select-skill N` shows the acting unit's
+Nth skill card with its range diagram; `--scale K` renders K x 540x960 (default
+2: 1080x1920); `--safe-inset L,T,R,B` fakes a phone's cutout insets;
+`--encounter ID`, `--speed S`, `--seed S`, `--level L`, `--enemy-level L` and
+`--content DIR` adjust the rest. The design (portrait canvas and safe area, art
+manifest v2 and ArtKey, the VFX schema, range diagrams, how Spine would plug in)
+and the art pipeline are in
 [`docs/design/presentation-and-vfx.md`](docs/design/presentation-and-vfx.md);
 regenerating the art is in [`Tooling/PixelArt/README.md`](Tooling/PixelArt/README.md).
+The art and animation brief for freelance quoting (DRAFT) is [`docs/art/art-brief.md`](docs/art/art-brief.md).
 
 ### Running on Android
 
 `src/BeastCraft.Android` runs the same battle viewer (the shared
-`src/BeastCraft.Game`) on Android: full screen in landscape, the 640x360 frame
-scaled by a whole number and letterboxed. **Tap** plays the next turn (or
-finishes the one playing), a **two-finger tap** or the on-screen **AUTO**
-button toggles auto-play, **Back** quits. It is a **local build only**; CI does
-not build it.
+`src/BeastCraft.Game`) on Android: full screen and **locked to portrait**, the
+1080x1920 canvas letterboxed inside the display cutout's safe area. **Tap** the
+buttons and skill cards, tap the board to play the next turn (or finish the one
+playing), a **two-finger tap** toggles auto-play, **Back** quits. It is a
+**local build only**; CI does not build it.
 The package ID `com.example.beastcraft` is a temporary placeholder; the real
 package ID is decided at release time.
 
@@ -299,18 +282,3 @@ hardware acceleration); `adb exec-out screencap -p > shot.png` takes a
 screenshot. The Android notes (content as APK assets, input, screens) and the
 iOS plan are in
 [`docs/design/presentation-and-vfx.md`](docs/design/presentation-and-vfx.md#hosts).
-
-### Running it in Unity (legacy)
-
-The Unity project is no longer built (see the engine-migration note under
-[Stack](#stack)); this section is kept for reference only. Nothing has been opened in an actual Unity Editor yet, so the generated
-`ProjectSettings/` YAML, `Library/` and solution files do not exist; that is
-expected. After the first open (see [Getting started](#getting-started)):
-
-1. Run the importers in order from the **Beast Craft → Data** menu:
-   **Import Beast Roster**, then **Import Skill Library** (wires each species'
-   `LearnableSkills` and `DefaultLoadout`, and creates the team bonds), then
-   **Import Drop Tables** (validated against the library's materials). Each
-   creates or updates the assets in place by id, so re-running is safe.
-2. Run the **EditMode** suite from **Window → General → Test Runner**. It has
-   so far only been run through the stub-based `Tooling/EditModeTests` runner.

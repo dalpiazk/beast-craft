@@ -5,7 +5,7 @@ using BeastCraft.Skills;
 namespace BeastCraft.Encounters
 {
     /// <summary>
-    /// The plain-data shape of <c>Data/Encounters/enemy-library.json</c>: every PvE enemy type the
+    /// The plain-data shape of <c>data/Encounters/enemy-library.json</c>: every PvE enemy type the
     /// game fields — stats, stance, size and kit. Enemies are not roster beasts (they are never
     /// owned, levelled or saved); <see cref="EnemyCatalog"/> turns each (enemy, element) pair into
     /// an in-memory <c>CreatureSpeciesSO</c> and skill kit on demand, so an enemy goes through the
@@ -21,8 +21,8 @@ namespace BeastCraft.Encounters
     [Serializable]
     public class EnemyLibraryData
     {
-        /// <summary>Path of the file relative to the Unity project folder (<c>BeastCraft/</c>).</summary>
-        public const string ProjectRelativePath = "Assets/_Project/Data/Encounters/enemy-library.json";
+        /// <summary>Path of the file relative to the repository root.</summary>
+        public const string ProjectRelativePath = "content/data/Encounters/enemy-library.json";
 
         /// <summary>The only <see cref="SchemaVersion"/> this code reads.</summary>
         public const int CurrentSchemaVersion = 1;
@@ -89,5 +89,13 @@ namespace BeastCraft.Encounters
         /// repeat a beast skill's id; they are never looked up globally).
         /// </summary>
         public SkillData[] Skills = new SkillData[0];
+
+        /// <summary>
+        /// Presentation only: the art key the viewer draws this enemy with (a sprite's
+        /// <c>ArtKey</c> in the art manifest), e.g. <c>"enemy/giant"</c>. Optional, but every shipped
+        /// enemy sets one; an enemy without art of its own points at a manifest alias entry (another
+        /// sprite plus a tint). Never read by battles.
+        /// </summary>
+        public string ArtKey;
     }
 }

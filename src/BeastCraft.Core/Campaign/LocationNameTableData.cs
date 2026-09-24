@@ -3,7 +3,7 @@ using System;
 namespace BeastCraft.Campaign
 {
     /// <summary>
-    /// The plain-data shape of <c>Data/Campaign/location-names.json</c>: the display names of the
+    /// The plain-data shape of <c>data/Campaign/location-names.json</c>: the display names of the
     /// region map's locations. A map node's <see cref="MapNode.LabelKey"/>
     /// (<c>"{regionId}/{kind}/{variant}"</c>) names one entry: region <c>regionId</c>'s list for the
     /// <see cref="LocationKind"/> <c>kind</c>, index <c>variant</c>. Every region has exactly
@@ -18,8 +18,8 @@ namespace BeastCraft.Campaign
     [Serializable]
     public class LocationNameTableData
     {
-        /// <summary>Path of the file relative to the Unity project folder (<c>BeastCraft/</c>).</summary>
-        public const string ProjectRelativePath = "Assets/_Project/Data/Campaign/location-names.json";
+        /// <summary>Path of the file relative to the repository root.</summary>
+        public const string ProjectRelativePath = "content/data/Campaign/location-names.json";
 
         /// <summary>The only <see cref="SchemaVersion"/> this code reads.</summary>
         public const int CurrentSchemaVersion = 1;

@@ -3,7 +3,7 @@ using System;
 namespace BeastCraft.Encounters
 {
     /// <summary>
-    /// The plain-data shape of <c>Data/Encounters/encounter-library.json</c>: how PvE encounters are
+    /// The plain-data shape of <c>data/Encounters/encounter-library.json</c>: how PvE encounters are
     /// put together from the enemy library. Two kinds of encounter:
     /// <list type="bullet">
     /// <item><b>Generated</b> (<see cref="Shapes"/>): an encounter shape is a recipe —
@@ -23,8 +23,8 @@ namespace BeastCraft.Encounters
     [Serializable]
     public class EncounterLibraryData
     {
-        /// <summary>Path of the file relative to the Unity project folder (<c>BeastCraft/</c>).</summary>
-        public const string ProjectRelativePath = "Assets/_Project/Data/Encounters/encounter-library.json";
+        /// <summary>Path of the file relative to the repository root.</summary>
+        public const string ProjectRelativePath = "content/data/Encounters/encounter-library.json";
 
         /// <summary>The only <see cref="SchemaVersion"/> this code reads.</summary>
         public const int CurrentSchemaVersion = 1;

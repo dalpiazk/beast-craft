@@ -5,8 +5,8 @@ Tone, world and the global consistency rules live in [content-bible.md](content-
 items-and-looks appendix. Only `DisplayName` / `Description` text follows these rules; ids, stats,
 prices, sources and unlocks never change in a content pass (mechanics: [economy-and-shop.md](economy-and-shop.md)).
 
-Files: `Data/Items/gear-library.json`, `Data/Items/consumable-library.json`,
-`Data/Skills/skill-library.json` (`Materials` only), `Data/Cosmetics/cosmetic-library.json`.
+Files: `content/data/Items/gear-library.json`, `content/data/Items/consumable-library.json`,
+`content/data/Skills/skill-library.json` (`Materials` only), `content/data/Cosmetics/cosmetic-library.json`.
 `shop-tables.json`, `idle-rewards.json` and `drop-tables.json` hold no player-facing text.
 
 ## Gear

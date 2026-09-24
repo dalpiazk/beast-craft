@@ -13,7 +13,7 @@ namespace BeastCraft.Tooling.BalanceSim
 {
     // ------------------------------------------------------------------------------------------
     // The PvE run's opposition. The default, generated set is GAME CONTENT: the enemy library and
-    // the encounter shapes in BeastCraft/Assets/_Project/Data/Encounters, read through the game's
+    // the encounter shapes in content/data/Encounters, read through the game's
     // own validators and EnemyCatalog. The legacy fixed set (--encounter-set fixed) stays a
     // simulator fixture in Tooling/BalanceSim/encounters.json, which no game code reads.
     // ------------------------------------------------------------------------------------------
@@ -192,10 +192,10 @@ namespace BeastCraft.Tooling.BalanceSim
     public static class EncounterLoader
     {
         /// <summary>The enemy library's path relative to the repo root.</summary>
-        public const string EnemyLibraryRepoRelativePath = "BeastCraft/" + EnemyLibraryData.ProjectRelativePath;
+        public const string EnemyLibraryRepoRelativePath = EnemyLibraryData.ProjectRelativePath;
 
         /// <summary>The encounter library's path relative to the repo root.</summary>
-        public const string EncounterLibraryRepoRelativePath = "BeastCraft/" + EncounterLibraryData.ProjectRelativePath;
+        public const string EncounterLibraryRepoRelativePath = EncounterLibraryData.ProjectRelativePath;
 
         /// <summary>The legacy fixed encounters' path relative to the repo root.</summary>
         public const string FixedRepoRelativePath = "Tooling/BalanceSim/encounters.json";

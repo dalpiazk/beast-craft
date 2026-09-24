@@ -1,7 +1,7 @@
 # Roster tuning log — first simulator pass
 
 The first tuning pass of the starter roster's base stats against the headless balance simulator's
-PvE mode. Only `BeastCraft/Assets/_Project/Data/Creatures/beast-roster.json` base stats (six stats and
+PvE mode. Only `content/data/Creatures/beast-roster.json` base stats (six stats and
 `MoveRange`) changed; the simulator's kit, encounters, damage formula, element chart and Runtime code
 are untouched.
 
@@ -2237,7 +2237,7 @@ Reproduce: `dotnet run --project Tooling/BalanceSim -c Release -- --mode pve --s
 
 ## Material economy (stage 5): drop tables tuned for skill pacing
 
-First pass of `BeastCraft/Assets/_Project/Data/Skills/drop-tables.json` against the new pacing model
+First pass of `content/data/Skills/drop-tables.json` against the new pacing model
 (`--mode pacing`; report [`pacing-report.md`](pacing-report.md)). The XP constants (100 x level^1.5,
 10 XP a use, 20 uses a battle cap, materials 250 / 1,000 / 4,000) are unchanged; only drop chances,
 quantities, bands and first-clear bonuses moved. The default PvE / PvP report is unaffected.
@@ -3006,7 +3006,7 @@ Reproduce: as above (about 160 s); each sweep row is the same run with the two c
 
 No balance change. The simulator's enemy types, encounter shapes and element-scheme weights moved out
 of `Tooling/BalanceSim/encounters.json` into game content,
-`BeastCraft/Assets/_Project/Data/Encounters/enemy-library.json` and `encounter-library.json`, by a
+`content/data/Encounters/enemy-library.json` and `encounter-library.json`, by a
 one-off scripted conversion (skills into the skill library's `SkillData` shape, `ThreatBudget` into
 `ThreatMin` / `ThreatMax`, the scheme weights out of `SimOptions`); the generator moved into the
 Runtime (`EncounterGenerator`) and the simulator now draws through it and fields enemies through the
@@ -3038,7 +3038,7 @@ bond-aware heuristic pick) clears 50%; an unscouted team clears about 10-38% at 
 The campaign's intended difficulty is not decided.
 
 Reproduce: `dotnet run --project Tooling/BalanceSim -c Release -- --out docs/balance/tuned-report.md
---write-difficulty BeastCraft/Assets/_Project/Data/Encounters/encounter-difficulty.json`.
+--write-difficulty content/data/Encounters/encounter-difficulty.json`.
 
 ## Behaviour bonds and tiered difficulty
 
@@ -3177,7 +3177,7 @@ points at a few levels.
 Reproduce: the guard, `dotnet run --project Tooling/BalanceSim -c Release -- --mode pve --seeds
 12345,777,4242,2024,99 --target-clear 50 --panel 16x4 --out out/guard.md`; the shipping table and
 report, `dotnet run --project Tooling/BalanceSim -c Release -- --panel 16x4 --avatar-value --out
-docs/balance/tuned-report.md --write-difficulty BeastCraft/Assets/_Project/Data/Encounters/encounter-difficulty.json`;
+docs/balance/tuned-report.md --write-difficulty content/data/Encounters/encounter-difficulty.json`;
 the level gap, `dotnet run --project Tooling/BalanceSim -c Release -- --mode pve --levels
 10,30,50,70,90 --level-gap -5,-3,-2,0,2,3,5 --out docs/balance/level-gap-report.md`.
 
@@ -3355,7 +3355,7 @@ commands, and the table's `_readme` names its gear:
 - report: `dotnet run --project Tooling/BalanceSim -c Release -- --panel 16x4 --avatar-value --out
   docs/balance/tuned-report.md` (unchanged bytes);
 - table: `dotnet run --project Tooling/BalanceSim -c Release -- --panel 16x4 --avatar-value --gear
-  typical --write-difficulty BeastCraft/Assets/_Project/Data/Encounters/encounter-difficulty.json`
+  typical --write-difficulty content/data/Encounters/encounter-difficulty.json`
   (the panel and the avatar-value replay do not touch the calibration; `--mode pve --gear typical
   --write-difficulty <path>` writes the same bytes in half the time).
 

@@ -3,7 +3,7 @@ using System;
 namespace BeastCraft.Economy
 {
     /// <summary>
-    /// The plain-data shape of <c>Data/Cosmetics/cosmetic-library.json</c>: every cosmetic category
+    /// The plain-data shape of <c>data/Cosmetics/cosmetic-library.json</c>: every cosmetic category
     /// (the avatar's, and each beast species' own — looks are per species, not per body type), their
     /// options and where each option comes from, and the milestones that unlock some of them.
     /// Purely cosmetic: nothing here has stats. <see cref="CosmeticLibraryValidator"/> checks it;
@@ -14,8 +14,8 @@ namespace BeastCraft.Economy
     [Serializable]
     public class CosmeticLibraryData
     {
-        /// <summary>Path of the file relative to the Unity project folder (<c>BeastCraft/</c>).</summary>
-        public const string ProjectRelativePath = "Assets/_Project/Data/Cosmetics/cosmetic-library.json";
+        /// <summary>Path of the file relative to the repository root.</summary>
+        public const string ProjectRelativePath = "content/data/Cosmetics/cosmetic-library.json";
 
         /// <summary>The only <see cref="SchemaVersion"/> this code reads.</summary>
         public const int CurrentSchemaVersion = 1;

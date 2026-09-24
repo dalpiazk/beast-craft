@@ -58,7 +58,7 @@ namespace BeastCraft.Tooling.BalanceSim
     public static class CampaignPacingSimulator
     {
         /// <summary>The region library's path relative to the repo root.</summary>
-        public const string RegionsRepoRelativePath = "BeastCraft/" + RegionLibraryData.ProjectRelativePath;
+        public const string RegionsRepoRelativePath = RegionLibraryData.ProjectRelativePath;
 
         /// <summary>Beasts fielded in every battle.</summary>
         public const int FieldedCount = 3;

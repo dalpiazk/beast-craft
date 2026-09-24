@@ -32,7 +32,7 @@ namespace BeastCraft.Tests.EditMode
             BattleSetup setup = Demo(out Dictionary<string, string> species);
 
             Assert.AreEqual("phoenix", species["beast:b1"]);
-            Assert.AreEqual(3, setup.TeamBeastIds.Count);
+            Assert.AreEqual(4, setup.TeamBeastIds.Count);
             Assert.AreEqual(3, setup.Encounter.Enemies.Count, "the Hollow Warden template: a champion and two brutes");
             Assert.AreEqual("champion", species["enemy1"]);
             Assert.AreEqual("brute", species["enemy2"]);

@@ -19,10 +19,10 @@ namespace BeastCraft.Presentation.Content
     /// through the game's own validators and builders — the same mapping the tests and the balance
     /// simulator use (<see cref="BeastRosterBuilder"/>, <see cref="SkillLibraryBuilder"/>,
     /// <see cref="EnemyCatalog"/>, <see cref="EncounterLibrary"/>) — plus the VFX library and the
-    /// pixel-art manifest.
+    /// art manifest (<see cref="ArtManifestData"/>, normalized to schema v2).
     /// <para>
-    /// The <em>content root</em> is the folder holding <c>Data/</c> and <c>Art/Pixel/</c>: in the
-    /// repo, <c>BeastCraft/Assets/_Project</c>; in a built host, the <c>Content</c> folder it copies
+    /// The <em>content root</em> is the folder holding <c>data/</c> and <c>art/pixel/</c>: in the
+    /// repo, <c>content/</c>; in a built host, the <c>Content</c> folder it copies
     /// them to. <see cref="FindRoot"/> finds either. Every file is read through an
     /// <see cref="IContentSource"/>, so a host without a file system for its content (Android: APK
     /// assets) loads the same way.
@@ -31,7 +31,7 @@ namespace BeastCraft.Presentation.Content
     public sealed class GameContent
     {
         /// <summary>The prefix of every data file's ProjectRelativePath, which a content root already stands for.</summary>
-        public const string ProjectPrefix = "Assets/_Project/";
+        public const string ProjectPrefix = "content/";
 
         private GameContent()
         {
@@ -57,18 +57,18 @@ namespace BeastCraft.Presentation.Content
 
         public VfxLibrary Vfx { get; private set; }
 
-        public PixelArtManifestData Art { get; private set; }
+        public ArtManifestData Art { get; private set; }
 
         /// <summary>Every skill id a skill can have: beast skills, avatar actives and enemy-library skills.</summary>
         public HashSet<string> KnownSkillIds { get; private set; }
 
-        /// <summary>A file of the content root by its ProjectRelativePath (<c>Assets/_Project/...</c>).</summary>
+        /// <summary>A file of the content root by its ProjectRelativePath (<c>content/...</c>).</summary>
         public static string PathOf(string root, string projectRelativePath)
         {
             return Path.Combine(root, RelativeOf(projectRelativePath).Replace('/', Path.DirectorySeparatorChar));
         }
 
-        /// <summary>A ProjectRelativePath (<c>Assets/_Project/...</c>) as a content-root-relative path with forward slashes.</summary>
+        /// <summary>A ProjectRelativePath (<c>content/...</c>) as a content-root-relative path with forward slashes.</summary>
         public static string RelativeOf(string projectRelativePath)
         {
             return projectRelativePath.StartsWith(ProjectPrefix, StringComparison.Ordinal)
@@ -78,7 +78,7 @@ namespace BeastCraft.Presentation.Content
 
         /// <summary>
         /// The content root: <paramref name="explicitRoot"/> when given, else the first of
-        /// <c>Content/</c> beside the executable, or <c>BeastCraft/Assets/_Project</c> walking up
+        /// <c>Content/</c> beside the executable, or the repo's <c>content/</c> walking up
         /// from the working directory or the executable. Null when none holds the roster.
         /// </summary>
         public static string FindRoot(string explicitRoot = null)
@@ -98,7 +98,7 @@ namespace BeastCraft.Presentation.Content
             {
                 for (DirectoryInfo dir = new DirectoryInfo(start); dir != null; dir = dir.Parent)
                 {
-                    string candidate = Path.Combine(dir.FullName, "BeastCraft", "Assets", "_Project");
+                    string candidate = Path.Combine(dir.FullName, "content");
                     if (File.Exists(PathOf(candidate, BeastRosterData.ProjectRelativePath)))
                     {
                         return candidate;
@@ -117,7 +117,7 @@ namespace BeastCraft.Presentation.Content
         {
             if (string.IsNullOrEmpty(root) || !Directory.Exists(root))
             {
-                errors.Add("No content root (looked for Content/ beside the app and BeastCraft/Assets/_Project above it).");
+                errors.Add("No content root (looked for Content/ beside the app and content/ above it).");
                 return null;
             }
 
@@ -137,11 +137,13 @@ namespace BeastCraft.Presentation.Content
             EncounterDifficultyData difficulty = Read<EncounterDifficultyData>(root, EncounterDifficultyData.ProjectRelativePath, errors);
             DropTableData dropTables = Read<DropTableData>(root, DropTableData.ProjectRelativePath, errors);
             VfxLibraryData vfx = Read<VfxLibraryData>(root, VfxLibraryData.ProjectRelativePath, errors);
-            PixelArtManifestData art = Read<PixelArtManifestData>(root, PixelArtManifestData.ProjectRelativePath, errors);
+            ArtManifestData art = ArtManifestData.Normalize(Read<ArtManifestData>(root, ArtManifestData.ProjectRelativePath, errors));
             if (errors.Count > 0)
             {
                 return null;
             }
+
+            Prefix(errors, "pixel-art-manifest.json", ArtManifestValidator.Validate(art));
 
             Prefix(errors, "beast-roster.json", BeastRosterValidator.Validate(roster));
             Prefix(errors, "skill-library.json", SkillLibraryValidator.Validate(skills, roster));
@@ -151,6 +153,7 @@ namespace BeastCraft.Presentation.Content
 
             HashSet<string> known = KnownSkills(skills, enemyLibrary);
             Prefix(errors, "vfx-library.json", VfxLibraryValidator.Validate(vfx, known, art));
+            Prefix(errors, "art keys", ArtReferenceValidator.Validate(roster, enemyLibrary, art));
             if (errors.Count > 0)
             {
                 return null;

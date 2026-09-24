@@ -1,0 +1,15 @@
+# name: icon_shield
+# label: Status icon: shielded
+# kind: icon
+# size: 9x9
+# outline: auto
+# artkey: icon/status/shield
+.........
+.CCCCCCC.
+.CwwcccC.
+.CwccccC.
+.CcccccC.
+..CcccC..
+...CcC...
+....C....
+.........

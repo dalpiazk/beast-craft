@@ -16,8 +16,8 @@ namespace BeastCraft.Tooling.BalanceSim
     /// beast skill built twice (as authored, and with its element forced to <c>None</c> for
     /// <see cref="KitMode.Neutral"/>), each species' default loadout, and the avatar's default
     /// actives (the first <see cref="SkillLibraryData.AvatarDefaultActiveCount"/>) and passives.
-    /// Everything is built through <see cref="SkillLibraryBuilder"/>, the same mapping the Editor
-    /// importer uses, so the simulator fights with the skills Unity would generate.
+    /// Everything is built through <see cref="SkillLibraryBuilder"/>, the same mapping the game's
+    /// content loader uses, so the simulator fights with the skills the game builds.
     /// <para>
     /// Skills are fielded at one skill level for the whole run (<c>--skill-level</c>), at the tier
     /// that level implies (<see cref="SkillLibraryBuilder.TierForLevel"/>): level 1 is the authored
@@ -27,7 +27,7 @@ namespace BeastCraft.Tooling.BalanceSim
     public sealed class SkillLibraryKits
     {
         /// <summary>The library's path relative to the repo root.</summary>
-        public const string RepoRelativePath = "BeastCraft/" + SkillLibraryData.ProjectRelativePath;
+        public const string RepoRelativePath = SkillLibraryData.ProjectRelativePath;
 
         private readonly Dictionary<string, SkillSO> _elemental = new Dictionary<string, SkillSO>(StringComparer.Ordinal);
         private readonly Dictionary<string, SkillSO> _neutral = new Dictionary<string, SkillSO>(StringComparer.Ordinal);

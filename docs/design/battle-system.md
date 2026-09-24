@@ -155,7 +155,7 @@ What that implies for balance and for the systems:
 
 ## Encounters as game content — BUILT; tiered difficulty targets DECIDED (user); the rest PENDING PRODUCER REVIEW
 
-PvE encounters are game content, authored as JSON under `BeastCraft/Assets/_Project/Data/Encounters/`
+PvE encounters are game content, authored as JSON under `content/data/Encounters/`
 and read by the game and the balance simulator alike, so the simulator calibrates exactly what the
 game fields. The enemies, shapes and weights came over unchanged from the simulator's former
 fixtures: the regenerated `tuned-report.md` differs from the one before the move only in its
@@ -259,7 +259,7 @@ Full rules, save shape and pacing: `docs/design/progression-and-saves.md`, "Regi
 ## Data-driven foundation already in place
 
 The authored data this combat model needs is already committed as ScriptableObject schemas under
-`BeastCraft/Assets/_Project/Scripts/Runtime/Battle/`:
+`src/BeastCraft.Core/Battle/`:
 
 - **`SkillSO`** — target shape (`SingleTarget`, `Line`, `Cross`, `AreaBurst`, `AllEnemies`,
   `AllAllies`, `Self`), range, resource cost, cooldown, a list of effects, and the targeting fields
@@ -1742,7 +1742,7 @@ in the file, unused, as ready-made shapes for the balance simulator to assign:
 
 ### JSON is the source of truth; Unity assets are generated
 
-The roster lives in **`BeastCraft/Assets/_Project/Data/Creatures/beast-roster.json`**, not in
+The roster lives in **`content/data/Creatures/beast-roster.json`**, not in
 hand-authored `.asset` files. A plain JSON file is readable and diffable outside Unity — the
 headless balance simulator (`Tooling/BalanceSim`) reads it directly with `System.Text.Json` (`IncludeFields = true`;
 keys are the C# field names exactly) — whereas `.asset` YAML references its scripts by `.meta` GUIDs
@@ -1865,7 +1865,7 @@ saved in `PlayerSave` (see [Progression, saves and the battle session](progressi
 
 The drop side of "Skill progression": where the materials come from, what the player holds, and
 how fast a skill climbs as a result. Everything lives in `BeastCraft.Progression`; the numbers are
-data (`Data/Skills/drop-tables.json`) tuned against the balance simulator's pacing model
+data (`content/data/Skills/drop-tables.json`) tuned against the balance simulator's pacing model
 (`--mode pacing`, `docs/balance/pacing-report.md`), not confirmed balance.
 
 **Drop tables.** `drop-tables.json` (DTOs `DropTableData`, checked by `DropTableValidator`, built by
@@ -2091,9 +2091,9 @@ has something to cleanse). Mechanism and content are the lead's design; the magn
 simulator-tuned.
 
 **Data** (explicit enum values, never renumbered; ids never renamed after ship). Authored in the
-`TeamBonds` array of `Data/Skills/skill-library.json` (`SkillLibraryData.CurrentSchemaVersion` 3;
+`TeamBonds` array of `content/data/Skills/skill-library.json` (`SkillLibraryData.CurrentSchemaVersion` 3;
 DTOs `TeamBondData` / `TeamBondTierData` / `BondReactionData`, checked by `SkillLibraryValidator`,
-mapped by `SkillLibraryBuilder.ApplyTeamBond`, imported into `Assets/_Project/Data/Bonds/` by the
+mapped by `SkillLibraryBuilder.ApplyTeamBond`, imported as ScriptableObjects by the (retired) Unity
 skill library importer, loaded the same way by the simulator):
 
 - `TeamBondSO` (`Runtime/Bonds`, namespace `BeastCraft.Bonds`): `BondId`, `DisplayName`,
@@ -2213,7 +2213,7 @@ guardian's reach should stay at 2 hexes (the draft said adjacent).
 
 ## Beast skill kits — SIMULATOR-TUNED CONTENT, NOT CONFIRMED BALANCE
 
-Every authored skill lives in **`BeastCraft/Assets/_Project/Data/Skills/skill-library.json`**, the
+Every authored skill lives in **`content/data/Skills/skill-library.json`**, the
 same JSON-as-source-of-truth pattern as the roster (see "JSON is the source of truth" above): 60 beast
 skills (six per beast), 6 avatar actives, 10 avatar passives, 3 skill materials, and per species its
 `LearnableSkills` (level → skill id) and `DefaultLoadout` (3 skill ids in slot, i.e. fire-priority,
@@ -2589,7 +2589,7 @@ and debuffs moving damage, avatar damage, and the loose level-invariance band ag
 
 The starter roster (the section above) adds `beast-roster.json`, the `BeastCraft.Creatures.Roster`
 data types and validator, `GrowthRateCurve.CurveId` and `GrowthRateCurve.EvaluateScale`, the Editor
-importer (the first Editor script, and the first `UnityEditor` stubs in `Tooling/CiStubs`), and
+importer (the first Editor script, and the first `UnityEditor` stubs, in the since-retired `Tooling/CiStubs`), and
 EditMode tests that check the JSON directly: structure, the ten pinned ids, one beast per element,
 the stat-budget and move-range bands, and the curve semantics.
 
@@ -2619,7 +2619,7 @@ cooldown 2). It runs in an `elemental` mode (kit in the beast's element) and a `
 
 Its **primary mode is PvE, team versus encounter**, following the direction above. Every 4-beast
 combination of the roster (210 teams) fights encounters generated from the game's encounter content
-(`BeastCraft/Assets/_Project/Data/Encounters/`; simulator fixtures in
+(`content/data/Encounters/`; simulator fixtures in
 `Tooling/BalanceSim/encounters.json` until "Encounters as game content" above). Until the
 mixed-encounter change below they were three fixed encounters: `boss` (one Colossus with very high
 HP, heavy hits in both categories and a periodic area slam), `swarm` (24 small biters and stingers on
@@ -2784,7 +2784,7 @@ made the level-difference curve more convex (k 0.012, q 0.009); skill numbers an
 constants only, the roster unchanged (tuning log, "Avatar retune" to "Level-gap re-check").
 
 **Encounters have since become game content** (see "Encounters as game content"): the simulator's
-enemy types, shapes and element-scheme weights moved into `Data/Encounters/`, its generator into the
+enemy types, shapes and element-scheme weights moved into `content/data/Encounters/`, its generator into the
 Runtime, and the calibrated multipliers into the simulator-written `encounter-difficulty.json`, with
 an importer, `EncounterPlan` and the battle-session support to field them. No number changed (tuning
 log, "Encounters as game content"); the campaign's difficulty target is pending producer review.

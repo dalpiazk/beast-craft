@@ -4,8 +4,8 @@ namespace BeastCraft.Presentation.Content
 {
     /// <summary>
     /// Where a host's content files come from. Paths are relative to the content root (the folder
-    /// holding <c>Data/</c> and <c>Art/Pixel/</c>) and always use forward slashes, e.g.
-    /// <c>Data/Creatures/beast-roster.json</c> (<see cref="GameContent.RelativeOf"/> turns a
+    /// holding <c>data/</c> and <c>art/pixel/</c>) and always use forward slashes, e.g.
+    /// <c>data/Creatures/beast-roster.json</c> (<see cref="GameContent.RelativeOf"/> turns a
     /// ProjectRelativePath into one).
     /// <para>
     /// The desktop host reads plain files (<see cref="FileContentSource"/>); the Android host reads

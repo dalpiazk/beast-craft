@@ -43,6 +43,7 @@ namespace BeastCraft.Creatures.Roster
             species.DisplayName = data.DisplayName;
             species.Description = data.Description;
             species.BaseStats = data.BaseStats;
+            species.ArtKey = string.IsNullOrEmpty(data.ArtKey) ? null : data.ArtKey;
             species.GrowthRate = growthRate;
 
             string[] names = data.Elements ?? new string[0];

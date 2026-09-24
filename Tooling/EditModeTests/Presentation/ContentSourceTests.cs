@@ -17,8 +17,8 @@ namespace BeastCraft.Tests.EditMode
         [Test]
         public void RelativeOf_StripsTheProjectPrefix_AndKeepsForwardSlashes()
         {
-            Assert.AreEqual("Art/Pixel/pixel-art-manifest.json", GameContent.RelativeOf(PixelArtManifestData.ProjectRelativePath));
-            Assert.AreEqual("Data/x.json", GameContent.RelativeOf("Data/x.json"));
+            Assert.AreEqual("art/pixel/pixel-art-manifest.json", GameContent.RelativeOf(ArtManifestData.ProjectRelativePath));
+            Assert.AreEqual("data/x.json", GameContent.RelativeOf("data/x.json"));
         }
 
         [Test]
@@ -34,7 +34,7 @@ namespace BeastCraft.Tests.EditMode
             CollectionAssert.AreEquivalent(VfxLibraryTests.Content.KnownSkillIds, viaSource.KnownSkillIds);
             Assert.AreEqual(VfxLibraryTests.Content.Art.Sprites.Length, viaSource.Art.Sprites.Length);
 
-            string folder = "Art/Pixel/";
+            string folder = "art/pixel/";
             using (Stream png = viaSource.Source.Open(folder + viaSource.Art.Sprites[0].File))
             {
                 Assert.Greater(png.Length, 8);

@@ -1,0 +1,136 @@
+{
+  "_readme": "Source of truth for the starter roster. Numbers are the third simulator-tuned pass (retuned with the skill library against the authored kits and avatar, with base Speed spread so the fastest beast gets 10-15% more turns than the slowest; see docs/balance/tuning-log.md), not confirmed balance. Edit here, then in Unity run Beast Craft/Data/Import Beast Roster. All species use the medium growth curve for now (user decision); fast and slow are kept, unused, for the balance simulator. Stance is the species' CombatStance (Vanguard, Ranged or Skirmisher; missing means Vanguard), which decides how it positions itself in battle. BaseStats.CritChance is the species' percent critical-hit chance (0-100), used as-is at every level like MoveRange; neither counts toward the six-stat budget. See docs/design/battle-system.md, 'Starter roster' and 'Combat stances'. Display text (names, descriptions) is DRAFT pending producer review; tone, naming and length rules are in docs/design/content-bible.md.",
+  "SchemaVersion": 1,
+  "GrowthCurves": [
+    {
+      "CurveId": "fast",
+      "MaxLevel": 100,
+      "Keys": [
+        { "Progress": 0.0, "Scale": 0.2 },
+        { "Progress": 0.25, "Scale": 0.6 },
+        { "Progress": 0.5, "Scale": 0.85 },
+        { "Progress": 1.0, "Scale": 1.0 }
+      ]
+    },
+    {
+      "CurveId": "medium",
+      "MaxLevel": 100,
+      "Keys": [
+        { "Progress": 0.0, "Scale": 0.15 },
+        { "Progress": 1.0, "Scale": 1.0 }
+      ]
+    },
+    {
+      "CurveId": "slow",
+      "MaxLevel": 100,
+      "Keys": [
+        { "Progress": 0.0, "Scale": 0.1 },
+        { "Progress": 0.5, "Scale": 0.4 },
+        { "Progress": 0.75, "Scale": 0.65 },
+        { "Progress": 1.0, "Scale": 1.0 }
+      ]
+    }
+  ],
+  "Species": [
+    {
+      "SpeciesId": "phoenix",
+      "ArtKey": "beast/phoenix",
+      "DisplayName": "Phoenix",
+      "Description": "A proud bird of living flame that burns brightest just before it falls. It strikes hard from afar and sets foes smouldering, and once a battle wraps itself in renewing fire, but it has little to stand behind up close.",
+      "Elements": [ "Fire" ],
+      "GrowthCurveId": "medium",
+      "Stance": "Ranged",
+      "BaseStats": { "Hp": 92, "Attack": 102, "Defense": 70, "SpecialAttack": 120, "SpecialDefense": 85, "Speed": 104, "MoveRange": 4, "CritChance": 10 }
+    },
+    {
+      "SpeciesId": "leviathan",
+      "ArtKey": "beast/leviathan",
+      "DisplayName": "Leviathan",
+      "Description": "A calm serpent of the deep whose coils could cradle a ship. Its whirlpools drag enemies to it, and it shields itself in its scales and simply outlasts whatever breaks against it.",
+      "Elements": [ "Water" ],
+      "GrowthCurveId": "medium",
+      "Stance": "Vanguard",
+      "BaseStats": { "Hp": 138, "Attack": 86, "Defense": 120, "SpecialAttack": 86, "SpecialDefense": 106, "Speed": 94, "MoveRange": 3, "CritChance": 3 }
+    },
+    {
+      "SpeciesId": "golem",
+      "ArtKey": "beast/golem",
+      "DisplayName": "Golem",
+      "Description": "A hillside that learned to stand. Slow and stubborn, it plants itself up front, dares every nearby enemy to strike it and raises walls of granite around its friends. Nothing gets past it.",
+      "Elements": [ "Earth" ],
+      "GrowthCurveId": "medium",
+      "Stance": "Vanguard",
+      "BaseStats": { "Hp": 150, "Attack": 118, "Defense": 137, "SpecialAttack": 41, "SpecialDefense": 96, "Speed": 88, "MoveRange": 2, "CritChance": 2 }
+    },
+    {
+      "SpeciesId": "griffin",
+      "ArtKey": "beast/griffin",
+      "DisplayName": "Griffin",
+      "Description": "Half eagle, half lion, all wind. Bold and restless, it is across the field before the enemy has turned, rakes with talons and lances of air, and is gone again before the blow lands.",
+      "Elements": [ "Air" ],
+      "GrowthCurveId": "medium",
+      "Stance": "Skirmisher",
+      "BaseStats": { "Hp": 116, "Attack": 118, "Defense": 97, "SpecialAttack": 85, "SpecialDefense": 91, "Speed": 108, "MoveRange": 5, "CritChance": 8 }
+    },
+    {
+      "SpeciesId": "thunderbird",
+      "ArtKey": "beast/thunderbird",
+      "DisplayName": "Thunderbird",
+      "Description": "Its wingbeat is the thunder and its dive is the lightning. Nothing acts before it, and it opens every fight with one great dive from the clouds, though it cannot take many hits back.",
+      "Elements": [ "Lightning" ],
+      "GrowthCurveId": "medium",
+      "Stance": "Skirmisher",
+      "BaseStats": { "Hp": 116, "Attack": 108, "Defense": 88, "SpecialAttack": 100, "SpecialDefense": 91, "Speed": 110, "MoveRange": 4, "CritChance": 15 }
+    },
+    {
+      "SpeciesId": "frost_wyrm",
+      "ArtKey": "beast/frost_wyrm",
+      "DisplayName": "Frost Wyrm",
+      "Description": "An old dragon wrapped in rime, with a dry sense of humour. It never hurries; it simply makes the battlefield colder, slowing and freezing its foes, and waits for the cold to win.",
+      "Elements": [ "Ice" ],
+      "GrowthCurveId": "medium",
+      "Stance": "Vanguard",
+      "BaseStats": { "Hp": 98, "Attack": 74, "Defense": 124, "SpecialAttack": 103, "SpecialDefense": 118, "Speed": 99, "MoveRange": 3, "CritChance": 5 }
+    },
+    {
+      "SpeciesId": "treant",
+      "ArtKey": "beast/treant",
+      "DisplayName": "Treant",
+      "Description": "A gentle forest guardian with roots older than kingdoms. It shelters its allies under bark, mends whichever friend is worst off and lashes enemies with thorned vines.",
+      "Elements": [ "Nature" ],
+      "GrowthCurveId": "medium",
+      "Stance": "Vanguard",
+      "BaseStats": { "Hp": 134, "Attack": 77, "Defense": 98, "SpecialAttack": 105, "SpecialDefense": 124, "Speed": 92, "MoveRange": 3, "CritChance": 3 }
+    },
+    {
+      "SpeciesId": "tarasque",
+      "ArtKey": "beast/tarasque",
+      "DisplayName": "Tarasque",
+      "Description": "A grumpy river-beast in a shell of iron plates and spines. Where the Golem only endures, the Tarasque endures and bites back, cracking armour and crushing whatever stands in front of it.",
+      "Elements": [ "Metal" ],
+      "GrowthCurveId": "medium",
+      "Stance": "Vanguard",
+      "BaseStats": { "Hp": 112, "Attack": 130, "Defense": 127, "SpecialAttack": 54, "SpecialDefense": 78, "Speed": 97, "MoveRange": 3, "CritChance": 6 }
+    },
+    {
+      "SpeciesId": "kirin",
+      "ArtKey": "beast/kirin",
+      "DisplayName": "Kirin",
+      "Description": "A serene, luminous beast said to walk without bending the grass. It shuns claws and horns and fights with light instead, healing and blessing its team and calling down pillars of radiance.",
+      "Elements": [ "Light" ],
+      "GrowthCurveId": "medium",
+      "Stance": "Ranged",
+      "BaseStats": { "Hp": 115, "Attack": 51, "Defense": 90, "SpecialAttack": 137, "SpecialDefense": 118, "Speed": 101, "MoveRange": 4, "CritChance": 5 }
+    },
+    {
+      "SpeciesId": "basilisk",
+      "ArtKey": "beast/basilisk",
+      "DisplayName": "Basilisk",
+      "Description": "A sly serpent-king whose gaze reaches farther than any fang and can turn a foe to stone. It slips through shadow to find the weakest enemy, and cannot afford to be found in turn.",
+      "Elements": [ "Dark" ],
+      "GrowthCurveId": "medium",
+      "Stance": "Ranged",
+      "BaseStats": { "Hp": 103, "Attack": 94, "Defense": 79, "SpecialAttack": 110, "SpecialDefense": 94, "Speed": 105, "MoveRange": 5, "CritChance": 12 }
+    }
+  ]
+}

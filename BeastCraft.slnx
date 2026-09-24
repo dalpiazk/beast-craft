@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/BeastCraft.Core/BeastCraft.Core.csproj" />
+    <Project Path="src/BeastCraft.Desktop/BeastCraft.Desktop.csproj" />
+    <Project Path="src/BeastCraft.Game/BeastCraft.Game.csproj" />
+    <Project Path="src/BeastCraft.Presentation/BeastCraft.Presentation.csproj" />
+  </Folder>
+  <Folder Name="/Tooling/">
+    <Project Path="Tooling/BalanceSim/BalanceSim.csproj" />
+    <Project Path="Tooling/EditModeTests/EditModeTests.csproj" />
+  </Folder>
+</Solution>

@@ -11,16 +11,15 @@ namespace BeastCraft.Tooling.BalanceSim
     /// Reads <c>beast-roster.json</c> directly and rebuilds the species in memory.
     /// <para>
     /// Parsing and validation happen here; the field mapping is the Runtime
-    /// <see cref="BeastRosterBuilder.BuildAll"/>, the same one the Editor's
-    /// <c>BeastRosterImporter</c> applies, so the simulator fights exactly the beasts the Editor
-    /// would generate. <c>JsonUtility</c> is unavailable outside Unity, hence System.Text.Json with
+    /// <see cref="BeastRosterBuilder.BuildAll"/>, the same one the game's content loader
+    /// applies, so the simulator fights exactly the beasts the game builds. System.Text.Json with
     /// public fields included (the case the roster doc already names).
     /// </para>
     /// </summary>
     public static class RosterLoader
     {
         /// <summary>The roster's path relative to the repo root.</summary>
-        public const string RepoRelativePath = "BeastCraft/" + BeastRosterData.ProjectRelativePath;
+        public const string RepoRelativePath = BeastRosterData.ProjectRelativePath;
 
         /// <summary>
         /// Resolves the roster file: the explicit path when given, otherwise the first match for

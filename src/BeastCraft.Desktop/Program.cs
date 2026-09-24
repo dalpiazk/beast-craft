@@ -12,7 +12,7 @@ namespace BeastCraft.Desktop
             if (options == null)
             {
                 Console.Error.WriteLine(error);
-                Console.Error.WriteLine("Usage: BeastCraft.Desktop [--screenshot PATH [--turns N] [--skill ID] [--at MS] [--scale K]] [--seed S] [--level L] [--enemy-level L] [--content DIR]");
+                Console.Error.WriteLine("Usage: BeastCraft.Desktop [--screenshot PATH [--turns N] [--skill ID] [--at MS] [--scale K]] [--select-skill N] [--speed S] [--safe-inset L,T,R,B] [--seed S] [--level L] [--enemy-level L] [--encounter ID] [--content DIR]");
                 return 2;
             }
 

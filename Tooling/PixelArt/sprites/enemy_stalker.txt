@@ -1,0 +1,6 @@
+# name: enemy_stalker
+# label: Stalker (alias of enemy_champion, tinted)
+# kind: enemy
+# alias: enemy_champion
+# tint: h
+# artkey: enemy/stalker

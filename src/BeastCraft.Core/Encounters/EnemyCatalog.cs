@@ -138,7 +138,8 @@ namespace BeastCraft.Encounters
                     Elements = element == Element.None ? new string[0] : new[] { element.ToString() },
                     BaseStats = enemy.BaseStats,
                     Stance = enemy.Stance,
-                    Footprint = enemy.Footprint
+                    Footprint = enemy.Footprint,
+                    ArtKey = enemy.ArtKey
                 };
 
                 CreatureSpeciesSO species = new CreatureSpeciesSO();

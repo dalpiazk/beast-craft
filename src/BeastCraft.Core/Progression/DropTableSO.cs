@@ -3,7 +3,7 @@ using System;
 namespace BeastCraft.Progression
 {
     /// <summary>
-    /// The imported drop tables: <c>Data/Skills/drop-tables.json</c> copied verbatim into an asset
+    /// The imported drop tables: <c>data/Skills/drop-tables.json</c> copied verbatim into an asset
     /// by the Editor importer (menu: Beast Craft/Data/Import Drop Tables), so the game reads the
     /// same <see cref="DropTableData"/> the balance simulator does. Never hand-edit
     /// <see cref="Data"/>; edit the JSON and re-import.

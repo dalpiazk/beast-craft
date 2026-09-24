@@ -1,0 +1,9 @@
+# name: fx_ring
+# label: Shockwave ring (white, tinted and sized in game)
+# kind: fx
+# size: 48x48
+# outline: none
+# generator: ring
+# ramp: w 4 3
+# thickness: 1
+# artkey: fx/layer/ring

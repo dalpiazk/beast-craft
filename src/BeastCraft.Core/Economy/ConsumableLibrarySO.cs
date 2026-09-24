@@ -2,7 +2,7 @@
 namespace BeastCraft.Economy
 {
     /// <summary>
-    /// The imported consumable library: <c>Data/Items/consumable-library.json</c> copied verbatim by
+    /// The imported consumable library: <c>data/Items/consumable-library.json</c> copied verbatim by
     /// the Editor importer (menu: Beast Craft/Data/Import Consumables), which also writes one
     /// <see cref="ConsumableSO"/> asset per consumable (what <c>BattleContent</c> resolves). Never
     /// hand-edit <see cref="Data"/>; edit the JSON and re-import.

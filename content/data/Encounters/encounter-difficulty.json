@@ -1,0 +1,39 @@
+{
+  "_readme": "WRITTEN BY Tooling/BalanceSim --write-difficulty; never hand-edit (re-run the simulator after changing the roster, skills, enemies or shapes, including a shape's TargetClear). One calibrated difficulty multiplier per (kit mode, encounter shape, level): every enemy's HP, Attack, Defense, SpecialAttack and SpecialDefense are scaled by it (EnemyScaling) so that the calibration target clears its shape's TargetClear percent (Targets; per cell too) of the shape's generated encounters at that level. CalibratedOn 'bonds' = the team a scouting player's bond-aware heuristic pick fields per encounter. Targets: solo 50.0%, elite 60.0%, squad 80.0%, horde 80.0% (encounter-library.json, tiered by the kind of fight: trash cleared most of the time, bosses about half). Player gear: typical (--gear typical: what a player normally wears at the level, three pieces of its band from gear-library.json; the shipping assumption, a user decision). The game reads the elemental cells (EncounterDifficultyTable: linear between calibrated levels, clamped outside them) and multiplies by encounter-library.json's DifficultyScale, a global producer factor (1.0 = as calibrated). Schema 1 files (one uniform TargetClear) still load. Regenerate with: dotnet run --project Tooling/BalanceSim -c Release -- --panel 16x4 --avatar-value --gear typical --write-difficulty content/data/Encounters/encounter-difficulty.json",
+  "SchemaVersion": 2,
+  "Seed": 12345,
+  "CalibratedOn": "bonds",
+  "Compositions": 8,
+  "Targets": [
+    { "Shape": "solo", "TargetClear": 50 },
+    { "Shape": "elite", "TargetClear": 60 },
+    { "Shape": "squad", "TargetClear": 80 },
+    { "Shape": "horde", "TargetClear": 80 }
+  ],
+  "Cells": [
+    { "KitMode": "elemental", "Shape": "solo", "Level": 1, "Multiplier": 1.296875, "TargetClear": 50 },
+    { "KitMode": "elemental", "Shape": "solo", "Level": 50, "Multiplier": 1.2734375, "TargetClear": 50 },
+    { "KitMode": "elemental", "Shape": "solo", "Level": 100, "Multiplier": 1.296875, "TargetClear": 50 },
+    { "KitMode": "elemental", "Shape": "elite", "Level": 1, "Multiplier": 1.140625, "TargetClear": 60 },
+    { "KitMode": "elemental", "Shape": "elite", "Level": 50, "Multiplier": 1.15625, "TargetClear": 60 },
+    { "KitMode": "elemental", "Shape": "elite", "Level": 100, "Multiplier": 1.15625, "TargetClear": 60 },
+    { "KitMode": "elemental", "Shape": "squad", "Level": 1, "Multiplier": 1.25, "TargetClear": 80 },
+    { "KitMode": "elemental", "Shape": "squad", "Level": 50, "Multiplier": 1.2109375, "TargetClear": 80 },
+    { "KitMode": "elemental", "Shape": "squad", "Level": 100, "Multiplier": 1.22265625, "TargetClear": 80 },
+    { "KitMode": "elemental", "Shape": "horde", "Level": 1, "Multiplier": 1.3125, "TargetClear": 80 },
+    { "KitMode": "elemental", "Shape": "horde", "Level": 50, "Multiplier": 1.25, "TargetClear": 80 },
+    { "KitMode": "elemental", "Shape": "horde", "Level": 100, "Multiplier": 1.1875, "TargetClear": 80 },
+    { "KitMode": "neutral", "Shape": "solo", "Level": 1, "Multiplier": 0.96875, "TargetClear": 50 },
+    { "KitMode": "neutral", "Shape": "solo", "Level": 50, "Multiplier": 0.98046875, "TargetClear": 50 },
+    { "KitMode": "neutral", "Shape": "solo", "Level": 100, "Multiplier": 0.986328125, "TargetClear": 50 },
+    { "KitMode": "neutral", "Shape": "elite", "Level": 1, "Multiplier": 0.859375, "TargetClear": 60 },
+    { "KitMode": "neutral", "Shape": "elite", "Level": 50, "Multiplier": 0.88671875, "TargetClear": 60 },
+    { "KitMode": "neutral", "Shape": "elite", "Level": 100, "Multiplier": 0.8671875, "TargetClear": 60 },
+    { "KitMode": "neutral", "Shape": "squad", "Level": 1, "Multiplier": 1.1875, "TargetClear": 80 },
+    { "KitMode": "neutral", "Shape": "squad", "Level": 50, "Multiplier": 1.2109375, "TargetClear": 80 },
+    { "KitMode": "neutral", "Shape": "squad", "Level": 100, "Multiplier": 1.20703125, "TargetClear": 80 },
+    { "KitMode": "neutral", "Shape": "horde", "Level": 1, "Multiplier": 1.25, "TargetClear": 80 },
+    { "KitMode": "neutral", "Shape": "horde", "Level": 50, "Multiplier": 1.25, "TargetClear": 80 },
+    { "KitMode": "neutral", "Shape": "horde", "Level": 100, "Multiplier": 1.1875, "TargetClear": 80 }
+  ]
+}

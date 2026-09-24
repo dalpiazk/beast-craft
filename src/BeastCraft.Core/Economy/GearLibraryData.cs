@@ -3,7 +3,7 @@ using System;
 namespace BeastCraft.Economy
 {
     /// <summary>
-    /// The plain-data shape of <c>Data/Items/gear-library.json</c>: every piece of beast gear
+    /// The plain-data shape of <c>data/Items/gear-library.json</c>: every piece of beast gear
     /// (<c>GearSO</c>) and avatar gear (<c>AvatarGearSO</c>) the game ships, with where each can be
     /// had (the Trader, battle drops, boss rewards). Plain serializable classes with public fields,
     /// read by <c>JsonUtility</c> (the Editor importer) and <c>System.Text.Json</c> (the balance
@@ -13,8 +13,8 @@ namespace BeastCraft.Economy
     [Serializable]
     public class GearLibraryData
     {
-        /// <summary>Path of the file relative to the Unity project folder (<c>BeastCraft/</c>).</summary>
-        public const string ProjectRelativePath = "Assets/_Project/Data/Items/gear-library.json";
+        /// <summary>Path of the file relative to the repository root.</summary>
+        public const string ProjectRelativePath = "content/data/Items/gear-library.json";
 
         /// <summary>The only <see cref="SchemaVersion"/> this code reads.</summary>
         public const int CurrentSchemaVersion = 1;

@@ -2,7 +2,7 @@
 namespace BeastCraft.Economy
 {
     /// <summary>
-    /// The imported cosmetic library: <c>Data/Cosmetics/cosmetic-library.json</c> copied verbatim by
+    /// The imported cosmetic library: <c>data/Cosmetics/cosmetic-library.json</c> copied verbatim by
     /// the Editor importer (menu: Beast Craft/Data/Import Cosmetics), which also writes the
     /// <c>CustomizationCategoryDefinition</c> assets, the avatar's and each species'
     /// <c>CustomizationSchema</c>. Never hand-edit <see cref="Data"/>; edit the JSON and re-import.

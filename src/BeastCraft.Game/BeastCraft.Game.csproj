@@ -2,7 +2,7 @@
 
   <!--
     BeastCraft.Game: the MonoGame code every host shares: the battle viewer (BattleViewerGame:
-    drawing, keyboard and touch input, integer scaling with letterboxing), the sprite atlas and the
+    drawing, keyboard, mouse and touch input, the 1080x1920 portrait canvas letterboxed into the screen), the sprite atlas, sprite renderer and the
     pixel text, and the APK-asset content source. The hosts are thin: src/BeastCraft.Desktop
     (DesktopGL) and src/BeastCraft.Android (MonoGame.Framework.Android) each reference this library
     plus their own MonoGame platform package.

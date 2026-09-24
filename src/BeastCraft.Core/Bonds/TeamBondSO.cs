@@ -11,7 +11,7 @@ namespace BeastCraft.Bonds
     /// lower ones) or scaling (<see cref="PerCount"/>: one tier whose magnitudes grow with every
     /// member, up to <see cref="MaxCount"/>). See the battle-system design doc, "Team bonds".
     /// <para>
-    /// Generated from the <c>TeamBonds</c> array of <c>Data/Skills/skill-library.json</c> by the
+    /// Generated from the <c>TeamBonds</c> array of <c>data/Skills/skill-library.json</c> by the
     /// skill library importer; never hand-edit the imported fields, edit the JSON and re-import.
     /// Which bonds are active for a team is <see cref="TeamBondResolver"/>'s call; applying them is
     /// <see cref="TeamBondLoadout"/>'s, called by <c>BattleTurnExecutor.BeginBattle</c>. Only the

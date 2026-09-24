@@ -6,7 +6,7 @@ using BeastCraft.Skills;
 namespace BeastCraft.Economy
 {
     /// <summary>
-    /// The plain-data shape of <c>Data/Economy/shop-tables.json</c>: what a Trader stocks and at what
+    /// The plain-data shape of <c>data/Economy/shop-tables.json</c>: what a Trader stocks and at what
     /// price. Prices are in <em>price units</em> — one unit is <see cref="PriceUnitData"/>'s
     /// <c>Base + PerLevel x level</c>, the gold a squad clear pays at that level before variance — so
     /// a price keeps pace with income. <see cref="ShopTableValidator"/> checks it;
@@ -15,8 +15,8 @@ namespace BeastCraft.Economy
     [Serializable]
     public class ShopTableData
     {
-        /// <summary>Path of the file relative to the Unity project folder (<c>BeastCraft/</c>).</summary>
-        public const string ProjectRelativePath = "Assets/_Project/Data/Economy/shop-tables.json";
+        /// <summary>Path of the file relative to the repository root.</summary>
+        public const string ProjectRelativePath = "content/data/Economy/shop-tables.json";
 
         /// <summary>The only <see cref="SchemaVersion"/> this code reads.</summary>
         public const int CurrentSchemaVersion = 1;
