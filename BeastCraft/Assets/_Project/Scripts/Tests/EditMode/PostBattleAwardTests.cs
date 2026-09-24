@@ -14,16 +14,11 @@ namespace BeastCraft.Tests.EditMode
     /// </summary>
     public class PostBattleAwardTests
     {
-        private readonly List<ScriptableObject> _created = new List<ScriptableObject>();
+        private readonly List<ContentAsset> _created = new List<ContentAsset>();
 
         [TearDown]
         public void TearDown()
         {
-            foreach (ScriptableObject created in _created)
-            {
-                Object.DestroyImmediate(created);
-            }
-
             _created.Clear();
         }
 
@@ -88,7 +83,7 @@ namespace BeastCraft.Tests.EditMode
 
         private SkillSO Skill(string id, float power)
         {
-            SkillSO skill = ScriptableObject.CreateInstance<SkillSO>();
+            SkillSO skill = new SkillSO();
             _created.Add(skill);
             skill.SkillId = id;
             skill.Cooldown = 0;

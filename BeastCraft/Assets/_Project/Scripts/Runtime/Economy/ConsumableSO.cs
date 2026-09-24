@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using BeastCraft.Battle;
-using UnityEngine;
 
 namespace BeastCraft.Economy
 {
@@ -11,15 +10,13 @@ namespace BeastCraft.Economy
     /// Editor importer). Its effects are ordinary <see cref="SkillEffect"/>s, applied through
     /// <see cref="SkillEffectApplier"/> by <see cref="ConsumableLoadout"/>.
     /// </summary>
-    [CreateAssetMenu(menuName = "Beast Craft/Economy/Consumable", fileName = "NewConsumable")]
-    public class ConsumableSO : ScriptableObject
+    public class ConsumableSO : ContentAsset
     {
         /// <summary>Stable id persisted in save data. Never rename after ship.</summary>
         public string ConsumableId;
 
         public string DisplayName;
 
-        [TextArea]
         public string Description;
 
         /// <summary>Inventory icon. Engine-neutral art key the host renderer resolves (null = none).</summary>

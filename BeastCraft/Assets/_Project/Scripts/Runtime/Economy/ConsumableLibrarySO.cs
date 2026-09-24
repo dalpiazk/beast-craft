@@ -1,4 +1,3 @@
-using UnityEngine;
 
 namespace BeastCraft.Economy
 {
@@ -8,8 +7,7 @@ namespace BeastCraft.Economy
     /// <see cref="ConsumableSO"/> asset per consumable (what <c>BattleContent</c> resolves). Never
     /// hand-edit <see cref="Data"/>; edit the JSON and re-import.
     /// </summary>
-    [CreateAssetMenu(menuName = "Beast Craft/Economy/Consumable Library", fileName = "ConsumableLibrary")]
-    public class ConsumableLibrarySO : ScriptableObject
+    public class ConsumableLibrarySO : ContentAsset
     {
         /// <summary>The authored library, as imported.</summary>
         public ConsumableLibraryData Data = new ConsumableLibraryData();

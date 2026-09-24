@@ -21,16 +21,11 @@ namespace BeastCraft.Tests.EditMode
     /// </summary>
     public class TeamBondTests
     {
-        private readonly List<ScriptableObject> _created = new List<ScriptableObject>();
+        private readonly List<ContentAsset> _created = new List<ContentAsset>();
 
         [TearDown]
         public void TearDown()
         {
-            for (int i = 0; i < _created.Count; i++)
-            {
-                UnityEngine.Object.DestroyImmediate(_created[i]);
-            }
-
             _created.Clear();
         }
 
@@ -114,7 +109,7 @@ namespace BeastCraft.Tests.EditMode
         [Test]
         public void MembersOf_ReadsStanceElementsAndIdFromTheSpecies()
         {
-            CreatureSpeciesSO species = ScriptableObject.CreateInstance<CreatureSpeciesSO>();
+            CreatureSpeciesSO species = new CreatureSpeciesSO();
             _created.Add(species);
             species.SpeciesId = "griffin";
             species.Stance = CombatStance.Skirmisher;
@@ -196,7 +191,7 @@ namespace BeastCraft.Tests.EditMode
         public void Bonds_ApplyBeforeTheAvatarsAuras_AndOnlyOnce()
         {
             TeamBondSO wall = StanceBond("wall", CombatStance.Vanguard, Tier(2, Buff(StatType.Attack, 10)));
-            PassiveSkillSO aura = ScriptableObject.CreateInstance<PassiveSkillSO>();
+            PassiveSkillSO aura = new PassiveSkillSO();
             _created.Add(aura);
             aura.PassiveId = "aura";
             aura.Trigger = PassiveTrigger.Aura;
@@ -542,7 +537,7 @@ namespace BeastCraft.Tests.EditMode
                     new TeamBondTierData { MinCount = 2, Effects = new[] { new EffectData { EffectType = "BuffStat", AffectedStat = "Speed", Magnitude = 5, IsPercent = true } } }
                 }
             };
-            TeamBondSO bond = ScriptableObject.CreateInstance<TeamBondSO>();
+            TeamBondSO bond = new TeamBondSO();
             _created.Add(bond);
 
             SkillLibraryBuilder.ApplyTeamBond(data, bond);
@@ -572,7 +567,7 @@ namespace BeastCraft.Tests.EditMode
                 MaxCount = 3,
                 Tiers = new[] { new TeamBondTierData { MinCount = 1, Effects = new[] { new EffectData { EffectType = "BuffStat", AffectedStat = "Defense", Magnitude = 4, IsPercent = true } } } }
             };
-            TeamBondSO bond = ScriptableObject.CreateInstance<TeamBondSO>();
+            TeamBondSO bond = new TeamBondSO();
             _created.Add(bond);
 
             SkillLibraryBuilder.ApplyTeamBond(data, bond);
@@ -856,7 +851,7 @@ namespace BeastCraft.Tests.EditMode
 
         private List<BattleUnit> SmallBattle(out List<BattleUnit> team)
         {
-            SkillSO hit = ScriptableObject.CreateInstance<SkillSO>();
+            SkillSO hit = new SkillSO();
             _created.Add(hit);
             hit.SkillId = "hit";
             hit.TargetShape = SkillTargetShape.AllEnemies;
@@ -886,7 +881,7 @@ namespace BeastCraft.Tests.EditMode
             List<TeamBondSO> bonds = new List<TeamBondSO>();
             foreach (TeamBondData data in library.TeamBonds)
             {
-                TeamBondSO bond = ScriptableObject.CreateInstance<TeamBondSO>();
+                TeamBondSO bond = new TeamBondSO();
                 _created.Add(bond);
                 SkillLibraryBuilder.ApplyTeamBond(data, bond);
                 bonds.Add(bond);
@@ -975,7 +970,7 @@ namespace BeastCraft.Tests.EditMode
 
         private TeamBondSO NewBond(string id, TeamBondScope scope, TeamBondTier[] tiers)
         {
-            TeamBondSO bond = ScriptableObject.CreateInstance<TeamBondSO>();
+            TeamBondSO bond = new TeamBondSO();
             _created.Add(bond);
             bond.BondId = id;
             bond.DisplayName = id;

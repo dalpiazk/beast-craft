@@ -1,6 +1,5 @@
 using System;
 using BeastCraft.Creatures;
-using UnityEngine;
 
 namespace BeastCraft.Encounters
 {
@@ -16,8 +15,7 @@ namespace BeastCraft.Encounters
     /// them, so every encounter of a session shares one set of enemy species and kits.
     /// </para>
     /// </summary>
-    [CreateAssetMenu(menuName = "Beast Craft/Encounters/Encounter Library", fileName = "EncounterLibrary")]
-    public class EncounterLibrarySO : ScriptableObject
+    public class EncounterLibrarySO : ContentAsset
     {
         /// <summary>The enemy library, as imported.</summary>
         public EnemyLibraryData Enemies = new EnemyLibraryData();

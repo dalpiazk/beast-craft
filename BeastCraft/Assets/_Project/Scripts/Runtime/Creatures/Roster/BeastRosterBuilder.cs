@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using BeastCraft.Battle.Grid;
-using UnityEngine;
 
 namespace BeastCraft.Creatures.Roster
 {
@@ -97,7 +96,7 @@ namespace BeastCraft.Creatures.Roster
                     continue;
                 }
 
-                GrowthRateCurve curve = ScriptableObject.CreateInstance<GrowthRateCurve>();
+                GrowthRateCurve curve = new GrowthRateCurve();
                 curve.name = data.CurveId;
                 ApplyCurve(data, curve);
                 curves[data.CurveId] = curve;
@@ -110,7 +109,7 @@ namespace BeastCraft.Creatures.Roster
                     continue;
                 }
 
-                CreatureSpeciesSO beast = ScriptableObject.CreateInstance<CreatureSpeciesSO>();
+                CreatureSpeciesSO beast = new CreatureSpeciesSO();
                 beast.name = data.SpeciesId;
                 curves.TryGetValue(data.GrowthCurveId ?? string.Empty, out GrowthRateCurve growth);
                 ApplySpecies(data, beast, growth);

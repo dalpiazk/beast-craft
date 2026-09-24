@@ -8,7 +8,6 @@ using BeastCraft.Bonds;
 using BeastCraft.Creatures;
 using BeastCraft.Creatures.Roster;
 using BeastCraft.Skills;
-using UnityEngine;
 
 namespace BeastCraft.Tooling.BalanceSim
 {
@@ -114,7 +113,7 @@ namespace BeastCraft.Tooling.BalanceSim
 
             foreach (string id in library.AvatarDefaultPassives)
             {
-                PassiveSkillSO passive = ScriptableObject.CreateInstance<PassiveSkillSO>();
+                PassiveSkillSO passive = new PassiveSkillSO();
                 SkillLibraryBuilder.ApplyPassive(Array.Find(library.AvatarPassives, p => p.PassiveId == id), passive);
                 passive.name = id;
                 kits._avatarPassives.Add(passive);
@@ -122,7 +121,7 @@ namespace BeastCraft.Tooling.BalanceSim
 
             foreach (TeamBondData data in library.TeamBonds ?? new TeamBondData[0])
             {
-                TeamBondSO bond = ScriptableObject.CreateInstance<TeamBondSO>();
+                TeamBondSO bond = new TeamBondSO();
                 SkillLibraryBuilder.ApplyTeamBond(data, bond);
                 bond.name = data.BondId;
                 kits._teamBonds.Add(bond);
@@ -175,7 +174,7 @@ namespace BeastCraft.Tooling.BalanceSim
 
         private static SkillSO Build(SkillData data, bool neutral)
         {
-            SkillSO skill = ScriptableObject.CreateInstance<SkillSO>();
+            SkillSO skill = new SkillSO();
             SkillLibraryBuilder.ApplySkill(data, skill);
             skill.name = data.SkillId;
             if (neutral)

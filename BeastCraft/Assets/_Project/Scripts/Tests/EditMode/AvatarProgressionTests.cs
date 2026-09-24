@@ -14,16 +14,11 @@ namespace BeastCraft.Tests.EditMode
     /// </summary>
     public class AvatarProgressionTests
     {
-        private readonly List<ScriptableObject> _created = new List<ScriptableObject>();
+        private readonly List<ContentAsset> _created = new List<ContentAsset>();
 
         [TearDown]
         public void TearDown()
         {
-            foreach (ScriptableObject created in _created)
-            {
-                Object.DestroyImmediate(created);
-            }
-
             _created.Clear();
         }
 
@@ -100,8 +95,8 @@ namespace BeastCraft.Tests.EditMode
         [Test]
         public void StatsAtLevel_ScaleByTheGrowthCurve_ExceptMoveAndCrit()
         {
-            AvatarStatsSO stats = ScriptableObject.CreateInstance<AvatarStatsSO>();
-            GrowthRateCurve growth = ScriptableObject.CreateInstance<GrowthRateCurve>();
+            AvatarStatsSO stats = new AvatarStatsSO();
+            GrowthRateCurve growth = new GrowthRateCurve();
             _created.Add(stats);
             _created.Add(growth);
             growth.Curve = AnimationCurve.Linear(0f, 0.2f, 1f, 1f);
@@ -126,7 +121,7 @@ namespace BeastCraft.Tests.EditMode
         [Test]
         public void StatsAtLevel_WithoutGrowth_IsTheFlatBlock()
         {
-            AvatarStatsSO stats = ScriptableObject.CreateInstance<AvatarStatsSO>();
+            AvatarStatsSO stats = new AvatarStatsSO();
             _created.Add(stats);
             stats.BaseStats = new StatBlock(500, 100, 80, 120, 90, 100, 3, 5);
 

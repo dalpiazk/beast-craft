@@ -19,11 +19,6 @@ namespace BeastCraft.Tests.EditMode
         [TearDown]
         public void TearDown()
         {
-            for (int i = 0; i < _created.Count; i++)
-            {
-                Object.DestroyImmediate(_created[i]);
-            }
-
             _created.Clear();
         }
 
@@ -471,7 +466,7 @@ namespace BeastCraft.Tests.EditMode
 
         private SkillSO Skill(params SkillEffect[] effects)
         {
-            SkillSO skill = ScriptableObject.CreateInstance<SkillSO>();
+            SkillSO skill = new SkillSO();
             skill.Effects.AddRange(effects);
             _created.Add(skill);
             return skill;

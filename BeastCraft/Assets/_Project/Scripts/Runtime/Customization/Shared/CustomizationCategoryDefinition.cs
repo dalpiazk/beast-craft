@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using UnityEngine;
 
 namespace BeastCraft.Customization
 {
@@ -9,8 +8,7 @@ namespace BeastCraft.Customization
     /// systems. A category always resolves to a concrete value: see <see cref="GetDefaultOption"/>
     /// and <see cref="GetDefaultColor"/>.
     /// </summary>
-    [CreateAssetMenu(menuName = "Beast Craft/Customization/Category", fileName = "NewCustomizationCategory")]
-    public class CustomizationCategoryDefinition : ScriptableObject
+    public class CustomizationCategoryDefinition : ContentAsset
     {
         /// <summary>Stable string key persisted in save data and referenced from code. Never rename after ship.</summary>
         public string CategoryId;

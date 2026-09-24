@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using BeastCraft.Battle;
 using BeastCraft.Creatures;
 using BeastCraft.Progression;
-using UnityEngine;
 
 namespace BeastCraft.Avatar
 {
@@ -35,8 +34,7 @@ namespace BeastCraft.Avatar
     /// should not be authored on a passive.
     /// </para>
     /// </summary>
-    [CreateAssetMenu(menuName = "Beast Craft/Avatar/Passive Skill", fileName = "NewPassiveSkill")]
-    public class PassiveSkillSO : ScriptableObject
+    public class PassiveSkillSO : ContentAsset
     {
         /// <summary>Default <see cref="HpThresholdPercent"/>.</summary>
         public const int DefaultHpThresholdPercent = 50;
@@ -50,7 +48,6 @@ namespace BeastCraft.Avatar
         /// <summary>Player-facing passive name.</summary>
         public string DisplayName;
 
-        [TextArea]
         public string Description;
 
         /// <summary>Icon shown in the avatar's passive slots. Engine-neutral art key the host renderer resolves (null = none).</summary>

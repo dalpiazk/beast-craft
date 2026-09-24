@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using BeastCraft.Battle;
 using BeastCraft.Battle.Grid;
-using UnityEngine;
 
 namespace BeastCraft.Bonds
 {
@@ -35,7 +34,7 @@ namespace BeastCraft.Bonds
     /// </para>
     /// <para>
     /// <strong>One carrier per tier and stack count.</strong> As with <see cref="PassiveInstance"/>,
-    /// a carrier is created with <see cref="ScriptableObject.CreateInstance{T}"/> the first time a
+    /// a carrier is created the first time a
     /// tier is applied at a stack count and cached, weakly keyed by that <see cref="TeamBondTier"/>
     /// and then by the stacks, so rebuilding the loadout every battle does not pile up native
     /// objects. At one stack the carrier shares the tier's effect list; above one it carries
@@ -212,7 +211,7 @@ namespace BeastCraft.Bonds
                     byStacks.Remove(stacks);
                 }
 
-                carrier = ScriptableObject.CreateInstance<SkillSO>();
+                carrier = new SkillSO();
                 carrier.name = bond.name;
                 carrier.SkillId = bond.BondId;
                 carrier.DisplayName = bond.DisplayName;

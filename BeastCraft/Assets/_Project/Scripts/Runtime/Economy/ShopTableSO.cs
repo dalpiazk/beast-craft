@@ -1,4 +1,3 @@
-using UnityEngine;
 
 namespace BeastCraft.Economy
 {
@@ -6,8 +5,7 @@ namespace BeastCraft.Economy
     /// The imported shop tables (menu: Beast Craft/Data/Import Shop Tables). Never hand-edit
     /// <see cref="Data"/>; edit the JSON and re-import.
     /// </summary>
-    [CreateAssetMenu(menuName = "Beast Craft/Economy/Shop Tables", fileName = "ShopTables")]
-    public class ShopTableSO : ScriptableObject
+    public class ShopTableSO : ContentAsset
     {
         public ShopTableData Data = new ShopTableData();
     }

@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using BeastCraft.Battle;
-using UnityEngine;
 
 namespace BeastCraft.Avatar
 {
@@ -27,8 +26,7 @@ namespace BeastCraft.Avatar
     /// damaging skills through the damage formula — see <see cref="BattleAvatar"/>.
     /// </para>
     /// </summary>
-    [CreateAssetMenu(menuName = "Beast Craft/Avatar/Avatar Gear", fileName = "NewAvatarGear")]
-    public class AvatarGearSO : ScriptableObject
+    public class AvatarGearSO : ContentAsset
     {
         /// <summary>Stable string key persisted in save data. Never rename after ship.</summary>
         public string AvatarGearId;
@@ -36,7 +34,6 @@ namespace BeastCraft.Avatar
         /// <summary>Player-facing gear name.</summary>
         public string DisplayName;
 
-        [TextArea]
         public string Description;
 
         /// <summary>Inventory icon. The only art this asset carries; it is never drawn on the avatar. Engine-neutral art key the host renderer resolves (null = none).</summary>

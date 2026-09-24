@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using UnityEngine;
 
 namespace BeastCraft.Customization
 {
@@ -8,7 +7,7 @@ namespace BeastCraft.Customization
     /// asset — create an <c>AvatarCustomizationSchema</c> or a <c>CreatureCustomizationSchema</c>
     /// instead, so the asset type carries intent.
     /// </summary>
-    public abstract class CustomizationSchema : ScriptableObject
+    public abstract class CustomizationSchema : ContentAsset
     {
         /// <summary>
         /// The categories this schema includes, in UI presentation order. A schema only lists

@@ -3,7 +3,6 @@ using System.Runtime.CompilerServices;
 using BeastCraft.Battle;
 using BeastCraft.Battle.Grid;
 using BeastCraft.Creatures;
-using UnityEngine;
 
 namespace BeastCraft.Bonds
 {
@@ -656,7 +655,7 @@ namespace BeastCraft.Bonds
                     byKey.Remove(key);
                 }
 
-                carrier = ScriptableObject.CreateInstance<SkillSO>();
+                carrier = new SkillSO();
                 carrier.name = bond == null ? "bond_reaction" : bond.name;
                 carrier.SkillId = bond == null ? null : bond.BondId;
                 carrier.DisplayName = bond == null ? null : bond.DisplayName;

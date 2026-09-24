@@ -15,7 +15,7 @@ namespace BeastCraft.Tests.EditMode
     /// </summary>
     public class PlayerGearTests
     {
-        private readonly List<ScriptableObject> _created = new List<ScriptableObject>();
+        private readonly List<ContentAsset> _created = new List<ContentAsset>();
         private BattleContent _catalog;
 
         [SetUp]
@@ -29,11 +29,6 @@ namespace BeastCraft.Tests.EditMode
         [TearDown]
         public void TearDown()
         {
-            for (int i = 0; i < _created.Count; i++)
-            {
-                Object.DestroyImmediate(_created[i]);
-            }
-
             _created.Clear();
         }
 
@@ -209,7 +204,7 @@ namespace BeastCraft.Tests.EditMode
 
         private GearSO Gear(string id, GearSlot slot, int minimumLevel)
         {
-            GearSO gear = ScriptableObject.CreateInstance<GearSO>();
+            GearSO gear = new GearSO();
             gear.GearId = id;
             gear.Slot = slot;
             gear.MinimumLevel = minimumLevel;
@@ -220,7 +215,7 @@ namespace BeastCraft.Tests.EditMode
 
         private AvatarGearSO AvatarGear(string id, AvatarGearSlot slot)
         {
-            AvatarGearSO gear = ScriptableObject.CreateInstance<AvatarGearSO>();
+            AvatarGearSO gear = new AvatarGearSO();
             gear.AvatarGearId = id;
             gear.Slot = slot;
             _created.Add(gear);

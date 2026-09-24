@@ -33,8 +33,8 @@
 
   <!--
     Paths are relative to this csproj: Tooling/EditModeTests -> repo root is two levels up. The
-    Editor glob mirrors the test assembly definition, which references BeastCraft.Editor. The data
-    JSON files are not copied: the tests find them by walking up from the output directory.
+    Unity Editor importers are not compiled (they only work inside the retired Unity project). The
+    data JSON files are not copied: the tests find them by walking up from the output directory.
   -->
   <ItemGroup>
     <Compile Include="..\CiStubs\UnityStub\*.cs">
@@ -42,9 +42,6 @@
     </Compile>
     <Compile Include="..\..\BeastCraft\Assets\_Project\Scripts\Runtime\**\*.cs">
       <Link>GameSource\Runtime\%(RecursiveDir)%(Filename)%(Extension)</Link>
-    </Compile>
-    <Compile Include="..\..\BeastCraft\Assets\_Project\Scripts\Editor\**\*.cs">
-      <Link>GameSource\Editor\%(RecursiveDir)%(Filename)%(Extension)</Link>
     </Compile>
     <Compile Include="..\..\BeastCraft\Assets\_Project\Scripts\Tests\EditMode\**\*.cs">
       <Link>GameSource\Tests\EditMode\%(RecursiveDir)%(Filename)%(Extension)</Link>

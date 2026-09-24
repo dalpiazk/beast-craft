@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using BeastCraft.Avatar;
 using BeastCraft.Progression;
-using UnityEngine;
 
 namespace BeastCraft.Battle
 {
@@ -25,8 +24,8 @@ namespace BeastCraft.Battle
     /// the passive's <see cref="PassiveSkillSO.TargetScope"/>.
     /// </para>
     /// <para>
-    /// <strong>One carrier per passive asset.</strong> The carrier is created with
-    /// <see cref="ScriptableObject.CreateInstance{T}"/> the first time a given
+    /// <strong>One carrier per passive asset.</strong> The carrier is created
+    /// the first time a given
     /// <see cref="PassiveSkillSO"/> is put into a battle and then cached, weakly keyed by that asset,
     /// so every later <see cref="PassiveInstance"/> of the same asset — across battles too — shares
     /// it, and rebuilding the loadout every battle does not pile up native objects in a player. The
@@ -245,7 +244,7 @@ namespace BeastCraft.Battle
         /// </summary>
         private static SkillSO BuildCarrier(PassiveSkillSO passive)
         {
-            SkillSO carrier = ScriptableObject.CreateInstance<SkillSO>();
+            SkillSO carrier = new SkillSO();
             carrier.name = passive.name;
             carrier.SkillId = passive.PassiveId;
             carrier.DisplayName = passive.DisplayName;

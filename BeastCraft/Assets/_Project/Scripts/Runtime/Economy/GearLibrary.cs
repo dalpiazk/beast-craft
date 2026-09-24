@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using BeastCraft.Avatar;
 using BeastCraft.Battle;
 using BeastCraft.Creatures;
-using UnityEngine;
 
 namespace BeastCraft.Economy
 {
@@ -186,13 +185,13 @@ namespace BeastCraft.Economy
                 {
                     if (item.IsAvatarGear)
                     {
-                        AvatarGearSO asset = ScriptableObject.CreateInstance<AvatarGearSO>();
+                        AvatarGearSO asset = new AvatarGearSO();
                         Apply(item, asset);
                         avatar.Add(asset);
                     }
                     else
                     {
-                        GearSO asset = ScriptableObject.CreateInstance<GearSO>();
+                        GearSO asset = new GearSO();
                         Apply(item, asset);
                         beast.Add(asset);
                     }

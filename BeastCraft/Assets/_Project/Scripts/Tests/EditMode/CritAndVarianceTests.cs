@@ -15,16 +15,11 @@ namespace BeastCraft.Tests.EditMode
     /// </summary>
     public class CritAndVarianceTests
     {
-        private readonly List<ScriptableObject> _created = new List<ScriptableObject>();
+        private readonly List<ContentAsset> _created = new List<ContentAsset>();
 
         [TearDown]
         public void TearDown()
         {
-            for (int i = 0; i < _created.Count; i++)
-            {
-                Object.DestroyImmediate(_created[i]);
-            }
-
             _created.Clear();
         }
 
@@ -284,7 +279,7 @@ namespace BeastCraft.Tests.EditMode
         [Test]
         public void GetStatAtLevel_CritChanceWithoutGrowthRate_ReturnsBase()
         {
-            CreatureSpeciesSO species = ScriptableObject.CreateInstance<CreatureSpeciesSO>();
+            CreatureSpeciesSO species = new CreatureSpeciesSO();
             _created.Add(species);
             species.BaseStats = new StatBlock(10, 0, 0, 0, 0, 0, 2, 8);
 
@@ -432,7 +427,7 @@ namespace BeastCraft.Tests.EditMode
             // SpecialAttack 200: a magnitude-7 heal is 7% of 200 = 14 HP.
             BattleUnit target = Unit("t", new StatBlock(100, 1, 1, 200, 1, 1), 1);
             target.CurrentHp = 50;
-            SkillSO heal = ScriptableObject.CreateInstance<SkillSO>();
+            SkillSO heal = new SkillSO();
             heal.Effects.Add(new SkillEffect { EffectType = SkillEffectType.Heal, Magnitude = 7f });
             _created.Add(heal);
             System.Random rng = new System.Random(2);
@@ -527,7 +522,7 @@ namespace BeastCraft.Tests.EditMode
 
         private SkillSO DamageSkill(float power)
         {
-            SkillSO skill = ScriptableObject.CreateInstance<SkillSO>();
+            SkillSO skill = new SkillSO();
             skill.Category = DamageCategory.Physical;
             skill.Element = Element.None;
             skill.Effects.Add(new SkillEffect { EffectType = SkillEffectType.Damage, Magnitude = power });
@@ -549,7 +544,7 @@ namespace BeastCraft.Tests.EditMode
 
         private SkillSO StatSkill(SkillEffectType type, float magnitude, int duration)
         {
-            SkillSO skill = ScriptableObject.CreateInstance<SkillSO>();
+            SkillSO skill = new SkillSO();
             skill.Effects.Add(new SkillEffect { EffectType = type, AffectedStat = StatType.CritChance, Magnitude = magnitude, DurationTurns = duration });
             _created.Add(skill);
             return skill;
@@ -557,12 +552,12 @@ namespace BeastCraft.Tests.EditMode
 
         private CreatureSpeciesSO Species(StatBlock baseStats, AnimationCurve curve)
         {
-            GrowthRateCurve growth = ScriptableObject.CreateInstance<GrowthRateCurve>();
+            GrowthRateCurve growth = new GrowthRateCurve();
             growth.Curve = curve;
             growth.MaxLevel = 11;
             _created.Add(growth);
 
-            CreatureSpeciesSO species = ScriptableObject.CreateInstance<CreatureSpeciesSO>();
+            CreatureSpeciesSO species = new CreatureSpeciesSO();
             species.BaseStats = baseStats;
             species.GrowthRate = growth;
             _created.Add(species);
@@ -571,7 +566,7 @@ namespace BeastCraft.Tests.EditMode
 
         private GearSO Gear(params StatModifier[] modifiers)
         {
-            GearSO gear = ScriptableObject.CreateInstance<GearSO>();
+            GearSO gear = new GearSO();
             gear.MinimumLevel = 1;
             gear.Modifiers.AddRange(modifiers);
             _created.Add(gear);

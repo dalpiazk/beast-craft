@@ -30,7 +30,7 @@ namespace BeastCraft.Tests.EditMode
         private const string Shape = "squad";
         private const int EncounterLevel = 8;
 
-        private readonly List<ScriptableObject> _created = new List<ScriptableObject>();
+        private readonly List<ContentAsset> _created = new List<ContentAsset>();
         private BeastRosterData _roster;
         private SkillLibraryData _library;
         private BattleContent _content;
@@ -60,11 +60,6 @@ namespace BeastCraft.Tests.EditMode
         [TearDown]
         public void TearDown()
         {
-            for (int i = 0; i < _created.Count; i++)
-            {
-                UnityEngine.Object.DestroyImmediate(_created[i]);
-            }
-
             _created.Clear();
         }
 
@@ -790,9 +785,9 @@ namespace BeastCraft.Tests.EditMode
             return FindUnit(result, unitId).Position;
         }
 
-        private T Create<T>() where T : ScriptableObject
+        private T Create<T>() where T : ContentAsset, new()
         {
-            T asset = ScriptableObject.CreateInstance<T>();
+            T asset = new T();
             _created.Add(asset);
             return asset;
         }

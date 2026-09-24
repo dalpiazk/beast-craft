@@ -1,5 +1,4 @@
 using System;
-using UnityEngine;
 
 namespace BeastCraft.Progression
 {
@@ -9,8 +8,7 @@ namespace BeastCraft.Progression
     /// same <see cref="DropTableData"/> the balance simulator does. Never hand-edit
     /// <see cref="Data"/>; edit the JSON and re-import.
     /// </summary>
-    [CreateAssetMenu(menuName = "Beast Craft/Progression/Drop Tables", fileName = "DropTables")]
-    public class DropTableSO : ScriptableObject
+    public class DropTableSO : ContentAsset
     {
         /// <summary>The authored tables, as imported.</summary>
         public DropTableData Data = new DropTableData();

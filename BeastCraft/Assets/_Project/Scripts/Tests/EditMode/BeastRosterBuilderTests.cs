@@ -10,16 +10,11 @@ namespace BeastCraft.Tests.EditMode
     /// <summary><see cref="BeastRosterBuilder"/>: the roster JSON to species/curve mapping shared by the importer and everything outside the Editor.</summary>
     public class BeastRosterBuilderTests
     {
-        private readonly List<ScriptableObject> _created = new List<ScriptableObject>();
+        private readonly List<ContentAsset> _created = new List<ContentAsset>();
 
         [TearDown]
         public void TearDown()
         {
-            for (int i = 0; i < _created.Count; i++)
-            {
-                Object.DestroyImmediate(_created[i]);
-            }
-
             _created.Clear();
         }
 

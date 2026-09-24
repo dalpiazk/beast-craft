@@ -1,4 +1,3 @@
-using UnityEngine;
 
 namespace BeastCraft.Economy
 {
@@ -8,8 +7,7 @@ namespace BeastCraft.Economy
     /// <c>CustomizationCategoryDefinition</c> assets, the avatar's and each species'
     /// <c>CustomizationSchema</c>. Never hand-edit <see cref="Data"/>; edit the JSON and re-import.
     /// </summary>
-    [CreateAssetMenu(menuName = "Beast Craft/Economy/Cosmetic Library", fileName = "CosmeticLibrary")]
-    public class CosmeticLibrarySO : ScriptableObject
+    public class CosmeticLibrarySO : ContentAsset
     {
         /// <summary>The authored library, as imported.</summary>
         public CosmeticLibraryData Data = new CosmeticLibraryData();

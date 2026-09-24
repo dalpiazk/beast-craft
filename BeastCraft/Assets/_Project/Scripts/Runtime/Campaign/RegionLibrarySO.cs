@@ -1,5 +1,4 @@
 using System;
-using UnityEngine;
 
 namespace BeastCraft.Campaign
 {
@@ -11,8 +10,7 @@ namespace BeastCraft.Campaign
     /// re-import. <see cref="Library"/> builds the runtime <see cref="RegionLibrary"/> and
     /// <see cref="Names"/> the <see cref="LocationNameTable"/> on first use and keeps them.
     /// </summary>
-    [CreateAssetMenu(menuName = "Beast Craft/Campaign/Region Library", fileName = "RegionLibrary")]
-    public class RegionLibrarySO : ScriptableObject
+    public class RegionLibrarySO : ContentAsset
     {
         /// <summary>The regions, seals and map rules, as imported.</summary>
         public RegionLibraryData Data = new RegionLibraryData();

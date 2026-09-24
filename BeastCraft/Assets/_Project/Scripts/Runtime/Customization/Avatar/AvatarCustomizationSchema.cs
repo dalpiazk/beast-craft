@@ -1,4 +1,3 @@
-using UnityEngine;
 
 namespace BeastCraft.Customization.Avatar
 {
@@ -16,7 +15,6 @@ namespace BeastCraft.Customization.Avatar
     /// reference is specifically the avatar schema. The category assets themselves are authored in
     /// the Editor.
     /// </remarks>
-    [CreateAssetMenu(menuName = "Beast Craft/Customization/Avatar Schema", fileName = "AvatarCustomizationSchema")]
     public class AvatarCustomizationSchema : CustomizationSchema
     {
     }

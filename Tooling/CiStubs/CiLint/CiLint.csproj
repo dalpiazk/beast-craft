@@ -30,15 +30,12 @@
 
   <!--
     Paths are relative to this csproj: Tooling/CiStubs/CiLint -> repo root is three levels up.
-    The Editor glob covers the Editor-only scripts (e.g. the beast-roster importer); the UnityEditor
-    APIs they use are stubbed in UnityStub/UnityEditor.cs.
+    The Unity Editor importers (Scripts/Editor) are no longer compiled: the content types they
+    build are plain C# now, so they only ever worked inside the retired Unity project.
   -->
   <ItemGroup>
     <Compile Include="..\..\..\BeastCraft\Assets\_Project\Scripts\Runtime\**\*.cs">
       <Link>GameSource\Runtime\%(RecursiveDir)%(Filename)%(Extension)</Link>
-    </Compile>
-    <Compile Include="..\..\..\BeastCraft\Assets\_Project\Scripts\Editor\**\*.cs">
-      <Link>GameSource\Editor\%(RecursiveDir)%(Filename)%(Extension)</Link>
     </Compile>
   </ItemGroup>
 

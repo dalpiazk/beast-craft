@@ -29,16 +29,11 @@ namespace BeastCraft.Tests.EditMode
         private const double MinTurnRateSpread = 1.10;
         private const double MaxTurnRateSpread = 1.15;
 
-        private readonly List<ScriptableObject> _created = new List<ScriptableObject>();
+        private readonly List<ContentAsset> _created = new List<ContentAsset>();
 
         [TearDown]
         public void TearDown()
         {
-            for (int i = 0; i < _created.Count; i++)
-            {
-                UnityEngine.Object.DestroyImmediate(_created[i]);
-            }
-
             _created.Clear();
         }
 
@@ -348,12 +343,12 @@ namespace BeastCraft.Tests.EditMode
 
         private CreatureSpeciesSO BuildSpecies(SpeciesData data, GrowthCurveData curveData)
         {
-            GrowthRateCurve curve = ScriptableObject.CreateInstance<GrowthRateCurve>();
+            GrowthRateCurve curve = new GrowthRateCurve();
             curve.Curve = curveData.ToAnimationCurve();
             curve.MaxLevel = curveData.MaxLevel;
             _created.Add(curve);
 
-            CreatureSpeciesSO species = ScriptableObject.CreateInstance<CreatureSpeciesSO>();
+            CreatureSpeciesSO species = new CreatureSpeciesSO();
             species.SpeciesId = data.SpeciesId;
             species.BaseStats = data.BaseStats;
             species.GrowthRate = curve;

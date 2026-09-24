@@ -1,4 +1,3 @@
-using UnityEngine;
 
 namespace BeastCraft.Creatures
 {
@@ -12,8 +11,7 @@ namespace BeastCraft.Creatures
     /// is only the fresh-asset placeholder; a curve that starts at 0 makes every level-1 stat 0.
     /// </para>
     /// </summary>
-    [CreateAssetMenu(menuName = "Beast Craft/Creatures/Growth Rate", fileName = "NewGrowthRate")]
-    public class GrowthRateCurve : ScriptableObject
+    public class GrowthRateCurve : ContentAsset
     {
         /// <summary>
         /// Stable key species data refers to this curve by (see <c>beast-roster.json</c>); the roster

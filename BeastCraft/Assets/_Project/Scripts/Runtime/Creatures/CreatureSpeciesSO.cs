@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using BeastCraft.Battle;
 using BeastCraft.Battle.Grid;
 using BeastCraft.Customization.Creature;
-using UnityEngine;
 
 namespace BeastCraft.Creatures
 {
@@ -10,8 +9,7 @@ namespace BeastCraft.Creatures
     /// Authored definition of a creature species: its identity, base stats, growth, evolution
     /// branches, learnable skills and which customization schema its player-facing appearance uses.
     /// </summary>
-    [CreateAssetMenu(menuName = "Beast Craft/Creatures/Species", fileName = "NewCreatureSpecies")]
-    public class CreatureSpeciesSO : ScriptableObject
+    public class CreatureSpeciesSO : ContentAsset
     {
         /// <summary>Stable string key persisted in save data. Never rename after ship.</summary>
         public string SpeciesId;
@@ -19,7 +17,6 @@ namespace BeastCraft.Creatures
         /// <summary>Player-facing species name.</summary>
         public string DisplayName;
 
-        [TextArea]
         public string Description;
 
         /// <summary>Roster / codex icon. Engine-neutral art key the host renderer resolves (null = none).</summary>

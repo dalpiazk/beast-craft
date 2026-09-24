@@ -190,23 +190,16 @@ namespace BeastCraft.Tests.EditMode
         [Test]
         public void RegionLibrarySO_BuildsTheNameTableOnceAndResetsIt()
         {
-            RegionLibrarySO asset = ScriptableObject.CreateInstance<RegionLibrarySO>();
-            try
-            {
-                asset.LocationNames = LoadNames();
-                LocationNameTable first = asset.Names;
-                Assert.AreSame(first, asset.Names, "built once, then shared");
-                Assert.AreEqual(asset.LocationNames.Regions[0].Den[1], first.Resolve(asset.LocationNames.Regions[0].RegionId + "/den/1"));
+            RegionLibrarySO asset = new RegionLibrarySO();
+            asset.LocationNames = LoadNames();
+            LocationNameTable first = asset.Names;
+            Assert.AreSame(first, asset.Names, "built once, then shared");
+            Assert.AreEqual(asset.LocationNames.Regions[0].Den[1], first.Resolve(asset.LocationNames.Regions[0].RegionId + "/den/1"));
 
-                asset.LocationNames = new LocationNameTableData();
-                asset.ResetRuntimeCaches();
-                Assert.AreNotSame(first, asset.Names);
-                Assert.AreEqual("Den", asset.Names.Resolve("r01/den/1"), "the re-imported (empty) table falls back");
-            }
-            finally
-            {
-                UnityEngine.Object.DestroyImmediate(asset);
-            }
+            asset.LocationNames = new LocationNameTableData();
+            asset.ResetRuntimeCaches();
+            Assert.AreNotSame(first, asset.Names);
+            Assert.AreEqual("Den", asset.Names.Resolve("r01/den/1"), "the re-imported (empty) table falls back");
         }
     }
 }

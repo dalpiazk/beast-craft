@@ -1,15 +1,13 @@
 using System.Collections.Generic;
 using BeastCraft.Creatures;
 using BeastCraft.Progression;
-using UnityEngine;
 
 namespace BeastCraft.Battle
 {
     /// <summary>
     /// Authored definition of a creature skill used in tactical grid battles.
     /// </summary>
-    [CreateAssetMenu(menuName = "Beast Craft/Battle/Skill", fileName = "NewSkill")]
-    public class SkillSO : ScriptableObject
+    public class SkillSO : ContentAsset
     {
         /// <summary>Stable string key persisted in save data. Never rename after ship.</summary>
         public string SkillId;
@@ -17,7 +15,6 @@ namespace BeastCraft.Battle
         /// <summary>Player-facing skill name.</summary>
         public string DisplayName;
 
-        [TextArea]
         public string Description;
 
         /// <summary>Icon shown in the battle action bar and skill lists. Engine-neutral art key the host renderer resolves (null = none).</summary>

@@ -1,4 +1,3 @@
-using UnityEngine;
 
 namespace BeastCraft.Economy
 {
@@ -8,8 +7,7 @@ namespace BeastCraft.Economy
     /// <c>AvatarGearSO</c> asset per piece. Never hand-edit <see cref="Data"/>; edit the JSON and
     /// re-import.
     /// </summary>
-    [CreateAssetMenu(menuName = "Beast Craft/Economy/Gear Library", fileName = "GearLibrary")]
-    public class GearLibrarySO : ScriptableObject
+    public class GearLibrarySO : ContentAsset
     {
         /// <summary>The authored library, as imported.</summary>
         public GearLibraryData Data = new GearLibraryData();

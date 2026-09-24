@@ -4,7 +4,6 @@ using System.Runtime.CompilerServices;
 using BeastCraft.Battle;
 using BeastCraft.Battle.Grid;
 using BeastCraft.Save;
-using UnityEngine;
 
 namespace BeastCraft.Economy
 {
@@ -132,7 +131,7 @@ namespace BeastCraft.Economy
                 }
 
                 Carriers.Remove(consumable);
-                carrier = ScriptableObject.CreateInstance<SkillSO>();
+                carrier = new SkillSO();
                 carrier.name = consumable.name;
                 carrier.SkillId = consumable.ConsumableId;
                 carrier.DisplayName = consumable.DisplayName;

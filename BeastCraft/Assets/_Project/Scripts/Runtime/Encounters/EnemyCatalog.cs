@@ -5,7 +5,6 @@ using BeastCraft.Battle.Grid;
 using BeastCraft.Creatures;
 using BeastCraft.Creatures.Roster;
 using BeastCraft.Skills;
-using UnityEngine;
 
 namespace BeastCraft.Encounters
 {
@@ -23,9 +22,7 @@ namespace BeastCraft.Encounters
     /// </para>
     /// <para>
     /// Species and kits are read-only in battle, so sharing them across battles (and threads) is
-    /// safe; building them is not thread-safe. Every built object is flagged
-    /// <see cref="HideFlags.DontUnloadUnusedAsset"/> so Unity's <c>Resources.UnloadUnusedAssets</c>
-    /// never frees one the catalog still hands out. Expects a library that passed
+    /// safe; building them is not thread-safe. Expects a library that passed
     /// <see cref="EnemyLibraryValidator"/>; an unknown id gives null.
     /// </para>
     /// </summary>
@@ -144,9 +141,8 @@ namespace BeastCraft.Encounters
                     Footprint = enemy.Footprint
                 };
 
-                CreatureSpeciesSO species = ScriptableObject.CreateInstance<CreatureSpeciesSO>();
+                CreatureSpeciesSO species = new CreatureSpeciesSO();
                 species.name = enemy.EnemyId;
-                species.hideFlags = HideFlags.DontUnloadUnusedAsset;
                 BeastRosterBuilder.ApplySpecies(data, species, GrowthRate);
                 byElement[slot] = species;
             }
@@ -186,9 +182,8 @@ namespace BeastCraft.Encounters
                         continue;
                     }
 
-                    SkillSO skill = ScriptableObject.CreateInstance<SkillSO>();
+                    SkillSO skill = new SkillSO();
                     skill.name = data.SkillId;
-                    skill.hideFlags = HideFlags.DontUnloadUnusedAsset;
                     SkillLibraryBuilder.ApplySkill(data, skill);
                     skill.Element = element;
                     kit.Add(skill);

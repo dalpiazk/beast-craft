@@ -1,4 +1,3 @@
-using UnityEngine;
 
 namespace BeastCraft.Customization.Creature
 {
@@ -15,7 +14,6 @@ namespace BeastCraft.Customization.Creature
     /// appendage_wings category at all, rather than a "no wings" option). The defaults rule applies
     /// to included categories only.
     /// </remarks>
-    [CreateAssetMenu(menuName = "Beast Craft/Customization/Creature Schema", fileName = "CreatureCustomizationSchema")]
     public class CreatureCustomizationSchema : CustomizationSchema
     {
     }

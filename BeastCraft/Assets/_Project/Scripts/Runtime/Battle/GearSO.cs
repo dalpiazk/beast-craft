@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using UnityEngine;
 
 namespace BeastCraft.Battle
 {
@@ -13,8 +12,7 @@ namespace BeastCraft.Battle
     /// customization system and carry no stats.
     /// </para>
     /// </summary>
-    [CreateAssetMenu(menuName = "Beast Craft/Battle/Gear", fileName = "NewGear")]
-    public class GearSO : ScriptableObject
+    public class GearSO : ContentAsset
     {
         /// <summary>Stable string key persisted in save data. Never rename after ship.</summary>
         public string GearId;
@@ -22,7 +20,6 @@ namespace BeastCraft.Battle
         /// <summary>Player-facing gear name.</summary>
         public string DisplayName;
 
-        [TextArea]
         public string Description;
 
         /// <summary>Inventory icon. Engine-neutral art key the host renderer resolves (null = none).</summary>

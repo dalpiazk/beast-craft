@@ -7,16 +7,11 @@ namespace BeastCraft.Tests.EditMode
 {
     public class StatBlockMoveRangeTests
     {
-        private readonly List<ScriptableObject> _created = new List<ScriptableObject>();
+        private readonly List<ContentAsset> _created = new List<ContentAsset>();
 
         [TearDown]
         public void TearDown()
         {
-            for (int i = 0; i < _created.Count; i++)
-            {
-                Object.DestroyImmediate(_created[i]);
-            }
-
             _created.Clear();
         }
 
@@ -87,7 +82,7 @@ namespace BeastCraft.Tests.EditMode
         [Test]
         public void GetStatAtLevel_MoveRangeWithoutGrowthRate_ReturnsBase()
         {
-            CreatureSpeciesSO species = ScriptableObject.CreateInstance<CreatureSpeciesSO>();
+            CreatureSpeciesSO species = new CreatureSpeciesSO();
             _created.Add(species);
             species.BaseStats = new StatBlock(10, 0, 0, 0, 0, 0, 2);
 
@@ -96,12 +91,12 @@ namespace BeastCraft.Tests.EditMode
 
         private CreatureSpeciesSO Species(StatBlock baseStats, AnimationCurve curve)
         {
-            GrowthRateCurve growth = ScriptableObject.CreateInstance<GrowthRateCurve>();
+            GrowthRateCurve growth = new GrowthRateCurve();
             growth.Curve = curve;
             growth.MaxLevel = 11;
             _created.Add(growth);
 
-            CreatureSpeciesSO species = ScriptableObject.CreateInstance<CreatureSpeciesSO>();
+            CreatureSpeciesSO species = new CreatureSpeciesSO();
             species.BaseStats = baseStats;
             species.GrowthRate = growth;
             _created.Add(species);

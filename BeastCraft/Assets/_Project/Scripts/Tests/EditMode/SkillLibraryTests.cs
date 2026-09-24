@@ -34,16 +34,11 @@ namespace BeastCraft.Tests.EditMode
         /// <summary>How far, in points of HP, a beast heal's share of its own HP may drift between levels 1, 50 and 100.</summary>
         private const double HealShareTolerance = 5.0;
 
-        private readonly List<ScriptableObject> _created = new List<ScriptableObject>();
+        private readonly List<ContentAsset> _created = new List<ContentAsset>();
 
         [TearDown]
         public void TearDown()
         {
-            for (int i = 0; i < _created.Count; i++)
-            {
-                UnityEngine.Object.DestroyImmediate(_created[i]);
-            }
-
             _created.Clear();
         }
 
@@ -493,7 +488,7 @@ namespace BeastCraft.Tests.EditMode
         {
             SkillLibraryData library = LoadLibrary();
             PassiveData data = Array.Find(library.AvatarPassives, p => p.PassiveId == "last_stand");
-            PassiveSkillSO passive = ScriptableObject.CreateInstance<PassiveSkillSO>();
+            PassiveSkillSO passive = new PassiveSkillSO();
             _created.Add(passive);
             SkillLibraryBuilder.ApplyPassive(data, passive);
 
@@ -503,7 +498,7 @@ namespace BeastCraft.Tests.EditMode
             Assert.AreEqual(2, passive.InternalCooldown);
             Assert.AreEqual(StatusType.Shield, passive.Effects[0].Status);
 
-            SkillMaterialSO material = ScriptableObject.CreateInstance<SkillMaterialSO>();
+            SkillMaterialSO material = new SkillMaterialSO();
             _created.Add(material);
             SkillLibraryBuilder.ApplyMaterial(library.Materials[2], material);
             Assert.AreEqual(3, material.Tier);
@@ -687,7 +682,7 @@ namespace BeastCraft.Tests.EditMode
 
         private SkillSO BuildSkill(SkillData data)
         {
-            SkillSO skill = ScriptableObject.CreateInstance<SkillSO>();
+            SkillSO skill = new SkillSO();
             _created.Add(skill);
             SkillLibraryBuilder.ApplySkill(data, skill);
             return skill;

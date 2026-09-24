@@ -1,5 +1,4 @@
 using System;
-using UnityEngine;
 
 namespace BeastCraft.Idle
 {
@@ -10,8 +9,7 @@ namespace BeastCraft.Idle
     /// JSON and re-import. <see cref="Rewards"/> builds the runtime <see cref="IdleRewards"/> on first
     /// use and keeps it.
     /// </summary>
-    [CreateAssetMenu(menuName = "Beast Craft/Idle/Idle Rewards", fileName = "IdleRewards")]
-    public class IdleRewardsSO : ScriptableObject
+    public class IdleRewardsSO : ContentAsset
     {
         /// <summary>The rates, as imported.</summary>
         public IdleRewardsData Data = new IdleRewardsData();

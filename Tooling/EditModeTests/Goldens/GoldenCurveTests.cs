@@ -44,9 +44,9 @@ namespace BeastCraft.Tests.EditMode
                       .Append(' ').Append(F(BeastRosterValidator.ScaleAtLevel(data, level))).Append('\n');
                 }
 
-                GrowthRateCurve asset = ScriptableObject.CreateInstance<GrowthRateCurve>();
+                GrowthRateCurve asset = new GrowthRateCurve();
                 BeastRosterBuilder.ApplyCurve(data, asset);
-                AvatarStatsSO avatar = ScriptableObject.CreateInstance<AvatarStatsSO>();
+                AvatarStatsSO avatar = new AvatarStatsSO();
                 avatar.BaseStats = new StatBlock(517, 233, 181, 97, 1, 100);
                 avatar.Growth = asset;
 

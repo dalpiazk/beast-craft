@@ -16,16 +16,10 @@ namespace BeastCraft.Tests.EditMode
         [SetUp]
         public void SetUp()
         {
-            _asset = ScriptableObject.CreateInstance<EncounterLibrarySO>();
+            _asset = new EncounterLibrarySO();
             _asset.Enemies = EncounterContentTests.LoadEnemyLibrary();
             _asset.Encounters = EncounterContentTests.LoadEncounterLibrary();
             _asset.Difficulty = EncounterPlanTests.LoadDifficulty();
-        }
-
-        [TearDown]
-        public void TearDown()
-        {
-            Object.DestroyImmediate(_asset);
         }
 
         [Test]

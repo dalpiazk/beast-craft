@@ -1,5 +1,4 @@
 using BeastCraft.Creatures;
-using UnityEngine;
 
 namespace BeastCraft.Avatar
 {
@@ -25,15 +24,8 @@ namespace BeastCraft.Avatar
     /// damage effects roll crits off it like a beast's (0 by default, so an avatar crits only if its
     /// base or its gear gives it a chance).
     /// </para>
-    /// <para>
-    /// Namespace note: <c>BeastCraft.Avatar</c> hides <c>UnityEngine.Avatar</c> (Mecanim's rig
-    /// avatar) for any code inside <c>BeastCraft.*</c>, because the simple name <c>Avatar</c>
-    /// resolves to this namespace before the <c>using UnityEngine;</c> type. Code there that needs
-    /// Mecanim's type must write <c>UnityEngine.Avatar</c> fully qualified.
-    /// </para>
     /// </summary>
-    [CreateAssetMenu(menuName = "Beast Craft/Avatar/Avatar Stats", fileName = "AvatarStats")]
-    public class AvatarStatsSO : ScriptableObject
+    public class AvatarStatsSO : ContentAsset
     {
         /// <summary>
         /// The avatar's default max-level Speed: 100, the turn order's reference Speed

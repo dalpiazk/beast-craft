@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using BeastCraft.Creatures;
-using UnityEngine;
 
 namespace BeastCraft.Bonds
 {
@@ -19,8 +18,7 @@ namespace BeastCraft.Bonds
     /// player's team has bonds (for now).
     /// </para>
     /// </summary>
-    [CreateAssetMenu(menuName = "Beast Craft/Bonds/Team Bond", fileName = "NewTeamBond")]
-    public class TeamBondSO : ScriptableObject
+    public class TeamBondSO : ContentAsset
     {
         /// <summary>Stable string key (save data, analytics, UI). Never rename after ship.</summary>
         public string BondId;
@@ -28,7 +26,6 @@ namespace BeastCraft.Bonds
         /// <summary>Player-facing bond name.</summary>
         public string DisplayName;
 
-        [TextArea]
         public string Description;
 
         /// <summary>Icon shown in the team-building screen. Engine-neutral art key the host renderer resolves (null = none).</summary>

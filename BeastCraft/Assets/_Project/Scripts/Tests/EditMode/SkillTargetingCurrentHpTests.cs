@@ -20,11 +20,6 @@ namespace BeastCraft.Tests.EditMode
         [TearDown]
         public void TearDown()
         {
-            for (int i = 0; i < _created.Count; i++)
-            {
-                Object.DestroyImmediate(_created[i]);
-            }
-
             _created.Clear();
         }
 
@@ -149,7 +144,7 @@ namespace BeastCraft.Tests.EditMode
 
         private SkillSO Skill(SkillTargetingCriterion criterion, SkillTargetingOrder order, int range)
         {
-            SkillSO skill = ScriptableObject.CreateInstance<SkillSO>();
+            SkillSO skill = new SkillSO();
             skill.TargetShape = SkillTargetShape.SingleTarget;
             skill.Range = range;
             skill.Cooldown = 1;

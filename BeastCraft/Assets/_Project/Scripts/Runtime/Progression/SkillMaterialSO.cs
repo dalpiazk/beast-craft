@@ -1,4 +1,3 @@
-using UnityEngine;
 
 namespace BeastCraft.Progression
 {
@@ -11,8 +10,7 @@ namespace BeastCraft.Progression
     /// functions report whether a material was used, and the caller removes it.
     /// </para>
     /// </summary>
-    [CreateAssetMenu(menuName = "Beast Craft/Progression/Skill Material", fileName = "NewSkillMaterial")]
-    public class SkillMaterialSO : ScriptableObject
+    public class SkillMaterialSO : ContentAsset
     {
         /// <summary>Stable string key persisted in save data. Never rename after ship.</summary>
         public string MaterialId;
@@ -20,7 +18,6 @@ namespace BeastCraft.Progression
         /// <summary>Player-facing material name.</summary>
         public string DisplayName;
 
-        [TextArea]
         public string Description;
 
         /// <summary>Icon shown in inventory and skill-training screens. Engine-neutral art key the host renderer resolves (null = none).</summary>

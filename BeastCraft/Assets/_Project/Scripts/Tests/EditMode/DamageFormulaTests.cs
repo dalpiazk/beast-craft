@@ -17,16 +17,11 @@ namespace BeastCraft.Tests.EditMode
     /// </summary>
     public class DamageFormulaTests
     {
-        private readonly List<ScriptableObject> _created = new List<ScriptableObject>();
+        private readonly List<ContentAsset> _created = new List<ContentAsset>();
 
         [TearDown]
         public void TearDown()
         {
-            for (int i = 0; i < _created.Count; i++)
-            {
-                UnityEngine.Object.DestroyImmediate(_created[i]);
-            }
-
             _created.Clear();
         }
 
@@ -107,7 +102,7 @@ namespace BeastCraft.Tests.EditMode
         [Test]
         public void Category_DefaultsToPhysical()
         {
-            SkillSO skill = ScriptableObject.CreateInstance<SkillSO>();
+            SkillSO skill = new SkillSO();
             _created.Add(skill);
 
             Assert.AreEqual(DamageCategory.Physical, skill.Category);
@@ -312,7 +307,7 @@ namespace BeastCraft.Tests.EditMode
         {
             BattleUnit caster = new BattleUnit("p1", BattleTeam.Player, new StatBlock(100, 100, 10, 10, 10, 10, 3), HexCoordinate.Zero, null, null, 60);
             BattleUnit target = new BattleUnit("e1", BattleTeam.Enemy, new StatBlock(500, 10, 100, 10, 10, 10, 3), HexCoordinate.Zero, null, null, 50);
-            SkillSO burn = ScriptableObject.CreateInstance<SkillSO>();
+            SkillSO burn = new SkillSO();
             burn.Effects.Add(new SkillEffect { EffectType = SkillEffectType.ApplyStatus, Status = StatusType.DamageOverTime, Magnitude = 50f, DurationTurns = 2 });
             _created.Add(burn);
 
@@ -327,7 +322,7 @@ namespace BeastCraft.Tests.EditMode
         [Test]
         public void LevelDifference_HealsAndShieldsIgnoreIt()
         {
-            SkillSO support = ScriptableObject.CreateInstance<SkillSO>();
+            SkillSO support = new SkillSO();
             support.Effects.Add(new SkillEffect { EffectType = SkillEffectType.Heal, Magnitude = 50f });
             support.Effects.Add(new SkillEffect { EffectType = SkillEffectType.ApplyStatus, Status = StatusType.Shield, Magnitude = 40f, DurationTurns = 2 });
             _created.Add(support);
@@ -497,12 +492,12 @@ namespace BeastCraft.Tests.EditMode
 
         private CreatureSpeciesSO Species(StatBlock baseStats, GrowthCurveData curveData)
         {
-            GrowthRateCurve curve = ScriptableObject.CreateInstance<GrowthRateCurve>();
+            GrowthRateCurve curve = new GrowthRateCurve();
             curve.Curve = curveData.ToAnimationCurve();
             curve.MaxLevel = curveData.MaxLevel;
             _created.Add(curve);
 
-            CreatureSpeciesSO species = ScriptableObject.CreateInstance<CreatureSpeciesSO>();
+            CreatureSpeciesSO species = new CreatureSpeciesSO();
             species.BaseStats = baseStats;
             species.GrowthRate = curve;
             _created.Add(species);
@@ -511,7 +506,7 @@ namespace BeastCraft.Tests.EditMode
 
         private SkillSO Skill(DamageCategory category, Element element, float power)
         {
-            SkillSO skill = ScriptableObject.CreateInstance<SkillSO>();
+            SkillSO skill = new SkillSO();
             skill.Category = category;
             skill.Element = element;
             skill.Effects.Add(new SkillEffect { EffectType = SkillEffectType.Damage, Magnitude = power });
@@ -521,7 +516,7 @@ namespace BeastCraft.Tests.EditMode
 
         private SkillSO StatSkill(SkillEffectType type, StatType stat, float magnitude)
         {
-            SkillSO skill = ScriptableObject.CreateInstance<SkillSO>();
+            SkillSO skill = new SkillSO();
             skill.Effects.Add(new SkillEffect { EffectType = type, AffectedStat = stat, Magnitude = magnitude });
             _created.Add(skill);
             return skill;

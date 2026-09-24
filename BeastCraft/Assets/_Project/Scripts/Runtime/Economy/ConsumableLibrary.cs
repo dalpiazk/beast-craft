@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using BeastCraft.Battle;
 using BeastCraft.Creatures;
 using BeastCraft.Skills;
-using UnityEngine;
 
 namespace BeastCraft.Economy
 {
@@ -98,7 +97,7 @@ namespace BeastCraft.Economy
                         List<ConsumableSO> assets = new List<ConsumableSO>();
                         foreach (ConsumableData entry in _entries)
                         {
-                            ConsumableSO asset = ScriptableObject.CreateInstance<ConsumableSO>();
+                            ConsumableSO asset = new ConsumableSO();
                             Apply(entry, asset);
                             assets.Add(asset);
                         }
