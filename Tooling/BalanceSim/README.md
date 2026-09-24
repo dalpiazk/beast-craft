@@ -31,7 +31,10 @@ dotnet run --project Tooling/BalanceSim -c Release -- [options]
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `--mode <m>` | `both` | `pve`, `pvp` or `both`. |
-| `--kit <k>` | `both` | `elemental`, `neutral` or `both` (see below). |
+| `--kit <k>` | `both` | The element axis: `elemental`, `neutral` or `both` (see below). |
+| `--skill-kit <k>` | `library` | The skill axis: `library` (each beast's authored `DefaultLoadout` from `skill-library.json`, the real game setup and the committed report's setting; see "Library kits") or `standard` (the same standard kit for every beast, so the stat lines are what is measured; see "The standard kit"). Before the authored-kits retune this was `--kit standard|library`; `--kit` now takes only the element axis. |
+| `--skill-level <n>` | `1` | Skill level (1-20) for library skills and library avatar skills; the tier is the gates below that level (16+ = all three passed). |
+| `--skill-library <path>` | found by walking up | Path to `skill-library.json` (read only with `--skill-kit library` or `--avatar library`, i.e. by default). |
 | `--levels <list>` | `1,50,100` | Comma-separated levels; beasts and enemies fight at the same level. |
 | `--encounter-set <s>` | `generated` | `generated`: random compositions per shape (see "Generated encounters"). `fixed`: the three hand-authored encounters (`boss`, `swarm`, `pack`). |
 | `--compositions <n>` | `8` | Generated compositions per shape. |
@@ -46,15 +49,20 @@ dotnet run --project Tooling/BalanceSim -c Release -- [options]
 | `--matrix-level <n>` | `50` | Level of the PvP win matrix and the stat table (falls back to the highest simulated level). |
 | `--roster <path>` | found by walking up | Path to `beast-roster.json`. |
 | `--encounters-file <path>` | found by walking up | Path to `encounters.json`. |
+| `--avatar <preset>` | `library` | PvE only. `library` (the committed report's setting) fields the skill library's default avatar: its first three actives and `AvatarDefaultPassives`, at `--skill-level`. `support` fields a fixture avatar with three passive skills beside every player team (`AvatarPresets.cs`; not authored content). `none` fields no avatar. `library` and `support` add an "Avatar passives" section with firings per battle. See `docs/design/battle-system.md`, "Avatar passives" and "Beast skill kits". |
 | `--out <path>` | none | Also write the report to this file (it always goes to stdout). |
 | `--self-check` | off | Run everything twice and fail unless both reports are identical; also replay sample PvE battles through `BattleTurnExecutor.RunBattle` and fail if the simulator's loop disagrees. |
+| `--seeds <list>` | none | Comma-separated base seeds, run one after another in one process (cannot be combined with `--seed`). Each seed's run is exactly the `--seed <n>` run; stdout (and `--out`) get the multi-seed aggregate, and with `--out` each seed's full report is also written beside it as `<name>.seed<n>.md`. See "Multi-seed runs". |
+| `--calibrate-sample <n>` | off | **Opt-in, changes results.** The difficulty search evaluates a seeded subset of `n` teams; the chosen multiplier is then run once with every team, and every number in the report comes from that full run. See "Performance". |
+| `--timings` | off | Print a wall-clock breakdown to stderr: per PvE cell, every calibration step (multiplier, clear rate, seconds), PvP, the report and GC counts. Never changes the report. |
 
-Exit codes: `0` success, `1` bad arguments, `2` missing or invalid roster or encounters (the roster
-is checked with `BeastRosterValidator` first, exactly as the Editor importer does), `3` a self-check
-failed. The run time goes to stderr, never into the report. The default run (both modes, both kits,
+Exit codes: `0` success, `1` bad arguments, `2` missing or invalid roster, skill library or encounters
+(the roster is checked with `BeastRosterValidator` and the library with `SkillLibraryValidator`
+first, exactly as the Editor importers do), `3` a self-check failed. The run time goes to stderr, never into the report. The default run (PvE and PvP, both element modes,
 three levels, four shapes x 8 compositions, 1 sample per team and composition) takes about
-150 s on an 8-thread machine (about 5.5 minutes with `--self-check`, which runs
-everything twice and replays two teams per composition through `RunBattle`). PvE battles run in
+50 s on an 8-core machine (about 95 s with `--self-check`, which runs
+everything twice and replays two teams per composition through `RunBattle`); it took 210 s before
+the performance pass (see "Performance"). PvE battles run in
 parallel, and the output is identical whatever the thread count.
 
 Two reports are committed, both the default arguments:
@@ -62,31 +70,63 @@ Two reports are committed, both the default arguments:
 - `docs/balance/baseline-report.md` — the "before" picture, on the roster's first-draft stats. It is
   kept as a record and is **not** regenerated (a fresh run now reads the tuned roster). It predates
   the ATB turn order, so its battle lengths are in rounds.
-- `docs/balance/tuned-report.md` — the current roster after the second tuning pass (see
-  `docs/balance/tuning-log.md`, "Retune for ATB + stances + crits + mixed encounters"), under the
-  current Runtime (the ATB turn order, combat stances, variance and crits) and the generated
-  encounters. Regenerate it
-  whenever the roster, fixtures, simulator or Runtime change:
+- `docs/balance/tuned-report.md` — the current roster and skill library after the third tuning pass
+  and its element chart v2 follow-up (see `docs/balance/tuning-log.md`, "Retune with authored kits,
+  avatar passives, sqrt speed and mitigation", "Element chart v2", "Thunderbird range vs move" and "Niche pass: Thunderbird opener, Phoenix/Frost Wyrm lifts, remaining negatives"), under the real game setup (every beast's authored default loadout, the library
+  avatar with its passives, skill level 1), the current Runtime (the square-root ATB turn order, the
+  mitigation damage formula, `SpecialAttack`-scaled heals, combat stances, variance and crits) and
+  the generated encounters. Regenerate it whenever the roster, the skill library, fixtures, simulator
+  or Runtime change:
 
 ```sh
 dotnet run --project Tooling/BalanceSim -c Release -- --out docs/balance/tuned-report.md
 ```
 
+## Library kits
+
+The default, `--skill-kit library`, fields each beast's authored `DefaultLoadout` from
+`BeastCraft/Assets/_Project/Data/Skills/skill-library.json` (`SkillLibraryLoader.cs`), built through
+`SkillLibraryBuilder` — the same DTO-to-`SkillSO` mapping as the Editor importer — and fielded as
+`SkillInstance`s at `--skill-level` and the tier that level implies. In `neutral` mode every library
+skill's element is forced to `None`. The report shows a "Library beast kits" table in place of the
+standard kit and has no kit parity table (it measures the standard kit's Strike / Shot / Blast
+balance; library kits differ by design). PvP uses the library kits too. The default `--avatar
+library` fields the library's default avatar (first three actives, `AvatarDefaultPassives`) on the
+same skill level. The avatar's stats (either preset) are a fixture block: 100 in every combat stat
+at max level, scaled by the roster's growth curve like a beast's (15 at level 1, 57 at level 50), so
+its shields (a percent of its Defense) and heals (a percent of its SpecialAttack) are the same share
+of a beast's HP at every level.
+
+This is the real game setup and the committed report's. `--skill-level 10` is the sanity run the
+tuning log reports beside it. For a quick check:
+
+```sh
+dotnet run --project Tooling/BalanceSim -c Release -- --self-check --mode pve --levels 50 --compositions 2
+```
+
 ## The standard kit
 
-No skills are authored yet, so every beast fights with the same kit, and its stat line is what gets
-measured. Fire priority is Blast, the physical single-target skill, then Burst. Every beast skill
+With `--skill-kit standard` (add `--avatar none` for the pre-retune setting), every beast fights
+with the same kit, and its stat line is what gets measured. This was the default until the
+authored-kits retune; the kit parity table and the power derivation below apply only to it. Fire priority is Blast, the physical single-target skill, then Burst. Every beast skill
 aims at the nearest enemy. The physical skill depends on the beast's combat stance (see "Runtime
 rules" below): Vanguard and Skirmisher beasts carry Strike (range 1), which walks them into melee;
 Ranged beasts, which never walk into melee, carry Shot (range 3) instead.
 
 | Skill | Category | Shape | Range | Power | Cooldown |
 | --- | --- | --- | ---: | ---: | ---: |
-| Blast | Special | SingleTarget | 3 | 40 | 1 |
-| Strike (Vanguard, Skirmisher) | Physical | SingleTarget | 1 | 57 | 1 |
-| Shot (Ranged) | Physical | SingleTarget | 3 | 41 | 1 |
-| Burst, physical half | Physical | AreaBurst, radius 2 around the caster | 2 | 20 | 2 |
-| Burst, special half | Special | AreaBurst, radius 2 around the caster | 2 | 20 | 2 |
+| Blast | Special | SingleTarget | 3 | 68 | 1 |
+| Strike (Vanguard, Skirmisher) | Physical | SingleTarget | 1 | 93 | 1 |
+| Shot (Ranged) | Physical | SingleTarget | 3 | 70 | 1 |
+| Burst, physical half | Physical | AreaBurst, radius 2 around the caster | 2 | 37 | 2 |
+| Burst, special half | Special | AreaBurst, radius 2 around the caster | 2 | 37 | 2 |
+
+**Power is a percent of the attacking stat** (`DamageFormula`: `Power / 100 x A x A / (A + D)`, then
+element, crit and variance; adopted from Sword x Staff, see
+`docs/balance/research-sword-x-staff.md`). The powers were rescaled from the old level-term formula
+(Blast 40, Strike 57, Shot 41, Burst 20) so a neutral hit between two average level-50 roster beasts
+takes the same share of HP as before; enemy powers in `encounters.json` were rescaled the same way
+(`P' = round(1.52 P + 7)`).
 
 The goal is that `Attack` and `SpecialAttack` (and `Defense` / `SpecialDefense`) carry equal weight
 for every stance. The first baseline did not manage that: Strike at cooldown 1 against Blast at
@@ -96,11 +136,12 @@ cooldown 2 weighted `Attack` about twice as heavily.
 - **Power offsets how often each fires.** Strike needs a free tile next to its target, so it fires
   less often than Blast: while the beast is still closing, and when the target is crowded. Shot has
   Blast's range but fires after it, so it occasionally finds that Blast has just felled the only
-  enemy in reach. Measured over the default PvE run at Strike 55 / Shot 40, Strike fired 0.70x as
-  often as Blast for both Vanguard and Skirmisher beasts and Shot 0.965x for Ranged beasts, so
-  Strike's power is 40 / 0.70 = 57 and Shot's 40 / 0.965 = 41. The report's **kit parity** table
-  checks the result per stance and per shape: the physical share of single-target power delivered
-  is 49.7-50.6% per stance (50.0% overall) at the defaults, and a stance outside 50 +/- 5 is flagged.
+  enemy in reach. Measured over the default PvE run after the square-root speed / mitigation formula
+  change, Strike fires 0.71-0.72x as often as Blast for Vanguard beasts and 0.81-0.82x for
+  Skirmishers (0.733x pooled, weighted by fires) and Shot about 0.965x for Ranged beasts, so
+  Strike's power is 68 / 0.733 = 93 and Shot's 68 / 0.965 = 70. One Strike serves two stances, so
+  Vanguards land a little under 50% and Skirmishers a little over. The report's **kit parity** table
+  checks the result per stance and per shape, and a stance outside 50 +/- 5 is flagged.
   **Why Shot:** before it, a Ranged beast only fired Strike at an enemy that was already adjacent,
   and the physical share fell to 37-47% (the tuning log's "After combat stances"), so `Attack` was
   under-weighted and the three Ranged beasts under-measured. Re-derive `StrikePower` / `ShotPower`
@@ -121,7 +162,8 @@ cooldown 2 weighted `Attack` about twice as heavily.
 ## PvE: team vs encounter
 
 - **Teams.** Every combination of `--team-size` distinct beasts (210 teams of 4, format
-  `SmallGroup`; each beast is in 84). No gear, no avatar.
+  `SmallGroup`; each beast is in 84). No gear; the `--avatar` preset (by default the library avatar)
+  fights beside every team.
 - **Encounters.** `encounters.json` beside this file. **These are simulator fixtures, not game
   content:** synthetic enemies that are not roster beasts, and no game code reads them. Each enemy
   becomes an in-memory `CreatureSpeciesSO` on the roster's `medium` growth curve, so it is built by
@@ -136,13 +178,27 @@ cooldown 2 weighted `Attack` about twice as heavily.
     maximum HP.
 
   Each enemy has a `Stance` (a `CombatStance` name; missing = `Vanguard`), and each skill an optional
-  `Targeting` (`Distance`, the default, `Stat` or `CurrentHp`; `Random` is refused so battles never
+  `Targeting` (`Distance`, the default, `Stat`, `CurrentHp` or `HpFraction`; `Random` is refused so battles never
   draw targets from the rng), `TargetingOrder` (default `Lowest`) and `TargetingStat` (default `HP`,
   read only by `Stat`). `Stat` + `HP` compares the stat block, i.e. **maximum** HP; `CurrentHp`
   compares the HP a beast has left, so `CurrentHp` + `Lowest` is "pick off the weakest"
   (`SkillTargetResolver`). The loader rejects a Ranged enemy without a `SingleTarget` skill of range
   2 or more (a Ranged unit never walks into melee), an enemy without a `SingleTarget` skill (the only
   shape that walks), move 0, and a composition that cannot fit its deployment zone.
+
+  The advanced effect fields are optional, and every one is inert when missing. See "Status effects
+  and advanced skill effects" in `docs/design/battle-system.md`.
+  - Per enemy: `StatusResist` (0–100, `BattleUnit.StatusResist`).
+  - Per skill: `HitCount`, `ExecuteBonusPercent`, `InitialCooldown` (−1 means the ordinary
+    cooldown) and `MaxUsesPerBattle`.
+  - Per skill: `Effects`, a list of further `SkillEffect`s applied after the damage effect. Each
+    entry has `Type`, `Status`, `Stat`, `Magnitude`, `DurationTurns`, `Chance`, `MaxStacks`,
+    `IsPercent`, `HitCount` and `ExecuteBonusPercent`. The enum-valued fields take the runtime enum
+    names.
+  - `Targeting` also accepts `HpFraction`.
+
+  The bosses (giant, champion and the fixed colossus) carry `StatusResist` 50. No fixture skill uses
+  the other fields yet, so the reports are unchanged.
 - **Placement.** Each side takes the front-most tiles of its own deployment zone (front row first,
   then outward from the centre line). Enemies are placed in fixture order; the team is committed
   through `PlacementValidator.TryPlaceAll`. Which member gets which slot is a fixed seeded shuffle
@@ -156,7 +212,10 @@ cooldown 2 weighted `Attack` about twice as heavily.
   HP, Atk, Def, SpA and SpD. Speed and Move stay unscaled: Speed is how many turns a unit gets, so
   scaling it would change the enemies' action economy, not just their toughness. The multiplier starts at 1 and doubles or halves until the target clear rate is
   bracketed (between 1/64 and 64), then bisects 8 times. The evaluated multiplier closest to the
-  target wins (first evaluated on a tie). The process is deterministic because each clear rate is.
+  target wins (first evaluated on a tie), and its battles are the ones reported (they are kept, not
+  re-run). The process is deterministic because each clear rate is. A step whose multiplier scales
+  every enemy of the shape to exactly the stats an earlier step did (late bisection steps at level
+  1, where stats are small) plays identical battles, so it reuses them instead of re-running.
   Each clear rate is over every team's battles against every composition of the shape (210 teams x
   8 compositions x 1 sample = 1680 per evaluation at the defaults). The report lists each
   composition's own clear rate at the shape's multiplier, and the range per cell.
@@ -168,8 +227,8 @@ cooldown 2 weighted `Attack` about twice as heavily.
   - **Damage share / taken share**: the beast's share of its team's damage dealt and taken (HP
     actually removed, so overkill is not counted).
   - **Survival** (standing at the end), **time to clear** (normalized time of the clears it was
-    in) and **turns / time** (its turns per unit of time over its battles: Speed / 100 while it
-    stands).
+    in) and **turns / time** (its turns per unit of time over its battles: sqrt(Speed / 100) while
+    it stands). The stat table also lists each beast's **turn rate** at the matrix level.
   - Per shape, per level, and overall (every shape and level weighted equally), plus a per-shape
     ranking that shows niches, and the crit table.
   - **Element matchups** (`elemental` mode, every shape and level pooled): each beast's marginal over
@@ -177,6 +236,26 @@ cooldown 2 weighted `Attack` about twice as heavily.
     threat) its kit element hits super-effectively, neutrally or resisted, and over the compositions
     with no dominant element. A regrouping of battles already run, so it costs nothing; the buckets
     are small (a few compositions each), so read it as direction, not measurement.
+- **Team composition** (`TeamReport.cs`; "PvE team composition: does the lineup matter?"). The
+  marginals judge beasts one at a time; this judges whole teams, from the same battles:
+  - **Does composition matter?** One line per kit mode and shape (and overall): best-to-worst and
+    p10–p90 team spread, and the teams' SD against the SD damage rolls alone would give.
+  - **Team clear-rate spread**: min, p10, median, p90, max and SD of the 210 teams' clear rates per
+    kit mode, shape and level, levels pooled, and overall; **noise SD** = root mean binomial
+    variance, p(1 - p) / (N - 1) per cell (an upper bound: a team's chance differs between
+    compositions), and **beyond noise** = sqrt(SD² - noise SD²), a lower bound on the lineup's own
+    spread. A single level is only 8 battles per team by default, so read the pooled rows. Plus a
+    10-point histogram of the teams.
+  - **Best and worst lineups** (`elemental`, the primary mode): the top and bottom 5 teams per shape
+    and overall.
+  - **Pair synergy** (`elemental`): for each of the 45 pairs, the clear rate of the 28 teams holding
+    both against the no-interaction prediction from the two marginals, baseline + w x (mA + mB),
+    and the difference with its binomial SE; top and bottom 5 per shape and overall. **w is not 1**:
+    with every k-of-n team fielded, a marginal is n / (n - 1) times the beast's additive effect and
+    a pair's teams carry (n - k) / (n - 2) of the pair's effects, so w = (n - 1)(n - k) / (n (n - 2))
+    = 0.675 for 4 of 10; baseline + mA + mB would show every pair of strong beasts as anti-synergy.
+    With 45 pairs a few |synergy / SE| near 2.5 are expected from noise; one seed cannot separate
+    them, `--seeds` can (see "Multi-seed runs").
 - **Flags.** Overall marginal outside +/-5 points; **no niche** (bottom 3 in every shape);
   **no weakness** (top 3 in every shape); a stance whose kit parity is outside 50 +/- 5%;
   stalemates; calibration misses.
@@ -208,9 +287,10 @@ encounter set simulates that.
 
 The shaman is a Vanguard: its storm is a disc around itself, so a Ranged shaman that keeps its
 distance would rarely catch anyone. The swarm is two single-skill types rather than one type with a
-physical and a special skill because every hit deals at least the damage formula's +2 floor: two
-hits per swarm unit doubled the floor damage, and at level 1 the horde could not be calibrated below
-35% clear even at the minimum multiplier.
+physical and a special skill because, under the old level-term formula, every hit dealt at least its
++2 offset: two hits per swarm unit doubled the floor damage, and at level 1 the horde could not be
+calibrated below 35% clear even at the minimum multiplier. (The current formula has no offset, only
+the 1-damage floor.)
 
 **Shapes** (`Shapes`):
 
@@ -274,8 +354,9 @@ to be simulator-side workarounds before they became Runtime rules:
 
 The default run has no stalemates, PvE or PvP.
 
-- **Turn order is the Runtime's ATB gauge.** `TurnManager` fills every unit's gauge by its Speed
-  and hands a turn to whoever reaches 1000, overflow carried, so twice the Speed is twice the turns.
+- **Turn order is the Runtime's ATB gauge.** `TurnManager` fills every unit's gauge by
+  `round(100 x sqrt(Speed))` per tick and hands a turn to whoever reaches 100000, overflow carried,
+  so turns grow with the square root of Speed (four times the Speed is twice the turns).
   There are no rounds: battle length is **normalized time**, 1.0 = one turn of a Speed-100 unit.
   Speed scales with level, so the same fight takes longer at level 1 than at level 100; compare
   times within a level. The cap (`--max-time`, default 2000, `BattleTurnExecutor.DefaultMaxTime`)
@@ -313,9 +394,89 @@ beast's observed crit rate and average roll multiplier against its authored chan
 
 **Noise.** Rerunning the default PvE run with `--seed 777` (which also draws different compositions,
 so it measures composition sampling as well as roll noise) moves a beast's overall marginal by
-2.0 points on average and at most 4.8 (`elemental`; 1.2 and 3.2 in `neutral`), and a single
-shape cell by up to 12.6 (`elemental`, where the drawn elements matter most); see the tuning log. Raise `--compositions` or
-`--samples` to shrink it (the run time grows in proportion).
+2.2 points on average and at most 4.2 (`elemental`; 2.0 and 6.2 in `neutral`), and a single
+shape cell by up to 16.5 (library setup, after the authored-kits retune; the standard kit measured
+2.0 / 4.8 / 12.6); see the tuning log. Raise `--compositions` or
+`--samples` to shrink it (the run time grows in proportion), or judge on the mean of several seeds
+(`--seeds`, see "Multi-seed runs").
+
+## Multi-seed runs
+
+A single seed's marginals carry a couple of points of noise (above), so balance passes judge
+candidates on the mean of 3-5 base seeds. `--seeds` does that in one process:
+
+```sh
+dotnet run --project Tooling/BalanceSim -c Release -- --mode pve --seeds 12345,777,4242 --out out/candidate.md
+```
+
+- Each seed's run is exactly the `--seed <n>` run with the same other arguments (it loads its own
+  generated compositions); with `--out`, its full report is written as `out/candidate.seed<n>.md`,
+  byte-identical to `--seed <n> --out`. `--self-check` applies to every seed.
+- stdout and `--out` get the **aggregate**: per kit mode, every beast's marginal clear rate per
+  shape (mean over seeds, the rank of that mean and in how many seeds it was top 3 there) and
+  overall (mean, sample standard deviation, range and each seed's value), plus the range of the
+  means, the beasts outside the `--marginal-threshold` band and the beasts with no top-3 shape on
+  the means. Then **team composition over seeds**: each team's clear rate averaged over the seeds,
+  with the teams' spread within a seed (per-seed SD), how much one team moves between seeds
+  (seed-to-seed SD: damage rolls and each seed's composition draw) and the **persistent SD**,
+  sqrt(per-seed SD² - seed-to-seed SD²), the spread that is the lineup's own; the percentiles,
+  histogram and best / worst lineups of the seed means; and each pair's synergy per seed with the
+  mean, SD over seeds and a noise estimate (`*` = mean beyond 2 x noise). It is deterministic like
+  the reports.
+- The seeds run one after another, each using every core, so the wall clock is about the sum of
+  single-seed runs (loading and JIT are a second or two of a 50 s run). What it replaces is the
+  bookkeeping: one process per seed and scripts parsing the Markdown back; the aggregate comes
+  straight from the simulator's numbers, unrounded.
+
+## Performance
+
+The default run took 210 s before the performance pass and takes about 50 s now (8-core Intel Core
+Ultra 7 258V, .NET 10), with a **byte-identical report**. What was measured (a `dotnet-trace` CPU
+sample and the `--timings` breakdown) and what was done about it:
+
+- **All the time is PvE calibration.** PvP takes 0.06 s and the report 0.1 s. PvE is 24 cells
+  (2 kit modes x 4 shapes x 3 levels), each about 10 calibration steps of 1680 battles; the final
+  step's battles are the reported ones, so nothing is run twice. The `horde` cells (16-24 enemies
+  on a Large board) were two thirds of the time.
+- **Path finding was 60% of the CPU**, almost all of it hash-set and dictionary work in
+  `HexPathfinder.FindPath` (`TryPlanApproach` runs up to seven searches per approach, about 190
+  searches per horde battle), and the run allocated 297 GB (51,700 gen0 GCs). The Runtime now keeps
+  a search's per-tile state in flat arrays indexed by `HexGrid.TileIndex` and reused per thread,
+  the open set is a binary heap on exactly the old expansion order (f, then distance to the goal,
+  then queue order), `HexGrid` answers bounds, occupancy and blocking from arrays, and the
+  stance search (`ReachableTiles`) works the same way. Paths, tie-breaks and every battle are
+  unchanged: a differential test of the old and new grid, pathfinder and reachability on 40,000
+  random boards (1.6 million path queries) found no difference, and every report below is
+  byte-identical. Smaller Runtime cuts: a precomputed ATB fill-rate table, no status snapshot when
+  a unit has no damage-over-time, and a pre-sized target list.
+- **Server GC** (`BalanceSim.csproj`): allocation is now 51 GB, and per-core heaps cut the rest of
+  the GC cost (58 s to 49 s).
+- **Identical calibration steps are reused** (see "Difficulty calibration"): about one step per
+  level-1 cell.
+- Tried and dropped: running several cells at once (no gain: the machine is already saturated;
+  two concurrent runs take twice as long), and stopping a calibration step early once its clear
+  rate provably cannot become the best (at most about 5% of the work, because the steps that
+  matter land close to the target).
+
+| Run | Before | After |
+| --- | ---: | ---: |
+| Default | 211 s | 51 s |
+| Default with `--self-check` | 410 s | 94 s |
+| 3 seeds (12345, 777, 4242): before, three processes; after, `--seeds` | 606 s | 141 s |
+| 5 seeds (+ 1, 2) | 1012 s | 231 s |
+| 3 seeds with `--calibrate-sample 30` (opt-in, changes results) | - | 36 s |
+
+**`--calibrate-sample <n>` (opt-in).** The calibration search is 9 of every cell's 10 steps. With
+`--calibrate-sample 30` the search evaluates a seeded subset of 30 of the 210 teams, and only the
+chosen multiplier runs with every team (so every number in the report is still over all 1680
+battles per cell). It is about 3.5x faster, but it moves each multiplier slightly, so the report is
+**not** identical: on the default run, beasts' overall marginals moved by 0.2-0.3 points on
+average and at most 0.7, and a shape cell by at most 2.0 (with 60 teams: 0.1-0.2, 0.7 and 2.3),
+where changing the seed (777) moves them by about 2 on average, up to 6.7, and a shape cell by up
+to 18. The report says so in its PvE
+configuration. Use it for quick iteration, and the default for anything committed.
+
+Measure before optimizing further: `--timings` prints the per-cell and per-step breakdown.
 
 ## Determinism
 
@@ -330,8 +491,10 @@ fixtures, code and arguments produce a byte-identical report.
 
 ## Design assumptions (and what they bias)
 
-- **One kit for everyone.** Real beasts will have authored skills. A special attacker is no longer
-  under-rated relative to a physical one, but no beast is played to its strengths either.
+- **Default loadouts only.** Every beast fields its three authored default skills at one skill level
+  (default 1) for the whole run; the other learnable skills and passives are never fielded, and the
+  player's loadout choices are not modelled. (With `--skill-kit standard`, one kit for everyone: no
+  beast is played to its strengths.)
 - **Simple targeting, stance-only tactics.** Beasts and most enemies hit the nearest enemy, so
   whoever is in front takes most of the hits; the stalker, the caster, the champion's hex (and, in
   the fixed set, the wisps and stingers) pick off the beast with the least current HP. Beyond the
@@ -343,7 +506,8 @@ fixtures, code and arguments produce a byte-identical report.
   pool is small and hand-made: which types exist, and how often each is drawn, is itself a bias.
 - **Large creatures are one hex.** `HexGrid` has no multi-hex footprint, so the boss can be
   surrounded by six attackers. This is an open item in the design doc.
-- **No gear, no avatar,** and only species base stats, the growth curve and the level.
+- **No gear,** a fixture avatar stat block, and only species base stats, the growth curve and the
+  level.
 
 All tunables (kit numbers, calibration bounds, flag thresholds, element-scheme weights, CLI
 defaults) are constants at the top of `SimOptions.cs`; enemy types, shapes and the fixed encounters

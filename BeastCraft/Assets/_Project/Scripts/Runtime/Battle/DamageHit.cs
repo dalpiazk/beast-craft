@@ -1,19 +1,21 @@
 namespace BeastCraft.Battle
 {
     /// <summary>
-    /// One damage effect that landed on one target during a <see cref="SkillActivation"/>: who was
+    /// One damage hit that landed on one target during a <see cref="SkillActivation"/>: who was
     /// hit and the <see cref="DamageRoll"/> behind it (amount, crit, variance roll). Recorded by
     /// <see cref="SkillEffectApplier"/> into <see cref="SkillActivation.Hits"/> so a caller (a
     /// battle log, the balance simulator) can tell a crit from an ordinary hit without re-deriving
-    /// it. A report, not an event system: nothing subscribes to it and nothing reads it back into
-    /// the battle.
+    /// it. A multi-hit effect (<see cref="SkillEffect.HitCount"/>) records one of these per hit. A
+    /// report, not an event system: nothing subscribes to it and nothing reads it back into the
+    /// battle.
     /// </summary>
     public readonly struct DamageHit
     {
-        public DamageHit(BattleUnit target, DamageRoll roll)
+        public DamageHit(BattleUnit target, DamageRoll roll, int absorbed = 0)
         {
             Target = target;
             Roll = roll;
+            Absorbed = absorbed;
         }
 
         /// <summary>The unit the damage effect landed on.</summary>
@@ -24,5 +26,11 @@ namespace BeastCraft.Battle
         /// being clamped to the target's remaining HP, so an overkill hit reports its full value.
         /// </summary>
         public DamageRoll Roll { get; }
+
+        /// <summary>
+        /// How much of <see cref="DamageRoll.Amount"/> the target's <see cref="StatusType.Shield"/>
+        /// soaked up before the rest reached HP. 0 with no shield.
+        /// </summary>
+        public int Absorbed { get; }
     }
 }

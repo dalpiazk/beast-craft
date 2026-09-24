@@ -1,6 +1,8 @@
+using System;
 using System.Collections.Generic;
 using BeastCraft.Battle.Grid;
 using BeastCraft.Creatures;
+using BeastCraft.Progression;
 
 namespace BeastCraft.Battle
 {
@@ -21,7 +23,8 @@ namespace BeastCraft.Battle
     /// this signature is what it unpacks into. The skill loadout is likewise passed in rather than
     /// derived from <see cref="CreatureSpeciesSO.LearnableSkills"/>: which learned skills a beast
     /// has <em>equipped</em>, and in what stack order, is a player choice the species does not
-    /// record.
+    /// record. That choice lives in a <see cref="BeastSkillBook"/>, which the overload taking one
+    /// turns into the loadout through <see cref="BuildLoadout"/>.
     /// </para>
     /// <para>
     /// Non-throwing, like the rest of the namespace. A null species is logged by
@@ -46,19 +49,87 @@ namespace BeastCraft.Battle
         /// </para>
         /// <para>
         /// <paramref name="level"/> is recorded as <see cref="BattleUnit.Level"/> as well as used to
-        /// assemble the stats, so the damage formula's level term and the stats it divides always
-        /// come from the same level. A level below 1 is stored as 1 by the unit, the same floor
+        /// assemble the stats, so the recorded level and the stats always come from the same level
+        /// (the damage formula reads only the stats). A level below 1 is stored as 1 by the unit, the same floor
         /// the growth curve clamps to.
         /// </para>
         /// </summary>
         public static BattleUnit CreateBeast(string id, BattleTeam team, CreatureSpeciesSO species, int level,
                                              IEnumerable<GearSO> equipped, HexCoordinate position, SkillLoadout skills = null)
         {
+            return CreateBeast(id, team, species, level, equipped, position, skills, 0);
+        }
+
+        /// <summary>
+        /// <see cref="CreateBeast(string, BattleTeam, CreatureSpeciesSO, int, IEnumerable{GearSO}, HexCoordinate, SkillLoadout)"/>
+        /// with a <see cref="BattleUnit.StatusResist"/> (percent, clamped into [0, 100] by the unit):
+        /// how much of every hostile non-damage effect's chance the beast shrugs off. The species
+        /// carries no resistance of its own; a caller that wants a resistant unit — the balance
+        /// simulator's bosses — passes it here.
+        /// </summary>
+        public static BattleUnit CreateBeast(string id, BattleTeam team, CreatureSpeciesSO species, int level,
+                                             IEnumerable<GearSO> equipped, HexCoordinate position, SkillLoadout skills, int statusResist)
+        {
             StatBlock stats = StatCalculator.ComputeStats(species, level, equipped);
             Element[] elements = species == null ? null : species.Elements;
             CombatStance stance = species == null ? CombatStance.Vanguard : species.Stance;
 
-            return new BattleUnit(id, team, stats, position, skills, elements, level, stance);
+            return new BattleUnit(id, team, stats, position, skills, elements, level, stance, statusResist);
+        }
+
+        /// <summary>
+        /// Builds one beast whose loadout comes from its <see cref="BeastSkillBook"/>: exactly
+        /// <see cref="CreateBeast(string, BattleTeam, CreatureSpeciesSO, int, IEnumerable{GearSO}, HexCoordinate, SkillLoadout)"/>
+        /// with the loadout <see cref="BuildLoadout"/> makes from <paramref name="skillBook"/> and
+        /// <paramref name="skillLookup"/>. A null book or lookup gives an empty loadout.
+        /// </summary>
+        public static BattleUnit CreateBeast(string id, BattleTeam team, CreatureSpeciesSO species, int level,
+                                             IEnumerable<GearSO> equipped, HexCoordinate position,
+                                             BeastSkillBook skillBook, Func<string, SkillSO> skillLookup)
+        {
+            return CreateBeast(id, team, species, level, equipped, position, BuildLoadout(skillBook, skillLookup));
+        }
+
+        /// <summary>
+        /// The battle loadout for a skill book — a beast's, or the avatar's active book
+        /// (<see cref="AvatarActiveSkillBook"/>): each equipped slot, in slot order (slot order is
+        /// fire priority), resolved to its <see cref="SkillSO"/> by <paramref name="skillLookup"/>
+        /// (skill id to asset) and put in at the level and tier its <see cref="SkillProgress"/>
+        /// records (<see cref="SkillInstance.FromProgress"/>).
+        /// <para>
+        /// Empty slots are skipped, so the stack closes up: with slot 1 empty, slot 2's skill is the
+        /// loadout's second entry and still fires after slot 0's. A slot naming a skill the book
+        /// does not know (only possible in hand-edited or corrupt data) or one the lookup cannot
+        /// resolve is skipped the same way. A null book or lookup gives an empty loadout. Never
+        /// throws, never returns <c>null</c>.
+        /// </para>
+        /// </summary>
+        public static SkillLoadout BuildLoadout(SkillBook skillBook, Func<string, SkillSO> skillLookup)
+        {
+            List<SkillInstance> instances = new List<SkillInstance>();
+
+            if (skillBook != null && skillLookup != null)
+            {
+                for (int slot = 0; slot < skillBook.SlotCount; slot++)
+                {
+                    string skillId = skillBook.GetEquipped(slot);
+                    SkillProgress progress = skillBook.GetProgress(skillId);
+
+                    if (progress == null)
+                    {
+                        continue;
+                    }
+
+                    SkillSO skill = skillLookup(skillId);
+
+                    if (skill != null)
+                    {
+                        instances.Add(SkillInstance.FromProgress(skill, progress));
+                    }
+                }
+            }
+
+            return SkillLoadout.FromInstances(instances);
         }
     }
 }

@@ -39,10 +39,19 @@ namespace BeastCraft.Battle.Grid
         private const int MediumRadius = 5;
         private const int LargeRadius = 7;
 
-        private readonly HashSet<HexCoordinate> _tiles;
-        private readonly HashSet<HexCoordinate> _blockedTiles;
-        private readonly Dictionary<HexCoordinate, string> _occupantsByTile;
         private readonly Dictionary<string, HexCoordinate> _tilesByOccupant;
+
+        // Built on first use of Tiles, in the same insertion order as ever: bounds checks are
+        // arithmetic (see IsInBounds), so most boards never need the set at all.
+        private HashSet<HexCoordinate> _tiles;
+
+        // Occupancy and terrain blocking by tile, indexed by TileIndex, so the hot queries
+        // (IsPassable, IsOccupied, IsBlocked -- asked once per neighbour by every path search) are
+        // an array read instead of a hash lookup. _tilesByOccupant is the same occupancy keyed by
+        // unit id; every write goes to both.
+        private readonly int _span;
+        private readonly string[] _occupantByIndex;
+        private readonly bool[] _blockedByIndex;
 
         // Smallest |R| that still counts as a deployment row. Derived from DeploymentZoneDepth and
         // held because every zone query tests against it. Floored at 1 so the two zones can never
@@ -56,12 +65,11 @@ namespace BeastCraft.Battle.Grid
             DeploymentZoneDepth = Math.Max(1, (Radius + 1) / 2);
             _deploymentRowThreshold = Math.Max(1, (Radius - DeploymentZoneDepth) + 1);
 
-            _tiles = new HashSet<HexCoordinate>();
-            _blockedTiles = new HashSet<HexCoordinate>();
-            _occupantsByTile = new Dictionary<HexCoordinate, string>();
             _tilesByOccupant = new Dictionary<string, HexCoordinate>(StringComparer.Ordinal);
 
-            GenerateTiles();
+            _span = (2 * Radius) + 1;
+            _occupantByIndex = new string[_span * _span];
+            _blockedByIndex = new bool[_span * _span];
         }
 
         /// <summary>The preset this board was built from.</summary>
@@ -89,13 +97,45 @@ namespace BeastCraft.Battle.Grid
         /// <summary>Total number of legal tiles on the board.</summary>
         public int TileCount
         {
-            get { return _tiles.Count; }
+            get { return 1 + (3 * Radius * (Radius + 1)); }
         }
 
         /// <summary>Every legal tile on the board, in no guaranteed order.</summary>
         public IEnumerable<HexCoordinate> Tiles
         {
-            get { return _tiles; }
+            get
+            {
+                if (_tiles == null)
+                {
+                    _tiles = GenerateTiles();
+                }
+
+                return _tiles;
+            }
+        }
+
+        /// <summary>
+        /// The size of the dense index space <see cref="TileIndex"/> maps into: every legal tile
+        /// has an index in <c>[0, TileIndexCapacity)</c> (some indices name no tile). Lets a search
+        /// keep per-tile state in plain arrays rather than hash maps.
+        /// </summary>
+        public int TileIndexCapacity
+        {
+            get { return _span * _span; }
+        }
+
+        /// <summary>
+        /// A dense, stable index for a legal tile (see <see cref="TileIndexCapacity"/>), or -1 when
+        /// the coordinate is off the board. Two different legal tiles never share an index.
+        /// </summary>
+        public int TileIndex(HexCoordinate coordinate)
+        {
+            if (!IsInBounds(coordinate))
+            {
+                return -1;
+            }
+
+            return ((coordinate.Q + Radius) * _span) + coordinate.R + Radius;
         }
 
         /// <summary>The radius a given preset maps to. See the radius constants for the caveat.</summary>
@@ -117,7 +157,10 @@ namespace BeastCraft.Battle.Grid
         /// <summary>True when the coordinate names a tile that exists on this board.</summary>
         public bool IsInBounds(HexCoordinate coordinate)
         {
-            return _tiles.Contains(coordinate);
+            // The board is the hexagon of radius Radius: exactly the tiles GenerateTiles lists.
+            int q = coordinate.Q;
+            int r = coordinate.R;
+            return q >= -Radius && q <= Radius && r >= -Radius && r <= Radius && q + r >= -Radius && q + r <= Radius;
         }
 
         /// <summary>
@@ -125,7 +168,8 @@ namespace BeastCraft.Battle.Grid
         /// </summary>
         public bool IsOccupied(HexCoordinate coordinate)
         {
-            return _occupantsByTile.ContainsKey(coordinate);
+            int index = TileIndex(coordinate);
+            return index >= 0 && _occupantByIndex[index] != null;
         }
 
         /// <summary>
@@ -134,8 +178,8 @@ namespace BeastCraft.Battle.Grid
         /// </summary>
         public string GetOccupant(HexCoordinate coordinate)
         {
-            string occupant;
-            return _occupantsByTile.TryGetValue(coordinate, out occupant) ? occupant : null;
+            int index = TileIndex(coordinate);
+            return index < 0 ? null : _occupantByIndex[index];
         }
 
         /// <summary>The tile a unit stands on, if it is currently placed on this board.</summary>
@@ -162,8 +206,9 @@ namespace BeastCraft.Battle.Grid
                 return false;
             }
 
-            string existing;
-            if (_occupantsByTile.TryGetValue(coordinate, out existing))
+            int index = TileIndex(coordinate);
+            string existing = _occupantByIndex[index];
+            if (existing != null)
             {
                 return string.Equals(existing, unitId, StringComparison.Ordinal);
             }
@@ -171,10 +216,10 @@ namespace BeastCraft.Battle.Grid
             HexCoordinate previous;
             if (_tilesByOccupant.TryGetValue(unitId, out previous))
             {
-                _occupantsByTile.Remove(previous);
+                _occupantByIndex[TileIndex(previous)] = null;
             }
 
-            _occupantsByTile[coordinate] = unitId;
+            _occupantByIndex[index] = unitId;
             _tilesByOccupant[unitId] = coordinate;
             return true;
         }
@@ -191,15 +236,15 @@ namespace BeastCraft.Battle.Grid
             }
 
             _tilesByOccupant.Remove(unitId);
-            _occupantsByTile.Remove(coordinate);
+            _occupantByIndex[TileIndex(coordinate)] = null;
             return true;
         }
 
         /// <summary>Clears all occupancy, leaving the tile set and terrain blocking intact.</summary>
         public void ClearOccupancy()
         {
-            _occupantsByTile.Clear();
             _tilesByOccupant.Clear();
+            Array.Clear(_occupantByIndex, 0, _occupantByIndex.Length);
         }
 
         /// <summary>
@@ -215,15 +260,7 @@ namespace BeastCraft.Battle.Grid
                 return false;
             }
 
-            if (blocked)
-            {
-                _blockedTiles.Add(coordinate);
-            }
-            else
-            {
-                _blockedTiles.Remove(coordinate);
-            }
-
+            _blockedByIndex[TileIndex(coordinate)] = blocked;
             return true;
         }
 
@@ -235,7 +272,8 @@ namespace BeastCraft.Battle.Grid
         /// </summary>
         public bool IsBlocked(HexCoordinate coordinate)
         {
-            return !IsInBounds(coordinate) || _blockedTiles.Contains(coordinate);
+            int index = TileIndex(coordinate);
+            return index < 0 || _blockedByIndex[index];
         }
 
         /// <summary>
@@ -255,13 +293,23 @@ namespace BeastCraft.Battle.Grid
         /// </summary>
         public bool IsPassable(HexCoordinate coordinate, string movingUnitId)
         {
-            if (IsBlocked(coordinate))
+            return IsPassableAt(TileIndex(coordinate), movingUnitId);
+        }
+
+        /// <summary>
+        /// <see cref="IsPassable"/> for a tile already turned into its <see cref="TileIndex"/>
+        /// (-1, off the board, is never passable), so a search that has the index does not
+        /// recompute it.
+        /// </summary>
+        internal bool IsPassableAt(int index, string movingUnitId)
+        {
+            if (index < 0 || _blockedByIndex[index])
             {
                 return false;
             }
 
-            string occupant;
-            if (!_occupantsByTile.TryGetValue(coordinate, out occupant))
+            string occupant = _occupantByIndex[index];
+            if (occupant == null)
             {
                 return true;
             }
@@ -273,7 +321,7 @@ namespace BeastCraft.Battle.Grid
         /// <summary>Clears all terrain blocking, leaving the tile set and occupancy intact.</summary>
         public void ClearBlocked()
         {
-            _blockedTiles.Clear();
+            Array.Clear(_blockedByIndex, 0, _blockedByIndex.Length);
         }
 
         /// <summary>
@@ -394,12 +442,14 @@ namespace BeastCraft.Battle.Grid
         }
 
         /// <summary>
-        /// Fills the tile set with a hexagon of hexes of <see cref="Radius"/> rings around the
+        /// Builds the tile set: a hexagon of hexes of <see cref="Radius"/> rings around the
         /// origin. The r-bounds clamp each q-column so the result is a hexagon rather than a
         /// rhombus.
         /// </summary>
-        private void GenerateTiles()
+        private HashSet<HexCoordinate> GenerateTiles()
         {
+            HashSet<HexCoordinate> tiles = new HashSet<HexCoordinate>();
+
             for (int q = -Radius; q <= Radius; q++)
             {
                 int lowerR;
@@ -408,9 +458,11 @@ namespace BeastCraft.Battle.Grid
 
                 for (int r = lowerR; r <= upperR; r++)
                 {
-                    _tiles.Add(new HexCoordinate(q, r));
+                    tiles.Add(new HexCoordinate(q, r));
                 }
             }
+
+            return tiles;
         }
 
         /// <summary>

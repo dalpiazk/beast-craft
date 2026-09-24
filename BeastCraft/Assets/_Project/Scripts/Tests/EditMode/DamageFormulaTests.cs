@@ -12,8 +12,8 @@ namespace BeastCraft.Tests.EditMode
     /// <summary>
     /// <see cref="DamageFormula"/> on raw numbers and through <see cref="SkillEffectApplier"/>.
     /// Expected values are hand-computed from
-    /// <c>((2 * Level / 5 + 2) * Power * A / D) / 50 + 2</c>, times the element multiplier,
-    /// truncated.
+    /// <c>Power / 100 * A * A / (A + D)</c> (DefenseWeight and GlobalScale both 1), times the
+    /// element multiplier, truncated.
     /// </summary>
     public class DamageFormulaTests
     {
@@ -30,26 +30,67 @@ namespace BeastCraft.Tests.EditMode
             _created.Clear();
         }
 
-        // (22 * 40 * 1) / 50 + 2 = 19.6.
-        [TestCase(50, 40f, 100, 100, 19)]
-        // (6 * 50 * 1.5) / 50 + 2 = 11.
-        [TestCase(10, 50f, 30, 20, 11)]
-        // (2.4 * 40 * 1) / 50 + 2 = 3.92.
-        [TestCase(1, 40f, 15, 15, 3)]
-        // (42 * 40 * 1) / 50 + 2 = 35.6.
-        [TestCase(100, 40f, 100, 100, 35)]
-        // (42 * 40 * 130 / 170) / 50 + 2 = 27.69.
-        [TestCase(100, 40f, 130, 170, 27)]
-        public void Compute_KnownValues(int level, float power, int attack, int defense, int expected)
+        // 1.0 * 100 * 100 / 200 = 50.
+        [TestCase(100f, 100, 100, 50)]
+        // 1.2 * 100 * 100 / 200 = 60.
+        [TestCase(120f, 100, 100, 60)]
+        // 0.5 * 30 * 30 / 50 = 9.
+        [TestCase(50f, 30, 20, 9)]
+        // 0.68 * 59 * 59 / 116 = 20.41 (the simulator's Blast between average level-50 beasts).
+        [TestCase(68f, 59, 57, 20)]
+        // 1.0 * 130 * 130 / 300 = 56.33.
+        [TestCase(100f, 130, 170, 56)]
+        // 1.0 * 100 * 100 / 400 = 25.
+        [TestCase(100f, 100, 300, 25)]
+        public void Compute_KnownValues(float power, int attack, int defense, int expected)
         {
-            Assert.AreEqual(expected, DamageFormula.Compute(level, power, attack, defense, ElementChart.Neutral));
+            Assert.AreEqual(expected, DamageFormula.Compute(power, attack, defense, ElementChart.Neutral));
         }
 
         [Test]
         public void ComputeBase_IsUntruncated()
         {
-            Assert.AreEqual(3.92f, DamageFormula.ComputeBase(1, 40f, 15, 15), 0.0001f);
-            Assert.AreEqual(19.6f, DamageFormula.ComputeBase(50, 40f, 100, 100), 0.0001f);
+            Assert.AreEqual(7.5, DamageFormula.ComputeBase(100f, 15, 15), 1e-9);
+            Assert.AreEqual(3.92, DamageFormula.ComputeBase(49f, 16, 16), 1e-9);
+            Assert.AreEqual(56.3333333, DamageFormula.ComputeBase(100f, 130, 170), 1e-6);
+        }
+
+        [Test]
+        public void Constants_MatchTheDesign()
+        {
+            Assert.AreEqual(100.0, DamageFormula.PowerPercent);
+            Assert.AreEqual(1.0, DamageFormula.DefenseWeight);
+            Assert.AreEqual(1.0, DamageFormula.GlobalScale);
+            Assert.AreEqual(1, DamageFormula.MinimumDamage);
+        }
+
+        [Test]
+        public void Power_IsAPercentOfTheAttackingStat_BeforeMitigation()
+        {
+            // Against zero Defense the mitigation is exactly 1, so the hit is Power% of A.
+            Assert.AreEqual(100, DamageFormula.Compute(100f, 100, 0, ElementChart.Neutral));
+            Assert.AreEqual(120, DamageFormula.Compute(120f, 100, 0, ElementChart.Neutral));
+            Assert.AreEqual(45, DamageFormula.Compute(45f, 100, 0, ElementChart.Neutral));
+        }
+
+        [Test]
+        public void Mitigation_HasDiminishingReturns()
+        {
+            // A = 100 against D = 0, 100, 200, 300: shares 1, 1/2, 1/3, 1/4. Each extra 100 Defense
+            // buys less, and no amount of Defense negates the hit.
+            Assert.AreEqual(100, DamageFormula.Compute(100f, 100, 0, ElementChart.Neutral));
+            Assert.AreEqual(50, DamageFormula.Compute(100f, 100, 100, ElementChart.Neutral));
+            Assert.AreEqual(33, DamageFormula.Compute(100f, 100, 200, ElementChart.Neutral));
+            Assert.AreEqual(25, DamageFormula.Compute(100f, 100, 300, ElementChart.Neutral));
+            Assert.AreEqual(9, DamageFormula.Compute(100f, 100, 1000, ElementChart.Neutral));
+        }
+
+        [Test]
+        public void Attack_CountsTwice_SoDoublingItMoreThanDoublesTheHit()
+        {
+            // 100 vs 100: 50. 200 vs 100: 200 * 200 / 300 = 133.33, 2.67x rather than 2x.
+            Assert.AreEqual(50, DamageFormula.Compute(100f, 100, 100, ElementChart.Neutral));
+            Assert.AreEqual(133, DamageFormula.Compute(100f, 200, 100, ElementChart.Neutral));
         }
 
         [Test]
@@ -58,9 +99,9 @@ namespace BeastCraft.Tests.EditMode
             BattleUnit caster = Unit("caster", new StatBlock(100, 100, 1, 50, 1, 0), 10);
             BattleUnit target = Unit("target", new StatBlock(500, 1, 100, 1, 25, 0), 10);
 
-            // Physical: (6 * 50 * 100 / 100) / 50 + 2 = 8. Special: (6 * 50 * 50 / 25) / 50 + 2 = 14.
-            Assert.AreEqual(8, DamageFormula.Compute(caster, target, Skill(DamageCategory.Physical, Element.None, 50f), 50f));
-            Assert.AreEqual(14, DamageFormula.Compute(caster, target, Skill(DamageCategory.Special, Element.None, 50f), 50f));
+            // Physical: 100 * 100 / 200 = 50. Special: 50 * 50 / 75 = 33.33.
+            Assert.AreEqual(50, DamageFormula.Compute(caster, target, Skill(DamageCategory.Physical, Element.None, 100f), 100f));
+            Assert.AreEqual(33, DamageFormula.Compute(caster, target, Skill(DamageCategory.Special, Element.None, 100f), 100f));
         }
 
         [Test]
@@ -77,10 +118,10 @@ namespace BeastCraft.Tests.EditMode
         [Test]
         public void ElementMultiplier_IsAppliedToTheUntruncatedBase()
         {
-            // Base 3.92: x2 then truncate is 7; truncate then x2 would be 6.
-            Assert.AreEqual(7, DamageFormula.Compute(1, 40f, 15, 15, ElementChart.Strong));
-            // Base 3.92 x0.5 = 1.96, truncated to 1.
-            Assert.AreEqual(1, DamageFormula.Compute(1, 40f, 15, 15, ElementChart.Weak));
+            // Base 7.5: x2 then truncate is 15; truncate then x2 would be 14.
+            Assert.AreEqual(15, DamageFormula.Compute(100f, 15, 15, ElementChart.Strong));
+            // Base 7.5 x0.5 = 3.75, truncated to 3.
+            Assert.AreEqual(3, DamageFormula.Compute(100f, 15, 15, ElementChart.Weak));
         }
 
         [Test]
@@ -89,22 +130,22 @@ namespace BeastCraft.Tests.EditMode
             BattleUnit caster = Unit("caster", new StatBlock(100, 20, 20, 20, 20, 0), 10, Element.Water);
             BattleUnit target = Unit("target", new StatBlock(100, 20, 20, 20, 20, 0), 10, Element.Nature, Element.Metal);
 
-            // Base (6 * 50) / 50 + 2 = 8; Fire is strong against both Nature and Metal: x4.
-            Assert.AreEqual(32, DamageFormula.Compute(caster, target, Skill(DamageCategory.Physical, Element.Fire, 50f), 50f));
+            // Base 1.0 * 20 * 20 / 40 = 10; Fire is strong against both Nature and Metal: x4.
+            Assert.AreEqual(40, DamageFormula.Compute(caster, target, Skill(DamageCategory.Physical, Element.Fire, 100f), 100f));
         }
 
         [Test]
         public void PositivePower_DealsAtLeastOne()
         {
-            // Base ~2.0, x0.25 = 0.5, truncated to 0, floored to 1.
-            Assert.AreEqual(DamageFormula.MinimumDamage, DamageFormula.Compute(1, 1f, 1, 1000, ElementChart.Weak * ElementChart.Weak));
+            // Base ~0.00001, x0.25, truncated to 0, floored to 1.
+            Assert.AreEqual(DamageFormula.MinimumDamage, DamageFormula.Compute(1f, 1, 1000, ElementChart.Weak * ElementChart.Weak));
         }
 
         [TestCase(0f)]
         [TestCase(-10f)]
         public void ZeroOrNegativePower_DealsNothing(float power)
         {
-            Assert.AreEqual(0, DamageFormula.Compute(100, power, 500, 1, ElementChart.Strong));
+            Assert.AreEqual(0, DamageFormula.Compute(power, 500, 1, ElementChart.Strong));
         }
 
         [Test]
@@ -120,51 +161,45 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
-        public void ZeroOrNegativeDefense_IsTreatedAsOne()
+        public void ZeroOrNegativeDefense_MeansNoMitigation()
         {
-            int atOne = DamageFormula.Compute(10, 50f, 20, 1, ElementChart.Neutral);
+            int atZero = DamageFormula.Compute(100f, 20, 0, ElementChart.Neutral);
 
-            // (6 * 50 * 20 / 1) / 50 + 2 = 122.
-            Assert.AreEqual(122, atOne);
-            Assert.AreEqual(atOne, DamageFormula.Compute(10, 50f, 20, 0, ElementChart.Neutral));
-            Assert.AreEqual(atOne, DamageFormula.Compute(10, 50f, 20, -5, ElementChart.Neutral));
+            // 1.0 * 20 * 20 / 20 = 20: Power% of A, unmitigated.
+            Assert.AreEqual(20, atZero);
+            Assert.AreEqual(atZero, DamageFormula.Compute(100f, 20, -5, ElementChart.Neutral));
         }
 
         [Test]
-        public void ZeroOrNegativeAttack_DealsTheBaseOffset()
+        public void ZeroOrNegativeAttack_DealsTheMinimumDamageFloor()
         {
-            Assert.AreEqual(2, DamageFormula.Compute(100, 500f, 0, 10, ElementChart.Neutral));
-            Assert.AreEqual(2, DamageFormula.Compute(100, 500f, -20, 10, ElementChart.Neutral));
-            Assert.AreEqual(4, DamageFormula.Compute(100, 500f, 0, 10, ElementChart.Strong));
+            Assert.AreEqual(0.0, DamageFormula.ComputeBase(500f, 0, 10));
+            Assert.AreEqual(0.0, DamageFormula.ComputeBase(500f, -20, 10));
+            Assert.AreEqual(DamageFormula.MinimumDamage, DamageFormula.Compute(500f, 0, 10, ElementChart.Neutral));
+            Assert.AreEqual(DamageFormula.MinimumDamage, DamageFormula.Compute(500f, -20, 10, ElementChart.Neutral));
+            Assert.AreEqual(DamageFormula.MinimumDamage, DamageFormula.Compute(500f, 0, 0, ElementChart.Strong));
         }
 
         [Test]
-        public void Level_ScalesDamage()
+        public void Level_IsNotInTheFormula()
         {
-            // Level terms 2.4, 6, 22, 42 at power 50, A = D.
-            Assert.AreEqual(4, DamageFormula.Compute(1, 50f, 20, 20, ElementChart.Neutral));
-            Assert.AreEqual(8, DamageFormula.Compute(10, 50f, 20, 20, ElementChart.Neutral));
-            Assert.AreEqual(24, DamageFormula.Compute(50, 50f, 20, 20, ElementChart.Neutral));
-            Assert.AreEqual(44, DamageFormula.Compute(100, 50f, 20, 20, ElementChart.Neutral));
-        }
-
-        [Test]
-        public void LevelBelowOne_IsTreatedAsOne()
-        {
-            Assert.AreEqual(DamageFormula.Compute(1, 50f, 20, 20, ElementChart.Neutral), DamageFormula.Compute(0, 50f, 20, 20, ElementChart.Neutral));
-            Assert.AreEqual(1, Unit("u", new StatBlock(10, 0, 0, 0, 0, 0), 0).Level);
-            Assert.AreEqual(1, new BattleUnit("u", BattleTeam.Enemy, new StatBlock(10, 0, 0, 0, 0, 0), HexCoordinate.Zero).Level);
-        }
-
-        [Test]
-        public void CasterLevel_IsWhatCounts()
-        {
+            // Identical stats at levels 1 and 100 hit identically: level reaches damage only through
+            // the stats the growth curve assembled.
             BattleUnit low = Unit("low", new StatBlock(100, 20, 20, 20, 20, 0), 1);
             BattleUnit high = Unit("high", new StatBlock(100, 20, 20, 20, 20, 0), 100);
-            SkillSO skill = Skill(DamageCategory.Physical, Element.None, 50f);
+            SkillSO skill = Skill(DamageCategory.Physical, Element.None, 100f);
 
-            Assert.AreEqual(44, DamageFormula.Compute(high, low, skill, 50f));
-            Assert.AreEqual(4, DamageFormula.Compute(low, high, skill, 50f));
+            Assert.AreEqual(10, DamageFormula.Compute(high, low, skill, 100f));
+            Assert.AreEqual(10, DamageFormula.Compute(low, high, skill, 100f));
+            Assert.AreEqual(100, high.Level);
+            Assert.AreEqual(1, low.Level);
+        }
+
+        [Test]
+        public void LevelBelowOne_IsStoredAsOne()
+        {
+            Assert.AreEqual(1, Unit("u", new StatBlock(10, 0, 0, 0, 0, 0), 0).Level);
+            Assert.AreEqual(1, new BattleUnit("u", BattleTeam.Enemy, new StatBlock(10, 0, 0, 0, 0, 0), HexCoordinate.Zero).Level);
         }
 
         [Test]
@@ -172,19 +207,19 @@ namespace BeastCraft.Tests.EditMode
         {
             BattleUnit caster = Unit("caster", new StatBlock(100, 20, 20, 20, 20, 0), 10);
             BattleUnit target = Unit("target", new StatBlock(500, 20, 20, 20, 20, 0), 10);
-            SkillSO strike = Skill(DamageCategory.Physical, Element.None, 50f);
-            SkillSO special = Skill(DamageCategory.Special, Element.None, 50f);
+            SkillSO strike = Skill(DamageCategory.Physical, Element.None, 100f);
+            SkillSO special = Skill(DamageCategory.Special, Element.None, 100f);
             SkillSO buff = StatSkill(SkillEffectType.BuffStat, StatType.Attack, 20f);
 
             SkillEffectApplier.Apply(new SkillActivation(buff, new[] { caster }), caster);
             SkillEffectApplier.Apply(new SkillActivation(strike, new[] { target }), caster);
 
-            // Attack 40 vs Defense 20: (6 * 50 * 2) / 50 + 2 = 14.
-            Assert.AreEqual(486, target.CurrentHp);
+            // Attack 40 vs Defense 20: 40 * 40 / 60 = 26.67.
+            Assert.AreEqual(474, target.CurrentHp);
 
-            // An Attack buff does nothing for a special skill: (6 * 50 * 1) / 50 + 2 = 8.
+            // An Attack buff does nothing for a special skill: 20 * 20 / 40 = 10.
             SkillEffectApplier.Apply(new SkillActivation(special, new[] { target }), caster);
-            Assert.AreEqual(478, target.CurrentHp);
+            Assert.AreEqual(464, target.CurrentHp);
         }
 
         [Test]
@@ -194,26 +229,26 @@ namespace BeastCraft.Tests.EditMode
             BattleUnit target = Unit("target", new StatBlock(500, 20, 20, 20, 20, 0), 10);
 
             SkillEffectApplier.Apply(new SkillActivation(StatSkill(SkillEffectType.DebuffStat, StatType.Defense, 10f), new[] { target }), caster);
-            SkillEffectApplier.Apply(new SkillActivation(Skill(DamageCategory.Physical, Element.None, 50f), new[] { target }), caster);
+            SkillEffectApplier.Apply(new SkillActivation(Skill(DamageCategory.Physical, Element.None, 100f), new[] { target }), caster);
 
-            // Attack 20 vs Defense 10: (6 * 50 * 2) / 50 + 2 = 14.
-            Assert.AreEqual(486, target.CurrentHp);
+            // Attack 20 vs Defense 10: 20 * 20 / 30 = 13.33.
+            Assert.AreEqual(487, target.CurrentHp);
         }
 
         [Test]
-        public void StatfulAvatar_DealsDamageFromItsOwnStatsAndLevel()
+        public void StatfulAvatar_DealsDamageFromItsOwnStats()
         {
             BattleUnit avatar = BattleAvatar.Create(null, new StatBlock(50, 5, 5, 40, 5, 0), null, BattleAvatar.DefaultId, 30);
             BattleUnit enemy = Unit("enemy", new StatBlock(500, 20, 20, 20, 20, 0), 30);
 
-            SkillEffectApplier.Apply(new SkillActivation(Skill(DamageCategory.Special, Element.None, 50f), new[] { enemy }), avatar);
+            SkillEffectApplier.Apply(new SkillActivation(Skill(DamageCategory.Special, Element.None, 100f), new[] { enemy }), avatar);
 
-            // Level term 14; SpecialAttack 40 vs SpecialDefense 20: (14 * 50 * 2) / 50 + 2 = 30.
-            Assert.AreEqual(470, enemy.CurrentHp);
+            // SpecialAttack 40 vs SpecialDefense 20: 40 * 40 / 60 = 26.67.
+            Assert.AreEqual(474, enemy.CurrentHp);
         }
 
         [Test]
-        public void ZeroStatAvatar_DealsTheFloorWhateverThePower()
+        public void ZeroStatAvatar_DealsTheFloorWhateverThePowerOrElement()
         {
             BattleUnit avatar = BattleAvatar.Create(null);
             BattleUnit neutral = Unit("neutral", new StatBlock(500, 20, 20, 20, 20, 0), 50);
@@ -221,30 +256,29 @@ namespace BeastCraft.Tests.EditMode
 
             SkillEffectApplier.Apply(new SkillActivation(Skill(DamageCategory.Physical, Element.Fire, 1000f), new[] { neutral, weakToFire }), avatar);
 
-            // Zero Attack: base is exactly the +2 offset, then the element multiplier.
-            Assert.AreEqual(498, neutral.CurrentHp);
-            Assert.AreEqual(496, weakToFire.CurrentHp);
+            // Zero Attack: the base is exactly 0, so both hits land on the MinimumDamage floor.
+            Assert.AreEqual(499, neutral.CurrentHp);
+            Assert.AreEqual(499, weakToFire.CurrentHp);
         }
 
         [Test]
         public void NullArguments_DealNothing()
         {
             BattleUnit unit = Unit("u", new StatBlock(100, 20, 20, 20, 20, 0), 10);
-            SkillSO skill = Skill(DamageCategory.Physical, Element.None, 50f);
+            SkillSO skill = Skill(DamageCategory.Physical, Element.None, 100f);
 
-            Assert.AreEqual(0, DamageFormula.Compute(null, unit, skill, 50f));
-            Assert.AreEqual(0, DamageFormula.Compute(unit, null, skill, 50f));
-            Assert.AreEqual(0, DamageFormula.Compute(unit, unit, null, 50f));
+            Assert.AreEqual(0, DamageFormula.Compute(null, unit, skill, 100f));
+            Assert.AreEqual(0, DamageFormula.Compute(unit, null, skill, 100f));
+            Assert.AreEqual(0, DamageFormula.Compute(unit, unit, null, 100f));
         }
 
         /// <summary>
-        /// The intent of the level term: between two identical beasts on the roster's shared
-        /// <c>medium</c> curve, a Power-40 neutral hit takes a roughly similar share of max HP at
-        /// level 1 and level 100. It is only loosely true (about 20% at level 1, 33% at 50 and 35%
-        /// at 100), so the band is deliberately loose; tightening it is the balance simulator's job.
+        /// The level-invariance the formula relies on: between two identical beasts on the roster's
+        /// shared <c>medium</c> curve, a Power-100 neutral hit takes the same share of max HP at every
+        /// level up to integer rounding (7 of 15 at level 1, 28 of 57 at 50, 50 of 100 at 100).
         /// </summary>
         [Test]
-        public void LevelTerm_KeepsHitShareRoughlyFlatAcrossTheMediumCurve()
+        public void HitShare_IsFlatAcrossTheMediumCurve()
         {
             GrowthCurveData medium = Array.Find(BeastRosterTests.LoadRoster().GrowthCurves, c => c.CurveId == "medium");
             Assert.IsNotNull(medium);
@@ -259,33 +293,33 @@ namespace BeastCraft.Tests.EditMode
                 BattleUnit defender = BattleUnitFactory.CreateBeast("d", BattleTeam.Enemy, species, levels[i], null, HexCoordinate.Zero);
                 int maxHp = defender.CurrentHp;
 
-                SkillEffectApplier.Apply(new SkillActivation(Skill(DamageCategory.Physical, Element.None, 40f), new[] { defender }), attacker);
+                SkillEffectApplier.Apply(new SkillActivation(Skill(DamageCategory.Physical, Element.None, 100f), new[] { defender }), attacker);
 
                 shares[i] = (float)(maxHp - defender.CurrentHp) / maxHp;
-                Assert.That(shares[i], Is.InRange(0.1f, 0.5f), "level " + levels[i] + " hit share");
+                Assert.That(shares[i], Is.InRange(0.45f, 0.5f), "level " + levels[i] + " hit share");
             }
 
             float lowest = Mathf.Min(shares[0], Mathf.Min(shares[1], shares[2]));
             float highest = Mathf.Max(shares[0], Mathf.Max(shares[1], shares[2]));
-            Assert.That(highest / lowest, Is.LessThanOrEqualTo(2f), "hit share should stay within a factor of 2 across levels");
+            Assert.That(highest / lowest, Is.LessThanOrEqualTo(1.1f), "hit share should be flat across levels up to rounding");
         }
 
         /// <summary>
         /// Pins the worked examples in the design doc ("Damage formula"): Phoenix hitting Golem with a
-        /// Power-40 Fire skill (weak against Earth, 0.5x), physical and special, from the authored
+        /// Power-100 Fire skill (weak against Earth, 0.5x), physical and special, from the authored
         /// roster.
         /// </summary>
-        [TestCase(1, 1, 2)]
-        [TestCase(50, 7, 11)]
-        [TestCase(100, 13, 22)]
+        [TestCase(1, 3, 5)]
+        [TestCase(50, 12, 18)]
+        [TestCase(100, 21, 33)]
         public void Roster_PhoenixIntoGolem_MatchesTheDesignDocExamples(int level, int physical, int special)
         {
             BeastRosterData roster = BeastRosterTests.LoadRoster();
             BattleUnit phoenix = RosterBeast(roster, "phoenix", level);
             BattleUnit golem = RosterBeast(roster, "golem", level);
 
-            Assert.AreEqual(physical, DamageFormula.Compute(phoenix, golem, Skill(DamageCategory.Physical, Element.Fire, 40f), 40f));
-            Assert.AreEqual(special, DamageFormula.Compute(phoenix, golem, Skill(DamageCategory.Special, Element.Fire, 40f), 40f));
+            Assert.AreEqual(physical, DamageFormula.Compute(phoenix, golem, Skill(DamageCategory.Physical, Element.Fire, 100f), 100f));
+            Assert.AreEqual(special, DamageFormula.Compute(phoenix, golem, Skill(DamageCategory.Special, Element.Fire, 100f), 100f));
         }
 
         private BattleUnit RosterBeast(BeastRosterData roster, string speciesId, int level)

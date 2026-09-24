@@ -74,9 +74,10 @@ puzzle every encounter.
   beasts are: a fast team cycles its avatar faster. The alternative is an avatar gauge filled by
   the avatar's own Speed, which would make that stat (currently unused) matter and decouple the
   avatar from team composition. Open; the rule is unchanged until it is decided.
-- **Avatar progression.** The avatar now has stats (decision 6, amended), but no progression
-  level and no growth: its base is a flat authored block and only avatar gear moves it. Whether and
-  how the avatar levels up is undesigned. The damage formula still needs a caster level for it, so
+- **Avatar level.** The avatar has stats (decision 6, amended) and its *skills* now progress —
+  its active skills and its passives level on the beast-skill model (see "Avatar passives") — but
+  the avatar itself still has no level and no stat growth: its base is a flat authored block and
+  only avatar gear moves it. It has no level or XP progression of its own; the statful
   `BattleAvatar.Create` takes a per-battle level (default 1) that the battle setup is expected to
   pick sensibly, e.g. the player team's level — a stopgap input, not a design for progression.
 
@@ -150,6 +151,8 @@ The authored data this combat model needs is already committed as ScriptableObje
 - **`AvatarGearSO`** / **`AvatarStatsSO`** (under `Runtime/Avatar/`, namespace `BeastCraft.Avatar`)
   — the avatar's own stat gear (slot, stat modifiers, rarity; no visuals) and its authored base
   stats. See decision 6.
+- **`PassiveSkillSO`** (also `Runtime/Avatar/`) — an avatar passive: trigger, gating, target scope
+  and an ordinary `SkillEffect` list. See "Avatar passives".
 
 These were deliberately authored at an abstract level. Range is an integer count of grid steps and
 target shapes are named by their tactical intent rather than by a concrete tile layout, so the data
@@ -214,13 +217,25 @@ composition and role play at the cost of turn length. Supporting all three forma
 picking one size means the encounter designer can choose the pacing per fight — a tight duel, a
 standard squad fight, or a full set-piece — instead of the whole game being tuned to a single shape.
 
-### 3. Turn order model — DECIDED — AMENDED: ATB speed gauge
+### 3. Turn order model — DECIDED — AMENDED: ATB speed gauge, square-root fill
 
-**Turn order is an ATB-style speed gauge.** Every combatant fills its own gauge at a rate equal to
-its current `StatType.Speed` and takes a turn each time the gauge reaches a fixed threshold, so
-**a unit twice as fast as another acts about twice as often**. Units still act **one at a time**,
-and everything else about a turn is unchanged. This amends the original decision, a speed-sorted
-initiative queue (everyone acts once per round, fastest first); the amendment is the producer's.
+**Turn order is an ATB-style speed gauge.** Every combatant fills its own gauge at a rate that grows
+with the **square root** of its current `StatType.Speed` and takes a turn each time the gauge
+reaches a fixed threshold, so **a unit four times as fast as another acts twice as often**, and
++21% Speed buys +10% turns. Units still act **one at a time**, and everything else about a turn is
+unchanged. This amends the original decision, a speed-sorted initiative queue (everyone acts once
+per round, fastest first); the amendment is the producer's.
+
+*Second amendment: square-root fill (user-approved).* The first gauge filled at a rate equal to
+Speed, so turns were linear in Speed. It now fills at `round(100 × sqrt(Speed))`, adopted from Sword
+x Staff, whose turn interval is `100000 / sqrt(SPD × scale)` (see
+[`docs/balance/research-sword-x-staff.md`](../balance/research-sword-x-staff.md)). Stacked Speed now
+has diminishing returns: a Speed buff or Speed gear buys fewer extra turns the more Speed a unit
+already has, so Speed is harder to snowball. **User decision:** the roster's "10–15% speed spread"
+target now applies to **turns**, not to the Speed stat: the fastest beast should take about 10–15%
+more turns than the slowest, which under the square root lets base Speed spread by about 20–30%.
+The current roster (base Speed 92–105, a 14% stat spread) therefore spreads turns by only about 7%;
+widening base Speed is left to the next roster retune (see the tuning log).
 
 *Why it changed.* Under the round queue Speed only decided *order* within a round: a Speed-120 beast
 got exactly as many turns as a Speed-40 one, it merely took them earlier. The balance simulator
@@ -233,19 +248,24 @@ The rule, as built in `TurnManager` (all integer arithmetic, so a client and a s
 re-simulation always agree):
 
 - **Gauge and threshold.** Every unit starts the battle at gauge 0. `TurnManager.ActionThreshold`
-  is **1000**. A unit's fill rate is its live `Stats.Speed`, **clamped to at least 1** so nothing can
-  stall forever. It is read at every step, so a speed buff or debuff changes the unit's cadence
-  from the moment it lands.
+  is **100000**. A unit's fill rate is `TurnManager.FillRateForSpeed(Speed)` =
+  `round(FillScale × sqrt(max(1, Speed)))` with `FillScale` = **100**, computed **exactly in
+  integers** (the integer square root of `Speed × 100²`, rounded half up; no floating point, so every
+  platform agrees). Speed 100 fills 1000 per tick, Speed 1 (the floor, so nothing can stall forever)
+  100. The rate is read from the live `Stats.Speed` at every step, so a speed buff or debuff changes
+  the unit's cadence from the moment it lands. The rate rises strictly with Speed up to Speed 2500,
+  so the rounding never merges two speeds in any plausible range.
 - **Event-driven time.** The next turn is found without stepping tick by tick: for every living
-  unit, ticks needed = `ceil((1000 − gauge) / speed)` (0 when already full); time advances by the
-  smallest of those, and every living unit's gauge gains `speed × elapsed`.
+  unit, ticks needed = `ceil((100000 − gauge) / rate)` (0 when already full); time advances by the
+  smallest of those, and every living unit's gauge gains `rate × elapsed`.
 - **One unit acts per step.** Of the units now at or above the threshold, the actor is the one with
-  the **highest gauge (most overflow)**, then the **higher Speed**, then the ordinal unit id (the
-  shared `BattleUnitOrder` tie-break). Other full units act on the following steps, with no time
-  passing in between.
-- **Overflow carries.** After the actor's turn, 1000 is subtracted from its gauge and the remainder
-  counts toward its next turn. That is what keeps the long-run rate exact when 1000 is not a multiple
-  of the unit's Speed (a Speed-120 unit gets exactly 3× the turns of a Speed-40 one).
+  the **highest gauge (most overflow)**, then the **higher fill rate** (the higher Speed), then the
+  ordinal unit id (the shared `BattleUnitOrder` tie-break). Other full units act on the following
+  steps, with no time passing in between.
+- **Overflow carries.** After the actor's turn, 100000 is subtracted from its gauge and the
+  remainder counts toward its next turn. That is what keeps the long-run rate exact when the
+  threshold is not a multiple of the unit's rate (a Speed-225 unit gets exactly 3× the turns of a
+  Speed-25 one).
 - **Defeated units** never fill and are never handed a turn.
 - **Per-turn counters are unchanged.** Cooldowns (decision 5), timed buffs and the movement budget
   (decision 7) were always counted in the unit's *own* turns, so a faster unit simply cycles them
@@ -253,23 +273,29 @@ re-simulation always agree):
 
 *Time.* There are no rounds any more. Battle time is counted in integer ticks
 (`TurnManager.ElapsedTicks`) and reported **normalized**: 1.0 = one turn of a Speed-100 unit
-(`TurnManager.ReferenceSpeed` = 100, so 10 ticks). Speed scales with level through the growth curve,
-so the same fight takes longer in normalized time at low levels; compare times within a level.
+(`TurnManager.ReferenceSpeed` = 100, whose rate is `ReferenceFillRate` = 1000, so
+`TicksPerTimeUnit` = 100 ticks). Speed scales with level through the growth curve, so the same fight
+takes longer in normalized time at low levels (less so than under the linear gauge: a level-1 beast
+at Speed 15 now takes 0.39 turns per unit of time, not 0.15); compare times within a level.
 `BattleResult` reports `ElapsedTicks` / `Time` (when the last turn was taken) and `ActionCount`
 (turns executed). `TurnManager.PredictNextActors(n)` forecasts the next *n* turns assuming no speed
 change or defeat, which is what a turn-order UI would show.
 
-*Worked example.* Speeds 100 (a), 150 (b), 50 (c). b fills first (t = 7, gauge 1050, carries 50);
-a at t = 10; b at t = 14 (1100, carries 100); at t = 20 all three are at exactly 1000, so the faster
-goes first: b, a, c. t = 20 is the full cycle — six turns in the ratio 3 : 2 : 1 — and t = 27
-repeats t = 7.
+*Worked example.* Speeds 100 (a, rate 1000), 225 (b, rate 1500), 49 (c, rate 700) — the speeds
+are 1 : 2.25 : 0.49, the turn rates 1 : 1.5 : 0.7. b fills first (t = 67, gauge 100500, carries
+500); a at t = 100; b at t = 134 (101000, carries 1000); c at t = 143 (100100); at t = 200 a and b
+are both at exactly 100000, so the faster goes first: b, then a; b again at t = 267.
+`TurnManagerTests` pins this sequence.
 
 *The time cap* (`BattleTurnExecutor.DefaultMaxTime` = 2000 normalized) is still a scaffold safety
 net against a battle that cannot end, not a game rule. It replaced the 200-round cap and is sized so
-the net survives low levels: 2000 is 200 turns of a Speed-10 unit (about a level-1 beast).
+the net survives low levels: 2000 is about 630 turns of a Speed-10 unit (rate 316; about a level-1
+beast), up from 200 under the linear gauge.
 
-*Tunable defaults, not balance.* The threshold only sets the gauge's resolution; the reference speed
-is a reporting convention. Neither changes who acts how often: only the ratios between speeds do.
+*Tunable defaults, not balance.* The threshold and `FillScale` only set the gauge's resolution
+(rounding the rate to a whole number moves a roster-band unit's turn rate by at most about 0.05%);
+the reference speed is a reporting convention. None of them changes who acts how often: only the
+ratios between the square roots of the speeds do.
 Starting every gauge at 0 (rather than, say, a random or Speed-scaled head start) is also a default.
 
 *Background, from the original decision.* A single, one-at-a-time order is classic JRPG/tactics
@@ -375,10 +401,14 @@ player can reason about it while building, and it needs no runtime decision-maki
 is that a beast can fire a skill at a moment when a human player wouldn't have — which is the same
 trade auto-resolution already made everywhere else.
 
-### 6. The avatar's skill loadout — DECIDED (timing and targeting); stats AMENDED
+### 6. The avatar's skill loadout — DECIDED (timing and targeting); stats AMENDED; passives ADDED
 
 **The avatar has skills too, on the same rotation mechanic**, intended to support and buff the
-player's own beasts rather than to attack. Per decision 2 the avatar is **not a piece on the grid**
+player's own beasts rather than to attack. **Amended (user):** those active skills stay, but the
+avatar's *main* role is now its **3 passive slots** — passives that fire on battle events rather
+than on a rotation — and both its actives and its passives are acquired and leveled slowly through
+play on the same progression model as beast skills. See "Avatar passives" below for the passive
+rules; everything in this section about the active loadout still holds. Per decision 2 the avatar is **not a piece on the grid**
 and has no meaningful `HexCoordinate` position, and it correspondingly gets **no turn of its own in
 the turn order** (no gauge — but see the open item below).
 
@@ -447,15 +477,24 @@ cosmetic. The producer has reversed that, and the rule is now two separate thing
   original `BattleAvatar.Create(skills)` still builds an all-zero avatar for callers with no stats
   authored.
 
+**Amendment — the avatar's skills progress, and it has passives.** The avatar's skills now live
+in an `AvatarSkillBook` (save data): `Actives` (its active support skills, **3 slots**,
+`AvatarSkillBook.ActiveSlotCount` — before this the avatar's loadout had no fixed size, and 3
+matches a beast's) and `Passives` (**3 slots**, `PassiveSlotCount`). Both are acquired and leveled
+exactly like beast skills (practice XP, materials, breakthroughs). `BattleAvatar.Create(book,
+activeLookup, passiveLookup, baseStats, gear, level, out passives)` builds the avatar with its
+equipped actives as its `SkillLoadout` (at their levels) and hands back its equipped passives as the
+battle's `PassiveLoadout`. The passives are the subject of "Avatar passives".
+
 Everything else above is unchanged: the avatar is still off the grid, still takes no initiative
 turn, still ticks on player-beast turns, is still a caster outside the roster, and still cannot be
 defeated. **The avatar's stats now feed the damage formula** exactly as a beast's do (see "Damage
-formula"): a damaging avatar skill uses the avatar's `Attack` or `SpecialAttack` and its level. Heals
-and buffs are still flat for everyone, so an avatar buff still lands the same whatever the avatar's
-stats are. Avatar leveling is out of scope and open (see "What is not settled yet"); the statful
-`BattleAvatar.Create` takes a per-battle level (default 1) for the formula to read in the meantime.
-The zero-stat `Create(skills)` avatar is level 1 with no attacking stat, so every damage effect it
-lands deals the formula's floor of 2 (times the element multiplier) — see "Damage formula".
+formula"): a damaging avatar skill uses the avatar's `Attack` or `SpecialAttack`. Heals
+scale with the caster's `SpecialAttack`, the avatar's included; buffs are still flat for everyone,
+so an avatar buff still lands the same whatever the avatar's stats are. Avatar leveling is out of scope and open (see "What is not settled yet"); the statful
+`BattleAvatar.Create` takes a per-battle level (default 1), recorded on the unit (the damage formula
+no longer reads level). The zero-stat `Create(skills)` avatar has no attacking stat, so every damage
+effect it lands deals the formula's `MinimumDamage` floor of 1 — see "Damage formula".
 
 ### 7. Movement during a turn — DECIDED
 
@@ -598,13 +637,18 @@ above, **none of the rules in this section were confirmed by the producer.** The
 defaults chosen so the system is complete rather than half-built, and they are expected to be
 revisited when balance work starts.
 
-- **Damage is stat-based; healing is flat.** A `Damage` effect's `SkillEffect.Magnitude` is its
+- **Damage and healing are stat-based.** A `Damage` effect's `SkillEffect.Magnitude` is its
   *power*, and the HP it takes comes from `DamageFormula` — caster level, caster attacking stat
   against target defending stat, the element multiplier, then a crit roll and a variance roll (see
   "Damage formula" below). This superseded the original rule, which applied every magnitude flat and
-  deferred the formula to a balancing pass. Heals are still applied flat with no variance, and buffs
-  and debuffs still move a stat by exactly their magnitude; whether and how healing should scale is
-  deferred to the balance pass.
+  deferred the formula to a balancing pass. A `Heal` restores **`Magnitude / 100 × caster's
+  SpecialAttack × HealScale`** HP (`SkillEffectApplier.HealScale`, a tunable constant, 1.0),
+  rounded to the nearest whole HP and scaled by skill level like every magnitude: no defense term,
+  no crit and no variance roll (so a heal takes no rng draws). The avatar is the caster of its
+  passives, so a passive heal reads the avatar's `SpecialAttack`. (Heals were flat HP until the
+  authored-kits retune: huge at level 1, negligible at level 100. `SpecialAttack` grows on the same
+  curve as HP, so a heal now restores about the same share of HP at every level — see
+  "Beast skill kits".) Buffs and debuffs still move a stat by exactly their magnitude.
   `BattleUnit` gained a `CurrentHp` alongside its `StatBlock` (whose
   `Hp` is now explicitly the *maximum*); every unit starts a battle at full health, since there is
   no persistent creature-instance model to carry damage in from a previous fight. Both damage and
@@ -646,16 +690,181 @@ revisited when balance work starts.
   turn reads any stat — the movement budget included — so a modifier on its last turn has already
   expired by the time that turn acts.
 
-- **`ApplyStatus` is unimplemented and does nothing.** There is no status-effect system anywhere in
-  the data model — no poison, stun or burn, and no field on `SkillEffect` naming *which* status,
-  because the set of statuses has never been designed. Implementing the effect would mean inventing
-  that design inside the effect applier, which is the wrong place for it. The switch arm exists and
-  is documented as a deliberate gap rather than silently falling through: authoring an `ApplyStatus`
-  effect today is a no-op. It is pending an actual status-effect design, at which point that arm is
-  where it plugs in.
+- **`ApplyStatus` applies a status.** It used to be a documented no-op, for want of a status
+  design. `SkillEffect.Status` now names which `StatusType` it applies, and the rules are in
+  "Status effects and advanced skill effects" below. An `ApplyStatus` effect left at
+  `StatusType.None` still does nothing.
+
+- **Re-applying the same timed buff or debuff refreshes it instead of stacking.** Each timed
+  modifier remembers the authored effect it came from. `SkillEffect.MaxStacks` (default 1) caps how
+  many copies of *that effect* a unit carries. At the cap, the copy with the fewest turns left is
+  reverted and replaced. Before this, re-applying the same effect stacked without limit. No content
+  relied on that. Two *different* effects on the same stat still stack independently, as before.
 
 Resource cost is still not spent, per the open question above; effect application does not gate on
 it.
+
+## Status effects and advanced skill effects — TUNABLE STARTING DEFAULTS, NOT CONFIRMED BALANCE
+
+This is the effect engine the per-beast skill kits need. It follows the user's reference, Sword x
+Staff: chance-based taunt, multi-hit with per-hit rolls, stacking debuffs with a stack cap,
+Defense-based shields, knockback, heal targeting by HP fraction, execute scaling and skills that
+fire on turn one. **Every new field is inert at its default.** A skill authored before this pass
+behaves, rolls and replays exactly as it did. The simulator's report is byte-identical. No content
+uses any of this yet: authoring the per-beast kits is the next deliverable.
+
+**New data** (explicit enum values, never renumbered):
+
+- `SkillEffect.Status` (`StatusType`: `None = 0`, `Taunt = 1`, `Stun = 2`, `Shield = 3`,
+  `DamageOverTime = 4`, `Knockback = 5`), `Chance` (percent, default 100), `MaxStacks` (default 1),
+  `IsPercent` (default false), `HitCount` (default 1) and `ExecuteBonusPercent` (default 0). Unity
+  zero-fills a list entry added in the inspector, so a `Chance`, `MaxStacks` or `HitCount` of 0 or
+  below reads as its default. A freshly authored effect lands once, always. It never silently lands
+  zero times.
+- `SkillTargetingCriterion.HpFraction = 4`.
+- `SkillSO.InitialCooldown` (default −1, meaning the ordinary cooldown) and
+  `SkillSO.MaxUsesPerBattle` (default 0, meaning unlimited).
+- `BattleUnit.StatusResist`: percent, 0–100, default 0, fixed at construction. There is a
+  `BattleUnitFactory.CreateBeast` overload that takes it. `BattleUnit.Statuses` is a read-only view
+  of the statuses on the unit.
+- `BattleTurnResult.Stunned` and `StatusDamage`, and `DamageHit.Absorbed`.
+- `StatusEffects`, the status engine. `SkillEffectApplier.GetEffectiveChance` and `RollChance`.
+  `DamageFormula.GetExecuteMultiplier` and a `Roll` / `Compute` overload with a bonus multiplier.
+
+**Chance and resistance.** Every non-damage effect (heal, buff, debuff, status, knockback) rolls
+its `Chance` separately for each target. Damage always lands. A hostile application, meaning one
+onto a unit of the other team, is reduced by the target's resistance:
+`effective = Chance × (100 − StatusResist) / 100`, in integers and truncated. So an 85% taunt on a
+50%-resistant boss has a 42% chance. Effects on the caster's own side are never resisted. The roll
+is `rng.Next(100) < effective`. It draws once, **and only when the effective chance is below 100**.
+An effect that always lands draws nothing, which keeps existing content's draw sequence unchanged.
+A null rng (the deterministic fallback) lands only certain effects. There is no luck either way,
+just as the fallback never crits.
+
+**The rng draw order** stays target-major and in authored effect order. Within that:
+
+- A damage effect draws crit, then variance, for each hit in turn. It draws nothing for hits that
+  never happen because the target fell.
+- A non-damage effect draws its single chance roll, if it needs one, before it applies.
+- Nothing else draws: not the statuses themselves, not a damage-over-time snapshot, not a
+  knockback, and not a taunt-forced pick.
+
+For example, `[Damage, 50% debuff]` on one target draws crit, variance, then chance.
+
+**Statuses** live on the affected unit. Their durations count **the affected unit's own turns**, as
+timed modifiers do, and mean "in force for this many of its turns":
+
+- `StatusEffects.BeginTurn` counts the current turn off every status present as the turn opens.
+- `StatusEffects.EndTurn` removes the statuses with nothing left when the turn closes.
+- So a status applied during the unit's own turn (a self-shield) does not lose that turn.
+- A `DurationTurns` below 1 reads as 1 for a stored status.
+
+The turn order is:
+
+1. Lift the defeated.
+2. Tick the timed modifiers.
+3. `BeginTurn`: damage-over-time lands, and the stun is read.
+4. Skills, movement and retreat, unless stunned.
+5. The avatar tick.
+6. `EndTurn`.
+
+The statuses:
+
+- **Taunt.** The taunted unit's enemy-side picking skills (`SingleTarget`, `Line`) must pick the
+  taunter while it is alive and on the other team. The range-limited pick takes it when it is in
+  range. The range-free focus pick always takes it, so `BattleTurnExecutor` walks toward it through
+  the ordinary approach and fires once it is in range. While the taunter is out of reach, the
+  range-limited pick falls back to the ordinary rule. The taunt decides the pick before any
+  criterion, so a `Random` skill draws nothing when taunted. Ally-side skills are never taunted. A
+  unit carries one taunt, and the latest replaces the earlier one. A taunt whose source has fallen
+  forces nothing. The reference's "100% against non-character units" is expressed through
+  resistance rather than a special case.
+- **Stun** (also used for Freeze). A unit that begins its turn stunned skips it. It does not move,
+  fires nothing, does not retreat, and **its cooldowns do not tick**: a stun delays the rotation
+  rather than burning it. Its timed modifiers and statuses still tick, and its gauge is spent as
+  normal. The avatar still ticks on a stunned player beast's turn. Stuns do not stack. A new stun
+  keeps whichever of the two has more turns left.
+- **Shield.** It absorbs damage before HP. It is worth `Magnitude`% of the **caster's** `Defense`
+  (`StatusEffects.ShieldPercentDivisor`), level-scaled like every magnitude and truncated. Every
+  damage hit and every damage-over-time tick is taken from the shield first. A shield brought to 0
+  is removed, and one that outlasts its duration expires. A unit holds one shield: **the larger
+  one wins**. On a tie the existing shield is kept and its duration is not refreshed.
+- **Damage over time** (also used for Burn and Poison). At application it snapshots
+  `DamageFormula` with `Magnitude` as the power: the caster's attacking stat against the target's
+  defending stat (by the skill's category), with the element, no crit, no variance and a floor of
+  1. Later buffs do not change it. The damage is dealt at the start of each of the affected unit's
+  own turns, through its shield. A unit its stacks defeat takes no turn: no skills, and no avatar
+  tick. `MaxStacks` copies per authored effect ride at once, each on its own clock. At the cap, the
+  copy with the fewest turns left is replaced, so the default of 1 refreshes.
+- **Knockback.** It pushes the target `Magnitude` whole hexes away from the caster, one tile at a
+  time. The distance uses the authored magnitude and is not level-scaled. It stops at the first
+  off-board, blocked or occupied tile. "Directly away" is the axial direction with the largest
+  Cartesian dot product with the caster-to-target vector, computed exactly in integers as
+  `2·q1·q2 + q1·r2 + r1·q2 + 2·r1·r2`. Ties go to the earlier direction. It needs the grid, which
+  the executor passes to `SkillEffectApplier.Apply`. With no grid it does nothing. It is never
+  stored.
+
+**Stacking stat buffs and debuffs.** `MaxStacks` caps the timed copies of one authored effect on a
+unit, and each copy expires on its own clock. At the cap, the copy with the fewest turns left (the
+oldest on a tie) is reverted and replaced. Instant changes (`DurationTurns` 0) are permanent and
+uncapped, as before. With `IsPercent`, the change is `Magnitude`% of the unit's **current** value of
+the stat at the moment it lands, truncated. That keeps the rule simple: `BattleUnit` holds no
+separate base block. It also means percent stacks compound: two +10% buffs on 100 Attack give 121.
+The applied delta is stored and reverted exactly, like any modifier.
+
+**Multi-hit.** A damage effect with `HitCount` greater than 1 runs the whole pipeline once per hit:
+its own crit and variance rolls, the execute bonus at the HP the target has at that moment, shield
+absorption and the defeat check. It stops as soon as the target falls. Each hit is recorded in
+`SkillActivation.Hits`.
+
+**Execute.** Damage is multiplied by `1 + ExecuteBonusPercent / 100 × (max − current) / max`. The
+multiplier is applied after the element, crit and variance, and before the single truncation. The
+curve is linear in missing HP:
+
+- ×1 at full health.
+- ×1.5 at half HP for a 100% bonus.
+- ×(1 + bonus/100) at 0 HP. A living target approaches this but never quite reaches it.
+
+A multiplier of exactly 1 is skipped rather than multiplied, so it is bit-exact.
+
+**Heal targeting.** `HpFraction` compares `CurrentHp / Stats.Hp` exactly by cross-multiplying in
+64-bit integers (`a.cur × b.max` against `b.cur × a.max`), never as a float. It uses the same
+id-order tie-break as every criterion. Use it with `Ally` and `Lowest` to heal whoever is worst off.
+`CurrentHp` gets this wrong when maximums differ.
+
+**Skill-level limits.**
+
+- `InitialCooldown` below 0 (the default, −1) starts the counter at the ordinary cooldown, the
+  instance's effective cooldown, exactly as before. A value of 0 or more is taken as authored, and a
+  tier's cooldown reduction does not touch it. `0` fires on the owner's first turn.
+- `MaxUsesPerBattle` is counted per slot by `SkillLoadout.MarkFired`. A slot that reaches it is
+  spent (`IsSpent`, `UsesThisBattle`): its counter still ticks, but it is never offered again that
+  battle. 0 means unlimited.
+- Proc chances, per-battle caps and internal cooldowns for triggered effects live on the avatar's
+  passives (see "Avatar passives"), not on individual effects.
+
+**Simulator.** `encounters.json` can now express all of this for future content:
+
+- `StatusResist` per enemy type.
+- Per skill: `HitCount`, `ExecuteBonusPercent`, `InitialCooldown`, `MaxUsesPerBattle` and an
+  `Effects` list of further effects after the damage effect, with names from the runtime enums. The
+  loader validates them.
+- `HpFraction` targeting.
+
+The bosses (giant, champion and the fixed colossus) carry `StatusResist` 50. No fixture skill
+applies a status, so the report is unchanged.
+
+**Open questions.**
+
+- Whether resistance should also shorten durations, as in some references, rather than only gating
+  the chance.
+- Whether a shield should scale off the caster's `Defense` or the target's.
+- Whether damage over time should be able to crit.
+- Whether taunt should also force area skills' positioning.
+- Whether knockback into a unit should deal collision damage.
+- Whether a stun should also freeze the gauge.
+- The simulator attributes damage to the unit whose turn it is. Once content applies
+  damage-over-time, that attribution will need the source recorded.
 
 ## Element system — TUNABLE STARTING CHART, NOT CONFIRMED BALANCE
 
@@ -684,26 +893,65 @@ applies to **damage only** — heals, buffs and debuffs are never scaled. (It wa
 damage was still a flat magnitude; the formula now sits underneath it — see "Damage formula".)
 
 **The chart is attacker-side.** Each row is read from the attacking element's point of view and is
-only ever looked up in that direction; it is not forced to be symmetric. `2x` is strong, `0.5x` is
-weak, and every pair not listed is `1x`:
+only ever looked up in that direction; it is not forced to be symmetric. `2x` is strong, `1.25x`
+(`ElementChart.Mild`) is a mild edge, `0.5x` is weak, and every pair not listed is `1x`. This is
+**chart v2** (element chart v2, user-approved):
 
-| Attack | Strong against (2x) | Weak against (0.5x) |
-| --- | --- | --- |
-| Fire | Nature, Metal | Water, Earth |
-| Water | Fire, Earth | Lightning, Nature |
-| Earth | Lightning, Metal | Water, Air |
-| Air | Earth, Nature | Ice, Lightning |
-| Lightning | Water, Air | Earth, Metal |
-| Ice | Nature, Air | Fire, Metal |
-| Nature | Water, Earth, Dark | Fire, Ice |
-| Metal | Ice, Light | Fire, Lightning |
-| Light | Dark | — |
-| Dark | Light | — |
+| Attack | Strong against (2x) | Mild against (1.25x) | Weak against (0.5x) |
+| --- | --- | --- | --- |
+| Fire | Nature, Metal | — | Water, Earth |
+| Water | Fire, Metal | — | Lightning, Nature |
+| Earth | Lightning, Ice | — | Water, Air |
+| Air | Fire, Earth | — | Ice, Nature |
+| Lightning | Water, Air | — | Earth, Metal, Light |
+| Ice | Nature, Air | — | Fire, Metal |
+| Nature | Water, Earth, Dark | — | Lightning, Ice |
+| Metal | Lightning, Ice, Light | — | Fire, Air, Dark |
+| Light | Dark | Water, Air, Ice, Earth | — |
+| Dark | Light | Fire, Lightning, Nature, Metal | — |
+
+**The main eight are normalized.** Among Fire, Water, Earth, Air, Lightning, Ice, Nature and Metal,
+every attacking row is 2x against exactly two and 0.5x against exactly two, and every defending
+column takes 2x from exactly two and 0.5x from exactly two (`ElementChartTests` pins this). No main
+element is better or worse than another on offence or defence by count alone; which matchups come
+up in a fight is what separates them.
+
+**Light and Dark are generalists, not counters.** Each is 2x into the other and a mild 1.25x into
+four main elements (Light: Water, Air, Ice, Earth; Dark: Fire, Lightning, Nature, Metal — the two
+sets split the main eight), and never 0.5x on offence. Defensively each takes one 2x and one 0.5x
+from the main eight: Nature 2x and Metal 0.5x into Dark, Metal 2x and Lightning 0.5x into Light.
+
+**Why v2.** v1 was uneven on defence: within the main eight, Earth and Nature each took 2x from
+three elements while Fire, Lightning and Ice took 2x from only one (and Metal's row had one 2x
+target); Light and Dark each hit only the other. In the simulator (the `elemental` minus the
+`neutral` overall marginal, three seeds) the element system gave the Lightning beast +12.5 points and
+Fire, Metal and Ice +2 to +4, and cost Dark −8.9, Light −5.2 and Nature −4.0; under v2 every beast
+is within −4.3 … +3.8 on the same roster (see `docs/balance/tuning-log.md`, "Element chart v2"). The user wanted Light and Dark as generalists and balanced defensive counts.
+The changes from v1, each with its theme:
+
+| Matchup | v1 | v2 | Why |
+| --- | ---: | ---: | --- |
+| Air → Fire | 1x | 2x | A gust snuffs flame |
+| Water → Metal | 1x | 2x | Rust |
+| Earth → Ice | 1x | 2x | Rock shatters ice |
+| Metal → Lightning | 0.5x | 2x | The lightning rod (Lightning → Metal stays 0.5x) |
+| Nature → Lightning | 1x | 0.5x | Wood insulates |
+| Air → Nature | 2x | 0.5x | Forests withstand wind |
+| Metal → Air | 1x | 0.5x | A blade can't cut wind |
+| Metal → Dark | 1x | 0.5x | Dark resists Metal |
+| Lightning → Light | 1x | 0.5x | Light resists Lightning |
+| Light → Water, Air, Ice, Earth | 1x | 1.25x | Light as a generalist |
+| Dark → Fire, Lightning, Nature, Metal | 1x | 1.25x | Dark as a generalist |
+| Water → Earth | 2x | 1x | Now neutral |
+| Earth → Metal | 2x | 1x | Now neutral |
+| Air → Lightning | 0.5x | 1x | Now neutral |
+| Nature → Fire | 0.5x | 1x | Now neutral |
 
 **These values are a tunable starting default, not producer-confirmed balance** — the same standing
 as the arena radii and the deployment-zone split. The set of elements is fixed; which pairs are
-strong or weak, and whether 2x / 0.5x are the right sizes, are expected to move once balance work
-has real fights to measure. `ElementChart` is the single place to change them.
+strong, mild or weak, and whether 2x / 1.25x / 0.5x are the right sizes, may still move as balance
+work measures real fights. `ElementChart` (`Strong`, `Mild`, `Weak` and its rows) is the single
+place to change them.
 
 ## Damage formula — TUNABLE STARTING DEFAULTS, NOT CONFIRMED BALANCE
 
@@ -717,66 +965,99 @@ or renumbered — append only). Physical damage reads the caster's `Attack` agai
 `Defense`; special damage reads `SpecialAttack` against `SpecialDefense`. The default is `Physical`.
 The category belongs to the skill as a whole, like its element.
 
-**The formula** (the static, pure `DamageFormula`, one place to tune):
+**The formula** (the static, pure `DamageFormula`, one place to tune) — **AMENDED: adopted from
+Sword x Staff** (user-approved; see
+[`docs/balance/research-sword-x-staff.md`](../balance/research-sword-x-staff.md)). It replaces the
+first, Pokémon-style level-term formula:
 
 ```
-base   = ((2 * Level / 5 + 2) * Power * A / D) / 50 + 2
-damage = max(1, truncate(base * ElementChart multiplier * crit * roll / 100))
-crit   = 1.5 on a critical hit, else 1
+base   = Power / 100 × A × A / (A + DefenseWeight × D) × GlobalScale
+damage = max(1, truncate(base × ElementChart multiplier × crit × roll / 100))
+crit   = max(MinCritMultiplier, CritMultiplier) = 1.5 on a critical hit, else 1
 roll   = a whole percent, uniform on [90, 110]
 ```
 
-- `Level` is the caster's `BattleUnit.Level`; `Power` is the `Damage` effect's `SkillEffect.Magnitude`;
-  `A` / `D` are the category's stats, read from the units' **current effective** `Stats` at the
-  moment the effect lands, so buffs and debuffs move damage.
-- The element multiplier is the skill's element against the target's elements, exactly as before,
-  and applies to the whole of `base` (the +2 included). The caster's own elements still do nothing.
-- **Float math, truncated once at the end**, after the element, crit and variance multipliers (in
-  that order) — the same truncation stance the applier always had. Crits and rolls are covered
-  under "Variance and critical hits" below.
-- **Guards:** `Power <= 0` deals 0 (so a negative damage magnitude no longer reads as a heal); any
-  positive `Power` deals at least 1; `D <= 0` is treated as 1; `A < 0` as 0; `Level < 1` as 1.
-- The constants (`2`, `5`, `+2`, `/50`, `+2`, minimum 1, and the crit and variance constants below)
-  are named on `DamageFormula` so the balance simulator can tune them in one place.
+- **`Power` is a percent of the attacking stat.** It is the `Damage` effect's
+  `SkillEffect.Magnitude`: Power 120 means 120% of the caster's `Attack` (physical) or
+  `SpecialAttack` (special) before mitigation — the reference's "skill base = stat × skill
+  coefficient". `A` / `D` are the category's stats, read from the units' **current effective**
+  `Stats` at the moment the effect lands, so buffs and debuffs move damage.
+- **Mitigation is `A / (A + DefenseWeight × D)`**, the reference's armor term: a share of the hit,
+  never a subtraction. Defense has smooth diminishing returns — against Attack 100, Defense 0, 100,
+  200, 300 lets through 100%, 50%, 33%, 25% — and never negates a hit. `A` appears twice (base and
+  mitigation), so Attack is worth slightly more than linear: doubling Attack against equal Defense
+  multiplies the hit by 2.67.
+- **Level is not in the formula.** Stats already scale with level through the growth curve, and with
+  `A`, `D` and HP on the same curve a hit between two equally levelled beasts takes the same share of
+  HP at every level, up to integer rounding. (The old `(2 × Level / 5 + 2)` term only held that
+  loosely: 20% at level 1 against 35% at level 100.) `BattleUnit.Level` is kept — it is recorded and
+  other systems may read it — but `DamageFormula` ignores it, and the raw overloads no longer take a
+  level: `Compute(power, attack, defense, element[, variancePercent, isCrit])` and
+  `ComputeBase(power, attack, defense)`.
+- The element multiplier is the skill's element against the target's elements, exactly as before.
+  The caster's own elements still do nothing.
+- **Arithmetic.** The base is computed in double precision (basic IEEE operations only, one division
+  last, so an exactly whole hit never truncates to one less) and truncated once at the end, after the
+  element, crit and variance multipliers (in that order). Crits and rolls are covered under
+  "Variance and critical hits" below.
+- **Guards:** `Power <= 0` deals 0 (so a negative damage magnitude never reads as a heal); any
+  positive `Power` deals at least 1; `A <= 0` makes the base exactly 0 (so the hit lands on the floor
+  of 1); `D < 0` is treated as 0 (no mitigation, and no division by zero while `A > 0`).
 
-**Why the level term.** Between two equally levelled beasts on the same curve, `A / D` does not
-change with level, but HP does. The `(2 * Level / 5 + 2)` term scales damage up with level so that a
-hit between evenly matched beasts takes a *roughly* similar share of HP at level 1 and level 100 and
-fights do not lengthen as the roster levels. With the authored `medium` curve it holds only loosely:
-a Power-40 neutral hit between two identical 600-total (100-per-stat) beasts takes 3 of 15 HP (20%)
-at level 1, 19 of 57 (33%) at level 50 and 35 of 100 (35%) at level 100 — HP grows about 6.7x across
-the curve while the level term grows 17.5x, and the +2 floor dominates at level 1. An EditMode test
-pins that loose band; tightening it is a balance-simulator question.
+| Constant | Value | Meaning |
+| --- | --- | --- |
+| `PowerPercent` | 100 | Power is authored in percent of the attacking stat. |
+| `DefenseWeight` | 1.0 | Weight of `D` in the mitigation term: at 1, equal Attack and Defense halve a hit. |
+| `GlobalScale` | 1.0 | A uniform multiplier on every hit, the lever for overall fight length. |
+| `MinimumDamage` | 1 | The floor for any positive-power hit. |
+| `CritMultiplier` / `MinCritMultiplier` | 1.5 / 1.3 | See "Variance and critical hits". |
 
-**Worked examples (starter roster, `medium` curve, Power 40; a 100% roll and no crit, i.e. the
+**How the constants were chosen.** `DefenseWeight` and `GlobalScale` start at 1, as in the
+reference, and the balance simulator's kit and enemy powers were **rescaled instead** so that a
+neutral hit between two average level-50 roster beasts removes the same share of HP as under the old
+formula. For the sim's Blast (special, old Power 40, new Power 68) between two average roster beasts:
+
+| Level | Old damage / HP | New damage / HP |
+| --- | --- | --- |
+| 1 | 3 / 17 (17.6%) | 5 / 17 (29.4%) |
+| 50 | 20 / 65 (30.8%) | 20 / 65 (30.8%) |
+| 100 | 36 / 114 (31.6%) | 35 / 114 (30.7%) |
+
+Level 50 and 100 match; level 1 rises to the same share as every other level, because the old level
+term under-scaled low-level damage. The old formula's powers map to new ones by
+`P' ≈ 1.52 × P + 7` (matching `0.44 × P + 2` against `P' / 100 × A / 2` at `A = D ≈ 58`); the tuning
+log lists every rescaled power.
+
+**Worked examples (starter roster, `medium` curve, Power 100; a 100% roll and no crit, i.e. the
 deterministic fallback).** Phoenix (Fire) hitting Golem (Earth) with a Fire skill — Fire is weak
 against Earth (0.5x) — with the same hit from a neutral skill in brackets:
 
 | Level | Phoenix → Golem, physical | Phoenix → Golem, special | Golem HP |
 | --- | --- | --- | --- |
-| 1 | 1 (neutral: 3) | 2 (neutral: 4) | 22 |
-| 50 | 7 (neutral: 15) | 11 (neutral: 23) | 83 |
-| 100 | 13 (neutral: 27) | 22 (neutral: 44) | 146 |
+| 1 | 3 (neutral: 6) | 5 (neutral: 10) | 22 |
+| 50 | 12 (neutral: 24) | 18 (neutral: 37) | 83 |
+| 100 | 21 (neutral: 43) | 33 (neutral: 66) | 146 |
 
-The reverse, Golem hitting Phoenix with a neutral skill: 4 / 25 / 47 physical and 3 / 15 / 27 special
-at levels 1 / 50 / 100, against Phoenix's 14 / 53 / 92 HP — the glass cannon and the wall still
-reading as intended. These are the second tuning pass's numbers; `DamageFormulaTests` pins the Fire
-examples.
+The reverse, Golem hitting Phoenix with a neutral Power-100 skill: 8 / 31 / 54 physical and
+4 / 15 / 27 special at levels 1 / 50 / 100, against Phoenix's 14 / 53 / 92 HP — the glass cannon and
+the wall still reading as intended. `DamageFormulaTests` pins the Fire examples.
 
-**A zero attacking stat deals the floor.** With `A = 0`, `base` is exactly the +2 constant, so a
-unit with no attacking stat deals 2 × the element multiplier per damage effect regardless of power.
-This matters for the zero-stat `BattleAvatar.Create(skills)` avatar: before the formula its damage
-effects dealt their authored magnitude flat; now they deal 2 (4 on a strong matchup, 1 on a weak
-one). That is deliberate — no special case in the formula — and an avatar meant to hit hard should be
-built with stats via the statful overload.
+**A zero attacking stat deals the floor.** With `A = 0` the base is exactly 0, so a unit with no
+attacking stat deals `MinimumDamage` (1) per damage effect regardless of power or element. This
+matters for the zero-stat `BattleAvatar.Create(skills)` avatar, which under the old formula chipped
+the +2 offset (2, or 4 on a strong matchup). An avatar meant to hit hard should be built with stats
+via the statful overload.
 
-**Levels.** `BattleUnit` now carries a `Level` (at least 1; an optional constructor argument
-defaulting to 1, so existing call sites are unaffected). `BattleUnitFactory.CreateBeast` records the
-level it assembled the stats at. The avatar has no progression level, so the statful
-`BattleAvatar.Create` takes a per-battle level (default 1) — see "What is not settled yet".
+**Levels.** `BattleUnit` carries a `Level` (at least 1; an optional constructor argument defaulting
+to 1). `BattleUnitFactory.CreateBeast` records the level it assembled the stats at. The avatar has no
+progression level, so the statful `BattleAvatar.Create` takes a per-battle level (default 1) — see
+"What is not settled yet". None of these feed damage any more; level reaches damage only through the
+stats it assembled.
 
 **Still deferred:** a same-element attack bonus (STAB), a balance lever to add once there are
-fights to measure it against, and stat-scaled healing — heals stay flat, with no variance. Random
+fights to measure it against; the reference's flat skill damage, damage boost / damage resistance and
+skill damage reduction terms. (Healing now scales with the caster's `SpecialAttack`, with no
+variance; see "Effect application".) Random
 variance and critical hits were deferred here at first, because they make a battle random and the
 balance simulator needed a fixed answer per seed; they are now in, reproducible from the battle's
 seed (below).
@@ -793,6 +1074,7 @@ decisions taken for Beast Craft) — and are named constants on `DamageFormula`:
 | --- | --- | --- |
 | `VarianceMinPercent` / `VarianceMaxPercent` | 90 / 110 | The variance roll: a whole percent, uniform, both ends inclusive (`rng.Next(90, 111)`). Tighter than Pokémon's 85–100%, so a player can still plan on lethal thresholds. |
 | `CritMultiplier` | 1.5 | What a critical hit multiplies the hit by. |
+| `MinCritMultiplier` | 1.3 | Floor of the crit multiplier, from the reference's `max(1.3, 1 + critDamage − critDamageReduction)`. `DamageFormula.GetCritMultiplier(reduction)` = `max(1.3, 1.5 − reduction)`; the formula passes 0 today, so the floor never binds until a crit-damage or crit-resist stat exists. |
 | `MinCritChance` / `MaxCritChance` | 0 / 100 | The crit chance is clamped into this range when it is rolled. |
 
 - **Order of operations:** `base × element × crit × roll / 100`, truncated once, then floored at
@@ -812,7 +1094,10 @@ decisions taken for Beast Craft) — and are named constants on `DamageFormula`:
   `StatCalculator`, with the ordinary 0 floor (not the HP floor of 1) and no ceiling — a block may
   hold more than 100, and the excess is simply wasted when the chance is clamped at roll time, which
   also keeps a timed buff's reversion exact.
-- **Crit damage is not a stat** (deferred; if added, gear- and skill-only, per the research).
+- **Crit damage is not a stat** (deferred; if added, gear- and skill-only, per the research). When a
+  crit-damage bonus or a crit-damage reduction arrives, it goes through
+  `DamageFormula.GetCritMultiplier`, whose 1.3 floor (`MinCritMultiplier`) is already in place, so no
+  amount of reduction can make a crit worth less than +30%.
 - **Heals, buffs and debuffs never roll.** Variance and crits apply to damage only.
 
 **The rng and the draw order.** The battle's one `System.Random` — the `rng` `BattleTurnExecutor`
@@ -827,11 +1112,10 @@ the same stream only for `SkillTargetingCriterion.Random`. A battle is therefore
 reproducible: the same seed replays it exactly.
 
 **The deterministic fallback.** A `null` rng means a 100% roll and no crit, and draws nothing.
-`DamageFormula.Compute(caster, target, skill, power)`, the raw `Compute(level, power, attack,
-defense, element)` and the two-argument `SkillEffectApplier.Apply(activation, caster)` are that
-fallback, so every exact-number example in this document and every existing exact-number test still
-holds. Tests pin specific rolls with `Compute(level, power, attack, defense, element,
-variancePercent, isCrit)`.
+`DamageFormula.Compute(caster, target, skill, power)`, the raw `Compute(power, attack, defense,
+element)` and the two-argument `SkillEffectApplier.Apply(activation, caster)` are that fallback, so
+every exact-number example in this document and every exact-number test holds. Tests pin specific
+rolls with `Compute(power, attack, defense, element, variancePercent, isCrit)`.
 
 **Reporting.** `DamageFormula.Roll` returns a `DamageRoll` (amount, `IsCrit`, `VariancePercent`),
 and `SkillEffectApplier` records one `DamageHit` (target plus roll) per landed damage effect on
@@ -985,26 +1269,29 @@ be scoped as one rather than treated as the tail end of this one.
 ## Starter roster — SIMULATOR-TUNED DATA, NOT CONFIRMED BALANCE
 
 The first ten beasts, one per element, are authored as data. Names, elements and archetypes are
-approved. **The numbers below are the second simulator-tuned pass**: first-draft stats chosen to
-express each archetype were tuned by hand against the headless balance simulator's PvE mode, then
+approved. **The numbers below are the third simulator-tuned pass**: first-draft stats chosen to
+express each archetype were tuned by hand against the headless balance simulator's PvE mode,
 re-tuned for the ATB gauge, combat stances, variance and crits and the generated mixed encounters,
-with base Speed held to a 15% band (see "Next steps" and
-[`docs/balance/tuning-log.md`](../balance/tuning-log.md), which has the first draft and both passes).
-Nothing here is confirmed balance; the numbers are expected to move again once skills and real
-encounters exist.
+and then re-tuned a third time, together with the skill numbers, against the real game setup: each
+beast's authored skill kit, the library avatar with its passives, the square-root speed gauge and
+the mitigation damage formula, with base Speed widened so the fastest beast gets 10–15% more turns
+than the slowest. A light follow-up pass re-fit it to element chart v2 (four stat lines and nine
+skill numbers; see [`docs/balance/tuning-log.md`](../balance/tuning-log.md), which has the first
+draft and every pass, "Element chart v2" and its "Thunderbird range vs move" experiment last). Nothing here is confirmed balance; the numbers are expected to move again
+once real encounters exist.
 
 | SpeciesId | Beast | Element | Archetype | Stance | Curve | HP | ATK | DEF | SpA | SpD | SPE | Six-stat total | Move | Crit |
 | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `phoenix` | Phoenix | Fire | Glass cannon | Ranged | medium | 92 | 102 | 70 | 120 | 85 | 101 | 570 | 4 | 10% |
-| `leviathan` | Leviathan | Water | Tank | Vanguard | medium | 122 | 86 | 126 | 86 | 100 | 95 | 615 | 3 | 3% |
-| `golem` | Golem | Earth | Pure wall | Vanguard | medium | 146 | 95 | 137 | 64 | 96 | 92 | 630 | 2 | 2% |
-| `griffin` | Griffin | Air | Fast skirmisher | Skirmisher | medium | 106 | 112 | 91 | 91 | 91 | 104 | 595 | 5 | 8% |
-| `thunderbird` | Thunderbird | Lightning | Burst striker | Skirmisher | medium | 110 | 117 | 88 | 114 | 91 | 105 | 625 | 4 | 15% |
-| `frost_wyrm` | Frost Wyrm | Ice | Control / attrition | Vanguard | medium | 98 | 74 | 124 | 103 | 118 | 98 | 615 | 3 | 5% |
-| `treant` | Treant | Nature | Support-tank | Vanguard | medium | 134 | 87 | 98 | 93 | 124 | 94 | 630 | 3 | 3% |
-| `tarasque` | Tarasque | Metal | Armored bruiser | Vanguard | medium | 112 | 137 | 127 | 54 | 78 | 97 | 605 | 3 | 6% |
-| `kirin` | Kirin | Light | Support caster | Ranged | medium | 115 | 51 | 90 | 150 | 124 | 100 | 630 | 4 | 5% |
-| `basilisk` | Basilisk | Dark | Ranged assassin | Ranged | medium | 103 | 94 | 79 | 153 | 94 | 102 | 625 | 5 | 12% |
+| `phoenix` | Phoenix | Fire | Glass cannon | Ranged | medium | 92 | 102 | 70 | 120 | 85 | 104 | 573 | 4 | 10% |
+| `leviathan` | Leviathan | Water | Tank | Vanguard | medium | 132 | 86 | 126 | 86 | 100 | 94 | 624 | 3 | 3% |
+| `golem` | Golem | Earth | Pure wall | Vanguard | medium | 150 | 109 | 137 | 50 | 96 | 88 | 630 | 2 | 2% |
+| `griffin` | Griffin | Air | Fast skirmisher | Skirmisher | medium | 116 | 118 | 97 | 85 | 91 | 108 | 615 | 5 | 8% |
+| `thunderbird` | Thunderbird | Lightning | Burst striker | Skirmisher | medium | 116 | 117 | 88 | 108 | 91 | 110 | 630 | 4 | 15% |
+| `frost_wyrm` | Frost Wyrm | Ice | Control / attrition | Vanguard | medium | 98 | 74 | 124 | 103 | 118 | 99 | 616 | 3 | 5% |
+| `treant` | Treant | Nature | Support-tank | Vanguard | medium | 134 | 77 | 98 | 105 | 124 | 92 | 630 | 3 | 3% |
+| `tarasque` | Tarasque | Metal | Armored bruiser | Vanguard | medium | 112 | 130 | 127 | 54 | 78 | 97 | 598 | 3 | 6% |
+| `kirin` | Kirin | Light | Support caster | Ranged | medium | 115 | 51 | 90 | 140 | 124 | 101 | 621 | 4 | 5% |
+| `basilisk` | Basilisk | Dark | Ranged assassin | Ranged | medium | 103 | 94 | 79 | 110 | 94 | 105 | 585 | 5 | 12% |
 
 Stats are max-level values (curve scale 1). **All ten beasts share the `medium` growth curve for
 now, by user decision**; differentiating curves per beast is deferred to the headless balance
@@ -1012,13 +1299,21 @@ simulator. The drafting rules:
 
 - **Shared budget.** Every beast's six combat stats sum to a shared budget of 600, and the roster
   tests allow ±5% (570–630). Archetype comes from how the budget is *distributed*, not from raw
-  power. The first draft put every beast at exactly 600; both tuning passes used the ±5% band as a
-  balance lever. After the second, Phoenix sits on the 570 floor (its Fire kit and Ranged stance
-  carry it; see the tuning log), Griffin is at 595 and the others at 605–630 (Kirin, Treant and
-  Golem on the ceiling). If
+  power. The first draft put every beast at exactly 600; every tuning pass used the ±5% band as a
+  balance lever. After the third (authored kits) and the element chart v2 follow-up, totals run
+  from 573 (Phoenix, whose kit and Ranged stance carry it) and 585 (Basilisk, whose power now comes
+  from its kit: execute, poison and a 45% petrify) to 630 (Thunderbird, Treant and Golem on the
+  ceiling). Stats a beast's kit
+  never reads are no longer free budget either: Golem's and Tarasque's `SpecialAttack` and Phoenix's
+  `Attack` are unused by their default kits, while every heal now reads the caster's
+  `SpecialAttack`. If
   the simulator later gives some beasts a slower curve, whether they deserve a larger budget as
   payoff for a weak early game is a balance question for it, not something this pass assumes.
-- **Speed is a narrow band (user decision): the fastest base Speed is at most 1.15× the slowest.**
+- **Speed is a narrow band of *turns* (user decision): the fastest beast gets 10–15% more turns than
+  the slowest.** The roster uses base Speed 88–110 (1.25×), which under the square-root gauge is a
+  **1.118× turn ratio** (`TurnManager.FillRateForSpeed` 1049 vs 938); `BeastRosterTests` pins that
+  fill-rate ratio to 1.10–1.15, and the order below. The history of the rule:
+  **Until the authored-kits retune, the band was on the Speed stat: the fastest base Speed at most 1.15× the slowest.**
   Under the ATB gauge (decision 3) Speed is an action economy (twice the Speed is twice the turns),
   so the first pass's 40–120 spread gave Thunderbird three turns for each of Golem's, and no amount
   of bulk made up for it: the slow Vanguards were bottom three nearly everywhere. The user expects
@@ -1028,12 +1323,19 @@ simulator. The drafting rules:
   ("target ~2.5–3× slowest:fastest"), which that research marked unsourced (no source gives a target
   ratio) and left for the simulator to validate. The simulator did not bear it out, and the genre's
   answer for slow tanks is taunt/threat and damage reduction rather than speed (same research, §4).
-  Within the band the archetypes keep their **order** (Thunderbird 105 > Griffin 104 > Basilisk 102
-  > Phoenix 101 > Kirin 100 > Frost Wyrm 98 > Tarasque 97 > Leviathan 95 > Treant 94 > Golem 92),
-  and the budget Speed no longer takes went into the slow beasts' other stats. The roster tests pin
-  the band and the order (Golem strictly slowest), so widening either is a deliberate design change.
+  Within the band the archetypes keep their **order** (now Thunderbird 110 > Griffin 108 > Basilisk
+  105 > Phoenix 104 > Kirin 101 > Frost Wyrm 99 > Tarasque 97 > Leviathan 94 > Treant 92 > Golem
+  88). **Superseded by the square-root gauge (decision 3, second amendment):** the 10–15% target
+  applies to *turns*, which grow with `sqrt(Speed)`, so the old 1.14× Speed band (92–105) gave only
+  about 1.07× turns. The authored-kits retune widened Speed to 1.25× (1.118× turns) and replaced the
+  Speed-stat band test with the turn-ratio test above; the order test is unchanged (Golem strictly
+  slowest), so widening or reordering either is a deliberate design change.
 - **Move range in a small band (2–5)**, outside the budget. Griffin and Basilisk are the mobile
-  ends (5); Golem is the only 2.
+  ends (5); Golem is the only 2. Thunderbird moved from 4 to 3 in the element chart v2 follow-up
+  (as the fastest beast with Move 4 it reached the enemy alone and took its focus) and back to 4
+  when Thunder Talons went from range 1 to 2: at range 2 it fires from outside melee and, as a
+  Skirmisher, retreats to its reach with the leftover budget (see the tuning log, "Thunderbird range
+  vs move").
 - **Crit chance in a small band (0–25%)**, also outside the budget and not level-scaled (user-approved
   values; see "Variance and critical hits"). The roster tests pin the ten values and the band; the
   validator only requires a percent (0–100). "Range" in the archetypes means move range, the per-turn hex
@@ -1046,9 +1348,10 @@ simulator. The drafting rules:
 - **Stances follow the archetypes** (decision 8): the artillery-style casters (Phoenix, Kirin,
   Basilisk) are Ranged, the fast strikers (Thunderbird, Griffin) Skirmishers, and the five tanks and
   bruisers hold the line as Vanguards. The roster tests pin all ten.
-- **Skills, evolutions and customization are empty.** No skills have been authored yet, so every
-  species' `LearnableSkills` and `EvolutionOptions` are empty and `CustomizationSchema` and `Icon`
-  are unset. The importer never touches those fields, so authoring them on the assets later is safe.
+- **Evolutions and customization are empty.** Every species' `EvolutionOptions` is empty and
+  `CustomizationSchema` and `Icon` are unset. Skills are authored in the skill library (see "Beast
+  skill kits"), whose importer fills `LearnableSkills` and `DefaultLoadout`; the roster importer
+  never touches any of those fields.
 
 ### Growth-curve semantics — DECIDED FOR AUTHORED DATA
 
@@ -1106,6 +1409,500 @@ Beast Roster**. The importer (`BeastCraft.Editor.Data.BeastRosterImporter`):
 The generated assets (and their `.meta` files) are produced on the first Editor run; none are
 committed yet. `SpeciesId` and `CurveId` follow the never-rename-after-ship rule; the roster tests pin
 the ten approved species ids.
+
+## Skill progression — TUNABLE STARTING DEFAULTS, NOT CONFIRMED BALANCE
+
+**Decided by the user:** a beast equips **3 skills** chosen from a growing pool of skills it has
+**acquired**, and the lineup can be changed between battles. Skills **improve slowly** through play,
+by two routes together: **practice XP** from using the skill in battle, on a slow curve, and rarer
+**materials** that add XP and are required to pass **tier breakthroughs**. The same model is meant
+for the avatar's passive skills, so it is built generically (the avatar now uses it: see "Avatar
+passives"). The numbers below are
+engineering defaults, all constants or authored fields, and cheap to retune.
+
+**Data model.** Everything generic lives in the `BeastCraft.Progression` namespace:
+
+- `SkillProgressionDefinition` (serializable, embedded in `SkillSO.Progression`): `MaxLevel`
+  (default 20), `MagnitudeGrowthPerLevel` (percent, default 3) and `Tiers`, a list of
+  `SkillTierDefinition` gates in ascending order (defaults: levels 5 / 10 / 15 needing material tiers
+  1 / 2 / 3). Each gate has a `ThresholdLevel`, a `RequiredMaterialTier`, and optional bonuses:
+  `CooldownReduction` (turns) and `BonusEffects` (extra `SkillEffect`s). It is a separate block
+  rather than loose fields on `SkillSO` so any skill-definition type can carry one and reuse the
+  same rules.
+- `SkillProgress` (serializable save data, like the roster DTOs): `SkillId`, `Level`, `Xp`, `Tier`
+  (gates passed).
+- `SkillMaterialSO` (asset): `MaterialId` (never rename after ship), `DisplayName`, `Description`,
+  `Icon`, `Tier`, `XpValue`.
+- `BeastSkillBook` (serializable save data): `Known` (one `SkillProgress` per acquired skill) and
+  `Equipped`, `EquipSlotCount = 3` skill ids by slot. **Slot order is fire priority.** Its equip and
+  practice rules live on the abstract `SkillBook` base, which the avatar's `AvatarActiveSkillBook`
+  and `AvatarPassiveSkillBook` share (see "Avatar passives"); the saved fields are unchanged.
+- `SkillProgression` (static rules), `SkillBreakthroughResult` and `SkillEquipResult` (explicit enum
+  values, never renumbered).
+
+**The XP curve.** `XpToNextLevel(level) = round(100 × level^1.5)`: 100 XP for level 1→2, 800 for
+4→5, 3,162 for 10→11, 8,282 for 19→20. Cumulative, reaching level 5 takes 1,703 XP, level 10
+11,106 XP and level 20 67,135 XP. Practice is a flat **10 XP per use**, where a use is a slot that
+**fired** (whiffs count, held slots do not), with at most **20 uses credited per award**. Callers
+award once per battle, so that is a per-battle cap that stops a long fight with a cooldown-0 skill
+being farmed. On practice alone that is 171 uses to level 5, 1,111 to level 10 and 6,714 to level
+20. That is deliberately slow, and materials are the accelerator. `SkillProgression.ApplyMaterial` adds
+a material's `XpValue`; any tier of material can be fed.
+
+**Gates.** A skill levels while its XP covers the next level, up to its **level cap**: the next
+unpassed gate's threshold, or `MaxLevel` once every gate is passed. At a gate the skill stops. XP
+keeps banking there but only up to one level's worth (`XpToNextLevel(level)`), and the rest is
+discarded. That way practice done while waiting on a material is not wholly lost, but it cannot be
+stockpiled. At `MaxLevel` XP is held at 0. `SkillProgression.TryBreakthrough(progress, definition,
+material)` passes the gate when the skill is at its threshold and the material's tier is at least
+the gate's `RequiredMaterialTier` (a higher tier also works). The tier then goes up by one and the
+bank immediately buys the next level if it is full. A breakthrough does not add the material's XP.
+On failure (`NoTierRemaining`, `BelowThreshold`, `MaterialTierTooLow`, `MissingInput`) nothing
+changes and the caller keeps the material. A gate authored at or past `MaxLevel` blocks nothing but
+still grants its bonuses: a "mastery" gate.
+
+**Acquisition and equipping.** `BeastSkillBook.Learn(skill)` acquires a skill at level 1, tier 0
+(re-learning never resets progress). `LearnAvailable(species, beastLevel)` learns every
+`CreatureSpeciesSO.LearnableSkills` entry at or below the beast's level, which is the level-up
+source. Drops and rewards will call `Learn` directly later. `Equip(slot, skillId)` refuses an
+out-of-range slot, an unknown skill, or a skill already in another slot (a skill occupies at most one
+slot). `Unequip` empties a slot, `SwapSlots` reorders priority, and slots may be empty.
+
+**How a level reaches the battle.** `SkillInstance` (in `BeastCraft.Battle`) is a skill at a level
+and tier. It is immutable, clamped to the definition, and captured when the loadout is built.
+`SkillLoadout` slots hold instances, `SkillActivation.Instance` carries one, and
+`SkillEffectApplier` reads its `Effects` (the authored effects, then each passed gate's
+`BonusEffects`) and scales every magnitude by
+`1 + MagnitudeGrowthPerLevel / 100 × (level − 1)` before use. That scaled number is the power handed
+to `DamageFormula` (so a level-11 skill at the defaults hits for 1.3× the power, and 1.57× at level
+20), the heal amount, or the buff/debuff size. Durations are not scaled. A slot's cooldown is the
+authored `Cooldown` less every passed gate's `CooldownReduction`, clamped at 0.
+`BattleUnitFactory.BuildLoadout(book, skillLookup)` and a `CreateBeast` overload build the loadout
+from a skill book. Equipped slots come in slot order at their recorded level and tier, and empty or
+unresolvable slots close up. **Level 1, tier 0 is the authored skill exactly**: the plain
+`new SkillLoadout(SkillSO[])` path and `new SkillActivation(skill, targets)` still build level-1
+instances, and the multiplier is not applied at all at level 1. Existing behaviour, tests and the
+simulator (which still fights level-1 kits) are therefore unchanged.
+
+**After a battle.** `BattleSkillUsage.CountFiredSkills(result, avatar)` reads a `BattleResult` into
+unit id → skill id → uses. Only fired slots count. The avatar's casts are counted under its id only
+when the avatar is passed in, because avatar activations carry no caster. `CountFiredSkillsFor(result,
+unitId)` returns one unit's counts, and `BeastSkillBook.AwardPractice(uses, skillLookup)` credits them
+to the book's known skills.
+
+**Open questions.** Whether practice should need a hit (or scale with damage dealt) rather than a
+fire. Whether enemy-side or defeated beasts earn practice. The material economy (drop rates, how
+material XP compares with practice). Whether stat changes should scale per level like damage (they
+truncate to whole points, so small buffs grow in steps). Whether the slow curve suits the narrative
+pacing. There is no inventory yet, so consuming a material is the caller's job. No UI, no save
+system and no authored materials or tier bonuses exist yet.
+
+## Avatar passives — TUNABLE STARTING DEFAULTS, NOT CONFIRMED BALANCE
+
+**Decided by the user:** the avatar does not fight on the grid. It keeps its active support skills
+(decision 6) and gains **3 passive slots**, which are its main role. Passives are acquired and
+leveled slowly through play on **the same progression model as beast skills** (practice XP,
+materials, tier breakthroughs), and so are the avatar's active skills. The trigger semantics, hook
+points, gating order and scopes below are engineering defaults chosen by the lead. The first passive
+content (10 passives across every trigger) is in the skill library; see "Beast skill kits".
+
+**Data** (explicit enum values, never renumbered; ids never renamed after ship):
+
+- `PassiveSkillSO` (`Runtime/Avatar`, namespace `BeastCraft.Avatar`): `PassiveId` (stable save key),
+  `DisplayName`, `Description`, `Icon`, `Progression` (the shared `SkillProgressionDefinition`
+  block), `Trigger`, `HpThresholdPercent` (default 50), `ProcChance` (percent, default 100),
+  `MaxTriggersPerBattle` (0 = unlimited), `InternalCooldown` (avatar ticks), `TargetScope`,
+  `Element` and `Category` (for damage effects, as on `SkillSO`), and `Effects` (a
+  `List<SkillEffect>`: the whole effect engine).
+- `PassiveTrigger`: `Aura = 0`, `BattleStart = 1`, `EnemyDefeated = 2`, `AllyDefeated = 3`,
+  `AllyCrit = 4`, `AllyTurnStart = 5`, `AllyBelowHpPercent = 6`.
+- `PassiveTarget`: `AllAllies = 0`, `TriggeringUnit = 1`, `AllEnemies = 2`,
+  `LowestHpFractionAlly = 3`.
+- `AvatarSkillBook` (`BeastCraft.Progression`, save data): `Actives` (`AvatarActiveSkillBook`,
+  `ActiveSlotCount = 3`) and `Passives` (`AvatarPassiveSkillBook`, `PassiveSlotCount = 3`). Both
+  are `SkillBook`s, the abstract base `BeastSkillBook` now derives from, so the equip rules are
+  written once: only known ids, no duplicates, empty slots allowed, slot order is priority.
+- Battle: `PassiveInstance` (a passive at a level and tier, plus its per-battle trigger count,
+  cooldown and threshold latches), `PassiveLoadout` (the equipped passives in slot order, and the
+  trigger rules), `PassiveActivation` (one firing: passive, slot, trigger, triggering unit, and the
+  `SkillActivation` its effects went through). `BattleTurnResult.PassiveActivations` and
+  `BattleResult.OpeningPassiveActivations` record every firing.
+
+**One engine.** A passive is applied exactly like a fired skill. Its instance wraps a private
+carrier `SkillSO` (sharing the passive's effects, progression, element and category) in a
+`SkillInstance` at the passive's level and tier, and `SkillEffectApplier` applies it **with the
+avatar as the caster**: damage uses the avatar's attacking stat and crit chance, a shield the
+avatar's `Defense`, a heal the avatar's `SpecialAttack`. So every magnitude scales with the passive's level by the same
+`1 + MagnitudeGrowthPerLevel / 100 × (level − 1)`, each passed gate's `BonusEffects` are appended,
+and chance, resistance, statuses and multi-hit behave as they do for skills. A gate's
+`CooldownReduction` means nothing to a passive. Knockback on a passive pushes away from the
+avatar's placeholder tile and should not be authored (a content convention, not a runtime check).
+
+**Hook points** (in `BattleTurnExecutor`; nothing runs without an avatar and a non-empty loadout):
+
+1. **Battle start** (`BattleTurnExecutor.BeginBattle`, which `RunBattle` calls before the first
+   turn): every `Aura` passive in slot order, then every `BattleStart` passive in slot order. A
+   caller driving `ExecuteTurn` itself should call `BeginBattle` once; if it does not, the first
+   turn runs it.
+2. **Each turn**, after `StatusEffects.BeginTurn` (damage-over-time): the after-damage check. Then,
+   on a player beast's turn it survived (stunned or not), every `AllyTurnStart` passive with that
+   beast as the triggering unit, **before its skills**.
+3. **After every skill a beast fires**: the after-damage check, with that skill's hits.
+4. **The avatar tick** (player beasts' turns only, as before): every passive's internal cooldown
+   ticks down once, then the avatar's actives fire, each followed by the after-damage check.
+
+**The after-damage check** handles, in order, each trying its passives in slot order:
+
+- `AllyCrit`: once per critical hit landed by the player beast whose skill it was (the crit-landing
+  beast is the triggering unit). The avatar's own crits, active or passive, are not ally crits.
+- Defeats: every unit defeated since the last check, in roster order. `AllyDefeated` for a player
+  beast (the fallen beast is the triggering unit, so pair it with `AllAllies` or
+  `LowestHpFractionAlly`, not `TriggeringUnit`); `EnemyDefeated` for an enemy (the triggering unit is
+  the beast whose turn it is when that is a living player beast — it gets the credit, even for an
+  avatar active's kill — and otherwise none).
+- `AllyBelowHpPercent`: every living player beast, in roster order, **strictly below** the passive's
+  threshold (`CurrentHp × 100 < HpThresholdPercent × Stats.Hp`, integers). It fires **once per
+  crossing**: the passive latches that beast on the attempt (whether or not the attempt fires) and
+  re-arms it only when the beast is next seen at or above the threshold. Checking after every
+  application, on any side's turn, rather than only at the beast's turn start was chosen so an
+  emergency passive can answer the hit that caused the crossing.
+
+Passives therefore react on enemy turns too (an ally falling, an ally dropping low, an enemy dying
+to its own damage-over-time), but their cooldowns only tick on avatar ticks.
+
+**Gating**, checked in this order each time a passive's trigger happens: not spent
+(`MaxTriggersPerBattle`), off its internal cooldown, at least one target in its scope, then the
+`ProcChance` roll. A blocked or failed attempt changes nothing (no count, no cooldown). A firing
+counts toward the cap and sets the cooldown to `InternalCooldown`; each avatar tick takes one off.
+Because the tick comes at the end of each player beast's turn, a passive with cooldown `N` that
+fires at a player beast's turn start is ready again at the `N`-th player-beast turn start after
+that one (enemy turns in between do not count). `ProcChance` of 0 or below, or above 100, reads as 100, like
+`SkillEffect.Chance`.
+
+**No chaining.** A unit defeated by a passive's own effect is recorded silently: it never triggers
+`EnemyDefeated` or `AllyDefeated`, and a passive's crits are not `AllyCrit`s. That bounds the
+passives any one event can set off. (HP thresholds are state, not events, so a crossing caused by a
+passive is seen at the next check.)
+
+**Target scopes** are all position-free and draw-free: `AllAllies` and `AllEnemies` are the living
+units of that side in id order (the resolver's global shapes); `LowestHpFractionAlly` is the living
+player beast with the lowest `CurrentHp / Stats.Hp`, compared exactly by cross-multiplication with
+the id tie-break (the resolver's `HpFraction` pick); `TriggeringUnit` is the trigger's unit when it
+is alive. A passive with no one to land on does not fire.
+
+**"Lasts the battle."** An `Aura` is applied once, at battle start, before anything else. Its stat
+changes should be authored with `DurationTurns` 0: the effect engine applies such a change to the
+stat block permanently and never reverts it, which is how an aura lasts the whole battle (a
+"+5% crit to all allies" aura is `BuffStat` `CritChance` 5, duration 0, on `AllAllies`). A
+`BattleStart` passive is the same one-shot but meant for timed effects (an opening shield, a
+two-turn buff), which keep their authored durations.
+
+**The rng.** A passive adds exactly one draw, its `ProcChance` roll, and only when the chance is
+below 100 and every other check has passed; its effects then draw as any skill's would (crit and
+variance per damage hit, a chance roll per uncertain non-damage effect). Draws happen at the hook
+point, in the order above. With no passives nothing draws that did not before: existing battles, the
+EditMode suite and the simulator's committed report are unchanged.
+
+**Practice XP.** `BattleSkillUsage.CountPassiveTriggers(result)` counts firings per `PassiveId`
+(opening firings included) and `CountAvatarActiveUses(result)` counts the avatar's active casts per
+`SkillId`. `AvatarSkillBook.AwardPractice(activeUses, activeLookup, passiveTriggers, passiveLookup)`
+credits both books on the ordinary rules: 10 XP per use, at most 20 uses per award. A passive's use
+is a time it fired; blocked triggers and failed proc rolls are not uses.
+
+**Simulator.** `--avatar library|support|none` (default `library`, the authored default avatar, see
+"Beast skill kits"; the committed report uses it since the authored-kits retune).
+`support` is a fixture, not content: a +5 crit aura, a two-turn Defense shield on a beast that
+drops below 40% (cooldown 2), and a 50% chance of a two-turn +10% Attack surge for the team on each
+enemy defeat. Either preset's avatar has a fixture stat block: 100 in every combat stat at max
+level, scaled by the roster's `medium` growth curve like a beast's (15 at level 1, 57 at level 50),
+so its shields and heals are the same share of a beast's HP at every level. (Until heals scaled it
+was `10 + level`, which made level-1 avatar heals and shields relatively weak.) The report then gains an
+"Avatar passives" section with firings per battle. The simulator's own loop calls `BeginBattle` and
+passes the passives to every turn, so `--self-check` still compares it against `RunBattle`.
+
+**Open questions.** Whether passive-caused defeats should chain (currently never). Whether the
+avatar's own crits should count as `AllyCrit`. Whether `EnemyDefeated` should credit the unit that
+dealt the blow rather than the unit whose turn it is (they differ for damage-over-time and avatar
+kills). Whether a failed proc roll should consume the threshold crossing. Whether internal cooldowns
+should run on the avatar's own clock if the avatar ever gets a gauge (decision 6's open item).
+How passives are acquired (drops, quests, avatar milestones) and the passive material economy. No
+passive UI or save system exists yet.
+
+## Beast skill kits — SIMULATOR-TUNED CONTENT, NOT CONFIRMED BALANCE
+
+Every authored skill lives in **`BeastCraft/Assets/_Project/Data/Skills/skill-library.json`**, the
+same JSON-as-source-of-truth pattern as the roster (see "JSON is the source of truth" above): 60 beast
+skills (six per beast), 6 avatar actives, 10 avatar passives, 3 skill materials, and per species its
+`LearnableSkills` (level → skill id) and `DefaultLoadout` (3 skill ids in slot, i.e. fire-priority,
+order). The numbers started as a first draft that followed the budget rule below, and were then
+**tuned against the balance simulator together with the roster** (the authored-kits retune; see
+[`docs/balance/tuning-log.md`](../balance/tuning-log.md), "Retune with authored kits, avatar
+passives, sqrt speed and mitigation", which lists every changed number). They are still not
+confirmed balance.
+
+**Data and tooling.** The C# shape is `BeastCraft.Skills.SkillLibraryData` (Runtime; enums written as
+member names; a missing `TargetingCriterion` means `Distance` — the nearest unit — not `SkillSO`'s
+`Random`, so authored skills never spend the rng on targeting, and the validator rejects `Random`).
+`SkillLibraryBuilder` is the one DTO → `SkillSO` / `PassiveSkillSO` / `SkillMaterialSO` mapping,
+shared by the Editor importer and the simulator. `SkillLibraryValidator` holds the structural rules:
+ids unique across the whole file and snake_case; every reference resolves; every enum parses;
+numbers in sane bands (power 0–400, chance 1–100, cooldown 0–10, hits 1–8, stacks 1–10, execute
+0–200, knockback 1–4 whole hexes, a timed status needs a duration, damage and heals are instant);
+avatar actives use only `Self` / `AllAllies` / `AllEnemies` and never knockback; tier gates rise
+and name an existing material tier; cooldown reductions never take a cooldown below 1; every
+species learns at least 5 skills, its 3 defaults are learnable by level 5, and at least one default is
+an enemy-side `SingleTarget` or `Line` skill (the only kind that walks a beast forward — a kit
+without one never moves). Given the roster it also checks that kits and species match one to one and
+that a **Ranged** beast's defaults hold no enemy-side positional skill of range 1 (it would never walk
+in to use it). The content guidelines — five or six skills per beast, each beast's signature
+mechanics, the tier pattern, the power budget — are EditMode tests (`SkillLibraryTests`), not
+validator rules, so the balance pass can move them.
+
+**Workflow:** edit the JSON, then in Unity run **Beast Craft → Data → Import Beast Roster** and then
+**Beast Craft → Data → Import Skill Library**. The importer
+(`BeastCraft.Editor.Data.SkillLibraryImporter`) validates first (all-or-nothing), creates or updates
+in place a `SkillSO` per beast skill (`Data/Skills/Beast/`) and avatar active
+(`Data/Skills/AvatarActive/`), a `PassiveSkillSO` per passive (`Data/Skills/AvatarPassive/`) and a
+`SkillMaterialSO` per material (`Data/Skills/Materials/`), matched by id anywhere in the project
+(GUIDs survive), and replaces each species asset's `LearnableSkills` and new `DefaultLoadout` list.
+It never touches an asset's `Icon` and never deletes. No generated assets are committed yet.
+
+**Honest mechanics.** Every effect uses only what the engine has. There is no revive, cleanse,
+evasion, pull or counter-attack mechanic, so the kits say so: Phoenix's "Rebirth Flame" is a
+once-per-battle self heal and large shield; Kirin's "Purifying Ward" is a team shield and Special
+Defense boost; Griffin's "evasion" is a Defense / Special Defense / MoveRange self-buff; Leviathan's
+"Undertow" pull is a taunt plus slow; Tarasque's "counter" stance is a Defense / Attack fortify.
+Freeze and root are `Stun`, Burn and Poison are `DamageOverTime`.
+
+**Heals are a percent of the caster's `SpecialAttack`** (× `HealScale`, 1.0; see "Effect
+application"), as shields are a percent of its `Defense`. Until the authored-kits retune they were
+flat HP, sized for level 50, so a heal restored 50–90% of a beast's HP at level 1 and 7–14% at
+level 100. When heals started scaling, every heal magnitude was rescaled so that it restores about
+what it did at level 50 for its caster (`new = old × 100 / caster's level-50 SpecialAttack`), and
+then retuned with the rest of the kits. Because `SpecialAttack` and HP grow on the same curve, a
+beast's heal on itself now restores the same share of its HP at level 1, 50 and 100, up to
+whole-HP rounding at level 1 (the test `Library_BeastHealsRestoreAboutTheSameShareOfHpAtEveryLevel`
+holds the drift within 5 points; the tuning log has the table).
+
+### The power budget (first draft)
+
+Damage per cooldown turn, **DPT = Σ(power × hits × (1 + execute / 200)) + Σ(DoT power × turns × 0.5 ×
+chance), × shape factor, ÷ max(1, cooldown)**. Shape factor: `SingleTarget` 1.0, `Line` 1.3, `Cross`
+1.5, `AreaBurst` 1.5 at radius 1 and 2.0 at radius 2+, `AllEnemies` 2.5 (rough expected targets).
+The execute term assumes the target is on average half dead; DoT counts half because it is delayed
+and can be outlived.
+
+- **Budget per slot:** a pure damage skill aims at **DPT ≈ 90 at range 1** and **≈ 70 at range 2+**
+  — exactly the standard kit's Strike / Blast parity, so a library kit and the standard kit start in
+  the same place.
+- **Role scaling:** tanks and supports ≈ 0.8× (low damage by design), glass cannons and burst
+  strikers ≈ 1.1×.
+- **Utility trades damage:** a damage skill with a rider (a debuff, a knockback, a low-chance stun,
+  a DoT) sits around 0.75× its budget; one with hard control (stun ≥ 30%) or a taunt around 0.3–0.5×;
+  pure utility (heal, shield, buff, taunt) carries no damage.
+- **Limited-use openers** (`MaxUsesPerBattle` > 0, often `InitialCooldown` 0) may exceed the per-turn
+  budget per use (Storm Dive is 120 power once), since they cannot repeat.
+- **Tiers stay modest:** gates at levels 5 / 10 / 15 needing material tiers 1 / 2 / 3; the level-10
+  gate adds a small bonus effect and the level-15 gate either takes 1 off a cooldown of 3 or more or
+  adds another small effect (never −1 on a cooldown-2 damage skill, which would double it). Levels
+  add 3% magnitude each (1.57× at level 20), per the progression defaults.
+
+The test `Library_UnlimitedDamageSkillsStayWithinTheFirstDraftPowerBudget` holds every unlimited
+damage skill at or below 1.2× its budget. The "Dmg/turn" column below is this DPT.
+
+**After the retune** (and the element chart v2 follow-up) the rule's numbers are unchanged, and
+every unlimited damage skill still sits at or below 1.2× its budget. These defaults sit above their
+role-scaled guide, deliberately:
+
+- **Golem's Boulder Slam** is 90 (1.0× the melee budget, above a tank's ≈ 0.8×; 85 before chart
+  v2). The slowest beast with Move 2 lands it less often than any other melee skill, and at 75 the
+  Golem was bottom three in every shape.
+- **Leviathan's Serpent Bite** is 86 (0.96×, above a tank's ≈ 0.8×; 82 before chart v2).
+- **Thunderbird's Thunder Talons** is 26 × 3 = 78 at range 2 (1.11×, the rule's burst-striker
+  figure) and **Chain Lightning** 22 × 3 at radius 2, cooldown 2 = 66 (0.94×). Both were 28 × 3 =
+  84 (the 1.2× ceiling) until the niche pass, which put the once-per-battle **Storm Dive** (120,
+  was 230) in the default loadout in place of Static Charge; with a real third slot the ceiling
+  numbers made the Thunderbird the strongest `neutral` beast, so both came down. Talons was
+  36 × 3 = 108 at range 1 until "Thunderbird range vs move". See the tuning log, "Niche pass".
+- **Tarasque's Iron Crush** is 160 on cooldown 2 (80, 0.89× the melee budget; 148 before the
+  niche pass), **Basilisk's Coup de Grace** 115 with a 60% execute (75, 1.07×; 105 before), and
+  **Kirin's Radiant Bolt** 66 (0.94×, above a support's ≈ 0.8×; 62 before): small lifts from the
+  niche pass, each well inside the ceiling.
+
+Two utility numbers moved past the first-draft guideline, both paid for in damage: Basilisk's
+Petrifying Gaze stuns at 45% (hard control on 45 power at cooldown 3, 0.21× the ranged budget), and
+Golem's Granite Bulwark shields every ally within 2 hexes for 85% of the Golem's Defense every 3
+turns (70% before element chart v2; the shield carries the tank's value, see the tuning log).
+
+### Kits
+
+**Default loadouts** follow the role: tanks = damage (the approach skill, first so the others fire
+from the tile it walked to) + taunt + mitigation; supports = heal + buff/shield + damage; damage
+dealers = two damage skills + one utility (the Thunderbird's third slot is its once-per-battle
+Storm Dive opener instead, since the niche pass). Learn levels spread from 1 to 60; every default is
+learnable by level 5.
+
+#### Phoenix — Fire, Ranged
+
+| Skill | Learn | Default | Shape | Cat. | Cd | Effects | Dmg/turn | Tier bonuses |
+| --- | ---: | :---: | --- | --- | ---: | --- | ---: | --- |
+| Ember Shot `ember_shot` | 1 | slot 1 | SingleTarget r3 | Special | 1 | Damage 60; DoT 14 3t, stacks x3 | 81 | L10: adds -5% SpecialDefense 2t; L15: adds Damage 15 |
+| Flame Wave `flame_wave` | 1 | slot 2 | Line r4 | Special | 2 | Damage 90; DoT 10 2t (50%) | 62 | L10: adds -8% SpecialDefense 2t; L15: adds DoT 10 2t |
+| Rebirth Flame `rebirth_flame` | 4 | slot 3 | Self | - | 4 (1/battle) | Heal 44; Shield 80% Def 3t | - | L10: adds +15% SpecialAttack 3t; L15: adds +10% Speed 3t |
+| Blaze Bolt `blaze_bolt` | 12 |  | SingleTarget r4 | Special | 2 | Damage 150 | 75 | L10: adds DoT 15 2t; L15: adds -10% SpecialDefense 2t |
+| Firestorm `firestorm` | 30 |  | AllEnemies | Special | 4 | Damage 40; DoT 12 2t, stacks x3 | 32 | L10: adds -8% SpecialDefense 2t; L15: -1 cd |
+| Sunfire Nova `sunfire_nova` | 55 |  | Cross r3 | Special | 3 | Damage 110; DoT 15 3t | 66 | L10: adds -10% SpecialDefense 2t; L15: -1 cd |
+
+#### Leviathan — Water, Vanguard
+
+| Skill | Learn | Default | Shape | Cat. | Cd | Effects | Dmg/turn | Tier bonuses |
+| --- | ---: | :---: | --- | --- | ---: | --- | ---: | --- |
+| Serpent Bite `serpent_bite` | 1 | slot 1 | SingleTarget r1 | Physical | 1 | Damage 86 | 86 | L10: adds -8% Attack 2t; L15: adds DoT 10 2t |
+| Undertow `undertow` | 1 | slot 2 | AreaBurst r3 | - | 3 | Taunt 2t (85%); -10% Speed 2t | - | L10: adds -10% SpecialAttack 2t; L15: -1 cd |
+| Deep Shell `deep_shell` | 3 | slot 3 | Self | - | 3 | Shield 65% Def 3t; Heal 24 | - | L10: adds +15% SpecialDefense 3t; L15: -1 cd |
+| Tidal Wave `tidal_wave` | 8 |  | Line r3 | Special | 2 | Damage 90; Knockback 1 hex (50%) | 58 | L10: adds -10% Speed 2t; L15: adds -8% SpecialDefense 2t |
+| Maelstrom `maelstrom` | 30 |  | AreaBurst r2 | Special | 3 | Damage 70; -15% SpecialDefense 2t | 47 | L10: adds DoT 10 2t; L15: -1 cd |
+| Tidal Renewal `tidal_renewal` | 50 |  | AreaBurst (ally) r2 | - | 4 | Heal 29; +10% Defense 2t | - | L10: adds Shield 20% Def 2t; L15: -1 cd |
+
+#### Golem — Earth, Vanguard
+
+| Skill | Learn | Default | Shape | Cat. | Cd | Effects | Dmg/turn | Tier bonuses |
+| --- | ---: | :---: | --- | --- | ---: | --- | ---: | --- |
+| Boulder Slam `boulder_slam` | 1 | slot 1 | SingleTarget r1 | Physical | 1 | Damage 90 | 90 | L10: adds -10% Speed 2t (50%); L15: adds Knockback 1 hex |
+| Stone Challenge `stone_challenge` | 1 | slot 2 | AreaBurst r3 | - | 3 | Taunt 3t (90%) | - | L10: adds -10% Attack 2t; L15: -1 cd |
+| Granite Bulwark `granite_bulwark` | 3 | slot 3 | AreaBurst (ally) r2 | - | 3 | Shield 85% Def 2t | - | L10: adds +10% SpecialDefense 2t; L15: -1 cd |
+| Tectonic Shove `tectonic_shove` | 12 |  | SingleTarget r1 | Physical | 2 | Damage 70; Knockback 2 hex | 35 | L10: adds -10% Defense 2t; L15: adds Stun 1t (10%) |
+| Quake `quake` | 25 |  | AreaBurst r2 | Physical | 3 | Damage 80; -15% Speed 2t (40%) | 53 | L10: adds Stun 1t (10%); L15: -1 cd |
+| Stoneskin `stoneskin` | 40 |  | Self | - | 4 | +25% Defense 3t; +25% SpecialDefense 3t | - | L10: adds Shield 30% Def 2t; L15: -1 cd |
+
+#### Griffin — Air, Skirmisher
+
+| Skill | Learn | Default | Shape | Cat. | Cd | Effects | Dmg/turn | Tier bonuses |
+| --- | ---: | :---: | --- | --- | ---: | --- | ---: | --- |
+| Gale Talon `gale_talon` | 1 | slot 2 | SingleTarget r1 | Physical | 1 | Damage 89 | 89 | L10: adds -8% Defense 2t; L15: adds Damage 20 |
+| Wind Lance `wind_lance` | 1 | slot 1 | Line r3 | Physical | 2 | Damage 110 | 72 | L10: adds Knockback 1 hex; L15: adds -10% Speed 2t |
+| Gust `gust` | 3 | slot 3 | AreaBurst r1 | Physical | 3 | Damage 55; Knockback 2 hex | 28 | L10: adds -10% Speed 2t; L15: -1 cd |
+| Tailwind `tailwind` | 12 |  | Self | - | 4 | +20% Defense 2t; +20% SpecialDefense 2t; +1 MoveRange 2t | - | L10: adds +10% Speed 2t; L15: -1 cd |
+| Updraft `updraft` | 28 |  | AllAllies | - | 5 | +10% Speed 2t; +1 MoveRange 2t | - | L10: adds +5% Attack 2t; L15: -1 cd |
+| Sky Rend `sky_rend` | 50 |  | SingleTarget r1 | Physical | 2 | Damage 175; -10% Defense 2t | 88 | L10: adds DoT 12 2t; L15: adds Stun 1t (10%) |
+
+#### Thunderbird — Lightning, Skirmisher
+
+| Skill | Learn | Default | Shape | Cat. | Cd | Effects | Dmg/turn | Tier bonuses |
+| --- | ---: | :---: | --- | --- | ---: | --- | ---: | --- |
+| Thunder Talons `thunder_talons` | 1 | slot 1 | SingleTarget r2 | Physical | 1 | Damage 26 x3 hits | 78 | L10: adds -5% Defense 2t, stacks x3; L15: adds Damage 25 |
+| Chain Lightning `chain_lightning` | 1 | slot 2 | AreaBurst r2 | Special | 2 | Damage 22 x3 hits | 66 | L10: adds Stun 1t (10%); L15: adds -8% SpecialDefense 2t |
+| Static Charge `static_charge` | 3 |  | Self | - | 4 | +25 CritChance 3t; +10% Speed 3t | - | L10: adds +10% Attack 3t; L15: -1 cd |
+| Storm Dive `storm_dive` | 5 | slot 3 | SingleTarget r3 | Physical | 4 (first turn, 1/battle) | Damage 120 | 30 | L10: adds Stun 1t (25%); L15: adds -15% Defense 2t |
+| Thunderclap `thunderclap` | 25 |  | AreaBurst r1 | Special | 3 | Damage 70; Stun 1t (20%) | 35 | L10: adds -10% Speed 2t; L15: -1 cd |
+| Plasma Barrage `plasma_barrage` | 50 |  | Line r4 | Special | 2 | Damage 26 x4 hits | 68 | L10: adds -8% Defense 2t; L15: adds -8% SpecialDefense 2t |
+
+#### Frost Wyrm — Ice, Vanguard
+
+| Skill | Learn | Default | Shape | Cat. | Cd | Effects | Dmg/turn | Tier bonuses |
+| --- | ---: | :---: | --- | --- | ---: | --- | ---: | --- |
+| Rime Bolt `rime_bolt` | 1 | slot 1 | SingleTarget r2 | Special | 1 | Damage 52; -8% Speed 3t, stacks x3 | 52 | L10: adds -5% SpecialDefense 2t; L15: adds Stun 1t (10%) |
+| Deep Freeze `deep_freeze` | 1 | slot 2 | SingleTarget r2 | Special | 3 | Damage 60; Stun 1t (35%) | 20 | L10: adds -10% Speed 2t; L15: -1 cd |
+| Frost Breath `frost_breath` | 3 | slot 3 | AreaBurst r2 | Special | 2 | Damage 46; -10% Speed 2t (50%), stacks x3 | 46 | L10: adds Stun 1t (10%); L15: adds -8% SpecialDefense 2t |
+| Blizzard `blizzard` | 18 |  | Cross r3 | Special | 3 | Damage 90; -10% Speed 2t | 45 | L10: adds Stun 1t (15%); L15: -1 cd |
+| Ice Armor `ice_armor` | 35 |  | Self | - | 4 | Shield 45% Def 3t; +15% SpecialDefense 3t | - | L10: adds +10% Defense 3t; L15: -1 cd |
+| Absolute Zero `absolute_zero` | 60 |  | AllEnemies | Special | 5 (1/battle) | Damage 50; Stun 1t (20%) | 25 | L10: adds -15% Speed 2t; L15: adds -10% SpecialDefense 2t |
+
+#### Treant — Nature, Vanguard
+
+| Skill | Learn | Default | Shape | Cat. | Cd | Effects | Dmg/turn | Tier bonuses |
+| --- | ---: | :---: | --- | --- | ---: | --- | ---: | --- |
+| Thorn Lash `thorn_lash` | 1 | slot 1 | SingleTarget r2 | Special | 1 | Damage 40; DoT 10 3t, stacks x3 | 55 | L10: adds -8% Speed 2t (50%); L15: adds -8% SpecialDefense 2t |
+| Verdant Mend `verdant_mend` | 1 | slot 2 | SingleTarget (ally) r3, lowest HP% | - | 2 | Heal 40 | - | L10: adds Shield 20% Def 2t; L15: adds +10% Defense 2t |
+| Bark Ward `bark_ward` | 3 | slot 3 | AreaBurst (ally) r2 | - | 3 | Shield 30% Def 2t | - | L10: adds Heal 11; L15: -1 cd |
+| Entangling Roots `entangling_roots` | 8 |  | SingleTarget r2 | Special | 3 | Damage 50; Stun 1t (25%) | 17 | L10: adds -15% Speed 2t; L15: -1 cd |
+| Spore Cloud `spore_cloud` | 20 |  | AreaBurst r2 | Special | 3 | DoT 25 3t; -10% Attack 2t | 25 | L10: adds -10% SpecialAttack 2t; L15: -1 cd |
+| Lifebloom `lifebloom` | 45 |  | AllAllies | - | 4 | Heal 19; +10% Defense 2t | - | L10: adds +10% SpecialDefense 2t; L15: -1 cd |
+
+#### Tarasque — Metal, Vanguard
+
+| Skill | Learn | Default | Shape | Cat. | Cd | Effects | Dmg/turn | Tier bonuses |
+| --- | ---: | :---: | --- | --- | ---: | --- | ---: | --- |
+| Sunder `sunder` | 1 | slot 1 | SingleTarget r1 | Physical | 1 | Damage 65; -12% Defense 3t, stacks x3 | 65 | L10: adds -8% SpecialDefense 3t; L15: adds DoT 10 2t |
+| Iron Crush `iron_crush` | 1 | slot 2 | SingleTarget r1 | Physical | 2 | Damage 160 | 80 | L10: adds Stun 1t (15%); L15: adds -10% Defense 2t |
+| Iron Fortress `iron_fortress` | 4 | slot 3 | Self | - | 4 | +30% Defense 3t; +15% Attack 3t | - | L10: adds Shield 30% Def 2t; L15: -1 cd |
+| Spiked Carapace `spiked_carapace` | 15 |  | Self | - | 3 | Shield 40% Def 2t; +20% SpecialDefense 2t | - | L10: adds +10% Attack 2t; L15: -1 cd |
+| Shrapnel Burst `shrapnel_burst` | 30 |  | AreaBurst r1 | Physical | 2 | Damage 85; -8% Defense 2t (50%) | 64 | L10: adds DoT 10 2t; L15: adds -10% Speed 2t |
+| Juggernaut Charge `juggernaut_charge` | 55 |  | Line r2 | Physical | 3 | Damage 150; Knockback 1 hex | 65 | L10: adds Stun 1t (20%); L15: -1 cd |
+
+#### Kirin — Light, Ranged
+
+| Skill | Learn | Default | Shape | Cat. | Cd | Effects | Dmg/turn | Tier bonuses |
+| --- | ---: | :---: | --- | --- | ---: | --- | ---: | --- |
+| Sacred Spring `sacred_spring` | 1 | slot 1 | AllAllies | - | 3 | Heal 20 | - | L10: adds +8% SpecialDefense 2t; L15: -1 cd |
+| Blessing `blessing` | 1 | slot 2 | AllAllies | - | 4 | +12% SpecialAttack 2t; +12% SpecialDefense 2t | - | L10: adds +5 CritChance 2t; L15: -1 cd |
+| Radiant Bolt `radiant_bolt` | 3 | slot 3 | SingleTarget r3 | Special | 1 | Damage 66 | 66 | L10: adds -5% SpecialDefense 2t; L15: adds Damage 15 |
+| Judgment `judgment` | 15 |  | SingleTarget r4 | Special | 3 | Damage 190 | 63 | L10: adds Stun 1t (15%); L15: -1 cd |
+| Purifying Ward `purifying_ward` | 30 |  | AllAllies | - | 4 | Shield 25% Def 2t; +10% SpecialDefense 2t | - | L10: adds Heal 7; L15: -1 cd |
+| Halo `halo` | 50 |  | AreaBurst (ally) r2 | - | 3 | Heal 19; +10% Defense 2t | - | L10: adds Shield 20% Def 2t; L15: -1 cd |
+
+#### Basilisk — Dark, Ranged
+
+| Skill | Learn | Default | Shape | Cat. | Cd | Effects | Dmg/turn | Tier bonuses |
+| --- | ---: | :---: | --- | --- | ---: | --- | ---: | --- |
+| Venom Spit `venom_spit` | 1 | slot 1 | SingleTarget r3 | Special | 1 | Damage 45; DoT 15 3t, stacks x3 | 68 | L10: adds -5% SpecialDefense 2t, stacks x3; L15: adds Damage 15 |
+| Coup de Grace `coup_de_grace` | 1 | slot 2 | SingleTarget r3, lowest HP% | Special | 2 | Damage 115, execute +60% | 75 | L10: adds DoT 15 2t; L15: adds -10% Defense 2t |
+| Petrifying Gaze `petrifying_gaze` | 4 | slot 3 | SingleTarget r3 | Special | 3 | Damage 45; Stun 1t (45%) | 15 | L10: adds -15% Speed 2t; L15: -1 cd |
+| Eclipse Fang `eclipse_fang` | 12 |  | SingleTarget r3 | Special | 2 | Damage 32 x4 hits | 64 | L10: adds -8% SpecialDefense 2t; L15: adds Damage 20 |
+| Predator Focus `predator_focus` | 25 |  | Self | - | 4 | +20 CritChance 3t; +10% SpecialAttack 3t | - | L10: adds +10% Speed 3t; L15: -1 cd |
+| Miasma `miasma` | 40 |  | Cross r3 | Special | 3 | DoT 22 3t, stacks x2; -10% SpecialDefense 2t | 16 | L10: adds -10% Attack 2t; L15: -1 cd |
+
+#### Avatar actives
+
+| Skill | Default | Shape | Cd | Effects | Tier bonuses |
+| --- | :---: | --- | ---: | --- | --- |
+| Rallying Cry `rallying_cry` | slot 1 | AllAllies | 4 | +10% Attack 2t; +10% SpecialAttack 2t | L10: adds +5% Speed 2t; L15: -1 cd |
+| Mending Light `mending_light` | slot 2 | AllAllies | 3 | Heal 13 | L10: adds +5% SpecialDefense 2t; L15: -1 cd |
+| Aegis `aegis` | slot 3 | AllAllies | 4 | Shield 30% Def 2t | L10: adds +5% Defense 2t; L15: -1 cd |
+| Hex of Frailty `hex_of_frailty` |  | AllEnemies | 4 | -10% Defense 2t; -10% SpecialDefense 2t | L10: adds -5% Attack 2t; L15: -1 cd |
+| Battle Focus `battle_focus` |  | AllAllies | 5 | +8 CritChance 2t | L10: adds +5% Attack 2t; L15: -1 cd |
+| Slowing Field `slowing_field` |  | AllEnemies | 5 | -12% Speed 2t | L10: adds -5% Attack 2t; L15: -1 cd |
+
+#### Avatar passives
+
+| Passive | Default | Trigger | Scope | Proc % | Max / battle | Int. cd | Effects | Tier bonuses |
+| --- | :---: | --- | --- | ---: | ---: | ---: | --- | --- |
+| Keen Eye `keen_eye` | slot 1 | Aura | AllAllies | 100 | - | 0 | +5 CritChance | L10: adds +2 CritChance; L15: adds +2 CritChance |
+| Iron Will `iron_will` |  | Aura | AllAllies | 100 | - | 0 | +5% Defense; +5% SpecialDefense | L10: adds +2% Defense; L15: adds +2% SpecialDefense |
+| Opening Ward `opening_ward` | slot 2 | BattleStart | AllAllies | 100 | - | 0 | Shield 40% Def 2t | L10: adds +5% Defense 2t; L15: adds +5% SpecialDefense 2t |
+| Battle Hymn `battle_hymn` |  | BattleStart | AllAllies | 100 | - | 0 | +10% Speed 2t | L10: adds +5% Attack 2t; L15: adds +5% SpecialAttack 2t |
+| Withering Curse `withering_curse` |  | BattleStart | AllEnemies | 100 | - | 0 | -10% Defense 3t; -10% SpecialDefense 3t | L10: adds -5% Speed 3t; L15: adds -5% Attack 3t |
+| Bloodlust `bloodlust` |  | EnemyDefeated | AllAllies | 50 | - | 2 | +10% Attack 2t; +10% SpecialAttack 2t | L10: adds +5% Speed 2t; L15: adds +5 CritChance 2t |
+| Vengeance `vengeance` |  | AllyDefeated | AllAllies | 100 | 2 | 0 | +15% Attack 3t; +15% SpecialAttack 3t | L10: adds Shield 20% Def 2t; L15: adds +10% Speed 3t |
+| Storm Call `storm_call` |  | AllyCrit | AllEnemies | 30 | - | 3 | Damage 25 | L10: adds -5% Speed 1t; L15: adds -5% Defense 1t |
+| Verdant Pulse `verdant_pulse` |  | AllyTurnStart | TriggeringUnit | 50 | - | 0 | Heal 5 | L10: adds +3% Defense 1t; L15: adds +3% SpecialDefense 1t |
+| Last Stand `last_stand` | slot 3 | AllyBelowHpPercent < 40% | TriggeringUnit | 100 | - | 2 | Shield 80% Def 2t | L10: adds +10% Defense 2t; L15: adds +10% SpecialDefense 2t |
+
+#### Materials
+
+| Material | Tier | XP | Opens |
+| --- | ---: | ---: | --- |
+| Essence Shard `essence_shard` | 1 | 250 | the level-5 gate (and any lower) |
+| Essence Crystal `essence_crystal` | 2 | 1000 | the level-10 gate (and any lower) |
+| Essence Core `essence_core` | 3 | 4000 | the level-15 gate (and any lower) |
+
+### Simulator
+
+**The simulator's default is the real game setup:** `--skill-kit library` fields each beast's
+`DefaultLoadout` at `--skill-level` (default 1; the tier is the gates below that level, so 16+ has
+passed all three), in both element modes (`--kit neutral` forces the library skills' elements to
+`None`), and `--avatar library` fields the library's default avatar — its first three actives and
+`AvatarDefaultPassives` — at the same skill level. The committed `tuned-report.md` is that default.
+`--skill-kit standard` (with `--avatar none` to match the old setting) still fields the standard kit
+and its kit parity table, for measuring stat lines in isolation. (Before the retune the skill axis
+was `--kit standard|library`; `--kit` now takes only `elemental|neutral|both`.)
+
+**Open questions.** Whether
+taunt needs a resist or diminishing returns (the Golem's 90% area taunt now reaches 3 hexes and
+lasts 3 of the enemy's turns every 3 of its own, so a Golem that survives can keep a nearby enemy
+taunted almost permanently; bosses resist half of it). Whether one skill should be allowed on several species (the library
+allows it; this draft gives every skill exactly one owner). The resource cost (`ResourceCost`) is
+0 everywhere until the resource itself is designed.
 
 ## Next steps
 
@@ -1221,8 +2018,10 @@ across slots, and a null grid.
 The headless balance simulator (`Tooling/BalanceSim/`, see its README) is **local-only tooling, not a
 CI job**. It compiles the `Runtime` scripts against the committed UnityStub, reads
 `beast-roster.json` with `System.Text.Json`, and fights through the real `BattleUnitFactory`,
-`PlacementValidator`, `TurnManager` and `BattleTurnExecutor` on real `HexGrid`s. No skills are
-authored yet, so every beast fights with the same standard kit, rebalanced so `Attack` and
+`PlacementValidator`, `TurnManager` and `BattleTurnExecutor` on real `HexGrid`s. Since the
+authored-kits retune its default is the real game setup — every beast's authored default loadout and
+the library avatar (`--skill-kit library --avatar library`; see "Beast skill kits"). With
+`--skill-kit standard` every beast fights with the same standard kit instead, rebalanced so `Attack` and
 `SpecialAttack` weigh the same: Blast (special, power 40, range 3, cooldown 1), Strike (physical,
 power 55, range 1, cooldown 1; the extra power offsets range 1 firing about 0.73x as often as
 Blast) and a Burst split into equal physical and special halves (area, radius 2, power 20 each,
@@ -1342,17 +2141,66 @@ has three top-3 slots. Thunderbird is the most polarized beast (first against th
 against the horde). The tuning log has the before/after stats, the multi-seed tables, the fixed-set
 sanity check and the iteration log.
 
+**Square-root speed and the mitigation damage formula (Sword x Staff) have since replaced the linear
+gauge and the level-term formula** (decision 3 and "Damage formula"; research in
+[`docs/balance/research-sword-x-staff.md`](../balance/research-sword-x-staff.md)). The simulator's kit
+and enemy powers were rescaled to the new "percent of the attacking stat" meaning (Blast 68, Strike
+93, Shot 70, Burst 37), and the tuned report was regenerated on the **unchanged** roster; balance
+shifted and a full retune (including widening base Speed for the turn-based 10–15% target) is the
+next deliverable. The tuning log's "Sqrt speed + mitigation formula" section has the before/after
+marginals and the per-beast turn rates.
+
+**Skill progression has since been added** (the section above, by user decision): the
+`BeastCraft.Progression` namespace (`SkillProgressionDefinition`, `SkillTierDefinition`,
+`SkillProgress`, `SkillMaterialSO`, `BeastSkillBook`, `SkillProgression`, `SkillBreakthroughResult`,
+`SkillEquipResult`), `SkillSO.Progression`, `SkillInstance` carried by `SkillLoadout` and
+`SkillActivation` into `SkillEffectApplier`, `SkillLoadout.FromInstances` / `GetInstance`,
+`BattleUnitFactory.BuildLoadout` with a skill-book `CreateBeast` overload, and `BattleSkillUsage`.
+Level 1, tier 0 is the authored skill exactly, so the simulator and its reports are unchanged.
+EditMode tests cover the curve, practice and material XP, gate blocking and banking, breakthroughs
+with the right and wrong material tier, magnitude scaling in real damage, heals and buffs, tier
+cooldown reduction and bonus effects in a battle turn, the equip rules, species acquisition, the
+factory's slot order, and use counts read back from `RunBattle`.
+
+The effect engine for per-beast kits has landed, as described in "Status effects and advanced skill
+effects" above. It adds:
+
+- Chance and `StatusResist`.
+- `StatusType` statuses: taunt, stun, shield, damage over time and knockback.
+- Stacking and percent stat changes.
+- Multi-hit and execute.
+- `HpFraction` targeting.
+- `InitialCooldown` and `MaxUsesPerBattle`.
+
+Every new field is inert at its default, so the simulator's report is unchanged. `encounters.json`
+can express all of it, and the bosses carry 50% resistance. EditMode tests cover each rule,
+including the draw order and seeded reproducibility.
+
+**Element chart v2 has since replaced the first chart** (user-approved; see "Element system"):
+the main eight are normalized to two 2x and two 0.5x per row and per column, Light and Dark became
+generalists with a 1.25x `ElementChart.Mild` tier, and `ElementChartTests` pins all 121 pairs and the
+normalization. The per-beast element effect (`elemental` minus `neutral` overall marginal, three
+seeds) narrowed from −8.9 … +12.5 to −4.3 … +3.8 on the unchanged roster. That left Thunderbird at
+−7.2 `elemental` (its old edge had hidden a weak neutral line), so a light retune followed (four
+stat lines, nine skill numbers, six three-seed iterations); `tuned-report.md` is regenerated and the
+tuning log's "Element chart v2" section has the tables. A follow-up experiment ("Thunderbird range
+vs move") then gave Thunder Talons range 2 at 28 × 3 and restored the Thunderbird's Move 4. A
+"niche pass" then swapped Storm Dive (now 120) into the Thunderbird's defaults for Static Charge,
+trimmed Talons / Chain Lightning to 26 / 22 × 3, and made small lifts to Phoenix, Frost Wyrm,
+Leviathan, Tarasque, Basilisk and Kirin skills (skill numbers only; the roster is unchanged).
+
 Every pass so far is deliberately **data structures and algorithms only** — no MonoBehaviours, no
 scene or prefab wiring, and no committed `.asset` instances (the roster's are generated in-Editor). The hex radii backing each arena preset
 are placeholder implementation defaults chosen to be tunable, not producer-confirmed balance
 numbers, and the deployment-zone split, the effect rules and the element chart above are the same
 kind of default, as is the damage formula.
-Still to come: confirming or revising the second tuning pass (and, if needed, the damage formula and
+Still to come: confirming or revising the third tuning pass (and, if needed, the damage formula and
 element chart), deciding the design questions it raised above — a design decision the reports inform
 rather than make — and extending the simulator once authored skills, real encounters and the avatar
 give it more than a standard kit and fixture enemies to measure; multi-hex large creatures, an open
-item under "Encounter direction" above; stat-scaled healing; the starter roster's skills (none are
-authored yet), the status-effect system behind `ApplyStatus`, resource gating on top of cooldowns,
+item under "Encounter direction" above; the starter roster's skills (none are
+authored yet — the effect engine they need, statuses included, has landed), the avatar's passive
+content (the passive engine has landed, see "Avatar passives"), resource gating on top of cooldowns,
 the placement UI (a Unity
 Editor task, not a continuation of the placement validation that just landed), the encounter
 definition that selects an arena preset and a battle format, and the presentation layer.

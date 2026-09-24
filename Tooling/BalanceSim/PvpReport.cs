@@ -104,7 +104,8 @@ namespace BeastCraft.Tooling.BalanceSim
                               SimOptions.Format(SimOptions.HighWinRate) + "% or below " + SimOptions.Format(SimOptions.LowWinRate) +
                               "%, a swing of more than " + SimOptions.Format(SimOptions.MaxLevelSwing) + " points across levels, and any stalemate.");
             report.AppendLine("- Turn order: the Runtime's ATB gauge (`TurnManager`: each unit acts every " + TurnManager.ActionThreshold +
-                              " / Speed ticks). Battle length is normalized time, 1.0 = one turn of a Speed-" + TurnManager.ReferenceSpeed +
+                              " / round(" + TurnManager.FillScale + " x sqrt(Speed)) ticks, so turns grow with the square root of Speed). Battle length is normalized time, 1.0 = one turn of a Speed-" +
+                              TurnManager.ReferenceSpeed +
                               " unit, so it reads longer at low levels, where Speed is lower; max time " + options.MaxTime + ".");
             report.AppendLine();
         }

@@ -44,6 +44,12 @@ namespace BeastCraft.Tooling.BalanceSim
         public int[] MemberCrits;
 
         /// <summary>
+        /// Per avatar passive, in the preset's slot order: how many times it fired this battle
+        /// (battle start included). <c>null</c> when no avatar was fielded.
+        /// </summary>
+        public int[] PassiveFirings;
+
+        /// <summary>
         /// Per team member: the sum over its hits of the random multiplier applied to each,
         /// <c>(crit ? CritMultiplier : 1) * variance / 100</c>. Divided by <see cref="MemberHits"/>
         /// it is the average damage multiplier the rolls gave the beast.
@@ -67,6 +73,25 @@ namespace BeastCraft.Tooling.BalanceSim
     {
         public double Multiplier;
         public double ClearRate;
+
+        /// <summary>Wall-clock seconds the evaluation took (for <c>--timings</c>; never in the report).</summary>
+        public double Seconds;
+
+        /// <summary>Battles the evaluation covered (for <c>--timings</c>).</summary>
+        public int Battles;
+
+        /// <summary>
+        /// True when the multiplier scaled every enemy to exactly the stats an earlier evaluation
+        /// of the cell did, so its battles were reused rather than re-run (see
+        /// <see cref="PveSimulator.RunCell"/>). For <c>--timings</c>; never in the report.
+        /// </summary>
+        public bool Reused;
+
+        /// <summary>
+        /// With <c>--calibrate-sample</c>: true for the one evaluation of every team at the chosen
+        /// multiplier that follows the sampled search (the others then cover only the sample).
+        /// </summary>
+        public bool Final;
     }
 
     /// <summary>
@@ -119,11 +144,15 @@ namespace BeastCraft.Tooling.BalanceSim
         private readonly IReadOnlyList<CreatureSpeciesSO> _species;
         private readonly SkillSO[][] _elementalKits;
         private readonly SkillSO[][] _neutralKits;
+        private readonly SkillInstance[][] _elementalLibraryKits;
+        private readonly SkillInstance[][] _neutralLibraryKits;
 
         public PveSimulator(SimOptions options, IReadOnlyList<CreatureSpeciesSO> species)
         {
             _options = options;
             _species = species;
+            // Every species shares the medium curve; the avatar's fixture stats follow it too.
+            Avatar = new AvatarPresets(options.AvatarPreset, options.Library, species.Count > 0 ? species[0].GrowthRate : null);
             _elementalKits = new SkillSO[species.Count][];
             _neutralKits = new SkillSO[species.Count][];
             for (int i = 0; i < species.Count; i++)
@@ -132,16 +161,38 @@ namespace BeastCraft.Tooling.BalanceSim
                 _neutralKits[i] = Kit.BuildBeastKit(species[i], KitMode.Neutral);
             }
 
+            if (options.KitSource == KitSource.Library)
+            {
+                _elementalLibraryKits = new SkillInstance[species.Count][];
+                _neutralLibraryKits = new SkillInstance[species.Count][];
+                for (int i = 0; i < species.Count; i++)
+                {
+                    _elementalLibraryKits[i] = options.Library.BeastKit(species[i], KitMode.Elemental);
+                    _neutralLibraryKits[i] = options.Library.BeastKit(species[i], KitMode.Neutral);
+                }
+            }
+
             Teams = Combinations(species.Count, options.TeamSize);
             SlotOrders = new int[Teams.Count][];
             for (int t = 0; t < Teams.Count; t++)
             {
                 SlotOrders[t] = ShuffledSlots(options.Seed, t, options.TeamSize);
             }
+
+            CalibrationTeams = SampleTeams(options.Seed, Teams.Count, options.CalibrateSample);
         }
+
+        /// <summary>
+        /// With <c>--calibrate-sample n</c> (n below the team count): the team indices, ascending, a
+        /// seeded draw of n, that the difficulty search evaluates. Null = every team (the default).
+        /// </summary>
+        public int[] CalibrationTeams { get; }
 
         /// <summary>Every combination of <c>TeamSize</c> distinct species, as ascending roster indices, in lexicographic order.</summary>
         public List<int[]> Teams { get; }
+
+        /// <summary>The avatar fielded beside every player team (<c>--avatar</c>); disabled by default.</summary>
+        public AvatarPresets Avatar { get; }
 
         /// <summary>
         /// Per team, which member stands in which deployment slot (and so gets which unit id). A
@@ -196,9 +247,39 @@ namespace BeastCraft.Tooling.BalanceSim
             PveBattle[] best = null;
             double bestGap = double.MaxValue;
 
+            // The multiplier reaches a battle only through Scale(enemy stats), and every battle's
+            // seed ignores it, so two multipliers that scale every enemy of the shape to the same
+            // stats play every battle identically. Late bisection steps often do (small stats
+            // round alike, notably at level 1): those evaluations reuse the earlier battles.
+            List<StatBlock> enemyStats = DistinctEnemyStats(shape, level);
+            List<int[]> evaluatedScales = new List<int[]>();
+            List<PveBattle[]> evaluatedBattles = new List<PveBattle[]>();
+
+            // --calibrate-sample: the search evaluates a subset of the teams, and only the chosen
+            // multiplier is then run with every team (below).
+            int[] searchTeams = CalibrationTeams;
+
             double Evaluate(double multiplier)
             {
-                PveBattle[] battles = RunAllTeams(mode, level, shape, multiplier);
+                System.Diagnostics.Stopwatch clock = System.Diagnostics.Stopwatch.StartNew();
+                int[] scale = ScaledStats(enemyStats, multiplier);
+                PveBattle[] battles = null;
+                for (int e = 0; e < evaluatedScales.Count && battles == null; e++)
+                {
+                    if (SameStats(evaluatedScales[e], scale))
+                    {
+                        battles = evaluatedBattles[e];
+                    }
+                }
+
+                bool reused = battles != null;
+                if (!reused)
+                {
+                    battles = searchTeams == null ? RunAllTeams(mode, level, shape, multiplier) : RunTeams(mode, level, shape, multiplier, searchTeams);
+                    evaluatedScales.Add(scale);
+                    evaluatedBattles.Add(battles);
+                }
+
                 int cleared = 0;
                 foreach (PveBattle battle in battles)
                 {
@@ -206,7 +287,14 @@ namespace BeastCraft.Tooling.BalanceSim
                 }
 
                 double rate = (100.0 * cleared) / battles.Length;
-                cell.Evaluations.Add(new CalibrationPoint { Multiplier = multiplier, ClearRate = rate });
+                cell.Evaluations.Add(new CalibrationPoint
+                {
+                    Multiplier = multiplier,
+                    ClearRate = rate,
+                    Seconds = clock.Elapsed.TotalSeconds,
+                    Battles = battles.Length,
+                    Reused = reused
+                });
 
                 double gap = Math.Abs(rate - target);
                 if (gap < bestGap)
@@ -274,8 +362,141 @@ namespace BeastCraft.Tooling.BalanceSim
                 }
             }
 
+            if (searchTeams != null)
+            {
+                System.Diagnostics.Stopwatch clock = System.Diagnostics.Stopwatch.StartNew();
+                best = RunAllTeams(mode, level, shape, cell.Multiplier);
+                int cleared = 0;
+                foreach (PveBattle battle in best)
+                {
+                    cleared += battle.Cleared ? 1 : 0;
+                }
+
+                cell.ClearRate = (100.0 * cleared) / best.Length;
+                cell.Evaluations.Add(new CalibrationPoint
+                {
+                    Multiplier = cell.Multiplier,
+                    ClearRate = cell.ClearRate,
+                    Seconds = clock.Elapsed.TotalSeconds,
+                    Battles = best.Length,
+                    Final = true
+                });
+            }
+
             cell.Battles = best;
             return cell;
+        }
+
+        /// <summary>
+        /// <see cref="RunAllTeams"/> for a subset of the teams only (<paramref name="teams"/>, team
+        /// indices): composition-major, then the subset's order, then sample. Every battle is the one
+        /// <see cref="RunAllTeams"/> would play for that team, seed and all.
+        /// </summary>
+        public PveBattle[] RunTeams(KitMode mode, int level, EncounterShape shape, double multiplier, int[] teams)
+        {
+            int samples = Samples;
+            int count = teams.Length;
+            PveBattle[] battles = new PveBattle[shape.Compositions.Count * count * samples];
+            bool[][] playersWinTies = new bool[shape.Compositions.Count][];
+            for (int c = 0; c < shape.Compositions.Count; c++)
+            {
+                playersWinTies[c] = PlayersWinTies(mode, level, shape.Compositions[c].Id);
+            }
+
+            Parallel.For(0, battles.Length, i =>
+            {
+                int t = teams[(i / samples) % count];
+                int c = i / (samples * count);
+                battles[i] = RunBattle(mode, level, shape.Compositions[c], multiplier, t, i % samples, false, playersWinTies[c][t], out _);
+            });
+
+            return battles;
+        }
+
+        /// <summary>
+        /// <paramref name="size"/> distinct team indices out of <paramref name="teamCount"/>, a seeded
+        /// shuffle's first <paramref name="size"/>, ascending; null when <paramref name="size"/> is 0
+        /// (off) or covers every team, so the full search runs exactly as without the option.
+        /// </summary>
+        private static int[] SampleTeams(int seed, int teamCount, int size)
+        {
+            if (size <= 0 || size >= teamCount)
+            {
+                return null;
+            }
+
+            int[] order = new int[teamCount];
+            for (int i = 0; i < teamCount; i++)
+            {
+                order[i] = i;
+            }
+
+            Random rng = new Random(unchecked((seed * 486187739) + 0x5a17));
+            for (int i = teamCount - 1; i > 0; i--)
+            {
+                int j = rng.Next(i + 1);
+                int swap = order[i];
+                order[i] = order[j];
+                order[j] = swap;
+            }
+
+            int[] sample = new int[size];
+            Array.Copy(order, sample, size);
+            Array.Sort(sample);
+            return sample;
+        }
+
+        /// <summary>
+        /// The unscaled stat block of every distinct enemy species in the shape's compositions at
+        /// this level, in first-appearance order: what <see cref="Scale"/> is applied to.
+        /// </summary>
+        private static List<StatBlock> DistinctEnemyStats(EncounterShape shape, int level)
+        {
+            List<CreatureSpeciesSO> seen = new List<CreatureSpeciesSO>();
+            List<StatBlock> stats = new List<StatBlock>();
+            foreach (Encounter composition in shape.Compositions)
+            {
+                foreach (EnemySlot slot in composition.Enemies)
+                {
+                    if (!seen.Contains(slot.Species))
+                    {
+                        seen.Add(slot.Species);
+                        stats.Add(StatCalculator.ComputeStats(slot.Species, level, null));
+                    }
+                }
+            }
+
+            return stats;
+        }
+
+        /// <summary>Every stat <see cref="Scale"/> changes, for every block, at this multiplier.</summary>
+        private static int[] ScaledStats(List<StatBlock> stats, double multiplier)
+        {
+            int[] values = new int[stats.Count * 5];
+            for (int i = 0; i < stats.Count; i++)
+            {
+                StatBlock scaled = Scale(stats[i], multiplier);
+                values[(i * 5) + 0] = scaled.Hp;
+                values[(i * 5) + 1] = scaled.Attack;
+                values[(i * 5) + 2] = scaled.Defense;
+                values[(i * 5) + 3] = scaled.SpecialAttack;
+                values[(i * 5) + 4] = scaled.SpecialDefense;
+            }
+
+            return values;
+        }
+
+        private static bool SameStats(int[] a, int[] b)
+        {
+            for (int i = 0; i < a.Length; i++)
+            {
+                if (a[i] != b[i])
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         /// <summary>
@@ -340,7 +561,8 @@ namespace BeastCraft.Tooling.BalanceSim
         /// One battle. The loop below is <see cref="BattleTurnExecutor.RunBattle"/>'s loop reproduced
         /// statement for statement (the ATB time cap, the last-turn timestamp and all), with an HP
         /// snapshot around each turn so damage can be attributed to the unit whose turn it was (the
-        /// only actor: no avatar is fielded), and a per-member turn count. With
+        /// avatar's passives, when one is fielded with <c>--avatar</c>, are credited to that unit
+        /// too; the battle-start ones to nobody), and a per-member turn count. With
         /// <paramref name="useRunBattle"/> the real RunBattle is called instead, which is what the
         /// self-check compares against. Everything else — lifting the defeated off the grid, the
         /// partial approach — is the Runtime's own rule, applied inside
@@ -365,7 +587,7 @@ namespace BeastCraft.Tooling.BalanceSim
             {
                 EnemySlot slot = encounter.Enemies[i];
                 BattleUnit enemy = BattleUnitFactory.CreateBeast(enemyPrefix + slot.UnitId, BattleTeam.Enemy, slot.Species, level, null, enemyTiles[i],
-                                                                 Kit.Loadout(slot.KitFor(mode)));
+                                                                 Kit.Loadout(slot.KitFor(mode)), slot.StatusResist);
                 enemy.Stats = Scale(enemy.Stats, multiplier);
                 enemy.CurrentHp = enemy.Stats.Hp;
 
@@ -385,10 +607,9 @@ namespace BeastCraft.Tooling.BalanceSim
             {
                 int member = slots[s];
                 int speciesIndex = team[member];
-                SkillSO[] kit = mode == KitMode.Elemental ? _elementalKits[speciesIndex] : _neutralKits[speciesIndex];
                 string id = playerPrefix + "p" + (s + 1).ToString(System.Globalization.CultureInfo.InvariantCulture);
                 members[member] = BattleUnitFactory.CreateBeast(id, BattleTeam.Player, _species[speciesIndex], level, null, playerTiles[s],
-                                                                Kit.Loadout(kit));
+                                                                BeastLoadout(speciesIndex, mode));
                 requests.Add(new PlacementRequest(id, playerTiles[s]));
             }
 
@@ -410,21 +631,33 @@ namespace BeastCraft.Tooling.BalanceSim
                 MemberCrits = new int[team.Length],
                 MemberRollMultiplier = new double[team.Length],
                 MemberPhysicalFires = new int[team.Length],
-                MemberSpecialFires = new int[team.Length]
+                MemberSpecialFires = new int[team.Length],
+                PassiveFirings = Avatar.Enabled ? new int[Avatar.Passives.Count] : null
             };
 
             TurnManager turnManager = new TurnManager(units);
             Random rng = new Random(DeriveSeed(_options.Seed, mode, level, encounter.Id, teamIndex, sample));
+            BattleUnit avatar = Avatar.Build(level, out PassiveLoadout passives);
             BattleOutcome outcome;
             long elapsedTicks;
             int actions;
 
             if (useRunBattle)
             {
-                BattleResult result = BattleTurnExecutor.RunBattle(turnManager, units, grid, rng, null, _options.MaxTime);
+                BattleResult result = avatar == null
+                    ? BattleTurnExecutor.RunBattle(turnManager, units, grid, rng, null, _options.MaxTime)
+                    : BattleTurnExecutor.RunBattle(turnManager, units, grid, rng, avatar, passives, _options.MaxTime);
                 outcome = result.Outcome;
                 elapsedTicks = result.ElapsedTicks;
                 actions = result.ActionCount;
+                if (avatar != null)
+                {
+                    CountPassives(battle, result.OpeningPassiveActivations);
+                    foreach (BattleTurnResult turn in result.Turns)
+                    {
+                        CountPassives(battle, turn.PassiveActivations);
+                    }
+                }
             }
             else
             {
@@ -438,6 +671,9 @@ namespace BeastCraft.Tooling.BalanceSim
                 long capTicks = (long)(_options.MaxTime < 1 ? 1 : _options.MaxTime) * TurnManager.TicksPerTimeUnit;
                 long lastTurnTicks = 0;
                 actions = 0;
+
+                // RunBattle's battle-start hook; a no-op without an avatar.
+                CountPassives(battle, BattleTurnExecutor.BeginBattle(units, grid, rng, avatar, passives));
 
                 while (true)
                 {
@@ -467,8 +703,9 @@ namespace BeastCraft.Tooling.BalanceSim
                         }
 
                         lastTurnTicks = turnManager.ElapsedTicks;
-                        BattleTurnResult turn = BattleTurnExecutor.ExecuteTurn(current, units, grid, rng, null);
+                        BattleTurnResult turn = BattleTurnExecutor.ExecuteTurn(current, units, grid, rng, avatar, passives);
                         actions++;
+                        CountPassives(battle, turn.PassiveActivations);
 
                         bool actorIsMember = memberIndex.TryGetValue(current, out int actor);
                         for (int u = 0; u < units.Count; u++)
@@ -514,6 +751,33 @@ namespace BeastCraft.Tooling.BalanceSim
 
             finalUnits = units;
             return battle;
+        }
+
+        /// <summary>
+        /// A fresh loadout for a player beast: the standard kit (the default), or with
+        /// <c>--skill-kit library</c> its authored default loadout at <c>--skill-level</c>.
+        /// </summary>
+        private SkillLoadout BeastLoadout(int speciesIndex, KitMode mode)
+        {
+            if (_options.KitSource == KitSource.Library)
+            {
+                return SkillLoadout.FromInstances(mode == KitMode.Elemental ? _elementalLibraryKits[speciesIndex] : _neutralLibraryKits[speciesIndex]);
+            }
+
+            return Kit.Loadout(mode == KitMode.Elemental ? _elementalKits[speciesIndex] : _neutralKits[speciesIndex]);
+        }
+
+        private static void CountPassives(PveBattle battle, IReadOnlyList<PassiveActivation> activations)
+        {
+            if (battle.PassiveFirings == null)
+            {
+                return;
+            }
+
+            foreach (PassiveActivation activation in activations)
+            {
+                battle.PassiveFirings[activation.SlotIndex]++;
+            }
         }
 
         private static void CountFires(PveBattle battle, BattleTurnResult turn, int actor)

@@ -13,11 +13,29 @@ namespace BeastCraft.Battle
     /// Water's own row says so).
     /// </para>
     /// <para>
-    /// <strong>Tunable starting default, not confirmed balance.</strong> The 2x / 0.5x / 1x values
-    /// and which pairs sit where are a first-pass engineering default, chosen so the element system
-    /// is complete rather than half-built. Expect both to move once balance work has real fights to
-    /// measure against. <see cref="Strong"/>, <see cref="Weak"/> and the tables below are the only
-    /// places to change.
+    /// <strong>Tunable starting default, not confirmed balance.</strong> The 2x / 1.25x / 0.5x / 1x
+    /// values and which pairs sit where are a design default, expected to move once balance work has
+    /// real fights to measure against. <see cref="Strong"/>, <see cref="Mild"/>, <see cref="Weak"/>
+    /// and the rows in <c>BuildTable</c> are the only places to change.
+    /// </para>
+    /// <para>
+    /// <strong>Chart v2 (normalized).</strong> Among the eight main elements (Fire through Metal)
+    /// every attacking row is strong against exactly two and weak against exactly two, and every
+    /// defending column takes 2x from exactly two and 0.5x from exactly two, so no main element is
+    /// systematically better on offence or defence. v1 was uneven (Fire, Lightning and Ice gained
+    /// from it; Earth and Nature lost). Light and Dark are generalists rather than counters: each is
+    /// 2x against the other and a mild 1.25x against four main elements (Light: Water, Air, Ice,
+    /// Earth; Dark: Fire, Lightning, Nature, Metal), and the only 0.5x either takes is Metal into
+    /// Dark and Lightning into Light. Nature (2x) and Metal (2x) keep one hit each into Dark and
+    /// Light.
+    /// </para>
+    /// <para>
+    /// The v1 → v2 moves and their themes: a gust snuffs flame (Air 2x Fire); rust (Water 2x Metal);
+    /// rock shatters ice (Earth 2x Ice); the lightning rod (Metal 2x Lightning, and Lightning 0.5x
+    /// Metal as before); wood insulates (Nature 0.5x Lightning); forests withstand wind (Air 0.5x
+    /// Nature); a blade can't cut wind (Metal 0.5x Air). New outside the main eight: Metal 0.5x Dark,
+    /// Lightning 0.5x Light, and the Light / Dark 1.25x rows. Water → Earth, Earth → Metal,
+    /// Air → Lightning and Nature → Fire are now neutral.
     /// </para>
     /// <para>
     /// <see cref="Element.None"/> on either side is always 1x: a neutral skill hits everything
@@ -29,6 +47,12 @@ namespace BeastCraft.Battle
     {
         /// <summary>The multiplier for a matchup the attacker is strong in.</summary>
         public const float Strong = 2f;
+
+        /// <summary>
+        /// The multiplier for a mild edge: Light's and Dark's generalist matchups against four main
+        /// elements each.
+        /// </summary>
+        public const float Mild = 1.25f;
 
         /// <summary>The multiplier for a matchup the attacker is weak in.</summary>
         public const float Weak = 0.5f;
@@ -44,8 +68,8 @@ namespace BeastCraft.Battle
 
         /// <summary>
         /// The multiplier <paramref name="attack"/> deals against a single
-        /// <paramref name="defend"/> element: <see cref="Strong"/>, <see cref="Weak"/> or
-        /// <see cref="Neutral"/>.
+        /// <paramref name="defend"/> element: <see cref="Strong"/>, <see cref="Mild"/>,
+        /// <see cref="Weak"/> or <see cref="Neutral"/>.
         /// </summary>
         public static float GetMultiplier(Element attack, Element defend)
         {
@@ -100,22 +124,23 @@ namespace BeastCraft.Battle
                 }
             }
 
-            // Attacker-side rows: Row(attack, strong against..., weak against...).
-            Row(table, Element.Fire, new[] { Element.Nature, Element.Metal }, new[] { Element.Water, Element.Earth });
-            Row(table, Element.Water, new[] { Element.Fire, Element.Earth }, new[] { Element.Lightning, Element.Nature });
-            Row(table, Element.Earth, new[] { Element.Lightning, Element.Metal }, new[] { Element.Water, Element.Air });
-            Row(table, Element.Air, new[] { Element.Earth, Element.Nature }, new[] { Element.Ice, Element.Lightning });
-            Row(table, Element.Lightning, new[] { Element.Water, Element.Air }, new[] { Element.Earth, Element.Metal });
-            Row(table, Element.Ice, new[] { Element.Nature, Element.Air }, new[] { Element.Fire, Element.Metal });
-            Row(table, Element.Nature, new[] { Element.Water, Element.Earth, Element.Dark }, new[] { Element.Fire, Element.Ice });
-            Row(table, Element.Metal, new[] { Element.Ice, Element.Light }, new[] { Element.Fire, Element.Lightning });
-            Row(table, Element.Light, new[] { Element.Dark }, new Element[0]);
-            Row(table, Element.Dark, new[] { Element.Light }, new Element[0]);
+            // Attacker-side rows: Row(attack, strong against..., weak against..., mild against...).
+            Element[] none = new Element[0];
+            Row(table, Element.Fire, new[] { Element.Nature, Element.Metal }, new[] { Element.Water, Element.Earth }, none);
+            Row(table, Element.Water, new[] { Element.Fire, Element.Metal }, new[] { Element.Lightning, Element.Nature }, none);
+            Row(table, Element.Earth, new[] { Element.Lightning, Element.Ice }, new[] { Element.Water, Element.Air }, none);
+            Row(table, Element.Air, new[] { Element.Fire, Element.Earth }, new[] { Element.Ice, Element.Nature }, none);
+            Row(table, Element.Lightning, new[] { Element.Water, Element.Air }, new[] { Element.Earth, Element.Metal, Element.Light }, none);
+            Row(table, Element.Ice, new[] { Element.Nature, Element.Air }, new[] { Element.Fire, Element.Metal }, none);
+            Row(table, Element.Nature, new[] { Element.Water, Element.Earth, Element.Dark }, new[] { Element.Lightning, Element.Ice }, none);
+            Row(table, Element.Metal, new[] { Element.Lightning, Element.Ice, Element.Light }, new[] { Element.Fire, Element.Air, Element.Dark }, none);
+            Row(table, Element.Light, new[] { Element.Dark }, none, new[] { Element.Water, Element.Air, Element.Ice, Element.Earth });
+            Row(table, Element.Dark, new[] { Element.Light }, none, new[] { Element.Fire, Element.Lightning, Element.Nature, Element.Metal });
 
             return table;
         }
 
-        private static void Row(float[,] table, Element attack, Element[] strong, Element[] weak)
+        private static void Row(float[,] table, Element attack, Element[] strong, Element[] weak, Element[] mild)
         {
             for (int i = 0; i < strong.Length; i++)
             {
@@ -125,6 +150,11 @@ namespace BeastCraft.Battle
             for (int i = 0; i < weak.Length; i++)
             {
                 table[(int)attack, (int)weak[i]] = Weak;
+            }
+
+            for (int i = 0; i < mild.Length; i++)
+            {
+                table[(int)attack, (int)mild[i]] = Mild;
             }
         }
     }

@@ -17,6 +17,16 @@ namespace BeastCraft.Tooling.BalanceSim
         Neutral = 1
     }
 
+    /// <summary>Which skills the beasts fight with (<c>--skill-kit standard|library</c>).</summary>
+    public enum KitSource
+    {
+        /// <summary>The standard kit (<see cref="Kit.BuildBeastKit"/>): every beast the same, so stats are what is measured.</summary>
+        Standard = 0,
+
+        /// <summary>Each beast's authored default loadout from <c>skill-library.json</c> (<see cref="SkillLibraryKits"/>). The default: the real game setup.</summary>
+        Library = 1
+    }
+
     /// <summary>
     /// Every tunable the simulator has, in one place. The constants are the defaults; the CLI
     /// overrides the subset exposed by <see cref="Parse"/>.
@@ -38,11 +48,15 @@ namespace BeastCraft.Tooling.BalanceSim
         //     Ranged beasts only fired Strike at an enemy already adjacent and the physical share
         //     fell to 37-47%. Each physical skill's power is Blast's divided by how often it fires
         //     relative to Blast in its stances, measured over the default PvE run (generated
-        //     compositions, 3 levels, both kit modes) at Strike 55 / Shot 40: Strike fired 0.70x as
-        //     often as Blast for Vanguard and for Skirmisher beasts, Shot 0.965x for Ranged beasts
-        //     (it fires after Blast and loses the odd target Blast just felled). So Strike is 57
-        //     (= 40 / 0.70) and Shot 41 (= 40 / 0.965): fires x power, and with it the weight of
-        //     Attack vs SpecialAttack, is even per stance. The report's kit parity table shows the
+        //     compositions, 3 levels, both kit modes) after the sqrt-speed / mitigation-formula
+        //     change, at Strike 97 / Shot 70: Strike fired 0.71-0.72x as often as Blast for Vanguard
+        //     beasts and 0.81-0.82x for Skirmisher beasts (0.733x pooled over both, weighted by
+        //     fires), Shot 0.96x for Ranged beasts (it fires after Blast and loses the odd target
+        //     Blast just felled). So Strike is 93 (= 68 / 0.733) and Shot 70 (= 68 / 0.965): fires x
+        //     power, and with it the weight of Attack vs SpecialAttack, is even per stance. One
+        //     Strike serves two stances, so Vanguards sit a little under 50% and Skirmishers a little
+        //     over (they reach melee more often since the speed band was compressed). (Under the A / (A + D) formula damage is
+        //     exactly proportional to power, with no +2 offset, so power ratios are damage ratios.) The report's kit parity table shows the
         //     physical share of single-target power per stance and per shape, and flags a stance
         //     outside 50 +/- 5. Re-derive StrikePower / ShotPower if the kit, the enemies or the
         //     movement rules change.
@@ -51,7 +65,14 @@ namespace BeastCraft.Tooling.BalanceSim
         //     would re-open the bias this kit exists to close. Firing order does not bias the
         //     outcome: a target dies iff the two halves' damage together reaches its HP, whichever
         //     half lands the blow.
-        // Burst (2 x power 20, radius 2, cooldown 2) is lower power and longer cooldown than the
+        // Powers are percent of the attacking stat (DamageFormula: Power / 100 * A * A / (A + D)).
+        // They were rescaled from the old level-term formula (Blast 40, Strike 57, Shot 41,
+        // Burst 20) so a neutral hit between two average level-50 roster beasts takes the same
+        // share of HP as before: Blast 40 -> 68, Burst 20 -> 37 (old damage 0.44 P + 2 against
+        // new P' / 100 * A / 2 at A = D ~ 58), and Strike 93 / Shot 70 re-derived from Blast for
+        // parity (see above).
+        //
+        // Burst (2 x power 37, radius 2, cooldown 2) is lower power and longer cooldown than the
         // single-target pair: a periodic spike that only pays off when several enemies are close,
         // i.e. against swarms and packs. Cooldown 2 rather than 3 so it comes up on the beast's
         // second turn — fights at calibrated difficulty last a handful of turns per beast, and at
@@ -66,13 +87,13 @@ namespace BeastCraft.Tooling.BalanceSim
         // ------------------------------------------------------------------------------------
         public const string BlastId = "sim_blast";
         public const DamageCategory BlastCategory = DamageCategory.Special;
-        public const float BlastPower = 40f;
+        public const float BlastPower = 68f;
         public const int BlastRange = 3;
         public const int BlastCooldown = 1;
 
         public const string StrikeId = "sim_strike";
         public const DamageCategory StrikeCategory = DamageCategory.Physical;
-        public const float StrikePower = 57f;
+        public const float StrikePower = 93f;
         public const int StrikeRange = 1;
         public const int StrikeCooldown = BlastCooldown;
 
@@ -84,13 +105,13 @@ namespace BeastCraft.Tooling.BalanceSim
         /// </summary>
         public const string ShotId = "sim_shot";
         public const DamageCategory ShotCategory = DamageCategory.Physical;
-        public const float ShotPower = 41f;
+        public const float ShotPower = 70f;
         public const int ShotRange = BlastRange;
         public const int ShotCooldown = BlastCooldown;
 
         public const string BurstPhysicalId = "sim_burst_physical";
         public const string BurstSpecialId = "sim_burst_special";
-        public const float BurstPower = 20f;
+        public const float BurstPower = 37f;
         public const int BurstRadius = 2;
         public const int BurstCooldown = 2;
 
@@ -183,6 +204,12 @@ namespace BeastCraft.Tooling.BalanceSim
 
         public int MaxTime = BattleTurnExecutor.DefaultMaxTime;
         public int Seed = DefaultSeed;
+
+        /// <summary>
+        /// <c>--seeds</c>: run every one of these base seeds in one process and report the
+        /// aggregate (see <see cref="SeedAggregate"/>); null for the ordinary single-seed run.
+        /// </summary>
+        public List<int> Seeds;
         public int Samples = DefaultSamples;
 
         /// <summary>PvE battles per team per composition: <c>--samples</c> when given, else the set's default.</summary>
@@ -197,6 +224,49 @@ namespace BeastCraft.Tooling.BalanceSim
         public bool SelfCheck;
         public bool ShowHelp;
 
+        /// <summary><c>--timings</c>: print a per-phase wall-clock breakdown to stderr (never into the report).</summary>
+        public bool Timings;
+
+        /// <summary>
+        /// <c>--calibrate-sample n</c>: the difficulty search evaluates only a seeded subset of n
+        /// teams, then the chosen multiplier runs once with every team. 0 (the default) = every
+        /// team at every step. Opt-in because it changes the calibrated multipliers, so the report.
+        /// </summary>
+        public int CalibrateSample;
+
+        /// <summary>The PvE avatar preset (<c>--avatar</c>); the library avatar by default, <see cref="AvatarPresets.None"/> fields none.</summary>
+        public string AvatarPreset = AvatarPresets.Library;
+
+        /// <summary>Which skills the beasts fight with (<c>--skill-kit standard|library</c>); library is the committed report's setting.</summary>
+        public KitSource KitSource = KitSource.Library;
+
+        /// <summary>The skill level library skills and passives are fielded at (<c>--skill-level</c>).</summary>
+        public int SkillLevel = 1;
+
+        /// <summary><c>--skill-library</c>: the library file, or null to find it by walking up.</summary>
+        public string SkillLibraryPath;
+
+        /// <summary>
+        /// The loaded skill library, when the run needs it (<c>--skill-kit library</c> or
+        /// <c>--avatar library</c>). Set by <see cref="Program"/> after parsing, not a CLI option.
+        /// </summary>
+        public SkillLibraryKits Library;
+
+        /// <summary>A copy of these options for one seed of a <c>--seeds</c> run: <see cref="Seed"/> set, <see cref="Seeds"/> cleared.</summary>
+        public SimOptions ForSeed(int seed)
+        {
+            SimOptions copy = (SimOptions)MemberwiseClone();
+            copy.Seed = seed;
+            copy.Seeds = null;
+            return copy;
+        }
+
+        /// <summary>Whether this run fields anything from the skill library.</summary>
+        public bool NeedsLibrary
+        {
+            get { return KitSource == KitSource.Library || AvatarPreset == AvatarPresets.Library; }
+        }
+
         public const string Usage =
             "Beast Craft headless balance simulator (local-only tooling).\n" +
             "\n" +
@@ -204,7 +274,14 @@ namespace BeastCraft.Tooling.BalanceSim
             "\n" +
             "  --mode <m>                 pve | pvp | both (default both). pve = team vs encounter (primary);\n" +
             "                             pvp = the 1v1 round-robin (secondary).\n" +
-            "  --kit <k>                  elemental | neutral | both (default both).\n" +
+            "  --kit <k>                  elemental | neutral | both (default both): the element axis. neutral forces every\n" +
+            "                             beast and enemy skill's element to None.\n" +
+            "  --skill-kit <k>            library | standard (default library): the skill axis. library = each beast's\n" +
+            "                             DefaultLoadout from skill-library.json (the real game setup); standard = the same\n" +
+            "                             kit for every beast, so stat lines are what is measured (adds the kit parity table).\n" +
+            "  --skill-level <n>          Skill level for library skills and avatar passives, 1-20 (default 1); the tier is\n" +
+            "                             the gates below that level (16+ = every gate passed).\n" +
+            "  --skill-library <path>     skill-library.json (default: found by walking up from the working directory).\n" +
             "  --levels <list>            Comma-separated levels (default 1,50,100).\n" +
             "  --encounter-set <s>        generated | fixed (default generated). generated = random compositions of the enemy\n" +
             "                             type pool per shape (solo, elite, squad, horde); fixed = the hand-authored boss,\n" +
@@ -218,15 +295,28 @@ namespace BeastCraft.Tooling.BalanceSim
             "                             override every enemy's element.\n" +
             "  --max-time <n>             Battle-time cap before a battle is a stalemate, in turns of a Speed-100 unit (default 2000).\n" +
             "  --seed <n>                 Base seed; each battle derives its own (default 12345).\n" +
+            "  --seeds <list>             Comma-separated base seeds, run one after another in one process. Each seed's run is\n" +
+            "                             exactly a --seed run; stdout (and --out) get the multi-seed aggregate (mean +/- sd per\n" +
+            "                             beast), and with --out each seed's full report is also written as <name>.seed<n>.md.\n" +
             "  --samples <n>              Battles per team and composition (PvE) and per pairing (PvP), each with its own\n" +
             "                             seed: damage variance and crits make battles random (default: PvP 5; PvE 1 per\n" +
             "                             generated composition, 5 per fixed encounter).\n" +
             "  --matrix-level <n>         Level the PvP win matrix and stat table are drawn at (default 50, else the highest level).\n" +
             "  --roster <path>            beast-roster.json (default: found by walking up from the working directory).\n" +
             "  --encounters-file <path>   encounters.json (default: Tooling/BalanceSim/encounters.json, found the same way).\n" +
+            "  --avatar <preset>          library | support | none (default library). PvE only: field an avatar beside the\n" +
+            "                             player team (see AvatarPresets): library = the library's default loadout (first 3\n" +
+            "                             actives + AvatarDefaultPassives) at --skill-level, the committed report's setting;\n" +
+            "                             support = a passive-only fixture; none = no avatar.\n" +
             "  --out <path>               Also write the Markdown report to this file.\n" +
             "  --self-check               Run everything twice and fail unless both reports are identical; also checks the\n" +
             "                             PvE battle loop against BattleTurnExecutor.RunBattle.\n" +
+            "  --timings                  Print a wall-clock breakdown (per PvE cell and calibration step, PvP, report, GC)\n" +
+            "                             to stderr. Never changes the report.\n" +
+            "  --calibrate-sample <n>     Opt-in speed-up that CHANGES results: the difficulty search evaluates a seeded\n" +
+            "                             subset of n teams (e.g. 50 of 210), then the chosen multiplier runs once with every\n" +
+            "                             team; the report's numbers all come from that full run (default: off, every team at\n" +
+            "                             every step).\n" +
             "  --help                     Show this text.\n";
 
         /// <summary>Parses the command line. Returns null and fills <paramref name="error"/> on bad input.</summary>
@@ -235,6 +325,7 @@ namespace BeastCraft.Tooling.BalanceSim
             SimOptions options = new SimOptions();
             bool matrixLevelGiven = false;
             bool samplesGiven = false;
+            bool seedGiven = false;
             error = null;
 
             for (int i = 0; i < args.Length; i++)
@@ -250,6 +341,16 @@ namespace BeastCraft.Tooling.BalanceSim
                         break;
                     case "--self-check":
                         options.SelfCheck = true;
+                        break;
+                    case "--timings":
+                        options.Timings = true;
+                        break;
+                    case "--calibrate-sample":
+                        if (!TryNextInt(args, ref i, arg, 1, out options.CalibrateSample, out error))
+                        {
+                            return null;
+                        }
+
                         break;
                     case "--levels":
                         if (!TryNext(args, ref i, arg, out text, out error) || !TryParseLevels(text, options.Levels, out error))
@@ -267,6 +368,47 @@ namespace BeastCraft.Tooling.BalanceSim
                         break;
                     case "--kit":
                         if (!TryNext(args, ref i, arg, out text, out error) || !TryParseKit(text, options.Modes, out error))
+                        {
+                            return null;
+                        }
+
+                        break;
+                    case "--skill-kit":
+                        if (!TryNext(args, ref i, arg, out text, out error))
+                        {
+                            return null;
+                        }
+
+                        if (string.Equals(text, "standard", StringComparison.OrdinalIgnoreCase))
+                        {
+                            options.KitSource = KitSource.Standard;
+                        }
+                        else if (string.Equals(text, "library", StringComparison.OrdinalIgnoreCase))
+                        {
+                            options.KitSource = KitSource.Library;
+                        }
+                        else
+                        {
+                            error = "--skill-kit expects library or standard, got '" + text + "'.";
+                            return null;
+                        }
+
+                        break;
+                    case "--skill-level":
+                        if (!TryNextInt(args, ref i, arg, 1, out options.SkillLevel, out error))
+                        {
+                            return null;
+                        }
+
+                        if (options.SkillLevel > 20)
+                        {
+                            error = "--skill-level must be between 1 and 20 (the authored skills' max level).";
+                            return null;
+                        }
+
+                        break;
+                    case "--skill-library":
+                        if (!TryNext(args, ref i, arg, out options.SkillLibraryPath, out error))
                         {
                             return null;
                         }
@@ -354,6 +496,32 @@ namespace BeastCraft.Tooling.BalanceSim
                             return null;
                         }
 
+                        seedGiven = true;
+                        break;
+                    case "--seeds":
+                        if (!TryNext(args, ref i, arg, out text, out error))
+                        {
+                            return null;
+                        }
+
+                        options.Seeds = new List<int>();
+                        foreach (string part in text.Split(','))
+                        {
+                            if (!int.TryParse(part.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int seed))
+                            {
+                                error = "--seeds expects comma-separated integers, got '" + text + "'.";
+                                return null;
+                            }
+
+                            if (options.Seeds.Contains(seed))
+                            {
+                                error = "--seeds lists " + seed + " twice.";
+                                return null;
+                            }
+
+                            options.Seeds.Add(seed);
+                        }
+
                         break;
                     case "--samples":
                         if (!TryNextInt(args, ref i, arg, 1, out options.Samples, out error))
@@ -420,10 +588,31 @@ namespace BeastCraft.Tooling.BalanceSim
                         }
 
                         break;
+                    case "--avatar":
+                        if (!TryNext(args, ref i, arg, out text, out error))
+                        {
+                            return null;
+                        }
+
+                        text = text.ToLowerInvariant();
+                        if (!AvatarPresets.IsKnown(text))
+                        {
+                            error = "--avatar expects " + string.Join(" or ", AvatarPresets.Names) + ", got '" + text + "'.";
+                            return null;
+                        }
+
+                        options.AvatarPreset = text;
+                        break;
                     default:
                         error = "Unknown argument '" + arg + "'. Use --help for usage.";
                         return null;
                 }
+            }
+
+            if (seedGiven && options.Seeds != null)
+            {
+                error = "--seed and --seeds cannot be combined.";
+                return null;
             }
 
             options.PveSamples = samplesGiven ? options.Samples : options.EncounterSet == EncounterSet.Generated ? DefaultGeneratedSamples : DefaultSamples;
@@ -554,7 +743,8 @@ namespace BeastCraft.Tooling.BalanceSim
                     modes.Add(KitMode.Neutral);
                     return true;
                 default:
-                    error = "--kit expects elemental, neutral or both, got '" + text + "'.";
+                    error = "--kit expects elemental, neutral or both, got '" + text + "'" +
+                            (text == "standard" || text == "library" ? " (the skill axis is now --skill-kit)." : ".");
                     return false;
             }
         }

@@ -172,24 +172,49 @@ namespace BeastCraft.Battle
         /// </summary>
         private static List<BattleUnit> CollectLiving(IEnumerable<BattleUnit> allUnits)
         {
-            List<BattleUnit> living = new List<BattleUnit>();
-
             if (allUnits == null)
             {
-                return living;
+                return new List<BattleUnit>();
             }
 
-            foreach (BattleUnit unit in allUnits)
+            // Sized and walked by index when the roster is a list (it always is in a battle), so
+            // collecting allocates one array and no enumerator. Same units, same order.
+            IReadOnlyList<BattleUnit> roster = allUnits as IReadOnlyList<BattleUnit>;
+            List<BattleUnit> living;
+
+            if (roster != null)
             {
-                if (unit != null && !unit.IsDefeated)
+                living = new List<BattleUnit>(roster.Count);
+
+                for (int i = 0; i < roster.Count; i++)
                 {
-                    living.Add(unit);
+                    BattleUnit unit = roster[i];
+
+                    if (unit != null && !unit.IsDefeated)
+                    {
+                        living.Add(unit);
+                    }
+                }
+            }
+            else
+            {
+                living = new List<BattleUnit>();
+
+                foreach (BattleUnit unit in allUnits)
+                {
+                    if (unit != null && !unit.IsDefeated)
+                    {
+                        living.Add(unit);
+                    }
                 }
             }
 
-            living.Sort(BattleUnitOrder.CompareById);
+            living.Sort(ById);
             return living;
         }
+
+        /// <summary><see cref="BattleUnitOrder.CompareById"/> as one shared delegate, so sorting allocates none.</summary>
+        private static readonly Comparison<BattleUnit> ById = BattleUnitOrder.CompareById;
 
         /// <summary>
         /// True when a candidate sits on the side the skill is allowed to hit, judged against the
@@ -293,6 +318,16 @@ namespace BeastCraft.Battle
         /// different one.
         /// </para>
         /// <para>
+        /// <strong>Taunt comes first.</strong> For an <see cref="SkillTargetSide.Enemy"/>-side skill,
+        /// when the caster is taunted (<see cref="StatusEffects.GetTaunter"/>) and the taunter is
+        /// among the candidates — alive, on the other team, and within range when
+        /// <paramref name="limitToRange"/> — the taunter is the pick, whatever the criterion, and no
+        /// rng is drawn. A taunter out of range is not a candidate for the range-limited pick, which
+        /// then falls back to the ordinary rule; the range-free pick still returns it, which is what
+        /// makes <see cref="BattleTurnExecutor"/> walk a taunted unit toward its taunter.
+        /// Ally-side skills are never taunted.
+        /// </para>
+        /// <para>
         /// Ties are broken by taking the first candidate in id order — the comparison below only
         /// displaces the incumbent on a strict win. That is deliberately the same rule whatever the
         /// criterion measures, and it matches <see cref="TurnManager"/>: keying on the id makes the
@@ -318,29 +353,56 @@ namespace BeastCraft.Battle
                 return null;
             }
 
+            BattleUnit taunter = skill.TargetSide == SkillTargetSide.Enemy ? StatusEffects.GetTaunter(caster) : null;
+
+            if (taunter != null && candidates.Contains(taunter))
+            {
+                return taunter;
+            }
+
             if (skill.TargetingCriterion == SkillTargetingCriterion.Random)
             {
                 return rng == null ? candidates[0] : candidates[rng.Next(candidates.Count)];
             }
 
             BattleUnit best = candidates[0];
-            int bestValue = CriterionValue(skill, caster, best);
 
             for (int i = 1; i < candidates.Count; i++)
             {
-                int value = CriterionValue(skill, caster, candidates[i]);
+                int comparison = Compare(skill, caster, candidates[i], best);
                 bool wins = skill.TargetingOrder == SkillTargetingOrder.Highest
-                    ? value > bestValue
-                    : value < bestValue;
+                    ? comparison > 0
+                    : comparison < 0;
 
                 if (wins)
                 {
                     best = candidates[i];
-                    bestValue = value;
                 }
             }
 
             return best;
+        }
+
+        /// <summary>
+        /// How <paramref name="a"/> ranks against <paramref name="b"/> on the skill's criterion:
+        /// negative when <paramref name="a"/>'s value is lower, positive when higher, 0 on a tie.
+        /// Every criterion but <see cref="SkillTargetingCriterion.HpFraction"/> compares
+        /// <see cref="CriterionValue"/>; the fraction is compared exactly by cross-multiplying in
+        /// 64-bit integers (<c>a.Current * b.Max</c> against <c>b.Current * a.Max</c>), so no float
+        /// ever decides who is picked. A maximum of 0 or below reads as a fraction of 0.
+        /// </summary>
+        private static int Compare(SkillSO skill, BattleUnit caster, BattleUnit a, BattleUnit b)
+        {
+            if (skill.TargetingCriterion == SkillTargetingCriterion.HpFraction)
+            {
+                long aCurrent = a.Stats.Hp > 0 ? a.CurrentHp : 0;
+                long aMax = a.Stats.Hp > 0 ? a.Stats.Hp : 1;
+                long bCurrent = b.Stats.Hp > 0 ? b.CurrentHp : 0;
+                long bMax = b.Stats.Hp > 0 ? b.Stats.Hp : 1;
+                return (aCurrent * bMax).CompareTo(bCurrent * aMax);
+            }
+
+            return CriterionValue(skill, caster, a).CompareTo(CriterionValue(skill, caster, b));
         }
 
         /// <summary>

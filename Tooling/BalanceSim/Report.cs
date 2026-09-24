@@ -30,13 +30,37 @@ namespace BeastCraft.Tooling.BalanceSim
             report.AppendLine("- Roster: `" + RosterLoader.RepoRelativePath + "` (" + species.Count + " species)");
             report.AppendLine("- Sections: " + (options.RunPve ? "PvE team vs encounter (primary)" : string.Empty) +
                               (options.RunPve && options.RunPvp ? "; " : string.Empty) + (options.RunPvp ? "PvP 1v1 round-robin (secondary)" : string.Empty));
+            if (options.RunPve && pve != null && pve.Avatar.Enabled)
+            {
+                report.AppendLine("- Avatar (PvE only): the `" + pve.Avatar.Preset + "` " + (pve.Avatar.IsAuthored ? "preset (the skill library's default loadout, " : "fixture preset (") +
+                                  "`--avatar`), fielded beside every player team; see \"Avatar passives\"");
+            }
+
+            if (options.KitSource == KitSource.Library)
+            {
+                report.AppendLine("- Skill kit: `library` (`--skill-kit library`, the default): each beast's authored default loadout from `" +
+                                  SkillLibraryKits.RepoRelativePath + "` at skill level " + options.SkillLevel + " (`--skill-level`)");
+            }
+            else
+            {
+                report.AppendLine("- Skill kit: `standard` (`--skill-kit standard`): the same kit for every beast, so the stat lines are what is measured");
+            }
+
             report.AppendLine();
 
-            AppendKit(report);
+            if (options.KitSource == KitSource.Library)
+            {
+                AppendLibraryKit(report, options, species);
+            }
+            else
+            {
+                AppendKit(report);
+            }
 
             if (options.RunPve)
             {
                 PveReport.AppendSection(report, options, species, encounters, pve, cells);
+                AppendAvatar(report, pve, cells);
             }
 
             if (options.RunPvp)
@@ -75,23 +99,152 @@ namespace BeastCraft.Tooling.BalanceSim
             report.AppendLine("`SpecialDefense` on the receiving end) carry about equal weight in every stance; the PvE kit parity table checks it.");
             report.AppendLine("Burst goes last so it fires from the tile the beast has just walked to. `elemental` mode: every kit skill carries");
             report.AppendLine("the beast's first element; `neutral`: all are `None`, isolating the stat lines from the element chart.");
+            report.AppendLine("Power is a percent of the attacking stat: a hit is `Power / 100 x A x A / (A + " +
+                              DamageFormula.DefenseWeight.ToString("0.##", CultureInfo.InvariantCulture) + " x D) x " +
+                              DamageFormula.GlobalScale.ToString("0.##", CultureInfo.InvariantCulture) + "`, then element, crit and variance (`DamageFormula`).");
             report.AppendLine();
+        }
+
+        /// <summary>
+        /// The <c>--skill-kit library</c> replacement for the standard kit table: each beast's default
+        /// loadout in fire-priority order, with each skill's shape, range, cooldown and effects as
+        /// fielded (at the run's skill level and implied tier).
+        /// </summary>
+        private static void AppendLibraryKit(StringBuilder report, SimOptions options, IReadOnlyList<CreatureSpeciesSO> species)
+        {
+            report.AppendLine("## Library beast kits");
+            report.AppendLine();
+            report.AppendLine("Every beast fights with its authored `DefaultLoadout` from the skill library, in slot (fire-priority) order, at skill");
+            report.AppendLine("level " + options.SkillLevel + " and the tier that level implies. Effects are listed as authored (magnitudes before level scaling);");
+            report.AppendLine("`neutral` mode forces every library skill's element to `None`. There is no kit parity table in this mode: the kits differ");
+            report.AppendLine("by design.");
+            report.AppendLine();
+            report.AppendLine("| Beast | Stance | Slot | Skill | Shape | Range | Cooldown | Effects |");
+            report.AppendLine("| --- | --- | ---: | --- | --- | ---: | ---: | --- |");
+            foreach (CreatureSpeciesSO beast in species)
+            {
+                IReadOnlyList<string> ids = options.Library.DefaultLoadout(beast.SpeciesId);
+                for (int i = 0; i < ids.Count; i++)
+                {
+                    SkillInstance skill = options.Library.Instance(options.Library.Skill(ids[i]));
+                    report.AppendLine("| " + (i == 0 ? beast.DisplayName : string.Empty) + " | " + (i == 0 ? beast.Stance.ToString() : string.Empty) + " | " + (i + 1) +
+                                      " | " + skill.Skill.DisplayName + " | " + skill.Skill.TargetShape + (skill.Skill.TargetSide == SkillTargetSide.Ally ? " (ally)" : string.Empty) +
+                                      " | " + skill.Skill.Range + " | " + skill.EffectiveCooldown + " | " + DescribeEffects(skill.Effects) + " |");
+                }
+            }
+
+            report.AppendLine();
+        }
+
+        /// <summary>A compact one-line description of an effect list, for the library kit table.</summary>
+        public static string DescribeEffects(IReadOnlyList<SkillEffect> effects)
+        {
+            List<string> parts = new List<string>();
+            foreach (SkillEffect e in effects)
+            {
+                string chance = e.Chance > 0 && e.Chance < SkillEffect.AlwaysChance ? " " + e.Chance + "%" : string.Empty;
+                string turns = e.DurationTurns > 0 ? " " + e.DurationTurns + "t" : string.Empty;
+                string stacks = e.MaxStacks > 1 ? " x" + e.MaxStacks + " stacks" : string.Empty;
+                switch (e.EffectType)
+                {
+                    case SkillEffectType.Damage:
+                        parts.Add("dmg " + Number(e.Magnitude) + (e.HitCount > 1 ? " x" + e.HitCount + " hits" : string.Empty) +
+                                  (e.ExecuteBonusPercent > 0 ? " exec +" + e.ExecuteBonusPercent + "%" : string.Empty));
+                        break;
+                    case SkillEffectType.Heal:
+                        parts.Add("heal " + Number(e.Magnitude));
+                        break;
+                    case SkillEffectType.BuffStat:
+                    case SkillEffectType.DebuffStat:
+                        parts.Add((e.EffectType == SkillEffectType.BuffStat ? "+" : "-") + Number(e.Magnitude) + (e.IsPercent ? "% " : " ") + e.AffectedStat + turns + chance + stacks);
+                        break;
+                    default:
+                        parts.Add(e.Status + (e.Status == StatusType.Knockback ? " " + Number(e.Magnitude) : e.Magnitude > 0f ? " " + Number(e.Magnitude) : string.Empty) + turns +
+                                  chance + stacks);
+                        break;
+                }
+            }
+
+            return string.Join("; ", parts);
+        }
+
+        /// <summary>
+        /// How often each of the fielded avatar's passives fired, averaged over every PvE battle at
+        /// the calibrated difficulty. Nothing at all without <c>--avatar</c>, so the default report
+        /// is unchanged.
+        /// </summary>
+        private static void AppendAvatar(StringBuilder report, PveSimulator pve, List<PveCell> cells)
+        {
+            if (pve == null || !pve.Avatar.Enabled)
+            {
+                return;
+            }
+
+            IReadOnlyList<BeastCraft.Avatar.PassiveSkillSO> passives = pve.Avatar.Passives;
+            long[] totals = new long[passives.Count];
+            long battles = 0;
+            foreach (PveCell cell in cells)
+            {
+                foreach (PveBattle battle in cell.Battles)
+                {
+                    battles++;
+                    for (int p = 0; p < totals.Length; p++)
+                    {
+                        totals[p] += battle.PassiveFirings[p];
+                    }
+                }
+            }
+
+            report.AppendLine("## Avatar passives");
+            report.AppendLine();
+            report.AppendLine(pve.Avatar.IsAuthored
+                                  ? "The `" + pve.Avatar.Preset + "` preset is the skill library's default avatar loadout (actives: " + ActiveNames(pve.Avatar) + ")."
+                                  : "The `" + pve.Avatar.Preset + "` preset is a simulator fixture for exercising the passive engine, not authored content.");
+            report.AppendLine("Firings per battle are averaged over every PvE battle at its cell's calibrated difficulty (" + battles + " battles).");
+            report.AppendLine();
+            report.AppendLine("| Passive | Trigger | Scope | Proc % | Max / battle | Cooldown | Firings per battle |");
+            report.AppendLine("| --- | --- | --- | ---: | ---: | ---: | ---: |");
+            for (int p = 0; p < passives.Count; p++)
+            {
+                BeastCraft.Avatar.PassiveSkillSO passive = passives[p];
+                report.AppendLine("| " + passive.PassiveId + " | " + passive.Trigger + " | " + passive.TargetScope + " | " + passive.ProcChance + " | " +
+                                  (passive.MaxTriggersPerBattle > 0 ? passive.MaxTriggersPerBattle.ToString(CultureInfo.InvariantCulture) : "-") + " | " +
+                                  passive.InternalCooldown + " | " +
+                                  (battles == 0 ? 0.0 : (double)totals[p] / battles).ToString("0.00", CultureInfo.InvariantCulture) + " |");
+            }
+
+            report.AppendLine();
+        }
+
+        private static string ActiveNames(AvatarPresets avatar)
+        {
+            List<string> names = new List<string>();
+            foreach (SkillSO skill in avatar.Actives)
+            {
+                names.Add(skill.DisplayName);
+            }
+
+            return names.Count == 0 ? "none" : string.Join(", ", names);
         }
 
         private static void AppendStats(StringBuilder report, SimOptions options, IReadOnlyList<CreatureSpeciesSO> species)
         {
             report.AppendLine("## Assembled stats at level " + options.MatrixLevel);
             report.AppendLine();
-            report.AppendLine("From `StatCalculator.ComputeStats` with no gear — what each beast actually fought with at that level.");
+            report.AppendLine("From `StatCalculator.ComputeStats` with no gear — what each beast actually fought with at that level. **Turn rate**");
+            report.AppendLine("= `TurnManager.FillRateForSpeed(Spe)` / the Speed-" + TurnManager.ReferenceSpeed + " rate: its turns per unit of normalized time (about sqrt(Spe / " +
+                              TurnManager.ReferenceSpeed + ")).");
             report.AppendLine();
-            report.AppendLine("| Beast | Element | Stance | HP | Atk | Def | SpA | SpD | Spe | Move | Crit |");
-            report.AppendLine("| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |");
+            report.AppendLine("| Beast | Element | Stance | HP | Atk | Def | SpA | SpD | Spe | Turn rate | Move | Crit |");
+            report.AppendLine("| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |");
 
             foreach (CreatureSpeciesSO beast in species)
             {
                 StatBlock stats = StatCalculator.ComputeStats(beast, options.MatrixLevel, null);
                 report.AppendLine("| " + beast.DisplayName + " | " + PvpReport.ElementsOf(beast) + " | " + beast.Stance + " | " + stats.Hp + " | " + stats.Attack + " | " + stats.Defense +
-                                  " | " + stats.SpecialAttack + " | " + stats.SpecialDefense + " | " + stats.Speed + " | " + stats.MoveRange + " | " +
+                                  " | " + stats.SpecialAttack + " | " + stats.SpecialDefense + " | " + stats.Speed + " | " +
+                                  ((double)TurnManager.FillRateForSpeed(stats.Speed) / TurnManager.ReferenceFillRate).ToString("0.000", CultureInfo.InvariantCulture) +
+                                  " | " + stats.MoveRange + " | " +
                                   stats.CritChance + "% |");
             }
         }

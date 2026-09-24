@@ -30,7 +30,8 @@ namespace BeastCraft.Tooling.BalanceSim
 
         /// <summary>
         /// Its turns per unit of normalized time over all its battles (total turns / total battle
-        /// time): about Speed / 100 while it stands, less when it falls early. NaN with no time.
+        /// time): about sqrt(Speed / 100) while it stands (the ATB gauge fills with the square root
+        /// of Speed), less when it falls early. NaN with no time.
         /// </summary>
         public double TurnsPerTime = double.NaN;
     }
@@ -226,7 +227,12 @@ namespace BeastCraft.Tooling.BalanceSim
             }
 
             AppendCalibration(report, options, cells);
-            AppendParity(report, options, species, simulator, shapes, cells);
+            if (options.KitSource == KitSource.Standard)
+            {
+                // The parity table measures the standard kit's Strike / Shot / Blast balance; library kits differ by design.
+                AppendParity(report, options, species, simulator, shapes, cells);
+            }
+
             AppendRolls(report, species, simulator, cells);
             AppendFlags(report, options, species, simulator, shapes, cells, summaries);
 
@@ -238,6 +244,8 @@ namespace BeastCraft.Tooling.BalanceSim
                     AppendElementMatchups(report, options, species, simulator, cells);
                 }
             }
+
+            TeamReport.AppendSection(report, options, species, shapes, simulator, cells);
         }
 
         private static ModeSummary Summarize(SimOptions options, IReadOnlyList<CreatureSpeciesSO> species, List<EncounterShape> shapes,
@@ -291,8 +299,34 @@ namespace BeastCraft.Tooling.BalanceSim
             return summary;
         }
 
+        /// <summary>
+        /// One kit mode's marginal clear rates exactly as the "Marginal clear rate by shape" table
+        /// shows them: <paramref name="byShape"/>[shape][beast] (levels averaged) and
+        /// <paramref name="overall"/>[beast]. Used by <see cref="SeedAggregate"/>.
+        /// </summary>
+        public static void Marginals(SimOptions options, IReadOnlyList<CreatureSpeciesSO> species, List<EncounterShape> shapes, PveSimulator simulator,
+                                     List<PveCell> cells, KitMode mode, out double[][] byShape, out double[] overall)
+        {
+            ModeSummary summary = Summarize(options, species, shapes, simulator, cells, mode);
+            byShape = new double[shapes.Count][];
+            for (int e = 0; e < shapes.Count; e++)
+            {
+                byShape[e] = new double[species.Count];
+                for (int b = 0; b < species.Count; b++)
+                {
+                    byShape[e][b] = summary.ByShape[e][b].Marginal;
+                }
+            }
+
+            overall = new double[species.Count];
+            for (int b = 0; b < species.Count; b++)
+            {
+                overall[b] = summary.Overall[b].Marginal;
+            }
+        }
+
         /// <summary>Beast indices, highest value first; ties in roster order.</summary>
-        private static List<int> Order(int count, Func<int, double> value)
+        public static List<int> Order(int count, Func<int, double> value)
         {
             List<int> order = new List<int>();
             for (int i = 0; i < count; i++)
@@ -358,6 +392,13 @@ namespace BeastCraft.Tooling.BalanceSim
             report.AppendLine("  with distinct seeds (`--samples`; " + perCell + " battles per " + (generated ? "composition" : "encounter") +
                               " per evaluation). Seeds exclude the multiplier, so calibration compares");
             report.AppendLine("  multipliers on the same rolls; the clear rate is over every battle of the " + (generated ? "shape" : "encounter") + ".");
+            if (simulator.CalibrationTeams != null)
+            {
+                report.AppendLine("- Calibration sample (`--calibrate-sample " + simulator.CalibrationTeams.Length + "`): the multiplier search evaluated a seeded subset of " +
+                                  simulator.CalibrationTeams.Length + " of the " + simulator.Teams.Count + " teams;");
+                report.AppendLine("  the chosen multiplier was then run once with every team, and every number below comes from that full run (the");
+                report.AppendLine("  \"Evaluations\" column counts it). Multipliers, and so every number, differ slightly from a run without the option.");
+            }
             report.AppendLine("- Levels: " + SimOptions.Join(options.Levels) + " (beasts and enemies at the same level); kit modes: " +
                               PvpReport.ModeList(options.Modes) + "; no gear; no avatar");
             report.AppendLine("- Placement: each side takes the front-most tiles of its own deployment zone (front row first, then outward from");
@@ -382,17 +423,17 @@ namespace BeastCraft.Tooling.BalanceSim
             report.AppendLine("  as above and prefers stop tiles that screen its Ranged / Skirmisher allies; a Ranged unit never walks into melee");
             report.AppendLine("  (so Ranged beasts carry Shot, range 3, instead of Strike); Ranged and Skirmisher units prefer stop tiles with");
             report.AppendLine("  fewer adjacent enemies and spend leftover movement backing away, keeping the nearest enemy within their longest reach.");
-            report.AppendLine("- Turn order: the Runtime's ATB gauge (`TurnManager`): every unit fills a gauge by its Speed and acts at " +
-                              TurnManager.ActionThreshold + ", so twice the");
-            report.AppendLine("  Speed is twice the turns. Battle time is normalized: 1.0 = one turn of a Speed-" + TurnManager.ReferenceSpeed +
-                              " unit. Speed scales with level, so the");
+            report.AppendLine("- Turn order: the Runtime's ATB gauge (`TurnManager`): every unit fills a gauge by round(" + TurnManager.FillScale +
+                              " x sqrt(Speed)) per tick and acts at " + TurnManager.ActionThreshold + ",");
+            report.AppendLine("  so turns grow with the square root of Speed (four times the Speed is twice the turns). Battle time is normalized:");
+            report.AppendLine("  1.0 = one turn of a Speed-" + TurnManager.ReferenceSpeed + " unit. Speed scales with level, so the");
             report.AppendLine("  same fight reads longer at low levels; compare times within a level, not across levels.");
             report.AppendLine("- Max time: " + options.MaxTime + " (a battle reaching it is a stalemate and counts as not cleared); base seed: " + options.Seed);
             report.AppendLine("- Metrics: **marginal** = clear rate of teams containing the beast minus teams without it (points; the primary");
             report.AppendLine("  number). **Dmg share** / **Taken share** = the beast's share of its team's damage dealt / taken (HP actually");
             report.AppendLine("  removed, so overkill is not counted), averaged over its battles. **Survival** = standing at the end. **Time to");
             report.AppendLine("  clear** = mean length of the clears it took part in (normalized time). **Turns / time** = the beast's turns per");
-            report.AppendLine("  unit of time over its battles (Speed / 100 while standing). \"Overall\" averages every " + (generated ? "shape" : "encounter") +
+            report.AppendLine("  unit of time over its battles (sqrt(Speed / 100) while standing). \"Overall\" averages every " + (generated ? "shape" : "encounter") +
                               " and level equally.");
             report.AppendLine();
         }
@@ -1329,7 +1370,7 @@ namespace BeastCraft.Tooling.BalanceSim
             return multiplier > 1f ? strong : multiplier < 1f ? weak : neutral;
         }
 
-        private static string Marked(SimOptions options, double marginal)
+        public static string Marked(SimOptions options, double marginal)
         {
             string text = SimOptions.Signed(marginal);
             if (marginal > options.MarginalThreshold)

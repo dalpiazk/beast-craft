@@ -25,6 +25,10 @@
     <RootNamespace>BeastCraft.Tooling.BalanceSim</RootNamespace>
     <AssemblyName>BalanceSim</AssemblyName>
     <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Server GC: every core allocates battle state flat out, and per-core heaps cut the default
+         run's GC pauses (about 8700 gen0 collections with workstation GC, 1800 with this) and its
+         wall clock by about a sixth. Measured; see README.md, "Performance". -->
+    <ServerGarbageCollection>true</ServerGarbageCollection>
   </PropertyGroup>
 
   <ItemGroup>

@@ -1,0 +1,1819 @@
+{
+  "_readme": "Source of truth for every authored skill: beast skills, the avatar's active skills and passives, the skill-training materials, and each species' learnable skills and default loadout. Drafted against a power budget and tuned with the roster against the balance simulator (default loadouts; see docs/balance/tuning-log.md), not confirmed balance. Edit here, then in Unity run Beast Craft/Data/Import Skill Library (after Import Beast Roster). Enums are member names (case-sensitive). Missing fields take the DTO defaults in SkillLibraryData.cs; note a missing TargetingCriterion means Distance (nearest), not Random. Damage Magnitude is power, a percent of the attacking stat; Heal is a percent of the caster's SpecialAttack (x HealScale, the avatar's for its skills and passives); a Shield is a percent of the caster's Defense; a DamageOverTime is a per-turn power; a Knockback is whole hexes. DefaultLoadout order is fire priority. The first 3 AvatarActives are the avatar's default actives. See docs/design/battle-system.md, 'Beast skill kits'.",
+  "SchemaVersion": 1,
+  "Materials": [
+    { "MaterialId": "essence_shard", "DisplayName": "Essence Shard", "Description": "A sliver of crystallised battle essence. Feeds a skill a little XP; opens its first breakthrough (level 5).", "Tier": 1, "XpValue": 250 },
+    { "MaterialId": "essence_crystal", "DisplayName": "Essence Crystal", "Description": "A clear crystal of battle essence. Feeds a skill a good deal of XP; opens its second breakthrough (level 10).", "Tier": 2, "XpValue": 1000 },
+    { "MaterialId": "essence_core", "DisplayName": "Essence Core", "Description": "The dense heart of a great battle's essence. Feeds a skill a large amount of XP; opens its final breakthrough (level 15).", "Tier": 3, "XpValue": 4000 }
+  ],
+  "BeastSkills": [
+    {
+      "SkillId": "boulder_slam",
+      "DisplayName": "Boulder Slam",
+      "Description": "A ponderous stone fist. Hits hard enough to matter, never hard enough to carry a fight.",
+      "TargetShape": "SingleTarget",
+      "Range": 1,
+      "Cooldown": 1,
+      "Element": "Earth",
+      "Category": "Physical",
+      "Effects": [
+        { "EffectType": "Damage", "Magnitude": 90 }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "DebuffStat", "AffectedStat": "Speed", "Magnitude": 10, "DurationTurns": 2, "Chance": 50, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "BonusEffects": [ { "EffectType": "ApplyStatus", "Status": "Knockback", "Magnitude": 1, "DurationTurns": 0 } ] }
+        ]
+      }
+    },
+    {
+      "SkillId": "stone_challenge",
+      "DisplayName": "Stone Challenge",
+      "Description": "The Golem plants itself and bellows; enemies within three hexes find they cannot look away.",
+      "TargetShape": "AreaBurst",
+      "Range": 3,
+      "Cooldown": 3,
+      "Element": "Earth",
+      "Category": "Physical",
+      "Effects": [
+        { "EffectType": "ApplyStatus", "Status": "Taunt", "Magnitude": 0, "DurationTurns": 3, "Chance": 90 }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "DebuffStat", "AffectedStat": "Attack", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "CooldownReduction": 1 }
+        ]
+      }
+    },
+    {
+      "SkillId": "granite_bulwark",
+      "DisplayName": "Granite Bulwark",
+      "Description": "Raises slabs of granite around itself and every ally within two hexes: a shield worth part of the Golem's Defense.",
+      "TargetShape": "AreaBurst",
+      "Range": 2,
+      "Cooldown": 3,
+      "TargetSide": "Ally",
+      "Element": "Earth",
+      "Effects": [
+        { "EffectType": "ApplyStatus", "Status": "Shield", "Magnitude": 85, "DurationTurns": 2 }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "BuffStat", "AffectedStat": "SpecialDefense", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "CooldownReduction": 1 }
+        ]
+      }
+    },
+    {
+      "SkillId": "tectonic_shove",
+      "DisplayName": "Tectonic Shove",
+      "Description": "A shoulder charge that sends the target skidding two hexes back.",
+      "TargetShape": "SingleTarget",
+      "Range": 1,
+      "Cooldown": 2,
+      "Element": "Earth",
+      "Category": "Physical",
+      "Effects": [
+        { "EffectType": "Damage", "Magnitude": 70 },
+        { "EffectType": "ApplyStatus", "Status": "Knockback", "Magnitude": 2, "DurationTurns": 0 }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "DebuffStat", "AffectedStat": "Defense", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "BonusEffects": [ { "EffectType": "ApplyStatus", "Status": "Stun", "Magnitude": 0, "DurationTurns": 1, "Chance": 10 } ] }
+        ]
+      }
+    },
+    {
+      "SkillId": "quake",
+      "DisplayName": "Quake",
+      "Description": "Stamps the ground: everything within two hexes is shaken and may be slowed.",
+      "TargetShape": "AreaBurst",
+      "Range": 2,
+      "Cooldown": 3,
+      "Element": "Earth",
+      "Category": "Physical",
+      "Effects": [
+        { "EffectType": "Damage", "Magnitude": 80 },
+        { "EffectType": "DebuffStat", "AffectedStat": "Speed", "Magnitude": 15, "DurationTurns": 2, "Chance": 40, "IsPercent": true }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "ApplyStatus", "Status": "Stun", "Magnitude": 0, "DurationTurns": 1, "Chance": 10 } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "CooldownReduction": 1 }
+        ]
+      }
+    },
+    {
+      "SkillId": "stoneskin",
+      "DisplayName": "Stoneskin",
+      "Description": "Hardens its hide: more Defense and Special Defense for three turns.",
+      "TargetShape": "Self",
+      "Range": 0,
+      "Cooldown": 4,
+      "Element": "Earth",
+      "Effects": [
+        { "EffectType": "BuffStat", "AffectedStat": "Defense", "Magnitude": 25, "DurationTurns": 3, "IsPercent": true },
+        { "EffectType": "BuffStat", "AffectedStat": "SpecialDefense", "Magnitude": 25, "DurationTurns": 3, "IsPercent": true }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "ApplyStatus", "Status": "Shield", "Magnitude": 30, "DurationTurns": 2 } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "CooldownReduction": 1 }
+        ]
+      }
+    },
+    {
+      "SkillId": "serpent_bite",
+      "DisplayName": "Serpent Bite",
+      "Description": "A crushing bite from the deep.",
+      "TargetShape": "SingleTarget",
+      "Range": 1,
+      "Cooldown": 1,
+      "Element": "Water",
+      "Category": "Physical",
+      "Effects": [
+        { "EffectType": "Damage", "Magnitude": 86 }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "DebuffStat", "AffectedStat": "Attack", "Magnitude": 8, "DurationTurns": 2, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "BonusEffects": [ { "EffectType": "ApplyStatus", "Status": "DamageOverTime", "Magnitude": 10, "DurationTurns": 2 } ] }
+        ]
+      }
+    },
+    {
+      "SkillId": "undertow",
+      "DisplayName": "Undertow",
+      "Description": "Churns the water into a whirlpool: enemies within three hexes are drawn to the Leviathan (taunted) and slowed.",
+      "TargetShape": "AreaBurst",
+      "Range": 3,
+      "Cooldown": 3,
+      "Element": "Water",
+      "Category": "Special",
+      "Effects": [
+        { "EffectType": "ApplyStatus", "Status": "Taunt", "Magnitude": 0, "DurationTurns": 2, "Chance": 85 },
+        { "EffectType": "DebuffStat", "AffectedStat": "Speed", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "DebuffStat", "AffectedStat": "SpecialAttack", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "CooldownReduction": 1 }
+        ]
+      }
+    },
+    {
+      "SkillId": "deep_shell",
+      "DisplayName": "Deep Shell",
+      "Description": "Coils behind its scales and closes its wounds: a shield worth about two-thirds of its Defense and a small heal.",
+      "TargetShape": "Self",
+      "Range": 0,
+      "Cooldown": 3,
+      "Element": "Water",
+      "Effects": [
+        { "EffectType": "ApplyStatus", "Status": "Shield", "Magnitude": 65, "DurationTurns": 3 },
+        { "EffectType": "Heal", "Magnitude": 24 }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "BuffStat", "AffectedStat": "SpecialDefense", "Magnitude": 15, "DurationTurns": 3, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "CooldownReduction": 1 }
+        ]
+      }
+    },
+    {
+      "SkillId": "tidal_wave",
+      "DisplayName": "Tidal Wave",
+      "Description": "A wall of water down a three-hex line that may knock the front rank back.",
+      "TargetShape": "Line",
+      "Range": 3,
+      "Cooldown": 2,
+      "Element": "Water",
+      "Category": "Special",
+      "Effects": [
+        { "EffectType": "Damage", "Magnitude": 90 },
+        { "EffectType": "ApplyStatus", "Status": "Knockback", "Magnitude": 1, "DurationTurns": 0, "Chance": 50 }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "DebuffStat", "AffectedStat": "Speed", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "BonusEffects": [ { "EffectType": "DebuffStat", "AffectedStat": "SpecialDefense", "Magnitude": 8, "DurationTurns": 2, "IsPercent": true } ] }
+        ]
+      }
+    },
+    {
+      "SkillId": "maelstrom",
+      "DisplayName": "Maelstrom",
+      "Description": "A churning vortex around the Leviathan that wears down Special Defense.",
+      "TargetShape": "AreaBurst",
+      "Range": 2,
+      "Cooldown": 3,
+      "Element": "Water",
+      "Category": "Special",
+      "Effects": [
+        { "EffectType": "Damage", "Magnitude": 70 },
+        { "EffectType": "DebuffStat", "AffectedStat": "SpecialDefense", "Magnitude": 15, "DurationTurns": 2, "IsPercent": true }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "ApplyStatus", "Status": "DamageOverTime", "Magnitude": 10, "DurationTurns": 2 } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "CooldownReduction": 1 }
+        ]
+      }
+    },
+    {
+      "SkillId": "tidal_renewal",
+      "DisplayName": "Tidal Renewal",
+      "Description": "A cool tide washes over allies within two hexes, healing them and hardening their guard.",
+      "TargetShape": "AreaBurst",
+      "Range": 2,
+      "Cooldown": 4,
+      "TargetSide": "Ally",
+      "Element": "Water",
+      "Effects": [
+        { "EffectType": "Heal", "Magnitude": 29 },
+        { "EffectType": "BuffStat", "AffectedStat": "Defense", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "ApplyStatus", "Status": "Shield", "Magnitude": 20, "DurationTurns": 2 } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "CooldownReduction": 1 }
+        ]
+      }
+    },
+    {
+      "SkillId": "thorn_lash",
+      "DisplayName": "Thorn Lash",
+      "Description": "A whip of thorned vine that leaves a festering wound (stacks three times).",
+      "TargetShape": "SingleTarget",
+      "Range": 2,
+      "Cooldown": 1,
+      "Element": "Nature",
+      "Category": "Special",
+      "Effects": [
+        { "EffectType": "Damage", "Magnitude": 40 },
+        { "EffectType": "ApplyStatus", "Status": "DamageOverTime", "Magnitude": 10, "DurationTurns": 3, "MaxStacks": 3 }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "DebuffStat", "AffectedStat": "Speed", "Magnitude": 8, "DurationTurns": 2, "Chance": 50, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "BonusEffects": [ { "EffectType": "DebuffStat", "AffectedStat": "SpecialDefense", "Magnitude": 8, "DurationTurns": 2, "IsPercent": true } ] }
+        ]
+      }
+    },
+    {
+      "SkillId": "verdant_mend",
+      "DisplayName": "Verdant Mend",
+      "Description": "Sap and leaf close the wounds of whichever ally within three hexes is worst off.",
+      "TargetShape": "SingleTarget",
+      "Range": 3,
+      "Cooldown": 2,
+      "TargetSide": "Ally",
+      "TargetingCriterion": "HpFraction",
+      "TargetingOrder": "Lowest",
+      "Element": "Nature",
+      "Effects": [
+        { "EffectType": "Heal", "Magnitude": 40 }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "ApplyStatus", "Status": "Shield", "Magnitude": 20, "DurationTurns": 2 } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "BonusEffects": [ { "EffectType": "BuffStat", "AffectedStat": "Defense", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true } ] }
+        ]
+      }
+    },
+    {
+      "SkillId": "bark_ward",
+      "DisplayName": "Bark Ward",
+      "Description": "Grows a skin of bark over every ally within two hexes.",
+      "TargetShape": "AreaBurst",
+      "Range": 2,
+      "Cooldown": 3,
+      "TargetSide": "Ally",
+      "Element": "Nature",
+      "Effects": [
+        { "EffectType": "ApplyStatus", "Status": "Shield", "Magnitude": 30, "DurationTurns": 2 }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "Heal", "Magnitude": 11 } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "CooldownReduction": 1 }
+        ]
+      }
+    },
+    {
+      "SkillId": "entangling_roots",
+      "DisplayName": "Entangling Roots",
+      "Description": "Roots burst from the ground and may hold the target fast for a turn.",
+      "TargetShape": "SingleTarget",
+      "Range": 2,
+      "Cooldown": 3,
+      "Element": "Nature",
+      "Category": "Special",
+      "Effects": [
+        { "EffectType": "Damage", "Magnitude": 50 },
+        { "EffectType": "ApplyStatus", "Status": "Stun", "Magnitude": 0, "DurationTurns": 1, "Chance": 25 }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "DebuffStat", "AffectedStat": "Speed", "Magnitude": 15, "DurationTurns": 2, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "CooldownReduction": 1 }
+        ]
+      }
+    },
+    {
+      "SkillId": "spore_cloud",
+      "DisplayName": "Spore Cloud",
+      "Description": "Releases choking spores around itself: a lingering poison that also saps strength.",
+      "TargetShape": "AreaBurst",
+      "Range": 2,
+      "Cooldown": 3,
+      "Element": "Nature",
+      "Category": "Special",
+      "Effects": [
+        { "EffectType": "ApplyStatus", "Status": "DamageOverTime", "Magnitude": 25, "DurationTurns": 3 },
+        { "EffectType": "DebuffStat", "AffectedStat": "Attack", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "DebuffStat", "AffectedStat": "SpecialAttack", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "CooldownReduction": 1 }
+        ]
+      }
+    },
+    {
+      "SkillId": "lifebloom",
+      "DisplayName": "Lifebloom",
+      "Description": "The whole team blossoms: a heal and a Defense boost.",
+      "TargetShape": "AllAllies",
+      "Range": 0,
+      "Cooldown": 4,
+      "Element": "Nature",
+      "Effects": [
+        { "EffectType": "Heal", "Magnitude": 19 },
+        { "EffectType": "BuffStat", "AffectedStat": "Defense", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "BuffStat", "AffectedStat": "SpecialDefense", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "CooldownReduction": 1 }
+        ]
+      }
+    },
+    {
+      "SkillId": "sunder",
+      "DisplayName": "Sunder",
+      "Description": "A rending strike that cracks armour: -12% Defense for three turns, stacking up to three times.",
+      "TargetShape": "SingleTarget",
+      "Range": 1,
+      "Cooldown": 1,
+      "Element": "Metal",
+      "Category": "Physical",
+      "Effects": [
+        { "EffectType": "Damage", "Magnitude": 65 },
+        { "EffectType": "DebuffStat", "AffectedStat": "Defense", "Magnitude": 12, "DurationTurns": 3, "MaxStacks": 3, "IsPercent": true }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "DebuffStat", "AffectedStat": "SpecialDefense", "Magnitude": 8, "DurationTurns": 3, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "BonusEffects": [ { "EffectType": "ApplyStatus", "Status": "DamageOverTime", "Magnitude": 10, "DurationTurns": 2 } ] }
+        ]
+      }
+    },
+    {
+      "SkillId": "iron_crush",
+      "DisplayName": "Iron Crush",
+      "Description": "The Tarasque brings its whole plated weight down on one foe.",
+      "TargetShape": "SingleTarget",
+      "Range": 1,
+      "Cooldown": 2,
+      "Element": "Metal",
+      "Category": "Physical",
+      "Effects": [
+        { "EffectType": "Damage", "Magnitude": 160 }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "ApplyStatus", "Status": "Stun", "Magnitude": 0, "DurationTurns": 1, "Chance": 15 } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "BonusEffects": [ { "EffectType": "DebuffStat", "AffectedStat": "Defense", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true } ] }
+        ]
+      }
+    },
+    {
+      "SkillId": "iron_fortress",
+      "DisplayName": "Iron Fortress",
+      "Description": "Braces behind its plates and waits for the counterblow: more Defense and Attack for three turns.",
+      "TargetShape": "Self",
+      "Range": 0,
+      "Cooldown": 4,
+      "Element": "Metal",
+      "Effects": [
+        { "EffectType": "BuffStat", "AffectedStat": "Defense", "Magnitude": 30, "DurationTurns": 3, "IsPercent": true },
+        { "EffectType": "BuffStat", "AffectedStat": "Attack", "Magnitude": 15, "DurationTurns": 3, "IsPercent": true }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "ApplyStatus", "Status": "Shield", "Magnitude": 30, "DurationTurns": 2 } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "CooldownReduction": 1 }
+        ]
+      }
+    },
+    {
+      "SkillId": "spiked_carapace",
+      "DisplayName": "Spiked Carapace",
+      "Description": "Bristles its spines: a shield and a Special Defense boost.",
+      "TargetShape": "Self",
+      "Range": 0,
+      "Cooldown": 3,
+      "Element": "Metal",
+      "Effects": [
+        { "EffectType": "ApplyStatus", "Status": "Shield", "Magnitude": 40, "DurationTurns": 2 },
+        { "EffectType": "BuffStat", "AffectedStat": "SpecialDefense", "Magnitude": 20, "DurationTurns": 2, "IsPercent": true }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "BuffStat", "AffectedStat": "Attack", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "CooldownReduction": 1 }
+        ]
+      }
+    },
+    {
+      "SkillId": "shrapnel_burst",
+      "DisplayName": "Shrapnel Burst",
+      "Description": "Sheds a storm of metal scales at everything adjacent.",
+      "TargetShape": "AreaBurst",
+      "Range": 1,
+      "Cooldown": 2,
+      "Element": "Metal",
+      "Category": "Physical",
+      "Effects": [
+        { "EffectType": "Damage", "Magnitude": 85 },
+        { "EffectType": "DebuffStat", "AffectedStat": "Defense", "Magnitude": 8, "DurationTurns": 2, "Chance": 50, "IsPercent": true }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "ApplyStatus", "Status": "DamageOverTime", "Magnitude": 10, "DurationTurns": 2 } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "BonusEffects": [ { "EffectType": "DebuffStat", "AffectedStat": "Speed", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true } ] }
+        ]
+      }
+    },
+    {
+      "SkillId": "juggernaut_charge",
+      "DisplayName": "Juggernaut Charge",
+      "Description": "A two-hex charge that flattens the line and shoves the front of it back.",
+      "TargetShape": "Line",
+      "Range": 2,
+      "Cooldown": 3,
+      "Element": "Metal",
+      "Category": "Physical",
+      "Effects": [
+        { "EffectType": "Damage", "Magnitude": 150 },
+        { "EffectType": "ApplyStatus", "Status": "Knockback", "Magnitude": 1, "DurationTurns": 0 }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "ApplyStatus", "Status": "Stun", "Magnitude": 0, "DurationTurns": 1, "Chance": 20 } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "CooldownReduction": 1 }
+        ]
+      }
+    },
+    {
+      "SkillId": "rime_bolt",
+      "DisplayName": "Rime Bolt",
+      "Description": "A shard of ice that chills: -8% Speed for three turns, stacking up to three times.",
+      "TargetShape": "SingleTarget",
+      "Range": 2,
+      "Cooldown": 1,
+      "Element": "Ice",
+      "Category": "Special",
+      "Effects": [
+        { "EffectType": "Damage", "Magnitude": 52 },
+        { "EffectType": "DebuffStat", "AffectedStat": "Speed", "Magnitude": 8, "DurationTurns": 3, "MaxStacks": 3, "IsPercent": true }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "DebuffStat", "AffectedStat": "SpecialDefense", "Magnitude": 5, "DurationTurns": 2, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "BonusEffects": [ { "EffectType": "ApplyStatus", "Status": "Stun", "Magnitude": 0, "DurationTurns": 1, "Chance": 10 } ] }
+        ]
+      }
+    },
+    {
+      "SkillId": "deep_freeze",
+      "DisplayName": "Deep Freeze",
+      "Description": "Encases the target in ice; it may be frozen solid for a turn.",
+      "TargetShape": "SingleTarget",
+      "Range": 2,
+      "Cooldown": 3,
+      "Element": "Ice",
+      "Category": "Special",
+      "Effects": [
+        { "EffectType": "Damage", "Magnitude": 60 },
+        { "EffectType": "ApplyStatus", "Status": "Stun", "Magnitude": 0, "DurationTurns": 1, "Chance": 35 }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "DebuffStat", "AffectedStat": "Speed", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "CooldownReduction": 1 }
+        ]
+      }
+    },
+    {
+      "SkillId": "frost_breath",
+      "DisplayName": "Frost Breath",
+      "Description": "A freezing exhalation over everything within two hexes; may chill (stacks three times).",
+      "TargetShape": "AreaBurst",
+      "Range": 2,
+      "Cooldown": 2,
+      "Element": "Ice",
+      "Category": "Special",
+      "Effects": [
+        { "EffectType": "Damage", "Magnitude": 46 },
+        { "EffectType": "DebuffStat", "AffectedStat": "Speed", "Magnitude": 10, "DurationTurns": 2, "Chance": 50, "MaxStacks": 3, "IsPercent": true }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "ApplyStatus", "Status": "Stun", "Magnitude": 0, "DurationTurns": 1, "Chance": 10 } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "BonusEffects": [ { "EffectType": "DebuffStat", "AffectedStat": "SpecialDefense", "Magnitude": 8, "DurationTurns": 2, "IsPercent": true } ] }
+        ]
+      }
+    },
+    {
+      "SkillId": "blizzard",
+      "DisplayName": "Blizzard",
+      "Description": "Driving snow along all six axes, three hexes out.",
+      "TargetShape": "Cross",
+      "Range": 3,
+      "Cooldown": 3,
+      "Element": "Ice",
+      "Category": "Special",
+      "Effects": [
+        { "EffectType": "Damage", "Magnitude": 90 },
+        { "EffectType": "DebuffStat", "AffectedStat": "Speed", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "ApplyStatus", "Status": "Stun", "Magnitude": 0, "DurationTurns": 1, "Chance": 15 } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "CooldownReduction": 1 }
+        ]
+      }
+    },
+    {
+      "SkillId": "ice_armor",
+      "DisplayName": "Ice Armor",
+      "Description": "Coats itself in rime: a shield and more Special Defense.",
+      "TargetShape": "Self",
+      "Range": 0,
+      "Cooldown": 4,
+      "Element": "Ice",
+      "Effects": [
+        { "EffectType": "ApplyStatus", "Status": "Shield", "Magnitude": 45, "DurationTurns": 3 },
+        { "EffectType": "BuffStat", "AffectedStat": "SpecialDefense", "Magnitude": 15, "DurationTurns": 3, "IsPercent": true }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "BuffStat", "AffectedStat": "Defense", "Magnitude": 10, "DurationTurns": 3, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "CooldownReduction": 1 }
+        ]
+      }
+    },
+    {
+      "SkillId": "absolute_zero",
+      "DisplayName": "Absolute Zero",
+      "Description": "Once a battle, the air itself freezes: every enemy is struck and may be frozen.",
+      "TargetShape": "AllEnemies",
+      "Range": 0,
+      "Cooldown": 5,
+      "MaxUsesPerBattle": 1,
+      "Element": "Ice",
+      "Category": "Special",
+      "Effects": [
+        { "EffectType": "Damage", "Magnitude": 50 },
+        { "EffectType": "ApplyStatus", "Status": "Stun", "Magnitude": 0, "DurationTurns": 1, "Chance": 20 }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "DebuffStat", "AffectedStat": "Speed", "Magnitude": 15, "DurationTurns": 2, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "BonusEffects": [ { "EffectType": "DebuffStat", "AffectedStat": "SpecialDefense", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true } ] }
+        ]
+      }
+    },
+    {
+      "SkillId": "thunder_talons",
+      "DisplayName": "Thunder Talons",
+      "Description": "Three quick bolts loosed from its talons at two hexes: many weak hits, each its own crit roll.",
+      "TargetShape": "SingleTarget",
+      "Range": 2,
+      "Cooldown": 1,
+      "Element": "Lightning",
+      "Category": "Physical",
+      "Effects": [
+        { "EffectType": "Damage", "Magnitude": 26, "HitCount": 3 }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "DebuffStat", "AffectedStat": "Defense", "Magnitude": 5, "DurationTurns": 2, "MaxStacks": 3, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "BonusEffects": [ { "EffectType": "Damage", "Magnitude": 25 } ] }
+        ]
+      }
+    },
+    {
+      "SkillId": "chain_lightning",
+      "DisplayName": "Chain Lightning",
+      "Description": "Lightning arcs between everything within two hexes, three times over: its answer to a swarm.",
+      "TargetShape": "AreaBurst",
+      "Range": 2,
+      "Cooldown": 2,
+      "Element": "Lightning",
+      "Category": "Special",
+      "Effects": [
+        { "EffectType": "Damage", "Magnitude": 22, "HitCount": 3 }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "ApplyStatus", "Status": "Stun", "Magnitude": 0, "DurationTurns": 1, "Chance": 10 } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "BonusEffects": [ { "EffectType": "DebuffStat", "AffectedStat": "SpecialDefense", "Magnitude": 8, "DurationTurns": 2, "IsPercent": true } ] }
+        ]
+      }
+    },
+    {
+      "SkillId": "static_charge",
+      "DisplayName": "Static Charge",
+      "Description": "Builds a charge in its feathers: +25 crit chance and more Speed for three turns.",
+      "TargetShape": "Self",
+      "Range": 0,
+      "Cooldown": 4,
+      "Element": "Lightning",
+      "Effects": [
+        { "EffectType": "BuffStat", "AffectedStat": "CritChance", "Magnitude": 25, "DurationTurns": 3 },
+        { "EffectType": "BuffStat", "AffectedStat": "Speed", "Magnitude": 10, "DurationTurns": 3, "IsPercent": true }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "BuffStat", "AffectedStat": "Attack", "Magnitude": 10, "DurationTurns": 3, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "CooldownReduction": 1 }
+        ]
+      }
+    },
+    {
+      "SkillId": "storm_dive",
+      "DisplayName": "Storm Dive",
+      "Description": "Opens the fight with a single dive from the clouds: one heavy hit, once per battle.",
+      "TargetShape": "SingleTarget",
+      "Range": 3,
+      "Cooldown": 4,
+      "InitialCooldown": 0,
+      "MaxUsesPerBattle": 1,
+      "Element": "Lightning",
+      "Category": "Physical",
+      "Effects": [
+        { "EffectType": "Damage", "Magnitude": 120 }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "ApplyStatus", "Status": "Stun", "Magnitude": 0, "DurationTurns": 1, "Chance": 25 } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "BonusEffects": [ { "EffectType": "DebuffStat", "AffectedStat": "Defense", "Magnitude": 15, "DurationTurns": 2, "IsPercent": true } ] }
+        ]
+      }
+    },
+    {
+      "SkillId": "thunderclap",
+      "DisplayName": "Thunderclap",
+      "Description": "A deafening crack around itself that may stun.",
+      "TargetShape": "AreaBurst",
+      "Range": 1,
+      "Cooldown": 3,
+      "Element": "Lightning",
+      "Category": "Special",
+      "Effects": [
+        { "EffectType": "Damage", "Magnitude": 70 },
+        { "EffectType": "ApplyStatus", "Status": "Stun", "Magnitude": 0, "DurationTurns": 1, "Chance": 20 }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "DebuffStat", "AffectedStat": "Speed", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "CooldownReduction": 1 }
+        ]
+      }
+    },
+    {
+      "SkillId": "plasma_barrage",
+      "DisplayName": "Plasma Barrage",
+      "Description": "Four bolts down a four-hex line.",
+      "TargetShape": "Line",
+      "Range": 4,
+      "Cooldown": 2,
+      "Element": "Lightning",
+      "Category": "Special",
+      "Effects": [
+        { "EffectType": "Damage", "Magnitude": 26, "HitCount": 4 }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "DebuffStat", "AffectedStat": "Defense", "Magnitude": 8, "DurationTurns": 2, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "BonusEffects": [ { "EffectType": "DebuffStat", "AffectedStat": "SpecialDefense", "Magnitude": 8, "DurationTurns": 2, "IsPercent": true } ] }
+        ]
+      }
+    },
+    {
+      "SkillId": "gale_talon",
+      "DisplayName": "Gale Talon",
+      "Description": "A diving rake of talons.",
+      "TargetShape": "SingleTarget",
+      "Range": 1,
+      "Cooldown": 1,
+      "Element": "Air",
+      "Category": "Physical",
+      "Effects": [
+        { "EffectType": "Damage", "Magnitude": 89 }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "DebuffStat", "AffectedStat": "Defense", "Magnitude": 8, "DurationTurns": 2, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "BonusEffects": [ { "EffectType": "Damage", "Magnitude": 20 } ] }
+        ]
+      }
+    },
+    {
+      "SkillId": "wind_lance",
+      "DisplayName": "Wind Lance",
+      "Description": "A spear of compressed air down a three-hex line.",
+      "TargetShape": "Line",
+      "Range": 3,
+      "Cooldown": 2,
+      "Element": "Air",
+      "Category": "Physical",
+      "Effects": [
+        { "EffectType": "Damage", "Magnitude": 110 }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "ApplyStatus", "Status": "Knockback", "Magnitude": 1, "DurationTurns": 0 } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "BonusEffects": [ { "EffectType": "DebuffStat", "AffectedStat": "Speed", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true } ] }
+        ]
+      }
+    },
+    {
+      "SkillId": "gust",
+      "DisplayName": "Gust",
+      "Description": "A beat of great wings that hurls everything adjacent two hexes away.",
+      "TargetShape": "AreaBurst",
+      "Range": 1,
+      "Cooldown": 3,
+      "Element": "Air",
+      "Category": "Physical",
+      "Effects": [
+        { "EffectType": "Damage", "Magnitude": 55 },
+        { "EffectType": "ApplyStatus", "Status": "Knockback", "Magnitude": 2, "DurationTurns": 0 }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "DebuffStat", "AffectedStat": "Speed", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "CooldownReduction": 1 }
+        ]
+      }
+    },
+    {
+      "SkillId": "tailwind",
+      "DisplayName": "Tailwind",
+      "Description": "Rides the wind: harder to pin down (more Defense and Special Defense; there is no evasion stat) and one more hex of movement for two turns.",
+      "TargetShape": "Self",
+      "Range": 0,
+      "Cooldown": 4,
+      "Element": "Air",
+      "Effects": [
+        { "EffectType": "BuffStat", "AffectedStat": "Defense", "Magnitude": 20, "DurationTurns": 2, "IsPercent": true },
+        { "EffectType": "BuffStat", "AffectedStat": "SpecialDefense", "Magnitude": 20, "DurationTurns": 2, "IsPercent": true },
+        { "EffectType": "BuffStat", "AffectedStat": "MoveRange", "Magnitude": 1, "DurationTurns": 2 }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "BuffStat", "AffectedStat": "Speed", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "CooldownReduction": 1 }
+        ]
+      }
+    },
+    {
+      "SkillId": "updraft",
+      "DisplayName": "Updraft",
+      "Description": "Lifts the whole team on a rising wind: more Speed and one more hex of movement.",
+      "TargetShape": "AllAllies",
+      "Range": 0,
+      "Cooldown": 5,
+      "Element": "Air",
+      "Effects": [
+        { "EffectType": "BuffStat", "AffectedStat": "Speed", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true },
+        { "EffectType": "BuffStat", "AffectedStat": "MoveRange", "Magnitude": 1, "DurationTurns": 2 }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "BuffStat", "AffectedStat": "Attack", "Magnitude": 5, "DurationTurns": 2, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "CooldownReduction": 1 }
+        ]
+      }
+    },
+    {
+      "SkillId": "sky_rend",
+      "DisplayName": "Sky Rend",
+      "Description": "A plummeting strike that tears through armour.",
+      "TargetShape": "SingleTarget",
+      "Range": 1,
+      "Cooldown": 2,
+      "Element": "Air",
+      "Category": "Physical",
+      "Effects": [
+        { "EffectType": "Damage", "Magnitude": 175 },
+        { "EffectType": "DebuffStat", "AffectedStat": "Defense", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "ApplyStatus", "Status": "DamageOverTime", "Magnitude": 12, "DurationTurns": 2 } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "BonusEffects": [ { "EffectType": "ApplyStatus", "Status": "Stun", "Magnitude": 0, "DurationTurns": 1, "Chance": 10 } ] }
+        ]
+      }
+    },
+    {
+      "SkillId": "ember_shot",
+      "DisplayName": "Ember Shot",
+      "Description": "A bolt of flame that sets the target burning (stacks three times).",
+      "TargetShape": "SingleTarget",
+      "Range": 3,
+      "Cooldown": 1,
+      "Element": "Fire",
+      "Category": "Special",
+      "Effects": [
+        { "EffectType": "Damage", "Magnitude": 60 },
+        { "EffectType": "ApplyStatus", "Status": "DamageOverTime", "Magnitude": 14, "DurationTurns": 3, "MaxStacks": 3 }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "DebuffStat", "AffectedStat": "SpecialDefense", "Magnitude": 5, "DurationTurns": 2, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "BonusEffects": [ { "EffectType": "Damage", "Magnitude": 15 } ] }
+        ]
+      }
+    },
+    {
+      "SkillId": "flame_wave",
+      "DisplayName": "Flame Wave",
+      "Description": "A sheet of fire down a four-hex line; may leave it burning.",
+      "TargetShape": "Line",
+      "Range": 4,
+      "Cooldown": 2,
+      "Element": "Fire",
+      "Category": "Special",
+      "Effects": [
+        { "EffectType": "Damage", "Magnitude": 90 },
+        { "EffectType": "ApplyStatus", "Status": "DamageOverTime", "Magnitude": 10, "DurationTurns": 2, "Chance": 50 }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "DebuffStat", "AffectedStat": "SpecialDefense", "Magnitude": 8, "DurationTurns": 2, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "BonusEffects": [ { "EffectType": "ApplyStatus", "Status": "DamageOverTime", "Magnitude": 10, "DurationTurns": 2 } ] }
+        ]
+      }
+    },
+    {
+      "SkillId": "rebirth_flame",
+      "DisplayName": "Rebirth Flame",
+      "Description": "Once a battle, the Phoenix wreathes itself in renewing fire: a heal and a large shield. There is no revive mechanic; this is the honest stand-in.",
+      "TargetShape": "Self",
+      "Range": 0,
+      "Cooldown": 4,
+      "MaxUsesPerBattle": 1,
+      "Element": "Fire",
+      "Effects": [
+        { "EffectType": "Heal", "Magnitude": 44 },
+        { "EffectType": "ApplyStatus", "Status": "Shield", "Magnitude": 80, "DurationTurns": 3 }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "BuffStat", "AffectedStat": "SpecialAttack", "Magnitude": 15, "DurationTurns": 3, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "BonusEffects": [ { "EffectType": "BuffStat", "AffectedStat": "Speed", "Magnitude": 10, "DurationTurns": 3, "IsPercent": true } ] }
+        ]
+      }
+    },
+    {
+      "SkillId": "blaze_bolt",
+      "DisplayName": "Blaze Bolt",
+      "Description": "A concentrated lance of fire at up to four hexes.",
+      "TargetShape": "SingleTarget",
+      "Range": 4,
+      "Cooldown": 2,
+      "Element": "Fire",
+      "Category": "Special",
+      "Effects": [
+        { "EffectType": "Damage", "Magnitude": 150 }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "ApplyStatus", "Status": "DamageOverTime", "Magnitude": 15, "DurationTurns": 2 } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "BonusEffects": [ { "EffectType": "DebuffStat", "AffectedStat": "SpecialDefense", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true } ] }
+        ]
+      }
+    },
+    {
+      "SkillId": "firestorm",
+      "DisplayName": "Firestorm",
+      "Description": "Fire rains on every enemy and leaves them burning.",
+      "TargetShape": "AllEnemies",
+      "Range": 0,
+      "Cooldown": 4,
+      "Element": "Fire",
+      "Category": "Special",
+      "Effects": [
+        { "EffectType": "Damage", "Magnitude": 40 },
+        { "EffectType": "ApplyStatus", "Status": "DamageOverTime", "Magnitude": 12, "DurationTurns": 2, "MaxStacks": 3 }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "DebuffStat", "AffectedStat": "SpecialDefense", "Magnitude": 8, "DurationTurns": 2, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "CooldownReduction": 1 }
+        ]
+      }
+    },
+    {
+      "SkillId": "sunfire_nova",
+      "DisplayName": "Sunfire Nova",
+      "Description": "A cross of white fire three hexes out along every axis.",
+      "TargetShape": "Cross",
+      "Range": 3,
+      "Cooldown": 3,
+      "Element": "Fire",
+      "Category": "Special",
+      "Effects": [
+        { "EffectType": "Damage", "Magnitude": 110 },
+        { "EffectType": "ApplyStatus", "Status": "DamageOverTime", "Magnitude": 15, "DurationTurns": 3 }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "DebuffStat", "AffectedStat": "SpecialDefense", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "CooldownReduction": 1 }
+        ]
+      }
+    },
+    {
+      "SkillId": "sacred_spring",
+      "DisplayName": "Sacred Spring",
+      "Description": "A spring of light wells up under the whole team and heals it.",
+      "TargetShape": "AllAllies",
+      "Range": 0,
+      "Cooldown": 3,
+      "Element": "Light",
+      "Effects": [
+        { "EffectType": "Heal", "Magnitude": 20 }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "BuffStat", "AffectedStat": "SpecialDefense", "Magnitude": 8, "DurationTurns": 2, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "CooldownReduction": 1 }
+        ]
+      }
+    },
+    {
+      "SkillId": "blessing",
+      "DisplayName": "Blessing",
+      "Description": "Blesses the team: more Special Attack and Special Defense for two turns.",
+      "TargetShape": "AllAllies",
+      "Range": 0,
+      "Cooldown": 4,
+      "Element": "Light",
+      "Effects": [
+        { "EffectType": "BuffStat", "AffectedStat": "SpecialAttack", "Magnitude": 12, "DurationTurns": 2, "IsPercent": true },
+        { "EffectType": "BuffStat", "AffectedStat": "SpecialDefense", "Magnitude": 12, "DurationTurns": 2, "IsPercent": true }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "BuffStat", "AffectedStat": "CritChance", "Magnitude": 5, "DurationTurns": 2 } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "CooldownReduction": 1 }
+        ]
+      }
+    },
+    {
+      "SkillId": "radiant_bolt",
+      "DisplayName": "Radiant Bolt",
+      "Description": "A bolt of pure light.",
+      "TargetShape": "SingleTarget",
+      "Range": 3,
+      "Cooldown": 1,
+      "Element": "Light",
+      "Category": "Special",
+      "Effects": [
+        { "EffectType": "Damage", "Magnitude": 66 }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "DebuffStat", "AffectedStat": "SpecialDefense", "Magnitude": 5, "DurationTurns": 2, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "BonusEffects": [ { "EffectType": "Damage", "Magnitude": 15 } ] }
+        ]
+      }
+    },
+    {
+      "SkillId": "judgment",
+      "DisplayName": "Judgment",
+      "Description": "A pillar of light on one foe at up to four hexes: the Kirin's one real nuke.",
+      "TargetShape": "SingleTarget",
+      "Range": 4,
+      "Cooldown": 3,
+      "Element": "Light",
+      "Category": "Special",
+      "Effects": [
+        { "EffectType": "Damage", "Magnitude": 190 }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "ApplyStatus", "Status": "Stun", "Magnitude": 0, "DurationTurns": 1, "Chance": 15 } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "CooldownReduction": 1 }
+        ]
+      }
+    },
+    {
+      "SkillId": "purifying_ward",
+      "DisplayName": "Purifying Ward",
+      "Description": "Wraps the team in cleansing light. There is no cleanse mechanic: it is a shield and a Special Defense boost.",
+      "TargetShape": "AllAllies",
+      "Range": 0,
+      "Cooldown": 4,
+      "Element": "Light",
+      "Effects": [
+        { "EffectType": "ApplyStatus", "Status": "Shield", "Magnitude": 25, "DurationTurns": 2 },
+        { "EffectType": "BuffStat", "AffectedStat": "SpecialDefense", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "Heal", "Magnitude": 7 } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "CooldownReduction": 1 }
+        ]
+      }
+    },
+    {
+      "SkillId": "halo",
+      "DisplayName": "Halo",
+      "Description": "A ring of light heals and steadies every ally within two hexes.",
+      "TargetShape": "AreaBurst",
+      "Range": 2,
+      "Cooldown": 3,
+      "TargetSide": "Ally",
+      "Element": "Light",
+      "Effects": [
+        { "EffectType": "Heal", "Magnitude": 19 },
+        { "EffectType": "BuffStat", "AffectedStat": "Defense", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "ApplyStatus", "Status": "Shield", "Magnitude": 20, "DurationTurns": 2 } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "CooldownReduction": 1 }
+        ]
+      }
+    },
+    {
+      "SkillId": "venom_spit",
+      "DisplayName": "Venom Spit",
+      "Description": "Spits a venom that keeps working (poison, stacks three times).",
+      "TargetShape": "SingleTarget",
+      "Range": 3,
+      "Cooldown": 1,
+      "Element": "Dark",
+      "Category": "Special",
+      "Effects": [
+        { "EffectType": "Damage", "Magnitude": 45 },
+        { "EffectType": "ApplyStatus", "Status": "DamageOverTime", "Magnitude": 15, "DurationTurns": 3, "MaxStacks": 3 }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "DebuffStat", "AffectedStat": "SpecialDefense", "Magnitude": 5, "DurationTurns": 2, "MaxStacks": 3, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "BonusEffects": [ { "EffectType": "Damage", "Magnitude": 15 } ] }
+        ]
+      }
+    },
+    {
+      "SkillId": "coup_de_grace",
+      "DisplayName": "Coup de Grace",
+      "Description": "Finds the most wounded enemy in reach and finishes it: up to +60% damage against a nearly dead target.",
+      "TargetShape": "SingleTarget",
+      "Range": 3,
+      "Cooldown": 2,
+      "TargetingCriterion": "HpFraction",
+      "TargetingOrder": "Lowest",
+      "Element": "Dark",
+      "Category": "Special",
+      "Effects": [
+        { "EffectType": "Damage", "Magnitude": 115, "ExecuteBonusPercent": 60 }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "ApplyStatus", "Status": "DamageOverTime", "Magnitude": 15, "DurationTurns": 2 } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "BonusEffects": [ { "EffectType": "DebuffStat", "AffectedStat": "Defense", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true } ] }
+        ]
+      }
+    },
+    {
+      "SkillId": "petrifying_gaze",
+      "DisplayName": "Petrifying Gaze",
+      "Description": "A glance that may turn the target to stone for a turn.",
+      "TargetShape": "SingleTarget",
+      "Range": 3,
+      "Cooldown": 3,
+      "Element": "Dark",
+      "Category": "Special",
+      "Effects": [
+        { "EffectType": "Damage", "Magnitude": 45 },
+        { "EffectType": "ApplyStatus", "Status": "Stun", "Magnitude": 0, "DurationTurns": 1, "Chance": 45 }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "DebuffStat", "AffectedStat": "Speed", "Magnitude": 15, "DurationTurns": 2, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "CooldownReduction": 1 }
+        ]
+      }
+    },
+    {
+      "SkillId": "eclipse_fang",
+      "DisplayName": "Eclipse Fang",
+      "Description": "Four shadow bites in the blink of an eye: four crit rolls to find a weak point.",
+      "TargetShape": "SingleTarget",
+      "Range": 3,
+      "Cooldown": 2,
+      "Element": "Dark",
+      "Category": "Special",
+      "Effects": [
+        { "EffectType": "Damage", "Magnitude": 32, "HitCount": 4 }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "DebuffStat", "AffectedStat": "SpecialDefense", "Magnitude": 8, "DurationTurns": 2, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "BonusEffects": [ { "EffectType": "Damage", "Magnitude": 20 } ] }
+        ]
+      }
+    },
+    {
+      "SkillId": "predator_focus",
+      "DisplayName": "Predator Focus",
+      "Description": "Narrows its eyes on the kill: +20 crit chance and more Special Attack for three turns.",
+      "TargetShape": "Self",
+      "Range": 0,
+      "Cooldown": 4,
+      "Element": "Dark",
+      "Effects": [
+        { "EffectType": "BuffStat", "AffectedStat": "CritChance", "Magnitude": 20, "DurationTurns": 3 },
+        { "EffectType": "BuffStat", "AffectedStat": "SpecialAttack", "Magnitude": 10, "DurationTurns": 3, "IsPercent": true }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "BuffStat", "AffectedStat": "Speed", "Magnitude": 10, "DurationTurns": 3, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "CooldownReduction": 1 }
+        ]
+      }
+    },
+    {
+      "SkillId": "miasma",
+      "DisplayName": "Miasma",
+      "Description": "A cross of poison fog three hexes out that lingers and weakens.",
+      "TargetShape": "Cross",
+      "Range": 3,
+      "Cooldown": 3,
+      "Element": "Dark",
+      "Category": "Special",
+      "Effects": [
+        { "EffectType": "ApplyStatus", "Status": "DamageOverTime", "Magnitude": 22, "DurationTurns": 3, "MaxStacks": 2 },
+        { "EffectType": "DebuffStat", "AffectedStat": "SpecialDefense", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "DebuffStat", "AffectedStat": "Attack", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "CooldownReduction": 1 }
+        ]
+      }
+    }
+  ],
+  "AvatarActives": [
+    {
+      "SkillId": "rallying_cry",
+      "DisplayName": "Rallying Cry",
+      "Description": "The avatar's war cry: +10% Attack and Special Attack for the whole team for two turns.",
+      "TargetShape": "AllAllies",
+      "Range": 0,
+      "Cooldown": 4,
+      "Effects": [
+        { "EffectType": "BuffStat", "AffectedStat": "Attack", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true },
+        { "EffectType": "BuffStat", "AffectedStat": "SpecialAttack", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "BuffStat", "AffectedStat": "Speed", "Magnitude": 5, "DurationTurns": 2, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "CooldownReduction": 1 }
+        ]
+      }
+    },
+    {
+      "SkillId": "mending_light",
+      "DisplayName": "Mending Light",
+      "Description": "A gentle light that heals every beast a little.",
+      "TargetShape": "AllAllies",
+      "Range": 0,
+      "Cooldown": 3,
+      "Effects": [
+        { "EffectType": "Heal", "Magnitude": 13 }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "BuffStat", "AffectedStat": "SpecialDefense", "Magnitude": 5, "DurationTurns": 2, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "CooldownReduction": 1 }
+        ]
+      }
+    },
+    {
+      "SkillId": "aegis",
+      "DisplayName": "Aegis",
+      "Description": "Throws a shield over every beast, worth part of the avatar's Defense.",
+      "TargetShape": "AllAllies",
+      "Range": 0,
+      "Cooldown": 4,
+      "Effects": [
+        { "EffectType": "ApplyStatus", "Status": "Shield", "Magnitude": 30, "DurationTurns": 2 }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "BuffStat", "AffectedStat": "Defense", "Magnitude": 5, "DurationTurns": 2, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "CooldownReduction": 1 }
+        ]
+      }
+    },
+    {
+      "SkillId": "hex_of_frailty",
+      "DisplayName": "Hex of Frailty",
+      "Description": "Curses every enemy: -10% Defense and Special Defense for two turns.",
+      "TargetShape": "AllEnemies",
+      "Range": 0,
+      "Cooldown": 4,
+      "Effects": [
+        { "EffectType": "DebuffStat", "AffectedStat": "Defense", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true },
+        { "EffectType": "DebuffStat", "AffectedStat": "SpecialDefense", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "DebuffStat", "AffectedStat": "Attack", "Magnitude": 5, "DurationTurns": 2, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "CooldownReduction": 1 }
+        ]
+      }
+    },
+    {
+      "SkillId": "battle_focus",
+      "DisplayName": "Battle Focus",
+      "Description": "Sharpens the team's eye: +8 crit chance for two turns.",
+      "TargetShape": "AllAllies",
+      "Range": 0,
+      "Cooldown": 5,
+      "Effects": [
+        { "EffectType": "BuffStat", "AffectedStat": "CritChance", "Magnitude": 8, "DurationTurns": 2 }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "BuffStat", "AffectedStat": "Attack", "Magnitude": 5, "DurationTurns": 2, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "CooldownReduction": 1 }
+        ]
+      }
+    },
+    {
+      "SkillId": "slowing_field",
+      "DisplayName": "Slowing Field",
+      "Description": "Thickens the air around the enemy: -12% Speed for two turns.",
+      "TargetShape": "AllEnemies",
+      "Range": 0,
+      "Cooldown": 5,
+      "Effects": [
+        { "EffectType": "DebuffStat", "AffectedStat": "Speed", "Magnitude": 12, "DurationTurns": 2, "IsPercent": true }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "DebuffStat", "AffectedStat": "Attack", "Magnitude": 5, "DurationTurns": 2, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "CooldownReduction": 1 }
+        ]
+      }
+    }
+  ],
+  "AvatarPassives": [
+    {
+      "PassiveId": "keen_eye",
+      "DisplayName": "Keen Eye",
+      "Description": "Aura: every beast has +5 crit chance for the whole battle.",
+      "Trigger": "Aura",
+      "TargetScope": "AllAllies",
+      "Effects": [
+        { "EffectType": "BuffStat", "AffectedStat": "CritChance", "Magnitude": 5, "DurationTurns": 0 }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "BuffStat", "AffectedStat": "CritChance", "Magnitude": 2, "DurationTurns": 0 } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "BonusEffects": [ { "EffectType": "BuffStat", "AffectedStat": "CritChance", "Magnitude": 2, "DurationTurns": 0 } ] }
+        ]
+      }
+    },
+    {
+      "PassiveId": "iron_will",
+      "DisplayName": "Iron Will",
+      "Description": "Aura: every beast has +5% Defense and Special Defense for the whole battle.",
+      "Trigger": "Aura",
+      "TargetScope": "AllAllies",
+      "Effects": [
+        { "EffectType": "BuffStat", "AffectedStat": "Defense", "Magnitude": 5, "DurationTurns": 0, "IsPercent": true },
+        { "EffectType": "BuffStat", "AffectedStat": "SpecialDefense", "Magnitude": 5, "DurationTurns": 0, "IsPercent": true }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "BuffStat", "AffectedStat": "Defense", "Magnitude": 2, "DurationTurns": 0, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "BonusEffects": [ { "EffectType": "BuffStat", "AffectedStat": "SpecialDefense", "Magnitude": 2, "DurationTurns": 0, "IsPercent": true } ] }
+        ]
+      }
+    },
+    {
+      "PassiveId": "opening_ward",
+      "DisplayName": "Opening Ward",
+      "Description": "At the start of battle every beast gets a two-turn shield worth part of the avatar's Defense.",
+      "Trigger": "BattleStart",
+      "TargetScope": "AllAllies",
+      "Effects": [
+        { "EffectType": "ApplyStatus", "Status": "Shield", "Magnitude": 40, "DurationTurns": 2 }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "BuffStat", "AffectedStat": "Defense", "Magnitude": 5, "DurationTurns": 2, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "BonusEffects": [ { "EffectType": "BuffStat", "AffectedStat": "SpecialDefense", "Magnitude": 5, "DurationTurns": 2, "IsPercent": true } ] }
+        ]
+      }
+    },
+    {
+      "PassiveId": "battle_hymn",
+      "DisplayName": "Battle Hymn",
+      "Description": "At the start of battle the team is quickened: +10% Speed for two turns.",
+      "Trigger": "BattleStart",
+      "TargetScope": "AllAllies",
+      "Effects": [
+        { "EffectType": "BuffStat", "AffectedStat": "Speed", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "BuffStat", "AffectedStat": "Attack", "Magnitude": 5, "DurationTurns": 2, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "BonusEffects": [ { "EffectType": "BuffStat", "AffectedStat": "SpecialAttack", "Magnitude": 5, "DurationTurns": 2, "IsPercent": true } ] }
+        ]
+      }
+    },
+    {
+      "PassiveId": "withering_curse",
+      "DisplayName": "Withering Curse",
+      "Description": "At the start of battle every enemy is cursed: -10% Defense and Special Defense for three turns.",
+      "Trigger": "BattleStart",
+      "TargetScope": "AllEnemies",
+      "Effects": [
+        { "EffectType": "DebuffStat", "AffectedStat": "Defense", "Magnitude": 10, "DurationTurns": 3, "IsPercent": true },
+        { "EffectType": "DebuffStat", "AffectedStat": "SpecialDefense", "Magnitude": 10, "DurationTurns": 3, "IsPercent": true }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "DebuffStat", "AffectedStat": "Speed", "Magnitude": 5, "DurationTurns": 3, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "BonusEffects": [ { "EffectType": "DebuffStat", "AffectedStat": "Attack", "Magnitude": 5, "DurationTurns": 3, "IsPercent": true } ] }
+        ]
+      }
+    },
+    {
+      "PassiveId": "bloodlust",
+      "DisplayName": "Bloodlust",
+      "Description": "When an enemy falls, half the time the team surges: +10% Attack and Special Attack for two turns (at most every other avatar tick).",
+      "Trigger": "EnemyDefeated",
+      "ProcChance": 50,
+      "InternalCooldown": 2,
+      "TargetScope": "AllAllies",
+      "Effects": [
+        { "EffectType": "BuffStat", "AffectedStat": "Attack", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true },
+        { "EffectType": "BuffStat", "AffectedStat": "SpecialAttack", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "BuffStat", "AffectedStat": "Speed", "Magnitude": 5, "DurationTurns": 2, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "BonusEffects": [ { "EffectType": "BuffStat", "AffectedStat": "CritChance", "Magnitude": 5, "DurationTurns": 2 } ] }
+        ]
+      }
+    },
+    {
+      "PassiveId": "vengeance",
+      "DisplayName": "Vengeance",
+      "Description": "When a beast falls, the survivors rally: +15% Attack and Special Attack for three turns (twice a battle).",
+      "Trigger": "AllyDefeated",
+      "MaxTriggersPerBattle": 2,
+      "TargetScope": "AllAllies",
+      "Effects": [
+        { "EffectType": "BuffStat", "AffectedStat": "Attack", "Magnitude": 15, "DurationTurns": 3, "IsPercent": true },
+        { "EffectType": "BuffStat", "AffectedStat": "SpecialAttack", "Magnitude": 15, "DurationTurns": 3, "IsPercent": true }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "ApplyStatus", "Status": "Shield", "Magnitude": 20, "DurationTurns": 2 } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "BonusEffects": [ { "EffectType": "BuffStat", "AffectedStat": "Speed", "Magnitude": 10, "DurationTurns": 3, "IsPercent": true } ] }
+        ]
+      }
+    },
+    {
+      "PassiveId": "storm_call",
+      "DisplayName": "Storm Call",
+      "Description": "When a beast lands a critical hit, the avatar sometimes calls down a follow-up strike on every enemy.",
+      "Trigger": "AllyCrit",
+      "ProcChance": 30,
+      "InternalCooldown": 3,
+      "TargetScope": "AllEnemies",
+      "Category": "Special",
+      "Effects": [
+        { "EffectType": "Damage", "Magnitude": 25 }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "DebuffStat", "AffectedStat": "Speed", "Magnitude": 5, "DurationTurns": 1, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "BonusEffects": [ { "EffectType": "DebuffStat", "AffectedStat": "Defense", "Magnitude": 5, "DurationTurns": 1, "IsPercent": true } ] }
+        ]
+      }
+    },
+    {
+      "PassiveId": "verdant_pulse",
+      "DisplayName": "Verdant Pulse",
+      "Description": "Half the time a beast starts its turn, it recovers a little HP.",
+      "Trigger": "AllyTurnStart",
+      "ProcChance": 50,
+      "TargetScope": "TriggeringUnit",
+      "Effects": [
+        { "EffectType": "Heal", "Magnitude": 5 }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "BuffStat", "AffectedStat": "Defense", "Magnitude": 3, "DurationTurns": 1, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "BonusEffects": [ { "EffectType": "BuffStat", "AffectedStat": "SpecialDefense", "Magnitude": 3, "DurationTurns": 1, "IsPercent": true } ] }
+        ]
+      }
+    },
+    {
+      "PassiveId": "last_stand",
+      "DisplayName": "Last Stand",
+      "Description": "When a beast drops below 40% HP it is wrapped in a two-turn emergency shield (at most every other avatar tick).",
+      "Trigger": "AllyBelowHpPercent",
+      "HpThresholdPercent": 40,
+      "InternalCooldown": 2,
+      "TargetScope": "TriggeringUnit",
+      "Effects": [
+        { "EffectType": "ApplyStatus", "Status": "Shield", "Magnitude": 80, "DurationTurns": 2 }
+      ],
+      "Progression": {
+        "MaxLevel": 20,
+        "MagnitudeGrowthPerLevel": 3,
+        "Tiers": [
+          { "ThresholdLevel": 5, "RequiredMaterialTier": 1 },
+          { "ThresholdLevel": 10, "RequiredMaterialTier": 2, "BonusEffects": [ { "EffectType": "BuffStat", "AffectedStat": "Defense", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true } ] },
+          { "ThresholdLevel": 15, "RequiredMaterialTier": 3, "BonusEffects": [ { "EffectType": "BuffStat", "AffectedStat": "SpecialDefense", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true } ] }
+        ]
+      }
+    }
+  ],
+  "AvatarDefaultPassives": [ "keen_eye", "opening_ward", "last_stand" ],
+  "SpeciesKits": [
+    {
+      "SpeciesId": "golem",
+      "LearnableSkills": [
+        { "Level": 1, "SkillId": "boulder_slam" },
+        { "Level": 1, "SkillId": "stone_challenge" },
+        { "Level": 3, "SkillId": "granite_bulwark" },
+        { "Level": 12, "SkillId": "tectonic_shove" },
+        { "Level": 25, "SkillId": "quake" },
+        { "Level": 40, "SkillId": "stoneskin" }
+      ],
+      "DefaultLoadout": [ "boulder_slam", "stone_challenge", "granite_bulwark" ]
+    },
+    {
+      "SpeciesId": "leviathan",
+      "LearnableSkills": [
+        { "Level": 1, "SkillId": "serpent_bite" },
+        { "Level": 1, "SkillId": "undertow" },
+        { "Level": 3, "SkillId": "deep_shell" },
+        { "Level": 8, "SkillId": "tidal_wave" },
+        { "Level": 30, "SkillId": "maelstrom" },
+        { "Level": 50, "SkillId": "tidal_renewal" }
+      ],
+      "DefaultLoadout": [ "serpent_bite", "undertow", "deep_shell" ]
+    },
+    {
+      "SpeciesId": "treant",
+      "LearnableSkills": [
+        { "Level": 1, "SkillId": "thorn_lash" },
+        { "Level": 1, "SkillId": "verdant_mend" },
+        { "Level": 3, "SkillId": "bark_ward" },
+        { "Level": 8, "SkillId": "entangling_roots" },
+        { "Level": 20, "SkillId": "spore_cloud" },
+        { "Level": 45, "SkillId": "lifebloom" }
+      ],
+      "DefaultLoadout": [ "thorn_lash", "verdant_mend", "bark_ward" ]
+    },
+    {
+      "SpeciesId": "tarasque",
+      "LearnableSkills": [
+        { "Level": 1, "SkillId": "sunder" },
+        { "Level": 1, "SkillId": "iron_crush" },
+        { "Level": 4, "SkillId": "iron_fortress" },
+        { "Level": 15, "SkillId": "spiked_carapace" },
+        { "Level": 30, "SkillId": "shrapnel_burst" },
+        { "Level": 55, "SkillId": "juggernaut_charge" }
+      ],
+      "DefaultLoadout": [ "sunder", "iron_crush", "iron_fortress" ]
+    },
+    {
+      "SpeciesId": "frost_wyrm",
+      "LearnableSkills": [
+        { "Level": 1, "SkillId": "rime_bolt" },
+        { "Level": 1, "SkillId": "deep_freeze" },
+        { "Level": 3, "SkillId": "frost_breath" },
+        { "Level": 18, "SkillId": "blizzard" },
+        { "Level": 35, "SkillId": "ice_armor" },
+        { "Level": 60, "SkillId": "absolute_zero" }
+      ],
+      "DefaultLoadout": [ "rime_bolt", "deep_freeze", "frost_breath" ]
+    },
+    {
+      "SpeciesId": "thunderbird",
+      "LearnableSkills": [
+        { "Level": 1, "SkillId": "thunder_talons" },
+        { "Level": 1, "SkillId": "chain_lightning" },
+        { "Level": 3, "SkillId": "static_charge" },
+        { "Level": 5, "SkillId": "storm_dive" },
+        { "Level": 25, "SkillId": "thunderclap" },
+        { "Level": 50, "SkillId": "plasma_barrage" }
+      ],
+      "DefaultLoadout": [ "thunder_talons", "chain_lightning", "storm_dive" ]
+    },
+    {
+      "SpeciesId": "griffin",
+      "LearnableSkills": [
+        { "Level": 1, "SkillId": "gale_talon" },
+        { "Level": 1, "SkillId": "wind_lance" },
+        { "Level": 3, "SkillId": "gust" },
+        { "Level": 12, "SkillId": "tailwind" },
+        { "Level": 28, "SkillId": "updraft" },
+        { "Level": 50, "SkillId": "sky_rend" }
+      ],
+      "DefaultLoadout": [ "wind_lance", "gale_talon", "gust" ]
+    },
+    {
+      "SpeciesId": "phoenix",
+      "LearnableSkills": [
+        { "Level": 1, "SkillId": "ember_shot" },
+        { "Level": 1, "SkillId": "flame_wave" },
+        { "Level": 4, "SkillId": "rebirth_flame" },
+        { "Level": 12, "SkillId": "blaze_bolt" },
+        { "Level": 30, "SkillId": "firestorm" },
+        { "Level": 55, "SkillId": "sunfire_nova" }
+      ],
+      "DefaultLoadout": [ "ember_shot", "flame_wave", "rebirth_flame" ]
+    },
+    {
+      "SpeciesId": "kirin",
+      "LearnableSkills": [
+        { "Level": 1, "SkillId": "sacred_spring" },
+        { "Level": 1, "SkillId": "blessing" },
+        { "Level": 3, "SkillId": "radiant_bolt" },
+        { "Level": 15, "SkillId": "judgment" },
+        { "Level": 30, "SkillId": "purifying_ward" },
+        { "Level": 50, "SkillId": "halo" }
+      ],
+      "DefaultLoadout": [ "sacred_spring", "blessing", "radiant_bolt" ]
+    },
+    {
+      "SpeciesId": "basilisk",
+      "LearnableSkills": [
+        { "Level": 1, "SkillId": "venom_spit" },
+        { "Level": 1, "SkillId": "coup_de_grace" },
+        { "Level": 4, "SkillId": "petrifying_gaze" },
+        { "Level": 12, "SkillId": "eclipse_fang" },
+        { "Level": 25, "SkillId": "predator_focus" },
+        { "Level": 40, "SkillId": "miasma" }
+      ],
+      "DefaultLoadout": [ "venom_spit", "coup_de_grace", "petrifying_gaze" ]
+    }
+  ]
+}

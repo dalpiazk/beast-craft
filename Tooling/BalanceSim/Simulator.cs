@@ -76,6 +76,14 @@ namespace BeastCraft.Tooling.BalanceSim
             return records;
         }
 
+        /// <summary>The standard kit, or with <c>--skill-kit library</c> the species' authored default loadout.</summary>
+        private static SkillLoadout BeastLoadout(SimOptions options, CreatureSpeciesSO species, KitMode mode)
+        {
+            return options.KitSource == KitSource.Library
+                ? SkillLoadout.FromInstances(options.Library.BeastKit(species, mode))
+                : Kit.Loadout(Kit.BuildBeastKit(species, mode));
+        }
+
         private static BattleRecord RunOne(SimOptions options, IReadOnlyList<CreatureSpeciesSO> species, KitMode mode, int level, int playerIndex, int enemyIndex,
                                            int sample)
         {
@@ -83,9 +91,9 @@ namespace BeastCraft.Tooling.BalanceSim
             FindStartTiles(grid, out HexCoordinate playerTile, out HexCoordinate enemyTile);
 
             BattleUnit player = BattleUnitFactory.CreateBeast(SimOptions.PlayerUnitId, BattleTeam.Player, species[playerIndex], level, null,
-                                                              playerTile, Kit.Loadout(Kit.BuildBeastKit(species[playerIndex], mode)));
+                                                              playerTile, BeastLoadout(options, species[playerIndex], mode));
             BattleUnit enemy = BattleUnitFactory.CreateBeast(SimOptions.EnemyUnitId, BattleTeam.Enemy, species[enemyIndex], level, null,
-                                                             enemyTile, Kit.Loadout(Kit.BuildBeastKit(species[enemyIndex], mode)));
+                                                             enemyTile, BeastLoadout(options, species[enemyIndex], mode));
 
             if (!grid.TryPlaceUnit(player.Id, playerTile) || !grid.TryPlaceUnit(enemy.Id, enemyTile))
             {

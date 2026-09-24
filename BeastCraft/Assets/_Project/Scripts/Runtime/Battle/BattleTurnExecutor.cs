@@ -110,10 +110,17 @@ namespace BeastCraft.Battle
     /// With a null grid nothing moves, whatever the stance.
     /// </para>
     /// <para>
+    /// <strong>Statuses.</strong> The executor frames every turn with the status engine
+    /// (<see cref="StatusEffects.BeginTurn"/> as it opens, <see cref="StatusEffects.EndTurn"/> as
+    /// it closes): damage-over-time lands first and can end the turn, and a
+    /// <see cref="StatusType.Stun"/> skips it. A <see cref="StatusType.Taunt"/> needs no code
+    /// here — <see cref="SkillTargetResolver"/> makes the taunter the focus, so the ordinary
+    /// approach walks toward it — and a <see cref="StatusType.Knockback"/> moves its target
+    /// through the grid this passes to <see cref="SkillEffectApplier"/>.
+    /// </para>
+    /// <para>
     /// <strong>Still not built here.</strong> <c>SkillSO.ResourceCost</c> is not spent (deferred by
-    /// the producer), no status-effect system exists for
-    /// <see cref="SkillEffectType.ApplyStatus"/> to hang off, and nothing in this file is a
-    /// MonoBehaviour or knows a scene exists. Beyond the stances there is no AI: a unit does not
+    /// the producer), and nothing in this file is a MonoBehaviour or knows a scene exists. Beyond the stances there is no AI: a unit does not
     /// retreat when hurt, spread out against area skills, hold a choke point or coordinate a focus,
     /// because none of that has been designed.
     /// </para>
@@ -160,6 +167,15 @@ namespace BeastCraft.Battle
         /// step, so an expiring move-range buff does not pay for one more turn of walking.
         /// </description></item>
         /// <item><description>
+        /// <see cref="StatusEffects.BeginTurn"/>: this turn is counted off every status the unit
+        /// carries and its damage-over-time stacks deal their damage (shield first). A unit they
+        /// defeat stops here — no movement, no skills, and no avatar tick, since it took no turn.
+        /// A unit that began the turn <see cref="StatusType.Stun">stunned</see> skips the next three
+        /// steps: it does not move, fires nothing, and its cooldowns do <em>not</em> tick (a stun
+        /// delays the rotation rather than burning it). Its gauge was spent as normal by
+        /// <see cref="TurnManager"/>, and the avatar still ticks on a stunned player beast's turn.
+        /// </description></item>
+        /// <item><description>
         /// <see cref="SkillLoadout.Tick"/>, which counts every slot down and reports the ones now at
         /// 0 without re-arming any of them.
         /// </description></item>
@@ -185,6 +201,9 @@ namespace BeastCraft.Battle
         /// instead fill a gauge of its own from its own Speed is an open design item (battle-system
         /// design doc, §6), and the rule is unchanged until it is decided.
         /// </description></item>
+        /// <item><description>
+        /// <see cref="StatusEffects.EndTurn"/>: statuses with no turns left come off.
+        /// </description></item>
         /// </list>
         /// </para>
         /// <para>
@@ -200,8 +219,10 @@ namespace BeastCraft.Battle
         /// </para>
         /// <para>
         /// <strong>The rng.</strong> <paramref name="rng"/> is the battle's one random stream.
-        /// Targeting draws from it (only for <see cref="SkillTargetingCriterion.Random"/>), and every
-        /// damage effect that lands draws its crit roll then its variance roll from it, in the order
+        /// Targeting draws from it (only for <see cref="SkillTargetingCriterion.Random"/>, and not at
+        /// all when a taunt decides the pick), every damage hit that lands draws its crit roll then
+        /// its variance roll from it, and a non-damage effect whose chance is below 100 draws its
+        /// chance check (see <see cref="SkillEffectApplier"/>), all in the order
         /// the turn fires skills — the unit's ready slots in stack order, then the avatar's — and
         /// within each skill in <see cref="SkillEffectApplier"/>'s target-major, authored-effect
         /// order. A null rng is the deterministic fallback: no variance, no crits (see
@@ -215,8 +236,48 @@ namespace BeastCraft.Battle
         /// </summary>
         public static BattleTurnResult ExecuteTurn(BattleUnit unit, IEnumerable<BattleUnit> allUnits, HexGrid grid, Random rng, BattleUnit avatar)
         {
+            return ExecuteTurn(unit, allUnits, grid, rng, avatar, null);
+        }
+
+        /// <summary>
+        /// <see cref="ExecuteTurn(BattleUnit, IEnumerable{BattleUnit}, HexGrid, Random, BattleUnit)"/>
+        /// with the avatar's equipped passives (see <see cref="PassiveLoadout"/> and the design doc,
+        /// "Avatar passives"). With a null or empty loadout, or no avatar, it is exactly the
+        /// passive-free turn. Otherwise the passive hooks run at these points, and everything they
+        /// fire is recorded on <see cref="BattleTurnResult.PassiveActivations"/>:
+        /// <list type="bullet">
+        /// <item><description>
+        /// If the loadout has not begun (a caller driving turns itself without
+        /// <see cref="BeginBattle"/>), its battle-start hook runs first, as the turn opens.
+        /// </description></item>
+        /// <item><description>
+        /// After <see cref="StatusEffects.BeginTurn"/>: the after-damage hook (the unit's own
+        /// damage-over-time may have defeated it or dropped it below a threshold). Then, on a
+        /// player beast's turn that it survived, stunned or not, the
+        /// <see cref="BeastCraft.Avatar.PassiveTrigger.AllyTurnStart"/> passives, before any of its
+        /// skills.
+        /// </description></item>
+        /// <item><description>
+        /// After every skill the unit fires: the after-damage hook, with that activation's hits for
+        /// <see cref="BeastCraft.Avatar.PassiveTrigger.AllyCrit"/>.
+        /// </description></item>
+        /// <item><description>
+        /// At the avatar tick (player beasts' turns only): every passive's internal cooldown ticks
+        /// once, before the avatar's actives; then the after-damage hook after each avatar
+        /// activation (its crits are not ally crits).
+        /// </description></item>
+        /// </list>
+        /// A passive whose proc chance is below 100 draws once from <paramref name="rng"/> for its
+        /// roll, at the moment it is tried; nothing else about a passive draws, beyond what its
+        /// effects draw as any skill's would.
+        /// </summary>
+        public static BattleTurnResult ExecuteTurn(BattleUnit unit, IEnumerable<BattleUnit> allUnits, HexGrid grid, Random rng, BattleUnit avatar,
+                                                   PassiveLoadout passives)
+        {
             List<BattleSkillOutcome> outcomes = new List<BattleSkillOutcome>();
             List<SkillActivation> avatarActivations = new List<SkillActivation>();
+            List<PassiveActivation> passiveActivations = new List<PassiveActivation>();
+            PassiveHooks hooks = PassiveHooks.For(passives, avatar, allUnits, grid, rng, passiveActivations);
 
             if (unit == null || unit.IsDefeated)
             {
@@ -226,18 +287,46 @@ namespace BeastCraft.Battle
 
             HexCoordinate start = unit.Position;
 
+            if (hooks != null && !passives.HasBegun)
+            {
+                passives.Begin(avatar, allUnits, grid, rng, passiveActivations);
+
+                if (unit.IsDefeated)
+                {
+                    // A battle-start passive finished it before it could act.
+                    return new BattleTurnResult(unit, start, unit.Position, 0, 0, outcomes, avatarActivations, 0, false, 0, passiveActivations);
+                }
+            }
+
             // Anything defeated outside this type must not keep obstructing this turn's routes.
             LiftDefeated(allUnits, grid);
 
             SkillEffectApplier.TickModifiers(unit);
+
+            bool stunned;
+            int statusDamage = StatusEffects.BeginTurn(unit, out stunned);
+            hooks?.AfterApplication(unit, null);
+
+            if (unit.IsDefeated)
+            {
+                // Its own damage-over-time finished it as the turn opened: there is no turn to take.
+                LiftDefeated(allUnits, grid);
+                return new BattleTurnResult(unit, start, unit.Position, 0, 0, outcomes, avatarActivations, 0, stunned, statusDamage, passiveActivations);
+            }
+
+            if (hooks != null && unit.Team == avatar.Team)
+            {
+                passives.OnAllyTurnStart(unit, avatar, allUnits, grid, rng, passiveActivations);
+            }
 
             // Read after the tick, not before: move range is a stat, so a move-range buff that
             // expires on this tick must already be gone from this turn's budget.
             int budget = unit.MoveRange < 0 ? 0 : unit.MoveRange;
             int remaining = budget;
 
+            // A stunned unit's rotation does not advance: nothing is offered, so nothing fires.
             SkillLoadout loadout = unit.Skills;
-            IReadOnlyList<int> ready = loadout == null ? new List<int>() : loadout.Tick();
+            IReadOnlyList<int> ready = loadout == null || stunned ? new List<int>() : loadout.Tick();
 
             for (int i = 0; i < ready.Count; i++)
             {
@@ -256,7 +345,7 @@ namespace BeastCraft.Battle
 
                 if (!NeedsApproach(skill.TargetShape))
                 {
-                    outcomes.Add(Fire(loadout, slotIndex, skill, unit, allUnits, grid, rng, 0));
+                    outcomes.Add(Fire(loadout, slotIndex, skill, unit, allUnits, grid, rng, 0, hooks));
                     continue;
                 }
 
@@ -270,7 +359,7 @@ namespace BeastCraft.Battle
 
                 if (unit.Position.Distance(candidate.Position) <= skill.Range)
                 {
-                    outcomes.Add(Fire(loadout, slotIndex, skill, unit, allUnits, grid, rng, 0));
+                    outcomes.Add(Fire(loadout, slotIndex, skill, unit, allUnits, grid, rng, 0, hooks));
                     continue;
                 }
 
@@ -305,30 +394,71 @@ namespace BeastCraft.Battle
                 }
 
                 remaining -= steps;
-                outcomes.Add(Fire(loadout, slotIndex, skill, unit, allUnits, grid, rng, steps));
+                outcomes.Add(Fire(loadout, slotIndex, skill, unit, allUnits, grid, rng, steps, hooks));
             }
 
             // Leftover budget: a Ranged or Skirmisher unit backs away; a Vanguard keeps its ground.
             int retreatSteps = 0;
-            if (!unit.IsDefeated && remaining > 0 && RetreatsWithLeftover(unit.Stance))
+            if (!stunned && !unit.IsDefeated && remaining > 0 && RetreatsWithLeftover(unit.Stance))
             {
                 retreatSteps = Retreat(unit, allUnits, grid, remaining);
                 remaining -= retreatSteps;
             }
 
-            if (unit.Team == BattleTeam.Player && avatar != null && avatar.Skills != null)
+            if (unit.Team == BattleTeam.Player && avatar != null)
             {
-                IReadOnlyList<SkillActivation> cast = avatar.Skills.TickAndResolve(avatar, allUnits, grid, rng);
-
-                for (int i = 0; i < cast.Count; i++)
+                // The avatar tick: passive cooldowns count down on the same clock as its actives.
+                if (hooks != null)
                 {
-                    SkillEffectApplier.Apply(cast[i], avatar, rng);
-                    LiftDefeated(allUnits, grid);
-                    avatarActivations.Add(cast[i]);
+                    passives.TickCooldowns();
+                }
+
+                if (avatar.Skills != null)
+                {
+                    IReadOnlyList<SkillActivation> cast = avatar.Skills.TickAndResolve(avatar, allUnits, grid, rng);
+
+                    for (int i = 0; i < cast.Count; i++)
+                    {
+                        SkillEffectApplier.Apply(cast[i], avatar, rng, grid);
+                        LiftDefeated(allUnits, grid);
+                        avatarActivations.Add(cast[i]);
+                        hooks?.AfterApplication(unit, null);
+                    }
                 }
             }
 
-            return new BattleTurnResult(unit, start, unit.Position, budget, budget - remaining, outcomes, avatarActivations, retreatSteps);
+            StatusEffects.EndTurn(unit);
+
+            return new BattleTurnResult(unit, start, unit.Position, budget, budget - remaining, outcomes, avatarActivations, retreatSteps, stunned,
+                                        statusDamage, passiveActivations);
+        }
+
+        /// <summary>
+        /// The battle-start passive hook: every <see cref="BeastCraft.Avatar.PassiveTrigger.Aura"/>
+        /// passive in slot order, then every <see cref="BeastCraft.Avatar.PassiveTrigger.BattleStart"/>
+        /// one, applied with the avatar as caster (see <see cref="PassiveLoadout"/>). Returns what
+        /// fired, in order.
+        /// <para>
+        /// <see cref="RunBattle(TurnManager, IEnumerable{BattleUnit}, HexGrid, Random, BattleUnit, PassiveLoadout, int)"/>
+        /// calls it before the first turn and reports the result as
+        /// <see cref="BattleResult.OpeningPassiveActivations"/>. A caller driving
+        /// <see cref="ExecuteTurn(BattleUnit, IEnumerable{BattleUnit}, HexGrid, Random, BattleUnit, PassiveLoadout)"/>
+        /// itself should call it once with the same roster before its first turn; if it does not,
+        /// the first turn runs it. Runs once per loadout: later calls return an empty list. A null
+        /// or empty loadout, or no avatar, does nothing.
+        /// </para>
+        /// </summary>
+        public static IReadOnlyList<PassiveActivation> BeginBattle(IEnumerable<BattleUnit> allUnits, HexGrid grid, Random rng, BattleUnit avatar,
+                                                                   PassiveLoadout passives)
+        {
+            List<PassiveActivation> fired = new List<PassiveActivation>();
+
+            if (PassiveHooks.For(passives, avatar, allUnits, grid, rng, fired) != null)
+            {
+                passives.Begin(avatar, allUnits, grid, rng, fired);
+            }
+
+            return fired;
         }
 
         /// <summary>
@@ -377,7 +507,22 @@ namespace BeastCraft.Battle
         /// </summary>
         public static BattleResult RunBattle(TurnManager turnManager, IEnumerable<BattleUnit> allUnits, HexGrid grid, Random rng, BattleUnit avatar, int maxTime = DefaultMaxTime)
         {
+            return RunBattle(turnManager, allUnits, grid, rng, avatar, null, maxTime);
+        }
+
+        /// <summary>
+        /// <see cref="RunBattle(TurnManager, IEnumerable{BattleUnit}, HexGrid, Random, BattleUnit, int)"/>
+        /// with the avatar's equipped passives: <see cref="BeginBattle"/> runs on the roster before
+        /// the first turn (its firings are <see cref="BattleResult.OpeningPassiveActivations"/>),
+        /// and every turn is
+        /// <see cref="ExecuteTurn(BattleUnit, IEnumerable{BattleUnit}, HexGrid, Random, BattleUnit, PassiveLoadout)"/>
+        /// with them. A null or empty loadout is exactly the passive-free battle.
+        /// </summary>
+        public static BattleResult RunBattle(TurnManager turnManager, IEnumerable<BattleUnit> allUnits, HexGrid grid, Random rng, BattleUnit avatar,
+                                             PassiveLoadout passives, int maxTime = DefaultMaxTime)
+        {
             List<BattleUnit> roster = CopyRoster(allUnits);
+            IReadOnlyList<PassiveActivation> opening = BeginBattle(roster, grid, rng, avatar, passives);
             List<BattleTurnResult> turns = new List<BattleTurnResult>();
             long capTicks = (long)(maxTime < 1 ? 1 : maxTime) * TurnManager.TicksPerTimeUnit;
             long lastTurnTicks = 0;
@@ -407,13 +552,13 @@ namespace BeastCraft.Battle
                 if (!current.IsDefeated)
                 {
                     lastTurnTicks = turnManager.ElapsedTicks;
-                    turns.Add(ExecuteTurn(current, roster, grid, rng, avatar));
+                    turns.Add(ExecuteTurn(current, roster, grid, rng, avatar, passives));
                 }
 
                 turnManager.AdvanceTurn();
             }
 
-            return new BattleResult(outcome, lastTurnTicks, turns);
+            return new BattleResult(outcome, lastTurnTicks, turns, opening);
         }
 
         /// <summary>
@@ -435,18 +580,21 @@ namespace BeastCraft.Battle
 
         /// <summary>
         /// Resolves one slot from where the caster is standing right now, applies what it does,
-        /// lifts anyone it defeated (the caster included) off the grid, and re-arms the slot. The
+        /// lifts anyone it defeated (the caster included) off the grid, re-arms the slot, and runs
+        /// the after-damage passive hook (when there are passives). The
         /// one place in a beast's turn that a cooldown is reset, so a skill cannot be marked fired
         /// without having actually resolved.
         /// </summary>
-        private static BattleSkillOutcome Fire(SkillLoadout loadout, int slotIndex, SkillSO skill, BattleUnit caster, IEnumerable<BattleUnit> allUnits, HexGrid grid, Random rng, int movementSpent)
+        private static BattleSkillOutcome Fire(SkillLoadout loadout, int slotIndex, SkillSO skill, BattleUnit caster, IEnumerable<BattleUnit> allUnits, HexGrid grid, Random rng, int movementSpent,
+                                               PassiveHooks hooks)
         {
             IReadOnlyList<BattleUnit> targets = SkillTargetResolver.ResolveTargets(skill, caster, allUnits, grid, rng);
-            SkillActivation activation = new SkillActivation(skill, targets);
+            SkillActivation activation = new SkillActivation(loadout.GetInstance(slotIndex), targets);
 
-            SkillEffectApplier.Apply(activation, caster, rng);
+            SkillEffectApplier.Apply(activation, caster, rng, grid);
             LiftDefeated(allUnits, grid);
             loadout.MarkFired(slotIndex);
+            hooks?.AfterApplication(caster, activation);
 
             return new BattleSkillOutcome(slotIndex, skill, BattleSkillStatus.Fired, activation, movementSpent);
         }
@@ -643,7 +791,7 @@ namespace BeastCraft.Battle
                                                 HexCoordinate? plainStop, out HexCoordinate pick)
         {
             pick = mover.Position;
-            Dictionary<HexCoordinate, int> costs = ReachableTiles(grid, mover, int.MaxValue, null);
+            ReachMap costs = ReachableTiles(grid, mover, int.MaxValue);
             List<BattleUnit> enemies = LivingEnemies(mover, allUnits);
             IReadOnlyList<HexCoordinate> tiles = grid.GetTilesInRange(candidate.Position, skill.Range);
 
@@ -658,7 +806,7 @@ namespace BeastCraft.Battle
                 HexCoordinate tile = tiles[i];
                 int cost;
 
-                if (tile == mover.Position || !costs.TryGetValue(tile, out cost))
+                if (tile == mover.Position || !costs.TryGetCost(tile, out cost))
                 {
                     continue;
                 }
@@ -724,8 +872,8 @@ namespace BeastCraft.Battle
                 return 0;
             }
 
-            List<HexCoordinate> order = new List<HexCoordinate>();
-            Dictionary<HexCoordinate, int> costs = ReachableTiles(grid, unit, budget, order);
+            ReachMap costs = ReachableTiles(grid, unit, budget);
+            List<HexCoordinate> order = costs.Order;
 
             HexCoordinate best = unit.Position;
             int bestNearest = NearestDistance(best, enemies);
@@ -749,7 +897,8 @@ namespace BeastCraft.Battle
                 }
 
                 int crowd = AdjacentCount(tile, enemies);
-                int cost = costs[tile];
+                int cost;
+                costs.TryGetCost(tile, out cost);
 
                 bool better = nearest > bestNearest
                     || (nearest == bestNearest && crowd < bestCrowd)
@@ -794,44 +943,136 @@ namespace BeastCraft.Battle
         /// steps, with its step cost, the mover's own tile included at 0. Breadth-first over
         /// <see cref="HexGrid.IsPassable"/> tiles (other units obstruct, as they do for the
         /// pathfinder), expanding neighbours in <see cref="HexCoordinate.AxialDirections"/>' fixed
-        /// order; when <paramref name="order"/> is given it receives the tiles in discovery order.
+        /// order; <see cref="ReachMap.Order"/> holds the tiles in discovery order.
+        /// <para>
+        /// The result is this thread's reusable <see cref="ReachMap"/>, valid until the next call
+        /// on the same thread: read it before searching again. (Only
+        /// <see cref="TryPickStandoffTile"/> and <see cref="Retreat"/> call this, and each reads its
+        /// map to the end before anything else searches.)
+        /// </para>
         /// </summary>
-        private static Dictionary<HexCoordinate, int> ReachableTiles(HexGrid grid, BattleUnit mover, int maxSteps, List<HexCoordinate> order)
+        private static ReachMap ReachableTiles(HexGrid grid, BattleUnit mover, int maxSteps)
         {
-            Dictionary<HexCoordinate, int> costs = new Dictionary<HexCoordinate, int>();
-            Queue<HexCoordinate> frontier = new Queue<HexCoordinate>();
-            IReadOnlyList<HexCoordinate> directions = HexCoordinate.AxialDirections;
+            ReachMap costs = ReachMap.Begin(grid, mover.Position);
+            List<HexCoordinate> order = costs.Order;
+            HexCoordinate[] directions = HexPathfinder.Directions;
 
-            costs[mover.Position] = 0;
-            frontier.Enqueue(mover.Position);
-            order?.Add(mover.Position);
-
-            while (frontier.Count > 0)
+            // Breadth-first: every tile is queued exactly when it is appended to the discovery
+            // order, so walking that list from the front is the FIFO queue.
+            for (int head = 0; head < order.Count; head++)
             {
-                HexCoordinate current = frontier.Dequeue();
-                int cost = costs[current];
+                HexCoordinate current = order[head];
+                int cost;
+                costs.TryGetCost(current, out cost);
 
                 if (cost >= maxSteps)
                 {
                     continue;
                 }
 
-                for (int i = 0; i < directions.Count; i++)
+                for (int i = 0; i < directions.Length; i++)
                 {
                     HexCoordinate next = current + directions[i];
+                    int index = grid.TileIndex(next);
 
-                    if (costs.ContainsKey(next) || !grid.IsPassable(next, mover.Id))
+                    if (!grid.IsPassableAt(index, mover.Id) || costs.Contains(next, index))
                     {
                         continue;
                     }
 
-                    costs[next] = cost + 1;
-                    frontier.Enqueue(next);
-                    order?.Add(next);
+                    costs.Add(next, index, cost + 1);
                 }
             }
 
             return costs;
+        }
+
+        /// <summary>
+        /// The tiles <see cref="ReachableTiles"/> found and their step costs: flat arrays indexed
+        /// by <see cref="HexGrid.TileIndex"/> and stamped with a generation, one instance reused
+        /// per thread, so a search allocates nothing. The start tile is held apart so a mover
+        /// recorded off the board still reads as reachable at 0, as it always has.
+        /// </summary>
+        private sealed class ReachMap
+        {
+            [ThreadStatic]
+            private static ReachMap _current;
+
+            private HexGrid _grid;
+            private HexCoordinate _start;
+            private int _generation;
+            private int[] _stamp = new int[0];
+            private int[] _cost = new int[0];
+
+            /// <summary>Every tile found, the start first, in discovery order.</summary>
+            public readonly List<HexCoordinate> Order = new List<HexCoordinate>();
+
+            public static ReachMap Begin(HexGrid grid, HexCoordinate start)
+            {
+                ReachMap map = _current;
+                if (map == null)
+                {
+                    map = new ReachMap();
+                    _current = map;
+                }
+
+                int capacity = grid.TileIndexCapacity;
+                if (map._stamp.Length < capacity)
+                {
+                    map._stamp = new int[capacity];
+                    map._cost = new int[capacity];
+                    map._generation = 0;
+                }
+
+                if (map._generation == int.MaxValue)
+                {
+                    Array.Clear(map._stamp, 0, map._stamp.Length);
+                    map._generation = 0;
+                }
+
+                map._generation++;
+                map._grid = grid;
+                map._start = start;
+                map.Order.Clear();
+                map.Add(start, grid.TileIndex(start), 0);
+                return map;
+            }
+
+            /// <summary>Whether a tile has been found; <paramref name="index"/> is its <see cref="HexGrid.TileIndex"/>.</summary>
+            public bool Contains(HexCoordinate tile, int index)
+            {
+                return tile == _start || (index >= 0 && _stamp[index] == _generation);
+            }
+
+            public bool TryGetCost(HexCoordinate tile, out int cost)
+            {
+                if (tile == _start)
+                {
+                    cost = 0;
+                    return true;
+                }
+
+                int index = _grid.TileIndex(tile);
+                if (index >= 0 && _stamp[index] == _generation)
+                {
+                    cost = _cost[index];
+                    return true;
+                }
+
+                cost = 0;
+                return false;
+            }
+
+            public void Add(HexCoordinate tile, int index, int cost)
+            {
+                if (index >= 0)
+                {
+                    _stamp[index] = _generation;
+                    _cost[index] = cost;
+                }
+
+                Order.Add(tile);
+            }
         }
 
         /// <summary>
@@ -983,7 +1224,7 @@ namespace BeastCraft.Battle
         /// is deliberately left alone, so a defeated unit still says where it fell. A null grid or
         /// roster lifts nothing.
         /// </summary>
-        private static void LiftDefeated(IEnumerable<BattleUnit> allUnits, HexGrid grid)
+        internal static void LiftDefeated(IEnumerable<BattleUnit> allUnits, HexGrid grid)
         {
             if (grid == null || allUnits == null)
             {
@@ -1064,6 +1305,43 @@ namespace BeastCraft.Battle
             }
 
             return roster;
+        }
+
+        /// <summary>
+        /// The live passive context of one turn — the loadout, the avatar casting it, the roster,
+        /// grid and rng, and where firings are recorded — so each hook call inside a turn stays one
+        /// line. <see cref="For"/> returns <c>null</c> when there is nothing to run (no avatar, or
+        /// no equipped passive), which is what keeps a passive-free turn exactly as it was.
+        /// </summary>
+        private sealed class PassiveHooks
+        {
+            private readonly PassiveLoadout _passives;
+            private readonly BattleUnit _avatar;
+            private readonly IEnumerable<BattleUnit> _allUnits;
+            private readonly HexGrid _grid;
+            private readonly Random _rng;
+            private readonly List<PassiveActivation> _sink;
+
+            private PassiveHooks(PassiveLoadout passives, BattleUnit avatar, IEnumerable<BattleUnit> allUnits, HexGrid grid, Random rng, List<PassiveActivation> sink)
+            {
+                _passives = passives;
+                _avatar = avatar;
+                _allUnits = allUnits;
+                _grid = grid;
+                _rng = rng;
+                _sink = sink;
+            }
+
+            public static PassiveHooks For(PassiveLoadout passives, BattleUnit avatar, IEnumerable<BattleUnit> allUnits, HexGrid grid, Random rng,
+                                           List<PassiveActivation> sink)
+            {
+                return passives == null || passives.Count == 0 || avatar == null ? null : new PassiveHooks(passives, avatar, allUnits, grid, rng, sink);
+            }
+
+            public void AfterApplication(BattleUnit turnUnit, SkillActivation beastActivation)
+            {
+                _passives.AfterApplication(turnUnit, beastActivation, _avatar, _allUnits, _grid, _rng, _sink);
+            }
         }
     }
 }

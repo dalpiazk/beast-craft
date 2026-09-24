@@ -1,7 +1,9 @@
+using System;
 using System.Collections.Generic;
 using BeastCraft.Avatar;
 using BeastCraft.Battle.Grid;
 using BeastCraft.Creatures;
+using BeastCraft.Progression;
 
 namespace BeastCraft.Battle
 {
@@ -68,15 +70,25 @@ namespace BeastCraft.Battle
     /// customization system. <strong>The avatar's stats and level feed
     /// <see cref="DamageFormula"/> exactly as a beast's do</strong>: a damaging avatar skill (say an
     /// <see cref="SkillTargetShape.AllEnemies"/> strike) uses the avatar's <c>Attack</c> or
-    /// <c>SpecialAttack</c> and its <see cref="BattleUnit.Level"/>. Its heals and buffs are still
-    /// flat, as everyone's are, so for those its stats change nothing yet.
+    /// <c>SpecialAttack</c> and its <see cref="BattleUnit.Level"/>. Its heals (its passives' included)
+    /// are a percent of its <c>SpecialAttack</c>, as everyone's are (see
+    /// <see cref="SkillEffectApplier.HealScale"/>); its buffs are still flat.
     /// </para>
     /// <para>
-    /// <strong>Level.</strong> Avatar progression is still undesigned — there is no avatar XP and
-    /// no avatar level anywhere in the data. The damage formula needs a caster level all the same,
-    /// so the statful <c>Create</c> takes a <em>battle</em> level that the battle setup is expected
-    /// to choose sensibly (for example the level of the player's team), defaulting to 1. It is a
-    /// per-battle input, not a stored avatar attribute, until progression is designed.
+    /// <strong>Level.</strong> The avatar itself has no XP and no level anywhere in the data. The
+    /// damage formula needs a caster level all the same, so the statful <c>Create</c> takes a
+    /// <em>battle</em> level that the battle setup is expected to choose sensibly (for example the
+    /// level of the player's team), defaulting to 1. It is a per-battle input, not a stored avatar
+    /// attribute.
+    /// </para>
+    /// <para>
+    /// <strong>Skills and passives progress.</strong> What does progress is the avatar's skills:
+    /// its active skills and its passives are kept in an <see cref="AvatarSkillBook"/> and level on
+    /// the same practice-XP, material and breakthrough model as beast skills.
+    /// <see cref="Create(AvatarSkillBook, Func{string, SkillSO}, Func{string, PassiveSkillSO}, StatBlock, IEnumerable{AvatarGearSO}, int, out PassiveLoadout, string)"/>
+    /// builds the avatar from that book: its equipped actives become its <see cref="SkillLoadout"/>
+    /// (at their levels), and its equipped passives come back as the battle's
+    /// <see cref="PassiveLoadout"/>, to hand to <see cref="BattleTurnExecutor.RunBattle(TurnManager, IEnumerable{BattleUnit}, HexGrid, System.Random, BattleUnit, PassiveLoadout, int)"/>.
     /// </para>
     /// </summary>
     public static class BattleAvatar
@@ -115,13 +127,14 @@ namespace BeastCraft.Battle
         /// for the same reason.
         /// </para>
         /// <para>
-        /// <strong>Its damage is the formula's floor.</strong> This avatar is level 1 with zero
-        /// <c>Attack</c> and <c>SpecialAttack</c>, and <see cref="DamageFormula"/> gives a zero
-        /// attacking stat exactly its +2 constant: every damage effect it lands deals 2 times the
-        /// element multiplier (truncated, at least 1), whatever the authored power. Before the
+        /// <strong>Its damage is the formula's floor.</strong> This avatar has zero
+        /// <c>Attack</c> and <c>SpecialAttack</c>, so every damage effect it lands deals exactly
+        /// <see cref="DamageFormula.MinimumDamage"/> (1), whatever the authored power and whatever
+        /// the element. Before the
         /// damage formula it dealt the authored magnitude flat; a caller relying on an avatar
-        /// strike landing hard must now give the avatar stats through the other overload. Heals and
-        /// buffs it casts are unchanged, since those are still flat.
+        /// strike landing hard must now give the avatar stats through the other overload. The same goes
+        /// for heals, which scale with <c>SpecialAttack</c>: this avatar's heals restore nothing. Buffs
+        /// it casts are unchanged, since those are still flat.
         /// </para>
         /// <para>
         /// <see cref="BattleUnit.IsDefeated"/> is left <c>false</c> and stays that way: there is no
@@ -170,6 +183,32 @@ namespace BeastCraft.Battle
         {
             StatBlock stats = StatCalculator.ComputeStats(baseStats, StatCalculator.CollectModifiers(equipped));
             return new BattleUnit(id, BattleTeam.Player, stats, PlaceholderPosition, skills, null, level);
+        }
+
+        /// <summary>
+        /// Builds the avatar from its <see cref="AvatarSkillBook"/>: exactly
+        /// <see cref="Create(SkillLoadout, StatBlock, IEnumerable{AvatarGearSO}, string, int)"/> with
+        /// the loadout <see cref="BattleUnitFactory.BuildLoadout"/> makes from the book's
+        /// <see cref="AvatarSkillBook.Actives"/> and <paramref name="activeLookup"/> (equipped slots
+        /// in slot order, at their recorded level and tier), and with
+        /// <paramref name="passives"/> set to <see cref="PassiveLoadout.FromBook"/> of the book's
+        /// <see cref="AvatarSkillBook.Passives"/> and <paramref name="passiveLookup"/>.
+        /// <para>
+        /// The passives are handed back rather than stored on the unit because
+        /// <see cref="BattleUnit"/> is a plain record shared with every beast, and a passive set is
+        /// per-battle state the executor drives; pass both to
+        /// <see cref="BattleTurnExecutor.RunBattle(TurnManager, IEnumerable{BattleUnit}, HexGrid, System.Random, BattleUnit, PassiveLoadout, int)"/>.
+        /// A null book or lookup gives an empty loadout on that side; never throws and never
+        /// returns a null <paramref name="passives"/>.
+        /// </para>
+        /// </summary>
+        public static BattleUnit Create(AvatarSkillBook skillBook, Func<string, SkillSO> activeLookup, Func<string, PassiveSkillSO> passiveLookup,
+                                        StatBlock baseStats, IEnumerable<AvatarGearSO> equipped, int level, out PassiveLoadout passives,
+                                        string id = DefaultId)
+        {
+            SkillLoadout skills = BattleUnitFactory.BuildLoadout(skillBook == null ? null : skillBook.Actives, activeLookup);
+            passives = PassiveLoadout.FromBook(skillBook == null ? null : skillBook.Passives, passiveLookup);
+            return Create(skills, baseStats, equipped, id, level);
         }
     }
 }

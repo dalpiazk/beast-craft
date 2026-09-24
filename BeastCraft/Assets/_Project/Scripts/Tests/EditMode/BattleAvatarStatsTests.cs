@@ -158,7 +158,7 @@ namespace BeastCraft.Tests.EditMode
             _created.Add(sweep);
 
             BattleUnit player = new BattleUnit("p1", BattleTeam.Player, new StatBlock(10, 0, 0, 0, 0, 1), new HexCoordinate(0, 1));
-            // Attack 10 against Defense 0 (treated as 1) at power 1000 is one-shot damage.
+            // Attack 10 against Defense 0 (no mitigation) at power 1000 is 100 damage: a one-shot.
             BattleUnit enemy = new BattleUnit("e1", BattleTeam.Enemy, new StatBlock(10, 10, 0, 0, 0, 5), new HexCoordinate(0, -1),
                                               new SkillLoadout(new[] { sweep }));
             AvatarGearSO armor = Gear(AvatarGearSlot.Armor, new StatModifier { Stat = StatType.HP, FlatBonus = 10 });

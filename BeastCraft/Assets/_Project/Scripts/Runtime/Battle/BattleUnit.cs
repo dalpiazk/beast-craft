@@ -16,9 +16,9 @@ namespace BeastCraft.Battle
     /// <para>
     /// Intentionally minimal: the identity, allegiance, stats and position that the grid and the
     /// turn manager need to reference, plus the equipped skill stack the rotation ticks, the live
-    /// HP pool effects spend against, the timed stat modifiers riding on the unit, and the level
-    /// the damage formula reads. This is NOT the final creature-instance runtime model — the real
-    /// one will carry equipped gear, status effects and a link back to its
+    /// HP pool effects spend against, the timed stat modifiers and statuses riding on the unit, and
+    /// the level the damage formula reads. This is NOT the final creature-instance runtime model —
+    /// the real one will carry equipped gear and a link back to its
     /// <c>CreatureSpeciesSO</c>, and this type will either grow into it or be replaced by it.
     /// </para>
     /// <para>
@@ -58,8 +58,8 @@ namespace BeastCraft.Battle
         /// to the caller's array (or the species asset) do not reach a unit already in battle.
         /// </para>
         /// <para>
-        /// <paramref name="level"/> is the unit's <see cref="Level"/>, read by
-        /// <see cref="DamageFormula"/>. It defaults to 1 so every existing call site keeps
+        /// <paramref name="level"/> is the unit's <see cref="Level"/> (a record only: the damage
+        /// formula no longer reads it; see <see cref="Level"/>). It defaults to 1 so every existing call site keeps
         /// compiling; <see cref="BattleUnitFactory.CreateBeast"/> passes the beast's real level.
         /// Anything below 1 is stored as 1.
         /// </para>
@@ -68,9 +68,15 @@ namespace BeastCraft.Battle
         /// <c>CreatureSpeciesSO.Stance</c>. It defaults to <see cref="CombatStance.Vanguard"/>, whose
         /// movement is the plain approach rule, so every existing call site keeps its behaviour.
         /// </para>
+        /// <para>
+        /// <paramref name="statusResist"/> is the unit's <see cref="StatusResist"/>, clamped into
+        /// [0, 100]. It defaults to 0 — no resistance — so every existing call site keeps its
+        /// behaviour.
+        /// </para>
         /// </summary>
         public BattleUnit(string id, BattleTeam team, StatBlock stats, HexCoordinate position, SkillLoadout skills = null,
-                          IReadOnlyList<Element> elements = null, int level = 1, CombatStance stance = CombatStance.Vanguard)
+                          IReadOnlyList<Element> elements = null, int level = 1, CombatStance stance = CombatStance.Vanguard,
+                          int statusResist = 0)
         {
             Id = id;
             Team = team;
@@ -82,7 +88,11 @@ namespace BeastCraft.Battle
             Elements = CopyElements(elements);
             Level = level < 1 ? 1 : level;
             Stance = stance;
+            StatusResist = statusResist < 0 ? 0 : statusResist > 100 ? 100 : statusResist;
+            _statuses = new List<ActiveStatus>();
         }
+
+        private readonly List<ActiveStatus> _statuses;
 
         /// <summary>
         /// Stable identifier for this combatant, unique within a single battle. This is the key the
@@ -214,8 +224,11 @@ namespace BeastCraft.Battle
         public IReadOnlyList<Element> Elements { get; }
 
         /// <summary>
-        /// The unit's level, always at least 1. Read by <see cref="DamageFormula"/> as the
-        /// caster's level in the level term, so a higher-level unit hits harder with the same stats.
+        /// The unit's level, always at least 1. <strong>Not</strong> part of
+        /// <see cref="DamageFormula"/>: the formula used to carry a Pokemon-style level term, but
+        /// stats already scale with level through the growth curve, so the level now reaches damage
+        /// only through the stats it assembled. Kept for everything else that asks a unit its level
+        /// (reporting, the avatar, future progression rules).
         /// <para>
         /// For a beast this is the level its stats were assembled at (see
         /// <see cref="BattleUnitFactory.CreateBeast"/>); it is only recorded here, and changing it
@@ -225,8 +238,7 @@ namespace BeastCraft.Battle
         /// <para>
         /// Read-only and fixed at construction, like <see cref="Elements"/>: nothing levels a unit
         /// mid-battle. The constructor stores anything below 1 as 1 — the one correction this
-        /// passive record makes, because a level-0 or negative caster has no meaning in the
-        /// formula.
+        /// passive record makes, because a level-0 or negative unit has no meaning.
         /// </para>
         /// </summary>
         public int Level { get; }
@@ -242,6 +254,36 @@ namespace BeastCraft.Battle
         /// </para>
         /// </summary>
         public CombatStance Stance { get; }
+
+        /// <summary>
+        /// Percent (0-100) knocked off the chance of every <em>hostile</em> non-damage effect that
+        /// targets this unit — a debuff, a status or a knockback cast by the other team:
+        /// the effective chance is <c>SkillEffect.Chance * (100 - StatusResist) / 100</c>. Effects
+        /// from the unit's own side (heals, buffs, shields) ignore it. See
+        /// <see cref="SkillEffectApplier"/>.
+        /// <para>
+        /// Read-only and fixed at construction, like <see cref="Stance"/>: a trait of what the unit
+        /// is (the balance simulator gives its bosses resistance), not a battle state.
+        /// </para>
+        /// </summary>
+        public int StatusResist { get; }
+
+        /// <summary>
+        /// The statuses currently riding on this unit (<see cref="StatusType"/>), in the order they
+        /// were applied. A read-only view: <see cref="StatusEffects"/> is the only writer, applying
+        /// them through <see cref="SkillEffectApplier"/> and ticking them on the unit's own turns
+        /// from <see cref="BattleTurnExecutor"/>. Never <c>null</c>; empty is the normal state.
+        /// </summary>
+        public IReadOnlyList<ActiveStatus> Statuses
+        {
+            get { return _statuses; }
+        }
+
+        /// <summary>The mutable status list behind <see cref="Statuses"/>, for <see cref="StatusEffects"/> only.</summary>
+        internal List<ActiveStatus> StatusList
+        {
+            get { return _statuses; }
+        }
 
         /// <summary>
         /// True once the unit is out of the fight. Defeated units are skipped by the turn order and
