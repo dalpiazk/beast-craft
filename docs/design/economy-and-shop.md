@@ -22,7 +22,7 @@ future source.
 | Earned by | Spent on |
 | --- | --- |
 | **Gold** on every clear (dens, passes and lairs pay more) and by selling gear | The **Trader**: gear, skill materials, skill tomes and avatar skills, consumables, looks |
-| **Gear** from battle drops, the Trader, and every pass's and lair's first clear | Worn by beasts and the avatar (stats); sold back for 25% |
+| **Gear** from battle drops, the Trader, and every pass's (a common) and lair's (rare or epic) first clear | Worn by beasts and the avatar (stats); sold back for 25% |
 | **Consumables** from the Trader | One per battle, used as it begins, spent win or lose |
 | **Looks** from starters, the Trader, lairs, milestones and rare battle drops | Worn by the avatar and each beast of the look's species; no stats |
 
@@ -43,8 +43,8 @@ Paid on a player victory only (`PostBattleAward.AwardGold`, `BattleSession.Apply
 `PlayerSave.Gold` through `Wallet` (held in [0, 9,999,999]; income past the ceiling is lost).
 
 Earned (campaign model, p50): **977** gold in region 1, **4,559** in region 5, **9,026** in region 10,
-**49,953** over the campaign, plus about 15,000 from selling replaced gear (design targets ~0.9k /
-4.4k / 8.8k / 55k).
+**49,953** over the campaign, plus about 8,300 from selling replaced gear — **14% of all gold**
+(user target 10-15%) — (design targets ~0.9k / 4.4k / 8.8k / 55k).
 
 ### Seed streams
 
@@ -66,9 +66,9 @@ the economy on or off never moves the battle, the material rolls or each other:
 A map's **trading post** (a Shop node) opens `ShopService` (the `IShopService` of
 `CampaignRules.Trade`), and **every camp has a travelling trader** too (the game opens the shop with
 `CampaignRules.ShopContextFor(run, campNode)`): every path crosses the camp row, so a player meets a
-Trader about once per stage (about every 9 battles in the campaign model). The camp trader is an
-economy-lane assumption, **pending producer review** (without it a Trader is met every ~36 battles
-and the economy's pacing does not hold).
+Trader about once per stage (about every 9 battles in the campaign model). **The camp trader is
+approved (user decision)**; without it a Trader is met every ~36 battles and the economy's pacing
+does not hold.
 
 **Stock** is rolled once per trading post (`ShopContext.NodeKey` = region/stage/node/seed) from the
 node's seed and **frozen into the save** (`PlayerSave.Shops`, the last 16): leaving, coming back or
@@ -79,14 +79,16 @@ from pools sorted by id:
 | Category | Listings | Pool | Price (price units) |
 | --- | --- | --- | --- |
 | Materials | 1-3 | shard from level 1 (stacks of up to 2), crystal from 21, core from 41 (never before the tier's first-clear band) | 2.1 / 7 / 24.5 at the Trader's level |
-| Gear | 2-3 | shop-tagged beast and avatar commons (weight 75) and rares (25) of the Trader's band or the one before; never epics | 4.2 common, 10.5 rare, at the piece's MinimumLevel + 10 |
+| Gear | 2-3 | shop-tagged beast and avatar commons (weight 75) and rares (25) of the Trader's band or the one before; never epics | 3 common, 8 rare, at the piece's MinimumLevel + 10 |
 | Skills | 0-2 | tomes of skills an owned beast's species learns (**own species only**), up to 10 levels before it would; the avatar's actives and non-default passives once the avatar is level enough (levels 5-70) | tome 5.6 at the learn level; avatar skill 8.4 at its level |
 | Consumables | 2-3 | those of the Trader's region (stacks of up to 2) | 0.7 common, 1.4 rare, at the Trader's level |
 | Looks | 1-2 | shop looks of the region not yet usable | 5.6 common, 14 rare, at the region's middle level |
 
 A **price unit** at a level is `10 + 2 x level` (the squad gold curve), so prices keep pace with
-income. Gear **sells back** for 25% of its price (epics, never sold, are valued at 21 units). The
-prices are the design's x0.7: the Trader is met every ~9 battles, not the design's ~12.
+income. Gear **sells back** for 25% of its price (epics, never sold, are valued at 10.5 units). The
+prices are the design's x0.7 (**approved, user decision**): the Trader is met every ~9 battles, not
+the design's ~12. Gear is cheaper still (3 / 8 units, the design's x0.5): it keeps the gold from
+selling replaced gear at about 14% of all gold (user target 10-15%).
 
 `ShopService.TryBuy(save, context, listing, targetBeastId)` validates first and changes the save only
 on success: `Bought`, or `UnknownListing`, `SoldOut`, `NotEnoughGold`, `StackFull`,
@@ -100,7 +102,7 @@ on success: `Bought`, or `UnknownListing`, `SoldOut`, `NotEnoughGold`, `StackFul
 (`MinimumLevel` 1 / 21 / 41 / 61 / 81). Per band six beast pieces — Striker fang (Attack) and focus
 stone (SpecialAttack), Bulwark barding (Defense + HP) and warding mantle (SpecialDefense + HP), Swift
 wind charm (Speed) and keen collar (CritChance) — each common (shop, drops) and rare (shop, drops,
-pass and lair rewards); from band 41 an epic of each (lairs only, never sold). Avatar: staff
+lair rewards); from band 41 an epic of each (lairs only, never sold). Avatar: staff
 (SpecialAttack), coat (HP / Defense / SpecialDefense), ring (Speed + crit), common and rare per band.
 `AvatarGearSO` gained `MinimumLevel` (gated on the avatar's level by `GearRules.EquipAvatarGear`).
 
@@ -130,8 +132,8 @@ the guard stay **gearless**.
 **Drops** (`drop-tables.json` `GearDrops`, stream 3, with `RewardModifiers.Gear`): elite 8% common and
 1.5% rare, solo 3% common, squad and horde 1% common — a piece of that rarity from the encounter
 level's band's drop pool. **Passes and lairs** (`CampaignRules.ResolveBattle(..., economy)`, first
-clear only): a guaranteed rare from the band's boss pool at a pass, an epic at a lair (a rare below
-band 41).
+clear only): a guaranteed **common** of the band at a pass (stage gate; user decision), an epic from
+the boss pool at a region's lair (a rare below band 41). Only lairs guarantee rare or epic gear.
 
 ### Typical gear and the shipping difficulty
 
@@ -220,9 +222,10 @@ consumable at every den, pass and lair battle). Purchases do not change the clea
 
 | Gate | Target | Result |
 | --- | --- | --- |
-| Want-list affordability (spent / wanted per visit) | p50 55-80% | 69% (p10 5%, p90 100%) |
+| Want-list affordability (spent / wanted per visit) | p50 55-80% | 63% (p10 5%, p90 100%) |
+| Gold from selling gear | about 10-15% of all gold | 14% (8,340 of ~58,300) |
 | Visits where nothing meaningful in stock is affordable | < 5% | 0% |
-| Gold held at every boss | < 2 visits' income (p50) | 1.0-1.9 |
+| Gold held at every boss | < 2 visits' income (p50) | 1.0-1.6 |
 | Focus skill L5 / L10 / L15 / L20 | 15-20 / 72-88 / 162-198 / >= 270 | 17 / 86 / 190 / 323 |
 
 Every earlier campaign gate still holds (545 battles p50). The gate material is almost never wanted:
@@ -239,9 +242,6 @@ dotnet run --project Tooling/BalanceSim -c Release -- --mode pve --seeds 12345,7
 ## Open items (producer review)
 
 - Every name, number and look (DRAFT); no art (placeholder `ArtKey`s), no UI.
-- The camp's travelling trader (see "The Trader").
-- Pass first clears grant a rare every stage (three per region): replaced gear sold back is about a
-  quarter of all gold — consider fewer or lower-rarity pass rewards if selling should matter less.
 - Speed consumables and consumable shields (above); cross-species tomes; a cleanse consumable.
 - The shipping difficulty with `--gear typical` (above), once the combat lane's retune lands.
 - Premium looks and idle rewards (future).

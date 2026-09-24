@@ -49,8 +49,9 @@ namespace BeastCraft.Economy
 
         /// <summary>
         /// A guaranteed piece of <paramref name="rarity"/> from the <c>boss</c> pool of
-        /// <paramref name="level"/>'s band; when that band has none of that rarity (no epics below
-        /// level 41), the next rarity down. One draw. Null only for an empty library.
+        /// <paramref name="level"/>'s band, or its <c>drop</c> pool when the boss pool has none of
+        /// that rarity (commons are not boss-tagged); when neither has one (no epics below level
+        /// 41), the next rarity down. One draw. Null only for an empty library.
         /// </summary>
         public static GearItem RollGuaranteed(GearLibrary library, int rarity, int level, Random rng)
         {
@@ -62,6 +63,11 @@ namespace BeastCraft.Economy
             for (int r = rarity; r >= 0; r--)
             {
                 List<GearItem> pool = library.Pool(GearLibrary.SourceBoss, r, level);
+                if (pool.Count == 0)
+                {
+                    pool = library.Pool(GearLibrary.SourceDrop, r, level);
+                }
+
                 if (pool.Count > 0)
                 {
                     return pool[rng.Next(pool.Count)];

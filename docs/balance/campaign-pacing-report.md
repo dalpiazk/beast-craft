@@ -138,16 +138,16 @@ consumable at every den, pass and lair battle. Purchases do not change the clear
 
 | Region | Gold earned p50 | Visits (mean) | Battles per visit | Gold held at the boss p50 | Held / visit income p50 | Gear at typical (mean) | Consumables used (mean) | Verdict |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| r01 | 977 | 6.3 | 8.3 | 167 | 1.0 | 58% | 7.1 | ok |
-| r02 | 1831 | 6.2 | 8.8 | 406 | 1.4 | 96% | 7.4 | ok |
-| r03 | 2753 | 6.2 | 8.8 | 577 | 1.3 | 55% | 7.6 | ok |
-| r04 | 3627 | 6.3 | 8.8 | 914 | 1.6 | 86% | 7.6 | ok |
-| r05 | 4559 | 6.2 | 8.8 | 1084 | 1.5 | 51% | 7.6 | ok |
-| r06 | 5440 | 6.2 | 8.8 | 1610 | 1.8 | 81% | 7.5 | ok |
-| r07 | 6358 | 6.2 | 8.8 | 1798 | 1.7 | 32% | 7.6 | ok |
-| r08 | 7241 | 6.3 | 8.8 | 2149 | 1.8 | 58% | 7.6 | ok |
-| r09 | 8146 | 6.1 | 8.9 | 2409 | 1.8 | 22% | 7.6 | ok |
-| r10 | 9026 | 6.2 | 8.9 | 2712 | 1.9 | 40% | 7.6 | ok |
+| r01 | 977 | 6.3 | 8.3 | 164 | 1.0 | 63% | 7.3 | ok |
+| r02 | 1831 | 6.2 | 8.8 | 364 | 1.2 | 97% | 7.5 | ok |
+| r03 | 2753 | 6.2 | 8.8 | 529 | 1.2 | 50% | 7.6 | ok |
+| r04 | 3627 | 6.3 | 8.8 | 791 | 1.4 | 75% | 7.6 | ok |
+| r05 | 4559 | 6.2 | 8.8 | 963 | 1.3 | 38% | 7.6 | ok |
+| r06 | 5440 | 6.2 | 8.8 | 1315 | 1.5 | 60% | 7.5 | ok |
+| r07 | 6358 | 6.2 | 8.8 | 1531 | 1.5 | 19% | 7.6 | ok |
+| r08 | 7241 | 6.3 | 8.8 | 1809 | 1.6 | 37% | 7.6 | ok |
+| r09 | 8146 | 6.1 | 8.9 | 2067 | 1.5 | 15% | 7.6 | ok |
+| r10 | 9026 | 6.2 | 8.9 | 2369 | 1.6 | 29% | 7.6 | ok |
 | **Campaign** | 49953 | 62.2 | | | | | | |
 
 Design reference (not a gate): about 900 gold in region 1, 4400 in region 5, 8800 in region 10, 55000 over the campaign. Gold held target: under 2.0 visits' income at every boss (p50). "Gear at typical" = the share of the fielded beasts' slots at or
@@ -155,10 +155,10 @@ above the typical profile (`--gear typical`) for the boss's band.
 
 | Gate | Target | Result | Verdict |
 | --- | --- | --- | --- |
-| Want-list affordability (gold spent / wanted, per visit) | p50 55%-80% | p10 5%, p50 69%, p90 100% | ok |
+| Want-list affordability (gold spent / wanted, per visit) | p50 55%-80% | p10 5%, p50 63%, p90 100% | ok |
 | Visits where nothing meaningful in stock (material, gear, consumable, skill) is affordable on arrival | under 5% | 0% of 62192 | ok |
 
-Per campaign (means): bought AvatarGear 8.6, AvatarPassive 4.8, AvatarSkill 4.7, BeastGear 25.0, BeastSkill 1.1, Consumable 75.5, Cosmetic 30.8 (materials by tier: 0.0 / 0.0 / 0.0); gear dropped 10.0, from passes and lairs 40.0, sold back 71.6 for 15122 gold; looks unlocked by source boss 14.0, drop 3.1, milestone 13.8, shop 30.8.
+Per campaign (means): bought AvatarGear 10.2, AvatarPassive 4.7, AvatarSkill 4.7, BeastGear 28.0, BeastSkill 1.0, Consumable 75.8, Cosmetic 28.1 (materials by tier: 0.0 / 0.0 / 0.0); gear dropped 10.0, from passes and lairs 40.0, sold back 76.3 for 8340 gold (14% of all gold; target about 10-15%); looks unlocked by source boss 14.0, drop 3.1, milestone 13.8, shop 28.1.
 
 ## Focus skill
 

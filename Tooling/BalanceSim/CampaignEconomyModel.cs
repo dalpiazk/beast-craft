@@ -689,7 +689,9 @@ namespace BeastCraft.Tooling.BalanceSim
             sb.Append(" (materials by tier: ").Append(SimOptions.Format(tiers[1] / runs.Count)).Append(" / ").Append(SimOptions.Format(tiers[2] / runs.Count)).Append(" / ")
               .Append(SimOptions.Format(tiers[3] / runs.Count)).Append("); gear dropped ").Append(SimOptions.Format(drops / runs.Count)).Append(", from passes and lairs ")
               .Append(SimOptions.Format(bosses / runs.Count)).Append(", sold back ").Append(SimOptions.Format(sold / runs.Count)).Append(" for ")
-              .Append(Int(sales / runs.Count)).Append(" gold; looks unlocked by source ");
+              .Append(Int(sales / runs.Count)).Append(" gold (")
+              .Append(Pct(100.0 * sales / Math.Max(1.0, sales + Sum(runs.ConvertAll(run => Sum(run.Econ.GoldByRegion)).ToArray()))))
+              .Append(" of all gold; target about 10-15%); looks unlocked by source ");
             keys = new List<string>(looks.Keys);
             keys.Sort(StringComparer.Ordinal);
             for (int i = 0; i < keys.Count; i++)

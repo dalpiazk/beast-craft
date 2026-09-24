@@ -3101,3 +3101,16 @@ economy doc).
 Reproduce: `dotnet run --project Tooling/BalanceSim -c Release -- --mode campaign --self-check --out
 docs/balance/campaign-pacing-report.md`; `-- --mode pve --economy-probe --out <scratch>`; `-- --mode
 pve --seeds 12345,777,4242 --gear rare --out <scratch>`.
+
+### Pass rewards and gear prices (user decisions)
+
+User decisions: the camp's travelling trader and prices x0.7 stay (approved); a stage pass's first
+clear now guarantees a **common** of its band (from the drop pool; commons are not boss-tagged), and
+only region lairs guarantee rare / epic gear. With passes granting rares, selling replaced gear was
+23% of all gold (15,122 of ~65,000); the user target is 10-15%. Commons at passes alone brought it to
+19% (11,647); gear prices then went from 4.2 / 10.5 units (common / rare; the design's x0.7) to
+3 / 8 (x0.5), and the never-sold epic's sellback valuation from 21 to 10.5 units: **8,340 gold from
+sales, 14% of all gold**. Every gate still met: affordability p50 63%, nothing-affordable visits 0%,
+gold held at every boss 1.0-1.6 visits' income, focus skill 17 / 86 / 190 / 323, 545 battles; gold
+earned unchanged (977 / 4,559 / 9,026 / 49,953). The report's "Per campaign" line now prints the
+sales share.

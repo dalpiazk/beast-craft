@@ -187,9 +187,9 @@
     }
   ],
   "Gear": {
-    "CommonUnits": 4.2,
-    "RareUnits": 10.5,
-    "EpicUnits": 21,
+    "CommonUnits": 3,
+    "RareUnits": 8,
+    "EpicUnits": 10.5,
     "CommonWeight": 75,
     "RareWeight": 25,
     "BandLookback": 20

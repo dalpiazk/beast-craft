@@ -139,6 +139,7 @@ namespace BeastCraft.Tests.EditMode
             Assert.AreEqual(2, GearDrops.RollGuaranteed(_library, 2, 55, new Random(1)).Rarity);
             Assert.AreEqual(1, GearDrops.RollGuaranteed(_library, 2, 15, new Random(1)).Rarity, "no epics below band 41: the lair gives a rare");
             Assert.IsNull(GearDrops.RollGuaranteed(null, 1, 15, new Random(1)));
+            Assert.AreEqual(0, GearDrops.RollGuaranteed(_library, 0, 15, new Random(1)).Rarity, "commons come from the drop pool");
 
             PlayerSave save = PlayerSave.CreateNew();
             Assert.AreEqual("gear1", GearDrops.Grant(save, _library.Get("fang_t1")));
@@ -177,7 +178,7 @@ namespace BeastCraft.Tests.EditMode
             CampaignResult gate = WalkToTheTop(save, regions, "r01", 0, 11, economy);
             Assert.AreEqual(CampaignOutcome.StageCleared, gate.Outcome);
             Assert.IsNotNull(gate.GearGranted);
-            Assert.AreEqual(1, _library.Get(gate.GearGranted).Rarity, "a pass's first clear: a rare");
+            Assert.AreEqual(0, _library.Get(gate.GearGranted).Rarity, "a pass's first clear: a common (user decision)");
             Assert.AreEqual(1, save.Gear.BeastGear.Count + save.Gear.AvatarGear.Count);
 
             CampaignResult replay = WalkToTheTop(save, regions, "r01", 0, 12, economy);

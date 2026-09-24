@@ -383,7 +383,7 @@ keep their left-to-right order, so the paths read as routes across the region.
 | `ResolveBattle(save, regions, nodeId, outcome)` | Win: the node is cleared and current. A Gate also clears the stage and ends the expedition; the Boss sets `BossCleared`, grants its seal (`GrantSeal`), unlocks the next region and ends it. Loss (lead decision): nothing moves — retry the node or take another path; `Attempts` counts. Rewards are `BattleSession.ApplyRewards(…, beastLevelCap: BeastCap(save, regions))`, not this. |
 | `Camp(save, regions, nodeId, beastId)` | Rest node: trains one chosen beast by a standing clear at the node's level (falloff, cap). Battles already start at full HP, so there is no healing. A travelling trader also waits at every camp: the game opens the shop with `ShopContextFor(run, campNode)` (the economy's pacing assumes it; see [economy-and-shop.md](economy-and-shop.md)). |
 | `Trade(save, regions, nodeId, shop)` | Shop node (a trading post): opens the `IShopService` — the economy's `ShopService`, whose stock is rolled once and frozen into the save; `ShopServiceStub` or null offers nothing — and marks the node visited. Buying and selling go through the shop with `ShopContextFor(run, node)`. |
-| `ResolveBattle(save, regions, nodeId, outcome, economy)` | As `ResolveBattle`, plus the economy's first-clear rewards: a pass's (Gate's) first clear grants a guaranteed rare, a lair's (Boss's) an epic (a rare below band 41) and its boss-exclusive looks, then milestone looks (`CampaignResult.GearGranted`, `CosmeticsUnlocked`). |
+| `ResolveBattle(save, regions, nodeId, outcome, economy)` | As `ResolveBattle`, plus the economy's first-clear rewards: a pass's (Gate's) first clear grants a guaranteed common, a lair's (Boss's) an epic (a rare below band 41) and its boss-exclusive looks, then milestone looks (`CampaignResult.GearGranted`, `CosmeticsUnlocked`). |
 | `RewardModifiersFor(node)` | The economy's reward modifiers for `ApplyRewards`: dens (Elite) gold x1.5, passes +5, lairs +10. |
 | `Retreat(save)` | Abandons the expedition (stage progress already earned stays). |
 | `GrantSeal(save, regions, sealId)` | Adds the seal and releases every beast's bank at the new cap. Bosses call it; it is also the hook for future story-event seals. |
@@ -618,9 +618,8 @@ its System.Text.Json twin here.
   templates (names, elements, escorts) are placeholders for producer review; the boss
   `DifficultyOverride`s were calibrated before the tiered difficulty targets and should be
   re-calibrated after them (see "Region campaign").
-- **Camp traders are an economy assumption.** The economy's pacing assumes a travelling trader at
-  every camp (about one Trader visit per stage); the game must open the shop there. Pending producer
-  review.
+- **Camp traders (approved).** The economy's pacing relies on a travelling trader at every camp
+  (about one Trader visit per stage); the game must open the shop there.
 - **Bench share retuned away from the lead's numbers** (10% + 9% per level instead of 50% + 7.5%)
   to reach the intended "reserves ~6 levels behind"; pending lead/user review (see "Beast and avatar
   level").
