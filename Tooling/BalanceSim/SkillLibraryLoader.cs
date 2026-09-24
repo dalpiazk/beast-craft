@@ -4,6 +4,7 @@ using System.IO;
 using System.Text.Json;
 using BeastCraft.Avatar;
 using BeastCraft.Battle;
+using BeastCraft.Bonds;
 using BeastCraft.Creatures;
 using BeastCraft.Creatures.Roster;
 using BeastCraft.Skills;
@@ -34,6 +35,7 @@ namespace BeastCraft.Tooling.BalanceSim
         private readonly Dictionary<string, string[]> _defaults = new Dictionary<string, string[]>(StringComparer.Ordinal);
         private readonly List<SkillSO> _avatarActives = new List<SkillSO>();
         private readonly List<PassiveSkillSO> _avatarPassives = new List<PassiveSkillSO>();
+        private readonly List<TeamBondSO> _teamBonds = new List<TeamBondSO>();
 
         private SkillLibraryKits(int skillLevel)
         {
@@ -53,6 +55,12 @@ namespace BeastCraft.Tooling.BalanceSim
         public IReadOnlyList<PassiveSkillSO> AvatarPassives
         {
             get { return _avatarPassives; }
+        }
+
+        /// <summary>The library's team bonds, in file order (the order they are resolved and applied in).</summary>
+        public IReadOnlyList<TeamBondSO> TeamBonds
+        {
+            get { return _teamBonds; }
         }
 
         /// <summary>The explicit path when given, otherwise found by walking up like the roster.</summary>
@@ -110,6 +118,14 @@ namespace BeastCraft.Tooling.BalanceSim
                 SkillLibraryBuilder.ApplyPassive(Array.Find(library.AvatarPassives, p => p.PassiveId == id), passive);
                 passive.name = id;
                 kits._avatarPassives.Add(passive);
+            }
+
+            foreach (TeamBondData data in library.TeamBonds ?? new TeamBondData[0])
+            {
+                TeamBondSO bond = ScriptableObject.CreateInstance<TeamBondSO>();
+                SkillLibraryBuilder.ApplyTeamBond(data, bond);
+                bond.name = data.BondId;
+                kits._teamBonds.Add(bond);
             }
 
             return kits;

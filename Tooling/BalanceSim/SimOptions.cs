@@ -240,6 +240,12 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <summary>Which skills the beasts fight with (<c>--skill-kit standard|library</c>); library is the committed report's setting.</summary>
         public KitSource KitSource = KitSource.Library;
 
+        /// <summary>
+        /// <c>--bonds on|off</c> (default on): whether the skill library's team bonds apply to the
+        /// player teams. Only with <c>--skill-kit library</c> (see <see cref="BondsActive"/>).
+        /// </summary>
+        public bool Bonds = true;
+
         /// <summary>The skill level library skills and passives are fielded at (<c>--skill-level</c>).</summary>
         public int SkillLevel = 1;
 
@@ -259,6 +265,15 @@ namespace BeastCraft.Tooling.BalanceSim
             copy.Seed = seed;
             copy.Seeds = null;
             return copy;
+        }
+
+        /// <summary>
+        /// Whether team bonds apply this run: <c>--bonds on</c> (the default) with the library kit
+        /// (bonds belong to the authored game setup; the standard kit measures stat lines alone).
+        /// </summary>
+        public bool BondsActive
+        {
+            get { return Bonds && KitSource == KitSource.Library && Library != null && Library.TeamBonds.Count > 0; }
         }
 
         /// <summary>Whether this run fields anything from the skill library.</summary>
@@ -282,6 +297,8 @@ namespace BeastCraft.Tooling.BalanceSim
             "  --skill-level <n>          Skill level for library skills and avatar passives, 1-20 (default 1); the tier is\n" +
             "                             the gates below that level (16+ = every gate passed).\n" +
             "  --skill-library <path>     skill-library.json (default: found by walking up from the working directory).\n" +
+            "  --bonds <on|off>           Team bonds (default on): the library's TeamBonds apply at battle start to every player\n" +
+            "                             team that meets their condition. Library kit only; ignored with --skill-kit standard.\n" +
             "  --levels <list>            Comma-separated levels (default 1,50,100).\n" +
             "  --encounter-set <s>        generated | fixed (default generated). generated = random compositions of the enemy\n" +
             "                             type pool per shape (solo, elite, squad, horde); fixed = the hand-authored boss,\n" +
@@ -587,6 +604,21 @@ namespace BeastCraft.Tooling.BalanceSim
                             return null;
                         }
 
+                        break;
+                    case "--bonds":
+                        if (!TryNext(args, ref i, arg, out text, out error))
+                        {
+                            return null;
+                        }
+
+                        text = text.ToLowerInvariant();
+                        if (text != "on" && text != "off")
+                        {
+                            error = "--bonds expects on or off, got '" + text + "'.";
+                            return null;
+                        }
+
+                        options.Bonds = text == "on";
                         break;
                     case "--avatar":
                         if (!TryNext(args, ref i, arg, out text, out error))

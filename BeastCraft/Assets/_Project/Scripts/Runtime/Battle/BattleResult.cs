@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using BeastCraft.Bonds;
 
 namespace BeastCraft.Battle
 {
@@ -14,8 +15,9 @@ namespace BeastCraft.Battle
     public class BattleResult
     {
         public BattleResult(BattleOutcome outcome, long elapsedTicks, IReadOnlyList<BattleTurnResult> turns,
-                            IReadOnlyList<PassiveActivation> openingPassiveActivations = null)
+                            IReadOnlyList<PassiveActivation> openingPassiveActivations = null, IReadOnlyList<TeamBondActivation> bondActivations = null)
         {
+            BondActivations = bondActivations ?? new List<TeamBondActivation>();
             Outcome = outcome;
             ElapsedTicks = elapsedTicks < 0 ? 0 : elapsedTicks;
             Turns = turns ?? new List<BattleTurnResult>();
@@ -28,6 +30,13 @@ namespace BeastCraft.Battle
         /// <see cref="BattleTurnResult.PassiveActivations"/>. Never <c>null</c>.
         /// </summary>
         public IReadOnlyList<PassiveActivation> OpeningPassiveActivations { get; }
+
+        /// <summary>
+        /// The player team's bonds applied as the battle began, before any avatar passive and any
+        /// turn, in application order (see <see cref="TeamBondLoadout"/>). Empty for a battle run
+        /// without bonds. Never <c>null</c>.
+        /// </summary>
+        public IReadOnlyList<TeamBondActivation> BondActivations { get; }
 
         /// <summary>Which side won, or that nobody did.</summary>
         public BattleOutcome Outcome { get; }

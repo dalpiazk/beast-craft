@@ -62,6 +62,13 @@ namespace BeastCraft.Skills
         /// <summary>Per species: what it learns and at which level, and its default loadout.</summary>
         public SpeciesKitData[] SpeciesKits = new SpeciesKitData[0];
 
+        /// <summary>
+        /// Team bonds: composition-triggered team effects applied at battle start. Imports into
+        /// <c>TeamBondSO</c> assets. Optional (an empty list means no bonds); see the battle-system
+        /// design doc, "Team bonds".
+        /// </summary>
+        public TeamBondData[] TeamBonds = new TeamBondData[0];
+
         /// <summary>How many of <see cref="AvatarActives"/>, from the front, make the avatar's default active loadout.</summary>
         public const int AvatarDefaultActiveCount = 3;
     }
@@ -246,6 +253,45 @@ namespace BeastCraft.Skills
         /// order, each learnable by level <see cref="SkillLibraryValidator.MaxDefaultLearnLevel"/>.
         /// </summary>
         public string[] DefaultLoadout = new string[0];
+    }
+
+    /// <summary>One team bond. Imports into a <c>TeamBondSO</c>; the fields mirror it.</summary>
+    [Serializable]
+    public class TeamBondData
+    {
+        /// <summary>Stable lowercase snake_case key. Never rename after ship.</summary>
+        public string BondId;
+
+        public string DisplayName;
+
+        public string Description;
+
+        /// <summary>A <c>TeamBondCondition</c> name: <c>Stance</c>, <c>Elements</c> or <c>Species</c>. Missing: <c>Stance</c>.</summary>
+        public string Condition;
+
+        /// <summary>For a <c>Stance</c> bond: a <c>CombatStance</c> name. Missing: <c>Vanguard</c>.</summary>
+        public string Stance;
+
+        /// <summary>For an <c>Elements</c> bond: the element set, as <c>Element</c> names.</summary>
+        public string[] Elements = new string[0];
+
+        /// <summary>For a <c>Species</c> bond: the species set, as roster <c>SpeciesId</c>s.</summary>
+        public string[] Species = new string[0];
+
+        /// <summary>A <c>TeamBondScope</c> name: <c>Members</c> or <c>Team</c>. Missing: <c>Members</c>.</summary>
+        public string Scope;
+
+        /// <summary>The tiers, by strictly rising <see cref="TeamBondTierData.MinCount"/>.</summary>
+        public TeamBondTierData[] Tiers = new TeamBondTierData[0];
+    }
+
+    /// <summary>One <c>TeamBondTier</c>: the count it needs and its full effect list (tiers replace, not stack).</summary>
+    [Serializable]
+    public class TeamBondTierData
+    {
+        public int MinCount = 2;
+
+        public EffectData[] Effects = new EffectData[0];
     }
 
     /// <summary>One <c>SkillLearnEntry</c>: a beast-skill id and the level it is learned at.</summary>

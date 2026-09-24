@@ -1628,6 +1628,85 @@ should run on the avatar's own clock if the avatar ever gets a gauge (decision 6
 How passives are acquired (drops, quests, avatar milestones) and the passive material economy. No
 passive UI or save system exists yet.
 
+## Team bonds — TUNABLE STARTING DEFAULTS, NOT CONFIRMED BALANCE
+
+**Why.** The simulator's team-composition analysis (`docs/balance/tuning-log.md`, "Team
+composition analysis") found that lineups matter per encounter but mostly additively: a team was
+roughly the sum of its beasts, with only four real pair effects in the roster. **Team bonds** make
+composition matter on purpose: team effects that switch on at battle start when the player's team
+meets a condition. The mechanism below is the lead's design; the content and magnitudes are
+simulator-tuned first drafts ("Team bonds" in the tuning log).
+
+**Data** (explicit enum values, never renumbered; ids never renamed after ship). Authored in the
+`TeamBonds` array of `Data/Skills/skill-library.json` (DTOs `TeamBondData` / `TeamBondTierData`,
+checked by `SkillLibraryValidator`, mapped by `SkillLibraryBuilder.ApplyTeamBond`, imported into
+`Assets/_Project/Data/Bonds/` by the skill library importer, loaded the same way by the simulator):
+
+- `TeamBondSO` (`Runtime/Bonds`, namespace `BeastCraft.Bonds`): `BondId`, `DisplayName`,
+  `Description`, `Icon`, `Condition`, the condition's set (`Stance`, `Elements` or `SpeciesIds`),
+  `Scope`, and `Tiers` (`TeamBondTier`: `MinCount` and an `Effects` list of ordinary
+  `SkillEffect`s).
+- `TeamBondCondition`: `Stance = 0` (count = team members of that stance), `Elements = 1` (count =
+  distinct elements of the set the team covers, capped at the number of members carrying one, so a
+  pair bond needs both halves on two beasts), `Species = 2` (count = distinct listed species
+  fielded). A bond's **members** are the beasts that match (every beast carrying a set element; every
+  beast of a listed species).
+- `TeamBondScope`: `Members = 0` (only the members get the effects), `Team = 1` (every beast on the
+  team does).
+- Tiers rise strictly by `MinCount` (at least 2: a bond is between beasts; an element or species
+  bond's tiers stop at its set's size). The **highest tier reached applies, and tiers replace rather
+  than stack**, so each tier is authored as its full effect list.
+- Bond effects land on the player's own team at battle start, so the validator allows only
+  `BuffStat` (not `HP`: a max-HP buff heals nothing) and a `Shield` status, always landing
+  (`Chance` 100). `DurationTurns` 0 on a stat change means the whole battle, as for an avatar aura.
+
+**Runtime.** `TeamBondResolver.Resolve(bonds, members)` is pure (no battle state, no rng): given
+`TeamBondMember`s (species id, stance, elements; `MembersOf(species)` builds them for a team of
+species) it returns the `ActiveTeamBond`s in the bonds' order, each with its tier, count and member
+indices. `TeamBondLoadout` binds that to the team's battle units for one battle (`For(bonds,
+members, team)`), and `BattleTurnExecutor.BeginBattle(…, passives, bonds, out bondActivations)` /
+`RunBattle(…, passives, bonds, maxTime)` apply it **once, as the battle begins, before the avatar's
+auras and battle-start passives** (so a percent aura sees the bonded stat). For each active bond in
+order, each living recipient in team order **applies the tier's effects to itself**: it is both the
+caster and the only target of a private `Self`-shaped carrier skill at level 1 (bonds do not level),
+through `SkillEffectApplier` — so a shield is a percent of the recipient's own Defense and a percent
+buff scales the recipient's own stat. `BattleResult.BondActivations` records each applied bond
+(`TeamBondActivation`: bond, tier, recipients). **Enemies never get bonds** (for now: the loadout is
+built for the player's team only). Bond effects with `Chance` 100 draw nothing from the battle rng,
+so a battle without bonds is unchanged, and a caller driving turns itself must call the bond-aware
+`BeginBattle` (unlike passives, a first turn does not apply bonds on its own).
+
+**Content (first draft).** Three stance bonds (every beast is in its stance's) and five element
+pairs that cover all ten elements once (every beast is in exactly one). Pairs were chosen so no two
+bonds need the same two beasts (Griffin + Thunderbird already share `pack_hunters`, so Air pairs
+with Fire and Lightning with Water):
+
+| Bond | Condition | Scope | Tiers (MinCount+: effects) |
+| --- | --- | --- | --- |
+| `pack_hunters` Pack Hunters | Skirmisher beasts | Members | 2+: +12 CritChance; 3+: +16 CritChance, +1 MoveRange |
+| `shield_wall` Shield Wall | Vanguard beasts | Members | 2+: Shield 30% of own Defense, 3 turns; 3+: Shield 45% of own Defense, 3 turns |
+| `crossfire` Crossfire | Ranged beasts | Members | 2+: +8% Attack, +8% SpecialAttack; 3+: +12% Attack, +12% SpecialAttack |
+| `wildfire` Wildfire | Fire + Air | Members | 2+: +15% Speed, +8% Attack, +8% SpecialAttack |
+| `storm_front` Storm Front | Lightning + Water | Members | 2+: +10% Attack, +10% SpecialAttack |
+| `bedrock` Bedrock | Earth + Metal | Members | 2+: +6% Defense, +6% SpecialDefense |
+| `winter_grove` Winter Grove | Ice + Nature | Members | 2+: Shield 90% of own Defense, 3 turns |
+| `twilight` Twilight | Light + Dark | Team | 2+: +5% Defense, +5% SpecialDefense |
+
+With the ten-beast roster (5 Vanguard, 3 Ranged, 2 Skirmisher) the Skirmisher bond's second tier
+cannot be reached yet; it is authored for a larger roster.
+
+**Simulator.** `--bonds on|off` (default on, library kit only). The report's "PvE team bonds"
+section lists each bond's frequency (teams active per tier), the beasts' memberships, and each
+bond's marginal per shape: **Δ** (teams with the bond minus teams without) and **excess** over the
+additive prediction from the members' marginals (the part of the bond the lineup earns). The
+simulator's loop calls the bond-aware `BeginBattle`, so `--self-check` still compares it against
+`RunBattle`. Results and tuning: `docs/balance/tuning-log.md`, "Team bonds".
+
+**Open questions.** Whether enemies (bosses, packs) should get bonds of their own. Whether a bond
+should be visible and previewed on the team-building screen (the resolver is pure so it can be).
+Species bonds (named pairs) are supported but none is authored yet. Whether dual-element beasts
+should count once per element. Whether bonds should level or be unlocked through progression.
+
 ## Beast skill kits — SIMULATOR-TUNED CONTENT, NOT CONFIRMED BALANCE
 
 Every authored skill lives in **`BeastCraft/Assets/_Project/Data/Skills/skill-library.json`**, the

@@ -40,6 +40,10 @@ namespace BeastCraft.Tooling.BalanceSim
             {
                 report.AppendLine("- Skill kit: `library` (`--skill-kit library`, the default): each beast's authored default loadout from `" +
                                   SkillLibraryKits.RepoRelativePath + "` at skill level " + options.SkillLevel + " (`--skill-level`)");
+                report.AppendLine(options.BondsActive
+                    ? "- Team bonds: on (`--bonds on`, the default): the library's " + options.Library.TeamBonds.Count +
+                      " `TeamBonds` apply at battle start to every player team that meets their condition (never to enemies); see \"PvE team bonds\""
+                    : "- Team bonds: off (`--bonds off`)");
             }
             else
             {

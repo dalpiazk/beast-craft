@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using BeastCraft.Avatar;
 using BeastCraft.Battle;
+using BeastCraft.Bonds;
 using BeastCraft.Creatures;
 using BeastCraft.Progression;
 
@@ -67,6 +68,32 @@ namespace BeastCraft.Skills
             material.Description = data.Description;
             material.Tier = data.Tier;
             material.XpValue = data.XpValue;
+        }
+
+        /// <summary>Writes every JSON-owned field of <paramref name="data"/> onto <paramref name="bond"/> (lists replaced outright).</summary>
+        public static void ApplyTeamBond(TeamBondData data, TeamBondSO bond)
+        {
+            bond.BondId = data.BondId;
+            bond.DisplayName = data.DisplayName;
+            bond.Description = data.Description;
+            bond.Condition = SkillLibraryValidator.ParseOr(data.Condition, TeamBondCondition.Stance);
+            bond.Stance = SkillLibraryValidator.ParseOr(data.Stance, CombatStance.Vanguard);
+            bond.Scope = SkillLibraryValidator.ParseOr(data.Scope, TeamBondScope.Members);
+            bond.Elements = new List<Element>();
+            foreach (string element in data.Elements ?? new string[0])
+            {
+                bond.Elements.Add(SkillLibraryValidator.ParseOr(element, Element.None));
+            }
+
+            bond.SpeciesIds = new List<string>(data.Species ?? new string[0]);
+            bond.Tiers = new List<TeamBondTier>();
+            foreach (TeamBondTierData tier in data.Tiers ?? new TeamBondTierData[0])
+            {
+                if (tier != null)
+                {
+                    bond.Tiers.Add(new TeamBondTier { MinCount = tier.MinCount, Effects = BuildEffects(tier.Effects) });
+                }
+            }
         }
 
         /// <summary>A fresh <see cref="SkillEffect"/> for each entry, in order (null entries skipped).</summary>

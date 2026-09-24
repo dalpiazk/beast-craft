@@ -2049,3 +2049,107 @@ teams' spread within a seed with that seed-to-seed noise removed: the part that 
 
 Reproduce: `dotnet run --project Tooling/BalanceSim -c Release -- --seeds 12345,777,4242 --out out/teams.md`
 (about 130 s); the default run's "PvE team composition" section shows seed 12345 alone.
+
+## Team bonds
+
+Follow-up to "Team composition analysis": lineups mattered per encounter but almost additively, so
+the game now has **team bonds**, composition-triggered team effects applied at battle start to the
+player's team (never enemies). Mechanism and data: `docs/design/battle-system.md`, "Team bonds";
+content: the `TeamBonds` array of `skill-library.json` (three stance bonds, five element pairs
+covering all ten elements, so every beast is in exactly two bonds). The simulator applies them by
+default (`--bonds on|off`, library kit only) and reports them in "PvE team bonds". No beast stats
+or skills changed; only bond magnitudes were tuned.
+
+**Guard.** Bonds must widen the spread between lineups without breaking per-beast balance: every
+beast's 3-seed mean overall marginal within +/-4 (`elemental`) and +/-7 (`neutral`), tuning bond
+magnitudes, never beast stats. All numbers are `--seeds 12345,777,4242`, default arguments.
+`--bonds off` reproduces the pre-bond aggregate byte for byte (the Runtime change is inert without
+bonds).
+
+**Iterations** (full 3-seed runs; the element-pair bonds are on 28 teams each, `shield_wall` on 155,
+`crossfire` on 70, `pack_hunters` on 28):
+
+| Run | Change | Out of band |
+| --- | --- | --- |
+| 1 | First draft: `shield_wall` 40/60% Defense shield, `crossfire` +6/+10%, `pack_hunters` +8/+12 crit, `wildfire` +8% Speed, `storm_front` +6% Atk/SpA, `bedrock` +10% Def/SpD, `winter_grove` 50% shield, `twilight` +5% Def/SpD (team) | Tarasque `elemental` +5.6, Golem `neutral` +7.6, Phoenix `neutral` -7.6 (the Vanguard shield and `bedrock` stacked on Golem / Tarasque; Fire + Air too weak) |
+| 2 | `shield_wall` 30/45, `crossfire` 8/12, `bedrock` 5, `wildfire` +15% Speed, `winter_grove` 70 | none, but the overall spread did not move (`elemental` 4.4 -> 4.4) |
+| 3 | Pair bonds up: `pack_hunters` 12/16 crit, `wildfire` +20% Speed, `storm_front` 10, `bedrock` 6, `winter_grove` 90 | none; spread 4.4 -> 4.7; `wildfire` still a loss (Speed alone buys little under sqrt speed) |
+| 4 (final) | `wildfire` = +15% Speed, +8% Atk, +8% SpA | none |
+
+**Per-beast marginals, final** (3-seed mean overall, bonds off -> on):
+
+| Beast | `elemental` | `neutral` |
+| --- | ---: | ---: |
+| Kirin | +2.0 -> +2.8 | +4.1 -> +3.8 |
+| Tarasque | +0.8 -> +1.4 | -6.0 -> -3.7 |
+| Golem | -0.2 -> +0.5 | +2.5 -> +5.3 |
+| Leviathan | -0.1 -> -0.2 | +3.9 -> +1.4 |
+| Basilisk | 0.0 -> -0.2 | +1.7 -> -0.3 |
+| Phoenix | -0.3 -> -0.5 | -4.8 -> -4.2 |
+| Frost Wyrm | -2.3 -> -0.5 | -3.2 -> 0.0 |
+| Griffin | +1.4 -> -0.7 | -3.4 -> -4.9 |
+| Thunderbird | +0.5 -> -1.1 | +6.1 -> +3.3 |
+| Treant | -1.9 -> -1.3 | -0.9 -> -0.7 |
+
+Every beast is inside the guard (`elemental` -1.3 … +2.8, tighter than before bonds' -2.3 … +2.0
+in range terms; `neutral` -4.9 … +5.3, was -6.0 … +6.1).
+
+**Composition spread** (persistent team SD, the lineup's own spread with seed-to-seed noise removed;
+bonds off -> on):
+
+| Kit mode | `solo` | `elite` | `squad` | `horde` | overall |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `elemental` | 5.7 -> 5.4 | 4.4 -> 4.7 | 11.0 -> 10.7 | 7.5 -> 10.0 | 4.4 -> 4.6 |
+| `neutral` | 18.7 -> 18.1 | 11.1 -> 11.9 | 14.5 -> 14.8 | 11.3 -> 14.0 | 8.2 -> 9.2 |
+
+**Bond marginal** (`elemental`, 3-seed mean; Δ = teams with the bond minus without, excess = over
+the additive prediction from the members' marginals, the part the lineup earns):
+
+| Bond | Teams | `solo` | `elite` | `squad` | `horde` | Overall Δ (SD) | Overall excess |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `pack_hunters` | 28 | +1.1 / +0.8 | -0.2 / +2.6 | +11.6 / +5.8 | +1.4 / +7.8 | +3.5 (2.4) | +4.2 |
+| `shield_wall` | 155 | -2.0 / -0.5 | -1.4 / -0.8 | -13.4 / -0.9 | +3.6 / -1.1 | -3.3 (0.1) | -0.8 |
+| `crossfire` | 70 | 0.0 / +0.2 | +0.6 / +0.1 | +8.2 / +0.8 | -2.1 / +0.4 | +1.7 (1.5) | +0.4 |
+| `wildfire` | 28 | -0.6 / +0.8 | -1.2 / +1.4 | +8.2 / +0.8 | -9.6 / -2.5 | -0.8 (1.0) | +0.1 |
+| `storm_front` | 28 | -0.2 / +1.8 | +2.2 / +1.6 | -4.3 / +0.6 | +2.2 / -0.3 | 0.0 (2.7) | +0.9 |
+| `bedrock` | 28 | +1.0 / -2.7 | +1.7 / +0.5 | +4.1 / +1.1 | 0.0 / +2.1 | +1.7 (4.5) | +0.3 |
+| `winter_grove` | 28 | -4.6 / -1.2 | 0.0 / +2.0 | -4.2 / +4.4 | +13.6 / +3.9 | +1.2 (2.5) | +2.3 |
+| `twilight` | 28 | +4.8 / +1.7 | +5.5 / +1.6 | +3.9 / -0.1 | -2.6 / -0.1 | +2.9 (2.9) | +0.8 |
+
+In `neutral` the excesses are larger (`bedrock` +5.3, `pack_hunters` +4.3, `winter_grove` +4.2,
+`storm_front` +1.9, `wildfire` +1.7).
+
+**Pair synergy, overall (`elemental`, 3-seed mean).** Before: Griffin + Thunderbird +3.7, Golem +
+Treant +2.2 … Thunderbird + Treant -3.5, Leviathan + Griffin -3.3. After: Griffin + Thunderbird
+**+4.2** (`pack_hunters`), Frost Wyrm + Treant **+2.3** (`winter_grove`, new), Leviathan + Tarasque
++2.0, Golem + Frost Wyrm +1.8, Golem + Treant +1.7; anti-synergies Thunderbird + Treant -3.8,
+Leviathan + Griffin -3.2, Thunderbird + Frost Wyrm -2.0, Frost Wyrm + Kirin -2.0, Tarasque +
+Basilisk -1.7.
+
+**Reading.**
+
+- **Composition matters more where encounters are crowded, not overall.** The horde spread grows
+  by a third (7.5 -> 10.0 `elemental`, 11.3 -> 14.0 `neutral`) and the elite a little; solo and
+  squad do not move, and the overall spread only 4.4 -> 4.6 (`neutral` 8.2 -> 9.2). The bonds with
+  real interaction are `pack_hunters` (excess +4.2 overall, +7.8 horde, +5.8 squad) and
+  `winter_grove` (+2.3; +4.4 squad, +3.9 horde); they are what make "field these two together" a
+  choice.
+- **Why the overall spread barely moves.** A pair bond is active on 28 of 210 teams, so even a
+  5-point bond adds only about 0.34 x 5 = 1.7 points of SD in quadrature, and the balance guard
+  forbids the bigger magnitudes that would move it more: most of a pair bond's value lands on its
+  two beasts' marginals (each gains about a third of it), which is exactly what the guard caps.
+  The calibrated difficulty also absorbs any bond that nearly every team has: `shield_wall` (155
+  teams) raises the multiplier for everyone and reads as -3.3 Δ, -0.8 excess.
+- **Weak spots.** `wildfire` (Phoenix + Griffin) is still roughly neutral in `elemental` after two
+  buffs (Δ -0.8, excess +0.1; the horde -9.6 is the two beasts' own horde weakness). `bedrock` and
+  `twilight` are mostly additive (excess under +1 in `elemental`), i.e. buffs to their beasts
+  rather than to the pairing. `pack_hunters`' second tier (3 Skirmishers) cannot occur with this
+  roster.
+- **If composition should matter more still,** the levers are bonds whose value depends on the
+  lineup rather than on the beasts (effects that scale with the count, or target the non-members,
+  e.g. a Vanguard bond that shields the Ranged beasts), fewer but stronger bonds on pairs that are
+  currently anti-synergies (Leviathan + Griffin, Thunderbird + Treant), and letting the player see
+  the encounter before choosing (the simulator fields a fixed lineup against every composition).
+
+Reproduce: `dotnet run --project Tooling/BalanceSim -c Release -- --seeds 12345,777,4242 --out out/bonds.md`
+and the same with `--bonds off` for the baseline (about 140 s each).

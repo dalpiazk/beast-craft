@@ -35,6 +35,7 @@ dotnet run --project Tooling/BalanceSim -c Release -- [options]
 | `--skill-kit <k>` | `library` | The skill axis: `library` (each beast's authored `DefaultLoadout` from `skill-library.json`, the real game setup and the committed report's setting; see "Library kits") or `standard` (the same standard kit for every beast, so the stat lines are what is measured; see "The standard kit"). Before the authored-kits retune this was `--kit standard|library`; `--kit` now takes only the element axis. |
 | `--skill-level <n>` | `1` | Skill level (1-20) for library skills and library avatar skills; the tier is the gates below that level (16+ = all three passed). |
 | `--skill-library <path>` | found by walking up | Path to `skill-library.json` (read only with `--skill-kit library` or `--avatar library`, i.e. by default). |
+| `--bonds <on\|off>` | `on` | Team bonds from the library's `TeamBonds`: applied at battle start to every player team that meets a bond's condition (never to enemies). Library kit only (ignored with `--skill-kit standard`). Adds the "PvE team bonds" section. See "Library kits". |
 | `--levels <list>` | `1,50,100` | Comma-separated levels; beasts and enemies fight at the same level. |
 | `--encounter-set <s>` | `generated` | `generated`: random compositions per shape (see "Generated encounters"). `fixed`: the three hand-authored encounters (`boss`, `swarm`, `pack`). |
 | `--compositions <n>` | `8` | Generated compositions per shape. |
@@ -72,8 +73,8 @@ Two reports are committed, both the default arguments:
   the ATB turn order, so its battle lengths are in rounds.
 - `docs/balance/tuned-report.md` — the current roster and skill library after the third tuning pass
   and its element chart v2 follow-up (see `docs/balance/tuning-log.md`, "Retune with authored kits,
-  avatar passives, sqrt speed and mitigation", "Element chart v2", "Thunderbird range vs move" and "Niche pass: Thunderbird opener, Phoenix/Frost Wyrm lifts, remaining negatives"), under the real game setup (every beast's authored default loadout, the library
-  avatar with its passives, skill level 1), the current Runtime (the square-root ATB turn order, the
+  avatar passives, sqrt speed and mitigation", "Element chart v2", "Thunderbird range vs move" and "Niche pass: Thunderbird opener, Phoenix/Frost Wyrm lifts, remaining negatives", then "Team bonds"), under the real game setup (every beast's authored default loadout, the library
+  avatar with its passives, the library's team bonds, skill level 1), the current Runtime (the square-root ATB turn order, the
   mitigation damage formula, `SpecialAttack`-scaled heals, combat stances, variance and crits) and
   the generated encounters. Regenerate it whenever the roster, the skill library, fixtures, simulator
   or Runtime change:
@@ -96,6 +97,14 @@ same skill level. The avatar's stats (either preset) are a fixture block: 100 in
 at max level, scaled by the roster's growth curve like a beast's (15 at level 1, 57 at level 50), so
 its shields (a percent of its Defense) and heals (a percent of its SpecialAttack) are the same share
 of a beast's HP at every level.
+
+**Team bonds** (`--bonds on|off`, default on) come from the same file's `TeamBonds` array, built
+through `SkillLibraryBuilder.ApplyTeamBond` like the importer's. Each team's active bonds are resolved
+once per run (`TeamBondResolver`, from its species' stances and elements) and applied at battle start
+through `BattleTurnExecutor.BeginBattle` / `RunBattle` with a `TeamBondLoadout`, before the avatar's
+passives; enemies never get bonds. Bonds are part of the library setup, so `--skill-kit standard`
+ignores them. The report's header says whether they were on, and "PvE team bonds" (see "PvE: team vs
+encounter") shows what they did.
 
 This is the real game setup and the committed report's. `--skill-level 10` is the sanity run the
 tuning log reports beside it. For a quick check:
@@ -256,6 +265,18 @@ cooldown 2 weighted `Attack` about twice as heavily.
     = 0.675 for 4 of 10; baseline + mA + mB would show every pair of strong beasts as anti-synergy.
     With 45 pairs a few |synergy / SE| near 2.5 are expected from noise; one seed cannot separate
     them, `--seeds` can (see "Multi-seed runs").
+- **Team bonds** (`BondReport.cs`; "PvE team bonds", only with bonds on): every bond with its
+  condition, scope, tier effects and how many of the 210 teams have it (per tier), which bonds each
+  beast belongs to, and how many bonds the teams activate. Then per kit mode a **bond marginal**
+  table: per shape and overall, **Δ** = clear rate of the teams with the bond active minus the teams
+  without, and **excess** = the active teams' rate over the additive prediction from their members'
+  marginals (baseline + (n - 1) / n x the members' centred marginals, the pair synergy model per
+  team). Δ mixes the bond with its members' own strength (only teams holding them can have it); the
+  excess is the part the lineup earns, since the members' marginals already carry the bond's
+  average. And the primary mode's clear rate by number of active bonds. The `--seeds` aggregate
+  repeats the bond marginal averaged over seeds ("PvE team bonds over seeds"). For the whole effect
+  of bonds, compare a `--bonds off` run: its "PvE team composition over seeds" spread and pair
+  synergy tables are the bond-free baseline.
 - **Flags.** Overall marginal outside +/-5 points; **no niche** (bottom 3 in every shape);
   **no weakness** (top 3 in every shape); a stance whose kit parity is outside 50 +/- 5%;
   stalemates; calibration misses.

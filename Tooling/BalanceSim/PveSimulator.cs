@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using BeastCraft.Battle;
 using BeastCraft.Battle.Grid;
 using BeastCraft.Battle.Placement;
+using BeastCraft.Bonds;
 using BeastCraft.Creatures;
 
 namespace BeastCraft.Tooling.BalanceSim
@@ -180,7 +181,24 @@ namespace BeastCraft.Tooling.BalanceSim
             }
 
             CalibrationTeams = SampleTeams(options.Seed, Teams.Count, options.CalibrateSample);
+            TeamBonds = new List<ActiveTeamBond>[Teams.Count];
+            for (int t = 0; t < Teams.Count; t++)
+            {
+                List<TeamBondMember> members = new List<TeamBondMember>();
+                foreach (int speciesIndex in Teams[t])
+                {
+                    members.Add(TeamBondMember.FromSpecies(species[speciesIndex]));
+                }
+
+                TeamBonds[t] = options.BondsActive ? TeamBondResolver.Resolve(options.Library.TeamBonds, members) : new List<ActiveTeamBond>();
+            }
         }
+
+        /// <summary>
+        /// Per team: its active bonds (<see cref="TeamBondResolver"/>, member indices in the team's
+        /// roster order), or empty for every team when bonds are off (<see cref="SimOptions.BondsActive"/>).
+        /// </summary>
+        public List<ActiveTeamBond>[] TeamBonds { get; }
 
         /// <summary>
         /// With <c>--calibrate-sample n</c> (n below the team count): the team indices, ascending, a
@@ -638,15 +656,14 @@ namespace BeastCraft.Tooling.BalanceSim
             TurnManager turnManager = new TurnManager(units);
             Random rng = new Random(DeriveSeed(_options.Seed, mode, level, encounter.Id, teamIndex, sample));
             BattleUnit avatar = Avatar.Build(level, out PassiveLoadout passives);
+            TeamBondLoadout bonds = TeamBonds[teamIndex].Count == 0 ? null : new TeamBondLoadout(TeamBonds[teamIndex], members);
             BattleOutcome outcome;
             long elapsedTicks;
             int actions;
 
             if (useRunBattle)
             {
-                BattleResult result = avatar == null
-                    ? BattleTurnExecutor.RunBattle(turnManager, units, grid, rng, null, _options.MaxTime)
-                    : BattleTurnExecutor.RunBattle(turnManager, units, grid, rng, avatar, passives, _options.MaxTime);
+                BattleResult result = BattleTurnExecutor.RunBattle(turnManager, units, grid, rng, avatar, passives, bonds, _options.MaxTime);
                 outcome = result.Outcome;
                 elapsedTicks = result.ElapsedTicks;
                 actions = result.ActionCount;
@@ -672,8 +689,8 @@ namespace BeastCraft.Tooling.BalanceSim
                 long lastTurnTicks = 0;
                 actions = 0;
 
-                // RunBattle's battle-start hook; a no-op without an avatar.
-                CountPassives(battle, BattleTurnExecutor.BeginBattle(units, grid, rng, avatar, passives));
+                // RunBattle's battle-start hook: the team's bonds, then the avatar's passives (each a no-op when absent).
+                CountPassives(battle, BattleTurnExecutor.BeginBattle(units, grid, rng, avatar, passives, bonds, out IReadOnlyList<TeamBondActivation> _));
 
                 while (true)
                 {

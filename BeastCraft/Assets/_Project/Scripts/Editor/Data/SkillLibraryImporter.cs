@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.IO;
 using BeastCraft.Avatar;
 using BeastCraft.Battle;
+using BeastCraft.Bonds;
 using BeastCraft.Creatures;
 using BeastCraft.Creatures.Roster;
 using BeastCraft.Progression;
@@ -13,7 +14,9 @@ namespace BeastCraft.Editor.Data
 {
     /// <summary>
     /// Generates the skill assets from <c>Data/Skills/skill-library.json</c> and wires each species'
-    /// learnable skills and default loadout.
+    /// learnable skills and default loadout; also generates the team bond assets
+    /// (<see cref="TeamBondSO"/>, matched by <see cref="TeamBondSO.BondId"/>) from its
+    /// <c>TeamBonds</c> array.
     /// <para>
     /// Idempotent, like <see cref="BeastRosterImporter"/>: a <see cref="SkillSO"/> is matched by
     /// <see cref="SkillSO.SkillId"/>, a <see cref="PassiveSkillSO"/> by
@@ -38,6 +41,7 @@ namespace BeastCraft.Editor.Data
         public const string AvatarActivesFolder = "Assets/_Project/Data/Skills/AvatarActive";
         public const string AvatarPassivesFolder = "Assets/_Project/Data/Skills/AvatarPassive";
         public const string MaterialsFolder = "Assets/_Project/Data/Skills/Materials";
+        public const string TeamBondsFolder = "Assets/_Project/Data/Bonds";
 
         private const string LogPrefix = "[Skill Library Import] ";
 
@@ -73,6 +77,7 @@ namespace BeastCraft.Editor.Data
             EnsureFolder(AvatarActivesFolder);
             EnsureFolder(AvatarPassivesFolder);
             EnsureFolder(MaterialsFolder);
+            EnsureFolder(TeamBondsFolder);
 
             Dictionary<string, SkillSO> existingSkills = FindExisting<SkillSO>(s => s.SkillId);
             HashSet<string> importedSkills = new HashSet<string>();
@@ -104,12 +109,25 @@ namespace BeastCraft.Editor.Data
 
             WarnOrphans(existingMaterials.Keys, importedMaterials, "Material");
 
+            Dictionary<string, TeamBondSO> existingBonds = FindExisting<TeamBondSO>(b => b.BondId);
+            HashSet<string> importedBonds = new HashSet<string>();
+            TeamBondData[] bonds = library.TeamBonds ?? new TeamBondData[0];
+            foreach (TeamBondData data in bonds)
+            {
+                TeamBondSO bond = FindOrCreate(existingBonds, data.BondId, TeamBondsFolder, b => b.BondId = data.BondId);
+                SkillLibraryBuilder.ApplyTeamBond(data, bond);
+                EditorUtility.SetDirty(bond);
+                importedBonds.Add(data.BondId);
+            }
+
+            WarnOrphans(existingBonds.Keys, importedBonds, "Team bond");
+
             int wired = WireSpecies(library.SpeciesKits, beastSkills);
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
             Debug.Log(LogPrefix + "Imported " + library.BeastSkills.Length + " beast skills, " + library.AvatarActives.Length + " avatar actives, " +
-                      library.AvatarPassives.Length + " avatar passives and " + library.Materials.Length + " materials, and wired " + wired +
+                      library.AvatarPassives.Length + " avatar passives, " + library.Materials.Length + " materials and " + bonds.Length + " team bonds, and wired " + wired +
                       " species from '" + jsonPath + "'.");
             return true;
         }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using BeastCraft.Battle.Grid;
+using BeastCraft.Bonds;
 using BeastCraft.Creatures;
 
 namespace BeastCraft.Battle
@@ -462,6 +463,24 @@ namespace BeastCraft.Battle
         }
 
         /// <summary>
+        /// The battle-start hook with the player team's bonds: every active bond in
+        /// <paramref name="bonds"/> is applied first (see <see cref="TeamBondLoadout"/>; what was
+        /// applied is <paramref name="bondActivations"/>), then the passives exactly as
+        /// <see cref="BeginBattle(IEnumerable{BattleUnit}, HexGrid, Random, BattleUnit, PassiveLoadout)"/>,
+        /// so an avatar aura or battle-start passive sees the bonded stats. A loadout of bonds is
+        /// applied once; later calls apply nothing. A null bond loadout is exactly the bond-free
+        /// hook. Unlike the passives, bonds are not applied by a first turn that runs without this
+        /// hook: a caller driving turns itself must call it.
+        /// </summary>
+        public static IReadOnlyList<PassiveActivation> BeginBattle(IEnumerable<BattleUnit> allUnits, HexGrid grid, Random rng, BattleUnit avatar,
+                                                                   PassiveLoadout passives, TeamBondLoadout bonds,
+                                                                   out IReadOnlyList<TeamBondActivation> bondActivations)
+        {
+            bondActivations = bonds == null ? new List<TeamBondActivation>() : bonds.Apply(grid, rng);
+            return BeginBattle(allUnits, grid, rng, avatar, passives);
+        }
+
+        /// <summary>
         /// Plays the battle out: take <see cref="TurnManager.CurrentUnit"/>, run its turn, advance,
         /// and keep going until one side is gone.
         /// <para>
@@ -521,8 +540,21 @@ namespace BeastCraft.Battle
         public static BattleResult RunBattle(TurnManager turnManager, IEnumerable<BattleUnit> allUnits, HexGrid grid, Random rng, BattleUnit avatar,
                                              PassiveLoadout passives, int maxTime = DefaultMaxTime)
         {
+            return RunBattle(turnManager, allUnits, grid, rng, avatar, passives, null, maxTime);
+        }
+
+        /// <summary>
+        /// <see cref="RunBattle(TurnManager, IEnumerable{BattleUnit}, HexGrid, Random, BattleUnit, PassiveLoadout, int)"/>
+        /// with the player team's bonds: the battle-start hook is
+        /// <see cref="BeginBattle(IEnumerable{BattleUnit}, HexGrid, Random, BattleUnit, PassiveLoadout, TeamBondLoadout, out IReadOnlyList{TeamBondActivation})"/>
+        /// (bonds, then passives), and what the bonds applied is
+        /// <see cref="BattleResult.BondActivations"/>. A null bond loadout is exactly the bond-free battle.
+        /// </summary>
+        public static BattleResult RunBattle(TurnManager turnManager, IEnumerable<BattleUnit> allUnits, HexGrid grid, Random rng, BattleUnit avatar,
+                                             PassiveLoadout passives, TeamBondLoadout bonds, int maxTime = DefaultMaxTime)
+        {
             List<BattleUnit> roster = CopyRoster(allUnits);
-            IReadOnlyList<PassiveActivation> opening = BeginBattle(roster, grid, rng, avatar, passives);
+            IReadOnlyList<PassiveActivation> opening = BeginBattle(roster, grid, rng, avatar, passives, bonds, out IReadOnlyList<TeamBondActivation> bonded);
             List<BattleTurnResult> turns = new List<BattleTurnResult>();
             long capTicks = (long)(maxTime < 1 ? 1 : maxTime) * TurnManager.TicksPerTimeUnit;
             long lastTurnTicks = 0;
@@ -558,7 +590,7 @@ namespace BeastCraft.Battle
                 turnManager.AdvanceTurn();
             }
 
-            return new BattleResult(outcome, lastTurnTicks, turns, opening);
+            return new BattleResult(outcome, lastTurnTicks, turns, opening, bonded);
         }
 
         /// <summary>
