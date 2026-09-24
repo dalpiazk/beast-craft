@@ -1,10 +1,13 @@
 using System;
 using System.Collections.Generic;
 using BeastCraft.Battle;
+using BeastCraft.Battle.Scouting;
+using BeastCraft.Creatures;
 using BeastCraft.Economy;
 using BeastCraft.Encounters;
 using BeastCraft.Progression;
 using BeastCraft.Save;
+using BeastCraft.Session;
 
 namespace BeastCraft.Campaign
 {
@@ -265,6 +268,13 @@ namespace BeastCraft.Campaign
             if (outcome != BattleOutcome.PlayerVictory)
             {
                 run.Attempts++;
+                if (run.NodeAttemptsNodeId != nodeId)
+                {
+                    // A loss at another location starts that location's count afresh.
+                    run.NodeAttemptsNodeId = nodeId;
+                    run.NodeAttempts = 0;
+                }
+
                 run.NodeAttempts++;
                 return CampaignResult.Done(CampaignOutcome.Lost, node);
             }
@@ -439,6 +449,90 @@ namespace BeastCraft.Campaign
             return result;
         }
 
+        /// <summary>
+        /// How many times the player has lost at <paramref name="nodeId"/> since last clearing a node:
+        /// <see cref="MapRun.NodeAttempts"/> when they are being counted at that location
+        /// (<see cref="MapRun.NodeAttemptsNodeId"/>), else 0. It is also the attempt number of the next
+        /// fight there (<see cref="BattleSeed"/>). 0 for a null run.
+        /// </summary>
+        public static int LossesAt(MapRun run, int nodeId)
+        {
+            return run != null && nodeId >= 0 && run.NodeAttemptsNodeId == nodeId ? run.NodeAttempts : 0;
+        }
+
+        /// <summary>
+        /// The pre-fight team suggestion for location <paramref name="nodeId"/> of the expedition in
+        /// progress, or null when none is offered. The one call site of the suggestion rule (user
+        /// decision): <see cref="TeamSuggestionPolicy.ShouldSuggest"/> of <see cref="LossesAt"/> and
+        /// <paramref name="settings"/> (null = the defaults); when it holds,
+        /// <see cref="TeamSuggester.Suggest"/> over every beast the save owns (each as its species from
+        /// <paramref name="content"/> at its level; unknown species are skipped) against the node's
+        /// encounter (<see cref="PlanFor"/>: its <see cref="EncounterPlan.Preview"/>, the always-free
+        /// <c>Full</c> preview, and whether its enemies' kits can afflict the team), with
+        /// <paramref name="content"/>'s team bonds. Null also when there is no expedition, the node is
+        /// not a battle, or the content cannot build its encounter. Pure; changes nothing.
+        /// </summary>
+        public static CampaignTeamSuggestion SuggestionFor(PlayerSave save, int nodeId, PlayerSettings settings, EncounterLibrary encounters, BattleContent content,
+                                                           int teamSize = 4)
+        {
+            if (save == null || save.Campaign == null || !save.Campaign.HasActiveRun || content == null || content.Enemies == null)
+            {
+                return null;
+            }
+
+            MapRun run = save.Campaign.ActiveRun;
+            int losses = LossesAt(run, nodeId);
+            if (!TeamSuggestionPolicy.ShouldSuggest(losses, settings))
+            {
+                return null;
+            }
+
+            EncounterPlan plan = PlanFor(run.Find(nodeId), encounters, content.Enemies);
+            if (plan == null)
+            {
+                return null;
+            }
+
+            List<TeamSuggestionCandidate> owned = new List<TeamSuggestionCandidate>();
+            List<string> ownedIds = new List<string>();
+            foreach (OwnedBeast beast in save.Beasts)
+            {
+                CreatureSpeciesSO species = beast == null || beast.Progress == null ? null : content.GetSpecies(beast.Progress.SpeciesId);
+                if (species != null)
+                {
+                    owned.Add(new TeamSuggestionCandidate(species, beast.Progress.Level));
+                    ownedIds.Add(beast.BeastId);
+                }
+            }
+
+            List<SkillSO> enemySkills = new List<SkillSO>();
+            foreach (EncounterLineupEnemy enemy in plan.Enemies)
+            {
+                IReadOnlyList<SkillSO> kit = plan.Catalog.Kit(enemy.EnemyId, enemy.Element);
+                if (kit != null)
+                {
+                    enemySkills.AddRange(kit);
+                }
+            }
+
+            TeamSuggestion suggestion = TeamSuggester.Suggest(new TeamSuggestionRequest
+            {
+                Preview = plan.Preview(),
+                Owned = owned,
+                TeamSize = teamSize,
+                Bonds = content.TeamBonds,
+                EncounterCanAfflict = TeamSuggester.CanAfflict(enemySkills)
+            });
+
+            List<string> beastIds = new List<string>();
+            foreach (int member in suggestion.Members)
+            {
+                beastIds.Add(ownedIds[member]);
+            }
+
+            return new CampaignTeamSuggestion(nodeId, losses, suggestion, beastIds);
+        }
+
         private static CampaignResult CheckNode(PlayerSave save, RegionLibrary library, int nodeId, out MapRun run, out MapNode node, out RegionData region)
         {
             run = null;
@@ -490,6 +584,7 @@ namespace BeastCraft.Campaign
             run.Cleared.Add(node.NodeId);
             run.CurrentNodeId = node.NodeId;
             run.NodeAttempts = 0;
+            run.NodeAttemptsNodeId = -1;
         }
     }
 
@@ -582,5 +677,29 @@ namespace BeastCraft.Campaign
         {
             return new CampaignResult { Outcome = outcome, Node = node };
         }
+    }
+
+    /// <summary>A team suggested before a fight (<see cref="CampaignRules.SuggestionFor"/>).</summary>
+    public sealed class CampaignTeamSuggestion
+    {
+        public CampaignTeamSuggestion(int nodeId, int losses, TeamSuggestion suggestion, IReadOnlyList<string> beastIds)
+        {
+            NodeId = nodeId;
+            Losses = losses;
+            Suggestion = suggestion;
+            BeastIds = beastIds;
+        }
+
+        /// <summary>The map location the suggestion is for.</summary>
+        public int NodeId { get; }
+
+        /// <summary>The losses at that location that triggered it (<see cref="CampaignRules.LossesAt"/>).</summary>
+        public int Losses { get; }
+
+        /// <summary>The suggester's result (members index the save's beasts with a known species, in save order).</summary>
+        public TeamSuggestion Suggestion { get; }
+
+        /// <summary>The suggested beasts' <see cref="OwnedBeast.BeastId"/>s, in save order.</summary>
+        public IReadOnlyList<string> BeastIds { get; }
     }
 }

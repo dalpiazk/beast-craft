@@ -311,7 +311,7 @@ namespace BeastCraft.Save
         /// <summary>
         /// The expedition in progress: no nodes without a run; with one, a known and unlocked region,
         /// nodes whose ids are their indices, known types, levels 1-100, links only to nodes one layer
-        /// up, a current node on the map (or -1) and cleared nodes on the map, each once.
+        /// up, a current node and a retried node on the map (or -1) and cleared nodes on the map, each once.
         /// </summary>
         private static void ValidateRun(CampaignProgress campaign, ISaveContentCatalog catalog, List<SaveIssue> issues)
         {
@@ -397,6 +397,11 @@ namespace BeastCraft.Save
             if (run.CurrentNodeId != -1 && run.Find(run.CurrentNodeId) == null)
             {
                 issues.Add(new SaveIssue(SaveIssueKind.InvalidMapRun, "Campaign.ActiveRun.CurrentNodeId", null, "current node " + run.CurrentNodeId + " is not on the map"));
+            }
+
+            if (run.NodeAttemptsNodeId != -1 && run.Find(run.NodeAttemptsNodeId) == null)
+            {
+                issues.Add(new SaveIssue(SaveIssueKind.InvalidMapRun, "Campaign.ActiveRun.NodeAttemptsNodeId", null, "retried node " + run.NodeAttemptsNodeId + " is not on the map"));
             }
 
             if (run.Cleared != null)

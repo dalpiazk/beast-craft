@@ -8,7 +8,7 @@ namespace BeastCraft.Battle.Scouting
     /// when the player has turned suggestions off (<see cref="PlayerSettings.TeamSuggestionsEnabled"/>).
     /// The free enemy-element preview (<see cref="EncounterPreview"/>) is always shown; only the
     /// suggested team is gated. The loss count is per map location, kept by the campaign's map run
-    /// (wired when the campaign lands). Pure. See the battle-system design doc, "Encounter preview".
+    /// (<c>CampaignRules.LossesAt</c>); <c>CampaignRules.SuggestionFor</c> is the call site. Pure. See the battle-system design doc, "Encounter preview".
     /// </summary>
     public static class TeamSuggestionPolicy
     {

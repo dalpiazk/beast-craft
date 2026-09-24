@@ -40,8 +40,16 @@ namespace BeastCraft.Campaign
         /// </summary>
         public int Attempts;
 
-        /// <summary>Attempts at the node currently being retried (reset when a node is cleared).</summary>
+        /// <summary>Losses at <see cref="NodeAttemptsNodeId"/>, the node currently being retried (reset when a node is cleared).</summary>
         public int NodeAttempts;
+
+        /// <summary>
+        /// The location <see cref="NodeAttempts"/> counts losses at, or −1 when none (reset when a node is
+        /// cleared; a loss at another location restarts the count there). The team suggestion's
+        /// per-location loss count (<see cref="CampaignRules.LossesAt"/>). A save written before this
+        /// field reads −1: its count starts again at the next loss.
+        /// </summary>
+        public int NodeAttemptsNodeId = -1;
 
         /// <summary>The node with <paramref name="nodeId"/>, or null.</summary>
         public MapNode Find(int nodeId)
@@ -66,6 +74,7 @@ namespace BeastCraft.Campaign
             Cleared = new List<int>();
             Attempts = 0;
             NodeAttempts = 0;
+            NodeAttemptsNodeId = -1;
         }
 
         /// <summary>Replaces null lists and strings with empty ones and drops null nodes. Returns how many things were repaired.</summary>

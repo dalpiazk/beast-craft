@@ -69,7 +69,7 @@ null campaign string becomes "").
 | `Seals` | `List<string>` | Owned seal ids (`regions.json` `Seals`), in the order granted. Key items, not materials. |
 | `Regions` | `List<RegionProgress>` | `{RegionId, StagesCleared, BossCleared}` per **unlocked** region (an entry = unlocked). |
 | `CurrentRegionId` | `string` | The region last entered, or "". |
-| `ActiveRun` | `MapRun` | The expedition in progress (the stretch of the region map being explored): `{RegionId, Stage, Seed, Nodes, CurrentNodeId, Cleared, Attempts, NodeAttempts}`. **`RegionId == ""` means none** — JsonUtility writes every class field, so the run is never null. |
+| `ActiveRun` | `MapRun` | The expedition in progress (the stretch of the region map being explored): `{RegionId, Stage, Seed, Nodes, CurrentNodeId, Cleared, Attempts, NodeAttempts, NodeAttemptsNodeId}` (`NodeAttempts` counts the losses at location `NodeAttemptsNodeId`, -1 when none: the team suggestion's per-location loss count; added to schema 4 before it shipped, an older file reads -1). **`RegionId == ""` means none** — JsonUtility writes every class field, so the run is never null. |
 
 `MapRun.Nodes` is a snapshot of the generated map (node id = index), so a content or generator change
 never moves the ground under a saved expedition. `MapNode` is `{NodeId, Layer, Lane, Type, Level,
@@ -635,9 +635,9 @@ its System.Text.Json twin here.
 
 ## Known gaps / follow-ups
 
-- **The team suggestion is not wired.** `TeamSuggestionPolicy` needs the campaign's per-location
-  loss count (the map run's per-node attempts, on the campaign branch) and a pre-fight UI; the policy,
-  `TeamSuggester` and `PlayerSettingsStore` are ready and tested.
+- **The team suggestion has no UI.** The rule is wired (`CampaignRules.SuggestionFor`: the map
+  run's per-location loss count, `TeamSuggestionPolicy`, `TeamSuggester`, the player's settings) and
+  tested; the pre-fight screen that shows it is not built.
 - **How a map node picks an encounter is not decided.** Encounters are game content
   (`EncounterPlan`), but which shape and level a node offers, and the campaign's difficulty target
   (the shipped table is calibrated for a scouting player at the shapes' tiered targets, `squad` and `horde` 80%, `elite` 60%, `solo` 50%; `DifficultyScale` 1.0), are pending

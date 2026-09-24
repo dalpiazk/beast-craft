@@ -251,12 +251,13 @@ namespace BeastCraft.Tests.EditMode
             run.Nodes[2].NodeId = 5;
             run.Nodes[2].Level = 0;
             run.CurrentNodeId = 12;
+            run.NodeAttemptsNodeId = 13;
             run.Cleared.Add(0);
             run.Cleared.Add(40);
 
             List<SaveIssue> issues = SaveValidator.Validate(save, Catalog);
 
-            Assert.AreEqual(7, issues.Count, string.Join("\n", issues));
+            Assert.AreEqual(8, issues.Count, string.Join("\n", issues));
             Assert.IsTrue(issues.TrueForAll(i => i.Kind == SaveIssueKind.InvalidMapRun || i.Kind == SaveIssueKind.InvalidValue));
 
             PlayerSave locked = SaveWithRun();

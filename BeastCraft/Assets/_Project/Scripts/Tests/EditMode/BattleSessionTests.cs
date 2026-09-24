@@ -4,7 +4,9 @@ using System.Text;
 using BeastCraft.Avatar;
 using BeastCraft.Battle;
 using BeastCraft.Battle.Grid;
+using BeastCraft.Battle.Scouting;
 using BeastCraft.Bonds;
+using BeastCraft.Campaign;
 using BeastCraft.Creatures;
 using BeastCraft.Creatures.Roster;
 using BeastCraft.Encounters;
@@ -562,6 +564,127 @@ namespace BeastCraft.Tests.EditMode
             Assert.IsNull(result.Battle);
             StringAssert.Contains(fragment, result.Error);
             return result;
+        }
+
+        [Test]
+        public void SuggestionFor_TwoLossesAtALocation_OffersNothing()
+        {
+            PlayerSave save = CampaignSave(out MapNode node);
+            LoseAt(save, node, 2);
+
+            Assert.AreEqual(2, CampaignRules.LossesAt(save.Campaign.ActiveRun, node.NodeId));
+            Assert.IsNull(CampaignRules.SuggestionFor(save, node.NodeId, new PlayerSettings(), SuggestionEncounters(), _content, 3));
+        }
+
+        [Test]
+        public void SuggestionFor_ThreeLossesAtALocation_SuggestsTheSuggestersTeamFromTheOwnedBeasts()
+        {
+            PlayerSave save = CampaignSave(out MapNode node);
+            LoseAt(save, node, 3);
+            EncounterLibrary encounters = SuggestionEncounters();
+
+            CampaignTeamSuggestion suggestion = CampaignRules.SuggestionFor(save, node.NodeId, null, encounters, _content, 3);
+
+            Assert.IsNotNull(suggestion, "three losses and suggestions on by default");
+            Assert.AreEqual(node.NodeId, suggestion.NodeId);
+            Assert.AreEqual(3, suggestion.Losses);
+            Assert.AreEqual(3, suggestion.BeastIds.Count);
+            CollectionAssert.AllItemsAreUnique(suggestion.BeastIds);
+            foreach (string beastId in suggestion.BeastIds)
+            {
+                Assert.IsNotNull(save.FindBeast(beastId), beastId);
+            }
+
+            // Exactly TeamSuggester's pick for the node's encounter, over the save's beasts in order.
+            EncounterPlan plan = CampaignRules.PlanFor(node, encounters, _enemies);
+            List<TeamSuggestionCandidate> owned = new List<TeamSuggestionCandidate>();
+            foreach (OwnedBeast beast in save.Beasts)
+            {
+                owned.Add(new TeamSuggestionCandidate(_content.GetSpecies(beast.Progress.SpeciesId), beast.Progress.Level));
+            }
+
+            List<SkillSO> enemySkills = new List<SkillSO>();
+            foreach (EncounterLineupEnemy enemy in plan.Enemies)
+            {
+                enemySkills.AddRange(_enemies.Kit(enemy.EnemyId, enemy.Element));
+            }
+
+            TeamSuggestion direct = TeamSuggester.Suggest(new TeamSuggestionRequest
+            {
+                Preview = plan.Preview(),
+                Owned = owned,
+                TeamSize = 3,
+                Bonds = _content.TeamBonds,
+                EncounterCanAfflict = TeamSuggester.CanAfflict(enemySkills)
+            });
+            CollectionAssert.AreEqual(direct.Members, suggestion.Suggestion.Members);
+            for (int m = 0; m < direct.Members.Count; m++)
+            {
+                Assert.AreEqual(save.Beasts[direct.Members[m]].BeastId, suggestion.BeastIds[m]);
+            }
+        }
+
+        [Test]
+        public void SuggestionFor_SuggestionsTurnedOff_OffersNothing()
+        {
+            PlayerSave save = CampaignSave(out MapNode node);
+            LoseAt(save, node, 5);
+
+            Assert.IsNull(CampaignRules.SuggestionFor(save, node.NodeId, new PlayerSettings { TeamSuggestionsEnabled = false }, SuggestionEncounters(), _content, 3));
+        }
+
+        [Test]
+        public void LossesAt_CountsPerLocation_AndAClearResetsThem()
+        {
+            PlayerSave save = CampaignSave(out MapNode node);
+            MapRun run = save.Campaign.ActiveRun;
+            MapNode other = CampaignRules.Choices(run).Find(n => n.IsBattle && n.NodeId != node.NodeId);
+            Assert.IsNotNull(other, "the first row offers two battle locations");
+
+            LoseAt(save, node, 3);
+            LoseAt(save, other, 1);
+
+            Assert.AreEqual(0, CampaignRules.LossesAt(run, node.NodeId), "a loss elsewhere restarts the count");
+            Assert.AreEqual(1, CampaignRules.LossesAt(run, other.NodeId));
+            Assert.AreEqual(4, run.Attempts, "the run still counts every loss");
+            Assert.IsNull(CampaignRules.SuggestionFor(save, node.NodeId, null, SuggestionEncounters(), _content, 3));
+
+            CampaignRules.ResolveBattle(save, CampaignRegions(), other.NodeId, BattleOutcome.PlayerVictory);
+            Assert.AreEqual(0, CampaignRules.LossesAt(run, other.NodeId));
+            Assert.AreEqual(-1, run.NodeAttemptsNodeId);
+        }
+
+        private static RegionLibrary CampaignRegions()
+        {
+            return RegionLibrary.Build(CampaignMapTests.LoadRegions());
+        }
+
+        private static EncounterLibrary SuggestionEncounters()
+        {
+            return EncounterLibrary.Build(EncounterContentTests.LoadEncounterLibrary(), EncounterDifficultyTable.Build(EncounterPlanTests.LoadDifficulty()));
+        }
+
+        /// <summary>A save owning six beasts (six species kits at level 10) on an r01 expedition, and a battle location on its first row.</summary>
+        private PlayerSave CampaignSave(out MapNode node)
+        {
+            PlayerSave save = StarterSave();
+            for (int i = 4; i < 6; i++)
+            {
+                save.Beasts.Add(OwnedBeast.Create("b" + (i + 1), _library.SpeciesKits[i].SpeciesId, 10));
+            }
+
+            Assert.IsTrue(CampaignRules.StartRun(save, CampaignRegions(), "r01", 11).Success);
+            node = CampaignRules.Choices(save.Campaign.ActiveRun).Find(n => n.IsBattle);
+            Assert.IsNotNull(node);
+            return save;
+        }
+
+        private static void LoseAt(PlayerSave save, MapNode node, int times)
+        {
+            for (int i = 0; i < times; i++)
+            {
+                Assert.AreEqual(CampaignOutcome.Lost, CampaignRules.ResolveBattle(save, CampaignRegions(), node.NodeId, BattleOutcome.EnemyVictory).Outcome);
+            }
         }
 
         /// <summary>The first four species kits as a level-10 team with their default loadouts, and the avatar's default books at level 6.</summary>

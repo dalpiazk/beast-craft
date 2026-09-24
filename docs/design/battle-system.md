@@ -1229,9 +1229,14 @@ offered only after the player has lost that battle **3** times (`MinLossesBefore
 never when the player has turned suggestions off in the game settings
 (`PlayerSettings.TeamSuggestionsEnabled`, default on; see `docs/design/progression-and-saves.md`,
 "Player settings"): `TeamSuggestionPolicy.ShouldSuggest(lossesOnThisEncounter, settings)`. The loss
-count is per map location, kept by the campaign's per-node attempts (the region campaign's map run);
-it is wired in when that work merges, and until then nothing calls the policy. The element preview
-itself is never gated.
+count is per map location: the map run counts the losses at the location being retried
+(`MapRun.NodeAttempts` at `MapRun.NodeAttemptsNodeId`; a loss elsewhere restarts the count, a clear
+resets it), read by `CampaignRules.LossesAt(run, nodeId)`. The one call site is
+`CampaignRules.SuggestionFor(save, nodeId, settings, encounters, content, teamSize)`: it applies the
+policy and, when it holds, runs `TeamSuggester.Suggest` over every beast the save owns against the
+node's `EncounterPlan` (its `Full` preview, `CanAfflict` over the enemies' kits, the content's team
+bonds), returning the suggested beast ids (`CampaignTeamSuggestion`), or null. The pre-fight UI that
+shows it is not built. The element preview itself is never gated.
 
 - **Grouping.** Enemies with the same element, stance and display name (ordinal) are one line
   with a count; lines keep the order of their first enemy in the lineup.
