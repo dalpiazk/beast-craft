@@ -260,6 +260,8 @@ scaled by a whole number and letterboxed. **Tap** plays the next turn (or
 finishes the one playing), a **two-finger tap** or the on-screen **AUTO**
 button toggles auto-play, **Back** quits. It is a **local build only**; CI does
 not build it.
+The package ID `com.example.beastcraft` is a temporary placeholder; the real
+package ID is decided at release time.
 
 Prerequisites (all user-level, no admin):
 
@@ -277,7 +279,7 @@ Build a debug APK (self-contained: the assemblies are embedded, so a plain
 
 ```
 dotnet build src/BeastCraft.Android -c Debug
-# -> src/BeastCraft.Android/bin/Debug/net10.0-android/com.composedstudio.beastcraft-Signed.apk
+# -> src/BeastCraft.Android/bin/Debug/net10.0-android/com.example.beastcraft-Signed.apk
 ```
 
 Run it on a phone: enable **Developer options** (tap *Build number* seven
@@ -286,8 +288,8 @@ then:
 
 ```
 adb devices                                  # the phone should be listed as "device"
-adb install -r src/BeastCraft.Android/bin/Debug/net10.0-android/com.composedstudio.beastcraft-Signed.apk
-adb shell monkey -p com.composedstudio.beastcraft -c android.intent.category.LAUNCHER 1
+adb install -r src/BeastCraft.Android/bin/Debug/net10.0-android/com.example.beastcraft-Signed.apk
+adb shell monkey -p com.example.beastcraft -c android.intent.category.LAUNCHER 1
 adb logcat -d | grep -iE "FATAL|monodroid"   # if it does not start
 ```
 

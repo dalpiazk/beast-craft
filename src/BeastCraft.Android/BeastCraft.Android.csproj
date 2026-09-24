@@ -11,7 +11,7 @@
     Android":
 
         dotnet build src/BeastCraft.Android -c Debug
-        adb install -r src/BeastCraft.Android/bin/Debug/net10.0-android/com.composedstudio.beastcraft-Signed.apk
+        adb install -r src/BeastCraft.Android/bin/Debug/net10.0-android/com.example.beastcraft-Signed.apk
   -->
 
   <PropertyGroup>
@@ -25,7 +25,8 @@
     <EnableNETAnalyzers>false</EnableNETAnalyzers>
     <RootNamespace>BeastCraft.Android</RootNamespace>
     <AssemblyName>BeastCraft.Android</AssemblyName>
-    <ApplicationId>com.composedstudio.beastcraft</ApplicationId>
+    <!-- TEMPORARY placeholder package id; the real one is decided at release time. -->
+    <ApplicationId>com.example.beastcraft</ApplicationId>
     <ApplicationTitle>Beast Craft</ApplicationTitle>
     <ApplicationVersion>1</ApplicationVersion>
     <ApplicationDisplayVersion>0.1</ApplicationDisplayVersion>
