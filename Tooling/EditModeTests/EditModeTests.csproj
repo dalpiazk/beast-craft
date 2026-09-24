@@ -49,6 +49,8 @@
     <Compile Include="..\..\BeastCraft\Assets\_Project\Scripts\Tests\EditMode\**\*.cs">
       <Link>GameSource\Tests\EditMode\%(RecursiveDir)%(Filename)%(Extension)</Link>
     </Compile>
+    <!-- Golden-value tests owned by this runner (see Goldens/GoldenFiles.cs). -->
+    <Compile Include="Goldens\*.cs" />
   </ItemGroup>
 
   <ItemGroup>
