@@ -18,13 +18,17 @@ namespace BeastCraft.Encounters
         private readonly List<ElementScheme> _schemes = new List<ElementScheme>();
         private readonly List<int> _schemeWeights = new List<int>();
 
-        private EncounterLibrary(EncounterLibraryData data)
+        private EncounterLibrary(EncounterLibraryData data, EncounterDifficultyTable difficulty)
         {
             Data = data;
+            Difficulty = difficulty;
         }
 
         /// <summary>The authored data.</summary>
         public EncounterLibraryData Data { get; }
+
+        /// <summary>The calibrated difficulty (<c>encounter-difficulty.json</c>); null when none was supplied.</summary>
+        public EncounterDifficultyTable Difficulty { get; }
 
         /// <summary><see cref="EncounterLibraryData.DifficultyScale"/> (1 when not above 0).</summary>
         public double DifficultyScale
@@ -51,12 +55,13 @@ namespace BeastCraft.Encounters
         }
 
         /// <summary>
-        /// A library over <paramref name="data"/>. Null entries and repeated ids are skipped (the
-        /// first wins).
+        /// A library over <paramref name="data"/>, with <paramref name="difficulty"/> (may be null:
+        /// every shape then reads as uncalibrated, multiplier 1) as its calibrated difficulty. Null
+        /// entries and repeated ids are skipped (the first wins).
         /// </summary>
-        public static EncounterLibrary Build(EncounterLibraryData data)
+        public static EncounterLibrary Build(EncounterLibraryData data, EncounterDifficultyTable difficulty = null)
         {
-            EncounterLibrary library = new EncounterLibrary(data ?? new EncounterLibraryData());
+            EncounterLibrary library = new EncounterLibrary(data ?? new EncounterLibraryData(), difficulty);
 
             foreach (EncounterShapeData shape in library.Data.Shapes ?? new EncounterShapeData[0])
             {
@@ -85,6 +90,33 @@ namespace BeastCraft.Encounters
             }
 
             return library;
+        }
+
+        /// <summary>
+        /// The stat multiplier a generated encounter of <paramref name="shapeId"/> at
+        /// <paramref name="level"/> fields its enemies with: the calibrated multiplier
+        /// (<see cref="EncounterDifficultyTable.Multiplier"/>, 1 without a table) times
+        /// <see cref="DifficultyScale"/>.
+        /// </summary>
+        public double Multiplier(string shapeId, int level)
+        {
+            double calibrated = Difficulty == null ? 1.0 : Difficulty.Multiplier(shapeId, level);
+            return calibrated * DifficultyScale;
+        }
+
+        /// <summary>
+        /// The stat multiplier of <paramref name="template"/> at <paramref name="level"/>: its
+        /// <see cref="EncounterTemplateData.DifficultyOverride"/> when set (it replaces the scale too),
+        /// otherwise its shape's <see cref="Multiplier"/>.
+        /// </summary>
+        public double TemplateMultiplier(EncounterTemplateData template, int level)
+        {
+            if (template == null)
+            {
+                return 1.0;
+            }
+
+            return template.DifficultyOverride > 0.0 ? template.DifficultyOverride : Multiplier(template.ShapeId, level);
         }
 
         /// <summary>The shape with <paramref name="shapeId"/>, or null.</summary>

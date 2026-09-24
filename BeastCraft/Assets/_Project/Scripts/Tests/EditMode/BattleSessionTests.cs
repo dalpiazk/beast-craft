@@ -7,6 +7,7 @@ using BeastCraft.Battle.Grid;
 using BeastCraft.Bonds;
 using BeastCraft.Creatures;
 using BeastCraft.Creatures.Roster;
+using BeastCraft.Encounters;
 using BeastCraft.Progression;
 using BeastCraft.Save;
 using BeastCraft.Session;
@@ -36,6 +37,7 @@ namespace BeastCraft.Tests.EditMode
         private GearSO _blade;
         private GearSO _lateShell;
         private AvatarGearSO _cloak;
+        private EnemyCatalog _enemies;
 
         [SetUp]
         public void SetUp()
@@ -397,6 +399,95 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
+        public void Run_FieldsAGeneratedPlan_WithItsElementsKitsAndScaledStats()
+        {
+            EncounterLibrary library = EncounterLibrary.Build(EncounterContentTests.LoadEncounterLibrary(), EncounterDifficultyTable.Build(EncounterPlanTests.LoadDifficulty()));
+            EncounterPlan plan = EncounterPlan.Generate(library, _enemies, "squad", EncounterLevel, 77);
+            BattleSetup setup = Setup(StarterSave(), 5);
+            setup.Encounter = plan.ToSetup();
+
+            BattleSessionResult result = BattleSession.Run(setup);
+
+            Assert.IsTrue(result.Success, result.Error);
+            Assert.AreEqual("squad", result.ShapeId);
+            Assert.AreEqual(EncounterLevel, result.EncounterLevel);
+            Assert.Greater(plan.Multiplier, 1.0, "the calibrated squad is tougher than the raw stats");
+
+            for (int i = 0; i < plan.Enemies.Count; i++)
+            {
+                EncounterLineupEnemy planned = plan.Enemies[i];
+                BattleUnit unit = FindUnit(result, "enemy" + (i + 1));
+                CreatureSpeciesSO species = _enemies.Species(planned.EnemyId, planned.Element);
+                StatBlock expected = EnemyScaling.Scale(StatCalculator.ComputeStats(species, EncounterLevel, null), plan.Multiplier);
+
+                Assert.AreEqual(BattleTeam.Enemy, unit.Team);
+                Assert.AreEqual(expected, result.StartingStats[unit.Id], planned.EnemyId + ": level stats times the plan's multiplier");
+                Assert.AreEqual(_enemies.Kit(planned.EnemyId, planned.Element).Count, unit.Skills.Count);
+                Assert.AreEqual(_enemies.Kit(planned.EnemyId, planned.Element)[0].SkillId, unit.Skills.Skills[0].SkillId);
+                Assert.AreEqual(planned.Element, unit.Skills.Skills[0].Element);
+            }
+        }
+
+        [Test]
+        public void ApplyRewards_WithoutArguments_PaysTheEncountersShapeAndBand()
+        {
+            // An EXAMPLE template, built here for the test only (the shipped library authors none):
+            // one swarmling at a quarter of its stats, so the team wins.
+            EncounterLibraryData data = EncounterContentTests.LoadEncounterLibrary();
+            data.Templates = new[]
+            {
+                new EncounterTemplateData
+                {
+                    EncounterId = "example_lone_swarmling",
+                    ShapeId = "horde",
+                    Arena = "Medium",
+                    Groups = new[] { new EncounterGroupData { EnemyId = "swarmling", Count = 1, Elements = new[] { "Fire" } } },
+                    DifficultyOverride = 0.25
+                }
+            };
+            EncounterPlan plan = EncounterPlan.FromTemplate(EncounterLibrary.Build(data), _enemies, "example_lone_swarmling", 30);
+            PlayerSave save = StarterSave();
+            BattleSetup setup = Setup(save, 3);
+            setup.Encounter = plan.ToSetup();
+
+            BattleSessionResult result = BattleSession.Run(setup);
+            Assert.AreEqual(BattleOutcome.PlayerVictory, result.Outcome, result.Error);
+
+            BattleRewardSummary summary = BattleSession.ApplyRewards(save, result, _content, _drops, new System.Random(4));
+
+            Assert.IsTrue(summary.Applied, summary.Error);
+            Assert.IsTrue(summary.Loot.FirstClear);
+            Assert.IsTrue(save.Materials.HasCleared("horde", _drops.BandForLevel(30).MinLevel), "the horde cell of the level-30 band");
+            Assert.AreEqual(AvatarProgression.BattleXp(BattleOutcome.PlayerVictory, 30), summary.AvatarXpGained);
+        }
+
+        [Test]
+        public void ApplyRewards_WithoutArguments_RefusesAnEncounterThatNamedNoShape()
+        {
+            PlayerSave save = StarterSave();
+            BattleSessionResult result = BattleSession.Run(Setup(save, 42, weakEnemies: true));
+            Assert.IsTrue(result.Success, result.Error);
+
+            BattleRewardSummary summary = BattleSession.ApplyRewards(save, result, _content, _drops);
+
+            Assert.IsFalse(summary.Applied);
+            StringAssert.Contains("no shape or level", summary.Error);
+            Assert.IsEmpty(save.Materials.ClearedCells);
+        }
+
+        [Test]
+        public void Run_RefusesAnElementOnARosterSpecies_AndABadMultiplier()
+        {
+            BattleSetup element = Setup(StarterSave(), 1);
+            element.Encounter.Enemies[0].Element = Element.Fire;
+            AssertFails(element, "Element only applies to enemy-library enemies");
+
+            BattleSetup multiplier = Setup(StarterSave(), 1);
+            multiplier.Encounter.Enemies[0].StatMultiplier = 0.0;
+            AssertFails(multiplier, "StatMultiplier");
+        }
+
+        [Test]
         public void ApplyRewards_RefusesAFailedBattle()
         {
             PlayerSave save = StarterSave();
@@ -593,7 +684,8 @@ namespace BeastCraft.Tests.EditMode
             _cloak.Slot = AvatarGearSlot.Armor;
             _cloak.Modifiers.Add(new StatModifier { Stat = StatType.HP, FlatBonus = 100 });
 
-            return new BattleContent(species, skills.Values, passives, bonds, new[] { _blade, _lateShell }, new[] { _cloak });
+            _enemies = EnemyCatalog.Build(EncounterContentTests.LoadEnemyLibrary(), curves["medium"]);
+            return new BattleContent(species, skills.Values, passives, bonds, new[] { _blade, _lateShell }, new[] { _cloak }, _enemies);
         }
 
         private SkillSO BuildSkill(SkillData data)

@@ -37,6 +37,12 @@ namespace BeastCraft.Session
         /// <summary>The seed the battle ran with.</summary>
         public int Seed { get; internal set; }
 
+        /// <summary>The encounter's <see cref="EncounterSetup.ShapeId"/> (null when the setup named none).</summary>
+        public string ShapeId { get; internal set; }
+
+        /// <summary>The encounter's <see cref="EncounterSetup.EncounterLevel"/> (0 when the setup named none).</summary>
+        public int EncounterLevel { get; internal set; }
+
         /// <summary>The finished battle (outcome, turns, activations), or null on failure.</summary>
         public BattleResult Battle { get; internal set; }
 

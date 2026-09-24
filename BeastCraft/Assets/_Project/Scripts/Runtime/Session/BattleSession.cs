@@ -6,6 +6,7 @@ using BeastCraft.Battle.Grid;
 using BeastCraft.Battle.Placement;
 using BeastCraft.Bonds;
 using BeastCraft.Creatures;
+using BeastCraft.Encounters;
 using BeastCraft.Progression;
 using BeastCraft.Save;
 
@@ -62,6 +63,8 @@ namespace BeastCraft.Session
             PlayerSave save = setup.Save;
             BattleContent content = setup.Content;
             EncounterSetup encounter = setup.Encounter;
+            result.ShapeId = encounter == null ? null : encounter.ShapeId;
+            result.EncounterLevel = encounter == null ? 0 : encounter.EncounterLevel;
 
             if (save == null)
             {
@@ -260,6 +263,26 @@ namespace BeastCraft.Session
             return summary;
         }
 
+        /// <summary>
+        /// <see cref="ApplyRewards(PlayerSave, BattleSessionResult, BattleContent, string, int, DropTable, Random)"/>
+        /// for the shape and level the battle's <see cref="EncounterSetup"/> named
+        /// (<see cref="BattleSessionResult.ShapeId"/>, <see cref="BattleSessionResult.EncounterLevel"/>;
+        /// <c>EncounterPlan.ToSetup</c> sets both). Refused, changing nothing, when the setup named
+        /// no shape or no level.
+        /// </summary>
+        public static BattleRewardSummary ApplyRewards(PlayerSave save, BattleSessionResult result, BattleContent content, DropTable dropTable, Random rng = null)
+        {
+            if (result != null && result.Success && (string.IsNullOrEmpty(result.ShapeId) || result.EncounterLevel < 1))
+            {
+                return new BattleRewardSummary
+                {
+                    Error = "The battle's encounter named no shape or level (EncounterSetup.ShapeId / EncounterLevel); pass them explicitly."
+                };
+            }
+
+            return ApplyRewards(save, result, content, result == null ? null : result.ShapeId, result == null ? 0 : result.EncounterLevel, dropTable, rng);
+        }
+
         private static BattleUnit FindUnit(IReadOnlyList<BattleUnit> units, string unitId)
         {
             foreach (BattleUnit unit in units)
@@ -387,6 +410,13 @@ namespace BeastCraft.Session
                 }
 
                 CreatureSpeciesSO species = content.GetSpecies(spec.SpeciesId);
+                bool libraryEnemy = false;
+
+                if (species == null && content.Enemies != null)
+                {
+                    species = content.Enemies.Species(spec.SpeciesId, spec.Element ?? Element.None);
+                    libraryEnemy = species != null;
+                }
 
                 if (species == null)
                 {
@@ -394,9 +424,26 @@ namespace BeastCraft.Session
                     continue;
                 }
 
+                if (spec.Element.HasValue && !libraryEnemy)
+                {
+                    errors.Add(label + " (" + spec.SpeciesId + ") is a roster species; Element only applies to enemy-library enemies.");
+                }
+
+                if (!(spec.StatMultiplier > 0.0) || double.IsInfinity(spec.StatMultiplier))
+                {
+                    errors.Add(label + " (" + spec.SpeciesId + ") has StatMultiplier " + spec.StatMultiplier + "; it must be a positive number.");
+                }
+
                 List<SkillSO> skills = new List<SkillSO>();
 
-                if (spec.SkillIds == null)
+                if (spec.SkillIds == null && libraryEnemy)
+                {
+                    foreach (SkillSO skill in content.Enemies.Kit(spec.SpeciesId, spec.Element ?? Element.None))
+                    {
+                        skills.Add(skill);
+                    }
+                }
+                else if (spec.SkillIds == null)
                 {
                     if (species.DefaultLoadout != null)
                     {
@@ -556,8 +603,18 @@ namespace BeastCraft.Session
             for (int i = 0; i < enemies.Count; i++)
             {
                 ResolvedEnemy enemy = enemies[i];
-                units.Add(BattleUnitFactory.CreateBeast(enemy.UnitId, BattleTeam.Enemy, enemy.Species, enemy.Spec.Level, null, anchors[i],
-                                                        new SkillLoadout(enemy.Skills), enemy.Spec.StatusResist));
+                BattleUnit unit = BattleUnitFactory.CreateBeast(enemy.UnitId, BattleTeam.Enemy, enemy.Species, enemy.Spec.Level, null, anchors[i],
+                                                                new SkillLoadout(enemy.Skills), enemy.Spec.StatusResist);
+
+                // The difficulty multiplier, exactly as the balance simulator fields a calibrated
+                // enemy: scale the level-computed stats, then start at full (scaled) HP.
+                if (enemy.Spec.StatMultiplier != 1.0)
+                {
+                    unit.Stats = EnemyScaling.Scale(unit.Stats, enemy.Spec.StatMultiplier);
+                    unit.CurrentHp = unit.Stats.Hp;
+                }
+
+                units.Add(unit);
             }
 
             if (encounter.PrebuiltEnemies != null)
