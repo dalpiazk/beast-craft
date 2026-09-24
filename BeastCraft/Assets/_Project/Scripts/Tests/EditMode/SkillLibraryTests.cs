@@ -660,7 +660,7 @@ namespace BeastCraft.Tests.EditMode
         public void Validator_RejectsAnUnknownSchemaVersion()
         {
             SkillLibraryData library = MinimalLibrary();
-            library.SchemaVersion = 2;
+            library.SchemaVersion = SkillLibraryData.CurrentSchemaVersion + 1;
 
             AssertRejects(library, "SchemaVersion");
         }

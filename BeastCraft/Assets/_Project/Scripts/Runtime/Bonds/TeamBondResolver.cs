@@ -15,7 +15,10 @@ namespace BeastCraft.Bonds
     /// the beasts carrying any of them; <c>Species</c> counts the listed species present (each once),
     /// and its members are the beasts of those species. The bond's tier is the highest one whose
     /// <see cref="TeamBondTier.MinCount"/> the count reaches (the validator keeps the tiers strictly
-    /// rising). A count below the first tier leaves the bond inactive.
+    /// rising). A count below the first tier leaves the bond inactive. A scaling bond
+    /// (<see cref="TeamBondSO.PerCount"/>) has one tier, reached at its <c>MinCount</c> (1 or
+    /// more), and applies <see cref="ActiveTeamBond.Stacks"/> = the count capped at
+    /// <see cref="TeamBondSO.MaxCount"/> stacks of it.
     /// </para>
     /// <para>
     /// Non-throwing: null bonds, null tiers and null members are skipped. The result keeps the
@@ -47,7 +50,7 @@ namespace BeastCraft.Bonds
 
                 if (tier > 0)
                 {
-                    active.Add(new ActiveTeamBond(bond, tier, count, members));
+                    active.Add(new ActiveTeamBond(bond, tier, count, members, bond.StacksFor(count)));
                 }
             }
 

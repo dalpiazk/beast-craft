@@ -1904,40 +1904,53 @@ checked by `SkillLibraryValidator`, mapped by `SkillLibraryBuilder.ApplyTeamBond
 
 - `TeamBondSO` (`Runtime/Bonds`, namespace `BeastCraft.Bonds`): `BondId`, `DisplayName`,
   `Description`, `Icon`, `Condition`, the condition's set (`Stance`, `Elements` or `SpeciesIds`),
-  `Scope`, and `Tiers` (`TeamBondTier`: `MinCount` and an `Effects` list of ordinary
-  `SkillEffect`s).
+  `Scope`, `Tiers` (`TeamBondTier`: `MinCount` and an `Effects` list of ordinary
+  `SkillEffect`s), and for a scaling bond `PerCount` and `MaxCount` (below).
 - `TeamBondCondition`: `Stance = 0` (count = team members of that stance), `Elements = 1` (count =
   distinct elements of the set the team covers, capped at the number of members carrying one, so a
   pair bond needs both halves on two beasts), `Species = 2` (count = distinct listed species
   fielded). A bond's **members** are the beasts that match (every beast carrying a set element; every
   beast of a listed species).
 - `TeamBondScope`: `Members = 0` (only the members get the effects), `Team = 1` (every beast on the
-  team does).
+  team does), `Others = 2` (every beast that is **not** a member: the members lend the effect to
+  their teammates; a team made only of members has no recipient, and the bond changes nothing).
 - Tiers rise strictly by `MinCount` (at least 2: a bond is between beasts; an element or species
   bond's tiers stop at its set's size). The **highest tier reached applies, and tiers replace rather
   than stack**, so each tier is authored as its full effect list.
+- **Scaling bonds** (`PerCount` true, `SkillLibraryData.CurrentSchemaVersion` 2): exactly one tier,
+  whose effects are **per stack**. The bond is active once the count reaches the tier's `MinCount`
+  (1 or more, up to `MaxCount`), and applies **stacks = min(count, `MaxCount`)**: every effect once,
+  at `Magnitude` x stacks (a +4% buff at three stacks is one +12% buff, not three compounding ones).
+  `MaxCount` is at least 1 and at most what the set can reach; a tiered bond leaves it 0. The
+  validator caps the worst case (magnitude x `MaxCount`): at most 20% of a stat for a percent buff,
+  15 flat `CritChance`, 1 `MoveRange`, a shield of 60% of Defense; a flat buff of any other stat
+  does not scale. `ActiveTeamBond.Stacks` (and `TeamBondActivation.Stacks`) carry the stacks; a
+  tiered bond has one.
 - Bond effects land on the player's own team at battle start, so the validator allows only
   `BuffStat` (not `HP`: a max-HP buff heals nothing) and a `Shield` status, always landing
   (`Chance` 100). `DurationTurns` 0 on a stat change means the whole battle, as for an avatar aura.
 
 **Runtime.** `TeamBondResolver.Resolve(bonds, members)` is pure (no battle state, no rng): given
 `TeamBondMember`s (species id, stance, elements; `MembersOf(species)` builds them for a team of
-species) it returns the `ActiveTeamBond`s in the bonds' order, each with its tier, count and member
-indices. `TeamBondLoadout` binds that to the team's battle units for one battle (`For(bonds,
+species) it returns the `ActiveTeamBond`s in the bonds' order, each with its tier, count, stacks and
+member indices. `TeamBondLoadout` binds that to the team's battle units for one battle (`For(bonds,
 members, team)`), and `BattleTurnExecutor.BeginBattle(…, passives, bonds, out bondActivations)` /
 `RunBattle(…, passives, bonds, maxTime)` apply it **once, as the battle begins, before the avatar's
 auras and battle-start passives** (so a percent aura sees the bonded stat). For each active bond in
 order, each living recipient in team order **applies the tier's effects to itself**: it is both the
 caster and the only target of a private `Self`-shaped carrier skill at level 1 (bonds do not level),
 through `SkillEffectApplier` — so a shield is a percent of the recipient's own Defense and a percent
-buff scales the recipient's own stat. `BattleResult.BondActivations` records each applied bond
+buff scales the recipient's own stat. Carriers are cached per tier and stack count
+(`TeamBondLoadout.CarrierFor`): one stack shares the tier's effect list, more stacks carry scaled
+**clones**, so the authored magnitudes are never modified. `BattleResult.BondActivations` records each applied bond
 (`TeamBondActivation`: bond, tier, recipients). **Enemies never get bonds** (for now: the loadout is
 built for the player's team only). Bond effects with `Chance` 100 draw nothing from the battle rng,
 so a battle without bonds is unchanged, and a caller driving turns itself must call the bond-aware
 `BeginBattle` (unlike passives, a first turn does not apply bonds on its own).
 
-**Content (first draft).** Three stance bonds (every beast is in its stance's) and five element
-pairs that cover all ten elements once (every beast is in exactly one). Pairs were chosen so no two
+**Content (first draft).** Three tiered stance bonds and three scaling stance bonds (every beast is
+in its stance's two) and five element pairs that cover all ten elements once (every beast is in
+exactly one). Pairs were chosen so no two
 bonds need the same two beasts (Griffin + Thunderbird already share `pack_hunters`, so Air pairs
 with Fire and Lightning with Water):
 
@@ -1951,14 +1964,22 @@ with Fire and Lightning with Water):
 | `bedrock` Bedrock | Earth + Metal | Members | 2+: +6% Defense, +6% SpecialDefense |
 | `winter_grove` Winter Grove | Ice + Nature | Members | 2+: Shield 90% of own Defense, 3 turns |
 | `twilight` Twilight | Light + Dark | Team | 2+: +5% Defense, +5% SpecialDefense |
+| `bulwark` Bulwark | Vanguard beasts | Others | scaling, 1+, max 3: +4% Defense, +4% SpecialDefense per stack |
+| `overwatch` Overwatch | Ranged beasts | Team | scaling, 1+, max 3: +3 CritChance per stack |
+| `flanking` Flanking | Skirmisher beasts | Team | scaling, 1+, max 2: +4% Speed per stack |
 
 With the ten-beast roster (5 Vanguard, 3 Ranged, 2 Skirmisher) the Skirmisher bond's second tier
-cannot be reached yet; it is authored for a larger roster.
+cannot be reached yet; it is authored for a larger roster. The scaling bonds make every lineup's
+stance mix count: every four-beast team has at least one of them (a team of four Vanguards resolves
+`bulwark` but has no one to give it to). Tuning: `docs/balance/tuning-log.md`, "Scaling bonds".
 
 **Simulator.** `--bonds on|off` (default on, library kit only). The report's "PvE team bonds"
-section lists each bond's frequency (teams active per tier), the beasts' memberships, and each
-bond's marginal per shape: **Δ** (teams with the bond minus teams without) and **excess** over the
-additive prediction from the members' marginals (the part of the bond the lineup earns). The
+section lists each bond's frequency (teams active per tier, or per stack count), the beasts'
+memberships, and each bond's marginal per shape: **Δ** (teams with the bond minus teams without)
+and **excess** over the additive prediction from the members' marginals (the part of the bond the
+lineup earns); a scaling bond also gets its clear rate and excess by count and its per-stack slope.
+The bond-aware scouted picker weighs a scaling bond at 0.125 per stack
+(`ScoutedPicker.ScalingBondWeight`). The
 simulator's loop calls the bond-aware `BeginBattle`, so `--self-check` still compares it against
 `RunBattle`. Results and tuning: `docs/balance/tuning-log.md`, "Team bonds".
 

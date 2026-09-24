@@ -79,7 +79,7 @@ Two reports are committed, both the default arguments:
   the ATB turn order, so its battle lengths are in rounds.
 - `docs/balance/tuned-report.md` — the current roster and skill library after the third tuning pass
   and its element chart v2 follow-up (see `docs/balance/tuning-log.md`, "Retune with authored kits,
-  avatar passives, sqrt speed and mitigation", "Element chart v2", "Thunderbird range vs move" and "Niche pass: Thunderbird opener, Phoenix/Frost Wyrm lifts, remaining negatives", then "Team bonds"; "Scouting and counter-picking" added the scouted-picking section, no balance change; "Avatar gauge" moved the avatar onto its own ATB gauge, no tuning; "Large enemies (footprints)" made the giant, colossus and champion multi-hex, no tuning beyond the bosses' range parity; "Scouting-based calibration" calibrates the difficulty on the bond-aware scouted pick instead of the average team, no balance change), under the real game setup (every beast's authored default loadout, the library
+  avatar passives, sqrt speed and mitigation", "Element chart v2", "Thunderbird range vs move" and "Niche pass: Thunderbird opener, Phoenix/Frost Wyrm lifts, remaining negatives", then "Team bonds"; "Scouting and counter-picking" added the scouted-picking section, no balance change; "Avatar gauge" moved the avatar onto its own ATB gauge, no tuning; "Large enemies (footprints)" made the giant, colossus and champion multi-hex, no tuning beyond the bosses' range parity; "Scouting-based calibration" calibrates the difficulty on the bond-aware scouted pick instead of the average team, no balance change; "Scaling bonds" added three per-count stance bonds), under the real game setup (every beast's authored default loadout, the library
   avatar with its passives, the library's team bonds, skill level 1), the current Runtime (the square-root ATB turn order, the
   mitigation damage formula, `SpecialAttack`-scaled heals, combat stances, variance and crits) and
   the generated encounters. Regenerate it whenever the roster, the skill library, fixtures, simulator
@@ -329,8 +329,13 @@ cooldown 2 weighted `Attack` about twice as heavily.
   marginals (baseline + (n - 1) / n x the members' centred marginals, the pair synergy model per
   team). Δ mixes the bond with its members' own strength (only teams holding them can have it); the
   excess is the part the lineup earns, since the members' marginals already carry the bond's
-  average. And the primary mode's clear rate by number of active bonds. The `--seeds` aggregate
-  repeats the bond marginal averaged over seeds ("PvE team bonds over seeds"). For the whole effect
+  average. A **scaling** (`PerCount`) bond's frequency is per stack count (x1, x2, …), and per kit
+  mode a "Scaling bonds by stacks" table gives, by condition count, the stacks applied (0 when none
+  applies: below `MinCount`, or an `Others` bond on a team made only of its members), the teams,
+  their clear rate and excess, and the bond's **per-stack slope** (least-squares points of clear rate
+  per applied stack over every team). And the primary mode's clear rate by number of active bonds. The `--seeds` aggregate
+  repeats the bond marginal and the scaling tables averaged over seeds ("PvE team bonds over
+  seeds"; the slope with its SD over seeds). For the whole effect
   of bonds, compare a `--bonds off` run: its "PvE team composition over seeds" spread and pair
   synergy tables are the bond-free baseline.
 - **Scouted picking** (`ScoutingReport.cs`; "PvE scouted picking", on by default, off with
@@ -475,7 +480,9 @@ second; `--scouted none` drops it and its header line, and the rest of the repor
   lowest-scored non-Vanguard is swapped for the best-scored unpicked Vanguard. It ignores stats,
   kits, levels and bonds, so its picks are the same in every kit mode and level.
 - **Heuristic + bonds** (bonds on only): every team meeting the Vanguard minimum scores its members'
-  heuristic scores plus 0.5 per tier of each bond it activates (`ScoutedPicker.BondWeight`); the best
+  heuristic scores plus 0.5 per tier of each tiered bond it activates (`ScoutedPicker.BondWeight`)
+  and 0.125 per stack of each scaling bond (`ScoutedPicker.ScalingBondWeight`; nothing for an
+  `Others` bond no teammate receives); the best
   team is fielded, ties to the lower team index. 0.5 is the gap between a neutral and a strong
   matchup against one enemy in half the lineup's weight: a starting knob, not tuned.
 - **Best team** (with `oracle`): the one lineup with the best clear rate in the same mode and shape

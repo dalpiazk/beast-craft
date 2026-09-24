@@ -193,7 +193,8 @@ namespace BeastCraft.Tooling.BalanceSim
             {
                 report.AppendLine("- **Heuristic + bonds**: the team (with the same Vanguard minimum) maximising its members' heuristic scores plus " +
                                   Number(ScoutedPicker.BondWeight) + " per");
-                report.AppendLine("  tier of each bond it activates.");
+                report.AppendLine("  tier of each tiered bond it activates and " + Number(ScoutedPicker.ScalingBondWeight) +
+                                  " per stack of each scaling bond (none for an `Others` bond no teammate receives).");
             }
 
             if (ScoutedPicker.Runs(options, ScoutedPicker.OracleIndex))
@@ -478,7 +479,7 @@ namespace BeastCraft.Tooling.BalanceSim
 
         private static string Number(double value)
         {
-            return value.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+            return value.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
         }
     }
 }

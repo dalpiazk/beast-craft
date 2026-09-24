@@ -1,6 +1,6 @@
 {
-  "_readme": "Source of truth for every authored skill: beast skills, the avatar's active skills and passives, the skill-training materials, and each species' learnable skills and default loadout. Drafted against a power budget and tuned with the roster against the balance simulator (default loadouts; see docs/balance/tuning-log.md), not confirmed balance. Edit here, then in Unity run Beast Craft/Data/Import Skill Library (after Import Beast Roster). Enums are member names (case-sensitive). Missing fields take the DTO defaults in SkillLibraryData.cs; note a missing TargetingCriterion means Distance (nearest), not Random. Damage Magnitude is power, a percent of the attacking stat; Heal is a percent of the caster's SpecialAttack (x HealScale, the avatar's for its skills and passives); a Shield is a percent of the caster's Defense; a DamageOverTime is a per-turn power; a Knockback is whole hexes. DefaultLoadout order is fire priority. TeamBonds are composition-triggered team effects applied at battle start to the player's team (never enemies): a Stance, Elements (distinct elements of the set the team covers) or Species condition, tiers by rising MinCount (the highest reached applies; tiers replace, not stack), and per-tier Effects (BuffStat or a Shield status only, Chance 100) applied by each recipient to itself; Scope Members = the beasts that meet the condition, Team = every beast. See docs/design/battle-system.md, 'Team bonds'. The first 3 AvatarActives are the avatar's default actives. See docs/design/battle-system.md, 'Beast skill kits'.",
-  "SchemaVersion": 1,
+  "_readme": "Source of truth for every authored skill: beast skills, the avatar's active skills and passives, the skill-training materials, and each species' learnable skills and default loadout. Drafted against a power budget and tuned with the roster against the balance simulator (default loadouts; see docs/balance/tuning-log.md), not confirmed balance. Edit here, then in Unity run Beast Craft/Data/Import Skill Library (after Import Beast Roster). Enums are member names (case-sensitive). Missing fields take the DTO defaults in SkillLibraryData.cs; note a missing TargetingCriterion means Distance (nearest), not Random. Damage Magnitude is power, a percent of the attacking stat; Heal is a percent of the caster's SpecialAttack (x HealScale, the avatar's for its skills and passives); a Shield is a percent of the caster's Defense; a DamageOverTime is a per-turn power; a Knockback is whole hexes. DefaultLoadout order is fire priority. TeamBonds are composition-triggered team effects applied at battle start to the player's team (never enemies): a Stance, Elements (distinct elements of the set the team covers) or Species condition, tiers by rising MinCount (the highest reached applies; tiers replace, not stack), and per-tier Effects (BuffStat or a Shield status only, Chance 100) applied by each recipient to itself; Scope Members = the beasts that meet the condition, Team = every beast, Others = every beast that does not meet it. A PerCount (scaling) bond has one tier (MinCount 1 or more) whose magnitudes apply once per counted member, up to MaxCount stacks. See docs/design/battle-system.md, 'Team bonds'. The first 3 AvatarActives are the avatar's default actives. See docs/design/battle-system.md, 'Beast skill kits'.",
+  "SchemaVersion": 2,
   "Materials": [
     { "MaterialId": "essence_shard", "DisplayName": "Essence Shard", "Description": "A sliver of crystallised battle essence. Feeds a skill a little XP; opens its first breakthrough (level 5).", "Tier": 1, "XpValue": 250 },
     { "MaterialId": "essence_crystal", "DisplayName": "Essence Crystal", "Description": "A clear crystal of battle essence. Feeds a skill a good deal of XP; opens its second breakthrough (level 10).", "Tier": 2, "XpValue": 1000 },
@@ -1906,6 +1906,45 @@
       "Scope": "Team",
       "Tiers": [
         { "MinCount": 2, "Effects": [ { "EffectType": "BuffStat", "AffectedStat": "Defense", "Magnitude": 5, "IsPercent": true }, { "EffectType": "BuffStat", "AffectedStat": "SpecialDefense", "Magnitude": 5, "IsPercent": true } ] }
+      ]
+    },
+    {
+      "BondId": "bulwark",
+      "DisplayName": "Bulwark",
+      "Description": "Every Vanguard on the team covers the beasts behind it: each non-Vanguard teammate gains Defense and Special Defense per Vanguard (up to 3).",
+      "Condition": "Stance",
+      "Stance": "Vanguard",
+      "Scope": "Others",
+      "PerCount": true,
+      "MaxCount": 3,
+      "Tiers": [
+        { "MinCount": 1, "Effects": [ { "EffectType": "BuffStat", "AffectedStat": "Defense", "Magnitude": 4, "IsPercent": true }, { "EffectType": "BuffStat", "AffectedStat": "SpecialDefense", "Magnitude": 4, "IsPercent": true } ] }
+      ]
+    },
+    {
+      "BondId": "overwatch",
+      "DisplayName": "Overwatch",
+      "Description": "Every Ranged beast spots for the whole team: each beast on the team gains critical-hit chance per Ranged teammate (up to 3).",
+      "Condition": "Stance",
+      "Stance": "Ranged",
+      "Scope": "Team",
+      "PerCount": true,
+      "MaxCount": 3,
+      "Tiers": [
+        { "MinCount": 1, "Effects": [ { "EffectType": "BuffStat", "AffectedStat": "CritChance", "Magnitude": 3 } ] }
+      ]
+    },
+    {
+      "BondId": "flanking",
+      "DisplayName": "Flanking",
+      "Description": "Every Skirmisher draws the enemy out of line: each beast on the team acts faster per Skirmisher (up to 2).",
+      "Condition": "Stance",
+      "Stance": "Skirmisher",
+      "Scope": "Team",
+      "PerCount": true,
+      "MaxCount": 2,
+      "Tiers": [
+        { "MinCount": 1, "Effects": [ { "EffectType": "BuffStat", "AffectedStat": "Speed", "Magnitude": 4, "IsPercent": true } ] }
       ]
     }
   ]

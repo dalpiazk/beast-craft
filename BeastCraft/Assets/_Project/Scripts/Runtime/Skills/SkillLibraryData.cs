@@ -30,8 +30,12 @@ namespace BeastCraft.Skills
         /// <summary>Path of the library file relative to the Unity project folder (<c>BeastCraft/</c>).</summary>
         public const string ProjectRelativePath = "Assets/_Project/Data/Skills/skill-library.json";
 
-        /// <summary>The only <see cref="SchemaVersion"/> this code reads.</summary>
-        public const int CurrentSchemaVersion = 1;
+        /// <summary>
+        /// The only <see cref="SchemaVersion"/> this code reads. 2 added scaling team bonds
+        /// (<see cref="TeamBondData.PerCount"/>, <see cref="TeamBondData.MaxCount"/>, scope
+        /// <c>Others</c>).
+        /// </summary>
+        public const int CurrentSchemaVersion = 2;
 
         /// <summary>Bumped when the file's shape changes incompatibly.</summary>
         public int SchemaVersion;
@@ -278,11 +282,20 @@ namespace BeastCraft.Skills
         /// <summary>For a <c>Species</c> bond: the species set, as roster <c>SpeciesId</c>s.</summary>
         public string[] Species = new string[0];
 
-        /// <summary>A <c>TeamBondScope</c> name: <c>Members</c> or <c>Team</c>. Missing: <c>Members</c>.</summary>
+        /// <summary>A <c>TeamBondScope</c> name: <c>Members</c>, <c>Team</c> or <c>Others</c>. Missing: <c>Members</c>.</summary>
         public string Scope;
 
-        /// <summary>The tiers, by strictly rising <see cref="TeamBondTierData.MinCount"/>.</summary>
+        /// <summary>The tiers, by strictly rising <see cref="TeamBondTierData.MinCount"/>; exactly one for a <see cref="PerCount"/> bond.</summary>
         public TeamBondTierData[] Tiers = new TeamBondTierData[0];
+
+        /// <summary>
+        /// A scaling bond: its one tier's magnitudes apply once per counted member (stack), up to
+        /// <see cref="MaxCount"/>. Missing: false (a tiered bond).
+        /// </summary>
+        public bool PerCount;
+
+        /// <summary>For a <see cref="PerCount"/> bond: the stack cap (at least the tier's <c>MinCount</c>). Missing / 0 otherwise.</summary>
+        public int MaxCount;
     }
 
     /// <summary>One <c>TeamBondTier</c>: the count it needs and its full effect list (tiers replace, not stack).</summary>

@@ -2497,3 +2497,119 @@ three seeds from about 150 s to 33 s; `--calibrate-on mean` costs what the defau
 
 Reproduce: `dotnet run --project Tooling/BalanceSim -c Release -- --seeds 12345,777,4242 --out out/scoutcal.md`
 (about 35 s) and the continuity run with `--calibrate-on mean` added (about 170 s).
+
+## Scaling bonds
+
+Design decision (milestone 2): add **lineup-scaling** team bonds beside the pair and tiered stance
+bonds, so every team's stance mix counts. A scaling bond (`PerCount`, skill library schema 2) has
+one tier whose effects are per stack: once its count reaches the tier's `MinCount` it applies
+stacks = min(count, `MaxCount`), every magnitude x stacks as one application. A new scope,
+`Others`, gives the effect to the teammates that are *not* members. The validator caps the worst
+case (magnitude x `MaxCount`: 20% of a stat, 15 flat crit, a 60% shield, 1 move); carriers are
+cached per tier and stack count with cloned effects. The bond-aware scouted picker weighs a scaling
+bond at 0.125 per stack (`ScoutedPicker.ScalingBondWeight`; nothing for an `Others` bond no
+teammate receives). See battle-system.md, "Team bonds".
+
+**Bonds** (the design's starting magnitudes, kept; roster 5 Vanguard, 3 Ranged, 2 Skirmisher):
+
+| Bond | Condition | Scope | Per stack | Max | Teams at x1 / x2 / x3 (of 210) |
+| --- | --- | --- | --- | ---: | --- |
+| `bulwark` Bulwark | Vanguard beasts | Others | +4% Defense, +4% SpecialDefense | 3 | 50 / 100 / 55 |
+| `overwatch` Overwatch | Ranged beasts | Team | +3 CritChance | 3 | 105 / 63 / 7 |
+| `flanking` Flanking | Skirmisher beasts | Team | +4% Speed | 2 | 112 / 28 / - |
+
+Every one of the 210 lineups **resolves** a scaling bond (a test pins it for the roster), but the
+five all-Vanguard teams resolve only `bulwark`, which has no non-Vanguard to land on: 205 of 210
+teams **apply** one. (Any stance-count bond on a Vanguard-only team would need Members or Team scope.)
+
+**Normalized marginals** (3-seed mean, `--seeds 12345,777,4242`; before = the "Scouting-based
+calibration" default, after = this change; the guard reads normalized):
+
+| Beast | Stance | `elemental` before | after | Δ | `neutral` before | after | Δ |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Phoenix | Ranged | +2.1 | +3.3 | +1.2 | -1.3 | -1.4 | -0.1 |
+| Treant | Vanguard | +2.7 | +2.4 | -0.3 | +2.2 | +2.6 | +0.4 |
+| Kirin | Ranged | +0.8 | +1.7 | +0.9 | -0.9 | -0.9 | 0.0 |
+| Tarasque | Vanguard | +2.3 | +1.5 | -0.8 | -3.4 | -3.6 | -0.2 |
+| Golem | Vanguard | +3.4 | +1.5 | -1.9 | +4.8 | +3.3 | -1.5 |
+| Basilisk | Ranged | +1.5 | -0.2 | -1.7 | +2.0 | -0.7 | **-2.7** |
+| Frost Wyrm | Vanguard | -0.7 | -1.0 | -0.3 | 0.0 | 0.0 | 0.0 |
+| Leviathan | Vanguard | -2.3 | -2.0 | +0.3 | +0.4 | +1.7 | +1.3 |
+| Thunderbird | Skirmisher | **-5.0** | -3.6 | +1.4 | +1.0 | +1.6 | +0.6 |
+| Griffin | Skirmisher | **-4.8** | -3.6 | +1.2 | -4.9 | -2.7 | **+2.2** |
+
+- **The guard now holds in both modes** (`elemental` -3.6 ... +3.3 within +/-4, `neutral` -3.6 ...
+  +3.3 within +/-7): `flanking` lifts the two Skirmishers, which were outside it, by about 1.3 each.
+  Top 3 in some shape: 9 of 10 in each mode (not Thunderbird `elemental`, Kirin `neutral`).
+- **Stance means moved at most 1.4 points** (`elemental` Skirmisher +1.3, Ranged +0.1, Vanguard
+  -0.6; `neutral` Skirmisher +1.4, Ranged -0.9, Vanguard 0.0), so no bond was rescaled. Two single
+  beasts moved more than 2 (Basilisk `neutral` -2.7, Griffin `neutral` +2.2) while their stance
+  partners did not (Kirin 0.0, Phoenix -0.1; Thunderbird +0.6), so a bond magnitude, which moves a
+  stance as a whole, is not the lever. A second seed set (`--seeds 1,2,3`) repeats the pattern
+  (Basilisk -2.0 / -2.1, Griffin +2.2 / +1.8, Golem -1.5 / -2.2, stance means within 1.4): real but
+  beast-specific, for the stage D retune.
+- **Calibration** barely moves: the overall multiplier rises x1.163 -> x1.177 `elemental`, x1.044 ->
+  x1.059 `neutral` (the picked team gets the bonds too); no-scouting rate 25.2% -> 23.8% and 42.3%
+  -> 40.3%.
+
+**Scaling bonds by stacks** (3-seed means, levels pooled, overall; **excess** over the additive
+prediction from the members' marginals; **slope** = least-squares points of clear rate per applied
+stack over every team, mean (SD) over seeds):
+
+| Bond | Count | Stacks | Teams | `elemental` clear | excess | `neutral` clear | excess |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `bulwark` (slope 0.0 (0.7) / +0.9 (0.4)) | 0 | 0 | 5 | 29.7% | +7.6 | 46.3% | +8.2 |
+|  | 1 | 1 | 50 | 23.9% | +1.0 | 41.4% | +2.2 |
+|  | 2 | 2 | 100 | 21.9% | -1.9 | 36.8% | -3.5 |
+|  | 3 | 3 | 50 | 26.3% | +1.6 | 45.4% | +4.0 |
+|  | 4 | 0 | 5 | 29.7% | +4.3 | 41.5% | -1.0 |
+| `overwatch` (slope +0.9 (1.1) / -0.8 (1.2)) | 0 | 0 | 35 | 24.2% | +1.5 | 47.1% | +5.8 |
+|  | 1 | 1 | 105 | 23.0% | -0.6 | 37.4% | -3.1 |
+|  | 2 | 2 | 63 | 24.2% | -0.3 | 40.2% | +0.5 |
+|  | 3 | 3 | 7 | 30.6% | +5.1 | 50.9% | +12.1 |
+| `flanking` (slope -2.5 (0.2) / -0.6 (1.1)) | 0 | 0 | 70 | 26.9% | +1.1 | 42.6% | +1.9 |
+|  | 1 | 1 | 112 | 21.9% | -1.4 | 37.8% | -2.3 |
+|  | 2 | 2 | 28 | 23.7% | +2.9 | 44.2% | +4.7 |
+
+The slope mixes the bond with its stance's own strength (only Skirmisher teams can hold `flanking`,
+and Skirmishers are the weakest beasts: its slope is negative although the bond helps), and the
+excess of a Team-scope stance bond is flat by construction (its stacks are a sum of memberships the
+additive model already fits). What the excess does show is the stance-extreme lineups beating the
+additive prediction: no Vanguard, 3 Ranged or 2 Skirmishers run +2.9 to +12.1 (4 Vanguards +4.3 /
+-1.0), the 2-Vanguard / 1-Ranged / 1-Skirmisher counts -0.6 to -3.5.
+
+**Composition spread: the goal is missed.** The target was a persistent team SD (`elemental`
+overall, 3 seeds) at least 1.5 points above the value before this change.
+
+| Kit mode | Scope | Persistent SD before | after | Per-seed SD before | after | Seed-to-seed SD before | after |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `elemental` | overall | 0.0 | 0.0 | 6.3 | 6.2 | 7.8 | 6.4 |
+| `elemental` | `solo` | 3.5 | 3.5 | 8.0 | 8.2 | 7.2 | 7.4 |
+| `elemental` | `elite` | 0.0 | 0.0 | 10.8 | 9.4 | 15.6 | 10.4 |
+| `elemental` | `squad` | 9.5 | 9.1 | 13.0 | 13.5 | 8.9 | 10.0 |
+| `elemental` | `horde` | 0.0 | 5.0 | 17.3 | 17.4 | 18.9 | 16.7 |
+| `neutral` | overall | 3.1 | 3.8 | 11.8 | 11.5 | 11.4 | 10.8 |
+
+- **Before is already 0.0**, not the 6.1 the design assumed: under the scouted-pick calibration
+  each seed's own composition draw decides most of a team's `elemental` rate, so the
+  seed-to-seed SD (7.8) exceeds the within-seed spread (6.3) and the persistent estimate floors at
+  0. The within-seed spread did not move (6.3 -> 6.2; `--seeds 1,2,3`: 6.3 -> 6.4, persistent 1.0
+  -> 0.0).
+- **Why the bonds do not spread teams:** a Team-scope stance bond adds a fixed amount per stance
+  member, i.e. it shifts that stance's beasts' marginals, and the stance it helps most here
+  (Skirmishers, via `flanking`) is the weakest, so it narrows the spread; `bulwark` (Others) is
+  concave in the Vanguard count (stacks x recipients = 3, 4, 3 for 1, 2, 3 Vanguards) and helps the
+  balanced middle most, which also narrows it.
+- **Probes (not committed):** larger magnitudes at the validator caps' edge (bulwark 6%, overwatch
+  5, flanking 8%) gave persistent 2.1 but only because the seed-to-seed SD fell (per-seed 6.3 ->
+  6.1), and moved the Skirmishers +3.4 / +4.5 (over the 2-point rule). Convex stacks (overwatch
+  +5 crit and flanking +8% Speed with Members scope, so value ~ count²) left it at 0.0 (per-seed
+  6.4). Stat bonds of this size do not make the `elemental` lineup matter more across seeds; the
+  lever is probably element or kit synergy (e.g. bonds that change what a beast does), or measuring
+  composition against fixed compositions rather than per-seed draws. Left for the lead.
+
+**Runtime** unchanged (default run about 11 s, three seeds about 30 s). `--self-check` and
+`--mode pacing --self-check` pass.
+
+Reproduce: `dotnet run --project Tooling/BalanceSim -c Release -- --seeds 12345,777,4242 --out out/scaling.md`
+(about 30 s); before = the same at the previous commit.

@@ -8,7 +8,9 @@ namespace BeastCraft.Bonds
     /// Authored definition of one team bond: a team-composition condition (enough beasts of a
     /// stance, a set of elements covered, or a set of species fielded together) and, per tier, the
     /// effects the bond applies as the battle begins. Bonds reward building a team rather than
-    /// picking beasts one at a time. See the battle-system design doc, "Team bonds".
+    /// picking beasts one at a time. A bond is either tiered (the highest tier reached replaces the
+    /// lower ones) or scaling (<see cref="PerCount"/>: one tier whose magnitudes grow with every
+    /// member, up to <see cref="MaxCount"/>). See the battle-system design doc, "Team bonds".
     /// <para>
     /// Generated from the <c>TeamBonds</c> array of <c>Data/Skills/skill-library.json</c> by the
     /// skill library importer; never hand-edit the imported fields, edit the JSON and re-import.
@@ -47,7 +49,39 @@ namespace BeastCraft.Bonds
         /// <summary>Who the tier effects land on.</summary>
         public TeamBondScope Scope = TeamBondScope.Members;
 
-        /// <summary>The tiers, by strictly rising <see cref="TeamBondTier.MinCount"/>; the highest one reached applies.</summary>
+        /// <summary>
+        /// The tiers, by strictly rising <see cref="TeamBondTier.MinCount"/>; the highest one reached
+        /// applies. A <see cref="PerCount"/> bond has exactly one.
+        /// </summary>
         public List<TeamBondTier> Tiers = new List<TeamBondTier>();
+
+        /// <summary>
+        /// A scaling bond: instead of tiers that replace one another, its single tier is a
+        /// <em>per-stack</em> effect list. Once the count reaches the tier's
+        /// <see cref="TeamBondTier.MinCount"/> the bond applies every effect's
+        /// <see cref="BeastCraft.Battle.SkillEffect.Magnitude"/> x <see cref="StacksFor"/> (the count, capped at
+        /// <see cref="MaxCount"/>), so each further member adds one more stack. False (the default)
+        /// is the tiered bond.
+        /// </summary>
+        public bool PerCount;
+
+        /// <summary>For a <see cref="PerCount"/> bond: the most stacks it applies. Ignored otherwise.</summary>
+        public int MaxCount;
+
+        /// <summary>
+        /// How many times the reached tier's magnitudes apply at condition count
+        /// <paramref name="count"/>: for a <see cref="PerCount"/> bond, <paramref name="count"/>
+        /// capped at <see cref="MaxCount"/> (never below 1); for a tiered bond, always 1.
+        /// </summary>
+        public int StacksFor(int count)
+        {
+            if (!PerCount)
+            {
+                return 1;
+            }
+
+            int stacks = MaxCount > 0 && count > MaxCount ? MaxCount : count;
+            return stacks < 1 ? 1 : stacks;
+        }
     }
 }

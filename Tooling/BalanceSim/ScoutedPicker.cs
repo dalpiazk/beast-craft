@@ -106,7 +106,9 @@ namespace BeastCraft.Tooling.BalanceSim
     /// </para>
     /// <para>
     /// <strong>Bond-aware.</strong> Every team meeting the Vanguard minimum scores its members'
-    /// summed heuristic scores plus <see cref="BondWeight"/> per tier of each active bond; the best
+    /// summed heuristic scores plus <see cref="BondWeight"/> per tier of each active tiered bond
+    /// and <see cref="ScalingBondWeight"/> per stack of each active scaling bond (none for an
+    /// <c>Others</c> bond on a team made only of its members, which has no recipient); the best
     /// team is fielded (ties to the lower team index).
     /// </para>
     /// <para>
@@ -134,6 +136,9 @@ namespace BeastCraft.Tooling.BalanceSim
 
         /// <summary>Bond-aware score per tier of each active bond (per-enemy score units: a 2x matchup scores 1.0 more than a 1x one).</summary>
         public const double BondWeight = 0.5;
+
+        /// <summary>Bond-aware score per stack of each active scaling (<c>PerCount</c>) bond.</summary>
+        public const double ScalingBondWeight = 0.125;
 
         public const int StrategyCount = 4;
         public const int RandomIndex = 0;
@@ -240,6 +245,26 @@ namespace BeastCraft.Tooling.BalanceSim
             return team;
         }
 
+        /// <summary>
+        /// What one active bond adds to a team's bond-aware score: <see cref="BondWeight"/> x tier for
+        /// a tiered bond, <see cref="ScalingBondWeight"/> x stacks for a scaling one, and nothing for
+        /// an <c>Others</c> bond whose members are the whole team (no one receives it).
+        /// </summary>
+        public static double BondScore(ActiveTeamBond bond, int teamSize)
+        {
+            if (!bond.Bond.PerCount)
+            {
+                return BondWeight * bond.Tier;
+            }
+
+            if (bond.Bond.Scope == TeamBondScope.Others && bond.Members.Count >= teamSize)
+            {
+                return 0.0;
+            }
+
+            return ScalingBondWeight * bond.Stacks;
+        }
+
         /// <summary>The bond-aware team index (see the class notes).</summary>
         public static int PickWithBonds(double[] scores, IReadOnlyList<CreatureSpeciesSO> species, List<int[]> teams, List<ActiveTeamBond>[] bonds, int vanguardMin)
         {
@@ -259,7 +284,7 @@ namespace BeastCraft.Tooling.BalanceSim
 
                 foreach (ActiveTeamBond bond in bonds[t])
                 {
-                    value += BondWeight * bond.Tier;
+                    value += BondScore(bond, teams[t].Length);
                 }
 
                 if (value > bestValue + 1e-12)

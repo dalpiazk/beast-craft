@@ -644,13 +644,28 @@ namespace BeastCraft.Skills
             }
         }
 
+        /// <summary>A scaling bond's worst case (magnitude x MaxCount): at most this percent of a stat.</summary>
+        public const float MaxScalingPercentStat = 20f;
+
+        /// <summary>A scaling bond's worst case: at most this much flat <c>CritChance</c> (points).</summary>
+        public const float MaxScalingCritChance = 15f;
+
+        /// <summary>A scaling bond's worst case: a shield of at most this percent of the recipient's Defense.</summary>
+        public const float MaxScalingShield = 60f;
+
+        /// <summary>A scaling bond's worst case: at most this much <c>MoveRange</c>.</summary>
+        public const float MaxScalingMoveRange = 1f;
+
         /// <summary>
         /// Team bonds (optional: none is fine). Ids share the library's id space; the condition's
         /// set is present and valid for its kind (a stance; two or more distinct elements; two or
         /// more distinct species, which must be roster species when the roster is given); tiers rise
         /// strictly from a MinCount of at least 2 up to what the set can reach; and every effect is
         /// one a bond may carry: it lands on the bond's own team at battle start, so only a
-        /// <c>BuffStat</c> or a <c>Shield</c> status, always landing (Chance 100).
+        /// <c>BuffStat</c> or a <c>Shield</c> status, always landing (Chance 100). A scaling bond
+        /// (<c>PerCount</c>) has exactly one tier with 1 &lt;= MinCount &lt;= MaxCount &lt;= what the set
+        /// can reach, and its worst case (each magnitude x MaxCount) stays within the caps
+        /// (<see cref="MaxScalingPercentStat"/> and the rest); a tiered bond sets no MaxCount.
         /// </summary>
         private static void ValidateTeamBonds(TeamBondData[] bonds, HashSet<string> allIds, BeastRosterData roster, List<string> errors)
         {
@@ -747,6 +762,17 @@ namespace BeastCraft.Skills
                     errors.Add(label + ": has no Tiers.");
                 }
 
+                if (b.PerCount)
+                {
+                    ValidateScalingBond(b, tiers, reach, label, errors);
+                    continue;
+                }
+
+                if (b.MaxCount != 0)
+                {
+                    errors.Add(label + ": MaxCount " + b.MaxCount + " is only for a PerCount (scaling) bond; a tiered bond leaves it 0.");
+                }
+
                 int previous = 1;
                 for (int t = 0; t < tiers.Length; t++)
                 {
@@ -767,6 +793,104 @@ namespace BeastCraft.Skills
                     previous = Math.Max(previous, tier.MinCount);
                     CheckEffects(tier.Effects, at, "Effects", true, errors);
                     CheckBondEffects(tier.Effects, at, errors);
+                }
+            }
+        }
+
+        /// <summary>
+        /// A scaling bond: exactly one tier, 1 &lt;= MinCount &lt;= MaxCount &lt;= <paramref name="reach"/>,
+        /// the usual bond-effect rules, and each effect's worst case (magnitude x MaxCount) within
+        /// the caps. Only a percent stat buff, a flat CritChance or MoveRange buff, or a Shield scales.
+        /// </summary>
+        private static void ValidateScalingBond(TeamBondData b, TeamBondTierData[] tiers, int reach, string label, List<string> errors)
+        {
+            if (tiers.Length != 1)
+            {
+                errors.Add(label + ": a PerCount (scaling) bond has exactly one tier, not " + tiers.Length + ".");
+            }
+
+            if (b.MaxCount < 1 || b.MaxCount > reach)
+            {
+                errors.Add(label + ": MaxCount " + b.MaxCount + " must be at least 1" +
+                           (reach == int.MaxValue ? string.Empty : " and at most the set's size (" + reach + ")") + ".");
+            }
+
+            for (int t = 0; t < tiers.Length; t++)
+            {
+                TeamBondTierData tier = tiers[t];
+                string at = label + " Tiers[" + t + "]";
+                if (tier == null)
+                {
+                    errors.Add(at + " is null.");
+                    continue;
+                }
+
+                if (tier.MinCount < 1 || tier.MinCount > b.MaxCount)
+                {
+                    errors.Add(at + ": MinCount " + tier.MinCount + " of a PerCount bond must be from 1 up to its MaxCount (" + b.MaxCount + ").");
+                }
+
+                CheckEffects(tier.Effects, at, "Effects", true, errors);
+                CheckBondEffects(tier.Effects, at, errors);
+                CheckScalingCaps(tier.Effects, Math.Max(1, b.MaxCount), at, errors);
+            }
+        }
+
+        private static void CheckScalingCaps(EffectData[] effects, int maxCount, string label, List<string> errors)
+        {
+            if (effects == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < effects.Length; i++)
+            {
+                EffectData e = effects[i];
+                if (e == null)
+                {
+                    continue;
+                }
+
+                string at = label + " Effects[" + i + "]";
+                SkillEffectType type = ParseOr(e.EffectType, SkillEffectType.Damage);
+                StatType stat = ParseOr(e.AffectedStat, StatType.Attack);
+                float worst = e.Magnitude * maxCount;
+                float cap;
+                string what;
+                if (type == SkillEffectType.ApplyStatus)
+                {
+                    cap = MaxScalingShield;
+                    what = "a shield of " + MaxScalingShield + "% of Defense";
+                }
+                else if (type != SkillEffectType.BuffStat)
+                {
+                    continue;
+                }
+                else if (stat == StatType.CritChance && !e.IsPercent)
+                {
+                    cap = MaxScalingCritChance;
+                    what = MaxScalingCritChance + " CritChance";
+                }
+                else if (stat == StatType.MoveRange && !e.IsPercent)
+                {
+                    cap = MaxScalingMoveRange;
+                    what = MaxScalingMoveRange + " MoveRange";
+                }
+                else if (e.IsPercent && stat != StatType.CritChance && stat != StatType.MoveRange)
+                {
+                    cap = MaxScalingPercentStat;
+                    what = MaxScalingPercentStat + "% of the stat";
+                }
+                else
+                {
+                    errors.Add(at + ": a PerCount bond scales a percent stat buff, a flat CritChance or MoveRange buff, or a Shield; not a " +
+                               (e.IsPercent ? "percent " : "flat ") + stat + " buff.");
+                    continue;
+                }
+
+                if (worst > cap)
+                {
+                    errors.Add(at + ": at MaxCount " + maxCount + " this scales to " + worst + ", over the cap of " + what + ".");
                 }
             }
         }
