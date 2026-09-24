@@ -155,6 +155,11 @@ The numbers are simulator-tuned starting points, not confirmed balance — see
   dotnet format Tooling/EditModeTests --verify-no-changes
   dotnet test   Tooling/EditModeTests --configuration Release
   ```
+
+  `BeastCraft.slnx` at the root holds every project except the Android host
+  (which needs the Android workload), so a bare `dotnet build`, `dotnet test`
+  or `dotnet format --verify-no-changes` from the root covers src/ and
+  Tooling/ in one go.
 - A **headless balance simulator** ([`Tooling/BalanceSim/`](Tooling/BalanceSim/README.md))
   — local-only, not a CI job — that runs the real battle code headless and
   writes Markdown reports: PvE against generated mixed encounters (solo, elite,
