@@ -292,7 +292,7 @@ namespace BeastCraft.Tooling.BalanceSim
 
                 // Every shape is generated, filter or not, so a shape's compositions never depend on
                 // which other shapes the run happens to include.
-                List<EncounterShape> all = EncounterGenerator.Generate(encounterLibrary, enemies, options, errors);
+                List<EncounterShape> all = GeneratedEncounters.Generate(encounterLibrary, enemies, options, errors);
                 if (all == null)
                 {
                     return null;
