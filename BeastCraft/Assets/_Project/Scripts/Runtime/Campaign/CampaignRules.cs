@@ -243,7 +243,9 @@ namespace BeastCraft.Campaign
         /// a stage's pass (Gate) grants a guaranteed rare from its band's <c>boss</c> gear pool, the
         /// first clear of a region's lair (Boss) a guaranteed epic (a rare below the epic bands), each
         /// drawn on <c>DeriveSeed(node.EncounterSeed, </c><see cref="NodeRewardStream"/><c>)</c>
-        /// (<see cref="CampaignResult.GearGranted"/>). A replay grants nothing.
+        /// (<see cref="CampaignResult.GearGranted"/>); a lair's first clear also unlocks its
+        /// boss-exclusive looks and then any milestone looks reached (<see cref="CampaignResult.CosmeticsUnlocked"/>).
+        /// A replay grants nothing new.
         /// </summary>
         public static CampaignResult ResolveBattle(PlayerSave save, RegionLibrary library, int nodeId, BattleOutcome outcome, EconomyContent economy)
         {
@@ -290,6 +292,10 @@ namespace BeastCraft.Campaign
                 if (firstBoss)
                 {
                     GrantNodeGear(save, economy, node, 2, result);
+                    if (economy != null && economy.Cosmetics != null)
+                    {
+                        result.CosmeticsUnlocked.AddRange(CosmeticRules.UnlockBossLooks(save, economy.Cosmetics, region.RegionId));
+                    }
                 }
                 if (!string.IsNullOrEmpty(region.BossRewardSealId))
                 {
@@ -308,6 +314,11 @@ namespace BeastCraft.Campaign
                 }
 
                 run.Clear();
+                if (economy != null && economy.Cosmetics != null)
+                {
+                    result.CosmeticsUnlocked.AddRange(CosmeticRules.UnlockMilestones(save, economy.Cosmetics));
+                }
+
                 return result;
             }
 
@@ -547,6 +558,9 @@ namespace BeastCraft.Campaign
 
         /// <summary>The gear id a pass's or lair's first clear granted (now a new instance in the save), or null.</summary>
         public string GearGranted { get; internal set; }
+
+        /// <summary>Cosmetic looks a lair's first clear unlocked (its boss-exclusive looks, then milestones such as bosses beaten).</summary>
+        public List<string> CosmeticsUnlocked { get; } = new List<string>();
 
         internal static CampaignResult Refused(string error)
         {

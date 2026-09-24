@@ -78,5 +78,8 @@ namespace BeastCraft.Session
 
         /// <summary>The consumables spent from the pack (the battle used them, whatever its outcome). Never null.</summary>
         public List<string> ConsumablesSpent { get; } = new List<string>();
+
+        /// <summary>Cosmetic looks newly unlocked (a battle drop, then milestones the battle reached), as <c>"categoryId/optionId"</c>. Never null.</summary>
+        public List<string> CosmeticsUnlocked { get; } = new List<string>();
     }
 }

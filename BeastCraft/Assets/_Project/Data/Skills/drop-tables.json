@@ -16,6 +16,10 @@
     { "Shape": "solo", "Rarity": 0, "ChancePerMille": 30 },
     { "Shape": "squad", "Rarity": 0, "ChancePerMille": 10 }, { "Shape": "horde", "Rarity": 0, "ChancePerMille": 10 }
   ],
+  "CosmeticDrops": [
+    { "Shape": "elite", "ChancePerMille": 20 }, { "Shape": "solo", "ChancePerMille": 10 },
+    { "Shape": "squad", "ChancePerMille": 5 }, { "Shape": "horde", "ChancePerMille": 5 }
+  ],
   "Bands": [
     {
       "MinLevel": 1, "MaxLevel": 3, "FirstClearMaterialId": "essence_shard", "FirstClearQuantity": 1,

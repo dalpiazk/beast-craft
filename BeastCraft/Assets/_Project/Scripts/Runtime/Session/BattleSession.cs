@@ -241,7 +241,10 @@ namespace BeastCraft.Session
         /// stream (<c>LootRoller.DeriveSeed(result.Seed, PostBattleAward.GoldStream)</c>), so the
         /// material rolls are exactly those of a gold-free table. With <see cref="RewardModifiers.Gear"/>
         /// a clear also rolls the table's gear drops (<see cref="GearDrops.Roll"/>, stream
-        /// <see cref="PostBattleAward.GearStream"/>), each granted as a new instance.
+        /// <see cref="PostBattleAward.GearStream"/>), each granted as a new instance; with
+        /// <see cref="RewardModifiers.Cosmetics"/> it rolls the table's cosmetic drop (stream
+        /// <see cref="PostBattleAward.CosmeticStream"/>) and, after the XP, unlocks the milestone looks
+        /// the battle reached.
         /// </summary>
         public static BattleRewardSummary ApplyRewards(PlayerSave save, BattleSessionResult result, BattleContent content, string shape, int encounterLevel,
                                                        DropTable dropTable, int beastLevelCap, RewardModifiers modifiers, Random rng = null)
@@ -313,6 +316,16 @@ namespace BeastCraft.Session
                 }
             }
 
+            if (result.Outcome == BattleOutcome.PlayerVictory && mods.Cosmetics != null)
+            {
+                CosmeticOption look = CosmeticRules.RollDrop(dropTable, mods.Cosmetics, save, shape, encounterLevel,
+                                                             new Random(LootRoller.DeriveSeed(result.Seed, PostBattleAward.CosmeticStream)));
+                if (look != null && CosmeticRules.Unlock(save, mods.Cosmetics, look.Key))
+                {
+                    summary.CosmeticsUnlocked.Add(look.Key);
+                }
+            }
+
             foreach (KeyValuePair<string, string> pair in result.TeamUnitIds)
             {
                 OwnedBeast beast = save.FindBeast(pair.Key);
@@ -350,6 +363,11 @@ namespace BeastCraft.Session
                 summary.AvatarFalloffPercent = LevelGapXp.Percent(LevelGapXp.Gap(save.Avatar.Level, encounterLevel));
                 summary.AvatarXpGained = AvatarProgression.BattleXp(result.Outcome, encounterLevel, save.Avatar.Level);
                 summary.AvatarLevelsGained = AvatarProgression.AwardBattle(save.Avatar, result.Outcome, encounterLevel);
+            }
+
+            if (mods.Cosmetics != null)
+            {
+                summary.CosmeticsUnlocked.AddRange(CosmeticRules.UnlockMilestones(save, mods.Cosmetics));
             }
 
             summary.Applied = true;

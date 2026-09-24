@@ -19,5 +19,19 @@ namespace BeastCraft.Economy
 
         /// <summary>The gear library drops are drawn from (<c>drop-tables.json</c> <c>GearDrops</c>); null = no gear drops.</summary>
         public GearLibrary Gear;
+
+        /// <summary>
+        /// The cosmetic library battle drops (<c>drop-tables.json</c> <c>CosmeticDrops</c>) are drawn
+        /// from and whose milestone looks are checked after the battle; null = neither.
+        /// </summary>
+        public CosmeticLibrary Cosmetics;
+
+        /// <summary>The <see cref="Gear"/> and <see cref="Cosmetics"/> of <paramref name="economy"/> on these modifiers (for chaining).</summary>
+        public RewardModifiers With(EconomyContent economy)
+        {
+            Gear = economy == null ? null : economy.Gear;
+            Cosmetics = economy == null ? null : economy.Cosmetics;
+            return this;
+        }
     }
 }
