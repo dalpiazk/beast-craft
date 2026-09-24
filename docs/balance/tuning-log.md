@@ -3039,3 +3039,144 @@ The campaign's intended difficulty is not decided.
 
 Reproduce: `dotnet run --project Tooling/BalanceSim -c Release -- --out docs/balance/tuned-report.md
 --write-difficulty BeastCraft/Assets/_Project/Data/Encounters/encounter-difficulty.json`.
+
+## Behaviour bonds and tiered difficulty
+
+Two lead-designed changes, approved by the user: the stat bonds become **behaviour bonds** (a member
+of the bond acts in battle when its trigger happens), and the difficulty calibration aims each
+encounter shape at its own **tiered target** instead of a flat 50%. Built in six steps, each
+committed on a green local gate.
+
+**1. Engine, byte for byte.** `BondReaction` on each bond tier (trigger, action, target, trigger
+filter, reactor order, chance, cooldown, caps, range, effects), `SkillEffectType.Cleanse`,
+`TeamBondCondition.DistinctStances`, the executor's `BattleHooks` (passives and/or reacting bonds)
+with bonds passed into every turn, `BondReactionRecord` on each turn result. The design rules: one
+reaction per bond per event, the chance rolled last and only below 100 (at most one draw), no
+chaining (a reaction's hits, crits and defeats trigger nothing; `PassiveLoadout.SyncDefeatedSilently`
+keeps its kills from firing defeat passives). With the old content (no reacting tier) no hook is
+built, and the gate held exactly: the default report, `encounter-difficulty.json` and the level-gap
+report (`--levels 10,30,50,70,90 --level-gap -5..10`) were byte-identical to the committed ones
+(line endings aside). 27 EditMode tests cover the intercept, crit follow-ups, the threshold latch,
+the turn-start cleanse, silent reaction defeats, draw-for-draw identity and the validator.
+
+**2. The composition panel** (`--panel 16x4`, "Composition panel" in the BalanceSim README): 16 fixed
+compositions per shape from a constant seed, every team 4 times each at the level-50 cell's
+multiplier; a two-way ANOVA splits team clear rates into a team main effect and a team x composition
+interaction (the value of counter-picking). It supersedes the multi-seed "persistent SD". Baseline on
+the old stat bonds, seeds 12345, 777, 4242, 2024, 99, target 50%:
+
+| Kit mode | Main-effect SD | Interaction SD |
+| --- | ---: | ---: |
+| `elemental` | 11.0 | 28.1 |
+| `neutral` | 20.5 | 19.2 |
+
+**3. Content swap.** The eleven stat bonds became nine behaviour bonds (see battle-system.md, "Team
+bonds"); every beast is in one stance bond and one element bond, plus `combined_arms`. Enemies now
+apply statuses so `twilight` has something to cleanse: Quake stuns 20%, Bolt burns 30%, Sting poisons
+25%. The bond-aware picker weighs each bond per tier (`ScoutedPicker.BondWeights`) and gives the
+cleanse bond nothing against an encounter that cannot afflict.
+
+**4. Tiered targets.** `TargetClear` per shape in `encounter-library.json`: `squad` 80, `horde` 80,
+`elite` 60, `solo` 50. `encounter-difficulty.json` schema 2 carries them; `--target-clear N` is the
+legacy uniform target (the balance guard's setting), `shape=N` pairs override one shape. The level-gap
+bands are now relative to the cell's target T: gap 0 T +/- 5; +2/+3 0.4 T-0.7 T; +5 under 0.2 T; and,
+new, over-levelled -2/-3 at least T + 0.4 (100 - T), -5 at least T + 0.8 (100 - T).
+
+**5. Retune** at the uniform 50% target, five seeds (as the guard is defined). Straight after the
+swap the guard failed: `elemental` Thunderbird +7.1 and Leviathan -5.4 (normalized), 8/10 niches;
+`neutral` Thunderbird +14.2 and Tarasque -7.9, 6/10 niches; stance means Skirmisher +3.8 / Vanguard
+-1.8. Two structural causes, found by removing one bond at a time: `combined_arms` needs three stances,
+and with only two Skirmishers in the roster every such team holds one, so its value lands on them
+(without it the `elemental` stance means fell to Skirmisher +0.5, Ranged 0.0, Vanguard -0.2); and the Vanguards had lost
+`shield_wall` and `bulwark` while the adjacent-only guardian fired 0.2 times a battle. Enemy statuses
+were not the cause (the same content without them moved the two outliers by under a point: Thunderbird +6.5 -> +6.3, Leviathan -4.8 -> -4.2).
+
+Reaction chances and powers first:
+
+| Bond | Draft | Tuned |
+| --- | --- | --- |
+| `guardian` | 40% / 60%, adjacent, Shield 15 | 60% / 80%, within 2 hexes, healthiest Vanguard first, Shield 40 |
+| `pack_hunters` | +6 crit, follow-up power 45 | +3 crit, power 25 |
+| `crossfire` | 40% / 55%, power 40 | 45% / 60%, power 50 |
+| `storm_front` | stun 40% | stun 30% |
+| `bedrock` | below 50%, taunt within 2 for 2 turns | below 60%, within 3 for 3 turns |
+| `winter_grove` | Shield 60 + Heal 20 | Shield 50 + Heal 15 |
+| `twilight` | cleanse, 2 per member | cleanse + Heal 15, 3 per member |
+| `combined_arms` | +15% Atk / SpA | +10% |
+
+Beasts only where still outside the guard, crit chances (a user decision) and the six-stat budget
+(600 +/- 5%) untouched: Thunderbird Atk 117 -> 108, SpA 108 -> 100; Leviathan HP 132 -> 138, Def
+126 -> 120, SpD 100 -> 106; Golem Atk 109 -> 118, SpA 50 -> 41; Kirin SpA 140 -> 137, SpD 124 -> 118.
+
+Picker weights were fitted to the panel's pooled `elemental` excess at 0.1 per point (never below 0):
+`winter_grove` 0.34, `bedrock` 0.1, the rest 0.02 or less. At 0.25 per point the bond-aware pick leaned
+on Winter Grove over better element matchups and trailed the plain heuristic; at 0.1 it leads it.
+
+Result, five seeds at 50%:
+
+| | `elemental` | `neutral` |
+| --- | --- | --- |
+| Normalized marginals (guard) | -3.1 … +3.8 (+/-4: all inside) | -5.7 … +5.7 (+/-7: all inside) |
+| Top 3 in some shape (niches) | 9 of 10 (not Leviathan) | 9 of 10 (not Kirin) |
+| Stance means (Ranged / Skirmisher / Vanguard) | +1.1 / -0.5 / -0.5 | -1.2 / +5.3 / -1.4 |
+| Scouting uplift: heuristic / heuristic + bonds | +28.8 / +31.1 | -1.0 / +5.5 |
+| Panel main-effect / interaction SD | 8.6 / 24.5 | 19.8 / 18.5 |
+
+Reactions per battle of an active team and panel excess over the additive prediction (`elemental`,
+five-seed means):
+
+| Bond | Reactions / battle | Panel excess |
+| --- | ---: | ---: |
+| `guardian` | 0.62 | 0.0 |
+| `pack_hunters` | 1.12 | +0.1 |
+| `crossfire` | 0.88 | -0.1 |
+| `wildfire` | 4.61 | +0.1 |
+| `storm_front` | 1.26 | +0.2 |
+| `bedrock` | 2.36 | +1.0 |
+| `winter_grove` | 1.87 | +3.5 |
+| `twilight` | 0.60 | +0.1 |
+| `combined_arms` | 1.88 | 0.0 |
+
+**The panel target was not met.** The design asked for the `elemental` main-effect SD to rise 1.5 or
+the interaction SD 2 over the old bonds; both fell (11.0 -> 8.6, 28.1 -> 24.5). The drop is mostly the
+guard retune compressing the beasts, and stronger bonds do not buy it back: a probe with every
+reaction near its validator cap and stronger enemy statuses (guardian 80/100%, crossfire power 60,
+wildfire 60% burns, winter grove below 50% for Shield 80 + Heal 30, combined arms +20%) broke the
+guard (Treant +12.8, Golem -7.2) and still gave only 9.9 / 22.3, because the calibration raises the
+difficulty with the picked team's strength. On this roster the lineup's spread comes from the
+element chart and the beasts; the bonds mostly ride on their members (panel excess near 0 for every
+bond but Winter Grove and Bedrock). Open for the lead: a bond-driven spread needs bonds whose value
+depends on the composition far more sharply than these do, or a different yardstick.
+
+**Shipping table** (the default run, seed 12345, at the tiered targets; the game reads `elemental`):
+
+| Kit mode | Shape | Target | L1 | L50 | L100 |
+| --- | --- | ---: | ---: | ---: | ---: |
+| `elemental` | `solo` | 50 | x1.246 | x1.266 | x1.234 |
+| `elemental` | `elite` | 60 | x1.094 | x1.141 | x1.117 |
+| `elemental` | `squad` | 80 | x1.207 | x1.211 | x1.211 |
+| `elemental` | `horde` | 80 | x1.250 | x1.219 | x1.238 |
+| `neutral` | `solo` | 50 | x0.922 | x0.930 | x0.953 |
+| `neutral` | `elite` | 60 | x0.844 | x0.848 | x0.848 |
+| `neutral` | `squad` | 80 | x1.141 | x1.184 | x1.191 |
+| `neutral` | `horde` | 80 | x1.188 | x1.250 | x1.242 |
+
+Per shape, levels averaged (`elemental`): the scouted rate is on target (51.6 / 59.4 / 79.4 / 80.5);
+the unscouted average team clears 7.1% of `solo`, 10.0% of `elite`, 58.1% of `squad` and 50.9% of
+`horde`; the plain heuristic (no bonds) 50.0 / 66.7 / 70.8 / 62.5 (24 battles a shape, noisy); the
+scouted team without its avatar 4.7 / 7.6 / 45.8 / 29.9. The avatar is worth 40-50 points on the
+bosses: flagged for the producer with the unscouted rates.
+
+Level gap (`docs/balance/level-gap-report.md`, `elemental`, all shapes, mean target 67.5%), scouted
+rate at gaps -5, -3, -2, 0, +2, +3, +5, level 50: 94.1, 85.7, 80.1, 68.2, 31.3, 23.0, 13.5. Being
+over-levelled makes every shape easier at every level; 25 of 35 all-shape cells sit inside their
+bands. The misses: at +3 the scouted rate falls below 0.4 T at L10-L50 (17-23% against 27%: a
+couple of levels under costs more than the band allows early on), and -2, -5 and +5 miss by 0.4-2.6
+points at a few levels.
+
+Reproduce: the guard, `dotnet run --project Tooling/BalanceSim -c Release -- --mode pve --seeds
+12345,777,4242,2024,99 --target-clear 50 --panel 16x4 --out out/guard.md`; the shipping table and
+report, `dotnet run --project Tooling/BalanceSim -c Release -- --panel 16x4 --avatar-value --out
+docs/balance/tuned-report.md --write-difficulty BeastCraft/Assets/_Project/Data/Encounters/encounter-difficulty.json`;
+the level gap, `dotnet run --project Tooling/BalanceSim -c Release -- --mode pve --levels
+10,30,50,70,90 --level-gap -5,-3,-2,0,2,3,5 --out docs/balance/level-gap-report.md`.

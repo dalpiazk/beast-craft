@@ -35,7 +35,7 @@ dotnet run --project Tooling/BalanceSim -c Release -- [options]
 | `--skill-kit <k>` | `library` | The skill axis: `library` (each beast's authored `DefaultLoadout` from `skill-library.json`, the real game setup and the committed report's setting; see "Library kits") or `standard` (the same standard kit for every beast, so the stat lines are what is measured; see "The standard kit"). Before the authored-kits retune this was `--kit standard|library`; `--kit` now takes only the element axis. |
 | `--skill-level <n>` | `1` | Skill level (1-20) for library skills and library avatar skills; the tier is the gates below that level (16+ = all three passed). |
 | `--skill-library <path>` | found by walking up | Path to `skill-library.json` (read only with `--skill-kit library` or `--avatar library`, i.e. by default). |
-| `--bonds <on\|off>` | `on` | Team bonds from the library's `TeamBonds`: applied at battle start to every player team that meets a bond's condition (never to enemies). Library kit only (ignored with `--skill-kit standard`). Adds the "PvE team bonds" section. See "Library kits". |
+| `--bonds <on\|off>` | `on` | Team bonds from the library's `TeamBonds`, for every player team that meets a bond's condition (never enemies): battle-start effects, and the behaviour bonds' reactions on every turn. Library kit only (ignored with `--skill-kit standard`). Adds the "PvE team bonds" section. See "Library kits". |
 | `--scouted <list>` | `all` | Scouted picking, the "PvE scouted picking" section: comma-separated `random`, `heuristic`, `bonds` (the bond-aware heuristic; bonds on only), `oracle` (also adds the held-out best team), or `all` / `none`. Post-processing of the battles already run: no extra battles, sub-second. `none` removes the section and its header line; the rest of the report is unchanged (the default calibration still uses the bond-aware picker, see `--calibrate-on`). See "Scouted picking". |
 | `--scouted-detail <d>` | `full` | What the heuristic pickers see of each composition (`ScoutingDetail`): `full`, `elements-only` or `dominant-element`. |
 | `--scouted-vanguard-min <n>` | `1` | Fewest Vanguards a heuristic pick fields, 0 to `--team-size`. |
@@ -93,7 +93,10 @@ Two reports are committed, both the default arguments:
   avatar with its passives, the library's team bonds, skill level 1), the current Runtime (the square-root ATB turn order, the
   mitigation damage formula, `SpecialAttack`-scaled heals, combat stances, variance and crits) and
   the generated encounters. Regenerate it, and the game's difficulty table with it, whenever the
-  roster, the skill library, the encounter content, the simulator or the Runtime change:
+  roster, the skill library, the encounter content, the simulator or the Runtime change. Since
+  "Behaviour bonds and tiered difficulty" it runs the behaviour bonds, the composition panel
+  (`--panel 16x4`), the avatar-value replay (`--avatar-value`, for the no-avatar column of
+  "Difficulty by shape") and the tiered targets:
 
 ```sh
 dotnet run --project Tooling/BalanceSim -c Release -- --panel 16x4 --avatar-value --out docs/balance/tuned-report.md --write-difficulty BeastCraft/Assets/_Project/Data/Encounters/encounter-difficulty.json
@@ -124,9 +127,12 @@ battle.
 
 **Team bonds** (`--bonds on|off`, default on) come from the same file's `TeamBonds` array, built
 through `SkillLibraryBuilder.ApplyTeamBond` like the importer's. Each team's active bonds are resolved
-once per run (`TeamBondResolver`, from its species' stances and elements) and applied at battle start
-through `BattleTurnExecutor.BeginBattle` / `RunBattle` with a `TeamBondLoadout`, before the avatar's
-passives; enemies never get bonds. Bonds are part of the library setup, so `--skill-kit standard`
+once per run (`TeamBondResolver`, from its species' stances and elements); a `TeamBondLoadout`
+applies their battle-start effects through `BattleTurnExecutor.BeginBattle` / `RunBattle`, before the
+avatar's passives, and the simulator's loop passes it into every `ExecuteTurn` / `ExecuteAvatarTurn`
+so the behaviour bonds react all battle (each reaction is counted per bond on `PveBattle.BondReactions`;
+in the `neutral` kit mode a reaction strikes without an element, `TeamBondLoadout.ReactionElementOverride`);
+enemies never get bonds. Bonds are part of the library setup, so `--skill-kit standard`
 ignores them. The report's header says whether they were on, and "PvE team bonds" (see "PvE: team vs
 encounter") shows what they did.
 
@@ -273,7 +279,10 @@ cooldown 2 weighted `Attack` about twice as heavily.
 - **Difficulty calibration.** One multiplier per (kit mode, shape, level), shared by all the shape's
   compositions (per fixed encounter with `--encounter-set fixed`), scales every enemy's
   HP, Atk, Def, SpA and SpD. Speed and Move stay unscaled: Speed is how many turns a unit gets, so
-  scaling it would change the enemies' action economy, not just their toughness. The multiplier starts at 1 and doubles or halves until the target clear rate is
+  scaling it would change the enemies' action economy, not just their toughness. **The target** is
+  the shape's `TargetClear` in `encounter-library.json` (tiered: `squad` and `horde` 80%, `elite` 60%,
+  `solo` 50%; 50% for a fixed-set encounter) unless `--target-clear` sets one for every shape (the
+  guard's `--target-clear 50`) or per shape. The multiplier starts at 1 and doubles or halves until the target clear rate is
   bracketed (between 1/64 and 64), then bisects 8 times. The evaluated multiplier closest to the
   target wins (first evaluated on a tie), and its battles are the ones reported (they are kept, not
   re-run). The process is deterministic because each clear rate is. A step whose multiplier scales
@@ -345,8 +354,9 @@ cooldown 2 weighted `Attack` about twice as heavily.
     With 45 pairs a few |synergy / SE| near 2.5 are expected from noise; one seed cannot separate
     them, `--seeds` can (see "Multi-seed runs").
 - **Team bonds** (`BondReport.cs`; "PvE team bonds", only with bonds on): every bond with its
-  condition, scope, tier effects and how many of the 210 teams have it (per tier), which bonds each
-  beast belongs to, and how many bonds the teams activate. Then per kit mode a **bond marginal**
+  condition, scope, tier effects and reaction and how many of the 210 teams have it (per tier), which
+  bonds each beast belongs to, and how many bonds the teams activate; per kit mode and shape, each
+  behaviour bond's **reactions per battle** of an active team. Then per kit mode a **bond marginal**
   table: per shape and overall, **Δ** = clear rate of the teams with the bond active minus the teams
   without, and **excess** = the active teams' rate over the additive prediction from their members'
   marginals (baseline + (n - 1) / n x the members' centred marginals, the pair synergy model per
@@ -491,15 +501,18 @@ The default run has no stalemates, PvE or PvP.
 
 `--write-difficulty <path>` writes the run's calibrated multipliers, one per (kit mode, shape,
 level), as the game's `encounter-difficulty.json` (`DifficultyWriter.cs`; round-trip numbers, the
-same bytes for the same run). The committed file is the default run's (seed 12345, 8 compositions,
-levels 1 / 50 / 100, calibrated on the bond-aware scouted pick at 50%). The game reads its
-`elemental` cells through `EncounterDifficultyTable` (linear between calibrated levels, clamped
-outside them) and multiplies by `encounter-library.json`'s `DifficultyScale` (1.0). **Pending
-producer review:** the table is calibrated for a player who scouts and counter-picks, so an
-unscouted team clears about 10-38% of the shipped encounters (the report's "No-scouting clear");
-whether that is the campaign's intended difficulty, and so what `DifficultyScale` should be, is not
-decided. Only single-seed generated PvE runs can write it (`--seeds` and `--encounter-set fixed`
-are refused).
+same bytes for the same run; schema 2: `Targets` and a `TargetClear` per cell). The committed file
+is the documented command's (seed 12345, 8 compositions, levels 1 / 50 / 100, calibrated on the
+bond-aware scouted pick at each shape's **tiered target**: `squad` and `horde` 80%, `elite` 60%,
+`solo` 50%, the shapes' `TargetClear`, a user decision). The game reads its `elemental` cells through
+`EncounterDifficultyTable` (linear between calibrated levels, clamped outside them) and multiplies by
+`encounter-library.json`'s `DifficultyScale` (1.0, a global producer factor). The table is
+calibrated for a player who scouts and counter-picks: an unscouted team clears far less (the
+report's "Difficulty by shape": about 7-10% of `solo` and `elite`, 50-60% of `squad` and `horde`).
+A table written at another target than the library's still loads, but the importer warns
+(`EncounterDifficultyTable.Warnings`). The balance guard is judged at `--target-clear 50`, never on
+the shipping table. Only single-seed generated PvE runs can write it (`--seeds` and
+`--encounter-set fixed` are refused).
 
 ## Level gap
 
@@ -561,8 +574,8 @@ strategy names one of the 210 teams per composition, and that team's recorded re
 composition is the outcome. The section is on by default (`--scouted all`) and costs well under a
 second; `--scouted none` drops it and its header line, and the rest of the report is byte-identical.
 
-- **Calibration.** By default each shape's multiplier aims the **Heuristic + bonds** pick at 50%
-  (`--calibrate-on bonds`, see "Difficulty calibration"), so that column sits near 50% (within its
+- **Calibration.** By default each shape's multiplier aims the **Heuristic + bonds** pick at the shape's target
+  (`--calibrate-on bonds`, see "Difficulty calibration"), so that column sits near the target (within its
   noise: here it rests on one battle per composition and level, the calibration on 16), and the
   **No scouting** column (the mean over every team: the unscouted player) sits below it; every
   strategy's gain over no scouting reads as **uplift** in points. With `--calibrate-on mean` the
@@ -577,9 +590,12 @@ second; `--scouted none` drops it and its header line, and the rest of the repor
   lowest-scored non-Vanguard is swapped for the best-scored unpicked Vanguard. It ignores stats,
   kits, levels and bonds, so its picks are the same in every kit mode and level.
 - **Heuristic + bonds** (bonds on only): every team meeting the Vanguard minimum scores its members'
-  heuristic scores plus 0.5 per tier of each tiered bond it activates (`ScoutedPicker.BondWeight`)
-  and 0.125 per stack of each scaling bond (`ScoutedPicker.ScalingBondWeight`; nothing for an
-  `Others` bond no teammate receives); the best
+  heuristic scores plus, per tier of each tiered bond it activates, that bond's weight
+  (`ScoutedPicker.BondWeights`, fitted at 0.1 per point of the bond's pooled `elemental` panel excess;
+  0.5, `ScoutedPicker.BondWeight`, for a bond not listed; nothing for a bond that answers only afflicted
+  allies when no enemy can stun or burn, `ScoutedPicker.CanAfflict`) and 0.125 per stack of each
+  scaling bond (`ScoutedPicker.ScalingBondWeight`; nothing for an `Others` bond no teammate receives);
+  the best
   team is fielded, ties to the lower team index. 0.5 is the gap between a neutral and a strong
   matchup against one enemy in half the lineup's weight: a starting knob, not tuned.
 - **Best team** (with `oracle`): the one lineup with the best clear rate in the same mode and shape
