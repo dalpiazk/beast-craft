@@ -1,0 +1,196 @@
+using System.Collections.Generic;
+using System.Text;
+using BeastCraft.Battle;
+using BeastCraft.Battle.Grid;
+using BeastCraft.Presentation.Board;
+using BeastCraft.Presentation.Content;
+using BeastCraft.Presentation.Playback;
+using BeastCraft.Presentation.Text;
+using BeastCraft.Session;
+using NUnit.Framework;
+
+namespace BeastCraft.Tests.EditMode
+{
+    /// <summary>
+    /// The viewer's side of a battle: the demo battle built from the real content, stepped turn by
+    /// turn through <see cref="BattlePlayback"/> (and proven identical to
+    /// <see cref="BattleSession.Run"/>), the skill beats read off each turn, the hex layout, and the
+    /// built-in pixel font.
+    /// </summary>
+    public class BattlePlaybackTests
+    {
+        private static BattleSetup Demo(out Dictionary<string, string> species, int seed = DemoBattle.DefaultSeed)
+        {
+            BattleSetup setup = DemoBattle.Create(VfxLibraryTests.Content, seed, out species, out string error);
+            Assert.IsNotNull(setup, error);
+            return setup;
+        }
+
+        [Test]
+        public void DemoBattle_IsARealEncounter_WithPhoenixInTheTeam()
+        {
+            BattleSetup setup = Demo(out Dictionary<string, string> species);
+
+            Assert.AreEqual("phoenix", species["beast:b1"]);
+            Assert.AreEqual(3, setup.TeamBeastIds.Count);
+            Assert.AreEqual(3, setup.Encounter.Enemies.Count, "the Hollow Warden template: a champion and two brutes");
+            Assert.AreEqual("champion", species["enemy1"]);
+            Assert.AreEqual("brute", species["enemy2"]);
+        }
+
+        [Test]
+        public void Stepping_IsExactlyBattleSessionRun()
+        {
+            BattleSessionResult run = BattleSession.Run(Demo(out _));
+            BattlePlayback playback = new BattlePlayback(BattleSession.Begin(Demo(out _)));
+
+            int turns = 0;
+            while (playback.Advance() != null)
+            {
+                turns++;
+            }
+
+            Assert.IsTrue(playback.IsOver);
+            Assert.IsTrue(playback.Result.Success, playback.Result.Error);
+            Assert.AreEqual(run.Battle.ActionCount, turns);
+            Assert.AreEqual(Trace(run), Trace(playback.Result));
+            Assert.AreNotEqual(BattleOutcome.Stalemate, playback.Outcome);
+        }
+
+        [Test]
+        public void EachTurn_ChainsItsSnapshots_AndTheBeatsNameRealSkills()
+        {
+            BattlePlayback playback = new BattlePlayback(BattleSession.Begin(Demo(out _)));
+            IReadOnlyDictionary<string, UnitSnapshot> previous = playback.Initial;
+            bool phoenixFired = false;
+
+            PlayedTurn turn;
+            while ((turn = playback.Advance()) != null)
+            {
+                Assert.AreSame(previous, turn.Before, "a turn starts where the last one ended");
+                Assert.AreEqual(turn.Turn.EndPosition, turn.After[turn.Turn.Unit.Id].Position);
+
+                foreach (SkillBeat beat in turn.Beats)
+                {
+                    Assert.AreEqual(turn.Turn.Unit.Id, beat.CasterId);
+                    Assert.IsTrue(VfxLibraryTests.Content.KnownSkillIds.Contains(beat.SkillId), beat.SkillId);
+                    phoenixFired |= beat.CasterId == "beast:b1" && beat.SkillId == "ember_shot";
+
+                    int damage = 0;
+                    foreach (BeatTarget target in beat.Targets)
+                    {
+                        damage += target.Damage;
+                    }
+
+                    int hits = 0;
+                    SkillActivation activation = FindActivation(turn.Turn, beat.SkillId);
+                    foreach (DamageHit hit in activation.Hits)
+                    {
+                        hits += hit.Roll.Amount;
+                    }
+
+                    Assert.AreEqual(hits, damage, "a beat's damage is its hits' damage");
+                }
+
+                previous = turn.After;
+            }
+
+            Assert.IsTrue(phoenixFired, "the Phoenix fires Ember Shot at least once");
+            Assert.IsEmpty(playback.Forecast(5), "no forecast once the battle is over");
+        }
+
+        [Test]
+        public void Forecast_ListsLivingUnits()
+        {
+            BattlePlayback playback = new BattlePlayback(BattleSession.Begin(Demo(out _)));
+
+            List<BattleUnit> next = playback.Forecast(6);
+
+            Assert.AreEqual(6, next.Count);
+            Assert.IsTrue(next.TrueForAll(u => !u.IsDefeated));
+        }
+
+        [Test]
+        public void HexLayout_CentresRoundTrip_AndNeighboursSitOneStepApart()
+        {
+            HexLayout layout = new HexLayout(320, 180);
+            HexGrid grid = new HexGrid(ArenaSize.Large);
+
+            Assert.AreEqual((320, 180), layout.CenterPixel(HexCoordinate.Zero));
+            Assert.AreEqual((352, 180), layout.CenterPixel(new HexCoordinate(1, 0)));
+            Assert.AreEqual((336, 207), layout.CenterPixel(new HexCoordinate(0, 1)));
+            Assert.AreEqual((304, 162), layout.TileTopLeft(HexCoordinate.Zero));
+
+            foreach (HexCoordinate tile in grid.Tiles)
+            {
+                Vec2 centre = layout.Center(tile);
+                Assert.AreEqual(tile, layout.TileAt(centre.X, centre.Y));
+                Assert.AreEqual(tile, layout.TileAt(centre.X + 7f, centre.Y - 7f), "a point inside the tile maps to it");
+            }
+
+            Assert.AreEqual((11 * 32, 36 + 10 * 27), HexLayout.BoardSize(5));
+            Assert.AreEqual(layout.Center(new HexCoordinate(2, -1)), layout.FootprintCenter(new HexCoordinate(2, -1), UnitFootprint.Hex7));
+            Vec2 triangle = layout.FootprintCenter(HexCoordinate.Zero, UnitFootprint.Triangle);
+            Assert.AreEqual((320f + 352f + 336f) / 3f, triangle.X, 1e-3);
+        }
+
+        [Test]
+        public void PixelFont_EveryCharacterIsAThreeByFiveGlyph()
+        {
+            foreach (char c in PixelFont.Characters)
+            {
+                string[] rows = PixelFont.Glyph(c);
+                Assert.AreEqual(PixelFont.GlyphHeight, rows.Length, "'" + c + "'");
+                foreach (string row in rows)
+                {
+                    Assert.AreEqual(PixelFont.GlyphWidth, row.Length, "'" + c + "'");
+                }
+
+                Assert.AreEqual(c, PixelFont.Characters[PixelFont.IndexOf(c)]);
+            }
+
+            Assert.AreEqual(PixelFont.Glyph('a'), PixelFont.Glyph('A'));
+            Assert.AreEqual(PixelFont.Glyph('?'), PixelFont.Glyph('~'));
+            Assert.AreEqual(11, PixelFont.Measure("abc"));
+        }
+
+        private static SkillActivation FindActivation(BattleTurnResult turn, string skillId)
+        {
+            foreach (BattleSkillOutcome outcome in turn.SkillOutcomes)
+            {
+                if (outcome.Fired && outcome.Activation != null && outcome.Activation.Skill.SkillId == skillId)
+                {
+                    return outcome.Activation;
+                }
+            }
+
+            foreach (SkillActivation activation in turn.AvatarActivations)
+            {
+                if (activation.Skill.SkillId == skillId)
+                {
+                    return activation;
+                }
+            }
+
+            Assert.Fail("no activation of " + skillId);
+            return null;
+        }
+
+        private static string Trace(BattleSessionResult result)
+        {
+            StringBuilder trace = new StringBuilder();
+            trace.Append(result.Outcome).Append('/').Append(result.Battle.ElapsedTicks).Append('/').Append(result.Battle.ActionCount);
+            foreach (BattleTurnResult turn in result.Battle.Turns)
+            {
+                trace.Append('|').Append(turn.Unit.Id).Append('@').Append(turn.EndPosition);
+            }
+
+            foreach (BattleUnit unit in result.Units)
+            {
+                trace.Append('#').Append(unit.Id).Append('=').Append(unit.CurrentHp);
+            }
+
+            return trace.ToString();
+        }
+    }
+}
