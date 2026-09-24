@@ -2153,3 +2153,84 @@ Basilisk -1.7.
 
 Reproduce: `dotnet run --project Tooling/BalanceSim -c Release -- --seeds 12345,777,4242 --out out/bonds.md`
 and the same with `--bonds off` for the baseline (about 140 s each).
+
+## Scouting and counter-picking (no balance change)
+
+Follow-up to "Team composition analysis", which found that picking the team for the encounter
+pays but the simulator only ever fielded a fixed lineup. The game now has an `EncounterPreview`
+(`docs/design/battle-system.md`, "Encounter preview": enemy groups with element, stance and count,
+`ScoutingDetail.Full` by default), and the simulator reports what seeing it is worth: "PvE scouted
+picking" (`Tooling/BalanceSim/README.md`, "Scouted picking"), on by default. It re-reads the
+battles already run (every team against every composition), so the report gains a section and no
+battle, stat or calibration changes: the difficulty is still calibrated against the *average*
+team, so the baseline is about 50% and every strategy's gain reads as uplift. `--scouted none`
+reproduces the previous report byte for byte.
+
+Strategies: **random** (a seeded random team per composition; the noise control), **heuristic**
+(each beast scores 1 x its chart multiplier into the enemies - 0.5 x theirs into it, per enemy; best
+four, at least one Vanguard), **heuristic + bonds** (the team maximising the members' scores plus
+0.5 per active bond tier), **best team** (the one lineup that did best in the shape at the other
+levels, scored at this level: strong-team knowledge without the encounter, held out so not
+luck-inflated) and **oracle** (per composition, the team that did best against it: an upper bound,
+about 100% by construction with 210 teams and one battle each).
+
+**Results**, `--mode pve --seeds 12345,777,4242`, default arguments (8 compositions per shape;
+clear rate, uplift over the baseline in brackets; SD = the heuristic uplift's SD over seeds):
+
+| Kit mode | Shape | Baseline | Random | Heuristic | SD | Heuristic + bonds | Best team | Oracle |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `elemental` | `solo` | 49.8% | 48.6% (-1.2) | 79.2% (+29.3) | 3.9 | 83.3% (+33.5) | 70.8% (+21.0) | 100.0% (+50.2) |
+| `elemental` | `elite` | 51.2% | 56.9% (+5.8) | 70.8% (+19.7) | 3.8 | 76.4% (+25.2) | 70.8% (+19.7) | 100.0% (+48.8) |
+| `elemental` | `squad` | 49.9% | 47.2% (-2.7) | 76.4% (+26.5) | 4.9 | 73.6% (+23.7) | 76.4% (+26.5) | 100.0% (+50.1) |
+| `elemental` | `horde` | 49.6% | 38.9% (-10.7) | 54.2% (+4.6) | 20.8 | 54.2% (+4.6) | 83.3% (+33.7) | 100.0% (+50.4) |
+| `elemental` | overall | 50.1% | 47.9% (-2.2) | 70.1% (+20.0) | 3.8 | 71.9% (+21.7) | 75.3% (+25.2) | 100.0% (+49.9) |
+| `neutral` | overall | 50.3% | 50.0% (-0.3) | 50.3% (0.0) | 7.4 | 56.6% (+6.3) | 83.3% (+33.0) | 100.0% (+49.7) |
+
+A shape's figure per seed is 24 battles (binomial SE about 10 points), so the same three seeds were
+also run with `--compositions 32` (96 battles per shape per seed; SE about 3 points on the 3-seed
+mean) as the tighter check:
+
+| Kit mode | Shape | Baseline | Random | Heuristic | SD | Heuristic + bonds | Best team |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `elemental` | `solo` | 50.1% | +1.6 | 79.5% (+29.4) | 4.5 | 87.5% (+37.4) | 68.1% (+17.9) |
+| `elemental` | `elite` | 49.5% | -2.2 | 74.3% (+24.8) | 8.6 | 78.5% (+29.0) | 62.5% (+13.0) |
+| `elemental` | `squad` | 50.2% | +1.6 | 68.8% (+18.6) | 7.0 | 67.7% (+17.5) | 80.2% (+30.0) |
+| `elemental` | `horde` | 49.6% | +0.4 | 65.6% (+16.0) | 0.3 | 66.7% (+17.1) | 79.2% (+29.6) |
+| `elemental` | overall | 49.8% | +0.3 | 72.0% (+22.2) | 0.9 | 75.1% (+25.2) | 72.5% (+22.6) |
+| `neutral` | overall | 50.1% | -1.1 | 49.3% (-0.8) | 2.4 | 57.0% (+6.9) | 82.3% (+32.2) |
+
+- **Scouting plus a plain element counter-pick is worth about +20 points** of clear rate at the
+  calibrated difficulty (+20.0 at 8 compositions, +22.2 at 32; about 50% -> 70%). The `neutral`
+  control, where the chart does nothing, gives the same picks 0.0 / -0.8: the whole gain is the
+  element chart, not the picks happening to be strong lineups.
+- **By shape**, the counter-pick is strongest against a lone giant (+29) and an elite group
+  (+20 to +25), where one or two elements dominate. Against squads and hordes, whose mixed elements
+  dilute any counter, it is +16 to +19 on the tighter run (the default run's +26.5 squad / +4.6 horde
+  are within its noise; horde's seed SD is 20.8). There the held-out **best team** (+30) beats it:
+  bringing a strong lineup matters more than countering the elements, while against solo and elite
+  encounters countering beats the strong lineup (+29 vs +18, +25 vs +13).
+- **Bonds help the counter-pick a little**: +1.7 (8 compositions) / +3.0 (32) overall in
+  `elemental`, mostly in solo and elite; in `neutral` they are the only thing the bond-aware pick
+  knows, and it gains +6 to +7 there, consistent with the bond marginals.
+- **Oracle** is 100% in every shape: with 210 teams and one battle per team and composition,
+  some team always wins, so it is a luck bound rather than a skill ceiling. The honest ceiling for
+  "knowing what works" is between the best-team and oracle columns.
+- **Pick rates: no beast is always or never picked by the counter-pick.** In every shape each beast
+  is fielded in between 13% (Frost Wyrm, solo) and 63% (Leviathan solo, Phoenix elite / squad) of
+  heuristic picks (8 compositions; 18-59% at 32), and the bond-aware pick likewise spans 4-71% with
+  no 0 or 100. Phoenix drops to 4-21% under the bond-aware pick (its `wildfire` partner Griffin is
+  rarely the counter) and Tarasque / Golem rise (they reach `bedrock` and `shield_wall` together).
+  The **oracle** does have extremes in single shapes, but they are about the lineups that happened to
+  win, not the counter-pick: `horde` Leviathan always and Griffin never (8 compositions), `squad`
+  Thunderbird always and `horde` Basilisk never (32).
+
+**Implications (not acted on).** Visible elements make the chart a real decision: the same beasts
+clear about 20 points more often when picked for the encounter, with no must-pick beast. If the game
+expects players to scout, difficulty tuned to 50% for the average team is about 70% for a scouting
+player; whether authored encounters should be calibrated against the average or the counter-picked
+team, and whether the partial `ScoutingDetail` levels should gate some encounters, are open design
+questions. Horde and squad encounters reward lineup strength more than countering, which is where
+bonds and stances carry the choice.
+
+Reproduce: `dotnet run --project Tooling/BalanceSim -c Release -- --mode pve --seeds 12345,777,4242 --out out/scout.md`
+(about 150 s) and the same with `--compositions 32` (about 10 min).

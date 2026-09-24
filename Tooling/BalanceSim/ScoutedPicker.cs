@@ -1,0 +1,617 @@
+using System;
+using System.Collections.Generic;
+using BeastCraft.Battle;
+using BeastCraft.Battle.Scouting;
+using BeastCraft.Bonds;
+using BeastCraft.Creatures;
+
+namespace BeastCraft.Tooling.BalanceSim
+{
+    /// <summary>The scouted-picking strategies a run reports (<c>--scouted</c>).</summary>
+    [Flags]
+    public enum ScoutStrategies
+    {
+        None = 0,
+
+        /// <summary>A seeded random team per composition: the no-information control.</summary>
+        Random = 1,
+
+        /// <summary>The element counter-pick heuristic (<see cref="ScoutedPicker.Pick"/>).</summary>
+        Heuristic = 2,
+
+        /// <summary>The heuristic plus each team's active bonds (<see cref="ScoutedPicker.PickWithBonds"/>); bonds on only.</summary>
+        BondAware = 4,
+
+        /// <summary>Per composition, the team that did best against it in hindsight (and the best single team per cell).</summary>
+        Oracle = 8,
+
+        All = Random | Heuristic | BondAware | Oracle
+    }
+
+    /// <summary>The sim's thin adapter from a fixture enemy to what <see cref="EncounterPreview"/> reads.</summary>
+    public sealed class EnemySlotPreviewSource : IEncounterPreviewSource
+    {
+        private readonly EnemySlot _slot;
+
+        public EnemySlotPreviewSource(EnemySlot slot)
+        {
+            _slot = slot;
+        }
+
+        public Element Element
+        {
+            get { return _slot.Element; }
+        }
+
+        public CombatStance Stance
+        {
+            get { return _slot.Species.Stance; }
+        }
+
+        public string DisplayName
+        {
+            get { return _slot.GroupDisplayName; }
+        }
+    }
+
+    /// <summary>One PvE cell's scouted picks: per strategy, the team fielded against each composition, and the clear rates that gives.</summary>
+    public sealed class ScoutedCell
+    {
+        public PveCell Cell;
+
+        /// <summary>Mean clear rate of every team over every composition: the unscouted average team (what calibration aims at).</summary>
+        public double Baseline;
+
+        /// <summary>[strategy][composition] the team index picked (null when the strategy was not run).</summary>
+        public int[][] Picks = new int[ScoutedPicker.StrategyCount][];
+
+        /// <summary>[strategy] the clear rate of the picks: the mean over compositions of the picked team's rate against it.</summary>
+        public double[] Rate = new double[ScoutedPicker.StrategyCount];
+
+        /// <summary>[team] each team's clear rate over the whole cell.</summary>
+        public double[] TeamRate;
+
+        /// <summary>
+        /// With <see cref="ScoutStrategies.Oracle"/>: the clear rate of the best single team, chosen
+        /// without the per-composition view and held out (see <see cref="ScoutedPicker"/>, "Best team").
+        /// </summary>
+        public double BestFixed;
+
+        /// <summary>The team behind <see cref="BestFixed"/>.</summary>
+        public int BestFixedTeam;
+
+        /// <summary>Whether <see cref="BestFixed"/> was chosen on other levels' battles (false = single level, in-sample).</summary>
+        public bool BestFixedHeldOut;
+    }
+
+    /// <summary>
+    /// Scouted picking: what the player gains by seeing an encounter (<see cref="EncounterPreview"/>)
+    /// and picking a team for it. Pure post-processing of the battles a run already has: every
+    /// strategy picks one of the simulated teams per composition, and that team's recorded result
+    /// against the composition is its outcome, so no battle is run. The calibration is unchanged
+    /// (it still aims the mean of all teams at the target), which makes each strategy's gain over that
+    /// mean directly readable as uplift.
+    /// <para>
+    /// <strong>Heuristic.</strong> Each beast scores against the preview, per enemy:
+    /// <c>sum over groups of Count x (OffenceWeight x chart(beast element, group element) -
+    /// DefenceWeight x chart(group element, beast elements)) / TotalEnemies</c> (chart =
+    /// <see cref="ElementChart.GetMultiplier(Element, Element)"/>; a beast attacks with its first
+    /// element, the kit element). The team is the <c>TeamSize</c> best scores (ties to the lower
+    /// roster index); if it has fewer than <c>--scouted-vanguard-min</c> Vanguards, its lowest-scored
+    /// non-Vanguard picks are swapped for the best unpicked Vanguards. No rng.
+    /// </para>
+    /// <para>
+    /// <strong>Bond-aware.</strong> Every team meeting the Vanguard minimum scores its members'
+    /// summed heuristic scores plus <see cref="BondWeight"/> per tier of each active bond; the best
+    /// team is fielded (ties to the lower team index).
+    /// </para>
+    /// <para>
+    /// <strong>Oracle.</strong> Per composition, the team with the best recorded clear rate against
+    /// it (ties: the team's clear rate over the whole cell, then the lower team index): an upper
+    /// bound, and with one battle per team and composition an inflated one (it keeps the luckiest
+    /// of 210 coin flips).
+    /// </para>
+    /// <para>
+    /// <strong>Best team.</strong> Reported with the oracle: the one lineup that did best in the same
+    /// mode and shape at the <em>other</em> levels, scored at this level (<see cref="ScoutedCell.BestFixed"/>).
+    /// Knowing which team is strong, not what it faces, and held out, so not inflated by the luck
+    /// it was chosen on: the comparison that says whether counter-picking beats bringing a strong team.
+    /// </para>
+    /// </summary>
+    public static class ScoutedPicker
+    {
+        public const int DefaultVanguardMin = 1;
+
+        /// <summary>Weight of the beast's attack multiplier into each enemy.</summary>
+        public const double OffenceWeight = 1.0;
+
+        /// <summary>Weight of each enemy's attack multiplier into the beast.</summary>
+        public const double DefenceWeight = 0.5;
+
+        /// <summary>Bond-aware score per tier of each active bond (per-enemy score units: a 2x matchup scores 1.0 more than a 1x one).</summary>
+        public const double BondWeight = 0.5;
+
+        public const int StrategyCount = 4;
+        public const int RandomIndex = 0;
+        public const int HeuristicIndex = 1;
+        public const int BondAwareIndex = 2;
+        public const int OracleIndex = 3;
+
+        public static readonly ScoutStrategies[] StrategyFlags = { ScoutStrategies.Random, ScoutStrategies.Heuristic, ScoutStrategies.BondAware, ScoutStrategies.Oracle };
+        public static readonly string[] StrategyNames = { "Random", "Heuristic", "Heuristic + bonds", "Oracle" };
+
+        /// <summary>Whether the run reports scouting at all.</summary>
+        public static bool Active(SimOptions options)
+        {
+            return options.RunPve && options.Scouted != ScoutStrategies.None;
+        }
+
+        /// <summary>Whether strategy <paramref name="index"/> runs: asked for, and (bond-aware) bonds are on, else it would equal the heuristic.</summary>
+        public static bool Runs(SimOptions options, int index)
+        {
+            return (options.Scouted & StrategyFlags[index]) != 0 && (index != BondAwareIndex || options.BondsActive);
+        }
+
+        public static EncounterPreview Preview(Encounter encounter, ScoutingDetail detail)
+        {
+            List<IEncounterPreviewSource> sources = new List<IEncounterPreviewSource>();
+            foreach (EnemySlot slot in encounter.Enemies)
+            {
+                sources.Add(new EnemySlotPreviewSource(slot));
+            }
+
+            return EncounterPreview.Build(sources, encounter.Arena, detail);
+        }
+
+        /// <summary>[beast] the heuristic's per-enemy score against <paramref name="preview"/> (see the class notes).</summary>
+        public static double[] Scores(EncounterPreview preview, IReadOnlyList<CreatureSpeciesSO> species)
+        {
+            double[] scores = new double[species.Count];
+            if (preview.TotalEnemies == 0)
+            {
+                return scores;
+            }
+
+            for (int b = 0; b < species.Count; b++)
+            {
+                Element[] elements = species[b].Elements ?? new Element[0];
+                Element attack = elements.Length > 0 ? elements[0] : Element.None;
+                double sum = 0.0;
+                foreach (EncounterPreviewGroup group in preview.Groups)
+                {
+                    sum += group.Count * ((OffenceWeight * ElementChart.GetMultiplier(attack, group.Element)) -
+                                          (DefenceWeight * ElementChart.GetMultiplier(group.Element, elements)));
+                }
+
+                scores[b] = sum / preview.TotalEnemies;
+            }
+
+            return scores;
+        }
+
+        /// <summary>The heuristic team: ascending roster indices (see the class notes).</summary>
+        public static int[] Pick(double[] scores, IReadOnlyList<CreatureSpeciesSO> species, int teamSize, int vanguardMin)
+        {
+            List<int> order = PveReport.Order(scores.Length, b => scores[b]);
+            List<int> picked = order.GetRange(0, Math.Min(teamSize, order.Count));
+            int vanguards = 0;
+            foreach (int b in picked)
+            {
+                vanguards += species[b].Stance == CombatStance.Vanguard ? 1 : 0;
+            }
+
+            while (vanguards < vanguardMin)
+            {
+                int incoming = -1;
+                foreach (int b in order)
+                {
+                    if (incoming < 0 && !picked.Contains(b) && species[b].Stance == CombatStance.Vanguard)
+                    {
+                        incoming = b;
+                    }
+                }
+
+                int outgoing = -1;
+                for (int i = picked.Count - 1; i >= 0 && outgoing < 0; i--)
+                {
+                    outgoing = species[picked[i]].Stance == CombatStance.Vanguard ? -1 : i;
+                }
+
+                if (incoming < 0 || outgoing < 0)
+                {
+                    break;
+                }
+
+                picked[outgoing] = incoming;
+                picked.Sort((x, y) =>
+                {
+                    int byScore = scores[y].CompareTo(scores[x]);
+                    return byScore != 0 ? byScore : x.CompareTo(y);
+                });
+                vanguards++;
+            }
+
+            int[] team = picked.ToArray();
+            Array.Sort(team);
+            return team;
+        }
+
+        /// <summary>The bond-aware team index (see the class notes).</summary>
+        public static int PickWithBonds(double[] scores, IReadOnlyList<CreatureSpeciesSO> species, List<int[]> teams, List<ActiveTeamBond>[] bonds, int vanguardMin)
+        {
+            int best = -1;
+            double bestValue = double.MinValue;
+            int bestFeasible = -1;
+            double bestFeasibleValue = double.MinValue;
+            for (int t = 0; t < teams.Count; t++)
+            {
+                double value = 0.0;
+                int vanguards = 0;
+                foreach (int b in teams[t])
+                {
+                    value += scores[b];
+                    vanguards += species[b].Stance == CombatStance.Vanguard ? 1 : 0;
+                }
+
+                foreach (ActiveTeamBond bond in bonds[t])
+                {
+                    value += BondWeight * bond.Tier;
+                }
+
+                if (value > bestValue + 1e-12)
+                {
+                    best = t;
+                    bestValue = value;
+                }
+
+                if (vanguards >= vanguardMin && value > bestFeasibleValue + 1e-12)
+                {
+                    bestFeasible = t;
+                    bestFeasibleValue = value;
+                }
+            }
+
+            return bestFeasible >= 0 ? bestFeasible : best;
+        }
+
+        /// <summary>Team <paramref name="team"/>'s clear rate against composition <paramref name="composition"/> (percent, over the samples).</summary>
+        public static double Rate(PveCell cell, int composition, int team)
+        {
+            int cleared = 0;
+            for (int s = 0; s < cell.Samples; s++)
+            {
+                cleared += cell.Battles[(((composition * cell.TeamCount) + team) * cell.Samples) + s].Cleared ? 1 : 0;
+            }
+
+            return cell.Samples == 0 ? 0.0 : (100.0 * cleared) / cell.Samples;
+        }
+
+        /// <summary>Every cell's picks and rates, in <paramref name="cells"/>' order. Empty when scouting is off.</summary>
+        public static List<ScoutedCell> Compute(SimOptions options, IReadOnlyList<CreatureSpeciesSO> species, PveSimulator simulator, List<PveCell> cells)
+        {
+            List<ScoutedCell> result = new List<ScoutedCell>();
+            if (!Active(options) || simulator == null)
+            {
+                return result;
+            }
+
+            Dictionary<string, int> teamIndex = new Dictionary<string, int>(StringComparer.Ordinal);
+            for (int t = 0; t < simulator.Teams.Count; t++)
+            {
+                teamIndex[Key(simulator.Teams[t])] = t;
+            }
+
+            // The heuristic sees only the composition, so its picks are shared by every mode and level.
+            Dictionary<Encounter, int> heuristic = new Dictionary<Encounter, int>();
+            Dictionary<Encounter, int> bondAware = new Dictionary<Encounter, int>();
+            foreach (PveCell cell in cells)
+            {
+                foreach (Encounter encounter in cell.Shape.Compositions)
+                {
+                    if (heuristic.ContainsKey(encounter))
+                    {
+                        continue;
+                    }
+
+                    double[] scores = Scores(Preview(encounter, options.ScoutedDetail), species);
+                    int[] team = Pick(scores, species, options.TeamSize, options.ScoutedVanguardMin);
+                    heuristic[encounter] = teamIndex[Key(team)];
+                    bondAware[encounter] = PickWithBonds(scores, species, simulator.Teams, simulator.TeamBonds, options.ScoutedVanguardMin);
+                }
+            }
+
+            foreach (PveCell cell in cells)
+            {
+                int compositions = cell.Shape.Compositions.Count;
+                int teams = cell.TeamCount;
+                TeamScope scope = TeamScope.FromCell(cell);
+                ScoutedCell scouted = new ScoutedCell { Cell = cell };
+                double sum = 0.0;
+                foreach (double rate in scope.Rate)
+                {
+                    sum += rate;
+                }
+
+                scouted.Baseline = teams == 0 ? 0.0 : sum / teams;
+                for (int k = 0; k < StrategyCount; k++)
+                {
+                    if (!Runs(options, k))
+                    {
+                        continue;
+                    }
+
+                    int[] picks = new int[compositions];
+                    for (int c = 0; c < compositions; c++)
+                    {
+                        Encounter encounter = cell.Shape.Compositions[c];
+                        switch (k)
+                        {
+                            case RandomIndex:
+                                picks[c] = new Random(RandomSeed(options.Seed, cell, encounter.Id)).Next(teams);
+                                break;
+                            case HeuristicIndex:
+                                picks[c] = heuristic[encounter];
+                                break;
+                            case BondAwareIndex:
+                                picks[c] = bondAware[encounter];
+                                break;
+                            default:
+                                picks[c] = Oracle(cell, c, scope.Rate);
+                                break;
+                        }
+                    }
+
+                    scouted.Picks[k] = picks;
+                    double total = 0.0;
+                    for (int c = 0; c < compositions; c++)
+                    {
+                        total += Rate(cell, c, picks[c]);
+                    }
+
+                    scouted.Rate[k] = compositions == 0 ? 0.0 : total / compositions;
+                }
+
+                scouted.TeamRate = scope.Rate;
+                result.Add(scouted);
+            }
+
+            if (Runs(options, OracleIndex))
+            {
+                foreach (ScoutedCell scouted in result)
+                {
+                    BestFixed(scouted, result);
+                }
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// The held-out best team: chosen by its clear rate in the same mode and shape at the other
+        /// levels (ties: the same mode's other levels over every shape, then the lower index), and
+        /// scored at this cell's level, so the choice never sees the battles it is scored on. With a
+        /// single level it falls back to this cell's own best (in-sample, and so inflated).
+        /// </summary>
+        private static void BestFixed(ScoutedCell scouted, List<ScoutedCell> all)
+        {
+            PveCell cell = scouted.Cell;
+            List<ScoutedCell> sameShape = all.FindAll(o => o.Cell.Mode == cell.Mode && o.Cell.Shape == cell.Shape && o.Cell.Level != cell.Level);
+            List<ScoutedCell> anyShape = all.FindAll(o => o.Cell.Mode == cell.Mode && o.Cell.Level != cell.Level);
+            scouted.BestFixedHeldOut = sameShape.Count > 0;
+            if (sameShape.Count == 0)
+            {
+                sameShape.Add(scouted);
+                anyShape.Add(scouted);
+            }
+
+            int teams = cell.TeamCount;
+            double[] primary = new double[teams];
+            double[] secondary = new double[teams];
+            foreach (ScoutedCell other in sameShape)
+            {
+                for (int t = 0; t < teams; t++)
+                {
+                    primary[t] += other.TeamRate[t];
+                }
+            }
+
+            foreach (ScoutedCell other in anyShape)
+            {
+                for (int t = 0; t < teams; t++)
+                {
+                    secondary[t] += other.TeamRate[t];
+                }
+            }
+
+            int best = 0;
+            for (int t = 1; t < teams; t++)
+            {
+                if (primary[t] > primary[best] + 1e-9 || (Math.Abs(primary[t] - primary[best]) <= 1e-9 && secondary[t] > secondary[best] + 1e-9))
+                {
+                    best = t;
+                }
+            }
+
+            scouted.BestFixedTeam = best;
+            scouted.BestFixed = teams == 0 ? 0.0 : scouted.TeamRate[best];
+        }
+
+        /// <summary>
+        /// [beast] how many of <paramref name="scouted"/>'s picks by strategy <paramref name="index"/>
+        /// field each beast (one pick per composition per cell).
+        /// </summary>
+        public static int[] PickCounts(IEnumerable<ScoutedCell> scouted, int index, List<int[]> teams, int speciesCount, out int picks)
+        {
+            int[] counts = new int[speciesCount];
+            picks = 0;
+            foreach (ScoutedCell cell in scouted)
+            {
+                foreach (int team in cell.Picks[index])
+                {
+                    picks++;
+                    foreach (int b in teams[team])
+                    {
+                        counts[b]++;
+                    }
+                }
+            }
+
+            return counts;
+        }
+
+        /// <summary>
+        /// Invariants over a run's scouting (empty = all hold): the oracle is at least the baseline and
+        /// every other strategy in every cell, each picked team is a real team, the heuristic's picks
+        /// meet the Vanguard minimum when the roster allows it, and each strategy's pick counts sum to
+        /// compositions x team size per shape.
+        /// </summary>
+        public static List<string> Check(SimOptions options, IReadOnlyList<CreatureSpeciesSO> species, PveSimulator simulator, List<PveCell> cells)
+        {
+            List<string> problems = new List<string>();
+            List<ScoutedCell> scouted = Compute(options, species, simulator, cells);
+            int vanguardsInRoster = 0;
+            foreach (CreatureSpeciesSO beast in species)
+            {
+                vanguardsInRoster += beast.Stance == CombatStance.Vanguard ? 1 : 0;
+            }
+
+            int needed = Math.Min(options.ScoutedVanguardMin, vanguardsInRoster);
+            foreach (ScoutedCell cell in scouted)
+            {
+                string where = "Scouting " + SimOptions.ModeName(cell.Cell.Mode) + "/" + cell.Cell.Shape.Id + "/L" + cell.Cell.Level + ": ";
+                if (Runs(options, OracleIndex))
+                {
+                    double oracle = cell.Rate[OracleIndex];
+                    if (oracle < cell.Baseline - 1e-9 || oracle < cell.BestFixed - 1e-9)
+                    {
+                        problems.Add(where + "oracle " + SimOptions.Format(oracle) + "% is below the baseline or the best fixed team.");
+                    }
+
+                    for (int k = 0; k < StrategyCount; k++)
+                    {
+                        if (k != OracleIndex && Runs(options, k) && cell.Rate[k] > oracle + 1e-9)
+                        {
+                            problems.Add(where + StrategyNames[k] + " " + SimOptions.Format(cell.Rate[k]) + "% beats the oracle.");
+                        }
+                    }
+                }
+
+                for (int k = 0; k < StrategyCount; k++)
+                {
+                    if (!Runs(options, k))
+                    {
+                        continue;
+                    }
+
+                    foreach (int team in cell.Picks[k])
+                    {
+                        if (team < 0 || team >= simulator.Teams.Count)
+                        {
+                            problems.Add(where + StrategyNames[k] + " picked no valid team.");
+                            continue;
+                        }
+
+                        if (k == HeuristicIndex || k == BondAwareIndex)
+                        {
+                            int vanguards = 0;
+                            foreach (int b in simulator.Teams[team])
+                            {
+                                vanguards += species[b].Stance == CombatStance.Vanguard ? 1 : 0;
+                            }
+
+                            if (vanguards < needed)
+                            {
+                                problems.Add(where + StrategyNames[k] + " fielded " + vanguards + " Vanguards, fewer than " + needed + ".");
+                            }
+                        }
+                    }
+                }
+            }
+
+            foreach (KitMode mode in options.Modes)
+            {
+                foreach (EncounterShape shape in ShapesOf(cells))
+                {
+                    List<ScoutedCell> inShape = scouted.FindAll(c => c.Cell.Mode == mode && c.Cell.Shape == shape);
+                    for (int k = 0; k < StrategyCount; k++)
+                    {
+                        if (!Runs(options, k))
+                        {
+                            continue;
+                        }
+
+                        int[] counts = PickCounts(inShape, k, simulator.Teams, species.Count, out int picks);
+                        int sum = 0;
+                        foreach (int count in counts)
+                        {
+                            sum += count;
+                        }
+
+                        int expected = inShape.Count * shape.Compositions.Count * options.TeamSize;
+                        if (picks != inShape.Count * shape.Compositions.Count || sum != expected)
+                        {
+                            problems.Add("Scouting " + SimOptions.ModeName(mode) + "/" + shape.Id + ": " + StrategyNames[k] + " pick counts sum to " + sum +
+                                         ", expected " + expected + ".");
+                        }
+                    }
+                }
+            }
+
+            return problems;
+        }
+
+        /// <summary>The distinct shapes of <paramref name="cells"/>, in first-seen order.</summary>
+        public static List<EncounterShape> ShapesOf(List<PveCell> cells)
+        {
+            List<EncounterShape> shapes = new List<EncounterShape>();
+            foreach (PveCell cell in cells)
+            {
+                if (!shapes.Contains(cell.Shape))
+                {
+                    shapes.Add(cell.Shape);
+                }
+            }
+
+            return shapes;
+        }
+
+        private static int Oracle(PveCell cell, int composition, double[] cellRate)
+        {
+            int best = 0;
+            double bestRate = double.MinValue;
+            for (int t = 0; t < cell.TeamCount; t++)
+            {
+                double rate = Rate(cell, composition, t);
+                if (rate > bestRate + 1e-9 || (Math.Abs(rate - bestRate) <= 1e-9 && cellRate[t] > cellRate[best] + 1e-9))
+                {
+                    best = t;
+                    bestRate = rate;
+                }
+            }
+
+            return best;
+        }
+
+        private static string Key(int[] team)
+        {
+            return string.Join(",", team);
+        }
+
+        /// <summary>The random pick's seed: a pure function of the base seed, the cell and the composition (never <c>string.GetHashCode</c>).</summary>
+        private static int RandomSeed(int seed, PveCell cell, string encounterId)
+        {
+            unchecked
+            {
+                int hash = (seed * 486187739) + 0x5c0;
+                hash = (hash * 486187739) + (int)cell.Mode;
+                hash = (hash * 486187739) + cell.Level;
+                foreach (char c in encounterId)
+                {
+                    hash = (hash * 486187739) + c;
+                }
+
+                return hash;
+            }
+        }
+    }
+}

@@ -287,6 +287,11 @@ namespace BeastCraft.Tooling.BalanceSim
                 }
             }
 
+            if (problems.Count == 0 && ScoutedPicker.Active(options))
+            {
+                problems.AddRange(ScoutedPicker.Check(options, species, pve, cells));
+            }
+
             TimeSpan pveTime = clock.Elapsed;
             if (options.RunPvp)
             {

@@ -50,6 +50,21 @@ namespace BeastCraft.Tooling.BalanceSim
                 report.AppendLine("- Skill kit: `standard` (`--skill-kit standard`): the same kit for every beast, so the stat lines are what is measured");
             }
 
+            if (ScoutedPicker.Active(options))
+            {
+                List<string> strategies = new List<string>();
+                for (int k = 0; k < ScoutedPicker.StrategyCount; k++)
+                {
+                    if (ScoutedPicker.Runs(options, k))
+                    {
+                        strategies.Add(ScoutedPicker.StrategyNames[k].ToLowerInvariant());
+                    }
+                }
+
+                report.AppendLine("- Scouted picking (PvE, `--scouted`): " + string.Join(", ", strategies) + " at preview detail `" +
+                                  SimOptions.DetailName(options.ScoutedDetail) + "`; post-processing of the same battles, see \"PvE scouted picking\"");
+            }
+
             report.AppendLine();
 
             if (options.KitSource == KitSource.Library)

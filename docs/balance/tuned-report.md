@@ -10,6 +10,7 @@ and arguments produce a byte-identical report. Battles per PvE team and composit
 - Avatar (PvE only): the `library` preset (the skill library's default loadout, `--avatar`), fielded beside every player team; see "Avatar passives"
 - Skill kit: `library` (`--skill-kit library`, the default): each beast's authored default loadout from `BeastCraft/Assets/_Project/Data/Skills/skill-library.json` at skill level 1 (`--skill-level`)
 - Team bonds: on (`--bonds on`, the default): the library's 8 `TeamBonds` apply at battle start to every player team that meets their condition (never to enemies); see "PvE team bonds"
+- Scouted picking (PvE, `--scouted`): random, heuristic, heuristic + bonds, oracle at preview detail `full`; post-processing of the same battles, see "PvE scouted picking"
 
 ## Library beast kits
 
@@ -736,6 +737,98 @@ prediction from the members' marginals (see the class notes in `BondReport.cs`).
 | 2 | 119 | 50.0% | 52.1% | 49.8% | 48.9% | 50.2% |
 | 3 | 29 | 51.3% | 51.0% | 53.2% | 54.0% | 52.4% |
 | 4 | 2 | 52.1% | 54.2% | 58.3% | 50.0% | 53.6% |
+
+### PvE scouted picking
+
+What seeing the encounter is worth. Before a battle the player sees an `EncounterPreview` (enemy groups with their
+elements, stances and counts; `--scouted-detail full` here) and picks a team for it. Each strategy
+below fields one of the 210 simulated teams per composition, and that team's recorded result against the
+composition is the outcome: a regrouping of battles already run, at the same calibrated difficulty (still aimed at
+the average team). **Baseline** = the mean over every team (the unscouted player); the other columns give the
+clear rate and, in brackets, the uplift over the baseline in points.
+
+- **Random**: a seeded random team per composition; the no-information control (its gap to the baseline is noise).
+- **Heuristic**: element counter-pick. Each beast scores, per enemy, 1 x its chart multiplier into
+  the enemy's element - 0.5 x the enemy's multiplier into it; the best 4 are fielded (ties to roster order), with at
+  least 1 Vanguard (`--scouted-vanguard-min`) swapped in for the lowest-scored pick. Stats, kits and bonds are ignored.
+- **Heuristic + bonds**: the team (with the same Vanguard minimum) maximising its members' heuristic scores plus 0.5 per
+  tier of each bond it activates.
+- **Best team**: the one lineup with the best clear rate in the shape at the other levels, scored at this level: knowing
+  which team is strong, not what it faces. **Oracle**: per composition, the team that did best against it in hindsight
+  (ties to the better cell rate). An upper bound, inflated by damage-roll luck when each team fights each composition 1 time.
+
+Noise: a strategy's shape figure rests on one pick per composition and level, 24 battles in all, so it carries a
+binomial standard error of about 10.2 points (5.1 overall); the Random column shows the scale. Read one seed's
+figures as indicative and the `--seeds` aggregate as the finding.
+
+#### Clear rate with scouting (`elemental`, levels averaged)
+
+| Shape | Baseline | Random | Heuristic | Heuristic + bonds | Best team | Oracle |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `solo` | 50.1% | 70.8% (+20.8) | 79.2% (+29.1) | 75.0% (+24.9) | 66.7% (+16.6) | 100.0% (+49.9) |
+| `elite` | 51.6% | 62.5% (+10.9) | 75.0% (+23.4) | 83.3% (+31.8) | 66.7% (+15.1) | 100.0% (+48.4) |
+| `squad` | 49.9% | 50.0% (+0.1) | 70.8% (+20.9) | 66.7% (+16.7) | 70.8% (+20.9) | 100.0% (+50.1) |
+| `horde` | 50.0% | 41.7% (-8.3) | 54.2% (+4.2) | 58.3% (+8.4) | 100.0% (+50.0) | 100.0% (+50.0) |
+| Overall | 50.4% | 56.3% (+5.9) | 69.8% (+19.4) | 70.8% (+20.4) | 76.0% (+25.7) | 100.0% (+49.6) |
+
+#### Pick rates (`elemental`, levels pooled)
+
+Percent of picks (one per composition and level) that field the beast, per shape; each column sums to 400.
+The heuristic pickers see only the composition, so their picks are the same in every mode and level. **0** / **100** =
+never / always fielded.
+
+| Beast | Element | Stance | `solo` H / B / O | `elite` H / B / O | `squad` H / B / O | `horde` H / B / O |
+| --- | --- | --- | ---: | ---: | ---: | ---: |
+| Phoenix | Fire | Ranged | 38 / 13 / 29 | 50 / 25 / 63 | 50 / 13 / **100** | 38 / **0** / 67 |
+| Leviathan | Water | Vanguard | 75 / 63 / 38 | 38 / 50 / **100** | 25 / 50 / **0** | 63 / 50 / **100** |
+| Golem | Earth | Vanguard | 50 / 50 / 67 | 63 / 75 / 33 | 63 / 63 / **0** | 50 / 50 / 67 |
+| Griffin | Air | Skirmisher | 50 / 38 / **0** | 38 / 25 / **0** | 25 / 13 / 33 | 38 / **0** / **0** |
+| Thunderbird | Lightning | Skirmisher | 25 / 50 / 38 | 25 / 38 / 63 | 25 / 38 / 67 | 25 / 50 / 33 |
+| Frost Wyrm | Ice | Vanguard | 13 / 38 / **0** | 38 / 25 / 33 | 38 / 38 / **0** | 13 / 50 / 67 |
+| Treant | Nature | Vanguard | 50 / 50 / 63 | 38 / 38 / 38 | 25 / 38 / **0** | 63 / 50 / 67 |
+| Tarasque | Metal | Vanguard | 13 / 38 / 33 | 38 / 75 / **0** | 63 / 63 / 67 | 25 / 50 / **0** |
+| Kirin | Light | Ranged | 63 / 25 / 96 | 38 / 25 / 63 | 50 / 38 / 67 | 63 / 50 / **0** |
+| Basilisk | Dark | Ranged | 25 / 38 / 38 | 38 / 25 / 8 | 38 / 50 / 67 | 25 / 50 / **0** |
+
+- Heuristic (H): never fielded: none. Always fielded: none.
+- Heuristic + bonds (B): never fielded: `horde` Phoenix, Griffin. Always fielded: none.
+- Oracle (O): never fielded: `solo` Griffin, Frost Wyrm; `elite` Griffin, Tarasque; `squad` Leviathan, Golem, Frost Wyrm, Treant; `horde` Griffin, Tarasque, Kirin, Basilisk. Always fielded: `elite` Leviathan; `squad` Phoenix; `horde` Leviathan.
+
+#### Clear rate with scouting (`neutral`, levels averaged)
+
+| Shape | Baseline | Random | Heuristic | Heuristic + bonds | Best team | Oracle |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `solo` | 49.5% | 33.3% (-16.2) | 70.8% (+21.3) | 54.2% (+4.6) | 87.5% (+38.0) | 100.0% (+50.5) |
+| `elite` | 49.0% | 54.2% (+5.2) | 75.0% (+26.0) | 54.2% (+5.2) | 70.8% (+21.8) | 100.0% (+51.0) |
+| `squad` | 49.8% | 37.5% (-12.3) | 54.2% (+4.3) | 45.8% (-4.0) | 79.2% (+29.3) | 100.0% (+50.2) |
+| `horde` | 50.8% | 37.5% (-13.3) | 33.3% (-17.4) | 58.3% (+7.6) | 91.7% (+40.9) | 100.0% (+49.2) |
+| Overall | 49.8% | 40.6% (-9.2) | 58.3% (+8.6) | 53.1% (+3.3) | 82.3% (+32.5) | 100.0% (+50.2) |
+
+In `neutral` mode every skill is `None`, so the chart the heuristic reads does not apply: its uplift here is what its
+picks are worth as lineups alone, the control for the `elemental` figure.
+
+#### Pick rates (`neutral`, levels pooled)
+
+Percent of picks (one per composition and level) that field the beast, per shape; each column sums to 400.
+The heuristic pickers see only the composition, so their picks are the same in every mode and level. **0** / **100** =
+never / always fielded.
+
+| Beast | Element | Stance | `solo` H / B / O | `elite` H / B / O | `squad` H / B / O | `horde` H / B / O |
+| --- | --- | --- | ---: | ---: | ---: | ---: |
+| Phoenix | Fire | Ranged | 38 / 13 / **100** | 50 / 25 / **100** | 50 / 13 / 33 | 38 / **0** / **100** |
+| Leviathan | Water | Vanguard | 75 / 63 / **100** | 38 / 50 / 67 | 25 / 50 / 67 | 63 / 50 / 67 |
+| Golem | Earth | Vanguard | 50 / 50 / 67 | 63 / 75 / **0** | 63 / 63 / **0** | 50 / 50 / **100** |
+| Griffin | Air | Skirmisher | 50 / 38 / 33 | 38 / 25 / **0** | 25 / 13 / 33 | 38 / **0** / 33 |
+| Thunderbird | Lightning | Skirmisher | 25 / 50 / **0** | 25 / 38 / **0** | 25 / 38 / **100** | 25 / 50 / 33 |
+| Frost Wyrm | Ice | Vanguard | 13 / 38 / **0** | 38 / 25 / 33 | 38 / 38 / **0** | 13 / 50 / 33 |
+| Treant | Nature | Vanguard | 50 / 50 / **0** | 38 / 38 / 67 | 25 / 38 / **0** | 63 / 50 / 33 |
+| Tarasque | Metal | Vanguard | 13 / 38 / **0** | 38 / 75 / 33 | 63 / 63 / **100** | 25 / 50 / **0** |
+| Kirin | Light | Ranged | 63 / 25 / **100** | 38 / 25 / 67 | 50 / 38 / **0** | 63 / 50 / **0** |
+| Basilisk | Dark | Ranged | 25 / 38 / **0** | 38 / 25 / 33 | 38 / 50 / 67 | 25 / 50 / **0** |
+
+- Heuristic (H): never fielded: none. Always fielded: none.
+- Heuristic + bonds (B): never fielded: `horde` Phoenix, Griffin. Always fielded: none.
+- Oracle (O): never fielded: `solo` Thunderbird, Frost Wyrm, Treant, Tarasque, Basilisk; `elite` Golem, Griffin, Thunderbird; `squad` Golem, Frost Wyrm, Treant, Kirin; `horde` Tarasque, Kirin, Basilisk. Always fielded: `solo` Phoenix, Leviathan, Kirin; `elite` Phoenix; `squad` Thunderbird, Tarasque; `horde` Phoenix, Golem.
 
 ## Avatar passives
 

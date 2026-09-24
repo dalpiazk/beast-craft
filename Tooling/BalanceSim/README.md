@@ -36,6 +36,9 @@ dotnet run --project Tooling/BalanceSim -c Release -- [options]
 | `--skill-level <n>` | `1` | Skill level (1-20) for library skills and library avatar skills; the tier is the gates below that level (16+ = all three passed). |
 | `--skill-library <path>` | found by walking up | Path to `skill-library.json` (read only with `--skill-kit library` or `--avatar library`, i.e. by default). |
 | `--bonds <on\|off>` | `on` | Team bonds from the library's `TeamBonds`: applied at battle start to every player team that meets a bond's condition (never to enemies). Library kit only (ignored with `--skill-kit standard`). Adds the "PvE team bonds" section. See "Library kits". |
+| `--scouted <list>` | `all` | Scouted picking, the "PvE scouted picking" section: comma-separated `random`, `heuristic`, `bonds` (the bond-aware heuristic; bonds on only), `oracle` (also adds the held-out best team), or `all` / `none`. Post-processing of the battles already run: no extra battles, sub-second. `none` removes the section and its header line, leaving the report exactly as before scouting existed. See "Scouted picking". |
+| `--scouted-detail <d>` | `full` | What the heuristic pickers see of each composition (`ScoutingDetail`): `full`, `elements-only` or `dominant-element`. |
+| `--scouted-vanguard-min <n>` | `1` | Fewest Vanguards a heuristic pick fields, 0 to `--team-size`. |
 | `--levels <list>` | `1,50,100` | Comma-separated levels; beasts and enemies fight at the same level. |
 | `--encounter-set <s>` | `generated` | `generated`: random compositions per shape (see "Generated encounters"). `fixed`: the three hand-authored encounters (`boss`, `swarm`, `pack`). |
 | `--compositions <n>` | `8` | Generated compositions per shape. |
@@ -73,7 +76,7 @@ Two reports are committed, both the default arguments:
   the ATB turn order, so its battle lengths are in rounds.
 - `docs/balance/tuned-report.md` — the current roster and skill library after the third tuning pass
   and its element chart v2 follow-up (see `docs/balance/tuning-log.md`, "Retune with authored kits,
-  avatar passives, sqrt speed and mitigation", "Element chart v2", "Thunderbird range vs move" and "Niche pass: Thunderbird opener, Phoenix/Frost Wyrm lifts, remaining negatives", then "Team bonds"), under the real game setup (every beast's authored default loadout, the library
+  avatar passives, sqrt speed and mitigation", "Element chart v2", "Thunderbird range vs move" and "Niche pass: Thunderbird opener, Phoenix/Frost Wyrm lifts, remaining negatives", then "Team bonds"; "Scouting and counter-picking" added the scouted-picking section, no balance change), under the real game setup (every beast's authored default loadout, the library
   avatar with its passives, the library's team bonds, skill level 1), the current Runtime (the square-root ATB turn order, the
   mitigation damage formula, `SpecialAttack`-scaled heals, combat stances, variance and crits) and
   the generated encounters. Regenerate it whenever the roster, the skill library, fixtures, simulator
@@ -277,6 +280,9 @@ cooldown 2 weighted `Attack` about twice as heavily.
   repeats the bond marginal averaged over seeds ("PvE team bonds over seeds"). For the whole effect
   of bonds, compare a `--bonds off` run: its "PvE team composition over seeds" spread and pair
   synergy tables are the bond-free baseline.
+- **Scouted picking** (`ScoutingReport.cs`; "PvE scouted picking", on by default, off with
+  `--scouted none`): what seeing the encounter and counter-picking a team for it is worth, per
+  shape and kit mode, with each strategy's pick rates. See "Scouted picking" below.
 - **Flags.** Overall marginal outside +/-5 points; **no niche** (bottom 3 in every shape);
   **no weakness** (top 3 in every shape); a stance whose kit parity is outside 50 +/- 5%;
   stalemates; calibration misses.
@@ -390,6 +396,86 @@ The default run has no stalemates, PvE or PvP.
   to win ties (`PveSimulator.PlayersWinTies`). The prefix is side-wide, so the order within a side,
   and every targeting tie (targeting only ever compares units of one side), is unchanged.
 
+## Scouted picking
+
+The game shows the player each encounter before the team is placed (`EncounterPreview`, see
+`docs/design/battle-system.md`, "Encounter preview"): the enemy groups with their elements, stances
+and counts. "PvE scouted picking" (`ScoutedPicker.cs`, `ScoutingReport.cs`) measures what that is
+worth. Every team already fights every composition, so a scouted pick needs no new battle: each
+strategy names one of the 210 teams per composition, and that team's recorded result against the
+composition is the outcome. The section is on by default (`--scouted all`) and costs well under a
+second; `--scouted none` drops it and its header line, and the rest of the report is byte-identical.
+
+- **Calibration is unchanged.** Each shape's multiplier still aims the *average* team at 50%, so
+  the **baseline** (the mean over every team: the unscouted player) sits at about 50% and every
+  strategy's gain over it reads directly as **uplift** in points.
+- **Random**: a seeded random team per composition. Its expected uplift is 0; its actual gap is the
+  noise scale of the table.
+- **Heuristic**: an element counter-pick from the preview alone (`--scouted-detail` sets how much it
+  sees). Each beast scores, per enemy,
+  `sum over groups of Count x (1.0 x chart(beast element -> group element) - 0.5 x chart(group element -> beast elements)) / enemies`,
+  the attack using the beast's first element (its kit element). The team is the 4 best scores, ties
+  to roster order; if it has fewer than `--scouted-vanguard-min` (default 1) Vanguards, its
+  lowest-scored non-Vanguard is swapped for the best-scored unpicked Vanguard. It ignores stats,
+  kits, levels and bonds, so its picks are the same in every kit mode and level.
+- **Heuristic + bonds** (bonds on only): every team meeting the Vanguard minimum scores its members'
+  heuristic scores plus 0.5 per tier of each bond it activates (`ScoutedPicker.BondWeight`); the best
+  team is fielded, ties to the lower team index. 0.5 is the gap between a neutral and a strong
+  matchup against one enemy in half the lineup's weight: a starting knob, not tuned.
+- **Best team** (with `oracle`): the one lineup with the best clear rate in the same mode and shape
+  at the *other* levels, scored at this level (ties: the other levels over every shape, then the lower
+  index). It knows which team is strong but not what it faces, and it is held out, so the damage-roll
+  luck it was chosen on does not count: it is the bar counter-picking has to clear to matter.
+- **Oracle**: per composition, the team that did best against it (ties: the team's clear rate over
+  the whole cell, then the lower index). An upper bound. With one battle per team and composition it
+  is also a luck bound: among 210 coin flips one nearly always wins, so it reads close to 100%.
+- **Neutral mode is the control.** With every skill `None` the chart the heuristic reads does
+  nothing, so its `neutral` uplift is what its picks are worth as lineups; the gap between the
+  `elemental` and `neutral` uplift is what the counter-pick itself earns.
+- **Pick rates**: per kit mode and shape, the percent of picks (one per composition and level) that
+  field each beast, for the heuristic (H), the bond-aware heuristic (B) and the oracle (O); each
+  column sums to 400 (4 beasts per pick). **0** / **100** flag a beast never / always fielded, and
+  the bullets under the table list them.
+- **Self-check invariants** (every run with scouting on; a failure exits 3): the oracle is at least
+  the baseline, the best team and every other strategy in every cell; every pick is a real team; the
+  heuristic pickers meet the Vanguard minimum whenever the roster has that many Vanguards; and each
+  strategy's pick counts sum to picks x team size per shape.
+- **Noise.** A shape's figure rests on one pick per composition and level (24 battles by default),
+  a binomial SE of about 10 points; judge on the `--seeds` aggregate (and more `--compositions` for
+  a tighter figure), not on one seed. Findings are in `docs/balance/tuning-log.md`, "Scouting and
+  counter-picking".
+
+### Worked example of the heuristic
+
+A composition of one Fire Giant, three Water Archers and two Metal Brutes (6 enemies) at
+`--scouted-detail full` previews as three groups: Fire x1, Water x3, Metal x2. A beast's score is
+`(1 x (off(Fire) - 0.5 def(Fire)) + 3 x (off(Water) - 0.5 def(Water)) + 2 x (off(Metal) - 0.5 def(Metal))) / 6`,
+with off = the chart multiplier of the beast's element into the group's, def = the group's into the
+beast's:
+
+| Beast | Element | Fire x1 | Water x3 | Metal x2 | Score |
+| --- | --- | --- | --- | --- | ---: |
+| Leviathan | Water | 2 - 0.5 x 0.5 | 1 - 0.5 x 1 | 2 - 0.5 x 1 | 1.042 |
+| Treant | Nature | 1 - 0.5 x 2 | 2 - 0.5 x 0.5 | 1 - 0.5 x 1 | 1.042 |
+| Thunderbird | Lightning | 1 - 0.5 x 1 | 2 - 0.5 x 0.5 | 0.5 - 0.5 x 2 | 0.792 |
+| Griffin | Air | 2 - 0.5 x 1 | 1 - 0.5 x 1 | 1 - 0.5 x 0.5 | 0.750 |
+| Basilisk | Dark | 1.25 - 0.5 x 1 | 1 - 0.5 x 1 | 1.25 - 0.5 x 0.5 | 0.708 |
+| Kirin | Light | 1 - 0.5 x 1 | 1.25 - 0.5 x 1 | 1 - 0.5 x 2 | 0.458 |
+| Phoenix | Fire | 1 - 0.5 x 1 | 0.5 - 0.5 x 2 | 2 - 0.5 x 0.5 | 0.417 |
+| Golem | Earth | 1 - 0.5 x 0.5 | 0.5 - 0.5 x 1 | 1 - 0.5 x 1 | 0.292 |
+| Frost Wyrm | Ice | 0.5 - 0.5 x 1 | 1 - 0.5 x 1 | 0.5 - 0.5 x 2 | 0.083 |
+| Tarasque | Metal | 0.5 - 0.5 x 2 | 1 - 0.5 x 2 | 1 - 0.5 x 1 | 0.083 |
+
+The top four are Leviathan and Treant (tied; roster order puts Leviathan first), Thunderbird and
+Griffin, so the heuristic fields **Leviathan, Griffin, Thunderbird, Treant** (in roster order).
+Leviathan and Treant are Vanguards, so no swap is needed; had the four been, say, Thunderbird,
+Griffin, Basilisk and Kirin, the lowest of them (Kirin) would have made way for the best-scored
+Vanguard. Basilisk misses by 0.04: the Fire Giant is a single enemy, so Griffin's 2x into it
+outweighs Basilisk's mild 1.25x into two Metal Brutes. At `dominant-element` the preview is one
+line, Water x6, and the scores become the Water column alone: Thunderbird and Treant (1.75), Kirin
+(0.75), then Leviathan, Griffin and Frost Wyrm tied at 0.5, so the team is Thunderbird, Treant,
+Kirin and Leviathan.
+
 ## PvP: 1v1 round-robin (secondary)
 
 Every pair of distinct species is played twice per level and kit mode with the sides swapped (each
@@ -444,6 +530,9 @@ dotnet run --project Tooling/BalanceSim -c Release -- --mode pve --seeds 12345,7
   histogram and best / worst lineups of the seed means; and each pair's synergy per seed with the
   mean, SD over seeds and a noise estimate (`*` = mean beyond 2 x noise). It is deterministic like
   the reports.
+- With scouting on (the default), **scouted picking over seeds**: each strategy's clear rate and
+  uplift per shape averaged over the seeds, the SD of the heuristic's uplift over seeds, and the
+  pick rates averaged over seeds (**0** / **100** = never / always in every seed).
 - The seeds run one after another, each using every core, so the wall clock is about the sum of
   single-seed runs (loading and JIT are a second or two of a 50 s run). What it replaces is the
   bookkeeping: one process per seed and scripts parsing the Markdown back; the aggregate comes

@@ -953,6 +953,45 @@ strong, mild or weak, and whether 2x / 1.25x / 0.5x are the right sizes, may sti
 work measures real fights. `ElementChart` (`Strong`, `Mild`, `Weak` and its rows) is the single
 place to change them.
 
+## Encounter preview — DECIDED (elements visible by default); partial scouting is a FUTURE KNOB
+
+**Enemy elements are visible and counterable.** Before the player places a team, the game shows the
+encounter: `EncounterPreview.Build(enemies, arena, detail)` (`BeastCraft.Battle.Scouting`) turns the
+lineup into its arena, its total enemy count and a list of `EncounterPreviewGroup` lines, front to
+back. Anything that holds a lineup implements `IEncounterPreviewSource` (element, stance, display
+name) — game encounter data once it exists, the balance simulator's fixtures today — so the
+preview never depends on how enemies are authored. It is pure (no randomness, no battle state), so
+the team-building screen can show it and a future "suggested team" can read it.
+
+- **Grouping.** Enemies with the same element, stance and display name (ordinal) are one line
+  with a count; lines keep the order of their first enemy in the lineup.
+- **Detail (`ScoutingDetail`).** `Full` — the default, and the only level the game uses now —
+  shows every line's name, element, stance and count. `ElementsOnly` hides names and stances and
+  merges the lines that share an element (so hidden fields do not leak through the number of lines).
+  `DominantElementOnly` leaves one line: the element carried by the most enemies (a tie goes to the
+  lowest `Element` value, so `None` wins a tie it is part of) with the total count. The partial
+  levels exist for a later fog-of-war mechanic (an unscouted region, a "mysterious" encounter, a
+  scouting skill that upgrades the detail); none is wired to anything yet, and the enum's values are
+  explicit so a saved setting survives additions.
+- **Why visible by default.** The element chart is a strategic layer only if the player can act
+  on it. Hidden elements would make it a coin flip the player cannot influence, and the chart's
+  normalization (every main element 2x into two and 0.5x from two) already means no single team is
+  best against everything, which is what makes picking for the encounter a real decision.
+
+**What it is worth (simulator, not confirmed balance).** The balance simulator's "PvE scouted
+picking" section (`Tooling/BalanceSim`, README "Scouted picking") replays the choice against the
+battles it already runs: a plain element counter-pick from the `Full` preview — each beast scored on
+its chart multiplier into the enemies minus half theirs into it, the best four fielded with at least
+one Vanguard — raises the clear rate at the calibrated difficulty from about 50% to about 70% (three
+seeds; the same picks in the `neutral` control gain nothing, so the gain is the chart's). It is
+largest against a lone giant or an elite group (+25 to +30 points); against squads and hordes,
+whose mixed elements dilute any counter, it is +16 to +19 and simply bringing a strong lineup does
+better. The counter-pick fields every beast in every shape (between about 13% and 63% of picks each); none
+becomes a must-pick or a never-pick. See `docs/balance/tuning-log.md`,
+"Scouting and counter-picking", for the numbers and pick rates. Difficulty is still calibrated
+against the average team, not the counter-picked one; whether it should be is an open question for
+when encounters are authored.
+
 ## Damage formula — TUNABLE STARTING DEFAULTS, NOT CONFIRMED BALANCE
 
 Damage is now stat-based, for beasts and the avatar alike. The formula's shape and constants are

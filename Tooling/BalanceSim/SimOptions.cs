@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using BeastCraft.Battle;
 using BeastCraft.Battle.Grid;
+using BeastCraft.Battle.Scouting;
 using BeastCraft.Creatures;
 
 namespace BeastCraft.Tooling.BalanceSim
@@ -246,6 +247,18 @@ namespace BeastCraft.Tooling.BalanceSim
         /// </summary>
         public bool Bonds = true;
 
+        /// <summary>
+        /// <c>--scouted</c>: which scouted-picking strategies the "PvE scouted picking" section
+        /// reports (<see cref="ScoutedPicker"/>). Every strategy by default; none = no section.
+        /// </summary>
+        public ScoutStrategies Scouted = ScoutStrategies.All;
+
+        /// <summary><c>--scouted-detail</c>: how much of each composition the heuristic pickers see (default full).</summary>
+        public ScoutingDetail ScoutedDetail = ScoutingDetail.Full;
+
+        /// <summary><c>--scouted-vanguard-min</c>: the fewest Vanguards a heuristic pick fields (default 1).</summary>
+        public int ScoutedVanguardMin = ScoutedPicker.DefaultVanguardMin;
+
         /// <summary>The skill level library skills and passives are fielded at (<c>--skill-level</c>).</summary>
         public int SkillLevel = 1;
 
@@ -299,6 +312,13 @@ namespace BeastCraft.Tooling.BalanceSim
             "  --skill-library <path>     skill-library.json (default: found by walking up from the working directory).\n" +
             "  --bonds <on|off>           Team bonds (default on): the library's TeamBonds apply at battle start to every player\n" +
             "                             team that meets their condition. Library kit only; ignored with --skill-kit standard.\n" +
+            "  --scouted <list>           Scouted picking, reported as \"PvE scouted picking\" (default all): comma-separated\n" +
+            "                             random, heuristic, bonds, oracle, or all / none. Post-processing of the battles\n" +
+            "                             already run: each strategy fields one of the simulated teams per composition, chosen\n" +
+            "                             from what it can see (README, \"Scouted picking\"). none = no section.\n" +
+            "  --scouted-detail <d>       full | elements-only | dominant-element (default full): the preview detail the\n" +
+            "                             heuristic pickers see (ScoutingDetail).\n" +
+            "  --scouted-vanguard-min <n> Fewest Vanguards a heuristic pick fields, 0 to the team size (default 1).\n" +
             "  --levels <list>            Comma-separated levels (default 1,50,100).\n" +
             "  --encounter-set <s>        generated | fixed (default generated). generated = random compositions of the enemy\n" +
             "                             type pool per shape (solo, elite, squad, horde); fixed = the hand-authored boss,\n" +
@@ -620,6 +640,27 @@ namespace BeastCraft.Tooling.BalanceSim
 
                         options.Bonds = text == "on";
                         break;
+                    case "--scouted":
+                        if (!TryNext(args, ref i, arg, out text, out error) || !TryParseScouted(text, options, out error))
+                        {
+                            return null;
+                        }
+
+                        break;
+                    case "--scouted-detail":
+                        if (!TryNext(args, ref i, arg, out text, out error) || !TryParseScoutingDetail(text, options, out error))
+                        {
+                            return null;
+                        }
+
+                        break;
+                    case "--scouted-vanguard-min":
+                        if (!TryNextInt(args, ref i, arg, 0, out options.ScoutedVanguardMin, out error))
+                        {
+                            return null;
+                        }
+
+                        break;
                     case "--avatar":
                         if (!TryNext(args, ref i, arg, out text, out error))
                         {
@@ -644,6 +685,12 @@ namespace BeastCraft.Tooling.BalanceSim
             if (seedGiven && options.Seeds != null)
             {
                 error = "--seed and --seeds cannot be combined.";
+                return null;
+            }
+
+            if (options.ScoutedVanguardMin > options.TeamSize)
+            {
+                error = "--scouted-vanguard-min " + options.ScoutedVanguardMin + " is larger than --team-size " + options.TeamSize + ".";
                 return null;
             }
 
@@ -778,6 +825,75 @@ namespace BeastCraft.Tooling.BalanceSim
                     error = "--kit expects elemental, neutral or both, got '" + text + "'" +
                             (text == "standard" || text == "library" ? " (the skill axis is now --skill-kit)." : ".");
                     return false;
+            }
+        }
+
+        private static bool TryParseScouted(string text, SimOptions options, out string error)
+        {
+            error = null;
+            ScoutStrategies strategies = ScoutStrategies.None;
+            foreach (string raw in text.Split(','))
+            {
+                switch (raw.Trim().ToLowerInvariant())
+                {
+                    case "none":
+                        break;
+                    case "all":
+                        strategies |= ScoutStrategies.All;
+                        break;
+                    case "random":
+                        strategies |= ScoutStrategies.Random;
+                        break;
+                    case "heuristic":
+                        strategies |= ScoutStrategies.Heuristic;
+                        break;
+                    case "bonds":
+                        strategies |= ScoutStrategies.BondAware;
+                        break;
+                    case "oracle":
+                        strategies |= ScoutStrategies.Oracle;
+                        break;
+                    default:
+                        error = "--scouted expects a comma-separated list of random, heuristic, bonds, oracle (or all / none), got '" + text + "'.";
+                        return false;
+                }
+            }
+
+            options.Scouted = strategies;
+            return true;
+        }
+
+        private static bool TryParseScoutingDetail(string text, SimOptions options, out string error)
+        {
+            error = null;
+            switch (text.ToLowerInvariant())
+            {
+                case "full":
+                    options.ScoutedDetail = ScoutingDetail.Full;
+                    return true;
+                case "elements-only":
+                    options.ScoutedDetail = ScoutingDetail.ElementsOnly;
+                    return true;
+                case "dominant-element":
+                    options.ScoutedDetail = ScoutingDetail.DominantElementOnly;
+                    return true;
+                default:
+                    error = "--scouted-detail expects full, elements-only or dominant-element, got '" + text + "'.";
+                    return false;
+            }
+        }
+
+        /// <summary>The <c>--scouted-detail</c> spelling of <paramref name="detail"/>.</summary>
+        public static string DetailName(ScoutingDetail detail)
+        {
+            switch (detail)
+            {
+                case ScoutingDetail.ElementsOnly:
+                    return "elements-only";
+                case ScoutingDetail.DominantElementOnly:
+                    return "dominant-element";
+                default:
+                    return "full";
             }
         }
 
