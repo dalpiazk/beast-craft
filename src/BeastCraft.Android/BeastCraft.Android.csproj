@@ -1,0 +1,56 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    BeastCraft.Android: the MonoGame Android host. A thin activity (MainActivity) around the shared
+    viewer in src/BeastCraft.Game, full screen in landscape with touch controls; the content (data
+    JSON and pixel art) is packaged as APK assets under Content/ and read through MonoGame's
+    TitleContainer (TitleContainerContentSource).
+
+    LOCAL BUILD ONLY, not built by CI: it needs the .NET Android workload, a JDK (17) and the
+    Android SDK (platform 36, build-tools 36.0.0, platform-tools). See the README, "Running on
+    Android":
+
+        dotnet build src/BeastCraft.Android -c Debug
+        adb install -r src/BeastCraft.Android/bin/Debug/net10.0-android/com.composedstudio.beastcraft-Signed.apk
+  -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-android</TargetFramework>
+    <SupportedOSPlatformVersion>23</SupportedOSPlatformVersion>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <EnableNETAnalyzers>false</EnableNETAnalyzers>
+    <RootNamespace>BeastCraft.Android</RootNamespace>
+    <AssemblyName>BeastCraft.Android</AssemblyName>
+    <ApplicationId>com.composedstudio.beastcraft</ApplicationId>
+    <ApplicationTitle>Beast Craft</ApplicationTitle>
+    <ApplicationVersion>1</ApplicationVersion>
+    <ApplicationDisplayVersion>0.1</ApplicationDisplayVersion>
+    <!--
+      Debug builds default to Fast Deployment (assemblies pushed next to the app by `dotnet build
+      -t:Install`, not packed into the APK), so a Debug APK installed with plain `adb install` would
+      start without its assemblies and crash. Embed them so the Debug APK is self-contained.
+    -->
+    <EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MonoGame.Framework.Android" Version="3.8.5.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\BeastCraft.Core\BeastCraft.Core.csproj" />
+    <ProjectReference Include="..\BeastCraft.Presentation\BeastCraft.Presentation.csproj" />
+    <ProjectReference Include="..\BeastCraft.Game\BeastCraft.Game.csproj" />
+  </ItemGroup>
+
+  <!-- The same content the desktop host copies beside its executable, as APK assets under Content/. -->
+  <ItemGroup>
+    <AndroidAsset Include="..\..\BeastCraft\Assets\_Project\Data\**\*.json" Link="Assets\Content\Data\%(RecursiveDir)%(Filename)%(Extension)" />
+    <AndroidAsset Include="..\..\BeastCraft\Assets\_Project\Art\Pixel\*.png;..\..\BeastCraft\Assets\_Project\Art\Pixel\*.json" Link="Assets\Content\Art\Pixel\%(Filename)%(Extension)" />
+  </ItemGroup>
+
+</Project>
