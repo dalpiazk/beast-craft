@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using UnityEngine;
 
 namespace BeastCraft.Customization
 {
@@ -18,13 +17,13 @@ namespace BeastCraft.Customization
         /// <summary>Player-facing label.</summary>
         public string DisplayName;
 
-        /// <summary>Thumbnail shown in the customization UI picker grid.</summary>
-        public Sprite PreviewIcon;
+        /// <summary>Thumbnail shown in the customization UI picker grid. Engine-neutral art key the host renderer resolves (null = none).</summary>
+        public string PreviewIcon;
 
         // Single-layer 2D composited art only for now; multi-angle / multi-sprite options
         // (e.g. a shirt needing separate front/side/back sprites) are a later extension.
-        /// <summary>The sprite layer this option contributes to the composited character.</summary>
-        public Sprite ArtLayer;
+        /// <summary>The sprite layer this option contributes to the composited character. Engine-neutral art key the host renderer resolves (null = none).</summary>
+        public string ArtLayer;
 
         /// <summary>Draw order within the composited layer stack. Lower draws first (further back).</summary>
         public int SortOrder;

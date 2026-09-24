@@ -22,8 +22,8 @@ namespace BeastCraft.Creatures
         [TextArea]
         public string Description;
 
-        /// <summary>Roster / codex icon.</summary>
-        public Sprite Icon;
+        /// <summary>Roster / codex icon. Engine-neutral art key the host renderer resolves (null = none).</summary>
+        public string Icon;
 
         /// <summary>
         /// Unscaled reference stats: the stats at growth-curve scale 1, which for authored curves is

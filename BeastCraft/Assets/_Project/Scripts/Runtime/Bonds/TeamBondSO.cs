@@ -31,8 +31,8 @@ namespace BeastCraft.Bonds
         [TextArea]
         public string Description;
 
-        /// <summary>Icon shown in the team-building screen.</summary>
-        public Sprite Icon;
+        /// <summary>Icon shown in the team-building screen. Engine-neutral art key the host renderer resolves (null = none).</summary>
+        public string Icon;
 
         /// <summary>What the bond counts on the team.</summary>
         public TeamBondCondition Condition = TeamBondCondition.Stance;

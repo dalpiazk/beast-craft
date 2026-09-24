@@ -39,8 +39,8 @@ namespace BeastCraft.Avatar
         [TextArea]
         public string Description;
 
-        /// <summary>Inventory icon. The only art this asset carries; it is never drawn on the avatar.</summary>
-        public Sprite Icon;
+        /// <summary>Inventory icon. The only art this asset carries; it is never drawn on the avatar. Engine-neutral art key the host renderer resolves (null = none).</summary>
+        public string Icon;
 
         /// <summary>Which avatar slot this occupies.</summary>
         public AvatarGearSlot Slot = AvatarGearSlot.Weapon;

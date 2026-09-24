@@ -22,8 +22,8 @@ namespace BeastCraft.Economy
         [TextArea]
         public string Description;
 
-        /// <summary>Inventory icon.</summary>
-        public Sprite Icon;
+        /// <summary>Inventory icon. Engine-neutral art key the host renderer resolves (null = none).</summary>
+        public string Icon;
 
         /// <summary>Rarity tier, 0 = common and upward.</summary>
         public int Rarity;

@@ -20,8 +20,8 @@ namespace BeastCraft.Battle
         [TextArea]
         public string Description;
 
-        /// <summary>Icon shown in the battle action bar and skill lists.</summary>
-        public Sprite Icon;
+        /// <summary>Icon shown in the battle action bar and skill lists. Engine-neutral art key the host renderer resolves (null = none).</summary>
+        public string Icon;
 
         /// <summary>
         /// Cost in the per-creature battle resource. The resource's name ("mana" / "focus" /

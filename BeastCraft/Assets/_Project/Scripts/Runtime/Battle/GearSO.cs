@@ -25,8 +25,8 @@ namespace BeastCraft.Battle
         [TextArea]
         public string Description;
 
-        /// <summary>Inventory icon.</summary>
-        public Sprite Icon;
+        /// <summary>Inventory icon. Engine-neutral art key the host renderer resolves (null = none).</summary>
+        public string Icon;
 
         /// <summary>Which creature slot this occupies.</summary>
         public GearSlot Slot = GearSlot.WeaponOrCore;

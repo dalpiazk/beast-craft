@@ -23,8 +23,8 @@ namespace BeastCraft.Progression
         [TextArea]
         public string Description;
 
-        /// <summary>Icon shown in inventory and skill-training screens.</summary>
-        public Sprite Icon;
+        /// <summary>Icon shown in inventory and skill-training screens. Engine-neutral art key the host renderer resolves (null = none).</summary>
+        public string Icon;
 
         /// <summary>
         /// Rarity tier, 1 upward. A breakthrough gate passes with any material whose tier is at

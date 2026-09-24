@@ -53,8 +53,8 @@ namespace BeastCraft.Avatar
         [TextArea]
         public string Description;
 
-        /// <summary>Icon shown in the avatar's passive slots.</summary>
-        public Sprite Icon;
+        /// <summary>Icon shown in the avatar's passive slots. Engine-neutral art key the host renderer resolves (null = none).</summary>
+        public string Icon;
 
         /// <summary>
         /// How this passive levels: max level, magnitude growth per level and breakthrough gates.
