@@ -190,6 +190,27 @@ namespace BeastCraft.Battle
         }
 
         /// <summary>
+        /// Removes every <see cref="StatusType.Stun"/> and <see cref="StatusType.DamageOverTime"/>
+        /// the unit carries (a <see cref="SkillEffectType.Cleanse"/> effect). Returns how many
+        /// statuses came off. Shields and taunts stay. Draw-free; a null unit is a no-op.
+        /// </summary>
+        public static int Cleanse(BattleUnit unit)
+        {
+            if (unit == null)
+            {
+                return 0;
+            }
+
+            return unit.StatusList.RemoveAll(status => status.Type == StatusType.Stun || status.Type == StatusType.DamageOverTime);
+        }
+
+        /// <summary>Whether the unit carries a <see cref="StatusType.Stun"/> or any <see cref="StatusType.DamageOverTime"/>: something a cleanse would remove.</summary>
+        public static bool IsAfflicted(BattleUnit unit)
+        {
+            return Find(unit, StatusType.Stun) != null || Find(unit, StatusType.DamageOverTime) != null;
+        }
+
+        /// <summary>
         /// Soaks up to <paramref name="amount"/> damage with the unit's shield and returns how much
         /// it took; a shield brought to 0 is removed. The rest is the caller's to spend on HP.
         /// </summary>

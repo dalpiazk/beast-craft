@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using BeastCraft.Battle.Grid;
+using BeastCraft.Bonds;
 using BeastCraft.Creatures;
 
 namespace BeastCraft.Battle
@@ -33,7 +34,8 @@ namespace BeastCraft.Battle
             int retreatSteps = 0,
             bool stunned = false,
             int statusDamage = 0,
-            IReadOnlyList<PassiveActivation> passiveActivations = null)
+            IReadOnlyList<PassiveActivation> passiveActivations = null,
+            IReadOnlyList<BondReactionRecord> bondReactions = null)
         {
             Unit = unit;
             StartPosition = startPosition;
@@ -46,6 +48,7 @@ namespace BeastCraft.Battle
             Stunned = stunned;
             StatusDamage = statusDamage;
             PassiveActivations = passiveActivations ?? new List<PassiveActivation>();
+            BondReactions = bondReactions ?? new List<BondReactionRecord>();
         }
 
         /// <summary>The unit whose turn this was.</summary>
@@ -129,5 +132,12 @@ namespace BeastCraft.Battle
         /// <see cref="PassiveLoadout"/>). Empty when no passives were supplied. Never <c>null</c>.
         /// </summary>
         public IReadOnlyList<PassiveActivation> PassiveActivations { get; }
+
+        /// <summary>
+        /// Every team-bond reaction that fired during this turn, in the order it fired, on either
+        /// side's turn (see <see cref="TeamBondLoadout"/> and <see cref="BondReaction"/>). Empty when
+        /// no bonds were supplied or none react. Never <c>null</c>.
+        /// </summary>
+        public IReadOnlyList<BondReactionRecord> BondReactions { get; }
     }
 }

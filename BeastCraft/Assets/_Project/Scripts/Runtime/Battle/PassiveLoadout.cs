@@ -203,6 +203,16 @@ namespace BeastCraft.Battle
             CheckThresholds(avatar, allUnits, grid, rng, sink);
         }
 
+        /// <summary>
+        /// Notes every defeated roster unit not yet seen without firing anything: a unit defeated by
+        /// something that must not trigger passives (a team bond's reaction) never fires
+        /// <see cref="PassiveTrigger.EnemyDefeated"/> or <see cref="PassiveTrigger.AllyDefeated"/>.
+        /// </summary>
+        internal void SyncDefeatedSilently(IEnumerable<BattleUnit> allUnits)
+        {
+            SyncDefeated(allUnits);
+        }
+
         /// <summary>One avatar turn off every passive's internal cooldown (once per avatar turn, before its actives).</summary>
         internal void TickCooldowns()
         {

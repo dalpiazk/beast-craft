@@ -999,6 +999,11 @@ namespace BeastCraft.Tooling.BalanceSim
             // The avatar fills its own ATB gauge: it is in the turn order, never in the targeting roster.
             TurnManager turnManager = new TurnManager(avatar == null ? units : new List<BattleUnit>(units) { avatar });
             TeamBondLoadout bonds = TeamBonds[teamIndex].Count == 0 ? null : new TeamBondLoadout(TeamBonds[teamIndex], members);
+            if (bonds != null && mode == KitMode.Neutral)
+            {
+                // Element-neutral mode: a behaviour bond's reaction strikes without an element, like every skill.
+                bonds.ReactionElementOverride = Element.None;
+            }
             BattleOutcome outcome;
             long elapsedTicks;
             int actions;
@@ -1082,8 +1087,8 @@ namespace BeastCraft.Tooling.BalanceSim
 
                         lastTurnTicks = turnManager.ElapsedTicks;
                         BattleTurnResult turn = current == avatar
-                            ? BattleTurnExecutor.ExecuteAvatarTurn(avatar, units, grid, rng, passives)
-                            : BattleTurnExecutor.ExecuteTurn(current, units, grid, rng, avatar, passives);
+                            ? BattleTurnExecutor.ExecuteAvatarTurn(avatar, units, grid, rng, passives, bonds)
+                            : BattleTurnExecutor.ExecuteTurn(current, units, grid, rng, avatar, passives, bonds);
                         actions++;
                         CountPassives(battle, turn.PassiveActivations);
                         CountAvatar(battle, turn, avatar);

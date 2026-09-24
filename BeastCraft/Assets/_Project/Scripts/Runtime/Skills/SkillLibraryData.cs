@@ -298,13 +298,65 @@ namespace BeastCraft.Skills
         public int MaxCount;
     }
 
-    /// <summary>One <c>TeamBondTier</c>: the count it needs and its full effect list (tiers replace, not stack).</summary>
+    /// <summary>
+    /// One <c>TeamBondTier</c>: the count it needs, its full battle-start effect list and its
+    /// in-battle reaction (tiers replace, not stack). A tier needs effects, a reaction, or both.
+    /// </summary>
     [Serializable]
     public class TeamBondTierData
     {
         public int MinCount = 2;
 
+        /// <summary>Applied once at battle start (see <c>TeamBondTier.Effects</c>). May be empty when the tier has a <see cref="Reaction"/>.</summary>
         public EffectData[] Effects = new EffectData[0];
+
+        /// <summary>
+        /// The tier's behaviour-bond reaction (a <c>BondReaction</c>). Missing, or a missing / empty
+        /// <see cref="BondReactionData.Trigger"/>: none.
+        /// </summary>
+        public BondReactionData Reaction;
+    }
+
+    /// <summary>One <c>BondReaction</c>. Enum fields are member names; missing ones take the defaults noted.</summary>
+    [Serializable]
+    public class BondReactionData
+    {
+        /// <summary>A <c>BondTrigger</c> name. Missing / empty: <c>None</c> (no reaction).</summary>
+        public string Trigger;
+
+        /// <summary>A <c>BondAction</c> name: <c>Apply</c> or <c>Intercept</c>. Missing: <c>Apply</c>.</summary>
+        public string Action;
+
+        /// <summary>A <c>BondReactionTarget</c> name. Missing: <c>TriggerTarget</c>.</summary>
+        public string Target;
+
+        /// <summary>A <c>BondTriggerFilter</c> name: <c>Any</c>, <c>Members</c> or <c>NonMembers</c>. Missing: <c>Any</c>.</summary>
+        public string TriggerFilter;
+
+        /// <summary>A <c>BondReactorOrder</c> name: <c>TeamOrder</c> or <c>HealthiestFirst</c>. Missing: <c>TeamOrder</c>.</summary>
+        public string ReactorOrder;
+
+        public int Chance = 100;
+
+        public int Cooldown;
+
+        public int MaxPerMember;
+
+        public int MaxPerTriggerUnit;
+
+        public int MaxPerBattle;
+
+        public int Range;
+
+        public int HpThresholdPercent = 50;
+
+        public EffectData[] Effects = new EffectData[0];
+
+        /// <summary>Whether this names a trigger at all (a missing / empty / <c>None</c> trigger is no reaction).</summary>
+        public bool IsSet
+        {
+            get { return !string.IsNullOrEmpty(Trigger) && Trigger != "None"; }
+        }
     }
 
     /// <summary>One <c>SkillLearnEntry</c>: a beast-skill id and the level it is learned at.</summary>

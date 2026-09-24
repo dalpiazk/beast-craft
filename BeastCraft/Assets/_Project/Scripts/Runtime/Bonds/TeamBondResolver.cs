@@ -13,7 +13,8 @@ namespace BeastCraft.Bonds
     /// <c>Elements</c> counts the set's distinct elements the team covers (never more than the
     /// number of members, so one dual-element beast is not a bond on its own), and its members are
     /// the beasts carrying any of them; <c>Species</c> counts the listed species present (each once),
-    /// and its members are the beasts of those species. The bond's tier is the highest one whose
+    /// and its members are the beasts of those species; <c>DistinctStances</c> counts the distinct
+    /// stances fielded, and every beast is a member. The bond's tier is the highest one whose
     /// <see cref="TeamBondTier.MinCount"/> the count reaches (the validator keeps the tiers strictly
     /// rising). A count below the first tier leaves the bond inactive. A scaling bond
     /// (<see cref="TeamBondSO.PerCount"/>) has one tier, reached at its <c>MinCount</c> (1 or
@@ -85,6 +86,7 @@ namespace BeastCraft.Bonds
             }
 
             HashSet<Element> elementsSeen = new HashSet<Element>();
+            HashSet<CombatStance> stancesSeen = new HashSet<CombatStance>();
             HashSet<string> speciesSeen = new HashSet<string>();
             int count = 0;
             int matched = 0;
@@ -122,6 +124,11 @@ namespace BeastCraft.Bonds
                     case TeamBondCondition.Species:
                         matches = !string.IsNullOrEmpty(member.SpeciesId) && bond.SpeciesIds != null && bond.SpeciesIds.Contains(member.SpeciesId);
                         count += matches && speciesSeen.Add(member.SpeciesId) ? 1 : 0;
+                        break;
+
+                    case TeamBondCondition.DistinctStances:
+                        matches = true;
+                        count += stancesSeen.Add(member.Stance) ? 1 : 0;
                         break;
                 }
 

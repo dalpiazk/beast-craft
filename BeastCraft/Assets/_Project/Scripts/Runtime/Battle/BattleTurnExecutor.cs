@@ -281,16 +281,47 @@ namespace BeastCraft.Battle
         public static BattleTurnResult ExecuteTurn(BattleUnit unit, IEnumerable<BattleUnit> allUnits, HexGrid grid, Random rng, BattleUnit avatar,
                                                    PassiveLoadout passives)
         {
+            return ExecuteTurn(unit, allUnits, grid, rng, avatar, passives, null);
+        }
+
+        /// <summary>
+        /// <see cref="ExecuteTurn(BattleUnit, IEnumerable{BattleUnit}, HexGrid, Random, BattleUnit, PassiveLoadout)"/>
+        /// with the player team's bonds, whose behaviour bonds react during the turn (see
+        /// <see cref="TeamBondLoadout"/> and <see cref="BondReaction"/>); what they did is recorded on
+        /// <see cref="BattleTurnResult.BondReactions"/>. With a null bond loadout, one not yet applied
+        /// (<see cref="BeginBattle(IEnumerable{BattleUnit}, HexGrid, Random, BattleUnit, PassiveLoadout, TeamBondLoadout, out IReadOnlyList{TeamBondActivation})"/>),
+        /// or one with no reacting tier, it is exactly the bond-free turn, random draws included.
+        /// Otherwise the bond hooks run at these points, each after the passive hook at the same point:
+        /// <list type="bullet">
+        /// <item><description>
+        /// As a beast of the team's turn opens, after its timed modifiers tick and before its statuses
+        /// do: its reaction cooldowns count down, and an ally stunned or burning may be cleansed (so
+        /// it acts this turn and takes no damage-over-time).
+        /// </description></item>
+        /// <item><description>
+        /// Between resolving a skill's targets and applying it: an enemy <c>SingleTarget</c> skill
+        /// aimed at one of the team's beasts may be intercepted by a guardian, which then takes it.
+        /// </description></item>
+        /// <item><description>
+        /// After every application, after the passive hook: the hit and crit reactions, then the
+        /// defeat and HP-threshold ones.
+        /// </description></item>
+        /// </list>
+        /// </summary>
+        public static BattleTurnResult ExecuteTurn(BattleUnit unit, IEnumerable<BattleUnit> allUnits, HexGrid grid, Random rng, BattleUnit avatar,
+                                                   PassiveLoadout passives, TeamBondLoadout bonds)
+        {
             if (unit != null && unit == avatar)
             {
                 // The avatar's own gauge came up: it has a turn of its own, not a beast's.
-                return ExecuteAvatarTurn(avatar, allUnits, grid, rng, passives);
+                return ExecuteAvatarTurn(avatar, allUnits, grid, rng, passives, bonds);
             }
 
             List<BattleSkillOutcome> outcomes = new List<BattleSkillOutcome>();
             List<SkillActivation> avatarActivations = new List<SkillActivation>();
             List<PassiveActivation> passiveActivations = new List<PassiveActivation>();
-            PassiveHooks hooks = PassiveHooks.For(passives, avatar, allUnits, grid, rng, passiveActivations);
+            List<BondReactionRecord> bondReactions = new List<BondReactionRecord>();
+            BattleHooks hooks = BattleHooks.For(passives, avatar, bonds, allUnits, grid, rng, passiveActivations, bondReactions);
 
             if (unit == null || unit.IsDefeated)
             {
@@ -300,14 +331,14 @@ namespace BeastCraft.Battle
 
             HexCoordinate start = unit.Position;
 
-            if (hooks != null && !passives.HasBegun)
+            if (hooks != null && hooks.HasPassives && !passives.HasBegun)
             {
                 passives.Begin(avatar, allUnits, grid, rng, passiveActivations);
 
                 if (unit.IsDefeated)
                 {
                     // A battle-start passive finished it before it could act.
-                    return new BattleTurnResult(unit, start, unit.Position, 0, 0, outcomes, avatarActivations, 0, false, 0, passiveActivations);
+                    return new BattleTurnResult(unit, start, unit.Position, 0, 0, outcomes, avatarActivations, 0, false, 0, passiveActivations, bondReactions);
                 }
             }
 
@@ -315,6 +346,7 @@ namespace BeastCraft.Battle
             LiftDefeated(allUnits, grid);
 
             SkillEffectApplier.TickModifiers(unit);
+            hooks?.BeforeAllyTurn(unit);
 
             bool stunned;
             int statusDamage = StatusEffects.BeginTurn(unit, out stunned);
@@ -324,10 +356,11 @@ namespace BeastCraft.Battle
             {
                 // Its own damage-over-time finished it as the turn opened: there is no turn to take.
                 LiftDefeated(allUnits, grid);
-                return new BattleTurnResult(unit, start, unit.Position, 0, 0, outcomes, avatarActivations, 0, stunned, statusDamage, passiveActivations);
+                return new BattleTurnResult(unit, start, unit.Position, 0, 0, outcomes, avatarActivations, 0, stunned, statusDamage, passiveActivations,
+                                            bondReactions);
             }
 
-            if (hooks != null && unit.Team == avatar.Team)
+            if (hooks != null && hooks.HasPassives && unit.Team == avatar.Team)
             {
                 passives.OnAllyTurnStart(unit, avatar, allUnits, grid, rng, passiveActivations);
             }
@@ -421,7 +454,7 @@ namespace BeastCraft.Battle
             StatusEffects.EndTurn(unit);
 
             return new BattleTurnResult(unit, start, unit.Position, budget, budget - remaining, outcomes, avatarActivations, retreatSteps, stunned,
-                                        statusDamage, passiveActivations);
+                                        statusDamage, passiveActivations, bondReactions);
         }
 
         /// <summary>
@@ -462,17 +495,31 @@ namespace BeastCraft.Battle
         /// </summary>
         public static BattleTurnResult ExecuteAvatarTurn(BattleUnit avatar, IEnumerable<BattleUnit> allUnits, HexGrid grid, Random rng, PassiveLoadout passives)
         {
+            return ExecuteAvatarTurn(avatar, allUnits, grid, rng, passives, null);
+        }
+
+        /// <summary>
+        /// <see cref="ExecuteAvatarTurn(BattleUnit, IEnumerable{BattleUnit}, HexGrid, Random, PassiveLoadout)"/>
+        /// with the player team's bonds: after each avatar activation (and its passive hook) the
+        /// bonds' defeat and HP-threshold reactions are checked. The avatar's hits and crits are no
+        /// beast's, so they trigger no hit or crit reaction. A null bond loadout is exactly the
+        /// bond-free avatar turn.
+        /// </summary>
+        public static BattleTurnResult ExecuteAvatarTurn(BattleUnit avatar, IEnumerable<BattleUnit> allUnits, HexGrid grid, Random rng, PassiveLoadout passives,
+                                                         TeamBondLoadout bonds)
+        {
             List<SkillActivation> avatarActivations = new List<SkillActivation>();
             List<PassiveActivation> passiveActivations = new List<PassiveActivation>();
+            List<BondReactionRecord> bondReactions = new List<BondReactionRecord>();
 
             if (avatar == null)
             {
                 return new BattleTurnResult(null, HexCoordinate.Zero, HexCoordinate.Zero, 0, 0, null, avatarActivations);
             }
 
-            PassiveHooks hooks = PassiveHooks.For(passives, avatar, allUnits, grid, rng, passiveActivations);
+            BattleHooks hooks = BattleHooks.For(passives, avatar, bonds, allUnits, grid, rng, passiveActivations, bondReactions);
 
-            if (hooks != null && !passives.HasBegun)
+            if (hooks != null && hooks.HasPassives && !passives.HasBegun)
             {
                 passives.Begin(avatar, allUnits, grid, rng, passiveActivations);
             }
@@ -480,7 +527,7 @@ namespace BeastCraft.Battle
             LiftDefeated(allUnits, grid);
             SkillEffectApplier.TickModifiers(avatar);
 
-            if (hooks != null)
+            if (hooks != null && hooks.HasPassives)
             {
                 passives.TickCooldowns();
             }
@@ -500,7 +547,7 @@ namespace BeastCraft.Battle
                 }
             }
 
-            return new BattleTurnResult(avatar, avatar.Position, avatar.Position, 0, 0, null, avatarActivations, 0, false, 0, passiveActivations);
+            return new BattleTurnResult(avatar, avatar.Position, avatar.Position, 0, 0, null, avatarActivations, 0, false, 0, passiveActivations, bondReactions);
         }
 
         /// <summary>
@@ -523,7 +570,7 @@ namespace BeastCraft.Battle
         {
             List<PassiveActivation> fired = new List<PassiveActivation>();
 
-            if (PassiveHooks.For(passives, avatar, allUnits, grid, rng, fired) != null)
+            if (passives != null && passives.Count > 0 && avatar != null)
             {
                 passives.Begin(avatar, allUnits, grid, rng, fired);
             }
@@ -625,7 +672,12 @@ namespace BeastCraft.Battle
         /// with the player team's bonds: the battle-start hook is
         /// <see cref="BeginBattle(IEnumerable{BattleUnit}, HexGrid, Random, BattleUnit, PassiveLoadout, TeamBondLoadout, out IReadOnlyList{TeamBondActivation})"/>
         /// (bonds, then passives), and what the bonds applied is
-        /// <see cref="BattleResult.BondActivations"/>. A null bond loadout is exactly the bond-free battle.
+        /// <see cref="BattleResult.BondActivations"/>; every turn is then
+        /// <see cref="ExecuteTurn(BattleUnit, IEnumerable{BattleUnit}, HexGrid, Random, BattleUnit, PassiveLoadout, TeamBondLoadout)"/>
+        /// (or the avatar's) with the bonds, so a behaviour bond reacts all battle long (its firings
+        /// are on each turn's <see cref="BattleTurnResult.BondReactions"/>). A null bond loadout is
+        /// exactly the bond-free battle, and a loadout whose bonds only act at battle start plays
+        /// every turn, and every random draw, exactly as the bond-free one.
         /// </summary>
         public static BattleResult RunBattle(TurnManager turnManager, IEnumerable<BattleUnit> allUnits, HexGrid grid, Random rng, BattleUnit avatar,
                                              PassiveLoadout passives, TeamBondLoadout bonds, int maxTime = DefaultMaxTime)
@@ -661,7 +713,9 @@ namespace BeastCraft.Battle
                 if (!current.IsDefeated)
                 {
                     lastTurnTicks = turnManager.ElapsedTicks;
-                    turns.Add(current == avatar ? ExecuteAvatarTurn(avatar, roster, grid, rng, passives) : ExecuteTurn(current, roster, grid, rng, avatar, passives));
+                    turns.Add(current == avatar
+                                  ? ExecuteAvatarTurn(avatar, roster, grid, rng, passives, bonds)
+                                  : ExecuteTurn(current, roster, grid, rng, avatar, passives, bonds));
                 }
 
                 turnManager.AdvanceTurn();
@@ -688,16 +742,23 @@ namespace BeastCraft.Battle
         }
 
         /// <summary>
-        /// Resolves one slot from where the caster is standing right now, applies what it does,
-        /// lifts anyone it defeated (the caster included) off the grid, re-arms the slot, and runs
-        /// the after-damage passive hook (when there are passives). The
-        /// one place in a beast's turn that a cooldown is reset, so a skill cannot be marked fired
-        /// without having actually resolved.
+        /// Resolves one slot from where the caster is standing right now, lets a guardian bond
+        /// intercept it (an enemy single-target skill aimed at one of the bonded team's beasts; see
+        /// <see cref="TeamBondLoadout"/>), applies what it does, lifts anyone it defeated (the caster
+        /// included) off the grid, re-arms the slot, and runs the after-damage hooks (passives, then
+        /// bonds). The one place in a beast's turn that a cooldown is reset, so a skill cannot be
+        /// marked fired without having actually resolved.
         /// </summary>
         private static BattleSkillOutcome Fire(SkillLoadout loadout, int slotIndex, SkillSO skill, BattleUnit caster, IEnumerable<BattleUnit> allUnits, HexGrid grid, Random rng, int movementSpent,
-                                               PassiveHooks hooks)
+                                               BattleHooks hooks)
         {
             IReadOnlyList<BattleUnit> targets = SkillTargetResolver.ResolveTargets(skill, caster, allUnits, grid, rng);
+
+            if (hooks != null)
+            {
+                targets = hooks.RedirectTargets(skill, caster, targets);
+            }
+
             SkillActivation activation = new SkillActivation(loadout.GetInstance(slotIndex), targets);
 
             SkillEffectApplier.Apply(activation, caster, rng, grid);
@@ -1575,39 +1636,71 @@ namespace BeastCraft.Battle
         }
 
         /// <summary>
-        /// The live passive context of one turn — the loadout, the avatar casting it, the roster,
-        /// grid and rng, and where firings are recorded — so each hook call inside a turn stays one
-        /// line. <see cref="For"/> returns <c>null</c> when there is nothing to run (no avatar, or
-        /// no equipped passive), which is what keeps a passive-free turn exactly as it was.
+        /// The live hook context of one turn — the avatar's passives and the avatar casting them, the
+        /// team's reacting bonds, the roster, grid and rng, and where firings are recorded — so each
+        /// hook call inside a turn stays one line. Either half may be absent. <see cref="For"/>
+        /// returns <c>null</c> when there is nothing to run (no avatar or no equipped passive, and no
+        /// applied bond with a reaction), which is what keeps such a turn exactly as it was, random
+        /// draws included.
         /// </summary>
-        private sealed class PassiveHooks
+        private sealed class BattleHooks
         {
             private readonly PassiveLoadout _passives;
+            private readonly TeamBondLoadout _bonds;
             private readonly BattleUnit _avatar;
             private readonly IEnumerable<BattleUnit> _allUnits;
             private readonly HexGrid _grid;
             private readonly Random _rng;
             private readonly List<PassiveActivation> _sink;
+            private readonly BondReactionContext _bondContext;
 
-            private PassiveHooks(PassiveLoadout passives, BattleUnit avatar, IEnumerable<BattleUnit> allUnits, HexGrid grid, Random rng, List<PassiveActivation> sink)
+            private BattleHooks(PassiveLoadout passives, TeamBondLoadout bonds, BattleUnit avatar, IEnumerable<BattleUnit> allUnits, HexGrid grid, Random rng,
+                                List<PassiveActivation> sink, List<BondReactionRecord> bondSink)
             {
                 _passives = passives;
+                _bonds = bonds;
                 _avatar = avatar;
                 _allUnits = allUnits;
                 _grid = grid;
                 _rng = rng;
                 _sink = sink;
+                _bondContext = bonds == null ? null : new BondReactionContext(allUnits, grid, rng, bondSink, passives);
             }
 
-            public static PassiveHooks For(PassiveLoadout passives, BattleUnit avatar, IEnumerable<BattleUnit> allUnits, HexGrid grid, Random rng,
-                                           List<PassiveActivation> sink)
+            public static BattleHooks For(PassiveLoadout passives, BattleUnit avatar, TeamBondLoadout bonds, IEnumerable<BattleUnit> allUnits, HexGrid grid, Random rng,
+                                          List<PassiveActivation> sink, List<BondReactionRecord> bondSink)
             {
-                return passives == null || passives.Count == 0 || avatar == null ? null : new PassiveHooks(passives, avatar, allUnits, grid, rng, sink);
+                PassiveLoadout activePassives = passives == null || passives.Count == 0 || avatar == null ? null : passives;
+                TeamBondLoadout reactingBonds = bonds != null && bonds.HasApplied && bonds.HasReactions ? bonds : null;
+
+                return activePassives == null && reactingBonds == null
+                    ? null
+                    : new BattleHooks(activePassives, reactingBonds, avatar, allUnits, grid, rng, sink, bondSink);
             }
 
+            /// <summary>Whether the avatar's passives are live this turn (an avatar with at least one equipped).</summary>
+            public bool HasPassives
+            {
+                get { return _passives != null; }
+            }
+
+            /// <summary>The after-damage hooks: the passives', then the bonds'.</summary>
             public void AfterApplication(BattleUnit turnUnit, SkillActivation beastActivation)
             {
-                _passives.AfterApplication(turnUnit, beastActivation, _avatar, _allUnits, _grid, _rng, _sink);
+                _passives?.AfterApplication(turnUnit, beastActivation, _avatar, _allUnits, _grid, _rng, _sink);
+                _bonds?.AfterApplication(turnUnit, beastActivation, _bondContext);
+            }
+
+            /// <summary>The bonds' intercept check on a resolved skill (the targets unchanged without reacting bonds).</summary>
+            public IReadOnlyList<BattleUnit> RedirectTargets(SkillSO skill, BattleUnit caster, IReadOnlyList<BattleUnit> targets)
+            {
+                return _bonds == null ? targets : _bonds.RedirectTargets(skill, caster, targets, _bondContext);
+            }
+
+            /// <summary>The bonds' turn-opening hook for <paramref name="unit"/> (cooldowns, cleanses).</summary>
+            public void BeforeAllyTurn(BattleUnit unit)
+            {
+                _bonds?.BeforeAllyTurn(unit, _bondContext);
             }
         }
     }

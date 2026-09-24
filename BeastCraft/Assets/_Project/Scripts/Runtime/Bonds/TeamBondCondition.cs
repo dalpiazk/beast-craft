@@ -31,5 +31,11 @@ namespace BeastCraft.Bonds
         /// species.
         /// </summary>
         Species = 2,
+
+        /// <summary>
+        /// How many distinct <see cref="Creatures.CombatStance"/>s the team fields (1 to 3). Every
+        /// beast is a member.
+        /// </summary>
+        DistinctStances = 3,
     }
 }

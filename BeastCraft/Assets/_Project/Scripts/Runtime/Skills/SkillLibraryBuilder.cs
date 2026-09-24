@@ -93,9 +93,35 @@ namespace BeastCraft.Skills
             {
                 if (tier != null)
                 {
-                    bond.Tiers.Add(new TeamBondTier { MinCount = tier.MinCount, Effects = BuildEffects(tier.Effects) });
+                    bond.Tiers.Add(new TeamBondTier { MinCount = tier.MinCount, Effects = BuildEffects(tier.Effects), Reaction = BuildReaction(tier.Reaction) });
                 }
             }
+        }
+
+        /// <summary>A fresh <see cref="BondReaction"/> from <paramref name="data"/>; an inert one (<see cref="BondTrigger.None"/>) when it is missing or names no trigger.</summary>
+        public static BondReaction BuildReaction(BondReactionData data)
+        {
+            if (data == null || !data.IsSet)
+            {
+                return new BondReaction();
+            }
+
+            return new BondReaction
+            {
+                Trigger = SkillLibraryValidator.ParseOr(data.Trigger, BondTrigger.None),
+                Action = SkillLibraryValidator.ParseOr(data.Action, BondAction.Apply),
+                Target = SkillLibraryValidator.ParseOr(data.Target, BondReactionTarget.TriggerTarget),
+                TriggerFilter = SkillLibraryValidator.ParseOr(data.TriggerFilter, BondTriggerFilter.Any),
+                ReactorOrder = SkillLibraryValidator.ParseOr(data.ReactorOrder, BondReactorOrder.TeamOrder),
+                Chance = data.Chance,
+                Cooldown = data.Cooldown,
+                MaxPerMember = data.MaxPerMember,
+                MaxPerTriggerUnit = data.MaxPerTriggerUnit,
+                MaxPerBattle = data.MaxPerBattle,
+                Range = data.Range,
+                HpThresholdPercent = data.HpThresholdPercent,
+                Effects = BuildEffects(data.Effects),
+            };
         }
 
         /// <summary>A fresh <see cref="SkillEffect"/> for each entry, in order (null entries skipped).</summary>

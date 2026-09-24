@@ -388,7 +388,7 @@ namespace BeastCraft.Skills
                     errors.Add(at + ": HitCount and ExecuteBonusPercent are only read by Damage effects.");
                 }
 
-                if ((type == SkillEffectType.Damage || type == SkillEffectType.Heal) && e.DurationTurns != 0)
+                if ((type == SkillEffectType.Damage || type == SkillEffectType.Heal || type == SkillEffectType.Cleanse) && e.DurationTurns != 0)
                 {
                     errors.Add(at + ": a " + type + " effect is instant; DurationTurns must be 0.");
                 }
@@ -402,7 +402,7 @@ namespace BeastCraft.Skills
                 {
                     errors.Add(at + ": damage power is " + e.Magnitude + "; it must be above 0 and at most " + MaxDamagePower + ".");
                 }
-                else if (type != SkillEffectType.Damage && status != StatusType.Taunt && status != StatusType.Stun &&
+                else if (type != SkillEffectType.Damage && type != SkillEffectType.Cleanse && status != StatusType.Taunt && status != StatusType.Stun &&
                          (e.Magnitude <= 0f || e.Magnitude > MaxOtherMagnitude))
                 {
                     errors.Add(at + ": Magnitude is " + e.Magnitude + "; it must be above 0 and at most " + MaxOtherMagnitude + ".");
@@ -737,6 +737,15 @@ namespace BeastCraft.Skills
 
                             break;
 
+                        case TeamBondCondition.DistinctStances:
+                            reach = Enum.GetValues(typeof(CombatStance)).Length;
+                            if (elements.Length > 0 || species.Length > 0 || !string.IsNullOrEmpty(b.Stance))
+                            {
+                                errors.Add(label + ": a DistinctStances bond lists no Elements, Species or Stance.");
+                            }
+
+                            break;
+
                         case TeamBondCondition.Species:
                             reach = CheckSet(species, label, "Species", errors, id =>
                             {
@@ -791,8 +800,17 @@ namespace BeastCraft.Skills
                     }
 
                     previous = Math.Max(previous, tier.MinCount);
-                    CheckEffects(tier.Effects, at, "Effects", true, errors);
+                    bool reacts = tier.Reaction != null && tier.Reaction.IsSet;
+                    if (!reacts || (tier.Effects != null && tier.Effects.Length > 0))
+                    {
+                        CheckEffects(tier.Effects, at, "Effects", true, errors);
+                    }
+
                     CheckBondEffects(tier.Effects, at, errors);
+                    if (reacts)
+                    {
+                        CheckReaction(tier.Reaction, at + " Reaction", errors);
+                    }
                 }
             }
         }
@@ -833,6 +851,140 @@ namespace BeastCraft.Skills
                 CheckEffects(tier.Effects, at, "Effects", true, errors);
                 CheckBondEffects(tier.Effects, at, errors);
                 CheckScalingCaps(tier.Effects, Math.Max(1, b.MaxCount), at, errors);
+                if (tier.Reaction != null && tier.Reaction.IsSet)
+                {
+                    errors.Add(at + ": a PerCount (scaling) bond has no Reaction; make it a tiered bond.");
+                }
+            }
+        }
+
+        /// <summary>A reaction's damage effect is at most this power (a reaction is a bonus hit, never a skill's worth).</summary>
+        public const float MaxReactionDamagePower = 60f;
+
+        /// <summary>A reaction's stun lands at most this percent of the time (reaction chance x effect chance) and lasts exactly one turn.</summary>
+        public const int MaxReactionStunChance = 50;
+
+        /// <summary>
+        /// A behaviour bond's reaction: its enums parse; Chance 1-100; Cooldown, caps and Range in
+        /// band; a hit or crit trigger has a Cooldown of at least 1 (a reaction per hit would scale
+        /// with multi-hit skills); <c>Intercept</c> goes with <c>EnemyTargetsAlly</c> and only with
+        /// it; the target is one the trigger has; effects are general-valid, land on the side they
+        /// are for (hostile ones on enemies, friendly ones on the team), deal at most
+        /// <see cref="MaxReactionDamagePower"/> power, and a stun is a one-turn stun landing at most
+        /// <see cref="MaxReactionStunChance"/>% of the time; no knockback (a reaction has no facing).
+        /// </summary>
+        private static void CheckReaction(BondReactionData r, string label, List<string> errors)
+        {
+            bool triggerOk = CheckEnum<BondTrigger>(r.Trigger, label, "Trigger", errors);
+            bool actionOk = CheckEnum<BondAction>(r.Action, label, "Action", errors);
+            bool targetOk = CheckEnum<BondReactionTarget>(r.Target, label, "Target", errors);
+            CheckEnum<BondTriggerFilter>(r.TriggerFilter, label, "TriggerFilter", errors);
+            CheckEnum<BondReactorOrder>(r.ReactorOrder, label, "ReactorOrder", errors);
+            CheckBand(r.Chance, 1, 100, label, "Chance", errors);
+            CheckBand(r.Cooldown, 0, MaxCooldown, label, "Cooldown", errors);
+            CheckBand(r.MaxPerMember, 0, MaxUses, label, "MaxPerMember", errors);
+            CheckBand(r.MaxPerTriggerUnit, 0, MaxUses, label, "MaxPerTriggerUnit", errors);
+            CheckBand(r.MaxPerBattle, 0, MaxUses, label, "MaxPerBattle", errors);
+            CheckBand(r.Range, 0, MaxRange, label, "Range", errors);
+
+            if (!triggerOk || !actionOk || !targetOk)
+            {
+                return;
+            }
+
+            BondTrigger trigger = ParseOr(r.Trigger, BondTrigger.None);
+            BondAction action = ParseOr(r.Action, BondAction.Apply);
+            BondReactionTarget target = ParseOr(r.Target, BondReactionTarget.TriggerTarget);
+            bool hitTrigger = trigger == BondTrigger.MemberHit || trigger == BondTrigger.MemberCrit || trigger == BondTrigger.AllyCrit ||
+                              trigger == BondTrigger.AllyHitByEnemy;
+
+            if (trigger == BondTrigger.None)
+            {
+                errors.Add(label + ": Trigger None is no reaction; leave the Reaction out instead.");
+                return;
+            }
+
+            if (hitTrigger && r.Cooldown < 1)
+            {
+                errors.Add(label + ": a " + trigger + " reaction needs a Cooldown of at least 1 (one per the reactor's turn).");
+            }
+
+            if ((action == BondAction.Intercept) != (trigger == BondTrigger.EnemyTargetsAlly))
+            {
+                errors.Add(label + ": Intercept is the EnemyTargetsAlly reaction and EnemyTargetsAlly only intercepts.");
+            }
+
+            if (trigger == BondTrigger.AllyBelowHpPercent)
+            {
+                CheckBand(r.HpThresholdPercent, 1, 99, label, "HpThresholdPercent", errors);
+            }
+
+            bool hasTriggerTarget = trigger == BondTrigger.MemberHit || trigger == BondTrigger.MemberCrit || trigger == BondTrigger.AllyCrit;
+            bool hasAttacker = trigger == BondTrigger.AllyHitByEnemy || trigger == BondTrigger.EnemyTargetsAlly;
+            if (action == BondAction.Apply && ((target == BondReactionTarget.TriggerTarget && !hasTriggerTarget) || (target == BondReactionTarget.Attacker && !hasAttacker)))
+            {
+                errors.Add(label + ": a " + trigger + " reaction has no " + target + " to land on.");
+            }
+
+            if (action == BondAction.Apply && target == BondReactionTarget.EnemiesNearReactor && r.Range < 1)
+            {
+                errors.Add(label + ": EnemiesNearReactor needs a Range (radius) of at least 1.");
+            }
+
+            EffectData[] effects = r.Effects ?? new EffectData[0];
+            if (action == BondAction.Apply && effects.Length == 0)
+            {
+                errors.Add(label + ": has no effects.");
+            }
+
+            if (effects.Length > 0)
+            {
+                CheckEffects(effects, label, "Effects", false, errors);
+            }
+
+            // An intercept's effects land on the guardian itself.
+            bool onEnemies = action == BondAction.Apply &&
+                             (target == BondReactionTarget.TriggerTarget || target == BondReactionTarget.Attacker || target == BondReactionTarget.EnemiesNearReactor);
+
+            for (int i = 0; i < effects.Length; i++)
+            {
+                EffectData e = effects[i];
+                if (e == null)
+                {
+                    continue;
+                }
+
+                string at = label + " Effects[" + i + "]";
+                SkillEffectType type = ParseOr(e.EffectType, SkillEffectType.Damage);
+                StatusType status = ParseOr(e.Status, StatusType.None);
+                bool hostile = type == SkillEffectType.Damage || type == SkillEffectType.DebuffStat ||
+                               (type == SkillEffectType.ApplyStatus && status != StatusType.Shield);
+
+                if (hostile != onEnemies)
+                {
+                    errors.Add(at + ": a " + (type == SkillEffectType.ApplyStatus ? status.ToString() : type.ToString()) + " effect is for " +
+                               (hostile ? "enemies" : "the team") + ", but this reaction lands on " + (onEnemies ? "enemies" : "the team") + ".");
+                }
+
+                if (type == SkillEffectType.Damage && e.Magnitude > MaxReactionDamagePower)
+                {
+                    errors.Add(at + ": a reaction's damage power is at most " + MaxReactionDamagePower + ", not " + e.Magnitude + ".");
+                }
+
+                if (type == SkillEffectType.ApplyStatus && status == StatusType.Knockback)
+                {
+                    errors.Add(at + ": a reaction cannot knock back (it has no direction of its own).");
+                }
+
+                if (type == SkillEffectType.ApplyStatus && status == StatusType.Stun)
+                {
+                    int chance = Math.Max(1, Math.Min(100, r.Chance)) * Math.Max(1, Math.Min(100, e.Chance)) / 100;
+                    if (chance > MaxReactionStunChance || e.DurationTurns != 1)
+                    {
+                        errors.Add(at + ": a reaction's stun lasts exactly 1 turn and lands at most " + MaxReactionStunChance + "% of the time (Chance x effect Chance); this is " +
+                                   chance + "% for " + e.DurationTurns + " turns.");
+                    }
+                }
             }
         }
 
