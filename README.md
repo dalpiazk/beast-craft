@@ -12,7 +12,13 @@ entirely original IP, built for phones.
 
 ```
 beast-craft/
-├── BeastCraft/     the Unity project (open THIS folder in Unity Hub, not the repo root)
+├── src/
+│   └── BeastCraft.Core/    the game runtime: engine-neutral C# (netstandard2.1), no engine
+│                           references (Battle, Bonds, Creatures, Avatar, Skills, Progression,
+│                           Campaign, Economy, Encounters, Save, Session, Customization, Idle,
+│                           Common)
+├── BeastCraft/     LEGACY Unity project, no longer built (the game is moving to MonoGame).
+│   │               Still home to the authored data JSON and the test sources.
 │   ├── Assets/_Project/    all first-party content, namespaced under _Project/
 │   │   ├── Art/            sprites, backdrops, UI, key art (Characters/Creatures/Environments/UI/KeyArt)
 │   │   ├── Audio/          Music/, Ambient/, SFX/
@@ -20,16 +26,15 @@ beast-craft/
 │   │   │                   and Skills/drop-tables.json (sources of truth) + generated .asset instances
 │   │   ├── Prefabs/
 │   │   ├── Scenes/
-│   │   └── Scripts/        Runtime/ (Battle, Bonds, Creatures, Avatar, Skills, Progression,
-│   │                       Save, Session, Customization, Idle; Core, Services, Narrative
-│   │                       and IAP are empty placeholders), Editor/, Tests/
+│   │   └── Scripts/        Tests/EditMode/ (the test suite, run by Tooling/EditModeTests);
+│   │                       Editor/ (Unity-only data importers, no longer compiled);
+│   │                       Runtime/ (only the old asmdef; the code is in src/BeastCraft.Core)
 │   ├── Packages/           package manifest
 │   └── ProjectSettings/    editor version pin; Unity fills in the rest on first open
 ├── Pipeline/       OFFLINE, build-time-only asset generation. Never runs at runtime.
-├── Tooling/        CiStubs/: hand-written UnityEngine stub + csproj so CI compiles
-│                   the game scripts without a Unity install. BalanceSim/: local-only
-│                   headless balance simulator over the real battle code. EditModeTests/:
-│                   local-only `dotnet test` runner for the EditMode suite. Never shipped.
+├── Tooling/        BalanceSim/: local-only headless balance simulator over the real
+│                   battle code. EditModeTests/: the `dotnet test` runner for the test
+│                   suite (CI runs it). Never shipped.
 ├── docs/           design/ and balance/ (simulator reports, tuning log, research) notes;
 │                   architecture/ is an empty placeholder
 └── .github/        CI workflows
@@ -41,6 +46,12 @@ between "ours" and "imported" stays obvious in the Project window and in diffs.
 ---
 
 ## Stack
+
+> **Engine migration.** The game is moving from Unity to **MonoGame**. The runtime
+> (`src/BeastCraft.Core`) is already engine-neutral C#; the MonoGame host is not
+> built yet, and the Unity project under `BeastCraft/` is legacy and no longer
+> builds (its Editor importers expect ScriptableObjects, which are now plain
+> classes). The Unity-specific lines below are the original plan.
 
 - **Engine:** Unity 6 LTS, URP with the **2D Renderer**
 - **Language:** C#
@@ -65,6 +76,10 @@ rules and the asset naming contract.
 ---
 
 ## Getting started
+
+To build and test the game code you need only the .NET SDK (10.x) and
+`git lfs install`; see **Building and testing** under [Status](#status). The
+steps below are for the legacy Unity project, which no longer builds.
 
 1. Install **Unity 6 LTS** (any `6000.0.x` LTS patch) via Unity Hub, with the
    **iOS** and **Android** build support modules.
@@ -95,8 +110,8 @@ project has never been opened in the Editor.**
 
 ### What exists
 
-**Runtime systems** (`BeastCraft/Assets/_Project/Scripts/Runtime/`, pure C#
-with no scene or MonoBehaviour dependencies):
+**Runtime systems** (`src/BeastCraft.Core/`, engine-neutral C# with no engine
+references):
 
 - **Battle** (`Battle/`) — a deterministic, seeded grid auto-battle: an ATB
   turn order (square-root-of-Speed initiative gauge, integer maths), the damage
@@ -116,13 +131,14 @@ with no scene or MonoBehaviour dependencies):
   `SaveSerializer` with a migration chain and load-time validation that reports
   unknown ids instead of failing, storage behind the thin `ISaveStorage` seam:
   `FileSaveStorage` writes local slot files atomically with a one-generation
-  backup that loads fall back to, rooted at `Application.persistentDataPath`
-  via `UnitySaveLocations.Default()`.
+  backup that loads fall back to, rooted under the user's local app-data folder
+  via `SaveLocations.Default()`.
 - **Battle session** (`Session/`) — `BattleSession`, the single entry point a
   scene will call: builds a battle from a save plus an encounter setup, runs it
   (same setup and seed, same battle) and pays the rewards (skill practice XP,
   material drops, avatar and beast XP) back into the save.
-- **Data schemas** — ScriptableObjects for creature species (stats, growth
+- **Data schemas** — plain content classes (formerly ScriptableObjects, class
+  names kept) for creature species (stats, growth
   curves, skill learn tables, evolution requirements), skills, passives, team
   bonds, materials, drop tables, beast gear, avatar stats and avatar stat gear,
   and the shared avatar + creature cosmetic customization framework.
@@ -147,13 +163,15 @@ The numbers are simulator-tuned starting points, not confirmed balance — see
 
 **Tooling:**
 
-- **CI** (`.github/workflows/ci.yml`) — a format and compile check that builds
-  the real game scripts against the hand-written UnityEngine stub in
-  `Tooling/CiStubs/`, then the EditMode suite through `Tooling/EditModeTests`
-  (format check and `dotnet test --configuration Release`). It needs no Unity
-  install, so it proves the scripts parse, type-check, are formatted and pass
-  the EditMode tests against the stub — nothing about whether the project
-  opens in Unity or serializes its assets correctly.
+- **Building and testing** — plain .NET (SDK 10); no engine install needed.
+  From the repo root, exactly what CI (`.github/workflows/ci.yml`) runs:
+
+  ```sh
+  dotnet format src/BeastCraft.Core/BeastCraft.Core.csproj --verify-no-changes
+  dotnet build  src/BeastCraft.Core/BeastCraft.Core.csproj --configuration Release
+  dotnet format Tooling/EditModeTests --verify-no-changes
+  dotnet test   Tooling/EditModeTests --configuration Release
+  ```
 - A **headless balance simulator** ([`Tooling/BalanceSim/`](Tooling/BalanceSim/README.md))
   — local-only, not a CI job — that runs the real battle code outside Unity and
   writes Markdown reports: PvE against generated mixed encounters (solo, elite,
@@ -162,19 +180,12 @@ The numbers are simulator-tuned starting points, not confirmed balance — see
   reports live in [`docs/balance/`](docs/balance/) (baseline, tuned, level-gap
   and pacing reports plus research notes); their numbers inform design
   decisions and are not applied automatically.
-- An **EditMode test runner** (`Tooling/EditModeTests/`) that compiles the
-  Runtime, Editor and `Tests/EditMode` scripts against the UnityStub and runs
-  the whole EditMode suite with NUnit, no Unity install needed. CI runs it as a
-  final gate; run it from the repo root before pushing:
-
-  ```sh
-  dotnet test Tooling/EditModeTests
-  ```
-
-  It swaps the stub's compile-only `JsonUtility` for a System.Text.Json
-  implementation that follows JsonUtility's field rules (see
-  [`Tooling/CiStubs/README.md`](Tooling/CiStubs/README.md)); Unity's own Test
-  Runner remains the authority on real serialization.
+- The **test runner** (`Tooling/EditModeTests/`) references
+  `src/BeastCraft.Core` and runs the suite in `BeastCraft/Assets/_Project/Scripts/Tests/EditMode`
+  plus its own golden-value tests (`Tooling/EditModeTests/Goldens`: growth-curve
+  samples and schema 1-5 save fixtures that must stay byte-identical;
+  `BEASTCRAFT_UPDATE_GOLDENS=1` rewrites them for a reviewed behaviour change).
+  CI runs it as a final gate; run it locally before pushing.
 
 ### What does not exist yet
 
@@ -185,15 +196,17 @@ The numbers are simulator-tuned starting points, not confirmed balance — see
   generator and its `Tooling/BalanceSim/encounters.json`.
 - Gear content — the gear schemas and save support exist, but `Data/Gear/` and
   `Data/AvatarGear/` are empty.
-- Narrative, IAP and services code (those `Runtime/` folders are empty; idle
-  rewards have their rules in `Runtime/Idle` but no UI),
+- Narrative, IAP and services code (only empty placeholder folders in the
+  legacy Unity `Runtime/`; idle rewards have their rules in
+  `src/BeastCraft.Core/Idle` but no UI),
   the offline art compositor, and any UGS integration.
 - PlayMode tests (the assembly exists, with no tests) and any Unity test run
   in CI.
 
-### Running it in Unity
+### Running it in Unity (legacy)
 
-Nothing has been opened in an actual Unity Editor yet, so the generated
+The Unity project is no longer built (see the engine-migration note under
+[Stack](#stack)); this section is kept for reference only. Nothing has been opened in an actual Unity Editor yet, so the generated
 `ProjectSettings/` YAML, `Library/` and solution files do not exist; that is
 expected. After the first open (see [Getting started](#getting-started)):
 
