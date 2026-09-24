@@ -273,6 +273,23 @@ namespace BeastCraft.Tooling.BalanceSim
                 }
             }
 
+            if (options.TargetOverrides != null)
+            {
+                foreach (string shape in options.TargetOverrides.Keys)
+                {
+                    if (!known.Contains(shape))
+                    {
+                        errors.Add("--target-clear: unknown " + (options.EncounterSet == EncounterSet.Generated ? "shape" : "encounter") + " id '" + shape + "'. Known: " +
+                                   string.Join(", ", known) + ".");
+                    }
+                }
+
+                if (errors.Count > 0)
+                {
+                    return null;
+                }
+            }
+
             if (options.EncounterFilter != null)
             {
                 foreach (string wanted in options.EncounterFilter)

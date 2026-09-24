@@ -9,8 +9,9 @@ namespace BeastCraft.Tooling.BalanceSim
     /// <summary>
     /// "PvE level gap" (<c>--level-gap</c>): every cell's clear rate with the enemies some levels
     /// above (or below) the team, at the multiplier calibrated at equal levels, scouted and not,
-    /// against the level-gap targets (<see cref="SimOptions.LevelGapNearLow"/> and friends). The
-    /// same tables over several seeds for <c>--seeds</c>. Pure: output depends only on the cells.
+    /// against the level-gap bands, which are relative to the cell's calibration target T (see
+    /// <see cref="Band"/>). The same tables over several seeds for <c>--seeds</c>. Pure: output
+    /// depends only on the cells.
     /// </summary>
     public static class LevelGapReport
     {
@@ -42,37 +43,83 @@ namespace BeastCraft.Tooling.BalanceSim
             Append(report, options, cells, "###");
         }
 
-        /// <summary>The target a scouted rate at <paramref name="gap"/> is held to, in words; null when the gap has none.</summary>
-        public static string TargetText(SimOptions options, int gap)
+        /// <summary>
+        /// The band a scouted rate at <paramref name="gap"/> is held to, for a cell calibrated to
+        /// <paramref name="target"/> (T, percent): gap 0 T +/- 5; +2 to +3 (a couple of levels under)
+        /// 0.4 T to 0.7 T; +5 and beyond under 0.2 T; -2 to -3 (a couple of levels over) at least
+        /// T + 0.4 (100 - T); -5 and beyond at least T + 0.8 (100 - T), so being over-levelled always
+        /// makes the fight easier. False (no band) for the other gaps.
+        /// </summary>
+        public static bool Band(double target, int gap, out double low, out double high)
         {
+            low = 0.0;
+            high = 100.0;
+            int under = Math.Abs(gap);
             if (gap == 0)
             {
-                return SimOptions.Format(options.TargetClearRate - SimOptions.LevelGapEvenTolerance) + "-" +
-                       SimOptions.Format(options.TargetClearRate + SimOptions.LevelGapEvenTolerance) + "%";
+                low = target - SimOptions.LevelGapEvenTolerance;
+                high = target + SimOptions.LevelGapEvenTolerance;
+                return true;
             }
 
-            if (gap >= SimOptions.LevelGapNearMin && gap <= SimOptions.LevelGapNearMax)
+            if (gap > 0 && under >= SimOptions.LevelGapNearMin && under <= SimOptions.LevelGapNearMax)
             {
-                return SimOptions.Format(SimOptions.LevelGapNearLow) + "-" + SimOptions.Format(SimOptions.LevelGapNearHigh) + "%";
+                low = SimOptions.LevelGapNearLowFactor * target;
+                high = SimOptions.LevelGapNearHighFactor * target;
+                return true;
             }
 
-            return gap >= SimOptions.LevelGapFarMin ? "under " + SimOptions.Format(SimOptions.LevelGapFarHigh) + "%" : null;
+            if (gap > 0 && under >= SimOptions.LevelGapFarMin)
+            {
+                high = SimOptions.LevelGapFarFactor * target;
+                return true;
+            }
+
+            if (gap < 0 && under >= SimOptions.LevelGapNearMin && under <= SimOptions.LevelGapNearMax)
+            {
+                low = target + (SimOptions.LevelGapOverNearFactor * (100.0 - target));
+                return true;
+            }
+
+            if (gap < 0 && under >= SimOptions.LevelGapFarMin)
+            {
+                low = target + (SimOptions.LevelGapOverFarFactor * (100.0 - target));
+                return true;
+            }
+
+            return false;
         }
 
-        /// <summary>Whether a scouted rate at <paramref name="gap"/> meets its target; true when the gap has none.</summary>
-        public static bool MeetsTarget(SimOptions options, int gap, double scouted)
+        /// <summary>The band at <paramref name="gap"/> for a cell calibrated to <paramref name="target"/>, in words; null when the gap has none.</summary>
+        public static string TargetText(double target, int gap)
         {
-            if (gap == 0)
+            if (!Band(target, gap, out double low, out double high))
             {
-                return Math.Abs(scouted - options.TargetClearRate) <= SimOptions.LevelGapEvenTolerance;
+                return null;
             }
 
-            if (gap >= SimOptions.LevelGapNearMin && gap <= SimOptions.LevelGapNearMax)
+            if (gap == 0 || (gap > 0 && gap <= SimOptions.LevelGapNearMax))
             {
-                return scouted >= SimOptions.LevelGapNearLow && scouted <= SimOptions.LevelGapNearHigh;
+                return SimOptions.Format(low) + "-" + SimOptions.Format(high) + "%";
             }
 
-            return gap < SimOptions.LevelGapFarMin || scouted < SimOptions.LevelGapFarHigh;
+            return gap > 0 ? "under " + SimOptions.Format(high) + "%" : "at least " + SimOptions.Format(low) + "%";
+        }
+
+        /// <summary>Whether a scouted rate at <paramref name="gap"/> meets its band (the far-under band is strict); true when the gap has none.</summary>
+        public static bool MeetsTarget(double target, int gap, double scouted)
+        {
+            if (!Band(target, gap, out double low, out double high))
+            {
+                return true;
+            }
+
+            if (gap >= SimOptions.LevelGapFarMin)
+            {
+                return scouted < high;
+            }
+
+            return scouted >= low && scouted <= high;
         }
 
         private static void Append(StringBuilder report, SimOptions options, List<List<PveCell>> seeds, string heading)
@@ -98,20 +145,21 @@ namespace BeastCraft.Tooling.BalanceSim
                                   ? "**scouted** clear % (the team the " + PveReport.PickerName(options) + " fields, " + samples + " battles per composition) "
                                   : string.Empty) +
                               "(**no scouting** %: " + noScoutTeams + " of " + teams + " teams (`--level-gap-teams`) x every composition).");
-            report.AppendLine("— = the enemies would be outside 1-" + SimOptions.MaxLevel + ". Targets for the scouted rate: gap 0 " + TargetText(options, 0) + "; +" + SimOptions.LevelGapNearMin + " to +" +
-                              SimOptions.LevelGapNearMax + " " + TargetText(options, SimOptions.LevelGapNearMin) + "; +" + SimOptions.LevelGapFarMin + " and beyond " +
-                              TargetText(options, SimOptions.LevelGapFarMin) + ". `!` = outside its target" + (scouted ? "." : " (not flagged: `--calibrate-on mean` has no scouted rate)."));
-            report.AppendLine("**All shapes** = the mean of the shape rows.");
+            report.AppendLine("— = the enemies would be outside 1-" + SimOptions.MaxLevel + ". Bands for the scouted rate, relative to the cell's calibration target T");
+            report.AppendLine("(its shape's target: " + options.TargetSummary(ShapesOf(first)) + "): gap 0 T +/- " + SimOptions.Format(SimOptions.LevelGapEvenTolerance) + "; +" +
+                              SimOptions.LevelGapNearMin + " to +" + SimOptions.LevelGapNearMax + " " + Factor(SimOptions.LevelGapNearLowFactor) + " T to " +
+                              Factor(SimOptions.LevelGapNearHighFactor) + " T; +" + SimOptions.LevelGapFarMin + " and beyond under " + Factor(SimOptions.LevelGapFarFactor) +
+                              " T; -" + SimOptions.LevelGapNearMin + " to -" + SimOptions.LevelGapNearMax + " (over-levelled)");
+            report.AppendLine("at least T + " + Factor(SimOptions.LevelGapOverNearFactor) + " (100 - T); -" + SimOptions.LevelGapFarMin + " and beyond at least T + " +
+                              Factor(SimOptions.LevelGapOverFarFactor) + " (100 - T). `!` = outside its band" +
+                              (scouted ? "." : " (not flagged: `--calibrate-on mean` has no scouted rate)."));
+            report.AppendLine("**All shapes** = the mean of the shape rows, held to the bands of the mean target (" +
+                              SimOptions.Format(MeanTarget(options, ShapesOf(first))) + "%).");
             report.AppendLine();
 
-            List<string> shapeIds = new List<string>();
-            foreach (PveCell cell in first)
-            {
-                if (!shapeIds.Contains(cell.Shape.Id))
-                {
-                    shapeIds.Add(cell.Shape.Id);
-                }
-            }
+            List<EncounterShape> shapes = ShapesOf(first);
+            List<string> shapeIds = shapes.ConvertAll(s => s.Id);
+            double meanTarget = MeanTarget(options, shapes);
 
             foreach (KitMode mode in options.Modes)
             {
@@ -131,15 +179,17 @@ namespace BeastCraft.Tooling.BalanceSim
                 int met = 0;
                 int flagged = 0;
                 List<string> misses = new List<string>();
-                foreach (string shapeId in shapeIds)
+                foreach (EncounterShape shape in shapes)
                 {
+                    string shapeId = shape.Id;
+                    double target = options.TargetFor(shape);
                     foreach (int level in options.Levels)
                     {
                         StringBuilder row = new StringBuilder("| `" + shapeId + "` | " + level + " |");
                         for (int g = 0; g < gaps.Count; g++)
                         {
                             Mean(seeds, mode, new List<string> { shapeId }, level, g, out double s, out double n, out bool inRange);
-                            row.Append(' ').Append(CellText(options, gaps[g], inRange, s, n, scouted, ref met, ref flagged)).Append(" |");
+                            row.Append(' ').Append(CellText(target, gaps[g], inRange, s, n, scouted, ref met, ref flagged)).Append(" |");
                         }
 
                         report.AppendLine(row.ToString());
@@ -156,10 +206,10 @@ namespace BeastCraft.Tooling.BalanceSim
                         Mean(seeds, mode, shapeIds, level, g, out double s, out double n, out bool inRange);
                         int before = allMet;
                         int beforeFlagged = allFlagged;
-                        row.Append(' ').Append(CellText(options, gaps[g], inRange, s, n, scouted, ref allMet, ref allFlagged)).Append(" |");
+                        row.Append(' ').Append(CellText(meanTarget, gaps[g], inRange, s, n, scouted, ref allMet, ref allFlagged)).Append(" |");
                         if (allFlagged > beforeFlagged && allMet == before)
                         {
-                            misses.Add("L" + level + " " + (gaps[g] > 0 ? "+" : string.Empty) + gaps[g] + ": " + SimOptions.Format(s) + "% (target " + TargetText(options, gaps[g]) + ")");
+                            misses.Add("L" + level + " " + (gaps[g] > 0 ? "+" : string.Empty) + gaps[g] + ": " + SimOptions.Format(s) + "% (target " + TargetText(meanTarget, gaps[g]) + ")");
                         }
                     }
 
@@ -176,7 +226,7 @@ namespace BeastCraft.Tooling.BalanceSim
             }
         }
 
-        private static string CellText(SimOptions options, int gap, bool inRange, double scoutedRate, double noScoutRate, bool scouted, ref int met, ref int flagged)
+        private static string CellText(double target, int gap, bool inRange, double scoutedRate, double noScoutRate, bool scouted, ref int met, ref int flagged)
         {
             if (!inRange)
             {
@@ -190,10 +240,10 @@ namespace BeastCraft.Tooling.BalanceSim
             }
 
             string mark = string.Empty;
-            if (TargetText(options, gap) != null)
+            if (TargetText(target, gap) != null)
             {
                 flagged++;
-                if (MeetsTarget(options, gap, scoutedRate))
+                if (MeetsTarget(target, gap, scoutedRate))
                 {
                     met++;
                 }
@@ -204,6 +254,38 @@ namespace BeastCraft.Tooling.BalanceSim
             }
 
             return SimOptions.Format(scoutedRate) + " " + none + mark;
+        }
+
+        /// <summary>The shapes of <paramref name="cells"/>, in first-appearance order.</summary>
+        private static List<EncounterShape> ShapesOf(List<PveCell> cells)
+        {
+            List<EncounterShape> shapes = new List<EncounterShape>();
+            foreach (PveCell cell in cells)
+            {
+                if (!shapes.Exists(s => s.Id == cell.Shape.Id))
+                {
+                    shapes.Add(cell.Shape);
+                }
+            }
+
+            return shapes;
+        }
+
+        /// <summary>The mean of the shapes' calibration targets: what the "All shapes" row is held to.</summary>
+        private static double MeanTarget(SimOptions options, List<EncounterShape> shapes)
+        {
+            double sum = 0.0;
+            foreach (EncounterShape shape in shapes)
+            {
+                sum += options.TargetFor(shape) / shapes.Count;
+            }
+
+            return shapes.Count == 0 ? SimOptions.DefaultTargetClearRate : sum;
+        }
+
+        private static string Factor(double value)
+        {
+            return value.ToString("0.0##", CultureInfo.InvariantCulture);
         }
 
         /// <summary>

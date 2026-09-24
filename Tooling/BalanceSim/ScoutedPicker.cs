@@ -800,9 +800,10 @@ namespace BeastCraft.Tooling.BalanceSim
                     problems.Add(where + "picked battles clear " + SimOptions.Format(rate) + "%, but the scouted rate is " + SimOptions.Format(cell.ScoutedClearRate) + "%.");
                 }
 
-                if (missIsProblem && Math.Abs(cell.ScoutedClearRate - options.TargetClearRate) > SimOptions.CalibrationTolerance && !IsStep(cell, options.TargetClearRate))
+                double target = options.TargetFor(cell.Shape);
+                if (missIsProblem && Math.Abs(cell.ScoutedClearRate - target) > SimOptions.CalibrationTolerance && !IsStep(cell, target))
                 {
-                    problems.Add(where + "the scouted rate " + SimOptions.Format(cell.ScoutedClearRate) + "% misses the " + SimOptions.Format(options.TargetClearRate) +
+                    problems.Add(where + "the scouted rate " + SimOptions.Format(cell.ScoutedClearRate) + "% misses the " + SimOptions.Format(target) +
                                  "% target by more than " + SimOptions.Format(SimOptions.CalibrationTolerance) + " points.");
                 }
             }

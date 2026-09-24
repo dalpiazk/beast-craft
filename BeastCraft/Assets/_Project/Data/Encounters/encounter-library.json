@@ -17,6 +17,7 @@
       "ThreatMin": 12,
       "ThreatMax": 12,
       "MinDistinctTypes": 1,
+      "TargetClear": 50,
       "Variants": [
         { "Label": "giant", "Weight": 1, "Slots": [ { "Types": [ "giant" ], "Min": 1, "Max": 1 } ] }
       ]
@@ -29,6 +30,7 @@
       "ThreatMin": 14,
       "ThreatMax": 17,
       "MinDistinctTypes": 2,
+      "TargetClear": 60,
       "Variants": [
         { "Label": "giant + escort", "Weight": 2, "Slots": [ { "Types": [ "giant" ], "Min": 1, "Max": 1 }, { "Types": [ "brute", "stalker", "archer", "caster", "shaman" ], "Min": 2, "Max": 2 } ] },
         { "Label": "two champions + escort", "Weight": 1, "Slots": [ { "Types": [ "champion" ], "Min": 2, "Max": 2 }, { "Types": [ "brute", "stalker", "archer", "caster", "shaman" ], "Min": 1, "Max": 2 } ] }
@@ -42,6 +44,7 @@
       "ThreatMin": 10,
       "ThreatMax": 12,
       "MinDistinctTypes": 3,
+      "TargetClear": 80,
       "Variants": [
         { "Label": "mixed", "Weight": 1, "Slots": [ { "Types": [ "brute", "stalker", "archer", "caster", "shaman" ], "Min": 4, "Max": 6 } ] }
       ]
@@ -54,6 +57,7 @@
       "ThreatMin": 12.5,
       "ThreatMax": 14,
       "MinDistinctTypes": 3,
+      "TargetClear": 80,
       "Variants": [
         { "Label": "swarm + ranged support", "Weight": 1, "Slots": [ { "Types": [ "swarmling", "stingling" ], "Min": 14, "Max": 20 }, { "Types": [ "archer", "caster" ], "Min": 2, "Max": 4 } ] }
       ]

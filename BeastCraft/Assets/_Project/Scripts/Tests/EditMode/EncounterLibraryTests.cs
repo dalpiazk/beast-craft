@@ -218,6 +218,7 @@ namespace BeastCraft.Tests.EditMode
                         ThreatMin = 4.0,
                         ThreatMax = 8.0,
                         MinDistinctTypes = 2,
+                        TargetClear = 80.0,
                         Variants = new[]
                         {
                             new EncounterVariantData
@@ -236,6 +237,7 @@ namespace BeastCraft.Tests.EditMode
                         ThreatMin = 14.0,
                         ThreatMax = 17.0,
                         MinDistinctTypes = 2,
+                        TargetClear = 50.0,
                         Variants = new[]
                         {
                             new EncounterVariantData

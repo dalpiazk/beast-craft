@@ -107,10 +107,14 @@ namespace BeastCraft.Encounters
         }
 
         /// <summary>
-        /// Structural checks for a difficulty file against the encounter library: the schema version,
-        /// cells with a known kit mode, a known shape, a level of 1-100 and a positive finite
+        /// Structural checks for a difficulty file against the encounter library: the schema version
+        /// (1 or 2), cells with a known kit mode, a known shape, a level of 1-100 and a positive finite
         /// multiplier, no repeated (kit mode, shape, level), and at least one elemental cell for every
-        /// shape of <paramref name="library"/> (a null library skips that).
+        /// shape of <paramref name="library"/> (a null library skips that). Schema 2 also: every
+        /// <see cref="EncounterDifficultyData.Targets"/> entry names a known shape once, with a target
+        /// strictly between 0 and 100, and every cell's <see cref="DifficultyCellData.TargetClear"/> is
+        /// its shape's target. A target that no longer matches the library is only a warning
+        /// (<see cref="Warnings"/>).
         /// </summary>
         public static List<string> Validate(EncounterDifficultyData data, EncounterLibraryData library)
         {
@@ -121,10 +125,13 @@ namespace BeastCraft.Encounters
                 return errors;
             }
 
-            if (data.SchemaVersion != EncounterDifficultyData.CurrentSchemaVersion)
+            if (data.SchemaVersion != EncounterDifficultyData.CurrentSchemaVersion && data.SchemaVersion != EncounterDifficultyData.UniformTargetSchemaVersion)
             {
-                errors.Add("SchemaVersion is " + data.SchemaVersion + "; this code reads version " + EncounterDifficultyData.CurrentSchemaVersion + ".");
+                errors.Add("SchemaVersion is " + data.SchemaVersion + "; this code reads versions " + EncounterDifficultyData.UniformTargetSchemaVersion + " and " +
+                           EncounterDifficultyData.CurrentSchemaVersion + ".");
             }
+
+            bool perShape = data.SchemaVersion == EncounterDifficultyData.CurrentSchemaVersion;
 
             HashSet<string> shapes = null;
             if (library != null)
@@ -181,6 +188,41 @@ namespace BeastCraft.Encounters
                 {
                     calibrated.Add(cell.Shape);
                 }
+
+                if (perShape && cell.Shape != null && cell.TargetClear != data.TargetFor(cell.Shape))
+                {
+                    errors.Add(at + ": TargetClear " + Number(cell.TargetClear) + " is not its shape's target (" + Number(data.TargetFor(cell.Shape)) + ").");
+                }
+            }
+
+            if (perShape)
+            {
+                HashSet<string> targeted = new HashSet<string>(StringComparer.Ordinal);
+                DifficultyTargetData[] targets = data.Targets ?? new DifficultyTargetData[0];
+                for (int i = 0; i < targets.Length; i++)
+                {
+                    DifficultyTargetData target = targets[i];
+                    string at = "Targets[" + i + "]";
+                    if (target == null)
+                    {
+                        errors.Add(at + " is null.");
+                        continue;
+                    }
+
+                    if (string.IsNullOrEmpty(target.Shape) || (shapes != null && !shapes.Contains(target.Shape)))
+                    {
+                        errors.Add(at + ": Shape '" + target.Shape + "' is not a shape in the encounter library.");
+                    }
+                    else if (!targeted.Add(target.Shape))
+                    {
+                        errors.Add(at + ": a second target for '" + target.Shape + "'.");
+                    }
+
+                    if (!(target.TargetClear > 0.0 && target.TargetClear < 100.0))
+                    {
+                        errors.Add(at + ": TargetClear " + Number(target.TargetClear) + " must be strictly between 0 and 100.");
+                    }
+                }
             }
 
             if (shapes != null)
@@ -195,6 +237,44 @@ namespace BeastCraft.Encounters
             }
 
             return errors;
+        }
+
+        /// <summary>
+        /// What is legal but stale: every shape of <paramref name="library"/> whose target in the
+        /// difficulty file (<see cref="EncounterDifficultyData.TargetFor"/>; the uniform one for a
+        /// schema 1 file) differs from the library's <see cref="EncounterShapeData.TargetClear"/>.
+        /// The table still works; it was calibrated to another clear rate. Re-run the simulator's
+        /// <c>--write-difficulty</c>. Empty for a null file or library.
+        /// </summary>
+        public static List<string> Warnings(EncounterDifficultyData data, EncounterLibraryData library)
+        {
+            List<string> warnings = new List<string>();
+            if (data == null || library == null)
+            {
+                return warnings;
+            }
+
+            foreach (EncounterShapeData shape in library.Shapes ?? new EncounterShapeData[0])
+            {
+                if (shape == null || string.IsNullOrEmpty(shape.ShapeId))
+                {
+                    continue;
+                }
+
+                double calibrated = data.TargetFor(shape.ShapeId);
+                if (Math.Abs(calibrated - shape.TargetClear) > 1e-9)
+                {
+                    warnings.Add("Shape '" + shape.ShapeId + "' was calibrated to a " + Number(calibrated) + "% clear rate but the encounter library now targets " +
+                                 Number(shape.TargetClear) + "%; re-run the balance simulator with --write-difficulty.");
+                }
+            }
+
+            return warnings;
+        }
+
+        private static string Number(double value)
+        {
+            return value.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
         }
     }
 }

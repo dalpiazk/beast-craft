@@ -171,7 +171,11 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <summary>The highest level a beast or enemy can be: a level gap that would put the enemies past it is not run.</summary>
         public const int MaxLevel = 100;
 
-        /// <summary>Level-gap targets (<see cref="LevelGapReport"/>): at gap 0 the scouted rate is the calibration target, within +/- this.</summary>
+        // Level-gap targets (LevelGapReport), relative to the cell's calibration target T (its
+        // shape's TargetClear): under-levelled fights get harder in proportion to T, over-levelled
+        // ones close the distance to a 100% clear.
+
+        /// <summary>Level-gap targets: at gap 0 the scouted rate is the calibration target T, within +/- this.</summary>
         public const double LevelGapEvenTolerance = 5.0;
 
         /// <summary>Level-gap targets: the smallest and largest gap (enemies above the team) of the "a couple of levels under" band.</summary>
@@ -180,17 +184,23 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <summary>See <see cref="LevelGapNearMin"/>.</summary>
         public const int LevelGapNearMax = 3;
 
-        /// <summary>Level-gap targets: the scouted rate a couple of levels under should sit in [low, high]...</summary>
-        public const double LevelGapNearLow = 20.0;
+        /// <summary>Level-gap targets: a couple of levels under, the scouted rate sits in [low x T, high x T]...</summary>
+        public const double LevelGapNearLowFactor = 0.4;
 
-        /// <summary>... see <see cref="LevelGapNearLow"/>.</summary>
-        public const double LevelGapNearHigh = 35.0;
+        /// <summary>... see <see cref="LevelGapNearLowFactor"/>.</summary>
+        public const double LevelGapNearHighFactor = 0.7;
 
         /// <summary>Level-gap targets: from this many levels under...</summary>
         public const int LevelGapFarMin = 5;
 
-        /// <summary>... the scouted rate should be below this.</summary>
-        public const double LevelGapFarHigh = 10.0;
+        /// <summary>... the scouted rate is below this x T.</summary>
+        public const double LevelGapFarFactor = 0.2;
+
+        /// <summary>Level-gap targets: a couple of levels <em>over</em> (gap -<see cref="LevelGapNearMin"/> to -<see cref="LevelGapNearMax"/>), the scouted rate is at least T + this x (100 - T)...</summary>
+        public const double LevelGapOverNearFactor = 0.4;
+
+        /// <summary>... and from -<see cref="LevelGapFarMin"/> on, at least T + this x (100 - T).</summary>
+        public const double LevelGapOverFarFactor = 0.8;
 
         /// <summary>
         /// The balance guard on the multi-seed mean of each beast's normalized overall marginal
@@ -263,6 +273,59 @@ namespace BeastCraft.Tooling.BalanceSim
         public List<string> EncounterFilter;
         public double MarginalThreshold = DefaultMarginalThreshold;
         public double TargetClearRate = DefaultTargetClearRate;
+
+        /// <summary>
+        /// <c>--target-clear N</c>: every shape calibrates to <see cref="TargetClearRate"/> (the
+        /// legacy uniform target). False (the default) = each shape's own target (see <see cref="TargetFor"/>).
+        /// </summary>
+        public bool UniformTarget;
+
+        /// <summary><c>--target-clear shape=N,...</c>: per-shape targets that override the library's; null = none.</summary>
+        public Dictionary<string, double> TargetOverrides;
+
+        /// <summary>
+        /// The clear rate, in percent, <paramref name="shape"/>'s difficulty is calibrated to:
+        /// <c>--target-clear N</c> for every shape; else a <c>--target-clear shape=N</c> override;
+        /// else the shape's <c>TargetClear</c> in <c>encounter-library.json</c> (the game's tiered
+        /// targets); else (a fixed-set encounter) <see cref="DefaultTargetClearRate"/>.
+        /// </summary>
+        public double TargetFor(EncounterShape shape)
+        {
+            if (UniformTarget)
+            {
+                return TargetClearRate;
+            }
+
+            if (shape != null && TargetOverrides != null && TargetOverrides.TryGetValue(shape.Id, out double target))
+            {
+                return target;
+            }
+
+            return shape != null && shape.Data != null && shape.Data.TargetClear > 0.0 ? shape.Data.TargetClear : DefaultTargetClearRate;
+        }
+
+        /// <summary>The targets in words: "50%" when every shape shares one, else "`solo` 50%, `elite` 60%, ...".</summary>
+        public string TargetSummary(IEnumerable<EncounterShape> shapes)
+        {
+            List<string> parts = new List<string>();
+            HashSet<double> distinct = new HashSet<double>();
+            foreach (EncounterShape shape in shapes)
+            {
+                double target = TargetFor(shape);
+                distinct.Add(target);
+                parts.Add("`" + shape.Id + "` " + Format(target) + "%");
+            }
+
+            if (distinct.Count == 1)
+            {
+                foreach (double target in distinct)
+                {
+                    return Format(target) + "%";
+                }
+            }
+
+            return string.Join(", ", parts);
+        }
 
         /// <summary>Null = the elements as generated (or authored, fixed set); otherwise every enemy gets this element.</summary>
         public Element? EnemyElementOverride;
@@ -515,7 +578,10 @@ namespace BeastCraft.Tooling.BalanceSim
             "  --compositions <n>         Generated compositions per shape (default 8).\n" +
             "  --encounters <list>        Comma-separated shape ids (generated) or encounter ids (fixed) (default all).\n" +
             "  --team-size <n>            Beasts per player team, 1-6 (default 4); every combination is fielded.\n" +
-            "  --target-clear <pct>       Clear rate the difficulty calibration aims for (default 50).\n" +
+            "  --target-clear <t>         Clear rate(s) the difficulty calibration aims for: a percentage for every shape (the\n" +
+            "                             legacy uniform target, e.g. 50) or shape=pct pairs (e.g. squad=80,elite=60) overriding\n" +
+            "                             the library. Default: each shape's TargetClear in encounter-library.json (the game's\n" +
+            "                             tiered targets; 50 for a fixed-set encounter).\n" +
             "  --marginal-threshold <x>   Flag a beast whose overall marginal clear rate is outside +/-x points (default 5).\n" +
             "  --enemy-element <e>        authored | None | <Element> (default authored = as generated or authored):\n" +
             "                             override every enemy's element.\n" +
@@ -799,14 +865,8 @@ namespace BeastCraft.Tooling.BalanceSim
 
                         break;
                     case "--target-clear":
-                        if (!TryNextDouble(args, ref i, arg, out options.TargetClearRate, out error))
+                        if (!TryNext(args, ref i, arg, out text, out error) || !TryParseTargets(text, options, out error))
                         {
-                            return null;
-                        }
-
-                        if (options.TargetClearRate <= 0.0 || options.TargetClearRate >= 100.0)
-                        {
-                            error = "--target-clear expects a percentage strictly between 0 and 100.";
                             return null;
                         }
 
@@ -1158,6 +1218,48 @@ namespace BeastCraft.Tooling.BalanceSim
             }
 
             levels.Sort();
+            error = null;
+            return true;
+        }
+
+        /// <summary>
+        /// <c>--target-clear</c>: one percentage for every shape (<see cref="UniformTarget"/>), or
+        /// comma-separated <c>shape=pct</c> overrides; every percentage strictly between 0 and 100.
+        /// Shape ids are checked against the loaded encounters later.
+        /// </summary>
+        private static bool TryParseTargets(string text, SimOptions options, out string error)
+        {
+            error = "--target-clear expects a percentage strictly between 0 and 100, or shape=pct pairs (e.g. squad=80,elite=60), got '" + text + "'.";
+            if (text.IndexOf('=') < 0)
+            {
+                if (!double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out double uniform) || !(uniform > 0.0 && uniform < 100.0))
+                {
+                    return false;
+                }
+
+                options.TargetClearRate = uniform;
+                options.UniformTarget = true;
+                options.TargetOverrides = null;
+                error = null;
+                return true;
+            }
+
+            Dictionary<string, double> overrides = new Dictionary<string, double>(StringComparer.Ordinal);
+            foreach (string raw in text.Split(','))
+            {
+                string[] pair = raw.Split('=');
+                if (pair.Length != 2 || pair[0].Trim().Length == 0 ||
+                    !double.TryParse(pair[1].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out double target) || !(target > 0.0 && target < 100.0) ||
+                    overrides.ContainsKey(pair[0].Trim()))
+                {
+                    return false;
+                }
+
+                overrides.Add(pair[0].Trim(), target);
+            }
+
+            options.TargetOverrides = overrides;
+            options.UniformTarget = false;
             error = null;
             return true;
         }

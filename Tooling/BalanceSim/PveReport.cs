@@ -235,14 +235,14 @@ namespace BeastCraft.Tooling.BalanceSim
                 {
                     report.AppendLine("simulator draws " + options.Compositions + " random compositions of mixed enemy types with varied elements; every team fights every");
                     report.AppendLine("composition. The player is assumed to scout: each shape's difficulty is calibrated so the team the " + PickerName(options));
-                    report.AppendLine("fields against each composition clears it about " + SimOptions.Format(options.TargetClearRate) +
-                                      "% of the time (`--calibrate-on " + SimOptions.CalibrationName(options.EffectiveCalibrateOn) + "`), and each beast");
+                    report.AppendLine("fields against each composition clears it about " + options.TargetSummary(shapes) +
+                                      " of the time (`--calibrate-on " + SimOptions.CalibrationName(options.EffectiveCalibrateOn) + "`), and each beast");
                 }
                 else
                 {
                     report.AppendLine("team is fielded against every encounter. The player is assumed to scout: each encounter's difficulty is calibrated");
-                    report.AppendLine("so the team the " + PickerName(options) + " fields against it clears it about " + SimOptions.Format(options.TargetClearRate) +
-                                      "% of the time (`--calibrate-on " + SimOptions.CalibrationName(options.EffectiveCalibrateOn) + "`), and each beast");
+                    report.AppendLine("so the team the " + PickerName(options) + " fields against it clears it about " + options.TargetSummary(shapes) +
+                                      " of the time (`--calibrate-on " + SimOptions.CalibrationName(options.EffectiveCalibrateOn) + "`), and each beast");
                 }
 
                 report.AppendLine("is judged by how much it moves the clear rate of every team it is in. The average team clears less than that (the");
@@ -252,14 +252,14 @@ namespace BeastCraft.Tooling.BalanceSim
             {
                 report.AppendLine("simulator draws " + options.Compositions + " random compositions of mixed enemy types with varied elements; every team fights every");
                 report.AppendLine("composition, each shape's difficulty is calibrated so the average team clears its compositions about " +
-                                  SimOptions.Format(options.TargetClearRate) + "% of the");
+                                  options.TargetSummary(shapes) + " of the");
                 report.AppendLine("time (where a beast's presence moves the outcome most), and each beast is judged by how much it moves its team's");
                 report.AppendLine("clear rate.");
             }
             else
             {
                 report.AppendLine("team is fielded against every encounter, each encounter's difficulty is calibrated so the average team clears it");
-                report.AppendLine("about " + SimOptions.Format(options.TargetClearRate) + "% of the time (where a beast's presence moves the outcome most), and each beast is judged");
+                report.AppendLine("about " + options.TargetSummary(shapes) + " of the time (where a beast's presence moves the outcome most), and each beast is judged");
                 report.AppendLine("by how much it moves its team's clear rate.");
             }
 
@@ -278,7 +278,7 @@ namespace BeastCraft.Tooling.BalanceSim
                 AppendFixedEncounters(report, catalog);
             }
 
-            AppendCalibration(report, options, cells);
+            AppendCalibration(report, options, species, simulator, cells);
             LevelGapReport.AppendSection(report, options, cells);
             AvatarValueReport.AppendSection(report, options, species, simulator, cells);
             if (options.KitSource == KitSource.Standard)
@@ -493,7 +493,7 @@ namespace BeastCraft.Tooling.BalanceSim
             report.AppendLine("- Difficulty: HP, Atk, Def, SpA and SpD of every enemy are scaled by one multiplier per (kit mode, " +
                               (generated ? "shape" : "encounter") + ", level)" + (generated ? ", shared by all" : string.Empty));
             report.AppendLine("  " + (generated ? "of the shape's compositions; " : string.Empty) + "Speed and Move are not. Calibration starts at x1, doubles or halves until the " +
-                              SimOptions.Format(options.TargetClearRate) + "% target is bracketed");
+                              "target (" + options.TargetSummary(catalog.Shapes) + ") is bracketed");
             report.AppendLine("  (x" + SimOptions.FormatMultiplier(SimOptions.MinMultiplier) + " to x" + SimOptions.FormatMultiplier(SimOptions.MaxMultiplier) +
                               "), then bisects " + SimOptions.CalibrationBisections + " times; the evaluated multiplier whose " +
                               (options.CalibratesOnPick ? "picked-team " : string.Empty) + "clear rate is closest to the");
@@ -931,13 +931,14 @@ namespace BeastCraft.Tooling.BalanceSim
             return per == 0 ? 0.0 : (100.0 * cleared) / per;
         }
 
-        private static void AppendCalibration(StringBuilder report, SimOptions options, List<PveCell> cells)
+        private static void AppendCalibration(StringBuilder report, SimOptions options, IReadOnlyList<CreatureSpeciesSO> species, PveSimulator simulator,
+                                              List<PveCell> cells)
         {
             report.AppendLine("### Calibrated difficulty");
             report.AppendLine();
             if (options.CalibratesOnPick)
             {
-                AppendPickCalibration(report, options, cells);
+                AppendPickCalibration(report, options, species, simulator, cells);
                 return;
             }
 
@@ -963,7 +964,7 @@ namespace BeastCraft.Tooling.BalanceSim
                     high = Math.Max(high, rate);
                 }
 
-                string miss = Math.Abs(cell.ClearRate - options.TargetClearRate) > SimOptions.CalibrationTolerance ? " !" : string.Empty;
+                string miss = Math.Abs(cell.ClearRate - options.TargetFor(cell.Shape)) > SimOptions.CalibrationTolerance ? " !" : string.Empty;
                 report.AppendLine("| `" + SimOptions.ModeName(cell.Mode) + "` | `" + cell.Shape.Id + "` | " + cell.Level + " | x" +
                                   SimOptions.FormatMultiplier(cell.Multiplier) + " | " + SimOptions.Format(cell.ClearRate) + "%" + miss + " | " +
                                   SimOptions.Format(low) + "-" + SimOptions.Format(high) + "% | " + cell.Evaluations.Count + " | " + cell.Battles.Length + " | " +
@@ -979,11 +980,11 @@ namespace BeastCraft.Tooling.BalanceSim
         }
 
         /// <summary>"Calibrated difficulty" for a scouted-pick calibration: the calibrated (picked-team) rate beside the no-scouting one.</summary>
-        private static void AppendPickCalibration(StringBuilder report, SimOptions options, List<PveCell> cells)
+        private static void AppendPickCalibration(StringBuilder report, SimOptions options, IReadOnlyList<CreatureSpeciesSO> species, PveSimulator simulator,
+                                                  List<PveCell> cells)
         {
-            report.AppendLine("| Kit mode | Shape | Level | Multiplier | Calibrated on | Scouted clear (target " + SimOptions.Format(options.TargetClearRate) +
-                              "%) | No-scouting clear | Gap | Composition clear range | Evaluations | Battles | Avg time | Stalemates |");
-            report.AppendLine("| --- | --- | ---: | ---: | --- | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: |");
+            report.AppendLine("| Kit mode | Shape | Level | Multiplier | Calibrated on | Target | Scouted clear | No-scouting clear | Gap | Composition clear range | Evaluations | Battles | Avg time | Stalemates |");
+            report.AppendLine("| --- | --- | ---: | ---: | --- | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: |");
             foreach (PveCell cell in cells)
             {
                 double time = 0.0;
@@ -1003,9 +1004,10 @@ namespace BeastCraft.Tooling.BalanceSim
                     high = Math.Max(high, rate);
                 }
 
-                string miss = Math.Abs(cell.CalibratedRate - options.TargetClearRate) > SimOptions.CalibrationTolerance ? " !" : string.Empty;
+                string miss = Math.Abs(cell.CalibratedRate - options.TargetFor(cell.Shape)) > SimOptions.CalibrationTolerance ? " !" : string.Empty;
                 report.AppendLine("| `" + SimOptions.ModeName(cell.Mode) + "` | `" + cell.Shape.Id + "` | " + cell.Level + " | x" +
                                   SimOptions.FormatMultiplier(cell.Multiplier) + " | " + SimOptions.CalibrationName(cell.CalibratedOn) + " | " +
+                                  SimOptions.Format(options.TargetFor(cell.Shape)) + "% | " +
                                   SimOptions.Format(cell.ScoutedClearRate) + "%" + miss + " | " + SimOptions.Format(cell.ClearRate) + "% | " +
                                   SimOptions.Signed(cell.ScoutedClearRate - cell.ClearRate) + " | " + SimOptions.Format(low) + "-" + SimOptions.Format(high) + "% | " +
                                   cell.Evaluations.Count + " | " + cell.Battles.Length + " | " + SimOptions.Format(time / cell.Battles.Length) + " | " + stalemates + " |");
@@ -1024,27 +1026,46 @@ namespace BeastCraft.Tooling.BalanceSim
             report.AppendLine("the composition clear range (lowest and highest clear rate of a single composition over every team) are that final run's.");
             report.AppendLine();
 
-            report.AppendLine("By shape, levels averaged:");
+            report.AppendLine("#### Difficulty by shape (levels averaged)");
             report.AppendLine();
-            report.AppendLine("| Kit mode | Shape | Multiplier | Scouted clear | No-scouting clear | Gap |");
-            report.AppendLine("| --- | --- | ---: | ---: | ---: | ---: |");
+            report.AppendLine("Each shape is calibrated to its own **target** (`TargetClear` in `encounter-library.json`, tiered by the kind of fight;");
+            report.AppendLine("`--target-clear` overrides it). **Scouted** = the calibrated rate (the " + PickerName(options) + "'s team); **no scouting** = the");
+            report.AppendLine("average team; **heuristic (no bonds)** = the team the plain element counter-pick fields, ignoring bonds (its first battle");
+            report.AppendLine("per composition in the every-team run, so noisier); **no avatar** = the scouted team's battles replayed without the avatar");
+            report.AppendLine("(`--avatar-value`; - without it).");
+            report.AppendLine();
+            report.AppendLine("| Kit mode | Shape | Target | Multiplier | Scouted clear | No-scouting clear | Heuristic (no bonds) | No avatar | Gap |");
+            report.AppendLine("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |");
             foreach (KitMode mode in options.Modes)
             {
                 foreach (EncounterShape shape in ScoutedPicker.ShapesOf(cells))
                 {
                     List<PveCell> part = cells.FindAll(c => c.Mode == mode && c.Shape == shape);
+                    int[] heuristicPicks = ScoutedPicker.PicksFor(options, species, simulator.Teams, simulator.TeamBonds, shape, ScoutedPicker.HeuristicIndex);
                     double multiplier = 0.0;
                     double scouted = 0.0;
                     double none = 0.0;
+                    double heuristic = 0.0;
+                    double noAvatar = 0.0;
                     foreach (PveCell cell in part)
                     {
                         multiplier += cell.Multiplier / part.Count;
                         scouted += cell.ScoutedClearRate / part.Count;
                         none += cell.ClearRate / part.Count;
+                        noAvatar += cell.NoAvatarScoutedClearRate / part.Count;
+                        int cleared = 0;
+                        for (int c = 0; c < shape.Compositions.Count; c++)
+                        {
+                            cleared += cell.Battles[simulator.BattleIndex(c, heuristicPicks[c], 0)].Cleared ? 1 : 0;
+                        }
+
+                        heuristic += 100.0 * cleared / shape.Compositions.Count / part.Count;
                     }
 
-                    report.AppendLine("| `" + SimOptions.ModeName(mode) + "` | `" + shape.Id + "` | x" + SimOptions.FormatMultiplier(multiplier) + " | " +
-                                      SimOptions.Format(scouted) + "% | " + SimOptions.Format(none) + "% | " + SimOptions.Signed(scouted - none) + " |");
+                    report.AppendLine("| `" + SimOptions.ModeName(mode) + "` | `" + shape.Id + "` | " + SimOptions.Format(options.TargetFor(shape)) + "% | x" +
+                                      SimOptions.FormatMultiplier(multiplier) + " | " + SimOptions.Format(scouted) + "% | " + SimOptions.Format(none) + "% | " +
+                                      SimOptions.Format(heuristic) + "% | " + (double.IsNaN(noAvatar) ? "-" : SimOptions.Format(noAvatar) + "%") + " | " +
+                                      SimOptions.Signed(scouted - none) + " |");
                 }
             }
 
@@ -1331,7 +1352,7 @@ namespace BeastCraft.Tooling.BalanceSim
                     any = true;
                 }
 
-                if (Math.Abs(cell.CalibratedRate - options.TargetClearRate) > SimOptions.CalibrationTolerance)
+                if (Math.Abs(cell.CalibratedRate - options.TargetFor(cell.Shape)) > SimOptions.CalibrationTolerance)
                 {
                     report.AppendLine("- " + where + ": calibration miss, closest " + (options.CalibratesOnPick ? "scouted " : string.Empty) + "clear rate " +
                                       SimOptions.Format(cell.CalibratedRate) + "%");

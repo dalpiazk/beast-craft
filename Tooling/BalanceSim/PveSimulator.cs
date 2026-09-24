@@ -531,7 +531,7 @@ namespace BeastCraft.Tooling.BalanceSim
         {
             CalibrationTarget calibrateOn = _options.EffectiveCalibrateOn;
             PveCell cell = new PveCell { Mode = mode, Level = level, Shape = shape, Samples = Samples, TeamCount = Teams.Count, CalibratedOn = calibrateOn };
-            double target = _options.TargetClearRate;
+            double target = _options.TargetFor(shape);
             PveBattle[] best = null;
             double bestGap = double.MaxValue;
             double bestRate = double.NaN;

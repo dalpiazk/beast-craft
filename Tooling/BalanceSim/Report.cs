@@ -68,8 +68,9 @@ namespace BeastCraft.Tooling.BalanceSim
             if (options.RunPve && options.CalibratesOnPick)
             {
                 report.AppendLine("- Difficulty (PvE, `--calibrate-on " + SimOptions.CalibrationName(options.EffectiveCalibrateOn) + "`): calibrated so the team the " +
-                                  PveReport.PickerName(options) + " fields per composition clears " + SimOptions.Format(options.TargetClearRate) +
-                                  "% (the player scouts and counter-picks); the average team's no-scouting rate is reported beside it, see \"Calibrated difficulty\"");
+                                  PveReport.PickerName(options) + " fields per composition clears " + options.TargetSummary(encounters.Shapes) +
+                                  (options.UniformTarget ? " (`--target-clear`)" : " (the shapes' `TargetClear`)") +
+                                  " (the player scouts and counter-picks); the average team's no-scouting rate is reported beside it, see \"Calibrated difficulty\"");
             }
 
             if (options.RunPve && options.LevelGaps != null)

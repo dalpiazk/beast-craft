@@ -44,7 +44,7 @@ dotnet run --project Tooling/BalanceSim -c Release -- [options]
 | `--compositions <n>` | `8` | Generated compositions per shape. |
 | `--encounters <list>` | all | Comma-separated shape ids (`solo`, `elite`, `squad`, `horde`) or, with `--encounter-set fixed`, encounter ids (`boss`, `swarm`, `pack`). |
 | `--team-size <n>` | `4` | Beasts per PvE team, 1-6. Every combination of the roster is fielded (C(10,4) = 210). |
-| `--target-clear <pct>` | `50` | Clear rate the difficulty calibration aims for (the scouted pick's by default; see `--calibrate-on`). |
+| `--target-clear <t>` | library | Clear rate the difficulty calibration aims for (the scouted pick's by default; see `--calibrate-on`). By default each shape's own `TargetClear` in `encounter-library.json` (the game's tiered targets: `squad` and `horde` 80, `elite` 60, `solo` 50; 50 for a fixed-set encounter). A single percentage (e.g. `50`) is the legacy uniform target for every shape (the balance guard is judged at `--target-clear 50`); `shape=pct` pairs (e.g. `squad=70,solo=45`) override single shapes. |
 | `--calibrate-on <t>` | `bonds` | Whose clear rate the PvE difficulty is calibrated to `--target-clear`. `bonds`: the team the bond-aware scouted picker (heuristic + bonds) fields against each composition, i.e. the player scouts and counter-picks; falls back to `heuristic` when bonds are not active (`--bonds off`, `--skill-kit standard`). `heuristic`: the plain element counter-pick. `mean`: the mean of every team (the unscouted player), the calibration before scouting; it reproduces the pre-scouting report byte for byte. See "Difficulty calibration". |
 | `--calibrate-samples <n>` | `16` | Scouted-pick calibration only: battles per composition the picked team fights at each search step (8 compositions x 16 = 128 battles per step, a binomial SE of about 4.4 points at 50%). Raise it if a cell's search is non-monotone. |
 | `--level-gap <list>` | off | PvE only. Also replay every cell with the enemies `g` levels above the team (negative = below) at the cell's calibrated multiplier, and add the "PvE level gap" section (and "PvE level gap over seeds" with `--seeds`). Comma-separated gaps and inclusive ranges, e.g. `-5..10` or `0,2,3,5`. The team and the avatar (unless `--avatar-level`) stay at the row's level; the enemies' stats follow their curve to their level, and the damage formula's level-difference term applies. Each battle's seed ignores the gap, so gap 0 is the calibration itself (no extra battles). A gap that puts the enemies outside 1-100 is not run (`—`). Suggested with `--levels 10,30,50,70,90`. See "Level gap". |
@@ -96,7 +96,7 @@ Two reports are committed, both the default arguments:
   roster, the skill library, the encounter content, the simulator or the Runtime change:
 
 ```sh
-dotnet run --project Tooling/BalanceSim -c Release -- --panel 16x4 --out docs/balance/tuned-report.md --write-difficulty BeastCraft/Assets/_Project/Data/Encounters/encounter-difficulty.json
+dotnet run --project Tooling/BalanceSim -c Release -- --panel 16x4 --avatar-value --out docs/balance/tuned-report.md --write-difficulty BeastCraft/Assets/_Project/Data/Encounters/encounter-difficulty.json
 ```
 
 ## Library kits
@@ -503,7 +503,7 @@ are refused).
 
 ## Level gap
 
-`--level-gap` answers "what does being under-levelled cost?". Every (kit mode, shape, level) cell is
+`--level-gap` answers "what does being under-levelled cost, and over-levelling buy?". Every (kit mode, shape, level) cell is
 first calibrated as usual, at equal levels; then, at the cell's multiplier, it is replayed with the
 enemies `g` levels above the team (`PveSimulator.RunLevelGaps`, `RunBattle(mode, teamLevel,
 enemyLevel, ...)`): the picked team per composition `--calibrate-samples` times (the **scouted**
@@ -515,13 +515,17 @@ their own level) and the damage formula's level-difference multiplier on every h
 (`DamageFormula.GetLevelMultiplier`; see `docs/design/battle-system.md`, "Damage formula").
 
 The section's table has one row per shape and level plus an **All shapes** mean per level, one
-column per gap, cells `scouted (no-scouting)`. Targets for the scouted rate (`SimOptions.LevelGap*`):
-gap 0 within 50 +/- 5, +2 and +3 in 20-35%, +5 and beyond under 10%; `!` marks a miss, and a line per
-mode counts the targets met. With `--self-check`, the loop-parity replay also runs each level at its
-widest in-range gap.
+column per gap, cells `scouted (no-scouting)`. Bands for the scouted rate are relative to the cell's
+calibration target T, its shape's `TargetClear` (`SimOptions.LevelGap*`, `LevelGapReport.Band`):
+gap 0 T +/- 5; +2 and +3 (a couple of levels under) 0.4 T to 0.7 T; +5 and beyond under 0.2 T; -2 and
+-3 (a couple of levels over) at least T + 0.4 (100 - T); -5 and beyond at least T + 0.8 (100 - T), so
+over-levelling must make every fight easier. At T = 50 that is 45-55, 20-35, under 10, at least 70 and at
+least 90; at T = 80, 75-85, 32-56, under 16, at least 88 and at least 96. **All shapes** rows are held to
+the bands of the mean target. `!` marks a miss, and a line per mode counts the targets met. With
+`--self-check`, the loop-parity replay also runs each level at its widest in-range gap.
 
 ```sh
-dotnet run --project Tooling/BalanceSim -c Release -- --mode pve --levels 10,30,50,70,90 --level-gap -5..10 --out docs/balance/level-gap-report.md
+dotnet run --project Tooling/BalanceSim -c Release -- --mode pve --levels 10,30,50,70,90 --level-gap -5,-3,-2,0,2,3,5 --out docs/balance/level-gap-report.md
 ```
 
 Cost: each nonzero gap adds about 128 + 336 battles per cell (a sixth of a calibration); the
