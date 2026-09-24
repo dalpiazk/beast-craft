@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Text.Json;
+using BeastCraft.Battle;
 using BeastCraft.Progression;
 using BeastCraft.Skills;
 using UnityEngine;
@@ -17,7 +18,9 @@ namespace BeastCraft.Tooling.BalanceSim
     /// practice XP through <see cref="SkillProgression.AwardPractice"/> and drops through
     /// <see cref="LootRoller.RollClear"/> against <c>drop-tables.json</c> — and a feeding policy
     /// spends the materials. The report gives the p10 / p50 / p90 battle counts for the focus skill
-    /// to reach levels 5, 10, 15 and 20 and checks the medians against <see cref="Gates"/>.
+    /// to reach levels 5, 10, 15 and 20 and checks the medians against <see cref="Gates"/>. It also
+    /// levels the avatar through <see cref="AvatarProgression.AwardBattle"/> and checks its median
+    /// level stays within <see cref="AvatarLevelTolerance"/> of the encounter level.
     /// <para>
     /// <strong>Campaign model</strong> (the constants below; README.md, "Pacing"): battle
     /// <c>i</c> (0-based) is fought at encounter level <c>min(100, 1 + i / BattlesPerLevel)</c>;
@@ -106,6 +109,13 @@ namespace BeastCraft.Tooling.BalanceSim
             new Gate(15, 160, 200, "~180 (160-200)"),
             new Gate(20, 295, 325, "~300-320 (295-325)"),
         };
+
+        /// <summary>
+        /// Avatar pacing target: at every 50-battle checkpoint the avatar's median level is within this
+        /// many levels of the encounter level (it levels alongside the content, neither outgrowing nor
+        /// falling behind it).
+        /// </summary>
+        public const int AvatarLevelTolerance = 3;
 
         /// <summary>
         /// Loads the skill library's materials and the drop tables, runs the Monte Carlo (twice with
@@ -238,6 +248,9 @@ namespace BeastCraft.Tooling.BalanceSim
             /// <summary>The focus skill's level after each battle.</summary>
             public int[] FocusLevelAfter;
 
+            /// <summary>The avatar's level after each battle.</summary>
+            public int[] AvatarLevelAfter;
+
             /// <summary>Materials gained per tier (index = tier).</summary>
             public int[] GainedByTier;
 
@@ -260,9 +273,11 @@ namespace BeastCraft.Tooling.BalanceSim
             SkillProgress focus = new SkillProgress("focus");
             SkillProgress secondary = new SkillProgress("secondary");
             MaterialInventory inventory = new MaterialInventory();
+            AvatarProgress avatar = new AvatarProgress();
             Campaign campaign = new Campaign
             {
                 FocusLevelAfter = new int[battles],
+                AvatarLevelAfter = new int[battles],
                 GainedByTier = new int[model.MaxTier + 1],
                 FirstOfTier = new int[model.MaxTier + 1]
             };
@@ -292,6 +307,8 @@ namespace BeastCraft.Tooling.BalanceSim
                 }
 
                 SkillProgression.AwardPractice(secondary, definition, secondaryUses);
+                AvatarProgression.AwardBattle(avatar, cleared ? BattleOutcome.PlayerVictory : BattleOutcome.EnemyVictory, level);
+                campaign.AvatarLevelAfter[i] = avatar.Level;
 
                 if (cleared)
                 {
@@ -530,6 +547,27 @@ namespace BeastCraft.Tooling.BalanceSim
                 List<int> levels = campaigns.ConvertAll(c => c.FocusLevelAfter[b - 1]);
                 sb.Append("| ").Append(b).Append(" | ").Append(Math.Min(100, 1 + ((b - 1) / BattlesPerLevel))).Append(" | ")
                   .Append(LevelPercentile(levels, 10)).Append(" | ").Append(LevelPercentile(levels, 50)).Append(" | ").Append(LevelPercentile(levels, 90)).Append(" |\n");
+            }
+
+            sb.Append("\n## Avatar level\n\n");
+            sb.Append("`AvatarProgression.AwardBattle` after every battle (").Append(AvatarProgression.ParticipationXp).Append(" XP win or lose, + ")
+              .Append(AvatarProgression.ClearBaseXp).Append(" + ").Append(AvatarProgression.ClearXpPerEnemyLevel).Append(" x encounter level on a clear; a level costs ")
+              .Append(AvatarProgression.XpCurveBase).Append(" + ").Append(AvatarProgression.XpCurvePerLevel).Append(" x level). Target: median within ")
+              .Append(AvatarLevelTolerance).Append(" levels of the encounter level at every checkpoint.\n\n");
+            sb.Append("| Battle | Encounter level | p10 | p50 | p90 | Verdict |\n| ---: | ---: | ---: | ---: | ---: | --- |\n");
+            for (int b = 50; b <= options.PacingBattles; b += 50)
+            {
+                List<int> levels = campaigns.ConvertAll(c => c.AvatarLevelAfter[b - 1]);
+                int encounter = Math.Min(100, 1 + ((b - 1) / BattlesPerLevel));
+                int p50 = LevelPercentile(levels, 50);
+                bool ok = Math.Abs(p50 - encounter) <= AvatarLevelTolerance;
+                if (!ok)
+                {
+                    misses.Add("Avatar at battle " + b + ": median level " + p50 + " vs encounter level " + encounter + ".");
+                }
+
+                sb.Append("| ").Append(b).Append(" | ").Append(encounter).Append(" | ").Append(LevelPercentile(levels, 10)).Append(" | ").Append(p50)
+                  .Append(" | ").Append(LevelPercentile(levels, 90)).Append(" | ").Append(ok ? "ok" : "**MISS**").Append(" |\n");
             }
 
             sb.Append("\n## Materials\n\n");

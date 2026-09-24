@@ -74,12 +74,20 @@ puzzle every encounter.
   beasts are: a fast team cycles its avatar faster. The alternative is an avatar gauge filled by
   the avatar's own Speed, which would make that stat (currently unused) matter and decouple the
   avatar from team composition. Open; the rule is unchanged until it is decided.
-- **Avatar level.** The avatar has stats (decision 6, amended) and its *skills* now progress —
-  its active skills and its passives level on the beast-skill model (see "Avatar passives") — but
-  the avatar itself still has no level and no stat growth: its base is a flat authored block and
-  only avatar gear moves it. It has no level or XP progression of its own; the statful
-  `BattleAvatar.Create` takes a per-battle level (default 1) that the battle setup is expected to
-  pick sensibly, e.g. the player team's level — a stopgap input, not a design for progression.
+- **Avatar level — progression now exists; the battle wiring is still open.** The avatar has its
+  own level (TUNABLE STARTING DEFAULTS): `AvatarProgress` (save data: `Level`, `Xp`) and
+  `AvatarProgression` (own constants, not the skill curve). A level costs `200 + 16 × level` XP
+  (216 at level 1, 1,784 at level 99; max level 100). `AwardBattle(progress, outcome, enemyLevel)`
+  pays **8 XP for any finished battle** plus a **clear bonus of `40 + 4 × enemyLevel`** on
+  `PlayerVictory`. At an 80% clear rate that is one level per ~5 battles at every level, so the
+  avatar **levels alongside the encounters** (the pacing target: median avatar level within 3 of
+  the encounter level; measured within 0-1 over a 500-battle campaign, balance simulator
+  `--mode pacing`); fighting below one's level pays less. Stats: `AvatarStatsSO.Growth` (a
+  `GrowthRateCurve`, as a species has) with `GetStatAtLevel` / `GetStatsAtLevel(level)`, which
+  scale `BaseStats` (then the max-level block) like `CreatureSpeciesSO.GetStatAtLevel` — MoveRange
+  and CritChance exempt, Speed scales; no `Growth` keeps the block flat. Still open: the battle
+  setup (and the simulator's avatar presets) passing `AvatarProgress.Level` and
+  `GetStatsAtLevel(level)` into `BattleAvatar.Create`, and authoring the avatar's growth curve.
 
 ## Encounter direction: PvE, not PvP — DIRECTION, NOT YET A CONFIRMED DECISION
 

@@ -2085,3 +2085,15 @@ regular drops but moves with the band boundaries and the level ramp.
 
 Reproduce: `dotnet run --project Tooling/BalanceSim -c Release -- --mode pacing --self-check --out docs/balance/pacing-report.md`
 (about 1.5 s).
+
+## Avatar level (stage 3a): pacing against the encounter level
+
+`AvatarProgression` (new): a level costs `200 + 16 × level`; a battle pays 8 XP, plus `40 + 4 ×
+enemy level` on a clear. Derived, not searched: at encounter level L and an 80% clear rate a battle
+pays `8 + 0.8 × (40 + 4L) = 40 + 3.2L`, and the pacing campaign spends 5 battles per encounter level,
+so a level should cost `5 × (40 + 3.2L) = 200 + 16L`. Target: median avatar level within 3 of the
+encounter level at every 50-battle checkpoint. Measured (`--mode pacing`, 1000 campaigns): median
+within 0-1 everywhere (battle 100: 21 vs 20; 250: 50 vs 50; 400: 81 vs 80; 500: 100), p10-p90 at
+most 3 levels wide. A player who clears less than 80% falls behind the content (at a 50% clear
+rate a battle pays about two thirds as much XP), which is the intended pressure; the curve's two
+constants move the whole track.

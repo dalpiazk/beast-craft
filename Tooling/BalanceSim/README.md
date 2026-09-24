@@ -454,6 +454,11 @@ dotnet run --project Tooling/BalanceSim -c Release -- --mode pacing --self-check
   and the spill-over skill's final level. **Targets** (`PacingSimulator.Gates`, on the median): L5
   15-20, L10 70-90, L15 160-200, L20 295-325. `--self-check` runs twice, demands identical reports
   and fails (exit 3) when a median misses its band. About 1.5 s.
+- **Avatar level**: every campaign also levels an `AvatarProgress` with
+  `AvatarProgression.AwardBattle` (win or loss by the same clear roll, at the battle's encounter
+  level); the report tabulates its p10 / p50 / p90 level every 50 battles, and `--self-check` fails
+  when the median strays more than `AvatarLevelTolerance` (3) levels from the encounter level. It
+  draws no random numbers, so it never shifts the skill-pacing results.
 - The model's constants (level ramp, shape weights, clear chance, uses per battle) are at the top of
   `PacingSimulator.cs`; the drop numbers are data. See the design doc, "Material economy", and
   `docs/balance/tuning-log.md`, "Material economy".

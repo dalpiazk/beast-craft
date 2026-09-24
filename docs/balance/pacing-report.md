@@ -40,6 +40,23 @@ Practice only ignores the gates (a skill cannot pass one without a material). Ne
 | 450 | 90 | 20 | 20 | 20 |
 | 500 | 100 | 20 | 20 | 20 |
 
+## Avatar level
+
+`AvatarProgression.AwardBattle` after every battle (8 XP win or lose, + 40 + 4 x encounter level on a clear; a level costs 200 + 16 x level). Target: median within 3 levels of the encounter level at every checkpoint.
+
+| Battle | Encounter level | p10 | p50 | p90 | Verdict |
+| ---: | ---: | ---: | ---: | ---: | --- |
+| 50 | 10 | 10 | 11 | 11 | ok |
+| 100 | 20 | 20 | 21 | 21 | ok |
+| 150 | 30 | 30 | 31 | 31 | ok |
+| 200 | 40 | 39 | 40 | 42 | ok |
+| 250 | 50 | 49 | 50 | 52 | ok |
+| 300 | 60 | 59 | 60 | 62 | ok |
+| 350 | 70 | 69 | 70 | 72 | ok |
+| 400 | 80 | 79 | 81 | 82 | ok |
+| 450 | 90 | 89 | 91 | 92 | ok |
+| 500 | 100 | 99 | 100 | 100 | ok |
+
 ## Materials
 
 | Material | Tier | Gained per campaign (mean) | First gained, battle p10 / p50 / p90 |

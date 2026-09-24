@@ -29,5 +29,47 @@ namespace BeastCraft.Avatar
     {
         /// <summary>The avatar's stats with nothing equipped.</summary>
         public StatBlock BaseStats;
+
+        /// <summary>
+        /// How the base scales with the avatar's level (<c>AvatarProgress.Level</c>), exactly as a
+        /// species' <see cref="CreatureSpeciesSO.GrowthRate"/> scales its <c>BaseStats</c>:
+        /// <see cref="BaseStats"/> are then the max-level values. Null keeps the block flat at every
+        /// level (the behaviour before avatar levels existed).
+        /// </summary>
+        public GrowthRateCurve Growth;
+
+        /// <summary>
+        /// One stat at <paramref name="level"/>: <see cref="BaseStats"/> scaled by <see cref="Growth"/>
+        /// and rounded, mirroring <see cref="CreatureSpeciesSO.GetStatAtLevel"/>. MoveRange and
+        /// CritChance are exempt (small tactical numbers, never scaled); Speed scales like the rest.
+        /// With no <see cref="Growth"/> the base is returned unscaled.
+        /// </summary>
+        public int GetStatAtLevel(StatType type, int level)
+        {
+            int baseStat = BaseStats.GetStat(type);
+
+            if (Growth == null || type == StatType.MoveRange || type == StatType.CritChance)
+            {
+                return baseStat;
+            }
+
+            return Mathf.RoundToInt(baseStat * Growth.GetScaleAtLevel(level));
+        }
+
+        /// <summary>
+        /// Every stat at <paramref name="level"/> (<see cref="GetStatAtLevel"/>): the base block to
+        /// hand to <c>BattleAvatar.Create</c> for an avatar of that level, before gear.
+        /// </summary>
+        public StatBlock GetStatsAtLevel(int level)
+        {
+            StatBlock stats = BaseStats;
+
+            foreach (StatType type in (StatType[])System.Enum.GetValues(typeof(StatType)))
+            {
+                stats.SetStat(type, GetStatAtLevel(type, level));
+            }
+
+            return stats;
+        }
     }
 }
