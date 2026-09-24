@@ -1,10 +1,13 @@
 # Progression, saves and the battle session
 
-How a player's progress is stored, how beasts and the avatar level up, and the single entry point
-a scene calls to fight a battle from save data and pay it out. This covers the runtime code under
-`BeastCraft/Assets/_Project/Scripts/Runtime/{Save,Session,Progression}` and the tooling that tests
-it outside Unity. The battle rules themselves are in [battle-system.md](battle-system.md); pacing
-numbers come from [`docs/balance/pacing-report.md`](../balance/pacing-report.md).
+How a player's progress is stored, how beasts and the avatar level up, the region campaign they
+play through, and the single entry point a scene calls to fight a battle from save data and pay it
+out. This covers the runtime code under
+`BeastCraft/Assets/_Project/Scripts/Runtime/{Save,Session,Progression,Campaign}` and the tooling that
+tests it outside Unity. The battle rules themselves are in [battle-system.md](battle-system.md);
+pacing numbers come from [`docs/balance/campaign-pacing-report.md`](../balance/campaign-pacing-report.md)
+(the region campaign) and [`docs/balance/pacing-report.md`](../balance/pacing-report.md) (skills and
+materials).
 
 Everything here is pure C# over two thin seams: an injected JSON engine and an injected storage
 backend. The one file backend is `FileSaveStorage` (below); there is no UI and no Unity Gaming
@@ -14,26 +17,27 @@ Services integration yet.
 
 ## Save format
 
-### `PlayerSave` (schema 2)
+### `PlayerSave` (schema 3)
 
 One versioned aggregate per player (`BeastCraft.Save.PlayerSave`):
 
 | Field | Type | Contents |
 | --- | --- | --- |
-| `SchemaVersion` | `int` | The schema the data is in. `CurrentSchemaVersion` is **2**. 0 or missing is never valid. |
+| `SchemaVersion` | `int` | The schema the data is in. `CurrentSchemaVersion` is **3**. 0 or missing is never valid. |
 | `Beasts` | `List<OwnedBeast>` | The beast collection, in the order obtained. |
 | `Avatar` | `AvatarProgress` | The avatar's own level and XP. |
 | `AvatarSkills` | `AvatarSkillBook` | The avatar's active and passive skill books. |
 | `Materials` | `MaterialInventory` | Held skill materials, cleared (shape, band) cells and pity counters. |
 | `Gear` | `GearInventory` | Every owned piece of beast and avatar gear, worn or not (schema 2). |
 | `AvatarEquippedGear` | `string[3]` | The avatar's worn gear by slot, indexed by `(int)AvatarGearSlot` (schema 2). |
+| `Campaign` | `CampaignProgress` | Owned seals, each unlocked region's progress, the current region and the expedition in progress (schema 3; see "Region campaign"). |
 
 `OwnedBeast` is one beast in the collection:
 
 | Field | Type | Contents |
 | --- | --- | --- |
 | `BeastId` | `string` | Unique within the save; how teams and other save data refer to the beast. Two beasts of one species are two beasts. |
-| `Progress` | `BeastProgress` | `{SpeciesId, Level, Xp}`: which species it is, its level (1-based) and XP banked toward the next. |
+| `Progress` | `BeastProgress` | `{SpeciesId, Level, Xp, BankedXp}`: which species it is, its level (1-based), XP toward the next, and XP banked while held at the level cap (`BankedXp`, schema 3). |
 | `Skills` | `BeastSkillBook` | Learned skills with their `SkillProgress` (level, XP, tier) and the 3 equipped slots (slot order is fire priority). |
 | `EquippedGear` | `string[3]` | Worn beast gear by slot, indexed by `(int)GearSlot` (schema 2). |
 
@@ -46,7 +50,26 @@ writes null strings back as empty ones, and every reader treats both as empty.
 
 `PlayerSave.EnsureInitialized()` replaces any null collection or sub-object with its empty default
 and drops null list entries, so code reading a loaded save never meets a null (`JsonUtility` never
-produces them; other serializers and hand-edited files can). It never touches ids or numbers.
+produces them; other serializers and hand-edited files can). It never touches ids or numbers (a
+null campaign string becomes "").
+
+### Campaign progress (schema 3)
+
+`CampaignProgress` (`BeastCraft.Campaign`):
+
+| Field | Type | Contents |
+| --- | --- | --- |
+| `Seals` | `List<string>` | Owned seal ids (`regions.json` `Seals`), in the order granted. Key items, not materials. |
+| `Regions` | `List<RegionProgress>` | `{RegionId, StagesCleared, BossCleared}` per **unlocked** region (an entry = unlocked). |
+| `CurrentRegionId` | `string` | The region last entered, or "". |
+| `ActiveRun` | `MapRun` | The expedition in progress: `{RegionId, Stage, Seed, Nodes, CurrentNodeId, Cleared, Attempts, NodeAttempts}`. **`RegionId == ""` means none** — JsonUtility writes every class field, so the run is never null. |
+
+`MapRun.Nodes` is a snapshot of the generated map (node id = index), so a content or generator change
+never moves the ground under a saved expedition. `MapNode` is `{NodeId, Layer, Lane, Type, Level,
+ShapeId, TemplateId, EncounterSeed, Next[]}`; `Type` is `MapNodeType` (`Battle 0, Elite 1, Rest 2,
+Shop 3, Gate 4, Boss 5`, saved as its number — append only). `CurrentNodeId` is −1 before the first
+step. A new save (`PlayerSave.CreateNew`) starts with `CampaignProgress.StartingRegionId` (`r01`)
+unlocked.
 
 ### Gear inventory
 
@@ -95,6 +118,7 @@ the load with a reason. The registered steps are `SaveMigrations.All()`:
 | Step | Upgrade |
 | --- | --- |
 | `SaveMigrations.AddGear` (1 → 2) | A v1 save owns no gear: read it into the current type (the gear fields take their empty defaults), fill in anything missing, write it back. |
+| `SaveMigrations.AddCampaign` (2 → 3) | A v2 save has no campaign and no bank: read it into the current type (empty campaign, `BankedXp` 0), fill in anything missing, unlock `r01`, write it back. Beasts keep their levels — one above the starting cap (12) stays there and only banks until the cap passes it. |
 
 To change the schema: bump `PlayerSave.CurrentSchemaVersion`, add a step whose `FromVersion` is the
 previous version, and add a test that loads an example of the old shape. Purely additive fields
@@ -165,9 +189,19 @@ only the structural checks run.
 | `DoubleEquippedGear` | an instance is worn in more than one slot or by more than one owner | — |
 | `GearSlotMismatch` | a worn instance is in a slot other than its gear's own | gear |
 | `GearLevelTooLow` | a beast wears gear above its level (the gear has no effect) | gear |
+| `UnknownRegion` | a region id (progress, current region, expedition) is empty or unknown | content (for unknown) |
+| `UnknownSeal` | an owned seal id is empty or unknown | content (for unknown) |
+| `DuplicateCampaignEntry` | a region or seal is listed twice | — |
+| `InvalidMapRun` | nodes stored without an expedition; an expedition in a locked region, with no nodes, a node id that is not its index, an unknown node type, a link that is not to the next row, or a current / cleared node not on the map | — |
+
+Negative `BankedXp`, `StagesCleared`, run `Stage` / attempts and node levels outside 1-100 are
+`InvalidValue`s.
 
 `SaveContentCatalog` is an `ISaveContentCatalog` over plain id sets; `SaveContentCatalog.FromData(roster, library)`
-builds it from the authored `beast-roster.json` and `skill-library.json`.
+builds it from the authored `beast-roster.json` and `skill-library.json`, and
+`FromData(roster, library, regions)` adds `regions.json`'s region and seal ids
+(`ISaveContentCatalog.IsKnownRegion` / `IsKnownSeal`, added with schema 3). A catalog built without
+campaign data answers every non-empty region and seal id as known.
 
 ---
 
@@ -175,43 +209,180 @@ builds it from the authored `beast-roster.json` and `skill-library.json`.
 
 Both are parallel, deliberately uncoupled rules: `AvatarProgression` (avatar level, scales its
 stats through `AvatarStatsSO.GetStatsAtLevel`) and `BeastProgression` (a beast's `BeastProgress`,
-which `BattleUnitFactory` builds the beast at). Both cap at level 100, bank XP toward the next level,
-level up as far as the bank allows, hold the bank at 0 at the cap, and normalize level and XP on
-every write. A null progress is a no-op.
+which `BattleUnitFactory` builds the beast at). Both cap at level 100, keep XP toward the next level,
+level up as far as it allows, hold nothing at level 100, and normalize level and XP on every write.
+A null progress is a no-op.
 
 | | Avatar (`AvatarProgression`) | Beast (`BeastProgression`) |
 | --- | --- | --- |
 | XP to next level | `200 + 16 × level` (216 at L1, 1,784 at L99) | `160 + 13 × level` (173 at L1, 1,447 at L99) |
 | Every finished battle | 8 XP (won, lost or stalemate) | 6 XP to every **fielded** beast — also when knocked out |
-| Clear bonus (player victory) | `40 + 4 × enemy level` | `40 + 4 × enemy level`, only to fielded beasts **still standing** at the end |
-| Benched | — | nothing |
+| Clear bonus (player victory) | `50 + 5 × enemy level` | `50 + 5 × enemy level`, only to fielded beasts **still standing** at the end |
+| Benched | — | the **bench share** of a standing beast's XP (below) |
+| Level-gap falloff | yes | yes (fielded and benched) |
+| Level cap | **none** (lead decision) | the campaign's beast level cap, with a bank (below) |
 
 Skill practice XP is separate (`SkillProgression`: 10 XP per time a skill fired, at most 20 uses per
-award) and is paid by the same reward step.
+award), is paid by the same reward step, and is never cut by the falloff or the cap.
 
-> **Beast XP numbers are autonomous defaults pending user review.** They were chosen without a
-> design brief, to one target — a beast fielded every battle levels alongside the encounters, as the
-> avatar does — and are all tunable. The avatar numbers predate this document.
+**Level-gap falloff** (`LevelGapXp`). A battle's **whole** XP (participation included) is cut by
+the earner's level before the award minus the encounter level: 0 or below 100%, +1 60%, +2 25%,
++3 10%, +4 5%, +5 and above 0% (integer maths, rounding down). Old content cannot be farmed: in the
+campaign model, 25 won battles of region 1 after region 5's boss pay nothing, and 25 of region 5's
+second stage pay 0.00 levels (p90 0.02). It costs the fielded team about 14% of its battle XP along
+the way (the early rows of each stage sit below it).
 
-**Pacing.** `dotnet run --project Tooling/BalanceSim -c Release -- --mode pacing` plays 1,000
-Monte Carlo campaigns of 500 battles (encounter level `1 + battle / 5`, 80% of battles cleared) and
-checks, at every 50-battle checkpoint, that the median level is within 3 of the encounter level.
-The beast in that model is fielded in every battle and knocked out in 20% of them (a modelling
-assumption, not measured from the PvE simulation). Current result
-([pacing-report.md](../balance/pacing-report.md)):
+**Bench share** (`BeastProgression.BenchXp` / `AwardBench`). A beast left on the bench earns
+`min(100%, 10% + 9% × levels below the enemy)` of what a standing fielded beast earns, then the
+falloff on its own level: 10% at or above the enemy's level, 55% five levels down, all of it from ten
+levels down. A reserve therefore settles a few levels behind the team instead of falling ever
+further back, and a new recruit catches up at the full rate. Campaign model: the bench is 5.0-6.0
+levels behind the fielded team at every boss from region 3; a level-1 recruit joining at region 5 is
+7.7 behind by the end of region 6.
+
+> **Bench numbers retuned, pending lead/user review.** The lead's decision was 50% + 7.5% per level
+> (capped at 100%), chosen for its predicted outcome, "reserves ~6-7 levels behind". That estimate
+> assumed the fielded beasts earn their full XP; under the falloff and knockouts they earn about 70%
+> of it, and 50% + 7.5% kept the bench only 1-2 levels behind (`--mode campaign`). The formula shape
+> is kept; the constants (`BenchShareBasePermille` 100, `BenchSharePerLevelPermille` 90) are what
+> produce the intended outcome.
+
+**Level cap and bank** (`BeastProgression.AddXp(progress, xp, levelCap)`, `LevelCap`). Below the cap
+a beast levels as usual. At the cap its `Xp` fills to one short of the next level and the rest goes
+to `BeastProgress.BankedXp`; `Xp + BankedXp` holds at most the XP of `LevelCap.BankLevelLimit` (3)
+levels from its level, and more is lost. `LevelCap.Release(progress, newCap)` spends the bank at a
+raised cap (the campaign releases every beast when a seal is granted), so a cap rise pays out at most
+three levels at once. A beast obtained (or migrated) above the cap keeps its level and only banks.
+The cap is `LevelCaps.BeastCap`: the highest owned seal's cap, or the starting cap (see "Region
+campaign"). In the campaign model the cap never binds for a player who follows the content (banked
+levels at every seal: 0); it stops a grinder from running more than a region ahead.
+
+> **XP numbers are autonomous defaults pending user review.** The clear bonus was `40 + 4 × level`
+> for both until the region campaign; the campaign clears about 70% of its battles (80% squads,
+> harder elites, gates and bosses, a loss retried), and at the old rate the team fell behind and into
+> a loss spiral (1,000+ battles). `50 + 5 × level` keeps it on the content in about 540 battles.
+
+**Pacing.** Two models, both `dotnet run --project Tooling/BalanceSim -c Release -- --mode ...`:
+
+- `--mode campaign` (the region campaign; see "Region campaign" below) — the one the XP numbers are
+  tuned to: the fielded team's median level is within a level of every gate and boss (target ±3),
+  the avatar's on it.
+- `--mode pacing` (1,000 Monte Carlo campaigns of 500 battles, encounter level `1 + battle / 5`, 80%
+  cleared, a beast fielded in every battle and knocked out in 20% of them). With the raised clear
+  bonus it runs slightly ahead, and the falloff holds it there: the median is one level above the
+  encounter level at every 50-battle checkpoint (target ±3), both for the avatar and the beast
+  ([pacing-report.md](../balance/pacing-report.md)):
 
 | Battle | 50 | 100 | 150 | 200 | 250 | 300 | 350 | 400 | 450 | 500 |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | Encounter level | 10 | 20 | 30 | 40 | 50 | 60 | 70 | 80 | 90 | 100 |
-| Avatar p50 | 11 | 21 | 31 | 40 | 50 | 60 | 70 | 81 | 91 | 100 |
-| Beast p50 | 10 | 20 | 30 | 40 | 50 | 60 | 70 | 80 | 90 | 100 |
-| Beast p10 – p90 | 9–11 | 19–22 | 29–32 | 39–42 | 48–52 | 58–62 | 68–72 | 78–82 | 87–92 | 97–100 |
+| Avatar p50 | 11 | 21 | 31 | 41 | 51 | 61 | 71 | 81 | 91 | 100 |
+| Beast p50 | 11 | 21 | 31 | 41 | 51 | 61 | 71 | 81 | 91 | 100 |
+| Beast p10 – p90 | 10–11 | 20–21 | 30–31 | 40–41 | 50–51 | 60–61 | 70–71 | 80–81 | 90–91 | 100–100 |
 
-Every checkpoint is inside the ±3 target for both. Why it works for the beast: at encounter level
-`L` a battle pays on average `6 + 0.8 × 0.8 × (40 + 4L) ≈ 31.6 + 2.56L`; five battles per encounter
-level pay `≈ 158 + 12.8L` against a level cost of `160 + 13L`. Fighting below one's level pays less,
-so grinding easy content is slow. `--self-check` runs the model twice and fails on any difference
-or missed target.
+`--self-check` runs either model twice and fails on any difference or missed target.
+
+---
+
+## Region campaign
+
+The campaign the player progresses through: ten regions covering levels 1-100, each played as four
+expeditions ("stages") on seeded node maps, Slay-the-Spire style, with a boss at the end of the
+fourth whose seal raises the beast level cap. Runtime code under `Runtime/Campaign` (namespace
+`BeastCraft.Campaign`); content in `BeastCraft/Assets/_Project/Data/Campaign/regions.json`; paced by
+[`docs/balance/campaign-pacing-report.md`](../balance/campaign-pacing-report.md). **The content is a
+DRAFT pending producer review** (names, level bands, map rules, bosses).
+
+### `regions.json`
+
+`{SchemaVersion, StartingLevelCap, LevelCapMargin, MapRules, Seals[], Regions[]}` — the usual
+Data / build / validator / SO pattern: `RegionLibraryData`, `RegionLibrary.Build` (indexed regions and
+seals, each region's effective rules, which regions a boss unlocks), `RegionLibraryValidator`,
+`RegionLibrarySO`, and the Editor importer (Beast Craft/Data/Import Regions, validated against
+`encounter-library.json`, all or nothing).
+
+| Content | Value |
+| --- | --- |
+| Regions | `r01` Verdant Hollow (1-10), `r02` Emberreach (11-20), `r03` Tidefall, `r04` Stormcrag, `r05` Rustwood, `r06` Frostmere, `r07` Thunderspire, `r08` Deepwild, `r09` Cinder Throne, `r10` Apex (91-100); 4 stages each; each requires the one before |
+| Battle shapes | squad 45, horde 40, solo 15 (every region) |
+| Seals | `seal_r01` … `seal_r10`, one per boss, caps 22, 32, 42, 52, 62, 72, 82, 92, 100, 100 (the next region's max + `LevelCapMargin` 2) |
+| Starting cap | 12 (region 1's max + 2) |
+| Map rules | 11 rows (row 0 to the top), 4 lanes, 4 paths, rest row 9, node weights Battle 70 / Elite 15 / Shop 8 / Rest 7, 1-3 elites from row 3, at most 1 shop, elites +1 level, gates +0, elite shape `elite` |
+
+A region's own `MapRules` override the library's when its `Layers` is above 0. The validator requires
+contiguous levels 1-100 from `r01` (`CampaignProgress.StartingRegionId`), each region requiring an
+earlier one, existing shapes and gate / boss templates, and seal caps that never fall and always
+cover the next region's max level.
+
+### Node maps (`NodeMapGenerator`)
+
+`Generate(region, rules, stage, seed)` is deterministic (one seeded `System.Random`: paths, then
+types, then shapes). `Paths` walks go from a lane of row 0 to the row under the top, stepping −1 / 0 /
++1 lanes without crossing an edge already walked (the first two start in different lanes); their
+union is the map, and every node of the row under the top leads to the single top node. Row 0 is
+Battle, the rest row is Rest ("Camp"), the top is the Gate — or, on the last stage, the Boss; other
+nodes are drawn by weight, never an Elite, Rest or Shop straight after its own type, no Elite below
+`EliteMinLayer`, no Rest under the rest row. A draw with the wrong number of elites or shops is
+re-drawn (20 tries), then fixed up deterministically.
+
+**Node level** (`RowLevel`): `MinLevel + floor(t × (MaxLevel − MinLevel) / T)` with `t = stage ×
+(Layers − 1) + row`, `T = Stages × (Layers − 1)` — about 2.25 levels per stage. Elites +1; Gates +0
+(`GateLevelOffset`); the Boss exactly the region's max level. Battle nodes draw a shape from the
+region's `ShapeWeights`; Elites and generated Gates use the elite shape; the Boss fields its
+template. Each node's `EncounterSeed` is `LootRoller.DeriveSeed(mapSeed, NodeId)`.
+
+### Rules (`CampaignRules`)
+
+| Call | Does |
+| --- | --- |
+| `StartRun(save, regions, regionId[, stage], seed)` | Generates and stores the stage's map (default stage: the first uncleared, or the last for a replay). Refused for a locked or unknown region, a stage past the next, or while another expedition is in progress. |
+| `CanEnter` / `Choices` | Row 0 before the first step; afterwards only the current node's links; never a cleared node. |
+| `PlanFor(node, encounters, enemies)` | The node's `EncounterPlan` (template, or generated from its shape, level and seed — a retry fields the same lineup). Null for Rest / Shop. |
+| `BattleSeed(node, attempt)` | `DeriveSeed(EncounterSeed, attempt)`: a new battle seed per retry. |
+| `ResolveBattle(save, regions, nodeId, outcome)` | Win: the node is cleared and current. A Gate also clears the stage and ends the expedition; the Boss sets `BossCleared`, grants its seal (`GrantSeal`), unlocks the next region and ends it. Loss (lead decision): nothing moves — retry the node or take another path; `Attempts` counts. Rewards are `BattleSession.ApplyRewards(…, beastLevelCap: BeastCap(save, regions))`, not this. |
+| `Camp(save, regions, nodeId, beastId)` | Rest node: trains one chosen beast by a standing clear at the node's level (falloff, cap). Battles already start at full HP, so there is no healing. |
+| `Trade(save, regions, nodeId, shop)` | Shop node: opens the `IShopService` (a stub, `ShopServiceStub`, until the economy lane's gold and stock land) and marks the node visited. |
+| `Retreat(save)` | Abandons the expedition (stage progress already earned stays). |
+| `GrantSeal(save, regions, sealId)` | Adds the seal and releases every beast's bank at the new cap. Bosses call it; it is also the hook for future story-event seals. |
+| `BeastCap(save, regions)` | `LevelCaps.BeastCap(save.Campaign.Seals, regions)`. |
+
+### Bosses (DRAFT)
+
+Ten authored templates in `encounter-library.json` (`boss_r01_hollow_warden` … `boss_r10_apex_pair`),
+shape `elite` (its drop cells), fought at the region's max level, each marked DRAFT PLACEHOLDER in its
+`Description`: r01 champion (Nature) + 2 brutes; r02 2 Fire champions + 2 archers; r03 Water giant +
+2 casters (Water / Ice); r04 Air giant + 3 stalkers; r05 2 champions (Metal / Earth) + shaman + 2
+brutes; r06 Ice giant + 10 swarmlings + 2 archers; r07 Lightning giant + Air champion + 2 casters;
+r08 Nature giant + 12 stinglings + 2 shamans; r09 Fire giant + 2 champions (Earth / Metal); r10 two
+giants (Fire / Water). Each `DifficultyOverride` (x0.80-x1.20) was calibrated with the simulator's
+fixed-encounter set (`--encounter-set fixed --kit elemental`, 64 samples per step) so the bond-aware
+scouted pick clears about 50% at that level (the user's boss target) — on the combat rules before the
+tiered-target and behaviour work, so it should be re-run after them.
+
+### Pacing (`--mode campaign`)
+
+`dotnet run --project Tooling/BalanceSim -c Release -- --mode campaign [--runs n] [--seed(s)] [--out
+path] [--self-check] [--regions path]`: 1,000 Monte Carlo campaigns through the real save, maps and
+rules. The player fields 3 beasts (knocked out in 20% of battles each), benches 3, recruits a level-1
+beast when region 5 starts, takes an Elite when the team's mean level is at least its level (else a
+Battle, else Rest, Shop), camps the lowest bench beast, and retries every loss. Clear chance at equal
+level: squad / horde 80%, elite and gates 60%, solo and bosses 50% (the user's tiers), moved across a
+level gap along the design's table in log-odds (+1 level: 60% / 36% / 27%). Result (all gates met):
+
+| Gate | Target | Result |
+| --- | --- | --- |
+| Battles, whole campaign | 400-600 (p50) | 541 (p10-p90 517-569); 52-54 per region, ~17 of them lost retries |
+| Fielded level at every gate and boss | p50 within 3 | within 0.3 of the node level everywhere |
+| Avatar level at every gate and boss | p50 within 3 | on the node level |
+| Bench | 5-8 behind, from region 3 | 5.0-6.0 |
+| Recruit | within 8 by the end of region 6 | 7.7 |
+| Level cap | never exceeded | 0 |
+| Banked levels at a seal | p50 ≤ 3 | 0 (the cap never binds for this player) |
+| Grind probe after r05's boss | < 0.05 levels (r01), < 0.5 (r05 stage 2) | 0.00, 0.00 |
+| Focus skill (`--mode pacing`'s gates) | L5 15-20, L10 70-90, L15 160-200, L20 295-325 | 17, 86, 190, 323 |
+
+The clear-chance model is an assumption, not measured from fought battles; the tiered targets are
+what the encounter table is calibrated to for a scouting player at equal level.
 
 ---
 
@@ -314,19 +485,28 @@ Pays a finished battle into the save:
   clear of (`shape`, `encounterLevel`) from `dropTable` into `save.Materials`, first-clear bonus and
   pity included. A null table drops nothing.
 - **Beast XP** — `BeastProgression.AwardBattle` to every team beast, knocked out = its unit
-  `IsDefeated` at the end. Benched beasts earn nothing.
-- **Avatar XP** — `AvatarProgression.AwardBattle` when the avatar took part.
+  `IsDefeated` at the end, after the level-gap falloff on its level, added under the beast level
+  cap.
+- **Bench XP** — `BeastProgression.AwardBench` to every other beast in the save (the bench share,
+  then the falloff), under the same cap.
+- **Avatar XP** — `AvatarProgression.AwardBattle` when the avatar took part (falloff; no cap).
 
 `rng` drives the drop rolls; null seeds one with `LootRoller.DeriveSeed(result.Seed, 0)`, so rewards
 are deterministic either way. The summary reports `Applied`, `Error`, `Outcome`,
-`SkillLevelsGained`, `BeastXpGained` (by beast id), `BeastLevelsGained`, `AvatarXpGained`,
-`AvatarLevelsGained` and the `Loot`. It refuses — changing nothing — a null save or result, a failed
+`SkillLevelsGained`, `BeastXpGained` (by beast id, after the falloff), `BeastLevelsGained`,
+`BenchXpGained` (by beast id), `BenchLevelsGained`, `XpBanked` (by beast id, what went to the bank),
+`FalloffPercent` (by beast id, team and bench), `BeastLevelCap`, `AvatarXpGained`,
+`AvatarFalloffPercent`, `AvatarLevelsGained` and the `Loot`. It refuses — changing nothing — a null save or result, a failed
 battle, or a result already paid out (`BattleSessionResult.RewardsApplied`). A team beast no longer in
 the save is skipped.
 
 `BattleSession.ApplyRewards(save, result, content, dropTable, rng = null)` does the same for the
 `ShapeId` and `EncounterLevel` the battle's `EncounterSetup` named (`EncounterPlan.ToSetup` sets
 both); it refuses, changing nothing, a result whose setup named no shape or no level.
+
+Both have an overload taking `int beastLevelCap` before `rng` (the campaign passes
+`CampaignRules.BeastCap(save, regions)`); the overloads without it pass `BeastProgression.MaxLevel`,
+no cap. `Session` does not depend on `Campaign`: the cap is just a number.
 
 ---
 
@@ -380,11 +560,17 @@ its System.Text.Json twin here.
 
 - **No gear content.** There are no gear data files or importer; `BattleContent` gets gear only
   from its caller, and the gear tests use in-memory `GearSO` / `AvatarGearSO` instances.
-- **How a map node picks an encounter is not decided.** Encounters are game content
-  (`EncounterPlan`), but which shape and level a node offers, and the campaign's difficulty target
-  (the shipped table is calibrated for a scouting player at 50%, `DifficultyScale` 1.0), are pending
-  producer review; see `docs/design/battle-system.md`, "Encounters as game content".
-- **Beast XP defaults need review** (see above), as does the pacing model's 20% knockout assumption.
+- **Region content is DRAFT.** Region and seal names, level bands, map rules and the ten boss
+  templates (names, elements, escorts) are placeholders for producer review; the boss
+  `DifficultyOverride`s were calibrated before the tiered difficulty targets and should be
+  re-calibrated after them (see "Region campaign").
+- **The shop is a stub.** Shop nodes call `IShopService`; `ShopServiceStub` offers nothing until the
+  economy lane's gold and stock land.
+- **Bench share retuned away from the lead's numbers** (10% + 9% per level instead of 50% + 7.5%)
+  to reach the intended "reserves ~6 levels behind"; pending lead/user review (see "Beast and avatar
+  level").
+- **Beast XP defaults need review** (see above), as do the campaign model's tiered clear chances
+  and both models' 20% knockout assumption.
 - **Enemies wear no gear.** `EnemySpec` has no gear field; a caller needing geared enemies builds
   them itself and passes them as `PrebuiltEnemies`.
 - **Storage is local files only.** `FileSaveStorage` has no Cloud Save counterpart, no

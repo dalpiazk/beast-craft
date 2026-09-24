@@ -219,6 +219,32 @@ seed and the map node) and keeps it separate from the battle's seed. Everything 
 4. **Between calibrated levels the multiplier is interpolated linearly** (calibrated at 1, 50 and
    100 only). A tunable default, not a measured curve.
 
+## Region campaign — BUILT; regions, maps and bosses are DRAFT CONTENT PENDING PRODUCER REVIEW
+
+How encounters reach the player (answering "how a map node picks a shape and a level" above): ten
+regions cover levels 1-100 (`r01` 1-10 … `r10` 91-100), each played as **four expeditions** on
+seeded, Slay-the-Spire-style node maps (`NodeMapGenerator`: 11 rows, 4 lanes, Battle / Elite / Shop /
+Rest nodes, a Gate on top of stages 1-3 and the region's **Boss** on top of stage 4). A node's level
+rises through the region (about 2.25 levels per stage); Battle nodes draw `squad` / `horde` / `solo`
+by the region's weights, Elites (+1 level) and generated Gates the `elite` shape, the Boss an
+authored template at the region's max level. A **lost battle is retried** at the same node with a
+new battle seed (or the player takes another path); Rest ("Camp") trains one beast; Shop ("Trader")
+opens a shop service that is a **stub** until the gold economy lands.
+
+Beating a boss grants its **seal**, which raises the **beast level cap** (12 at the start, then 22,
+32, … 92, 100): beasts at the cap bank XP (at most three levels' worth) and spend it when the cap
+rises. The avatar has no cap. A **level-gap falloff** cuts the XP of anyone fighting below their
+level (+1 60%, +2 25%, +3 10%, +4 5%, +5 nothing), and **benched beasts** earn a share of the battle's
+XP that grows the further behind they are, so reserves stay about 6 levels behind.
+
+The ten boss templates in `encounter-library.json` (`boss_r01_…` to `boss_r10_…`, shape `elite`)
+supersede "none authored" above; they are **DRAFT placeholders** (names, elements, escorts), each
+`DifficultyOverride` calibrated to about **50%** scouted clear at its level (the user's boss tier;
+squad / horde ~80, elite ~60).
+
+Full rules, save shape and pacing: `docs/design/progression-and-saves.md`, "Region campaign" and
+"Beast and avatar level"; numbers: `docs/balance/campaign-pacing-report.md` (`--mode campaign`).
+
 ## Data-driven foundation already in place
 
 The authored data this combat model needs is already committed as ScriptableObject schemas under

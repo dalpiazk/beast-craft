@@ -3039,3 +3039,39 @@ The campaign's intended difficulty is not decided.
 
 Reproduce: `dotnet run --project Tooling/BalanceSim -c Release -- --out docs/balance/tuned-report.md
 --write-difficulty BeastCraft/Assets/_Project/Data/Encounters/encounter-difficulty.json`.
+
+## Region campaign: XP falloff, bench, level cap (`--mode campaign`)
+
+The campaign-progression design (region node maps, level-gap falloff, bench XP, seals and the beast
+level cap) is paced by a new Monte Carlo model, `--mode campaign`
+([campaign-pacing-report.md](campaign-pacing-report.md)): the real save, `regions.json`, node maps,
+`CampaignRules`, cap and XP code, with a tiered clear-chance model (squad / horde 80%, elite and
+gates 60%, solo and bosses 50% at equal level). The design's numbers, applied literally, missed
+several of its own gates; what changed and why:
+
+| Knob | Design | Now | Why |
+| --- | --- | --- | --- |
+| Clear bonus, beast and avatar | `40 + 4 L` | `50 + 5 L` | The campaign clears ~70% of battles (harder elites, gates, bosses; losses retried), not the pacing model's 80%; at the old rate the team fell 1-2 levels behind each stage and into a loss spiral (1,074 battles with 11-row maps). |
+| Bench share | 50% + 7.5% per level below, max 100% | 10% + 9% per level below, max 100% | The design predicted "reserves ~6-7 behind" assuming fielded beasts earn their full XP; under the falloff (~14% lost) and knockouts they earn ~70%, and the literal rule kept the bench 1-2 behind. **Pending lead/user review.** |
+| Map rows | 14 (rest row 12, elites from 4) | 11 (rest row 9, elites from 3) | 14 rows gave 689 battles p50 (target 400-600) and the focus-skill gates missed (L20 at 376). |
+| Gate level | row + 1 | row + 0 | An elite-tier gate one level up clears ~36%: ~3 attempts per gate. |
+| r01 battle shapes | squad 60 / horde 40 | squad 45 / horde 40 / solo 15 | Solos drop the early shards the focus skill's L10 gate needs (86 battles, target 70-90). |
+
+Result, 1,000 campaigns: 541 battles p50 (517-569); fielded team within 0.3 levels of every gate and
+boss, avatar on it; bench 5.0-6.0 behind from region 3; recruit (level 1 at region 5) 7.7 behind at
+the end of region 6; cap never exceeded; nothing banked at a seal (the cap never binds on the
+content); grind probe 0.00 levels; focus skill 17 / 86 / 190 / 323 battles to L5 / 10 / 15 / 20.
+
+`--mode pacing` moves only through the falloff and the clear bonus: its avatar and beast now track
+one level above the encounter level (p10-p90 within one level), every other number unchanged.
+`tuned-report.md` is byte-identical (the PvE simulation does not use progression; the ten DRAFT boss
+templates are validated but not fought by the default run).
+
+The boss templates' `DifficultyOverride`s were calibrated with the fixed set (`--encounter-set fixed
+--kit elemental --calibrate-samples 64`, one boss at its level per run) to ~50% bond-aware scouted
+clear: x1.180, x1.156, x1.203, x1.043, x0.992, x0.938, x0.803, x0.844, x0.934, x0.805 (r01-r10; r04
+landed at 59% scouted, the bisection's closest step).
+
+Reproduce: `dotnet run --project Tooling/BalanceSim -c Release -- --mode campaign --self-check --out
+docs/balance/campaign-pacing-report.md` (about 2 s) and `-- --mode pacing --self-check --out
+docs/balance/pacing-report.md`.
