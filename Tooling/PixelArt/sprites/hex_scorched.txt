@@ -1,0 +1,8 @@
+# name: hex_scorched
+# label: Hex tile, Emberreach scorched rock
+# kind: hex
+# size: 32x36
+# outline: none
+# texture: tile_scorched
+# edge: K
+# artkey: tile/hex/scorched_rock

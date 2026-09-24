@@ -1,0 +1,7 @@
+# name: hex_outline
+# label: Hex outline (white edge, tinted in game)
+# kind: hex
+# size: 32x36
+# outline: none
+# edge: w
+# artkey: tile/hex/outline

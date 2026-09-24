@@ -1,0 +1,158 @@
+{
+  "_readme": "Beast Craft pixel-art style test palette. One character per colour; '.' is transparent. Ramps are listed dark -> mid -> light and drive build.py's autoshade. Keep to these 32 colours (31 + transparent). 'Z' is reserved for glows/halos/sparkles that carry no outline.",
+  "colors": {
+    ".": null,
+    "K": "#1c1428",
+    "1": "#3b3346",
+    "2": "#6d6379",
+    "3": "#a99fb4",
+    "4": "#f4eee0",
+    "r": "#8e2233",
+    "o": "#e2572b",
+    "y": "#ffb23f",
+    "Y": "#fff09a",
+    "b": "#23417f",
+    "c": "#3d8fd6",
+    "C": "#98dcf2",
+    "n": "#4c3526",
+    "m": "#7d5838",
+    "M": "#b98c58",
+    "g": "#215a3c",
+    "G": "#3f9b44",
+    "l": "#a2d65a",
+    "A": "#6fbfae",
+    "a": "#d4f2e8",
+    "q": "#b8612f",
+    "h": "#d99a3a",
+    "w": "#fffbe8",
+    "p": "#3a2458",
+    "P": "#7a4ba6",
+    "u": "#c89cf0",
+    "s": "#f2bd8e",
+    "S": "#c27b5c",
+    "e": "#5a2a2a",
+    "H": "#e6cfa0",
+    "Z": "#ffe79a"
+  },
+  "ramps": [
+    [
+      "1",
+      "2",
+      "3"
+    ],
+    [
+      "r",
+      "o",
+      "y"
+    ],
+    [
+      "o",
+      "y",
+      "Y"
+    ],
+    [
+      "b",
+      "c",
+      "C"
+    ],
+    [
+      "n",
+      "m",
+      "M"
+    ],
+    [
+      "g",
+      "G",
+      "l"
+    ],
+    [
+      "A",
+      "a",
+      "4"
+    ],
+    [
+      "p",
+      "P",
+      "u"
+    ],
+    [
+      "S",
+      "s",
+      "4"
+    ],
+    [
+      "H",
+      "4",
+      "w"
+    ],
+    [
+      "2",
+      "3",
+      "4"
+    ],
+    [
+      "m",
+      "M",
+      "4"
+    ]
+  ],
+  "elements": {
+    "Fire": [
+      "r",
+      "o",
+      "y",
+      "Y"
+    ],
+    "Water": [
+      "b",
+      "c",
+      "C"
+    ],
+    "Earth": [
+      "n",
+      "m",
+      "M"
+    ],
+    "Air": [
+      "A",
+      "a",
+      "4"
+    ],
+    "Lightning": [
+      "P",
+      "y",
+      "Y"
+    ],
+    "Ice": [
+      "c",
+      "C",
+      "4"
+    ],
+    "Nature": [
+      "g",
+      "G",
+      "l"
+    ],
+    "Metal": [
+      "1",
+      "2",
+      "3",
+      "q"
+    ],
+    "Light": [
+      "h",
+      "y",
+      "w"
+    ],
+    "Dark": [
+      "p",
+      "P",
+      "u"
+    ],
+    "Gloam": [
+      "p",
+      "P",
+      "u"
+    ]
+  }
+}

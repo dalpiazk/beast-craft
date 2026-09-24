@@ -1,0 +1,8 @@
+# name: hex_grass
+# label: Hex tile, Verdant Hollow grass
+# kind: hex
+# size: 32x36
+# outline: none
+# texture: tile_grass
+# edge: g
+# artkey: tile/hex/grass

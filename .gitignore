@@ -118,6 +118,13 @@ Tooling/BalanceSim/**/bin/
 Tooling/EditModeTests/bin/
 
 # ---------------------------------------------------------------------------
+# Tooling/PixelArt -- local previews (the game PNGs it writes to
+# BeastCraft/Assets/_Project/Art/Pixel are committed). Its .venv is caught by
+# the `.venv/` rule above.
+# ---------------------------------------------------------------------------
+Tooling/PixelArt/preview/
+
+# ---------------------------------------------------------------------------
 # OS cruft
 # ---------------------------------------------------------------------------
 .DS_Store

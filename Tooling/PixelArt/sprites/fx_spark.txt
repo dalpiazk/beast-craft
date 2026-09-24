@@ -1,0 +1,11 @@
+# name: fx_spark
+# label: Spark particle (white, tinted in game)
+# kind: particle
+# size: 5x5
+# outline: none
+# artkey: fx/particle/spark
+.....
+..4..
+.4w4.
+..4..
+.....
