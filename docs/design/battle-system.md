@@ -74,12 +74,20 @@ puzzle every encounter.
   beasts are: a fast team cycles its avatar faster. The alternative is an avatar gauge filled by
   the avatar's own Speed, which would make that stat (currently unused) matter and decouple the
   avatar from team composition. Open; the rule is unchanged until it is decided.
-- **Avatar level.** The avatar has stats (decision 6, amended) and its *skills* now progress —
-  its active skills and its passives level on the beast-skill model (see "Avatar passives") — but
-  the avatar itself still has no level and no stat growth: its base is a flat authored block and
-  only avatar gear moves it. It has no level or XP progression of its own; the statful
-  `BattleAvatar.Create` takes a per-battle level (default 1) that the battle setup is expected to
-  pick sensibly, e.g. the player team's level — a stopgap input, not a design for progression.
+- **Avatar level — progression now exists; the battle wiring is still open.** The avatar has its
+  own level (TUNABLE STARTING DEFAULTS): `AvatarProgress` (save data: `Level`, `Xp`) and
+  `AvatarProgression` (own constants, not the skill curve). A level costs `200 + 16 × level` XP
+  (216 at level 1, 1,784 at level 99; max level 100). `AwardBattle(progress, outcome, enemyLevel)`
+  pays **8 XP for any finished battle** plus a **clear bonus of `40 + 4 × enemyLevel`** on
+  `PlayerVictory`. At an 80% clear rate that is one level per ~5 battles at every level, so the
+  avatar **levels alongside the encounters** (the pacing target: median avatar level within 3 of
+  the encounter level; measured within 0-1 over a 500-battle campaign, balance simulator
+  `--mode pacing`); fighting below one's level pays less. Stats: `AvatarStatsSO.Growth` (a
+  `GrowthRateCurve`, as a species has) with `GetStatAtLevel` / `GetStatsAtLevel(level)`, which
+  scale `BaseStats` (then the max-level block) like `CreatureSpeciesSO.GetStatAtLevel` — MoveRange
+  and CritChance exempt, Speed scales; no `Growth` keeps the block flat. Still open: the battle
+  setup (and the simulator's avatar presets) passing `AvatarProgress.Level` and
+  `GetStatsAtLevel(level)` into `BattleAvatar.Create`, and authoring the avatar's growth curve.
 
 ## Encounter direction: PvE, not PvP — DIRECTION, NOT YET A CONFIRMED DECISION
 
@@ -1533,8 +1541,86 @@ to the book's known skills.
 fire. Whether enemy-side or defeated beasts earn practice. The material economy (drop rates, how
 material XP compares with practice). Whether stat changes should scale per level like damage (they
 truncate to whole points, so small buffs grow in steps). Whether the slow curve suits the narrative
-pacing. There is no inventory yet, so consuming a material is the caller's job. No UI, no save
-system and no authored materials or tier bonuses exist yet.
+pacing. The material economy (drop tables, the inventory and the pacing targets) is now in
+"Material economy" below; consuming a material is still the caller's job
+(`MaterialInventory.TryConsume`). No UI and no save system exist yet.
+
+## Material economy — SIMULATOR-TUNED STARTING VALUES, NOT CONFIRMED BALANCE
+
+The drop side of "Skill progression": where the materials come from, what the player holds, and
+how fast a skill climbs as a result. Everything lives in `BeastCraft.Progression`; the numbers are
+data (`Data/Skills/drop-tables.json`) tuned against the balance simulator's pacing model
+(`--mode pacing`, `docs/balance/pacing-report.md`), not confirmed balance.
+
+**Drop tables.** `drop-tables.json` (DTOs `DropTableData`, checked by `DropTableValidator`, built by
+`DropTableBuilder` into a runtime `DropTable`; the Editor importer, Beast Craft/Data/Import Drop
+Tables, copies it into a `DropTableSO`) is keyed by **encounter shape** (`solo`, `elite`, `squad`,
+`horde`) × **level band** (contiguous, covering levels 1-100). A cell is a list of entries
+`{MaterialId, Chance 1-100, MinQty, MaxQty}`; material ids are the skill library's.
+
+- **Drops only on a clear**, and every entry rolls **independently**: `rng.Next(100) < Chance`, then
+  a uniform quantity. `LootRoller.RollClear` always takes both draws per entry, hit or miss, so a
+  clear's draw count depends only on the cell (a seeded run is reproducible; retuning one chance
+  does not reshuffle every later roll). Seed it per battle with `LootRoller.DeriveSeed(seed,
+  battleIndex)` (a SplitMix64 mix, stable across runtimes).
+- **Pity**, per (shape, material tier): after `Threshold` consecutive clears of a shape whose cell
+  can drop that tier without dropping it, the next clear forces the cell's first entry of that tier
+  at its `MinQty`. A drop of the tier (natural or forced) resets the counter; a cell that cannot
+  drop the tier leaves it alone. Thresholds: tier 1 after 8, tier 2 after 15, tier 3 after 25.
+- **First clear**: the first clear of each (shape, band) grants the band's `FirstClearMaterialId`
+  once (the band's headline tier). It does not touch pity.
+
+**Save data.** `MaterialInventory` holds `Materials` (id + quantity), `ClearedCells` (shape + band
+`MinLevel`) and `Pity` (shape + tier + misses) as lists of `[Serializable]` entries, because
+`JsonUtility` cannot write a dictionary. `TryConsume` is how a caller spends a material after
+`SkillProgression.TryBreakthrough` / `ApplyMaterial` succeeds.
+
+**After a battle.** `PostBattleAward.AwardPractice(result, beastBooksByUnitId, skillLookup, avatarBook,
+...)` credits every player beast's fired skills (and the avatar's actives and passives) on any
+finished battle; `PostBattleAward.AwardDrops(result, table, shape, level, inventory, rng)` rolls the
+loot only on `PlayerVictory`.
+
+**Pacing targets** (a dedicated player pushing one signature skill; median battles):
+
+| Skill level | Cumulative XP | Target | Measured p10 / p50 / p90 |
+| ---: | ---: | --- | --- |
+| 5 (tier-1 gate) | 1,703 | 15-20 | 15 / 16 / 17 |
+| 10 (tier-2 gate) | 11,106 | ~80 | 69 / 77 / 85 |
+| 15 (tier-3 gate) | 31,998 | ~180 | 157 / 171 / 184 |
+| 20 (max) | 67,135 | ~300-320 | 283 / 301 / 302 |
+
+The model (Tooling/BalanceSim/README.md, "Pacing"): encounter level `1 + battle / 5`, shapes drawn
+solo 15 / elite 20 / squad 35 / horde 30, 80% of battles cleared, the focus skill firing 3-9 times a
+battle (the PvE report's 3-10 beast turns per battle; practice ~60 XP a battle), materials fed to
+the focus skill (one kept per tier its later gates need) and the rest spilled to a second skill.
+
+**What the targets force.** The XP constants are unchanged. At ~60 practice XP a battle, practice
+alone would take 29 battles to level 5 and ~1,100 to level 20, so reaching level 20 in ~300 battles
+means **materials supply about three quarters of the XP** (74% in the measured runs), not a 10-15%
+nudge. The level-5 target caps early income: with 20 uses a battle (the per-battle cap) practice
+alone reaches level 5 in 9 battles, so the two targets together pin practice at roughly 5-10 uses a
+battle. The drop tables are shaped around the gates:
+
+| Band | First clear | Mean material XP per clear | Role |
+| --- | --- | ---: | --- |
+| 1-3 | shard | 0 | tutorial: the four first-clear shards are the only drops; one opens the level-5 gate |
+| 4-20 | shard | 104 | shards; crystals only from a solo boss (5%) and pity |
+| 21-40 | crystal | 174 | the four first-clear crystals open the level-10 gate at ~battle 101 |
+| 41-60 | core | 139 | the first-clear cores open the level-15 gate at ~battle 201; regular drops thin out |
+| 61-80 | core | 512 | crystals and cores; finishes the focus skill and feeds the next ones |
+| 81-100 | core | 1,442 | the late game's surplus goes to the rest of the team |
+
+So the gates are paced by the **band a tier first appears in** (the first clears), and the levels
+between gates by the band's regular drops. The "~300-320" level-20 median sits at ~301 because the
+first band-61 clear's core usually completes it; the spread is mostly the order the shapes are met
+in. A 500-battle campaign earns about 106 shards, 120 crystals and 27 cores (about 3.8 level-20
+skills' worth of material XP), so the spill-over skill also reaches level 20 by the end: a
+playthrough maxes a handful of signature skills.
+
+**Open questions.** Whether first-clear bonuses should be per shape (four per band, as now) or per
+band. Whether pity should also count losses. A better campaign schedule (the linear level ramp, the
+shape mix and the 80% clear rate are assumptions, not content). How many uses a battle a real
+focused skill gets (the simulator's library kits could measure it). No UI, no drop presentation.
 
 ## Avatar passives — TUNABLE STARTING DEFAULTS, NOT CONFIRMED BALANCE
 

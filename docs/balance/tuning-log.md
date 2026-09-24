@@ -2234,3 +2234,51 @@ bonds and stances carry the choice.
 
 Reproduce: `dotnet run --project Tooling/BalanceSim -c Release -- --mode pve --seeds 12345,777,4242 --out out/scout.md`
 (about 150 s) and the same with `--compositions 32` (about 10 min).
+
+## Material economy (stage 5): drop tables tuned for skill pacing
+
+First pass of `BeastCraft/Assets/_Project/Data/Skills/drop-tables.json` against the new pacing model
+(`--mode pacing`; report [`pacing-report.md`](pacing-report.md)). The XP constants (100 x level^1.5,
+10 XP a use, 20 uses a battle cap, materials 250 / 1,000 / 4,000) are unchanged; only drop chances,
+quantities, bands and first-clear bonuses moved. The default PvE / PvP report is unaffected.
+
+- **Targets** (median battles for one focused skill): L5 15-20, L10 ~80, L15 ~180, L20 ~300-320.
+- **The design's starting table overshot every gate** (L5 in 6 battles, L10 in 46, L15 in 126 with
+  4-10 uses a battle): with every drop fed to one skill, 90% shard drops from level 1 are ~140 XP a
+  battle on their own.
+- **The targets are inconsistent with a 20-uses-a-battle practice rate.** At the per-battle cap
+  practice alone reaches L5 in 9 battles, below the 15-20 target, so practice must be about 5-10 uses
+  a battle; the model uses 3-9 (the PvE report's 3-10 beast turns per cleared battle). At that rate
+  practice alone takes ~1,100 battles to L20, so materials must supply ~3/4 of the XP to hit ~300,
+  not the 10-15% the design sketch assumed. Kept the XP constants; flagged for design.
+- **Structure**: a tutorial band 1-3 with no regular drops (its four first-clear shards pay for L5
+  and the gate), shards 4-20, crystals from band 21 (first clears open the L10 gate at ~101), cores
+  from band 41 (first clears open the L15 gate at ~201); regular drops scaled so the levels between
+  gates land on target; the rich late bands (61+) feed the rest of the team.
+
+| Level | Target | p10 / p50 / p90 (1000 campaigns, seed 12345) |
+| ---: | --- | --- |
+| 5 | 15-20 | 15 / 16 / 17 |
+| 10 | ~80 | 69 / 77 / 85 |
+| 15 | ~180 | 157 / 171 / 184 |
+| 20 | ~300-320 | 283 / 301 / 302 |
+
+Seeds 1, 2, 3 (300 campaigns each) agree within a battle. Material income per 500-battle campaign:
+~106 shards, ~120 crystals, ~27 cores; 74% of the focus skill's XP to L20 is material XP. The L20
+median is anchored at ~301 by the first band-61 core, so it is robust to small changes in the
+regular drops but moves with the band boundaries and the level ramp.
+
+Reproduce: `dotnet run --project Tooling/BalanceSim -c Release -- --mode pacing --self-check --out docs/balance/pacing-report.md`
+(about 1.5 s).
+
+## Avatar level (stage 3a): pacing against the encounter level
+
+`AvatarProgression` (new): a level costs `200 + 16 × level`; a battle pays 8 XP, plus `40 + 4 ×
+enemy level` on a clear. Derived, not searched: at encounter level L and an 80% clear rate a battle
+pays `8 + 0.8 × (40 + 4L) = 40 + 3.2L`, and the pacing campaign spends 5 battles per encounter level,
+so a level should cost `5 × (40 + 3.2L) = 200 + 16L`. Target: median avatar level within 3 of the
+encounter level at every 50-battle checkpoint. Measured (`--mode pacing`, 1000 campaigns): median
+within 0-1 everywhere (battle 100: 21 vs 20; 250: 50 vs 50; 400: 81 vs 80; 500: 100), p10-p90 at
+most 3 levels wide. A player who clears less than 80% falls behind the content (at a 50% clear
+rate a battle pays about two thirds as much XP), which is the intended pressure; the curve's two
+constants move the whole track.

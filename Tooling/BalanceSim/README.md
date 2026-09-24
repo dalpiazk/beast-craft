@@ -538,6 +538,41 @@ dotnet run --project Tooling/BalanceSim -c Release -- --mode pve --seeds 12345,7
   bookkeeping: one process per seed and scripts parsing the Markdown back; the aggregate comes
   straight from the simulator's numbers, unrounded.
 
+## Pacing (`--mode pacing`)
+
+A Monte Carlo model of skill progression and the material economy (`PacingSimulator.cs`), separate
+from the PvE and PvP runs (it loads only `skill-library.json` and `drop-tables.json`, never the
+roster or encounters, and leaves the default report untouched):
+
+```sh
+dotnet run --project Tooling/BalanceSim -c Release -- --mode pacing --self-check --out docs/balance/pacing-report.md
+```
+
+- Each **campaign** is `--battles` (500) battles. Battle `i` is at encounter level
+  `min(100, 1 + i / 5)`; its shape is drawn solo 15 / elite 20 / squad 35 / horde 30; it is cleared
+  with probability 0.8; the focus skill fires 3-9 times (uniform) and a secondary skill the same.
+  Practice goes through `SkillProgression.AwardPractice` win or lose; a clear rolls
+  `LootRoller.RollClear` against the drop tables. No battle is fought: this measures the economy,
+  not combat.
+- **Policy**: after each battle the focus skill passes a gate it waits at with the lowest adequate
+  material held, then is fed materials lowest tier first while below its cap, keeping one material
+  per tier its later gates need; anything it cannot use spills to the secondary skill.
+- `--runs` (1000) campaigns per base seed; `--seeds a,b,c` pools every seed's campaigns. Campaign `r`
+  of seed `s` is seeded `LootRoller.DeriveSeed(s, r)`, each battle `DeriveSeed(campaign, i)`.
+- The report gives p10 / p50 / p90 battles for the focus skill to reach levels 5, 10, 15 and 20,
+  the level by battle, material income and first-drop timing, the practice / material XP split
+  and the spill-over skill's final level. **Targets** (`PacingSimulator.Gates`, on the median): L5
+  15-20, L10 70-90, L15 160-200, L20 295-325. `--self-check` runs twice, demands identical reports
+  and fails (exit 3) when a median misses its band. About 1.5 s.
+- **Avatar level**: every campaign also levels an `AvatarProgress` with
+  `AvatarProgression.AwardBattle` (win or loss by the same clear roll, at the battle's encounter
+  level); the report tabulates its p10 / p50 / p90 level every 50 battles, and `--self-check` fails
+  when the median strays more than `AvatarLevelTolerance` (3) levels from the encounter level. It
+  draws no random numbers, so it never shifts the skill-pacing results.
+- The model's constants (level ramp, shape weights, clear chance, uses per battle) are at the top of
+  `PacingSimulator.cs`; the drop numbers are data. See the design doc, "Material economy", and
+  `docs/balance/tuning-log.md`, "Material economy".
+
 ## Performance
 
 The default run took 210 s before the performance pass and takes about 50 s now (8-core Intel Core
