@@ -1,5 +1,4 @@
 using System;
-using UnityEngine;
 
 namespace BeastCraft.Creatures
 {
@@ -101,7 +100,7 @@ namespace BeastCraft.Creatures
                     CritChance = value;
                     break;
                 default:
-                    Debug.LogError("[Creatures] SetStat called with unhandled StatType " + type + ".");
+                    Log.Error("[Creatures] SetStat called with unhandled StatType " + type + ".");
                     break;
             }
         }

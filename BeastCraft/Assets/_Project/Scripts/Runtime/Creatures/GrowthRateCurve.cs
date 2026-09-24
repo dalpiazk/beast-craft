@@ -35,7 +35,7 @@ namespace BeastCraft.Creatures
         {
             if (Curve == null)
             {
-                Debug.LogError("[Creatures] Growth rate '" + name + "' has no Curve assigned; returning scale 1.", this);
+                Log.Error("[Creatures] Growth rate '" + name + "' has no Curve assigned; returning scale 1.", this);
                 return 1f;
             }
 
@@ -55,7 +55,7 @@ namespace BeastCraft.Creatures
                 return curve.Evaluate(0f);
             }
 
-            int clampedLevel = Mathf.Clamp(level, 1, maxLevel);
+            int clampedLevel = MathUtil.Clamp(level, 1, maxLevel);
             float progress = (clampedLevel - 1f) / (maxLevel - 1f);
             return curve.Evaluate(progress);
         }
@@ -64,7 +64,7 @@ namespace BeastCraft.Creatures
         {
             if (MaxLevel < 1)
             {
-                Debug.LogError("[Creatures] Growth rate '" + name + "' has MaxLevel " + MaxLevel +
+                Log.Error("[Creatures] Growth rate '" + name + "' has MaxLevel " + MaxLevel +
                                "; it must be at least 1.", this);
             }
         }

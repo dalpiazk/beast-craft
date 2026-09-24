@@ -70,7 +70,7 @@ namespace BeastCraft.Avatar
                 return baseStat;
             }
 
-            return Mathf.RoundToInt(baseStat * Growth.GetScaleAtLevel(level));
+            return MathUtil.RoundToInt(baseStat * Growth.GetScaleAtLevel(level));
         }
 
         /// <summary>

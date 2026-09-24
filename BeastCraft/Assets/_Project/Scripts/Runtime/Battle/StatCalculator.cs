@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using BeastCraft.Avatar;
 using BeastCraft.Creatures;
-using UnityEngine;
 
 namespace BeastCraft.Battle
 {
@@ -26,7 +25,7 @@ namespace BeastCraft.Battle
     /// after the flat bonuses, so a percentage also scales what the gear added.
     /// </description></item>
     /// <item><description>
-    /// Rounded to the nearest whole number (<see cref="Mathf.RoundToInt"/>, the same rounding
+    /// Rounded to the nearest whole number (<see cref="MathUtil.RoundToInt"/>, the same rounding
     /// the growth curve uses), then clamped: every stat at least 0, and <see cref="StatType.HP"/>
     /// at least 1, so no amount of cursed gear can field a unit that enters a battle already at
     /// 0 HP. <see cref="StatType.CritChance"/> takes the ordinary 0 floor and no ceiling here: a
@@ -135,7 +134,7 @@ namespace BeastCraft.Battle
             for (int i = 0; i < AllStats.Length; i++)
             {
                 StatType stat = AllStats[i];
-                int value = Mathf.RoundToInt((baseStats.GetStat(stat) + flat[i]) * (1f + percent[i]));
+                int value = MathUtil.RoundToInt((baseStats.GetStat(stat) + flat[i]) * (1f + percent[i]));
                 int floor = stat == StatType.HP ? 1 : 0;
 
                 result.SetStat(stat, value < floor ? floor : value);
@@ -156,7 +155,7 @@ namespace BeastCraft.Battle
 
             if (species == null)
             {
-                Debug.LogError("[Battle] StatCalculator was given a null species; using an all-zero base.");
+                Log.Error("[Battle] StatCalculator was given a null species; using an all-zero base.");
                 return result;
             }
 

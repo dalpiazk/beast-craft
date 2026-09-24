@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using UnityEngine;
 
 namespace BeastCraft.Customization
 {
@@ -15,10 +14,10 @@ namespace BeastCraft.Customization
         /// <summary>The color applied when the player has made no choice.</summary>
         public Color DefaultColor = Color.white;
 
-        [Range(0f, 1f)] public float MinSaturation = 0f;
-        [Range(0f, 1f)] public float MaxSaturation = 1f;
-        [Range(0f, 1f)] public float MinValue = 0f;
-        [Range(0f, 1f)] public float MaxValue = 1f;
+        public float MinSaturation = 0f;
+        public float MaxSaturation = 1f;
+        public float MinValue = 0f;
+        public float MaxValue = 1f;
 
         /// <summary>Curated quick-pick swatches surfaced in the UI. Optional.</summary>
         public List<ColorSwatchPreset> Presets = new List<ColorSwatchPreset>();
@@ -32,18 +31,18 @@ namespace BeastCraft.Customization
         {
             // Tolerate inverted min/max authoring rather than returning garbage; OnValidate
             // on the owning category is what tells the designer the asset is wrong.
-            float minSaturation = Mathf.Min(MinSaturation, MaxSaturation);
-            float maxSaturation = Mathf.Max(MinSaturation, MaxSaturation);
-            float minValue = Mathf.Min(MinValue, MaxValue);
-            float maxValue = Mathf.Max(MinValue, MaxValue);
+            float minSaturation = MathUtil.Min(MinSaturation, MaxSaturation);
+            float maxSaturation = MathUtil.Max(MinSaturation, MaxSaturation);
+            float minValue = MathUtil.Min(MinValue, MaxValue);
+            float maxValue = MathUtil.Max(MinValue, MaxValue);
 
             float hue;
             float saturation;
             float value;
             Color.RGBToHSV(DefaultColor, out hue, out saturation, out value);
 
-            saturation = Mathf.Clamp(saturation, minSaturation, maxSaturation);
-            value = Mathf.Clamp(value, minValue, maxValue);
+            saturation = MathUtil.Clamp(saturation, minSaturation, maxSaturation);
+            value = MathUtil.Clamp(value, minValue, maxValue);
 
             Color clamped = Color.HSVToRGB(hue, saturation, value);
             clamped.a = DefaultColor.a;

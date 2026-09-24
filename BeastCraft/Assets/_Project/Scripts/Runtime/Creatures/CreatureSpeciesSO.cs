@@ -109,13 +109,13 @@ namespace BeastCraft.Creatures
 
             if (GrowthRate == null)
             {
-                Debug.LogError("[Creatures] Species '" + name + "' (id '" + SpeciesId +
+                Log.Error("[Creatures] Species '" + name + "' (id '" + SpeciesId +
                                "') has no GrowthRate assigned; returning unscaled base stat for " +
                                type + ".", this);
                 return baseStat;
             }
 
-            return Mathf.RoundToInt(baseStat * GrowthRate.GetScaleAtLevel(level));
+            return MathUtil.RoundToInt(baseStat * GrowthRate.GetScaleAtLevel(level));
         }
     }
 }

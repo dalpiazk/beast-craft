@@ -60,7 +60,7 @@ namespace BeastCraft.Customization
         {
             if (string.IsNullOrEmpty(categoryId))
             {
-                Debug.LogError("[Customization] SetOption called with an empty categoryId; ignoring.");
+                Log.Error("[Customization] SetOption called with an empty categoryId; ignoring.");
                 return;
             }
 
@@ -111,7 +111,7 @@ namespace BeastCraft.Customization
         {
             if (string.IsNullOrEmpty(categoryId))
             {
-                Debug.LogError("[Customization] SetColor called with an empty categoryId; ignoring.");
+                Log.Error("[Customization] SetColor called with an empty categoryId; ignoring.");
                 return;
             }
 
@@ -143,7 +143,7 @@ namespace BeastCraft.Customization
         {
             if (schema == null)
             {
-                Debug.LogError("[Customization] ResolveMissingWithDefaults called with a null schema; nothing to resolve.");
+                Log.Error("[Customization] ResolveMissingWithDefaults called with a null schema; nothing to resolve.");
                 return;
             }
 
@@ -157,13 +157,13 @@ namespace BeastCraft.Customization
                 CustomizationCategoryDefinition category = schema.Categories[i];
                 if (category == null)
                 {
-                    Debug.LogError("[Customization] Schema '" + schema.name + "' has a null category at index " + i + ".", schema);
+                    Log.Error("[Customization] Schema '" + schema.name + "' has a null category at index " + i + ".", schema);
                     continue;
                 }
 
                 if (string.IsNullOrEmpty(category.CategoryId))
                 {
-                    Debug.LogError("[Customization] Category asset '" + category.name + "' has an empty CategoryId; skipping.", category);
+                    Log.Error("[Customization] Category asset '" + category.name + "' has an empty CategoryId; skipping.", category);
                     continue;
                 }
 

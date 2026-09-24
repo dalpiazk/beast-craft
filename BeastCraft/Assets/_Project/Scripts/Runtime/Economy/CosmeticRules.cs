@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using BeastCraft.Customization;
 using BeastCraft.Progression;
 using BeastCraft.Save;
-using UnityEngine;
 
 namespace BeastCraft.Economy
 {

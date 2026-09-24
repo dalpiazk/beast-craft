@@ -41,7 +41,7 @@ namespace BeastCraft.Customization
         {
             if (ValueType != CustomizationValueType.DiscreteOption)
             {
-                Debug.LogError(
+                Log.Error(
                     "[Customization] GetDefaultOption() called on category '" + name +
                     "' (id '" + CategoryId + "') which is a " + ValueType +
                     " category. Use GetDefaultColor() instead.", this);
@@ -87,14 +87,14 @@ namespace BeastCraft.Customization
 
             if (defaultCount == 0)
             {
-                Debug.LogError(
+                Log.Error(
                     "[Customization] Category '" + name + "' (id '" + CategoryId +
                     "') has no option flagged IsDefault. Falling back to '" + fallback.OptionId +
                     "'. Fix the asset: exactly one option must be flagged default.", this);
             }
             else
             {
-                Debug.LogError(
+                Log.Error(
                     "[Customization] Category '" + name + "' (id '" + CategoryId + "') has " +
                     defaultCount + " options flagged IsDefault. Falling back to '" +
                     fallback.OptionId + "'. Fix the asset: exactly one option must be flagged default.",
@@ -112,7 +112,7 @@ namespace BeastCraft.Customization
         {
             if (ValueType != CustomizationValueType.ColorPicker)
             {
-                Debug.LogError(
+                Log.Error(
                     "[Customization] GetDefaultColor() called on category '" + name +
                     "' (id '" + CategoryId + "') which is a " + ValueType +
                     " category. Use GetDefaultOption() instead.", this);
@@ -120,7 +120,7 @@ namespace BeastCraft.Customization
 
             if (ColorPicker == null)
             {
-                Debug.LogError(
+                Log.Error(
                     "[Customization] Category '" + name + "' (id '" + CategoryId +
                     "') has no ColorPicker definition. Falling back to white.", this);
                 return Color.white;
@@ -175,7 +175,7 @@ namespace BeastCraft.Customization
             {
                 if (Options == null || Options.Count == 0)
                 {
-                    Debug.LogError(
+                    Log.Error(
                         "[Customization] Category '" + name + "' (id '" + CategoryId +
                         "') has no options. Every included category must contain at least one option.",
                         this);
@@ -193,7 +193,7 @@ namespace BeastCraft.Customization
 
                 if (defaultCount != 1)
                 {
-                    Debug.LogError(
+                    Log.Error(
                         "[Customization] Category '" + name + "' (id '" + CategoryId + "') has " +
                         defaultCount + " options flagged IsDefault; exactly 1 is required so the " +
                         "category always resolves to a concrete value.", this);
@@ -205,7 +205,7 @@ namespace BeastCraft.Customization
                 // be ambiguous. Only the allowed range needs checking.
                 if (ColorPicker == null)
                 {
-                    Debug.LogError(
+                    Log.Error(
                         "[Customization] Category '" + name + "' (id '" + CategoryId +
                         "') is a ColorPicker category but has no ColorPicker definition.", this);
                     return;
@@ -213,7 +213,7 @@ namespace BeastCraft.Customization
 
                 if (ColorPicker.MinSaturation > ColorPicker.MaxSaturation)
                 {
-                    Debug.LogError(
+                    Log.Error(
                         "[Customization] Category '" + name + "' (id '" + CategoryId +
                         "') has MinSaturation (" + ColorPicker.MinSaturation +
                         ") greater than MaxSaturation (" + ColorPicker.MaxSaturation + ").", this);
@@ -221,7 +221,7 @@ namespace BeastCraft.Customization
 
                 if (ColorPicker.MinValue > ColorPicker.MaxValue)
                 {
-                    Debug.LogError(
+                    Log.Error(
                         "[Customization] Category '" + name + "' (id '" + CategoryId +
                         "') has MinValue (" + ColorPicker.MinValue +
                         ") greater than MaxValue (" + ColorPicker.MaxValue + ").", this);
