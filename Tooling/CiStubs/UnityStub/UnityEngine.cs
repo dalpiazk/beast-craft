@@ -25,6 +25,13 @@ namespace UnityEngine
         public string name { get; set; }
 
         /// <summary>
+        /// Stand-in for <c>Object.hideFlags</c>. Stored only: the game sets
+        /// <see cref="HideFlags.DontUnloadUnusedAsset"/> on in-memory assets it builds at run time,
+        /// which matters to Unity's <c>Resources.UnloadUnusedAssets</c> and to nothing outside it.
+        /// </summary>
+        public HideFlags hideFlags { get; set; }
+
+        /// <summary>
         /// Stand-in for <c>Object.DestroyImmediate</c>, which the EditMode tests call in teardown to
         /// free the ScriptableObjects they create. There is no native object to free outside Unity,
         /// so this is a genuine no-op, not a lie: the managed instance is simply left to the GC.
@@ -37,6 +44,21 @@ namespace UnityEngine
         {
             return name ?? base.ToString();
         }
+    }
+
+    /// <summary>Stand-in for <c>UnityEngine.HideFlags</c>, with Unity's values.</summary>
+    [Flags]
+    public enum HideFlags
+    {
+        None = 0,
+        HideInHierarchy = 1,
+        HideInInspector = 2,
+        DontSaveInEditor = 4,
+        NotEditable = 8,
+        DontSaveInBuild = 16,
+        DontUnloadUnusedAsset = 32,
+        DontSave = 52,
+        HideAndDontSave = 61
     }
 
     /// <summary>
@@ -554,6 +576,20 @@ namespace UnityEngine
             throw new NotSupportedException("UnityStub.JsonUtility is compile-only; write JSON in Unity or with System.Text.Json.");
         }
 #endif
+    }
+
+    /// <summary>
+    /// Stand-in for <c>UnityEngine.Application</c>, limited to <see cref="persistentDataPath"/>
+    /// (read by <c>UnitySaveLocations</c>). Outside Unity there is no per-app data folder, so it is a
+    /// real, writable directory under the system temp path — honest behaviour, not a placeholder.
+    /// </summary>
+    public static class Application
+    {
+        // Lower-cased deliberately: the game scripts read it exactly as Unity spells it.
+        public static string persistentDataPath
+        {
+            get { return System.IO.Path.Combine(System.IO.Path.GetTempPath(), "BeastCraftUnityStub", "persistentData"); }
+        }
     }
 
     /// <summary>Stand-in base for Unity's inspector-decoration attributes.</summary>

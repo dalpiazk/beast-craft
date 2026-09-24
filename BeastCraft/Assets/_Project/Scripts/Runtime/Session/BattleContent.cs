@@ -4,6 +4,7 @@ using BeastCraft.Avatar;
 using BeastCraft.Battle;
 using BeastCraft.Bonds;
 using BeastCraft.Creatures;
+using BeastCraft.Encounters;
 using BeastCraft.Save;
 
 namespace BeastCraft.Session
@@ -34,9 +35,12 @@ namespace BeastCraft.Session
         /// <param name="teamBonds">The team bonds, in application order. May be null (no bonds).</param>
         /// <param name="gear">Every beast gear definition, by <see cref="GearSO.GearId"/>. May be null.</param>
         /// <param name="avatarGear">Every avatar gear definition, by <see cref="AvatarGearSO.AvatarGearId"/>. May be null.</param>
+        /// <param name="enemies">The enemy library's catalog, for enemy-library enemies (an <see cref="EnemySpec.SpeciesId"/> that is no roster species). May be null.</param>
         public BattleContent(IEnumerable<CreatureSpeciesSO> species, IEnumerable<SkillSO> skills, IEnumerable<PassiveSkillSO> passives,
-                             IEnumerable<TeamBondSO> teamBonds, IEnumerable<GearSO> gear = null, IEnumerable<AvatarGearSO> avatarGear = null)
+                             IEnumerable<TeamBondSO> teamBonds, IEnumerable<GearSO> gear = null, IEnumerable<AvatarGearSO> avatarGear = null,
+                             EnemyCatalog enemies = null)
         {
+            Enemies = enemies;
             AddAll(_gear, gear, g => g.GearId);
             AddAll(_avatarGear, avatarGear, g => g.AvatarGearId);
             AddAll(_species, species, s => s.SpeciesId);
@@ -54,6 +58,9 @@ namespace BeastCraft.Session
                 }
             }
         }
+
+        /// <summary>The enemy library's catalog, or null when the content has no enemy library.</summary>
+        public EnemyCatalog Enemies { get; }
 
         /// <summary>The team bonds, in application order.</summary>
         public IReadOnlyList<TeamBondSO> TeamBonds

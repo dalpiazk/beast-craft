@@ -68,7 +68,7 @@ no-scouting rate, see "Calibrated difficulty"), where marginals shrink, so they 
 
 - Teams: every combination of 4 distinct beasts (210 teams, format SmallGroup); each beast is in 84 of them
 - Encounters: generated (`--encounter-set generated`, the default): 4 shapes x 8 compositions (`--compositions`) = 32 compositions, drawn from the
-  enemy type pool in `Tooling/BalanceSim/encounters.json` (simulator fixtures, not game content) by a generator seeded from
+  enemy library `BeastCraft/Assets/_Project/Data/Encounters/enemy-library.json` per shape of `BeastCraft/Assets/_Project/Data/Encounters/encounter-library.json` (game content) by a generator seeded from
   `--seed` alone. Each draw picks a shape variant, a count per slot and each unit's type, and is kept only inside
   the shape's threat budget and with enough distinct types; each composition's element scheme is drawn too (one
   element for the whole team 30%, one per type 30%, one per unit 25%, none 15%), with elements dealt from a shuffled
@@ -95,7 +95,7 @@ no-scouting rate, see "Calibrated difficulty"), where marginals shrink, so they 
 - Movement rules are the Runtime's own (`BattleTurnExecutor`), with no simulator-side emulation: a defeated unit
   leaves the grid the moment it falls, and a unit that cannot reach range this turn makes a partial approach
   (walks its remaining move toward the target and holds the skill).
-- Combat stances are the Runtime's too (`CombatStance`, from the roster and the fixtures): a Vanguard approaches
+- Combat stances are the Runtime's too (`CombatStance`, from the roster and the enemies): a Vanguard approaches
   as above and prefers stop tiles that screen its Ranged / Skirmisher allies; a Ranged unit never walks into melee
   (so Ranged beasts carry Shot, range 3, instead of Strike); Ranged and Skirmisher units prefer stop tiles with
   fewer adjacent enemies and spend leftover movement backing away, keeping the nearest enemy within their longest reach.
@@ -113,7 +113,7 @@ no-scouting rate, see "Calibrated difficulty"), where marginals shrink, so they 
   marginal scales with p (1 - p), so this is the marginal the cell would show at 50%, then averaged the same way. The
   flags and the multi-seed balance guard (+/-4.0 `elemental`, +/-7.0 `neutral`) read the normalized overall.
 
-### Enemy types (simulator fixtures, not game content)
+### Enemy types (game content: `enemy-library.json`)
 
 Base stats are max-level values scaled by the roster's growth curve, like a beast's, before the difficulty
 multiplier (Move and Crit are exempt from both). Threat is the type's weight in a shape's budget. Kit entries are

@@ -36,6 +36,28 @@ namespace BeastCraft.Save
         /// <summary>Validation findings on a successful load; empty when the save is clean.</summary>
         public List<SaveIssue> Issues { get; private set; }
 
+        /// <summary>
+        /// Which stored file <see cref="SaveStore.Load"/> used: <see cref="SaveFileSource.Main"/>,
+        /// <see cref="SaveFileSource.Backup"/> (the main file was missing, corrupt, or read but
+        /// failed to load — see <see cref="MainFileProblem"/>), or <see cref="SaveFileSource.None"/>
+        /// when nothing was read or the result came straight from <see cref="SaveSerializer"/>.
+        /// </summary>
+        public SaveFileSource StorageSource { get; private set; }
+
+        /// <summary>
+        /// When <see cref="SaveStore.Load"/> fell back to the backup, why the main file was skipped;
+        /// null otherwise. Worth logging: the player lost their latest save.
+        /// </summary>
+        public string MainFileProblem { get; private set; }
+
+        /// <summary>This result, stamped with where <see cref="SaveStore"/> read it from.</summary>
+        internal SaveLoadResult WithStorage(SaveFileSource source, string mainFileProblem)
+        {
+            StorageSource = source;
+            MainFileProblem = mainFileProblem;
+            return this;
+        }
+
         /// <summary>A successful load.</summary>
         public static SaveLoadResult Loaded(PlayerSave save, int sourceVersion, bool migrated, List<SaveIssue> issues)
         {

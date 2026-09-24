@@ -7,6 +7,7 @@ using BeastCraft.Battle.Grid;
 using BeastCraft.Battle.Placement;
 using BeastCraft.Bonds;
 using BeastCraft.Creatures;
+using BeastCraft.Encounters;
 
 namespace BeastCraft.Tooling.BalanceSim
 {
@@ -764,7 +765,7 @@ namespace BeastCraft.Tooling.BalanceSim
 
         /// <summary>
         /// The unscaled stat block of every distinct enemy species in the shape's compositions at
-        /// this level, in first-appearance order: what <see cref="Scale"/> is applied to.
+        /// this level, in first-appearance order: what <see cref="EnemyScaling.Scale"/> is applied to.
         /// </summary>
         private static List<StatBlock> DistinctEnemyStats(EncounterShape shape, int level)
         {
@@ -785,13 +786,13 @@ namespace BeastCraft.Tooling.BalanceSim
             return stats;
         }
 
-        /// <summary>Every stat <see cref="Scale"/> changes, for every block, at this multiplier.</summary>
+        /// <summary>Every stat <see cref="EnemyScaling.Scale"/> changes, for every block, at this multiplier.</summary>
         private static int[] ScaledStats(List<StatBlock> stats, double multiplier)
         {
             int[] values = new int[stats.Count * 5];
             for (int i = 0; i < stats.Count; i++)
             {
-                StatBlock scaled = Scale(stats[i], multiplier);
+                StatBlock scaled = EnemyScaling.Scale(stats[i], multiplier);
                 values[(i * 5) + 0] = scaled.Hp;
                 values[(i * 5) + 1] = scaled.Attack;
                 values[(i * 5) + 2] = scaled.Defense;
@@ -934,7 +935,7 @@ namespace BeastCraft.Tooling.BalanceSim
                 HexCoordinate anchor = layout.Anchors[i];
                 BattleUnit enemy = BattleUnitFactory.CreateBeast(enemyPrefix + slot.UnitId, BattleTeam.Enemy, slot.Species, enemyLevel, null, anchor,
                                                                  Kit.Loadout(slot.KitFor(mode)), slot.StatusResist);
-                enemy.Stats = Scale(enemy.Stats, multiplier);
+                enemy.Stats = EnemyScaling.Scale(enemy.Stats, multiplier);
                 enemy.CurrentHp = enemy.Stats.Hp;
 
                 if (!grid.FitsDeploymentZone(anchor, enemy.Footprint, BattleTeam.Enemy) || !grid.TryPlaceUnit(enemy.Id, anchor, enemy.Footprint))
@@ -1443,31 +1444,6 @@ namespace BeastCraft.Tooling.BalanceSim
 
             outcome = player ? BattleOutcome.PlayerVictory : enemy ? BattleOutcome.EnemyVictory : BattleOutcome.MutualDefeat;
             return true;
-        }
-
-        /// <summary>
-        /// The difficulty knob: HP, Attack, Defense, SpecialAttack and SpecialDefense scale by the
-        /// multiplier (rounded, floored at 1). Speed, MoveRange and CritChance do not: under the ATB
-        /// gauge Speed is how many turns a unit gets, so scaling it would make the knob change the
-        /// enemies' action economy rather than just their toughness and punch, move range is a small
-        /// tactical integer, and crit chance is a probability that the knob should not turn into
-        /// certainty.
-        /// </summary>
-        public static StatBlock Scale(StatBlock stats, double multiplier)
-        {
-            StatBlock scaled = stats;
-            scaled.Hp = ScaleStat(stats.Hp, multiplier);
-            scaled.Attack = ScaleStat(stats.Attack, multiplier);
-            scaled.Defense = ScaleStat(stats.Defense, multiplier);
-            scaled.SpecialAttack = ScaleStat(stats.SpecialAttack, multiplier);
-            scaled.SpecialDefense = ScaleStat(stats.SpecialDefense, multiplier);
-            return scaled;
-        }
-
-        private static int ScaleStat(int value, double multiplier)
-        {
-            int scaled = (int)Math.Round(value * multiplier, MidpointRounding.AwayFromZero);
-            return scaled < 1 ? 1 : scaled;
         }
 
         /// <summary>

@@ -7,7 +7,8 @@ it outside Unity. The battle rules themselves are in [battle-system.md](battle-s
 numbers come from [`docs/balance/pacing-report.md`](../balance/pacing-report.md).
 
 Everything here is pure C# over two thin seams: an injected JSON engine and an injected storage
-backend. There is no UI, no file IO and no Unity Gaming Services integration yet.
+backend. The one file backend is `FileSaveStorage` (below); there is no UI and no Unity Gaming
+Services integration yet.
 
 ---
 
@@ -101,8 +102,43 @@ with a sensible default need no bump. (`SaveSerializer`'s current version is ove
 migration chain can be tested ahead of a real bump.)
 
 `SaveStore` binds a serializer to an `ISaveStorage` (`Exists`, `TryRead`, `TryWrite`, `Delete` by
-slot name) — the thin IO seam. The game will implement it over local files (write to a temp file
-and swap it in) and later Cloud Save.
+slot name) — the thin IO seam. Cloud Save is a later backend; local files are implemented:
+
+### File storage (`FileSaveStorage`)
+
+`FileSaveStorage : ISaveStorage` is pure System.IO, rooted at a directory passed in. In the game,
+`UnitySaveLocations.Default()` builds one over `Application.persistentDataPath/saves` — the only
+Unity-dependent line in the save system (the UnityStub's `Application.persistentDataPath` is a temp
+directory, so CiLint, BalanceSim and the EditMode runner compile and run it).
+
+*WebGL.* On WebGL, `Application.persistentDataPath` is an in-memory file system (Emscripten's
+IDBFS) that reaches the browser's IndexedDB only when JavaScript calls `FS.syncfs` after a write.
+`FileSaveStorage` does not make that call, so on WebGL a save would be lost on reload. A platform
+follow-up if WebGL is ever targeted (see Known gaps).
+
+```csharp
+SaveStore store = new SaveStore(UnitySaveLocations.Default(), new SaveSerializer(new JsonUtilitySaveSerializer(), catalog));
+store.Save("main", save);
+SaveLoadResult loaded = store.Load("main");
+```
+
+| Rule | Behaviour |
+| --- | --- |
+| Layout | Slot `main` → `main.save`; backup `main.save.bak`; `main.save.tmp` only mid-write. |
+| Slot names | 1–64 ASCII letters, digits, `_`, `-`; starts with a letter or digit; not a Windows device name (`CON`, `NUL`, `COM1`…). No dots or separators, so no traversal and no custom extension. Anything else is `SaveFileError.InvalidSlot`. |
+| Atomic write | Full text to the temp file, flushed (write-through), then swapped in with `File.Replace` (old main → backup), falling back to copy/delete/move where `Replace` is unsupported. A crash leaves the old or the new save readable, never a torn one. One backup generation. |
+| Corrupt main | Not valid UTF-8, blank, or failing the content check (default: trimmed text is `{…}`, a cheap truncation check). Reads then use the backup; a write deletes a corrupt main instead of rotating it over a good backup. |
+| Read fallback | `Read(slot)` → `SaveFileResult` with `Source` (`Main` / `Backup`), `MainFileProblem` (why main was skipped — worth logging), `LastWriteUtc`. Both unusable → `Corrupt` (or `Io`); neither present → `NotFound`. `ReadBackup(slot)` reads the backup alone. |
+| `SaveStore.Load` | Over an `IBackupSaveStorage` (`FileSaveStorage`): the `SaveLoadResult` carries `StorageSource` (`Main` / `Backup` / `None`) and `MainFileProblem`. When the main file passes the content check but fails to load (bad or missing schema version, unreadable JSON, a failed migration), the backup is loaded instead, with `MainFileProblem` = "read but failed to load (…)". No retry when the main save is from a newer build (loading and re-saving the older backup would overwrite it); if the backup fails too, the main failure is returned. Over a plain `ISaveStorage`, a read is reported as `Main`. |
+| Writes | Refuse text that would fail the content check (`InvalidContents`); the directory is created on demand. |
+| Encoding | UTF-8 without BOM; a leading BOM is tolerated on read. |
+| Exists / Delete | `Exists` = a main or backup file is present (content not checked). `Delete` removes main, backup and temp; false (`NotFound`) when there was nothing. |
+| Errors | `Read` / `Write` / `Remove` never throw; IO failures are `SaveFileError.Io` results with a message. The `ISaveStorage` methods reduce them to booleans. |
+| Concurrency | One process-wide lock around every operation: safe across threads and instances in one process. No cross-process locking — two game processes on one directory race, last swap wins (each file still whole). |
+
+`SaveSlotIndex.Build(storage, json)` lists every slot (`ListSlots()` — valid names with a main or
+backup file) newest first as `SaveSlotInfo`: timestamp, which file was read, the `SchemaVersion`
+header (no migration or validation) and any problem, for a load/continue menu.
 
 ### Validation
 
@@ -189,16 +225,25 @@ APIs, in the balance simulator's order.
 
 **`BattleContent`** — the content ids resolve against: species, skills (beast skills and avatar
 actives share one id space), passives, team bonds (in application order), and optionally beast and
-avatar gear. Built from the asset types the importers and `SkillLibraryBuilder` produce; lookups
-are by stable id, ordinal, first entry wins, unknown ids return `null`. It also implements
-`ISaveGearCatalog`.
+avatar gear, and optionally the enemy library's `EnemyCatalog` (`Enemies`). Built from the asset
+types the importers and `SkillLibraryBuilder` produce; lookups are by stable id, ordinal, first
+entry wins, unknown ids return `null`. It also implements `ISaveGearCatalog`.
 
-**`EncounterSetup`** — generic, because encounters are not game content yet:
+**`EncounterSetup`** — the opposition. For the game's PvE encounters `EncounterPlan.ToSetup()`
+writes one (see `docs/design/battle-system.md`, "Encounters as game content"); callers and tests can
+also build one by hand:
 
 - `Arena` (`ArenaSize`, default `Medium`);
-- `Enemies`: `EnemySpec {UnitId?, SpeciesId, Level, SkillIds?, Position?, StatusResist}` — no unit
-  id means `enemy1..N`; no skill ids means the species' `DefaultLoadout` (an empty list means no
-  skills; listed skills are level 1, tier 0); no position means auto-placed;
+- `ShapeId` and `EncounterLevel` — the drop-table shape and the encounter level, copied into
+  `BattleSessionResult` for the rewards (null / 0 when not set);
+- `Enemies`: `EnemySpec {UnitId?, SpeciesId, Level, SkillIds?, Position?, StatusResist, Element?,
+  StatMultiplier}` — `SpeciesId` is a roster species or, failing that, an enemy-library enemy
+  (`BattleContent.Enemies`); no unit id means `enemy1..N`; no skill ids means the species'
+  `DefaultLoadout`, or an enemy's catalog kit in its `Element` (an empty list means no skills;
+  listed skills are level 1, tier 0); `Element` applies to enemy-library enemies only (null = none);
+  `StatMultiplier` (default 1, must be above 0) scales the level-computed HP, Attack, Defense,
+  SpecialAttack and SpecialDefense with `EnemyScaling`, as the balance simulator calibrates it; no
+  position means auto-placed;
 - `PrebuiltEnemies`: `BattleUnit`s the caller built itself (enemy team, unique ids), placed at their
   own position and footprint.
 
@@ -252,8 +297,9 @@ every problem in `Errors` and no battle fought:
   silently dropping it;
 - worn gear (beast, or avatar unless overridden) that is not in the inventory, unknown, in the wrong
   slot, or worn twice (gear below the beast's level is **not** an error; `StatCalculator` ignores it);
-- no enemies, an enemy of unknown species or with an unknown skill, a prebuilt enemy not on the
-  enemy team, a duplicate unit id;
+- no enemies, an enemy of unknown species or with an unknown skill, an `Element` on a roster species,
+  a `StatMultiplier` that is not a positive number, a prebuilt enemy not on the enemy team, a
+  duplicate unit id;
 - an enemy position outside the enemy zone or taken, enemies that do not fit the zone, a team that
   does not fit the player zone or that `PlacementValidator` rejects.
 
@@ -276,8 +322,11 @@ are deterministic either way. The summary reports `Applied`, `Error`, `Outcome`,
 `SkillLevelsGained`, `BeastXpGained` (by beast id), `BeastLevelsGained`, `AvatarXpGained`,
 `AvatarLevelsGained` and the `Loot`. It refuses — changing nothing — a null save or result, a failed
 battle, or a result already paid out (`BattleSessionResult.RewardsApplied`). A team beast no longer in
-the save is skipped. `shape` and `encounterLevel` are passed in rather than stored on the encounter,
-since encounters are not content yet.
+the save is skipped.
+
+`BattleSession.ApplyRewards(save, result, content, dropTable, rng = null)` does the same for the
+`ShapeId` and `EncounterLevel` the battle's `EncounterSetup` named (`EncounterPlan.ToSetup` sets
+both); it refuses, changing nothing, a result whose setup named no shape or no level.
 
 ---
 
@@ -331,11 +380,21 @@ its System.Text.Json twin here.
 
 - **No gear content.** There are no gear data files or importer; `BattleContent` gets gear only
   from its caller, and the gear tests use in-memory `GearSO` / `AvatarGearSO` instances.
-- **Encounters are not game content yet.** `EncounterSetup` is a generic description, and the
-  reward step takes the encounter's shape and level as arguments.
+- **How a map node picks an encounter is not decided.** Encounters are game content
+  (`EncounterPlan`), but which shape and level a node offers, and the campaign's difficulty target
+  (the shipped table is calibrated for a scouting player at 50%, `DifficultyScale` 1.0), are pending
+  producer review; see `docs/design/battle-system.md`, "Encounters as game content".
 - **Beast XP defaults need review** (see above), as does the pacing model's 20% knockout assumption.
 - **Enemies wear no gear.** `EnemySpec` has no gear field; a caller needing geared enemies builds
   them itself and passes them as `PrebuiltEnemies`.
-- **No storage implementation.** `ISaveStorage` has no file or Cloud Save backend yet.
+- **Storage is local files only.** `FileSaveStorage` has no Cloud Save counterpart, no
+  cross-process lock and one backup generation; the content check catches truncation, not subtler
+  corruption (no checksum), which the serializer then reports on load (and `SaveStore` retries
+  the backup). A slot recovered from its backup is not rewritten automatically: the game should
+  log `SaveLoadResult.MainFileProblem` and save again.
+- **WebGL saves would not persist.** WebGL's `persistentDataPath` is an in-memory file system that
+  needs a JavaScript `FS.syncfs` flush after each write to reach IndexedDB; `FileSaveStorage` does
+  not flush (and the whole save path is untested on WebGL). A platform follow-up (a small `.jslib`
+  called after `Save`/`Delete`, or a WebGL `ISaveStorage`) if WebGL is ever targeted.
 - **Never run in Unity.** The project has not been opened in an Editor, so the save round trip has
   not yet been exercised against the real `JsonUtility`.

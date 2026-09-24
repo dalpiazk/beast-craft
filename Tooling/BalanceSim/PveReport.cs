@@ -5,6 +5,9 @@ using System.Text;
 using BeastCraft.Battle;
 using BeastCraft.Battle.Grid;
 using BeastCraft.Creatures;
+using BeastCraft.Creatures.Roster;
+using BeastCraft.Encounters;
+using BeastCraft.Skills;
 
 namespace BeastCraft.Tooling.BalanceSim
 {
@@ -424,11 +427,12 @@ namespace BeastCraft.Tooling.BalanceSim
             {
                 report.AppendLine("- Encounters: generated (`--encounter-set generated`, the default): " + catalog.Shapes.Count + " shapes x " +
                                   options.Compositions + " compositions (`--compositions`) = " + compositions + " compositions, drawn from the");
-                report.AppendLine("  enemy type pool in `" + EncounterLoader.RepoRelativePath + "` (simulator fixtures, not game content) by a generator seeded from");
+                report.AppendLine("  enemy library `" + EncounterLoader.EnemyLibraryRepoRelativePath + "` per shape of `" + EncounterLoader.EncounterLibraryRepoRelativePath +
+                                  "` (game content) by a generator seeded from");
                 report.AppendLine("  `--seed` alone. Each draw picks a shape variant, a count per slot and each unit's type, and is kept only inside");
                 report.AppendLine("  the shape's threat budget and with enough distinct types; each composition's element scheme is drawn too (one");
-                report.AppendLine("  element for the whole team " + SimOptions.SchemeWeightUniform + "%, one per type " + SimOptions.SchemeWeightPerType +
-                                  "%, one per unit " + SimOptions.SchemeWeightPerUnit + "%, none " + SimOptions.SchemeWeightNone +
+                report.AppendLine("  element for the whole team " + SchemeShare(catalog, ElementScheme.Uniform) + "%, one per type " + SchemeShare(catalog, ElementScheme.PerType) +
+                                  "%, one per unit " + SchemeShare(catalog, ElementScheme.PerUnit) + "%, none " + SchemeShare(catalog, ElementScheme.None) +
                                   "%), with elements dealt from a shuffled");
                 report.AppendLine("  deck of the ten so every element is dealt before any repeats. Enemy elements: " +
                                   (options.EnemyElementOverride.HasValue ? "all overridden to `" + options.EnemyElementOverride.Value + "`" : "as generated") +
@@ -436,7 +440,7 @@ namespace BeastCraft.Tooling.BalanceSim
             }
             else
             {
-                report.AppendLine("- Encounters: the fixed set (`--encounter-set fixed`) in `" + EncounterLoader.RepoRelativePath + "`" +
+                report.AppendLine("- Encounters: the fixed set (`--encounter-set fixed`) in `" + EncounterLoader.FixedRepoRelativePath + "`" +
                                   " — simulator fixtures, not game content; enemy elements: " +
                                   (options.EnemyElementOverride.HasValue ? "all overridden to `" + options.EnemyElementOverride.Value + "`" : "as authored") +
                                   " (enemy kits are `None` in `neutral` mode, so an elementless encounter reads the same in both modes)");
@@ -497,7 +501,7 @@ namespace BeastCraft.Tooling.BalanceSim
             report.AppendLine("- Movement rules are the Runtime's own (`BattleTurnExecutor`), with no simulator-side emulation: a defeated unit");
             report.AppendLine("  leaves the grid the moment it falls, and a unit that cannot reach range this turn makes a partial approach");
             report.AppendLine("  (walks its remaining move toward the target and holds the skill).");
-            report.AppendLine("- Combat stances are the Runtime's too (`CombatStance`, from the roster and the fixtures): a Vanguard approaches");
+            report.AppendLine("- Combat stances are the Runtime's too (`CombatStance`, from the roster and the enemies): a Vanguard approaches");
             report.AppendLine("  as above and prefers stop tiles that screen its Ranged / Skirmisher allies; a Ranged unit never walks into melee");
             report.AppendLine("  (so Ranged beasts carry Shot, range 3, instead of Strike); Ranged and Skirmisher units prefer stop tiles with");
             report.AppendLine("  fewer adjacent enemies and spend leftover movement backing away, keeping the nearest enemy within their longest reach.");
@@ -537,7 +541,7 @@ namespace BeastCraft.Tooling.BalanceSim
 
         private static void AppendTypes(StringBuilder report, EncounterCatalog catalog)
         {
-            report.AppendLine("### Enemy types (simulator fixtures, not game content)");
+            report.AppendLine("### Enemy types (game content: `enemy-library.json`)");
             report.AppendLine();
             report.AppendLine("Base stats are max-level values scaled by the roster's growth curve, like a beast's, before the difficulty");
             report.AppendLine("multiplier (Move and Crit are exempt from both). Threat is the type's weight in a shape's budget. Kit entries are");
@@ -546,10 +550,10 @@ namespace BeastCraft.Tooling.BalanceSim
             report.AppendLine();
             report.AppendLine("| Type | Role | Threat | Stance | HP | Atk | Def | SpA | SpD | Spe | Move | Crit | Kit |");
             report.AppendLine("| --- | --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |");
-            foreach (EnemyTypeData type in catalog.Types)
+            foreach (EnemyData type in catalog.Types)
             {
                 StatBlock s = type.BaseStats;
-                report.AppendLine("| " + type.DisplayName + SizeText(type) + " | " + type.Role + " | " + Number(type.Threat) + " | " + type.ParsedStance + " | " + s.Hp + " | " + s.Attack +
+                report.AppendLine("| " + type.DisplayName + SizeText(type) + " | " + type.Role + " | " + Number(type.Threat) + " | " + StanceOf(type) + " | " + s.Hp + " | " + s.Attack +
                                   " | " + s.Defense + " | " + s.SpecialAttack + " | " + s.SpecialDefense + " | " + s.Speed + " | " + s.MoveRange + " | " +
                                   s.CritChance + "% | " + KitText(type.Skills) + " |");
             }
@@ -566,10 +570,10 @@ namespace BeastCraft.Tooling.BalanceSim
             foreach (EncounterShape shape in catalog.Shapes)
             {
                 List<string> variants = new List<string>();
-                foreach (ShapeVariantData variant in shape.Data.Variants)
+                foreach (EncounterVariantData variant in shape.Data.Variants)
                 {
                     List<string> slots = new List<string>();
-                    foreach (ShapeSlotData slot in variant.Slots)
+                    foreach (EncounterSlotData slot in variant.Slots)
                     {
                         slots.Add((slot.Min == slot.Max ? slot.Min.ToString(CultureInfo.InvariantCulture) : slot.Min + "-" + slot.Max) + " from " +
                                   string.Join("/", slot.Types));
@@ -578,7 +582,7 @@ namespace BeastCraft.Tooling.BalanceSim
                     variants.Add(variant.Label + " (" + variant.Weight + ": " + string.Join(" + ", slots) + ")");
                 }
 
-                report.AppendLine("| `" + shape.Id + "` | " + shape.Arena + " | " + Number(shape.Data.ThreatBudget[0]) + "-" + Number(shape.Data.ThreatBudget[1]) +
+                report.AppendLine("| `" + shape.Id + "` | " + shape.Arena + " | " + Number(shape.Data.ThreatMin) + "-" + Number(shape.Data.ThreatMax) +
                                   " | " + shape.Data.MinDistinctTypes + " | " + string.Join("; ", variants) + " |");
             }
 
@@ -689,10 +693,38 @@ namespace BeastCraft.Tooling.BalanceSim
         }
 
         /// <summary>" (7 tiles)" after a large enemy's name; nothing for a one-tile enemy.</summary>
-        private static string SizeText(EnemyTypeData type)
+        private static string SizeText(EnemyData type)
         {
-            int tiles = Footprints.TileCount(type.ParsedFootprint);
+            EnemyLibraryValidator.TryParseFootprint(type.Footprint, out UnitFootprint footprint);
+            int tiles = Footprints.TileCount(footprint);
             return tiles == 1 ? string.Empty : " (" + tiles + " tiles)";
+        }
+
+        private static CombatStance StanceOf(EnemyData type)
+        {
+            BeastRosterValidator.TryParseStance(type.Stance, out CombatStance stance);
+            return stance;
+        }
+
+        /// <summary>
+        /// A scheme's share of the generated set's draws, in percent: its weight over the total (the
+        /// shipped weights add up to 100, so this is the weight itself).
+        /// </summary>
+        private static string SchemeShare(EncounterCatalog catalog, ElementScheme scheme)
+        {
+            int total = 0;
+            int weight = 0;
+            foreach (SchemeWeightData entry in catalog.SchemeWeights)
+            {
+                total += entry.Weight;
+                if (string.Equals(entry.Scheme, scheme.ToString(), StringComparison.Ordinal))
+                {
+                    weight = entry.Weight;
+                }
+            }
+
+            double share = total == 0 ? 0.0 : 100.0 * weight / total;
+            return share == Math.Floor(share) ? ((int)share).ToString(CultureInfo.InvariantCulture) : SimOptions.Format(share);
         }
 
         private static void AppendFixedEncounters(StringBuilder report, EncounterCatalog catalog)
@@ -710,7 +742,7 @@ namespace BeastCraft.Tooling.BalanceSim
             foreach (EncounterShape shape in catalog.Shapes)
             {
                 Encounter encounter = shape.Compositions[0];
-                foreach (EnemyGroupData group in encounter.FixedData.Groups)
+                foreach (FixedGroupData group in encounter.FixedData.Groups)
                 {
                     List<string> elements = new List<string>();
                     foreach (EnemySlot slot in encounter.Enemies)
@@ -723,7 +755,7 @@ namespace BeastCraft.Tooling.BalanceSim
 
                     StatBlock s = group.BaseStats;
                     report.AppendLine("| `" + encounter.Id + "` | " + encounter.Arena + " | " + group.DisplayName + SizeText(group) + " | " + group.Count + " | " +
-                                      group.ParsedStance + " | " + Compress(elements) + " | " + s.Hp + " | " + s.Attack + " | " + s.Defense + " | " + s.SpecialAttack + " | " +
+                                      StanceOf(group) + " | " + Compress(elements) + " | " + s.Hp + " | " + s.Attack + " | " + s.Defense + " | " + s.SpecialAttack + " | " +
                                       s.SpecialDefense + " | " + s.Speed + " | " + s.MoveRange + " | " + s.CritChance + "% | " + KitText(group.Skills) + " |");
                 }
             }
@@ -731,31 +763,50 @@ namespace BeastCraft.Tooling.BalanceSim
             report.AppendLine();
         }
 
-        private static string KitText(EnemySkillData[] skills)
+        /// <summary>
+        /// An enemy kit as category, shape, range, power (its first damage effect's magnitude),
+        /// cooldown and, for a single-target skill, whom it aims at.
+        /// </summary>
+        private static string KitText(SkillData[] skills)
         {
             List<string> kit = new List<string>();
-            foreach (EnemySkillData skill in skills)
+            foreach (SkillData skill in skills)
             {
-                kit.Add(skill.SkillId + " (" + skill.ParsedCategory + ", " + skill.ParsedShape + ", r" + skill.Range + ", p" +
-                        skill.Power.ToString(CultureInfo.InvariantCulture) + ", cd" + skill.Cooldown +
-                        (skill.ParsedShape == SkillTargetShape.SingleTarget ? ", " + TargetingLabel(skill) : string.Empty) + ")");
+                SkillTargetShape shape = SkillLibraryValidator.ParseOr(skill.TargetShape, SkillTargetShape.SingleTarget);
+                kit.Add(skill.SkillId + " (" + SkillLibraryValidator.ParseOr(skill.Category, DamageCategory.Physical) + ", " + shape + ", r" + skill.Range + ", p" +
+                        DamagePower(skill).ToString(CultureInfo.InvariantCulture) + ", cd" + skill.Cooldown +
+                        (shape == SkillTargetShape.SingleTarget ? ", " + TargetingLabel(skill) : string.Empty) + ")");
             }
 
             return string.Join("; ", kit);
         }
 
-        /// <summary>Whom a fixture skill aims at: "nearest", "farthest", "lowest current HP", or a stat extreme such as "lowest HP" (maximum).</summary>
-        private static string TargetingLabel(EnemySkillData skill)
+        /// <summary>The magnitude of a skill's first Damage effect (0 when it has none).</summary>
+        private static float DamagePower(SkillData skill)
         {
-            bool lowest = skill.ParsedTargetingOrder == SkillTargetingOrder.Lowest;
-            switch (skill.ParsedTargeting)
+            foreach (EffectData effect in skill.Effects ?? new EffectData[0])
+            {
+                if (effect != null && SkillLibraryValidator.ParseOr(effect.EffectType, SkillEffectType.Damage) == SkillEffectType.Damage)
+                {
+                    return effect.Magnitude;
+                }
+            }
+
+            return 0f;
+        }
+
+        /// <summary>Whom an enemy skill aims at: "nearest", "farthest", "lowest current HP", or a stat extreme such as "lowest HP" (maximum).</summary>
+        private static string TargetingLabel(SkillData skill)
+        {
+            bool lowest = SkillLibraryValidator.ParseOr(skill.TargetingOrder, SkillTargetingOrder.Lowest) == SkillTargetingOrder.Lowest;
+            switch (SkillLibraryValidator.ParseOr(skill.TargetingCriterion, SkillTargetingCriterion.Distance))
             {
                 case SkillTargetingCriterion.Distance:
                     return lowest ? "nearest" : "farthest";
                 case SkillTargetingCriterion.CurrentHp:
                     return (lowest ? "lowest" : "highest") + " current HP";
                 default:
-                    return (lowest ? "lowest " : "highest ") + "max " + skill.ParsedTargetingStat;
+                    return (lowest ? "lowest " : "highest ") + "max " + SkillLibraryValidator.ParseOr(skill.TargetingStat, StatType.HP);
             }
         }
 
