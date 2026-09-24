@@ -106,6 +106,12 @@ namespace BeastCraft.Presentation.Layout
             return new Rect(OffsetX, OffsetY, canvasWidth * Scale, canvasHeight * Scale);
         }
 
+        /// <summary>A canvas rectangle in screen pixels (e.g. the board area, to clip the zoomed board to).</summary>
+        public Rect ToScreen(Rect canvas)
+        {
+            return new Rect(OffsetX + canvas.X * Scale, OffsetY + canvas.Y * Scale, canvas.Width * Scale, canvas.Height * Scale);
+        }
+
         /// <summary>A screen point in canvas pixels (the inverse of the fit), for hit-testing taps and clicks.</summary>
         public Vec2 ToCanvas(float screenX, float screenY)
         {

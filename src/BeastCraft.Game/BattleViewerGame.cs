@@ -5,6 +5,7 @@ using System.IO;
 using BeastCraft.Battle;
 using BeastCraft.Game.Rendering;
 using BeastCraft.Presentation.Board;
+using BeastCraft.Presentation.Camera;
 using BeastCraft.Presentation.Content;
 using BeastCraft.Presentation.Layout;
 using BeastCraft.Presentation.Playback;
@@ -60,6 +61,10 @@ namespace BeastCraft.Game
         private Dictionary<string, string> _names;
         private BoardFit _boardFit;
         private CanvasFit _canvasFit;
+        private CameraRig _camera;
+        private TurnCamera _turnCamera;
+        private CameraView _cameraRest;
+        private int _cameraIdleMs;
 
         private TurnAnimation _animation;
         private int _clockMs;
@@ -137,7 +142,9 @@ namespace BeastCraft.Game
             }
 
             _playback = new BattlePlayback(run);
-            _boardFit = _screen.FitBoard(_playback.Grid.Radius);
+            _camera = new CameraRig(_playback.Grid.Radius, _screen.Board);
+            _cameraRest = _camera.FitAll;
+            _boardFit = _camera.Fit(_cameraRest);
             _names = UnitNames(_content, _speciesByUnit);
 
             if (_options.Screenshot)
@@ -218,13 +225,17 @@ namespace BeastCraft.Game
 
                 if (_clockMs >= _animation.DurationMs)
                 {
+                    _cameraRest = CameraNow();
+                    _cameraIdleMs = 0;
                     _animation = null;
+                    _turnCamera = null;
                     _idleMs = 0;
                 }
             }
             else
             {
                 _idleMs += played;
+                _cameraIdleMs += played;
                 if (step || (_auto && _idleMs >= AutoPauseMs))
                 {
                     PlayNextTurn();
@@ -262,15 +273,40 @@ namespace BeastCraft.Game
                 return;
             }
 
+            CameraView from = CameraNow();
             _animation = new TurnAnimation(turn, _layout, _content.Vfx, _options.Seed);
+            _turnCamera = new TurnCamera(_animation, _layout, _camera, from);
             _clockMs = 0;
             Log(turn);
+        }
+
+        /// <summary>
+        /// Where the camera looks now: the turn's own framing while one plays
+        /// (<see cref="TurnCamera"/>), else easing back from where the last turn left it toward the
+        /// whole arena (<see cref="CameraSettings.ReturnMs"/>, on the played clock, so it respects
+        /// the speed).
+        /// </summary>
+        private CameraView CameraNow()
+        {
+            if (_camera == null)
+            {
+                return default;
+            }
+
+            if (_animation != null && _turnCamera != null)
+            {
+                return _turnCamera.Sample(_clockMs);
+            }
+
+            return _camera.Ease(_cameraRest, _camera.FitAll, _cameraIdleMs, _camera.Settings.ReturnMs);
         }
 
         /// <summary>The skip button: plays every remaining turn at once and shows the result.</summary>
         private void SkipToEnd()
         {
             _animation = null;
+            _turnCamera = null;
+            _cameraRest = _camera.FitAll;
             PlayedTurn turn;
             while ((turn = _playback.Advance()) != null)
             {
@@ -321,6 +357,7 @@ namespace BeastCraft.Game
             }
 
             _animation = new TurnAnimation(shown, _layout, _content.Vfx, _options.Seed);
+            _turnCamera = new TurnCamera(_animation, _layout, _camera, _camera.FitAll);
             _clockMs = _options.AtMs ?? _animation.MidVfxMs(beatIndex);
             Console.WriteLine("Screenshot: turn " + (shown.Index + 1) + " (" + Name(shown.Turn.Unit.Id) + "), " + _clockMs + " ms into its " +
                               _animation.DurationMs + " ms animation" +
