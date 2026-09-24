@@ -181,18 +181,176 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
-        public void Level_IsNotInTheFormula()
+        public void LevelMultiplier_EqualLevels_IsTheIdentity_BitExact()
         {
-            // Identical stats at levels 1 and 100 hit identically: level reaches damage only through
-            // the stats the growth curve assembled.
-            BattleUnit low = Unit("low", new StatBlock(100, 20, 20, 20, 20, 0), 1);
-            BattleUnit high = Unit("high", new StatBlock(100, 20, 20, 20, 20, 0), 100);
+            for (int level = 1; level <= 100; level++)
+            {
+                Assert.AreEqual(1.0, DamageFormula.GetLevelMultiplier(level, level));
+            }
+
+            // Equal levels at 1 and at 100 hit exactly as the formula without the level term.
+            SkillSO skill = Skill(DamageCategory.Physical, Element.None, 100f);
+            Assert.AreEqual(10, DamageFormula.Compute(Unit("a", new StatBlock(100, 20, 20, 20, 20, 0), 1), Unit("b", new StatBlock(100, 20, 20, 20, 20, 0), 1), skill, 100f));
+            Assert.AreEqual(10, DamageFormula.Compute(Unit("a", new StatBlock(100, 20, 20, 20, 20, 0), 100), Unit("b", new StatBlock(100, 20, 20, 20, 20, 0), 100), skill, 100f));
+
+            // The eight-argument form at exactly 1 is the seven-argument form, bit for bit.
+            float[] powers = { 1f, 49f, 68f, 100f, 137.5f };
+            int[] stats = { 0, 7, 59, 130, 999 };
+            float[] elements = { 0.5f, 1f, 1.25f, 2f };
+
+            foreach (float power in powers)
+            {
+                foreach (int attack in stats)
+                {
+                    foreach (int defense in stats)
+                    {
+                        foreach (float element in elements)
+                        {
+                            Assert.AreEqual(DamageFormula.Compute(power, attack, defense, element, 97, true, 1.3),
+                                            DamageFormula.Compute(power, attack, defense, element, 97, true, 1.3, 1.0));
+                        }
+                    }
+                }
+            }
+        }
+
+        [Test]
+        public void LevelMultiplier_OneLevel_IsOnePlusOrMinusK()
+        {
+            double k = DamageFormula.LevelDifferencePerLevel + DamageFormula.LevelDifferenceConvex;
+
+            Assert.AreEqual(1.0 + k, DamageFormula.GetLevelMultiplier(51, 50), 1e-12);
+            Assert.AreEqual(1.0 - k, DamageFormula.GetLevelMultiplier(49, 50), 1e-12);
+            Assert.AreEqual(1.0 + k, DamageFormula.GetLevelMultiplier(2, 1), 1e-12);
+        }
+
+        [Test]
+        public void LevelMultiplier_IsMonotone_AndClampedAtTheCap()
+        {
+            Assert.AreEqual(1.0 + DamageFormula.LevelDifferenceCap, DamageFormula.GetLevelMultiplier(100, 1), 1e-12);
+            Assert.AreEqual(1.0 - DamageFormula.LevelDifferenceCap, DamageFormula.GetLevelMultiplier(1, 100), 1e-12);
+
+            double previous = 0.0;
+
+            for (int attacker = 1; attacker <= 100; attacker++)
+            {
+                double multiplier = DamageFormula.GetLevelMultiplier(attacker, 50);
+                Assert.GreaterOrEqual(multiplier, previous);
+                Assert.GreaterOrEqual(multiplier, 1.0 - DamageFormula.LevelDifferenceCap - 1e-12);
+                Assert.LessOrEqual(multiplier, 1.0 + DamageFormula.LevelDifferenceCap + 1e-12);
+                previous = multiplier;
+            }
+        }
+
+        [Test]
+        public void LevelDifference_AppliesInBothDirections()
+        {
+            StatBlock stats = new StatBlock(1000, 100, 100, 100, 100, 0);
+            BattleUnit high = Unit("high", stats, 55);
+            BattleUnit low = Unit("low", stats, 50);
             SkillSO skill = Skill(DamageCategory.Physical, Element.None, 100f);
 
-            Assert.AreEqual(10, DamageFormula.Compute(high, low, skill, 100f));
-            Assert.AreEqual(10, DamageFormula.Compute(low, high, skill, 100f));
-            Assert.AreEqual(100, high.Level);
-            Assert.AreEqual(1, low.Level);
+            // Base 1.0 * 100 * 100 / 200 = 50, times the level multiplier, truncated once.
+            int up = DamageFormula.Compute(high, low, skill, 100f);
+            int down = DamageFormula.Compute(low, high, skill, 100f);
+
+            Assert.AreEqual((int)(50.0 * DamageFormula.GetLevelMultiplier(55, 50)), up);
+            Assert.AreEqual((int)(50.0 * DamageFormula.GetLevelMultiplier(50, 55)), down);
+            Assert.Greater(up, 50);
+            Assert.Less(down, 50);
+        }
+
+        [Test]
+        public void LevelMultiplier_IsAppliedToTheUntruncatedHit_TruncatedOnce()
+        {
+            // 1.0 * 130 * 130 / 300 = 56.333; x1.035 = 58.305 -> 58. Truncating first would give
+            // 56 x 1.035 = 57.96 -> 57.
+            Assert.AreEqual(58, DamageFormula.Compute(100f, 130, 170, ElementChart.Neutral, DamageFormula.NeutralVariancePercent, false, 1.0, 1.035));
+
+            // With element, crit, roll and execute: 56.333 x 1.25 x 1.5 x 0.93 x 1.1 x 0.9 = 97.29.
+            Assert.AreEqual(97, DamageFormula.Compute(100f, 130, 170, 1.25f, 93, true, 1.1, 0.9));
+
+            // A negative multiplier reads as 0 and lands on the floor; any positive power deals at least 1.
+            Assert.AreEqual(DamageFormula.MinimumDamage, DamageFormula.Compute(100f, 130, 170, ElementChart.Neutral, 100, false, 1.0, -1.0));
+        }
+
+        [Test]
+        public void LevelDifference_NullRngPath_CarriesIt()
+        {
+            StatBlock stats = new StatBlock(1000, 100, 100, 100, 100, 0);
+            BattleUnit high = Unit("high", stats, 60);
+            BattleUnit low = Unit("low", stats, 50);
+            SkillSO skill = Skill(DamageCategory.Physical, Element.None, 100f);
+            int expected = (int)(50.0 * DamageFormula.GetLevelMultiplier(60, 50));
+
+            Assert.AreEqual(expected, DamageFormula.Compute(high, low, skill, 100f));
+            Assert.AreEqual(expected, DamageFormula.Roll(high, low, skill, 100f, null).Amount);
+
+            SkillEffectApplier.Apply(new SkillActivation(skill, new[] { low }), high);
+            Assert.AreEqual(1000 - expected, low.CurrentHp);
+        }
+
+        [Test]
+        public void LevelDifference_TakesNoRandomDraws()
+        {
+            StatBlock stats = new StatBlock(1000, 100, 100, 100, 100, 30);
+            SkillSO skill = Skill(DamageCategory.Physical, Element.None, 100f);
+            System.Random uneven = new System.Random(1234);
+            System.Random even = new System.Random(1234);
+
+            DamageRoll a = DamageFormula.Roll(Unit("a", stats, 90), Unit("b", stats, 10), skill, 100f, uneven);
+            DamageRoll b = DamageFormula.Roll(Unit("a", stats, 10), Unit("b", stats, 10), skill, 100f, even);
+
+            Assert.AreEqual(b.IsCrit, a.IsCrit);
+            Assert.AreEqual(b.VariancePercent, a.VariancePercent);
+            Assert.Greater(a.Amount, b.Amount);
+            Assert.AreEqual(even.Next(), uneven.Next(), "the level term draws nothing, so both streams are in step");
+        }
+
+        [Test]
+        public void LevelDifference_DamageOverTimeCarriesIt()
+        {
+            BattleUnit caster = new BattleUnit("p1", BattleTeam.Player, new StatBlock(100, 100, 10, 10, 10, 10, 3), HexCoordinate.Zero, null, null, 60);
+            BattleUnit target = new BattleUnit("e1", BattleTeam.Enemy, new StatBlock(500, 10, 100, 10, 10, 10, 3), HexCoordinate.Zero, null, null, 50);
+            SkillSO burn = ScriptableObject.CreateInstance<SkillSO>();
+            burn.Effects.Add(new SkillEffect { EffectType = SkillEffectType.ApplyStatus, Status = StatusType.DamageOverTime, Magnitude = 50f, DurationTurns = 2 });
+            _created.Add(burn);
+
+            SkillEffectApplier.Apply(new SkillActivation(burn, new[] { target }), caster);
+            BattleTurnResult first = BattleTurnExecutor.ExecuteTurn(target, new List<BattleUnit> { caster, target }, null, null, null);
+
+            // 50% power, A 100 vs D 100 = 25, times the caster's ten-level advantage.
+            Assert.AreEqual((int)(25.0 * DamageFormula.GetLevelMultiplier(60, 50)), first.StatusDamage);
+            Assert.Greater(first.StatusDamage, 25);
+        }
+
+        [Test]
+        public void LevelDifference_HealsAndShieldsIgnoreIt()
+        {
+            SkillSO support = ScriptableObject.CreateInstance<SkillSO>();
+            support.Effects.Add(new SkillEffect { EffectType = SkillEffectType.Heal, Magnitude = 50f });
+            support.Effects.Add(new SkillEffect { EffectType = SkillEffectType.ApplyStatus, Status = StatusType.Shield, Magnitude = 40f, DurationTurns = 2 });
+            _created.Add(support);
+
+            int[] healed = new int[2];
+            int[] shields = new int[2];
+            int[] casterLevels = { 50, 90 };
+
+            for (int i = 0; i < 2; i++)
+            {
+                BattleUnit caster = new BattleUnit("p1", BattleTeam.Player, new StatBlock(100, 10, 50, 60, 10, 10, 3), HexCoordinate.Zero, null, null, casterLevels[i]);
+                BattleUnit ally = new BattleUnit("p2", BattleTeam.Player, new StatBlock(200, 10, 10, 10, 10, 10, 3), HexCoordinate.Zero, null, null, 50);
+                ally.CurrentHp = 100;
+
+                SkillEffectApplier.Apply(new SkillActivation(support, new[] { ally }), caster);
+                healed[i] = ally.CurrentHp;
+                shields[i] = StatusEffects.ShieldPoints(ally);
+            }
+
+            Assert.Greater(healed[0], 100, "test setup: the heal lands");
+            Assert.Greater(shields[0], 0, "test setup: the shield lands");
+            Assert.AreEqual(healed[0], healed[1]);
+            Assert.AreEqual(shields[0], shields[1]);
         }
 
         [Test]

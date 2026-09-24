@@ -16,19 +16,22 @@ beast-craft/
 │   ├── Assets/_Project/    all first-party content, namespaced under _Project/
 │   │   ├── Art/            sprites, backdrops, UI, key art (Characters/Creatures/Environments/UI/KeyArt)
 │   │   ├── Audio/          Music/, Ambient/, SFX/
-│   │   ├── Data/           authored data: Creatures/beast-roster.json and Skills/skill-library.json
-│   │   │                   (sources of truth) + generated .asset instances
+│   │   ├── Data/           authored data: Creatures/beast-roster.json, Skills/skill-library.json
+│   │   │                   and Skills/drop-tables.json (sources of truth) + generated .asset instances
 │   │   ├── Prefabs/
 │   │   ├── Scenes/
-│   │   └── Scripts/        Runtime/ (Core, Services, Narrative, Battle, Creatures,
-│   │                       Avatar, Customization, Idle, IAP), Editor/, Tests/
+│   │   └── Scripts/        Runtime/ (Battle, Bonds, Creatures, Avatar, Skills, Progression,
+│   │                       Save, Session, Customization; Core, Services, Narrative, Idle
+│   │                       and IAP are empty placeholders), Editor/, Tests/
 │   ├── Packages/           package manifest
 │   └── ProjectSettings/    editor version pin; Unity fills in the rest on first open
 ├── Pipeline/       OFFLINE, build-time-only asset generation. Never runs at runtime.
 ├── Tooling/        CiStubs/: hand-written UnityEngine stub + csproj so CI compiles
 │                   the game scripts without a Unity install. BalanceSim/: local-only
-│                   headless balance simulator over the real battle code. Never shipped.
-├── docs/           design/, architecture/ and balance/ (simulator reports) notes
+│                   headless balance simulator over the real battle code. EditModeTests/:
+│                   local-only `dotnet test` runner for the EditMode suite. Never shipped.
+├── docs/           design/ and balance/ (simulator reports, tuning log, research) notes;
+│                   architecture/ is an empty placeholder
 └── .github/        CI workflows
 ```
 
@@ -86,64 +89,112 @@ rules and the asset naming contract.
 
 ## Status
 
-**Early scaffolding — data and tooling, no gameplay yet.**
+**Pre-alpha: a headless, deterministic battle and progression core with its
+data and tooling. No playable build — nothing is rendered, and the Unity
+project has never been opened in the Editor.**
 
-What exists today:
+### What exists
 
-- The directory skeleton, Unity project stub (version pin + package manifest),
-  assembly definitions, git/LFS configuration, and the offline asset-pipeline
-  structure and conventions.
-- **ScriptableObject data schemas** under
-  `BeastCraft/Assets/_Project/Scripts/Runtime/` — creature species (stats,
-  growth curves, skill learn tables, evolution requirements), skills, beast gear,
-  avatar stats and avatar stat gear (never rendered; separate from the purely
-  cosmetic customization), and the shared avatar + creature customization
-  framework.
-- **Starter roster data** — ten beasts, one per element, plus three growth curves
-  (all ten beasts currently share `medium`; `fast` and `slow` are kept for the
-  balance simulator), in
-  `BeastCraft/Assets/_Project/Data/Creatures/beast-roster.json`. The JSON is the
-  source of truth (readable outside Unity, e.g. by the headless balance
-  simulator); the Unity assets are generated from it by opening the project and
-  running **Beast Craft → Data → Import Beast Roster**, which creates or updates
-  them in place by id. No `.asset` files are committed yet. The numbers are a
-  third simulator-tuned pass (against the authored skill kits; base Speed
-  spread so the fastest beast gets 10-15% more turns), not confirmed
-  balance — see "Starter roster" in the
-  [battle-system design doc](docs/design/battle-system.md) and
-  [`docs/balance/tuning-log.md`](docs/balance/tuning-log.md).
-- **Skill library data** — every authored skill in
-  `BeastCraft/Assets/_Project/Data/Skills/skill-library.json`: six skills per
-  beast (60), each species' learnable skills (level 1-60) and 3-skill default
-  loadout, 6 avatar active skills, 10 avatar passives and 3 skill-training
-  materials, all with level-5/10/15 breakthrough tiers. Same pattern as the
-  roster: the JSON is the source of truth, checked by `SkillLibraryValidator`,
-  and **Beast Craft → Data → Import Skill Library** (after the roster import)
-  generates the `SkillSO` / `PassiveSkillSO` / `SkillMaterialSO` assets and
-  wires each species' `LearnableSkills` and `DefaultLoadout`. Drafted against
-  a documented power budget and tuned with the roster against the balance
-  simulator (default loadouts), not confirmed — see "Beast skill kits" in
-  the [battle-system design doc](docs/design/battle-system.md).
+**Runtime systems** (`BeastCraft/Assets/_Project/Scripts/Runtime/`, pure C#
+with no scene or MonoBehaviour dependencies):
+
+- **Battle** (`Battle/`) — a deterministic, seeded grid auto-battle: an ATB
+  turn order (square-root-of-Speed initiative gauge, integer maths), the damage
+  formula (attack/defence ratio, element chart, crits, variance, level-difference
+  modifier), statuses and stat modifiers, per-species combat stances, a hex grid
+  with pathfinding and multi-hex unit footprints, deployment/placement
+  validation, encounter scouting previews, skill targeting and effects, and
+  avatar passives.
+- **Team bonds** (`Bonds/`) — tiered team-composition bonuses (by stance or
+  element coverage), resolved purely from the team.
+- **Skills and progression** (`Skills/`, `Progression/`) — skill books with
+  levels and level-5/10/15 breakthroughs, beast and avatar level/XP, material
+  inventory, material drop tables and a loot roller with pity and first-clear
+  grants.
+- **Save system** (`Save/`, no UI or file IO yet) — a versioned `PlayerSave`
+  aggregate (beasts, avatar, skill books, materials, beast and avatar gear),
+  `SaveSerializer` with a migration chain and load-time validation that reports
+  unknown ids instead of failing, storage behind the thin `ISaveStorage` seam.
+- **Battle session** (`Session/`) — `BattleSession`, the single entry point a
+  scene will call: builds a battle from a save plus an encounter setup, runs it
+  (same setup and seed, same battle) and pays the rewards (skill practice XP,
+  material drops, avatar and beast XP) back into the save.
+- **Data schemas** — ScriptableObjects for creature species (stats, growth
+  curves, skill learn tables, evolution requirements), skills, passives, team
+  bonds, materials, drop tables, beast gear, avatar stats and avatar stat gear,
+  and the shared avatar + creature cosmetic customization framework.
+
+See the [battle-system design doc](docs/design/battle-system.md) and
+[`docs/design/progression-and-saves.md`](docs/design/progression-and-saves.md).
+
+**Authored data** (JSON is the source of truth, readable outside Unity; the
+Unity `.asset` files are generated from it and none are committed yet):
+
+- `Data/Creatures/beast-roster.json` — ten starter beasts, one per element,
+  with stances and three growth curves (all ten currently use `medium`; `fast`
+  and `slow` are kept for the simulator).
+- `Data/Skills/skill-library.json` — 60 beast skills (six per beast) with each
+  species' learnable skills and 3-skill default loadout, 6 avatar active
+  skills, 10 avatar passives, 3 skill-training materials and 11 team bonds.
+- `Data/Skills/drop-tables.json` — material drops by encounter shape x level
+  band, with pity thresholds.
+
+The numbers are simulator-tuned starting points, not confirmed balance — see
+[`docs/balance/tuning-log.md`](docs/balance/tuning-log.md).
+
+**Tooling:**
+
 - **CI** (`.github/workflows/ci.yml`) — a format and compile check that builds
   the real game scripts against the hand-written UnityEngine stub in
-  `Tooling/CiStubs/`. It needs no Unity install and runs no Unity tests, so it
-  proves the scripts parse, type-check and are formatted — nothing about
-  whether the project opens or behaves correctly.
+  `Tooling/CiStubs/`. It needs no Unity install and runs no tests, so it proves
+  the scripts parse, type-check and are formatted — nothing about whether the
+  project opens or behaves correctly.
 - A **headless balance simulator** ([`Tooling/BalanceSim/`](Tooling/BalanceSim/README.md))
-  — local-only, not a CI job — that runs the real battle code outside Unity
-  and writes a Markdown report. Its primary mode is PvE: every 4-beast team of
-  the starter roster fights randomly generated mixed encounters in four shapes
-  (solo, elite, squad, horde) with varied enemy types and elements, at
-  calibrated difficulty (the hand-authored boss, swarm and pack encounters remain
-  available via `--encounter-set fixed`); a 1v1 round-robin is kept as a secondary PvP section. The
-  committed reports are [`docs/balance/baseline-report.md`](docs/balance/baseline-report.md)
-  (first-draft stats, the "before") and [`docs/balance/tuned-report.md`](docs/balance/tuned-report.md)
-  (the tuned roster); their numbers are inputs to design decisions, not applied automatically.
-- A **battle-system design proposal** ([`docs/design/battle-system.md`](docs/design/battle-system.md))
-  whose open questions are still awaiting producer confirmation.
+  — local-only, not a CI job — that runs the real battle code outside Unity and
+  writes Markdown reports: PvE against generated mixed encounters (solo, elite,
+  squad, horde; hand-authored ones via `--encounter-set fixed`), a secondary
+  1v1 PvP round-robin, a `--level-gap` sweep and `--mode pacing`. Committed
+  reports live in [`docs/balance/`](docs/balance/) (baseline, tuned, level-gap
+  and pacing reports plus research notes); their numbers inform design
+  decisions and are not applied automatically.
+- A **local EditMode test runner** (`Tooling/EditModeTests/`) — not a CI job —
+  that compiles the Runtime, Editor and `Tests/EditMode` scripts against the
+  UnityStub and runs the whole EditMode suite with NUnit, no Unity install
+  needed. Run it from the repo root before pushing:
 
-What does not exist yet: any gameplay or runtime behaviour code — no
-compositor, no battle, narrative or idle systems — no scenes, no prefabs, and
-no UGS integration. The Unity project has also never been opened by an actual
-Editor, so the generated `ProjectSettings/` YAML, `Library/` and solution files
-do not exist yet; that is expected.
+  ```sh
+  dotnet test Tooling/EditModeTests
+  ```
+
+  It swaps the stub's compile-only `JsonUtility` for a System.Text.Json
+  implementation that follows JsonUtility's field rules (see
+  [`Tooling/CiStubs/README.md`](Tooling/CiStubs/README.md)); Unity's own Test
+  Runner remains the authority on real serialization.
+
+### What does not exist yet
+
+- Anything the player sees or touches: no scenes, prefabs, UI, rendering,
+  animation, audio playback or input handling (`Scenes/` and `Prefabs/` are
+  empty, and no runtime script is a MonoBehaviour).
+- Encounters as game data — the only encounters are the balance simulator's
+  generator and its `Tooling/BalanceSim/encounters.json`.
+- Gear content — the gear schemas and save support exist, but `Data/Gear/` and
+  `Data/AvatarGear/` are empty.
+- Narrative, idle, IAP and services code (those `Runtime/` folders are empty),
+  the offline art compositor, and any UGS integration.
+- PlayMode tests (the assembly exists, with no tests) and any Unity test run
+  in CI.
+
+### Running it in Unity
+
+Nothing has been opened in an actual Unity Editor yet, so the generated
+`ProjectSettings/` YAML, `Library/` and solution files do not exist; that is
+expected. After the first open (see [Getting started](#getting-started)):
+
+1. Run the importers in order from the **Beast Craft → Data** menu:
+   **Import Beast Roster**, then **Import Skill Library** (wires each species'
+   `LearnableSkills` and `DefaultLoadout`, and creates the team bonds), then
+   **Import Drop Tables** (validated against the library's materials). Each
+   creates or updates the assets in place by id, so re-running is safe.
+2. Run the **EditMode** suite from **Window → General → Test Runner**. It has
+   so far only been run through the stub-based `Tooling/EditModeTests` runner.

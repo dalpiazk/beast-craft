@@ -36,20 +36,26 @@ dotnet run --project Tooling/BalanceSim -c Release -- [options]
 | `--skill-level <n>` | `1` | Skill level (1-20) for library skills and library avatar skills; the tier is the gates below that level (16+ = all three passed). |
 | `--skill-library <path>` | found by walking up | Path to `skill-library.json` (read only with `--skill-kit library` or `--avatar library`, i.e. by default). |
 | `--bonds <on\|off>` | `on` | Team bonds from the library's `TeamBonds`: applied at battle start to every player team that meets a bond's condition (never to enemies). Library kit only (ignored with `--skill-kit standard`). Adds the "PvE team bonds" section. See "Library kits". |
-| `--scouted <list>` | `all` | Scouted picking, the "PvE scouted picking" section: comma-separated `random`, `heuristic`, `bonds` (the bond-aware heuristic; bonds on only), `oracle` (also adds the held-out best team), or `all` / `none`. Post-processing of the battles already run: no extra battles, sub-second. `none` removes the section and its header line, leaving the report exactly as before scouting existed. See "Scouted picking". |
+| `--scouted <list>` | `all` | Scouted picking, the "PvE scouted picking" section: comma-separated `random`, `heuristic`, `bonds` (the bond-aware heuristic; bonds on only), `oracle` (also adds the held-out best team), or `all` / `none`. Post-processing of the battles already run: no extra battles, sub-second. `none` removes the section and its header line; the rest of the report is unchanged (the default calibration still uses the bond-aware picker, see `--calibrate-on`). See "Scouted picking". |
 | `--scouted-detail <d>` | `full` | What the heuristic pickers see of each composition (`ScoutingDetail`): `full`, `elements-only` or `dominant-element`. |
 | `--scouted-vanguard-min <n>` | `1` | Fewest Vanguards a heuristic pick fields, 0 to `--team-size`. |
-| `--levels <list>` | `1,50,100` | Comma-separated levels; beasts and enemies fight at the same level. |
+| `--levels <list>` | `1,50,100` | Comma-separated levels; beasts and enemies fight at the same level (see `--level-gap` for fights across a level gap). |
 | `--encounter-set <s>` | `generated` | `generated`: random compositions per shape (see "Generated encounters"). `fixed`: the three hand-authored encounters (`boss`, `swarm`, `pack`). |
 | `--compositions <n>` | `8` | Generated compositions per shape. |
 | `--encounters <list>` | all | Comma-separated shape ids (`solo`, `elite`, `squad`, `horde`) or, with `--encounter-set fixed`, encounter ids (`boss`, `swarm`, `pack`). |
 | `--team-size <n>` | `4` | Beasts per PvE team, 1-6. Every combination of the roster is fielded (C(10,4) = 210). |
-| `--target-clear <pct>` | `50` | Clear rate the difficulty calibration aims for. |
+| `--target-clear <pct>` | `50` | Clear rate the difficulty calibration aims for (the scouted pick's by default; see `--calibrate-on`). |
+| `--calibrate-on <t>` | `bonds` | Whose clear rate the PvE difficulty is calibrated to `--target-clear`. `bonds`: the team the bond-aware scouted picker (heuristic + bonds) fields against each composition, i.e. the player scouts and counter-picks; falls back to `heuristic` when bonds are not active (`--bonds off`, `--skill-kit standard`). `heuristic`: the plain element counter-pick. `mean`: the mean of every team (the unscouted player), the calibration before scouting; it reproduces the pre-scouting report byte for byte. See "Difficulty calibration". |
+| `--calibrate-samples <n>` | `16` | Scouted-pick calibration only: battles per composition the picked team fights at each search step (8 compositions x 16 = 128 battles per step, a binomial SE of about 4.4 points at 50%). Raise it if a cell's search is non-monotone. |
+| `--level-gap <list>` | off | PvE only. Also replay every cell with the enemies `g` levels above the team (negative = below) at the cell's calibrated multiplier, and add the "PvE level gap" section (and "PvE level gap over seeds" with `--seeds`). Comma-separated gaps and inclusive ranges, e.g. `-5..10` or `0,2,3,5`. The team and the avatar (unless `--avatar-level`) stay at the row's level; the enemies' stats follow their curve to their level, and the damage formula's level-difference term applies. Each battle's seed ignores the gap, so gap 0 is the calibration itself (no extra battles). A gap that puts the enemies outside 1-100 is not run (`—`). Suggested with `--levels 10,30,50,70,90`. See "Level gap". |
+| `--level-gap-teams <n>` | `42` | `--level-gap` only: how many teams (a seeded subset of the 210) the **no-scouting** rate at each nonzero gap is measured over, against every composition (42 x 8 = 336 battles). The **scouted** rate always uses the picked team, `--calibrate-samples` battles per composition. |
+| `--avatar-value` | off | PvE only (needs an avatar and a scouted-pick calibration). Also replay every cell's picked-team battles (`--calibrate-samples` per composition, the same seeds) **without the avatar** at the calibrated multiplier, and add the "PvE avatar value" section ("over seeds" with `--seeds`): per cell the scouted rate with and without the avatar, the difference (the avatar's **value** in points of clear rate), the avatar's turns, and its **direct share** of the team's output: the avatar's damage (its own turns and its passives' hits) + healing (team HP restored on its turns) + shield soak (damage a shield absorbed, credited to the shield's caster) as a percent of the team's total, with the part its passives produced. Read-only accounting; the rest of the report is unchanged. See "Avatar value". |
+| `--turn-detail` | off | PvE only. Add the "PvE beast turns" section: per kit mode, shape and beast (every team's battles at the calibrated multiplier, levels pooled) its turns per battle, the share of them on which no skill fired, split into held by its stance and out of reach, stunned turns, and the share of its damage that came off large enemies (bosses: giant, champion). A diagnostic; never changes a battle. |
 | `--marginal-threshold <x>` | `5` | Flag a beast whose overall marginal clear rate is outside +/-x points. |
 | `--enemy-element <e>` | `authored` | `authored` (as generated, or as authored in the fixed set), `None` or an element name: override every enemy's element. |
 | `--max-time <n>` | `2000` | Battle-time cap (normalized, see below); a battle that reaches it is a stalemate. |
 | `--seed <n>` | `12345` | Base seed; each battle derives its own seed from it. |
-| `--samples <n>` | PvE 1 (generated) or 5 (fixed); PvP 5 | Battles per PvE team and composition (every calibration step) and per PvP game, each with its own seed. Damage variance and crits make battles random; see "Sampling" below. |
+| `--samples <n>` | PvE 1 (generated) or 5 (fixed); PvP 5 | Battles per PvE team and composition (at the calibrated multiplier, and at every calibration step with `--calibrate-on mean`) and per PvP game, each with its own seed. Damage variance and crits make battles random; see "Sampling" below. |
 | `--matrix-level <n>` | `50` | Level of the PvP win matrix and the stat table (falls back to the highest simulated level). |
 | `--roster <path>` | found by walking up | Path to `beast-roster.json`. |
 | `--encounters-file <path>` | found by walking up | Path to `encounters.json`. |
@@ -58,16 +64,16 @@ dotnet run --project Tooling/BalanceSim -c Release -- [options]
 | `--out <path>` | none | Also write the report to this file (it always goes to stdout). |
 | `--self-check` | off | Run everything twice and fail unless both reports are identical; also replay sample PvE battles through `BattleTurnExecutor.RunBattle` and fail if the simulator's loop disagrees. |
 | `--seeds <list>` | none | Comma-separated base seeds, run one after another in one process (cannot be combined with `--seed`). Each seed's run is exactly the `--seed <n>` run; stdout (and `--out`) get the multi-seed aggregate, and with `--out` each seed's full report is also written beside it as `<name>.seed<n>.md`. See "Multi-seed runs". |
-| `--calibrate-sample <n>` | off | **Opt-in, changes results.** The difficulty search evaluates a seeded subset of `n` teams; the chosen multiplier is then run once with every team, and every number in the report comes from that full run. See "Performance". |
+| `--calibrate-sample <n>` | off | `--calibrate-on mean` only (an error otherwise). **Opt-in, changes results.** The difficulty search evaluates a seeded subset of `n` teams; the chosen multiplier is then run once with every team, and every number in the report comes from that full run. See "Performance". |
 | `--timings` | off | Print a wall-clock breakdown to stderr: per PvE cell, every calibration step (multiplier, clear rate, seconds), PvP, the report and GC counts. Never changes the report. |
 
 Exit codes: `0` success, `1` bad arguments, `2` missing or invalid roster, skill library or encounters
 (the roster is checked with `BeastRosterValidator` and the library with `SkillLibraryValidator`
 first, exactly as the Editor importers do), `3` a self-check failed. The run time goes to stderr, never into the report. The default run (PvE and PvP, both element modes,
 three levels, four shapes x 8 compositions, 1 sample per team and composition) takes about
-50 s on an 8-core machine (about 95 s with `--self-check`, which runs
-everything twice and replays two teams per composition through `RunBattle`); it took 210 s before
-the performance pass (see "Performance"). PvE battles run in
+12 s on an 8-core machine (about 22 s with `--self-check`, which runs
+everything twice and replays two teams per composition through `RunBattle`); it took 50 s before
+the scouted-pick calibration and 210 s before the performance pass (see "Performance"). PvE battles run in
 parallel, and the output is identical whatever the thread count.
 
 Two reports are committed, both the default arguments:
@@ -77,7 +83,7 @@ Two reports are committed, both the default arguments:
   the ATB turn order, so its battle lengths are in rounds.
 - `docs/balance/tuned-report.md` — the current roster and skill library after the third tuning pass
   and its element chart v2 follow-up (see `docs/balance/tuning-log.md`, "Retune with authored kits,
-  avatar passives, sqrt speed and mitigation", "Element chart v2", "Thunderbird range vs move" and "Niche pass: Thunderbird opener, Phoenix/Frost Wyrm lifts, remaining negatives", then "Team bonds"; "Scouting and counter-picking" added the scouted-picking section, no balance change; "Avatar gauge" moved the avatar onto its own ATB gauge, no tuning; "Large enemies (footprints)" made the giant, colossus and champion multi-hex, no tuning beyond the bosses' range parity), under the real game setup (every beast's authored default loadout, the library
+  avatar passives, sqrt speed and mitigation", "Element chart v2", "Thunderbird range vs move" and "Niche pass: Thunderbird opener, Phoenix/Frost Wyrm lifts, remaining negatives", then "Team bonds"; "Scouting and counter-picking" added the scouted-picking section, no balance change; "Avatar gauge" moved the avatar onto its own ATB gauge, no tuning; "Large enemies (footprints)" made the giant, colossus and champion multi-hex, no tuning beyond the bosses' range parity; "Scouting-based calibration" calibrates the difficulty on the bond-aware scouted pick instead of the average team, no balance change; "Scaling bonds" added three per-count stance bonds; milestone 2's final retune: "Avatar retune", "Thunderbird in `elite`", "Beast retune under the scouted calibration" and "Level-gap re-check"), under the real game setup (every beast's authored default loadout, the library
   avatar with its passives, the library's team bonds, skill level 1), the current Runtime (the square-root ATB turn order, the
   mitigation damage formula, `SpecialAttack`-scaled heals, combat stances, variance and crits) and
   the generated encounters. Regenerate it whenever the roster, the skill library, fixtures, simulator
@@ -254,14 +260,39 @@ cooldown 2 weighted `Attack` about twice as heavily.
   re-run). The process is deterministic because each clear rate is. A step whose multiplier scales
   every enemy of the shape to exactly the stats an earlier step did (late bisection steps at level
   1, where stats are small) plays identical battles, so it reuses them instead of re-running.
-  Each clear rate is over every team's battles against every composition of the shape (210 teams x
-  8 compositions x 1 sample = 1680 per evaluation at the defaults). The report lists each
-  composition's own clear rate at the shape's multiplier, and the range per cell.
+  **What is aimed at the target (`--calibrate-on`).** The game expects the player to scout
+  (`EncounterPreview`) and counter-pick, so by default (`bonds`) the calibrated clear rate is that
+  of the team the bond-aware scouted picker fields against each composition (see "Scouted
+  picking"; the picks depend on the preview alone, so they are worked out once per shape and are
+  the same in both kit modes and every level). Each search step runs only those picked teams,
+  `--calibrate-samples` (16) times per composition: 8 x 16 = 128 battles per step, a binomial SE of
+  about 4.4 points. The picked battles are the ones the every-team run would play for that team
+  (same seed; sample 0 is exactly its every-team battle). At the chosen multiplier every team then
+  fights every composition once (210 x 8 = 1680 battles), and every metric, section and the
+  **no-scouting** rate (the mean over every team: the player who brings any team without looking)
+  come from that run. "Calibrated difficulty" shows both rates and their gap per cell and per
+  shape. `heuristic` aims the plain element counter-pick instead; `mean` aims the mean of every
+  team (every step runs all 1680 battles), the calibration before scouting, and reproduces that
+  report byte for byte. The report lists each composition's own clear rate (over every team) at
+  the shape's multiplier, and the range per cell.
   Where a step in the clear-rate curve cannot be split (for example level 1, where enemy stats
-  round to 1-2), the closest rate is reported; a miss beyond 10 points is flagged.
+  round to 1-2), the closest rate is reported; a miss beyond 10 points is flagged. The picked teams
+  are few and react to one stat rounding alike, so steps are more common on the scouted pick (in
+  the default run: `neutral` `solo` L1, 35.9%); `--self-check` fails a miss unless the search saw the
+  rate jump across the target within 1% of multiplier (a genuine step).
 - **Metrics**, all at the calibrated multiplier:
   - **Marginal clear rate**, the primary number: the clear rate of teams containing the beast minus
     teams without it, in points.
+  - **Normalized marginal** (scouted-pick calibration only): the marginal x 0.25 / (p (1 - p)) per
+    cell, p = the cell's no-scouting clear rate, then averaged like the raw one. A marginal scales
+    with the binomial variance p (1 - p), largest at 50%; calibrated on the scouted pick, the
+    average team clears well under 50% in the boss shapes (10-22% in `elemental` `solo` and
+    `elite`), which shrinks every raw marginal there. The normalized figure is what the cell would
+    show at 50%, so it stays comparable with the pre-scouting marginals and between shapes. It is
+    the "Overall normalized" column, what the flags read, and what the multi-seed balance guard
+    reads (every beast's 3-seed mean within +/-4 `elemental`, +/-7 `neutral`,
+    `SimOptions.GuardElemental` / `GuardNeutral`). It amplifies noise by the same factor (about 2x
+    at 13%).
   - **Damage share / taken share**: the beast's share of its team's damage dealt and taken (HP
     actually removed, so overkill is not counted).
   - **Survival** (standing at the end), **time to clear** (normalized time of the clears it was
@@ -302,16 +333,21 @@ cooldown 2 weighted `Attack` about twice as heavily.
   marginals (baseline + (n - 1) / n x the members' centred marginals, the pair synergy model per
   team). Δ mixes the bond with its members' own strength (only teams holding them can have it); the
   excess is the part the lineup earns, since the members' marginals already carry the bond's
-  average. And the primary mode's clear rate by number of active bonds. The `--seeds` aggregate
-  repeats the bond marginal averaged over seeds ("PvE team bonds over seeds"). For the whole effect
+  average. A **scaling** (`PerCount`) bond's frequency is per stack count (x1, x2, …), and per kit
+  mode a "Scaling bonds by stacks" table gives, by condition count, the stacks applied (0 when none
+  applies: below `MinCount`, or an `Others` bond on a team made only of its members), the teams,
+  their clear rate and excess, and the bond's **per-stack slope** (least-squares points of clear rate
+  per applied stack over every team). And the primary mode's clear rate by number of active bonds. The `--seeds` aggregate
+  repeats the bond marginal and the scaling tables averaged over seeds ("PvE team bonds over
+  seeds"; the slope with its SD over seeds). For the whole effect
   of bonds, compare a `--bonds off` run: its "PvE team composition over seeds" spread and pair
   synergy tables are the bond-free baseline.
 - **Scouted picking** (`ScoutingReport.cs`; "PvE scouted picking", on by default, off with
   `--scouted none`): what seeing the encounter and counter-picking a team for it is worth, per
   shape and kit mode, with each strategy's pick rates. See "Scouted picking" below.
-- **Flags.** Overall marginal outside +/-5 points; **no niche** (bottom 3 in every shape);
+- **Flags.** Overall marginal (normalized, with a scouted-pick calibration) outside +/-5 points; **no niche** (bottom 3 in every shape);
   **no weakness** (top 3 in every shape); a stance whose kit parity is outside 50 +/- 5%;
-  stalemates; calibration misses.
+  stalemates; calibration misses (on the calibrated rate: the scouted pick's by default).
 - **Battle loop.** The PvE loop reproduces `BattleTurnExecutor.RunBattle` statement for statement,
   with an HP snapshot around each `ExecuteTurn` so damage can be attributed to the acting unit.
   `--self-check` replays sample battles (sample 0, same seed) through the real `RunBattle` and
@@ -422,6 +458,52 @@ The default run has no stalemates, PvE or PvP.
   to win ties (`PveSimulator.PlayersWinTies`). The prefix is side-wide, so the order within a side,
   and every targeting tie (targeting only ever compares units of one side), is unchanged.
 
+## Level gap
+
+`--level-gap` answers "what does being under-levelled cost?". Every (kit mode, shape, level) cell is
+first calibrated as usual, at equal levels; then, at the cell's multiplier, it is replayed with the
+enemies `g` levels above the team (`PveSimulator.RunLevelGaps`, `RunBattle(mode, teamLevel,
+enemyLevel, ...)`): the picked team per composition `--calibrate-samples` times (the **scouted**
+rate, the one the targets read) and a seeded subset of `--level-gap-teams` teams once per
+composition (the **no-scouting** rate). The seed and the initiative tie split are the team level's,
+so the gaps replay the same damage-roll streams (common random numbers) and gap 0 is read from the
+calibration's own battles. Two things change with the gap: the enemies' stats (their growth curve at
+their own level) and the damage formula's level-difference multiplier on every hit, both ways
+(`DamageFormula.GetLevelMultiplier`; see `docs/design/battle-system.md`, "Damage formula").
+
+The section's table has one row per shape and level plus an **All shapes** mean per level, one
+column per gap, cells `scouted (no-scouting)`. Targets for the scouted rate (`SimOptions.LevelGap*`):
+gap 0 within 50 +/- 5, +2 and +3 in 20-35%, +5 and beyond under 10%; `!` marks a miss, and a line per
+mode counts the targets met. With `--self-check`, the loop-parity replay also runs each level at its
+widest in-range gap.
+
+```sh
+dotnet run --project Tooling/BalanceSim -c Release -- --mode pve --levels 10,30,50,70,90 --level-gap -5..10 --out docs/balance/level-gap-report.md
+```
+
+Cost: each nonzero gap adds about 128 + 336 battles per cell (a sixth of a calibration); the
+command above takes about a minute. The committed `docs/balance/level-gap-report.md` is that
+command's output; the default report has no level-gap section and is unchanged by the option.
+
+## Avatar value
+
+`--avatar-value` measures what the avatar is worth. At every cell's calibrated multiplier the picked
+teams' battles (the calibration's own, `--calibrate-samples` per composition) are replayed with **no
+avatar**, seed for seed, so the two runs differ only by the avatar. Its **value** is the scouted rate
+with it (the calibrated rate, about 50%) minus the rate without it, in points. Beside it the section
+gives the avatar's **direct share**: its damage, healing and shield soak as a percent of the whole
+team's (beasts and avatar) over the with-avatar battles, and how much of that its passives produced.
+Buffs, debuffs and auras have no direct output (they act through the beasts), so the share is a
+floor on the avatar's role and the value is the whole of it. Accounting, per turn, from HP and shield
+snapshots and the turn's hits: enemy HP lost on the avatar's own turns and to its passives' hits is
+the avatar's damage, the rest the beasts' (damage over time ticking on an enemy's turn included);
+team HP restored on the avatar's turns is its healing; a hit a shield soaks is credited to whoever
+cast that shield (damage over time soaked by a shield is not counted). None of it changes a battle.
+
+`--turn-detail` is the matching diagnostic for beasts ("PvE beast turns"): how often each beast's turn
+fires nothing, and why (a skill held by its stance, no target in reach, stunned), and how its damage
+splits between large enemies (bosses) and the rest.
+
 ## Scouted picking
 
 The game shows the player each encounter before the team is placed (`EncounterPreview`, see
@@ -432,9 +514,12 @@ strategy names one of the 210 teams per composition, and that team's recorded re
 composition is the outcome. The section is on by default (`--scouted all`) and costs well under a
 second; `--scouted none` drops it and its header line, and the rest of the report is byte-identical.
 
-- **Calibration is unchanged.** Each shape's multiplier still aims the *average* team at 50%, so
-  the **baseline** (the mean over every team: the unscouted player) sits at about 50% and every
-  strategy's gain over it reads directly as **uplift** in points.
+- **Calibration.** By default each shape's multiplier aims the **Heuristic + bonds** pick at 50%
+  (`--calibrate-on bonds`, see "Difficulty calibration"), so that column sits near 50% (within its
+  noise: here it rests on one battle per composition and level, the calibration on 16), and the
+  **No scouting** column (the mean over every team: the unscouted player) sits below it; every
+  strategy's gain over no scouting reads as **uplift** in points. With `--calibrate-on mean` the
+  multiplier aims the average team at 50% instead, and the column is headed **Baseline** as before.
 - **Random**: a seeded random team per composition. Its expected uplift is 0; its actual gap is the
   noise scale of the table.
 - **Heuristic**: an element counter-pick from the preview alone (`--scouted-detail` sets how much it
@@ -445,7 +530,9 @@ second; `--scouted none` drops it and its header line, and the rest of the repor
   lowest-scored non-Vanguard is swapped for the best-scored unpicked Vanguard. It ignores stats,
   kits, levels and bonds, so its picks are the same in every kit mode and level.
 - **Heuristic + bonds** (bonds on only): every team meeting the Vanguard minimum scores its members'
-  heuristic scores plus 0.5 per tier of each bond it activates (`ScoutedPicker.BondWeight`); the best
+  heuristic scores plus 0.5 per tier of each tiered bond it activates (`ScoutedPicker.BondWeight`)
+  and 0.125 per stack of each scaling bond (`ScoutedPicker.ScalingBondWeight`; nothing for an
+  `Others` bond no teammate receives); the best
   team is fielded, ties to the lower team index. 0.5 is the gap between a neutral and a strong
   matchup against one enemy in half the lineup's weight: a starting knob, not tuned.
 - **Best team** (with `oracle`): the one lineup with the best clear rate in the same mode and shape
@@ -465,7 +552,13 @@ second; `--scouted none` drops it and its header line, and the rest of the repor
 - **Self-check invariants** (every run with scouting on; a failure exits 3): the oracle is at least
   the baseline, the best team and every other strategy in every cell; every pick is a real team; the
   heuristic pickers meet the Vanguard minimum whenever the roster has that many Vanguards; and each
-  strategy's pick counts sum to picks x team size per shape.
+  strategy's pick counts sum to picks x team size per shape. For a scouted-pick calibration (every
+  run, scouting section or not; `ScoutedPicker.CheckCalibration`): each cell's picks equal the
+  picker's own for its shape, recomputed, are real teams meeting the Vanguard minimum, and are the
+  same in every mode and level; the picked battles are complete and clear exactly the reported
+  scouted rate; each picked team's first sample equals its every-team battle (outcome, time, turns);
+  and, with `--self-check`, no scouted rate misses the target by more than 10 points except at a
+  genuine step.
 - **Noise.** A shape's figure rests on one pick per composition and level (24 battles by default),
   a binomial SE of about 10 points; judge on the `--seeds` aggregate (and more `--compositions` for
   a tighter figure), not on one seed. Findings are in `docs/balance/tuning-log.md`, "Scouting and
@@ -515,12 +608,14 @@ tie-break exactly once. Battle length is reported in normalized time and total t
 
 Damage has a uniform 90-110% variance roll and each beast (and enemy) a crit chance
 (`CritChance`, x1.5), both drawn from the battle's rng (design doc, "Variance and critical hits"),
-so one battle per team is a single draw. Every PvE team fights every composition, at every
-calibration step, `--samples` times, and every PvP game is played `--samples` times, each with its
+so one battle per team is a single draw. At the calibrated multiplier every PvE team fights every
+composition `--samples` times (with `--calibrate-on mean`, at every calibration step too; the
+default scouted-pick search instead runs each picked team `--calibrate-samples` times per
+composition), and every PvP game is played `--samples` times, each with its
 own seed (the sample index is part of the seed). With generated encounters the default is **1 sample
 per team and composition**: the eight compositions already vary the fight, so each team fights each
-shape 8 times per step (more than the fixed set's 5), and the variety is spent on different fights
-rather than on re-rolling the same one. One evaluation is 1680 battles; a beast's metrics in one cell
+shape 8 times (more than the fixed set's 5), and the variety is spent on different fights
+rather than on re-rolling the same one. The every-team run is 1680 battles; a beast's metrics in one cell
 rest on 672 battles with it (84 teams x 8), and its overall marginal on 8064. The fixed set keeps 5
 samples, and PvP 5. The report's "Critical hits and damage rolls" table checks the plumbing: each
 beast's observed crit rate and average roll multiplier against its authored chance.
@@ -545,11 +640,16 @@ dotnet run --project Tooling/BalanceSim -c Release -- --mode pve --seeds 12345,7
 - Each seed's run is exactly the `--seed <n>` run with the same other arguments (it loads its own
   generated compositions); with `--out`, its full report is written as `out/candidate.seed<n>.md`,
   byte-identical to `--seed <n> --out`. `--self-check` applies to every seed.
-- stdout and `--out` get the **aggregate**: per kit mode, every beast's marginal clear rate per
+- stdout and `--out` get the **aggregate**: first **calibration over seeds** (per kit mode and
+  shape, the mean multiplier and its range, and the scouted and no-scouting clear rates with their
+  gap; with `--calibrate-on mean` only the no-scouting rate, the calibrated one). Then per kit mode,
+  every beast's marginal clear rate per
   shape (mean over seeds, the rank of that mean and in how many seeds it was top 3 there) and
-  overall (mean, sample standard deviation, range and each seed's value), plus the range of the
-  means, the beasts outside the `--marginal-threshold` band and the beasts with no top-3 shape on
-  the means. Then **team composition over seeds**: each team's clear rate averaged over the seeds,
+  overall (mean, sample standard deviation, range and each seed's value), the **normalized**
+  overall marginal (mean and SD over seeds; see "Metrics") with **!** outside the balance guard
+  (+/-4 `elemental`, +/-7 `neutral`), plus the range of the raw and normalized means, the beasts
+  outside the `--marginal-threshold` band (raw) and outside the guard (normalized), and the beasts
+  with no top-3 shape on the means. Then **team composition over seeds**: each team's clear rate averaged over the seeds,
   with the teams' spread within a seed (per-seed SD), how much one team moves between seeds
   (seed-to-seed SD: damage rolls and each seed's composition draw) and the **persistent SD**,
   sqrt(per-seed SD² - seed-to-seed SD²), the spread that is the lineup's own; the percentiles,
@@ -560,7 +660,7 @@ dotnet run --project Tooling/BalanceSim -c Release -- --mode pve --seeds 12345,7
   uplift per shape averaged over the seeds, the SD of the heuristic's uplift over seeds, and the
   pick rates averaged over seeds (**0** / **100** = never / always in every seed).
 - The seeds run one after another, each using every core, so the wall clock is about the sum of
-  single-seed runs (loading and JIT are a second or two of a 50 s run). What it replaces is the
+  single-seed runs (loading and JIT are a second or two of an 11 s run). What it replaces is the
   bookkeeping: one process per seed and scripts parsing the Markdown back; the aggregate comes
   straight from the simulator's numbers, unrounded.
 
@@ -595,15 +695,25 @@ dotnet run --project Tooling/BalanceSim -c Release -- --mode pacing --self-check
   level); the report tabulates its p10 / p50 / p90 level every 50 battles, and `--self-check` fails
   when the median strays more than `AvatarLevelTolerance` (3) levels from the encounter level. It
   draws no random numbers, so it never shifts the skill-pacing results.
+- **Beast level**: every campaign also levels one `BeastProgress` with
+  `BeastProgression.AwardBattle`, the beast fielded in every battle and knocked out in
+  `KnockoutChance` (20%) of them (a modelling assumption, not measured from the PvE runs; a
+  knocked-out beast earns participation XP only). Same checkpoints, p10 / p50 / p90, and
+  `--self-check` fails when the median strays more than `BeastLevelTolerance` (3) levels from the
+  encounter level. The knockout roll is drawn last each battle, so it leaves every earlier draw (and
+  the skill-pacing results) unchanged. The XP rules are in
+  [`docs/design/progression-and-saves.md`](../../docs/design/progression-and-saves.md), "Beast and
+  avatar level".
 - The model's constants (level ramp, shape weights, clear chance, uses per battle) are at the top of
   `PacingSimulator.cs`; the drop numbers are data. See the design doc, "Material economy", and
   `docs/balance/tuning-log.md`, "Material economy".
 
 ## Performance
 
-The default run took 210 s before the performance pass and takes about 50 s now (8-core Intel Core
-Ultra 7 258V, .NET 10), with a **byte-identical report**. What was measured (a `dotnet-trace` CPU
-sample and the `--timings` breakdown) and what was done about it:
+The default run took 210 s before the performance pass and about 50 s after it (8-core Intel Core
+Ultra 7 258V, .NET 10), with a **byte-identical report**; the scouted-pick calibration then cut it to
+about 12 s (below). What was measured (a `dotnet-trace` CPU sample and the `--timings` breakdown)
+and what was done about it (the pass itself, measured under `--calibrate-on mean`):
 
 - **All the time is PvE calibration.** PvP takes 0.06 s and the report 0.1 s. PvE is 24 cells
   (2 kit modes x 4 shapes x 3 levels), each about 10 calibration steps of 1680 battles; the final
@@ -653,6 +763,13 @@ giant's moves test every tile of its footprint, and one-tile units closing on it
 tiles instead of seven). A battle of one-tile units runs the same code as before (one enum compare
 per distance): the `squad` and `horde` cells moved by run-to-run noise only, and their results are
 byte-identical.
+
+**The scouted-pick calibration** (`--calibrate-on bonds`, the default) is also the largest speed-up
+since the performance pass: each search step runs only the picked team per composition, 16 times
+(128 battles instead of 1680), and only the chosen multiplier runs every team once. The default run
+went from about 52 s to about 11 s (PvE about 10 s), `--self-check` from about 95 s to 22 s, and three
+seeds (`--seeds 12345,777,4242`) from about 150 s to 33 s. `--calibrate-on mean` costs what the
+default did before (3 seeds: 166 s).
 
 Measure before optimizing further: `--timings` prints the per-cell and per-step breakdown.
 

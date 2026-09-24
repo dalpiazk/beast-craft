@@ -2408,3 +2408,596 @@ units other than the three bosses, and footprints in hand-authored encounters, a
 
 Reproduce: `dotnet run --project Tooling/BalanceSim -c Release -- --seeds 12345,777,4242 --out out/footprints.md`
 (about 150 s).
+
+## Scouting-based calibration
+
+Design decision (milestone 2): encounter difficulty assumes the player **scouts and counter-picks**.
+The simulator used to calibrate each (shape, level, kit mode) so the *average* of the 210 teams
+cleared 50%; "Scouting and counter-picking" showed a scouting player then clears about 70%. It now
+calibrates so the team the **bond-aware scouted picker** (heuristic + bonds) fields against each
+composition clears 50% (`--calibrate-on bonds`, the default; README "Difficulty calibration"), and
+reports the average team's rate beside it as the **no-scouting** rate. No beast, skill, bond, avatar
+or enemy data changed.
+
+How: the picks depend on the preview alone, so they are worked out once per shape
+(`ScoutedPicker.PicksFor`). Each search step runs only the picked team per composition,
+`--calibrate-samples` (16) times: 8 x 16 = 128 battles a step (SE about 4.4 points) instead of 1680.
+The picked battles are seeded like the every-team ones (sample 0 is exactly the picked team's
+every-team battle; the self-check verifies it). Same bracket and 8 bisections. At the chosen
+multiplier every team runs once, and every metric, the composition and bond sections, scouting and
+the no-scouting rate come from that run. `--calibrate-on heuristic` aims the plain counter-pick;
+`--calibrate-on mean` is the old calibration and **reproduces the committed report byte for byte**
+(`cmp` against `git show HEAD:docs/balance/tuned-report.md`: identical, SHA-256 `d14cda26...`).
+
+**Normalized marginals.** At a cell clear rate p a beast's marginal scales with p (1 - p), so the
+lower average-team rate shrinks raw marginals (most in the boss shapes, p about 10-20%). The report
+and the aggregate add **normalized** = marginal x 0.25 / (p (1 - p)) per cell (p = the no-scouting
+rate), averaged like the raw one; the flags and the balance guard (3-seed mean within +/-4
+`elemental`, +/-7 `neutral`) now read it. It amplifies noise by the same factor (about 2x at 13%),
+so the normalized SDs over seeds run 1.3-4.8 in `elemental`, against 0.8-4.3 raw before.
+
+**Calibration** (`--seeds 12345,777,4242`, default arguments; levels averaged, then seeds):
+
+| Kit mode | Shape | Multiplier before (mean) | Multiplier now | Scouted | No scouting | Gap |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| `elemental` | `solo` | x0.941 | x1.153 | 49.6% | 10.3% | +39.3 |
+| `elemental` | `elite` | x0.864 | x0.982 | 50.1% | 21.9% | +28.2 |
+| `elemental` | `squad` | x1.224 | x1.340 | 50.3% | 26.0% | +24.3 |
+| `elemental` | `horde` | x1.138 | x1.176 | 48.7% | 42.7% | +6.0 |
+| `elemental` | overall | x1.042 | x1.163 | 49.7% | 25.2% | +24.4 |
+| `neutral` | `solo` | x0.902 | x0.930 | 48.4% | 28.6% | +19.8 |
+| `neutral` | `elite` | x0.843 | x0.841 | 50.9% | 50.1% | +0.7 |
+| `neutral` | `squad` | x1.215 | x1.233 | 50.3% | 43.6% | +6.8 |
+| `neutral` | `horde` | x1.165 | x1.173 | 49.7% | 46.9% | +2.8 |
+| `neutral` | overall | x1.031 | x1.044 | 49.8% | 42.3% | +7.5 |
+
+- **Not scouting costs about 25 points** in `elemental`: the average team clears about a quarter
+  of encounters calibrated for the scouting player, a lone giant about one in ten. The gap is the
+  counter-pick's value, as before (+20 to +25 on the old calibration), now read from the other side
+  (and somewhat larger). Hordes, whose mixed elements dilute any counter, barely move (+6).
+- **`neutral` is the control**: with the chart off the bond-aware pick knows only bonds, and the
+  gap is +0.7 (elite) to +20 (solo); +7.5 overall.
+- **Misses are level-1 steps.** Four of 72 cells over the three seeds end more than 10 points off
+  (seed 12345 `neutral` `solo` L1 35.9%; 777 `neutral` `elite` L1 66.4%; 4242 `elemental` `horde`
+  L1 39.1% and `neutral` `solo` L1 63.3%): in each the picked teams' rate jumps across 50% between
+  two multipliers less than 1% apart (a single stat rounding at level 1, which the few picked
+  teams react to alike, where 210 teams averaged it out). They are flagged in the report and pass
+  the self-check, which fails only a miss that is not such a step.
+- In the scouting section the **Heuristic + bonds** column now sits at the target (48.3%
+  `elemental` overall over seeds, on one battle per composition and level against the
+  calibration's 16), and the plain heuristic reaches 51.4%: the two pickers are worth about the
+  same, as before.
+
+**Guard** (3-seed mean overall marginal; before = `--calibrate-on mean`, the continuity run, which
+reproduces the "Large enemies (footprints)" after-column exactly; after = the new default, raw and
+normalized; the guard reads the normalized figure):
+
+| Beast | Stance | `elemental` before | raw | normalized | `neutral` before | raw | normalized |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Golem | Vanguard | +1.6 | +1.6 | +3.4 | +5.8 | +4.1 | +4.8 |
+| Phoenix | Ranged | +1.1 | +1.7 | +2.1 | -0.4 | -0.8 | -1.3 |
+| Tarasque | Vanguard | +1.0 | +0.3 | +2.3 | -3.6 | -2.9 | -3.4 |
+| Frost Wyrm | Vanguard | +0.7 | +1.2 | -0.7 | -1.5 | +0.2 | 0.0 |
+| Treant | Vanguard | +0.7 | +1.3 | +2.7 | +1.3 | +1.7 | +2.2 |
+| Kirin | Ranged | +0.5 | +0.5 | +0.8 | -0.5 | -0.6 | -0.9 |
+| Basilisk | Ranged | +0.4 | +0.2 | +1.5 | +1.9 | +1.6 | +2.0 |
+| Leviathan | Vanguard | -0.9 | -0.9 | -2.3 | +0.6 | +0.1 | +0.4 |
+| Thunderbird | Skirmisher | -2.4 | -2.9 | **-5.0** | +2.0 | +1.3 | +1.0 |
+| Griffin | Skirmisher | -2.6 | -3.1 | **-4.8** | -5.6 | -4.8 | -4.9 |
+
+`neutral` is inside the guard (-4.9 ... +4.8). **`elemental` is not: Thunderbird -5.0 and Griffin
+-4.8 are outside +/-4** (the raw means, -2.9 and -3.1, would pass). Both Skirmishers already sat at
+the bottom on the old calibration (-2.4 / -2.6); the normalization weights the boss shapes up (x2.7
+`solo`, x1.5 `elite` at their mean p), and both are weakest there (`elite` -4.1 / -5.6 raw, Griffin `horde` -8.9).
+**Not tuned here**: the retune under the new calibration is stage D (Griffin / Thunderbird are on
+its list already).
+
+**Runtime.** The default run fell from about 52 s to 11 s (PvE about 10 s), `--self-check` to 22 s,
+three seeds from about 150 s to 33 s; `--calibrate-on mean` costs what the default did (3 seeds 166 s).
+
+Reproduce: `dotnet run --project Tooling/BalanceSim -c Release -- --seeds 12345,777,4242 --out out/scoutcal.md`
+(about 35 s) and the continuity run with `--calibrate-on mean` added (about 170 s).
+
+## Scaling bonds
+
+Design decision (milestone 2): add **lineup-scaling** team bonds beside the pair and tiered stance
+bonds, so every team's stance mix counts. A scaling bond (`PerCount`, skill library schema 2) has
+one tier whose effects are per stack: once its count reaches the tier's `MinCount` it applies
+stacks = min(count, `MaxCount`), every magnitude x stacks as one application. A new scope,
+`Others`, gives the effect to the teammates that are *not* members. The validator caps the worst
+case (magnitude x `MaxCount`: 20% of a stat, 15 flat crit, a 60% shield, 1 move); carriers are
+cached per tier and stack count with cloned effects. The bond-aware scouted picker weighs a scaling
+bond at 0.125 per stack (`ScoutedPicker.ScalingBondWeight`; nothing for an `Others` bond no
+teammate receives). See battle-system.md, "Team bonds".
+
+**Bonds** (the design's starting magnitudes, kept; roster 5 Vanguard, 3 Ranged, 2 Skirmisher):
+
+| Bond | Condition | Scope | Per stack | Max | Teams at x1 / x2 / x3 (of 210) |
+| --- | --- | --- | --- | ---: | --- |
+| `bulwark` Bulwark | Vanguard beasts | Others | +4% Defense, +4% SpecialDefense | 3 | 50 / 100 / 55 |
+| `overwatch` Overwatch | Ranged beasts | Team | +3 CritChance | 3 | 105 / 63 / 7 |
+| `flanking` Flanking | Skirmisher beasts | Team | +4% Speed | 2 | 112 / 28 / - |
+
+Every one of the 210 lineups **resolves** a scaling bond (a test pins it for the roster), but the
+five all-Vanguard teams resolve only `bulwark`, which has no non-Vanguard to land on: 205 of 210
+teams **apply** one. (Any stance-count bond on a Vanguard-only team would need Members or Team scope.)
+
+**Normalized marginals** (3-seed mean, `--seeds 12345,777,4242`; before = the "Scouting-based
+calibration" default, after = this change; the guard reads normalized):
+
+| Beast | Stance | `elemental` before | after | Δ | `neutral` before | after | Δ |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Phoenix | Ranged | +2.1 | +3.3 | +1.2 | -1.3 | -1.4 | -0.1 |
+| Treant | Vanguard | +2.7 | +2.4 | -0.3 | +2.2 | +2.6 | +0.4 |
+| Kirin | Ranged | +0.8 | +1.7 | +0.9 | -0.9 | -0.9 | 0.0 |
+| Tarasque | Vanguard | +2.3 | +1.5 | -0.8 | -3.4 | -3.6 | -0.2 |
+| Golem | Vanguard | +3.4 | +1.5 | -1.9 | +4.8 | +3.3 | -1.5 |
+| Basilisk | Ranged | +1.5 | -0.2 | -1.7 | +2.0 | -0.7 | **-2.7** |
+| Frost Wyrm | Vanguard | -0.7 | -1.0 | -0.3 | 0.0 | 0.0 | 0.0 |
+| Leviathan | Vanguard | -2.3 | -2.0 | +0.3 | +0.4 | +1.7 | +1.3 |
+| Thunderbird | Skirmisher | **-5.0** | -3.6 | +1.4 | +1.0 | +1.6 | +0.6 |
+| Griffin | Skirmisher | **-4.8** | -3.6 | +1.2 | -4.9 | -2.7 | **+2.2** |
+
+- **The guard now holds in both modes** (`elemental` -3.6 ... +3.3 within +/-4, `neutral` -3.6 ...
+  +3.3 within +/-7): `flanking` lifts the two Skirmishers, which were outside it, by about 1.3 each.
+  Top 3 in some shape: 9 of 10 in each mode (not Thunderbird `elemental`, Kirin `neutral`).
+- **Stance means moved at most 1.4 points** (`elemental` Skirmisher +1.3, Ranged +0.1, Vanguard
+  -0.6; `neutral` Skirmisher +1.4, Ranged -0.9, Vanguard 0.0), so no bond was rescaled. Two single
+  beasts moved more than 2 (Basilisk `neutral` -2.7, Griffin `neutral` +2.2) while their stance
+  partners did not (Kirin 0.0, Phoenix -0.1; Thunderbird +0.6), so a bond magnitude, which moves a
+  stance as a whole, is not the lever. A second seed set (`--seeds 1,2,3`) repeats the pattern
+  (Basilisk -2.0 / -2.1, Griffin +2.2 / +1.8, Golem -1.5 / -2.2, stance means within 1.4): real but
+  beast-specific, for the stage D retune.
+- **Calibration** barely moves: the overall multiplier rises x1.163 -> x1.177 `elemental`, x1.044 ->
+  x1.059 `neutral` (the picked team gets the bonds too); no-scouting rate 25.2% -> 23.8% and 42.3%
+  -> 40.3%.
+
+**Scaling bonds by stacks** (3-seed means, levels pooled, overall; **excess** over the additive
+prediction from the members' marginals; **slope** = least-squares points of clear rate per applied
+stack over every team, mean (SD) over seeds):
+
+| Bond | Count | Stacks | Teams | `elemental` clear | excess | `neutral` clear | excess |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `bulwark` (slope 0.0 (0.7) / +0.9 (0.4)) | 0 | 0 | 5 | 29.7% | +7.6 | 46.3% | +8.2 |
+|  | 1 | 1 | 50 | 23.9% | +1.0 | 41.4% | +2.2 |
+|  | 2 | 2 | 100 | 21.9% | -1.9 | 36.8% | -3.5 |
+|  | 3 | 3 | 50 | 26.3% | +1.6 | 45.4% | +4.0 |
+|  | 4 | 0 | 5 | 29.7% | +4.3 | 41.5% | -1.0 |
+| `overwatch` (slope +0.9 (1.1) / -0.8 (1.2)) | 0 | 0 | 35 | 24.2% | +1.5 | 47.1% | +5.8 |
+|  | 1 | 1 | 105 | 23.0% | -0.6 | 37.4% | -3.1 |
+|  | 2 | 2 | 63 | 24.2% | -0.3 | 40.2% | +0.5 |
+|  | 3 | 3 | 7 | 30.6% | +5.1 | 50.9% | +12.1 |
+| `flanking` (slope -2.5 (0.2) / -0.6 (1.1)) | 0 | 0 | 70 | 26.9% | +1.1 | 42.6% | +1.9 |
+|  | 1 | 1 | 112 | 21.9% | -1.4 | 37.8% | -2.3 |
+|  | 2 | 2 | 28 | 23.7% | +2.9 | 44.2% | +4.7 |
+
+The slope mixes the bond with its stance's own strength (only Skirmisher teams can hold `flanking`,
+and Skirmishers are the weakest beasts: its slope is negative although the bond helps), and the
+excess of a Team-scope stance bond is flat by construction (its stacks are a sum of memberships the
+additive model already fits). What the excess does show is the stance-extreme lineups beating the
+additive prediction: no Vanguard, 3 Ranged or 2 Skirmishers run +2.9 to +12.1 (4 Vanguards +4.3 /
+-1.0), the 2-Vanguard / 1-Ranged / 1-Skirmisher counts -0.6 to -3.5.
+
+**Composition spread: the goal is missed.** The target was a persistent team SD (`elemental`
+overall, 3 seeds) at least 1.5 points above the value before this change.
+
+| Kit mode | Scope | Persistent SD before | after | Per-seed SD before | after | Seed-to-seed SD before | after |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `elemental` | overall | 0.0 | 0.0 | 6.3 | 6.2 | 7.8 | 6.4 |
+| `elemental` | `solo` | 3.5 | 3.5 | 8.0 | 8.2 | 7.2 | 7.4 |
+| `elemental` | `elite` | 0.0 | 0.0 | 10.8 | 9.4 | 15.6 | 10.4 |
+| `elemental` | `squad` | 9.5 | 9.1 | 13.0 | 13.5 | 8.9 | 10.0 |
+| `elemental` | `horde` | 0.0 | 5.0 | 17.3 | 17.4 | 18.9 | 16.7 |
+| `neutral` | overall | 3.1 | 3.8 | 11.8 | 11.5 | 11.4 | 10.8 |
+
+- **Before is already 0.0**, not the 6.1 the design assumed: under the scouted-pick calibration
+  each seed's own composition draw decides most of a team's `elemental` rate, so the
+  seed-to-seed SD (7.8) exceeds the within-seed spread (6.3) and the persistent estimate floors at
+  0. The within-seed spread did not move (6.3 -> 6.2; `--seeds 1,2,3`: 6.3 -> 6.4, persistent 1.0
+  -> 0.0).
+- **Why the bonds do not spread teams:** a Team-scope stance bond adds a fixed amount per stance
+  member, i.e. it shifts that stance's beasts' marginals, and the stance it helps most here
+  (Skirmishers, via `flanking`) is the weakest, so it narrows the spread; `bulwark` (Others) is
+  concave in the Vanguard count (stacks x recipients = 3, 4, 3 for 1, 2, 3 Vanguards) and helps the
+  balanced middle most, which also narrows it.
+- **Probes (not committed):** larger magnitudes at the validator caps' edge (bulwark 6%, overwatch
+  5, flanking 8%) gave persistent 2.1 but only because the seed-to-seed SD fell (per-seed 6.3 ->
+  6.1), and moved the Skirmishers +3.4 / +4.5 (over the 2-point rule). Convex stacks (overwatch
+  +5 crit and flanking +8% Speed with Members scope, so value ~ count²) left it at 0.0 (per-seed
+  6.4). Stat bonds of this size do not make the `elemental` lineup matter more across seeds; the
+  lever is probably element or kit synergy (e.g. bonds that change what a beast does), or measuring
+  composition against fixed compositions rather than per-seed draws. Left for the lead.
+
+**Runtime** unchanged (default run about 11 s, three seeds about 30 s). `--self-check` and
+`--mode pacing --self-check` pass.
+
+Reproduce: `dotnet run --project Tooling/BalanceSim -c Release -- --seeds 12345,777,4242 --out out/scaling.md`
+(about 30 s); before = the same at the previous commit.
+
+## Level-difference modifier
+
+Design decision (milestone 2, user): **an under-levelled team must not clear content** ("that makes
+levelling pointless; the curve levels out too much"). Chosen fix: a level-difference multiplier on
+every damage hit, caster level minus target level, both directions, the avatar at its own level
+(`DamageFormula.GetLevelMultiplier`; battle-system.md, "Damage formula"):
+
+```
+level multiplier = clamp(1 + k d + q d |d|, 1 - cap, 1 + cap),  d = caster level - target level
+k = 0.025 (LevelDifferencePerLevel), q = 0.005 (LevelDifferenceConvex), cap = 0.4 (LevelDifferenceCap)
+```
+
+It is the last multiplier before the single truncation (after element, crit, variance and execute),
+exactly 1 between equal levels and then not applied at all, so **every equal-level battle is
+bit-identical**: the committed `tuned-report.md` is byte-identical with the modifier in (`cmp`
+against the fresh default run), and so are all three seeds' reports and the aggregate of
+`--mode pve --seeds 12345,777,4242` against the previous commit (**balance guard: normalized
+per-beast marginals unchanged, identity**). Damage over time inherits it; heals, shields, stat
+changes, status chance and knockback do not; no random draws. No roster, skill, bond, avatar or
+enemy data changed.
+
+**Measuring it: `--level-gap`.** Every (kit mode, shape, level) cell is calibrated at equal levels
+as before (scouted pick at 50%), then replayed at the same multiplier with the enemies `g` levels
+above the team: the picked team 16 times per composition (the **scouted** rate) and a seeded 42 of
+210 teams once per composition (the **no-scouting** rate). The seed ignores the gap (common random
+numbers), so gap 0 is the calibration itself. The team and the avatar stay at the row's level; the
+enemies' stats follow their curve to their level. Report section "PvE level gap" (and "over seeds"
+with `--seeds`); committed as `docs/balance/level-gap-report.md` (`--mode pve --levels
+10,30,50,70,90 --level-gap -5..10`, seed 12345, about 58 s). Targets for the scouted rate: gap 0
+50 +/- 5, +2 and +3 in 20-35%, +5 and beyond under 10%, at every level band.
+
+**Sweep** (3 seeds 12345 / 777 / 4242, `elemental` (the game's mode), every shape averaged,
+scouted rate; `!` = misses its target; k = 0 is the stats alone, i.e. before this change). The
+design's grid is k in {0.025, 0.03, 0.035, 0.04} x cap in {0.3, 0.4}; the cap only binds past
+cap / k levels (7.5-16), so the cap-0.3 rows repeat the cap-0.4 ones exactly up to +7 (common random
+numbers) and are listed once:
+
+| k | cap | q | +2 at L10 / 30 / 50 / 70 / 90 | +3 | +5 | +7 | Targets met L30-90 | L10 |
+| ---: | ---: | ---: | --- | --- | --- | --- | ---: | ---: |
+| 0 | - | 0 | 33.7 / 39.0 ! / 37.7 ! / 41.9 ! / 41.9 ! | 25.3 / 36.4 ! / 35.4 ! / 41.5 ! / 38.6 ! | 19.0 ! / 25.8 ! / 32.2 ! / 36.1 ! / 34.6 ! | 10.7 / 22.7 / 26.7 / 35.0 / 34.9 | 0/12 | 2/3 |
+| 0.025 | 0.3, 0.4 | 0 | 26.6 / 29.9 / 29.8 / 31.3 / 30.0 | 18.4 ! / 26.8 / 24.9 / 28.8 / 26.8 | 10.5 ! / 11.6 ! / 16.3 ! / 19.7 ! / 18.6 ! | 2.7 / 8.5 / 10.5 / 13.7 / 11.5 | 8/12 | 1/3 |
+| 0.03 | 0.3, 0.4 | 0 | 25.2 / 28.9 / 27.9 / 29.8 / 27.9 | 16.7 ! / 24.6 / 23.6 / 27.0 / 25.4 | 8.9 / 11.1 ! / 13.8 ! / 17.1 ! / 15.9 ! | 2.2 / 5.9 / 8.9 / 10.5 / 9.6 | 8/12 | 2/3 |
+| 0.035 | 0.3, 0.4 | 0 | 23.8 / 27.2 / 26.2 / 27.9 / 26.8 | 15.6 ! / 23.0 / 22.3 / 25.3 / 23.8 | 7.0 / 9.4 / 12.2 ! / 15.4 ! / 12.9 ! | 1.2 / 4.4 / 7.2 / 8.0 / 7.2 | 9/12 | 2/3 |
+| 0.04 | 0.3, 0.4 | 0 | 22.7 / 26.0 / 24.7 / 27.1 / 25.8 | 14.3 ! / 20.6 / 21.0 / 24.4 / 22.3 | 5.5 / 8.3 / 11.0 ! / 13.2 ! / 10.7 ! | 1.0 / 3.1 / 6.2 / 7.0 / 6.1 | 9/12 | 2/3 |
+| 0.03 | 0.4 | 0.004 | 23.4 / 26.6 / 25.1 / 27.2 / 26.5 | 13.5 ! / 20.0 / 20.6 / 24.0 / 21.2 | 3.8 / 6.2 / 8.3 / 9.2 / 8.3 | 0.3 / 0.8 / 2.0 / 3.1 / 2.8 | 12/12 | 2/3 |
+| **0.025** | **0.4** | **0.005** | 23.8 / 27.2 / 26.2 / 27.9 / 26.8 | 14.3 ! / 20.6 / 21.0 / 24.4 / 22.3 | 3.8 / 6.2 / 8.3 / 9.2 / 8.3 | 0.3 / 0.8 / 2.0 / 3.1 / 2.8 | **12/12** | 2/3 |
+
+- **Stats alone (k = 0) do not do it**: 5 levels under, the scouted team still clears 26-36% at
+  levels 30-90 (at level 10, where a level is about 4% of stats rather than 1-2%, 19%).
+- **No linear k meets both ends.** "Under 10% at +5" needs a multiplier of about 1.25 at 5 levels,
+  which linearly (k = 0.05) would put 3 under at about 1.15 and below 20%. Every linear k from
+  0.025 to 0.04 misses +5 at levels 50-90 (11-20%) while +2 / +3 still sit comfortably inside the band.
+- **The convex term q (design fallback) fixes it**: 1 + k d + q d |d| is mild near 0 and steep
+  further out. k = 0.025, q = 0.005 gives x1.07 at 2 levels (= linear 0.035), x1.12 at 3
+  (= linear 0.04) and x1.25 at 5. **Chosen: k = 0.025, q = 0.005, cap = 0.4**, which meets all 12
+  targets at levels 30-90; k = 0.03 / q = 0.004 is equivalent except +3 at level 30 sits exactly
+  on the 20% edge. Cap 0.4 (not 0.3): with q the multiplier reaches 1.4 at 7 levels, where a clear
+  is already 1-3%; 0.3 would bind at 6 and flatten +6 / +7.
+- **Chosen setting, full table** (3-seed means, every shape averaged, `scouted (no scouting)` %):
+
+| Mode | Level | -5 | -4 | -3 | -2 | -1 | 0 | +1 | +2 | +3 | +4 | +5 | +6 | +7 | +8 | +9 | +10 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `elemental` | 10 | 100.0 (98.7) | 98.5 (92.5) | 93.3 (77.9) | 83.3 (59.3) | 66.9 (37.5) | 49.3 (21.9) | 34.3 (17.0) | 23.8 (9.5) | 14.3 (3.9) ! | 10.2 (2.1) | 3.8 (0.6) | 1.8 (0.1) | 0.3 (0.0) | 0.0 (0.0) | 0.0 (0.0) | 0.0 (0.0) |
+| `elemental` | 30 | 98.8 (91.0) | 93.3 (75.9) | 87.8 (60.5) | 71.7 (43.5) | 60.4 (31.7) | 50.3 (22.7) | 34.0 (16.9) | 27.2 (10.4) | 20.6 (6.1) | 12.5 (2.7) | 6.2 (1.3) | 2.7 (0.5) | 0.8 (0.1) | 0.7 (0.0) | 0.6 (0.0) | 0.6 (0.0) |
+| `elemental` | 50 | 96.9 (84.9) | 92.4 (70.1) | 80.9 (56.1) | 70.5 (40.9) | 64.4 (29.7) | 49.3 (23.4) | 35.6 (16.7) | 26.2 (11.0) | 21.0 (6.7) | 15.9 (3.8) | 8.3 (1.4) | 5.9 (0.8) | 2.0 (0.2) | 2.1 (0.2) | 2.1 (0.2) | 1.6 (0.1) |
+| `elemental` | 70 | 95.8 (81.5) | 90.6 (66.6) | 77.2 (52.1) | 72.7 (39.0) | 64.3 (28.6) | 50.1 (23.3) | 42.9 (19.7) | 27.9 (13.3) | 24.4 (9.2) | 16.9 (4.4) | 9.2 (1.9) | 6.7 (0.9) | 3.1 (0.4) | 2.9 (0.4) | 2.7 (0.3) | 2.4 (0.3) |
+| `elemental` | 90 | 93.9 (76.4) | 86.9 (62.0) | 74.7 (48.0) | 69.9 (35.6) | 57.2 (25.8) | 49.8 (21.9) | 38.5 (18.0) | 26.8 (11.5) | 22.3 (7.5) | 13.9 (4.2) | 8.3 (1.8) | 4.7 (0.9) | 2.8 (0.3) | 3.6 (0.4) | 2.9 (0.3) | 2.1 (0.2) |
+| `neutral` | 10 | 100.0 (100.0) | 99.9 (99.8) | 99.2 (98.8) | 95.6 (95.0) | 78.7 (73.0) | 50.5 (41.7) | 30.4 (24.7) | 16.1 (12.0) ! | 4.8 (3.3) ! | 2.1 (1.5) | 0.2 (0.1) | 0.0 (0.0) | 0.0 (0.0) | 0.0 (0.0) | 0.0 (0.0) | 0.0 (0.0) |
+| `neutral` | 30 | 99.5 (99.4) | 98.9 (98.9) | 97.8 (94.9) | 90.4 (81.6) | 71.9 (62.0) | 51.6 (42.0) | 31.5 (27.1) | 15.8 (14.2) ! | 9.1 (7.4) ! | 2.5 (2.3) | 0.4 (0.7) | 0.2 (0.1) | 0.0 (0.0) | 0.0 (0.0) | 0.0 (0.0) | 0.0 (0.0) |
+| `neutral` | 50 | 99.7 (99.3) | 98.0 (97.4) | 94.4 (91.0) | 83.7 (74.5) | 71.2 (56.9) | 49.7 (40.9) | 26.9 (24.9) | 16.3 (12.1) ! | 7.2 (5.7) ! | 2.5 (2.1) | 0.1 (0.4) | 0.0 (0.0) | 0.0 (0.0) | 0.1 (0.0) | 0.1 (0.0) | 0.0 (0.0) |
+| `neutral` | 70 | 99.2 (99.2) | 98.2 (96.9) | 94.1 (89.4) | 84.0 (74.3) | 70.8 (55.2) | 50.3 (41.6) | 32.4 (30.2) | 16.0 (17.1) ! | 10.1 (8.2) ! | 3.8 (3.8) | 0.4 (0.9) | 0.3 (0.1) | 0.0 (0.1) | 0.0 (0.0) | 0.0 (0.0) | 0.1 (0.0) |
+| `neutral` | 90 | 98.8 (99.0) | 98.0 (94.7) | 90.6 (85.9) | 81.2 (69.5) | 67.2 (53.0) | 50.1 (40.8) | 31.1 (30.8) | 15.8 (16.2) ! | 7.6 (8.3) ! | 5.9 (3.2) | 1.1 (1.0) | 0.1 (0.1) | 0.0 (0.0) | 0.0 (0.0) | 0.0 (0.0) | 0.0 (0.0) |
+
+**Targets, honestly:**
+- `elemental`, levels 30-90: **met everywhere** (gap 0 49-50%; 2 under 26-28%; 3 under 21-24%;
+  5 under 6-9%). The no-scouting player is at 10-13% two levels under and under 2% at five.
+- `elemental`, **level 10: 3 under is 14% (target 20-35%)** — the stats already move 4% per level
+  there, so the modifier stacks on a gap that is steep on its own (k = 0 gives 25%). 2 under (24%) and
+  5 under (4%) are in target. A level-dependent k could soften it; not done (level 10 is early game,
+  where levelling is fast).
+- `neutral` (the element-free control) is **steeper**: 2 under 16%, 3 under 5-10% at every level.
+  Without the chart a fight is decided by stats and the multiplier alone, and the picked team has no
+  counter-pick edge to spend; the targets are set on `elemental`, the game's mode.
+- **Per shape**, the boss shapes (`solo`, `elite`) fall fastest (3 under 3-22%, 5 under 0-7%),
+  `squad` and `horde` slowest (5 under 12-15% and 7-17% at levels 50-90, mostly over target; `horde`
+  keeps 6-9% even 8-10 under at levels 50-90). The All-shapes mean meets the targets; 156 of 180
+  shape cells do. A per-shape look (why hordes keep a residue) is left for stage D.
+- Above-level fights are, symmetrically, easy: 3 levels over clears 75-93%, 5 over 94-100%.
+- The committed single-seed `level-gap-report.md` (seed 12345) shows the same picture with seed noise
+  (All shapes, `elemental`: 41 of 45 targets met; misses L10 +3 11.9%, L30 +3 16.2%, L50 +5 10.9%,
+  L70 +5 10.7%).
+
+**Pacing** (`--mode pacing --self-check`): passes, report byte-identical (the pacing model draws
+clear rates, it does not simulate battles; the avatar stays within 0-1 levels of the encounter
+level, so the avatar's own level difference is small in practice).
+
+**Runtime.** Default run unchanged (about 11 s; no level-gap section by default: the default levels
+1 / 50 / 100 cannot show gaps above level 100, and the report stays byte-identical). Each nonzero
+gap adds about 128 + 336 battles per cell: `--mode pve --levels 10,30,50,70,90 --level-gap -5..10`
+takes about 58 s, three seeds about 155 s.
+
+Reproduce: `dotnet run --project Tooling/BalanceSim -c Release -- --mode pve --levels 10,30,50,70,90
+--level-gap -5..10 --seeds 12345,777,4242 --out out/levelgap.md` (about 155 s); each sweep row is the
+same run with the three `DamageFormula.LevelDifference*` constants edited.
+
+## Avatar retune (milestone 2, stage D1)
+
+Design decision (milestone 2): after the avatar moved onto its own ATB gauge ("Avatar gauge") it acts
+about a third as often, and its actives and passive cooldowns were still authored for the old
+cadence. This retune restores its role, **passives first** (the user's vision: the passives are the
+avatar's main role). Data only, plus a measurement: `--avatar-value` (README, "Avatar value").
+
+**Measure.** At each cell's calibrated multiplier the picked teams' battles (8 compositions x 16) are
+replayed **without the avatar**, seed for seed; the avatar's **value** is the scouted rate with it
+(the calibrated ~50%) minus without, in points. Its **direct share** is its damage + healing + shield
+soak (a shield's soak credited to its caster) as a percent of the whole team's, with the part its
+passives produced. **Reference**: the same measurement on `cdf48ec` (the last commit on the
+per-beast-turn cadence), in a scratch worktree with the scouted-pick calibration (`035000f`, sim only)
+cherry-picked onto it and the no-avatar replay added (never checked out in the main tree). 3 seeds
+(12345 / 777 / 4242), levels 1 / 50 / 100, both kit modes.
+
+Targets: value at least 75% of the reference; direct share 10-15% (`elemental`).
+
+| Run | Change | `elemental` value (% of ref) | no-avatar % | direct share (passives) | `neutral` value | share |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| Reference `cdf48ec` | old cadence | **+41.6** (100%) | 8.4 | - | +48.1 | - |
+| A0 | before (gauge, old numbers) | +31.6 (76%) | 18.4 | 13.6% (10.8) | +41.4 | 15.8% |
+| A1 | design start: actives cd 4/3/4 -> 2, durations 2 -> 3, Mending Light 13 -> 20, Aegis 30 -> 45, Last Stand icd 2 -> 1 | +42.7 (103%) | 8.0 | **21.1%** (11.7) | +47.9 | 24.6% |
+| A2 | A1 with Mending Light 13, Aegis back to cd 4 / 30 | +38.3 (92%) | 11.5 | **16.1%** (12.8) | +45.2 | 19.0% |
+| **A3** | A2 with Last Stand icd back to 2 | **+37.0 (89%)** | 13.6 | **13.8%** (10.5) | +44.1 | 16.0% |
+| A3b | A2 with Last Stand 80 -> 60 (icd 1) | +35.2 (85%) | 14.8 | 13.9% (10.6) | +45.6 | 15.9% |
+
+Per shape, A0 -> A3 (`elemental`, value in points): `solo` +29.9 -> +38.2, `elite` +39.9 -> +43.8,
+`squad` +25.6 -> +27.2, `horde` +31.2 -> +38.9 (reference +44.4 / +47.3 / +32.2 / +42.6). Avatar
+turns per battle are unchanged (5.6-5.7).
+
+- **The before state already sat on the value line (76%)**, with the share inside its band. The
+  design's starting set overshoots the share (21%): Aegis at 45% of Defense every second avatar turn
+  soaks as much as Opening Ward and Last Stand together, which would turn the avatar into a shield
+  caster. The value can come from the buff instead: **Rallying Cry at cooldown 2 for three turns**
+  is up almost all the time and has no direct output, so it moves the value without moving the share.
+- **Chosen: A3.** Value +37.0 (89% of the reference; target met), direct share 13.8% (target met),
+  **three-quarters of it from the passives** (10.5 of 13.8: Opening Ward's opening shield and Last
+  Stand's emergency shield). Last Stand stays at internal cooldown 2: at 1 (A2) its extra firings
+  push the share over 15%, and trading its size for frequency (A3b, 60%) is worth less.
+- `neutral` (the control) is 44.1 points against 48.1 (92%) with a 16.0% share; it was 15.8% before,
+  the element-free fights last longer and shields soak more of them.
+
+**Changes** (skill library; the three optional actives and two optional passives follow the design so
+the whole avatar catalogue is on the new cadence; they are not in the default loadout the simulator
+fields):
+
+| Skill | Before | After |
+| --- | --- | --- |
+| Rallying Cry (default) | cd 4; +10% Attack / SpecialAttack 2t | **cd 2**; +10% Attack / SpecialAttack **3t** |
+| Mending Light (default) | cd 3; Heal 13 | **cd 2**; Heal 13 |
+| Aegis (default) | cd 4; Shield 30% Def 2t | unchanged |
+| Hex of Frailty | cd 4; -10% Def / SpD 2t | **cd 2**; **3t** |
+| Battle Focus | cd 5; +8 crit 2t | **cd 3**; **3t** |
+| Slowing Field | cd 5; -12% Speed 2t | **cd 3**; **3t** |
+| Keen Eye, Opening Ward, Last Stand (default passives) | - | unchanged (Last Stand icd 2) |
+| Bloodlust | icd 2 | **icd 1** |
+| Storm Call | icd 3 | **icd 1** |
+
+Each active's tier-15 `CooldownReduction` (1) now takes a cooldown-2 active to 1, never below; the
+library test that allowed a reduction only on cooldowns of 3 or more still holds for beast skills and
+now requires the avatar's actives (which deal no damage) to keep a cooldown of at least 1.
+
+**Guard** (3-seed normalized means, before -> after): the stronger avatar raises every cell's
+multiplier, so beasts shift. `elemental`: Treant +2.4 -> +2.6, Phoenix +3.3 -> +2.5, Kirin +1.7 ->
++2.1, Golem +1.5 -> +2.1, Tarasque +1.5 -> +1.2, Basilisk -0.2 -> 0.0, Frost Wyrm -1.0 -> -0.2,
+Leviathan -2.0 -> -1.5, **Griffin -3.6 -> -4.2, Thunderbird -3.6 -> -4.5** (outside +/-4, the stage D3
+retune below). `neutral` stays inside +/-7 (-3.9 ... +5.8; Golem +3.3 -> +5.8, Tarasque -3.6 -> -0.9).
+
+Reproduce: `dotnet run --project Tooling/BalanceSim -c Release -- --mode pve --seeds 12345,777,4242
+--avatar-value --out out/avatar.md` (about 40 s).
+
+## Thunderbird in `elite` (milestone 2, stage D2)
+
+The Thunderbird fell from about 0 to -4 in `elite` when the bosses became multi-hex ("Large enemies
+(footprints)"; seed 12345's committed reports, `46ce852` -> `b7ae1d0`: `elite` -0.3 -> -4.4, `solo`
+-2.2 -> -3.2, its `elite` survival 37.0% -> 34.5% at an unchanged damage share of 35%). The design's
+hypothesis was a Skirmisher that **holds** (the fewer-adjacent stop-tile preference) next to a
+Triangle champion with its short-range kit. `--turn-detail` (new; README, "Avatar value") measures it
+directly: per beast, the turns on which no skill fired and why, and the enemy HP it took off large
+enemies versus the rest.
+
+**Diagnosis** (3 seeds, after the avatar retune, every team's battles):
+
+- **No holding.** The Thunderbird fires on 100% of its turns in `solo` and `elite` (0.0% held by its
+  stance, 0.0% out of reach); so do the other Ranged and Skirmisher beasts. The hypothesis is rejected.
+- **It spends its damage on the boss.** 208 enemy HP per battle in `elite` (second only to the Phoenix),
+  but **84.8% of it off the giant or champions** (Griffin 97.8%, the Ranged beasts 80-83%). With a
+  Hex7 giant or two Triangle champions filling the front, the nearest enemy (Thunder Talons'
+  `Distance` targeting) is almost always the boss, and the escort's archers and casters keep firing;
+  its `elite` survival is 7.6-13% per seed, the lowest but the Griffin's.
+- **Range is not the lever.** Probes (3 seeds, `elemental` normalized overall / `elite` raw): Storm
+  Dive range 3 -> 4 (the design's candidate) -4.5 -> -3.7 / -3.8 -> -4.2; Thunder Talons range 2 -> 3
+  **-6.1** / -3.5 (worse: at range 3 it hangs back and hits less); Talons targeting the lowest HP
+  fraction -3.7 / -3.2 (it still picks the wounded boss); Talons targeting the **lowest current HP**
+  **+0.8** / **+1.0 (2nd)**.
+
+**Fix: Thunder Talons targets the enemy with the least HP left in reach** (`TargetingCriterion
+CurrentHp`, `Lowest`), a Skirmisher hunter picking off the escort (and, in `squad` / `horde`, finishing
+the weakest), where it used to pour its hits into the boss's HP pool. In `elite` its share of damage off
+bosses falls 84.8% -> 63.2% and its turns per battle rise 3.53 -> 3.70. It is a one-field data change,
+not one of the two candidates the design named (neither addresses the cause the measurement found);
+power was then trimmed in the retune below (26 -> 25 x 3) because the change is strong in `neutral`
+`squad`.
+
+Reproduce: `--mode pve --seeds 12345,777,4242 --turn-detail` ("PvE beast turns over seeds").
+
+## Beast retune under the scouted calibration (milestone 2, stage D3)
+
+Targets: every beast's normalized overall marginal within +/-4 `elemental` and +/-7 `neutral` (3 seeds,
+then confirmed over 5: 12345 / 777 / 4242 / 2024 / 99); **Griffin and Thunderbird `neutral` within +/-5**;
+every beast top 3 in some shape; no beast top 3 in every shape. Hard constraints kept: **no roster edits**
+(turn ratio, six-stat totals, Move, crit untouched), every signature skill kept, unlimited damage skills
+at most 1.2x their budget. Start: the avatar retune above plus the Thunder Talons targeting fix.
+
+| Skill | Before | After | DPT / budget | Why |
+| --- | --- | --- | --- | --- |
+| Thunder Talons | 26 x 3, nearest | **25 x 3**, **lowest current HP** | 75 / 70 = 1.07x | D2 fix; 26 left the Thunderbird's `neutral` at +5.3 (`squad` +25) |
+| Wind Lance (Griffin) | 110 | **122** | 79 / 70 = 1.13x | Griffin `elemental` -4.8 (`elite` 10th, `horde` 10th) |
+| Gale Talon (Griffin) | 89 | **95** | 95 / 90 = 1.06x | same |
+| Gust (Griffin) | 55; Knockback 2 | **75**; Knockback 2 | 38 / 70 = 0.54x | Griffin still -3.7; lifts `solo` / `elite` |
+| Radiant Bolt (Kirin) | 66 | **70** | 70 / 70 = 1.0x | Kirin had no `elemental` top-3 shape (4th in `elite` and `squad`) |
+| Serpent Bite (Leviathan) | 86 | **94** | 94 / 90 = 1.04x | Leviathan dropped out of every top 3 over 5 seeds |
+
+### Iteration log (normalized overall, 3-seed means unless noted)
+
+| Run | Change on top of the previous | TB `elem` / `neutral` | Griffin `elem` / `neutral` | Range `elemental` | Range `neutral` | `elemental` top-3 coverage | Notes |
+| --- | --- | --- | --- | --- | --- | ---: | --- |
+| Start | avatar retune | -4.5 / -0.6 | -4.2 / -3.9 | -4.5 … +2.6 | -3.9 … +5.8 | 9 / 10 | TB, Griffin outside +/-4; TB no top 3 |
+| D2 | Talons lowest current HP | +0.8 / **+5.3** | -4.8 / **-5.2** | -4.8 … +2.0 | -5.2 … +5.5 | 9 / 10 | Kirin drops out (4th) |
+| R1 | Talons 25, Wind Lance 122, Gale Talon 95, Radiant Bolt 70 | -0.2 / +3.6 | -3.7 / -2.2 | -3.7 … +1.7 | -2.5 … +5.5 | 10 / 10 | Griffin on the edge |
+| R2 | R1 + Gust 75 | -0.3 / +3.6 | -3.2 / -1.0 | -3.2 … +1.8 | -2.9 … +5.4 | 10 / 10 | 5 seeds: Leviathan no top 3 (4th `horde`) |
+| **R3** | R2 + Serpent Bite 94 | -0.3 / +3.5 | -3.3 / -1.1 | -3.3 … +1.4 | -3.0 … +5.4 | 10 / 10 | **5 seeds: 10 / 10**; chosen |
+
+Three three-seed iterations (of eight allowed) and two five-seed confirmations (R2, R3).
+
+### Results (mean of 5 seeds: 12345 / 777 / 4242 / 2024 / 99)
+
+Before = after the avatar retune (stage D1), after = R3. Normalized overall = the guard's figure (mean
+± SD over seeds); per shape the raw marginal and its rank on the mean; the last column counts the seeds
+in which the beast is top 3 in `solo` / `elite` / `squad` / `horde`.
+
+#### `elemental`: normalized overall and raw per shape, before -> after (rank in shape)
+
+| Beast | Normalized before | Normalized after | `solo` | `elite` | `squad` | `horde` | Top-3 seeds s/e/q/h, after |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | :---: |
+| Kirin | +2.9 | **+2.5** ± 2.6 | -0.1 (4) -> +0.1 (4) | +2.9 (2) -> +2.2 (2) | +3.5 (4) -> +2.9 (4) | +1.6 (5) -> +1.4 (5) | 0/4/2/1 |
+| Treant | +2.5 | **+1.8** ± 2.9 | +3.6 (1) -> +3.5 (2) | +1.9 (3) -> +0.5 (4) | -8.4 (10) -> -8.5 (10) | +7.7 (2) -> +7.2 (2) | 4/1/0/4 |
+| Golem | +1.6 | **+0.9** ± 2.9 | -2.1 (9) -> -2.0 (8) | +5.1 (1) -> +4.2 (1) | -5.1 (8) -> -7.0 (9) | +6.0 (3) -> +5.7 (3) | 0/3/0/3 |
+| Thunderbird | -2.8 | **+0.8** ± 2.4 | -1.8 (8) -> -2.1 (9) | -4.6 (10) -> -0.1 (6) | +4.2 (3) -> +8.4 (2) | -2.8 (6) -> -1.1 (6) | 0/0/4/0 |
+| Phoenix | +1.5 | **+0.5** ± 4.7 | -0.4 (6) -> -0.6 (6) | -1.1 (8) -> -1.8 (9) | +9.7 (1) -> +9.2 (1) | -3.0 (7) -> -3.2 (7) | 0/1/3/0 |
+| Tarasque | +0.5 | **0.0** ± 3.5 | -0.8 (7) -> -1.1 (7) | -0.1 (6) -> -0.8 (7) | +6.6 (2) -> +7.0 (3) | -4.7 (8) -> -4.9 (8) | 2/2/4/0 |
+| Frost Wyrm | -0.3 | **-1.1** ± 3.3 | -3.9 (10) -> -3.9 (10) | -0.4 (7) -> -1.5 (8) | -3.4 (7) -> -3.6 (7) | +12.6 (1) -> +12.0 (1) | 0/1/0/5 |
+| Basilisk | -0.5 | **-1.3** ± 1.1 | +2.9 (3) -> +2.4 (3) | -0.1 (5) -> +0.0 (5) | -0.9 (6) -> -2.3 (6) | -8.2 (9) -> -8.4 (9) | 3/0/0/0 |
+| Leviathan | -2.1 | **-1.5** ± 3.5 | -0.2 (5) -> -0.3 (5) | +0.3 (4) -> +0.6 (3) | -7.9 (9) -> -6.8 (8) | +1.9 (4) -> +2.0 (4) | 2/2/0/2 |
+| Griffin | -3.3 | **-2.6** ± 1.8 | +2.9 (2) -> +4.0 (1) | -4.0 (9) -> -3.2 (10) | +1.7 (5) -> +0.6 (5) | -11.1 (10) -> -10.6 (10) | 4/1/2/0 |
+
+Normalized range: -3.3 … +2.9 -> -2.6 … +2.5.
+
+Niche map `elemental` (after): mean top 3 per shape; **bold** = top 3 in ≥ 4 of 5 seeds
+
+| Shape | Top 3 |
+| --- | --- |
+| `solo` | **Griffin +4.0 (4/5)**, **Treant +3.5 (4/5)**, Basilisk +2.4 (3/5) |
+| `elite` | Golem +4.2 (3/5), **Kirin +2.2 (4/5)**, Leviathan +0.6 (2/5) |
+| `squad` | Phoenix +9.2 (3/5), **Thunderbird +8.4 (4/5)**, **Tarasque +7.0 (4/5)** |
+| `horde` | **Frost Wyrm +12.0 (5/5)**, **Treant +7.2 (4/5)**, Golem +5.7 (3/5) |
+
+Top 3 in some shape: 10 / 10.
+
+#### `neutral`: normalized overall and raw per shape, before -> after (rank in shape)
+
+| Beast | Normalized before | Normalized after | `solo` | `elite` | `squad` | `horde` | Top-3 seeds s/e/q/h, after |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | :---: |
+| Golem | +5.6 | **+5.1** ± 1.3 | +10.6 (1) -> +10.9 (2) | +6.2 (1) -> +5.1 (1) | -8.0 (8) -> -8.0 (8) | +8.7 (2) -> +8.4 (2) | 5/4/0/5 |
+| Thunderbird | +0.2 | **+3.9** ± 1.8 | -5.7 (7) -> -8.1 (9) | -5.8 (10) -> +3.1 (4) | +17.3 (1) -> +22.8 (1) | -2.9 (8) -> -1.5 (7) | 0/4/5/0 |
+| Treant | +1.6 | **+0.4** ± 1.1 | +4.8 (3) -> +4.8 (3) | +4.6 (3) -> +2.3 (5) | -12.2 (9) -> -12.5 (10) | +7.1 (3) -> +6.0 (3) | 3/1/0/5 |
+| Griffin | -2.9 | **-0.1** ± 2.3 | +9.5 (2) -> +16.0 (1) | -5.3 (9) -> -1.7 (7) | +1.4 (6) -> -0.6 (6) | -17.6 (10) -> -16.3 (10) | 5/0/0/0 |
+| Leviathan | -0.4 | **-0.2** ± 1.0 | +3.6 (4) -> +2.1 (4) | +3.8 (5) -> +5.1 (2) | -12.4 (10) -> -10.9 (9) | +2.7 (4) -> +3.0 (4) | 1/3/0/0 |
+| Frost Wyrm | +1.0 | **-0.3** ± 1.1 | -5.7 (8) -> -6.1 (8) | -3.4 (6) -> -5.8 (8) | +1.8 (5) -> +0.7 (5) | +12.5 (1) -> +11.4 (1) | 0/0/1/5 |
+| Kirin | -0.3 | **-0.9** ± 0.7 | -6.8 (9) -> -5.2 (7) | +4.4 (4) -> +1.3 (6) | +1.9 (4) -> +1.1 (4) | +0.4 (6) -> +0.2 (6) | 0/1/0/0 |
+| Basilisk | -1.4 | **-2.4** ± 2.6 | +3.1 (5) -> +0.9 (5) | +5.4 (2) -> +4.5 (3) | -6.0 (7) -> -5.4 (7) | -9.1 (9) -> -9.7 (9) | 1/2/0/0 |
+| Tarasque | -1.5 | **-2.5** ± 1.6 | -4.2 (6) -> -4.3 (6) | -5.3 (8) -> -7.1 (10) | +7.4 (3) -> +5.5 (3) | -2.6 (7) -> -2.9 (8) | 0/0/4/0 |
+| Phoenix | -1.9 | **-3.1** ± 0.5 | -9.2 (10) -> -11.0 (10) | -4.6 (7) -> -6.9 (9) | +8.9 (2) -> +7.4 (2) | +0.9 (5) -> +1.4 (5) | 0/0/5/0 |
+
+Normalized range: -2.9 … +5.6 -> -3.1 … +5.1.
+
+Niche map `neutral` (after): mean top 3 per shape; **bold** = top 3 in ≥ 4 of 5 seeds
+
+| Shape | Top 3 |
+| --- | --- |
+| `solo` | **Griffin +16.0 (5/5)**, **Golem +10.9 (5/5)**, Treant +4.8 (3/5) |
+| `elite` | **Golem +5.1 (4/5)**, Leviathan +5.1 (3/5), Basilisk +4.5 (2/5) |
+| `squad` | **Thunderbird +22.8 (5/5)**, **Phoenix +7.4 (5/5)**, **Tarasque +5.5 (4/5)** |
+| `horde` | **Frost Wyrm +11.4 (5/5)**, **Golem +8.4 (5/5)**, **Treant +6.0 (5/5)** |
+
+Top 3 in some shape: 9 / 10 (not: Kirin).
+
+### Targets: met and missed (5-seed means, final)
+
+| Target | Before | After | |
+| --- | --- | --- | --- |
+| Every beast `elemental` normalized within +/-4 | -3.3 … +2.9 (3 seeds: -4.5 … +2.6) | -2.6 … +2.5 (3 seeds: -3.3 … +1.4) | met |
+| Every beast `neutral` normalized within +/-7 | -2.9 … +5.6 | -3.1 … +5.1 | met (Golem +5.1 the edge) |
+| Griffin / Thunderbird `neutral` within +/-5 | -2.9 / +0.2 | -0.1 / +3.9 | met |
+| Every beast top 3 in some shape, `elemental` | 9 / 10 (not Leviathan) | **10 / 10** | met; Leviathan only on the mean (`elite` +0.6 against Treant +0.5, 2 / 5 seeds) |
+| No beast top 3 in every shape | none | none | met (most: two shapes `elemental`, Treant and Golem; three `neutral`, Golem) |
+| Turn ratio, six-stat totals, Move, crit, signatures | unchanged | unchanged | met (no roster edits; every signature test passes) |
+| Budget rule (<= 1.2x, unlimited damage skills) | met | met | highest Ember Shot 1.16x, Wind Lance 1.13x |
+
+`neutral` top-3 coverage is 9 / 10 (not Kirin, 4th in `squad`), with 9 robust niches (top 3 in at
+least 4 of 5 seeds) across 7 beasts. `elemental` robust niches: Griffin and Treant `solo`, Kirin
+`elite`, Thunderbird and Tarasque `squad`, Frost Wyrm and Treant `horde` (7 niches, 6 beasts).
+
+### What moved
+
+- **Thunderbird** -2.8 -> +0.8 `elemental` (`elite` 10th -> 6th, `squad` +4.2 -> +8.4, robustly 2nd),
+  +0.2 -> +3.9 `neutral` (`squad` +22.8, 1st in every seed; the edge the Talons trim holds). Its `solo`
+  is unchanged (-2.1, 9th): against a lone giant there is nothing weaker to pick.
+- **Griffin** -3.3 -> -2.6 `elemental`, -2.9 -> -0.1 `neutral`: the lifts land mostly in `solo` (1st in
+  both modes, +4.0 / +16.0), its duelist niche; `elite` (-3.2, 10th) and `horde` (-10.6, 10th) stay its
+  weak shapes (97.8% of its `elite` damage goes into the boss, like the Thunderbird's did; a targeting
+  change was not needed to meet the guard, and would blur the two Skirmishers).
+- **Kirin** keeps a robust `elite` niche (2nd, 4 / 5 seeds) through Radiant Bolt 70.
+- **Leviathan** -2.1 -> -1.5 `elemental`; Serpent Bite 94 buys back a top 3 (`elite` 3rd on the mean).
+- Everyone else gave up 0.4-1.0 points `elemental` to the two Skirmishers' gains; the `neutral`
+  losers are the Ranged damage dealers (Phoenix -1.9 -> -3.1, Basilisk -1.4 -> -2.4), whose `squad`
+  kills the Thunderbird now takes first.
+
+### Avatar after the beast retune
+
+The avatar's value stays on target with the final data (3 seeds, `--avatar-value`): **+36.5 points**
+`elemental` (88% of the `cdf48ec` reference 41.6; `solo` +36.5, `elite` +42.7, `squad` +27.2, `horde`
++39.8), **direct share 13.6%**, 10.2 of it from its passives (`neutral` +45.4, 15.8%).
+
+### Caveats
+
+- Leviathan's `elemental` niche is thin (`elite` 3rd by 0.1 point, top 3 in 2 of 5 seeds); a sixth
+  seed could drop it to 4th. Its `horde` (4th, +2.0) is the other near miss.
+- Golem `neutral` +5.1 is the most positive beast in either mode (top 3 in three `neutral` shapes); it
+  was +5.6 before and is inside +/-7.
+- Normalized SDs over seeds run 1.1-4.7 `elemental` (Phoenix 4.7); the 5-seed means are within about
+  +/-2 of the truth.
+- `tuned-report.md` is regenerated from the default run (seed 12345).
+
+Reproduce: `dotnet run --project Tooling/BalanceSim -c Release -- --mode pve --seeds
+12345,777,4242,2024,99 --out out/retune.md` (about 55 s).
+
+## Level-gap re-check (milestone 2, stage D4)
+
+With the final data (the stronger avatar, the beast retune) the level-gap targets were re-measured
+(`--mode pve --levels 10,30,50,70,90 --level-gap -5..10 --seeds 12345,777,4242`, the "Level-difference
+modifier" setup). At k = 0.025, q = 0.005 two `elemental` targets at levels 30-90 broke, narrowly:
+**3 under at level 50: 20.0% (just under 20)** and **5 under at level 70: 10.6%** (10 of 12 met; level
+10's 3 under 17.3%, already a known miss). The stronger avatar flattens the curve a little (its shields
+scale with its own level, the team's).
+
+**Re-sweep** (the fix has to make 5 under harder without making 3 under harder: more convexity at the
+same 3-level multiplier; `elemental`, every shape averaged, scouted %):
+
+| k | q | multiplier at 2 / 3 / 5 | 2 under L30 / 50 / 70 / 90 | 3 under | 5 under | Met L30-90 | L10 2 / 3 / 5 under |
+| ---: | ---: | --- | --- | --- | --- | ---: | --- |
+| 0.025 | 0.005 | 1.07 / 1.12 / 1.25 | 28.8 / 27.8 / 29.8 / 29.9 | 22.9 / **20.0 !** / 25.1 / 22.7 | 7.1 / 9.8 / **10.6 !** / 8.5 | 10 / 12 | 24.0 / 17.3 ! / 4.2 |
+| 0.017 | 0.007 | 1.06 / 1.11 / 1.26 | 30.2 / 29.6 / 31.0 / 30.6 | 23.2 / 20.2 / 25.8 / 23.2 | 6.3 / 9.4 / **10.2 !** / 8.0 | 11 / 12 | 24.9 / 17.4 ! / 4.0 |
+| **0.012** | **0.009** | 1.06 / 1.12 / 1.29 | 30.8 / 29.8 / 31.3 / 31.1 | 23.0 / 20.3 / 25.3 / 22.7 | 5.7 / 7.9 / 9.0 / 7.4 | **12 / 12** | 25.0 / 17.4 ! / 3.3 |
+
+**Chosen: k = 0.012, q = 0.009, cap = 0.4** (`DamageFormula.LevelDifferencePerLevel` /
+`LevelDifferenceConvex`): x1.02 / 1.06 / 1.12 / 1.29 / 1.4 (cap, from 7; 6 is x1.396) at 1 / 2 / 3 / 5 / 7
+levels over, x0.98 / 0.94 / 0.88 / 0.72 / 0.6 under. Every equal-level battle is untouched (the default
+report does not depend on k or q).
+
+- `elemental`, levels 30-90: all 12 targets met; 3 under at level 50 (20.3%) is the thin one. Gap 0
+  49.4-50.3%; 2 under 29.8-31.3%; 3 under 20.3-25.3%; 5 under 5.7-9.0%.
+- Level 10: 3 under 17.4% (target 20-35%), unchanged by k / q at this scale: the stats move about 4%
+  per level there. 2 under (25.0%) and 5 under (3.3%) are in target.
+- `neutral` (the control) stays steeper: 3 under 8.5-13.6% at levels 30-90 (misses by design, as
+  before), 5 under 0.2-0.8%.
+- The committed single-seed `level-gap-report.md` (seed 12345) meets 40 of 45 `elemental` All-shapes
+  targets; its misses are 3 under at levels 10 / 30 / 50 / 90 (13.1-19.5%) and 2 under at level 10
+  (19.7%), seed noise around the 3-seed means above.
+
+Reproduce: as above (about 160 s); each sweep row is the same run with the two constants edited.

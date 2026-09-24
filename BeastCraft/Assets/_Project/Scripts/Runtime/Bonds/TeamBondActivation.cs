@@ -30,6 +30,12 @@ namespace BeastCraft.Bonds
             get { return ActiveBond == null ? 0 : ActiveBond.Tier; }
         }
 
+        /// <summary>How many stacks of the tier's magnitudes were applied (1 for a tiered bond).</summary>
+        public int Stacks
+        {
+            get { return ActiveBond == null ? 0 : ActiveBond.Stacks; }
+        }
+
         /// <summary>The units the tier's effects were applied to (and by), in team order. Never null.</summary>
         public IReadOnlyList<BattleUnit> Recipients { get; }
     }

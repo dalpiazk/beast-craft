@@ -79,6 +79,8 @@ namespace BeastCraft.Skills
             bond.Condition = SkillLibraryValidator.ParseOr(data.Condition, TeamBondCondition.Stance);
             bond.Stance = SkillLibraryValidator.ParseOr(data.Stance, CombatStance.Vanguard);
             bond.Scope = SkillLibraryValidator.ParseOr(data.Scope, TeamBondScope.Members);
+            bond.PerCount = data.PerCount;
+            bond.MaxCount = data.PerCount ? data.MaxCount : 0;
             bond.Elements = new List<Element>();
             foreach (string element in data.Elements ?? new string[0])
             {

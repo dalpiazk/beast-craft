@@ -65,6 +65,29 @@ namespace BeastCraft.Tooling.BalanceSim
                                   SimOptions.DetailName(options.ScoutedDetail) + "`; post-processing of the same battles, see \"PvE scouted picking\"");
             }
 
+            if (options.RunPve && options.CalibratesOnPick)
+            {
+                report.AppendLine("- Difficulty (PvE, `--calibrate-on " + SimOptions.CalibrationName(options.EffectiveCalibrateOn) + "`): calibrated so the team the " +
+                                  PveReport.PickerName(options) + " fields per composition clears " + SimOptions.Format(options.TargetClearRate) +
+                                  "% (the player scouts and counter-picks); the average team's no-scouting rate is reported beside it, see \"Calibrated difficulty\"");
+            }
+
+            if (options.RunPve && options.LevelGaps != null)
+            {
+                report.AppendLine("- Level gap (PvE, `--level-gap`): every cell also replayed with the enemies " + SimOptions.Join(options.LevelGaps) +
+                                  " levels above the team at its calibrated multiplier; see \"PvE level gap\"");
+            }
+
+            if (options.RunPve && options.AvatarValue)
+            {
+                report.AppendLine("- Avatar value (PvE, `--avatar-value`): every cell's picked-team battles also replayed without the avatar; see \"PvE avatar value\"");
+            }
+
+            if (options.RunPve && options.TurnDetail)
+            {
+                report.AppendLine("- Beast turns (PvE, `--turn-detail`): no-fire turns and damage to large enemies per beast; see \"PvE beast turns\"");
+            }
+
             report.AppendLine();
 
             if (options.KitSource == KitSource.Library)

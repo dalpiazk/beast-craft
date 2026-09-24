@@ -58,8 +58,8 @@ namespace BeastCraft.Battle
         /// to the caller's array (or the species asset) do not reach a unit already in battle.
         /// </para>
         /// <para>
-        /// <paramref name="level"/> is the unit's <see cref="Level"/> (a record only: the damage
-        /// formula no longer reads it; see <see cref="Level"/>). It defaults to 1 so every existing call site keeps
+        /// <paramref name="level"/> is the unit's <see cref="Level"/> (the damage formula's
+        /// level-difference term reads it; see <see cref="Level"/>). It defaults to 1 so every existing call site keeps
         /// compiling; <see cref="BattleUnitFactory.CreateBeast"/> passes the beast's real level.
         /// Anything below 1 is stored as 1.
         /// </para>
@@ -244,16 +244,17 @@ namespace BeastCraft.Battle
         public IReadOnlyList<Element> Elements { get; }
 
         /// <summary>
-        /// The unit's level, always at least 1. <strong>Not</strong> part of
-        /// <see cref="DamageFormula"/>: the formula used to carry a Pokemon-style level term, but
-        /// stats already scale with level through the growth curve, so the level now reaches damage
-        /// only through the stats it assembled. Kept for everything else that asks a unit its level
-        /// (reporting, the avatar, future progression rules).
+        /// The unit's level, always at least 1. Level reaches damage two ways: through the stats the
+        /// growth curve assembled, and through <see cref="DamageFormula"/>'s level-difference term
+        /// (<see cref="DamageFormula.GetLevelMultiplier"/> of the caster's level against the
+        /// target's), which scales every hit — both the ones this unit deals and the ones it takes —
+        /// by the gap between the two levels, and is exactly the identity between equal levels.
+        /// Also read for reporting and progression.
         /// <para>
         /// For a beast this is the level its stats were assembled at (see
-        /// <see cref="BattleUnitFactory.CreateBeast"/>); it is only recorded here, and changing it
-        /// would not re-assemble <see cref="Stats"/>. For the avatar, which has no progression yet,
-        /// it is whatever battle level <see cref="BattleAvatar"/> was given.
+        /// <see cref="BattleUnitFactory.CreateBeast"/>); changing it would not re-assemble
+        /// <see cref="Stats"/>. For the avatar it is the avatar's own level (see
+        /// <see cref="BattleAvatar"/>), so the avatar's hits carry its own level difference.
         /// </para>
         /// <para>
         /// Read-only and fixed at construction, like <see cref="Elements"/>: nothing levels a unit

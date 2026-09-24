@@ -15,8 +15,9 @@ namespace BeastCraft.Bonds
     /// design doc, "Team bonds".
     /// <para>
     /// <strong>Application.</strong> Bonds apply in the resolver's order (the library's order). For
-    /// each, every living recipient (the bond's members, or the whole team for
-    /// <see cref="TeamBondScope.Team"/>), in team order, applies the reached tier's effects to
+    /// each, every living recipient (the bond's members; the whole team for
+    /// <see cref="TeamBondScope.Team"/>; the teammates that are not members for
+    /// <see cref="TeamBondScope.Others"/>), in team order, applies the reached tier's effects to
     /// itself: <see cref="SkillEffectApplier"/> with the recipient as both caster and only target,
     /// through a private <c>Self</c>-shaped carrier <see cref="SkillSO"/> at level 1 (bonds do not
     /// level), so a shield scales with the recipient's own <c>Defense</c>, a percent buff with its
@@ -25,16 +26,25 @@ namespace BeastCraft.Bonds
     /// bonds draw nothing.
     /// </para>
     /// <para>
-    /// <strong>One carrier per tier.</strong> As with <see cref="PassiveInstance"/>, the carrier is
-    /// created with <see cref="ScriptableObject.CreateInstance{T}"/> the first time a tier is
-    /// applied and cached, weakly keyed by that <see cref="TeamBondTier"/>, so rebuilding the
-    /// loadout every battle does not pile up native objects. It shares the tier's effect list.
+    /// <strong>Stacks.</strong> A scaling bond (<see cref="TeamBondSO.PerCount"/>) applies its tier
+    /// at <see cref="ActiveTeamBond.Stacks"/>: every effect's <c>Magnitude</c> multiplied by the
+    /// stacks, as one application (a +4% buff at three stacks is one +12% buff, not three
+    /// compounding ones).
+    /// </para>
+    /// <para>
+    /// <strong>One carrier per tier and stack count.</strong> As with <see cref="PassiveInstance"/>,
+    /// a carrier is created with <see cref="ScriptableObject.CreateInstance{T}"/> the first time a
+    /// tier is applied at a stack count and cached, weakly keyed by that <see cref="TeamBondTier"/>
+    /// and then by the stacks, so rebuilding the loadout every battle does not pile up native
+    /// objects. At one stack the carrier shares the tier's effect list; above one it carries
+    /// <em>clones</em> of the tier's effects with the magnitude scaled, so the authored effects are
+    /// never modified.
     /// </para>
     /// </summary>
     public sealed class TeamBondLoadout
     {
         private static readonly object CarrierLock = new object();
-        private static readonly ConditionalWeakTable<TeamBondTier, SkillSO> Carriers = new ConditionalWeakTable<TeamBondTier, SkillSO>();
+        private static readonly ConditionalWeakTable<TeamBondTier, Dictionary<int, SkillSO>> Carriers = new ConditionalWeakTable<TeamBondTier, Dictionary<int, SkillSO>>();
 
         private readonly List<ActiveTeamBond> _bonds = new List<ActiveTeamBond>();
         private readonly List<BattleUnit> _team = new List<BattleUnit>();
@@ -108,7 +118,7 @@ namespace BeastCraft.Bonds
                     continue;
                 }
 
-                SkillSO carrier = CarrierFor(bond.TierDefinition, bond.Bond);
+                SkillSO carrier = CarrierFor(bond.TierDefinition, bond.Bond, bond.Stacks);
 
                 foreach (BattleUnit recipient in recipients)
                 {
@@ -126,11 +136,13 @@ namespace BeastCraft.Bonds
         {
             List<BattleUnit> recipients = new List<BattleUnit>();
 
-            if (bond.Bond.Scope == TeamBondScope.Team)
+            if (bond.Bond.Scope == TeamBondScope.Team || bond.Bond.Scope == TeamBondScope.Others)
             {
-                foreach (BattleUnit unit in _team)
+                bool othersOnly = bond.Bond.Scope == TeamBondScope.Others;
+                for (int i = 0; i < _team.Count; i++)
                 {
-                    if (unit != null && !unit.IsDefeated)
+                    BattleUnit unit = _team[i];
+                    if (unit != null && !unit.IsDefeated && !(othersOnly && IsMember(bond, i)))
                     {
                         recipients.Add(unit);
                     }
@@ -150,12 +162,41 @@ namespace BeastCraft.Bonds
             return recipients;
         }
 
-        private static SkillSO CarrierFor(TeamBondTier tier, TeamBondSO bond)
+        private static bool IsMember(ActiveTeamBond bond, int index)
         {
+            foreach (int member in bond.Members)
+            {
+                if (member == index)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// The cached carrier for <paramref name="tier"/> at <paramref name="stacks"/> (see the
+        /// class remarks): the tier's own effect list at one stack, scaled clones above.
+        /// </summary>
+        public static SkillSO CarrierFor(TeamBondTier tier, TeamBondSO bond, int stacks)
+        {
+            if (stacks < 1)
+            {
+                stacks = 1;
+            }
+
             lock (CarrierLock)
             {
+                Dictionary<int, SkillSO> byStacks;
+                if (!Carriers.TryGetValue(tier, out byStacks))
+                {
+                    byStacks = new Dictionary<int, SkillSO>();
+                    Carriers.Add(tier, byStacks);
+                }
+
                 SkillSO carrier;
-                if (Carriers.TryGetValue(tier, out carrier))
+                if (byStacks.TryGetValue(stacks, out carrier))
                 {
                     // Unity's overloaded == reports a destroyed native object as null.
                     if (carrier != null)
@@ -163,20 +204,54 @@ namespace BeastCraft.Bonds
                         return carrier;
                     }
 
-                    Carriers.Remove(tier);
+                    byStacks.Remove(stacks);
                 }
 
                 carrier = ScriptableObject.CreateInstance<SkillSO>();
                 carrier.name = bond.name;
                 carrier.SkillId = bond.BondId;
                 carrier.DisplayName = bond.DisplayName;
-                carrier.Effects = tier.Effects ?? new List<SkillEffect>();
+                carrier.Effects = stacks == 1 ? tier.Effects ?? new List<SkillEffect>() : ScaledEffects(tier.Effects, stacks);
                 carrier.TargetShape = SkillTargetShape.Self;
                 carrier.TargetSide = SkillTargetSide.Ally;
                 carrier.Range = 0;
-                Carriers.Add(tier, carrier);
+                byStacks.Add(stacks, carrier);
                 return carrier;
             }
+        }
+
+        /// <summary>Clones of <paramref name="effects"/> with each <c>Magnitude</c> x <paramref name="stacks"/>; the originals are untouched.</summary>
+        private static List<SkillEffect> ScaledEffects(List<SkillEffect> effects, int stacks)
+        {
+            List<SkillEffect> scaled = new List<SkillEffect>();
+            if (effects == null)
+            {
+                return scaled;
+            }
+
+            foreach (SkillEffect effect in effects)
+            {
+                if (effect == null)
+                {
+                    continue;
+                }
+
+                scaled.Add(new SkillEffect
+                {
+                    EffectType = effect.EffectType,
+                    AffectedStat = effect.AffectedStat,
+                    Magnitude = effect.Magnitude * stacks,
+                    DurationTurns = effect.DurationTurns,
+                    Status = effect.Status,
+                    Chance = effect.Chance,
+                    MaxStacks = effect.MaxStacks,
+                    IsPercent = effect.IsPercent,
+                    HitCount = effect.HitCount,
+                    ExecuteBonusPercent = effect.ExecuteBonusPercent,
+                });
+            }
+
+            return scaled;
         }
     }
 }

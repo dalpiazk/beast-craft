@@ -281,6 +281,18 @@ namespace BeastCraft.Tooling.BalanceSim
                                 PrintCellTimings(cell);
                             }
 
+                            if (options.LevelGaps != null)
+                            {
+                                Stopwatch gapClock = Stopwatch.StartNew();
+                                pve.RunLevelGaps(cell);
+                                if (options.Timings)
+                                {
+                                    Console.Error.WriteLine("[timings] " + SimOptions.ModeName(mode) + "/" + shape.Id + "/L" + level + " level gaps: " +
+                                                            Seconds(gapClock.Elapsed) + " s.");
+                                }
+                            }
+
+                            pve.RunAvatarValue(cell);
                             if (cell.Battles == null || cell.Battles.Length != shape.Compositions.Count * pve.Teams.Count * pve.Samples)
                             {
                                 problems.Add("PvE " + SimOptions.ModeName(mode) + "/" + shape.Id + "/L" + level + " did not field every team against every composition.");
@@ -295,6 +307,12 @@ namespace BeastCraft.Tooling.BalanceSim
             if (problems.Count == 0 && ScoutedPicker.Active(options))
             {
                 problems.AddRange(ScoutedPicker.Check(options, species, pve, cells));
+            }
+
+            if (problems.Count == 0 && options.RunPve)
+            {
+                // A calibration miss is flagged in the report; only --self-check treats it as a failure.
+                problems.AddRange(ScoutedPicker.CheckCalibration(options, species, pve, cells, options.SelfCheck));
             }
 
             TimeSpan pveTime = clock.Elapsed;
@@ -355,7 +373,9 @@ namespace BeastCraft.Tooling.BalanceSim
         /// the real <see cref="BattleTurnExecutor.RunBattle"/> and through the simulator's own loop,
         /// and demands the same outcome, battle time, turn count, final HP and position for every unit. The
         /// simulator's loop adds no rules of its own and both are seeded alike (sample 0), so with
-        /// damage variance and crits drawn from that seed the two must still agree exactly.
+        /// damage variance and crits drawn from that seed the two must still agree exactly. With
+        /// <c>--level-gap</c>, each replay is repeated at the largest in-range nonzero gap as well
+        /// (the enemies at another level than the team), so the level-difference term is covered.
         /// </summary>
         private static List<string> CheckLoopParity(SimOptions options, List<CreatureSpeciesSO> species, EncounterCatalog encounters)
         {
@@ -369,6 +389,7 @@ namespace BeastCraft.Tooling.BalanceSim
             List<KitMode> modes = new List<KitMode>();
             List<Encounter> fights = new List<Encounter>();
             List<int> levels = new List<int>();
+            List<int> enemyLevels = new List<int>();
             List<int> teams = new List<int>();
             foreach (KitMode mode in options.Modes)
             {
@@ -376,12 +397,23 @@ namespace BeastCraft.Tooling.BalanceSim
                 {
                     foreach (int level in options.Levels)
                     {
-                        foreach (int team in new[] { 0, pve.Teams.Count - 1 })
+                        List<int> enemyAt = new List<int> { level };
+                        int gapLevel = ParityGapLevel(options, level);
+                        if (gapLevel != level)
                         {
-                            modes.Add(mode);
-                            fights.Add(encounter);
-                            levels.Add(level);
-                            teams.Add(team);
+                            enemyAt.Add(gapLevel);
+                        }
+
+                        foreach (int enemyLevel in enemyAt)
+                        {
+                            foreach (int team in new[] { 0, pve.Teams.Count - 1 })
+                            {
+                                modes.Add(mode);
+                                fights.Add(encounter);
+                                levels.Add(level);
+                                enemyLevels.Add(enemyLevel);
+                                teams.Add(team);
+                            }
                         }
                     }
                 }
@@ -394,10 +426,11 @@ namespace BeastCraft.Tooling.BalanceSim
                 KitMode mode = modes[i];
                 Encounter encounter = fights[i];
                 int level = levels[i];
+                int enemyLevel = enemyLevels[i];
                 int team = teams[i];
                 bool[] ties = pve.PlayersWinTies(mode, level, encounter.Id);
-                PveBattle ours = pve.RunBattle(mode, level, encounter, 1.0, team, 0, false, ties[team], out List<BattleUnit> ourUnits);
-                PveBattle real = pve.RunBattle(mode, level, encounter, 1.0, team, 0, true, ties[team], out List<BattleUnit> realUnits);
+                PveBattle ours = pve.RunBattle(mode, level, enemyLevel, encounter, 1.0, team, 0, false, ties[team], out List<BattleUnit> ourUnits);
+                PveBattle real = pve.RunBattle(mode, level, enemyLevel, encounter, 1.0, team, 0, true, ties[team], out List<BattleUnit> realUnits);
                 bool same = ours.Outcome == real.Outcome && ours.ElapsedTicks == real.ElapsedTicks && ours.Actions == real.Actions &&
                             ourUnits.Count == realUnits.Count;
                 for (int u = 0; same && u < ourUnits.Count; u++)
@@ -408,7 +441,8 @@ namespace BeastCraft.Tooling.BalanceSim
 
                 if (!same)
                 {
-                    found[i] = SimOptions.ModeName(mode) + "/" + encounter.Id + "/L" + level + " team " + team + ": " + ours.Outcome + " in " +
+                    found[i] = SimOptions.ModeName(mode) + "/" + encounter.Id + "/L" + level + (enemyLevel == level ? string.Empty : " vs enemies L" + enemyLevel) +
+                               " team " + team + ": " + ours.Outcome + " in " +
                                ours.ElapsedTicks + " ticks / " + ours.Actions + " turns vs RunBattle " + real.Outcome + " in " +
                                real.ElapsedTicks + " ticks / " + real.Actions + " turns.";
                 }
@@ -423,6 +457,30 @@ namespace BeastCraft.Tooling.BalanceSim
             }
 
             return problems;
+        }
+
+        /// <summary>
+        /// The enemy level the loop-parity check also replays <paramref name="level"/> at: the level
+        /// plus the <c>--level-gap</c> gap of largest magnitude that stays within 1-100 (the positive
+        /// one on a tie), or <paramref name="level"/> itself without the option or such a gap.
+        /// </summary>
+        private static int ParityGapLevel(SimOptions options, int level)
+        {
+            int best = 0;
+            if (options.LevelGaps != null)
+            {
+                foreach (int gap in options.LevelGaps)
+                {
+                    int enemyLevel = level + gap;
+                    bool inRange = enemyLevel >= 1 && enemyLevel <= SimOptions.MaxLevel;
+                    if (inRange && (Math.Abs(gap) > Math.Abs(best) || (Math.Abs(gap) == Math.Abs(best) && gap > best)))
+                    {
+                        best = gap;
+                    }
+                }
+            }
+
+            return level + best;
         }
     }
 }

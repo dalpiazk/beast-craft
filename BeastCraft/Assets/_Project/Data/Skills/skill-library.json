@@ -1,6 +1,6 @@
 {
-  "_readme": "Source of truth for every authored skill: beast skills, the avatar's active skills and passives, the skill-training materials, and each species' learnable skills and default loadout. Drafted against a power budget and tuned with the roster against the balance simulator (default loadouts; see docs/balance/tuning-log.md), not confirmed balance. Edit here, then in Unity run Beast Craft/Data/Import Skill Library (after Import Beast Roster). Enums are member names (case-sensitive). Missing fields take the DTO defaults in SkillLibraryData.cs; note a missing TargetingCriterion means Distance (nearest), not Random. Damage Magnitude is power, a percent of the attacking stat; Heal is a percent of the caster's SpecialAttack (x HealScale, the avatar's for its skills and passives); a Shield is a percent of the caster's Defense; a DamageOverTime is a per-turn power; a Knockback is whole hexes. DefaultLoadout order is fire priority. TeamBonds are composition-triggered team effects applied at battle start to the player's team (never enemies): a Stance, Elements (distinct elements of the set the team covers) or Species condition, tiers by rising MinCount (the highest reached applies; tiers replace, not stack), and per-tier Effects (BuffStat or a Shield status only, Chance 100) applied by each recipient to itself; Scope Members = the beasts that meet the condition, Team = every beast. See docs/design/battle-system.md, 'Team bonds'. The first 3 AvatarActives are the avatar's default actives. See docs/design/battle-system.md, 'Beast skill kits'.",
-  "SchemaVersion": 1,
+  "_readme": "Source of truth for every authored skill: beast skills, the avatar's active skills and passives, the skill-training materials, and each species' learnable skills and default loadout. Drafted against a power budget and tuned with the roster against the balance simulator (default loadouts; see docs/balance/tuning-log.md), not confirmed balance. Edit here, then in Unity run Beast Craft/Data/Import Skill Library (after Import Beast Roster). Enums are member names (case-sensitive). Missing fields take the DTO defaults in SkillLibraryData.cs; note a missing TargetingCriterion means Distance (nearest), not Random. Damage Magnitude is power, a percent of the attacking stat; Heal is a percent of the caster's SpecialAttack (x HealScale, the avatar's for its skills and passives); a Shield is a percent of the caster's Defense; a DamageOverTime is a per-turn power; a Knockback is whole hexes. DefaultLoadout order is fire priority. TeamBonds are composition-triggered team effects applied at battle start to the player's team (never enemies): a Stance, Elements (distinct elements of the set the team covers) or Species condition, tiers by rising MinCount (the highest reached applies; tiers replace, not stack), and per-tier Effects (BuffStat or a Shield status only, Chance 100) applied by each recipient to itself; Scope Members = the beasts that meet the condition, Team = every beast, Others = every beast that does not meet it. A PerCount (scaling) bond has one tier (MinCount 1 or more) whose magnitudes apply once per counted member, up to MaxCount stacks. See docs/design/battle-system.md, 'Team bonds'. The first 3 AvatarActives are the avatar's default actives. See docs/design/battle-system.md, 'Beast skill kits'.",
+  "SchemaVersion": 2,
   "Materials": [
     { "MaterialId": "essence_shard", "DisplayName": "Essence Shard", "Description": "A sliver of crystallised battle essence. Feeds a skill a little XP; opens its first breakthrough (level 5).", "Tier": 1, "XpValue": 250 },
     { "MaterialId": "essence_crystal", "DisplayName": "Essence Crystal", "Description": "A clear crystal of battle essence. Feeds a skill a good deal of XP; opens its second breakthrough (level 10).", "Tier": 2, "XpValue": 1000 },
@@ -151,7 +151,7 @@
       "Element": "Water",
       "Category": "Physical",
       "Effects": [
-        { "EffectType": "Damage", "Magnitude": 86 }
+        { "EffectType": "Damage", "Magnitude": 94 }
       ],
       "Progression": {
         "MaxLevel": 20,
@@ -690,14 +690,15 @@
     {
       "SkillId": "thunder_talons",
       "DisplayName": "Thunder Talons",
-      "Description": "Three quick bolts loosed from its talons at two hexes: many weak hits, each its own crit roll.",
+      "Description": "Three quick bolts loosed from its talons at two hexes at the enemy with the least HP left in reach: many weak hits, each its own crit roll.",
       "TargetShape": "SingleTarget",
       "Range": 2,
       "Cooldown": 1,
+      "TargetingCriterion": "CurrentHp",
       "Element": "Lightning",
       "Category": "Physical",
       "Effects": [
-        { "EffectType": "Damage", "Magnitude": 26, "HitCount": 3 }
+        { "EffectType": "Damage", "Magnitude": 25, "HitCount": 3 }
       ],
       "Progression": {
         "MaxLevel": 20,
@@ -832,7 +833,7 @@
       "Element": "Air",
       "Category": "Physical",
       "Effects": [
-        { "EffectType": "Damage", "Magnitude": 89 }
+        { "EffectType": "Damage", "Magnitude": 95 }
       ],
       "Progression": {
         "MaxLevel": 20,
@@ -854,7 +855,7 @@
       "Element": "Air",
       "Category": "Physical",
       "Effects": [
-        { "EffectType": "Damage", "Magnitude": 110 }
+        { "EffectType": "Damage", "Magnitude": 122 }
       ],
       "Progression": {
         "MaxLevel": 20,
@@ -876,7 +877,7 @@
       "Element": "Air",
       "Category": "Physical",
       "Effects": [
-        { "EffectType": "Damage", "Magnitude": 55 },
+        { "EffectType": "Damage", "Magnitude": 75 },
         { "EffectType": "ApplyStatus", "Status": "Knockback", "Magnitude": 2, "DurationTurns": 0 }
       ],
       "Progression": {
@@ -1147,7 +1148,7 @@
       "Element": "Light",
       "Category": "Special",
       "Effects": [
-        { "EffectType": "Damage", "Magnitude": 66 }
+        { "EffectType": "Damage", "Magnitude": 70 }
       ],
       "Progression": {
         "MaxLevel": 20,
@@ -1368,13 +1369,13 @@
     {
       "SkillId": "rallying_cry",
       "DisplayName": "Rallying Cry",
-      "Description": "The avatar's war cry: +10% Attack and Special Attack for the whole team for two turns.",
+      "Description": "The avatar's war cry: +10% Attack and Special Attack for the whole team for three turns.",
       "TargetShape": "AllAllies",
       "Range": 0,
-      "Cooldown": 4,
+      "Cooldown": 2,
       "Effects": [
-        { "EffectType": "BuffStat", "AffectedStat": "Attack", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true },
-        { "EffectType": "BuffStat", "AffectedStat": "SpecialAttack", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true }
+        { "EffectType": "BuffStat", "AffectedStat": "Attack", "Magnitude": 10, "DurationTurns": 3, "IsPercent": true },
+        { "EffectType": "BuffStat", "AffectedStat": "SpecialAttack", "Magnitude": 10, "DurationTurns": 3, "IsPercent": true }
       ],
       "Progression": {
         "MaxLevel": 20,
@@ -1392,7 +1393,7 @@
       "Description": "A gentle light that heals every beast a little.",
       "TargetShape": "AllAllies",
       "Range": 0,
-      "Cooldown": 3,
+      "Cooldown": 2,
       "Effects": [
         { "EffectType": "Heal", "Magnitude": 13 }
       ],
@@ -1429,13 +1430,13 @@
     {
       "SkillId": "hex_of_frailty",
       "DisplayName": "Hex of Frailty",
-      "Description": "Curses every enemy: -10% Defense and Special Defense for two turns.",
+      "Description": "Curses every enemy: -10% Defense and Special Defense for three turns.",
       "TargetShape": "AllEnemies",
       "Range": 0,
-      "Cooldown": 4,
+      "Cooldown": 2,
       "Effects": [
-        { "EffectType": "DebuffStat", "AffectedStat": "Defense", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true },
-        { "EffectType": "DebuffStat", "AffectedStat": "SpecialDefense", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true }
+        { "EffectType": "DebuffStat", "AffectedStat": "Defense", "Magnitude": 10, "DurationTurns": 3, "IsPercent": true },
+        { "EffectType": "DebuffStat", "AffectedStat": "SpecialDefense", "Magnitude": 10, "DurationTurns": 3, "IsPercent": true }
       ],
       "Progression": {
         "MaxLevel": 20,
@@ -1450,12 +1451,12 @@
     {
       "SkillId": "battle_focus",
       "DisplayName": "Battle Focus",
-      "Description": "Sharpens the team's eye: +8 crit chance for two turns.",
+      "Description": "Sharpens the team's eye: +8 crit chance for three turns.",
       "TargetShape": "AllAllies",
       "Range": 0,
-      "Cooldown": 5,
+      "Cooldown": 3,
       "Effects": [
-        { "EffectType": "BuffStat", "AffectedStat": "CritChance", "Magnitude": 8, "DurationTurns": 2 }
+        { "EffectType": "BuffStat", "AffectedStat": "CritChance", "Magnitude": 8, "DurationTurns": 3 }
       ],
       "Progression": {
         "MaxLevel": 20,
@@ -1470,12 +1471,12 @@
     {
       "SkillId": "slowing_field",
       "DisplayName": "Slowing Field",
-      "Description": "Thickens the air around the enemy: -12% Speed for two turns.",
+      "Description": "Thickens the air around the enemy: -12% Speed for three turns.",
       "TargetShape": "AllEnemies",
       "Range": 0,
-      "Cooldown": 5,
+      "Cooldown": 3,
       "Effects": [
-        { "EffectType": "DebuffStat", "AffectedStat": "Speed", "Magnitude": 12, "DurationTurns": 2, "IsPercent": true }
+        { "EffectType": "DebuffStat", "AffectedStat": "Speed", "Magnitude": 12, "DurationTurns": 3, "IsPercent": true }
       ],
       "Progression": {
         "MaxLevel": 20,
@@ -1589,10 +1590,10 @@
     {
       "PassiveId": "bloodlust",
       "DisplayName": "Bloodlust",
-      "Description": "When an enemy falls, half the time the team surges: +10% Attack and Special Attack for two turns (at most every other avatar tick).",
+      "Description": "When an enemy falls, half the time the team surges: +10% Attack and Special Attack for two turns (at most once per avatar turn).",
       "Trigger": "EnemyDefeated",
       "ProcChance": 50,
-      "InternalCooldown": 2,
+      "InternalCooldown": 1,
       "TargetScope": "AllAllies",
       "Effects": [
         { "EffectType": "BuffStat", "AffectedStat": "Attack", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true },
@@ -1635,7 +1636,7 @@
       "Description": "When a beast lands a critical hit, the avatar sometimes calls down a follow-up strike on every enemy.",
       "Trigger": "AllyCrit",
       "ProcChance": 30,
-      "InternalCooldown": 3,
+      "InternalCooldown": 1,
       "TargetScope": "AllEnemies",
       "Category": "Special",
       "Effects": [
@@ -1906,6 +1907,45 @@
       "Scope": "Team",
       "Tiers": [
         { "MinCount": 2, "Effects": [ { "EffectType": "BuffStat", "AffectedStat": "Defense", "Magnitude": 5, "IsPercent": true }, { "EffectType": "BuffStat", "AffectedStat": "SpecialDefense", "Magnitude": 5, "IsPercent": true } ] }
+      ]
+    },
+    {
+      "BondId": "bulwark",
+      "DisplayName": "Bulwark",
+      "Description": "Every Vanguard on the team covers the beasts behind it: each non-Vanguard teammate gains Defense and Special Defense per Vanguard (up to 3).",
+      "Condition": "Stance",
+      "Stance": "Vanguard",
+      "Scope": "Others",
+      "PerCount": true,
+      "MaxCount": 3,
+      "Tiers": [
+        { "MinCount": 1, "Effects": [ { "EffectType": "BuffStat", "AffectedStat": "Defense", "Magnitude": 4, "IsPercent": true }, { "EffectType": "BuffStat", "AffectedStat": "SpecialDefense", "Magnitude": 4, "IsPercent": true } ] }
+      ]
+    },
+    {
+      "BondId": "overwatch",
+      "DisplayName": "Overwatch",
+      "Description": "Every Ranged beast spots for the whole team: each beast on the team gains critical-hit chance per Ranged teammate (up to 3).",
+      "Condition": "Stance",
+      "Stance": "Ranged",
+      "Scope": "Team",
+      "PerCount": true,
+      "MaxCount": 3,
+      "Tiers": [
+        { "MinCount": 1, "Effects": [ { "EffectType": "BuffStat", "AffectedStat": "CritChance", "Magnitude": 3 } ] }
+      ]
+    },
+    {
+      "BondId": "flanking",
+      "DisplayName": "Flanking",
+      "Description": "Every Skirmisher draws the enemy out of line: each beast on the team acts faster per Skirmisher (up to 2).",
+      "Condition": "Stance",
+      "Stance": "Skirmisher",
+      "Scope": "Team",
+      "PerCount": true,
+      "MaxCount": 2,
+      "Tiers": [
+        { "MinCount": 1, "Effects": [ { "EffectType": "BuffStat", "AffectedStat": "Speed", "Magnitude": 4, "IsPercent": true } ] }
       ]
     }
   ]

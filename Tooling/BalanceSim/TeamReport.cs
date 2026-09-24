@@ -371,7 +371,8 @@ namespace BeastCraft.Tooling.BalanceSim
             report.AppendLine();
             report.AppendLine("The marginals above judge beasts one at a time; this judges whole teams. Each of the " + simulator.Teams.Count +
                               " teams' clear rate at the calibrated");
-            report.AppendLine("difficulty (so the average team clears about " + SimOptions.Format(options.TargetClearRate) + "%): per shape it is " + battles +
+            report.AppendLine("difficulty (" + (options.CalibratesOnPick ? "the scouted pick clears about " + SimOptions.Format(options.TargetClearRate) + "%, the average team the no-scouting rate"
+                                                  : "so the average team clears about " + SimOptions.Format(options.TargetClearRate) + "%") + "): per shape it is " + battles +
                               " battles (compositions x levels x samples), levels");
             report.AppendLine("pooled; overall averages the shapes. **Noise SD** is the spread the teams would show from damage rolls alone");
             report.AppendLine("(binomial, sqrt(p(1 - p) / (N - 1)) per cell, an upper bound since a team's chance differs between compositions), and");

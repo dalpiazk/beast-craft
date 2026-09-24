@@ -16,6 +16,22 @@ below about genuine behaviour matters beyond CI — `AnimationCurve.Evaluate`, `
 `ScriptableObject.CreateInstance` are run for real by the simulator. It is not a CI job; see its own
 README.
 
+`UnityStub` also has a third, local-only consumer: `Tooling/EditModeTests/`, which runs the
+`Tests/EditMode` suite with NUnit outside Unity (also not a CI job):
+
+```sh
+dotnet test Tooling/EditModeTests
+dotnet format Tooling/EditModeTests --verify-no-changes
+```
+
+It compiles the stub's *source files* directly into the test assembly (not via a
+`ProjectReference`) with the `UNITYSTUB_SYSTEM_TEXT_JSON` symbol defined. Under that symbol
+`JsonUtility.FromJson` / `ToJson` are real, implemented over System.Text.Json and restricted to
+JsonUtility's rules (public instance fields only — no properties, readonly or `[NonSerialized]`
+fields — exact, case-sensitive names, enums as numbers). Without the symbol, which is how CiLint and
+BalanceSim build it, they keep throwing `NotSupportedException` as described below.
+`Object.DestroyImmediate`, which the tests call in teardown, is an honest no-op in every build.
+
 Neither project is part of the Unity project (they live entirely outside `BeastCraft/`), neither is
 ever shipped, and game code must never reference them.
 
@@ -53,7 +69,8 @@ Two rules when adding surface:
 `EditorUtility`) used by the roster importer, as a second namespace in the same assembly. Those
 members, and `JsonUtility`, cannot be honestly implemented without an Editor (or, for JSON, a
 package reference), and CI never executes them, so they throw `NotSupportedException` if called
-rather than pretending to succeed. One consequence of sharing the assembly: CiLint would not flag a
+rather than pretending to succeed (JsonUtility's one exception is the `UNITYSTUB_SYSTEM_TEXT_JSON`
+build used by `Tooling/EditModeTests`, above). One consequence of sharing the assembly: CiLint would not flag a
 Runtime script that wrongly uses `UnityEditor`; Unity's assembly definitions still do.
 
 ## Future: real Unity tests

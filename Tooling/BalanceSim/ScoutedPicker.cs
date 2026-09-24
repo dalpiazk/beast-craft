@@ -59,7 +59,10 @@ namespace BeastCraft.Tooling.BalanceSim
     {
         public PveCell Cell;
 
-        /// <summary>Mean clear rate of every team over every composition: the unscouted average team (what calibration aims at).</summary>
+        /// <summary>
+        /// Mean clear rate of every team over every composition: the unscouted average team (the
+        /// no-scouting rate; what <c>--calibrate-on mean</c> aims at the target).
+        /// </summary>
         public double Baseline;
 
         /// <summary>[strategy][composition] the team index picked (null when the strategy was not run).</summary>
@@ -88,9 +91,10 @@ namespace BeastCraft.Tooling.BalanceSim
     /// Scouted picking: what the player gains by seeing an encounter (<see cref="EncounterPreview"/>)
     /// and picking a team for it. Pure post-processing of the battles a run already has: every
     /// strategy picks one of the simulated teams per composition, and that team's recorded result
-    /// against the composition is its outcome, so no battle is run. The calibration is unchanged
-    /// (it still aims the mean of all teams at the target), which makes each strategy's gain over that
-    /// mean directly readable as uplift.
+    /// against the composition is its outcome, so no battle is run. Each strategy's gain over the mean
+    /// of all teams (the no-scouting rate) reads as uplift. The heuristic pickers also drive the
+    /// default calibration (<c>--calibrate-on bonds|heuristic</c>, <see cref="PicksFor"/>), which
+    /// aims the picked team, not the mean, at the target.
     /// <para>
     /// <strong>Heuristic.</strong> Each beast scores against the preview, per enemy:
     /// <c>sum over groups of Count x (OffenceWeight x chart(beast element, group element) -
@@ -102,7 +106,9 @@ namespace BeastCraft.Tooling.BalanceSim
     /// </para>
     /// <para>
     /// <strong>Bond-aware.</strong> Every team meeting the Vanguard minimum scores its members'
-    /// summed heuristic scores plus <see cref="BondWeight"/> per tier of each active bond; the best
+    /// summed heuristic scores plus <see cref="BondWeight"/> per tier of each active tiered bond
+    /// and <see cref="ScalingBondWeight"/> per stack of each active scaling bond (none for an
+    /// <c>Others</c> bond on a team made only of its members, which has no recipient); the best
     /// team is fielded (ties to the lower team index).
     /// </para>
     /// <para>
@@ -130,6 +136,9 @@ namespace BeastCraft.Tooling.BalanceSim
 
         /// <summary>Bond-aware score per tier of each active bond (per-enemy score units: a 2x matchup scores 1.0 more than a 1x one).</summary>
         public const double BondWeight = 0.5;
+
+        /// <summary>Bond-aware score per stack of each active scaling (<c>PerCount</c>) bond.</summary>
+        public const double ScalingBondWeight = 0.125;
 
         public const int StrategyCount = 4;
         public const int RandomIndex = 0;
@@ -236,6 +245,26 @@ namespace BeastCraft.Tooling.BalanceSim
             return team;
         }
 
+        /// <summary>
+        /// What one active bond adds to a team's bond-aware score: <see cref="BondWeight"/> x tier for
+        /// a tiered bond, <see cref="ScalingBondWeight"/> x stacks for a scaling one, and nothing for
+        /// an <c>Others</c> bond whose members are the whole team (no one receives it).
+        /// </summary>
+        public static double BondScore(ActiveTeamBond bond, int teamSize)
+        {
+            if (!bond.Bond.PerCount)
+            {
+                return BondWeight * bond.Tier;
+            }
+
+            if (bond.Bond.Scope == TeamBondScope.Others && bond.Members.Count >= teamSize)
+            {
+                return 0.0;
+            }
+
+            return ScalingBondWeight * bond.Stacks;
+        }
+
         /// <summary>The bond-aware team index (see the class notes).</summary>
         public static int PickWithBonds(double[] scores, IReadOnlyList<CreatureSpeciesSO> species, List<int[]> teams, List<ActiveTeamBond>[] bonds, int vanguardMin)
         {
@@ -255,7 +284,7 @@ namespace BeastCraft.Tooling.BalanceSim
 
                 foreach (ActiveTeamBond bond in bonds[t])
                 {
-                    value += BondWeight * bond.Tier;
+                    value += BondScore(bond, teams[t].Length);
                 }
 
                 if (value > bestValue + 1e-12)
@@ -272,6 +301,60 @@ namespace BeastCraft.Tooling.BalanceSim
             }
 
             return bestFeasible >= 0 ? bestFeasible : best;
+        }
+
+        /// <summary>
+        /// The team index <paramref name="strategy"/> (<see cref="HeuristicIndex"/> or
+        /// <see cref="BondAwareIndex"/>) fields against <paramref name="encounter"/>: a pure function
+        /// of what the preview shows, so the same in every kit mode and level.
+        /// </summary>
+        public static int PickFor(SimOptions options, IReadOnlyList<CreatureSpeciesSO> species, List<int[]> teams, List<ActiveTeamBond>[] bonds, Encounter encounter,
+                                  int strategy)
+        {
+            double[] scores = Scores(Preview(encounter, options.ScoutedDetail), species);
+            if (strategy == BondAwareIndex)
+            {
+                return PickWithBonds(scores, species, teams, bonds, options.ScoutedVanguardMin);
+            }
+
+            if (strategy != HeuristicIndex)
+            {
+                throw new ArgumentOutOfRangeException(nameof(strategy), "Only the heuristic pickers pick from the preview alone.");
+            }
+
+            string key = Key(Pick(scores, species, options.TeamSize, options.ScoutedVanguardMin));
+            for (int t = 0; t < teams.Count; t++)
+            {
+                if (Key(teams[t]) == key)
+                {
+                    return t;
+                }
+            }
+
+            throw new InvalidOperationException("The heuristic picked " + key + ", which is not a simulated team.");
+        }
+
+        /// <summary>
+        /// Per composition of <paramref name="shape"/>, the team index <paramref name="strategy"/>
+        /// fields (<see cref="PickFor"/>): what a scouted-pick calibration
+        /// (<c>--calibrate-on heuristic|bonds</c>) aims at the target, computed once per shape.
+        /// </summary>
+        public static int[] PicksFor(SimOptions options, IReadOnlyList<CreatureSpeciesSO> species, List<int[]> teams, List<ActiveTeamBond>[] bonds, EncounterShape shape,
+                                     int strategy)
+        {
+            int[] picks = new int[shape.Compositions.Count];
+            for (int c = 0; c < picks.Length; c++)
+            {
+                picks[c] = PickFor(options, species, teams, bonds, shape.Compositions[c], strategy);
+            }
+
+            return picks;
+        }
+
+        /// <summary>The picker behind <paramref name="target"/> (<see cref="HeuristicIndex"/> or <see cref="BondAwareIndex"/>); -1 for the mean.</summary>
+        public static int StrategyFor(CalibrationTarget target)
+        {
+            return target == CalibrationTarget.Bonds ? BondAwareIndex : target == CalibrationTarget.Heuristic ? HeuristicIndex : -1;
         }
 
         /// <summary>Team <paramref name="team"/>'s clear rate against composition <paramref name="composition"/> (percent, over the samples).</summary>
@@ -295,12 +378,6 @@ namespace BeastCraft.Tooling.BalanceSim
                 return result;
             }
 
-            Dictionary<string, int> teamIndex = new Dictionary<string, int>(StringComparer.Ordinal);
-            for (int t = 0; t < simulator.Teams.Count; t++)
-            {
-                teamIndex[Key(simulator.Teams[t])] = t;
-            }
-
             // The heuristic sees only the composition, so its picks are shared by every mode and level.
             Dictionary<Encounter, int> heuristic = new Dictionary<Encounter, int>();
             Dictionary<Encounter, int> bondAware = new Dictionary<Encounter, int>();
@@ -313,10 +390,8 @@ namespace BeastCraft.Tooling.BalanceSim
                         continue;
                     }
 
-                    double[] scores = Scores(Preview(encounter, options.ScoutedDetail), species);
-                    int[] team = Pick(scores, species, options.TeamSize, options.ScoutedVanguardMin);
-                    heuristic[encounter] = teamIndex[Key(team)];
-                    bondAware[encounter] = PickWithBonds(scores, species, simulator.Teams, simulator.TeamBonds, options.ScoutedVanguardMin);
+                    heuristic[encounter] = PickFor(options, species, simulator.Teams, simulator.TeamBonds, encounter, HeuristicIndex);
+                    bondAware[encounter] = PickFor(options, species, simulator.Teams, simulator.TeamBonds, encounter, BondAwareIndex);
                 }
             }
 
@@ -559,6 +634,139 @@ namespace BeastCraft.Tooling.BalanceSim
 
             return problems;
         }
+
+        /// <summary>
+        /// Invariants over a scouted-pick calibration (empty = all hold, or <c>--calibrate-on mean</c>):
+        /// every cell's picks are the picker's own for its shape (recomputed), real teams meeting the
+        /// Vanguard minimum when the roster allows it, and the same in every mode and level of the
+        /// shape; the picked battles are complete, their clear rate is the reported scouted rate, and
+        /// each picked team's first sample is exactly its battle in the every-team run. With
+        /// <paramref name="missIsProblem"/> (<c>--self-check</c>) a scouted rate further than
+        /// <see cref="SimOptions.CalibrationTolerance"/> from the target is one too.
+        /// </summary>
+        public static List<string> CheckCalibration(SimOptions options, IReadOnlyList<CreatureSpeciesSO> species, PveSimulator simulator, List<PveCell> cells,
+                                                    bool missIsProblem)
+        {
+            List<string> problems = new List<string>();
+            if (!options.CalibratesOnPick || simulator == null)
+            {
+                return problems;
+            }
+
+            int vanguardsInRoster = 0;
+            foreach (CreatureSpeciesSO beast in species)
+            {
+                vanguardsInRoster += beast.Stance == CombatStance.Vanguard ? 1 : 0;
+            }
+
+            int needed = Math.Min(options.ScoutedVanguardMin, vanguardsInRoster);
+            int strategy = StrategyFor(options.EffectiveCalibrateOn);
+            Dictionary<EncounterShape, int[]> expected = new Dictionary<EncounterShape, int[]>();
+            foreach (PveCell cell in cells)
+            {
+                string where = "Calibration " + SimOptions.ModeName(cell.Mode) + "/" + cell.Shape.Id + "/L" + cell.Level + ": ";
+                int compositions = cell.Shape.Compositions.Count;
+                int n = cell.CalibrationSamples;
+                if (cell.CalibratedOn != options.EffectiveCalibrateOn || cell.Picks == null || cell.Picks.Length != compositions || cell.PickedBattles == null ||
+                    n < 1 || cell.PickedBattles.Length != compositions * n)
+                {
+                    problems.Add(where + "the scouted-pick calibration left no complete set of picks and picked battles.");
+                    continue;
+                }
+
+                if (!expected.TryGetValue(cell.Shape, out int[] picks))
+                {
+                    picks = PicksFor(options, species, simulator.Teams, simulator.TeamBonds, cell.Shape, strategy);
+                    expected[cell.Shape] = picks;
+                }
+
+                int cleared = 0;
+                for (int c = 0; c < compositions; c++)
+                {
+                    int team = cell.Picks[c];
+                    if (team != picks[c])
+                    {
+                        problems.Add(where + "composition " + c + " fielded team " + team + ", but the picker picks " + picks[c] + ".");
+                        continue;
+                    }
+
+                    if (team < 0 || team >= simulator.Teams.Count)
+                    {
+                        problems.Add(where + "picked no valid team for composition " + c + ".");
+                        continue;
+                    }
+
+                    int vanguards = 0;
+                    foreach (int b in simulator.Teams[team])
+                    {
+                        vanguards += species[b].Stance == CombatStance.Vanguard ? 1 : 0;
+                    }
+
+                    if (vanguards < needed)
+                    {
+                        problems.Add(where + "the pick for composition " + c + " fields " + vanguards + " Vanguards, fewer than " + needed + ".");
+                    }
+
+                    for (int s = 0; s < n; s++)
+                    {
+                        cleared += cell.PickedBattles[(c * n) + s].Cleared ? 1 : 0;
+                    }
+
+                    PveBattle first = cell.PickedBattles[c * n];
+                    PveBattle all = cell.Battles[simulator.BattleIndex(c, team, 0)];
+                    if (first.Outcome != all.Outcome || first.ElapsedTicks != all.ElapsedTicks || first.Actions != all.Actions)
+                    {
+                        problems.Add(where + "the picked team's first sample against composition " + c + " differs from its every-team battle.");
+                    }
+                }
+
+                double rate = (100.0 * cleared) / (compositions * n);
+                if (Math.Abs(rate - cell.ScoutedClearRate) > 1e-9)
+                {
+                    problems.Add(where + "picked battles clear " + SimOptions.Format(rate) + "%, but the scouted rate is " + SimOptions.Format(cell.ScoutedClearRate) + "%.");
+                }
+
+                if (missIsProblem && Math.Abs(cell.ScoutedClearRate - options.TargetClearRate) > SimOptions.CalibrationTolerance && !IsStep(cell, options.TargetClearRate))
+                {
+                    problems.Add(where + "the scouted rate " + SimOptions.Format(cell.ScoutedClearRate) + "% misses the " + SimOptions.Format(options.TargetClearRate) +
+                                 "% target by more than " + SimOptions.Format(SimOptions.CalibrationTolerance) + " points.");
+                }
+            }
+
+            return problems;
+        }
+
+        /// <summary>
+        /// Whether a calibration miss is a step in the clear-rate curve that no multiplier splits
+        /// (the report's <c>!</c>): the search evaluated a multiplier above the target rate and one
+        /// below it within <see cref="StepWidth"/> of each other, so the rate jumps across the target
+        /// between two multipliers that differ by little more than one stat rounding (typical at
+        /// level 1, where the picked teams all meet the same few integer stat lines). A miss that is
+        /// not a step means the search failed.
+        /// </summary>
+        public static bool IsStep(PveCell cell, double target)
+        {
+            foreach (CalibrationPoint above in cell.Evaluations)
+            {
+                if (above.Final || above.ClearRate <= target)
+                {
+                    continue;
+                }
+
+                foreach (CalibrationPoint below in cell.Evaluations)
+                {
+                    if (!below.Final && below.ClearRate < target && Math.Abs(below.Multiplier - above.Multiplier) <= StepWidth * Math.Min(above.Multiplier, below.Multiplier))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>Relative multiplier width within which a jump across the target counts as a step (<see cref="IsStep"/>).</summary>
+        public const double StepWidth = 0.01;
 
         /// <summary>The distinct shapes of <paramref name="cells"/>, in first-seen order.</summary>
         public static List<EncounterShape> ShapesOf(List<PveCell> cells)

@@ -14,9 +14,10 @@ namespace BeastCraft.Tests.EditMode
 {
     /// <summary>
     /// Team bonds: the resolver's three conditions and its tiers, application at battle start to
-    /// the right scope (members or the whole team, never enemies), self-applied shields, ordering
-    /// before the avatar's passives, once per battle, determinism, and the bond data (validator
-    /// negative cases, builder mapping, and the authored bonds' coverage of the roster).
+    /// the right scope (members, the whole team or the non-members, never enemies), self-applied
+    /// shields, scaling (per-count) bonds' stacks, cap and per-stack carriers, ordering before the
+    /// avatar's passives, once per battle, determinism, and the bond data (validator negative
+    /// cases, builder mapping, and the authored bonds' coverage of the roster).
     /// </summary>
     public class TeamBondTests
     {
@@ -263,6 +264,193 @@ namespace BeastCraft.Tests.EditMode
         }
 
         // ---------------------------------------------------------------------------------------
+        // Scaling (per-count) bonds and the Others scope.
+        // ---------------------------------------------------------------------------------------
+
+        [Test]
+        public void PerCount_StacksFollowTheCount_AndCapAtMaxCount()
+        {
+            TeamBondSO line = ScalingBond("line", CombatStance.Vanguard, TeamBondScope.Team, 3, PctBuff(StatType.Defense, 4));
+
+            for (int vanguards = 0; vanguards <= 4; vanguards++)
+            {
+                List<TeamBondMember> team = new List<TeamBondMember>();
+                for (int i = 0; i < 4; i++)
+                {
+                    team.Add(Member("s" + i, i < vanguards ? CombatStance.Vanguard : CombatStance.Ranged));
+                }
+
+                List<ActiveTeamBond> active = TeamBondResolver.Resolve(new[] { line }, team);
+                if (vanguards == 0)
+                {
+                    Assert.IsEmpty(active, "MinCount 1: no member, no bond");
+                    continue;
+                }
+
+                Assert.AreEqual(1, active.Count);
+                Assert.AreEqual(1, active[0].Tier, "a scaling bond has one tier");
+                Assert.AreEqual(vanguards, active[0].Count);
+                Assert.AreEqual(Math.Min(vanguards, 3), active[0].Stacks, "stacks = count capped at MaxCount");
+            }
+        }
+
+        [Test]
+        public void TieredBond_AlwaysHasOneStack()
+        {
+            TeamBondSO wall = StanceBond("wall", CombatStance.Vanguard, Tier(2, Buff(StatType.Defense, 5)), Tier(3, Buff(StatType.Defense, 10)));
+
+            List<ActiveTeamBond> active = TeamBondResolver.Resolve(new[] { wall }, Team(Member("a", CombatStance.Vanguard), Member("b", CombatStance.Vanguard),
+                                                                                        Member("c", CombatStance.Vanguard)));
+
+            Assert.AreEqual(2, active[0].Tier);
+            Assert.AreEqual(1, active[0].Stacks);
+            Assert.AreEqual(1, new ActiveTeamBond(wall, 2, 3, new[] { 0, 1, 2 }).Stacks, "the four-argument constructor takes the bond's own stacks");
+        }
+
+        [Test]
+        public void PerCount_AppliesMagnitudeTimesStacks_AsOneBuff()
+        {
+            TeamBondSO line = ScalingBond("line", CombatStance.Vanguard, TeamBondScope.Team, 3, PctBuff(StatType.Defense, 4));
+            BattleUnit a = Unit("p1", BattleTeam.Player, CombatStance.Vanguard, 0);
+            BattleUnit b = Unit("p2", BattleTeam.Player, CombatStance.Vanguard, 1);
+            BattleUnit c = Unit("p3", BattleTeam.Player, CombatStance.Ranged, 2);
+            List<BattleUnit> team = new List<BattleUnit> { a, b, c };
+
+            BattleTurnExecutor.BeginBattle(team, null, null, null, null, TeamBondLoadout.For(new[] { line }, MembersOf(team), team),
+                                           out IReadOnlyList<TeamBondActivation> applied);
+
+            Assert.AreEqual(2, applied[0].Stacks);
+            Assert.AreEqual(108, a.Stats.Defense, "two stacks of 4%: one 8% buff");
+            Assert.AreEqual(108, c.Stats.Defense, "Team scope: the non-member too");
+        }
+
+        [Test]
+        public void OthersScope_ReachesOnlyTheNonMembers_ButNoEnemy()
+        {
+            TeamBondSO bulwark = ScalingBond("bulwark", CombatStance.Vanguard, TeamBondScope.Others, 3, PctBuff(StatType.Defense, 4), PctBuff(StatType.SpecialDefense, 4));
+            BattleUnit v1 = Unit("p1", BattleTeam.Player, CombatStance.Vanguard, 0);
+            BattleUnit r = Unit("p2", BattleTeam.Player, CombatStance.Ranged, 1);
+            BattleUnit v2 = Unit("p3", BattleTeam.Player, CombatStance.Vanguard, 2);
+            BattleUnit s = Unit("p4", BattleTeam.Player, CombatStance.Skirmisher, 3);
+            BattleUnit enemy = Unit("e1", BattleTeam.Enemy, CombatStance.Ranged, 5);
+            List<BattleUnit> team = new List<BattleUnit> { v1, r, v2, s };
+
+            BattleTurnExecutor.BeginBattle(Roster(team, enemy), null, null, null, null, TeamBondLoadout.For(new[] { bulwark }, MembersOf(team), team),
+                                           out IReadOnlyList<TeamBondActivation> applied);
+
+            CollectionAssert.AreEqual(new[] { r, s }, applied[0].Recipients, "the non-members, in team order");
+            Assert.AreEqual(108, r.Stats.Defense, "two Vanguards: two stacks of 4%");
+            Assert.AreEqual(108, s.Stats.SpecialDefense);
+            Assert.AreEqual(100, v1.Stats.Defense, "members lend it, they do not get it");
+            Assert.AreEqual(100, v2.Stats.Defense);
+            Assert.AreEqual(100, enemy.Stats.Defense, "enemies never get the player's bonds");
+        }
+
+        [Test]
+        public void OthersScope_OnATeamOfOnlyMembers_AppliesNothing()
+        {
+            TeamBondSO bulwark = ScalingBond("bulwark", CombatStance.Vanguard, TeamBondScope.Others, 3, PctBuff(StatType.Defense, 4));
+            BattleUnit a = Unit("p1", BattleTeam.Player, CombatStance.Vanguard, 0);
+            BattleUnit b = Unit("p2", BattleTeam.Player, CombatStance.Vanguard, 1);
+            List<BattleUnit> team = new List<BattleUnit> { a, b };
+            TeamBondLoadout bonds = TeamBondLoadout.For(new[] { bulwark }, MembersOf(team), team);
+
+            BattleTurnExecutor.BeginBattle(team, null, null, null, null, bonds, out IReadOnlyList<TeamBondActivation> applied);
+
+            Assert.AreEqual(1, bonds.Bonds.Count, "the bond resolves (its condition is met)");
+            Assert.AreEqual(0, applied.Count, "but no teammate receives it");
+            Assert.AreEqual(100, a.Stats.Defense);
+        }
+
+        [Test]
+        public void ScaledCarrier_NeverChangesTheAuthoredMagnitudes()
+        {
+            SkillEffect authored = PctBuff(StatType.Defense, 4);
+            TeamBondSO line = ScalingBond("line", CombatStance.Vanguard, TeamBondScope.Team, 3, authored);
+            List<BattleUnit> team = new List<BattleUnit>
+            {
+                Unit("p1", BattleTeam.Player, CombatStance.Vanguard, 0), Unit("p2", BattleTeam.Player, CombatStance.Vanguard, 1),
+                Unit("p3", BattleTeam.Player, CombatStance.Vanguard, 2),
+            };
+
+            for (int battle = 0; battle < 2; battle++)
+            {
+                foreach (BattleUnit unit in team)
+                {
+                    unit.Stats = new StatBlock(1000, 100, 100, 100, 100, 10);
+                }
+
+                BattleTurnExecutor.BeginBattle(team, null, null, null, null, TeamBondLoadout.For(new[] { line }, MembersOf(team), team),
+                                               out IReadOnlyList<TeamBondActivation> _);
+                Assert.AreEqual(112, team[0].Stats.Defense, "three stacks of 4%, battle " + battle);
+            }
+
+            Assert.AreEqual(4f, authored.Magnitude, "the tier's own effect keeps its per-stack magnitude");
+            Assert.AreEqual(1, line.Tiers[0].Effects.Count);
+            Assert.AreSame(authored, line.Tiers[0].Effects[0]);
+        }
+
+        [Test]
+        public void Carriers_AreCachedPerTierAndStackCount()
+        {
+            TeamBondSO line = ScalingBond("line", CombatStance.Vanguard, TeamBondScope.Team, 3, PctBuff(StatType.Defense, 4), Buff(StatType.CritChance, 2));
+            TeamBondTier tier = line.Tiers[0];
+
+            SkillSO one = TeamBondLoadout.CarrierFor(tier, line, 1);
+            SkillSO two = TeamBondLoadout.CarrierFor(tier, line, 2);
+            SkillSO three = TeamBondLoadout.CarrierFor(tier, line, 3);
+
+            Assert.AreSame(one, TeamBondLoadout.CarrierFor(tier, line, 1));
+            Assert.AreSame(two, TeamBondLoadout.CarrierFor(tier, line, 2));
+            Assert.AreNotSame(one, two);
+            Assert.AreNotSame(two, three);
+            Assert.AreSame(tier.Effects, one.Effects, "one stack shares the authored list");
+            Assert.AreNotSame(tier.Effects, two.Effects, "more stacks carry clones");
+            Assert.AreEqual(8f, two.Effects[0].Magnitude);
+            Assert.AreEqual(12f, three.Effects[0].Magnitude);
+            Assert.AreEqual(6f, three.Effects[1].Magnitude);
+            Assert.IsTrue(three.Effects[0].IsPercent, "every other field is copied");
+            Assert.AreEqual(StatType.CritChance, three.Effects[1].AffectedStat);
+            Assert.AreEqual(4f, tier.Effects[0].Magnitude);
+            Assert.AreEqual(2f, tier.Effects[1].Magnitude);
+        }
+
+        [Test]
+        public void Library_EveryLineupOfTheRosterActivatesAScalingBond()
+        {
+            SkillLibraryData library = SkillLibraryTests.LoadLibrary();
+            BeastRosterData roster = BeastRosterTests.LoadRoster();
+            List<TeamBondSO> bonds = BuildBonds(library);
+            List<TeamBondMember> pool = new List<TeamBondMember>();
+            foreach (SpeciesData species in roster.Species)
+            {
+                BeastRosterValidator.TryParseStance(species.Stance, out CombatStance stance);
+                pool.Add(new TeamBondMember(species.SpeciesId, stance, null));
+            }
+
+            int teams = 0;
+            int n = pool.Count;
+            for (int a = 0; a < n; a++)
+            {
+                for (int b = a + 1; b < n; b++)
+                {
+                    for (int c = b + 1; c < n; c++)
+                    {
+                        for (int d = c + 1; d < n; d++)
+                        {
+                            List<ActiveTeamBond> active = TeamBondResolver.Resolve(bonds, Team(pool[a], pool[b], pool[c], pool[d]));
+                            Assert.IsTrue(active.Exists(x => x.Bond.PerCount), "a lineup with no scaling bond: " + pool[a].SpeciesId + ", " + pool[b].SpeciesId +
+                                                                                ", " + pool[c].SpeciesId + ", " + pool[d].SpeciesId);
+                            teams++;
+                        }
+                    }
+                }
+            }
+
+            Assert.Greater(teams, 0);
+        }
+
+        // ---------------------------------------------------------------------------------------
         // Data: validator, builder and the authored bonds.
         // ---------------------------------------------------------------------------------------
 
@@ -315,7 +503,8 @@ namespace BeastCraft.Tests.EditMode
         {
             // BondIds are stable keys and must never be renamed after ship; this pins them.
             SkillLibraryData library = SkillLibraryTests.LoadLibrary();
-            CollectionAssert.AreEquivalent(new[] { "pack_hunters", "shield_wall", "crossfire", "wildfire", "storm_front", "bedrock", "winter_grove", "twilight" },
+            CollectionAssert.AreEquivalent(new[] { "pack_hunters", "shield_wall", "crossfire", "wildfire", "storm_front", "bedrock", "winter_grove", "twilight",
+                                                   "bulwark", "overwatch", "flanking" },
                                            Array.ConvertAll(library.TeamBonds, b => b.BondId));
 
             List<ActiveTeamBond> active = TeamBondResolver.Resolve(BuildBonds(library),
@@ -324,7 +513,9 @@ namespace BeastCraft.Tests.EditMode
                                                                         Member("griffin", CombatStance.Skirmisher, Element.Air),
                                                                         Member("thunderbird", CombatStance.Skirmisher, Element.Lightning)));
             List<string> ids = active.ConvertAll(a => a.Bond.BondId);
-            CollectionAssert.AreEqual(new[] { "pack_hunters", "shield_wall", "bedrock" }, ids);
+            CollectionAssert.AreEqual(new[] { "pack_hunters", "shield_wall", "bedrock", "bulwark", "flanking" }, ids);
+            Assert.AreEqual(2, active[3].Stacks, "two Vanguards: two stacks of bulwark");
+            Assert.AreEqual(2, active[4].Stacks, "two Skirmishers: two stacks of flanking");
         }
 
         [Test]
@@ -356,6 +547,153 @@ namespace BeastCraft.Tests.EditMode
             Assert.AreEqual(2, bond.Tiers[0].MinCount);
             Assert.AreEqual(StatType.Speed, bond.Tiers[0].Effects[0].AffectedStat);
             Assert.IsTrue(bond.Tiers[0].Effects[0].IsPercent);
+        }
+
+        [Test]
+        public void Builder_MapsTheScalingFields_AndClearsMaxCountOnATieredBond()
+        {
+            TeamBondData data = new TeamBondData
+            {
+                BondId = "line",
+                DisplayName = "Line",
+                Description = "d",
+                Condition = "Stance",
+                Stance = "Vanguard",
+                Scope = "Others",
+                PerCount = true,
+                MaxCount = 3,
+                Tiers = new[] { new TeamBondTierData { MinCount = 1, Effects = new[] { new EffectData { EffectType = "BuffStat", AffectedStat = "Defense", Magnitude = 4, IsPercent = true } } } }
+            };
+            TeamBondSO bond = ScriptableObject.CreateInstance<TeamBondSO>();
+            _created.Add(bond);
+
+            SkillLibraryBuilder.ApplyTeamBond(data, bond);
+
+            Assert.IsTrue(bond.PerCount);
+            Assert.AreEqual(3, bond.MaxCount);
+            Assert.AreEqual(TeamBondScope.Others, bond.Scope);
+            Assert.AreEqual(1, bond.Tiers[0].MinCount);
+
+            data.PerCount = false;
+            SkillLibraryBuilder.ApplyTeamBond(data, bond);
+            Assert.IsFalse(bond.PerCount);
+            Assert.AreEqual(0, bond.MaxCount);
+        }
+
+        [TestCase("TwoTiers", "has exactly one tier")]
+        [TestCase("MinCountZero", "must be from 1 up to its MaxCount")]
+        [TestCase("MinCountAboveMax", "must be from 1 up to its MaxCount")]
+        [TestCase("MaxCountZero", "MaxCount 0 must be at least 1")]
+        [TestCase("MaxCountAboveSet", "at most the set's size (2)")]
+        [TestCase("PercentOverCap", "over the cap of 20% of the stat")]
+        [TestCase("CritOverCap", "over the cap of 15 CritChance")]
+        [TestCase("MoveOverCap", "over the cap of 1 MoveRange")]
+        [TestCase("ShieldOverCap", "over the cap of a shield of 60% of Defense")]
+        [TestCase("FlatAttack", "not a flat Attack buff")]
+        [TestCase("MaxCountOnTiered", "is only for a PerCount (scaling) bond")]
+        public void Validator_RejectsBadScalingBonds(string fault, string fragment)
+        {
+            SkillLibraryData library = SkillLibraryTests.LoadLibrary();
+            TeamBondData bond = new TeamBondData
+            {
+                BondId = "test_line",
+                DisplayName = "Test",
+                Description = "d",
+                Condition = "Stance",
+                Stance = "Vanguard",
+                Scope = "Others",
+                PerCount = true,
+                MaxCount = 3,
+                Tiers = new[] { new TeamBondTierData { MinCount = 1, Effects = new[] { new EffectData { EffectType = "BuffStat", AffectedStat = "Defense", Magnitude = 4, IsPercent = true } } } }
+            };
+            EffectData effect = bond.Tiers[0].Effects[0];
+
+            switch (fault)
+            {
+                case "TwoTiers":
+                    bond.Tiers = new[] { bond.Tiers[0], new TeamBondTierData { MinCount = 2, Effects = bond.Tiers[0].Effects } };
+                    break;
+                case "MinCountZero":
+                    bond.Tiers[0].MinCount = 0;
+                    break;
+                case "MinCountAboveMax":
+                    bond.Tiers[0].MinCount = 4;
+                    break;
+                case "MaxCountZero":
+                    bond.MaxCount = 0;
+                    break;
+                case "MaxCountAboveSet":
+                    bond.Condition = "Elements";
+                    bond.Stance = null;
+                    bond.Elements = new[] { "Air", "Lightning" };
+                    break;
+                case "PercentOverCap":
+                    effect.Magnitude = 7;
+                    break;
+                case "CritOverCap":
+                    effect.AffectedStat = "CritChance";
+                    effect.IsPercent = false;
+                    effect.Magnitude = 6;
+                    break;
+                case "MoveOverCap":
+                    effect.AffectedStat = "MoveRange";
+                    effect.IsPercent = false;
+                    effect.Magnitude = 1;
+                    break;
+                case "ShieldOverCap":
+                    effect.EffectType = "ApplyStatus";
+                    effect.Status = "Shield";
+                    effect.DurationTurns = 3;
+                    effect.Magnitude = 25;
+                    break;
+                case "FlatAttack":
+                    effect.AffectedStat = "Attack";
+                    effect.IsPercent = false;
+                    effect.Magnitude = 2;
+                    break;
+                case "MaxCountOnTiered":
+                    bond.PerCount = false;
+                    bond.Tiers[0].MinCount = 2;
+                    break;
+            }
+
+            library.TeamBonds = new List<TeamBondData>(library.TeamBonds) { bond }.ToArray();
+            List<string> errors = SkillLibraryValidator.Validate(library);
+
+            Assert.IsTrue(errors.Exists(e => e.Contains(fragment)), "Expected an error containing '" + fragment + "', got:\n" + string.Join("\n", errors));
+        }
+
+        [Test]
+        public void Validator_AcceptsAScalingBondAtItsCaps()
+        {
+            SkillLibraryData library = SkillLibraryTests.LoadLibrary();
+            TeamBondData bond = new TeamBondData
+            {
+                BondId = "test_line",
+                DisplayName = "Test",
+                Description = "d",
+                Condition = "Stance",
+                Stance = "Ranged",
+                Scope = "Team",
+                PerCount = true,
+                MaxCount = 3,
+                Tiers = new[]
+                {
+                    new TeamBondTierData
+                    {
+                        MinCount = 1,
+                        Effects = new[]
+                        {
+                            new EffectData { EffectType = "BuffStat", AffectedStat = "Speed", Magnitude = 6, IsPercent = true },
+                            new EffectData { EffectType = "BuffStat", AffectedStat = "CritChance", Magnitude = 5 },
+                            new EffectData { EffectType = "ApplyStatus", Status = "Shield", Magnitude = 20, DurationTurns = 3 },
+                        }
+                    }
+                }
+            };
+            library.TeamBonds = new List<TeamBondData>(library.TeamBonds) { bond }.ToArray();
+
+            Assert.IsEmpty(SkillLibraryValidator.Validate(library, BeastRosterTests.LoadRoster()));
         }
 
         [TestCase("Condition", "Friendship", "is not a TeamBondCondition name")]
@@ -390,27 +728,61 @@ namespace BeastCraft.Tests.EditMode
 
             switch (fault)
             {
-                case "Condition": bond.Condition = value; break;
-                case "Scope": bond.Scope = value; break;
-                case "OneElement": bond.Elements = new[] { "Air" }; break;
-                case "DuplicateElement": bond.Elements = new[] { "Air", "Air", "Fire" }; break;
-                case "NoneElement": bond.Elements = new[] { "Air", "None" }; break;
-                case "TierTooLow": bond.Tiers[0].MinCount = 1; break;
-                case "TierAboveSet": bond.Tiers[0].MinCount = 3; break;
+                case "Condition":
+                    bond.Condition = value;
+                    break;
+                case "Scope":
+                    bond.Scope = value;
+                    break;
+                case "OneElement":
+                    bond.Elements = new[] { "Air" };
+                    break;
+                case "DuplicateElement":
+                    bond.Elements = new[] { "Air", "Air", "Fire" };
+                    break;
+                case "NoneElement":
+                    bond.Elements = new[] { "Air", "None" };
+                    break;
+                case "TierTooLow":
+                    bond.Tiers[0].MinCount = 1;
+                    break;
+                case "TierAboveSet":
+                    bond.Tiers[0].MinCount = 3;
+                    break;
                 case "TiersNotRising":
                     bond.Condition = "Stance";
                     bond.Elements = new string[0];
                     bond.Stance = "Vanguard";
                     bond.Tiers = new[] { bond.Tiers[0], new TeamBondTierData { MinCount = 2, Effects = bond.Tiers[0].Effects } };
                     break;
-                case "NoTiers": bond.Tiers = new TeamBondTierData[0]; break;
-                case "DamageEffect": effect.EffectType = "Damage"; effect.Magnitude = 50; break;
-                case "DebuffEffect": effect.EffectType = "DebuffStat"; break;
-                case "StunEffect": effect.EffectType = "ApplyStatus"; effect.Status = "Stun"; effect.DurationTurns = 1; break;
-                case "LowChance": effect.Chance = 50; break;
-                case "HpBuff": effect.AffectedStat = "HP"; break;
-                case "DuplicateId": bond.BondId = library.BeastSkills[0].SkillId; break;
-                case "StanceWithElements": bond.Condition = "Stance"; bond.Stance = "Ranged"; break;
+                case "NoTiers":
+                    bond.Tiers = new TeamBondTierData[0];
+                    break;
+                case "DamageEffect":
+                    effect.EffectType = "Damage";
+                    effect.Magnitude = 50;
+                    break;
+                case "DebuffEffect":
+                    effect.EffectType = "DebuffStat";
+                    break;
+                case "StunEffect":
+                    effect.EffectType = "ApplyStatus";
+                    effect.Status = "Stun";
+                    effect.DurationTurns = 1;
+                    break;
+                case "LowChance":
+                    effect.Chance = 50;
+                    break;
+                case "HpBuff":
+                    effect.AffectedStat = "HP";
+                    break;
+                case "DuplicateId":
+                    bond.BondId = library.BeastSkills[0].SkillId;
+                    break;
+                case "StanceWithElements":
+                    bond.Condition = "Stance";
+                    bond.Stance = "Ranged";
+                    break;
             }
 
             List<TeamBondData> bonds = new List<TeamBondData>(library.TeamBonds) { bond };
@@ -552,6 +924,21 @@ namespace BeastCraft.Tests.EditMode
         private static SkillEffect Buff(StatType stat, int amount)
         {
             return new SkillEffect { EffectType = SkillEffectType.BuffStat, AffectedStat = stat, Magnitude = amount };
+        }
+
+        private static SkillEffect PctBuff(StatType stat, int percent)
+        {
+            return new SkillEffect { EffectType = SkillEffectType.BuffStat, AffectedStat = stat, Magnitude = percent, IsPercent = true };
+        }
+
+        private TeamBondSO ScalingBond(string id, CombatStance stance, TeamBondScope scope, int maxCount, params SkillEffect[] perStack)
+        {
+            TeamBondSO bond = NewBond(id, scope, new[] { Tier(1, perStack) });
+            bond.Condition = TeamBondCondition.Stance;
+            bond.Stance = stance;
+            bond.PerCount = true;
+            bond.MaxCount = maxCount;
+            return bond;
         }
 
         private TeamBondSO StanceBond(string id, CombatStance stance, params TeamBondTier[] tiers)

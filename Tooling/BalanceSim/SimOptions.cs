@@ -28,6 +28,19 @@ namespace BeastCraft.Tooling.BalanceSim
         Library = 1
     }
 
+    /// <summary>What the PvE difficulty calibration aims at the target clear rate (<c>--calibrate-on</c>).</summary>
+    public enum CalibrationTarget
+    {
+        /// <summary>The mean over every team (the unscouted player): the calibration before scouting existed.</summary>
+        Mean = 0,
+
+        /// <summary>The team the element counter-pick heuristic fields per composition (<see cref="ScoutedPicker.Pick"/>).</summary>
+        Heuristic = 1,
+
+        /// <summary>The team the bond-aware picker fields per composition (<see cref="ScoutedPicker.PickWithBonds"/>); the default.</summary>
+        Bonds = 2
+    }
+
     /// <summary>
     /// Every tunable the simulator has, in one place. The constants are the defaults; the CLI
     /// overrides the subset exposed by <see cref="Parse"/>.
@@ -142,6 +155,52 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <summary>A calibrated clear rate further than this from the target is reported as a calibration miss.</summary>
         public const double CalibrationTolerance = 10.0;
 
+        /// <summary>
+        /// <c>--calibrate-samples</c> default: battles per composition the picked team fights at each
+        /// step of a scouted-pick calibration (8 compositions x 16 = 128 battles per step, a
+        /// binomial standard error of about 4.4 points at 50%).
+        /// </summary>
+        public const int DefaultCalibrateSamples = 16;
+
+        /// <summary>
+        /// <c>--level-gap-teams</c> default: how many teams (a seeded subset) the no-scouting rate at
+        /// each nonzero level gap is measured over (42 of 210 x 8 compositions = 336 battles).
+        /// </summary>
+        public const int DefaultLevelGapTeams = 42;
+
+        /// <summary>The highest level a beast or enemy can be: a level gap that would put the enemies past it is not run.</summary>
+        public const int MaxLevel = 100;
+
+        /// <summary>Level-gap targets (<see cref="LevelGapReport"/>): at gap 0 the scouted rate is the calibration target, within +/- this.</summary>
+        public const double LevelGapEvenTolerance = 5.0;
+
+        /// <summary>Level-gap targets: the smallest and largest gap (enemies above the team) of the "a couple of levels under" band.</summary>
+        public const int LevelGapNearMin = 2;
+
+        /// <summary>See <see cref="LevelGapNearMin"/>.</summary>
+        public const int LevelGapNearMax = 3;
+
+        /// <summary>Level-gap targets: the scouted rate a couple of levels under should sit in [low, high]...</summary>
+        public const double LevelGapNearLow = 20.0;
+
+        /// <summary>... see <see cref="LevelGapNearLow"/>.</summary>
+        public const double LevelGapNearHigh = 35.0;
+
+        /// <summary>Level-gap targets: from this many levels under...</summary>
+        public const int LevelGapFarMin = 5;
+
+        /// <summary>... the scouted rate should be below this.</summary>
+        public const double LevelGapFarHigh = 10.0;
+
+        /// <summary>
+        /// The balance guard on the multi-seed mean of each beast's normalized overall marginal
+        /// (<see cref="PveReport.NormalizationFactor"/>): within +/- this in <c>elemental</c>...
+        /// </summary>
+        public const double GuardElemental = 4.0;
+
+        /// <summary>... and within +/- this in <c>neutral</c>.</summary>
+        public const double GuardNeutral = 7.0;
+
         // ------------------------------------------------------------------------------------
         // Generated encounters (EncounterGenerator). Compositions per shape, and the weights of
         // the element schemes a composition is assigned (see ElementScheme).
@@ -235,6 +294,40 @@ namespace BeastCraft.Tooling.BalanceSim
         /// </summary>
         public int CalibrateSample;
 
+        /// <summary>
+        /// <c>--calibrate-on</c>: whose clear rate the difficulty search aims at the target. The
+        /// bond-aware scouted pick by default (see <see cref="EffectiveCalibrateOn"/> for its
+        /// fallback); <see cref="CalibrationTarget.Mean"/> is the calibration before scouting.
+        /// </summary>
+        public CalibrationTarget CalibrateOn = CalibrationTarget.Bonds;
+
+        /// <summary><c>--calibrate-samples</c>: battles per composition per step of a scouted-pick calibration.</summary>
+        public int CalibrateSamples = DefaultCalibrateSamples;
+
+        /// <summary>
+        /// <c>--level-gap</c>: the level gaps (enemy level minus team level; positive = the enemies
+        /// are above the team) the "PvE level gap" section replays every cell at, ascending; null
+        /// (the default) = no section and nothing extra run.
+        /// </summary>
+        public List<int> LevelGaps;
+
+        /// <summary><c>--level-gap-teams</c>: teams (a seeded subset) the no-scouting rate at a nonzero gap is measured over.</summary>
+        public int LevelGapTeams = DefaultLevelGapTeams;
+
+        /// <summary>
+        /// <c>--avatar-value</c>: also replay every cell's picked-team battles with no avatar at the
+        /// calibrated multiplier and add the "PvE avatar value" section (the avatar's worth in points
+        /// of clear rate, and its direct share of the team's output). Off by default.
+        /// </summary>
+        public bool AvatarValue;
+
+        /// <summary>
+        /// <c>--turn-detail</c>: count every beast's no-fire turns (held by its stance, out of reach)
+        /// and its damage to large enemies versus the rest, and add the "PvE beast turns" section.
+        /// Off by default; never changes a battle.
+        /// </summary>
+        public bool TurnDetail;
+
         /// <summary>The PvE avatar preset (<c>--avatar</c>); the library avatar by default, <see cref="AvatarPresets.None"/> fields none.</summary>
         public string AvatarPreset = AvatarPresets.Library;
 
@@ -307,6 +400,42 @@ namespace BeastCraft.Tooling.BalanceSim
             get { return Bonds && KitSource == KitSource.Library && Library != null && Library.TeamBonds.Count > 0; }
         }
 
+        /// <summary>
+        /// The calibration target this run actually uses: <see cref="CalibrateOn"/>, except that the
+        /// bond-aware pick falls back to the plain heuristic when bonds are not active
+        /// (<c>--bonds off</c> or <c>--skill-kit standard</c>), where it has no bonds to weigh.
+        /// </summary>
+        public CalibrationTarget EffectiveCalibrateOn
+        {
+            get { return CalibrateOn == CalibrationTarget.Bonds && !BondsActive ? CalibrationTarget.Heuristic : CalibrateOn; }
+        }
+
+        /// <summary>Whether the difficulty is calibrated on a scouted pick (anything but <c>--calibrate-on mean</c>).</summary>
+        public bool CalibratesOnPick
+        {
+            get { return CalibrateOn != CalibrationTarget.Mean; }
+        }
+
+        /// <summary>The <c>--calibrate-on</c> spelling of <paramref name="target"/>.</summary>
+        public static string CalibrationName(CalibrationTarget target)
+        {
+            switch (target)
+            {
+                case CalibrationTarget.Mean:
+                    return "mean";
+                case CalibrationTarget.Heuristic:
+                    return "heuristic";
+                default:
+                    return "bonds";
+            }
+        }
+
+        /// <summary>The guard on a beast's normalized overall marginal (multi-seed mean) in <paramref name="mode"/>.</summary>
+        public static double Guard(KitMode mode)
+        {
+            return mode == KitMode.Elemental ? GuardElemental : GuardNeutral;
+        }
+
         /// <summary>Whether this run fields anything from the skill library.</summary>
         public bool NeedsLibrary
         {
@@ -375,10 +504,31 @@ namespace BeastCraft.Tooling.BalanceSim
             "                             PvE battle loop against BattleTurnExecutor.RunBattle.\n" +
             "  --timings                  Print a wall-clock breakdown (per PvE cell and calibration step, PvP, report, GC)\n" +
             "                             to stderr. Never changes the report.\n" +
-            "  --calibrate-sample <n>     Opt-in speed-up that CHANGES results: the difficulty search evaluates a seeded\n" +
-            "                             subset of n teams (e.g. 50 of 210), then the chosen multiplier runs once with every\n" +
-            "                             team; the report's numbers all come from that full run (default: off, every team at\n" +
-            "                             every step).\n" +
+            "  --calibrate-on <t>         bonds | heuristic | mean (default bonds): whose PvE clear rate the difficulty is\n" +
+            "                             calibrated to --target-clear. bonds / heuristic = the team that scouted picker fields\n" +
+            "                             per composition (the player is assumed to scout and counter-pick; bonds falls back to\n" +
+            "                             heuristic when bonds are off or with --skill-kit standard); mean = the mean of every\n" +
+            "                             team (the unscouted player; the calibration before scouting).\n" +
+            "  --calibrate-samples <n>    Scouted-pick calibration: battles per composition the picked team fights at each\n" +
+            "                             search step (default 16). The chosen multiplier then runs once with every team.\n" +
+            "  --level-gap <list>         PvE: also replay every cell with the enemies this many levels above the team (negative =\n" +
+            "                             below), at the cell's calibrated multiplier, and report \"PvE level gap\". Comma-separated\n" +
+            "                             gaps and ranges, e.g. -5..10 or 0,2,3,5. The team (and the avatar, unless --avatar-level)\n" +
+            "                             stays at the row's level; each battle's seed ignores the gap, so gap 0 is the calibration\n" +
+            "                             itself. A gap that puts the enemies outside 1-100 is not run. Default: off.\n" +
+            "  --level-gap-teams <n>      --level-gap: teams (a seeded subset) the no-scouting rate at a nonzero gap is measured\n" +
+            "                             over (default 42; the scouted rate always uses the picked team, --calibrate-samples\n" +
+            "                             battles per composition).\n" +
+            "  --avatar-value             PvE: also replay each cell's picked-team battles with no avatar at the calibrated\n" +
+            "                             multiplier and report \"PvE avatar value\": the avatar's worth in points of the scouted\n" +
+            "                             clear rate, and its direct share of the team's damage, healing and shield soak. Needs an\n" +
+            "                             avatar (--avatar library|support) and a scouted-pick calibration. Default: off.\n" +
+            "  --turn-detail              PvE: report \"PvE beast turns\": each beast's no-fire turns (held by its stance, out of\n" +
+            "                             reach, stunned) and its damage to large enemies (bosses) versus the rest. Default: off.\n" +
+            "  --calibrate-sample <n>     --calibrate-on mean only. Opt-in speed-up that CHANGES results: the difficulty search\n" +
+            "                             evaluates a seeded subset of n teams (e.g. 50 of 210), then the chosen multiplier runs\n" +
+            "                             once with every team; the report's numbers all come from that full run (default: off,\n" +
+            "                             every team at every step).\n" +
             "  --help                     Show this text.\n";
 
         /// <summary>Parses the command line. Returns null and fills <paramref name="error"/> on bad input.</summary>
@@ -407,10 +557,60 @@ namespace BeastCraft.Tooling.BalanceSim
                     case "--timings":
                         options.Timings = true;
                         break;
+                    case "--avatar-value":
+                        options.AvatarValue = true;
+                        break;
+                    case "--turn-detail":
+                        options.TurnDetail = true;
+                        break;
                     case "--calibrate-sample":
                         if (!TryNextInt(args, ref i, arg, 1, out options.CalibrateSample, out error))
                         {
                             return null;
+                        }
+
+                        break;
+                    case "--calibrate-samples":
+                        if (!TryNextInt(args, ref i, arg, 1, out options.CalibrateSamples, out error))
+                        {
+                            return null;
+                        }
+
+                        break;
+                    case "--level-gap":
+                        if (!TryNext(args, ref i, arg, out text, out error) || !TryParseGaps(text, out options.LevelGaps, out error))
+                        {
+                            return null;
+                        }
+
+                        break;
+                    case "--level-gap-teams":
+                        if (!TryNextInt(args, ref i, arg, 1, out options.LevelGapTeams, out error))
+                        {
+                            return null;
+                        }
+
+                        break;
+                    case "--calibrate-on":
+                        if (!TryNext(args, ref i, arg, out text, out error))
+                        {
+                            return null;
+                        }
+
+                        switch (text.ToLowerInvariant())
+                        {
+                            case "mean":
+                                options.CalibrateOn = CalibrationTarget.Mean;
+                                break;
+                            case "heuristic":
+                                options.CalibrateOn = CalibrationTarget.Heuristic;
+                                break;
+                            case "bonds":
+                                options.CalibrateOn = CalibrationTarget.Bonds;
+                                break;
+                            default:
+                                error = "--calibrate-on expects bonds, heuristic or mean, got '" + text + "'.";
+                                return null;
                         }
 
                         break;
@@ -747,6 +947,18 @@ namespace BeastCraft.Tooling.BalanceSim
                 return null;
             }
 
+            if (options.CalibrateSample > 0 && options.CalibratesOnPick)
+            {
+                error = "--calibrate-sample only applies with --calibrate-on mean (a scouted-pick calibration already searches on the picked teams alone).";
+                return null;
+            }
+
+            if (options.AvatarValue && (!options.RunPve || options.AvatarPreset == AvatarPresets.None || !options.CalibratesOnPick))
+            {
+                error = "--avatar-value needs PvE, an avatar (--avatar library or support) and a scouted-pick calibration (not --calibrate-on mean).";
+                return null;
+            }
+
             if (options.ScoutedVanguardMin > options.TeamSize)
             {
                 error = "--scouted-vanguard-min " + options.ScoutedVanguardMin + " is larger than --team-size " + options.TeamSize + ".";
@@ -836,6 +1048,42 @@ namespace BeastCraft.Tooling.BalanceSim
             }
 
             levels.Sort();
+            error = null;
+            return true;
+        }
+
+        /// <summary>
+        /// <c>--level-gap</c>: comma-separated integers and inclusive ranges <c>a..b</c> (either end
+        /// may be negative), each within +/-(<see cref="MaxLevel"/> - 1); duplicates are dropped and
+        /// the result is sorted ascending.
+        /// </summary>
+        private static bool TryParseGaps(string text, out List<int> gaps, out string error)
+        {
+            gaps = new List<int>();
+            error = "--level-gap expects comma-separated integers or ranges a..b between -" + (MaxLevel - 1) + " and " + (MaxLevel - 1) + ", got '" + text + "'.";
+            foreach (string raw in text.Split(','))
+            {
+                string part = raw.Trim();
+                int split = part.IndexOf("..", StringComparison.Ordinal);
+                string first = split < 0 ? part : part.Substring(0, split);
+                string last = split < 0 ? part : part.Substring(split + 2);
+                if (!int.TryParse(first.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int from) ||
+                    !int.TryParse(last.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int to) ||
+                    from > to || from < -(MaxLevel - 1) || to > MaxLevel - 1)
+                {
+                    return false;
+                }
+
+                for (int gap = from; gap <= to; gap++)
+                {
+                    if (!gaps.Contains(gap))
+                    {
+                        gaps.Add(gap);
+                    }
+                }
+            }
+
+            gaps.Sort();
             error = null;
             return true;
         }

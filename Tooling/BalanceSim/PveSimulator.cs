@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using BeastCraft.Avatar;
 using BeastCraft.Battle;
 using BeastCraft.Battle.Grid;
 using BeastCraft.Battle.Placement;
@@ -63,6 +64,43 @@ namespace BeastCraft.Tooling.BalanceSim
         /// </summary>
         public double[] MemberRollMultiplier;
 
+        /// <summary>
+        /// <c>--avatar-value</c> / <c>--turn-detail</c> only (zero otherwise): the team's direct output
+        /// this battle, split between the avatar and the beasts. Damage = enemy HP lost (the avatar's:
+        /// on its own turns plus its passives' hits, e.g. Storm Call, on a beast's turn; the beasts':
+        /// the rest, damage over time ticking on an enemy's turn included); heal = team HP restored
+        /// (on the avatar's turns = the avatar's, on a beast's turn = the beasts'); shield absorbed =
+        /// damage a shield soaked off a beast, credited to whoever cast that shield (damage over time
+        /// soaked by a shield is not counted). Read-only accounting: it never changes a battle.
+        /// </summary>
+        public long AvatarDamage;
+        public long AvatarHeal;
+        public long AvatarShieldAbsorbed;
+
+        /// <summary>The part of <see cref="AvatarShieldAbsorbed"/> soaked by shields from the avatar's passives (e.g. Opening Ward, Last Stand).</summary>
+        public long AvatarPassiveShieldAbsorbed;
+
+        /// <summary>The part of <see cref="AvatarDamage"/> dealt by the avatar's passives (e.g. Storm Call).</summary>
+        public long AvatarPassiveDamage;
+        public long BeastDamage;
+        public long BeastHeal;
+        public long BeastShieldAbsorbed;
+
+        /// <summary>
+        /// <c>--turn-detail</c> only (null otherwise), per team member: turns on which none of its
+        /// skills fired (stunned turns excluded), and of those the turns on which a skill was held by
+        /// the beast's stance (<see cref="BattleSkillStatus.HeldByStance"/>) or could not reach a target
+        /// (<see cref="BattleSkillStatus.Unreachable"/> / <see cref="BattleSkillStatus.OutOfMovement"/>),
+        /// its stunned turns, and the enemy HP it took off large enemies (bosses: any footprint
+        /// larger than one tile) and off the rest (escorts) on its own turns.
+        /// </summary>
+        public int[] MemberNoFireTurns;
+        public int[] MemberHeldTurns;
+        public int[] MemberUnreachableTurns;
+        public int[] MemberStunnedTurns;
+        public int[] MemberBossDamage;
+        public int[] MemberEscortDamage;
+
         public bool Cleared
         {
             get { return Outcome == BattleOutcome.PlayerVictory; }
@@ -95,10 +133,37 @@ namespace BeastCraft.Tooling.BalanceSim
         public bool Reused;
 
         /// <summary>
-        /// With <c>--calibrate-sample</c>: true for the one evaluation of every team at the chosen
-        /// multiplier that follows the sampled search (the others then cover only the sample).
+        /// With a scouted-pick calibration (<c>--calibrate-on heuristic|bonds</c>) or
+        /// <c>--calibrate-sample</c>: true for the one evaluation of every team at the chosen
+        /// multiplier that follows the search (the others then cover only the picked teams or the sample).
         /// </summary>
         public bool Final;
+    }
+
+    /// <summary>
+    /// One <c>--level-gap</c> replay of a cell: the team at the cell's level, the enemies
+    /// <see cref="Gap"/> levels above it (below when negative), at the cell's calibrated multiplier.
+    /// </summary>
+    public class LevelGapPoint
+    {
+        /// <summary>Enemy level minus team level.</summary>
+        public int Gap;
+
+        /// <summary>False when the cell's level plus the gap falls outside 1-100: nothing was run.</summary>
+        public bool InRange;
+
+        /// <summary>
+        /// The picked team's clear rate (the scouted player), over <see cref="PveCell.CalibrationSamples"/>
+        /// battles per composition; at gap 0 the calibrated rate itself. NaN with <c>--calibrate-on mean</c>
+        /// (no picks) or out of range.
+        /// </summary>
+        public double ScoutedClearRate = double.NaN;
+
+        /// <summary>
+        /// The no-scouting clear rate over the <c>--level-gap-teams</c> subset and every composition
+        /// (at gap 0, those teams' battles of the calibration's every-team run). NaN out of range.
+        /// </summary>
+        public double NoScoutClearRate = double.NaN;
     }
 
     /// <summary>
@@ -111,8 +176,54 @@ namespace BeastCraft.Tooling.BalanceSim
         public int Level;
         public EncounterShape Shape;
         public double Multiplier;
+
+        /// <summary>
+        /// The mean clear rate of every team over every composition at <see cref="Multiplier"/>: what
+        /// <c>--calibrate-on mean</c> aims at the target, and otherwise the no-scouting rate (the
+        /// player who does not look at the encounter and brings a random team).
+        /// </summary>
         public double ClearRate;
+
+        /// <summary>What the calibration aimed at the target (<see cref="SimOptions.EffectiveCalibrateOn"/>).</summary>
+        public CalibrationTarget CalibratedOn;
+
+        /// <summary>
+        /// Scouted-pick calibration only: the picked team's clear rate at <see cref="Multiplier"/>,
+        /// over <see cref="CalibrationSamples"/> battles per composition (the calibrated number);
+        /// NaN with <c>--calibrate-on mean</c>.
+        /// </summary>
+        public double ScoutedClearRate = double.NaN;
+
+        /// <summary>Scouted-pick calibration only: per composition, the team index the picker fields; null with <c>--calibrate-on mean</c>.</summary>
+        public int[] Picks;
+
+        /// <summary>Scouted-pick calibration only: battles per composition per search step (<c>--calibrate-samples</c>).</summary>
+        public int CalibrationSamples;
+
+        /// <summary>
+        /// Scouted-pick calibration only: the picked teams' battles at <see cref="Multiplier"/>
+        /// (<see cref="PveSimulator.RunPicked"/>: composition <c>c</c>, sample <c>s</c> at
+        /// <c>c * CalibrationSamples + s</c>), behind <see cref="ScoutedClearRate"/>; null otherwise.
+        /// </summary>
+        public PveBattle[] PickedBattles;
+
+        /// <summary>
+        /// <c>--avatar-value</c> only (NaN otherwise): the picked teams' clear rate at
+        /// <see cref="Multiplier"/> with no avatar fielded, over the same battles (seeds) as
+        /// <see cref="PickedBattles"/>. The avatar's value is <see cref="ScoutedClearRate"/> minus this.
+        /// </summary>
+        public double NoAvatarScoutedClearRate = double.NaN;
+
+        /// <summary>The rate the calibration aimed at the target: <see cref="ScoutedClearRate"/>, or <see cref="ClearRate"/> with <c>--calibrate-on mean</c>.</summary>
+        public double CalibratedRate
+        {
+            get { return CalibratedOn == CalibrationTarget.Mean ? ClearRate : ScoutedClearRate; }
+        }
+
         public List<CalibrationPoint> Evaluations = new List<CalibrationPoint>();
+
+        /// <summary><c>--level-gap</c>: one point per gap, in <see cref="SimOptions.LevelGaps"/> order; null without the option.</summary>
+        public List<LevelGapPoint> LevelGaps;
 
         /// <summary>
         /// Every battle at the calibrated multiplier: composition-major, then team, then sample, so
@@ -154,12 +265,26 @@ namespace BeastCraft.Tooling.BalanceSim
         private readonly SkillInstance[][] _elementalLibraryKits;
         private readonly SkillInstance[][] _neutralLibraryKits;
 
+        /// <summary>The avatar passives' authored effects: a shield whose origin is one of these came from a passive (<c>--avatar-value</c>).</summary>
+        private readonly HashSet<SkillEffect> _passiveEffects;
+
         public PveSimulator(SimOptions options, IReadOnlyList<CreatureSpeciesSO> species)
         {
             _options = options;
             _species = species;
             // Every species shares the medium curve; the avatar's fixture stats follow it too.
             Avatar = new AvatarPresets(options.AvatarPreset, options.Library, species.Count > 0 ? species[0].GrowthRate : null);
+            _passiveEffects = new HashSet<SkillEffect>();
+            if (Avatar.Enabled)
+            {
+                foreach (PassiveSkillSO passive in Avatar.Passives)
+                {
+                    foreach (SkillEffect effect in passive.Effects)
+                    {
+                        _passiveEffects.Add(effect);
+                    }
+                }
+            }
             _elementalKits = new SkillSO[species.Count][];
             _neutralKits = new SkillSO[species.Count][];
             for (int i = 0; i < species.Count; i++)
@@ -187,6 +312,7 @@ namespace BeastCraft.Tooling.BalanceSim
             }
 
             CalibrationTeams = SampleTeams(options.Seed, Teams.Count, options.CalibrateSample);
+            LevelGapTeams = options.LevelGaps == null ? null : SampleTeams(unchecked(options.Seed + LevelGapSeedOffset), Teams.Count, options.LevelGapTeams);
             TeamBonds = new List<ActiveTeamBond>[Teams.Count];
             for (int t = 0; t < Teams.Count; t++)
             {
@@ -211,6 +337,16 @@ namespace BeastCraft.Tooling.BalanceSim
         /// seeded draw of n, that the difficulty search evaluates. Null = every team (the default).
         /// </summary>
         public int[] CalibrationTeams { get; }
+
+        /// <summary>
+        /// With <c>--level-gap</c>: the team indices, ascending, a seeded draw of
+        /// <c>--level-gap-teams</c>, whose no-scouting rate each nonzero gap measures. Null = every team
+        /// (the option covers them all) or no <c>--level-gap</c>.
+        /// </summary>
+        public int[] LevelGapTeams { get; }
+
+        /// <summary>Added to the base seed for the <see cref="LevelGapTeams"/> draw, so it is not the <c>--calibrate-sample</c> draw.</summary>
+        private const int LevelGapSeedOffset = 0x1e7e1;
 
         /// <summary>Every combination of <c>TeamSize</c> distinct species, as ascending roster indices, in lexicographic order.</summary>
         public List<int[]> Teams { get; }
@@ -263,13 +399,37 @@ namespace BeastCraft.Tooling.BalanceSim
         /// depend only on the inputs. Battles are random (damage variance and crits), so each team
         /// fights each composition <see cref="Samples"/> times with distinct seeds and the clear rate
         /// is over all of them.
+        /// <para>
+        /// What is aimed at the target is <see cref="SimOptions.EffectiveCalibrateOn"/>: by default
+        /// the team the bond-aware scouted picker fields against each composition (the player is
+        /// assumed to scout and counter-pick), whose battles alone are run at each step,
+        /// <c>--calibrate-samples</c> times per composition (<see cref="RunPicked"/>); the chosen
+        /// multiplier then runs every team once, which every metric and the no-scouting rate
+        /// (<see cref="PveCell.ClearRate"/>) come from. <c>--calibrate-on mean</c> aims the mean of
+        /// every team at the target instead (every team at every step), exactly as before scouting.
+        /// </para>
         /// </summary>
         public PveCell RunCell(KitMode mode, int level, EncounterShape shape)
         {
-            PveCell cell = new PveCell { Mode = mode, Level = level, Shape = shape, Samples = Samples, TeamCount = Teams.Count };
+            CalibrationTarget calibrateOn = _options.EffectiveCalibrateOn;
+            PveCell cell = new PveCell { Mode = mode, Level = level, Shape = shape, Samples = Samples, TeamCount = Teams.Count, CalibratedOn = calibrateOn };
             double target = _options.TargetClearRate;
             PveBattle[] best = null;
             double bestGap = double.MaxValue;
+            double bestRate = double.NaN;
+
+            // --calibrate-on heuristic|bonds: the search runs only the team the picker fields against
+            // each composition (the picks depend on the preview alone, so once per shape), each
+            // CalibrateSamples times; the chosen multiplier then runs every team once (below).
+            int[] picks = null;
+            int pickSamples = 0;
+            if (calibrateOn != CalibrationTarget.Mean)
+            {
+                picks = ScoutedPicker.PicksFor(_options, _species, Teams, TeamBonds, shape, ScoutedPicker.StrategyFor(calibrateOn));
+                pickSamples = _options.CalibrateSamples;
+                cell.Picks = picks;
+                cell.CalibrationSamples = pickSamples;
+            }
 
             // The multiplier reaches a battle only through Scale(enemy stats), and every battle's
             // seed ignores it, so two multipliers that scale every enemy of the shape to the same
@@ -279,9 +439,9 @@ namespace BeastCraft.Tooling.BalanceSim
             List<int[]> evaluatedScales = new List<int[]>();
             List<PveBattle[]> evaluatedBattles = new List<PveBattle[]>();
 
-            // --calibrate-sample: the search evaluates a subset of the teams, and only the chosen
-            // multiplier is then run with every team (below).
-            int[] searchTeams = CalibrationTeams;
+            // --calibrate-sample (mean only): the search evaluates a subset of the teams, and only the
+            // chosen multiplier is then run with every team (below).
+            int[] searchTeams = picks == null ? CalibrationTeams : null;
 
             double Evaluate(double multiplier)
             {
@@ -299,7 +459,8 @@ namespace BeastCraft.Tooling.BalanceSim
                 bool reused = battles != null;
                 if (!reused)
                 {
-                    battles = searchTeams == null ? RunAllTeams(mode, level, shape, multiplier) : RunTeams(mode, level, shape, multiplier, searchTeams);
+                    battles = picks != null ? RunPicked(mode, level, shape, multiplier, picks, pickSamples)
+                        : searchTeams == null ? RunAllTeams(mode, level, shape, multiplier) : RunTeams(mode, level, shape, multiplier, searchTeams);
                     evaluatedScales.Add(scale);
                     evaluatedBattles.Add(battles);
                 }
@@ -325,6 +486,7 @@ namespace BeastCraft.Tooling.BalanceSim
                 {
                     bestGap = gap;
                     best = battles;
+                    bestRate = rate;
                     cell.Multiplier = multiplier;
                     cell.ClearRate = rate;
                 }
@@ -386,7 +548,13 @@ namespace BeastCraft.Tooling.BalanceSim
                 }
             }
 
-            if (searchTeams != null)
+            if (picks != null)
+            {
+                cell.ScoutedClearRate = bestRate;
+                cell.PickedBattles = best;
+            }
+
+            if (searchTeams != null || picks != null)
             {
                 System.Diagnostics.Stopwatch clock = System.Diagnostics.Stopwatch.StartNew();
                 best = RunAllTeams(mode, level, shape, cell.Multiplier);
@@ -412,11 +580,135 @@ namespace BeastCraft.Tooling.BalanceSim
         }
 
         /// <summary>
+        /// <c>--level-gap</c>: replays <paramref name="cell"/> (already calibrated at equal levels)
+        /// with the enemies each gap of <see cref="SimOptions.LevelGaps"/> above the team, at the
+        /// cell's multiplier, and stores one <see cref="LevelGapPoint"/> per gap in
+        /// <see cref="PveCell.LevelGaps"/>. Scouted: the cell's picks, <see cref="PveCell.CalibrationSamples"/>
+        /// battles per composition (<see cref="RunPicked"/>); no scouting: <see cref="LevelGapTeams"/>
+        /// against every composition (<see cref="RunTeams"/>). Every battle's seed is the equal-level
+        /// battle's (the gap is not in it), so the gaps share their damage-roll streams and gap 0 is
+        /// read straight from the calibration's own battles. A gap that puts the enemies outside
+        /// 1-<see cref="SimOptions.MaxLevel"/> is not run.
+        /// </summary>
+        public void RunLevelGaps(PveCell cell)
+        {
+            if (_options.LevelGaps == null)
+            {
+                return;
+            }
+
+            int[] teams = LevelGapTeams;
+            if (teams == null)
+            {
+                teams = new int[Teams.Count];
+                for (int t = 0; t < teams.Length; t++)
+                {
+                    teams[t] = t;
+                }
+            }
+
+            cell.LevelGaps = new List<LevelGapPoint>();
+            foreach (int gap in _options.LevelGaps)
+            {
+                int enemyLevel = cell.Level + gap;
+                LevelGapPoint point = new LevelGapPoint { Gap = gap, InRange = enemyLevel >= 1 && enemyLevel <= SimOptions.MaxLevel };
+                cell.LevelGaps.Add(point);
+                if (!point.InRange)
+                {
+                    continue;
+                }
+
+                if (gap == 0)
+                {
+                    point.ScoutedClearRate = cell.Picks == null ? double.NaN : cell.ScoutedClearRate;
+                    int cleared = 0;
+                    int count = 0;
+                    for (int c = 0; c < cell.Shape.Compositions.Count; c++)
+                    {
+                        foreach (int t in teams)
+                        {
+                            for (int s = 0; s < Samples; s++)
+                            {
+                                cleared += cell.Battles[BattleIndex(c, t, s)].Cleared ? 1 : 0;
+                                count++;
+                            }
+                        }
+                    }
+
+                    point.NoScoutClearRate = (100.0 * cleared) / count;
+                    continue;
+                }
+
+                if (cell.Picks != null)
+                {
+                    point.ScoutedClearRate = ClearRate(RunPicked(cell.Mode, cell.Level, cell.Shape, cell.Multiplier, cell.Picks, cell.CalibrationSamples, gap));
+                }
+
+                point.NoScoutClearRate = ClearRate(RunTeams(cell.Mode, cell.Level, cell.Shape, cell.Multiplier, teams, gap));
+            }
+        }
+
+        private static double ClearRate(PveBattle[] battles)
+        {
+            int cleared = 0;
+            foreach (PveBattle battle in battles)
+            {
+                cleared += battle.Cleared ? 1 : 0;
+            }
+
+            return (100.0 * cleared) / battles.Length;
+        }
+
+        /// <summary>
+        /// The scouted-pick calibration's battles: against each composition <c>c</c> of the shape, the
+        /// picked team <paramref name="picks"/>[c], <paramref name="samples"/> times (samples 0 to
+        /// n-1), stored at <c>c * samples + s</c>. Each battle is the one <see cref="RunAllTeams"/>
+        /// would play for that team and sample, seed and all, so sample 0 is exactly the all-teams
+        /// battle of the picked team. <paramref name="levelGap"/> puts the enemies that many levels
+        /// above the team (see <see cref="RunLevelGaps"/>); 0, the default, is the equal-level fight.
+        /// </summary>
+        public PveBattle[] RunPicked(KitMode mode, int level, EncounterShape shape, double multiplier, int[] picks, int samples, int levelGap = 0,
+                                     bool withAvatar = true)
+        {
+            PveBattle[] battles = new PveBattle[shape.Compositions.Count * samples];
+            bool[] playersWinTies = new bool[shape.Compositions.Count];
+            for (int c = 0; c < shape.Compositions.Count; c++)
+            {
+                playersWinTies[c] = PlayersWinTies(mode, level, shape.Compositions[c].Id)[picks[c]];
+            }
+
+            Parallel.For(0, battles.Length, i =>
+            {
+                int c = i / samples;
+                battles[i] = RunBattle(mode, level, level + levelGap, shape.Compositions[c], multiplier, picks[c], i % samples, false, playersWinTies[c],
+                                       withAvatar, out _);
+            });
+
+            return battles;
+        }
+
+        /// <summary>
+        /// <c>--avatar-value</c>: replays the cell's picked-team battles (same seeds, same multiplier)
+        /// with no avatar and stores their clear rate in <see cref="PveCell.NoAvatarScoutedClearRate"/>.
+        /// Nothing without the option or without picks (<c>--calibrate-on mean</c>).
+        /// </summary>
+        public void RunAvatarValue(PveCell cell)
+        {
+            if (!_options.AvatarValue || cell.Picks == null || !Avatar.Enabled)
+            {
+                return;
+            }
+
+            cell.NoAvatarScoutedClearRate = ClearRate(RunPicked(cell.Mode, cell.Level, cell.Shape, cell.Multiplier, cell.Picks, cell.CalibrationSamples, 0, false));
+        }
+
+        /// <summary>
         /// <see cref="RunAllTeams"/> for a subset of the teams only (<paramref name="teams"/>, team
         /// indices): composition-major, then the subset's order, then sample. Every battle is the one
-        /// <see cref="RunAllTeams"/> would play for that team, seed and all.
+        /// <see cref="RunAllTeams"/> would play for that team, seed and all. <paramref name="levelGap"/>
+        /// as in <see cref="RunPicked"/>.
         /// </summary>
-        public PveBattle[] RunTeams(KitMode mode, int level, EncounterShape shape, double multiplier, int[] teams)
+        public PveBattle[] RunTeams(KitMode mode, int level, EncounterShape shape, double multiplier, int[] teams, int levelGap = 0)
         {
             int samples = Samples;
             int count = teams.Length;
@@ -431,7 +723,7 @@ namespace BeastCraft.Tooling.BalanceSim
             {
                 int t = teams[(i / samples) % count];
                 int c = i / (samples * count);
-                battles[i] = RunBattle(mode, level, shape.Compositions[c], multiplier, t, i % samples, false, playersWinTies[c][t], out _);
+                battles[i] = RunBattle(mode, level, level + levelGap, shape.Compositions[c], multiplier, t, i % samples, false, playersWinTies[c][t], out _);
             });
 
             return battles;
@@ -598,6 +890,33 @@ namespace BeastCraft.Tooling.BalanceSim
         public PveBattle RunBattle(KitMode mode, int level, Encounter encounter, double multiplier, int teamIndex, int sample, bool useRunBattle,
                                    bool playersWinTies, out List<BattleUnit> finalUnits)
         {
+            return RunBattle(mode, level, level, encounter, multiplier, teamIndex, sample, useRunBattle, playersWinTies, out finalUnits);
+        }
+
+        /// <summary>
+        /// <see cref="RunBattle(KitMode, int, Encounter, double, int, int, bool, bool, out List{BattleUnit})"/>
+        /// with the two sides at different levels: the team's beasts (and the avatar, unless
+        /// <c>--avatar-level</c>) at <paramref name="teamLevel"/>, the enemies at
+        /// <paramref name="enemyLevel"/> (their stats on their curve, and their level in the damage
+        /// formula's level-difference term). The seed and the initiative tie split are the team
+        /// level's, so the level gap is not in them: the same battle at another gap draws the same
+        /// stream of rolls, and equal levels are exactly the one-level battle.
+        /// </summary>
+        public PveBattle RunBattle(KitMode mode, int teamLevel, int enemyLevel, Encounter encounter, double multiplier, int teamIndex, int sample,
+                                   bool useRunBattle, bool playersWinTies, out List<BattleUnit> finalUnits)
+        {
+            return RunBattle(mode, teamLevel, enemyLevel, encounter, multiplier, teamIndex, sample, useRunBattle, playersWinTies, true, out finalUnits);
+        }
+
+        /// <summary>
+        /// <see cref="RunBattle(KitMode, int, int, Encounter, double, int, int, bool, bool, out List{BattleUnit})"/>;
+        /// <paramref name="withAvatar"/> false fields no avatar even when one is configured
+        /// (<c>--avatar-value</c>), with the same seed, so the battle differs only by the avatar.
+        /// </summary>
+        public PveBattle RunBattle(KitMode mode, int teamLevel, int enemyLevel, Encounter encounter, double multiplier, int teamIndex, int sample,
+                                   bool useRunBattle, bool playersWinTies, bool withAvatar, out List<BattleUnit> finalUnits)
+        {
+            int level = teamLevel;
             int[] team = Teams[teamIndex];
             int[] slots = SlotOrders[teamIndex];
             HexGrid grid = new HexGrid(encounter.Arena);
@@ -613,7 +932,7 @@ namespace BeastCraft.Tooling.BalanceSim
             {
                 EnemySlot slot = encounter.Enemies[i];
                 HexCoordinate anchor = layout.Anchors[i];
-                BattleUnit enemy = BattleUnitFactory.CreateBeast(enemyPrefix + slot.UnitId, BattleTeam.Enemy, slot.Species, level, null, anchor,
+                BattleUnit enemy = BattleUnitFactory.CreateBeast(enemyPrefix + slot.UnitId, BattleTeam.Enemy, slot.Species, enemyLevel, null, anchor,
                                                                  Kit.Loadout(slot.KitFor(mode)), slot.StatusResist);
                 enemy.Stats = Scale(enemy.Stats, multiplier);
                 enemy.CurrentHp = enemy.Stats.Hp;
@@ -659,11 +978,22 @@ namespace BeastCraft.Tooling.BalanceSim
                 MemberRollMultiplier = new double[team.Length],
                 MemberPhysicalFires = new int[team.Length],
                 MemberSpecialFires = new int[team.Length],
-                PassiveFirings = Avatar.Enabled ? new int[Avatar.Passives.Count] : null
+                PassiveFirings = Avatar.Enabled && withAvatar ? new int[Avatar.Passives.Count] : null
             };
 
+            if (_options.TurnDetail)
+            {
+                battle.MemberNoFireTurns = new int[team.Length];
+                battle.MemberHeldTurns = new int[team.Length];
+                battle.MemberUnreachableTurns = new int[team.Length];
+                battle.MemberStunnedTurns = new int[team.Length];
+                battle.MemberBossDamage = new int[team.Length];
+                battle.MemberEscortDamage = new int[team.Length];
+            }
+
             Random rng = new Random(DeriveSeed(_options.Seed, mode, level, encounter.Id, teamIndex, sample));
-            BattleUnit avatar = Avatar.Build(_options.AvatarLevel > 0 ? _options.AvatarLevel : level, out PassiveLoadout passives);
+            PassiveLoadout passives = null;
+            BattleUnit avatar = withAvatar ? Avatar.Build(_options.AvatarLevel > 0 ? _options.AvatarLevel : level, out passives) : null;
 
             // The avatar fills its own ATB gauge: it is in the turn order, never in the targeting roster.
             TurnManager turnManager = new TurnManager(avatar == null ? units : new List<BattleUnit>(units) { avatar });
@@ -697,6 +1027,19 @@ namespace BeastCraft.Tooling.BalanceSim
                 }
 
                 int[] before = new int[units.Count];
+                bool direct = _options.AvatarValue || _options.TurnDetail;
+                ActiveStatus[] shieldBefore = direct ? new ActiveStatus[units.Count] : null;
+                int[] shieldAmountBefore = direct ? new int[units.Count] : null;
+                Dictionary<BattleUnit, int> unitIndex = null;
+                if (direct)
+                {
+                    unitIndex = new Dictionary<BattleUnit, int>();
+                    for (int u = 0; u < units.Count; u++)
+                    {
+                        unitIndex[units[u]] = u;
+                    }
+                }
+
                 long capTicks = (long)(_options.MaxTime < 1 ? 1 : _options.MaxTime) * TurnManager.TicksPerTimeUnit;
                 long lastTurnTicks = 0;
                 actions = 0;
@@ -729,6 +1072,11 @@ namespace BeastCraft.Tooling.BalanceSim
                         for (int u = 0; u < units.Count; u++)
                         {
                             before[u] = units[u].CurrentHp;
+                            if (direct)
+                            {
+                                shieldBefore[u] = FindShield(units[u]);
+                                shieldAmountBefore[u] = shieldBefore[u] == null ? 0 : shieldBefore[u].Amount;
+                            }
                         }
 
                         lastTurnTicks = turnManager.ElapsedTicks;
@@ -764,6 +1112,12 @@ namespace BeastCraft.Tooling.BalanceSim
                             battle.MemberActions[actor]++;
                             CountFires(battle, turn, actor);
                             CountRolls(battle, turn, actor);
+                        }
+
+                        if (direct)
+                        {
+                            CountDirect(battle, turn, current == avatar && avatar != null, actorIsMember ? actor : -1, avatar, units, unitIndex, before,
+                                        shieldBefore, shieldAmountBefore);
                         }
                     }
 
@@ -807,6 +1161,195 @@ namespace BeastCraft.Tooling.BalanceSim
             }
 
             battle.AvatarCasts += turn.AvatarActivations.Count;
+        }
+
+        private static ActiveStatus FindShield(BattleUnit unit)
+        {
+            foreach (ActiveStatus status in unit.Statuses)
+            {
+                if (status.Type == StatusType.Shield)
+                {
+                    return status;
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// <c>--avatar-value</c> / <c>--turn-detail</c>: adds one turn to the battle's direct-output
+        /// split (see <see cref="PveBattle.AvatarDamage"/>) and, with <c>--turn-detail</c>, the acting
+        /// member's no-fire and boss / escort counters. Reads the HP and shield snapshots taken before
+        /// the turn and the turn's result; never touches the battle.
+        /// </summary>
+        private void CountDirect(PveBattle battle, BattleTurnResult turn, bool avatarTurn, int actor, BattleUnit avatar, List<BattleUnit> units,
+                                 Dictionary<BattleUnit, int> unitIndex, int[] before, ActiveStatus[] shieldBefore, int[] shieldAmountBefore)
+        {
+            // The avatar's passive hits this turn (e.g. Storm Call on a beast's crit), before the HP deltas.
+            long passiveDamage = 0;
+            foreach (PassiveActivation passive in turn.PassiveActivations)
+            {
+                if (passive.Activation == null)
+                {
+                    continue;
+                }
+
+                foreach (DamageHit hit in passive.Activation.Hits)
+                {
+                    if (hit.Target.Team == BattleTeam.Enemy)
+                    {
+                        passiveDamage += Math.Max(0, hit.Roll.Amount - hit.Absorbed);
+                    }
+                }
+            }
+
+            long enemyLoss = 0;
+            long teamGain = 0;
+            for (int u = 0; u < units.Count; u++)
+            {
+                int delta = before[u] - units[u].CurrentHp;
+                if (units[u].Team == BattleTeam.Enemy)
+                {
+                    if (delta > 0)
+                    {
+                        enemyLoss += delta;
+                        if (actor >= 0 && _options.TurnDetail)
+                        {
+                            if (units[u].Footprint != UnitFootprint.Single)
+                            {
+                                battle.MemberBossDamage[actor] += delta;
+                            }
+                            else
+                            {
+                                battle.MemberEscortDamage[actor] += delta;
+                            }
+                        }
+                    }
+                }
+                else if (delta < 0)
+                {
+                    teamGain -= delta;
+                }
+            }
+
+            if (avatarTurn)
+            {
+                battle.AvatarDamage += enemyLoss;
+                battle.AvatarHeal += teamGain;
+            }
+            else
+            {
+                long avatarPart = Math.Min(passiveDamage, enemyLoss);
+                battle.AvatarDamage += avatarPart;
+                battle.AvatarPassiveDamage += avatarPart;
+                battle.BeastDamage += enemyLoss - avatarPart;
+                battle.BeastHeal += teamGain;
+            }
+
+            // Shield soak: each hit on a beast is soaked first by the shield it had before the turn,
+            // then by whatever shield it has after it (one cast mid-turn, e.g. Last Stand).
+            int[] soaked = null;
+            AddShieldSoak(battle, turn.PassiveActivations, avatar, units, unitIndex, shieldBefore, shieldAmountBefore, _passiveEffects, ref soaked);
+            foreach (BattleSkillOutcome outcome in turn.SkillOutcomes)
+            {
+                if (outcome.Fired && outcome.Activation != null)
+                {
+                    AddShieldSoak(battle, outcome.Activation, avatar, units, unitIndex, shieldBefore, shieldAmountBefore, _passiveEffects, ref soaked);
+                }
+            }
+
+            if (actor < 0 || !_options.TurnDetail)
+            {
+                return;
+            }
+
+            if (turn.Stunned)
+            {
+                battle.MemberStunnedTurns[actor]++;
+                return;
+            }
+
+            bool fired = false;
+            bool held = false;
+            bool unreachable = false;
+            foreach (BattleSkillOutcome outcome in turn.SkillOutcomes)
+            {
+                fired |= outcome.Fired;
+                held |= outcome.Status == BattleSkillStatus.HeldByStance;
+                unreachable |= outcome.Status == BattleSkillStatus.Unreachable || outcome.Status == BattleSkillStatus.OutOfMovement;
+            }
+
+            if (!fired)
+            {
+                battle.MemberNoFireTurns[actor]++;
+                if (held)
+                {
+                    battle.MemberHeldTurns[actor]++;
+                }
+                else if (unreachable)
+                {
+                    battle.MemberUnreachableTurns[actor]++;
+                }
+            }
+        }
+
+        private static void AddShieldSoak(PveBattle battle, IReadOnlyList<PassiveActivation> passives, BattleUnit avatar, List<BattleUnit> units,
+                                          Dictionary<BattleUnit, int> unitIndex, ActiveStatus[] shieldBefore, int[] shieldAmountBefore, HashSet<SkillEffect> passiveEffects,
+                                          ref int[] soaked)
+        {
+            foreach (PassiveActivation passive in passives)
+            {
+                if (passive.Activation != null)
+                {
+                    AddShieldSoak(battle, passive.Activation, avatar, units, unitIndex, shieldBefore, shieldAmountBefore, passiveEffects, ref soaked);
+                }
+            }
+        }
+
+        private static void AddShieldSoak(PveBattle battle, SkillActivation activation, BattleUnit avatar, List<BattleUnit> units,
+                                          Dictionary<BattleUnit, int> unitIndex, ActiveStatus[] shieldBefore, int[] shieldAmountBefore, HashSet<SkillEffect> passiveEffects,
+                                          ref int[] soaked)
+        {
+            foreach (DamageHit hit in activation.Hits)
+            {
+                if (hit.Absorbed <= 0 || hit.Target.Team != BattleTeam.Player || !unitIndex.TryGetValue(hit.Target, out int u))
+                {
+                    continue;
+                }
+
+                if (soaked == null)
+                {
+                    soaked = new int[units.Count];
+                }
+
+                int fromBefore = Math.Min(hit.Absorbed, Math.Max(0, shieldAmountBefore[u] - soaked[u]));
+                soaked[u] += fromBefore;
+                ActiveStatus after = FindShield(units[u]);
+                ActiveStatus rest = after != null && after != shieldBefore[u] ? after : shieldBefore[u] ?? after;
+                Credit(battle, shieldBefore[u] ?? rest, avatar, passiveEffects, fromBefore);
+                Credit(battle, rest, avatar, passiveEffects, hit.Absorbed - fromBefore);
+            }
+        }
+
+        private static void Credit(PveBattle battle, ActiveStatus shield, BattleUnit avatar, HashSet<SkillEffect> passiveEffects, int amount)
+        {
+            if (amount <= 0)
+            {
+                return;
+            }
+
+            if (shield != null && shield.Source != null && shield.Source == avatar)
+            {
+                battle.AvatarShieldAbsorbed += amount;
+                if (shield.Origin != null && passiveEffects.Contains(shield.Origin))
+                {
+                    battle.AvatarPassiveShieldAbsorbed += amount;
+                }
+            }
+            else
+            {
+                battle.BeastShieldAbsorbed += amount;
+            }
         }
 
         private static void CountPassives(PveBattle battle, IReadOnlyList<PassiveActivation> activations)

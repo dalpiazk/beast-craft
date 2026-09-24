@@ -12,11 +12,13 @@ namespace BeastCraft.Battle
     /// <strong>The formula, in full:</strong>
     /// <code>
     /// base   = Power / 100 * A * A / (A + DefenseWeight * D) * GlobalScale
-    /// damage = max(MinimumDamage, truncate(base * element * crit * roll / 100))
+    /// damage = max(MinimumDamage, truncate(base * element * crit * roll / 100 * execute * level))
     /// </code>
-    /// where <c>crit</c> is <see cref="GetCritMultiplier"/> on a critical hit and 1 otherwise, and
+    /// where <c>crit</c> is <see cref="GetCritMultiplier"/> on a critical hit and 1 otherwise,
     /// <c>roll</c> is a whole percent drawn uniformly from
-    /// [<see cref="VarianceMinPercent"/>, <see cref="VarianceMaxPercent"/>].
+    /// [<see cref="VarianceMinPercent"/>, <see cref="VarianceMaxPercent"/>], <c>execute</c> is
+    /// <see cref="GetExecuteMultiplier"/> and <c>level</c> is <see cref="GetLevelMultiplier"/> of the
+    /// caster's level against the target's.
     /// <list type="bullet">
     /// <item><description>
     /// <c>Power</c> is the authored <see cref="SkillEffect.Magnitude"/> of the damage effect, read
@@ -39,11 +41,21 @@ namespace BeastCraft.Battle
     /// term — so Attack is worth a little more than linear, as in the reference.
     /// </description></item>
     /// <item><description>
-    /// <strong>Level is not in the formula.</strong> Stats already scale with level through the
-    /// growth curve, and with <c>A</c>, <c>D</c> and HP all on the same curve, a hit between two
-    /// equally levelled beasts takes the same share of HP at every level (up to integer
-    /// rounding). <see cref="BattleUnit.Level"/> is kept — other systems read it — but the damage
-    /// formula ignores it.
+    /// <strong>Level difference.</strong> Stats already scale with level through the growth curve,
+    /// and with <c>A</c>, <c>D</c> and HP all on the same curve, a hit between two equally
+    /// levelled units takes the same share of HP at every level (up to integer rounding). On top
+    /// of that, a hit is scaled by <see cref="GetLevelMultiplier"/> of the caster's
+    /// <see cref="BattleUnit.Level"/> minus the target's:
+    /// <c>clamp(1 + k * delta + q * delta * |delta|, 1 - cap, 1 + cap)</c> with <c>k</c> =
+    /// <see cref="LevelDifferencePerLevel"/>, <c>q</c> = <see cref="LevelDifferenceConvex"/> and
+    /// <c>cap</c> = <see cref="LevelDifferenceCap"/>. It applies both ways (an over-levelled
+    /// attacker hits harder, an under-levelled one softer), so a team several levels under its
+    /// content loses on both sides of every exchange — the growth curve alone flattens out too
+    /// much for a level gap to matter at mid and high levels. Equal levels are exactly 1 and are
+    /// not multiplied at all, so an equal-level battle is bit-identical to the formula without the
+    /// term. The avatar hits and is hit at its own level. Damage over time inherits it (its
+    /// per-turn amount is computed here when applied); heals, shields, stat changes, status chance
+    /// and knockback do not read level. It takes no random draws.
     /// </description></item>
     /// <item><description>
     /// The element multiplier is
@@ -88,7 +100,7 @@ namespace BeastCraft.Battle
     /// <para>
     /// <strong>Arithmetic.</strong> The base is computed in double precision (IEEE basic
     /// operations only, so it is reproducible) and truncated toward zero to whole HP once, at the
-    /// very end, after the element, crit and variance multipliers (in that order), so a fractional
+    /// very end, after the element, crit, variance, execute and level multipliers (in that order), so a fractional
     /// result never buys a point it did not earn. The guards: a <c>Power</c> of 0 or less deals 0 (a
     /// zero-power damage effect is a no-op, and a negative one never reads as a heal); any positive
     /// <c>Power</c> deals at least <see cref="MinimumDamage"/>, so a resisted hit is never worth
@@ -174,6 +186,23 @@ namespace BeastCraft.Battle
         /// </summary>
         public const float MinCritMultiplier = 1.3f;
 
+        /// <summary>
+        /// <c>k</c> of <see cref="GetLevelMultiplier"/>: how much each level the caster has over the
+        /// target adds to a hit (and each level under takes off), as a fraction. Tuned with the
+        /// balance simulator's <c>--level-gap</c> sweep; see the tuning log, "Level-difference
+        /// modifier".
+        /// </summary>
+        public const double LevelDifferencePerLevel = 0.012;
+
+        /// <summary>
+        /// <c>q</c> of <see cref="GetLevelMultiplier"/>: a convex term <c>q * delta * |delta|</c> that
+        /// makes a wide gap bite harder than a narrow one. 0 disables it.
+        /// </summary>
+        public const double LevelDifferenceConvex = 0.009;
+
+        /// <summary>The level multiplier never leaves [1 - cap, 1 + cap], however wide the gap.</summary>
+        public const double LevelDifferenceCap = 0.4;
+
         /// <summary>The crit chance is clamped to at least this (percent) when rolled.</summary>
         public const int MinCritChance = 0;
 
@@ -223,8 +252,33 @@ namespace BeastCraft.Battle
             int attack = GetAttackStat(caster.Stats, skill.Category);
             int defense = GetDefenseStat(target.Stats, skill.Category);
             float multiplier = ElementChart.GetMultiplier(skill.Element, target.Elements);
+            double level = GetLevelMultiplier(caster.Level, target.Level);
 
-            return new DamageRoll(Compute(power, attack, defense, multiplier, variancePercent, isCrit, bonusMultiplier), isCrit, variancePercent);
+            return new DamageRoll(Compute(power, attack, defense, multiplier, variancePercent, isCrit, bonusMultiplier, level), isCrit, variancePercent);
+        }
+
+        /// <summary>
+        /// The level-difference multiplier for a hit from a unit at <paramref name="attackerLevel"/>
+        /// on one at <paramref name="defenderLevel"/>: with <c>delta = attacker - defender</c>,
+        /// <c>clamp(1 + LevelDifferencePerLevel * delta + LevelDifferenceConvex * delta * |delta|,
+        /// 1 - LevelDifferenceCap, 1 + LevelDifferenceCap)</c>. Exactly 1 (the identity) when the
+        /// levels are equal. Applies both ways: above 1 when the attacker is the higher level, below
+        /// 1 when it is the lower. Pure; no random draws.
+        /// </summary>
+        public static double GetLevelMultiplier(int attackerLevel, int defenderLevel)
+        {
+            if (attackerLevel == defenderLevel)
+            {
+                return 1.0;
+            }
+
+            double delta = (double)attackerLevel - defenderLevel;
+            double magnitude = delta < 0.0 ? -delta : delta;
+            double multiplier = 1.0 + (LevelDifferencePerLevel * delta) + (LevelDifferenceConvex * delta * magnitude);
+            double low = 1.0 - LevelDifferenceCap;
+            double high = 1.0 + LevelDifferenceCap;
+
+            return multiplier < low ? low : multiplier > high ? high : multiplier;
         }
 
         /// <summary>
@@ -287,6 +341,17 @@ namespace BeastCraft.Battle
         /// </summary>
         public static int Compute(float power, int attack, int defense, float elementMultiplier, int variancePercent, bool isCrit, double bonusMultiplier)
         {
+            return Compute(power, attack, defense, elementMultiplier, variancePercent, isCrit, bonusMultiplier, 1.0);
+        }
+
+        /// <summary>
+        /// <see cref="Compute(float, int, int, float, int, bool, double)"/> with
+        /// <paramref name="levelMultiplier"/> (<see cref="GetLevelMultiplier"/>) applied after the
+        /// execute bonus and before the single truncation. Exactly 1 is not multiplied at all, so it
+        /// is bit-exact with the seven-argument form; a negative value is treated as 0.
+        /// </summary>
+        public static int Compute(float power, int attack, int defense, float elementMultiplier, int variancePercent, bool isCrit, double bonusMultiplier, double levelMultiplier)
+        {
             if (power <= 0f)
             {
                 return 0;
@@ -307,6 +372,11 @@ namespace BeastCraft.Battle
             if (bonusMultiplier != 1.0)
             {
                 scaled *= bonusMultiplier < 0.0 ? 0.0 : bonusMultiplier;
+            }
+
+            if (levelMultiplier != 1.0)
+            {
+                scaled *= levelMultiplier < 0.0 ? 0.0 : levelMultiplier;
             }
 
             int damage = (int)scaled;

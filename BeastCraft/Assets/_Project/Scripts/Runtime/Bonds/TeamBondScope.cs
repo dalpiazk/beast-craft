@@ -16,5 +16,12 @@ namespace BeastCraft.Bonds
 
         /// <summary>Every beast on the bonded team, members or not.</summary>
         Team = 1,
+
+        /// <summary>
+        /// Every beast on the bonded team that is <em>not</em> one of the bond's members: the
+        /// members lend the effect to their teammates (a Vanguard line covering the beasts behind
+        /// it). A team made only of members has no recipient, so the bond changes nothing there.
+        /// </summary>
+        Others = 2,
     }
 }
