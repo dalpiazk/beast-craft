@@ -196,7 +196,7 @@ The numbers are simulator-tuned starting points, not confirmed balance — see
   and pacing reports plus research notes); their numbers inform design
   decisions and are not applied automatically.
 - The **test runner** (`Tooling/EditModeTests/`) references
-  `src/BeastCraft.Core` and runs the suite in `BeastCraft/Assets/_Project/Scripts/Tests/EditMode`
+  `src/BeastCraft.Core` and runs the suite in `Tooling/EditModeTests/Tests`
   plus its own golden-value tests (`Tooling/EditModeTests/Goldens`: growth-curve
   samples and schema 1-5 save fixtures that must stay byte-identical;
   `BEASTCRAFT_UPDATE_GOLDENS=1` rewrites them for a reviewed behaviour change).

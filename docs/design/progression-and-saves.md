@@ -810,7 +810,7 @@ dotnet format Tooling/EditModeTests --verify-no-changes
 ```
 
 `Tooling/EditModeTests/EditModeTests.csproj` (net10.0, C# 9, NUnit 3) references
-`src/BeastCraft.Core` and compiles the suite in `BeastCraft/Assets/_Project/Scripts/Tests/EditMode`
+`src/BeastCraft.Core` and compiles the suite in `Tooling/EditModeTests/Tests`
 plus its own golden tests (`Tooling/EditModeTests/Goldens`). CI runs it too (format check, then
 `dotnet test --configuration Release`), as a final gate after a green local run. The authored JSON
 data is not copied; the tests find it by walking up from the output directory.
