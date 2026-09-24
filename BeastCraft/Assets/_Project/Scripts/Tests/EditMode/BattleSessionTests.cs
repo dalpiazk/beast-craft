@@ -736,7 +736,7 @@ namespace BeastCraft.Tests.EditMode
             _cloak.Modifiers.Add(new StatModifier { Stat = StatType.HP, FlatBonus = 100 });
 
             _enemies = EnemyCatalog.Build(EncounterContentTests.LoadEnemyLibrary(), curves["medium"]);
-            return new BattleContent(species, skills.Values, passives, bonds, new[] { _blade, _lateShell }, new[] { _cloak }, _enemies);
+            return new BattleContent(species, skills.Values, passives, bonds, new[] { _blade, _lateShell }, new[] { _cloak }, _enemies, _consumables.All);
         }
 
         private SkillSO BuildSkill(SkillData data)

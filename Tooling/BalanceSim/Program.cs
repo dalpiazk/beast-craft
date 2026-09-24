@@ -89,6 +89,15 @@ namespace BeastCraft.Tooling.BalanceSim
                 }
             }
 
+            if (options.RunPve && options.EconomyProbe)
+            {
+                options.Consumables = EconomyProbe.LoadConsumables(options.ConsumableLibraryPath, errors);
+                if (options.Consumables == null)
+                {
+                    return Fail("The consumable library is invalid:", errors);
+                }
+            }
+
             if (options.RunPve && options.TeamSize > species.Count)
             {
                 Console.Error.WriteLine("--team-size " + options.TeamSize + " is larger than the roster (" + species.Count + " species).");

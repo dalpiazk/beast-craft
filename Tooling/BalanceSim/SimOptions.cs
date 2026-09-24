@@ -313,6 +313,12 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <summary>The loaded gear kits when <see cref="Gear"/> or <see cref="EconomyProbe"/> needs them; set by <see cref="Program"/>, not a CLI option.</summary>
         public GearKits GearKits;
 
+        /// <summary><c>--consumable-library</c>: consumable-library.json, or null to find it by walking up.</summary>
+        public string ConsumableLibraryPath;
+
+        /// <summary>The loaded consumables when <see cref="EconomyProbe"/> needs them; set by <see cref="Program"/>, not a CLI option.</summary>
+        public BeastCraft.Economy.ConsumableLibrary Consumables;
+
         /// <summary>
         /// <c>--calibrate-sample n</c>: the difficulty search evaluates only a seeded subset of n
         /// teams, then the chosen multiplier runs once with every team. 0 (the default) = every
@@ -541,6 +547,8 @@ namespace BeastCraft.Tooling.BalanceSim
             "                             each beast (GearKits). typical = what a player normally wears at the level, the\n" +
             "                             shipping difficulty's assumption. The default report and the balance guard are gearless.\n" +
             "  --gear-library <path>      gear-library.json (default: found by walking up from the working directory).\n" +
+            "  --consumable-library <path> consumable-library.json (default: found by walking up from the working directory).\n" +
+            "  --consumables              The same as --economy-probe (the consumable probe).\n" +
             "  --economy-probe            PvE: append \"PvE economy probe\": every cell replayed at its calibrated multiplier with\n" +
             "                             each gear profile and each consumable, as clear-rate points and levels-equivalent\n" +
             "                             (against the team one level up). Default: off.\n" +
@@ -1018,7 +1026,15 @@ namespace BeastCraft.Tooling.BalanceSim
 
                         break;
                     case "--economy-probe":
+                    case "--consumables":
                         options.EconomyProbe = true;
+                        break;
+                    case "--consumable-library":
+                        if (!TryNext(args, ref i, arg, out options.ConsumableLibraryPath, out error))
+                        {
+                            return null;
+                        }
+
                         break;
                     case "--avatar-level":
                         if (!TryNextInt(args, ref i, arg, 1, out options.AvatarLevel, out error))

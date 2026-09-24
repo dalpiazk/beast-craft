@@ -99,6 +99,7 @@ namespace BeastCraft.Session
             }
 
             List<AvatarGearSO> avatarGear = setup.IncludeAvatar ? setup.AvatarGear ?? ResolveAvatarGear(save, content, errors) : null;
+            ConsumableLoadout.Check(save, setup.Consumables, content.GetConsumable, errors);
 
             CheckUnitIds(team, enemies, encounter, setup.IncludeAvatar, errors);
 
@@ -150,6 +151,20 @@ namespace BeastCraft.Session
             }
 
             TeamBondLoadout bonds = content.TeamBonds.Count == 0 ? null : TeamBondLoadout.For(content.TeamBonds, TeamBondResolver.MembersOf(teamSpecies), members);
+
+            List<ConsumableSO> consumables = new List<ConsumableSO>();
+            foreach (string id in setup.Consumables ?? new List<string>())
+            {
+                consumables.Add(content.GetConsumable(id));
+            }
+
+            if (consumables.Count > 0)
+            {
+                // Before the bonds and passives (applied by RunBattle's battle-start hook), on its own stream.
+                ConsumableLoadout.Apply(consumables, members, units.FindAll(u => u.Team == BattleTeam.Enemy), grid,
+                                        new Random(LootRoller.DeriveSeed(setup.Seed, PostBattleAward.ConsumableStream)));
+                result.ConsumablesUsed = new List<string>(setup.Consumables);
+            }
 
             TurnManager turnManager = new TurnManager(avatar == null ? units : new List<BattleUnit>(units) { avatar });
             Random rng = new Random(setup.Seed);
@@ -279,6 +294,14 @@ namespace BeastCraft.Session
                 int gold = PostBattleAward.AwardGold(result.Battle, dropTable, shape, encounterLevel, summary.Loot.FirstClear, mods.GoldMultiplier, mods.BonusGold,
                                                      new Random(LootRoller.DeriveSeed(result.Seed, PostBattleAward.GoldStream)));
                 summary.GoldGained = Wallet.Add(save, gold);
+            }
+
+            foreach (string id in result.ConsumablesUsed)
+            {
+                if (ConsumableInventory.TryRemove(save, id, 1))
+                {
+                    summary.ConsumablesSpent.Add(id);
+                }
             }
 
             if (result.Outcome == BattleOutcome.PlayerVictory && mods.Gear != null)

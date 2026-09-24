@@ -75,5 +75,8 @@ namespace BeastCraft.Session
 
         /// <summary>The gear ids dropped (each now a new instance in the save), in roll order. Never null.</summary>
         public List<string> GearGained { get; } = new List<string>();
+
+        /// <summary>The consumables spent from the pack (the battle used them, whatever its outcome). Never null.</summary>
+        public List<string> ConsumablesSpent { get; } = new List<string>();
     }
 }

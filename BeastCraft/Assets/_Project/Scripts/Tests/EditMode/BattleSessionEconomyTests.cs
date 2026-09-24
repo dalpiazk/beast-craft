@@ -106,6 +106,96 @@ namespace BeastCraft.Tests.EditMode
             Assert.AreEqual(0, save.Gold);
         }
 
+        private readonly ConsumableLibrary _consumables = ConsumableLibrary.Build(ConsumableTests.LoadConsumables());
+
+        [Test]
+        public void Run_UsesAConsumable_AndApplyRewardsSpendsItExactlyOnce()
+        {
+            PlayerSave save = StarterSave();
+            ConsumableInventory.TryAdd(save, "fury_draught", 2, 5);
+            BattleSetup setup = Setup(save, 42, weakEnemies: true);
+            setup.Consumables.Add("fury_draught");
+
+            BattleSessionResult result = BattleSession.Run(setup);
+            Assert.IsTrue(result.Success, result.Error);
+            CollectionAssert.AreEqual(new[] { "fury_draught" }, result.ConsumablesUsed);
+            Assert.AreEqual(2, ConsumableInventory.Quantity(save, "fury_draught"), "Run never writes the save");
+
+            BattleRewardSummary summary = BattleSession.ApplyRewards(save, result, _content, Shape, EncounterLevel, _drops);
+            CollectionAssert.AreEqual(new[] { "fury_draught" }, summary.ConsumablesSpent);
+            Assert.AreEqual(1, ConsumableInventory.Quantity(save, "fury_draught"));
+            Assert.IsFalse(BattleSession.ApplyRewards(save, result, _content, Shape, EncounterLevel, _drops).Applied);
+            Assert.AreEqual(1, ConsumableInventory.Quantity(save, "fury_draught"), "spent once");
+
+            BattleSessionResult again = BattleSession.Run(setup);
+            Assert.AreEqual(Trace(result), Trace(again), "deterministic per seed");
+        }
+
+        [Test]
+        public void Run_WithAConsumable_ChangesTheBattle_AndWithoutOneIsTheSameBattle()
+        {
+            PlayerSave save = StarterSave();
+            ConsumableInventory.TryAdd(save, "venom_flask", 1, 3);
+            int changed = 0;
+            for (int seed = 1; seed <= 8; seed++)
+            {
+                BattleSetup plain = Setup(save, seed);
+                BattleSetup empty = Setup(save, seed);
+                empty.Consumables = new List<string>();
+                BattleSetup venom = Setup(save, seed);
+                venom.Consumables.Add("venom_flask");
+
+                string plainTrace = Trace(BattleSession.Run(plain));
+                Assert.AreEqual(plainTrace, Trace(BattleSession.Run(empty)), "no consumable is exactly the old battle");
+                changed += plainTrace == Trace(BattleSession.Run(venom)) ? 0 : 1;
+            }
+
+            Assert.Greater(changed, 0, "the venom changes some battles");
+
+            List<BattleUnit> team = new List<BattleUnit> { BattleUnitFactory.CreateBeast("t", BattleTeam.Player, _content.GetSpecies(_library.SpeciesKits[0].SpeciesId), 40, null,
+                                                                                         default(BeastCraft.Battle.Grid.HexCoordinate), new SkillLoadout(new List<SkillSO>())) };
+            int before = team[0].Stats.Defense;
+            ConsumableLoadout.Apply(new[] { _consumables.Get("iron_tonic") }, team, new List<BattleUnit>(), null, new System.Random(1));
+            Assert.Greater(team[0].Stats.Defense, before, "the tonic's percent Defense buff landed");
+        }
+
+        [Test]
+        public void ApplyRewards_SpendsTheConsumableOnADefeat_Too()
+        {
+            PlayerSave save = StarterSave();
+            ConsumableInventory.TryAdd(save, "smoke_bomb", 1, 5);
+            BattleSetup setup = Setup(save, 3);
+            setup.TeamBeastIds = new List<string> { save.Beasts[0].BeastId };
+            setup.IncludeAvatar = false;
+            setup.Consumables.Add("smoke_bomb");
+            setup.Encounter.Enemies = new List<EnemySpec>();
+            for (int i = 0; i < 4; i++)
+            {
+                setup.Encounter.Enemies.Add(new EnemySpec(_library.SpeciesKits[4 + i].SpeciesId, 60));
+            }
+
+            BattleSessionResult result = BattleSession.Run(setup);
+            Assert.AreEqual(BattleOutcome.EnemyVictory, result.Outcome, result.Error);
+            BattleSession.ApplyRewards(save, result, _content, Shape, EncounterLevel, _drops);
+            Assert.AreEqual(0, ConsumableInventory.Quantity(save, "smoke_bomb"));
+        }
+
+        [Test]
+        public void Run_RefusesTwoConsumables_OrOneNotHeld()
+        {
+            PlayerSave save = StarterSave();
+            ConsumableInventory.TryAdd(save, "fury_draught", 1, 5);
+            ConsumableInventory.TryAdd(save, "iron_tonic", 1, 5);
+            BattleSetup two = Setup(save, 1);
+            two.Consumables.Add("fury_draught");
+            two.Consumables.Add("iron_tonic");
+            AssertFails(two, "At most 1 consumable");
+
+            BattleSetup unheld = Setup(save, 1);
+            unheld.Consumables.Add("venom_flask");
+            AssertFails(unheld, "is not held");
+        }
+
         private static string Json(object value)
         {
             return UnityEngine.JsonUtility.ToJson(value);

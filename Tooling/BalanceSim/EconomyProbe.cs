@@ -1,9 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Text;
+using System.Text.Json;
 using BeastCraft.Battle;
 using BeastCraft.Creatures;
+using BeastCraft.Economy;
 
 namespace BeastCraft.Tooling.BalanceSim
 {
@@ -144,9 +147,49 @@ namespace BeastCraft.Tooling.BalanceSim
             return sb.ToString();
         }
 
-        /// <summary>Adds one variant per consumable (see the consumable library); none yet.</summary>
+        /// <summary>The consumable library's path relative to the repo root.</summary>
+        public const string ConsumablesRepoRelativePath = "BeastCraft/" + ConsumableLibraryData.ProjectRelativePath;
+
+        /// <summary>Loads and validates <c>consumable-library.json</c>; null with <paramref name="errors"/> filled on failure.</summary>
+        public static ConsumableLibrary LoadConsumables(string path, List<string> errors)
+        {
+            string resolved = RosterLoader.ResolveFile(path, ConsumablesRepoRelativePath);
+            if (resolved == null || !File.Exists(resolved))
+            {
+                errors.Add("Could not find " + ConsumablesRepoRelativePath + "; run from inside the repo or pass --consumable-library <path>.");
+                return null;
+            }
+
+            ConsumableLibraryData data;
+            try
+            {
+                data = JsonSerializer.Deserialize<ConsumableLibraryData>(File.ReadAllText(resolved), new JsonSerializerOptions { IncludeFields = true });
+            }
+            catch (Exception exception)
+            {
+                errors.Add("Could not read " + resolved + ": " + exception.Message);
+                return null;
+            }
+
+            List<string> problems = ConsumableLibraryValidator.Validate(data);
+            errors.AddRange(problems);
+            return problems.Count > 0 ? null : ConsumableLibrary.Build(data);
+        }
+
+        /// <summary>Adds one variant per consumable in the library.</summary>
         private static void AddConsumableVariants(SimOptions options, List<string> names, List<Action<PveSimulator>> variants)
         {
+            if (options.Consumables == null)
+            {
+                return;
+            }
+
+            foreach (ConsumableSO consumable in options.Consumables.All)
+            {
+                ConsumableSO c = consumable;
+                names.Add("consumable " + c.ConsumableId);
+                variants.Add(sim => sim.Consumable = c);
+            }
         }
 
         private static double Rate(PveBattle[] battles)

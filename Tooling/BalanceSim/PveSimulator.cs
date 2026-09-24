@@ -7,6 +7,7 @@ using BeastCraft.Battle.Grid;
 using BeastCraft.Battle.Placement;
 using BeastCraft.Bonds;
 using BeastCraft.Creatures;
+using BeastCraft.Economy;
 using BeastCraft.Encounters;
 
 namespace BeastCraft.Tooling.BalanceSim
@@ -358,6 +359,9 @@ namespace BeastCraft.Tooling.BalanceSim
         /// pieces; null (the default) = none, exactly the gearless battle.
         /// </summary>
         public Func<CreatureSpeciesSO, int, List<GearSO>> GearFor { get; set; }
+
+        /// <summary>The consumable every player team uses as each battle begins (the economy probe); null (the default) = none.</summary>
+        public ConsumableSO Consumable { get; set; }
 
         /// <summary>The avatar fielded beside every player team (<c>--avatar</c>); disabled by default.</summary>
         public AvatarPresets Avatar { get; }
@@ -1000,7 +1004,14 @@ namespace BeastCraft.Tooling.BalanceSim
                 battle.MemberEscortDamage = new int[team.Length];
             }
 
-            Random rng = new Random(DeriveSeed(_options.Seed, mode, level, encounter.Id, teamIndex, sample));
+            int battleSeed = DeriveSeed(_options.Seed, mode, level, encounter.Id, teamIndex, sample);
+            Random rng = new Random(battleSeed);
+            if (Consumable != null)
+            {
+                // As BattleSession.Run: before the bonds and passives, on the battle's consumable stream.
+                ConsumableLoadout.Apply(new[] { Consumable }, members, units.FindAll(u => u.Team == BattleTeam.Enemy), grid,
+                                        new Random(BeastCraft.Progression.LootRoller.DeriveSeed(battleSeed, BeastCraft.Progression.PostBattleAward.ConsumableStream)));
+            }
             PassiveLoadout passives = null;
             BattleUnit avatar = withAvatar ? Avatar.Build(_options.AvatarLevel > 0 ? _options.AvatarLevel : level, out passives) : null;
 
