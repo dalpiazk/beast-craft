@@ -475,7 +475,25 @@ gold and materials** and **~10% of beast XP** over a campaign; idle looks come f
 battle drops** (no idle-exclusive looks); idle XP goes to the **current party and the bench, through
 the battles' catch-up rule**; clock tampering is **clamped silently to the real elapsed time** (no
 message, no penalty); idle respects the **level cap and bank** and the **level-gap falloff**; it gives
-**no first-clear or pity credit**.
+**no first-clear or pity credit**; the **avatar earns idle XP at the party's rate** through its own
+falloff (no cap).
+
+> **Local play only — the fairness choices rely on it.** Beast Craft is slated for **local,
+> single-player play** (not an MMO, no shared or competitive online play). The idle calculation's
+> fairness choices are acceptable only because no player's idle income is ever set against another's:
+> paying the whole period **at the rate of claim time**, a **larger idle share for lighter players**,
+> and **client-clock clamping without a server**. **If online, MMO or competitive play is ever added,
+> the idle calculation must be revisited** — server-authoritative time, rate-over-period accounting
+> (each hour paid at the progress level it was spent at) and tighter shares — because as it stands it
+> would come across as unfair.
+
+**Approved behaviour and current defaults.** Approved (user decisions): paying the whole claim at the
+progress level **at claim time** (clearing a higher location just before claiming pays the whole
+period at the new rate, as AFK games commonly do); idle's share **rising for lighter players** (below).
+Current defaults, tunable and open to review: idle gold held at ~6% by the Trader's affordability gate
+(below); the offline clock limits (a clock set forward across a reboot, cross-device claims; "No
+server clock"); the look chance scaled by `hours / CapHours`; material rolls from the `squad` cell;
+the first claim of a new or migrated save only starting the clock.
 
 ### The claim (`IdleRewardCalculator.Claim(save, content, nowUtc, nowMonotonic, partyBeastIds)`)
 
@@ -502,8 +520,10 @@ a save (new or migrated) only starts the clock and pays nothing. Every later cla
    above, +9% per level below, all of it from ten below), then the falloff. All of it goes through
    `BeastProgression.AddXp(progress, xp, cap)` under `CampaignRules.BeastCap`: at the cap it banks, at
    most three levels' worth, and the rest is not granted (`IdleClaimResult.XpBanked` /
-   `XpLostAtCap`; the UI shows "banked at cap"). No clear bonus (not a battle); the avatar earns no
-   idle XP.
+   `XpLostAtCap`; the UI shows "banked at cap"). No clear bonus (not a battle).
+   **The avatar** (user decision) earns the party's rate, `floor(hours × XpPerHour)`, cut by the
+   falloff on its own level against the progress level, with no cap (`AvatarProgression.AddXp`; the
+   avatar has none): `IdleClaimResult.AvatarXpGained` / `AvatarFalloffPercent` / `AvatarLevelsGained`.
 6. **A look**: one roll, chance `CosmeticChancePer10k / 10,000 × hours / CapHours` (so claiming often
    gains nothing), from the battle-drop pool (`CosmeticRules.PickDrop`, what `RollDrop` draws on a hit:
    the progress level's region's `drop` looks not yet owned). Milestone looks the XP reaches unlock too.
@@ -515,6 +535,10 @@ claim's clock when unset. Same save, clock readings and party, same claim. Non-t
 no save or no rates is refused and changes nothing.
 
 ### No server clock (the offline rule)
+
+This rule assumes **local-only play** (see the note above): with no shared or competitive play, a
+client-clamped clock only ever affects the player's own game. Online, MMO or competitive play would
+need server-authoritative time instead.
 
 The game is offline-first and has no trusted time source yet (Cloud Code is a later backend), so the
 claim trusts **the smaller of two clocks**: the wall clock (UTC, which the player can set) and a
@@ -581,7 +605,9 @@ affordability gate (p50 55-80%) to 100%: at 0.11 × G(L) (6.4% of all gold) it i
 most visits are fully affordable. Reaching ~15% idle gold needs higher Trader prices or a gold sink
 first (producer item). The shares depend on the player's cadence: at 15 battles a day idle is 8.8% of
 gold, 20% of materials and 14% of XP (over the ceilings); at 40 a day 3.7%, 8.9% and 6.2%; with one
-claim a day (a 16-hour absence capped at 8) 3.0%, 7.4% and 5.0%. With `--idle-hours-per-day 0` the
+claim a day (a 16-hour absence capped at 8) 3.0%, 7.4% and 5.0%. **A lighter player's larger idle
+share is accepted** (user decision; acceptable for local-only play). The avatar's idle XP is 8.7% of
+its XP (p50, not gated; it stays within 1 level of every gate and boss). With `--idle-hours-per-day 0` the
 report is the pre-idle one plus an "off" line.
 
 Reproduce: `dotnet run --project Tooling/BalanceSim -c Release -- --mode campaign --self-check --out
@@ -811,6 +837,9 @@ its System.Text.Json twin here.
   needs a JavaScript `FS.syncfs` flush after each write to reach IndexedDB; `FileSaveStorage` does
   not flush (and the whole save path is untested on WebGL). A platform follow-up (a small `.jslib`
   called after `Save`/`Delete`, or a WebGL `ISaveStorage`) if WebGL is ever targeted.
+- **Idle rewards assume local-only play.** If online, MMO or competitive play is ever added, revisit
+  the idle calculation (server-authoritative time, rate-over-period accounting, tighter shares); see
+  "Idle rewards".
 - **Idle rewards have no UI and no server clock.** The claim, preview, "capped" and "banked at cap"
   data are built and tested; the idle screen is not. The offline clock rule leaves a clock set forward
   across a reboot (bounded by the 8-hour cap) and cross-device claims (Cloud Save) to a future server

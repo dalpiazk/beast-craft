@@ -159,6 +159,10 @@ namespace BeastCraft.Tooling.BalanceSim
             public int CappedClaims;
             public int Looks;
             public double Hours;
+
+            /// <summary>Avatar XP from idle claims, and the avatar's total XP at the last boss.</summary>
+            public long IdleAvatarXp;
+            public long AvatarTotalXp;
         }
 
         public Result Stats
@@ -196,6 +200,7 @@ namespace BeastCraft.Tooling.BalanceSim
                 _result.ClaimsByRegion[regionIndex]++;
                 _result.CappedClaims += claim.Capped ? 1 : 0;
                 _result.Hours += claim.Hours;
+                _result.IdleAvatarXp += claim.AvatarXpGained;
                 _result.Looks += claim.CosmeticDropped == null ? 0 : 1;
                 economy.OnMilestoneLooks(claim.CosmeticsUnlocked.FindAll(key => key != claim.CosmeticDropped));
                 foreach (MaterialStack stack in claim.Loot.Drops)
@@ -226,6 +231,7 @@ namespace BeastCraft.Tooling.BalanceSim
             long now = TotalXp(save);
             _result.TotalXpByRegion[regionIndex] = now - xpAtLastRegionEnd;
             xpAtLastRegionEnd = now;
+            _result.AvatarTotalXp = AvatarProgression.TotalXpToReach(save.Avatar.Level) + Math.Max(0, save.Avatar.Xp);
         }
 
         /// <summary>Every beast's XP from level 1: levels, XP toward the next and the bank.</summary>
@@ -273,7 +279,7 @@ namespace BeastCraft.Tooling.BalanceSim
             sb.Append("gold; XP to the fielded beasts (the party) and the bench share to the rest, through the level-gap falloff and under the level cap;\n");
             sb.Append(SimOptions.Format(rewards.MaterialRollsPerHour)).Append(" roll(s) an hour of the `").Append(rewards.Shape)
               .Append("` drop cell with scaled chances (no pity, no first-clear credit); a rare look from the battle-drop pool.\n");
-            sb.Append("The avatar earns no idle XP. Idle income feeds the campaign (levels, the purse, the focus skill's materials).\n\n");
+            sb.Append("The avatar earns the party's rate through its own falloff (no cap). Idle income feeds the campaign (levels, the purse, the focus skill's materials).\n\n");
 
             sb.Append("| Progress levels | Gold / hour | XP / hour | Material chance | Look chance / full claim |\n| --- | ---: | ---: | ---: | ---: |\n");
             foreach (IdleBand band in rewards.Bands)
@@ -348,7 +354,8 @@ namespace BeastCraft.Tooling.BalanceSim
               .Append(SimOptions.Format(idleTiers[1] / runs.Count)).Append(" / ").Append(SimOptions.Format(idleTiers[2] / runs.Count)).Append(" / ")
               .Append(SimOptions.Format(idleTiers[3] / runs.Count)).Append(" (clears: ").Append(SimOptions.Format(activeTiers[1] / runs.Count)).Append(" / ")
               .Append(SimOptions.Format(activeTiers[2] / runs.Count)).Append(" / ").Append(SimOptions.Format(activeTiers[3] / runs.Count)).Append("), ")
-              .Append(Mean(runs.ConvertAll(run => (double)run.Idle.Looks)).ToString("0.00", CultureInfo.InvariantCulture)).Append(" idle look drops.\n\n");
+              .Append(Mean(runs.ConvertAll(run => (double)run.Idle.Looks)).ToString("0.00", CultureInfo.InvariantCulture)).Append(" idle look drops; idle avatar XP ")
+              .Append(Pct(p(runs.ConvertAll(run => Share(run.Idle.IdleAvatarXp, run.Idle.AvatarTotalXp)), 50))).Append(" of the avatar's XP (p50; not gated).\n\n");
         }
 
         private static void Row(StringBuilder sb, string label, double ceiling, List<double> values, Func<List<double>, double, double> p, bool ok)

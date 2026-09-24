@@ -61,8 +61,9 @@ namespace BeastCraft.Idle
     /// the falloff. All of it is added under the beast level cap
     /// (<see cref="BeastProgression.AddXp(BeastProgress, int, int)"/>): at the cap it banks, at most
     /// <see cref="LevelCap.BankLevelLimit"/> levels' worth, and more is not granted
-    /// (<see cref="IdleClaimResult.XpLostAtCap"/>; the UI shows "banked at cap"). The avatar earns no
-    /// idle XP.</item>
+    /// (<see cref="IdleClaimResult.XpLostAtCap"/>; the UI shows "banked at cap"). The avatar earns the
+    /// party's rate too (user decision), cut by the falloff on its own level against the progress
+    /// level, with no cap (<see cref="AvatarProgression.AddXp"/>; the avatar has none).</item>
     /// <item><b>A look</b>: one roll per claim with the band's <c>CosmeticChancePer10k</c> scaled by
     /// <c>hours / CapHours</c> (so claiming often gains nothing), from the same pool as battle drops
     /// (<see cref="CosmeticRules.PickDrop"/>: the progress level's region's <c>drop</c> looks not yet
@@ -285,6 +286,14 @@ namespace BeastCraft.Idle
 
             int xp = (int)Math.Min(int.MaxValue, Math.Floor(result.Hours * band.XpPerHour));
             int level = result.ProgressLevel;
+            if (save.Avatar != null)
+            {
+                int avatarGap = LevelGapXp.Gap(save.Avatar.Level, level);
+                result.AvatarXpGained = LevelGapXp.Apply(xp, avatarGap);
+                result.AvatarFalloffPercent = LevelGapXp.Percent(avatarGap);
+                result.AvatarLevelsGained = AvatarProgression.AddXp(save.Avatar, result.AvatarXpGained);
+            }
+
             foreach (OwnedBeast beast in save.Beasts)
             {
                 if (string.IsNullOrEmpty(beast.BeastId) || result.XpOffered.ContainsKey(beast.BeastId))
@@ -397,6 +406,15 @@ namespace BeastCraft.Idle
 
         /// <summary>XP offered but not granted because the bank was full, by beast id.</summary>
         public Dictionary<string, int> XpLostAtCap { get; } = new Dictionary<string, int>(StringComparer.Ordinal);
+
+        /// <summary>The XP the avatar earned (the party's rate after the falloff on its level; no cap).</summary>
+        public int AvatarXpGained { get; internal set; }
+
+        /// <summary>The falloff percent the avatar's XP was cut to.</summary>
+        public int AvatarFalloffPercent { get; internal set; } = 100;
+
+        /// <summary>Levels the avatar gained.</summary>
+        public int AvatarLevelsGained { get; internal set; }
 
         /// <summary>The party beasts paid, in save order.</summary>
         public List<string> PartyBeastIds { get; } = new List<string>();

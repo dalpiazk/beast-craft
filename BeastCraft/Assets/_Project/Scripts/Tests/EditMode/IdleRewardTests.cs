@@ -354,6 +354,48 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
+        public void Xp_AvatarEarnsThePartyRate_ThroughItsFalloff_WithNoCap()
+        {
+            PlayerSave save = ProgressedSave();
+            save.Avatar.Level = 15;
+            Start(save);
+            int xp = 8 * _content.Rewards.BandFor(15).XpPerHour;
+
+            IdleClaimResult atLevel = ClaimAfter(save, TimeSpan.FromHours(8), TimeSpan.FromHours(8));
+
+            Assert.AreEqual(xp, atLevel.AvatarXpGained, "at the progress level: the party's rate");
+            Assert.AreEqual(100, atLevel.AvatarFalloffPercent);
+            Assert.AreEqual(xp, save.Avatar.Xp);
+
+            save.Avatar.Level = 16;
+            save.Avatar.Xp = 0;
+            IdleClaimResult above = ClaimAfter(save, TimeSpan.FromHours(16), TimeSpan.FromHours(16));
+            Assert.AreEqual(xp * 60 / 100, above.AvatarXpGained, "one level above: the falloff's 60%");
+            Assert.AreEqual(60, above.AvatarFalloffPercent);
+
+            save.Avatar.Level = 30;
+            save.Avatar.Xp = 0;
+            IdleClaimResult far = ClaimAfter(save, TimeSpan.FromHours(24), TimeSpan.FromHours(24));
+            Assert.AreEqual(0, far.AvatarXpGained, "far above the content: nothing");
+
+            PlayerSave capped = ProgressedSave();
+            int cap = CampaignRules.BeastCap(capped, _content.Regions);
+            capped.Campaign.Unlock("r03");
+            capped.Campaign.FindRegion("r03").StagesCleared = 3;
+            Assert.Greater(CampaignRules.ProgressLevel(capped, _content.Regions), cap + 2);
+            capped.Avatar.Level = cap;
+            Start(capped);
+            IdleClaimResult noCap = ClaimAfter(capped, TimeSpan.FromHours(8), TimeSpan.FromHours(8));
+            Assert.Greater(noCap.AvatarXpGained, 0);
+            for (int i = 2; i <= 60; i++)
+            {
+                ClaimAfter(capped, TimeSpan.FromHours(8 * i), TimeSpan.FromHours(8 * i));
+            }
+
+            Assert.Greater(capped.Avatar.Level, cap, "the avatar has no level cap (lead decision)");
+        }
+
+        [Test]
         public void Xp_BenchAtTheProgressLevel_EarnsTheBaseShare()
         {
             PlayerSave save = ProgressedSave();

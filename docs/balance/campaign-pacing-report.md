@@ -58,39 +58,39 @@ fielded beasts. Target: the fielded and avatar medians within 3 levels of the no
 | r01 | 3 | Gate | 7 | 7.3 | 8.0 | 8.0 | 8 | ok |
 | r01 | 4 | Boss | 10 | 9.7 | 10.0 | 10.0 | 10 | ok |
 | r02 | 1 | Gate | 13 | 12.7 | 13.0 | 13.0 | 13 | ok |
-| r02 | 2 | Gate | 15 | 15.0 | 15.7 | 16.0 | 15 | ok |
+| r02 | 2 | Gate | 15 | 15.0 | 15.7 | 16.0 | 16 | ok |
 | r02 | 3 | Gate | 17 | 17.7 | 18.0 | 18.0 | 18 | ok |
 | r02 | 4 | Boss | 20 | 19.7 | 20.0 | 20.0 | 20 | ok |
 | r03 | 1 | Gate | 23 | 22.7 | 23.0 | 23.3 | 23 | ok |
-| r03 | 2 | Gate | 25 | 25.0 | 25.7 | 26.0 | 25 | ok |
+| r03 | 2 | Gate | 25 | 25.0 | 25.7 | 26.0 | 26 | ok |
 | r03 | 3 | Gate | 27 | 27.7 | 28.0 | 28.0 | 28 | ok |
 | r03 | 4 | Boss | 30 | 29.7 | 30.0 | 30.3 | 30 | ok |
 | r04 | 1 | Gate | 33 | 32.7 | 33.0 | 33.3 | 33 | ok |
-| r04 | 2 | Gate | 35 | 35.0 | 35.7 | 36.0 | 35 | ok |
+| r04 | 2 | Gate | 35 | 35.0 | 35.7 | 36.0 | 36 | ok |
 | r04 | 3 | Gate | 37 | 37.7 | 38.0 | 38.0 | 38 | ok |
 | r04 | 4 | Boss | 40 | 39.7 | 40.0 | 40.3 | 40 | ok |
 | r05 | 1 | Gate | 43 | 42.7 | 43.0 | 43.3 | 43 | ok |
-| r05 | 2 | Gate | 45 | 45.0 | 45.7 | 46.0 | 45 | ok |
+| r05 | 2 | Gate | 45 | 45.0 | 45.7 | 46.0 | 46 | ok |
 | r05 | 3 | Gate | 47 | 47.7 | 48.0 | 48.0 | 48 | ok |
 | r05 | 4 | Boss | 50 | 49.7 | 50.0 | 50.3 | 50 | ok |
 | r06 | 1 | Gate | 53 | 52.7 | 53.0 | 53.3 | 53 | ok |
-| r06 | 2 | Gate | 55 | 55.0 | 55.7 | 56.0 | 55 | ok |
+| r06 | 2 | Gate | 55 | 55.0 | 55.7 | 56.0 | 56 | ok |
 | r06 | 3 | Gate | 57 | 57.7 | 58.0 | 58.0 | 58 | ok |
 | r06 | 4 | Boss | 60 | 60.0 | 60.0 | 60.3 | 60 | ok |
 | r07 | 1 | Gate | 63 | 62.7 | 63.0 | 63.3 | 63 | ok |
-| r07 | 2 | Gate | 65 | 65.0 | 65.7 | 66.0 | 65 | ok |
+| r07 | 2 | Gate | 65 | 65.0 | 65.7 | 66.0 | 66 | ok |
 | r07 | 3 | Gate | 67 | 67.7 | 68.0 | 68.0 | 68 | ok |
 | r07 | 4 | Boss | 70 | 70.0 | 70.0 | 70.3 | 70 | ok |
 | r08 | 1 | Gate | 73 | 72.7 | 73.0 | 73.3 | 73 | ok |
-| r08 | 2 | Gate | 75 | 75.0 | 75.7 | 76.0 | 75 | ok |
+| r08 | 2 | Gate | 75 | 75.0 | 75.7 | 76.0 | 76 | ok |
 | r08 | 3 | Gate | 77 | 77.7 | 78.0 | 78.0 | 78 | ok |
 | r08 | 4 | Boss | 80 | 80.0 | 80.0 | 80.3 | 80 | ok |
 | r09 | 1 | Gate | 83 | 82.7 | 83.0 | 83.3 | 83 | ok |
-| r09 | 2 | Gate | 85 | 85.0 | 85.7 | 86.0 | 85 | ok |
+| r09 | 2 | Gate | 85 | 85.0 | 85.7 | 86.0 | 86 | ok |
 | r09 | 3 | Gate | 87 | 87.7 | 88.0 | 88.0 | 88 | ok |
 | r09 | 4 | Boss | 90 | 90.0 | 90.0 | 90.3 | 90 | ok |
 | r10 | 1 | Gate | 93 | 92.7 | 93.0 | 93.3 | 93 | ok |
-| r10 | 2 | Gate | 95 | 95.0 | 95.7 | 96.0 | 95 | ok |
+| r10 | 2 | Gate | 95 | 95.0 | 95.7 | 96.0 | 96 | ok |
 | r10 | 3 | Gate | 97 | 97.7 | 98.0 | 98.0 | 98 | ok |
 | r10 | 4 | Boss | 100 | 100.0 | 100.0 | 100.0 | 100 | ok |
 
@@ -116,7 +116,7 @@ At each boss, before its seal's release. The bench earns 10% of a standing field
 - Cap exceeded: 0 beast-levels over all campaigns (target 0): ok
 - Banked levels per beast at a seal (before its release): p50 0.0, p90 0.0, max 0.0 (target p50 <= 3): ok
 - XP lost past the bank limit: 0.0 per campaign (all beasts)
-- XP lost to the level-gap falloff: fielded 22.3% of their battle XP, avatar 14.7%
+- XP lost to the level-gap falloff: fielded 22.3% of their battle XP, avatar 21.7%
 
 ## Grind probe
 
@@ -141,14 +141,14 @@ consumable at every den, pass and lair battle. Purchases do not change the clear
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
 | r01 | 988 | 6.3 | 8.1 | 173 | 1.1 | 64% | 7.3 | ok |
 | r02 | 1866 | 6.2 | 8.3 | 393 | 1.3 | 97% | 7.7 | ok |
-| r03 | 2802 | 6.2 | 8.2 | 581 | 1.3 | 50% | 7.7 | ok |
+| r03 | 2802 | 6.2 | 8.2 | 579 | 1.3 | 50% | 7.7 | ok |
 | r04 | 3673 | 6.2 | 8.1 | 878 | 1.5 | 75% | 7.7 | ok |
-| r05 | 4630 | 6.2 | 8.2 | 1031 | 1.4 | 39% | 7.7 | ok |
-| r06 | 5514 | 6.2 | 8.2 | 1428 | 1.6 | 62% | 7.7 | ok |
-| r07 | 6451 | 6.2 | 8.2 | 1662 | 1.6 | 19% | 7.7 | ok |
-| r08 | 7326 | 6.2 | 8.2 | 1969 | 1.6 | 37% | 7.7 | ok |
-| r09 | 8303 | 6.2 | 8.2 | 2186 | 1.6 | 15% | 7.7 | ok |
-| r10 | 9193 | 6.2 | 8.1 | 2581 | 1.7 | 30% | 7.7 | ok |
+| r05 | 4630 | 6.2 | 8.2 | 1027 | 1.4 | 39% | 7.7 | ok |
+| r06 | 5514 | 6.2 | 8.2 | 1420 | 1.6 | 62% | 7.7 | ok |
+| r07 | 6451 | 6.2 | 8.2 | 1646 | 1.5 | 19% | 7.7 | ok |
+| r08 | 7326 | 6.2 | 8.2 | 1960 | 1.6 | 37% | 7.7 | ok |
+| r09 | 8303 | 6.2 | 8.2 | 2181 | 1.6 | 15% | 7.7 | ok |
+| r10 | 9193 | 6.2 | 8.1 | 2559 | 1.7 | 30% | 7.7 | ok |
 | **Campaign** | 50744 | 62.0 | | | | | | |
 
 Design reference (not a gate): about 900 gold in region 1, 4400 in region 5, 8800 in region 10, 55000 over the campaign. Gold held target: under 2.0 visits' income at every boss (p50). "Gear at typical" = the share of the fielded beasts' slots at or
@@ -159,7 +159,7 @@ above the typical profile (`--gear typical`) for the boss's band.
 | Want-list affordability (gold spent / wanted, per visit) | p50 55%-80% | p10 8%, p50 74%, p90 100% | ok |
 | Visits where nothing meaningful in stock (material, gear, consumable, skill) is affordable on arrival | under 5% | 0% of 61951 | ok |
 
-Per campaign (means): bought AvatarGear 10.2, AvatarPassive 4.8, AvatarSkill 4.8, BeastGear 28.1, BeastSkill 1.1, Consumable 77.1, Cosmetic 31.6 (materials by tier: 0.0 / 0.0 / 0.0); gear dropped 10.6, from passes and lairs 40.0, sold back 77.0 for 8451 gold (14% of all gold; target about 10-15%); looks unlocked by source boss 14.0, drop 3.1, milestone 14.0, shop 31.6.
+Per campaign (means): bought AvatarGear 10.2, AvatarPassive 4.8, AvatarSkill 4.8, BeastGear 28.1, BeastSkill 1.1, Consumable 77.1, Cosmetic 31.6 (materials by tier: 0.0 / 0.0 / 0.0); gear dropped 10.6, from passes and lairs 40.0, sold back 77.0 for 8452 gold (14% of all gold; target about 10-15%); looks unlocked by source boss 14.0, drop 3.1, milestone 14.0, shop 31.6.
 
 ## Idle rewards
 
@@ -167,7 +167,7 @@ The game's `IdleRewardCalculator` (`idle-rewards.json`) on the model's save: the
 `--battles-per-day`, `--idle-hours-per-day`, `--idle-claims-per-day`). A claim pays at the progress level (the highest cleared location):
 gold; XP to the fielded beasts (the party) and the bench share to the rest, through the level-gap falloff and under the level cap;
 1.0 roll(s) an hour of the `squad` drop cell with scaled chances (no pity, no first-clear credit); a rare look from the battle-drop pool.
-The avatar earns no idle XP. Idle income feeds the campaign (levels, the purse, the focus skill's materials).
+The avatar earns the party's rate through its own falloff (no cap). Idle income feeds the campaign (levels, the purse, the focus skill's materials).
 
 | Progress levels | Gold / hour | XP / hour | Material chance | Look chance / full claim |
 | --- | ---: | ---: | ---: | ---: |
@@ -204,7 +204,7 @@ beast XP credited (battles, camps and idle).
 | Idle materials / all materials (by XP value) | at most 15.0% | 10.6% | 13.4% | 16.8% | ok |
 | Idle beast XP / all beast XP | at most 10.0% | 8.9% | 9.3% | 9.8% | ok |
 
-Per campaign (means): 40.0 claims (0.0 lost idle time past the cap), 319.8 idle hours paid, 3536 gold (p50), materials by tier 18.7 / 23.1 / 2.5 (clears: 97.0 / 113.3 / 25.6), 0.04 idle look drops.
+Per campaign (means): 40.0 claims (0.0 lost idle time past the cap), 319.8 idle hours paid, 3536 gold (p50), materials by tier 18.7 / 23.1 / 2.5 (clears: 97.0 / 113.3 / 25.6), 0.04 idle look drops; idle avatar XP 8.7% of the avatar's XP (p50; not gated).
 
 ## Focus skill
 

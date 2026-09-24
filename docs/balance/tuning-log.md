@@ -3421,3 +3421,13 @@ often gains nothing). The ceilings hold for the modelled player, not for a light
 Reproduce: `dotnet run --project Tooling/BalanceSim -c Release -- --mode campaign --self-check --out
 docs/balance/campaign-pacing-report.md` (add `--battles-per-day`, `--idle-hours-per-day`,
 `--idle-claims-per-day` for the sensitivity rows; the kG / kX / m rows by editing `idle-rewards.json`).
+
+### Avatar idle XP (user decision)
+
+The avatar now earns idle XP at the party's rate, through the falloff on its own level against the
+progress level, with no cap. Campaign re-run: the beasts' shares are unchanged (gold 5.6%, materials
+13.4%, beast XP 9.3%, p50); the avatar's idle XP is 8.7% of its XP; its p50 level on arriving at each
+stage-2 pass moves from the node level to one above (within 1 everywhere, target +/-3); the falloff's
+cut of the avatar's battle XP rises 14.7% -> 21.7%. Every gate is still met. User decisions recorded
+with it: a lighter player's larger idle share is accepted, and paying at the progress level at claim
+time is kept; both rely on local-only play (docs/design/progression-and-saves.md, "Idle rewards").
