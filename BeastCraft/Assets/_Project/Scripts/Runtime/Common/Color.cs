@@ -6,7 +6,7 @@ namespace BeastCraft
     /// An RGBA colour (each channel 0-1) with RGB/HSV conversion. Engine-neutral: the game only does
     /// colour math and stores colours in saves; renderers convert at their own boundary.
     /// <para>
-    /// A verbatim port of the Unity-era <c>UnityEngine.Color</c> surface the game used (the same
+    /// A verbatim port of the Unity-era <c>Color</c> surface the game used (the same
     /// public fields <c>r</c>/<c>g</c>/<c>b</c>/<c>a</c>, so saved colours keep their JSON shape,
     /// and Unity's own HSV algorithm, so clamped default colours are unchanged).
     /// </para>

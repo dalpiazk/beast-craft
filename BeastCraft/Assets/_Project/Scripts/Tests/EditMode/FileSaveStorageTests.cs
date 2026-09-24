@@ -564,12 +564,16 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
-        public void UnitySaveLocations_UseASavesFolderUnderPersistentDataPath()
+        public void SaveLocations_UseASavesFolderUnderTheUsersLocalAppData()
         {
-            string expected = Path.Combine(Application.persistentDataPath, UnitySaveLocations.SavesFolderName);
+            string root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), SaveLocations.AppFolderName);
+            string expected = Path.Combine(root, SaveLocations.SavesFolderName);
 
-            Assert.AreEqual(expected, UnitySaveLocations.DefaultDirectory());
-            Assert.AreEqual(Path.GetFullPath(expected), UnitySaveLocations.Default().RootDirectory);
+            Assert.AreEqual(root, SaveLocations.DefaultRoot());
+            Assert.AreEqual(expected, SaveLocations.DefaultDirectory());
+            Assert.AreEqual(Path.GetFullPath(expected), SaveLocations.Default().RootDirectory);
+            Assert.AreEqual(Path.Combine(_root, SaveLocations.SavesFolderName), SaveLocations.DefaultDirectory(_root), "a host may supply its own root");
+            Assert.Throws<ArgumentException>(() => SaveLocations.DefaultDirectory(" "));
         }
 
         private static PlayerSave SaveAtLevel(int avatarLevel)

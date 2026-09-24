@@ -9,8 +9,8 @@ namespace BeastCraft.Battle.Grid
     /// <para>
     /// Axial storage keeps two components (<see cref="Q"/>, <see cref="R"/>) rather than three; the
     /// implied cube coordinate is (Q, R, -Q-R), which is what the distance formula reconstructs.
-    /// Deliberately a plain value type with no Unity dependency: this is pure board math, and
-    /// keeping it free of <c>UnityEngine</c> means it stays testable and cheap to copy.
+    /// Deliberately a plain value type with no engine dependency: this is pure board math, and
+    /// keeping it free of engine types means it stays testable and cheap to copy.
     /// </para>
     /// </summary>
     public readonly struct HexCoordinate : IEquatable<HexCoordinate>

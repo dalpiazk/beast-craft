@@ -6,9 +6,8 @@ using System.Text;
 namespace BeastCraft.Save
 {
     /// <summary>
-    /// <see cref="ISaveStorage"/> over local files in one directory — pure System.IO, no Unity.
-    /// (<see cref="UnitySaveLocations"/> supplies the game's directory under
-    /// <c>Application.persistentDataPath</c>.)
+    /// <see cref="ISaveStorage"/> over local files in one directory — pure System.IO.
+    /// (<see cref="SaveLocations"/> supplies the game's default directory.)
     /// <para>
     /// <strong>Layout.</strong> Slot <c>main</c> is <c>main.save</c>; its one-generation backup is
     /// <c>main.save.bak</c>; <c>main.save.tmp</c> exists only mid-write (or after a crash mid-write,
