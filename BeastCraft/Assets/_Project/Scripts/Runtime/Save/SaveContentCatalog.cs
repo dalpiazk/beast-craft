@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using BeastCraft.Campaign;
 using BeastCraft.Creatures.Roster;
 using BeastCraft.Skills;
 
@@ -89,6 +90,34 @@ namespace BeastCraft.Save
             }
 
             return new SaveContentCatalog(species, skills, passives, materials);
+        }
+
+        /// <summary>
+        /// <see cref="FromData(BeastRosterData, SkillLibraryData)"/> plus every region and seal id in
+        /// <paramref name="regions"/> (<c>regions.json</c>), which are then checked. A null
+        /// <paramref name="regions"/> leaves them unchecked.
+        /// </summary>
+        public static SaveContentCatalog FromData(BeastRosterData roster, SkillLibraryData library, RegionLibraryData regions)
+        {
+            SaveContentCatalog content = FromData(roster, library);
+            if (regions == null)
+            {
+                return content;
+            }
+
+            List<string> regionIds = new List<string>();
+            List<string> sealIds = new List<string>();
+            foreach (RegionData region in regions.Regions ?? new RegionData[0])
+            {
+                regionIds.Add(region == null ? null : region.RegionId);
+            }
+
+            foreach (SealData seal in regions.Seals ?? new SealData[0])
+            {
+                sealIds.Add(seal == null ? null : seal.SealId);
+            }
+
+            return new SaveContentCatalog(content._species, content._skills, content._passives, content._materials, regionIds, sealIds);
         }
 
         public bool IsKnownSpecies(string speciesId)
