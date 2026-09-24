@@ -19,7 +19,7 @@ namespace BeastCraft.Tests.EditMode
     {
         private static SaveSerializer NewSerializer(ISaveEconomyCatalog economy = null)
         {
-            return new SaveSerializer(new JsonUtilitySaveSerializer(), null, null, PlayerSave.CurrentSchemaVersion, null, economy);
+            return new SaveSerializer(new JsonSaveSerializer(), null, null, PlayerSave.CurrentSchemaVersion, null, economy);
         }
 
         [Test]
@@ -77,7 +77,7 @@ namespace BeastCraft.Tests.EditMode
             save.Consumables.Add(new ConsumableStack("fury_draught", 2));
             save.Cosmetics.Unlock("griffin_crest/crest_storm");
             save.AvatarAppearance.SetOption("avatar_hair", "hair_braids");
-            save.AvatarAppearance.SetColor("avatar_hair_color", new UnityEngine.Color(0.2f, 0.4f, 0.6f, 1f));
+            save.AvatarAppearance.SetColor("avatar_hair_color", new Color(0.2f, 0.4f, 0.6f, 1f));
             save.Shops.Add(new ShopVisit
             {
                 NodeKey = "r01/2/5/123",
@@ -141,7 +141,7 @@ namespace BeastCraft.Tests.EditMode
             save.AvatarAppearance.SetOption("griffin_crest", "crest_plain");
             save.Beasts[0].Appearance.SetOption("griffin_crest", "crest_royal");
             save.Beasts[0].Appearance.SetOption("griffin_crest_bogus", "x");
-            save.Beasts[0].Appearance.SetColor("avatar_hair_color", UnityEngine.Color.black);
+            save.Beasts[0].Appearance.SetColor("avatar_hair_color", Color.black);
 
             List<SaveIssue> issues = SaveValidator.Validate(save, null, null, economy);
             string all = string.Join("\n", issues);

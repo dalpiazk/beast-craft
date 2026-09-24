@@ -1,7 +1,7 @@
 # Tooling/BalanceSim
 
-A headless balance simulator for Beast Craft. It runs the **real** battle code (the game's `Runtime`
-scripts, compiled outside Unity against the committed `Tooling/CiStubs/UnityStub`) and prints a
+A headless balance simulator for Beast Craft. It runs the **real** battle code (the engine-neutral
+game runtime, `src/BeastCraft.Core`, by project reference) and prints a
 Markdown report of how much each beast in the starter roster helps a team.
 
 - **Primary mode, PvE (team vs encounter).** The game is expected to be PvE (see "Encounter
@@ -398,7 +398,7 @@ enemy types, and elements that vary across battles and sometimes within one enem
 encounter set simulates that.
 
 All of this is game content (`BeastCraft/Assets/_Project/Data/Encounters/`), and the draw is the
-game's own `EncounterGenerator` (`Runtime/Encounters`): the simulator makes one generator per run
+game's own `EncounterGenerator` (`src/BeastCraft.Core/Encounters`): the simulator makes one generator per run
 from `--seed` and draws `--compositions` lineups per shape through it (`GeneratedEncounters.cs`), so
 the compositions it calibrates are exactly what the game can field. The file readmes list every
 field.
@@ -976,9 +976,10 @@ dotnet format Tooling/BalanceSim/BalanceSim.csproj --verify-no-changes
 dotnet build  Tooling/BalanceSim/BalanceSim.csproj -c Release
 ```
 
-It targets `net10.0` (the installed LTS SDK) and, like `CiLint`, compiles with C# 9 and nullable
-disabled so the Unity scripts build unchanged. Only `Scripts/Runtime/**` is compiled: no Editor
-scripts and no tests.
+It targets `net10.0` (the installed LTS SDK) and compiles with C# 9 and nullable disabled, like the
+game runtime it references (`src/BeastCraft.Core`, netstandard2.1). It reads the authored data JSON
+under `BeastCraft/Assets/_Project/Data/` directly with System.Text.Json (found by walking up), never
+through Unity assets.
 
 ## Economy (`--gear`, `--economy-probe`, and `--mode campaign`'s economy)
 

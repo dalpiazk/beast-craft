@@ -2,22 +2,16 @@ using System.Collections.Generic;
 using BeastCraft.Battle;
 using BeastCraft.Creatures;
 using NUnit.Framework;
-using UnityEngine;
 
 namespace BeastCraft.Tests.EditMode
 {
     public class StatCalculatorTests
     {
-        private readonly List<ScriptableObject> _created = new List<ScriptableObject>();
+        private readonly List<ContentAsset> _created = new List<ContentAsset>();
 
         [TearDown]
         public void TearDown()
         {
-            for (int i = 0; i < _created.Count; i++)
-            {
-                Object.DestroyImmediate(_created[i]);
-            }
-
             _created.Clear();
         }
 
@@ -190,12 +184,12 @@ namespace BeastCraft.Tests.EditMode
 
         private CreatureSpeciesSO Species(StatBlock baseStats)
         {
-            GrowthRateCurve growth = ScriptableObject.CreateInstance<GrowthRateCurve>();
+            GrowthRateCurve growth = new GrowthRateCurve();
             growth.Curve = AnimationCurve.Linear(0f, 1f, 1f, 2f);
             growth.MaxLevel = 11;
             _created.Add(growth);
 
-            CreatureSpeciesSO species = ScriptableObject.CreateInstance<CreatureSpeciesSO>();
+            CreatureSpeciesSO species = new CreatureSpeciesSO();
             species.BaseStats = baseStats;
             species.GrowthRate = growth;
             _created.Add(species);
@@ -204,7 +198,7 @@ namespace BeastCraft.Tests.EditMode
 
         private GearSO Gear(int minimumLevel, params StatModifier[] modifiers)
         {
-            GearSO gear = ScriptableObject.CreateInstance<GearSO>();
+            GearSO gear = new GearSO();
             gear.MinimumLevel = minimumLevel;
             gear.Modifiers.AddRange(modifiers);
             _created.Add(gear);

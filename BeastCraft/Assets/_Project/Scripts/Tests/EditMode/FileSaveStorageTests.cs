@@ -6,7 +6,6 @@ using System.Text;
 using System.Threading.Tasks;
 using BeastCraft.Save;
 using NUnit.Framework;
-using UnityEngine;
 
 namespace BeastCraft.Tests.EditMode
 {
@@ -46,7 +45,7 @@ namespace BeastCraft.Tests.EditMode
         public void SaveStore_RoundTripsThroughFiles()
         {
             FileSaveStorage storage = new FileSaveStorage(_root);
-            SaveStore store = new SaveStore(storage, new SaveSerializer(new JsonUtilitySaveSerializer()));
+            SaveStore store = new SaveStore(storage, new SaveSerializer(new JsonSaveSerializer()));
 
             PlayerSave save = PlayerSave.CreateNew();
             save.Avatar.Level = 9;
@@ -297,7 +296,7 @@ namespace BeastCraft.Tests.EditMode
             Directory.CreateDirectory(Path.GetDirectoryName(_root));
             File.WriteAllText(_root, "not a directory");
             FileSaveStorage storage = new FileSaveStorage(_root);
-            SaveStore store = new SaveStore(storage, new SaveSerializer(new JsonUtilitySaveSerializer()));
+            SaveStore store = new SaveStore(storage, new SaveSerializer(new JsonSaveSerializer()));
 
             SaveFileResult write = storage.Write("main", SaveA);
 
@@ -372,7 +371,7 @@ namespace BeastCraft.Tests.EditMode
         public void SlotIndex_ListsSlotsNewestFirst_WithSchemaVersions()
         {
             FileSaveStorage storage = new FileSaveStorage(_root);
-            SaveStore store = new SaveStore(storage, new SaveSerializer(new JsonUtilitySaveSerializer()));
+            SaveStore store = new SaveStore(storage, new SaveSerializer(new JsonSaveSerializer()));
             store.Save("older", PlayerSave.CreateNew());
             store.Save("newer", PlayerSave.CreateNew());
             storage.Write("backup_only", "{\"SchemaVersion\":1}");
@@ -389,7 +388,7 @@ namespace BeastCraft.Tests.EditMode
 
             CollectionAssert.AreEqual(new[] { "backup_only", "broken", "newer", "older" }, storage.ListSlots());
 
-            List<SaveSlotInfo> index = SaveSlotIndex.Build(storage, new JsonUtilitySaveSerializer());
+            List<SaveSlotInfo> index = SaveSlotIndex.Build(storage, new JsonSaveSerializer());
 
             CollectionAssert.AreEqual(new[] { "newer", "older", "backup_only", "broken" }, index.ConvertAll(s => s.Slot));
 
@@ -486,7 +485,7 @@ namespace BeastCraft.Tests.EditMode
         public void SaveStoreLoad_FailedMigration_RetriesTheBackup()
         {
             FileSaveStorage storage = new FileSaveStorage(_root);
-            SaveStore store = new SaveStore(storage, new SaveSerializer(new JsonUtilitySaveSerializer(), migrations: new[] { new FailOnMarkerMigration() }, currentVersion: 2));
+            SaveStore store = new SaveStore(storage, new SaveSerializer(new JsonSaveSerializer(), migrations: new[] { new FailOnMarkerMigration() }, currentVersion: 2));
             storage.Write("main", "{\"SchemaVersion\":1,\"Avatar\":{\"Level\":3,\"Xp\":0}}");
             storage.Write("main", "{\"SchemaVersion\":1,\"Avatar\":{\"Level\":9,\"Xp\":0},\"Marker\":\"poison\"}");
 
@@ -537,7 +536,7 @@ namespace BeastCraft.Tests.EditMode
         [Test]
         public void SaveStoreLoad_OverAPlainStorage_ReportsMain()
         {
-            SaveStore store = new SaveStore(new SingleSlotStorage(), new SaveSerializer(new JsonUtilitySaveSerializer()));
+            SaveStore store = new SaveStore(new SingleSlotStorage(), new SaveSerializer(new JsonSaveSerializer()));
 
             Assert.AreEqual(SaveFileSource.None, store.Load("main").StorageSource);
             Assert.IsTrue(store.Save("main", SaveAtLevel(5)));
@@ -552,7 +551,7 @@ namespace BeastCraft.Tests.EditMode
         [Test]
         public void SlotIndex_OfAMissingDirectory_IsEmpty()
         {
-            Assert.IsEmpty(SaveSlotIndex.Build(new FileSaveStorage(_root), new JsonUtilitySaveSerializer()));
+            Assert.IsEmpty(SaveSlotIndex.Build(new FileSaveStorage(_root), new JsonSaveSerializer()));
         }
 
         [Test]
@@ -564,12 +563,16 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
-        public void UnitySaveLocations_UseASavesFolderUnderPersistentDataPath()
+        public void SaveLocations_UseASavesFolderUnderTheUsersLocalAppData()
         {
-            string expected = Path.Combine(Application.persistentDataPath, UnitySaveLocations.SavesFolderName);
+            string root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), SaveLocations.AppFolderName);
+            string expected = Path.Combine(root, SaveLocations.SavesFolderName);
 
-            Assert.AreEqual(expected, UnitySaveLocations.DefaultDirectory());
-            Assert.AreEqual(Path.GetFullPath(expected), UnitySaveLocations.Default().RootDirectory);
+            Assert.AreEqual(root, SaveLocations.DefaultRoot());
+            Assert.AreEqual(expected, SaveLocations.DefaultDirectory());
+            Assert.AreEqual(Path.GetFullPath(expected), SaveLocations.Default().RootDirectory);
+            Assert.AreEqual(Path.Combine(_root, SaveLocations.SavesFolderName), SaveLocations.DefaultDirectory(_root), "a host may supply its own root");
+            Assert.Throws<ArgumentException>(() => SaveLocations.DefaultDirectory(" "));
         }
 
         private static PlayerSave SaveAtLevel(int avatarLevel)
@@ -582,7 +585,7 @@ namespace BeastCraft.Tests.EditMode
         private SaveStore NewFileStore(out FileSaveStorage storage)
         {
             storage = new FileSaveStorage(_root);
-            return new SaveStore(storage, new SaveSerializer(new JsonUtilitySaveSerializer()));
+            return new SaveStore(storage, new SaveSerializer(new JsonSaveSerializer()));
         }
 
         /// <summary>Schema 1 to 2 that fails on a save carrying <c>"Marker":"poison"</c>.</summary>

@@ -6,7 +6,6 @@ using BeastCraft.Bonds;
 using BeastCraft.Creatures;
 using BeastCraft.Skills;
 using NUnit.Framework;
-using UnityEngine;
 
 namespace BeastCraft.Tests.EditMode
 {
@@ -20,16 +19,11 @@ namespace BeastCraft.Tests.EditMode
     /// </summary>
     public class BondReactionTests
     {
-        private readonly List<ScriptableObject> _created = new List<ScriptableObject>();
+        private readonly List<ContentAsset> _created = new List<ContentAsset>();
 
         [TearDown]
         public void TearDown()
         {
-            for (int i = 0; i < _created.Count; i++)
-            {
-                Object.DestroyImmediate(_created[i]);
-            }
-
             _created.Clear();
         }
 
@@ -237,7 +231,7 @@ namespace BeastCraft.Tests.EditMode
         [Test]
         public void ReactionDefeat_FiresNoEnemyDefeatedPassive()
         {
-            PassiveSkillSO onKill = ScriptableObject.CreateInstance<PassiveSkillSO>();
+            PassiveSkillSO onKill = new PassiveSkillSO();
             _created.Add(onKill);
             onKill.PassiveId = "onkill";
             onKill.Trigger = PassiveTrigger.EnemyDefeated;
@@ -333,7 +327,7 @@ namespace BeastCraft.Tests.EditMode
             data.Tiers[0].Reaction.MaxPerMember = 2;
             data.Tiers[0].Reaction.MaxPerTriggerUnit = 3;
             data.Tiers[0].Reaction.MaxPerBattle = 4;
-            TeamBondSO bond = ScriptableObject.CreateInstance<TeamBondSO>();
+            TeamBondSO bond = new TeamBondSO();
             _created.Add(bond);
 
             SkillLibraryBuilder.ApplyTeamBond(data, bond);
@@ -627,7 +621,7 @@ namespace BeastCraft.Tests.EditMode
 
         private TeamBondSO Bond(string id, TeamBondCondition condition, CombatStance stance, int minCount, BondReaction reaction)
         {
-            TeamBondSO bond = ScriptableObject.CreateInstance<TeamBondSO>();
+            TeamBondSO bond = new TeamBondSO();
             _created.Add(bond);
             bond.BondId = id;
             bond.DisplayName = id;
@@ -639,7 +633,7 @@ namespace BeastCraft.Tests.EditMode
 
         private SkillSO Skill(string id, SkillTargetShape shape, int range, params SkillEffect[] effects)
         {
-            SkillSO skill = ScriptableObject.CreateInstance<SkillSO>();
+            SkillSO skill = new SkillSO();
             _created.Add(skill);
             skill.SkillId = id;
             skill.TargetShape = shape;

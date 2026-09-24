@@ -12,8 +12,7 @@ namespace BeastCraft.Tests.EditMode
 {
     /// <summary>
     /// The save system: <see cref="PlayerSave"/> round-trips through <see cref="SaveSerializer"/>
-    /// (over <see cref="JsonUtilitySaveSerializer"/> — the real JsonUtility in Unity, the stub's
-    /// System.Text.Json twin in <c>Tooling/EditModeTests</c>), versions and migrations, validation
+    /// (over <see cref="JsonSaveSerializer"/>, System.Text.Json under JsonUtility's field rules), versions and migrations, validation
     /// that reports rather than crashes, and <see cref="SaveStore"/> over a storage seam.
     /// </summary>
     public class PlayerSaveTests
@@ -63,7 +62,7 @@ namespace BeastCraft.Tests.EditMode
 
         private static SaveSerializer NewSerializer(ISaveContentCatalog catalog = null, IEnumerable<ISaveMigration> migrations = null, int version = PlayerSave.CurrentSchemaVersion)
         {
-            return new SaveSerializer(new JsonUtilitySaveSerializer(), catalog, migrations, version);
+            return new SaveSerializer(new JsonSaveSerializer(), catalog, migrations, version);
         }
 
         [Test]

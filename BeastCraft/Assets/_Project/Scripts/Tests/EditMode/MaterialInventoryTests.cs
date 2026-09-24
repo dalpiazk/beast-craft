@@ -3,7 +3,6 @@ using System.Collections;
 using System.Reflection;
 using BeastCraft.Progression;
 using NUnit.Framework;
-using UnityEngine;
 
 namespace BeastCraft.Tests.EditMode
 {
@@ -100,7 +99,7 @@ namespace BeastCraft.Tests.EditMode
                                 "\"ClearedCells\":[{\"Shape\":\"solo\",\"BandMinLevel\":21}]," +
                                 "\"Pity\":[{\"Shape\":\"horde\",\"Tier\":2,\"Misses\":6}]}";
 
-            MaterialInventory inventory = JsonUtility.FromJson<MaterialInventory>(json);
+            MaterialInventory inventory = FieldJson.FromJson<MaterialInventory>(json);
 
             Assert.AreEqual(3, inventory.GetCount("shard"));
             Assert.IsTrue(inventory.HasCleared("solo", 21));

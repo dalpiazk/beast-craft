@@ -5,7 +5,6 @@ using BeastCraft.Battle.Grid;
 using BeastCraft.Creatures;
 using BeastCraft.Progression;
 using NUnit.Framework;
-using UnityEngine;
 
 namespace BeastCraft.Tests.EditMode
 {
@@ -17,16 +16,11 @@ namespace BeastCraft.Tests.EditMode
     /// </summary>
     public class AvatarPassiveTests
     {
-        private readonly List<ScriptableObject> _created = new List<ScriptableObject>();
+        private readonly List<ContentAsset> _created = new List<ContentAsset>();
 
         [TearDown]
         public void TearDown()
         {
-            for (int i = 0; i < _created.Count; i++)
-            {
-                Object.DestroyImmediate(_created[i]);
-            }
-
             _created.Clear();
         }
 
@@ -535,7 +529,7 @@ namespace BeastCraft.Tests.EditMode
         public void PassiveSkill_ProgressesOnTheSharedRules()
         {
             PassiveSkillSO aura = Passive("aura", PassiveTrigger.Aura, PassiveTarget.AllAllies, Buff(StatType.Attack, 10));
-            SkillMaterialSO material = ScriptableObject.CreateInstance<SkillMaterialSO>();
+            SkillMaterialSO material = new SkillMaterialSO();
             material.Tier = 1;
             material.XpValue = 100000;
             _created.Add(material);
@@ -906,7 +900,7 @@ namespace BeastCraft.Tests.EditMode
 
         private PassiveSkillSO Passive(string id, PassiveTrigger trigger, PassiveTarget scope, params SkillEffect[] effects)
         {
-            PassiveSkillSO passive = ScriptableObject.CreateInstance<PassiveSkillSO>();
+            PassiveSkillSO passive = new PassiveSkillSO();
             passive.PassiveId = id;
             passive.Trigger = trigger;
             passive.TargetScope = scope;
@@ -917,7 +911,7 @@ namespace BeastCraft.Tests.EditMode
 
         private SkillSO Skill(string id, SkillTargetShape shape, int cooldown, params SkillEffect[] effects)
         {
-            SkillSO skill = ScriptableObject.CreateInstance<SkillSO>();
+            SkillSO skill = new SkillSO();
             skill.SkillId = id;
             skill.TargetShape = shape;
             skill.TargetSide = shape == SkillTargetShape.AllAllies ? SkillTargetSide.Ally : SkillTargetSide.Enemy;

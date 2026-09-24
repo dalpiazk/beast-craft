@@ -4,7 +4,6 @@ using System.IO;
 using BeastCraft.Progression;
 using BeastCraft.Skills;
 using NUnit.Framework;
-using UnityEngine;
 
 namespace BeastCraft.Tests.EditMode
 {
@@ -298,7 +297,7 @@ namespace BeastCraft.Tests.EditMode
             string path = FindFile(DropTableData.ProjectRelativePath);
             Assert.IsNotNull(path, "Could not find " + DropTableData.ProjectRelativePath);
 
-            DropTableData tables = JsonUtility.FromJson<DropTableData>(File.ReadAllText(path));
+            DropTableData tables = FieldJson.FromJson<DropTableData>(File.ReadAllText(path));
             Assert.IsNotNull(tables);
             return tables;
         }

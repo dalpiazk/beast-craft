@@ -3,7 +3,6 @@ using BeastCraft.Battle;
 using BeastCraft.Battle.Grid;
 using BeastCraft.Creatures;
 using NUnit.Framework;
-using UnityEngine;
 
 namespace BeastCraft.Tests.EditMode
 {
@@ -14,11 +13,6 @@ namespace BeastCraft.Tests.EditMode
         [TearDown]
         public void TearDown()
         {
-            for (int i = 0; i < _created.Count; i++)
-            {
-                Object.DestroyImmediate(_created[i]);
-            }
-
             _created.Clear();
         }
 
@@ -87,7 +81,7 @@ namespace BeastCraft.Tests.EditMode
 
         private SkillSO Skill(SkillEffectType type, float magnitude, int duration)
         {
-            SkillSO skill = ScriptableObject.CreateInstance<SkillSO>();
+            SkillSO skill = new SkillSO();
             skill.Effects.Add(new SkillEffect
             {
                 EffectType = type,

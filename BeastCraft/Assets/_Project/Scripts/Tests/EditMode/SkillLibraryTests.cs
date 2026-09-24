@@ -8,7 +8,6 @@ using BeastCraft.Creatures.Roster;
 using BeastCraft.Progression;
 using BeastCraft.Skills;
 using NUnit.Framework;
-using UnityEngine;
 
 namespace BeastCraft.Tests.EditMode
 {
@@ -34,16 +33,11 @@ namespace BeastCraft.Tests.EditMode
         /// <summary>How far, in points of HP, a beast heal's share of its own HP may drift between levels 1, 50 and 100.</summary>
         private const double HealShareTolerance = 5.0;
 
-        private readonly List<ScriptableObject> _created = new List<ScriptableObject>();
+        private readonly List<ContentAsset> _created = new List<ContentAsset>();
 
         [TearDown]
         public void TearDown()
         {
-            for (int i = 0; i < _created.Count; i++)
-            {
-                UnityEngine.Object.DestroyImmediate(_created[i]);
-            }
-
             _created.Clear();
         }
 
@@ -234,9 +228,9 @@ namespace BeastCraft.Tests.EditMode
                         foreach (int level in new[] { 1, 50, 100 })
                         {
                             float scale = BeastRosterValidator.ScaleAtLevel(curve, level);
-                            int hp = Mathf.RoundToInt(species.BaseStats.Hp * scale);
+                            int hp = MathUtil.RoundToInt(species.BaseStats.Hp * scale);
                             BattleUnit caster = new BattleUnit("c", BattleTeam.Player,
-                                                               new StatBlock(hp, 1, 1, Mathf.RoundToInt(species.BaseStats.SpecialAttack * scale), 1, 1), BeastCraft.Battle.Grid.HexCoordinate.Zero);
+                                                               new StatBlock(hp, 1, 1, MathUtil.RoundToInt(species.BaseStats.SpecialAttack * scale), 1, 1), BeastCraft.Battle.Grid.HexCoordinate.Zero);
                             double share = 100.0 * SkillEffectApplier.GetHealAmount(caster, effect.Magnitude) / hp;
                             low = Math.Min(low, share);
                             high = Math.Max(high, share);
@@ -493,7 +487,7 @@ namespace BeastCraft.Tests.EditMode
         {
             SkillLibraryData library = LoadLibrary();
             PassiveData data = Array.Find(library.AvatarPassives, p => p.PassiveId == "last_stand");
-            PassiveSkillSO passive = ScriptableObject.CreateInstance<PassiveSkillSO>();
+            PassiveSkillSO passive = new PassiveSkillSO();
             _created.Add(passive);
             SkillLibraryBuilder.ApplyPassive(data, passive);
 
@@ -503,7 +497,7 @@ namespace BeastCraft.Tests.EditMode
             Assert.AreEqual(2, passive.InternalCooldown);
             Assert.AreEqual(StatusType.Shield, passive.Effects[0].Status);
 
-            SkillMaterialSO material = ScriptableObject.CreateInstance<SkillMaterialSO>();
+            SkillMaterialSO material = new SkillMaterialSO();
             _created.Add(material);
             SkillLibraryBuilder.ApplyMaterial(library.Materials[2], material);
             Assert.AreEqual(3, material.Tier);
@@ -687,7 +681,7 @@ namespace BeastCraft.Tests.EditMode
 
         private SkillSO BuildSkill(SkillData data)
         {
-            SkillSO skill = ScriptableObject.CreateInstance<SkillSO>();
+            SkillSO skill = new SkillSO();
             _created.Add(skill);
             SkillLibraryBuilder.ApplySkill(data, skill);
             return skill;
@@ -798,7 +792,7 @@ namespace BeastCraft.Tests.EditMode
             string path = FindLibraryFile();
             Assert.IsNotNull(path, "Could not find " + SkillLibraryData.ProjectRelativePath);
 
-            SkillLibraryData library = JsonUtility.FromJson<SkillLibraryData>(File.ReadAllText(path));
+            SkillLibraryData library = FieldJson.FromJson<SkillLibraryData>(File.ReadAllText(path));
             Assert.IsNotNull(library);
             return library;
         }

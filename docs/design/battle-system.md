@@ -2604,7 +2604,8 @@ exactly the budget and firing a turn later, a fully blocked unit staying put, th
 across slots, and a null grid.
 
 The headless balance simulator (`Tooling/BalanceSim/`, see its README) is **local-only tooling, not a
-CI job**. It compiles the `Runtime` scripts against the committed UnityStub, reads
+CI job**. It references the engine-neutral runtime (`src/BeastCraft.Core`; it compiled the Unity
+`Runtime` scripts against a UnityStub before the MonoGame move), reads
 `beast-roster.json` with `System.Text.Json`, and fights through the real `BattleUnitFactory`,
 `PlacementValidator`, `TurnManager` and `BattleTurnExecutor` on real `HexGrid`s. Since the
 authored-kits retune its default is the real game setup — every beast's authored default loadout and

@@ -5,7 +5,6 @@ using BeastCraft.Creatures;
 using BeastCraft.Encounters;
 using BeastCraft.Skills;
 using NUnit.Framework;
-using UnityEngine;
 
 namespace BeastCraft.Tests.EditMode
 {
@@ -17,16 +16,11 @@ namespace BeastCraft.Tests.EditMode
     /// </summary>
     public class EncounterContentTests
     {
-        private readonly List<ScriptableObject> _created = new List<ScriptableObject>();
+        private readonly List<ContentAsset> _created = new List<ContentAsset>();
 
         [TearDown]
         public void TearDown()
         {
-            for (int i = 0; i < _created.Count; i++)
-            {
-                Object.DestroyImmediate(_created[i]);
-            }
-
             _created.Clear();
         }
 
@@ -108,7 +102,7 @@ namespace BeastCraft.Tests.EditMode
             string path = DropTableTests.FindFile(projectRelativePath);
             Assert.IsNotNull(path, "Could not find " + projectRelativePath);
 
-            T data = JsonUtility.FromJson<T>(File.ReadAllText(path));
+            T data = FieldJson.FromJson<T>(File.ReadAllText(path));
             Assert.IsNotNull(data);
             return data;
         }

@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using BeastCraft.Battle;
 using BeastCraft.Creatures;
-using UnityEngine;
 
 namespace BeastCraft.Tooling.BalanceSim
 {
@@ -86,7 +85,7 @@ namespace BeastCraft.Tooling.BalanceSim
 
         private static SkillSO BuildSkill(string id, DamageCategory category, SkillTargetShape shape, float power, int range, int cooldown, Element element)
         {
-            SkillSO skill = ScriptableObject.CreateInstance<SkillSO>();
+            SkillSO skill = new SkillSO();
             skill.name = id;
             skill.SkillId = id;
             skill.DisplayName = id;

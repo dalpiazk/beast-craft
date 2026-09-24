@@ -7,7 +7,6 @@ using System.Text.Json;
 using BeastCraft.Battle;
 using BeastCraft.Progression;
 using BeastCraft.Skills;
-using UnityEngine;
 
 namespace BeastCraft.Tooling.BalanceSim
 {
@@ -236,7 +235,7 @@ namespace BeastCraft.Tooling.BalanceSim
                 Table = table;
                 foreach (SkillMaterialData data in materials)
                 {
-                    SkillMaterialSO material = ScriptableObject.CreateInstance<SkillMaterialSO>();
+                    SkillMaterialSO material = new SkillMaterialSO();
                     SkillLibraryBuilder.ApplyMaterial(data, material);
                     Materials.Add(material);
                 }

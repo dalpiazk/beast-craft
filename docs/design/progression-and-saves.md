@@ -3,8 +3,8 @@
 How a player's progress is stored, how beasts and the avatar level up, the region campaign they
 play through, and the single entry point a scene calls to fight a battle from save data and pay it
 out. This covers the runtime code under
-`BeastCraft/Assets/_Project/Scripts/Runtime/{Save,Session,Progression,Campaign,Economy,Idle}` and the tooling that
-tests it outside Unity. The battle rules themselves are in [battle-system.md](battle-system.md); the
+`src/BeastCraft.Core/{Save,Session,Progression,Campaign,Economy,Idle}` and the tooling that
+tests it. The battle rules themselves are in [battle-system.md](battle-system.md); the
 economy (gold, the Trader, gear, consumables, cosmetics) is in [economy-and-shop.md](economy-and-shop.md);
 pacing numbers come from [`docs/balance/campaign-pacing-report.md`](../balance/campaign-pacing-report.md)
 (the region campaign) and [`docs/balance/pacing-report.md`](../balance/pacing-report.md) (skills and
@@ -114,7 +114,17 @@ definitions up through an `ISaveGearCatalog` (which `BattleContent` implements).
 ### Serializing, schema versions and migrations
 
 `SaveSerializer` turns a `PlayerSave` into JSON and back through an injected `ISaveJsonSerializer`.
-In the game that is `JsonUtilitySaveSerializer` (Unity's `JsonUtility`, optional pretty-print).
+In the game that is `JsonSaveSerializer` over `BeastCraft.FieldJson` (optional pretty-print).
+
+*The serializer.* `FieldJson` is System.Text.Json restricted to the rules the save DTOs were written
+for under Unity's `JsonUtility`: public instance fields only (no properties, no `readonly` or
+`[NonSerialized]` fields), names exactly as declared and case-sensitive, enums as numbers, unknown
+keys ignored, malformed input throws. It is the System.Text.Json implementation the save tests have
+always run on outside Unity, ported verbatim (same options and field filter) when the runtime became
+engine-neutral, so saves are written byte-for-byte as before. Golden fixtures pin that: schema 1-5
+saves in `Tooling/EditModeTests/Goldens/Saves` must load, migrate and write back byte-identically.
+(One known difference from real Unity `JsonUtility`, unchanged by the port: a null string or array
+field is written as `null` rather than `""`/`[]`.)
 
 - **Writing** stamps `SchemaVersion` to the current version, then serializes.
 - **Loading** never throws. It reads only the version first; refuses empty or unreadable text, a
@@ -150,10 +160,10 @@ slot name) — the thin IO seam. Cloud Save is a later backend; local files are 
 
 ### File storage (`FileSaveStorage`)
 
-`FileSaveStorage : ISaveStorage` is pure System.IO, rooted at a directory passed in. In the game,
-`UnitySaveLocations.Default()` builds one over `Application.persistentDataPath/saves` — the only
-Unity-dependent line in the save system (the UnityStub's `Application.persistentDataPath` is a temp
-directory, so CiLint, BalanceSim and the EditMode runner compile and run it).
+`FileSaveStorage : ISaveStorage` is pure System.IO, rooted at a directory passed in. By default
+`SaveLocations.Default()` builds one over the per-user local app-data folder
+(`LocalApplicationData/BeastCraft/saves`); a host with its own storage root passes it to
+`SaveLocations.DefaultDirectory(root)` or builds `FileSaveStorage` directly.
 
 *WebGL.* On WebGL, `Application.persistentDataPath` is an in-memory file system (Emscripten's
 IDBFS) that reaches the browser's IndexedDB only when JavaScript calls `FS.syncfs` after a write.
@@ -161,7 +171,7 @@ IDBFS) that reaches the browser's IndexedDB only when JavaScript calls `FS.syncf
 follow-up if WebGL is ever targeted (see Known gaps).
 
 ```csharp
-SaveStore store = new SaveStore(UnitySaveLocations.Default(), new SaveSerializer(new JsonUtilitySaveSerializer(), catalog));
+SaveStore store = new SaveStore(SaveLocations.Default(), new SaveSerializer(new JsonSaveSerializer(), catalog));
 store.Save("main", save);
 SaveLoadResult loaded = store.Load("main");
 ```
@@ -792,30 +802,18 @@ GUIDs); tests and the balance simulator's `RosterLoader` build the roster throug
 
 ---
 
-## Running the EditMode tests without Unity
+## Running the tests
 
 ```sh
 dotnet test Tooling/EditModeTests
 dotnet format Tooling/EditModeTests --verify-no-changes
 ```
 
-`Tooling/EditModeTests/EditModeTests.csproj` (net10.0, C# 9, NUnit 3) globs in the real
-`Scripts/Runtime`, `Scripts/Editor` and `Scripts/Tests/EditMode` sources and runs the whole EditMode
-suite. CI runs it too (format check, then `dotnet test --configuration Release`), as a final gate
-after a green local run, and it is no substitute for
-Unity's Test Runner, which exercises the real `JsonUtility` and asset serialization. The authored
-JSON data is not copied; the tests find it by walking up from the output directory.
-
-**The `JsonUtility` swap.** The project compiles the `Tooling/CiStubs/UnityStub` source files
-directly into the test assembly (not through a project reference) with the
-`UNITYSTUB_SYSTEM_TEXT_JSON` symbol defined. Under that symbol the stub's `JsonUtility.FromJson` /
-`ToJson(obj[, prettyPrint])` are real, implemented over System.Text.Json and restricted to
-JsonUtility's rules: public instance fields only (no properties, no readonly or `[NonSerialized]`
-fields), names exactly as declared and case-sensitive, enums as numbers, unknown keys ignored,
-malformed input throws. Without the symbol — how CiLint and BalanceSim build the stub — they still
-throw `NotSupportedException`. `Object.DestroyImmediate` is an honest no-op in every build. So the
-save tests run through `JsonUtilitySaveSerializer` in both places: the real `JsonUtility` in Unity,
-its System.Text.Json twin here.
+`Tooling/EditModeTests/EditModeTests.csproj` (net10.0, C# 9, NUnit 3) references
+`src/BeastCraft.Core` and compiles the suite in `BeastCraft/Assets/_Project/Scripts/Tests/EditMode`
+plus its own golden tests (`Tooling/EditModeTests/Goldens`). CI runs it too (format check, then
+`dotnet test --configuration Release`), as a final gate after a green local run. The authored JSON
+data is not copied; the tests find it by walking up from the output directory.
 
 ---
 

@@ -6,7 +6,6 @@ using BeastCraft.Creatures.Roster;
 using BeastCraft.Encounters;
 using BeastCraft.Skills;
 using NUnit.Framework;
-using UnityEngine;
 
 namespace BeastCraft.Tests.EditMode
 {
@@ -17,16 +16,11 @@ namespace BeastCraft.Tests.EditMode
     /// </summary>
     public class EnemyLibraryTests
     {
-        private readonly List<ScriptableObject> _created = new List<ScriptableObject>();
+        private readonly List<ContentAsset> _created = new List<ContentAsset>();
 
         [TearDown]
         public void TearDown()
         {
-            for (int i = 0; i < _created.Count; i++)
-            {
-                Object.DestroyImmediate(_created[i]);
-            }
-
             _created.Clear();
         }
 
@@ -169,7 +163,6 @@ namespace BeastCraft.Tests.EditMode
             Assert.AreEqual(0, plain.Elements.Length);
             Assert.AreEqual(CombatStance.Ranged, species.Stance);
             Assert.AreEqual(UnitFootprint.Triangle, species.Footprint);
-            Assert.AreEqual(HideFlags.DontUnloadUnusedAsset, species.hideFlags & HideFlags.DontUnloadUnusedAsset);
             Assert.AreEqual(CombatStance.Ranged, catalog.StanceOf("archer"));
             Assert.AreEqual(UnitFootprint.Triangle, catalog.FootprintOf("archer"));
         }
@@ -218,8 +211,6 @@ namespace BeastCraft.Tests.EditMode
                     Assert.AreEqual(authored.Effects[e].Magnitude, skill.Effects[e].Magnitude);
                     Assert.AreEqual(authored.Effects[e].HitCount, skill.Effects[e].HitCount);
                 }
-
-                Assert.AreEqual(HideFlags.DontUnloadUnusedAsset, skill.hideFlags & HideFlags.DontUnloadUnusedAsset);
             }
 
             Assert.AreEqual(SkillTargetingCriterion.CurrentHp, kit[0].TargetingCriterion);
@@ -311,7 +302,7 @@ namespace BeastCraft.Tests.EditMode
 
         private EnemyCatalog Catalog(EnemyLibraryData library)
         {
-            GrowthRateCurve curve = ScriptableObject.CreateInstance<GrowthRateCurve>();
+            GrowthRateCurve curve = new GrowthRateCurve();
             _created.Add(curve);
             EnemyCatalog catalog = EnemyCatalog.Build(library, curve);
             foreach (EnemyData enemy in catalog.Enemies)

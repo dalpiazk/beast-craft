@@ -6,7 +6,6 @@ using BeastCraft.Bonds;
 using BeastCraft.Creatures;
 using BeastCraft.Save;
 using NUnit.Framework;
-using UnityEngine;
 
 namespace BeastCraft.Tests.EditMode
 {
@@ -19,16 +18,11 @@ namespace BeastCraft.Tests.EditMode
     /// </summary>
     public class TeamSuggesterTests
     {
-        private readonly List<ScriptableObject> _created = new List<ScriptableObject>();
+        private readonly List<ContentAsset> _created = new List<ContentAsset>();
 
         [TearDown]
         public void TearDown()
         {
-            for (int i = 0; i < _created.Count; i++)
-            {
-                Object.DestroyImmediate(_created[i]);
-            }
-
             _created.Clear();
         }
 
@@ -348,7 +342,7 @@ namespace BeastCraft.Tests.EditMode
 
         private CreatureSpeciesSO Species(string id, CombatStance stance, Element element)
         {
-            CreatureSpeciesSO species = ScriptableObject.CreateInstance<CreatureSpeciesSO>();
+            CreatureSpeciesSO species = new CreatureSpeciesSO();
             _created.Add(species);
             species.SpeciesId = id;
             species.Stance = stance;
@@ -358,7 +352,7 @@ namespace BeastCraft.Tests.EditMode
 
         private TeamBondSO SpeciesBond(string id, params string[] species)
         {
-            TeamBondSO bond = ScriptableObject.CreateInstance<TeamBondSO>();
+            TeamBondSO bond = new TeamBondSO();
             _created.Add(bond);
             bond.BondId = id;
             bond.Condition = TeamBondCondition.Species;
@@ -369,7 +363,7 @@ namespace BeastCraft.Tests.EditMode
 
         private SkillSO Skill(SkillTargetSide side, StatusType? status)
         {
-            SkillSO skill = ScriptableObject.CreateInstance<SkillSO>();
+            SkillSO skill = new SkillSO();
             _created.Add(skill);
             skill.TargetSide = side;
             skill.Effects = new List<SkillEffect> { new SkillEffect { EffectType = SkillEffectType.Damage, Magnitude = 50 } };

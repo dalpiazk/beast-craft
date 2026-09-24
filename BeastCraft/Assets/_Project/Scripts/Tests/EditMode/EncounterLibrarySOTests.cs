@@ -1,6 +1,5 @@
 using BeastCraft.Encounters;
 using NUnit.Framework;
-using UnityEngine;
 
 namespace BeastCraft.Tests.EditMode
 {
@@ -16,16 +15,10 @@ namespace BeastCraft.Tests.EditMode
         [SetUp]
         public void SetUp()
         {
-            _asset = ScriptableObject.CreateInstance<EncounterLibrarySO>();
+            _asset = new EncounterLibrarySO();
             _asset.Enemies = EncounterContentTests.LoadEnemyLibrary();
             _asset.Encounters = EncounterContentTests.LoadEncounterLibrary();
             _asset.Difficulty = EncounterPlanTests.LoadDifficulty();
-        }
-
-        [TearDown]
-        public void TearDown()
-        {
-            Object.DestroyImmediate(_asset);
         }
 
         [Test]
@@ -62,7 +55,7 @@ namespace BeastCraft.Tests.EditMode
                 }
             };
 
-            EncounterLibraryData copy = JsonUtility.FromJson<EncounterLibraryData>(JsonUtility.ToJson(data));
+            EncounterLibraryData copy = FieldJson.FromJson<EncounterLibraryData>(FieldJson.ToJson(data));
 
             Assert.AreEqual(data.DifficultyScale, copy.DifficultyScale);
             Assert.AreEqual(data.SchemeWeights.Length, copy.SchemeWeights.Length);
@@ -78,7 +71,7 @@ namespace BeastCraft.Tests.EditMode
             Assert.AreEqual("Metal", copy.Templates[0].Groups[0].Elements[0]);
 
             EnemyLibraryData enemies = EncounterContentTests.LoadEnemyLibrary();
-            EnemyLibraryData enemiesCopy = JsonUtility.FromJson<EnemyLibraryData>(JsonUtility.ToJson(enemies));
+            EnemyLibraryData enemiesCopy = FieldJson.FromJson<EnemyLibraryData>(FieldJson.ToJson(enemies));
             Assert.AreEqual(enemies.Enemies.Length, enemiesCopy.Enemies.Length);
             for (int i = 0; i < enemies.Enemies.Length; i++)
             {
@@ -88,7 +81,7 @@ namespace BeastCraft.Tests.EditMode
             }
 
             EncounterDifficultyData difficulty = EncounterPlanTests.LoadDifficulty();
-            EncounterDifficultyData difficultyCopy = JsonUtility.FromJson<EncounterDifficultyData>(JsonUtility.ToJson(difficulty));
+            EncounterDifficultyData difficultyCopy = FieldJson.FromJson<EncounterDifficultyData>(FieldJson.ToJson(difficulty));
             Assert.AreEqual(difficulty.Cells.Length, difficultyCopy.Cells.Length);
             Assert.AreEqual(difficulty.Cells[0].Multiplier, difficultyCopy.Cells[0].Multiplier);
         }

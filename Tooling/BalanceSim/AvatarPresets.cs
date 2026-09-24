@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using BeastCraft.Avatar;
 using BeastCraft.Battle;
 using BeastCraft.Creatures;
-using UnityEngine;
 
 namespace BeastCraft.Tooling.BalanceSim
 {
@@ -62,7 +61,7 @@ namespace BeastCraft.Tooling.BalanceSim
 
             // The avatar's stats are an AvatarStatsSO on the roster's curve, read exactly as the game
             // reads one (GetStatsAtLevel): Hp 1 (it is never targeted), the combat stats and Speed.
-            _stats = ScriptableObject.CreateInstance<AvatarStatsSO>();
+            _stats = new AvatarStatsSO();
             _stats.BaseStats = new StatBlock(1, StatAtMaxLevel, StatAtMaxLevel, StatAtMaxLevel, StatAtMaxLevel, SpeedAtMaxLevel);
             _stats.Growth = curve;
 
@@ -175,7 +174,7 @@ namespace BeastCraft.Tooling.BalanceSim
 
         private static PassiveSkillSO Passive(string id, PassiveTrigger trigger, PassiveTarget scope, SkillEffect effect)
         {
-            PassiveSkillSO passive = ScriptableObject.CreateInstance<PassiveSkillSO>();
+            PassiveSkillSO passive = new PassiveSkillSO();
             passive.PassiveId = id;
             passive.DisplayName = id;
             passive.Trigger = trigger;

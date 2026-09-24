@@ -4,7 +4,6 @@ using BeastCraft.Battle.Grid;
 using BeastCraft.Creatures;
 using BeastCraft.Progression;
 using NUnit.Framework;
-using UnityEngine;
 
 namespace BeastCraft.Tests.EditMode
 {
@@ -15,16 +14,11 @@ namespace BeastCraft.Tests.EditMode
     /// </summary>
     public class SkillProgressionTests
     {
-        private readonly List<ScriptableObject> _created = new List<ScriptableObject>();
+        private readonly List<ContentAsset> _created = new List<ContentAsset>();
 
         [TearDown]
         public void TearDown()
         {
-            for (int i = 0; i < _created.Count; i++)
-            {
-                Object.DestroyImmediate(_created[i]);
-            }
-
             _created.Clear();
         }
 
@@ -372,7 +366,7 @@ namespace BeastCraft.Tests.EditMode
             SkillSO first = Skill(1, "first");
             SkillSO fifth = Skill(1, "fifth");
             SkillSO tenth = Skill(1, "tenth");
-            CreatureSpeciesSO species = ScriptableObject.CreateInstance<CreatureSpeciesSO>();
+            CreatureSpeciesSO species = new CreatureSpeciesSO();
             _created.Add(species);
             species.LearnableSkills.Add(new SkillLearnEntry { Level = 1, Skill = first });
             species.LearnableSkills.Add(new SkillLearnEntry { Level = 5, Skill = fifth });
@@ -422,7 +416,7 @@ namespace BeastCraft.Tests.EditMode
             Assert.AreEqual(4, loadout.GetInstance(1).Level);
             Assert.IsNull(loadout.GetInstance(2));
 
-            CreatureSpeciesSO species = ScriptableObject.CreateInstance<CreatureSpeciesSO>();
+            CreatureSpeciesSO species = new CreatureSpeciesSO();
             _created.Add(species);
             BattleUnit unit = BattleUnitFactory.CreateBeast("b1", BattleTeam.Player, species, 1, null, HexCoordinate.Zero, book, Lookup(assets));
             Assert.AreEqual(2, unit.Skills.Count);
@@ -544,7 +538,7 @@ namespace BeastCraft.Tests.EditMode
 
         private SkillSO Skill(int cooldown, string id = "skill")
         {
-            SkillSO skill = ScriptableObject.CreateInstance<SkillSO>();
+            SkillSO skill = new SkillSO();
             skill.SkillId = id;
             skill.Cooldown = cooldown;
             skill.TargetShape = SkillTargetShape.SingleTarget;
@@ -555,7 +549,7 @@ namespace BeastCraft.Tests.EditMode
 
         private SkillMaterialSO Material(int tier, int xp)
         {
-            SkillMaterialSO material = ScriptableObject.CreateInstance<SkillMaterialSO>();
+            SkillMaterialSO material = new SkillMaterialSO();
             material.MaterialId = "mat-t" + tier;
             material.Tier = tier;
             material.XpValue = xp;

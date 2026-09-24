@@ -4,22 +4,16 @@ using BeastCraft.Battle;
 using BeastCraft.Battle.Grid;
 using BeastCraft.Creatures;
 using NUnit.Framework;
-using UnityEngine;
 
 namespace BeastCraft.Tests.EditMode
 {
     public class BattleAvatarStatsTests
     {
-        private readonly List<ScriptableObject> _created = new List<ScriptableObject>();
+        private readonly List<ContentAsset> _created = new List<ContentAsset>();
 
         [TearDown]
         public void TearDown()
         {
-            for (int i = 0; i < _created.Count; i++)
-            {
-                Object.DestroyImmediate(_created[i]);
-            }
-
             _created.Clear();
         }
 
@@ -97,7 +91,7 @@ namespace BeastCraft.Tests.EditMode
         [Test]
         public void Create_FromAvatarStatsAsset_UsesItsBase()
         {
-            AvatarStatsSO profile = ScriptableObject.CreateInstance<AvatarStatsSO>();
+            AvatarStatsSO profile = new AvatarStatsSO();
             profile.BaseStats = new StatBlock(30, 4, 0, 0, 0, 0);
             _created.Add(profile);
             AvatarGearSO trinket = Gear(AvatarGearSlot.Trinket, new StatModifier { Stat = StatType.HP, PercentBonus = 0.5f });
@@ -142,7 +136,7 @@ namespace BeastCraft.Tests.EditMode
         [Test]
         public void NewAvatarStatsAsset_DefaultsToTheReferenceSpeed()
         {
-            AvatarStatsSO profile = ScriptableObject.CreateInstance<AvatarStatsSO>();
+            AvatarStatsSO profile = new AvatarStatsSO();
             _created.Add(profile);
 
             Assert.AreEqual(AvatarStatsSO.DefaultSpeed, profile.BaseStats.Speed);
@@ -153,8 +147,8 @@ namespace BeastCraft.Tests.EditMode
         [Test]
         public void Create_FromProfileAndProgress_ScalesTheBaseToTheAvatarsLevel()
         {
-            AvatarStatsSO profile = ScriptableObject.CreateInstance<AvatarStatsSO>();
-            GrowthRateCurve growth = ScriptableObject.CreateInstance<GrowthRateCurve>();
+            AvatarStatsSO profile = new AvatarStatsSO();
+            GrowthRateCurve growth = new GrowthRateCurve();
             _created.Add(profile);
             _created.Add(growth);
             growth.Curve = AnimationCurve.Linear(0f, 0.2f, 1f, 1f);
@@ -203,7 +197,7 @@ namespace BeastCraft.Tests.EditMode
         [Test]
         public void StatfulAvatar_IsNeverHitOrDefeated_InABattleItsSideLoses()
         {
-            SkillSO sweep = ScriptableObject.CreateInstance<SkillSO>();
+            SkillSO sweep = new SkillSO();
             sweep.TargetShape = SkillTargetShape.AllEnemies;
             sweep.TargetSide = SkillTargetSide.Enemy;
             sweep.Effects.Add(new SkillEffect { EffectType = SkillEffectType.Damage, Magnitude = 1000f });
@@ -227,7 +221,7 @@ namespace BeastCraft.Tests.EditMode
 
         private AvatarGearSO Gear(AvatarGearSlot slot, params StatModifier[] modifiers)
         {
-            AvatarGearSO gear = ScriptableObject.CreateInstance<AvatarGearSO>();
+            AvatarGearSO gear = new AvatarGearSO();
             gear.Slot = slot;
             gear.Modifiers.AddRange(modifiers);
             _created.Add(gear);

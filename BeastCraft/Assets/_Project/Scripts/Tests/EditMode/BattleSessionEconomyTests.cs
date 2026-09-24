@@ -155,7 +155,7 @@ namespace BeastCraft.Tests.EditMode
         [Test]
         public void Run_WithAnInvalidSetup_LeavesTheSaveByteIdentical()
         {
-            SaveSerializer serializer = new SaveSerializer(new JsonUtilitySaveSerializer(), SaveContentCatalog.FromData(_roster, _library));
+            SaveSerializer serializer = new SaveSerializer(new JsonSaveSerializer(), SaveContentCatalog.FromData(_roster, _library));
             PlayerSave save = StarterSave();
             ConsumableInventory.TryAdd(save, "fury_draught", 1, 5);
             string before = serializer.Serialize(save);
@@ -245,7 +245,7 @@ namespace BeastCraft.Tests.EditMode
 
         private static string Json(object value)
         {
-            return UnityEngine.JsonUtility.ToJson(value);
+            return FieldJson.ToJson(value);
         }
     }
 }

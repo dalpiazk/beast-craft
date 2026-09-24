@@ -5,8 +5,6 @@ using BeastCraft.Battle.Grid;
 using BeastCraft.Battle.Placement;
 using BeastCraft.Creatures;
 using NUnit.Framework;
-using UnityEngine;
-using Object = UnityEngine.Object;
 using Random = System.Random;
 
 namespace BeastCraft.Tests.EditMode
@@ -32,11 +30,6 @@ namespace BeastCraft.Tests.EditMode
         [TearDown]
         public void TearDown()
         {
-            for (int i = 0; i < _created.Count; i++)
-            {
-                Object.DestroyImmediate(_created[i]);
-            }
-
             _created.Clear();
         }
 
@@ -697,18 +690,11 @@ namespace BeastCraft.Tests.EditMode
         [Test]
         public void Factory_CopiesTheSpeciesFootprint_DefaultSingle()
         {
-            CreatureSpeciesSO species = ScriptableObject.CreateInstance<CreatureSpeciesSO>();
-            try
-            {
-                Assert.AreEqual(UnitFootprint.Single, BattleUnitFactory.CreateBeast("a", BattleTeam.Player, species, 1, null, HexCoordinate.Zero).Footprint);
-                species.Footprint = UnitFootprint.Hex7;
-                Assert.AreEqual(UnitFootprint.Hex7, BattleUnitFactory.CreateBeast("g", BattleTeam.Enemy, species, 1, null, HexCoordinate.Zero).Footprint);
-                Assert.AreEqual(UnitFootprint.Single, BattleUnitFactory.CreateBeast("n", BattleTeam.Enemy, null, 1, null, HexCoordinate.Zero).Footprint);
-            }
-            finally
-            {
-                Object.DestroyImmediate(species);
-            }
+            CreatureSpeciesSO species = new CreatureSpeciesSO();
+            Assert.AreEqual(UnitFootprint.Single, BattleUnitFactory.CreateBeast("a", BattleTeam.Player, species, 1, null, HexCoordinate.Zero).Footprint);
+            species.Footprint = UnitFootprint.Hex7;
+            Assert.AreEqual(UnitFootprint.Hex7, BattleUnitFactory.CreateBeast("g", BattleTeam.Enemy, species, 1, null, HexCoordinate.Zero).Footprint);
+            Assert.AreEqual(UnitFootprint.Single, BattleUnitFactory.CreateBeast("n", BattleTeam.Enemy, null, 1, null, HexCoordinate.Zero).Footprint);
         }
 
         // ---------------------------------------------------------------------------------------
@@ -799,7 +785,7 @@ namespace BeastCraft.Tests.EditMode
 
         private void Knock(BattleUnit caster, BattleUnit target, int hexes, HexGrid grid)
         {
-            SkillSO skill = ScriptableObject.CreateInstance<SkillSO>();
+            SkillSO skill = new SkillSO();
             skill.Effects.Add(new SkillEffect { EffectType = SkillEffectType.ApplyStatus, Status = StatusType.Knockback, Magnitude = hexes });
             _created.Add(skill);
             SkillEffectApplier.Apply(new SkillActivation(skill, new[] { target }), caster, null, grid);
@@ -842,7 +828,7 @@ namespace BeastCraft.Tests.EditMode
 
         private SkillSO Area(SkillTargetShape shape, int range)
         {
-            SkillSO skill = ScriptableObject.CreateInstance<SkillSO>();
+            SkillSO skill = new SkillSO();
             skill.TargetShape = shape;
             skill.Range = range;
             skill.Cooldown = 1;
