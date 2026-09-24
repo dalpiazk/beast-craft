@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using BeastCraft.Battle.Grid;
 using BeastCraft.Creatures;
 
 namespace BeastCraft.Tooling.BalanceSim
@@ -161,6 +162,13 @@ namespace BeastCraft.Tooling.BalanceSim
                     return byStance != 0 ? byStance : order[a.Key.EnemyId].CompareTo(order[b.Key.EnemyId]);
                 });
 
+                // Every draw must seat on the shape's arena (large enemies need room). The loader's
+                // worst-case check makes this pass for every draw of a valid file; it is a safety net.
+                if (!EncounterLoader.Fits(shape.ParsedArena, Footprints(sorted)))
+                {
+                    continue;
+                }
+
                 string key = Describe(sorted);
                 if (seen.Contains(key) && attempt < DistinctAttempts)
                 {
@@ -176,6 +184,21 @@ namespace BeastCraft.Tooling.BalanceSim
         }
 
         /// <summary>Front-to-back placement rank: melee screen first, ranged at the back.</summary>
+        /// <summary>The footprint of every unit of a sorted draw, in placement order.</summary>
+        private static List<UnitFootprint> Footprints(List<KeyValuePair<EnemyTypeData, int>> sorted)
+        {
+            List<UnitFootprint> footprints = new List<UnitFootprint>();
+            foreach (KeyValuePair<EnemyTypeData, int> entry in sorted)
+            {
+                for (int i = 0; i < entry.Value; i++)
+                {
+                    footprints.Add(entry.Key.ParsedFootprint);
+                }
+            }
+
+            return footprints;
+        }
+
         private static int StanceRank(CombatStance stance)
         {
             switch (stance)

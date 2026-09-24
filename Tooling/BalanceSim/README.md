@@ -77,7 +77,7 @@ Two reports are committed, both the default arguments:
   the ATB turn order, so its battle lengths are in rounds.
 - `docs/balance/tuned-report.md` — the current roster and skill library after the third tuning pass
   and its element chart v2 follow-up (see `docs/balance/tuning-log.md`, "Retune with authored kits,
-  avatar passives, sqrt speed and mitigation", "Element chart v2", "Thunderbird range vs move" and "Niche pass: Thunderbird opener, Phoenix/Frost Wyrm lifts, remaining negatives", then "Team bonds"; "Scouting and counter-picking" added the scouted-picking section, no balance change; "Avatar gauge" moved the avatar onto its own ATB gauge, no tuning), under the real game setup (every beast's authored default loadout, the library
+  avatar passives, sqrt speed and mitigation", "Element chart v2", "Thunderbird range vs move" and "Niche pass: Thunderbird opener, Phoenix/Frost Wyrm lifts, remaining negatives", then "Team bonds"; "Scouting and counter-picking" added the scouted-picking section, no balance change; "Avatar gauge" moved the avatar onto its own ATB gauge, no tuning; "Large enemies (footprints)" made the giant, colossus and champion multi-hex, no tuning beyond the bosses' range parity), under the real game setup (every beast's authored default loadout, the library
   avatar with its passives, the library's team bonds, skill level 1), the current Runtime (the square-root ATB turn order, the
   mitigation damage formula, `SpecialAttack`-scaled heals, combat stances, variance and crits) and
   the generated encounters. Regenerate it whenever the roster, the skill library, fixtures, simulator
@@ -207,6 +207,19 @@ cooldown 2 weighted `Attack` about twice as heavily.
   2 or more (a Ranged unit never walks into melee), an enemy without a `SingleTarget` skill (the only
   shape that walks), move 0, and a composition that cannot fit its deployment zone.
 
+  Each enemy also has an optional `Footprint` (a `UnitFootprint` name; missing = `Single`, one
+  tile): the giant and the colossus are `Hex7` (seven tiles, the boss size) and the champion
+  `Triangle` (three tiles, the mini-boss size); see "Unit footprints" in
+  `docs/design/battle-system.md`. Every range to or from a large enemy is measured between nearest
+  tiles, an area hits it once, and a large caster's area grows from all its tiles, so the `Hex7`
+  bosses author their ranges one lower than their one-tile values were (gaze 2, quake and roar 1: a
+  radius-1 burst from a `Hex7` is the radius-2 disc around its centre) to keep their reach; the
+  champion's shockwave stays at 2. The loader packs every shape's worst case (each slot at its `Max`,
+  each unit its slot's largest type, largest first) and every fixed encounter into the enemy zone the
+  way a battle does, and refuses what does not fit: a `Hex7` enemy never fits a `Small` arena (a
+  two-row zone). The generator also refuses a draw that would not fit (a safety net; no valid file
+  produces one).
+
   The advanced effect fields are optional, and every one is inert when missing. See "Status effects
   and advanced skill effects" in `docs/design/battle-system.md`.
   - Per enemy: `StatusResist` (0–100, `BattleUnit.StatusResist`).
@@ -221,7 +234,11 @@ cooldown 2 weighted `Attack` about twice as heavily.
   The bosses (giant, champion and the fixed colossus) carry `StatusResist` 50. No fixture skill uses
   the other fields yet, so the reports are unchanged.
 - **Placement.** Each side takes the front-most tiles of its own deployment zone (front row first,
-  then outward from the centre line). Enemies are placed in fixture order; the team is committed
+  then outward from the centre line). Enemies are placed in fixture order by `DeploymentPacker`: each
+  takes the front-most anchor where its whole footprint fits the zone on free tiles, so one-tile
+  enemies take exactly the front-most tiles and a `Hex7` boss on a Medium board sits centred on the
+  middle row of the enemy zone, its escort filling the tiles around it (the layout is worked out once
+  per composition). The team is committed
   through `PlacementValidator.TryPlaceAll`. Which member gets which slot is a fixed seeded shuffle
   per team, because the slot fixes the unit id, and ids break initiative ties and equal-distance target
   ties within the team. Pinning slots to roster order would always expose the first species.
@@ -311,8 +328,8 @@ encounter set simulates that.
 
 | Type | Role | Threat | Stance | Kit (targeting) |
 | --- | --- | ---: | --- | --- |
-| Giant | boss, HP 1600 | 12 | Vanguard | crush (Physical, r1) and gaze (Special, r3), power 70, nearest; quake + roar (Physical + Special AreaBurst, r2, power 35, cd 3) |
-| Champion | mini-boss, HP 800 | 6 | Vanguard | cleave (Physical, r1, power 55, nearest); hex (Special, r2, power 55, cd 2, lowest current HP); shockwave (Special AreaBurst, r2, power 30, cd 3) |
+| Giant (7 tiles) | boss, HP 1600 | 12 | Vanguard | crush (Physical, r1) and gaze (Special, r2), nearest; quake + roar (Physical + Special AreaBurst, r1 from its footprint = r2 from its centre, cd 3) |
+| Champion (3 tiles) | mini-boss, HP 800 | 6 | Vanguard | cleave (Physical, r1, nearest); hex (Special, r2, cd 2, lowest current HP); shockwave (Special AreaBurst, r2 from its footprint, cd 3) |
 | Brute | melee tank | 2.75 | Vanguard | smash (Physical, r1, power 50, nearest) |
 | Stalker | fast melee hunter (Speed 105, Move 4, crit 10) | 2 | Skirmisher | shadow claw (Special, r1, power 55, lowest current HP) |
 | Archer | ranged physical | 2 | Ranged | arrow (Physical, r3, power 42, nearest) |
@@ -630,6 +647,13 @@ where changing the seed (777) moves them by about 2 on average, up to 6.7, and a
 to 18. The report says so in its PvE
 configuration. Use it for quick iteration, and the default for anything committed.
 
+**Unit footprints** (multi-hex bosses) cost about a tenth: the default run went from 47.9 s to
+52.5 s on the same machine, most of it in the `solo` and `elite` cells (+1.8 s each: a seven-tile
+giant's moves test every tile of its footprint, and one-tile units closing on it aim at twelve goal
+tiles instead of seven). A battle of one-tile units runs the same code as before (one enum compare
+per distance): the `squad` and `horde` cells moved by run-to-run noise only, and their results are
+byte-identical.
+
 Measure before optimizing further: `--timings` prints the per-cell and per-step breakdown.
 
 ## Determinism
@@ -658,8 +682,11 @@ fixtures, code and arguments produce a byte-identical report.
 - **Fixture enemies.** Their stat ratios, kits, threat weights and the generator's element schemes
   decide which beasts look good. The calibration removes overall difficulty, but not shape. The type
   pool is small and hand-made: which types exist, and how often each is drawn, is itself a bias.
-- **Large creatures are one hex.** `HexGrid` has no multi-hex footprint, so the boss can be
-  surrounded by six attackers. This is an open item in the design doc.
+- **Large creatures are simple shapes.** The giant and the colossus cover seven tiles and the
+  champion three (no rotation, no terrain interaction beyond fitting), measured nearest tile to
+  nearest tile; a giant cannot be knocked back and a champion moves at most one tile. Before the
+  footprints (see the tuning log, "Large enemies (footprints)") every boss was one hex and could be
+  surrounded by six attackers; a giant now has twelve tiles around it.
 - **No gear,** a fixture avatar stat block, and only species base stats, the growth curve and the
   level.
 

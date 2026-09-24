@@ -7,7 +7,7 @@ namespace BeastCraft.Creatures.Roster
     /// Structural integrity checks for <see cref="BeastRosterData"/>: the rules every roster file
     /// must satisfy to import at all (ids present, unique and well-formed, elements that parse,
     /// curve references that resolve, curves that start above 0 and end at 1, stats that are
-    /// usable, a crit chance that is a percent, stances that parse). Balance guidelines — stat budgets, move-range bands, one beast per element — are
+    /// usable, a crit chance that is a percent, stances that parse, and no footprint other than Single — beasts are always one tile). Balance guidelines — stat budgets, move-range bands, one beast per element — are
     /// deliberately NOT here; they are tests over the current starter roster, and the balance
     /// simulator is free to move them.
     /// </summary>
@@ -256,6 +256,12 @@ namespace BeastCraft.Creatures.Roster
                 if (!TryParseStance(s.Stance, out CombatStance _))
                 {
                     errors.Add(label + ": '" + s.Stance + "' is not a CombatStance name (Vanguard, Ranged or Skirmisher).");
+                }
+
+                // Beasts are always one tile: multi-hex footprints are for large enemies only.
+                if (!string.IsNullOrEmpty(s.Footprint) && !string.Equals(s.Footprint, "Single", StringComparison.Ordinal))
+                {
+                    errors.Add(label + ": Footprint '" + s.Footprint + "' is not allowed; beasts always occupy a single tile (Single).");
                 }
 
                 StatBlock stats = s.BaseStats;

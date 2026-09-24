@@ -126,5 +126,12 @@ namespace BeastCraft.Creatures.Roster
         /// <see cref="CombatStance.Vanguard"/>, the species default.
         /// </summary>
         public string Stance;
+
+        /// <summary>
+        /// Not authored: beasts are always one tile. Present only so a roster that tries to give a
+        /// beast a footprint is refused by <see cref="BeastRosterValidator"/> rather than silently
+        /// ignored. Missing, empty or <c>"Single"</c> is the only accepted value.
+        /// </summary>
+        public string Footprint;
     }
 }

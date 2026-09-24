@@ -111,6 +111,18 @@ namespace BeastCraft.Battle
     /// With a null grid nothing moves, whatever the stance.
     /// </para>
     /// <para>
+    /// <strong>Large units</strong> (see <see cref="UnitFootprint"/>). A unit that covers several
+    /// tiles is still one unit with one anchor (<see cref="BattleUnit.Position"/>), and every rule
+    /// above holds for it with distances measured between nearest tiles
+    /// (<see cref="FootprintMath"/>). A one-tile unit closing on a large one aims at the tiles
+    /// around its whole footprint (see <see cref="ApproachGoals"/>) and a standoff unit keeps its
+    /// distance from the nearest of them. A large unit moves by anchor: its whole footprint must fit
+    /// at every step (<see cref="HexGrid.CanStand"/>), it approaches by a breadth-first search for
+    /// the cheapest anchor in range (see <see cref="TryPlanLargeApproach"/>), and it counts each
+    /// enemy next to any of its tiles once when it weighs crowding. A battle of one-tile units runs
+    /// exactly the rules it always did.
+    /// </para>
+    /// <para>
     /// <strong>Statuses.</strong> The executor frames every turn with the status engine
     /// (<see cref="StatusEffects.BeginTurn"/> as it opens, <see cref="StatusEffects.EndTurn"/> as
     /// it closes): damage-over-time lands first and can end the turn, and a
@@ -358,7 +370,7 @@ namespace BeastCraft.Battle
                     continue;
                 }
 
-                if (unit.Position.Distance(candidate.Position) <= skill.Range)
+                if (FootprintMath.UnitDistance(unit, candidate) <= skill.Range)
                 {
                     outcomes.Add(Fire(loadout, slotIndex, skill, unit, allUnits, grid, rng, 0, hooks));
                     continue;
@@ -744,6 +756,11 @@ namespace BeastCraft.Battle
         /// </list>
         /// </para>
         /// <para>
+        /// <strong>Large units.</strong> Against a large candidate the goals ring its whole footprint
+        /// (<see cref="ApproachGoals"/>) and range is measured to its nearest tile. A large
+        /// <em>mover</em> plans differently altogether: see <see cref="TryPlanLargeApproach"/>.
+        /// </para>
+        /// <para>
         /// The search starts at index 1 of each route: index 0 is the tile the mover is already on,
         /// and that tile is known to be out of range because the caller checked before asking. A
         /// route that never comes within range — possible for a <c>Range</c> of 0, which wants a
@@ -769,6 +786,11 @@ namespace BeastCraft.Battle
                 return false;
             }
 
+            if (mover.Footprint != UnitFootprint.Single)
+            {
+                return TryPlanLargeApproach(mover, candidate, skill, allUnits, grid, out route, out steps);
+            }
+
             List<BattleUnit> screened = mover.Stance == CombatStance.Vanguard ? FragileAllies(mover, allUnits) : null;
             bool screening = screened != null && screened.Count > 0;
 
@@ -784,7 +806,7 @@ namespace BeastCraft.Battle
 
                 for (int step = 1; step < path.Count; step++)
                 {
-                    if (path[step].Distance(candidate.Position) > skill.Range)
+                    if (FootprintMath.DistanceTo(path[step], candidate.Position, candidate.Footprint) > skill.Range)
                     {
                         continue;
                     }
@@ -837,6 +859,13 @@ namespace BeastCraft.Battle
         /// when nothing stands on it, then each of its six neighbours, in
         /// <see cref="HexCoordinate.AxialDirections"/>' fixed order. Impassable goals are dropped
         /// here rather than searched for and failed on.
+        /// <para>
+        /// A large candidate is ringed instead: after its anchor (when nothing stands there), every
+        /// tile next to any of its tiles and not one of them — twelve around a
+        /// <see cref="UnitFootprint.Hex7"/>, nine around a <see cref="UnitFootprint.Triangle"/> —
+        /// walked footprint tile by footprint tile (<see cref="Footprints.Offsets"/>' order), each in
+        /// <see cref="HexCoordinate.AxialDirections"/>' order, first sighting kept.
+        /// </para>
         /// </summary>
         private static List<HexCoordinate> ApproachGoals(HexGrid grid, BattleUnit mover, BattleUnit candidate)
         {
@@ -849,6 +878,27 @@ namespace BeastCraft.Battle
 
             IReadOnlyList<HexCoordinate> directions = HexCoordinate.AxialDirections;
 
+            if (candidate.Footprint != UnitFootprint.Single)
+            {
+                IReadOnlyList<HexCoordinate> offsets = Footprints.Offsets(candidate.Footprint);
+
+                for (int o = 0; o < offsets.Count; o++)
+                {
+                    for (int i = 0; i < directions.Count; i++)
+                    {
+                        HexCoordinate ring = candidate.Position + offsets[o] + directions[i];
+
+                        if (FootprintMath.DistanceTo(ring, candidate.Position, candidate.Footprint) == 1 && grid.IsPassable(ring, mover.Id) &&
+                            !goals.Contains(ring))
+                        {
+                            goals.Add(ring);
+                        }
+                    }
+                }
+
+                return goals;
+            }
+
             for (int i = 0; i < directions.Count; i++)
             {
                 HexCoordinate tile = candidate.Position + directions[i];
@@ -860,6 +910,96 @@ namespace BeastCraft.Battle
             }
 
             return goals;
+        }
+
+        /// <summary>
+        /// <see cref="TryPlanApproach"/> for a large mover (any footprint but
+        /// <see cref="UnitFootprint.Single"/>). Rather than aiming A* at goal tiles, it walks every
+        /// anchor it can reach (<see cref="ReachableTiles"/>, where the whole footprint must fit at
+        /// every step) and takes the cheapest anchor from which the candidate is in range, measured
+        /// footprint to footprint. Among anchors of that cost: a <see cref="CombatStance.Vanguard"/>
+        /// with fragile allies prefers the one nearest the closest of them (screening, judged at the
+        /// in-range anchor); a <see cref="CombatStance.Ranged"/> or
+        /// <see cref="CombatStance.Skirmisher"/> unit the one farthest from the candidate, then the
+        /// one with the fewest enemies next to any of its tiles; then breadth-first discovery order.
+        /// The route is then <see cref="HexPathfinder.FindPath(HexGrid, HexCoordinate, HexCoordinate, string, UnitFootprint)"/>
+        /// to that anchor, which has exactly the breadth-first cost, so a partial approach walks a
+        /// prefix of it as usual. False when no reachable anchor is in range.
+        /// </summary>
+        private static bool TryPlanLargeApproach(BattleUnit mover, BattleUnit candidate, SkillSO skill, IEnumerable<BattleUnit> allUnits, HexGrid grid,
+                                                 out IReadOnlyList<HexCoordinate> route, out int steps)
+        {
+            route = null;
+            steps = 0;
+
+            List<BattleUnit> screened = mover.Stance == CombatStance.Vanguard ? FragileAllies(mover, allUnits) : null;
+            bool screening = screened != null && screened.Count > 0;
+            bool standoff = mover.Stance == CombatStance.Ranged || mover.Stance == CombatStance.Skirmisher;
+            List<BattleUnit> enemies = standoff ? LivingEnemies(mover, allUnits) : null;
+
+            ReachMap costs = ReachableTiles(grid, mover, int.MaxValue);
+            List<HexCoordinate> order = costs.Order;
+
+            bool found = false;
+            HexCoordinate best = mover.Position;
+            int bestCost = 0;
+            int bestDistance = 0;
+            int bestCrowd = 0;
+            int bestScreen = 0;
+
+            // Index 0 is the mover's own anchor, already known to be out of range.
+            for (int i = 1; i < order.Count; i++)
+            {
+                HexCoordinate anchor = order[i];
+                int cost;
+                costs.TryGetCost(anchor, out cost);
+
+                if (found && cost > bestCost)
+                {
+                    // Breadth-first order: nothing further on is as cheap.
+                    break;
+                }
+
+                int distance = FootprintMath.UnitDistance(anchor, mover.Footprint, candidate.Position, candidate.Footprint);
+
+                if (distance > skill.Range)
+                {
+                    continue;
+                }
+
+                int crowd = standoff ? AdjacentCount(anchor, mover.Footprint, enemies) : 0;
+                int screen = screening ? ScreeningDistance(anchor, screened) : 0;
+
+                bool better = !found
+                    || (standoff && (distance > bestDistance || (distance == bestDistance && crowd < bestCrowd)))
+                    || (screening && screen < bestScreen);
+
+                if (better)
+                {
+                    found = true;
+                    best = anchor;
+                    bestCost = cost;
+                    bestDistance = distance;
+                    bestCrowd = crowd;
+                    bestScreen = screen;
+                }
+            }
+
+            if (!found)
+            {
+                return false;
+            }
+
+            IReadOnlyList<HexCoordinate> path = HexPathfinder.FindPath(grid, mover.Position, best, mover.Id, mover.Footprint);
+
+            if (path.Count < 2)
+            {
+                return false;
+            }
+
+            route = path;
+            steps = path.Count - 1;
+            return true;
         }
 
         /// <summary>
@@ -890,7 +1030,11 @@ namespace BeastCraft.Battle
             pick = mover.Position;
             ReachMap costs = ReachableTiles(grid, mover, int.MaxValue);
             List<BattleUnit> enemies = LivingEnemies(mover, allUnits);
-            IReadOnlyList<HexCoordinate> tiles = grid.GetTilesInRange(candidate.Position, skill.Range);
+
+            // A large candidate's in-range tiles all lie within Range + 1 of its anchor; the
+            // distance filter below keeps only those within Range of its nearest tile.
+            bool large = candidate.Footprint != UnitFootprint.Single;
+            IReadOnlyList<HexCoordinate> tiles = grid.GetTilesInRange(candidate.Position, large ? skill.Range + 1 : skill.Range);
 
             bool found = false;
             int bestCost = 0;
@@ -908,8 +1052,14 @@ namespace BeastCraft.Battle
                     continue;
                 }
 
-                int distance = tile.Distance(candidate.Position);
-                int crowd = AdjacentCount(tile, enemies);
+                int distance = FootprintMath.DistanceTo(tile, candidate.Position, candidate.Footprint);
+
+                if (large && distance > skill.Range)
+                {
+                    continue;
+                }
+
+                int crowd = AdjacentCount(tile, UnitFootprint.Single, enemies);
                 bool isPlain = plainStop.HasValue && plainStop.Value == tile;
 
                 bool better = !found
@@ -973,8 +1123,8 @@ namespace BeastCraft.Battle
             List<HexCoordinate> order = costs.Order;
 
             HexCoordinate best = unit.Position;
-            int bestNearest = NearestDistance(best, enemies);
-            int bestCrowd = AdjacentCount(best, enemies);
+            int bestNearest = NearestDistance(best, unit.Footprint, enemies);
+            int bestCrowd = AdjacentCount(best, unit.Footprint, enemies);
             int bestCost = 0;
 
             for (int i = 0; i < order.Count; i++)
@@ -986,14 +1136,14 @@ namespace BeastCraft.Battle
                     continue;
                 }
 
-                int nearest = NearestDistance(tile, enemies);
+                int nearest = NearestDistance(tile, unit.Footprint, enemies);
 
                 if (nearest > cap)
                 {
                     continue;
                 }
 
-                int crowd = AdjacentCount(tile, enemies);
+                int crowd = AdjacentCount(tile, unit.Footprint, enemies);
                 int cost;
                 costs.TryGetCost(tile, out cost);
 
@@ -1040,12 +1190,14 @@ namespace BeastCraft.Battle
         /// steps, with its step cost, the mover's own tile included at 0. Breadth-first over
         /// <see cref="HexGrid.IsPassable"/> tiles (other units obstruct, as they do for the
         /// pathfinder), expanding neighbours in <see cref="HexCoordinate.AxialDirections"/>' fixed
-        /// order; <see cref="ReachMap.Order"/> holds the tiles in discovery order.
+        /// order; <see cref="ReachMap.Order"/> holds the tiles in discovery order. For a large mover
+        /// the tiles are anchors and each must satisfy <see cref="HexGrid.CanStand"/> for its
+        /// footprint, exactly as the footprint-aware pathfinder requires.
         /// <para>
         /// The result is this thread's reusable <see cref="ReachMap"/>, valid until the next call
         /// on the same thread: read it before searching again. (Only
-        /// <see cref="TryPickStandoffTile"/> and <see cref="Retreat"/> call this, and each reads its
-        /// map to the end before anything else searches.)
+        /// <see cref="TryPickStandoffTile"/>, <see cref="TryPlanLargeApproach"/> and <see cref="Retreat"/>
+        /// call this, and each reads its map to the end before anything else searches.)
         /// </para>
         /// </summary>
         private static ReachMap ReachableTiles(HexGrid grid, BattleUnit mover, int maxSteps)
@@ -1053,6 +1205,8 @@ namespace BeastCraft.Battle
             ReachMap costs = ReachMap.Begin(grid, mover.Position);
             List<HexCoordinate> order = costs.Order;
             HexCoordinate[] directions = HexPathfinder.Directions;
+            UnitFootprint footprint = mover.Footprint;
+            bool single = footprint == UnitFootprint.Single;
 
             // Breadth-first: every tile is queued exactly when it is appended to the discovery
             // order, so walking that list from the front is the FIFO queue.
@@ -1072,7 +1226,9 @@ namespace BeastCraft.Battle
                     HexCoordinate next = current + directions[i];
                     int index = grid.TileIndex(next);
 
-                    if (!grid.IsPassableAt(index, mover.Id) || costs.Contains(next, index))
+                    bool passable = single ? grid.IsPassableAt(index, mover.Id) : grid.CanStandAt(index, next, footprint, mover.Id);
+
+                    if (!passable || costs.Contains(next, index))
                     {
                         continue;
                     }
@@ -1255,17 +1411,22 @@ namespace BeastCraft.Battle
         /// </summary>
         private static int ScreeningDistance(HexCoordinate tile, List<BattleUnit> allies)
         {
-            return NearestDistance(tile, allies);
+            return NearestDistance(tile, UnitFootprint.Single, allies);
         }
 
-        /// <summary>The hex distance from a tile to the nearest of the given units (<c>int.MaxValue</c> when there are none).</summary>
-        private static int NearestDistance(HexCoordinate tile, List<BattleUnit> units)
+        /// <summary>
+        /// The hex distance from a unit of footprint <paramref name="footprint"/> anchored on
+        /// <paramref name="tile"/> to the nearest of the given units, nearest tile to nearest tile
+        /// (<see cref="FootprintMath.UnitDistance(HexCoordinate, UnitFootprint, HexCoordinate, UnitFootprint)"/>;
+        /// <c>int.MaxValue</c> when there are none).
+        /// </summary>
+        private static int NearestDistance(HexCoordinate tile, UnitFootprint footprint, List<BattleUnit> units)
         {
             int nearest = int.MaxValue;
 
             for (int i = 0; i < units.Count; i++)
             {
-                int distance = tile.Distance(units[i].Position);
+                int distance = FootprintMath.UnitDistance(tile, footprint, units[i].Position, units[i].Footprint);
 
                 if (distance < nearest)
                 {
@@ -1276,14 +1437,18 @@ namespace BeastCraft.Battle
             return nearest;
         }
 
-        /// <summary>How many of the given units stand on a tile adjacent to <paramref name="tile"/>.</summary>
-        private static int AdjacentCount(HexCoordinate tile, List<BattleUnit> units)
+        /// <summary>
+        /// How many of the given units stand next to a unit of footprint <paramref name="footprint"/>
+        /// anchored on <paramref name="tile"/> — for a one-tile unit, on a tile adjacent to it; for a
+        /// large one, next to any of its tiles. Each unit counts once, however many tiles it touches.
+        /// </summary>
+        private static int AdjacentCount(HexCoordinate tile, UnitFootprint footprint, List<BattleUnit> units)
         {
             int count = 0;
 
             for (int i = 0; i < units.Count; i++)
             {
-                if (tile.Distance(units[i].Position) == 1)
+                if (FootprintMath.UnitDistance(tile, footprint, units[i].Position, units[i].Footprint) == 1)
                 {
                     count++;
                 }
@@ -1300,12 +1465,17 @@ namespace BeastCraft.Battle
         /// <see cref="BattleUnit.Position"/>'s own documentation names the grid as the authority on
         /// which tile is taken, so the grid is asked first and its answer is what decides: a
         /// rejected placement leaves the unit exactly where it was, with both halves still agreeing,
-        /// rather than teleporting a unit whose tile the board does not think it holds.
+        /// rather than teleporting a unit whose tile the board does not think it holds. A large unit
+        /// moves its whole footprint with it (all or nothing).
         /// </para>
         /// </summary>
         private static bool TryMove(BattleUnit unit, HexGrid grid, HexCoordinate destination)
         {
-            if (!grid.TryPlaceUnit(unit.Id, destination))
+            bool placed = unit.Footprint == UnitFootprint.Single
+                ? grid.TryPlaceUnit(unit.Id, destination)
+                : grid.TryPlaceUnit(unit.Id, destination, unit.Footprint);
+
+            if (!placed)
             {
                 return false;
             }

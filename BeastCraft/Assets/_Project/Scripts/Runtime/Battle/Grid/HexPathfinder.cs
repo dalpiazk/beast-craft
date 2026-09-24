@@ -177,6 +177,130 @@ namespace BeastCraft.Battle.Grid
             return new List<HexCoordinate>();
         }
 
+        /// <summary>
+        /// <see cref="FindPath(HexGrid, HexCoordinate, HexCoordinate, string)"/> for a mover of any
+        /// <see cref="UnitFootprint"/>: <paramref name="start"/> and <paramref name="goal"/> are
+        /// anchors, and every anchor on the route but the start must satisfy
+        /// <see cref="HexGrid.CanStand"/> — the whole footprint fits there, the mover's own tiles
+        /// counting as free. Same search, same expansion order and tie-breaks, same failure cases.
+        /// <para>
+        /// <see cref="UnitFootprint.Single"/> <em>is</em> the four-argument method — it is called, not
+        /// re-implemented — so a one-tile mover's route cannot differ from what it always was. A
+        /// larger footprint runs the same A* over anchors with <see cref="HexGrid.CanStand"/> in
+        /// place of <see cref="HexGrid.IsPassable"/>, on the same per-thread scratch storage.
+        /// </para>
+        /// </summary>
+        public static IReadOnlyList<HexCoordinate> FindPath(HexGrid grid, HexCoordinate start, HexCoordinate goal, string movingUnitId, UnitFootprint footprint)
+        {
+            if (footprint == UnitFootprint.Single)
+            {
+                return FindPath(grid, start, goal, movingUnitId);
+            }
+
+            return FindPathSized(grid, start, goal, movingUnitId, footprint);
+        }
+
+        /// <summary>
+        /// The footprint-aware A* behind the five-argument <see cref="FindPath(HexGrid, HexCoordinate, HexCoordinate, string, UnitFootprint)"/>.
+        /// Written for any footprint (for <see cref="UnitFootprint.Single"/>,
+        /// <see cref="HexGrid.CanStand"/> is <see cref="HexGrid.IsPassable"/>, and a differential
+        /// test holds this to the four-argument search on random boards), but only ever called for
+        /// a larger one.
+        /// </summary>
+        internal static IReadOnlyList<HexCoordinate> FindPathSized(HexGrid grid, HexCoordinate start, HexCoordinate goal, string movingUnitId, UnitFootprint footprint)
+        {
+            if (grid == null || !grid.IsInBounds(start) || !grid.IsInBounds(goal))
+            {
+                return new List<HexCoordinate>();
+            }
+
+            if (!string.IsNullOrEmpty(movingUnitId))
+            {
+                HexCoordinate recorded;
+                if (grid.TryGetPosition(movingUnitId, out recorded) && recorded != start)
+                {
+                    return new List<HexCoordinate>();
+                }
+            }
+
+            if (start == goal)
+            {
+                return new List<HexCoordinate> { start };
+            }
+
+            if (!grid.CanStand(goal, footprint, movingUnitId))
+            {
+                return new List<HexCoordinate>();
+            }
+
+            Scratch search = _scratch;
+            if (search == null)
+            {
+                search = new Scratch();
+                _scratch = search;
+            }
+
+            search.Begin(grid.TileIndexCapacity);
+            int generation = search.Generation;
+            int[] seen = search.Seen;
+            int[] closed = search.Closed;
+            int[] costFromStart = search.Cost;
+            HexCoordinate[] cameFrom = search.CameFrom;
+
+            int startIndex = grid.TileIndex(start);
+            seen[startIndex] = generation;
+            costFromStart[startIndex] = 0;
+            search.Push(startIndex, start, start.Distance(goal));
+
+            while (search.Count > 0)
+            {
+                int currentIndex = search.Pop();
+                HexCoordinate current = search.Tile[currentIndex];
+
+                if (current == goal)
+                {
+                    return BuildPath(grid, cameFrom, costFromStart[currentIndex], start, goal);
+                }
+
+                closed[currentIndex] = generation;
+                int stepsToCurrent = costFromStart[currentIndex];
+
+                HexCoordinate[] directions = Directions;
+                for (int i = 0; i < directions.Length; i++)
+                {
+                    HexCoordinate neighbor = current + directions[i];
+                    int neighborIndex = grid.TileIndex(neighbor);
+
+                    if (!grid.CanStandAt(neighborIndex, neighbor, footprint, movingUnitId) || closed[neighborIndex] == generation)
+                    {
+                        continue;
+                    }
+
+                    int tentativeCost = stepsToCurrent + 1;
+
+                    if (seen[neighborIndex] == generation && tentativeCost >= costFromStart[neighborIndex])
+                    {
+                        continue;
+                    }
+
+                    cameFrom[neighborIndex] = current;
+                    costFromStart[neighborIndex] = tentativeCost;
+                    seen[neighborIndex] = generation;
+
+                    if (search.IsQueued(neighborIndex))
+                    {
+                        search.Improved(neighborIndex);
+                    }
+                    else
+                    {
+                        search.Push(neighborIndex, neighbor, neighbor.Distance(goal));
+                    }
+                }
+            }
+
+            return new List<HexCoordinate>();
+        }
+
         private static HexCoordinate[] CopyDirections()
         {
             IReadOnlyList<HexCoordinate> directions = HexCoordinate.AxialDirections;

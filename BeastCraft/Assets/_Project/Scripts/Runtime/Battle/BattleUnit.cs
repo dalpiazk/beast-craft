@@ -73,10 +73,15 @@ namespace BeastCraft.Battle
         /// [0, 100]. It defaults to 0 — no resistance — so every existing call site keeps its
         /// behaviour.
         /// </para>
+        /// <para>
+        /// <paramref name="footprint"/> is the unit's <see cref="Footprint"/>, normally its species'
+        /// <c>CreatureSpeciesSO.Footprint</c>. It defaults to <see cref="UnitFootprint.Single"/>, one
+        /// tile, so every existing call site keeps its behaviour.
+        /// </para>
         /// </summary>
         public BattleUnit(string id, BattleTeam team, StatBlock stats, HexCoordinate position, SkillLoadout skills = null,
                           IReadOnlyList<Element> elements = null, int level = 1, CombatStance stance = CombatStance.Vanguard,
-                          int statusResist = 0)
+                          int statusResist = 0, UnitFootprint footprint = UnitFootprint.Single)
         {
             Id = id;
             Team = team;
@@ -89,6 +94,7 @@ namespace BeastCraft.Battle
             Level = level < 1 ? 1 : level;
             Stance = stance;
             StatusResist = statusResist < 0 ? 0 : statusResist > 100 ? 100 : statusResist;
+            Footprint = footprint;
             _statuses = new List<ActiveStatus>();
         }
 
@@ -146,8 +152,22 @@ namespace BeastCraft.Battle
         /// fell on, for logs and results. From then on it is a record, not occupancy: the tile may
         /// be taken by someone else, and nothing reads a defeated unit's position for play.
         /// </para>
+        /// <para>
+        /// For a large unit (see <see cref="Footprint"/>) this is the footprint's <em>anchor</em> — the
+        /// centre of a <see cref="UnitFootprint.Hex7"/> — and the unit also covers the footprint's
+        /// other tiles; distances to it are measured to its nearest tile
+        /// (<see cref="FootprintMath"/>).
+        /// </para>
         /// </summary>
         public HexCoordinate Position { get; set; }
+
+        /// <summary>
+        /// How many tiles this unit covers and in what shape, anchored on <see cref="Position"/>.
+        /// Fixed at construction, like <see cref="Stance"/>. Every beast is
+        /// <see cref="UnitFootprint.Single"/>; only large enemies are bigger. See the design doc,
+        /// "Unit footprints".
+        /// </summary>
+        public UnitFootprint Footprint { get; }
 
         /// <summary>
         /// How many hex steps this unit may move on one of its own turns, as a whole-turn budget

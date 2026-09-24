@@ -2340,3 +2340,71 @@ repair: per-beast balance holds without it.
 
 Reproduce: `dotnet run --project Tooling/BalanceSim -c Release -- --seeds 12345,777,4242 --out out/gauge.md`
 (about 140 s).
+
+## Large enemies (footprints)
+
+The bosses now cover several hexes (design doc, "Unit footprints"): the giant and the fixed-set
+colossus are `Hex7` (seven tiles), the champion `Triangle` (three). Ranges to and from them are
+measured between nearest tiles, an area hits them once, a large caster's area grows from all of its
+tiles, a giant cannot be knocked back and a champion moves at most one tile. Beasts, skills, bonds and
+the avatar are unchanged. **Parity retune of the fixtures** so the giant's reach does not silently
+grow by the footprint's radius: giant and colossus gaze range 3 -> 2, quake and roar area radius
+2 -> 1 (a radius-1 burst from a `Hex7` is exactly the old radius-2 disc around its centre); the
+champion's shockwave stays at 2. No other enemy numbers changed.
+
+**One-tile battles are byte-identical.** Before the fixtures were given footprints, the new code
+reproduced the committed default report byte for byte (the full run, every shape). With the
+footprints, every `squad` and `horde` result is unchanged on all three seeds (they have no large
+units), as are the fixed set's `swarm` and `pack`; only the enemy-type descriptions and the scouting
+lines that pool shapes (the held-out best team's tie-break, the oracle summary) move.
+
+**Calibration.** The bosses are easier to reach (twelve tiles around a giant), so the calibrated
+difficulty rose: `solo` x0.918-0.936 -> x0.953-0.961 `elemental` and x0.863-0.883 -> x0.898-0.904
+`neutral`; `elite` x0.826-0.840 -> x0.863-0.875 and x0.805-0.813 -> x0.826-0.836 (seed 12345;
+average times unchanged within 0.2). The fixed `boss` (colossus) moved from x0.93-0.95 to x0.96-0.97.
+
+**Guard** (every beast's 3-seed mean overall marginal within +/-4 `elemental` and +/-7 `neutral`;
+`--seeds 12345,777,4242`, default arguments), before -> after, with the two boss shapes (the other
+two are unchanged):
+
+| Beast | Stance | `elemental` `solo` | `elemental` `elite` | `elemental` overall | `neutral` `solo` | `neutral` `elite` | `neutral` overall |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Golem | Vanguard | +2.4 -> +0.5 | +4.1 -> +5.2 | +1.8 -> +1.6 | +13.4 -> +13.8 | +1.8 -> +5.8 | +4.7 -> +5.8 |
+| Phoenix | Ranged | -4.7 -> -3.3 | -2.5 -> +1.2 | -0.2 -> +1.1 | -15.7 -> -5.6 | -10.3 -> -3.4 | -4.7 -> -0.4 |
+| Tarasque | Vanguard | +2.8 -> +4.0 | +0.8 -> -2.2 | +1.5 -> +1.0 | -11.5 -> -12.4 | -2.2 -> -5.0 | -2.6 -> -3.6 |
+| Frost Wyrm | Vanguard | -7.3 -> -5.9 | -0.7 -> -0.2 | +0.2 -> +0.7 | -12.8 -> -11.9 | -5.0 -> -6.0 | -1.5 -> -1.5 |
+| Treant | Vanguard | +4.3 -> +5.5 | -5.2 -> -0.8 | -0.7 -> +0.7 | +5.2 -> +6.2 | -0.8 -> +5.2 | -0.4 -> +1.3 |
+| Kirin | Ranged | -2.6 -> -2.8 | +0.9 -> +2.6 | +0.1 -> +0.5 | -3.7 -> -7.6 | +2.1 -> +5.0 | -0.3 -> -0.5 |
+| Basilisk | Ranged | +5.6 -> +2.5 | +4.5 -> +3.9 | +1.4 -> +0.4 | +15.8 -> +8.8 | +9.0 -> +8.3 | +3.8 -> +1.9 |
+| Leviathan | Vanguard | +2.5 -> -0.3 | +2.9 -> +1.8 | 0.0 -> -0.9 | +14.3 -> +8.6 | +2.8 -> +3.9 | +1.7 -> +0.6 |
+| Thunderbird | Skirmisher | -1.0 -> -2.7 | -3.0 -> -6.7 | -1.1 -> -2.4 | +0.2 -> -4.5 | +5.0 -> -6.3 | +6.0 -> +2.0 |
+| Griffin | Skirmisher | -1.9 -> +2.5 | -1.8 -> -4.8 | -2.9 -> -2.6 | -5.3 -> +4.5 | -2.4 -> -7.6 | -6.7 -> -5.6 |
+
+Every beast is inside the guard (`elemental` -2.6 ... +1.6, `neutral` -5.6 ... +5.8), and the spread
+narrowed (`neutral` -6.7 ... +6.0 before), so **no enemy tuning iteration was made**.
+
+**What moved, per shape.**
+
+- *Melee Vanguards against the bosses:* a giant now has twelve tiles around it rather than six, so
+  more of a team reaches it at once. Treant gains most (`elite` +4.4 / +6.0), Golem gains in `elite`
+  (+1.1 / +4.0) and holds its `solo` lead in `neutral`; Leviathan loses some of its `solo` edge
+  (-2.8 / -5.7) now that it is no longer one of the few beasts in contact.
+- *Knockback against the bosses:* a giant cannot be pushed and a champion moves one tile at most.
+  At skill level 1 the only default-loadout knockback is Griffin's Gust (area, 2 hexes); Griffin
+  loses in `elite` (-3.0 / -5.2), where the champions it used to shove are now pinned, but gains in
+  `solo` (+4.4 / +9.8), plausibly because the old one-tile giant was pushed out of its teammates' reach and the
+  seven-tile one stays in it. Thunderbird (no knockback) loses most in `elite` (-3.7 / -11.3; its
+  `neutral` overall +6.0 -> +2.0); the cause is not isolated (its kit is short-range single-target
+  plus a Skirmisher's crowd preference, both of which the footprint changes).
+- *Ranged beasts:* the parity retune keeps the giant's reach from its centre, but a standoff unit's
+  range now counts to the giant's ring, so Ranged beasts stand one tile further from its centre and
+  its area slams: Phoenix recovers (`neutral` `solo` -15.7 -> -5.6, overall -4.7 -> -0.4), Basilisk
+  loses its `solo` lead (+15.8 -> +8.8 `neutral`).
+
+**Open.** Knockback is weaker against bosses by design; whether Griffin (and Thunderbird, whose
+`elite` drop is unexplained) should get boss value back is a beast retune (a later deliverable), not
+an enemy one. Enemy multi-hex
+units other than the three bosses, and footprints in hand-authored encounters, are not designed.
+
+Reproduce: `dotnet run --project Tooling/BalanceSim -c Release -- --seeds 12345,777,4242 --out out/footprints.md`
+(about 150 s).

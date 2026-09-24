@@ -116,11 +116,10 @@ What that implies for balance and for the systems:
   elsewhere has a niche.
 - **Area skills need something to hit.** `AreaBurst` is centred on the caster and never moves it, so
   in a skill stack it wants to come after something that walks the beast into the enemy cluster.
-- **Large creatures are single-tile today — open item.** `HexGrid` tracks exactly one tile per unit;
-  there is no multi-hex footprint, so a "huge" enemy occupies one hex like everything else and can be
-  surrounded by six attackers. Multi-hex units would touch occupancy, pathfinding (a footprint has to
-  fit along the route), targeting (distance to a footprint, not a point) and area-skill overlap.
-  Not designed or implemented; listed so encounter design does not assume it exists.
+- **Large creatures cover several hexes — now built (was an open item).** A boss (giant) covers seven
+  hexes and a mini-boss (champion) three; beasts stay one hex. Occupancy, pathfinding (the footprint
+  has to fit along the route), targeting (distance to the nearest tile of a footprint) and area-skill
+  overlap all follow; see "Unit footprints".
 - **Two movement rules large PvE fights need — now built (were open items).** The simulator showed
   both gaps at encounter scale, and both are now Runtime rules in `BattleTurnExecutor` (see
   decision 7, "scaffold details"), so the simulator no longer works around either:
@@ -362,6 +361,10 @@ Two consequences for how skills are authored follow directly, and both are now s
   their footprint rather than picking one unit. `SkillTargetResolver`'s own documentation is the
   authority on which field each shape actually reads.
 
+  *Amended by "Unit footprints":* against or from a large unit, range and the `Distance` criterion
+  are measured between nearest tiles, an area hits a large unit once when any of its tiles is in it,
+  and a large caster's areas grow from all of its tiles.
+
 *Background.* The alternative — manual per-turn control with an action menu — is the conventional
 tactics-game shape, and it is what earlier drafts of this document assumed. It gives the player more
 moment-to-moment agency, but it costs a full action UI, a target picker, and a tutorial for both, on
@@ -578,7 +581,9 @@ showed what their absence did to large PvE fights):
   ignore the defeated.
 - **The route** is the cheapest one that reaches *any* tile within range of the target, found by
   pathing at the tiles around the target (the target's own tile is occupied, so nothing can path onto
-  it) and stopping at the first tile on that route that is in range.
+  it) and stopping at the first tile on that route that is in range. Around a large target the goals
+  ring its whole footprint, and a large mover plans by anchor instead (its footprint must fit at
+  every step): see "Unit footprints".
 
 ### 8. Combat stances — DECIDED (the three stances and their roles); the heuristics are SCAFFOLD
 
@@ -610,7 +615,9 @@ The rules in full:
 - **Anti-surround (Ranged and Skirmisher).** Among the in-range tiles the unit can reach in the
   fewest steps (every such tile, not only those on the plain rule's seven goal routes), it prefers
   the one farthest from the target, then the one with the fewest living enemies adjacent, then the
-  plain rule's own pick, then a fixed board order. A Vanguard does not avoid crowds.
+  plain rule's own pick, then a fixed board order. A Vanguard does not avoid crowds. Distances and
+  adjacency respect footprints ("Unit footprints"): a large enemy counts once however many of its
+  tiles touch the stop tile, and the farthest-in-range test measures to its nearest tile.
 - **Ranged keeps its distance.** An already-in-range skill fires from where the unit stands, as
   before. The "farthest in-range tile" preference is, in practice, a guarantee rather than a change:
   a unit only approaches from out of range, one step changes a distance by at most one, so the
@@ -646,6 +653,97 @@ deterministic and legible, and are cheap to revisit. The balance simulator's fir
 in the tuning log ("After combat stances"): with the one-size standard kit, Ranged beasts lose
 Strike's damage and the physical/special parity the kit was tuned to, so the numbers say more about
 that kit than about the stances.
+
+## Unit footprints — DECIDED (user: bosses cover several hexes); the geometry is SCAFFOLD
+
+**Large enemies cover more than one hex.** The user's direction: giants are bosses and occupy more
+than one hex; champions, the elite tier below them, are sized accordingly. Beasts stay one hex.
+`UnitFootprint` (`Battle/Grid`) names three sizes, each a fixed set of offsets from the unit's
+**anchor**, which is `BattleUnit.Position` and the tile the grid records it on:
+
+| Footprint | Tiles | Offsets from the anchor | Used by |
+| --- | ---: | --- | --- |
+| `Single` (default) | 1 | the anchor | every beast, the avatar, every ordinary enemy |
+| `Triangle` | 3 | anchor, `(1, 0)`, `(1, -1)` — the two-tile edge (the anchor's row) faces the player side | champion (mini-boss) |
+| `Hex7` | 7 | anchor (the centre) and its six neighbours | giant, colossus (bosses) |
+
+`Footprints.Offsets` lists them anchor first, then in `HexCoordinate.AxialDirections` order, so every
+walk over a footprint is deterministic. There is no rotation: a large unit translates, it never
+turns. `CreatureSpeciesSO.Footprint` (default `Single`) is copied onto the unit by
+`BattleUnitFactory` (`BattleUnit.Footprint`, fixed at construction). The roster JSON has no footprint
+field, and `BeastRosterValidator` refuses any value but `Single` — **beasts are always one tile**. The
+only large units today are the balance simulator's fixture enemies (`encounters.json`, optional
+`Footprint`).
+
+**Board.** `HexGrid` records a large unit's anchor and footprint and names it on every tile it
+covers (`GetOccupant`). `TryPlaceUnit(id, anchor, footprint)` is **all or nothing**: every tile must
+be on the board, free of terrain and empty or already the unit's own, or nothing changes; on success
+the old tiles are all released and the new ones all taken. The two-argument `TryPlaceUnit` keeps a
+large unit's recorded footprint (so a move is an anchor move), `RemoveUnit` — and so lifting the
+defeated — frees every tile, and `CanStand(anchor, footprint, mover)` asks whether a footprint fits
+somewhere. A board of one-tile units runs exactly the code it always did.
+
+**Distance.** Every range and adjacency rule is measured between the **nearest tiles** of the two
+units (`FootprintMath`): to a `Hex7` it is `max(0, d - 1)` from the centre, to a `Triangle` the
+minimum over its three tiles, between two large units the minimum over one's tiles. So a range-1
+skill reaches a giant from any of the **twelve** tiles around it (nine around a champion), and a
+giant's own range counts from its outer ring. For one-tile units every one of these is exactly
+`HexCoordinate.Distance`.
+
+**Targeting** (amends decision 4). Range and the `Distance` criterion use the footprint distance. An
+area shape hits a unit when **any** of its tiles is in the area, and hits it **once** however many of
+its tiles are covered. A large *caster's* areas grow from all of its tiles: an `AreaBurst` is the
+union of the discs around each of them (for a `Hex7`, the disc of `Range + 1` around its centre), a
+`Cross` the union of the arms from each, and a `Line` fires from its tile nearest the focus toward the
+focus's tile nearest that one (ties in footprint order). The caster's own tiles are excluded from a
+`Cross` or `Line` exactly as a one-tile caster's tile is. Taunt, the criteria and the id tie-break are
+unchanged.
+
+**Movement** (amends decisions 7 and 8).
+
+- *A one-tile unit closing on a large one* aims its routes at the tiles around the whole footprint:
+  the candidate's anchor (only if nothing stands there), then every tile next to any footprint tile
+  and not one of them, walked footprint tile by footprint tile, each in axial order, first sighting
+  kept (twelve goals around a `Hex7`, nine around a `Triangle`). A standoff (Ranged / Skirmisher) unit
+  measures "farthest within range" to the footprint's nearest tile.
+- *A large unit moves by anchor*, and its whole footprint must fit at every step
+  (`HexPathfinder.FindPath(grid, start, goal, mover, footprint)`, the same A* with `CanStand` in place
+  of `IsPassable`; its own tiles count as free). With `Single` that overload *is* the one-tile search.
+  To approach it does not aim at goal tiles: it walks every reachable anchor breadth-first and takes
+  the cheapest from which the candidate is in range; among equally cheap anchors a Vanguard screens
+  (nearest a fragile ally, judged at that anchor), a Ranged or Skirmisher unit takes the farthest from
+  the candidate and then the least crowded, then breadth-first order. The route is the pathfinder's to
+  that anchor — the same length — so a partial approach walks a prefix of it as usual. Its retreat and
+  crowd checks use the footprint distance too.
+- *Anti-surround counts units, not tiles.* "Enemies adjacent" is the number of living enemies next to
+  the tile — for a large unit, next to any of its tiles — each counted once, so a giant touching a
+  stop tile along two of its tiles is still one enemy.
+
+**Knockback.** A `Hex7` is immovable. A `Triangle` moves at most one tile, and only if its whole
+footprint fits at the new anchor. When either unit is large, the push runs from the caster's tile
+nearest the target toward the target's tile nearest the caster, so a beast is shoved straight off the
+giant's face. One-tile against one-tile is unchanged.
+
+**Deployment.** `DeploymentPacker.TryPack` seats a side's units front-most first (nearest the centre
+line, then outward from the vertical centre line, then by `Q`): each takes the first anchor whose
+whole footprint lies in the zone on free tiles. For one-tile units that is exactly the front-most
+tiles. On a Medium board a `Hex7` boss sits centred on the middle row of the three-row zone; on a
+Small board (a two-row zone) it fits nowhere. The balance simulator packs its enemies this way, and
+its loader refuses any shape (worst case: every slot at its maximum, each its slot's largest type) or
+fixed encounter that does not fit. `PlacementValidator` is unchanged — beasts are one tile — and a
+caller passing already-placed tiles passes every tile a large unit covers.
+
+*Balance.* A `Hex7` boss is easier to reach (twelve tiles around it, every range to it one longer
+from its centre), so melee and short-range beasts gain against it; it cannot be knocked back, so
+knockback kits lose value against it. Its own reach would also have grown by one, so the fixtures'
+giant and colossus author their ranges one lower than their one-tile values were (gaze 3 → 2, quake
+and roar area radius 2 → 1: a radius-1 burst from a `Hex7` is the radius-2 disc around its centre,
+exactly the old one); the champion's shockwave stays at 2. See the tuning log, "Large enemies
+(footprints)".
+
+*Scaffold details, not confirmed balance.* The shapes, the anchor convention, the triangle's
+orientation, the nearest-tile distance, the large-mover approach and the knockback caps are
+engineering defaults chosen to be deterministic and legible; none has been through encounter design.
 
 ## Effect application — SCAFFOLD ASSUMPTIONS, NOT CONFIRMED BALANCE
 
@@ -821,7 +919,9 @@ The statuses:
   Cartesian dot product with the caster-to-target vector, computed exactly in integers as
   `2·q1·q2 + q1·r2 + r1·q2 + 2·r1·r2`. Ties go to the earlier direction. It needs the grid, which
   the executor passes to `SkillEffectApplier.Apply`. With no grid it does nothing. It is never
-  stored.
+  stored. Large units ("Unit footprints"): a seven-hex target is immovable, a three-hex one moves at
+  most one tile and only where its whole footprint fits, and the push runs between the two units'
+  nearest tiles.
 
 **Stacking stat buffs and debuffs.** `MaxStacks` caps the timed copies of one authored effect on a
 unit, and each copy expires on its own clock. At the cap, the copy with the fewest turns left (the
@@ -1301,6 +1401,12 @@ the wrong half *and* buried under terrain *and* already taken at once, and a lay
 validating if it hands back every reason it was rejected. The one exception is off-board tiles,
 which report `OutOfBounds` alone because "also blocked" and "also outside the zone" are not
 additional facts there.
+
+**Large units** ("Unit footprints") deploy only where their whole footprint lies in their zone.
+`DeploymentPacker` seats a side automatically, front-most first, units of any size (the balance
+simulator uses it for its enemies); on a Small board, whose zones are two rows deep, a seven-hex
+unit fits nowhere. Beasts are one tile, so the player's validation below is unchanged; the
+already-placed tiles it checks against must include every tile a large enemy covers.
 
 **Validation never touches the board**, so it is safe to call on every drag of a marker. Committing
 is the separate `PlacementValidator.TryPlaceAll`, which validates first and is all-or-nothing: a
@@ -2420,8 +2526,7 @@ kind of default, as is the damage formula.
 Still to come: confirming or revising the third tuning pass (and, if needed, the damage formula and
 element chart), deciding the design questions it raised above — a design decision the reports inform
 rather than make — and extending the simulator once authored skills, real encounters and the avatar
-give it more than a standard kit and fixture enemies to measure; multi-hex large creatures, an open
-item under "Encounter direction" above; the starter roster's skills (none are
+give it more than a standard kit and fixture enemies to measure; the starter roster's skills (none are
 authored yet — the effect engine they need, statuses included, has landed), the avatar's passive
 content (the passive engine has landed, see "Avatar passives"), resource gating on top of cooldowns,
 the placement UI (a Unity

@@ -294,12 +294,20 @@ namespace BeastCraft.Battle
         /// (<see cref="AwayDirection"/>); ties go to the earlier direction in
         /// <see cref="HexCoordinate.AxialDirections"/>. No grid, a target not on it, a caster on the
         /// target's own tile, or a distance below 1 does nothing. Moves the grid first and
-        /// <see cref="BattleUnit.Position"/> only once the grid accepted, like the executor.
+        /// <see cref="BattleUnit.Position"/> only once the grid accepted, like the executor. When
+        /// either unit is larger than one tile the footprint rule applies instead (a giant is
+        /// immune, a champion moves at most one tile; see <see cref="KnockbackLarge"/>).
         /// </summary>
         internal static void Knockback(BattleUnit caster, BattleUnit target, int hexes, HexGrid grid)
         {
             if (grid == null || hexes < 1 || !grid.TryGetPosition(target.Id, out HexCoordinate position))
             {
+                return;
+            }
+
+            if (target.Footprint != UnitFootprint.Single || caster.Footprint != UnitFootprint.Single)
+            {
+                KnockbackLarge(caster, target, hexes, grid, position);
                 return;
             }
 
@@ -325,6 +333,53 @@ namespace BeastCraft.Battle
             }
 
             if (destination != position && grid.TryPlaceUnit(target.Id, destination))
+            {
+                target.Position = destination;
+            }
+        }
+
+        /// <summary>
+        /// Knockback when either side is a large unit (see <see cref="UnitFootprint"/>). A
+        /// <see cref="UnitFootprint.Hex7"/> target is immovable: nothing happens. Otherwise the push
+        /// runs from the caster's tile nearest the target toward the target's tile nearest the
+        /// caster (<see cref="FootprintMath.NearestTile"/>; for a one-tile unit, its own tile), so a
+        /// beast is shoved straight off the giant's face rather than away from its centre. A
+        /// <see cref="UnitFootprint.Triangle"/> target moves at most one tile, and only if its whole
+        /// footprint fits at the new anchor (<see cref="HexGrid.CanStand"/>); a one-tile target
+        /// slides up to <paramref name="hexes"/> tiles exactly as in the one-tile rule.
+        /// </summary>
+        private static void KnockbackLarge(BattleUnit caster, BattleUnit target, int hexes, HexGrid grid, HexCoordinate position)
+        {
+            if (target.Footprint == UnitFootprint.Hex7)
+            {
+                return;
+            }
+
+            HexCoordinate from = FootprintMath.NearestTile(caster.Position, caster.Footprint, position, target.Footprint);
+            HexCoordinate to = FootprintMath.NearestTile(position, target.Footprint, caster.Position, caster.Footprint);
+            HexCoordinate? away = AwayDirection(from, to);
+
+            if (!away.HasValue)
+            {
+                return;
+            }
+
+            int steps = target.Footprint == UnitFootprint.Single ? hexes : 1;
+            HexCoordinate destination = position;
+
+            for (int step = 0; step < steps; step++)
+            {
+                HexCoordinate next = destination + away.Value;
+
+                if (!grid.CanStand(next, target.Footprint, target.Id))
+                {
+                    break;
+                }
+
+                destination = next;
+            }
+
+            if (destination != position && grid.TryPlaceUnit(target.Id, destination, target.Footprint))
             {
                 target.Position = destination;
             }

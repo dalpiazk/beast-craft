@@ -4,6 +4,7 @@ using System.IO;
 using System.Text.Json;
 using BeastCraft.Battle;
 using BeastCraft.Battle.Grid;
+using BeastCraft.Battle.Placement;
 using BeastCraft.Creatures;
 using BeastCraft.Creatures.Roster;
 using UnityEngine;
@@ -65,8 +66,18 @@ namespace BeastCraft.Tooling.BalanceSim
         /// </summary>
         public int StatusResist;
 
+        /// <summary>
+        /// A <see cref="UnitFootprint"/> name: how many tiles the enemy covers (<c>Single</c>,
+        /// <c>Triangle</c> = 3, <c>Hex7</c> = 7). Missing or empty = <c>Single</c>. The bosses are
+        /// large: giant and colossus <c>Hex7</c>, champion <c>Triangle</c>.
+        /// </summary>
+        public string Footprint;
+
         [System.Text.Json.Serialization.JsonIgnore]
         public CombatStance ParsedStance;
+
+        [System.Text.Json.Serialization.JsonIgnore]
+        public UnitFootprint ParsedFootprint;
     }
 
     /// <summary>A fixed encounter's group: an enemy type, how many, and their elements.</summary>
@@ -280,6 +291,23 @@ namespace BeastCraft.Tooling.BalanceSim
 
         /// <summary>The authored groups of a fixed encounter; null for a generated composition.</summary>
         public EncounterData FixedData;
+
+        /// <summary>
+        /// Where the enemies stand, worked out once on first use (<see cref="PveSimulator"/>): the
+        /// same for every battle against this lineup. Written at most once per value; a race between
+        /// threads computes the same layout twice, which is harmless.
+        /// </summary>
+        public EnemyLayout Layout;
+    }
+
+    /// <summary>
+    /// An encounter's enemy layout: one anchor per enemy (in <see cref="Encounter.Enemies"/> order)
+    /// and every tile the enemies cover, from <see cref="DeploymentPacker.TryPack"/>.
+    /// </summary>
+    public class EnemyLayout
+    {
+        public List<HexCoordinate> Anchors = new List<HexCoordinate>();
+        public List<HexCoordinate> Covered = new List<HexCoordinate>();
     }
 
     /// <summary>
@@ -508,6 +536,11 @@ namespace BeastCraft.Tooling.BalanceSim
                 errors.Add(where + ": Stance '" + type.Stance + "' is not Vanguard, Ranged or Skirmisher.");
             }
 
+            if (!TryParseFootprint(type.Footprint, out type.ParsedFootprint))
+            {
+                errors.Add(where + ": Footprint '" + type.Footprint + "' is not Single, Triangle or Hex7.");
+            }
+
             if (type.StatusResist < 0 || type.StatusResist > 100)
             {
                 errors.Add(where + ": StatusResist must be between 0 and 100.");
@@ -611,6 +644,7 @@ namespace BeastCraft.Tooling.BalanceSim
                 }
 
                 int max = 0;
+                List<UnitFootprint> worst = new List<UnitFootprint>();
                 foreach (ShapeSlotData slot in variant.Slots)
                 {
                     if (slot.Types == null || slot.Types.Length == 0 || slot.Min < 0 || slot.Max < slot.Min)
@@ -620,19 +654,32 @@ namespace BeastCraft.Tooling.BalanceSim
                     }
 
                     max += slot.Max;
+                    UnitFootprint largest = UnitFootprint.Single;
                     foreach (string type in slot.Types)
                     {
-                        if (!types.ContainsKey(type))
+                        if (!types.TryGetValue(type, out EnemyTypeData data))
                         {
                             errors.Add(variantWhere + ": unknown enemy type '" + type + "'.");
                         }
+                        else if (Footprints.TileCount(data.ParsedFootprint) > Footprints.TileCount(largest))
+                        {
+                            largest = data.ParsedFootprint;
+                        }
+                    }
+
+                    for (int i = 0; i < slot.Max && i <= 99; i++)
+                    {
+                        worst.Add(largest);
                     }
                 }
 
-                if (max > zoneSize || max > 99)
+                // Worst case: every slot at its Max, each unit its slot's largest type, the largest
+                // placed first (the generator's order puts the Vanguard bosses first).
+                worst.Sort((a, b) => Footprints.TileCount(b).CompareTo(Footprints.TileCount(a)));
+                if (max > 99 || !Fits(shape.ParsedArena, worst))
                 {
-                    errors.Add(variantWhere + ": up to " + max + " enemies do not fit the " + shape.ParsedArena + " enemy deployment zone (" + zoneSize +
-                               " tiles) or exceed 99.");
+                    errors.Add(variantWhere + ": up to " + max + " enemies (every slot at Max, each its slot's largest type) do not fit the " +
+                               shape.ParsedArena + " enemy deployment zone (" + zoneSize + " tiles; large enemies need their whole footprint inside it) or exceed 99.");
                 }
             }
         }
@@ -660,6 +707,7 @@ namespace BeastCraft.Tooling.BalanceSim
 
             int zoneSize = new HexGrid(encounter.ParsedArena).GetDeploymentZone(BattleTeam.Enemy).Count;
             int total = 0;
+            List<UnitFootprint> footprints = new List<UnitFootprint>();
 
             foreach (EnemyGroupData group in encounter.Groups)
             {
@@ -687,11 +735,17 @@ namespace BeastCraft.Tooling.BalanceSim
 
                 group.ParsedElements = elements.ToArray();
                 ValidateType(group, groupWhere, errors);
+
+                for (int i = 0; i < group.Count && i <= 99; i++)
+                {
+                    footprints.Add(group.ParsedFootprint);
+                }
             }
 
-            if (total > zoneSize)
+            if (total <= 99 && !Fits(encounter.ParsedArena, footprints))
             {
-                errors.Add(where + ": " + total + " enemies do not fit the " + encounter.ParsedArena + " enemy deployment zone (" + zoneSize + " tiles).");
+                errors.Add(where + ": " + total + " enemies do not fit the " + encounter.ParsedArena + " enemy deployment zone (" + zoneSize +
+                           " tiles; large enemies need their whole footprint inside it).");
             }
 
             if (total > 99)
@@ -703,6 +757,31 @@ namespace BeastCraft.Tooling.BalanceSim
         private static bool TryParseArena(string text, out ArenaSize arena)
         {
             return Enum.TryParse(text, false, out arena) && Enum.IsDefined(typeof(ArenaSize), arena);
+        }
+
+        /// <summary>
+        /// Parses a <see cref="UnitFootprint"/> name exactly as written (names only, like the other
+        /// enum fields). Missing or empty is <see cref="UnitFootprint.Single"/>.
+        /// </summary>
+        public static bool TryParseFootprint(string text, out UnitFootprint footprint)
+        {
+            footprint = UnitFootprint.Single;
+            if (string.IsNullOrEmpty(text))
+            {
+                return true;
+            }
+
+            return Enum.IsDefined(typeof(UnitFootprint), text) && Enum.TryParse(text, false, out footprint);
+        }
+
+        /// <summary>
+        /// The arena fit dry run: whether enemies of these footprints, packed in this order the way
+        /// every battle packs them (<see cref="DeploymentPacker.TryPack"/>), all fit an empty board's
+        /// enemy zone. A seven-tile enemy never fits a Small board (its zone is two rows deep).
+        /// </summary>
+        public static bool Fits(ArenaSize arena, IReadOnlyList<UnitFootprint> footprints)
+        {
+            return DeploymentPacker.TryPack(new HexGrid(arena), BattleTeam.Enemy, footprints, new List<HexCoordinate>(), new List<HexCoordinate>());
         }
 
         /// <summary>
@@ -847,6 +926,7 @@ namespace BeastCraft.Tooling.BalanceSim
                 species.GrowthRate = _curve;
                 species.Elements = element == Element.None ? new Element[0] : new[] { element };
                 species.Stance = type.ParsedStance;
+                species.Footprint = type.ParsedFootprint;
                 byElement[element] = species;
                 _kits[type][element] = Kit.BuildEnemyKit(type.Skills, element);
             }

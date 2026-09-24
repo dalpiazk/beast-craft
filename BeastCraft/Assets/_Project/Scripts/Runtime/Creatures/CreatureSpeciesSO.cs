@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using BeastCraft.Battle;
+using BeastCraft.Battle.Grid;
 using BeastCraft.Customization.Creature;
 using UnityEngine;
 
@@ -69,6 +70,15 @@ namespace BeastCraft.Creatures
         /// so a species authored before stances existed behaves exactly as it did.
         /// </summary>
         public CombatStance Stance = CombatStance.Vanguard;
+
+        /// <summary>
+        /// How many tiles a unit of this species covers (see <see cref="UnitFootprint"/>). Copied
+        /// onto each unit by <c>BattleUnitFactory.CreateBeast</c>. Always
+        /// <see cref="UnitFootprint.Single"/> for a beast — the roster has no footprint field and
+        /// <c>BeastRosterValidator</c> refuses any other value — and only the balance simulator's large
+        /// enemies (built as in-memory species) set it.
+        /// </summary>
+        public UnitFootprint Footprint = UnitFootprint.Single;
 
         /// <summary>
         /// The species' stat on the given axis at the given level. Falls back to the unscaled base

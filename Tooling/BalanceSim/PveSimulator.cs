@@ -605,19 +605,22 @@ namespace BeastCraft.Tooling.BalanceSim
             string playerPrefix = playersWinTies ? TieWinnerPrefix : TieLoserPrefix;
             string enemyPrefix = playersWinTies ? TieLoserPrefix : TieWinnerPrefix;
 
-            // Enemies: front-most tiles of the enemy zone, in fixture order.
-            List<HexCoordinate> enemyTiles = FrontTiles(grid, BattleTeam.Enemy, encounter.Enemies.Count);
+            // Enemies: packed front-most first, in fixture order (large enemies take the first anchor
+            // their whole footprint fits; one-tile enemies simply take the front-most tiles).
+            EnemyLayout layout = Layout(encounter);
+            List<HexCoordinate> enemyTiles = layout.Covered;
             for (int i = 0; i < encounter.Enemies.Count; i++)
             {
                 EnemySlot slot = encounter.Enemies[i];
-                BattleUnit enemy = BattleUnitFactory.CreateBeast(enemyPrefix + slot.UnitId, BattleTeam.Enemy, slot.Species, level, null, enemyTiles[i],
+                HexCoordinate anchor = layout.Anchors[i];
+                BattleUnit enemy = BattleUnitFactory.CreateBeast(enemyPrefix + slot.UnitId, BattleTeam.Enemy, slot.Species, level, null, anchor,
                                                                  Kit.Loadout(slot.KitFor(mode)), slot.StatusResist);
                 enemy.Stats = Scale(enemy.Stats, multiplier);
                 enemy.CurrentHp = enemy.Stats.Hp;
 
-                if (!grid.IsInDeploymentZone(enemyTiles[i], BattleTeam.Enemy) || !grid.TryPlaceUnit(enemy.Id, enemyTiles[i]))
+                if (!grid.FitsDeploymentZone(anchor, enemy.Footprint, BattleTeam.Enemy) || !grid.TryPlaceUnit(enemy.Id, anchor, enemy.Footprint))
                 {
-                    throw new InvalidOperationException("Could not place enemy " + enemy.Id + " of '" + encounter.Id + "' at " + enemyTiles[i] + ".");
+                    throw new InvalidOperationException("Could not place enemy " + enemy.Id + " of '" + encounter.Id + "' at " + anchor + ".");
                 }
 
                 units.Add(enemy);
@@ -925,24 +928,46 @@ namespace BeastCraft.Tooling.BalanceSim
         }
 
         /// <summary>
+        /// Where an encounter's enemies stand: <see cref="DeploymentPacker.TryPack"/> of their
+        /// footprints in fixture order on an empty board of the encounter's arena, worked out once per
+        /// encounter and shared by every battle against it. For one-tile enemies the anchors are
+        /// exactly <see cref="FrontTiles"/> of the enemy zone. Throws when they do not fit (the loader
+        /// and the generator refuse such lineups first).
+        /// </summary>
+        public static EnemyLayout Layout(Encounter encounter)
+        {
+            EnemyLayout layout = encounter.Layout;
+            if (layout != null)
+            {
+                return layout;
+            }
+
+            List<UnitFootprint> footprints = new List<UnitFootprint>();
+            foreach (EnemySlot slot in encounter.Enemies)
+            {
+                footprints.Add(slot.Species.Footprint);
+            }
+
+            layout = new EnemyLayout();
+            if (!DeploymentPacker.TryPack(new HexGrid(encounter.Arena), BattleTeam.Enemy, footprints, layout.Anchors, layout.Covered))
+            {
+                throw new InvalidOperationException("The " + encounter.Enemies.Count + " enemies of '" + encounter.Id + "' do not fit the " + encounter.Arena +
+                                                    " enemy deployment zone.");
+            }
+
+            encounter.Layout = layout;
+            return layout;
+        }
+
+        /// <summary>
         /// The <paramref name="count"/> tiles of a team's deployment zone nearest the centre line:
         /// front row first (smallest |R|), then outward from the board's vertical centre line, then
-        /// by Q. Both sides therefore start as close as the zones allow.
+        /// by Q (<see cref="DeploymentPacker.FrontOrder"/>). Both sides therefore start as close as
+        /// the zones allow.
         /// </summary>
         public static List<HexCoordinate> FrontTiles(HexGrid grid, BattleTeam team, int count)
         {
-            List<HexCoordinate> zone = new List<HexCoordinate>(grid.GetDeploymentZone(team));
-            zone.Sort((a, b) =>
-            {
-                int byRow = Math.Abs(a.R).CompareTo(Math.Abs(b.R));
-                if (byRow != 0)
-                {
-                    return byRow;
-                }
-
-                int byOffset = Math.Abs((2 * a.Q) + a.R).CompareTo(Math.Abs((2 * b.Q) + b.R));
-                return byOffset != 0 ? byOffset : a.Q.CompareTo(b.Q);
-            });
+            List<HexCoordinate> zone = DeploymentPacker.FrontOrder(grid, team);
 
             if (zone.Count < count)
             {

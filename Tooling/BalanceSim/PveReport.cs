@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 using BeastCraft.Battle;
+using BeastCraft.Battle.Grid;
 using BeastCraft.Creatures;
 
 namespace BeastCraft.Tooling.BalanceSim
@@ -406,7 +407,9 @@ namespace BeastCraft.Tooling.BalanceSim
             report.AppendLine("- Placement: each side takes the front-most tiles of its own deployment zone (front row first, then outward from");
             report.AppendLine("  the centre line); enemies front-to-back in composition order (Vanguard, then Skirmisher, then Ranged types), the");
             report.AppendLine("  team through `PlacementValidator.TryPlaceAll`. Which team member gets which slot (and unit id, the initiative-tie");
-            report.AppendLine("  and target-tie break within the team) is a fixed seeded shuffle per team.");
+            report.AppendLine("  and target-tie break within the team) is a fixed seeded shuffle per team. Large enemies (the giant and the colossus");
+            report.AppendLine("  cover 7 tiles, the champion 3) take the front-most anchor where their whole footprint fits the zone");
+            report.AppendLine("  (`DeploymentPacker`); every range to or from them is measured between nearest tiles.");
             report.AppendLine("- Initiative ties between the sides: `TurnManager` breaks equally full, equally fast gauges on the ordinal unit id,");
             report.AppendLine("  so each battle prefixes one side's ids so that it wins cross-side ties; against every composition, at every kit");
             report.AppendLine("  mode and level, exactly half the teams win them (a seeded shuffle of the team indices). The prefix is side-wide,");
@@ -458,14 +461,14 @@ namespace BeastCraft.Tooling.BalanceSim
             report.AppendLine("Base stats are max-level values scaled by the roster's growth curve, like a beast's, before the difficulty");
             report.AppendLine("multiplier (Move and Crit are exempt from both). Threat is the type's weight in a shape's budget. Kit entries are");
             report.AppendLine("category, shape, range, power, cooldown and whom the skill aims at (`nearest`, or `lowest current HP` = the beast");
-            report.AppendLine("with the least HP left).");
+            report.AppendLine("with the least HP left). A large enemy's size (tiles covered) follows its name; its ranges count from its nearest tile.");
             report.AppendLine();
             report.AppendLine("| Type | Role | Threat | Stance | HP | Atk | Def | SpA | SpD | Spe | Move | Crit | Kit |");
             report.AppendLine("| --- | --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |");
             foreach (EnemyTypeData type in catalog.Types)
             {
                 StatBlock s = type.BaseStats;
-                report.AppendLine("| " + type.DisplayName + " | " + type.Role + " | " + Number(type.Threat) + " | " + type.ParsedStance + " | " + s.Hp + " | " + s.Attack +
+                report.AppendLine("| " + type.DisplayName + SizeText(type) + " | " + type.Role + " | " + Number(type.Threat) + " | " + type.ParsedStance + " | " + s.Hp + " | " + s.Attack +
                                   " | " + s.Defense + " | " + s.SpecialAttack + " | " + s.SpecialDefense + " | " + s.Speed + " | " + s.MoveRange + " | " +
                                   s.CritChance + "% | " + KitText(type.Skills) + " |");
             }
@@ -604,13 +607,21 @@ namespace BeastCraft.Tooling.BalanceSim
             report.AppendLine();
         }
 
+        /// <summary>" (7 tiles)" after a large enemy's name; nothing for a one-tile enemy.</summary>
+        private static string SizeText(EnemyTypeData type)
+        {
+            int tiles = Footprints.TileCount(type.ParsedFootprint);
+            return tiles == 1 ? string.Empty : " (" + tiles + " tiles)";
+        }
+
         private static void AppendFixedEncounters(StringBuilder report, EncounterCatalog catalog)
         {
             report.AppendLine("### Encounters (simulator fixtures, not game content)");
             report.AppendLine();
             report.AppendLine("Base stats are max-level values scaled by the roster's growth curve, like a beast's, before the difficulty");
             report.AppendLine("multiplier (Move and Crit are exempt from both). Kit entries are category, shape, range, power, cooldown and whom the");
-            report.AppendLine("skill aims at (`nearest`, or `lowest current HP` = the beast with the least HP left).");
+            report.AppendLine("skill aims at (`nearest`, or `lowest current HP` = the beast with the least HP left). A large enemy's size (tiles");
+            report.AppendLine("covered) follows its name; its ranges count from its nearest tile.");
             report.AppendLine();
             report.AppendLine("| Encounter | Arena | Enemy | Count | Stance | Elements | HP | Atk | Def | SpA | SpD | Spe | Move | Crit | Kit |");
             report.AppendLine("| --- | --- | --- | ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |");
@@ -630,7 +641,7 @@ namespace BeastCraft.Tooling.BalanceSim
                     }
 
                     StatBlock s = group.BaseStats;
-                    report.AppendLine("| `" + encounter.Id + "` | " + encounter.Arena + " | " + group.DisplayName + " | " + group.Count + " | " +
+                    report.AppendLine("| `" + encounter.Id + "` | " + encounter.Arena + " | " + group.DisplayName + SizeText(group) + " | " + group.Count + " | " +
                                       group.ParsedStance + " | " + Compress(elements) + " | " + s.Hp + " | " + s.Attack + " | " + s.Defense + " | " + s.SpecialAttack + " | " +
                                       s.SpecialDefense + " | " + s.Speed + " | " + s.MoveRange + " | " + s.CritChance + "% | " + KitText(group.Skills) + " |");
                 }
