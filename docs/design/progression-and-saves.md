@@ -7,7 +7,8 @@ it outside Unity. The battle rules themselves are in [battle-system.md](battle-s
 numbers come from [`docs/balance/pacing-report.md`](../balance/pacing-report.md).
 
 Everything here is pure C# over two thin seams: an injected JSON engine and an injected storage
-backend. There is no UI, no file IO and no Unity Gaming Services integration yet.
+backend. The one file backend is `FileSaveStorage` (below); there is no UI and no Unity Gaming
+Services integration yet.
 
 ---
 
@@ -101,8 +102,37 @@ with a sensible default need no bump. (`SaveSerializer`'s current version is ove
 migration chain can be tested ahead of a real bump.)
 
 `SaveStore` binds a serializer to an `ISaveStorage` (`Exists`, `TryRead`, `TryWrite`, `Delete` by
-slot name) — the thin IO seam. The game will implement it over local files (write to a temp file
-and swap it in) and later Cloud Save.
+slot name) — the thin IO seam. Cloud Save is a later backend; local files are implemented:
+
+### File storage (`FileSaveStorage`)
+
+`FileSaveStorage : ISaveStorage` is pure System.IO, rooted at a directory passed in. In the game,
+`UnitySaveLocations.Default()` builds one over `Application.persistentDataPath/saves` — the only
+Unity-dependent line in the save system (the UnityStub's `Application.persistentDataPath` is a temp
+directory, so CiLint, BalanceSim and the EditMode runner compile and run it).
+
+```csharp
+SaveStore store = new SaveStore(UnitySaveLocations.Default(), new SaveSerializer(new JsonUtilitySaveSerializer(), catalog));
+store.Save("main", save);
+SaveLoadResult loaded = store.Load("main");
+```
+
+| Rule | Behaviour |
+| --- | --- |
+| Layout | Slot `main` → `main.save`; backup `main.save.bak`; `main.save.tmp` only mid-write. |
+| Slot names | 1–64 ASCII letters, digits, `_`, `-`; starts with a letter or digit; not a Windows device name (`CON`, `NUL`, `COM1`…). No dots or separators, so no traversal and no custom extension. Anything else is `SaveFileError.InvalidSlot`. |
+| Atomic write | Full text to the temp file, flushed (write-through), then swapped in with `File.Replace` (old main → backup), falling back to copy/delete/move where `Replace` is unsupported. A crash leaves the old or the new save readable, never a torn one. One backup generation. |
+| Corrupt main | Not valid UTF-8, blank, or failing the content check (default: trimmed text is `{…}`, a cheap truncation check). Reads then use the backup; a write deletes a corrupt main instead of rotating it over a good backup. |
+| Read fallback | `Read(slot)` → `SaveFileResult` with `Source` (`Main` / `Backup`), `MainFileProblem` (why main was skipped — worth logging), `LastWriteUtc`. Both unusable → `Corrupt` (or `Io`); neither present → `NotFound`. |
+| Writes | Refuse text that would fail the content check (`InvalidContents`); the directory is created on demand. |
+| Encoding | UTF-8 without BOM; a leading BOM is tolerated on read. |
+| Exists / Delete | `Exists` = a main or backup file is present (content not checked). `Delete` removes main, backup and temp; false (`NotFound`) when there was nothing. |
+| Errors | `Read` / `Write` / `Remove` never throw; IO failures are `SaveFileError.Io` results with a message. The `ISaveStorage` methods reduce them to booleans. |
+| Concurrency | One process-wide lock around every operation: safe across threads and instances in one process. No cross-process locking — two game processes on one directory race, last swap wins (each file still whole). |
+
+`SaveSlotIndex.Build(storage, json)` lists every slot (`ListSlots()` — valid names with a main or
+backup file) newest first as `SaveSlotInfo`: timestamp, which file was read, the `SchemaVersion`
+header (no migration or validation) and any problem, for a load/continue menu.
 
 ### Validation
 
@@ -336,6 +366,11 @@ its System.Text.Json twin here.
 - **Beast XP defaults need review** (see above), as does the pacing model's 20% knockout assumption.
 - **Enemies wear no gear.** `EnemySpec` has no gear field; a caller needing geared enemies builds
   them itself and passes them as `PrebuiltEnemies`.
-- **No storage implementation.** `ISaveStorage` has no file or Cloud Save backend yet.
+- **Storage is local files only.** `FileSaveStorage` has no Cloud Save counterpart, no
+  cross-process lock and one backup generation; the content check catches truncation, not subtler
+  corruption (no checksum), which the serializer then reports on load. `SaveStore.Load` does not
+  retry the backup when the main file passes the check but fails to deserialize, and it does not
+  surface `SaveFileResult.MainFileProblem` — call `FileSaveStorage.Read` to log a backup fallback.
+  WebGL (IndexedDB-backed `persistentDataPath`, needing a sync) is untested.
 - **Never run in Unity.** The project has not been opened in an Editor, so the save round trip has
   not yet been exercised against the real `JsonUtility`.

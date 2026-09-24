@@ -556,6 +556,20 @@ namespace UnityEngine
 #endif
     }
 
+    /// <summary>
+    /// Stand-in for <c>UnityEngine.Application</c>, limited to <see cref="persistentDataPath"/>
+    /// (read by <c>UnitySaveLocations</c>). Outside Unity there is no per-app data folder, so it is a
+    /// real, writable directory under the system temp path — honest behaviour, not a placeholder.
+    /// </summary>
+    public static class Application
+    {
+        // Lower-cased deliberately: the game scripts read it exactly as Unity spells it.
+        public static string persistentDataPath
+        {
+            get { return System.IO.Path.Combine(System.IO.Path.GetTempPath(), "BeastCraftUnityStub", "persistentData"); }
+        }
+    }
+
     /// <summary>Stand-in base for Unity's inspector-decoration attributes.</summary>
     [AttributeUsage(AttributeTargets.Field, AllowMultiple = false, Inherited = true)]
     public abstract class PropertyAttribute : Attribute
