@@ -15,7 +15,8 @@ namespace BeastCraft.Encounters
     /// and then each unit's type, and keeps the draw only if its summed <see cref="EnemyData.Threat"/>
     /// is inside the shape's budget, it has at least <see cref="EncounterShapeData.MinDistinctTypes"/>
     /// types and it seats on the arena (<see cref="EncounterFit"/>); units are ordered front to back
-    /// (Vanguard, Skirmisher, Ranged; library order within a stance). It then draws an
+    /// (Vanguard, Skirmisher, Ranged; library order within a stance: <see cref="EncounterFit.ComparePlacement"/>,
+    /// the order the validator's worst-case fit check packs in). It then draws an
     /// <see cref="ElementScheme"/> by the library's weights and deals the elements from a shuffled
     /// deck of the ten, reshuffled when empty, shared by every draw of this generator — so every
     /// element is dealt before any is dealt twice.
@@ -147,11 +148,8 @@ namespace BeastCraft.Encounters
                     sorted.Add(new KeyValuePair<EnemyData, int>(_enemies.Get(entry.Key), entry.Value));
                 }
 
-                sorted.Sort((a, b) =>
-                {
-                    int byStance = StanceRank(_enemies.StanceOf(a.Key.EnemyId)).CompareTo(StanceRank(_enemies.StanceOf(b.Key.EnemyId)));
-                    return byStance != 0 ? byStance : _order[a.Key.EnemyId].CompareTo(_order[b.Key.EnemyId]);
-                });
+                sorted.Sort((a, b) => EncounterFit.ComparePlacement(_enemies.StanceOf(a.Key.EnemyId), _order[a.Key.EnemyId], _enemies.StanceOf(b.Key.EnemyId),
+                                                                   _order[b.Key.EnemyId]));
 
                 // Every draw must seat on the shape's arena (large enemies need room). The validator's
                 // worst-case check makes this pass for every draw of a valid library; it is a safety net.
@@ -220,20 +218,6 @@ namespace BeastCraft.Encounters
             }
 
             return schemes[schemes.Count - 1];
-        }
-
-        /// <summary>Front-to-back placement rank: melee screen first, ranged at the back.</summary>
-        private static int StanceRank(CombatStance stance)
-        {
-            switch (stance)
-            {
-                case CombatStance.Vanguard:
-                    return 0;
-                case CombatStance.Skirmisher:
-                    return 1;
-                default:
-                    return 2;
-            }
         }
 
         /// <summary>"giant x1, archer x2" in placement order: the key of a seen set.</summary>

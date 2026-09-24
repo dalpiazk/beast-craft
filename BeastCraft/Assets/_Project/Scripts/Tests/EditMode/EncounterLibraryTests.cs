@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using BeastCraft.Battle.Grid;
 using BeastCraft.Encounters;
 using BeastCraft.Progression;
 using NUnit.Framework;
@@ -65,6 +66,72 @@ namespace BeastCraft.Tests.EditMode
 
             AssertRejected(hex7, "variant 'giant'");
             AssertRejected(crowd, "do not fit the Medium");
+        }
+
+        /// <summary>
+        /// A seven-tile Ranged enemy behind one to four Vanguard singles on a Medium arena. Largest
+        /// first, four singles and the boss seat (it takes the middle row and the singles fill in
+        /// around it), which is all the old descending-size check tried. But the generator places
+        /// Vanguards first: four singles take the middle of the front row and the boss then fits
+        /// nowhere, so every four-brute draw fails its fit safety net. The validator must check the
+        /// generator's order, at every count, and refuse the variant.
+        /// </summary>
+        [Test]
+        public void Validate_RefusesALargeRangedEnemyTheGeneratorCannotSeatBehindItsScreen()
+        {
+            EnemyLibraryData enemies = ScreenEnemies("Ranged");
+            EncounterLibraryData library = ScreenLibrary();
+
+            List<UnitFootprint> largestFirst = new List<UnitFootprint> { UnitFootprint.Hex7 };
+            List<UnitFootprint> generatorOrder = new List<UnitFootprint>();
+            for (int i = 0; i < 4; i++)
+            {
+                largestFirst.Add(UnitFootprint.Single);
+                generatorOrder.Add(UnitFootprint.Single);
+            }
+
+            generatorOrder.Add(UnitFootprint.Hex7);
+            Assert.IsTrue(EncounterFit.Fits(ArenaSize.Medium, largestFirst), "largest first, the lineup seats (the old check passed it)");
+            Assert.IsFalse(EncounterFit.Fits(ArenaSize.Medium, generatorOrder), "in the generator's order it does not");
+
+            List<string> errors = EncounterLibraryValidator.Validate(library, enemies, Drops("duel", "boss"));
+            Assert.IsTrue(errors.Exists(e => e.Contains("variant 'screen': 5 enemies it can draw (4 x Single, 1 x Hex7") && e.Contains("do not fit the Medium")),
+                          string.Join("\n", errors));
+
+            library.Shapes[1].Variants[0].Slots[0].Min = 4;
+            EncounterGenerator generator = new EncounterGenerator(EncounterLibrary.Build(library), EnemyCatalog.Build(enemies, null), 3);
+            Assert.IsNull(generator.Draw("boss"), "with exactly four brutes the generator can never seat it");
+        }
+
+        /// <summary>The same lineup with the boss a Vanguard: the generator places it first, so it seats and the validator accepts it.</summary>
+        [Test]
+        public void Validate_AcceptsALargeVanguardTheGeneratorSeatsFirst()
+        {
+            EnemyLibraryData enemies = ScreenEnemies("Vanguard");
+            EncounterLibraryData library = ScreenLibrary();
+
+            List<string> errors = EncounterLibraryValidator.Validate(library, enemies, Drops("duel", "boss"));
+            Assert.IsEmpty(errors, string.Join("\n", errors));
+
+            EncounterLineup lineup = new EncounterGenerator(EncounterLibrary.Build(library), EnemyCatalog.Build(enemies, null), 3).Draw("boss");
+            Assert.IsNotNull(lineup);
+            Assert.AreEqual("wyvern", lineup.Enemies[0].EnemyId, "the large Vanguard is placed first");
+        }
+
+        /// <summary>
+        /// At most three singles: the Ranged boss seats behind them at every count the slot can draw,
+        /// so the check is not simply "large non-Vanguards refused".
+        /// </summary>
+        [Test]
+        public void Validate_AcceptsALargeRangedEnemyWhenEveryDrawSeats()
+        {
+            EnemyLibraryData enemies = ScreenEnemies("Ranged");
+            EncounterLibraryData library = ScreenLibrary();
+            library.Shapes[1].Variants[0].Slots[0].Max = 3;
+
+            List<string> errors = EncounterLibraryValidator.Validate(library, enemies, Drops("duel", "boss"));
+            Assert.IsEmpty(errors, string.Join("\n", errors));
+            Assert.IsNotNull(new EncounterGenerator(EncounterLibrary.Build(library), EnemyCatalog.Build(enemies, null), 3).Draw("boss"));
         }
 
         [Test]
@@ -185,6 +252,40 @@ namespace BeastCraft.Tests.EditMode
                     }
                 }
             };
+        }
+
+        /// <summary>A seven-tile <c>wyvern</c> of the given stance (first in library order), then brute, archer and giant.</summary>
+        private static EnemyLibraryData ScreenEnemies(string wyvernStance)
+        {
+            EnemyData wyvern = EnemyLibraryTests.Giant();
+            wyvern.EnemyId = "wyvern";
+            wyvern.DisplayName = "Wyvern";
+            wyvern.Stance = wyvernStance;
+            return EnemyLibraryTests.Library(wyvern, EnemyLibraryTests.Brute(), EnemyLibraryTests.Archer(), EnemyLibraryTests.Giant());
+        }
+
+        /// <summary><see cref="Library"/> with <c>boss</c> replaced by one variant, <c>screen</c>: one to four brutes and one wyvern.</summary>
+        private static EncounterLibraryData ScreenLibrary()
+        {
+            EncounterLibraryData library = Library();
+            EncounterShapeData boss = library.Shapes[1];
+            boss.ThreatMin = 0.0;
+            boss.ThreatMax = 100.0;
+            boss.Variants = new[]
+            {
+                new EncounterVariantData
+                {
+                    Label = "screen",
+                    Weight = 1,
+                    Slots = new[]
+                    {
+                        new EncounterSlotData { Types = new[] { "brute" }, Min = 1, Max = 4 },
+                        new EncounterSlotData { Types = new[] { "wyvern" }, Min = 1, Max = 1 }
+                    }
+                }
+            };
+
+            return library;
         }
 
         internal static DropTableData Drops(params string[] shapes)

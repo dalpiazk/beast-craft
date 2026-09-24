@@ -179,8 +179,8 @@ provenance lines.
 
 **Runtime** (`Runtime/Encounters`, namespace `BeastCraft.Encounters`): `EnemyLibraryValidator` and
 `EncounterLibraryValidator` (the simulator's old fixture rules, plus id collisions, the drop-table
-shape match and the arena fit of every shape's worst case and every template, `EncounterFit`: a
-seven-tile enemy never fits a Small arena); `EnemyCatalog` (one cached in-memory species per enemy and
+shape match and the arena fit of every lineup a shape can draw, placed in the generator's order, and
+of every template, `EncounterFit`: a seven-tile enemy never fits a Small arena); `EnemyCatalog` (one cached in-memory species per enemy and
 element through `BeastRosterBuilder.ApplySpecies`, one cached kit through
 `SkillLibraryBuilder.ApplySkill` plus the element; flagged `DontUnloadUnusedAsset`);
 `EncounterGenerator` (seeded draws of an `EncounterLineup` per shape: variant, counts, types, stance
@@ -801,8 +801,8 @@ line, then outward from the vertical centre line, then by `Q`): each takes the f
 whole footprint lies in the zone on free tiles. For one-tile units that is exactly the front-most
 tiles. On a Medium board a `Hex7` boss sits centred on the middle row of the three-row zone; on a
 Small board (a two-row zone) it fits nowhere. The balance simulator packs its enemies this way, and
-its loader refuses any shape (worst case: every slot at its maximum, each its slot's largest type) or
-fixed encounter that does not fit. `PlacementValidator` is unchanged — beasts are one tile — and a
+its loader refuses any shape (any lineup it can draw, placed in the generator's front-to-back order)
+or fixed encounter that does not fit. `PlacementValidator` is unchanged — beasts are one tile — and a
 caller passing already-placed tiles passes every tile a large unit covers.
 
 *Balance.* A `Hex7` boss is easier to reach (twelve tiles around it, every range to it one longer

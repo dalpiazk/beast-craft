@@ -237,9 +237,11 @@ cooldown 2 weighted `Attack` about twice as heavily.
   tiles, an area hits it once, and a large caster's area grows from all its tiles, so the `Hex7`
   bosses author their ranges one lower than their one-tile values were (gaze 2, quake and roar 1: a
   radius-1 burst from a `Hex7` is the radius-2 disc around its centre) to keep their reach; the
-  champion's shockwave stays at 2. The validators pack every shape's worst case (each slot at its
-  `Max`, each unit its slot's largest type, largest first), every template and every fixed encounter
-  into the enemy zone the way a battle does (`EncounterFit`), and refuse what does not fit: a `Hex7`
+  champion's shockwave stays at 2. The validators pack every lineup a shape can draw (every count
+  and type mix, in the generator's front-to-back order, `EncounterFit.ComparePlacement`: greedy
+  packing is order-sensitive, so a large Ranged enemy behind a Vanguard screen can fail where
+  largest-first fits), every template and every fixed encounter into the enemy zone the way a battle
+  does (`EncounterFit`), and refuse what does not fit: a `Hex7`
   enemy never fits a `Small` arena (a two-row zone). The generator also refuses a draw that would not
   fit (a safety net; no valid file produces one).
 

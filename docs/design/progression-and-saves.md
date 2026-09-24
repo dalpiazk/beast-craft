@@ -111,6 +111,11 @@ slot name) — the thin IO seam. Cloud Save is a later backend; local files are 
 Unity-dependent line in the save system (the UnityStub's `Application.persistentDataPath` is a temp
 directory, so CiLint, BalanceSim and the EditMode runner compile and run it).
 
+*WebGL.* On WebGL, `Application.persistentDataPath` is an in-memory file system (Emscripten's
+IDBFS) that reaches the browser's IndexedDB only when JavaScript calls `FS.syncfs` after a write.
+`FileSaveStorage` does not make that call, so on WebGL a save would be lost on reload. A platform
+follow-up if WebGL is ever targeted (see Known gaps).
+
 ```csharp
 SaveStore store = new SaveStore(UnitySaveLocations.Default(), new SaveSerializer(new JsonUtilitySaveSerializer(), catalog));
 store.Save("main", save);
@@ -386,6 +391,10 @@ its System.Text.Json twin here.
   cross-process lock and one backup generation; the content check catches truncation, not subtler
   corruption (no checksum), which the serializer then reports on load (and `SaveStore` retries
   the backup). A slot recovered from its backup is not rewritten automatically: the game should
-  log `SaveLoadResult.MainFileProblem` and save again. WebGL (IndexedDB-backed `persistentDataPath`, needing a sync) is untested.
+  log `SaveLoadResult.MainFileProblem` and save again.
+- **WebGL saves would not persist.** WebGL's `persistentDataPath` is an in-memory file system that
+  needs a JavaScript `FS.syncfs` flush after each write to reach IndexedDB; `FileSaveStorage` does
+  not flush (and the whole save path is untested on WebGL). A platform follow-up (a small `.jslib`
+  called after `Save`/`Delete`, or a WebGL `ISaveStorage`) if WebGL is ever targeted.
 - **Never run in Unity.** The project has not been opened in an Editor, so the save round trip has
   not yet been exercised against the real `JsonUtility`.
