@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using BeastCraft.Battle;
 using BeastCraft.Progression;
 
@@ -21,6 +23,12 @@ namespace BeastCraft.Session
 
         /// <summary>Skill levels gained across the team's beasts and the avatar's actives and passives.</summary>
         public int SkillLevelsGained { get; internal set; }
+
+        /// <summary>Beast XP credited, by team beast id (every team beast still in the save has an entry).</summary>
+        public Dictionary<string, int> BeastXpGained { get; } = new Dictionary<string, int>(StringComparer.Ordinal);
+
+        /// <summary>Beast levels gained across the team.</summary>
+        public int BeastLevelsGained { get; internal set; }
 
         /// <summary>Avatar XP credited (0 when the avatar did not take part).</summary>
         public int AvatarXpGained { get; internal set; }

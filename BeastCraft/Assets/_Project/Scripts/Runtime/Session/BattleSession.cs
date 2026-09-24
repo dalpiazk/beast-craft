@@ -30,8 +30,9 @@ namespace BeastCraft.Session
     /// <strong><see cref="ApplyRewards"/></strong> pays a finished battle into the save: practice XP
     /// (<see cref="PostBattleAward.AwardPractice"/>), drops on a clear
     /// (<see cref="PostBattleAward.AwardDrops"/>, first-clear and pity included) and avatar XP
-    /// (<see cref="AvatarProgression.AwardBattle"/>). Beasts have no level/XP rules yet, so their
-    /// own <see cref="BeastProgress"/> is not changed.
+    /// (<see cref="AvatarProgression.AwardBattle"/>) and each team beast's own XP
+    /// (<see cref="BeastProgression.AwardBattle"/>: participation for every fielded beast, the
+    /// clear bonus for those still standing on a win; benched beasts earn nothing).
     /// </para>
     /// <para>
     /// Neither method throws on bad input: a bad setup is a failed <see cref="BattleSessionResult"/>
@@ -164,8 +165,9 @@ namespace BeastCraft.Session
         /// beast's and the avatar's skills that fired, drops for a clear of
         /// (<paramref name="shape"/>, <paramref name="encounterLevel"/>) from
         /// <paramref name="dropTable"/> into <see cref="PlayerSave.Materials"/> (only on a player
-        /// victory; a null table drops nothing), and avatar XP for the battle at
-        /// <paramref name="encounterLevel"/> when the avatar took part. <paramref name="content"/>
+        /// victory; a null table drops nothing), beast XP to every team beast
+        /// (<see cref="BeastProgression"/>; a beast knocked out by the end gets participation only)
+        /// and avatar XP for the battle at <paramref name="encounterLevel"/> when the avatar took part. <paramref name="content"/>
         /// supplies each skill's and passive's progression definition (null uses the defaults).
         /// <paramref name="rng"/> drives the drop rolls; null seeds one from the battle's seed
         /// (<see cref="LootRoller.DeriveSeed"/>), so rewards are deterministic either way.
@@ -219,6 +221,21 @@ namespace BeastCraft.Session
             summary.Loot = PostBattleAward.AwardDrops(result.Battle, dropTable, shape, encounterLevel, save.Materials,
                                                       rng ?? new Random(LootRoller.DeriveSeed(result.Seed, 0)));
 
+            foreach (KeyValuePair<string, string> pair in result.TeamUnitIds)
+            {
+                OwnedBeast beast = save.FindBeast(pair.Key);
+                BattleUnit unit = FindUnit(result.Units, pair.Value);
+
+                if (beast == null || summary.BeastXpGained.ContainsKey(pair.Key))
+                {
+                    continue;
+                }
+
+                bool knockedOut = unit != null && unit.IsDefeated;
+                summary.BeastXpGained[pair.Key] = BeastProgression.BattleXp(result.Outcome, encounterLevel, knockedOut);
+                summary.BeastLevelsGained += BeastProgression.AwardBattle(beast.Progress, result.Outcome, encounterLevel, knockedOut);
+            }
+
             if (result.Avatar != null)
             {
                 summary.AvatarXpGained = AvatarProgression.BattleXp(result.Outcome, encounterLevel);
@@ -228,6 +245,19 @@ namespace BeastCraft.Session
             summary.Applied = true;
             result.RewardsApplied = true;
             return summary;
+        }
+
+        private static BattleUnit FindUnit(IReadOnlyList<BattleUnit> units, string unitId)
+        {
+            foreach (BattleUnit unit in units)
+            {
+                if (unit != null && string.Equals(unit.Id, unitId, StringComparison.Ordinal))
+                {
+                    return unit;
+                }
+            }
+
+            return null;
         }
 
         private static List<OwnedBeast> ResolveTeam(BattleSetup setup, PlayerSave save, BattleContent content, List<string> errors)

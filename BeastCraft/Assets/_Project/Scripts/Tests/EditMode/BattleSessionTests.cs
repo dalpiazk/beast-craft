@@ -134,9 +134,18 @@ namespace BeastCraft.Tests.EditMode
         public void ApplyRewards_PaysPracticeLootAndAvatarXp_OnceOnly()
         {
             PlayerSave save = StarterSave();
-            BattleSessionResult result = BattleSession.Run(Setup(save, 42, weakEnemies: true));
+            OwnedBeast benched = OwnedBeast.Create("bench", _roster.Species[0].SpeciesId, 10);
+            save.Beasts.Add(benched);
+            BattleSetup setup = Setup(save, 42, weakEnemies: true);
+            setup.TeamBeastIds.Remove(benched.BeastId);
+            BattleSessionResult result = BattleSession.Run(setup);
             Assert.AreEqual(BattleOutcome.PlayerVictory, result.Outcome, result.Error);
             int avatarXpBefore = AvatarProgression.TotalXpToReach(save.Avatar.Level) + save.Avatar.Xp;
+            int[] beastXpBefore = new int[4];
+            for (int i = 0; i < 4; i++)
+            {
+                beastXpBefore[i] = BeastProgression.TotalXpToReach(save.Beasts[i].Progress.Level) + save.Beasts[i].Progress.Xp;
+            }
 
             BattleRewardSummary summary = BattleSession.ApplyRewards(save, result, _content, Shape, EncounterLevel, _drops, new System.Random(99));
 
@@ -164,6 +173,20 @@ namespace BeastCraft.Tests.EditMode
             }
 
             Assert.AreEqual(AvatarProgression.BattleXp(BattleOutcome.PlayerVictory, EncounterLevel), summary.AvatarXpGained);
+
+            Assert.AreEqual(4, summary.BeastXpGained.Count, "every fielded beast is paid");
+            for (int i = 0; i < 4; i++)
+            {
+                OwnedBeast beast = save.Beasts[i];
+                bool knockedOut = FindUnit(result, result.UnitIdFor(beast.BeastId)).IsDefeated;
+                int expected = BeastProgression.BattleXp(BattleOutcome.PlayerVictory, EncounterLevel, knockedOut);
+                Assert.AreEqual(expected, summary.BeastXpGained[beast.BeastId]);
+                Assert.AreEqual(beastXpBefore[i] + expected, BeastProgression.TotalXpToReach(beast.Progress.Level) + beast.Progress.Xp);
+            }
+
+            Assert.IsFalse(summary.BeastXpGained.ContainsKey(benched.BeastId), "benched beasts earn nothing");
+            Assert.AreEqual(10, benched.Progress.Level);
+            Assert.AreEqual(0, benched.Progress.Xp);
             Assert.AreEqual(avatarXpBefore + summary.AvatarXpGained, AvatarProgression.TotalXpToReach(save.Avatar.Level) + save.Avatar.Xp);
 
             BattleRewardSummary again = BattleSession.ApplyRewards(save, result, _content, Shape, EncounterLevel, _drops, new System.Random(99));
@@ -215,6 +238,8 @@ namespace BeastCraft.Tests.EditMode
             Assert.IsEmpty(summary.Loot.Drops);
             Assert.IsEmpty(save.Materials.ClearedCells);
             Assert.AreEqual(0, summary.AvatarXpGained, "the avatar did not take part");
+            Assert.AreEqual(BeastProgression.ParticipationXp, summary.BeastXpGained[save.Beasts[0].BeastId], "a lost battle pays participation only");
+            Assert.AreEqual(BeastProgression.ParticipationXp, save.Beasts[0].Progress.Xp);
             Assert.IsNull(result.Avatar);
         }
 

@@ -8,8 +8,8 @@ namespace BeastCraft.Progression
     /// <para>
     /// Plain serializable save data with public fields, like <see cref="AvatarProgress"/> and
     /// <see cref="SkillProgress"/>. The species is named by its stable
-    /// <c>CreatureSpeciesSO.SpeciesId</c>, never an asset reference. No beast XP curve exists yet,
-    /// so this type only holds the numbers; the rules will live beside it when one is designed.
+    /// <c>CreatureSpeciesSO.SpeciesId</c>, never an asset reference. The rules are
+    /// <see cref="BeastProgression"/>'s; this type only holds the numbers.
     /// </para>
     /// </summary>
     [Serializable]

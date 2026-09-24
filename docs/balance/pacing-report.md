@@ -57,6 +57,23 @@ Practice only ignores the gates (a skill cannot pass one without a material). Ne
 | 450 | 90 | 89 | 91 | 92 | ok |
 | 500 | 100 | 99 | 100 | 100 | ok |
 
+## Beast level
+
+`BeastProgression.AwardBattle` after every battle for a beast fielded in all of them (6 XP win or lose, knocked out or not, + 40 + 4 x encounter level on a clear it is still standing for; knocked out in 20.0% of battles; a level costs 160 + 13 x level). Benched beasts earn nothing. Target: median within 3 levels of the encounter level at every checkpoint.
+
+| Battle | Encounter level | p10 | p50 | p90 | Verdict |
+| ---: | ---: | ---: | ---: | ---: | --- |
+| 50 | 10 | 9 | 10 | 11 | ok |
+| 100 | 20 | 19 | 20 | 22 | ok |
+| 150 | 30 | 29 | 30 | 32 | ok |
+| 200 | 40 | 39 | 40 | 42 | ok |
+| 250 | 50 | 48 | 50 | 52 | ok |
+| 300 | 60 | 58 | 60 | 62 | ok |
+| 350 | 70 | 68 | 70 | 72 | ok |
+| 400 | 80 | 78 | 80 | 82 | ok |
+| 450 | 90 | 87 | 90 | 92 | ok |
+| 500 | 100 | 97 | 100 | 100 | ok |
+
 ## Materials
 
 | Material | Tier | Gained per campaign (mean) | First gained, battle p10 / p50 / p90 |
