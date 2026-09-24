@@ -13,7 +13,9 @@ everything else is the game's code — `regions.json`, `NodeMapGenerator`, `Camp
 - Level cap: starting 12, then each boss's seal (22, 32, 42, 52, 62, 72, 82, 92, 100, 100); bank limit 3 levels
 - Player: 3 fielded beasts (each knocked out in 20.0% of battles), 3 on the bench, a level-1 recruit joins the bench when region 5 starts; the avatar fights every battle
 - Route: an Elite when the fielded mean level is at least its level, else a Battle, else Rest, Shop, Elite (ties at random);
-  a lost battle is retried at the same node (new battle seed); Camp trains the lowest bench beast; Shop is a stub (no effect)
+  a lost battle is retried at the same node (new battle seed); Camp trains the lowest bench beast, then its travelling trader is
+  visited, as is any trading post taken (the game's `ShopService`; see "Economy")
+- Team: fielded griffin, phoenix, golem; bench kirin, treant, tarasque; recruit basilisk (species only matter for skill tomes)
 - Clear chance at equal level: squad / horde 80.0%, elite and generated gates 60.0%, solo and bosses 50.0%; across a gap (node level - fielded mean) it follows the table below in log-odds, interpolated, clamped at its ends
 - Focus skill fires 3-9 times per battle, secondary the same; materials spent with `--mode pacing`'s policy
 
@@ -124,16 +126,51 @@ After r05's boss, the fielded team (copies) wins 25 battles of old content; mean
 | r01 stage 4 | 0.00 | 0.00 | < 0.05 | ok |
 | r05 stage 2 | 0.00 | 0.02 | < 0.50 | ok |
 
+## Economy
+
+Gold from every clear (`drop-tables.json` `Gold`: 10 + 2 x level, x the shape (solo 1.2, elite 1.5, horde 1.1), +/-10%, +5 on a
+cell's first clear; dens x1.5, passes +5, lairs +10), gear and look drops, pass and lair first-clear rewards, and the Trader
+(`shop-tables.json`, the game's `ShopService`) at every trading post the route takes and at every camp (its travelling trader;
+every path crosses the camp row). The shopper wants, in order: the focus skill's gate material when it waits without one, the
+best gear upgrade, consumables up to 2 held, one skill (a tome up to 10 levels early, or an avatar skill), one look;
+it buys in that order while the gold lasts (a look only while 2 price units stay in the purse), sells replaced gear (25%), and uses a
+consumable at every den, pass and lair battle. Purchases do not change the clear chance (the difficulty assumes typical gear).
+
+| Region | Gold earned p50 | Visits (mean) | Battles per visit | Gold held at the boss p50 | Held / visit income p50 | Gear at typical (mean) | Consumables used (mean) | Verdict |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| r01 | 977 | 6.3 | 8.3 | 167 | 1.0 | 58% | 7.1 | ok |
+| r02 | 1831 | 6.2 | 8.8 | 406 | 1.4 | 96% | 7.4 | ok |
+| r03 | 2753 | 6.2 | 8.8 | 577 | 1.3 | 55% | 7.6 | ok |
+| r04 | 3627 | 6.3 | 8.8 | 914 | 1.6 | 86% | 7.6 | ok |
+| r05 | 4559 | 6.2 | 8.8 | 1084 | 1.5 | 51% | 7.6 | ok |
+| r06 | 5440 | 6.2 | 8.8 | 1610 | 1.8 | 81% | 7.5 | ok |
+| r07 | 6358 | 6.2 | 8.8 | 1798 | 1.7 | 32% | 7.6 | ok |
+| r08 | 7241 | 6.3 | 8.8 | 2149 | 1.8 | 58% | 7.6 | ok |
+| r09 | 8146 | 6.1 | 8.9 | 2409 | 1.8 | 22% | 7.6 | ok |
+| r10 | 9026 | 6.2 | 8.9 | 2712 | 1.9 | 40% | 7.6 | ok |
+| **Campaign** | 49953 | 62.2 | | | | | | |
+
+Design reference (not a gate): about 900 gold in region 1, 4400 in region 5, 8800 in region 10, 55000 over the campaign. Gold held target: under 2.0 visits' income at every boss (p50). "Gear at typical" = the share of the fielded beasts' slots at or
+above the typical profile (`--gear typical`) for the boss's band.
+
+| Gate | Target | Result | Verdict |
+| --- | --- | --- | --- |
+| Want-list affordability (gold spent / wanted, per visit) | p50 55%-80% | p10 5%, p50 69%, p90 100% | ok |
+| Visits where nothing meaningful in stock (material, gear, consumable, skill) is affordable on arrival | under 5% | 0% of 62192 | ok |
+
+Per campaign (means): bought AvatarGear 8.6, AvatarPassive 4.8, AvatarSkill 4.7, BeastGear 25.0, BeastSkill 1.1, Consumable 75.5, Cosmetic 30.8 (materials by tier: 0.0 / 0.0 / 0.0); gear dropped 10.0, from passes and lairs 40.0, sold back 71.6 for 15122 gold; looks unlocked by source boss 14.0, drop 3.1, milestone 13.8, shop 30.8.
+
 ## Focus skill
 
-Battles (losses included) for the focus skill to reach each level, against `--mode pacing`'s targets.
+Battles (losses included) for the focus skill to reach each level, the Trader's gate materials included. Targets (the
+economy design): L5 15-20, L10 ~80 +/-10%, L15 ~180 +/-10%, L20 at least 270.
 
 | Level | Target (p50) | p10 | p50 | p90 | Verdict |
 | ---: | --- | ---: | ---: | ---: | --- |
 | 5 | 15-20 | 15 | 17 | 19 | ok |
-| 10 | ~80 (70-90) | 77 | 86 | 95 | ok |
-| 15 | ~180 (160-200) | 174 | 190 | 207 | ok |
-| 20 | ~300-320 (295-325) | 304 | 323 | 342 | ok |
+| 10 | ~80 (72-88) | 77 | 86 | 95 | ok |
+| 15 | ~180 (162-198) | 174 | 190 | 207 | ok |
+| 20 | 270+ | 304 | 323 | 342 | ok |
 
 ## Verdict
 

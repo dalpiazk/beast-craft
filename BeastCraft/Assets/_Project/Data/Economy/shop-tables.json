@@ -166,36 +166,36 @@
   "Materials": [
     {
       "MaterialId": "essence_shard",
-      "PriceUnits": 3,
+      "PriceUnits": 2.1,
       "MinShopLevel": 1,
       "MaxQuantity": 2,
       "Weight": 6
     },
     {
       "MaterialId": "essence_crystal",
-      "PriceUnits": 10,
+      "PriceUnits": 7.0,
       "MinShopLevel": 21,
       "MaxQuantity": 1,
       "Weight": 3
     },
     {
       "MaterialId": "essence_core",
-      "PriceUnits": 35,
+      "PriceUnits": 24.5,
       "MinShopLevel": 41,
       "MaxQuantity": 1,
       "Weight": 1
     }
   ],
   "Gear": {
-    "CommonUnits": 6,
-    "RareUnits": 15,
-    "EpicUnits": 30,
+    "CommonUnits": 4.2,
+    "RareUnits": 10.5,
+    "EpicUnits": 21,
     "CommonWeight": 75,
     "RareWeight": 25,
     "BandLookback": 20
   },
   "Skills": {
-    "BeastTomeUnits": 8,
+    "BeastTomeUnits": 5.6,
     "EarlyAccessLevels": 10
   },
   "AvatarSkillUnlocks": [
@@ -203,88 +203,88 @@
       "SkillId": "rallying_cry",
       "Kind": "Active",
       "MinAvatarLevel": 5,
-      "PriceUnits": 12
+      "PriceUnits": 8.4
     },
     {
       "SkillId": "mending_light",
       "Kind": "Active",
       "MinAvatarLevel": 5,
-      "PriceUnits": 12
+      "PriceUnits": 8.4
     },
     {
       "SkillId": "aegis",
       "Kind": "Active",
       "MinAvatarLevel": 10,
-      "PriceUnits": 12
+      "PriceUnits": 8.4
     },
     {
       "SkillId": "hex_of_frailty",
       "Kind": "Active",
       "MinAvatarLevel": 15,
-      "PriceUnits": 12
+      "PriceUnits": 8.4
     },
     {
       "SkillId": "battle_focus",
       "Kind": "Active",
       "MinAvatarLevel": 25,
-      "PriceUnits": 12
+      "PriceUnits": 8.4
     },
     {
       "SkillId": "slowing_field",
       "Kind": "Active",
       "MinAvatarLevel": 35,
-      "PriceUnits": 12
+      "PriceUnits": 8.4
     },
     {
       "SkillId": "iron_will",
       "Kind": "Passive",
       "MinAvatarLevel": 8,
-      "PriceUnits": 12
+      "PriceUnits": 8.4
     },
     {
       "SkillId": "battle_hymn",
       "Kind": "Passive",
       "MinAvatarLevel": 12,
-      "PriceUnits": 12
+      "PriceUnits": 8.4
     },
     {
       "SkillId": "withering_curse",
       "Kind": "Passive",
       "MinAvatarLevel": 20,
-      "PriceUnits": 12
+      "PriceUnits": 8.4
     },
     {
       "SkillId": "bloodlust",
       "Kind": "Passive",
       "MinAvatarLevel": 30,
-      "PriceUnits": 12
+      "PriceUnits": 8.4
     },
     {
       "SkillId": "vengeance",
       "Kind": "Passive",
       "MinAvatarLevel": 40,
-      "PriceUnits": 12
+      "PriceUnits": 8.4
     },
     {
       "SkillId": "storm_call",
       "Kind": "Passive",
       "MinAvatarLevel": 55,
-      "PriceUnits": 12
+      "PriceUnits": 8.4
     },
     {
       "SkillId": "verdant_pulse",
       "Kind": "Passive",
       "MinAvatarLevel": 70,
-      "PriceUnits": 12
+      "PriceUnits": 8.4
     }
   ],
   "Consumables": {
-    "CommonUnits": 1,
-    "RareUnits": 2,
+    "CommonUnits": 0.7,
+    "RareUnits": 1.4,
     "MaxQuantity": 2
   },
   "Cosmetics": {
-    "CommonUnits": 8,
-    "RareUnits": 20
+    "CommonUnits": 5.6,
+    "RareUnits": 14.0
   }
 }

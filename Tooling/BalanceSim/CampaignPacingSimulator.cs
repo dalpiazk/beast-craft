@@ -32,7 +32,9 @@ namespace BeastCraft.Tooling.BalanceSim
     /// (a loss retries the node). Route: an Elite when the fielded team's mean level is at least
     /// the Elite's level, otherwise a Battle, otherwise a Rest, a Shop, an Elite (ties drawn at
     /// random). Camp trains the lowest-level bench beast. The focus skill and its materials follow
-    /// <c>--mode pacing</c>'s feeding policy.
+    /// <c>--mode pacing</c>'s feeding policy. The economy (gold, gear and look drops, pass and lair
+    /// rewards, the Trader at trading posts and at every camp, a greedy shopper) is
+    /// <see cref="CampaignEconomyModel"/>'s, on its own random stream.
     /// </para>
     /// <para>
     /// <strong>Clear chance</strong> by tier (the user's tiered targets, the difficulty the
@@ -118,6 +120,15 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <summary>A node lost this many times in a row is counted as stuck (and cleared, so the campaign ends).</summary>
         public const int StuckAttempts = 200;
 
+        /// <summary>The focus skill's targets with the economy (the design: L10 ~80 and L15 ~180 within 10%, L20 at least 270).</summary>
+        public static readonly PacingSimulator.Gate[] FocusGates =
+        {
+            new PacingSimulator.Gate(5, 15, 20, "15-20"),
+            new PacingSimulator.Gate(10, 72, 88, "~80 (72-88)"),
+            new PacingSimulator.Gate(15, 162, 198, "~180 (162-198)"),
+            new PacingSimulator.Gate(20, 270, int.MaxValue, "270+"),
+        };
+
         /// <summary>Loads the data, runs the Monte Carlo (twice with <c>--self-check</c>), prints the report. Exit codes as <c>--mode pacing</c>.</summary>
         public static int Run(SimOptions options)
         {
@@ -169,6 +180,17 @@ namespace BeastCraft.Tooling.BalanceSim
 
             World world = new World(new PacingSimulator.Model(library.Materials, DropTableBuilder.Build(tables, DropTableBuilder.TierLookup(library.Materials))),
                                     RegionLibrary.Build(regions), EncounterLibrary.Build(encounters));
+            world.Economy = CampaignEconomyModel.World.Load(library, errors);
+            if (world.Economy == null)
+            {
+                Console.Error.WriteLine("The economy data is invalid:");
+                foreach (string error in errors)
+                {
+                    Console.Error.WriteLine("  " + error);
+                }
+
+                return 2;
+            }
             List<int> seeds = options.Seeds ?? new List<int> { options.Seed };
 
             DateTime start = DateTime.UtcNow;
@@ -235,6 +257,9 @@ namespace BeastCraft.Tooling.BalanceSim
 
             public EncounterLibrary Encounters { get; }
 
+            /// <summary>The economy's content and the Trader (<see cref="CampaignEconomyModel"/>).</summary>
+            public CampaignEconomyModel.World Economy { get; set; }
+
             /// <summary>The drop-table shape a node pays out from: its shape, or its template's.</summary>
             public string DropShape(MapNode node)
             {
@@ -298,6 +323,9 @@ namespace BeastCraft.Tooling.BalanceSim
 
             public int[] FocusReached = new int[SkillProgressionDefinition.DefaultMaxLevel + 1];
             public int Stuck;
+
+            /// <summary>The economy's measurements (<see cref="CampaignEconomyModel"/>).</summary>
+            public CampaignEconomyModel.Result Econ;
         }
 
         private sealed class Player
@@ -309,6 +337,7 @@ namespace BeastCraft.Tooling.BalanceSim
             public SkillProgress Focus = new SkillProgress("focus");
             public SkillProgress Secondary = new SkillProgress("secondary");
             public SkillProgressionDefinition Definition = new SkillProgressionDefinition();
+            public CampaignEconomyModel Economy;
 
             public double FieldedMean()
             {
@@ -379,11 +408,12 @@ namespace BeastCraft.Tooling.BalanceSim
 
             Result result = new Result(regions.Regions.Count, maxStages);
             Random rng = new Random(campaignSeed);
-            Player player = new Player { Save = PlayerSave.CreateNew() };
-            MaterialInventory inventory = player.Save.Materials;
+            Player player = new Player { Save = PlayerSave.CreateNew(), Economy = new CampaignEconomyModel(world.Economy, campaignSeed, regions.Regions.Count) };
+            result.Econ = player.Economy.Stats;
             for (int i = 0; i < FieldedCount + BenchCount; i++)
             {
-                OwnedBeast beast = OwnedBeast.Create("b" + (i + 1), "sim", 1);
+                string species = i < FieldedCount ? CampaignEconomyModel.FieldedSpecies[i] : CampaignEconomyModel.BenchSpecies[i - FieldedCount];
+                OwnedBeast beast = OwnedBeast.Create("b" + (i + 1), species, 1);
                 player.Save.Beasts.Add(beast);
                 (i < FieldedCount ? player.Fielded : player.Bench).Add(beast);
             }
@@ -394,7 +424,7 @@ namespace BeastCraft.Tooling.BalanceSim
                 RegionData region = regions.Regions[r];
                 if (r + 1 == RecruitRegion)
                 {
-                    player.Recruit = OwnedBeast.Create("recruit", "sim", 1);
+                    player.Recruit = OwnedBeast.Create("recruit", CampaignEconomyModel.RecruitSpecies, 1);
                     player.Save.Beasts.Add(player.Recruit);
                     player.Bench.Add(player.Recruit);
                 }
@@ -434,14 +464,18 @@ namespace BeastCraft.Tooling.BalanceSim
                         lowest = beast.Progress.Level < lowest.Progress.Level ? beast : lowest;
                     }
 
+                    ShopContext camp = CampaignRules.ShopContextFor(save.Campaign.ActiveRun, node);
                     Expect(CampaignRules.Camp(save, regions, node.NodeId, lowest.BeastId));
                     CheckCap(player, result, regions);
+                    Shop(world, player, camp, regionIndex);
                     continue;
                 }
 
                 if (node.Type == MapNodeType.Shop)
                 {
-                    Expect(CampaignRules.Trade(save, regions, node.NodeId, null));
+                    ShopContext post = CampaignRules.ShopContextFor(save.Campaign.ActiveRun, node);
+                    Expect(CampaignRules.Trade(save, regions, node.NodeId, world.Economy.Shop));
+                    Shop(world, player, post, regionIndex);
                     continue;
                 }
 
@@ -476,8 +510,15 @@ namespace BeastCraft.Tooling.BalanceSim
                         result.BankedLevelsAtSeal.Add(banked / save.Beasts.Count);
                     }
 
-                    CampaignResult resolved = CampaignRules.ResolveBattle(save, regions, node.NodeId, cleared ? BattleOutcome.PlayerVictory : BattleOutcome.EnemyVictory);
+                    CampaignResult resolved = CampaignRules.ResolveBattle(save, regions, node.NodeId, cleared ? BattleOutcome.PlayerVictory : BattleOutcome.EnemyVictory,
+                                                                         world.Economy.Content);
                     Expect(resolved);
+                    player.Economy.OnResolved(save, resolved);
+                    if (cleared && node.Type == MapNodeType.Boss)
+                    {
+                        player.Economy.OnRegionEnd(save, regionIndex, node.Level);
+                    }
+
                     CheckCap(player, result, regions);
                     if (cleared)
                     {
@@ -485,6 +526,15 @@ namespace BeastCraft.Tooling.BalanceSim
                     }
                 }
             }
+        }
+
+        /// <summary>A Trader visit (a trading post, or the camp's travelling trader), then the focus and secondary skills take any material bought.</summary>
+        private static void Shop(World world, Player player, ShopContext context, int regionIndex)
+        {
+            PlayerSave save = player.Save;
+            player.Economy.Visit(save, context, player.Fielded, player.Focus, player.Definition, regionIndex);
+            MaterialSpending.Spend(world.Model, player.Focus, player.Definition, save.Materials, null);
+            MaterialSpending.Spend(world.Model, player.Secondary, player.Definition, save.Materials, MaterialSpending.Reserve(world.Model, player.Focus, player.Definition));
         }
 
         /// <summary>Fights (draws) one battle at <paramref name="node"/> and pays it out. Returns whether it was cleared.</summary>
@@ -497,6 +547,7 @@ namespace BeastCraft.Tooling.BalanceSim
             BattleOutcome outcome = cleared ? BattleOutcome.PlayerVictory : BattleOutcome.EnemyVictory;
             int focusUses = PacingSimulator.FocusUsesMin + rng.Next(PacingSimulator.FocusUsesMax - PacingSimulator.FocusUsesMin + 1);
             int secondaryUses = PacingSimulator.FocusUsesMin + rng.Next(PacingSimulator.FocusUsesMax - PacingSimulator.FocusUsesMin + 1);
+            player.Economy.BeforeBattle(save, node, regionIndex);
 
             result.Battles++;
             result.BattlesByRegion[regionIndex]++;
@@ -506,7 +557,8 @@ namespace BeastCraft.Tooling.BalanceSim
             SkillProgression.AwardPractice(player.Secondary, player.Definition, secondaryUses);
             if (cleared)
             {
-                LootRoller.RollClear(world.Model.Table, world.DropShape(node), node.Level, save.Materials, rng);
+                LootResult loot = LootRoller.RollClear(world.Model.Table, world.DropShape(node), node.Level, save.Materials, rng);
+                player.Economy.OnClear(save, world.Model.Table, node, world.DropShape(node), loot.FirstClear, regionIndex);
             }
 
             MaterialSpending.Spend(world.Model, player.Focus, player.Definition, save.Materials, null);
@@ -764,7 +816,10 @@ namespace BeastCraft.Tooling.BalanceSim
               .Append(" on the bench, a level-1 recruit joins the bench when region ").Append(CampaignPacingSimulator.RecruitRegion)
               .Append(" starts; the avatar fights every battle\n");
             sb.Append("- Route: an Elite when the fielded mean level is at least its level, else a Battle, else Rest, Shop, Elite (ties at random);\n");
-            sb.Append("  a lost battle is retried at the same node (new battle seed); Camp trains the lowest bench beast; Shop is a stub (no effect)\n");
+            sb.Append("  a lost battle is retried at the same node (new battle seed); Camp trains the lowest bench beast, then its travelling trader is\n");
+            sb.Append("  visited, as is any trading post taken (the game's `ShopService`; see \"Economy\")\n");
+            sb.Append("- Team: fielded ").Append(string.Join(", ", CampaignEconomyModel.FieldedSpecies)).Append("; bench ").Append(string.Join(", ", CampaignEconomyModel.BenchSpecies))
+              .Append("; recruit ").Append(CampaignEconomyModel.RecruitSpecies).Append(" (species only matter for skill tomes)\n");
             sb.Append("- Clear chance at equal level: squad / horde ").Append(Pct(CampaignPacingSimulator.SquadClear * 100.0)).Append(", elite and generated gates ")
               .Append(Pct(CampaignPacingSimulator.EliteClear * 100.0)).Append(", solo and bosses ").Append(Pct(CampaignPacingSimulator.BossClear * 100.0))
               .Append("; across a gap (node level - fielded mean) it follows the table below in log-odds, interpolated, clamped at its ends\n");
@@ -957,11 +1012,14 @@ namespace BeastCraft.Tooling.BalanceSim
             sb.Append("| ").Append(probe.RegionId).Append(" stage 2 | ").Append(Levels(P(grindSame, 50))).Append(" | ").Append(Levels(P(grindSame, 90))).Append(" | < ")
               .Append(Levels(CampaignPacingSimulator.GrindSameRegionMax)).Append(" | ").Append(sameOk ? "ok" : "**MISS**").Append(" |\n\n");
 
+            CampaignEconomyModel.Report(sb, regions, runs, P, misses);
+
             // Skill.
             sb.Append("## Focus skill\n\n");
-            sb.Append("Battles (losses included) for the focus skill to reach each level, against `--mode pacing`'s targets.\n\n");
+            sb.Append("Battles (losses included) for the focus skill to reach each level, the Trader's gate materials included. Targets (the\n");
+            sb.Append("economy design): L5 15-20, L10 ~80 +/-10%, L15 ~180 +/-10%, L20 at least 270.\n\n");
             sb.Append("| Level | Target (p50) | p10 | p50 | p90 | Verdict |\n| ---: | --- | ---: | ---: | ---: | --- |\n");
-            foreach (PacingSimulator.Gate gate in PacingSimulator.Gates)
+            foreach (PacingSimulator.Gate gate in CampaignPacingSimulator.FocusGates)
             {
                 List<int> reached = runs.ConvertAll(run => run.FocusReached[gate.Level]);
                 int p50 = PacingSimulator.Percentile(reached, 50);

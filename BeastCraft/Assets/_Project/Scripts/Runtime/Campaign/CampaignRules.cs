@@ -32,7 +32,9 @@ namespace BeastCraft.Campaign
     /// abandons the expedition.</item>
     /// <item><b>Rest ("Camp")</b>: trains one chosen beast by what a standing fielded beast earns for
     /// a clear at the node's level (after the level-gap falloff, under the cap), since battles
-    /// already start at full HP.</item>
+    /// already start at full HP. A travelling trader also waits at every camp: the game opens the
+    /// shop there with <see cref="ShopContextFor"/> of the camp node (the economy's pacing assumes it,
+    /// about one Trader visit per stage).</item>
     /// <item><b>Shop ("Trader")</b>: opens the <see cref="IShopService"/> (the economy's
     /// <c>ShopService</c>: gold, frozen stock) and marks the node visited.</item>
     /// </list>

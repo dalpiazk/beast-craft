@@ -130,10 +130,18 @@ namespace BeastCraft.Tests.EditMode
         {
             Assert.AreEqual(40, _shop.PriceUnit(15));
             Assert.AreEqual(210, _shop.PriceUnit(100));
-            Assert.AreEqual(6 * (10 + (2 * 11)), _shop.GearPrice(_economy.Gear.Get("fang_t1")));
-            Assert.AreEqual(15 * (10 + (2 * 51)), _shop.GearPrice(_economy.Gear.Get("fang_t3_rare")));
-            Assert.AreEqual(15 * (10 + (2 * 51)) * 25 / 100, _shop.SellPrice(_economy.Gear.Get("fang_t3_rare")));
-            Assert.AreEqual(30 * (10 + (2 * 91)) * 25 / 100, _shop.SellPrice(_economy.Gear.Get("fang_t5_epic")), "epics sell back though never sold");
+            Assert.AreEqual(Round(_table.Gear.CommonUnits * (10 + (2 * 11))), _shop.GearPrice(_economy.Gear.Get("fang_t1")), "a common at its MinimumLevel + 10");
+            int rare = Round(_table.Gear.RareUnits * (10 + (2 * 51)));
+            Assert.AreEqual(rare, _shop.GearPrice(_economy.Gear.Get("fang_t3_rare")));
+            Assert.AreEqual(rare * 25 / 100, _shop.SellPrice(_economy.Gear.Get("fang_t3_rare")));
+            Assert.AreEqual(Round(_table.Gear.EpicUnits * (10 + (2 * 91))) * 25 / 100, _shop.SellPrice(_economy.Gear.Get("fang_t5_epic")), "epics sell back though never sold");
+            Assert.Less(_shop.GearPrice(_economy.Gear.Get("fang_t1")), _shop.GearPrice(_economy.Gear.Get("fang_t1_rare")));
+            Assert.AreEqual(1, _shop.Price(0.001f, 1), "never free");
+        }
+
+        private static int Round(double value)
+        {
+            return (int)System.Math.Round(value, System.MidpointRounding.AwayFromZero);
         }
 
         [Test]
