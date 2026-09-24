@@ -8,10 +8,11 @@ using UnityEngine;
 namespace BeastCraft.Editor.Data
 {
     /// <summary>
-    /// Copies <c>Data/Campaign/regions.json</c> into the project's single <see cref="RegionLibrarySO"/>
-    /// (menu: Beast Craft/Data/Import Regions), after validating it against
-    /// <c>encounter-library.json</c> so every Battle shape and gate and boss template exists. Run it
-    /// whenever either file changes (after Import Encounters when templates change).
+    /// Copies <c>Data/Campaign/regions.json</c> and <c>location-names.json</c> into the project's single
+    /// <see cref="RegionLibrarySO"/> (menu: Beast Craft/Data/Import Regions), after validating the
+    /// regions against <c>encounter-library.json</c> (every Battle shape and gate and boss template
+    /// exists) and the location names against the regions. Run it whenever any of the files changes
+    /// (after Import Encounters when templates change).
     /// <para>
     /// Idempotent and all-or-nothing, like <see cref="EncounterLibraryImporter"/>: an existing
     /// <see cref="RegionLibrarySO"/> anywhere in the project is updated in place (keeping its GUID);
@@ -29,18 +30,30 @@ namespace BeastCraft.Editor.Data
         [MenuItem("Beast Craft/Data/Import Regions")]
         public static void ImportFromMenu()
         {
-            Import(RegionLibraryData.ProjectRelativePath, EncounterLibraryData.ProjectRelativePath);
+            Import(RegionLibraryData.ProjectRelativePath, EncounterLibraryData.ProjectRelativePath, LocationNameTableData.ProjectRelativePath);
         }
 
         /// <summary>
         /// Imports the regions at a project-relative path, cross-checked against the encounter
-        /// library at <paramref name="encountersPath"/> (required). Returns false if nothing was imported.
+        /// library at <paramref name="encountersPath"/> (required), with the location names at their
+        /// default path. Returns false if nothing was imported.
         /// </summary>
         public static bool Import(string regionsPath, string encountersPath)
         {
-            if (!File.Exists(regionsPath) || !File.Exists(encountersPath))
+            return Import(regionsPath, encountersPath, LocationNameTableData.ProjectRelativePath);
+        }
+
+        /// <summary>
+        /// Imports the regions at a project-relative path, cross-checked against the encounter
+        /// library at <paramref name="encountersPath"/>, and the location names at
+        /// <paramref name="locationNamesPath"/>, checked against the regions (all required). Returns
+        /// false if nothing was imported.
+        /// </summary>
+        public static bool Import(string regionsPath, string encountersPath, string locationNamesPath)
+        {
+            if (!File.Exists(regionsPath) || !File.Exists(encountersPath) || !File.Exists(locationNamesPath))
             {
-                Debug.LogError(LogPrefix + "Not found: '" + regionsPath + "' or '" + encountersPath + "'.");
+                Debug.LogError(LogPrefix + "Not found: '" + regionsPath + "', '" + encountersPath + "' or '" + locationNamesPath + "'.");
                 return false;
             }
 
@@ -50,6 +63,14 @@ namespace BeastCraft.Editor.Data
             if (errors.Count > 0)
             {
                 Debug.LogError(LogPrefix + "'" + regionsPath + "' is invalid; nothing was imported:\n  " + string.Join("\n  ", errors));
+                return false;
+            }
+
+            LocationNameTableData names = JsonUtility.FromJson<LocationNameTableData>(File.ReadAllText(locationNamesPath));
+            List<string> nameErrors = LocationNameTableValidator.Validate(names, regions);
+            if (nameErrors.Count > 0)
+            {
+                Debug.LogError(LogPrefix + "'" + locationNamesPath + "' is invalid; nothing was imported:\n  " + string.Join("\n  ", nameErrors));
                 return false;
             }
 
@@ -66,11 +87,13 @@ namespace BeastCraft.Editor.Data
             }
 
             asset.Data = regions;
+            asset.LocationNames = names;
             asset.ResetRuntimeCaches();
             EditorUtility.SetDirty(asset);
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
-            Debug.Log(LogPrefix + "Imported " + regions.Regions.Length + " regions and " + regions.Seals.Length + " seals from '" + regionsPath + "'.");
+            Debug.Log(LogPrefix + "Imported " + regions.Regions.Length + " regions and " + regions.Seals.Length + " seals from '" + regionsPath +
+                      "', with location names from '" + locationNamesPath + "'.");
             return true;
         }
 

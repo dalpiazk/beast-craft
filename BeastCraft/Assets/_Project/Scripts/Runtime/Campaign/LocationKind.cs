@@ -72,5 +72,34 @@ namespace BeastCraft.Campaign
                     return "wilds";
             }
         }
+
+        /// <summary>The kind whose <see cref="Key"/> is <paramref name="key"/> (case-sensitive); false for anything else.</summary>
+        public static bool TryParseKey(string key, out LocationKind kind)
+        {
+            switch (key)
+            {
+                case "wilds":
+                    kind = LocationKind.Wilds;
+                    return true;
+                case "den":
+                    kind = LocationKind.Den;
+                    return true;
+                case "camp":
+                    kind = LocationKind.Camp;
+                    return true;
+                case "trading_post":
+                    kind = LocationKind.TradingPost;
+                    return true;
+                case "pass":
+                    kind = LocationKind.Pass;
+                    return true;
+                case "lair":
+                    kind = LocationKind.Lair;
+                    return true;
+                default:
+                    kind = LocationKind.Wilds;
+                    return false;
+            }
+        }
     }
 }

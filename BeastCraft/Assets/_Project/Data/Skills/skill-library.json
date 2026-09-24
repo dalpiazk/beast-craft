@@ -1,5 +1,5 @@
 {
-  "_readme": "Source of truth for every authored skill: beast skills, the avatar's active skills and passives, the skill-training materials, and each species' learnable skills and default loadout. Drafted against a power budget and tuned with the roster against the balance simulator (default loadouts; see docs/balance/tuning-log.md), not confirmed balance. Edit here, then in Unity run Beast Craft/Data/Import Skill Library (after Import Beast Roster). Enums are member names (case-sensitive). Missing fields take the DTO defaults in SkillLibraryData.cs; note a missing TargetingCriterion means Distance (nearest), not Random. Damage Magnitude is power, a percent of the attacking stat; Heal is a percent of the caster's SpecialAttack (x HealScale, the avatar's for its skills and passives); a Shield is a percent of the caster's Defense; a DamageOverTime is a per-turn power; a Knockback is whole hexes. DefaultLoadout order is fire priority. TeamBonds are composition-triggered team behaviours for the player's team (never enemies): a Stance, Elements (distinct elements of the set the team covers), Species or DistinctStances condition, tiers by rising MinCount (the highest reached applies; tiers replace, not stack), each with battle-start Effects (BuffStat or a Shield status only, Chance 100, applied by each recipient to itself; Scope Members = the beasts that meet the condition, Team = every beast, Others = every beast that does not meet it) and/or an in-battle Reaction: when its Trigger happens (EnemyTargetsAlly, AllyCrit, AllyHitByEnemy, MemberHit, MemberCrit, AllyBelowHpPercent, AllyTurnStartAfflicted, AllyDefeated), the first member that is alive, unstunned, in Range, off its Cooldown (its own turns) and under its caps (MaxPerMember, MaxPerTriggerUnit, MaxPerBattle) passes a Chance roll and casts the reaction's Effects on its Target (Self, TriggeringAlly, TriggerTarget, Attacker, EnemiesNearReactor, Team), or with Action Intercept takes an enemy's single-target hit in an adjacent ally's place. Reactions never chain. A PerCount (scaling) bond has one tier (MinCount 1 or more) whose magnitudes apply once per counted member, up to MaxCount stacks, and no reaction. See docs/design/battle-system.md, 'Team bonds'. The first 3 AvatarActives are the avatar's default actives. See docs/design/battle-system.md, 'Beast skill kits'.",
+  "_readme": "Source of truth for every authored skill: beast skills, the avatar's active skills and passives, the skill-training materials, and each species' learnable skills and default loadout. Drafted against a power budget and tuned with the roster against the balance simulator (default loadouts; see docs/balance/tuning-log.md), not confirmed balance. Edit here, then in Unity run Beast Craft/Data/Import Skill Library (after Import Beast Roster). Enums are member names (case-sensitive). Missing fields take the DTO defaults in SkillLibraryData.cs; note a missing TargetingCriterion means Distance (nearest), not Random. Damage Magnitude is power, a percent of the attacking stat; Heal is a percent of the caster's SpecialAttack (x HealScale, the avatar's for its skills and passives); a Shield is a percent of the caster's Defense; a DamageOverTime is a per-turn power; a Knockback is whole hexes. DefaultLoadout order is fire priority. TeamBonds are composition-triggered team behaviours for the player's team (never enemies): a Stance, Elements (distinct elements of the set the team covers), Species or DistinctStances condition, tiers by rising MinCount (the highest reached applies; tiers replace, not stack), each with battle-start Effects (BuffStat or a Shield status only, Chance 100, applied by each recipient to itself; Scope Members = the beasts that meet the condition, Team = every beast, Others = every beast that does not meet it) and/or an in-battle Reaction: when its Trigger happens (EnemyTargetsAlly, AllyCrit, AllyHitByEnemy, MemberHit, MemberCrit, AllyBelowHpPercent, AllyTurnStartAfflicted, AllyDefeated), the first member that is alive, unstunned, in Range, off its Cooldown (its own turns) and under its caps (MaxPerMember, MaxPerTriggerUnit, MaxPerBattle) passes a Chance roll and casts the reaction's Effects on its Target (Self, TriggeringAlly, TriggerTarget, Attacker, EnemiesNearReactor, Team), or with Action Intercept takes an enemy's single-target hit in an adjacent ally's place. Reactions never chain. A PerCount (scaling) bond has one tier (MinCount 1 or more) whose magnitudes apply once per counted member, up to MaxCount stacks, and no reaction. See docs/design/battle-system.md, 'Team bonds'. The first 3 AvatarActives are the avatar's default actives. See docs/design/battle-system.md, 'Beast skill kits'. Display text (names, descriptions) is DRAFT pending producer review; tone, naming and length rules are in docs/design/content-bible.md.",
   "SchemaVersion": 3,
   "Materials": [
     { "MaterialId": "essence_shard", "DisplayName": "Essence Shard", "Description": "A sliver of crystallised battle essence. Feeds a skill a little XP; opens its first breakthrough (level 5).", "Tier": 1, "XpValue": 250 },
@@ -10,7 +10,7 @@
     {
       "SkillId": "boulder_slam",
       "DisplayName": "Boulder Slam",
-      "Description": "A ponderous stone fist. Hits hard enough to matter, never hard enough to carry a fight.",
+      "Description": "A ponderous stone fist on an adjacent foe: solid, dependable, never flashy.",
       "TargetShape": "SingleTarget",
       "Range": 1,
       "Cooldown": 1,
@@ -32,7 +32,7 @@
     {
       "SkillId": "stone_challenge",
       "DisplayName": "Stone Challenge",
-      "Description": "The Golem plants itself and bellows; enemies within three hexes find they cannot look away.",
+      "Description": "The Golem plants itself and bellows: enemies within three hexes may be taunted into attacking it for three turns.",
       "TargetShape": "AreaBurst",
       "Range": 3,
       "Cooldown": 3,
@@ -54,7 +54,7 @@
     {
       "SkillId": "granite_bulwark",
       "DisplayName": "Granite Bulwark",
-      "Description": "Raises slabs of granite around itself and every ally within two hexes: a shield worth part of the Golem's Defense.",
+      "Description": "Raises slabs of granite around itself and every ally within two hexes: a two-turn shield worth most of the Golem's Defense.",
       "TargetShape": "AreaBurst",
       "Range": 2,
       "Cooldown": 3,
@@ -76,7 +76,7 @@
     {
       "SkillId": "tectonic_shove",
       "DisplayName": "Tectonic Shove",
-      "Description": "A shoulder charge that sends the target skidding two hexes back.",
+      "Description": "A shoulder charge that sends an adjacent foe skidding two hexes back.",
       "TargetShape": "SingleTarget",
       "Range": 1,
       "Cooldown": 2,
@@ -122,7 +122,7 @@
     {
       "SkillId": "stoneskin",
       "DisplayName": "Stoneskin",
-      "Description": "Hardens its hide: more Defense and Special Defense for three turns.",
+      "Description": "Hardens its hide: +25% Defense and Special Defense for three turns.",
       "TargetShape": "Self",
       "Range": 0,
       "Cooldown": 4,
@@ -144,7 +144,7 @@
     {
       "SkillId": "serpent_bite",
       "DisplayName": "Serpent Bite",
-      "Description": "A crushing bite from the deep.",
+      "Description": "A crushing bite from the deep on an adjacent foe.",
       "TargetShape": "SingleTarget",
       "Range": 1,
       "Cooldown": 1,
@@ -166,7 +166,7 @@
     {
       "SkillId": "undertow",
       "DisplayName": "Undertow",
-      "Description": "Churns the water into a whirlpool: enemies within three hexes are drawn to the Leviathan (taunted) and slowed.",
+      "Description": "Churns the water into a whirlpool: enemies within three hexes are slowed and may be drawn to the Leviathan (taunted) for two turns.",
       "TargetShape": "AreaBurst",
       "Range": 3,
       "Cooldown": 3,
@@ -189,7 +189,7 @@
     {
       "SkillId": "deep_shell",
       "DisplayName": "Deep Shell",
-      "Description": "Coils behind its scales and closes its wounds: a shield worth about two-thirds of its Defense and a small heal.",
+      "Description": "Coils behind its scales and closes its wounds: a three-turn shield worth about two-thirds of its Defense and a small heal.",
       "TargetShape": "Self",
       "Range": 0,
       "Cooldown": 3,
@@ -280,7 +280,7 @@
     {
       "SkillId": "thorn_lash",
       "DisplayName": "Thorn Lash",
-      "Description": "A whip of thorned vine that leaves a festering wound (stacks three times).",
+      "Description": "A whip of thorned vine at up to two hexes that leaves the target smarting with poison (stacks three times).",
       "TargetShape": "SingleTarget",
       "Range": 2,
       "Cooldown": 1,
@@ -327,7 +327,7 @@
     {
       "SkillId": "bark_ward",
       "DisplayName": "Bark Ward",
-      "Description": "Grows a skin of bark over every ally within two hexes.",
+      "Description": "Grows a skin of bark over every ally within two hexes: a two-turn shield.",
       "TargetShape": "AreaBurst",
       "Range": 2,
       "Cooldown": 3,
@@ -440,7 +440,7 @@
     {
       "SkillId": "iron_crush",
       "DisplayName": "Iron Crush",
-      "Description": "The Tarasque brings its whole plated weight down on one foe.",
+      "Description": "The Tarasque brings its whole plated weight down on one adjacent foe: its heaviest single blow.",
       "TargetShape": "SingleTarget",
       "Range": 1,
       "Cooldown": 2,
@@ -506,7 +506,7 @@
     {
       "SkillId": "shrapnel_burst",
       "DisplayName": "Shrapnel Burst",
-      "Description": "Sheds a storm of metal scales at everything adjacent.",
+      "Description": "Sheds a storm of metal scales at everything adjacent, and may crack their armour.",
       "TargetShape": "AreaBurst",
       "Range": 1,
       "Cooldown": 2,
@@ -690,7 +690,7 @@
     {
       "SkillId": "thunder_talons",
       "DisplayName": "Thunder Talons",
-      "Description": "Three quick bolts loosed from its talons at two hexes at the enemy with the least HP left in reach: many weak hits, each its own crit roll.",
+      "Description": "Three quick bolts from its talons at the enemy with the least HP within two hexes: many light hits, each with its own crit roll.",
       "TargetShape": "SingleTarget",
       "Range": 2,
       "Cooldown": 1,
@@ -757,7 +757,7 @@
     {
       "SkillId": "storm_dive",
       "DisplayName": "Storm Dive",
-      "Description": "Opens the fight with a single dive from the clouds: one heavy hit, once per battle.",
+      "Description": "Opens the fight with a single dive from the clouds at up to three hexes: one heavy hit, once per battle.",
       "TargetShape": "SingleTarget",
       "Range": 3,
       "Cooldown": 4,
@@ -826,7 +826,7 @@
     {
       "SkillId": "gale_talon",
       "DisplayName": "Gale Talon",
-      "Description": "A diving rake of talons.",
+      "Description": "A diving rake of talons on an adjacent foe.",
       "TargetShape": "SingleTarget",
       "Range": 1,
       "Cooldown": 1,
@@ -893,7 +893,7 @@
     {
       "SkillId": "tailwind",
       "DisplayName": "Tailwind",
-      "Description": "Rides the wind: harder to pin down (more Defense and Special Defense; there is no evasion stat) and one more hex of movement for two turns.",
+      "Description": "Rides the wind: +20% Defense and Special Defense and one more hex of movement for two turns.",
       "TargetShape": "Self",
       "Range": 0,
       "Cooldown": 4,
@@ -1007,7 +1007,7 @@
     {
       "SkillId": "rebirth_flame",
       "DisplayName": "Rebirth Flame",
-      "Description": "Once a battle, the Phoenix wreathes itself in renewing fire: a heal and a large shield. There is no revive mechanic; this is the honest stand-in.",
+      "Description": "Once a battle, the Phoenix wreathes itself in renewing fire: a heal and a large three-turn shield.",
       "TargetShape": "Self",
       "Range": 0,
       "Cooldown": 4,
@@ -1163,7 +1163,7 @@
     {
       "SkillId": "judgment",
       "DisplayName": "Judgment",
-      "Description": "A pillar of light on one foe at up to four hexes: the Kirin's one real nuke.",
+      "Description": "A pillar of light on one foe at up to four hexes: the Kirin's mightiest single strike.",
       "TargetShape": "SingleTarget",
       "Range": 4,
       "Cooldown": 3,
@@ -1185,7 +1185,7 @@
     {
       "SkillId": "purifying_ward",
       "DisplayName": "Purifying Ward",
-      "Description": "Wraps the team in cleansing light. There is no cleanse mechanic: it is a shield and a Special Defense boost.",
+      "Description": "Wraps the whole team in pure light: a shield and more Special Defense for two turns.",
       "TargetShape": "AllAllies",
       "Range": 0,
       "Cooldown": 4,
@@ -1369,7 +1369,7 @@
     {
       "SkillId": "rallying_cry",
       "DisplayName": "Rallying Cry",
-      "Description": "The avatar's war cry: +10% Attack and Special Attack for the whole team for three turns.",
+      "Description": "The Beastbinder's rallying cry: +10% Attack and Special Attack for the whole team for three turns.",
       "TargetShape": "AllAllies",
       "Range": 0,
       "Cooldown": 2,
@@ -1390,7 +1390,7 @@
     {
       "SkillId": "mending_light",
       "DisplayName": "Mending Light",
-      "Description": "A gentle light that heals every beast a little.",
+      "Description": "The Beastbinder raises a gentle light that heals every beast a little.",
       "TargetShape": "AllAllies",
       "Range": 0,
       "Cooldown": 2,
@@ -1410,7 +1410,7 @@
     {
       "SkillId": "aegis",
       "DisplayName": "Aegis",
-      "Description": "Throws a shield over every beast, worth part of the avatar's Defense.",
+      "Description": "The Beastbinder throws a two-turn shield over every beast, worth part of the Beastbinder's Defense.",
       "TargetShape": "AllAllies",
       "Range": 0,
       "Cooldown": 4,
@@ -1430,7 +1430,7 @@
     {
       "SkillId": "hex_of_frailty",
       "DisplayName": "Hex of Frailty",
-      "Description": "Curses every enemy: -10% Defense and Special Defense for three turns.",
+      "Description": "The Beastbinder hexes every enemy: -10% Defense and Special Defense for three turns.",
       "TargetShape": "AllEnemies",
       "Range": 0,
       "Cooldown": 2,
@@ -1451,7 +1451,7 @@
     {
       "SkillId": "battle_focus",
       "DisplayName": "Battle Focus",
-      "Description": "Sharpens the team's eye: +8 crit chance for three turns.",
+      "Description": "The Beastbinder calls out every opening: +8 crit chance for the whole team for three turns.",
       "TargetShape": "AllAllies",
       "Range": 0,
       "Cooldown": 3,
@@ -1471,7 +1471,7 @@
     {
       "SkillId": "slowing_field",
       "DisplayName": "Slowing Field",
-      "Description": "Thickens the air around the enemy: -12% Speed for three turns.",
+      "Description": "The Beastbinder thickens the air around the enemy: -12% Speed for every enemy for three turns.",
       "TargetShape": "AllEnemies",
       "Range": 0,
       "Cooldown": 3,
@@ -1493,7 +1493,7 @@
     {
       "PassiveId": "keen_eye",
       "DisplayName": "Keen Eye",
-      "Description": "Aura: every beast has +5 crit chance for the whole battle.",
+      "Description": "Aura: the Beastbinder's watchful eye gives every beast +5 crit chance for the whole battle.",
       "Trigger": "Aura",
       "TargetScope": "AllAllies",
       "Effects": [
@@ -1512,7 +1512,7 @@
     {
       "PassiveId": "iron_will",
       "DisplayName": "Iron Will",
-      "Description": "Aura: every beast has +5% Defense and Special Defense for the whole battle.",
+      "Description": "Aura: the Beastbinder's steady presence gives every beast +5% Defense and Special Defense for the whole battle.",
       "Trigger": "Aura",
       "TargetScope": "AllAllies",
       "Effects": [
@@ -1532,7 +1532,7 @@
     {
       "PassiveId": "opening_ward",
       "DisplayName": "Opening Ward",
-      "Description": "At the start of battle every beast gets a two-turn shield worth part of the avatar's Defense.",
+      "Description": "At the start of battle the Beastbinder wards every beast with a two-turn shield worth part of the Beastbinder's Defense.",
       "Trigger": "BattleStart",
       "TargetScope": "AllAllies",
       "Effects": [
@@ -1551,7 +1551,7 @@
     {
       "PassiveId": "battle_hymn",
       "DisplayName": "Battle Hymn",
-      "Description": "At the start of battle the team is quickened: +10% Speed for two turns.",
+      "Description": "At the start of battle the Beastbinder's hymn quickens the team: +10% Speed for two turns.",
       "Trigger": "BattleStart",
       "TargetScope": "AllAllies",
       "Effects": [
@@ -1570,7 +1570,7 @@
     {
       "PassiveId": "withering_curse",
       "DisplayName": "Withering Curse",
-      "Description": "At the start of battle every enemy is cursed: -10% Defense and Special Defense for three turns.",
+      "Description": "At the start of battle the Beastbinder curses every enemy: -10% Defense and Special Defense for three turns.",
       "Trigger": "BattleStart",
       "TargetScope": "AllEnemies",
       "Effects": [
@@ -1589,8 +1589,8 @@
     },
     {
       "PassiveId": "bloodlust",
-      "DisplayName": "Bloodlust",
-      "Description": "When an enemy falls, half the time the team surges: +10% Attack and Special Attack for two turns (at most once per avatar turn).",
+      "DisplayName": "Rising Fervor",
+      "Description": "When an enemy is defeated, half the time the team surges: +10% Attack and Special Attack for two turns (at most once per Beastbinder turn).",
       "Trigger": "EnemyDefeated",
       "ProcChance": 50,
       "InternalCooldown": 1,
@@ -1611,8 +1611,8 @@
     },
     {
       "PassiveId": "vengeance",
-      "DisplayName": "Vengeance",
-      "Description": "When a beast falls, the survivors rally: +15% Attack and Special Attack for three turns (twice a battle).",
+      "DisplayName": "Kindred Resolve",
+      "Description": "When a beast falls, the rest of the team steels itself: +15% Attack and Special Attack for three turns (twice a battle).",
       "Trigger": "AllyDefeated",
       "MaxTriggersPerBattle": 2,
       "TargetScope": "AllAllies",
@@ -1633,7 +1633,7 @@
     {
       "PassiveId": "storm_call",
       "DisplayName": "Storm Call",
-      "Description": "When a beast lands a critical hit, the avatar sometimes calls down a follow-up strike on every enemy.",
+      "Description": "When a beast lands a critical hit, the Beastbinder may call down a follow-up strike on every enemy (30% of the time).",
       "Trigger": "AllyCrit",
       "ProcChance": 30,
       "InternalCooldown": 1,
@@ -1655,7 +1655,7 @@
     {
       "PassiveId": "verdant_pulse",
       "DisplayName": "Verdant Pulse",
-      "Description": "Half the time a beast starts its turn, it recovers a little HP.",
+      "Description": "Half the time a beast starts its turn, the bond mends a little of its HP.",
       "Trigger": "AllyTurnStart",
       "ProcChance": 50,
       "TargetScope": "TriggeringUnit",
@@ -1675,7 +1675,7 @@
     {
       "PassiveId": "last_stand",
       "DisplayName": "Last Stand",
-      "Description": "When a beast drops below 40% HP it is wrapped in a two-turn emergency shield (at most every other avatar tick).",
+      "Description": "When a beast drops below 40% HP, the Beastbinder wraps it in a two-turn emergency shield (at most once every two Beastbinder turns).",
       "Trigger": "AllyBelowHpPercent",
       "HpThresholdPercent": 40,
       "InternalCooldown": 2,

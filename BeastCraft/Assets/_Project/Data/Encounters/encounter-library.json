@@ -1,5 +1,5 @@
 {
-  "_readme": "GAME CONTENT: how PvE encounters are put together from enemy-library.json. Shapes are generated encounters: the runtime EncounterGenerator picks a variant (by Weight), draws each slot's count in [Min, Max] and each unit's type uniformly from Types, and keeps the draw only if its summed enemy Threat is inside [ThreatMin, ThreatMax], it has at least MinDistinctTypes types and it seats on the arena; units are placed front to back (Vanguard, Skirmisher, Ranged; library order within a stance). Each lineup then draws an element scheme by SchemeWeights (Uniform: one element for the whole team; PerType: one per type; PerUnit: one per unit; None), with elements dealt from a shuffled deck of the ten so every element is dealt before any repeats. Shape ids are drop-tables.json's shape ids (the validator requires the two sets to match): a cleared encounter pays out from its shape's drop cell. Templates are authored fixed encounters ({ EncounterId, DisplayName, Description, ShapeId, Arena, Groups: [{ EnemyId, Count, Elements }], DifficultyOverride }; Elements are cycled over the group, empty = no element; DifficultyOverride 0 = use the shape's calibrated difficulty). The ten region bosses (regions.json's BossTemplateId) are the only templates, DRAFT placeholders pending producer review; each DifficultyOverride is calibrated so a scouting team at the boss's level wearing typical gear clears about 50% (docs/balance/tuning-log.md). Difficulty: every enemy's HP, Attack, Defense, SpecialAttack and SpecialDefense are multiplied by the shape's calibrated multiplier at the encounter's level (encounter-difficulty.json, written by the balance simulator's --write-difficulty, interpolated between the calibrated levels) times DifficultyScale. PENDING PRODUCER REVIEW: DifficultyScale is 1.0 and the table is calibrated so a player who scouts and counter-picks (the simulator's bond-aware heuristic pick) wearing typical gear (the balance simulator's --gear typical, a user decision) clears each shape's TargetClear (the tiered targets, a user decision: squad and horde 80%, elite 60%, solo 50%; encounter-difficulty.json records the target of every cell); whether the campaign should be that hard, and how a map node picks a shape and a level, are producer decisions not made here. Validated by EncounterLibraryValidator (the Editor importer Beast Craft/Data/Import Encounters, the EditMode tests, Tooling/BalanceSim): every shape's worst case (each slot at Max, each unit its slot's largest type) and every template must fit its arena's enemy deployment zone. The shapes and weights came over unchanged from the balance simulator's former fixtures; see docs/design/battle-system.md, 'Encounter direction'.",
+  "_readme": "GAME CONTENT: how PvE encounters are put together from enemy-library.json. Shapes are generated encounters: the runtime EncounterGenerator picks a variant (by Weight), draws each slot's count in [Min, Max] and each unit's type uniformly from Types, and keeps the draw only if its summed enemy Threat is inside [ThreatMin, ThreatMax], it has at least MinDistinctTypes types and it seats on the arena; units are placed front to back (Vanguard, Skirmisher, Ranged; library order within a stance). Each lineup then draws an element scheme by SchemeWeights (Uniform: one element for the whole team; PerType: one per type; PerUnit: one per unit; None), with elements dealt from a shuffled deck of the ten so every element is dealt before any repeats. Shape ids are drop-tables.json's shape ids (the validator requires the two sets to match): a cleared encounter pays out from its shape's drop cell. Templates are authored fixed encounters ({ EncounterId, DisplayName, Description, ShapeId, Arena, Groups: [{ EnemyId, Count, Elements }], DifficultyOverride }; Elements are cycled over the group, empty = no element; DifficultyOverride 0 = use the shape's calibrated difficulty). The ten region bosses (regions.json's BossTemplateId) are the only templates, DRAFT placeholders pending producer review; each DifficultyOverride is calibrated so a scouting team at the boss's level wearing typical gear clears about 50% (docs/balance/tuning-log.md). Difficulty: every enemy's HP, Attack, Defense, SpecialAttack and SpecialDefense are multiplied by the shape's calibrated multiplier at the encounter's level (encounter-difficulty.json, written by the balance simulator's --write-difficulty, interpolated between the calibrated levels) times DifficultyScale. PENDING PRODUCER REVIEW: DifficultyScale is 1.0 and the table is calibrated so a player who scouts and counter-picks (the simulator's bond-aware heuristic pick) wearing typical gear (the balance simulator's --gear typical, a user decision) clears each shape's TargetClear (the tiered targets, a user decision: squad and horde 80%, elite 60%, solo 50%; encounter-difficulty.json records the target of every cell); whether the campaign should be that hard, and how a map node picks a shape and a level, are producer decisions not made here. Validated by EncounterLibraryValidator (the Editor importer Beast Craft/Data/Import Encounters, the EditMode tests, Tooling/BalanceSim): every shape's worst case (each slot at Max, each unit its slot's largest type) and every template must fit its arena's enemy deployment zone. The shapes and weights came over unchanged from the balance simulator's former fixtures; see docs/design/battle-system.md, 'Encounter direction'. Boss names and descriptions follow docs/design/content-bible.md and end with the [DRAFT] marker until the producer signs them off; the calibration note that used to sit in each Description is this readme's (each DifficultyOverride clears about 50% for a scouting team at the boss's level in typical gear).",
   "SchemaVersion": 1,
   "DifficultyScale": 1.0,
   "SchemeWeights": [
@@ -66,8 +66,8 @@
   "Templates": [
     {
       "EncounterId": "boss_r01_hollow_warden",
-      "DisplayName": "Hollow Warden",
-      "Description": "DRAFT PLACEHOLDER, PENDING PRODUCER REVIEW (name, elements, escorts): region r01 boss, fought at level 10. DifficultyOverride calibrated by the balance simulator so a scouting team at level 10 wearing typical gear (the shipping assumption) clears about 50%.",
+      "DisplayName": "Mossjaw the Warden",
+      "Description": "A moss-backed champion that once guarded the Hollow's Seal for the first Beastbinders and now guards it from everyone. Two horned brutes stamp at its side. [DRAFT]",
       "ShapeId": "elite",
       "Arena": "Medium",
       "Groups": [ { "EnemyId": "champion", "Count": 1, "Elements": [ "Nature" ] }, { "EnemyId": "brute", "Count": 2, "Elements": [ ] } ],
@@ -76,7 +76,7 @@
     {
       "EncounterId": "boss_r02_ember_twins",
       "DisplayName": "Ember Twins",
-      "Description": "DRAFT PLACEHOLDER, PENDING PRODUCER REVIEW (name, elements, escorts): region r02 boss, fought at level 20. DifficultyOverride calibrated by the balance simulator so a scouting team at level 20 wearing typical gear (the shipping assumption) clears about 50%.",
+      "Description": "Twin fire champions who fight back to back on the ridge, trading sparks and grudges, while two archers pepper the field from the rocks above. [DRAFT]",
       "ShapeId": "elite",
       "Arena": "Medium",
       "Groups": [ { "EnemyId": "champion", "Count": 2, "Elements": [ "Fire" ] }, { "EnemyId": "archer", "Count": 2, "Elements": [ ] } ],
@@ -84,8 +84,8 @@
     },
     {
       "EncounterId": "boss_r03_tide_colossus",
-      "DisplayName": "Tide Colossus",
-      "Description": "DRAFT PLACEHOLDER, PENDING PRODUCER REVIEW (name, elements, escorts): region r03 boss, fought at level 30. DifficultyOverride calibrated by the balance simulator so a scouting team at level 30 wearing typical gear (the shipping assumption) clears about 50%.",
+      "DisplayName": "Drowned Colossus",
+      "Description": "A barnacled water giant risen from the drowned ruins, with two casters chanting tide and frost from the shallows at its feet. [DRAFT]",
       "ShapeId": "elite",
       "Arena": "Medium",
       "Groups": [ { "EnemyId": "giant", "Count": 1, "Elements": [ "Water" ] }, { "EnemyId": "caster", "Count": 2, "Elements": [ "Water", "Ice" ] } ],
@@ -93,8 +93,8 @@
     },
     {
       "EncounterId": "boss_r04_storm_titan",
-      "DisplayName": "Storm Titan",
-      "Description": "DRAFT PLACEHOLDER, PENDING PRODUCER REVIEW (name, elements, escorts): region r04 boss, fought at level 40. DifficultyOverride calibrated by the balance simulator so a scouting team at level 40 wearing typical gear (the shipping assumption) clears about 50%.",
+      "DisplayName": "Gale Titan",
+      "Description": "An air giant who walks the cloud line wrapped in its own gale, while three stalkers slip through the wind to pounce on stragglers. [DRAFT]",
       "ShapeId": "elite",
       "Arena": "Large",
       "Groups": [ { "EnemyId": "giant", "Count": 1, "Elements": [ "Air" ] }, { "EnemyId": "stalker", "Count": 3, "Elements": [ ] } ],
@@ -102,8 +102,8 @@
     },
     {
       "EncounterId": "boss_r05_rust_knights",
-      "DisplayName": "Rust Knights",
-      "Description": "DRAFT PLACEHOLDER, PENDING PRODUCER REVIEW (name, elements, escorts): region r05 boss, fought at level 50. DifficultyOverride calibrated by the balance simulator so a scouting team at level 50 wearing typical gear (the shipping assumption) clears about 50%.",
+      "DisplayName": "Iron Stags",
+      "Description": "Two great antlered champions, one of iron and one of stone, lock horns with anyone who nears the Seal. A shaman and two brutes keep the herd. [DRAFT]",
       "ShapeId": "elite",
       "Arena": "Large",
       "Groups": [ { "EnemyId": "champion", "Count": 2, "Elements": [ "Metal", "Earth" ] }, { "EnemyId": "shaman", "Count": 1, "Elements": [ ] }, { "EnemyId": "brute", "Count": 2, "Elements": [ ] } ],
@@ -112,7 +112,7 @@
     {
       "EncounterId": "boss_r06_frost_matriarch",
       "DisplayName": "Frost Matriarch",
-      "Description": "DRAFT PLACEHOLDER, PENDING PRODUCER REVIEW (name, elements, escorts): region r06 boss, fought at level 60. DifficultyOverride calibrated by the balance simulator so a scouting team at level 60 wearing typical gear (the shipping assumption) clears about 50%.",
+      "Description": "A towering ice giant who shelters a skittering brood of ten swarmlings under her skirts of snow, while two archers watch from the drifts. [DRAFT]",
       "ShapeId": "elite",
       "Arena": "Large",
       "Groups": [ { "EnemyId": "giant", "Count": 1, "Elements": [ "Ice" ] }, { "EnemyId": "swarmling", "Count": 10, "Elements": [ ] }, { "EnemyId": "archer", "Count": 2, "Elements": [ ] } ],
@@ -121,7 +121,7 @@
     {
       "EncounterId": "boss_r07_thunder_court",
       "DisplayName": "Thunder Court",
-      "Description": "DRAFT PLACEHOLDER, PENDING PRODUCER REVIEW (name, elements, escorts): region r07 boss, fought at level 70. DifficultyOverride calibrated by the balance simulator so a scouting team at level 70 wearing typical gear (the shipping assumption) clears about 50%.",
+      "Description": "The lightning giant holds court on the highest spire, a gale champion at its right hand and two casters crackling at its back. [DRAFT]",
       "ShapeId": "elite",
       "Arena": "Large",
       "Groups": [ { "EnemyId": "giant", "Count": 1, "Elements": [ "Lightning" ] }, { "EnemyId": "champion", "Count": 1, "Elements": [ "Air" ] }, { "EnemyId": "caster", "Count": 2, "Elements": [ ] } ],
@@ -129,8 +129,8 @@
     },
     {
       "EncounterId": "boss_r08_deepwild_heart",
-      "DisplayName": "Heart of the Deepwild",
-      "Description": "DRAFT PLACEHOLDER, PENDING PRODUCER REVIEW (name, elements, escorts): region r08 boss, fought at level 80. DifficultyOverride calibrated by the balance simulator so a scouting team at level 80 wearing typical gear (the shipping assumption) clears about 50%.",
+      "DisplayName": "Deepwild Heart",
+      "Description": "The oldest living thing in the Deepwild: a nature giant grown half into the forest, wrapped in a humming cloud of twelve stinglings and tended by two shamans. [DRAFT]",
       "ShapeId": "elite",
       "Arena": "Large",
       "Groups": [ { "EnemyId": "giant", "Count": 1, "Elements": [ "Nature" ] }, { "EnemyId": "stingling", "Count": 12, "Elements": [ ] }, { "EnemyId": "shaman", "Count": 2, "Elements": [ ] } ],
@@ -139,7 +139,7 @@
     {
       "EncounterId": "boss_r09_cinder_king",
       "DisplayName": "Cinder King",
-      "Description": "DRAFT PLACEHOLDER, PENDING PRODUCER REVIEW (name, elements, escorts): region r09 boss, fought at level 90. DifficultyOverride calibrated by the balance simulator so a scouting team at level 90 wearing typical gear (the shipping assumption) clears about 50%.",
+      "Description": "A fire giant crowned in cooling lava who sits the volcano's throne, flanked by two champions of stone and iron. [DRAFT]",
       "ShapeId": "elite",
       "Arena": "Large",
       "Groups": [ { "EnemyId": "giant", "Count": 1, "Elements": [ "Fire" ] }, { "EnemyId": "champion", "Count": 2, "Elements": [ "Earth", "Metal" ] } ],
@@ -147,8 +147,8 @@
     },
     {
       "EncounterId": "boss_r10_apex_pair",
-      "DisplayName": "The Apex Pair",
-      "Description": "DRAFT PLACEHOLDER, PENDING PRODUCER REVIEW (name, elements, escorts): region r10 boss, fought at level 100. DifficultyOverride calibrated by the balance simulator so a scouting team at level 100 wearing typical gear (the shipping assumption) clears about 50%.",
+      "DisplayName": "Flame and Flood",
+      "Description": "Two ancient giants, one of fire and one of water, who have guarded the Worldcrown's summit together since the first Seal was set. Where they meet, the Gloam rises. [DRAFT]",
       "ShapeId": "elite",
       "Arena": "Large",
       "Groups": [ { "EnemyId": "giant", "Count": 2, "Elements": [ "Fire", "Water" ] } ],
