@@ -99,8 +99,26 @@ namespace BeastCraft.Editor.Data
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
             Debug.Log(LogPrefix + "Imported " + enemies.Enemies.Length + " enemies, " + encounters.Shapes.Length + " shapes, " +
-                      (encounters.Templates == null ? 0 : encounters.Templates.Length) + " templates and " + difficulty.Cells.Length + " difficulty cells.");
+                      (encounters.Templates == null ? 0 : encounters.Templates.Length) + " templates (" + CountDrafts(encounters) + " marked Draft) and " +
+                      difficulty.Cells.Length + " difficulty cells.");
             return true;
+        }
+
+        private static int CountDrafts(EncounterLibraryData encounters)
+        {
+            int drafts = 0;
+            if (encounters.Templates != null)
+            {
+                foreach (EncounterTemplateData template in encounters.Templates)
+                {
+                    if (template != null && template.Draft)
+                    {
+                        drafts++;
+                    }
+                }
+            }
+
+            return drafts;
         }
 
         private static T Read<T>(string path, List<string> errors) where T : class

@@ -18,14 +18,17 @@ and stat, and never changes between bands, so players can see the upgrade at a g
 | --- | --- | --- | --- |
 | 1 | Bramble | Wayfarer | - |
 | 21 | Copper | Pathfinder | - |
-| 41 | Ironbound | Warden | Sealforged |
+| 41 | Ironbound | Outrider | Sealforged |
 | 61 | Silversteel | Stormcaller | Titanforged |
 | 81 | Sunmetal | Starbound | Primeval |
 
 - **Common** prefixes are materials that climb from hedgerow scraps to sunmetal.
-- **Rare** prefixes are the Beastbinder's road ranks (wayfarer, pathfinder, warden, stormcaller,
-  starbound): gear a seasoned traveller would trust.
-- **Epic** prefixes are mythic origins (a broken seal, a titan, the first age). Epic descriptions
+- **Rare** prefixes are the Beastbinder's road ranks (wayfarer, pathfinder, outrider, stormcaller,
+  starbound): gear a seasoned traveller would trust. (Not "warden": that word belongs to the r01 boss,
+  Mossjaw the Warden, and its lair names.)
+- **Epic** prefixes are mythic origins (a waking Seal, a titan, the first age). Seals are claimed whole,
+  never broken (content-bible.md, 'World premise'), so Sealforged text speaks of a Seal's glow, stone or
+  old ward, and "Seal" is capitalised. Epic descriptions
   always end "A lair's prize, never sold."; rare band-81 descriptions may say "the finest ... a Trader sells".
 
 | Noun | Slot | Stat focus the description must hint at |
@@ -72,19 +75,27 @@ stay plain UI labels ("Kirin Horn", "Hair Colour").
   Elder (75), Ascendant (100); avatar looks: Veteran Binder Garb (avatar level 50), First Seal Laurel
   (first boss), Crown of Seals (all ten bosses).
 - **Boss (lair)** looks share one signature word per region, taken from the region's element rather
-  than its name, so they survive a region rename:
+  than its name, so they survive a region rename. Each word also echoes the region's boss and Seal
+  (content-bible.md, 'Regions'):
 
-| Region | Element theme | Signature | Looks |
-| --- | --- | --- | --- |
-| r01 | Nature (woodland) | Mossgrove | Mossgrove Mane (Kirin) |
-| r02 | Fire | Emberflare | Emberflare Wings (Phoenix) |
-| r03 | Water | Undertow | Undertow Scales (Leviathan), Undertow Cape (avatar) |
-| r04 | Air | Galeborn | Galeborn Wings (Griffin) |
-| r05 | Metal (iron forest) | Rustleaf | Rustleaf Spikes (Tarasque), Rustleaf Helm (avatar) |
-| r06 | Ice | Rimeglass | Rimeglass Wings (Frost Wyrm) |
-| r07 | Lightning | Stormcrown | Stormcrown Wings (Thunderbird) |
-| r08 | Nature (deep forest) | Elderroot | Elderroot Blossoms (Treant), Elderroot Cloak (avatar) |
-| r09 | Fire and Earth (volcanic) | Magmavein | Magmavein Runes (Golem) |
-| r10 | The summit | Summit | Summit Scales (Basilisk), Summit Regalia (avatar) |
+| Region | Element theme | Boss (Seal) | Signature | Looks |
+| --- | --- | --- | --- | --- |
+| r01 Verdant Hollow | Nature (mossy woodland) | Mossjaw the Warden (Moss Seal) | Mossgrove | Mossgrove Mane (Kirin) |
+| r02 Emberreach | Fire | Ember Twins (Ember Seal) | Emberflare | Emberflare Wings (Phoenix) |
+| r03 Tidefall | Water and Ice | Drowned Colossus (Tide Seal) | Undertow | Undertow Scales (Leviathan), Undertow Cape (avatar) |
+| r04 Stormcrag | Air | Gale Titan (Gale Seal) | Galeborn | Galeborn Wings (Griffin) |
+| r05 Rustwood | Metal and Earth (iron forest) | Iron Stags (Iron Seal) | Rustleaf | Rustleaf Spikes (Tarasque), Rustleaf Helm (avatar) |
+| r06 Frostmere | Ice | Frost Matriarch (Rime Seal) | Rimeglass | Rimeglass Wings (Frost Wyrm) |
+| r07 Thunderspire | Lightning and Air | Thunder Court (Thunder Seal) | Stormcrown | Stormcrown Wings (Thunderbird) |
+| r08 Deepwild | Nature (oldest forest) | Deepwild Heart (Root Seal) | Elderroot | Elderroot Blossoms (Treant), Elderroot Cloak (avatar) |
+| r09 Cinder Throne | Fire, Earth and Metal (volcanic) | Cinder King (Cinder Seal) | Magmavein | Magmavein Runes (Golem) |
+| r10 Worldcrown | Fire and Water (the summit) | Flame and Flood (Crown Seal) | Summit | Summit Scales (Basilisk), Summit Regalia (avatar) |
 
-Milestone entries' own `DisplayName`s read "Title (condition)", e.g. "Elder (beast level 75)".
+r09's "Magmavein" covers the whole volcano: magma for the Fire giant, the vein for the stone and iron
+champions (Earth, Metal). r07's "Stormcrown" is the Thunder Court's crown (its lair names include
+Crown of Bolts); it is unrelated to the Worldcrown and the Crown Seal.
+
+Milestone entries' own `DisplayName`s read "Title (condition)", e.g. "Elder (beast level 75)". The boss
+milestones follow the Seal lore (a Seal is claimed and carried, not broken): **Sealbearer** (first region
+boss beaten) and **Keeper of Seals** (all ten), matching the First Seal Laurel and Crown of Seals looks.
+The avatar outfit sold from region 5 is Forester Greens (again, not "Warden").

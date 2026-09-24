@@ -434,8 +434,8 @@ keep their left-to-right order, so the paths read as routes across the region.
 ### Bosses (DRAFT)
 
 Ten authored templates in `encounter-library.json` (`boss_r01_hollow_warden` … `boss_r10_apex_pair`),
-shape `elite` (its drop cells), fought at the region's max level, each `Description` ending in the `[DRAFT]`
-marker (names and lore: [content-bible.md](content-bible.md)): r01 champion (Nature) + 2 brutes; r02 2 Fire champions + 2 archers; r03 Water giant +
+shape `elite` (its drop cells), fought at the region's max level, each flagged `"Draft": true` (not
+player-facing; names and lore: [content-bible.md](content-bible.md)): r01 champion (Nature) + 2 brutes; r02 2 Fire champions + 2 archers; r03 Water giant +
 2 casters (Water / Ice); r04 Air giant + 3 stalkers; r05 2 champions (Metal / Earth) + shaman + 2
 brutes; r06 Ice giant + 10 swarmlings + 2 archers; r07 Lightning giant + Air champion + 2 casters;
 r08 Nature giant + 12 stinglings + 2 shamans; r09 Fire giant + 2 champions (Earth / Metal); r10 two

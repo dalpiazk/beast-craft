@@ -26,6 +26,9 @@ namespace BeastCraft.Encounters
         /// <summary>The largest <see cref="EncounterLibraryData.DifficultyScale"/> or template override accepted.</summary>
         public const double MaxDifficulty = 10.0;
 
+        /// <summary>The old in-text draft marker; draft status now lives in <see cref="EncounterTemplateData.Draft"/>.</summary>
+        public const string DraftMarker = "[DRAFT]";
+
         /// <summary>
         /// At most this many distinct placement sequences are fit-checked per shape variant; a variant
         /// that can draw more is refused rather than half-checked (today's variants draw a few dozen).
@@ -465,6 +468,11 @@ namespace BeastCraft.Encounters
             return string.Join(",", vector);
         }
 
+        private static bool ContainsDraftMarker(string text)
+        {
+            return !string.IsNullOrEmpty(text) && text.IndexOf(DraftMarker, StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
         private static void ValidateTemplate(EncounterTemplateData template, int index, Dictionary<string, EnemyData> enemies, HashSet<string> shapeIds,
                                              HashSet<string> ids, List<string> errors)
         {
@@ -492,6 +500,11 @@ namespace BeastCraft.Encounters
             if (template.DifficultyOverride < 0.0 || template.DifficultyOverride > MaxDifficulty)
             {
                 errors.Add(where + ": DifficultyOverride must be 0 (none) or above 0 and at most " + MaxDifficulty + ".");
+            }
+
+            if (ContainsDraftMarker(template.DisplayName) || ContainsDraftMarker(template.Description))
+            {
+                errors.Add(where + ": DisplayName and Description are player-facing and must not carry a '" + DraftMarker + "' marker; set Draft to true instead.");
             }
 
             if (!TryParseArena(template.Arena, out ArenaSize arena))

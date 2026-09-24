@@ -196,7 +196,7 @@
         },
         {
           "OptionId": "warden",
-          "DisplayName": "Warden Greens",
+          "DisplayName": "Forester Greens",
           "IsDefault": false,
           "SortOrder": 5,
           "SupportsPaletteShader": true,
@@ -2909,7 +2909,7 @@
     },
     {
       "MilestoneId": "first_boss",
-      "DisplayName": "Sealbreaker (first region boss beaten)",
+      "DisplayName": "Sealbearer (first region boss beaten)",
       "Kind": "BossesCleared",
       "Threshold": 1
     },

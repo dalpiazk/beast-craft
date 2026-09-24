@@ -177,6 +177,31 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
+        public void Validate_RefusesADraftMarkerInPlayerFacingTemplateText()
+        {
+            EncounterLibraryData library = Library();
+            library.Templates = new[]
+            {
+                new EncounterTemplateData
+                {
+                    EncounterId = "marked_boss",
+                    DisplayName = "Marked Boss",
+                    Description = "A placeholder boss. [DRAFT]",
+                    ShapeId = "boss",
+                    Arena = "Large",
+                    Groups = new[] { new EncounterGroupData { EnemyId = "giant", Count = 1 } }
+                }
+            };
+
+            AssertRejected(library, "Template 'marked_boss': DisplayName and Description are player-facing and must not carry a '[DRAFT]' marker");
+
+            library.Templates[0].Description = "A placeholder boss.";
+            library.Templates[0].Draft = true;
+            List<string> errors = EncounterLibraryValidator.Validate(library, Enemies(), Drops("duel", "boss"));
+            Assert.IsFalse(errors.Exists(e => e.Contains("marked_boss")), string.Join("\n", errors));
+        }
+
+        [Test]
         public void Validate_RefusesShapesThatDoNotMatchTheDropTables()
         {
             List<string> errors = EncounterLibraryValidator.Validate(Library(), Enemies(), Drops("duel", "swarm"));

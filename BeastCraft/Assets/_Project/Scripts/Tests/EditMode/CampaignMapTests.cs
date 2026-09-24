@@ -59,7 +59,8 @@ namespace BeastCraft.Tests.EditMode
             {
                 EncounterTemplateData template = encounters.GetTemplate(region.BossTemplateId);
                 Assert.IsNotNull(template, region.RegionId);
-                StringAssert.Contains("DRAFT", template.Description, "boss templates are placeholders pending producer review");
+                Assert.IsTrue(template.Draft, region.RegionId + ": boss templates are placeholders pending producer review (Draft flag)");
+                StringAssert.DoesNotContain(EncounterLibraryValidator.DraftMarker, template.Description, region.RegionId + ": draft status stays out of player-facing text");
                 Assert.Greater(template.DifficultyOverride, 0.0, region.RegionId + ": the boss carries its own calibrated difficulty");
 
                 EncounterPlan plan = EncounterPlan.FromTemplate(encounters, enemies, region.BossTemplateId, region.MaxLevel);

@@ -17,7 +17,7 @@ Where the text lives:
 | Bosses | `Data/Encounters/encounter-library.json` (`Templates`) |
 | Regions and Seals | `Data/Campaign/regions.json` |
 | Map location names | `Data/Campaign/location-names.json` |
-| Gear, consumables, materials, looks, shop text | `Data/Items`, `Data/Cosmetics`, `Data/Economy`, the skill library's `Materials` |
+| Gear, consumables, materials, looks, shop text | `Data/Items`, `Data/Cosmetics`, `Data/Economy`, the skill library's `Materials` (naming rules: [content-items.md](content-items.md)) |
 
 ---
 
@@ -184,5 +184,9 @@ Mechanical hints must match the data exactly (targets, range in hexes, durations
 battle). When the numbers change, the description changes with them; when a description would need
 a mechanic that does not exist, say what the skill really does instead.
 
-Boss descriptions end with the marker `[DRAFT]` until the producer signs the bosses off (the EditMode
-tests require it while they are placeholders).
+Boss templates carry `"Draft": true` in `encounter-library.json` until the producer signs the bosses off
+(the EditMode tests require it while they are placeholders). The flag is never shown to the player, so
+no draft marker goes in a `DisplayName` or `Description` (the encounter validator rejects `[DRAFT]` there).
+
+Items, consumables, materials and looks have their own appendix: [content-items.md](content-items.md)
+(gear prefixes, boss-look signature words per region, milestone titles).
