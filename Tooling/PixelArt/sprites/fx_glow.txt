@@ -1,0 +1,8 @@
+# name: fx_glow
+# label: Soft glow disc (white, tinted; additive)
+# kind: fx
+# size: 32x32
+# outline: none
+# generator: disc
+# ramp: w 4 3 2
+# artkey: fx/layer/glow

@@ -1,6 +1,6 @@
 {
-  "_readme": "Skill VFX (presentation only; never read by the battle). ElementDefaults: exactly one effect per Element (None included), used by every skill without an entry of its own. Skills: per-skill effects by skill id (beast skills, avatar actives, enemy-library skills). An effect: Motion Projectile (flies caster -> target over TravelMs, optionally drawing Projectile) or Instant; then at impact, per target: HitStopMs freeze, Flipbook (a pixel-art sheet by sprite Name; frame size must match the manifest), Particles (burst; speeds px/s, Gravity px/s^2, Colors are palette chars), ScreenShake (Amplitude virtual px, DurationMs), HitFlash (palette-char tint on the target), DamageNumber (palette-char colours; rises RisePx over RiseMs). Sheets and palette chars come from content/art/pixel/pixel-art-manifest.json. Ranges and rules: BeastCraft.Vfx.VfxLibraryValidator. Tints multiply, so tinted sheets are drawn white (Tooling/PixelArt).",
-  "SchemaVersion": 1,
+  "_readme": "Skill VFX (presentation only; never read by the battle). Schema v2 (v1 still reads). A skill's effect resolves: its own entry (Skills, by skill id: beast skills, avatar actives, enemy-library skills), else the default of its primary effect type (EffectDefaults, by Key: Heal, Shield, Taunt, Stun, Burn (damage over time from a Fire source), Poison (from any other), Cleanse, BuffStat, DebuffStat, Knockback; a skill that deals damage has none and looks like its element), else its element's default (ElementDefaults: exactly one per Element, None included). Each EffectDefaults entry: Effect, played when that effect lands (also on every target a status newly lands on, and on a knocked-back target), and Aura, shown on the unit while the status or stat change lasts (Sheet at its feet (Depth Ground) or over it (Over), pulsing every PulseMs; Icon above its HP bar). An effect: Motion Projectile (flies caster -> target over TravelMs, optionally drawing Projectile) or Instant; then at impact, per target: HitStopMs freeze, Flipbook, Particles, ScreenShake (Amplitude virtual px, DurationMs), HitFlash, DamageNumber; and Layers, composited in order, each timed from the hit-stop's release (StartMs, negative = before the impact; DurationMs) with its own Blend (Alpha or Additive), Anchor (Target: each target; Area: once, the centre of every hex the targets stand on; Caster) and Depth (Ground under the units, else Over): Flipbook (Frames at Fps, Scale -> EndScale), GroundDecal (a scorch sized to EndRadius hexes, fading over FadeOutMs), Shockwave (a ring growing StartRadius -> EndRadius hexes; EndRadius 0 = the affected area's radius), RadialBurst (Count sprites flying out along their rays), Particles (a burst), Glyphs (Count rune frames circling at StartRadius, rising RisePx, turning Spin times). Sheets are sprite Names and colours palette chars from content/art/pixel/pixel-art-manifest.json; tints multiply, so tinted sheets are drawn white (Tooling/PixelArt). Ranges and rules: BeastCraft.Vfx.VfxLibraryValidator.",
+  "SchemaVersion": 2,
   "ElementDefaults": [
     {
       "Element": "None",
@@ -575,6 +575,507 @@
       }
     }
   ],
+  "EffectDefaults": [
+    {
+      "Key": "Heal",
+      "Effect": {
+        "Motion": "Instant",
+        "TravelMs": 0,
+        "HitStopMs": 0,
+        "Layers": [
+          {
+            "Type": "Flipbook",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 520,
+            "Blend": "Additive",
+            "Sheet": "fx_glow",
+            "Tint": "l",
+            "Scale": 1.0,
+            "EndScale": 2.2,
+            "FadeOutMs": 520,
+            "Frames": 1,
+            "Fps": 1
+          },
+          {
+            "Type": "Glyphs",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 720,
+            "Blend": "Additive",
+            "Sheet": "fx_glyphs",
+            "Tint": "l",
+            "Scale": 1.0,
+            "FadeInMs": 120,
+            "FadeOutMs": 260,
+            "StartRadius": 0.7,
+            "EndRadius": 0.0,
+            "Count": 3,
+            "RisePx": 18,
+            "Spin": 0.4
+          },
+          {
+            "Type": "Particles",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 800,
+            "Blend": "Additive",
+            "Particles": {
+              "Sheet": "fx_spark",
+              "Count": 12,
+              "SpeedMin": 15,
+              "SpeedMax": 50,
+              "LifetimeMs": 750,
+              "Colors": [
+                "l",
+                "a",
+                "w"
+              ],
+              "Gravity": -90,
+              "Additive": true
+            }
+          }
+        ]
+      }
+    },
+    {
+      "Key": "Shield",
+      "Effect": {
+        "Motion": "Instant",
+        "TravelMs": 0,
+        "HitStopMs": 0,
+        "Layers": [
+          {
+            "Type": "Shockwave",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 420,
+            "Blend": "Additive",
+            "Sheet": "fx_ring",
+            "Tint": "C",
+            "Scale": 1.0,
+            "StartRadius": 1.5,
+            "EndRadius": 0.6
+          },
+          {
+            "Type": "Flipbook",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 380,
+            "Blend": "Additive",
+            "Sheet": "fx_glow",
+            "Tint": "C",
+            "Scale": 1.4,
+            "EndScale": 1.0,
+            "FadeOutMs": 380,
+            "Frames": 1,
+            "Fps": 1
+          }
+        ]
+      },
+      "Aura": {
+        "Sheet": "fx_aura_ring",
+        "Tint": "C",
+        "Scale": 1.0,
+        "PulseMs": 1400,
+        "Blend": "Additive",
+        "Depth": "Ground",
+        "Icon": "icon_shield",
+        "IconTint": ""
+      }
+    },
+    {
+      "Key": "Taunt",
+      "Effect": {
+        "Motion": "Instant",
+        "TravelMs": 0,
+        "HitFlash": {
+          "Tint": "o",
+          "DurationMs": 120
+        },
+        "HitStopMs": 0,
+        "Layers": [
+          {
+            "Type": "Shockwave",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 420,
+            "Blend": "Additive",
+            "Sheet": "fx_ring",
+            "Tint": "o",
+            "Scale": 1.0,
+            "StartRadius": 0.2,
+            "EndRadius": 1.3
+          },
+          {
+            "Type": "RadialBurst",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 320,
+            "Blend": "Additive",
+            "Sheet": "fx_ray",
+            "Tint": "o",
+            "Scale": 1.2,
+            "EndScale": 0.6,
+            "StartRadius": 0.3,
+            "EndRadius": 1.0,
+            "Count": 6
+          }
+        ]
+      },
+      "Aura": {
+        "Sheet": "fx_aura_ring",
+        "Tint": "r",
+        "Scale": 1.0,
+        "PulseMs": 900,
+        "Blend": "Additive",
+        "Depth": "Ground",
+        "Icon": "icon_taunt",
+        "IconTint": ""
+      }
+    },
+    {
+      "Key": "Stun",
+      "Effect": {
+        "Motion": "Instant",
+        "TravelMs": 0,
+        "ScreenShake": {
+          "Amplitude": 1.5,
+          "DurationMs": 140
+        },
+        "HitFlash": {
+          "Tint": "Y",
+          "DurationMs": 140
+        },
+        "HitStopMs": 0,
+        "Layers": [
+          {
+            "Type": "RadialBurst",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 420,
+            "Blend": "Additive",
+            "Sheet": "fx_spark",
+            "Tint": "Y",
+            "Scale": 1.5,
+            "EndScale": 0.8,
+            "StartRadius": 0.2,
+            "EndRadius": 0.8,
+            "Count": 5
+          },
+          {
+            "Type": "Flipbook",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 300,
+            "Blend": "Additive",
+            "Sheet": "fx_glow",
+            "Tint": "Y",
+            "Scale": 0.8,
+            "EndScale": 1.6,
+            "FadeOutMs": 300,
+            "Frames": 1,
+            "Fps": 1
+          }
+        ]
+      },
+      "Aura": {
+        "Sheet": "fx_glow",
+        "Tint": "Y",
+        "Scale": 0.6,
+        "PulseMs": 600,
+        "Blend": "Additive",
+        "Depth": "Over",
+        "Icon": "icon_stun",
+        "IconTint": ""
+      }
+    },
+    {
+      "Key": "Burn",
+      "Effect": {
+        "Motion": "Instant",
+        "TravelMs": 0,
+        "HitStopMs": 0,
+        "Layers": [
+          {
+            "Type": "Flipbook",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 500,
+            "Blend": "Alpha",
+            "Sheet": "fx_fire_burst",
+            "Tint": "",
+            "Scale": 1.0,
+            "Frames": 8,
+            "Fps": 16
+          },
+          {
+            "Type": "Particles",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 700,
+            "Blend": "Additive",
+            "Particles": {
+              "Sheet": "fx_ember",
+              "Count": 10,
+              "SpeedMin": 20,
+              "SpeedMax": 70,
+              "LifetimeMs": 650,
+              "Colors": [
+                "Y",
+                "y",
+                "o"
+              ],
+              "Gravity": -60,
+              "Additive": true
+            }
+          }
+        ]
+      },
+      "Aura": {
+        "Sheet": "fx_glow",
+        "Tint": "o",
+        "Scale": 0.9,
+        "PulseMs": 700,
+        "Blend": "Additive",
+        "Depth": "Ground",
+        "Icon": "icon_burn",
+        "IconTint": ""
+      }
+    },
+    {
+      "Key": "Poison",
+      "Effect": {
+        "Motion": "Instant",
+        "TravelMs": 0,
+        "HitStopMs": 0,
+        "Layers": [
+          {
+            "Type": "Flipbook",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 420,
+            "Blend": "Additive",
+            "Sheet": "fx_glow",
+            "Tint": "G",
+            "Scale": 0.8,
+            "EndScale": 1.6,
+            "FadeOutMs": 420,
+            "Frames": 1,
+            "Fps": 1
+          },
+          {
+            "Type": "Particles",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 800,
+            "Blend": "Additive",
+            "Particles": {
+              "Sheet": "fx_spark",
+              "Count": 10,
+              "SpeedMin": 10,
+              "SpeedMax": 40,
+              "LifetimeMs": 750,
+              "Colors": [
+                "l",
+                "G"
+              ],
+              "Gravity": -50,
+              "Additive": true
+            }
+          }
+        ]
+      },
+      "Aura": {
+        "Sheet": "fx_aura_ring",
+        "Tint": "G",
+        "Scale": 1.0,
+        "PulseMs": 1000,
+        "Blend": "Additive",
+        "Depth": "Ground",
+        "Icon": "icon_poison",
+        "IconTint": ""
+      }
+    },
+    {
+      "Key": "Cleanse",
+      "Effect": {
+        "Motion": "Instant",
+        "TravelMs": 0,
+        "HitStopMs": 0,
+        "Layers": [
+          {
+            "Type": "Shockwave",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 460,
+            "Blend": "Additive",
+            "Sheet": "fx_ring",
+            "Tint": "w",
+            "Scale": 1.0,
+            "StartRadius": 0.2,
+            "EndRadius": 1.2
+          },
+          {
+            "Type": "Glyphs",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 600,
+            "Blend": "Additive",
+            "Sheet": "fx_glyphs",
+            "Tint": "w",
+            "Scale": 1.0,
+            "FadeOutMs": 250,
+            "StartRadius": 0.6,
+            "EndRadius": 0.0,
+            "Count": 4,
+            "RisePx": 14,
+            "Spin": -0.5
+          }
+        ]
+      }
+    },
+    {
+      "Key": "BuffStat",
+      "Effect": {
+        "Motion": "Instant",
+        "TravelMs": 0,
+        "HitStopMs": 0,
+        "Layers": [
+          {
+            "Type": "Flipbook",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 360,
+            "Blend": "Additive",
+            "Sheet": "fx_glow",
+            "Tint": "l",
+            "Scale": 0.8,
+            "EndScale": 1.5,
+            "FadeOutMs": 360,
+            "Frames": 1,
+            "Fps": 1
+          },
+          {
+            "Type": "Glyphs",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 560,
+            "Blend": "Additive",
+            "Sheet": "fx_glyphs",
+            "Tint": "l",
+            "Scale": 1.0,
+            "FadeOutMs": 240,
+            "StartRadius": 0.5,
+            "EndRadius": 0.0,
+            "Count": 2,
+            "RisePx": 20,
+            "Spin": 0.3
+          }
+        ]
+      },
+      "Aura": {
+        "Scale": 1.0,
+        "PulseMs": 1200,
+        "Blend": "Additive",
+        "Depth": "Ground",
+        "Icon": "icon_buff",
+        "IconTint": ""
+      }
+    },
+    {
+      "Key": "DebuffStat",
+      "Effect": {
+        "Motion": "Instant",
+        "TravelMs": 0,
+        "HitStopMs": 0,
+        "Layers": [
+          {
+            "Type": "Flipbook",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 360,
+            "Blend": "Additive",
+            "Sheet": "fx_glow",
+            "Tint": "u",
+            "Scale": 1.5,
+            "EndScale": 0.8,
+            "FadeOutMs": 360,
+            "Frames": 1,
+            "Fps": 1
+          },
+          {
+            "Type": "Particles",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 600,
+            "Blend": "Additive",
+            "Particles": {
+              "Sheet": "fx_spark",
+              "Count": 8,
+              "SpeedMin": 10,
+              "SpeedMax": 30,
+              "LifetimeMs": 550,
+              "Colors": [
+                "u",
+                "P"
+              ],
+              "Gravity": 60,
+              "Additive": true
+            }
+          }
+        ]
+      },
+      "Aura": {
+        "Scale": 1.0,
+        "PulseMs": 1200,
+        "Blend": "Additive",
+        "Depth": "Ground",
+        "Icon": "icon_debuff",
+        "IconTint": ""
+      }
+    },
+    {
+      "Key": "Knockback",
+      "Effect": {
+        "Motion": "Instant",
+        "TravelMs": 0,
+        "ScreenShake": {
+          "Amplitude": 2.0,
+          "DurationMs": 160
+        },
+        "HitStopMs": 0,
+        "Layers": [
+          {
+            "Type": "Shockwave",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 260,
+            "Blend": "Additive",
+            "Sheet": "fx_ring",
+            "Tint": "4",
+            "Scale": 1.0,
+            "StartRadius": 0.2,
+            "EndRadius": 0.9
+          },
+          {
+            "Type": "RadialBurst",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 240,
+            "Blend": "Additive",
+            "Sheet": "fx_ray",
+            "Tint": "4",
+            "Scale": 1.0,
+            "EndScale": 0.5,
+            "StartRadius": 0.2,
+            "EndRadius": 0.8,
+            "Count": 4
+          }
+        ]
+      }
+    }
+  ],
   "Skills": [
     {
       "SkillId": "ember_shot",
@@ -585,31 +1086,6 @@
           "Sheet": "fx_ember",
           "Tint": "",
           "Scale": 2,
-          "Additive": true
-        },
-        "Flipbook": {
-          "Sheet": "fx_fire_burst",
-          "FrameWidth": 32,
-          "FrameHeight": 32,
-          "Frames": 8,
-          "Fps": 14,
-          "Tint": "",
-          "Scale": 2,
-          "Additive": false
-        },
-        "Particles": {
-          "Sheet": "fx_ember",
-          "Count": 18,
-          "SpeedMin": 40,
-          "SpeedMax": 120,
-          "LifetimeMs": 650,
-          "Colors": [
-            "Y",
-            "y",
-            "o",
-            "r"
-          ],
-          "Gravity": -40,
           "Additive": true
         },
         "ScreenShake": {
@@ -626,7 +1102,113 @@
           "CritColor": "Y",
           "RiseMs": 800,
           "RisePx": 16
-        }
+        },
+        "Layers": [
+          {
+            "Type": "Glyphs",
+            "Anchor": "Caster",
+            "StartMs": -350,
+            "DurationMs": 560,
+            "Blend": "Additive",
+            "Sheet": "fx_glyphs",
+            "Tint": "y",
+            "Scale": 1.0,
+            "FadeInMs": 100,
+            "FadeOutMs": 200,
+            "StartRadius": 0.6,
+            "EndRadius": 0.0,
+            "Count": 3,
+            "RisePx": 8,
+            "Spin": 0.5
+          },
+          {
+            "Type": "GroundDecal",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 1400,
+            "Blend": "Alpha",
+            "Sheet": "fx_scorch",
+            "Tint": "",
+            "Scale": 1.0,
+            "FadeOutMs": 900,
+            "StartRadius": 0.0,
+            "EndRadius": 0.7
+          },
+          {
+            "Type": "Flipbook",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 260,
+            "Blend": "Additive",
+            "Sheet": "fx_glow",
+            "Tint": "Y",
+            "Scale": 1.2,
+            "EndScale": 2.6,
+            "FadeOutMs": 260,
+            "Frames": 1,
+            "Fps": 1
+          },
+          {
+            "Type": "Shockwave",
+            "Anchor": "Area",
+            "StartMs": 0,
+            "DurationMs": 420,
+            "Blend": "Additive",
+            "Sheet": "fx_ring",
+            "Tint": "y",
+            "Scale": 1.0,
+            "StartRadius": 0.2,
+            "EndRadius": 1.4
+          },
+          {
+            "Type": "Flipbook",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 572,
+            "Blend": "Alpha",
+            "Sheet": "fx_fire_burst",
+            "Tint": "",
+            "Scale": 2.0,
+            "Frames": 8,
+            "Fps": 14
+          },
+          {
+            "Type": "RadialBurst",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 340,
+            "Blend": "Additive",
+            "Sheet": "fx_ray",
+            "Tint": "Y",
+            "Scale": 1.5,
+            "EndScale": 0.7,
+            "StartRadius": 0.3,
+            "EndRadius": 1.2,
+            "Count": 8
+          },
+          {
+            "Type": "Particles",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 700,
+            "Blend": "Additive",
+            "Particles": {
+              "Sheet": "fx_ember",
+              "Count": 18,
+              "SpeedMin": 40,
+              "SpeedMax": 120,
+              "LifetimeMs": 650,
+              "Colors": [
+                "Y",
+                "y",
+                "o",
+                "r"
+              ],
+              "Gravity": -40,
+              "Additive": true
+            }
+          }
+        ]
       }
     },
     {
@@ -634,31 +1216,6 @@
       "Effect": {
         "Motion": "Instant",
         "TravelMs": 0,
-        "Flipbook": {
-          "Sheet": "fx_fire_burst",
-          "FrameWidth": 32,
-          "FrameHeight": 32,
-          "Frames": 8,
-          "Fps": 12,
-          "Tint": "",
-          "Scale": 2,
-          "Additive": false
-        },
-        "Particles": {
-          "Sheet": "fx_ember",
-          "Count": 24,
-          "SpeedMin": 50,
-          "SpeedMax": 150,
-          "LifetimeMs": 700,
-          "Colors": [
-            "Y",
-            "y",
-            "o",
-            "r"
-          ],
-          "Gravity": -30,
-          "Additive": true
-        },
         "ScreenShake": {
           "Amplitude": 3,
           "DurationMs": 260
@@ -673,7 +1230,204 @@
           "CritColor": "Y",
           "RiseMs": 800,
           "RisePx": 16
-        }
+        },
+        "Layers": [
+          {
+            "Type": "Glyphs",
+            "Anchor": "Caster",
+            "StartMs": -80,
+            "DurationMs": 520,
+            "Blend": "Additive",
+            "Sheet": "fx_glyphs",
+            "Tint": "o",
+            "Scale": 1.0,
+            "FadeInMs": 80,
+            "FadeOutMs": 200,
+            "StartRadius": 0.7,
+            "EndRadius": 0.0,
+            "Count": 4,
+            "RisePx": 6,
+            "Spin": -0.6
+          },
+          {
+            "Type": "GroundDecal",
+            "Anchor": "Area",
+            "StartMs": 0,
+            "DurationMs": 1500,
+            "Blend": "Alpha",
+            "Sheet": "fx_scorch",
+            "Tint": "",
+            "Scale": 1.0,
+            "FadeOutMs": 1000,
+            "StartRadius": 0.0,
+            "EndRadius": 0.0
+          },
+          {
+            "Type": "Shockwave",
+            "Anchor": "Area",
+            "StartMs": 0,
+            "DurationMs": 480,
+            "Blend": "Additive",
+            "Sheet": "fx_ring",
+            "Tint": "o",
+            "Scale": 1.0,
+            "StartRadius": 0.3,
+            "EndRadius": 0.0
+          },
+          {
+            "Type": "Flipbook",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 300,
+            "Blend": "Additive",
+            "Sheet": "fx_glow",
+            "Tint": "y",
+            "Scale": 1.0,
+            "EndScale": 2.2,
+            "FadeOutMs": 300,
+            "Frames": 1,
+            "Fps": 1
+          },
+          {
+            "Type": "Flipbook",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 667,
+            "Blend": "Alpha",
+            "Sheet": "fx_fire_burst",
+            "Tint": "",
+            "Scale": 2.0,
+            "Frames": 8,
+            "Fps": 12
+          },
+          {
+            "Type": "RadialBurst",
+            "Anchor": "Area",
+            "StartMs": 0,
+            "DurationMs": 380,
+            "Blend": "Additive",
+            "Sheet": "fx_ray",
+            "Tint": "y",
+            "Scale": 1.8,
+            "EndScale": 0.8,
+            "StartRadius": 0.4,
+            "EndRadius": 0.0,
+            "Count": 10
+          },
+          {
+            "Type": "Particles",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 760,
+            "Blend": "Additive",
+            "Particles": {
+              "Sheet": "fx_ember",
+              "Count": 24,
+              "SpeedMin": 50,
+              "SpeedMax": 150,
+              "LifetimeMs": 700,
+              "Colors": [
+                "Y",
+                "y",
+                "o",
+                "r"
+              ],
+              "Gravity": -30,
+              "Additive": true
+            }
+          }
+        ]
+      }
+    },
+    {
+      "SkillId": "rebirth_flame",
+      "Effect": {
+        "Motion": "Instant",
+        "TravelMs": 0,
+        "HitFlash": {
+          "Tint": "Y",
+          "DurationMs": 160
+        },
+        "HitStopMs": 0,
+        "Layers": [
+          {
+            "Type": "Glyphs",
+            "Anchor": "Caster",
+            "StartMs": 0,
+            "DurationMs": 900,
+            "Blend": "Additive",
+            "Sheet": "fx_glyphs",
+            "Tint": "y",
+            "Scale": 1.0,
+            "FadeInMs": 150,
+            "FadeOutMs": 300,
+            "StartRadius": 0.8,
+            "EndRadius": 0.0,
+            "Count": 5,
+            "RisePx": 22,
+            "Spin": 0.8
+          },
+          {
+            "Type": "Shockwave",
+            "Anchor": "Caster",
+            "StartMs": 120,
+            "DurationMs": 520,
+            "Blend": "Additive",
+            "Sheet": "fx_ring",
+            "Tint": "Y",
+            "Scale": 1.0,
+            "StartRadius": 0.2,
+            "EndRadius": 1.6
+          },
+          {
+            "Type": "Flipbook",
+            "Anchor": "Caster",
+            "StartMs": 0,
+            "DurationMs": 640,
+            "Blend": "Additive",
+            "Sheet": "fx_glow",
+            "Tint": "y",
+            "Scale": 1.0,
+            "EndScale": 2.8,
+            "FadeOutMs": 640,
+            "Frames": 1,
+            "Fps": 1
+          },
+          {
+            "Type": "Flipbook",
+            "Anchor": "Caster",
+            "StartMs": 60,
+            "DurationMs": 572,
+            "Blend": "Additive",
+            "Sheet": "fx_fire_burst",
+            "Tint": "",
+            "Scale": 1.2,
+            "EndScale": 1.8,
+            "Frames": 8,
+            "Fps": 14
+          },
+          {
+            "Type": "Particles",
+            "Anchor": "Caster",
+            "StartMs": 0,
+            "DurationMs": 900,
+            "Blend": "Additive",
+            "Particles": {
+              "Sheet": "fx_ember",
+              "Count": 22,
+              "SpeedMin": 20,
+              "SpeedMax": 80,
+              "LifetimeMs": 850,
+              "Colors": [
+                "Y",
+                "y",
+                "o"
+              ],
+              "Gravity": -140,
+              "Additive": true
+            }
+          }
+        ]
       }
     }
   ]

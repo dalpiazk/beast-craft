@@ -52,6 +52,12 @@ loads the PNGs at runtime (`Texture2D.FromStream`), indexed by the manifest. The
   white mask and outline the game tints (team zones, highlights).
 - FX: `fx_fire_burst` (8-frame flipbook), `fx_hit_burst` (6 frames, white, tinted per element),
   particles `fx_ember` and `fx_spark` (white, tinted).
+- VFX layer textures (VFX schema v2; white/grey, tinted and sized in game): `fx_ring` (shockwave
+  ring, generator `ring`), `fx_aura_ring` (ground aura ellipse), `fx_glow` (soft disc, generator
+  `disc`), `fx_scorch` (ground decal, generator `blob`), `fx_ray` (radial-burst streak, pivot at
+  its tail) and `fx_glyphs` (4 rune frames).
+- Status icons (9x9): `icon_stun`, `icon_shield`, `icon_burn`, `icon_poison`, `icon_taunt`,
+  `icon_buff`, `icon_debuff`, drawn above a unit's HP bar while the status lasts.
 - Items, map tiles and the camp marker from the style test.
 
 Generated kinds (`fx` bursts, `hex` tiles) have no grid rows: their header drives an

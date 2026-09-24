@@ -48,6 +48,13 @@ own name and ArtKey, told apart by a tint (an enemy with no art of its own yet):
 Generated kinds (no grid rows; the header drives an integer-only generator):
   kind: fx      generator: burst, frames: N, ramp: <chars hot -> cold>, seed: <int>
                 an expanding, hollowing flame ring with ragged edges and late embers.
+  kind: fx      generator: ring, ramp: <chars outer -> inner>, thickness: <px>
+                a circle (or, for a non-square size, an ellipse) outline: shockwaves, ground auras.
+  kind: fx      generator: disc, ramp: <chars centre -> edge>
+                a filled disc in bands, its last band dithered: glows.
+  kind: fx      generator: blob, ramp: <chars centre -> edge>, seed: <int>
+                a ragged filled disc with a few specks: ground decals (scorch, frost, ooze).
+  These are drawn white/grey so the VFX data can tint them (tints multiply).
   kind: hex     a pointy-top hex (size 32x36; rows step 27 px, columns 32 px):
                 texture: <tile sprite>   fill the hex by tiling that sprite, or
                 fill: <char>             fill it with one colour, and/or
@@ -223,6 +230,76 @@ def burst_frames(meta, w, h):
     return frames
 
 
+def ellipse_d2(x, y, w, h):
+    """Squared distance of pixel (x, y) from the centre, in doubled units scaled so the ellipse
+    through the frame's edges is d2 == w * w (a circle when w == h). Integer only."""
+    dx, dy = 2 * x + 1 - w, 2 * y + 1 - h
+    return dx * dx + (dy * w // h) * (dy * w // h)
+
+
+def ring_frames(meta, w, h):
+    ramp = meta["ramp"].split()
+    thick = int(meta.get("thickness", "2"))
+    outer = w - 1
+    inner = max(0, outer - 2 * thick * len(ramp))
+    grid = [[TRANSPARENT] * w for _ in range(h)]
+    for y in range(h):
+        for x in range(w):
+            d2 = ellipse_d2(x, y, w, h)
+            if inner * inner < d2 <= outer * outer:
+                band = 0
+                for j in range(1, len(ramp)):
+                    edge = outer - 2 * thick * j
+                    if d2 <= edge * edge:
+                        band = j
+                grid[y][x] = ramp[band]
+    return [grid]
+
+
+def disc_frames(meta, w, h):
+    ramp = meta["ramp"].split()
+    outer = w - 1
+    grid = [[TRANSPARENT] * w for _ in range(h)]
+    for y in range(h):
+        for x in range(w):
+            d2 = ellipse_d2(x, y, w, h)
+            if d2 > outer * outer:
+                continue
+            band = 0
+            for j in range(1, len(ramp)):
+                edge = outer * j // len(ramp)
+                if d2 > edge * edge:
+                    band = j
+            if band == len(ramp) - 1 and (x + y) % 2 == 1:
+                continue  # dither the outer band
+            grid[y][x] = ramp[band]
+    return [grid]
+
+
+def blob_frames(meta, w, h):
+    ramp = meta["ramp"].split()
+    seed = int(meta.get("seed", "1"))
+    speck = meta.get("speck")
+    outer = w - 3
+    grid = [[TRANSPARENT] * w for _ in range(h)]
+    for y in range(h):
+        for x in range(w):
+            d2 = ellipse_d2(x, y, w, h)
+            jitter = (hash32(seed, x // 3, y // 3) % 7) - 3        # coarse ragged edge, -3 .. +3
+            r = outer + 2 * jitter
+            if d2 > r * r:
+                continue
+            band = 0
+            for j in range(1, len(ramp)):
+                edge = r * j // len(ramp)
+                if d2 > edge * edge:
+                    band = j
+            grid[y][x] = ramp[band]
+            if speck and hash32(seed, x, y, 5) % 23 == 0:
+                grid[y][x] = speck
+    return [grid]
+
+
 def hex_inside(x, y, w, h):
     """Pointy-top hex through the pixel centres: |dx| <= w/2 and |dy| <= h/2 - |dx| * (h/4) / (w/2)."""
     dx, dy = abs(2 * x + 1 - w), abs(2 * y + 1 - h)
@@ -254,6 +331,9 @@ def hex_frame(meta, w, h, built):
 
 
 # ---------------------------------------------------------------------------------------------
+
+GENERATORS = {"ring": ring_frames, "disc": disc_frames, "blob": blob_frames}
+
 
 def to_image(grid, colors):
     h, w = len(grid), len(grid[0])
@@ -297,6 +377,8 @@ def build():
             continue
         if meta["kind"] == "fx" and meta.get("generator") == "burst":
             frames = burst_frames(meta, w, h)
+        elif meta["kind"] == "fx" and meta.get("generator") in GENERATORS:
+            frames = GENERATORS[meta["generator"]](meta, w, h)
         elif meta["kind"] == "hex":
             frames = hex_frame(meta, w, h, built)
         if not frames:
@@ -453,6 +535,7 @@ SECTIONS = [
     ("Items 16x16", ("item",)),
     ("Map tiles 16x16 (2x2 tiled) + marker", ("tile", "marker")),
     ("Hex tiles 32x36 + particles", ("hex", "particle")),
+    ("VFX layers (rings, glows, decals, rays, glyphs) + status icons", ("fx", "icon")),
 ]
 
 

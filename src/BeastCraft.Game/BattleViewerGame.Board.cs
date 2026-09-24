@@ -47,7 +47,12 @@ namespace BeastCraft.Game
 
             ScheduledBeat beat = _animation == null ? null : _animation.BeatAt(_clockMs);
             VfxFrame vfx = beat == null ? null : beat.Timeline.Sample(_clockMs - beat.StartMs);
-            Vec2 shake = vfx == null ? Vec2.Zero : vfx.Shake;
+            List<(VfxTimeline Timeline, VfxFrame Frame)> frames = BeatFrames(beat, vfx);
+            Vec2 shake = Vec2.Zero;
+            foreach ((VfxTimeline _, VfxFrame frame) in frames)
+            {
+                shake = shake + frame.Shake;
+            }
 
             Rect board = _screen.Board;
             _draw.Fill(Pixel, new Vector2(board.X, board.Y), new Vector2(board.Width, board.Height), Ink("p", Color.Purple) * 0.35f);
@@ -56,12 +61,19 @@ namespace BeastCraft.Game
                                 Matrix.CreateTranslation(_boardFit.OriginX, _boardFit.OriginY, 0f) * canvas;
             _draw.SetTransform(boardSpace);
             DrawBoard();
-            DrawUnits();
+            DrawUnits(frames);
+            foreach ((VfxTimeline timeline, VfxFrame frame) in frames)
+            {
+                DrawVfx(timeline, frame, false);
+                _draw.SetBlend(BlendState.Additive);
+                DrawVfx(timeline, frame, true);
+                _draw.SetBlend(BlendState.AlphaBlend);
+            }
+
+            DrawLayerSprites(frames, false);
             if (vfx != null)
             {
-                DrawVfx(beat, vfx, false);
                 _draw.SetBlend(BlendState.Additive);
-                DrawVfx(beat, vfx, true);
                 DrawFlash(beat, vfx);
                 _draw.SetBlend(BlendState.AlphaBlend);
                 DrawDamageNumbers(beat, vfx);
@@ -95,7 +107,113 @@ namespace BeastCraft.Game
             }
         }
 
-        private void DrawUnits()
+        /// <summary>The beat's main frame and each of its on-apply overlays' frames at the viewer's clock (empty with no beat).</summary>
+        private List<(VfxTimeline Timeline, VfxFrame Frame)> BeatFrames(ScheduledBeat beat, VfxFrame main)
+        {
+            List<(VfxTimeline Timeline, VfxFrame Frame)> frames = new List<(VfxTimeline Timeline, VfxFrame Frame)>();
+            if (beat == null)
+            {
+                return frames;
+            }
+
+            frames.Add((beat.Timeline, main));
+            foreach (BeatOverlay overlay in beat.Overlays)
+            {
+                frames.Add((overlay.Timeline, overlay.Timeline.Sample(_clockMs - beat.StartMs - overlay.OffsetMs)));
+            }
+
+            return frames;
+        }
+
+        /// <summary>The layer sprites of every frame on the ground (<paramref name="ground"/>) or over the units.</summary>
+        private void DrawLayerSprites(List<(VfxTimeline Timeline, VfxFrame Frame)> frames, bool ground)
+        {
+            foreach ((VfxTimeline _, VfxFrame frame) in frames)
+            {
+                foreach (VfxSprite sprite in frame.Sprites)
+                {
+                    if (sprite.Ground == ground)
+                    {
+                        DrawVfxSprite(sprite);
+                    }
+                }
+            }
+
+            _draw.SetBlend(BlendState.AlphaBlend);
+        }
+
+        /// <summary>
+        /// One layer or aura sprite: its frame (wrapped to the sheet), at its size (a ring or decal
+        /// spans <see cref="VfxSprite.SizePx"/> board pixels, whatever the texture's resolution) or
+        /// scale, turned, tinted, faded, in its blend.
+        /// </summary>
+        private void DrawVfxSprite(VfxSprite sprite)
+        {
+            ArtSprite art = _atlas.Sprite(sprite.Sheet);
+            if (art == null || sprite.Alpha <= 0f)
+            {
+                return;
+            }
+
+            float scale = sprite.Scale;
+            if (sprite.SizePx > 0f)
+            {
+                float natural = art.Data.FrameWidth / Math.Max(1f, art.Data.PixelsPerUnit) * _draw.UnitSize;
+                scale = sprite.SizePx / Math.Max(1f, natural);
+            }
+
+            _draw.SetBlend(sprite.Additive ? BlendState.Additive : BlendState.AlphaBlend);
+            int frame = art.Data.Frames <= 0 ? 0 : ((sprite.Frame % art.Data.Frames) + art.Data.Frames) % art.Data.Frames;
+            _draw.DrawSprite(art, frame, new Vector2(sprite.Position.X, sprite.Position.Y), scale, Ink(sprite.Tint, Color.White) * sprite.Alpha, false,
+                             sprite.Rotation);
+        }
+
+        /// <summary>The lasting effect keys a unit shows now (its statuses and stat changes), as the turn animation has them.</summary>
+        private List<string> StatusKeys(UnitSnapshot unit)
+        {
+            return _animation != null ? _animation.ShownStatusKeys(unit.Id, _clockMs) : unit.StatusKeys();
+        }
+
+        /// <summary>The aura sprites of <paramref name="unit"/>'s lasting effects, on the ground or over it.</summary>
+        private void DrawAuras(UnitSnapshot unit, Vector2 feet, bool ground)
+        {
+            foreach (string key in StatusKeys(unit))
+            {
+                if (VfxAuraSampler.TrySample(_content.Vfx.Aura(key), new Vec2(feet.X, feet.Y), UnitScale(unit), _clockMs + _idleClockMs, out VfxSprite sprite) &&
+                    sprite.Ground == ground)
+                {
+                    DrawVfxSprite(sprite);
+                }
+            }
+
+            _draw.SetBlend(BlendState.AlphaBlend);
+        }
+
+        /// <summary>The status icons of <paramref name="unit"/>'s lasting effects, in a row centred above its HP bar.</summary>
+        private void DrawStatusIcons(UnitSnapshot unit, float centerX, float barY)
+        {
+            List<ArtSprite> icons = new List<ArtSprite>();
+            List<string> tints = new List<string>();
+            foreach (string key in StatusKeys(unit))
+            {
+                VfxAuraData aura = _content.Vfx.Aura(key);
+                ArtSprite icon = aura == null ? null : _atlas.Sprite(aura.Icon);
+                if (icon != null)
+                {
+                    icons.Add(icon);
+                    tints.Add(aura.IconTint);
+                }
+            }
+
+            const float step = 10f;
+            float x = centerX - (icons.Count - 1) * step / 2f;
+            for (int i = 0; i < icons.Count; i++)
+            {
+                _draw.DrawSprite(icons[i], 0, new Vector2((float)Math.Round(x + i * step), barY - 7f), 1f, Ink(tints[i], Color.White));
+            }
+        }
+
+        private void DrawUnits(List<(VfxTimeline Timeline, VfxFrame Frame)> frames)
         {
             IReadOnlyDictionary<string, UnitSnapshot> state = _animation != null ? _animation.Turn.After : _playback.Current;
             List<UnitSnapshot> units = new List<UnitSnapshot>(state.Values);
@@ -125,6 +243,16 @@ namespace BeastCraft.Game
                 }
             }
 
+            // Then everything that lies on the ground: decals and ground rings, and ground auras.
+            DrawLayerSprites(frames, true);
+            foreach (UnitSnapshot unit in units)
+            {
+                if (Standing(unit))
+                {
+                    DrawAuras(unit, At(Center(unit)), true);
+                }
+            }
+
             foreach (UnitSnapshot unit in units)
             {
                 if (!Standing(unit))
@@ -137,9 +265,12 @@ namespace BeastCraft.Game
                 bool fading = _animation != null && _animation.ShownFading(unit.Id, _clockMs);
                 ArtSprite sprite = SpriteFor(unit.Id);
                 DrawUnitSprite(sprite, unit, at, fading ? Color.White * 0.4f : Color.White);
+                DrawAuras(unit, at, false);
 
                 int hp = _animation != null ? _animation.ShownHp(unit.Id, _clockMs) : unit.Hp;
-                DrawHpBar(at.X, (float)Math.Round(at.Y - HeadHeight(sprite, scale)) - 4f, scale <= 1f ? 24f : 40f, 3f, hp, unit.MaxHp);
+                float barY = (float)Math.Round(at.Y - HeadHeight(sprite, scale)) - 4f;
+                DrawHpBar(at.X, barY, scale <= 1f ? 24f : 40f, 3f, hp, unit.MaxHp);
+                DrawStatusIcons(unit, at.X, barY);
             }
         }
 
@@ -153,9 +284,10 @@ namespace BeastCraft.Game
             _draw.Fill(Pixel, new Vector2(x, y), new Vector2((float)Math.Ceiling(width * fraction), height), Ink(fill, Color.Green));
         }
 
-        private void DrawVfx(ScheduledBeat beat, VfxFrame vfx, bool additivePass)
+        /// <summary>A timeline's schema-v1 parts (projectile, flipbook, particles) in one blend pass.</summary>
+        private void DrawVfx(VfxTimeline timeline, VfxFrame vfx, bool additivePass)
         {
-            VfxEffectData effect = beat.Timeline.Effect;
+            VfxEffectData effect = timeline.Effect;
 
             VfxSpriteData projectile = effect.Projectile;
             if (projectile != null && projectile.Additive == additivePass)
@@ -169,7 +301,7 @@ namespace BeastCraft.Game
             VfxFlipbookData flipbook = effect.Flipbook;
             if (flipbook != null && flipbook.Additive == additivePass && vfx.FlipbookFrame >= 0)
             {
-                foreach (VfxTarget target in beat.Timeline.Targets)
+                foreach (VfxTarget target in timeline.Targets)
                 {
                     DrawCentered(flipbook.Sheet, vfx.FlipbookFrame, target.Position, flipbook.Scale, Ink(flipbook.Tint, Color.White));
                 }

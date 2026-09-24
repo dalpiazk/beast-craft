@@ -1,0 +1,10 @@
+# name: fx_scorch
+# label: Scorch decal (ground)
+# kind: fx
+# size: 48x48
+# outline: none
+# generator: blob
+# ramp: K e 1
+# speck: o
+# seed: 4411
+# artkey: fx/layer/scorch

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using BeastCraft.Battle;
 using BeastCraft.Creatures;
+using BeastCraft.Vfx;
 
 namespace BeastCraft.Presentation.Playback
 {
@@ -31,13 +32,16 @@ namespace BeastCraft.Presentation.Playback
     /// </summary>
     public sealed class SkillBeat
     {
-        public SkillBeat(string casterId, string skillId, string skillName, Element element, IReadOnlyList<BeatTarget> targets)
+        public SkillBeat(string casterId, string skillId, string skillName, Element element, IReadOnlyList<BeatTarget> targets,
+                         string primaryKey = null, IReadOnlyList<string> effectKeys = null)
         {
             CasterId = casterId;
             SkillId = skillId;
             SkillName = skillName;
             Element = element;
             Targets = targets ?? new BeatTarget[0];
+            PrimaryKey = primaryKey;
+            EffectKeys = effectKeys ?? new string[0];
         }
 
         public string CasterId { get; }
@@ -49,6 +53,15 @@ namespace BeastCraft.Presentation.Playback
         public Element Element { get; }
 
         public IReadOnlyList<BeatTarget> Targets { get; }
+
+        /// <summary>
+        /// The skill's primary effect type for VFX (<see cref="VfxLibrary.PrimaryKey"/>): null for
+        /// a damage skill (it looks like its element), else a heal, a taunt...
+        /// </summary>
+        public string PrimaryKey { get; }
+
+        /// <summary>Every effect type the skill can apply (<see cref="VfxEffectKey"/>), each once: what its on-apply overlays may be.</summary>
+        public IReadOnlyList<string> EffectKeys { get; }
 
         /// <summary>
         /// Every skill that fired on <paramref name="turn"/>, in firing order: a beast's fired slots
@@ -124,8 +137,18 @@ namespace BeastCraft.Presentation.Playback
                 targets.Add(new BeatTarget(id, damage[id], crit[id]));
             }
 
+            List<string> keys = new List<string>();
+            foreach (SkillEffect effect in skill == null || skill.Effects == null ? new List<SkillEffect>() : skill.Effects)
+            {
+                string key = VfxLibrary.KeyOf(effect, skill.Element);
+                if (key != null && !keys.Contains(key))
+                {
+                    keys.Add(key);
+                }
+            }
+
             return new SkillBeat(casterId, skill == null ? null : skill.SkillId, skill == null ? null : skill.DisplayName,
-                                 skill == null ? Element.None : skill.Element, targets);
+                                 skill == null ? Element.None : skill.Element, targets, VfxLibrary.PrimaryKey(skill), keys);
         }
     }
 }

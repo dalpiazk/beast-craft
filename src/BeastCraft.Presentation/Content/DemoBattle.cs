@@ -20,18 +20,27 @@ namespace BeastCraft.Presentation.Content
         public const string DefaultEncounterId = "boss_r01_hollow_warden";
 
         /// <summary>
-        /// The team's level. Three beasts against a boss tuned for a fuller party need the edge: at
-        /// 20 against the encounter's 10 the default seed is a 25-turn player victory.
+        /// The team's level. A small party against a boss tuned for a fuller one needs the edge: at
+        /// 20 against the encounter's 10 the default seed is a 21-turn player victory.
         /// </summary>
         public const int DefaultLevel = 20;
 
         /// <summary>The encounter's level (its calibrated difficulty is for this level).</summary>
         public const int DefaultEncounterLevel = 10;
 
-        public const int DefaultSeed = 20260924;
+        /// <summary>
+        /// The battle's seed: with <see cref="DefaultTeam"/>, the first seed from 20260924 on at which
+        /// the showcase statuses all happen (a burn, a heal, a taunt, a shield and a stun) and the team
+        /// wins. The rules are untouched; only which battle the demo shows is chosen.
+        /// </summary>
+        public const int DefaultSeed = 20260933;
 
-        /// <summary>The default team: Phoenix leads (its fire skills are the fully authored VFX).</summary>
-        public static readonly string[] DefaultTeam = { "phoenix", "golem", "kirin" };
+        /// <summary>
+        /// The default team: Phoenix leads (its fire skills are the fully authored VFX: burn, and its
+        /// rebirth heal and shield); the Golem taunts and shields, the Kirin heals, and the Frost Wyrm's
+        /// Deep Freeze stuns, so every status VFX default shows in one battle.
+        /// </summary>
+        public static readonly string[] DefaultTeam = { "phoenix", "golem", "kirin", "frost_wyrm" };
 
         /// <summary>
         /// The setup, and which species each battle unit is (unit id to species or enemy id), for

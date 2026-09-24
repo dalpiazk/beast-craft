@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using BeastCraft.Battle;
@@ -59,7 +60,7 @@ namespace BeastCraft.Tests.EditMode
 
             Assert.IsTrue(Content.Vfx.HasOwnEffect("ember_shot"));
             Assert.IsTrue(Content.Vfx.HasOwnEffect("flame_wave"));
-            Assert.AreEqual("fx_fire_burst", Content.Vfx.Resolve("ember_shot", Element.Fire).Flipbook.Sheet);
+            Assert.IsTrue(Array.Exists(Content.Vfx.Resolve("ember_shot", Element.Fire).Layers, l => l.Type == VfxLayerType.Flipbook && l.Sheet == "fx_fire_burst"));
         }
 
         [Test]
@@ -185,8 +186,8 @@ namespace BeastCraft.Tests.EditMode
             AssertError(data, "no Effect");
 
             data = Minimal();
-            data.SchemaVersion = 2;
-            AssertError(data, "SchemaVersion is 2");
+            data.SchemaVersion = 3;
+            AssertError(data, "SchemaVersion is 3");
         }
 
         private static void AssertError(VfxLibraryData data, string fragment)

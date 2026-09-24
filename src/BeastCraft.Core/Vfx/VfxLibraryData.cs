@@ -11,28 +11,127 @@ namespace BeastCraft.Vfx
     // (ArtManifestData: content/art/pixel/pixel-art-manifest.json, written by
     // Tooling/PixelArt/build.py). The rules are in
     // VfxLibraryValidator; the timeline that plays a spec is BeastCraft.Presentation.VfxTimeline.
+    //
+    // Schema v2 adds layered effects (VfxEffectData.Layers: flipbooks, ground decals, shockwave
+    // rings, radial bursts, particles and glyphs, each with its own start, duration and blend) and
+    // per-effect-type defaults (EffectDefaults: heal, shield, taunt, stun, burn, poison, cleanse,
+    // stat buff/debuff, knockback), each an on-apply effect plus an optional aura and icon shown
+    // while the status lasts. A skill's effect resolves: its own entry, else its effect type's
+    // default, else its element's default (damage-by-element). v1 files still read.
     // ------------------------------------------------------------------------------------------
 
-    /// <summary>The whole library: one default per element, then per-skill overrides.</summary>
+    /// <summary>The whole library: one default per element, per-effect-type defaults, then per-skill overrides.</summary>
     [Serializable]
     public class VfxLibraryData
     {
         /// <summary>The file's path relative to the repository root (like the other data files).</summary>
         public const string ProjectRelativePath = "content/data/Vfx/vfx-library.json";
 
-        /// <summary>The only schema version this build reads.</summary>
-        public const int CurrentSchemaVersion = 1;
+        /// <summary>The schema this build writes; 1 (no layers, no effect-type defaults) still reads.</summary>
+        public const int CurrentSchemaVersion = 2;
+
+        public const int MinSchemaVersion = 1;
 
         public int SchemaVersion;
 
         /// <summary>
         /// Exactly one per <c>Element</c> value, <c>None</c> included: what a skill of that element
-        /// looks like when the library has no entry for the skill itself.
+        /// looks like when the library has no entry for the skill itself nor for its effect type —
+        /// in practice, damage by element.
         /// </summary>
         public VfxElementDefaultData[] ElementDefaults = new VfxElementDefaultData[0];
 
+        /// <summary>
+        /// Per-effect-type defaults by <see cref="VfxEffectKey"/> (at most one each): the on-apply
+        /// effect of a skill whose primary effect is that type (a heal, a taunt...), also played on
+        /// every target a status newly lands on, and the aura/icon shown while the status lasts.
+        /// </summary>
+        public VfxEffectTypeDefaultData[] EffectDefaults = new VfxEffectTypeDefaultData[0];
+
         /// <summary>Per-skill effects, by skill id (beast skills, avatar actives and enemy-library skills).</summary>
         public VfxSkillEffectData[] Skills = new VfxSkillEffectData[0];
+    }
+
+    /// <summary>One effect type's defaults: what applying it looks like, and what it looks like while it lasts.</summary>
+    [Serializable]
+    public class VfxEffectTypeDefaultData
+    {
+        /// <summary>A <see cref="VfxEffectKey"/> name.</summary>
+        public string Key;
+
+        /// <summary>Played on the target when the effect lands (null = nothing).</summary>
+        public VfxEffectData Effect;
+
+        /// <summary>Shown on a unit for as long as the status lasts (statuses and stat changes only; null = none).</summary>
+        public VfxAuraData Aura;
+    }
+
+    /// <summary>The effect-type keys (<see cref="VfxEffectTypeDefaultData.Key"/>).</summary>
+    public static class VfxEffectKey
+    {
+        public const string Heal = "Heal";
+        public const string Shield = "Shield";
+        public const string Taunt = "Taunt";
+        public const string Stun = "Stun";
+
+        /// <summary>Damage over time from a Fire source.</summary>
+        public const string Burn = "Burn";
+
+        /// <summary>Damage over time from any other source.</summary>
+        public const string Poison = "Poison";
+
+        public const string Cleanse = "Cleanse";
+        public const string BuffStat = "BuffStat";
+        public const string DebuffStat = "DebuffStat";
+        public const string Knockback = "Knockback";
+
+        /// <summary>Every key, in a fixed order.</summary>
+        public static readonly string[] All = { Heal, Shield, Taunt, Stun, Burn, Poison, Cleanse, BuffStat, DebuffStat, Knockback };
+
+        /// <summary>The keys that last (a status or a timed stat change), so can carry an aura.</summary>
+        public static readonly string[] Lasting = { Shield, Taunt, Stun, Burn, Poison, BuffStat, DebuffStat };
+
+        public static bool IsKey(string key)
+        {
+            return Array.IndexOf(All, key) >= 0;
+        }
+
+        public static bool IsLasting(string key)
+        {
+            return Array.IndexOf(Lasting, key) >= 0;
+        }
+    }
+
+    /// <summary>
+    /// What a lasting status looks like on its unit: a looping sprite at its feet or over it that
+    /// pulses, and a small icon above its HP bar.
+    /// </summary>
+    [Serializable]
+    public class VfxAuraData
+    {
+        /// <summary>A sprite Name in the art manifest (null/empty = no aura sprite, icon only).</summary>
+        public string Sheet;
+
+        /// <summary>A palette char to tint with, or null/empty for the sheet's own colours.</summary>
+        public string Tint;
+
+        /// <summary>Draw scale (0.25-4) at the peak of the pulse.</summary>
+        public float Scale = 1f;
+
+        /// <summary>One pulse (scale and opacity breathe) every this many ms (200-4000).</summary>
+        public int PulseMs = 1200;
+
+        /// <summary><c>Alpha</c> or <c>Additive</c>.</summary>
+        public string Blend = VfxBlend.Additive;
+
+        /// <summary><c>Ground</c> (under the unit, at its feet) or <c>Over</c> (on it).</summary>
+        public string Depth = VfxDepth.Ground;
+
+        /// <summary>A sprite Name of the status icon shown above the HP bar (null/empty = none).</summary>
+        public string Icon;
+
+        /// <summary>A palette char to tint the icon with (null/empty = its own colours).</summary>
+        public string IconTint;
     }
 
     /// <summary>An element's default effect.</summary>
@@ -57,7 +156,8 @@ namespace BeastCraft.Vfx
     /// <summary>
     /// One effect, played from the caster to each target: an optional travelling projectile, then at
     /// impact a hit-stop, a flipbook, a particle burst, a screen shake, a hit flash on the target and
-    /// a floating damage number. Every part but the motion is optional (null = none).
+    /// a floating damage number, plus (schema v2) any number of <see cref="Layers"/>, each with its
+    /// own start and duration. Every part but the motion is optional (null = none).
     /// </summary>
     [Serializable]
     public class VfxEffectData
@@ -85,6 +185,129 @@ namespace BeastCraft.Vfx
         public int HitStopMs;
 
         public VfxDamageNumberData DamageNumber;
+
+        /// <summary>
+        /// Schema v2: the layered look, composited in order (ground layers under the units, the
+        /// rest over them), each timed from the hit-stop's release (<see cref="VfxLayerData.StartMs"/>).
+        /// </summary>
+        public VfxLayerData[] Layers = new VfxLayerData[0];
+    }
+
+    /// <summary>
+    /// One layer of an effect. <see cref="Type"/> says what it draws; the other fields are read as
+    /// that type needs (the validator holds each type to its own). Positions are in board pixels
+    /// and radii in hexes (one hex column step, 32 board pixels), so a layer sized to the affected
+    /// area fits any arena and any art.
+    /// </summary>
+    [Serializable]
+    public class VfxLayerData
+    {
+        /// <summary>A <see cref="VfxLayerType"/> name.</summary>
+        public string Type;
+
+        /// <summary><c>Target</c> (on each target), <c>Area</c> (once, at the centre of the affected hexes) or <c>Caster</c>.</summary>
+        public string Anchor = VfxAnchor.Target;
+
+        /// <summary>When it starts, ms after the hit-stop releases (negative: before the impact; -2000 to 3000).</summary>
+        public int StartMs;
+
+        /// <summary>How long it lasts (1-4000 ms).</summary>
+        public int DurationMs = 400;
+
+        /// <summary><c>Alpha</c> or <c>Additive</c> (glows, light, fire).</summary>
+        public string Blend = VfxBlend.Alpha;
+
+        /// <summary><c>Ground</c> (under the units) or <c>Over</c>; null/empty = the type's own (a decal is on the ground, the rest over).</summary>
+        public string Depth;
+
+        /// <summary>A sprite Name in the art manifest (not read by <c>Particles</c>, which name their own).</summary>
+        public string Sheet;
+
+        /// <summary>A palette char to tint with, or null/empty for the sheet's own colours.</summary>
+        public string Tint;
+
+        /// <summary>Draw scale at the start (0.1-8); for a sized layer (decal, shockwave) ignored in favour of the radius.</summary>
+        public float Scale = 1f;
+
+        /// <summary>Draw scale at the end (0 = the same as <see cref="Scale"/>).</summary>
+        public float EndScale;
+
+        /// <summary>Fade in over this many ms from the start, and out over <see cref="FadeOutMs"/> to the end (each 0 to the duration).</summary>
+        public int FadeInMs;
+
+        public int FadeOutMs;
+
+        /// <summary>Flipbook: frames to play (1 to the sheet's) at <see cref="Fps"/>; the last frame holds.</summary>
+        public int Frames;
+
+        public int Fps = 12;
+
+        /// <summary>
+        /// Shockwave, decal, burst and glyphs: radius in hexes at the start and end (0-8). An end of
+        /// 0 or less is the radius of the affected area (<c>VfxArea</c>: every tile a target stands
+        /// on), so a ring grows to exactly the hexes the skill hit.
+        /// </summary>
+        public float StartRadius;
+
+        public float EndRadius;
+
+        /// <summary>Radial burst: rays; glyphs: glyphs (1-32).</summary>
+        public int Count = 6;
+
+        /// <summary>Glyphs: how far they float up over the duration (board px, 0-64).</summary>
+        public float RisePx;
+
+        /// <summary>Glyphs: turns the ring makes over the duration (-4 to 4).</summary>
+        public float Spin;
+
+        /// <summary>Particles: the burst (its own sheet, count, speeds, lifetime, colours, gravity; its Additive is ignored for <see cref="Blend"/>).</summary>
+        public VfxParticleData Particles;
+    }
+
+    /// <summary>The layer type names (<see cref="VfxLayerData.Type"/>).</summary>
+    public static class VfxLayerType
+    {
+        /// <summary>A sheet's frames played once at the anchor, optionally growing.</summary>
+        public const string Flipbook = "Flipbook";
+
+        /// <summary>A scorch (or frost, or glow) on the ground at the anchor, sized to a radius, fading out.</summary>
+        public const string GroundDecal = "GroundDecal";
+
+        /// <summary>A ring whose radius grows from StartRadius to EndRadius (the affected area by default), fading.</summary>
+        public const string Shockwave = "Shockwave";
+
+        /// <summary>Count sprites flying outward from the anchor, rotated along their rays.</summary>
+        public const string RadialBurst = "RadialBurst";
+
+        /// <summary>A particle burst from the anchor.</summary>
+        public const string Particles = "Particles";
+
+        /// <summary>A few rune sprites circling the anchor and floating up.</summary>
+        public const string Glyphs = "Glyphs";
+
+        public static readonly string[] All = { Flipbook, GroundDecal, Shockwave, RadialBurst, Particles, Glyphs };
+    }
+
+    /// <summary>The anchor names (<see cref="VfxLayerData.Anchor"/>).</summary>
+    public static class VfxAnchor
+    {
+        public const string Target = "Target";
+        public const string Area = "Area";
+        public const string Caster = "Caster";
+    }
+
+    /// <summary>The blend names.</summary>
+    public static class VfxBlend
+    {
+        public const string Alpha = "Alpha";
+        public const string Additive = "Additive";
+    }
+
+    /// <summary>The depth names.</summary>
+    public static class VfxDepth
+    {
+        public const string Ground = "Ground";
+        public const string Over = "Over";
     }
 
     /// <summary>The motion names.</summary>
