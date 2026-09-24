@@ -420,10 +420,11 @@ shape `elite` (its drop cells), fought at the region's max level, each marked DR
 2 casters (Water / Ice); r04 Air giant + 3 stalkers; r05 2 champions (Metal / Earth) + shaman + 2
 brutes; r06 Ice giant + 10 swarmlings + 2 archers; r07 Lightning giant + Air champion + 2 casters;
 r08 Nature giant + 12 stinglings + 2 shamans; r09 Fire giant + 2 champions (Earth / Metal); r10 two
-giants (Fire / Water). Each `DifficultyOverride` (x0.80-x1.20) was calibrated with the simulator's
-fixed-encounter set (`--encounter-set fixed --kit elemental`, 64 samples per step) so the bond-aware
-scouted pick clears about 50% at that level (the user's boss target) — on the combat rules before the
-tiered-target and behaviour work, so it should be re-run after them.
+giants (Fire / Water). Each `DifficultyOverride` (x0.86-x1.43) is calibrated with the simulator's
+fixed-encounter set (`--encounter-set fixed --kit elemental --scouted bonds --calibrate-samples 64
+--gear typical`) so the bond-aware scouted pick, wearing typical gear (the shipping difficulty's
+assumption, as the shape table), clears about 50% at that level (the user's boss target), on the
+merged combat rules (behaviour bonds, enemy statuses); see the tuning log, "Boss re-calibration".
 
 ### Pacing (`--mode campaign`)
 
@@ -649,8 +650,8 @@ its System.Text.Json twin here.
   "Open items".
 - **Region content is DRAFT.** Region and seal names, level bands, map rules and the ten boss
   templates (names, elements, escorts) are placeholders for producer review; the boss
-  `DifficultyOverride`s were calibrated before the tiered difficulty targets and should be
-  re-calibrated after them (see "Region campaign").
+  `DifficultyOverride`s are calibrated (typical gear, 50% scouted) and must be re-run after any
+  combat, roster or enemy change (see "Bosses (DRAFT)").
 - **Camp traders (approved).** The economy's pacing relies on a travelling trader at every camp
   (about one Trader visit per stage); the game must open the shop there.
 - **Bench share retuned away from the lead's numbers** (10% + 9% per level instead of 50% + 7.5%)

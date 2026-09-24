@@ -3307,3 +3307,40 @@ sales, 14% of all gold**. Every gate still met: affordability p50 63%, nothing-a
 gold held at every boss 1.0-1.6 visits' income, focus skill 17 / 86 / 190 / 323, 545 battles; gold
 earned unchanged (977 / 4,559 / 9,026 / 49,953). The report's "Per campaign" line now prints the
 sales share.
+
+## Boss re-calibration after the combat merge
+
+The ten DRAFT boss templates' `DifficultyOverride`s (Region campaign, above) were calibrated on the
+combat rules before behaviour bonds, enemy statuses (the giant's Quake stuns, the caster's Bolt and
+the stingling's Sting burn / poison) and the tiered targets. Re-run on the merged rules, same recipe
+(the fixed set, `--kit elemental`, bond-aware scouted pick, 64 samples per step, target 50%, one boss
+at its level per run), with and without typical gear. The boss replaces the shape table's multiplier
+at its node, so it ships on the table's assumption: **typical gear** (user decision for the shipping
+table, below).
+
+| Boss | Level | Before | Gearless | Typical gear (shipped) | Scouted clear at shipped |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| r01 Hollow Warden | 10 | x1.180 | x1.270 | **x1.430** | 51.6% |
+| r02 Ember Twins | 20 | x1.156 | x0.986 | **x1.031** | 46.9% |
+| r03 Tide Colossus | 30 | x1.203 | x1.227 | **x1.219** | 51.6% |
+| r04 Storm Titan | 40 | x1.043 | x1.066 | **x1.078** | 50.0% |
+| r05 Rust Knights | 50 | x0.992 | x0.953 | **x0.963** | 51.6% |
+| r06 Frost Matriarch | 60 | x0.938 | x1.031 | **x1.063** | 50.0% |
+| r07 Thunder Court | 70 | x0.803 | x0.867 | **x0.883** | 48.4% |
+| r08 Heart of the Deepwild | 80 | x0.844 | x1.023 | **x1.055** | 51.6% |
+| r09 Cinder King | 90 | x0.934 | x0.867 | **x0.922** | 50.0% |
+| r10 Apex Pair | 100 | x0.805 | x0.734 | **x0.863** | 50.0% |
+
+Against the old overrides the gearless multipliers move -15% to +21%: most bosses got easier to
+beat (a higher multiplier holds them at 50%; the most at r08, whose stinglings' poison the Twilight
+bond cleanses), r02, r05, r09 and r10 harder. Typical gear then adds up to 17.6% (r10; r01 12.6%,
+the rest under 7%; r03's typical multiplier is 0.7% under its gearless one, inside the noise: 64
+samples per step put about +/-6 points on each scouted clear).
+
+Reproduce: write each template as a fixed encounter (every group's enemy copied from
+`enemy-library.json` with its `Count` and `Elements`, arena as authored; a scratch
+`encounters.json`), then per boss `dotnet run --project Tooling/BalanceSim -c Release -- --mode pve
+--kit elemental --encounter-set fixed --encounters-file <scratch> --encounters <id> --levels <level>
+--calibrate-samples 64 --scouted bonds --gear typical` (drop `--gear typical` for the gearless
+column); the "Difficulty" row's multiplier is the override. `--mode campaign` is unchanged (it models
+bosses at a flat 50%).
