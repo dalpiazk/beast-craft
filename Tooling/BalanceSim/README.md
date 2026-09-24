@@ -382,19 +382,20 @@ the compositions it calibrates are exactly what the game can field. The file rea
 field.
 
 **Enemy library** (`enemy-library.json`, `Enemies`; max-level base stats, speeds in a narrow 95-105
-band; the powers below predate the formula rescaling, the file has the current numbers):
+band). Powers are on the current percent-of-stat scale (the file is the source of truth; the
+`_readme` there lists every field):
 
-| Type | Role | Threat | Stance | Kit (targeting) |
+| Type | Role | Threat | Stance | Kit (power, targeting) |
 | --- | --- | ---: | --- | --- |
-| Giant (7 tiles) | boss, HP 1600 | 12 | Vanguard | crush (Physical, r1) and gaze (Special, r2), nearest; quake + roar (Physical + Special AreaBurst, r1 from its footprint = r2 from its centre, cd 3) |
-| Champion (3 tiles) | mini-boss, HP 800 | 6 | Vanguard | cleave (Physical, r1, nearest); hex (Special, r2, cd 2, lowest current HP); shockwave (Special AreaBurst, r2 from its footprint, cd 3) |
-| Brute | melee tank | 2.75 | Vanguard | smash (Physical, r1, power 50, nearest) |
-| Stalker | fast melee hunter (Speed 105, Move 4, crit 10) | 2 | Skirmisher | shadow claw (Special, r1, power 55, lowest current HP) |
-| Archer | ranged physical | 2 | Ranged | arrow (Physical, r3, power 42, nearest) |
-| Caster | ranged special | 2 | Ranged | bolt (Special, r3, power 42, lowest current HP) |
-| Shaman | area special | 2 | Vanguard | staff (Physical, r1, power 35, nearest); storm (Special AreaBurst, r2, power 28, cd 2) |
-| Swarmling | swarm, HP 30 | 0.45 | Vanguard | bite (Physical, r1, power 30, nearest) |
-| Stingling | swarm, HP 30 | 0.45 | Vanguard | sting (Special, r1, power 30, nearest) |
+| Giant (7 tiles) | boss, HP 1600 | 12 | Vanguard | crush (Physical, r1, 113) and gaze (Special, r2, 113), nearest; quake + roar (Physical + Special AreaBurst, r1 from its footprint = r2 from its centre, 60, cd 3) |
+| Champion (3 tiles) | mini-boss, HP 800 | 6 | Vanguard | cleave (Physical, r1, 90, nearest); hex (Special, r2, 90, cd 2, lowest current HP); shockwave (Special AreaBurst, r2 from its footprint, 52, cd 3) |
+| Brute | melee tank, HP 190 | 2.75 | Vanguard | smash (Physical, r1, 83, nearest) |
+| Stalker | fast melee hunter, HP 125 (Speed 105, Move 4, crit 10) | 2 | Skirmisher | shadow claw (Special, r1, 90, lowest current HP) |
+| Archer | ranged physical, HP 90 | 2 | Ranged | arrow (Physical, r3, 71, nearest) |
+| Caster | ranged special, HP 85 | 2 | Ranged | bolt (Special, r3, 71, lowest current HP) |
+| Shaman | area special, HP 130 | 2 | Vanguard | staff (Physical, r1, 60, nearest); storm (Special AreaBurst, r2, 49, cd 2) |
+| Swarmling | swarm, HP 30 | 0.45 | Vanguard | bite (Physical, r1, 52, nearest) |
+| Stingling | swarm, HP 30 | 0.45 | Vanguard | sting (Special, r1, 52, nearest) |
 
 The shaman is a Vanguard: its storm is a disc around itself, so a Ranged shaman that keeps its
 distance would rarely catch anyone. The swarm is two single-skill types rather than one type with a
@@ -431,9 +432,9 @@ the 1-damage floor.)
 - **Threat** is a hand-set weight per type, fitted to per-composition clear rates (a least-squares
   fit of logit clear rate on type counts, `neutral` mode, level 50, 24 compositions per shape) and
   rounded: brute 2.75 vs 2 for the other standard types, a swarm unit about a fifth of an archer or
-  caster, two champions about a giant. The stalker (buffed to HP 125 and power 55) and champion
-  (HP 800) were raised until they pulled their weight. The budget only keeps a shape's compositions
-  comparably hard; the calibration still sets one multiplier per shape. Compositions still differ:
+  caster, two champions about a giant. The stalker (buffed to HP 125 and power 55, 90 on the
+  current scale) and champion (HP 800) were raised until they pulled their weight. The budget only
+  keeps a shape's compositions comparably hard; the calibration still sets one multiplier per shape. Compositions still differ:
   at the defaults a single composition's clear rate at its shape's multiplier ranges over roughly
   15% to 80%, most within 30-70% (the report's "Composition clear range"). That spread is intended variety, not a
   calibration miss; every battle still counts toward the marginal.
