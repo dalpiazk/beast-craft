@@ -793,7 +793,7 @@ namespace BeastCraft.Tests.EditMode
             string path = FindLibraryFile();
             Assert.IsNotNull(path, "Could not find " + SkillLibraryData.ProjectRelativePath);
 
-            SkillLibraryData library = JsonUtility.FromJson<SkillLibraryData>(File.ReadAllText(path));
+            SkillLibraryData library = FieldJson.FromJson<SkillLibraryData>(File.ReadAllText(path));
             Assert.IsNotNull(library);
             return library;
         }

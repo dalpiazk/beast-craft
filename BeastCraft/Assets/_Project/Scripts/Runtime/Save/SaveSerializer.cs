@@ -5,7 +5,7 @@ namespace BeastCraft.Save
 {
     /// <summary>
     /// Turns a <see cref="PlayerSave"/> into JSON text and back, through an injected
-    /// <see cref="ISaveJsonSerializer"/> (Unity's <c>JsonUtility</c> in the game). Pure C#: file or
+    /// <see cref="ISaveJsonSerializer"/> (<see cref="JsonSaveSerializer"/> in the game). Pure C#: file or
     /// cloud IO is <see cref="ISaveStorage"/>'s job (see <see cref="SaveStore"/>).
     /// <para>
     /// <strong>Loading</strong> reads the schema version first, refuses a missing version or one

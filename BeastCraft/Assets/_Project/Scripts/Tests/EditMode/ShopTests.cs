@@ -71,10 +71,10 @@ namespace BeastCraft.Tests.EditMode
 
             ShopVisit a = _shop.GetStock(first, here);
             ShopVisit b = _shop.GetStock(second, here);
-            Assert.AreEqual(JsonUtility.ToJson(a), JsonUtility.ToJson(b), "same trading post, same stock");
+            Assert.AreEqual(FieldJson.ToJson(a), FieldJson.ToJson(b), "same trading post, same stock");
             Assert.AreEqual(here.NodeKey, a.NodeKey);
             Assert.AreEqual("r02/1/7/424242", here.NodeKey);
-            Assert.AreNotEqual(JsonUtility.ToJson(a.Listings), JsonUtility.ToJson(_shop.Roll(Save(15), new ShopContext("r02", 1, 7, 15, 99))));
+            Assert.AreNotEqual(FieldJson.ToJson(a.Listings), FieldJson.ToJson(_shop.Roll(Save(15), new ShopContext("r02", 1, 7, 15, 99))));
             Assert.That(a.Listings.Count, Is.InRange(6, 13));
             Assert.IsTrue(a.Listings.TrueForAll(l => l.Price > 0 && l.Remaining == l.Quantity));
 
@@ -84,9 +84,9 @@ namespace BeastCraft.Tests.EditMode
             Assert.AreEqual(1, first.Shops.Count);
             Assert.IsTrue(_shop.Open(first, here));
 
-            SaveSerializer serializer = new SaveSerializer(new JsonUtilitySaveSerializer());
+            SaveSerializer serializer = new SaveSerializer(new JsonSaveSerializer());
             SaveLoadResult reloaded = serializer.Deserialize(serializer.Serialize(first));
-            Assert.AreEqual(JsonUtility.ToJson(a), JsonUtility.ToJson(_shop.GetStock(reloaded.Save, here)), "frozen across a reload");
+            Assert.AreEqual(FieldJson.ToJson(a), FieldJson.ToJson(_shop.GetStock(reloaded.Save, here)), "frozen across a reload");
 
             for (int i = 0; i < ShopService.MaxRememberedShops + 3; i++)
             {
@@ -242,11 +242,11 @@ namespace BeastCraft.Tests.EditMode
             Assert.AreEqual(GearEquipResult.Equipped, GearRules.EquipBeastGear(save, "g", GearSlot.WeaponOrCore, worn, content));
             Assert.AreEqual(GearEquipResult.Equipped, GearRules.EquipAvatarGear(save, AvatarGearSlot.Trinket, ring, content));
 
-            string before = JsonUtility.ToJson(save);
+            string before = FieldJson.ToJson(save);
             Assert.AreEqual(ShopOutcome.Equipped, _shop.TrySellGear(save, worn).Outcome);
             Assert.AreEqual(ShopOutcome.Equipped, _shop.TrySellGear(save, ring).Outcome);
             Assert.AreEqual(ShopOutcome.UnknownItem, _shop.TrySellGear(save, "gear999").Outcome);
-            Assert.AreEqual(before, JsonUtility.ToJson(save), "a refused sale changes nothing");
+            Assert.AreEqual(before, FieldJson.ToJson(save), "a refused sale changes nothing");
 
             ShopSaleResult sold = _shop.TrySellGear(save, spare);
             Assert.AreEqual(ShopOutcome.Sold, sold.Outcome);
@@ -284,11 +284,11 @@ namespace BeastCraft.Tests.EditMode
 
         private void AssertRefused(PlayerSave save, ShopContext here, int index, string target, ShopOutcome expected, string because = null)
         {
-            string before = JsonUtility.ToJson(save);
+            string before = FieldJson.ToJson(save);
             ShopPurchaseResult result = _shop.TryBuy(save, here, index, target);
             Assert.AreEqual(expected, result.Outcome, because);
             Assert.AreEqual(0, result.Price);
-            Assert.AreEqual(before, JsonUtility.ToJson(save), "a refused purchase changes nothing (" + expected + ")");
+            Assert.AreEqual(before, FieldJson.ToJson(save), "a refused purchase changes nothing (" + expected + ")");
         }
 
         /// <summary>A save with a griffin "g" at <paramref name="level"/> and the avatar at the same level.</summary>

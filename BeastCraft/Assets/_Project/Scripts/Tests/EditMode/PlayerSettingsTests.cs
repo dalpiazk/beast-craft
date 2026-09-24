@@ -43,12 +43,12 @@ namespace BeastCraft.Tests.EditMode
         public void RoundTripsThroughFileSaveStorage()
         {
             FileSaveStorage storage = new FileSaveStorage(_root);
-            PlayerSettingsStore store = new PlayerSettingsStore(storage, new JsonUtilitySaveSerializer());
+            PlayerSettingsStore store = new PlayerSettingsStore(storage, new JsonSaveSerializer());
 
             Assert.IsTrue(store.Save(new PlayerSettings { TeamSuggestionsEnabled = false, SchemaVersion = 0 }));
             Assert.IsTrue(File.Exists(storage.GetSlotPath(PlayerSettingsStore.SlotName)));
 
-            PlayerSettings loaded = new PlayerSettingsStore(new FileSaveStorage(_root), new JsonUtilitySaveSerializer()).Load();
+            PlayerSettings loaded = new PlayerSettingsStore(new FileSaveStorage(_root), new JsonSaveSerializer()).Load();
 
             Assert.IsFalse(loaded.TeamSuggestionsEnabled);
             Assert.AreEqual(PlayerSettings.CurrentSchemaVersion, loaded.SchemaVersion, "Save stamps the current version");
@@ -57,7 +57,7 @@ namespace BeastCraft.Tests.EditMode
         [Test]
         public void Missing_LoadsTheDefaults()
         {
-            PlayerSettingsStore store = new PlayerSettingsStore(new FileSaveStorage(_root), new JsonUtilitySaveSerializer());
+            PlayerSettingsStore store = new PlayerSettingsStore(new FileSaveStorage(_root), new JsonSaveSerializer());
 
             Assert.IsFalse(store.TryLoad(out PlayerSettings settings));
             Assert.IsTrue(settings.TeamSuggestionsEnabled);
@@ -74,7 +74,7 @@ namespace BeastCraft.Tests.EditMode
             Directory.CreateDirectory(_root);
             FileSaveStorage storage = new FileSaveStorage(_root);
             File.WriteAllText(storage.GetSlotPath(PlayerSettingsStore.SlotName), text);
-            PlayerSettingsStore store = new PlayerSettingsStore(storage, new JsonUtilitySaveSerializer());
+            PlayerSettingsStore store = new PlayerSettingsStore(storage, new JsonSaveSerializer());
 
             PlayerSettings settings = store.Load();
 
@@ -87,7 +87,7 @@ namespace BeastCraft.Tests.EditMode
         public void CorruptMainFile_FallsBackToTheBackup()
         {
             FileSaveStorage storage = new FileSaveStorage(_root);
-            PlayerSettingsStore store = new PlayerSettingsStore(storage, new JsonUtilitySaveSerializer());
+            PlayerSettingsStore store = new PlayerSettingsStore(storage, new JsonSaveSerializer());
             store.Save(new PlayerSettings { TeamSuggestionsEnabled = false });
             store.Save(new PlayerSettings { TeamSuggestionsEnabled = false });
             File.WriteAllText(storage.GetSlotPath(PlayerSettingsStore.SlotName), "{\"cut");
@@ -102,7 +102,7 @@ namespace BeastCraft.Tests.EditMode
             FileSaveStorage storage = new FileSaveStorage(_root);
             File.WriteAllText(storage.GetSlotPath(PlayerSettingsStore.SlotName), "{\"SchemaVersion\":1,\"SomeFutureSetting\":3}");
 
-            PlayerSettingsStore store = new PlayerSettingsStore(storage, new JsonUtilitySaveSerializer());
+            PlayerSettingsStore store = new PlayerSettingsStore(storage, new JsonSaveSerializer());
 
             Assert.IsTrue(store.TryLoad(out PlayerSettings settings));
             Assert.IsTrue(settings.TeamSuggestionsEnabled);
@@ -112,8 +112,8 @@ namespace BeastCraft.Tests.EditMode
         public void TheSettingsSlot_IsNeverAGameSave()
         {
             FileSaveStorage storage = new FileSaveStorage(_root);
-            SaveStore saves = new SaveStore(storage, new SaveSerializer(new JsonUtilitySaveSerializer()));
-            PlayerSettingsStore settings = new PlayerSettingsStore(storage, new JsonUtilitySaveSerializer());
+            SaveStore saves = new SaveStore(storage, new SaveSerializer(new JsonSaveSerializer()));
+            PlayerSettingsStore settings = new PlayerSettingsStore(storage, new JsonSaveSerializer());
 
             Assert.IsTrue(PlayerSettingsStore.IsReservedSlot("settings"));
             Assert.IsTrue(PlayerSettingsStore.IsReservedSlot("Settings"), "any letter case: file names are case-insensitive on Windows and macOS");
@@ -126,7 +126,7 @@ namespace BeastCraft.Tests.EditMode
 
             Assert.IsFalse(saves.Exists("settings"));
             Assert.IsFalse(saves.Load("settings").Success);
-            List<SaveSlotInfo> index = SaveSlotIndex.Build(storage, new JsonUtilitySaveSerializer());
+            List<SaveSlotInfo> index = SaveSlotIndex.Build(storage, new JsonSaveSerializer());
             CollectionAssert.AreEqual(new[] { "main" }, index.ConvertAll(s => s.Slot), "the slot index lists game saves only");
             Assert.IsTrue(settings.TryLoad(out PlayerSettings _), "a game save beside it leaves the settings alone");
         }
@@ -134,8 +134,8 @@ namespace BeastCraft.Tests.EditMode
         [Test]
         public void Save_Null_IsRefused()
         {
-            Assert.IsFalse(new PlayerSettingsStore(new FileSaveStorage(_root), new JsonUtilitySaveSerializer()).Save(null));
-            Assert.Throws<ArgumentNullException>(() => new PlayerSettingsStore(null, new JsonUtilitySaveSerializer()));
+            Assert.IsFalse(new PlayerSettingsStore(new FileSaveStorage(_root), new JsonSaveSerializer()).Save(null));
+            Assert.Throws<ArgumentNullException>(() => new PlayerSettingsStore(null, new JsonSaveSerializer()));
         }
     }
 }

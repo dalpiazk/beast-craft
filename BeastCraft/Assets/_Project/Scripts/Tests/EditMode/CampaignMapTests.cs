@@ -132,9 +132,9 @@ namespace BeastCraft.Tests.EditMode
         [Test]
         public void Generate_IsDeterministicPerSeed()
         {
-            string first = JsonUtility.ToJson(new MapRun { Nodes = NodeMapGenerator.Generate(_regions, "r02", 1, 99) });
-            string second = JsonUtility.ToJson(new MapRun { Nodes = NodeMapGenerator.Generate(_regions, "r02", 1, 99) });
-            string other = JsonUtility.ToJson(new MapRun { Nodes = NodeMapGenerator.Generate(_regions, "r02", 1, 100) });
+            string first = FieldJson.ToJson(new MapRun { Nodes = NodeMapGenerator.Generate(_regions, "r02", 1, 99) });
+            string second = FieldJson.ToJson(new MapRun { Nodes = NodeMapGenerator.Generate(_regions, "r02", 1, 99) });
+            string other = FieldJson.ToJson(new MapRun { Nodes = NodeMapGenerator.Generate(_regions, "r02", 1, 100) });
 
             Assert.AreEqual(first, second);
             Assert.AreNotEqual(first, other);
@@ -183,7 +183,7 @@ namespace BeastCraft.Tests.EditMode
         public void Place_UsesItsOwnStream_AndLeavesTheMapItself()
         {
             List<MapNode> nodes = NodeMapGenerator.Generate(_regions, "r04", 2, 31);
-            string placed = JsonUtility.ToJson(new MapRun { Nodes = nodes });
+            string placed = FieldJson.ToJson(new MapRun { Nodes = nodes });
             foreach (MapNode node in nodes)
             {
                 node.X = 0f;
@@ -193,11 +193,11 @@ namespace BeastCraft.Tests.EditMode
 
             MapRun unplaced = new MapRun { RegionId = "r04", Stage = 2, Seed = 31, Nodes = nodes };
             Assert.AreEqual(1, unplaced.EnsureInitialized(), "the missing placement is one repair");
-            Assert.AreEqual(placed, JsonUtility.ToJson(new MapRun { Nodes = unplaced.Nodes }));
+            Assert.AreEqual(placed, FieldJson.ToJson(new MapRun { Nodes = unplaced.Nodes }));
             Assert.AreEqual(0, unplaced.EnsureInitialized());
 
             NodeMapGenerator.Place(nodes, "r04", 32);
-            Assert.AreNotEqual(placed, JsonUtility.ToJson(new MapRun { Nodes = nodes }), "another seed jitters differently");
+            Assert.AreNotEqual(placed, FieldJson.ToJson(new MapRun { Nodes = nodes }), "another seed jitters differently");
             NodeMapGenerator.Place(null, "r04", 1);
         }
 
@@ -331,7 +331,7 @@ namespace BeastCraft.Tests.EditMode
         public void Generate_TooStrictCounts_AreFixedUpDeterministically()
         {
             RegionData region = _regions.GetRegion("r01");
-            MapRulesData rules = JsonUtility.FromJson<MapRulesData>(JsonUtility.ToJson(_regions.RulesFor(region)));
+            MapRulesData rules = FieldJson.FromJson<MapRulesData>(FieldJson.ToJson(_regions.RulesFor(region)));
             rules.NodeWeights = new[] { new NodeWeightData { Type = "Battle", Weight = 1 }, new NodeWeightData { Type = "Shop", Weight = 1000 } };
             rules.MinElites = 2;
             rules.MaxElites = 2;
@@ -341,7 +341,7 @@ namespace BeastCraft.Tests.EditMode
 
             Assert.AreEqual(0, nodes.FindAll(n => n.Type == MapNodeType.Shop).Count, "extra shops become battles");
             Assert.AreEqual(2, nodes.FindAll(n => n.Type == MapNodeType.Elite).Count, "the lowest eligible battles become elites");
-            Assert.AreEqual(JsonUtility.ToJson(new MapRun { Nodes = nodes }), JsonUtility.ToJson(new MapRun { Nodes = NodeMapGenerator.Generate(region, rules, 0, 5) }));
+            Assert.AreEqual(FieldJson.ToJson(new MapRun { Nodes = nodes }), FieldJson.ToJson(new MapRun { Nodes = NodeMapGenerator.Generate(region, rules, 0, 5) }));
         }
 
         [Test]
@@ -371,8 +371,8 @@ namespace BeastCraft.Tests.EditMode
             Assert.IsTrue(save.Campaign.HasActiveRun);
             Assert.AreEqual("r01", save.Campaign.CurrentRegionId);
             Assert.AreEqual(0, save.Campaign.ActiveRun.Stage);
-            Assert.AreEqual(JsonUtility.ToJson(new MapRun { Nodes = NodeMapGenerator.Generate(_regions, "r01", 0, 7) }),
-                            JsonUtility.ToJson(new MapRun { Nodes = save.Campaign.ActiveRun.Nodes }));
+            Assert.AreEqual(FieldJson.ToJson(new MapRun { Nodes = NodeMapGenerator.Generate(_regions, "r01", 0, 7) }),
+                            FieldJson.ToJson(new MapRun { Nodes = save.Campaign.ActiveRun.Nodes }));
             Assert.IsFalse(CampaignRules.StartRun(save, _regions, "r01", 8).Success, "one expedition at a time");
 
             Assert.IsTrue(CampaignRules.Retreat(save).Success);
@@ -558,7 +558,7 @@ namespace BeastCraft.Tests.EditMode
             CampaignRules.StartRun(save, _regions, "r01", 5);
             CampaignRules.ResolveBattle(save, _regions, CampaignRules.Choices(save.Campaign.ActiveRun)[0].NodeId, BattleOutcome.PlayerVictory);
             CampaignRules.GrantSeal(save, _regions, "seal_r01");
-            SaveSerializer serializer = new SaveSerializer(new JsonUtilitySaveSerializer(),
+            SaveSerializer serializer = new SaveSerializer(new JsonSaveSerializer(),
                                                            SaveContentCatalog.FromData(BeastRosterTests.LoadRoster(), SkillLibraryTests.LoadLibrary(), _data));
 
             string json = serializer.Serialize(save);

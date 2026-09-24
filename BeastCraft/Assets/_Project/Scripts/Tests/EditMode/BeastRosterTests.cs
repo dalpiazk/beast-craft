@@ -367,7 +367,7 @@ namespace BeastCraft.Tests.EditMode
             string path = FindRosterFile();
             Assert.IsNotNull(path, "Could not find " + BeastRosterData.ProjectRelativePath);
 
-            BeastRosterData roster = JsonUtility.FromJson<BeastRosterData>(File.ReadAllText(path));
+            BeastRosterData roster = FieldJson.FromJson<BeastRosterData>(File.ReadAllText(path));
             Assert.IsNotNull(roster);
             return roster;
         }

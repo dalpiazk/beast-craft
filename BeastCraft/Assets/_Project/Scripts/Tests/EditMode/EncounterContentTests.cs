@@ -103,7 +103,7 @@ namespace BeastCraft.Tests.EditMode
             string path = DropTableTests.FindFile(projectRelativePath);
             Assert.IsNotNull(path, "Could not find " + projectRelativePath);
 
-            T data = JsonUtility.FromJson<T>(File.ReadAllText(path));
+            T data = FieldJson.FromJson<T>(File.ReadAllText(path));
             Assert.IsNotNull(data);
             return data;
         }

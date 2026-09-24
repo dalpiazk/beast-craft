@@ -18,7 +18,7 @@ namespace BeastCraft.Tests.EditMode
 
         private static SaveSerializer NewSerializer(ISaveContentCatalog catalog = null)
         {
-            return new SaveSerializer(new JsonUtilitySaveSerializer(), catalog);
+            return new SaveSerializer(new JsonSaveSerializer(), catalog);
         }
 
         /// <summary>A three-node map: 0 (layer 0) → 1 and 2 (layer 1).</summary>
@@ -153,7 +153,7 @@ namespace BeastCraft.Tests.EditMode
             }
 
             SaveSerializer serializer = NewSerializer(Catalog);
-            SaveLoadResult loaded = serializer.Deserialize(new JsonUtilitySaveSerializer().ToJson(stored));
+            SaveLoadResult loaded = serializer.Deserialize(new JsonSaveSerializer().ToJson(stored));
 
             Assert.IsTrue(loaded.Success, loaded.Error);
             Assert.IsEmpty(loaded.Issues, string.Join("\n", loaded.Issues));

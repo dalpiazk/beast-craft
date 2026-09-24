@@ -202,7 +202,7 @@ namespace BeastCraft.Tests.EditMode
         [Test]
         public void ApplyRewards_IsDeterministic_AndTheSaveRoundTrips()
         {
-            SaveSerializer serializer = new SaveSerializer(new JsonUtilitySaveSerializer(), SaveContentCatalog.FromData(_roster, _library));
+            SaveSerializer serializer = new SaveSerializer(new JsonSaveSerializer(), SaveContentCatalog.FromData(_roster, _library));
             string[] written = new string[2];
 
             for (int run = 0; run < 2; run++)

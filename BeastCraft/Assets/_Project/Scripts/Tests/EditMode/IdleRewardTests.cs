@@ -94,7 +94,7 @@ namespace BeastCraft.Tests.EditMode
                               "\"ActiveRun\":{\"RegionId\":\"\",\"Stage\":0,\"Seed\":0,\"Nodes\":[],\"CurrentNodeId\":-1,\"Cleared\":[],\"Attempts\":0,\"NodeAttempts\":0}}," +
                               "\"Gold\":77,\"Consumables\":[],\"Shops\":[],\"Cosmetics\":{\"Unlocked\":[]}," +
                               "\"AvatarAppearance\":{\"OptionEntries\":[],\"ColorEntries\":[]}}";
-            SaveSerializer serializer = new SaveSerializer(new JsonUtilitySaveSerializer(), null, null, PlayerSave.CurrentSchemaVersion, null, null);
+            SaveSerializer serializer = new SaveSerializer(new JsonSaveSerializer(), null, null, PlayerSave.CurrentSchemaVersion, null, null);
 
             SaveLoadResult migrated = serializer.Deserialize(v4);
 
@@ -533,7 +533,7 @@ namespace BeastCraft.Tests.EditMode
             Start(first);
             Start(second);
             Assert.AreEqual(first.Idle.IdleSeed, second.Idle.IdleSeed);
-            SaveSerializer serializer = new SaveSerializer(new JsonUtilitySaveSerializer(), null);
+            SaveSerializer serializer = new SaveSerializer(new JsonSaveSerializer(), null);
 
             for (int i = 1; i <= 12; i++)
             {

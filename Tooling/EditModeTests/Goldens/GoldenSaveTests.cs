@@ -54,7 +54,7 @@ namespace BeastCraft.Tests.EditMode
 
         private static SaveSerializer NewSerializer()
         {
-            return new SaveSerializer(new JsonUtilitySaveSerializer());
+            return new SaveSerializer(new JsonSaveSerializer());
         }
 
         private static string RichV5()
@@ -105,7 +105,7 @@ namespace BeastCraft.Tests.EditMode
         [Test]
         public void PlayerSettings_RoundTripToTheGoldenText()
         {
-            JsonUtilitySaveSerializer json = new JsonUtilitySaveSerializer();
+            JsonSaveSerializer json = new JsonSaveSerializer();
             PlayerSettings settings = json.FromJson<PlayerSettings>("{\"SchemaVersion\":1,\"TeamSuggestionsEnabled\":false,\"Unknown\":3}");
 
             GoldenFiles.AssertMatches("Saves/settings.expected.json", json.ToJson(settings) + "\n" + json.ToJson(new PlayerSettings()));

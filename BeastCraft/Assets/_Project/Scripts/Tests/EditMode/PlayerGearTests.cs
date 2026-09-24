@@ -145,7 +145,7 @@ namespace BeastCraft.Tests.EditMode
                               "\"Skills\":{\"Known\":[{\"SkillId\":\"ember_bite\",\"Level\":2,\"Xp\":5,\"Tier\":0}],\"Equipped\":[\"ember_bite\",\"\",\"\"]}}]," +
                               "\"Avatar\":{\"Level\":3,\"Xp\":40}," +
                               "\"Materials\":{\"Materials\":[{\"MaterialId\":\"essence_shard\",\"Quantity\":2}],\"ClearedCells\":[],\"Pity\":[]}}";
-            SaveSerializer serializer = new SaveSerializer(new JsonUtilitySaveSerializer(), null, null, PlayerSave.CurrentSchemaVersion, _catalog);
+            SaveSerializer serializer = new SaveSerializer(new JsonSaveSerializer(), null, null, PlayerSave.CurrentSchemaVersion, _catalog);
 
             SaveLoadResult migrated = serializer.Deserialize(v1);
 
@@ -181,7 +181,7 @@ namespace BeastCraft.Tests.EditMode
             string staff = save.Gear.AddAvatarGear("oak_staff");
             GearRules.EquipBeastGear(save, "b2", GearSlot.WeaponOrCore, blade, _catalog);
             GearRules.EquipAvatarGear(save, AvatarGearSlot.Weapon, staff, _catalog);
-            SaveSerializer serializer = new SaveSerializer(new JsonUtilitySaveSerializer(), null, null, PlayerSave.CurrentSchemaVersion, _catalog);
+            SaveSerializer serializer = new SaveSerializer(new JsonSaveSerializer(), null, null, PlayerSave.CurrentSchemaVersion, _catalog);
 
             SaveLoadResult loaded = serializer.Deserialize(serializer.Serialize(save));
 

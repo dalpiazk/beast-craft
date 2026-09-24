@@ -2,8 +2,8 @@ namespace BeastCraft.Save
 {
     /// <summary>
     /// The JSON engine <see cref="SaveSerializer"/> writes and reads through. Injectable so the save
-    /// logic stays pure C#: in the game it is <see cref="JsonUtilitySaveSerializer"/> (Unity's
-    /// <c>JsonUtility</c>); anything else that follows JsonUtility's rules — public fields by exact
+    /// logic stays pure C#: in the game it is <see cref="JsonSaveSerializer"/> (<see cref="FieldJson"/>);
+    /// anything else that follows the same rules (Unity's JsonUtility rules) — public fields by exact
     /// name, lists not dictionaries, unknown keys ignored — can stand in for it.
     /// <para>
     /// Implementations may throw on malformed input; <see cref="SaveSerializer"/> catches and reports.

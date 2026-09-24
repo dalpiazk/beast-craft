@@ -19,7 +19,7 @@ namespace BeastCraft.Tests.EditMode
     {
         private static SaveSerializer NewSerializer(ISaveEconomyCatalog economy = null)
         {
-            return new SaveSerializer(new JsonUtilitySaveSerializer(), null, null, PlayerSave.CurrentSchemaVersion, null, economy);
+            return new SaveSerializer(new JsonSaveSerializer(), null, null, PlayerSave.CurrentSchemaVersion, null, economy);
         }
 
         [Test]

@@ -192,7 +192,7 @@ namespace BeastCraft.Tests.EditMode
         public void MigratedLevel40Beast_UnderTheStartingCap_KeepsItsLevelAndBanks()
         {
             const string v2 = "{\"SchemaVersion\":2,\"Beasts\":[{\"BeastId\":\"b1\",\"Progress\":{\"SpeciesId\":\"emberfox\",\"Level\":40,\"Xp\":0}}]}";
-            SaveLoadResult loaded = new SaveSerializer(new JsonUtilitySaveSerializer()).Deserialize(v2);
+            SaveLoadResult loaded = new SaveSerializer(new JsonSaveSerializer()).Deserialize(v2);
             Assert.IsTrue(loaded.Success, loaded.Error);
             BeastProgress beast = loaded.Save.FindBeast("b1").Progress;
 
