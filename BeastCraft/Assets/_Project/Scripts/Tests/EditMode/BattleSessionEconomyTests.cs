@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using BeastCraft.Battle;
+using BeastCraft.Battle.Grid;
 using BeastCraft.Economy;
 using BeastCraft.Progression;
 using BeastCraft.Save;
@@ -109,7 +110,7 @@ namespace BeastCraft.Tests.EditMode
         private readonly ConsumableLibrary _consumables = ConsumableLibrary.Build(ConsumableTests.LoadConsumables());
 
         [Test]
-        public void Run_UsesAConsumable_AndApplyRewardsSpendsItExactlyOnce()
+        public void Run_SpendsAConsumableAsTheBattleBegins_AndApplyRewardsNeverSpendsItAgain()
         {
             PlayerSave save = StarterSave();
             ConsumableInventory.TryAdd(save, "fury_draught", 2, 5);
@@ -119,23 +120,66 @@ namespace BeastCraft.Tests.EditMode
             BattleSessionResult result = BattleSession.Run(setup);
             Assert.IsTrue(result.Success, result.Error);
             CollectionAssert.AreEqual(new[] { "fury_draught" }, result.ConsumablesUsed);
-            Assert.AreEqual(2, ConsumableInventory.Quantity(save, "fury_draught"), "Run never writes the save");
+            Assert.IsTrue(result.ConsumablesDeducted);
+            Assert.AreEqual(1, ConsumableInventory.Quantity(save, "fury_draught"), "spent as the battle began");
 
             BattleRewardSummary summary = BattleSession.ApplyRewards(save, result, _content, Shape, EncounterLevel, _drops);
-            CollectionAssert.AreEqual(new[] { "fury_draught" }, summary.ConsumablesSpent);
-            Assert.AreEqual(1, ConsumableInventory.Quantity(save, "fury_draught"));
+            Assert.IsTrue(summary.Applied, summary.Error);
+            CollectionAssert.AreEqual(new[] { "fury_draught" }, summary.ConsumablesSpent, "reported, not spent again");
+            Assert.AreEqual(1, ConsumableInventory.Quantity(save, "fury_draught"), "ApplyRewards never double-spends");
             Assert.IsFalse(BattleSession.ApplyRewards(save, result, _content, Shape, EncounterLevel, _drops).Applied);
             Assert.AreEqual(1, ConsumableInventory.Quantity(save, "fury_draught"), "spent once");
 
             BattleSessionResult again = BattleSession.Run(setup);
             Assert.AreEqual(Trace(result), Trace(again), "deterministic per seed");
+            Assert.AreEqual(0, ConsumableInventory.Quantity(save, "fury_draught"), "the second battle spent the last one");
+        }
+
+        [Test]
+        public void Run_SpendsTheConsumable_EvenWhenRewardsAreNeverApplied_SoItCannotBeReused()
+        {
+            PlayerSave save = StarterSave();
+            ConsumableInventory.TryAdd(save, "fury_draught", 1, 5);
+            BattleSetup setup = Setup(save, 42, weakEnemies: true);
+            setup.Consumables.Add("fury_draught");
+
+            BattleSessionResult first = BattleSession.Run(setup);
+            Assert.IsTrue(first.Success, first.Error);
+            Assert.AreEqual(0, ConsumableInventory.Quantity(save, "fury_draught"), "spent at Run, with no ApplyRewards");
+
+            BattleSessionResult replay = AssertFails(setup, "is not held");
+            Assert.IsFalse(replay.ConsumablesDeducted);
+            Assert.IsEmpty(replay.ConsumablesUsed);
+        }
+
+        [Test]
+        public void Run_WithAnInvalidSetup_LeavesTheSaveByteIdentical()
+        {
+            SaveSerializer serializer = new SaveSerializer(new JsonUtilitySaveSerializer(), SaveContentCatalog.FromData(_roster, _library));
+            PlayerSave save = StarterSave();
+            ConsumableInventory.TryAdd(save, "fury_draught", 1, 5);
+            string before = serializer.Serialize(save);
+
+            // Fails validation (an unknown enemy species) with the consumable itself valid.
+            BattleSetup invalid = Setup(save, 1);
+            invalid.Consumables.Add("fury_draught");
+            invalid.Encounter.Enemies.Add(new EnemySpec("no_such_species", 5));
+            AssertFails(invalid, "unknown species");
+            Assert.AreEqual(before, serializer.Serialize(save));
+
+            // Passes validation but fails placement, which runs after the consumable check.
+            BattleSetup badTile = Setup(save, 1);
+            badTile.Consumables.Add("fury_draught");
+            badTile.Encounter.Enemies[0].Position = new HexGrid(badTile.Encounter.Arena).GetDeploymentZone(BattleTeam.Player)[0];
+            AssertFails(badTile, "cannot stand at");
+            Assert.AreEqual(before, serializer.Serialize(save));
+            Assert.AreEqual(1, ConsumableInventory.Quantity(save, "fury_draught"));
         }
 
         [Test]
         public void Run_WithAConsumable_ChangesTheBattle_AndWithoutOneIsTheSameBattle()
         {
             PlayerSave save = StarterSave();
-            ConsumableInventory.TryAdd(save, "venom_flask", 1, 3);
             int changed = 0;
             for (int seed = 1; seed <= 8; seed++)
             {
@@ -144,6 +188,7 @@ namespace BeastCraft.Tests.EditMode
                 empty.Consumables = new List<string>();
                 BattleSetup venom = Setup(save, seed);
                 venom.Consumables.Add("venom_flask");
+                ConsumableInventory.TryAdd(save, "venom_flask", 1, 3); // each venom battle spends one
 
                 string plainTrace = Trace(BattleSession.Run(plain));
                 Assert.AreEqual(plainTrace, Trace(BattleSession.Run(empty)), "no consumable is exactly the old battle");
@@ -160,7 +205,7 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
-        public void ApplyRewards_SpendsTheConsumableOnADefeat_Too()
+        public void Run_SpendsTheConsumableOnADefeat_Too()
         {
             PlayerSave save = StarterSave();
             ConsumableInventory.TryAdd(save, "smoke_bomb", 1, 5);
@@ -176,7 +221,9 @@ namespace BeastCraft.Tests.EditMode
 
             BattleSessionResult result = BattleSession.Run(setup);
             Assert.AreEqual(BattleOutcome.EnemyVictory, result.Outcome, result.Error);
-            BattleSession.ApplyRewards(save, result, _content, Shape, EncounterLevel, _drops);
+            Assert.AreEqual(0, ConsumableInventory.Quantity(save, "smoke_bomb"), "spent as the battle began");
+            BattleRewardSummary summary = BattleSession.ApplyRewards(save, result, _content, Shape, EncounterLevel, _drops);
+            CollectionAssert.AreEqual(new[] { "smoke_bomb" }, summary.ConsumablesSpent);
             Assert.AreEqual(0, ConsumableInventory.Quantity(save, "smoke_bomb"));
         }
 

@@ -156,7 +156,10 @@ against this profile ("Gear at typical", 22-96% of slots by boss).
 
 `Data/Items/consumable-library.json` (`ConsumableSO`): **at most one per battle**, chosen before the
 fight (`BattleSetup.Consumables`), used as it begins — before the team's bonds and the avatar's
-opening passives, on stream 2 — and spent by `ApplyRewards` win or lose (once). A team consumable is
+opening passives, on stream 2 — and spent win or lose, exactly once: `BattleSession.Run` takes it
+from the pack as the battle begins (after every check passes; a setup that fails spends nothing),
+so a battle whose rewards are never applied still used it up, and a second `Run` without another in
+the pack is refused. `ApplyRewards` only reports it (`ConsumablesSpent`); it never spends it again. A team consumable is
 applied by every living beast to itself (as a bond is); an enemy one by the team's first living beast
 to every living enemy (less their status resist). No consumable = exactly the old battle.
 

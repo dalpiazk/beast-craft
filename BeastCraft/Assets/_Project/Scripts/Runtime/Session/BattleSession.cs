@@ -27,7 +27,10 @@ namespace BeastCraft.Session
     /// <see cref="TurnManager"/> over the beasts plus the avatar; then
     /// <see cref="BattleTurnExecutor.RunBattle(TurnManager, IEnumerable{BattleUnit}, HexGrid, Random, BattleUnit, PassiveLoadout, TeamBondLoadout, int)"/>
     /// with one <see cref="Random"/> seeded from <see cref="BattleSetup.Seed"/>. Same setup, same
-    /// seed, same battle.
+    /// seed, same battle. The battle's consumables (<see cref="BattleSetup.Consumables"/>) are
+    /// spent from the save's pack by <see cref="Run"/> itself, once every check has passed and just
+    /// before the battle begins — the only write <see cref="Run"/> makes to the save. A setup that
+    /// fails validation or placement changes nothing.
     /// </para>
     /// <para>
     /// <strong><see cref="ApplyRewards"/></strong> pays a finished battle into the save: practice XP
@@ -160,10 +163,21 @@ namespace BeastCraft.Session
 
             if (consumables.Count > 0)
             {
+                // Every check has passed and the battle is about to begin: spend the consumables now,
+                // exactly once, whatever the outcome — so a battle whose rewards are never applied
+                // (the app closed, or Run called again) cannot use a held item for free. Check
+                // guaranteed each is known, held and chosen once, so every removal succeeds.
+                foreach (string id in setup.Consumables)
+                {
+                    ConsumableInventory.TryRemove(save, id, 1);
+                }
+
+                result.ConsumablesUsed = new List<string>(setup.Consumables);
+                result.ConsumablesDeducted = true;
+
                 // Before the bonds and passives (applied by RunBattle's battle-start hook), on its own stream.
                 ConsumableLoadout.Apply(consumables, members, units.FindAll(u => u.Team == BattleTeam.Enemy), grid,
                                         new Random(LootRoller.DeriveSeed(setup.Seed, PostBattleAward.ConsumableStream)));
-                result.ConsumablesUsed = new List<string>(setup.Consumables);
             }
 
             TurnManager turnManager = new TurnManager(avatar == null ? units : new List<BattleUnit>(units) { avatar });
@@ -221,6 +235,12 @@ namespace BeastCraft.Session
         /// supplies each skill's and passive's progression definition (null uses the defaults).
         /// <paramref name="rng"/> drives the drop rolls; null seeds one from the battle's seed
         /// (<see cref="LootRoller.DeriveSeed"/>), so rewards are deterministic either way.
+        /// <para>
+        /// The battle's consumables are not spent here: <see cref="Run"/> took them from the pack as
+        /// the battle began (<see cref="BattleSessionResult.ConsumablesDeducted"/>), so the summary
+        /// only reports them (<see cref="BattleRewardSummary.ConsumablesSpent"/>). A result not
+        /// marked deducted has them spent here instead, once — never both.
+        /// </para>
         /// <para>
         /// Refused — nothing changes — for a null save or result, a failed battle, or a result
         /// already paid out. A team beast no longer in the save is skipped.
@@ -299,11 +319,20 @@ namespace BeastCraft.Session
                 summary.GoldGained = Wallet.Add(save, gold);
             }
 
-            foreach (string id in result.ConsumablesUsed)
+            if (result.ConsumablesDeducted)
             {
-                if (ConsumableInventory.TryRemove(save, id, 1))
+                // Run already took them from the pack as the battle began; only report them.
+                summary.ConsumablesSpent.AddRange(result.ConsumablesUsed);
+            }
+            else
+            {
+                // A result whose consumables were not taken at Run (none from the current Run): spend them here, once.
+                foreach (string id in result.ConsumablesUsed)
                 {
-                    summary.ConsumablesSpent.Add(id);
+                    if (ConsumableInventory.TryRemove(save, id, 1))
+                    {
+                        summary.ConsumablesSpent.Add(id);
+                    }
                 }
             }
 

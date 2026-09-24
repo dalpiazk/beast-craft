@@ -515,20 +515,24 @@ also build one by hand:
 4. **Avatar** (when included): `BattleAvatar.Create(book, skill lookup, passive lookup, profile,
    progress, gear, out passives)`, id `avatar`.
 5. **Bonds**: `TeamBondLoadout.For(content.TeamBonds, TeamBondResolver.MembersOf(team species), team units)`.
-6. **Battle**: `new TurnManager(beasts + avatar)` and the bond-aware
+6. **Consumables** (when chosen): spent from the save's pack (`ConsumableInventory.TryRemove`,
+   one each) and used on stream 2 (`ConsumableLoadout.Apply`) — the only write `Run` makes to the
+   save, and only once every check above has passed.
+7. **Battle**: `new TurnManager(beasts + avatar)` and the bond-aware
    `BattleTurnExecutor.RunBattle(turnManager, units, grid, new Random(Seed), avatar, passives, bonds, MaxTime)`.
 
 The result carries `Success`, `Errors` / `Error`, the `Battle` (`BattleResult`) and `Outcome`, the
 `Grid`, `Units` (enemies then the team, end-of-battle state; not the avatar), `Avatar`,
 `ActiveBonds`, `StartingStats` (every unit's assembled stats before the battle began, by unit id,
 avatar included), `TeamUnitIds` / `UnitIdFor(beastId)`, and the usage counts rewards are paid from:
-`SkillUsesByBeastId` (by `BeastId`), `AvatarActiveUses` and `PassiveTriggers`.
+`SkillUsesByBeastId` (by `BeastId`), `AvatarActiveUses` and `PassiveTriggers`; and `ConsumablesUsed`
+with `ConsumablesDeducted` (true once `Run` has spent them).
 
 **Determinism.** The only randomness is the one `Random(Seed)`: same setup, same seed, same battle
 (a test compares full turn-by-turn traces across runs).
 
 **Error handling.** `Run` never throws on bad input. A bad setup returns `Success = false` with
-every problem in `Errors` and no battle fought:
+every problem in `Errors`, no battle fought and the save untouched (no consumable spent):
 
 - no setup, save, content or encounter;
 - an empty team, more than 6 beasts, an empty or repeated beast id, a beast not in the save;
@@ -565,7 +569,10 @@ Pays a finished battle into the save:
   (`DeriveSeed(seed, 1)`), so the material rolls never move; with `RewardModifiers.Gear`, the table's
   gear drops (stream 3); with `RewardModifiers.Cosmetics`, its low-chance look drop (stream 4) and,
   after the XP, any milestone looks reached. The battle's consumables (`BattleSetup.Consumables`,
-  at most one, used as it began on stream 2) are spent whatever the outcome.
+  at most one, used as it began on stream 2) were already spent by `Run` as the battle began,
+  whatever the outcome (so they are spent even if rewards are never applied); `ApplyRewards` only
+  reports them in `ConsumablesSpent` and never spends them again. A result not marked
+  `ConsumablesDeducted` (none from the current `Run`) has them spent here instead, once.
 
 `rng` drives the drop rolls; null seeds one with `LootRoller.DeriveSeed(result.Seed, 0)`, so rewards
 are deterministic either way. The summary reports `Applied`, `Error`, `Outcome`,

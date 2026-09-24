@@ -10,7 +10,8 @@ namespace BeastCraft.Session
     /// <see cref="Save"/> (the chosen beasts, the avatar's level and skill books), the chosen team,
     /// the avatar's stat profile and gear, the <see cref="Content"/> to resolve ids with, the
     /// <see cref="Encounter"/>, and the <see cref="Seed"/>. Plain input; the session never changes it
-    /// (it reads the save, it does not write it — rewards are <see cref="BattleSession.ApplyRewards"/>).
+    /// (it reads the save and writes only one thing: the chosen <see cref="Consumables"/> are spent
+    /// from the pack as the battle begins — rewards are <see cref="BattleSession.ApplyRewards"/>).
     /// </summary>
     public class BattleSetup
     {
@@ -50,7 +51,9 @@ namespace BeastCraft.Session
         /// <summary>
         /// Consumable ids to use as the battle begins (<c>ConsumableLoadout</c>): at most
         /// <c>ConsumableLoadout.MaxPerBattle</c> (one), each held in the save and known to the
-        /// content. Spent by <see cref="BattleSession.ApplyRewards"/> whatever the outcome. Empty (the
+        /// content. Spent from the save's pack by <see cref="BattleSession.Run"/> as the battle begins
+        /// (after every check passes), whatever the outcome and whether or not rewards are ever
+        /// applied; a setup that fails validation spends nothing. Empty (the
         /// default) = none, exactly the consumable-free battle.
         /// </summary>
         public List<string> Consumables = new List<string>();
