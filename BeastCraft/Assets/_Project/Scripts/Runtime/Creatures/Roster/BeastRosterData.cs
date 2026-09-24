@@ -1,5 +1,4 @@
 using System;
-using UnityEngine;
 
 namespace BeastCraft.Creatures.Roster
 {
