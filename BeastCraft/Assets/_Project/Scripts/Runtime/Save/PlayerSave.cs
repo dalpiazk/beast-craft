@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using BeastCraft.Campaign;
 using BeastCraft.Progression;
 
 namespace BeastCraft.Save
@@ -7,8 +8,9 @@ namespace BeastCraft.Save
     /// <summary>
     /// Everything persisted about one player, as one versioned aggregate: the beast collection
     /// (each beast's species, level, XP and skill book), the avatar's level and skill books, and the
-    /// material inventory with its first-clear and pity state, and the gear inventory with what each
-    /// beast and the avatar wears (schema 2).
+    /// material inventory with its first-clear and pity state, the gear inventory with what each
+    /// beast and the avatar wears (schema 2), and the region campaign: seals, region progress and
+    /// the expedition in progress (schema 3).
     /// <para>
     /// <strong>JsonUtility-compatible by construction.</strong> Every type reachable from here is
     /// <c>[Serializable]</c> with public fields, and every map is a list (<c>JsonUtility</c> drops
@@ -28,7 +30,7 @@ namespace BeastCraft.Save
     public class PlayerSave
     {
         /// <summary>The schema this code writes, and the newest it reads.</summary>
-        public const int CurrentSchemaVersion = 2;
+        public const int CurrentSchemaVersion = 3;
 
         /// <summary>The schema the data is in. 0 (or missing) is never valid.</summary>
         public int SchemaVersion = CurrentSchemaVersion;
@@ -55,10 +57,22 @@ namespace BeastCraft.Save
         /// </summary>
         public string[] AvatarEquippedGear = new string[GearRules.AvatarSlotCount];
 
-        /// <summary>A brand-new player: no beasts, avatar level 1, nothing learned or held.</summary>
+        /// <summary>
+        /// The region campaign: owned seals, each unlocked region's progress and the expedition in
+        /// progress (<see cref="CampaignProgress.ActiveRun"/>, whose <c>RegionId</c> is "" when there
+        /// is none). Added in schema 3.
+        /// </summary>
+        public CampaignProgress Campaign = new CampaignProgress();
+
+        /// <summary>
+        /// A brand-new player: no beasts, avatar level 1, nothing learned or held, the starting
+        /// region (<see cref="CampaignProgress.StartingRegionId"/>) unlocked.
+        /// </summary>
         public static PlayerSave CreateNew()
         {
-            return new PlayerSave();
+            PlayerSave save = new PlayerSave();
+            save.Campaign.Unlock(CampaignProgress.StartingRegionId);
+            return save;
         }
 
         /// <summary>The beast with <paramref name="beastId"/>, or <c>null</c>.</summary>
@@ -203,6 +217,14 @@ namespace BeastCraft.Save
             repaired += Materials.Materials.RemoveAll(stack => stack == null);
             repaired += Materials.ClearedCells.RemoveAll(cell => cell == null);
             repaired += Materials.Pity.RemoveAll(counter => counter == null);
+
+            if (Campaign == null)
+            {
+                Campaign = new CampaignProgress();
+                repaired++;
+            }
+
+            repaired += Campaign.EnsureInitialized();
             return repaired;
         }
 

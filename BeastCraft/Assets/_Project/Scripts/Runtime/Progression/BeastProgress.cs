@@ -3,8 +3,8 @@ using System;
 namespace BeastCraft.Progression
 {
     /// <summary>
-    /// Where one owned beast's own level has got to: which species it is, its level, and the XP
-    /// banked toward the next. Its skills progress separately (<see cref="BeastSkillBook"/>).
+    /// Where one owned beast's own level has got to: which species it is, its level, the XP
+    /// toward the next, and any XP banked while at the level cap. Its skills progress separately (<see cref="BeastSkillBook"/>).
     /// <para>
     /// Plain serializable save data with public fields, like <see cref="AvatarProgress"/> and
     /// <see cref="SkillProgress"/>. The species is named by its stable
@@ -35,5 +35,12 @@ namespace BeastCraft.Progression
 
         /// <summary>XP banked toward the next level.</summary>
         public int Xp;
+
+        /// <summary>
+        /// XP earned while held at the beast level cap, beyond what <see cref="Xp"/> holds: spent as
+        /// levels when the cap rises (<see cref="LevelCap.Release"/>), and itself capped at the XP of
+        /// <see cref="LevelCap.BankLevelLimit"/> levels. 0 below the cap. Added in save schema 3.
+        /// </summary>
+        public int BankedXp;
     }
 }

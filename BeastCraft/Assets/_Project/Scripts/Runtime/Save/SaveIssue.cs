@@ -46,7 +46,19 @@ namespace BeastCraft.Save
         GearSlotMismatch,
 
         /// <summary>A beast wears gear whose minimum level is above its own (the gear has no effect).</summary>
-        GearLevelTooLow
+        GearLevelTooLow,
+
+        /// <summary>A campaign region id (progress, current region or expedition) is empty or not in the catalog.</summary>
+        UnknownRegion,
+
+        /// <summary>An owned seal id is empty or not in the catalog.</summary>
+        UnknownSeal,
+
+        /// <summary>A region or seal is listed more than once.</summary>
+        DuplicateCampaignEntry,
+
+        /// <summary>The expedition in progress is inconsistent (nodes, links, current or cleared node, region not unlocked).</summary>
+        InvalidMapRun
     }
 
     /// <summary>

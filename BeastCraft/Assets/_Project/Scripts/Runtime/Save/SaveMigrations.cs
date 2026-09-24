@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using BeastCraft.Campaign;
 
 namespace BeastCraft.Save
 {
@@ -10,6 +11,8 @@ namespace BeastCraft.Save
     /// <list type="bullet">
     /// <item>1 to 2: gear (<see cref="PlayerSave.Gear"/>, <see cref="PlayerSave.AvatarEquippedGear"/>,
     /// <see cref="OwnedBeast.EquippedGear"/>): <see cref="AddGear"/>.</item>
+    /// <item>2 to 3: the region campaign (<see cref="PlayerSave.Campaign"/>) and the level-cap bank
+    /// (<c>BeastProgress.BankedXp</c>): <see cref="AddCampaign"/>.</item>
     /// </list>
     /// </summary>
     public static class SaveMigrations
@@ -17,7 +20,7 @@ namespace BeastCraft.Save
         /// <summary>A fresh list of every step (callers may append to it).</summary>
         public static List<ISaveMigration> All()
         {
-            return new List<ISaveMigration> { new AddGear() };
+            return new List<ISaveMigration> { new AddGear(), new AddCampaign() };
         }
 
         /// <summary>
@@ -36,6 +39,29 @@ namespace BeastCraft.Save
                 PlayerSave save = serializer.FromJson<PlayerSave>(json);
                 save.EnsureInitialized();
                 save.SchemaVersion = 2;
+                return serializer.ToJson(save);
+            }
+        }
+
+        /// <summary>
+        /// Schema 2 to 3: a v2 save has no campaign and no level-cap bank. The upgrade reads it into
+        /// the current type (the campaign and every <c>BankedXp</c> take their empty defaults), fills
+        /// in anything missing, unlocks the starting region and writes it back. Beasts keep their
+        /// levels: one above the starting cap stays there and only banks XP until the cap passes it.
+        /// </summary>
+        public sealed class AddCampaign : ISaveMigration
+        {
+            public int FromVersion
+            {
+                get { return 2; }
+            }
+
+            public string Upgrade(string json, ISaveJsonSerializer serializer)
+            {
+                PlayerSave save = serializer.FromJson<PlayerSave>(json);
+                save.EnsureInitialized();
+                save.Campaign.Unlock(CampaignProgress.StartingRegionId);
+                save.SchemaVersion = 3;
                 return serializer.ToJson(save);
             }
         }

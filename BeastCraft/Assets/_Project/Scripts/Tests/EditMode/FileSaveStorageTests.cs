@@ -486,7 +486,7 @@ namespace BeastCraft.Tests.EditMode
         public void SaveStoreLoad_FailedMigration_RetriesTheBackup()
         {
             FileSaveStorage storage = new FileSaveStorage(_root);
-            SaveStore store = new SaveStore(storage, new SaveSerializer(new JsonUtilitySaveSerializer(), migrations: new[] { new FailOnMarkerMigration() }));
+            SaveStore store = new SaveStore(storage, new SaveSerializer(new JsonUtilitySaveSerializer(), migrations: new[] { new FailOnMarkerMigration() }, currentVersion: 2));
             storage.Write("main", "{\"SchemaVersion\":1,\"Avatar\":{\"Level\":3,\"Xp\":0}}");
             storage.Write("main", "{\"SchemaVersion\":1,\"Avatar\":{\"Level\":9,\"Xp\":0},\"Marker\":\"poison\"}");
 
