@@ -86,6 +86,9 @@ namespace BeastCraft.Session
         /// <summary>Whether <see cref="BattleSession.ApplyRewards"/> has already paid this battle out.</summary>
         public bool RewardsApplied { get; internal set; }
 
+        /// <summary>The consumables used as the battle began (<see cref="BattleSetup.Consumables"/>), spent by <see cref="BattleSession.ApplyRewards"/>.</summary>
+        public IReadOnlyList<string> ConsumablesUsed { get; internal set; } = new List<string>();
+
         /// <summary>The unit id <paramref name="beastId"/> fought as, or null.</summary>
         public string UnitIdFor(string beastId)
         {

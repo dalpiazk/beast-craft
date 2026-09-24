@@ -18,5 +18,11 @@ namespace BeastCraft.Save
 
         /// <summary>Whether <paramref name="materialId"/> is a known <c>SkillMaterialSO.MaterialId</c>.</summary>
         bool IsKnownMaterial(string materialId);
+
+        /// <summary>Whether <paramref name="regionId"/> is a known <c>regions.json</c> <c>RegionId</c> (added with save schema 3).</summary>
+        bool IsKnownRegion(string regionId);
+
+        /// <summary>Whether <paramref name="sealId"/> is a known <c>regions.json</c> <c>SealId</c> (added with save schema 3).</summary>
+        bool IsKnownSeal(string sealId);
     }
 }

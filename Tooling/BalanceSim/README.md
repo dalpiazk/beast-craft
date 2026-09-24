@@ -971,3 +971,20 @@ dotnet build  Tooling/BalanceSim/BalanceSim.csproj -c Release
 It targets `net10.0` (the installed LTS SDK) and, like `CiLint`, compiles with C# 9 and nullable
 disabled so the Unity scripts build unchanged. Only `Scripts/Runtime/**` is compiled: no Editor
 scripts and no tests.
+
+## Economy (`--gear`, `--economy-probe`, and `--mode campaign`'s economy)
+
+- `--gear none|common|rare|epic|typical` (default `none`): the PvE player team wears three pieces of
+  the encounter level's band from `gear-library.json` (`GearKits`: a fang or focus stone by the
+  beast's higher attack stat, barding or warding mantle by its higher defence, a keen collar for a
+  base crit of 8+ else a wind charm). `typical` is what a player normally wears at the level (the
+  shipping difficulty's assumption). The default run, its report and the balance guard stay gearless
+  (byte-identical); a gear run adds one header line.
+- `--economy-probe` (alias `--consumables`): appends "PvE economy probe": every cell replayed at its
+  calibrated multiplier by every team with each gear profile and each consumable of
+  `consumable-library.json`, as clear-rate points and levels-equivalent against the team one level
+  above the enemies. About 50-75 s on top of the default PvE run.
+- `--gear-library`, `--consumable-library`: the files (default: found by walking up).
+- `--mode campaign` includes the economy (`CampaignEconomyModel`: gold, drops, the Trader at trading
+  posts and camps, a greedy shopper) on its own random stream, with its gates in the report's
+  "Economy" section. See docs/design/economy-and-shop.md.

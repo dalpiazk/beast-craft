@@ -7,6 +7,7 @@ using BeastCraft.Battle.Grid;
 using BeastCraft.Battle.Placement;
 using BeastCraft.Bonds;
 using BeastCraft.Creatures;
+using BeastCraft.Economy;
 using BeastCraft.Encounters;
 
 namespace BeastCraft.Tooling.BalanceSim
@@ -333,6 +334,7 @@ namespace BeastCraft.Tooling.BalanceSim
         {
             _options = options;
             _species = species;
+            GearFor = options.GearKits == null || options.Gear == GearProfile.None ? null : (s, l) => options.GearKits.For(s, l, options.Gear);
             // Every species shares the medium curve; the avatar's fixture stats follow it too.
             Avatar = new AvatarPresets(options.AvatarPreset, options.Library, species.Count > 0 ? species[0].GrowthRate : null);
             _passiveEffects = new HashSet<SkillEffect>();
@@ -490,6 +492,15 @@ namespace BeastCraft.Tooling.BalanceSim
 
         /// <summary>Every combination of <c>TeamSize</c> distinct species, as ascending roster indices, in lexicographic order.</summary>
         public List<int[]> Teams { get; }
+
+        /// <summary>
+        /// The gear each player beast wears (<c>--gear</c>, the economy probe): species and level to
+        /// pieces; null (the default) = none, exactly the gearless battle.
+        /// </summary>
+        public Func<CreatureSpeciesSO, int, List<GearSO>> GearFor { get; set; }
+
+        /// <summary>The consumable every player team uses as each battle begins (the economy probe); null (the default) = none.</summary>
+        public ConsumableSO Consumable { get; set; }
 
         /// <summary>The avatar fielded beside every player team (<c>--avatar</c>); disabled by default.</summary>
         public AvatarPresets Avatar { get; }
@@ -1176,7 +1187,8 @@ namespace BeastCraft.Tooling.BalanceSim
                 int member = slots[s];
                 int speciesIndex = team[member];
                 string id = playerPrefix + "p" + (s + 1).ToString(System.Globalization.CultureInfo.InvariantCulture);
-                members[member] = BattleUnitFactory.CreateBeast(id, BattleTeam.Player, _species[speciesIndex], level, null, playerTiles[s],
+                members[member] = BattleUnitFactory.CreateBeast(id, BattleTeam.Player, _species[speciesIndex], level,
+                                                                GearFor == null ? null : GearFor(_species[speciesIndex], level), playerTiles[s],
                                                                 BeastLoadout(speciesIndex, mode));
                 requests.Add(new PlacementRequest(id, playerTiles[s]));
             }
@@ -1213,7 +1225,14 @@ namespace BeastCraft.Tooling.BalanceSim
                 battle.MemberEscortDamage = new int[team.Length];
             }
 
-            Random rng = new Random(DeriveSeed(_options.Seed, mode, level, encounter.Id, teamIndex, sample));
+            int battleSeed = DeriveSeed(_options.Seed, mode, level, encounter.Id, teamIndex, sample);
+            Random rng = new Random(battleSeed);
+            if (Consumable != null)
+            {
+                // As BattleSession.Run: before the bonds and passives, on the battle's consumable stream.
+                ConsumableLoadout.Apply(new[] { Consumable }, members, units.FindAll(u => u.Team == BattleTeam.Enemy), grid,
+                                        new Random(BeastCraft.Progression.LootRoller.DeriveSeed(battleSeed, BeastCraft.Progression.PostBattleAward.ConsumableStream)));
+            }
             PassiveLoadout passives = null;
             BattleUnit avatar = withAvatar ? Avatar.Build(_options.AvatarLevel > 0 ? _options.AvatarLevel : level, out passives) : null;
 

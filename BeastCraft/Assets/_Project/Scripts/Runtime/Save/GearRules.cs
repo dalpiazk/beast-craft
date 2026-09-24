@@ -36,7 +36,7 @@ namespace BeastCraft.Save
     /// <item>an instance is worn by at most one owner, in one slot (beast gear by beasts, avatar gear by the avatar);</item>
     /// <item>beast gear needs the beast at or above the gear's <c>MinimumLevel</c> when equipped
     /// (a beast is never de-levelled, so it stays valid; <c>StatCalculator</c> ignores under-level
-    /// gear anyway).</item>
+    /// gear anyway), and avatar gear the avatar at or above its <c>MinimumLevel</c>.</item>
     /// </list>
     /// Equipping into an occupied slot replaces what was there (which returns to the inventory
     /// unequipped). Gear definitions are looked up through an <see cref="ISaveGearCatalog"/>.
@@ -120,7 +120,7 @@ namespace BeastCraft.Save
                 return GearEquipResult.UnknownInstance;
             }
 
-            if (catalog == null || !catalog.TryGetAvatarGear(gear.GearId, out AvatarGearSlot gearSlot))
+            if (catalog == null || !catalog.TryGetAvatarGear(gear.GearId, out AvatarGearSlot gearSlot, out int minimumLevel))
             {
                 return GearEquipResult.UnknownGear;
             }
@@ -128,6 +128,11 @@ namespace BeastCraft.Save
             if (gearSlot != slot)
             {
                 return GearEquipResult.SlotMismatch;
+            }
+
+            if ((save.Avatar == null ? 1 : save.Avatar.Level) < minimumLevel)
+            {
+                return GearEquipResult.LevelTooLow;
             }
 
             save.AvatarEquippedGear = Resized(save.AvatarEquippedGear, AvatarSlotCount);

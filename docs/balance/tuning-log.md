@@ -3232,3 +3232,78 @@ pass rather than chased here.
 Reproduce: the guard, `dotnet run --project Tooling/BalanceSim -c Release -- --mode pve --seeds
 12345,777,4242,2024,99 --target-clear 50 --out out/guard.md` (its tables carry the gap-0 column);
 the shipping report and table, the unchanged command in the Tooling README.
+
+## Region campaign: XP falloff, bench, level cap (`--mode campaign`)
+
+The campaign-progression design (region node maps, level-gap falloff, bench XP, seals and the beast
+level cap) is paced by a new Monte Carlo model, `--mode campaign`
+([campaign-pacing-report.md](campaign-pacing-report.md)): the real save, `regions.json`, node maps,
+`CampaignRules`, cap and XP code, with a tiered clear-chance model (squad / horde 80%, elite and
+gates 60%, solo and bosses 50% at equal level). The design's numbers, applied literally, missed
+several of its own gates; what changed and why:
+
+| Knob | Design | Now | Why |
+| --- | --- | --- | --- |
+| Clear bonus, beast and avatar | `40 + 4 L` | `50 + 5 L` | The campaign clears ~70% of battles (harder elites, gates, bosses; losses retried), not the pacing model's 80%; at the old rate the team fell 1-2 levels behind each stage and into a loss spiral (1,074 battles with 11-row maps). |
+| Bench share | 50% + 7.5% per level below, max 100% | 10% + 9% per level below, max 100% | The design predicted "reserves ~6-7 behind" assuming fielded beasts earn their full XP; under the falloff (~14% lost) and knockouts they earn ~70%, and the literal rule kept the bench 1-2 behind. **Pending lead/user review.** |
+| Map rows | 14 (rest row 12, elites from 4) | 11 (rest row 9, elites from 3) | 14 rows gave 689 battles p50 (target 400-600) and the focus-skill gates missed (L20 at 376). |
+| Gate level | row + 1 | row + 0 | An elite-tier gate one level up clears ~36%: ~3 attempts per gate. |
+| r01 battle shapes | squad 60 / horde 40 | squad 45 / horde 40 / solo 15 | Solos drop the early shards the focus skill's L10 gate needs (86 battles, target 70-90). |
+
+Result, 1,000 campaigns: 541 battles p50 (517-569); fielded team within 0.3 levels of every gate and
+boss, avatar on it; bench 5.0-6.0 behind from region 3; recruit (level 1 at region 5) 7.7 behind at
+the end of region 6; cap never exceeded; nothing banked at a seal (the cap never binds on the
+content); grind probe 0.00 levels; focus skill 17 / 86 / 190 / 323 battles to L5 / 10 / 15 / 20.
+
+`--mode pacing` moves only through the falloff and the clear bonus: its avatar and beast now track
+one level above the encounter level (p10-p90 within one level), every other number unchanged.
+`tuned-report.md` is byte-identical (the PvE simulation does not use progression; the ten DRAFT boss
+templates are validated but not fought by the default run).
+
+The boss templates' `DifficultyOverride`s were calibrated with the fixed set (`--encounter-set fixed
+--kit elemental --calibrate-samples 64`, one boss at its level per run) to ~50% bond-aware scouted
+clear: x1.180, x1.156, x1.203, x1.043, x0.992, x0.938, x0.803, x0.844, x0.934, x0.805 (r01-r10; r04
+landed at 59% scouted, the bisection's closest step).
+
+Reproduce: `dotnet run --project Tooling/BalanceSim -c Release -- --mode campaign --self-check --out
+docs/balance/campaign-pacing-report.md` (about 2 s) and `-- --mode pacing --self-check --out
+docs/balance/pacing-report.md`.
+
+## Economy: gear budget, consumables, Trader prices (`--economy-probe`, `--mode campaign`)
+
+The economy (gold, the Trader, gear, consumables, cosmetics; docs/design/economy-and-shop.md) was
+tuned with two new tools: `--economy-probe` (every PvE cell replayed at its calibrated multiplier with
+each gear profile and each consumable, in levels-equivalent against the team one level above the
+enemies) and the economy model inside `--mode campaign`.
+
+| Knob | Design | Now | Why |
+| --- | --- | --- | --- |
+| Gear budget | common 5% / rare 8% / epic 12% of a stat at every band | the same in band 1, scaled per band by `(T(11) / T(min + 10))^0.65` | A level adds less of a stat the higher it is: flat-5% commons measured 0.69 / 1.30 / 1.64 LE at L1 / 50 / 100 (target ~0.7); scaled: 0.69 / 0.74 / 0.69. |
+| Epics | one per slot, mixed stats | one per piece (six per band from 41), focused | Mixed-stat epics measured below the rares (0.91 LE at L50); focused: 1.78. |
+| Consumables | +10% stats, +8 crit, shield 25%, -10% enemy Speed, 30% DoT | +4% stats, +12 crit, -5% enemy Attack / SpecialAttack, 50% DoT 8; no speed, no shield | At most one per battle, each at or under ~0.3 LE (measured 0.17-0.26 mean, 0.20-0.39 at L50). Speed buffs / debuffs measured negative (-0.4 to -0.7 LE); a consumable shield displaced bond shields (negative). |
+| Trader visits | every ~12 battles | a trading post (unchanged maps) plus a travelling trader at every camp: every ~9 battles | Trading posts alone were met every ~36 battles (1.5 per region); more trading posts in the maps pushed the recruit past its gate (fewer battles). |
+| Prices | design units | x0.7 | Visits every ~9 battles bring ~7 price units each, not ~11: affordability p50 45% at the design's prices, 69% now (target 55-80%). |
+
+Result, 1,000 campaigns: want-list affordability p50 69%; no visit without an affordable essential;
+gold held at every boss 1.0-1.9 visits' income; gold earned 977 / 4,559 / 9,026 in regions 1 / 5 / 10,
+49,953 over the campaign (+~15,000 from gear sales); focus skill 17 / 86 / 190 / 323; every earlier
+campaign gate unchanged (545 battles p50). The multi-seed balance guard holds under `--gear rare`.
+Typical gear raises the calibrated difficulty multipliers by 0.4-8.6% (not yet applied; see the
+economy doc).
+
+Reproduce: `dotnet run --project Tooling/BalanceSim -c Release -- --mode campaign --self-check --out
+docs/balance/campaign-pacing-report.md`; `-- --mode pve --economy-probe --out <scratch>`; `-- --mode
+pve --seeds 12345,777,4242 --gear rare --out <scratch>`.
+
+### Pass rewards and gear prices (user decisions)
+
+User decisions: the camp's travelling trader and prices x0.7 stay (approved); a stage pass's first
+clear now guarantees a **common** of its band (from the drop pool; commons are not boss-tagged), and
+only region lairs guarantee rare / epic gear. With passes granting rares, selling replaced gear was
+23% of all gold (15,122 of ~65,000); the user target is 10-15%. Commons at passes alone brought it to
+19% (11,647); gear prices then went from 4.2 / 10.5 units (common / rare; the design's x0.7) to
+3 / 8 (x0.5), and the never-sold epic's sellback valuation from 21 to 10.5 units: **8,340 gold from
+sales, 14% of all gold**. Every gate still met: affordability p50 63%, nothing-affordable visits 0%,
+gold held at every boss 1.0-1.6 visits' income, focus skill 17 / 86 / 190 / 323, 545 battles; gold
+earned unchanged (977 / 4,559 / 9,026 / 49,953). The report's "Per campaign" line now prints the
+sales share.

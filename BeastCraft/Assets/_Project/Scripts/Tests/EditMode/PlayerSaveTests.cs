@@ -185,7 +185,7 @@ namespace BeastCraft.Tests.EditMode
 
             Assert.IsFalse(typeof(IDictionary).IsAssignableFrom(type), type.Name + " must not be a dictionary (JsonUtility drops it)");
             Assert.IsTrue(type.IsDefined(typeof(SerializableAttribute), false), type.Name + " is [Serializable]");
-            Assert.IsNotNull(type.GetConstructor(Type.EmptyTypes), type.Name + " has a parameterless constructor");
+            Assert.IsTrue(type.IsValueType || type.GetConstructor(Type.EmptyTypes) != null, type.Name + " has a parameterless constructor");
 
             foreach (FieldInfo field in type.GetFields(BindingFlags.Public | BindingFlags.Instance))
             {

@@ -46,5 +46,13 @@ namespace BeastCraft.Session
 
         /// <summary>The battle's time cap (see <see cref="BattleTurnExecutor.DefaultMaxTime"/>).</summary>
         public int MaxTime = BattleTurnExecutor.DefaultMaxTime;
+
+        /// <summary>
+        /// Consumable ids to use as the battle begins (<c>ConsumableLoadout</c>): at most
+        /// <c>ConsumableLoadout.MaxPerBattle</c> (one), each held in the save and known to the
+        /// content. Spent by <see cref="BattleSession.ApplyRewards"/> whatever the outcome. Empty (the
+        /// default) = none, exactly the consumable-free battle.
+        /// </summary>
+        public List<string> Consumables = new List<string>();
     }
 }

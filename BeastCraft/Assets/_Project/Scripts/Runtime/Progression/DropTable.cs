@@ -16,11 +16,44 @@ namespace BeastCraft.Progression
         private readonly List<string> _shapes;
         private readonly Dictionary<int, int> _pity;
 
+        private readonly List<GearDropChance> _gearDrops;
+        private readonly Dictionary<string, int> _cosmeticDrops;
+
         internal DropTable(List<string> shapes, List<DropBand> bands, Dictionary<int, int> pity)
+            : this(shapes, bands, pity, null, null, null)
+        {
+        }
+
+        internal DropTable(List<string> shapes, List<DropBand> bands, Dictionary<int, int> pity, GoldTable gold, List<GearDropChance> gearDrops,
+                           Dictionary<string, int> cosmeticDrops)
         {
             _shapes = shapes;
             _bands = bands;
             _pity = pity;
+            Gold = gold ?? GoldTable.None;
+            _gearDrops = gearDrops ?? new List<GearDropChance>();
+            _cosmeticDrops = cosmeticDrops ?? new Dictionary<string, int>(StringComparer.Ordinal);
+        }
+
+        /// <summary>The gold a clear pays (schema 2); <see cref="GoldTable.None"/> for a table without gold. Never null.</summary>
+        public GoldTable Gold { get; }
+
+        /// <summary>Every gear drop roll (schema 2), in authored order.</summary>
+        public IReadOnlyList<GearDropChance> GearDrops
+        {
+            get { return _gearDrops; }
+        }
+
+        /// <summary>The gear drop rolls a clear of <paramref name="shape"/> makes, in authored order.</summary>
+        public List<GearDropChance> GearDropsFor(string shape)
+        {
+            return _gearDrops.FindAll(d => string.Equals(d.Shape, shape, StringComparison.Ordinal));
+        }
+
+        /// <summary>The per-mille chance a clear of <paramref name="shape"/> drops a cosmetic look (0 = never).</summary>
+        public int CosmeticDropPerMille(string shape)
+        {
+            return shape != null && _cosmeticDrops.TryGetValue(shape, out int chance) ? chance : 0;
         }
 
         /// <summary>Every shape id, in authored order.</summary>
@@ -78,6 +111,93 @@ namespace BeastCraft.Progression
         public int PityThreshold(int tier)
         {
             return _pity.TryGetValue(tier, out int threshold) ? threshold : 0;
+        }
+    }
+
+    /// <summary>One gear drop roll of a <see cref="DropTable"/>: <see cref="Shape"/> clears drop a piece of <see cref="Rarity"/> with <see cref="ChancePerMille"/>.</summary>
+    public sealed class GearDropChance
+    {
+        internal GearDropChance(string shape, int rarity, int chancePerMille)
+        {
+            Shape = shape;
+            Rarity = rarity;
+            ChancePerMille = chancePerMille < 0 ? 0 : chancePerMille > 1000 ? 1000 : chancePerMille;
+        }
+
+        public string Shape { get; }
+
+        public int Rarity { get; }
+
+        public int ChancePerMille { get; }
+    }
+
+    /// <summary>
+    /// The gold a clear pays, built from <see cref="GoldData"/>: <c>round((Base + PerLevel x level)
+    /// x shape multiplier x (1 + v / 100))</c> with <c>v</c> uniform in <c>[-VariancePct, VariancePct]</c>
+    /// (one <c>rng.Next</c> draw, always taken), plus <see cref="FirstClearBonus"/> on a first clear,
+    /// then the caller's multiplier (rounded) and flat bonus; never below 0. See the economy design
+    /// doc, "Gold".
+    /// </summary>
+    public sealed class GoldTable
+    {
+        /// <summary>The table that pays nothing (a version-1 drop-table file).</summary>
+        public static readonly GoldTable None = new GoldTable(0, 0, 0, 0, null);
+
+        private readonly Dictionary<string, double> _multipliers;
+
+        internal GoldTable(int baseGold, int perLevel, int variancePct, int firstClearBonus, Dictionary<string, double> multipliers)
+        {
+            Base = Math.Max(0, baseGold);
+            PerLevel = Math.Max(0, perLevel);
+            VariancePct = Math.Max(0, Math.Min(100, variancePct));
+            FirstClearBonus = Math.Max(0, firstClearBonus);
+            _multipliers = multipliers ?? new Dictionary<string, double>(StringComparer.Ordinal);
+        }
+
+        public int Base { get; }
+
+        public int PerLevel { get; }
+
+        public int VariancePct { get; }
+
+        public int FirstClearBonus { get; }
+
+        /// <summary>Whether this table pays any gold at all.</summary>
+        public bool PaysGold
+        {
+            get { return Base > 0 || PerLevel > 0 || FirstClearBonus > 0; }
+        }
+
+        /// <summary><paramref name="shape"/>'s multiplier (1 when not listed).</summary>
+        public double Multiplier(string shape)
+        {
+            return shape != null && _multipliers.TryGetValue(shape, out double m) ? m : 1.0;
+        }
+
+        /// <summary>The gold before variance, first-clear bonus and modifiers: <c>(Base + PerLevel x level) x multiplier</c>.</summary>
+        public double BaseGold(string shape, int level)
+        {
+            return (Base + ((double)PerLevel * Math.Max(1, level))) * Multiplier(shape);
+        }
+
+        /// <summary>
+        /// Rolls one clear's gold (see the class remarks) with <paramref name="multiplier"/> and
+        /// <paramref name="bonus"/> from the caller's reward modifiers. Draws exactly once from
+        /// <paramref name="rng"/> (a null rng rolls no variance).
+        /// </summary>
+        public int Roll(string shape, int level, bool firstClear, double multiplier, int bonus, Random rng)
+        {
+            int roll = rng == null ? VariancePct : rng.Next((2 * VariancePct) + 1);
+            double gold = Math.Round(BaseGold(shape, level) * (1.0 + ((roll - VariancePct) / 100.0)), MidpointRounding.AwayFromZero);
+            gold += firstClear ? FirstClearBonus : 0;
+            gold = Math.Round(gold * (multiplier > 0.0 ? multiplier : 0.0), MidpointRounding.AwayFromZero) + bonus;
+            return gold < 0.0 ? 0 : gold > int.MaxValue ? int.MaxValue : (int)gold;
+        }
+
+        /// <summary>The mean of <see cref="Roll"/> (the variance is symmetric; rounding ignored), for the pacing model.</summary>
+        public double Expected(string shape, int level, bool firstClear, double multiplier, int bonus)
+        {
+            return Math.Max(0.0, ((BaseGold(shape, level) + (firstClear ? FirstClearBonus : 0)) * multiplier) + bonus);
         }
     }
 
@@ -258,7 +378,40 @@ namespace BeastCraft.Progression
                 }
             }
 
-            return new DropTable(shapes, bands, pity);
+            Dictionary<string, double> multipliers = new Dictionary<string, double>(StringComparer.Ordinal);
+            GoldTable gold = GoldTable.None;
+            if (data.Gold != null)
+            {
+                foreach (ShapeMultiplierData m in data.Gold.ShapeMultipliers ?? new ShapeMultiplierData[0])
+                {
+                    if (m != null && !string.IsNullOrEmpty(m.Shape) && m.Multiplier > 0f && !multipliers.ContainsKey(m.Shape))
+                    {
+                        multipliers.Add(m.Shape, m.Multiplier);
+                    }
+                }
+
+                gold = new GoldTable(data.Gold.Base, data.Gold.PerLevel, data.Gold.VariancePct, data.Gold.FirstClearBonus, multipliers);
+            }
+
+            List<GearDropChance> gearDrops = new List<GearDropChance>();
+            foreach (GearDropData d in data.GearDrops ?? new GearDropData[0])
+            {
+                if (d != null && !string.IsNullOrEmpty(d.Shape) && d.ChancePerMille > 0)
+                {
+                    gearDrops.Add(new GearDropChance(d.Shape, d.Rarity, d.ChancePerMille));
+                }
+            }
+
+            Dictionary<string, int> cosmeticDrops = new Dictionary<string, int>(StringComparer.Ordinal);
+            foreach (CosmeticDropData d in data.CosmeticDrops ?? new CosmeticDropData[0])
+            {
+                if (d != null && !string.IsNullOrEmpty(d.Shape) && d.ChancePerMille > 0 && !cosmeticDrops.ContainsKey(d.Shape))
+                {
+                    cosmeticDrops.Add(d.Shape, Math.Min(1000, d.ChancePerMille));
+                }
+            }
+
+            return new DropTable(shapes, bands, pity, gold, gearDrops, cosmeticDrops);
         }
 
         /// <summary>

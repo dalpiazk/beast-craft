@@ -157,7 +157,7 @@ namespace BeastCraft.Tests.EditMode
             Assert.IsTrue(migrated.Success, migrated.Error);
             Assert.IsTrue(migrated.Migrated);
             Assert.AreEqual(1, migrated.SourceVersion);
-            Assert.AreEqual(2, migrated.Save.SchemaVersion);
+            Assert.AreEqual(PlayerSave.CurrentSchemaVersion, migrated.Save.SchemaVersion);
             Assert.IsEmpty(migrated.Issues, string.Join("\n", migrated.Issues));
             Assert.IsEmpty(migrated.Save.Gear.BeastGear);
             Assert.IsEmpty(migrated.Save.Gear.AvatarGear);
@@ -171,7 +171,7 @@ namespace BeastCraft.Tests.EditMode
             Assert.AreEqual(2, migrated.Save.Materials.GetCount("essence_shard"));
 
             string v2 = serializer.Serialize(migrated.Save);
-            StringAssert.Contains("\"SchemaVersion\":2", v2);
+            StringAssert.Contains("\"SchemaVersion\":" + PlayerSave.CurrentSchemaVersion, v2);
             SaveLoadResult reloaded = serializer.Deserialize(v2);
             Assert.IsTrue(reloaded.Success, reloaded.Error);
             Assert.IsFalse(reloaded.Migrated);

@@ -9,12 +9,15 @@ namespace BeastCraft.Progression
     /// <para>
     /// <strong>Tuned so the avatar levels alongside the encounters.</strong> A battle pays
     /// <see cref="ParticipationXp"/> win or lose, plus <c>ClearBaseXp + ClearXpPerEnemyLevel ×
-    /// enemyLevel</c> on a clear. At an encounter level <c>L</c> and an 80% clear rate that is about
-    /// <c>40 + 3.2 L</c> a battle; a level costs <c>XpCurveBase + XpCurvePerLevel × level</c>
-    /// (<c>200 + 16 L</c>), so a player who wins four fights in five gains about one level per five
-    /// battles — the pacing model's campaign, which raises the encounter level every five battles
-    /// (balance simulator <c>--mode pacing</c>, "Avatar level"). Fighting below one's level pays less,
-    /// so grinding easy content is slow. Tunable starting defaults, not confirmed balance.
+    /// enemyLevel</c> on a clear (raised from <c>40 + 4 L</c> to <c>50 + 5 L</c> with the beasts' for
+    /// the region campaign). At an encounter level <c>L</c> and the campaign's ~70% clear rate that
+    /// is about <c>43 + 3.5 L</c> a battle; a level costs <c>XpCurveBase + XpCurvePerLevel × level</c>
+    /// (<c>200 + 16 L</c>), so the avatar gains a level about every 4.6 battles and arrives at each
+    /// gate and boss on its level (balance simulator <c>--mode campaign</c>; <c>--mode pacing</c>,
+    /// "Avatar level", tracks one level above its encounters). Fighting below one's level pays less
+    /// (the level-gap falloff, <see cref="LevelGapXp"/>: nothing from five levels down), so grinding
+    /// easy content is slow. There is no avatar level cap. Tunable starting defaults, not confirmed
+    /// balance.
     /// </para>
     /// <para>
     /// Non-throwing: a null progress is a no-op; level and XP are normalized on every write.
@@ -35,10 +38,10 @@ namespace BeastCraft.Progression
         public const int ParticipationXp = 8;
 
         /// <summary>The flat part of the clear bonus (paid only on <see cref="BattleOutcome.PlayerVictory"/>).</summary>
-        public const int ClearBaseXp = 40;
+        public const int ClearBaseXp = 50;
 
         /// <summary>The clear bonus per enemy level.</summary>
-        public const int ClearXpPerEnemyLevel = 4;
+        public const int ClearXpPerEnemyLevel = 5;
 
         /// <summary>
         /// XP from <paramref name="level"/> to the next: <c>XpCurveBase + XpCurvePerLevel × level</c>,
@@ -79,10 +82,28 @@ namespace BeastCraft.Progression
             return ParticipationXp + ClearBaseXp + (ClearXpPerEnemyLevel * level);
         }
 
-        /// <summary>Credits one finished battle (<see cref="BattleXp"/>). Returns the levels gained.</summary>
+        /// <summary>
+        /// What one battle pays an avatar of <paramref name="avatarLevel"/>:
+        /// <see cref="BattleXp(BattleOutcome, int)"/> after the level-gap falloff
+        /// (<see cref="LevelGapXp"/>, on <paramref name="avatarLevel"/> − <paramref name="enemyLevel"/>).
+        /// </summary>
+        public static int BattleXp(BattleOutcome outcome, int enemyLevel, int avatarLevel)
+        {
+            return LevelGapXp.Apply(BattleXp(outcome, enemyLevel), LevelGapXp.Gap(avatarLevel, enemyLevel));
+        }
+
+        /// <summary>
+        /// Credits one finished battle: <see cref="BattleXp(BattleOutcome, int, int)"/> at the
+        /// avatar's level before the award (the avatar has no level cap). Returns the levels gained.
+        /// </summary>
         public static int AwardBattle(AvatarProgress progress, BattleOutcome outcome, int enemyLevel)
         {
-            return AddXp(progress, BattleXp(outcome, enemyLevel));
+            if (progress == null)
+            {
+                return 0;
+            }
+
+            return AddXp(progress, BattleXp(outcome, enemyLevel, progress.Level));
         }
 
         /// <summary>

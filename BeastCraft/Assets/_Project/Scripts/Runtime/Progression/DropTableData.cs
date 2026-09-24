@@ -25,8 +25,15 @@ namespace BeastCraft.Progression
         /// <summary>Path of the drop-table file relative to the Unity project folder (<c>BeastCraft/</c>).</summary>
         public const string ProjectRelativePath = "Assets/_Project/Data/Skills/drop-tables.json";
 
-        /// <summary>The only <see cref="SchemaVersion"/> this code reads.</summary>
-        public const int CurrentSchemaVersion = 1;
+        /// <summary>
+        /// The newest <see cref="SchemaVersion"/> this code reads: 2 adds the economy sections
+        /// (<see cref="Gold"/>, <see cref="GearDrops"/>, <see cref="CosmeticDrops"/>). A version-1 file
+        /// (no economy) still reads; see <see cref="MinSchemaVersion"/>.
+        /// </summary>
+        public const int CurrentSchemaVersion = 2;
+
+        /// <summary>The oldest <see cref="SchemaVersion"/> this code reads (version 1: materials only).</summary>
+        public const int MinSchemaVersion = 1;
 
         /// <summary>Bumped when the file's shape changes incompatibly.</summary>
         public int SchemaVersion;
@@ -45,6 +52,85 @@ namespace BeastCraft.Progression
         /// <see cref="DropTableValidator.MaxEncounterLevel"/>.
         /// </summary>
         public LevelBandData[] Bands = new LevelBandData[0];
+
+        /// <summary>
+        /// Schema 2: the gold a clear pays (<see cref="GoldData"/>). All zero (the default, and every
+        /// version-1 file) pays no gold. See the economy design doc, <c>docs/design/economy-and-shop.md</c>.
+        /// </summary>
+        public GoldData Gold = new GoldData();
+
+        /// <summary>
+        /// Schema 2: gear drop chances by shape and rarity. Each entry rolls on its own; a hit grants
+        /// one gear piece of that rarity from the encounter level's gear band (the gear library's
+        /// drop pool), on its own seed stream. Empty = no gear drops.
+        /// </summary>
+        public GearDropData[] GearDrops = new GearDropData[0];
+
+        /// <summary>
+        /// Schema 2: the low chance per clear, by shape, of a random cosmetic look (the cosmetic
+        /// library's drop pool, one not yet unlocked), on its own seed stream. Empty = none.
+        /// </summary>
+        public CosmeticDropData[] CosmeticDrops = new CosmeticDropData[0];
+    }
+
+    /// <summary>
+    /// The gold a clear pays: <c>round((Base + PerLevel x level) x shape multiplier x
+    /// U[1 - VariancePct%, 1 + VariancePct%])</c>, plus <see cref="FirstClearBonus"/> on the cell's
+    /// first clear, then the caller's reward modifiers (campaign elites, gates and bosses).
+    /// </summary>
+    [Serializable]
+    public class GoldData
+    {
+        /// <summary>Gold at level 0 (the curve's intercept). 0 with <see cref="PerLevel"/> 0 = no gold.</summary>
+        public int Base;
+
+        /// <summary>Gold added per encounter level.</summary>
+        public int PerLevel;
+
+        /// <summary>Uniform variance, percent either side (0-50).</summary>
+        public int VariancePct;
+
+        /// <summary>Per-shape multipliers; a shape not listed pays x1.</summary>
+        public ShapeMultiplierData[] ShapeMultipliers = new ShapeMultiplierData[0];
+
+        /// <summary>Gold added on the first clear of a (shape, band) cell (the material first-clear bonus's gold twin).</summary>
+        public int FirstClearBonus;
+    }
+
+    /// <summary>A shape's gold multiplier.</summary>
+    [Serializable]
+    public class ShapeMultiplierData
+    {
+        /// <summary>A <see cref="DropTableData.Shapes"/> id.</summary>
+        public string Shape;
+
+        /// <summary>The multiplier, above 0 and at most 10.</summary>
+        public float Multiplier = 1f;
+    }
+
+    /// <summary>One gear drop roll: a <see cref="Shape"/> clear drops a piece of <see cref="Rarity"/> with <see cref="ChancePerMille"/>.</summary>
+    [Serializable]
+    public class GearDropData
+    {
+        /// <summary>A <see cref="DropTableData.Shapes"/> id.</summary>
+        public string Shape;
+
+        /// <summary>Gear rarity, 0 (common) to 2 (epic).</summary>
+        public int Rarity;
+
+        /// <summary>Chance per clear in thousandths, 1 to 1000.</summary>
+        public int ChancePerMille;
+    }
+
+    /// <summary>The chance per clear of a <see cref="Shape"/> of a random cosmetic look.</summary>
+    [Serializable]
+    public class CosmeticDropData
+    {
+        /// <summary>A <see cref="DropTableData.Shapes"/> id.</summary>
+        public string Shape;
+
+        /// <summary>Chance per clear in thousandths, 1 to 1000.</summary>
+        public int ChancePerMille;
     }
 
     /// <summary>

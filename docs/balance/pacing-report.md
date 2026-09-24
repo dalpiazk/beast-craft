@@ -42,37 +42,37 @@ Practice only ignores the gates (a skill cannot pass one without a material). Ne
 
 ## Avatar level
 
-`AvatarProgression.AwardBattle` after every battle (8 XP win or lose, + 40 + 4 x encounter level on a clear; a level costs 200 + 16 x level). Target: median within 3 levels of the encounter level at every checkpoint.
+`AvatarProgression.AwardBattle` after every battle (8 XP win or lose, + 50 + 5 x encounter level on a clear, after the level-gap falloff; a level costs 200 + 16 x level). Target: median within 3 levels of the encounter level at every checkpoint.
+
+| Battle | Encounter level | p10 | p50 | p90 | Verdict |
+| ---: | ---: | ---: | ---: | ---: | --- |
+| 50 | 10 | 11 | 11 | 11 | ok |
+| 100 | 20 | 21 | 21 | 21 | ok |
+| 150 | 30 | 31 | 31 | 31 | ok |
+| 200 | 40 | 41 | 41 | 41 | ok |
+| 250 | 50 | 51 | 51 | 51 | ok |
+| 300 | 60 | 61 | 61 | 61 | ok |
+| 350 | 70 | 71 | 71 | 71 | ok |
+| 400 | 80 | 81 | 81 | 81 | ok |
+| 450 | 90 | 91 | 91 | 91 | ok |
+| 500 | 100 | 100 | 100 | 100 | ok |
+
+## Beast level
+
+`BeastProgression.AwardBattle` after every battle for a beast fielded in all of them (6 XP win or lose, knocked out or not, + 50 + 5 x encounter level on a clear it is still standing for; knocked out in 20.0% of battles; a level costs 160 + 13 x level), after the level-gap falloff. Benched beasts: see `--mode campaign`. Target: median within 3 levels of the encounter level at every checkpoint.
 
 | Battle | Encounter level | p10 | p50 | p90 | Verdict |
 | ---: | ---: | ---: | ---: | ---: | --- |
 | 50 | 10 | 10 | 11 | 11 | ok |
 | 100 | 20 | 20 | 21 | 21 | ok |
 | 150 | 30 | 30 | 31 | 31 | ok |
-| 200 | 40 | 39 | 40 | 42 | ok |
-| 250 | 50 | 49 | 50 | 52 | ok |
-| 300 | 60 | 59 | 60 | 62 | ok |
-| 350 | 70 | 69 | 70 | 72 | ok |
-| 400 | 80 | 79 | 81 | 82 | ok |
-| 450 | 90 | 89 | 91 | 92 | ok |
-| 500 | 100 | 99 | 100 | 100 | ok |
-
-## Beast level
-
-`BeastProgression.AwardBattle` after every battle for a beast fielded in all of them (6 XP win or lose, knocked out or not, + 40 + 4 x encounter level on a clear it is still standing for; knocked out in 20.0% of battles; a level costs 160 + 13 x level). Benched beasts earn nothing. Target: median within 3 levels of the encounter level at every checkpoint.
-
-| Battle | Encounter level | p10 | p50 | p90 | Verdict |
-| ---: | ---: | ---: | ---: | ---: | --- |
-| 50 | 10 | 9 | 10 | 11 | ok |
-| 100 | 20 | 19 | 20 | 22 | ok |
-| 150 | 30 | 29 | 30 | 32 | ok |
-| 200 | 40 | 39 | 40 | 42 | ok |
-| 250 | 50 | 48 | 50 | 52 | ok |
-| 300 | 60 | 58 | 60 | 62 | ok |
-| 350 | 70 | 68 | 70 | 72 | ok |
-| 400 | 80 | 78 | 80 | 82 | ok |
-| 450 | 90 | 87 | 90 | 92 | ok |
-| 500 | 100 | 97 | 100 | 100 | ok |
+| 200 | 40 | 40 | 41 | 41 | ok |
+| 250 | 50 | 50 | 51 | 51 | ok |
+| 300 | 60 | 60 | 61 | 61 | ok |
+| 350 | 70 | 70 | 71 | 71 | ok |
+| 400 | 80 | 80 | 81 | 81 | ok |
+| 450 | 90 | 90 | 91 | 91 | ok |
+| 500 | 100 | 100 | 100 | 100 | ok |
 
 ## Materials
 

@@ -72,5 +72,37 @@ namespace BeastCraft.Progression
 
             return LootRoller.RollClear(table, shape, level, inventory, rng);
         }
+
+        /// <summary>The <see cref="LootRoller.DeriveSeed"/> stream a battle's gold is rolled on (materials are stream 0).</summary>
+        public const int GoldStream = 1;
+
+        /// <summary>The stream a battle's consumable effects draw from.</summary>
+        public const int ConsumableStream = 2;
+
+        /// <summary>The stream a battle's gear drops are rolled on.</summary>
+        public const int GearStream = 3;
+
+        /// <summary>The stream a battle's cosmetic drop is rolled on.</summary>
+        public const int CosmeticStream = 4;
+
+        /// <summary>
+        /// The gold a clear of (<paramref name="shape"/>, <paramref name="level"/>) pays from
+        /// <paramref name="table"/>'s <see cref="DropTable.Gold"/> (<see cref="GoldTable.Roll"/>, with
+        /// <paramref name="firstClear"/>'s bonus and the <paramref name="goldMultiplier"/> /
+        /// <paramref name="bonusGold"/> reward modifiers) — only on a
+        /// <see cref="BattleOutcome.PlayerVictory"/>; 0 otherwise, or with no table or no gold. The
+        /// caller adds it to the wallet. Seed <paramref name="rng"/> with
+        /// <c>LootRoller.DeriveSeed(battleSeed, </c><see cref="GoldStream"/><c>)</c> so gold never
+        /// shifts the material rolls.
+        /// </summary>
+        public static int AwardGold(BattleResult result, DropTable table, string shape, int level, bool firstClear, double goldMultiplier, int bonusGold, Random rng)
+        {
+            if (result == null || result.Outcome != BattleOutcome.PlayerVictory || table == null || !table.Gold.PaysGold)
+            {
+                return 0;
+            }
+
+            return table.Gold.Roll(shape, level, firstClear, goldMultiplier, bonusGold, rng);
+        }
     }
 }

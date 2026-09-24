@@ -383,6 +383,28 @@ namespace BeastCraft.Tooling.BalanceSim
         public bool Timings;
 
         /// <summary>
+        /// <c>--gear none|common|rare|epic|typical</c>: the gear the PvE player team wears
+        /// (<see cref="GearKits"/>). None by default: the committed report and the balance guard are
+        /// gearless; <c>typical</c> is the shipping difficulty's assumption (the lead's decision).
+        /// </summary>
+        public GearProfile Gear = GearProfile.None;
+
+        /// <summary><c>--gear-library</c>: gear-library.json, or null to find it by walking up.</summary>
+        public string GearLibraryPath;
+
+        /// <summary><c>--economy-probe</c>: append "PvE economy probe" (gear profiles and consumables in levels-equivalent). Off by default.</summary>
+        public bool EconomyProbe;
+
+        /// <summary>The loaded gear kits when <see cref="Gear"/> or <see cref="EconomyProbe"/> needs them; set by <see cref="Program"/>, not a CLI option.</summary>
+        public GearKits GearKits;
+
+        /// <summary><c>--consumable-library</c>: consumable-library.json, or null to find it by walking up.</summary>
+        public string ConsumableLibraryPath;
+
+        /// <summary>The loaded consumables when <see cref="EconomyProbe"/> needs them; set by <see cref="Program"/>, not a CLI option.</summary>
+        public BeastCraft.Economy.ConsumableLibrary Consumables;
+
+        /// <summary>
         /// <c>--calibrate-sample n</c>: the difficulty search evaluates only a seeded subset of n
         /// teams, then the chosen multiplier runs once with every team. 0 (the default) = every
         /// team at every step. Opt-in because it changes the calibrated multipliers, so the report.
@@ -495,6 +517,12 @@ namespace BeastCraft.Tooling.BalanceSim
 
         /// <summary><c>--runs</c>: pacing campaigns per base seed.</summary>
         public int PacingRuns = PacingSimulator.DefaultRuns;
+
+        /// <summary><c>--mode campaign</c>: run the region-campaign pacing model (<see cref="CampaignPacingSimulator"/>) instead of PvE / PvP.</summary>
+        public bool RunCampaign;
+
+        /// <summary><c>--regions</c>: the campaign's regions.json, or null to find it by walking up.</summary>
+        public string RegionsPath;
 
         /// <summary><c>--drop-tables</c>: the drop-table file, or null to find it by walking up.</summary>
         public string DropTablesPath;
@@ -612,11 +640,13 @@ namespace BeastCraft.Tooling.BalanceSim
             "\n" +
             "Usage: dotnet run --project Tooling/BalanceSim -c Release -- [options]\n" +
             "\n" +
-            "  --mode <m>                 pve | pvp | both | pacing (default both). pve = team vs encounter (primary);\n" +
+            "  --mode <m>                 pve | pvp | both | pacing | campaign (default both). pve = team vs encounter (primary);\n" +
             "                             pvp = the 1v1 round-robin (secondary); pacing = the skill-progression / material\n" +
-            "                             economy model (Monte Carlo campaigns; see README.md, \"Pacing\").\n" +
+            "                             economy model (Monte Carlo campaigns; see README.md, \"Pacing\"); campaign = the region\n" +
+            "                             campaign model (node maps, level cap, bench; docs/design/progression-and-saves.md).\n" +
             "  --battles <n>              pacing: battles per campaign (default 500).\n" +
-            "  --runs <n>                 pacing: campaigns per base seed (default 1000; --seeds pools every seed's).\n" +
+            "  --runs <n>                 pacing / campaign: campaigns per base seed (default 1000; --seeds pools every seed's).\n" +
+            "  --regions <path>           campaign: regions.json (default: found by walking up from the working directory).\n" +
             "  --drop-tables <path>       drop-tables.json (default: found by walking up from the working directory). Pacing\n" +
             "                             rolls it; PvE checks the encounter library's shape ids against it.\n" +
             "  --kit <k>                  elemental | neutral | both (default both): the element axis. neutral forces every\n" +
@@ -670,6 +700,16 @@ namespace BeastCraft.Tooling.BalanceSim
             "  --avatar-level <n>         The avatar's level, 1-100 (default: each battle's encounter level). Scales its\n" +
             "                             stats on the medium curve (Speed included: 100 at level 100, so its ATB gauge\n" +
             "                             keeps pace with the beasts') and is its damage-formula level.\n" +
+            "  --gear <g>                 none | common | rare | epic | typical (default none): the gear the PvE player team\n" +
+            "                             wears, three pieces of the encounter level's band from gear-library.json matched to\n" +
+            "                             each beast (GearKits). typical = what a player normally wears at the level, the\n" +
+            "                             shipping difficulty's assumption. The default report and the balance guard are gearless.\n" +
+            "  --gear-library <path>      gear-library.json (default: found by walking up from the working directory).\n" +
+            "  --consumable-library <path> consumable-library.json (default: found by walking up from the working directory).\n" +
+            "  --consumables              The same as --economy-probe (the consumable probe).\n" +
+            "  --economy-probe            PvE: append \"PvE economy probe\": every cell replayed at its calibrated multiplier with\n" +
+            "                             each gear profile and each consumable, as clear-rate points and levels-equivalent\n" +
+            "                             (against the team one level up). Default: off.\n" +
             "  --out <path>               Also write the Markdown report to this file.\n" +
             "  --write-difficulty <path>  PvE, generated set, one seed: also write the calibrated multipliers as the game's\n" +
             "                             encounter-difficulty.json (BeastCraft/Assets/_Project/Data/Encounters/). Report unchanged.\n" +
@@ -893,6 +933,13 @@ namespace BeastCraft.Tooling.BalanceSim
                         break;
                     case "--drop-tables":
                         if (!TryNext(args, ref i, arg, out options.DropTablesPath, out error))
+                        {
+                            return null;
+                        }
+
+                        break;
+                    case "--regions":
+                        if (!TryNext(args, ref i, arg, out options.RegionsPath, out error))
                         {
                             return null;
                         }
@@ -1144,6 +1191,37 @@ namespace BeastCraft.Tooling.BalanceSim
                         }
 
                         options.AvatarPreset = text;
+                        break;
+                    case "--gear":
+                        if (!TryNext(args, ref i, arg, out text, out error))
+                        {
+                            return null;
+                        }
+
+                        if (!Enum.TryParse(text, true, out options.Gear) || !Enum.IsDefined(typeof(GearProfile), options.Gear) || int.TryParse(text, out int _))
+                        {
+                            error = "--gear expects none, common, rare, epic or typical, got '" + text + "'.";
+                            return null;
+                        }
+
+                        break;
+                    case "--gear-library":
+                        if (!TryNext(args, ref i, arg, out options.GearLibraryPath, out error))
+                        {
+                            return null;
+                        }
+
+                        break;
+                    case "--economy-probe":
+                    case "--consumables":
+                        options.EconomyProbe = true;
+                        break;
+                    case "--consumable-library":
+                        if (!TryNext(args, ref i, arg, out options.ConsumableLibraryPath, out error))
+                        {
+                            return null;
+                        }
+
                         break;
                     case "--avatar-level":
                         if (!TryNextInt(args, ref i, arg, 1, out options.AvatarLevel, out error))
@@ -1478,8 +1556,13 @@ namespace BeastCraft.Tooling.BalanceSim
                     options.RunPvp = false;
                     options.RunPacing = true;
                     return true;
+                case "campaign":
+                    options.RunPve = false;
+                    options.RunPvp = false;
+                    options.RunCampaign = true;
+                    return true;
                 default:
-                    error = "--mode expects pve, pvp, both or pacing, got '" + text + "'.";
+                    error = "--mode expects pve, pvp, both, pacing or campaign, got '" + text + "'.";
                     return false;
             }
         }

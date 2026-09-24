@@ -6,6 +6,7 @@ using BeastCraft.Battle.Grid;
 using BeastCraft.Battle.Placement;
 using BeastCraft.Bonds;
 using BeastCraft.Creatures;
+using BeastCraft.Economy;
 using BeastCraft.Encounters;
 using BeastCraft.Progression;
 using BeastCraft.Save;
@@ -32,9 +33,11 @@ namespace BeastCraft.Session
     /// <strong><see cref="ApplyRewards"/></strong> pays a finished battle into the save: practice XP
     /// (<see cref="PostBattleAward.AwardPractice"/>), drops on a clear
     /// (<see cref="PostBattleAward.AwardDrops"/>, first-clear and pity included) and avatar XP
-    /// (<see cref="AvatarProgression.AwardBattle"/>) and each team beast's own XP
+    /// (<see cref="AvatarProgression.AwardBattle"/>) and every owned beast's own XP
     /// (<see cref="BeastProgression.AwardBattle"/>: participation for every fielded beast, the
-    /// clear bonus for those still standing on a win; benched beasts earn nothing).
+    /// clear bonus for those still standing on a win; <see cref="BeastProgression.AwardBench"/> for
+    /// the beasts left on the bench), all after the level-gap falloff (<see cref="LevelGapXp"/>) and,
+    /// through the overloads that take one, under a beast level cap (<see cref="LevelCap"/>).
     /// </para>
     /// <para>
     /// Neither method throws on bad input: a bad setup is a failed <see cref="BattleSessionResult"/>
@@ -96,6 +99,7 @@ namespace BeastCraft.Session
             }
 
             List<AvatarGearSO> avatarGear = setup.IncludeAvatar ? setup.AvatarGear ?? ResolveAvatarGear(save, content, errors) : null;
+            ConsumableLoadout.Check(save, setup.Consumables, content.GetConsumable, errors);
 
             CheckUnitIds(team, enemies, encounter, setup.IncludeAvatar, errors);
 
@@ -148,6 +152,20 @@ namespace BeastCraft.Session
 
             TeamBondLoadout bonds = content.TeamBonds.Count == 0 ? null : TeamBondLoadout.For(content.TeamBonds, TeamBondResolver.MembersOf(teamSpecies), members);
 
+            List<ConsumableSO> consumables = new List<ConsumableSO>();
+            foreach (string id in setup.Consumables ?? new List<string>())
+            {
+                consumables.Add(content.GetConsumable(id));
+            }
+
+            if (consumables.Count > 0)
+            {
+                // Before the bonds and passives (applied by RunBattle's battle-start hook), on its own stream.
+                ConsumableLoadout.Apply(consumables, members, units.FindAll(u => u.Team == BattleTeam.Enemy), grid,
+                                        new Random(LootRoller.DeriveSeed(setup.Seed, PostBattleAward.ConsumableStream)));
+                result.ConsumablesUsed = new List<string>(setup.Consumables);
+            }
+
             TurnManager turnManager = new TurnManager(avatar == null ? units : new List<BattleUnit>(units) { avatar });
             Random rng = new Random(setup.Seed);
             BattleResult battle = BattleTurnExecutor.RunBattle(turnManager, units, grid, rng, avatar, passives, bonds, setup.MaxTime);
@@ -177,13 +195,29 @@ namespace BeastCraft.Session
         }
 
         /// <summary>
+        /// <see cref="ApplyRewards(PlayerSave, BattleSessionResult, BattleContent, string, int, DropTable, int, Random)"/>
+        /// with no beast level cap (<see cref="BeastProgression.MaxLevel"/>).
+        /// </summary>
+        public static BattleRewardSummary ApplyRewards(PlayerSave save, BattleSessionResult result, BattleContent content, string shape, int encounterLevel,
+                                                       DropTable dropTable, Random rng = null)
+        {
+            return ApplyRewards(save, result, content, shape, encounterLevel, dropTable, BeastProgression.MaxLevel, rng);
+        }
+
+        /// <summary>
         /// Pays <paramref name="result"/> out into <paramref name="save"/>: practice XP to every team
         /// beast's and the avatar's skills that fired, drops for a clear of
         /// (<paramref name="shape"/>, <paramref name="encounterLevel"/>) from
         /// <paramref name="dropTable"/> into <see cref="PlayerSave.Materials"/> (only on a player
         /// victory; a null table drops nothing), beast XP to every team beast
-        /// (<see cref="BeastProgression"/>; a beast knocked out by the end gets participation only)
-        /// and avatar XP for the battle at <paramref name="encounterLevel"/> when the avatar took part. <paramref name="content"/>
+        /// (<see cref="BeastProgression.AwardBattle"/>; a beast knocked out by the end gets
+        /// participation only), bench XP to every other beast in the save
+        /// (<see cref="BeastProgression.AwardBench"/>) and avatar XP for the battle at
+        /// <paramref name="encounterLevel"/> when the avatar took part — every XP award after the
+        /// level-gap falloff on the earner's level before the award (<see cref="LevelGapXp"/>), and
+        /// beast XP added under <paramref name="beastLevelCap"/> (<see cref="LevelCap"/>: a beast at
+        /// the cap banks instead of levelling; <see cref="BeastProgression.MaxLevel"/> is no cap; the
+        /// campaign passes <c>Campaign.LevelCaps.BeastCap</c>). <paramref name="content"/>
         /// supplies each skill's and passive's progression definition (null uses the defaults).
         /// <paramref name="rng"/> drives the drop rolls; null seeds one from the battle's seed
         /// (<see cref="LootRoller.DeriveSeed"/>), so rewards are deterministic either way.
@@ -193,9 +227,30 @@ namespace BeastCraft.Session
         /// </para>
         /// </summary>
         public static BattleRewardSummary ApplyRewards(PlayerSave save, BattleSessionResult result, BattleContent content, string shape, int encounterLevel,
-                                                       DropTable dropTable, Random rng = null)
+                                                       DropTable dropTable, int beastLevelCap, Random rng = null)
+        {
+            return ApplyRewards(save, result, content, shape, encounterLevel, dropTable, beastLevelCap, null, rng);
+        }
+
+        /// <summary>
+        /// <see cref="ApplyRewards(PlayerSave, BattleSessionResult, BattleContent, string, int, DropTable, int, Random)"/>
+        /// with the caller's economy <paramref name="modifiers"/> (null = <see cref="RewardModifiers.None"/>).
+        /// On a clear the battle also pays gold (<see cref="PostBattleAward.AwardGold"/>: the drop
+        /// table's <c>Gold</c> with the first-clear bonus when the material roll was a first clear,
+        /// then the modifiers' multiplier and bonus) into the <see cref="Wallet"/>, on its own seed
+        /// stream (<c>LootRoller.DeriveSeed(result.Seed, PostBattleAward.GoldStream)</c>), so the
+        /// material rolls are exactly those of a gold-free table. With <see cref="RewardModifiers.Gear"/>
+        /// a clear also rolls the table's gear drops (<see cref="GearDrops.Roll"/>, stream
+        /// <see cref="PostBattleAward.GearStream"/>), each granted as a new instance; with
+        /// <see cref="RewardModifiers.Cosmetics"/> it rolls the table's cosmetic drop (stream
+        /// <see cref="PostBattleAward.CosmeticStream"/>) and, after the XP, unlocks the milestone looks
+        /// the battle reached.
+        /// </summary>
+        public static BattleRewardSummary ApplyRewards(PlayerSave save, BattleSessionResult result, BattleContent content, string shape, int encounterLevel,
+                                                       DropTable dropTable, int beastLevelCap, RewardModifiers modifiers, Random rng = null)
         {
             BattleRewardSummary summary = new BattleRewardSummary();
+            RewardModifiers mods = modifiers ?? RewardModifiers.None;
 
             if (save == null || result == null)
             {
@@ -217,6 +272,7 @@ namespace BeastCraft.Session
 
             save.EnsureInitialized();
             summary.Outcome = result.Outcome;
+            summary.BeastLevelCap = beastLevelCap < 1 ? 1 : beastLevelCap > BeastProgression.MaxLevel ? BeastProgression.MaxLevel : beastLevelCap;
 
             Dictionary<string, BeastSkillBook> books = new Dictionary<string, BeastSkillBook>(StringComparer.Ordinal);
             foreach (KeyValuePair<string, string> pair in result.TeamUnitIds)
@@ -236,6 +292,39 @@ namespace BeastCraft.Session
             summary.SkillLevelsGained = PostBattleAward.AwardPractice(result.Battle, books, skillLookup, avatarBook, skillLookup, passiveLookup);
             summary.Loot = PostBattleAward.AwardDrops(result.Battle, dropTable, shape, encounterLevel, save.Materials,
                                                       rng ?? new Random(LootRoller.DeriveSeed(result.Seed, 0)));
+            if (result.Outcome == BattleOutcome.PlayerVictory && dropTable != null && dropTable.Gold.PaysGold)
+            {
+                int gold = PostBattleAward.AwardGold(result.Battle, dropTable, shape, encounterLevel, summary.Loot.FirstClear, mods.GoldMultiplier, mods.BonusGold,
+                                                     new Random(LootRoller.DeriveSeed(result.Seed, PostBattleAward.GoldStream)));
+                summary.GoldGained = Wallet.Add(save, gold);
+            }
+
+            foreach (string id in result.ConsumablesUsed)
+            {
+                if (ConsumableInventory.TryRemove(save, id, 1))
+                {
+                    summary.ConsumablesSpent.Add(id);
+                }
+            }
+
+            if (result.Outcome == BattleOutcome.PlayerVictory && mods.Gear != null)
+            {
+                foreach (GearItem item in GearDrops.Roll(dropTable, mods.Gear, shape, encounterLevel, new Random(LootRoller.DeriveSeed(result.Seed, PostBattleAward.GearStream))))
+                {
+                    GearDrops.Grant(save, item);
+                    summary.GearGained.Add(item.GearId);
+                }
+            }
+
+            if (result.Outcome == BattleOutcome.PlayerVictory && mods.Cosmetics != null)
+            {
+                CosmeticOption look = CosmeticRules.RollDrop(dropTable, mods.Cosmetics, save, shape, encounterLevel,
+                                                             new Random(LootRoller.DeriveSeed(result.Seed, PostBattleAward.CosmeticStream)));
+                if (look != null && CosmeticRules.Unlock(save, mods.Cosmetics, look.Key))
+                {
+                    summary.CosmeticsUnlocked.Add(look.Key);
+                }
+            }
 
             foreach (KeyValuePair<string, string> pair in result.TeamUnitIds)
             {
@@ -248,14 +337,37 @@ namespace BeastCraft.Session
                 }
 
                 bool knockedOut = unit != null && unit.IsDefeated;
-                summary.BeastXpGained[pair.Key] = BeastProgression.BattleXp(result.Outcome, encounterLevel, knockedOut);
-                summary.BeastLevelsGained += BeastProgression.AwardBattle(beast.Progress, result.Outcome, encounterLevel, knockedOut);
+                int bankBefore = beast.Progress.BankedXp;
+                summary.FalloffPercent[pair.Key] = LevelGapXp.Percent(LevelGapXp.Gap(beast.Progress.Level, encounterLevel));
+                summary.BeastXpGained[pair.Key] = BeastProgression.BattleXp(result.Outcome, encounterLevel, knockedOut, beast.Progress.Level);
+                summary.BeastLevelsGained += BeastProgression.AwardBattle(beast.Progress, result.Outcome, encounterLevel, knockedOut, summary.BeastLevelCap);
+                NoteBanked(summary, pair.Key, bankBefore, beast.Progress.BankedXp);
+            }
+
+            foreach (OwnedBeast beast in save.Beasts)
+            {
+                if (string.IsNullOrEmpty(beast.BeastId) || summary.BeastXpGained.ContainsKey(beast.BeastId) || summary.BenchXpGained.ContainsKey(beast.BeastId))
+                {
+                    continue;
+                }
+
+                int bankBefore = beast.Progress.BankedXp;
+                summary.FalloffPercent[beast.BeastId] = LevelGapXp.Percent(LevelGapXp.Gap(beast.Progress.Level, encounterLevel));
+                summary.BenchXpGained[beast.BeastId] = BeastProgression.BenchXp(result.Outcome, encounterLevel, beast.Progress.Level);
+                summary.BenchLevelsGained += BeastProgression.AwardBench(beast.Progress, result.Outcome, encounterLevel, summary.BeastLevelCap);
+                NoteBanked(summary, beast.BeastId, bankBefore, beast.Progress.BankedXp);
             }
 
             if (result.Avatar != null)
             {
-                summary.AvatarXpGained = AvatarProgression.BattleXp(result.Outcome, encounterLevel);
+                summary.AvatarFalloffPercent = LevelGapXp.Percent(LevelGapXp.Gap(save.Avatar.Level, encounterLevel));
+                summary.AvatarXpGained = AvatarProgression.BattleXp(result.Outcome, encounterLevel, save.Avatar.Level);
                 summary.AvatarLevelsGained = AvatarProgression.AwardBattle(save.Avatar, result.Outcome, encounterLevel);
+            }
+
+            if (mods.Cosmetics != null)
+            {
+                summary.CosmeticsUnlocked.AddRange(CosmeticRules.UnlockMilestones(save, mods.Cosmetics));
             }
 
             summary.Applied = true;
@@ -264,13 +376,35 @@ namespace BeastCraft.Session
         }
 
         /// <summary>
-        /// <see cref="ApplyRewards(PlayerSave, BattleSessionResult, BattleContent, string, int, DropTable, Random)"/>
-        /// for the shape and level the battle's <see cref="EncounterSetup"/> named
-        /// (<see cref="BattleSessionResult.ShapeId"/>, <see cref="BattleSessionResult.EncounterLevel"/>;
-        /// <c>EncounterPlan.ToSetup</c> sets both). Refused, changing nothing, when the setup named
-        /// no shape or no level.
+        /// <see cref="ApplyRewards(PlayerSave, BattleSessionResult, BattleContent, string, int, DropTable, int, Random)"/>
+        /// for the shape and level the battle's <see cref="EncounterSetup"/> named, with no beast
+        /// level cap. See <see cref="ApplyRewards(PlayerSave, BattleSessionResult, BattleContent, DropTable, int, Random)"/>.
         /// </summary>
         public static BattleRewardSummary ApplyRewards(PlayerSave save, BattleSessionResult result, BattleContent content, DropTable dropTable, Random rng = null)
+        {
+            return ApplyRewards(save, result, content, dropTable, BeastProgression.MaxLevel, rng);
+        }
+
+        /// <summary>
+        /// <see cref="ApplyRewards(PlayerSave, BattleSessionResult, BattleContent, string, int, DropTable, int, Random)"/>
+        /// for the shape and level the battle's <see cref="EncounterSetup"/> named
+        /// (<see cref="BattleSessionResult.ShapeId"/>, <see cref="BattleSessionResult.EncounterLevel"/>;
+        /// <c>EncounterPlan.ToSetup</c> sets both), under <paramref name="beastLevelCap"/>. Refused,
+        /// changing nothing, when the setup named no shape or no level.
+        /// </summary>
+        public static BattleRewardSummary ApplyRewards(PlayerSave save, BattleSessionResult result, BattleContent content, DropTable dropTable, int beastLevelCap,
+                                                       Random rng = null)
+        {
+            return ApplyRewards(save, result, content, dropTable, beastLevelCap, null, rng);
+        }
+
+        /// <summary>
+        /// <see cref="ApplyRewards(PlayerSave, BattleSessionResult, BattleContent, DropTable, int, Random)"/>
+        /// with the caller's economy <paramref name="modifiers"/> (the campaign passes
+        /// <c>CampaignRules.RewardModifiersFor(node)</c>).
+        /// </summary>
+        public static BattleRewardSummary ApplyRewards(PlayerSave save, BattleSessionResult result, BattleContent content, DropTable dropTable, int beastLevelCap,
+                                                       RewardModifiers modifiers, Random rng = null)
         {
             if (result != null && result.Success && (string.IsNullOrEmpty(result.ShapeId) || result.EncounterLevel < 1))
             {
@@ -280,7 +414,16 @@ namespace BeastCraft.Session
                 };
             }
 
-            return ApplyRewards(save, result, content, result == null ? null : result.ShapeId, result == null ? 0 : result.EncounterLevel, dropTable, rng);
+            return ApplyRewards(save, result, content, result == null ? null : result.ShapeId, result == null ? 0 : result.EncounterLevel, dropTable, beastLevelCap, modifiers,
+                                rng);
+        }
+
+        private static void NoteBanked(BattleRewardSummary summary, string beastId, int before, int after)
+        {
+            if (after > before)
+            {
+                summary.XpBanked[beastId] = after - before;
+            }
         }
 
         private static BattleUnit FindUnit(IReadOnlyList<BattleUnit> units, string unitId)

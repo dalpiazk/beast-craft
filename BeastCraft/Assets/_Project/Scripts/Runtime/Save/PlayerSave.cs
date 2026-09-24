@@ -1,5 +1,8 @@
 using System;
 using System.Collections.Generic;
+using BeastCraft.Campaign;
+using BeastCraft.Customization;
+using BeastCraft.Economy;
 using BeastCraft.Progression;
 
 namespace BeastCraft.Save
@@ -7,8 +10,10 @@ namespace BeastCraft.Save
     /// <summary>
     /// Everything persisted about one player, as one versioned aggregate: the beast collection
     /// (each beast's species, level, XP and skill book), the avatar's level and skill books, and the
-    /// material inventory with its first-clear and pity state, and the gear inventory with what each
-    /// beast and the avatar wears (schema 2).
+    /// material inventory with its first-clear and pity state, the gear inventory with what each
+    /// beast and the avatar wears (schema 2), the region campaign: seals, region progress and
+    /// the expedition in progress (schema 3), and the economy: gold, consumables, the Traders' frozen
+    /// stock, cosmetic unlocks and the avatar's and every beast's appearance (schema 4).
     /// <para>
     /// <strong>JsonUtility-compatible by construction.</strong> Every type reachable from here is
     /// <c>[Serializable]</c> with public fields, and every map is a list (<c>JsonUtility</c> drops
@@ -28,7 +33,7 @@ namespace BeastCraft.Save
     public class PlayerSave
     {
         /// <summary>The schema this code writes, and the newest it reads.</summary>
-        public const int CurrentSchemaVersion = 2;
+        public const int CurrentSchemaVersion = 4;
 
         /// <summary>The schema the data is in. 0 (or missing) is never valid.</summary>
         public int SchemaVersion = CurrentSchemaVersion;
@@ -55,10 +60,44 @@ namespace BeastCraft.Save
         /// </summary>
         public string[] AvatarEquippedGear = new string[GearRules.AvatarSlotCount];
 
-        /// <summary>A brand-new player: no beasts, avatar level 1, nothing learned or held.</summary>
+        /// <summary>
+        /// The region campaign: owned seals, each unlocked region's progress and the expedition in
+        /// progress (<see cref="CampaignProgress.ActiveRun"/>, whose <c>RegionId</c> is "" when there
+        /// is none). Added in schema 3.
+        /// </summary>
+        public CampaignProgress Campaign = new CampaignProgress();
+
+        /// <summary>Gold held, 0 to <see cref="Wallet.MaxGold"/>. Change it through <see cref="Wallet"/>. Added in schema 4.</summary>
+        public int Gold;
+
+        /// <summary>Held consumables, one stack per id, in the order first obtained. Added in schema 4.</summary>
+        public List<ConsumableStack> Consumables = new List<ConsumableStack>();
+
+        /// <summary>
+        /// Every Trader's stock as first seen, frozen (<see cref="ShopVisit"/>), oldest first; the
+        /// shop keeps only the most recent <c>ShopService.MaxRememberedShops</c>. Added in schema 4.
+        /// </summary>
+        public List<ShopVisit> Shops = new List<ShopVisit>();
+
+        /// <summary>Account-wide cosmetic unlocks (defaults and starter looks are free and not listed). Added in schema 4.</summary>
+        public CosmeticCollection Cosmetics = new CosmeticCollection();
+
+        /// <summary>
+        /// The avatar's chosen look: an option per discrete avatar category and a colour per colour
+        /// category; a category missing here reads as its default. Change it through
+        /// <c>CosmeticRules</c>. Purely cosmetic, no stats. Added in schema 4.
+        /// </summary>
+        public CustomizationSelection AvatarAppearance = new CustomizationSelection();
+
+        /// <summary>
+        /// A brand-new player: no beasts, avatar level 1, nothing learned or held, the starting
+        /// region (<see cref="CampaignProgress.StartingRegionId"/>) unlocked.
+        /// </summary>
         public static PlayerSave CreateNew()
         {
-            return new PlayerSave();
+            PlayerSave save = new PlayerSave();
+            save.Campaign.Unlock(CampaignProgress.StartingRegionId);
+            return save;
         }
 
         /// <summary>The beast with <paramref name="beastId"/>, or <c>null</c>.</summary>
@@ -120,6 +159,8 @@ namespace BeastCraft.Save
                     beast.EquippedGear = new string[GearRules.BeastSlotCount];
                     repaired++;
                 }
+
+                repaired += RepairAppearance(ref beast.Appearance);
             }
 
             if (Avatar == null)
@@ -203,6 +244,78 @@ namespace BeastCraft.Save
             repaired += Materials.Materials.RemoveAll(stack => stack == null);
             repaired += Materials.ClearedCells.RemoveAll(cell => cell == null);
             repaired += Materials.Pity.RemoveAll(counter => counter == null);
+
+            if (Campaign == null)
+            {
+                Campaign = new CampaignProgress();
+                repaired++;
+            }
+
+            repaired += Campaign.EnsureInitialized();
+
+            if (Consumables == null)
+            {
+                Consumables = new List<ConsumableStack>();
+                repaired++;
+            }
+
+            repaired += Consumables.RemoveAll(stack => stack == null);
+
+            if (Shops == null)
+            {
+                Shops = new List<ShopVisit>();
+                repaired++;
+            }
+
+            repaired += Shops.RemoveAll(visit => visit == null);
+            foreach (ShopVisit visit in Shops)
+            {
+                if (visit.Listings == null)
+                {
+                    visit.Listings = new List<ShopListing>();
+                    repaired++;
+                }
+
+                repaired += visit.Listings.RemoveAll(listing => listing == null);
+            }
+
+            if (Cosmetics == null)
+            {
+                Cosmetics = new CosmeticCollection();
+                repaired++;
+            }
+
+            if (Cosmetics.Unlocked == null)
+            {
+                Cosmetics.Unlocked = new List<string>();
+                repaired++;
+            }
+
+            repaired += RepairAppearance(ref AvatarAppearance);
+            return repaired;
+        }
+
+        private static int RepairAppearance(ref CustomizationSelection appearance)
+        {
+            int repaired = 0;
+            if (appearance == null)
+            {
+                appearance = new CustomizationSelection();
+                repaired++;
+            }
+
+            if (appearance.OptionEntries == null)
+            {
+                appearance.OptionEntries = new List<CustomizationSelection.CategoryOptionEntry>();
+                repaired++;
+            }
+
+            if (appearance.ColorEntries == null)
+            {
+                appearance.ColorEntries = new List<CustomizationSelection.CategoryColorEntry>();
+                repaired++;
+            }
+
             return repaired;
         }
 

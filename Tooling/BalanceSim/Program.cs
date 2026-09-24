@@ -37,6 +37,11 @@ namespace BeastCraft.Tooling.BalanceSim
                 return PacingSimulator.Run(options);
             }
 
+            if (options.RunCampaign)
+            {
+                return CampaignPacingSimulator.Run(options);
+            }
+
             string rosterPath = RosterLoader.ResolvePath(options.RosterPath);
             if (rosterPath == null || !File.Exists(rosterPath))
             {
@@ -72,6 +77,24 @@ namespace BeastCraft.Tooling.BalanceSim
                 if (options.Library == null)
                 {
                     return Fail("Skill library '" + libraryPath + "' is invalid:", errors);
+                }
+            }
+
+            if (options.RunPve && (options.Gear != GearProfile.None || options.EconomyProbe))
+            {
+                options.GearKits = GearKits.Load(options.GearLibraryPath, species, errors);
+                if (options.GearKits == null)
+                {
+                    return Fail("The gear library is invalid:", errors);
+                }
+            }
+
+            if (options.RunPve && options.EconomyProbe)
+            {
+                options.Consumables = EconomyProbe.LoadConsumables(options.ConsumableLibraryPath, errors);
+                if (options.Consumables == null)
+                {
+                    return Fail("The consumable library is invalid:", errors);
                 }
             }
 
@@ -371,6 +394,10 @@ namespace BeastCraft.Tooling.BalanceSim
 
             // LF regardless of platform, so the report is byte-identical on Windows and Linux.
             string report = Report.Build(options, species, encounters, pve, cells, pvpRecords).Replace("\r\n", "\n");
+            if (options.EconomyProbe && options.RunPve)
+            {
+                report += EconomyProbe.Build(options, species, cells).Replace("\r\n", "\n");
+            }
             if (options.Timings)
             {
                 TimeSpan reportTime = clock.Elapsed - pveTime - pvpTime;
