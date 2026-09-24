@@ -682,46 +682,8 @@ namespace BeastCraft.Battle
         public static BattleResult RunBattle(TurnManager turnManager, IEnumerable<BattleUnit> allUnits, HexGrid grid, Random rng, BattleUnit avatar,
                                              PassiveLoadout passives, TeamBondLoadout bonds, int maxTime = DefaultMaxTime)
         {
-            List<BattleUnit> roster = CopyRoster(allUnits);
-            IReadOnlyList<PassiveActivation> opening = BeginBattle(roster, grid, rng, avatar, passives, bonds, out IReadOnlyList<TeamBondActivation> bonded);
-            List<BattleTurnResult> turns = new List<BattleTurnResult>();
-            long capTicks = (long)(maxTime < 1 ? 1 : maxTime) * TurnManager.TicksPerTimeUnit;
-            long lastTurnTicks = 0;
-            BattleOutcome outcome;
-
-            while (true)
-            {
-                if (TryConclude(roster, out outcome))
-                {
-                    break;
-                }
-
-                if (turnManager == null || turnManager.ElapsedTicks > capTicks)
-                {
-                    outcome = BattleOutcome.Stalemate;
-                    break;
-                }
-
-                BattleUnit current = turnManager.CurrentUnit;
-
-                if (current == null)
-                {
-                    outcome = BattleOutcome.Stalemate;
-                    break;
-                }
-
-                if (!current.IsDefeated)
-                {
-                    lastTurnTicks = turnManager.ElapsedTicks;
-                    turns.Add(current == avatar
-                                  ? ExecuteAvatarTurn(avatar, roster, grid, rng, passives, bonds)
-                                  : ExecuteTurn(current, roster, grid, rng, avatar, passives, bonds));
-                }
-
-                turnManager.AdvanceTurn();
-            }
-
-            return new BattleResult(outcome, lastTurnTicks, turns, opening, bonded);
+            // The loop itself lives in BattleRun, so stepping a battle turn by turn runs exactly this code.
+            return new BattleRun(turnManager, allUnits, grid, rng, avatar, passives, bonds, maxTime).RunToEnd();
         }
 
         /// <summary>
@@ -1574,7 +1536,7 @@ namespace BeastCraft.Battle
         /// also reports). See <see cref="RunBattle"/> for why this is not
         /// <see cref="TurnManager.IsComplete"/>.
         /// </summary>
-        private static bool TryConclude(List<BattleUnit> roster, out BattleOutcome outcome)
+        internal static bool TryConclude(List<BattleUnit> roster, out BattleOutcome outcome)
         {
             bool player = false;
             bool enemy = false;
@@ -1615,7 +1577,7 @@ namespace BeastCraft.Battle
         /// turn's targeting see the same list, and so a caller's collection is neither retained nor
         /// re-enumerated once per skill for the length of a battle.
         /// </summary>
-        private static List<BattleUnit> CopyRoster(IEnumerable<BattleUnit> allUnits)
+        internal static List<BattleUnit> CopyRoster(IEnumerable<BattleUnit> allUnits)
         {
             List<BattleUnit> roster = new List<BattleUnit>();
 

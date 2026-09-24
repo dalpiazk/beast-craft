@@ -84,6 +84,50 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
+        public void Begin_SteppedTurnByTurn_IsExactlyRun()
+        {
+            BattleSessionResult run = BattleSession.Run(Setup(StarterSave(), 1234));
+
+            BattleSessionRun stepped = BattleSession.Begin(Setup(StarterSave(), 1234));
+            Assert.IsNotNull(stepped.Battle, stepped.Result.Error);
+            int turns = 0;
+            while (stepped.Step() != null)
+            {
+                turns++;
+                Assert.AreEqual(turns, stepped.Battle.Turns.Count);
+            }
+
+            Assert.IsTrue(stepped.Battle.IsOver);
+            BattleSessionResult finished = stepped.Finish();
+
+            Assert.IsTrue(finished.Success, finished.Error);
+            Assert.AreEqual(run.Battle.ActionCount, turns);
+            Assert.AreEqual(Trace(run), Trace(finished));
+            Assert.AreSame(finished, stepped.Finish(), "finishing twice returns the same result");
+            Assert.IsNull(stepped.Step());
+        }
+
+        [Test]
+        public void Begin_FinishedWithoutStepping_IsExactlyRun()
+        {
+            BattleSessionResult run = BattleSession.Run(Setup(StarterSave(), 99));
+            BattleSessionRun begun = BattleSession.Begin(Setup(StarterSave(), 99));
+
+            Assert.AreEqual(Trace(run), Trace(begun.Finish()));
+        }
+
+        [Test]
+        public void Begin_AFailedSetup_HasNoBattle()
+        {
+            BattleSessionRun run = BattleSession.Begin(null);
+
+            Assert.IsNull(run.Battle);
+            Assert.IsFalse(run.Result.Success);
+            Assert.IsNull(run.Step());
+            Assert.AreSame(run.Result, run.Finish());
+        }
+
+        [Test]
         public void Run_BuildsTheTeamFromTheSave()
         {
             PlayerSave save = StarterSave();
