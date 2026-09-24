@@ -222,8 +222,11 @@ seed and the map node) and keeps it separate from the battle's seed. Everything 
 ## Region campaign — BUILT; regions, maps and bosses are DRAFT CONTENT PENDING PRODUCER REVIEW
 
 How encounters reach the player (answering "how a map node picks a shape and a level" above): ten
-regions cover levels 1-100 (`r01` 1-10 … `r10` 91-100), each played as **four expeditions** on
-seeded, Slay-the-Spire-style node maps (`NodeMapGenerator`: 11 rows, 4 lanes, Battle / Elite / Shop /
+regions cover levels 1-100 (`r01` 1-10 … `r10` 91-100). **The player explores each region as a map**
+(the open world is TBD) of locations — wilds, beast dens, camps, trading posts, a guarded pass and the
+boss's lair — over **four expeditions**. Behind that map sit seeded, Slay-the-Spire-style node maps,
+**an internal pacing model only** (each node carries its location kind, map position and label key
+for the map UI) (`NodeMapGenerator`: 11 rows, 4 lanes, Battle / Elite / Shop /
 Rest nodes, a Gate on top of stages 1-3 and the region's **Boss** on top of stage 4). A node's level
 rises through the region (about 2.25 levels per stage); Battle nodes draw `squad` / `horde` / `solo`
 by the region's weights, Elites (+1 level) and generated Gates the `elite` shape, the Boss an

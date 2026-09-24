@@ -62,12 +62,18 @@ null campaign string becomes "").
 | `Seals` | `List<string>` | Owned seal ids (`regions.json` `Seals`), in the order granted. Key items, not materials. |
 | `Regions` | `List<RegionProgress>` | `{RegionId, StagesCleared, BossCleared}` per **unlocked** region (an entry = unlocked). |
 | `CurrentRegionId` | `string` | The region last entered, or "". |
-| `ActiveRun` | `MapRun` | The expedition in progress: `{RegionId, Stage, Seed, Nodes, CurrentNodeId, Cleared, Attempts, NodeAttempts}`. **`RegionId == ""` means none** — JsonUtility writes every class field, so the run is never null. |
+| `ActiveRun` | `MapRun` | The expedition in progress (the stretch of the region map being explored): `{RegionId, Stage, Seed, Nodes, CurrentNodeId, Cleared, Attempts, NodeAttempts}`. **`RegionId == ""` means none** — JsonUtility writes every class field, so the run is never null. |
 
 `MapRun.Nodes` is a snapshot of the generated map (node id = index), so a content or generator change
 never moves the ground under a saved expedition. `MapNode` is `{NodeId, Layer, Lane, Type, Level,
-ShapeId, TemplateId, EncounterSeed, Next[]}`; `Type` is `MapNodeType` (`Battle 0, Elite 1, Rest 2,
-Shop 3, Gate 4, Boss 5`, saved as its number — append only). `CurrentNodeId` is −1 before the first
+ShapeId, TemplateId, EncounterSeed, Next[], Kind, X, Y, LabelKey}`; `Type` is `MapNodeType` (`Battle 0,
+Elite 1, Rest 2, Shop 3, Gate 4, Boss 5`, saved as its number — append only), the pacing role;
+`Kind` is the location the player sees, `LocationKind` (`Wilds 0, Den 1, Camp 2, TradingPost 3, Pass 4,
+Lair 5`, append only; today one per type, separate so the open world can add landmarks), `X` / `Y` its
+normalized position on the region map and `LabelKey` its display-name key. The four location fields
+were added to schema 3 before it shipped (no bump): a stored map without them is placed on load
+(`MapRun.EnsureInitialized` calls `NodeMapGenerator.Place` with the run's own seed, exactly as
+generation would), and the validator reports a position outside 0-1 or an unknown kind. `CurrentNodeId` is −1 before the first
 step. A new save (`PlayerSave.CreateNew`) starts with `CampaignProgress.StartingRegionId` (`r01`)
 unlocked.
 
@@ -286,9 +292,14 @@ levels at every seal: 0); it stops a grinder from running more than a region ahe
 
 ## Region campaign
 
-The campaign the player progresses through: ten regions covering levels 1-100, each played as four
-expeditions ("stages") on seeded node maps, Slay-the-Spire style, with a boss at the end of the
-fourth whose seal raises the beast level cap. Runtime code under `Runtime/Campaign` (namespace
+The campaign the player progresses through: ten regions covering levels 1-100. **To the player each
+region is a map to explore** (the open world is TBD): four expeditions ("stages") into it, each
+crossing a stretch of the region's locations — wilds where wild beasts roam, beast dens, camps,
+trading posts, the guarded pass out, and in the fourth the boss's lair, whose seal raises the beast
+level cap. **The seeded node map (Slay-the-Spire style) is the internal pacing model behind that
+map**, never shown as a node graph: every node carries a location kind, a normalized map position and
+a label key (`MapNode.Kind` / `X` / `Y` / `LabelKey`, see "Node maps") so a spatial map UI can place
+and name the locations, and when the open world lands only that presentation layer changes. Runtime code under `Runtime/Campaign` (namespace
 `BeastCraft.Campaign`); content in `BeastCraft/Assets/_Project/Data/Campaign/regions.json`; paced by
 [`docs/balance/campaign-pacing-report.md`](../balance/campaign-pacing-report.md). **The content is a
 DRAFT pending producer review** (names, level bands, map rules, bosses).
@@ -330,6 +341,15 @@ re-drawn (20 tries), then fixed up deterministically.
 (`GateLevelOffset`); the Boss exactly the region's max level. Battle nodes draw a shape from the
 region's `ShapeWeights`; Elites and generated Gates use the elite shape; the Boss fields its
 template. Each node's `EncounterSeed` is `LootRoller.DeriveSeed(mapSeed, NodeId)`.
+
+**Locations** (`NodeMapGenerator.Place`, presentation only): every node becomes a location on the
+region map — `Kind` from its type (`LocationKinds.For`), `X` from its lane and `Y` from its row, each
+cell centre jittered by up to a quarter lane and a fifth of a row (the Pass or Lair centred at the far
+edge), scaled into [0.05, 0.95] and rounded to 4 decimals, and `LabelKey` = `"{regionId}/{kind}/{0-7}"`
+(e.g. `r01/wilds/3`, for a localization table of place names). Its draws come from their own stream
+(`DeriveSeed(mapSeed, NodeMapGenerator.PlacementStream)`), so placement never changes a map's
+structure, types, levels or encounter seeds; rows never overlap (deeper rows lie further in) and lanes
+keep their left-to-right order, so the paths read as routes across the region.
 
 ### Rules (`CampaignRules`)
 

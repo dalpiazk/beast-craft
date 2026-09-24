@@ -355,6 +355,16 @@ namespace BeastCraft.Save
                 CheckRange(issues, path + ".Level", node.Level, 1, BeastProgression.MaxLevel);
                 CheckRange(issues, path + ".Layer", node.Layer, 0, int.MaxValue);
 
+                if (!Enum.IsDefined(typeof(LocationKind), node.Kind))
+                {
+                    issues.Add(new SaveIssue(SaveIssueKind.InvalidMapRun, path + ".Kind", null, "unknown location kind " + (int)node.Kind));
+                }
+
+                if (!(node.X >= 0f && node.X <= 1f) || !(node.Y >= 0f && node.Y <= 1f))
+                {
+                    issues.Add(new SaveIssue(SaveIssueKind.InvalidMapRun, path + ".X", null, "map position (" + node.X + ", " + node.Y + ") is outside 0-1"));
+                }
+
                 if (node.Next == null)
                 {
                     continue;

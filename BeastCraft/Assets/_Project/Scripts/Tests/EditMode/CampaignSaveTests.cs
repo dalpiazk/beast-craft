@@ -39,6 +39,7 @@ namespace BeastCraft.Tests.EditMode
             run.Nodes.Add(new MapNode { NodeId = 0, Layer = 0, Lane = 1, Type = MapNodeType.Battle, Level = 13, ShapeId = "squad", EncounterSeed = 5, Next = new[] { 1, 2 } });
             run.Nodes.Add(new MapNode { NodeId = 1, Layer = 1, Lane = 0, Type = MapNodeType.Elite, Level = 14, ShapeId = "elite", EncounterSeed = 6 });
             run.Nodes.Add(new MapNode { NodeId = 2, Layer = 1, Lane = 2, Type = MapNodeType.Rest, Level = 13 });
+            NodeMapGenerator.Place(run.Nodes, run.RegionId, run.Seed);
             run.CurrentNodeId = 0;
             run.Cleared.Add(0);
             run.Attempts = 2;
@@ -136,6 +137,44 @@ namespace BeastCraft.Tests.EditMode
             Assert.AreEqual(PlayerSave.CurrentSchemaVersion, migrated.Save.SchemaVersion);
             Assert.IsTrue(migrated.Save.Campaign.IsUnlocked(CampaignProgress.StartingRegionId));
             Assert.IsNotNull(migrated.Save.Gear);
+        }
+
+        [Test]
+        public void UnplacedMap_IsPlacedOnLoad_ExactlyAsThePlacementWould()
+        {
+            PlayerSave placed = SaveWithRun();
+            PlayerSave stored = SaveWithRun();
+            foreach (MapNode node in stored.Campaign.ActiveRun.Nodes)
+            {
+                node.X = 0f;
+                node.Y = 0f;
+                node.Kind = LocationKind.Wilds;
+                node.LabelKey = string.Empty;
+            }
+
+            SaveSerializer serializer = NewSerializer(Catalog);
+            SaveLoadResult loaded = serializer.Deserialize(new JsonUtilitySaveSerializer().ToJson(stored));
+
+            Assert.IsTrue(loaded.Success, loaded.Error);
+            Assert.IsEmpty(loaded.Issues, string.Join("\n", loaded.Issues));
+            Assert.AreEqual(serializer.Serialize(placed), serializer.Serialize(loaded.Save));
+            MapNode elite = loaded.Save.Campaign.ActiveRun.Nodes[1];
+            Assert.AreEqual(LocationKind.Den, elite.Kind);
+            StringAssert.StartsWith("r02/den/", elite.LabelKey);
+            Assert.IsTrue(elite.IsPlaced);
+        }
+
+        [Test]
+        public void Validate_ReportsALocationOffTheMap()
+        {
+            PlayerSave save = SaveWithRun();
+            save.Campaign.ActiveRun.Nodes[0].X = 1.5f;
+            save.Campaign.ActiveRun.Nodes[1].Kind = (LocationKind)99;
+
+            List<SaveIssue> issues = SaveValidator.Validate(save, Catalog);
+
+            Assert.AreEqual(2, issues.Count, string.Join("\n", issues));
+            Assert.IsTrue(issues.TrueForAll(i => i.Kind == SaveIssueKind.InvalidMapRun));
         }
 
         [Test]

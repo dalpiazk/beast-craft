@@ -137,6 +137,66 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
+        public void Generate_PlacesEveryLocationOnTheRegionMap()
+        {
+            foreach (RegionData region in _regions.Regions)
+            {
+                MapRulesData rules = _regions.RulesFor(region);
+                int top = rules.Layers - 1;
+                for (int seed = 0; seed < 20; seed++)
+                {
+                    List<MapNode> nodes = NodeMapGenerator.Generate(region, rules, seed % region.Stages, seed);
+                    foreach (MapNode node in nodes)
+                    {
+                        string where = region.RegionId + " seed " + seed + " node " + node.NodeId;
+                        Assert.That(node.X, Is.InRange(0.05f, 0.95f), where);
+                        Assert.That(node.Y, Is.InRange(0.05f, 0.95f), where);
+                        Assert.AreEqual(LocationKinds.For(node.Type), node.Kind, where);
+                        StringAssert.StartsWith(region.RegionId + "/" + LocationKinds.Key(node.Kind) + "/", node.LabelKey, where);
+                        foreach (MapNode other in nodes)
+                        {
+                            if (other.Layer > node.Layer)
+                            {
+                                Assert.Less(node.Y, other.Y, where + ": deeper rows lie further into the region");
+                            }
+                            else if (other.Layer == node.Layer && other.Lane > node.Lane)
+                            {
+                                Assert.Less(node.X, other.X, where + ": lanes run left to right");
+                            }
+                        }
+                    }
+
+                    MapNode last = nodes[nodes.Count - 1];
+                    Assert.AreEqual(top, last.Layer);
+                    Assert.AreEqual(0.5f, last.X, 1e-6f, "the Pass or Lair sits centred at the far edge");
+                    Assert.IsTrue(last.Kind == LocationKind.Pass || last.Kind == LocationKind.Lair);
+                }
+            }
+        }
+
+        [Test]
+        public void Place_UsesItsOwnStream_AndLeavesTheMapItself()
+        {
+            List<MapNode> nodes = NodeMapGenerator.Generate(_regions, "r04", 2, 31);
+            string placed = JsonUtility.ToJson(new MapRun { Nodes = nodes });
+            foreach (MapNode node in nodes)
+            {
+                node.X = 0f;
+                node.Y = 0f;
+                node.LabelKey = string.Empty;
+            }
+
+            MapRun unplaced = new MapRun { RegionId = "r04", Stage = 2, Seed = 31, Nodes = nodes };
+            Assert.AreEqual(1, unplaced.EnsureInitialized(), "the missing placement is one repair");
+            Assert.AreEqual(placed, JsonUtility.ToJson(new MapRun { Nodes = unplaced.Nodes }));
+            Assert.AreEqual(0, unplaced.EnsureInitialized());
+
+            NodeMapGenerator.Place(nodes, "r04", 32);
+            Assert.AreNotEqual(placed, JsonUtility.ToJson(new MapRun { Nodes = nodes }), "another seed jitters differently");
+            NodeMapGenerator.Place(null, "r04", 1);
+        }
+
+        [Test]
         public void Generate_EveryAuthoredRegionAndStage_MakesAWellFormedMap()
         {
             foreach (RegionData region in _regions.Regions)

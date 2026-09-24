@@ -96,6 +96,14 @@ namespace BeastCraft.Campaign
                 }
             }
 
+            // A map stored before locations had positions (or hand-edited): place it again from its
+            // own seed, exactly as the generator would have.
+            if (Nodes.Exists(node => !node.IsPlaced || string.IsNullOrEmpty(node.LabelKey)))
+            {
+                NodeMapGenerator.Place(Nodes, RegionId, Seed);
+                repaired++;
+            }
+
             if (Cleared == null)
             {
                 Cleared = new List<int>();
@@ -141,6 +149,42 @@ namespace BeastCraft.Campaign
 
         /// <summary>The node ids this one leads to, all on the next layer. Empty at the top.</summary>
         public int[] Next = new int[0];
+
+        /// <summary>
+        /// How the location is presented on the region map (<see cref="LocationKinds.For"/> of
+        /// <see cref="Type"/>). Presentation only: the rules read <see cref="Type"/>. Added to schema
+        /// 3 before it shipped.
+        /// </summary>
+        public LocationKind Kind;
+
+        /// <summary>
+        /// Where the location sits on the region map, normalized: 0 = the map's left edge, 1 = its
+        /// right (lanes spread left to right). Derived from <see cref="Lane"/> plus a small seeded
+        /// jitter (<see cref="NodeMapGenerator.Place"/>), so a spatial map UI can lay the locations
+        /// out as places to explore rather than a grid. In [0.05, 0.95] once placed.
+        /// </summary>
+        public float X;
+
+        /// <summary>
+        /// Where the location sits on the region map, normalized: 0 = the entry edge, 1 = the far
+        /// edge (the Pass or the Lair). Derived from <see cref="Layer"/> plus a small seeded jitter.
+        /// In [0.05, 0.95] once placed; (0, 0) means "not placed" (<see cref="MapRun.EnsureInitialized"/> places it).
+        /// </summary>
+        public float Y;
+
+        /// <summary>
+        /// The display-label hook: a stable localization key a map UI resolves to the location's
+        /// name, <c>"{regionId}/{kind}/{variant}"</c> (e.g. <c>r01/wilds/3</c>; the kind is
+        /// <see cref="LocationKinds.Key"/>), the variant drawn from the map seed, 0 to
+        /// <see cref="NodeMapGenerator.LabelVariants"/> − 1. "" until placed.
+        /// </summary>
+        public string LabelKey = string.Empty;
+
+        /// <summary>Whether the location has a map position (<see cref="X"/> and <see cref="Y"/> not both 0).</summary>
+        public bool IsPlaced
+        {
+            get { return X != 0f || Y != 0f; }
+        }
 
         /// <summary>Whether the node is fought (Battle, Elite, Gate, Boss).</summary>
         public bool IsBattle

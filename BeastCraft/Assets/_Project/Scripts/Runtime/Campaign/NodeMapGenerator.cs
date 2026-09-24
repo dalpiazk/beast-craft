@@ -31,6 +31,9 @@ namespace BeastCraft.Campaign
     /// uses <see cref="MapRulesData.EliteShapeId"/>; the Boss and authored Gates name their
     /// template. Every node's <see cref="MapNode.EncounterSeed"/> is
     /// <c>LootRoller.DeriveSeed(seed, NodeId)</c>.</item>
+    /// <item><b>Locations.</b> <see cref="Place"/> gives every node its map position, location kind
+    /// and label key from a separate seeded stream: the node map is the internal pacing model, and
+    /// the player sees a region map of locations to explore.</item>
     /// </list>
     /// Node ids run row by row, lane by lane, the top last. Tunable starting rules (regions.json),
     /// paced by the balance simulator's <c>--mode campaign</c>.
@@ -39,6 +42,12 @@ namespace BeastCraft.Campaign
     {
         /// <summary>How many full type draws are tried before the deterministic fix-up.</summary>
         public const int MaxTypeAttempts = 20;
+
+        /// <summary>How many display-label variants each <see cref="LocationKind"/> has (<see cref="MapNode.LabelKey"/>).</summary>
+        public const int LabelVariants = 8;
+
+        /// <summary>The <see cref="LootRoller.DeriveSeed"/> stream placement draws from (never a node id, so never an encounter seed).</summary>
+        public const int PlacementStream = 0x504C4143;
 
         /// <summary>
         /// The base level of row <paramref name="layer"/> of stage <paramref name="stage"/>:
@@ -217,7 +226,59 @@ namespace BeastCraft.Campaign
                 }
             }
 
+            Place(nodes, region.RegionId, seed);
             return nodes;
+        }
+
+        /// <summary>
+        /// Lays a map's nodes out as locations on the region map (see <see cref="MapNode.X"/>,
+        /// <see cref="MapNode.Y"/>, <see cref="MapNode.Kind"/>, <see cref="MapNode.LabelKey"/>): X from
+        /// the lane and Y from the layer, each cell's centre moved by a small jitter (up to a quarter
+        /// lane and a fifth of a row, the top location centred), both scaled into [0.05, 0.95] and
+        /// rounded to 4 decimals. The draws come from their own stream,
+        /// <c>Random(LootRoller.DeriveSeed(seed, </c><see cref="PlacementStream"/><c>))</c>, in node
+        /// order (jitter X, jitter Y, label variant), so placing never changes the map's structure,
+        /// types, levels or encounter seeds, and the same map and seed always place the same way.
+        /// The lane and row counts are read off the nodes. Presentation only: the node map is the
+        /// internal pacing model, and this is how it becomes a map the player explores.
+        /// </summary>
+        public static void Place(List<MapNode> nodes, string regionId, int seed)
+        {
+            if (nodes == null || nodes.Count == 0)
+            {
+                return;
+            }
+
+            int lanes = 1;
+            int rows = 1;
+            foreach (MapNode node in nodes)
+            {
+                if (node != null)
+                {
+                    lanes = Math.Max(lanes, node.Lane + 1);
+                    rows = Math.Max(rows, node.Layer);
+                }
+            }
+
+            Random rng = new Random(LootRoller.DeriveSeed(seed, PlacementStream));
+            foreach (MapNode node in nodes)
+            {
+                if (node == null)
+                {
+                    continue;
+                }
+
+                double jitterX = (rng.NextDouble() - 0.5) * 0.5;
+                double jitterY = (rng.NextDouble() - 0.5) * 0.4;
+                int variant = rng.Next(LabelVariants);
+                bool top = node.Layer >= rows;
+                double x = top ? 0.5 : (Clamp(node.Lane, 0, lanes - 1) + 0.5 + jitterX) / lanes;
+                double y = (Clamp(node.Layer, 0, rows) + 0.5 + (top ? 0.0 : jitterY)) / (rows + 1);
+                node.Kind = LocationKinds.For(node.Type);
+                node.X = (float)Math.Round(0.05 + (0.9 * x), 4);
+                node.Y = (float)Math.Round(0.05 + (0.9 * y), 4);
+                node.LabelKey = (regionId ?? string.Empty) + "/" + LocationKinds.Key(node.Kind) + "/" + variant.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            }
         }
 
         private static void AssignTypes(List<MapNode> nodes, List<int>[] parents, List<int>[] children, MapRulesData rules, int rows, Random rng)
