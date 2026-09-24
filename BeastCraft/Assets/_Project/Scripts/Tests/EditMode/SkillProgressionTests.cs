@@ -462,7 +462,7 @@ namespace BeastCraft.Tests.EditMode
             BattleUnit avatar = BattleAvatar.Create(new SkillLoadout(new[] { cheer }));
             List<BattleUnit> roster = new List<BattleUnit> { player, enemy };
 
-            BattleResult result = BattleTurnExecutor.RunBattle(new TurnManager(roster), roster, null, new System.Random(3), avatar);
+            BattleResult result = BattleTurnExecutor.RunBattle(new TurnManager(new List<BattleUnit>(roster) { avatar }), roster, null, new System.Random(3), avatar);
             Assert.AreEqual(BattleOutcome.PlayerVictory, result.Outcome);
 
             int playerFired = 0;

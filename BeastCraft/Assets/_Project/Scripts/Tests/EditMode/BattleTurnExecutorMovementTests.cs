@@ -117,10 +117,37 @@ namespace BeastCraft.Tests.EditMode
             BattleUnit victim = Place(grid, Unit("e1", BattleTeam.Enemy, Fragile, 0, At(3)));
             BattleUnit avatar = Unit("avatar", BattleTeam.Player, Sturdy, 0, HexCoordinate.Zero,
                                      Skill(0, SkillTargetShape.AllEnemies));
+            List<BattleUnit> roster = new List<BattleUnit> { beast, victim };
 
-            BattleTurnResult result = BattleTurnExecutor.ExecuteTurn(beast, new List<BattleUnit> { beast, victim }, grid, new System.Random(1), avatar);
+            // A player beast's turn no longer ticks the avatar: it casts on its own turns.
+            BattleTurnResult beastTurn = BattleTurnExecutor.ExecuteTurn(beast, roster, grid, new System.Random(1), avatar);
+            Assert.AreEqual(0, beastTurn.AvatarActivations.Count);
+            Assert.IsFalse(victim.IsDefeated);
 
+            BattleTurnResult result = BattleTurnExecutor.ExecuteAvatarTurn(avatar, roster, grid, new System.Random(1), null);
+
+            Assert.AreSame(avatar, result.Unit);
             Assert.AreEqual(1, result.AvatarActivations.Count);
+            Assert.AreEqual(0, result.SkillOutcomes.Count);
+            Assert.AreEqual(0, result.MovementSpent);
+            Assert.IsTrue(victim.IsDefeated);
+            Assert.IsNull(grid.GetOccupant(At(3)));
+        }
+
+        [Test]
+        public void ExecuteTurn_HandedTheAvatar_RunsTheAvatarsOwnTurn()
+        {
+            HexGrid grid = Corridor();
+            BattleUnit beast = Place(grid, Unit("p1", BattleTeam.Player, Sturdy, 0, At(-4)));
+            BattleUnit victim = Place(grid, Unit("e1", BattleTeam.Enemy, Fragile, 0, At(3)));
+            BattleUnit avatar = Unit("avatar", BattleTeam.Player, Sturdy, 0, HexCoordinate.Zero,
+                                     Skill(0, SkillTargetShape.AllEnemies));
+
+            BattleTurnResult result = BattleTurnExecutor.ExecuteTurn(avatar, new List<BattleUnit> { beast, victim }, grid, new System.Random(1), avatar);
+
+            Assert.AreSame(avatar, result.Unit);
+            Assert.AreEqual(1, result.AvatarActivations.Count);
+            Assert.AreEqual(0, result.SkillOutcomes.Count, "not a beast's turn: its loadout is not fired as a beast's");
             Assert.IsTrue(victim.IsDefeated);
             Assert.IsNull(grid.GetOccupant(At(3)));
         }

@@ -238,6 +238,12 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <summary>The PvE avatar preset (<c>--avatar</c>); the library avatar by default, <see cref="AvatarPresets.None"/> fields none.</summary>
         public string AvatarPreset = AvatarPresets.Library;
 
+        /// <summary>
+        /// <c>--avatar-level</c>: the fielded avatar's level (its stats on the medium curve and its
+        /// damage-formula level), 1-100; 0, the default, means each battle's encounter level.
+        /// </summary>
+        public int AvatarLevel;
+
         /// <summary>Which skills the beasts fight with (<c>--skill-kit standard|library</c>); library is the committed report's setting.</summary>
         public KitSource KitSource = KitSource.Library;
 
@@ -361,6 +367,9 @@ namespace BeastCraft.Tooling.BalanceSim
             "                             player team (see AvatarPresets): library = the library's default loadout (first 3\n" +
             "                             actives + AvatarDefaultPassives) at --skill-level, the committed report's setting;\n" +
             "                             support = a passive-only fixture; none = no avatar.\n" +
+            "  --avatar-level <n>         The avatar's level, 1-100 (default: each battle's encounter level). Scales its\n" +
+            "                             stats on the medium curve (Speed included: 100 at level 100, so its ATB gauge\n" +
+            "                             keeps pace with the beasts') and is its damage-formula level.\n" +
             "  --out <path>               Also write the Markdown report to this file.\n" +
             "  --self-check               Run everything twice and fail unless both reports are identical; also checks the\n" +
             "                             PvE battle loop against BattleTurnExecutor.RunBattle.\n" +
@@ -712,6 +721,19 @@ namespace BeastCraft.Tooling.BalanceSim
                         }
 
                         options.AvatarPreset = text;
+                        break;
+                    case "--avatar-level":
+                        if (!TryNextInt(args, ref i, arg, 1, out options.AvatarLevel, out error))
+                        {
+                            return null;
+                        }
+
+                        if (options.AvatarLevel > 100)
+                        {
+                            error = "--avatar-level must be between 1 and 100.";
+                            return null;
+                        }
+
                         break;
                     default:
                         error = "Unknown argument '" + arg + "'. Use --help for usage.";

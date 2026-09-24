@@ -84,8 +84,8 @@ namespace BeastCraft.Avatar
         public int MaxTriggersPerBattle;
 
         /// <summary>
-        /// After firing, how many avatar ticks (one per player-beast turn, the clock the avatar's
-        /// active skills also run on) must pass before it may fire again. 0 or below: no cooldown.
+        /// After firing, how many avatar turns (the avatar's own ATB turns, the clock its active
+        /// skills also run on) must pass before it may fire again. 0 or below: no cooldown.
         /// </summary>
         public int InternalCooldown;
 

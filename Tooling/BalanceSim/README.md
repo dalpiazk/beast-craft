@@ -53,7 +53,8 @@ dotnet run --project Tooling/BalanceSim -c Release -- [options]
 | `--matrix-level <n>` | `50` | Level of the PvP win matrix and the stat table (falls back to the highest simulated level). |
 | `--roster <path>` | found by walking up | Path to `beast-roster.json`. |
 | `--encounters-file <path>` | found by walking up | Path to `encounters.json`. |
-| `--avatar <preset>` | `library` | PvE only. `library` (the committed report's setting) fields the skill library's default avatar: its first three actives and `AvatarDefaultPassives`, at `--skill-level`. `support` fields a fixture avatar with three passive skills beside every player team (`AvatarPresets.cs`; not authored content). `none` fields no avatar. `library` and `support` add an "Avatar passives" section with firings per battle. See `docs/design/battle-system.md`, "Avatar passives" and "Beast skill kits". |
+| `--avatar <preset>` | `library` | PvE only. `library` (the committed report's setting) fields the skill library's default avatar: its first three actives and `AvatarDefaultPassives`, at `--skill-level`. `support` fields a fixture avatar with three passive skills beside every player team (`AvatarPresets.cs`; not authored content). `none` fields no avatar. `library` and `support` add an "Avatar passives" section with firings per battle and the avatar's turns and active casts per battle. See `docs/design/battle-system.md`, "Avatar passives" and "Beast skill kits". |
+| `--avatar-level <n>` | encounter level | PvE only. The fielded avatar's level, 1-100: its fixture stats on the medium curve (Speed included) and its damage-formula level. By default each battle's encounter level (the avatar levels alongside the encounters; see `--mode pacing`, "Avatar level"). |
 | `--out <path>` | none | Also write the report to this file (it always goes to stdout). |
 | `--self-check` | off | Run everything twice and fail unless both reports are identical; also replay sample PvE battles through `BattleTurnExecutor.RunBattle` and fail if the simulator's loop disagrees. |
 | `--seeds <list>` | none | Comma-separated base seeds, run one after another in one process (cannot be combined with `--seed`). Each seed's run is exactly the `--seed <n>` run; stdout (and `--out`) get the multi-seed aggregate, and with `--out` each seed's full report is also written beside it as `<name>.seed<n>.md`. See "Multi-seed runs". |
@@ -76,7 +77,7 @@ Two reports are committed, both the default arguments:
   the ATB turn order, so its battle lengths are in rounds.
 - `docs/balance/tuned-report.md` — the current roster and skill library after the third tuning pass
   and its element chart v2 follow-up (see `docs/balance/tuning-log.md`, "Retune with authored kits,
-  avatar passives, sqrt speed and mitigation", "Element chart v2", "Thunderbird range vs move" and "Niche pass: Thunderbird opener, Phoenix/Frost Wyrm lifts, remaining negatives", then "Team bonds"; "Scouting and counter-picking" added the scouted-picking section, no balance change), under the real game setup (every beast's authored default loadout, the library
+  avatar passives, sqrt speed and mitigation", "Element chart v2", "Thunderbird range vs move" and "Niche pass: Thunderbird opener, Phoenix/Frost Wyrm lifts, remaining negatives", then "Team bonds"; "Scouting and counter-picking" added the scouted-picking section, no balance change; "Avatar gauge" moved the avatar onto its own ATB gauge, no tuning), under the real game setup (every beast's authored default loadout, the library
   avatar with its passives, the library's team bonds, skill level 1), the current Runtime (the square-root ATB turn order, the
   mitigation damage formula, `SpecialAttack`-scaled heals, combat stances, variance and crits) and
   the generated encounters. Regenerate it whenever the roster, the skill library, fixtures, simulator
@@ -96,10 +97,18 @@ skill's element is forced to `None`. The report shows a "Library beast kits" tab
 standard kit and has no kit parity table (it measures the standard kit's Strike / Shot / Blast
 balance; library kits differ by design). PvP uses the library kits too. The default `--avatar
 library` fields the library's default avatar (first three actives, `AvatarDefaultPassives`) on the
-same skill level. The avatar's stats (either preset) are a fixture block: 100 in every combat stat
-at max level, scaled by the roster's growth curve like a beast's (15 at level 1, 57 at level 50), so
-its shields (a percent of its Defense) and heals (a percent of its SpecialAttack) are the same share
-of a beast's HP at every level.
+same skill level. The avatar's stats (either preset) are a fixture block read the way the game reads
+one, `AvatarStatsSO.GetStatsAtLevel(level)`: 100 in every combat stat and Speed 100 at max level,
+scaled by the roster's growth curve like a beast's (15 at level 1, 57 at level 50), so its shields
+(a percent of its Defense) and heals (a percent of its SpecialAttack) are the same share of a
+beast's HP at every level. Its level is `--avatar-level`, by default the encounter level.
+
+**The avatar's gauge.** The avatar joins the `TurnManager` beside the beasts (never the targeting
+roster) and fills its own ATB gauge from its Speed; when it comes up the loop runs
+`BattleTurnExecutor.ExecuteAvatarTurn` (its passives' internal cooldowns, then its actives),
+exactly as `RunBattle` does, which `--self-check` verifies. Its turns count in the battle's action
+total like any unit's, and the "Avatar passives" section reports its turns and active casts per
+battle.
 
 **Team bonds** (`--bonds on|off`, default on) come from the same file's `TeamBonds` array, built
 through `SkillLibraryBuilder.ApplyTeamBond` like the importer's. Each team's active bonds are resolved

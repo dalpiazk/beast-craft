@@ -2282,3 +2282,61 @@ within 0-1 everywhere (battle 100: 21 vs 20; 250: 50 vs 50; 400: 81 vs 80; 500: 
 most 3 levels wide. A player who clears less than 80% falls behind the content (at a 50% clear
 rate a battle pays about two thirds as much XP), which is the intended pressure; the curve's two
 constants move the whole track.
+
+## Avatar gauge (stage 3b): the avatar on its own ATB gauge
+
+The avatar used to tick once per player-beast turn, so a four-beast team cycled it about four times
+as often as one beast acts. It now fills its own ATB gauge from its own Speed
+(`BattleTurnExecutor.ExecuteAvatarTurn`; design doc, decision 6, timing amendment): its actives and
+its passives' internal cooldowns run on its own turns, `AllyTurnStart` passives stay per beast turn,
+and a beast's turn no longer ticks it. The simulator's library avatar gets Speed 100 at max level on
+the medium curve (`AvatarStatsSO.GetStatsAtLevel`, 15 at level 1, the same scale as its other stats),
+at the encounter level (`--avatar-level`, default). No beast data, skills, bonds or avatar numbers
+changed.
+
+**Cadence** (default run, seed 12345, 40,320 battles at the calibrated difficulty):
+
+| | Before (per player-beast turn) | After (own gauge) |
+| --- | ---: | ---: |
+| Avatar turns (ticks) per battle | 17.26 | 5.79 (5.66-5.79 over the 3 seeds) |
+| ... per unit of normalized time | 1.65 | 0.56 |
+| Avatar active casts per battle | 13.29 | 3.74 (3.62-3.74) |
+| `last_stand` firings per battle (cooldown 2) | 2.98 (2.97-3.00) | 2.24 (2.20-2.24) |
+| `keen_eye` (aura) / `opening_ward` (battle start) | 1.00 / 1.00 | 1.00 / 1.00 |
+
+So the avatar acts about a third as often and casts about 72% less; `last_stand`, gated by its
+cooldown in avatar turns, fires a quarter less.
+
+**Guard** (as for team bonds: every beast's 3-seed mean overall marginal within +/-4 `elemental`
+and +/-7 `neutral`; `--seeds 12345,777,4242`, default arguments), before -> after:
+
+| Beast | `elemental` | `neutral` |
+| --- | ---: | ---: |
+| Golem | +0.5 -> +1.8 | +5.3 -> +4.7 |
+| Tarasque | +1.4 -> +1.5 | -3.7 -> -2.6 |
+| Basilisk | -0.2 -> +1.4 | -0.3 -> +3.8 |
+| Frost Wyrm | -0.5 -> +0.2 | 0.0 -> -1.5 |
+| Kirin | +2.8 -> +0.1 | +3.8 -> -0.3 |
+| Leviathan | -0.2 -> 0.0 | +1.4 -> +1.7 |
+| Phoenix | -0.5 -> -0.2 | -4.2 -> -4.7 |
+| Treant | -1.3 -> -0.7 | -0.7 -> -0.4 |
+| Thunderbird | -1.1 -> -1.1 | +3.3 -> +6.0 |
+| Griffin | -0.7 -> -2.9 | -4.9 -> -6.7 |
+
+Every beast is inside the guard (`elemental` -2.9 ... +1.8, `neutral` -6.7 ... +6.0), so **no tuning
+iteration was made**. Griffin `neutral` (-6.7) and Thunderbird `neutral` (+6.0) sit closest to the
+edge; Kirin (Light, the team healer) lost the most in `elemental` (-2.7), as the avatar's Mending
+Light and Aegis now cover less of what it covered.
+
+**Composition matters more.** The avatar's frequent team-wide casts had been flattening lineups: the
+persistent team SD (lineup spread with seed-to-seed noise removed) rose `elemental` overall 4.6 ->
+6.1 (squad 10.7 -> 12.0, horde 10.0 -> 13.5) and `neutral` overall 9.2 -> 11.3.
+
+**Open (design, not acted on).** The avatar's actives (Rallying Cry, Mending Light, Aegis) and
+passive cooldowns were authored for the old cadence; at roughly 0.56 turns per unit of time they are
+a much smaller share of a battle. Retuning them (shorter cooldowns, larger magnitudes, or a faster
+authored avatar Speed) is a design choice about how big the avatar's role should be, not a balance
+repair: per-beast balance holds without it.
+
+Reproduce: `dotnet run --project Tooling/BalanceSim -c Release -- --seeds 12345,777,4242 --out out/gauge.md`
+(about 140 s).

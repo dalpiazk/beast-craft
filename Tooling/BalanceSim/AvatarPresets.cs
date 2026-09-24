@@ -35,13 +35,20 @@ namespace BeastCraft.Tooling.BalanceSim
         private readonly List<PassiveSkillSO> _passives = new List<PassiveSkillSO>();
         private readonly List<SkillSO> _actives = new List<SkillSO>();
         private readonly SkillLibraryKits _library;
-        private readonly GrowthRateCurve _curve;
+        private readonly AvatarStatsSO _stats;
 
         /// <summary>
         /// The avatar's every combat stat at the growth curve's max level (scale 1): a mid-roster
         /// beast's Attack, Defense and SpecialAttack. A sim fixture, not authored avatar data.
         /// </summary>
         public const int StatAtMaxLevel = 100;
+
+        /// <summary>
+        /// The avatar's Speed at the growth curve's max level: <c>TurnManager.ReferenceSpeed</c>, the
+        /// middle of the roster's 88-110 band, so its own ATB gauge keeps pace with an average beast
+        /// of the same level (the runtime default, <c>AvatarStatsSO.DefaultSpeed</c>).
+        /// </summary>
+        public const int SpeedAtMaxLevel = AvatarStatsSO.DefaultSpeed;
 
         /// <summary>
         /// Builds the preset's passives (and, for <see cref="Library"/>, actives) once; <see cref="None"/>
@@ -52,7 +59,12 @@ namespace BeastCraft.Tooling.BalanceSim
         public AvatarPresets(string preset, SkillLibraryKits library = null, GrowthRateCurve curve = null)
         {
             Preset = preset ?? None;
-            _curve = curve;
+
+            // The avatar's stats are an AvatarStatsSO on the roster's curve, read exactly as the game
+            // reads one (GetStatsAtLevel): Hp 1 (it is never targeted), the combat stats and Speed.
+            _stats = ScriptableObject.CreateInstance<AvatarStatsSO>();
+            _stats.BaseStats = new StatBlock(1, StatAtMaxLevel, StatAtMaxLevel, StatAtMaxLevel, StatAtMaxLevel, SpeedAtMaxLevel);
+            _stats.Growth = curve;
 
             if (Preset == Library)
             {
@@ -120,13 +132,16 @@ namespace BeastCraft.Tooling.BalanceSim
         }
 
         /// <summary>
-        /// A fresh avatar and passive loadout for one battle at <paramref name="level"/>, or
-        /// <c>null</c> (and a null loadout) for <see cref="None"/>. The avatar's stats are a fixture
-        /// block: <see cref="StatAtMaxLevel"/> in every combat stat, scaled by the roster's growth
-        /// curve exactly as a beast's are (<c>round(100 x scale)</c>: 15 at level 1, 57 at 50, 100 at
-        /// 100). Its shields scale off its Defense and its heals off its SpecialAttack, so following
-        /// the beasts' curve keeps their share of a beast's HP the same at every level. (Before heals
-        /// scaled, the block grew linearly as <c>10 + level</c>.)
+        /// A fresh avatar and passive loadout for one battle with the avatar at <paramref name="level"/>
+        /// (<c>--avatar-level</c>, by default the encounter level), or <c>null</c> (and a null
+        /// loadout) for <see cref="None"/>. The avatar's stats are a fixture block,
+        /// <c>AvatarStatsSO.GetStatsAtLevel(level)</c> of <see cref="StatAtMaxLevel"/> in every
+        /// combat stat and <see cref="SpeedAtMaxLevel"/> Speed on the roster's growth curve, exactly
+        /// as a beast's scale (<c>round(100 x scale)</c>: 15 at level 1, 57 at 50, 100 at 100). Its
+        /// shields scale off its Defense and its heals off its SpecialAttack, so following the
+        /// beasts' curve keeps their share of a beast's HP the same at every level; its Speed fills
+        /// its own ATB gauge (it is in the turn order), so following the curve keeps its turn rate
+        /// level with a Speed-100 beast's.
         /// </summary>
         public BattleUnit Build(int level, out PassiveLoadout passives)
         {
@@ -155,9 +170,7 @@ namespace BeastCraft.Tooling.BalanceSim
                 actives = SkillLoadout.FromInstances(skills);
             }
 
-            float scale = _curve == null ? 1f : _curve.GetScaleAtLevel(level);
-            int stat = Math.Max(1, Mathf.RoundToInt(StatAtMaxLevel * scale));
-            return BattleAvatar.Create(actives, new StatBlock(1, stat, stat, stat, stat, 0), null, BattleAvatar.DefaultId, level);
+            return BattleAvatar.Create(actives, _stats.GetStatsAtLevel(level), null, BattleAvatar.DefaultId, level);
         }
 
         private static PassiveSkillSO Passive(string id, PassiveTrigger trigger, PassiveTarget scope, SkillEffect effect)

@@ -50,6 +50,12 @@ namespace BeastCraft.Tooling.BalanceSim
         /// </summary>
         public int[] PassiveFirings;
 
+        /// <summary>The avatar's own turns this battle (0 when no avatar was fielded).</summary>
+        public int AvatarTurns;
+
+        /// <summary>The avatar's active-skill casts this battle (every <c>AvatarActivations</c> entry).</summary>
+        public int AvatarCasts;
+
         /// <summary>
         /// Per team member: the sum over its hits of the random multiplier applied to each,
         /// <c>(crit ? CritMultiplier : 1) * variance / 100</c>. Divided by <see cref="MemberHits"/>
@@ -653,9 +659,11 @@ namespace BeastCraft.Tooling.BalanceSim
                 PassiveFirings = Avatar.Enabled ? new int[Avatar.Passives.Count] : null
             };
 
-            TurnManager turnManager = new TurnManager(units);
             Random rng = new Random(DeriveSeed(_options.Seed, mode, level, encounter.Id, teamIndex, sample));
-            BattleUnit avatar = Avatar.Build(level, out PassiveLoadout passives);
+            BattleUnit avatar = Avatar.Build(_options.AvatarLevel > 0 ? _options.AvatarLevel : level, out PassiveLoadout passives);
+
+            // The avatar fills its own ATB gauge: it is in the turn order, never in the targeting roster.
+            TurnManager turnManager = new TurnManager(avatar == null ? units : new List<BattleUnit>(units) { avatar });
             TeamBondLoadout bonds = TeamBonds[teamIndex].Count == 0 ? null : new TeamBondLoadout(TeamBonds[teamIndex], members);
             BattleOutcome outcome;
             long elapsedTicks;
@@ -673,6 +681,7 @@ namespace BeastCraft.Tooling.BalanceSim
                     foreach (BattleTurnResult turn in result.Turns)
                     {
                         CountPassives(battle, turn.PassiveActivations);
+                        CountAvatar(battle, turn, avatar);
                     }
                 }
             }
@@ -720,9 +729,12 @@ namespace BeastCraft.Tooling.BalanceSim
                         }
 
                         lastTurnTicks = turnManager.ElapsedTicks;
-                        BattleTurnResult turn = BattleTurnExecutor.ExecuteTurn(current, units, grid, rng, avatar, passives);
+                        BattleTurnResult turn = current == avatar
+                            ? BattleTurnExecutor.ExecuteAvatarTurn(avatar, units, grid, rng, passives)
+                            : BattleTurnExecutor.ExecuteTurn(current, units, grid, rng, avatar, passives);
                         actions++;
                         CountPassives(battle, turn.PassiveActivations);
+                        CountAvatar(battle, turn, avatar);
 
                         bool actorIsMember = memberIndex.TryGetValue(current, out int actor);
                         for (int u = 0; u < units.Count; u++)
@@ -782,6 +794,16 @@ namespace BeastCraft.Tooling.BalanceSim
             }
 
             return Kit.Loadout(mode == KitMode.Elemental ? _elementalKits[speciesIndex] : _neutralKits[speciesIndex]);
+        }
+
+        private static void CountAvatar(PveBattle battle, BattleTurnResult turn, BattleUnit avatar)
+        {
+            if (avatar != null && turn.Unit == avatar)
+            {
+                battle.AvatarTurns++;
+            }
+
+            battle.AvatarCasts += turn.AvatarActivations.Count;
         }
 
         private static void CountPassives(PveBattle battle, IReadOnlyList<PassiveActivation> activations)

@@ -119,13 +119,13 @@ namespace BeastCraft.Battle
         /// <summary>The captured <see cref="PassiveSkillSO.MaxTriggersPerBattle"/>; 0 is unlimited.</summary>
         public int MaxTriggersPerBattle { get; }
 
-        /// <summary>The captured <see cref="PassiveSkillSO.InternalCooldown"/>, in avatar ticks.</summary>
+        /// <summary>The captured <see cref="PassiveSkillSO.InternalCooldown"/>, in avatar turns.</summary>
         public int InternalCooldown { get; }
 
         /// <summary>How many times it has fired this battle.</summary>
         public int TriggerCount { get; private set; }
 
-        /// <summary>Avatar ticks left before it may fire again; 0 when it is off cooldown.</summary>
+        /// <summary>Avatar turns left before it may fire again; 0 when it is off cooldown.</summary>
         public int CooldownRemaining { get; private set; }
 
         /// <summary>Whether it has fired <see cref="MaxTriggersPerBattle"/> times and will not fire again this battle.</summary>
@@ -156,7 +156,7 @@ namespace BeastCraft.Battle
             CooldownRemaining = InternalCooldown;
         }
 
-        /// <summary>One avatar tick off the internal cooldown, floored at 0.</summary>
+        /// <summary>One avatar turn off the internal cooldown, floored at 0.</summary>
         internal void TickCooldown()
         {
             if (CooldownRemaining > 0)

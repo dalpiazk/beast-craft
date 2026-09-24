@@ -105,7 +105,7 @@ namespace BeastCraft.Battle
     /// to the reachable tile farthest from the nearest living enemy that still keeps that enemy
     /// within its longest single-target reach, never closer than it already stands (see
     /// <see cref="Retreat"/>; reported as <see cref="BattleTurnResult.RetreatSteps"/>). It
-    /// happens before the avatar's activations, and not at all for a unit that defeated itself.
+    /// does not happen at all for a unit that defeated itself.
     /// </description></item>
     /// </list>
     /// With a null grid nothing moves, whatever the stance.
@@ -155,7 +155,9 @@ namespace BeastCraft.Battle
         /// <summary>
         /// Runs one unit's whole turn: expire its timed modifiers, tick its rotation, then attempt
         /// every ready slot in stack order — moving toward a target when a skill needs it and the
-        /// turn can still afford it — and finally tick the avatar if this was a player beast.
+        /// turn can still afford it. The avatar is not ticked here: it takes turns of its own
+        /// (<see cref="ExecuteAvatarTurn"/>), and handed the avatar as <paramref name="unit"/> this
+        /// runs exactly that.
         /// <para>
         /// The steps, in order:
         /// <list type="number">
@@ -170,11 +172,11 @@ namespace BeastCraft.Battle
         /// <item><description>
         /// <see cref="StatusEffects.BeginTurn"/>: this turn is counted off every status the unit
         /// carries and its damage-over-time stacks deal their damage (shield first). A unit they
-        /// defeat stops here — no movement, no skills, and no avatar tick, since it took no turn.
+        /// defeat stops here — no movement, no skills, since it took no turn.
         /// A unit that began the turn <see cref="StatusType.Stun">stunned</see> skips the next three
         /// steps: it does not move, fires nothing, and its cooldowns do <em>not</em> tick (a stun
         /// delays the rotation rather than burning it). Its gauge was spent as normal by
-        /// <see cref="TurnManager"/>, and the avatar still ticks on a stunned player beast's turn.
+        /// <see cref="TurnManager"/>.
         /// </description></item>
         /// <item><description>
         /// <see cref="SkillLoadout.Tick"/>, which counts every slot down and reports the ones now at
@@ -193,14 +195,6 @@ namespace BeastCraft.Battle
         /// <item><description>
         /// A Ranged or Skirmisher unit that is still standing spends any budget left over on a
         /// retreat (see the stance notes on this class). A Vanguard's leftover is discarded.
-        /// </description></item>
-        /// <item><description>
-        /// On a <see cref="BattleTeam.Player"/> unit's turn only, the avatar's loadout is ticked and
-        /// resolved through <see cref="SkillLoadout.TickAndResolve"/>, per the confirmed rule that
-        /// it ticks once per player-side beast turn. Its effects are applied too. Under the ATB
-        /// gauge this means a faster team also cycles its avatar faster; whether the avatar should
-        /// instead fill a gauge of its own from its own Speed is an open design item (battle-system
-        /// design doc, §6), and the rule is unchanged until it is decided.
         /// </description></item>
         /// <item><description>
         /// <see cref="StatusEffects.EndTurn"/>: statuses with no turns left come off.
@@ -224,7 +218,7 @@ namespace BeastCraft.Battle
         /// all when a taunt decides the pick), every damage hit that lands draws its crit roll then
         /// its variance roll from it, and a non-damage effect whose chance is below 100 draws its
         /// chance check (see <see cref="SkillEffectApplier"/>), all in the order
-        /// the turn fires skills — the unit's ready slots in stack order, then the avatar's — and
+        /// the turn fires skills — the unit's ready slots in stack order — and
         /// within each skill in <see cref="SkillEffectApplier"/>'s target-major, authored-effect
         /// order. A null rng is the deterministic fallback: no variance, no crits (see
         /// <see cref="DamageFormula"/>).
@@ -263,9 +257,9 @@ namespace BeastCraft.Battle
         /// <see cref="BeastCraft.Avatar.PassiveTrigger.AllyCrit"/>.
         /// </description></item>
         /// <item><description>
-        /// At the avatar tick (player beasts' turns only): every passive's internal cooldown ticks
-        /// once, before the avatar's actives; then the after-damage hook after each avatar
-        /// activation (its crits are not ally crits).
+        /// On the avatar's own turn (<see cref="ExecuteAvatarTurn"/>): every passive's internal
+        /// cooldown ticks once, before the avatar's actives; then the after-damage hook after each
+        /// avatar activation (its crits are not ally crits).
         /// </description></item>
         /// </list>
         /// A passive whose proc chance is below 100 draws once from <paramref name="rng"/> for its
@@ -275,6 +269,12 @@ namespace BeastCraft.Battle
         public static BattleTurnResult ExecuteTurn(BattleUnit unit, IEnumerable<BattleUnit> allUnits, HexGrid grid, Random rng, BattleUnit avatar,
                                                    PassiveLoadout passives)
         {
+            if (unit != null && unit == avatar)
+            {
+                // The avatar's own gauge came up: it has a turn of its own, not a beast's.
+                return ExecuteAvatarTurn(avatar, allUnits, grid, rng, passives);
+            }
+
             List<BattleSkillOutcome> outcomes = new List<BattleSkillOutcome>();
             List<SkillActivation> avatarActivations = new List<SkillActivation>();
             List<PassiveActivation> passiveActivations = new List<PassiveActivation>();
@@ -406,32 +406,89 @@ namespace BeastCraft.Battle
                 remaining -= retreatSteps;
             }
 
-            if (unit.Team == BattleTeam.Player && avatar != null)
-            {
-                // The avatar tick: passive cooldowns count down on the same clock as its actives.
-                if (hooks != null)
-                {
-                    passives.TickCooldowns();
-                }
-
-                if (avatar.Skills != null)
-                {
-                    IReadOnlyList<SkillActivation> cast = avatar.Skills.TickAndResolve(avatar, allUnits, grid, rng);
-
-                    for (int i = 0; i < cast.Count; i++)
-                    {
-                        SkillEffectApplier.Apply(cast[i], avatar, rng, grid);
-                        LiftDefeated(allUnits, grid);
-                        avatarActivations.Add(cast[i]);
-                        hooks?.AfterApplication(unit, null);
-                    }
-                }
-            }
-
             StatusEffects.EndTurn(unit);
 
             return new BattleTurnResult(unit, start, unit.Position, budget, budget - remaining, outcomes, avatarActivations, retreatSteps, stunned,
                                         statusDamage, passiveActivations);
+        }
+
+        /// <summary>
+        /// Runs the avatar's own turn: the avatar is in the <see cref="TurnManager"/> roster (it
+        /// fills a gauge from its own Speed like any unit) but not in <paramref name="allUnits"/>,
+        /// so it is never targeted and never counted by the win check. On its turn, in order:
+        /// <list type="number">
+        /// <item><description>
+        /// If <paramref name="passives"/> has not begun (a caller driving turns itself without
+        /// <see cref="BeginBattle"/>), its battle-start hook runs first.
+        /// </description></item>
+        /// <item><description>
+        /// Anything defeated outside this type is lifted off the grid, and the avatar's own timed
+        /// modifiers tick (a buff it gave itself with a <see cref="SkillTargetShape.Self"/> skill is
+        /// counted in its own turns, like a beast's). It has no status engine step: nothing can put
+        /// a status on a unit nobody can target.
+        /// </description></item>
+        /// <item><description>
+        /// Every passive's internal cooldown ticks once (<see cref="PassiveLoadout"/> cooldowns are
+        /// counted in avatar turns), before its actives.
+        /// </description></item>
+        /// <item><description>
+        /// <see cref="SkillLoadout.TickAndResolve"/> on its actives; each activation is applied with
+        /// the avatar as caster, the newly defeated are lifted off the grid, and the after-damage
+        /// passive hook runs. The avatar's crits are not ally crits, and an enemy its skill defeats
+        /// credits no beast (an <see cref="BeastCraft.Avatar.PassiveTrigger.EnemyDefeated"/> passive
+        /// scoped to the triggering unit finds none).
+        /// </description></item>
+        /// </list>
+        /// <see cref="BeastCraft.Avatar.PassiveTrigger.AllyTurnStart"/> passives do not fire here:
+        /// they fire as each player <em>beast's</em> turn opens.
+        /// The result is attributed to the avatar: no movement, no <see cref="BattleTurnResult.SkillOutcomes"/>,
+        /// its casts on <see cref="BattleTurnResult.AvatarActivations"/> and its passives on
+        /// <see cref="BattleTurnResult.PassiveActivations"/>.
+        /// <see cref="ExecuteTurn(BattleUnit, IEnumerable{BattleUnit}, HexGrid, Random, BattleUnit, PassiveLoadout)"/>
+        /// routes here when handed the avatar as the unit, so a caller driving turns itself gets the
+        /// same turn. A null avatar takes no turn (an empty result).
+        /// </summary>
+        public static BattleTurnResult ExecuteAvatarTurn(BattleUnit avatar, IEnumerable<BattleUnit> allUnits, HexGrid grid, Random rng, PassiveLoadout passives)
+        {
+            List<SkillActivation> avatarActivations = new List<SkillActivation>();
+            List<PassiveActivation> passiveActivations = new List<PassiveActivation>();
+
+            if (avatar == null)
+            {
+                return new BattleTurnResult(null, HexCoordinate.Zero, HexCoordinate.Zero, 0, 0, null, avatarActivations);
+            }
+
+            PassiveHooks hooks = PassiveHooks.For(passives, avatar, allUnits, grid, rng, passiveActivations);
+
+            if (hooks != null && !passives.HasBegun)
+            {
+                passives.Begin(avatar, allUnits, grid, rng, passiveActivations);
+            }
+
+            LiftDefeated(allUnits, grid);
+            SkillEffectApplier.TickModifiers(avatar);
+
+            if (hooks != null)
+            {
+                passives.TickCooldowns();
+            }
+
+            if (avatar.Skills != null)
+            {
+                IReadOnlyList<SkillActivation> cast = avatar.Skills.TickAndResolve(avatar, allUnits, grid, rng);
+
+                for (int i = 0; i < cast.Count; i++)
+                {
+                    SkillEffectApplier.Apply(cast[i], avatar, rng, grid);
+                    LiftDefeated(allUnits, grid);
+                    avatarActivations.Add(cast[i]);
+
+                    // No beast is credited: this is nobody's turn but the avatar's.
+                    hooks?.AfterApplication(null, null);
+                }
+            }
+
+            return new BattleTurnResult(avatar, avatar.Position, avatar.Position, 0, 0, null, avatarActivations, 0, false, 0, passiveActivations);
         }
 
         /// <summary>
@@ -515,9 +572,17 @@ namespace BeastCraft.Battle
         /// <paramref name="allUnits"/> is the roster: the beasts on both sides, and not the avatar,
         /// which is a caster only (see <see cref="BattleAvatar"/>). It is copied once up front, so
         /// the win check and every turn's targeting read the same list, and the caller's collection
-        /// is not retained. It is expected to hold the same units <paramref name="turnManager"/> was
+        /// is not retained. It is expected to hold the same beasts <paramref name="turnManager"/> was
         /// built from; if it does not, the loop still terminates — a turn order that runs dry while
         /// both sides look alive reports <see cref="BattleOutcome.Stalemate"/> rather than spinning.
+        /// </para>
+        /// <para>
+        /// <strong>The avatar's gauge.</strong> With an avatar, build <paramref name="turnManager"/>
+        /// from the beasts <em>and</em> the avatar: it fills a gauge from its own Speed like any
+        /// unit, and when <see cref="TurnManager.CurrentUnit"/> is the avatar the loop runs
+        /// <see cref="ExecuteAvatarTurn"/> instead of a beast's turn. Its turns are in
+        /// <see cref="BattleResult.Turns"/> (and <see cref="BattleResult.ActionCount"/>) like any
+        /// other. A turn manager built without it simply never gives the avatar a turn.
         /// </para>
         /// <para>
         /// Non-throwing: a null turn manager or an empty roster returns a result rather than
@@ -584,7 +649,7 @@ namespace BeastCraft.Battle
                 if (!current.IsDefeated)
                 {
                     lastTurnTicks = turnManager.ElapsedTicks;
-                    turns.Add(ExecuteTurn(current, roster, grid, rng, avatar, passives));
+                    turns.Add(current == avatar ? ExecuteAvatarTurn(avatar, roster, grid, rng, passives) : ExecuteTurn(current, roster, grid, rng, avatar, passives));
                 }
 
                 turnManager.AdvanceTurn();

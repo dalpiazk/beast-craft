@@ -69,12 +69,13 @@ puzzle every encounter.
   options. With no player menu, whether a beast has a fallback attack at all — or simply always has
   at least one short-cooldown skill in its rotation — is open, and items in battle are out of scope
   until there is a mechanism that would use them.
-- **Does the avatar get its own gauge?** The avatar still ticks once per player-beast turn
-  (decision 6). Under the ATB gauge (decision 3) that ties its cadence to how fast the player's
-  beasts are: a fast team cycles its avatar faster. The alternative is an avatar gauge filled by
-  the avatar's own Speed, which would make that stat (currently unused) matter and decouple the
-  avatar from team composition. Open; the rule is unchanged until it is decided.
-- **Avatar level — progression now exists; the battle wiring is still open.** The avatar has its
+- **The avatar's gauge — settled (stage 3b).** The avatar now fills an ATB gauge of its own from
+  its own Speed (decisions 3 and 6), so its cadence no longer depends on the team's size or speed.
+  Still open: the avatar's authored base Speed and growth curve (the default is Speed 100, the
+  reference Speed, at max level), and retuning the avatar's actives and passives for the slower
+  cadence (a four-beast team used to tick it about three times as often; see the tuning log,
+  "Avatar gauge").
+- **Avatar level — progression exists and is wired into battle; its curve is not authored.** The avatar has its
   own level (TUNABLE STARTING DEFAULTS): `AvatarProgress` (save data: `Level`, `Xp`) and
   `AvatarProgression` (own constants, not the skill curve). A level costs `200 + 16 × level` XP
   (216 at level 1, 1,784 at level 99; max level 100). `AwardBattle(progress, outcome, enemyLevel)`
@@ -85,9 +86,11 @@ puzzle every encounter.
   `--mode pacing`); fighting below one's level pays less. Stats: `AvatarStatsSO.Growth` (a
   `GrowthRateCurve`, as a species has) with `GetStatAtLevel` / `GetStatsAtLevel(level)`, which
   scale `BaseStats` (then the max-level block) like `CreatureSpeciesSO.GetStatAtLevel` — MoveRange
-  and CritChance exempt, Speed scales; no `Growth` keeps the block flat. Still open: the battle
-  setup (and the simulator's avatar presets) passing `AvatarProgress.Level` and
-  `GetStatsAtLevel(level)` into `BattleAvatar.Create`, and authoring the avatar's growth curve.
+  and CritChance exempt, Speed scales; no `Growth` keeps the block flat. Wired:
+  `BattleAvatar.Create(book, activeLookup, passiveLookup, statsAsset, progress, gear, out passives)`
+  builds the avatar from `statsAsset.GetStatsAtLevel(progress.Level)` at that level, and the
+  simulator's avatar presets read their fixture block the same way (`--avatar-level`, default the
+  encounter level). Still open: authoring the avatar's `AvatarStatsSO` and its growth curve.
 
 ## Encounter direction: PvE, not PvP — DIRECTION, NOT YET A CONFIRMED DECISION
 
@@ -277,7 +280,8 @@ re-simulation always agree):
 - **Defeated units** never fill and are never handed a turn.
 - **Per-turn counters are unchanged.** Cooldowns (decision 5), timed buffs and the movement budget
   (decision 7) were always counted in the unit's *own* turns, so a faster unit simply cycles them
-  faster. The avatar is the exception still being discussed; see decision 6.
+  faster. The avatar is no exception: it fills its own gauge from its own Speed and counts its
+  cooldowns (and its passives' internal cooldowns) in its own turns; see decision 6.
 
 *Time.* There are no rounds any more. Battle time is counted in integer ticks
 (`TurnManager.ElapsedTicks`) and reported **normalized**: 1.0 = one turn of a Speed-100 unit
@@ -409,7 +413,7 @@ player can reason about it while building, and it needs no runtime decision-maki
 is that a beast can fire a skill at a moment when a human player wouldn't have — which is the same
 trade auto-resolution already made everywhere else.
 
-### 6. The avatar's skill loadout — DECIDED (timing and targeting); stats AMENDED; passives ADDED
+### 6. The avatar's skill loadout — DECIDED (timing and targeting); stats AMENDED; passives ADDED; timing AMENDED (own gauge)
 
 **The avatar has skills too, on the same rotation mechanic**, intended to support and buff the
 player's own beasts rather than to attack. **Amended (user):** those active skills stay, but the
@@ -417,18 +421,22 @@ avatar's *main* role is now its **3 passive slots** — passives that fire on ba
 than on a rotation — and both its actives and its passives are acquired and leveled slowly through
 play on the same progression model as beast skills. See "Avatar passives" below for the passive
 rules; everything in this section about the active loadout still holds. Per decision 2 the avatar is **not a piece on the grid**
-and has no meaningful `HexCoordinate` position, and it correspondingly gets **no turn of its own in
-the turn order** (no gauge — but see the open item below).
+and has no meaningful `HexCoordinate` position; it does, however, have **a turn of its own in the
+turn order** (see the timing amendment below).
 
-**Confirmed timing:** the avatar's loadout **ticks once every time one of the player's own beasts
-takes its turn.** Not on enemy turns — once per player-side beast-turn. With three player beasts
-deployed, the avatar's counters therefore tick three times for every turn a typical one of them
-takes, and an avatar skill on a 3-turn cooldown fires about as often as one beast acts.
+**Confirmed timing — amended (stage 3b): the avatar has its own gauge.** The avatar fills an ATB
+gauge from **its own Speed**, exactly as a beast does (decision 3: square-root fill, the same
+tie-breaks), and its loadout **ticks once per avatar turn**. On its turn
+(`BattleTurnExecutor.ExecuteAvatarTurn`) its passives' internal cooldowns tick, then its actives
+tick and fire; it has no movement and no status step. Its cadence therefore no longer depends on how
+many beasts the player fields or how fast they are: a Speed-100 avatar acts once per unit of battle
+time whether it supports one beast or six. The default Speed is 100 (`AvatarStatsSO.DefaultSpeed`,
+the reference Speed and the middle of the roster's 88-110 band), scaled with the avatar's level like
+its other stats.
 
-**Open item since the ATB amendment (decision 3).** Rounds are gone, so "once per player-beast turn"
-now also means the avatar cycles faster the faster the player's beasts are. Whether the avatar
-should instead fill a gauge of its own from its own Speed is undecided (listed under "What is not
-settled yet"); until then the rule above stands and is what `BattleTurnExecutor` does.
+*Superseded:* the avatar's loadout used to tick once every time one of the player's own beasts took
+its turn (not on enemy turns). Under the ATB gauge that made a fast or large team cycle its avatar
+faster, which is why it was listed as an open item until the gauge was chosen.
 
 **Confirmed targeting:** **avatar skills are restricted to the position-free target shapes —
 `Self`, `AllAllies`, `AllEnemies`.** This closes the question this section previously left open.
@@ -452,20 +460,21 @@ unchanged.
 
 Two consequences of that representation, both deliberate:
 
-- **The avatar is a caster, not a member of the roster.** It is passed as the `caster` argument and
-  is *not* added to the `allUnits` roster or to `TurnManager`. That is what makes it a non-combatant
-  in practice: it takes no initiative turn, an enemy `AllEnemies` sweep cannot reach it, and its own
-  `AllAllies` buff lands on the player's beasts. A `Self` skill still works, since the resolver
-  returns the caster directly without consulting the roster.
+- **The avatar is a caster, not a member of the roster.** It is passed as the `caster` (or
+  `avatar`) argument and is *not* added to the `allUnits` roster; it *is* added to `TurnManager`
+  (its gauge). Keeping it out of the roster is what makes it a non-combatant in practice: the win
+  check never counts it, an enemy `AllEnemies` sweep cannot reach it, and its own `AllAllies` buff
+  lands on the player's beasts. A `Self` skill still works, since the resolver returns the caster
+  directly without consulting the roster.
 - **The avatar cannot be defeated.** `IsDefeated` stays `false` for the life of the battle; there
   is no rule in the design by which a commander could be defeated, and nothing can write the flag on
   a unit it cannot target. (This bullet originally also said the avatar had no stats — superseded,
   see below.)
 
-**The timing half is now wired up.** `BattleTurnExecutor` ticks the avatar's loadout at the end of
-every player-side beast's turn, exactly as this section describes: not on enemy turns, and not on a
-clock of its own. The rotation engine that landed for decision 5 is deliberately owner-agnostic, so it
-drives the avatar unchanged.
+**The timing half is wired up.** `RunBattle` hands the avatar's turns to
+`BattleTurnExecutor.ExecuteAvatarTurn` (and `ExecuteTurn`, handed the avatar, does the same), and a
+beast's turn no longer ticks the avatar. The rotation engine that landed for decision 5 is
+deliberately owner-agnostic, so it drives the avatar unchanged. Without an avatar nothing changes.
 
 **Amendment — the avatar has stats and stat gear (supersedes "the avatar has no stats").** This
 section previously decided that the avatar's `StatBlock` is all zeros because avatar items are
@@ -474,7 +483,8 @@ cosmetic. The producer has reversed that, and the rule is now two separate thing
 - **Avatar cosmetics stay purely cosmetic.** The customization system (`AvatarCustomizationSchema`)
   is unchanged: it decides what the avatar looks like and grants no stats.
 - **The avatar has real stats, raised by non-cosmetic avatar gear that is never rendered.** Its
-  base is authored on an `AvatarStatsSO` (a flat `StatBlock`; there is no avatar level). Gear is
+  base is authored on an `AvatarStatsSO` (a `StatBlock` of max-level values with a growth curve,
+  scaled to the avatar's own level; see "What is not settled yet", avatar level). Gear is
   `AvatarGearSO` — a stable `AvatarGearId`, display name, description, inventory icon, an
   `AvatarGearSlot` (`Weapon`, `Armor`, `Trinket`), a `StatModifier` list and a rarity tier, and no
   visual fields at all. It is a separate type from the beasts' `GearSO`, with its own slot enum, so
@@ -482,8 +492,8 @@ cosmetic. The producer has reversed that, and the rule is now two separate thing
   equipped)` assembles the avatar's stats through `StatCalculator` exactly like beast gear (flat,
   then summed percent, rounded, every stat at least 0 and `HP` at least 1); null gear and null
   modifiers are skipped, and one-item-per-slot is left to the equipment screen, as for beasts. The
-  original `BattleAvatar.Create(skills)` still builds an all-zero avatar for callers with no stats
-  authored.
+  original `BattleAvatar.Create(skills)` still builds a zero-stat avatar for callers with no stats
+  authored, except for Speed 100 so that its gauge fills at the reference rate.
 
 **Amendment — the avatar's skills progress, and it has passives.** The avatar's skills now live
 in an `AvatarSkillBook` (save data): `Actives` (its active support skills, **3 slots**,
@@ -494,14 +504,14 @@ activeLookup, passiveLookup, baseStats, gear, level, out passives)` builds the a
 equipped actives as its `SkillLoadout` (at their levels) and hands back its equipped passives as the
 battle's `PassiveLoadout`. The passives are the subject of "Avatar passives".
 
-Everything else above is unchanged: the avatar is still off the grid, still takes no initiative
-turn, still ticks on player-beast turns, is still a caster outside the roster, and still cannot be
+Everything else above is unchanged: the avatar is still off the grid, takes its own turns from its
+own gauge (the timing amendment), is still a caster outside the roster, and still cannot be
 defeated. **The avatar's stats now feed the damage formula** exactly as a beast's do (see "Damage
 formula"): a damaging avatar skill uses the avatar's `Attack` or `SpecialAttack`. Heals
 scale with the caster's `SpecialAttack`, the avatar's included; buffs are still flat for everyone,
-so an avatar buff still lands the same whatever the avatar's stats are. Avatar leveling is out of scope and open (see "What is not settled yet"); the statful
-`BattleAvatar.Create` takes a per-battle level (default 1), recorded on the unit (the damage formula
-no longer reads level). The zero-stat `Create(skills)` avatar has no attacking stat, so every damage
+so an avatar buff still lands the same whatever the avatar's stats are. The avatar's level is its own
+(`AvatarProgress.Level`, see "What is not settled yet"); the statful `BattleAvatar.Create` takes it
+(default 1) and records it on the unit (the damage formula no longer reads level). The zero-stat `Create(skills)` avatar has no attacking stat, so every damage
 effect it lands deals the formula's `MinimumDamage` floor of 1 — see "Damage formula".
 
 ### 7. Movement during a turn — DECIDED
@@ -617,7 +627,7 @@ The rules in full:
   already on a best tile stays), then breadth-first order. The unit's own tile always competes, so
   a retreat never ends nearer the enemy than it started; a unit that is already beyond its reach
   stays put (approaching is the skills' job). No retreat with no enemy left, no picking skill, a
-  null grid, or if the unit defeated itself. It happens before the avatar's activations, counts in
+  null grid, or if the unit defeated itself. It counts in
   the turn's `MovementSpent`, and is reported as `BattleTurnResult.RetreatSteps`.
 - **Vanguard screens.** Among routes that reach range in the same number of steps, a Vanguard picks
   the one whose end tile this turn (the in-range stop, or where a partial approach runs out) is
@@ -631,7 +641,7 @@ Leviathan, Golem, Treant, Tarasque, Frost Wyrm (see "Starter roster").
 
 *Scaffold details, not confirmed balance.* The three stances and who is which are decided; the
 heuristics under them (the tie-break orders, the screening distance, the retreat cap at the longest
-single-target range, retreating before the avatar acts) are engineering defaults chosen to be
+single-target range) are engineering defaults chosen to be
 deterministic and legible, and are cheap to revisit. The balance simulator's first look at them is
 in the tuning log ("After combat stances"): with the one-size standard kit, Ranged beasts lose
 Strike's damage and the physical/special parity the kit was tuned to, so the numbers say more about
@@ -773,8 +783,10 @@ The turn order is:
 2. Tick the timed modifiers.
 3. `BeginTurn`: damage-over-time lands, and the stun is read.
 4. Skills, movement and retreat, unless stunned.
-5. The avatar tick.
-6. `EndTurn`.
+5. `EndTurn`.
+
+The avatar's own turn has none of these steps beyond lifting the defeated and ticking its timed
+modifiers: nothing can put a status on it (decision 6).
 
 The statuses:
 
@@ -790,7 +802,7 @@ The statuses:
 - **Stun** (also used for Freeze). A unit that begins its turn stunned skips it. It does not move,
   fires nothing, does not retreat, and **its cooldowns do not tick**: a stun delays the rotation
   rather than burning it. Its timed modifiers and statuses still tick, and its gauge is spent as
-  normal. The avatar still ticks on a stunned player beast's turn. Stuns do not stack. A new stun
+  normal. Stuns do not stack. A new stun
   keeps whichever of the two has more turns left.
 - **Shield.** It absorbs damage before HP. It is worth `Magnitude`% of the **caster's** `Defense`
   (`StatusEffects.ShieldPercentDivisor`), level-scaled like every magnitude and truncated. Every
@@ -801,8 +813,7 @@ The statuses:
   `DamageFormula` with `Magnitude` as the power: the caster's attacking stat against the target's
   defending stat (by the skill's category), with the element, no crit, no variance and a floor of
   1. Later buffs do not change it. The damage is dealt at the start of each of the affected unit's
-  own turns, through its shield. A unit its stacks defeat takes no turn: no skills, and no avatar
-  tick. `MaxStacks` copies per authored effect ride at once, each on its own clock. At the cap, the
+  own turns, through its shield. A unit its stacks defeat takes no turn: no skills. `MaxStacks` copies per authored effect ride at once, each on its own clock. At the cap, the
   copy with the fewest turns left is replaced, so the default of 1 refreshes.
 - **Knockback.** It pushes the target `Magnitude` whole hexes away from the caster, one tile at a
   time. The distance uses the authored magnitude and is not level-scaled. It stops at the first
@@ -1096,8 +1107,8 @@ the +2 offset (2, or 4 on a strong matchup). An avatar meant to hit hard should 
 via the statful overload.
 
 **Levels.** `BattleUnit` carries a `Level` (at least 1; an optional constructor argument defaulting
-to 1). `BattleUnitFactory.CreateBeast` records the level it assembled the stats at. The avatar has no
-progression level, so the statful `BattleAvatar.Create` takes a per-battle level (default 1) — see
+to 1). `BattleUnitFactory.CreateBeast` records the level it assembled the stats at. The statful
+`BattleAvatar.Create` takes the avatar's own level (`AvatarProgress.Level`, default 1) — see
 "What is not settled yet". None of these feed damage any more; level reaches damage only through the
 stats it assembled.
 
@@ -1153,7 +1164,7 @@ already carries for `ExecuteTurn` / `RunBattle` — is threaded through
 power, rng)`. Each damage effect that lands on a target draws **exactly two numbers, crit first,
 then variance**, always both — even at a 0% or 100% chance or zero power — so the number of draws
 never depends on stats. Draws happen in the order the battle fires skills: the unit's ready slots in
-stack order, then the avatar's activations; within a skill, target-major and then in authored effect
+stack order (on the avatar's own turn, its activations in slot order); within a skill, target-major and then in authored effect
 order; an effect skipped because its target is already defeated draws nothing. Targeting draws from
 the same stream only for `SkillTargetingCriterion.Random`. A battle is therefore random but
 reproducible: the same seed replays it exactly.
@@ -1218,8 +1229,8 @@ the equipment screen's job, but an under-levelled item never grants stats whatev
 arrives in. Null gear and null modifiers are skipped. A second overload takes an explicit base
 `StatBlock` plus a modifier list (with `CollectModifiers` turning a gear list into one) for a
 participant with no species behind it — which is how the avatar's stats are assembled from its
-`AvatarStatsSO` base and its `AvatarGearSO` (decision 6, amended). Avatar gear has no minimum level,
-because the avatar has no progression level.
+`AvatarStatsSO` base (at the avatar's level) and its `AvatarGearSO` (decision 6, amended). Avatar
+gear has no minimum level.
 
 `BattleUnitFactory.CreateBeast` is the pass that assembles a battle-ready `BattleUnit` from a
 creature: stats from `StatCalculator`, elements copied from the species, and the equipped skill
@@ -1636,7 +1647,7 @@ content (10 passives across every trigger) is in the skill library; see "Beast s
 - `PassiveSkillSO` (`Runtime/Avatar`, namespace `BeastCraft.Avatar`): `PassiveId` (stable save key),
   `DisplayName`, `Description`, `Icon`, `Progression` (the shared `SkillProgressionDefinition`
   block), `Trigger`, `HpThresholdPercent` (default 50), `ProcChance` (percent, default 100),
-  `MaxTriggersPerBattle` (0 = unlimited), `InternalCooldown` (avatar ticks), `TargetScope`,
+  `MaxTriggersPerBattle` (0 = unlimited), `InternalCooldown` (avatar turns), `TargetScope`,
   `Element` and `Category` (for damage effects, as on `SkillSO`), and `Effects` (a
   `List<SkillEffect>`: the whole effect engine).
 - `PassiveTrigger`: `Aura = 0`, `BattleStart = 1`, `EnemyDefeated = 2`, `AllyDefeated = 3`,
@@ -1673,8 +1684,9 @@ avatar's placeholder tile and should not be authored (a content convention, not 
    on a player beast's turn it survived (stunned or not), every `AllyTurnStart` passive with that
    beast as the triggering unit, **before its skills**.
 3. **After every skill a beast fires**: the after-damage check, with that skill's hits.
-4. **The avatar tick** (player beasts' turns only, as before): every passive's internal cooldown
-   ticks down once, then the avatar's actives fire, each followed by the after-damage check.
+4. **The avatar's own turn** (`ExecuteAvatarTurn`, whenever its gauge comes up): every passive's
+   internal cooldown ticks down once, then the avatar's actives fire, each followed by the
+   after-damage check. `AllyTurnStart` never fires on the avatar's turn; it stays per beast turn.
 
 **The after-damage check** handles, in order, each trying its passives in slot order:
 
@@ -1683,8 +1695,9 @@ avatar's placeholder tile and should not be authored (a content convention, not 
 - Defeats: every unit defeated since the last check, in roster order. `AllyDefeated` for a player
   beast (the fallen beast is the triggering unit, so pair it with `AllAllies` or
   `LowestHpFractionAlly`, not `TriggeringUnit`); `EnemyDefeated` for an enemy (the triggering unit is
-  the beast whose turn it is when that is a living player beast — it gets the credit, even for an
-  avatar active's kill — and otherwise none).
+  the beast whose turn it is when that is a living player beast — it gets the credit — and
+  otherwise none, as on an enemy's turn or the avatar's own, where an avatar active's kill credits
+  nobody).
 - `AllyBelowHpPercent`: every living player beast, in roster order, **strictly below** the passive's
   threshold (`CurrentHp × 100 < HpThresholdPercent × Stats.Hp`, integers). It fires **once per
   crossing**: the passive latches that beast on the attempt (whether or not the attempt fires) and
@@ -1693,15 +1706,15 @@ avatar's placeholder tile and should not be authored (a content convention, not 
   emergency passive can answer the hit that caused the crossing.
 
 Passives therefore react on enemy turns too (an ally falling, an ally dropping low, an enemy dying
-to its own damage-over-time), but their cooldowns only tick on avatar ticks.
+to its own damage-over-time), but their cooldowns only tick on the avatar's own turns.
 
 **Gating**, checked in this order each time a passive's trigger happens: not spent
 (`MaxTriggersPerBattle`), off its internal cooldown, at least one target in its scope, then the
 `ProcChance` roll. A blocked or failed attempt changes nothing (no count, no cooldown). A firing
-counts toward the cap and sets the cooldown to `InternalCooldown`; each avatar tick takes one off.
-Because the tick comes at the end of each player beast's turn, a passive with cooldown `N` that
-fires at a player beast's turn start is ready again at the `N`-th player-beast turn start after
-that one (enemy turns in between do not count). `ProcChance` of 0 or below, or above 100, reads as 100, like
+counts toward the cap and sets the cooldown to `InternalCooldown`; each avatar turn takes one off.
+So a passive with cooldown `N` is ready again after the avatar's `N`-th turn following the firing,
+however many beast turns (either side's) fall in between: with a Speed-100 avatar, about `N` units
+of battle time. `ProcChance` of 0 or below, or above 100, reads as 100, like
 `SkillEffect.Chance`.
 
 **No chaining.** A unit defeated by a passive's own effect is recorded silently: it never triggers
@@ -1744,12 +1757,18 @@ so its shields and heals are the same share of a beast's HP at every level. (Unt
 was `10 + level`, which made level-1 avatar heals and shields relatively weak.) The report then gains an
 "Avatar passives" section with firings per battle. The simulator's own loop calls `BeginBattle` and
 passes the passives to every turn, so `--self-check` still compares it against `RunBattle`.
+**Avatar gauge in the simulator:** the fixture block also carries Speed 100 at max level on the
+same curve (`AvatarStatsSO.GetStatsAtLevel`, so 15 at level 1), the avatar joins the `TurnManager`
+beside the beasts (never the targeting roster), and the simulator's loop runs `ExecuteAvatarTurn`
+when its gauge comes up, mirroring `RunBattle` (the self-check compares them). `--avatar-level <n>`
+fixes the avatar's level (stats and damage level); by default it is each battle's encounter level.
+The "Avatar passives" section also reports the avatar's turns and active casts per battle.
 
 **Open questions.** Whether passive-caused defeats should chain (currently never). Whether the
 avatar's own crits should count as `AllyCrit`. Whether `EnemyDefeated` should credit the unit that
 dealt the blow rather than the unit whose turn it is (they differ for damage-over-time and avatar
-kills). Whether a failed proc roll should consume the threshold crossing. Whether internal cooldowns
-should run on the avatar's own clock if the avatar ever gets a gauge (decision 6's open item).
+kills). Whether a failed proc roll should consume the threshold crossing. (Internal cooldowns now
+run on the avatar's own clock, its gauge; decided with stage 3b.)
 How passives are acquired (drops, quests, avatar milestones) and the passive material economy. No
 passive UI or save system exists yet.
 
