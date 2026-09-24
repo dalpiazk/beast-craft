@@ -564,7 +564,9 @@ namespace BeastCraft.Tooling.BalanceSim
             report.AppendLine("**Per-seed SD** = the teams' spread within one seed (root mean over seeds); **seed-to-seed SD** = how much one team's rate");
             report.AppendLine("moves between seeds (root mean over teams; damage rolls and each seed's composition draw); **persistent SD** =");
             report.AppendLine("sqrt(per-seed SD² - seed-to-seed SD²), the spread that is the lineup's own. Min … max, percentiles and the histogram are");
-            report.AppendLine("of the seed means, which still carry seed-to-seed SD / sqrt(" + n + ") of noise.");
+            report.AppendLine("of the seed means, which still carry seed-to-seed SD / sqrt(" + n + ") of noise. **Superseded** as the measure of how much");
+            report.AppendLine("the lineup matters by the composition panel (`--panel`, \"PvE composition panel over seeds\"): the persistent SD still folds");
+            report.AppendLine("each seed's composition draw into the lineup's spread, where the panel holds the compositions fixed.");
             report.AppendLine();
 
             // [mode][seed].

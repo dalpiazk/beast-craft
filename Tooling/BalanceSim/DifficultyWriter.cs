@@ -64,7 +64,7 @@ namespace BeastCraft.Tooling.BalanceSim
                    "PENDING PRODUCER REVIEW: this is calibrated for " + CalibrationMeaning(options.EffectiveCalibrateOn) + " to clear " +
                    Number(options.TargetClearRate) + "%; the campaign's intended difficulty (and DifficultyScale) is not decided. " +
                    "Regenerate with: dotnet run --project Tooling/BalanceSim -c Release -- " +
-                   "--out docs/balance/tuned-report.md --write-difficulty BeastCraft/Assets/_Project/Data/Encounters/encounter-difficulty.json";
+                   "--panel 16x4 --out docs/balance/tuned-report.md --write-difficulty BeastCraft/Assets/_Project/Data/Encounters/encounter-difficulty.json";
         }
 
         private static string CalibrationMeaning(CalibrationTarget target)

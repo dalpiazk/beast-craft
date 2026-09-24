@@ -68,6 +68,8 @@ dotnet run --project Tooling/BalanceSim -c Release -- [options]
 | `--out <path>` | none | Also write the report to this file (it always goes to stdout). |
 | `--self-check` | off | Run everything twice and fail unless both reports are identical; also replay sample PvE battles through `BattleTurnExecutor.RunBattle` and fail if the simulator's loop disagrees. |
 | `--seeds <list>` | none | Comma-separated base seeds, run one after another in one process (cannot be combined with `--seed`). Each seed's run is exactly the `--seed <n>` run; stdout (and `--out`) get the multi-seed aggregate, and with `--out` each seed's full report is also written beside it as `<name>.seed<n>.md`. See "Multi-seed runs". |
+| `--panel <KxS>` | off | PvE, generated set. Also fight the **composition panel**: K compositions per shape drawn from a constant seed (`SimOptions.PanelSeed`, never `--seed`), every team S times each (S >= 2), at the `--panel-level` cell's calibrated multiplier, and add the "PvE composition panel" section (and "PvE composition panel over seeds" with `--seeds`): the team main-effect SD, the team x composition interaction SD (the value of counter-picking), clear rate by stance mix, and per bond its excess over the additive prediction and reactions per battle. The committed tuned report uses `16x4` (53,760 battles per kit mode, about 14 s). See "Composition panel". |
+| `--panel-level <n>` | `50` | `--panel` only: the level the panel is fought at; one of `--levels`. |
 | `--calibrate-sample <n>` | off | `--calibrate-on mean` only (an error otherwise). **Opt-in, changes results.** The difficulty search evaluates a seeded subset of `n` teams; the chosen multiplier is then run once with every team, and every number in the report comes from that full run. See "Performance". |
 | `--timings` | off | Print a wall-clock breakdown to stderr: per PvE cell, every calibration step (multiplier, clear rate, seconds), PvP, the report and GC counts. Never changes the report. |
 
@@ -94,7 +96,7 @@ Two reports are committed, both the default arguments:
   roster, the skill library, the encounter content, the simulator or the Runtime change:
 
 ```sh
-dotnet run --project Tooling/BalanceSim -c Release -- --out docs/balance/tuned-report.md --write-difficulty BeastCraft/Assets/_Project/Data/Encounters/encounter-difficulty.json
+dotnet run --project Tooling/BalanceSim -c Release -- --panel 16x4 --out docs/balance/tuned-report.md --write-difficulty BeastCraft/Assets/_Project/Data/Encounters/encounter-difficulty.json
 ```
 
 ## Library kits
@@ -704,6 +706,30 @@ dotnet run --project Tooling/BalanceSim -c Release -- --mode pve --seeds 12345,7
   single-seed runs (loading and JIT are a second or two of an 11 s run). What it replaces is the
   bookkeeping: one process per seed and scripts parsing the Markdown back; the aggregate comes
   straight from the simulator's numbers, unrounded.
+
+## Composition panel
+
+`--panel KxS` measures how much the lineup matters, and how much *counter-picking* matters, on a
+fixed set of opponents (`PanelReport.cs`). The run's own compositions change with `--seed`, so the
+older multi-seed "persistent SD" folded each seed's composition draw into the lineup's spread; the
+panel holds the compositions still:
+
+- K compositions per shape are drawn by the game's generator from the constant
+  `SimOptions.PanelSeed` (ids `panel-<shape>-NN`), identical in every run and every seed.
+- All 210 teams fight every panel composition S times at `--panel-level` (default 50), at that
+  cell's calibrated multiplier; each battle is seeded like any other (the panel id is in the seed).
+- Per kit mode and shape, a two-way ANOVA of the 0/1 outcomes (teams x compositions, S replicates):
+  **team main-effect SD** = sqrt(Var(team means) - noise²), noise² = the mean cell variance
+  p(1 - p) / (S - 1) divided by K (the roll noise of a team's panel mean); **interaction SD** =
+  sqrt((MS_int - MS_err) / S), how much a team's clear rate depends on which composition it faces
+  beyond the two means. Pooled = root mean square over the shapes.
+- Clear rate by stance mix (Vanguard / Ranged / Skirmisher counts), per shape.
+- Per library bond: **excess** = the active teams' mean panel rate minus the additive prediction
+  from the beasts' panel marginals (a lower bound on the bond's value, since part of it is absorbed
+  into its members' marginals), and **reactions per battle** for a behaviour bond.
+
+`16x4` is 53,760 battles per kit mode (about 14 s on 8 cores); it is part of the committed
+tuned-report command. With `--seeds`, "PvE composition panel over seeds" lists every seed's SDs.
 
 ## Pacing (`--mode pacing`)
 

@@ -157,6 +157,13 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <summary>The element-scheme weights the compositions were drawn with (generated set), in file order.</summary>
         public List<SchemeWeightData> SchemeWeights = new List<SchemeWeightData>();
 
+        /// <summary>
+        /// <c>--panel</c> only (else empty): the composition panel, one shape per entry of
+        /// <see cref="Shapes"/> (same ids, same order) with <c>--panel</c>'s K compositions drawn from
+        /// <see cref="SimOptions.PanelSeed"/>.
+        /// </summary>
+        public List<EncounterShape> PanelShapes = new List<EncounterShape>();
+
         /// <summary>Every composition of every shape, in shape then composition order.</summary>
         public List<Encounter> AllCompositions
         {
@@ -303,6 +310,21 @@ namespace BeastCraft.Tooling.BalanceSim
                     if (options.EncounterFilter == null || options.EncounterFilter.Contains(shape.Id))
                     {
                         catalog.Shapes.Add(shape);
+                    }
+                }
+
+                if (options.PanelActive)
+                {
+                    List<EncounterShape> panel = GeneratedEncounters.Generate(encounterLibrary, enemies, options, errors, SimOptions.PanelSeed, options.PanelCompositions,
+                                                                              "panel-");
+                    if (panel == null)
+                    {
+                        return null;
+                    }
+
+                    foreach (EncounterShape shape in catalog.Shapes)
+                    {
+                        catalog.PanelShapes.Add(panel.Find(p => p.Id == shape.Id));
                     }
                 }
             }

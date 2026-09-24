@@ -78,6 +78,13 @@ namespace BeastCraft.Tooling.BalanceSim
                                   " levels above the team at its calibrated multiplier; see \"PvE level gap\"");
             }
 
+            if (options.RunPve && options.PanelActive)
+            {
+                report.AppendLine("- Composition panel (PvE, `--panel " + options.PanelCompositions + "x" + options.PanelSamples + "`): every team against a fixed panel of " +
+                                  options.PanelCompositions + " compositions per shape, " + options.PanelSamples + " times each, at level " + options.PanelLevel +
+                                  "; see \"PvE composition panel\"");
+            }
+
             if (options.RunPve && options.AvatarValue)
             {
                 report.AppendLine("- Avatar value (PvE, `--avatar-value`): every cell's picked-team battles also replayed without the avatar; see \"PvE avatar value\"");

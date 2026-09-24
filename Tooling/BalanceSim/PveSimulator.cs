@@ -55,6 +55,13 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <summary>The avatar's own turns this battle (0 when no avatar was fielded).</summary>
         public int AvatarTurns;
 
+        /// <summary>
+        /// Per library team bond (<see cref="SkillLibraryKits.TeamBonds"/> order): how many times its
+        /// reaction fired this battle (<see cref="BattleTurnResult.BondReactions"/>). <c>null</c> when
+        /// the team has no reacting bond.
+        /// </summary>
+        public int[] BondReactions;
+
         /// <summary>The avatar's active-skill casts this battle (every <c>AvatarActivations</c> entry).</summary>
         public int AvatarCasts;
 
@@ -252,6 +259,37 @@ namespace BeastCraft.Tooling.BalanceSim
     }
 
     /// <summary>
+    /// <c>--panel</c>: every team against every composition of one panel shape
+    /// (<see cref="EncounterCatalog.PanelShapes"/>), <see cref="Samples"/> times each, at the
+    /// <c>--panel-level</c> cell's calibrated multiplier. Kept as counts, not battles.
+    /// </summary>
+    public class PanelCell
+    {
+        public KitMode Mode;
+
+        /// <summary>The run's shape (the panel shape has the same id).</summary>
+        public EncounterShape Shape;
+
+        public int Level;
+        public double Multiplier;
+        public int Compositions;
+        public int Samples;
+        public int TeamCount;
+
+        /// <summary>[team][composition] battles cleared (of <see cref="Samples"/>).</summary>
+        public int[][] Cleared;
+
+        /// <summary>[team][library bond] reactions fired over every battle of the team.</summary>
+        public long[][] Reactions;
+
+        /// <summary>Team <paramref name="t"/>'s clear rate against composition <paramref name="c"/>, 0-1.</summary>
+        public double Rate(int t, int c)
+        {
+            return (double)Cleared[t][c] / Samples;
+        }
+    }
+
+    /// <summary>
     /// Team-vs-encounter battles through the real Runtime code: beasts and fixture enemies are both
     /// built by <see cref="BattleUnitFactory.CreateBeast"/>, the player team is committed with
     /// <see cref="PlacementValidator.TryPlaceAll"/>, and every turn is a real
@@ -325,6 +363,85 @@ namespace BeastCraft.Tooling.BalanceSim
 
                 TeamBonds[t] = options.BondsActive ? TeamBondResolver.Resolve(options.Library.TeamBonds, members) : new List<ActiveTeamBond>();
             }
+
+            BondIndex = new Dictionary<TeamBondSO, int>();
+            if (options.Library != null)
+            {
+                for (int b = 0; b < options.Library.TeamBonds.Count; b++)
+                {
+                    BondIndex[options.Library.TeamBonds[b]] = b;
+                }
+            }
+        }
+
+        /// <summary>Each library bond's index (<see cref="SkillLibraryKits.TeamBonds"/> order), for <see cref="PveBattle.BondReactions"/>.</summary>
+        public Dictionary<TeamBondSO, int> BondIndex { get; }
+
+        /// <summary><c>--panel</c>: the panel cells run so far (per kit mode, per shape), in run order.</summary>
+        public List<PanelCell> PanelCells { get; } = new List<PanelCell>();
+
+        /// <summary>
+        /// <c>--panel</c>: every team against every composition of <paramref name="panelShape"/>,
+        /// <c>--panel</c>'s S times each, at <paramref name="calibrated"/>'s level and multiplier
+        /// (the <c>--panel-level</c> cell of the same kit mode and shape), parallel, reduced to
+        /// counts. Every battle is <see cref="RunBattle(KitMode, int, Encounter, double, int, int, bool, bool, out List{BattleUnit})"/>
+        /// with its own seed (the panel composition's id is in it). Stored in <see cref="PanelCells"/>.
+        /// </summary>
+        public PanelCell RunPanel(KitMode mode, EncounterShape panelShape, PveCell calibrated)
+        {
+            int samples = _options.PanelSamples;
+            int teams = Teams.Count;
+            int compositions = panelShape.Compositions.Count;
+            int bondCount = BondIndex.Count;
+            PveBattle[] battles = new PveBattle[compositions * teams * samples];
+            bool[][] playersWinTies = new bool[compositions][];
+            for (int c = 0; c < compositions; c++)
+            {
+                playersWinTies[c] = PlayersWinTies(mode, calibrated.Level, panelShape.Compositions[c].Id);
+            }
+
+            Parallel.For(0, battles.Length, i =>
+            {
+                int t = (i / samples) % teams;
+                int c = i / (samples * teams);
+                battles[i] = RunBattle(mode, calibrated.Level, panelShape.Compositions[c], calibrated.Multiplier, t, i % samples, false, playersWinTies[c][t], out _);
+            });
+
+            PanelCell cell = new PanelCell
+            {
+                Mode = mode,
+                Shape = calibrated.Shape,
+                Level = calibrated.Level,
+                Multiplier = calibrated.Multiplier,
+                Compositions = compositions,
+                Samples = samples,
+                TeamCount = teams,
+                Cleared = new int[teams][],
+                Reactions = new long[teams][]
+            };
+
+            for (int t = 0; t < teams; t++)
+            {
+                cell.Cleared[t] = new int[compositions];
+                cell.Reactions[t] = new long[bondCount];
+            }
+
+            for (int i = 0; i < battles.Length; i++)
+            {
+                int t = (i / samples) % teams;
+                int c = i / (samples * teams);
+                cell.Cleared[t][c] += battles[i].Cleared ? 1 : 0;
+                if (battles[i].BondReactions != null)
+                {
+                    for (int b = 0; b < bondCount; b++)
+                    {
+                        cell.Reactions[t][b] += battles[i].BondReactions[b];
+                    }
+                }
+            }
+
+            PanelCells.Add(cell);
+            return cell;
         }
 
         /// <summary>
@@ -999,6 +1116,11 @@ namespace BeastCraft.Tooling.BalanceSim
             // The avatar fills its own ATB gauge: it is in the turn order, never in the targeting roster.
             TurnManager turnManager = new TurnManager(avatar == null ? units : new List<BattleUnit>(units) { avatar });
             TeamBondLoadout bonds = TeamBonds[teamIndex].Count == 0 ? null : new TeamBondLoadout(TeamBonds[teamIndex], members);
+            if (bonds != null && bonds.HasReactions)
+            {
+                battle.BondReactions = new int[BondIndex.Count];
+            }
+
             if (bonds != null && mode == KitMode.Neutral)
             {
                 // Element-neutral mode: a behaviour bond's reaction strikes without an element, like every skill.
@@ -1091,6 +1213,7 @@ namespace BeastCraft.Tooling.BalanceSim
                             : BattleTurnExecutor.ExecuteTurn(current, units, grid, rng, avatar, passives, bonds);
                         actions++;
                         CountPassives(battle, turn.PassiveActivations);
+                        CountReactions(battle, turn.BondReactions);
                         CountAvatar(battle, turn, avatar);
 
                         bool actorIsMember = memberIndex.TryGetValue(current, out int actor);
@@ -1355,6 +1478,22 @@ namespace BeastCraft.Tooling.BalanceSim
             else
             {
                 battle.BeastShieldAbsorbed += amount;
+            }
+        }
+
+        private void CountReactions(PveBattle battle, IReadOnlyList<BondReactionRecord> reactions)
+        {
+            if (battle.BondReactions == null)
+            {
+                return;
+            }
+
+            foreach (BondReactionRecord reaction in reactions)
+            {
+                if (reaction.Bond != null && BondIndex.TryGetValue(reaction.Bond, out int index))
+                {
+                    battle.BondReactions[index]++;
+                }
             }
         }
 

@@ -302,6 +302,24 @@ namespace BeastCraft.Tooling.BalanceSim
                 }
             }
 
+            if (options.PanelActive && pve != null)
+            {
+                Stopwatch panelClock = Stopwatch.StartNew();
+                foreach (KitMode mode in options.Modes)
+                {
+                    for (int e = 0; e < encounters.Shapes.Count; e++)
+                    {
+                        PveCell calibrated = cells.Find(c => c.Mode == mode && c.Level == options.PanelLevel && c.Shape == encounters.Shapes[e]);
+                        pve.RunPanel(mode, encounters.PanelShapes[e], calibrated);
+                    }
+                }
+
+                if (options.Timings)
+                {
+                    Console.Error.WriteLine("[timings] composition panel: " + Seconds(panelClock.Elapsed) + " s.");
+                }
+            }
+
             if (problems.Count == 0 && ScoutedPicker.Active(options))
             {
                 problems.AddRange(ScoutedPicker.Check(options, species, pve, cells));

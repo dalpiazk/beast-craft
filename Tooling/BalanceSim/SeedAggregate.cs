@@ -58,6 +58,7 @@ namespace BeastCraft.Tooling.BalanceSim
             }
 
             TeamReport.AppendAggregate(report, options, species, seeds, catalogs, simulators, cells);
+            PanelReport.AppendAggregate(report, options, seeds, simulators);
             BondReport.AppendAggregate(report, options, species, seeds, catalogs, simulators, cells);
             ScoutingReport.AppendAggregate(report, options, species, seeds, catalogs, simulators, cells);
 

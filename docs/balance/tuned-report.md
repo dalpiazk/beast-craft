@@ -12,6 +12,7 @@ and arguments produce a byte-identical report. Battles per PvE team and composit
 - Team bonds: on (`--bonds on`, the default): the library's 11 `TeamBonds` apply at battle start to every player team that meets their condition (never to enemies); see "PvE team bonds"
 - Scouted picking (PvE, `--scouted`): random, heuristic, heuristic + bonds, oracle at preview detail `full`; post-processing of the same battles, see "PvE scouted picking"
 - Difficulty (PvE, `--calibrate-on bonds`): calibrated so the team the bond-aware scouted picker (heuristic + bonds) fields per composition clears 50.0% (the player scouts and counter-picks); the average team's no-scouting rate is reported beside it, see "Calibrated difficulty"
+- Composition panel (PvE, `--panel 16x4`): every team against a fixed panel of 16 compositions per shape, 4 times each, at level 50; see "PvE composition panel"
 
 ## Library beast kits
 
@@ -686,6 +687,89 @@ Top 5 each way per shape. With 45 pairs, |synergy / SE| up to about 2.5 is expec
 | overall | anti-synergy | Golem + Griffin | 28 | 19.9% | 21.5% | -1.6 | 0.8 |
 | overall | anti-synergy | Thunderbird + Frost Wyrm | 28 | 23.5% | 25.0% | -1.5 | 0.8 |
 | overall | anti-synergy | Treant + Basilisk | 28 | 24.5% | 25.8% | -1.3 | 0.8 |
+
+### PvE composition panel
+
+A fixed panel of 16 compositions per shape, drawn from a constant seed (5150, never `--seed`, so every run and every seed of a
+`--seeds` run measures the same lineups): all 210 teams fight every panel composition 4 times at level 50 and that cell's calibrated
+multiplier (`--panel 16x4 --panel-level 50`). The clear rates' variance is split three ways. **Team main-effect SD** = sqrt(Var(team means) -
+noise²): how much the lineup matters whatever it faces (noise² = the roll variance of a team's panel mean, each cell's
+p(1 - p) / (S - 1) averaged and divided by K). **Interaction SD** = sqrt((MS_int - MS_err) / S) from a two-way ANOVA
+with S replicates: how much a lineup's rate depends on *which* composition it faces beyond both means, the value of
+counter-picking. This supersedes the `--seeds` "persistent SD", which folded each seed's composition draw into the lineup's
+own spread. **Pooled** is the root mean square over the shapes.
+
+| Kit mode | Shape | Multiplier | Battles | Mean clear | Team main-effect SD | Interaction SD | Noise SD (team mean) |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `elemental` | `solo` | 1.168 | 13440 | 17.4% | 7.7 | 28.6 | 2.7 |
+| `elemental` | `elite` | 1.141 | 13440 | 6.8% | 5.2 | 17.8 | 2.0 |
+| `elemental` | `squad` | 1.320 | 13440 | 47.6% | 14.3 | 33.5 | 3.4 |
+| `elemental` | `horde` | 1.250 | 13440 | 23.9% | 12.0 | 28.6 | 3.0 |
+| `elemental` | pooled |  |  | 23.9% | **10.4** | **27.7** |  |
+| `neutral` | `solo` | 0.984 | 13440 | 28.0% | 25.1 | 1.8 | 4.7 |
+| `neutral` | `elite` | 0.891 | 13440 | 56.7% | 17.3 | 23.3 | 4.6 |
+| `neutral` | `squad` | 1.266 | 13440 | 57.6% | 21.7 | 24.3 | 4.0 |
+| `neutral` | `horde` | 1.313 | 13440 | 11.3% | 10.7 | 16.8 | 2.6 |
+| `neutral` | pooled |  |  | 38.4% | **19.5** | **18.8** |  |
+
+#### Clear rate by stance mix (panel)
+
+| Kit mode | Vanguard / Ranged / Skirmisher | Teams | `solo` | `elite` | `squad` | `horde` | Mean |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `elemental` | 4 / 0 / 0 | 5 | 15.3% | 6.9% | 29.1% | 46.3% | 24.4% |
+| `elemental` | 3 / 1 / 0 | 30 | 15.3% | 6.5% | 41.6% | 38.4% | 25.4% |
+| `elemental` | 3 / 0 / 1 | 20 | 16.1% | 8.7% | 41.5% | 21.3% | 21.9% |
+| `elemental` | 2 / 2 / 0 | 30 | 15.5% | 7.6% | 46.1% | 24.1% | 23.3% |
+| `elemental` | 2 / 1 / 1 | 60 | 17.4% | 5.9% | 44.8% | 18.2% | 21.5% |
+| `elemental` | 2 / 0 / 2 | 10 | 18.6% | 7.7% | 53.1% | 19.5% | 24.7% |
+| `elemental` | 1 / 3 / 0 | 5 | 19.7% | 11.9% | 53.1% | 27.5% | 28.0% |
+| `elemental` | 1 / 2 / 1 | 30 | 22.2% | 6.4% | 52.4% | 18.4% | 24.9% |
+| `elemental` | 1 / 1 / 2 | 15 | 16.8% | 5.2% | 64.1% | 23.5% | 27.4% |
+| `elemental` | 0 / 3 / 1 | 2 | 20.3% | 10.2% | 71.9% | 25.8% | 32.0% |
+| `elemental` | 0 / 2 / 2 | 3 | 15.1% | 3.1% | 75.0% | 32.8% | 31.5% |
+| `neutral` | 4 / 0 / 0 | 5 | 7.5% | 40.0% | 33.1% | 27.5% | 27.0% |
+| `neutral` | 3 / 1 / 0 | 30 | 17.3% | 50.7% | 48.5% | 23.3% | 34.9% |
+| `neutral` | 3 / 0 / 1 | 20 | 63.4% | 72.1% | 55.3% | 7.9% | 49.7% |
+| `neutral` | 2 / 2 / 0 | 30 | 26.5% | 60.7% | 53.9% | 14.8% | 39.0% |
+| `neutral` | 2 / 1 / 1 | 60 | 25.6% | 51.8% | 54.4% | 5.5% | 34.3% |
+| `neutral` | 2 / 0 / 2 | 10 | 34.8% | 61.7% | 62.3% | 10.0% | 42.2% |
+| `neutral` | 1 / 3 / 0 | 5 | 27.2% | 76.9% | 58.8% | 16.3% | 44.8% |
+| `neutral` | 1 / 2 / 1 | 30 | 28.9% | 55.8% | 67.8% | 7.2% | 39.9% |
+| `neutral` | 1 / 1 / 2 | 15 | 21.3% | 57.8% | 72.8% | 9.7% | 40.4% |
+| `neutral` | 0 / 3 / 1 | 2 | 17.2% | 61.7% | 93.0% | 7.0% | 44.7% |
+| `neutral` | 0 / 2 / 2 | 3 | 10.4% | 50.0% | 87.5% | 18.8% | 41.7% |
+
+#### Team bonds on the panel
+
+**Excess** = the mean panel clear rate of the teams the bond is active for minus what the beasts' own panel marginals
+predict for those teams with no interaction (the additive model of "PvE team bonds"). A bond that only rides on
+who its members are shows ~0; one that makes its lineup better than its parts shows its value. Part of any bond's
+effect is absorbed into its members' marginals, so excess is a lower bound. **Reactions / battle** = its reactions fired per battle of an active team.
+
+| Kit mode | Bond | Teams | `solo` | `elite` | `squad` | `horde` | Pooled excess | Reactions / battle |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `elemental` | pack_hunters | 28 | -1.7 | 0.0 | +4.7 | +7.2 | **+2.6** | - |
+| `elemental` | shield_wall | 155 | -0.2 | -0.1 | -0.3 | -1.2 | **-0.4** | - |
+| `elemental` | crossfire | 70 | +0.3 | +0.4 | -0.1 | -0.8 | **0.0** | - |
+| `elemental` | wildfire | 28 | +3.1 | +0.9 | +1.0 | +1.0 | **+1.5** | - |
+| `elemental` | storm_front | 28 | +1.0 | +0.7 | +1.2 | -0.4 | **+0.6** | - |
+| `elemental` | bedrock | 28 | +2.0 | +1.2 | +0.7 | +3.4 | **+1.8** | - |
+| `elemental` | winter_grove | 28 | +1.3 | +0.9 | +2.1 | +7.0 | **+2.8** | - |
+| `elemental` | twilight | 28 | +0.9 | +0.3 | -0.9 | +0.3 | **+0.2** | - |
+| `elemental` | bulwark | 205 | +0.1 | 0.0 | -0.2 | -0.4 | **-0.1** | - |
+| `elemental` | overwatch | 175 | -0.1 | -0.3 | -0.1 | +0.1 | **-0.1** | - |
+| `elemental` | flanking | 140 | +0.3 | 0.0 | -0.9 | -1.4 | **-0.5** | - |
+| `neutral` | pack_hunters | 28 | -8.3 | +0.4 | +1.4 | +7.2 | **+0.2** | - |
+| `neutral` | shield_wall | 155 | -0.1 | -0.2 | -0.6 | -0.8 | **-0.4** | - |
+| `neutral` | crossfire | 70 | +4.7 | +2.5 | +0.9 | 0.0 | **+2.0** | - |
+| `neutral` | wildfire | 28 | -0.2 | +0.1 | +7.7 | -0.5 | **+1.8** | - |
+| `neutral` | storm_front | 28 | +4.1 | +7.5 | +2.6 | +1.7 | **+4.0** | - |
+| `neutral` | bedrock | 28 | +0.6 | +4.8 | +3.9 | +1.8 | **+2.8** | - |
+| `neutral` | winter_grove | 28 | +6.9 | +7.0 | +5.3 | +6.4 | **+6.4** | - |
+| `neutral` | twilight | 28 | +8.7 | +3.9 | +0.2 | +0.4 | **+3.3** | - |
+| `neutral` | bulwark | 205 | +0.2 | +0.1 | -0.3 | -0.3 | **-0.1** | - |
+| `neutral` | overwatch | 175 | -2.2 | -1.6 | -0.4 | -0.1 | **-1.1** | - |
+| `neutral` | flanking | 140 | +1.7 | -0.1 | -0.3 | -1.4 | **0.0** | - |
 
 ### PvE team bonds
 

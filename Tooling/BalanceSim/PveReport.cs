@@ -300,6 +300,7 @@ namespace BeastCraft.Tooling.BalanceSim
             }
 
             TeamReport.AppendSection(report, options, species, shapes, simulator, cells);
+            PanelReport.AppendSection(report, options, species, shapes, simulator);
             BondReport.AppendSection(report, options, species, shapes, simulator, cells);
             ScoutingReport.AppendSection(report, options, species, shapes, simulator, cells);
         }

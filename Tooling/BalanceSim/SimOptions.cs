@@ -201,6 +201,15 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <summary>... and within +/- this in <c>neutral</c>.</summary>
         public const double GuardNeutral = 7.0;
 
+        /// <summary>
+        /// <c>--panel</c>: the composition panel's generator seed. Constant, never <c>--seed</c>, so
+        /// every run (and every seed of a <c>--seeds</c> run) measures the same panel of lineups.
+        /// </summary>
+        public const int PanelSeed = 5150;
+
+        /// <summary><c>--panel-level</c> default: the level the composition panel is fought at (one of <c>--levels</c>).</summary>
+        public const int DefaultPanelLevel = 50;
+
         // ------------------------------------------------------------------------------------
         // Generated encounters (EncounterGenerator). Compositions per shape; the element-scheme
         // weights are game content (encounter-library.json, SchemeWeights).
@@ -337,6 +346,24 @@ namespace BeastCraft.Tooling.BalanceSim
         /// Off by default; never changes a battle.
         /// </summary>
         public bool TurnDetail;
+
+        /// <summary>
+        /// <c>--panel KxS</c>: the composition panel's K compositions per shape (0, the default, = no
+        /// panel) and S battles per team and composition. See <see cref="PanelReport"/>.
+        /// </summary>
+        public int PanelCompositions;
+
+        /// <summary>See <see cref="PanelCompositions"/>.</summary>
+        public int PanelSamples;
+
+        /// <summary><c>--panel-level</c>: the level the panel is fought at, at that cell's calibrated multiplier.</summary>
+        public int PanelLevel = DefaultPanelLevel;
+
+        /// <summary>Whether this run measures the composition panel (<c>--panel</c>).</summary>
+        public bool PanelActive
+        {
+            get { return PanelCompositions > 0; }
+        }
 
         /// <summary>The PvE avatar preset (<c>--avatar</c>); the library avatar by default, <see cref="AvatarPresets.None"/> fields none.</summary>
         public string AvatarPreset = AvatarPresets.Library;
@@ -540,6 +567,13 @@ namespace BeastCraft.Tooling.BalanceSim
             "                             avatar (--avatar library|support) and a scouted-pick calibration. Default: off.\n" +
             "  --turn-detail              PvE: report \"PvE beast turns\": each beast's no-fire turns (held by its stance, out of\n" +
             "                             reach, stunned) and its damage to large enemies (bosses) versus the rest. Default: off.\n" +
+            "  --panel <KxS>              PvE, generated set: also fight the composition panel, K compositions per shape drawn\n" +
+            "                             from a constant seed (never --seed), every team S times each, at the --panel-level\n" +
+            "                             cell's calibrated multiplier, and report \"PvE composition panel\": the team main-effect\n" +
+            "                             SD, the team x composition interaction SD (the counter-pick value), clear rate by stance\n" +
+            "                             mix, and per bond its excess over the additive prediction and reactions per battle.\n" +
+            "                             S >= 2. Default: off (the committed tuned report uses 16x4).\n" +
+            "  --panel-level <n>          The panel's level, one of --levels (default 50).\n" +
             "  --calibrate-sample <n>     --calibrate-on mean only. Opt-in speed-up that CHANGES results: the difficulty search\n" +
             "                             evaluates a seeded subset of n teams (e.g. 50 of 210), then the chosen multiplier runs\n" +
             "                             once with every team; the report's numbers all come from that full run (default: off,\n" +
@@ -553,6 +587,7 @@ namespace BeastCraft.Tooling.BalanceSim
             bool matrixLevelGiven = false;
             bool samplesGiven = false;
             bool seedGiven = false;
+            bool panelLevelGiven = false;
             error = null;
 
             for (int i = 0; i < args.Length; i++)
@@ -598,6 +633,21 @@ namespace BeastCraft.Tooling.BalanceSim
                             return null;
                         }
 
+                        break;
+                    case "--panel":
+                        if (!TryNext(args, ref i, arg, out text, out error) || !TryParsePanel(text, options, out error))
+                        {
+                            return null;
+                        }
+
+                        break;
+                    case "--panel-level":
+                        if (!TryNextInt(args, ref i, arg, 1, out options.PanelLevel, out error))
+                        {
+                            return null;
+                        }
+
+                        panelLevelGiven = true;
                         break;
                     case "--level-gap-teams":
                         if (!TryNextInt(args, ref i, arg, 1, out options.LevelGapTeams, out error))
@@ -989,6 +1039,24 @@ namespace BeastCraft.Tooling.BalanceSim
                 return null;
             }
 
+            if (options.PanelActive && (!options.RunPve || options.EncounterSet != EncounterSet.Generated))
+            {
+                error = "--panel needs PvE and the generated encounter set.";
+                return null;
+            }
+
+            if (options.PanelActive && !options.Levels.Contains(options.PanelLevel))
+            {
+                error = "--panel-level " + options.PanelLevel + " is not one of the simulated levels (--levels " + Join(options.Levels) + ").";
+                return null;
+            }
+
+            if (panelLevelGiven && !options.PanelActive)
+            {
+                error = "--panel-level needs --panel.";
+                return null;
+            }
+
             if (options.CalibrateSample > 0 && options.CalibratesOnPick)
             {
                 error = "--calibrate-sample only applies with --calibrate-on mean (a scouted-pick calibration already searches on the picked teams alone).";
@@ -1090,6 +1158,24 @@ namespace BeastCraft.Tooling.BalanceSim
             }
 
             levels.Sort();
+            error = null;
+            return true;
+        }
+
+        /// <summary><c>--panel KxS</c>: two integers, K >= 1 compositions and S >= 2 samples (the interaction needs replication).</summary>
+        private static bool TryParsePanel(string text, SimOptions options, out string error)
+        {
+            error = "--panel expects KxS with K >= 1 compositions and S >= 2 samples, e.g. 16x4, got '" + text + "'.";
+            string[] parts = text.ToLowerInvariant().Split('x');
+            if (parts.Length != 2 ||
+                !int.TryParse(parts[0].Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int compositions) ||
+                !int.TryParse(parts[1].Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int samples) || compositions < 1 || samples < 2)
+            {
+                return false;
+            }
+
+            options.PanelCompositions = compositions;
+            options.PanelSamples = samples;
             error = null;
             return true;
         }
