@@ -56,20 +56,24 @@ namespace BeastCraft.Tests.EditMode
                     Item("flat_attack", "Team", new EffectData { EffectType = "BuffStat", AffectedStat = "Attack", Magnitude = 5, DurationTurns = 2 }),
                     Item("nobody", "Allies", new EffectData { EffectType = "BuffStat", AffectedStat = "Attack", Magnitude = 5, DurationTurns = 2, IsPercent = true }),
                     Item("ok", "Enemies", new EffectData { EffectType = "ApplyStatus", Status = "DamageOverTime", Magnitude = 8, DurationTurns = 3 }),
-                    Item("ok", "Team", new EffectData { EffectType = "BuffStat", AffectedStat = "CritChance", Magnitude = 5, DurationTurns = 3 })
+                    Item("ok", "Team", new EffectData { EffectType = "BuffStat", AffectedStat = "CritChance", Magnitude = 5, DurationTurns = 3 }),
+                    Item("cleanser", "Team", new EffectData { EffectType = "Cleanse" }),
+                    Item("enemy_cleanse", "Enemies", new EffectData { EffectType = "Cleanse" }),
+                    Item("timed_cleanse", "Team", new EffectData { EffectType = "Cleanse", DurationTurns = 2 })
                 }
             };
 
             List<string> errors = ConsumableLibraryValidator.Validate(data);
             string all = string.Join("\n", errors);
 
-            foreach (string id in new[] { "healer", "team_debuff", "enemy_shield", "forever", "mover", "flat_attack", "nobody" })
+            foreach (string id in new[] { "healer", "team_debuff", "enemy_shield", "forever", "mover", "flat_attack", "nobody", "enemy_cleanse", "timed_cleanse" })
             {
                 StringAssert.Contains("'" + id + "'", all);
             }
 
+            StringAssert.DoesNotContain("'cleanser'", all, "an instant team Cleanse is allowed");
             StringAssert.Contains("used twice", all);
-            Assert.AreEqual(8, errors.Count, all);
+            Assert.AreEqual(10, errors.Count, all);
         }
 
         [Test]

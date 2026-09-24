@@ -145,9 +145,12 @@ namespace BeastCraft.Economy
     /// rarity 0-2, MinRegion 1-10, MaxStack 1-<see cref="MaxMaxStack"/>, recipients <c>Team</c> or
     /// <c>Enemies</c>, and 1-3 effects each of which is a timed stat change or status the
     /// consumable's recipients should get: for <c>Team</c> a <c>BuffStat</c> (percent, or flat
-    /// CritChance) or an <c>ApplyStatus</c> Shield; for <c>Enemies</c> a <c>DebuffStat</c> or an
-    /// <c>ApplyStatus</c> DamageOverTime. Every effect lasts 1-<see cref="MaxDuration"/> turns with a
-    /// positive magnitude; never damage, heals, stuns, taunts or MoveRange. Strength (at most about
+    /// CritChance), an <c>ApplyStatus</c> Shield or a <c>Cleanse</c> (instant: DurationTurns 0, its
+    /// Magnitude not read); for <c>Enemies</c> a <c>DebuffStat</c> or an <c>ApplyStatus</c>
+    /// DamageOverTime. Every other effect lasts 1-<see cref="MaxDuration"/> turns with a positive
+    /// magnitude; never damage, heals, stuns, taunts or MoveRange. (A Cleanse is allowed for content
+    /// to come: consumables are used as a battle begins, before anything can stun or burn the team,
+    /// so today it would remove nothing.) Strength (at most about
     /// +0.3 of a level each) is the balance simulator's <c>--economy-probe</c>, not checked here.
     /// </summary>
     public static class ConsumableLibraryValidator
@@ -258,6 +261,21 @@ namespace BeastCraft.Economy
             {
                 ok = status == (team ? StatusType.Shield : StatusType.DamageOverTime);
             }
+            else if (type == SkillEffectType.Cleanse)
+            {
+                ok = team && status == StatusType.None;
+                if (ok && e.DurationTurns != 0)
+                {
+                    errors.Add(at + ": a Cleanse effect is instant; DurationTurns must be 0.");
+                }
+
+                if (!ok)
+                {
+                    errors.Add(at + ": effect " + e.EffectType + " is not one this consumable's recipients may get (a Cleanse is for the team).");
+                }
+
+                return;
+            }
             else
             {
                 ok = false;
@@ -266,7 +284,7 @@ namespace BeastCraft.Economy
             if (!ok)
             {
                 errors.Add(at + ": effect " + e.EffectType + " " + e.AffectedStat + " " + e.Status + " is not one this consumable's recipients may get " +
-                           "(team: percent BuffStat / flat CritChance / Shield; enemies: DebuffStat / DamageOverTime).");
+                           "(team: percent BuffStat / flat CritChance / Shield / Cleanse; enemies: DebuffStat / DamageOverTime).");
             }
 
             if (!(e.Magnitude > 0f) || e.DurationTurns < 1 || e.DurationTurns > MaxDuration)

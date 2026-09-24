@@ -172,7 +172,7 @@ Left out, with findings for the combat lane: **speed consumables** (the design's
 +10% Speed and Smoke Bomb -10% enemy Speed) measured **negative** (-0.4 to -0.7 LE) — a pre-battle
 Speed change makes battles worse for the team; worth a look at the ATB gauge; and a **consumable
 shield** displaced the stance bonds' longer shields (net negative). No heals (battles start at full
-HP), revives, or cleanses yet (a cleanse becomes possible with the combat lane's Cleanse effect).
+HP), revives, or cleanses yet (the validator now accepts a team `Cleanse`; see "Open items").
 Percent buffs round to nothing on the tiny stats of the first few levels.
 
 ## Skills for sale
@@ -243,5 +243,8 @@ dotnet run --project Tooling/BalanceSim -c Release -- --mode pve --seeds 12345,7
 ## Open items (producer review)
 
 - Every name, number and look (DRAFT); no art (placeholder `ArtKey`s), no UI.
-- Speed consumables and consumable shields (above); cross-species tomes; a cleanse consumable.
+- Speed consumables and consumable shields (above); cross-species tomes; a cleanse consumable
+  (`ConsumableLibraryValidator` accepts an instant team `Cleanse` effect, but consumables are used
+  as a battle begins, before anything can stun or burn the team, so one needs an in-battle use or
+  a trigger first; no content yet).
 - Premium looks and idle rewards (future).
