@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using BeastCraft.Battle.Grid;
+using BeastCraft.Bonds;
 using BeastCraft.Creatures;
 
 namespace BeastCraft.Battle
@@ -104,10 +105,22 @@ namespace BeastCraft.Battle
     /// to the reachable tile farthest from the nearest living enemy that still keeps that enemy
     /// within its longest single-target reach, never closer than it already stands (see
     /// <see cref="Retreat"/>; reported as <see cref="BattleTurnResult.RetreatSteps"/>). It
-    /// happens before the avatar's activations, and not at all for a unit that defeated itself.
+    /// does not happen at all for a unit that defeated itself.
     /// </description></item>
     /// </list>
     /// With a null grid nothing moves, whatever the stance.
+    /// </para>
+    /// <para>
+    /// <strong>Large units</strong> (see <see cref="UnitFootprint"/>). A unit that covers several
+    /// tiles is still one unit with one anchor (<see cref="BattleUnit.Position"/>), and every rule
+    /// above holds for it with distances measured between nearest tiles
+    /// (<see cref="FootprintMath"/>). A one-tile unit closing on a large one aims at the tiles
+    /// around its whole footprint (see <see cref="ApproachGoals"/>) and a standoff unit keeps its
+    /// distance from the nearest of them. A large unit moves by anchor: its whole footprint must fit
+    /// at every step (<see cref="HexGrid.CanStand"/>), it approaches by a breadth-first search for
+    /// the cheapest anchor in range (see <see cref="TryPlanLargeApproach"/>), and it counts each
+    /// enemy next to any of its tiles once when it weighs crowding. A battle of one-tile units runs
+    /// exactly the rules it always did.
     /// </para>
     /// <para>
     /// <strong>Statuses.</strong> The executor frames every turn with the status engine
@@ -154,7 +167,9 @@ namespace BeastCraft.Battle
         /// <summary>
         /// Runs one unit's whole turn: expire its timed modifiers, tick its rotation, then attempt
         /// every ready slot in stack order — moving toward a target when a skill needs it and the
-        /// turn can still afford it — and finally tick the avatar if this was a player beast.
+        /// turn can still afford it. The avatar is not ticked here: it takes turns of its own
+        /// (<see cref="ExecuteAvatarTurn"/>), and handed the avatar as <paramref name="unit"/> this
+        /// runs exactly that.
         /// <para>
         /// The steps, in order:
         /// <list type="number">
@@ -169,11 +184,11 @@ namespace BeastCraft.Battle
         /// <item><description>
         /// <see cref="StatusEffects.BeginTurn"/>: this turn is counted off every status the unit
         /// carries and its damage-over-time stacks deal their damage (shield first). A unit they
-        /// defeat stops here — no movement, no skills, and no avatar tick, since it took no turn.
+        /// defeat stops here — no movement, no skills, since it took no turn.
         /// A unit that began the turn <see cref="StatusType.Stun">stunned</see> skips the next three
         /// steps: it does not move, fires nothing, and its cooldowns do <em>not</em> tick (a stun
         /// delays the rotation rather than burning it). Its gauge was spent as normal by
-        /// <see cref="TurnManager"/>, and the avatar still ticks on a stunned player beast's turn.
+        /// <see cref="TurnManager"/>.
         /// </description></item>
         /// <item><description>
         /// <see cref="SkillLoadout.Tick"/>, which counts every slot down and reports the ones now at
@@ -192,14 +207,6 @@ namespace BeastCraft.Battle
         /// <item><description>
         /// A Ranged or Skirmisher unit that is still standing spends any budget left over on a
         /// retreat (see the stance notes on this class). A Vanguard's leftover is discarded.
-        /// </description></item>
-        /// <item><description>
-        /// On a <see cref="BattleTeam.Player"/> unit's turn only, the avatar's loadout is ticked and
-        /// resolved through <see cref="SkillLoadout.TickAndResolve"/>, per the confirmed rule that
-        /// it ticks once per player-side beast turn. Its effects are applied too. Under the ATB
-        /// gauge this means a faster team also cycles its avatar faster; whether the avatar should
-        /// instead fill a gauge of its own from its own Speed is an open design item (battle-system
-        /// design doc, §6), and the rule is unchanged until it is decided.
         /// </description></item>
         /// <item><description>
         /// <see cref="StatusEffects.EndTurn"/>: statuses with no turns left come off.
@@ -223,7 +230,7 @@ namespace BeastCraft.Battle
         /// all when a taunt decides the pick), every damage hit that lands draws its crit roll then
         /// its variance roll from it, and a non-damage effect whose chance is below 100 draws its
         /// chance check (see <see cref="SkillEffectApplier"/>), all in the order
-        /// the turn fires skills — the unit's ready slots in stack order, then the avatar's — and
+        /// the turn fires skills — the unit's ready slots in stack order — and
         /// within each skill in <see cref="SkillEffectApplier"/>'s target-major, authored-effect
         /// order. A null rng is the deterministic fallback: no variance, no crits (see
         /// <see cref="DamageFormula"/>).
@@ -262,9 +269,9 @@ namespace BeastCraft.Battle
         /// <see cref="BeastCraft.Avatar.PassiveTrigger.AllyCrit"/>.
         /// </description></item>
         /// <item><description>
-        /// At the avatar tick (player beasts' turns only): every passive's internal cooldown ticks
-        /// once, before the avatar's actives; then the after-damage hook after each avatar
-        /// activation (its crits are not ally crits).
+        /// On the avatar's own turn (<see cref="ExecuteAvatarTurn"/>): every passive's internal
+        /// cooldown ticks once, before the avatar's actives; then the after-damage hook after each
+        /// avatar activation (its crits are not ally crits).
         /// </description></item>
         /// </list>
         /// A passive whose proc chance is below 100 draws once from <paramref name="rng"/> for its
@@ -274,6 +281,12 @@ namespace BeastCraft.Battle
         public static BattleTurnResult ExecuteTurn(BattleUnit unit, IEnumerable<BattleUnit> allUnits, HexGrid grid, Random rng, BattleUnit avatar,
                                                    PassiveLoadout passives)
         {
+            if (unit != null && unit == avatar)
+            {
+                // The avatar's own gauge came up: it has a turn of its own, not a beast's.
+                return ExecuteAvatarTurn(avatar, allUnits, grid, rng, passives);
+            }
+
             List<BattleSkillOutcome> outcomes = new List<BattleSkillOutcome>();
             List<SkillActivation> avatarActivations = new List<SkillActivation>();
             List<PassiveActivation> passiveActivations = new List<PassiveActivation>();
@@ -357,7 +370,7 @@ namespace BeastCraft.Battle
                     continue;
                 }
 
-                if (unit.Position.Distance(candidate.Position) <= skill.Range)
+                if (FootprintMath.UnitDistance(unit, candidate) <= skill.Range)
                 {
                     outcomes.Add(Fire(loadout, slotIndex, skill, unit, allUnits, grid, rng, 0, hooks));
                     continue;
@@ -405,32 +418,89 @@ namespace BeastCraft.Battle
                 remaining -= retreatSteps;
             }
 
-            if (unit.Team == BattleTeam.Player && avatar != null)
-            {
-                // The avatar tick: passive cooldowns count down on the same clock as its actives.
-                if (hooks != null)
-                {
-                    passives.TickCooldowns();
-                }
-
-                if (avatar.Skills != null)
-                {
-                    IReadOnlyList<SkillActivation> cast = avatar.Skills.TickAndResolve(avatar, allUnits, grid, rng);
-
-                    for (int i = 0; i < cast.Count; i++)
-                    {
-                        SkillEffectApplier.Apply(cast[i], avatar, rng, grid);
-                        LiftDefeated(allUnits, grid);
-                        avatarActivations.Add(cast[i]);
-                        hooks?.AfterApplication(unit, null);
-                    }
-                }
-            }
-
             StatusEffects.EndTurn(unit);
 
             return new BattleTurnResult(unit, start, unit.Position, budget, budget - remaining, outcomes, avatarActivations, retreatSteps, stunned,
                                         statusDamage, passiveActivations);
+        }
+
+        /// <summary>
+        /// Runs the avatar's own turn: the avatar is in the <see cref="TurnManager"/> roster (it
+        /// fills a gauge from its own Speed like any unit) but not in <paramref name="allUnits"/>,
+        /// so it is never targeted and never counted by the win check. On its turn, in order:
+        /// <list type="number">
+        /// <item><description>
+        /// If <paramref name="passives"/> has not begun (a caller driving turns itself without
+        /// <see cref="BeginBattle"/>), its battle-start hook runs first.
+        /// </description></item>
+        /// <item><description>
+        /// Anything defeated outside this type is lifted off the grid, and the avatar's own timed
+        /// modifiers tick (a buff it gave itself with a <see cref="SkillTargetShape.Self"/> skill is
+        /// counted in its own turns, like a beast's). It has no status engine step: nothing can put
+        /// a status on a unit nobody can target.
+        /// </description></item>
+        /// <item><description>
+        /// Every passive's internal cooldown ticks once (<see cref="PassiveLoadout"/> cooldowns are
+        /// counted in avatar turns), before its actives.
+        /// </description></item>
+        /// <item><description>
+        /// <see cref="SkillLoadout.TickAndResolve"/> on its actives; each activation is applied with
+        /// the avatar as caster, the newly defeated are lifted off the grid, and the after-damage
+        /// passive hook runs. The avatar's crits are not ally crits, and an enemy its skill defeats
+        /// credits no beast (an <see cref="BeastCraft.Avatar.PassiveTrigger.EnemyDefeated"/> passive
+        /// scoped to the triggering unit finds none).
+        /// </description></item>
+        /// </list>
+        /// <see cref="BeastCraft.Avatar.PassiveTrigger.AllyTurnStart"/> passives do not fire here:
+        /// they fire as each player <em>beast's</em> turn opens.
+        /// The result is attributed to the avatar: no movement, no <see cref="BattleTurnResult.SkillOutcomes"/>,
+        /// its casts on <see cref="BattleTurnResult.AvatarActivations"/> and its passives on
+        /// <see cref="BattleTurnResult.PassiveActivations"/>.
+        /// <see cref="ExecuteTurn(BattleUnit, IEnumerable{BattleUnit}, HexGrid, Random, BattleUnit, PassiveLoadout)"/>
+        /// routes here when handed the avatar as the unit, so a caller driving turns itself gets the
+        /// same turn. A null avatar takes no turn (an empty result).
+        /// </summary>
+        public static BattleTurnResult ExecuteAvatarTurn(BattleUnit avatar, IEnumerable<BattleUnit> allUnits, HexGrid grid, Random rng, PassiveLoadout passives)
+        {
+            List<SkillActivation> avatarActivations = new List<SkillActivation>();
+            List<PassiveActivation> passiveActivations = new List<PassiveActivation>();
+
+            if (avatar == null)
+            {
+                return new BattleTurnResult(null, HexCoordinate.Zero, HexCoordinate.Zero, 0, 0, null, avatarActivations);
+            }
+
+            PassiveHooks hooks = PassiveHooks.For(passives, avatar, allUnits, grid, rng, passiveActivations);
+
+            if (hooks != null && !passives.HasBegun)
+            {
+                passives.Begin(avatar, allUnits, grid, rng, passiveActivations);
+            }
+
+            LiftDefeated(allUnits, grid);
+            SkillEffectApplier.TickModifiers(avatar);
+
+            if (hooks != null)
+            {
+                passives.TickCooldowns();
+            }
+
+            if (avatar.Skills != null)
+            {
+                IReadOnlyList<SkillActivation> cast = avatar.Skills.TickAndResolve(avatar, allUnits, grid, rng);
+
+                for (int i = 0; i < cast.Count; i++)
+                {
+                    SkillEffectApplier.Apply(cast[i], avatar, rng, grid);
+                    LiftDefeated(allUnits, grid);
+                    avatarActivations.Add(cast[i]);
+
+                    // No beast is credited: this is nobody's turn but the avatar's.
+                    hooks?.AfterApplication(null, null);
+                }
+            }
+
+            return new BattleTurnResult(avatar, avatar.Position, avatar.Position, 0, 0, null, avatarActivations, 0, false, 0, passiveActivations);
         }
 
         /// <summary>
@@ -459,6 +529,24 @@ namespace BeastCraft.Battle
             }
 
             return fired;
+        }
+
+        /// <summary>
+        /// The battle-start hook with the player team's bonds: every active bond in
+        /// <paramref name="bonds"/> is applied first (see <see cref="TeamBondLoadout"/>; what was
+        /// applied is <paramref name="bondActivations"/>), then the passives exactly as
+        /// <see cref="BeginBattle(IEnumerable{BattleUnit}, HexGrid, Random, BattleUnit, PassiveLoadout)"/>,
+        /// so an avatar aura or battle-start passive sees the bonded stats. A loadout of bonds is
+        /// applied once; later calls apply nothing. A null bond loadout is exactly the bond-free
+        /// hook. Unlike the passives, bonds are not applied by a first turn that runs without this
+        /// hook: a caller driving turns itself must call it.
+        /// </summary>
+        public static IReadOnlyList<PassiveActivation> BeginBattle(IEnumerable<BattleUnit> allUnits, HexGrid grid, Random rng, BattleUnit avatar,
+                                                                   PassiveLoadout passives, TeamBondLoadout bonds,
+                                                                   out IReadOnlyList<TeamBondActivation> bondActivations)
+        {
+            bondActivations = bonds == null ? new List<TeamBondActivation>() : bonds.Apply(grid, rng);
+            return BeginBattle(allUnits, grid, rng, avatar, passives);
         }
 
         /// <summary>
@@ -496,9 +584,17 @@ namespace BeastCraft.Battle
         /// <paramref name="allUnits"/> is the roster: the beasts on both sides, and not the avatar,
         /// which is a caster only (see <see cref="BattleAvatar"/>). It is copied once up front, so
         /// the win check and every turn's targeting read the same list, and the caller's collection
-        /// is not retained. It is expected to hold the same units <paramref name="turnManager"/> was
+        /// is not retained. It is expected to hold the same beasts <paramref name="turnManager"/> was
         /// built from; if it does not, the loop still terminates — a turn order that runs dry while
         /// both sides look alive reports <see cref="BattleOutcome.Stalemate"/> rather than spinning.
+        /// </para>
+        /// <para>
+        /// <strong>The avatar's gauge.</strong> With an avatar, build <paramref name="turnManager"/>
+        /// from the beasts <em>and</em> the avatar: it fills a gauge from its own Speed like any
+        /// unit, and when <see cref="TurnManager.CurrentUnit"/> is the avatar the loop runs
+        /// <see cref="ExecuteAvatarTurn"/> instead of a beast's turn. Its turns are in
+        /// <see cref="BattleResult.Turns"/> (and <see cref="BattleResult.ActionCount"/>) like any
+        /// other. A turn manager built without it simply never gives the avatar a turn.
         /// </para>
         /// <para>
         /// Non-throwing: a null turn manager or an empty roster returns a result rather than
@@ -521,8 +617,21 @@ namespace BeastCraft.Battle
         public static BattleResult RunBattle(TurnManager turnManager, IEnumerable<BattleUnit> allUnits, HexGrid grid, Random rng, BattleUnit avatar,
                                              PassiveLoadout passives, int maxTime = DefaultMaxTime)
         {
+            return RunBattle(turnManager, allUnits, grid, rng, avatar, passives, null, maxTime);
+        }
+
+        /// <summary>
+        /// <see cref="RunBattle(TurnManager, IEnumerable{BattleUnit}, HexGrid, Random, BattleUnit, PassiveLoadout, int)"/>
+        /// with the player team's bonds: the battle-start hook is
+        /// <see cref="BeginBattle(IEnumerable{BattleUnit}, HexGrid, Random, BattleUnit, PassiveLoadout, TeamBondLoadout, out IReadOnlyList{TeamBondActivation})"/>
+        /// (bonds, then passives), and what the bonds applied is
+        /// <see cref="BattleResult.BondActivations"/>. A null bond loadout is exactly the bond-free battle.
+        /// </summary>
+        public static BattleResult RunBattle(TurnManager turnManager, IEnumerable<BattleUnit> allUnits, HexGrid grid, Random rng, BattleUnit avatar,
+                                             PassiveLoadout passives, TeamBondLoadout bonds, int maxTime = DefaultMaxTime)
+        {
             List<BattleUnit> roster = CopyRoster(allUnits);
-            IReadOnlyList<PassiveActivation> opening = BeginBattle(roster, grid, rng, avatar, passives);
+            IReadOnlyList<PassiveActivation> opening = BeginBattle(roster, grid, rng, avatar, passives, bonds, out IReadOnlyList<TeamBondActivation> bonded);
             List<BattleTurnResult> turns = new List<BattleTurnResult>();
             long capTicks = (long)(maxTime < 1 ? 1 : maxTime) * TurnManager.TicksPerTimeUnit;
             long lastTurnTicks = 0;
@@ -552,13 +661,13 @@ namespace BeastCraft.Battle
                 if (!current.IsDefeated)
                 {
                     lastTurnTicks = turnManager.ElapsedTicks;
-                    turns.Add(ExecuteTurn(current, roster, grid, rng, avatar, passives));
+                    turns.Add(current == avatar ? ExecuteAvatarTurn(avatar, roster, grid, rng, passives) : ExecuteTurn(current, roster, grid, rng, avatar, passives));
                 }
 
                 turnManager.AdvanceTurn();
             }
 
-            return new BattleResult(outcome, lastTurnTicks, turns, opening);
+            return new BattleResult(outcome, lastTurnTicks, turns, opening, bonded);
         }
 
         /// <summary>
@@ -647,6 +756,11 @@ namespace BeastCraft.Battle
         /// </list>
         /// </para>
         /// <para>
+        /// <strong>Large units.</strong> Against a large candidate the goals ring its whole footprint
+        /// (<see cref="ApproachGoals"/>) and range is measured to its nearest tile. A large
+        /// <em>mover</em> plans differently altogether: see <see cref="TryPlanLargeApproach"/>.
+        /// </para>
+        /// <para>
         /// The search starts at index 1 of each route: index 0 is the tile the mover is already on,
         /// and that tile is known to be out of range because the caller checked before asking. A
         /// route that never comes within range — possible for a <c>Range</c> of 0, which wants a
@@ -672,6 +786,11 @@ namespace BeastCraft.Battle
                 return false;
             }
 
+            if (mover.Footprint != UnitFootprint.Single)
+            {
+                return TryPlanLargeApproach(mover, candidate, skill, allUnits, grid, out route, out steps);
+            }
+
             List<BattleUnit> screened = mover.Stance == CombatStance.Vanguard ? FragileAllies(mover, allUnits) : null;
             bool screening = screened != null && screened.Count > 0;
 
@@ -687,7 +806,7 @@ namespace BeastCraft.Battle
 
                 for (int step = 1; step < path.Count; step++)
                 {
-                    if (path[step].Distance(candidate.Position) > skill.Range)
+                    if (FootprintMath.DistanceTo(path[step], candidate.Position, candidate.Footprint) > skill.Range)
                     {
                         continue;
                     }
@@ -740,6 +859,13 @@ namespace BeastCraft.Battle
         /// when nothing stands on it, then each of its six neighbours, in
         /// <see cref="HexCoordinate.AxialDirections"/>' fixed order. Impassable goals are dropped
         /// here rather than searched for and failed on.
+        /// <para>
+        /// A large candidate is ringed instead: after its anchor (when nothing stands there), every
+        /// tile next to any of its tiles and not one of them — twelve around a
+        /// <see cref="UnitFootprint.Hex7"/>, nine around a <see cref="UnitFootprint.Triangle"/> —
+        /// walked footprint tile by footprint tile (<see cref="Footprints.Offsets"/>' order), each in
+        /// <see cref="HexCoordinate.AxialDirections"/>' order, first sighting kept.
+        /// </para>
         /// </summary>
         private static List<HexCoordinate> ApproachGoals(HexGrid grid, BattleUnit mover, BattleUnit candidate)
         {
@@ -752,6 +878,27 @@ namespace BeastCraft.Battle
 
             IReadOnlyList<HexCoordinate> directions = HexCoordinate.AxialDirections;
 
+            if (candidate.Footprint != UnitFootprint.Single)
+            {
+                IReadOnlyList<HexCoordinate> offsets = Footprints.Offsets(candidate.Footprint);
+
+                for (int o = 0; o < offsets.Count; o++)
+                {
+                    for (int i = 0; i < directions.Count; i++)
+                    {
+                        HexCoordinate ring = candidate.Position + offsets[o] + directions[i];
+
+                        if (FootprintMath.DistanceTo(ring, candidate.Position, candidate.Footprint) == 1 && grid.IsPassable(ring, mover.Id) &&
+                            !goals.Contains(ring))
+                        {
+                            goals.Add(ring);
+                        }
+                    }
+                }
+
+                return goals;
+            }
+
             for (int i = 0; i < directions.Count; i++)
             {
                 HexCoordinate tile = candidate.Position + directions[i];
@@ -763,6 +910,96 @@ namespace BeastCraft.Battle
             }
 
             return goals;
+        }
+
+        /// <summary>
+        /// <see cref="TryPlanApproach"/> for a large mover (any footprint but
+        /// <see cref="UnitFootprint.Single"/>). Rather than aiming A* at goal tiles, it walks every
+        /// anchor it can reach (<see cref="ReachableTiles"/>, where the whole footprint must fit at
+        /// every step) and takes the cheapest anchor from which the candidate is in range, measured
+        /// footprint to footprint. Among anchors of that cost: a <see cref="CombatStance.Vanguard"/>
+        /// with fragile allies prefers the one nearest the closest of them (screening, judged at the
+        /// in-range anchor); a <see cref="CombatStance.Ranged"/> or
+        /// <see cref="CombatStance.Skirmisher"/> unit the one farthest from the candidate, then the
+        /// one with the fewest enemies next to any of its tiles; then breadth-first discovery order.
+        /// The route is then <see cref="HexPathfinder.FindPath(HexGrid, HexCoordinate, HexCoordinate, string, UnitFootprint)"/>
+        /// to that anchor, which has exactly the breadth-first cost, so a partial approach walks a
+        /// prefix of it as usual. False when no reachable anchor is in range.
+        /// </summary>
+        private static bool TryPlanLargeApproach(BattleUnit mover, BattleUnit candidate, SkillSO skill, IEnumerable<BattleUnit> allUnits, HexGrid grid,
+                                                 out IReadOnlyList<HexCoordinate> route, out int steps)
+        {
+            route = null;
+            steps = 0;
+
+            List<BattleUnit> screened = mover.Stance == CombatStance.Vanguard ? FragileAllies(mover, allUnits) : null;
+            bool screening = screened != null && screened.Count > 0;
+            bool standoff = mover.Stance == CombatStance.Ranged || mover.Stance == CombatStance.Skirmisher;
+            List<BattleUnit> enemies = standoff ? LivingEnemies(mover, allUnits) : null;
+
+            ReachMap costs = ReachableTiles(grid, mover, int.MaxValue);
+            List<HexCoordinate> order = costs.Order;
+
+            bool found = false;
+            HexCoordinate best = mover.Position;
+            int bestCost = 0;
+            int bestDistance = 0;
+            int bestCrowd = 0;
+            int bestScreen = 0;
+
+            // Index 0 is the mover's own anchor, already known to be out of range.
+            for (int i = 1; i < order.Count; i++)
+            {
+                HexCoordinate anchor = order[i];
+                int cost;
+                costs.TryGetCost(anchor, out cost);
+
+                if (found && cost > bestCost)
+                {
+                    // Breadth-first order: nothing further on is as cheap.
+                    break;
+                }
+
+                int distance = FootprintMath.UnitDistance(anchor, mover.Footprint, candidate.Position, candidate.Footprint);
+
+                if (distance > skill.Range)
+                {
+                    continue;
+                }
+
+                int crowd = standoff ? AdjacentCount(anchor, mover.Footprint, enemies) : 0;
+                int screen = screening ? ScreeningDistance(anchor, screened) : 0;
+
+                bool better = !found
+                    || (standoff && (distance > bestDistance || (distance == bestDistance && crowd < bestCrowd)))
+                    || (screening && screen < bestScreen);
+
+                if (better)
+                {
+                    found = true;
+                    best = anchor;
+                    bestCost = cost;
+                    bestDistance = distance;
+                    bestCrowd = crowd;
+                    bestScreen = screen;
+                }
+            }
+
+            if (!found)
+            {
+                return false;
+            }
+
+            IReadOnlyList<HexCoordinate> path = HexPathfinder.FindPath(grid, mover.Position, best, mover.Id, mover.Footprint);
+
+            if (path.Count < 2)
+            {
+                return false;
+            }
+
+            route = path;
+            steps = path.Count - 1;
+            return true;
         }
 
         /// <summary>
@@ -793,7 +1030,11 @@ namespace BeastCraft.Battle
             pick = mover.Position;
             ReachMap costs = ReachableTiles(grid, mover, int.MaxValue);
             List<BattleUnit> enemies = LivingEnemies(mover, allUnits);
-            IReadOnlyList<HexCoordinate> tiles = grid.GetTilesInRange(candidate.Position, skill.Range);
+
+            // A large candidate's in-range tiles all lie within Range + 1 of its anchor; the
+            // distance filter below keeps only those within Range of its nearest tile.
+            bool large = candidate.Footprint != UnitFootprint.Single;
+            IReadOnlyList<HexCoordinate> tiles = grid.GetTilesInRange(candidate.Position, large ? skill.Range + 1 : skill.Range);
 
             bool found = false;
             int bestCost = 0;
@@ -811,8 +1052,14 @@ namespace BeastCraft.Battle
                     continue;
                 }
 
-                int distance = tile.Distance(candidate.Position);
-                int crowd = AdjacentCount(tile, enemies);
+                int distance = FootprintMath.DistanceTo(tile, candidate.Position, candidate.Footprint);
+
+                if (large && distance > skill.Range)
+                {
+                    continue;
+                }
+
+                int crowd = AdjacentCount(tile, UnitFootprint.Single, enemies);
                 bool isPlain = plainStop.HasValue && plainStop.Value == tile;
 
                 bool better = !found
@@ -876,8 +1123,8 @@ namespace BeastCraft.Battle
             List<HexCoordinate> order = costs.Order;
 
             HexCoordinate best = unit.Position;
-            int bestNearest = NearestDistance(best, enemies);
-            int bestCrowd = AdjacentCount(best, enemies);
+            int bestNearest = NearestDistance(best, unit.Footprint, enemies);
+            int bestCrowd = AdjacentCount(best, unit.Footprint, enemies);
             int bestCost = 0;
 
             for (int i = 0; i < order.Count; i++)
@@ -889,14 +1136,14 @@ namespace BeastCraft.Battle
                     continue;
                 }
 
-                int nearest = NearestDistance(tile, enemies);
+                int nearest = NearestDistance(tile, unit.Footprint, enemies);
 
                 if (nearest > cap)
                 {
                     continue;
                 }
 
-                int crowd = AdjacentCount(tile, enemies);
+                int crowd = AdjacentCount(tile, unit.Footprint, enemies);
                 int cost;
                 costs.TryGetCost(tile, out cost);
 
@@ -943,12 +1190,14 @@ namespace BeastCraft.Battle
         /// steps, with its step cost, the mover's own tile included at 0. Breadth-first over
         /// <see cref="HexGrid.IsPassable"/> tiles (other units obstruct, as they do for the
         /// pathfinder), expanding neighbours in <see cref="HexCoordinate.AxialDirections"/>' fixed
-        /// order; <see cref="ReachMap.Order"/> holds the tiles in discovery order.
+        /// order; <see cref="ReachMap.Order"/> holds the tiles in discovery order. For a large mover
+        /// the tiles are anchors and each must satisfy <see cref="HexGrid.CanStand"/> for its
+        /// footprint, exactly as the footprint-aware pathfinder requires.
         /// <para>
         /// The result is this thread's reusable <see cref="ReachMap"/>, valid until the next call
         /// on the same thread: read it before searching again. (Only
-        /// <see cref="TryPickStandoffTile"/> and <see cref="Retreat"/> call this, and each reads its
-        /// map to the end before anything else searches.)
+        /// <see cref="TryPickStandoffTile"/>, <see cref="TryPlanLargeApproach"/> and <see cref="Retreat"/>
+        /// call this, and each reads its map to the end before anything else searches.)
         /// </para>
         /// </summary>
         private static ReachMap ReachableTiles(HexGrid grid, BattleUnit mover, int maxSteps)
@@ -956,6 +1205,8 @@ namespace BeastCraft.Battle
             ReachMap costs = ReachMap.Begin(grid, mover.Position);
             List<HexCoordinate> order = costs.Order;
             HexCoordinate[] directions = HexPathfinder.Directions;
+            UnitFootprint footprint = mover.Footprint;
+            bool single = footprint == UnitFootprint.Single;
 
             // Breadth-first: every tile is queued exactly when it is appended to the discovery
             // order, so walking that list from the front is the FIFO queue.
@@ -975,7 +1226,9 @@ namespace BeastCraft.Battle
                     HexCoordinate next = current + directions[i];
                     int index = grid.TileIndex(next);
 
-                    if (!grid.IsPassableAt(index, mover.Id) || costs.Contains(next, index))
+                    bool passable = single ? grid.IsPassableAt(index, mover.Id) : grid.CanStandAt(index, next, footprint, mover.Id);
+
+                    if (!passable || costs.Contains(next, index))
                     {
                         continue;
                     }
@@ -1158,17 +1411,22 @@ namespace BeastCraft.Battle
         /// </summary>
         private static int ScreeningDistance(HexCoordinate tile, List<BattleUnit> allies)
         {
-            return NearestDistance(tile, allies);
+            return NearestDistance(tile, UnitFootprint.Single, allies);
         }
 
-        /// <summary>The hex distance from a tile to the nearest of the given units (<c>int.MaxValue</c> when there are none).</summary>
-        private static int NearestDistance(HexCoordinate tile, List<BattleUnit> units)
+        /// <summary>
+        /// The hex distance from a unit of footprint <paramref name="footprint"/> anchored on
+        /// <paramref name="tile"/> to the nearest of the given units, nearest tile to nearest tile
+        /// (<see cref="FootprintMath.UnitDistance(HexCoordinate, UnitFootprint, HexCoordinate, UnitFootprint)"/>;
+        /// <c>int.MaxValue</c> when there are none).
+        /// </summary>
+        private static int NearestDistance(HexCoordinate tile, UnitFootprint footprint, List<BattleUnit> units)
         {
             int nearest = int.MaxValue;
 
             for (int i = 0; i < units.Count; i++)
             {
-                int distance = tile.Distance(units[i].Position);
+                int distance = FootprintMath.UnitDistance(tile, footprint, units[i].Position, units[i].Footprint);
 
                 if (distance < nearest)
                 {
@@ -1179,14 +1437,18 @@ namespace BeastCraft.Battle
             return nearest;
         }
 
-        /// <summary>How many of the given units stand on a tile adjacent to <paramref name="tile"/>.</summary>
-        private static int AdjacentCount(HexCoordinate tile, List<BattleUnit> units)
+        /// <summary>
+        /// How many of the given units stand next to a unit of footprint <paramref name="footprint"/>
+        /// anchored on <paramref name="tile"/> — for a one-tile unit, on a tile adjacent to it; for a
+        /// large one, next to any of its tiles. Each unit counts once, however many tiles it touches.
+        /// </summary>
+        private static int AdjacentCount(HexCoordinate tile, UnitFootprint footprint, List<BattleUnit> units)
         {
             int count = 0;
 
             for (int i = 0; i < units.Count; i++)
             {
-                if (tile.Distance(units[i].Position) == 1)
+                if (FootprintMath.UnitDistance(tile, footprint, units[i].Position, units[i].Footprint) == 1)
                 {
                     count++;
                 }
@@ -1203,12 +1465,17 @@ namespace BeastCraft.Battle
         /// <see cref="BattleUnit.Position"/>'s own documentation names the grid as the authority on
         /// which tile is taken, so the grid is asked first and its answer is what decides: a
         /// rejected placement leaves the unit exactly where it was, with both halves still agreeing,
-        /// rather than teleporting a unit whose tile the board does not think it holds.
+        /// rather than teleporting a unit whose tile the board does not think it holds. A large unit
+        /// moves its whole footprint with it (all or nothing).
         /// </para>
         /// </summary>
         private static bool TryMove(BattleUnit unit, HexGrid grid, HexCoordinate destination)
         {
-            if (!grid.TryPlaceUnit(unit.Id, destination))
+            bool placed = unit.Footprint == UnitFootprint.Single
+                ? grid.TryPlaceUnit(unit.Id, destination)
+                : grid.TryPlaceUnit(unit.Id, destination, unit.Footprint);
+
+            if (!placed)
             {
                 return false;
             }

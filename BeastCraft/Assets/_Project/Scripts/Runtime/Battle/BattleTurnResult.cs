@@ -6,8 +6,9 @@ namespace BeastCraft.Battle
 {
     /// <summary>
     /// Everything one unit's turn did: where it started and finished, what its movement budget was
-    /// and how much of it went, what each ready skill slot made of its chance, and — on a player
-    /// beast's turn only — what the avatar's rotation fired alongside it.
+    /// and how much of it went, what each ready skill slot made of its chance, and — on the
+    /// avatar's own turn (<see cref="BattleTurnExecutor.ExecuteAvatarTurn"/>) — what its rotation
+    /// fired.
     /// <para>
     /// The return shape of <see cref="BattleTurnExecutor.ExecuteTurn"/>. A turn is no longer a
     /// single list of activations, because a skill can now come up ready and decline to go off, and
@@ -111,9 +112,9 @@ namespace BeastCraft.Battle
         public IReadOnlyList<BattleSkillOutcome> SkillOutcomes { get; }
 
         /// <summary>
-        /// What the player's avatar cast off the back of this turn, per the confirmed rule that its
-        /// loadout ticks once per player-side beast turn. Always empty on an enemy beast's turn, and
-        /// when no avatar was supplied. Never <c>null</c>.
+        /// What the player's avatar cast on this turn, which is then the avatar's own turn (its
+        /// loadout ticks once per avatar turn; see <see cref="BattleTurnExecutor.ExecuteAvatarTurn"/>).
+        /// Always empty on a beast's turn, and when no avatar was supplied. Never <c>null</c>.
         /// <para>
         /// Plain <see cref="SkillActivation"/>s rather than <see cref="BattleSkillOutcome"/>s
         /// because the avatar's kit cannot fail to reach: every ready slot of its fires, so there is

@@ -35,6 +35,10 @@ dotnet run --project Tooling/BalanceSim -c Release -- [options]
 | `--skill-kit <k>` | `library` | The skill axis: `library` (each beast's authored `DefaultLoadout` from `skill-library.json`, the real game setup and the committed report's setting; see "Library kits") or `standard` (the same standard kit for every beast, so the stat lines are what is measured; see "The standard kit"). Before the authored-kits retune this was `--kit standard|library`; `--kit` now takes only the element axis. |
 | `--skill-level <n>` | `1` | Skill level (1-20) for library skills and library avatar skills; the tier is the gates below that level (16+ = all three passed). |
 | `--skill-library <path>` | found by walking up | Path to `skill-library.json` (read only with `--skill-kit library` or `--avatar library`, i.e. by default). |
+| `--bonds <on\|off>` | `on` | Team bonds from the library's `TeamBonds`: applied at battle start to every player team that meets a bond's condition (never to enemies). Library kit only (ignored with `--skill-kit standard`). Adds the "PvE team bonds" section. See "Library kits". |
+| `--scouted <list>` | `all` | Scouted picking, the "PvE scouted picking" section: comma-separated `random`, `heuristic`, `bonds` (the bond-aware heuristic; bonds on only), `oracle` (also adds the held-out best team), or `all` / `none`. Post-processing of the battles already run: no extra battles, sub-second. `none` removes the section and its header line, leaving the report exactly as before scouting existed. See "Scouted picking". |
+| `--scouted-detail <d>` | `full` | What the heuristic pickers see of each composition (`ScoutingDetail`): `full`, `elements-only` or `dominant-element`. |
+| `--scouted-vanguard-min <n>` | `1` | Fewest Vanguards a heuristic pick fields, 0 to `--team-size`. |
 | `--levels <list>` | `1,50,100` | Comma-separated levels; beasts and enemies fight at the same level. |
 | `--encounter-set <s>` | `generated` | `generated`: random compositions per shape (see "Generated encounters"). `fixed`: the three hand-authored encounters (`boss`, `swarm`, `pack`). |
 | `--compositions <n>` | `8` | Generated compositions per shape. |
@@ -49,7 +53,8 @@ dotnet run --project Tooling/BalanceSim -c Release -- [options]
 | `--matrix-level <n>` | `50` | Level of the PvP win matrix and the stat table (falls back to the highest simulated level). |
 | `--roster <path>` | found by walking up | Path to `beast-roster.json`. |
 | `--encounters-file <path>` | found by walking up | Path to `encounters.json`. |
-| `--avatar <preset>` | `library` | PvE only. `library` (the committed report's setting) fields the skill library's default avatar: its first three actives and `AvatarDefaultPassives`, at `--skill-level`. `support` fields a fixture avatar with three passive skills beside every player team (`AvatarPresets.cs`; not authored content). `none` fields no avatar. `library` and `support` add an "Avatar passives" section with firings per battle. See `docs/design/battle-system.md`, "Avatar passives" and "Beast skill kits". |
+| `--avatar <preset>` | `library` | PvE only. `library` (the committed report's setting) fields the skill library's default avatar: its first three actives and `AvatarDefaultPassives`, at `--skill-level`. `support` fields a fixture avatar with three passive skills beside every player team (`AvatarPresets.cs`; not authored content). `none` fields no avatar. `library` and `support` add an "Avatar passives" section with firings per battle and the avatar's turns and active casts per battle. See `docs/design/battle-system.md`, "Avatar passives" and "Beast skill kits". |
+| `--avatar-level <n>` | encounter level | PvE only. The fielded avatar's level, 1-100: its fixture stats on the medium curve (Speed included) and its damage-formula level. By default each battle's encounter level (the avatar levels alongside the encounters; see `--mode pacing`, "Avatar level"). |
 | `--out <path>` | none | Also write the report to this file (it always goes to stdout). |
 | `--self-check` | off | Run everything twice and fail unless both reports are identical; also replay sample PvE battles through `BattleTurnExecutor.RunBattle` and fail if the simulator's loop disagrees. |
 | `--seeds <list>` | none | Comma-separated base seeds, run one after another in one process (cannot be combined with `--seed`). Each seed's run is exactly the `--seed <n>` run; stdout (and `--out`) get the multi-seed aggregate, and with `--out` each seed's full report is also written beside it as `<name>.seed<n>.md`. See "Multi-seed runs". |
@@ -72,8 +77,8 @@ Two reports are committed, both the default arguments:
   the ATB turn order, so its battle lengths are in rounds.
 - `docs/balance/tuned-report.md` — the current roster and skill library after the third tuning pass
   and its element chart v2 follow-up (see `docs/balance/tuning-log.md`, "Retune with authored kits,
-  avatar passives, sqrt speed and mitigation", "Element chart v2", "Thunderbird range vs move" and "Niche pass: Thunderbird opener, Phoenix/Frost Wyrm lifts, remaining negatives"), under the real game setup (every beast's authored default loadout, the library
-  avatar with its passives, skill level 1), the current Runtime (the square-root ATB turn order, the
+  avatar passives, sqrt speed and mitigation", "Element chart v2", "Thunderbird range vs move" and "Niche pass: Thunderbird opener, Phoenix/Frost Wyrm lifts, remaining negatives", then "Team bonds"; "Scouting and counter-picking" added the scouted-picking section, no balance change; "Avatar gauge" moved the avatar onto its own ATB gauge, no tuning; "Large enemies (footprints)" made the giant, colossus and champion multi-hex, no tuning beyond the bosses' range parity), under the real game setup (every beast's authored default loadout, the library
+  avatar with its passives, the library's team bonds, skill level 1), the current Runtime (the square-root ATB turn order, the
   mitigation damage formula, `SpecialAttack`-scaled heals, combat stances, variance and crits) and
   the generated encounters. Regenerate it whenever the roster, the skill library, fixtures, simulator
   or Runtime change:
@@ -92,10 +97,26 @@ skill's element is forced to `None`. The report shows a "Library beast kits" tab
 standard kit and has no kit parity table (it measures the standard kit's Strike / Shot / Blast
 balance; library kits differ by design). PvP uses the library kits too. The default `--avatar
 library` fields the library's default avatar (first three actives, `AvatarDefaultPassives`) on the
-same skill level. The avatar's stats (either preset) are a fixture block: 100 in every combat stat
-at max level, scaled by the roster's growth curve like a beast's (15 at level 1, 57 at level 50), so
-its shields (a percent of its Defense) and heals (a percent of its SpecialAttack) are the same share
-of a beast's HP at every level.
+same skill level. The avatar's stats (either preset) are a fixture block read the way the game reads
+one, `AvatarStatsSO.GetStatsAtLevel(level)`: 100 in every combat stat and Speed 100 at max level,
+scaled by the roster's growth curve like a beast's (15 at level 1, 57 at level 50), so its shields
+(a percent of its Defense) and heals (a percent of its SpecialAttack) are the same share of a
+beast's HP at every level. Its level is `--avatar-level`, by default the encounter level.
+
+**The avatar's gauge.** The avatar joins the `TurnManager` beside the beasts (never the targeting
+roster) and fills its own ATB gauge from its Speed; when it comes up the loop runs
+`BattleTurnExecutor.ExecuteAvatarTurn` (its passives' internal cooldowns, then its actives),
+exactly as `RunBattle` does, which `--self-check` verifies. Its turns count in the battle's action
+total like any unit's, and the "Avatar passives" section reports its turns and active casts per
+battle.
+
+**Team bonds** (`--bonds on|off`, default on) come from the same file's `TeamBonds` array, built
+through `SkillLibraryBuilder.ApplyTeamBond` like the importer's. Each team's active bonds are resolved
+once per run (`TeamBondResolver`, from its species' stances and elements) and applied at battle start
+through `BattleTurnExecutor.BeginBattle` / `RunBattle` with a `TeamBondLoadout`, before the avatar's
+passives; enemies never get bonds. Bonds are part of the library setup, so `--skill-kit standard`
+ignores them. The report's header says whether they were on, and "PvE team bonds" (see "PvE: team vs
+encounter") shows what they did.
 
 This is the real game setup and the committed report's. `--skill-level 10` is the sanity run the
 tuning log reports beside it. For a quick check:
@@ -186,6 +207,19 @@ cooldown 2 weighted `Attack` about twice as heavily.
   2 or more (a Ranged unit never walks into melee), an enemy without a `SingleTarget` skill (the only
   shape that walks), move 0, and a composition that cannot fit its deployment zone.
 
+  Each enemy also has an optional `Footprint` (a `UnitFootprint` name; missing = `Single`, one
+  tile): the giant and the colossus are `Hex7` (seven tiles, the boss size) and the champion
+  `Triangle` (three tiles, the mini-boss size); see "Unit footprints" in
+  `docs/design/battle-system.md`. Every range to or from a large enemy is measured between nearest
+  tiles, an area hits it once, and a large caster's area grows from all its tiles, so the `Hex7`
+  bosses author their ranges one lower than their one-tile values were (gaze 2, quake and roar 1: a
+  radius-1 burst from a `Hex7` is the radius-2 disc around its centre) to keep their reach; the
+  champion's shockwave stays at 2. The loader packs every shape's worst case (each slot at its `Max`,
+  each unit its slot's largest type, largest first) and every fixed encounter into the enemy zone the
+  way a battle does, and refuses what does not fit: a `Hex7` enemy never fits a `Small` arena (a
+  two-row zone). The generator also refuses a draw that would not fit (a safety net; no valid file
+  produces one).
+
   The advanced effect fields are optional, and every one is inert when missing. See "Status effects
   and advanced skill effects" in `docs/design/battle-system.md`.
   - Per enemy: `StatusResist` (0–100, `BattleUnit.StatusResist`).
@@ -200,7 +234,11 @@ cooldown 2 weighted `Attack` about twice as heavily.
   The bosses (giant, champion and the fixed colossus) carry `StatusResist` 50. No fixture skill uses
   the other fields yet, so the reports are unchanged.
 - **Placement.** Each side takes the front-most tiles of its own deployment zone (front row first,
-  then outward from the centre line). Enemies are placed in fixture order; the team is committed
+  then outward from the centre line). Enemies are placed in fixture order by `DeploymentPacker`: each
+  takes the front-most anchor where its whole footprint fits the zone on free tiles, so one-tile
+  enemies take exactly the front-most tiles and a `Hex7` boss on a Medium board sits centred on the
+  middle row of the enemy zone, its escort filling the tiles around it (the layout is worked out once
+  per composition). The team is committed
   through `PlacementValidator.TryPlaceAll`. Which member gets which slot is a fixed seeded shuffle
   per team, because the slot fixes the unit id, and ids break initiative ties and equal-distance target
   ties within the team. Pinning slots to roster order would always expose the first species.
@@ -256,6 +294,21 @@ cooldown 2 weighted `Attack` about twice as heavily.
     = 0.675 for 4 of 10; baseline + mA + mB would show every pair of strong beasts as anti-synergy.
     With 45 pairs a few |synergy / SE| near 2.5 are expected from noise; one seed cannot separate
     them, `--seeds` can (see "Multi-seed runs").
+- **Team bonds** (`BondReport.cs`; "PvE team bonds", only with bonds on): every bond with its
+  condition, scope, tier effects and how many of the 210 teams have it (per tier), which bonds each
+  beast belongs to, and how many bonds the teams activate. Then per kit mode a **bond marginal**
+  table: per shape and overall, **Δ** = clear rate of the teams with the bond active minus the teams
+  without, and **excess** = the active teams' rate over the additive prediction from their members'
+  marginals (baseline + (n - 1) / n x the members' centred marginals, the pair synergy model per
+  team). Δ mixes the bond with its members' own strength (only teams holding them can have it); the
+  excess is the part the lineup earns, since the members' marginals already carry the bond's
+  average. And the primary mode's clear rate by number of active bonds. The `--seeds` aggregate
+  repeats the bond marginal averaged over seeds ("PvE team bonds over seeds"). For the whole effect
+  of bonds, compare a `--bonds off` run: its "PvE team composition over seeds" spread and pair
+  synergy tables are the bond-free baseline.
+- **Scouted picking** (`ScoutingReport.cs`; "PvE scouted picking", on by default, off with
+  `--scouted none`): what seeing the encounter and counter-picking a team for it is worth, per
+  shape and kit mode, with each strategy's pick rates. See "Scouted picking" below.
 - **Flags.** Overall marginal outside +/-5 points; **no niche** (bottom 3 in every shape);
   **no weakness** (top 3 in every shape); a stance whose kit parity is outside 50 +/- 5%;
   stalemates; calibration misses.
@@ -275,8 +328,8 @@ encounter set simulates that.
 
 | Type | Role | Threat | Stance | Kit (targeting) |
 | --- | --- | ---: | --- | --- |
-| Giant | boss, HP 1600 | 12 | Vanguard | crush (Physical, r1) and gaze (Special, r3), power 70, nearest; quake + roar (Physical + Special AreaBurst, r2, power 35, cd 3) |
-| Champion | mini-boss, HP 800 | 6 | Vanguard | cleave (Physical, r1, power 55, nearest); hex (Special, r2, power 55, cd 2, lowest current HP); shockwave (Special AreaBurst, r2, power 30, cd 3) |
+| Giant (7 tiles) | boss, HP 1600 | 12 | Vanguard | crush (Physical, r1) and gaze (Special, r2), nearest; quake + roar (Physical + Special AreaBurst, r1 from its footprint = r2 from its centre, cd 3) |
+| Champion (3 tiles) | mini-boss, HP 800 | 6 | Vanguard | cleave (Physical, r1, nearest); hex (Special, r2, cd 2, lowest current HP); shockwave (Special AreaBurst, r2 from its footprint, cd 3) |
 | Brute | melee tank | 2.75 | Vanguard | smash (Physical, r1, power 50, nearest) |
 | Stalker | fast melee hunter (Speed 105, Move 4, crit 10) | 2 | Skirmisher | shadow claw (Special, r1, power 55, lowest current HP) |
 | Archer | ranged physical | 2 | Ranged | arrow (Physical, r3, power 42, nearest) |
@@ -369,6 +422,86 @@ The default run has no stalemates, PvE or PvP.
   to win ties (`PveSimulator.PlayersWinTies`). The prefix is side-wide, so the order within a side,
   and every targeting tie (targeting only ever compares units of one side), is unchanged.
 
+## Scouted picking
+
+The game shows the player each encounter before the team is placed (`EncounterPreview`, see
+`docs/design/battle-system.md`, "Encounter preview"): the enemy groups with their elements, stances
+and counts. "PvE scouted picking" (`ScoutedPicker.cs`, `ScoutingReport.cs`) measures what that is
+worth. Every team already fights every composition, so a scouted pick needs no new battle: each
+strategy names one of the 210 teams per composition, and that team's recorded result against the
+composition is the outcome. The section is on by default (`--scouted all`) and costs well under a
+second; `--scouted none` drops it and its header line, and the rest of the report is byte-identical.
+
+- **Calibration is unchanged.** Each shape's multiplier still aims the *average* team at 50%, so
+  the **baseline** (the mean over every team: the unscouted player) sits at about 50% and every
+  strategy's gain over it reads directly as **uplift** in points.
+- **Random**: a seeded random team per composition. Its expected uplift is 0; its actual gap is the
+  noise scale of the table.
+- **Heuristic**: an element counter-pick from the preview alone (`--scouted-detail` sets how much it
+  sees). Each beast scores, per enemy,
+  `sum over groups of Count x (1.0 x chart(beast element -> group element) - 0.5 x chart(group element -> beast elements)) / enemies`,
+  the attack using the beast's first element (its kit element). The team is the 4 best scores, ties
+  to roster order; if it has fewer than `--scouted-vanguard-min` (default 1) Vanguards, its
+  lowest-scored non-Vanguard is swapped for the best-scored unpicked Vanguard. It ignores stats,
+  kits, levels and bonds, so its picks are the same in every kit mode and level.
+- **Heuristic + bonds** (bonds on only): every team meeting the Vanguard minimum scores its members'
+  heuristic scores plus 0.5 per tier of each bond it activates (`ScoutedPicker.BondWeight`); the best
+  team is fielded, ties to the lower team index. 0.5 is the gap between a neutral and a strong
+  matchup against one enemy in half the lineup's weight: a starting knob, not tuned.
+- **Best team** (with `oracle`): the one lineup with the best clear rate in the same mode and shape
+  at the *other* levels, scored at this level (ties: the other levels over every shape, then the lower
+  index). It knows which team is strong but not what it faces, and it is held out, so the damage-roll
+  luck it was chosen on does not count: it is the bar counter-picking has to clear to matter.
+- **Oracle**: per composition, the team that did best against it (ties: the team's clear rate over
+  the whole cell, then the lower index). An upper bound. With one battle per team and composition it
+  is also a luck bound: among 210 coin flips one nearly always wins, so it reads close to 100%.
+- **Neutral mode is the control.** With every skill `None` the chart the heuristic reads does
+  nothing, so its `neutral` uplift is what its picks are worth as lineups; the gap between the
+  `elemental` and `neutral` uplift is what the counter-pick itself earns.
+- **Pick rates**: per kit mode and shape, the percent of picks (one per composition and level) that
+  field each beast, for the heuristic (H), the bond-aware heuristic (B) and the oracle (O); each
+  column sums to 400 (4 beasts per pick). **0** / **100** flag a beast never / always fielded, and
+  the bullets under the table list them.
+- **Self-check invariants** (every run with scouting on; a failure exits 3): the oracle is at least
+  the baseline, the best team and every other strategy in every cell; every pick is a real team; the
+  heuristic pickers meet the Vanguard minimum whenever the roster has that many Vanguards; and each
+  strategy's pick counts sum to picks x team size per shape.
+- **Noise.** A shape's figure rests on one pick per composition and level (24 battles by default),
+  a binomial SE of about 10 points; judge on the `--seeds` aggregate (and more `--compositions` for
+  a tighter figure), not on one seed. Findings are in `docs/balance/tuning-log.md`, "Scouting and
+  counter-picking".
+
+### Worked example of the heuristic
+
+A composition of one Fire Giant, three Water Archers and two Metal Brutes (6 enemies) at
+`--scouted-detail full` previews as three groups: Fire x1, Water x3, Metal x2. A beast's score is
+`(1 x (off(Fire) - 0.5 def(Fire)) + 3 x (off(Water) - 0.5 def(Water)) + 2 x (off(Metal) - 0.5 def(Metal))) / 6`,
+with off = the chart multiplier of the beast's element into the group's, def = the group's into the
+beast's:
+
+| Beast | Element | Fire x1 | Water x3 | Metal x2 | Score |
+| --- | --- | --- | --- | --- | ---: |
+| Leviathan | Water | 2 - 0.5 x 0.5 | 1 - 0.5 x 1 | 2 - 0.5 x 1 | 1.042 |
+| Treant | Nature | 1 - 0.5 x 2 | 2 - 0.5 x 0.5 | 1 - 0.5 x 1 | 1.042 |
+| Thunderbird | Lightning | 1 - 0.5 x 1 | 2 - 0.5 x 0.5 | 0.5 - 0.5 x 2 | 0.792 |
+| Griffin | Air | 2 - 0.5 x 1 | 1 - 0.5 x 1 | 1 - 0.5 x 0.5 | 0.750 |
+| Basilisk | Dark | 1.25 - 0.5 x 1 | 1 - 0.5 x 1 | 1.25 - 0.5 x 0.5 | 0.708 |
+| Kirin | Light | 1 - 0.5 x 1 | 1.25 - 0.5 x 1 | 1 - 0.5 x 2 | 0.458 |
+| Phoenix | Fire | 1 - 0.5 x 1 | 0.5 - 0.5 x 2 | 2 - 0.5 x 0.5 | 0.417 |
+| Golem | Earth | 1 - 0.5 x 0.5 | 0.5 - 0.5 x 1 | 1 - 0.5 x 1 | 0.292 |
+| Frost Wyrm | Ice | 0.5 - 0.5 x 1 | 1 - 0.5 x 1 | 0.5 - 0.5 x 2 | 0.083 |
+| Tarasque | Metal | 0.5 - 0.5 x 2 | 1 - 0.5 x 2 | 1 - 0.5 x 1 | 0.083 |
+
+The top four are Leviathan and Treant (tied; roster order puts Leviathan first), Thunderbird and
+Griffin, so the heuristic fields **Leviathan, Griffin, Thunderbird, Treant** (in roster order).
+Leviathan and Treant are Vanguards, so no swap is needed; had the four been, say, Thunderbird,
+Griffin, Basilisk and Kirin, the lowest of them (Kirin) would have made way for the best-scored
+Vanguard. Basilisk misses by 0.04: the Fire Giant is a single enemy, so Griffin's 2x into it
+outweighs Basilisk's mild 1.25x into two Metal Brutes. At `dominant-element` the preview is one
+line, Water x6, and the scores become the Water column alone: Thunderbird and Treant (1.75), Kirin
+(0.75), then Leviathan, Griffin and Frost Wyrm tied at 0.5, so the team is Thunderbird, Treant,
+Kirin and Leviathan.
+
 ## PvP: 1v1 round-robin (secondary)
 
 Every pair of distinct species is played twice per level and kit mode with the sides swapped (each
@@ -423,10 +556,48 @@ dotnet run --project Tooling/BalanceSim -c Release -- --mode pve --seeds 12345,7
   histogram and best / worst lineups of the seed means; and each pair's synergy per seed with the
   mean, SD over seeds and a noise estimate (`*` = mean beyond 2 x noise). It is deterministic like
   the reports.
+- With scouting on (the default), **scouted picking over seeds**: each strategy's clear rate and
+  uplift per shape averaged over the seeds, the SD of the heuristic's uplift over seeds, and the
+  pick rates averaged over seeds (**0** / **100** = never / always in every seed).
 - The seeds run one after another, each using every core, so the wall clock is about the sum of
   single-seed runs (loading and JIT are a second or two of a 50 s run). What it replaces is the
   bookkeeping: one process per seed and scripts parsing the Markdown back; the aggregate comes
   straight from the simulator's numbers, unrounded.
+
+## Pacing (`--mode pacing`)
+
+A Monte Carlo model of skill progression and the material economy (`PacingSimulator.cs`), separate
+from the PvE and PvP runs (it loads only `skill-library.json` and `drop-tables.json`, never the
+roster or encounters, and leaves the default report untouched):
+
+```sh
+dotnet run --project Tooling/BalanceSim -c Release -- --mode pacing --self-check --out docs/balance/pacing-report.md
+```
+
+- Each **campaign** is `--battles` (500) battles. Battle `i` is at encounter level
+  `min(100, 1 + i / 5)`; its shape is drawn solo 15 / elite 20 / squad 35 / horde 30; it is cleared
+  with probability 0.8; the focus skill fires 3-9 times (uniform) and a secondary skill the same.
+  Practice goes through `SkillProgression.AwardPractice` win or lose; a clear rolls
+  `LootRoller.RollClear` against the drop tables. No battle is fought: this measures the economy,
+  not combat.
+- **Policy**: after each battle the focus skill passes a gate it waits at with the lowest adequate
+  material held, then is fed materials lowest tier first while below its cap, keeping one material
+  per tier its later gates need; anything it cannot use spills to the secondary skill.
+- `--runs` (1000) campaigns per base seed; `--seeds a,b,c` pools every seed's campaigns. Campaign `r`
+  of seed `s` is seeded `LootRoller.DeriveSeed(s, r)`, each battle `DeriveSeed(campaign, i)`.
+- The report gives p10 / p50 / p90 battles for the focus skill to reach levels 5, 10, 15 and 20,
+  the level by battle, material income and first-drop timing, the practice / material XP split
+  and the spill-over skill's final level. **Targets** (`PacingSimulator.Gates`, on the median): L5
+  15-20, L10 70-90, L15 160-200, L20 295-325. `--self-check` runs twice, demands identical reports
+  and fails (exit 3) when a median misses its band. About 1.5 s.
+- **Avatar level**: every campaign also levels an `AvatarProgress` with
+  `AvatarProgression.AwardBattle` (win or loss by the same clear roll, at the battle's encounter
+  level); the report tabulates its p10 / p50 / p90 level every 50 battles, and `--self-check` fails
+  when the median strays more than `AvatarLevelTolerance` (3) levels from the encounter level. It
+  draws no random numbers, so it never shifts the skill-pacing results.
+- The model's constants (level ramp, shape weights, clear chance, uses per battle) are at the top of
+  `PacingSimulator.cs`; the drop numbers are data. See the design doc, "Material economy", and
+  `docs/balance/tuning-log.md`, "Material economy".
 
 ## Performance
 
@@ -476,6 +647,13 @@ where changing the seed (777) moves them by about 2 on average, up to 6.7, and a
 to 18. The report says so in its PvE
 configuration. Use it for quick iteration, and the default for anything committed.
 
+**Unit footprints** (multi-hex bosses) cost about a tenth: the default run went from 47.9 s to
+52.5 s on the same machine, most of it in the `solo` and `elite` cells (+1.8 s each: a seven-tile
+giant's moves test every tile of its footprint, and one-tile units closing on it aim at twelve goal
+tiles instead of seven). A battle of one-tile units runs the same code as before (one enum compare
+per distance): the `squad` and `horde` cells moved by run-to-run noise only, and their results are
+byte-identical.
+
 Measure before optimizing further: `--timings` prints the per-cell and per-step breakdown.
 
 ## Determinism
@@ -504,8 +682,11 @@ fixtures, code and arguments produce a byte-identical report.
 - **Fixture enemies.** Their stat ratios, kits, threat weights and the generator's element schemes
   decide which beasts look good. The calibration removes overall difficulty, but not shape. The type
   pool is small and hand-made: which types exist, and how often each is drawn, is itself a bias.
-- **Large creatures are one hex.** `HexGrid` has no multi-hex footprint, so the boss can be
-  surrounded by six attackers. This is an open item in the design doc.
+- **Large creatures are simple shapes.** The giant and the colossus cover seven tiles and the
+  champion three (no rotation, no terrain interaction beyond fitting), measured nearest tile to
+  nearest tile; a giant cannot be knocked back and a champion moves at most one tile. Before the
+  footprints (see the tuning log, "Large enemies (footprints)") every boss was one hex and could be
+  surrounded by six attackers; a giant now has twelve tiles around it.
 - **No gear,** a fixture avatar stat block, and only species base stats, the growth curve and the
   level.
 

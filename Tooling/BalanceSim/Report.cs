@@ -40,10 +40,29 @@ namespace BeastCraft.Tooling.BalanceSim
             {
                 report.AppendLine("- Skill kit: `library` (`--skill-kit library`, the default): each beast's authored default loadout from `" +
                                   SkillLibraryKits.RepoRelativePath + "` at skill level " + options.SkillLevel + " (`--skill-level`)");
+                report.AppendLine(options.BondsActive
+                    ? "- Team bonds: on (`--bonds on`, the default): the library's " + options.Library.TeamBonds.Count +
+                      " `TeamBonds` apply at battle start to every player team that meets their condition (never to enemies); see \"PvE team bonds\""
+                    : "- Team bonds: off (`--bonds off`)");
             }
             else
             {
                 report.AppendLine("- Skill kit: `standard` (`--skill-kit standard`): the same kit for every beast, so the stat lines are what is measured");
+            }
+
+            if (ScoutedPicker.Active(options))
+            {
+                List<string> strategies = new List<string>();
+                for (int k = 0; k < ScoutedPicker.StrategyCount; k++)
+                {
+                    if (ScoutedPicker.Runs(options, k))
+                    {
+                        strategies.Add(ScoutedPicker.StrategyNames[k].ToLowerInvariant());
+                    }
+                }
+
+                report.AppendLine("- Scouted picking (PvE, `--scouted`): " + string.Join(", ", strategies) + " at preview detail `" +
+                                  SimOptions.DetailName(options.ScoutedDetail) + "`; post-processing of the same battles, see \"PvE scouted picking\"");
             }
 
             report.AppendLine();
@@ -60,7 +79,7 @@ namespace BeastCraft.Tooling.BalanceSim
             if (options.RunPve)
             {
                 PveReport.AppendSection(report, options, species, encounters, pve, cells);
-                AppendAvatar(report, pve, cells);
+                AppendAvatar(report, options, pve, cells);
             }
 
             if (options.RunPvp)
@@ -173,7 +192,7 @@ namespace BeastCraft.Tooling.BalanceSim
         /// the calibrated difficulty. Nothing at all without <c>--avatar</c>, so the default report
         /// is unchanged.
         /// </summary>
-        private static void AppendAvatar(StringBuilder report, PveSimulator pve, List<PveCell> cells)
+        private static void AppendAvatar(StringBuilder report, SimOptions options, PveSimulator pve, List<PveCell> cells)
         {
             if (pve == null || !pve.Avatar.Enabled)
             {
@@ -183,11 +202,17 @@ namespace BeastCraft.Tooling.BalanceSim
             IReadOnlyList<BeastCraft.Avatar.PassiveSkillSO> passives = pve.Avatar.Passives;
             long[] totals = new long[passives.Count];
             long battles = 0;
+            long avatarTurns = 0;
+            long avatarCasts = 0;
+            long battleTicks = 0;
             foreach (PveCell cell in cells)
             {
                 foreach (PveBattle battle in cell.Battles)
                 {
                     battles++;
+                    avatarTurns += battle.AvatarTurns;
+                    avatarCasts += battle.AvatarCasts;
+                    battleTicks += battle.ElapsedTicks;
                     for (int p = 0; p < totals.Length; p++)
                     {
                         totals[p] += battle.PassiveFirings[p];
@@ -202,6 +227,16 @@ namespace BeastCraft.Tooling.BalanceSim
                                   : "The `" + pve.Avatar.Preset + "` preset is a simulator fixture for exercising the passive engine, not authored content.");
             report.AppendLine("Firings per battle are averaged over every PvE battle at its cell's calibrated difficulty (" + battles + " battles).");
             report.AppendLine();
+            double time = (double)battleTicks / TurnManager.TicksPerTimeUnit;
+            report.AppendLine("- Avatar level: " + (options.AvatarLevel > 0
+                                                         ? options.AvatarLevel.ToString(CultureInfo.InvariantCulture) + " (`--avatar-level`)"
+                                                         : "each battle's encounter level (`--avatar-level` unset)") +
+                              "; its stats follow the medium curve (every combat stat " + AvatarPresets.StatAtMaxLevel + " and Speed " +
+                              AvatarPresets.SpeedAtMaxLevel + " at level 100).");
+            report.AppendLine("- Avatar turns (its own ATB gauge) per battle: " + Per(avatarTurns, battles) + " (" +
+                              (time <= 0 ? 0.0 : avatarTurns / time).ToString("0.00", CultureInfo.InvariantCulture) +
+                              " per unit of normalized time); active casts per battle: " + Per(avatarCasts, battles) + ".");
+            report.AppendLine();
             report.AppendLine("| Passive | Trigger | Scope | Proc % | Max / battle | Cooldown | Firings per battle |");
             report.AppendLine("| --- | --- | --- | ---: | ---: | ---: | ---: |");
             for (int p = 0; p < passives.Count; p++)
@@ -214,6 +249,11 @@ namespace BeastCraft.Tooling.BalanceSim
             }
 
             report.AppendLine();
+        }
+
+        private static string Per(long total, long battles)
+        {
+            return (battles == 0 ? 0.0 : (double)total / battles).ToString("0.00", CultureInfo.InvariantCulture);
         }
 
         private static string ActiveNames(AvatarPresets avatar)

@@ -11,7 +11,7 @@ namespace BeastCraft.Tests.EditMode
 {
     /// <summary>
     /// Avatar passives: every trigger and when it must not fire, proc chance, per-battle caps,
-    /// internal cooldowns counted in avatar ticks, target scopes, level scaling and tier bonus
+    /// internal cooldowns counted in avatar turns, target scopes, level scaling and tier bonus
     /// effects, the avatar's skill book and its equip rules, practice-use counts, determinism, and
     /// that a battle with no passives is unchanged.
     /// </summary>
@@ -213,9 +213,14 @@ namespace BeastCraft.Tests.EditMode
             BattleTurnExecutor.BeginBattle(roster, null, rng, avatar, passives);
 
             BattleTurnResult critterTurn = BattleTurnExecutor.ExecuteTurn(critter, roster, null, rng, avatar, passives);
-            Assert.AreEqual(1, critterTurn.AvatarActivations.Count, "the avatar's crit strike landed too");
-            Assert.IsTrue(critterTurn.AvatarActivations[0].Hits[0].Roll.IsCrit);
-            Assert.AreEqual(2, critterTurn.PassiveActivations.Count, "two crit hits from the beast; the avatar's crit is not an ally crit");
+            Assert.AreEqual(0, critterTurn.AvatarActivations.Count, "the avatar casts on its own turns, not a beast's");
+            Assert.AreEqual(2, critterTurn.PassiveActivations.Count, "two crit hits from the beast");
+            Assert.AreEqual(102, critter.Stats.Defense);
+
+            BattleTurnResult avatarTurn = BattleTurnExecutor.ExecuteAvatarTurn(avatar, roster, null, rng, passives);
+            Assert.AreEqual(1, avatarTurn.AvatarActivations.Count, "the avatar's crit strike landed");
+            Assert.IsTrue(avatarTurn.AvatarActivations[0].Hits[0].Roll.IsCrit);
+            Assert.AreEqual(0, avatarTurn.PassiveActivations.Count, "the avatar's crit is not an ally crit");
             Assert.AreEqual(102, critter.Stats.Defense);
 
             BattleTurnResult plainTurn = BattleTurnExecutor.ExecuteTurn(plain, roster, null, rng, avatar, passives);
@@ -364,7 +369,7 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
-        public void InternalCooldown_CountsAvatarTicks_NotEnemyTurns()
+        public void InternalCooldown_CountsAvatarTurns_NotBeastTurns()
         {
             PassiveSkillSO slow = Passive("slow", PassiveTrigger.AllyTurnStart, PassiveTarget.TriggeringUnit, Buff(StatType.Attack, 1));
             slow.InternalCooldown = 3;
@@ -375,17 +380,20 @@ namespace BeastCraft.Tests.EditMode
             BattleUnit avatar = MakeAvatar();
 
             List<int> pattern = new List<int>();
-            for (int i = 0; i < 7; i++)
+            for (int i = 0; i < 4; i++)
             {
+                // Two player-beast turns and an enemy turn per avatar turn: only the avatar's own
+                // turns count the cooldown down, however many beast turns fall between them.
                 pattern.Add(BattleTurnExecutor.ExecuteTurn(player, roster, null, null, avatar, passives).PassiveActivations.Count);
-
-                // Enemy turns in between are not avatar ticks and must not shorten the cooldown.
                 BattleTurnExecutor.ExecuteTurn(enemy, roster, null, null, avatar, passives);
-                BattleTurnExecutor.ExecuteTurn(enemy, roster, null, null, avatar, passives);
+                pattern.Add(BattleTurnExecutor.ExecuteTurn(player, roster, null, null, avatar, passives).PassiveActivations.Count);
+                Assert.AreEqual(0, BattleTurnExecutor.ExecuteAvatarTurn(avatar, roster, null, null, passives).PassiveActivations.Count,
+                                "an AllyTurnStart passive never fires on the avatar's own turn");
             }
 
-            // Fires, then three avatar ticks (the end of that turn and the next two) before it is ready.
-            CollectionAssert.AreEqual(new[] { 1, 0, 0, 1, 0, 0, 1 }, pattern);
+            // Fires, then three avatar turns before it is ready: six beast turns later, not three.
+            CollectionAssert.AreEqual(new[] { 1, 0, 0, 0, 0, 0, 1, 0 }, pattern);
+            Assert.AreEqual(102, player.Stats.Attack);
         }
 
         [Test]
@@ -632,16 +640,24 @@ namespace BeastCraft.Tests.EditMode
             List<BattleUnit> roster = new List<BattleUnit> { player, enemy };
             BattleUnit avatar = BattleAvatar.Create(new SkillLoadout(new[] { cheer }));
 
-            BattleResult result = BattleTurnExecutor.RunBattle(new TurnManager(roster), roster, null, new System.Random(4), avatar, Loadout(rally, aura));
+            // The avatar is in the turn order (its own gauge), never in the targeting roster.
+            BattleResult result = BattleTurnExecutor.RunBattle(new TurnManager(new List<BattleUnit>(roster) { avatar }), roster, null, new System.Random(4), avatar,
+                                                               Loadout(rally, aura));
             Assert.AreEqual(BattleOutcome.PlayerVictory, result.Outcome);
 
             int playerTurns = 0;
+            int avatarTurns = 0;
             int avatarCasts = 0;
             foreach (BattleTurnResult turn in result.Turns)
             {
                 playerTurns += turn.Unit == player ? 1 : 0;
+                avatarTurns += turn.Unit == avatar ? 1 : 0;
                 avatarCasts += turn.AvatarActivations.Count;
+                Assert.IsTrue(turn.Unit == avatar || turn.AvatarActivations.Count == 0, "only the avatar's own turns cast");
             }
+
+            Assert.Greater(avatarTurns, 0);
+            Assert.AreEqual(avatarTurns, avatarCasts, "a cooldown-0 active fires on every avatar turn");
 
             Dictionary<string, int> passiveCounts = BattleSkillUsage.CountPassiveTriggers(result);
             Dictionary<string, int> activeCounts = BattleSkillUsage.CountAvatarActiveUses(result);
@@ -811,7 +827,7 @@ namespace BeastCraft.Tests.EditMode
                 new BattleUnit("e1", BattleTeam.Enemy, new StatBlock(700, 60, 40, 0, 0, 11, 0, 20), new HexCoordinate(3, 0), new SkillLoadout(new[] { strike })),
             };
             BattleUnit avatar = mode == 3 ? null : BattleAvatar.Create(new SkillLoadout(new[] { boost }));
-            TurnManager turns = new TurnManager(roster);
+            TurnManager turns = new TurnManager(avatar == null ? roster : new List<BattleUnit>(roster) { avatar });
             System.Random rng = new System.Random(seed);
 
             BattleResult result;

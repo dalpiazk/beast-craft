@@ -32,6 +32,11 @@ namespace BeastCraft.Tooling.BalanceSim
                 return 0;
             }
 
+            if (options.RunPacing)
+            {
+                return PacingSimulator.Run(options);
+            }
+
             string rosterPath = RosterLoader.ResolvePath(options.RosterPath);
             if (rosterPath == null || !File.Exists(rosterPath))
             {
@@ -285,6 +290,11 @@ namespace BeastCraft.Tooling.BalanceSim
                         }
                     }
                 }
+            }
+
+            if (problems.Count == 0 && ScoutedPicker.Active(options))
+            {
+                problems.AddRange(ScoutedPicker.Check(options, species, pve, cells));
             }
 
             TimeSpan pveTime = clock.Elapsed;

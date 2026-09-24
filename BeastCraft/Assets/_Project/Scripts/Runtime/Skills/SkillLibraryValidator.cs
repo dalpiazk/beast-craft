@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using BeastCraft.Avatar;
 using BeastCraft.Battle;
+using BeastCraft.Bonds;
 using BeastCraft.Creatures;
 using BeastCraft.Creatures.Roster;
 using BeastCraft.Progression;
@@ -16,8 +17,10 @@ namespace BeastCraft.Skills
     /// actives keep to the position-free shapes; every species kit is complete and usable (at least
     /// <see cref="MinLearnableSkills"/> learnable skills, a full default loadout learnable by level
     /// <see cref="MaxDefaultLearnLevel"/>, one skill in it that walks the beast toward its enemies);
-    /// and, given the roster, every species has a kit and a <see cref="CombatStance.Ranged"/>
-    /// beast's defaults hold no melee skill it would never walk in to use.
+    /// given the roster, every species has a kit and a <see cref="CombatStance.Ranged"/>
+    /// beast's defaults hold no melee skill it would never walk in to use; and every team bond has a
+    /// valid condition set, strictly rising tiers the set can reach, and only effects a bond may
+    /// carry (a <c>BuffStat</c> other than HP, or a <c>Shield</c>, always landing).
     /// <para>
     /// Balance guidelines — the power budget, which beast carries which signature mechanic, five or
     /// six skills per beast — are deliberately NOT here; they are tests over the current library
@@ -94,6 +97,7 @@ namespace BeastCraft.Skills
             ValidateIdList(library.AvatarDefaultPassives, "AvatarDefaultPassives", AvatarSkillBook.PassiveSlotCount, passives, errors);
 
             ValidateKits(library.SpeciesKits, beastSkills, roster, errors);
+            ValidateTeamBonds(library.TeamBonds, allIds, roster, errors);
             return errors;
         }
 
@@ -636,6 +640,194 @@ namespace BeastCraft.Skills
                     {
                         errors.Add("Roster species '" + speciesId + "' has no species kit.");
                     }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Team bonds (optional: none is fine). Ids share the library's id space; the condition's
+        /// set is present and valid for its kind (a stance; two or more distinct elements; two or
+        /// more distinct species, which must be roster species when the roster is given); tiers rise
+        /// strictly from a MinCount of at least 2 up to what the set can reach; and every effect is
+        /// one a bond may carry: it lands on the bond's own team at battle start, so only a
+        /// <c>BuffStat</c> or a <c>Shield</c> status, always landing (Chance 100).
+        /// </summary>
+        private static void ValidateTeamBonds(TeamBondData[] bonds, HashSet<string> allIds, BeastRosterData roster, List<string> errors)
+        {
+            if (bonds == null)
+            {
+                return;
+            }
+
+            HashSet<string> rosterIds = new HashSet<string>();
+            if (roster != null && roster.Species != null)
+            {
+                foreach (SpeciesData species in roster.Species)
+                {
+                    if (species != null && !string.IsNullOrEmpty(species.SpeciesId))
+                    {
+                        rosterIds.Add(species.SpeciesId);
+                    }
+                }
+            }
+
+            for (int i = 0; i < bonds.Length; i++)
+            {
+                TeamBondData b = bonds[i];
+                if (b == null)
+                {
+                    errors.Add("Team bond #" + i + " is null.");
+                    continue;
+                }
+
+                string label = "Team bond '" + b.BondId + "'";
+                CheckId(b.BondId, label, "BondId", allIds, errors);
+                CheckText(b.DisplayName, b.Description, label, errors);
+                bool conditionOk = CheckEnum<TeamBondCondition>(b.Condition, label, "Condition", errors);
+                CheckEnum<TeamBondScope>(b.Scope, label, "Scope", errors);
+                TeamBondCondition condition = ParseOr(b.Condition, TeamBondCondition.Stance);
+                string[] elements = b.Elements ?? new string[0];
+                string[] species = b.Species ?? new string[0];
+
+                // The most the condition can count: unbounded for a stance (any team size), the
+                // set's size for elements and species.
+                int reach = int.MaxValue;
+                if (conditionOk)
+                {
+                    switch (condition)
+                    {
+                        case TeamBondCondition.Stance:
+                            CheckEnum<CombatStance>(b.Stance, label, "Stance", errors);
+                            if (elements.Length > 0 || species.Length > 0)
+                            {
+                                errors.Add(label + ": a Stance bond lists no Elements or Species.");
+                            }
+
+                            break;
+
+                        case TeamBondCondition.Elements:
+                            reach = CheckSet(elements, label, "Elements", errors, name =>
+                            {
+                                if (!TryParse(name, Element.None, out Element element) || string.IsNullOrEmpty(name) || element == Element.None)
+                                {
+                                    return "'" + name + "' is not an Element name (None is not allowed).";
+                                }
+
+                                return null;
+                            });
+                            if (species.Length > 0 || !string.IsNullOrEmpty(b.Stance))
+                            {
+                                errors.Add(label + ": an Elements bond lists no Species or Stance.");
+                            }
+
+                            break;
+
+                        case TeamBondCondition.Species:
+                            reach = CheckSet(species, label, "Species", errors, id =>
+                            {
+                                if (!BeastRosterValidator.IsSnakeCaseId(id))
+                                {
+                                    return "'" + id + "' must be a lowercase snake_case SpeciesId.";
+                                }
+
+                                return roster != null && !rosterIds.Contains(id) ? "'" + id + "' is not a species in the roster." : null;
+                            });
+                            if (elements.Length > 0 || !string.IsNullOrEmpty(b.Stance))
+                            {
+                                errors.Add(label + ": a Species bond lists no Elements or Stance.");
+                            }
+
+                            break;
+                    }
+                }
+
+                TeamBondTierData[] tiers = b.Tiers ?? new TeamBondTierData[0];
+                if (tiers.Length == 0)
+                {
+                    errors.Add(label + ": has no Tiers.");
+                }
+
+                int previous = 1;
+                for (int t = 0; t < tiers.Length; t++)
+                {
+                    TeamBondTierData tier = tiers[t];
+                    string at = label + " Tiers[" + t + "]";
+                    if (tier == null)
+                    {
+                        errors.Add(at + " is null.");
+                        continue;
+                    }
+
+                    if (tier.MinCount <= previous || tier.MinCount > reach)
+                    {
+                        errors.Add(at + ": MinCount " + tier.MinCount + " must rise strictly, from 2" +
+                                   (reach == int.MaxValue ? string.Empty : " up to the set's size (" + reach + ")") + ".");
+                    }
+
+                    previous = Math.Max(previous, tier.MinCount);
+                    CheckEffects(tier.Effects, at, "Effects", true, errors);
+                    CheckBondEffects(tier.Effects, at, errors);
+                }
+            }
+        }
+
+        /// <summary>Checks a condition's set (at least two distinct valid entries); returns its distinct size.</summary>
+        private static int CheckSet(string[] values, string label, string field, List<string> errors, Func<string, string> problem)
+        {
+            HashSet<string> seen = new HashSet<string>();
+            foreach (string value in values)
+            {
+                string issue = problem(value);
+                if (issue != null)
+                {
+                    errors.Add(label + ": " + field + " " + issue);
+                }
+                else if (!seen.Add(value))
+                {
+                    errors.Add(label + ": " + field + " lists '" + value + "' twice.");
+                }
+            }
+
+            if (values.Length < 2)
+            {
+                errors.Add(label + ": " + field + " needs at least two entries (a bond is between beasts).");
+            }
+
+            return seen.Count;
+        }
+
+        private static void CheckBondEffects(EffectData[] effects, string label, List<string> errors)
+        {
+            if (effects == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < effects.Length; i++)
+            {
+                EffectData e = effects[i];
+                if (e == null)
+                {
+                    continue;
+                }
+
+                string at = label + " Effects[" + i + "]";
+                SkillEffectType type = ParseOr(e.EffectType, SkillEffectType.Damage);
+                StatusType status = ParseOr(e.Status, StatusType.None);
+                if (type != SkillEffectType.BuffStat && !(type == SkillEffectType.ApplyStatus && status == StatusType.Shield))
+                {
+                    errors.Add(at + ": a bond effect lands on its own team at battle start; only BuffStat or a Shield status, not " +
+                               (type == SkillEffectType.ApplyStatus ? status.ToString() : type.ToString()) + ".");
+                }
+
+                if (e.Chance != SkillEffect.AlwaysChance)
+                {
+                    errors.Add(at + ": a bond effect always lands; Chance must be 100.");
+                }
+
+                if (type == SkillEffectType.BuffStat && ParseOr(e.AffectedStat, StatType.Attack) == StatType.HP)
+                {
+                    errors.Add(at + ": an HP buff raises only the maximum (it heals nothing); buff another stat or add a Shield.");
                 }
             }
         }

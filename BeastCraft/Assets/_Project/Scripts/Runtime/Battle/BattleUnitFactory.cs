@@ -45,7 +45,10 @@ namespace BeastCraft.Battle
         /// The unit enters at full health (<see cref="BattleUnit.CurrentHp"/> equals the assembled
         /// max HP), with no timed modifiers, and holds a copy of the species' elements and its
         /// <see cref="CreatureSpeciesSO.Stance"/>, so later edits to the species asset do not reach
-        /// it mid-battle. A null species gives the default <see cref="CombatStance.Vanguard"/>.
+        /// it mid-battle. It also copies the species' <see cref="CreatureSpeciesSO.Footprint"/> (a
+        /// beast's is always <see cref="UnitFootprint.Single"/>; the simulator's large enemies are
+        /// built through here too). A null species gives the default <see cref="CombatStance.Vanguard"/>
+        /// and <see cref="UnitFootprint.Single"/>.
         /// </para>
         /// <para>
         /// <paramref name="level"/> is recorded as <see cref="BattleUnit.Level"/> as well as used to
@@ -73,8 +76,9 @@ namespace BeastCraft.Battle
             StatBlock stats = StatCalculator.ComputeStats(species, level, equipped);
             Element[] elements = species == null ? null : species.Elements;
             CombatStance stance = species == null ? CombatStance.Vanguard : species.Stance;
+            UnitFootprint footprint = species == null ? UnitFootprint.Single : species.Footprint;
 
-            return new BattleUnit(id, team, stats, position, skills, elements, level, stance, statusResist);
+            return new BattleUnit(id, team, stats, position, skills, elements, level, stance, statusResist, footprint);
         }
 
         /// <summary>

@@ -1,5 +1,5 @@
 {
-  "_readme": "Source of truth for every authored skill: beast skills, the avatar's active skills and passives, the skill-training materials, and each species' learnable skills and default loadout. Drafted against a power budget and tuned with the roster against the balance simulator (default loadouts; see docs/balance/tuning-log.md), not confirmed balance. Edit here, then in Unity run Beast Craft/Data/Import Skill Library (after Import Beast Roster). Enums are member names (case-sensitive). Missing fields take the DTO defaults in SkillLibraryData.cs; note a missing TargetingCriterion means Distance (nearest), not Random. Damage Magnitude is power, a percent of the attacking stat; Heal is a percent of the caster's SpecialAttack (x HealScale, the avatar's for its skills and passives); a Shield is a percent of the caster's Defense; a DamageOverTime is a per-turn power; a Knockback is whole hexes. DefaultLoadout order is fire priority. The first 3 AvatarActives are the avatar's default actives. See docs/design/battle-system.md, 'Beast skill kits'.",
+  "_readme": "Source of truth for every authored skill: beast skills, the avatar's active skills and passives, the skill-training materials, and each species' learnable skills and default loadout. Drafted against a power budget and tuned with the roster against the balance simulator (default loadouts; see docs/balance/tuning-log.md), not confirmed balance. Edit here, then in Unity run Beast Craft/Data/Import Skill Library (after Import Beast Roster). Enums are member names (case-sensitive). Missing fields take the DTO defaults in SkillLibraryData.cs; note a missing TargetingCriterion means Distance (nearest), not Random. Damage Magnitude is power, a percent of the attacking stat; Heal is a percent of the caster's SpecialAttack (x HealScale, the avatar's for its skills and passives); a Shield is a percent of the caster's Defense; a DamageOverTime is a per-turn power; a Knockback is whole hexes. DefaultLoadout order is fire priority. TeamBonds are composition-triggered team effects applied at battle start to the player's team (never enemies): a Stance, Elements (distinct elements of the set the team covers) or Species condition, tiers by rising MinCount (the highest reached applies; tiers replace, not stack), and per-tier Effects (BuffStat or a Shield status only, Chance 100) applied by each recipient to itself; Scope Members = the beasts that meet the condition, Team = every beast. See docs/design/battle-system.md, 'Team bonds'. The first 3 AvatarActives are the avatar's default actives. See docs/design/battle-system.md, 'Beast skill kits'.",
   "SchemaVersion": 1,
   "Materials": [
     { "MaterialId": "essence_shard", "DisplayName": "Essence Shard", "Description": "A sliver of crystallised battle essence. Feeds a skill a little XP; opens its first breakthrough (level 5).", "Tier": 1, "XpValue": 250 },
@@ -1814,6 +1814,99 @@
         { "Level": 40, "SkillId": "miasma" }
       ],
       "DefaultLoadout": [ "venom_spit", "coup_de_grace", "petrifying_gaze" ]
+    }
+  ],
+  "TeamBonds": [
+    {
+      "BondId": "pack_hunters",
+      "DisplayName": "Pack Hunters",
+      "Description": "Skirmishers who hunt together find the gaps in a line: every Skirmisher on the team gains critical-hit chance.",
+      "Condition": "Stance",
+      "Stance": "Skirmisher",
+      "Scope": "Members",
+      "Tiers": [
+        { "MinCount": 2, "Effects": [ { "EffectType": "BuffStat", "AffectedStat": "CritChance", "Magnitude": 12 } ] },
+        { "MinCount": 3, "Effects": [ { "EffectType": "BuffStat", "AffectedStat": "CritChance", "Magnitude": 16 }, { "EffectType": "BuffStat", "AffectedStat": "MoveRange", "Magnitude": 1 } ] }
+      ]
+    },
+    {
+      "BondId": "shield_wall",
+      "DisplayName": "Shield Wall",
+      "Description": "Vanguards standing shoulder to shoulder brace for the first clash: every Vanguard starts the battle behind a shield worth part of its own Defense.",
+      "Condition": "Stance",
+      "Stance": "Vanguard",
+      "Scope": "Members",
+      "Tiers": [
+        { "MinCount": 2, "Effects": [ { "EffectType": "ApplyStatus", "Status": "Shield", "Magnitude": 30, "DurationTurns": 3 } ] },
+        { "MinCount": 3, "Effects": [ { "EffectType": "ApplyStatus", "Status": "Shield", "Magnitude": 45, "DurationTurns": 3 } ] }
+      ]
+    },
+    {
+      "BondId": "crossfire",
+      "DisplayName": "Crossfire",
+      "Description": "Ranged beasts covering each other's angles: every Ranged beast on the team hits harder, physical and special alike.",
+      "Condition": "Stance",
+      "Stance": "Ranged",
+      "Scope": "Members",
+      "Tiers": [
+        { "MinCount": 2, "Effects": [ { "EffectType": "BuffStat", "AffectedStat": "Attack", "Magnitude": 8, "IsPercent": true }, { "EffectType": "BuffStat", "AffectedStat": "SpecialAttack", "Magnitude": 8, "IsPercent": true } ] },
+        { "MinCount": 3, "Effects": [ { "EffectType": "BuffStat", "AffectedStat": "Attack", "Magnitude": 12, "IsPercent": true }, { "EffectType": "BuffStat", "AffectedStat": "SpecialAttack", "Magnitude": 12, "IsPercent": true } ] }
+      ]
+    },
+    {
+      "BondId": "wildfire",
+      "DisplayName": "Wildfire",
+      "Description": "Wind feeds the flame and the flame lifts the wind: Fire and Air beasts fielded together act faster and hit harder.",
+      "Condition": "Elements",
+      "Elements": [ "Fire", "Air" ],
+      "Scope": "Members",
+      "Tiers": [
+        { "MinCount": 2, "Effects": [ { "EffectType": "BuffStat", "AffectedStat": "Speed", "Magnitude": 15, "IsPercent": true }, { "EffectType": "BuffStat", "AffectedStat": "Attack", "Magnitude": 8, "IsPercent": true }, { "EffectType": "BuffStat", "AffectedStat": "SpecialAttack", "Magnitude": 8, "IsPercent": true } ] }
+      ]
+    },
+    {
+      "BondId": "storm_front",
+      "DisplayName": "Storm Front",
+      "Description": "Thunder over the deep: Lightning and Water beasts fielded together strike harder, physical and special alike.",
+      "Condition": "Elements",
+      "Elements": [ "Lightning", "Water" ],
+      "Scope": "Members",
+      "Tiers": [
+        { "MinCount": 2, "Effects": [ { "EffectType": "BuffStat", "AffectedStat": "Attack", "Magnitude": 10, "IsPercent": true }, { "EffectType": "BuffStat", "AffectedStat": "SpecialAttack", "Magnitude": 10, "IsPercent": true } ] }
+      ]
+    },
+    {
+      "BondId": "bedrock",
+      "DisplayName": "Bedrock",
+      "Description": "Stone and iron, layered: Earth and Metal beasts fielded together are harder to hurt.",
+      "Condition": "Elements",
+      "Elements": [ "Earth", "Metal" ],
+      "Scope": "Members",
+      "Tiers": [
+        { "MinCount": 2, "Effects": [ { "EffectType": "BuffStat", "AffectedStat": "Defense", "Magnitude": 6, "IsPercent": true }, { "EffectType": "BuffStat", "AffectedStat": "SpecialDefense", "Magnitude": 6, "IsPercent": true } ] }
+      ]
+    },
+    {
+      "BondId": "winter_grove",
+      "DisplayName": "Winter Grove",
+      "Description": "Evergreens under rime: Ice and Nature beasts fielded together start the battle behind a shield worth part of their own Defense.",
+      "Condition": "Elements",
+      "Elements": [ "Ice", "Nature" ],
+      "Scope": "Members",
+      "Tiers": [
+        { "MinCount": 2, "Effects": [ { "EffectType": "ApplyStatus", "Status": "Shield", "Magnitude": 90, "DurationTurns": 3 } ] }
+      ]
+    },
+    {
+      "BondId": "twilight",
+      "DisplayName": "Twilight",
+      "Description": "Light and Dark in balance steady the whole team: with a Light and a Dark beast fielded together, every beast on the team resists a little more.",
+      "Condition": "Elements",
+      "Elements": [ "Light", "Dark" ],
+      "Scope": "Team",
+      "Tiers": [
+        { "MinCount": 2, "Effects": [ { "EffectType": "BuffStat", "AffectedStat": "Defense", "Magnitude": 5, "IsPercent": true }, { "EffectType": "BuffStat", "AffectedStat": "SpecialDefense", "Magnitude": 5, "IsPercent": true } ] }
+      ]
     }
   ]
 }

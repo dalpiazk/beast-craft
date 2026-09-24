@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using BeastCraft.Battle;
 using BeastCraft.Battle.Grid;
 using BeastCraft.Battle.Placement;
+using BeastCraft.Bonds;
 using BeastCraft.Creatures;
 
 namespace BeastCraft.Tooling.BalanceSim
@@ -48,6 +49,12 @@ namespace BeastCraft.Tooling.BalanceSim
         /// (battle start included). <c>null</c> when no avatar was fielded.
         /// </summary>
         public int[] PassiveFirings;
+
+        /// <summary>The avatar's own turns this battle (0 when no avatar was fielded).</summary>
+        public int AvatarTurns;
+
+        /// <summary>The avatar's active-skill casts this battle (every <c>AvatarActivations</c> entry).</summary>
+        public int AvatarCasts;
 
         /// <summary>
         /// Per team member: the sum over its hits of the random multiplier applied to each,
@@ -180,7 +187,24 @@ namespace BeastCraft.Tooling.BalanceSim
             }
 
             CalibrationTeams = SampleTeams(options.Seed, Teams.Count, options.CalibrateSample);
+            TeamBonds = new List<ActiveTeamBond>[Teams.Count];
+            for (int t = 0; t < Teams.Count; t++)
+            {
+                List<TeamBondMember> members = new List<TeamBondMember>();
+                foreach (int speciesIndex in Teams[t])
+                {
+                    members.Add(TeamBondMember.FromSpecies(species[speciesIndex]));
+                }
+
+                TeamBonds[t] = options.BondsActive ? TeamBondResolver.Resolve(options.Library.TeamBonds, members) : new List<ActiveTeamBond>();
+            }
         }
+
+        /// <summary>
+        /// Per team: its active bonds (<see cref="TeamBondResolver"/>, member indices in the team's
+        /// roster order), or empty for every team when bonds are off (<see cref="SimOptions.BondsActive"/>).
+        /// </summary>
+        public List<ActiveTeamBond>[] TeamBonds { get; }
 
         /// <summary>
         /// With <c>--calibrate-sample n</c> (n below the team count): the team indices, ascending, a
@@ -581,19 +605,22 @@ namespace BeastCraft.Tooling.BalanceSim
             string playerPrefix = playersWinTies ? TieWinnerPrefix : TieLoserPrefix;
             string enemyPrefix = playersWinTies ? TieLoserPrefix : TieWinnerPrefix;
 
-            // Enemies: front-most tiles of the enemy zone, in fixture order.
-            List<HexCoordinate> enemyTiles = FrontTiles(grid, BattleTeam.Enemy, encounter.Enemies.Count);
+            // Enemies: packed front-most first, in fixture order (large enemies take the first anchor
+            // their whole footprint fits; one-tile enemies simply take the front-most tiles).
+            EnemyLayout layout = Layout(encounter);
+            List<HexCoordinate> enemyTiles = layout.Covered;
             for (int i = 0; i < encounter.Enemies.Count; i++)
             {
                 EnemySlot slot = encounter.Enemies[i];
-                BattleUnit enemy = BattleUnitFactory.CreateBeast(enemyPrefix + slot.UnitId, BattleTeam.Enemy, slot.Species, level, null, enemyTiles[i],
+                HexCoordinate anchor = layout.Anchors[i];
+                BattleUnit enemy = BattleUnitFactory.CreateBeast(enemyPrefix + slot.UnitId, BattleTeam.Enemy, slot.Species, level, null, anchor,
                                                                  Kit.Loadout(slot.KitFor(mode)), slot.StatusResist);
                 enemy.Stats = Scale(enemy.Stats, multiplier);
                 enemy.CurrentHp = enemy.Stats.Hp;
 
-                if (!grid.IsInDeploymentZone(enemyTiles[i], BattleTeam.Enemy) || !grid.TryPlaceUnit(enemy.Id, enemyTiles[i]))
+                if (!grid.FitsDeploymentZone(anchor, enemy.Footprint, BattleTeam.Enemy) || !grid.TryPlaceUnit(enemy.Id, anchor, enemy.Footprint))
                 {
-                    throw new InvalidOperationException("Could not place enemy " + enemy.Id + " of '" + encounter.Id + "' at " + enemyTiles[i] + ".");
+                    throw new InvalidOperationException("Could not place enemy " + enemy.Id + " of '" + encounter.Id + "' at " + anchor + ".");
                 }
 
                 units.Add(enemy);
@@ -635,18 +662,19 @@ namespace BeastCraft.Tooling.BalanceSim
                 PassiveFirings = Avatar.Enabled ? new int[Avatar.Passives.Count] : null
             };
 
-            TurnManager turnManager = new TurnManager(units);
             Random rng = new Random(DeriveSeed(_options.Seed, mode, level, encounter.Id, teamIndex, sample));
-            BattleUnit avatar = Avatar.Build(level, out PassiveLoadout passives);
+            BattleUnit avatar = Avatar.Build(_options.AvatarLevel > 0 ? _options.AvatarLevel : level, out PassiveLoadout passives);
+
+            // The avatar fills its own ATB gauge: it is in the turn order, never in the targeting roster.
+            TurnManager turnManager = new TurnManager(avatar == null ? units : new List<BattleUnit>(units) { avatar });
+            TeamBondLoadout bonds = TeamBonds[teamIndex].Count == 0 ? null : new TeamBondLoadout(TeamBonds[teamIndex], members);
             BattleOutcome outcome;
             long elapsedTicks;
             int actions;
 
             if (useRunBattle)
             {
-                BattleResult result = avatar == null
-                    ? BattleTurnExecutor.RunBattle(turnManager, units, grid, rng, null, _options.MaxTime)
-                    : BattleTurnExecutor.RunBattle(turnManager, units, grid, rng, avatar, passives, _options.MaxTime);
+                BattleResult result = BattleTurnExecutor.RunBattle(turnManager, units, grid, rng, avatar, passives, bonds, _options.MaxTime);
                 outcome = result.Outcome;
                 elapsedTicks = result.ElapsedTicks;
                 actions = result.ActionCount;
@@ -656,6 +684,7 @@ namespace BeastCraft.Tooling.BalanceSim
                     foreach (BattleTurnResult turn in result.Turns)
                     {
                         CountPassives(battle, turn.PassiveActivations);
+                        CountAvatar(battle, turn, avatar);
                     }
                 }
             }
@@ -672,8 +701,8 @@ namespace BeastCraft.Tooling.BalanceSim
                 long lastTurnTicks = 0;
                 actions = 0;
 
-                // RunBattle's battle-start hook; a no-op without an avatar.
-                CountPassives(battle, BattleTurnExecutor.BeginBattle(units, grid, rng, avatar, passives));
+                // RunBattle's battle-start hook: the team's bonds, then the avatar's passives (each a no-op when absent).
+                CountPassives(battle, BattleTurnExecutor.BeginBattle(units, grid, rng, avatar, passives, bonds, out IReadOnlyList<TeamBondActivation> _));
 
                 while (true)
                 {
@@ -703,9 +732,12 @@ namespace BeastCraft.Tooling.BalanceSim
                         }
 
                         lastTurnTicks = turnManager.ElapsedTicks;
-                        BattleTurnResult turn = BattleTurnExecutor.ExecuteTurn(current, units, grid, rng, avatar, passives);
+                        BattleTurnResult turn = current == avatar
+                            ? BattleTurnExecutor.ExecuteAvatarTurn(avatar, units, grid, rng, passives)
+                            : BattleTurnExecutor.ExecuteTurn(current, units, grid, rng, avatar, passives);
                         actions++;
                         CountPassives(battle, turn.PassiveActivations);
+                        CountAvatar(battle, turn, avatar);
 
                         bool actorIsMember = memberIndex.TryGetValue(current, out int actor);
                         for (int u = 0; u < units.Count; u++)
@@ -765,6 +797,16 @@ namespace BeastCraft.Tooling.BalanceSim
             }
 
             return Kit.Loadout(mode == KitMode.Elemental ? _elementalKits[speciesIndex] : _neutralKits[speciesIndex]);
+        }
+
+        private static void CountAvatar(PveBattle battle, BattleTurnResult turn, BattleUnit avatar)
+        {
+            if (avatar != null && turn.Unit == avatar)
+            {
+                battle.AvatarTurns++;
+            }
+
+            battle.AvatarCasts += turn.AvatarActivations.Count;
         }
 
         private static void CountPassives(PveBattle battle, IReadOnlyList<PassiveActivation> activations)
@@ -886,24 +928,46 @@ namespace BeastCraft.Tooling.BalanceSim
         }
 
         /// <summary>
+        /// Where an encounter's enemies stand: <see cref="DeploymentPacker.TryPack"/> of their
+        /// footprints in fixture order on an empty board of the encounter's arena, worked out once per
+        /// encounter and shared by every battle against it. For one-tile enemies the anchors are
+        /// exactly <see cref="FrontTiles"/> of the enemy zone. Throws when they do not fit (the loader
+        /// and the generator refuse such lineups first).
+        /// </summary>
+        public static EnemyLayout Layout(Encounter encounter)
+        {
+            EnemyLayout layout = encounter.Layout;
+            if (layout != null)
+            {
+                return layout;
+            }
+
+            List<UnitFootprint> footprints = new List<UnitFootprint>();
+            foreach (EnemySlot slot in encounter.Enemies)
+            {
+                footprints.Add(slot.Species.Footprint);
+            }
+
+            layout = new EnemyLayout();
+            if (!DeploymentPacker.TryPack(new HexGrid(encounter.Arena), BattleTeam.Enemy, footprints, layout.Anchors, layout.Covered))
+            {
+                throw new InvalidOperationException("The " + encounter.Enemies.Count + " enemies of '" + encounter.Id + "' do not fit the " + encounter.Arena +
+                                                    " enemy deployment zone.");
+            }
+
+            encounter.Layout = layout;
+            return layout;
+        }
+
+        /// <summary>
         /// The <paramref name="count"/> tiles of a team's deployment zone nearest the centre line:
         /// front row first (smallest |R|), then outward from the board's vertical centre line, then
-        /// by Q. Both sides therefore start as close as the zones allow.
+        /// by Q (<see cref="DeploymentPacker.FrontOrder"/>). Both sides therefore start as close as
+        /// the zones allow.
         /// </summary>
         public static List<HexCoordinate> FrontTiles(HexGrid grid, BattleTeam team, int count)
         {
-            List<HexCoordinate> zone = new List<HexCoordinate>(grid.GetDeploymentZone(team));
-            zone.Sort((a, b) =>
-            {
-                int byRow = Math.Abs(a.R).CompareTo(Math.Abs(b.R));
-                if (byRow != 0)
-                {
-                    return byRow;
-                }
-
-                int byOffset = Math.Abs((2 * a.Q) + a.R).CompareTo(Math.Abs((2 * b.Q) + b.R));
-                return byOffset != 0 ? byOffset : a.Q.CompareTo(b.Q);
-            });
+            List<HexCoordinate> zone = DeploymentPacker.FrontOrder(grid, team);
 
             if (zone.Count < count)
             {

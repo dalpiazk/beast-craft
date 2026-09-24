@@ -41,6 +41,20 @@ namespace BeastCraft.Battle
     /// occupancy do not carve up. That matches <see cref="HexGrid.GetTilesInRange"/>'s existing
     /// stance, and leaves cover as a deliberate later addition rather than a half-built one.
     /// </para>
+    /// <para>
+    /// <strong>Large units</strong> (see <see cref="UnitFootprint"/>). Every distance a skill
+    /// measures — range, and the <see cref="SkillTargetingCriterion.Distance"/> criterion — runs
+    /// between the <em>nearest</em> tiles of caster and candidate (<see cref="FootprintMath.UnitDistance(BattleUnit, BattleUnit)"/>),
+    /// so a range-1 skill reaches a giant from any of the twelve tiles around it. An area shape
+    /// hits a unit when <em>any</em> of its tiles is in the area, and hits it once however many of
+    /// its tiles are covered. A large caster's areas grow from all of its tiles: an
+    /// <see cref="SkillTargetShape.AreaBurst"/> is the union of the discs around each of them (for
+    /// a seven-tile caster, the disc of <c>Range + 1</c> around its centre), a
+    /// <see cref="SkillTargetShape.Cross"/> the union of the arms from each, and a
+    /// <see cref="SkillTargetShape.Line"/> fires from its tile nearest the focus toward the focus's
+    /// tile nearest that one. The caster's own tiles are excluded from a Cross or Line exactly as a
+    /// one-tile caster's tile is. With every unit one tile, all of this is exactly the one-tile rule.
+    /// </para>
     /// </summary>
     public static class SkillTargetResolver
     {
@@ -244,20 +258,61 @@ namespace BeastCraft.Battle
             return results;
         }
 
-        /// <summary>Every living unit on the given side standing on one of the footprint's tiles.</summary>
+        /// <summary>
+        /// Every living unit on the given side standing on one of the area's tiles — for a large
+        /// unit, on any one of its tiles. Walks the units, not the tiles, so each unit is hit once.
+        /// </summary>
         private static List<BattleUnit> CollectOnTiles(List<BattleUnit> living, BattleUnit caster, SkillTargetSide side, HashSet<HexCoordinate> footprint)
         {
             List<BattleUnit> results = new List<BattleUnit>();
 
             for (int i = 0; i < living.Count; i++)
             {
-                if (IsOnSide(living[i], caster, side) && footprint.Contains(living[i].Position))
+                if (IsOnSide(living[i], caster, side) && Covers(footprint, living[i]))
                 {
                     results.Add(living[i]);
                 }
             }
 
             return results;
+        }
+
+        /// <summary>Whether any tile the unit covers is in <paramref name="area"/>.</summary>
+        private static bool Covers(HashSet<HexCoordinate> area, BattleUnit unit)
+        {
+            if (unit.Footprint == UnitFootprint.Single)
+            {
+                return area.Contains(unit.Position);
+            }
+
+            IReadOnlyList<HexCoordinate> offsets = Footprints.Offsets(unit.Footprint);
+            for (int i = 0; i < offsets.Count; i++)
+            {
+                if (area.Contains(unit.Position + offsets[i]))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Takes a large caster's own tiles back out of a Cross or Line area, as a one-tile
+        /// caster's own tile is never on its arms. A one-tile caster needs nothing removed.
+        /// </summary>
+        private static void ExcludeCaster(HashSet<HexCoordinate> area, BattleUnit caster)
+        {
+            if (caster.Footprint == UnitFootprint.Single)
+            {
+                return;
+            }
+
+            IReadOnlyList<HexCoordinate> offsets = Footprints.Offsets(caster.Footprint);
+            for (int i = 0; i < offsets.Count; i++)
+            {
+                area.Remove(caster.Position + offsets[i]);
+            }
         }
 
         /// <summary>
@@ -342,7 +397,7 @@ namespace BeastCraft.Battle
             for (int i = 0; i < living.Count; i++)
             {
                 if (IsOnSide(living[i], caster, skill.TargetSide)
-                    && (!limitToRange || caster.Position.Distance(living[i].Position) <= skill.Range))
+                    && (!limitToRange || FootprintMath.UnitDistance(caster, living[i]) <= skill.Range))
                 {
                     candidates.Add(living[i]);
                 }
@@ -417,7 +472,7 @@ namespace BeastCraft.Battle
                 case SkillTargetingCriterion.Stat:
                     return candidate.Stats.GetStat(skill.TargetingStat);
                 case SkillTargetingCriterion.Distance:
-                    return caster.Position.Distance(candidate.Position);
+                    return FootprintMath.UnitDistance(caster, candidate);
                 case SkillTargetingCriterion.CurrentHp:
                     return candidate.CurrentHp;
                 default:
@@ -446,9 +501,14 @@ namespace BeastCraft.Battle
                 return results;
             }
 
-            HexCoordinate direction = SnapToAxis(caster.Position, focus.Position, skill.Range);
+            // One-tile caster and focus: the caster's tile toward the focus's. Otherwise from the
+            // caster's tile nearest the focus toward the focus's tile nearest that one.
+            HexCoordinate origin = FootprintMath.NearestTile(caster.Position, caster.Footprint, focus.Position, focus.Footprint);
+            HexCoordinate aim = FootprintMath.NearestTile(focus.Position, focus.Footprint, origin, UnitFootprint.Single);
+            HexCoordinate direction = SnapToAxis(origin, aim, skill.Range);
             HashSet<HexCoordinate> footprint = new HashSet<HexCoordinate>();
-            AddArm(footprint, grid, caster.Position, direction, skill.Range);
+            AddArm(footprint, grid, origin, direction, skill.Range);
+            ExcludeCaster(footprint, caster);
 
             return CollectOnTiles(living, caster, skill.TargetSide, footprint);
         }
@@ -467,12 +527,18 @@ namespace BeastCraft.Battle
 
             HashSet<HexCoordinate> footprint = new HashSet<HexCoordinate>();
             IReadOnlyList<HexCoordinate> directions = AxialDirections();
+            IReadOnlyList<HexCoordinate> origins = Footprints.Offsets(caster.Footprint);
 
-            for (int i = 0; i < directions.Count; i++)
+            // A one-tile caster has one origin, its own tile; a large one radiates from each of its tiles.
+            for (int o = 0; o < origins.Count; o++)
             {
-                AddArm(footprint, grid, caster.Position, directions[i], skill.Range);
+                for (int i = 0; i < directions.Count; i++)
+                {
+                    AddArm(footprint, grid, caster.Position + origins[o], directions[i], skill.Range);
+                }
             }
 
+            ExcludeCaster(footprint, caster);
             return CollectOnTiles(living, caster, skill.TargetSide, footprint);
         }
 
@@ -487,12 +553,18 @@ namespace BeastCraft.Battle
                 return new List<BattleUnit>();
             }
 
-            IReadOnlyList<HexCoordinate> tiles = grid.GetTilesInRange(caster.Position, skill.Range);
             HashSet<HexCoordinate> footprint = new HashSet<HexCoordinate>();
+            IReadOnlyList<HexCoordinate> origins = Footprints.Offsets(caster.Footprint);
 
-            for (int i = 0; i < tiles.Count; i++)
+            // A large caster's burst is the union of the discs around each of its tiles.
+            for (int o = 0; o < origins.Count; o++)
             {
-                footprint.Add(tiles[i]);
+                IReadOnlyList<HexCoordinate> tiles = grid.GetTilesInRange(caster.Position + origins[o], skill.Range);
+
+                for (int i = 0; i < tiles.Count; i++)
+                {
+                    footprint.Add(tiles[i]);
+                }
             }
 
             return CollectOnTiles(living, caster, skill.TargetSide, footprint);

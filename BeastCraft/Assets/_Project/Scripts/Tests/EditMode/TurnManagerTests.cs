@@ -386,6 +386,69 @@ namespace BeastCraft.Tests.EditMode
             Assert.AreEqual(10000, result.ElapsedTicks);
         }
 
+        [Test]
+        public void RunBattle_Avatar_FillsItsOwnGauge_WhateverTheTeamsSizeAndSpeed()
+        {
+            // The avatar is a turn-order participant (Speed 100 by default) and never a roster member.
+            // Cap 5 = 500 ticks: a Speed-100 unit takes turns at 100..500, so the avatar takes 5
+            // turns next to one Speed-100 beast and still 5 next to three Speed-400 ones.
+            SkillSO cheer = UnityEngine.ScriptableObject.CreateInstance<SkillSO>();
+            try
+            {
+                cheer.SkillId = "cheer";
+                cheer.TargetShape = SkillTargetShape.AllAllies;
+                cheer.Cooldown = 0;
+
+                foreach (int beasts in new[] { 1, 3 })
+                {
+                    int speed = beasts == 1 ? 100 : 400;
+                    List<BattleUnit> roster = new List<BattleUnit> { Unit("e", 100, BattleTeam.Enemy) };
+                    for (int b = 0; b < beasts; b++)
+                    {
+                        roster.Add(Unit("p" + b, speed));
+                    }
+
+                    BattleUnit avatar = BattleAvatar.Create(new SkillLoadout(new[] { cheer }));
+                    Assert.AreEqual(TurnManager.ReferenceSpeed, avatar.Stats.Speed);
+
+                    BattleResult result = BattleTurnExecutor.RunBattle(new TurnManager(new List<BattleUnit>(roster) { avatar }), roster, null,
+                                                                       new System.Random(1), avatar, 5);
+
+                    int avatarTurns = 0;
+                    int casts = 0;
+                    foreach (BattleTurnResult turn in result.Turns)
+                    {
+                        avatarTurns += turn.Unit == avatar ? 1 : 0;
+                        casts += turn.AvatarActivations.Count;
+                    }
+
+                    Assert.AreEqual(BattleOutcome.Stalemate, result.Outcome, beasts + " beasts");
+                    Assert.AreEqual(5, avatarTurns, beasts + " beasts");
+                    Assert.AreEqual(5, casts, beasts + " beasts: once per avatar turn, not per beast turn");
+                    Assert.AreEqual(5 + 5 + beasts * (beasts == 1 ? 5 : 10), result.ActionCount, "the avatar's turns are counted like any other");
+                    Assert.IsFalse(avatar.IsDefeated);
+                }
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(cheer);
+            }
+        }
+
+        [Test]
+        public void Avatar_InTheTurnOrder_IsOrderedLikeAnyUnit()
+        {
+            BattleUnit avatar = BattleAvatar.Create(null);
+            BattleUnit fast = Unit("p", 400);
+            BattleUnit slow = Unit("e", 25, BattleTeam.Enemy);
+
+            Dictionary<BattleUnit, int> counts = CountTurnsUntil(1000, fast, slow, avatar);
+
+            Assert.AreEqual(10, CountFor(counts, BattleAvatar.DefaultId), "Speed 100: a turn every 100 ticks");
+            Assert.AreEqual(20, CountFor(counts, "p"));
+            Assert.AreEqual(5, CountFor(counts, "e"));
+        }
+
         // ---------------------------------------------------------------------------------------
 
         private static Dictionary<BattleUnit, int> CountTurnsUntil(long ticks, params BattleUnit[] units)

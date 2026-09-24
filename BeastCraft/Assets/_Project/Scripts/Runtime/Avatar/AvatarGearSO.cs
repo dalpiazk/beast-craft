@@ -21,8 +21,8 @@ namespace BeastCraft.Avatar
     /// cross-equipped by construction rather than by a runtime check.
     /// </para>
     /// <para>
-    /// There is no minimum-level field because the avatar has no progression level yet (only a
-    /// per-battle level for the damage formula); avatar progression is an open design question.
+    /// There is no minimum-level field: the avatar now has a level of its own
+    /// (<c>AvatarProgress</c>), but whether avatar gear should be gated on it is not decided.
     /// The resulting stats feed the avatar's damaging skills through the damage formula — see
     /// <see cref="BattleAvatar"/>.
     /// </para>

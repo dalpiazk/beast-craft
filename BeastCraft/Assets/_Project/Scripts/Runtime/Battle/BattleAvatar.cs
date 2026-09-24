@@ -11,10 +11,11 @@ namespace BeastCraft.Battle
     /// Builds the player's avatar as a battle participant.
     /// <para>
     /// The avatar is a non-combatant commander: it does not fight, it is not a piece on the grid,
-    /// and it has no slot in the initiative queue (design decision 2). What it does have is a
+    /// and nothing can target it (design decision 2). What it does have is a
     /// <see cref="SkillLoadout"/> of support skills on the same cooldown rotation every beast uses
     /// (decision 6), which is the main reason it needs to exist at runtime at all — plus, since
-    /// decision 6 was amended, a stat block of its own (see "Stats" below).
+    /// decision 6 was amended, a stat block of its own (see "Stats" below) and an ATB gauge of its
+    /// own, filled from its own Speed (see "Its own turns" below).
     /// </para>
     /// <para>
     /// <strong>It is an ordinary <see cref="BattleUnit"/>, not a parallel type.</strong> Everything
@@ -48,19 +49,22 @@ namespace BeastCraft.Battle
     /// </para>
     /// <para>
     /// <strong>The avatar is a caster, not a member of the roster.</strong> Pass it as the
-    /// <c>caster</c> argument; do <em>not</em> add it to the <c>allUnits</c> roster or to
-    /// <see cref="TurnManager"/>. Keeping it out of the roster is what makes it a non-combatant in
-    /// practice rather than just in description: it takes no initiative turn, an enemy's
+    /// <c>caster</c> (or <c>avatar</c>) argument; do <em>not</em> add it to the <c>allUnits</c>
+    /// roster. Keeping it out of the roster is what makes it a non-combatant in practice rather
+    /// than just in description: nothing counts it for the win check, an enemy's
     /// <see cref="SkillTargetShape.AllEnemies"/> sweep cannot reach it, and its own
     /// <see cref="SkillTargetShape.AllAllies"/> buff lands on the player's beasts — which is exactly
     /// the supporting role decision 6 describes. A <see cref="SkillTargetShape.Self"/> skill still
     /// works, because the resolver returns the caster directly without consulting the roster.
     /// </para>
     /// <para>
-    /// <strong>Driven by the turn executor.</strong> The confirmed timing — the avatar's loadout
-    /// ticks once every time one of the <em>player's own</em> beasts takes its turn, not on enemy
-    /// turns and not once per round — lives in <see cref="BattleTurnExecutor.ExecuteTurn"/>, which
-    /// takes the avatar as its own argument. This class only builds it.
+    /// <strong>Its own turns.</strong> The avatar <em>is</em> in the <see cref="TurnManager"/>
+    /// roster: build the turn manager from the beasts plus the avatar. It fills a gauge from its own
+    /// <c>Speed</c> like any unit (tie-breaks unchanged), and on its turn
+    /// <see cref="BattleTurnExecutor.ExecuteAvatarTurn"/> ticks its passives' internal cooldowns and
+    /// its active loadout, so its cadence no longer depends on how many beasts the player fields or
+    /// how fast they are. A turn manager built without it gives it no turns (it then never casts).
+    /// This class only builds it.
     /// </para>
     /// <para>
     /// <strong>Stats (design decision 6, amended).</strong> The avatar has real stats: an authored
@@ -75,11 +79,12 @@ namespace BeastCraft.Battle
     /// <see cref="SkillEffectApplier.HealScale"/>); its buffs are still flat.
     /// </para>
     /// <para>
-    /// <strong>Level.</strong> The avatar itself has no XP and no level anywhere in the data. The
-    /// damage formula needs a caster level all the same, so the statful <c>Create</c> takes a
-    /// <em>battle</em> level that the battle setup is expected to choose sensibly (for example the
-    /// level of the player's team), defaulting to 1. It is a per-battle input, not a stored avatar
-    /// attribute.
+    /// <strong>Level.</strong> The avatar has a level of its own (<see cref="AvatarProgress.Level"/>,
+    /// earned by <see cref="AvatarProgression"/>). It scales its base stats
+    /// (<see cref="AvatarStatsSO.GetStatsAtLevel"/>) and is its caster level in the damage formula.
+    /// <see cref="Create(AvatarSkillBook, Func{string, SkillSO}, Func{string, PassiveSkillSO}, AvatarStatsSO, AvatarProgress, IEnumerable{AvatarGearSO}, out PassiveLoadout, string)"/>
+    /// is the battle setup's entry point and wires both; the lower-level overloads take the level
+    /// and the base block separately (default level 1).
     /// </para>
     /// <para>
     /// <strong>Skills and passives progress.</strong> What does progress is the avatar's skills:
@@ -108,6 +113,13 @@ namespace BeastCraft.Battle
         private static readonly HexCoordinate PlaceholderPosition = HexCoordinate.Zero;
 
         /// <summary>
+        /// The "no stats authored" block: every stat 0 except Speed, which is
+        /// <see cref="AvatarStatsSO.DefaultSpeed"/> so the avatar's gauge still fills at the
+        /// reference rate.
+        /// </summary>
+        private static readonly StatBlock NoStats = new StatBlock(0, 0, 0, 0, 0, AvatarStatsSO.DefaultSpeed);
+
+        /// <summary>
         /// Builds the avatar. <paramref name="skills"/> is its authored support stack; passing
         /// <c>null</c> gives it an empty loadout that simply never fires, matching
         /// <see cref="BattleUnit"/>'s own handling.
@@ -118,13 +130,13 @@ namespace BeastCraft.Battle
         /// would buff the wrong half of the board.
         /// </para>
         /// <para>
-        /// This overload gives the avatar an all-zero stat block, unclamped, exactly as it always
-        /// has; it is the "no stats authored" path and is kept so existing callers are unaffected.
-        /// Use <see cref="Create(SkillLoadout, StatBlock, IEnumerable{AvatarGearSO}, string, int)"/>
-        /// to give the avatar its base stats and gear. It takes no turn, so its zero <c>Speed</c>
-        /// never sorts anything, and it is not in the roster, so nothing targets its HP. A zero
-        /// <c>Hp</c> means <see cref="BattleUnit.CurrentHp"/> also starts at 0, which is harmless
-        /// for the same reason.
+        /// This overload gives the avatar a stat block that is all zero, unclamped, except
+        /// <c>Speed</c>, which is <see cref="AvatarStatsSO.DefaultSpeed"/> so that the avatar's own
+        /// ATB gauge fills at the reference rate; it is the "no stats authored" path. Use
+        /// <see cref="Create(SkillLoadout, StatBlock, IEnumerable{AvatarGearSO}, string, int)"/>
+        /// to give the avatar its base stats and gear. It is not in the targeting roster, so nothing
+        /// targets its HP: a zero <c>Hp</c> means <see cref="BattleUnit.CurrentHp"/> also starts at
+        /// 0, which is harmless for that reason.
         /// </para>
         /// <para>
         /// <strong>Its damage is the formula's floor.</strong> This avatar has zero
@@ -147,7 +159,7 @@ namespace BeastCraft.Battle
         /// </summary>
         public static BattleUnit Create(SkillLoadout skills, string id = DefaultId)
         {
-            return new BattleUnit(id, BattleTeam.Player, default(StatBlock), PlaceholderPosition, skills);
+            return new BattleUnit(id, BattleTeam.Player, NoStats, PlaceholderPosition, skills);
         }
 
         /// <summary>
@@ -161,11 +173,11 @@ namespace BeastCraft.Battle
         /// and never a member of the roster, never defeated.
         /// <para>
         /// <paramref name="level"/> becomes the avatar's <see cref="BattleUnit.Level"/>, the
-        /// caster level <see cref="DamageFormula"/> reads for its damaging skills. It is a battle
-        /// level, not avatar progression (which is still open; see the class remarks): the battle
-        /// setup should pass something sensible such as the player team's level. It defaults to 1,
-        /// and anything below 1 is stored as 1. It is the last parameter so that existing callers,
-        /// including any passing <paramref name="id"/> positionally, are unaffected.
+        /// caster level <see cref="DamageFormula"/> reads for its damaging skills: the avatar's own
+        /// level (<see cref="AvatarProgress.Level"/>), which should also be the level
+        /// <paramref name="baseStats"/> were scaled to (<see cref="AvatarStatsSO.GetStatsAtLevel"/>).
+        /// It defaults to 1, and anything below 1 is stored as 1. It is the last parameter so that
+        /// existing callers, including any passing <paramref name="id"/> positionally, are unaffected.
         /// </para>
         /// <para>
         /// A null <paramref name="equipped"/> list, null pieces and null modifiers are skipped. One
@@ -209,6 +221,25 @@ namespace BeastCraft.Battle
             SkillLoadout skills = BattleUnitFactory.BuildLoadout(skillBook == null ? null : skillBook.Actives, activeLookup);
             passives = PassiveLoadout.FromBook(skillBook == null ? null : skillBook.Passives, passiveLookup);
             return Create(skills, baseStats, equipped, id, level);
+        }
+
+        /// <summary>
+        /// The battle setup's entry point: the avatar at its own level. Exactly
+        /// <see cref="Create(AvatarSkillBook, Func{string, SkillSO}, Func{string, PassiveSkillSO}, StatBlock, IEnumerable{AvatarGearSO}, int, out PassiveLoadout, string)"/>
+        /// with the base block <paramref name="profile"/>'s
+        /// <see cref="AvatarStatsSO.GetStatsAtLevel"/> at <paramref name="progress"/>'s
+        /// <see cref="AvatarProgress.Level"/>, and that level as the avatar's. A null
+        /// <paramref name="progress"/> is level 1; a null <paramref name="profile"/> is the
+        /// no-stats block of <see cref="Create(SkillLoadout, string)"/> (zero, Speed
+        /// <see cref="AvatarStatsSO.DefaultSpeed"/>). Never throws.
+        /// </summary>
+        public static BattleUnit Create(AvatarSkillBook skillBook, Func<string, SkillSO> activeLookup, Func<string, PassiveSkillSO> passiveLookup,
+                                        AvatarStatsSO profile, AvatarProgress progress, IEnumerable<AvatarGearSO> equipped, out PassiveLoadout passives,
+                                        string id = DefaultId)
+        {
+            int level = progress == null || progress.Level < 1 ? 1 : progress.Level;
+            StatBlock baseStats = profile == null ? NoStats : profile.GetStatsAtLevel(level);
+            return Create(skillBook, activeLookup, passiveLookup, baseStats, equipped, level, out passives, id);
         }
     }
 }

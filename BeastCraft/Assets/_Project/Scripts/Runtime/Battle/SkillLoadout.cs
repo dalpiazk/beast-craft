@@ -29,13 +29,11 @@ namespace BeastCraft.Battle
     /// Deliberately owner-agnostic. <see cref="Tick"/> knows nothing about the board, the roster or
     /// even <see cref="BattleUnit"/>, so the player's avatar — which is not a grid piece and whose
     /// <see cref="HexCoordinate"/> is a placeholder nothing reads, see <see cref="BattleAvatar"/> —
-    /// drives the identical rotation. The confirmed rule for its timing is that the avatar's loadout
-    /// ticks once per <em>player-side beast turn</em>: there are no rounds under the ATB gauge, so
-    /// the avatar ticks once each time any player-side beast takes a turn (so faster or more
-    /// numerous player beasts tick it more often), which <see cref="BattleTurnExecutor"/>
-    /// implements by calling <see cref="TickAndResolve"/> on the avatar at the end of each player
-    /// beast's turn. Whether the avatar should instead fill a gauge of its own from its own Speed
-    /// is an open design item (battle-system design doc, §6).
+    /// drives the identical rotation. Its loadout ticks once per <em>avatar turn</em>: the avatar
+    /// fills an ATB gauge of its own from its own Speed (it is in the <see cref="TurnManager"/>
+    /// roster, though not in the targeting roster), so its cadence does not depend on how many
+    /// beasts the player fields or how fast they are. <see cref="BattleTurnExecutor.ExecuteAvatarTurn"/>
+    /// calls <see cref="TickAndResolve"/> on it each time its gauge comes up.
     /// </para>
     /// <para>
     /// <strong>Levels.</strong> Each slot holds a <see cref="SkillInstance"/> — the skill plus the

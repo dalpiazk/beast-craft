@@ -151,7 +151,7 @@ namespace BeastCraft.Battle
         /// <see cref="PassiveTrigger.AllyDefeated"/> (the fallen beast is the triggering unit) or
         /// <see cref="PassiveTrigger.EnemyDefeated"/> (the triggering unit is
         /// <paramref name="turnUnit"/> when it is a living player beast — the beast whose turn it
-        /// is gets the credit — and otherwise none).
+        /// is gets the credit — and otherwise none, as on an enemy's or the avatar's own turn).
         /// </description></item>
         /// <item><description>
         /// <see cref="PassiveTrigger.AllyBelowHpPercent"/>: every living player beast, in roster
@@ -203,7 +203,7 @@ namespace BeastCraft.Battle
             CheckThresholds(avatar, allUnits, grid, rng, sink);
         }
 
-        /// <summary>One avatar tick off every passive's internal cooldown (once per player-beast turn).</summary>
+        /// <summary>One avatar turn off every passive's internal cooldown (once per avatar turn, before its actives).</summary>
         internal void TickCooldowns()
         {
             for (int i = 0; i < _slots.Count; i++)

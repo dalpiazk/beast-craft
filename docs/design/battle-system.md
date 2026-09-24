@@ -69,17 +69,28 @@ puzzle every encounter.
   options. With no player menu, whether a beast has a fallback attack at all — or simply always has
   at least one short-cooldown skill in its rotation — is open, and items in battle are out of scope
   until there is a mechanism that would use them.
-- **Does the avatar get its own gauge?** The avatar still ticks once per player-beast turn
-  (decision 6). Under the ATB gauge (decision 3) that ties its cadence to how fast the player's
-  beasts are: a fast team cycles its avatar faster. The alternative is an avatar gauge filled by
-  the avatar's own Speed, which would make that stat (currently unused) matter and decouple the
-  avatar from team composition. Open; the rule is unchanged until it is decided.
-- **Avatar level.** The avatar has stats (decision 6, amended) and its *skills* now progress —
-  its active skills and its passives level on the beast-skill model (see "Avatar passives") — but
-  the avatar itself still has no level and no stat growth: its base is a flat authored block and
-  only avatar gear moves it. It has no level or XP progression of its own; the statful
-  `BattleAvatar.Create` takes a per-battle level (default 1) that the battle setup is expected to
-  pick sensibly, e.g. the player team's level — a stopgap input, not a design for progression.
+- **The avatar's gauge — settled (stage 3b).** The avatar now fills an ATB gauge of its own from
+  its own Speed (decisions 3 and 6), so its cadence no longer depends on the team's size or speed.
+  Still open: the avatar's authored base Speed and growth curve (the default is Speed 100, the
+  reference Speed, at max level), and retuning the avatar's actives and passives for the slower
+  cadence (a four-beast team used to tick it about three times as often; see the tuning log,
+  "Avatar gauge").
+- **Avatar level — progression exists and is wired into battle; its curve is not authored.** The avatar has its
+  own level (TUNABLE STARTING DEFAULTS): `AvatarProgress` (save data: `Level`, `Xp`) and
+  `AvatarProgression` (own constants, not the skill curve). A level costs `200 + 16 × level` XP
+  (216 at level 1, 1,784 at level 99; max level 100). `AwardBattle(progress, outcome, enemyLevel)`
+  pays **8 XP for any finished battle** plus a **clear bonus of `40 + 4 × enemyLevel`** on
+  `PlayerVictory`. At an 80% clear rate that is one level per ~5 battles at every level, so the
+  avatar **levels alongside the encounters** (the pacing target: median avatar level within 3 of
+  the encounter level; measured within 0-1 over a 500-battle campaign, balance simulator
+  `--mode pacing`); fighting below one's level pays less. Stats: `AvatarStatsSO.Growth` (a
+  `GrowthRateCurve`, as a species has) with `GetStatAtLevel` / `GetStatsAtLevel(level)`, which
+  scale `BaseStats` (then the max-level block) like `CreatureSpeciesSO.GetStatAtLevel` — MoveRange
+  and CritChance exempt, Speed scales; no `Growth` keeps the block flat. Wired:
+  `BattleAvatar.Create(book, activeLookup, passiveLookup, statsAsset, progress, gear, out passives)`
+  builds the avatar from `statsAsset.GetStatsAtLevel(progress.Level)` at that level, and the
+  simulator's avatar presets read their fixture block the same way (`--avatar-level`, default the
+  encounter level). Still open: authoring the avatar's `AvatarStatsSO` and its growth curve.
 
 ## Encounter direction: PvE, not PvP — DIRECTION, NOT YET A CONFIRMED DECISION
 
@@ -105,11 +116,10 @@ What that implies for balance and for the systems:
   elsewhere has a niche.
 - **Area skills need something to hit.** `AreaBurst` is centred on the caster and never moves it, so
   in a skill stack it wants to come after something that walks the beast into the enemy cluster.
-- **Large creatures are single-tile today — open item.** `HexGrid` tracks exactly one tile per unit;
-  there is no multi-hex footprint, so a "huge" enemy occupies one hex like everything else and can be
-  surrounded by six attackers. Multi-hex units would touch occupancy, pathfinding (a footprint has to
-  fit along the route), targeting (distance to a footprint, not a point) and area-skill overlap.
-  Not designed or implemented; listed so encounter design does not assume it exists.
+- **Large creatures cover several hexes — now built (was an open item).** A boss (giant) covers seven
+  hexes and a mini-boss (champion) three; beasts stay one hex. Occupancy, pathfinding (the footprint
+  has to fit along the route), targeting (distance to the nearest tile of a footprint) and area-skill
+  overlap all follow; see "Unit footprints".
 - **Two movement rules large PvE fights need — now built (were open items).** The simulator showed
   both gaps at encounter scale, and both are now Runtime rules in `BattleTurnExecutor` (see
   decision 7, "scaffold details"), so the simulator no longer works around either:
@@ -269,7 +279,8 @@ re-simulation always agree):
 - **Defeated units** never fill and are never handed a turn.
 - **Per-turn counters are unchanged.** Cooldowns (decision 5), timed buffs and the movement budget
   (decision 7) were always counted in the unit's *own* turns, so a faster unit simply cycles them
-  faster. The avatar is the exception still being discussed; see decision 6.
+  faster. The avatar is no exception: it fills its own gauge from its own Speed and counts its
+  cooldowns (and its passives' internal cooldowns) in its own turns; see decision 6.
 
 *Time.* There are no rounds any more. Battle time is counted in integer ticks
 (`TurnManager.ElapsedTicks`) and reported **normalized**: 1.0 = one turn of a Speed-100 unit
@@ -350,6 +361,10 @@ Two consequences for how skills are authored follow directly, and both are now s
   their footprint rather than picking one unit. `SkillTargetResolver`'s own documentation is the
   authority on which field each shape actually reads.
 
+  *Amended by "Unit footprints":* against or from a large unit, range and the `Distance` criterion
+  are measured between nearest tiles, an area hits a large unit once when any of its tiles is in it,
+  and a large caster's areas grow from all of its tiles.
+
 *Background.* The alternative — manual per-turn control with an action menu — is the conventional
 tactics-game shape, and it is what earlier drafts of this document assumed. It gives the player more
 moment-to-moment agency, but it costs a full action UI, a target picker, and a tutorial for both, on
@@ -401,7 +416,7 @@ player can reason about it while building, and it needs no runtime decision-maki
 is that a beast can fire a skill at a moment when a human player wouldn't have — which is the same
 trade auto-resolution already made everywhere else.
 
-### 6. The avatar's skill loadout — DECIDED (timing and targeting); stats AMENDED; passives ADDED
+### 6. The avatar's skill loadout — DECIDED (timing and targeting); stats AMENDED; passives ADDED; timing AMENDED (own gauge)
 
 **The avatar has skills too, on the same rotation mechanic**, intended to support and buff the
 player's own beasts rather than to attack. **Amended (user):** those active skills stay, but the
@@ -409,18 +424,22 @@ avatar's *main* role is now its **3 passive slots** — passives that fire on ba
 than on a rotation — and both its actives and its passives are acquired and leveled slowly through
 play on the same progression model as beast skills. See "Avatar passives" below for the passive
 rules; everything in this section about the active loadout still holds. Per decision 2 the avatar is **not a piece on the grid**
-and has no meaningful `HexCoordinate` position, and it correspondingly gets **no turn of its own in
-the turn order** (no gauge — but see the open item below).
+and has no meaningful `HexCoordinate` position; it does, however, have **a turn of its own in the
+turn order** (see the timing amendment below).
 
-**Confirmed timing:** the avatar's loadout **ticks once every time one of the player's own beasts
-takes its turn.** Not on enemy turns — once per player-side beast-turn. With three player beasts
-deployed, the avatar's counters therefore tick three times for every turn a typical one of them
-takes, and an avatar skill on a 3-turn cooldown fires about as often as one beast acts.
+**Confirmed timing — amended (stage 3b): the avatar has its own gauge.** The avatar fills an ATB
+gauge from **its own Speed**, exactly as a beast does (decision 3: square-root fill, the same
+tie-breaks), and its loadout **ticks once per avatar turn**. On its turn
+(`BattleTurnExecutor.ExecuteAvatarTurn`) its passives' internal cooldowns tick, then its actives
+tick and fire; it has no movement and no status step. Its cadence therefore no longer depends on how
+many beasts the player fields or how fast they are: a Speed-100 avatar acts once per unit of battle
+time whether it supports one beast or six. The default Speed is 100 (`AvatarStatsSO.DefaultSpeed`,
+the reference Speed and the middle of the roster's 88-110 band), scaled with the avatar's level like
+its other stats.
 
-**Open item since the ATB amendment (decision 3).** Rounds are gone, so "once per player-beast turn"
-now also means the avatar cycles faster the faster the player's beasts are. Whether the avatar
-should instead fill a gauge of its own from its own Speed is undecided (listed under "What is not
-settled yet"); until then the rule above stands and is what `BattleTurnExecutor` does.
+*Superseded:* the avatar's loadout used to tick once every time one of the player's own beasts took
+its turn (not on enemy turns). Under the ATB gauge that made a fast or large team cycle its avatar
+faster, which is why it was listed as an open item until the gauge was chosen.
 
 **Confirmed targeting:** **avatar skills are restricted to the position-free target shapes —
 `Self`, `AllAllies`, `AllEnemies`.** This closes the question this section previously left open.
@@ -444,20 +463,21 @@ unchanged.
 
 Two consequences of that representation, both deliberate:
 
-- **The avatar is a caster, not a member of the roster.** It is passed as the `caster` argument and
-  is *not* added to the `allUnits` roster or to `TurnManager`. That is what makes it a non-combatant
-  in practice: it takes no initiative turn, an enemy `AllEnemies` sweep cannot reach it, and its own
-  `AllAllies` buff lands on the player's beasts. A `Self` skill still works, since the resolver
-  returns the caster directly without consulting the roster.
+- **The avatar is a caster, not a member of the roster.** It is passed as the `caster` (or
+  `avatar`) argument and is *not* added to the `allUnits` roster; it *is* added to `TurnManager`
+  (its gauge). Keeping it out of the roster is what makes it a non-combatant in practice: the win
+  check never counts it, an enemy `AllEnemies` sweep cannot reach it, and its own `AllAllies` buff
+  lands on the player's beasts. A `Self` skill still works, since the resolver returns the caster
+  directly without consulting the roster.
 - **The avatar cannot be defeated.** `IsDefeated` stays `false` for the life of the battle; there
   is no rule in the design by which a commander could be defeated, and nothing can write the flag on
   a unit it cannot target. (This bullet originally also said the avatar had no stats — superseded,
   see below.)
 
-**The timing half is now wired up.** `BattleTurnExecutor` ticks the avatar's loadout at the end of
-every player-side beast's turn, exactly as this section describes: not on enemy turns, and not on a
-clock of its own. The rotation engine that landed for decision 5 is deliberately owner-agnostic, so it
-drives the avatar unchanged.
+**The timing half is wired up.** `RunBattle` hands the avatar's turns to
+`BattleTurnExecutor.ExecuteAvatarTurn` (and `ExecuteTurn`, handed the avatar, does the same), and a
+beast's turn no longer ticks the avatar. The rotation engine that landed for decision 5 is
+deliberately owner-agnostic, so it drives the avatar unchanged. Without an avatar nothing changes.
 
 **Amendment — the avatar has stats and stat gear (supersedes "the avatar has no stats").** This
 section previously decided that the avatar's `StatBlock` is all zeros because avatar items are
@@ -466,7 +486,8 @@ cosmetic. The producer has reversed that, and the rule is now two separate thing
 - **Avatar cosmetics stay purely cosmetic.** The customization system (`AvatarCustomizationSchema`)
   is unchanged: it decides what the avatar looks like and grants no stats.
 - **The avatar has real stats, raised by non-cosmetic avatar gear that is never rendered.** Its
-  base is authored on an `AvatarStatsSO` (a flat `StatBlock`; there is no avatar level). Gear is
+  base is authored on an `AvatarStatsSO` (a `StatBlock` of max-level values with a growth curve,
+  scaled to the avatar's own level; see "What is not settled yet", avatar level). Gear is
   `AvatarGearSO` — a stable `AvatarGearId`, display name, description, inventory icon, an
   `AvatarGearSlot` (`Weapon`, `Armor`, `Trinket`), a `StatModifier` list and a rarity tier, and no
   visual fields at all. It is a separate type from the beasts' `GearSO`, with its own slot enum, so
@@ -474,8 +495,8 @@ cosmetic. The producer has reversed that, and the rule is now two separate thing
   equipped)` assembles the avatar's stats through `StatCalculator` exactly like beast gear (flat,
   then summed percent, rounded, every stat at least 0 and `HP` at least 1); null gear and null
   modifiers are skipped, and one-item-per-slot is left to the equipment screen, as for beasts. The
-  original `BattleAvatar.Create(skills)` still builds an all-zero avatar for callers with no stats
-  authored.
+  original `BattleAvatar.Create(skills)` still builds a zero-stat avatar for callers with no stats
+  authored, except for Speed 100 so that its gauge fills at the reference rate.
 
 **Amendment — the avatar's skills progress, and it has passives.** The avatar's skills now live
 in an `AvatarSkillBook` (save data): `Actives` (its active support skills, **3 slots**,
@@ -486,14 +507,14 @@ activeLookup, passiveLookup, baseStats, gear, level, out passives)` builds the a
 equipped actives as its `SkillLoadout` (at their levels) and hands back its equipped passives as the
 battle's `PassiveLoadout`. The passives are the subject of "Avatar passives".
 
-Everything else above is unchanged: the avatar is still off the grid, still takes no initiative
-turn, still ticks on player-beast turns, is still a caster outside the roster, and still cannot be
+Everything else above is unchanged: the avatar is still off the grid, takes its own turns from its
+own gauge (the timing amendment), is still a caster outside the roster, and still cannot be
 defeated. **The avatar's stats now feed the damage formula** exactly as a beast's do (see "Damage
 formula"): a damaging avatar skill uses the avatar's `Attack` or `SpecialAttack`. Heals
 scale with the caster's `SpecialAttack`, the avatar's included; buffs are still flat for everyone,
-so an avatar buff still lands the same whatever the avatar's stats are. Avatar leveling is out of scope and open (see "What is not settled yet"); the statful
-`BattleAvatar.Create` takes a per-battle level (default 1), recorded on the unit (the damage formula
-no longer reads level). The zero-stat `Create(skills)` avatar has no attacking stat, so every damage
+so an avatar buff still lands the same whatever the avatar's stats are. The avatar's level is its own
+(`AvatarProgress.Level`, see "What is not settled yet"); the statful `BattleAvatar.Create` takes it
+(default 1) and records it on the unit (the damage formula no longer reads level). The zero-stat `Create(skills)` avatar has no attacking stat, so every damage
 effect it lands deals the formula's `MinimumDamage` floor of 1 — see "Damage formula".
 
 ### 7. Movement during a turn — DECIDED
@@ -560,7 +581,9 @@ showed what their absence did to large PvE fights):
   ignore the defeated.
 - **The route** is the cheapest one that reaches *any* tile within range of the target, found by
   pathing at the tiles around the target (the target's own tile is occupied, so nothing can path onto
-  it) and stopping at the first tile on that route that is in range.
+  it) and stopping at the first tile on that route that is in range. Around a large target the goals
+  ring its whole footprint, and a large mover plans by anchor instead (its footprint must fit at
+  every step): see "Unit footprints".
 
 ### 8. Combat stances — DECIDED (the three stances and their roles); the heuristics are SCAFFOLD
 
@@ -592,7 +615,9 @@ The rules in full:
 - **Anti-surround (Ranged and Skirmisher).** Among the in-range tiles the unit can reach in the
   fewest steps (every such tile, not only those on the plain rule's seven goal routes), it prefers
   the one farthest from the target, then the one with the fewest living enemies adjacent, then the
-  plain rule's own pick, then a fixed board order. A Vanguard does not avoid crowds.
+  plain rule's own pick, then a fixed board order. A Vanguard does not avoid crowds. Distances and
+  adjacency respect footprints ("Unit footprints"): a large enemy counts once however many of its
+  tiles touch the stop tile, and the farthest-in-range test measures to its nearest tile.
 - **Ranged keeps its distance.** An already-in-range skill fires from where the unit stands, as
   before. The "farthest in-range tile" preference is, in practice, a guarantee rather than a change:
   a unit only approaches from out of range, one step changes a distance by at most one, so the
@@ -609,7 +634,7 @@ The rules in full:
   already on a best tile stays), then breadth-first order. The unit's own tile always competes, so
   a retreat never ends nearer the enemy than it started; a unit that is already beyond its reach
   stays put (approaching is the skills' job). No retreat with no enemy left, no picking skill, a
-  null grid, or if the unit defeated itself. It happens before the avatar's activations, counts in
+  null grid, or if the unit defeated itself. It counts in
   the turn's `MovementSpent`, and is reported as `BattleTurnResult.RetreatSteps`.
 - **Vanguard screens.** Among routes that reach range in the same number of steps, a Vanguard picks
   the one whose end tile this turn (the in-range stop, or where a partial approach runs out) is
@@ -623,11 +648,102 @@ Leviathan, Golem, Treant, Tarasque, Frost Wyrm (see "Starter roster").
 
 *Scaffold details, not confirmed balance.* The three stances and who is which are decided; the
 heuristics under them (the tie-break orders, the screening distance, the retreat cap at the longest
-single-target range, retreating before the avatar acts) are engineering defaults chosen to be
+single-target range) are engineering defaults chosen to be
 deterministic and legible, and are cheap to revisit. The balance simulator's first look at them is
 in the tuning log ("After combat stances"): with the one-size standard kit, Ranged beasts lose
 Strike's damage and the physical/special parity the kit was tuned to, so the numbers say more about
 that kit than about the stances.
+
+## Unit footprints — DECIDED (user: bosses cover several hexes); the geometry is SCAFFOLD
+
+**Large enemies cover more than one hex.** The user's direction: giants are bosses and occupy more
+than one hex; champions, the elite tier below them, are sized accordingly. Beasts stay one hex.
+`UnitFootprint` (`Battle/Grid`) names three sizes, each a fixed set of offsets from the unit's
+**anchor**, which is `BattleUnit.Position` and the tile the grid records it on:
+
+| Footprint | Tiles | Offsets from the anchor | Used by |
+| --- | ---: | --- | --- |
+| `Single` (default) | 1 | the anchor | every beast, the avatar, every ordinary enemy |
+| `Triangle` | 3 | anchor, `(1, 0)`, `(1, -1)` — the two-tile edge (the anchor's row) faces the player side | champion (mini-boss) |
+| `Hex7` | 7 | anchor (the centre) and its six neighbours | giant, colossus (bosses) |
+
+`Footprints.Offsets` lists them anchor first, then in `HexCoordinate.AxialDirections` order, so every
+walk over a footprint is deterministic. There is no rotation: a large unit translates, it never
+turns. `CreatureSpeciesSO.Footprint` (default `Single`) is copied onto the unit by
+`BattleUnitFactory` (`BattleUnit.Footprint`, fixed at construction). The roster JSON has no footprint
+field, and `BeastRosterValidator` refuses any value but `Single` — **beasts are always one tile**. The
+only large units today are the balance simulator's fixture enemies (`encounters.json`, optional
+`Footprint`).
+
+**Board.** `HexGrid` records a large unit's anchor and footprint and names it on every tile it
+covers (`GetOccupant`). `TryPlaceUnit(id, anchor, footprint)` is **all or nothing**: every tile must
+be on the board, free of terrain and empty or already the unit's own, or nothing changes; on success
+the old tiles are all released and the new ones all taken. The two-argument `TryPlaceUnit` keeps a
+large unit's recorded footprint (so a move is an anchor move), `RemoveUnit` — and so lifting the
+defeated — frees every tile, and `CanStand(anchor, footprint, mover)` asks whether a footprint fits
+somewhere. A board of one-tile units runs exactly the code it always did.
+
+**Distance.** Every range and adjacency rule is measured between the **nearest tiles** of the two
+units (`FootprintMath`): to a `Hex7` it is `max(0, d - 1)` from the centre, to a `Triangle` the
+minimum over its three tiles, between two large units the minimum over one's tiles. So a range-1
+skill reaches a giant from any of the **twelve** tiles around it (nine around a champion), and a
+giant's own range counts from its outer ring. For one-tile units every one of these is exactly
+`HexCoordinate.Distance`.
+
+**Targeting** (amends decision 4). Range and the `Distance` criterion use the footprint distance. An
+area shape hits a unit when **any** of its tiles is in the area, and hits it **once** however many of
+its tiles are covered. A large *caster's* areas grow from all of its tiles: an `AreaBurst` is the
+union of the discs around each of them (for a `Hex7`, the disc of `Range + 1` around its centre), a
+`Cross` the union of the arms from each, and a `Line` fires from its tile nearest the focus toward the
+focus's tile nearest that one (ties in footprint order). The caster's own tiles are excluded from a
+`Cross` or `Line` exactly as a one-tile caster's tile is. Taunt, the criteria and the id tie-break are
+unchanged.
+
+**Movement** (amends decisions 7 and 8).
+
+- *A one-tile unit closing on a large one* aims its routes at the tiles around the whole footprint:
+  the candidate's anchor (only if nothing stands there), then every tile next to any footprint tile
+  and not one of them, walked footprint tile by footprint tile, each in axial order, first sighting
+  kept (twelve goals around a `Hex7`, nine around a `Triangle`). A standoff (Ranged / Skirmisher) unit
+  measures "farthest within range" to the footprint's nearest tile.
+- *A large unit moves by anchor*, and its whole footprint must fit at every step
+  (`HexPathfinder.FindPath(grid, start, goal, mover, footprint)`, the same A* with `CanStand` in place
+  of `IsPassable`; its own tiles count as free). With `Single` that overload *is* the one-tile search.
+  To approach it does not aim at goal tiles: it walks every reachable anchor breadth-first and takes
+  the cheapest from which the candidate is in range; among equally cheap anchors a Vanguard screens
+  (nearest a fragile ally, judged at that anchor), a Ranged or Skirmisher unit takes the farthest from
+  the candidate and then the least crowded, then breadth-first order. The route is the pathfinder's to
+  that anchor — the same length — so a partial approach walks a prefix of it as usual. Its retreat and
+  crowd checks use the footprint distance too.
+- *Anti-surround counts units, not tiles.* "Enemies adjacent" is the number of living enemies next to
+  the tile — for a large unit, next to any of its tiles — each counted once, so a giant touching a
+  stop tile along two of its tiles is still one enemy.
+
+**Knockback.** A `Hex7` is immovable. A `Triangle` moves at most one tile, and only if its whole
+footprint fits at the new anchor. When either unit is large, the push runs from the caster's tile
+nearest the target toward the target's tile nearest the caster, so a beast is shoved straight off the
+giant's face. One-tile against one-tile is unchanged.
+
+**Deployment.** `DeploymentPacker.TryPack` seats a side's units front-most first (nearest the centre
+line, then outward from the vertical centre line, then by `Q`): each takes the first anchor whose
+whole footprint lies in the zone on free tiles. For one-tile units that is exactly the front-most
+tiles. On a Medium board a `Hex7` boss sits centred on the middle row of the three-row zone; on a
+Small board (a two-row zone) it fits nowhere. The balance simulator packs its enemies this way, and
+its loader refuses any shape (worst case: every slot at its maximum, each its slot's largest type) or
+fixed encounter that does not fit. `PlacementValidator` is unchanged — beasts are one tile — and a
+caller passing already-placed tiles passes every tile a large unit covers.
+
+*Balance.* A `Hex7` boss is easier to reach (twelve tiles around it, every range to it one longer
+from its centre), so melee and short-range beasts gain against it; it cannot be knocked back, so
+knockback kits lose value against it. Its own reach would also have grown by one, so the fixtures'
+giant and colossus author their ranges one lower than their one-tile values were (gaze 3 → 2, quake
+and roar area radius 2 → 1: a radius-1 burst from a `Hex7` is the radius-2 disc around its centre,
+exactly the old one); the champion's shockwave stays at 2. See the tuning log, "Large enemies
+(footprints)".
+
+*Scaffold details, not confirmed balance.* The shapes, the anchor convention, the triangle's
+orientation, the nearest-tile distance, the large-mover approach and the knockback caps are
+engineering defaults chosen to be deterministic and legible; none has been through encounter design.
 
 ## Effect application — SCAFFOLD ASSUMPTIONS, NOT CONFIRMED BALANCE
 
@@ -765,8 +881,10 @@ The turn order is:
 2. Tick the timed modifiers.
 3. `BeginTurn`: damage-over-time lands, and the stun is read.
 4. Skills, movement and retreat, unless stunned.
-5. The avatar tick.
-6. `EndTurn`.
+5. `EndTurn`.
+
+The avatar's own turn has none of these steps beyond lifting the defeated and ticking its timed
+modifiers: nothing can put a status on it (decision 6).
 
 The statuses:
 
@@ -782,7 +900,7 @@ The statuses:
 - **Stun** (also used for Freeze). A unit that begins its turn stunned skips it. It does not move,
   fires nothing, does not retreat, and **its cooldowns do not tick**: a stun delays the rotation
   rather than burning it. Its timed modifiers and statuses still tick, and its gauge is spent as
-  normal. The avatar still ticks on a stunned player beast's turn. Stuns do not stack. A new stun
+  normal. Stuns do not stack. A new stun
   keeps whichever of the two has more turns left.
 - **Shield.** It absorbs damage before HP. It is worth `Magnitude`% of the **caster's** `Defense`
   (`StatusEffects.ShieldPercentDivisor`), level-scaled like every magnitude and truncated. Every
@@ -793,8 +911,7 @@ The statuses:
   `DamageFormula` with `Magnitude` as the power: the caster's attacking stat against the target's
   defending stat (by the skill's category), with the element, no crit, no variance and a floor of
   1. Later buffs do not change it. The damage is dealt at the start of each of the affected unit's
-  own turns, through its shield. A unit its stacks defeat takes no turn: no skills, and no avatar
-  tick. `MaxStacks` copies per authored effect ride at once, each on its own clock. At the cap, the
+  own turns, through its shield. A unit its stacks defeat takes no turn: no skills. `MaxStacks` copies per authored effect ride at once, each on its own clock. At the cap, the
   copy with the fewest turns left is replaced, so the default of 1 refreshes.
 - **Knockback.** It pushes the target `Magnitude` whole hexes away from the caster, one tile at a
   time. The distance uses the authored magnitude and is not level-scaled. It stops at the first
@@ -802,7 +919,9 @@ The statuses:
   Cartesian dot product with the caster-to-target vector, computed exactly in integers as
   `2·q1·q2 + q1·r2 + r1·q2 + 2·r1·r2`. Ties go to the earlier direction. It needs the grid, which
   the executor passes to `SkillEffectApplier.Apply`. With no grid it does nothing. It is never
-  stored.
+  stored. Large units ("Unit footprints"): a seven-hex target is immovable, a three-hex one moves at
+  most one tile and only where its whole footprint fits, and the push runs between the two units'
+  nearest tiles.
 
 **Stacking stat buffs and debuffs.** `MaxStacks` caps the timed copies of one authored effect on a
 unit, and each copy expires on its own clock. At the cap, the copy with the fewest turns left (the
@@ -953,6 +1072,45 @@ strong, mild or weak, and whether 2x / 1.25x / 0.5x are the right sizes, may sti
 work measures real fights. `ElementChart` (`Strong`, `Mild`, `Weak` and its rows) is the single
 place to change them.
 
+## Encounter preview — DECIDED (elements visible by default); partial scouting is a FUTURE KNOB
+
+**Enemy elements are visible and counterable.** Before the player places a team, the game shows the
+encounter: `EncounterPreview.Build(enemies, arena, detail)` (`BeastCraft.Battle.Scouting`) turns the
+lineup into its arena, its total enemy count and a list of `EncounterPreviewGroup` lines, front to
+back. Anything that holds a lineup implements `IEncounterPreviewSource` (element, stance, display
+name) — game encounter data once it exists, the balance simulator's fixtures today — so the
+preview never depends on how enemies are authored. It is pure (no randomness, no battle state), so
+the team-building screen can show it and a future "suggested team" can read it.
+
+- **Grouping.** Enemies with the same element, stance and display name (ordinal) are one line
+  with a count; lines keep the order of their first enemy in the lineup.
+- **Detail (`ScoutingDetail`).** `Full` — the default, and the only level the game uses now —
+  shows every line's name, element, stance and count. `ElementsOnly` hides names and stances and
+  merges the lines that share an element (so hidden fields do not leak through the number of lines).
+  `DominantElementOnly` leaves one line: the element carried by the most enemies (a tie goes to the
+  lowest `Element` value, so `None` wins a tie it is part of) with the total count. The partial
+  levels exist for a later fog-of-war mechanic (an unscouted region, a "mysterious" encounter, a
+  scouting skill that upgrades the detail); none is wired to anything yet, and the enum's values are
+  explicit so a saved setting survives additions.
+- **Why visible by default.** The element chart is a strategic layer only if the player can act
+  on it. Hidden elements would make it a coin flip the player cannot influence, and the chart's
+  normalization (every main element 2x into two and 0.5x from two) already means no single team is
+  best against everything, which is what makes picking for the encounter a real decision.
+
+**What it is worth (simulator, not confirmed balance).** The balance simulator's "PvE scouted
+picking" section (`Tooling/BalanceSim`, README "Scouted picking") replays the choice against the
+battles it already runs: a plain element counter-pick from the `Full` preview — each beast scored on
+its chart multiplier into the enemies minus half theirs into it, the best four fielded with at least
+one Vanguard — raises the clear rate at the calibrated difficulty from about 50% to about 70% (three
+seeds; the same picks in the `neutral` control gain nothing, so the gain is the chart's). It is
+largest against a lone giant or an elite group (+25 to +30 points); against squads and hordes,
+whose mixed elements dilute any counter, it is +16 to +19 and simply bringing a strong lineup does
+better. The counter-pick fields every beast in every shape (between about 13% and 63% of picks each); none
+becomes a must-pick or a never-pick. See `docs/balance/tuning-log.md`,
+"Scouting and counter-picking", for the numbers and pick rates. Difficulty is still calibrated
+against the average team, not the counter-picked one; whether it should be is an open question for
+when encounters are authored.
+
 ## Damage formula — TUNABLE STARTING DEFAULTS, NOT CONFIRMED BALANCE
 
 Damage is now stat-based, for beasts and the avatar alike. The formula's shape and constants are
@@ -1049,8 +1207,8 @@ the +2 offset (2, or 4 on a strong matchup). An avatar meant to hit hard should 
 via the statful overload.
 
 **Levels.** `BattleUnit` carries a `Level` (at least 1; an optional constructor argument defaulting
-to 1). `BattleUnitFactory.CreateBeast` records the level it assembled the stats at. The avatar has no
-progression level, so the statful `BattleAvatar.Create` takes a per-battle level (default 1) — see
+to 1). `BattleUnitFactory.CreateBeast` records the level it assembled the stats at. The statful
+`BattleAvatar.Create` takes the avatar's own level (`AvatarProgress.Level`, default 1) — see
 "What is not settled yet". None of these feed damage any more; level reaches damage only through the
 stats it assembled.
 
@@ -1106,7 +1264,7 @@ already carries for `ExecuteTurn` / `RunBattle` — is threaded through
 power, rng)`. Each damage effect that lands on a target draws **exactly two numbers, crit first,
 then variance**, always both — even at a 0% or 100% chance or zero power — so the number of draws
 never depends on stats. Draws happen in the order the battle fires skills: the unit's ready slots in
-stack order, then the avatar's activations; within a skill, target-major and then in authored effect
+stack order (on the avatar's own turn, its activations in slot order); within a skill, target-major and then in authored effect
 order; an effect skipped because its target is already defeated draws nothing. Targeting draws from
 the same stream only for `SkillTargetingCriterion.Random`. A battle is therefore random but
 reproducible: the same seed replays it exactly.
@@ -1171,8 +1329,8 @@ the equipment screen's job, but an under-levelled item never grants stats whatev
 arrives in. Null gear and null modifiers are skipped. A second overload takes an explicit base
 `StatBlock` plus a modifier list (with `CollectModifiers` turning a gear list into one) for a
 participant with no species behind it — which is how the avatar's stats are assembled from its
-`AvatarStatsSO` base and its `AvatarGearSO` (decision 6, amended). Avatar gear has no minimum level,
-because the avatar has no progression level.
+`AvatarStatsSO` base (at the avatar's level) and its `AvatarGearSO` (decision 6, amended). Avatar
+gear has no minimum level.
 
 `BattleUnitFactory.CreateBeast` is the pass that assembles a battle-ready `BattleUnit` from a
 creature: stats from `StatCalculator`, elements copied from the species, and the equipped skill
@@ -1243,6 +1401,12 @@ the wrong half *and* buried under terrain *and* already taken at once, and a lay
 validating if it hands back every reason it was rejected. The one exception is off-board tiles,
 which report `OutOfBounds` alone because "also blocked" and "also outside the zone" are not
 additional facts there.
+
+**Large units** ("Unit footprints") deploy only where their whole footprint lies in their zone.
+`DeploymentPacker` seats a side automatically, front-most first, units of any size (the balance
+simulator uses it for its enemies); on a Small board, whose zones are two rows deep, a seven-hex
+unit fits nowhere. Beasts are one tile, so the player's validation below is unchanged; the
+already-placed tiles it checks against must include every tile a large enemy covers.
 
 **Validation never touches the board**, so it is safe to call on every drag of a marker. Committing
 is the separate `PlacementValidator.TryPlaceAll`, which validates first and is all-or-nothing: a
@@ -1494,8 +1658,86 @@ to the book's known skills.
 fire. Whether enemy-side or defeated beasts earn practice. The material economy (drop rates, how
 material XP compares with practice). Whether stat changes should scale per level like damage (they
 truncate to whole points, so small buffs grow in steps). Whether the slow curve suits the narrative
-pacing. There is no inventory yet, so consuming a material is the caller's job. No UI, no save
-system and no authored materials or tier bonuses exist yet.
+pacing. The material economy (drop tables, the inventory and the pacing targets) is now in
+"Material economy" below; consuming a material is still the caller's job
+(`MaterialInventory.TryConsume`). No UI and no save system exist yet.
+
+## Material economy — SIMULATOR-TUNED STARTING VALUES, NOT CONFIRMED BALANCE
+
+The drop side of "Skill progression": where the materials come from, what the player holds, and
+how fast a skill climbs as a result. Everything lives in `BeastCraft.Progression`; the numbers are
+data (`Data/Skills/drop-tables.json`) tuned against the balance simulator's pacing model
+(`--mode pacing`, `docs/balance/pacing-report.md`), not confirmed balance.
+
+**Drop tables.** `drop-tables.json` (DTOs `DropTableData`, checked by `DropTableValidator`, built by
+`DropTableBuilder` into a runtime `DropTable`; the Editor importer, Beast Craft/Data/Import Drop
+Tables, copies it into a `DropTableSO`) is keyed by **encounter shape** (`solo`, `elite`, `squad`,
+`horde`) × **level band** (contiguous, covering levels 1-100). A cell is a list of entries
+`{MaterialId, Chance 1-100, MinQty, MaxQty}`; material ids are the skill library's.
+
+- **Drops only on a clear**, and every entry rolls **independently**: `rng.Next(100) < Chance`, then
+  a uniform quantity. `LootRoller.RollClear` always takes both draws per entry, hit or miss, so a
+  clear's draw count depends only on the cell (a seeded run is reproducible; retuning one chance
+  does not reshuffle every later roll). Seed it per battle with `LootRoller.DeriveSeed(seed,
+  battleIndex)` (a SplitMix64 mix, stable across runtimes).
+- **Pity**, per (shape, material tier): after `Threshold` consecutive clears of a shape whose cell
+  can drop that tier without dropping it, the next clear forces the cell's first entry of that tier
+  at its `MinQty`. A drop of the tier (natural or forced) resets the counter; a cell that cannot
+  drop the tier leaves it alone. Thresholds: tier 1 after 8, tier 2 after 15, tier 3 after 25.
+- **First clear**: the first clear of each (shape, band) grants the band's `FirstClearMaterialId`
+  once (the band's headline tier). It does not touch pity.
+
+**Save data.** `MaterialInventory` holds `Materials` (id + quantity), `ClearedCells` (shape + band
+`MinLevel`) and `Pity` (shape + tier + misses) as lists of `[Serializable]` entries, because
+`JsonUtility` cannot write a dictionary. `TryConsume` is how a caller spends a material after
+`SkillProgression.TryBreakthrough` / `ApplyMaterial` succeeds.
+
+**After a battle.** `PostBattleAward.AwardPractice(result, beastBooksByUnitId, skillLookup, avatarBook,
+...)` credits every player beast's fired skills (and the avatar's actives and passives) on any
+finished battle; `PostBattleAward.AwardDrops(result, table, shape, level, inventory, rng)` rolls the
+loot only on `PlayerVictory`.
+
+**Pacing targets** (a dedicated player pushing one signature skill; median battles):
+
+| Skill level | Cumulative XP | Target | Measured p10 / p50 / p90 |
+| ---: | ---: | --- | --- |
+| 5 (tier-1 gate) | 1,703 | 15-20 | 15 / 16 / 17 |
+| 10 (tier-2 gate) | 11,106 | ~80 | 69 / 77 / 85 |
+| 15 (tier-3 gate) | 31,998 | ~180 | 157 / 171 / 184 |
+| 20 (max) | 67,135 | ~300-320 | 283 / 301 / 302 |
+
+The model (Tooling/BalanceSim/README.md, "Pacing"): encounter level `1 + battle / 5`, shapes drawn
+solo 15 / elite 20 / squad 35 / horde 30, 80% of battles cleared, the focus skill firing 3-9 times a
+battle (the PvE report's 3-10 beast turns per battle; practice ~60 XP a battle), materials fed to
+the focus skill (one kept per tier its later gates need) and the rest spilled to a second skill.
+
+**What the targets force.** The XP constants are unchanged. At ~60 practice XP a battle, practice
+alone would take 29 battles to level 5 and ~1,100 to level 20, so reaching level 20 in ~300 battles
+means **materials supply about three quarters of the XP** (74% in the measured runs), not a 10-15%
+nudge. The level-5 target caps early income: with 20 uses a battle (the per-battle cap) practice
+alone reaches level 5 in 9 battles, so the two targets together pin practice at roughly 5-10 uses a
+battle. The drop tables are shaped around the gates:
+
+| Band | First clear | Mean material XP per clear | Role |
+| --- | --- | ---: | --- |
+| 1-3 | shard | 0 | tutorial: the four first-clear shards are the only drops; one opens the level-5 gate |
+| 4-20 | shard | 104 | shards; crystals only from a solo boss (5%) and pity |
+| 21-40 | crystal | 174 | the four first-clear crystals open the level-10 gate at ~battle 101 |
+| 41-60 | core | 139 | the first-clear cores open the level-15 gate at ~battle 201; regular drops thin out |
+| 61-80 | core | 512 | crystals and cores; finishes the focus skill and feeds the next ones |
+| 81-100 | core | 1,442 | the late game's surplus goes to the rest of the team |
+
+So the gates are paced by the **band a tier first appears in** (the first clears), and the levels
+between gates by the band's regular drops. The "~300-320" level-20 median sits at ~301 because the
+first band-61 clear's core usually completes it; the spread is mostly the order the shapes are met
+in. A 500-battle campaign earns about 106 shards, 120 crystals and 27 cores (about 3.8 level-20
+skills' worth of material XP), so the spill-over skill also reaches level 20 by the end: a
+playthrough maxes a handful of signature skills.
+
+**Open questions.** Whether first-clear bonuses should be per shape (four per band, as now) or per
+band. Whether pity should also count losses. A better campaign schedule (the linear level ramp, the
+shape mix and the 80% clear rate are assumptions, not content). How many uses a battle a real
+focused skill gets (the simulator's library kits could measure it). No UI, no drop presentation.
 
 ## Avatar passives — TUNABLE STARTING DEFAULTS, NOT CONFIRMED BALANCE
 
@@ -1511,7 +1753,7 @@ content (10 passives across every trigger) is in the skill library; see "Beast s
 - `PassiveSkillSO` (`Runtime/Avatar`, namespace `BeastCraft.Avatar`): `PassiveId` (stable save key),
   `DisplayName`, `Description`, `Icon`, `Progression` (the shared `SkillProgressionDefinition`
   block), `Trigger`, `HpThresholdPercent` (default 50), `ProcChance` (percent, default 100),
-  `MaxTriggersPerBattle` (0 = unlimited), `InternalCooldown` (avatar ticks), `TargetScope`,
+  `MaxTriggersPerBattle` (0 = unlimited), `InternalCooldown` (avatar turns), `TargetScope`,
   `Element` and `Category` (for damage effects, as on `SkillSO`), and `Effects` (a
   `List<SkillEffect>`: the whole effect engine).
 - `PassiveTrigger`: `Aura = 0`, `BattleStart = 1`, `EnemyDefeated = 2`, `AllyDefeated = 3`,
@@ -1548,8 +1790,9 @@ avatar's placeholder tile and should not be authored (a content convention, not 
    on a player beast's turn it survived (stunned or not), every `AllyTurnStart` passive with that
    beast as the triggering unit, **before its skills**.
 3. **After every skill a beast fires**: the after-damage check, with that skill's hits.
-4. **The avatar tick** (player beasts' turns only, as before): every passive's internal cooldown
-   ticks down once, then the avatar's actives fire, each followed by the after-damage check.
+4. **The avatar's own turn** (`ExecuteAvatarTurn`, whenever its gauge comes up): every passive's
+   internal cooldown ticks down once, then the avatar's actives fire, each followed by the
+   after-damage check. `AllyTurnStart` never fires on the avatar's turn; it stays per beast turn.
 
 **The after-damage check** handles, in order, each trying its passives in slot order:
 
@@ -1558,8 +1801,9 @@ avatar's placeholder tile and should not be authored (a content convention, not 
 - Defeats: every unit defeated since the last check, in roster order. `AllyDefeated` for a player
   beast (the fallen beast is the triggering unit, so pair it with `AllAllies` or
   `LowestHpFractionAlly`, not `TriggeringUnit`); `EnemyDefeated` for an enemy (the triggering unit is
-  the beast whose turn it is when that is a living player beast — it gets the credit, even for an
-  avatar active's kill — and otherwise none).
+  the beast whose turn it is when that is a living player beast — it gets the credit — and
+  otherwise none, as on an enemy's turn or the avatar's own, where an avatar active's kill credits
+  nobody).
 - `AllyBelowHpPercent`: every living player beast, in roster order, **strictly below** the passive's
   threshold (`CurrentHp × 100 < HpThresholdPercent × Stats.Hp`, integers). It fires **once per
   crossing**: the passive latches that beast on the attempt (whether or not the attempt fires) and
@@ -1568,15 +1812,15 @@ avatar's placeholder tile and should not be authored (a content convention, not 
   emergency passive can answer the hit that caused the crossing.
 
 Passives therefore react on enemy turns too (an ally falling, an ally dropping low, an enemy dying
-to its own damage-over-time), but their cooldowns only tick on avatar ticks.
+to its own damage-over-time), but their cooldowns only tick on the avatar's own turns.
 
 **Gating**, checked in this order each time a passive's trigger happens: not spent
 (`MaxTriggersPerBattle`), off its internal cooldown, at least one target in its scope, then the
 `ProcChance` roll. A blocked or failed attempt changes nothing (no count, no cooldown). A firing
-counts toward the cap and sets the cooldown to `InternalCooldown`; each avatar tick takes one off.
-Because the tick comes at the end of each player beast's turn, a passive with cooldown `N` that
-fires at a player beast's turn start is ready again at the `N`-th player-beast turn start after
-that one (enemy turns in between do not count). `ProcChance` of 0 or below, or above 100, reads as 100, like
+counts toward the cap and sets the cooldown to `InternalCooldown`; each avatar turn takes one off.
+So a passive with cooldown `N` is ready again after the avatar's `N`-th turn following the firing,
+however many beast turns (either side's) fall in between: with a Speed-100 avatar, about `N` units
+of battle time. `ProcChance` of 0 or below, or above 100, reads as 100, like
 `SkillEffect.Chance`.
 
 **No chaining.** A unit defeated by a passive's own effect is recorded silently: it never triggers
@@ -1619,14 +1863,99 @@ so its shields and heals are the same share of a beast's HP at every level. (Unt
 was `10 + level`, which made level-1 avatar heals and shields relatively weak.) The report then gains an
 "Avatar passives" section with firings per battle. The simulator's own loop calls `BeginBattle` and
 passes the passives to every turn, so `--self-check` still compares it against `RunBattle`.
+**Avatar gauge in the simulator:** the fixture block also carries Speed 100 at max level on the
+same curve (`AvatarStatsSO.GetStatsAtLevel`, so 15 at level 1), the avatar joins the `TurnManager`
+beside the beasts (never the targeting roster), and the simulator's loop runs `ExecuteAvatarTurn`
+when its gauge comes up, mirroring `RunBattle` (the self-check compares them). `--avatar-level <n>`
+fixes the avatar's level (stats and damage level); by default it is each battle's encounter level.
+The "Avatar passives" section also reports the avatar's turns and active casts per battle.
 
 **Open questions.** Whether passive-caused defeats should chain (currently never). Whether the
 avatar's own crits should count as `AllyCrit`. Whether `EnemyDefeated` should credit the unit that
 dealt the blow rather than the unit whose turn it is (they differ for damage-over-time and avatar
-kills). Whether a failed proc roll should consume the threshold crossing. Whether internal cooldowns
-should run on the avatar's own clock if the avatar ever gets a gauge (decision 6's open item).
+kills). Whether a failed proc roll should consume the threshold crossing. (Internal cooldowns now
+run on the avatar's own clock, its gauge; decided with stage 3b.)
 How passives are acquired (drops, quests, avatar milestones) and the passive material economy. No
 passive UI or save system exists yet.
+
+## Team bonds — TUNABLE STARTING DEFAULTS, NOT CONFIRMED BALANCE
+
+**Why.** The simulator's team-composition analysis (`docs/balance/tuning-log.md`, "Team
+composition analysis") found that lineups matter per encounter but mostly additively: a team was
+roughly the sum of its beasts, with only four real pair effects in the roster. **Team bonds** make
+composition matter on purpose: team effects that switch on at battle start when the player's team
+meets a condition. The mechanism below is the lead's design; the content and magnitudes are
+simulator-tuned first drafts ("Team bonds" in the tuning log).
+
+**Data** (explicit enum values, never renumbered; ids never renamed after ship). Authored in the
+`TeamBonds` array of `Data/Skills/skill-library.json` (DTOs `TeamBondData` / `TeamBondTierData`,
+checked by `SkillLibraryValidator`, mapped by `SkillLibraryBuilder.ApplyTeamBond`, imported into
+`Assets/_Project/Data/Bonds/` by the skill library importer, loaded the same way by the simulator):
+
+- `TeamBondSO` (`Runtime/Bonds`, namespace `BeastCraft.Bonds`): `BondId`, `DisplayName`,
+  `Description`, `Icon`, `Condition`, the condition's set (`Stance`, `Elements` or `SpeciesIds`),
+  `Scope`, and `Tiers` (`TeamBondTier`: `MinCount` and an `Effects` list of ordinary
+  `SkillEffect`s).
+- `TeamBondCondition`: `Stance = 0` (count = team members of that stance), `Elements = 1` (count =
+  distinct elements of the set the team covers, capped at the number of members carrying one, so a
+  pair bond needs both halves on two beasts), `Species = 2` (count = distinct listed species
+  fielded). A bond's **members** are the beasts that match (every beast carrying a set element; every
+  beast of a listed species).
+- `TeamBondScope`: `Members = 0` (only the members get the effects), `Team = 1` (every beast on the
+  team does).
+- Tiers rise strictly by `MinCount` (at least 2: a bond is between beasts; an element or species
+  bond's tiers stop at its set's size). The **highest tier reached applies, and tiers replace rather
+  than stack**, so each tier is authored as its full effect list.
+- Bond effects land on the player's own team at battle start, so the validator allows only
+  `BuffStat` (not `HP`: a max-HP buff heals nothing) and a `Shield` status, always landing
+  (`Chance` 100). `DurationTurns` 0 on a stat change means the whole battle, as for an avatar aura.
+
+**Runtime.** `TeamBondResolver.Resolve(bonds, members)` is pure (no battle state, no rng): given
+`TeamBondMember`s (species id, stance, elements; `MembersOf(species)` builds them for a team of
+species) it returns the `ActiveTeamBond`s in the bonds' order, each with its tier, count and member
+indices. `TeamBondLoadout` binds that to the team's battle units for one battle (`For(bonds,
+members, team)`), and `BattleTurnExecutor.BeginBattle(…, passives, bonds, out bondActivations)` /
+`RunBattle(…, passives, bonds, maxTime)` apply it **once, as the battle begins, before the avatar's
+auras and battle-start passives** (so a percent aura sees the bonded stat). For each active bond in
+order, each living recipient in team order **applies the tier's effects to itself**: it is both the
+caster and the only target of a private `Self`-shaped carrier skill at level 1 (bonds do not level),
+through `SkillEffectApplier` — so a shield is a percent of the recipient's own Defense and a percent
+buff scales the recipient's own stat. `BattleResult.BondActivations` records each applied bond
+(`TeamBondActivation`: bond, tier, recipients). **Enemies never get bonds** (for now: the loadout is
+built for the player's team only). Bond effects with `Chance` 100 draw nothing from the battle rng,
+so a battle without bonds is unchanged, and a caller driving turns itself must call the bond-aware
+`BeginBattle` (unlike passives, a first turn does not apply bonds on its own).
+
+**Content (first draft).** Three stance bonds (every beast is in its stance's) and five element
+pairs that cover all ten elements once (every beast is in exactly one). Pairs were chosen so no two
+bonds need the same two beasts (Griffin + Thunderbird already share `pack_hunters`, so Air pairs
+with Fire and Lightning with Water):
+
+| Bond | Condition | Scope | Tiers (MinCount+: effects) |
+| --- | --- | --- | --- |
+| `pack_hunters` Pack Hunters | Skirmisher beasts | Members | 2+: +12 CritChance; 3+: +16 CritChance, +1 MoveRange |
+| `shield_wall` Shield Wall | Vanguard beasts | Members | 2+: Shield 30% of own Defense, 3 turns; 3+: Shield 45% of own Defense, 3 turns |
+| `crossfire` Crossfire | Ranged beasts | Members | 2+: +8% Attack, +8% SpecialAttack; 3+: +12% Attack, +12% SpecialAttack |
+| `wildfire` Wildfire | Fire + Air | Members | 2+: +15% Speed, +8% Attack, +8% SpecialAttack |
+| `storm_front` Storm Front | Lightning + Water | Members | 2+: +10% Attack, +10% SpecialAttack |
+| `bedrock` Bedrock | Earth + Metal | Members | 2+: +6% Defense, +6% SpecialDefense |
+| `winter_grove` Winter Grove | Ice + Nature | Members | 2+: Shield 90% of own Defense, 3 turns |
+| `twilight` Twilight | Light + Dark | Team | 2+: +5% Defense, +5% SpecialDefense |
+
+With the ten-beast roster (5 Vanguard, 3 Ranged, 2 Skirmisher) the Skirmisher bond's second tier
+cannot be reached yet; it is authored for a larger roster.
+
+**Simulator.** `--bonds on|off` (default on, library kit only). The report's "PvE team bonds"
+section lists each bond's frequency (teams active per tier), the beasts' memberships, and each
+bond's marginal per shape: **Δ** (teams with the bond minus teams without) and **excess** over the
+additive prediction from the members' marginals (the part of the bond the lineup earns). The
+simulator's loop calls the bond-aware `BeginBattle`, so `--self-check` still compares it against
+`RunBattle`. Results and tuning: `docs/balance/tuning-log.md`, "Team bonds".
+
+**Open questions.** Whether enemies (bosses, packs) should get bonds of their own. Whether a bond
+should be visible and previewed on the team-building screen (the resolver is pure so it can be).
+Species bonds (named pairs) are supported but none is authored yet. Whether dual-element beasts
+should count once per element. Whether bonds should level or be unlocked through progression.
 
 ## Beast skill kits — SIMULATOR-TUNED CONTENT, NOT CONFIRMED BALANCE
 
@@ -2197,8 +2526,7 @@ kind of default, as is the damage formula.
 Still to come: confirming or revising the third tuning pass (and, if needed, the damage formula and
 element chart), deciding the design questions it raised above — a design decision the reports inform
 rather than make — and extending the simulator once authored skills, real encounters and the avatar
-give it more than a standard kit and fixture enemies to measure; multi-hex large creatures, an open
-item under "Encounter direction" above; the starter roster's skills (none are
+give it more than a standard kit and fixture enemies to measure; the starter roster's skills (none are
 authored yet — the effect engine they need, statuses included, has landed), the avatar's passive
 content (the passive engine has landed, see "Avatar passives"), resource gating on top of cooldowns,
 the placement UI (a Unity

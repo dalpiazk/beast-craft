@@ -20,6 +20,13 @@ namespace BeastCraft.Battle.Grid
     /// about without carrying a second object around.
     /// </para>
     /// <para>
+    /// <strong>Large units.</strong> A unit may cover several tiles (<see cref="UnitFootprint"/>):
+    /// the grid records its anchor (<see cref="TryGetPosition"/>) and footprint
+    /// (<see cref="GetFootprint"/>), and <see cref="GetOccupant"/> names it on every tile it
+    /// covers. Placement is all or nothing and <see cref="RemoveUnit"/> frees every tile. A board
+    /// of one-tile units runs exactly the code it always did.
+    /// </para>
+    /// <para>
     /// Scaffolding only: this is the board's state and its bounds/occupancy/terrain queries. Per-
     /// tile movement cost, line of sight and elevation are all deliberately absent — every step
     /// costs 1, which is what <see cref="HexPathfinder"/> assumes — and land in a later pass.
@@ -40,6 +47,12 @@ namespace BeastCraft.Battle.Grid
         private const int LargeRadius = 7;
 
         private readonly Dictionary<string, HexCoordinate> _tilesByOccupant;
+
+        // The footprint of every placed unit that covers more than one tile, keyed by unit id. A
+        // unit absent from it is Single, which is every unit in a battle without large enemies, so
+        // the Single paths only ever ask whether this is empty. _tilesByOccupant keeps the anchor;
+        // _occupantByIndex holds the id on every tile the footprint covers.
+        private readonly Dictionary<string, UnitFootprint> _footprintByOccupant;
 
         // Built on first use of Tiles, in the same insertion order as ever: bounds checks are
         // arithmetic (see IsInBounds), so most boards never need the set at all.
@@ -66,6 +79,7 @@ namespace BeastCraft.Battle.Grid
             _deploymentRowThreshold = Math.Max(1, (Radius - DeploymentZoneDepth) + 1);
 
             _tilesByOccupant = new Dictionary<string, HexCoordinate>(StringComparer.Ordinal);
+            _footprintByOccupant = new Dictionary<string, UnitFootprint>(StringComparer.Ordinal);
 
             _span = (2 * Radius) + 1;
             _occupantByIndex = new string[_span * _span];
@@ -195,15 +209,42 @@ namespace BeastCraft.Battle.Grid
         }
 
         /// <summary>
+        /// The footprint a unit was placed with (its anchor is <see cref="TryGetPosition"/>). A unit
+        /// that is not on the board, or was placed as one tile, reads as
+        /// <see cref="UnitFootprint.Single"/>.
+        /// </summary>
+        public UnitFootprint GetFootprint(string unitId)
+        {
+            UnitFootprint footprint;
+            if (string.IsNullOrEmpty(unitId) || _footprintByOccupant.Count == 0 || !_footprintByOccupant.TryGetValue(unitId, out footprint))
+            {
+                return UnitFootprint.Single;
+            }
+
+            return footprint;
+        }
+
+        /// <summary>
         /// Places (or moves) a unit onto a tile. Fails without changing anything when the id is
         /// empty, the tile is off the board, or another unit already holds it. Re-placing a unit on
         /// the tile it already occupies succeeds and is a no-op.
+        /// <para>
+        /// A unit already on the board with a larger footprint keeps it: the tile is its new anchor
+        /// and the move is exactly <see cref="TryPlaceUnit(string, HexCoordinate, UnitFootprint)"/>
+        /// with the recorded footprint.
+        /// </para>
         /// </summary>
         public bool TryPlaceUnit(string unitId, HexCoordinate coordinate)
         {
             if (string.IsNullOrEmpty(unitId) || !IsInBounds(coordinate))
             {
                 return false;
+            }
+
+            UnitFootprint recorded;
+            if (_footprintByOccupant.Count > 0 && _footprintByOccupant.TryGetValue(unitId, out recorded))
+            {
+                return TryPlaceFootprint(unitId, coordinate, recorded);
             }
 
             int index = TileIndex(coordinate);
@@ -225,7 +266,96 @@ namespace BeastCraft.Battle.Grid
         }
 
         /// <summary>
-        /// Lifts a unit off the board. Returns false when that unit was not placed to begin with.
+        /// Places (or moves) a unit of any <see cref="UnitFootprint"/> with its anchor on
+        /// <paramref name="anchor"/>. <strong>All or nothing:</strong> every tile the footprint would
+        /// cover must be on the board, free of terrain blocking, and either empty or already held by
+        /// this same unit; otherwise nothing changes and this returns false. On success the unit's
+        /// old tiles are all released and the new ones all taken, so a move never leaves a stray
+        /// tile behind, and a unit may move onto tiles it already covers (a one-step shuffle).
+        /// <para>
+        /// <see cref="UnitFootprint.Single"/> for a unit not recorded as larger is exactly the
+        /// two-argument <see cref="TryPlaceUnit(string, HexCoordinate)"/>, rules and all (that
+        /// overload, unlike a larger footprint, does not refuse a terrain-blocked tile).
+        /// </para>
+        /// </summary>
+        public bool TryPlaceUnit(string unitId, HexCoordinate anchor, UnitFootprint footprint)
+        {
+            if (footprint == UnitFootprint.Single && (_footprintByOccupant.Count == 0 || unitId == null || !_footprintByOccupant.ContainsKey(unitId)))
+            {
+                return TryPlaceUnit(unitId, anchor);
+            }
+
+            if (string.IsNullOrEmpty(unitId) || !IsInBounds(anchor))
+            {
+                return false;
+            }
+
+            return TryPlaceFootprint(unitId, anchor, footprint);
+        }
+
+        /// <summary>The all-or-nothing footprint placement behind both <c>TryPlaceUnit</c> overloads.</summary>
+        private bool TryPlaceFootprint(string unitId, HexCoordinate anchor, UnitFootprint footprint)
+        {
+            HexCoordinate[] offsets = Footprints.OffsetArray(footprint);
+
+            for (int i = 0; i < offsets.Length; i++)
+            {
+                int index = TileIndex(anchor + offsets[i]);
+                if (index < 0 || _blockedByIndex[index])
+                {
+                    return false;
+                }
+
+                string existing = _occupantByIndex[index];
+                if (existing != null && !string.Equals(existing, unitId, StringComparison.Ordinal))
+                {
+                    return false;
+                }
+            }
+
+            ReleaseTiles(unitId);
+
+            for (int i = 0; i < offsets.Length; i++)
+            {
+                _occupantByIndex[TileIndex(anchor + offsets[i])] = unitId;
+            }
+
+            _tilesByOccupant[unitId] = anchor;
+            if (footprint == UnitFootprint.Single)
+            {
+                _footprintByOccupant.Remove(unitId);
+            }
+            else
+            {
+                _footprintByOccupant[unitId] = footprint;
+            }
+
+            return true;
+        }
+
+        /// <summary>Clears every tile a placed unit covers (its id records are left to the caller).</summary>
+        private void ReleaseTiles(string unitId)
+        {
+            HexCoordinate previous;
+            if (!_tilesByOccupant.TryGetValue(unitId, out previous))
+            {
+                return;
+            }
+
+            HexCoordinate[] offsets = Footprints.OffsetArray(GetFootprint(unitId));
+            for (int i = 0; i < offsets.Length; i++)
+            {
+                int index = TileIndex(previous + offsets[i]);
+                if (index >= 0 && string.Equals(_occupantByIndex[index], unitId, StringComparison.Ordinal))
+                {
+                    _occupantByIndex[index] = null;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Lifts a unit off the board, every tile of its footprint. Returns false when that unit was
+        /// not placed to begin with.
         /// </summary>
         public bool RemoveUnit(string unitId)
         {
@@ -233,6 +363,14 @@ namespace BeastCraft.Battle.Grid
             if (string.IsNullOrEmpty(unitId) || !_tilesByOccupant.TryGetValue(unitId, out coordinate))
             {
                 return false;
+            }
+
+            if (_footprintByOccupant.Count > 0 && _footprintByOccupant.ContainsKey(unitId))
+            {
+                ReleaseTiles(unitId);
+                _footprintByOccupant.Remove(unitId);
+                _tilesByOccupant.Remove(unitId);
+                return true;
             }
 
             _tilesByOccupant.Remove(unitId);
@@ -244,6 +382,7 @@ namespace BeastCraft.Battle.Grid
         public void ClearOccupancy()
         {
             _tilesByOccupant.Clear();
+            _footprintByOccupant.Clear();
             Array.Clear(_occupantByIndex, 0, _occupantByIndex.Length);
         }
 
@@ -316,6 +455,62 @@ namespace BeastCraft.Battle.Grid
 
             return !string.IsNullOrEmpty(movingUnitId)
                 && string.Equals(occupant, movingUnitId, StringComparison.Ordinal);
+        }
+
+        /// <summary>
+        /// Whether a unit of footprint <paramref name="footprint"/> could stand with its anchor on
+        /// <paramref name="anchor"/>: every tile it would cover is <see cref="IsPassable"/> to
+        /// <paramref name="movingUnitId"/> (on the board, not blocked, empty or its own). For
+        /// <see cref="UnitFootprint.Single"/> this is exactly <see cref="IsPassable"/>.
+        /// </summary>
+        public bool CanStand(HexCoordinate anchor, UnitFootprint footprint, string movingUnitId)
+        {
+            return CanStandAt(TileIndex(anchor), anchor, footprint, movingUnitId);
+        }
+
+        /// <summary><see cref="CanStand"/> with the anchor's <see cref="TileIndex"/> already computed.</summary>
+        internal bool CanStandAt(int anchorIndex, HexCoordinate anchor, UnitFootprint footprint, string movingUnitId)
+        {
+            if (!IsPassableAt(anchorIndex, movingUnitId))
+            {
+                return false;
+            }
+
+            if (footprint == UnitFootprint.Single)
+            {
+                return true;
+            }
+
+            HexCoordinate[] offsets = Footprints.OffsetArray(footprint);
+            for (int i = 1; i < offsets.Length; i++)
+            {
+                if (!IsPassableAt(TileIndex(anchor + offsets[i]), movingUnitId))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Whether every tile a footprint anchored on <paramref name="anchor"/> covers is in
+        /// <paramref name="team"/>'s deployment zone (<see cref="IsInDeploymentZone"/>). A pure shape
+        /// query: terrain and occupancy are ignored. For <see cref="UnitFootprint.Single"/> it is
+        /// <see cref="IsInDeploymentZone"/>.
+        /// </summary>
+        public bool FitsDeploymentZone(HexCoordinate anchor, UnitFootprint footprint, BattleTeam team)
+        {
+            HexCoordinate[] offsets = Footprints.OffsetArray(footprint);
+            for (int i = 0; i < offsets.Length; i++)
+            {
+                if (!IsInDeploymentZone(anchor + offsets[i], team))
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         /// <summary>Clears all terrain blocking, leaving the tile set and occupancy intact.</summary>

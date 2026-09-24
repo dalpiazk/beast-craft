@@ -122,7 +122,7 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
-        public void LegacyCreate_IsStillAllZeroAndUnclamped()
+        public void LegacyCreate_IsAllZeroAndUnclamped_ExceptTheDefaultSpeed()
         {
             SkillLoadout loadout = new SkillLoadout(null);
 
@@ -130,12 +130,64 @@ namespace BeastCraft.Tests.EditMode
 
             Assert.AreEqual("commander", avatar.Id);
             Assert.AreEqual(BattleTeam.Player, avatar.Team);
-            Assert.AreEqual(default(StatBlock), avatar.Stats);
+            Assert.AreEqual(new StatBlock(0, 0, 0, 0, 0, AvatarStatsSO.DefaultSpeed), avatar.Stats);
+            Assert.AreEqual(100, AvatarStatsSO.DefaultSpeed, "the turn order's reference Speed");
             Assert.AreEqual(0, avatar.CurrentHp);
             Assert.AreEqual(HexCoordinate.Zero, avatar.Position);
             Assert.AreSame(loadout, avatar.Skills);
             Assert.AreEqual(1, avatar.Level);
             Assert.IsFalse(avatar.IsDefeated);
+        }
+
+        [Test]
+        public void NewAvatarStatsAsset_DefaultsToTheReferenceSpeed()
+        {
+            AvatarStatsSO profile = ScriptableObject.CreateInstance<AvatarStatsSO>();
+            _created.Add(profile);
+
+            Assert.AreEqual(AvatarStatsSO.DefaultSpeed, profile.BaseStats.Speed);
+            Assert.AreEqual(TurnManager.ReferenceSpeed, profile.BaseStats.Speed);
+            Assert.AreEqual(0, profile.BaseStats.Attack);
+        }
+
+        [Test]
+        public void Create_FromProfileAndProgress_ScalesTheBaseToTheAvatarsLevel()
+        {
+            AvatarStatsSO profile = ScriptableObject.CreateInstance<AvatarStatsSO>();
+            GrowthRateCurve growth = ScriptableObject.CreateInstance<GrowthRateCurve>();
+            _created.Add(profile);
+            _created.Add(growth);
+            growth.Curve = AnimationCurve.Linear(0f, 0.2f, 1f, 1f);
+            growth.MaxLevel = 100;
+            profile.BaseStats = new StatBlock(500, 100, 80, 120, 90, 100, 3, 5);
+            profile.Growth = growth;
+            AvatarGearSO ring = Gear(AvatarGearSlot.Trinket, new StatModifier { Stat = StatType.Attack, FlatBonus = 5 });
+
+            BattleUnit low = BattleAvatar.Create(null, null, null, profile, new BeastCraft.Progression.AvatarProgress { Level = 1 }, new[] { ring },
+                                                 out PassiveLoadout lowPassives);
+            BattleUnit high = BattleAvatar.Create(null, null, null, profile, new BeastCraft.Progression.AvatarProgress { Level = 100 }, null,
+                                                  out PassiveLoadout _);
+
+            Assert.AreEqual(1, low.Level);
+            Assert.AreEqual(profile.GetStatAtLevel(StatType.Attack, 1) + 5, low.Stats.Attack, "the level-1 base, then the gear");
+            Assert.AreEqual(profile.GetStatAtLevel(StatType.Speed, 1), low.Stats.Speed, "Speed scales with the avatar's level");
+            Assert.AreEqual(3, low.Stats.MoveRange);
+            Assert.IsNotNull(lowPassives);
+            Assert.AreEqual(100, high.Level);
+            Assert.AreEqual(profile.BaseStats.ToString(), high.Stats.ToString(), "max level is the authored block");
+            Assert.Less(low.Stats.Speed, high.Stats.Speed);
+            Assert.Less(low.Stats.SpecialAttack, high.Stats.SpecialAttack);
+        }
+
+        [Test]
+        public void Create_FromProfileAndProgress_NullsFallBackToLevelOneAndTheNoStatsBlock()
+        {
+            BattleUnit avatar = BattleAvatar.Create(null, null, null, null, null, null, out PassiveLoadout passives);
+
+            Assert.AreEqual(1, avatar.Level);
+            Assert.AreEqual(AvatarStatsSO.DefaultSpeed, avatar.Stats.Speed);
+            Assert.AreEqual(1, avatar.Stats.Hp, "StatCalculator's floor");
+            Assert.IsNotNull(passives);
         }
 
         [Test]

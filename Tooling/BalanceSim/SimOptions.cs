@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using BeastCraft.Battle;
 using BeastCraft.Battle.Grid;
+using BeastCraft.Battle.Scouting;
 using BeastCraft.Creatures;
 
 namespace BeastCraft.Tooling.BalanceSim
@@ -237,14 +238,50 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <summary>The PvE avatar preset (<c>--avatar</c>); the library avatar by default, <see cref="AvatarPresets.None"/> fields none.</summary>
         public string AvatarPreset = AvatarPresets.Library;
 
+        /// <summary>
+        /// <c>--avatar-level</c>: the fielded avatar's level (its stats on the medium curve and its
+        /// damage-formula level), 1-100; 0, the default, means each battle's encounter level.
+        /// </summary>
+        public int AvatarLevel;
+
         /// <summary>Which skills the beasts fight with (<c>--skill-kit standard|library</c>); library is the committed report's setting.</summary>
         public KitSource KitSource = KitSource.Library;
+
+        /// <summary>
+        /// <c>--bonds on|off</c> (default on): whether the skill library's team bonds apply to the
+        /// player teams. Only with <c>--skill-kit library</c> (see <see cref="BondsActive"/>).
+        /// </summary>
+        public bool Bonds = true;
+
+        /// <summary>
+        /// <c>--scouted</c>: which scouted-picking strategies the "PvE scouted picking" section
+        /// reports (<see cref="ScoutedPicker"/>). Every strategy by default; none = no section.
+        /// </summary>
+        public ScoutStrategies Scouted = ScoutStrategies.All;
+
+        /// <summary><c>--scouted-detail</c>: how much of each composition the heuristic pickers see (default full).</summary>
+        public ScoutingDetail ScoutedDetail = ScoutingDetail.Full;
+
+        /// <summary><c>--scouted-vanguard-min</c>: the fewest Vanguards a heuristic pick fields (default 1).</summary>
+        public int ScoutedVanguardMin = ScoutedPicker.DefaultVanguardMin;
 
         /// <summary>The skill level library skills and passives are fielded at (<c>--skill-level</c>).</summary>
         public int SkillLevel = 1;
 
         /// <summary><c>--skill-library</c>: the library file, or null to find it by walking up.</summary>
         public string SkillLibraryPath;
+
+        /// <summary><c>--mode pacing</c>: run the skill-progression pacing model (<see cref="PacingSimulator"/>) instead of PvE / PvP.</summary>
+        public bool RunPacing;
+
+        /// <summary><c>--battles</c>: battles per pacing campaign.</summary>
+        public int PacingBattles = PacingSimulator.DefaultBattles;
+
+        /// <summary><c>--runs</c>: pacing campaigns per base seed.</summary>
+        public int PacingRuns = PacingSimulator.DefaultRuns;
+
+        /// <summary><c>--drop-tables</c>: the drop-table file, or null to find it by walking up.</summary>
+        public string DropTablesPath;
 
         /// <summary>
         /// The loaded skill library, when the run needs it (<c>--skill-kit library</c> or
@@ -261,6 +298,15 @@ namespace BeastCraft.Tooling.BalanceSim
             return copy;
         }
 
+        /// <summary>
+        /// Whether team bonds apply this run: <c>--bonds on</c> (the default) with the library kit
+        /// (bonds belong to the authored game setup; the standard kit measures stat lines alone).
+        /// </summary>
+        public bool BondsActive
+        {
+            get { return Bonds && KitSource == KitSource.Library && Library != null && Library.TeamBonds.Count > 0; }
+        }
+
         /// <summary>Whether this run fields anything from the skill library.</summary>
         public bool NeedsLibrary
         {
@@ -272,8 +318,12 @@ namespace BeastCraft.Tooling.BalanceSim
             "\n" +
             "Usage: dotnet run --project Tooling/BalanceSim -c Release -- [options]\n" +
             "\n" +
-            "  --mode <m>                 pve | pvp | both (default both). pve = team vs encounter (primary);\n" +
-            "                             pvp = the 1v1 round-robin (secondary).\n" +
+            "  --mode <m>                 pve | pvp | both | pacing (default both). pve = team vs encounter (primary);\n" +
+            "                             pvp = the 1v1 round-robin (secondary); pacing = the skill-progression / material\n" +
+            "                             economy model (Monte Carlo campaigns; see README.md, \"Pacing\").\n" +
+            "  --battles <n>              pacing: battles per campaign (default 500).\n" +
+            "  --runs <n>                 pacing: campaigns per base seed (default 1000; --seeds pools every seed's).\n" +
+            "  --drop-tables <path>       pacing: drop-tables.json (default: found by walking up from the working directory).\n" +
             "  --kit <k>                  elemental | neutral | both (default both): the element axis. neutral forces every\n" +
             "                             beast and enemy skill's element to None.\n" +
             "  --skill-kit <k>            library | standard (default library): the skill axis. library = each beast's\n" +
@@ -282,6 +332,15 @@ namespace BeastCraft.Tooling.BalanceSim
             "  --skill-level <n>          Skill level for library skills and avatar passives, 1-20 (default 1); the tier is\n" +
             "                             the gates below that level (16+ = every gate passed).\n" +
             "  --skill-library <path>     skill-library.json (default: found by walking up from the working directory).\n" +
+            "  --bonds <on|off>           Team bonds (default on): the library's TeamBonds apply at battle start to every player\n" +
+            "                             team that meets their condition. Library kit only; ignored with --skill-kit standard.\n" +
+            "  --scouted <list>           Scouted picking, reported as \"PvE scouted picking\" (default all): comma-separated\n" +
+            "                             random, heuristic, bonds, oracle, or all / none. Post-processing of the battles\n" +
+            "                             already run: each strategy fields one of the simulated teams per composition, chosen\n" +
+            "                             from what it can see (README, \"Scouted picking\"). none = no section.\n" +
+            "  --scouted-detail <d>       full | elements-only | dominant-element (default full): the preview detail the\n" +
+            "                             heuristic pickers see (ScoutingDetail).\n" +
+            "  --scouted-vanguard-min <n> Fewest Vanguards a heuristic pick fields, 0 to the team size (default 1).\n" +
             "  --levels <list>            Comma-separated levels (default 1,50,100).\n" +
             "  --encounter-set <s>        generated | fixed (default generated). generated = random compositions of the enemy\n" +
             "                             type pool per shape (solo, elite, squad, horde); fixed = the hand-authored boss,\n" +
@@ -308,6 +367,9 @@ namespace BeastCraft.Tooling.BalanceSim
             "                             player team (see AvatarPresets): library = the library's default loadout (first 3\n" +
             "                             actives + AvatarDefaultPassives) at --skill-level, the committed report's setting;\n" +
             "                             support = a passive-only fixture; none = no avatar.\n" +
+            "  --avatar-level <n>         The avatar's level, 1-100 (default: each battle's encounter level). Scales its\n" +
+            "                             stats on the medium curve (Speed included: 100 at level 100, so its ATB gauge\n" +
+            "                             keeps pace with the beasts') and is its damage-formula level.\n" +
             "  --out <path>               Also write the Markdown report to this file.\n" +
             "  --self-check               Run everything twice and fail unless both reports are identical; also checks the\n" +
             "                             PvE battle loop against BattleTurnExecutor.RunBattle.\n" +
@@ -403,6 +465,27 @@ namespace BeastCraft.Tooling.BalanceSim
                         if (options.SkillLevel > 20)
                         {
                             error = "--skill-level must be between 1 and 20 (the authored skills' max level).";
+                            return null;
+                        }
+
+                        break;
+                    case "--battles":
+                        if (!TryNextInt(args, ref i, arg, 1, out options.PacingBattles, out error))
+                        {
+                            return null;
+                        }
+
+                        break;
+                    case "--runs":
+                        if (!TryNextInt(args, ref i, arg, 1, out options.PacingRuns, out error))
+                        {
+                            return null;
+                        }
+
+                        break;
+                    case "--drop-tables":
+                        if (!TryNext(args, ref i, arg, out options.DropTablesPath, out error))
+                        {
                             return null;
                         }
 
@@ -588,6 +671,42 @@ namespace BeastCraft.Tooling.BalanceSim
                         }
 
                         break;
+                    case "--bonds":
+                        if (!TryNext(args, ref i, arg, out text, out error))
+                        {
+                            return null;
+                        }
+
+                        text = text.ToLowerInvariant();
+                        if (text != "on" && text != "off")
+                        {
+                            error = "--bonds expects on or off, got '" + text + "'.";
+                            return null;
+                        }
+
+                        options.Bonds = text == "on";
+                        break;
+                    case "--scouted":
+                        if (!TryNext(args, ref i, arg, out text, out error) || !TryParseScouted(text, options, out error))
+                        {
+                            return null;
+                        }
+
+                        break;
+                    case "--scouted-detail":
+                        if (!TryNext(args, ref i, arg, out text, out error) || !TryParseScoutingDetail(text, options, out error))
+                        {
+                            return null;
+                        }
+
+                        break;
+                    case "--scouted-vanguard-min":
+                        if (!TryNextInt(args, ref i, arg, 0, out options.ScoutedVanguardMin, out error))
+                        {
+                            return null;
+                        }
+
+                        break;
                     case "--avatar":
                         if (!TryNext(args, ref i, arg, out text, out error))
                         {
@@ -603,6 +722,19 @@ namespace BeastCraft.Tooling.BalanceSim
 
                         options.AvatarPreset = text;
                         break;
+                    case "--avatar-level":
+                        if (!TryNextInt(args, ref i, arg, 1, out options.AvatarLevel, out error))
+                        {
+                            return null;
+                        }
+
+                        if (options.AvatarLevel > 100)
+                        {
+                            error = "--avatar-level must be between 1 and 100.";
+                            return null;
+                        }
+
+                        break;
                     default:
                         error = "Unknown argument '" + arg + "'. Use --help for usage.";
                         return null;
@@ -612,6 +744,12 @@ namespace BeastCraft.Tooling.BalanceSim
             if (seedGiven && options.Seeds != null)
             {
                 error = "--seed and --seeds cannot be combined.";
+                return null;
+            }
+
+            if (options.ScoutedVanguardMin > options.TeamSize)
+            {
+                error = "--scouted-vanguard-min " + options.ScoutedVanguardMin + " is larger than --team-size " + options.TeamSize + ".";
                 return null;
             }
 
@@ -719,8 +857,13 @@ namespace BeastCraft.Tooling.BalanceSim
                     options.RunPve = true;
                     options.RunPvp = true;
                     return true;
+                case "pacing":
+                    options.RunPve = false;
+                    options.RunPvp = false;
+                    options.RunPacing = true;
+                    return true;
                 default:
-                    error = "--mode expects pve, pvp or both, got '" + text + "'.";
+                    error = "--mode expects pve, pvp, both or pacing, got '" + text + "'.";
                     return false;
             }
         }
@@ -746,6 +889,75 @@ namespace BeastCraft.Tooling.BalanceSim
                     error = "--kit expects elemental, neutral or both, got '" + text + "'" +
                             (text == "standard" || text == "library" ? " (the skill axis is now --skill-kit)." : ".");
                     return false;
+            }
+        }
+
+        private static bool TryParseScouted(string text, SimOptions options, out string error)
+        {
+            error = null;
+            ScoutStrategies strategies = ScoutStrategies.None;
+            foreach (string raw in text.Split(','))
+            {
+                switch (raw.Trim().ToLowerInvariant())
+                {
+                    case "none":
+                        break;
+                    case "all":
+                        strategies |= ScoutStrategies.All;
+                        break;
+                    case "random":
+                        strategies |= ScoutStrategies.Random;
+                        break;
+                    case "heuristic":
+                        strategies |= ScoutStrategies.Heuristic;
+                        break;
+                    case "bonds":
+                        strategies |= ScoutStrategies.BondAware;
+                        break;
+                    case "oracle":
+                        strategies |= ScoutStrategies.Oracle;
+                        break;
+                    default:
+                        error = "--scouted expects a comma-separated list of random, heuristic, bonds, oracle (or all / none), got '" + text + "'.";
+                        return false;
+                }
+            }
+
+            options.Scouted = strategies;
+            return true;
+        }
+
+        private static bool TryParseScoutingDetail(string text, SimOptions options, out string error)
+        {
+            error = null;
+            switch (text.ToLowerInvariant())
+            {
+                case "full":
+                    options.ScoutedDetail = ScoutingDetail.Full;
+                    return true;
+                case "elements-only":
+                    options.ScoutedDetail = ScoutingDetail.ElementsOnly;
+                    return true;
+                case "dominant-element":
+                    options.ScoutedDetail = ScoutingDetail.DominantElementOnly;
+                    return true;
+                default:
+                    error = "--scouted-detail expects full, elements-only or dominant-element, got '" + text + "'.";
+                    return false;
+            }
+        }
+
+        /// <summary>The <c>--scouted-detail</c> spelling of <paramref name="detail"/>.</summary>
+        public static string DetailName(ScoutingDetail detail)
+        {
+            switch (detail)
+            {
+                case ScoutingDetail.ElementsOnly:
+                    return "elements-only";
+                case ScoutingDetail.DominantElementOnly:
+                    return "dominant-element";
+                default:
+                    return "full";
             }
         }
 

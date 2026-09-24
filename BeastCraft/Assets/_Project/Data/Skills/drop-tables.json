@@ -1,0 +1,66 @@
+{
+  "_readme": "Material drop tables: which skill-training materials (ids from skill-library.json Materials) a CLEARED battle drops, by encounter shape x level band. Every Drops entry rolls independently (Chance percent, then MinQty-MaxQty uniform). Pity: after Threshold consecutive clears of a shape whose cell can drop that tier without dropping it, the next clear forces it. The first clear of each (shape, band) grants FirstClearMaterialId once. Tuned against the balance simulator's pacing mode (dotnet run --project Tooling/BalanceSim -c Release -- --mode pacing; see docs/balance/pacing-report.md and docs/balance/tuning-log.md), not confirmed balance. Edit here, then in Unity run Beast Craft/Data/Import Drop Tables (after Import Skill Library). See docs/design/battle-system.md, 'Material economy'.",
+  "SchemaVersion": 1,
+  "Shapes": [ "solo", "elite", "squad", "horde" ],
+  "Pity": [
+    { "Tier": 1, "Threshold": 8 },
+    { "Tier": 2, "Threshold": 15 },
+    { "Tier": 3, "Threshold": 25 }
+  ],
+  "Bands": [
+    {
+      "MinLevel": 1, "MaxLevel": 3, "FirstClearMaterialId": "essence_shard", "FirstClearQuantity": 1,
+      "Cells": [
+        { "Shape": "solo", "Drops": [  ] },
+        { "Shape": "elite", "Drops": [  ] },
+        { "Shape": "squad", "Drops": [  ] },
+        { "Shape": "horde", "Drops": [  ] }
+      ]
+    },
+    {
+      "MinLevel": 4, "MaxLevel": 20, "FirstClearMaterialId": "essence_shard", "FirstClearQuantity": 1,
+      "Cells": [
+        { "Shape": "solo", "Drops": [ { "MaterialId": "essence_shard", "Chance": 100 }, { "MaterialId": "essence_crystal", "Chance": 5 } ] },
+        { "Shape": "elite", "Drops": [ { "MaterialId": "essence_shard", "Chance": 45 } ] },
+        { "Shape": "squad", "Drops": [ { "MaterialId": "essence_shard", "Chance": 20 } ] },
+        { "Shape": "horde", "Drops": [ { "MaterialId": "essence_shard", "Chance": 25 } ] }
+      ]
+    },
+    {
+      "MinLevel": 21, "MaxLevel": 40, "FirstClearMaterialId": "essence_crystal", "FirstClearQuantity": 1,
+      "Cells": [
+        { "Shape": "solo", "Drops": [ { "MaterialId": "essence_shard", "Chance": 100 }, { "MaterialId": "essence_crystal", "Chance": 10 } ] },
+        { "Shape": "elite", "Drops": [ { "MaterialId": "essence_shard", "Chance": 50 }, { "MaterialId": "essence_crystal", "Chance": 5 } ] },
+        { "Shape": "squad", "Drops": [ { "MaterialId": "essence_shard", "Chance": 30 }, { "MaterialId": "essence_crystal", "Chance": 3 } ] },
+        { "Shape": "horde", "Drops": [ { "MaterialId": "essence_shard", "Chance": 50 }, { "MaterialId": "essence_crystal", "Chance": 4 } ] }
+      ]
+    },
+    {
+      "MinLevel": 41, "MaxLevel": 60, "FirstClearMaterialId": "essence_core", "FirstClearQuantity": 1,
+      "Cells": [
+        { "Shape": "solo", "Drops": [ { "MaterialId": "essence_shard", "Chance": 60 }, { "MaterialId": "essence_crystal", "Chance": 6 }, { "MaterialId": "essence_core", "Chance": 2 } ] },
+        { "Shape": "elite", "Drops": [ { "MaterialId": "essence_shard", "Chance": 40 }, { "MaterialId": "essence_crystal", "Chance": 4 } ] },
+        { "Shape": "squad", "Drops": [ { "MaterialId": "essence_shard", "Chance": 25 }, { "MaterialId": "essence_crystal", "Chance": 2 } ] },
+        { "Shape": "horde", "Drops": [ { "MaterialId": "essence_shard", "Chance": 40 }, { "MaterialId": "essence_crystal", "Chance": 3 } ] }
+      ]
+    },
+    {
+      "MinLevel": 61, "MaxLevel": 80, "FirstClearMaterialId": "essence_core", "FirstClearQuantity": 1,
+      "Cells": [
+        { "Shape": "solo", "Drops": [ { "MaterialId": "essence_crystal", "Chance": 60 }, { "MaterialId": "essence_core", "Chance": 10 } ] },
+        { "Shape": "elite", "Drops": [ { "MaterialId": "essence_crystal", "Chance": 40 }, { "MaterialId": "essence_core", "Chance": 5 } ] },
+        { "Shape": "squad", "Drops": [ { "MaterialId": "essence_crystal", "Chance": 25 }, { "MaterialId": "essence_core", "Chance": 2 } ] },
+        { "Shape": "horde", "Drops": [ { "MaterialId": "essence_crystal", "Chance": 30 }, { "MaterialId": "essence_core", "Chance": 3 } ] }
+      ]
+    },
+    {
+      "MinLevel": 81, "MaxLevel": 100, "FirstClearMaterialId": "essence_core", "FirstClearQuantity": 1,
+      "Cells": [
+        { "Shape": "solo", "Drops": [ { "MaterialId": "essence_crystal", "Chance": 100 }, { "MaterialId": "essence_core", "Chance": 25 } ] },
+        { "Shape": "elite", "Drops": [ { "MaterialId": "essence_crystal", "Chance": 80 }, { "MaterialId": "essence_core", "Chance": 15 } ] },
+        { "Shape": "squad", "Drops": [ { "MaterialId": "essence_crystal", "Chance": 60 }, { "MaterialId": "essence_core", "Chance": 8 } ] },
+        { "Shape": "horde", "Drops": [ { "MaterialId": "essence_crystal", "Chance": 70, "MinQty": 2, "MaxQty": 2 }, { "MaterialId": "essence_core", "Chance": 10 } ] }
+      ]
+    }
+  ]
+}

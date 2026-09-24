@@ -2049,3 +2049,362 @@ teams' spread within a seed with that seed-to-seed noise removed: the part that 
 
 Reproduce: `dotnet run --project Tooling/BalanceSim -c Release -- --seeds 12345,777,4242 --out out/teams.md`
 (about 130 s); the default run's "PvE team composition" section shows seed 12345 alone.
+
+## Team bonds
+
+Follow-up to "Team composition analysis": lineups mattered per encounter but almost additively, so
+the game now has **team bonds**, composition-triggered team effects applied at battle start to the
+player's team (never enemies). Mechanism and data: `docs/design/battle-system.md`, "Team bonds";
+content: the `TeamBonds` array of `skill-library.json` (three stance bonds, five element pairs
+covering all ten elements, so every beast is in exactly two bonds). The simulator applies them by
+default (`--bonds on|off`, library kit only) and reports them in "PvE team bonds". No beast stats
+or skills changed; only bond magnitudes were tuned.
+
+**Guard.** Bonds must widen the spread between lineups without breaking per-beast balance: every
+beast's 3-seed mean overall marginal within +/-4 (`elemental`) and +/-7 (`neutral`), tuning bond
+magnitudes, never beast stats. All numbers are `--seeds 12345,777,4242`, default arguments.
+`--bonds off` reproduces the pre-bond aggregate byte for byte (the Runtime change is inert without
+bonds).
+
+**Iterations** (full 3-seed runs; the element-pair bonds are on 28 teams each, `shield_wall` on 155,
+`crossfire` on 70, `pack_hunters` on 28):
+
+| Run | Change | Out of band |
+| --- | --- | --- |
+| 1 | First draft: `shield_wall` 40/60% Defense shield, `crossfire` +6/+10%, `pack_hunters` +8/+12 crit, `wildfire` +8% Speed, `storm_front` +6% Atk/SpA, `bedrock` +10% Def/SpD, `winter_grove` 50% shield, `twilight` +5% Def/SpD (team) | Tarasque `elemental` +5.6, Golem `neutral` +7.6, Phoenix `neutral` -7.6 (the Vanguard shield and `bedrock` stacked on Golem / Tarasque; Fire + Air too weak) |
+| 2 | `shield_wall` 30/45, `crossfire` 8/12, `bedrock` 5, `wildfire` +15% Speed, `winter_grove` 70 | none, but the overall spread did not move (`elemental` 4.4 -> 4.4) |
+| 3 | Pair bonds up: `pack_hunters` 12/16 crit, `wildfire` +20% Speed, `storm_front` 10, `bedrock` 6, `winter_grove` 90 | none; spread 4.4 -> 4.7; `wildfire` still a loss (Speed alone buys little under sqrt speed) |
+| 4 (final) | `wildfire` = +15% Speed, +8% Atk, +8% SpA | none |
+
+**Per-beast marginals, final** (3-seed mean overall, bonds off -> on):
+
+| Beast | `elemental` | `neutral` |
+| --- | ---: | ---: |
+| Kirin | +2.0 -> +2.8 | +4.1 -> +3.8 |
+| Tarasque | +0.8 -> +1.4 | -6.0 -> -3.7 |
+| Golem | -0.2 -> +0.5 | +2.5 -> +5.3 |
+| Leviathan | -0.1 -> -0.2 | +3.9 -> +1.4 |
+| Basilisk | 0.0 -> -0.2 | +1.7 -> -0.3 |
+| Phoenix | -0.3 -> -0.5 | -4.8 -> -4.2 |
+| Frost Wyrm | -2.3 -> -0.5 | -3.2 -> 0.0 |
+| Griffin | +1.4 -> -0.7 | -3.4 -> -4.9 |
+| Thunderbird | +0.5 -> -1.1 | +6.1 -> +3.3 |
+| Treant | -1.9 -> -1.3 | -0.9 -> -0.7 |
+
+Every beast is inside the guard (`elemental` -1.3 … +2.8, tighter than before bonds' -2.3 … +2.0
+in range terms; `neutral` -4.9 … +5.3, was -6.0 … +6.1).
+
+**Composition spread** (persistent team SD, the lineup's own spread with seed-to-seed noise removed;
+bonds off -> on):
+
+| Kit mode | `solo` | `elite` | `squad` | `horde` | overall |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `elemental` | 5.7 -> 5.4 | 4.4 -> 4.7 | 11.0 -> 10.7 | 7.5 -> 10.0 | 4.4 -> 4.6 |
+| `neutral` | 18.7 -> 18.1 | 11.1 -> 11.9 | 14.5 -> 14.8 | 11.3 -> 14.0 | 8.2 -> 9.2 |
+
+**Bond marginal** (`elemental`, 3-seed mean; Δ = teams with the bond minus without, excess = over
+the additive prediction from the members' marginals, the part the lineup earns):
+
+| Bond | Teams | `solo` | `elite` | `squad` | `horde` | Overall Δ (SD) | Overall excess |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `pack_hunters` | 28 | +1.1 / +0.8 | -0.2 / +2.6 | +11.6 / +5.8 | +1.4 / +7.8 | +3.5 (2.4) | +4.2 |
+| `shield_wall` | 155 | -2.0 / -0.5 | -1.4 / -0.8 | -13.4 / -0.9 | +3.6 / -1.1 | -3.3 (0.1) | -0.8 |
+| `crossfire` | 70 | 0.0 / +0.2 | +0.6 / +0.1 | +8.2 / +0.8 | -2.1 / +0.4 | +1.7 (1.5) | +0.4 |
+| `wildfire` | 28 | -0.6 / +0.8 | -1.2 / +1.4 | +8.2 / +0.8 | -9.6 / -2.5 | -0.8 (1.0) | +0.1 |
+| `storm_front` | 28 | -0.2 / +1.8 | +2.2 / +1.6 | -4.3 / +0.6 | +2.2 / -0.3 | 0.0 (2.7) | +0.9 |
+| `bedrock` | 28 | +1.0 / -2.7 | +1.7 / +0.5 | +4.1 / +1.1 | 0.0 / +2.1 | +1.7 (4.5) | +0.3 |
+| `winter_grove` | 28 | -4.6 / -1.2 | 0.0 / +2.0 | -4.2 / +4.4 | +13.6 / +3.9 | +1.2 (2.5) | +2.3 |
+| `twilight` | 28 | +4.8 / +1.7 | +5.5 / +1.6 | +3.9 / -0.1 | -2.6 / -0.1 | +2.9 (2.9) | +0.8 |
+
+In `neutral` the excesses are larger (`bedrock` +5.3, `pack_hunters` +4.3, `winter_grove` +4.2,
+`storm_front` +1.9, `wildfire` +1.7).
+
+**Pair synergy, overall (`elemental`, 3-seed mean).** Before: Griffin + Thunderbird +3.7, Golem +
+Treant +2.2 … Thunderbird + Treant -3.5, Leviathan + Griffin -3.3. After: Griffin + Thunderbird
+**+4.2** (`pack_hunters`), Frost Wyrm + Treant **+2.3** (`winter_grove`, new), Leviathan + Tarasque
++2.0, Golem + Frost Wyrm +1.8, Golem + Treant +1.7; anti-synergies Thunderbird + Treant -3.8,
+Leviathan + Griffin -3.2, Thunderbird + Frost Wyrm -2.0, Frost Wyrm + Kirin -2.0, Tarasque +
+Basilisk -1.7.
+
+**Reading.**
+
+- **Composition matters more where encounters are crowded, not overall.** The horde spread grows
+  by a third (7.5 -> 10.0 `elemental`, 11.3 -> 14.0 `neutral`) and the elite a little; solo and
+  squad do not move, and the overall spread only 4.4 -> 4.6 (`neutral` 8.2 -> 9.2). The bonds with
+  real interaction are `pack_hunters` (excess +4.2 overall, +7.8 horde, +5.8 squad) and
+  `winter_grove` (+2.3; +4.4 squad, +3.9 horde); they are what make "field these two together" a
+  choice.
+- **Why the overall spread barely moves.** A pair bond is active on 28 of 210 teams, so even a
+  5-point bond adds only about 0.34 x 5 = 1.7 points of SD in quadrature, and the balance guard
+  forbids the bigger magnitudes that would move it more: most of a pair bond's value lands on its
+  two beasts' marginals (each gains about a third of it), which is exactly what the guard caps.
+  The calibrated difficulty also absorbs any bond that nearly every team has: `shield_wall` (155
+  teams) raises the multiplier for everyone and reads as -3.3 Δ, -0.8 excess.
+- **Weak spots.** `wildfire` (Phoenix + Griffin) is still roughly neutral in `elemental` after two
+  buffs (Δ -0.8, excess +0.1; the horde -9.6 is the two beasts' own horde weakness). `bedrock` and
+  `twilight` are mostly additive (excess under +1 in `elemental`), i.e. buffs to their beasts
+  rather than to the pairing. `pack_hunters`' second tier (3 Skirmishers) cannot occur with this
+  roster.
+- **If composition should matter more still,** the levers are bonds whose value depends on the
+  lineup rather than on the beasts (effects that scale with the count, or target the non-members,
+  e.g. a Vanguard bond that shields the Ranged beasts), fewer but stronger bonds on pairs that are
+  currently anti-synergies (Leviathan + Griffin, Thunderbird + Treant), and letting the player see
+  the encounter before choosing (the simulator fields a fixed lineup against every composition).
+
+Reproduce: `dotnet run --project Tooling/BalanceSim -c Release -- --seeds 12345,777,4242 --out out/bonds.md`
+and the same with `--bonds off` for the baseline (about 140 s each).
+
+## Scouting and counter-picking (no balance change)
+
+Follow-up to "Team composition analysis", which found that picking the team for the encounter
+pays but the simulator only ever fielded a fixed lineup. The game now has an `EncounterPreview`
+(`docs/design/battle-system.md`, "Encounter preview": enemy groups with element, stance and count,
+`ScoutingDetail.Full` by default), and the simulator reports what seeing it is worth: "PvE scouted
+picking" (`Tooling/BalanceSim/README.md`, "Scouted picking"), on by default. It re-reads the
+battles already run (every team against every composition), so the report gains a section and no
+battle, stat or calibration changes: the difficulty is still calibrated against the *average*
+team, so the baseline is about 50% and every strategy's gain reads as uplift. `--scouted none`
+reproduces the previous report byte for byte.
+
+Strategies: **random** (a seeded random team per composition; the noise control), **heuristic**
+(each beast scores 1 x its chart multiplier into the enemies - 0.5 x theirs into it, per enemy; best
+four, at least one Vanguard), **heuristic + bonds** (the team maximising the members' scores plus
+0.5 per active bond tier), **best team** (the one lineup that did best in the shape at the other
+levels, scored at this level: strong-team knowledge without the encounter, held out so not
+luck-inflated) and **oracle** (per composition, the team that did best against it: an upper bound,
+about 100% by construction with 210 teams and one battle each).
+
+**Results**, `--mode pve --seeds 12345,777,4242`, default arguments (8 compositions per shape;
+clear rate, uplift over the baseline in brackets; SD = the heuristic uplift's SD over seeds):
+
+| Kit mode | Shape | Baseline | Random | Heuristic | SD | Heuristic + bonds | Best team | Oracle |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `elemental` | `solo` | 49.8% | 48.6% (-1.2) | 79.2% (+29.3) | 3.9 | 83.3% (+33.5) | 70.8% (+21.0) | 100.0% (+50.2) |
+| `elemental` | `elite` | 51.2% | 56.9% (+5.8) | 70.8% (+19.7) | 3.8 | 76.4% (+25.2) | 70.8% (+19.7) | 100.0% (+48.8) |
+| `elemental` | `squad` | 49.9% | 47.2% (-2.7) | 76.4% (+26.5) | 4.9 | 73.6% (+23.7) | 76.4% (+26.5) | 100.0% (+50.1) |
+| `elemental` | `horde` | 49.6% | 38.9% (-10.7) | 54.2% (+4.6) | 20.8 | 54.2% (+4.6) | 83.3% (+33.7) | 100.0% (+50.4) |
+| `elemental` | overall | 50.1% | 47.9% (-2.2) | 70.1% (+20.0) | 3.8 | 71.9% (+21.7) | 75.3% (+25.2) | 100.0% (+49.9) |
+| `neutral` | overall | 50.3% | 50.0% (-0.3) | 50.3% (0.0) | 7.4 | 56.6% (+6.3) | 83.3% (+33.0) | 100.0% (+49.7) |
+
+A shape's figure per seed is 24 battles (binomial SE about 10 points), so the same three seeds were
+also run with `--compositions 32` (96 battles per shape per seed; SE about 3 points on the 3-seed
+mean) as the tighter check:
+
+| Kit mode | Shape | Baseline | Random | Heuristic | SD | Heuristic + bonds | Best team |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `elemental` | `solo` | 50.1% | +1.6 | 79.5% (+29.4) | 4.5 | 87.5% (+37.4) | 68.1% (+17.9) |
+| `elemental` | `elite` | 49.5% | -2.2 | 74.3% (+24.8) | 8.6 | 78.5% (+29.0) | 62.5% (+13.0) |
+| `elemental` | `squad` | 50.2% | +1.6 | 68.8% (+18.6) | 7.0 | 67.7% (+17.5) | 80.2% (+30.0) |
+| `elemental` | `horde` | 49.6% | +0.4 | 65.6% (+16.0) | 0.3 | 66.7% (+17.1) | 79.2% (+29.6) |
+| `elemental` | overall | 49.8% | +0.3 | 72.0% (+22.2) | 0.9 | 75.1% (+25.2) | 72.5% (+22.6) |
+| `neutral` | overall | 50.1% | -1.1 | 49.3% (-0.8) | 2.4 | 57.0% (+6.9) | 82.3% (+32.2) |
+
+- **Scouting plus a plain element counter-pick is worth about +20 points** of clear rate at the
+  calibrated difficulty (+20.0 at 8 compositions, +22.2 at 32; about 50% -> 70%). The `neutral`
+  control, where the chart does nothing, gives the same picks 0.0 / -0.8: the whole gain is the
+  element chart, not the picks happening to be strong lineups.
+- **By shape**, the counter-pick is strongest against a lone giant (+29) and an elite group
+  (+20 to +25), where one or two elements dominate. Against squads and hordes, whose mixed elements
+  dilute any counter, it is +16 to +19 on the tighter run (the default run's +26.5 squad / +4.6 horde
+  are within its noise; horde's seed SD is 20.8). There the held-out **best team** (+30) beats it:
+  bringing a strong lineup matters more than countering the elements, while against solo and elite
+  encounters countering beats the strong lineup (+29 vs +18, +25 vs +13).
+- **Bonds help the counter-pick a little**: +1.7 (8 compositions) / +3.0 (32) overall in
+  `elemental`, mostly in solo and elite; in `neutral` they are the only thing the bond-aware pick
+  knows, and it gains +6 to +7 there, consistent with the bond marginals.
+- **Oracle** is 100% in every shape: with 210 teams and one battle per team and composition,
+  some team always wins, so it is a luck bound rather than a skill ceiling. The honest ceiling for
+  "knowing what works" is between the best-team and oracle columns.
+- **Pick rates: no beast is always or never picked by the counter-pick.** In every shape each beast
+  is fielded in between 13% (Frost Wyrm, solo) and 63% (Leviathan solo, Phoenix elite / squad) of
+  heuristic picks (8 compositions; 18-59% at 32), and the bond-aware pick likewise spans 4-71% with
+  no 0 or 100. Phoenix drops to 4-21% under the bond-aware pick (its `wildfire` partner Griffin is
+  rarely the counter) and Tarasque / Golem rise (they reach `bedrock` and `shield_wall` together).
+  The **oracle** does have extremes in single shapes, but they are about the lineups that happened to
+  win, not the counter-pick: `horde` Leviathan always and Griffin never (8 compositions), `squad`
+  Thunderbird always and `horde` Basilisk never (32).
+
+**Implications (not acted on).** Visible elements make the chart a real decision: the same beasts
+clear about 20 points more often when picked for the encounter, with no must-pick beast. If the game
+expects players to scout, difficulty tuned to 50% for the average team is about 70% for a scouting
+player; whether authored encounters should be calibrated against the average or the counter-picked
+team, and whether the partial `ScoutingDetail` levels should gate some encounters, are open design
+questions. Horde and squad encounters reward lineup strength more than countering, which is where
+bonds and stances carry the choice.
+
+Reproduce: `dotnet run --project Tooling/BalanceSim -c Release -- --mode pve --seeds 12345,777,4242 --out out/scout.md`
+(about 150 s) and the same with `--compositions 32` (about 10 min).
+
+## Material economy (stage 5): drop tables tuned for skill pacing
+
+First pass of `BeastCraft/Assets/_Project/Data/Skills/drop-tables.json` against the new pacing model
+(`--mode pacing`; report [`pacing-report.md`](pacing-report.md)). The XP constants (100 x level^1.5,
+10 XP a use, 20 uses a battle cap, materials 250 / 1,000 / 4,000) are unchanged; only drop chances,
+quantities, bands and first-clear bonuses moved. The default PvE / PvP report is unaffected.
+
+- **Targets** (median battles for one focused skill): L5 15-20, L10 ~80, L15 ~180, L20 ~300-320.
+- **The design's starting table overshot every gate** (L5 in 6 battles, L10 in 46, L15 in 126 with
+  4-10 uses a battle): with every drop fed to one skill, 90% shard drops from level 1 are ~140 XP a
+  battle on their own.
+- **The targets are inconsistent with a 20-uses-a-battle practice rate.** At the per-battle cap
+  practice alone reaches L5 in 9 battles, below the 15-20 target, so practice must be about 5-10 uses
+  a battle; the model uses 3-9 (the PvE report's 3-10 beast turns per cleared battle). At that rate
+  practice alone takes ~1,100 battles to L20, so materials must supply ~3/4 of the XP to hit ~300,
+  not the 10-15% the design sketch assumed. Kept the XP constants; flagged for design.
+- **Structure**: a tutorial band 1-3 with no regular drops (its four first-clear shards pay for L5
+  and the gate), shards 4-20, crystals from band 21 (first clears open the L10 gate at ~101), cores
+  from band 41 (first clears open the L15 gate at ~201); regular drops scaled so the levels between
+  gates land on target; the rich late bands (61+) feed the rest of the team.
+
+| Level | Target | p10 / p50 / p90 (1000 campaigns, seed 12345) |
+| ---: | --- | --- |
+| 5 | 15-20 | 15 / 16 / 17 |
+| 10 | ~80 | 69 / 77 / 85 |
+| 15 | ~180 | 157 / 171 / 184 |
+| 20 | ~300-320 | 283 / 301 / 302 |
+
+Seeds 1, 2, 3 (300 campaigns each) agree within a battle. Material income per 500-battle campaign:
+~106 shards, ~120 crystals, ~27 cores; 74% of the focus skill's XP to L20 is material XP. The L20
+median is anchored at ~301 by the first band-61 core, so it is robust to small changes in the
+regular drops but moves with the band boundaries and the level ramp.
+
+Reproduce: `dotnet run --project Tooling/BalanceSim -c Release -- --mode pacing --self-check --out docs/balance/pacing-report.md`
+(about 1.5 s).
+
+## Avatar level (stage 3a): pacing against the encounter level
+
+`AvatarProgression` (new): a level costs `200 + 16 × level`; a battle pays 8 XP, plus `40 + 4 ×
+enemy level` on a clear. Derived, not searched: at encounter level L and an 80% clear rate a battle
+pays `8 + 0.8 × (40 + 4L) = 40 + 3.2L`, and the pacing campaign spends 5 battles per encounter level,
+so a level should cost `5 × (40 + 3.2L) = 200 + 16L`. Target: median avatar level within 3 of the
+encounter level at every 50-battle checkpoint. Measured (`--mode pacing`, 1000 campaigns): median
+within 0-1 everywhere (battle 100: 21 vs 20; 250: 50 vs 50; 400: 81 vs 80; 500: 100), p10-p90 at
+most 3 levels wide. A player who clears less than 80% falls behind the content (at a 50% clear
+rate a battle pays about two thirds as much XP), which is the intended pressure; the curve's two
+constants move the whole track.
+
+## Avatar gauge (stage 3b): the avatar on its own ATB gauge
+
+The avatar used to tick once per player-beast turn, so a four-beast team cycled it about four times
+as often as one beast acts. It now fills its own ATB gauge from its own Speed
+(`BattleTurnExecutor.ExecuteAvatarTurn`; design doc, decision 6, timing amendment): its actives and
+its passives' internal cooldowns run on its own turns, `AllyTurnStart` passives stay per beast turn,
+and a beast's turn no longer ticks it. The simulator's library avatar gets Speed 100 at max level on
+the medium curve (`AvatarStatsSO.GetStatsAtLevel`, 15 at level 1, the same scale as its other stats),
+at the encounter level (`--avatar-level`, default). No beast data, skills, bonds or avatar numbers
+changed.
+
+**Cadence** (default run, seed 12345, 40,320 battles at the calibrated difficulty):
+
+| | Before (per player-beast turn) | After (own gauge) |
+| --- | ---: | ---: |
+| Avatar turns (ticks) per battle | 17.26 | 5.79 (5.66-5.79 over the 3 seeds) |
+| ... per unit of normalized time | 1.65 | 0.56 |
+| Avatar active casts per battle | 13.29 | 3.74 (3.62-3.74) |
+| `last_stand` firings per battle (cooldown 2) | 2.98 (2.97-3.00) | 2.24 (2.20-2.24) |
+| `keen_eye` (aura) / `opening_ward` (battle start) | 1.00 / 1.00 | 1.00 / 1.00 |
+
+So the avatar acts about a third as often and casts about 72% less; `last_stand`, gated by its
+cooldown in avatar turns, fires a quarter less.
+
+**Guard** (as for team bonds: every beast's 3-seed mean overall marginal within +/-4 `elemental`
+and +/-7 `neutral`; `--seeds 12345,777,4242`, default arguments), before -> after:
+
+| Beast | `elemental` | `neutral` |
+| --- | ---: | ---: |
+| Golem | +0.5 -> +1.8 | +5.3 -> +4.7 |
+| Tarasque | +1.4 -> +1.5 | -3.7 -> -2.6 |
+| Basilisk | -0.2 -> +1.4 | -0.3 -> +3.8 |
+| Frost Wyrm | -0.5 -> +0.2 | 0.0 -> -1.5 |
+| Kirin | +2.8 -> +0.1 | +3.8 -> -0.3 |
+| Leviathan | -0.2 -> 0.0 | +1.4 -> +1.7 |
+| Phoenix | -0.5 -> -0.2 | -4.2 -> -4.7 |
+| Treant | -1.3 -> -0.7 | -0.7 -> -0.4 |
+| Thunderbird | -1.1 -> -1.1 | +3.3 -> +6.0 |
+| Griffin | -0.7 -> -2.9 | -4.9 -> -6.7 |
+
+Every beast is inside the guard (`elemental` -2.9 ... +1.8, `neutral` -6.7 ... +6.0), so **no tuning
+iteration was made**. Griffin `neutral` (-6.7) and Thunderbird `neutral` (+6.0) sit closest to the
+edge; Kirin (Light, the team healer) lost the most in `elemental` (-2.7), as the avatar's Mending
+Light and Aegis now cover less of what it covered.
+
+**Composition matters more.** The avatar's frequent team-wide casts had been flattening lineups: the
+persistent team SD (lineup spread with seed-to-seed noise removed) rose `elemental` overall 4.6 ->
+6.1 (squad 10.7 -> 12.0, horde 10.0 -> 13.5) and `neutral` overall 9.2 -> 11.3.
+
+**Open (design, not acted on).** The avatar's actives (Rallying Cry, Mending Light, Aegis) and
+passive cooldowns were authored for the old cadence; at roughly 0.56 turns per unit of time they are
+a much smaller share of a battle. Retuning them (shorter cooldowns, larger magnitudes, or a faster
+authored avatar Speed) is a design choice about how big the avatar's role should be, not a balance
+repair: per-beast balance holds without it.
+
+Reproduce: `dotnet run --project Tooling/BalanceSim -c Release -- --seeds 12345,777,4242 --out out/gauge.md`
+(about 140 s).
+
+## Large enemies (footprints)
+
+The bosses now cover several hexes (design doc, "Unit footprints"): the giant and the fixed-set
+colossus are `Hex7` (seven tiles), the champion `Triangle` (three). Ranges to and from them are
+measured between nearest tiles, an area hits them once, a large caster's area grows from all of its
+tiles, a giant cannot be knocked back and a champion moves at most one tile. Beasts, skills, bonds and
+the avatar are unchanged. **Parity retune of the fixtures** so the giant's reach does not silently
+grow by the footprint's radius: giant and colossus gaze range 3 -> 2, quake and roar area radius
+2 -> 1 (a radius-1 burst from a `Hex7` is exactly the old radius-2 disc around its centre); the
+champion's shockwave stays at 2. No other enemy numbers changed.
+
+**One-tile battles are byte-identical.** Before the fixtures were given footprints, the new code
+reproduced the committed default report byte for byte (the full run, every shape). With the
+footprints, every `squad` and `horde` result is unchanged on all three seeds (they have no large
+units), as are the fixed set's `swarm` and `pack`; only the enemy-type descriptions and the scouting
+lines that pool shapes (the held-out best team's tie-break, the oracle summary) move.
+
+**Calibration.** The bosses are easier to reach (twelve tiles around a giant), so the calibrated
+difficulty rose: `solo` x0.918-0.936 -> x0.953-0.961 `elemental` and x0.863-0.883 -> x0.898-0.904
+`neutral`; `elite` x0.826-0.840 -> x0.863-0.875 and x0.805-0.813 -> x0.826-0.836 (seed 12345;
+average times unchanged within 0.2). The fixed `boss` (colossus) moved from x0.93-0.95 to x0.96-0.97.
+
+**Guard** (every beast's 3-seed mean overall marginal within +/-4 `elemental` and +/-7 `neutral`;
+`--seeds 12345,777,4242`, default arguments), before -> after, with the two boss shapes (the other
+two are unchanged):
+
+| Beast | Stance | `elemental` `solo` | `elemental` `elite` | `elemental` overall | `neutral` `solo` | `neutral` `elite` | `neutral` overall |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Golem | Vanguard | +2.4 -> +0.5 | +4.1 -> +5.2 | +1.8 -> +1.6 | +13.4 -> +13.8 | +1.8 -> +5.8 | +4.7 -> +5.8 |
+| Phoenix | Ranged | -4.7 -> -3.3 | -2.5 -> +1.2 | -0.2 -> +1.1 | -15.7 -> -5.6 | -10.3 -> -3.4 | -4.7 -> -0.4 |
+| Tarasque | Vanguard | +2.8 -> +4.0 | +0.8 -> -2.2 | +1.5 -> +1.0 | -11.5 -> -12.4 | -2.2 -> -5.0 | -2.6 -> -3.6 |
+| Frost Wyrm | Vanguard | -7.3 -> -5.9 | -0.7 -> -0.2 | +0.2 -> +0.7 | -12.8 -> -11.9 | -5.0 -> -6.0 | -1.5 -> -1.5 |
+| Treant | Vanguard | +4.3 -> +5.5 | -5.2 -> -0.8 | -0.7 -> +0.7 | +5.2 -> +6.2 | -0.8 -> +5.2 | -0.4 -> +1.3 |
+| Kirin | Ranged | -2.6 -> -2.8 | +0.9 -> +2.6 | +0.1 -> +0.5 | -3.7 -> -7.6 | +2.1 -> +5.0 | -0.3 -> -0.5 |
+| Basilisk | Ranged | +5.6 -> +2.5 | +4.5 -> +3.9 | +1.4 -> +0.4 | +15.8 -> +8.8 | +9.0 -> +8.3 | +3.8 -> +1.9 |
+| Leviathan | Vanguard | +2.5 -> -0.3 | +2.9 -> +1.8 | 0.0 -> -0.9 | +14.3 -> +8.6 | +2.8 -> +3.9 | +1.7 -> +0.6 |
+| Thunderbird | Skirmisher | -1.0 -> -2.7 | -3.0 -> -6.7 | -1.1 -> -2.4 | +0.2 -> -4.5 | +5.0 -> -6.3 | +6.0 -> +2.0 |
+| Griffin | Skirmisher | -1.9 -> +2.5 | -1.8 -> -4.8 | -2.9 -> -2.6 | -5.3 -> +4.5 | -2.4 -> -7.6 | -6.7 -> -5.6 |
+
+Every beast is inside the guard (`elemental` -2.6 ... +1.6, `neutral` -5.6 ... +5.8), and the spread
+narrowed (`neutral` -6.7 ... +6.0 before), so **no enemy tuning iteration was made**.
+
+**What moved, per shape.**
+
+- *Melee Vanguards against the bosses:* a giant now has twelve tiles around it rather than six, so
+  more of a team reaches it at once. Treant gains most (`elite` +4.4 / +6.0), Golem gains in `elite`
+  (+1.1 / +4.0) and holds its `solo` lead in `neutral`; Leviathan loses some of its `solo` edge
+  (-2.8 / -5.7) now that it is no longer one of the few beasts in contact.
+- *Knockback against the bosses:* a giant cannot be pushed and a champion moves one tile at most.
+  At skill level 1 the only default-loadout knockback is Griffin's Gust (area, 2 hexes); Griffin
+  loses in `elite` (-3.0 / -5.2), where the champions it used to shove are now pinned, but gains in
+  `solo` (+4.4 / +9.8), plausibly because the old one-tile giant was pushed out of its teammates' reach and the
+  seven-tile one stays in it. Thunderbird (no knockback) loses most in `elite` (-3.7 / -11.3; its
+  `neutral` overall +6.0 -> +2.0); the cause is not isolated (its kit is short-range single-target
+  plus a Skirmisher's crowd preference, both of which the footprint changes).
+- *Ranged beasts:* the parity retune keeps the giant's reach from its centre, but a standoff unit's
+  range now counts to the giant's ring, so Ranged beasts stand one tile further from its centre and
+  its area slams: Phoenix recovers (`neutral` `solo` -15.7 -> -5.6, overall -4.7 -> -0.4), Basilisk
+  loses its `solo` lead (+15.8 -> +8.8 `neutral`).
+
+**Open.** Knockback is weaker against bosses by design; whether Griffin (and Thunderbird, whose
+`elite` drop is unexplained) should get boss value back is a beast retune (a later deliverable), not
+an enemy one. Enemy multi-hex
+units other than the three bosses, and footprints in hand-authored encounters, are not designed.
+
+Reproduce: `dotnet run --project Tooling/BalanceSim -c Release -- --seeds 12345,777,4242 --out out/footprints.md`
+(about 150 s).

@@ -305,6 +305,23 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
+        public void Validator_RefusesAnyFootprintButSingle_BeastsAreAlwaysOneTile()
+        {
+            BeastRosterData roster = LoadRoster();
+            roster.Species[0].Footprint = "Hex7";
+            roster.Species[1].Footprint = "Triangle";
+            roster.Species[2].Footprint = "Single";
+            roster.Species[3].Footprint = string.Empty;
+
+            List<string> errors = BeastRosterValidator.Validate(roster);
+
+            Assert.AreEqual(2, errors.Count, string.Join("\n", errors));
+            Assert.IsTrue(errors.Exists(e => e.Contains("Footprint 'Hex7' is not allowed")), string.Join("\n", errors));
+            Assert.IsTrue(errors.Exists(e => e.Contains("Footprint 'Triangle' is not allowed")), string.Join("\n", errors));
+            Assert.IsTrue(Array.TrueForAll(LoadRoster().Species, s => string.IsNullOrEmpty(s.Footprint)), "the roster authors no footprint");
+        }
+
+        [Test]
         public void Validator_ParsesStanceNames_AndMissingMeansVanguard()
         {
             Assert.IsTrue(BeastRosterValidator.TryParseStance("Skirmisher", out CombatStance stance));
