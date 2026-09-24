@@ -29,7 +29,10 @@ namespace BeastCraft.Session
         /// <summary>The avatar's stat profile. Null gives the no-stats avatar (Speed only).</summary>
         public AvatarStatsSO AvatarProfile;
 
-        /// <summary>The avatar's equipped stat gear. May be null.</summary>
+        /// <summary>
+        /// An override for the avatar's stat gear. Null (the default) uses what the save's avatar
+        /// wears (<see cref="PlayerSave.AvatarEquippedGear"/>); any list, even an empty one, replaces it.
+        /// </summary>
         public List<AvatarGearSO> AvatarGear;
 
         /// <summary>The content ids resolve against. Required.</summary>

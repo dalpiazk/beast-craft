@@ -33,6 +33,9 @@ namespace BeastCraft.Tests.EditMode
         private BattleContent _content;
         private DropTable _drops;
         private AvatarStatsSO _profile;
+        private GearSO _blade;
+        private GearSO _lateShell;
+        private AvatarGearSO _cloak;
 
         [SetUp]
         public void SetUp()
@@ -256,6 +259,74 @@ namespace BeastCraft.Tests.EditMode
             Assert.IsTrue(result.Success, result.Error);
             Assert.IsNotNull(FindUnit(result, "boss"));
             Assert.AreEqual(tile, StartOf(result, "boss"), "the boss starts where it was put");
+        }
+
+        [Test]
+        public void Run_BeastsAndAvatarWearTheirSavedGear()
+        {
+            PlayerSave save = StarterSave();
+            OwnedBeast b1 = save.Beasts[0];
+            string blade = save.Gear.AddBeastGear(_blade.GearId);
+            string shell = save.Gear.AddBeastGear(_lateShell.GearId);
+            string cloak = save.Gear.AddAvatarGear(_cloak.AvatarGearId);
+            Assert.AreEqual(GearEquipResult.Equipped, GearRules.EquipBeastGear(save, b1.BeastId, GearSlot.WeaponOrCore, blade, _content));
+            Assert.AreEqual(GearEquipResult.LevelTooLow, GearRules.EquipBeastGear(save, b1.BeastId, GearSlot.ArmorOrShell, shell, _content));
+            b1.EquippedGear[(int)GearSlot.ArmorOrShell] = shell;
+            Assert.AreEqual(GearEquipResult.Equipped, GearRules.EquipAvatarGear(save, AvatarGearSlot.Armor, cloak, _content));
+
+            BattleSessionResult result = BattleSession.Run(Setup(save, 9));
+
+            Assert.IsTrue(result.Success, result.Error);
+            CreatureSpeciesSO b1Species = _content.GetSpecies(b1.Progress.SpeciesId);
+            StatBlock bare = StatCalculator.ComputeStats(b1Species, b1.Progress.Level, null);
+            StatBlock worn = result.StartingStats[result.UnitIdFor(b1.BeastId)];
+            Assert.AreEqual(StatCalculator.ComputeStats(b1Species, b1.Progress.Level, new[] { _blade, _lateShell }), worn);
+            Assert.AreEqual(bare.Attack + 50, worn.Attack, "the blade applies");
+            Assert.AreEqual(bare.Hp, worn.Hp, "the level-50 shell is ignored at level 10 (not an error)");
+
+            OwnedBeast b2 = save.Beasts[1];
+            Assert.AreEqual(StatCalculator.ComputeStats(_content.GetSpecies(b2.Progress.SpeciesId), b2.Progress.Level, null),
+                            result.StartingStats[result.UnitIdFor(b2.BeastId)]);
+
+            StatBlock avatarBase = _profile.GetStatsAtLevel(save.Avatar.Level);
+            Assert.AreEqual(StatCalculator.ComputeStats(avatarBase, StatCalculator.CollectModifiers(new[] { _cloak })), result.StartingStats[result.Avatar.Id]);
+            Assert.AreEqual(avatarBase.Hp + 100, result.StartingStats[result.Avatar.Id].Hp);
+
+            BattleSetup overridden = Setup(save, 9);
+            overridden.AvatarGear = new List<AvatarGearSO>();
+            BattleSessionResult bareAvatar = BattleSession.Run(overridden);
+            Assert.IsTrue(bareAvatar.Success, bareAvatar.Error);
+            Assert.AreEqual(avatarBase.Hp, bareAvatar.StartingStats[bareAvatar.Avatar.Id].Hp, "an explicit AvatarGear list overrides the save");
+        }
+
+        [Test]
+        public void Run_BadGear_ReturnsClearErrors()
+        {
+            BattleSetup missing = Setup(StarterSave(), 1);
+            missing.Save.Beasts[0].EquippedGear[0] = "gear99";
+            AssertFails(missing, "'gear99', which is not in the inventory");
+
+            BattleSetup unknown = Setup(StarterSave(), 1);
+            string ghost = unknown.Save.Gear.AddBeastGear("ghost_gear");
+            unknown.Save.Beasts[0].EquippedGear[0] = ghost;
+            AssertFails(unknown, "unknown gear 'ghost_gear'");
+
+            BattleSetup wrongSlot = Setup(StarterSave(), 1);
+            string blade = wrongSlot.Save.Gear.AddBeastGear(_blade.GearId);
+            wrongSlot.Save.Beasts[0].EquippedGear[(int)GearSlot.Accessory] = blade;
+            AssertFails(wrongSlot, "belongs in WeaponOrCore");
+
+            BattleSetup twice = Setup(StarterSave(), 1);
+            string shared = twice.Save.Gear.AddBeastGear(_blade.GearId);
+            twice.Save.Beasts[0].EquippedGear[0] = shared;
+            twice.Save.Beasts[1].EquippedGear[0] = shared;
+            AssertFails(twice, "worn more than once");
+
+            BattleSetup avatarMissing = Setup(StarterSave(), 1);
+            avatarMissing.Save.AvatarEquippedGear[(int)AvatarGearSlot.Armor] = "gear42";
+            AssertFails(avatarMissing, "The avatar wears gear instance 'gear42'");
+            avatarMissing.AvatarGear = new List<AvatarGearSO>();
+            Assert.IsTrue(BattleSession.Run(avatarMissing).Success, "an override skips the save's avatar gear");
         }
 
         [Test]
@@ -506,7 +577,23 @@ namespace BeastCraft.Tests.EditMode
                 bonds.Add(bond);
             }
 
-            return new BattleContent(species, skills.Values, passives, bonds);
+            _blade = Create<GearSO>();
+            _blade.GearId = "test_blade";
+            _blade.Slot = GearSlot.WeaponOrCore;
+            _blade.Modifiers.Add(new StatModifier { Stat = StatType.Attack, FlatBonus = 50 });
+
+            _lateShell = Create<GearSO>();
+            _lateShell.GearId = "test_late_shell";
+            _lateShell.Slot = GearSlot.ArmorOrShell;
+            _lateShell.MinimumLevel = 50;
+            _lateShell.Modifiers.Add(new StatModifier { Stat = StatType.HP, FlatBonus = 500 });
+
+            _cloak = Create<AvatarGearSO>();
+            _cloak.AvatarGearId = "test_cloak";
+            _cloak.Slot = AvatarGearSlot.Armor;
+            _cloak.Modifiers.Add(new StatModifier { Stat = StatType.HP, FlatBonus = 100 });
+
+            return new BattleContent(species, skills.Values, passives, bonds, new[] { _blade, _lateShell }, new[] { _cloak });
         }
 
         private SkillSO BuildSkill(SkillData data)

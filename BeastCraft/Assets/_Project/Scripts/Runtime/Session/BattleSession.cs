@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using BeastCraft.Avatar;
 using BeastCraft.Battle;
 using BeastCraft.Battle.Grid;
 using BeastCraft.Battle.Placement;
@@ -16,10 +17,10 @@ namespace BeastCraft.Session
     /// <strong><see cref="Run"/></strong> validates the <see cref="BattleSetup"/> up front, then
     /// builds everything through the battle code's own public APIs, in the balance simulator's
     /// order: the enemies (<see cref="BattleUnitFactory"/>) placed on the board (explicit
-    /// positions, then <see cref="DeploymentPacker"/>), the team's beasts at their saved levels
+    /// positions, then <see cref="DeploymentPacker"/>), the team's beasts at their saved levels, wearing their saved gear,
     /// with loadouts from their <see cref="BeastSkillBook"/>s, seated front-most first through
     /// <see cref="PlacementValidator.TryPlaceAll"/>, the avatar
-    /// (<see cref="BattleAvatar"/> from its progress, books, profile and gear, with its
+    /// (<see cref="BattleAvatar"/> from its progress, books, profile and worn gear, or <see cref="BattleSetup.AvatarGear"/> when set, with its
     /// <see cref="PassiveLoadout"/>), the team's bonds (<see cref="TeamBondLoadout.For"/>), and a
     /// <see cref="TurnManager"/> over the beasts plus the avatar; then
     /// <see cref="BattleTurnExecutor.RunBattle(TurnManager, IEnumerable{BattleUnit}, HexGrid, Random, BattleUnit, PassiveLoadout, TeamBondLoadout, int)"/>
@@ -91,6 +92,8 @@ namespace BeastCraft.Session
                 CheckEquipped(save.AvatarSkills.Passives, "The avatar", "passive", id => content.GetPassive(id) != null, errors);
             }
 
+            List<AvatarGearSO> avatarGear = setup.IncludeAvatar ? setup.AvatarGear ?? ResolveAvatarGear(save, content, errors) : null;
+
             CheckUnitIds(team, enemies, encounter, setup.IncludeAvatar, errors);
 
             if (errors.Count > 0)
@@ -106,7 +109,7 @@ namespace BeastCraft.Session
                 return result;
             }
 
-            List<BattleUnit> members = PlaceTeam(grid, team, content, errors);
+            List<BattleUnit> members = PlaceTeam(grid, team, save, content, errors);
 
             if (members == null)
             {
@@ -120,8 +123,18 @@ namespace BeastCraft.Session
 
             if (setup.IncludeAvatar)
             {
-                avatar = BattleAvatar.Create(save.AvatarSkills, content.GetSkill, content.GetPassive, setup.AvatarProfile, save.Avatar, setup.AvatarGear,
+                avatar = BattleAvatar.Create(save.AvatarSkills, content.GetSkill, content.GetPassive, setup.AvatarProfile, save.Avatar, avatarGear,
                                              out passives);
+            }
+
+            foreach (BattleUnit unit in units)
+            {
+                result.StartingStats[unit.Id] = unit.Stats;
+            }
+
+            if (avatar != null)
+            {
+                result.StartingStats[avatar.Id] = avatar.Stats;
             }
 
             List<CreatureSpeciesSO> teamSpecies = new List<CreatureSpeciesSO>();
@@ -317,6 +330,7 @@ namespace BeastCraft.Session
                 }
 
                 CheckEquipped(beast.Skills, "Beast '" + id + "'", "skill", skillId => content.GetSkill(skillId) != null, errors);
+                ResolveBeastGear(save, beast, content, errors);
                 team.Add(beast);
             }
 
@@ -554,7 +568,95 @@ namespace BeastCraft.Session
             return true;
         }
 
-        private static List<BattleUnit> PlaceTeam(HexGrid grid, List<OwnedBeast> team, BattleContent content, List<string> errors)
+        /// <summary>
+        /// The gear <paramref name="beast"/> wears, resolved to definitions. Every problem — an
+        /// instance not owned, worn by another beast too, an unknown gear id, a gear in the wrong
+        /// slot — is an error, like an unknown equipped skill. Gear below the beast's level is not
+        /// an error: <see cref="StatCalculator"/> ignores it.
+        /// </summary>
+        private static List<GearSO> ResolveBeastGear(PlayerSave save, OwnedBeast beast, BattleContent content, List<string> errors)
+        {
+            List<GearSO> gear = new List<GearSO>();
+
+            for (int slot = 0; beast.EquippedGear != null && slot < beast.EquippedGear.Length; slot++)
+            {
+                string instanceId = GearRules.GetSlot(beast.EquippedGear, slot);
+                if (instanceId == null)
+                {
+                    continue;
+                }
+
+                string owner = "Beast '" + beast.BeastId + "'";
+                OwnedGear owned = save.Gear == null ? null : save.Gear.FindBeastGear(instanceId);
+                GearSO definition = owned == null ? null : content.GetGear(owned.GearId);
+
+                if (owned == null)
+                {
+                    errors.Add(owner + " wears gear instance '" + instanceId + "', which is not in the inventory.");
+                }
+                else if (definition == null)
+                {
+                    errors.Add(owner + " wears unknown gear '" + owned.GearId + "'.");
+                }
+                else if (slot >= GearRules.BeastSlotCount || (int)definition.Slot != slot)
+                {
+                    errors.Add(owner + " wears '" + owned.GearId + "' in slot " + slot + "; it belongs in " + definition.Slot + ".");
+                }
+                else if (GearRules.CountBeastGearWorn(save, instanceId) != 1)
+                {
+                    errors.Add(owner + " wears gear instance '" + instanceId + "', which is worn more than once.");
+                }
+                else
+                {
+                    gear.Add(definition);
+                }
+            }
+
+            return gear;
+        }
+
+        /// <summary>The gear the save's avatar wears, resolved to definitions; problems are errors as for a beast.</summary>
+        private static List<AvatarGearSO> ResolveAvatarGear(PlayerSave save, BattleContent content, List<string> errors)
+        {
+            List<AvatarGearSO> gear = new List<AvatarGearSO>();
+
+            for (int slot = 0; save.AvatarEquippedGear != null && slot < save.AvatarEquippedGear.Length; slot++)
+            {
+                string instanceId = GearRules.GetSlot(save.AvatarEquippedGear, slot);
+                if (instanceId == null)
+                {
+                    continue;
+                }
+
+                OwnedGear owned = save.Gear == null ? null : save.Gear.FindAvatarGear(instanceId);
+                AvatarGearSO definition = owned == null ? null : content.GetAvatarGear(owned.GearId);
+
+                if (owned == null)
+                {
+                    errors.Add("The avatar wears gear instance '" + instanceId + "', which is not in the inventory.");
+                }
+                else if (definition == null)
+                {
+                    errors.Add("The avatar wears unknown gear '" + owned.GearId + "'.");
+                }
+                else if (slot >= GearRules.AvatarSlotCount || (int)definition.Slot != slot)
+                {
+                    errors.Add("The avatar wears '" + owned.GearId + "' in slot " + slot + "; it belongs in " + definition.Slot + ".");
+                }
+                else if (Array.IndexOf(save.AvatarEquippedGear, instanceId) != slot)
+                {
+                    errors.Add("The avatar wears gear instance '" + instanceId + "' more than once.");
+                }
+                else
+                {
+                    gear.Add(definition);
+                }
+            }
+
+            return gear;
+        }
+
+        private static List<BattleUnit> PlaceTeam(HexGrid grid, List<OwnedBeast> team, PlayerSave save, BattleContent content, List<string> errors)
         {
             List<HexCoordinate> front = new List<HexCoordinate>();
             foreach (HexCoordinate tile in DeploymentPacker.FrontOrder(grid, BattleTeam.Player))
@@ -578,7 +680,8 @@ namespace BeastCraft.Session
             {
                 OwnedBeast beast = team[i];
                 string unitId = BeastUnitIdPrefix + beast.BeastId;
-                members.Add(BattleUnitFactory.CreateBeast(unitId, BattleTeam.Player, content.GetSpecies(beast.Progress.SpeciesId), beast.Progress.Level, null,
+                List<GearSO> gear = ResolveBeastGear(save, beast, content, new List<string>());
+                members.Add(BattleUnitFactory.CreateBeast(unitId, BattleTeam.Player, content.GetSpecies(beast.Progress.SpeciesId), beast.Progress.Level, gear,
                                                           front[i], beast.Skills, content.GetSkill));
                 requests.Add(new PlacementRequest(unitId, front[i]));
             }

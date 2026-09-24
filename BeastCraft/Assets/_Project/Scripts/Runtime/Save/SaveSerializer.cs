@@ -20,6 +20,7 @@ namespace BeastCraft.Save
     {
         private readonly ISaveJsonSerializer _json;
         private readonly ISaveContentCatalog _catalog;
+        private readonly ISaveGearCatalog _gearCatalog;
         private readonly Dictionary<int, ISaveMigration> _migrations = new Dictionary<int, ISaveMigration>();
 
         /// <param name="json">The JSON engine. Required.</param>
@@ -29,7 +30,9 @@ namespace BeastCraft.Save
         /// The version written and read up to. Defaults to <see cref="PlayerSave.CurrentSchemaVersion"/>;
         /// overridable so migration chains can be tested ahead of a real schema bump.
         /// </param>
-        public SaveSerializer(ISaveJsonSerializer json, ISaveContentCatalog catalog = null, IEnumerable<ISaveMigration> migrations = null, int currentVersion = PlayerSave.CurrentSchemaVersion)
+        /// <param name="gearCatalog">Gear definitions to validate owned and worn gear against; null runs only the structural gear checks.</param>
+        public SaveSerializer(ISaveJsonSerializer json, ISaveContentCatalog catalog = null, IEnumerable<ISaveMigration> migrations = null, int currentVersion = PlayerSave.CurrentSchemaVersion,
+                              ISaveGearCatalog gearCatalog = null)
         {
             if (json == null)
             {
@@ -43,6 +46,7 @@ namespace BeastCraft.Save
 
             _json = json;
             _catalog = catalog;
+            _gearCatalog = gearCatalog;
             CurrentVersion = currentVersion;
 
             foreach (ISaveMigration migration in migrations ?? SaveMigrations.All())
@@ -152,7 +156,7 @@ namespace BeastCraft.Save
 
             save.SchemaVersion = CurrentVersion;
             save.EnsureInitialized();
-            return SaveLoadResult.Loaded(save, sourceVersion, sourceVersion < CurrentVersion, SaveValidator.Validate(save, _catalog));
+            return SaveLoadResult.Loaded(save, sourceVersion, sourceVersion < CurrentVersion, SaveValidator.Validate(save, _catalog, _gearCatalog));
         }
 
         /// <summary>Just the version field of a save, read before anything else so migrations can be chosen.</summary>

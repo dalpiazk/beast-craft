@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using BeastCraft.Battle;
 using BeastCraft.Battle.Grid;
 using BeastCraft.Bonds;
+using BeastCraft.Creatures;
 
 namespace BeastCraft.Session
 {
@@ -50,6 +51,13 @@ namespace BeastCraft.Session
 
         /// <summary>The roster (enemies, then the player's beasts in team order), in their end-of-battle state. Not the avatar.</summary>
         public IReadOnlyList<BattleUnit> Units { get; internal set; } = new List<BattleUnit>();
+
+        /// <summary>
+        /// Every unit's assembled stats as the battle began (species or profile at level, plus
+        /// gear), by unit id — before bonds, passives or anything in the battle changed them. The
+        /// avatar is included when it took part.
+        /// </summary>
+        public Dictionary<string, StatBlock> StartingStats { get; } = new Dictionary<string, StatBlock>(StringComparer.Ordinal);
 
         /// <summary>The avatar's unit, or null when it did not take part.</summary>
         public BattleUnit Avatar { get; internal set; }

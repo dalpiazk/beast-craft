@@ -28,7 +28,25 @@ namespace BeastCraft.Save
         DuplicateSkill,
 
         /// <summary>A level, XP, tier, quantity or counter is outside its valid range.</summary>
-        InvalidValue
+        InvalidValue,
+
+        /// <summary>An owned gear instance has an empty gear id or one not in the gear catalog.</summary>
+        UnknownGear,
+
+        /// <summary>A gear instance has no instance id, or shares one with another instance.</summary>
+        DuplicateGearInstance,
+
+        /// <summary>An equip slot names an instance the right gear inventory list does not hold.</summary>
+        UnknownGearInstance,
+
+        /// <summary>A gear instance is worn in more than one slot or by more than one owner.</summary>
+        DoubleEquippedGear,
+
+        /// <summary>A gear instance is worn in a slot other than its gear's own.</summary>
+        GearSlotMismatch,
+
+        /// <summary>A beast wears gear whose minimum level is above its own (the gear has no effect).</summary>
+        GearLevelTooLow
     }
 
     /// <summary>

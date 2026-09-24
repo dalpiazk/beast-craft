@@ -6,7 +6,7 @@ namespace BeastCraft.Save
     /// <summary>
     /// One beast in the player's collection, as save data: a stable per-beast id (two beasts of the
     /// same species are different beasts), its <see cref="BeastProgress"/> (species, level, XP) and
-    /// its <see cref="BeastSkillBook"/>. Plain serializable data with public fields; see
+    /// its <see cref="BeastSkillBook"/> and its worn gear. Plain serializable data with public fields; see
     /// <see cref="PlayerSave"/>.
     /// </summary>
     [Serializable]
@@ -23,6 +23,13 @@ namespace BeastCraft.Save
 
         /// <summary>Learned skills, their progress, and the equipped slots.</summary>
         public BeastSkillBook Skills = new BeastSkillBook();
+
+        /// <summary>
+        /// Worn beast gear, by slot: index <c>(int)GearSlot</c> holds a <see cref="OwnedGear.InstanceId"/>
+        /// from <see cref="GearInventory.BeastGear"/>, or null/"" when empty. Change it through
+        /// <see cref="GearRules"/>. Added in schema 2.
+        /// </summary>
+        public string[] EquippedGear = new string[GearRules.BeastSlotCount];
 
         /// <summary>A new beast: <paramref name="beastId"/> of <paramref name="speciesId"/> at <paramref name="level"/>, knowing nothing yet.</summary>
         public static OwnedBeast Create(string beastId, string speciesId, int level)

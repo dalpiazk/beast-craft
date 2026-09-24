@@ -7,7 +7,8 @@ namespace BeastCraft.Save
     /// <summary>
     /// Everything persisted about one player, as one versioned aggregate: the beast collection
     /// (each beast's species, level, XP and skill book), the avatar's level and skill books, and the
-    /// material inventory with its first-clear and pity state.
+    /// material inventory with its first-clear and pity state, and the gear inventory with what each
+    /// beast and the avatar wears (schema 2).
     /// <para>
     /// <strong>JsonUtility-compatible by construction.</strong> Every type reachable from here is
     /// <c>[Serializable]</c> with public fields, and every map is a list (<c>JsonUtility</c> drops
@@ -27,7 +28,7 @@ namespace BeastCraft.Save
     public class PlayerSave
     {
         /// <summary>The schema this code writes, and the newest it reads.</summary>
-        public const int CurrentSchemaVersion = 1;
+        public const int CurrentSchemaVersion = 2;
 
         /// <summary>The schema the data is in. 0 (or missing) is never valid.</summary>
         public int SchemaVersion = CurrentSchemaVersion;
@@ -43,6 +44,16 @@ namespace BeastCraft.Save
 
         /// <summary>Held materials, cleared cells and pity counters.</summary>
         public MaterialInventory Materials = new MaterialInventory();
+
+        /// <summary>Every owned piece of beast and avatar gear, worn or not. Added in schema 2.</summary>
+        public GearInventory Gear = new GearInventory();
+
+        /// <summary>
+        /// The avatar's worn gear, by slot: index <c>(int)AvatarGearSlot</c> holds an
+        /// <see cref="OwnedGear.InstanceId"/> from <see cref="GearInventory.AvatarGear"/>, or null/""
+        /// when empty. Change it through <see cref="GearRules"/>. Added in schema 2.
+        /// </summary>
+        public string[] AvatarEquippedGear = new string[GearRules.AvatarSlotCount];
 
         /// <summary>A brand-new player: no beasts, avatar level 1, nothing learned or held.</summary>
         public static PlayerSave CreateNew()
@@ -103,6 +114,12 @@ namespace BeastCraft.Save
                 }
 
                 repaired += RepairBook(beast.Skills);
+
+                if (beast.EquippedGear == null)
+                {
+                    beast.EquippedGear = new string[GearRules.BeastSlotCount];
+                    repaired++;
+                }
             }
 
             if (Avatar == null)
@@ -153,6 +170,33 @@ namespace BeastCraft.Save
             if (Materials.Pity == null)
             {
                 Materials.Pity = new List<PityCounter>();
+                repaired++;
+            }
+
+            if (Gear == null)
+            {
+                Gear = new GearInventory();
+                repaired++;
+            }
+
+            if (Gear.BeastGear == null)
+            {
+                Gear.BeastGear = new List<OwnedGear>();
+                repaired++;
+            }
+
+            if (Gear.AvatarGear == null)
+            {
+                Gear.AvatarGear = new List<OwnedGear>();
+                repaired++;
+            }
+
+            repaired += Gear.BeastGear.RemoveAll(gear => gear == null);
+            repaired += Gear.AvatarGear.RemoveAll(gear => gear == null);
+
+            if (AvatarEquippedGear == null)
+            {
+                AvatarEquippedGear = new string[GearRules.AvatarSlotCount];
                 repaired++;
             }
 

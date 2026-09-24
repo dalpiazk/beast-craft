@@ -387,7 +387,7 @@ namespace BeastCraft.Tests.EditMode
             PlayerSave legacy = PlayerSave.CreateNew();
             legacy.Beasts.Add(OwnedBeast.Create("b1", "emberfox", 1));
             legacy.Materials.Add("old_shard", 9);
-            string v1Json = NewSerializer().Serialize(legacy);
+            string v1Json = NewSerializer(null, null, 1).Serialize(legacy);
 
             SaveLoadResult fromV1 = v3.Deserialize(v1Json);
 
@@ -412,7 +412,7 @@ namespace BeastCraft.Tests.EditMode
         [Test]
         public void Migrations_MissingOrFailingStep_FailsTheLoad()
         {
-            string v1Json = NewSerializer().Serialize(BuildSave());
+            string v1Json = NewSerializer(null, null, 1).Serialize(BuildSave());
 
             SaveLoadResult missing = NewSerializer(null, new[] { new LevelFloorMigration(2, 2) }, 3).Deserialize(v1Json);
             SaveLoadResult throwing = NewSerializer(null, new ISaveMigration[] { new ThrowingMigration(1) }, 2).Deserialize(v1Json);
@@ -429,7 +429,12 @@ namespace BeastCraft.Tests.EditMode
             Assert.Throws<ArgumentException>(() => NewSerializer(null, new[] { new LevelFloorMigration(1, 2), new LevelFloorMigration(1, 3) }, 2));
             Assert.Throws<ArgumentNullException>(() => new SaveSerializer(null));
             Assert.Throws<ArgumentOutOfRangeException>(() => NewSerializer(null, null, 0));
-            Assert.IsEmpty(SaveMigrations.All(), "schema 1 has no upgrades yet");
+            List<ISaveMigration> all = SaveMigrations.All();
+            Assert.AreEqual(PlayerSave.CurrentSchemaVersion - 1, all.Count, "one step per version bump");
+            for (int i = 0; i < all.Count; i++)
+            {
+                Assert.AreEqual(i + 1, all[i].FromVersion);
+            }
         }
 
         [Test]

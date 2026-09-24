@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using BeastCraft.Battle;
 using BeastCraft.Progression;
 
 namespace BeastCraft.Save
@@ -18,6 +19,30 @@ namespace BeastCraft.Save
     {
         /// <summary>Every issue in <paramref name="save"/>, in save order. Empty when it is clean (or null).</summary>
         public static List<SaveIssue> Validate(PlayerSave save, ISaveContentCatalog catalog)
+        {
+            return Validate(save, catalog, null);
+        }
+
+        /// <summary>
+        /// <see cref="Validate(PlayerSave, ISaveContentCatalog)"/> plus the gear checks against
+        /// <paramref name="gearCatalog"/>: unknown gear ids, worn slots that do not match the gear's
+        /// slot, and beast gear worn below its minimum level. Without a gear catalog only the
+        /// structural gear checks run (instance ids present and unique, worn instances owned, no
+        /// instance worn twice).
+        /// </summary>
+        public static List<SaveIssue> Validate(PlayerSave save, ISaveContentCatalog catalog, ISaveGearCatalog gearCatalog)
+        {
+            List<SaveIssue> issues = ValidateCore(save, catalog);
+
+            if (save != null)
+            {
+                ValidateGear(save, gearCatalog, issues);
+            }
+
+            return issues;
+        }
+
+        private static List<SaveIssue> ValidateCore(PlayerSave save, ISaveContentCatalog catalog)
         {
             List<SaveIssue> issues = new List<SaveIssue>();
 
@@ -197,6 +222,142 @@ namespace BeastCraft.Save
                     }
                 }
             }
+        }
+
+        private static void ValidateGear(PlayerSave save, ISaveGearCatalog gearCatalog, List<SaveIssue> issues)
+        {
+            GearInventory inventory = save.Gear;
+            HashSet<string> instanceIds = new HashSet<string>(StringComparer.Ordinal);
+            Dictionary<string, OwnedGear> beastGear = new Dictionary<string, OwnedGear>(StringComparer.Ordinal);
+            Dictionary<string, OwnedGear> avatarGear = new Dictionary<string, OwnedGear>(StringComparer.Ordinal);
+
+            if (inventory != null)
+            {
+                IndexGear(inventory.BeastGear, "Gear.BeastGear", true, gearCatalog, instanceIds, beastGear, issues);
+                IndexGear(inventory.AvatarGear, "Gear.AvatarGear", false, gearCatalog, instanceIds, avatarGear, issues);
+            }
+
+            HashSet<string> worn = new HashSet<string>(StringComparer.Ordinal);
+
+            if (save.Beasts != null)
+            {
+                for (int b = 0; b < save.Beasts.Count; b++)
+                {
+                    OwnedBeast beast = save.Beasts[b];
+                    if (beast == null || beast.EquippedGear == null)
+                    {
+                        continue;
+                    }
+
+                    int level = beast.Progress == null ? 1 : beast.Progress.Level;
+                    for (int slot = 0; slot < beast.EquippedGear.Length; slot++)
+                    {
+                        string instanceId = beast.EquippedGear[slot];
+                        string path = "Beasts[" + b + "].EquippedGear[" + slot + "]";
+
+                        if (!CheckWorn(instanceId, path, slot, GearRules.BeastSlotCount, beastGear, worn, issues, out OwnedGear gear))
+                        {
+                            continue;
+                        }
+
+                        if (gearCatalog != null && gearCatalog.TryGetBeastGear(gear.GearId, out GearSlot gearSlot, out int minimumLevel))
+                        {
+                            if ((int)gearSlot != slot)
+                            {
+                                issues.Add(new SaveIssue(SaveIssueKind.GearSlotMismatch, path, instanceId, "'" + gear.GearId + "' belongs in the " + gearSlot + " slot"));
+                            }
+
+                            if (level < minimumLevel)
+                            {
+                                issues.Add(new SaveIssue(SaveIssueKind.GearLevelTooLow, path, instanceId, "'" + gear.GearId + "' needs level " + minimumLevel + "; the beast is " + level));
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (save.AvatarEquippedGear != null)
+            {
+                for (int slot = 0; slot < save.AvatarEquippedGear.Length; slot++)
+                {
+                    string instanceId = save.AvatarEquippedGear[slot];
+                    string path = "AvatarEquippedGear[" + slot + "]";
+
+                    if (CheckWorn(instanceId, path, slot, GearRules.AvatarSlotCount, avatarGear, worn, issues, out OwnedGear gear) &&
+                        gearCatalog != null && gearCatalog.TryGetAvatarGear(gear.GearId, out BeastCraft.Avatar.AvatarGearSlot gearSlot) && (int)gearSlot != slot)
+                    {
+                        issues.Add(new SaveIssue(SaveIssueKind.GearSlotMismatch, path, instanceId, "'" + gear.GearId + "' belongs in the " + gearSlot + " slot"));
+                    }
+                }
+            }
+        }
+
+        private static void IndexGear(List<OwnedGear> list, string path, bool beast, ISaveGearCatalog gearCatalog, HashSet<string> instanceIds,
+                                      Dictionary<string, OwnedGear> index, List<SaveIssue> issues)
+        {
+            if (list == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < list.Count; i++)
+            {
+                OwnedGear gear = list[i];
+                string entryPath = path + "[" + i + "]";
+
+                if (gear == null)
+                {
+                    continue;
+                }
+
+                if (string.IsNullOrEmpty(gear.InstanceId) || !instanceIds.Add(gear.InstanceId))
+                {
+                    issues.Add(new SaveIssue(SaveIssueKind.DuplicateGearInstance, entryPath + ".InstanceId", gear.InstanceId, "instance id is empty or used more than once"));
+                }
+                else
+                {
+                    index[gear.InstanceId] = gear;
+                }
+
+                bool known = !string.IsNullOrEmpty(gear.GearId) &&
+                             (gearCatalog == null || (beast ? gearCatalog.TryGetBeastGear(gear.GearId, out GearSlot _, out int _) : gearCatalog.TryGetAvatarGear(gear.GearId, out BeastCraft.Avatar.AvatarGearSlot _)));
+                if (!known)
+                {
+                    issues.Add(new SaveIssue(SaveIssueKind.UnknownGear, entryPath + ".GearId", gear.GearId, "unknown gear '" + gear.GearId + "'"));
+                }
+            }
+        }
+
+        /// <summary>The shared checks on one worn slot. True (with the owned instance) when it holds a wearable instance worth checking further.</summary>
+        private static bool CheckWorn(string instanceId, string path, int slot, int slotCount, Dictionary<string, OwnedGear> owned, HashSet<string> worn,
+                                      List<SaveIssue> issues, out OwnedGear gear)
+        {
+            gear = null;
+
+            if (string.IsNullOrEmpty(instanceId))
+            {
+                return false;
+            }
+
+            if (slot >= slotCount)
+            {
+                issues.Add(new SaveIssue(SaveIssueKind.InvalidValue, path, instanceId, "slot past the " + slotCount + " gear slots"));
+                return false;
+            }
+
+            if (!owned.TryGetValue(instanceId, out gear))
+            {
+                issues.Add(new SaveIssue(SaveIssueKind.UnknownGearInstance, path, instanceId, "worn instance '" + instanceId + "' is not in the inventory"));
+                return false;
+            }
+
+            if (!worn.Add(instanceId))
+            {
+                issues.Add(new SaveIssue(SaveIssueKind.DoubleEquippedGear, path, instanceId, "instance '" + instanceId + "' is worn more than once"));
+                return false;
+            }
+
+            return true;
         }
 
         private static void CheckRange(List<SaveIssue> issues, string path, int value, int min, int max)
