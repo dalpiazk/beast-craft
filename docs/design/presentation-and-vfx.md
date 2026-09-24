@@ -1,8 +1,9 @@
-# Presentation and VFX (MonoGame desktop spike)
+# Presentation and VFX (MonoGame desktop and Android spike)
 
 How the game is drawn: which code owns what, how a battle becomes pictures, the skill VFX
-data, the placeholder art pipeline, and the plan for Android. Status: **spike** — one battle
-viewer on desktop, placeholder art, everything below is deliberately small.
+data, the placeholder art pipeline, and the hosts (desktop, Android; iOS planned). Status:
+**spike**: one battle viewer on desktop and Android, placeholder art, everything below is
+deliberately small.
 
 ## Architecture: Core -> battle results -> presentation
 
@@ -21,8 +22,14 @@ src/BeastCraft.Presentation   engine-neutral "what to show" (netstandard2.1, no 
       |  ParticleBurst     closed-form ballistic particles (seeded)
       |  HexLayout         axial hex -> virtual pixels (pointy-top, whole pixels)
       |  PixelFont         a 3x5 font defined in code
+      |  IContentSource    where content files come from (FileContentSource: plain files)
       v
-src/BeastCraft.Desktop        MonoGame DesktopGL host: textures, SpriteBatch, input, window.
+src/BeastCraft.Game           the shared MonoGame viewer (net10.0 library): BattleViewerGame
+      |                    (drawing, keyboard + touch input, integer scaling), SpriteAtlas,
+      |                    PixelText, TitleContainerContentSource; ViewerHost = per-host knobs
+      v
+src/BeastCraft.Desktop        DesktopGL host: Program.Main, command line, ViewerHost.Desktop().
+src/BeastCraft.Android        Android host: MainActivity, APK assets, ViewerHost.Mobile(...).
 ```
 
 Rules the spike keeps, and later hosts must keep:
@@ -38,7 +45,8 @@ Rules the spike keeps, and later hosts must keep:
   `--screenshot` mode reproducible and lets a host scrub, skip (Space finishes a turn) or run at
   any frame rate.
 - **No engine types below the host.** Core and Presentation use their own `Vec2`, palette chars
-  and plain data; MonoGame's `Color`/`Vector2`/`Texture2D` appear only in `BeastCraft.Desktop`.
+  and plain data; MonoGame's `Color`/`Vector2`/`Texture2D` appear only in `BeastCraft.Game` and
+  the hosts.
 - **Pixel-perfect.** Everything renders into a 640x360 target, scaled to the window by the
   largest whole number that fits (letterboxed), `SamplerState.PointClamp`. Sprites sit on whole
   pixels; big units are drawn at x2, never fractional scales.
@@ -132,22 +140,73 @@ pointy-top hex tiles (columns 32 px apart, rows 27 px: whole pixels), the fire b
 hit burst and two particles. Multi-hex enemies are drawn at x2 over their tinted footprint (the
 Hex7 giant's real sprite should be authored at 64x64 later).
 
-## Android, after this spike
+## Hosts
 
-1. **`src/BeastCraft.Android`**, a MonoGame Android host (`MonoGame.Framework.Android`,
-   `net*-android`) referencing Core and Presentation unchanged. Nothing platform-specific lives in
-   the shared projects today; keep it that way.
-2. **Share the renderer.** Move the drawing code out of `BeastCraft.Desktop` into a shared
-   MonoGame project (e.g. `BeastCraft.Game`) that both hosts reference; each host keeps only its
-   entry point, window/activity setup and input mapping (touch: tap = step, a button for auto).
-3. **Content on device.** Ship `Content/` as Android assets and open files through a small
-   `IContentSource` (desktop: files; Android: `TitleContainer.OpenStream`), which `GameContent`
-   and the atlas read through instead of `File`/`Directory`.
-4. **Screens.** 640x360 already scales by whole numbers to 1280x720 and 1920x1080; phones with
-   other aspect ratios letterbox, or widen the virtual width to the nearest whole-scale fit.
-   Large arenas (radius 7, 414 px tall) need a camera or a smaller tile before they fit.
-5. **Later:** the content pipeline (texture atlases, compression) only if load times demand it;
-   a real font; audio; a shader-based hit flash.
+### Layout: one shared viewer, thin hosts
+
+`src/BeastCraft.Game` holds every line of MonoGame code the hosts share. It is MonoGame's own
+pattern for shared game code (the 3.8.5 "2D Starter Kit" template's Core project): a plain
+`net10.0` class library compiled against one MonoGame platform package with
+`PrivateAssets="All"`, so the reference never flows to a host. Every platform package ships the
+same `MonoGame.Framework` assembly (3.8.5.1, same identity on DesktopGL and Android), and each
+host brings its own at runtime. The starter kit compiles against `MonoGame.Framework.Native`; this
+compiles against DesktopGL, which the desktop host restores anyway, so CI downloads nothing new.
+A library was chosen over a shared project (`.shproj`/`.projitems`) because it compiles once, is
+built and format-checked by CI like any csproj, and keeps the host projects trivial.
+
+What differs per host is one small object, `ViewerHost`: window vs full screen, keyboard vs touch
+(plus its help line and the on-screen AUTO button), the HUD title, and the content source. A host
+is an entry point that builds a `ViewerHost` and runs `BattleViewerGame`; nothing else.
+
+### Content: `IContentSource`
+
+`GameContent.Load(IContentSource, errors)` and the sprite atlas open every file through
+`IContentSource` (`Exists`, `Open`, `Describe` for messages), with content-root-relative paths
+using forward slashes (`GameContent.RelativeOf` maps a ProjectRelativePath). Desktop uses
+`FileContentSource` (files beside the exe, the repo's `BeastCraft/Assets/_Project`, or
+`--content DIR`; `GameContent.Load(string root, ...)` is unchanged and delegates to it). Android
+uses `TitleContainerContentSource("Content")`: MonoGame's `TitleContainer`, i.e. the APK's assets
+via the activity's `AssetManager`. It copies each file into a `MemoryStream`, since asset streams
+cannot seek.
+
+### Android (`src/BeastCraft.Android`)
+
+- `MonoGame.Framework.Android` 3.8.5.1, `net10.0-android` (API 36 platform, min API 23); a
+  `MainActivity : AndroidGameActivity`, sensor landscape, full screen. The same data JSON and
+  pixel art the desktop copies to `Content/` are packaged as `AndroidAsset`s under
+  `assets/Content/`.
+- **Input:** tap = step one turn (or finish the one playing); a two-finger tap, or the AUTO
+  button at the foot of the right-hand panel, toggles auto-play; Back quits. Touches are judged
+  as gestures when the last finger lifts, so a two-finger tap never also steps. MonoGame reports
+  Back as `GamePad` Back; its `Exit()` on Android only moves the task to the back, so the
+  activity calls `Finish()` on `Game.Exiting`.
+- **Screens:** the same 640x360 frame, scaled by the largest whole number that fits and
+  letterboxed (a 2400x1080 phone: x3 = 1920x1080 with 240 px bars; 1280x720: x2). Large arenas
+  (radius 7, 414 px tall) still need a camera or a smaller tile before they fit.
+- **Builds are local only.** CI does not build Android: the runner would need the Android
+  workload, a JDK and the Android SDK, which costs far more minutes than a compile check is
+  worth. Everything Android shares with desktop (`BeastCraft.Game`, Presentation, Core) is built
+  and format-checked in CI through the desktop project. The Debug APK embeds its assemblies
+  (`EmbedAssembliesIntoApk`) so a plain `adb install` works; it is about 46 MB (two ABIs,
+  untrimmed). See the README's "Running on Android".
+- **Verified** on an API 36 x86_64 emulator (2400x1080): launches, draws the battle, taps step,
+  the AUTO button toggles auto-play, Back finishes the activity, no crash in logcat. Not yet on
+  a physical phone; the two-finger tap is untested (adb cannot inject multi-touch).
+
+### iOS (planned, not started)
+
+The same shape: `src/BeastCraft.iOS` with `MonoGame.Framework.iOS` (`net10.0-ios`), an
+`AppDelegate`/`UIApplicationDelegate` that runs `BattleViewerGame` with `ViewerHost.Mobile(...)`,
+the content as bundle resources read through `TitleContainerContentSource` (on iOS,
+`TitleContainer` reads the app bundle). Building, signing and running need a **Mac with Xcode**
+(and an Apple developer account for a device), so it is out of reach of this Windows setup and
+of the Linux CI runner. Nothing in the shared code is Android-specific, so no refactor should be
+needed; Back has no iOS equivalent (the app is closed by the system).
+
+### Later
+
+The content pipeline (texture atlases, compression) only if load times demand it; a real font;
+audio; a shader-based hit flash; safe-area insets for display cutouts.
 
 ## Open questions
 

@@ -19,7 +19,9 @@ beast-craft/
 │   │                       Vfx data, Common)
 │   ├── BeastCraft.Presentation/  engine-neutral presentation: content loading, hex layout,
 │   │                       battle playback, VFX timeline/particles, pixel font (netstandard2.1)
-│   └── BeastCraft.Desktop/ the MonoGame DesktopGL host (desktop spike, net10.0)
+│   ├── BeastCraft.Game/    the shared MonoGame battle viewer (drawing, input, scaling; net10.0)
+│   ├── BeastCraft.Desktop/ the MonoGame DesktopGL host (desktop spike, net10.0)
+│   └── BeastCraft.Android/ the MonoGame Android host (net10.0-android; local build, not in CI)
 ├── BeastCraft/     LEGACY Unity project, no longer built (the game is moving to MonoGame).
 │   │               Still home to the authored data JSON and the test sources.
 │   ├── Assets/_Project/    all first-party content, namespaced under _Project/
@@ -56,7 +58,8 @@ between "ours" and "imported" stays obvious in the Project window and in diffs.
 > **Engine migration.** The game is moving from Unity to **MonoGame**. The runtime
 > (`src/BeastCraft.Core`) is already engine-neutral C#; the MonoGame host exists as
 > a desktop spike (`src/BeastCraft.Desktop`, see
-> [Running the game](#running-the-game-desktop-spike)), and the Unity project under `BeastCraft/` is legacy and no longer
+> [Running the game](#running-the-game-desktop-spike)) plus an Android host
+> (`src/BeastCraft.Android`, see [Running on Android](#running-on-android)), and the Unity project under `BeastCraft/` is legacy and no longer
 > builds (its Editor importers expect ScriptableObjects, which are now plain
 > classes). The Unity-specific lines below are the original plan.
 
@@ -178,6 +181,7 @@ The numbers are simulator-tuned starting points, not confirmed balance — see
   dotnet format src/BeastCraft.Core/BeastCraft.Core.csproj --verify-no-changes
   dotnet build  src/BeastCraft.Core/BeastCraft.Core.csproj --configuration Release
   dotnet format src/BeastCraft.Presentation/BeastCraft.Presentation.csproj --verify-no-changes
+  dotnet format src/BeastCraft.Game/BeastCraft.Game.csproj --verify-no-changes
   dotnet format src/BeastCraft.Desktop/BeastCraft.Desktop.csproj --verify-no-changes
   dotnet build  src/BeastCraft.Desktop/BeastCraft.Desktop.csproj --configuration Release
   dotnet format Tooling/EditModeTests --verify-no-changes
@@ -200,8 +204,8 @@ The numbers are simulator-tuned starting points, not confirmed balance — see
 
 ### What does not exist yet
 
-- Anything the player sees or touches beyond the desktop spike's battle viewer:
-  no menus, map, team building, audio or touch input; the spike's art is
+- Anything the player sees or touches beyond the spike's battle viewer (desktop
+  and Android): no menus, map, team building or audio; the spike's art is
   placeholder (`Scenes/` and `Prefabs/` are empty, and no runtime script is a
   MonoBehaviour).
 - Encounters as game data — the only encounters are the balance simulator's
@@ -247,6 +251,52 @@ first turn that fires that skill; `--at MS` picks the moment inside that turn
 the VFX schema and the art pipeline are in
 [`docs/design/presentation-and-vfx.md`](docs/design/presentation-and-vfx.md);
 regenerating the art is in [`Tooling/PixelArt/README.md`](Tooling/PixelArt/README.md).
+
+### Running on Android
+
+`src/BeastCraft.Android` runs the same battle viewer (the shared
+`src/BeastCraft.Game`) on Android: full screen in landscape, the 640x360 frame
+scaled by a whole number and letterboxed. **Tap** plays the next turn (or
+finishes the one playing), a **two-finger tap** or the on-screen **AUTO**
+button toggles auto-play, **Back** quits. It is a **local build only**; CI does
+not build it.
+
+Prerequisites (all user-level, no admin):
+
+- .NET SDK 10 with the Android workload (`dotnet workload install android`;
+  the `maui-android` workload includes it).
+- A JDK 17, e.g. Microsoft OpenJDK 17, with `JAVA_HOME` pointing at it.
+- The Android SDK with `platform-tools`, `platforms;android-36` and
+  `build-tools;36.0.0` (Google's command-line tools; `sdkmanager`, or the newer
+  `android sdk install platforms/android-36 build-tools/36.0.0 platform-tools`),
+  with `ANDROID_HOME` pointing at it (e.g. `%LOCALAPPDATA%\Android\Sdk`).
+- The pixel art from Git LFS (`git lfs pull`), as for desktop.
+
+Build a debug APK (self-contained: the assemblies are embedded, so a plain
+`adb install` works):
+
+```
+dotnet build src/BeastCraft.Android -c Debug
+# -> src/BeastCraft.Android/bin/Debug/net10.0-android/com.composedstudio.beastcraft-Signed.apk
+```
+
+Run it on a phone: enable **Developer options** (tap *Build number* seven
+times) and **USB debugging**, connect it over USB, accept the debugging prompt,
+then:
+
+```
+adb devices                                  # the phone should be listed as "device"
+adb install -r src/BeastCraft.Android/bin/Debug/net10.0-android/com.composedstudio.beastcraft-Signed.apk
+adb shell monkey -p com.composedstudio.beastcraft -c android.intent.category.LAUNCHER 1
+adb logcat -d | grep -iE "FATAL|monodroid"   # if it does not start
+```
+
+(`dotnet build src/BeastCraft.Android -c Debug -t:Run` builds, installs and
+launches in one step.) An emulator works too (an x86_64 system image with
+hardware acceleration); `adb exec-out screencap -p > shot.png` takes a
+screenshot. The Android notes (content as APK assets, input, screens) and the
+iOS plan are in
+[`docs/design/presentation-and-vfx.md`](docs/design/presentation-and-vfx.md#hosts).
 
 ### Running it in Unity (legacy)
 
