@@ -72,9 +72,12 @@ puzzle every encounter.
 - **The avatar's gauge — settled (stage 3b).** The avatar now fills an ATB gauge of its own from
   its own Speed (decisions 3 and 6), so its cadence no longer depends on the team's size or speed.
   Still open: the avatar's authored base Speed and growth curve (the default is Speed 100, the
-  reference Speed, at max level), and retuning the avatar's actives and passives for the slower
-  cadence (a four-beast team used to tick it about three times as often; see the tuning log,
-  "Avatar gauge").
+  reference Speed, at max level). The actives and passives were retuned for the slower cadence in
+  milestone 2 (Rallying Cry and Mending Light to cooldown 2, buff and debuff durations 2 -> 3, the
+  optional actives' cooldowns and Bloodlust / Storm Call's internal cooldowns shortened): measured
+  with `--avatar-value`, the avatar is worth about 37 points of the scouted clear rate against 42
+  on the old per-beast-turn cadence, with a 14% direct share of the team's output, three-quarters
+  of it from its passives (tuning log, "Avatar retune").
 - **Avatar level — progression exists and is wired into battle; its curve is not authored.** The avatar has its
   own level (TUNABLE STARTING DEFAULTS): `AvatarProgress` (save data: `Level`, `Xp`) and
   `AvatarProgression` (own constants, not the skill curve). A level costs `200 + 16 × level` XP
@@ -2244,12 +2247,12 @@ learnable by level 5.
 
 | Skill | Default | Shape | Cd | Effects | Tier bonuses |
 | --- | :---: | --- | ---: | --- | --- |
-| Rallying Cry `rallying_cry` | slot 1 | AllAllies | 4 | +10% Attack 2t; +10% SpecialAttack 2t | L10: adds +5% Speed 2t; L15: -1 cd |
-| Mending Light `mending_light` | slot 2 | AllAllies | 3 | Heal 13 | L10: adds +5% SpecialDefense 2t; L15: -1 cd |
+| Rallying Cry `rallying_cry` | slot 1 | AllAllies | 2 | +10% Attack 3t; +10% SpecialAttack 3t | L10: adds +5% Speed 2t; L15: -1 cd |
+| Mending Light `mending_light` | slot 2 | AllAllies | 2 | Heal 13 | L10: adds +5% SpecialDefense 2t; L15: -1 cd |
 | Aegis `aegis` | slot 3 | AllAllies | 4 | Shield 30% Def 2t | L10: adds +5% Defense 2t; L15: -1 cd |
-| Hex of Frailty `hex_of_frailty` |  | AllEnemies | 4 | -10% Defense 2t; -10% SpecialDefense 2t | L10: adds -5% Attack 2t; L15: -1 cd |
-| Battle Focus `battle_focus` |  | AllAllies | 5 | +8 CritChance 2t | L10: adds +5% Attack 2t; L15: -1 cd |
-| Slowing Field `slowing_field` |  | AllEnemies | 5 | -12% Speed 2t | L10: adds -5% Attack 2t; L15: -1 cd |
+| Hex of Frailty `hex_of_frailty` |  | AllEnemies | 2 | -10% Defense 3t; -10% SpecialDefense 3t | L10: adds -5% Attack 2t; L15: -1 cd |
+| Battle Focus `battle_focus` |  | AllAllies | 3 | +8 CritChance 3t | L10: adds +5% Attack 2t; L15: -1 cd |
+| Slowing Field `slowing_field` |  | AllEnemies | 3 | -12% Speed 3t | L10: adds -5% Attack 2t; L15: -1 cd |
 
 #### Avatar passives
 
@@ -2260,9 +2263,9 @@ learnable by level 5.
 | Opening Ward `opening_ward` | slot 2 | BattleStart | AllAllies | 100 | - | 0 | Shield 40% Def 2t | L10: adds +5% Defense 2t; L15: adds +5% SpecialDefense 2t |
 | Battle Hymn `battle_hymn` |  | BattleStart | AllAllies | 100 | - | 0 | +10% Speed 2t | L10: adds +5% Attack 2t; L15: adds +5% SpecialAttack 2t |
 | Withering Curse `withering_curse` |  | BattleStart | AllEnemies | 100 | - | 0 | -10% Defense 3t; -10% SpecialDefense 3t | L10: adds -5% Speed 3t; L15: adds -5% Attack 3t |
-| Bloodlust `bloodlust` |  | EnemyDefeated | AllAllies | 50 | - | 2 | +10% Attack 2t; +10% SpecialAttack 2t | L10: adds +5% Speed 2t; L15: adds +5 CritChance 2t |
+| Bloodlust `bloodlust` |  | EnemyDefeated | AllAllies | 50 | - | 1 | +10% Attack 2t; +10% SpecialAttack 2t | L10: adds +5% Speed 2t; L15: adds +5 CritChance 2t |
 | Vengeance `vengeance` |  | AllyDefeated | AllAllies | 100 | 2 | 0 | +15% Attack 3t; +15% SpecialAttack 3t | L10: adds Shield 20% Def 2t; L15: adds +10% Speed 3t |
-| Storm Call `storm_call` |  | AllyCrit | AllEnemies | 30 | - | 3 | Damage 25 | L10: adds -5% Speed 1t; L15: adds -5% Defense 1t |
+| Storm Call `storm_call` |  | AllyCrit | AllEnemies | 30 | - | 1 | Damage 25 | L10: adds -5% Speed 1t; L15: adds -5% Defense 1t |
 | Verdant Pulse `verdant_pulse` |  | AllyTurnStart | TriggeringUnit | 50 | - | 0 | Heal 5 | L10: adds +3% Defense 1t; L15: adds +3% SpecialDefense 1t |
 | Last Stand `last_stand` | slot 3 | AllyBelowHpPercent < 40% | TriggeringUnit | 100 | - | 2 | Shield 80% Def 2t | L10: adds +10% Defense 2t; L15: adds +10% SpecialDefense 2t |
 

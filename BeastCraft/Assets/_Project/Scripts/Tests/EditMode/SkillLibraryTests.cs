@@ -161,9 +161,7 @@ namespace BeastCraft.Tests.EditMode
         {
             // Taking a cooldown-2 damage skill to 1 doubles its output; tiers stay "modest".
             SkillLibraryData library = LoadLibrary();
-            List<SkillData> skills = new List<SkillData>(library.BeastSkills);
-            skills.AddRange(library.AvatarActives);
-            foreach (SkillData skill in skills)
+            foreach (SkillData skill in library.BeastSkills)
             {
                 foreach (TierData tier in skill.Progression.Tiers)
                 {
@@ -171,6 +169,22 @@ namespace BeastCraft.Tests.EditMode
                     {
                         Assert.That(skill.Cooldown, Is.GreaterThanOrEqualTo(3), skill.SkillId);
                         Assert.AreEqual(1, tier.CooldownReduction, skill.SkillId);
+                    }
+                }
+            }
+
+            // The avatar's actives deal no damage and act on its own, slower gauge (the milestone-2
+            // avatar retune took Rallying Cry and Mending Light to cooldown 2): its tier-15 reduction
+            // may bring a cooldown to 1, never below.
+            foreach (SkillData skill in library.AvatarActives)
+            {
+                Assert.IsFalse(DealsDamage(skill), skill.SkillId);
+                foreach (TierData tier in skill.Progression.Tiers)
+                {
+                    if (tier.CooldownReduction > 0)
+                    {
+                        Assert.AreEqual(1, tier.CooldownReduction, skill.SkillId);
+                        Assert.That(skill.Cooldown - tier.CooldownReduction, Is.GreaterThanOrEqualTo(1), skill.SkillId);
                     }
                 }
             }

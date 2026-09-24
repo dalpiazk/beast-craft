@@ -2718,3 +2718,75 @@ takes about 58 s, three seeds about 155 s.
 Reproduce: `dotnet run --project Tooling/BalanceSim -c Release -- --mode pve --levels 10,30,50,70,90
 --level-gap -5..10 --seeds 12345,777,4242 --out out/levelgap.md` (about 155 s); each sweep row is the
 same run with the three `DamageFormula.LevelDifference*` constants edited.
+
+## Avatar retune (milestone 2, stage D1)
+
+Design decision (milestone 2): after the avatar moved onto its own ATB gauge ("Avatar gauge") it acts
+about a third as often, and its actives and passive cooldowns were still authored for the old
+cadence. This retune restores its role, **passives first** (the user's vision: the passives are the
+avatar's main role). Data only, plus a measurement: `--avatar-value` (README, "Avatar value").
+
+**Measure.** At each cell's calibrated multiplier the picked teams' battles (8 compositions x 16) are
+replayed **without the avatar**, seed for seed; the avatar's **value** is the scouted rate with it
+(the calibrated ~50%) minus without, in points. Its **direct share** is its damage + healing + shield
+soak (a shield's soak credited to its caster) as a percent of the whole team's, with the part its
+passives produced. **Reference**: the same measurement on `cdf48ec` (the last commit on the
+per-beast-turn cadence), in a scratch worktree with the scouted-pick calibration (`035000f`, sim only)
+cherry-picked onto it and the no-avatar replay added (never checked out in the main tree). 3 seeds
+(12345 / 777 / 4242), levels 1 / 50 / 100, both kit modes.
+
+Targets: value at least 75% of the reference; direct share 10-15% (`elemental`).
+
+| Run | Change | `elemental` value (% of ref) | no-avatar % | direct share (passives) | `neutral` value | share |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| Reference `cdf48ec` | old cadence | **+41.6** (100%) | 8.4 | - | +48.1 | - |
+| A0 | before (gauge, old numbers) | +31.6 (76%) | 18.4 | 13.6% (10.8) | +41.4 | 15.8% |
+| A1 | design start: actives cd 4/3/4 -> 2, durations 2 -> 3, Mending Light 13 -> 20, Aegis 30 -> 45, Last Stand icd 2 -> 1 | +42.7 (103%) | 8.0 | **21.1%** (11.7) | +47.9 | 24.6% |
+| A2 | A1 with Mending Light 13, Aegis back to cd 4 / 30 | +38.3 (92%) | 11.5 | **16.1%** (12.8) | +45.2 | 19.0% |
+| **A3** | A2 with Last Stand icd back to 2 | **+37.0 (89%)** | 13.6 | **13.8%** (10.5) | +44.1 | 16.0% |
+| A3b | A2 with Last Stand 80 -> 60 (icd 1) | +35.2 (85%) | 14.8 | 13.9% (10.6) | +45.6 | 15.9% |
+
+Per shape, A0 -> A3 (`elemental`, value in points): `solo` +29.9 -> +38.2, `elite` +39.9 -> +43.8,
+`squad` +25.6 -> +27.2, `horde` +31.2 -> +38.9 (reference +44.4 / +47.3 / +32.2 / +42.6). Avatar
+turns per battle are unchanged (5.6-5.7).
+
+- **The before state already sat on the value line (76%)**, with the share inside its band. The
+  design's starting set overshoots the share (21%): Aegis at 45% of Defense every second avatar turn
+  soaks as much as Opening Ward and Last Stand together, which would turn the avatar into a shield
+  caster. The value can come from the buff instead: **Rallying Cry at cooldown 2 for three turns**
+  is up almost all the time and has no direct output, so it moves the value without moving the share.
+- **Chosen: A3.** Value +37.0 (89% of the reference; target met), direct share 13.8% (target met),
+  **three-quarters of it from the passives** (10.5 of 13.8: Opening Ward's opening shield and Last
+  Stand's emergency shield). Last Stand stays at internal cooldown 2: at 1 (A2) its extra firings
+  push the share over 15%, and trading its size for frequency (A3b, 60%) is worth less.
+- `neutral` (the control) is 44.1 points against 48.1 (92%) with a 16.0% share; it was 15.8% before,
+  the element-free fights last longer and shields soak more of them.
+
+**Changes** (skill library; the three optional actives and two optional passives follow the design so
+the whole avatar catalogue is on the new cadence; they are not in the default loadout the simulator
+fields):
+
+| Skill | Before | After |
+| --- | --- | --- |
+| Rallying Cry (default) | cd 4; +10% Attack / SpecialAttack 2t | **cd 2**; +10% Attack / SpecialAttack **3t** |
+| Mending Light (default) | cd 3; Heal 13 | **cd 2**; Heal 13 |
+| Aegis (default) | cd 4; Shield 30% Def 2t | unchanged |
+| Hex of Frailty | cd 4; -10% Def / SpD 2t | **cd 2**; **3t** |
+| Battle Focus | cd 5; +8 crit 2t | **cd 3**; **3t** |
+| Slowing Field | cd 5; -12% Speed 2t | **cd 3**; **3t** |
+| Keen Eye, Opening Ward, Last Stand (default passives) | - | unchanged (Last Stand icd 2) |
+| Bloodlust | icd 2 | **icd 1** |
+| Storm Call | icd 3 | **icd 1** |
+
+Each active's tier-15 `CooldownReduction` (1) now takes a cooldown-2 active to 1, never below; the
+library test that allowed a reduction only on cooldowns of 3 or more still holds for beast skills and
+now requires the avatar's actives (which deal no damage) to keep a cooldown of at least 1.
+
+**Guard** (3-seed normalized means, before -> after): the stronger avatar raises every cell's
+multiplier, so beasts shift. `elemental`: Treant +2.4 -> +2.6, Phoenix +3.3 -> +2.5, Kirin +1.7 ->
++2.1, Golem +1.5 -> +2.1, Tarasque +1.5 -> +1.2, Basilisk -0.2 -> 0.0, Frost Wyrm -1.0 -> -0.2,
+Leviathan -2.0 -> -1.5, **Griffin -3.6 -> -4.2, Thunderbird -3.6 -> -4.5** (outside +/-4, the stage D3
+retune below). `neutral` stays inside +/-7 (-3.9 ... +5.8; Golem +3.3 -> +5.8, Tarasque -3.6 -> -0.9).
+
+Reproduce: `dotnet run --project Tooling/BalanceSim -c Release -- --mode pve --seeds 12345,777,4242
+--avatar-value --out out/avatar.md` (about 40 s).

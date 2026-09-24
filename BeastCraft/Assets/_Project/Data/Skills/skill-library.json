@@ -1368,13 +1368,13 @@
     {
       "SkillId": "rallying_cry",
       "DisplayName": "Rallying Cry",
-      "Description": "The avatar's war cry: +10% Attack and Special Attack for the whole team for two turns.",
+      "Description": "The avatar's war cry: +10% Attack and Special Attack for the whole team for three turns.",
       "TargetShape": "AllAllies",
       "Range": 0,
-      "Cooldown": 4,
+      "Cooldown": 2,
       "Effects": [
-        { "EffectType": "BuffStat", "AffectedStat": "Attack", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true },
-        { "EffectType": "BuffStat", "AffectedStat": "SpecialAttack", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true }
+        { "EffectType": "BuffStat", "AffectedStat": "Attack", "Magnitude": 10, "DurationTurns": 3, "IsPercent": true },
+        { "EffectType": "BuffStat", "AffectedStat": "SpecialAttack", "Magnitude": 10, "DurationTurns": 3, "IsPercent": true }
       ],
       "Progression": {
         "MaxLevel": 20,
@@ -1392,7 +1392,7 @@
       "Description": "A gentle light that heals every beast a little.",
       "TargetShape": "AllAllies",
       "Range": 0,
-      "Cooldown": 3,
+      "Cooldown": 2,
       "Effects": [
         { "EffectType": "Heal", "Magnitude": 13 }
       ],
@@ -1429,13 +1429,13 @@
     {
       "SkillId": "hex_of_frailty",
       "DisplayName": "Hex of Frailty",
-      "Description": "Curses every enemy: -10% Defense and Special Defense for two turns.",
+      "Description": "Curses every enemy: -10% Defense and Special Defense for three turns.",
       "TargetShape": "AllEnemies",
       "Range": 0,
-      "Cooldown": 4,
+      "Cooldown": 2,
       "Effects": [
-        { "EffectType": "DebuffStat", "AffectedStat": "Defense", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true },
-        { "EffectType": "DebuffStat", "AffectedStat": "SpecialDefense", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true }
+        { "EffectType": "DebuffStat", "AffectedStat": "Defense", "Magnitude": 10, "DurationTurns": 3, "IsPercent": true },
+        { "EffectType": "DebuffStat", "AffectedStat": "SpecialDefense", "Magnitude": 10, "DurationTurns": 3, "IsPercent": true }
       ],
       "Progression": {
         "MaxLevel": 20,
@@ -1450,12 +1450,12 @@
     {
       "SkillId": "battle_focus",
       "DisplayName": "Battle Focus",
-      "Description": "Sharpens the team's eye: +8 crit chance for two turns.",
+      "Description": "Sharpens the team's eye: +8 crit chance for three turns.",
       "TargetShape": "AllAllies",
       "Range": 0,
-      "Cooldown": 5,
+      "Cooldown": 3,
       "Effects": [
-        { "EffectType": "BuffStat", "AffectedStat": "CritChance", "Magnitude": 8, "DurationTurns": 2 }
+        { "EffectType": "BuffStat", "AffectedStat": "CritChance", "Magnitude": 8, "DurationTurns": 3 }
       ],
       "Progression": {
         "MaxLevel": 20,
@@ -1470,12 +1470,12 @@
     {
       "SkillId": "slowing_field",
       "DisplayName": "Slowing Field",
-      "Description": "Thickens the air around the enemy: -12% Speed for two turns.",
+      "Description": "Thickens the air around the enemy: -12% Speed for three turns.",
       "TargetShape": "AllEnemies",
       "Range": 0,
-      "Cooldown": 5,
+      "Cooldown": 3,
       "Effects": [
-        { "EffectType": "DebuffStat", "AffectedStat": "Speed", "Magnitude": 12, "DurationTurns": 2, "IsPercent": true }
+        { "EffectType": "DebuffStat", "AffectedStat": "Speed", "Magnitude": 12, "DurationTurns": 3, "IsPercent": true }
       ],
       "Progression": {
         "MaxLevel": 20,
@@ -1589,10 +1589,10 @@
     {
       "PassiveId": "bloodlust",
       "DisplayName": "Bloodlust",
-      "Description": "When an enemy falls, half the time the team surges: +10% Attack and Special Attack for two turns (at most every other avatar tick).",
+      "Description": "When an enemy falls, half the time the team surges: +10% Attack and Special Attack for two turns (at most once per avatar turn).",
       "Trigger": "EnemyDefeated",
       "ProcChance": 50,
-      "InternalCooldown": 2,
+      "InternalCooldown": 1,
       "TargetScope": "AllAllies",
       "Effects": [
         { "EffectType": "BuffStat", "AffectedStat": "Attack", "Magnitude": 10, "DurationTurns": 2, "IsPercent": true },
@@ -1635,7 +1635,7 @@
       "Description": "When a beast lands a critical hit, the avatar sometimes calls down a follow-up strike on every enemy.",
       "Trigger": "AllyCrit",
       "ProcChance": 30,
-      "InternalCooldown": 3,
+      "InternalCooldown": 1,
       "TargetScope": "AllEnemies",
       "Category": "Special",
       "Effects": [
