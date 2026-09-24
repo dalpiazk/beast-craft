@@ -140,15 +140,16 @@ the boss pool at a region's lair (a rare below band 41). Only lairs guarantee ra
 The balance simulator's `--gear typical` is what a player normally wears (weapon / armor /
 accessory): band 1-20 three commons; 21-40 a rare weapon; 41-60 rare weapon and armor; 61-80 an epic
 weapon, rare armor and accessory; 81-100 epic weapon and armor, a rare accessory. The shipping
-`encounter-difficulty.json` should be calibrated with it (the lead's decision):
+`encounter-difficulty.json` is calibrated with it (the lead's / user's decision), as are the boss
+templates' `DifficultyOverride`s:
 
 ```
-dotnet run --project Tooling/BalanceSim -c Release -- --gear typical --write-difficulty BeastCraft/Assets/_Project/Data/Encounters/encounter-difficulty.json --out <scratch>
+dotnet run --project Tooling/BalanceSim -c Release -- --panel 16x4 --avatar-value --gear typical --write-difficulty BeastCraft/Assets/_Project/Data/Encounters/encounter-difficulty.json
 ```
 
-On the current tables that raises the calibrated multipliers by 0.4-8.6% (about 3% on average). **Not
-yet applied**: the difficulty table is the combat lane's, being retuned (tiered targets, behaviour
-bonds); run it once after that lands. The `--mode campaign` model measures the modelled player's gear
+Applied after the combat merge (behaviour bonds, tiered targets): against the gearless table the
+`elemental` multipliers rose by 0-5.1% except `horde` at level 100 (-4.1%; see the log); see the tuning log, "Shipping difficulty table in typical gear". The tuned report
+stays gearless. The `--mode campaign` model measures the modelled player's gear
 against this profile ("Gear at typical", 22-96% of slots by boss).
 
 ## Consumables
@@ -243,5 +244,4 @@ dotnet run --project Tooling/BalanceSim -c Release -- --mode pve --seeds 12345,7
 
 - Every name, number and look (DRAFT); no art (placeholder `ArtKey`s), no UI.
 - Speed consumables and consumable shields (above); cross-species tomes; a cleanse consumable.
-- The shipping difficulty with `--gear typical` (above), once the combat lane's retune lands.
 - Premium looks and idle rewards (future).

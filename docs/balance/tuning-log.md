@@ -3344,3 +3344,31 @@ Reproduce: write each template as a fixed encounter (every group's enemy copied 
 --calibrate-samples 64 --scouted bonds --gear typical` (drop `--gear typical` for the gearless
 column); the "Difficulty" row's multiplier is the override. `--mode campaign` is unchanged (it models
 bosses at a flat 50%).
+
+## Shipping difficulty table in typical gear
+
+User decision: the shipping `encounter-difficulty.json` assumes the gear a player normally wears
+(`--gear typical`: commons in band 1-20, then rare and epic pieces by band; see the economy doc). The
+committed tuned report stays gearless (the per-beast guard's setting), so the two now come from two
+commands, and the table's `_readme` names its gear:
+
+- report: `dotnet run --project Tooling/BalanceSim -c Release -- --panel 16x4 --avatar-value --out
+  docs/balance/tuned-report.md` (unchanged bytes);
+- table: `dotnet run --project Tooling/BalanceSim -c Release -- --panel 16x4 --avatar-value --gear
+  typical --write-difficulty BeastCraft/Assets/_Project/Data/Encounters/encounter-difficulty.json`
+  (the panel and the avatar-value replay do not touch the calibration; `--mode pve --gear typical
+  --write-difficulty <path>` writes the same bytes in half the time).
+
+| `elemental` | L1 | L50 | L100 |
+| --- | ---: | ---: | ---: |
+| `solo` (50%) | x1.246 -> x1.297 (+4.1%) | x1.266 -> x1.273 (+0.6%) | x1.234 -> x1.297 (+5.1%) |
+| `elite` (60%) | x1.094 -> x1.141 (+4.3%) | x1.141 -> x1.156 (+1.4%) | x1.117 -> x1.156 (+3.5%) |
+| `squad` (80%) | x1.207 -> x1.250 (+3.6%) | x1.211 -> x1.211 (0.0%) | x1.211 -> x1.223 (+1.0%) |
+| `horde` (80%) | x1.250 -> x1.313 (+5.0%) | x1.219 -> x1.250 (+2.6%) | x1.238 -> x1.188 (-4.1%) |
+
+Typical gear lets the enemies be up to 5% stronger at the same scouted clear, the size the economy
+probe predicted (0.4-8.6% before the combat merge). The one decrease, `horde` at level 100, is not
+explained by the gear: the picked team clears 82.0% there at x1.188 in gear and 81.3% at x1.238
+without, so the geared calibration landed a step lower on 128 battles per search step (+/-3.5 points
+at 80%); flagged for the next balance pass rather than hand-edited (the file is written, never
+edited). The `neutral` cells move the same way (0-5.5%, `horde` L100 -4.4%).

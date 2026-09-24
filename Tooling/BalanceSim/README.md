@@ -98,11 +98,16 @@ Two reports are committed, both the default arguments:
   "Behaviour bonds and tiered difficulty" it runs the behaviour bonds, the composition panel
   (`--panel 16x4`), the avatar-value replay (`--avatar-value`, for the no-avatar column of
   "Difficulty by shape") and the tiered targets. Since "Level-gap mix" (see below) its balance
-  sections are judged over the default gap mix; the command is unchanged and the difficulty table it
-  writes is the same:
+  sections are judged over the default gap mix. Since the campaign merge the report and the game's
+  difficulty table come from two commands: the report stays **gearless** (the per-beast balance
+  guard's setting), and the shipping table is calibrated with **typical gear** (`--gear typical`, a
+  user decision; "Difficulty table for the game"):
 
 ```sh
-dotnet run --project Tooling/BalanceSim -c Release -- --panel 16x4 --avatar-value --out docs/balance/tuned-report.md --write-difficulty BeastCraft/Assets/_Project/Data/Encounters/encounter-difficulty.json
+# the committed report (gearless)
+dotnet run --project Tooling/BalanceSim -c Release -- --panel 16x4 --avatar-value --out docs/balance/tuned-report.md
+# the shipping difficulty table (the same run plus --gear typical; its report is not committed)
+dotnet run --project Tooling/BalanceSim -c Release -- --panel 16x4 --avatar-value --gear typical --write-difficulty BeastCraft/Assets/_Project/Data/Encounters/encounter-difficulty.json
 ```
 
 ## Library kits
@@ -505,8 +510,11 @@ The default run has no stalemates, PvE or PvP.
 `--write-difficulty <path>` writes the run's calibrated multipliers, one per (kit mode, shape,
 level), as the game's `encounter-difficulty.json` (`DifficultyWriter.cs`; round-trip numbers, the
 same bytes for the same run; schema 2: `Targets` and a `TargetClear` per cell). The committed file
-is the documented command's (seed 12345, 8 compositions, levels 1 / 50 / 100, calibrated on the
-bond-aware scouted pick at each shape's **tiered target**: `squad` and `horde` 80%, `elite` 60%,
+is the documented table command's (`--panel 16x4 --avatar-value --gear typical --write-difficulty
+...`, above; the panel and avatar-value replay do not touch the calibration: `--mode pve --gear
+typical --write-difficulty` writes the same bytes): seed 12345, 8 compositions, levels 1 / 50 / 100,
+the player team in **typical gear** (the shipping assumption, a user decision; its `_readme` names
+the gear), calibrated on the bond-aware scouted pick at each shape's **tiered target**: `squad` and `horde` 80%, `elite` 60%,
 `solo` 50%, the shapes' `TargetClear`, a user decision). The game reads its `elemental` cells through
 `EncounterDifficultyTable` (linear between calibrated levels, clamped outside them) and multiplies by
 `encounter-library.json`'s `DifficultyScale` (1.0, a global producer factor). The table is
@@ -514,7 +522,7 @@ calibrated for a player who scouts and counter-picks: an unscouted team clears f
 report's "Difficulty by shape": about 7-10% of `solo` and `elite`, 50-60% of `squad` and `horde`).
 A table written at another target than the library's still loads, but the importer warns
 (`EncounterDifficultyTable.Warnings`). The balance guard is judged at `--target-clear 50`, never on
-the shipping table. Only single-seed generated PvE runs can write it (`--seeds` and
+the shipping table, and the committed report is gearless. Only single-seed generated PvE runs can write it (`--seeds` and
 `--encounter-set fixed` are refused).
 
 ## Level gap

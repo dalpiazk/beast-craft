@@ -61,8 +61,13 @@ namespace BeastCraft.Tooling.BalanceSim
             File.WriteAllText(path, json.ToString(), new UTF8Encoding(false));
         }
 
-        /// <summary>The documented command that writes the committed table (and the tuned report beside it).</summary>
-        public const string Command = "dotnet run --project Tooling/BalanceSim -c Release -- --panel 16x4 --avatar-value --out docs/balance/tuned-report.md " +
+        /// <summary>
+        /// The documented command that writes the committed (shipping) table: the tuned report's command
+        /// with <c>--gear typical</c> (user decision: the shipping difficulty assumes the gear a player
+        /// normally wears) and no <c>--out</c>. The committed tuned report itself stays gearless
+        /// (<c>-- --panel 16x4 --avatar-value --out docs/balance/tuned-report.md</c>).
+        /// </summary>
+        public const string Command = "dotnet run --project Tooling/BalanceSim -c Release -- --panel 16x4 --avatar-value --gear typical " +
                                       "--write-difficulty BeastCraft/Assets/_Project/Data/Encounters/encounter-difficulty.json";
 
         private static string Readme(SimOptions options, EncounterCatalog encounters)
@@ -74,9 +79,24 @@ namespace BeastCraft.Tooling.BalanceSim
                    SimOptions.CalibrationName(options.EffectiveCalibrateOn) + "' = " + CalibrationMeaning(options.EffectiveCalibrateOn) + ". Targets: " +
                    options.TargetSummary(encounters.Shapes).Replace("`", string.Empty) +
                    (options.UniformTarget ? " (uniform, --target-clear)" : " (encounter-library.json, tiered by the kind of fight: trash cleared most of the time, bosses about half)") +
+                   ". Player gear: " + GearMeaning(options.Gear) +
                    ". The game reads the elemental cells (EncounterDifficultyTable: linear between calibrated levels, clamped outside them) and " +
                    "multiplies by encounter-library.json's DifficultyScale, a global producer factor (1.0 = as calibrated). Schema 1 files " +
                    "(one uniform TargetClear) still load. Regenerate with: " + Command;
+        }
+
+        private static string GearMeaning(GearProfile gear)
+        {
+            switch (gear)
+            {
+                case GearProfile.None:
+                    return "none (--gear none)";
+                case GearProfile.Typical:
+                    return "typical (--gear typical: what a player normally wears at the level, three pieces of its band from gear-library.json; the shipping assumption, a user decision)";
+                default:
+                    string name = gear.ToString().ToLowerInvariant();
+                    return name + " (--gear " + name + ": three pieces of the level's band from gear-library.json)";
+            }
         }
 
         private static string CalibrationMeaning(CalibrationTarget target)

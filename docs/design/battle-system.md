@@ -173,7 +173,8 @@ provenance lines.
   variants of slots), the element-scheme
   weights (`SchemeWeights`: one element for the team 30, one per type 30, one per unit 25, none 15),
   authored fixed encounters (`Templates`: shape, arena, groups of enemy x count x elements, optional
-  `DifficultyOverride`; **none authored**) and `DifficultyScale` (1.0). Shape ids must be exactly the
+  `DifficultyOverride`; the ten DRAFT region bosses, `boss_r01_hollow_warden` ... `boss_r10_apex_pair`,
+  see `docs/design/progression-and-saves.md`, "Bosses (DRAFT)") and `DifficultyScale` (1.0). Shape ids must be exactly the
   drop tables' shapes: a cleared encounter pays out from its shape's cell.
 - `encounter-difficulty.json` — **written by the simulator** (`--write-difficulty`), never by hand:
   the calibrated multiplier per (kit mode, shape, level 1 / 50 / 100). Schema 2 also carries each
@@ -212,15 +213,16 @@ seed and the map node) and keeps it separate from the battle's seed. Everything 
 1. **The campaign's difficulty target — DECIDED (user): tiered by the kind of fight.** Each shape
    carries its own `TargetClear`: trash is meant to be cleared most of the time (`squad` and `horde`
    **80%**), an elite **60%**, a boss about half (`solo` **50%**). The shipped table is calibrated so
-   the team a scouting, counter-picking player fields (the simulator's bond-aware pick) clears that
+   the team a scouting, counter-picking player fields (the simulator's bond-aware pick), wearing
+   **typical gear** (`--gear typical`, user decision), clears that
    share of each shape's generated encounters at each calibrated level; `DifficultyScale` stays a
    global producer factor (**1.0** = as calibrated). A player who does not scout clears far less at
    the same multipliers (the tuned report's "Difficulty by shape": about 7-10% of `solo` and
    `elite`, 50-60% of `squad` and `horde`, `elemental`). Being over-levelled must make every fight
    easier, and the simulator checks it (`--level-gap`, bands relative to the target). Changing a
    target means re-running the simulator's `--write-difficulty`.
-2. **Which authored encounters exist.** `Templates` is empty. The tests build example templates in
-   memory only.
+2. **Which authored encounters exist.** `Templates` holds the ten DRAFT region bosses (placeholders
+   pending producer review); the tests also build example templates in memory.
 3. **How a map node picks a shape and a level.** `EncounterPlan` takes both from its caller.
 4. **Between calibrated levels the multiplier is interpolated linearly** (calibrated at 1, 50 and
    100 only). A tunable default, not a measured curve.
