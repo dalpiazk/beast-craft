@@ -1026,7 +1026,7 @@
       "File": "skill_coup_de_grace.png",
       "Kind": "sprite",
       "Category": "skill",
-      "Label": "Coup de Grace",
+      "Label": "Shadow Pounce",
       "ArtKey": "skill/coup_de_grace",
       "FrameWidth": 24,
       "FrameHeight": 24,

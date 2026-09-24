@@ -467,6 +467,7 @@ namespace BeastCraft.Tests.EditMode
 
             SkillSO chain = BuildSkill(Skill(library, "chain_lightning"));
 
+            Assert.AreEqual("Shadow Pounce", coup.DisplayName, "Renamed from Coup de Grace (display text only; the id is a save key and stays).");
             Assert.AreEqual(0, dive.InitialCooldown);
             Assert.AreEqual(1, dive.MaxUsesPerBattle);
             Assert.AreEqual(120f, dive.Effects[0].Magnitude, "Retuned from 230 (niche pass): a default-loadout opener, not a learned nuke.");

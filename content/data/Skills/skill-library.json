@@ -1307,7 +1307,7 @@
     },
     {
       "SkillId": "coup_de_grace",
-      "DisplayName": "Coup de Grace",
+      "DisplayName": "Shadow Pounce",
       "Description": "Pounces on the most worn-down enemy in reach: up to +60% damage against a target that is nearly out of the fight.",
       "ArtKey": "skill/coup_de_grace",
       "TargetShape": "SingleTarget",

@@ -2310,7 +2310,7 @@ role-scaled guide, deliberately:
   numbers made the Thunderbird the strongest `neutral` beast, so both came down. Talons was
   36 × 3 = 108 at range 1 until "Thunderbird range vs move". See the tuning log, "Niche pass".
 - **Tarasque's Iron Crush** is 160 on cooldown 2 (80, 0.89× the melee budget; 148 before the
-  niche pass), **Basilisk's Coup de Grace** 115 with a 60% execute (75, 1.07×; 105 before), and
+  niche pass), **Basilisk's Shadow Pounce** 115 with a 60% execute (75, 1.07×; 105 before), and
   **Kirin's Radiant Bolt** 70 (1.0×, above a support's ≈ 0.8×; 62 before the niche pass, 66 before
   milestone 2): small lifts, each well inside the ceiling.
 - **Griffin's Wind Lance** is 122 on a line, cooldown 2 (79, 1.13×; 110 before milestone 2), **Gale
@@ -2434,7 +2434,7 @@ learnable by level 5.
 | Skill | Learn | Default | Shape | Cat. | Cd | Effects | Dmg/turn | Tier bonuses |
 | --- | ---: | :---: | --- | --- | ---: | --- | ---: | --- |
 | Venom Spit `venom_spit` | 1 | slot 1 | SingleTarget r3 | Special | 1 | Damage 45; DoT 15 3t, stacks x3 | 68 | L10: adds -5% SpecialDefense 2t, stacks x3; L15: adds Damage 15 |
-| Coup de Grace `coup_de_grace` | 1 | slot 2 | SingleTarget r3, lowest HP% | Special | 2 | Damage 115, execute +60% | 75 | L10: adds DoT 15 2t; L15: adds -10% Defense 2t |
+| Shadow Pounce `coup_de_grace` | 1 | slot 2 | SingleTarget r3, lowest HP% | Special | 2 | Damage 115, execute +60% | 75 | L10: adds DoT 15 2t; L15: adds -10% Defense 2t |
 | Petrifying Gaze `petrifying_gaze` | 4 | slot 3 | SingleTarget r3 | Special | 3 | Damage 45; Stun 1t (45%) | 15 | L10: adds -15% Speed 2t; L15: -1 cd |
 | Eclipse Fang `eclipse_fang` | 12 |  | SingleTarget r3 | Special | 2 | Damage 32 x4 hits | 64 | L10: adds -8% SpecialDefense 2t; L15: adds Damage 20 |
 | Predator Focus `predator_focus` | 25 |  | Self | - | 4 | +20 CritChance 3t; +10% SpecialAttack 3t | - | L10: adds +10% Speed 3t; L15: -1 cd |

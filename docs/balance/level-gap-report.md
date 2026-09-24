@@ -51,7 +51,7 @@ by design.
 |  |  | 2 | Blessing | AllAllies | 0 | 4 | +12% SpecialAttack 2t; +12% SpecialDefense 2t |
 |  |  | 3 | Radiant Bolt | SingleTarget | 3 | 1 | dmg 70 |
 | Basilisk | Ranged | 1 | Venom Spit | SingleTarget | 3 | 1 | dmg 45; DamageOverTime 15 3t x3 stacks |
-|  |  | 2 | Coup de Grace | SingleTarget | 3 | 2 | dmg 115 exec +60% |
+|  |  | 2 | Shadow Pounce | SingleTarget | 3 | 2 | dmg 115 exec +60% |
 |  |  | 3 | Petrifying Gaze | SingleTarget | 3 | 3 | dmg 45; Stun 1t 45% |
 
 ## PvE: team vs encounter (primary)
