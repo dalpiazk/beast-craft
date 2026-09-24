@@ -3075,3 +3075,29 @@ landed at 59% scouted, the bisection's closest step).
 Reproduce: `dotnet run --project Tooling/BalanceSim -c Release -- --mode campaign --self-check --out
 docs/balance/campaign-pacing-report.md` (about 2 s) and `-- --mode pacing --self-check --out
 docs/balance/pacing-report.md`.
+
+## Economy: gear budget, consumables, Trader prices (`--economy-probe`, `--mode campaign`)
+
+The economy (gold, the Trader, gear, consumables, cosmetics; docs/design/economy-and-shop.md) was
+tuned with two new tools: `--economy-probe` (every PvE cell replayed at its calibrated multiplier with
+each gear profile and each consumable, in levels-equivalent against the team one level above the
+enemies) and the economy model inside `--mode campaign`.
+
+| Knob | Design | Now | Why |
+| --- | --- | --- | --- |
+| Gear budget | common 5% / rare 8% / epic 12% of a stat at every band | the same in band 1, scaled per band by `(T(11) / T(min + 10))^0.65` | A level adds less of a stat the higher it is: flat-5% commons measured 0.69 / 1.30 / 1.64 LE at L1 / 50 / 100 (target ~0.7); scaled: 0.69 / 0.74 / 0.69. |
+| Epics | one per slot, mixed stats | one per piece (six per band from 41), focused | Mixed-stat epics measured below the rares (0.91 LE at L50); focused: 1.78. |
+| Consumables | +10% stats, +8 crit, shield 25%, -10% enemy Speed, 30% DoT | +4% stats, +12 crit, -5% enemy Attack / SpecialAttack, 50% DoT 8; no speed, no shield | At most one per battle, each at or under ~0.3 LE (measured 0.17-0.26 mean, 0.20-0.39 at L50). Speed buffs / debuffs measured negative (-0.4 to -0.7 LE); a consumable shield displaced bond shields (negative). |
+| Trader visits | every ~12 battles | a trading post (unchanged maps) plus a travelling trader at every camp: every ~9 battles | Trading posts alone were met every ~36 battles (1.5 per region); more trading posts in the maps pushed the recruit past its gate (fewer battles). |
+| Prices | design units | x0.7 | Visits every ~9 battles bring ~7 price units each, not ~11: affordability p50 45% at the design's prices, 69% now (target 55-80%). |
+
+Result, 1,000 campaigns: want-list affordability p50 69%; no visit without an affordable essential;
+gold held at every boss 1.0-1.9 visits' income; gold earned 977 / 4,559 / 9,026 in regions 1 / 5 / 10,
+49,953 over the campaign (+~15,000 from gear sales); focus skill 17 / 86 / 190 / 323; every earlier
+campaign gate unchanged (545 battles p50). The multi-seed balance guard holds under `--gear rare`.
+Typical gear raises the calibrated difficulty multipliers by 0.4-8.6% (not yet applied; see the
+economy doc).
+
+Reproduce: `dotnet run --project Tooling/BalanceSim -c Release -- --mode campaign --self-check --out
+docs/balance/campaign-pacing-report.md`; `-- --mode pve --economy-probe --out <scratch>`; `-- --mode
+pve --seeds 12345,777,4242 --gear rare --out <scratch>`.

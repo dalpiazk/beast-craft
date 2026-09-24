@@ -3,8 +3,9 @@
 How a player's progress is stored, how beasts and the avatar level up, the region campaign they
 play through, and the single entry point a scene calls to fight a battle from save data and pay it
 out. This covers the runtime code under
-`BeastCraft/Assets/_Project/Scripts/Runtime/{Save,Session,Progression,Campaign}` and the tooling that
-tests it outside Unity. The battle rules themselves are in [battle-system.md](battle-system.md);
+`BeastCraft/Assets/_Project/Scripts/Runtime/{Save,Session,Progression,Campaign,Economy}` and the tooling that
+tests it outside Unity. The battle rules themselves are in [battle-system.md](battle-system.md); the
+economy (gold, the Trader, gear, consumables, cosmetics) is in [economy-and-shop.md](economy-and-shop.md);
 pacing numbers come from [`docs/balance/campaign-pacing-report.md`](../balance/campaign-pacing-report.md)
 (the region campaign) and [`docs/balance/pacing-report.md`](../balance/pacing-report.md) (skills and
 materials).
@@ -17,13 +18,13 @@ Services integration yet.
 
 ## Save format
 
-### `PlayerSave` (schema 3)
+### `PlayerSave` (schema 4)
 
 One versioned aggregate per player (`BeastCraft.Save.PlayerSave`):
 
 | Field | Type | Contents |
 | --- | --- | --- |
-| `SchemaVersion` | `int` | The schema the data is in. `CurrentSchemaVersion` is **3**. 0 or missing is never valid. |
+| `SchemaVersion` | `int` | The schema the data is in. `CurrentSchemaVersion` is **4**. 0 or missing is never valid. |
 | `Beasts` | `List<OwnedBeast>` | The beast collection, in the order obtained. |
 | `Avatar` | `AvatarProgress` | The avatar's own level and XP. |
 | `AvatarSkills` | `AvatarSkillBook` | The avatar's active and passive skill books. |
@@ -31,6 +32,11 @@ One versioned aggregate per player (`BeastCraft.Save.PlayerSave`):
 | `Gear` | `GearInventory` | Every owned piece of beast and avatar gear, worn or not (schema 2). |
 | `AvatarEquippedGear` | `string[3]` | The avatar's worn gear by slot, indexed by `(int)AvatarGearSlot` (schema 2). |
 | `Campaign` | `CampaignProgress` | Owned seals, each unlocked region's progress, the current region and the expedition in progress (schema 3; see "Region campaign"). |
+| `Gold` | `int` | Gold held, 0 to 9,999,999 (`Economy.Wallet`; schema 4). |
+| `Consumables` | `List<ConsumableStack>` | `{ConsumableId, Quantity}`, one stack per consumable, 1 to its max stack (schema 4). |
+| `Shops` | `List<ShopVisit>` | Each Trader's stock as first seen, frozen: `{NodeKey, Listings[] {Category, ItemId, Quantity, Price, Remaining}}`, the most recent 16 (schema 4). |
+| `Cosmetics` | `CosmeticCollection` | `Unlocked`: account-wide `"categoryId/optionId"` look unlocks (defaults and starter looks are free and never listed; schema 4). |
+| `AvatarAppearance` | `CustomizationSelection` | The avatar's chosen looks and colours; a category not listed reads as its default (schema 4). |
 
 `OwnedBeast` is one beast in the collection:
 
@@ -40,6 +46,7 @@ One versioned aggregate per player (`BeastCraft.Save.PlayerSave`):
 | `Progress` | `BeastProgress` | `{SpeciesId, Level, Xp, BankedXp}`: which species it is, its level (1-based), XP toward the next, and XP banked while held at the level cap (`BankedXp`, schema 3). |
 | `Skills` | `BeastSkillBook` | Learned skills with their `SkillProgress` (level, XP, tier) and the 3 equipped slots (slot order is fire priority). |
 | `EquippedGear` | `string[3]` | Worn beast gear by slot, indexed by `(int)GearSlot` (schema 2). |
+| `Appearance` | `CustomizationSelection` | The beast's chosen looks, from its own species' categories only (schema 4). |
 
 **JsonUtility-compatible by construction.** Every type reachable from `PlayerSave` is
 `[Serializable]` with public fields and a parameterless constructor, and every map is a list —
@@ -125,6 +132,11 @@ the load with a reason. The registered steps are `SaveMigrations.All()`:
 | --- | --- |
 | `SaveMigrations.AddGear` (1 → 2) | A v1 save owns no gear: read it into the current type (the gear fields take their empty defaults), fill in anything missing, write it back. |
 | `SaveMigrations.AddCampaign` (2 → 3) | A v2 save has no campaign and no bank: read it into the current type (empty campaign, `BankedXp` 0), fill in anything missing, unlock `r01`, write it back. Beasts keep their levels — one above the starting cap (12) stays there and only banks until the cap passes it. |
+| `SaveMigrations.AddEconomy` (3 → 4) | A v3 save has no economy: read it into the current type (no gold, consumables, Trader visits or unlocks; every appearance at its defaults — starter looks are free anyway), fill in anything missing, write it back. Nothing else moves. |
+
+Schema 3 was not yet shipped when the economy landed on top of it, so the map's location fields
+(`MapNode.Kind` / `X` / `Y` / `LabelKey`) were added to schema 3 directly rather than bumping it;
+a stored map without them is placed on load.
 
 To change the schema: bump `PlayerSave.CurrentSchemaVersion`, add a step whose `FromVersion` is the
 previous version, and add a test that loads an example of the old shape. Purely additive fields
@@ -172,7 +184,7 @@ header (no migration or validation) and any problem, for a load/continue menu.
 
 ### Validation
 
-`SaveValidator.Validate(save, ISaveContentCatalog, ISaveGearCatalog)` reports problems as
+`SaveValidator.Validate(save, ISaveContentCatalog, ISaveGearCatalog[, ISaveEconomyCatalog])` reports problems as
 `SaveIssue {Kind, Path, Id, Message}` (a `Path` like `Beasts[2].Skills.Known[0].SkillId`). It never
 throws and never changes the save: an id that has disappeared from the content is the game's to
 handle (typically ignore the entry and log it), not a reason to refuse the file. With null catalogs
@@ -194,11 +206,20 @@ only the structural checks run.
 | `UnknownGearInstance` | a worn slot names an instance the right inventory list does not hold | — |
 | `DoubleEquippedGear` | an instance is worn in more than one slot or by more than one owner | — |
 | `GearSlotMismatch` | a worn instance is in a slot other than its gear's own | gear |
-| `GearLevelTooLow` | a beast wears gear above its level (the gear has no effect) | gear |
+| `GearLevelTooLow` | a beast wears gear above its level (the gear has no effect), or the avatar wears avatar gear above its level (avatar gear has a `MinimumLevel` since schema 4) | gear |
 | `UnknownRegion` | a region id (progress, current region, expedition) is empty or unknown | content (for unknown) |
 | `UnknownSeal` | an owned seal id is empty or unknown | content (for unknown) |
 | `DuplicateCampaignEntry` | a region or seal is listed twice | — |
-| `InvalidMapRun` | nodes stored without an expedition; an expedition in a locked region, with no nodes, a node id that is not its index, an unknown node type, a link that is not to the next row, or a current / cleared node not on the map | — |
+| `InvalidMapRun` | nodes stored without an expedition; an expedition in a locked region, with no nodes, a node id that is not its index, an unknown node type or location kind, a map position outside 0-1, a link that is not to the next row, or a current / cleared node not on the map | — |
+| `UnknownConsumable` | a held consumable id is empty or unknown, or held in two stacks | economy (for unknown) |
+| `UnknownCosmetic` | an unlock key or a worn look names no known category / option, or a category of another owner (a species' look on the avatar or another species) | economy (except empty / duplicate) |
+| `CosmeticNotUnlocked` | an appearance wears a look that is neither free nor unlocked | economy |
+| `InvalidShopVisit` | a Trader visit with an empty or duplicate key, or a listing with no id, an unknown category, or counts / price out of range | — |
+
+Gold outside 0-9,999,999 and a consumable stack outside 1 to its max stack are `InvalidValue`s.
+The economy catalog is `Economy.EconomyContent` (the consumable and cosmetic libraries).
+`CosmeticRules.RepairAppearances` drops every worn look that is no longer usable, so it reads as the
+default again.
 
 Negative `BankedXp`, `StagesCleared`, run `Stage` / attempts and node levels outside 1-100 are
 `InvalidValue`s.
@@ -360,8 +381,10 @@ keep their left-to-right order, so the paths read as routes across the region.
 | `PlanFor(node, encounters, enemies)` | The node's `EncounterPlan` (template, or generated from its shape, level and seed — a retry fields the same lineup). Null for Rest / Shop. |
 | `BattleSeed(node, attempt)` | `DeriveSeed(EncounterSeed, attempt)`: a new battle seed per retry. |
 | `ResolveBattle(save, regions, nodeId, outcome)` | Win: the node is cleared and current. A Gate also clears the stage and ends the expedition; the Boss sets `BossCleared`, grants its seal (`GrantSeal`), unlocks the next region and ends it. Loss (lead decision): nothing moves — retry the node or take another path; `Attempts` counts. Rewards are `BattleSession.ApplyRewards(…, beastLevelCap: BeastCap(save, regions))`, not this. |
-| `Camp(save, regions, nodeId, beastId)` | Rest node: trains one chosen beast by a standing clear at the node's level (falloff, cap). Battles already start at full HP, so there is no healing. |
-| `Trade(save, regions, nodeId, shop)` | Shop node: opens the `IShopService` (a stub, `ShopServiceStub`, until the economy lane's gold and stock land) and marks the node visited. |
+| `Camp(save, regions, nodeId, beastId)` | Rest node: trains one chosen beast by a standing clear at the node's level (falloff, cap). Battles already start at full HP, so there is no healing. A travelling trader also waits at every camp: the game opens the shop with `ShopContextFor(run, campNode)` (the economy's pacing assumes it; see [economy-and-shop.md](economy-and-shop.md)). |
+| `Trade(save, regions, nodeId, shop)` | Shop node (a trading post): opens the `IShopService` — the economy's `ShopService`, whose stock is rolled once and frozen into the save; `ShopServiceStub` or null offers nothing — and marks the node visited. Buying and selling go through the shop with `ShopContextFor(run, node)`. |
+| `ResolveBattle(save, regions, nodeId, outcome, economy)` | As `ResolveBattle`, plus the economy's first-clear rewards: a pass's (Gate's) first clear grants a guaranteed rare, a lair's (Boss's) an epic (a rare below band 41) and its boss-exclusive looks, then milestone looks (`CampaignResult.GearGranted`, `CosmeticsUnlocked`). |
+| `RewardModifiersFor(node)` | The economy's reward modifiers for `ApplyRewards`: dens (Elite) gold x1.5, passes +5, lairs +10. |
 | `Retreat(save)` | Abandons the expedition (stage progress already earned stays). |
 | `GrantSeal(save, regions, sealId)` | Adds the seal and releases every beast's bank at the new cap. Bosses call it; it is also the hook for future story-event seals. |
 | `BeastCap(save, regions)` | `LevelCaps.BeastCap(save.Campaign.Seals, regions)`. |
@@ -510,13 +533,21 @@ Pays a finished battle into the save:
 - **Bench XP** — `BeastProgression.AwardBench` to every other beast in the save (the bench share,
   then the falloff), under the same cap.
 - **Avatar XP** — `AvatarProgression.AwardBattle` when the avatar took part (falloff; no cap).
+- **Economy** (schema 4; [economy-and-shop.md](economy-and-shop.md)) — on a clear, gold from the drop
+  table's `Gold` (first-clear bonus when the material roll was a first clear, then the
+  `RewardModifiers`' multiplier and bonus) into the wallet on its own seed stream
+  (`DeriveSeed(seed, 1)`), so the material rolls never move; with `RewardModifiers.Gear`, the table's
+  gear drops (stream 3); with `RewardModifiers.Cosmetics`, its low-chance look drop (stream 4) and,
+  after the XP, any milestone looks reached. The battle's consumables (`BattleSetup.Consumables`,
+  at most one, used as it began on stream 2) are spent whatever the outcome.
 
 `rng` drives the drop rolls; null seeds one with `LootRoller.DeriveSeed(result.Seed, 0)`, so rewards
 are deterministic either way. The summary reports `Applied`, `Error`, `Outcome`,
 `SkillLevelsGained`, `BeastXpGained` (by beast id, after the falloff), `BeastLevelsGained`,
 `BenchXpGained` (by beast id), `BenchLevelsGained`, `XpBanked` (by beast id, what went to the bank),
 `FalloffPercent` (by beast id, team and bench), `BeastLevelCap`, `AvatarXpGained`,
-`AvatarFalloffPercent`, `AvatarLevelsGained` and the `Loot`. It refuses — changing nothing — a null save or result, a failed
+`AvatarFalloffPercent`, `AvatarLevelsGained`, the `Loot`, `GoldGained`, `GearGained`, `ConsumablesSpent` and
+`CosmeticsUnlocked`. It refuses — changing nothing — a null save or result, a failed
 battle, or a result already paid out (`BattleSessionResult.RewardsApplied`). A team beast no longer in
 the save is skipped.
 
@@ -526,7 +557,9 @@ both); it refuses, changing nothing, a result whose setup named no shape or no l
 
 Both have an overload taking `int beastLevelCap` before `rng` (the campaign passes
 `CampaignRules.BeastCap(save, regions)`); the overloads without it pass `BeastProgression.MaxLevel`,
-no cap. `Session` does not depend on `Campaign`: the cap is just a number.
+no cap. `Session` does not depend on `Campaign`: the cap is just a number. Both also have an overload
+taking `RewardModifiers` after the cap (the campaign passes
+`CampaignRules.RewardModifiersFor(node).With(economy)`).
 
 ---
 
@@ -578,14 +611,16 @@ its System.Text.Json twin here.
 
 ## Known gaps / follow-ups
 
-- **No gear content.** There are no gear data files or importer; `BattleContent` gets gear only
-  from its caller, and the gear tests use in-memory `GearSO` / `AvatarGearSO` instances.
+- **Economy content is DRAFT** (gear, consumable and look names and numbers, shop prices); no UI
+  and no art (looks carry placeholder art keys). See [economy-and-shop.md](economy-and-shop.md),
+  "Open items".
 - **Region content is DRAFT.** Region and seal names, level bands, map rules and the ten boss
   templates (names, elements, escorts) are placeholders for producer review; the boss
   `DifficultyOverride`s were calibrated before the tiered difficulty targets and should be
   re-calibrated after them (see "Region campaign").
-- **The shop is a stub.** Shop nodes call `IShopService`; `ShopServiceStub` offers nothing until the
-  economy lane's gold and stock land.
+- **Camp traders are an economy assumption.** The economy's pacing assumes a travelling trader at
+  every camp (about one Trader visit per stage); the game must open the shop there. Pending producer
+  review.
 - **Bench share retuned away from the lead's numbers** (10% + 9% per level instead of 50% + 7.5%)
   to reach the intended "reserves ~6 levels behind"; pending lead/user review (see "Beast and avatar
   level").
