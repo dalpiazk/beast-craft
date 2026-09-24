@@ -27,7 +27,8 @@ beast-craft/
 ├── Pipeline/       OFFLINE, build-time-only asset generation. Never runs at runtime.
 ├── Tooling/        CiStubs/: hand-written UnityEngine stub + csproj so CI compiles
 │                   the game scripts without a Unity install. BalanceSim/: local-only
-│                   headless balance simulator over the real battle code. Never shipped.
+│                   headless balance simulator over the real battle code. EditModeTests/:
+│                   local-only `dotnet test` runner for the EditMode suite. Never shipped.
 ├── docs/           design/, architecture/ and balance/ (simulator reports) notes
 └── .github/        CI workflows
 ```
@@ -139,6 +140,19 @@ What exists today:
   committed reports are [`docs/balance/baseline-report.md`](docs/balance/baseline-report.md)
   (first-draft stats, the "before") and [`docs/balance/tuned-report.md`](docs/balance/tuned-report.md)
   (the tuned roster); their numbers are inputs to design decisions, not applied automatically.
+- A **local EditMode test runner** (`Tooling/EditModeTests/`) — not a CI job —
+  that compiles the Runtime, Editor and `Tests/EditMode` scripts against the
+  UnityStub and runs the whole EditMode suite with NUnit, no Unity install
+  needed. Run it from the repo root before pushing:
+
+  ```sh
+  dotnet test Tooling/EditModeTests
+  ```
+
+  It swaps the stub's compile-only `JsonUtility` for a System.Text.Json
+  implementation that follows JsonUtility's field rules (see
+  [`Tooling/CiStubs/README.md`](Tooling/CiStubs/README.md)); Unity's own Test
+  Runner remains the authority on real serialization.
 - A **battle-system design proposal** ([`docs/design/battle-system.md`](docs/design/battle-system.md))
   whose open questions are still awaiting producer confirmation.
 

@@ -24,6 +24,15 @@ namespace UnityEngine
         // Lower-cased deliberately: the game scripts read `name` exactly as Unity spells it.
         public string name { get; set; }
 
+        /// <summary>
+        /// Stand-in for <c>Object.DestroyImmediate</c>, which the EditMode tests call in teardown to
+        /// free the ScriptableObjects they create. There is no native object to free outside Unity,
+        /// so this is a genuine no-op, not a lie: the managed instance is simply left to the GC.
+        /// </summary>
+        public static void DestroyImmediate(Object obj)
+        {
+        }
+
         public override string ToString()
         {
             return name ?? base.ToString();
@@ -456,18 +465,95 @@ namespace UnityEngine
     }
 
     /// <summary>
-    /// Stand-in for <c>UnityEngine.JsonUtility</c>, used by the Editor roster importer and the
-    /// roster EditMode test. netstandard2.1 has no built-in JSON serializer and this project takes
-    /// no package references, so this is a compile-only surface and throws if actually called: CI
-    /// only compiles, it never runs. The roster file is exercised for real by the EditMode test in
-    /// Unity (and, outside Unity, with System.Text.Json, which reads the same field names).
+    /// Stand-in for <c>UnityEngine.JsonUtility</c>, used by the Editor data importers, the save
+    /// serializer and several EditMode tests.
+    /// <para>
+    /// By default (CiLint, BalanceSim) this is a compile-only surface and throws if actually called:
+    /// netstandard2.1 has no built-in JSON serializer and this project takes no package references.
+    /// </para>
+    /// <para>
+    /// When compiled with <c>UNITYSTUB_SYSTEM_TEXT_JSON</c> defined (only
+    /// <c>Tooling/EditModeTests</c>, which compiles these sources directly on a runtime that ships
+    /// System.Text.Json), it is a real implementation over System.Text.Json restricted to
+    /// JsonUtility's rules: public instance fields only (no properties, no readonly fields, no
+    /// <c>[NonSerialized]</c> fields), names exactly as declared, case-sensitive, enums as numbers,
+    /// unknown keys ignored.
+    /// </para>
     /// </summary>
     public static class JsonUtility
     {
+#if UNITYSTUB_SYSTEM_TEXT_JSON
+        private static readonly System.Text.Json.JsonSerializerOptions CompactOptions = CreateOptions(false);
+        private static readonly System.Text.Json.JsonSerializerOptions PrettyOptions = CreateOptions(true);
+
+        public static T FromJson<T>(string json)
+        {
+            // Like JsonUtility, malformed or empty input throws (here a JsonException/ArgumentNullException).
+            return System.Text.Json.JsonSerializer.Deserialize<T>(json, CompactOptions);
+        }
+
+        public static string ToJson(object obj)
+        {
+            return ToJson(obj, false);
+        }
+
+        public static string ToJson(object obj, bool prettyPrint)
+        {
+            if (obj == null)
+            {
+                return string.Empty;
+            }
+
+            return System.Text.Json.JsonSerializer.Serialize(obj, obj.GetType(), prettyPrint ? PrettyOptions : CompactOptions);
+        }
+
+        private static System.Text.Json.JsonSerializerOptions CreateOptions(bool prettyPrint)
+        {
+            System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver resolver = new System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver();
+            resolver.Modifiers.Add(KeepOnlyJsonUtilityFields);
+
+            return new System.Text.Json.JsonSerializerOptions
+            {
+                IncludeFields = true,
+                WriteIndented = prettyPrint,
+                TypeInfoResolver = resolver
+            };
+        }
+
+        /// <summary>Drops every member JsonUtility would not write: properties, readonly fields and [NonSerialized] fields.</summary>
+        private static void KeepOnlyJsonUtilityFields(System.Text.Json.Serialization.Metadata.JsonTypeInfo typeInfo)
+        {
+            if (typeInfo.Kind != System.Text.Json.Serialization.Metadata.JsonTypeInfoKind.Object)
+            {
+                return;
+            }
+
+            for (int i = typeInfo.Properties.Count - 1; i >= 0; i--)
+            {
+                System.Reflection.FieldInfo field = typeInfo.Properties[i].AttributeProvider as System.Reflection.FieldInfo;
+
+                if (field == null || field.IsInitOnly || field.IsDefined(typeof(NonSerializedAttribute), true))
+                {
+                    typeInfo.Properties.RemoveAt(i);
+                }
+            }
+        }
+#else
         public static T FromJson<T>(string json)
         {
             throw new NotSupportedException("UnityStub.JsonUtility is compile-only; parse JSON in Unity or with System.Text.Json.");
         }
+
+        public static string ToJson(object obj)
+        {
+            throw new NotSupportedException("UnityStub.JsonUtility is compile-only; write JSON in Unity or with System.Text.Json.");
+        }
+
+        public static string ToJson(object obj, bool prettyPrint)
+        {
+            throw new NotSupportedException("UnityStub.JsonUtility is compile-only; write JSON in Unity or with System.Text.Json.");
+        }
+#endif
     }
 
     /// <summary>Stand-in base for Unity's inspector-decoration attributes.</summary>
