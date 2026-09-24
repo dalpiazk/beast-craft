@@ -71,12 +71,10 @@ pulls snap at the turn's start; damage over time, heals, buffs and statuses have
 own yet (their HP changes settle at the end of the turn); the avatar is left out (it has no
 tile).
 
-## The VFX library (`BeastCraft/Assets/_Project/Data/Vfx/vfx-library.json`)
+## The VFX library (`content/data/Vfx/vfx-library.json`)
 
-Kept beside the other data files rather than in a new top-level `content/`: every loader, test
-and the desktop copy step already work from the `Assets/_Project/Data` layout
-(`ProjectRelativePath`), and moving *all* content out of the legacy Unity tree is a separate,
-repo-wide change. It is presentation data only — the battle never reads it, so no edit to it can
+Kept beside the other data files under `content/data/` (every loader, test and the host copy
+step resolves it through its `ProjectRelativePath`, a repo-relative path). It is presentation data only — the battle never reads it, so no edit to it can
 change an outcome or the balance reports.
 
 ```jsonc
@@ -130,9 +128,9 @@ Sprites are text grids (one char per palette colour) in `Tooling/PixelArt/sprite
 `build.py` (Python 3 + Pillow 12.3.0) adds the auto-outline and rim shading, runs the integer-only
 generators (the `fx` burst flipbooks, the `hex` tiles made from a tile texture), and writes the
 game's PNGs (Git LFS) plus `pixel-art-manifest.json` (every sprite's file, frame size, frame
-count, ArtKey, and the palette) to `BeastCraft/Assets/_Project/Art/Pixel/`. With the pinned
-Pillow it regenerates them byte for byte. The desktop project copies `Data/**/*.json` and
-`Art/Pixel/*` into `Content/` beside the executable; `GameContent.FindRoot` looks there first and
+count, ArtKey, and the palette) to `content/art/pixel/`. With the pinned
+Pillow it regenerates them byte for byte. The desktop project copies `content/data/**/*.json` and
+`content/art/pixel/*` into `Content/data/` and `Content/art/pixel/` beside the executable; `GameContent.FindRoot` looks there first and
 falls back to the repo. Style rules: `Tooling/PixelArt/STYLE.md`.
 
 Placeholder content: all ten roster beasts, four enemies (the others borrow the brute), 32x36
@@ -163,7 +161,7 @@ is an entry point that builds a `ViewerHost` and runs `BattleViewerGame`; nothin
 `GameContent.Load(IContentSource, errors)` and the sprite atlas open every file through
 `IContentSource` (`Exists`, `Open`, `Describe` for messages), with content-root-relative paths
 using forward slashes (`GameContent.RelativeOf` maps a ProjectRelativePath). Desktop uses
-`FileContentSource` (files beside the exe, the repo's `BeastCraft/Assets/_Project`, or
+`FileContentSource` (files beside the exe, the repo's `content/`, or
 `--content DIR`; `GameContent.Load(string root, ...)` is unchanged and delegates to it). Android
 uses `TitleContainerContentSource("Content")`: MonoGame's `TitleContainer`, i.e. the APK's assets
 via the activity's `AssetManager`. It copies each file into a `MemoryStream`, since asset streams
@@ -210,8 +208,6 @@ audio; a shader-based hit flash; safe-area insets for display cutouts.
 
 ## Open questions
 
-- Keep generated pixel art in the legacy `BeastCraft/Assets/_Project/Art` tree, or move all
-  content (data and art) to a top-level `content/` when Unity is removed?
 - Should `ArtKey` become part of the species and enemy data (as the cosmetics already do) instead
   of the host mapping `beast_<id>` / `enemy_<id>` sprite names?
 - Status effects, heals, buffs and the avatar's casts need their own VFX vocabulary (a "status

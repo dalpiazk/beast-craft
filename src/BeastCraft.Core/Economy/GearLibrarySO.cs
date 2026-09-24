@@ -2,7 +2,7 @@
 namespace BeastCraft.Economy
 {
     /// <summary>
-    /// The imported gear library: <c>Data/Items/gear-library.json</c> copied verbatim by the Editor
+    /// The imported gear library: <c>data/Items/gear-library.json</c> copied verbatim by the Editor
     /// importer (menu: Beast Craft/Data/Import Gear Library), which also writes one <c>GearSO</c> /
     /// <c>AvatarGearSO</c> asset per piece. Never hand-edit <see cref="Data"/>; edit the JSON and
     /// re-import.

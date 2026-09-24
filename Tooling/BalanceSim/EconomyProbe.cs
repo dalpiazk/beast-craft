@@ -148,7 +148,7 @@ namespace BeastCraft.Tooling.BalanceSim
         }
 
         /// <summary>The consumable library's path relative to the repo root.</summary>
-        public const string ConsumablesRepoRelativePath = "BeastCraft/" + ConsumableLibraryData.ProjectRelativePath;
+        public const string ConsumablesRepoRelativePath = ConsumableLibraryData.ProjectRelativePath;
 
         /// <summary>Loads and validates <c>consumable-library.json</c>; null with <paramref name="errors"/> filled on failure.</summary>
         public static ConsumableLibrary LoadConsumables(string path, List<string> errors)

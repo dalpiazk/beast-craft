@@ -27,7 +27,7 @@ namespace BeastCraft.Tooling.BalanceSim
     public sealed class SkillLibraryKits
     {
         /// <summary>The library's path relative to the repo root.</summary>
-        public const string RepoRelativePath = "BeastCraft/" + SkillLibraryData.ProjectRelativePath;
+        public const string RepoRelativePath = SkillLibraryData.ProjectRelativePath;
 
         private readonly Dictionary<string, SkillSO> _elemental = new Dictionary<string, SkillSO>(StringComparer.Ordinal);
         private readonly Dictionary<string, SkillSO> _neutral = new Dictionary<string, SkillSO>(StringComparer.Ordinal);

@@ -160,13 +160,13 @@ See the [battle-system design doc](docs/design/battle-system.md) and
 **Authored data** (JSON is the source of truth, readable outside Unity; the
 Unity `.asset` files are generated from it and none are committed yet):
 
-- `Data/Creatures/beast-roster.json` — ten starter beasts, one per element,
+- `content/data/Creatures/beast-roster.json` — ten starter beasts, one per element,
   with stances and three growth curves (all ten currently use `medium`; `fast`
   and `slow` are kept for the simulator).
-- `Data/Skills/skill-library.json` — 60 beast skills (six per beast) with each
+- `content/data/Skills/skill-library.json` — 60 beast skills (six per beast) with each
   species' learnable skills and 3-skill default loadout, 6 avatar active
   skills, 10 avatar passives, 3 skill-training materials and 11 team bonds.
-- `Data/Skills/drop-tables.json` — material drops by encounter shape x level
+- `content/data/Skills/drop-tables.json` — material drops by encounter shape x level
   band, with pity thresholds.
 
 The numbers are simulator-tuned starting points, not confirmed balance — see
@@ -210,8 +210,8 @@ The numbers are simulator-tuned starting points, not confirmed balance — see
   MonoBehaviour).
 - Encounters as game data — the only encounters are the balance simulator's
   generator and its `Tooling/BalanceSim/encounters.json`.
-- Gear content — the gear schemas and save support exist, but `Data/Gear/` and
-  `Data/AvatarGear/` are empty.
+- Gear content — the gear schemas and save support exist, but `content/data/Gear/` and
+  `content/data/AvatarGear/` are empty.
 - Narrative, IAP and services code (only empty placeholder folders in the
   legacy Unity `Runtime/`; idle rewards have their rules in
   `src/BeastCraft.Core/Idle` but no UI),
@@ -234,7 +234,7 @@ dotnet run --project src/BeastCraft.Desktop -c Release
 
 **Space** plays the next turn (or finishes the one playing), **A** toggles
 auto-play, **Esc** quits. Each fired skill plays its VFX from
-`Data/Vfx/vfx-library.json`; Phoenix's Ember Shot and Flame Wave are fully
+`content/data/Vfx/vfx-library.json`; Phoenix's Ember Shot and Flame Wave are fully
 authored, every other skill uses its element's default.
 
 Screenshot mode renders one frame to a PNG and exits (it still opens a window

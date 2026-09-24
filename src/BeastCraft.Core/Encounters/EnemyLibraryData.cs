@@ -5,7 +5,7 @@ using BeastCraft.Skills;
 namespace BeastCraft.Encounters
 {
     /// <summary>
-    /// The plain-data shape of <c>Data/Encounters/enemy-library.json</c>: every PvE enemy type the
+    /// The plain-data shape of <c>data/Encounters/enemy-library.json</c>: every PvE enemy type the
     /// game fields — stats, stance, size and kit. Enemies are not roster beasts (they are never
     /// owned, levelled or saved); <see cref="EnemyCatalog"/> turns each (enemy, element) pair into
     /// an in-memory <c>CreatureSpeciesSO</c> and skill kit on demand, so an enemy goes through the
@@ -21,8 +21,8 @@ namespace BeastCraft.Encounters
     [Serializable]
     public class EnemyLibraryData
     {
-        /// <summary>Path of the file relative to the Unity project folder (<c>BeastCraft/</c>).</summary>
-        public const string ProjectRelativePath = "Assets/_Project/Data/Encounters/enemy-library.json";
+        /// <summary>Path of the file relative to the repository root.</summary>
+        public const string ProjectRelativePath = "content/data/Encounters/enemy-library.json";
 
         /// <summary>The only <see cref="SchemaVersion"/> this code reads.</summary>
         public const int CurrentSchemaVersion = 1;

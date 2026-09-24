@@ -3,7 +3,7 @@ using System;
 namespace BeastCraft.Encounters
 {
     /// <summary>
-    /// The plain-data shape of <c>Data/Encounters/encounter-difficulty.json</c>: the difficulty
+    /// The plain-data shape of <c>data/Encounters/encounter-difficulty.json</c>: the difficulty
     /// multiplier the balance simulator calibrated per (kit mode, encounter shape, level). Written by
     /// the simulator (<c>--write-difficulty</c>), never by hand; <see cref="EncounterDifficultyTable"/>
     /// reads it.
@@ -19,8 +19,8 @@ namespace BeastCraft.Encounters
     [Serializable]
     public class EncounterDifficultyData
     {
-        /// <summary>Path of the file relative to the Unity project folder (<c>BeastCraft/</c>).</summary>
-        public const string ProjectRelativePath = "Assets/_Project/Data/Encounters/encounter-difficulty.json";
+        /// <summary>Path of the file relative to the repository root.</summary>
+        public const string ProjectRelativePath = "content/data/Encounters/encounter-difficulty.json";
 
         /// <summary>
         /// The <see cref="SchemaVersion"/> the simulator writes. 2 added per-shape targets

@@ -5,10 +5,10 @@ decisions; nothing here is applied to the roster automatically. Battles are rand
 but every battle's rng is seeded from the inputs, so the run is deterministic: the same roster, fixtures, code
 and arguments produce a byte-identical report. Battles per PvE team and composition: 1; per PvP game: 5 (`--samples`), each with its own seed.
 
-- Roster: `BeastCraft/Assets/_Project/Data/Creatures/beast-roster.json` (10 species)
+- Roster: `content/data/Creatures/beast-roster.json` (10 species)
 - Sections: PvE team vs encounter (primary); PvP 1v1 round-robin (secondary)
 - Avatar (PvE only): the `library` preset (the skill library's default loadout, `--avatar`), fielded beside every player team; see "Avatar passives"
-- Skill kit: `library` (`--skill-kit library`, the default): each beast's authored default loadout from `BeastCraft/Assets/_Project/Data/Skills/skill-library.json` at skill level 1 (`--skill-level`)
+- Skill kit: `library` (`--skill-kit library`, the default): each beast's authored default loadout from `content/data/Skills/skill-library.json` at skill level 1 (`--skill-level`)
 - Team bonds: on (`--bonds on`, the default): the library's 9 `TeamBonds` apply at battle start to every player team that meets their condition (never to enemies); see "PvE team bonds"
 - Scouted picking (PvE, `--scouted`): random, heuristic, heuristic + bonds, oracle at preview detail `full`; post-processing of the same battles, see "PvE scouted picking"
 - Difficulty (PvE, `--calibrate-on bonds`): calibrated so the team the bond-aware scouted picker (heuristic + bonds) fields per composition clears `solo` 50.0%, `elite` 60.0%, `squad` 80.0%, `horde` 80.0% (the shapes' `TargetClear`) (the player scouts and counter-picks); the average team's no-scouting rate is reported beside it, see "Calibrated difficulty"
@@ -72,7 +72,7 @@ no-scouting rate, see "Calibrated difficulty"), where marginals shrink, so they 
 
 - Teams: every combination of 4 distinct beasts (210 teams, format SmallGroup); each beast is in 84 of them
 - Encounters: generated (`--encounter-set generated`, the default): 4 shapes x 8 compositions (`--compositions`) = 32 compositions, drawn from the
-  enemy library `BeastCraft/Assets/_Project/Data/Encounters/enemy-library.json` per shape of `BeastCraft/Assets/_Project/Data/Encounters/encounter-library.json` (game content) by a generator seeded from
+  enemy library `content/data/Encounters/enemy-library.json` per shape of `content/data/Encounters/encounter-library.json` (game content) by a generator seeded from
   `--seed` alone. Each draw picks a shape variant, a count per slot and each unit's type, and is kept only inside
   the shape's threat budget and with enough distinct types; each composition's element scheme is drawn too (one
   element for the whole team 30%, one per type 30%, one per unit 25%, none 15%), with elements dealt from a shuffled

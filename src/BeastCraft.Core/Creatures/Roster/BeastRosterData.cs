@@ -3,7 +3,7 @@ using System;
 namespace BeastCraft.Creatures.Roster
 {
     /// <summary>
-    /// The plain-data shape of <c>Data/Creatures/beast-roster.json</c>, the source of truth for the
+    /// The plain-data shape of <c>data/Creatures/beast-roster.json</c>, the source of truth for the
     /// starter roster's species and growth curves. The Unity assets
     /// (<see cref="CreatureSpeciesSO"/>, <see cref="GrowthRateCurve"/>) are generated from it by the
     /// Editor importer (menu: Beast Craft/Data/Import Beast Roster); never hand-edit the imported
@@ -19,8 +19,8 @@ namespace BeastCraft.Creatures.Roster
     [Serializable]
     public class BeastRosterData
     {
-        /// <summary>Path of the roster file relative to the Unity project folder (<c>BeastCraft/</c>).</summary>
-        public const string ProjectRelativePath = "Assets/_Project/Data/Creatures/beast-roster.json";
+        /// <summary>Path of the roster file relative to the repository root.</summary>
+        public const string ProjectRelativePath = "content/data/Creatures/beast-roster.json";
 
         /// <summary>Bumped when the file's shape changes incompatibly.</summary>
         public int SchemaVersion;

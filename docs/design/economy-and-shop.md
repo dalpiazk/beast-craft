@@ -1,9 +1,9 @@
 # Economy: gold, the Trader, gear, consumables and cosmetics
 
 **Status: BUILT; every number is a TUNABLE STARTING VALUE and all content (names, stats, looks) is
-DRAFT pending producer review.** Runtime code under `BeastCraft/Assets/_Project/Scripts/Runtime/Economy`
-(namespace `BeastCraft.Economy`); content under `BeastCraft/Assets/_Project/Data/{Items,Economy,Cosmetics}`
-and `Data/Skills/drop-tables.json`; paced by the balance simulator's `--mode campaign`
+DRAFT pending producer review.** Runtime code under `src/BeastCraft.Core/Economy`
+(namespace `BeastCraft.Economy`); content under `content/data/{Items,Economy,Cosmetics}`
+and `content/data/Skills/drop-tables.json`; paced by the balance simulator's `--mode campaign`
 ([`docs/balance/campaign-pacing-report.md`](../balance/campaign-pacing-report.md), "Economy") and
 measured in battle by `--economy-probe`. Save shape: [progression-and-saves.md](progression-and-saves.md)
 (schema 4).
@@ -74,7 +74,7 @@ does not hold.
 
 **Stock** is rolled once per trading post (`ShopContext.NodeKey` = region/stage/node/seed) from the
 node's seed and **frozen into the save** (`PlayerSave.Shops`, the last 16): leaving, coming back or
-reloading never re-rolls it, and purchases stick. `Data/Economy/shop-tables.json` gives each level
+reloading never re-rolls it, and purchases stick. `content/data/Economy/shop-tables.json` gives each level
 band a listing count per category, rolled in a fixed order with weighted draws without replacement
 from pools sorted by id:
 
@@ -100,7 +100,7 @@ on success: `Bought`, or `UnknownListing`, `SoldOut`, `NotEnoughGold`, `StackFul
 
 ## Gear
 
-`Data/Items/gear-library.json`: **78 beast pieces** and **30 avatar pieces** in five bands
+`content/data/Items/gear-library.json`: **78 beast pieces** and **30 avatar pieces** in five bands
 (`MinimumLevel` 1 / 21 / 41 / 61 / 81). Per band six beast pieces — Striker fang (Attack) and focus
 stone (SpecialAttack), Bulwark barding (Defense + HP) and warding mantle (SpecialDefense + HP), Swift
 wind charm (Speed) and keen collar (CritChance) — each common (shop, drops) and rare (shop, drops,
@@ -146,7 +146,7 @@ weapon, rare armor and accessory; 81-100 epic weapon and armor, a rare accessory
 templates' `DifficultyOverride`s:
 
 ```
-dotnet run --project Tooling/BalanceSim -c Release -- --panel 16x4 --avatar-value --gear typical --write-difficulty BeastCraft/Assets/_Project/Data/Encounters/encounter-difficulty.json
+dotnet run --project Tooling/BalanceSim -c Release -- --panel 16x4 --avatar-value --gear typical --write-difficulty content/data/Encounters/encounter-difficulty.json
 ```
 
 Applied after the combat merge (behaviour bonds, tiered targets): against the gearless table the
@@ -156,7 +156,7 @@ against this profile ("Gear at typical", 22-96% of slots by boss).
 
 ## Consumables
 
-`Data/Items/consumable-library.json` (`ConsumableSO`): **at most one per battle**, chosen before the
+`content/data/Items/consumable-library.json` (`ConsumableSO`): **at most one per battle**, chosen before the
 fight (`BattleSetup.Consumables`), used as it begins — before the team's bonds and the avatar's
 opening passives, on stream 2 — and spent win or lose, exactly once: `BattleSession.Run` takes it
 from the pack as the battle begins (after every check passes; a setup that fails spends nothing),
@@ -189,7 +189,7 @@ it, until learned.
 
 ## Cosmetics
 
-`Data/Cosmetics/cosmetic-library.json`: **per-species looks** — each of the ten species has its own
+`content/data/Cosmetics/cosmetic-library.json`: **per-species looks** — each of the ten species has its own
 parts (two, three for the frost wyrm: horns, wings, tail; wings where the species has them) and a tint
 colour — plus the avatar's hair, outfit, headwear, cape and hair / skin / eye colours: 38 categories,
 212 looks. **No stats.** Unlock keys are `"categoryId/optionId"` (category ids are global),

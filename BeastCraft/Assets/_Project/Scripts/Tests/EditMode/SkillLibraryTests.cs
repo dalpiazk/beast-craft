@@ -808,7 +808,6 @@ namespace BeastCraft.Tests.EditMode
                     string[] candidates =
                     {
                         Path.Combine(dir.FullName, SkillLibraryData.ProjectRelativePath),
-                        Path.Combine(dir.FullName, "BeastCraft", SkillLibraryData.ProjectRelativePath),
                     };
 
                     foreach (string candidate in candidates)

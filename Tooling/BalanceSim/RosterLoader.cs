@@ -20,7 +20,7 @@ namespace BeastCraft.Tooling.BalanceSim
     public static class RosterLoader
     {
         /// <summary>The roster's path relative to the repo root.</summary>
-        public const string RepoRelativePath = "BeastCraft/" + BeastRosterData.ProjectRelativePath;
+        public const string RepoRelativePath = BeastRosterData.ProjectRelativePath;
 
         /// <summary>
         /// Resolves the roster file: the explicit path when given, otherwise the first match for

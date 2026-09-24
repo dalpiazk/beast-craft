@@ -4,8 +4,8 @@ Usage (from the repo root; Pillow 12.3.0, see requirements.txt):
     python Tooling/PixelArt/build.py
 
 Reads palette.json and sprites/*.txt and writes the GAME ASSETS (committed):
-  BeastCraft/Assets/_Project/Art/Pixel/<name>.png          1x native; multi-frame = horizontal strip
-  BeastCraft/Assets/_Project/Art/Pixel/pixel-art-manifest.json
+  content/art/pixel/<name>.png                             1x native; multi-frame = horizontal strip
+  content/art/pixel/pixel-art-manifest.json
                                                         every sprite (file, frame size, frames,
                                                         frame ms, kind, ArtKey) + the palette
 and LOCAL PREVIEWS (git-ignored) under Tooling/PixelArt/preview/:
@@ -45,7 +45,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 ROOT = pathlib.Path(__file__).resolve().parent
 REPO = ROOT.parent.parent
-OUT = REPO / "BeastCraft" / "Assets" / "_Project" / "Art" / "Pixel"
+OUT = REPO / "content" / "art" / "pixel"
 PREVIEW = ROOT / "preview"
 MANIFEST = "pixel-art-manifest.json"
 TRANSPARENT = "."

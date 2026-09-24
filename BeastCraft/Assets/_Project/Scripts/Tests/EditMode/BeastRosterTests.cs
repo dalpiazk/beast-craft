@@ -356,9 +356,8 @@ namespace BeastCraft.Tests.EditMode
         }
 
         /// <summary>
-        /// Reads the roster JSON. In the Unity Editor the working directory is the project folder, so
-        /// the project-relative path resolves directly; other runners find it by walking up from
-        /// their working or base directory. Internal so other fixtures that measure against the
+        /// Reads the roster JSON by its repo-relative path (<c>content/data/...</c>), found by walking up
+        /// from the working or base directory. Internal so other fixtures that measure against the
         /// authored roster (see <see cref="DamageFormulaTests"/>) read it the same way.
         /// </summary>
         internal static BeastRosterData LoadRoster()
@@ -381,8 +380,7 @@ namespace BeastCraft.Tests.EditMode
                 {
                     string[] candidates =
                     {
-                        Path.Combine(dir.FullName, BeastRosterData.ProjectRelativePath),
-                        Path.Combine(dir.FullName, "BeastCraft", BeastRosterData.ProjectRelativePath)
+                        Path.Combine(dir.FullName, BeastRosterData.ProjectRelativePath)
                     };
 
                     foreach (string candidate in candidates)

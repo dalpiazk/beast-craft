@@ -11,13 +11,13 @@ Where the text lives:
 
 | Text | File |
 | --- | --- |
-| Beasts | `Data/Creatures/beast-roster.json` (`DisplayName`, `Description`) |
-| Beast skills, Beastbinder arts and passives | `Data/Skills/skill-library.json` |
-| Enemy types and their skills | `Data/Encounters/enemy-library.json` |
-| Bosses | `Data/Encounters/encounter-library.json` (`Templates`) |
-| Regions and Seals | `Data/Campaign/regions.json` |
-| Map location names | `Data/Campaign/location-names.json` |
-| Gear, consumables, materials, looks, shop text | `Data/Items`, `Data/Cosmetics`, `Data/Economy`, the skill library's `Materials` (naming rules: [content-items.md](content-items.md)) |
+| Beasts | `content/data/Creatures/beast-roster.json` (`DisplayName`, `Description`) |
+| Beast skills, Beastbinder arts and passives | `content/data/Skills/skill-library.json` |
+| Enemy types and their skills | `content/data/Encounters/enemy-library.json` |
+| Bosses | `content/data/Encounters/encounter-library.json` (`Templates`) |
+| Regions and Seals | `content/data/Campaign/regions.json` |
+| Map location names | `content/data/Campaign/location-names.json` |
+| Gear, consumables, materials, looks, shop text | `content/data/Items`, `content/data/Cosmetics`, `content/data/Economy`, the skill library's `Materials` (naming rules: [content-items.md](content-items.md)) |
 
 ---
 

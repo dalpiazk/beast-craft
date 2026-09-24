@@ -3,7 +3,7 @@ using System;
 namespace BeastCraft.Progression
 {
     /// <summary>
-    /// The plain-data shape of <c>Data/Skills/drop-tables.json</c>: which skill-training materials a
+    /// The plain-data shape of <c>data/Skills/drop-tables.json</c>: which skill-training materials a
     /// cleared battle drops, keyed by encounter shape and level band, plus the pity thresholds and
     /// the first-clear bonus. See the battle-system design doc, "Material economy".
     /// <para>
@@ -22,8 +22,8 @@ namespace BeastCraft.Progression
     [Serializable]
     public class DropTableData
     {
-        /// <summary>Path of the drop-table file relative to the Unity project folder (<c>BeastCraft/</c>).</summary>
-        public const string ProjectRelativePath = "Assets/_Project/Data/Skills/drop-tables.json";
+        /// <summary>Path of the drop-table file relative to the repository root.</summary>
+        public const string ProjectRelativePath = "content/data/Skills/drop-tables.json";
 
         /// <summary>
         /// The newest <see cref="SchemaVersion"/> this code reads: 2 adds the economy sections

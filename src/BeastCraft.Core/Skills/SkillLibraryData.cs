@@ -3,7 +3,7 @@ using System;
 namespace BeastCraft.Skills
 {
     /// <summary>
-    /// The plain-data shape of <c>Data/Skills/skill-library.json</c>, the source of truth for every
+    /// The plain-data shape of <c>data/Skills/skill-library.json</c>, the source of truth for every
     /// authored skill: beast skills, the avatar's active skills and passives, the skill-training
     /// materials, and which beast learns what (with its default loadout). The Unity assets
     /// (<c>SkillSO</c>, <c>PassiveSkillSO</c>, <c>SkillMaterialSO</c>, and each
@@ -27,8 +27,8 @@ namespace BeastCraft.Skills
     [Serializable]
     public class SkillLibraryData
     {
-        /// <summary>Path of the library file relative to the Unity project folder (<c>BeastCraft/</c>).</summary>
-        public const string ProjectRelativePath = "Assets/_Project/Data/Skills/skill-library.json";
+        /// <summary>Path of the library file relative to the repository root.</summary>
+        public const string ProjectRelativePath = "content/data/Skills/skill-library.json";
 
         /// <summary>
         /// The only <see cref="SchemaVersion"/> this code reads. 2 added scaling team bonds

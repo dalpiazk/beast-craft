@@ -3,7 +3,7 @@ using System;
 namespace BeastCraft.Idle
 {
     /// <summary>
-    /// The authored idle (AFK) reward rates, <c>Data/Idle/idle-rewards.json</c>: the accumulation cap,
+    /// The authored idle (AFK) reward rates, <c>data/Idle/idle-rewards.json</c>: the accumulation cap,
     /// the drop-table shape the materials and the look roll come from, and per band of the player's
     /// progress level (<c>CampaignRules.ProgressLevel</c>: the level of the highest cleared map
     /// location) what an idle hour pays. Validated by <see cref="IdleRewardsValidator"/>, built by
@@ -14,8 +14,8 @@ namespace BeastCraft.Idle
     [Serializable]
     public class IdleRewardsData
     {
-        /// <summary>Where the authored file lives, relative to the Unity project folder.</summary>
-        public const string ProjectRelativePath = "Assets/_Project/Data/Idle/idle-rewards.json";
+        /// <summary>Where the authored file lives, relative to the repository root.</summary>
+        public const string ProjectRelativePath = "content/data/Idle/idle-rewards.json";
 
         /// <summary>The schema this code reads.</summary>
         public const int CurrentSchemaVersion = 1;

@@ -8,7 +8,7 @@ namespace BeastCraft.Vfx
     // Presentation data only -- nothing here is read by the battle, and changing it can never
     // change a battle's outcome. Plain serializable data (public fields), read with FieldJson.
     // Sheets are named by the pixel-art manifest's sprite Name and colours by palette char
-    // (Art/Pixel/pixel-art-manifest.json, written by Tooling/PixelArt/build.py). The rules are in
+    // (content/art/pixel/pixel-art-manifest.json, written by Tooling/PixelArt/build.py). The rules are in
     // VfxLibraryValidator; the timeline that plays a spec is BeastCraft.Presentation.VfxTimeline.
     // ------------------------------------------------------------------------------------------
 
@@ -16,8 +16,8 @@ namespace BeastCraft.Vfx
     [Serializable]
     public class VfxLibraryData
     {
-        /// <summary>The file's path relative to the Unity project folder (like the other data files).</summary>
-        public const string ProjectRelativePath = "Assets/_Project/Data/Vfx/vfx-library.json";
+        /// <summary>The file's path relative to the repository root (like the other data files).</summary>
+        public const string ProjectRelativePath = "content/data/Vfx/vfx-library.json";
 
         /// <summary>The only schema version this build reads.</summary>
         public const int CurrentSchemaVersion = 1;
@@ -203,14 +203,14 @@ namespace BeastCraft.Vfx
     }
 
     /// <summary>
-    /// The pixel-art manifest (<c>Art/Pixel/pixel-art-manifest.json</c>, written by
+    /// The pixel-art manifest (<c>content/art/pixel/pixel-art-manifest.json</c>, written by
     /// <c>Tooling/PixelArt/build.py</c>) as far as the VFX checks and the renderer need it.
     /// </summary>
     [Serializable]
     public class PixelArtManifestData
     {
-        /// <summary>The manifest's path relative to the Unity project folder.</summary>
-        public const string ProjectRelativePath = "Assets/_Project/Art/Pixel/pixel-art-manifest.json";
+        /// <summary>The manifest's path relative to the repository root.</summary>
+        public const string ProjectRelativePath = "content/art/pixel/pixel-art-manifest.json";
 
         public int SchemaVersion;
 

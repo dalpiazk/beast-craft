@@ -135,10 +135,10 @@ namespace BeastCraft.Tooling.BalanceSim
 
             private static T Read<T>(string projectRelativePath, JsonSerializerOptions json, List<string> errors) where T : class
             {
-                string path = RosterLoader.ResolveFile(null, "BeastCraft/" + projectRelativePath);
+                string path = RosterLoader.ResolveFile(null, projectRelativePath);
                 if (path == null || !File.Exists(path))
                 {
-                    errors.Add("Could not find BeastCraft/" + projectRelativePath + ".");
+                    errors.Add("Could not find " + projectRelativePath + ".");
                     return null;
                 }
 

@@ -4,7 +4,7 @@ using BeastCraft.Creatures;
 namespace BeastCraft.Encounters
 {
     /// <summary>
-    /// The imported encounter content: <c>Data/Encounters/enemy-library.json</c>,
+    /// The imported encounter content: <c>data/Encounters/enemy-library.json</c>,
     /// <c>encounter-library.json</c> and the simulator-written <c>encounter-difficulty.json</c>,
     /// copied verbatim by the Editor importer (menu: Beast Craft/Data/Import Encounters) together
     /// with a link to the enemies' <see cref="GrowthRateCurve"/> asset, so the game reads exactly the

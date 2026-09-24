@@ -68,7 +68,7 @@ namespace BeastCraft.Tooling.BalanceSim
         /// (<c>-- --panel 16x4 --avatar-value --out docs/balance/tuned-report.md</c>).
         /// </summary>
         public const string Command = "dotnet run --project Tooling/BalanceSim -c Release -- --panel 16x4 --avatar-value --gear typical " +
-                                      "--write-difficulty BeastCraft/Assets/_Project/Data/Encounters/encounter-difficulty.json";
+                                      "--write-difficulty content/data/Encounters/encounter-difficulty.json";
 
         private static string Readme(SimOptions options, EncounterCatalog encounters)
         {

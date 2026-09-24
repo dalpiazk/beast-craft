@@ -109,10 +109,10 @@ namespace BeastCraft.Tooling.BalanceSim
             /// <summary>Loads and validates <c>idle-rewards.json</c> against the drop tables; null with <paramref name="errors"/> filled on failure.</summary>
             public static IdleRewards Load(DropTableData tables, List<string> errors)
             {
-                string path = RosterLoader.ResolveFile(null, "BeastCraft/" + IdleRewardsData.ProjectRelativePath);
+                string path = RosterLoader.ResolveFile(null, IdleRewardsData.ProjectRelativePath);
                 if (path == null || !File.Exists(path))
                 {
-                    errors.Add("Could not find BeastCraft/" + IdleRewardsData.ProjectRelativePath + ".");
+                    errors.Add("Could not find " + IdleRewardsData.ProjectRelativePath + ".");
                     return null;
                 }
 

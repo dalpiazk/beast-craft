@@ -358,7 +358,7 @@ level cap. **The seeded node map (Slay-the-Spire style) is the internal pacing m
 map**, never shown as a node graph: every node carries a location kind, a normalized map position and
 a label key (`MapNode.Kind` / `X` / `Y` / `LabelKey`, see "Node maps") so a spatial map UI can place
 and name the locations, and when the open world lands only that presentation layer changes. Runtime code under `Runtime/Campaign` (namespace
-`BeastCraft.Campaign`); content in `BeastCraft/Assets/_Project/Data/Campaign/regions.json`; paced by
+`BeastCraft.Campaign`); content in `content/data/Campaign/regions.json`; paced by
 [`docs/balance/campaign-pacing-report.md`](../balance/campaign-pacing-report.md). **The content is a
 DRAFT pending producer review** (names, level bands, map rules, bosses).
 
@@ -490,7 +490,7 @@ what the encounter table is calibrated to for a scouting player at equal level.
 
 Time away from the game pays gold, beast XP, skill materials and, very rarely, a look (AFK rewards).
 Runtime code under `Runtime/Idle` (namespace `BeastCraft.Idle`); rates in
-`BeastCraft/Assets/_Project/Data/Idle/idle-rewards.json`; paced by `--mode campaign`
+`content/data/Idle/idle-rewards.json`; paced by `--mode campaign`
 ([`docs/balance/campaign-pacing-report.md`](../balance/campaign-pacing-report.md), "Idle rewards").
 **Every rate is a tunable starting value; no UI yet.**
 

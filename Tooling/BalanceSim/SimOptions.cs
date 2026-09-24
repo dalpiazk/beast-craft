@@ -703,7 +703,7 @@ namespace BeastCraft.Tooling.BalanceSim
             "                             generated composition, 5 per fixed encounter).\n" +
             "  --matrix-level <n>         Level the PvP win matrix and stat table are drawn at (default 50, else the highest level).\n" +
             "  --roster <path>            beast-roster.json (default: found by walking up from the working directory).\n" +
-            "  --enemy-library <path>     enemy-library.json (default: BeastCraft/Assets/_Project/Data/Encounters/, found the same way).\n" +
+            "  --enemy-library <path>     enemy-library.json (default: content/data/Encounters/, found the same way).\n" +
             "  --encounter-library <path> encounter-library.json (default: beside enemy-library.json, found the same way).\n" +
             "  --encounters-file <path>   the fixed set's encounters.json (default: Tooling/BalanceSim/encounters.json, found the same way).\n" +
             "  --avatar <preset>          library | support | none (default library). PvE only: field an avatar beside the\n" +
@@ -725,7 +725,7 @@ namespace BeastCraft.Tooling.BalanceSim
             "                             (against the team one level up). Default: off.\n" +
             "  --out <path>               Also write the Markdown report to this file.\n" +
             "  --write-difficulty <path>  PvE, generated set, one seed: also write the calibrated multipliers as the game's\n" +
-            "                             encounter-difficulty.json (BeastCraft/Assets/_Project/Data/Encounters/). Report unchanged.\n" +
+            "                             encounter-difficulty.json (content/data/Encounters/). Report unchanged.\n" +
             "  --self-check               Run everything twice and fail unless both reports are identical; also checks the\n" +
             "                             PvE battle loop against BattleTurnExecutor.RunBattle.\n" +
             "  --timings                  Print a wall-clock breakdown (per PvE cell and calibration step, PvP, report, GC)\n" +

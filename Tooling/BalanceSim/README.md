@@ -59,7 +59,7 @@ dotnet run --project Tooling/BalanceSim -c Release -- [options]
 | `--samples <n>` | PvE 1 (generated) or 5 (fixed); PvP 5 | Battles per PvE team and composition (at the calibrated multiplier, and at every calibration step with `--calibrate-on mean`) and per PvP game, each with its own seed. Damage variance and crits make battles random; see "Sampling" below. |
 | `--matrix-level <n>` | `50` | Level of the PvP win matrix and the stat table (falls back to the highest simulated level). |
 | `--roster <path>` | found by walking up | Path to `beast-roster.json`. |
-| `--enemy-library <path>` | found by walking up | Path to the game's `enemy-library.json` (`BeastCraft/Assets/_Project/Data/Encounters/`). |
+| `--enemy-library <path>` | found by walking up | Path to the game's `enemy-library.json` (`content/data/Encounters/`). |
 | `--encounter-library <path>` | found by walking up | Path to the game's `encounter-library.json` (same folder). |
 | `--drop-tables <path>` | found by walking up | Path to `drop-tables.json`: rolled by `--mode pacing`; in PvE the encounter library's shape ids are checked against it. |
 | `--encounters-file <path>` | found by walking up | Path to the legacy fixed set's `encounters.json` (beside this file). |
@@ -107,13 +107,13 @@ Two reports are committed, both the default arguments:
 # the committed report (gearless)
 dotnet run --project Tooling/BalanceSim -c Release -- --panel 16x4 --avatar-value --out docs/balance/tuned-report.md
 # the shipping difficulty table (the same run plus --gear typical; its report is not committed)
-dotnet run --project Tooling/BalanceSim -c Release -- --panel 16x4 --avatar-value --gear typical --write-difficulty BeastCraft/Assets/_Project/Data/Encounters/encounter-difficulty.json
+dotnet run --project Tooling/BalanceSim -c Release -- --panel 16x4 --avatar-value --gear typical --write-difficulty content/data/Encounters/encounter-difficulty.json
 ```
 
 ## Library kits
 
 The default, `--skill-kit library`, fields each beast's authored `DefaultLoadout` from
-`BeastCraft/Assets/_Project/Data/Skills/skill-library.json` (`SkillLibraryLoader.cs`), built through
+`content/data/Skills/skill-library.json` (`SkillLibraryLoader.cs`), built through
 `SkillLibraryBuilder` — the same DTO-to-`SkillSO` mapping as the Editor importer — and fielded as
 `SkillInstance`s at `--skill-level` and the tier that level implies. In `neutral` mode every library
 skill's element is forced to `None`. The report shows a "Library beast kits" table in place of the
@@ -213,7 +213,7 @@ cooldown 2 weighted `Attack` about twice as heavily.
   fights beside every team.
 - **Encounters.** Two sets:
   - **Generated (default): game content.** The enemy library
-    (`BeastCraft/Assets/_Project/Data/Encounters/enemy-library.json`) and the encounter shapes
+    (`content/data/Encounters/enemy-library.json`) and the encounter shapes
     (`encounter-library.json` beside it), read through the game's own `EnemyLibraryValidator` and
     `EncounterLibraryValidator` (against the roster and `drop-tables.json`) and fielded through the
     game's `EnemyCatalog`, so the simulator fights exactly the enemies the game fields. The
@@ -397,7 +397,7 @@ The user's direction is PvE with enemy sides from one giant to about two dozen s
 enemy types, and elements that vary across battles and sometimes within one enemy team. The default
 encounter set simulates that.
 
-All of this is game content (`BeastCraft/Assets/_Project/Data/Encounters/`), and the draw is the
+All of this is game content (`content/data/Encounters/`), and the draw is the
 game's own `EncounterGenerator` (`src/BeastCraft.Core/Encounters`): the simulator makes one generator per run
 from `--seed` and draws `--compositions` lineups per shape through it (`GeneratedEncounters.cs`), so
 the compositions it calibrates are exactly what the game can field. The file readmes list every
@@ -966,7 +966,7 @@ content, fixtures, code and arguments produce a byte-identical report.
 
 All tunables (kit numbers, calibration bounds, flag thresholds, CLI defaults) are constants at the
 top of `SimOptions.cs`; the enemies, shapes and element-scheme weights are game content in
-`BeastCraft/Assets/_Project/Data/Encounters/`, and the legacy fixed encounters are in
+`content/data/Encounters/`, and the legacy fixed encounters are in
 `encounters.json`.
 
 ## Build and format
@@ -978,7 +978,7 @@ dotnet build  Tooling/BalanceSim/BalanceSim.csproj -c Release
 
 It targets `net10.0` (the installed LTS SDK) and compiles with C# 9 and nullable disabled, like the
 game runtime it references (`src/BeastCraft.Core`, netstandard2.1). It reads the authored data JSON
-under `BeastCraft/Assets/_Project/Data/` directly with System.Text.Json (found by walking up), never
+under `content/data/` directly with System.Text.Json (found by walking up), never
 through Unity assets.
 
 ## Economy (`--gear`, `--economy-probe`, and `--mode campaign`'s economy)

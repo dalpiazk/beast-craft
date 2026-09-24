@@ -43,7 +43,7 @@ namespace BeastCraft.Tooling.BalanceSim
     public sealed class GearKits
     {
         /// <summary>The gear library's path relative to the repo root.</summary>
-        public const string RepoRelativePath = "BeastCraft/" + GearLibraryData.ProjectRelativePath;
+        public const string RepoRelativePath = GearLibraryData.ProjectRelativePath;
 
         private readonly Dictionary<string, List<GearSO>> _cache = new Dictionary<string, List<GearSO>>(StringComparer.Ordinal);
         private readonly object _lock = new object();

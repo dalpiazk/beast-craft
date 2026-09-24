@@ -3,7 +3,7 @@ using System;
 namespace BeastCraft.Idle
 {
     /// <summary>
-    /// The imported idle reward rates: <c>Data/Idle/idle-rewards.json</c> copied verbatim by the Editor
+    /// The imported idle reward rates: <c>data/Idle/idle-rewards.json</c> copied verbatim by the Editor
     /// importer (menu: Beast Craft/Data/Import Idle Rewards), so the game reads exactly the data the
     /// balance simulator's <c>--mode campaign</c> paced. Never hand-edit <see cref="Data"/>; edit the
     /// JSON and re-import. <see cref="Rewards"/> builds the runtime <see cref="IdleRewards"/> on first
