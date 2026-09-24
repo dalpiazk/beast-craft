@@ -38,7 +38,8 @@ namespace BeastCraft.Economy
     /// wearing them (the avatar's <see cref="PlayerSave.AvatarAppearance"/>, each beast's
     /// <see cref="OwnedBeast.Appearance"/>; a beast wears only its own species' categories), and the
     /// unlock sources other than the Trader: lairs (boss-exclusive looks), milestones (a beast of the
-    /// species reaching a level, the avatar's level, bosses beaten), and low-chance battle drops.
+    /// species reaching a level, the avatar's level, bosses beaten), and low-chance battle drops (and
+    /// the idle rewards' rare roll, from the same pool: <see cref="PickDrop"/>).
     /// Colour pickers are always free. A category missing from an appearance reads as its default.
     /// Purely cosmetic: nothing here touches stats. Non-throwing; a refused call changes nothing.
     /// </summary>
@@ -194,6 +195,23 @@ namespace BeastCraft.Economy
             }
 
             if (rng.Next(1000) >= table.CosmeticDropPerMille(shape))
+            {
+                return null;
+            }
+
+            return PickDrop(library, save, level, rng);
+        }
+
+        /// <summary>
+        /// One look from the battle-drop pool: the library's <c>drop</c> looks of the level's region
+        /// (<see cref="CosmeticLibrary.RegionOfLevel"/>) that the save cannot already wear, drawn with
+        /// one <c>rng.Next</c> (none when the pool is empty). Returns it (not yet unlocked), or null.
+        /// What <see cref="RollDrop"/> draws on a hit, and the idle rewards' look roll (the same pool,
+        /// lead / user decision: no idle-exclusive looks).
+        /// </summary>
+        public static CosmeticOption PickDrop(CosmeticLibrary library, PlayerSave save, int level, System.Random rng)
+        {
+            if (library == null || rng == null)
             {
                 return null;
             }

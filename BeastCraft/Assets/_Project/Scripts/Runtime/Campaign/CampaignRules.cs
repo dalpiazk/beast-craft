@@ -56,6 +56,59 @@ namespace BeastCraft.Campaign
         }
 
         /// <summary>
+        /// How far the player has got: the level of the highest cleared map location — a region's
+        /// boss (its max level) once beaten, else the pass (Gate) of its last cleared stage, and any
+        /// battle location cleared in the expedition in progress — over every unlocked region
+        /// <paramref name="library"/> knows. 0 when nothing is cleared (or no save or library). What
+        /// the idle rewards are paid at (<c>Idle.IdleRewardCalculator</c>).
+        /// </summary>
+        public static int ProgressLevel(PlayerSave save, RegionLibrary library)
+        {
+            if (save == null || save.Campaign == null || library == null)
+            {
+                return 0;
+            }
+
+            int best = 0;
+            foreach (RegionProgress progress in save.Campaign.Regions ?? new List<RegionProgress>())
+            {
+                RegionData region = progress == null ? null : library.GetRegion(progress.RegionId);
+                if (region == null)
+                {
+                    continue;
+                }
+
+                if (progress.BossCleared)
+                {
+                    best = Math.Max(best, region.MaxLevel);
+                    continue;
+                }
+
+                if (progress.StagesCleared > 0)
+                {
+                    MapRulesData rules = library.RulesFor(region);
+                    int gate = NodeMapGenerator.RowLevel(region, rules, progress.StagesCleared - 1, rules.Layers - 1) + rules.GateLevelOffset;
+                    best = Math.Max(best, gate);
+                }
+            }
+
+            MapRun run = save.Campaign.ActiveRun;
+            if (save.Campaign.HasActiveRun && library.GetRegion(run.RegionId) != null)
+            {
+                foreach (int nodeId in run.Cleared ?? new List<int>())
+                {
+                    MapNode node = run.Find(nodeId);
+                    if (node != null && node.IsBattle)
+                    {
+                        best = Math.Max(best, node.Level);
+                    }
+                }
+            }
+
+            return Math.Max(0, Math.Min(BeastProgression.MaxLevel, best));
+        }
+
+        /// <summary>
         /// The stage an expedition into <paramref name="regionId"/> starts at by default: the first
         /// uncleared stage, or the last stage once all are cleared (the boss again, for a replay).
         /// −1 when the region is unknown or not unlocked.

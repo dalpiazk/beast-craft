@@ -90,6 +90,48 @@ namespace BeastCraft.Progression
         }
 
         /// <summary>
+        /// Rolls the cell of (<paramref name="shape"/>, <paramref name="level"/>) <paramref name="rolls"/>
+        /// times with every chance scaled by <paramref name="chanceMultiplier"/> (clamped to 0-1), adds
+        /// the drops to <paramref name="inventory"/> and returns them (empty, never null). For rewards
+        /// that are not a clear (idle rewards): <strong>no pity and no first-clear credit</strong> — the
+        /// inventory's pity counters and cleared cells are never read or written. Per roll and entry,
+        /// in authored order: <c>rng.Next(10000) &lt; round(Chance × multiplier × 100)</c> drops it and
+        /// the quantity is drawn as in <see cref="RollClear"/>; both draws are always taken.
+        /// Non-throwing: a null table, inventory or rng, an unknown shape or no rolls grants nothing.
+        /// </summary>
+        public static LootResult RollScaled(DropTable table, string shape, int level, double chanceMultiplier, int rolls, MaterialInventory inventory, Random rng)
+        {
+            LootResult result = new LootResult();
+            DropCell cell = table == null || inventory == null || rng == null ? null : table.GetCell(shape, level);
+            if (cell == null || rolls <= 0)
+            {
+                return result;
+            }
+
+            double multiplier = double.IsNaN(chanceMultiplier) ? 0.0 : Math.Max(0.0, Math.Min(1.0, chanceMultiplier));
+            IReadOnlyList<DropEntry> entries = cell.Entries;
+            for (int roll = 0; roll < rolls; roll++)
+            {
+                foreach (DropEntry entry in entries)
+                {
+                    bool hit = rng.Next(10000) < (int)Math.Round(entry.Chance * multiplier * 100.0, MidpointRounding.AwayFromZero);
+                    int quantity = entry.MinQty + rng.Next(entry.MaxQty - entry.MinQty + 1);
+                    if (hit && quantity > 0)
+                    {
+                        result.Add(entry.MaterialId, quantity);
+                    }
+                }
+            }
+
+            foreach (MaterialStack stack in result.Drops)
+            {
+                inventory.Add(stack.MaterialId, stack.Quantity);
+            }
+
+            return result;
+        }
+
+        /// <summary>
         /// A per-battle seed from a base seed and the battle's index: a SplitMix64-style mix, stable
         /// across platforms and runtimes (unlike <c>string.GetHashCode</c>), so battle
         /// <paramref name="battleIndex"/> of a run seeded <paramref name="baseSeed"/> always rolls the

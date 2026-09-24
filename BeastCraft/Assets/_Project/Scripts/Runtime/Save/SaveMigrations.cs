@@ -16,6 +16,7 @@ namespace BeastCraft.Save
     /// <item>3 to 4: the economy (<see cref="PlayerSave.Gold"/>, <see cref="PlayerSave.Consumables"/>,
     /// <see cref="PlayerSave.Shops"/>, <see cref="PlayerSave.Cosmetics"/>,
     /// <see cref="PlayerSave.AvatarAppearance"/>, <see cref="OwnedBeast.Appearance"/>): <see cref="AddEconomy"/>.</item>
+    /// <item>4 to 5: the idle reward clock (<see cref="PlayerSave.Idle"/>): <see cref="AddIdle"/>.</item>
     /// </list>
     /// </summary>
     public static class SaveMigrations
@@ -23,7 +24,7 @@ namespace BeastCraft.Save
         /// <summary>A fresh list of every step (callers may append to it).</summary>
         public static List<ISaveMigration> All()
         {
-            return new List<ISaveMigration> { new AddGear(), new AddCampaign(), new AddEconomy() };
+            return new List<ISaveMigration> { new AddGear(), new AddCampaign(), new AddEconomy(), new AddIdle() };
         }
 
         /// <summary>
@@ -87,6 +88,28 @@ namespace BeastCraft.Save
                 PlayerSave save = serializer.FromJson<PlayerSave>(json);
                 save.EnsureInitialized();
                 save.SchemaVersion = 4;
+                return serializer.ToJson(save);
+            }
+        }
+
+        /// <summary>
+        /// Schema 4 to 5: a v4 save has no idle clock. The upgrade reads it into the current type (the
+        /// clock takes its default: not started, no seed, no claims — the first claim after the upgrade
+        /// starts it and pays nothing, since no offline time can be proven), fills in anything missing
+        /// and writes it back. Nothing else moves.
+        /// </summary>
+        public sealed class AddIdle : ISaveMigration
+        {
+            public int FromVersion
+            {
+                get { return 4; }
+            }
+
+            public string Upgrade(string json, ISaveJsonSerializer serializer)
+            {
+                PlayerSave save = serializer.FromJson<PlayerSave>(json);
+                save.EnsureInitialized();
+                save.SchemaVersion = 5;
                 return serializer.ToJson(save);
             }
         }
