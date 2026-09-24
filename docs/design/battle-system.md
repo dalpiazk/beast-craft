@@ -79,7 +79,9 @@ puzzle every encounter.
   41.6 on the old per-beast-turn cadence, with a 13.6% direct share of the team's output,
   three-quarters of it from its passives (tuning log, "Avatar retune").
 - **Avatar level — progression exists and is wired into battle; its curve is not authored.** The avatar has its
-  own level (TUNABLE STARTING DEFAULTS): `AvatarProgress` (save data: `Level`, `Xp`) and
+  own level (TUNABLE STARTING DEFAULTS): `AvatarProgress` (save data: `Level`, `Xp`; persisted in
+  `PlayerSave`, see [Progression, saves and the battle session](progression-and-saves.md), which
+  also has the beast-level counterpart) and
   `AvatarProgression` (own constants, not the skill curve). A level costs `200 + 16 × level` XP
   (216 at level 1, 1,784 at level 99; max level 100). `AwardBattle(progress, outcome, enemyLevel)`
   pays **8 XP for any finished battle** plus a **clear bonus of `40 + 4 × enemyLevel`** on
@@ -1704,7 +1706,8 @@ material XP compares with practice). Whether stat changes should scale per level
 truncate to whole points, so small buffs grow in steps). Whether the slow curve suits the narrative
 pacing. The material economy (drop tables, the inventory and the pacing targets) is now in
 "Material economy" below; consuming a material is still the caller's job
-(`MaterialInventory.TryConsume`). No UI and no save system exist yet.
+(`MaterialInventory.TryConsume`). No UI exists yet; skill books and the material inventory are
+saved in `PlayerSave` (see [Progression, saves and the battle session](progression-and-saves.md)).
 
 ## Material economy — SIMULATOR-TUNED STARTING VALUES, NOT CONFIRMED BALANCE
 
@@ -1920,7 +1923,8 @@ dealt the blow rather than the unit whose turn it is (they differ for damage-ove
 kills). Whether a failed proc roll should consume the threshold crossing. (Internal cooldowns now
 run on the avatar's own clock, its gauge; decided with stage 3b.)
 How passives are acquired (drops, quests, avatar milestones) and the passive material economy. No
-passive UI or save system exists yet.
+passive UI exists yet; the avatar's skill book (actives and passives) is saved in `PlayerSave` (see
+[Progression, saves and the battle session](progression-and-saves.md)).
 
 ## Team bonds — TUNABLE STARTING DEFAULTS, NOT CONFIRMED BALANCE
 

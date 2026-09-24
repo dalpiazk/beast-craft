@@ -610,21 +610,51 @@ namespace BeastCraft.Tests.EditMode
 
             switch (fault)
             {
-                case "TwoTiers": bond.Tiers = new[] { bond.Tiers[0], new TeamBondTierData { MinCount = 2, Effects = bond.Tiers[0].Effects } }; break;
-                case "MinCountZero": bond.Tiers[0].MinCount = 0; break;
-                case "MinCountAboveMax": bond.Tiers[0].MinCount = 4; break;
-                case "MaxCountZero": bond.MaxCount = 0; break;
+                case "TwoTiers":
+                    bond.Tiers = new[] { bond.Tiers[0], new TeamBondTierData { MinCount = 2, Effects = bond.Tiers[0].Effects } };
+                    break;
+                case "MinCountZero":
+                    bond.Tiers[0].MinCount = 0;
+                    break;
+                case "MinCountAboveMax":
+                    bond.Tiers[0].MinCount = 4;
+                    break;
+                case "MaxCountZero":
+                    bond.MaxCount = 0;
+                    break;
                 case "MaxCountAboveSet":
                     bond.Condition = "Elements";
                     bond.Stance = null;
                     bond.Elements = new[] { "Air", "Lightning" };
                     break;
-                case "PercentOverCap": effect.Magnitude = 7; break;
-                case "CritOverCap": effect.AffectedStat = "CritChance"; effect.IsPercent = false; effect.Magnitude = 6; break;
-                case "MoveOverCap": effect.AffectedStat = "MoveRange"; effect.IsPercent = false; effect.Magnitude = 1; break;
-                case "ShieldOverCap": effect.EffectType = "ApplyStatus"; effect.Status = "Shield"; effect.DurationTurns = 3; effect.Magnitude = 25; break;
-                case "FlatAttack": effect.AffectedStat = "Attack"; effect.IsPercent = false; effect.Magnitude = 2; break;
-                case "MaxCountOnTiered": bond.PerCount = false; bond.Tiers[0].MinCount = 2; break;
+                case "PercentOverCap":
+                    effect.Magnitude = 7;
+                    break;
+                case "CritOverCap":
+                    effect.AffectedStat = "CritChance";
+                    effect.IsPercent = false;
+                    effect.Magnitude = 6;
+                    break;
+                case "MoveOverCap":
+                    effect.AffectedStat = "MoveRange";
+                    effect.IsPercent = false;
+                    effect.Magnitude = 1;
+                    break;
+                case "ShieldOverCap":
+                    effect.EffectType = "ApplyStatus";
+                    effect.Status = "Shield";
+                    effect.DurationTurns = 3;
+                    effect.Magnitude = 25;
+                    break;
+                case "FlatAttack":
+                    effect.AffectedStat = "Attack";
+                    effect.IsPercent = false;
+                    effect.Magnitude = 2;
+                    break;
+                case "MaxCountOnTiered":
+                    bond.PerCount = false;
+                    bond.Tiers[0].MinCount = 2;
+                    break;
             }
 
             library.TeamBonds = new List<TeamBondData>(library.TeamBonds) { bond }.ToArray();

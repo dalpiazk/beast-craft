@@ -297,7 +297,7 @@ runtime objects, the roster counterpart of `SkillLibraryBuilder`:
 It writes only JSON-owned fields: a species' icon, evolution options, learnable skills, default
 loadout and customization schema are never touched (the skill-library importer wires the skill
 lists). The Editor's `BeastRosterImporter` applies it to existing or new assets (keeping their
-GUIDs); tests build the roster through `BuildAll`.
+GUIDs); tests and the balance simulator's `RosterLoader` build the roster through `BuildAll`.
 
 ---
 
@@ -336,12 +336,6 @@ its System.Text.Json twin here.
 - **Beast XP defaults need review** (see above), as does the pacing model's 20% knockout assumption.
 - **Enemies wear no gear.** `EnemySpec` has no gear field; a caller needing geared enemies builds
   them itself and passes them as `PrebuiltEnemies`.
-- **`RosterLoader` dedupe.** `Tooling/BalanceSim/RosterLoader.cs` still carries its own copy of the
-  roster mapping (and does not set `Footprint`); switch it to `BeastRosterBuilder.BuildAll` after the
-  combat lane merges.
-- **Cross-links to add at merge.** Link this document from the README ("Status") and from
-  `docs/design/battle-system.md`, and mention the beast-level section in
-  `Tooling/BalanceSim/README.md` ("Pacing"); those shared files were deliberately not edited here.
 - **No storage implementation.** `ISaveStorage` has no file or Cloud Save backend yet.
 - **Never run in Unity.** The project has not been opened in an Editor, so the save round trip has
   not yet been exercised against the real `JsonUtility`.

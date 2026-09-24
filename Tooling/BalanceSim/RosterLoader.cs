@@ -4,20 +4,17 @@ using System.IO;
 using System.Text.Json;
 using BeastCraft.Creatures;
 using BeastCraft.Creatures.Roster;
-using UnityEngine;
 
 namespace BeastCraft.Tooling.BalanceSim
 {
     /// <summary>
     /// Reads <c>beast-roster.json</c> directly and rebuilds the species in memory.
     /// <para>
-    /// Mirrors <c>BeastCraft.Editor.Data.BeastRosterImporter</c>'s field mapping (curves: CurveId,
-    /// Curve from <see cref="GrowthCurveData.ToAnimationCurve"/>, MaxLevel; species: SpeciesId,
-    /// DisplayName, Description, BaseStats, GrowthRate, Elements via
-    /// <see cref="BeastRosterValidator.TryParseElement"/>, Stance via
-    /// <see cref="BeastRosterValidator.TryParseStance"/>) so the simulator fights the same beasts
-    /// the Editor would generate. <c>JsonUtility</c> is unavailable outside Unity, hence
-    /// System.Text.Json with public fields included — the case the roster doc already names.
+    /// Parsing and validation happen here; the field mapping is the Runtime
+    /// <see cref="BeastRosterBuilder.BuildAll"/>, the same one the Editor's
+    /// <c>BeastRosterImporter</c> applies, so the simulator fights exactly the beasts the Editor
+    /// would generate. <c>JsonUtility</c> is unavailable outside Unity, hence System.Text.Json with
+    /// public fields included (the case the roster doc already names).
     /// </para>
     /// </summary>
     public static class RosterLoader
@@ -71,7 +68,8 @@ namespace BeastCraft.Tooling.BalanceSim
         /// Parses and validates the roster, then builds one <see cref="CreatureSpeciesSO"/> per
         /// species in file order. Returns null and fills <paramref name="errors"/> when the file
         /// does not parse or fails <see cref="BeastRosterValidator.Validate"/>. The growth curves are
-        /// returned by id too, so the encounter fixtures can scale on the same curves.
+        /// returned by id too, so the encounter fixtures can scale on the same curves. The instances
+        /// come from <see cref="BeastRosterBuilder.BuildAll"/>.
         /// </summary>
         public static List<CreatureSpeciesSO> Load(string path, List<string> errors, out Dictionary<string, GrowthRateCurve> curves)
         {
@@ -94,40 +92,7 @@ namespace BeastCraft.Tooling.BalanceSim
                 return null;
             }
 
-            curves = new Dictionary<string, GrowthRateCurve>(StringComparer.Ordinal);
-            foreach (GrowthCurveData curveData in roster.GrowthCurves)
-            {
-                GrowthRateCurve curve = ScriptableObject.CreateInstance<GrowthRateCurve>();
-                curve.name = curveData.CurveId;
-                curve.CurveId = curveData.CurveId;
-                curve.Curve = curveData.ToAnimationCurve();
-                curve.MaxLevel = curveData.MaxLevel;
-                curves[curveData.CurveId] = curve;
-            }
-
-            List<CreatureSpeciesSO> species = new List<CreatureSpeciesSO>();
-            foreach (SpeciesData speciesData in roster.Species)
-            {
-                CreatureSpeciesSO beast = ScriptableObject.CreateInstance<CreatureSpeciesSO>();
-                beast.name = speciesData.SpeciesId;
-                beast.SpeciesId = speciesData.SpeciesId;
-                beast.DisplayName = speciesData.DisplayName;
-                beast.Description = speciesData.Description;
-                beast.BaseStats = speciesData.BaseStats;
-                beast.GrowthRate = curves[speciesData.GrowthCurveId];
-
-                Element[] elements = new Element[speciesData.Elements.Length];
-                for (int i = 0; i < elements.Length; i++)
-                {
-                    BeastRosterValidator.TryParseElement(speciesData.Elements[i], out elements[i]);
-                }
-
-                beast.Elements = elements;
-                BeastRosterValidator.TryParseStance(speciesData.Stance, out beast.Stance);
-                species.Add(beast);
-            }
-
-            return species;
+            return BeastRosterBuilder.BuildAll(roster, out curves);
         }
     }
 }

@@ -139,7 +139,10 @@ What exists today:
   available via `--encounter-set fixed`); a 1v1 round-robin is kept as a secondary PvP section. The
   committed reports are [`docs/balance/baseline-report.md`](docs/balance/baseline-report.md)
   (first-draft stats, the "before") and [`docs/balance/tuned-report.md`](docs/balance/tuned-report.md)
-  (the tuned roster); their numbers are inputs to design decisions, not applied automatically.
+  (the tuned roster), with [`docs/balance/level-gap-report.md`](docs/balance/level-gap-report.md)
+  (the `--level-gap` sweep of the level-difference damage modifier) and
+  [`docs/balance/pacing-report.md`](docs/balance/pacing-report.md) (`--mode pacing`: skill, avatar
+  and beast level pacing); their numbers are inputs to design decisions, not applied automatically.
 - A **local EditMode test runner** (`Tooling/EditModeTests/`) — not a CI job —
   that compiles the Runtime, Editor and `Tests/EditMode` scripts against the
   UnityStub and runs the whole EditMode suite with NUnit, no Unity install
@@ -155,10 +158,14 @@ What exists today:
   Runner remains the authority on real serialization.
 - A **save system core** (`Scripts/Runtime/Save/`, no UI or file IO yet): a
   versioned `PlayerSave` aggregate (beasts with species/level/XP and skill
-  books, avatar level and skill books, materials with cleared cells and pity),
-  JsonUtility-compatible; `SaveSerializer` over an injectable JSON engine with
-  a migration-step chain and load-time validation that reports unknown ids
-  instead of failing; storage behind the thin `ISaveStorage` seam.
+  books, avatar level and skill books, materials with cleared cells and pity,
+  beast and avatar gear), JsonUtility-compatible; `SaveSerializer` over an
+  injectable JSON engine with a migration-step chain and load-time validation
+  that reports unknown ids instead of failing; storage behind the thin
+  `ISaveStorage` seam. Alongside it, beast level/XP (`BeastProgression`), the
+  shared roster builder (`BeastRosterBuilder`) and a deterministic
+  `BattleSession` that builds a battle from a save, runs it and applies the
+  rewards. See [`docs/design/progression-and-saves.md`](docs/design/progression-and-saves.md).
 - A **battle-system design proposal** ([`docs/design/battle-system.md`](docs/design/battle-system.md))
   whose open questions are still awaiting producer confirmation.
 

@@ -695,6 +695,15 @@ dotnet run --project Tooling/BalanceSim -c Release -- --mode pacing --self-check
   level); the report tabulates its p10 / p50 / p90 level every 50 battles, and `--self-check` fails
   when the median strays more than `AvatarLevelTolerance` (3) levels from the encounter level. It
   draws no random numbers, so it never shifts the skill-pacing results.
+- **Beast level**: every campaign also levels one `BeastProgress` with
+  `BeastProgression.AwardBattle`, the beast fielded in every battle and knocked out in
+  `KnockoutChance` (20%) of them (a modelling assumption, not measured from the PvE runs; a
+  knocked-out beast earns participation XP only). Same checkpoints, p10 / p50 / p90, and
+  `--self-check` fails when the median strays more than `BeastLevelTolerance` (3) levels from the
+  encounter level. The knockout roll is drawn last each battle, so it leaves every earlier draw (and
+  the skill-pacing results) unchanged. The XP rules are in
+  [`docs/design/progression-and-saves.md`](../../docs/design/progression-and-saves.md), "Beast and
+  avatar level".
 - The model's constants (level ramp, shape weights, clear chance, uses per battle) are at the top of
   `PacingSimulator.cs`; the drop numbers are data. See the design doc, "Material economy", and
   `docs/balance/tuning-log.md`, "Material economy".
