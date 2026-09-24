@@ -18,8 +18,9 @@ beast-craft/
 │   │                       Campaign, Economy, Encounters, Save, Session, Customization, Idle,
 │   │                       Vfx data, Common)
 │   ├── BeastCraft.Presentation/  engine-neutral presentation: content loading, hex layout,
-│   │                       battle playback, VFX timeline/particles, pixel font (netstandard2.1)
-│   ├── BeastCraft.Game/    the shared MonoGame battle viewer (drawing, input, scaling; net10.0)
+│   │                       battle playback, VFX timeline/layers/auras, portrait layout, range
+│   │                       diagrams, pixel font (netstandard2.1)
+│   ├── BeastCraft.Game/    the shared MonoGame battle viewer (portrait canvas, drawing, input; net10.0)
 │   ├── BeastCraft.Desktop/ the MonoGame DesktopGL host (desktop spike, net10.0)
 │   └── BeastCraft.Android/ the MonoGame Android host (net10.0-android; local build, not in CI)
 ├── content/        the game's authored content, read by the hosts, the tests and the simulator
@@ -85,7 +86,8 @@ rules and the asset naming contract.
 
 **Pre-alpha: a headless, deterministic battle and progression core with its
 data and tooling, and a MonoGame desktop spike that renders one real battle
-with placeholder pixel art and skill VFX. No playable game yet.**
+in portrait with throwaway pixel-art placeholders and layered skill VFX. No
+playable game yet.**
 
 ### What exists
 
@@ -193,43 +195,53 @@ The numbers are simulator-tuned starting points, not confirmed balance — see
 
 `src/BeastCraft.Desktop` is a MonoGame DesktopGL app (MonoGame 3.8.5.1, net10.0;
 Windows first, and it builds on Linux). It fights one real PvE battle through the
-game's own session code — Phoenix, Golem and Kirin (level 20) against the Hollow
-Warden encounter (a champion and two brutes, level 10), seed 20260924 — and
-draws it pixel-perfect: a 640x360 frame scaled up by a whole number.
+game's own session code — Phoenix, Golem, Kirin and Frost Wyrm (level 20) against
+the Hollow Warden encounter (a champion and two brutes, level 10), seed 20260933 —
+and draws it in **portrait**: a fixed 1080x1920 canvas scaled to the window and
+letterboxed (the window opens at 540x960 and can be resized). The art is
+throwaway pixel placeholders; the final art is illustrated.
 
 ```
-git lfs install && git lfs pull          # the pixel art is in Git LFS
+git lfs install && git lfs pull          # the placeholder art is in Git LFS
 dotnet run --project src/BeastCraft.Desktop -c Release
 ```
 
 **Space** plays the next turn (or finishes the one playing), **A** toggles
-auto-play, **Esc** quits. Each fired skill plays its VFX from
-`content/data/Vfx/vfx-library.json`; Phoenix's Ember Shot and Flame Wave are fully
-authored, every other skill uses its element's default.
+auto-play, **1**/**2**/**3** set the speed, **S** skips to the result, **Tab**
+cycles the selected skill, **Esc** quits; the on-screen PLAY/PAUSE, x1/x2/x3 and
+SKIP buttons do the same, and hovering or clicking a skill card shows its range
+diagram. Each fired skill plays its VFX from `content/data/Vfx/vfx-library.json`
+(schema v2: layered effects, per-effect-type defaults with status auras and icons);
+Phoenix's Ember Shot, Flame Wave and Rebirth Flame carry the full layer stack.
 
 Screenshot mode renders one frame to a PNG and exits (it still opens a window
 briefly, for the graphics device):
 
 ```
 dotnet run --project src/BeastCraft.Desktop -c Release -- --screenshot shot.png --turns 1 --skill ember_shot
+dotnet run --project src/BeastCraft.Desktop -c Release -- --screenshot diagram.png --skill flame_wave --select-skill 1
 ```
 
 `--turns N` plays N turns and shows the Nth; `--skill ID` then carries on to the
 first turn that fires that skill; `--at MS` picks the moment inside that turn
-(default: the skill's VFX mid-play); `--scale K` (default 2), `--seed S`,
-`--level L`, `--enemy-level L` and `--content DIR` adjust the rest. The design,
-the VFX schema and the art pipeline are in
+(default: the skill's VFX mid-play); `--select-skill N` shows the acting unit's
+Nth skill card with its range diagram; `--scale K` renders K x 540x960 (default
+2: 1080x1920); `--safe-inset L,T,R,B` fakes a phone's cutout insets;
+`--encounter ID`, `--speed S`, `--seed S`, `--level L`, `--enemy-level L` and
+`--content DIR` adjust the rest. The design (portrait canvas and safe area, art
+manifest v2 and ArtKey, the VFX schema, range diagrams, how Spine would plug in)
+and the art pipeline are in
 [`docs/design/presentation-and-vfx.md`](docs/design/presentation-and-vfx.md);
 regenerating the art is in [`Tooling/PixelArt/README.md`](Tooling/PixelArt/README.md).
 
 ### Running on Android
 
 `src/BeastCraft.Android` runs the same battle viewer (the shared
-`src/BeastCraft.Game`) on Android: full screen in landscape, the 640x360 frame
-scaled by a whole number and letterboxed. **Tap** plays the next turn (or
-finishes the one playing), a **two-finger tap** or the on-screen **AUTO**
-button toggles auto-play, **Back** quits. It is a **local build only**; CI does
-not build it.
+`src/BeastCraft.Game`) on Android: full screen and **locked to portrait**, the
+1080x1920 canvas letterboxed inside the display cutout's safe area. **Tap** the
+buttons and skill cards, tap the board to play the next turn (or finish the one
+playing), a **two-finger tap** toggles auto-play, **Back** quits. It is a
+**local build only**; CI does not build it.
 The package ID `com.example.beastcraft` is a temporary placeholder; the real
 package ID is decided at release time.
 
