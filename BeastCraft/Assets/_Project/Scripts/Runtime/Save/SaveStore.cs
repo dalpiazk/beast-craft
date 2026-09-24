@@ -40,15 +40,61 @@ namespace BeastCraft.Save
             return json != null && _storage.TryWrite(slot, json);
         }
 
-        /// <summary>Reads <paramref name="slot"/>; see <see cref="SaveSerializer.Deserialize"/>. A missing slot is a failed result.</summary>
+        /// <summary>
+        /// Reads <paramref name="slot"/>; see <see cref="SaveSerializer.Deserialize"/>. A missing slot
+        /// is a failed result. The result's <see cref="SaveLoadResult.StorageSource"/> says which
+        /// file was used.
+        /// <para>
+        /// Over an <see cref="IBackupSaveStorage"/> (e.g. <see cref="FileSaveStorage"/>): when the main
+        /// file reads but fails to load (unparseable, a failed migration), the backup is loaded
+        /// instead and <see cref="SaveLoadResult.MainFileProblem"/> says why. There is no retry when
+        /// the main save was written by a newer build: loading the older backup, then saving, would
+        /// overwrite that newer progress. When the backup fails too, the main file's failure is
+        /// returned.
+        /// </para>
+        /// </summary>
         public SaveLoadResult Load(string slot)
         {
-            if (!_storage.TryRead(slot, out string json))
+            if (!(_storage is IBackupSaveStorage backed))
             {
-                return SaveLoadResult.Failed("No save in slot '" + slot + "'.", 0);
+                if (!_storage.TryRead(slot, out string json))
+                {
+                    return SaveLoadResult.Failed("No save in slot '" + slot + "'.", 0);
+                }
+
+                return _serializer.Deserialize(json).WithStorage(SaveFileSource.Main, null);
             }
 
-            return _serializer.Deserialize(json);
+            SaveFileResult read = backed.Read(slot);
+
+            if (!read.Success)
+            {
+                string error = read.ErrorKind == SaveFileError.NotFound ? "No save in slot '" + slot + "'." : read.Error;
+                return SaveLoadResult.Failed(error, 0).WithStorage(SaveFileSource.None, read.MainFileProblem);
+            }
+
+            SaveLoadResult loaded = _serializer.Deserialize(read.Contents).WithStorage(read.Source, read.MainFileProblem);
+
+            if (loaded.Success || read.Source != SaveFileSource.Main || loaded.SourceVersion > _serializer.CurrentVersion)
+            {
+                return loaded;
+            }
+
+            SaveFileResult backup = backed.ReadBackup(slot);
+
+            if (!backup.Success)
+            {
+                return loaded;
+            }
+
+            SaveLoadResult fromBackup = _serializer.Deserialize(backup.Contents);
+
+            if (!fromBackup.Success)
+            {
+                return loaded;
+            }
+
+            return fromBackup.WithStorage(SaveFileSource.Backup, "read but failed to load (" + loaded.Error + ")");
         }
     }
 }
