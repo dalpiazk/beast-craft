@@ -63,14 +63,14 @@ namespace BeastCraft.Tests.EditMode
             Assert.AreEqual(0, AvatarProgression.AwardBattle(null, BattleOutcome.PlayerVictory, 20));
         }
 
-        [TestCase(10, 10, 500)]
-        [TestCase(10, 15, 500)]
-        [TestCase(10, 9, 575)]
-        [TestCase(10, 6, 800)]
-        [TestCase(10, 4, 950)]
-        [TestCase(10, 3, 1000)]
+        [TestCase(10, 10, 100)]
+        [TestCase(10, 15, 100)]
+        [TestCase(10, 9, 190)]
+        [TestCase(10, 4, 640)]
+        [TestCase(10, 1, 910)]
+        [TestCase(20, 10, 1000)]
         [TestCase(40, 1, 1000)]
-        public void BenchShare_HalfAtTheEnemysLevel_CatchingUpBelowIt(int enemyLevel, int benchLevel, int permille)
+        public void BenchShare_SmallAtTheEnemysLevel_CatchingUpBelowIt(int enemyLevel, int benchLevel, int permille)
         {
             Assert.AreEqual(permille, BeastProgression.BenchSharePermille(enemyLevel, benchLevel));
         }
@@ -80,11 +80,11 @@ namespace BeastCraft.Tests.EditMode
         {
             int standing = BeastProgression.BattleXp(BattleOutcome.PlayerVictory, 20, false);
 
-            Assert.AreEqual(standing / 2, BeastProgression.BenchXp(BattleOutcome.PlayerVictory, 20, 20));
-            Assert.AreEqual(standing * 875 / 1000, BeastProgression.BenchXp(BattleOutcome.PlayerVictory, 20, 15));
+            Assert.AreEqual(standing / 10, BeastProgression.BenchXp(BattleOutcome.PlayerVictory, 20, 20));
+            Assert.AreEqual(standing * 550 / 1000, BeastProgression.BenchXp(BattleOutcome.PlayerVictory, 20, 15));
             Assert.AreEqual(standing, BeastProgression.BenchXp(BattleOutcome.PlayerVictory, 20, 1));
-            Assert.AreEqual(standing / 2 * 60 / 100, BeastProgression.BenchXp(BattleOutcome.PlayerVictory, 20, 21), "a bench beast above the encounter falls off too");
-            Assert.AreEqual(BeastProgression.ParticipationXp / 2, BeastProgression.BenchXp(BattleOutcome.EnemyVictory, 20, 20), "a loss pays the share of participation");
+            Assert.AreEqual(standing / 10 * 60 / 100, BeastProgression.BenchXp(BattleOutcome.PlayerVictory, 20, 21), "a bench beast above the encounter falls off too");
+            Assert.AreEqual(BeastProgression.ParticipationXp * 100 / 1000, BeastProgression.BenchXp(BattleOutcome.EnemyVictory, 20, 20), "a loss pays the share of participation");
 
             for (int benchLevel = 1; benchLevel <= 30; benchLevel++)
             {
@@ -93,7 +93,7 @@ namespace BeastCraft.Tests.EditMode
 
             BeastProgress reserve = new BeastProgress("emberfox", 20);
             BeastProgression.AwardBench(reserve, BattleOutcome.PlayerVictory, 20);
-            Assert.AreEqual(standing / 2, reserve.Xp);
+            Assert.AreEqual(standing / 10, reserve.Xp);
             Assert.AreEqual(0, BeastProgression.AwardBench(null, BattleOutcome.PlayerVictory, 20));
         }
 

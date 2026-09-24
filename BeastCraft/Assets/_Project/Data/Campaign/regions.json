@@ -4,17 +4,17 @@
   "StartingLevelCap": 12,
   "LevelCapMargin": 2,
   "MapRules": {
-    "Layers": 14,
+    "Layers": 11,
     "Lanes": 4,
     "Paths": 4,
-    "EliteMinLayer": 4,
-    "RestLayer": 12,
+    "EliteMinLayer": 3,
+    "RestLayer": 9,
     "NodeWeights": [ { "Type": "Battle", "Weight": 70 }, { "Type": "Elite", "Weight": 15 }, { "Type": "Shop", "Weight": 8 }, { "Type": "Rest", "Weight": 7 } ],
     "MinElites": 1,
     "MaxElites": 3,
     "MaxShops": 1,
     "EliteLevelOffset": 1,
-    "GateLevelOffset": 1,
+    "GateLevelOffset": 0,
     "EliteShapeId": "elite"
   },
   "Seals": [
@@ -38,7 +38,7 @@
       "MaxLevel": 10,
       "Stages": 4,
       "RequiresRegionId": "",
-      "ShapeWeights": [ { "ShapeId": "squad", "Weight": 60 }, { "ShapeId": "horde", "Weight": 40 } ],
+      "ShapeWeights": [ { "ShapeId": "squad", "Weight": 45 }, { "ShapeId": "horde", "Weight": 40 }, { "ShapeId": "solo", "Weight": 15 } ],
       "GateTemplateIds": [ ],
       "BossTemplateId": "boss_r01_hollow_warden",
       "BossRewardSealId": "seal_r01"

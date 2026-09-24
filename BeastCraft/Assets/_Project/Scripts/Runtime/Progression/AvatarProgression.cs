@@ -9,11 +9,12 @@ namespace BeastCraft.Progression
     /// <para>
     /// <strong>Tuned so the avatar levels alongside the encounters.</strong> A battle pays
     /// <see cref="ParticipationXp"/> win or lose, plus <c>ClearBaseXp + ClearXpPerEnemyLevel ×
-    /// enemyLevel</c> on a clear. At an encounter level <c>L</c> and an 80% clear rate that is about
-    /// <c>40 + 3.2 L</c> a battle; a level costs <c>XpCurveBase + XpCurvePerLevel × level</c>
-    /// (<c>200 + 16 L</c>), so a player who wins four fights in five gains about one level per five
-    /// battles — the pacing model's campaign, which raises the encounter level every five battles
-    /// (balance simulator <c>--mode pacing</c>, "Avatar level"). Fighting below one's level pays less
+    /// enemyLevel</c> on a clear (raised from <c>40 + 4 L</c> to <c>50 + 5 L</c> with the beasts' for
+    /// the region campaign). At an encounter level <c>L</c> and the campaign's ~70% clear rate that
+    /// is about <c>43 + 3.5 L</c> a battle; a level costs <c>XpCurveBase + XpCurvePerLevel × level</c>
+    /// (<c>200 + 16 L</c>), so the avatar gains a level about every 4.6 battles and arrives at each
+    /// gate and boss on its level (balance simulator <c>--mode campaign</c>; <c>--mode pacing</c>,
+    /// "Avatar level", tracks one level above its encounters). Fighting below one's level pays less
     /// (the level-gap falloff, <see cref="LevelGapXp"/>: nothing from five levels down), so grinding
     /// easy content is slow. There is no avatar level cap. Tunable starting defaults, not confirmed
     /// balance.
@@ -37,10 +38,10 @@ namespace BeastCraft.Progression
         public const int ParticipationXp = 8;
 
         /// <summary>The flat part of the clear bonus (paid only on <see cref="BattleOutcome.PlayerVictory"/>).</summary>
-        public const int ClearBaseXp = 40;
+        public const int ClearBaseXp = 50;
 
         /// <summary>The clear bonus per enemy level.</summary>
-        public const int ClearXpPerEnemyLevel = 4;
+        public const int ClearXpPerEnemyLevel = 5;
 
         /// <summary>
         /// XP from <paramref name="level"/> to the next: <c>XpCurveBase + XpCurvePerLevel × level</c>,

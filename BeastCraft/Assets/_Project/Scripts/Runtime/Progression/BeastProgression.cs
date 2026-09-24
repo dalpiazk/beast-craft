@@ -6,13 +6,15 @@ namespace BeastCraft.Progression
     /// The rules of a beast's own level: its XP curve and what a battle pays each beast that was
     /// fielded. Deliberately its own constants, parallel to but not coupled with
     /// <see cref="AvatarProgression"/>. Applied after a battle by <c>BattleSession.ApplyRewards</c>;
-    /// paced in <c>docs/balance/pacing-report.md</c>, "Beast level".
+    /// paced in <c>docs/balance/campaign-pacing-report.md</c> (the region campaign) and
+    /// <c>docs/balance/pacing-report.md</c>, "Beast level".
     /// <para>
     /// <strong>Autonomous default, pending producer review.</strong> These numbers were chosen
-    /// without a design brief, to one target: a beast fielded in every battle levels alongside the
-    /// encounters, its median level within 3 of the encounter level at every checkpoint of the
-    /// pacing campaign (balance simulator <c>--mode pacing</c>, "Beast level"), as the avatar does.
-    /// All tunable; nothing else depends on the exact values.
+    /// without a design brief, to one target: a fielded beast levels alongside the encounters, its
+    /// median level within 3 of the node level at every gate and boss of the region campaign
+    /// (balance simulator <c>--mode campaign</c>) and of the encounter level at every checkpoint of
+    /// the pacing campaign (<c>--mode pacing</c>), as the avatar does. All tunable; nothing else
+    /// depends on the exact values.
     /// </para>
     /// <para>
     /// <strong>Who is paid.</strong> Every beast fielded in a finished battle earns
@@ -20,9 +22,17 @@ namespace BeastCraft.Progression
     /// <see cref="BattleOutcome.PlayerVictory"/>, a fielded beast still standing at the end also
     /// earns the clear bonus <c>ClearBaseXp + ClearXpPerEnemyLevel × enemyLevel</c>; a beast knocked
     /// out before the end earns participation only. A beast left on the bench earns a share of what
-    /// a standing fielded beast earns (<see cref="BenchXp"/>): half at or above the enemy's level,
-    /// 7.5% more per level below it, all of it from 7 levels down — so a reserve settles a few levels
-    /// behind the team instead of falling ever further back.
+    /// a standing fielded beast earns (<see cref="BenchXp"/>): 10% at or above the enemy's level,
+    /// 9% more per level below it, all of it from 10 levels down — so a reserve settles about 6
+    /// levels behind the team (campaign report: 5-6 from region 3) instead of falling ever further
+    /// back, and a new recruit catches up at the full rate.
+    /// </para>
+    /// <para>
+    /// <strong>Bench numbers retuned from the lead's 50% + 7.5% per level, pending lead/user
+    /// review.</strong> That rule was chosen for its outcome, "reserves about 6-7 levels behind",
+    /// estimated with the fielded beasts earning their full XP. Under the level-gap falloff and
+    /// knockouts they earn about 70% of it, so 50% + 7.5% settled the bench only 1-2 levels behind
+    /// (<c>--mode campaign</c>); the same shape at 10% + 9% gives the intended 5-8.
     /// </para>
     /// <para>
     /// <strong>Falloff and cap.</strong> Every award is cut by the level-gap falloff on the beast's
@@ -30,13 +40,16 @@ namespace BeastCraft.Progression
     /// (<see cref="AddXp(BeastProgress, int, int)"/>, <see cref="LevelCap"/>).
     /// </para>
     /// <para>
-    /// <strong>The curve.</strong> A level costs <c>XpCurveBase + XpCurvePerLevel × level</c>. At an
-    /// encounter level <c>L</c>, an 80% clear rate and a beast knocked out in 20% of won battles, a
-    /// battle pays about <c>6 + 0.64 × (40 + 4 L) ≈ 31.6 + 2.56 L</c>, so the campaign's five battles
-    /// per encounter level pay about <c>158 + 12.8 L</c> against a cost of <c>160 + 13 L</c>, so the
-    /// beast keeps pace with the encounters without running away from them (pacing report: median
-    /// exactly on the encounter level at every checkpoint, p10-p90 within 3). Fighting below one's
-    /// level pays less, so grinding easy content is slow.
+    /// <strong>The curve.</strong> A level costs <c>XpCurveBase + XpCurvePerLevel × level</c>. The
+    /// clear bonus was raised from <c>40 + 4 L</c> to <c>50 + 5 L</c> for the region campaign, whose
+    /// battles clear about 70% of the time (80% squads, harder elites, gates and bosses; a loss is
+    /// retried): at that rate and a beast knocked out in 20% of won battles a battle pays about
+    /// <c>6 + 0.56 × (50 + 5 L) ≈ 34 + 2.8 L</c>, a level every 4.6-5 battles, so the fielded team
+    /// arrives at each gate and boss within a level of it in about 540 battles
+    /// (<c>--mode campaign</c>). Running ahead is held back by the level-gap falloff, which is why
+    /// the pacing model's 80% campaign (five battles a level) now tracks one level above the
+    /// encounters instead of on them. Fighting below one's level pays less, so grinding easy
+    /// content is slow.
     /// </para>
     /// <para>
     /// Non-throwing: a null progress is a no-op; level and XP are normalized on every write.
@@ -57,16 +70,16 @@ namespace BeastCraft.Progression
         public const int ParticipationXp = 6;
 
         /// <summary>The flat part of the clear bonus (a player victory, beast still standing).</summary>
-        public const int ClearBaseXp = 40;
+        public const int ClearBaseXp = 50;
 
         /// <summary>The clear bonus per enemy level.</summary>
-        public const int ClearXpPerEnemyLevel = 4;
+        public const int ClearXpPerEnemyLevel = 5;
 
-        /// <summary>A benched beast's share of the battle's XP, in tenths of a percent, at or above the enemy's level (lead decision: 50%).</summary>
-        public const int BenchShareBasePermille = 500;
+        /// <summary>A benched beast's share of the battle's XP, in tenths of a percent, at or above the enemy's level (10%; see the class remarks).</summary>
+        public const int BenchShareBasePermille = 100;
 
-        /// <summary>The bench share grows by this much (tenths of a percent) per level the benched beast is below the enemy (7.5%), up to all of it.</summary>
-        public const int BenchSharePerLevelPermille = 75;
+        /// <summary>The bench share grows by this much (tenths of a percent) per level the benched beast is below the enemy (9%), up to all of it.</summary>
+        public const int BenchSharePerLevelPermille = 90;
 
         /// <summary>
         /// XP from <paramref name="level"/> to the next: <c>XpCurveBase + XpCurvePerLevel × level</c>,
@@ -137,7 +150,7 @@ namespace BeastCraft.Progression
         /// <summary>
         /// The share of a battle's XP a beast left on the bench earns, in tenths of a percent:
         /// <c>BenchShareBasePermille + BenchSharePerLevelPermille × levels below the enemy</c>, at
-        /// most 1000 (all of it). 500 at or above the enemy's level, 1000 from 7 levels below.
+        /// most 1000 (all of it). 100 at or above the enemy's level, 1000 from 10 levels below.
         /// </summary>
         public static int BenchSharePermille(int enemyLevel, int benchLevel)
         {

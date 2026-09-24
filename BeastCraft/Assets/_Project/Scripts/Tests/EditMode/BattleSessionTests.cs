@@ -292,8 +292,8 @@ namespace BeastCraft.Tests.EditMode
             Assert.IsTrue(bankedAny, "a standing beast earned more than the 2 XP it lacked");
             Assert.AreEqual(0, summary.BeastLevelsGained);
             Assert.AreEqual(BeastProgression.BenchXp(BattleOutcome.PlayerVictory, EncounterLevel, 1), summary.BenchXpGained[rookie.BeastId]);
-            Assert.AreEqual(BeastProgression.BattleXp(BattleOutcome.PlayerVictory, EncounterLevel, false), summary.BenchXpGained[rookie.BeastId],
-                            "seven or more levels behind, the bench share is all of a standing beast's XP");
+            Assert.AreEqual(BeastProgression.BattleXp(BattleOutcome.PlayerVictory, EncounterLevel, false) * BeastProgression.BenchSharePermille(EncounterLevel, 1) / 1000,
+                            summary.BenchXpGained[rookie.BeastId], "seven levels behind: the catch-up share of a standing beast's XP");
             Assert.AreEqual(100, summary.FalloffPercent[rookie.BeastId]);
             Assert.IsFalse(summary.XpBanked.ContainsKey(rookie.BeastId));
             Assert.AreEqual(100, summary.AvatarFalloffPercent, "the avatar (level 6) is below the encounter");

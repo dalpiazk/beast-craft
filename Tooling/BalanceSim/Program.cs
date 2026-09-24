@@ -37,6 +37,11 @@ namespace BeastCraft.Tooling.BalanceSim
                 return PacingSimulator.Run(options);
             }
 
+            if (options.RunCampaign)
+            {
+                return CampaignPacingSimulator.Run(options);
+            }
+
             string rosterPath = RosterLoader.ResolvePath(options.RosterPath);
             if (rosterPath == null || !File.Exists(rosterPath))
             {

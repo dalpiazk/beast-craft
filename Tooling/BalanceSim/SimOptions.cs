@@ -383,6 +383,12 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <summary><c>--runs</c>: pacing campaigns per base seed.</summary>
         public int PacingRuns = PacingSimulator.DefaultRuns;
 
+        /// <summary><c>--mode campaign</c>: run the region-campaign pacing model (<see cref="CampaignPacingSimulator"/>) instead of PvE / PvP.</summary>
+        public bool RunCampaign;
+
+        /// <summary><c>--regions</c>: the campaign's regions.json, or null to find it by walking up.</summary>
+        public string RegionsPath;
+
         /// <summary><c>--drop-tables</c>: the drop-table file, or null to find it by walking up.</summary>
         public string DropTablesPath;
 
@@ -457,11 +463,13 @@ namespace BeastCraft.Tooling.BalanceSim
             "\n" +
             "Usage: dotnet run --project Tooling/BalanceSim -c Release -- [options]\n" +
             "\n" +
-            "  --mode <m>                 pve | pvp | both | pacing (default both). pve = team vs encounter (primary);\n" +
+            "  --mode <m>                 pve | pvp | both | pacing | campaign (default both). pve = team vs encounter (primary);\n" +
             "                             pvp = the 1v1 round-robin (secondary); pacing = the skill-progression / material\n" +
-            "                             economy model (Monte Carlo campaigns; see README.md, \"Pacing\").\n" +
+            "                             economy model (Monte Carlo campaigns; see README.md, \"Pacing\"); campaign = the region\n" +
+            "                             campaign model (node maps, level cap, bench; docs/design/progression-and-saves.md).\n" +
             "  --battles <n>              pacing: battles per campaign (default 500).\n" +
-            "  --runs <n>                 pacing: campaigns per base seed (default 1000; --seeds pools every seed's).\n" +
+            "  --runs <n>                 pacing / campaign: campaigns per base seed (default 1000; --seeds pools every seed's).\n" +
+            "  --regions <path>           campaign: regions.json (default: found by walking up from the working directory).\n" +
             "  --drop-tables <path>       drop-tables.json (default: found by walking up from the working directory). Pacing\n" +
             "                             rolls it; PvE checks the encounter library's shape ids against it.\n" +
             "  --kit <k>                  elemental | neutral | both (default both): the element axis. neutral forces every\n" +
@@ -700,6 +708,13 @@ namespace BeastCraft.Tooling.BalanceSim
                         break;
                     case "--drop-tables":
                         if (!TryNext(args, ref i, arg, out options.DropTablesPath, out error))
+                        {
+                            return null;
+                        }
+
+                        break;
+                    case "--regions":
+                        if (!TryNext(args, ref i, arg, out options.RegionsPath, out error))
                         {
                             return null;
                         }
@@ -1152,8 +1167,13 @@ namespace BeastCraft.Tooling.BalanceSim
                     options.RunPvp = false;
                     options.RunPacing = true;
                     return true;
+                case "campaign":
+                    options.RunPve = false;
+                    options.RunPvp = false;
+                    options.RunCampaign = true;
+                    return true;
                 default:
-                    error = "--mode expects pve, pvp, both or pacing, got '" + text + "'.";
+                    error = "--mode expects pve, pvp, both, pacing or campaign, got '" + text + "'.";
                     return false;
             }
         }
