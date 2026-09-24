@@ -2589,7 +2589,7 @@ and debuffs moving damage, avatar damage, and the loose level-invariance band ag
 
 The starter roster (the section above) adds `beast-roster.json`, the `BeastCraft.Creatures.Roster`
 data types and validator, `GrowthRateCurve.CurveId` and `GrowthRateCurve.EvaluateScale`, the Editor
-importer (the first Editor script, and the first `UnityEditor` stubs in `Tooling/CiStubs`), and
+importer (the first Editor script, and the first `UnityEditor` stubs, in the since-retired `Tooling/CiStubs`), and
 EditMode tests that check the JSON directly: structure, the ten pinned ids, one beast per element,
 the stat-budget and move-range bands, and the curve semantics.
 

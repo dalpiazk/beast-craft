@@ -12,6 +12,8 @@ Everything below is style-agnostic on purpose: the pixel placeholders go through
 manifest, renderer and VFX schema that illustrated PNGs (and later Spine) will. Do not polish
 the placeholders.
 
+The art and animation brief for freelance quoting (DRAFT): [`docs/art/art-brief.md`](../art/art-brief.md).
+
 ## Architecture: Core -> battle results -> presentation
 
 ```

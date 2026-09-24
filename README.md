@@ -233,6 +233,7 @@ manifest v2 and ArtKey, the VFX schema, range diagrams, how Spine would plug in)
 and the art pipeline are in
 [`docs/design/presentation-and-vfx.md`](docs/design/presentation-and-vfx.md);
 regenerating the art is in [`Tooling/PixelArt/README.md`](Tooling/PixelArt/README.md).
+The art and animation brief for freelance quoting (DRAFT) is [`docs/art/art-brief.md`](docs/art/art-brief.md).
 
 ### Running on Android
 
