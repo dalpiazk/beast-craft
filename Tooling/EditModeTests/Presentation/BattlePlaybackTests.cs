@@ -111,6 +111,66 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
+        public void TurnAnimation_SchedulesBeats_AndDropsHpAsHitsLand()
+        {
+            BattlePlayback playback = new BattlePlayback(BattleSession.Begin(Demo(out _)));
+            HexLayout layout = new HexLayout(200, 180);
+            bool sawKnockout = false;
+
+            PlayedTurn turn;
+            while ((turn = playback.Advance()) != null)
+            {
+                TurnAnimation animation = new TurnAnimation(turn, layout, VfxLibraryTests.Content.Vfx, 1);
+                TurnAnimation again = new TurnAnimation(turn, layout, VfxLibraryTests.Content.Vfx, 1);
+                Assert.AreEqual(turn.Beats.Count, animation.Beats.Count);
+                Assert.AreEqual(again.DurationMs, animation.DurationMs, "seeded: the same turn animates the same way");
+
+                int previousEnd = animation.MoveMs;
+                foreach (ScheduledBeat beat in animation.Beats)
+                {
+                    Assert.GreaterOrEqual(beat.StartMs, previousEnd, "beats play one after another");
+                    previousEnd = beat.EndMs;
+                    Assert.AreSame(beat, animation.BeatAt(beat.StartMs));
+                }
+
+                Assert.GreaterOrEqual(animation.DurationMs, previousEnd);
+
+                foreach (UnitSnapshot unit in turn.After.Values)
+                {
+                    Assert.AreEqual(unit.Hp, animation.ShownHp(unit.Id, animation.DurationMs), "every bar settles on the after-HP");
+                    Assert.LessOrEqual(animation.ShownHp(unit.Id, animation.DurationMs - 1), turn.Before[unit.Id].Hp > unit.Hp ? turn.Before[unit.Id].Hp : unit.Hp);
+                    Assert.AreEqual(!unit.Defeated, animation.ShownStanding(unit.Id, animation.DurationMs));
+                    if (unit.Defeated && !turn.Before[unit.Id].Defeated)
+                    {
+                        sawKnockout = true;
+                        Assert.IsTrue(animation.ShownStanding(unit.Id, 0), "a unit felled this turn is still up as the turn starts");
+                    }
+                }
+
+                if (animation.Beats.Count > 0)
+                {
+                    ScheduledBeat first = animation.Beats[0];
+                    int impact = first.StartMs + first.Timeline.ImpactMs;
+                    foreach (BeatTarget target in first.Beat.Targets)
+                    {
+                        if (target.Damage > 0 && !turn.Before[target.UnitId].Defeated)
+                        {
+                            Assert.AreEqual(turn.Before[target.UnitId].Hp, animation.ShownHp(target.UnitId, impact - 1), "no damage shows before impact");
+                            int expected = System.Math.Max(turn.After[target.UnitId].Hp, turn.Before[target.UnitId].Hp - target.Damage);
+                            Assert.AreEqual(expected, animation.ShownHp(target.UnitId, impact), "the bar drops at impact (a shield or a later heal can hold it up)");
+                        }
+                    }
+
+                    int mid = animation.MidVfxMs(0);
+                    Assert.AreSame(first, animation.BeatAt(mid));
+                    Assert.IsFalse(first.Timeline.Sample(mid - first.StartMs).HitStop);
+                }
+            }
+
+            Assert.IsTrue(sawKnockout, "someone falls in the demo battle");
+        }
+
+        [Test]
         public void HexLayout_CentresRoundTrip_AndNeighboursSitOneStepApart()
         {
             HexLayout layout = new HexLayout(320, 180);

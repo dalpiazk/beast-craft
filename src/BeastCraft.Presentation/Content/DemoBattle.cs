@@ -11,14 +11,23 @@ namespace BeastCraft.Presentation.Content
     /// <summary>
     /// The desktop spike's battle: a real PvE fight built from the authored content, exactly as the
     /// game would field it — a save holding the chosen species at one level with their default
-    /// loadouts, against an encounter template (<see cref="EncounterPlan.FromTemplate"/>, its
+    /// loadouts, against an encounter template at its own level (<see cref="EncounterPlan.FromTemplate"/>, its
     /// calibrated difficulty included) — handed to <see cref="BattleSession.Begin"/> with a fixed
     /// seed. No avatar: it has no tile, and the spike shows beasts.
     /// </summary>
     public static class DemoBattle
     {
         public const string DefaultEncounterId = "boss_r01_hollow_warden";
-        public const int DefaultLevel = 10;
+
+        /// <summary>
+        /// The team's level. Three beasts against a boss tuned for a fuller party need the edge: at
+        /// 20 against the encounter's 10 the default seed is a 25-turn player victory.
+        /// </summary>
+        public const int DefaultLevel = 20;
+
+        /// <summary>The encounter's level (its calibrated difficulty is for this level).</summary>
+        public const int DefaultEncounterLevel = 10;
+
         public const int DefaultSeed = 20260924;
 
         /// <summary>The default team: Phoenix leads (its fire skills are the fully authored VFX).</summary>
@@ -30,7 +39,8 @@ namespace BeastCraft.Presentation.Content
         /// encounter is unknown.
         /// </summary>
         public static BattleSetup Create(GameContent content, int seed, out Dictionary<string, string> speciesByUnit, out string error,
-                                         IReadOnlyList<string> team = null, string encounterId = DefaultEncounterId, int level = DefaultLevel)
+                                         IReadOnlyList<string> team = null, string encounterId = DefaultEncounterId, int level = DefaultLevel,
+                                         int encounterLevel = DefaultEncounterLevel)
         {
             speciesByUnit = new Dictionary<string, string>(StringComparer.Ordinal);
             error = null;
@@ -61,7 +71,7 @@ namespace BeastCraft.Presentation.Content
                 speciesByUnit[BattleSession.BeastUnitIdPrefix + beastId] = kit.SpeciesId;
             }
 
-            EncounterPlan plan = EncounterPlan.FromTemplate(content.Encounters, content.Enemies, encounterId, level);
+            EncounterPlan plan = EncounterPlan.FromTemplate(content.Encounters, content.Enemies, encounterId, encounterLevel);
             if (plan == null)
             {
                 error = "Unknown encounter template '" + encounterId + "'.";
