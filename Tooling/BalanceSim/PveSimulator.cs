@@ -240,6 +240,28 @@ namespace BeastCraft.Tooling.BalanceSim
         /// </summary>
         public PveBattle[] Battles;
 
+        /// <summary>
+        /// <c>--gap-mix</c> (on by default): the every-team run again with each battle at the level gap
+        /// the mix deals it (<see cref="GapMixGaps"/>; <see cref="PveSimulator.RunGapMix"/>), in the
+        /// <see cref="Battles"/> layout; a gap-0 battle is <see cref="Battles"/>' own. Null with
+        /// <c>--gap-mix 0</c>. What the balance sections read (<see cref="BalanceBattles"/>).
+        /// </summary>
+        public PveBattle[] MixBattles;
+
+        /// <summary><c>--gap-mix</c>: the level gap (enemy level minus team level) of each battle of <see cref="MixBattles"/>.</summary>
+        public int[] GapMixGaps;
+
+        /// <summary>
+        /// The battles the balance sections read (per-beast marginals, niches, flags, element
+        /// matchups, team composition, bonds): <see cref="MixBattles"/> when the level-gap mix is on,
+        /// else <see cref="Battles"/>. Calibration, scouting and the plumbing checks read
+        /// <see cref="Battles"/> (gap 0).
+        /// </summary>
+        public PveBattle[] BalanceBattles
+        {
+            get { return MixBattles ?? Battles; }
+        }
+
         /// <summary>Battles per team and composition: each is the same fight with a different seed (damage rolls differ).</summary>
         public int Samples;
 
@@ -765,6 +787,88 @@ namespace BeastCraft.Tooling.BalanceSim
                 point.NoScoutClearRate = ClearRate(RunTeams(cell.Mode, cell.Level, cell.Shape, cell.Multiplier, teams, gap));
             }
         }
+
+        /// <summary>
+        /// <c>--gap-mix</c>: replays <paramref name="cell"/>'s every-team run (at its calibrated
+        /// multiplier) with each battle at a level gap drawn from the mix, and stores it in
+        /// <see cref="PveCell.MixBattles"/> / <see cref="PveCell.GapMixGaps"/>. The gaps are dealt, not
+        /// rolled: per composition, a seeded shuffle of its team x sample slots takes the gaps in
+        /// proportion to their weights (slot p of N gets the gap whose cumulative weight covers
+        /// (p + 0.5) / N; the table runs from the lowest gap on even compositions and from the highest
+        /// on odd ones, so rounding evens out over the cell). A gap-0 battle is the cell's own; any
+        /// other is <see cref="RunBattle(KitMode, int, int, Encounter, double, int, int, bool, bool, out List{BattleUnit})"/>
+        /// with the enemies <c>g</c> levels above the team: enemies at the cell's level + g, the team at
+        /// the cell's level, and where that puts the enemies outside 1-<see cref="SimOptions.MaxLevel"/>
+        /// the enemies stay at the bound and the team moves instead (the gap is kept). The initiative
+        /// tie split is the cell's. Nothing with the mix off.
+        /// </summary>
+        public void RunGapMix(PveCell cell)
+        {
+            if (!_options.GapMixActive)
+            {
+                return;
+            }
+
+            int samples = Samples;
+            int teams = Teams.Count;
+            int slots = teams * samples;
+            int compositions = cell.Shape.Compositions.Count;
+            int[] gaps = new int[cell.Battles.Length];
+            bool[][] playersWinTies = new bool[compositions][];
+            for (int c = 0; c < compositions; c++)
+            {
+                Encounter encounter = cell.Shape.Compositions[c];
+                playersWinTies[c] = PlayersWinTies(cell.Mode, cell.Level, encounter.Id);
+                int[] order = new int[slots];
+                for (int i = 0; i < slots; i++)
+                {
+                    order[i] = i;
+                }
+
+                Random rng = new Random(DeriveSeed(unchecked(_options.Seed + GapMixSeedOffset), cell.Mode, cell.Level, encounter.Id, -1, -1));
+                for (int i = slots - 1; i > 0; i--)
+                {
+                    int j = rng.Next(i + 1);
+                    int swap = order[i];
+                    order[i] = order[j];
+                    order[j] = swap;
+                }
+
+                for (int p = 0; p < slots; p++)
+                {
+                    gaps[(c * slots) + order[p]] = _options.GapAt((p + 0.5) / slots, c % 2 == 1);
+                }
+            }
+
+            PveBattle[] battles = new PveBattle[cell.Battles.Length];
+            Parallel.For(0, battles.Length, i =>
+            {
+                int gap = gaps[i];
+                if (gap == 0)
+                {
+                    battles[i] = cell.Battles[i];
+                    return;
+                }
+
+                int c = cell.CompositionOf(i);
+                int t = cell.TeamOf(i);
+                int teamLevel = cell.Level;
+                int enemyLevel = cell.Level + gap;
+                if (enemyLevel > SimOptions.MaxLevel || enemyLevel < 1)
+                {
+                    enemyLevel = enemyLevel > SimOptions.MaxLevel ? SimOptions.MaxLevel : 1;
+                    teamLevel = enemyLevel - gap;
+                }
+
+                battles[i] = RunBattle(cell.Mode, teamLevel, enemyLevel, cell.Shape.Compositions[c], cell.Multiplier, t, i % samples, false, playersWinTies[c][t], out _);
+            });
+
+            cell.MixBattles = battles;
+            cell.GapMixGaps = gaps;
+        }
+
+        /// <summary>Added to the base seed for the <see cref="RunGapMix"/> deal, so it is no other draw.</summary>
+        private const int GapMixSeedOffset = 0x6a9;
 
         private static double ClearRate(PveBattle[] battles)
         {

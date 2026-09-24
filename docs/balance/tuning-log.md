@@ -3180,3 +3180,55 @@ report, `dotnet run --project Tooling/BalanceSim -c Release -- --panel 16x4 --av
 docs/balance/tuned-report.md --write-difficulty BeastCraft/Assets/_Project/Data/Encounters/encounter-difficulty.json`;
 the level gap, `dotnet run --project Tooling/BalanceSim -c Release -- --mode pve --levels
 10,30,50,70,90 --level-gap -5,-3,-2,0,2,3,5 --out docs/balance/level-gap-report.md`.
+
+## Level-gap mix and the team suggester
+
+No balance change: the roster, the skill library and the difficulty table are unchanged
+(`encounter-difficulty.json` is byte-identical). Three user decisions:
+
+1. **Balance is judged over a mix of level gaps** (`--gap-mix`, on by default; Tooling README,
+   "Level-gap mix"). The per-beast marginals, niches, flags, element matchups, team composition and
+   bond sections now read battles at enemy level minus team level -3 / -2 / -1 / 0 / +1 / +2 / +3
+   with shares 5 / 10 / 15 / 40 / 15 / 10 / 5% (each every-team battle is dealt one gap in exact
+   proportion; the gap-0 share is the calibration's own battles). The calibration, the table,
+   scouting and the plumbing checks stay at gap 0, and `--gap-mix 0` reproduces the pre-mix report
+   byte for byte. Cost: the default run 13 s -> 16 s, the tuned-report command about 30 s -> 33 s.
+2. **Enemy elements are shown free before every fight** (the `Full` preview is the pre-fight
+   screen; `docs/design/battle-system.md`, "Encounter preview"). The scouted calibration targets are
+   kept.
+3. **The bond-aware picker is the game's `TeamSuggester`** (Runtime, `BeastCraft.Battle.Scouting`):
+   the simulator calls it, and every run checks that `Suggest` with the whole roster names the
+   simulator's pick (32 of 32 compositions in the default run, 160 of 160 with `--compositions 40`,
+   also with bonds off, a team of 3 with two Vanguards, and `dominant-element` detail). The game
+   shows the suggestion only after three losses on the same battle and when the player has not
+   turned it off (`TeamSuggestionPolicy`, `PlayerSettings`).
+
+The guard under the mix (five seeds 12345 / 777 / 4242 / 2024 / 99, `--target-clear 50`; the gap-0
+column is the same run's equal-level battles and reproduces "Behaviour bonds and tiered
+difficulty"):
+
+| | `elemental` mix | `elemental` gap 0 | `neutral` mix | `neutral` gap 0 |
+| --- | --- | --- | --- | --- |
+| Normalized marginals (guard +/-4 / +/-7) | -3.4 … +2.1 (all inside) | -3.1 … +3.8 | -4.2 … +5.2 (all inside) | -5.7 … +5.7 |
+| Top 3 in some shape | 8 of 10 (not Kirin, Leviathan) | 9 of 10 (not Leviathan) | 8 of 10 (not Leviathan, Kirin) | 9 of 10 (not Kirin) |
+
+The mix narrows the normalized spread in both modes and costs one niche per mode, each by less than
+1.3 points: Kirin is 4th in `elemental` `elite` (+0.6 against Treant's +1.4) and
+Leviathan 4th in `neutral` `elite` (+2.7 against Basilisk's +4.0). Retune attempts on the same five
+seeds (scratch rosters, `--roster`), none adopted:
+
+| Candidate | `elemental` mix | `neutral` mix | Gap 0 |
+| --- | --- | --- | --- |
+| Leviathan Def 120 -> 117, Speed 94 -> 97; Kirin HP 115 -> 121 | 8 / 10 (not Kirin, Leviathan) | 8 / 10 (not Treant, Kirin) | `elemental` 9 / 10, `neutral` 8 / 10 |
+| Kirin HP 115 -> 125 | 8 / 10 (not Kirin, Leviathan) | 8 / 10 (not Kirin, Leviathan) | Kirin +4.1 normalized: outside the `elemental` guard |
+
+(Three earlier candidates were run on a wrong seed set, 1 / 2 in place of 2024 / 99, and are not
+counted: Leviathan's offence up and defences down made it worse, Leviathan Speed +6 for Defense -6
+pushed Phoenix to -4.1.) The top-3 boundary is within the five-seed noise of the shape means (SD over
+seeds 1-2 points): each change moved a niche from one beast to another rather than adding one. The
+normalized guard holds under the mix in both modes; the niche count is flagged for the next balance
+pass rather than chased here.
+
+Reproduce: the guard, `dotnet run --project Tooling/BalanceSim -c Release -- --mode pve --seeds
+12345,777,4242,2024,99 --target-clear 50 --out out/guard.md` (its tables carry the gap-0 column);
+the shipping report and table, the unchanged command in the Tooling README.

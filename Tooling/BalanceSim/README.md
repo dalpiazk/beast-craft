@@ -48,6 +48,7 @@ dotnet run --project Tooling/BalanceSim -c Release -- [options]
 | `--calibrate-on <t>` | `bonds` | Whose clear rate the PvE difficulty is calibrated to `--target-clear`. `bonds`: the team the bond-aware scouted picker (heuristic + bonds) fields against each composition, i.e. the player scouts and counter-picks; falls back to `heuristic` when bonds are not active (`--bonds off`, `--skill-kit standard`). `heuristic`: the plain element counter-pick. `mean`: the mean of every team (the unscouted player), the calibration before scouting; it reproduces the pre-scouting report byte for byte. See "Difficulty calibration". |
 | `--calibrate-samples <n>` | `16` | Scouted-pick calibration only: battles per composition the picked team fights at each search step (8 compositions x 16 = 128 battles per step, a binomial SE of about 4.4 points at 50%). Raise it if a cell's search is non-monotone. |
 | `--level-gap <list>` | off | PvE only. Also replay every cell with the enemies `g` levels above the team (negative = below) at the cell's calibrated multiplier, and add the "PvE level gap" section (and "PvE level gap over seeds" with `--seeds`). Comma-separated gaps and inclusive ranges, e.g. `-5..10` or `0,2,3,5`. The team and the avatar (unless `--avatar-level`) stay at the row's level; the enemies' stats follow their curve to their level, and the damage formula's level-difference term applies. Each battle's seed ignores the gap, so gap 0 is the calibration itself (no extra battles). A gap that puts the enemies outside 1-100 is not run (`—`). Suggested with `--levels 10,30,50,70,90`. See "Level gap". |
+| `--gap-mix <spec>` | `-3:5,-2:10,-1:15,0:40,1:15,2:10,3:5` | PvE. The **level-gap mix** the balance sections are judged over: comma-separated `gap:weight` pairs (enemy level minus team level; weights normalized to their sum; a bare gap weighs 1). Every cell's every-team battles are replayed with each battle dealt one gap in those proportions; the per-beast marginals, niches, flags, element matchups, team composition and bond sections read those battles, while the calibration, the difficulty table, scouting and the plumbing checks stay at gap 0. `0` (or `off`) is gap 0 alone and reproduces the report before the mix byte for byte. See "Level-gap mix". |
 | `--level-gap-teams <n>` | `42` | `--level-gap` only: how many teams (a seeded subset of the 210) the **no-scouting** rate at each nonzero gap is measured over, against every composition (42 x 8 = 336 battles). The **scouted** rate always uses the picked team, `--calibrate-samples` battles per composition. |
 | `--avatar-value` | off | PvE only (needs an avatar and a scouted-pick calibration). Also replay every cell's picked-team battles (`--calibrate-samples` per composition, the same seeds) **without the avatar** at the calibrated multiplier, and add the "PvE avatar value" section ("over seeds" with `--seeds`): per cell the scouted rate with and without the avatar, the difference (the avatar's **value** in points of clear rate), the avatar's turns, and its **direct share** of the team's output: the avatar's damage (its own turns and its passives' hits) + healing (team HP restored on its turns) + shield soak (damage a shield absorbed, credited to the shield's caster) as a percent of the team's total, with the part its passives produced. Read-only accounting; the rest of the report is unchanged. See "Avatar value". |
 | `--turn-detail` | off | PvE only. Add the "PvE beast turns" section: per kit mode, shape and beast (every team's battles at the calibrated multiplier, levels pooled) its turns per battle, the share of them on which no skill fired, split into held by its stance and out of reach, stunned turns, and the share of its damage that came off large enemies (bosses: giant, champion). A diagnostic; never changes a battle. |
@@ -77,7 +78,7 @@ Exit codes: `0` success, `1` bad arguments, `2` missing or invalid roster, skill
 (the roster is checked with `BeastRosterValidator` and the library with `SkillLibraryValidator`
 first, exactly as the Editor importers do), `3` a self-check failed. The run time goes to stderr, never into the report. The default run (PvE and PvP, both element modes,
 three levels, four shapes x 8 compositions, 1 sample per team and composition) takes about
-12 s on an 8-core machine (about 22 s with `--self-check`, which runs
+16 s on an 8-core machine (13 s with `--gap-mix 0`; about 32 s with `--self-check`, which runs
 everything twice and replays two teams per composition through `RunBattle`); it took 50 s before
 the scouted-pick calibration and 210 s before the performance pass (see "Performance"). PvE battles run in
 parallel, and the output is identical whatever the thread count.
@@ -96,7 +97,9 @@ Two reports are committed, both the default arguments:
   roster, the skill library, the encounter content, the simulator or the Runtime change. Since
   "Behaviour bonds and tiered difficulty" it runs the behaviour bonds, the composition panel
   (`--panel 16x4`), the avatar-value replay (`--avatar-value`, for the no-avatar column of
-  "Difficulty by shape") and the tiered targets:
+  "Difficulty by shape") and the tiered targets. Since "Level-gap mix" (see below) its balance
+  sections are judged over the default gap mix; the command is unchanged and the difficulty table it
+  writes is the same:
 
 ```sh
 dotnet run --project Tooling/BalanceSim -c Release -- --panel 16x4 --avatar-value --out docs/balance/tuned-report.md --write-difficulty BeastCraft/Assets/_Project/Data/Encounters/encounter-difficulty.json
@@ -545,6 +548,53 @@ Cost: each nonzero gap adds about 128 + 336 battles per cell (a sixth of a calib
 command above takes about a minute. The committed `docs/balance/level-gap-report.md` is that
 command's output; the default report has no level-gap section and is unchanged by the option.
 
+## Level-gap mix
+
+The player does not always fight at their own level: a map node can sit a few levels above the team
+(under-levelled) or below it (over-levelled). Judging beasts only on equal-level fights would tune
+them for a case that is under half of play, so by default (`--gap-mix`, a user decision on its
+shape: "battles 1-3 levels above and below") the balance sections are judged over a **mix of level
+gaps**, while the difficulty table keeps its meaning (calibrated at gap 0).
+
+| Gap (enemy level - team level) | -3 | -2 | -1 | 0 | +1 | +2 | +3 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Share | 5% | 10% | 15% | 40% | 15% | 10% | 5% |
+
+Symmetric (under- and over-levelled equally likely), peaked at the equal-level fight and tapering
+with distance: a starting point, not measured play data (`SimOptions.DefaultGapMix`).
+
+- **How.** After a cell is calibrated (at gap 0, as always) its every-team run is replayed at the
+  calibrated multiplier with each (composition, team, sample) battle **dealt** one gap
+  (`PveSimulator.RunGapMix`): per composition a seeded shuffle of the team slots takes the gaps in
+  exact proportion (slot p of N gets the gap whose cumulative weight covers (p + 0.5) / N, the table
+  walked from alternate ends on alternate compositions so the rounding evens out). A gap-0 battle is
+  the calibration's own battle; any other is `RunBattle(teamLevel, enemyLevel)` as in `--level-gap`
+  (the same seed, so common random numbers). Where a gap would put the enemies outside 1-100 (L1 with
+  enemies below, L100 with enemies above) the enemies stay at the bound and the team moves (L1, gap
+  -3: team L4 against enemies L1), so the gap is always what it says.
+- **What reads the mix.** Per-beast marginals (raw and normalized, per shape and level, overall), the
+  niche rankings, the flags on them, the element matchups, the role metrics, team composition (spread,
+  best / worst lineups, pair synergy), the bond marginals, scaling and reactions, and the `--seeds`
+  aggregate of all of them (so the balance guard is judged on the mix). The normalization uses the
+  cell's clear rate over the mix.
+- **What stays at gap 0.** The calibration and the difficulty table (`--write-difficulty` writes the
+  same file with or without the mix), "Calibrated difficulty", scouted picking, the composition
+  panel, the avatar value, the kit parity and crit tables, stalemate flags, `--level-gap`, and the
+  self-check invariants.
+- **Side by side.** "Level-gap mix" gives, per kit mode and shape, the no-scouting clear rate at gap 0
+  and over the mix, and per gap over the battles the mix dealt it; each "Marginal clear rate by shape"
+  table adds **Gap 0 overall** and **Gap 0 normalized** columns; the `--seeds` aggregate adds a **Gap 0
+  normalized** column and a gap-0 guard / niche line. All of it comes from battles already run.
+- **Cost.** About 60% of one every-team run per cell (the gap-0 share is reused): the default run
+  went from about 13 s to 16 s, the tuned-report command from about 30 s to 33 s; five seeds
+  (`--mode pve --seeds`, no panel) take about 80 s.
+- **Noise.** A dealt gap makes each battle a single draw at the mix's clear rate, so the marginals'
+  roll noise is what it was at gap 0 (the same number of battles); the per-gap columns of the section
+  are small (5% of a cell for a +/-3 gap) and only indicative. For a clean per-gap curve use
+  `--level-gap`.
+
+`--gap-mix 0` turns it off and reproduces the pre-mix report byte for byte.
+
 ## Avatar value
 
 `--avatar-value` measures what the avatar is worth. At every cell's calibrated multiplier the picked
@@ -719,7 +769,9 @@ dotnet run --project Tooling/BalanceSim -c Release -- --mode pve --seeds 12345,7
   overall marginal (mean and SD over seeds; see "Metrics") with **!** outside the balance guard
   (+/-4 `elemental`, +/-7 `neutral`), plus the range of the raw and normalized means, the beasts
   outside the `--marginal-threshold` band (raw) and outside the guard (normalized), and the beasts
-  with no top-3 shape on the means. Then **team composition over seeds**: each team's clear rate averaged over the seeds,
+  with no top-3 shape on the means. With the level-gap mix on (the default) all of these are over the
+  mix, and a **Gap 0 normalized** column and a gap-0 guard / niche line give the equal-level reading
+  beside them. Then **team composition over seeds**: each team's clear rate averaged over the seeds,
   with the teams' spread within a seed (per-seed SD), how much one team moves between seeds
   (seed-to-seed SD: damage rolls and each seed's composition draw) and the **persistent SD**,
   sqrt(per-seed SD² - seed-to-seed SD²), the spread that is the lineup's own; the percentiles,

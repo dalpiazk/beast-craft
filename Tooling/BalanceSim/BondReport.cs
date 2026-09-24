@@ -444,7 +444,8 @@ namespace BeastCraft.Tooling.BalanceSim
                                 continue;
                             }
 
-                            for (int i = 0; i < cell.Battles.Length; i++)
+                            PveBattle[] cellBattles = cell.BalanceBattles;
+                            for (int i = 0; i < cellBattles.Length; i++)
                             {
                                 if (!active[cell.TeamOf(i)])
                                 {
@@ -452,7 +453,7 @@ namespace BeastCraft.Tooling.BalanceSim
                                 }
 
                                 battles++;
-                                reactions += cell.Battles[i].BondReactions == null ? 0 : cell.Battles[i].BondReactions[b];
+                                reactions += cellBattles[i].BondReactions == null ? 0 : cellBattles[i].BondReactions[b];
                             }
                         }
 

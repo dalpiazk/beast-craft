@@ -79,6 +79,13 @@ namespace BeastCraft.Tooling.BalanceSim
                                   " levels above the team at its calibrated multiplier; see \"PvE level gap\"");
             }
 
+            if (options.GapMixActive)
+            {
+                report.AppendLine("- Level-gap mix (PvE, `--gap-mix`): the balance sections (marginals, niches, flags, element matchups, team composition,");
+                report.AppendLine("  bonds) are judged over battles at a mix of level gaps (" + options.GapMixText + "); calibration and scouting stay at gap 0;");
+                report.AppendLine("  see \"Level-gap mix\"");
+            }
+
             if (options.RunPve && options.PanelActive)
             {
                 report.AppendLine("- Composition panel (PvE, `--panel " + options.PanelCompositions + "x" + options.PanelSamples + "`): every team against a fixed panel of " +

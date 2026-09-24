@@ -50,6 +50,12 @@ namespace BeastCraft.Tooling.BalanceSim
             report.AppendLine("p = the cell's no-scouting clear rate, then averaged like the raw one: the marginal at a 50% cell). The balance guard reads it:");
             report.AppendLine("within +/-" + SimOptions.Format(SimOptions.GuardElemental) + " `elemental`, +/-" + SimOptions.Format(SimOptions.GuardNeutral) +
                               " `neutral` (**!** = outside).");
+            if (options.GapMixActive)
+            {
+                report.AppendLine("Every number is over the level-gap mix (`--gap-mix`: " + options.GapMixText + "; see each seed's \"Level-gap mix\") except");
+                report.AppendLine("**Gap 0 normalized**, the same mean over the equal-level battles alone, and the gap-0 summary lines.");
+            }
+
             report.AppendLine();
 
             foreach (KitMode mode in options.Modes)
@@ -139,10 +145,18 @@ namespace BeastCraft.Tooling.BalanceSim
             double[][][] byShape = new double[n][][];
             double[][] overall = new double[n][];
             double[][] normalized = new double[n][];
+            bool mix = options.GapMixActive;
+            double[][][] gap0ByShape = new double[n][][];
+            double[][] gap0Normalized = new double[n][];
             for (int s = 0; s < n; s++)
             {
-                PveReport.Marginals(options.ForSeed(seeds[s]), species, catalogs[s].Shapes, simulators[s], cells[s], mode, out byShape[s], out overall[s],
+                PveReport.Marginals(options.ForSeed(seeds[s]), species, catalogs[s].Shapes, simulators[s], cells[s], mode, false, out byShape[s], out overall[s],
                                     out normalized[s]);
+                if (mix)
+                {
+                    PveReport.Marginals(options.ForSeed(seeds[s]), species, catalogs[s].Shapes, simulators[s], cells[s], mode, true, out gap0ByShape[s], out double[] _,
+                                        out gap0Normalized[s]);
+                }
             }
 
             double[][] shapeMean = new double[shapes.Count][];
@@ -223,8 +237,8 @@ namespace BeastCraft.Tooling.BalanceSim
                 rule.Append(" ---: |");
             }
 
-            header.Append(" Overall mean | SD | Range | Normalized mean | Normalized SD |");
-            rule.Append(" ---: | ---: | ---: | ---: | ---: |");
+            header.Append(" Overall mean | SD | Range | Normalized mean | Normalized SD |" + (mix ? " Gap 0 normalized |" : string.Empty));
+            rule.Append(" ---: | ---: | ---: | ---: | ---: |" + (mix ? " ---: |" : string.Empty));
             foreach (int seed in seeds)
             {
                 header.Append(" " + seed.ToString(CultureInfo.InvariantCulture) + " |");
@@ -245,6 +259,11 @@ namespace BeastCraft.Tooling.BalanceSim
                            SimOptions.Signed(low[b]) + " … " + SimOptions.Signed(high[b]) + " | " + SimOptions.Signed(normalizedMean[b]) +
                            (Math.Abs(normalizedMean[b]) > guard ? " **!**" : string.Empty) + " | " +
                            (double.IsNaN(normalizedSd[b]) ? "-" : SimOptions.Format(normalizedSd[b])) + " |");
+                if (mix)
+                {
+                    row.Append(" " + SimOptions.Signed(MeanOver(gap0Normalized, b)) + (Math.Abs(MeanOver(gap0Normalized, b)) > guard ? " **!**" : string.Empty) + " |");
+                }
+
                 for (int s = 0; s < n; s++)
                 {
                     row.Append(" " + SimOptions.Signed(overall[s][b]) + " |");
@@ -294,7 +313,76 @@ namespace BeastCraft.Tooling.BalanceSim
                               (outsideGuard.Count == 0 ? "every beast inside" : "outside: " + string.Join(", ", outsideGuard)) + ".");
             report.AppendLine("- Top " + SimOptions.NicheBand + " in at least one " + unit + " on the means: " + (beasts - noNiche.Count) + " of " + beasts +
                               (noNiche.Count == 0 ? string.Empty : " (not: " + string.Join(", ", noNiche) + ")") + ".");
+            if (mix)
+            {
+                AppendGap0Summary(report, species, shapes, gap0ByShape, gap0Normalized, guard, unit);
+            }
+
             report.AppendLine();
+        }
+
+        /// <summary>With the level-gap mix on: the balance guard's two summary lines over the gap-0 battles alone, for comparison.</summary>
+        private static void AppendGap0Summary(StringBuilder report, IReadOnlyList<CreatureSpeciesSO> species, List<EncounterShape> shapes, double[][][] byShape,
+                                              double[][] normalized, double guard, string unit)
+        {
+            int beasts = species.Count;
+            List<string> outsideGuard = new List<string>();
+            List<int> order = PveReport.Order(beasts, b => MeanOver(normalized, b));
+            foreach (int b in order)
+            {
+                if (Math.Abs(MeanOver(normalized, b)) > guard)
+                {
+                    outsideGuard.Add(species[b].DisplayName + " " + SimOptions.Signed(MeanOver(normalized, b)));
+                }
+            }
+
+            List<string> noNiche = new List<string>();
+            List<int>[] rankings = new List<int>[shapes.Count];
+            for (int e = 0; e < shapes.Count; e++)
+            {
+                double[] means = new double[beasts];
+                for (int b = 0; b < beasts; b++)
+                {
+                    for (int s = 0; s < byShape.Length; s++)
+                    {
+                        means[b] += byShape[s][e][b] / byShape.Length;
+                    }
+                }
+
+                rankings[e] = PveReport.Order(beasts, b => means[b]);
+            }
+
+            for (int b = 0; b < beasts; b++)
+            {
+                bool niche = false;
+                for (int e = 0; e < shapes.Count; e++)
+                {
+                    niche |= rankings[e].IndexOf(b) < SimOptions.NicheBand;
+                }
+
+                if (!niche)
+                {
+                    noNiche.Add(species[b].DisplayName);
+                }
+            }
+
+            report.AppendLine("- Gap 0 (equal levels only), normalized overall means: " + SimOptions.Signed(MeanOver(normalized, order[beasts - 1])) + " … " +
+                              SimOptions.Signed(MeanOver(normalized, order[0])) + "; guard +/-" + SimOptions.Format(guard) + ": " +
+                              (outsideGuard.Count == 0 ? "every beast inside" : "outside: " + string.Join(", ", outsideGuard)) + "; top " + SimOptions.NicheBand +
+                              " in at least one " + unit + ": " + (beasts - noNiche.Count) + " of " + beasts +
+                              (noNiche.Count == 0 ? string.Empty : " (not: " + string.Join(", ", noNiche) + ")") + ".");
+        }
+
+        /// <summary>The mean over seeds of <paramref name="values"/>[seed][<paramref name="b"/>].</summary>
+        private static double MeanOver(double[][] values, int b)
+        {
+            double sum = 0.0;
+            foreach (double[] seed in values)
+            {
+                sum += seed[b] / values.Length;
+            }
+
+            return sum;
         }
     }
 }

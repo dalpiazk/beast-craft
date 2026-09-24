@@ -25,13 +25,20 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <summary>Battles behind each team's rate.</summary>
         public int Battles;
 
+        /// <summary>Every team's rate over the cell's gap-0 battles (<see cref="PveCell.Battles"/>).</summary>
         public static TeamScope FromCell(PveCell cell)
+        {
+            return FromCell(cell, cell.Battles);
+        }
+
+        /// <summary>Every team's rate over <paramref name="battles"/>, in the cell's layout (<see cref="PveCell.Battles"/> or <see cref="PveCell.MixBattles"/>).</summary>
+        public static TeamScope FromCell(PveCell cell, PveBattle[] battles)
         {
             int teams = cell.TeamCount;
             int[] cleared = new int[teams];
-            for (int i = 0; i < cell.Battles.Length; i++)
+            for (int i = 0; i < battles.Length; i++)
             {
-                cleared[cell.TeamOf(i)] += cell.Battles[i].Cleared ? 1 : 0;
+                cleared[cell.TeamOf(i)] += battles[i].Cleared ? 1 : 0;
             }
 
             int per = cell.Shape.Compositions.Count * cell.Samples;
@@ -65,7 +72,7 @@ namespace BeastCraft.Tooling.BalanceSim
         }
     }
 
-    /// <summary>One kit mode's team clear rates: per cell, per shape (levels pooled) and overall.</summary>
+    /// <summary>One kit mode's team clear rates over the balance battles (the level-gap mix when it is on): per cell, per shape (levels pooled) and overall.</summary>
     public class TeamData
     {
         public KitMode Mode;
@@ -88,7 +95,8 @@ namespace BeastCraft.Tooling.BalanceSim
                 data.ByCell[e] = new TeamScope[options.Levels.Count];
                 for (int l = 0; l < options.Levels.Count; l++)
                 {
-                    data.ByCell[e][l] = TeamScope.FromCell(PveReport.Find(cells, mode, options.Levels[l], shapes[e]));
+                    PveCell cell = PveReport.Find(cells, mode, options.Levels[l], shapes[e]);
+                    data.ByCell[e][l] = TeamScope.FromCell(cell, cell.BalanceBattles);
                 }
 
                 data.ByShape[e] = TeamScope.Average(new List<TeamScope>(data.ByCell[e]));

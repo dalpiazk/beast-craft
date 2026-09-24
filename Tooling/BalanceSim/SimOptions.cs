@@ -163,6 +163,19 @@ namespace BeastCraft.Tooling.BalanceSim
         public const int DefaultCalibrateSamples = 16;
 
         /// <summary>
+        /// <c>--gap-mix</c> default, <c>gap:weight</c> pairs (weights are normalized to their sum): the
+        /// gameplay mix of level gaps the balance sections are judged over. Enemies 1-3 levels above
+        /// (the team under-levelled) or below (over-levelled) are as likely as each other and taper off
+        /// with distance; the equal-level fight is the single most common one: 0 = 40%, +/-1 = 15%
+        /// each, +/-2 = 10% each, +/-3 = 5% each. A user decision on its shape ("battles 1-3 levels
+        /// above and below"); the weights are a starting point, not measured play data.
+        /// </summary>
+        public const string DefaultGapMix = "-3:5,-2:10,-1:15,0:40,1:15,2:10,3:5";
+
+        /// <summary>Largest |gap| <c>--gap-mix</c> accepts.</summary>
+        public const int MaxGapMixGap = 10;
+
+        /// <summary>
         /// <c>--level-gap-teams</c> default: how many teams (a seeded subset) the no-scouting rate at
         /// each nonzero level gap is measured over (42 of 210 x 8 compositions = 336 battles).
         /// </summary>
@@ -397,6 +410,16 @@ namespace BeastCraft.Tooling.BalanceSim
         public int LevelGapTeams = DefaultLevelGapTeams;
 
         /// <summary>
+        /// <c>--gap-mix</c>: the level gaps (enemy level minus team level) the balance sections'
+        /// battles are fought at, ascending, with <see cref="GapMixWeights"/>. The default,
+        /// <see cref="DefaultGapMix"/>; <c>--gap-mix 0</c> = gap 0 only (off).
+        /// </summary>
+        public List<int> GapMixGaps = ParseGapMixOrThrow(DefaultGapMix, out List<double> _);
+
+        /// <summary><c>--gap-mix</c>: each gap's share, summing to 1, in <see cref="GapMixGaps"/> order.</summary>
+        public List<double> GapMixWeights = DefaultGapMixWeights();
+
+        /// <summary>
         /// <c>--avatar-value</c>: also replay every cell's picked-team battles with no avatar at the
         /// calibrated multiplier and add the "PvE avatar value" section (the avatar's worth in points
         /// of clear rate, and its direct share of the team's output). Off by default.
@@ -481,6 +504,48 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <c>--avatar library</c>). Set by <see cref="Program"/> after parsing, not a CLI option.
         /// </summary>
         public SkillLibraryKits Library;
+
+        /// <summary>Whether the level-gap mix is on: PvE, and some nonzero gap in <c>--gap-mix</c>.</summary>
+        public bool GapMixActive
+        {
+            get { return RunPve && GapMixGaps != null && GapMixGaps.Exists(g => g != 0); }
+        }
+
+        /// <summary>The mix as <c>gap: percent</c> pairs (e.g. <c>-3: 5%, ..., 0: 40%, ..., +3: 5%</c>), for the report.</summary>
+        public string GapMixText
+        {
+            get
+            {
+                List<string> parts = new List<string>();
+                for (int i = 0; i < GapMixGaps.Count; i++)
+                {
+                    parts.Add((GapMixGaps[i] > 0 ? "+" : string.Empty) + GapMixGaps[i].ToString(CultureInfo.InvariantCulture) + ": " + Format(100.0 * GapMixWeights[i]) + "%");
+                }
+
+                return string.Join(", ", parts);
+            }
+        }
+
+        /// <summary>
+        /// The gap whose cumulative weight covers <paramref name="u"/> (0-1), walking the gaps from the
+        /// lowest, or from the highest with <paramref name="descending"/> (<see cref="PveSimulator.RunGapMix"/>).
+        /// </summary>
+        public int GapAt(double u, bool descending)
+        {
+            double cumulative = 0.0;
+            int n = GapMixGaps.Count;
+            for (int k = 0; k < n; k++)
+            {
+                int i = descending ? n - 1 - k : k;
+                cumulative += GapMixWeights[i];
+                if (u < cumulative)
+                {
+                    return GapMixGaps[i];
+                }
+            }
+
+            return GapMixGaps[descending ? 0 : n - 1];
+        }
 
         /// <summary>A copy of these options for one seed of a <c>--seeds</c> run: <see cref="Seed"/> set, <see cref="Seeds"/> cleared.</summary>
         public SimOptions ForSeed(int seed)
@@ -624,6 +689,11 @@ namespace BeastCraft.Tooling.BalanceSim
             "                             gaps and ranges, e.g. -5..10 or 0,2,3,5. The team (and the avatar, unless --avatar-level)\n" +
             "                             stays at the row's level; each battle's seed ignores the gap, so gap 0 is the calibration\n" +
             "                             itself. A gap that puts the enemies outside 1-100 is not run. Default: off.\n" +
+            "  --gap-mix <spec>           PvE: the level gaps (enemy level minus team level) the balance sections (marginals,\n" +
+            "                             niches, flags, element matchups, team composition, bonds) are fought at: comma-separated\n" +
+            "                             gap:weight pairs; each every-team battle is dealt one gap in proportion to the weights.\n" +
+            "                             Calibration and scouting stay at gap 0. Default " + DefaultGapMix + ";\n" +
+            "                             0 (or off) = gap 0 only, the report before the mix.\n" +
             "  --level-gap-teams <n>      --level-gap: teams (a seeded subset) the no-scouting rate at a nonzero gap is measured\n" +
             "                             over (default 42; the scouted rate always uses the picked team, --calibrate-samples\n" +
             "                             battles per composition).\n" +
@@ -714,6 +784,13 @@ namespace BeastCraft.Tooling.BalanceSim
                         }
 
                         panelLevelGiven = true;
+                        break;
+                    case "--gap-mix":
+                        if (!TryNext(args, ref i, arg, out text, out error) || !TryParseGapMix(text, out options.GapMixGaps, out options.GapMixWeights, out error))
+                        {
+                            return null;
+                        }
+
                         break;
                     case "--level-gap-teams":
                         if (!TryNextInt(args, ref i, arg, 1, out options.LevelGapTeams, out error))
@@ -1316,6 +1393,67 @@ namespace BeastCraft.Tooling.BalanceSim
             gaps.Sort();
             error = null;
             return true;
+        }
+
+        /// <summary>
+        /// <c>--gap-mix</c>: comma-separated <c>gap:weight</c> pairs (a bare gap weighs 1), gaps within
+        /// +/-<see cref="MaxGapMixGap"/> and distinct, weights positive; the result is sorted by gap
+        /// and the weights normalized to sum to 1. <c>0</c> (or <c>off</c>) is gap 0 alone: the mix off.
+        /// </summary>
+        public static bool TryParseGapMix(string text, out List<int> gaps, out List<double> weights, out string error)
+        {
+            gaps = new List<int>();
+            weights = new List<double>();
+            error = "--gap-mix expects comma-separated gap:weight pairs (gaps between -" + MaxGapMixGap + " and " + MaxGapMixGap +
+                    ", distinct; weights above 0), e.g. " + DefaultGapMix + ", or 0 / off; got '" + text + "'.";
+            if (string.Equals(text.Trim(), "off", StringComparison.OrdinalIgnoreCase))
+            {
+                text = "0";
+            }
+
+            SortedDictionary<int, double> parsed = new SortedDictionary<int, double>();
+            double total = 0.0;
+            foreach (string raw in text.Split(','))
+            {
+                string part = raw.Trim();
+                int colon = part.IndexOf(':');
+                string gapText = colon < 0 ? part : part.Substring(0, colon);
+                string weightText = colon < 0 ? "1" : part.Substring(colon + 1);
+                if (!int.TryParse(gapText.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int gap) ||
+                    !double.TryParse(weightText.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out double weight) ||
+                    Math.Abs(gap) > MaxGapMixGap || !(weight > 0.0) || double.IsInfinity(weight) || parsed.ContainsKey(gap))
+                {
+                    return false;
+                }
+
+                parsed[gap] = weight;
+                total += weight;
+            }
+
+            foreach (KeyValuePair<int, double> pair in parsed)
+            {
+                gaps.Add(pair.Key);
+                weights.Add(pair.Value / total);
+            }
+
+            error = null;
+            return true;
+        }
+
+        private static List<int> ParseGapMixOrThrow(string text, out List<double> weights)
+        {
+            if (!TryParseGapMix(text, out List<int> gaps, out weights, out string error))
+            {
+                throw new InvalidOperationException(error);
+            }
+
+            return gaps;
+        }
+
+        private static List<double> DefaultGapMixWeights()
+        {
+            ParseGapMixOrThrow(DefaultGapMix, out List<double> weights);
+            return weights;
         }
 
         private static bool TryParseSimMode(string text, SimOptions options, out string error)
