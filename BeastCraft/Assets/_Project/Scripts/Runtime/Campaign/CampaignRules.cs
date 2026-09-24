@@ -231,6 +231,22 @@ namespace BeastCraft.Campaign
         /// </summary>
         public static CampaignResult ResolveBattle(PlayerSave save, RegionLibrary library, int nodeId, BattleOutcome outcome)
         {
+            return ResolveBattle(save, library, nodeId, outcome, null);
+        }
+
+        /// <summary>The <c>LootRoller.DeriveSeed(node.EncounterSeed, …)</c> stream a pass's or lair's first-clear reward is drawn on.</summary>
+        public const int NodeRewardStream = 5;
+
+        /// <summary>
+        /// <see cref="ResolveBattle(PlayerSave, RegionLibrary, int, BattleOutcome)"/> with the
+        /// economy's first-clear rewards (<paramref name="economy"/> null = none): the first clear of
+        /// a stage's pass (Gate) grants a guaranteed rare from its band's <c>boss</c> gear pool, the
+        /// first clear of a region's lair (Boss) a guaranteed epic (a rare below the epic bands), each
+        /// drawn on <c>DeriveSeed(node.EncounterSeed, </c><see cref="NodeRewardStream"/><c>)</c>
+        /// (<see cref="CampaignResult.GearGranted"/>). A replay grants nothing.
+        /// </summary>
+        public static CampaignResult ResolveBattle(PlayerSave save, RegionLibrary library, int nodeId, BattleOutcome outcome, EconomyContent economy)
+        {
             CampaignResult refused = CheckNode(save, library, nodeId, out MapRun run, out MapNode node, out RegionData region);
             if (refused != null)
             {
@@ -253,16 +269,28 @@ namespace BeastCraft.Campaign
             RegionProgress progress = save.Campaign.FindRegion(run.RegionId);
             if (node.Type == MapNodeType.Gate)
             {
+                bool firstGate = progress.StagesCleared <= run.Stage;
                 progress.StagesCleared = Math.Max(progress.StagesCleared, run.Stage + 1);
                 run.Clear();
-                return CampaignResult.Done(CampaignOutcome.StageCleared, node);
+                CampaignResult gate = CampaignResult.Done(CampaignOutcome.StageCleared, node);
+                if (firstGate)
+                {
+                    GrantNodeGear(save, economy, node, 1, gate);
+                }
+
+                return gate;
             }
 
             if (node.Type == MapNodeType.Boss)
             {
+                bool firstBoss = !progress.BossCleared;
                 progress.StagesCleared = Math.Max(progress.StagesCleared, Math.Max(1, region.Stages) - 1);
                 progress.BossCleared = true;
                 CampaignResult result = CampaignResult.Done(CampaignOutcome.RegionCleared, node);
+                if (firstBoss)
+                {
+                    GrantNodeGear(save, economy, node, 2, result);
+                }
                 if (!string.IsNullOrEmpty(region.BossRewardSealId))
                 {
                     CampaignResult seal = GrantSeal(save, library, region.BossRewardSealId);
@@ -421,6 +449,20 @@ namespace BeastCraft.Campaign
             return null;
         }
 
+        private static void GrantNodeGear(PlayerSave save, EconomyContent economy, MapNode node, int rarity, CampaignResult result)
+        {
+            if (economy == null || economy.Gear == null)
+            {
+                return;
+            }
+
+            GearItem item = GearDrops.RollGuaranteed(economy.Gear, rarity, node.Level, new Random(LootRoller.DeriveSeed(node.EncounterSeed, NodeRewardStream)));
+            if (item != null && GearDrops.Grant(save, item) != null)
+            {
+                result.GearGranted = item.GearId;
+            }
+        }
+
         private static void Clear(MapRun run, MapNode node)
         {
             run.Cleared.Add(node.NodeId);
@@ -502,6 +544,9 @@ namespace BeastCraft.Campaign
 
         /// <summary>Whether a Shop visit actually offered a shop (the stub never does).</summary>
         public bool ShopOpened { get; internal set; }
+
+        /// <summary>The gear id a pass's or lair's first clear granted (now a new instance in the save), or null.</summary>
+        public string GearGranted { get; internal set; }
 
         internal static CampaignResult Refused(string error)
         {

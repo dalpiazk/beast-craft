@@ -298,6 +298,22 @@ namespace BeastCraft.Tooling.BalanceSim
         public bool Timings;
 
         /// <summary>
+        /// <c>--gear none|common|rare|epic|typical</c>: the gear the PvE player team wears
+        /// (<see cref="GearKits"/>). None by default: the committed report and the balance guard are
+        /// gearless; <c>typical</c> is the shipping difficulty's assumption (the lead's decision).
+        /// </summary>
+        public GearProfile Gear = GearProfile.None;
+
+        /// <summary><c>--gear-library</c>: gear-library.json, or null to find it by walking up.</summary>
+        public string GearLibraryPath;
+
+        /// <summary><c>--economy-probe</c>: append "PvE economy probe" (gear profiles and consumables in levels-equivalent). Off by default.</summary>
+        public bool EconomyProbe;
+
+        /// <summary>The loaded gear kits when <see cref="Gear"/> or <see cref="EconomyProbe"/> needs them; set by <see cref="Program"/>, not a CLI option.</summary>
+        public GearKits GearKits;
+
+        /// <summary>
         /// <c>--calibrate-sample n</c>: the difficulty search evaluates only a seeded subset of n
         /// teams, then the chosen multiplier runs once with every team. 0 (the default) = every
         /// team at every step. Opt-in because it changes the calibrated multipliers, so the report.
@@ -520,6 +536,14 @@ namespace BeastCraft.Tooling.BalanceSim
             "  --avatar-level <n>         The avatar's level, 1-100 (default: each battle's encounter level). Scales its\n" +
             "                             stats on the medium curve (Speed included: 100 at level 100, so its ATB gauge\n" +
             "                             keeps pace with the beasts') and is its damage-formula level.\n" +
+            "  --gear <g>                 none | common | rare | epic | typical (default none): the gear the PvE player team\n" +
+            "                             wears, three pieces of the encounter level's band from gear-library.json matched to\n" +
+            "                             each beast (GearKits). typical = what a player normally wears at the level, the\n" +
+            "                             shipping difficulty's assumption. The default report and the balance guard are gearless.\n" +
+            "  --gear-library <path>      gear-library.json (default: found by walking up from the working directory).\n" +
+            "  --economy-probe            PvE: append \"PvE economy probe\": every cell replayed at its calibrated multiplier with\n" +
+            "                             each gear profile and each consumable, as clear-rate points and levels-equivalent\n" +
+            "                             (against the team one level up). Default: off.\n" +
             "  --out <path>               Also write the Markdown report to this file.\n" +
             "  --write-difficulty <path>  PvE, generated set, one seed: also write the calibrated multipliers as the game's\n" +
             "                             encounter-difficulty.json (BeastCraft/Assets/_Project/Data/Encounters/). Report unchanged.\n" +
@@ -972,6 +996,29 @@ namespace BeastCraft.Tooling.BalanceSim
                         }
 
                         options.AvatarPreset = text;
+                        break;
+                    case "--gear":
+                        if (!TryNext(args, ref i, arg, out text, out error))
+                        {
+                            return null;
+                        }
+
+                        if (!Enum.TryParse(text, true, out options.Gear) || !Enum.IsDefined(typeof(GearProfile), options.Gear) || int.TryParse(text, out int _))
+                        {
+                            error = "--gear expects none, common, rare, epic or typical, got '" + text + "'.";
+                            return null;
+                        }
+
+                        break;
+                    case "--gear-library":
+                        if (!TryNext(args, ref i, arg, out options.GearLibraryPath, out error))
+                        {
+                            return null;
+                        }
+
+                        break;
+                    case "--economy-probe":
+                        options.EconomyProbe = true;
                         break;
                     case "--avatar-level":
                         if (!TryNextInt(args, ref i, arg, 1, out options.AvatarLevel, out error))

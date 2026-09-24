@@ -72,5 +72,8 @@ namespace BeastCraft.Session
 
         /// <summary>Gold added to the wallet (0 unless the battle was a player victory and the drop table pays gold).</summary>
         public int GoldGained { get; internal set; }
+
+        /// <summary>The gear ids dropped (each now a new instance in the save), in roll order. Never null.</summary>
+        public List<string> GearGained { get; } = new List<string>();
     }
 }

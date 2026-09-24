@@ -11,6 +11,11 @@
     "Base": 10, "PerLevel": 2, "VariancePct": 10, "FirstClearBonus": 5,
     "ShapeMultipliers": [ { "Shape": "solo", "Multiplier": 1.2 }, { "Shape": "elite", "Multiplier": 1.5 }, { "Shape": "squad", "Multiplier": 1.0 }, { "Shape": "horde", "Multiplier": 1.1 } ]
   },
+  "GearDrops": [
+    { "Shape": "elite", "Rarity": 0, "ChancePerMille": 80 }, { "Shape": "elite", "Rarity": 1, "ChancePerMille": 15 },
+    { "Shape": "solo", "Rarity": 0, "ChancePerMille": 30 },
+    { "Shape": "squad", "Rarity": 0, "ChancePerMille": 10 }, { "Shape": "horde", "Rarity": 0, "ChancePerMille": 10 }
+  ],
   "Bands": [
     {
       "MinLevel": 1, "MaxLevel": 3, "FirstClearMaterialId": "essence_shard", "FirstClearQuantity": 1,

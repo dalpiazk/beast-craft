@@ -3,8 +3,8 @@ namespace BeastCraft.Economy
     /// <summary>
     /// What the caller of <c>BattleSession.ApplyRewards</c> adds to a clear's economy rewards: a gold
     /// multiplier and flat bonus (the campaign's dens, passes and lairs; see
-    /// <c>CampaignRules.RewardModifiersFor</c>). <see cref="None"/> changes nothing. Plain data; never
-    /// mutate <see cref="None"/>.
+    /// <c>CampaignRules.RewardModifiersFor</c>), and the library gear drops are drawn from (null =
+    /// no gear drops). <see cref="None"/> changes nothing. Plain data; never mutate <see cref="None"/>.
     /// </summary>
     public sealed class RewardModifiers
     {
@@ -16,5 +16,8 @@ namespace BeastCraft.Economy
 
         /// <summary>Flat gold added after the multiplier.</summary>
         public int BonusGold;
+
+        /// <summary>The gear library drops are drawn from (<c>drop-tables.json</c> <c>GearDrops</c>); null = no gear drops.</summary>
+        public GearLibrary Gear;
     }
 }

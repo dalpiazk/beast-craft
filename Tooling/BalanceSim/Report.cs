@@ -44,6 +44,11 @@ namespace BeastCraft.Tooling.BalanceSim
                     ? "- Team bonds: on (`--bonds on`, the default): the library's " + options.Library.TeamBonds.Count +
                       " `TeamBonds` apply at battle start to every player team that meets their condition (never to enemies); see \"PvE team bonds\""
                     : "- Team bonds: off (`--bonds off`)");
+                if (options.Gear != GearProfile.None)
+                {
+                    report.AppendLine("- Gear (PvE): `--gear " + options.Gear.ToString().ToLowerInvariant() + "`: every player beast wears three pieces of the encounter level's band " +
+                                      "from `gear-library.json` (GearKits); the default and the balance guard are gearless");
+                }
             }
             else
             {

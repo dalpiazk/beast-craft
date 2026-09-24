@@ -224,7 +224,9 @@ namespace BeastCraft.Session
         /// table's <c>Gold</c> with the first-clear bonus when the material roll was a first clear,
         /// then the modifiers' multiplier and bonus) into the <see cref="Wallet"/>, on its own seed
         /// stream (<c>LootRoller.DeriveSeed(result.Seed, PostBattleAward.GoldStream)</c>), so the
-        /// material rolls are exactly those of a gold-free table.
+        /// material rolls are exactly those of a gold-free table. With <see cref="RewardModifiers.Gear"/>
+        /// a clear also rolls the table's gear drops (<see cref="GearDrops.Roll"/>, stream
+        /// <see cref="PostBattleAward.GearStream"/>), each granted as a new instance.
         /// </summary>
         public static BattleRewardSummary ApplyRewards(PlayerSave save, BattleSessionResult result, BattleContent content, string shape, int encounterLevel,
                                                        DropTable dropTable, int beastLevelCap, RewardModifiers modifiers, Random rng = null)
@@ -277,6 +279,15 @@ namespace BeastCraft.Session
                 int gold = PostBattleAward.AwardGold(result.Battle, dropTable, shape, encounterLevel, summary.Loot.FirstClear, mods.GoldMultiplier, mods.BonusGold,
                                                      new Random(LootRoller.DeriveSeed(result.Seed, PostBattleAward.GoldStream)));
                 summary.GoldGained = Wallet.Add(save, gold);
+            }
+
+            if (result.Outcome == BattleOutcome.PlayerVictory && mods.Gear != null)
+            {
+                foreach (GearItem item in GearDrops.Roll(dropTable, mods.Gear, shape, encounterLevel, new Random(LootRoller.DeriveSeed(result.Seed, PostBattleAward.GearStream))))
+                {
+                    GearDrops.Grant(save, item);
+                    summary.GearGained.Add(item.GearId);
+                }
             }
 
             foreach (KeyValuePair<string, string> pair in result.TeamUnitIds)

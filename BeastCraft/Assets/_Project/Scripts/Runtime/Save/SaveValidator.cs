@@ -472,9 +472,18 @@ namespace BeastCraft.Save
                     string path = "AvatarEquippedGear[" + slot + "]";
 
                     if (CheckWorn(instanceId, path, slot, GearRules.AvatarSlotCount, avatarGear, worn, issues, out OwnedGear gear) &&
-                        gearCatalog != null && gearCatalog.TryGetAvatarGear(gear.GearId, out BeastCraft.Avatar.AvatarGearSlot gearSlot) && (int)gearSlot != slot)
+                        gearCatalog != null && gearCatalog.TryGetAvatarGear(gear.GearId, out BeastCraft.Avatar.AvatarGearSlot gearSlot, out int minimumLevel))
                     {
-                        issues.Add(new SaveIssue(SaveIssueKind.GearSlotMismatch, path, instanceId, "'" + gear.GearId + "' belongs in the " + gearSlot + " slot"));
+                        if ((int)gearSlot != slot)
+                        {
+                            issues.Add(new SaveIssue(SaveIssueKind.GearSlotMismatch, path, instanceId, "'" + gear.GearId + "' belongs in the " + gearSlot + " slot"));
+                        }
+
+                        int avatarLevel = save.Avatar == null ? 1 : save.Avatar.Level;
+                        if (avatarLevel < minimumLevel)
+                        {
+                            issues.Add(new SaveIssue(SaveIssueKind.GearLevelTooLow, path, instanceId, "'" + gear.GearId + "' needs avatar level " + minimumLevel + "; the avatar is " + avatarLevel));
+                        }
                     }
                 }
             }
@@ -508,7 +517,7 @@ namespace BeastCraft.Save
                 }
 
                 bool known = !string.IsNullOrEmpty(gear.GearId) &&
-                             (gearCatalog == null || (beast ? gearCatalog.TryGetBeastGear(gear.GearId, out GearSlot _, out int _) : gearCatalog.TryGetAvatarGear(gear.GearId, out BeastCraft.Avatar.AvatarGearSlot _)));
+                             (gearCatalog == null || (beast ? gearCatalog.TryGetBeastGear(gear.GearId, out GearSlot _, out int _) : gearCatalog.TryGetAvatarGear(gear.GearId, out BeastCraft.Avatar.AvatarGearSlot _, out int _)));
                 if (!known)
                 {
                     issues.Add(new SaveIssue(SaveIssueKind.UnknownGear, entryPath + ".GearId", gear.GearId, "unknown gear '" + gear.GearId + "'"));

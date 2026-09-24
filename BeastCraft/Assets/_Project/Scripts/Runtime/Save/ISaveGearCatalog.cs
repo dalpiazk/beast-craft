@@ -13,7 +13,7 @@ namespace BeastCraft.Save
         /// <summary>Whether <paramref name="gearId"/> is a known <c>GearSO.GearId</c>, and if so its slot and minimum level.</summary>
         bool TryGetBeastGear(string gearId, out GearSlot slot, out int minimumLevel);
 
-        /// <summary>Whether <paramref name="gearId"/> is a known <c>AvatarGearSO.AvatarGearId</c>, and if so its slot.</summary>
-        bool TryGetAvatarGear(string gearId, out AvatarGearSlot slot);
+        /// <summary>Whether <paramref name="gearId"/> is a known <c>AvatarGearSO.AvatarGearId</c>, and if so its slot and minimum (avatar) level.</summary>
+        bool TryGetAvatarGear(string gearId, out AvatarGearSlot slot, out int minimumLevel);
     }
 }

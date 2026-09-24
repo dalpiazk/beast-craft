@@ -58,6 +58,31 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
+        public void ApplyRewards_WithTheGearLibrary_GrantsGearDropsOnTheirOwnStream()
+        {
+            DropTableData data = DropTableTests.LoadTables();
+            data.GearDrops = new[] { new GearDropData { Shape = Shape, Rarity = 0, ChancePerMille = 1000 } };
+            DropTable table = DropTableBuilder.Build(data, DropTableBuilder.TierLookup(_library.Materials));
+            GearLibrary gear = GearLibrary.Build(GearLibraryTests.LoadGear());
+
+            PlayerSave withGear = StarterSave();
+            PlayerSave without = StarterSave();
+            BattleSessionResult first = BattleSession.Run(Setup(withGear, 42, weakEnemies: true));
+            BattleSessionResult second = BattleSession.Run(Setup(without, 42, weakEnemies: true));
+            BattleRewardSummary dropped = BattleSession.ApplyRewards(withGear, first, _content, Shape, EncounterLevel, table, BeastProgression.MaxLevel,
+                                                                     new RewardModifiers { Gear = gear });
+            BattleRewardSummary plain = BattleSession.ApplyRewards(without, second, _content, Shape, EncounterLevel, table);
+
+            Assert.AreEqual(1, dropped.GearGained.Count);
+            Assert.IsEmpty(plain.GearGained, "no library, no gear");
+            GearItem item = gear.Get(dropped.GearGained[0]);
+            Assert.AreEqual(1, item.MinimumLevel, "level 8 draws from the first band");
+            Assert.AreEqual(1, withGear.Gear.BeastGear.Count + withGear.Gear.AvatarGear.Count);
+            Assert.AreEqual(Json(without.Materials), Json(withGear.Materials));
+            Assert.AreEqual(plain.GoldGained, dropped.GoldGained, "gear never moves gold");
+        }
+
+        [Test]
         public void ApplyRewards_OnADefeat_PaysNoGold()
         {
             PlayerSave save = StarterSave();

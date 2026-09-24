@@ -106,10 +106,11 @@ namespace BeastCraft.Session
             return gear != null;
         }
 
-        public bool TryGetAvatarGear(string gearId, out AvatarGearSlot slot)
+        public bool TryGetAvatarGear(string gearId, out AvatarGearSlot slot, out int minimumLevel)
         {
             AvatarGearSO gear = GetAvatarGear(gearId);
             slot = gear == null ? default(AvatarGearSlot) : gear.Slot;
+            minimumLevel = gear == null ? 0 : gear.MinimumLevel;
             return gear != null;
         }
 

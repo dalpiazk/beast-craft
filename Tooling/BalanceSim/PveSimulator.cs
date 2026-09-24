@@ -273,6 +273,7 @@ namespace BeastCraft.Tooling.BalanceSim
         {
             _options = options;
             _species = species;
+            GearFor = options.GearKits == null || options.Gear == GearProfile.None ? null : (s, l) => options.GearKits.For(s, l, options.Gear);
             // Every species shares the medium curve; the avatar's fixture stats follow it too.
             Avatar = new AvatarPresets(options.AvatarPreset, options.Library, species.Count > 0 ? species[0].GrowthRate : null);
             _passiveEffects = new HashSet<SkillEffect>();
@@ -351,6 +352,12 @@ namespace BeastCraft.Tooling.BalanceSim
 
         /// <summary>Every combination of <c>TeamSize</c> distinct species, as ascending roster indices, in lexicographic order.</summary>
         public List<int[]> Teams { get; }
+
+        /// <summary>
+        /// The gear each player beast wears (<c>--gear</c>, the economy probe): species and level to
+        /// pieces; null (the default) = none, exactly the gearless battle.
+        /// </summary>
+        public Func<CreatureSpeciesSO, int, List<GearSO>> GearFor { get; set; }
 
         /// <summary>The avatar fielded beside every player team (<c>--avatar</c>); disabled by default.</summary>
         public AvatarPresets Avatar { get; }
@@ -955,7 +962,8 @@ namespace BeastCraft.Tooling.BalanceSim
                 int member = slots[s];
                 int speciesIndex = team[member];
                 string id = playerPrefix + "p" + (s + 1).ToString(System.Globalization.CultureInfo.InvariantCulture);
-                members[member] = BattleUnitFactory.CreateBeast(id, BattleTeam.Player, _species[speciesIndex], level, null, playerTiles[s],
+                members[member] = BattleUnitFactory.CreateBeast(id, BattleTeam.Player, _species[speciesIndex], level,
+                                                                GearFor == null ? null : GearFor(_species[speciesIndex], level), playerTiles[s],
                                                                 BeastLoadout(speciesIndex, mode));
                 requests.Add(new PlacementRequest(id, playerTiles[s]));
             }
