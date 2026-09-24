@@ -314,6 +314,20 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <summary><c>--level-gap-teams</c>: teams (a seeded subset) the no-scouting rate at a nonzero gap is measured over.</summary>
         public int LevelGapTeams = DefaultLevelGapTeams;
 
+        /// <summary>
+        /// <c>--avatar-value</c>: also replay every cell's picked-team battles with no avatar at the
+        /// calibrated multiplier and add the "PvE avatar value" section (the avatar's worth in points
+        /// of clear rate, and its direct share of the team's output). Off by default.
+        /// </summary>
+        public bool AvatarValue;
+
+        /// <summary>
+        /// <c>--turn-detail</c>: count every beast's no-fire turns (held by its stance, out of reach)
+        /// and its damage to large enemies versus the rest, and add the "PvE beast turns" section.
+        /// Off by default; never changes a battle.
+        /// </summary>
+        public bool TurnDetail;
+
         /// <summary>The PvE avatar preset (<c>--avatar</c>); the library avatar by default, <see cref="AvatarPresets.None"/> fields none.</summary>
         public string AvatarPreset = AvatarPresets.Library;
 
@@ -505,6 +519,12 @@ namespace BeastCraft.Tooling.BalanceSim
             "  --level-gap-teams <n>      --level-gap: teams (a seeded subset) the no-scouting rate at a nonzero gap is measured\n" +
             "                             over (default 42; the scouted rate always uses the picked team, --calibrate-samples\n" +
             "                             battles per composition).\n" +
+            "  --avatar-value             PvE: also replay each cell's picked-team battles with no avatar at the calibrated\n" +
+            "                             multiplier and report \"PvE avatar value\": the avatar's worth in points of the scouted\n" +
+            "                             clear rate, and its direct share of the team's damage, healing and shield soak. Needs an\n" +
+            "                             avatar (--avatar library|support) and a scouted-pick calibration. Default: off.\n" +
+            "  --turn-detail              PvE: report \"PvE beast turns\": each beast's no-fire turns (held by its stance, out of\n" +
+            "                             reach, stunned) and its damage to large enemies (bosses) versus the rest. Default: off.\n" +
             "  --calibrate-sample <n>     --calibrate-on mean only. Opt-in speed-up that CHANGES results: the difficulty search\n" +
             "                             evaluates a seeded subset of n teams (e.g. 50 of 210), then the chosen multiplier runs\n" +
             "                             once with every team; the report's numbers all come from that full run (default: off,\n" +
@@ -536,6 +556,12 @@ namespace BeastCraft.Tooling.BalanceSim
                         break;
                     case "--timings":
                         options.Timings = true;
+                        break;
+                    case "--avatar-value":
+                        options.AvatarValue = true;
+                        break;
+                    case "--turn-detail":
+                        options.TurnDetail = true;
                         break;
                     case "--calibrate-sample":
                         if (!TryNextInt(args, ref i, arg, 1, out options.CalibrateSample, out error))
@@ -924,6 +950,12 @@ namespace BeastCraft.Tooling.BalanceSim
             if (options.CalibrateSample > 0 && options.CalibratesOnPick)
             {
                 error = "--calibrate-sample only applies with --calibrate-on mean (a scouted-pick calibration already searches on the picked teams alone).";
+                return null;
+            }
+
+            if (options.AvatarValue && (!options.RunPve || options.AvatarPreset == AvatarPresets.None || !options.CalibratesOnPick))
+            {
+                error = "--avatar-value needs PvE, an avatar (--avatar library or support) and a scouted-pick calibration (not --calibrate-on mean).";
                 return null;
             }
 

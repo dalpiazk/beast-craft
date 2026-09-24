@@ -49,6 +49,8 @@ dotnet run --project Tooling/BalanceSim -c Release -- [options]
 | `--calibrate-samples <n>` | `16` | Scouted-pick calibration only: battles per composition the picked team fights at each search step (8 compositions x 16 = 128 battles per step, a binomial SE of about 4.4 points at 50%). Raise it if a cell's search is non-monotone. |
 | `--level-gap <list>` | off | PvE only. Also replay every cell with the enemies `g` levels above the team (negative = below) at the cell's calibrated multiplier, and add the "PvE level gap" section (and "PvE level gap over seeds" with `--seeds`). Comma-separated gaps and inclusive ranges, e.g. `-5..10` or `0,2,3,5`. The team and the avatar (unless `--avatar-level`) stay at the row's level; the enemies' stats follow their curve to their level, and the damage formula's level-difference term applies. Each battle's seed ignores the gap, so gap 0 is the calibration itself (no extra battles). A gap that puts the enemies outside 1-100 is not run (`—`). Suggested with `--levels 10,30,50,70,90`. See "Level gap". |
 | `--level-gap-teams <n>` | `42` | `--level-gap` only: how many teams (a seeded subset of the 210) the **no-scouting** rate at each nonzero gap is measured over, against every composition (42 x 8 = 336 battles). The **scouted** rate always uses the picked team, `--calibrate-samples` battles per composition. |
+| `--avatar-value` | off | PvE only (needs an avatar and a scouted-pick calibration). Also replay every cell's picked-team battles (`--calibrate-samples` per composition, the same seeds) **without the avatar** at the calibrated multiplier, and add the "PvE avatar value" section ("over seeds" with `--seeds`): per cell the scouted rate with and without the avatar, the difference (the avatar's **value** in points of clear rate), the avatar's turns, and its **direct share** of the team's output: the avatar's damage (its own turns and its passives' hits) + healing (team HP restored on its turns) + shield soak (damage a shield absorbed, credited to the shield's caster) as a percent of the team's total, with the part its passives produced. Read-only accounting; the rest of the report is unchanged. See "Avatar value". |
+| `--turn-detail` | off | PvE only. Add the "PvE beast turns" section: per kit mode, shape and beast (every team's battles at the calibrated multiplier, levels pooled) its turns per battle, the share of them on which no skill fired, split into held by its stance and out of reach, stunned turns, and the share of its damage that came off large enemies (bosses: giant, champion). A diagnostic; never changes a battle. |
 | `--marginal-threshold <x>` | `5` | Flag a beast whose overall marginal clear rate is outside +/-x points. |
 | `--enemy-element <e>` | `authored` | `authored` (as generated, or as authored in the fixed set), `None` or an element name: override every enemy's element. |
 | `--max-time <n>` | `2000` | Battle-time cap (normalized, see below); a battle that reaches it is a stalemate. |
@@ -482,6 +484,25 @@ dotnet run --project Tooling/BalanceSim -c Release -- --mode pve --levels 10,30,
 Cost: each nonzero gap adds about 128 + 336 battles per cell (a sixth of a calibration); the
 command above takes about a minute. The committed `docs/balance/level-gap-report.md` is that
 command's output; the default report has no level-gap section and is unchanged by the option.
+
+## Avatar value
+
+`--avatar-value` measures what the avatar is worth. At every cell's calibrated multiplier the picked
+teams' battles (the calibration's own, `--calibrate-samples` per composition) are replayed with **no
+avatar**, seed for seed, so the two runs differ only by the avatar. Its **value** is the scouted rate
+with it (the calibrated rate, about 50%) minus the rate without it, in points. Beside it the section
+gives the avatar's **direct share**: its damage, healing and shield soak as a percent of the whole
+team's (beasts and avatar) over the with-avatar battles, and how much of that its passives produced.
+Buffs, debuffs and auras have no direct output (they act through the beasts), so the share is a
+floor on the avatar's role and the value is the whole of it. Accounting, per turn, from HP and shield
+snapshots and the turn's hits: enemy HP lost on the avatar's own turns and to its passives' hits is
+the avatar's damage, the rest the beasts' (damage over time ticking on an enemy's turn included);
+team HP restored on the avatar's turns is its healing; a hit a shield soaks is credited to whoever
+cast that shield (damage over time soaked by a shield is not counted). None of it changes a battle.
+
+`--turn-detail` is the matching diagnostic for beasts ("PvE beast turns"): how often each beast's turn
+fires nothing, and why (a skill held by its stance, no target in reach, stunned), and how its damage
+splits between large enemies (bosses) and the rest.
 
 ## Scouted picking
 

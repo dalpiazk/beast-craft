@@ -78,6 +78,16 @@ namespace BeastCraft.Tooling.BalanceSim
                                   " levels above the team at its calibrated multiplier; see \"PvE level gap\"");
             }
 
+            if (options.RunPve && options.AvatarValue)
+            {
+                report.AppendLine("- Avatar value (PvE, `--avatar-value`): every cell's picked-team battles also replayed without the avatar; see \"PvE avatar value\"");
+            }
+
+            if (options.RunPve && options.TurnDetail)
+            {
+                report.AppendLine("- Beast turns (PvE, `--turn-detail`): no-fire turns and damage to large enemies per beast; see \"PvE beast turns\"");
+            }
+
             report.AppendLine();
 
             if (options.KitSource == KitSource.Library)

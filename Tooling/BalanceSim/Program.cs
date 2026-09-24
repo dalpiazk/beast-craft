@@ -292,6 +292,7 @@ namespace BeastCraft.Tooling.BalanceSim
                                 }
                             }
 
+                            pve.RunAvatarValue(cell);
                             if (cell.Battles == null || cell.Battles.Length != shape.Compositions.Count * pve.Teams.Count * pve.Samples)
                             {
                                 problems.Add("PvE " + SimOptions.ModeName(mode) + "/" + shape.Id + "/L" + level + " did not field every team against every composition.");

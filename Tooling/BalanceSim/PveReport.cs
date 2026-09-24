@@ -277,6 +277,7 @@ namespace BeastCraft.Tooling.BalanceSim
 
             AppendCalibration(report, options, cells);
             LevelGapReport.AppendSection(report, options, cells);
+            AvatarValueReport.AppendSection(report, options, species, simulator, cells);
             if (options.KitSource == KitSource.Standard)
             {
                 // The parity table measures the standard kit's Strike / Shot / Blast balance; library kits differ by design.
