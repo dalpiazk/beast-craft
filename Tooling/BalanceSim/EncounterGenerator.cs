@@ -8,12 +8,12 @@ using BeastCraft.Encounters;
 namespace BeastCraft.Tooling.BalanceSim
 {
     /// <summary>
-    /// Draws the default PvE run's encounters: for each shape in <c>encounters.json</c>,
+    /// Draws the default PvE run's encounters: for each shape in <c>encounter-library.json</c>,
     /// <c>--compositions</c> random compositions of enemy types under the shape's threat budget,
-    /// each with a randomly chosen element scheme. Seeded from <c>--seed</c> alone, so the same
-    /// seed, file and composition count give the same compositions; every shape is generated in
-    /// file order whatever <c>--encounters</c> filters, so a shape's compositions do not depend on
-    /// which other shapes a run includes.
+    /// each with an element scheme drawn by the library's weights. Seeded from <c>--seed</c> alone,
+    /// so the same seed, files and composition count give the same compositions; every shape is
+    /// generated in file order whatever <c>--encounters</c> filters, so a shape's compositions do not
+    /// depend on which other shapes a run includes.
     /// <para>
     /// Elements are dealt from a shuffled deck of the ten elements (reshuffled when empty) shared by
     /// the whole generation, so every element is dealt before any is dealt twice: any run that deals
@@ -28,51 +28,50 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <summary>Redraws spent trying to avoid repeating an earlier composition of the same shape before accepting a repeat.</summary>
         public const int DistinctAttempts = 200;
 
-        public static List<EncounterShape> Generate(EnemyTypeData[] types, ShapeData[] shapes, GrowthRateCurve curve, SimOptions options, List<string> errors)
+        public static List<EncounterShape> Generate(EncounterLibraryData library, EnemyCatalog enemies, SimOptions options, List<string> errors)
         {
-            Dictionary<string, EnemyTypeData> byId = new Dictionary<string, EnemyTypeData>(StringComparer.Ordinal);
             Dictionary<string, int> order = new Dictionary<string, int>(StringComparer.Ordinal);
-            for (int i = 0; i < types.Length; i++)
+            for (int i = 0; i < enemies.Enemies.Count; i++)
             {
-                byId[types[i].EnemyId] = types[i];
-                order[types[i].EnemyId] = i;
+                order[enemies.Enemies[i].EnemyId] = i;
             }
 
             Random rng = new Random(unchecked((options.Seed * 486187739) + 0x5EED));
             ElementDeck deck = new ElementDeck(rng);
-            EnemyFactory factory = new EnemyFactory(curve);
+            EnemyFactory factory = new EnemyFactory(enemies);
             List<EncounterShape> result = new List<EncounterShape>();
 
-            foreach (ShapeData shape in shapes)
+            foreach (EncounterShapeData shape in library.Shapes)
             {
+                EncounterLibraryValidator.TryParseArena(shape.Arena, out ArenaSize arena);
                 EncounterShape built = new EncounterShape
                 {
                     Id = shape.ShapeId,
                     DisplayName = shape.DisplayName,
                     Description = shape.Description,
-                    Arena = shape.ParsedArena,
+                    Arena = arena,
                     Data = shape
                 };
 
                 HashSet<string> seen = new HashSet<string>(StringComparer.Ordinal);
                 for (int k = 0; k < options.Compositions; k++)
                 {
-                    List<KeyValuePair<EnemyTypeData, int>> counts = DrawCounts(shape, byId, order, rng, seen, out double threat);
+                    List<KeyValuePair<EnemyData, int>> counts = DrawCounts(shape, arena, enemies, order, rng, seen, out double threat);
                     if (counts == null)
                     {
                         errors.Add("Shape '" + shape.ShapeId + "': no draw in " + MaxAttempts + " attempts met the threat budget [" +
-                                   Number(shape.ThreatBudget[0]) + ", " + Number(shape.ThreatBudget[1]) + "] and MinDistinctTypes " + shape.MinDistinctTypes + ".");
+                                   Number(shape.ThreatMin) + ", " + Number(shape.ThreatMax) + "] and MinDistinctTypes " + shape.MinDistinctTypes + ".");
                         return null;
                     }
 
                     Encounter encounter = new Encounter
                     {
                         Id = shape.ShapeId + "-" + (k + 1).ToString("00", CultureInfo.InvariantCulture),
-                        Arena = shape.ParsedArena,
+                        Arena = arena,
                         Threat = threat
                     };
 
-                    AssignElements(encounter, counts, factory, deck, rng, options);
+                    AssignElements(encounter, counts, library.SchemeWeights, factory, deck, rng, options);
                     built.Compositions.Add(encounter);
                 }
 
@@ -84,13 +83,13 @@ namespace BeastCraft.Tooling.BalanceSim
 
         /// <summary>
         /// One composition's type counts, front-to-back (Vanguard, then Skirmisher, then Ranged;
-        /// pool order within a stance), or null when no draw fits the budget.
+        /// library order within a stance), or null when no draw fits the budget.
         /// </summary>
-        private static List<KeyValuePair<EnemyTypeData, int>> DrawCounts(ShapeData shape, Dictionary<string, EnemyTypeData> byId, Dictionary<string, int> order,
-                                                                         Random rng, HashSet<string> seen, out double threat)
+        private static List<KeyValuePair<EnemyData, int>> DrawCounts(EncounterShapeData shape, ArenaSize arena, EnemyCatalog enemies, Dictionary<string, int> order,
+                                                                     Random rng, HashSet<string> seen, out double threat)
         {
             int totalWeight = 0;
-            foreach (ShapeVariantData variant in shape.Variants)
+            foreach (EncounterVariantData variant in shape.Variants)
             {
                 totalWeight += variant.Weight;
             }
@@ -98,8 +97,8 @@ namespace BeastCraft.Tooling.BalanceSim
             for (int attempt = 0; attempt < MaxAttempts; attempt++)
             {
                 int pick = rng.Next(totalWeight);
-                ShapeVariantData chosen = shape.Variants[0];
-                foreach (ShapeVariantData variant in shape.Variants)
+                EncounterVariantData chosen = shape.Variants[0];
+                foreach (EncounterVariantData variant in shape.Variants)
                 {
                     if (pick < variant.Weight)
                     {
@@ -111,7 +110,7 @@ namespace BeastCraft.Tooling.BalanceSim
                 }
 
                 Dictionary<string, int> counts = new Dictionary<string, int>(StringComparer.Ordinal);
-                foreach (ShapeSlotData slot in chosen.Slots)
+                foreach (EncounterSlotData slot in chosen.Slots)
                 {
                     int n = rng.Next(slot.Min, slot.Max + 1);
                     for (int i = 0; i < n; i++)
@@ -126,30 +125,30 @@ namespace BeastCraft.Tooling.BalanceSim
                 int total = 0;
                 foreach (KeyValuePair<string, int> entry in counts)
                 {
-                    threat += byId[entry.Key].Threat * entry.Value;
+                    threat += enemies.Get(entry.Key).Threat * entry.Value;
                     total += entry.Value;
                 }
 
-                if (total == 0 || counts.Count < shape.MinDistinctTypes || threat < shape.ThreatBudget[0] - 1e-9 || threat > shape.ThreatBudget[1] + 1e-9)
+                if (total == 0 || counts.Count < shape.MinDistinctTypes || threat < shape.ThreatMin - 1e-9 || threat > shape.ThreatMax + 1e-9)
                 {
                     continue;
                 }
 
-                List<KeyValuePair<EnemyTypeData, int>> sorted = new List<KeyValuePair<EnemyTypeData, int>>();
+                List<KeyValuePair<EnemyData, int>> sorted = new List<KeyValuePair<EnemyData, int>>();
                 foreach (KeyValuePair<string, int> entry in counts)
                 {
-                    sorted.Add(new KeyValuePair<EnemyTypeData, int>(byId[entry.Key], entry.Value));
+                    sorted.Add(new KeyValuePair<EnemyData, int>(enemies.Get(entry.Key), entry.Value));
                 }
 
                 sorted.Sort((a, b) =>
                 {
-                    int byStance = StanceRank(a.Key.ParsedStance).CompareTo(StanceRank(b.Key.ParsedStance));
+                    int byStance = StanceRank(enemies.StanceOf(a.Key.EnemyId)).CompareTo(StanceRank(enemies.StanceOf(b.Key.EnemyId)));
                     return byStance != 0 ? byStance : order[a.Key.EnemyId].CompareTo(order[b.Key.EnemyId]);
                 });
 
-                // Every draw must seat on the shape's arena (large enemies need room). The loader's
+                // Every draw must seat on the shape's arena (large enemies need room). The validator's
                 // worst-case check makes this pass for every draw of a valid file; it is a safety net.
-                if (!EncounterFit.Fits(shape.ParsedArena, Footprints(sorted)))
+                if (!EncounterFit.Fits(arena, Footprints(sorted, enemies)))
                 {
                     continue;
                 }
@@ -168,22 +167,23 @@ namespace BeastCraft.Tooling.BalanceSim
             return null;
         }
 
-        /// <summary>Front-to-back placement rank: melee screen first, ranged at the back.</summary>
         /// <summary>The footprint of every unit of a sorted draw, in placement order.</summary>
-        private static List<UnitFootprint> Footprints(List<KeyValuePair<EnemyTypeData, int>> sorted)
+        private static List<UnitFootprint> Footprints(List<KeyValuePair<EnemyData, int>> sorted, EnemyCatalog enemies)
         {
             List<UnitFootprint> footprints = new List<UnitFootprint>();
-            foreach (KeyValuePair<EnemyTypeData, int> entry in sorted)
+            foreach (KeyValuePair<EnemyData, int> entry in sorted)
             {
+                UnitFootprint footprint = enemies.FootprintOf(entry.Key.EnemyId);
                 for (int i = 0; i < entry.Value; i++)
                 {
-                    footprints.Add(entry.Key.ParsedFootprint);
+                    footprints.Add(footprint);
                 }
             }
 
             return footprints;
         }
 
+        /// <summary>Front-to-back placement rank: melee screen first, ranged at the back.</summary>
         private static int StanceRank(CombatStance stance)
         {
             switch (stance)
@@ -197,15 +197,15 @@ namespace BeastCraft.Tooling.BalanceSim
             }
         }
 
-        private static void AssignElements(Encounter encounter, List<KeyValuePair<EnemyTypeData, int>> counts, EnemyFactory factory, ElementDeck deck,
-                                           Random rng, SimOptions options)
+        private static void AssignElements(Encounter encounter, List<KeyValuePair<EnemyData, int>> counts, SchemeWeightData[] weights, EnemyFactory factory,
+                                           ElementDeck deck, Random rng, SimOptions options)
         {
-            ElementScheme scheme = PickScheme(rng);
+            ElementScheme scheme = PickScheme(weights, rng);
             encounter.ElementScheme = SchemeName(scheme);
             Element shared = scheme == ElementScheme.Uniform ? deck.Next() : Element.None;
             int unit = 0;
 
-            foreach (KeyValuePair<EnemyTypeData, int> entry in counts)
+            foreach (KeyValuePair<EnemyData, int> entry in counts)
             {
                 Element typeElement = scheme == ElementScheme.PerType ? deck.Next() : shared;
                 for (int i = 0; i < entry.Value; i++)
@@ -217,7 +217,7 @@ namespace BeastCraft.Tooling.BalanceSim
                     }
 
                     unit++;
-                    encounter.Enemies.Add(factory.Slot(entry.Key, element, unit));
+                    encounter.Enemies.Add(factory.Slot(entry.Key.EnemyId, element, unit));
                 }
             }
 
@@ -227,23 +227,29 @@ namespace BeastCraft.Tooling.BalanceSim
             }
         }
 
-        private static ElementScheme PickScheme(Random rng)
+        /// <summary>One draw over the library's scheme weights, in file order.</summary>
+        private static ElementScheme PickScheme(SchemeWeightData[] weights, Random rng)
         {
-            int total = SimOptions.SchemeWeightUniform + SimOptions.SchemeWeightPerType + SimOptions.SchemeWeightPerUnit + SimOptions.SchemeWeightNone;
+            int total = 0;
+            foreach (SchemeWeightData entry in weights)
+            {
+                total += entry.Weight;
+            }
+
             int pick = rng.Next(total);
-            if (pick < SimOptions.SchemeWeightUniform)
+            ElementScheme last = ElementScheme.None;
+            foreach (SchemeWeightData entry in weights)
             {
-                return ElementScheme.Uniform;
+                last = (ElementScheme)Enum.Parse(typeof(ElementScheme), entry.Scheme);
+                if (pick < entry.Weight)
+                {
+                    return last;
+                }
+
+                pick -= entry.Weight;
             }
 
-            pick -= SimOptions.SchemeWeightUniform;
-            if (pick < SimOptions.SchemeWeightPerType)
-            {
-                return ElementScheme.PerType;
-            }
-
-            pick -= SimOptions.SchemeWeightPerType;
-            return pick < SimOptions.SchemeWeightPerUnit ? ElementScheme.PerUnit : ElementScheme.None;
+            return last;
         }
 
         public static string SchemeName(ElementScheme scheme)
@@ -262,10 +268,10 @@ namespace BeastCraft.Tooling.BalanceSim
         }
 
         /// <summary>"giant x1, archer x2" in placement order.</summary>
-        private static string Describe(List<KeyValuePair<EnemyTypeData, int>> counts)
+        private static string Describe(List<KeyValuePair<EnemyData, int>> counts)
         {
             List<string> parts = new List<string>();
-            foreach (KeyValuePair<EnemyTypeData, int> entry in counts)
+            foreach (KeyValuePair<EnemyData, int> entry in counts)
             {
                 parts.Add(entry.Key.EnemyId + " x" + entry.Value);
             }

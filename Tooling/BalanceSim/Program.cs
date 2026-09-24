@@ -127,19 +127,11 @@ namespace BeastCraft.Tooling.BalanceSim
             EncounterCatalog encounters = new EncounterCatalog();
             if (options.RunPve)
             {
-                string encountersPath = EncounterLoader.ResolvePath(options.EncountersPath);
-                if (encountersPath == null || !File.Exists(encountersPath))
-                {
-                    Console.Error.WriteLine("Could not find " + EncounterLoader.RepoRelativePath +
-                                            "; run from inside the repo or pass --encounters-file <path>.");
-                    return 2;
-                }
-
                 List<string> errors = new List<string>();
-                encounters = EncounterLoader.Load(encountersPath, curves, options, errors);
+                encounters = EncounterLoader.Load(options, curves, errors);
                 if (encounters == null)
                 {
-                    return Fail("Encounters '" + encountersPath + "' are invalid:", errors);
+                    return Fail("Encounters are invalid:", errors);
                 }
             }
 

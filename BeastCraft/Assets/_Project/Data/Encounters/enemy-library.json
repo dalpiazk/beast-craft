@@ -1,0 +1,116 @@
+{
+  "_readme": "GAME CONTENT: every PvE enemy type (source of truth). Enemies are not roster beasts: they are never owned, levelled or saved. Runtime/Encounters/EnemyCatalog builds one in-memory species (BeastRosterBuilder.ApplySpecies: SpeciesId = EnemyId, the unit's element as its only element) and one kit (SkillLibraryBuilder.ApplySkill, then every skill takes the unit's element) per (enemy, element), so enemies go through the same stat assembly as beasts. Validated by EnemyLibraryValidator (the Editor importer Beast Craft/Data/Import Encounters, the EditMode tests and Tooling/BalanceSim all run it): EnemyId lowercase snake_case, unique and never a roster SpeciesId; GrowthCurveId a beast-roster.json curve (BaseStats are max-level values scaled by it, as a beast's are; CritChance and MoveRange are exempt); MoveRange >= 1; CritChance and StatusResist 0-100; Stance a CombatStance name (missing = Vanguard); Footprint a UnitFootprint name (missing = Single; the giant is Hex7, seven tiles, which never fits a Small arena; the champion Triangle, three); at least one enemy-side SingleTarget or Line skill (the only shapes that walk a unit in), and for a Ranged enemy one with Range >= 2 (a Ranged unit never walks into melee). Skills use the skill library's SkillData shape (TargetShape, Range, Cooldown, Category, TargetingCriterion / TargetingOrder / TargetingStat, Effects, ...), in fire-priority order, with two differences: Element must be empty (every skill takes the unit's element) and SkillIds are local to the enemy. TargetingCriterion Random is refused (battles never spend the rng on enemy targeting); missing = Distance (nearest). A Damage effect's Magnitude is the skill's power, a percent of the attacking stat (DamageFormula). Threat is a hand-set estimate in 'standard enemy = 2' units that keeps a shape's generated lineups comparably hard (encounter-library.json). Every range to or from a large enemy is measured between nearest tiles, so the Hex7 giant's ranges are authored one lower than a one-tile unit's. The numbers came over unchanged from the balance simulator's former fixtures and are simulator-tuned, not confirmed balance. Edit here, then in Unity run Beast Craft/Data/Import Encounters; re-run the balance simulator (Tooling/BalanceSim/README.md) and regenerate encounter-difficulty.json with --write-difficulty after any change.",
+  "SchemaVersion": 1,
+  "GrowthCurveId": "medium",
+  "Enemies": [
+    {
+      "EnemyId": "giant",
+      "DisplayName": "Giant",
+      "Role": "boss",
+      "Threat": 12,
+      "Stance": "Vanguard",
+      "StatusResist": 50,
+      "Footprint": "Hex7",
+      "BaseStats": { "Hp": 1600, "Attack": 120, "Defense": 110, "SpecialAttack": 120, "SpecialDefense": 110, "Speed": 95, "MoveRange": 3, "CritChance": 5 },
+      "Skills": [
+        { "SkillId": "crush", "DisplayName": "Crush", "Category": "Physical", "TargetShape": "SingleTarget", "Range": 1, "Cooldown": 1, "TargetingCriterion": "Distance", "Effects": [ { "Magnitude": 113 } ] },
+        { "SkillId": "gaze", "DisplayName": "Gaze", "Category": "Special", "TargetShape": "SingleTarget", "Range": 2, "Cooldown": 1, "TargetingCriterion": "Distance", "Effects": [ { "Magnitude": 113 } ] },
+        { "SkillId": "quake", "DisplayName": "Quake", "Category": "Physical", "TargetShape": "AreaBurst", "Range": 1, "Cooldown": 3, "Effects": [ { "Magnitude": 60 } ] },
+        { "SkillId": "roar", "DisplayName": "Roar", "Category": "Special", "TargetShape": "AreaBurst", "Range": 1, "Cooldown": 3, "Effects": [ { "Magnitude": 60 } ] }
+      ]
+    },
+    {
+      "EnemyId": "champion",
+      "DisplayName": "Champion",
+      "Role": "mini-boss",
+      "Threat": 6,
+      "Stance": "Vanguard",
+      "StatusResist": 50,
+      "Footprint": "Triangle",
+      "BaseStats": { "Hp": 800, "Attack": 125, "Defense": 110, "SpecialAttack": 120, "SpecialDefense": 110, "Speed": 95, "MoveRange": 3, "CritChance": 6 },
+      "Skills": [
+        { "SkillId": "cleave", "DisplayName": "Cleave", "Category": "Physical", "TargetShape": "SingleTarget", "Range": 1, "Cooldown": 1, "TargetingCriterion": "Distance", "Effects": [ { "Magnitude": 90 } ] },
+        { "SkillId": "hex", "DisplayName": "Hex", "Category": "Special", "TargetShape": "SingleTarget", "Range": 2, "Cooldown": 2, "TargetingCriterion": "CurrentHp", "TargetingOrder": "Lowest", "Effects": [ { "Magnitude": 90 } ] },
+        { "SkillId": "shockwave", "DisplayName": "Shockwave", "Category": "Special", "TargetShape": "AreaBurst", "Range": 2, "Cooldown": 3, "Effects": [ { "Magnitude": 52 } ] }
+      ]
+    },
+    {
+      "EnemyId": "brute",
+      "DisplayName": "Brute",
+      "Role": "melee tank",
+      "Threat": 2.75,
+      "Stance": "Vanguard",
+      "BaseStats": { "Hp": 190, "Attack": 105, "Defense": 125, "SpecialAttack": 40, "SpecialDefense": 95, "Speed": 95, "MoveRange": 3, "CritChance": 4 },
+      "Skills": [
+        { "SkillId": "smash", "DisplayName": "Smash", "Category": "Physical", "TargetShape": "SingleTarget", "Range": 1, "Cooldown": 1, "TargetingCriterion": "Distance", "Effects": [ { "Magnitude": 83 } ] }
+      ]
+    },
+    {
+      "EnemyId": "stalker",
+      "DisplayName": "Stalker",
+      "Role": "fast melee hunter",
+      "Threat": 2,
+      "Stance": "Skirmisher",
+      "BaseStats": { "Hp": 125, "Attack": 50, "Defense": 85, "SpecialAttack": 120, "SpecialDefense": 85, "Speed": 105, "MoveRange": 4, "CritChance": 10 },
+      "Skills": [
+        { "SkillId": "shadow_claw", "DisplayName": "Shadow Claw", "Category": "Special", "TargetShape": "SingleTarget", "Range": 1, "Cooldown": 1, "TargetingCriterion": "CurrentHp", "TargetingOrder": "Lowest", "Effects": [ { "Magnitude": 90 } ] }
+      ]
+    },
+    {
+      "EnemyId": "archer",
+      "DisplayName": "Archer",
+      "Role": "ranged physical",
+      "Threat": 2,
+      "Stance": "Ranged",
+      "BaseStats": { "Hp": 90, "Attack": 115, "Defense": 70, "SpecialAttack": 50, "SpecialDefense": 80, "Speed": 100, "MoveRange": 3, "CritChance": 8 },
+      "Skills": [
+        { "SkillId": "arrow", "DisplayName": "Arrow", "Category": "Physical", "TargetShape": "SingleTarget", "Range": 3, "Cooldown": 1, "TargetingCriterion": "Distance", "Effects": [ { "Magnitude": 71 } ] }
+      ]
+    },
+    {
+      "EnemyId": "caster",
+      "DisplayName": "Caster",
+      "Role": "ranged special",
+      "Threat": 2,
+      "Stance": "Ranged",
+      "BaseStats": { "Hp": 85, "Attack": 45, "Defense": 70, "SpecialAttack": 120, "SpecialDefense": 95, "Speed": 100, "MoveRange": 3, "CritChance": 5 },
+      "Skills": [
+        { "SkillId": "bolt", "DisplayName": "Bolt", "Category": "Special", "TargetShape": "SingleTarget", "Range": 3, "Cooldown": 1, "TargetingCriterion": "CurrentHp", "TargetingOrder": "Lowest", "Effects": [ { "Magnitude": 71 } ] }
+      ]
+    },
+    {
+      "EnemyId": "shaman",
+      "DisplayName": "Shaman",
+      "Role": "area special",
+      "Threat": 2,
+      "Stance": "Vanguard",
+      "BaseStats": { "Hp": 130, "Attack": 95, "Defense": 90, "SpecialAttack": 110, "SpecialDefense": 105, "Speed": 95, "MoveRange": 3, "CritChance": 5 },
+      "Skills": [
+        { "SkillId": "staff", "DisplayName": "Staff", "Category": "Physical", "TargetShape": "SingleTarget", "Range": 1, "Cooldown": 1, "TargetingCriterion": "Distance", "Effects": [ { "Magnitude": 60 } ] },
+        { "SkillId": "storm", "DisplayName": "Storm", "Category": "Special", "TargetShape": "AreaBurst", "Range": 2, "Cooldown": 2, "Effects": [ { "Magnitude": 49 } ] }
+      ]
+    },
+    {
+      "EnemyId": "swarmling",
+      "DisplayName": "Swarmling",
+      "Role": "swarm",
+      "Threat": 0.45,
+      "Stance": "Vanguard",
+      "BaseStats": { "Hp": 30, "Attack": 60, "Defense": 40, "SpecialAttack": 30, "SpecialDefense": 40, "Speed": 105, "MoveRange": 4, "CritChance": 5 },
+      "Skills": [
+        { "SkillId": "bite", "DisplayName": "Bite", "Category": "Physical", "TargetShape": "SingleTarget", "Range": 1, "Cooldown": 1, "TargetingCriterion": "Distance", "Effects": [ { "Magnitude": 52 } ] }
+      ]
+    },
+    {
+      "EnemyId": "stingling",
+      "DisplayName": "Stingling",
+      "Role": "swarm",
+      "Threat": 0.45,
+      "Stance": "Vanguard",
+      "BaseStats": { "Hp": 30, "Attack": 30, "Defense": 40, "SpecialAttack": 60, "SpecialDefense": 40, "Speed": 105, "MoveRange": 4, "CritChance": 5 },
+      "Skills": [
+        { "SkillId": "sting", "DisplayName": "Sting", "Category": "Special", "TargetShape": "SingleTarget", "Range": 1, "Cooldown": 1, "TargetingCriterion": "Distance", "Effects": [ { "Magnitude": 52 } ] }
+      ]
+    }
+  ]
+}

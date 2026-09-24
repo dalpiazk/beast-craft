@@ -202,14 +202,10 @@ namespace BeastCraft.Tooling.BalanceSim
         public const double GuardNeutral = 7.0;
 
         // ------------------------------------------------------------------------------------
-        // Generated encounters (EncounterGenerator). Compositions per shape, and the weights of
-        // the element schemes a composition is assigned (see ElementScheme).
+        // Generated encounters (EncounterGenerator). Compositions per shape; the element-scheme
+        // weights are game content (encounter-library.json, SchemeWeights).
         // ------------------------------------------------------------------------------------
         public const int DefaultCompositions = 8;
-        public const int SchemeWeightUniform = 30;
-        public const int SchemeWeightPerType = 30;
-        public const int SchemeWeightPerUnit = 25;
-        public const int SchemeWeightNone = 15;
 
         /// <summary>
         /// Element-matchup view: a composition counts as dominated by an element when enemies of
@@ -259,7 +255,7 @@ namespace BeastCraft.Tooling.BalanceSim
         public double MarginalThreshold = DefaultMarginalThreshold;
         public double TargetClearRate = DefaultTargetClearRate;
 
-        /// <summary>Null = the elements authored in encounters.json; otherwise every enemy gets this element.</summary>
+        /// <summary>Null = the elements as generated (or authored, fixed set); otherwise every enemy gets this element.</summary>
         public Element? EnemyElementOverride;
 
         public int MaxTime = BattleTurnExecutor.DefaultMaxTime;
@@ -280,7 +276,15 @@ namespace BeastCraft.Tooling.BalanceSim
         public int MatrixLevel = DefaultMatrixLevel;
         public string OutPath;
         public string RosterPath;
+
+        /// <summary><c>--encounters-file</c>: the legacy fixed encounters (<c>Tooling/BalanceSim/encounters.json</c>), or null to find it.</summary>
         public string EncountersPath;
+
+        /// <summary><c>--enemy-library</c>: the game's enemy library, or null to find it by walking up.</summary>
+        public string EnemyLibraryPath;
+
+        /// <summary><c>--encounter-library</c>: the game's encounter library, or null to find it by walking up.</summary>
+        public string EncounterLibraryPath;
         public bool SelfCheck;
         public bool ShowHelp;
 
@@ -452,7 +456,8 @@ namespace BeastCraft.Tooling.BalanceSim
             "                             economy model (Monte Carlo campaigns; see README.md, \"Pacing\").\n" +
             "  --battles <n>              pacing: battles per campaign (default 500).\n" +
             "  --runs <n>                 pacing: campaigns per base seed (default 1000; --seeds pools every seed's).\n" +
-            "  --drop-tables <path>       pacing: drop-tables.json (default: found by walking up from the working directory).\n" +
+            "  --drop-tables <path>       drop-tables.json (default: found by walking up from the working directory). Pacing\n" +
+            "                             rolls it; PvE checks the encounter library's shape ids against it.\n" +
             "  --kit <k>                  elemental | neutral | both (default both): the element axis. neutral forces every\n" +
             "                             beast and enemy skill's element to None.\n" +
             "  --skill-kit <k>            library | standard (default library): the skill axis. library = each beast's\n" +
@@ -471,9 +476,9 @@ namespace BeastCraft.Tooling.BalanceSim
             "                             heuristic pickers see (ScoutingDetail).\n" +
             "  --scouted-vanguard-min <n> Fewest Vanguards a heuristic pick fields, 0 to the team size (default 1).\n" +
             "  --levels <list>            Comma-separated levels (default 1,50,100).\n" +
-            "  --encounter-set <s>        generated | fixed (default generated). generated = random compositions of the enemy\n" +
-            "                             type pool per shape (solo, elite, squad, horde); fixed = the hand-authored boss,\n" +
-            "                             swarm and pack encounters.\n" +
+            "  --encounter-set <s>        generated | fixed (default generated). generated = random compositions of the game's\n" +
+            "                             enemy library per encounter-library shape (solo, elite, squad, horde); fixed = the\n" +
+            "                             legacy hand-authored boss, swarm and pack simulator fixtures (encounters.json).\n" +
             "  --compositions <n>         Generated compositions per shape (default 8).\n" +
             "  --encounters <list>        Comma-separated shape ids (generated) or encounter ids (fixed) (default all).\n" +
             "  --team-size <n>            Beasts per player team, 1-6 (default 4); every combination is fielded.\n" +
@@ -491,7 +496,9 @@ namespace BeastCraft.Tooling.BalanceSim
             "                             generated composition, 5 per fixed encounter).\n" +
             "  --matrix-level <n>         Level the PvP win matrix and stat table are drawn at (default 50, else the highest level).\n" +
             "  --roster <path>            beast-roster.json (default: found by walking up from the working directory).\n" +
-            "  --encounters-file <path>   encounters.json (default: Tooling/BalanceSim/encounters.json, found the same way).\n" +
+            "  --enemy-library <path>     enemy-library.json (default: BeastCraft/Assets/_Project/Data/Encounters/, found the same way).\n" +
+            "  --encounter-library <path> encounter-library.json (default: beside enemy-library.json, found the same way).\n" +
+            "  --encounters-file <path>   the fixed set's encounters.json (default: Tooling/BalanceSim/encounters.json, found the same way).\n" +
             "  --avatar <preset>          library | support | none (default library). PvE only: field an avatar beside the\n" +
             "                             player team (see AvatarPresets): library = the library's default loadout (first 3\n" +
             "                             actives + AvatarDefaultPassives) at --skill-level, the committed report's setting;\n" +
@@ -866,6 +873,20 @@ namespace BeastCraft.Tooling.BalanceSim
                         break;
                     case "--encounters-file":
                         if (!TryNext(args, ref i, arg, out options.EncountersPath, out error))
+                        {
+                            return null;
+                        }
+
+                        break;
+                    case "--enemy-library":
+                        if (!TryNext(args, ref i, arg, out options.EnemyLibraryPath, out error))
+                        {
+                            return null;
+                        }
+
+                        break;
+                    case "--encounter-library":
+                        if (!TryNext(args, ref i, arg, out options.EncounterLibraryPath, out error))
                         {
                             return null;
                         }

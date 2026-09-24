@@ -309,7 +309,7 @@ namespace BeastCraft.Tests.EditMode
             Assert.IsTrue(errors.Exists(e => e.Contains(fragment)), "expected an error containing '" + fragment + "', got:\n" + string.Join("\n", errors));
         }
 
-        private static string FindFile(string projectRelativePath)
+        internal static string FindFile(string projectRelativePath)
         {
             string[] starts = { Directory.GetCurrentDirectory(), AppContext.BaseDirectory };
 

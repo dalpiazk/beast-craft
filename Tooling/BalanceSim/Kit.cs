@@ -6,13 +6,12 @@ using UnityEngine;
 namespace BeastCraft.Tooling.BalanceSim
 {
     /// <summary>
-    /// Builds the skills the simulator fights with: the standard beast kit (every beast gets the
-    /// same one, so stats are what is measured) and the enemy kits authored in
-    /// <c>encounters.json</c>. Every beast skill aims at the nearest eligible unit
-    /// (<see cref="SkillTargetingCriterion.Distance"/> / <see cref="SkillTargetingOrder.Lowest"/>);
-    /// an enemy skill uses its fixture's targeting (nearest by default, the least current HP, or a
-    /// stat extreme). Neither ever uses <see cref="SkillTargetingCriterion.Random"/>, so no battle
-    /// consumes the rng for targeting.
+    /// Builds the standard beast kit the simulator fights with (every beast gets the same one, so
+    /// stats are what is measured). Every standard skill aims at the nearest eligible unit
+    /// (<see cref="SkillTargetingCriterion.Distance"/> / <see cref="SkillTargetingOrder.Lowest"/>),
+    /// never <see cref="SkillTargetingCriterion.Random"/>, so no battle consumes the rng for
+    /// targeting. Enemy kits are the game's own (<c>EnemyCatalog.Kit</c>), whose validator refuses
+    /// Random targeting too.
     /// </summary>
     public static class Kit
     {
@@ -52,41 +51,8 @@ namespace BeastCraft.Tooling.BalanceSim
             };
         }
 
-        /// <summary>
-        /// An enemy kit from its fixture definition: every skill in the given element, with its
-        /// authored targeting, its optional advanced fields (hit count, execute bonus, initial
-        /// cooldown, use limit) and any extra effects after the damage effect. The extra effects are
-        /// shared, read-only <see cref="SkillEffect"/> instances, like the skills themselves.
-        /// </summary>
-        public static SkillSO[] BuildEnemyKit(IReadOnlyList<EnemySkillData> skills, Element element)
-        {
-            SkillSO[] kit = new SkillSO[skills.Count];
-            for (int i = 0; i < skills.Count; i++)
-            {
-                EnemySkillData data = skills[i];
-                kit[i] = BuildSkill(data.SkillId, data.ParsedCategory, data.ParsedShape, data.Power, data.Range, data.Cooldown, element);
-                kit[i].TargetingCriterion = data.ParsedTargeting;
-                kit[i].TargetingOrder = data.ParsedTargetingOrder;
-                kit[i].TargetingStat = data.ParsedTargetingStat;
-                kit[i].InitialCooldown = data.InitialCooldown;
-                kit[i].MaxUsesPerBattle = data.MaxUsesPerBattle;
-                kit[i].Effects[0].HitCount = data.HitCount;
-                kit[i].Effects[0].ExecuteBonusPercent = data.ExecuteBonusPercent;
-
-                foreach (EnemyEffectData extra in data.Effects ?? new EnemyEffectData[0])
-                {
-                    if (extra.Parsed != null)
-                    {
-                        kit[i].Effects.Add(extra.Parsed);
-                    }
-                }
-            }
-
-            return kit;
-        }
-
         /// <summary>A fresh loadout (fresh cooldown counters) over shared, read-only skill assets.</summary>
-        public static SkillLoadout Loadout(SkillSO[] kit)
+        public static SkillLoadout Loadout(IEnumerable<SkillSO> kit)
         {
             return new SkillLoadout(kit);
         }
