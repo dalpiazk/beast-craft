@@ -49,7 +49,7 @@ namespace BeastCraft.Save
     /// race, and the last swap wins — each file is still whole, never interleaved.
     /// </para>
     /// </summary>
-    public class FileSaveStorage : ISaveStorage
+    public class FileSaveStorage : IBackupSaveStorage
     {
         /// <summary>The main file's extension.</summary>
         public const string Extension = ".save";
@@ -240,6 +240,39 @@ namespace BeastCraft.Save
                     kind,
                     "Slot '" + slot + "' could not be read: main file " + mainProbe.Problem + "; backup " + backupProbe.Problem + ".",
                     mainProbe.Problem);
+            }
+        }
+
+        /// <summary>
+        /// Reads only <paramref name="slot"/>'s backup file, ignoring the main one — for a caller
+        /// (<see cref="SaveStore.Load"/>) whose main file read fine but did not load. Never throws.
+        /// </summary>
+        public SaveFileResult ReadBackup(string slot)
+        {
+            string main = GetSlotPath(slot);
+
+            if (main == null)
+            {
+                return InvalidSlot(slot);
+            }
+
+            lock (Gate)
+            {
+                FileProbe backupProbe = Probe(main + BackupSuffix);
+
+                if (backupProbe.Usable)
+                {
+                    return SaveFileResult.Read(backupProbe.Text, SaveFileSource.Backup, backupProbe.LastWriteUtc, null);
+                }
+
+                if (backupProbe.Missing)
+                {
+                    return SaveFileResult.Failed(SaveFileError.NotFound, "Slot '" + slot + "' has no backup.");
+                }
+
+                return SaveFileResult.Failed(
+                    backupProbe.IoFailure ? SaveFileError.Io : SaveFileError.Corrupt,
+                    "Slot '" + slot + "' backup " + backupProbe.Problem + ".");
             }
         }
 

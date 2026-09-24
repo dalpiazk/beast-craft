@@ -409,6 +409,147 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
+        public void ReadBackup_ReadsOnlyTheBackup()
+        {
+            FileSaveStorage storage = new FileSaveStorage(_root);
+
+            Assert.AreEqual(SaveFileError.InvalidSlot, storage.ReadBackup("../x").ErrorKind);
+            Assert.AreEqual(SaveFileError.NotFound, storage.ReadBackup("main").ErrorKind);
+
+            storage.Write("main", SaveA);
+            Assert.AreEqual(SaveFileError.NotFound, storage.ReadBackup("main").ErrorKind, "A lone main file is not a backup.");
+
+            storage.Write("main", SaveB);
+            SaveFileResult backup = storage.ReadBackup("main");
+            Assert.IsTrue(backup.Success, backup.Error);
+            Assert.AreEqual(SaveFileSource.Backup, backup.Source);
+            Assert.AreEqual(SaveA, backup.Contents);
+
+            File.WriteAllText(storage.GetBackupPath("main"), "{\"cut");
+            Assert.AreEqual(SaveFileError.Corrupt, storage.ReadBackup("main").ErrorKind);
+        }
+
+        [Test]
+        public void SaveStoreLoad_ReportsTheMainFile()
+        {
+            SaveStore store = NewFileStore(out FileSaveStorage _);
+            store.Save("main", SaveAtLevel(4));
+
+            SaveLoadResult loaded = store.Load("main");
+
+            Assert.IsTrue(loaded.Success, loaded.Error);
+            Assert.AreEqual(SaveFileSource.Main, loaded.StorageSource);
+            Assert.IsNull(loaded.MainFileProblem);
+
+            SaveLoadResult missing = store.Load("empty");
+            Assert.IsFalse(missing.Success);
+            StringAssert.Contains("No save in slot 'empty'", missing.Error);
+            Assert.AreEqual(SaveFileSource.None, missing.StorageSource);
+        }
+
+        [Test]
+        public void SaveStoreLoad_CorruptMain_UsesBackupAndSaysWhy()
+        {
+            SaveStore store = NewFileStore(out FileSaveStorage storage);
+            store.Save("main", SaveAtLevel(3));
+            store.Save("main", SaveAtLevel(9));
+            File.WriteAllText(storage.GetSlotPath("main"), "{\"SchemaVersion\":2,\"Avat");
+
+            SaveLoadResult loaded = store.Load("main");
+
+            Assert.IsTrue(loaded.Success, loaded.Error);
+            Assert.AreEqual(3, loaded.Save.Avatar.Level);
+            Assert.AreEqual(SaveFileSource.Backup, loaded.StorageSource);
+            StringAssert.Contains("content check", loaded.MainFileProblem);
+        }
+
+        // Failures that the real JsonUtility and the stub's System.Text.Json twin agree on.
+        [TestCase("{\"SchemaVersion\":0}", "SchemaVersion")]
+        [TestCase("{\"Avatar\":{\"Level\":9}}", "SchemaVersion")]
+        public void SaveStoreLoad_MainThatReadsButFailsToLoad_RetriesTheBackup(string mainText, string expectedReason)
+        {
+            SaveStore store = NewFileStore(out FileSaveStorage storage);
+            store.Save("main", SaveAtLevel(3));
+            store.Save("main", SaveAtLevel(9));
+            File.WriteAllText(storage.GetSlotPath("main"), mainText);
+
+            SaveLoadResult loaded = store.Load("main");
+
+            Assert.IsTrue(loaded.Success, loaded.Error);
+            Assert.AreEqual(3, loaded.Save.Avatar.Level);
+            Assert.AreEqual(SaveFileSource.Backup, loaded.StorageSource);
+            StringAssert.Contains("failed to load", loaded.MainFileProblem);
+            StringAssert.Contains(expectedReason, loaded.MainFileProblem);
+        }
+
+        [Test]
+        public void SaveStoreLoad_FailedMigration_RetriesTheBackup()
+        {
+            FileSaveStorage storage = new FileSaveStorage(_root);
+            SaveStore store = new SaveStore(storage, new SaveSerializer(new JsonUtilitySaveSerializer(), migrations: new[] { new FailOnMarkerMigration() }));
+            storage.Write("main", "{\"SchemaVersion\":1,\"Avatar\":{\"Level\":3,\"Xp\":0}}");
+            storage.Write("main", "{\"SchemaVersion\":1,\"Avatar\":{\"Level\":9,\"Xp\":0},\"Marker\":\"poison\"}");
+
+            SaveLoadResult loaded = store.Load("main");
+
+            Assert.IsTrue(loaded.Success, loaded.Error);
+            Assert.AreEqual(3, loaded.Save.Avatar.Level);
+            Assert.IsTrue(loaded.Migrated);
+            Assert.AreEqual(SaveFileSource.Backup, loaded.StorageSource);
+            StringAssert.Contains("Migrating", loaded.MainFileProblem);
+        }
+
+        [Test]
+        public void SaveStoreLoad_NewerBuildsMain_DoesNotFallBackToAnOlderBackup()
+        {
+            SaveStore store = NewFileStore(out FileSaveStorage storage);
+            store.Save("main", SaveAtLevel(3));
+            store.Save("main", SaveAtLevel(9));
+            File.WriteAllText(storage.GetSlotPath("main"), "{\"SchemaVersion\":99}");
+
+            SaveLoadResult loaded = store.Load("main");
+
+            Assert.IsFalse(loaded.Success);
+            StringAssert.Contains("newer build", loaded.Error);
+            Assert.AreEqual(SaveFileSource.Main, loaded.StorageSource);
+            Assert.IsNull(loaded.MainFileProblem);
+        }
+
+        [Test]
+        public void SaveStoreLoad_MainAndBackupBothFailToLoad_ReturnsTheMainFailure()
+        {
+            SaveStore store = NewFileStore(out FileSaveStorage storage);
+            store.Save("main", SaveAtLevel(3));
+            store.Save("main", SaveAtLevel(9));
+            File.WriteAllText(storage.GetSlotPath("main"), "{\"SchemaVersion\":0}");
+            File.WriteAllText(storage.GetBackupPath("main"), "{\"SchemaVersion\":-1}");
+
+            SaveLoadResult loaded = store.Load("main");
+
+            Assert.IsFalse(loaded.Success);
+            StringAssert.Contains("SchemaVersion", loaded.Error);
+            Assert.AreEqual(SaveFileSource.Main, loaded.StorageSource);
+
+            File.Delete(storage.GetBackupPath("main"));
+            Assert.AreEqual(SaveFileSource.Main, store.Load("main").StorageSource, "No backup: the main failure stands.");
+        }
+
+        [Test]
+        public void SaveStoreLoad_OverAPlainStorage_ReportsMain()
+        {
+            SaveStore store = new SaveStore(new SingleSlotStorage(), new SaveSerializer(new JsonUtilitySaveSerializer()));
+
+            Assert.AreEqual(SaveFileSource.None, store.Load("main").StorageSource);
+            Assert.IsTrue(store.Save("main", SaveAtLevel(5)));
+
+            SaveLoadResult loaded = store.Load("main");
+
+            Assert.IsTrue(loaded.Success, loaded.Error);
+            Assert.AreEqual(SaveFileSource.Main, loaded.StorageSource);
+            Assert.IsNull(loaded.MainFileProblem);
+        }
+
+        [Test]
         public void SlotIndex_OfAMissingDirectory_IsEmpty()
         {
             Assert.IsEmpty(SaveSlotIndex.Build(new FileSaveStorage(_root), new JsonUtilitySaveSerializer()));
@@ -429,6 +570,71 @@ namespace BeastCraft.Tests.EditMode
 
             Assert.AreEqual(expected, UnitySaveLocations.DefaultDirectory());
             Assert.AreEqual(Path.GetFullPath(expected), UnitySaveLocations.Default().RootDirectory);
+        }
+
+        private static PlayerSave SaveAtLevel(int avatarLevel)
+        {
+            PlayerSave save = PlayerSave.CreateNew();
+            save.Avatar.Level = avatarLevel;
+            return save;
+        }
+
+        private SaveStore NewFileStore(out FileSaveStorage storage)
+        {
+            storage = new FileSaveStorage(_root);
+            return new SaveStore(storage, new SaveSerializer(new JsonUtilitySaveSerializer()));
+        }
+
+        /// <summary>Schema 1 to 2 that fails on a save carrying <c>"Marker":"poison"</c>.</summary>
+        private class FailOnMarkerMigration : ISaveMigration
+        {
+            public int FromVersion
+            {
+                get { return 1; }
+            }
+
+            public string Upgrade(string json, ISaveJsonSerializer serializer)
+            {
+                if (json.Contains("poison"))
+                {
+                    throw new InvalidOperationException("poisoned save");
+                }
+
+                PlayerSave save = serializer.FromJson<PlayerSave>(json);
+                save.EnsureInitialized();
+                save.SchemaVersion = 2;
+                return serializer.ToJson(save);
+            }
+        }
+
+        /// <summary>A plain <see cref="ISaveStorage"/> (no backup) holding one slot in memory.</summary>
+        private class SingleSlotStorage : ISaveStorage
+        {
+            private string _text;
+
+            public bool Exists(string slot)
+            {
+                return _text != null;
+            }
+
+            public bool TryRead(string slot, out string contents)
+            {
+                contents = _text;
+                return _text != null;
+            }
+
+            public bool TryWrite(string slot, string contents)
+            {
+                _text = contents;
+                return true;
+            }
+
+            public bool Delete(string slot)
+            {
+                bool had = _text != null;
+                _text = null;
+                return had;
+            }
         }
     }
 }

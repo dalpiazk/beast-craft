@@ -123,7 +123,8 @@ SaveLoadResult loaded = store.Load("main");
 | Slot names | 1–64 ASCII letters, digits, `_`, `-`; starts with a letter or digit; not a Windows device name (`CON`, `NUL`, `COM1`…). No dots or separators, so no traversal and no custom extension. Anything else is `SaveFileError.InvalidSlot`. |
 | Atomic write | Full text to the temp file, flushed (write-through), then swapped in with `File.Replace` (old main → backup), falling back to copy/delete/move where `Replace` is unsupported. A crash leaves the old or the new save readable, never a torn one. One backup generation. |
 | Corrupt main | Not valid UTF-8, blank, or failing the content check (default: trimmed text is `{…}`, a cheap truncation check). Reads then use the backup; a write deletes a corrupt main instead of rotating it over a good backup. |
-| Read fallback | `Read(slot)` → `SaveFileResult` with `Source` (`Main` / `Backup`), `MainFileProblem` (why main was skipped — worth logging), `LastWriteUtc`. Both unusable → `Corrupt` (or `Io`); neither present → `NotFound`. |
+| Read fallback | `Read(slot)` → `SaveFileResult` with `Source` (`Main` / `Backup`), `MainFileProblem` (why main was skipped — worth logging), `LastWriteUtc`. Both unusable → `Corrupt` (or `Io`); neither present → `NotFound`. `ReadBackup(slot)` reads the backup alone. |
+| `SaveStore.Load` | Over an `IBackupSaveStorage` (`FileSaveStorage`): the `SaveLoadResult` carries `StorageSource` (`Main` / `Backup` / `None`) and `MainFileProblem`. When the main file passes the content check but fails to load (bad or missing schema version, unreadable JSON, a failed migration), the backup is loaded instead, with `MainFileProblem` = "read but failed to load (…)". No retry when the main save is from a newer build (loading and re-saving the older backup would overwrite it); if the backup fails too, the main failure is returned. Over a plain `ISaveStorage`, a read is reported as `Main`. |
 | Writes | Refuse text that would fail the content check (`InvalidContents`); the directory is created on demand. |
 | Encoding | UTF-8 without BOM; a leading BOM is tolerated on read. |
 | Exists / Delete | `Exists` = a main or backup file is present (content not checked). `Delete` removes main, backup and temp; false (`NotFound`) when there was nothing. |
@@ -368,9 +369,8 @@ its System.Text.Json twin here.
   them itself and passes them as `PrebuiltEnemies`.
 - **Storage is local files only.** `FileSaveStorage` has no Cloud Save counterpart, no
   cross-process lock and one backup generation; the content check catches truncation, not subtler
-  corruption (no checksum), which the serializer then reports on load. `SaveStore.Load` does not
-  retry the backup when the main file passes the check but fails to deserialize, and it does not
-  surface `SaveFileResult.MainFileProblem` — call `FileSaveStorage.Read` to log a backup fallback.
-  WebGL (IndexedDB-backed `persistentDataPath`, needing a sync) is untested.
+  corruption (no checksum), which the serializer then reports on load (and `SaveStore` retries
+  the backup). A slot recovered from its backup is not rewritten automatically: the game should
+  log `SaveLoadResult.MainFileProblem` and save again. WebGL (IndexedDB-backed `persistentDataPath`, needing a sync) is untested.
 - **Never run in Unity.** The project has not been opened in an Editor, so the save round trip has
   not yet been exercised against the real `JsonUtility`.

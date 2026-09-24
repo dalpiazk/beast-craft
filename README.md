@@ -111,10 +111,13 @@ with no scene or MonoBehaviour dependencies):
   levels and level-5/10/15 breakthroughs, beast and avatar level/XP, material
   inventory, material drop tables and a loot roller with pity and first-clear
   grants.
-- **Save system** (`Save/`, no UI or file IO yet) — a versioned `PlayerSave`
+- **Save system** (`Save/`, no UI yet) — a versioned `PlayerSave`
   aggregate (beasts, avatar, skill books, materials, beast and avatar gear),
   `SaveSerializer` with a migration chain and load-time validation that reports
-  unknown ids instead of failing, storage behind the thin `ISaveStorage` seam.
+  unknown ids instead of failing, storage behind the thin `ISaveStorage` seam:
+  `FileSaveStorage` writes local slot files atomically with a one-generation
+  backup that loads fall back to, rooted at `Application.persistentDataPath`
+  via `UnitySaveLocations.Default()`.
 - **Battle session** (`Session/`) — `BattleSession`, the single entry point a
   scene will call: builds a battle from a save plus an encounter setup, runs it
   (same setup and seed, same battle) and pays the rewards (skill practice XP,
@@ -159,8 +162,8 @@ The numbers are simulator-tuned starting points, not confirmed balance — see
   decisions and are not applied automatically.
 - A **local EditMode test runner** (`Tooling/EditModeTests/`) — not a CI job —
   that compiles the Runtime, Editor and `Tests/EditMode` scripts against the
-  UnityStub and runs the whole EditMode suite with NUnit, no Unity install
-  needed. Run it from the repo root before pushing:
+  UnityStub and runs the whole EditMode suite (641 tests) with NUnit, no Unity
+  install needed. Run it from the repo root before pushing:
 
   ```sh
   dotnet test Tooling/EditModeTests

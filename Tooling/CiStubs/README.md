@@ -7,7 +7,7 @@ scripts **without a Unity Editor install or a Unity licence**.
 
 | Project | Purpose |
 | --- | --- |
-| `UnityStub/` | A tiny fake `UnityEngine` assembly — just enough API surface (`Object`, `ScriptableObject`, `Sprite`, `Color`, `Mathf`, `AnimationCurve`, `JsonUtility`, `Debug`, the inspector attributes, and a few `UnityEditor` types) for the game scripts to compile. |
+| `UnityStub/` | A tiny fake `UnityEngine` assembly — just enough API surface (`Object`, `ScriptableObject`, `Sprite`, `Color`, `Mathf`, `AnimationCurve`, `JsonUtility`, `Debug`, `Application.persistentDataPath` (a real temp directory), the inspector attributes, and a few `UnityEditor` types) for the game scripts to compile. |
 | `CiLint/` | A source-less project that globs in `BeastCraft/Assets/_Project/Scripts/{Runtime,Editor}/**/*.cs` and compiles them against `UnityStub`. This is the project CI builds and formats. |
 
 `UnityStub` has one other consumer: `Tooling/BalanceSim/`, the local-only headless balance simulator,
