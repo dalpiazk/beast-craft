@@ -1970,3 +1970,82 @@ four minutes. For a first screen of many candidates, `--calibrate-sample 30` run
 search on 30 of the 210 teams and is about 3.5x faster again. It moves the overall marginals by
 at most 0.7 points, against about 2 points for a seed change. Confirm the final candidate without
 it, since the committed report never uses it.
+
+## Team composition analysis (no balance change)
+
+Question: is there enough variation that the player's team composition matters, or does every
+lineup win regardless? The simulator already fielded all 210 four-beast teams against every
+composition; it now also reports whole teams (`Tooling/BalanceSim/README.md`, "Team composition";
+the "PvE team composition" section of `tuned-report.md` and of the `--seeds` aggregate). Measured
+on the current tuned data, default arguments, `--seeds 12345,777,4242`. Every number is at the
+calibrated difficulty, where the average team clears 50%, so "every lineup wins" cannot happen by
+construction; the question is how far apart the lineups are there.
+
+**Noise first.** A team's clear rate in one shape is 24 battles per seed (8 compositions x 3
+levels), so one team moves 12-14 points between seeds (damage rolls and each seed's composition
+draw). One seed's best / worst lists are therefore mostly noise. The **persistent SD** below is the
+teams' spread within a seed with that seed-to-seed noise removed: the part that is the lineup's own.
+
+| Kit mode | Shape | Persistent team SD | Per-seed SD | Seed-to-seed SD | Seed means min … max | p10 … p90 |
+| --- | --- | ---: | ---: | ---: | --- | --- |
+| `elemental` | `solo` | 5.7 | 13.6 | 12.3 | 25.0% … 70.8% | 38.9% … 62.5% |
+| `elemental` | `elite` | 4.4 | 12.6 | 11.8 | 25.0% … 72.2% | 38.9% … 59.7% |
+| `elemental` | `squad` | 11.0 | 16.1 | 11.7 | 11.1% … 83.3% | 33.3% … 66.7% |
+| `elemental` | `horde` | 7.5 | 15.8 | 14.0 | 29.2% … 86.1% | 37.4% … 65.3% |
+| `elemental` | overall | 4.4 | 7.8 | 6.5 | 31.6% … 63.5% | 43.0% … 57.3% |
+| `neutral` | `solo` | 18.7 | 24.7 | 16.2 | 1.4% … 94.4% | 22.2% … 80.6% |
+| `neutral` | `elite` | 11.1 | 16.1 | 11.7 | 20.8% … 77.8% | 30.6% … 65.3% |
+| `neutral` | `squad` | 14.5 | 17.4 | 9.6 | 8.3% … 87.5% | 30.4% … 70.8% |
+| `neutral` | `horde` | 11.3 | 16.8 | 12.5 | 22.2% … 86.1% | 33.3% … 69.4% |
+| `neutral` | overall | 8.2 | 10.9 | 7.2 | 28.5% … 71.9% | 37.5% … 61.2% |
+
+(Min … max and p10 … p90 are of the 3-seed means, which still carry about seed-to-seed SD / sqrt(3)
+= 7-8 points of noise per shape, so they overstate the true extremes; the persistent SD does not.)
+
+- **Composition matters, per encounter more than overall.** With elements on, the lineup's own
+  spread is an SD of 4-6 points against a solo giant or an elite, 7.5 against a horde and 11 against
+  a squad: a true p10-to-p90 gap of roughly 11-28 points of clear rate at the same difficulty. Over
+  every shape together it is only 4.4 (about 11 points p10-p90), because the lineups that are best
+  in one shape are not best in another. Leviathan + Golem + Frost Wyrm + Treant is the best horde
+  team (86.1%) and second-best elite team (72.2%) but the third-worst squad team (23.6%); the
+  squad leaders are built around Griffin + Thunderbird (Griffin + Thunderbird + Tarasque + Kirin
+  83.3%, + Frost Wyrm + Tarasque 81.9%). So picking the team for the encounter pays; one team for
+  everything is roughly as good as another (seed means 31.6% … 63.5% overall, 89% of the teams
+  between 40% and 60%).
+- **The element chart narrows the gap between lineups.** Without elements (`neutral`) the
+  persistent spread is 1.5-3x larger (solo 18.7: some teams almost never beat a solo giant, others
+  almost always). With elements, a team's value swings with each composition's elements and
+  averages out over the shape's mixed compositions, so the report cannot see it: the simulator
+  fields a fixed team against every composition, whereas a player who sees the enemy's elements
+  before choosing would get more out of the lineup than these numbers show.
+- **Best and worst lineups (`elemental`, 3-seed means, SD over seeds in brackets).** Overall best:
+  Phoenix + Griffin + Thunderbird + Kirin 63.5% (11.0), Leviathan + Golem + Treant + Kirin 63.5%
+  (6.3), Phoenix + Golem + Treant + Kirin 63.5% (2.8), Griffin + Thunderbird + Tarasque + Kirin
+  62.8% (4.2), Golem + Griffin + Thunderbird + Basilisk 61.8% (2.2). Overall worst: Thunderbird +
+  Frost Wyrm + Treant + Kirin 31.6% (8.5), Phoenix + Thunderbird + Frost Wyrm + Treant 36.1% (8.9),
+  Leviathan + Golem + Thunderbird + Treant 37.5% (7.5), Thunderbird + Frost Wyrm + Treant + Basilisk
+  37.5% (4.5), Leviathan + Golem + Griffin + Treant 37.5% (4.5). Per shape: solo best Leviathan +
+  Treant + Tarasque + Kirin 70.8%, worst Phoenix + Griffin + Kirin + Basilisk 25.0%; elite best
+  Phoenix + Leviathan + Kirin + Basilisk 72.2%, worst Phoenix + Thunderbird + Frost Wyrm + Treant
+  25.0%; squad best Griffin + Thunderbird + Tarasque + Kirin 83.3%, worst Leviathan + Golem +
+  Thunderbird + Treant 11.1%; horde best Leviathan + Golem + Frost Wyrm + Treant 86.1%, worst
+  Golem + Thunderbird + Treant + Tarasque 29.2%. Neighbouring ranks are within noise.
+- **Pairs are close to additive, but the few real interactions are as big as any single beast.**
+  Synergy = the clear rate of the 28 teams holding a pair minus what the two marginals predict
+  (baseline + 0.675 x (mA + mB)). Over every shape (`elemental`, 3-seed mean, noise 0.5-1.0, every
+  seed the same sign): Griffin + Thunderbird **+3.7** (+5.1 squad, +6.2 horde), Golem + Treant
+  +2.2, Thunderbird + Basilisk +1.8, Griffin + Basilisk +1.7 (+5.3 horde), Golem + Frost Wyrm +1.6
+  (+3.9 horde); anti-synergies Thunderbird + Treant **-3.5** (-4.4 solo, -4.0 horde), Leviathan +
+  Griffin **-3.3** (-4.1 solo, -3.3 squad, -3.1 horde), Golem + Tarasque -1.9 (-4.6 solo),
+  Thunderbird + Frost Wyrm -1.7, Leviathan + Golem -1.6. The beasts' own overall marginals span
+  only -2.3 … +2.0 in `elemental`, so Griffin + Thunderbird and the two anti-synergies are the
+  largest single composition effects in the roster. Every other pair is within about +/-1.5
+  overall.
+- **Reading for design.** Nobody wins regardless of lineup at a fair difficulty, and the choice is
+  worth the most per encounter (squad and horde) and least against a lone giant or elite, where
+  the four-beast spread is only 4-6 points. If the game should reward building a team more, the
+  levers are the interactions above (pair skills or passives that deliberately create synergies)
+  and encounters whose elements the player can see and counter before the fight.
+
+Reproduce: `dotnet run --project Tooling/BalanceSim -c Release -- --seeds 12345,777,4242 --out out/teams.md`
+(about 130 s); the default run's "PvE team composition" section shows seed 12345 alone.

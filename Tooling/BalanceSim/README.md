@@ -236,6 +236,26 @@ cooldown 2 weighted `Attack` about twice as heavily.
     threat) its kit element hits super-effectively, neutrally or resisted, and over the compositions
     with no dominant element. A regrouping of battles already run, so it costs nothing; the buckets
     are small (a few compositions each), so read it as direction, not measurement.
+- **Team composition** (`TeamReport.cs`; "PvE team composition: does the lineup matter?"). The
+  marginals judge beasts one at a time; this judges whole teams, from the same battles:
+  - **Does composition matter?** One line per kit mode and shape (and overall): best-to-worst and
+    p10–p90 team spread, and the teams' SD against the SD damage rolls alone would give.
+  - **Team clear-rate spread**: min, p10, median, p90, max and SD of the 210 teams' clear rates per
+    kit mode, shape and level, levels pooled, and overall; **noise SD** = root mean binomial
+    variance, p(1 - p) / (N - 1) per cell (an upper bound: a team's chance differs between
+    compositions), and **beyond noise** = sqrt(SD² - noise SD²), a lower bound on the lineup's own
+    spread. A single level is only 8 battles per team by default, so read the pooled rows. Plus a
+    10-point histogram of the teams.
+  - **Best and worst lineups** (`elemental`, the primary mode): the top and bottom 5 teams per shape
+    and overall.
+  - **Pair synergy** (`elemental`): for each of the 45 pairs, the clear rate of the 28 teams holding
+    both against the no-interaction prediction from the two marginals, baseline + w x (mA + mB),
+    and the difference with its binomial SE; top and bottom 5 per shape and overall. **w is not 1**:
+    with every k-of-n team fielded, a marginal is n / (n - 1) times the beast's additive effect and
+    a pair's teams carry (n - k) / (n - 2) of the pair's effects, so w = (n - 1)(n - k) / (n (n - 2))
+    = 0.675 for 4 of 10; baseline + mA + mB would show every pair of strong beasts as anti-synergy.
+    With 45 pairs a few |synergy / SE| near 2.5 are expected from noise; one seed cannot separate
+    them, `--seeds` can (see "Multi-seed runs").
 - **Flags.** Overall marginal outside +/-5 points; **no niche** (bottom 3 in every shape);
   **no weakness** (top 3 in every shape); a stance whose kit parity is outside 50 +/- 5%;
   stalemates; calibration misses.
@@ -396,7 +416,13 @@ dotnet run --project Tooling/BalanceSim -c Release -- --mode pve --seeds 12345,7
   shape (mean over seeds, the rank of that mean and in how many seeds it was top 3 there) and
   overall (mean, sample standard deviation, range and each seed's value), plus the range of the
   means, the beasts outside the `--marginal-threshold` band and the beasts with no top-3 shape on
-  the means. It is deterministic like the reports.
+  the means. Then **team composition over seeds**: each team's clear rate averaged over the seeds,
+  with the teams' spread within a seed (per-seed SD), how much one team moves between seeds
+  (seed-to-seed SD: damage rolls and each seed's composition draw) and the **persistent SD**,
+  sqrt(per-seed SD² - seed-to-seed SD²), the spread that is the lineup's own; the percentiles,
+  histogram and best / worst lineups of the seed means; and each pair's synergy per seed with the
+  mean, SD over seeds and a noise estimate (`*` = mean beyond 2 x noise). It is deterministic like
+  the reports.
 - The seeds run one after another, each using every core, so the wall clock is about the sum of
   single-seed runs (loading and JIT are a second or two of a 50 s run). What it replaces is the
   bookkeeping: one process per seed and scripts parsing the Markdown back; the aggregate comes

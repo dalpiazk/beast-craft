@@ -244,6 +244,8 @@ namespace BeastCraft.Tooling.BalanceSim
                     AppendElementMatchups(report, options, species, simulator, cells);
                 }
             }
+
+            TeamReport.AppendSection(report, options, species, shapes, simulator, cells);
         }
 
         private static ModeSummary Summarize(SimOptions options, IReadOnlyList<CreatureSpeciesSO> species, List<EncounterShape> shapes,

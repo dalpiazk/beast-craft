@@ -50,6 +50,8 @@ namespace BeastCraft.Tooling.BalanceSim
                 AppendMode(report, options, species, seeds, shapes, catalogs, simulators, cells, mode);
             }
 
+            TeamReport.AppendAggregate(report, options, species, seeds, catalogs, simulators, cells);
+
             return report.ToString();
         }
 
