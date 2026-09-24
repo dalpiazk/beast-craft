@@ -149,9 +149,11 @@ The numbers are simulator-tuned starting points, not confirmed balance — see
 
 - **CI** (`.github/workflows/ci.yml`) — a format and compile check that builds
   the real game scripts against the hand-written UnityEngine stub in
-  `Tooling/CiStubs/`. It needs no Unity install and runs no tests, so it proves
-  the scripts parse, type-check and are formatted — nothing about whether the
-  project opens or behaves correctly.
+  `Tooling/CiStubs/`, then the EditMode suite through `Tooling/EditModeTests`
+  (format check and `dotnet test --configuration Release`). It needs no Unity
+  install, so it proves the scripts parse, type-check, are formatted and pass
+  the EditMode tests against the stub — nothing about whether the project
+  opens in Unity or serializes its assets correctly.
 - A **headless balance simulator** ([`Tooling/BalanceSim/`](Tooling/BalanceSim/README.md))
   — local-only, not a CI job — that runs the real battle code outside Unity and
   writes Markdown reports: PvE against generated mixed encounters (solo, elite,
@@ -160,10 +162,10 @@ The numbers are simulator-tuned starting points, not confirmed balance — see
   reports live in [`docs/balance/`](docs/balance/) (baseline, tuned, level-gap
   and pacing reports plus research notes); their numbers inform design
   decisions and are not applied automatically.
-- A **local EditMode test runner** (`Tooling/EditModeTests/`) — not a CI job —
-  that compiles the Runtime, Editor and `Tests/EditMode` scripts against the
-  UnityStub and runs the whole EditMode suite (689 tests) with NUnit, no Unity
-  install needed. Run it from the repo root before pushing:
+- An **EditMode test runner** (`Tooling/EditModeTests/`) that compiles the
+  Runtime, Editor and `Tests/EditMode` scripts against the UnityStub and runs
+  the whole EditMode suite with NUnit, no Unity install needed. CI runs it as a
+  final gate; run it from the repo root before pushing:
 
   ```sh
   dotnet test Tooling/EditModeTests

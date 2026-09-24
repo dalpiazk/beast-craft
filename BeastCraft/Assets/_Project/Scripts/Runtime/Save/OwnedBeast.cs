@@ -1,4 +1,5 @@
 using System;
+using BeastCraft.Customization;
 using BeastCraft.Progression;
 
 namespace BeastCraft.Save
@@ -30,6 +31,13 @@ namespace BeastCraft.Save
         /// <see cref="GearRules"/>. Added in schema 2.
         /// </summary>
         public string[] EquippedGear = new string[GearRules.BeastSlotCount];
+
+        /// <summary>
+        /// This beast's chosen look, from its species' cosmetic categories (a category missing here
+        /// reads as its default). Purely cosmetic, no stats; change it through <c>CosmeticRules</c>.
+        /// Added in schema 4.
+        /// </summary>
+        public CustomizationSelection Appearance = new CustomizationSelection();
 
         /// <summary>A new beast: <paramref name="beastId"/> of <paramref name="speciesId"/> at <paramref name="level"/>, knowing nothing yet.</summary>
         public static OwnedBeast Create(string beastId, string speciesId, int level)

@@ -11,7 +11,9 @@ namespace BeastCraft.Bonds
     /// per battle (<see cref="For"/>) and handed to
     /// <see cref="BattleTurnExecutor.RunBattle(TurnManager, IEnumerable{BattleUnit}, HexGrid, System.Random, BattleUnit, PassiveLoadout, TeamBondLoadout, int)"/>
     /// or <see cref="BattleTurnExecutor.BeginBattle(IEnumerable{BattleUnit}, HexGrid, System.Random, BattleUnit, PassiveLoadout, TeamBondLoadout, out IReadOnlyList{TeamBondActivation})"/>,
-    /// which apply it once, as the battle begins, before any avatar passive. See the battle-system
+    /// which apply its battle-start effects once, as the battle begins, before any avatar passive,
+    /// and then run its behaviour bonds' reactions on every turn (see the other half of this class,
+    /// <c>TeamBondLoadout.Reactions.cs</c>, and <see cref="BondReaction"/>). See the battle-system
     /// design doc, "Team bonds".
     /// <para>
     /// <strong>Application.</strong> Bonds apply in the resolver's order (the library's order). For
@@ -41,7 +43,7 @@ namespace BeastCraft.Bonds
     /// never modified.
     /// </para>
     /// </summary>
-    public sealed class TeamBondLoadout
+    public sealed partial class TeamBondLoadout
     {
         private static readonly object CarrierLock = new object();
         private static readonly ConditionalWeakTable<TeamBondTier, Dictionary<int, SkillSO>> Carriers = new ConditionalWeakTable<TeamBondTier, Dictionary<int, SkillSO>>();
@@ -71,6 +73,8 @@ namespace BeastCraft.Bonds
             {
                 _team.AddRange(team);
             }
+
+            InitReactionState();
         }
 
         /// <summary>
@@ -108,6 +112,7 @@ namespace BeastCraft.Bonds
             }
 
             HasApplied = true;
+            SyncTeamDefeated();
 
             foreach (ActiveTeamBond bond in _bonds)
             {

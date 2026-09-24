@@ -106,10 +106,15 @@ namespace BeastCraft.Tooling.BalanceSim
     /// </para>
     /// <para>
     /// <strong>Bond-aware.</strong> Every team meeting the Vanguard minimum scores its members'
-    /// summed heuristic scores plus <see cref="BondWeight"/> per tier of each active tiered bond
-    /// and <see cref="ScalingBondWeight"/> per stack of each active scaling bond (none for an
-    /// <c>Others</c> bond on a team made only of its members, which has no recipient); the best
-    /// team is fielded (ties to the lower team index).
+    /// summed heuristic scores plus, per tier of each active tiered bond, that bond's weight
+    /// (<see cref="TeamSuggester.BondWeights"/>, else <see cref="BondWeight"/>; a bond that reacts to afflicted
+    /// allies weighs nothing against an encounter that cannot stun or burn, see
+    /// <see cref="CanAfflict"/>), and <see cref="ScalingBondWeight"/> per stack of each active
+    /// scaling bond (none for an <c>Others</c> bond on a team made only of its members, which has
+    /// no recipient); the best team is fielded (ties to the lower team index). The scores, the bond
+    /// weights and the choice rule are the game's own <see cref="TeamSuggester"/> (Runtime), so the
+    /// team the game suggests is the team the difficulty is calibrated on; <see cref="SuggesterParity"/>
+    /// checks that every run.
     /// </para>
     /// <para>
     /// <strong>Oracle.</strong> Per composition, the team with the best recorded clear rate against
@@ -128,17 +133,17 @@ namespace BeastCraft.Tooling.BalanceSim
     {
         public const int DefaultVanguardMin = 1;
 
-        /// <summary>Weight of the beast's attack multiplier into each enemy.</summary>
-        public const double OffenceWeight = 1.0;
+        /// <summary>Weight of the beast's attack multiplier into each enemy (<see cref="TeamSuggester.OffenceWeight"/>).</summary>
+        public const double OffenceWeight = TeamSuggester.OffenceWeight;
 
-        /// <summary>Weight of each enemy's attack multiplier into the beast.</summary>
-        public const double DefenceWeight = 0.5;
+        /// <summary>Weight of each enemy's attack multiplier into the beast (<see cref="TeamSuggester.DefenceWeight"/>).</summary>
+        public const double DefenceWeight = TeamSuggester.DefenceWeight;
 
-        /// <summary>Bond-aware score per tier of each active bond (per-enemy score units: a 2x matchup scores 1.0 more than a 1x one).</summary>
-        public const double BondWeight = 0.5;
+        /// <summary>Bond-aware score per tier of an active bond not in <see cref="TeamSuggester.BondWeights"/> (<see cref="TeamSuggester.BondWeight"/>).</summary>
+        public const double BondWeight = TeamSuggester.BondWeight;
 
-        /// <summary>Bond-aware score per stack of each active scaling (<c>PerCount</c>) bond.</summary>
-        public const double ScalingBondWeight = 0.125;
+        /// <summary>Bond-aware score per stack of each active scaling (<c>PerCount</c>) bond (<see cref="TeamSuggester.ScalingBondWeight"/>).</summary>
+        public const double ScalingBondWeight = TeamSuggester.ScalingBondWeight;
 
         public const int StrategyCount = 4;
         public const int RandomIndex = 0;
@@ -172,30 +177,10 @@ namespace BeastCraft.Tooling.BalanceSim
             return EncounterPreview.Build(sources, encounter.Arena, detail);
         }
 
-        /// <summary>[beast] the heuristic's per-enemy score against <paramref name="preview"/> (see the class notes).</summary>
+        /// <summary>[beast] the heuristic's per-enemy score against <paramref name="preview"/> (<see cref="TeamSuggester.ScoreBeasts"/>).</summary>
         public static double[] Scores(EncounterPreview preview, IReadOnlyList<CreatureSpeciesSO> species)
         {
-            double[] scores = new double[species.Count];
-            if (preview.TotalEnemies == 0)
-            {
-                return scores;
-            }
-
-            for (int b = 0; b < species.Count; b++)
-            {
-                Element[] elements = species[b].Elements ?? new Element[0];
-                Element attack = elements.Length > 0 ? elements[0] : Element.None;
-                double sum = 0.0;
-                foreach (EncounterPreviewGroup group in preview.Groups)
-                {
-                    sum += group.Count * ((OffenceWeight * ElementChart.GetMultiplier(attack, group.Element)) -
-                                          (DefenceWeight * ElementChart.GetMultiplier(group.Element, elements)));
-                }
-
-                scores[b] = sum / preview.TotalEnemies;
-            }
-
-            return scores;
+            return TeamSuggester.ScoreBeasts(preview, species);
         }
 
         /// <summary>The heuristic team: ascending roster indices (see the class notes).</summary>
@@ -245,62 +230,103 @@ namespace BeastCraft.Tooling.BalanceSim
             return team;
         }
 
-        /// <summary>
-        /// What one active bond adds to a team's bond-aware score: <see cref="BondWeight"/> x tier for
-        /// a tiered bond, <see cref="ScalingBondWeight"/> x stacks for a scaling one, and nothing for
-        /// an <c>Others</c> bond whose members are the whole team (no one receives it).
-        /// </summary>
+        /// <summary>What one active bond adds to a team's bond-aware score, against an encounter that can afflict the team (<see cref="TeamSuggester.BondScore"/>).</summary>
         public static double BondScore(ActiveTeamBond bond, int teamSize)
         {
-            if (!bond.Bond.PerCount)
-            {
-                return BondWeight * bond.Tier;
-            }
-
-            if (bond.Bond.Scope == TeamBondScope.Others && bond.Members.Count >= teamSize)
-            {
-                return 0.0;
-            }
-
-            return ScalingBondWeight * bond.Stacks;
+            return TeamSuggester.BondScore(bond, teamSize, true);
         }
 
-        /// <summary>The bond-aware team index (see the class notes).</summary>
+        /// <summary>
+        /// Whether any enemy of <paramref name="encounter"/> carries an enemy-side skill that can stun
+        /// or put damage-over-time on the team (<see cref="TeamSuggester.CanAfflict"/> over its kits, as
+        /// the scouting preview's enemy types show).
+        /// </summary>
+        public static bool CanAfflict(Encounter encounter)
+        {
+            List<SkillSO> skills = new List<SkillSO>();
+            foreach (EnemySlot slot in encounter.Enemies)
+            {
+                skills.AddRange(slot.ElementalKit);
+            }
+
+            return TeamSuggester.CanAfflict(skills);
+        }
+
+        /// <summary>The bond-aware team index (see the class notes), against an encounter that can afflict the team.</summary>
         public static int PickWithBonds(double[] scores, IReadOnlyList<CreatureSpeciesSO> species, List<int[]> teams, List<ActiveTeamBond>[] bonds, int vanguardMin)
         {
-            int best = -1;
-            double bestValue = double.MinValue;
-            int bestFeasible = -1;
-            double bestFeasibleValue = double.MinValue;
+            return PickWithBonds(scores, species, teams, bonds, vanguardMin, true);
+        }
+
+        /// <summary>
+        /// The bond-aware team index among the simulator's <paramref name="teams"/>: the game's own
+        /// choice rule, <see cref="TeamSuggester.SelectBest"/>, over the simulator's team list and its
+        /// precomputed bonds.
+        /// </summary>
+        public static int PickWithBonds(double[] scores, IReadOnlyList<CreatureSpeciesSO> species, List<int[]> teams, List<ActiveTeamBond>[] bonds, int vanguardMin,
+                                        bool encounterAfflicts)
+        {
+            return TeamSuggester.SelectBest(teams, bonds, scores, species, vanguardMin, encounterAfflicts);
+        }
+
+        /// <summary>
+        /// The game's <see cref="TeamSuggester.Suggest"/> for <paramref name="encounter"/>, given the whole
+        /// roster (every species once, in roster order, at one level) as the owned beasts, the run's
+        /// team size, Vanguard minimum and bonds: the team the game would suggest, as a simulator team
+        /// index (-1 if it is none of them).
+        /// </summary>
+        public static int SuggestFor(SimOptions options, IReadOnlyList<CreatureSpeciesSO> species, List<int[]> teams, Encounter encounter)
+        {
+            List<TeamSuggestionCandidate> owned = new List<TeamSuggestionCandidate>();
+            foreach (CreatureSpeciesSO beast in species)
+            {
+                owned.Add(new TeamSuggestionCandidate(beast, options.Levels.Count > 0 ? options.Levels[0] : 1));
+            }
+
+            TeamSuggestion suggestion = TeamSuggester.Suggest(new TeamSuggestionRequest
+            {
+                Preview = Preview(encounter, options.ScoutedDetail),
+                Owned = owned,
+                TeamSize = options.TeamSize,
+                MinVanguards = options.ScoutedVanguardMin,
+                Bonds = options.BondsActive ? options.Library.TeamBonds : null,
+                EncounterCanAfflict = CanAfflict(encounter)
+            });
+
+            string key = string.Join(",", suggestion.Members);
             for (int t = 0; t < teams.Count; t++)
             {
-                double value = 0.0;
-                int vanguards = 0;
-                foreach (int b in teams[t])
+                if (Key(teams[t]) == key)
                 {
-                    value += scores[b];
-                    vanguards += species[b].Stance == CombatStance.Vanguard ? 1 : 0;
-                }
-
-                foreach (ActiveTeamBond bond in bonds[t])
-                {
-                    value += BondScore(bond, teams[t].Length);
-                }
-
-                if (value > bestValue + 1e-12)
-                {
-                    best = t;
-                    bestValue = value;
-                }
-
-                if (vanguards >= vanguardMin && value > bestFeasibleValue + 1e-12)
-                {
-                    bestFeasible = t;
-                    bestFeasibleValue = value;
+                    return t;
                 }
             }
 
-            return bestFeasible >= 0 ? bestFeasible : best;
+            return -1;
+        }
+
+        /// <summary>
+        /// How many of <paramref name="shapes"/>' compositions the game's <see cref="SuggestFor"/> gives
+        /// exactly the simulator's bond-aware pick (<see cref="PickFor"/>) for, out of
+        /// <paramref name="total"/>; both share the scoring and the choice rule, so anything short of
+        /// every composition is a porting bug (the run fails).
+        /// </summary>
+        public static int SuggesterParity(SimOptions options, IReadOnlyList<CreatureSpeciesSO> species, PveSimulator simulator, IEnumerable<EncounterShape> shapes,
+                                          out int total)
+        {
+            int matches = 0;
+            total = 0;
+            foreach (EncounterShape shape in shapes)
+            {
+                foreach (Encounter encounter in shape.Compositions)
+                {
+                    total++;
+                    int pick = PickFor(options, species, simulator.Teams, simulator.TeamBonds, encounter, BondAwareIndex);
+                    matches += SuggestFor(options, species, simulator.Teams, encounter) == pick ? 1 : 0;
+                }
+            }
+
+            return matches;
         }
 
         /// <summary>
@@ -314,7 +340,7 @@ namespace BeastCraft.Tooling.BalanceSim
             double[] scores = Scores(Preview(encounter, options.ScoutedDetail), species);
             if (strategy == BondAwareIndex)
             {
-                return PickWithBonds(scores, species, teams, bonds, options.ScoutedVanguardMin);
+                return PickWithBonds(scores, species, teams, bonds, options.ScoutedVanguardMin, CanAfflict(encounter));
             }
 
             if (strategy != HeuristicIndex)
@@ -726,9 +752,10 @@ namespace BeastCraft.Tooling.BalanceSim
                     problems.Add(where + "picked battles clear " + SimOptions.Format(rate) + "%, but the scouted rate is " + SimOptions.Format(cell.ScoutedClearRate) + "%.");
                 }
 
-                if (missIsProblem && Math.Abs(cell.ScoutedClearRate - options.TargetClearRate) > SimOptions.CalibrationTolerance && !IsStep(cell, options.TargetClearRate))
+                double target = options.TargetFor(cell.Shape);
+                if (missIsProblem && Math.Abs(cell.ScoutedClearRate - target) > SimOptions.CalibrationTolerance && !IsStep(cell, target))
                 {
-                    problems.Add(where + "the scouted rate " + SimOptions.Format(cell.ScoutedClearRate) + "% misses the " + SimOptions.Format(options.TargetClearRate) +
+                    problems.Add(where + "the scouted rate " + SimOptions.Format(cell.ScoutedClearRate) + "% misses the " + SimOptions.Format(target) +
                                  "% target by more than " + SimOptions.Format(SimOptions.CalibrationTolerance) + " points.");
                 }
             }

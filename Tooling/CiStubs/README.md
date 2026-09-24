@@ -16,8 +16,9 @@ below about genuine behaviour matters beyond CI — `AnimationCurve.Evaluate`, `
 `ScriptableObject.CreateInstance` are run for real by the simulator. It is not a CI job; see its own
 README.
 
-`UnityStub` also has a third, local-only consumer: `Tooling/EditModeTests/`, which runs the
-`Tests/EditMode` suite with NUnit outside Unity (also not a CI job):
+`UnityStub` also has a third consumer: `Tooling/EditModeTests/`, which runs the `Tests/EditMode`
+suite with NUnit outside Unity. CI runs it after the CiLint check (a format check, then
+`dotnet test Tooling/EditModeTests --configuration Release`), as a final gate: run it locally first:
 
 ```sh
 dotnet test Tooling/EditModeTests

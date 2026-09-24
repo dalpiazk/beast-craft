@@ -46,10 +46,11 @@ namespace BeastCraft.Tooling.BalanceSim
             int teams = simulator.Teams.Count;
             report.AppendLine("### PvE team bonds");
             report.AppendLine();
-            report.AppendLine("Team bonds (`TeamBonds` in the skill library) apply at battle start to every player team that meets their condition");
-            report.AppendLine("(`--bonds on`, the default; never to enemies). Each recipient applies the reached tier's effects to itself, so a");
-            report.AppendLine("shield scales with its own Defense. **Members** = the beasts that meet the condition; **Team** = every beast; **Others** =");
-            report.AppendLine("every beast that does not meet it.");
+            report.AppendLine("Team bonds (`TeamBonds` in the skill library) belong to every player team that meets their condition (`--bonds on`,");
+            report.AppendLine("the default; never to enemies). A tier's battle-start effects are applied by each recipient to itself, so a shield scales");
+            report.AppendLine("with its own Defense (**Members** = the beasts that meet the condition; **Team** = every beast; **Others** = every beast");
+            report.AppendLine("that does not meet it); its **reaction** is a behaviour one of its members performs in battle whenever the trigger happens");
+            report.AppendLine("(`BondReaction`: trigger, who it lands on, chance, range, cooldown in the member's own turns, caps).");
             report.AppendLine();
 
             report.AppendLine("#### Bonds and how often they are active");
@@ -78,7 +79,9 @@ namespace BeastCraft.Tooling.BalanceSim
                     for (int t = 0; t < bond.Tiers.Count; t++)
                     {
                         active += perTier[t];
-                        tierText.Add(bond.Tiers[t].MinCount + "+: " + Report.DescribeEffects(bond.Tiers[t].Effects));
+                        string effects = Report.DescribeEffects(bond.Tiers[t].Effects);
+                        string reaction = Report.DescribeReaction(bond.Tiers[t].Reaction);
+                        tierText.Add(bond.Tiers[t].MinCount + "+: " + effects + (effects.Length > 0 && reaction.Length > 0 ? "; " : string.Empty) + reaction);
                         tierCounts.Add("t" + (t + 1) + " " + perTier[t]);
                     }
                 }
@@ -88,9 +91,9 @@ namespace BeastCraft.Tooling.BalanceSim
             }
 
             report.AppendLine();
-            report.AppendLine("Tier effects are applied as authored (bonds do not level); a later tier replaces an earlier one. A scaling bond has one");
-            report.AppendLine("tier applied at magnitude x stacks (stacks = its count, capped; xk = teams at k stacks). **Others** = every beast that is not");
-            report.AppendLine("a member. Every beast belongs to its stance's bonds and to one element bond:");
+            report.AppendLine("Tier effects and reactions are applied as authored (bonds do not level); a later tier replaces an earlier one. A scaling");
+            report.AppendLine("bond has one tier applied at magnitude x stacks (stacks = its count, capped; xk = teams at k stacks). Every beast belongs");
+            report.AppendLine("to its stance's bond and to one element bond:");
             report.AppendLine();
             foreach (CreatureSpeciesSO beast in species)
             {
@@ -155,6 +158,8 @@ namespace BeastCraft.Tooling.BalanceSim
                 AppendScaling(report, options, simulator, bonds, new[] { TeamData.Build(options, shapes, cells, mode).Overall.Rate },
                               new List<PveSimulator> { simulator }, species, "#### Scaling bonds by stacks (`" + SimOptions.ModeName(mode) + "`, levels pooled)");
             }
+
+            AppendReactions(report, options, shapes, simulator, cells, bonds);
 
             TeamData primary = TeamData.Build(options, shapes, cells, TeamReport.PrimaryMode(options));
             report.AppendLine("#### Clear rate by number of active bonds (`" + SimOptions.ModeName(TeamReport.PrimaryMode(options)) + "`, levels pooled)");
@@ -383,6 +388,93 @@ namespace BeastCraft.Tooling.BalanceSim
             report.AppendLine();
         }
 
+        /// <summary>
+        /// Per reacting bond: its reactions fired per battle of a team it is active for, per kit mode
+        /// and shape (levels pooled), over every battle at the calibrated multiplier.
+        /// </summary>
+        private static void AppendReactions(StringBuilder report, SimOptions options, List<EncounterShape> shapes, PveSimulator simulator, List<PveCell> cells,
+                                            IReadOnlyList<TeamBondSO> bonds)
+        {
+            List<int> reacting = new List<int>();
+            for (int b = 0; b < bonds.Count; b++)
+            {
+                if (bonds[b].Tiers.Exists(tier => tier != null && tier.HasReaction))
+                {
+                    reacting.Add(b);
+                }
+            }
+
+            if (reacting.Count == 0)
+            {
+                return;
+            }
+
+            report.AppendLine("#### Bond reactions per battle (levels pooled)");
+            report.AppendLine();
+            report.AppendLine("Reactions fired per battle of a team the bond is active for, every battle at the calibrated multiplier.");
+            report.AppendLine();
+            StringBuilder header = new StringBuilder("| Kit mode | Bond |");
+            StringBuilder rule = new StringBuilder("| --- | --- |");
+            foreach (EncounterShape shape in shapes)
+            {
+                header.Append(" `" + shape.Id + "` |");
+                rule.Append(" ---: |");
+            }
+
+            header.Append(" Overall |");
+            rule.Append(" ---: |");
+            report.AppendLine(header.ToString());
+            report.AppendLine(rule.ToString());
+            foreach (KitMode mode in options.Modes)
+            {
+                foreach (int b in reacting)
+                {
+                    bool[] active = ActiveMask(simulator, bonds[b]);
+                    StringBuilder line = new StringBuilder("| `" + SimOptions.ModeName(mode) + "` | `" + bonds[b].BondId + "` |");
+                    long allReactions = 0;
+                    long allBattles = 0;
+                    foreach (EncounterShape shape in shapes)
+                    {
+                        long reactions = 0;
+                        long battles = 0;
+                        foreach (PveCell cell in cells)
+                        {
+                            if (cell.Mode != mode || cell.Shape != shape)
+                            {
+                                continue;
+                            }
+
+                            PveBattle[] cellBattles = cell.BalanceBattles;
+                            for (int i = 0; i < cellBattles.Length; i++)
+                            {
+                                if (!active[cell.TeamOf(i)])
+                                {
+                                    continue;
+                                }
+
+                                battles++;
+                                reactions += cellBattles[i].BondReactions == null ? 0 : cellBattles[i].BondReactions[b];
+                            }
+                        }
+
+                        allReactions += reactions;
+                        allBattles += battles;
+                        line.Append(" " + PerBattle(reactions, battles) + " |");
+                    }
+
+                    line.Append(" " + PerBattle(allReactions, allBattles) + " |");
+                    report.AppendLine(line.ToString());
+                }
+            }
+
+            report.AppendLine();
+        }
+
+        private static string PerBattle(long count, long battles)
+        {
+            return battles == 0 ? "-" : ((double)count / battles).ToString("0.00", CultureInfo.InvariantCulture);
+        }
+
         private static string SlopeText(double[] values)
         {
             double mean = 0.0;
@@ -461,6 +553,8 @@ namespace BeastCraft.Tooling.BalanceSim
                     return bond.Stance + " beasts";
                 case TeamBondCondition.Elements:
                     return string.Join(" + ", bond.Elements) + " (distinct elements covered)";
+                case TeamBondCondition.DistinctStances:
+                    return "distinct stances fielded";
                 default:
                     List<string> names = new List<string>();
                     foreach (string id in bond.SpeciesIds)

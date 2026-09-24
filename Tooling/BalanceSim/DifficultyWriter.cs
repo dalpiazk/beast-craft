@@ -20,12 +20,19 @@ namespace BeastCraft.Tooling.BalanceSim
         {
             StringBuilder json = new StringBuilder();
             json.Append("{\n");
-            json.Append("  \"_readme\": ").Append(Quote(Readme(options))).Append(",\n");
+            json.Append("  \"_readme\": ").Append(Quote(Readme(options, encounters))).Append(",\n");
             json.Append("  \"SchemaVersion\": ").Append(EncounterDifficultyData.CurrentSchemaVersion).Append(",\n");
             json.Append("  \"Seed\": ").Append(options.Seed.ToString(CultureInfo.InvariantCulture)).Append(",\n");
-            json.Append("  \"TargetClear\": ").Append(Number(options.TargetClearRate)).Append(",\n");
             json.Append("  \"CalibratedOn\": ").Append(Quote(SimOptions.CalibrationName(options.EffectiveCalibrateOn))).Append(",\n");
             json.Append("  \"Compositions\": ").Append(options.Compositions.ToString(CultureInfo.InvariantCulture)).Append(",\n");
+            json.Append("  \"Targets\": [\n");
+            List<string> targets = new List<string>();
+            foreach (EncounterShape shape in encounters.Shapes)
+            {
+                targets.Add("    { \"Shape\": " + Quote(shape.Id) + ", \"TargetClear\": " + Number(options.TargetFor(shape)) + " }");
+            }
+
+            json.Append(string.Join(",\n", targets)).Append("\n  ],\n");
             json.Append("  \"Cells\": [\n");
 
             List<string> rows = new List<string>();
@@ -42,7 +49,8 @@ namespace BeastCraft.Tooling.BalanceSim
                             if (cell.Mode == mode && cell.Level == level && cell.Shape == shape)
                             {
                                 rows.Add("    { \"KitMode\": " + Quote(SimOptions.ModeName(mode)) + ", \"Shape\": " + Quote(shape.Id) + ", \"Level\": " +
-                                         level.ToString(CultureInfo.InvariantCulture) + ", \"Multiplier\": " + Number(cell.Multiplier) + " }");
+                                         level.ToString(CultureInfo.InvariantCulture) + ", \"Multiplier\": " + Number(cell.Multiplier) + ", \"TargetClear\": " +
+                                         Number(options.TargetFor(shape)) + " }");
                             }
                         }
                     }
@@ -53,18 +61,42 @@ namespace BeastCraft.Tooling.BalanceSim
             File.WriteAllText(path, json.ToString(), new UTF8Encoding(false));
         }
 
-        private static string Readme(SimOptions options)
+        /// <summary>
+        /// The documented command that writes the committed (shipping) table: the tuned report's command
+        /// with <c>--gear typical</c> (user decision: the shipping difficulty assumes the gear a player
+        /// normally wears) and no <c>--out</c>. The committed tuned report itself stays gearless
+        /// (<c>-- --panel 16x4 --avatar-value --out docs/balance/tuned-report.md</c>).
+        /// </summary>
+        public const string Command = "dotnet run --project Tooling/BalanceSim -c Release -- --panel 16x4 --avatar-value --gear typical " +
+                                      "--write-difficulty BeastCraft/Assets/_Project/Data/Encounters/encounter-difficulty.json";
+
+        private static string Readme(SimOptions options, EncounterCatalog encounters)
         {
             return "WRITTEN BY Tooling/BalanceSim --write-difficulty; never hand-edit (re-run the simulator after changing the roster, skills, " +
-                   "enemies or shapes). One calibrated difficulty multiplier per (kit mode, encounter shape, level): every enemy's HP, Attack, " +
-                   "Defense, SpecialAttack and SpecialDefense are scaled by it (EnemyScaling) so that the calibration target clears TargetClear percent " +
-                   "of the shape's generated encounters at that level. CalibratedOn '" + SimOptions.CalibrationName(options.EffectiveCalibrateOn) +
-                   "' = " + CalibrationMeaning(options.EffectiveCalibrateOn) + ". The game reads the elemental cells (EncounterDifficultyTable: " +
-                   "linear between calibrated levels, clamped outside them) and multiplies by encounter-library.json's DifficultyScale. " +
-                   "PENDING PRODUCER REVIEW: this is calibrated for " + CalibrationMeaning(options.EffectiveCalibrateOn) + " to clear " +
-                   Number(options.TargetClearRate) + "%; the campaign's intended difficulty (and DifficultyScale) is not decided. " +
-                   "Regenerate with: dotnet run --project Tooling/BalanceSim -c Release -- " +
-                   "--out docs/balance/tuned-report.md --write-difficulty BeastCraft/Assets/_Project/Data/Encounters/encounter-difficulty.json";
+                   "enemies or shapes, including a shape's TargetClear). One calibrated difficulty multiplier per (kit mode, encounter shape, level): " +
+                   "every enemy's HP, Attack, Defense, SpecialAttack and SpecialDefense are scaled by it (EnemyScaling) so that the calibration target " +
+                   "clears its shape's TargetClear percent (Targets; per cell too) of the shape's generated encounters at that level. CalibratedOn '" +
+                   SimOptions.CalibrationName(options.EffectiveCalibrateOn) + "' = " + CalibrationMeaning(options.EffectiveCalibrateOn) + ". Targets: " +
+                   options.TargetSummary(encounters.Shapes).Replace("`", string.Empty) +
+                   (options.UniformTarget ? " (uniform, --target-clear)" : " (encounter-library.json, tiered by the kind of fight: trash cleared most of the time, bosses about half)") +
+                   ". Player gear: " + GearMeaning(options.Gear) +
+                   ". The game reads the elemental cells (EncounterDifficultyTable: linear between calibrated levels, clamped outside them) and " +
+                   "multiplies by encounter-library.json's DifficultyScale, a global producer factor (1.0 = as calibrated). Schema 1 files " +
+                   "(one uniform TargetClear) still load. Regenerate with: " + Command;
+        }
+
+        private static string GearMeaning(GearProfile gear)
+        {
+            switch (gear)
+            {
+                case GearProfile.None:
+                    return "none (--gear none)";
+                case GearProfile.Typical:
+                    return "typical (--gear typical: what a player normally wears at the level, three pieces of its band from gear-library.json; the shipping assumption, a user decision)";
+                default:
+                    string name = gear.ToString().ToLowerInvariant();
+                    return name + " (--gear " + name + ": three pieces of the level's band from gear-library.json)";
+            }
         }
 
         private static string CalibrationMeaning(CalibrationTarget target)

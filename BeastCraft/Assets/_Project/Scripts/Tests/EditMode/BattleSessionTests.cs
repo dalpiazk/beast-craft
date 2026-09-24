@@ -4,7 +4,9 @@ using System.Text;
 using BeastCraft.Avatar;
 using BeastCraft.Battle;
 using BeastCraft.Battle.Grid;
+using BeastCraft.Battle.Scouting;
 using BeastCraft.Bonds;
+using BeastCraft.Campaign;
 using BeastCraft.Creatures;
 using BeastCraft.Creatures.Roster;
 using BeastCraft.Encounters;
@@ -23,7 +25,7 @@ namespace BeastCraft.Tests.EditMode
     /// deterministically per seed; rewards land in the save (practice XP, first-clear drops, avatar
     /// XP) and the save still round-trips; a bad setup is a clear error, never an exception.
     /// </summary>
-    public class BattleSessionTests
+    public partial class BattleSessionTests
     {
         private const string Shape = "squad";
         private const int EncounterLevel = 8;
@@ -184,14 +186,17 @@ namespace BeastCraft.Tests.EditMode
             {
                 OwnedBeast beast = save.Beasts[i];
                 bool knockedOut = FindUnit(result, result.UnitIdFor(beast.BeastId)).IsDefeated;
-                int expected = BeastProgression.BattleXp(BattleOutcome.PlayerVictory, EncounterLevel, knockedOut);
-                Assert.AreEqual(expected, summary.BeastXpGained[beast.BeastId]);
+                int expected = BeastProgression.BattleXp(BattleOutcome.PlayerVictory, EncounterLevel, knockedOut, 10);
+                Assert.AreEqual(expected, summary.BeastXpGained[beast.BeastId], "level 10 vs encounter 8: after the level-gap falloff");
                 Assert.AreEqual(beastXpBefore[i] + expected, BeastProgression.TotalXpToReach(beast.Progress.Level) + beast.Progress.Xp);
             }
 
-            Assert.IsFalse(summary.BeastXpGained.ContainsKey(benched.BeastId), "benched beasts earn nothing");
+            Assert.IsFalse(summary.BeastXpGained.ContainsKey(benched.BeastId), "a benched beast is not paid as fielded");
+            int benchXp = BeastProgression.BenchXp(BattleOutcome.PlayerVictory, EncounterLevel, 10);
+            Assert.Greater(benchXp, 0);
+            Assert.AreEqual(benchXp, summary.BenchXpGained[benched.BeastId], "a benched beast earns its bench share");
             Assert.AreEqual(10, benched.Progress.Level);
-            Assert.AreEqual(0, benched.Progress.Xp);
+            Assert.AreEqual(benchXp, benched.Progress.Xp);
             Assert.AreEqual(avatarXpBefore + summary.AvatarXpGained, AvatarProgression.TotalXpToReach(save.Avatar.Level) + save.Avatar.Xp);
 
             BattleRewardSummary again = BattleSession.ApplyRewards(save, result, _content, Shape, EncounterLevel, _drops, new System.Random(99));
@@ -243,9 +248,57 @@ namespace BeastCraft.Tests.EditMode
             Assert.IsEmpty(summary.Loot.Drops);
             Assert.IsEmpty(save.Materials.ClearedCells);
             Assert.AreEqual(0, summary.AvatarXpGained, "the avatar did not take part");
-            Assert.AreEqual(BeastProgression.ParticipationXp, summary.BeastXpGained[save.Beasts[0].BeastId], "a lost battle pays participation only");
-            Assert.AreEqual(BeastProgression.ParticipationXp, save.Beasts[0].Progress.Xp);
+            int participation = LevelGapXp.Apply(BeastProgression.ParticipationXp, LevelGapXp.Gap(10, EncounterLevel));
+            Assert.AreEqual(participation, summary.BeastXpGained[save.Beasts[0].BeastId], "a lost battle pays participation only (after the falloff)");
+            Assert.AreEqual(participation, save.Beasts[0].Progress.Xp);
             Assert.IsNull(result.Avatar);
+        }
+
+        [Test]
+        public void ApplyRewards_UnderACap_BanksAtTheCap_PaysTheBench_AndReportsTheFalloff()
+        {
+            const int cap = 10;
+            PlayerSave save = StarterSave();
+            OwnedBeast rookie = OwnedBeast.Create("rookie", _roster.Species[0].SpeciesId, 1);
+            save.Beasts.Add(rookie);
+            int nearlyLevelled = BeastProgression.XpToNextLevel(10) - 3;
+            for (int i = 0; i < 4; i++)
+            {
+                save.Beasts[i].Progress.Xp = nearlyLevelled;
+            }
+
+            BattleSetup setup = Setup(save, 42, weakEnemies: true);
+            setup.TeamBeastIds.Remove(rookie.BeastId);
+            BattleSessionResult result = BattleSession.Run(setup);
+            Assert.AreEqual(BattleOutcome.PlayerVictory, result.Outcome, result.Error);
+
+            BattleRewardSummary summary = BattleSession.ApplyRewards(save, result, _content, Shape, EncounterLevel, _drops, cap, new System.Random(99));
+
+            Assert.IsTrue(summary.Applied, summary.Error);
+            Assert.AreEqual(cap, summary.BeastLevelCap);
+            bool bankedAny = false;
+            for (int i = 0; i < 4; i++)
+            {
+                OwnedBeast beast = save.Beasts[i];
+                int pool = nearlyLevelled + summary.BeastXpGained[beast.BeastId];
+                int held = System.Math.Min(pool, BeastProgression.XpToNextLevel(10) - 1);
+                Assert.AreEqual(10, beast.Progress.Level, "held at the cap");
+                Assert.AreEqual(held, beast.Progress.Xp);
+                Assert.AreEqual(pool - held, beast.Progress.BankedXp, "the rest is banked");
+                Assert.AreEqual(pool - held, summary.XpBanked.TryGetValue(beast.BeastId, out int banked) ? banked : 0);
+                Assert.AreEqual(25, summary.FalloffPercent[beast.BeastId], "level 10 vs encounter 8");
+                Assert.AreEqual(pool >= BeastProgression.XpToNextLevel(10) ? 1 : 0, LevelCap.Release(beast.Progress, 20), "a raised cap spends the bank");
+                bankedAny |= pool > held;
+            }
+
+            Assert.IsTrue(bankedAny, "a standing beast earned more than the 2 XP it lacked");
+            Assert.AreEqual(0, summary.BeastLevelsGained);
+            Assert.AreEqual(BeastProgression.BenchXp(BattleOutcome.PlayerVictory, EncounterLevel, 1), summary.BenchXpGained[rookie.BeastId]);
+            Assert.AreEqual(BeastProgression.BattleXp(BattleOutcome.PlayerVictory, EncounterLevel, false) * BeastProgression.BenchSharePermille(EncounterLevel, 1) / 1000,
+                            summary.BenchXpGained[rookie.BeastId], "seven levels behind: the catch-up share of a standing beast's XP");
+            Assert.AreEqual(100, summary.FalloffPercent[rookie.BeastId]);
+            Assert.IsFalse(summary.XpBanked.ContainsKey(rookie.BeastId));
+            Assert.AreEqual(100, summary.AvatarFalloffPercent, "the avatar (level 6) is below the encounter");
         }
 
         [Test]
@@ -513,6 +566,127 @@ namespace BeastCraft.Tests.EditMode
             return result;
         }
 
+        [Test]
+        public void SuggestionFor_TwoLossesAtALocation_OffersNothing()
+        {
+            PlayerSave save = CampaignSave(out MapNode node);
+            LoseAt(save, node, 2);
+
+            Assert.AreEqual(2, CampaignRules.LossesAt(save.Campaign.ActiveRun, node.NodeId));
+            Assert.IsNull(CampaignRules.SuggestionFor(save, node.NodeId, new PlayerSettings(), SuggestionEncounters(), _content, 3));
+        }
+
+        [Test]
+        public void SuggestionFor_ThreeLossesAtALocation_SuggestsTheSuggestersTeamFromTheOwnedBeasts()
+        {
+            PlayerSave save = CampaignSave(out MapNode node);
+            LoseAt(save, node, 3);
+            EncounterLibrary encounters = SuggestionEncounters();
+
+            CampaignTeamSuggestion suggestion = CampaignRules.SuggestionFor(save, node.NodeId, null, encounters, _content, 3);
+
+            Assert.IsNotNull(suggestion, "three losses and suggestions on by default");
+            Assert.AreEqual(node.NodeId, suggestion.NodeId);
+            Assert.AreEqual(3, suggestion.Losses);
+            Assert.AreEqual(3, suggestion.BeastIds.Count);
+            CollectionAssert.AllItemsAreUnique(suggestion.BeastIds);
+            foreach (string beastId in suggestion.BeastIds)
+            {
+                Assert.IsNotNull(save.FindBeast(beastId), beastId);
+            }
+
+            // Exactly TeamSuggester's pick for the node's encounter, over the save's beasts in order.
+            EncounterPlan plan = CampaignRules.PlanFor(node, encounters, _enemies);
+            List<TeamSuggestionCandidate> owned = new List<TeamSuggestionCandidate>();
+            foreach (OwnedBeast beast in save.Beasts)
+            {
+                owned.Add(new TeamSuggestionCandidate(_content.GetSpecies(beast.Progress.SpeciesId), beast.Progress.Level));
+            }
+
+            List<SkillSO> enemySkills = new List<SkillSO>();
+            foreach (EncounterLineupEnemy enemy in plan.Enemies)
+            {
+                enemySkills.AddRange(_enemies.Kit(enemy.EnemyId, enemy.Element));
+            }
+
+            TeamSuggestion direct = TeamSuggester.Suggest(new TeamSuggestionRequest
+            {
+                Preview = plan.Preview(),
+                Owned = owned,
+                TeamSize = 3,
+                Bonds = _content.TeamBonds,
+                EncounterCanAfflict = TeamSuggester.CanAfflict(enemySkills)
+            });
+            CollectionAssert.AreEqual(direct.Members, suggestion.Suggestion.Members);
+            for (int m = 0; m < direct.Members.Count; m++)
+            {
+                Assert.AreEqual(save.Beasts[direct.Members[m]].BeastId, suggestion.BeastIds[m]);
+            }
+        }
+
+        [Test]
+        public void SuggestionFor_SuggestionsTurnedOff_OffersNothing()
+        {
+            PlayerSave save = CampaignSave(out MapNode node);
+            LoseAt(save, node, 5);
+
+            Assert.IsNull(CampaignRules.SuggestionFor(save, node.NodeId, new PlayerSettings { TeamSuggestionsEnabled = false }, SuggestionEncounters(), _content, 3));
+        }
+
+        [Test]
+        public void LossesAt_CountsPerLocation_AndAClearResetsThem()
+        {
+            PlayerSave save = CampaignSave(out MapNode node);
+            MapRun run = save.Campaign.ActiveRun;
+            MapNode other = CampaignRules.Choices(run).Find(n => n.IsBattle && n.NodeId != node.NodeId);
+            Assert.IsNotNull(other, "the first row offers two battle locations");
+
+            LoseAt(save, node, 3);
+            LoseAt(save, other, 1);
+
+            Assert.AreEqual(0, CampaignRules.LossesAt(run, node.NodeId), "a loss elsewhere restarts the count");
+            Assert.AreEqual(1, CampaignRules.LossesAt(run, other.NodeId));
+            Assert.AreEqual(4, run.Attempts, "the run still counts every loss");
+            Assert.IsNull(CampaignRules.SuggestionFor(save, node.NodeId, null, SuggestionEncounters(), _content, 3));
+
+            CampaignRules.ResolveBattle(save, CampaignRegions(), other.NodeId, BattleOutcome.PlayerVictory);
+            Assert.AreEqual(0, CampaignRules.LossesAt(run, other.NodeId));
+            Assert.AreEqual(-1, run.NodeAttemptsNodeId);
+        }
+
+        private static RegionLibrary CampaignRegions()
+        {
+            return RegionLibrary.Build(CampaignMapTests.LoadRegions());
+        }
+
+        private static EncounterLibrary SuggestionEncounters()
+        {
+            return EncounterLibrary.Build(EncounterContentTests.LoadEncounterLibrary(), EncounterDifficultyTable.Build(EncounterPlanTests.LoadDifficulty()));
+        }
+
+        /// <summary>A save owning six beasts (six species kits at level 10) on an r01 expedition, and a battle location on its first row.</summary>
+        private PlayerSave CampaignSave(out MapNode node)
+        {
+            PlayerSave save = StarterSave();
+            for (int i = 4; i < 6; i++)
+            {
+                save.Beasts.Add(OwnedBeast.Create("b" + (i + 1), _library.SpeciesKits[i].SpeciesId, 10));
+            }
+
+            Assert.IsTrue(CampaignRules.StartRun(save, CampaignRegions(), "r01", 11).Success);
+            node = CampaignRules.Choices(save.Campaign.ActiveRun).Find(n => n.IsBattle);
+            Assert.IsNotNull(node);
+            return save;
+        }
+
+        private static void LoseAt(PlayerSave save, MapNode node, int times)
+        {
+            for (int i = 0; i < times; i++)
+            {
+                Assert.AreEqual(CampaignOutcome.Lost, CampaignRules.ResolveBattle(save, CampaignRegions(), node.NodeId, BattleOutcome.EnemyVictory).Outcome);
+            }
+        }
+
         /// <summary>The first four species kits as a level-10 team with their default loadouts, and the avatar's default books at level 6.</summary>
         private PlayerSave StarterSave()
         {
@@ -685,7 +859,7 @@ namespace BeastCraft.Tests.EditMode
             _cloak.Modifiers.Add(new StatModifier { Stat = StatType.HP, FlatBonus = 100 });
 
             _enemies = EnemyCatalog.Build(EncounterContentTests.LoadEnemyLibrary(), curves["medium"]);
-            return new BattleContent(species, skills.Values, passives, bonds, new[] { _blade, _lateShell }, new[] { _cloak }, _enemies);
+            return new BattleContent(species, skills.Values, passives, bonds, new[] { _blade, _lateShell }, new[] { _cloak }, _enemies, _consumables.All);
         }
 
         private SkillSO BuildSkill(SkillData data)

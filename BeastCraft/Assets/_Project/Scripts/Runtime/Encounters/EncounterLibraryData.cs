@@ -34,9 +34,9 @@ namespace BeastCraft.Encounters
 
         /// <summary>
         /// Campaign-wide factor on every calibrated difficulty multiplier
-        /// (<c>EncounterDifficultyTable</c>). 1 fields the calibrated difficulty as is.
-        /// PENDING PRODUCER REVIEW: the calibration targets a scouting, counter-picking player at a
-        /// 50% clear rate; whether the campaign should be that hard is a producer decision.
+        /// (<c>EncounterDifficultyTable</c>). 1 fields the calibrated difficulty as is, i.e. each
+        /// shape at its own <see cref="EncounterShapeData.TargetClear"/> for a scouting,
+        /// counter-picking player; a global producer knob on top of the tiered targets.
         /// </summary>
         public double DifficultyScale = 1.0;
 
@@ -86,6 +86,15 @@ namespace BeastCraft.Encounters
 
         /// <summary>A lineup needs at least this many distinct enemy types (the "mix" rule).</summary>
         public int MinDistinctTypes = 1;
+
+        /// <summary>
+        /// The clear rate, in percent (strictly between 0 and 100), this shape's difficulty is
+        /// calibrated to: the balance simulator aims the team a scouting player's bond-aware pick
+        /// fields at it (<c>--write-difficulty</c>, <see cref="EncounterDifficultyData"/>). Tiered by
+        /// the kind of fight: trash (squad, horde) is meant to be cleared most of the time, a boss
+        /// about half. A change here needs the difficulty table re-written.
+        /// </summary>
+        public double TargetClear;
 
         /// <summary>Alternative recipes; the generator picks one per draw, weighted by <see cref="EncounterVariantData.Weight"/>.</summary>
         public EncounterVariantData[] Variants = new EncounterVariantData[0];

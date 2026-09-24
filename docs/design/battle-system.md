@@ -153,7 +153,7 @@ What that implies for balance and for the systems:
   before that criterion existed they compared maximum HP, which never tracks damage taken. Every
   enemy type has a stance of its own (decision 8).
 
-## Encounters as game content — BUILT; the campaign's difficulty target is PENDING PRODUCER REVIEW
+## Encounters as game content — BUILT; tiered difficulty targets DECIDED (user); the rest PENDING PRODUCER REVIEW
 
 PvE encounters are game content, authored as JSON under `BeastCraft/Assets/_Project/Data/Encounters/`
 and read by the game and the balance simulator alike, so the simulator calibrates exactly what the
@@ -169,13 +169,18 @@ provenance lines.
   `SkillData` shape. A skill's `Element` must be empty: every skill takes the unit's element, so one
   type serves every element. Enemy ids may not be roster species ids.
 - `encounter-library.json` — the generated encounter `Shapes` (`solo`, `elite`, `squad`, `horde`:
-  arena, `ThreatMin`-`ThreatMax`, `MinDistinctTypes`, weighted variants of slots), the element-scheme
+  arena, `ThreatMin`-`ThreatMax`, `MinDistinctTypes`, the calibration's `TargetClear`, weighted
+  variants of slots), the element-scheme
   weights (`SchemeWeights`: one element for the team 30, one per type 30, one per unit 25, none 15),
   authored fixed encounters (`Templates`: shape, arena, groups of enemy x count x elements, optional
-  `DifficultyOverride`; **none authored**) and `DifficultyScale` (1.0). Shape ids must be exactly the
+  `DifficultyOverride`; the ten DRAFT region bosses, `boss_r01_hollow_warden` ... `boss_r10_apex_pair`,
+  see `docs/design/progression-and-saves.md`, "Bosses (DRAFT)") and `DifficultyScale` (1.0). Shape ids must be exactly the
   drop tables' shapes: a cleared encounter pays out from its shape's cell.
 - `encounter-difficulty.json` — **written by the simulator** (`--write-difficulty`), never by hand:
-  the calibrated multiplier per (kit mode, shape, level 1 / 50 / 100).
+  the calibrated multiplier per (kit mode, shape, level 1 / 50 / 100). Schema 2 also carries each
+  shape's target (`Targets`, and `TargetClear` per cell); a schema 1 file (one uniform target) still
+  loads. `EncounterDifficultyTable.Warnings` (logged by the importer) flags a table calibrated to
+  another target than the library's.
 
 **Runtime** (`Runtime/Encounters`, namespace `BeastCraft.Encounters`): `EnemyLibraryValidator` and
 `EncounterLibraryValidator` (the simulator's old fixture rules, plus id collisions, the drop-table
@@ -205,19 +210,51 @@ seed and the map node) and keeps it separate from the battle's seed. Everything 
 
 **PENDING PRODUCER REVIEW — deliberately not decided here:**
 
-1. **The campaign's difficulty target.** The shipped table is calibrated so the team a scouting,
-   counter-picking player fields (the simulator's bond-aware heuristic pick) clears **50%** of each
-   shape's generated encounters at each calibrated level; `DifficultyScale` is **1.0**. A player who
-   does not scout clears about **10-38%** at the same multipliers (the tuned report's "No-scouting
-   clear", `elemental`). Whether the campaign should be that hard, easier early on, or scaled by
-   shape is a producer decision; `DifficultyScale` (and a template's `DifficultyOverride`) is the
-   knob, and re-running the simulator with another `--target-clear` or `--calibrate-on` regenerates
-   the table.
-2. **Which authored encounters exist.** `Templates` is empty. The tests build example templates in
-   memory only.
+1. **The campaign's difficulty target — DECIDED (user): tiered by the kind of fight.** Each shape
+   carries its own `TargetClear`: trash is meant to be cleared most of the time (`squad` and `horde`
+   **80%**), an elite **60%**, a boss about half (`solo` **50%**). The shipped table is calibrated so
+   the team a scouting, counter-picking player fields (the simulator's bond-aware pick), wearing
+   **typical gear** (`--gear typical`, user decision), clears that
+   share of each shape's generated encounters at each calibrated level; `DifficultyScale` stays a
+   global producer factor (**1.0** = as calibrated). A player who does not scout clears far less at
+   the same multipliers (the tuned report's "Difficulty by shape": about 7-10% of `solo` and
+   `elite`, 50-60% of `squad` and `horde`, `elemental`). Being over-levelled must make every fight
+   easier, and the simulator checks it (`--level-gap`, bands relative to the target). Changing a
+   target means re-running the simulator's `--write-difficulty`.
+2. **Which authored encounters exist.** `Templates` holds the ten DRAFT region bosses (placeholders
+   pending producer review); the tests also build example templates in memory.
 3. **How a map node picks a shape and a level.** `EncounterPlan` takes both from its caller.
 4. **Between calibrated levels the multiplier is interpolated linearly** (calibrated at 1, 50 and
    100 only). A tunable default, not a measured curve.
+
+## Region campaign — BUILT; regions, maps and bosses are DRAFT CONTENT PENDING PRODUCER REVIEW
+
+How encounters reach the player (answering "how a map node picks a shape and a level" above): ten
+regions cover levels 1-100 (`r01` 1-10 … `r10` 91-100). **The player explores each region as a map**
+(the open world is TBD) of locations — wilds, beast dens, camps, trading posts, a guarded pass and the
+boss's lair — over **four expeditions**. Behind that map sit seeded, Slay-the-Spire-style node maps,
+**an internal pacing model only** (each node carries its location kind, map position and label key
+for the map UI) (`NodeMapGenerator`: 11 rows, 4 lanes, Battle / Elite / Shop /
+Rest nodes, a Gate on top of stages 1-3 and the region's **Boss** on top of stage 4). A node's level
+rises through the region (about 2.25 levels per stage); Battle nodes draw `squad` / `horde` / `solo`
+by the region's weights, Elites (+1 level) and generated Gates the `elite` shape, the Boss an
+authored template at the region's max level. A **lost battle is retried** at the same node with a
+new battle seed (or the player takes another path); Rest ("Camp") trains one beast; Shop ("Trader")
+opens a shop service that is a **stub** until the gold economy lands.
+
+Beating a boss grants its **seal**, which raises the **beast level cap** (12 at the start, then 22,
+32, … 92, 100): beasts at the cap bank XP (at most three levels' worth) and spend it when the cap
+rises. The avatar has no cap. A **level-gap falloff** cuts the XP of anyone fighting below their
+level (+1 60%, +2 25%, +3 10%, +4 5%, +5 nothing), and **benched beasts** earn a share of the battle's
+XP that grows the further behind they are, so reserves stay about 6 levels behind.
+
+The ten boss templates in `encounter-library.json` (`boss_r01_…` to `boss_r10_…`, shape `elite`)
+supersede "none authored" above; they are **DRAFT placeholders** (names, elements, escorts), each
+`DifficultyOverride` calibrated to about **50%** scouted clear at its level (the user's boss tier;
+squad / horde ~80, elite ~60).
+
+Full rules, save shape and pacing: `docs/design/progression-and-saves.md`, "Region campaign" and
+"Beast and avatar level"; numbers: `docs/balance/campaign-pacing-report.md` (`--mode campaign`).
 
 ## Data-driven foundation already in place
 
@@ -911,6 +948,9 @@ uses any of this yet: authoring the per-beast kits is the next deliverable.
   below reads as its default. A freshly authored effect lands once, always. It never silently lands
   zero times.
 - `SkillTargetingCriterion.HpFraction = 4`.
+- `SkillEffectType.Cleanse = 5` (added with the behaviour bonds): removes every `Stun` and
+  `DamageOverTime` on the target (`StatusEffects.Cleanse`); non-damage, so it passes the chance
+  check like any other; `Magnitude` is not read. See "Team bonds".
 - `SkillSO.InitialCooldown` (default −1, meaning the ordinary cooldown) and
   `SkillSO.MaxUsesPerBattle` (default 0, meaning unlimited).
 - `BattleUnit.StatusResist`: percent, 0–100, default 0, fixed at construction. There is a
@@ -1154,7 +1194,51 @@ lineup into its arena, its total enemy count and a list of `EncounterPreviewGrou
 back. Anything that holds a lineup implements `IEncounterPreviewSource` (element, stance, display
 name) — game encounter data once it exists, the balance simulator's fixtures today — so the
 preview never depends on how enemies are authored. It is pure (no randomness, no battle state), so
-the team-building screen can show it and a future "suggested team" can read it.
+the team-building screen can show it and the suggested team (below) reads it.
+
+**Game rule: the enemy elements are free, before every fight (user decision).** The pre-fight
+screen always shows the `Full` preview — every line's name, element, stance and count — at no cost
+and with no scouting action, before the team is placed; `EncounterPreview.Build`'s default detail,
+`Full`, *is* that preview. Not having scouted is no longer a hidden-information penalty: the
+difficulty table stays calibrated on the scouted counter-pick (the targets are unchanged), and the
+information that pick needs is simply always on screen.
+
+**Suggested team (`TeamSuggester`, `BeastCraft.Battle.Scouting`).** From the preview and the beasts
+the player owns, `TeamSuggester.Suggest(TeamSuggestionRequest)` names a counter team:
+
+- **Inputs.** `Preview` (the encounter's `EncounterPreview`), `Owned` (a `TeamSuggestionCandidate`
+  per owned beast: species and level; the caller maps the save's `OwnedBeast`s through the species
+  catalog), `TeamSize` (default 4), `MinVanguards` (default 1), `Bonds` (the skill library's team
+  bonds) and `EncounterCanAfflict` (`TeamSuggester.CanAfflict` over the enemies' kits; default true).
+- **Scoring.** Each beast scores, per enemy, its kit element's chart multiplier into the enemies minus
+  half theirs into it; `LevelWeight` (0.1, an untuned starting knob) is taken off per level below
+  the owner's highest-levelled candidate. A team scores its members plus, per active bond
+  (`TeamBondResolver`), the bond's weight (`TeamSuggester.BondWeights`, fitted to the simulator's
+  panel excess; 0.5 per tier for an unlisted bond; nothing for a bond that answers only afflicted
+  allies when the encounter cannot stun or burn; 0.125 per stack of a scaling bond).
+- **Choice.** Every combination of the team size over distinct species (a species owned twice counts
+  once, as its highest-levelled copy) in lexicographic order of the owned list; the best team with
+  at least `MinVanguards` Vanguards wins, ties to the earlier combination; with too few Vanguards
+  owned, the best team overall (`TeamSuggestion.MeetsVanguardMin` false). Deterministic, no rng.
+- **One implementation.** It *is* the balance simulator's bond-aware scouted picker, which the
+  difficulty table is calibrated on: the simulator calls `TeamSuggester` for the scores, bond
+  weights and choice rule, and every run checks that `Suggest`, given the whole roster at one level,
+  names exactly the simulator's pick (stderr `TeamSuggester parity`; 100% of compositions, or the run
+  fails).
+
+**When the suggestion is shown (`TeamSuggestionPolicy`, user decision).** The suggested team is
+offered only after the player has lost that battle **3** times (`MinLossesBeforeSuggestion`), and
+never when the player has turned suggestions off in the game settings
+(`PlayerSettings.TeamSuggestionsEnabled`, default on; see `docs/design/progression-and-saves.md`,
+"Player settings"): `TeamSuggestionPolicy.ShouldSuggest(lossesOnThisEncounter, settings)`. The loss
+count is per map location: the map run counts the losses at the location being retried
+(`MapRun.NodeAttempts` at `MapRun.NodeAttemptsNodeId`; a loss elsewhere restarts the count, a clear
+resets it), read by `CampaignRules.LossesAt(run, nodeId)`. The one call site is
+`CampaignRules.SuggestionFor(save, nodeId, settings, encounters, content, teamSize)`: it applies the
+policy and, when it holds, runs `TeamSuggester.Suggest` over every beast the save owns against the
+node's `EncounterPlan` (its `Full` preview, `CanAfflict` over the enemies' kits, the content's team
+bonds), returning the suggested beast ids (`CampaignTeamSuggestion`), or null. The pre-fight UI that
+shows it is not built. The element preview itself is never gated.
 
 - **Grouping.** Enemies with the same element, stance and display name (ordinal) are one line
   with a count; lines keep the order of their first enemy in the lineup.
@@ -1998,101 +2082,134 @@ passive UI exists yet; the avatar's skill book (actives and passives) is saved i
 
 **Why.** The simulator's team-composition analysis (`docs/balance/tuning-log.md`, "Team
 composition analysis") found that lineups matter per encounter but mostly additively: a team was
-roughly the sum of its beasts, with only four real pair effects in the roster. **Team bonds** make
-composition matter on purpose: team effects that switch on at battle start when the player's team
-meets a condition. The mechanism below is the lead's design; the content and magnitudes are
-simulator-tuned first drafts ("Team bonds" in the tuning log).
+roughly the sum of its beasts. **Team bonds** make composition matter on purpose. The first bonds
+were stat buffs applied at battle start; they are now **behaviour bonds**: one of the bond's members
+*does something* in battle when its trigger happens — steps in front of a hit, returns fire,
+cleanses a stunned ally (lead design, "Behaviour bonds and tiered difficulty" in the tuning log;
+the user approved all nine bonds below, including `combined_arms`, and enemy statuses so `twilight`
+has something to cleanse). Mechanism and content are the lead's design; the magnitudes are
+simulator-tuned.
 
 **Data** (explicit enum values, never renumbered; ids never renamed after ship). Authored in the
-`TeamBonds` array of `Data/Skills/skill-library.json` (DTOs `TeamBondData` / `TeamBondTierData`,
-checked by `SkillLibraryValidator`, mapped by `SkillLibraryBuilder.ApplyTeamBond`, imported into
-`Assets/_Project/Data/Bonds/` by the skill library importer, loaded the same way by the simulator):
+`TeamBonds` array of `Data/Skills/skill-library.json` (`SkillLibraryData.CurrentSchemaVersion` 3;
+DTOs `TeamBondData` / `TeamBondTierData` / `BondReactionData`, checked by `SkillLibraryValidator`,
+mapped by `SkillLibraryBuilder.ApplyTeamBond`, imported into `Assets/_Project/Data/Bonds/` by the
+skill library importer, loaded the same way by the simulator):
 
 - `TeamBondSO` (`Runtime/Bonds`, namespace `BeastCraft.Bonds`): `BondId`, `DisplayName`,
   `Description`, `Icon`, `Condition`, the condition's set (`Stance`, `Elements` or `SpeciesIds`),
-  `Scope`, `Tiers` (`TeamBondTier`: `MinCount` and an `Effects` list of ordinary
-  `SkillEffect`s), and for a scaling bond `PerCount` and `MaxCount` (below).
+  `Scope`, `Tiers` (`TeamBondTier`: `MinCount`, a battle-start `Effects` list of ordinary
+  `SkillEffect`s, and a `Reaction`), and for a scaling bond `PerCount` and `MaxCount` (below).
 - `TeamBondCondition`: `Stance = 0` (count = team members of that stance), `Elements = 1` (count =
   distinct elements of the set the team covers, capped at the number of members carrying one, so a
   pair bond needs both halves on two beasts), `Species = 2` (count = distinct listed species
-  fielded). A bond's **members** are the beasts that match (every beast carrying a set element; every
-  beast of a listed species).
-- `TeamBondScope`: `Members = 0` (only the members get the effects), `Team = 1` (every beast on the
-  team does), `Others = 2` (every beast that is **not** a member: the members lend the effect to
-  their teammates; a team made only of members has no recipient, and the bond changes nothing).
-- Tiers rise strictly by `MinCount` (at least 2: a bond is between beasts; an element or species
-  bond's tiers stop at its set's size). The **highest tier reached applies, and tiers replace rather
-  than stack**, so each tier is authored as its full effect list.
-- **Scaling bonds** (`PerCount` true, `SkillLibraryData.CurrentSchemaVersion` 2): exactly one tier,
-  whose effects are **per stack**. The bond is active once the count reaches the tier's `MinCount`
-  (1 or more, up to `MaxCount`), and applies **stacks = min(count, `MaxCount`)**: every effect once,
-  at `Magnitude` x stacks (a +4% buff at three stacks is one +12% buff, not three compounding ones).
-  `MaxCount` is at least 1 and at most what the set can reach; a tiered bond leaves it 0. The
-  validator caps the worst case (magnitude x `MaxCount`): at most 20% of a stat for a percent buff,
-  15 flat `CritChance`, 1 `MoveRange`, a shield of 60% of Defense; a flat buff of any other stat
-  does not scale. `ActiveTeamBond.Stacks` (and `TeamBondActivation.Stacks`) carry the stacks; a
-  tiered bond has one.
-- Bond effects land on the player's own team at battle start, so the validator allows only
-  `BuffStat` (not `HP`: a max-HP buff heals nothing) and a `Shield` status, always landing
-  (`Chance` 100). `DurationTurns` 0 on a stat change means the whole battle, as for an avatar aura.
+  fielded), `DistinctStances = 3` (count = distinct stances fielded, 1-3; every beast is a member).
+  A bond's **members** are the beasts that match.
+- `TeamBondScope` (for the battle-start effects): `Members = 0`, `Team = 1`, `Others = 2` (every
+  beast that is **not** a member).
+- Tiers rise strictly by `MinCount`; the **highest tier reached applies, and tiers replace rather
+  than stack**, so each tier is authored in full (its effects and its reaction). A tier needs
+  battle-start effects, a reaction, or both.
+- **Battle-start effects** land on the player's own team, so the validator allows only `BuffStat`
+  (not `HP`) and a `Shield` status, always landing (`Chance` 100); `DurationTurns` 0 = the whole
+  battle. **Scaling bonds** (`PerCount`: one tier, `Magnitude` x min(count, `MaxCount`) stacks, the
+  worst case capped) are still supported but none is authored, and a scaling bond has no reaction.
+- **`BondReaction`** (`TeamBondTier.Reaction`; inert at `Trigger` `None`, so a zero-filled one does
+  nothing):
+  - `Trigger` (`BondTrigger`): `EnemyTargetsAlly = 1` (an enemy `SingleTarget` skill has resolved
+    to exactly one of the team's beasts, before it lands), `AllyCrit = 2` (a team beast crit on its
+    own turn; the reactor is never the critter), `AllyHitByEnemy = 3` (an enemy `SingleTarget` skill
+    hit a team beast; never the beast hit), `MemberHit = 4` / `MemberCrit = 5` (a member's own hit
+    or crit on an enemy; the reactor is that member), `AllyBelowHpPercent = 6` (a beast is now
+    strictly below `HpThresholdPercent`: one attempt per crossing, re-armed at or above it — the
+    passive rule), `AllyTurnStartAfflicted = 7` (a beast is about to begin its turn stunned or
+    carrying damage-over-time), `AllyDefeated = 8`.
+  - `Action`: `Apply = 0` (cast `Effects` on `Target`) or `Intercept = 1` (`EnemyTargetsAlly` only:
+    the reactor's `Effects` land on itself, then the enemy skill's target list is swapped for it; no
+    range recheck; area skills are never intercepted).
+  - `Target` (`BondReactionTarget`): `Self`, `TriggeringAlly`, `TriggerTarget` (the enemy hit or
+    crit), `Attacker`, `EnemiesNearReactor` (living enemies within `Range`), `Team`.
+  - `TriggerFilter` (`Any` / `Members` / `NonMembers`, on the triggering ally), `ReactorOrder`
+    (`TeamOrder` / `HealthiestFirst`), `Chance`, `Cooldown` (the reactor's own turns),
+    `MaxPerMember`, `MaxPerTriggerUnit`, `MaxPerBattle`, `Range` (reactor to the unit it acts on,
+    nearest tile to nearest tile; 0 = unlimited), `HpThresholdPercent`, `Effects`.
+  - Validator: `Chance` 1-100; a hit or crit trigger has `Cooldown` >= 1 (one per the reactor's
+    turn, whatever the hit count); `Intercept` goes with `EnemyTargetsAlly` and only with it; the
+    target must exist for the trigger; hostile effects land on enemies and friendly ones on the team;
+    damage power at most 60; a stun lasts exactly 1 turn and lands at most 50% of the time (reaction
+    chance x effect chance); no knockback.
+- `SkillEffectType.Cleanse = 5`: removes every `Stun` and `DamageOverTime` the target carries
+  (`StatusEffects.Cleanse`); shields and taunts stay. `Magnitude` is not read.
 
-**Runtime.** `TeamBondResolver.Resolve(bonds, members)` is pure (no battle state, no rng): given
-`TeamBondMember`s (species id, stance, elements; `MembersOf(species)` builds them for a team of
-species) it returns the `ActiveTeamBond`s in the bonds' order, each with its tier, count, stacks and
-member indices. `TeamBondLoadout` binds that to the team's battle units for one battle (`For(bonds,
-members, team)`), and `BattleTurnExecutor.BeginBattle(…, passives, bonds, out bondActivations)` /
-`RunBattle(…, passives, bonds, maxTime)` apply it **once, as the battle begins, before the avatar's
-auras and battle-start passives** (so a percent aura sees the bonded stat). For each active bond in
-order, each living recipient in team order **applies the tier's effects to itself**: it is both the
-caster and the only target of a private `Self`-shaped carrier skill at level 1 (bonds do not level),
-through `SkillEffectApplier` — so a shield is a percent of the recipient's own Defense and a percent
-buff scales the recipient's own stat. Carriers are cached per tier and stack count
-(`TeamBondLoadout.CarrierFor`): one stack shares the tier's effect list, more stacks carry scaled
-**clones**, so the authored magnitudes are never modified. `BattleResult.BondActivations` records each applied bond
-(`TeamBondActivation`: bond, tier, recipients). **Enemies never get bonds** (for now: the loadout is
-built for the player's team only). Bond effects with `Chance` 100 draw nothing from the battle rng,
-so a battle without bonds is unchanged, and a caller driving turns itself must call the bond-aware
-`BeginBattle` (unlike passives, a first turn does not apply bonds on its own).
+**Runtime.** `TeamBondResolver.Resolve(bonds, members)` is pure: given `TeamBondMember`s it returns
+the `ActiveTeamBond`s in the bonds' order with tier, count, stacks and member indices.
+`TeamBondLoadout` binds that to the team's battle units for one battle (`For(bonds, members,
+team)`). `BattleTurnExecutor.BeginBattle(…, passives, bonds, out bondActivations)` /
+`RunBattle(…, passives, bonds, maxTime)` apply the battle-start effects **once, before the avatar's
+auras and battle-start passives** (each recipient applies them to itself through a private carrier;
+`BattleResult.BondActivations` records them), and `RunBattle` — so `BattleSession` — then passes the
+bonds into **every turn**: `ExecuteTurn(…, passives, bonds)` and `ExecuteAvatarTurn(…, passives,
+bonds)` (the old overloads remain and mean "no bonds"). The executor's hook bundle
+(`BattleHooks`: the avatar's passives and/or the reacting bonds) runs:
 
-**Content (first draft).** Three tiered stance bonds and three scaling stance bonds (every beast is
-in its stance's two) and five element pairs that cover all ten elements once (every beast is in
-exactly one). Pairs were chosen so no two
-bonds need the same two beasts (Griffin + Thunderbird already share `pack_hunters`, so Air pairs
-with Fire and Lightning with Water):
+- as a team beast's turn opens, after its modifiers tick and **before its statuses tick**: its
+  reaction cooldowns count down, then `AllyTurnStartAfflicted` (a stun cleansed here lets the beast
+  act this turn; a cleansed burn deals no damage);
+- **between resolving a skill's targets and applying it**: the `Intercept` check;
+- after every application, **after the passive hook**: per damage hit in hit order the hit and crit
+  triggers (or `AllyHitByEnemy` once per team beast an enemy single-target skill hit), then
+  `AllyDefeated` for every newly fallen beast (team order), then the HP thresholds (team order); the
+  last two also after damage-over-time opens a turn and after each avatar activation.
 
-| Bond | Condition | Scope | Tiers (MinCount+: effects) |
-| --- | --- | --- | --- |
-| `pack_hunters` Pack Hunters | Skirmisher beasts | Members | 2+: +12 CritChance; 3+: +16 CritChance, +1 MoveRange |
-| `shield_wall` Shield Wall | Vanguard beasts | Members | 2+: Shield 30% of own Defense, 3 turns; 3+: Shield 45% of own Defense, 3 turns |
-| `crossfire` Crossfire | Ranged beasts | Members | 2+: +8% Attack, +8% SpecialAttack; 3+: +12% Attack, +12% SpecialAttack |
-| `wildfire` Wildfire | Fire + Air | Members | 2+: +15% Speed, +8% Attack, +8% SpecialAttack |
-| `storm_front` Storm Front | Lightning + Water | Members | 2+: +10% Attack, +10% SpecialAttack |
-| `bedrock` Bedrock | Earth + Metal | Members | 2+: +6% Defense, +6% SpecialDefense |
-| `winter_grove` Winter Grove | Ice + Nature | Members | 2+: Shield 90% of own Defense, 3 turns |
-| `twilight` Twilight | Light + Dark | Team | 2+: +5% Defense, +5% SpecialDefense |
-| `bulwark` Bulwark | Vanguard beasts | Others | scaling, 1+, max 3: +4% Defense, +4% SpecialDefense per stack |
-| `overwatch` Overwatch | Ranged beasts | Team | scaling, 1+, max 3: +3 CritChance per stack |
-| `flanking` Flanking | Skirmisher beasts | Team | scaling, 1+, max 2: +4% Speed per stack |
+Within one event the bonds are tried in library order; **one reaction per bond per event**: the
+first member (in `ReactorOrder`) that is alive, not stunned, has someone in range to act on, is off
+cooldown and under its caps is chosen, and only then is `Chance` rolled — **at most one draw**, none
+at 100. Effects are cast by the reactor through `SkillEffectApplier` with a carrier `SkillSO` cached
+per (reaction, element, category): the reactor's first element and its stronger attacking category
+(physical on a tie). **No chaining**: a reaction's hits, crits and defeats trigger nothing — no
+bond, and no avatar passive (`PassiveLoadout.SyncDefeatedSilently` notes its kills); an intercepted
+hit is still the enemy's own activation. The defeated are lifted off the grid after each reaction.
+Every firing is recorded on `BattleTurnResult.BondReactions` (`BondReactionRecord`: bond, trigger,
+reactor, triggering unit, activation, and for an intercept the beast it was aimed at). A loadout
+with no reacting tier (or not yet applied) creates no hook, so such a battle plays every turn and
+every random draw exactly as the bond-free one. **Enemies never get bonds** (for now).
 
-With the ten-beast roster (5 Vanguard, 3 Ranged, 2 Skirmisher) the Skirmisher bond's second tier
-cannot be reached yet; it is authored for a larger roster. The scaling bonds make every lineup's
-stance mix count: every four-beast team has at least one of them (a team of four Vanguards resolves
-`bulwark` but has no one to give it to). Tuning: `docs/balance/tuning-log.md`, "Scaling bonds".
+**Enemy statuses.** So that `twilight` has something to cleanse, three enemy skills now apply
+statuses (`enemy-library.json`): the giant's Quake stuns (20%, 1 turn, radius 1), the caster's Bolt
+burns (damage-over-time 15, 30%, 2 turns, 2 stacks), the stingling's Sting poisons (10, 25%, 2 turns).
 
-**Simulator.** `--bonds on|off` (default on, library kit only). The report's "PvE team bonds"
-section lists each bond's frequency (teams active per tier, or per stack count), the beasts'
-memberships, and each bond's marginal per shape: **Δ** (teams with the bond minus teams without)
-and **excess** over the additive prediction from the members' marginals (the part of the bond the
-lineup earns); a scaling bond also gets its clear rate and excess by count and its per-stack slope.
-The bond-aware scouted picker weighs a scaling bond at 0.125 per stack
-(`ScoutedPicker.ScalingBondWeight`). The
-simulator's loop calls the bond-aware `BeginBattle`, so `--self-check` still compares it against
-`RunBattle`. Results and tuning: `docs/balance/tuning-log.md`, "Team bonds".
+**Content** (every beast is in exactly one stance bond and one element bond, plus `combined_arms`):
 
-**Open questions.** Whether enemies (bosses, packs) should get bonds of their own. Whether a bond
-should be visible and previewed on the team-building screen (the resolver is pure so it can be).
-Species bonds (named pairs) are supported but none is authored yet. Whether dual-element beasts
-should count once per element. Whether bonds should level or be unlocked through progression.
+| Bond | Condition | Reaction (tuned) |
+| --- | --- | --- |
+| `guardian` Guardian | Vanguard 2+ / 3+ | an enemy single-target attack aimed at a **non-Vanguard** within 2 hexes: the healthiest Vanguard intercepts it, 60% / 80%, cd 1, behind a Shield of 40% of its Defense (1 turn) |
+| `pack_hunters` Pack Hunters | Skirmisher 2 | +3 CritChance at battle start; when another ally crits, a Skirmisher within 4 hexes strikes the same target (power 25), cd 1 |
+| `crossfire` Crossfire | Ranged 2+ / 3+ | an enemy single-target hit on a **Ranged** member: another Ranged member within 3 hexes of the attacker returns fire (power 50), 45% / 60%, cd 1 |
+| `wildfire` Wildfire | Fire + Air | a member's damage hit: 30% Burn (damage-over-time 20, 2 turns, 2 stacks; resisted), cd 1 |
+| `storm_front` Storm Front | Lightning + Water | a member's crit: 30% Stun 1 turn (resisted), cd 2 |
+| `bedrock` Bedrock | Earth + Metal | an ally below 60% HP: the healthiest member Taunts every enemy within 3 hexes for 3 turns; once per ally per battle |
+| `winter_grove` Winter Grove | Ice + Nature | an ally below 35% HP: a member shields it (50% of the member's Defense, 2 turns) and heals it 15; once per ally per battle |
+| `twilight` Twilight | Light + Dark | an ally starting its turn stunned or burning: a member cleanses it and heals it 15, so it acts; 3 per member per battle |
+| `combined_arms` Combined Arms | 3 distinct stances | an ally defeated: the whole team +10% Attack and SpecialAttack for 3 turns; twice per battle |
+
+The lead's draft values (guardian 40% / 60% within 1 hex, pack_hunters +6 crit and power 45,
+crossfire 40% / 55% at power 40, storm_front 40%, bedrock below 50% within 2 hexes for 2 turns,
+winter_grove Shield 60 + Heal 20, twilight cleanse only twice, combined_arms +15%) were retuned
+against the balance guard; the guardian's range went from 1 to 2 because adjacent intercepts fired
+0.2 times a battle. See the tuning log.
+
+**Simulator.** `--bonds on|off` (default on, library kit only). "PvE team bonds" lists each bond
+(tiers, reactions), how often it is active, the beasts' memberships, each bond's marginal per shape
+(**Δ** and **excess** over the additive prediction) and **reactions per battle**; the composition
+panel (`--panel`) adds each bond's panel excess and reactions. The bond-aware scouted picker weighs
+each bond per tier by its panel excess (`ScoutedPicker.BondWeights`), and a bond that answers only
+afflicted allies weighs nothing against an encounter that cannot stun or burn. The simulator's loop
+passes the bonds into every turn, so `--self-check` still compares it against `RunBattle`.
+
+**Open questions.** Whether enemies (bosses, packs) should get bonds of their own. How reactions are
+shown to the player (the records carry everything a battle log needs). Species bonds are supported
+but none is authored. Whether bonds should level or be unlocked through progression. Whether the
+guardian's reach should stay at 2 hexes (the draft said adjacent).
 
 ## Beast skill kits — SIMULATOR-TUNED CONTENT, NOT CONFIRMED BALANCE
 
@@ -2670,6 +2787,12 @@ enemy types, shapes and element-scheme weights moved into `Data/Encounters/`, it
 Runtime, and the calibrated multipliers into the simulator-written `encounter-difficulty.json`, with
 an importer, `EncounterPlan` and the battle-session support to field them. No number changed (tuning
 log, "Encounters as game content"); the campaign's difficulty target is pending producer review.
+
+**Behaviour bonds and tiered difficulty** then replaced the stat bonds with bonds that act in battle
+(see "Team bonds"), gave three enemy skills statuses, and calibrated each shape to its own target
+(`squad` and `horde` 80%, `elite` 60%, `solo` 50%, a user decision); four beasts were retuned
+within the stat budget to keep the balance guard (tuning log, "Behaviour bonds and tiered
+difficulty").
 
 Every pass so far is deliberately **data structures and algorithms only** — no MonoBehaviours, no
 scene or prefab wiring, and no committed `.asset` instances (the roster's are generated in-Editor). The hex radii backing each arena preset

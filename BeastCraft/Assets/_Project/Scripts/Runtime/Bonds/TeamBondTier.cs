@@ -5,9 +5,10 @@ using BeastCraft.Battle;
 namespace BeastCraft.Bonds
 {
     /// <summary>
-    /// One tier of a <see cref="TeamBondSO"/>: the count its condition must reach, and the effects
-    /// the bond applies at that tier. Tiers replace one another rather than stack: a bond at tier 2
-    /// applies tier 2's <see cref="Effects"/> only, so each tier is authored as its full effect list.
+    /// One tier of a <see cref="TeamBondSO"/>: the count its condition must reach, the effects the
+    /// bond applies at battle start at that tier, and its in-battle <see cref="Reaction"/> (if any).
+    /// Tiers replace one another rather than stack: a bond at tier 2 applies tier 2's
+    /// <see cref="Effects"/> and <see cref="Reaction"/> only, so each tier is authored in full.
     /// </summary>
     [Serializable]
     public class TeamBondTier
@@ -22,5 +23,18 @@ namespace BeastCraft.Bonds
         /// the whole battle.
         /// </summary>
         public List<SkillEffect> Effects = new List<SkillEffect>();
+
+        /// <summary>
+        /// The tier's behaviour: what one of the bond's members does in battle when its trigger
+        /// happens (see <see cref="BondReaction"/>). Inert (<see cref="BondTrigger.None"/>) for a
+        /// battle-start-only tier. A tier needs effects, a reaction, or both.
+        /// </summary>
+        public BondReaction Reaction = new BondReaction();
+
+        /// <summary>Whether this tier reacts in battle (its <see cref="Reaction"/> is set and active).</summary>
+        public bool HasReaction
+        {
+            get { return Reaction != null && Reaction.IsActive; }
+        }
     }
 }

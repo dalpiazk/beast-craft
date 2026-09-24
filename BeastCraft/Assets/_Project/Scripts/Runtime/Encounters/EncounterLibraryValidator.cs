@@ -211,6 +211,12 @@ namespace BeastCraft.Encounters
                 errors.Add(where + ": MinDistinctTypes must be >= 1.");
             }
 
+            if (!(shape.TargetClear > 0.0 && shape.TargetClear < 100.0))
+            {
+                errors.Add(where + ": TargetClear " + shape.TargetClear.ToString(System.Globalization.CultureInfo.InvariantCulture) +
+                           " must be strictly between 0 and 100 (the percent clear rate its difficulty is calibrated to).");
+            }
+
             if (shape.Variants == null || shape.Variants.Length == 0)
             {
                 errors.Add(where + ": no Variants.");

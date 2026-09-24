@@ -21,10 +21,10 @@ namespace BeastCraft.Avatar
     /// cross-equipped by construction rather than by a runtime check.
     /// </para>
     /// <para>
-    /// There is no minimum-level field: the avatar now has a level of its own
-    /// (<c>AvatarProgress</c>), but whether avatar gear should be gated on it is not decided.
-    /// The resulting stats feed the avatar's damaging skills through the damage formula — see
-    /// <see cref="BattleAvatar"/>.
+    /// <see cref="MinimumLevel"/> gates equipping on the avatar's own level (<c>AvatarProgress</c>,
+    /// <c>GearRules.EquipAvatarGear</c>), as beast gear is gated on the beast's; the stats are not
+    /// re-gated in battle (the avatar is never de-levelled). The resulting stats feed the avatar's
+    /// damaging skills through the damage formula — see <see cref="BattleAvatar"/>.
     /// </para>
     /// </summary>
     [CreateAssetMenu(menuName = "Beast Craft/Avatar/Avatar Gear", fileName = "NewAvatarGear")]
@@ -51,5 +51,8 @@ namespace BeastCraft.Avatar
         // Plain int rather than an enum, matching GearSO: rarity tiers are a live-balance concern.
         /// <summary>Rarity tier, 0 = common and upward.</summary>
         public int Rarity;
+
+        /// <summary>Minimum avatar level required to equip this (its gear band's floor). 1 = no gate.</summary>
+        public int MinimumLevel = 1;
     }
 }

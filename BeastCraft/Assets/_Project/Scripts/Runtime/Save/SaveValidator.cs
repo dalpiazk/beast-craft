@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using BeastCraft.Battle;
+using BeastCraft.Campaign;
 using BeastCraft.Progression;
 
 namespace BeastCraft.Save
@@ -12,7 +13,8 @@ namespace BeastCraft.Save
     /// save from a newer content build) is the game's to handle, not a reason to refuse the file.
     /// <para>
     /// With a null catalog only the structural checks run (ids present and unique, ranges, equipped
-    /// entries learned); with one, every species, skill, passive and material id is also looked up.
+    /// entries learned, the expedition in progress consistent); with one, every species, skill,
+    /// passive, material, region and seal id is also looked up.
     /// </para>
     /// </summary>
     public static class SaveValidator
@@ -32,11 +34,25 @@ namespace BeastCraft.Save
         /// </summary>
         public static List<SaveIssue> Validate(PlayerSave save, ISaveContentCatalog catalog, ISaveGearCatalog gearCatalog)
         {
+            return Validate(save, catalog, gearCatalog, null);
+        }
+
+        /// <summary>
+        /// <see cref="Validate(PlayerSave, ISaveContentCatalog, ISaveGearCatalog)"/> plus the economy
+        /// checks (schema 4): gold in range, consumable stacks (known ids with
+        /// <paramref name="economyCatalog"/>, 1 to the max stack, one stack per id), frozen Trader
+        /// visits, cosmetic unlocks (known keys, each once) and appearances (known categories of the
+        /// right owner, known options, each free or unlocked). Without an economy catalog only the
+        /// structural checks run.
+        /// </summary>
+        public static List<SaveIssue> Validate(PlayerSave save, ISaveContentCatalog catalog, ISaveGearCatalog gearCatalog, ISaveEconomyCatalog economyCatalog)
+        {
             List<SaveIssue> issues = ValidateCore(save, catalog);
 
             if (save != null)
             {
                 ValidateGear(save, gearCatalog, issues);
+                SaveEconomyValidator.Validate(save, economyCatalog, issues);
             }
 
             return issues;
@@ -68,6 +84,7 @@ namespace BeastCraft.Save
             }
 
             ValidateMaterials(save.Materials, catalog, issues);
+            ValidateCampaign(save.Campaign, catalog, issues);
             return issues;
         }
 
@@ -115,6 +132,7 @@ namespace BeastCraft.Save
 
                     CheckRange(issues, path + ".Progress.Level", beast.Progress.Level, 1, int.MaxValue);
                     CheckRange(issues, path + ".Progress.Xp", beast.Progress.Xp, 0, int.MaxValue);
+                    CheckRange(issues, path + ".Progress.BankedXp", beast.Progress.BankedXp, 0, int.MaxValue);
                 }
 
                 ValidateBook(beast.Skills, path + ".Skills", skillKnown, SaveIssueKind.UnknownSkill, issues);
@@ -224,6 +242,181 @@ namespace BeastCraft.Save
             }
         }
 
+        private static void ValidateCampaign(CampaignProgress campaign, ISaveContentCatalog catalog, List<SaveIssue> issues)
+        {
+            if (campaign == null)
+            {
+                return;
+            }
+
+            if (campaign.Seals != null)
+            {
+                HashSet<string> seals = new HashSet<string>(StringComparer.Ordinal);
+                for (int i = 0; i < campaign.Seals.Count; i++)
+                {
+                    string sealId = campaign.Seals[i];
+                    string path = "Campaign.Seals[" + i + "]";
+                    if (string.IsNullOrEmpty(sealId) || (catalog != null && !catalog.IsKnownSeal(sealId)))
+                    {
+                        issues.Add(new SaveIssue(SaveIssueKind.UnknownSeal, path, sealId, "unknown seal '" + sealId + "'"));
+                    }
+                    else if (!seals.Add(sealId))
+                    {
+                        issues.Add(new SaveIssue(SaveIssueKind.DuplicateCampaignEntry, path, sealId, "seal '" + sealId + "' is owned more than once"));
+                    }
+                }
+            }
+
+            if (campaign.Regions != null)
+            {
+                HashSet<string> regions = new HashSet<string>(StringComparer.Ordinal);
+                for (int i = 0; i < campaign.Regions.Count; i++)
+                {
+                    RegionProgress region = campaign.Regions[i];
+                    string path = "Campaign.Regions[" + i + "]";
+                    if (region == null)
+                    {
+                        continue;
+                    }
+
+                    if (CheckRegionId(region.RegionId, path + ".RegionId", catalog, issues) && !regions.Add(region.RegionId))
+                    {
+                        issues.Add(new SaveIssue(SaveIssueKind.DuplicateCampaignEntry, path + ".RegionId", region.RegionId, "region '" + region.RegionId + "' is listed more than once"));
+                    }
+
+                    CheckRange(issues, path + ".StagesCleared", region.StagesCleared, 0, int.MaxValue);
+                }
+            }
+
+            if (!string.IsNullOrEmpty(campaign.CurrentRegionId))
+            {
+                CheckRegionId(campaign.CurrentRegionId, "Campaign.CurrentRegionId", catalog, issues);
+            }
+
+            ValidateRun(campaign, catalog, issues);
+        }
+
+        /// <summary>Reports an empty or (with a catalog) unknown region id. True when the id is fine.</summary>
+        private static bool CheckRegionId(string regionId, string path, ISaveContentCatalog catalog, List<SaveIssue> issues)
+        {
+            if (string.IsNullOrEmpty(regionId) || (catalog != null && !catalog.IsKnownRegion(regionId)))
+            {
+                issues.Add(new SaveIssue(SaveIssueKind.UnknownRegion, path, regionId, "unknown region '" + regionId + "'"));
+                return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// The expedition in progress: no nodes without a run; with one, a known and unlocked region,
+        /// nodes whose ids are their indices, known types, levels 1-100, links only to nodes one layer
+        /// up, a current node and a retried node on the map (or -1) and cleared nodes on the map, each once.
+        /// </summary>
+        private static void ValidateRun(CampaignProgress campaign, ISaveContentCatalog catalog, List<SaveIssue> issues)
+        {
+            MapRun run = campaign.ActiveRun;
+            if (run == null)
+            {
+                return;
+            }
+
+            int nodeCount = run.Nodes == null ? 0 : run.Nodes.Count;
+            if (string.IsNullOrEmpty(run.RegionId))
+            {
+                if (nodeCount > 0 || (run.Cleared != null && run.Cleared.Count > 0))
+                {
+                    issues.Add(new SaveIssue(SaveIssueKind.InvalidMapRun, "Campaign.ActiveRun", null, "no expedition (RegionId is empty) but nodes or cleared nodes are stored"));
+                }
+
+                return;
+            }
+
+            if (CheckRegionId(run.RegionId, "Campaign.ActiveRun.RegionId", catalog, issues) && !campaign.IsUnlocked(run.RegionId))
+            {
+                issues.Add(new SaveIssue(SaveIssueKind.InvalidMapRun, "Campaign.ActiveRun.RegionId", run.RegionId, "the expedition's region '" + run.RegionId + "' is not unlocked"));
+            }
+
+            CheckRange(issues, "Campaign.ActiveRun.Stage", run.Stage, 0, int.MaxValue);
+            CheckRange(issues, "Campaign.ActiveRun.Attempts", run.Attempts, 0, int.MaxValue);
+            CheckRange(issues, "Campaign.ActiveRun.NodeAttempts", run.NodeAttempts, 0, int.MaxValue);
+
+            if (nodeCount == 0)
+            {
+                issues.Add(new SaveIssue(SaveIssueKind.InvalidMapRun, "Campaign.ActiveRun.Nodes", run.RegionId, "an expedition with no map nodes"));
+                return;
+            }
+
+            for (int i = 0; i < nodeCount; i++)
+            {
+                MapNode node = run.Nodes[i];
+                string path = "Campaign.ActiveRun.Nodes[" + i + "]";
+                if (node == null)
+                {
+                    continue;
+                }
+
+                if (node.NodeId != i)
+                {
+                    issues.Add(new SaveIssue(SaveIssueKind.InvalidMapRun, path + ".NodeId", null, "node id " + node.NodeId + " is not its index " + i));
+                }
+
+                if (!Enum.IsDefined(typeof(MapNodeType), node.Type))
+                {
+                    issues.Add(new SaveIssue(SaveIssueKind.InvalidMapRun, path + ".Type", null, "unknown node type " + (int)node.Type));
+                }
+
+                CheckRange(issues, path + ".Level", node.Level, 1, BeastProgression.MaxLevel);
+                CheckRange(issues, path + ".Layer", node.Layer, 0, int.MaxValue);
+
+                if (!Enum.IsDefined(typeof(LocationKind), node.Kind))
+                {
+                    issues.Add(new SaveIssue(SaveIssueKind.InvalidMapRun, path + ".Kind", null, "unknown location kind " + (int)node.Kind));
+                }
+
+                if (!(node.X >= 0f && node.X <= 1f) || !(node.Y >= 0f && node.Y <= 1f))
+                {
+                    issues.Add(new SaveIssue(SaveIssueKind.InvalidMapRun, path + ".X", null, "map position (" + node.X + ", " + node.Y + ") is outside 0-1"));
+                }
+
+                if (node.Next == null)
+                {
+                    continue;
+                }
+
+                for (int n = 0; n < node.Next.Length; n++)
+                {
+                    MapNode next = run.Find(node.Next[n]);
+                    if (next == null || next.Layer != node.Layer + 1)
+                    {
+                        issues.Add(new SaveIssue(SaveIssueKind.InvalidMapRun, path + ".Next[" + n + "]", null, "link to " + node.Next[n] + " is not a node on the next layer"));
+                    }
+                }
+            }
+
+            if (run.CurrentNodeId != -1 && run.Find(run.CurrentNodeId) == null)
+            {
+                issues.Add(new SaveIssue(SaveIssueKind.InvalidMapRun, "Campaign.ActiveRun.CurrentNodeId", null, "current node " + run.CurrentNodeId + " is not on the map"));
+            }
+
+            if (run.NodeAttemptsNodeId != -1 && run.Find(run.NodeAttemptsNodeId) == null)
+            {
+                issues.Add(new SaveIssue(SaveIssueKind.InvalidMapRun, "Campaign.ActiveRun.NodeAttemptsNodeId", null, "retried node " + run.NodeAttemptsNodeId + " is not on the map"));
+            }
+
+            if (run.Cleared != null)
+            {
+                HashSet<int> cleared = new HashSet<int>();
+                for (int i = 0; i < run.Cleared.Count; i++)
+                {
+                    if (run.Find(run.Cleared[i]) == null || !cleared.Add(run.Cleared[i]))
+                    {
+                        issues.Add(new SaveIssue(SaveIssueKind.InvalidMapRun, "Campaign.ActiveRun.Cleared[" + i + "]", null, "cleared node " + run.Cleared[i] + " is not on the map or is listed twice"));
+                    }
+                }
+            }
+        }
+
         private static void ValidateGear(PlayerSave save, ISaveGearCatalog gearCatalog, List<SaveIssue> issues)
         {
             GearInventory inventory = save.Gear;
@@ -284,9 +477,18 @@ namespace BeastCraft.Save
                     string path = "AvatarEquippedGear[" + slot + "]";
 
                     if (CheckWorn(instanceId, path, slot, GearRules.AvatarSlotCount, avatarGear, worn, issues, out OwnedGear gear) &&
-                        gearCatalog != null && gearCatalog.TryGetAvatarGear(gear.GearId, out BeastCraft.Avatar.AvatarGearSlot gearSlot) && (int)gearSlot != slot)
+                        gearCatalog != null && gearCatalog.TryGetAvatarGear(gear.GearId, out BeastCraft.Avatar.AvatarGearSlot gearSlot, out int minimumLevel))
                     {
-                        issues.Add(new SaveIssue(SaveIssueKind.GearSlotMismatch, path, instanceId, "'" + gear.GearId + "' belongs in the " + gearSlot + " slot"));
+                        if ((int)gearSlot != slot)
+                        {
+                            issues.Add(new SaveIssue(SaveIssueKind.GearSlotMismatch, path, instanceId, "'" + gear.GearId + "' belongs in the " + gearSlot + " slot"));
+                        }
+
+                        int avatarLevel = save.Avatar == null ? 1 : save.Avatar.Level;
+                        if (avatarLevel < minimumLevel)
+                        {
+                            issues.Add(new SaveIssue(SaveIssueKind.GearLevelTooLow, path, instanceId, "'" + gear.GearId + "' needs avatar level " + minimumLevel + "; the avatar is " + avatarLevel));
+                        }
                     }
                 }
             }
@@ -320,7 +522,7 @@ namespace BeastCraft.Save
                 }
 
                 bool known = !string.IsNullOrEmpty(gear.GearId) &&
-                             (gearCatalog == null || (beast ? gearCatalog.TryGetBeastGear(gear.GearId, out GearSlot _, out int _) : gearCatalog.TryGetAvatarGear(gear.GearId, out BeastCraft.Avatar.AvatarGearSlot _)));
+                             (gearCatalog == null || (beast ? gearCatalog.TryGetBeastGear(gear.GearId, out GearSlot _, out int _) : gearCatalog.TryGetAvatarGear(gear.GearId, out BeastCraft.Avatar.AvatarGearSlot _, out int _)));
                 if (!known)
                 {
                     issues.Add(new SaveIssue(SaveIssueKind.UnknownGear, entryPath + ".GearId", gear.GearId, "unknown gear '" + gear.GearId + "'"));

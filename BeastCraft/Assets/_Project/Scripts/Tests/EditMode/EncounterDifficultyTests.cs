@@ -92,9 +92,97 @@ namespace BeastCraft.Tests.EditMode
             }
         }
 
+        [Test]
+        public void SchemaOne_IsReadAsOneUniformTarget()
+        {
+            EncounterLibraryData library = EncounterLibraryTests.Library();
+            EncounterDifficultyData data = Data(Cell("elemental", "duel", 1, 1.1), Cell("elemental", "boss", 1, 1.3));
+
+            Assert.AreEqual(EncounterDifficultyData.UniformTargetSchemaVersion, data.SchemaVersion);
+            Assert.IsEmpty(EncounterDifficultyTable.Validate(data, library), "a schema 1 file still loads");
+            Assert.AreEqual(50.0, data.TargetFor("duel"));
+            Assert.AreEqual(50.0, data.TargetFor("boss"));
+            Assert.AreEqual(1.3, EncounterDifficultyTable.Build(data).Multiplier("boss", 1), 1e-12);
+
+            List<string> warnings = EncounterDifficultyTable.Warnings(data, library);
+            Assert.AreEqual(1, warnings.Count, string.Join("\n", warnings));
+            Assert.IsTrue(warnings[0].Contains("Shape 'duel' was calibrated to a 50% clear rate but the encounter library now targets 80%"), warnings[0]);
+        }
+
+        [Test]
+        public void SchemaTwo_CarriesPerShapeTargets_AndChecksThem()
+        {
+            EncounterLibraryData library = EncounterLibraryTests.Library();
+            EncounterDifficultyData data = TieredData(Target("duel", 80.0), Target("boss", 50.0));
+            data.Cells = new[] { TieredCell("elemental", "duel", 1, 1.1, 80.0), TieredCell("elemental", "boss", 1, 1.3, 50.0) };
+
+            Assert.IsEmpty(EncounterDifficultyTable.Validate(data, library));
+            Assert.IsEmpty(EncounterDifficultyTable.Warnings(data, library), "the targets match the library");
+            Assert.AreEqual(80.0, data.TargetFor("duel"));
+            Assert.AreEqual(50.0, data.TargetFor("boss"));
+            Assert.AreEqual(1.1, EncounterDifficultyTable.Build(data).Multiplier("duel", 7), 1e-12, "interpolation is unchanged");
+
+            data.Cells[0].TargetClear = 70.0;
+            data.Targets = new[] { Target("duel", 80.0), Target("boss", 50.0), Target("boss", 55.0), Target("ghost", 50.0), Target("duel", 100.0) };
+            List<string> errors = EncounterDifficultyTable.Validate(data, library);
+            AssertHas(errors, "TargetClear 70 is not its shape's target (80)");
+            AssertHas(errors, "a second target for 'boss'");
+            AssertHas(errors, "Shape 'ghost' is not a shape in the encounter library");
+            AssertHas(errors, "TargetClear 100 must be strictly between 0 and 100");
+
+            library.Shapes[1].TargetClear = 60.0;
+            data = TieredData(Target("duel", 80.0), Target("boss", 50.0));
+            data.Cells = new[] { TieredCell("elemental", "duel", 1, 1.1, 80.0), TieredCell("elemental", "boss", 1, 1.3, 50.0) };
+            Assert.IsEmpty(EncounterDifficultyTable.Validate(data, library), "a stale target is legal...");
+            Assert.AreEqual(1, EncounterDifficultyTable.Warnings(data, library).Count, "...but warned about");
+        }
+
+        [Test]
+        public void CommittedTable_IsSchemaTwo_AtTheLibrarysTargets()
+        {
+            EncounterDifficultyData data = EncounterContentTests.Load<EncounterDifficultyData>(EncounterDifficultyData.ProjectRelativePath);
+            EncounterLibraryData library = EncounterContentTests.LoadEncounterLibrary();
+
+            Assert.AreEqual(EncounterDifficultyData.CurrentSchemaVersion, data.SchemaVersion);
+            Assert.IsEmpty(EncounterDifficultyTable.Warnings(data, library), string.Join("\n", EncounterDifficultyTable.Warnings(data, library)));
+            foreach (EncounterShapeData shape in library.Shapes)
+            {
+                Assert.AreEqual(shape.TargetClear, data.TargetFor(shape.ShapeId), shape.ShapeId);
+            }
+        }
+
+        [TestCase(0.0)]
+        [TestCase(100.0)]
+        [TestCase(-5.0)]
+        public void LibraryValidator_NeedsATargetStrictlyBetweenZeroAndOneHundred(double target)
+        {
+            EncounterLibraryData library = EncounterLibraryTests.Library();
+            library.Shapes[0].TargetClear = target;
+
+            List<string> errors = EncounterLibraryValidator.Validate(library, EncounterLibraryTests.Enemies(), null);
+
+            AssertHas(errors, "Shape 'duel': TargetClear");
+        }
+
+        /// <summary>A schema 1 file (one uniform 50% target), the shape the older tests were written against.</summary>
         internal static EncounterDifficultyData Data(params DifficultyCellData[] cells)
         {
-            return new EncounterDifficultyData { SchemaVersion = EncounterDifficultyData.CurrentSchemaVersion, TargetClear = 50.0, CalibratedOn = "bonds", Cells = cells };
+            return new EncounterDifficultyData { SchemaVersion = EncounterDifficultyData.UniformTargetSchemaVersion, TargetClear = 50.0, CalibratedOn = "bonds", Cells = cells };
+        }
+
+        private static EncounterDifficultyData TieredData(params DifficultyTargetData[] targets)
+        {
+            return new EncounterDifficultyData { SchemaVersion = EncounterDifficultyData.CurrentSchemaVersion, CalibratedOn = "bonds", Targets = targets };
+        }
+
+        private static DifficultyTargetData Target(string shape, double target)
+        {
+            return new DifficultyTargetData { Shape = shape, TargetClear = target };
+        }
+
+        private static DifficultyCellData TieredCell(string mode, string shape, int level, double multiplier, double target)
+        {
+            return new DifficultyCellData { KitMode = mode, Shape = shape, Level = level, Multiplier = multiplier, TargetClear = target };
         }
 
         internal static DifficultyCellData Cell(string mode, string shape, int level, double multiplier)

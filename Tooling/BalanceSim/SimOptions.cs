@@ -163,6 +163,19 @@ namespace BeastCraft.Tooling.BalanceSim
         public const int DefaultCalibrateSamples = 16;
 
         /// <summary>
+        /// <c>--gap-mix</c> default, <c>gap:weight</c> pairs (weights are normalized to their sum): the
+        /// gameplay mix of level gaps the balance sections are judged over. Enemies 1-3 levels above
+        /// (the team under-levelled) or below (over-levelled) are as likely as each other and taper off
+        /// with distance; the equal-level fight is the single most common one: 0 = 40%, +/-1 = 15%
+        /// each, +/-2 = 10% each, +/-3 = 5% each. A user decision on its shape ("battles 1-3 levels
+        /// above and below"); the weights are a starting point, not measured play data.
+        /// </summary>
+        public const string DefaultGapMix = "-3:5,-2:10,-1:15,0:40,1:15,2:10,3:5";
+
+        /// <summary>Largest |gap| <c>--gap-mix</c> accepts.</summary>
+        public const int MaxGapMixGap = 10;
+
+        /// <summary>
         /// <c>--level-gap-teams</c> default: how many teams (a seeded subset) the no-scouting rate at
         /// each nonzero level gap is measured over (42 of 210 x 8 compositions = 336 battles).
         /// </summary>
@@ -171,7 +184,11 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <summary>The highest level a beast or enemy can be: a level gap that would put the enemies past it is not run.</summary>
         public const int MaxLevel = 100;
 
-        /// <summary>Level-gap targets (<see cref="LevelGapReport"/>): at gap 0 the scouted rate is the calibration target, within +/- this.</summary>
+        // Level-gap targets (LevelGapReport), relative to the cell's calibration target T (its
+        // shape's TargetClear): under-levelled fights get harder in proportion to T, over-levelled
+        // ones close the distance to a 100% clear.
+
+        /// <summary>Level-gap targets: at gap 0 the scouted rate is the calibration target T, within +/- this.</summary>
         public const double LevelGapEvenTolerance = 5.0;
 
         /// <summary>Level-gap targets: the smallest and largest gap (enemies above the team) of the "a couple of levels under" band.</summary>
@@ -180,17 +197,23 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <summary>See <see cref="LevelGapNearMin"/>.</summary>
         public const int LevelGapNearMax = 3;
 
-        /// <summary>Level-gap targets: the scouted rate a couple of levels under should sit in [low, high]...</summary>
-        public const double LevelGapNearLow = 20.0;
+        /// <summary>Level-gap targets: a couple of levels under, the scouted rate sits in [low x T, high x T]...</summary>
+        public const double LevelGapNearLowFactor = 0.4;
 
-        /// <summary>... see <see cref="LevelGapNearLow"/>.</summary>
-        public const double LevelGapNearHigh = 35.0;
+        /// <summary>... see <see cref="LevelGapNearLowFactor"/>.</summary>
+        public const double LevelGapNearHighFactor = 0.7;
 
         /// <summary>Level-gap targets: from this many levels under...</summary>
         public const int LevelGapFarMin = 5;
 
-        /// <summary>... the scouted rate should be below this.</summary>
-        public const double LevelGapFarHigh = 10.0;
+        /// <summary>... the scouted rate is below this x T.</summary>
+        public const double LevelGapFarFactor = 0.2;
+
+        /// <summary>Level-gap targets: a couple of levels <em>over</em> (gap -<see cref="LevelGapNearMin"/> to -<see cref="LevelGapNearMax"/>), the scouted rate is at least T + this x (100 - T)...</summary>
+        public const double LevelGapOverNearFactor = 0.4;
+
+        /// <summary>... and from -<see cref="LevelGapFarMin"/> on, at least T + this x (100 - T).</summary>
+        public const double LevelGapOverFarFactor = 0.8;
 
         /// <summary>
         /// The balance guard on the multi-seed mean of each beast's normalized overall marginal
@@ -200,6 +223,15 @@ namespace BeastCraft.Tooling.BalanceSim
 
         /// <summary>... and within +/- this in <c>neutral</c>.</summary>
         public const double GuardNeutral = 7.0;
+
+        /// <summary>
+        /// <c>--panel</c>: the composition panel's generator seed. Constant, never <c>--seed</c>, so
+        /// every run (and every seed of a <c>--seeds</c> run) measures the same panel of lineups.
+        /// </summary>
+        public const int PanelSeed = 5150;
+
+        /// <summary><c>--panel-level</c> default: the level the composition panel is fought at (one of <c>--levels</c>).</summary>
+        public const int DefaultPanelLevel = 50;
 
         // ------------------------------------------------------------------------------------
         // Generated encounters (EncounterGenerator). Compositions per shape; the element-scheme
@@ -255,6 +287,59 @@ namespace BeastCraft.Tooling.BalanceSim
         public double MarginalThreshold = DefaultMarginalThreshold;
         public double TargetClearRate = DefaultTargetClearRate;
 
+        /// <summary>
+        /// <c>--target-clear N</c>: every shape calibrates to <see cref="TargetClearRate"/> (the
+        /// legacy uniform target). False (the default) = each shape's own target (see <see cref="TargetFor"/>).
+        /// </summary>
+        public bool UniformTarget;
+
+        /// <summary><c>--target-clear shape=N,...</c>: per-shape targets that override the library's; null = none.</summary>
+        public Dictionary<string, double> TargetOverrides;
+
+        /// <summary>
+        /// The clear rate, in percent, <paramref name="shape"/>'s difficulty is calibrated to:
+        /// <c>--target-clear N</c> for every shape; else a <c>--target-clear shape=N</c> override;
+        /// else the shape's <c>TargetClear</c> in <c>encounter-library.json</c> (the game's tiered
+        /// targets); else (a fixed-set encounter) <see cref="DefaultTargetClearRate"/>.
+        /// </summary>
+        public double TargetFor(EncounterShape shape)
+        {
+            if (UniformTarget)
+            {
+                return TargetClearRate;
+            }
+
+            if (shape != null && TargetOverrides != null && TargetOverrides.TryGetValue(shape.Id, out double target))
+            {
+                return target;
+            }
+
+            return shape != null && shape.Data != null && shape.Data.TargetClear > 0.0 ? shape.Data.TargetClear : DefaultTargetClearRate;
+        }
+
+        /// <summary>The targets in words: "50%" when every shape shares one, else "`solo` 50%, `elite` 60%, ...".</summary>
+        public string TargetSummary(IEnumerable<EncounterShape> shapes)
+        {
+            List<string> parts = new List<string>();
+            HashSet<double> distinct = new HashSet<double>();
+            foreach (EncounterShape shape in shapes)
+            {
+                double target = TargetFor(shape);
+                distinct.Add(target);
+                parts.Add("`" + shape.Id + "` " + Format(target) + "%");
+            }
+
+            if (distinct.Count == 1)
+            {
+                foreach (double target in distinct)
+                {
+                    return Format(target) + "%";
+                }
+            }
+
+            return string.Join(", ", parts);
+        }
+
         /// <summary>Null = the elements as generated (or authored, fixed set); otherwise every enemy gets this element.</summary>
         public Element? EnemyElementOverride;
 
@@ -298,6 +383,28 @@ namespace BeastCraft.Tooling.BalanceSim
         public bool Timings;
 
         /// <summary>
+        /// <c>--gear none|common|rare|epic|typical</c>: the gear the PvE player team wears
+        /// (<see cref="GearKits"/>). None by default: the committed report and the balance guard are
+        /// gearless; <c>typical</c> is the shipping difficulty's assumption (the lead's decision).
+        /// </summary>
+        public GearProfile Gear = GearProfile.None;
+
+        /// <summary><c>--gear-library</c>: gear-library.json, or null to find it by walking up.</summary>
+        public string GearLibraryPath;
+
+        /// <summary><c>--economy-probe</c>: append "PvE economy probe" (gear profiles and consumables in levels-equivalent). Off by default.</summary>
+        public bool EconomyProbe;
+
+        /// <summary>The loaded gear kits when <see cref="Gear"/> or <see cref="EconomyProbe"/> needs them; set by <see cref="Program"/>, not a CLI option.</summary>
+        public GearKits GearKits;
+
+        /// <summary><c>--consumable-library</c>: consumable-library.json, or null to find it by walking up.</summary>
+        public string ConsumableLibraryPath;
+
+        /// <summary>The loaded consumables when <see cref="EconomyProbe"/> needs them; set by <see cref="Program"/>, not a CLI option.</summary>
+        public BeastCraft.Economy.ConsumableLibrary Consumables;
+
+        /// <summary>
         /// <c>--calibrate-sample n</c>: the difficulty search evaluates only a seeded subset of n
         /// teams, then the chosen multiplier runs once with every team. 0 (the default) = every
         /// team at every step. Opt-in because it changes the calibrated multipliers, so the report.
@@ -325,6 +432,16 @@ namespace BeastCraft.Tooling.BalanceSim
         public int LevelGapTeams = DefaultLevelGapTeams;
 
         /// <summary>
+        /// <c>--gap-mix</c>: the level gaps (enemy level minus team level) the balance sections'
+        /// battles are fought at, ascending, with <see cref="GapMixWeights"/>. The default,
+        /// <see cref="DefaultGapMix"/>; <c>--gap-mix 0</c> = gap 0 only (off).
+        /// </summary>
+        public List<int> GapMixGaps = ParseGapMixOrThrow(DefaultGapMix, out List<double> _);
+
+        /// <summary><c>--gap-mix</c>: each gap's share, summing to 1, in <see cref="GapMixGaps"/> order.</summary>
+        public List<double> GapMixWeights = DefaultGapMixWeights();
+
+        /// <summary>
         /// <c>--avatar-value</c>: also replay every cell's picked-team battles with no avatar at the
         /// calibrated multiplier and add the "PvE avatar value" section (the avatar's worth in points
         /// of clear rate, and its direct share of the team's output). Off by default.
@@ -337,6 +454,24 @@ namespace BeastCraft.Tooling.BalanceSim
         /// Off by default; never changes a battle.
         /// </summary>
         public bool TurnDetail;
+
+        /// <summary>
+        /// <c>--panel KxS</c>: the composition panel's K compositions per shape (0, the default, = no
+        /// panel) and S battles per team and composition. See <see cref="PanelReport"/>.
+        /// </summary>
+        public int PanelCompositions;
+
+        /// <summary>See <see cref="PanelCompositions"/>.</summary>
+        public int PanelSamples;
+
+        /// <summary><c>--panel-level</c>: the level the panel is fought at, at that cell's calibrated multiplier.</summary>
+        public int PanelLevel = DefaultPanelLevel;
+
+        /// <summary>Whether this run measures the composition panel (<c>--panel</c>).</summary>
+        public bool PanelActive
+        {
+            get { return PanelCompositions > 0; }
+        }
 
         /// <summary>The PvE avatar preset (<c>--avatar</c>); the library avatar by default, <see cref="AvatarPresets.None"/> fields none.</summary>
         public string AvatarPreset = AvatarPresets.Library;
@@ -383,6 +518,12 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <summary><c>--runs</c>: pacing campaigns per base seed.</summary>
         public int PacingRuns = PacingSimulator.DefaultRuns;
 
+        /// <summary><c>--mode campaign</c>: run the region-campaign pacing model (<see cref="CampaignPacingSimulator"/>) instead of PvE / PvP.</summary>
+        public bool RunCampaign;
+
+        /// <summary><c>--regions</c>: the campaign's regions.json, or null to find it by walking up.</summary>
+        public string RegionsPath;
+
         /// <summary><c>--drop-tables</c>: the drop-table file, or null to find it by walking up.</summary>
         public string DropTablesPath;
 
@@ -391,6 +532,48 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <c>--avatar library</c>). Set by <see cref="Program"/> after parsing, not a CLI option.
         /// </summary>
         public SkillLibraryKits Library;
+
+        /// <summary>Whether the level-gap mix is on: PvE, and some nonzero gap in <c>--gap-mix</c>.</summary>
+        public bool GapMixActive
+        {
+            get { return RunPve && GapMixGaps != null && GapMixGaps.Exists(g => g != 0); }
+        }
+
+        /// <summary>The mix as <c>gap: percent</c> pairs (e.g. <c>-3: 5%, ..., 0: 40%, ..., +3: 5%</c>), for the report.</summary>
+        public string GapMixText
+        {
+            get
+            {
+                List<string> parts = new List<string>();
+                for (int i = 0; i < GapMixGaps.Count; i++)
+                {
+                    parts.Add((GapMixGaps[i] > 0 ? "+" : string.Empty) + GapMixGaps[i].ToString(CultureInfo.InvariantCulture) + ": " + Format(100.0 * GapMixWeights[i]) + "%");
+                }
+
+                return string.Join(", ", parts);
+            }
+        }
+
+        /// <summary>
+        /// The gap whose cumulative weight covers <paramref name="u"/> (0-1), walking the gaps from the
+        /// lowest, or from the highest with <paramref name="descending"/> (<see cref="PveSimulator.RunGapMix"/>).
+        /// </summary>
+        public int GapAt(double u, bool descending)
+        {
+            double cumulative = 0.0;
+            int n = GapMixGaps.Count;
+            for (int k = 0; k < n; k++)
+            {
+                int i = descending ? n - 1 - k : k;
+                cumulative += GapMixWeights[i];
+                if (u < cumulative)
+                {
+                    return GapMixGaps[i];
+                }
+            }
+
+            return GapMixGaps[descending ? 0 : n - 1];
+        }
 
         /// <summary>A copy of these options for one seed of a <c>--seeds</c> run: <see cref="Seed"/> set, <see cref="Seeds"/> cleared.</summary>
         public SimOptions ForSeed(int seed)
@@ -457,11 +640,13 @@ namespace BeastCraft.Tooling.BalanceSim
             "\n" +
             "Usage: dotnet run --project Tooling/BalanceSim -c Release -- [options]\n" +
             "\n" +
-            "  --mode <m>                 pve | pvp | both | pacing (default both). pve = team vs encounter (primary);\n" +
+            "  --mode <m>                 pve | pvp | both | pacing | campaign (default both). pve = team vs encounter (primary);\n" +
             "                             pvp = the 1v1 round-robin (secondary); pacing = the skill-progression / material\n" +
-            "                             economy model (Monte Carlo campaigns; see README.md, \"Pacing\").\n" +
+            "                             economy model (Monte Carlo campaigns; see README.md, \"Pacing\"); campaign = the region\n" +
+            "                             campaign model (node maps, level cap, bench; docs/design/progression-and-saves.md).\n" +
             "  --battles <n>              pacing: battles per campaign (default 500).\n" +
-            "  --runs <n>                 pacing: campaigns per base seed (default 1000; --seeds pools every seed's).\n" +
+            "  --runs <n>                 pacing / campaign: campaigns per base seed (default 1000; --seeds pools every seed's).\n" +
+            "  --regions <path>           campaign: regions.json (default: found by walking up from the working directory).\n" +
             "  --drop-tables <path>       drop-tables.json (default: found by walking up from the working directory). Pacing\n" +
             "                             rolls it; PvE checks the encounter library's shape ids against it.\n" +
             "  --kit <k>                  elemental | neutral | both (default both): the element axis. neutral forces every\n" +
@@ -488,7 +673,10 @@ namespace BeastCraft.Tooling.BalanceSim
             "  --compositions <n>         Generated compositions per shape (default 8).\n" +
             "  --encounters <list>        Comma-separated shape ids (generated) or encounter ids (fixed) (default all).\n" +
             "  --team-size <n>            Beasts per player team, 1-6 (default 4); every combination is fielded.\n" +
-            "  --target-clear <pct>       Clear rate the difficulty calibration aims for (default 50).\n" +
+            "  --target-clear <t>         Clear rate(s) the difficulty calibration aims for: a percentage for every shape (the\n" +
+            "                             legacy uniform target, e.g. 50) or shape=pct pairs (e.g. squad=80,elite=60) overriding\n" +
+            "                             the library. Default: each shape's TargetClear in encounter-library.json (the game's\n" +
+            "                             tiered targets; 50 for a fixed-set encounter).\n" +
             "  --marginal-threshold <x>   Flag a beast whose overall marginal clear rate is outside +/-x points (default 5).\n" +
             "  --enemy-element <e>        authored | None | <Element> (default authored = as generated or authored):\n" +
             "                             override every enemy's element.\n" +
@@ -512,6 +700,16 @@ namespace BeastCraft.Tooling.BalanceSim
             "  --avatar-level <n>         The avatar's level, 1-100 (default: each battle's encounter level). Scales its\n" +
             "                             stats on the medium curve (Speed included: 100 at level 100, so its ATB gauge\n" +
             "                             keeps pace with the beasts') and is its damage-formula level.\n" +
+            "  --gear <g>                 none | common | rare | epic | typical (default none): the gear the PvE player team\n" +
+            "                             wears, three pieces of the encounter level's band from gear-library.json matched to\n" +
+            "                             each beast (GearKits). typical = what a player normally wears at the level, the\n" +
+            "                             shipping difficulty's assumption. The default report and the balance guard are gearless.\n" +
+            "  --gear-library <path>      gear-library.json (default: found by walking up from the working directory).\n" +
+            "  --consumable-library <path> consumable-library.json (default: found by walking up from the working directory).\n" +
+            "  --consumables              The same as --economy-probe (the consumable probe).\n" +
+            "  --economy-probe            PvE: append \"PvE economy probe\": every cell replayed at its calibrated multiplier with\n" +
+            "                             each gear profile and each consumable, as clear-rate points and levels-equivalent\n" +
+            "                             (against the team one level up). Default: off.\n" +
             "  --out <path>               Also write the Markdown report to this file.\n" +
             "  --write-difficulty <path>  PvE, generated set, one seed: also write the calibrated multipliers as the game's\n" +
             "                             encounter-difficulty.json (BeastCraft/Assets/_Project/Data/Encounters/). Report unchanged.\n" +
@@ -531,6 +729,11 @@ namespace BeastCraft.Tooling.BalanceSim
             "                             gaps and ranges, e.g. -5..10 or 0,2,3,5. The team (and the avatar, unless --avatar-level)\n" +
             "                             stays at the row's level; each battle's seed ignores the gap, so gap 0 is the calibration\n" +
             "                             itself. A gap that puts the enemies outside 1-100 is not run. Default: off.\n" +
+            "  --gap-mix <spec>           PvE: the level gaps (enemy level minus team level) the balance sections (marginals,\n" +
+            "                             niches, flags, element matchups, team composition, bonds) are fought at: comma-separated\n" +
+            "                             gap:weight pairs; each every-team battle is dealt one gap in proportion to the weights.\n" +
+            "                             Calibration and scouting stay at gap 0. Default " + DefaultGapMix + ";\n" +
+            "                             0 (or off) = gap 0 only, the report before the mix.\n" +
             "  --level-gap-teams <n>      --level-gap: teams (a seeded subset) the no-scouting rate at a nonzero gap is measured\n" +
             "                             over (default 42; the scouted rate always uses the picked team, --calibrate-samples\n" +
             "                             battles per composition).\n" +
@@ -540,6 +743,13 @@ namespace BeastCraft.Tooling.BalanceSim
             "                             avatar (--avatar library|support) and a scouted-pick calibration. Default: off.\n" +
             "  --turn-detail              PvE: report \"PvE beast turns\": each beast's no-fire turns (held by its stance, out of\n" +
             "                             reach, stunned) and its damage to large enemies (bosses) versus the rest. Default: off.\n" +
+            "  --panel <KxS>              PvE, generated set: also fight the composition panel, K compositions per shape drawn\n" +
+            "                             from a constant seed (never --seed), every team S times each, at the --panel-level\n" +
+            "                             cell's calibrated multiplier, and report \"PvE composition panel\": the team main-effect\n" +
+            "                             SD, the team x composition interaction SD (the counter-pick value), clear rate by stance\n" +
+            "                             mix, and per bond its excess over the additive prediction and reactions per battle.\n" +
+            "                             S >= 2. Default: off (the committed tuned report uses 16x4).\n" +
+            "  --panel-level <n>          The panel's level, one of --levels (default 50).\n" +
             "  --calibrate-sample <n>     --calibrate-on mean only. Opt-in speed-up that CHANGES results: the difficulty search\n" +
             "                             evaluates a seeded subset of n teams (e.g. 50 of 210), then the chosen multiplier runs\n" +
             "                             once with every team; the report's numbers all come from that full run (default: off,\n" +
@@ -553,6 +763,7 @@ namespace BeastCraft.Tooling.BalanceSim
             bool matrixLevelGiven = false;
             bool samplesGiven = false;
             bool seedGiven = false;
+            bool panelLevelGiven = false;
             error = null;
 
             for (int i = 0; i < args.Length; i++)
@@ -594,6 +805,28 @@ namespace BeastCraft.Tooling.BalanceSim
                         break;
                     case "--level-gap":
                         if (!TryNext(args, ref i, arg, out text, out error) || !TryParseGaps(text, out options.LevelGaps, out error))
+                        {
+                            return null;
+                        }
+
+                        break;
+                    case "--panel":
+                        if (!TryNext(args, ref i, arg, out text, out error) || !TryParsePanel(text, options, out error))
+                        {
+                            return null;
+                        }
+
+                        break;
+                    case "--panel-level":
+                        if (!TryNextInt(args, ref i, arg, 1, out options.PanelLevel, out error))
+                        {
+                            return null;
+                        }
+
+                        panelLevelGiven = true;
+                        break;
+                    case "--gap-mix":
+                        if (!TryNext(args, ref i, arg, out text, out error) || !TryParseGapMix(text, out options.GapMixGaps, out options.GapMixWeights, out error))
                         {
                             return null;
                         }
@@ -705,6 +938,13 @@ namespace BeastCraft.Tooling.BalanceSim
                         }
 
                         break;
+                    case "--regions":
+                        if (!TryNext(args, ref i, arg, out options.RegionsPath, out error))
+                        {
+                            return null;
+                        }
+
+                        break;
                     case "--skill-library":
                         if (!TryNext(args, ref i, arg, out options.SkillLibraryPath, out error))
                         {
@@ -749,14 +989,8 @@ namespace BeastCraft.Tooling.BalanceSim
 
                         break;
                     case "--target-clear":
-                        if (!TryNextDouble(args, ref i, arg, out options.TargetClearRate, out error))
+                        if (!TryNext(args, ref i, arg, out text, out error) || !TryParseTargets(text, options, out error))
                         {
-                            return null;
-                        }
-
-                        if (options.TargetClearRate <= 0.0 || options.TargetClearRate >= 100.0)
-                        {
-                            error = "--target-clear expects a percentage strictly between 0 and 100.";
                             return null;
                         }
 
@@ -958,6 +1192,37 @@ namespace BeastCraft.Tooling.BalanceSim
 
                         options.AvatarPreset = text;
                         break;
+                    case "--gear":
+                        if (!TryNext(args, ref i, arg, out text, out error))
+                        {
+                            return null;
+                        }
+
+                        if (!Enum.TryParse(text, true, out options.Gear) || !Enum.IsDefined(typeof(GearProfile), options.Gear) || int.TryParse(text, out int _))
+                        {
+                            error = "--gear expects none, common, rare, epic or typical, got '" + text + "'.";
+                            return null;
+                        }
+
+                        break;
+                    case "--gear-library":
+                        if (!TryNext(args, ref i, arg, out options.GearLibraryPath, out error))
+                        {
+                            return null;
+                        }
+
+                        break;
+                    case "--economy-probe":
+                    case "--consumables":
+                        options.EconomyProbe = true;
+                        break;
+                    case "--consumable-library":
+                        if (!TryNext(args, ref i, arg, out options.ConsumableLibraryPath, out error))
+                        {
+                            return null;
+                        }
+
+                        break;
                     case "--avatar-level":
                         if (!TryNextInt(args, ref i, arg, 1, out options.AvatarLevel, out error))
                         {
@@ -986,6 +1251,24 @@ namespace BeastCraft.Tooling.BalanceSim
             if (options.WriteDifficultyPath != null && (!options.RunPve || options.EncounterSet != EncounterSet.Generated || options.Seeds != null))
             {
                 error = "--write-difficulty needs PvE, the generated encounter set and a single seed (not --seeds).";
+                return null;
+            }
+
+            if (options.PanelActive && (!options.RunPve || options.EncounterSet != EncounterSet.Generated))
+            {
+                error = "--panel needs PvE and the generated encounter set.";
+                return null;
+            }
+
+            if (options.PanelActive && !options.Levels.Contains(options.PanelLevel))
+            {
+                error = "--panel-level " + options.PanelLevel + " is not one of the simulated levels (--levels " + Join(options.Levels) + ").";
+                return null;
+            }
+
+            if (panelLevelGiven && !options.PanelActive)
+            {
+                error = "--panel-level needs --panel.";
                 return null;
             }
 
@@ -1095,6 +1378,66 @@ namespace BeastCraft.Tooling.BalanceSim
         }
 
         /// <summary>
+        /// <c>--target-clear</c>: one percentage for every shape (<see cref="UniformTarget"/>), or
+        /// comma-separated <c>shape=pct</c> overrides; every percentage strictly between 0 and 100.
+        /// Shape ids are checked against the loaded encounters later.
+        /// </summary>
+        private static bool TryParseTargets(string text, SimOptions options, out string error)
+        {
+            error = "--target-clear expects a percentage strictly between 0 and 100, or shape=pct pairs (e.g. squad=80,elite=60), got '" + text + "'.";
+            if (text.IndexOf('=') < 0)
+            {
+                if (!double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out double uniform) || !(uniform > 0.0 && uniform < 100.0))
+                {
+                    return false;
+                }
+
+                options.TargetClearRate = uniform;
+                options.UniformTarget = true;
+                options.TargetOverrides = null;
+                error = null;
+                return true;
+            }
+
+            Dictionary<string, double> overrides = new Dictionary<string, double>(StringComparer.Ordinal);
+            foreach (string raw in text.Split(','))
+            {
+                string[] pair = raw.Split('=');
+                if (pair.Length != 2 || pair[0].Trim().Length == 0 ||
+                    !double.TryParse(pair[1].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out double target) || !(target > 0.0 && target < 100.0) ||
+                    overrides.ContainsKey(pair[0].Trim()))
+                {
+                    return false;
+                }
+
+                overrides.Add(pair[0].Trim(), target);
+            }
+
+            options.TargetOverrides = overrides;
+            options.UniformTarget = false;
+            error = null;
+            return true;
+        }
+
+        /// <summary><c>--panel KxS</c>: two integers, K >= 1 compositions and S >= 2 samples (the interaction needs replication).</summary>
+        private static bool TryParsePanel(string text, SimOptions options, out string error)
+        {
+            error = "--panel expects KxS with K >= 1 compositions and S >= 2 samples, e.g. 16x4, got '" + text + "'.";
+            string[] parts = text.ToLowerInvariant().Split('x');
+            if (parts.Length != 2 ||
+                !int.TryParse(parts[0].Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int compositions) ||
+                !int.TryParse(parts[1].Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int samples) || compositions < 1 || samples < 2)
+            {
+                return false;
+            }
+
+            options.PanelCompositions = compositions;
+            options.PanelSamples = samples;
+            error = null;
+            return true;
+        }
+
+        /// <summary>
         /// <c>--level-gap</c>: comma-separated integers and inclusive ranges <c>a..b</c> (either end
         /// may be negative), each within +/-(<see cref="MaxLevel"/> - 1); duplicates are dropped and
         /// the result is sorted ascending.
@@ -1130,6 +1473,67 @@ namespace BeastCraft.Tooling.BalanceSim
             return true;
         }
 
+        /// <summary>
+        /// <c>--gap-mix</c>: comma-separated <c>gap:weight</c> pairs (a bare gap weighs 1), gaps within
+        /// +/-<see cref="MaxGapMixGap"/> and distinct, weights positive; the result is sorted by gap
+        /// and the weights normalized to sum to 1. <c>0</c> (or <c>off</c>) is gap 0 alone: the mix off.
+        /// </summary>
+        public static bool TryParseGapMix(string text, out List<int> gaps, out List<double> weights, out string error)
+        {
+            gaps = new List<int>();
+            weights = new List<double>();
+            error = "--gap-mix expects comma-separated gap:weight pairs (gaps between -" + MaxGapMixGap + " and " + MaxGapMixGap +
+                    ", distinct; weights above 0), e.g. " + DefaultGapMix + ", or 0 / off; got '" + text + "'.";
+            if (string.Equals(text.Trim(), "off", StringComparison.OrdinalIgnoreCase))
+            {
+                text = "0";
+            }
+
+            SortedDictionary<int, double> parsed = new SortedDictionary<int, double>();
+            double total = 0.0;
+            foreach (string raw in text.Split(','))
+            {
+                string part = raw.Trim();
+                int colon = part.IndexOf(':');
+                string gapText = colon < 0 ? part : part.Substring(0, colon);
+                string weightText = colon < 0 ? "1" : part.Substring(colon + 1);
+                if (!int.TryParse(gapText.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int gap) ||
+                    !double.TryParse(weightText.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out double weight) ||
+                    Math.Abs(gap) > MaxGapMixGap || !(weight > 0.0) || double.IsInfinity(weight) || parsed.ContainsKey(gap))
+                {
+                    return false;
+                }
+
+                parsed[gap] = weight;
+                total += weight;
+            }
+
+            foreach (KeyValuePair<int, double> pair in parsed)
+            {
+                gaps.Add(pair.Key);
+                weights.Add(pair.Value / total);
+            }
+
+            error = null;
+            return true;
+        }
+
+        private static List<int> ParseGapMixOrThrow(string text, out List<double> weights)
+        {
+            if (!TryParseGapMix(text, out List<int> gaps, out weights, out string error))
+            {
+                throw new InvalidOperationException(error);
+            }
+
+            return gaps;
+        }
+
+        private static List<double> DefaultGapMixWeights()
+        {
+            ParseGapMixOrThrow(DefaultGapMix, out List<double> weights);
+            return weights;
+        }
+
         private static bool TryParseSimMode(string text, SimOptions options, out string error)
         {
             error = null;
@@ -1152,8 +1556,13 @@ namespace BeastCraft.Tooling.BalanceSim
                     options.RunPvp = false;
                     options.RunPacing = true;
                     return true;
+                case "campaign":
+                    options.RunPve = false;
+                    options.RunPvp = false;
+                    options.RunCampaign = true;
+                    return true;
                 default:
-                    error = "--mode expects pve, pvp, both or pacing, got '" + text + "'.";
+                    error = "--mode expects pve, pvp, both, pacing or campaign, got '" + text + "'.";
                     return false;
             }
         }

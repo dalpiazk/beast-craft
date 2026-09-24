@@ -1,6 +1,6 @@
 {
-  "_readme": "Source of truth for every authored skill: beast skills, the avatar's active skills and passives, the skill-training materials, and each species' learnable skills and default loadout. Drafted against a power budget and tuned with the roster against the balance simulator (default loadouts; see docs/balance/tuning-log.md), not confirmed balance. Edit here, then in Unity run Beast Craft/Data/Import Skill Library (after Import Beast Roster). Enums are member names (case-sensitive). Missing fields take the DTO defaults in SkillLibraryData.cs; note a missing TargetingCriterion means Distance (nearest), not Random. Damage Magnitude is power, a percent of the attacking stat; Heal is a percent of the caster's SpecialAttack (x HealScale, the avatar's for its skills and passives); a Shield is a percent of the caster's Defense; a DamageOverTime is a per-turn power; a Knockback is whole hexes. DefaultLoadout order is fire priority. TeamBonds are composition-triggered team effects applied at battle start to the player's team (never enemies): a Stance, Elements (distinct elements of the set the team covers) or Species condition, tiers by rising MinCount (the highest reached applies; tiers replace, not stack), and per-tier Effects (BuffStat or a Shield status only, Chance 100) applied by each recipient to itself; Scope Members = the beasts that meet the condition, Team = every beast, Others = every beast that does not meet it. A PerCount (scaling) bond has one tier (MinCount 1 or more) whose magnitudes apply once per counted member, up to MaxCount stacks. See docs/design/battle-system.md, 'Team bonds'. The first 3 AvatarActives are the avatar's default actives. See docs/design/battle-system.md, 'Beast skill kits'.",
-  "SchemaVersion": 2,
+  "_readme": "Source of truth for every authored skill: beast skills, the avatar's active skills and passives, the skill-training materials, and each species' learnable skills and default loadout. Drafted against a power budget and tuned with the roster against the balance simulator (default loadouts; see docs/balance/tuning-log.md), not confirmed balance. Edit here, then in Unity run Beast Craft/Data/Import Skill Library (after Import Beast Roster). Enums are member names (case-sensitive). Missing fields take the DTO defaults in SkillLibraryData.cs; note a missing TargetingCriterion means Distance (nearest), not Random. Damage Magnitude is power, a percent of the attacking stat; Heal is a percent of the caster's SpecialAttack (x HealScale, the avatar's for its skills and passives); a Shield is a percent of the caster's Defense; a DamageOverTime is a per-turn power; a Knockback is whole hexes. DefaultLoadout order is fire priority. TeamBonds are composition-triggered team behaviours for the player's team (never enemies): a Stance, Elements (distinct elements of the set the team covers), Species or DistinctStances condition, tiers by rising MinCount (the highest reached applies; tiers replace, not stack), each with battle-start Effects (BuffStat or a Shield status only, Chance 100, applied by each recipient to itself; Scope Members = the beasts that meet the condition, Team = every beast, Others = every beast that does not meet it) and/or an in-battle Reaction: when its Trigger happens (EnemyTargetsAlly, AllyCrit, AllyHitByEnemy, MemberHit, MemberCrit, AllyBelowHpPercent, AllyTurnStartAfflicted, AllyDefeated), the first member that is alive, unstunned, in Range, off its Cooldown (its own turns) and under its caps (MaxPerMember, MaxPerTriggerUnit, MaxPerBattle) passes a Chance roll and casts the reaction's Effects on its Target (Self, TriggeringAlly, TriggerTarget, Attacker, EnemiesNearReactor, Team), or with Action Intercept takes an enemy's single-target hit in an adjacent ally's place. Reactions never chain. A PerCount (scaling) bond has one tier (MinCount 1 or more) whose magnitudes apply once per counted member, up to MaxCount stacks, and no reaction. See docs/design/battle-system.md, 'Team bonds'. The first 3 AvatarActives are the avatar's default actives. See docs/design/battle-system.md, 'Beast skill kits'.",
+  "SchemaVersion": 3,
   "Materials": [
     { "MaterialId": "essence_shard", "DisplayName": "Essence Shard", "Description": "A sliver of crystallised battle essence. Feeds a skill a little XP; opens its first breakthrough (level 5).", "Tier": 1, "XpValue": 250 },
     { "MaterialId": "essence_crystal", "DisplayName": "Essence Crystal", "Description": "A clear crystal of battle essence. Feeds a skill a good deal of XP; opens its second breakthrough (level 10).", "Tier": 2, "XpValue": 1000 },
@@ -1819,133 +1819,137 @@
   ],
   "TeamBonds": [
     {
-      "BondId": "pack_hunters",
-      "DisplayName": "Pack Hunters",
-      "Description": "Skirmishers who hunt together find the gaps in a line: every Skirmisher on the team gains critical-hit chance.",
-      "Condition": "Stance",
-      "Stance": "Skirmisher",
-      "Scope": "Members",
-      "Tiers": [
-        { "MinCount": 2, "Effects": [ { "EffectType": "BuffStat", "AffectedStat": "CritChance", "Magnitude": 12 } ] },
-        { "MinCount": 3, "Effects": [ { "EffectType": "BuffStat", "AffectedStat": "CritChance", "Magnitude": 16 }, { "EffectType": "BuffStat", "AffectedStat": "MoveRange", "Magnitude": 1 } ] }
-      ]
-    },
-    {
-      "BondId": "shield_wall",
-      "DisplayName": "Shield Wall",
-      "Description": "Vanguards standing shoulder to shoulder brace for the first clash: every Vanguard starts the battle behind a shield worth part of its own Defense.",
+      "BondId": "guardian",
+      "DisplayName": "Guardian",
+      "Description": "Vanguards cover the beasts behind them: when an enemy's single-target attack is aimed at a non-Vanguard ally within two hexes, the healthiest Vanguard may step in, bracing behind a shield, and take the blow instead.",
       "Condition": "Stance",
       "Stance": "Vanguard",
       "Scope": "Members",
       "Tiers": [
-        { "MinCount": 2, "Effects": [ { "EffectType": "ApplyStatus", "Status": "Shield", "Magnitude": 30, "DurationTurns": 3 } ] },
-        { "MinCount": 3, "Effects": [ { "EffectType": "ApplyStatus", "Status": "Shield", "Magnitude": 45, "DurationTurns": 3 } ] }
+        {
+          "MinCount": 2,
+          "Reaction": { "Trigger": "EnemyTargetsAlly", "Action": "Intercept", "Target": "Self", "TriggerFilter": "NonMembers", "Chance": 60, "Cooldown": 1, "Range": 2, "Effects": [ { "EffectType": "ApplyStatus", "Status": "Shield", "Magnitude": 40, "DurationTurns": 1 } ], "ReactorOrder": "HealthiestFirst" }
+        },
+        {
+          "MinCount": 3,
+          "Reaction": { "Trigger": "EnemyTargetsAlly", "Action": "Intercept", "Target": "Self", "TriggerFilter": "NonMembers", "Chance": 80, "Cooldown": 1, "Range": 2, "Effects": [ { "EffectType": "ApplyStatus", "Status": "Shield", "Magnitude": 40, "DurationTurns": 1 } ], "ReactorOrder": "HealthiestFirst" }
+        }
+      ]
+    },
+    {
+      "BondId": "pack_hunters",
+      "DisplayName": "Pack Hunters",
+      "Description": "Skirmishers hunt as a pack: each gains critical-hit chance, and when an ally lands a critical hit, a Skirmisher within reach piles onto the same target.",
+      "Condition": "Stance",
+      "Stance": "Skirmisher",
+      "Scope": "Members",
+      "Tiers": [
+        {
+          "MinCount": 2,
+          "Effects": [ { "EffectType": "BuffStat", "AffectedStat": "CritChance", "Magnitude": 3 } ],
+          "Reaction": { "Trigger": "AllyCrit", "Target": "TriggerTarget", "Cooldown": 1, "Range": 4, "Effects": [ { "EffectType": "Damage", "Magnitude": 25 } ] }
+        }
       ]
     },
     {
       "BondId": "crossfire",
       "DisplayName": "Crossfire",
-      "Description": "Ranged beasts covering each other's angles: every Ranged beast on the team hits harder, physical and special alike.",
+      "Description": "Ranged beasts cover each other's angles: when an enemy's single-target attack hits a Ranged beast, another Ranged beast within range of the attacker may return fire.",
       "Condition": "Stance",
       "Stance": "Ranged",
       "Scope": "Members",
       "Tiers": [
-        { "MinCount": 2, "Effects": [ { "EffectType": "BuffStat", "AffectedStat": "Attack", "Magnitude": 8, "IsPercent": true }, { "EffectType": "BuffStat", "AffectedStat": "SpecialAttack", "Magnitude": 8, "IsPercent": true } ] },
-        { "MinCount": 3, "Effects": [ { "EffectType": "BuffStat", "AffectedStat": "Attack", "Magnitude": 12, "IsPercent": true }, { "EffectType": "BuffStat", "AffectedStat": "SpecialAttack", "Magnitude": 12, "IsPercent": true } ] }
+        {
+          "MinCount": 2,
+          "Reaction": { "Trigger": "AllyHitByEnemy", "Target": "Attacker", "TriggerFilter": "Members", "Chance": 45, "Cooldown": 1, "Range": 3, "Effects": [ { "EffectType": "Damage", "Magnitude": 50 } ] }
+        },
+        {
+          "MinCount": 3,
+          "Reaction": { "Trigger": "AllyHitByEnemy", "Target": "Attacker", "TriggerFilter": "Members", "Chance": 60, "Cooldown": 1, "Range": 3, "Effects": [ { "EffectType": "Damage", "Magnitude": 50 } ] }
+        }
       ]
     },
     {
       "BondId": "wildfire",
       "DisplayName": "Wildfire",
-      "Description": "Wind feeds the flame and the flame lifts the wind: Fire and Air beasts fielded together act faster and hit harder.",
+      "Description": "Wind feeds the flame: when a Fire or Air beast fielded with the other lands a hit, the target may catch fire and burn for two turns.",
       "Condition": "Elements",
       "Elements": [ "Fire", "Air" ],
       "Scope": "Members",
       "Tiers": [
-        { "MinCount": 2, "Effects": [ { "EffectType": "BuffStat", "AffectedStat": "Speed", "Magnitude": 15, "IsPercent": true }, { "EffectType": "BuffStat", "AffectedStat": "Attack", "Magnitude": 8, "IsPercent": true }, { "EffectType": "BuffStat", "AffectedStat": "SpecialAttack", "Magnitude": 8, "IsPercent": true } ] }
+        {
+          "MinCount": 2,
+          "Reaction": { "Trigger": "MemberHit", "Target": "TriggerTarget", "Cooldown": 1, "Effects": [ { "EffectType": "ApplyStatus", "Status": "DamageOverTime", "Magnitude": 20, "DurationTurns": 2, "Chance": 30, "MaxStacks": 2 } ] }
+        }
       ]
     },
     {
       "BondId": "storm_front",
       "DisplayName": "Storm Front",
-      "Description": "Thunder over the deep: Lightning and Water beasts fielded together strike harder, physical and special alike.",
+      "Description": "Thunder over the deep: when a Lightning or Water beast fielded with the other lands a critical hit, the target may be stunned for a turn.",
       "Condition": "Elements",
       "Elements": [ "Lightning", "Water" ],
       "Scope": "Members",
       "Tiers": [
-        { "MinCount": 2, "Effects": [ { "EffectType": "BuffStat", "AffectedStat": "Attack", "Magnitude": 10, "IsPercent": true }, { "EffectType": "BuffStat", "AffectedStat": "SpecialAttack", "Magnitude": 10, "IsPercent": true } ] }
+        {
+          "MinCount": 2,
+          "Reaction": { "Trigger": "MemberCrit", "Target": "TriggerTarget", "Cooldown": 2, "Effects": [ { "EffectType": "ApplyStatus", "Status": "Stun", "DurationTurns": 1, "Chance": 30 } ] }
+        }
       ]
     },
     {
       "BondId": "bedrock",
       "DisplayName": "Bedrock",
-      "Description": "Stone and iron, layered: Earth and Metal beasts fielded together are harder to hurt.",
+      "Description": "Stone and iron, layered: when an ally drops below 60% health, the healthiest Earth or Metal beast draws every enemy near it onto itself for three turns (once per ally per battle).",
       "Condition": "Elements",
       "Elements": [ "Earth", "Metal" ],
       "Scope": "Members",
       "Tiers": [
-        { "MinCount": 2, "Effects": [ { "EffectType": "BuffStat", "AffectedStat": "Defense", "Magnitude": 6, "IsPercent": true }, { "EffectType": "BuffStat", "AffectedStat": "SpecialDefense", "Magnitude": 6, "IsPercent": true } ] }
+        {
+          "MinCount": 2,
+          "Reaction": { "Trigger": "AllyBelowHpPercent", "Target": "EnemiesNearReactor", "ReactorOrder": "HealthiestFirst", "HpThresholdPercent": 60, "MaxPerTriggerUnit": 1, "Range": 3, "Effects": [ { "EffectType": "ApplyStatus", "Status": "Taunt", "DurationTurns": 3 } ] }
+        }
       ]
     },
     {
       "BondId": "winter_grove",
       "DisplayName": "Winter Grove",
-      "Description": "Evergreens under rime: Ice and Nature beasts fielded together start the battle behind a shield worth part of their own Defense.",
+      "Description": "Evergreens under rime: when an ally drops below a third of its health, an Ice or Nature beast wraps it in a frost shield and mends it (once per ally per battle).",
       "Condition": "Elements",
       "Elements": [ "Ice", "Nature" ],
       "Scope": "Members",
       "Tiers": [
-        { "MinCount": 2, "Effects": [ { "EffectType": "ApplyStatus", "Status": "Shield", "Magnitude": 90, "DurationTurns": 3 } ] }
+        {
+          "MinCount": 2,
+          "Reaction": { "Trigger": "AllyBelowHpPercent", "Target": "TriggeringAlly", "HpThresholdPercent": 35, "MaxPerTriggerUnit": 1, "Effects": [ { "EffectType": "ApplyStatus", "Status": "Shield", "Magnitude": 50, "DurationTurns": 2 }, { "EffectType": "Heal", "Magnitude": 15 } ] }
+        }
       ]
     },
     {
       "BondId": "twilight",
       "DisplayName": "Twilight",
-      "Description": "Light and Dark in balance steady the whole team: with a Light and a Dark beast fielded together, every beast on the team resists a little more.",
+      "Description": "Light and Dark in balance: when an ally starts its turn stunned or burning, a Light or Dark beast clears it and mends it so the ally can act (three times per beast per battle).",
       "Condition": "Elements",
       "Elements": [ "Light", "Dark" ],
-      "Scope": "Team",
+      "Scope": "Members",
       "Tiers": [
-        { "MinCount": 2, "Effects": [ { "EffectType": "BuffStat", "AffectedStat": "Defense", "Magnitude": 5, "IsPercent": true }, { "EffectType": "BuffStat", "AffectedStat": "SpecialDefense", "Magnitude": 5, "IsPercent": true } ] }
+        {
+          "MinCount": 2,
+          "Reaction": { "Trigger": "AllyTurnStartAfflicted", "Target": "TriggeringAlly", "MaxPerMember": 3, "Effects": [ { "EffectType": "Cleanse" }, { "EffectType": "Heal", "Magnitude": 15 } ] }
+        }
       ]
     },
     {
-      "BondId": "bulwark",
-      "DisplayName": "Bulwark",
-      "Description": "Every Vanguard on the team covers the beasts behind it: each non-Vanguard teammate gains Defense and Special Defense per Vanguard (up to 3).",
-      "Condition": "Stance",
-      "Stance": "Vanguard",
-      "Scope": "Others",
-      "PerCount": true,
-      "MaxCount": 3,
+      "BondId": "combined_arms",
+      "DisplayName": "Combined Arms",
+      "Description": "A team fielding all three stances fights on when one falls: each time an ally is defeated, the rest hit harder, physical and special alike, for three turns (twice per battle).",
+      "Condition": "DistinctStances",
+      "Scope": "Members",
       "Tiers": [
-        { "MinCount": 1, "Effects": [ { "EffectType": "BuffStat", "AffectedStat": "Defense", "Magnitude": 4, "IsPercent": true }, { "EffectType": "BuffStat", "AffectedStat": "SpecialDefense", "Magnitude": 4, "IsPercent": true } ] }
-      ]
-    },
-    {
-      "BondId": "overwatch",
-      "DisplayName": "Overwatch",
-      "Description": "Every Ranged beast spots for the whole team: each beast on the team gains critical-hit chance per Ranged teammate (up to 3).",
-      "Condition": "Stance",
-      "Stance": "Ranged",
-      "Scope": "Team",
-      "PerCount": true,
-      "MaxCount": 3,
-      "Tiers": [
-        { "MinCount": 1, "Effects": [ { "EffectType": "BuffStat", "AffectedStat": "CritChance", "Magnitude": 3 } ] }
-      ]
-    },
-    {
-      "BondId": "flanking",
-      "DisplayName": "Flanking",
-      "Description": "Every Skirmisher draws the enemy out of line: each beast on the team acts faster per Skirmisher (up to 2).",
-      "Condition": "Stance",
-      "Stance": "Skirmisher",
-      "Scope": "Team",
-      "PerCount": true,
-      "MaxCount": 2,
-      "Tiers": [
-        { "MinCount": 1, "Effects": [ { "EffectType": "BuffStat", "AffectedStat": "Speed", "Magnitude": 4, "IsPercent": true } ] }
+        {
+          "MinCount": 3,
+          "Reaction": { "Trigger": "AllyDefeated", "Target": "Team", "MaxPerBattle": 2, "Effects": [ { "EffectType": "BuffStat", "AffectedStat": "Attack", "Magnitude": 10, "IsPercent": true, "DurationTurns": 3 }, { "EffectType": "BuffStat", "AffectedStat": "SpecialAttack", "Magnitude": 10, "IsPercent": true, "DurationTurns": 3 } ] }
+        }
       ]
     }
   ]

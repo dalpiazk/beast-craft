@@ -42,7 +42,7 @@ namespace BeastCraft.Save
     /// </summary>
     public static class SaveSlotIndex
     {
-        /// <summary>Every slot in <paramref name="storage"/>, newest write first (ties by name).</summary>
+        /// <summary>Every save slot in <paramref name="storage"/>, newest write first (ties by name); never the settings slot (<see cref="PlayerSettingsStore.SlotName"/>).</summary>
         public static List<SaveSlotInfo> Build(FileSaveStorage storage, ISaveJsonSerializer json)
         {
             if (storage == null)
@@ -59,6 +59,11 @@ namespace BeastCraft.Save
 
             foreach (string slot in storage.ListSlots())
             {
+                if (PlayerSettingsStore.IsReservedSlot(slot))
+                {
+                    continue;
+                }
+
                 SaveFileResult read = storage.Read(slot);
 
                 if (!read.Success)

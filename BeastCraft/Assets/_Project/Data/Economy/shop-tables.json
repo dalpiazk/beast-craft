@@ -1,0 +1,290 @@
+{
+  "_readme": "GAME CONTENT, TUNABLE STARTING VALUES PENDING PRODUCER REVIEW. What a Trader (a map trading post) stocks and charges. Prices are in PRICE UNITS: one unit = PriceUnit.Base + PriceUnit.PerLevel x level (the squad gold curve of drop-tables.json), so prices keep pace with income: materials and consumables at the Trader level, gear at its MinimumLevel + 10, a beast skill tome at the skill learn level, an avatar skill at its MinAvatarLevel, looks at the middle level of the Trader region. Stock is rolled once per trading post from its seed (categories in the order Material, Gear, Skill, Consumable, Cosmetic; a count per band, weighted draws without replacement) and frozen into the save. Gear: shop-tagged commons and rares of the Trader band or the one before (epics are never sold); sold back at SellbackPct (gear only). Skills: tomes for species the player owns (a skill up to EarlyAccessLevels before the beast would learn it; own species only, lead decision) and the avatar skills below. Materials never before their tier first-clear band. Validated by ShopTableValidator; Editor: Beast Craft/Data/Import Shop Tables. Paced by --mode campaign. See docs/design/economy-and-shop.md, \"The Trader\".",
+  "SchemaVersion": 1,
+  "PriceUnit": {
+    "Base": 10,
+    "PerLevel": 2
+  },
+  "SellbackPct": 25,
+  "Bands": [
+    {
+      "MinLevel": 1,
+      "MaxLevel": 20,
+      "Categories": [
+        {
+          "Category": "Material",
+          "Min": 1,
+          "Max": 3
+        },
+        {
+          "Category": "Gear",
+          "Min": 2,
+          "Max": 3
+        },
+        {
+          "Category": "Skill",
+          "Min": 0,
+          "Max": 2
+        },
+        {
+          "Category": "Consumable",
+          "Min": 2,
+          "Max": 3
+        },
+        {
+          "Category": "Cosmetic",
+          "Min": 1,
+          "Max": 2
+        }
+      ]
+    },
+    {
+      "MinLevel": 21,
+      "MaxLevel": 40,
+      "Categories": [
+        {
+          "Category": "Material",
+          "Min": 1,
+          "Max": 3
+        },
+        {
+          "Category": "Gear",
+          "Min": 2,
+          "Max": 3
+        },
+        {
+          "Category": "Skill",
+          "Min": 0,
+          "Max": 2
+        },
+        {
+          "Category": "Consumable",
+          "Min": 2,
+          "Max": 3
+        },
+        {
+          "Category": "Cosmetic",
+          "Min": 1,
+          "Max": 2
+        }
+      ]
+    },
+    {
+      "MinLevel": 41,
+      "MaxLevel": 60,
+      "Categories": [
+        {
+          "Category": "Material",
+          "Min": 1,
+          "Max": 3
+        },
+        {
+          "Category": "Gear",
+          "Min": 2,
+          "Max": 3
+        },
+        {
+          "Category": "Skill",
+          "Min": 0,
+          "Max": 2
+        },
+        {
+          "Category": "Consumable",
+          "Min": 2,
+          "Max": 3
+        },
+        {
+          "Category": "Cosmetic",
+          "Min": 1,
+          "Max": 2
+        }
+      ]
+    },
+    {
+      "MinLevel": 61,
+      "MaxLevel": 80,
+      "Categories": [
+        {
+          "Category": "Material",
+          "Min": 1,
+          "Max": 3
+        },
+        {
+          "Category": "Gear",
+          "Min": 2,
+          "Max": 3
+        },
+        {
+          "Category": "Skill",
+          "Min": 0,
+          "Max": 2
+        },
+        {
+          "Category": "Consumable",
+          "Min": 2,
+          "Max": 3
+        },
+        {
+          "Category": "Cosmetic",
+          "Min": 1,
+          "Max": 2
+        }
+      ]
+    },
+    {
+      "MinLevel": 81,
+      "MaxLevel": 100,
+      "Categories": [
+        {
+          "Category": "Material",
+          "Min": 1,
+          "Max": 3
+        },
+        {
+          "Category": "Gear",
+          "Min": 2,
+          "Max": 3
+        },
+        {
+          "Category": "Skill",
+          "Min": 0,
+          "Max": 2
+        },
+        {
+          "Category": "Consumable",
+          "Min": 2,
+          "Max": 3
+        },
+        {
+          "Category": "Cosmetic",
+          "Min": 1,
+          "Max": 2
+        }
+      ]
+    }
+  ],
+  "Materials": [
+    {
+      "MaterialId": "essence_shard",
+      "PriceUnits": 2.1,
+      "MinShopLevel": 1,
+      "MaxQuantity": 2,
+      "Weight": 6
+    },
+    {
+      "MaterialId": "essence_crystal",
+      "PriceUnits": 7.0,
+      "MinShopLevel": 21,
+      "MaxQuantity": 1,
+      "Weight": 3
+    },
+    {
+      "MaterialId": "essence_core",
+      "PriceUnits": 24.5,
+      "MinShopLevel": 41,
+      "MaxQuantity": 1,
+      "Weight": 1
+    }
+  ],
+  "Gear": {
+    "CommonUnits": 3,
+    "RareUnits": 8,
+    "EpicUnits": 10.5,
+    "CommonWeight": 75,
+    "RareWeight": 25,
+    "BandLookback": 20
+  },
+  "Skills": {
+    "BeastTomeUnits": 5.6,
+    "EarlyAccessLevels": 10
+  },
+  "AvatarSkillUnlocks": [
+    {
+      "SkillId": "rallying_cry",
+      "Kind": "Active",
+      "MinAvatarLevel": 5,
+      "PriceUnits": 8.4
+    },
+    {
+      "SkillId": "mending_light",
+      "Kind": "Active",
+      "MinAvatarLevel": 5,
+      "PriceUnits": 8.4
+    },
+    {
+      "SkillId": "aegis",
+      "Kind": "Active",
+      "MinAvatarLevel": 10,
+      "PriceUnits": 8.4
+    },
+    {
+      "SkillId": "hex_of_frailty",
+      "Kind": "Active",
+      "MinAvatarLevel": 15,
+      "PriceUnits": 8.4
+    },
+    {
+      "SkillId": "battle_focus",
+      "Kind": "Active",
+      "MinAvatarLevel": 25,
+      "PriceUnits": 8.4
+    },
+    {
+      "SkillId": "slowing_field",
+      "Kind": "Active",
+      "MinAvatarLevel": 35,
+      "PriceUnits": 8.4
+    },
+    {
+      "SkillId": "iron_will",
+      "Kind": "Passive",
+      "MinAvatarLevel": 8,
+      "PriceUnits": 8.4
+    },
+    {
+      "SkillId": "battle_hymn",
+      "Kind": "Passive",
+      "MinAvatarLevel": 12,
+      "PriceUnits": 8.4
+    },
+    {
+      "SkillId": "withering_curse",
+      "Kind": "Passive",
+      "MinAvatarLevel": 20,
+      "PriceUnits": 8.4
+    },
+    {
+      "SkillId": "bloodlust",
+      "Kind": "Passive",
+      "MinAvatarLevel": 30,
+      "PriceUnits": 8.4
+    },
+    {
+      "SkillId": "vengeance",
+      "Kind": "Passive",
+      "MinAvatarLevel": 40,
+      "PriceUnits": 8.4
+    },
+    {
+      "SkillId": "storm_call",
+      "Kind": "Passive",
+      "MinAvatarLevel": 55,
+      "PriceUnits": 8.4
+    },
+    {
+      "SkillId": "verdant_pulse",
+      "Kind": "Passive",
+      "MinAvatarLevel": 70,
+      "PriceUnits": 8.4
+    }
+  ],
+  "Consumables": {
+    "CommonUnits": 0.7,
+    "RareUnits": 1.4,
+    "MaxQuantity": 2
+  },
+  "Cosmetics": {
+    "CommonUnits": 5.6,
+    "RareUnits": 14.0
+  }
+}

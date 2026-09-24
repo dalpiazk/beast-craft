@@ -44,6 +44,11 @@ namespace BeastCraft.Tooling.BalanceSim
                     ? "- Team bonds: on (`--bonds on`, the default): the library's " + options.Library.TeamBonds.Count +
                       " `TeamBonds` apply at battle start to every player team that meets their condition (never to enemies); see \"PvE team bonds\""
                     : "- Team bonds: off (`--bonds off`)");
+                if (options.Gear != GearProfile.None)
+                {
+                    report.AppendLine("- Gear (PvE): `--gear " + options.Gear.ToString().ToLowerInvariant() + "`: every player beast wears three pieces of the encounter level's band " +
+                                      "from `gear-library.json` (GearKits); the default and the balance guard are gearless");
+                }
             }
             else
             {
@@ -68,14 +73,29 @@ namespace BeastCraft.Tooling.BalanceSim
             if (options.RunPve && options.CalibratesOnPick)
             {
                 report.AppendLine("- Difficulty (PvE, `--calibrate-on " + SimOptions.CalibrationName(options.EffectiveCalibrateOn) + "`): calibrated so the team the " +
-                                  PveReport.PickerName(options) + " fields per composition clears " + SimOptions.Format(options.TargetClearRate) +
-                                  "% (the player scouts and counter-picks); the average team's no-scouting rate is reported beside it, see \"Calibrated difficulty\"");
+                                  PveReport.PickerName(options) + " fields per composition clears " + options.TargetSummary(encounters.Shapes) +
+                                  (options.UniformTarget ? " (`--target-clear`)" : " (the shapes' `TargetClear`)") +
+                                  " (the player scouts and counter-picks); the average team's no-scouting rate is reported beside it, see \"Calibrated difficulty\"");
             }
 
             if (options.RunPve && options.LevelGaps != null)
             {
                 report.AppendLine("- Level gap (PvE, `--level-gap`): every cell also replayed with the enemies " + SimOptions.Join(options.LevelGaps) +
                                   " levels above the team at its calibrated multiplier; see \"PvE level gap\"");
+            }
+
+            if (options.GapMixActive)
+            {
+                report.AppendLine("- Level-gap mix (PvE, `--gap-mix`): the balance sections (marginals, niches, flags, element matchups, team composition,");
+                report.AppendLine("  bonds) are judged over battles at a mix of level gaps (" + options.GapMixText + "); calibration and scouting stay at gap 0;");
+                report.AppendLine("  see \"Level-gap mix\"");
+            }
+
+            if (options.RunPve && options.PanelActive)
+            {
+                report.AppendLine("- Composition panel (PvE, `--panel " + options.PanelCompositions + "x" + options.PanelSamples + "`): every team against a fixed panel of " +
+                                  options.PanelCompositions + " compositions per shape, " + options.PanelSamples + " times each, at level " + options.PanelLevel +
+                                  "; see \"PvE composition panel\"");
             }
 
             if (options.RunPve && options.AvatarValue)
@@ -200,6 +220,9 @@ namespace BeastCraft.Tooling.BalanceSim
                     case SkillEffectType.DebuffStat:
                         parts.Add((e.EffectType == SkillEffectType.BuffStat ? "+" : "-") + Number(e.Magnitude) + (e.IsPercent ? "% " : " ") + e.AffectedStat + turns + chance + stacks);
                         break;
+                    case SkillEffectType.Cleanse:
+                        parts.Add("cleanse (Stun, DoT)" + chance);
+                        break;
                     default:
                         parts.Add(e.Status + (e.Status == StatusType.Knockback ? " " + Number(e.Magnitude) : e.Magnitude > 0f ? " " + Number(e.Magnitude) : string.Empty) + turns +
                                   chance + stacks);
@@ -208,6 +231,65 @@ namespace BeastCraft.Tooling.BalanceSim
             }
 
             return string.Join("; ", parts);
+        }
+
+        /// <summary>A compact one-line description of a bond reaction (trigger, who acts, caps, effects), for the bond table.</summary>
+        public static string DescribeReaction(BeastCraft.Bonds.BondReaction r)
+        {
+            if (r == null || !r.IsActive)
+            {
+                return string.Empty;
+            }
+
+            List<string> parts = new List<string> { "on " + r.Trigger };
+            if (r.TriggerFilter != BeastCraft.Bonds.BondTriggerFilter.Any)
+            {
+                parts.Add("(" + r.TriggerFilter + ")");
+            }
+
+            parts.Add(r.Action == BeastCraft.Bonds.BondAction.Intercept ? "intercept" : "-> " + r.Target);
+            if (r.Chance > 0 && r.Chance < SkillEffect.AlwaysChance)
+            {
+                parts.Add(r.Chance + "%");
+            }
+
+            if (r.Trigger == BeastCraft.Bonds.BondTrigger.AllyBelowHpPercent)
+            {
+                parts.Add("below " + r.HpThresholdPercent + "%");
+            }
+
+            if (r.Range > 0)
+            {
+                parts.Add("range " + r.Range);
+            }
+
+            if (r.Cooldown > 0)
+            {
+                parts.Add("cd " + r.Cooldown);
+            }
+
+            if (r.MaxPerMember > 0)
+            {
+                parts.Add(r.MaxPerMember + "/member");
+            }
+
+            if (r.MaxPerTriggerUnit > 0)
+            {
+                parts.Add(r.MaxPerTriggerUnit + "/ally");
+            }
+
+            if (r.MaxPerBattle > 0)
+            {
+                parts.Add(r.MaxPerBattle + "/battle");
+            }
+
+            if (r.ReactorOrder == BeastCraft.Bonds.BondReactorOrder.HealthiestFirst)
+            {
+                parts.Add("healthiest first");
+            }
+
+            string effects = DescribeEffects(r.Effects);
+            return string.Join(" ", parts) + (effects.Length > 0 ? ": " + effects : string.Empty);
         }
 
         /// <summary>

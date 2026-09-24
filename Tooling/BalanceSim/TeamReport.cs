@@ -25,13 +25,20 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <summary>Battles behind each team's rate.</summary>
         public int Battles;
 
+        /// <summary>Every team's rate over the cell's gap-0 battles (<see cref="PveCell.Battles"/>).</summary>
         public static TeamScope FromCell(PveCell cell)
+        {
+            return FromCell(cell, cell.Battles);
+        }
+
+        /// <summary>Every team's rate over <paramref name="battles"/>, in the cell's layout (<see cref="PveCell.Battles"/> or <see cref="PveCell.MixBattles"/>).</summary>
+        public static TeamScope FromCell(PveCell cell, PveBattle[] battles)
         {
             int teams = cell.TeamCount;
             int[] cleared = new int[teams];
-            for (int i = 0; i < cell.Battles.Length; i++)
+            for (int i = 0; i < battles.Length; i++)
             {
-                cleared[cell.TeamOf(i)] += cell.Battles[i].Cleared ? 1 : 0;
+                cleared[cell.TeamOf(i)] += battles[i].Cleared ? 1 : 0;
             }
 
             int per = cell.Shape.Compositions.Count * cell.Samples;
@@ -65,7 +72,7 @@ namespace BeastCraft.Tooling.BalanceSim
         }
     }
 
-    /// <summary>One kit mode's team clear rates: per cell, per shape (levels pooled) and overall.</summary>
+    /// <summary>One kit mode's team clear rates over the balance battles (the level-gap mix when it is on): per cell, per shape (levels pooled) and overall.</summary>
     public class TeamData
     {
         public KitMode Mode;
@@ -88,7 +95,8 @@ namespace BeastCraft.Tooling.BalanceSim
                 data.ByCell[e] = new TeamScope[options.Levels.Count];
                 for (int l = 0; l < options.Levels.Count; l++)
                 {
-                    data.ByCell[e][l] = TeamScope.FromCell(PveReport.Find(cells, mode, options.Levels[l], shapes[e]));
+                    PveCell cell = PveReport.Find(cells, mode, options.Levels[l], shapes[e]);
+                    data.ByCell[e][l] = TeamScope.FromCell(cell, cell.BalanceBattles);
                 }
 
                 data.ByShape[e] = TeamScope.Average(new List<TeamScope>(data.ByCell[e]));
@@ -371,8 +379,8 @@ namespace BeastCraft.Tooling.BalanceSim
             report.AppendLine();
             report.AppendLine("The marginals above judge beasts one at a time; this judges whole teams. Each of the " + simulator.Teams.Count +
                               " teams' clear rate at the calibrated");
-            report.AppendLine("difficulty (" + (options.CalibratesOnPick ? "the scouted pick clears about " + SimOptions.Format(options.TargetClearRate) + "%, the average team the no-scouting rate"
-                                                  : "so the average team clears about " + SimOptions.Format(options.TargetClearRate) + "%") + "): per shape it is " + battles +
+            report.AppendLine("difficulty (" + (options.CalibratesOnPick ? "the scouted pick clears about " + options.TargetSummary(shapes) + ", the average team the no-scouting rate"
+                                                  : "so the average team clears about " + options.TargetSummary(shapes)) + "): per shape it is " + battles +
                               " battles (compositions x levels x samples), levels");
             report.AppendLine("pooled; overall averages the shapes. **Noise SD** is the spread the teams would show from damage rolls alone");
             report.AppendLine("(binomial, sqrt(p(1 - p) / (N - 1)) per cell, an upper bound since a team's chance differs between compositions), and");
@@ -564,7 +572,9 @@ namespace BeastCraft.Tooling.BalanceSim
             report.AppendLine("**Per-seed SD** = the teams' spread within one seed (root mean over seeds); **seed-to-seed SD** = how much one team's rate");
             report.AppendLine("moves between seeds (root mean over teams; damage rolls and each seed's composition draw); **persistent SD** =");
             report.AppendLine("sqrt(per-seed SD² - seed-to-seed SD²), the spread that is the lineup's own. Min … max, percentiles and the histogram are");
-            report.AppendLine("of the seed means, which still carry seed-to-seed SD / sqrt(" + n + ") of noise.");
+            report.AppendLine("of the seed means, which still carry seed-to-seed SD / sqrt(" + n + ") of noise. **Superseded** as the measure of how much");
+            report.AppendLine("the lineup matters by the composition panel (`--panel`, \"PvE composition panel over seeds\"): the persistent SD still folds");
+            report.AppendLine("each seed's composition draw into the lineup's spread, where the panel holds the compositions fixed.");
             report.AppendLine();
 
             // [mode][seed].

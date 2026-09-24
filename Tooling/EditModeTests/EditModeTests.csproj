@@ -11,8 +11,10 @@
     swaps the stub's compile-only JsonUtility for a working System.Text.Json implementation that
     follows JsonUtility's rules. CiLint and BalanceSim keep the stub's default behaviour.
 
-    Deliberately NOT a CI job (Actions budget): run it locally before pushing. It is no substitute
-    for Unity's own Test Runner, which exercises the real JsonUtility and asset serialization.
+    CI runs it (.github/workflows/ci.yml: a dotnet format check, then dotnet test in Release), as a
+    final gate only: run it locally before pushing (Actions budget).
+    It is no substitute for Unity's own Test Runner, which exercises the real JsonUtility and asset
+    serialization.
   -->
 
   <PropertyGroup>

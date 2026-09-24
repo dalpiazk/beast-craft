@@ -18,8 +18,20 @@ namespace BeastCraft.Tooling.BalanceSim
     {
         public static List<EncounterShape> Generate(EncounterLibraryData data, EnemyCatalog enemies, SimOptions options, List<string> errors)
         {
+            return Generate(data, enemies, options, errors, options.Seed, options.Compositions, string.Empty);
+        }
+
+        /// <summary>
+        /// <see cref="Generate(EncounterLibraryData, EnemyCatalog, SimOptions, List{string})"/> with its own generator seed,
+        /// composition count and id prefix: the composition panel (<c>--panel</c>) draws from
+        /// <see cref="SimOptions.PanelSeed"/>, and its ids (<c>panel-squad-01</c>) seed its battles
+        /// apart from the run's own compositions.
+        /// </summary>
+        public static List<EncounterShape> Generate(EncounterLibraryData data, EnemyCatalog enemies, SimOptions options, List<string> errors, int seed, int count,
+                                                    string idPrefix)
+        {
             EncounterLibrary library = EncounterLibrary.Build(data);
-            EncounterGenerator generator = new EncounterGenerator(library, enemies, options.Seed);
+            EncounterGenerator generator = new EncounterGenerator(library, enemies, seed);
             EnemyFactory factory = new EnemyFactory(enemies);
             List<EncounterShape> result = new List<EncounterShape>();
 
@@ -35,7 +47,7 @@ namespace BeastCraft.Tooling.BalanceSim
                 };
 
                 HashSet<string> seen = new HashSet<string>(System.StringComparer.Ordinal);
-                for (int k = 0; k < options.Compositions; k++)
+                for (int k = 0; k < count; k++)
                 {
                     EncounterLineup lineup = generator.Draw(shape.ShapeId, seen);
                     if (lineup == null)
@@ -47,7 +59,7 @@ namespace BeastCraft.Tooling.BalanceSim
 
                     Encounter encounter = new Encounter
                     {
-                        Id = shape.ShapeId + "-" + (k + 1).ToString("00", CultureInfo.InvariantCulture),
+                        Id = idPrefix + shape.ShapeId + "-" + (k + 1).ToString("00", CultureInfo.InvariantCulture),
                         Arena = lineup.Arena,
                         Threat = lineup.Threat,
                         ElementScheme = options.EnemyElementOverride.HasValue ? "override" : SchemeName(lineup.ElementScheme)

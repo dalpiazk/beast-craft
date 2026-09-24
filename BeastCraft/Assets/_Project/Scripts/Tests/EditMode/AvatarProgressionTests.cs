@@ -49,8 +49,8 @@ namespace BeastCraft.Tests.EditMode
             Assert.AreEqual(8, AvatarProgression.BattleXp(BattleOutcome.EnemyVictory, 50));
             Assert.AreEqual(8, AvatarProgression.BattleXp(BattleOutcome.Stalemate, 50));
             Assert.AreEqual(8, AvatarProgression.BattleXp(BattleOutcome.MutualDefeat, 50));
-            Assert.AreEqual(8 + 40 + 200, AvatarProgression.BattleXp(BattleOutcome.PlayerVictory, 50));
-            Assert.AreEqual(8 + 40 + 4, AvatarProgression.BattleXp(BattleOutcome.PlayerVictory, 0), "enemy level read as at least 1");
+            Assert.AreEqual(8 + 50 + 250, AvatarProgression.BattleXp(BattleOutcome.PlayerVictory, 50));
+            Assert.AreEqual(8 + 50 + 5, AvatarProgression.BattleXp(BattleOutcome.PlayerVictory, 0), "enemy level read as at least 1");
         }
 
         [Test]
@@ -86,13 +86,14 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
-        public void EveryLevelAlongsideTheEncounters_TakesAboutFiveBattlesAtAnEightyPercentClearRate()
+        public void EveryLevelAlongsideTheEncounters_TakesAboutFourAndAHalfBattlesAtTheCampaignsClearRate()
         {
+            // The region campaign clears about 70% of its battles (80% squads, harder elites, gates and bosses).
             foreach (int level in new[] { 1, 25, 50, 99 })
             {
                 double perBattle = AvatarProgression.ParticipationXp +
-                                   (0.8 * (AvatarProgression.ClearBaseXp + (AvatarProgression.ClearXpPerEnemyLevel * level)));
-                Assert.That(AvatarProgression.XpToNextLevel(level) / perBattle, Is.InRange(4.5, 5.5), "level " + level);
+                                   (0.7 * (AvatarProgression.ClearBaseXp + (AvatarProgression.ClearXpPerEnemyLevel * level)));
+                Assert.That(AvatarProgression.XpToNextLevel(level) / perBattle, Is.InRange(4.3, 5.0), "level " + level);
             }
         }
 

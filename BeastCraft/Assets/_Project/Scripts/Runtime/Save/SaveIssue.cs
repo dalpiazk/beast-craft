@@ -46,7 +46,31 @@ namespace BeastCraft.Save
         GearSlotMismatch,
 
         /// <summary>A beast wears gear whose minimum level is above its own (the gear has no effect).</summary>
-        GearLevelTooLow
+        GearLevelTooLow,
+
+        /// <summary>A campaign region id (progress, current region or expedition) is empty or not in the catalog.</summary>
+        UnknownRegion,
+
+        /// <summary>An owned seal id is empty or not in the catalog.</summary>
+        UnknownSeal,
+
+        /// <summary>A region or seal is listed more than once.</summary>
+        DuplicateCampaignEntry,
+
+        /// <summary>The expedition in progress is inconsistent (nodes, links, current or cleared node, region not unlocked).</summary>
+        InvalidMapRun,
+
+        /// <summary>A held consumable id is empty or not in the economy catalog, or held in two stacks.</summary>
+        UnknownConsumable,
+
+        /// <summary>A cosmetic key (unlocked, or chosen in an appearance) names no known category or option, or a category of the wrong owner.</summary>
+        UnknownCosmetic,
+
+        /// <summary>An appearance wears a look that is neither free (default or starter) nor unlocked.</summary>
+        CosmeticNotUnlocked,
+
+        /// <summary>A frozen Trader visit is inconsistent (no key, a key twice, an item id missing, counts or price out of range).</summary>
+        InvalidShopVisit
     }
 
     /// <summary>

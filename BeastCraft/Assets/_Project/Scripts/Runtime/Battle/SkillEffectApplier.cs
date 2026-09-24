@@ -329,6 +329,10 @@ namespace BeastCraft.Battle
                     StatusEffects.Apply(activation.Skill, caster, target, effect, magnitude, grid);
                     break;
 
+                case SkillEffectType.Cleanse:
+                    StatusEffects.Cleanse(target);
+                    break;
+
                 default:
                     // An effect type added to the enum without an arm here. Ignored rather than
                     // thrown, matching this namespace's non-throwing stance.

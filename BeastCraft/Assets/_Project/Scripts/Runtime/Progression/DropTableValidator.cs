@@ -45,9 +45,10 @@ namespace BeastCraft.Progression
                 return errors;
             }
 
-            if (table.SchemaVersion != DropTableData.CurrentSchemaVersion)
+            if (table.SchemaVersion < DropTableData.MinSchemaVersion || table.SchemaVersion > DropTableData.CurrentSchemaVersion)
             {
-                errors.Add("SchemaVersion is " + table.SchemaVersion + "; this code reads version " + DropTableData.CurrentSchemaVersion + ".");
+                errors.Add("SchemaVersion is " + table.SchemaVersion + "; this code reads versions " + DropTableData.MinSchemaVersion + " to " +
+                           DropTableData.CurrentSchemaVersion + ".");
             }
 
             Dictionary<string, int> tiers = null;
@@ -66,7 +67,141 @@ namespace BeastCraft.Progression
             HashSet<string> shapes = ValidateShapes(table.Shapes, errors);
             ValidatePity(table.Pity, tiers, errors);
             ValidateBands(table.Bands, shapes, tiers, errors);
+            ValidateEconomy(table, shapes, errors);
             return errors;
+        }
+
+        /// <summary>The most gold a <see cref="GoldData.Base"/>, <see cref="GoldData.PerLevel"/> or <see cref="GoldData.FirstClearBonus"/> may be.</summary>
+        public const int MaxGoldValue = 10000;
+
+        /// <summary>The largest <see cref="GoldData.VariancePct"/>.</summary>
+        public const int MaxGoldVariancePct = 50;
+
+        /// <summary>The highest gear rarity a drop may name (0 common, 1 rare, 2 epic).</summary>
+        public const int MaxGearRarity = 2;
+
+        /// <summary>
+        /// The schema-2 economy sections: gold values in range and multipliers above 0 for known
+        /// shapes, each at most once; gear and cosmetic drops for known shapes with a chance of 1 to
+        /// 1000 per mille (each (shape, rarity) and each cosmetic shape at most once). A version-1
+        /// file must leave them empty.
+        /// </summary>
+        private static void ValidateEconomy(DropTableData table, HashSet<string> shapes, List<string> errors)
+        {
+            GoldData gold = table.Gold;
+            bool hasEconomy = (gold != null && (gold.Base != 0 || gold.PerLevel != 0 || gold.FirstClearBonus != 0 || (gold.ShapeMultipliers != null && gold.ShapeMultipliers.Length > 0))) ||
+                              (table.GearDrops != null && table.GearDrops.Length > 0) || (table.CosmeticDrops != null && table.CosmeticDrops.Length > 0);
+            if (hasEconomy && table.SchemaVersion < 2)
+            {
+                errors.Add("Gold, GearDrops and CosmeticDrops need SchemaVersion 2.");
+            }
+
+            if (gold != null)
+            {
+                CheckGold(gold.Base, "Gold.Base", errors);
+                CheckGold(gold.PerLevel, "Gold.PerLevel", errors);
+                CheckGold(gold.FirstClearBonus, "Gold.FirstClearBonus", errors);
+                if (gold.VariancePct < 0 || gold.VariancePct > MaxGoldVariancePct)
+                {
+                    errors.Add("Gold.VariancePct is " + gold.VariancePct + "; it must be 0 to " + MaxGoldVariancePct + ".");
+                }
+
+                HashSet<string> seen = new HashSet<string>(StringComparer.Ordinal);
+                ShapeMultiplierData[] multipliers = gold.ShapeMultipliers ?? new ShapeMultiplierData[0];
+                for (int i = 0; i < multipliers.Length; i++)
+                {
+                    ShapeMultiplierData m = multipliers[i];
+                    string at = "Gold.ShapeMultipliers[" + i + "]";
+                    if (m == null)
+                    {
+                        errors.Add(at + " is null.");
+                        continue;
+                    }
+
+                    if (!shapes.Contains(m.Shape ?? string.Empty))
+                    {
+                        errors.Add(at + ": '" + m.Shape + "' is not one of the Shapes.");
+                    }
+                    else if (!seen.Add(m.Shape))
+                    {
+                        errors.Add(at + ": '" + m.Shape + "' is listed twice.");
+                    }
+
+                    if (!(m.Multiplier > 0f) || m.Multiplier > 10f)
+                    {
+                        errors.Add(at + ": Multiplier is " + m.Multiplier + "; it must be above 0 and at most 10.");
+                    }
+                }
+            }
+
+            HashSet<string> gearSeen = new HashSet<string>(StringComparer.Ordinal);
+            GearDropData[] gear = table.GearDrops ?? new GearDropData[0];
+            for (int i = 0; i < gear.Length; i++)
+            {
+                GearDropData d = gear[i];
+                string at = "GearDrops[" + i + "]";
+                if (d == null)
+                {
+                    errors.Add(at + " is null.");
+                    continue;
+                }
+
+                if (!shapes.Contains(d.Shape ?? string.Empty))
+                {
+                    errors.Add(at + ": '" + d.Shape + "' is not one of the Shapes.");
+                }
+
+                if (d.Rarity < 0 || d.Rarity > MaxGearRarity)
+                {
+                    errors.Add(at + ": Rarity is " + d.Rarity + "; it must be 0 to " + MaxGearRarity + ".");
+                }
+                else if (!gearSeen.Add(d.Shape + "/" + d.Rarity))
+                {
+                    errors.Add(at + ": shape '" + d.Shape + "' rarity " + d.Rarity + " is listed twice.");
+                }
+
+                CheckPerMille(d.ChancePerMille, at, errors);
+            }
+
+            HashSet<string> cosmeticSeen = new HashSet<string>(StringComparer.Ordinal);
+            CosmeticDropData[] cosmetics = table.CosmeticDrops ?? new CosmeticDropData[0];
+            for (int i = 0; i < cosmetics.Length; i++)
+            {
+                CosmeticDropData d = cosmetics[i];
+                string at = "CosmeticDrops[" + i + "]";
+                if (d == null)
+                {
+                    errors.Add(at + " is null.");
+                    continue;
+                }
+
+                if (!shapes.Contains(d.Shape ?? string.Empty))
+                {
+                    errors.Add(at + ": '" + d.Shape + "' is not one of the Shapes.");
+                }
+                else if (!cosmeticSeen.Add(d.Shape))
+                {
+                    errors.Add(at + ": '" + d.Shape + "' is listed twice.");
+                }
+
+                CheckPerMille(d.ChancePerMille, at, errors);
+            }
+        }
+
+        private static void CheckGold(int value, string at, List<string> errors)
+        {
+            if (value < 0 || value > MaxGoldValue)
+            {
+                errors.Add(at + " is " + value + "; it must be 0 to " + MaxGoldValue + ".");
+            }
+        }
+
+        private static void CheckPerMille(int chance, string at, List<string> errors)
+        {
+            if (chance < 1 || chance > 1000)
+            {
+                errors.Add(at + ": ChancePerMille is " + chance + "; it must be 1 to 1000.");
+            }
         }
 
         /// <summary>Whether <paramref name="id"/> is lowercase snake_case: [a-z0-9_], starting with a letter.</summary>

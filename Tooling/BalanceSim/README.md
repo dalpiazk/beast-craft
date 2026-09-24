@@ -35,7 +35,7 @@ dotnet run --project Tooling/BalanceSim -c Release -- [options]
 | `--skill-kit <k>` | `library` | The skill axis: `library` (each beast's authored `DefaultLoadout` from `skill-library.json`, the real game setup and the committed report's setting; see "Library kits") or `standard` (the same standard kit for every beast, so the stat lines are what is measured; see "The standard kit"). Before the authored-kits retune this was `--kit standard|library`; `--kit` now takes only the element axis. |
 | `--skill-level <n>` | `1` | Skill level (1-20) for library skills and library avatar skills; the tier is the gates below that level (16+ = all three passed). |
 | `--skill-library <path>` | found by walking up | Path to `skill-library.json` (read only with `--skill-kit library` or `--avatar library`, i.e. by default). |
-| `--bonds <on\|off>` | `on` | Team bonds from the library's `TeamBonds`: applied at battle start to every player team that meets a bond's condition (never to enemies). Library kit only (ignored with `--skill-kit standard`). Adds the "PvE team bonds" section. See "Library kits". |
+| `--bonds <on\|off>` | `on` | Team bonds from the library's `TeamBonds`, for every player team that meets a bond's condition (never enemies): battle-start effects, and the behaviour bonds' reactions on every turn. Library kit only (ignored with `--skill-kit standard`). Adds the "PvE team bonds" section. See "Library kits". |
 | `--scouted <list>` | `all` | Scouted picking, the "PvE scouted picking" section: comma-separated `random`, `heuristic`, `bonds` (the bond-aware heuristic; bonds on only), `oracle` (also adds the held-out best team), or `all` / `none`. Post-processing of the battles already run: no extra battles, sub-second. `none` removes the section and its header line; the rest of the report is unchanged (the default calibration still uses the bond-aware picker, see `--calibrate-on`). See "Scouted picking". |
 | `--scouted-detail <d>` | `full` | What the heuristic pickers see of each composition (`ScoutingDetail`): `full`, `elements-only` or `dominant-element`. |
 | `--scouted-vanguard-min <n>` | `1` | Fewest Vanguards a heuristic pick fields, 0 to `--team-size`. |
@@ -44,10 +44,11 @@ dotnet run --project Tooling/BalanceSim -c Release -- [options]
 | `--compositions <n>` | `8` | Generated compositions per shape. |
 | `--encounters <list>` | all | Comma-separated shape ids (`solo`, `elite`, `squad`, `horde`) or, with `--encounter-set fixed`, encounter ids (`boss`, `swarm`, `pack`). |
 | `--team-size <n>` | `4` | Beasts per PvE team, 1-6. Every combination of the roster is fielded (C(10,4) = 210). |
-| `--target-clear <pct>` | `50` | Clear rate the difficulty calibration aims for (the scouted pick's by default; see `--calibrate-on`). |
+| `--target-clear <t>` | library | Clear rate the difficulty calibration aims for (the scouted pick's by default; see `--calibrate-on`). By default each shape's own `TargetClear` in `encounter-library.json` (the game's tiered targets: `squad` and `horde` 80, `elite` 60, `solo` 50; 50 for a fixed-set encounter). A single percentage (e.g. `50`) is the legacy uniform target for every shape (the balance guard is judged at `--target-clear 50`); `shape=pct` pairs (e.g. `squad=70,solo=45`) override single shapes. |
 | `--calibrate-on <t>` | `bonds` | Whose clear rate the PvE difficulty is calibrated to `--target-clear`. `bonds`: the team the bond-aware scouted picker (heuristic + bonds) fields against each composition, i.e. the player scouts and counter-picks; falls back to `heuristic` when bonds are not active (`--bonds off`, `--skill-kit standard`). `heuristic`: the plain element counter-pick. `mean`: the mean of every team (the unscouted player), the calibration before scouting; it reproduces the pre-scouting report byte for byte. See "Difficulty calibration". |
 | `--calibrate-samples <n>` | `16` | Scouted-pick calibration only: battles per composition the picked team fights at each search step (8 compositions x 16 = 128 battles per step, a binomial SE of about 4.4 points at 50%). Raise it if a cell's search is non-monotone. |
 | `--level-gap <list>` | off | PvE only. Also replay every cell with the enemies `g` levels above the team (negative = below) at the cell's calibrated multiplier, and add the "PvE level gap" section (and "PvE level gap over seeds" with `--seeds`). Comma-separated gaps and inclusive ranges, e.g. `-5..10` or `0,2,3,5`. The team and the avatar (unless `--avatar-level`) stay at the row's level; the enemies' stats follow their curve to their level, and the damage formula's level-difference term applies. Each battle's seed ignores the gap, so gap 0 is the calibration itself (no extra battles). A gap that puts the enemies outside 1-100 is not run (`—`). Suggested with `--levels 10,30,50,70,90`. See "Level gap". |
+| `--gap-mix <spec>` | `-3:5,-2:10,-1:15,0:40,1:15,2:10,3:5` | PvE. The **level-gap mix** the balance sections are judged over: comma-separated `gap:weight` pairs (enemy level minus team level; weights normalized to their sum; a bare gap weighs 1). Every cell's every-team battles are replayed with each battle dealt one gap in those proportions; the per-beast marginals, niches, flags, element matchups, team composition and bond sections read those battles, while the calibration, the difficulty table, scouting and the plumbing checks stay at gap 0. `0` (or `off`) is gap 0 alone and reproduces the report before the mix byte for byte. See "Level-gap mix". |
 | `--level-gap-teams <n>` | `42` | `--level-gap` only: how many teams (a seeded subset of the 210) the **no-scouting** rate at each nonzero gap is measured over, against every composition (42 x 8 = 336 battles). The **scouted** rate always uses the picked team, `--calibrate-samples` battles per composition. |
 | `--avatar-value` | off | PvE only (needs an avatar and a scouted-pick calibration). Also replay every cell's picked-team battles (`--calibrate-samples` per composition, the same seeds) **without the avatar** at the calibrated multiplier, and add the "PvE avatar value" section ("over seeds" with `--seeds`): per cell the scouted rate with and without the avatar, the difference (the avatar's **value** in points of clear rate), the avatar's turns, and its **direct share** of the team's output: the avatar's damage (its own turns and its passives' hits) + healing (team HP restored on its turns) + shield soak (damage a shield absorbed, credited to the shield's caster) as a percent of the team's total, with the part its passives produced. Read-only accounting; the rest of the report is unchanged. See "Avatar value". |
 | `--turn-detail` | off | PvE only. Add the "PvE beast turns" section: per kit mode, shape and beast (every team's battles at the calibrated multiplier, levels pooled) its turns per battle, the share of them on which no skill fired, split into held by its stance and out of reach, stunned turns, and the share of its damage that came off large enemies (bosses: giant, champion). A diagnostic; never changes a battle. |
@@ -68,6 +69,8 @@ dotnet run --project Tooling/BalanceSim -c Release -- [options]
 | `--out <path>` | none | Also write the report to this file (it always goes to stdout). |
 | `--self-check` | off | Run everything twice and fail unless both reports are identical; also replay sample PvE battles through `BattleTurnExecutor.RunBattle` and fail if the simulator's loop disagrees. |
 | `--seeds <list>` | none | Comma-separated base seeds, run one after another in one process (cannot be combined with `--seed`). Each seed's run is exactly the `--seed <n>` run; stdout (and `--out`) get the multi-seed aggregate, and with `--out` each seed's full report is also written beside it as `<name>.seed<n>.md`. See "Multi-seed runs". |
+| `--panel <KxS>` | off | PvE, generated set. Also fight the **composition panel**: K compositions per shape drawn from a constant seed (`SimOptions.PanelSeed`, never `--seed`), every team S times each (S >= 2), at the `--panel-level` cell's calibrated multiplier, and add the "PvE composition panel" section (and "PvE composition panel over seeds" with `--seeds`): the team main-effect SD, the team x composition interaction SD (the value of counter-picking), clear rate by stance mix, and per bond its excess over the additive prediction and reactions per battle. The committed tuned report uses `16x4` (53,760 battles per kit mode, about 14 s). See "Composition panel". |
+| `--panel-level <n>` | `50` | `--panel` only: the level the panel is fought at; one of `--levels`. |
 | `--calibrate-sample <n>` | off | `--calibrate-on mean` only (an error otherwise). **Opt-in, changes results.** The difficulty search evaluates a seeded subset of `n` teams; the chosen multiplier is then run once with every team, and every number in the report comes from that full run. See "Performance". |
 | `--timings` | off | Print a wall-clock breakdown to stderr: per PvE cell, every calibration step (multiplier, clear rate, seconds), PvP, the report and GC counts. Never changes the report. |
 
@@ -75,7 +78,7 @@ Exit codes: `0` success, `1` bad arguments, `2` missing or invalid roster, skill
 (the roster is checked with `BeastRosterValidator` and the library with `SkillLibraryValidator`
 first, exactly as the Editor importers do), `3` a self-check failed. The run time goes to stderr, never into the report. The default run (PvE and PvP, both element modes,
 three levels, four shapes x 8 compositions, 1 sample per team and composition) takes about
-12 s on an 8-core machine (about 22 s with `--self-check`, which runs
+16 s on an 8-core machine (13 s with `--gap-mix 0`; about 32 s with `--self-check`, which runs
 everything twice and replays two teams per composition through `RunBattle`); it took 50 s before
 the scouted-pick calibration and 210 s before the performance pass (see "Performance"). PvE battles run in
 parallel, and the output is identical whatever the thread count.
@@ -91,10 +94,20 @@ Two reports are committed, both the default arguments:
   avatar with its passives, the library's team bonds, skill level 1), the current Runtime (the square-root ATB turn order, the
   mitigation damage formula, `SpecialAttack`-scaled heals, combat stances, variance and crits) and
   the generated encounters. Regenerate it, and the game's difficulty table with it, whenever the
-  roster, the skill library, the encounter content, the simulator or the Runtime change:
+  roster, the skill library, the encounter content, the simulator or the Runtime change. Since
+  "Behaviour bonds and tiered difficulty" it runs the behaviour bonds, the composition panel
+  (`--panel 16x4`), the avatar-value replay (`--avatar-value`, for the no-avatar column of
+  "Difficulty by shape") and the tiered targets. Since "Level-gap mix" (see below) its balance
+  sections are judged over the default gap mix. Since the campaign merge the report and the game's
+  difficulty table come from two commands: the report stays **gearless** (the per-beast balance
+  guard's setting), and the shipping table is calibrated with **typical gear** (`--gear typical`, a
+  user decision; "Difficulty table for the game"):
 
 ```sh
-dotnet run --project Tooling/BalanceSim -c Release -- --out docs/balance/tuned-report.md --write-difficulty BeastCraft/Assets/_Project/Data/Encounters/encounter-difficulty.json
+# the committed report (gearless)
+dotnet run --project Tooling/BalanceSim -c Release -- --panel 16x4 --avatar-value --out docs/balance/tuned-report.md
+# the shipping difficulty table (the same run plus --gear typical; its report is not committed)
+dotnet run --project Tooling/BalanceSim -c Release -- --panel 16x4 --avatar-value --gear typical --write-difficulty BeastCraft/Assets/_Project/Data/Encounters/encounter-difficulty.json
 ```
 
 ## Library kits
@@ -122,9 +135,12 @@ battle.
 
 **Team bonds** (`--bonds on|off`, default on) come from the same file's `TeamBonds` array, built
 through `SkillLibraryBuilder.ApplyTeamBond` like the importer's. Each team's active bonds are resolved
-once per run (`TeamBondResolver`, from its species' stances and elements) and applied at battle start
-through `BattleTurnExecutor.BeginBattle` / `RunBattle` with a `TeamBondLoadout`, before the avatar's
-passives; enemies never get bonds. Bonds are part of the library setup, so `--skill-kit standard`
+once per run (`TeamBondResolver`, from its species' stances and elements); a `TeamBondLoadout`
+applies their battle-start effects through `BattleTurnExecutor.BeginBattle` / `RunBattle`, before the
+avatar's passives, and the simulator's loop passes it into every `ExecuteTurn` / `ExecuteAvatarTurn`
+so the behaviour bonds react all battle (each reaction is counted per bond on `PveBattle.BondReactions`;
+in the `neutral` kit mode a reaction strikes without an element, `TeamBondLoadout.ReactionElementOverride`);
+enemies never get bonds. Bonds are part of the library setup, so `--skill-kit standard`
 ignores them. The report's header says whether they were on, and "PvE team bonds" (see "PvE: team vs
 encounter") shows what they did.
 
@@ -271,7 +287,10 @@ cooldown 2 weighted `Attack` about twice as heavily.
 - **Difficulty calibration.** One multiplier per (kit mode, shape, level), shared by all the shape's
   compositions (per fixed encounter with `--encounter-set fixed`), scales every enemy's
   HP, Atk, Def, SpA and SpD. Speed and Move stay unscaled: Speed is how many turns a unit gets, so
-  scaling it would change the enemies' action economy, not just their toughness. The multiplier starts at 1 and doubles or halves until the target clear rate is
+  scaling it would change the enemies' action economy, not just their toughness. **The target** is
+  the shape's `TargetClear` in `encounter-library.json` (tiered: `squad` and `horde` 80%, `elite` 60%,
+  `solo` 50%; 50% for a fixed-set encounter) unless `--target-clear` sets one for every shape (the
+  guard's `--target-clear 50`) or per shape. The multiplier starts at 1 and doubles or halves until the target clear rate is
   bracketed (between 1/64 and 64), then bisects 8 times. The evaluated multiplier closest to the
   target wins (first evaluated on a tie), and its battles are the ones reported (they are kept, not
   re-run). The process is deterministic because each clear rate is. A step whose multiplier scales
@@ -343,8 +362,9 @@ cooldown 2 weighted `Attack` about twice as heavily.
     With 45 pairs a few |synergy / SE| near 2.5 are expected from noise; one seed cannot separate
     them, `--seeds` can (see "Multi-seed runs").
 - **Team bonds** (`BondReport.cs`; "PvE team bonds", only with bonds on): every bond with its
-  condition, scope, tier effects and how many of the 210 teams have it (per tier), which bonds each
-  beast belongs to, and how many bonds the teams activate. Then per kit mode a **bond marginal**
+  condition, scope, tier effects and reaction and how many of the 210 teams have it (per tier), which
+  bonds each beast belongs to, and how many bonds the teams activate; per kit mode and shape, each
+  behaviour bond's **reactions per battle** of an active team. Then per kit mode a **bond marginal**
   table: per shape and overall, **Δ** = clear rate of the teams with the bond active minus the teams
   without, and **excess** = the active teams' rate over the additive prediction from their members'
   marginals (baseline + (n - 1) / n x the members' centred marginals, the pair synergy model per
@@ -489,19 +509,25 @@ The default run has no stalemates, PvE or PvP.
 
 `--write-difficulty <path>` writes the run's calibrated multipliers, one per (kit mode, shape,
 level), as the game's `encounter-difficulty.json` (`DifficultyWriter.cs`; round-trip numbers, the
-same bytes for the same run). The committed file is the default run's (seed 12345, 8 compositions,
-levels 1 / 50 / 100, calibrated on the bond-aware scouted pick at 50%). The game reads its
-`elemental` cells through `EncounterDifficultyTable` (linear between calibrated levels, clamped
-outside them) and multiplies by `encounter-library.json`'s `DifficultyScale` (1.0). **Pending
-producer review:** the table is calibrated for a player who scouts and counter-picks, so an
-unscouted team clears about 10-38% of the shipped encounters (the report's "No-scouting clear");
-whether that is the campaign's intended difficulty, and so what `DifficultyScale` should be, is not
-decided. Only single-seed generated PvE runs can write it (`--seeds` and `--encounter-set fixed`
-are refused).
+same bytes for the same run; schema 2: `Targets` and a `TargetClear` per cell). The committed file
+is the documented table command's (`--panel 16x4 --avatar-value --gear typical --write-difficulty
+...`, above; the panel and avatar-value replay do not touch the calibration: `--mode pve --gear
+typical --write-difficulty` writes the same bytes): seed 12345, 8 compositions, levels 1 / 50 / 100,
+the player team in **typical gear** (the shipping assumption, a user decision; its `_readme` names
+the gear), calibrated on the bond-aware scouted pick at each shape's **tiered target**: `squad` and `horde` 80%, `elite` 60%,
+`solo` 50%, the shapes' `TargetClear`, a user decision). The game reads its `elemental` cells through
+`EncounterDifficultyTable` (linear between calibrated levels, clamped outside them) and multiplies by
+`encounter-library.json`'s `DifficultyScale` (1.0, a global producer factor). The table is
+calibrated for a player who scouts and counter-picks: an unscouted team clears far less (the
+report's "Difficulty by shape": about 7-10% of `solo` and `elite`, 50-60% of `squad` and `horde`).
+A table written at another target than the library's still loads, but the importer warns
+(`EncounterDifficultyTable.Warnings`). The balance guard is judged at `--target-clear 50`, never on
+the shipping table, and the committed report is gearless. Only single-seed generated PvE runs can write it (`--seeds` and
+`--encounter-set fixed` are refused).
 
 ## Level gap
 
-`--level-gap` answers "what does being under-levelled cost?". Every (kit mode, shape, level) cell is
+`--level-gap` answers "what does being under-levelled cost, and over-levelling buy?". Every (kit mode, shape, level) cell is
 first calibrated as usual, at equal levels; then, at the cell's multiplier, it is replayed with the
 enemies `g` levels above the team (`PveSimulator.RunLevelGaps`, `RunBattle(mode, teamLevel,
 enemyLevel, ...)`): the picked team per composition `--calibrate-samples` times (the **scouted**
@@ -513,18 +539,69 @@ their own level) and the damage formula's level-difference multiplier on every h
 (`DamageFormula.GetLevelMultiplier`; see `docs/design/battle-system.md`, "Damage formula").
 
 The section's table has one row per shape and level plus an **All shapes** mean per level, one
-column per gap, cells `scouted (no-scouting)`. Targets for the scouted rate (`SimOptions.LevelGap*`):
-gap 0 within 50 +/- 5, +2 and +3 in 20-35%, +5 and beyond under 10%; `!` marks a miss, and a line per
-mode counts the targets met. With `--self-check`, the loop-parity replay also runs each level at its
-widest in-range gap.
+column per gap, cells `scouted (no-scouting)`. Bands for the scouted rate are relative to the cell's
+calibration target T, its shape's `TargetClear` (`SimOptions.LevelGap*`, `LevelGapReport.Band`):
+gap 0 T +/- 5; +2 and +3 (a couple of levels under) 0.4 T to 0.7 T; +5 and beyond under 0.2 T; -2 and
+-3 (a couple of levels over) at least T + 0.4 (100 - T); -5 and beyond at least T + 0.8 (100 - T), so
+over-levelling must make every fight easier. At T = 50 that is 45-55, 20-35, under 10, at least 70 and at
+least 90; at T = 80, 75-85, 32-56, under 16, at least 88 and at least 96. **All shapes** rows are held to
+the bands of the mean target. `!` marks a miss, and a line per mode counts the targets met. With
+`--self-check`, the loop-parity replay also runs each level at its widest in-range gap.
 
 ```sh
-dotnet run --project Tooling/BalanceSim -c Release -- --mode pve --levels 10,30,50,70,90 --level-gap -5..10 --out docs/balance/level-gap-report.md
+dotnet run --project Tooling/BalanceSim -c Release -- --mode pve --levels 10,30,50,70,90 --level-gap -5,-3,-2,0,2,3,5 --out docs/balance/level-gap-report.md
 ```
 
 Cost: each nonzero gap adds about 128 + 336 battles per cell (a sixth of a calibration); the
 command above takes about a minute. The committed `docs/balance/level-gap-report.md` is that
 command's output; the default report has no level-gap section and is unchanged by the option.
+
+## Level-gap mix
+
+The player does not always fight at their own level: a map node can sit a few levels above the team
+(under-levelled) or below it (over-levelled). Judging beasts only on equal-level fights would tune
+them for a case that is under half of play, so by default (`--gap-mix`, a user decision on its
+shape: "battles 1-3 levels above and below") the balance sections are judged over a **mix of level
+gaps**, while the difficulty table keeps its meaning (calibrated at gap 0).
+
+| Gap (enemy level - team level) | -3 | -2 | -1 | 0 | +1 | +2 | +3 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Share | 5% | 10% | 15% | 40% | 15% | 10% | 5% |
+
+Symmetric (under- and over-levelled equally likely), peaked at the equal-level fight and tapering
+with distance: a starting point, not measured play data (`SimOptions.DefaultGapMix`).
+
+- **How.** After a cell is calibrated (at gap 0, as always) its every-team run is replayed at the
+  calibrated multiplier with each (composition, team, sample) battle **dealt** one gap
+  (`PveSimulator.RunGapMix`): per composition a seeded shuffle of the team slots takes the gaps in
+  exact proportion (slot p of N gets the gap whose cumulative weight covers (p + 0.5) / N, the table
+  walked from alternate ends on alternate compositions so the rounding evens out). A gap-0 battle is
+  the calibration's own battle; any other is `RunBattle(teamLevel, enemyLevel)` as in `--level-gap`
+  (the same seed, so common random numbers). Where a gap would put the enemies outside 1-100 (L1 with
+  enemies below, L100 with enemies above) the enemies stay at the bound and the team moves (L1, gap
+  -3: team L4 against enemies L1), so the gap is always what it says.
+- **What reads the mix.** Per-beast marginals (raw and normalized, per shape and level, overall), the
+  niche rankings, the flags on them, the element matchups, the role metrics, team composition (spread,
+  best / worst lineups, pair synergy), the bond marginals, scaling and reactions, and the `--seeds`
+  aggregate of all of them (so the balance guard is judged on the mix). The normalization uses the
+  cell's clear rate over the mix.
+- **What stays at gap 0.** The calibration and the difficulty table (`--write-difficulty` writes the
+  same file with or without the mix), "Calibrated difficulty", scouted picking, the composition
+  panel, the avatar value, the kit parity and crit tables, stalemate flags, `--level-gap`, and the
+  self-check invariants.
+- **Side by side.** "Level-gap mix" gives, per kit mode and shape, the no-scouting clear rate at gap 0
+  and over the mix, and per gap over the battles the mix dealt it; each "Marginal clear rate by shape"
+  table adds **Gap 0 overall** and **Gap 0 normalized** columns; the `--seeds` aggregate adds a **Gap 0
+  normalized** column and a gap-0 guard / niche line. All of it comes from battles already run.
+- **Cost.** About 60% of one every-team run per cell (the gap-0 share is reused): the default run
+  went from about 13 s to 16 s, the tuned-report command from about 30 s to 33 s; five seeds
+  (`--mode pve --seeds`, no panel) take about 80 s.
+- **Noise.** A dealt gap makes each battle a single draw at the mix's clear rate, so the marginals'
+  roll noise is what it was at gap 0 (the same number of battles); the per-gap columns of the section
+  are small (5% of a cell for a +/-3 gap) and only indicative. For a clean per-gap curve use
+  `--level-gap`.
+
+`--gap-mix 0` turns it off and reproduces the pre-mix report byte for byte.
 
 ## Avatar value
 
@@ -555,8 +632,8 @@ strategy names one of the 210 teams per composition, and that team's recorded re
 composition is the outcome. The section is on by default (`--scouted all`) and costs well under a
 second; `--scouted none` drops it and its header line, and the rest of the report is byte-identical.
 
-- **Calibration.** By default each shape's multiplier aims the **Heuristic + bonds** pick at 50%
-  (`--calibrate-on bonds`, see "Difficulty calibration"), so that column sits near 50% (within its
+- **Calibration.** By default each shape's multiplier aims the **Heuristic + bonds** pick at the shape's target
+  (`--calibrate-on bonds`, see "Difficulty calibration"), so that column sits near the target (within its
   noise: here it rests on one battle per composition and level, the calibration on 16), and the
   **No scouting** column (the mean over every team: the unscouted player) sits below it; every
   strategy's gain over no scouting reads as **uplift** in points. With `--calibrate-on mean` the
@@ -571,11 +648,21 @@ second; `--scouted none` drops it and its header line, and the rest of the repor
   lowest-scored non-Vanguard is swapped for the best-scored unpicked Vanguard. It ignores stats,
   kits, levels and bonds, so its picks are the same in every kit mode and level.
 - **Heuristic + bonds** (bonds on only): every team meeting the Vanguard minimum scores its members'
-  heuristic scores plus 0.5 per tier of each tiered bond it activates (`ScoutedPicker.BondWeight`)
-  and 0.125 per stack of each scaling bond (`ScoutedPicker.ScalingBondWeight`; nothing for an
-  `Others` bond no teammate receives); the best
+  heuristic scores plus, per tier of each tiered bond it activates, that bond's weight
+  (`TeamSuggester.BondWeights`, fitted at 0.1 per point of the bond's pooled `elemental` panel excess;
+  0.5, `TeamSuggester.BondWeight`, for a bond not listed; nothing for a bond that answers only afflicted
+  allies when no enemy can stun or burn, `TeamSuggester.CanAfflict`) and 0.125 per stack of each
+  scaling bond (`TeamSuggester.ScalingBondWeight`; nothing for an `Others` bond no teammate receives);
+  the best
   team is fielded, ties to the lower team index. 0.5 is the gap between a neutral and a strong
   matchup against one enemy in half the lineup's weight: a starting knob, not tuned.
+  **The game's own picker.** The scores, the bond weights and the choice rule are the Runtime's
+  `TeamSuggester` (`BeastCraft.Battle.Scouting`), the team the game suggests after repeated losses
+  (`docs/design/battle-system.md`, "Encounter preview"); `ScoutedPicker` only adapts the simulator's
+  fixtures and team list to it. Every PvE run also asks `TeamSuggester.Suggest` for each composition
+  with the whole roster (one level) as the owned beasts and prints `TeamSuggester parity: n of n
+  compositions ...` to stderr; anything short of 100% fails the run (exit 3). The report is unchanged
+  by the port (byte-identical).
 - **Best team** (with `oracle`): the one lineup with the best clear rate in the same mode and shape
   at the *other* levels, scored at this level (ties: the other levels over every shape, then the lower
   index). It knows which team is strong but not what it faces, and it is held out, so the damage-roll
@@ -690,7 +777,9 @@ dotnet run --project Tooling/BalanceSim -c Release -- --mode pve --seeds 12345,7
   overall marginal (mean and SD over seeds; see "Metrics") with **!** outside the balance guard
   (+/-4 `elemental`, +/-7 `neutral`), plus the range of the raw and normalized means, the beasts
   outside the `--marginal-threshold` band (raw) and outside the guard (normalized), and the beasts
-  with no top-3 shape on the means. Then **team composition over seeds**: each team's clear rate averaged over the seeds,
+  with no top-3 shape on the means. With the level-gap mix on (the default) all of these are over the
+  mix, and a **Gap 0 normalized** column and a gap-0 guard / niche line give the equal-level reading
+  beside them. Then **team composition over seeds**: each team's clear rate averaged over the seeds,
   with the teams' spread within a seed (per-seed SD), how much one team moves between seeds
   (seed-to-seed SD: damage rolls and each seed's composition draw) and the **persistent SD**,
   sqrt(per-seed SD² - seed-to-seed SD²), the spread that is the lineup's own; the percentiles,
@@ -704,6 +793,30 @@ dotnet run --project Tooling/BalanceSim -c Release -- --mode pve --seeds 12345,7
   single-seed runs (loading and JIT are a second or two of an 11 s run). What it replaces is the
   bookkeeping: one process per seed and scripts parsing the Markdown back; the aggregate comes
   straight from the simulator's numbers, unrounded.
+
+## Composition panel
+
+`--panel KxS` measures how much the lineup matters, and how much *counter-picking* matters, on a
+fixed set of opponents (`PanelReport.cs`). The run's own compositions change with `--seed`, so the
+older multi-seed "persistent SD" folded each seed's composition draw into the lineup's spread; the
+panel holds the compositions still:
+
+- K compositions per shape are drawn by the game's generator from the constant
+  `SimOptions.PanelSeed` (ids `panel-<shape>-NN`), identical in every run and every seed.
+- All 210 teams fight every panel composition S times at `--panel-level` (default 50), at that
+  cell's calibrated multiplier; each battle is seeded like any other (the panel id is in the seed).
+- Per kit mode and shape, a two-way ANOVA of the 0/1 outcomes (teams x compositions, S replicates):
+  **team main-effect SD** = sqrt(Var(team means) - noise²), noise² = the mean cell variance
+  p(1 - p) / (S - 1) divided by K (the roll noise of a team's panel mean); **interaction SD** =
+  sqrt((MS_int - MS_err) / S), how much a team's clear rate depends on which composition it faces
+  beyond the two means. Pooled = root mean square over the shapes.
+- Clear rate by stance mix (Vanguard / Ranged / Skirmisher counts), per shape.
+- Per library bond: **excess** = the active teams' mean panel rate minus the additive prediction
+  from the beasts' panel marginals (a lower bound on the bond's value, since part of it is absorbed
+  into its members' marginals), and **reactions per battle** for a behaviour bond.
+
+`16x4` is 53,760 battles per kit mode (about 14 s on 8 cores); it is part of the committed
+tuned-report command. With `--seeds`, "PvE composition panel over seeds" lists every seed's SDs.
 
 ## Pacing (`--mode pacing`)
 
@@ -866,3 +979,20 @@ dotnet build  Tooling/BalanceSim/BalanceSim.csproj -c Release
 It targets `net10.0` (the installed LTS SDK) and, like `CiLint`, compiles with C# 9 and nullable
 disabled so the Unity scripts build unchanged. Only `Scripts/Runtime/**` is compiled: no Editor
 scripts and no tests.
+
+## Economy (`--gear`, `--economy-probe`, and `--mode campaign`'s economy)
+
+- `--gear none|common|rare|epic|typical` (default `none`): the PvE player team wears three pieces of
+  the encounter level's band from `gear-library.json` (`GearKits`: a fang or focus stone by the
+  beast's higher attack stat, barding or warding mantle by its higher defence, a keen collar for a
+  base crit of 8+ else a wind charm). `typical` is what a player normally wears at the level (the
+  shipping difficulty's assumption). The default run, its report and the balance guard stay gearless
+  (byte-identical); a gear run adds one header line.
+- `--economy-probe` (alias `--consumables`): appends "PvE economy probe": every cell replayed at its
+  calibrated multiplier by every team with each gear profile and each consumable of
+  `consumable-library.json`, as clear-rate points and levels-equivalent against the team one level
+  above the enemies. About 50-75 s on top of the default PvE run.
+- `--gear-library`, `--consumable-library`: the files (default: found by walking up).
+- `--mode campaign` includes the economy (`CampaignEconomyModel`: gold, drops, the Trader at trading
+  posts and camps, a greedy shopper) on its own random stream, with its gates in the report's
+  "Economy" section. See docs/design/economy-and-shop.md.

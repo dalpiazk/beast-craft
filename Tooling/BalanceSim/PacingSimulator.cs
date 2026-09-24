@@ -577,7 +577,7 @@ namespace BeastCraft.Tooling.BalanceSim
 
             sb.Append("\n## Avatar level\n\n");
             sb.Append("`AvatarProgression.AwardBattle` after every battle (").Append(AvatarProgression.ParticipationXp).Append(" XP win or lose, + ")
-              .Append(AvatarProgression.ClearBaseXp).Append(" + ").Append(AvatarProgression.ClearXpPerEnemyLevel).Append(" x encounter level on a clear; a level costs ")
+              .Append(AvatarProgression.ClearBaseXp).Append(" + ").Append(AvatarProgression.ClearXpPerEnemyLevel).Append(" x encounter level on a clear, after the level-gap falloff; a level costs ")
               .Append(AvatarProgression.XpCurveBase).Append(" + ").Append(AvatarProgression.XpCurvePerLevel).Append(" x level). Target: median within ")
               .Append(AvatarLevelTolerance).Append(" levels of the encounter level at every checkpoint.\n\n");
             sb.Append("| Battle | Encounter level | p10 | p50 | p90 | Verdict |\n| ---: | ---: | ---: | ---: | ---: | --- |\n");
@@ -601,7 +601,7 @@ namespace BeastCraft.Tooling.BalanceSim
               .Append(" XP win or lose, knocked out or not, + ").Append(BeastProgression.ClearBaseXp).Append(" + ").Append(BeastProgression.ClearXpPerEnemyLevel)
               .Append(" x encounter level on a clear it is still standing for; knocked out in ").Append(Pct(KnockoutChance * 100.0))
               .Append(" of battles; a level costs ").Append(BeastProgression.XpCurveBase).Append(" + ").Append(BeastProgression.XpCurvePerLevel)
-              .Append(" x level). Benched beasts earn nothing. Target: median within ").Append(BeastLevelTolerance)
+              .Append(" x level), after the level-gap falloff. Benched beasts: see `--mode campaign`. Target: median within ").Append(BeastLevelTolerance)
               .Append(" levels of the encounter level at every checkpoint.\n\n");
             sb.Append("| Battle | Encounter level | p10 | p50 | p90 | Verdict |\n| ---: | ---: | ---: | ---: | ---: | --- |\n");
             for (int b = 50; b <= options.PacingBattles; b += 50)

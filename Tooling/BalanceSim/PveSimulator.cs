@@ -7,6 +7,7 @@ using BeastCraft.Battle.Grid;
 using BeastCraft.Battle.Placement;
 using BeastCraft.Bonds;
 using BeastCraft.Creatures;
+using BeastCraft.Economy;
 using BeastCraft.Encounters;
 
 namespace BeastCraft.Tooling.BalanceSim
@@ -54,6 +55,13 @@ namespace BeastCraft.Tooling.BalanceSim
 
         /// <summary>The avatar's own turns this battle (0 when no avatar was fielded).</summary>
         public int AvatarTurns;
+
+        /// <summary>
+        /// Per library team bond (<see cref="SkillLibraryKits.TeamBonds"/> order): how many times its
+        /// reaction fired this battle (<see cref="BattleTurnResult.BondReactions"/>). <c>null</c> when
+        /// the team has no reacting bond.
+        /// </summary>
+        public int[] BondReactions;
 
         /// <summary>The avatar's active-skill casts this battle (every <c>AvatarActivations</c> entry).</summary>
         public int AvatarCasts;
@@ -233,6 +241,28 @@ namespace BeastCraft.Tooling.BalanceSim
         /// </summary>
         public PveBattle[] Battles;
 
+        /// <summary>
+        /// <c>--gap-mix</c> (on by default): the every-team run again with each battle at the level gap
+        /// the mix deals it (<see cref="GapMixGaps"/>; <see cref="PveSimulator.RunGapMix"/>), in the
+        /// <see cref="Battles"/> layout; a gap-0 battle is <see cref="Battles"/>' own. Null with
+        /// <c>--gap-mix 0</c>. What the balance sections read (<see cref="BalanceBattles"/>).
+        /// </summary>
+        public PveBattle[] MixBattles;
+
+        /// <summary><c>--gap-mix</c>: the level gap (enemy level minus team level) of each battle of <see cref="MixBattles"/>.</summary>
+        public int[] GapMixGaps;
+
+        /// <summary>
+        /// The battles the balance sections read (per-beast marginals, niches, flags, element
+        /// matchups, team composition, bonds): <see cref="MixBattles"/> when the level-gap mix is on,
+        /// else <see cref="Battles"/>. Calibration, scouting and the plumbing checks read
+        /// <see cref="Battles"/> (gap 0).
+        /// </summary>
+        public PveBattle[] BalanceBattles
+        {
+            get { return MixBattles ?? Battles; }
+        }
+
         /// <summary>Battles per team and composition: each is the same fight with a different seed (damage rolls differ).</summary>
         public int Samples;
 
@@ -248,6 +278,37 @@ namespace BeastCraft.Tooling.BalanceSim
         public int CompositionOf(int index)
         {
             return index / (Samples * TeamCount);
+        }
+    }
+
+    /// <summary>
+    /// <c>--panel</c>: every team against every composition of one panel shape
+    /// (<see cref="EncounterCatalog.PanelShapes"/>), <see cref="Samples"/> times each, at the
+    /// <c>--panel-level</c> cell's calibrated multiplier. Kept as counts, not battles.
+    /// </summary>
+    public class PanelCell
+    {
+        public KitMode Mode;
+
+        /// <summary>The run's shape (the panel shape has the same id).</summary>
+        public EncounterShape Shape;
+
+        public int Level;
+        public double Multiplier;
+        public int Compositions;
+        public int Samples;
+        public int TeamCount;
+
+        /// <summary>[team][composition] battles cleared (of <see cref="Samples"/>).</summary>
+        public int[][] Cleared;
+
+        /// <summary>[team][library bond] reactions fired over every battle of the team.</summary>
+        public long[][] Reactions;
+
+        /// <summary>Team <paramref name="t"/>'s clear rate against composition <paramref name="c"/>, 0-1.</summary>
+        public double Rate(int t, int c)
+        {
+            return (double)Cleared[t][c] / Samples;
         }
     }
 
@@ -273,6 +334,7 @@ namespace BeastCraft.Tooling.BalanceSim
         {
             _options = options;
             _species = species;
+            GearFor = options.GearKits == null || options.Gear == GearProfile.None ? null : (s, l) => options.GearKits.For(s, l, options.Gear);
             // Every species shares the medium curve; the avatar's fixture stats follow it too.
             Avatar = new AvatarPresets(options.AvatarPreset, options.Library, species.Count > 0 ? species[0].GrowthRate : null);
             _passiveEffects = new HashSet<SkillEffect>();
@@ -325,6 +387,85 @@ namespace BeastCraft.Tooling.BalanceSim
 
                 TeamBonds[t] = options.BondsActive ? TeamBondResolver.Resolve(options.Library.TeamBonds, members) : new List<ActiveTeamBond>();
             }
+
+            BondIndex = new Dictionary<TeamBondSO, int>();
+            if (options.Library != null)
+            {
+                for (int b = 0; b < options.Library.TeamBonds.Count; b++)
+                {
+                    BondIndex[options.Library.TeamBonds[b]] = b;
+                }
+            }
+        }
+
+        /// <summary>Each library bond's index (<see cref="SkillLibraryKits.TeamBonds"/> order), for <see cref="PveBattle.BondReactions"/>.</summary>
+        public Dictionary<TeamBondSO, int> BondIndex { get; }
+
+        /// <summary><c>--panel</c>: the panel cells run so far (per kit mode, per shape), in run order.</summary>
+        public List<PanelCell> PanelCells { get; } = new List<PanelCell>();
+
+        /// <summary>
+        /// <c>--panel</c>: every team against every composition of <paramref name="panelShape"/>,
+        /// <c>--panel</c>'s S times each, at <paramref name="calibrated"/>'s level and multiplier
+        /// (the <c>--panel-level</c> cell of the same kit mode and shape), parallel, reduced to
+        /// counts. Every battle is <see cref="RunBattle(KitMode, int, Encounter, double, int, int, bool, bool, out List{BattleUnit})"/>
+        /// with its own seed (the panel composition's id is in it). Stored in <see cref="PanelCells"/>.
+        /// </summary>
+        public PanelCell RunPanel(KitMode mode, EncounterShape panelShape, PveCell calibrated)
+        {
+            int samples = _options.PanelSamples;
+            int teams = Teams.Count;
+            int compositions = panelShape.Compositions.Count;
+            int bondCount = BondIndex.Count;
+            PveBattle[] battles = new PveBattle[compositions * teams * samples];
+            bool[][] playersWinTies = new bool[compositions][];
+            for (int c = 0; c < compositions; c++)
+            {
+                playersWinTies[c] = PlayersWinTies(mode, calibrated.Level, panelShape.Compositions[c].Id);
+            }
+
+            Parallel.For(0, battles.Length, i =>
+            {
+                int t = (i / samples) % teams;
+                int c = i / (samples * teams);
+                battles[i] = RunBattle(mode, calibrated.Level, panelShape.Compositions[c], calibrated.Multiplier, t, i % samples, false, playersWinTies[c][t], out _);
+            });
+
+            PanelCell cell = new PanelCell
+            {
+                Mode = mode,
+                Shape = calibrated.Shape,
+                Level = calibrated.Level,
+                Multiplier = calibrated.Multiplier,
+                Compositions = compositions,
+                Samples = samples,
+                TeamCount = teams,
+                Cleared = new int[teams][],
+                Reactions = new long[teams][]
+            };
+
+            for (int t = 0; t < teams; t++)
+            {
+                cell.Cleared[t] = new int[compositions];
+                cell.Reactions[t] = new long[bondCount];
+            }
+
+            for (int i = 0; i < battles.Length; i++)
+            {
+                int t = (i / samples) % teams;
+                int c = i / (samples * teams);
+                cell.Cleared[t][c] += battles[i].Cleared ? 1 : 0;
+                if (battles[i].BondReactions != null)
+                {
+                    for (int b = 0; b < bondCount; b++)
+                    {
+                        cell.Reactions[t][b] += battles[i].BondReactions[b];
+                    }
+                }
+            }
+
+            PanelCells.Add(cell);
+            return cell;
         }
 
         /// <summary>
@@ -351,6 +492,15 @@ namespace BeastCraft.Tooling.BalanceSim
 
         /// <summary>Every combination of <c>TeamSize</c> distinct species, as ascending roster indices, in lexicographic order.</summary>
         public List<int[]> Teams { get; }
+
+        /// <summary>
+        /// The gear each player beast wears (<c>--gear</c>, the economy probe): species and level to
+        /// pieces; null (the default) = none, exactly the gearless battle.
+        /// </summary>
+        public Func<CreatureSpeciesSO, int, List<GearSO>> GearFor { get; set; }
+
+        /// <summary>The consumable every player team uses as each battle begins (the economy probe); null (the default) = none.</summary>
+        public ConsumableSO Consumable { get; set; }
 
         /// <summary>The avatar fielded beside every player team (<c>--avatar</c>); disabled by default.</summary>
         public AvatarPresets Avatar { get; }
@@ -414,7 +564,7 @@ namespace BeastCraft.Tooling.BalanceSim
         {
             CalibrationTarget calibrateOn = _options.EffectiveCalibrateOn;
             PveCell cell = new PveCell { Mode = mode, Level = level, Shape = shape, Samples = Samples, TeamCount = Teams.Count, CalibratedOn = calibrateOn };
-            double target = _options.TargetClearRate;
+            double target = _options.TargetFor(shape);
             PveBattle[] best = null;
             double bestGap = double.MaxValue;
             double bestRate = double.NaN;
@@ -648,6 +798,88 @@ namespace BeastCraft.Tooling.BalanceSim
                 point.NoScoutClearRate = ClearRate(RunTeams(cell.Mode, cell.Level, cell.Shape, cell.Multiplier, teams, gap));
             }
         }
+
+        /// <summary>
+        /// <c>--gap-mix</c>: replays <paramref name="cell"/>'s every-team run (at its calibrated
+        /// multiplier) with each battle at a level gap drawn from the mix, and stores it in
+        /// <see cref="PveCell.MixBattles"/> / <see cref="PveCell.GapMixGaps"/>. The gaps are dealt, not
+        /// rolled: per composition, a seeded shuffle of its team x sample slots takes the gaps in
+        /// proportion to their weights (slot p of N gets the gap whose cumulative weight covers
+        /// (p + 0.5) / N; the table runs from the lowest gap on even compositions and from the highest
+        /// on odd ones, so rounding evens out over the cell). A gap-0 battle is the cell's own; any
+        /// other is <see cref="RunBattle(KitMode, int, int, Encounter, double, int, int, bool, bool, out List{BattleUnit})"/>
+        /// with the enemies <c>g</c> levels above the team: enemies at the cell's level + g, the team at
+        /// the cell's level, and where that puts the enemies outside 1-<see cref="SimOptions.MaxLevel"/>
+        /// the enemies stay at the bound and the team moves instead (the gap is kept). The initiative
+        /// tie split is the cell's. Nothing with the mix off.
+        /// </summary>
+        public void RunGapMix(PveCell cell)
+        {
+            if (!_options.GapMixActive)
+            {
+                return;
+            }
+
+            int samples = Samples;
+            int teams = Teams.Count;
+            int slots = teams * samples;
+            int compositions = cell.Shape.Compositions.Count;
+            int[] gaps = new int[cell.Battles.Length];
+            bool[][] playersWinTies = new bool[compositions][];
+            for (int c = 0; c < compositions; c++)
+            {
+                Encounter encounter = cell.Shape.Compositions[c];
+                playersWinTies[c] = PlayersWinTies(cell.Mode, cell.Level, encounter.Id);
+                int[] order = new int[slots];
+                for (int i = 0; i < slots; i++)
+                {
+                    order[i] = i;
+                }
+
+                Random rng = new Random(DeriveSeed(unchecked(_options.Seed + GapMixSeedOffset), cell.Mode, cell.Level, encounter.Id, -1, -1));
+                for (int i = slots - 1; i > 0; i--)
+                {
+                    int j = rng.Next(i + 1);
+                    int swap = order[i];
+                    order[i] = order[j];
+                    order[j] = swap;
+                }
+
+                for (int p = 0; p < slots; p++)
+                {
+                    gaps[(c * slots) + order[p]] = _options.GapAt((p + 0.5) / slots, c % 2 == 1);
+                }
+            }
+
+            PveBattle[] battles = new PveBattle[cell.Battles.Length];
+            Parallel.For(0, battles.Length, i =>
+            {
+                int gap = gaps[i];
+                if (gap == 0)
+                {
+                    battles[i] = cell.Battles[i];
+                    return;
+                }
+
+                int c = cell.CompositionOf(i);
+                int t = cell.TeamOf(i);
+                int teamLevel = cell.Level;
+                int enemyLevel = cell.Level + gap;
+                if (enemyLevel > SimOptions.MaxLevel || enemyLevel < 1)
+                {
+                    enemyLevel = enemyLevel > SimOptions.MaxLevel ? SimOptions.MaxLevel : 1;
+                    teamLevel = enemyLevel - gap;
+                }
+
+                battles[i] = RunBattle(cell.Mode, teamLevel, enemyLevel, cell.Shape.Compositions[c], cell.Multiplier, t, i % samples, false, playersWinTies[c][t], out _);
+            });
+
+            cell.MixBattles = battles;
+            cell.GapMixGaps = gaps;
+        }
+
+        /// <summary>Added to the base seed for the <see cref="RunGapMix"/> deal, so it is no other draw.</summary>
+        private const int GapMixSeedOffset = 0x6a9;
 
         private static double ClearRate(PveBattle[] battles)
         {
@@ -955,7 +1187,8 @@ namespace BeastCraft.Tooling.BalanceSim
                 int member = slots[s];
                 int speciesIndex = team[member];
                 string id = playerPrefix + "p" + (s + 1).ToString(System.Globalization.CultureInfo.InvariantCulture);
-                members[member] = BattleUnitFactory.CreateBeast(id, BattleTeam.Player, _species[speciesIndex], level, null, playerTiles[s],
+                members[member] = BattleUnitFactory.CreateBeast(id, BattleTeam.Player, _species[speciesIndex], level,
+                                                                GearFor == null ? null : GearFor(_species[speciesIndex], level), playerTiles[s],
                                                                 BeastLoadout(speciesIndex, mode));
                 requests.Add(new PlacementRequest(id, playerTiles[s]));
             }
@@ -992,13 +1225,30 @@ namespace BeastCraft.Tooling.BalanceSim
                 battle.MemberEscortDamage = new int[team.Length];
             }
 
-            Random rng = new Random(DeriveSeed(_options.Seed, mode, level, encounter.Id, teamIndex, sample));
+            int battleSeed = DeriveSeed(_options.Seed, mode, level, encounter.Id, teamIndex, sample);
+            Random rng = new Random(battleSeed);
+            if (Consumable != null)
+            {
+                // As BattleSession.Run: before the bonds and passives, on the battle's consumable stream.
+                ConsumableLoadout.Apply(new[] { Consumable }, members, units.FindAll(u => u.Team == BattleTeam.Enemy), grid,
+                                        new Random(BeastCraft.Progression.LootRoller.DeriveSeed(battleSeed, BeastCraft.Progression.PostBattleAward.ConsumableStream)));
+            }
             PassiveLoadout passives = null;
             BattleUnit avatar = withAvatar ? Avatar.Build(_options.AvatarLevel > 0 ? _options.AvatarLevel : level, out passives) : null;
 
             // The avatar fills its own ATB gauge: it is in the turn order, never in the targeting roster.
             TurnManager turnManager = new TurnManager(avatar == null ? units : new List<BattleUnit>(units) { avatar });
             TeamBondLoadout bonds = TeamBonds[teamIndex].Count == 0 ? null : new TeamBondLoadout(TeamBonds[teamIndex], members);
+            if (bonds != null && bonds.HasReactions)
+            {
+                battle.BondReactions = new int[BondIndex.Count];
+            }
+
+            if (bonds != null && mode == KitMode.Neutral)
+            {
+                // Element-neutral mode: a behaviour bond's reaction strikes without an element, like every skill.
+                bonds.ReactionElementOverride = Element.None;
+            }
             BattleOutcome outcome;
             long elapsedTicks;
             int actions;
@@ -1082,10 +1332,11 @@ namespace BeastCraft.Tooling.BalanceSim
 
                         lastTurnTicks = turnManager.ElapsedTicks;
                         BattleTurnResult turn = current == avatar
-                            ? BattleTurnExecutor.ExecuteAvatarTurn(avatar, units, grid, rng, passives)
-                            : BattleTurnExecutor.ExecuteTurn(current, units, grid, rng, avatar, passives);
+                            ? BattleTurnExecutor.ExecuteAvatarTurn(avatar, units, grid, rng, passives, bonds)
+                            : BattleTurnExecutor.ExecuteTurn(current, units, grid, rng, avatar, passives, bonds);
                         actions++;
                         CountPassives(battle, turn.PassiveActivations);
+                        CountReactions(battle, turn.BondReactions);
                         CountAvatar(battle, turn, avatar);
 
                         bool actorIsMember = memberIndex.TryGetValue(current, out int actor);
@@ -1350,6 +1601,22 @@ namespace BeastCraft.Tooling.BalanceSim
             else
             {
                 battle.BeastShieldAbsorbed += amount;
+            }
+        }
+
+        private void CountReactions(PveBattle battle, IReadOnlyList<BondReactionRecord> reactions)
+        {
+            if (battle.BondReactions == null)
+            {
+                return;
+            }
+
+            foreach (BondReactionRecord reaction in reactions)
+            {
+                if (reaction.Bond != null && BondIndex.TryGetValue(reaction.Bond, out int index))
+                {
+                    battle.BondReactions[index]++;
+                }
             }
         }
 

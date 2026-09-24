@@ -15,6 +15,13 @@ namespace BeastCraft.Battle
         /// Applies the <see cref="StatusType"/> named by <see cref="SkillEffect.Status"/>; see
         /// <see cref="StatusEffects"/>. Does nothing when that is <see cref="StatusType.None"/>.
         /// </summary>
-        ApplyStatus = 4
+        ApplyStatus = 4,
+
+        /// <summary>
+        /// Removes every <see cref="StatusType.Stun"/> and <see cref="StatusType.DamageOverTime"/>
+        /// the target carries (<see cref="StatusEffects.Cleanse"/>). <see cref="SkillEffect.Magnitude"/>
+        /// is not read.
+        /// </summary>
+        Cleanse = 5
     }
 }

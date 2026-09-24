@@ -86,6 +86,19 @@ namespace BeastCraft.Session
         /// <summary>Whether <see cref="BattleSession.ApplyRewards"/> has already paid this battle out.</summary>
         public bool RewardsApplied { get; internal set; }
 
+        /// <summary>
+        /// The consumables used as the battle began (<see cref="BattleSetup.Consumables"/>), already
+        /// spent from the pack by <see cref="BattleSession.Run"/> (see <see cref="ConsumablesDeducted"/>).
+        /// </summary>
+        public IReadOnlyList<string> ConsumablesUsed { get; internal set; } = new List<string>();
+
+        /// <summary>
+        /// Whether <see cref="BattleSession.Run"/> already took <see cref="ConsumablesUsed"/> from the
+        /// save's pack (it does, for every battle that began with a consumable), so
+        /// <see cref="BattleSession.ApplyRewards"/> only reports them rather than spending them again.
+        /// </summary>
+        public bool ConsumablesDeducted { get; internal set; }
+
         /// <summary>The unit id <paramref name="beastId"/> fought as, or null.</summary>
         public string UnitIdFor(string beastId)
         {

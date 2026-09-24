@@ -3,9 +3,10 @@
 #
 # Running the real EditMode/PlayMode suites needs a Unity Editor image and a
 # `UNITY_LICENSE` repository secret, neither of which exists yet. Until that
-# secret is provisioned, the only automated C# validation is the stub-based
-# compile + format check below (see Tooling/CiStubs/README.md for how that
-# works and what it does and does not prove).
+# secret is provisioned, the automated C# validation is stub-based: the
+# compile + format check of the game scripts, and the EditMode suite run with
+# NUnit outside Unity by Tooling/EditModeTests (see Tooling/CiStubs/README.md
+# for how both work and what they do and do not prove).
 #
 # When a Unity job is eventually added, it must follow this repo's CI-budget
 # discipline: a Unity Editor runner is an order of magnitude more expensive in
@@ -37,7 +38,8 @@ permissions:
 jobs:
   # Single job, no matrix: Unity Editor tests and mobile builds are out of
   # scope here. This compiles the real game scripts against the hand-written
-  # UnityEngine stub in Tooling/CiStubs, which needs no Unity install.
+  # UnityEngine stub in Tooling/CiStubs, which needs no Unity install, and
+  # runs the EditMode suite against the same stub.
   lint-and-compile:
     name: Lint and compile (C#)
     runs-on: ubuntu-latest
@@ -54,16 +56,14 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
-          # NuGet caching is intentionally disabled. Neither CiLint nor
-          # UnityStub declares a single PackageReference, so a restore pulls
-          # nothing down and ~/.nuget/packages/ is never created on a clean
-          # runner. That leaves the cache with nothing to hold -- and rather
-          # than being merely useless, `cache: true` then fails the job
-          # outright in setup-dotnet's post step ("Cache folder path is
-          # retrieved for .NET CLI but doesn't exist on disk"). It does not
-          # reproduce locally, where an existing global package folder hides
-          # the problem. Re-enable this (keyed on the .csproj files) if either
-          # project ever gains real PackageReferences.
+          # NuGet caching is intentionally disabled. CiLint and UnityStub
+          # declare no PackageReference; EditModeTests does (the test SDK and
+          # NUnit, three small packages restored in seconds), but no project
+          # commits a packages.lock.json, which setup-dotnet's cache keys on
+          # by default, and with CiLint alone `cache: true` failed the job in
+          # the post step ("Cache folder path is retrieved for .NET CLI but
+          # doesn't exist on disk"). Re-enable it with a lock file (or an
+          # explicit cache-dependency-path) if restores ever get slow.
           cache: false
 
       - name: Format check (dotnet format)
@@ -75,4 +75,20 @@ jobs:
       - name: Compile check (dotnet build)
         run: >-
           dotnet build Tooling/CiStubs/CiLint/CiLint.csproj
+          --configuration Release
+
+      # The EditMode suite, outside Unity: Tooling/EditModeTests compiles the
+      # Runtime, Editor and Tests/EditMode scripts against the UnityStub
+      # sources (with a real JsonUtility over System.Text.Json) and runs them
+      # with NUnit. Still no Unity install; Unity's Test Runner stays the
+      # authority on real serialization.
+      - name: Format check (EditModeTests)
+        run: >-
+          dotnet format Tooling/EditModeTests
+          --verify-no-changes
+          --verbosity diagnostic
+
+      - name: EditMode tests (dotnet test)
+        run: >-
+          dotnet test Tooling/EditModeTests
           --configuration Release

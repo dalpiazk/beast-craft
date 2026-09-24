@@ -68,6 +68,14 @@ namespace BeastCraft.Editor.Data
                 }
             }
 
+            if (errors.Count == 0)
+            {
+                foreach (string warning in EncounterDifficultyTable.Warnings(difficulty, encounters))
+                {
+                    Debug.LogWarning(LogPrefix + "encounter-difficulty.json: " + warning);
+                }
+            }
+
             if (errors.Count > 0)
             {
                 // All-or-nothing: a half-imported encounter set is worse than the previous good one.

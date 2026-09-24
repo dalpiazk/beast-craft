@@ -107,7 +107,7 @@ namespace BeastCraft.Tests.EditMode
             Assert.IsNotEmpty(DropTableValidator.Validate(null));
 
             DropTableData table = Minimal();
-            table.SchemaVersion = 2;
+            table.SchemaVersion = DropTableData.CurrentSchemaVersion + 1;
             AssertError(table, "SchemaVersion");
         }
 

@@ -37,6 +37,11 @@ namespace BeastCraft.Tooling.BalanceSim
                 return PacingSimulator.Run(options);
             }
 
+            if (options.RunCampaign)
+            {
+                return CampaignPacingSimulator.Run(options);
+            }
+
             string rosterPath = RosterLoader.ResolvePath(options.RosterPath);
             if (rosterPath == null || !File.Exists(rosterPath))
             {
@@ -72,6 +77,24 @@ namespace BeastCraft.Tooling.BalanceSim
                 if (options.Library == null)
                 {
                     return Fail("Skill library '" + libraryPath + "' is invalid:", errors);
+                }
+            }
+
+            if (options.RunPve && (options.Gear != GearProfile.None || options.EconomyProbe))
+            {
+                options.GearKits = GearKits.Load(options.GearLibraryPath, species, errors);
+                if (options.GearKits == null)
+                {
+                    return Fail("The gear library is invalid:", errors);
+                }
+            }
+
+            if (options.RunPve && options.EconomyProbe)
+            {
+                options.Consumables = EconomyProbe.LoadConsumables(options.ConsumableLibraryPath, errors);
+                if (options.Consumables == null)
+                {
+                    return Fail("The consumable library is invalid:", errors);
                 }
             }
 
@@ -147,6 +170,18 @@ namespace BeastCraft.Tooling.BalanceSim
             if (problems.Count > 0)
             {
                 return Fail("Self-check failed:", problems, 3);
+            }
+
+            if (options.RunPve && pve != null)
+            {
+                // The game's TeamSuggester, given the whole roster, must field exactly the simulator's bond-aware pick.
+                int matches = ScoutedPicker.SuggesterParity(options, species, pve, encounters.Shapes, out int compositions);
+                Console.Error.WriteLine("TeamSuggester parity: " + matches + " of " + compositions + " compositions suggest the simulator's bond-aware pick (" +
+                                        SimOptions.Format(compositions == 0 ? 100.0 : (100.0 * matches) / compositions) + "%).");
+                if (matches != compositions)
+                {
+                    return Fail("Self-check failed:", new List<string> { "TeamSuggester disagrees with the simulator's bond-aware pick." }, 3);
+                }
             }
 
             if (options.SelfCheck)
@@ -291,6 +326,17 @@ namespace BeastCraft.Tooling.BalanceSim
                             }
 
                             pve.RunAvatarValue(cell);
+                            if (options.GapMixActive)
+                            {
+                                Stopwatch mixClock = Stopwatch.StartNew();
+                                pve.RunGapMix(cell);
+                                if (options.Timings)
+                                {
+                                    Console.Error.WriteLine("[timings] " + SimOptions.ModeName(mode) + "/" + shape.Id + "/L" + level + " gap mix: " +
+                                                            Seconds(mixClock.Elapsed) + " s.");
+                                }
+                            }
+
                             if (cell.Battles == null || cell.Battles.Length != shape.Compositions.Count * pve.Teams.Count * pve.Samples)
                             {
                                 problems.Add("PvE " + SimOptions.ModeName(mode) + "/" + shape.Id + "/L" + level + " did not field every team against every composition.");
@@ -299,6 +345,24 @@ namespace BeastCraft.Tooling.BalanceSim
                             cells.Add(cell);
                         }
                     }
+                }
+            }
+
+            if (options.PanelActive && pve != null)
+            {
+                Stopwatch panelClock = Stopwatch.StartNew();
+                foreach (KitMode mode in options.Modes)
+                {
+                    for (int e = 0; e < encounters.Shapes.Count; e++)
+                    {
+                        PveCell calibrated = cells.Find(c => c.Mode == mode && c.Level == options.PanelLevel && c.Shape == encounters.Shapes[e]);
+                        pve.RunPanel(mode, encounters.PanelShapes[e], calibrated);
+                    }
+                }
+
+                if (options.Timings)
+                {
+                    Console.Error.WriteLine("[timings] composition panel: " + Seconds(panelClock.Elapsed) + " s.");
                 }
             }
 
@@ -330,6 +394,10 @@ namespace BeastCraft.Tooling.BalanceSim
 
             // LF regardless of platform, so the report is byte-identical on Windows and Linux.
             string report = Report.Build(options, species, encounters, pve, cells, pvpRecords).Replace("\r\n", "\n");
+            if (options.EconomyProbe && options.RunPve)
+            {
+                report += EconomyProbe.Build(options, species, cells).Replace("\r\n", "\n");
+            }
             if (options.Timings)
             {
                 TimeSpan reportTime = clock.Elapsed - pveTime - pvpTime;
