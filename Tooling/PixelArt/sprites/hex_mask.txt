@@ -1,0 +1,7 @@
+# name: hex_mask
+# label: Hex mask (white fill, tinted in game)
+# kind: hex
+# size: 32x36
+# outline: none
+# fill: w
+# artkey: tile/hex/mask

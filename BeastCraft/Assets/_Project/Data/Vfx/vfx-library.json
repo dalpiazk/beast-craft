@@ -1,0 +1,680 @@
+{
+  "_readme": "Skill VFX (presentation only; never read by the battle). ElementDefaults: exactly one effect per Element (None included), used by every skill without an entry of its own. Skills: per-skill effects by skill id (beast skills, avatar actives, enemy-library skills). An effect: Motion Projectile (flies caster -> target over TravelMs, optionally drawing Projectile) or Instant; then at impact, per target: HitStopMs freeze, Flipbook (a pixel-art sheet by sprite Name; frame size must match the manifest), Particles (burst; speeds px/s, Gravity px/s^2, Colors are palette chars), ScreenShake (Amplitude virtual px, DurationMs), HitFlash (palette-char tint on the target), DamageNumber (palette-char colours; rises RisePx over RiseMs). Sheets and palette chars come from BeastCraft/Assets/_Project/Art/Pixel/pixel-art-manifest.json. Ranges and rules: BeastCraft.Vfx.VfxLibraryValidator. Tints multiply, so tinted sheets are drawn white (Tooling/PixelArt).",
+  "SchemaVersion": 1,
+  "ElementDefaults": [
+    {
+      "Element": "None",
+      "Effect": {
+        "Motion": "Projectile",
+        "TravelMs": 220,
+        "Projectile": {
+          "Sheet": "fx_spark",
+          "Tint": "3",
+          "Scale": 2,
+          "Additive": true
+        },
+        "Flipbook": {
+          "Sheet": "fx_hit_burst",
+          "FrameWidth": 24,
+          "FrameHeight": 24,
+          "Frames": 6,
+          "Fps": 16,
+          "Tint": "3",
+          "Scale": 1,
+          "Additive": false
+        },
+        "Particles": {
+          "Sheet": "fx_spark",
+          "Count": 8,
+          "SpeedMin": 30,
+          "SpeedMax": 80,
+          "LifetimeMs": 420,
+          "Colors": [
+            "3",
+            "4",
+            "2"
+          ],
+          "Gravity": 60,
+          "Additive": true
+        },
+        "ScreenShake": {
+          "Amplitude": 1,
+          "DurationMs": 120
+        },
+        "HitFlash": {
+          "Tint": "w",
+          "DurationMs": 90
+        },
+        "HitStopMs": 40,
+        "DamageNumber": {
+          "Color": "4",
+          "CritColor": "Y",
+          "RiseMs": 700,
+          "RisePx": 12
+        }
+      }
+    },
+    {
+      "Element": "Fire",
+      "Effect": {
+        "Motion": "Projectile",
+        "TravelMs": 220,
+        "Projectile": {
+          "Sheet": "fx_spark",
+          "Tint": "o",
+          "Scale": 2,
+          "Additive": true
+        },
+        "Flipbook": {
+          "Sheet": "fx_hit_burst",
+          "FrameWidth": 24,
+          "FrameHeight": 24,
+          "Frames": 6,
+          "Fps": 16,
+          "Tint": "o",
+          "Scale": 1,
+          "Additive": false
+        },
+        "Particles": {
+          "Sheet": "fx_spark",
+          "Count": 8,
+          "SpeedMin": 30,
+          "SpeedMax": 80,
+          "LifetimeMs": 420,
+          "Colors": [
+            "o",
+            "y",
+            "r"
+          ],
+          "Gravity": 60,
+          "Additive": true
+        },
+        "ScreenShake": {
+          "Amplitude": 1,
+          "DurationMs": 120
+        },
+        "HitFlash": {
+          "Tint": "w",
+          "DurationMs": 90
+        },
+        "HitStopMs": 40,
+        "DamageNumber": {
+          "Color": "4",
+          "CritColor": "Y",
+          "RiseMs": 700,
+          "RisePx": 12
+        }
+      }
+    },
+    {
+      "Element": "Water",
+      "Effect": {
+        "Motion": "Projectile",
+        "TravelMs": 220,
+        "Projectile": {
+          "Sheet": "fx_spark",
+          "Tint": "c",
+          "Scale": 2,
+          "Additive": true
+        },
+        "Flipbook": {
+          "Sheet": "fx_hit_burst",
+          "FrameWidth": 24,
+          "FrameHeight": 24,
+          "Frames": 6,
+          "Fps": 16,
+          "Tint": "c",
+          "Scale": 1,
+          "Additive": false
+        },
+        "Particles": {
+          "Sheet": "fx_spark",
+          "Count": 8,
+          "SpeedMin": 30,
+          "SpeedMax": 80,
+          "LifetimeMs": 420,
+          "Colors": [
+            "c",
+            "C",
+            "b"
+          ],
+          "Gravity": 60,
+          "Additive": true
+        },
+        "ScreenShake": {
+          "Amplitude": 1,
+          "DurationMs": 120
+        },
+        "HitFlash": {
+          "Tint": "w",
+          "DurationMs": 90
+        },
+        "HitStopMs": 40,
+        "DamageNumber": {
+          "Color": "4",
+          "CritColor": "Y",
+          "RiseMs": 700,
+          "RisePx": 12
+        }
+      }
+    },
+    {
+      "Element": "Earth",
+      "Effect": {
+        "Motion": "Projectile",
+        "TravelMs": 220,
+        "Projectile": {
+          "Sheet": "fx_spark",
+          "Tint": "M",
+          "Scale": 2,
+          "Additive": true
+        },
+        "Flipbook": {
+          "Sheet": "fx_hit_burst",
+          "FrameWidth": 24,
+          "FrameHeight": 24,
+          "Frames": 6,
+          "Fps": 16,
+          "Tint": "M",
+          "Scale": 1,
+          "Additive": false
+        },
+        "Particles": {
+          "Sheet": "fx_spark",
+          "Count": 8,
+          "SpeedMin": 30,
+          "SpeedMax": 80,
+          "LifetimeMs": 420,
+          "Colors": [
+            "M",
+            "m",
+            "n"
+          ],
+          "Gravity": 60,
+          "Additive": true
+        },
+        "ScreenShake": {
+          "Amplitude": 1,
+          "DurationMs": 120
+        },
+        "HitFlash": {
+          "Tint": "w",
+          "DurationMs": 90
+        },
+        "HitStopMs": 40,
+        "DamageNumber": {
+          "Color": "4",
+          "CritColor": "Y",
+          "RiseMs": 700,
+          "RisePx": 12
+        }
+      }
+    },
+    {
+      "Element": "Air",
+      "Effect": {
+        "Motion": "Projectile",
+        "TravelMs": 220,
+        "Projectile": {
+          "Sheet": "fx_spark",
+          "Tint": "a",
+          "Scale": 2,
+          "Additive": true
+        },
+        "Flipbook": {
+          "Sheet": "fx_hit_burst",
+          "FrameWidth": 24,
+          "FrameHeight": 24,
+          "Frames": 6,
+          "Fps": 16,
+          "Tint": "a",
+          "Scale": 1,
+          "Additive": false
+        },
+        "Particles": {
+          "Sheet": "fx_spark",
+          "Count": 8,
+          "SpeedMin": 30,
+          "SpeedMax": 80,
+          "LifetimeMs": 420,
+          "Colors": [
+            "a",
+            "A",
+            "4"
+          ],
+          "Gravity": 60,
+          "Additive": true
+        },
+        "ScreenShake": {
+          "Amplitude": 1,
+          "DurationMs": 120
+        },
+        "HitFlash": {
+          "Tint": "w",
+          "DurationMs": 90
+        },
+        "HitStopMs": 40,
+        "DamageNumber": {
+          "Color": "4",
+          "CritColor": "Y",
+          "RiseMs": 700,
+          "RisePx": 12
+        }
+      }
+    },
+    {
+      "Element": "Lightning",
+      "Effect": {
+        "Motion": "Projectile",
+        "TravelMs": 220,
+        "Projectile": {
+          "Sheet": "fx_spark",
+          "Tint": "Y",
+          "Scale": 2,
+          "Additive": true
+        },
+        "Flipbook": {
+          "Sheet": "fx_hit_burst",
+          "FrameWidth": 24,
+          "FrameHeight": 24,
+          "Frames": 6,
+          "Fps": 16,
+          "Tint": "Y",
+          "Scale": 1,
+          "Additive": false
+        },
+        "Particles": {
+          "Sheet": "fx_spark",
+          "Count": 8,
+          "SpeedMin": 30,
+          "SpeedMax": 80,
+          "LifetimeMs": 420,
+          "Colors": [
+            "Y",
+            "y",
+            "P"
+          ],
+          "Gravity": 60,
+          "Additive": true
+        },
+        "ScreenShake": {
+          "Amplitude": 1,
+          "DurationMs": 120
+        },
+        "HitFlash": {
+          "Tint": "w",
+          "DurationMs": 90
+        },
+        "HitStopMs": 40,
+        "DamageNumber": {
+          "Color": "4",
+          "CritColor": "Y",
+          "RiseMs": 700,
+          "RisePx": 12
+        }
+      }
+    },
+    {
+      "Element": "Ice",
+      "Effect": {
+        "Motion": "Projectile",
+        "TravelMs": 220,
+        "Projectile": {
+          "Sheet": "fx_spark",
+          "Tint": "C",
+          "Scale": 2,
+          "Additive": true
+        },
+        "Flipbook": {
+          "Sheet": "fx_hit_burst",
+          "FrameWidth": 24,
+          "FrameHeight": 24,
+          "Frames": 6,
+          "Fps": 16,
+          "Tint": "C",
+          "Scale": 1,
+          "Additive": false
+        },
+        "Particles": {
+          "Sheet": "fx_spark",
+          "Count": 8,
+          "SpeedMin": 30,
+          "SpeedMax": 80,
+          "LifetimeMs": 420,
+          "Colors": [
+            "C",
+            "4",
+            "c"
+          ],
+          "Gravity": 60,
+          "Additive": true
+        },
+        "ScreenShake": {
+          "Amplitude": 1,
+          "DurationMs": 120
+        },
+        "HitFlash": {
+          "Tint": "w",
+          "DurationMs": 90
+        },
+        "HitStopMs": 40,
+        "DamageNumber": {
+          "Color": "4",
+          "CritColor": "Y",
+          "RiseMs": 700,
+          "RisePx": 12
+        }
+      }
+    },
+    {
+      "Element": "Nature",
+      "Effect": {
+        "Motion": "Projectile",
+        "TravelMs": 220,
+        "Projectile": {
+          "Sheet": "fx_spark",
+          "Tint": "l",
+          "Scale": 2,
+          "Additive": true
+        },
+        "Flipbook": {
+          "Sheet": "fx_hit_burst",
+          "FrameWidth": 24,
+          "FrameHeight": 24,
+          "Frames": 6,
+          "Fps": 16,
+          "Tint": "l",
+          "Scale": 1,
+          "Additive": false
+        },
+        "Particles": {
+          "Sheet": "fx_spark",
+          "Count": 8,
+          "SpeedMin": 30,
+          "SpeedMax": 80,
+          "LifetimeMs": 420,
+          "Colors": [
+            "l",
+            "G",
+            "g"
+          ],
+          "Gravity": 60,
+          "Additive": true
+        },
+        "ScreenShake": {
+          "Amplitude": 1,
+          "DurationMs": 120
+        },
+        "HitFlash": {
+          "Tint": "w",
+          "DurationMs": 90
+        },
+        "HitStopMs": 40,
+        "DamageNumber": {
+          "Color": "4",
+          "CritColor": "Y",
+          "RiseMs": 700,
+          "RisePx": 12
+        }
+      }
+    },
+    {
+      "Element": "Metal",
+      "Effect": {
+        "Motion": "Projectile",
+        "TravelMs": 220,
+        "Projectile": {
+          "Sheet": "fx_spark",
+          "Tint": "3",
+          "Scale": 2,
+          "Additive": true
+        },
+        "Flipbook": {
+          "Sheet": "fx_hit_burst",
+          "FrameWidth": 24,
+          "FrameHeight": 24,
+          "Frames": 6,
+          "Fps": 16,
+          "Tint": "3",
+          "Scale": 1,
+          "Additive": false
+        },
+        "Particles": {
+          "Sheet": "fx_spark",
+          "Count": 8,
+          "SpeedMin": 30,
+          "SpeedMax": 80,
+          "LifetimeMs": 420,
+          "Colors": [
+            "3",
+            "q",
+            "2"
+          ],
+          "Gravity": 60,
+          "Additive": true
+        },
+        "ScreenShake": {
+          "Amplitude": 1,
+          "DurationMs": 120
+        },
+        "HitFlash": {
+          "Tint": "w",
+          "DurationMs": 90
+        },
+        "HitStopMs": 40,
+        "DamageNumber": {
+          "Color": "4",
+          "CritColor": "Y",
+          "RiseMs": 700,
+          "RisePx": 12
+        }
+      }
+    },
+    {
+      "Element": "Light",
+      "Effect": {
+        "Motion": "Projectile",
+        "TravelMs": 220,
+        "Projectile": {
+          "Sheet": "fx_spark",
+          "Tint": "w",
+          "Scale": 2,
+          "Additive": true
+        },
+        "Flipbook": {
+          "Sheet": "fx_hit_burst",
+          "FrameWidth": 24,
+          "FrameHeight": 24,
+          "Frames": 6,
+          "Fps": 16,
+          "Tint": "w",
+          "Scale": 1,
+          "Additive": false
+        },
+        "Particles": {
+          "Sheet": "fx_spark",
+          "Count": 8,
+          "SpeedMin": 30,
+          "SpeedMax": 80,
+          "LifetimeMs": 420,
+          "Colors": [
+            "w",
+            "y",
+            "h"
+          ],
+          "Gravity": 60,
+          "Additive": true
+        },
+        "ScreenShake": {
+          "Amplitude": 1,
+          "DurationMs": 120
+        },
+        "HitFlash": {
+          "Tint": "w",
+          "DurationMs": 90
+        },
+        "HitStopMs": 40,
+        "DamageNumber": {
+          "Color": "4",
+          "CritColor": "Y",
+          "RiseMs": 700,
+          "RisePx": 12
+        }
+      }
+    },
+    {
+      "Element": "Dark",
+      "Effect": {
+        "Motion": "Projectile",
+        "TravelMs": 220,
+        "Projectile": {
+          "Sheet": "fx_spark",
+          "Tint": "u",
+          "Scale": 2,
+          "Additive": true
+        },
+        "Flipbook": {
+          "Sheet": "fx_hit_burst",
+          "FrameWidth": 24,
+          "FrameHeight": 24,
+          "Frames": 6,
+          "Fps": 16,
+          "Tint": "u",
+          "Scale": 1,
+          "Additive": false
+        },
+        "Particles": {
+          "Sheet": "fx_spark",
+          "Count": 8,
+          "SpeedMin": 30,
+          "SpeedMax": 80,
+          "LifetimeMs": 420,
+          "Colors": [
+            "u",
+            "P",
+            "p"
+          ],
+          "Gravity": 60,
+          "Additive": true
+        },
+        "ScreenShake": {
+          "Amplitude": 1,
+          "DurationMs": 120
+        },
+        "HitFlash": {
+          "Tint": "w",
+          "DurationMs": 90
+        },
+        "HitStopMs": 40,
+        "DamageNumber": {
+          "Color": "4",
+          "CritColor": "Y",
+          "RiseMs": 700,
+          "RisePx": 12
+        }
+      }
+    }
+  ],
+  "Skills": [
+    {
+      "SkillId": "ember_shot",
+      "Effect": {
+        "Motion": "Projectile",
+        "TravelMs": 280,
+        "Projectile": {
+          "Sheet": "fx_ember",
+          "Tint": "",
+          "Scale": 2,
+          "Additive": true
+        },
+        "Flipbook": {
+          "Sheet": "fx_fire_burst",
+          "FrameWidth": 32,
+          "FrameHeight": 32,
+          "Frames": 8,
+          "Fps": 14,
+          "Tint": "",
+          "Scale": 2,
+          "Additive": false
+        },
+        "Particles": {
+          "Sheet": "fx_ember",
+          "Count": 18,
+          "SpeedMin": 40,
+          "SpeedMax": 120,
+          "LifetimeMs": 650,
+          "Colors": [
+            "Y",
+            "y",
+            "o",
+            "r"
+          ],
+          "Gravity": -40,
+          "Additive": true
+        },
+        "ScreenShake": {
+          "Amplitude": 2.5,
+          "DurationMs": 220
+        },
+        "HitFlash": {
+          "Tint": "Y",
+          "DurationMs": 120
+        },
+        "HitStopMs": 70,
+        "DamageNumber": {
+          "Color": "y",
+          "CritColor": "Y",
+          "RiseMs": 800,
+          "RisePx": 16
+        }
+      }
+    },
+    {
+      "SkillId": "flame_wave",
+      "Effect": {
+        "Motion": "Instant",
+        "TravelMs": 0,
+        "Flipbook": {
+          "Sheet": "fx_fire_burst",
+          "FrameWidth": 32,
+          "FrameHeight": 32,
+          "Frames": 8,
+          "Fps": 12,
+          "Tint": "",
+          "Scale": 2,
+          "Additive": false
+        },
+        "Particles": {
+          "Sheet": "fx_ember",
+          "Count": 24,
+          "SpeedMin": 50,
+          "SpeedMax": 150,
+          "LifetimeMs": 700,
+          "Colors": [
+            "Y",
+            "y",
+            "o",
+            "r"
+          ],
+          "Gravity": -30,
+          "Additive": true
+        },
+        "ScreenShake": {
+          "Amplitude": 3,
+          "DurationMs": 260
+        },
+        "HitFlash": {
+          "Tint": "Y",
+          "DurationMs": 120
+        },
+        "HitStopMs": 80,
+        "DamageNumber": {
+          "Color": "y",
+          "CritColor": "Y",
+          "RiseMs": 800,
+          "RisePx": 16
+        }
+      }
+    }
+  ]
+}

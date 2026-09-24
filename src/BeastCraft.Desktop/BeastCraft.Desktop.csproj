@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    BeastCraft.Desktop: the MonoGame DesktopGL host (desktop spike). Windows first; builds on Linux
+    too (DesktopGL is SDL2 + OpenGL, no Windows-only dependencies). No MGCB content pipeline, no
+    shaders: PNGs load at runtime with Texture2D.FromStream, text is the built-in pixel font.
+
+        dotnet run (project src/BeastCraft.Desktop, Release); see the README for the
+        screenshot mode's arguments.
+
+    Everything that is not drawing lives in src/BeastCraft.Presentation (engine-neutral) and the
+    game rules in src/BeastCraft.Core, so an Android host can reuse both. The content (data JSON and
+    the pixel art) is copied from BeastCraft/Assets/_Project into Content/ beside the executable.
+  -->
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <EnableNETAnalyzers>false</EnableNETAnalyzers>
+    <RootNamespace>BeastCraft.Desktop</RootNamespace>
+    <AssemblyName>BeastCraft.Desktop</AssemblyName>
+    <RollForward>Major</RollForward>
+    <TieredPGO>true</TieredPGO>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.5.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\BeastCraft.Core\BeastCraft.Core.csproj" />
+    <ProjectReference Include="..\BeastCraft.Presentation\BeastCraft.Presentation.csproj" />
+  </ItemGroup>
+
+  <!-- The content, copied beside the executable (GameContent.FindRoot looks there first). -->
+  <ItemGroup>
+    <None Include="..\..\BeastCraft\Assets\_Project\Data\**\*.json" Link="Content\Data\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\BeastCraft\Assets\_Project\Art\Pixel\*.png;..\..\BeastCraft\Assets\_Project\Art\Pixel\*.json" Link="Content\Art\Pixel\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

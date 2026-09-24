@@ -13,17 +13,22 @@ entirely original IP, built for phones.
 ```
 beast-craft/
 ├── src/
-│   └── BeastCraft.Core/    the game runtime: engine-neutral C# (netstandard2.1), no engine
-│                           references (Battle, Bonds, Creatures, Avatar, Skills, Progression,
-│                           Campaign, Economy, Encounters, Save, Session, Customization, Idle,
-│                           Common)
+│   ├── BeastCraft.Core/    the game runtime: engine-neutral C# (netstandard2.1), no engine
+│   │                       references (Battle, Bonds, Creatures, Avatar, Skills, Progression,
+│   │                       Campaign, Economy, Encounters, Save, Session, Customization, Idle,
+│   │                       Vfx data, Common)
+│   ├── BeastCraft.Presentation/  engine-neutral presentation: content loading, hex layout,
+│   │                       battle playback, VFX timeline/particles, pixel font (netstandard2.1)
+│   └── BeastCraft.Desktop/ the MonoGame DesktopGL host (desktop spike, net10.0)
 ├── BeastCraft/     LEGACY Unity project, no longer built (the game is moving to MonoGame).
 │   │               Still home to the authored data JSON and the test sources.
 │   ├── Assets/_Project/    all first-party content, namespaced under _Project/
-│   │   ├── Art/            sprites, backdrops, UI, key art (Characters/Creatures/Environments/UI/KeyArt)
+│   │   ├── Art/            sprites, backdrops, UI, key art (Characters/Creatures/Environments/UI/KeyArt);
+│   │   │                   Pixel/ = the generated placeholder pixel art + manifest (Tooling/PixelArt)
 │   │   ├── Audio/          Music/, Ambient/, SFX/
 │   │   ├── Data/           authored data: Creatures/beast-roster.json, Skills/skill-library.json
-│   │   │                   and Skills/drop-tables.json (sources of truth) + generated .asset instances
+│   │   │                   and Skills/drop-tables.json (sources of truth) + generated .asset instances;
+│   │   │                   Vfx/vfx-library.json (skill VFX, presentation only)
 │   │   ├── Prefabs/
 │   │   ├── Scenes/
 │   │   └── Scripts/        Tests/EditMode/ (the test suite, run by Tooling/EditModeTests);
@@ -34,7 +39,8 @@ beast-craft/
 ├── Pipeline/       OFFLINE, build-time-only asset generation. Never runs at runtime.
 ├── Tooling/        BalanceSim/: local-only headless balance simulator over the real
 │                   battle code. EditModeTests/: the `dotnet test` runner for the test
-│                   suite (CI runs it). Never shipped.
+│                   suite (CI runs it). PixelArt/: text-grid sprites -> placeholder PNGs
+│                   (Python + Pillow). Never shipped.
 ├── docs/           design/ and balance/ (simulator reports, tuning log, research) notes;
 │                   architecture/ is an empty placeholder
 └── .github/        CI workflows
@@ -48,8 +54,9 @@ between "ours" and "imported" stays obvious in the Project window and in diffs.
 ## Stack
 
 > **Engine migration.** The game is moving from Unity to **MonoGame**. The runtime
-> (`src/BeastCraft.Core`) is already engine-neutral C#; the MonoGame host is not
-> built yet, and the Unity project under `BeastCraft/` is legacy and no longer
+> (`src/BeastCraft.Core`) is already engine-neutral C#; the MonoGame host exists as
+> a desktop spike (`src/BeastCraft.Desktop`, see
+> [Running the game](#running-the-game-desktop-spike)), and the Unity project under `BeastCraft/` is legacy and no longer
 > builds (its Editor importers expect ScriptableObjects, which are now plain
 > classes). The Unity-specific lines below are the original plan.
 
@@ -105,7 +112,8 @@ steps below are for the legacy Unity project, which no longer builds.
 ## Status
 
 **Pre-alpha: a headless, deterministic battle and progression core with its
-data and tooling. No playable build — nothing is rendered, and the Unity
+data and tooling, and a MonoGame desktop spike that renders one real battle
+with placeholder pixel art and skill VFX. No playable game yet, and the Unity
 project has never been opened in the Editor.**
 
 ### What exists
@@ -169,6 +177,9 @@ The numbers are simulator-tuned starting points, not confirmed balance — see
   ```sh
   dotnet format src/BeastCraft.Core/BeastCraft.Core.csproj --verify-no-changes
   dotnet build  src/BeastCraft.Core/BeastCraft.Core.csproj --configuration Release
+  dotnet format src/BeastCraft.Presentation/BeastCraft.Presentation.csproj --verify-no-changes
+  dotnet format src/BeastCraft.Desktop/BeastCraft.Desktop.csproj --verify-no-changes
+  dotnet build  src/BeastCraft.Desktop/BeastCraft.Desktop.csproj --configuration Release
   dotnet format Tooling/EditModeTests --verify-no-changes
   dotnet test   Tooling/EditModeTests --configuration Release
   ```
@@ -189,9 +200,10 @@ The numbers are simulator-tuned starting points, not confirmed balance — see
 
 ### What does not exist yet
 
-- Anything the player sees or touches: no scenes, prefabs, UI, rendering,
-  animation, audio playback or input handling (`Scenes/` and `Prefabs/` are
-  empty, and no runtime script is a MonoBehaviour).
+- Anything the player sees or touches beyond the desktop spike's battle viewer:
+  no menus, map, team building, audio or touch input; the spike's art is
+  placeholder (`Scenes/` and `Prefabs/` are empty, and no runtime script is a
+  MonoBehaviour).
 - Encounters as game data — the only encounters are the balance simulator's
   generator and its `Tooling/BalanceSim/encounters.json`.
 - Gear content — the gear schemas and save support exist, but `Data/Gear/` and
@@ -202,6 +214,39 @@ The numbers are simulator-tuned starting points, not confirmed balance — see
   the offline art compositor, and any UGS integration.
 - PlayMode tests (the assembly exists, with no tests) and any Unity test run
   in CI.
+
+### Running the game (desktop spike)
+
+`src/BeastCraft.Desktop` is a MonoGame DesktopGL app (MonoGame 3.8.5.1, net10.0;
+Windows first, and it builds on Linux). It fights one real PvE battle through the
+game's own session code — Phoenix, Golem and Kirin (level 20) against the Hollow
+Warden encounter (a champion and two brutes, level 10), seed 20260924 — and
+draws it pixel-perfect: a 640x360 frame scaled up by a whole number.
+
+```
+git lfs install && git lfs pull          # the pixel art is in Git LFS
+dotnet run --project src/BeastCraft.Desktop -c Release
+```
+
+**Space** plays the next turn (or finishes the one playing), **A** toggles
+auto-play, **Esc** quits. Each fired skill plays its VFX from
+`Data/Vfx/vfx-library.json`; Phoenix's Ember Shot and Flame Wave are fully
+authored, every other skill uses its element's default.
+
+Screenshot mode renders one frame to a PNG and exits (it still opens a window
+briefly, for the graphics device):
+
+```
+dotnet run --project src/BeastCraft.Desktop -c Release -- --screenshot shot.png --turns 1 --skill ember_shot
+```
+
+`--turns N` plays N turns and shows the Nth; `--skill ID` then carries on to the
+first turn that fires that skill; `--at MS` picks the moment inside that turn
+(default: the skill's VFX mid-play); `--scale K` (default 2), `--seed S`,
+`--level L`, `--enemy-level L` and `--content DIR` adjust the rest. The design,
+the VFX schema and the art pipeline are in
+[`docs/design/presentation-and-vfx.md`](docs/design/presentation-and-vfx.md);
+regenerating the art is in [`Tooling/PixelArt/README.md`](Tooling/PixelArt/README.md).
 
 ### Running it in Unity (legacy)
 

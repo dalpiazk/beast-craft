@@ -1,0 +1,11 @@
+# name: fx_ember
+# label: Ember particle
+# kind: particle
+# size: 5x5
+# outline: none
+# artkey: fx/particle/ember
+.....
+..y..
+.yYy.
+..y..
+.....

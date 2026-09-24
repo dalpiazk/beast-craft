@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    BeastCraft.Presentation: the engine-neutral half of the game's presentation layer. Everything a
+    renderer needs that is not drawing: loading the content JSON into the runtime, the hex board's
+    pixel layout, stepping a battle and snapshotting it, turning turn results into skill beats, the
+    VFX timeline and particle model, and a tiny built-in pixel font. Plain C# with no engine
+    references (no MonoGame types), so the desktop host (src/BeastCraft.Desktop), a later Android
+    host and the tests (Tooling/EditModeTests) share it.
+
+    netstandard2.1 and C# 9, like BeastCraft.Core, which it references.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <EnableNETAnalyzers>false</EnableNETAnalyzers>
+    <RootNamespace>BeastCraft.Presentation</RootNamespace>
+    <AssemblyName>BeastCraft.Presentation</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\BeastCraft.Core\BeastCraft.Core.csproj" />
+  </ItemGroup>
+
+</Project>

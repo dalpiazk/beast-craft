@@ -1,0 +1,11 @@
+# name: fx_fire_burst
+# label: Fire burst flipbook (8 frames)
+# kind: fx
+# size: 32x32
+# outline: none
+# generator: burst
+# frames: 8
+# ramp: Y y o r e
+# seed: 1907
+# frame_ms: 70
+# artkey: fx/flipbook/fire_burst

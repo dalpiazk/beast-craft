@@ -56,13 +56,29 @@ namespace BeastCraft.Session
         /// <summary>Validates <paramref name="setup"/>, builds the battle and plays it out. See the class remarks.</summary>
         public static BattleSessionResult Run(BattleSetup setup)
         {
+            BattleSessionRun run = Begin(setup);
+            return run.Battle == null ? run.Result : run.Finish();
+        }
+
+        /// <summary>
+        /// Everything <see cref="Run"/> does before the first turn — validation, the board, the
+        /// units, the consumables, the battle-start hook — returning the battle ready to step turn
+        /// by turn (<see cref="BattleSessionRun.Step"/>; a battle viewer's entry point) and then
+        /// <see cref="BattleSessionRun.Finish"/>ed into the same <see cref="BattleSessionResult"/>
+        /// <see cref="Run"/> returns. Same setup, same seed, same battle, stepped or not. A setup
+        /// that fails is a run with no <see cref="BattleSessionRun.Battle"/> and a failed
+        /// <see cref="BattleSessionRun.Result"/>.
+        /// </summary>
+        public static BattleSessionRun Begin(BattleSetup setup)
+        {
             BattleSessionResult result = new BattleSessionResult();
             List<string> errors = result.Errors;
+            BattleSessionRun failed = new BattleSessionRun(result);
 
             if (setup == null)
             {
                 errors.Add("No battle setup.");
-                return result;
+                return failed;
             }
 
             result.Seed = setup.Seed;
@@ -89,7 +105,7 @@ namespace BeastCraft.Session
 
             if (errors.Count > 0)
             {
-                return result;
+                return failed;
             }
 
             List<OwnedBeast> team = ResolveTeam(setup, save, content, errors);
@@ -108,7 +124,7 @@ namespace BeastCraft.Session
 
             if (errors.Count > 0)
             {
-                return result;
+                return failed;
             }
 
             HexGrid grid = new HexGrid(encounter.Arena);
@@ -116,14 +132,14 @@ namespace BeastCraft.Session
 
             if (!PlaceEnemies(grid, encounter, enemies, units, errors))
             {
-                return result;
+                return failed;
             }
 
             List<BattleUnit> members = PlaceTeam(grid, team, save, content, errors);
 
             if (members == null)
             {
-                return result;
+                return failed;
             }
 
             units.AddRange(members);
@@ -182,8 +198,17 @@ namespace BeastCraft.Session
 
             TurnManager turnManager = new TurnManager(avatar == null ? units : new List<BattleUnit>(units) { avatar });
             Random rng = new Random(setup.Seed);
-            BattleResult battle = BattleTurnExecutor.RunBattle(turnManager, units, grid, rng, avatar, passives, bonds, setup.MaxTime);
+            BattleRun battle = new BattleRun(turnManager, units, grid, rng, avatar, passives, bonds, setup.MaxTime);
+            return new BattleSessionRun(result, battle, grid, units, avatar, bonds, team, members);
+        }
 
+        /// <summary>
+        /// Fills <paramref name="result"/> from a finished battle: the record, board, units, bonds,
+        /// team unit ids and the skill-use counts. <see cref="BattleSessionRun.Finish"/>'s second half.
+        /// </summary>
+        internal static void Complete(BattleSessionResult result, BattleResult battle, HexGrid grid, List<BattleUnit> units, BattleUnit avatar,
+                                      TeamBondLoadout bonds, List<OwnedBeast> team, List<BattleUnit> members)
+        {
             result.Battle = battle;
             result.Grid = grid;
             result.Units = units;
@@ -204,8 +229,6 @@ namespace BeastCraft.Session
                 result.AvatarActiveUses = BattleSkillUsage.CountAvatarActiveUses(battle);
                 result.PassiveTriggers = BattleSkillUsage.CountPassiveTriggers(battle);
             }
-
-            return result;
         }
 
         /// <summary>

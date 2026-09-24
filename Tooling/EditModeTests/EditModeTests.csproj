@@ -5,9 +5,11 @@
 
         dotnet test Tooling/EditModeTests
 
-    References the game runtime, src/BeastCraft.Core, and compiles the suite's sources: the tests
+    References the game runtime, src/BeastCraft.Core, and the presentation layer,
+    src/BeastCraft.Presentation, and compiles the suite's sources: the tests
     under BeastCraft/Assets/_Project/Scripts/Tests/EditMode (their historical home in the retired
-    Unity project) and the golden-value tests beside this file (Goldens/).
+    Unity project), the golden-value tests beside this file (Goldens/) and the presentation tests
+    (Presentation/).
 
     CI runs it (.github/workflows/ci.yml: a dotnet format check, then dotnet test in Release), as a
     final gate only: run it locally before pushing (Actions budget).
@@ -28,6 +30,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\BeastCraft.Core\BeastCraft.Core.csproj" />
+    <!-- The engine-neutral presentation layer (content loading, hex layout, VFX timeline). -->
+    <ProjectReference Include="..\..\src\BeastCraft.Presentation\BeastCraft.Presentation.csproj" />
   </ItemGroup>
 
   <!--
@@ -40,6 +44,8 @@
     </Compile>
     <!-- Golden-value tests owned by this runner (see Goldens/GoldenFiles.cs). -->
     <Compile Include="Goldens\*.cs" />
+    <!-- Tests of src/BeastCraft.Presentation and the VFX library (Core's BeastCraft.Vfx). -->
+    <Compile Include="Presentation\*.cs" />
   </ItemGroup>
 
   <ItemGroup>

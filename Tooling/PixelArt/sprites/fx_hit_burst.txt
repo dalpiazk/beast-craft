@@ -1,0 +1,11 @@
+# name: fx_hit_burst
+# label: Generic hit burst (white, tinted in game)
+# kind: fx
+# size: 24x24
+# outline: none
+# generator: burst
+# frames: 6
+# ramp: w 4 3 2
+# seed: 4242
+# frame_ms: 60
+# artkey: fx/flipbook/hit_burst
