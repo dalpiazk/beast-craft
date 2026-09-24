@@ -153,6 +153,12 @@ What exists today:
   implementation that follows JsonUtility's field rules (see
   [`Tooling/CiStubs/README.md`](Tooling/CiStubs/README.md)); Unity's own Test
   Runner remains the authority on real serialization.
+- A **save system core** (`Scripts/Runtime/Save/`, no UI or file IO yet): a
+  versioned `PlayerSave` aggregate (beasts with species/level/XP and skill
+  books, avatar level and skill books, materials with cleared cells and pity),
+  JsonUtility-compatible; `SaveSerializer` over an injectable JSON engine with
+  a migration-step chain and load-time validation that reports unknown ids
+  instead of failing; storage behind the thin `ISaveStorage` seam.
 - A **battle-system design proposal** ([`docs/design/battle-system.md`](docs/design/battle-system.md))
   whose open questions are still awaiting producer confirmation.
 
