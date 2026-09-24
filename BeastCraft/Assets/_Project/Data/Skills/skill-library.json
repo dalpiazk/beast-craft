@@ -1821,18 +1821,18 @@
     {
       "BondId": "guardian",
       "DisplayName": "Guardian",
-      "Description": "Vanguards cover the beasts behind them: when an enemy's single-target attack is aimed at an adjacent non-Vanguard ally, a Vanguard may step in, bracing behind a small shield, and take the blow instead.",
+      "Description": "Vanguards cover the beasts behind them: when an enemy's single-target attack is aimed at a non-Vanguard ally within two hexes, the healthiest Vanguard may step in, bracing behind a shield, and take the blow instead.",
       "Condition": "Stance",
       "Stance": "Vanguard",
       "Scope": "Members",
       "Tiers": [
         {
           "MinCount": 2,
-          "Reaction": { "Trigger": "EnemyTargetsAlly", "Action": "Intercept", "Target": "Self", "TriggerFilter": "NonMembers", "Chance": 40, "Cooldown": 1, "Range": 1, "Effects": [ { "EffectType": "ApplyStatus", "Status": "Shield", "Magnitude": 15, "DurationTurns": 1 } ] }
+          "Reaction": { "Trigger": "EnemyTargetsAlly", "Action": "Intercept", "Target": "Self", "TriggerFilter": "NonMembers", "Chance": 60, "Cooldown": 1, "Range": 2, "Effects": [ { "EffectType": "ApplyStatus", "Status": "Shield", "Magnitude": 40, "DurationTurns": 1 } ], "ReactorOrder": "HealthiestFirst" }
         },
         {
           "MinCount": 3,
-          "Reaction": { "Trigger": "EnemyTargetsAlly", "Action": "Intercept", "Target": "Self", "TriggerFilter": "NonMembers", "Chance": 60, "Cooldown": 1, "Range": 1, "Effects": [ { "EffectType": "ApplyStatus", "Status": "Shield", "Magnitude": 15, "DurationTurns": 1 } ] }
+          "Reaction": { "Trigger": "EnemyTargetsAlly", "Action": "Intercept", "Target": "Self", "TriggerFilter": "NonMembers", "Chance": 80, "Cooldown": 1, "Range": 2, "Effects": [ { "EffectType": "ApplyStatus", "Status": "Shield", "Magnitude": 40, "DurationTurns": 1 } ], "ReactorOrder": "HealthiestFirst" }
         }
       ]
     },
@@ -1846,8 +1846,8 @@
       "Tiers": [
         {
           "MinCount": 2,
-          "Effects": [ { "EffectType": "BuffStat", "AffectedStat": "CritChance", "Magnitude": 6 } ],
-          "Reaction": { "Trigger": "AllyCrit", "Target": "TriggerTarget", "Cooldown": 1, "Range": 4, "Effects": [ { "EffectType": "Damage", "Magnitude": 45 } ] }
+          "Effects": [ { "EffectType": "BuffStat", "AffectedStat": "CritChance", "Magnitude": 3 } ],
+          "Reaction": { "Trigger": "AllyCrit", "Target": "TriggerTarget", "Cooldown": 1, "Range": 4, "Effects": [ { "EffectType": "Damage", "Magnitude": 25 } ] }
         }
       ]
     },
@@ -1861,11 +1861,11 @@
       "Tiers": [
         {
           "MinCount": 2,
-          "Reaction": { "Trigger": "AllyHitByEnemy", "Target": "Attacker", "TriggerFilter": "Members", "Chance": 40, "Cooldown": 1, "Range": 3, "Effects": [ { "EffectType": "Damage", "Magnitude": 40 } ] }
+          "Reaction": { "Trigger": "AllyHitByEnemy", "Target": "Attacker", "TriggerFilter": "Members", "Chance": 45, "Cooldown": 1, "Range": 3, "Effects": [ { "EffectType": "Damage", "Magnitude": 50 } ] }
         },
         {
           "MinCount": 3,
-          "Reaction": { "Trigger": "AllyHitByEnemy", "Target": "Attacker", "TriggerFilter": "Members", "Chance": 55, "Cooldown": 1, "Range": 3, "Effects": [ { "EffectType": "Damage", "Magnitude": 40 } ] }
+          "Reaction": { "Trigger": "AllyHitByEnemy", "Target": "Attacker", "TriggerFilter": "Members", "Chance": 60, "Cooldown": 1, "Range": 3, "Effects": [ { "EffectType": "Damage", "Magnitude": 50 } ] }
         }
       ]
     },
@@ -1893,21 +1893,21 @@
       "Tiers": [
         {
           "MinCount": 2,
-          "Reaction": { "Trigger": "MemberCrit", "Target": "TriggerTarget", "Cooldown": 2, "Effects": [ { "EffectType": "ApplyStatus", "Status": "Stun", "DurationTurns": 1, "Chance": 40 } ] }
+          "Reaction": { "Trigger": "MemberCrit", "Target": "TriggerTarget", "Cooldown": 2, "Effects": [ { "EffectType": "ApplyStatus", "Status": "Stun", "DurationTurns": 1, "Chance": 30 } ] }
         }
       ]
     },
     {
       "BondId": "bedrock",
       "DisplayName": "Bedrock",
-      "Description": "Stone and iron, layered: when an ally drops below half health, the healthiest Earth or Metal beast draws every enemy near it onto itself for two turns (once per ally per battle).",
+      "Description": "Stone and iron, layered: when an ally drops below 60% health, the healthiest Earth or Metal beast draws every enemy near it onto itself for three turns (once per ally per battle).",
       "Condition": "Elements",
       "Elements": [ "Earth", "Metal" ],
       "Scope": "Members",
       "Tiers": [
         {
           "MinCount": 2,
-          "Reaction": { "Trigger": "AllyBelowHpPercent", "Target": "EnemiesNearReactor", "ReactorOrder": "HealthiestFirst", "HpThresholdPercent": 50, "MaxPerTriggerUnit": 1, "Range": 2, "Effects": [ { "EffectType": "ApplyStatus", "Status": "Taunt", "DurationTurns": 2 } ] }
+          "Reaction": { "Trigger": "AllyBelowHpPercent", "Target": "EnemiesNearReactor", "ReactorOrder": "HealthiestFirst", "HpThresholdPercent": 60, "MaxPerTriggerUnit": 1, "Range": 3, "Effects": [ { "EffectType": "ApplyStatus", "Status": "Taunt", "DurationTurns": 3 } ] }
         }
       ]
     },
@@ -1921,21 +1921,21 @@
       "Tiers": [
         {
           "MinCount": 2,
-          "Reaction": { "Trigger": "AllyBelowHpPercent", "Target": "TriggeringAlly", "HpThresholdPercent": 35, "MaxPerTriggerUnit": 1, "Effects": [ { "EffectType": "ApplyStatus", "Status": "Shield", "Magnitude": 60, "DurationTurns": 2 }, { "EffectType": "Heal", "Magnitude": 20 } ] }
+          "Reaction": { "Trigger": "AllyBelowHpPercent", "Target": "TriggeringAlly", "HpThresholdPercent": 35, "MaxPerTriggerUnit": 1, "Effects": [ { "EffectType": "ApplyStatus", "Status": "Shield", "Magnitude": 50, "DurationTurns": 2 }, { "EffectType": "Heal", "Magnitude": 15 } ] }
         }
       ]
     },
     {
       "BondId": "twilight",
       "DisplayName": "Twilight",
-      "Description": "Light and Dark in balance: when an ally starts its turn stunned or burning, a Light or Dark beast clears it so the ally can act (twice per beast per battle).",
+      "Description": "Light and Dark in balance: when an ally starts its turn stunned or burning, a Light or Dark beast clears it and mends it so the ally can act (three times per beast per battle).",
       "Condition": "Elements",
       "Elements": [ "Light", "Dark" ],
       "Scope": "Members",
       "Tiers": [
         {
           "MinCount": 2,
-          "Reaction": { "Trigger": "AllyTurnStartAfflicted", "Target": "TriggeringAlly", "MaxPerMember": 2, "Effects": [ { "EffectType": "Cleanse" } ] }
+          "Reaction": { "Trigger": "AllyTurnStartAfflicted", "Target": "TriggeringAlly", "MaxPerMember": 3, "Effects": [ { "EffectType": "Cleanse" }, { "EffectType": "Heal", "Magnitude": 15 } ] }
         }
       ]
     },
@@ -1948,7 +1948,7 @@
       "Tiers": [
         {
           "MinCount": 3,
-          "Reaction": { "Trigger": "AllyDefeated", "Target": "Team", "MaxPerBattle": 2, "Effects": [ { "EffectType": "BuffStat", "AffectedStat": "Attack", "Magnitude": 15, "IsPercent": true, "DurationTurns": 3 }, { "EffectType": "BuffStat", "AffectedStat": "SpecialAttack", "Magnitude": 15, "IsPercent": true, "DurationTurns": 3 } ] }
+          "Reaction": { "Trigger": "AllyDefeated", "Target": "Team", "MaxPerBattle": 2, "Effects": [ { "EffectType": "BuffStat", "AffectedStat": "Attack", "Magnitude": 10, "IsPercent": true, "DurationTurns": 3 }, { "EffectType": "BuffStat", "AffectedStat": "SpecialAttack", "Magnitude": 10, "IsPercent": true, "DurationTurns": 3 } ] }
         }
       ]
     }

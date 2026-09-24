@@ -146,16 +146,17 @@ namespace BeastCraft.Tooling.BalanceSim
         /// </summary>
         public static readonly IReadOnlyDictionary<string, double> BondWeights = new Dictionary<string, double>(StringComparer.Ordinal)
         {
-            // 0.25 per point of pooled elemental panel excess (a 2-point bond weighs the old 0.5), none below 0.
+            // 0.1 per point of pooled elemental panel excess (5-seed mean at --target-clear 50), none below 0; at 0.25 per point
+            // the pick leaned on winter_grove over better element matchups and trailed the plain heuristic.
             { "guardian", 0.0 },
-            { "pack_hunters", 0.0 },
+            { "pack_hunters", 0.015 },
             { "crossfire", 0.0 },
-            { "wildfire", 0.425 },
-            { "storm_front", 0.15 },
-            { "bedrock", 0.175 },
-            { "winter_grove", 0.775 },
+            { "wildfire", 0.02 },
+            { "storm_front", 0.02 },
+            { "bedrock", 0.1 },
+            { "winter_grove", 0.34 },
             { "twilight", 0.0 },
-            { "combined_arms", 0.225 },
+            { "combined_arms", 0.005 },
         };
 
         /// <summary>Bond-aware score per stack of each active scaling (<c>PerCount</c>) bond.</summary>
