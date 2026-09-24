@@ -36,7 +36,7 @@
       "Camp": [ "Cloudrest Camp", "Windbreak Camp", "Eyrie Hearth", "Sheltered Crag", "Sunrise Ledge", "Lee Side Rest", "Pinecrag Camp", "Bellrock Camp" ],
       "TradingPost": [ "Sky Market", "Pulley Post", "Kite Trader", "Cliff Stall", "Windmill Exchange", "Feather Barter", "Crag Wagon", "Cloud Bazaar" ],
       "Pass": [ "Gale Pass", "Windgate", "Sky Bridge", "Cloudstep Gap", "Howling Notch", "Rope Bridge Pass", "High Saddle", "Crag Stair" ],
-      "Lair": [ "Titan Summit", "Galecrown Peak", "Eye of the Wind", "Skyseal Spire", "Cloudbreak Summit", "Whirlwind Crag", "Highwind Throne", "Stormcrag Crown" ]
+      "Lair": [ "Titan Summit", "Galecrown Peak", "Windeye", "Skyseal Spire", "Cloudbreak Summit", "Whirlwind Crag", "Highwind Throne", "Stormcrag Crown" ]
     },
     {
       "RegionId": "r05",
@@ -63,7 +63,7 @@
       "Camp": [ "Lightning Rod Camp", "Storm Shelter", "Lee Spire Camp", "Thunderlull Camp", "Rumble Hearth", "Stillair Rest", "Glasslight Camp", "Cloudbreak Rest" ],
       "TradingPost": [ "Spark Market", "Stormglass Trader", "Coil Cart", "Thunder Exchange", "Bottled Bolt Stall", "Static Stall", "Spire Bazaar", "Bolt Barter" ],
       "Pass": [ "Thunder Gate", "Spire Bridge", "Stormgap", "Bolt Stair", "Crackling Pass", "Charged Arch", "Skyrend Notch", "Rumbling Ford" ],
-      "Lair": [ "Court of Thunder", "High Spire", "Stormseal Throne", "Crown of Bolts", "Eye of the Storm", "Tempest Peak", "Thunderhall", "Lightning Throne" ]
+      "Lair": [ "Court of Thunder", "High Spire", "Stormseal Throne", "Crown of Bolts", "Stormeye", "Tempest Peak", "Thunderhall", "Lightning Throne" ]
     },
     {
       "RegionId": "r08",

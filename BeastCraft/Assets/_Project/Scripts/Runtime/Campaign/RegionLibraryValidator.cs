@@ -17,7 +17,7 @@ namespace BeastCraft.Campaign
     /// <item>Map rules (the library's and every override) generate a map: at least 3 layers, a lane,
     /// a path, a rest row between the start and the top (or −1), positive weights of Battle, Elite,
     /// Shop or Rest, sane elite and shop counts, non-negative offsets, an elite shape.</item>
-    /// <item>Seals: caps 1-100, each granted by at most one boss; the starting cap covers the first
+    /// <item>Seals: a DisplayName and Description (player-facing), caps 1-100, each granted by at most one boss; the starting cap covers the first
     /// region; following the regions in order, the caps never fall and each covers the next
     /// region's max level.</item>
     /// <item>With the encounter library: every Battle shape, the elite shape, and every gate and boss
@@ -127,6 +127,16 @@ namespace BeastCraft.Campaign
                 if (seal.LevelCap < 1 || seal.LevelCap > MaxLevel)
                 {
                     errors.Add(where + ": LevelCap " + seal.LevelCap + " must be 1-" + MaxLevel + ".");
+                }
+
+                if (string.IsNullOrWhiteSpace(seal.DisplayName))
+                {
+                    errors.Add(where + ": DisplayName is empty.");
+                }
+
+                if (string.IsNullOrWhiteSpace(seal.Description))
+                {
+                    errors.Add(where + ": Description is empty.");
                 }
             }
 

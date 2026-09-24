@@ -1253,7 +1253,7 @@
     {
       "SkillId": "coup_de_grace",
       "DisplayName": "Coup de Grace",
-      "Description": "Finds the most wounded enemy in reach and finishes it: up to +60% damage against a nearly dead target.",
+      "Description": "Pounces on the most worn-down enemy in reach: up to +60% damage against a target that is nearly out of the fight.",
       "TargetShape": "SingleTarget",
       "Range": 3,
       "Cooldown": 2,
@@ -1322,7 +1322,7 @@
     {
       "SkillId": "predator_focus",
       "DisplayName": "Predator Focus",
-      "Description": "Narrows its eyes on the kill: +20 crit chance and more Special Attack for three turns.",
+      "Description": "Locks its eyes on its target: +20 crit chance and more Special Attack for three turns.",
       "TargetShape": "Self",
       "Range": 0,
       "Cooldown": 4,

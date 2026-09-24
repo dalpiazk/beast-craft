@@ -151,6 +151,7 @@ namespace BeastCraft.Tests.EditMode
             data.Regions[5].RegionId = "r99";
             data.Regions[6].RegionId = data.Regions[7].RegionId;
             data.Regions[8].TradingPost = null;
+            data.Regions[9].Lair[4] = "Eye of the Storm";
 
             List<string> errors = LocationNameTableValidator.Validate(data, regions);
 
@@ -167,12 +168,23 @@ namespace BeastCraft.Tests.EditMode
             StringAssert.Contains("Region 'r06' has no location names", all);
             StringAssert.Contains("Region 'r07' has no location names", all);
             StringAssert.Contains("Region 'r09' TradingPost has 0 names", all);
+            StringAssert.Contains("Region 'r10' Lair[4] 'Eye of the Storm' is 4 words; names are 1-3 words", all);
 
             Assert.IsNotEmpty(LocationNameTableValidator.Validate(null));
             LocationNameTableData wrongVersion = LoadNames();
             wrongVersion.SchemaVersion = 7;
             Assert.AreEqual(1, LocationNameTableValidator.Validate(wrongVersion).Count);
             Assert.IsEmpty(LocationNameTableValidator.Validate(LoadNames()), "valid without the region cross-check too");
+        }
+
+        [Test]
+        public void CountWords_SplitsOnWhitespace()
+        {
+            Assert.AreEqual(0, LocationNameTableValidator.CountWords(null));
+            Assert.AreEqual(0, LocationNameTableValidator.CountWords("   "));
+            Assert.AreEqual(1, LocationNameTableValidator.CountWords("Stormeye"));
+            Assert.AreEqual(3, LocationNameTableValidator.CountWords("Court of Thunder"));
+            Assert.AreEqual(4, LocationNameTableValidator.CountWords("Eye  of the	Wind"));
         }
 
         [Test]
