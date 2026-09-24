@@ -3001,3 +3001,41 @@ report does not depend on k or q).
   (19.7%), seed noise around the 3-seed means above.
 
 Reproduce: as above (about 160 s); each sweep row is the same run with the two constants edited.
+
+## Encounters as game content
+
+No balance change. The simulator's enemy types, encounter shapes and element-scheme weights moved out
+of `Tooling/BalanceSim/encounters.json` into game content,
+`BeastCraft/Assets/_Project/Data/Encounters/enemy-library.json` and `encounter-library.json`, by a
+one-off scripted conversion (skills into the skill library's `SkillData` shape, `ThreatBudget` into
+`ThreatMin` / `ThreatMax`, the scheme weights out of `SimOptions`); the generator moved into the
+Runtime (`EncounterGenerator`) and the simulator now draws through it and fields enemies through the
+game's `EnemyCatalog`. `encounters.json` keeps only the legacy fixed set.
+
+**The gate:** the fresh default report differs from the committed one only in its three provenance
+lines (the encounter files' paths and "game content" wording, "from the roster and the enemies"); so
+do the fixed-set (`--encounter-set fixed`, one line) and a level-gap run (`--levels 30,70 --level-gap
+-2,0,3`). Every number, composition, multiplier and clear rate is byte-identical. `tuned-report.md` and
+`level-gap-report.md` are regenerated with exactly those lines changed.
+
+The default run's calibrated multipliers are now also written for the game
+(`--write-difficulty`, `encounter-difficulty.json`):
+
+| Kit mode | Shape | L1 | L50 | L100 |
+| --- | --- | ---: | ---: | ---: |
+| `elemental` | `solo` | x1.152 | x1.168 | x1.160 |
+| `elemental` | `elite` | x1.133 | x1.141 | x1.094 |
+| `elemental` | `squad` | x1.348 | x1.320 | x1.367 |
+| `elemental` | `horde` | x1.367 | x1.250 | x1.285 |
+| `neutral` | `solo` | x0.969 | x0.984 | x0.988 |
+| `neutral` | `elite` | x0.867 | x0.891 | x0.902 |
+| `neutral` | `squad` | x1.277 | x1.266 | x1.313 |
+| `neutral` | `horde` | x1.367 | x1.313 | x1.289 |
+
+The game reads the `elemental` rows (linear between levels, clamped outside) times `DifficultyScale`
+1.0. **Pending producer review:** this is calibrated so a scouting, counter-picking player (the
+bond-aware heuristic pick) clears 50%; an unscouted team clears about 10-38% at these multipliers.
+The campaign's intended difficulty is not decided.
+
+Reproduce: `dotnet run --project Tooling/BalanceSim -c Release -- --out docs/balance/tuned-report.md
+--write-difficulty BeastCraft/Assets/_Project/Data/Encounters/encounter-difficulty.json`.

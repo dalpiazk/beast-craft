@@ -68,7 +68,7 @@ namespace BeastCraft.Tooling.BalanceSim
         /// Parses and validates the roster, then builds one <see cref="CreatureSpeciesSO"/> per
         /// species in file order. Returns null and fills <paramref name="errors"/> when the file
         /// does not parse or fails <see cref="BeastRosterValidator.Validate"/>. The growth curves are
-        /// returned by id too, so the encounter fixtures can scale on the same curves. The instances
+        /// returned by id too, so the enemies can scale on the same curves. The instances
         /// come from <see cref="BeastRosterBuilder.BuildAll"/>.
         /// </summary>
         public static List<CreatureSpeciesSO> Load(string path, List<string> errors, out Dictionary<string, GrowthRateCurve> curves)

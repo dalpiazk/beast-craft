@@ -40,7 +40,7 @@ dotnet run --project Tooling/BalanceSim -c Release -- [options]
 | `--scouted-detail <d>` | `full` | What the heuristic pickers see of each composition (`ScoutingDetail`): `full`, `elements-only` or `dominant-element`. |
 | `--scouted-vanguard-min <n>` | `1` | Fewest Vanguards a heuristic pick fields, 0 to `--team-size`. |
 | `--levels <list>` | `1,50,100` | Comma-separated levels; beasts and enemies fight at the same level (see `--level-gap` for fights across a level gap). |
-| `--encounter-set <s>` | `generated` | `generated`: random compositions per shape (see "Generated encounters"). `fixed`: the three hand-authored encounters (`boss`, `swarm`, `pack`). |
+| `--encounter-set <s>` | `generated` | `generated`: random compositions per shape of the game's encounter content (see "Generated encounters"). `fixed`: the three legacy hand-authored simulator fixtures (`boss`, `swarm`, `pack`) in `encounters.json`. |
 | `--compositions <n>` | `8` | Generated compositions per shape. |
 | `--encounters <list>` | all | Comma-separated shape ids (`solo`, `elite`, `squad`, `horde`) or, with `--encounter-set fixed`, encounter ids (`boss`, `swarm`, `pack`). |
 | `--team-size <n>` | `4` | Beasts per PvE team, 1-6. Every combination of the roster is fielded (C(10,4) = 210). |
@@ -58,7 +58,11 @@ dotnet run --project Tooling/BalanceSim -c Release -- [options]
 | `--samples <n>` | PvE 1 (generated) or 5 (fixed); PvP 5 | Battles per PvE team and composition (at the calibrated multiplier, and at every calibration step with `--calibrate-on mean`) and per PvP game, each with its own seed. Damage variance and crits make battles random; see "Sampling" below. |
 | `--matrix-level <n>` | `50` | Level of the PvP win matrix and the stat table (falls back to the highest simulated level). |
 | `--roster <path>` | found by walking up | Path to `beast-roster.json`. |
-| `--encounters-file <path>` | found by walking up | Path to `encounters.json`. |
+| `--enemy-library <path>` | found by walking up | Path to the game's `enemy-library.json` (`BeastCraft/Assets/_Project/Data/Encounters/`). |
+| `--encounter-library <path>` | found by walking up | Path to the game's `encounter-library.json` (same folder). |
+| `--drop-tables <path>` | found by walking up | Path to `drop-tables.json`: rolled by `--mode pacing`; in PvE the encounter library's shape ids are checked against it. |
+| `--encounters-file <path>` | found by walking up | Path to the legacy fixed set's `encounters.json` (beside this file). |
+| `--write-difficulty <path>` | off | PvE, generated set, one seed: also write the calibrated multipliers as the game's `encounter-difficulty.json` (see "Difficulty table for the game"). Never changes the report. |
 | `--avatar <preset>` | `library` | PvE only. `library` (the committed report's setting) fields the skill library's default avatar: its first three actives and `AvatarDefaultPassives`, at `--skill-level`. `support` fields a fixture avatar with three passive skills beside every player team (`AvatarPresets.cs`; not authored content). `none` fields no avatar. `library` and `support` add an "Avatar passives" section with firings per battle and the avatar's turns and active casts per battle. See `docs/design/battle-system.md`, "Avatar passives" and "Beast skill kits". |
 | `--avatar-level <n>` | encounter level | PvE only. The fielded avatar's level, 1-100: its fixture stats on the medium curve (Speed included) and its damage-formula level. By default each battle's encounter level (the avatar levels alongside the encounters; see `--mode pacing`, "Avatar level"). |
 | `--out <path>` | none | Also write the report to this file (it always goes to stdout). |
@@ -86,11 +90,11 @@ Two reports are committed, both the default arguments:
   avatar passives, sqrt speed and mitigation", "Element chart v2", "Thunderbird range vs move" and "Niche pass: Thunderbird opener, Phoenix/Frost Wyrm lifts, remaining negatives", then "Team bonds"; "Scouting and counter-picking" added the scouted-picking section, no balance change; "Avatar gauge" moved the avatar onto its own ATB gauge, no tuning; "Large enemies (footprints)" made the giant, colossus and champion multi-hex, no tuning beyond the bosses' range parity; "Scouting-based calibration" calibrates the difficulty on the bond-aware scouted pick instead of the average team, no balance change; "Scaling bonds" added three per-count stance bonds; milestone 2's final retune: "Avatar retune", "Thunderbird in `elite`", "Beast retune under the scouted calibration" and "Level-gap re-check"), under the real game setup (every beast's authored default loadout, the library
   avatar with its passives, the library's team bonds, skill level 1), the current Runtime (the square-root ATB turn order, the
   mitigation damage formula, `SpecialAttack`-scaled heals, combat stances, variance and crits) and
-  the generated encounters. Regenerate it whenever the roster, the skill library, fixtures, simulator
-  or Runtime change:
+  the generated encounters. Regenerate it, and the game's difficulty table with it, whenever the
+  roster, the skill library, the encounter content, the simulator or the Runtime change:
 
 ```sh
-dotnet run --project Tooling/BalanceSim -c Release -- --out docs/balance/tuned-report.md
+dotnet run --project Tooling/BalanceSim -c Release -- --out docs/balance/tuned-report.md --write-difficulty BeastCraft/Assets/_Project/Data/Encounters/encounter-difficulty.json
 ```
 
 ## Library kits
@@ -152,8 +156,8 @@ Ranged beasts, which never walk into melee, carry Shot (range 3) instead.
 element, crit and variance; adopted from Sword x Staff, see
 `docs/balance/research-sword-x-staff.md`). The powers were rescaled from the old level-term formula
 (Blast 40, Strike 57, Shot 41, Burst 20) so a neutral hit between two average level-50 roster beasts
-takes the same share of HP as before; enemy powers in `encounters.json` were rescaled the same way
-(`P' = round(1.52 P + 7)`).
+takes the same share of HP as before; enemy powers (then in `encounters.json`, now the game's
+`enemy-library.json`) were rescaled the same way (`P' = round(1.52 P + 7)`).
 
 The goal is that `Attack` and `SpecialAttack` (and `Defense` / `SpecialDefense`) carry equal weight
 for every stance. The first baseline did not manage that: Strike at cooldown 1 against Blast at
@@ -191,27 +195,40 @@ cooldown 2 weighted `Attack` about twice as heavily.
 - **Teams.** Every combination of `--team-size` distinct beasts (210 teams of 4, format
   `SmallGroup`; each beast is in 84). No gear; the `--avatar` preset (by default the library avatar)
   fights beside every team.
-- **Encounters.** `encounters.json` beside this file. **These are simulator fixtures, not game
-  content:** synthetic enemies that are not roster beasts, and no game code reads them. Each enemy
-  becomes an in-memory `CreatureSpeciesSO` on the roster's `medium` growth curve, so it is built by
-  the same `BattleUnitFactory.CreateBeast` and scales with level the same way as a beast. Enemy kits
-  are authored in the file and are `Element.None` in `neutral` mode. Two sets:
-  - **Generated (default).** An enemy type pool and four encounter shapes; the simulator draws
-    random compositions per shape (see "Generated encounters" below).
-  - **Fixed (`--encounter-set fixed`).** The three hand-authored encounters used before the
-    generator (`boss`: one Colossus; `swarm`: 12 biters + 12 stingers on a Large arena; `pack`: 3
-    direwolves + 3 wisps). Elements are listed per group and cycled over its units. The wisps and
-    stingers now aim at the beast with the least current HP (`CurrentHp`), no longer the lowest
-    maximum HP.
+- **Encounters.** Two sets:
+  - **Generated (default): game content.** The enemy library
+    (`BeastCraft/Assets/_Project/Data/Encounters/enemy-library.json`) and the encounter shapes
+    (`encounter-library.json` beside it), read through the game's own `EnemyLibraryValidator` and
+    `EncounterLibraryValidator` (against the roster and `drop-tables.json`) and fielded through the
+    game's `EnemyCatalog`, so the simulator fights exactly the enemies the game fields. The
+    compositions come from the game's `EncounterGenerator` (see "Generated encounters" below).
+    Until the "Encounters as game content" change these were simulator fixtures in `encounters.json`;
+    the move changed no number (the regenerated reports differ only in their provenance lines).
+  - **Fixed (`--encounter-set fixed`): simulator fixtures, not game content.** The three
+    hand-authored encounters used before the generator (`boss`: one Colossus; `swarm`: 12 biters +
+    12 stingers on a Large arena; `pack`: 3 direwolves + 3 wisps), still in `encounters.json`
+    beside this file (schema 3: each group is an enemy in the enemy-library shape plus `Count` and
+    `Elements`, cycled over its units). No game code reads them. The wisps and stingers aim at the
+    beast with the least current HP (`CurrentHp`).
 
-  Each enemy has a `Stance` (a `CombatStance` name; missing = `Vanguard`), and each skill an optional
-  `Targeting` (`Distance`, the default, `Stat`, `CurrentHp` or `HpFraction`; `Random` is refused so battles never
-  draw targets from the rng), `TargetingOrder` (default `Lowest`) and `TargetingStat` (default `HP`,
-  read only by `Stat`). `Stat` + `HP` compares the stat block, i.e. **maximum** HP; `CurrentHp`
-  compares the HP a beast has left, so `CurrentHp` + `Lowest` is "pick off the weakest"
-  (`SkillTargetResolver`). The loader rejects a Ranged enemy without a `SingleTarget` skill of range
-  2 or more (a Ranged unit never walks into melee), an enemy without a `SingleTarget` skill (the only
-  shape that walks), move 0, and a composition that cannot fit its deployment zone.
+  Either way each enemy becomes an in-memory `CreatureSpeciesSO` (one per enemy and element,
+  `EnemyCatalog`) on the roster's `medium` growth curve, so it is built by the same
+  `BattleUnitFactory.CreateBeast` and scales with level the same way as a beast; its kit is
+  `SkillLibraryBuilder.ApplySkill` over the authored skills, every skill in the unit's element
+  (`Element.None` in `neutral` mode).
+
+  Enemy skills use the skill library's `SkillData` shape. Each enemy has a `Stance` (a
+  `CombatStance` name; missing = `Vanguard`), and each skill an optional `TargetingCriterion`
+  (`Distance`, the default, `Stat`, `CurrentHp` or `HpFraction`; `Random` is refused so battles
+  never draw targets from the rng), `TargetingOrder` (default `Lowest`) and `TargetingStat`
+  (default `HP`, read only by `Stat`). `Stat` + `HP` compares the stat block, i.e. **maximum** HP;
+  `CurrentHp` compares the HP a beast has left, so `CurrentHp` + `Lowest` is "pick off the weakest"
+  (`SkillTargetResolver`). A skill's power is its `Damage` effect's `Magnitude`; a skill `Element`
+  is refused (every skill takes the unit's element). The validators reject a Ranged enemy without an
+  approaching skill (`SingleTarget` or `Line`) of range 2 or more (a Ranged unit never walks into
+  melee), an enemy without an approaching skill (the only shapes that walk), move 0, an enemy id
+  that is a roster species id, a shape id missing from the drop tables, and a composition that
+  cannot fit its deployment zone.
 
   Each enemy also has an optional `Footprint` (a `UnitFootprint` name; missing = `Single`, one
   tile): the giant and the colossus are `Hex7` (seven tiles, the boss size) and the champion
@@ -220,27 +237,25 @@ cooldown 2 weighted `Attack` about twice as heavily.
   tiles, an area hits it once, and a large caster's area grows from all its tiles, so the `Hex7`
   bosses author their ranges one lower than their one-tile values were (gaze 2, quake and roar 1: a
   radius-1 burst from a `Hex7` is the radius-2 disc around its centre) to keep their reach; the
-  champion's shockwave stays at 2. The loader packs every shape's worst case (each slot at its `Max`,
-  each unit its slot's largest type, largest first) and every fixed encounter into the enemy zone the
-  way a battle does, and refuses what does not fit: a `Hex7` enemy never fits a `Small` arena (a
-  two-row zone). The generator also refuses a draw that would not fit (a safety net; no valid file
-  produces one).
+  champion's shockwave stays at 2. The validators pack every shape's worst case (each slot at its
+  `Max`, each unit its slot's largest type, largest first), every template and every fixed encounter
+  into the enemy zone the way a battle does (`EncounterFit`), and refuse what does not fit: a `Hex7`
+  enemy never fits a `Small` arena (a two-row zone). The generator also refuses a draw that would not
+  fit (a safety net; no valid file produces one).
 
   The advanced effect fields are optional, and every one is inert when missing. See "Status effects
   and advanced skill effects" in `docs/design/battle-system.md`.
   - Per enemy: `StatusResist` (0–100, `BattleUnit.StatusResist`).
-  - Per skill: `HitCount`, `ExecuteBonusPercent`, `InitialCooldown` (−1 means the ordinary
-    cooldown) and `MaxUsesPerBattle`.
-  - Per skill: `Effects`, a list of further `SkillEffect`s applied after the damage effect. Each
-    entry has `Type`, `Status`, `Stat`, `Magnitude`, `DurationTurns`, `Chance`, `MaxStacks`,
-    `IsPercent`, `HitCount` and `ExecuteBonusPercent`. The enum-valued fields take the runtime enum
-    names.
-  - `Targeting` also accepts `HpFraction`.
+  - Per skill: `InitialCooldown` (−1 means the ordinary cooldown) and `MaxUsesPerBattle`.
+  - Per skill: `Effects`, the skill library's `EffectData` list (the damage effect with its
+    `HitCount` and `ExecuteBonusPercent`, then any further effects: `EffectType`, `Status`,
+    `AffectedStat`, `Magnitude`, `DurationTurns`, `Chance`, `MaxStacks`, `IsPercent`), checked by
+    the skill library's own effect rules. The enum-valued fields take the runtime enum names.
 
   The bosses (giant, champion and the fixed colossus) carry `StatusResist` 50. No fixture skill uses
   the other fields yet, so the reports are unchanged.
 - **Placement.** Each side takes the front-most tiles of its own deployment zone (front row first,
-  then outward from the centre line). Enemies are placed in fixture order by `DeploymentPacker`: each
+  then outward from the centre line). Enemies are placed in lineup order by `DeploymentPacker`: each
   takes the front-most anchor where its whole footprint fits the zone on free tiles, so one-tile
   enemies take exactly the front-most tiles and a `Hex7` boss on a Medium board sits centred on the
   middle row of the enemy zone, its escort filling the tiles around it (the layout is worked out once
@@ -360,7 +375,14 @@ The user's direction is PvE with enemy sides from one giant to about two dozen s
 enemy types, and elements that vary across battles and sometimes within one enemy team. The default
 encounter set simulates that.
 
-**Enemy type pool** (`EnemyTypes`; max-level base stats, speeds in a narrow 95-105 band):
+All of this is game content (`BeastCraft/Assets/_Project/Data/Encounters/`), and the draw is the
+game's own `EncounterGenerator` (`Runtime/Encounters`): the simulator makes one generator per run
+from `--seed` and draws `--compositions` lineups per shape through it (`GeneratedEncounters.cs`), so
+the compositions it calibrates are exactly what the game can field. The file readmes list every
+field.
+
+**Enemy library** (`enemy-library.json`, `Enemies`; max-level base stats, speeds in a narrow 95-105
+band; the powers below predate the formula rescaling, the file has the current numbers):
 
 | Type | Role | Threat | Stance | Kit (targeting) |
 | --- | --- | ---: | --- | --- |
@@ -381,7 +403,7 @@ physical and a special skill because, under the old level-term formula, every hi
 calibrated below 35% clear even at the minimum multiplier. (The current formula has no offset, only
 the 1-damage floor.)
 
-**Shapes** (`Shapes`):
+**Shapes** (`encounter-library.json`, `Shapes`; `ThreatMin`-`ThreatMax`):
 
 | Shape | Arena | Recipe | Threat budget |
 | --- | --- | --- | --- |
@@ -390,7 +412,7 @@ the 1-damage floor.)
 | `squad` | Medium | 4-6 from brute / stalker / archer / caster / shaman, at least 3 types | 10-12 |
 | `horde` | Large | 14-20 swarmlings / stinglings + 2-4 archers / casters, at least 3 types (16-24 enemies) | 12.5-14 |
 
-**Generator rules** (`EncounterGenerator`, seeded from `--seed` alone):
+**Generator rules** (the runtime `EncounterGenerator`, seeded from `--seed` alone):
 
 - For each shape in file order, `--compositions` times: pick a variant by weight, draw each slot's
   count uniformly in [Min, Max] and each unit's type uniformly from the slot's types, and keep the
@@ -398,8 +420,10 @@ the 1-damage floor.)
   (up to 2000 redraws; the first 200 also reject a repeat of an earlier composition of the shape).
   Every shape is generated whatever `--encounters` selects, so a shape's compositions do not depend
   on the filter.
-- Each composition then draws an element scheme: **one element** for the whole team (30%), **one per
-  type** (30%), **one per unit** (fully mixed, 25%) or **none** (15%). Elements are dealt from a
+- Each composition then draws an element scheme by the library's `SchemeWeights`: **one element**
+  for the whole team (30%), **one per type** (30%), **one per unit** (fully mixed, 25%) or **none**
+  (15%). `--enemy-element` overrides the elements after the draw, so it never changes what is
+  drawn. Elements are dealt from a
   shuffled deck of the ten elements, reshuffled when empty and shared by the whole generation, so
   every element is dealt before any is dealt twice; the default run deals far more than ten, so all
   ten always appear. The report lists every composition (types, counts, elements, scheme, dominant
@@ -429,11 +453,11 @@ to be simulator-side workarounds before they became Runtime rules:
   Without it, sides whose move plus range fell short of the gap between the deployment zones (8 hexes
   on a Large board) waited forever, and the fixture enemies had to be given board-spanning movement
   (boss 7, direwolves 9, wisps 7, swarm 13). They now move like beasts (roster band 2-5): 3 for the
-  giant, champion, brute, archer, caster and shaman, 4 for the stalker and the swarm. The loader only
-  requires move >= 1 and at least one `SingleTarget` skill, the only shape that walks (of range 2 or
-  more for a Ranged enemy).
-- **Combat stances** (`CombatStance`, per species in `beast-roster.json` and per group in
-  `encounters.json`). A Vanguard moves exactly as above, except that among equally short approaches
+  giant, champion, brute, archer, caster and shaman, 4 for the stalker and the swarm. The validator
+  only requires move >= 1 and at least one approaching skill (`SingleTarget` or `Line`, the only
+  shapes that walk; of range 2 or more for a Ranged enemy).
+- **Combat stances** (`CombatStance`, per species in `beast-roster.json` and per enemy in
+  `enemy-library.json`). A Vanguard moves exactly as above, except that among equally short approaches
   it stops nearest its closest Ranged or Skirmisher ally (screening it). A Ranged unit never walks
   into melee (a range-1 slot fires only at an adjacent enemy, otherwise it holds without moving).
   Ranged and Skirmisher units prefer stop tiles with fewer adjacent enemies and spend whatever
@@ -457,6 +481,20 @@ The default run has no stalemates, PvE or PvP.
   (kit mode, composition, level) a seeded shuffle of the team indices picks exactly half the teams
   to win ties (`PveSimulator.PlayersWinTies`). The prefix is side-wide, so the order within a side,
   and every targeting tie (targeting only ever compares units of one side), is unchanged.
+
+### Difficulty table for the game
+
+`--write-difficulty <path>` writes the run's calibrated multipliers, one per (kit mode, shape,
+level), as the game's `encounter-difficulty.json` (`DifficultyWriter.cs`; round-trip numbers, the
+same bytes for the same run). The committed file is the default run's (seed 12345, 8 compositions,
+levels 1 / 50 / 100, calibrated on the bond-aware scouted pick at 50%). The game reads its
+`elemental` cells through `EncounterDifficultyTable` (linear between calibrated levels, clamped
+outside them) and multiplies by `encounter-library.json`'s `DifficultyScale` (1.0). **Pending
+producer review:** the table is calibrated for a player who scouts and counter-picks, so an
+unscouted team clears about 10-38% of the shipped encounters (the report's "No-scouting clear");
+whether that is the campaign's intended difficulty, and so what `DifficultyScale` should be, is not
+decided. Only single-seed generated PvE runs can write it (`--seeds` and `--encounter-set fixed`
+are refused).
 
 ## Level gap
 
@@ -777,12 +815,14 @@ Measure before optimizing further: `--timings` prints the per-cell and per-step 
 
 Every battle gets its own `System.Random`, seeded from the base seed and the battle's inputs (never
 from the calibration multiplier), and the sample index; the generated compositions come from their
-own rng, seeded from the base seed alone. The kits target by distance, a stat or current HP, never
+own rng (the game's `EncounterGenerator`), seeded from the base seed alone. That rng is
+`System.Random`'s seeded (legacy) algorithm, which Mono and Unity share; an EditMode test pins its
+first draws. The kits target by distance, a stat or current HP, never
 at random, so a battle's rng is consulted only for damage rolls: crit then variance, two draws per
 damage effect that lands, in the Runtime's fixed order. Parallel results are stored by composition,
 team and sample index and aggregated in a fixed order. The report
 contains no timestamps, machine paths or timings, and always uses LF line endings. The same roster,
-fixtures, code and arguments produce a byte-identical report.
+content, fixtures, code and arguments produce a byte-identical report.
 
 ## Design assumptions (and what they bias)
 
@@ -796,9 +836,10 @@ fixtures, code and arguments produce a byte-identical report.
   combat stances there is no AI: nobody retreats when hurt, spreads out against area skills or
   focuses fire deliberately. Those are Runtime rules, not simulator choices, but they colour every
   number.
-- **Fixture enemies.** Their stat ratios, kits, threat weights and the generator's element schemes
-  decide which beasts look good. The calibration removes overall difficulty, but not shape. The type
-  pool is small and hand-made: which types exist, and how often each is drawn, is itself a bias.
+- **The enemy library.** Its stat ratios, kits, threat weights and the element-scheme weights decide
+  which beasts look good. The calibration removes overall difficulty, but not shape. The library is
+  small and hand-made (it came over unchanged from the old simulator fixtures): which types exist,
+  and how often each is drawn, is itself a bias.
 - **Large creatures are simple shapes.** The giant and the colossus cover seven tiles and the
   champion three (no rotation, no terrain interaction beyond fitting), measured nearest tile to
   nearest tile; a giant cannot be knocked back and a champion moves at most one tile. Before the
@@ -807,9 +848,10 @@ fixtures, code and arguments produce a byte-identical report.
 - **No gear,** a fixture avatar stat block, and only species base stats, the growth curve and the
   level.
 
-All tunables (kit numbers, calibration bounds, flag thresholds, element-scheme weights, CLI
-defaults) are constants at the top of `SimOptions.cs`; enemy types, shapes and the fixed encounters
-are in `encounters.json`.
+All tunables (kit numbers, calibration bounds, flag thresholds, CLI defaults) are constants at the
+top of `SimOptions.cs`; the enemies, shapes and element-scheme weights are game content in
+`BeastCraft/Assets/_Project/Data/Encounters/`, and the legacy fixed encounters are in
+`encounters.json`.
 
 ## Build and format
 

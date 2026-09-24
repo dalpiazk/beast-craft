@@ -143,14 +143,81 @@ What that implies for balance and for the systems:
   with a few archers and casters) — from a pool of simulator-only enemy types (giant, champion,
   brute, stalker, archer, caster, shaman, two swarm types), under a per-shape threat budget, and
   gives each composition an element scheme (one element for the whole team, one per type, one per
-  unit, or none) so all ten elements appear. These are simulator fixtures, not game content or
-  encounter design; the pool, shapes and generator rules are in `Tooling/BalanceSim/README.md`.
+  unit, or none) so all ten elements appear. The pool, shapes and generator have since become game
+  content and the game's own generator (see "Encounters as game content" below); the rules are in
+  `Tooling/BalanceSim/README.md`.
 - **Most of what the simulator fields targets the nearest enemy.** Whoever stands in front takes
   most of the hits, so front-line bulk and placement matter a great deal. The simulator's "pick off
   the weakest" enemies (stalker, caster and the champion's hex; the fixed set's wisps and stingers)
   aim at the beast with the least **current** HP (`SkillTargetingCriterion.CurrentHp`, decision 4);
   before that criterion existed they compared maximum HP, which never tracks damage taken. Every
   enemy type has a stance of its own (decision 8).
+
+## Encounters as game content — BUILT; the campaign's difficulty target is PENDING PRODUCER REVIEW
+
+PvE encounters are game content, authored as JSON under `BeastCraft/Assets/_Project/Data/Encounters/`
+and read by the game and the balance simulator alike, so the simulator calibrates exactly what the
+game fields. The enemies, shapes and weights came over unchanged from the simulator's former
+fixtures: the regenerated `tuned-report.md` differs from the one before the move only in its
+provenance lines.
+
+**Files.**
+
+- `enemy-library.json` — every enemy type (giant, champion, brute, stalker, archer, caster, shaman,
+  swarmling, stingling): id, name, role, `Threat`, stance, status resist, footprint, max-level base
+  stats on a roster growth curve (`GrowthCurveId`, `medium`), and a kit in the skill library's
+  `SkillData` shape. A skill's `Element` must be empty: every skill takes the unit's element, so one
+  type serves every element. Enemy ids may not be roster species ids.
+- `encounter-library.json` — the generated encounter `Shapes` (`solo`, `elite`, `squad`, `horde`:
+  arena, `ThreatMin`-`ThreatMax`, `MinDistinctTypes`, weighted variants of slots), the element-scheme
+  weights (`SchemeWeights`: one element for the team 30, one per type 30, one per unit 25, none 15),
+  authored fixed encounters (`Templates`: shape, arena, groups of enemy x count x elements, optional
+  `DifficultyOverride`; **none authored**) and `DifficultyScale` (1.0). Shape ids must be exactly the
+  drop tables' shapes: a cleared encounter pays out from its shape's cell.
+- `encounter-difficulty.json` — **written by the simulator** (`--write-difficulty`), never by hand:
+  the calibrated multiplier per (kit mode, shape, level 1 / 50 / 100).
+
+**Runtime** (`Runtime/Encounters`, namespace `BeastCraft.Encounters`): `EnemyLibraryValidator` and
+`EncounterLibraryValidator` (the simulator's old fixture rules, plus id collisions, the drop-table
+shape match and the arena fit of every shape's worst case and every template, `EncounterFit`: a
+seven-tile enemy never fits a Small arena); `EnemyCatalog` (one cached in-memory species per enemy and
+element through `BeastRosterBuilder.ApplySpecies`, one cached kit through
+`SkillLibraryBuilder.ApplySkill` plus the element; flagged `DontUnloadUnusedAsset`);
+`EncounterGenerator` (seeded draws of an `EncounterLineup` per shape: variant, counts, types, stance
+order, arena fit, element scheme, a shared shuffled element deck); `EncounterDifficultyTable` (the
+elemental cells, linear between calibrated levels, clamped outside); `EnemyScaling` (the multiplier
+on HP, Attack, Defense, SpecialAttack and SpecialDefense, as the simulator applies it); `EncounterPlan`
+(`Generate(library, enemies, shapeId, level, seed)` or `FromTemplate(library, enemies, templateId,
+level)`, with `Preview(ScoutingDetail)` for scouting and `ToSetup()` for `BattleSession`); and
+`EncounterLibrarySO`, filled by the Editor importer (Beast Craft/Data/Import Encounters, after Import
+Beast Roster; all three files validated, all or nothing).
+
+**Battle session.** `EnemySpec` takes an enemy-library id as its species (resolved through
+`BattleContent.Enemies` when it is no roster species), an `Element` and a `StatMultiplier`; the
+session fields the catalog kit in that element and scales the level-computed stats. `EncounterSetup`
+carries `ShapeId` and `EncounterLevel` into `BattleSessionResult`, and
+`BattleSession.ApplyRewards(save, result, content, dropTable)` pays out from them. See
+`docs/design/progression-and-saves.md`, "Battle session".
+
+**Seeds.** The caller derives the encounter's seed (for example `LootRoller.DeriveSeed` from the save
+seed and the map node) and keeps it separate from the battle's seed. Everything rests on
+`System.Random`'s seeded sequence, which .NET, Mono and Unity share; an EditMode test pins it.
+
+**PENDING PRODUCER REVIEW — deliberately not decided here:**
+
+1. **The campaign's difficulty target.** The shipped table is calibrated so the team a scouting,
+   counter-picking player fields (the simulator's bond-aware heuristic pick) clears **50%** of each
+   shape's generated encounters at each calibrated level; `DifficultyScale` is **1.0**. A player who
+   does not scout clears about **10-38%** at the same multipliers (the tuned report's "No-scouting
+   clear", `elemental`). Whether the campaign should be that hard, easier early on, or scaled by
+   shape is a producer decision; `DifficultyScale` (and a template's `DifficultyOverride`) is the
+   knob, and re-running the simulator with another `--target-clear` or `--calibrate-on` regenerates
+   the table.
+2. **Which authored encounters exist.** `Templates` is empty. The tests build example templates in
+   memory only.
+3. **How a map node picks a shape and a level.** `EncounterPlan` takes both from its caller.
+4. **Between calibrated levels the multiplier is interpolated linearly** (calibrated at 1, 50 and
+   100 only). A tunable default, not a measured curve.
 
 ## Data-driven foundation already in place
 
@@ -677,8 +744,8 @@ walk over a footprint is deterministic. There is no rotation: a large unit trans
 turns. `CreatureSpeciesSO.Footprint` (default `Single`) is copied onto the unit by
 `BattleUnitFactory` (`BattleUnit.Footprint`, fixed at construction). The roster JSON has no footprint
 field, and `BeastRosterValidator` refuses any value but `Single` — **beasts are always one tile**. The
-only large units today are the balance simulator's fixture enemies (`encounters.json`, optional
-`Footprint`).
+only large units today are enemies: the enemy library's giant (`Hex7`) and champion (`Triangle`)
+(`enemy-library.json`, optional `Footprint`) and the simulator's legacy fixed-set colossus.
 
 **Board.** `HexGrid` records a large unit's anchor and footprint and names it on every tile it
 covers (`GetOccupant`). `TryPlaceUnit(id, anchor, footprint)` is **all or nothing**: every tile must
@@ -968,7 +1035,8 @@ id-order tie-break as every criterion. Use it with `Ally` and `Lowest` to heal w
 - Proc chances, per-battle caps and internal cooldowns for triggered effects live on the avatar's
   passives (see "Avatar passives"), not on individual effects.
 
-**Simulator.** `encounters.json` can now express all of this for future content:
+**Simulator.** `encounters.json` (since then the game's `enemy-library.json`, whose skills use the
+skill library's `SkillData` shape) can now express all of this for future content:
 
 - `StatusResist` per enemy type.
 - Per skill: `HitCount`, `ExecuteBonusPercent`, `InitialCooldown`, `MaxUsesPerBattle` and an
@@ -2432,8 +2500,9 @@ cooldown 2). It runs in an `elemental` mode (kit in the beast's element) and a `
 `Element.None`).
 
 Its **primary mode is PvE, team versus encounter**, following the direction above. Every 4-beast
-combination of the roster (210 teams) fights synthetic encounters defined in
-`Tooling/BalanceSim/encounters.json`. These are simulator fixtures, not game content. Until the
+combination of the roster (210 teams) fights encounters generated from the game's encounter content
+(`BeastCraft/Assets/_Project/Data/Encounters/`; simulator fixtures in
+`Tooling/BalanceSim/encounters.json` until "Encounters as game content" above). Until the
 mixed-encounter change below they were three fixed encounters: `boss` (one Colossus with very high
 HP, heavy hits in both categories and a periodic area slam), `swarm` (24 small biters and stingers on
 a Large arena) and `pack` (three melee direwolves and three ranged wisps), still available as
@@ -2576,7 +2645,7 @@ effects" above. It adds:
 - `InitialCooldown` and `MaxUsesPerBattle`.
 
 Every new field is inert at its default, so the simulator's report is unchanged. `encounters.json`
-can express all of it, and the bosses carry 50% resistance. EditMode tests cover each rule,
+(now `enemy-library.json`) can express all of it, and the bosses carry 50% resistance. EditMode tests cover each rule,
 including the draw order and seeded reproducibility.
 
 **Element chart v2 has since replaced the first chart** (user-approved; see "Element system"):
@@ -2595,6 +2664,12 @@ Milestone 2's final retune (under the scouted-pick calibration) retuned the avat
 made Thunder Talons target the weakest enemy in reach, lifted Griffin, Kirin and Leviathan skills and
 made the level-difference curve more convex (k 0.012, q 0.009); skill numbers and two formula
 constants only, the roster unchanged (tuning log, "Avatar retune" to "Level-gap re-check").
+
+**Encounters have since become game content** (see "Encounters as game content"): the simulator's
+enemy types, shapes and element-scheme weights moved into `Data/Encounters/`, its generator into the
+Runtime, and the calibrated multipliers into the simulator-written `encounter-difficulty.json`, with
+an importer, `EncounterPlan` and the battle-session support to field them. No number changed (tuning
+log, "Encounters as game content"); the campaign's difficulty target is pending producer review.
 
 Every pass so far is deliberately **data structures and algorithms only** — no MonoBehaviours, no
 scene or prefab wiring, and no committed `.asset` instances (the roster's are generated in-Editor). The hex radii backing each arena preset

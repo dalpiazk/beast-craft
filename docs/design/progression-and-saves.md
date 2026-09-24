@@ -189,16 +189,25 @@ APIs, in the balance simulator's order.
 
 **`BattleContent`** — the content ids resolve against: species, skills (beast skills and avatar
 actives share one id space), passives, team bonds (in application order), and optionally beast and
-avatar gear. Built from the asset types the importers and `SkillLibraryBuilder` produce; lookups
-are by stable id, ordinal, first entry wins, unknown ids return `null`. It also implements
-`ISaveGearCatalog`.
+avatar gear, and optionally the enemy library's `EnemyCatalog` (`Enemies`). Built from the asset
+types the importers and `SkillLibraryBuilder` produce; lookups are by stable id, ordinal, first
+entry wins, unknown ids return `null`. It also implements `ISaveGearCatalog`.
 
-**`EncounterSetup`** — generic, because encounters are not game content yet:
+**`EncounterSetup`** — the opposition. For the game's PvE encounters `EncounterPlan.ToSetup()`
+writes one (see `docs/design/battle-system.md`, "Encounters as game content"); callers and tests can
+also build one by hand:
 
 - `Arena` (`ArenaSize`, default `Medium`);
-- `Enemies`: `EnemySpec {UnitId?, SpeciesId, Level, SkillIds?, Position?, StatusResist}` — no unit
-  id means `enemy1..N`; no skill ids means the species' `DefaultLoadout` (an empty list means no
-  skills; listed skills are level 1, tier 0); no position means auto-placed;
+- `ShapeId` and `EncounterLevel` — the drop-table shape and the encounter level, copied into
+  `BattleSessionResult` for the rewards (null / 0 when not set);
+- `Enemies`: `EnemySpec {UnitId?, SpeciesId, Level, SkillIds?, Position?, StatusResist, Element?,
+  StatMultiplier}` — `SpeciesId` is a roster species or, failing that, an enemy-library enemy
+  (`BattleContent.Enemies`); no unit id means `enemy1..N`; no skill ids means the species'
+  `DefaultLoadout`, or an enemy's catalog kit in its `Element` (an empty list means no skills;
+  listed skills are level 1, tier 0); `Element` applies to enemy-library enemies only (null = none);
+  `StatMultiplier` (default 1, must be above 0) scales the level-computed HP, Attack, Defense,
+  SpecialAttack and SpecialDefense with `EnemyScaling`, as the balance simulator calibrates it; no
+  position means auto-placed;
 - `PrebuiltEnemies`: `BattleUnit`s the caller built itself (enemy team, unique ids), placed at their
   own position and footprint.
 
@@ -252,8 +261,9 @@ every problem in `Errors` and no battle fought:
   silently dropping it;
 - worn gear (beast, or avatar unless overridden) that is not in the inventory, unknown, in the wrong
   slot, or worn twice (gear below the beast's level is **not** an error; `StatCalculator` ignores it);
-- no enemies, an enemy of unknown species or with an unknown skill, a prebuilt enemy not on the
-  enemy team, a duplicate unit id;
+- no enemies, an enemy of unknown species or with an unknown skill, an `Element` on a roster species,
+  a `StatMultiplier` that is not a positive number, a prebuilt enemy not on the enemy team, a
+  duplicate unit id;
 - an enemy position outside the enemy zone or taken, enemies that do not fit the zone, a team that
   does not fit the player zone or that `PlacementValidator` rejects.
 
@@ -276,8 +286,11 @@ are deterministic either way. The summary reports `Applied`, `Error`, `Outcome`,
 `SkillLevelsGained`, `BeastXpGained` (by beast id), `BeastLevelsGained`, `AvatarXpGained`,
 `AvatarLevelsGained` and the `Loot`. It refuses — changing nothing — a null save or result, a failed
 battle, or a result already paid out (`BattleSessionResult.RewardsApplied`). A team beast no longer in
-the save is skipped. `shape` and `encounterLevel` are passed in rather than stored on the encounter,
-since encounters are not content yet.
+the save is skipped.
+
+`BattleSession.ApplyRewards(save, result, content, dropTable, rng = null)` does the same for the
+`ShapeId` and `EncounterLevel` the battle's `EncounterSetup` named (`EncounterPlan.ToSetup` sets
+both); it refuses, changing nothing, a result whose setup named no shape or no level.
 
 ---
 
@@ -331,8 +344,10 @@ its System.Text.Json twin here.
 
 - **No gear content.** There are no gear data files or importer; `BattleContent` gets gear only
   from its caller, and the gear tests use in-memory `GearSO` / `AvatarGearSO` instances.
-- **Encounters are not game content yet.** `EncounterSetup` is a generic description, and the
-  reward step takes the encounter's shape and level as arguments.
+- **How a map node picks an encounter is not decided.** Encounters are game content
+  (`EncounterPlan`), but which shape and level a node offers, and the campaign's difficulty target
+  (the shipped table is calibrated for a scouting player at 50%, `DifficultyScale` 1.0), are pending
+  producer review; see `docs/design/battle-system.md`, "Encounters as game content".
 - **Beast XP defaults need review** (see above), as does the pacing model's 20% knockout assumption.
 - **Enemies wear no gear.** `EnemySpec` has no gear field; a caller needing geared enemies builds
   them itself and passes them as `PrebuiltEnemies`.
