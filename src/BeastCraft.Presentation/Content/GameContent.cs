@@ -23,7 +23,9 @@ namespace BeastCraft.Presentation.Content
     /// <para>
     /// The <em>content root</em> is the folder holding <c>Data/</c> and <c>Art/Pixel/</c>: in the
     /// repo, <c>BeastCraft/Assets/_Project</c>; in a built host, the <c>Content</c> folder it copies
-    /// them to. <see cref="FindRoot"/> finds either.
+    /// them to. <see cref="FindRoot"/> finds either. Every file is read through an
+    /// <see cref="IContentSource"/>, so a host without a file system for its content (Android: APK
+    /// assets) loads the same way.
     /// </para>
     /// </summary>
     public sealed class GameContent
@@ -35,7 +37,11 @@ namespace BeastCraft.Presentation.Content
         {
         }
 
+        /// <summary>The content root, for messages (<see cref="IContentSource.Location"/>).</summary>
         public string Root { get; private set; }
+
+        /// <summary>Where the content was read from; the sprite atlas opens the PNGs through it.</summary>
+        public IContentSource Source { get; private set; }
 
         public BeastRosterData Roster { get; private set; }
 
@@ -59,10 +65,15 @@ namespace BeastCraft.Presentation.Content
         /// <summary>A file of the content root by its ProjectRelativePath (<c>Assets/_Project/...</c>).</summary>
         public static string PathOf(string root, string projectRelativePath)
         {
-            string relative = projectRelativePath.StartsWith(ProjectPrefix, StringComparison.Ordinal)
-                                  ? projectRelativePath.Substring(ProjectPrefix.Length)
-                                  : projectRelativePath;
-            return Path.Combine(root, relative.Replace('/', Path.DirectorySeparatorChar));
+            return Path.Combine(root, RelativeOf(projectRelativePath).Replace('/', Path.DirectorySeparatorChar));
+        }
+
+        /// <summary>A ProjectRelativePath (<c>Assets/_Project/...</c>) as a content-root-relative path with forward slashes.</summary>
+        public static string RelativeOf(string projectRelativePath)
+        {
+            return projectRelativePath.StartsWith(ProjectPrefix, StringComparison.Ordinal)
+                       ? projectRelativePath.Substring(ProjectPrefix.Length)
+                       : projectRelativePath;
         }
 
         /// <summary>
@@ -110,6 +121,15 @@ namespace BeastCraft.Presentation.Content
                 return null;
             }
 
+            return Load(new FileContentSource(root), errors);
+        }
+
+        /// <summary>
+        /// Loads and validates everything <paramref name="root"/> holds. Returns null and fills
+        /// <paramref name="errors"/> when a file is missing, unreadable or invalid.
+        /// </summary>
+        public static GameContent Load(IContentSource root, List<string> errors)
+        {
             BeastRosterData roster = Read<BeastRosterData>(root, BeastRosterData.ProjectRelativePath, errors);
             SkillLibraryData skills = Read<SkillLibraryData>(root, SkillLibraryData.ProjectRelativePath, errors);
             EnemyLibraryData enemyLibrary = Read<EnemyLibraryData>(root, EnemyLibraryData.ProjectRelativePath, errors);
@@ -180,7 +200,8 @@ namespace BeastCraft.Presentation.Content
 
             return new GameContent
             {
-                Root = root,
+                Root = root.Location,
+                Source = root,
                 Roster = roster,
                 SkillLibrary = skills,
                 EnemyLibrary = enemyLibrary,
@@ -226,10 +247,11 @@ namespace BeastCraft.Presentation.Content
             return skill;
         }
 
-        private static T Read<T>(string root, string projectRelativePath, List<string> errors) where T : class
+        private static T Read<T>(IContentSource root, string projectRelativePath, List<string> errors) where T : class
         {
-            string path = PathOf(root, projectRelativePath);
-            if (!File.Exists(path))
+            string relative = RelativeOf(projectRelativePath);
+            string path = root.Describe(relative);
+            if (!root.Exists(relative))
             {
                 errors.Add("Missing " + path + ".");
                 return null;
@@ -237,7 +259,13 @@ namespace BeastCraft.Presentation.Content
 
             try
             {
-                T data = FieldJson.FromJson<T>(File.ReadAllText(path));
+                string json;
+                using (StreamReader reader = new StreamReader(root.Open(relative)))
+                {
+                    json = reader.ReadToEnd();
+                }
+
+                T data = FieldJson.FromJson<T>(json);
                 if (data == null)
                 {
                     errors.Add(path + " is empty.");

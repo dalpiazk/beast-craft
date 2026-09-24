@@ -2,16 +2,20 @@
 # The game runtime is engine-neutral C# (src/BeastCraft.Core, netstandard2.1);
 # the Unity project under BeastCraft/ is legacy and no longer built. This job
 # format-checks and compiles the runtime, the engine-neutral presentation layer
-# (src/BeastCraft.Presentation) and the MonoGame DesktopGL host
-# (src/BeastCraft.Desktop), then format-checks and runs the test suite
+# (src/BeastCraft.Presentation), the shared MonoGame viewer (src/BeastCraft.Game)
+# and the MonoGame DesktopGL host (src/BeastCraft.Desktop), then format-checks
+# and runs the test suite
 # (Tooling/EditModeTests, NUnit). No engine install is needed: MonoGame is a
 # NuGet package, and the desktop host uses no content pipeline (MGCB) and no
 # Windows-only dependencies, so it compiles on this Linux runner as is.
 #
 # CI-budget discipline applies: CI is a final gate, never a test loop --
 # everything must be green locally first, one push per PR, and no per-commit
-# fan-out. Further hosts (Android) join these same steps, not a new job or
-# matrix.
+# fan-out. The Android host (src/BeastCraft.Android) is deliberately NOT built
+# here: it needs the .NET Android workload, a JDK and the Android SDK on the
+# runner, which would cost far more minutes than it is worth. It is a local
+# build (README: "Running on Android"); everything it shares with desktop
+# (BeastCraft.Game) is compiled and format-checked by the Desktop steps below.
 # ---------------------------------------------------------------------------
 
 name: CI
@@ -73,13 +77,14 @@ jobs:
           dotnet build src/BeastCraft.Core/BeastCraft.Core.csproj
           --configuration Release
 
-      # The presentation layer and the desktop host (MonoGame DesktopGL). The
-      # host's build compiles Core and Presentation too; it copies the content
+      # The presentation layer, the shared viewer and the desktop host (MonoGame
+      # DesktopGL). The host's build compiles Core, Presentation and Game too; it copies the content
       # (data JSON, and the pixel-art PNGs as LFS pointers here, since checkout
       # skips LFS) but never reads it, so no art is needed to compile.
-      - name: Format check (Presentation, Desktop)
+      - name: Format check (Presentation, Game, Desktop)
         run: |
           dotnet format src/BeastCraft.Presentation/BeastCraft.Presentation.csproj --verify-no-changes --verbosity diagnostic
+          dotnet format src/BeastCraft.Game/BeastCraft.Game.csproj --verify-no-changes --verbosity diagnostic
           dotnet format src/BeastCraft.Desktop/BeastCraft.Desktop.csproj --verify-no-changes --verbosity diagnostic
 
       - name: Compile check (Desktop)

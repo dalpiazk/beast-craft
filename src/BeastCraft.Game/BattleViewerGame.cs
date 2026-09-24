@@ -4,7 +4,7 @@ using System.Globalization;
 using System.IO;
 using BeastCraft.Battle;
 using BeastCraft.Battle.Grid;
-using BeastCraft.Desktop.Rendering;
+using BeastCraft.Game.Rendering;
 using BeastCraft.Presentation.Board;
 using BeastCraft.Presentation.Content;
 using BeastCraft.Presentation.Playback;
@@ -14,25 +14,30 @@ using BeastCraft.Vfx;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using Microsoft.Xna.Framework.Input.Touch;
 
-namespace BeastCraft.Desktop
+namespace BeastCraft.Game
 {
     // BeastCraft.Color (Core's engine-neutral colour) would win over a file-level using here.
     using Color = Microsoft.Xna.Framework.Color;
 
     /// <summary>
-    /// The desktop spike: one real PvE battle (<see cref="DemoBattle"/>) stepped a turn at a time
-    /// through <see cref="BattlePlayback"/> and drawn pixel-perfect: everything renders into a
-    /// 640x360 target that is scaled up by a whole number with point sampling. Space plays the next
-    /// turn (or finishes the one playing), A toggles auto-play, Esc quits. With
-    /// <c>--screenshot</c> it renders a single frame to a PNG and exits (<see cref="SpikeOptions"/>).
+    /// The battle viewer every host runs: one real PvE battle (<see cref="DemoBattle"/>) stepped a
+    /// turn at a time through <see cref="BattlePlayback"/> and drawn pixel-perfect: everything
+    /// renders into a 640x360 target that is scaled up by a whole number with point sampling and
+    /// centred, letterboxed, in the window or screen. On desktop Space plays the next turn (or
+    /// finishes the one playing), A toggles auto-play, Esc quits; on a touch device
+    /// (<see cref="ViewerHost.Touch"/>) a tap steps, a two-finger tap or the on-screen AUTO button
+    /// toggles auto-play and Back quits. With <c>--screenshot</c> it renders a single frame to a
+    /// PNG and exits (<see cref="ViewerOptions"/>).
     /// <para>
     /// The viewer only reads the battle: turns are the session's own
     /// (<see cref="BattleSession.Begin"/>), and every animation is a pure function of the recorded
     /// results (<see cref="TurnAnimation"/>, <see cref="VfxTimeline"/>).
     /// </para>
     /// </summary>
-    public sealed class SpikeGame : Game
+    // The namespace BeastCraft.Game would win over Microsoft.Xna.Framework.Game here, hence the full name.
+    public sealed class BattleViewerGame : Microsoft.Xna.Framework.Game
     {
         public const int VirtualWidth = 640;
         public const int VirtualHeight = 360;
@@ -44,7 +49,8 @@ namespace BeastCraft.Desktop
         private const int PanelX = 412;
         private const int AutoPauseMs = 260;
 
-        private readonly SpikeOptions _options;
+        private readonly ViewerOptions _options;
+        private readonly ViewerHost _host;
         private readonly GraphicsDeviceManager _graphics;
         private SpriteBatch _batch;
         private RenderTarget2D _frame;
@@ -62,11 +68,28 @@ namespace BeastCraft.Desktop
         private int _idleMs;
         private bool _auto;
         private KeyboardState _previousKeys;
+        private bool _previousBack;
+        private int _gestureTouches;
+        private Vector2 _gestureEnd;
         private readonly List<string> _log = new List<string>();
 
-        public SpikeGame(SpikeOptions options)
+        public BattleViewerGame(ViewerOptions options, ViewerHost host)
         {
             _options = options;
+            _host = host;
+            if (host.Touch)
+            {
+                // Full screen at the device's own resolution; the frame is letterboxed into it.
+                _graphics = new GraphicsDeviceManager(this)
+                {
+                    IsFullScreen = true,
+                    SupportedOrientations = DisplayOrientation.LandscapeLeft | DisplayOrientation.LandscapeRight,
+                    SynchronizeWithVerticalRetrace = true
+                };
+                TouchPanel.EnableMouseTouchPoint = false;
+                return;
+            }
+
             _graphics = new GraphicsDeviceManager(this)
             {
                 PreferredBackBufferWidth = VirtualWidth * 2,
@@ -75,7 +98,7 @@ namespace BeastCraft.Desktop
             };
             IsMouseVisible = true;
             Window.AllowUserResizing = true;
-            Window.Title = "Beast Craft - desktop spike (Space: step  A: auto  Esc: quit)";
+            Window.Title = host.WindowTitle;
         }
 
         /// <summary>Set when the spike could not start or could not write its screenshot.</summary>
@@ -88,7 +111,9 @@ namespace BeastCraft.Desktop
             _text = new PixelText(GraphicsDevice);
 
             List<string> errors = new List<string>();
-            _content = GameContent.Load(GameContent.FindRoot(_options.ContentRoot), errors);
+            _content = _host.Content != null
+                           ? GameContent.Load(_host.Content, errors)
+                           : GameContent.Load(GameContent.FindRoot(_options.ContentRoot), errors);
             if (_content == null)
             {
                 Fail("Could not load the content:\n" + string.Join("\n", errors));
@@ -133,7 +158,7 @@ namespace BeastCraft.Desktop
             }
 
             KeyboardState keys = Keyboard.GetState();
-            if (keys.IsKeyDown(Keys.Escape))
+            if (keys.IsKeyDown(Keys.Escape) || BackPressed())
             {
                 Exit();
             }
@@ -145,6 +170,11 @@ namespace BeastCraft.Desktop
             }
 
             _previousKeys = keys;
+            if (_host.Touch)
+            {
+                ReadTouch(ref step);
+            }
+
             int elapsed = (int)gameTime.ElapsedGameTime.TotalMilliseconds;
 
             if (_animation != null)
@@ -193,12 +223,7 @@ namespace BeastCraft.Desktop
             }
 
             GraphicsDevice.Clear(Color.Black);
-            int scale = Math.Max(1, Math.Min(GraphicsDevice.PresentationParameters.BackBufferWidth / VirtualWidth,
-                                             GraphicsDevice.PresentationParameters.BackBufferHeight / VirtualHeight));
-            int width = VirtualWidth * scale;
-            int height = VirtualHeight * scale;
-            Rectangle target = new Rectangle((GraphicsDevice.PresentationParameters.BackBufferWidth - width) / 2,
-                                             (GraphicsDevice.PresentationParameters.BackBufferHeight - height) / 2, width, height);
+            Rectangle target = FrameTarget();
             _batch.Begin(SpriteSortMode.Deferred, BlendState.Opaque, SamplerState.PointClamp);
             _batch.Draw(_frame, target, Color.White);
             _batch.End();
@@ -323,6 +348,84 @@ namespace BeastCraft.Desktop
         private bool Pressed(KeyboardState keys, Keys key)
         {
             return keys.IsKeyDown(key) && !_previousKeys.IsKeyDown(key);
+        }
+
+        /// <summary>
+        /// Where the 640x360 frame goes on the back buffer: scaled by the largest whole number that
+        /// fits (at least 1) and centred, so a phone's wider aspect ratio gets black bars.
+        /// </summary>
+        private Rectangle FrameTarget()
+        {
+            int backWidth = GraphicsDevice.PresentationParameters.BackBufferWidth;
+            int backHeight = GraphicsDevice.PresentationParameters.BackBufferHeight;
+            int scale = Math.Max(1, Math.Min(backWidth / VirtualWidth, backHeight / VirtualHeight));
+            int width = VirtualWidth * scale;
+            int height = VirtualHeight * scale;
+            return new Rectangle((backWidth - width) / 2, (backHeight - height) / 2, width, height);
+        }
+
+        /// <summary>Android's Back button (MonoGame reports it as GamePad Back); touch hosts only.</summary>
+        private bool BackPressed()
+        {
+            if (!_host.Touch)
+            {
+                return false;
+            }
+
+            bool back = GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed;
+            bool pressed = back && !_previousBack;
+            _previousBack = back;
+            return pressed;
+        }
+
+        /// <summary>
+        /// Touch as gestures, judged when the last finger lifts: two or more fingers down at once
+        /// toggle auto-play; one finger toggles it on the AUTO button and steps anywhere else.
+        /// </summary>
+        private void ReadTouch(ref bool step)
+        {
+            TouchCollection touches = TouchPanel.GetState();
+            int down = 0;
+            foreach (TouchLocation touch in touches)
+            {
+                if (touch.State == TouchLocationState.Pressed || touch.State == TouchLocationState.Moved)
+                {
+                    down++;
+                }
+
+                _gestureEnd = touch.Position;
+            }
+
+            _gestureTouches = Math.Max(_gestureTouches, down);
+            if (down > 0 || _gestureTouches == 0)
+            {
+                return;
+            }
+
+            if (_gestureTouches >= 2 || AutoButton().Contains(ToFrame(_gestureEnd)))
+            {
+                _auto = !_auto;
+            }
+            else
+            {
+                step = true;
+            }
+
+            _gestureTouches = 0;
+        }
+
+        /// <summary>A back-buffer point in frame pixels.</summary>
+        private Point ToFrame(Vector2 screen)
+        {
+            Rectangle target = FrameTarget();
+            int scale = target.Width / VirtualWidth;
+            return new Point((int)Math.Floor((screen.X - target.X) / scale), (int)Math.Floor((screen.Y - target.Y) / scale));
+        }
+
+        /// <summary>The on-screen AUTO button (touch hosts), at the foot of the right-hand panel.</summary>
+        private static Rectangle AutoButton()
+        {
+            return new Rectangle(PanelX, VirtualHeight - 30, VirtualWidth - PanelX - 6, 22);
         }
 
         // ------------------------------------------------------------------------------------------
@@ -536,7 +639,7 @@ namespace BeastCraft.Desktop
             Color shadow = _atlas.Palette("K", Color.Black);
 
             int turnNumber = _playback.Played.Count;
-            _text.Draw(_batch, "BEAST CRAFT  DESKTOP SPIKE", 6, 4, gold, 1, shadow);
+            _text.Draw(_batch, _host.HudTitle, 6, 4, gold, 1, shadow);
             _text.Draw(_batch, "TURN " + turnNumber + "   SEED " + _options.Seed.ToString(CultureInfo.InvariantCulture), 200, 4, ink, 1, shadow);
 
             // Right-hand panel: the acting unit and its skill, the turn order, the log.
@@ -584,8 +687,19 @@ namespace BeastCraft.Desktop
                 _text.DrawCentered(_batch, banner, BoardAreaWidth / 2, VirtualHeight / 2 - 10, gold, 4);
             }
 
-            string help = "SPACE: STEP   A: AUTO " + (_auto ? "ON" : "OFF") + "   ESC: QUIT";
+            string help = _host.Touch
+                              ? "TAP: STEP   TWO FINGERS: AUTO " + (_auto ? "ON" : "OFF") + "   BACK: QUIT"
+                              : "SPACE: STEP   A: AUTO " + (_auto ? "ON" : "OFF") + "   ESC: QUIT";
             _text.Draw(_batch, help, 6, VirtualHeight - 9, dim, 1, shadow);
+
+            if (_host.Touch)
+            {
+                Rectangle button = AutoButton();
+                _batch.Draw(_atlas.Pixel, button, shadow * 0.8f);
+                _batch.Draw(_atlas.Pixel, new Rectangle(button.X + 1, button.Y + 1, button.Width - 2, button.Height - 2),
+                            (_auto ? gold : dim) * 0.35f);
+                _text.DrawCentered(_batch, _auto ? "AUTO: ON" : "AUTO: OFF", button.Center.X, button.Y + 4, _auto ? gold : ink, 2, shadow);
+            }
         }
 
         // ------------------------------------------------------------------------------------------

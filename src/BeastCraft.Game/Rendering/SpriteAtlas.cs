@@ -7,13 +7,14 @@ using BeastCraft.Vfx;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
-namespace BeastCraft.Desktop.Rendering
+namespace BeastCraft.Game.Rendering
 {
     // BeastCraft.Color (Core's engine-neutral colour) would win over a file-level using here.
     using Color = Microsoft.Xna.Framework.Color;
 
     /// <summary>
-    /// The pixel art at runtime: every sprite of the manifest loaded from its PNG with
+    /// The pixel art at runtime: every sprite of the manifest loaded from its PNG (opened through
+    /// the content's <see cref="IContentSource"/>) with
     /// <see cref="Texture2D.FromStream(GraphicsDevice, Stream)"/> (no content pipeline) and
     /// premultiplied for SpriteBatch's default blending, plus the palette as colours.
     /// </summary>
@@ -25,10 +26,11 @@ namespace BeastCraft.Desktop.Rendering
 
         public SpriteAtlas(GraphicsDevice device, GameContent content)
         {
-            string folder = Path.GetDirectoryName(GameContent.PathOf(content.Root, PixelArtManifestData.ProjectRelativePath));
+            string manifest = GameContent.RelativeOf(PixelArtManifestData.ProjectRelativePath);
+            string folder = manifest.Substring(0, manifest.LastIndexOf('/') + 1);
             foreach (PixelSpriteData sprite in content.Art.Sprites)
             {
-                using (FileStream stream = File.OpenRead(Path.Combine(folder, sprite.File)))
+                using (Stream stream = content.Source.Open(folder + sprite.File))
                 {
                     Texture2D texture = Texture2D.FromStream(device, stream);
                     Premultiply(texture);

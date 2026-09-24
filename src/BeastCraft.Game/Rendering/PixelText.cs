@@ -3,7 +3,7 @@ using BeastCraft.Presentation.Text;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
-namespace BeastCraft.Desktop.Rendering
+namespace BeastCraft.Game.Rendering
 {
     // BeastCraft.Color (Core's engine-neutral colour) would win over a file-level using here.
     using Color = Microsoft.Xna.Framework.Color;
