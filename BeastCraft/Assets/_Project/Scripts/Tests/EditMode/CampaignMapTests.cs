@@ -59,7 +59,8 @@ namespace BeastCraft.Tests.EditMode
             {
                 EncounterTemplateData template = encounters.GetTemplate(region.BossTemplateId);
                 Assert.IsNotNull(template, region.RegionId);
-                StringAssert.Contains("DRAFT", template.Description, "boss templates are placeholders pending producer review");
+                Assert.IsTrue(template.Draft, region.RegionId + ": boss templates are placeholders pending producer review (Draft flag)");
+                StringAssert.DoesNotContain(EncounterLibraryValidator.DraftMarker, template.Description, region.RegionId + ": draft status stays out of player-facing text");
                 Assert.Greater(template.DifficultyOverride, 0.0, region.RegionId + ": the boss carries its own calibrated difficulty");
 
                 EncounterPlan plan = EncounterPlan.FromTemplate(encounters, enemies, region.BossTemplateId, region.MaxLevel);
@@ -79,6 +80,8 @@ namespace BeastCraft.Tests.EditMode
             data.Regions[4].ShapeWeights = new[] { new ShapeWeightData { ShapeId = "nope", Weight = 1 } };
             data.Regions[5].BossTemplateId = "no_boss";
             data.Seals[6].LevelCap = 50;
+            data.Seals[1].DisplayName = string.Empty;
+            data.Seals[2].Description = "  ";
             data.MapRules.Layers = 2;
             data.MapRules.NodeWeights = new[] { new NodeWeightData { Type = "Gate", Weight = 5 } };
 
@@ -91,6 +94,8 @@ namespace BeastCraft.Tests.EditMode
             StringAssert.Contains("shape 'nope'", all);
             StringAssert.Contains("boss template 'no_boss'", all);
             StringAssert.Contains("caps must not fall", all);
+            StringAssert.Contains("Seal '" + data.Seals[1].SealId + "': DisplayName is empty", all);
+            StringAssert.Contains("Seal '" + data.Seals[2].SealId + "': Description is empty", all);
             StringAssert.Contains("Layers must be at least 3", all);
             StringAssert.Contains("must be Battle, Elite, Shop or Rest", all);
             StringAssert.Contains("must include Battle", all);

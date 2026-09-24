@@ -153,6 +153,13 @@ namespace BeastCraft.Encounters
         /// <see cref="EncounterLibraryData.DifficultyScale"/>). 0, the default, means none.
         /// </summary>
         public double DifficultyOverride;
+
+        /// <summary>
+        /// True while the template's text and design are placeholders pending producer review.
+        /// Never shown to the player: draft status lives here, not in <see cref="Description"/>
+        /// (the validator rejects a "[DRAFT]" marker in the player-facing text).
+        /// </summary>
+        public bool Draft;
     }
 
     /// <summary>One group of a template: an enemy type, how many, and their elements.</summary>

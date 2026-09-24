@@ -1,0 +1,96 @@
+{
+  "_readme": "GAME CONTENT, DRAFT PENDING PRODUCER REVIEW (every name). The display names of the region map's locations: for each region (regions.json's RegionId, every region exactly once) and each LocationKind (Wilds, Den, Camp, TradingPost, Pass, Lair), exactly NodeMapGenerator.LabelVariants (8) names. A map node's LabelKey \"{regionId}/{kind}/{variant}\" (kind: wilds, den, camp, trading_post, pass, lair; variant 0-7, drawn from the map seed by NodeMapGenerator.Place) resolves to the variant-th name of that region's kind (LocationNameTable.Resolve); a key the table does not cover falls back to the kind's generic name (Wilds, Den, Camp, Trading Post, Pass, Lair). Names are 1-3 words, at most 24 characters, no apostrophes, unique within a region, themed to the region's element flavour (docs/design/content-bible.md). Presentation only: names never affect the maps, their rules or saves (a save keeps the LabelKey, so renaming a location renames it everywhere). Validated by LocationNameTableValidator (the Editor importer Beast Craft/Data/Import Regions, which imports this file with regions.json, and the EditMode tests).",
+  "SchemaVersion": 1,
+  "Regions": [
+    {
+      "RegionId": "r01",
+      "Wilds": [ "Mossy Glade", "Fernshade Trail", "Dappled Clearing", "Bramble Run", "Old Stone Ring", "Brookside Meadow", "Toadstool Dell", "Whispering Thicket" ],
+      "Den": [ "Hollow Log Den", "Bramble Burrow", "Tangleroot Den", "Stump Hollow", "Fern Grotto", "Mossback Knoll", "Briar Warren", "Shadowed Dell" ],
+      "Camp": [ "Firefly Camp", "Mossbed Rest", "Old Oak Camp", "Brookside Camp", "Lantern Glade", "Stone Circle Camp", "Acorn Hearth", "Willow Rest" ],
+      "TradingPost": [ "Wandering Wagon", "Acorn Exchange", "Mossy Market Cart", "Hollow Stump Stall", "Peddler Post", "Berry Barter", "Tinker Tent", "Crossroads Stall" ],
+      "Pass": [ "Mossgate Pass", "Old Root Bridge", "Stone Arch Trail", "Fernwall Gap", "Hollow Gate", "Bramble Gap", "Twin Oak Pass", "Brook Ford" ],
+      "Lair": [ "Warden Grove", "Heartwood Clearing", "The Moss Throne", "Old Seal Glade", "Greenheart Hollow", "Ancient Oak Ring", "Sealstone Grove", "Wardenwood" ]
+    },
+    {
+      "RegionId": "r02",
+      "Wilds": [ "Ashen Slope", "Cinder Trail", "Scorched Ridge", "Smoke Hollow", "Glowrock Flats", "Emberfield", "Charred Gulch", "Hot Spring Terrace" ],
+      "Den": [ "Magma Burrow", "Sootcave Den", "Flameback Hollow", "Ember Grotto", "Kiln Cave", "Smoulder Pit", "Obsidian Nook", "Blackrock Den" ],
+      "Camp": [ "Warm Rock Camp", "Hot Spring Rest", "Ashfall Camp", "Ridge Hearth", "Glowstone Camp", "Cool Cave Rest", "Pumice Camp", "Sunset Ledge" ],
+      "TradingPost": [ "Ember Market", "Coalcart Stall", "Ridge Trader", "Ashwind Bazaar", "Kiln Exchange", "Hot Rock Stall", "Tinder Tent", "Smithy Wagon" ],
+      "Pass": [ "Cinder Pass", "Ashgate", "Scorch Gap", "Ember Bridge", "Smokewall Pass", "Lava Ford", "Red Rock Pass", "Blackglass Gap" ],
+      "Lair": [ "Twin Flame Ridge", "Emberheart Crater", "Kindling Throne", "Scorched Summit", "Ember Seal Rise", "Firewell Basin", "Ashcrown Peak", "The Hearthstone" ]
+    },
+    {
+      "RegionId": "r03",
+      "Wilds": [ "Tidepool Shelf", "Kelp Shallows", "Barnacle Beach", "Drowned Steps", "Foamspray Cove", "Shell Strand", "Low Tide Flats", "Coral Causeway" ],
+      "Den": [ "Sea Cave Den", "Wreck Hollow", "Brine Grotto", "Clamshell Den", "Undertow Cave", "Sunken Cellar", "Eelback Burrow", "Driftwood Nook" ],
+      "Camp": [ "Lighthouse Camp", "Dry Ledge Rest", "Driftwood Fire", "Gull Rock Camp", "High Tide Rest", "Shellfire Camp", "Cove Hearth", "Lantern Buoy Camp" ],
+      "TradingPost": [ "Tidal Market", "Barnacle Barter", "Driftwood Stall", "Pearl Exchange", "Fisher Wagon", "Salt Trader", "Shellhouse Stall", "Harbor Cart" ],
+      "Pass": [ "Tidefall Gate", "Drowned Arch", "Kelp Bridge", "Surf Gap", "Causeway Pass", "Low Tide Crossing", "Breakwater Pass", "Sunken Stair" ],
+      "Lair": [ "Drowned Hall", "Colossus Cove", "Sunken Seal Vault", "Tidewell Chamber", "Abyssal Basin", "Deepwater Ruin", "Moonpool Grotto", "Floodgate Hall" ]
+    },
+    {
+      "RegionId": "r04",
+      "Wilds": [ "Cloudline Trail", "Windswept Ledge", "Gale Meadow", "Kite Cliffs", "Featherfall Slope", "Skyrock Shelf", "Mistveil Path", "Rope Bridge Run" ],
+      "Den": [ "Eyrie Nest", "Crag Hollow", "Gust Cave", "Talon Roost", "Windhowl Den", "Cliffside Nook", "Stormnest Grotto", "Updraft Burrow" ],
+      "Camp": [ "Cloudrest Camp", "Windbreak Camp", "Eyrie Hearth", "Sheltered Crag", "Sunrise Ledge", "Lee Side Rest", "Pinecrag Camp", "Bellrock Camp" ],
+      "TradingPost": [ "Sky Market", "Pulley Post", "Kite Trader", "Cliff Stall", "Windmill Exchange", "Feather Barter", "Crag Wagon", "Cloud Bazaar" ],
+      "Pass": [ "Gale Pass", "Windgate", "Sky Bridge", "Cloudstep Gap", "Howling Notch", "Rope Bridge Pass", "High Saddle", "Crag Stair" ],
+      "Lair": [ "Titan Summit", "Galecrown Peak", "Windeye", "Skyseal Spire", "Cloudbreak Summit", "Whirlwind Crag", "Highwind Throne", "Stormcrag Crown" ]
+    },
+    {
+      "RegionId": "r05",
+      "Wilds": [ "Iron Grove", "Rustleaf Path", "Copper Clearing", "Bellbark Wood", "Filings Field", "Redrain Hollow", "Tin Thicket", "Clanking Glade" ],
+      "Den": [ "Scrapheap Den", "Rusted Burrow", "Ironroot Hollow", "Oreseam Cave", "Bolt Nest", "Slag Grotto", "Chainvine Nook", "Anvil Knoll" ],
+      "Camp": [ "Tinker Camp", "Copper Kettle Rest", "Bellbark Camp", "Forge Ember Camp", "Iron Canopy Rest", "Oilcloth Camp", "Lodestone Hearth", "Rain Shelter" ],
+      "TradingPost": [ "Scrap Market", "Tinker Wagon", "Ore Exchange", "Rustwood Trader", "Gearwheel Stall", "Copper Barter", "Salvage Cart", "Bellwood Bazaar" ],
+      "Pass": [ "Iron Gate", "Rust Bridge", "Chainlink Pass", "Ironbark Gap", "Copperstep", "Ore Road Pass", "Ringing Arch", "Stag Trail" ],
+      "Lair": [ "Stag Clearing", "Antler Grove", "Iron Heart Glade", "Rustseal Hollow", "Lodestone Ring", "Bell Tree Court", "Ironwood Crown", "Rustfall Glade" ]
+    },
+    {
+      "RegionId": "r06",
+      "Wilds": [ "Frozen Shore", "Snowdrift Flats", "Icefloe Field", "Rime Reeds", "Glittering Ice", "Pinefrost Edge", "Whiteout Plain", "Crystal Shallows" ],
+      "Den": [ "Ice Cave Den", "Snowbank Burrow", "Frostfang Hollow", "Glacier Grotto", "Icicle Nook", "Snowcap Warren", "Frozen Hulk", "Blue Ice Den" ],
+      "Camp": [ "Ice Fishing Camp", "Warm Mitten Camp", "Pine Shelter", "Snow Lodge", "Aurora Camp", "Hearthstone Igloo", "Lakeside Rest", "Snug Tent Camp" ],
+      "TradingPost": [ "Frost Market", "Sled Trader", "Ice Fisher Stall", "Mitten Trader", "Snowshoe Barter", "Lantern Sled", "Icehouse Exchange", "Frostmere Cart" ],
+      "Pass": [ "Frozen Crossing", "Iceshelf Pass", "Snowgate", "Rime Bridge", "Glacier Gap", "Frostwind Pass", "Crackling Ice", "Pinefrost Ford" ],
+      "Lair": [ "Matriarch Hollow", "Mereheart", "Frozen Nest", "Rimeseal Chamber", "Glacier Throne", "Brood Cavern", "Midlake Isle", "Icebloom Hollow" ]
+    },
+    {
+      "RegionId": "r07",
+      "Wilds": [ "Crackling Heath", "Spire Fields", "Stormglass Flats", "Static Meadow", "Charged Ridge", "Rumblestone Path", "Sparkfern Slope", "Thunderhead Trail" ],
+      "Den": [ "Spark Burrow", "Stormcave Den", "Bolt Hollow", "Charged Grotto", "Lightning Nest", "Crackle Nook", "Thunder Roost", "Voltstone Den" ],
+      "Camp": [ "Lightning Rod Camp", "Storm Shelter", "Lee Spire Camp", "Thunderlull Camp", "Rumble Hearth", "Stillair Rest", "Glasslight Camp", "Cloudbreak Rest" ],
+      "TradingPost": [ "Spark Market", "Stormglass Trader", "Coil Cart", "Thunder Exchange", "Bottled Bolt Stall", "Static Stall", "Spire Bazaar", "Bolt Barter" ],
+      "Pass": [ "Thunder Gate", "Spire Bridge", "Stormgap", "Bolt Stair", "Crackling Pass", "Charged Arch", "Skyrend Notch", "Rumbling Ford" ],
+      "Lair": [ "Court of Thunder", "High Spire", "Stormseal Throne", "Crown of Bolts", "Stormeye", "Tempest Peak", "Thunderhall", "Lightning Throne" ]
+    },
+    {
+      "RegionId": "r08",
+      "Wilds": [ "Elderwood Trail", "Giant Fern Vale", "Mossgrown Ruins", "Glowcap Hollow", "Canopy Walk", "Tangled Deep", "Humming Thicket", "Firefly Mire" ],
+      "Den": [ "Titanroot Hollow", "Sporecave Den", "Hive Hollow", "Deeproot Burrow", "Thornheart Den", "Vinewrap Grotto", "Broodbloom Nook", "Old Growth Den" ],
+      "Camp": [ "Glowcap Camp", "Canopy Rest", "Treehouse Camp", "Root Hearth", "Moonflower Rest", "Hidden Glade", "Lantern Tree Camp", "Elder Stump Rest" ],
+      "TradingPost": [ "Canopy Market", "Seed Trader", "Glowcap Stall", "Root Cellar Exchange", "Treetop Bazaar", "Honey Barter", "Herbal Cart", "Rope Ladder Stall" ],
+      "Pass": [ "Deeproot Gate", "Vine Bridge", "Elder Arch", "Thornwall Gap", "Hollow Log Pass", "Canopy Crossing", "Mistfall Ford", "Great Root Stair" ],
+      "Lair": [ "Heartwood Deep", "Elder Heart", "Bloomseal Grove", "The Great Tree", "Hive Heart", "First Root Hollow", "Elderheart Glade", "Deepwild Heart" ]
+    },
+    {
+      "RegionId": "r09",
+      "Wilds": [ "Lava Fields", "Basalt Steps", "Obsidian Flats", "Sulphur Springs", "Magma Run", "Cinderfall Plain", "Ember Rain Gulch", "Pumice Slope" ],
+      "Den": [ "Molten Den", "Basalt Burrow", "Firevent Cave", "Slagheap Hollow", "Lava Tube Den", "Brimstone Nook", "Scorchmaw Grotto", "Clinker Cave" ],
+      "Camp": [ "Cooled Lava Camp", "Hot Spring Hearth", "Basalt Shelter", "Ash Screen Camp", "Steamvent Rest", "Obsidian Camp", "Blackrock Rest", "Ridge Watch Camp" ],
+      "TradingPost": [ "Cinder Market", "Forgefire Trader", "Obsidian Exchange", "Lava Glass Stall", "Ember Bazaar", "Slag Barter", "Firebrick Stall", "Ashcart Trader" ],
+      "Pass": [ "Throne Road", "Lava Bridge", "Basalt Gate", "Magma Ford", "Cinder Stair", "Obsidian Arch", "Fumarole Pass", "Ashen Gap" ],
+      "Lair": [ "Throne Hall", "Caldera Court", "Molten Crown", "Kingfire Crater", "Cinderseal Forge", "Throne of Ash", "Volcano Heart", "Magma Dais" ]
+    },
+    {
+      "RegionId": "r10",
+      "Wilds": [ "Summit Road", "Gloamveil Slope", "Twin Spring Terrace", "Steamcloud Heights", "Skyward Steps", "Crownward Ridge", "Starlit Scree", "Last Meadow" ],
+      "Den": [ "Summit Cave", "Steamvent Den", "Crownrock Hollow", "Highnest Den", "Mistfire Grotto", "Stormbreak Nook", "Eaglecrest Den", "Old Titan Den" ],
+      "Camp": [ "Last Camp", "Starwatch Camp", "Summit Hearth", "Twin Fire Rest", "Cloudsea Camp", "Wayfarer Rest", "Highcrag Shelter", "Dawnwatch Camp" ],
+      "TradingPost": [ "Summit Market", "Last Trader", "Cloudtop Bazaar", "Highroad Stall", "Crown Exchange", "Wayfarer Cart", "Star Barter", "Skyline Stall" ],
+      "Pass": [ "Crown Gate", "Sky Stair", "Final Bridge", "Summit Pass", "Cloudsea Crossing", "Twin Spring Gap", "Gloamgate", "Highest Arch" ],
+      "Lair": [ "The Worldcrown", "Summit Crown", "Twin Springs", "Crownseal Dais", "Steam Throne", "Gloam Wellspring", "Tidefire Basin", "Everpeak" ]
+    }
+  ]
+}

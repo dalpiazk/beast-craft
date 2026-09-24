@@ -362,7 +362,7 @@ seals, each region's effective rules, which regions a boss unlocks), `RegionLibr
 
 | Content | Value |
 | --- | --- |
-| Regions | `r01` Verdant Hollow (1-10), `r02` Emberreach (11-20), `r03` Tidefall, `r04` Stormcrag, `r05` Rustwood, `r06` Frostmere, `r07` Thunderspire, `r08` Deepwild, `r09` Cinder Throne, `r10` Apex (91-100); 4 stages each; each requires the one before |
+| Regions | `r01` Verdant Hollow (1-10), `r02` Emberreach (11-20), `r03` Tidefall, `r04` Stormcrag, `r05` Rustwood, `r06` Frostmere, `r07` Thunderspire, `r08` Deepwild, `r09` Cinder Throne, `r10` Worldcrown (91-100); 4 stages each; each requires the one before |
 | Battle shapes | squad 45, horde 40, solo 15 (every region) |
 | Seals | `seal_r01` … `seal_r10`, one per boss, caps 22, 32, 42, 52, 62, 72, 82, 92, 100, 100 (the next region's max + `LevelCapMargin` 2) |
 | Starting cap | 12 (region 1's max + 2) |
@@ -372,6 +372,20 @@ A region's own `MapRules` override the library's when its `Layers` is above 0. T
 contiguous levels 1-100 from `r01` (`CampaignProgress.StartingRegionId`), each region requiring an
 earlier one, existing shapes and gate / boss templates, and seal caps that never fall and always
 cover the next region's max level.
+
+### Location names (`location-names.json`)
+
+`{SchemaVersion, Regions[] {RegionId, Wilds[], Den[], Camp[], TradingPost[], Pass[], Lair[]}}`: for
+every region, exactly `NodeMapGenerator.LabelVariants` (8) display names per `LocationKind` — the place
+names a map UI prints. `LocationNameTable.Resolve(labelKey)` (or `Resolve(node)`) parses
+`"{regionId}/{kind}/{variant}"` and returns that region's `variant`-th name for the kind; a key the
+table does not cover falls back to the kind's generic name (Wilds, Den, Camp, Trading Post, Pass,
+Lair), a malformed key to "". `LocationNameTableValidator` requires every region exactly once, 8
+non-empty, trimmed names of at most 24 characters per kind, unique within the region; the Region
+importer imports the file with `regions.json` (all or nothing) into `RegionLibrarySO.LocationNames`
+(`RegionLibrarySO.Names` is the built table). Presentation only: a save keeps the key, so renaming a
+place renames it everywhere. Seals also carry a `Description` (flavour text). All region, seal,
+location and boss text is DRAFT, written to [content-bible.md](content-bible.md).
 
 ### Node maps (`NodeMapGenerator`)
 
@@ -394,7 +408,7 @@ template. Each node's `EncounterSeed` is `LootRoller.DeriveSeed(mapSeed, NodeId)
 region map — `Kind` from its type (`LocationKinds.For`), `X` from its lane and `Y` from its row, each
 cell centre jittered by up to a quarter lane and a fifth of a row (the Pass or Lair centred at the far
 edge), scaled into [0.05, 0.95] and rounded to 4 decimals, and `LabelKey` = `"{regionId}/{kind}/{0-7}"`
-(e.g. `r01/wilds/3`, for a localization table of place names). Its draws come from their own stream
+(e.g. `r01/wilds/3`), resolved to a place name by `LocationNameTable` (below). Its draws come from their own stream
 (`DeriveSeed(mapSeed, NodeMapGenerator.PlacementStream)`), so placement never changes a map's
 structure, types, levels or encounter seeds; rows never overlap (deeper rows lie further in) and lanes
 keep their left-to-right order, so the paths read as routes across the region.
@@ -420,8 +434,8 @@ keep their left-to-right order, so the paths read as routes across the region.
 ### Bosses (DRAFT)
 
 Ten authored templates in `encounter-library.json` (`boss_r01_hollow_warden` … `boss_r10_apex_pair`),
-shape `elite` (its drop cells), fought at the region's max level, each marked DRAFT PLACEHOLDER in its
-`Description`: r01 champion (Nature) + 2 brutes; r02 2 Fire champions + 2 archers; r03 Water giant +
+shape `elite` (its drop cells), fought at the region's max level, each flagged `"Draft": true` (not
+player-facing; names and lore: [content-bible.md](content-bible.md)): r01 champion (Nature) + 2 brutes; r02 2 Fire champions + 2 archers; r03 Water giant +
 2 casters (Water / Ice); r04 Air giant + 3 stalkers; r05 2 champions (Metal / Earth) + shaman + 2
 brutes; r06 Ice giant + 10 swarmlings + 2 archers; r07 Lightning giant + Air champion + 2 casters;
 r08 Nature giant + 12 stinglings + 2 shamans; r09 Fire giant + 2 champions (Earth / Metal); r10 two

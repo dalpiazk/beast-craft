@@ -108,6 +108,9 @@ namespace BeastCraft.Campaign
 
         public string DisplayName;
 
+        /// <summary>Flavour text for the key item (presentation only; "" when not authored).</summary>
+        public string Description;
+
         /// <summary>The beast level cap while this is the highest seal owned, 1-100.</summary>
         public int LevelCap;
     }

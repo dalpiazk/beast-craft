@@ -1,5 +1,5 @@
 {
-  "_readme": "GAME CONTENT, DRAFT PENDING PRODUCER REVIEW (every name; no art yet: ArtKey is a placeholder key). Cosmetics are PURELY visual (no stats). Looks are PER SPECIES (each beast species has its own categories: two or three parts, e.g. wings where it has them, and a tint colour; lead/user decision) plus the avatar's categories. Category ids are global (unlock keys are 'categoryId/optionId', account-wide). Each discrete category has exactly one default (Source default) and at least one starter look (free from the start); the rest come from: shop (the Trader sells it, from MinRegion; common or rare price tier), boss (a region lair's first clear, UnlockId = the region; never sold), milestone (UnlockId = a Milestones entry: BeastLevel = a beast of that species reaches the level (any beast for an avatar look), AvatarLevel, BossesCleared), drop (a low chance per won battle, drop-tables.json CosmeticDrops, from MinRegion; a future idle/AFK mechanism may also roll it), premium (reserved for a future purchase: never obtainable with gold or play in v1). Colour pickers are free. Validated by CosmeticLibraryValidator; Editor: Beast Craft/Data/Import Cosmetics (categories, the avatar schema, each species' schema). See docs/design/economy-and-shop.md, 'Cosmetics'.",
+  "_readme": "GAME CONTENT, DRAFT PENDING PRODUCER REVIEW (every name; no art yet: ArtKey is a placeholder key). Look and milestone names: DRAFT content pass; naming rules in docs/design/content-items.md. Cosmetics are PURELY visual (no stats). Looks are PER SPECIES (each beast species has its own categories: two or three parts, e.g. wings where it has them, and a tint colour; lead/user decision) plus the avatar's categories. Category ids are global (unlock keys are 'categoryId/optionId', account-wide). Each discrete category has exactly one default (Source default) and at least one starter look (free from the start); the rest come from: shop (the Trader sells it, from MinRegion; common or rare price tier), boss (a region lair's first clear, UnlockId = the region; never sold), milestone (UnlockId = a Milestones entry: BeastLevel = a beast of that species reaches the level (any beast for an avatar look), AvatarLevel, BossesCleared), drop (a low chance per won battle, drop-tables.json CosmeticDrops, from MinRegion; a future idle/AFK mechanism may also roll it), premium (reserved for a future purchase: never obtainable with gold or play in v1). Colour pickers are free. Validated by CosmeticLibraryValidator; Editor: Beast Craft/Data/Import Cosmetics (categories, the avatar schema, each species' schema). See docs/design/economy-and-shop.md, 'Cosmetics'.",
   "SchemaVersion": 1,
   "Categories": [
     {
@@ -11,7 +11,7 @@
       "Options": [
         {
           "OptionId": "short",
-          "DisplayName": "Short",
+          "DisplayName": "Short Crop",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": true,
@@ -23,7 +23,7 @@
         },
         {
           "OptionId": "braids",
-          "DisplayName": "Braids",
+          "DisplayName": "Trail Braids",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": true,
@@ -35,7 +35,7 @@
         },
         {
           "OptionId": "ponytail",
-          "DisplayName": "Ponytail",
+          "DisplayName": "High Ponytail",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": true,
@@ -47,7 +47,7 @@
         },
         {
           "OptionId": "curls",
-          "DisplayName": "Curls",
+          "DisplayName": "Wild Curls",
           "IsDefault": false,
           "SortOrder": 3,
           "SupportsPaletteShader": true,
@@ -59,7 +59,7 @@
         },
         {
           "OptionId": "mohawk",
-          "DisplayName": "Mohawk",
+          "DisplayName": "Crest Cut",
           "IsDefault": false,
           "SortOrder": 4,
           "SupportsPaletteShader": true,
@@ -71,7 +71,7 @@
         },
         {
           "OptionId": "topknot",
-          "DisplayName": "Topknot",
+          "DisplayName": "Wanderer's Topknot",
           "IsDefault": false,
           "SortOrder": 5,
           "SupportsPaletteShader": true,
@@ -83,7 +83,7 @@
         },
         {
           "OptionId": "silver_mane",
-          "DisplayName": "Silver Mane",
+          "DisplayName": "Silverstream Mane",
           "IsDefault": false,
           "SortOrder": 6,
           "SupportsPaletteShader": true,
@@ -95,7 +95,7 @@
         },
         {
           "OptionId": "windswept",
-          "DisplayName": "Windswept",
+          "DisplayName": "Windswept Locks",
           "IsDefault": false,
           "SortOrder": 7,
           "SupportsPaletteShader": true,
@@ -136,7 +136,7 @@
       "Options": [
         {
           "OptionId": "traveler",
-          "DisplayName": "Traveler",
+          "DisplayName": "Traveler's Garb",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": true,
@@ -148,7 +148,7 @@
         },
         {
           "OptionId": "ranger",
-          "DisplayName": "Ranger",
+          "DisplayName": "Ranger Leathers",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": true,
@@ -160,7 +160,7 @@
         },
         {
           "OptionId": "scholar",
-          "DisplayName": "Scholar",
+          "DisplayName": "Bestiary Scholar",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": true,
@@ -172,7 +172,7 @@
         },
         {
           "OptionId": "explorer",
-          "DisplayName": "Explorer",
+          "DisplayName": "Explorer's Kit",
           "IsDefault": false,
           "SortOrder": 3,
           "SupportsPaletteShader": true,
@@ -184,7 +184,7 @@
         },
         {
           "OptionId": "noble",
-          "DisplayName": "Noble",
+          "DisplayName": "Noble Finery",
           "IsDefault": false,
           "SortOrder": 4,
           "SupportsPaletteShader": true,
@@ -196,7 +196,7 @@
         },
         {
           "OptionId": "warden",
-          "DisplayName": "Warden",
+          "DisplayName": "Forester Greens",
           "IsDefault": false,
           "SortOrder": 5,
           "SupportsPaletteShader": true,
@@ -208,7 +208,7 @@
         },
         {
           "OptionId": "stormcoat",
-          "DisplayName": "Stormcoat",
+          "DisplayName": "Stormrider Coat",
           "IsDefault": false,
           "SortOrder": 6,
           "SupportsPaletteShader": true,
@@ -220,7 +220,7 @@
         },
         {
           "OptionId": "veteran_garb",
-          "DisplayName": "Veteran Garb",
+          "DisplayName": "Veteran Binder Garb",
           "IsDefault": false,
           "SortOrder": 7,
           "SupportsPaletteShader": true,
@@ -232,7 +232,7 @@
         },
         {
           "OptionId": "apex_regalia",
-          "DisplayName": "Apex Regalia",
+          "DisplayName": "Summit Regalia",
           "IsDefault": false,
           "SortOrder": 8,
           "SupportsPaletteShader": true,
@@ -244,7 +244,7 @@
         },
         {
           "OptionId": "festival_garb",
-          "DisplayName": "Festival Garb",
+          "DisplayName": "Firefly Festival Garb",
           "IsDefault": false,
           "SortOrder": 9,
           "SupportsPaletteShader": true,
@@ -277,7 +277,7 @@
         },
         {
           "OptionId": "bandana",
-          "DisplayName": "Bandana",
+          "DisplayName": "Trail Bandana",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": true,
@@ -289,7 +289,7 @@
         },
         {
           "OptionId": "explorer_hat",
-          "DisplayName": "Explorer Hat",
+          "DisplayName": "Wide-Brim Hat",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": true,
@@ -301,7 +301,7 @@
         },
         {
           "OptionId": "circlet",
-          "DisplayName": "Circlet",
+          "DisplayName": "Silver Circlet",
           "IsDefault": false,
           "SortOrder": 3,
           "SupportsPaletteShader": true,
@@ -313,7 +313,7 @@
         },
         {
           "OptionId": "rustwood_helm",
-          "DisplayName": "Rustwood Helm",
+          "DisplayName": "Rustleaf Helm",
           "IsDefault": false,
           "SortOrder": 4,
           "SupportsPaletteShader": true,
@@ -325,7 +325,7 @@
         },
         {
           "OptionId": "champions_laurel",
-          "DisplayName": "Champion's Laurel",
+          "DisplayName": "First Seal Laurel",
           "IsDefault": false,
           "SortOrder": 5,
           "SupportsPaletteShader": true,
@@ -349,7 +349,7 @@
         },
         {
           "OptionId": "feathered_cap",
-          "DisplayName": "Feathered Cap",
+          "DisplayName": "Plumed Cap",
           "IsDefault": false,
           "SortOrder": 7,
           "SupportsPaletteShader": true,
@@ -361,7 +361,7 @@
         },
         {
           "OptionId": "star_crown",
-          "DisplayName": "Star Crown",
+          "DisplayName": "Constellation Crown",
           "IsDefault": false,
           "SortOrder": 8,
           "SupportsPaletteShader": true,
@@ -394,7 +394,7 @@
         },
         {
           "OptionId": "short_cape",
-          "DisplayName": "Short Cape",
+          "DisplayName": "Shoulder Cape",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": true,
@@ -406,7 +406,7 @@
         },
         {
           "OptionId": "travel_cloak",
-          "DisplayName": "Travel Cloak",
+          "DisplayName": "Hooded Travel Cloak",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": true,
@@ -418,7 +418,7 @@
         },
         {
           "OptionId": "silk_mantle",
-          "DisplayName": "Silk Mantle",
+          "DisplayName": "Moonsilk Mantle",
           "IsDefault": false,
           "SortOrder": 3,
           "SupportsPaletteShader": true,
@@ -430,7 +430,7 @@
         },
         {
           "OptionId": "tidefall_cape",
-          "DisplayName": "Tidefall Cape",
+          "DisplayName": "Undertow Cape",
           "IsDefault": false,
           "SortOrder": 4,
           "SupportsPaletteShader": true,
@@ -442,7 +442,7 @@
         },
         {
           "OptionId": "deepwild_cloak",
-          "DisplayName": "Deepwild Cloak",
+          "DisplayName": "Elderroot Cloak",
           "IsDefault": false,
           "SortOrder": 5,
           "SupportsPaletteShader": true,
@@ -466,7 +466,7 @@
         },
         {
           "OptionId": "veteran_mantle",
-          "DisplayName": "Veteran Mantle",
+          "DisplayName": "Elder Mantle",
           "IsDefault": false,
           "SortOrder": 7,
           "SupportsPaletteShader": true,
@@ -503,7 +503,7 @@
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Natural Horn",
+          "DisplayName": "Ivory Horn",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": true,
@@ -515,7 +515,7 @@
         },
         {
           "OptionId": "swept",
-          "DisplayName": "Swept Horn",
+          "DisplayName": "Windswept Horn",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": true,
@@ -527,7 +527,7 @@
         },
         {
           "OptionId": "banded",
-          "DisplayName": "Banded Horn",
+          "DisplayName": "Ringed Horn",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": true,
@@ -539,7 +539,7 @@
         },
         {
           "OptionId": "sunlit",
-          "DisplayName": "Sunlit Horn",
+          "DisplayName": "Dawnbeam Horn",
           "IsDefault": false,
           "SortOrder": 3,
           "SupportsPaletteShader": true,
@@ -551,7 +551,7 @@
         },
         {
           "OptionId": "moonlit",
-          "DisplayName": "Moonlit Horn",
+          "DisplayName": "Moonpearl Horn",
           "IsDefault": false,
           "SortOrder": 4,
           "SupportsPaletteShader": true,
@@ -563,7 +563,7 @@
         },
         {
           "OptionId": "regal",
-          "DisplayName": "Regal Horn",
+          "DisplayName": "Halo Horn",
           "IsDefault": false,
           "SortOrder": 5,
           "SupportsPaletteShader": true,
@@ -575,7 +575,7 @@
         },
         {
           "OptionId": "wildborn",
-          "DisplayName": "Wildborn Horn",
+          "DisplayName": "Wildbranch Horn",
           "IsDefault": false,
           "SortOrder": 6,
           "SupportsPaletteShader": true,
@@ -587,7 +587,7 @@
         },
         {
           "OptionId": "veteran",
-          "DisplayName": "Veteran Horn",
+          "DisplayName": "Veteran Brighthorn",
           "IsDefault": false,
           "SortOrder": 7,
           "SupportsPaletteShader": true,
@@ -599,7 +599,7 @@
         },
         {
           "OptionId": "starlit",
-          "DisplayName": "Starlit Horn",
+          "DisplayName": "Aurora Horn",
           "IsDefault": false,
           "SortOrder": 8,
           "SupportsPaletteShader": true,
@@ -620,7 +620,7 @@
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Natural Mane",
+          "DisplayName": "Cloud Mane",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": true,
@@ -632,7 +632,7 @@
         },
         {
           "OptionId": "striped",
-          "DisplayName": "Striped Mane",
+          "DisplayName": "Ribboned Mane",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": true,
@@ -644,7 +644,7 @@
         },
         {
           "OptionId": "mottled",
-          "DisplayName": "Mottled Mane",
+          "DisplayName": "Dappled Mane",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": true,
@@ -668,7 +668,7 @@
         },
         {
           "OptionId": "runed",
-          "DisplayName": "Runed Mane",
+          "DisplayName": "Sunrune Mane",
           "IsDefault": false,
           "SortOrder": 4,
           "SupportsPaletteShader": true,
@@ -680,7 +680,7 @@
         },
         {
           "OptionId": "lair",
-          "DisplayName": "Verdant Hollow Mane",
+          "DisplayName": "Mossgrove Mane",
           "IsDefault": false,
           "SortOrder": 5,
           "SupportsPaletteShader": true,
@@ -692,7 +692,7 @@
         },
         {
           "OptionId": "ghostly",
-          "DisplayName": "Ghostly Mane",
+          "DisplayName": "Wisp Mane",
           "IsDefault": false,
           "SortOrder": 6,
           "SupportsPaletteShader": true,
@@ -704,7 +704,7 @@
         },
         {
           "OptionId": "ascendant",
-          "DisplayName": "Ascendant Mane",
+          "DisplayName": "Ascendant Sunmane",
           "IsDefault": false,
           "SortOrder": 7,
           "SupportsPaletteShader": true,
@@ -733,7 +733,7 @@
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Natural Plumage",
+          "DisplayName": "Ember Plumage",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": true,
@@ -745,7 +745,7 @@
         },
         {
           "OptionId": "swept",
-          "DisplayName": "Swept Plumage",
+          "DisplayName": "Sweeping Plumage",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": true,
@@ -757,7 +757,7 @@
         },
         {
           "OptionId": "banded",
-          "DisplayName": "Banded Plumage",
+          "DisplayName": "Barred Plumage",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": true,
@@ -769,7 +769,7 @@
         },
         {
           "OptionId": "sunlit",
-          "DisplayName": "Sunlit Plumage",
+          "DisplayName": "Sunflare Plumage",
           "IsDefault": false,
           "SortOrder": 3,
           "SupportsPaletteShader": true,
@@ -781,7 +781,7 @@
         },
         {
           "OptionId": "moonlit",
-          "DisplayName": "Moonlit Plumage",
+          "DisplayName": "Moonfire Plumage",
           "IsDefault": false,
           "SortOrder": 4,
           "SupportsPaletteShader": true,
@@ -793,7 +793,7 @@
         },
         {
           "OptionId": "regal",
-          "DisplayName": "Regal Plumage",
+          "DisplayName": "Crownfire Plumage",
           "IsDefault": false,
           "SortOrder": 5,
           "SupportsPaletteShader": true,
@@ -805,7 +805,7 @@
         },
         {
           "OptionId": "wildborn",
-          "DisplayName": "Wildborn Plumage",
+          "DisplayName": "Wildfire Plumage",
           "IsDefault": false,
           "SortOrder": 6,
           "SupportsPaletteShader": true,
@@ -817,7 +817,7 @@
         },
         {
           "OptionId": "veteran",
-          "DisplayName": "Veteran Plumage",
+          "DisplayName": "Veteran Blazeplume",
           "IsDefault": false,
           "SortOrder": 7,
           "SupportsPaletteShader": true,
@@ -829,7 +829,7 @@
         },
         {
           "OptionId": "starlit",
-          "DisplayName": "Starlit Plumage",
+          "DisplayName": "Starfire Plumage",
           "IsDefault": false,
           "SortOrder": 8,
           "SupportsPaletteShader": true,
@@ -850,7 +850,7 @@
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Natural Wings",
+          "DisplayName": "Flame Wings",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": true,
@@ -862,7 +862,7 @@
         },
         {
           "OptionId": "striped",
-          "DisplayName": "Striped Wings",
+          "DisplayName": "Streaked Wings",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": true,
@@ -874,7 +874,7 @@
         },
         {
           "OptionId": "mottled",
-          "DisplayName": "Mottled Wings",
+          "DisplayName": "Ashfleck Wings",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": true,
@@ -886,7 +886,7 @@
         },
         {
           "OptionId": "gilded",
-          "DisplayName": "Gilded Wings",
+          "DisplayName": "Gilded Pinions",
           "IsDefault": false,
           "SortOrder": 3,
           "SupportsPaletteShader": true,
@@ -898,7 +898,7 @@
         },
         {
           "OptionId": "runed",
-          "DisplayName": "Runed Wings",
+          "DisplayName": "Glyphflame Wings",
           "IsDefault": false,
           "SortOrder": 4,
           "SupportsPaletteShader": true,
@@ -910,7 +910,7 @@
         },
         {
           "OptionId": "lair",
-          "DisplayName": "Emberreach Wings",
+          "DisplayName": "Emberflare Wings",
           "IsDefault": false,
           "SortOrder": 5,
           "SupportsPaletteShader": true,
@@ -922,7 +922,7 @@
         },
         {
           "OptionId": "ghostly",
-          "DisplayName": "Ghostly Wings",
+          "DisplayName": "Ghostflame Wings",
           "IsDefault": false,
           "SortOrder": 6,
           "SupportsPaletteShader": true,
@@ -934,7 +934,7 @@
         },
         {
           "OptionId": "ascendant",
-          "DisplayName": "Ascendant Wings",
+          "DisplayName": "Ascendant Rebirth Wings",
           "IsDefault": false,
           "SortOrder": 7,
           "SupportsPaletteShader": true,
@@ -963,7 +963,7 @@
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Natural Fins",
+          "DisplayName": "Tide Fins",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": true,
@@ -975,7 +975,7 @@
         },
         {
           "OptionId": "swept",
-          "DisplayName": "Swept Fins",
+          "DisplayName": "Streamline Fins",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": true,
@@ -987,7 +987,7 @@
         },
         {
           "OptionId": "banded",
-          "DisplayName": "Banded Fins",
+          "DisplayName": "Wavebanded Fins",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": true,
@@ -999,7 +999,7 @@
         },
         {
           "OptionId": "sunlit",
-          "DisplayName": "Sunlit Fins",
+          "DisplayName": "Sunshallow Fins",
           "IsDefault": false,
           "SortOrder": 3,
           "SupportsPaletteShader": true,
@@ -1011,7 +1011,7 @@
         },
         {
           "OptionId": "moonlit",
-          "DisplayName": "Moonlit Fins",
+          "DisplayName": "Moontide Fins",
           "IsDefault": false,
           "SortOrder": 4,
           "SupportsPaletteShader": true,
@@ -1023,7 +1023,7 @@
         },
         {
           "OptionId": "regal",
-          "DisplayName": "Regal Fins",
+          "DisplayName": "Coral Crown Fins",
           "IsDefault": false,
           "SortOrder": 5,
           "SupportsPaletteShader": true,
@@ -1035,7 +1035,7 @@
         },
         {
           "OptionId": "wildborn",
-          "DisplayName": "Wildborn Fins",
+          "DisplayName": "Kelp-Frilled Fins",
           "IsDefault": false,
           "SortOrder": 6,
           "SupportsPaletteShader": true,
@@ -1047,7 +1047,7 @@
         },
         {
           "OptionId": "veteran",
-          "DisplayName": "Veteran Fins",
+          "DisplayName": "Veteran Deepfins",
           "IsDefault": false,
           "SortOrder": 7,
           "SupportsPaletteShader": true,
@@ -1059,7 +1059,7 @@
         },
         {
           "OptionId": "starlit",
-          "DisplayName": "Starlit Fins",
+          "DisplayName": "Starsea Fins",
           "IsDefault": false,
           "SortOrder": 8,
           "SupportsPaletteShader": true,
@@ -1080,7 +1080,7 @@
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Natural Scales",
+          "DisplayName": "Sea Scales",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": true,
@@ -1092,7 +1092,7 @@
         },
         {
           "OptionId": "striped",
-          "DisplayName": "Striped Scales",
+          "DisplayName": "Currentline Scales",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": true,
@@ -1104,7 +1104,7 @@
         },
         {
           "OptionId": "mottled",
-          "DisplayName": "Mottled Scales",
+          "DisplayName": "Foamfleck Scales",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": true,
@@ -1116,7 +1116,7 @@
         },
         {
           "OptionId": "gilded",
-          "DisplayName": "Gilded Scales",
+          "DisplayName": "Pearl-Gilt Scales",
           "IsDefault": false,
           "SortOrder": 3,
           "SupportsPaletteShader": true,
@@ -1128,7 +1128,7 @@
         },
         {
           "OptionId": "runed",
-          "DisplayName": "Runed Scales",
+          "DisplayName": "Tiderune Scales",
           "IsDefault": false,
           "SortOrder": 4,
           "SupportsPaletteShader": true,
@@ -1140,7 +1140,7 @@
         },
         {
           "OptionId": "lair",
-          "DisplayName": "Tidefall Scales",
+          "DisplayName": "Undertow Scales",
           "IsDefault": false,
           "SortOrder": 5,
           "SupportsPaletteShader": true,
@@ -1152,7 +1152,7 @@
         },
         {
           "OptionId": "ghostly",
-          "DisplayName": "Ghostly Scales",
+          "DisplayName": "Abyssglow Scales",
           "IsDefault": false,
           "SortOrder": 6,
           "SupportsPaletteShader": true,
@@ -1164,7 +1164,7 @@
         },
         {
           "OptionId": "ascendant",
-          "DisplayName": "Ascendant Scales",
+          "DisplayName": "Ascendant Tidescale",
           "IsDefault": false,
           "SortOrder": 7,
           "SupportsPaletteShader": true,
@@ -1193,7 +1193,7 @@
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Natural Crest",
+          "DisplayName": "Eagle Crest",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": true,
@@ -1205,7 +1205,7 @@
         },
         {
           "OptionId": "swept",
-          "DisplayName": "Swept Crest",
+          "DisplayName": "Windswept Crest",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": true,
@@ -1217,7 +1217,7 @@
         },
         {
           "OptionId": "banded",
-          "DisplayName": "Banded Crest",
+          "DisplayName": "Barred Crest",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": true,
@@ -1229,7 +1229,7 @@
         },
         {
           "OptionId": "sunlit",
-          "DisplayName": "Sunlit Crest",
+          "DisplayName": "Sunfeather Crest",
           "IsDefault": false,
           "SortOrder": 3,
           "SupportsPaletteShader": true,
@@ -1241,7 +1241,7 @@
         },
         {
           "OptionId": "moonlit",
-          "DisplayName": "Moonlit Crest",
+          "DisplayName": "Owlmoon Crest",
           "IsDefault": false,
           "SortOrder": 4,
           "SupportsPaletteShader": true,
@@ -1253,7 +1253,7 @@
         },
         {
           "OptionId": "regal",
-          "DisplayName": "Regal Crest",
+          "DisplayName": "Royal Plume Crest",
           "IsDefault": false,
           "SortOrder": 5,
           "SupportsPaletteShader": true,
@@ -1265,7 +1265,7 @@
         },
         {
           "OptionId": "wildborn",
-          "DisplayName": "Wildborn Crest",
+          "DisplayName": "Cliffwild Crest",
           "IsDefault": false,
           "SortOrder": 6,
           "SupportsPaletteShader": true,
@@ -1277,7 +1277,7 @@
         },
         {
           "OptionId": "veteran",
-          "DisplayName": "Veteran Crest",
+          "DisplayName": "Veteran Skycrest",
           "IsDefault": false,
           "SortOrder": 7,
           "SupportsPaletteShader": true,
@@ -1289,7 +1289,7 @@
         },
         {
           "OptionId": "starlit",
-          "DisplayName": "Starlit Crest",
+          "DisplayName": "Starwind Crest",
           "IsDefault": false,
           "SortOrder": 8,
           "SupportsPaletteShader": true,
@@ -1310,7 +1310,7 @@
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Natural Wings",
+          "DisplayName": "Sky Wings",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": true,
@@ -1322,7 +1322,7 @@
         },
         {
           "OptionId": "striped",
-          "DisplayName": "Striped Wings",
+          "DisplayName": "Pinstripe Wings",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": true,
@@ -1334,7 +1334,7 @@
         },
         {
           "OptionId": "mottled",
-          "DisplayName": "Mottled Wings",
+          "DisplayName": "Speckled Wings",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": true,
@@ -1346,7 +1346,7 @@
         },
         {
           "OptionId": "gilded",
-          "DisplayName": "Gilded Wings",
+          "DisplayName": "Goldpinion Wings",
           "IsDefault": false,
           "SortOrder": 3,
           "SupportsPaletteShader": true,
@@ -1358,7 +1358,7 @@
         },
         {
           "OptionId": "runed",
-          "DisplayName": "Runed Wings",
+          "DisplayName": "Galerune Wings",
           "IsDefault": false,
           "SortOrder": 4,
           "SupportsPaletteShader": true,
@@ -1370,7 +1370,7 @@
         },
         {
           "OptionId": "lair",
-          "DisplayName": "Stormcrag Wings",
+          "DisplayName": "Galeborn Wings",
           "IsDefault": false,
           "SortOrder": 5,
           "SupportsPaletteShader": true,
@@ -1382,7 +1382,7 @@
         },
         {
           "OptionId": "ghostly",
-          "DisplayName": "Ghostly Wings",
+          "DisplayName": "Mistfeather Wings",
           "IsDefault": false,
           "SortOrder": 6,
           "SupportsPaletteShader": true,
@@ -1394,7 +1394,7 @@
         },
         {
           "OptionId": "ascendant",
-          "DisplayName": "Ascendant Wings",
+          "DisplayName": "Ascendant Skywings",
           "IsDefault": false,
           "SortOrder": 7,
           "SupportsPaletteShader": true,
@@ -1423,7 +1423,7 @@
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Natural Shell",
+          "DisplayName": "Iron Shell",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": true,
@@ -1435,7 +1435,7 @@
         },
         {
           "OptionId": "swept",
-          "DisplayName": "Swept Shell",
+          "DisplayName": "Sloped Shell",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": true,
@@ -1447,7 +1447,7 @@
         },
         {
           "OptionId": "banded",
-          "DisplayName": "Banded Shell",
+          "DisplayName": "Riveted Shell",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": true,
@@ -1459,7 +1459,7 @@
         },
         {
           "OptionId": "sunlit",
-          "DisplayName": "Sunlit Shell",
+          "DisplayName": "Brass Shell",
           "IsDefault": false,
           "SortOrder": 3,
           "SupportsPaletteShader": true,
@@ -1471,7 +1471,7 @@
         },
         {
           "OptionId": "moonlit",
-          "DisplayName": "Moonlit Shell",
+          "DisplayName": "Moonsilver Shell",
           "IsDefault": false,
           "SortOrder": 4,
           "SupportsPaletteShader": true,
@@ -1483,7 +1483,7 @@
         },
         {
           "OptionId": "regal",
-          "DisplayName": "Regal Shell",
+          "DisplayName": "Bastion Shell",
           "IsDefault": false,
           "SortOrder": 5,
           "SupportsPaletteShader": true,
@@ -1495,7 +1495,7 @@
         },
         {
           "OptionId": "wildborn",
-          "DisplayName": "Wildborn Shell",
+          "DisplayName": "Mossback Shell",
           "IsDefault": false,
           "SortOrder": 6,
           "SupportsPaletteShader": true,
@@ -1507,7 +1507,7 @@
         },
         {
           "OptionId": "veteran",
-          "DisplayName": "Veteran Shell",
+          "DisplayName": "Veteran Carapace",
           "IsDefault": false,
           "SortOrder": 7,
           "SupportsPaletteShader": true,
@@ -1519,7 +1519,7 @@
         },
         {
           "OptionId": "starlit",
-          "DisplayName": "Starlit Shell",
+          "DisplayName": "Star-Iron Shell",
           "IsDefault": false,
           "SortOrder": 8,
           "SupportsPaletteShader": true,
@@ -1540,7 +1540,7 @@
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Natural Spikes",
+          "DisplayName": "Iron Spikes",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": true,
@@ -1552,7 +1552,7 @@
         },
         {
           "OptionId": "striped",
-          "DisplayName": "Striped Spikes",
+          "DisplayName": "Forge-Striped Spikes",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": true,
@@ -1564,7 +1564,7 @@
         },
         {
           "OptionId": "mottled",
-          "DisplayName": "Mottled Spikes",
+          "DisplayName": "Rustfleck Spikes",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": true,
@@ -1588,7 +1588,7 @@
         },
         {
           "OptionId": "runed",
-          "DisplayName": "Runed Spikes",
+          "DisplayName": "Forgerune Spikes",
           "IsDefault": false,
           "SortOrder": 4,
           "SupportsPaletteShader": true,
@@ -1600,7 +1600,7 @@
         },
         {
           "OptionId": "lair",
-          "DisplayName": "Rustwood Spikes",
+          "DisplayName": "Rustleaf Spikes",
           "IsDefault": false,
           "SortOrder": 5,
           "SupportsPaletteShader": true,
@@ -1612,7 +1612,7 @@
         },
         {
           "OptionId": "ghostly",
-          "DisplayName": "Ghostly Spikes",
+          "DisplayName": "Phantom Steel Spikes",
           "IsDefault": false,
           "SortOrder": 6,
           "SupportsPaletteShader": true,
@@ -1624,7 +1624,7 @@
         },
         {
           "OptionId": "ascendant",
-          "DisplayName": "Ascendant Spikes",
+          "DisplayName": "Ascendant Crownspikes",
           "IsDefault": false,
           "SortOrder": 7,
           "SupportsPaletteShader": true,
@@ -1653,7 +1653,7 @@
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Natural Horns",
+          "DisplayName": "Rime Horns",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": true,
@@ -1665,7 +1665,7 @@
         },
         {
           "OptionId": "swept",
-          "DisplayName": "Swept Horns",
+          "DisplayName": "Glacier-Swept Horns",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": true,
@@ -1677,7 +1677,7 @@
         },
         {
           "OptionId": "banded",
-          "DisplayName": "Banded Horns",
+          "DisplayName": "Frostbanded Horns",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": true,
@@ -1689,7 +1689,7 @@
         },
         {
           "OptionId": "sunlit",
-          "DisplayName": "Sunlit Horns",
+          "DisplayName": "Sundog Horns",
           "IsDefault": false,
           "SortOrder": 3,
           "SupportsPaletteShader": true,
@@ -1701,7 +1701,7 @@
         },
         {
           "OptionId": "moonlit",
-          "DisplayName": "Moonlit Horns",
+          "DisplayName": "Moonfrost Horns",
           "IsDefault": false,
           "SortOrder": 4,
           "SupportsPaletteShader": true,
@@ -1713,7 +1713,7 @@
         },
         {
           "OptionId": "regal",
-          "DisplayName": "Regal Horns",
+          "DisplayName": "Icecrown Horns",
           "IsDefault": false,
           "SortOrder": 5,
           "SupportsPaletteShader": true,
@@ -1725,7 +1725,7 @@
         },
         {
           "OptionId": "wildborn",
-          "DisplayName": "Wildborn Horns",
+          "DisplayName": "Snowdrift Horns",
           "IsDefault": false,
           "SortOrder": 6,
           "SupportsPaletteShader": true,
@@ -1737,7 +1737,7 @@
         },
         {
           "OptionId": "veteran",
-          "DisplayName": "Veteran Horns",
+          "DisplayName": "Veteran Frosthorns",
           "IsDefault": false,
           "SortOrder": 7,
           "SupportsPaletteShader": true,
@@ -1749,7 +1749,7 @@
         },
         {
           "OptionId": "starlit",
-          "DisplayName": "Starlit Horns",
+          "DisplayName": "Starfrost Horns",
           "IsDefault": false,
           "SortOrder": 8,
           "SupportsPaletteShader": true,
@@ -1770,7 +1770,7 @@
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Natural Wings",
+          "DisplayName": "Frost Wings",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": true,
@@ -1782,7 +1782,7 @@
         },
         {
           "OptionId": "striped",
-          "DisplayName": "Striped Wings",
+          "DisplayName": "Icevein Wings",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": true,
@@ -1794,7 +1794,7 @@
         },
         {
           "OptionId": "mottled",
-          "DisplayName": "Mottled Wings",
+          "DisplayName": "Snowfleck Wings",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": true,
@@ -1806,7 +1806,7 @@
         },
         {
           "OptionId": "gilded",
-          "DisplayName": "Gilded Wings",
+          "DisplayName": "Gilt-Frost Wings",
           "IsDefault": false,
           "SortOrder": 3,
           "SupportsPaletteShader": true,
@@ -1818,7 +1818,7 @@
         },
         {
           "OptionId": "runed",
-          "DisplayName": "Runed Wings",
+          "DisplayName": "Rimerune Wings",
           "IsDefault": false,
           "SortOrder": 4,
           "SupportsPaletteShader": true,
@@ -1830,7 +1830,7 @@
         },
         {
           "OptionId": "lair",
-          "DisplayName": "Frostmere Wings",
+          "DisplayName": "Rimeglass Wings",
           "IsDefault": false,
           "SortOrder": 5,
           "SupportsPaletteShader": true,
@@ -1842,7 +1842,7 @@
         },
         {
           "OptionId": "ghostly",
-          "DisplayName": "Ghostly Wings",
+          "DisplayName": "Whiteout Wings",
           "IsDefault": false,
           "SortOrder": 6,
           "SupportsPaletteShader": true,
@@ -1854,7 +1854,7 @@
         },
         {
           "OptionId": "ascendant",
-          "DisplayName": "Ascendant Wings",
+          "DisplayName": "Ascendant Glacier Wings",
           "IsDefault": false,
           "SortOrder": 7,
           "SupportsPaletteShader": true,
@@ -1875,7 +1875,7 @@
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Natural Tail",
+          "DisplayName": "Frost Tail",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": true,
@@ -1887,7 +1887,7 @@
         },
         {
           "OptionId": "ridged",
-          "DisplayName": "Ridged Tail",
+          "DisplayName": "Iceridge Tail",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": true,
@@ -1899,7 +1899,7 @@
         },
         {
           "OptionId": "forked",
-          "DisplayName": "Forked Tail",
+          "DisplayName": "Twin-Fork Tail",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": true,
@@ -1935,7 +1935,7 @@
         },
         {
           "OptionId": "seasoned",
-          "DisplayName": "Seasoned Tail",
+          "DisplayName": "Seasoned Frosttail",
           "IsDefault": false,
           "SortOrder": 5,
           "SupportsPaletteShader": true,
@@ -1964,7 +1964,7 @@
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Natural Crest",
+          "DisplayName": "Storm Crest",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": true,
@@ -1976,7 +1976,7 @@
         },
         {
           "OptionId": "swept",
-          "DisplayName": "Swept Crest",
+          "DisplayName": "Tailwind Crest",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": true,
@@ -1988,7 +1988,7 @@
         },
         {
           "OptionId": "banded",
-          "DisplayName": "Banded Crest",
+          "DisplayName": "Zigzag Crest",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": true,
@@ -2000,7 +2000,7 @@
         },
         {
           "OptionId": "sunlit",
-          "DisplayName": "Sunlit Crest",
+          "DisplayName": "Sunbolt Crest",
           "IsDefault": false,
           "SortOrder": 3,
           "SupportsPaletteShader": true,
@@ -2012,7 +2012,7 @@
         },
         {
           "OptionId": "moonlit",
-          "DisplayName": "Moonlit Crest",
+          "DisplayName": "Moonstorm Crest",
           "IsDefault": false,
           "SortOrder": 4,
           "SupportsPaletteShader": true,
@@ -2024,7 +2024,7 @@
         },
         {
           "OptionId": "regal",
-          "DisplayName": "Regal Crest",
+          "DisplayName": "Thunderhead Crest",
           "IsDefault": false,
           "SortOrder": 5,
           "SupportsPaletteShader": true,
@@ -2036,7 +2036,7 @@
         },
         {
           "OptionId": "wildborn",
-          "DisplayName": "Wildborn Crest",
+          "DisplayName": "Squall Crest",
           "IsDefault": false,
           "SortOrder": 6,
           "SupportsPaletteShader": true,
@@ -2048,7 +2048,7 @@
         },
         {
           "OptionId": "veteran",
-          "DisplayName": "Veteran Crest",
+          "DisplayName": "Veteran Stormcrest",
           "IsDefault": false,
           "SortOrder": 7,
           "SupportsPaletteShader": true,
@@ -2060,7 +2060,7 @@
         },
         {
           "OptionId": "starlit",
-          "DisplayName": "Starlit Crest",
+          "DisplayName": "Starbolt Crest",
           "IsDefault": false,
           "SortOrder": 8,
           "SupportsPaletteShader": true,
@@ -2081,7 +2081,7 @@
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Natural Wings",
+          "DisplayName": "Thunder Wings",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": true,
@@ -2093,7 +2093,7 @@
         },
         {
           "OptionId": "striped",
-          "DisplayName": "Striped Wings",
+          "DisplayName": "Bolt-Striped Wings",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": true,
@@ -2105,7 +2105,7 @@
         },
         {
           "OptionId": "mottled",
-          "DisplayName": "Mottled Wings",
+          "DisplayName": "Cloudfleck Wings",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": true,
@@ -2117,7 +2117,7 @@
         },
         {
           "OptionId": "gilded",
-          "DisplayName": "Gilded Wings",
+          "DisplayName": "Goldbolt Wings",
           "IsDefault": false,
           "SortOrder": 3,
           "SupportsPaletteShader": true,
@@ -2129,7 +2129,7 @@
         },
         {
           "OptionId": "runed",
-          "DisplayName": "Runed Wings",
+          "DisplayName": "Sparkrune Wings",
           "IsDefault": false,
           "SortOrder": 4,
           "SupportsPaletteShader": true,
@@ -2141,7 +2141,7 @@
         },
         {
           "OptionId": "lair",
-          "DisplayName": "Thunderspire Wings",
+          "DisplayName": "Stormcrown Wings",
           "IsDefault": false,
           "SortOrder": 5,
           "SupportsPaletteShader": true,
@@ -2153,7 +2153,7 @@
         },
         {
           "OptionId": "ghostly",
-          "DisplayName": "Ghostly Wings",
+          "DisplayName": "Static Wings",
           "IsDefault": false,
           "SortOrder": 6,
           "SupportsPaletteShader": true,
@@ -2165,7 +2165,7 @@
         },
         {
           "OptionId": "ascendant",
-          "DisplayName": "Ascendant Wings",
+          "DisplayName": "Ascendant Tempest Wings",
           "IsDefault": false,
           "SortOrder": 7,
           "SupportsPaletteShader": true,
@@ -2194,7 +2194,7 @@
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Natural Canopy",
+          "DisplayName": "Oak Canopy",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": true,
@@ -2206,7 +2206,7 @@
         },
         {
           "OptionId": "swept",
-          "DisplayName": "Swept Canopy",
+          "DisplayName": "Willow Canopy",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": true,
@@ -2218,7 +2218,7 @@
         },
         {
           "OptionId": "banded",
-          "DisplayName": "Banded Canopy",
+          "DisplayName": "Birchband Canopy",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": true,
@@ -2230,7 +2230,7 @@
         },
         {
           "OptionId": "sunlit",
-          "DisplayName": "Sunlit Canopy",
+          "DisplayName": "Summerleaf Canopy",
           "IsDefault": false,
           "SortOrder": 3,
           "SupportsPaletteShader": true,
@@ -2242,7 +2242,7 @@
         },
         {
           "OptionId": "moonlit",
-          "DisplayName": "Moonlit Canopy",
+          "DisplayName": "Moonmoss Canopy",
           "IsDefault": false,
           "SortOrder": 4,
           "SupportsPaletteShader": true,
@@ -2254,7 +2254,7 @@
         },
         {
           "OptionId": "regal",
-          "DisplayName": "Regal Canopy",
+          "DisplayName": "Grandcrown Canopy",
           "IsDefault": false,
           "SortOrder": 5,
           "SupportsPaletteShader": true,
@@ -2266,7 +2266,7 @@
         },
         {
           "OptionId": "wildborn",
-          "DisplayName": "Wildborn Canopy",
+          "DisplayName": "Brambletop Canopy",
           "IsDefault": false,
           "SortOrder": 6,
           "SupportsPaletteShader": true,
@@ -2278,7 +2278,7 @@
         },
         {
           "OptionId": "veteran",
-          "DisplayName": "Veteran Canopy",
+          "DisplayName": "Veteran Oakcrown",
           "IsDefault": false,
           "SortOrder": 7,
           "SupportsPaletteShader": true,
@@ -2290,7 +2290,7 @@
         },
         {
           "OptionId": "starlit",
-          "DisplayName": "Starlit Canopy",
+          "DisplayName": "Starleaf Canopy",
           "IsDefault": false,
           "SortOrder": 8,
           "SupportsPaletteShader": true,
@@ -2311,7 +2311,7 @@
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Natural Blossoms",
+          "DisplayName": "Meadow Blossoms",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": true,
@@ -2323,7 +2323,7 @@
         },
         {
           "OptionId": "striped",
-          "DisplayName": "Striped Blossoms",
+          "DisplayName": "Ribbon Blossoms",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": true,
@@ -2335,7 +2335,7 @@
         },
         {
           "OptionId": "mottled",
-          "DisplayName": "Mottled Blossoms",
+          "DisplayName": "Speckled Blossoms",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": true,
@@ -2347,7 +2347,7 @@
         },
         {
           "OptionId": "gilded",
-          "DisplayName": "Gilded Blossoms",
+          "DisplayName": "Goldenrod Blossoms",
           "IsDefault": false,
           "SortOrder": 3,
           "SupportsPaletteShader": true,
@@ -2359,7 +2359,7 @@
         },
         {
           "OptionId": "runed",
-          "DisplayName": "Runed Blossoms",
+          "DisplayName": "Runebloom Blossoms",
           "IsDefault": false,
           "SortOrder": 4,
           "SupportsPaletteShader": true,
@@ -2371,7 +2371,7 @@
         },
         {
           "OptionId": "lair",
-          "DisplayName": "Deepwild Blossoms",
+          "DisplayName": "Elderroot Blossoms",
           "IsDefault": false,
           "SortOrder": 5,
           "SupportsPaletteShader": true,
@@ -2383,7 +2383,7 @@
         },
         {
           "OptionId": "ghostly",
-          "DisplayName": "Ghostly Blossoms",
+          "DisplayName": "Ghostbloom Blossoms",
           "IsDefault": false,
           "SortOrder": 6,
           "SupportsPaletteShader": true,
@@ -2395,7 +2395,7 @@
         },
         {
           "OptionId": "ascendant",
-          "DisplayName": "Ascendant Blossoms",
+          "DisplayName": "Ascendant Worldbloom",
           "IsDefault": false,
           "SortOrder": 7,
           "SupportsPaletteShader": true,
@@ -2424,7 +2424,7 @@
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Natural Core",
+          "DisplayName": "Stone Core",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": true,
@@ -2436,7 +2436,7 @@
         },
         {
           "OptionId": "swept",
-          "DisplayName": "Swept Core",
+          "DisplayName": "Faceted Core",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": true,
@@ -2448,7 +2448,7 @@
         },
         {
           "OptionId": "banded",
-          "DisplayName": "Banded Core",
+          "DisplayName": "Strata Core",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": true,
@@ -2460,7 +2460,7 @@
         },
         {
           "OptionId": "sunlit",
-          "DisplayName": "Sunlit Core",
+          "DisplayName": "Amber Core",
           "IsDefault": false,
           "SortOrder": 3,
           "SupportsPaletteShader": true,
@@ -2472,7 +2472,7 @@
         },
         {
           "OptionId": "moonlit",
-          "DisplayName": "Moonlit Core",
+          "DisplayName": "Moonstone Core",
           "IsDefault": false,
           "SortOrder": 4,
           "SupportsPaletteShader": true,
@@ -2484,7 +2484,7 @@
         },
         {
           "OptionId": "regal",
-          "DisplayName": "Regal Core",
+          "DisplayName": "Crown Jewel Core",
           "IsDefault": false,
           "SortOrder": 5,
           "SupportsPaletteShader": true,
@@ -2496,7 +2496,7 @@
         },
         {
           "OptionId": "wildborn",
-          "DisplayName": "Wildborn Core",
+          "DisplayName": "Fossil Core",
           "IsDefault": false,
           "SortOrder": 6,
           "SupportsPaletteShader": true,
@@ -2508,7 +2508,7 @@
         },
         {
           "OptionId": "veteran",
-          "DisplayName": "Veteran Core",
+          "DisplayName": "Veteran Heartstone",
           "IsDefault": false,
           "SortOrder": 7,
           "SupportsPaletteShader": true,
@@ -2520,7 +2520,7 @@
         },
         {
           "OptionId": "starlit",
-          "DisplayName": "Starlit Core",
+          "DisplayName": "Star Geode Core",
           "IsDefault": false,
           "SortOrder": 8,
           "SupportsPaletteShader": true,
@@ -2541,7 +2541,7 @@
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Natural Runes",
+          "DisplayName": "Earth Runes",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": true,
@@ -2553,7 +2553,7 @@
         },
         {
           "OptionId": "striped",
-          "DisplayName": "Striped Runes",
+          "DisplayName": "Etched Runes",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": true,
@@ -2565,7 +2565,7 @@
         },
         {
           "OptionId": "mottled",
-          "DisplayName": "Mottled Runes",
+          "DisplayName": "Pebbled Runes",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": true,
@@ -2589,7 +2589,7 @@
         },
         {
           "OptionId": "runed",
-          "DisplayName": "Runed Runes",
+          "DisplayName": "Deep-Cut Runes",
           "IsDefault": false,
           "SortOrder": 4,
           "SupportsPaletteShader": true,
@@ -2601,7 +2601,7 @@
         },
         {
           "OptionId": "lair",
-          "DisplayName": "Cinder Throne Runes",
+          "DisplayName": "Magmavein Runes",
           "IsDefault": false,
           "SortOrder": 5,
           "SupportsPaletteShader": true,
@@ -2613,7 +2613,7 @@
         },
         {
           "OptionId": "ghostly",
-          "DisplayName": "Ghostly Runes",
+          "DisplayName": "Ghostlight Runes",
           "IsDefault": false,
           "SortOrder": 6,
           "SupportsPaletteShader": true,
@@ -2625,7 +2625,7 @@
         },
         {
           "OptionId": "ascendant",
-          "DisplayName": "Ascendant Runes",
+          "DisplayName": "Ascendant Mountain Runes",
           "IsDefault": false,
           "SortOrder": 7,
           "SupportsPaletteShader": true,
@@ -2654,7 +2654,7 @@
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Natural Crown",
+          "DisplayName": "Shadow Crown",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": true,
@@ -2666,7 +2666,7 @@
         },
         {
           "OptionId": "swept",
-          "DisplayName": "Swept Crown",
+          "DisplayName": "Hooded Crown",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": true,
@@ -2678,7 +2678,7 @@
         },
         {
           "OptionId": "banded",
-          "DisplayName": "Banded Crown",
+          "DisplayName": "Coiled Crown",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": true,
@@ -2690,7 +2690,7 @@
         },
         {
           "OptionId": "sunlit",
-          "DisplayName": "Sunlit Crown",
+          "DisplayName": "Eclipse Crown",
           "IsDefault": false,
           "SortOrder": 3,
           "SupportsPaletteShader": true,
@@ -2702,7 +2702,7 @@
         },
         {
           "OptionId": "moonlit",
-          "DisplayName": "Moonlit Crown",
+          "DisplayName": "New Moon Crown",
           "IsDefault": false,
           "SortOrder": 4,
           "SupportsPaletteShader": true,
@@ -2714,7 +2714,7 @@
         },
         {
           "OptionId": "regal",
-          "DisplayName": "Regal Crown",
+          "DisplayName": "Midnight Diadem",
           "IsDefault": false,
           "SortOrder": 5,
           "SupportsPaletteShader": true,
@@ -2726,7 +2726,7 @@
         },
         {
           "OptionId": "wildborn",
-          "DisplayName": "Wildborn Crown",
+          "DisplayName": "Thornwild Crown",
           "IsDefault": false,
           "SortOrder": 6,
           "SupportsPaletteShader": true,
@@ -2738,7 +2738,7 @@
         },
         {
           "OptionId": "veteran",
-          "DisplayName": "Veteran Crown",
+          "DisplayName": "Veteran Shadowcrown",
           "IsDefault": false,
           "SortOrder": 7,
           "SupportsPaletteShader": true,
@@ -2750,7 +2750,7 @@
         },
         {
           "OptionId": "starlit",
-          "DisplayName": "Starlit Crown",
+          "DisplayName": "Nightstar Crown",
           "IsDefault": false,
           "SortOrder": 8,
           "SupportsPaletteShader": true,
@@ -2771,7 +2771,7 @@
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Natural Scales",
+          "DisplayName": "Dusk Scales",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": true,
@@ -2783,7 +2783,7 @@
         },
         {
           "OptionId": "striped",
-          "DisplayName": "Striped Scales",
+          "DisplayName": "Viper-Stripe Scales",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": true,
@@ -2795,7 +2795,7 @@
         },
         {
           "OptionId": "mottled",
-          "DisplayName": "Mottled Scales",
+          "DisplayName": "Smokefleck Scales",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": true,
@@ -2807,7 +2807,7 @@
         },
         {
           "OptionId": "gilded",
-          "DisplayName": "Gilded Scales",
+          "DisplayName": "Gilt-Edge Scales",
           "IsDefault": false,
           "SortOrder": 3,
           "SupportsPaletteShader": true,
@@ -2819,7 +2819,7 @@
         },
         {
           "OptionId": "runed",
-          "DisplayName": "Runed Scales",
+          "DisplayName": "Shadowrune Scales",
           "IsDefault": false,
           "SortOrder": 4,
           "SupportsPaletteShader": true,
@@ -2831,7 +2831,7 @@
         },
         {
           "OptionId": "lair",
-          "DisplayName": "Apex Scales",
+          "DisplayName": "Summit Scales",
           "IsDefault": false,
           "SortOrder": 5,
           "SupportsPaletteShader": true,
@@ -2843,7 +2843,7 @@
         },
         {
           "OptionId": "ghostly",
-          "DisplayName": "Ghostly Scales",
+          "DisplayName": "Gloam Scales",
           "IsDefault": false,
           "SortOrder": 6,
           "SupportsPaletteShader": true,
@@ -2855,7 +2855,7 @@
         },
         {
           "OptionId": "ascendant",
-          "DisplayName": "Ascendant Scales",
+          "DisplayName": "Ascendant Umbra Scales",
           "IsDefault": false,
           "SortOrder": 7,
           "SupportsPaletteShader": true,
@@ -2879,43 +2879,43 @@
   "Milestones": [
     {
       "MilestoneId": "beast_level_25",
-      "DisplayName": "Seasoned (a beast of the species reaches level 25)",
+      "DisplayName": "Seasoned (beast level 25)",
       "Kind": "BeastLevel",
       "Threshold": 25
     },
     {
       "MilestoneId": "beast_level_50",
-      "DisplayName": "Veteran (level 50)",
+      "DisplayName": "Veteran (beast level 50)",
       "Kind": "BeastLevel",
       "Threshold": 50
     },
     {
       "MilestoneId": "beast_level_75",
-      "DisplayName": "Elder (level 75)",
+      "DisplayName": "Elder (beast level 75)",
       "Kind": "BeastLevel",
       "Threshold": 75
     },
     {
       "MilestoneId": "beast_level_100",
-      "DisplayName": "Ascendant (level 100)",
+      "DisplayName": "Ascendant (beast level 100)",
       "Kind": "BeastLevel",
       "Threshold": 100
     },
     {
       "MilestoneId": "avatar_level_50",
-      "DisplayName": "The avatar reaches level 50",
+      "DisplayName": "Veteran Binder (avatar level 50)",
       "Kind": "AvatarLevel",
       "Threshold": 50
     },
     {
       "MilestoneId": "first_boss",
-      "DisplayName": "The first region boss beaten",
+      "DisplayName": "Sealbearer (first region boss beaten)",
       "Kind": "BossesCleared",
       "Threshold": 1
     },
     {
       "MilestoneId": "all_bosses",
-      "DisplayName": "All ten region bosses beaten",
+      "DisplayName": "Keeper of Seals (all ten region bosses beaten)",
       "Kind": "BossesCleared",
       "Threshold": 10
     }

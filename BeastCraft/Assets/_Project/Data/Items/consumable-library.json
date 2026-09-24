@@ -1,9 +1,9 @@
 {
-  "_readme": "GAME CONTENT, TUNABLE STARTING VALUES PENDING PRODUCER REVIEW (names, effects). Battle consumables: at most ONE per battle (lead decision), chosen before the fight and used as it begins (before team bonds and the avatar's opening passives), spent whatever the outcome. Recipients Team: every living team beast applies the effects to itself (percent BuffStat or flat CritChance); Enemies: the team's first living beast applies them to every living enemy (DebuffStat or DamageOverTime, less the enemy's status resist). Every effect lasts 1-3 of the affected unit's turns. Strength target: at most about +0.3 of a level each (a tier-1 bond), measured by the balance simulator's --economy-probe (see docs/balance/tuning-log.md). No speed consumables (a pre-battle Speed buff or debuff measured NEGATIVE in the simulator; flagged for the combat lane), no shield (a consumable shield displaces the stance bonds' longer ones and measured negative), heals (battles start at full HP), revives or cleanses in v1 (a Cleanse consumable becomes possible with the combat lane's Cleanse effect). MinRegion: the first region whose Traders stock it; MaxStack: the most the pack holds. Validated by ConsumableLibraryValidator; Editor: Beast Craft/Data/Import Consumables. See docs/design/economy-and-shop.md, 'Consumables'.",
+  "_readme": "GAME CONTENT, TUNABLE STARTING VALUES PENDING PRODUCER REVIEW (names, effects). Names and descriptions: DRAFT content pass pending producer review; naming rules in docs/design/content-items.md. Battle consumables: at most ONE per battle (lead decision), chosen before the fight and used as it begins (before team bonds and the avatar's opening passives), spent whatever the outcome. Recipients Team: every living team beast applies the effects to itself (percent BuffStat or flat CritChance); Enemies: the team's first living beast applies them to every living enemy (DebuffStat or DamageOverTime, less the enemy's status resist). Every effect lasts 1-3 of the affected unit's turns. Strength target: at most about +0.3 of a level each (a tier-1 bond), measured by the balance simulator's --economy-probe (see docs/balance/tuning-log.md). No speed consumables (a pre-battle Speed buff or debuff measured NEGATIVE in the simulator; flagged for the combat lane), no shield (a consumable shield displaces the stance bonds' longer ones and measured negative), heals (battles start at full HP), revives or cleanses in v1 (a Cleanse consumable becomes possible with the combat lane's Cleanse effect). MinRegion: the first region whose Traders stock it; MaxStack: the most the pack holds. Validated by ConsumableLibraryValidator; Editor: Beast Craft/Data/Import Consumables. See docs/design/economy-and-shop.md, 'Consumables'.",
   "SchemaVersion": 1,
   "Consumables": [
     {
-      "ConsumableId": "fury_draught", "DisplayName": "Fury Draught", "Description": "A bitter red draught: the team's blows land harder for a few turns.",
+      "ConsumableId": "fury_draught", "DisplayName": "Fury Draught", "Description": "A fizzing red draught that tastes of pepper: the team's physical and elemental blows land harder for a few turns.",
       "Rarity": 0, "MinRegion": 1, "MaxStack": 5, "Recipients": "Team",
       "Effects": [
         { "EffectType": "BuffStat", "AffectedStat": "Attack", "Magnitude": 4, "DurationTurns": 3, "IsPercent": true },
@@ -11,7 +11,7 @@
       ]
     },
     {
-      "ConsumableId": "iron_tonic", "DisplayName": "Iron Tonic", "Description": "A metallic tonic that hardens hide and scale.",
+      "ConsumableId": "iron_tonic", "DisplayName": "Iron Tonic", "Description": "A metallic tonic (best gulped quickly) that toughens hide and scale against every kind of attack for a few turns.",
       "Rarity": 0, "MinRegion": 1, "MaxStack": 5, "Recipients": "Team",
       "Effects": [
         { "EffectType": "BuffStat", "AffectedStat": "Defense", "Magnitude": 4, "DurationTurns": 3, "IsPercent": true },
@@ -19,14 +19,14 @@
       ]
     },
     {
-      "ConsumableId": "hawkeye_drops", "DisplayName": "Hawk-eye Drops", "Description": "Stinging drops that show the team every weak spot.",
+      "ConsumableId": "hawkeye_drops", "DisplayName": "Hawk-eye Drops", "Description": "Stinging eye drops that show the team every weak spot: more critical hits for a few turns.",
       "Rarity": 0, "MinRegion": 2, "MaxStack": 5, "Recipients": "Team",
       "Effects": [
         { "EffectType": "BuffStat", "AffectedStat": "CritChance", "Magnitude": 12, "DurationTurns": 3 }
       ]
     },
     {
-      "ConsumableId": "smoke_bomb", "DisplayName": "Smoke Bomb", "Description": "Stinging smoke that leaves the enemy half-blind for a few turns.",
+      "ConsumableId": "smoke_bomb", "DisplayName": "Smoke Bomb", "Description": "A sooty clay ball that bursts into choking smoke: the enemy's attacks weaken for a couple of turns.",
       "Rarity": 0, "MinRegion": 3, "MaxStack": 5, "Recipients": "Enemies",
       "Effects": [
         { "EffectType": "DebuffStat", "AffectedStat": "Attack", "Magnitude": 5, "DurationTurns": 2, "IsPercent": true },
@@ -34,7 +34,7 @@
       ]
     },
     {
-      "ConsumableId": "venom_flask", "DisplayName": "Venom Flask", "Description": "A shattering flask of venom: some of the enemy sicken.",
+      "ConsumableId": "venom_flask", "DisplayName": "Venom Flask", "Description": "A flask of bubbling green venom, thrown to shatter: some of the enemy may sicken and take damage each turn.",
       "Rarity": 1, "MinRegion": 4, "MaxStack": 3, "Recipients": "Enemies",
       "Effects": [
         { "EffectType": "ApplyStatus", "Status": "DamageOverTime", "Magnitude": 8, "DurationTurns": 3, "Chance": 50 }

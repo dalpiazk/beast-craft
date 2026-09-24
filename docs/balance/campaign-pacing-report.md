@@ -41,7 +41,7 @@ Every battle fought, losses (retries) included.
 | r07 Thunderspire | 61-70 | 45 | 50 | 57 | 12.8 | 2.9 |
 | r08 Deepwild | 71-80 | 45 | 50 | 58 | 13.0 | 2.9 |
 | r09 Cinder Throne | 81-90 | 45 | 50 | 57 | 12.6 | 3.0 |
-| r10 Apex | 91-100 | 45 | 50 | 58 | 12.8 | 3.0 |
+| r10 Worldcrown | 91-100 | 45 | 50 | 58 | 12.8 | 3.0 |
 | **Total** | 1-100 | 489 | 507 | 527 | 129.5 | 29.2 |
 
 Target: total p50 400-600: ok.
