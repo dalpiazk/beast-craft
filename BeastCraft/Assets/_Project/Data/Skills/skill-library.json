@@ -151,7 +151,7 @@
       "Element": "Water",
       "Category": "Physical",
       "Effects": [
-        { "EffectType": "Damage", "Magnitude": 86 }
+        { "EffectType": "Damage", "Magnitude": 94 }
       ],
       "Progression": {
         "MaxLevel": 20,
@@ -690,14 +690,15 @@
     {
       "SkillId": "thunder_talons",
       "DisplayName": "Thunder Talons",
-      "Description": "Three quick bolts loosed from its talons at two hexes: many weak hits, each its own crit roll.",
+      "Description": "Three quick bolts loosed from its talons at two hexes at the enemy with the least HP left in reach: many weak hits, each its own crit roll.",
       "TargetShape": "SingleTarget",
       "Range": 2,
       "Cooldown": 1,
+      "TargetingCriterion": "CurrentHp",
       "Element": "Lightning",
       "Category": "Physical",
       "Effects": [
-        { "EffectType": "Damage", "Magnitude": 26, "HitCount": 3 }
+        { "EffectType": "Damage", "Magnitude": 25, "HitCount": 3 }
       ],
       "Progression": {
         "MaxLevel": 20,
@@ -832,7 +833,7 @@
       "Element": "Air",
       "Category": "Physical",
       "Effects": [
-        { "EffectType": "Damage", "Magnitude": 89 }
+        { "EffectType": "Damage", "Magnitude": 95 }
       ],
       "Progression": {
         "MaxLevel": 20,
@@ -854,7 +855,7 @@
       "Element": "Air",
       "Category": "Physical",
       "Effects": [
-        { "EffectType": "Damage", "Magnitude": 110 }
+        { "EffectType": "Damage", "Magnitude": 122 }
       ],
       "Progression": {
         "MaxLevel": 20,
@@ -876,7 +877,7 @@
       "Element": "Air",
       "Category": "Physical",
       "Effects": [
-        { "EffectType": "Damage", "Magnitude": 55 },
+        { "EffectType": "Damage", "Magnitude": 75 },
         { "EffectType": "ApplyStatus", "Status": "Knockback", "Magnitude": 2, "DurationTurns": 0 }
       ],
       "Progression": {
@@ -1147,7 +1148,7 @@
       "Element": "Light",
       "Category": "Special",
       "Effects": [
-        { "EffectType": "Damage", "Magnitude": 66 }
+        { "EffectType": "Damage", "Magnitude": 70 }
       ],
       "Progression": {
         "MaxLevel": 20,

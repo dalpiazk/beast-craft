@@ -2790,3 +2790,214 @@ retune below). `neutral` stays inside +/-7 (-3.9 ... +5.8; Golem +3.3 -> +5.8, T
 
 Reproduce: `dotnet run --project Tooling/BalanceSim -c Release -- --mode pve --seeds 12345,777,4242
 --avatar-value --out out/avatar.md` (about 40 s).
+
+## Thunderbird in `elite` (milestone 2, stage D2)
+
+The Thunderbird fell from about 0 to -4 in `elite` when the bosses became multi-hex ("Large enemies
+(footprints)"; seed 12345's committed reports, `46ce852` -> `b7ae1d0`: `elite` -0.3 -> -4.4, `solo`
+-2.2 -> -3.2, its `elite` survival 37.0% -> 34.5% at an unchanged damage share of 35%). The design's
+hypothesis was a Skirmisher that **holds** (the fewer-adjacent stop-tile preference) next to a
+Triangle champion with its short-range kit. `--turn-detail` (new; README, "Avatar value") measures it
+directly: per beast, the turns on which no skill fired and why, and the enemy HP it took off large
+enemies versus the rest.
+
+**Diagnosis** (3 seeds, after the avatar retune, every team's battles):
+
+- **No holding.** The Thunderbird fires on 100% of its turns in `solo` and `elite` (0.0% held by its
+  stance, 0.0% out of reach); so do the other Ranged and Skirmisher beasts. The hypothesis is rejected.
+- **It spends its damage on the boss.** 208 enemy HP per battle in `elite` (second only to the Phoenix),
+  but **84.8% of it off the giant or champions** (Griffin 97.8%, the Ranged beasts 80-83%). With a
+  Hex7 giant or two Triangle champions filling the front, the nearest enemy (Thunder Talons'
+  `Distance` targeting) is almost always the boss, and the escort's archers and casters keep firing;
+  its `elite` survival is 7.6-13% per seed, the lowest but the Griffin's.
+- **Range is not the lever.** Probes (3 seeds, `elemental` normalized overall / `elite` raw): Storm
+  Dive range 3 -> 4 (the design's candidate) -4.5 -> -3.7 / -3.8 -> -4.2; Thunder Talons range 2 -> 3
+  **-6.1** / -3.5 (worse: at range 3 it hangs back and hits less); Talons targeting the lowest HP
+  fraction -3.7 / -3.2 (it still picks the wounded boss); Talons targeting the **lowest current HP**
+  **+0.8** / **+1.0 (2nd)**.
+
+**Fix: Thunder Talons targets the enemy with the least HP left in reach** (`TargetingCriterion
+CurrentHp`, `Lowest`), a Skirmisher hunter picking off the escort (and, in `squad` / `horde`, finishing
+the weakest), where it used to pour its hits into the boss's HP pool. In `elite` its share of damage off
+bosses falls 84.8% -> 63.2% and its turns per battle rise 3.53 -> 3.70. It is a one-field data change,
+not one of the two candidates the design named (neither addresses the cause the measurement found);
+power was then trimmed in the retune below (26 -> 25 x 3) because the change is strong in `neutral`
+`squad`.
+
+Reproduce: `--mode pve --seeds 12345,777,4242 --turn-detail` ("PvE beast turns over seeds").
+
+## Beast retune under the scouted calibration (milestone 2, stage D3)
+
+Targets: every beast's normalized overall marginal within +/-4 `elemental` and +/-7 `neutral` (3 seeds,
+then confirmed over 5: 12345 / 777 / 4242 / 2024 / 99); **Griffin and Thunderbird `neutral` within +/-5**;
+every beast top 3 in some shape; no beast top 3 in every shape. Hard constraints kept: **no roster edits**
+(turn ratio, six-stat totals, Move, crit untouched), every signature skill kept, unlimited damage skills
+at most 1.2x their budget. Start: the avatar retune above plus the Thunder Talons targeting fix.
+
+| Skill | Before | After | DPT / budget | Why |
+| --- | --- | --- | --- | --- |
+| Thunder Talons | 26 x 3, nearest | **25 x 3**, **lowest current HP** | 75 / 70 = 1.07x | D2 fix; 26 left the Thunderbird's `neutral` at +5.3 (`squad` +25) |
+| Wind Lance (Griffin) | 110 | **122** | 79 / 70 = 1.13x | Griffin `elemental` -4.8 (`elite` 10th, `horde` 10th) |
+| Gale Talon (Griffin) | 89 | **95** | 95 / 90 = 1.06x | same |
+| Gust (Griffin) | 55; Knockback 2 | **75**; Knockback 2 | 38 / 70 = 0.54x | Griffin still -3.7; lifts `solo` / `elite` |
+| Radiant Bolt (Kirin) | 66 | **70** | 70 / 70 = 1.0x | Kirin had no `elemental` top-3 shape (4th in `elite` and `squad`) |
+| Serpent Bite (Leviathan) | 86 | **94** | 94 / 90 = 1.04x | Leviathan dropped out of every top 3 over 5 seeds |
+
+### Iteration log (normalized overall, 3-seed means unless noted)
+
+| Run | Change on top of the previous | TB `elem` / `neutral` | Griffin `elem` / `neutral` | Range `elemental` | Range `neutral` | `elemental` top-3 coverage | Notes |
+| --- | --- | --- | --- | --- | --- | ---: | --- |
+| Start | avatar retune | -4.5 / -0.6 | -4.2 / -3.9 | -4.5 … +2.6 | -3.9 … +5.8 | 9 / 10 | TB, Griffin outside +/-4; TB no top 3 |
+| D2 | Talons lowest current HP | +0.8 / **+5.3** | -4.8 / **-5.2** | -4.8 … +2.0 | -5.2 … +5.5 | 9 / 10 | Kirin drops out (4th) |
+| R1 | Talons 25, Wind Lance 122, Gale Talon 95, Radiant Bolt 70 | -0.2 / +3.6 | -3.7 / -2.2 | -3.7 … +1.7 | -2.5 … +5.5 | 10 / 10 | Griffin on the edge |
+| R2 | R1 + Gust 75 | -0.3 / +3.6 | -3.2 / -1.0 | -3.2 … +1.8 | -2.9 … +5.4 | 10 / 10 | 5 seeds: Leviathan no top 3 (4th `horde`) |
+| **R3** | R2 + Serpent Bite 94 | -0.3 / +3.5 | -3.3 / -1.1 | -3.3 … +1.4 | -3.0 … +5.4 | 10 / 10 | **5 seeds: 10 / 10**; chosen |
+
+Three three-seed iterations (of eight allowed) and two five-seed confirmations (R2, R3).
+
+### Results (mean of 5 seeds: 12345 / 777 / 4242 / 2024 / 99)
+
+Before = after the avatar retune (stage D1), after = R3. Normalized overall = the guard's figure (mean
+± SD over seeds); per shape the raw marginal and its rank on the mean; the last column counts the seeds
+in which the beast is top 3 in `solo` / `elite` / `squad` / `horde`.
+
+#### `elemental`: normalized overall and raw per shape, before -> after (rank in shape)
+
+| Beast | Normalized before | Normalized after | `solo` | `elite` | `squad` | `horde` | Top-3 seeds s/e/q/h, after |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | :---: |
+| Kirin | +2.9 | **+2.5** ± 2.6 | -0.1 (4) -> +0.1 (4) | +2.9 (2) -> +2.2 (2) | +3.5 (4) -> +2.9 (4) | +1.6 (5) -> +1.4 (5) | 0/4/2/1 |
+| Treant | +2.5 | **+1.8** ± 2.9 | +3.6 (1) -> +3.5 (2) | +1.9 (3) -> +0.5 (4) | -8.4 (10) -> -8.5 (10) | +7.7 (2) -> +7.2 (2) | 4/1/0/4 |
+| Golem | +1.6 | **+0.9** ± 2.9 | -2.1 (9) -> -2.0 (8) | +5.1 (1) -> +4.2 (1) | -5.1 (8) -> -7.0 (9) | +6.0 (3) -> +5.7 (3) | 0/3/0/3 |
+| Thunderbird | -2.8 | **+0.8** ± 2.4 | -1.8 (8) -> -2.1 (9) | -4.6 (10) -> -0.1 (6) | +4.2 (3) -> +8.4 (2) | -2.8 (6) -> -1.1 (6) | 0/0/4/0 |
+| Phoenix | +1.5 | **+0.5** ± 4.7 | -0.4 (6) -> -0.6 (6) | -1.1 (8) -> -1.8 (9) | +9.7 (1) -> +9.2 (1) | -3.0 (7) -> -3.2 (7) | 0/1/3/0 |
+| Tarasque | +0.5 | **0.0** ± 3.5 | -0.8 (7) -> -1.1 (7) | -0.1 (6) -> -0.8 (7) | +6.6 (2) -> +7.0 (3) | -4.7 (8) -> -4.9 (8) | 2/2/4/0 |
+| Frost Wyrm | -0.3 | **-1.1** ± 3.3 | -3.9 (10) -> -3.9 (10) | -0.4 (7) -> -1.5 (8) | -3.4 (7) -> -3.6 (7) | +12.6 (1) -> +12.0 (1) | 0/1/0/5 |
+| Basilisk | -0.5 | **-1.3** ± 1.1 | +2.9 (3) -> +2.4 (3) | -0.1 (5) -> +0.0 (5) | -0.9 (6) -> -2.3 (6) | -8.2 (9) -> -8.4 (9) | 3/0/0/0 |
+| Leviathan | -2.1 | **-1.5** ± 3.5 | -0.2 (5) -> -0.3 (5) | +0.3 (4) -> +0.6 (3) | -7.9 (9) -> -6.8 (8) | +1.9 (4) -> +2.0 (4) | 2/2/0/2 |
+| Griffin | -3.3 | **-2.6** ± 1.8 | +2.9 (2) -> +4.0 (1) | -4.0 (9) -> -3.2 (10) | +1.7 (5) -> +0.6 (5) | -11.1 (10) -> -10.6 (10) | 4/1/2/0 |
+
+Normalized range: -3.3 … +2.9 -> -2.6 … +2.5.
+
+Niche map `elemental` (after): mean top 3 per shape; **bold** = top 3 in ≥ 4 of 5 seeds
+
+| Shape | Top 3 |
+| --- | --- |
+| `solo` | **Griffin +4.0 (4/5)**, **Treant +3.5 (4/5)**, Basilisk +2.4 (3/5) |
+| `elite` | Golem +4.2 (3/5), **Kirin +2.2 (4/5)**, Leviathan +0.6 (2/5) |
+| `squad` | Phoenix +9.2 (3/5), **Thunderbird +8.4 (4/5)**, **Tarasque +7.0 (4/5)** |
+| `horde` | **Frost Wyrm +12.0 (5/5)**, **Treant +7.2 (4/5)**, Golem +5.7 (3/5) |
+
+Top 3 in some shape: 10 / 10.
+
+#### `neutral`: normalized overall and raw per shape, before -> after (rank in shape)
+
+| Beast | Normalized before | Normalized after | `solo` | `elite` | `squad` | `horde` | Top-3 seeds s/e/q/h, after |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | :---: |
+| Golem | +5.6 | **+5.1** ± 1.3 | +10.6 (1) -> +10.9 (2) | +6.2 (1) -> +5.1 (1) | -8.0 (8) -> -8.0 (8) | +8.7 (2) -> +8.4 (2) | 5/4/0/5 |
+| Thunderbird | +0.2 | **+3.9** ± 1.8 | -5.7 (7) -> -8.1 (9) | -5.8 (10) -> +3.1 (4) | +17.3 (1) -> +22.8 (1) | -2.9 (8) -> -1.5 (7) | 0/4/5/0 |
+| Treant | +1.6 | **+0.4** ± 1.1 | +4.8 (3) -> +4.8 (3) | +4.6 (3) -> +2.3 (5) | -12.2 (9) -> -12.5 (10) | +7.1 (3) -> +6.0 (3) | 3/1/0/5 |
+| Griffin | -2.9 | **-0.1** ± 2.3 | +9.5 (2) -> +16.0 (1) | -5.3 (9) -> -1.7 (7) | +1.4 (6) -> -0.6 (6) | -17.6 (10) -> -16.3 (10) | 5/0/0/0 |
+| Leviathan | -0.4 | **-0.2** ± 1.0 | +3.6 (4) -> +2.1 (4) | +3.8 (5) -> +5.1 (2) | -12.4 (10) -> -10.9 (9) | +2.7 (4) -> +3.0 (4) | 1/3/0/0 |
+| Frost Wyrm | +1.0 | **-0.3** ± 1.1 | -5.7 (8) -> -6.1 (8) | -3.4 (6) -> -5.8 (8) | +1.8 (5) -> +0.7 (5) | +12.5 (1) -> +11.4 (1) | 0/0/1/5 |
+| Kirin | -0.3 | **-0.9** ± 0.7 | -6.8 (9) -> -5.2 (7) | +4.4 (4) -> +1.3 (6) | +1.9 (4) -> +1.1 (4) | +0.4 (6) -> +0.2 (6) | 0/1/0/0 |
+| Basilisk | -1.4 | **-2.4** ± 2.6 | +3.1 (5) -> +0.9 (5) | +5.4 (2) -> +4.5 (3) | -6.0 (7) -> -5.4 (7) | -9.1 (9) -> -9.7 (9) | 1/2/0/0 |
+| Tarasque | -1.5 | **-2.5** ± 1.6 | -4.2 (6) -> -4.3 (6) | -5.3 (8) -> -7.1 (10) | +7.4 (3) -> +5.5 (3) | -2.6 (7) -> -2.9 (8) | 0/0/4/0 |
+| Phoenix | -1.9 | **-3.1** ± 0.5 | -9.2 (10) -> -11.0 (10) | -4.6 (7) -> -6.9 (9) | +8.9 (2) -> +7.4 (2) | +0.9 (5) -> +1.4 (5) | 0/0/5/0 |
+
+Normalized range: -2.9 … +5.6 -> -3.1 … +5.1.
+
+Niche map `neutral` (after): mean top 3 per shape; **bold** = top 3 in ≥ 4 of 5 seeds
+
+| Shape | Top 3 |
+| --- | --- |
+| `solo` | **Griffin +16.0 (5/5)**, **Golem +10.9 (5/5)**, Treant +4.8 (3/5) |
+| `elite` | **Golem +5.1 (4/5)**, Leviathan +5.1 (3/5), Basilisk +4.5 (2/5) |
+| `squad` | **Thunderbird +22.8 (5/5)**, **Phoenix +7.4 (5/5)**, **Tarasque +5.5 (4/5)** |
+| `horde` | **Frost Wyrm +11.4 (5/5)**, **Golem +8.4 (5/5)**, **Treant +6.0 (5/5)** |
+
+Top 3 in some shape: 9 / 10 (not: Kirin).
+
+### Targets: met and missed (5-seed means, final)
+
+| Target | Before | After | |
+| --- | --- | --- | --- |
+| Every beast `elemental` normalized within +/-4 | -3.3 … +2.9 (3 seeds: -4.5 … +2.6) | -2.6 … +2.5 (3 seeds: -3.3 … +1.4) | met |
+| Every beast `neutral` normalized within +/-7 | -2.9 … +5.6 | -3.1 … +5.1 | met (Golem +5.1 the edge) |
+| Griffin / Thunderbird `neutral` within +/-5 | -2.9 / +0.2 | -0.1 / +3.9 | met |
+| Every beast top 3 in some shape, `elemental` | 9 / 10 (not Leviathan) | **10 / 10** | met; Leviathan only on the mean (`elite` +0.6 against Treant +0.5, 2 / 5 seeds) |
+| No beast top 3 in every shape | none | none | met (most: two shapes `elemental`, Treant and Golem; three `neutral`, Golem) |
+| Turn ratio, six-stat totals, Move, crit, signatures | unchanged | unchanged | met (no roster edits; every signature test passes) |
+| Budget rule (<= 1.2x, unlimited damage skills) | met | met | highest Ember Shot 1.16x, Wind Lance 1.13x |
+
+`neutral` top-3 coverage is 9 / 10 (not Kirin, 4th in `squad`), with 9 robust niches (top 3 in at
+least 4 of 5 seeds) across 7 beasts. `elemental` robust niches: Griffin and Treant `solo`, Kirin
+`elite`, Thunderbird and Tarasque `squad`, Frost Wyrm and Treant `horde` (7 niches, 6 beasts).
+
+### What moved
+
+- **Thunderbird** -2.8 -> +0.8 `elemental` (`elite` 10th -> 6th, `squad` +4.2 -> +8.4, robustly 2nd),
+  +0.2 -> +3.9 `neutral` (`squad` +22.8, 1st in every seed; the edge the Talons trim holds). Its `solo`
+  is unchanged (-2.1, 9th): against a lone giant there is nothing weaker to pick.
+- **Griffin** -3.3 -> -2.6 `elemental`, -2.9 -> -0.1 `neutral`: the lifts land mostly in `solo` (1st in
+  both modes, +4.0 / +16.0), its duelist niche; `elite` (-3.2, 10th) and `horde` (-10.6, 10th) stay its
+  weak shapes (97.8% of its `elite` damage goes into the boss, like the Thunderbird's did; a targeting
+  change was not needed to meet the guard, and would blur the two Skirmishers).
+- **Kirin** keeps a robust `elite` niche (2nd, 4 / 5 seeds) through Radiant Bolt 70.
+- **Leviathan** -2.1 -> -1.5 `elemental`; Serpent Bite 94 buys back a top 3 (`elite` 3rd on the mean).
+- Everyone else gave up 0.4-1.0 points `elemental` to the two Skirmishers' gains; the `neutral`
+  losers are the Ranged damage dealers (Phoenix -1.9 -> -3.1, Basilisk -1.4 -> -2.4), whose `squad`
+  kills the Thunderbird now takes first.
+
+### Avatar after the beast retune
+
+The avatar's value stays on target with the final data (3 seeds, `--avatar-value`): **+36.5 points**
+`elemental` (88% of the `cdf48ec` reference 41.6; `solo` +36.5, `elite` +42.7, `squad` +27.2, `horde`
++39.8), **direct share 13.6%**, 10.2 of it from its passives (`neutral` +45.4, 15.8%).
+
+### Caveats
+
+- Leviathan's `elemental` niche is thin (`elite` 3rd by 0.1 point, top 3 in 2 of 5 seeds); a sixth
+  seed could drop it to 4th. Its `horde` (4th, +2.0) is the other near miss.
+- Golem `neutral` +5.1 is the most positive beast in either mode (top 3 in three `neutral` shapes); it
+  was +5.6 before and is inside +/-7.
+- Normalized SDs over seeds run 1.1-4.7 `elemental` (Phoenix 4.7); the 5-seed means are within about
+  +/-2 of the truth.
+- `tuned-report.md` is regenerated from the default run (seed 12345).
+
+Reproduce: `dotnet run --project Tooling/BalanceSim -c Release -- --mode pve --seeds
+12345,777,4242,2024,99 --out out/retune.md` (about 55 s).
+
+## Level-gap re-check (milestone 2, stage D4)
+
+With the final data (the stronger avatar, the beast retune) the level-gap targets were re-measured
+(`--mode pve --levels 10,30,50,70,90 --level-gap -5..10 --seeds 12345,777,4242`, the "Level-difference
+modifier" setup). At k = 0.025, q = 0.005 two `elemental` targets at levels 30-90 broke, narrowly:
+**3 under at level 50: 20.0% (just under 20)** and **5 under at level 70: 10.6%** (10 of 12 met; level
+10's 3 under 17.3%, already a known miss). The stronger avatar flattens the curve a little (its shields
+scale with its own level, the team's).
+
+**Re-sweep** (the fix has to make 5 under harder without making 3 under harder: more convexity at the
+same 3-level multiplier; `elemental`, every shape averaged, scouted %):
+
+| k | q | multiplier at 2 / 3 / 5 | 2 under L30 / 50 / 70 / 90 | 3 under | 5 under | Met L30-90 | L10 2 / 3 / 5 under |
+| ---: | ---: | --- | --- | --- | --- | ---: | --- |
+| 0.025 | 0.005 | 1.07 / 1.12 / 1.25 | 28.8 / 27.8 / 29.8 / 29.9 | 22.9 / **20.0 !** / 25.1 / 22.7 | 7.1 / 9.8 / **10.6 !** / 8.5 | 10 / 12 | 24.0 / 17.3 ! / 4.2 |
+| 0.017 | 0.007 | 1.06 / 1.11 / 1.26 | 30.2 / 29.6 / 31.0 / 30.6 | 23.2 / 20.2 / 25.8 / 23.2 | 6.3 / 9.4 / **10.2 !** / 8.0 | 11 / 12 | 24.9 / 17.4 ! / 4.0 |
+| **0.012** | **0.009** | 1.06 / 1.12 / 1.29 | 30.8 / 29.8 / 31.3 / 31.1 | 23.0 / 20.3 / 25.3 / 22.7 | 5.7 / 7.9 / 9.0 / 7.4 | **12 / 12** | 25.0 / 17.4 ! / 3.3 |
+
+**Chosen: k = 0.012, q = 0.009, cap = 0.4** (`DamageFormula.LevelDifferencePerLevel` /
+`LevelDifferenceConvex`): x1.02 / 1.06 / 1.12 / 1.29 / 1.4 (cap, from 7; 6 is x1.396) at 1 / 2 / 3 / 5 / 7
+levels over, x0.98 / 0.94 / 0.88 / 0.72 / 0.6 under. Every equal-level battle is untouched (the default
+report does not depend on k or q).
+
+- `elemental`, levels 30-90: all 12 targets met; 3 under at level 50 (20.3%) is the thin one. Gap 0
+  49.4-50.3%; 2 under 29.8-31.3%; 3 under 20.3-25.3%; 5 under 5.7-9.0%.
+- Level 10: 3 under 17.4% (target 20-35%), unchanged by k / q at this scale: the stats move about 4%
+  per level there. 2 under (25.0%) and 5 under (3.3%) are in target.
+- `neutral` (the control) stays steeper: 3 under 8.5-13.6% at levels 30-90 (misses by design, as
+  before), 5 under 0.2-0.8%.
+- The committed single-seed `level-gap-report.md` (seed 12345) meets 40 of 45 `elemental` All-shapes
+  targets; its misses are 3 under at levels 10 / 30 / 50 / 90 (13.1-19.5%) and 2 under at level 10
+  (19.7%), seed noise around the 3-seed means above.
+
+Reproduce: as above (about 160 s); each sweep row is the same run with the two constants edited.

@@ -192,13 +192,13 @@ namespace BeastCraft.Battle
         /// balance simulator's <c>--level-gap</c> sweep; see the tuning log, "Level-difference
         /// modifier".
         /// </summary>
-        public const double LevelDifferencePerLevel = 0.025;
+        public const double LevelDifferencePerLevel = 0.012;
 
         /// <summary>
         /// <c>q</c> of <see cref="GetLevelMultiplier"/>: a convex term <c>q * delta * |delta|</c> that
         /// makes a wide gap bite harder than a narrow one. 0 disables it.
         /// </summary>
-        public const double LevelDifferenceConvex = 0.005;
+        public const double LevelDifferenceConvex = 0.009;
 
         /// <summary>The level multiplier never leaves [1 - cap, 1 + cap], however wide the gap.</summary>
         public const double LevelDifferenceCap = 0.4;

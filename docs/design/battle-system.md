@@ -75,9 +75,9 @@ puzzle every encounter.
   reference Speed, at max level). The actives and passives were retuned for the slower cadence in
   milestone 2 (Rallying Cry and Mending Light to cooldown 2, buff and debuff durations 2 -> 3, the
   optional actives' cooldowns and Bloodlust / Storm Call's internal cooldowns shortened): measured
-  with `--avatar-value`, the avatar is worth about 37 points of the scouted clear rate against 42
-  on the old per-beast-turn cadence, with a 14% direct share of the team's output, three-quarters
-  of it from its passives (tuning log, "Avatar retune").
+  with `--avatar-value`, the avatar is worth about 36.5 points of the scouted clear rate against
+  41.6 on the old per-beast-turn cadence, with a 13.6% direct share of the team's output,
+  three-quarters of it from its passives (tuning log, "Avatar retune").
 - **Avatar level — progression exists and is wired into battle; its curve is not authored.** The avatar has its
   own level (TUNABLE STARTING DEFAULTS): `AvatarProgress` (save data: `Level`, `Xp`) and
   `AvatarProgression` (own constants, not the skill curve). A level costs `200 + 16 × level` XP
@@ -1148,7 +1148,7 @@ damage = max(1, truncate(base × ElementChart multiplier × crit × roll / 100 �
 crit   = max(MinCritMultiplier, CritMultiplier) = 1.5 on a critical hit, else 1
 roll   = a whole percent, uniform on [90, 110]
 level  = clamp(1 + k × d + q × d × |d|, 1 − cap, 1 + cap),  d = caster level − target level
-         (k = 0.025, q = 0.005, cap = 0.4; exactly 1 between equal levels)
+         (k = 0.012, q = 0.009, cap = 0.4; exactly 1 between equal levels)
 ```
 
 - **`Power` is a percent of the attacking stat.** It is the `Damage` effect's
@@ -1172,8 +1172,8 @@ level  = clamp(1 + k × d + q × d × |d|, 1 − cap, 1 + cap),  d = caster leve
   `d`: `clamp(1 + k d + q d |d|, 1 − cap, 1 + cap)` (`DamageFormula.GetLevelMultiplier`). It
   applies **both ways** (an under-levelled team hits softer *and* is hit harder), to beasts,
   enemies and the avatar alike (the avatar at its own level, `AvatarProgress.Level`). The convex
-  `q` term keeps a small gap mild and makes a wide one decisive: ×1.03 / 1.07 / 1.12 / 1.25 / 1.4
-  (cap) at 1 / 2 / 3 / 5 / 7+ levels over, ×0.97 / 0.93 / 0.88 / 0.75 / 0.6 under. Equal levels
+  `q` term keeps a small gap mild and makes a wide one decisive: ×1.02 / 1.06 / 1.12 / 1.29 / 1.4
+  (cap) at 1 / 2 / 3 / 5 / 7+ levels over, ×0.98 / 0.94 / 0.88 / 0.72 / 0.6 under. Equal levels
   are exactly 1 and are **not multiplied at all**, so an equal-level battle is bit-identical to the
   formula without the term (the committed balance report did not move). **Damage over time**
   inherits it (its per-turn amount is computed through the formula when applied); **heals, shields,
@@ -1185,11 +1185,14 @@ level  = clamp(1 + k × d + q × d × |d|, 1 − cap, 1 + cap),  d = caster leve
   scouted pick at equal levels (50%), the targets were: 2-3 levels under ≈ 20-35%, 5+ under < 10%,
   at every level band. A `--level-gap` sweep of linear `k` ∈ {0.025, 0.03, 0.035, 0.04} × cap ∈
   {0.3, 0.4} missed "< 10% at 5 under" at levels 50-90 for every `k` that kept 3 under above 20%;
-  the convex term fixed it. Measured (3 seeds, `elemental`, every shape averaged, the scouted team):
-  2 under 26-28%, 3 under 21-24%, 5 under 6-9% at levels 30-90. **Level 10** is steeper (24% /
-  14% / 4%): there a level is a large share of stats, so the stats already do most of the work.
-  The `neutral` control mode is steeper throughout (2 under ≈ 16%). The cap only binds from 7
-  levels apart, where a clear is already rare (≤ 3%).
+  the convex term fixed it (first k = 0.025, q = 0.005). The milestone-2 final retune (a stronger
+  avatar, the beast retune) left 3 under at level 50 on the 20% edge and 5 under at level 70 at 10.6%,
+  so the curve was made more convex at the same 3-level multiplier: **k = 0.012, q = 0.009**.
+  Measured (3 seeds, `elemental`, every shape averaged, the scouted team): 2 under 30-31%, 3 under
+  20-25%, 5 under 6-9% at levels 30-90. **Level 10** is steeper (25% / 17% / 3%): there a level is a
+  large share of stats, so the stats already do most of the work. The `neutral` control mode is
+  steeper throughout (3 under ≈ 9-14%). The cap binds from 7 levels apart (6 is ×1.396), where a
+  clear is already rare (≤ 4%).
 - The element multiplier is the skill's element against the target's elements, exactly as before.
   The caster's own elements still do nothing.
 - **Arithmetic.** The base is computed in double precision (basic IEEE operations only, one division
@@ -1207,8 +1210,8 @@ level  = clamp(1 + k × d + q × d × |d|, 1 − cap, 1 + cap),  d = caster leve
 | `GlobalScale` | 1.0 | A uniform multiplier on every hit, the lever for overall fight length. |
 | `MinimumDamage` | 1 | The floor for any positive-power hit. |
 | `CritMultiplier` / `MinCritMultiplier` | 1.5 / 1.3 | See "Variance and critical hits". |
-| `LevelDifferencePerLevel` (k) | 0.025 | Linear part of the level-difference multiplier, per level of difference. |
-| `LevelDifferenceConvex` (q) | 0.005 | Convex part: `q × d × |d|`, so a wide gap bites harder than a narrow one. |
+| `LevelDifferencePerLevel` (k) | 0.012 | Linear part of the level-difference multiplier, per level of difference. |
+| `LevelDifferenceConvex` (q) | 0.009 | Convex part: `q × d × |d|`, so a wide gap bites harder than a narrow one. |
 | `LevelDifferenceCap` | 0.4 | The level multiplier stays within [0.6, 1.4]. |
 
 **How the constants were chosen.** `DefenseWeight` and `GlobalScale` start at 1, as in the
@@ -2108,17 +2111,22 @@ role-scaled guide, deliberately:
 - **Golem's Boulder Slam** is 90 (1.0× the melee budget, above a tank's ≈ 0.8×; 85 before chart
   v2). The slowest beast with Move 2 lands it less often than any other melee skill, and at 75 the
   Golem was bottom three in every shape.
-- **Leviathan's Serpent Bite** is 86 (0.96×, above a tank's ≈ 0.8×; 82 before chart v2).
-- **Thunderbird's Thunder Talons** is 26 × 3 = 78 at range 2 (1.11×, the rule's burst-striker
-  figure) and **Chain Lightning** 22 × 3 at radius 2, cooldown 2 = 66 (0.94×). Both were 28 × 3 =
+- **Leviathan's Serpent Bite** is 94 (1.04×, above a tank's ≈ 0.8×; 82 before chart v2, 86 before
+  the milestone-2 retune, which lifted it to give the Leviathan a top-3 shape back).
+- **Thunderbird's Thunder Talons** is 25 × 3 = 75 at range 2 (1.07×) and targets the enemy with the
+  **least HP left** in reach (milestone 2: with the multi-hex bosses in front, nearest-first poured
+  85% of its `elite` damage into the boss while the escort kept firing; 26 × 3 before), and **Chain Lightning** 22 × 3 at radius 2, cooldown 2 = 66 (0.94×). Both were 28 × 3 =
   84 (the 1.2× ceiling) until the niche pass, which put the once-per-battle **Storm Dive** (120,
   was 230) in the default loadout in place of Static Charge; with a real third slot the ceiling
   numbers made the Thunderbird the strongest `neutral` beast, so both came down. Talons was
   36 × 3 = 108 at range 1 until "Thunderbird range vs move". See the tuning log, "Niche pass".
 - **Tarasque's Iron Crush** is 160 on cooldown 2 (80, 0.89× the melee budget; 148 before the
   niche pass), **Basilisk's Coup de Grace** 115 with a 60% execute (75, 1.07×; 105 before), and
-  **Kirin's Radiant Bolt** 66 (0.94×, above a support's ≈ 0.8×; 62 before): small lifts from the
-  niche pass, each well inside the ceiling.
+  **Kirin's Radiant Bolt** 70 (1.0×, above a support's ≈ 0.8×; 62 before the niche pass, 66 before
+  milestone 2): small lifts, each well inside the ceiling.
+- **Griffin's Wind Lance** is 122 on a line, cooldown 2 (79, 1.13×; 110 before milestone 2), **Gale
+  Talon** 95 (1.06×; 89) and **Gust** 75 (0.54×; 55): the milestone-2 retune lifted the Griffin back
+  inside the balance guard under the scouted calibration.
 
 Two utility numbers moved past the first-draft guideline, both paid for in damage: Basilisk's
 Petrifying Gaze stuns at 45% (hard control on 45 power at cooldown 3, 0.21× the ranged budget), and
@@ -2148,7 +2156,7 @@ learnable by level 5.
 
 | Skill | Learn | Default | Shape | Cat. | Cd | Effects | Dmg/turn | Tier bonuses |
 | --- | ---: | :---: | --- | --- | ---: | --- | ---: | --- |
-| Serpent Bite `serpent_bite` | 1 | slot 1 | SingleTarget r1 | Physical | 1 | Damage 86 | 86 | L10: adds -8% Attack 2t; L15: adds DoT 10 2t |
+| Serpent Bite `serpent_bite` | 1 | slot 1 | SingleTarget r1 | Physical | 1 | Damage 94 | 94 | L10: adds -8% Attack 2t; L15: adds DoT 10 2t |
 | Undertow `undertow` | 1 | slot 2 | AreaBurst r3 | - | 3 | Taunt 2t (85%); -10% Speed 2t | - | L10: adds -10% SpecialAttack 2t; L15: -1 cd |
 | Deep Shell `deep_shell` | 3 | slot 3 | Self | - | 3 | Shield 65% Def 3t; Heal 24 | - | L10: adds +15% SpecialDefense 3t; L15: -1 cd |
 | Tidal Wave `tidal_wave` | 8 |  | Line r3 | Special | 2 | Damage 90; Knockback 1 hex (50%) | 58 | L10: adds -10% Speed 2t; L15: adds -8% SpecialDefense 2t |
@@ -2170,9 +2178,9 @@ learnable by level 5.
 
 | Skill | Learn | Default | Shape | Cat. | Cd | Effects | Dmg/turn | Tier bonuses |
 | --- | ---: | :---: | --- | --- | ---: | --- | ---: | --- |
-| Gale Talon `gale_talon` | 1 | slot 2 | SingleTarget r1 | Physical | 1 | Damage 89 | 89 | L10: adds -8% Defense 2t; L15: adds Damage 20 |
-| Wind Lance `wind_lance` | 1 | slot 1 | Line r3 | Physical | 2 | Damage 110 | 72 | L10: adds Knockback 1 hex; L15: adds -10% Speed 2t |
-| Gust `gust` | 3 | slot 3 | AreaBurst r1 | Physical | 3 | Damage 55; Knockback 2 hex | 28 | L10: adds -10% Speed 2t; L15: -1 cd |
+| Gale Talon `gale_talon` | 1 | slot 2 | SingleTarget r1 | Physical | 1 | Damage 95 | 95 | L10: adds -8% Defense 2t; L15: adds Damage 20 |
+| Wind Lance `wind_lance` | 1 | slot 1 | Line r3 | Physical | 2 | Damage 122 | 79 | L10: adds Knockback 1 hex; L15: adds -10% Speed 2t |
+| Gust `gust` | 3 | slot 3 | AreaBurst r1 | Physical | 3 | Damage 75; Knockback 2 hex | 38 | L10: adds -10% Speed 2t; L15: -1 cd |
 | Tailwind `tailwind` | 12 |  | Self | - | 4 | +20% Defense 2t; +20% SpecialDefense 2t; +1 MoveRange 2t | - | L10: adds +10% Speed 2t; L15: -1 cd |
 | Updraft `updraft` | 28 |  | AllAllies | - | 5 | +10% Speed 2t; +1 MoveRange 2t | - | L10: adds +5% Attack 2t; L15: -1 cd |
 | Sky Rend `sky_rend` | 50 |  | SingleTarget r1 | Physical | 2 | Damage 175; -10% Defense 2t | 88 | L10: adds DoT 12 2t; L15: adds Stun 1t (10%) |
@@ -2181,7 +2189,7 @@ learnable by level 5.
 
 | Skill | Learn | Default | Shape | Cat. | Cd | Effects | Dmg/turn | Tier bonuses |
 | --- | ---: | :---: | --- | --- | ---: | --- | ---: | --- |
-| Thunder Talons `thunder_talons` | 1 | slot 1 | SingleTarget r2 | Physical | 1 | Damage 26 x3 hits | 78 | L10: adds -5% Defense 2t, stacks x3; L15: adds Damage 25 |
+| Thunder Talons `thunder_talons` | 1 | slot 1 | SingleTarget r2, lowest HP | Physical | 1 | Damage 25 x3 hits | 75 | L10: adds -5% Defense 2t, stacks x3; L15: adds Damage 25 |
 | Chain Lightning `chain_lightning` | 1 | slot 2 | AreaBurst r2 | Special | 2 | Damage 22 x3 hits | 66 | L10: adds Stun 1t (10%); L15: adds -8% SpecialDefense 2t |
 | Static Charge `static_charge` | 3 |  | Self | - | 4 | +25 CritChance 3t; +10% Speed 3t | - | L10: adds +10% Attack 3t; L15: -1 cd |
 | Storm Dive `storm_dive` | 5 | slot 3 | SingleTarget r3 | Physical | 4 (first turn, 1/battle) | Damage 120 | 30 | L10: adds Stun 1t (25%); L15: adds -15% Defense 2t |
@@ -2227,7 +2235,7 @@ learnable by level 5.
 | --- | ---: | :---: | --- | --- | ---: | --- | ---: | --- |
 | Sacred Spring `sacred_spring` | 1 | slot 1 | AllAllies | - | 3 | Heal 20 | - | L10: adds +8% SpecialDefense 2t; L15: -1 cd |
 | Blessing `blessing` | 1 | slot 2 | AllAllies | - | 4 | +12% SpecialAttack 2t; +12% SpecialDefense 2t | - | L10: adds +5 CritChance 2t; L15: -1 cd |
-| Radiant Bolt `radiant_bolt` | 3 | slot 3 | SingleTarget r3 | Special | 1 | Damage 66 | 66 | L10: adds -5% SpecialDefense 2t; L15: adds Damage 15 |
+| Radiant Bolt `radiant_bolt` | 3 | slot 3 | SingleTarget r3 | Special | 1 | Damage 70 | 70 | L10: adds -5% SpecialDefense 2t; L15: adds Damage 15 |
 | Judgment `judgment` | 15 |  | SingleTarget r4 | Special | 3 | Damage 190 | 63 | L10: adds Stun 1t (15%); L15: -1 cd |
 | Purifying Ward `purifying_ward` | 30 |  | AllAllies | - | 4 | Shield 25% Def 2t; +10% SpecialDefense 2t | - | L10: adds Heal 7; L15: -1 cd |
 | Halo `halo` | 50 |  | AreaBurst (ally) r2 | - | 3 | Heal 19; +10% Defense 2t | - | L10: adds Shield 20% Def 2t; L15: -1 cd |
@@ -2579,6 +2587,10 @@ vs move") then gave Thunder Talons range 2 at 28 × 3 and restored the Thunderbi
 "niche pass" then swapped Storm Dive (now 120) into the Thunderbird's defaults for Static Charge,
 trimmed Talons / Chain Lightning to 26 / 22 × 3, and made small lifts to Phoenix, Frost Wyrm,
 Leviathan, Tarasque, Basilisk and Kirin skills (skill numbers only; the roster is unchanged).
+Milestone 2's final retune (under the scouted-pick calibration) retuned the avatar for its own gauge,
+made Thunder Talons target the weakest enemy in reach, lifted Griffin, Kirin and Leviathan skills and
+made the level-difference curve more convex (k 0.012, q 0.009); skill numbers and two formula
+constants only, the roster unchanged (tuning log, "Avatar retune" to "Level-gap re-check").
 
 Every pass so far is deliberately **data structures and algorithms only** — no MonoBehaviours, no
 scene or prefab wiring, and no committed `.asset` instances (the roster's are generated in-Editor). The hex radii backing each arena preset

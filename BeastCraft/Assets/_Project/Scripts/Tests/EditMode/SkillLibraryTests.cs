@@ -365,7 +365,7 @@ namespace BeastCraft.Tests.EditMode
             Assert.IsTrue(HasSkill(library, "kirin", s => s.TargetShape == "AllAllies" && Array.Exists(s.Effects, e => e.AffectedStat == "SpecialAttack")));
             Assert.IsTrue(HasSkill(library, "kirin", s => s.TargetShape == "SingleTarget" && Array.Exists(s.Effects, e => e.EffectType == "Damage" && e.Magnitude >= 150f)));
             Assert.IsTrue(HasSkill(library, "kirin", s => s.TargetShape == "AllAllies" && Array.Exists(s.Effects, e => e.Status == "Shield")));
-            Assert.AreEqual(66f, Skill(library, "radiant_bolt").Effects[0].Magnitude, "Retuned from 62 (niche pass): 0.94x the range-2+ budget.");
+            Assert.AreEqual(70f, Skill(library, "radiant_bolt").Effects[0].Magnitude, "Retuned from 66 (milestone-2 retune; 62 before the niche pass): 1.0x the range-2+ budget.");
         }
 
         [Test]
@@ -478,7 +478,9 @@ namespace BeastCraft.Tests.EditMode
             Assert.AreEqual(120f, dive.Effects[0].Magnitude, "Retuned from 230 (niche pass): a default-loadout opener, not a learned nuke.");
             Assert.AreEqual(3, talons.Effects[0].HitCount);
             Assert.AreEqual(2, talons.Range, "Retuned from 1 (Thunderbird range vs move): it fires from outside melee and can retreat.");
-            Assert.AreEqual(26f, talons.Effects[0].Magnitude, "Retuned from 28 (niche pass): 26 x 3 = 78 is 1.11x the range-2+ budget.");
+            Assert.AreEqual(25f, talons.Effects[0].Magnitude, "Retuned from 26 (milestone-2 retune; 28 before the niche pass): 25 x 3 = 75 is 1.07x the range-2+ budget.");
+            Assert.AreEqual(SkillTargetingCriterion.CurrentHp, talons.TargetingCriterion, "Retuned from Distance (milestone 2): it picks off the weakest enemy in reach instead of pouring its hits into the boss.");
+            Assert.AreEqual(SkillTargetingOrder.Lowest, talons.TargetingOrder);
             Assert.AreEqual(22f, chain.Effects[0].Magnitude, "Retuned from 28 (niche pass): 22 x 3 at radius 2, cooldown 2 = 66, 0.94x the range-2+ budget.");
             Assert.AreEqual(60, coup.Effects[0].ExecuteBonusPercent, "Retuned from 50 (the authored-kits retune).");
             Assert.AreEqual(115f, coup.Effects[0].Magnitude, "Retuned from 105 (niche pass): 115 x 1.3 / 2 = 74.75, 1.07x the range-2+ budget.");
