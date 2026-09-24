@@ -149,6 +149,18 @@ namespace BeastCraft.Tooling.BalanceSim
                 return Fail("Self-check failed:", problems, 3);
             }
 
+            if (options.RunPve && pve != null)
+            {
+                // The game's TeamSuggester, given the whole roster, must field exactly the simulator's bond-aware pick.
+                int matches = ScoutedPicker.SuggesterParity(options, species, pve, encounters.Shapes, out int compositions);
+                Console.Error.WriteLine("TeamSuggester parity: " + matches + " of " + compositions + " compositions suggest the simulator's bond-aware pick (" +
+                                        SimOptions.Format(compositions == 0 ? 100.0 : (100.0 * matches) / compositions) + "%).");
+                if (matches != compositions)
+                {
+                    return Fail("Self-check failed:", new List<string> { "TeamSuggester disagrees with the simulator's bond-aware pick." }, 3);
+                }
+            }
+
             if (options.SelfCheck)
             {
                 string second = RunOnce(options, species, encounters, out List<string> _, out PveSimulator _, out List<PveCell> _);

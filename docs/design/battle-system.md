@@ -1163,7 +1163,46 @@ lineup into its arena, its total enemy count and a list of `EncounterPreviewGrou
 back. Anything that holds a lineup implements `IEncounterPreviewSource` (element, stance, display
 name) — game encounter data once it exists, the balance simulator's fixtures today — so the
 preview never depends on how enemies are authored. It is pure (no randomness, no battle state), so
-the team-building screen can show it and a future "suggested team" can read it.
+the team-building screen can show it and the suggested team (below) reads it.
+
+**Game rule: the enemy elements are free, before every fight (user decision).** The pre-fight
+screen always shows the `Full` preview — every line's name, element, stance and count — at no cost
+and with no scouting action, before the team is placed; `EncounterPreview.Build`'s default detail,
+`Full`, *is* that preview. Not having scouted is no longer a hidden-information penalty: the
+difficulty table stays calibrated on the scouted counter-pick (the targets are unchanged), and the
+information that pick needs is simply always on screen.
+
+**Suggested team (`TeamSuggester`, `BeastCraft.Battle.Scouting`).** From the preview and the beasts
+the player owns, `TeamSuggester.Suggest(TeamSuggestionRequest)` names a counter team:
+
+- **Inputs.** `Preview` (the encounter's `EncounterPreview`), `Owned` (a `TeamSuggestionCandidate`
+  per owned beast: species and level; the caller maps the save's `OwnedBeast`s through the species
+  catalog), `TeamSize` (default 4), `MinVanguards` (default 1), `Bonds` (the skill library's team
+  bonds) and `EncounterCanAfflict` (`TeamSuggester.CanAfflict` over the enemies' kits; default true).
+- **Scoring.** Each beast scores, per enemy, its kit element's chart multiplier into the enemies minus
+  half theirs into it; `LevelWeight` (0.1, an untuned starting knob) is taken off per level below
+  the owner's highest-levelled candidate. A team scores its members plus, per active bond
+  (`TeamBondResolver`), the bond's weight (`TeamSuggester.BondWeights`, fitted to the simulator's
+  panel excess; 0.5 per tier for an unlisted bond; nothing for a bond that answers only afflicted
+  allies when the encounter cannot stun or burn; 0.125 per stack of a scaling bond).
+- **Choice.** Every combination of the team size over distinct species (a species owned twice counts
+  once, as its highest-levelled copy) in lexicographic order of the owned list; the best team with
+  at least `MinVanguards` Vanguards wins, ties to the earlier combination; with too few Vanguards
+  owned, the best team overall (`TeamSuggestion.MeetsVanguardMin` false). Deterministic, no rng.
+- **One implementation.** It *is* the balance simulator's bond-aware scouted picker, which the
+  difficulty table is calibrated on: the simulator calls `TeamSuggester` for the scores, bond
+  weights and choice rule, and every run checks that `Suggest`, given the whole roster at one level,
+  names exactly the simulator's pick (stderr `TeamSuggester parity`; 100% of compositions, or the run
+  fails).
+
+**When the suggestion is shown (`TeamSuggestionPolicy`, user decision).** The suggested team is
+offered only after the player has lost that battle **3** times (`MinLossesBeforeSuggestion`), and
+never when the player has turned suggestions off in the game settings
+(`PlayerSettings.TeamSuggestionsEnabled`, default on; see `docs/design/progression-and-saves.md`,
+"Player settings"): `TeamSuggestionPolicy.ShouldSuggest(lossesOnThisEncounter, settings)`. The loss
+count is per map location, kept by the campaign's per-node attempts (the region campaign's map run);
+it is wired in when that work merges, and until then nothing calls the policy. The element preview
+itself is never gated.
 
 - **Grouping.** Enemies with the same element, stance and display name (ordinal) are one line
   with a count; lines keep the order of their first enemy in the lineup.

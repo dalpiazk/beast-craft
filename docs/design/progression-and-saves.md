@@ -138,7 +138,30 @@ SaveLoadResult loaded = store.Load("main");
 
 `SaveSlotIndex.Build(storage, json)` lists every slot (`ListSlots()` — valid names with a main or
 backup file) newest first as `SaveSlotInfo`: timestamp, which file was read, the `SchemaVersion`
-header (no migration or validation) and any problem, for a load/continue menu.
+header (no migration or validation) and any problem, for a load/continue menu. It never lists the
+settings slot (below).
+
+### Player settings (`PlayerSettings`, `PlayerSettingsStore`)
+
+Preferences, not progress, so they live outside `PlayerSave`: its schema and migrations are
+untouched, and one device's settings apply to every save slot.
+
+- **`PlayerSettings`** — `[Serializable]`, public fields, JsonUtility-safe: `SchemaVersion`
+  (`CurrentSchemaVersion` = 1) and `TeamSuggestionsEnabled` (default **true**: whether the game may
+  suggest a counter team after repeated losses; see `docs/design/battle-system.md`, "Encounter
+  preview", `TeamSuggestionPolicy`). New settings are added as fields with defaults: a key an older
+  file lacks keeps its default, so a purely additive setting needs no version bump.
+- **`PlayerSettingsStore(storage, json)`** — saves and loads through the same `ISaveStorage` and
+  `ISaveJsonSerializer` as the game saves (`FileSaveStorage` in the game, so the atomic write and the
+  one-generation backup apply), in the reserved slot **`settings`** (`PlayerSettingsStore.SlotName`).
+  `Save` stamps the current version; `Load` never fails: a missing slot, corrupt text (after the
+  storage's backup fallback), JSON the serializer rejects or a version below 1 give
+  `new PlayerSettings()` (`TryLoad` says whether the file was used). A newer build's file is read for
+  the fields this build knows.
+- **The reserved slot.** Settings and saves share one directory, so `settings` is reserved in any
+  letter case (`PlayerSettingsStore.IsReservedSlot`; file names are case-insensitive on Windows and
+  macOS): `SaveStore.Save` / `Load` refuse it and `Exists` reports false, and `SaveSlotIndex` skips
+  it. Whatever names game-save slots (today only `main`) must not use it.
 
 ### Validation
 
@@ -379,11 +402,14 @@ its System.Text.Json twin here.
 
 ## Known gaps / follow-ups
 
+- **The team suggestion is not wired.** `TeamSuggestionPolicy` needs the campaign's per-location
+  loss count (the map run's per-node attempts, on the campaign branch) and a pre-fight UI; the policy,
+  `TeamSuggester` and `PlayerSettingsStore` are ready and tested.
 - **No gear content.** There are no gear data files or importer; `BattleContent` gets gear only
   from its caller, and the gear tests use in-memory `GearSO` / `AvatarGearSO` instances.
 - **How a map node picks an encounter is not decided.** Encounters are game content
   (`EncounterPlan`), but which shape and level a node offers, and the campaign's difficulty target
-  (the shipped table is calibrated for a scouting player at 50%, `DifficultyScale` 1.0), are pending
+  (the shipped table is calibrated for a scouting player at the shapes' tiered targets, `squad` and `horde` 80%, `elite` 60%, `solo` 50%; `DifficultyScale` 1.0), are pending
   producer review; see `docs/design/battle-system.md`, "Encounters as game content".
 - **Beast XP defaults need review** (see above), as does the pacing model's 20% knockout assumption.
 - **Enemies wear no gear.** `EnemySpec` has no gear field; a caller needing geared enemies builds

@@ -591,13 +591,20 @@ second; `--scouted none` drops it and its header line, and the rest of the repor
   kits, levels and bonds, so its picks are the same in every kit mode and level.
 - **Heuristic + bonds** (bonds on only): every team meeting the Vanguard minimum scores its members'
   heuristic scores plus, per tier of each tiered bond it activates, that bond's weight
-  (`ScoutedPicker.BondWeights`, fitted at 0.1 per point of the bond's pooled `elemental` panel excess;
-  0.5, `ScoutedPicker.BondWeight`, for a bond not listed; nothing for a bond that answers only afflicted
-  allies when no enemy can stun or burn, `ScoutedPicker.CanAfflict`) and 0.125 per stack of each
-  scaling bond (`ScoutedPicker.ScalingBondWeight`; nothing for an `Others` bond no teammate receives);
+  (`TeamSuggester.BondWeights`, fitted at 0.1 per point of the bond's pooled `elemental` panel excess;
+  0.5, `TeamSuggester.BondWeight`, for a bond not listed; nothing for a bond that answers only afflicted
+  allies when no enemy can stun or burn, `TeamSuggester.CanAfflict`) and 0.125 per stack of each
+  scaling bond (`TeamSuggester.ScalingBondWeight`; nothing for an `Others` bond no teammate receives);
   the best
   team is fielded, ties to the lower team index. 0.5 is the gap between a neutral and a strong
   matchup against one enemy in half the lineup's weight: a starting knob, not tuned.
+  **The game's own picker.** The scores, the bond weights and the choice rule are the Runtime's
+  `TeamSuggester` (`BeastCraft.Battle.Scouting`), the team the game suggests after repeated losses
+  (`docs/design/battle-system.md`, "Encounter preview"); `ScoutedPicker` only adapts the simulator's
+  fixtures and team list to it. Every PvE run also asks `TeamSuggester.Suggest` for each composition
+  with the whole roster (one level) as the owned beasts and prints `TeamSuggester parity: n of n
+  compositions ...` to stderr; anything short of 100% fails the run (exit 3). The report is unchanged
+  by the port (byte-identical).
 - **Best team** (with `oracle`): the one lineup with the best clear rate in the same mode and shape
   at the *other* levels, scored at this level (ties: the other levels over every shape, then the lower
   index). It knows which team is strong but not what it faces, and it is held out, so the damage-roll

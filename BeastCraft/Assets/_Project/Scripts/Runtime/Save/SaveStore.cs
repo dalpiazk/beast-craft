@@ -4,7 +4,9 @@ namespace BeastCraft.Save
 {
     /// <summary>
     /// A <see cref="SaveSerializer"/> bound to an <see cref="ISaveStorage"/>: save and load a
-    /// <see cref="PlayerSave"/> by slot name. Non-throwing, like the serializer.
+    /// <see cref="PlayerSave"/> by slot name. Non-throwing, like the serializer. The settings slot
+    /// (<see cref="PlayerSettingsStore.SlotName"/>, any letter case) is never a save slot: it does not
+    /// exist here, and saving or loading it fails.
     /// </summary>
     public class SaveStore
     {
@@ -20,12 +22,17 @@ namespace BeastCraft.Save
         /// <summary>Whether <paramref name="slot"/> holds a save.</summary>
         public bool Exists(string slot)
         {
-            return _storage.Exists(slot);
+            return !PlayerSettingsStore.IsReservedSlot(slot) && _storage.Exists(slot);
         }
 
         /// <summary>Writes <paramref name="save"/> to <paramref name="slot"/>. False for a null save, a serializer failure or a storage failure.</summary>
         public bool Save(string slot, PlayerSave save)
         {
+            if (PlayerSettingsStore.IsReservedSlot(slot))
+            {
+                return false;
+            }
+
             string json;
 
             try
@@ -55,6 +62,11 @@ namespace BeastCraft.Save
         /// </summary>
         public SaveLoadResult Load(string slot)
         {
+            if (PlayerSettingsStore.IsReservedSlot(slot))
+            {
+                return SaveLoadResult.Failed("'" + slot + "' is the settings slot, not a save slot.", 0);
+            }
+
             if (!(_storage is IBackupSaveStorage backed))
             {
                 if (!_storage.TryRead(slot, out string json))
