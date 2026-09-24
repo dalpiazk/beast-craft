@@ -204,6 +204,12 @@ namespace BeastCraft.Tooling.BalanceSim
 
         public int MaxTime = BattleTurnExecutor.DefaultMaxTime;
         public int Seed = DefaultSeed;
+
+        /// <summary>
+        /// <c>--seeds</c>: run every one of these base seeds in one process and report the
+        /// aggregate (see <see cref="SeedAggregate"/>); null for the ordinary single-seed run.
+        /// </summary>
+        public List<int> Seeds;
         public int Samples = DefaultSamples;
 
         /// <summary>PvE battles per team per composition: <c>--samples</c> when given, else the set's default.</summary>
@@ -217,6 +223,16 @@ namespace BeastCraft.Tooling.BalanceSim
         public string EncountersPath;
         public bool SelfCheck;
         public bool ShowHelp;
+
+        /// <summary><c>--timings</c>: print a per-phase wall-clock breakdown to stderr (never into the report).</summary>
+        public bool Timings;
+
+        /// <summary>
+        /// <c>--calibrate-sample n</c>: the difficulty search evaluates only a seeded subset of n
+        /// teams, then the chosen multiplier runs once with every team. 0 (the default) = every
+        /// team at every step. Opt-in because it changes the calibrated multipliers, so the report.
+        /// </summary>
+        public int CalibrateSample;
 
         /// <summary>The PvE avatar preset (<c>--avatar</c>); the library avatar by default, <see cref="AvatarPresets.None"/> fields none.</summary>
         public string AvatarPreset = AvatarPresets.Library;
@@ -235,6 +251,15 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <c>--avatar library</c>). Set by <see cref="Program"/> after parsing, not a CLI option.
         /// </summary>
         public SkillLibraryKits Library;
+
+        /// <summary>A copy of these options for one seed of a <c>--seeds</c> run: <see cref="Seed"/> set, <see cref="Seeds"/> cleared.</summary>
+        public SimOptions ForSeed(int seed)
+        {
+            SimOptions copy = (SimOptions)MemberwiseClone();
+            copy.Seed = seed;
+            copy.Seeds = null;
+            return copy;
+        }
 
         /// <summary>Whether this run fields anything from the skill library.</summary>
         public bool NeedsLibrary
@@ -270,6 +295,9 @@ namespace BeastCraft.Tooling.BalanceSim
             "                             override every enemy's element.\n" +
             "  --max-time <n>             Battle-time cap before a battle is a stalemate, in turns of a Speed-100 unit (default 2000).\n" +
             "  --seed <n>                 Base seed; each battle derives its own (default 12345).\n" +
+            "  --seeds <list>             Comma-separated base seeds, run one after another in one process. Each seed's run is\n" +
+            "                             exactly a --seed run; stdout (and --out) get the multi-seed aggregate (mean +/- sd per\n" +
+            "                             beast), and with --out each seed's full report is also written as <name>.seed<n>.md.\n" +
             "  --samples <n>              Battles per team and composition (PvE) and per pairing (PvP), each with its own\n" +
             "                             seed: damage variance and crits make battles random (default: PvP 5; PvE 1 per\n" +
             "                             generated composition, 5 per fixed encounter).\n" +
@@ -283,6 +311,12 @@ namespace BeastCraft.Tooling.BalanceSim
             "  --out <path>               Also write the Markdown report to this file.\n" +
             "  --self-check               Run everything twice and fail unless both reports are identical; also checks the\n" +
             "                             PvE battle loop against BattleTurnExecutor.RunBattle.\n" +
+            "  --timings                  Print a wall-clock breakdown (per PvE cell and calibration step, PvP, report, GC)\n" +
+            "                             to stderr. Never changes the report.\n" +
+            "  --calibrate-sample <n>     Opt-in speed-up that CHANGES results: the difficulty search evaluates a seeded\n" +
+            "                             subset of n teams (e.g. 50 of 210), then the chosen multiplier runs once with every\n" +
+            "                             team; the report's numbers all come from that full run (default: off, every team at\n" +
+            "                             every step).\n" +
             "  --help                     Show this text.\n";
 
         /// <summary>Parses the command line. Returns null and fills <paramref name="error"/> on bad input.</summary>
@@ -291,6 +325,7 @@ namespace BeastCraft.Tooling.BalanceSim
             SimOptions options = new SimOptions();
             bool matrixLevelGiven = false;
             bool samplesGiven = false;
+            bool seedGiven = false;
             error = null;
 
             for (int i = 0; i < args.Length; i++)
@@ -306,6 +341,16 @@ namespace BeastCraft.Tooling.BalanceSim
                         break;
                     case "--self-check":
                         options.SelfCheck = true;
+                        break;
+                    case "--timings":
+                        options.Timings = true;
+                        break;
+                    case "--calibrate-sample":
+                        if (!TryNextInt(args, ref i, arg, 1, out options.CalibrateSample, out error))
+                        {
+                            return null;
+                        }
+
                         break;
                     case "--levels":
                         if (!TryNext(args, ref i, arg, out text, out error) || !TryParseLevels(text, options.Levels, out error))
@@ -451,6 +496,32 @@ namespace BeastCraft.Tooling.BalanceSim
                             return null;
                         }
 
+                        seedGiven = true;
+                        break;
+                    case "--seeds":
+                        if (!TryNext(args, ref i, arg, out text, out error))
+                        {
+                            return null;
+                        }
+
+                        options.Seeds = new List<int>();
+                        foreach (string part in text.Split(','))
+                        {
+                            if (!int.TryParse(part.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int seed))
+                            {
+                                error = "--seeds expects comma-separated integers, got '" + text + "'.";
+                                return null;
+                            }
+
+                            if (options.Seeds.Contains(seed))
+                            {
+                                error = "--seeds lists " + seed + " twice.";
+                                return null;
+                            }
+
+                            options.Seeds.Add(seed);
+                        }
+
                         break;
                     case "--samples":
                         if (!TryNextInt(args, ref i, arg, 1, out options.Samples, out error))
@@ -536,6 +607,12 @@ namespace BeastCraft.Tooling.BalanceSim
                         error = "Unknown argument '" + arg + "'. Use --help for usage.";
                         return null;
                 }
+            }
+
+            if (seedGiven && options.Seeds != null)
+            {
+                error = "--seed and --seeds cannot be combined.";
+                return null;
             }
 
             options.PveSamples = samplesGiven ? options.Samples : options.EncounterSet == EncounterSet.Generated ? DefaultGeneratedSamples : DefaultSamples;

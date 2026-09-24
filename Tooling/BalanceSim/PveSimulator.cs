@@ -73,6 +73,25 @@ namespace BeastCraft.Tooling.BalanceSim
     {
         public double Multiplier;
         public double ClearRate;
+
+        /// <summary>Wall-clock seconds the evaluation took (for <c>--timings</c>; never in the report).</summary>
+        public double Seconds;
+
+        /// <summary>Battles the evaluation covered (for <c>--timings</c>).</summary>
+        public int Battles;
+
+        /// <summary>
+        /// True when the multiplier scaled every enemy to exactly the stats an earlier evaluation
+        /// of the cell did, so its battles were reused rather than re-run (see
+        /// <see cref="PveSimulator.RunCell"/>). For <c>--timings</c>; never in the report.
+        /// </summary>
+        public bool Reused;
+
+        /// <summary>
+        /// With <c>--calibrate-sample</c>: true for the one evaluation of every team at the chosen
+        /// multiplier that follows the sampled search (the others then cover only the sample).
+        /// </summary>
+        public bool Final;
     }
 
     /// <summary>
@@ -159,7 +178,15 @@ namespace BeastCraft.Tooling.BalanceSim
             {
                 SlotOrders[t] = ShuffledSlots(options.Seed, t, options.TeamSize);
             }
+
+            CalibrationTeams = SampleTeams(options.Seed, Teams.Count, options.CalibrateSample);
         }
+
+        /// <summary>
+        /// With <c>--calibrate-sample n</c> (n below the team count): the team indices, ascending, a
+        /// seeded draw of n, that the difficulty search evaluates. Null = every team (the default).
+        /// </summary>
+        public int[] CalibrationTeams { get; }
 
         /// <summary>Every combination of <c>TeamSize</c> distinct species, as ascending roster indices, in lexicographic order.</summary>
         public List<int[]> Teams { get; }
@@ -220,9 +247,39 @@ namespace BeastCraft.Tooling.BalanceSim
             PveBattle[] best = null;
             double bestGap = double.MaxValue;
 
+            // The multiplier reaches a battle only through Scale(enemy stats), and every battle's
+            // seed ignores it, so two multipliers that scale every enemy of the shape to the same
+            // stats play every battle identically. Late bisection steps often do (small stats
+            // round alike, notably at level 1): those evaluations reuse the earlier battles.
+            List<StatBlock> enemyStats = DistinctEnemyStats(shape, level);
+            List<int[]> evaluatedScales = new List<int[]>();
+            List<PveBattle[]> evaluatedBattles = new List<PveBattle[]>();
+
+            // --calibrate-sample: the search evaluates a subset of the teams, and only the chosen
+            // multiplier is then run with every team (below).
+            int[] searchTeams = CalibrationTeams;
+
             double Evaluate(double multiplier)
             {
-                PveBattle[] battles = RunAllTeams(mode, level, shape, multiplier);
+                System.Diagnostics.Stopwatch clock = System.Diagnostics.Stopwatch.StartNew();
+                int[] scale = ScaledStats(enemyStats, multiplier);
+                PveBattle[] battles = null;
+                for (int e = 0; e < evaluatedScales.Count && battles == null; e++)
+                {
+                    if (SameStats(evaluatedScales[e], scale))
+                    {
+                        battles = evaluatedBattles[e];
+                    }
+                }
+
+                bool reused = battles != null;
+                if (!reused)
+                {
+                    battles = searchTeams == null ? RunAllTeams(mode, level, shape, multiplier) : RunTeams(mode, level, shape, multiplier, searchTeams);
+                    evaluatedScales.Add(scale);
+                    evaluatedBattles.Add(battles);
+                }
+
                 int cleared = 0;
                 foreach (PveBattle battle in battles)
                 {
@@ -230,7 +287,14 @@ namespace BeastCraft.Tooling.BalanceSim
                 }
 
                 double rate = (100.0 * cleared) / battles.Length;
-                cell.Evaluations.Add(new CalibrationPoint { Multiplier = multiplier, ClearRate = rate });
+                cell.Evaluations.Add(new CalibrationPoint
+                {
+                    Multiplier = multiplier,
+                    ClearRate = rate,
+                    Seconds = clock.Elapsed.TotalSeconds,
+                    Battles = battles.Length,
+                    Reused = reused
+                });
 
                 double gap = Math.Abs(rate - target);
                 if (gap < bestGap)
@@ -298,8 +362,141 @@ namespace BeastCraft.Tooling.BalanceSim
                 }
             }
 
+            if (searchTeams != null)
+            {
+                System.Diagnostics.Stopwatch clock = System.Diagnostics.Stopwatch.StartNew();
+                best = RunAllTeams(mode, level, shape, cell.Multiplier);
+                int cleared = 0;
+                foreach (PveBattle battle in best)
+                {
+                    cleared += battle.Cleared ? 1 : 0;
+                }
+
+                cell.ClearRate = (100.0 * cleared) / best.Length;
+                cell.Evaluations.Add(new CalibrationPoint
+                {
+                    Multiplier = cell.Multiplier,
+                    ClearRate = cell.ClearRate,
+                    Seconds = clock.Elapsed.TotalSeconds,
+                    Battles = best.Length,
+                    Final = true
+                });
+            }
+
             cell.Battles = best;
             return cell;
+        }
+
+        /// <summary>
+        /// <see cref="RunAllTeams"/> for a subset of the teams only (<paramref name="teams"/>, team
+        /// indices): composition-major, then the subset's order, then sample. Every battle is the one
+        /// <see cref="RunAllTeams"/> would play for that team, seed and all.
+        /// </summary>
+        public PveBattle[] RunTeams(KitMode mode, int level, EncounterShape shape, double multiplier, int[] teams)
+        {
+            int samples = Samples;
+            int count = teams.Length;
+            PveBattle[] battles = new PveBattle[shape.Compositions.Count * count * samples];
+            bool[][] playersWinTies = new bool[shape.Compositions.Count][];
+            for (int c = 0; c < shape.Compositions.Count; c++)
+            {
+                playersWinTies[c] = PlayersWinTies(mode, level, shape.Compositions[c].Id);
+            }
+
+            Parallel.For(0, battles.Length, i =>
+            {
+                int t = teams[(i / samples) % count];
+                int c = i / (samples * count);
+                battles[i] = RunBattle(mode, level, shape.Compositions[c], multiplier, t, i % samples, false, playersWinTies[c][t], out _);
+            });
+
+            return battles;
+        }
+
+        /// <summary>
+        /// <paramref name="size"/> distinct team indices out of <paramref name="teamCount"/>, a seeded
+        /// shuffle's first <paramref name="size"/>, ascending; null when <paramref name="size"/> is 0
+        /// (off) or covers every team, so the full search runs exactly as without the option.
+        /// </summary>
+        private static int[] SampleTeams(int seed, int teamCount, int size)
+        {
+            if (size <= 0 || size >= teamCount)
+            {
+                return null;
+            }
+
+            int[] order = new int[teamCount];
+            for (int i = 0; i < teamCount; i++)
+            {
+                order[i] = i;
+            }
+
+            Random rng = new Random(unchecked((seed * 486187739) + 0x5a17));
+            for (int i = teamCount - 1; i > 0; i--)
+            {
+                int j = rng.Next(i + 1);
+                int swap = order[i];
+                order[i] = order[j];
+                order[j] = swap;
+            }
+
+            int[] sample = new int[size];
+            Array.Copy(order, sample, size);
+            Array.Sort(sample);
+            return sample;
+        }
+
+        /// <summary>
+        /// The unscaled stat block of every distinct enemy species in the shape's compositions at
+        /// this level, in first-appearance order: what <see cref="Scale"/> is applied to.
+        /// </summary>
+        private static List<StatBlock> DistinctEnemyStats(EncounterShape shape, int level)
+        {
+            List<CreatureSpeciesSO> seen = new List<CreatureSpeciesSO>();
+            List<StatBlock> stats = new List<StatBlock>();
+            foreach (Encounter composition in shape.Compositions)
+            {
+                foreach (EnemySlot slot in composition.Enemies)
+                {
+                    if (!seen.Contains(slot.Species))
+                    {
+                        seen.Add(slot.Species);
+                        stats.Add(StatCalculator.ComputeStats(slot.Species, level, null));
+                    }
+                }
+            }
+
+            return stats;
+        }
+
+        /// <summary>Every stat <see cref="Scale"/> changes, for every block, at this multiplier.</summary>
+        private static int[] ScaledStats(List<StatBlock> stats, double multiplier)
+        {
+            int[] values = new int[stats.Count * 5];
+            for (int i = 0; i < stats.Count; i++)
+            {
+                StatBlock scaled = Scale(stats[i], multiplier);
+                values[(i * 5) + 0] = scaled.Hp;
+                values[(i * 5) + 1] = scaled.Attack;
+                values[(i * 5) + 2] = scaled.Defense;
+                values[(i * 5) + 3] = scaled.SpecialAttack;
+                values[(i * 5) + 4] = scaled.SpecialDefense;
+            }
+
+            return values;
+        }
+
+        private static bool SameStats(int[] a, int[] b)
+        {
+            for (int i = 0; i < a.Length; i++)
+            {
+                if (a[i] != b[i])
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         /// <summary>

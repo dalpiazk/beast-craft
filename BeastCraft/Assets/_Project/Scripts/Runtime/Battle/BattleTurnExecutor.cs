@@ -791,7 +791,7 @@ namespace BeastCraft.Battle
                                                 HexCoordinate? plainStop, out HexCoordinate pick)
         {
             pick = mover.Position;
-            Dictionary<HexCoordinate, int> costs = ReachableTiles(grid, mover, int.MaxValue, null);
+            ReachMap costs = ReachableTiles(grid, mover, int.MaxValue);
             List<BattleUnit> enemies = LivingEnemies(mover, allUnits);
             IReadOnlyList<HexCoordinate> tiles = grid.GetTilesInRange(candidate.Position, skill.Range);
 
@@ -806,7 +806,7 @@ namespace BeastCraft.Battle
                 HexCoordinate tile = tiles[i];
                 int cost;
 
-                if (tile == mover.Position || !costs.TryGetValue(tile, out cost))
+                if (tile == mover.Position || !costs.TryGetCost(tile, out cost))
                 {
                     continue;
                 }
@@ -872,8 +872,8 @@ namespace BeastCraft.Battle
                 return 0;
             }
 
-            List<HexCoordinate> order = new List<HexCoordinate>();
-            Dictionary<HexCoordinate, int> costs = ReachableTiles(grid, unit, budget, order);
+            ReachMap costs = ReachableTiles(grid, unit, budget);
+            List<HexCoordinate> order = costs.Order;
 
             HexCoordinate best = unit.Position;
             int bestNearest = NearestDistance(best, enemies);
@@ -897,7 +897,8 @@ namespace BeastCraft.Battle
                 }
 
                 int crowd = AdjacentCount(tile, enemies);
-                int cost = costs[tile];
+                int cost;
+                costs.TryGetCost(tile, out cost);
 
                 bool better = nearest > bestNearest
                     || (nearest == bestNearest && crowd < bestCrowd)
@@ -942,44 +943,136 @@ namespace BeastCraft.Battle
         /// steps, with its step cost, the mover's own tile included at 0. Breadth-first over
         /// <see cref="HexGrid.IsPassable"/> tiles (other units obstruct, as they do for the
         /// pathfinder), expanding neighbours in <see cref="HexCoordinate.AxialDirections"/>' fixed
-        /// order; when <paramref name="order"/> is given it receives the tiles in discovery order.
+        /// order; <see cref="ReachMap.Order"/> holds the tiles in discovery order.
+        /// <para>
+        /// The result is this thread's reusable <see cref="ReachMap"/>, valid until the next call
+        /// on the same thread: read it before searching again. (Only
+        /// <see cref="TryPickStandoffTile"/> and <see cref="Retreat"/> call this, and each reads its
+        /// map to the end before anything else searches.)
+        /// </para>
         /// </summary>
-        private static Dictionary<HexCoordinate, int> ReachableTiles(HexGrid grid, BattleUnit mover, int maxSteps, List<HexCoordinate> order)
+        private static ReachMap ReachableTiles(HexGrid grid, BattleUnit mover, int maxSteps)
         {
-            Dictionary<HexCoordinate, int> costs = new Dictionary<HexCoordinate, int>();
-            Queue<HexCoordinate> frontier = new Queue<HexCoordinate>();
-            IReadOnlyList<HexCoordinate> directions = HexCoordinate.AxialDirections;
+            ReachMap costs = ReachMap.Begin(grid, mover.Position);
+            List<HexCoordinate> order = costs.Order;
+            HexCoordinate[] directions = HexPathfinder.Directions;
 
-            costs[mover.Position] = 0;
-            frontier.Enqueue(mover.Position);
-            order?.Add(mover.Position);
-
-            while (frontier.Count > 0)
+            // Breadth-first: every tile is queued exactly when it is appended to the discovery
+            // order, so walking that list from the front is the FIFO queue.
+            for (int head = 0; head < order.Count; head++)
             {
-                HexCoordinate current = frontier.Dequeue();
-                int cost = costs[current];
+                HexCoordinate current = order[head];
+                int cost;
+                costs.TryGetCost(current, out cost);
 
                 if (cost >= maxSteps)
                 {
                     continue;
                 }
 
-                for (int i = 0; i < directions.Count; i++)
+                for (int i = 0; i < directions.Length; i++)
                 {
                     HexCoordinate next = current + directions[i];
+                    int index = grid.TileIndex(next);
 
-                    if (costs.ContainsKey(next) || !grid.IsPassable(next, mover.Id))
+                    if (!grid.IsPassableAt(index, mover.Id) || costs.Contains(next, index))
                     {
                         continue;
                     }
 
-                    costs[next] = cost + 1;
-                    frontier.Enqueue(next);
-                    order?.Add(next);
+                    costs.Add(next, index, cost + 1);
                 }
             }
 
             return costs;
+        }
+
+        /// <summary>
+        /// The tiles <see cref="ReachableTiles"/> found and their step costs: flat arrays indexed
+        /// by <see cref="HexGrid.TileIndex"/> and stamped with a generation, one instance reused
+        /// per thread, so a search allocates nothing. The start tile is held apart so a mover
+        /// recorded off the board still reads as reachable at 0, as it always has.
+        /// </summary>
+        private sealed class ReachMap
+        {
+            [ThreadStatic]
+            private static ReachMap _current;
+
+            private HexGrid _grid;
+            private HexCoordinate _start;
+            private int _generation;
+            private int[] _stamp = new int[0];
+            private int[] _cost = new int[0];
+
+            /// <summary>Every tile found, the start first, in discovery order.</summary>
+            public readonly List<HexCoordinate> Order = new List<HexCoordinate>();
+
+            public static ReachMap Begin(HexGrid grid, HexCoordinate start)
+            {
+                ReachMap map = _current;
+                if (map == null)
+                {
+                    map = new ReachMap();
+                    _current = map;
+                }
+
+                int capacity = grid.TileIndexCapacity;
+                if (map._stamp.Length < capacity)
+                {
+                    map._stamp = new int[capacity];
+                    map._cost = new int[capacity];
+                    map._generation = 0;
+                }
+
+                if (map._generation == int.MaxValue)
+                {
+                    Array.Clear(map._stamp, 0, map._stamp.Length);
+                    map._generation = 0;
+                }
+
+                map._generation++;
+                map._grid = grid;
+                map._start = start;
+                map.Order.Clear();
+                map.Add(start, grid.TileIndex(start), 0);
+                return map;
+            }
+
+            /// <summary>Whether a tile has been found; <paramref name="index"/> is its <see cref="HexGrid.TileIndex"/>.</summary>
+            public bool Contains(HexCoordinate tile, int index)
+            {
+                return tile == _start || (index >= 0 && _stamp[index] == _generation);
+            }
+
+            public bool TryGetCost(HexCoordinate tile, out int cost)
+            {
+                if (tile == _start)
+                {
+                    cost = 0;
+                    return true;
+                }
+
+                int index = _grid.TileIndex(tile);
+                if (index >= 0 && _stamp[index] == _generation)
+                {
+                    cost = _cost[index];
+                    return true;
+                }
+
+                cost = 0;
+                return false;
+            }
+
+            public void Add(HexCoordinate tile, int index, int cost)
+            {
+                if (index >= 0)
+                {
+                    _stamp[index] = _generation;
+                    _cost[index] = cost;
+                }
+
+                Order.Add(tile);
+            }
         }
 
         /// <summary>

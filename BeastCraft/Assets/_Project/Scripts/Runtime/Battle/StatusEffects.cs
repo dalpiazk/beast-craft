@@ -131,15 +131,25 @@ namespace BeastCraft.Battle
             List<ActiveStatus> statuses = unit.StatusList;
             stunned = IsStunned(unit);
 
+            bool anyDamageOverTime = false;
+
             for (int i = 0; i < statuses.Count; i++)
             {
                 if (statuses[i].RemainingTurns > 0)
                 {
                     statuses[i].RemainingTurns -= 1;
                 }
+
+                anyDamageOverTime |= statuses[i].Type == StatusType.DamageOverTime;
             }
 
             int dealt = 0;
+
+            if (!anyDamageOverTime)
+            {
+                // Nothing below would fire; skip the snapshot (this runs on every turn of every unit).
+                return dealt;
+            }
 
             // Snapshot: a shield broken by the first stack is removed from the live list mid-walk.
             ActiveStatus[] snapshot = statuses.ToArray();

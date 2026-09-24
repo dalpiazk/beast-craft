@@ -1948,3 +1948,25 @@ Phoenix), with 8 robust niches (7 before).
   levels, before the other slots grow.
 - `tuned-report.md` is regenerated from the default run (seed 12345); its PvE marginals equal the
   V7 seed-12345 run.
+
+## Tooling: a faster simulator and one-process multi-seed runs (no balance change)
+
+No roster, skill library, fixture or rule changed, and `tuned-report.md` is byte-identical. The
+default run went from 210 s to about 50 s on the 8-core tuning machine. Path finding had been 60%
+of the CPU; the Runtime now does the same searches, with the same results, on flat arrays and a
+heap, and the simulator uses Server GC. `Tooling/BalanceSim/README.md`, "Performance", has the
+profile and the before/after table. Every pass above judged candidates on the mean of 3-5 seeds,
+run as one process per seed and parsed back out of the reports. `--seeds` does that in one command:
+
+```sh
+dotnet run --project Tooling/BalanceSim -c Release -- --mode pve --seeds 12345,777,4242,2024,99 --out out/candidate.md
+```
+
+`out/candidate.md` is the aggregate: per kit mode and beast, the per-shape mean with its rank and
+the number of seeds with the beast in the top 3 (the "robust niche" count used above), and the
+overall mean, standard deviation, range and per-seed values. Each seed's full report is written
+beside it as `out/candidate.seed<n>.md`, identical to a `--seed <n>` run. Five seeds take about
+four minutes. For a first screen of many candidates, `--calibrate-sample 30` runs the difficulty
+search on 30 of the 210 teams and is about 3.5x faster again. It moves the overall marginals by
+at most 0.7 points, against about 2 points for a seed change. Confirm the final candidate without
+it, since the committed report never uses it.

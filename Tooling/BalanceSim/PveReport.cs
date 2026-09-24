@@ -297,8 +297,34 @@ namespace BeastCraft.Tooling.BalanceSim
             return summary;
         }
 
+        /// <summary>
+        /// One kit mode's marginal clear rates exactly as the "Marginal clear rate by shape" table
+        /// shows them: <paramref name="byShape"/>[shape][beast] (levels averaged) and
+        /// <paramref name="overall"/>[beast]. Used by <see cref="SeedAggregate"/>.
+        /// </summary>
+        public static void Marginals(SimOptions options, IReadOnlyList<CreatureSpeciesSO> species, List<EncounterShape> shapes, PveSimulator simulator,
+                                     List<PveCell> cells, KitMode mode, out double[][] byShape, out double[] overall)
+        {
+            ModeSummary summary = Summarize(options, species, shapes, simulator, cells, mode);
+            byShape = new double[shapes.Count][];
+            for (int e = 0; e < shapes.Count; e++)
+            {
+                byShape[e] = new double[species.Count];
+                for (int b = 0; b < species.Count; b++)
+                {
+                    byShape[e][b] = summary.ByShape[e][b].Marginal;
+                }
+            }
+
+            overall = new double[species.Count];
+            for (int b = 0; b < species.Count; b++)
+            {
+                overall[b] = summary.Overall[b].Marginal;
+            }
+        }
+
         /// <summary>Beast indices, highest value first; ties in roster order.</summary>
-        private static List<int> Order(int count, Func<int, double> value)
+        public static List<int> Order(int count, Func<int, double> value)
         {
             List<int> order = new List<int>();
             for (int i = 0; i < count; i++)
@@ -364,6 +390,13 @@ namespace BeastCraft.Tooling.BalanceSim
             report.AppendLine("  with distinct seeds (`--samples`; " + perCell + " battles per " + (generated ? "composition" : "encounter") +
                               " per evaluation). Seeds exclude the multiplier, so calibration compares");
             report.AppendLine("  multipliers on the same rolls; the clear rate is over every battle of the " + (generated ? "shape" : "encounter") + ".");
+            if (simulator.CalibrationTeams != null)
+            {
+                report.AppendLine("- Calibration sample (`--calibrate-sample " + simulator.CalibrationTeams.Length + "`): the multiplier search evaluated a seeded subset of " +
+                                  simulator.CalibrationTeams.Length + " of the " + simulator.Teams.Count + " teams;");
+                report.AppendLine("  the chosen multiplier was then run once with every team, and every number below comes from that full run (the");
+                report.AppendLine("  \"Evaluations\" column counts it). Multipliers, and so every number, differ slightly from a run without the option.");
+            }
             report.AppendLine("- Levels: " + SimOptions.Join(options.Levels) + " (beasts and enemies at the same level); kit modes: " +
                               PvpReport.ModeList(options.Modes) + "; no gear; no avatar");
             report.AppendLine("- Placement: each side takes the front-most tiles of its own deployment zone (front row first, then outward from");
@@ -1335,7 +1368,7 @@ namespace BeastCraft.Tooling.BalanceSim
             return multiplier > 1f ? strong : multiplier < 1f ? weak : neutral;
         }
 
-        private static string Marked(SimOptions options, double marginal)
+        public static string Marked(SimOptions options, double marginal)
         {
             string text = SimOptions.Signed(marginal);
             if (marginal > options.MarginalThreshold)

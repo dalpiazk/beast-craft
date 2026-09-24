@@ -172,24 +172,49 @@ namespace BeastCraft.Battle
         /// </summary>
         private static List<BattleUnit> CollectLiving(IEnumerable<BattleUnit> allUnits)
         {
-            List<BattleUnit> living = new List<BattleUnit>();
-
             if (allUnits == null)
             {
-                return living;
+                return new List<BattleUnit>();
             }
 
-            foreach (BattleUnit unit in allUnits)
+            // Sized and walked by index when the roster is a list (it always is in a battle), so
+            // collecting allocates one array and no enumerator. Same units, same order.
+            IReadOnlyList<BattleUnit> roster = allUnits as IReadOnlyList<BattleUnit>;
+            List<BattleUnit> living;
+
+            if (roster != null)
             {
-                if (unit != null && !unit.IsDefeated)
+                living = new List<BattleUnit>(roster.Count);
+
+                for (int i = 0; i < roster.Count; i++)
                 {
-                    living.Add(unit);
+                    BattleUnit unit = roster[i];
+
+                    if (unit != null && !unit.IsDefeated)
+                    {
+                        living.Add(unit);
+                    }
+                }
+            }
+            else
+            {
+                living = new List<BattleUnit>();
+
+                foreach (BattleUnit unit in allUnits)
+                {
+                    if (unit != null && !unit.IsDefeated)
+                    {
+                        living.Add(unit);
+                    }
                 }
             }
 
-            living.Sort(BattleUnitOrder.CompareById);
+            living.Sort(ById);
             return living;
         }
+
+        /// <summary><see cref="BattleUnitOrder.CompareById"/> as one shared delegate, so sorting allocates none.</summary>
+        private static readonly Comparison<BattleUnit> ById = BattleUnitOrder.CompareById;
 
         /// <summary>
         /// True when a candidate sits on the side the skill is allowed to hit, judged against the

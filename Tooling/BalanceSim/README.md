@@ -52,13 +52,17 @@ dotnet run --project Tooling/BalanceSim -c Release -- [options]
 | `--avatar <preset>` | `library` | PvE only. `library` (the committed report's setting) fields the skill library's default avatar: its first three actives and `AvatarDefaultPassives`, at `--skill-level`. `support` fields a fixture avatar with three passive skills beside every player team (`AvatarPresets.cs`; not authored content). `none` fields no avatar. `library` and `support` add an "Avatar passives" section with firings per battle. See `docs/design/battle-system.md`, "Avatar passives" and "Beast skill kits". |
 | `--out <path>` | none | Also write the report to this file (it always goes to stdout). |
 | `--self-check` | off | Run everything twice and fail unless both reports are identical; also replay sample PvE battles through `BattleTurnExecutor.RunBattle` and fail if the simulator's loop disagrees. |
+| `--seeds <list>` | none | Comma-separated base seeds, run one after another in one process (cannot be combined with `--seed`). Each seed's run is exactly the `--seed <n>` run; stdout (and `--out`) get the multi-seed aggregate, and with `--out` each seed's full report is also written beside it as `<name>.seed<n>.md`. See "Multi-seed runs". |
+| `--calibrate-sample <n>` | off | **Opt-in, changes results.** The difficulty search evaluates a seeded subset of `n` teams; the chosen multiplier is then run once with every team, and every number in the report comes from that full run. See "Performance". |
+| `--timings` | off | Print a wall-clock breakdown to stderr: per PvE cell, every calibration step (multiplier, clear rate, seconds), PvP, the report and GC counts. Never changes the report. |
 
 Exit codes: `0` success, `1` bad arguments, `2` missing or invalid roster, skill library or encounters
 (the roster is checked with `BeastRosterValidator` and the library with `SkillLibraryValidator`
 first, exactly as the Editor importers do), `3` a self-check failed. The run time goes to stderr, never into the report. The default run (PvE and PvP, both element modes,
 three levels, four shapes x 8 compositions, 1 sample per team and composition) takes about
-215 s on an 8-thread machine (about 8 minutes with `--self-check`, which runs
-everything twice and replays two teams per composition through `RunBattle`). PvE battles run in
+50 s on an 8-core machine (about 95 s with `--self-check`, which runs
+everything twice and replays two teams per composition through `RunBattle`); it took 210 s before
+the performance pass (see "Performance"). PvE battles run in
 parallel, and the output is identical whatever the thread count.
 
 Two reports are committed, both the default arguments:
@@ -208,7 +212,10 @@ cooldown 2 weighted `Attack` about twice as heavily.
   HP, Atk, Def, SpA and SpD. Speed and Move stay unscaled: Speed is how many turns a unit gets, so
   scaling it would change the enemies' action economy, not just their toughness. The multiplier starts at 1 and doubles or halves until the target clear rate is
   bracketed (between 1/64 and 64), then bisects 8 times. The evaluated multiplier closest to the
-  target wins (first evaluated on a tie). The process is deterministic because each clear rate is.
+  target wins (first evaluated on a tie), and its battles are the ones reported (they are kept, not
+  re-run). The process is deterministic because each clear rate is. A step whose multiplier scales
+  every enemy of the shape to exactly the stats an earlier step did (late bisection steps at level
+  1, where stats are small) plays identical battles, so it reuses them instead of re-running.
   Each clear rate is over every team's battles against every composition of the shape (210 teams x
   8 compositions x 1 sample = 1680 per evaluation at the defaults). The report lists each
   composition's own clear rate at the shape's multiplier, and the range per cell.
@@ -370,7 +377,80 @@ so it measures composition sampling as well as roll noise) moves a beast's overa
 2.2 points on average and at most 4.2 (`elemental`; 2.0 and 6.2 in `neutral`), and a single
 shape cell by up to 16.5 (library setup, after the authored-kits retune; the standard kit measured
 2.0 / 4.8 / 12.6); see the tuning log. Raise `--compositions` or
-`--samples` to shrink it (the run time grows in proportion).
+`--samples` to shrink it (the run time grows in proportion), or judge on the mean of several seeds
+(`--seeds`, see "Multi-seed runs").
+
+## Multi-seed runs
+
+A single seed's marginals carry a couple of points of noise (above), so balance passes judge
+candidates on the mean of 3-5 base seeds. `--seeds` does that in one process:
+
+```sh
+dotnet run --project Tooling/BalanceSim -c Release -- --mode pve --seeds 12345,777,4242 --out out/candidate.md
+```
+
+- Each seed's run is exactly the `--seed <n>` run with the same other arguments (it loads its own
+  generated compositions); with `--out`, its full report is written as `out/candidate.seed<n>.md`,
+  byte-identical to `--seed <n> --out`. `--self-check` applies to every seed.
+- stdout and `--out` get the **aggregate**: per kit mode, every beast's marginal clear rate per
+  shape (mean over seeds, the rank of that mean and in how many seeds it was top 3 there) and
+  overall (mean, sample standard deviation, range and each seed's value), plus the range of the
+  means, the beasts outside the `--marginal-threshold` band and the beasts with no top-3 shape on
+  the means. It is deterministic like the reports.
+- The seeds run one after another, each using every core, so the wall clock is about the sum of
+  single-seed runs (loading and JIT are a second or two of a 50 s run). What it replaces is the
+  bookkeeping: one process per seed and scripts parsing the Markdown back; the aggregate comes
+  straight from the simulator's numbers, unrounded.
+
+## Performance
+
+The default run took 210 s before the performance pass and takes about 50 s now (8-core Intel Core
+Ultra 7 258V, .NET 10), with a **byte-identical report**. What was measured (a `dotnet-trace` CPU
+sample and the `--timings` breakdown) and what was done about it:
+
+- **All the time is PvE calibration.** PvP takes 0.06 s and the report 0.1 s. PvE is 24 cells
+  (2 kit modes x 4 shapes x 3 levels), each about 10 calibration steps of 1680 battles; the final
+  step's battles are the reported ones, so nothing is run twice. The `horde` cells (16-24 enemies
+  on a Large board) were two thirds of the time.
+- **Path finding was 60% of the CPU**, almost all of it hash-set and dictionary work in
+  `HexPathfinder.FindPath` (`TryPlanApproach` runs up to seven searches per approach, about 190
+  searches per horde battle), and the run allocated 297 GB (51,700 gen0 GCs). The Runtime now keeps
+  a search's per-tile state in flat arrays indexed by `HexGrid.TileIndex` and reused per thread,
+  the open set is a binary heap on exactly the old expansion order (f, then distance to the goal,
+  then queue order), `HexGrid` answers bounds, occupancy and blocking from arrays, and the
+  stance search (`ReachableTiles`) works the same way. Paths, tie-breaks and every battle are
+  unchanged: a differential test of the old and new grid, pathfinder and reachability on 40,000
+  random boards (1.6 million path queries) found no difference, and every report below is
+  byte-identical. Smaller Runtime cuts: a precomputed ATB fill-rate table, no status snapshot when
+  a unit has no damage-over-time, and a pre-sized target list.
+- **Server GC** (`BalanceSim.csproj`): allocation is now 51 GB, and per-core heaps cut the rest of
+  the GC cost (58 s to 49 s).
+- **Identical calibration steps are reused** (see "Difficulty calibration"): about one step per
+  level-1 cell.
+- Tried and dropped: running several cells at once (no gain: the machine is already saturated;
+  two concurrent runs take twice as long), and stopping a calibration step early once its clear
+  rate provably cannot become the best (at most about 5% of the work, because the steps that
+  matter land close to the target).
+
+| Run | Before | After |
+| --- | ---: | ---: |
+| Default | 211 s | 51 s |
+| Default with `--self-check` | 410 s | 94 s |
+| 3 seeds (12345, 777, 4242): before, three processes; after, `--seeds` | 606 s | 141 s |
+| 5 seeds (+ 1, 2) | 1012 s | 231 s |
+| 3 seeds with `--calibrate-sample 30` (opt-in, changes results) | - | 36 s |
+
+**`--calibrate-sample <n>` (opt-in).** The calibration search is 9 of every cell's 10 steps. With
+`--calibrate-sample 30` the search evaluates a seeded subset of 30 of the 210 teams, and only the
+chosen multiplier runs with every team (so every number in the report is still over all 1680
+battles per cell). It is about 3.5x faster, but it moves each multiplier slightly, so the report is
+**not** identical: on the default run, beasts' overall marginals moved by 0.2-0.3 points on
+average and at most 0.7, and a shape cell by at most 2.0 (with 60 teams: 0.1-0.2, 0.7 and 2.3),
+where changing the seed (777) moves them by about 2 on average, up to 6.7, and a shape cell by up
+to 18. The report says so in its PvE
+configuration. Use it for quick iteration, and the default for anything committed.
+
+Measure before optimizing further: `--timings` prints the per-cell and per-step breakdown.
 
 ## Determinism
 

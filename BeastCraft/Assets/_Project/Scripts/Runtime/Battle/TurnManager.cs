@@ -227,8 +227,39 @@ namespace BeastCraft.Battle
         /// twice the turns, and +21% Speed is +10% turns. Strictly increasing in Speed across the
         /// whole plausible range (consecutive speeds differ by at least one whole rate up to Speed
         /// 2500), so comparing rates is comparing speeds.
+        /// <para>
+        /// Speeds up to <see cref="CachedSpeeds"/> are read from a table filled by this same
+        /// computation when the type loads, since the turn order asks for every living unit's rate
+        /// on every turn; the answer is identical either way.
+        /// </para>
         /// </summary>
         public static int FillRateForSpeed(int speed)
+        {
+            if (speed < CachedSpeeds)
+            {
+                return CachedFillRates[speed < 1 ? 1 : speed];
+            }
+
+            return ComputeFillRate(speed);
+        }
+
+        /// <summary>Speeds below this read <see cref="FillRateForSpeed"/> from a precomputed table.</summary>
+        private const int CachedSpeeds = 4096;
+
+        private static readonly int[] CachedFillRates = BuildFillRateTable();
+
+        private static int[] BuildFillRateTable()
+        {
+            int[] rates = new int[CachedSpeeds];
+            for (int speed = 0; speed < CachedSpeeds; speed++)
+            {
+                rates[speed] = ComputeFillRate(speed);
+            }
+
+            return rates;
+        }
+
+        private static int ComputeFillRate(int speed)
         {
             long radicand = (long)(speed < 1 ? 1 : speed) * FillScale * FillScale;
             long root = IntegerSqrt(radicand);
