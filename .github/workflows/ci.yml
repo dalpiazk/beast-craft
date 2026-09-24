@@ -1,13 +1,17 @@
 # ---------------------------------------------------------------------------
 # The game runtime is engine-neutral C# (src/BeastCraft.Core, netstandard2.1);
 # the Unity project under BeastCraft/ is legacy and no longer built. This job
-# format-checks and compiles the runtime, then format-checks and runs the test
-# suite (Tooling/EditModeTests, NUnit). No engine install is needed.
+# format-checks and compiles the runtime, the engine-neutral presentation layer
+# (src/BeastCraft.Presentation) and the MonoGame DesktopGL host
+# (src/BeastCraft.Desktop), then format-checks and runs the test suite
+# (Tooling/EditModeTests, NUnit). No engine install is needed: MonoGame is a
+# NuGet package, and the desktop host uses no content pipeline (MGCB) and no
+# Windows-only dependencies, so it compiles on this Linux runner as is.
 #
 # CI-budget discipline applies: CI is a final gate, never a test loop --
 # everything must be green locally first, one push per PR, and no per-commit
-# fan-out. When the MonoGame host lands, add it to these same steps rather
-# than a new job or matrix.
+# fan-out. Further hosts (Android) join these same steps, not a new job or
+# matrix.
 # ---------------------------------------------------------------------------
 
 name: CI
@@ -49,7 +53,8 @@ jobs:
         with:
           dotnet-version: '10.0.x'
           # NuGet caching is intentionally disabled. The packages are few and
-          # small (System.Text.Json for the runtime; the test SDK and NUnit),
+          # small (System.Text.Json for the runtime; MonoGame DesktopGL for the
+          # desktop host; the test SDK and NUnit),
           # but no project commits a packages.lock.json, which setup-dotnet's
           # cache keys on by default, and `cache: true` once failed the job in
           # the post step ("Cache folder path is retrieved for .NET CLI but
@@ -66,6 +71,20 @@ jobs:
       - name: Compile check (dotnet build)
         run: >-
           dotnet build src/BeastCraft.Core/BeastCraft.Core.csproj
+          --configuration Release
+
+      # The presentation layer and the desktop host (MonoGame DesktopGL). The
+      # host's build compiles Core and Presentation too; it copies the content
+      # (data JSON, and the pixel-art PNGs as LFS pointers here, since checkout
+      # skips LFS) but never reads it, so no art is needed to compile.
+      - name: Format check (Presentation, Desktop)
+        run: |
+          dotnet format src/BeastCraft.Presentation/BeastCraft.Presentation.csproj --verify-no-changes --verbosity diagnostic
+          dotnet format src/BeastCraft.Desktop/BeastCraft.Desktop.csproj --verify-no-changes --verbosity diagnostic
+
+      - name: Compile check (Desktop)
+        run: >-
+          dotnet build src/BeastCraft.Desktop/BeastCraft.Desktop.csproj
           --configuration Release
 
       # The test suite: Tooling/EditModeTests references BeastCraft.Core and
