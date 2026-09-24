@@ -207,6 +207,9 @@ namespace BeastCraft.Tooling.BalanceSim
                     case SkillEffectType.DebuffStat:
                         parts.Add((e.EffectType == SkillEffectType.BuffStat ? "+" : "-") + Number(e.Magnitude) + (e.IsPercent ? "% " : " ") + e.AffectedStat + turns + chance + stacks);
                         break;
+                    case SkillEffectType.Cleanse:
+                        parts.Add("cleanse (Stun, DoT)" + chance);
+                        break;
                     default:
                         parts.Add(e.Status + (e.Status == StatusType.Knockback ? " " + Number(e.Magnitude) : e.Magnitude > 0f ? " " + Number(e.Magnitude) : string.Empty) + turns +
                                   chance + stacks);
@@ -215,6 +218,65 @@ namespace BeastCraft.Tooling.BalanceSim
             }
 
             return string.Join("; ", parts);
+        }
+
+        /// <summary>A compact one-line description of a bond reaction (trigger, who acts, caps, effects), for the bond table.</summary>
+        public static string DescribeReaction(BeastCraft.Bonds.BondReaction r)
+        {
+            if (r == null || !r.IsActive)
+            {
+                return string.Empty;
+            }
+
+            List<string> parts = new List<string> { "on " + r.Trigger };
+            if (r.TriggerFilter != BeastCraft.Bonds.BondTriggerFilter.Any)
+            {
+                parts.Add("(" + r.TriggerFilter + ")");
+            }
+
+            parts.Add(r.Action == BeastCraft.Bonds.BondAction.Intercept ? "intercept" : "-> " + r.Target);
+            if (r.Chance > 0 && r.Chance < SkillEffect.AlwaysChance)
+            {
+                parts.Add(r.Chance + "%");
+            }
+
+            if (r.Trigger == BeastCraft.Bonds.BondTrigger.AllyBelowHpPercent)
+            {
+                parts.Add("below " + r.HpThresholdPercent + "%");
+            }
+
+            if (r.Range > 0)
+            {
+                parts.Add("range " + r.Range);
+            }
+
+            if (r.Cooldown > 0)
+            {
+                parts.Add("cd " + r.Cooldown);
+            }
+
+            if (r.MaxPerMember > 0)
+            {
+                parts.Add(r.MaxPerMember + "/member");
+            }
+
+            if (r.MaxPerTriggerUnit > 0)
+            {
+                parts.Add(r.MaxPerTriggerUnit + "/ally");
+            }
+
+            if (r.MaxPerBattle > 0)
+            {
+                parts.Add(r.MaxPerBattle + "/battle");
+            }
+
+            if (r.ReactorOrder == BeastCraft.Bonds.BondReactorOrder.HealthiestFirst)
+            {
+                parts.Add("healthiest first");
+            }
+
+            string effects = DescribeEffects(r.Effects);
+            return string.Join(" ", parts) + (effects.Length > 0 ? ": " + effects : string.Empty);
         }
 
         /// <summary>

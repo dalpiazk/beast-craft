@@ -106,10 +106,12 @@ namespace BeastCraft.Tooling.BalanceSim
     /// </para>
     /// <para>
     /// <strong>Bond-aware.</strong> Every team meeting the Vanguard minimum scores its members'
-    /// summed heuristic scores plus <see cref="BondWeight"/> per tier of each active tiered bond
-    /// and <see cref="ScalingBondWeight"/> per stack of each active scaling bond (none for an
-    /// <c>Others</c> bond on a team made only of its members, which has no recipient); the best
-    /// team is fielded (ties to the lower team index).
+    /// summed heuristic scores plus, per tier of each active tiered bond, that bond's weight
+    /// (<see cref="BondWeights"/>, else <see cref="BondWeight"/>; a bond that reacts to afflicted
+    /// allies weighs nothing against an encounter that cannot stun or burn, see
+    /// <see cref="CanAfflict"/>), and <see cref="ScalingBondWeight"/> per stack of each active
+    /// scaling bond (none for an <c>Others</c> bond on a team made only of its members, which has
+    /// no recipient); the best team is fielded (ties to the lower team index).
     /// </para>
     /// <para>
     /// <strong>Oracle.</strong> Per composition, the team with the best recorded clear rate against
@@ -136,6 +138,25 @@ namespace BeastCraft.Tooling.BalanceSim
 
         /// <summary>Bond-aware score per tier of each active bond (per-enemy score units: a 2x matchup scores 1.0 more than a 1x one).</summary>
         public const double BondWeight = 0.5;
+
+        /// <summary>
+        /// Bond-aware score per tier, by <c>BondId</c>, for the behaviour bonds: what the player's
+        /// pick credits each bond with, fitted to its composition-panel excess (see the tuning log,
+        /// "Behaviour bonds and tiered difficulty"). A bond not listed weighs <see cref="BondWeight"/>.
+        /// </summary>
+        public static readonly IReadOnlyDictionary<string, double> BondWeights = new Dictionary<string, double>(StringComparer.Ordinal)
+        {
+            // 0.25 per point of pooled elemental panel excess (a 2-point bond weighs the old 0.5), none below 0.
+            { "guardian", 0.0 },
+            { "pack_hunters", 0.0 },
+            { "crossfire", 0.0 },
+            { "wildfire", 0.425 },
+            { "storm_front", 0.15 },
+            { "bedrock", 0.175 },
+            { "winter_grove", 0.775 },
+            { "twilight", 0.0 },
+            { "combined_arms", 0.225 },
+        };
 
         /// <summary>Bond-aware score per stack of each active scaling (<c>PerCount</c>) bond.</summary>
         public const double ScalingBondWeight = 0.125;
@@ -252,9 +273,26 @@ namespace BeastCraft.Tooling.BalanceSim
         /// </summary>
         public static double BondScore(ActiveTeamBond bond, int teamSize)
         {
+            return BondScore(bond, teamSize, true);
+        }
+
+        /// <summary>
+        /// <see cref="BondScore(ActiveTeamBond, int)"/> against an encounter that can
+        /// (<paramref name="encounterAfflicts"/>) or cannot stun or burn the team: a tiered bond is
+        /// its <see cref="BondWeights"/> entry (else <see cref="BondWeight"/>) x tier, and nothing when
+        /// its reaction answers only afflicted allies and the encounter cannot afflict.
+        /// </summary>
+        public static double BondScore(ActiveTeamBond bond, int teamSize, bool encounterAfflicts)
+        {
             if (!bond.Bond.PerCount)
             {
-                return BondWeight * bond.Tier;
+                TeamBondTier tier = bond.TierDefinition;
+                if (!encounterAfflicts && tier != null && tier.HasReaction && tier.Reaction.Trigger == BondTrigger.AllyTurnStartAfflicted)
+                {
+                    return 0.0;
+                }
+
+                return (BondWeights.TryGetValue(bond.Bond.BondId ?? string.Empty, out double weight) ? weight : BondWeight) * bond.Tier;
             }
 
             if (bond.Bond.Scope == TeamBondScope.Others && bond.Members.Count >= teamSize)
@@ -265,8 +303,44 @@ namespace BeastCraft.Tooling.BalanceSim
             return ScalingBondWeight * bond.Stacks;
         }
 
-        /// <summary>The bond-aware team index (see the class notes).</summary>
+        /// <summary>
+        /// Whether any enemy of <paramref name="encounter"/> carries an enemy-side skill that can stun
+        /// or put damage-over-time on the team (its kit, as the scouting preview's enemy types show).
+        /// </summary>
+        public static bool CanAfflict(Encounter encounter)
+        {
+            foreach (EnemySlot slot in encounter.Enemies)
+            {
+                foreach (SkillSO skill in slot.ElementalKit)
+                {
+                    if (skill == null || skill.TargetSide != SkillTargetSide.Enemy || skill.Effects == null)
+                    {
+                        continue;
+                    }
+
+                    foreach (SkillEffect effect in skill.Effects)
+                    {
+                        if (effect != null && effect.EffectType == SkillEffectType.ApplyStatus &&
+                            (effect.Status == StatusType.Stun || effect.Status == StatusType.DamageOverTime))
+                        {
+                            return true;
+                        }
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>The bond-aware team index (see the class notes), against an encounter that can afflict the team.</summary>
         public static int PickWithBonds(double[] scores, IReadOnlyList<CreatureSpeciesSO> species, List<int[]> teams, List<ActiveTeamBond>[] bonds, int vanguardMin)
+        {
+            return PickWithBonds(scores, species, teams, bonds, vanguardMin, true);
+        }
+
+        /// <summary>The bond-aware team index (see the class notes); <paramref name="encounterAfflicts"/> as in <see cref="BondScore(ActiveTeamBond, int, bool)"/>.</summary>
+        public static int PickWithBonds(double[] scores, IReadOnlyList<CreatureSpeciesSO> species, List<int[]> teams, List<ActiveTeamBond>[] bonds, int vanguardMin,
+                                        bool encounterAfflicts)
         {
             int best = -1;
             double bestValue = double.MinValue;
@@ -284,7 +358,7 @@ namespace BeastCraft.Tooling.BalanceSim
 
                 foreach (ActiveTeamBond bond in bonds[t])
                 {
-                    value += BondScore(bond, teams[t].Length);
+                    value += BondScore(bond, teams[t].Length, encounterAfflicts);
                 }
 
                 if (value > bestValue + 1e-12)
@@ -314,7 +388,7 @@ namespace BeastCraft.Tooling.BalanceSim
             double[] scores = Scores(Preview(encounter, options.ScoutedDetail), species);
             if (strategy == BondAwareIndex)
             {
-                return PickWithBonds(scores, species, teams, bonds, options.ScoutedVanguardMin);
+                return PickWithBonds(scores, species, teams, bonds, options.ScoutedVanguardMin, CanAfflict(encounter));
             }
 
             if (strategy != HeuristicIndex)

@@ -416,38 +416,41 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
-        public void Library_EveryLineupOfTheRosterActivatesAScalingBond()
+        public void Library_EveryBeastIsInExactlyTwoBonds_BesideCombinedArms_AndEveryTierReacts()
         {
             SkillLibraryData library = SkillLibraryTests.LoadLibrary();
             BeastRosterData roster = BeastRosterTests.LoadRoster();
             List<TeamBondSO> bonds = BuildBonds(library);
-            List<TeamBondMember> pool = new List<TeamBondMember>();
-            foreach (SpeciesData species in roster.Species)
-            {
-                BeastRosterValidator.TryParseStance(species.Stance, out CombatStance stance);
-                pool.Add(new TeamBondMember(species.SpeciesId, stance, null));
-            }
 
-            int teams = 0;
-            int n = pool.Count;
-            for (int a = 0; a < n; a++)
+            foreach (TeamBondSO bond in bonds)
             {
-                for (int b = a + 1; b < n; b++)
+                Assert.IsFalse(bond.PerCount, bond.BondId + ": the behaviour bonds replaced the scaling ones");
+                foreach (TeamBondTier tier in bond.Tiers)
                 {
-                    for (int c = b + 1; c < n; c++)
-                    {
-                        for (int d = c + 1; d < n; d++)
-                        {
-                            List<ActiveTeamBond> active = TeamBondResolver.Resolve(bonds, Team(pool[a], pool[b], pool[c], pool[d]));
-                            Assert.IsTrue(active.Exists(x => x.Bond.PerCount), "a lineup with no scaling bond: " + pool[a].SpeciesId + ", " + pool[b].SpeciesId +
-                                                                                ", " + pool[c].SpeciesId + ", " + pool[d].SpeciesId);
-                            teams++;
-                        }
-                    }
+                    Assert.IsTrue(tier.HasReaction, bond.BondId + " tier " + tier.MinCount + " has no reaction");
                 }
             }
 
-            Assert.Greater(teams, 0);
+            foreach (SpeciesData species in roster.Species)
+            {
+                BeastRosterValidator.TryParseStance(species.Stance, out CombatStance stance);
+                List<Element> elements = new List<Element>();
+                foreach (string name in species.Elements)
+                {
+                    elements.Add(SkillLibraryValidator.ParseOr(name, Element.None));
+                }
+
+                TeamBondMember member = new TeamBondMember(species.SpeciesId, stance, elements);
+                int count = 0;
+                foreach (TeamBondSO bond in bonds)
+                {
+                    List<int> members = new List<int>();
+                    TeamBondResolver.Count(bond, new[] { member }, members);
+                    count += bond.Condition != TeamBondCondition.DistinctStances && members.Count > 0 ? 1 : 0;
+                }
+
+                Assert.AreEqual(2, count, species.SpeciesId + ": one stance bond and one element bond");
+            }
         }
 
         // ---------------------------------------------------------------------------------------
@@ -503,8 +506,8 @@ namespace BeastCraft.Tests.EditMode
         {
             // BondIds are stable keys and must never be renamed after ship; this pins them.
             SkillLibraryData library = SkillLibraryTests.LoadLibrary();
-            CollectionAssert.AreEquivalent(new[] { "pack_hunters", "shield_wall", "crossfire", "wildfire", "storm_front", "bedrock", "winter_grove", "twilight",
-                                                   "bulwark", "overwatch", "flanking" },
+            CollectionAssert.AreEquivalent(new[] { "guardian", "pack_hunters", "crossfire", "wildfire", "storm_front", "bedrock", "winter_grove", "twilight",
+                                                   "combined_arms" },
                                            Array.ConvertAll(library.TeamBonds, b => b.BondId));
 
             List<ActiveTeamBond> active = TeamBondResolver.Resolve(BuildBonds(library),
@@ -513,9 +516,14 @@ namespace BeastCraft.Tests.EditMode
                                                                         Member("griffin", CombatStance.Skirmisher, Element.Air),
                                                                         Member("thunderbird", CombatStance.Skirmisher, Element.Lightning)));
             List<string> ids = active.ConvertAll(a => a.Bond.BondId);
-            CollectionAssert.AreEqual(new[] { "pack_hunters", "shield_wall", "bedrock", "bulwark", "flanking" }, ids);
-            Assert.AreEqual(2, active[3].Stacks, "two Vanguards: two stacks of bulwark");
-            Assert.AreEqual(2, active[4].Stacks, "two Skirmishers: two stacks of flanking");
+            CollectionAssert.AreEqual(new[] { "guardian", "pack_hunters", "bedrock" }, ids, "two stances only: no combined_arms");
+
+            List<ActiveTeamBond> mixed = TeamBondResolver.Resolve(BuildBonds(library),
+                                                                  Team(Member("golem", CombatStance.Vanguard, Element.Earth),
+                                                                       Member("kirin", CombatStance.Ranged, Element.Light),
+                                                                       Member("basilisk", CombatStance.Ranged, Element.Dark),
+                                                                       Member("griffin", CombatStance.Skirmisher, Element.Air)));
+            CollectionAssert.AreEqual(new[] { "crossfire", "twilight", "combined_arms" }, mixed.ConvertAll(a => a.Bond.BondId));
         }
 
         [Test]

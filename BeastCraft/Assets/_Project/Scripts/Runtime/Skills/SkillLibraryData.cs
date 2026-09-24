@@ -33,9 +33,11 @@ namespace BeastCraft.Skills
         /// <summary>
         /// The only <see cref="SchemaVersion"/> this code reads. 2 added scaling team bonds
         /// (<see cref="TeamBondData.PerCount"/>, <see cref="TeamBondData.MaxCount"/>, scope
-        /// <c>Others</c>).
+        /// <c>Others</c>); 3 added behaviour bonds (<see cref="TeamBondTierData.Reaction"/>, the
+        /// <c>DistinctStances</c> condition, the <c>Cleanse</c> effect), which older code would read
+        /// as silent bonds.
         /// </summary>
-        public const int CurrentSchemaVersion = 2;
+        public const int CurrentSchemaVersion = 3;
 
         /// <summary>Bumped when the file's shape changes incompatibly.</summary>
         public int SchemaVersion;

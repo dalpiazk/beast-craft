@@ -15,7 +15,7 @@
       "Skills": [
         { "SkillId": "crush", "DisplayName": "Crush", "Category": "Physical", "TargetShape": "SingleTarget", "Range": 1, "Cooldown": 1, "TargetingCriterion": "Distance", "Effects": [ { "Magnitude": 113 } ] },
         { "SkillId": "gaze", "DisplayName": "Gaze", "Category": "Special", "TargetShape": "SingleTarget", "Range": 2, "Cooldown": 1, "TargetingCriterion": "Distance", "Effects": [ { "Magnitude": 113 } ] },
-        { "SkillId": "quake", "DisplayName": "Quake", "Category": "Physical", "TargetShape": "AreaBurst", "Range": 1, "Cooldown": 3, "Effects": [ { "Magnitude": 60 } ] },
+        { "SkillId": "quake", "DisplayName": "Quake", "Category": "Physical", "TargetShape": "AreaBurst", "Range": 1, "Cooldown": 3, "Effects": [ { "Magnitude": 60 }, { "EffectType": "ApplyStatus", "Status": "Stun", "DurationTurns": 1, "Chance": 20 } ] },
         { "SkillId": "roar", "DisplayName": "Roar", "Category": "Special", "TargetShape": "AreaBurst", "Range": 1, "Cooldown": 3, "Effects": [ { "Magnitude": 60 } ] }
       ]
     },
@@ -75,7 +75,7 @@
       "Stance": "Ranged",
       "BaseStats": { "Hp": 85, "Attack": 45, "Defense": 70, "SpecialAttack": 120, "SpecialDefense": 95, "Speed": 100, "MoveRange": 3, "CritChance": 5 },
       "Skills": [
-        { "SkillId": "bolt", "DisplayName": "Bolt", "Category": "Special", "TargetShape": "SingleTarget", "Range": 3, "Cooldown": 1, "TargetingCriterion": "CurrentHp", "TargetingOrder": "Lowest", "Effects": [ { "Magnitude": 71 } ] }
+        { "SkillId": "bolt", "DisplayName": "Bolt", "Category": "Special", "TargetShape": "SingleTarget", "Range": 3, "Cooldown": 1, "TargetingCriterion": "CurrentHp", "TargetingOrder": "Lowest", "Effects": [ { "Magnitude": 71 }, { "EffectType": "ApplyStatus", "Status": "DamageOverTime", "Magnitude": 15, "DurationTurns": 2, "Chance": 30, "MaxStacks": 2 } ] }
       ]
     },
     {
@@ -109,7 +109,7 @@
       "Stance": "Vanguard",
       "BaseStats": { "Hp": 30, "Attack": 30, "Defense": 40, "SpecialAttack": 60, "SpecialDefense": 40, "Speed": 105, "MoveRange": 4, "CritChance": 5 },
       "Skills": [
-        { "SkillId": "sting", "DisplayName": "Sting", "Category": "Special", "TargetShape": "SingleTarget", "Range": 1, "Cooldown": 1, "TargetingCriterion": "Distance", "Effects": [ { "Magnitude": 52 } ] }
+        { "SkillId": "sting", "DisplayName": "Sting", "Category": "Special", "TargetShape": "SingleTarget", "Range": 1, "Cooldown": 1, "TargetingCriterion": "Distance", "Effects": [ { "Magnitude": 52 }, { "EffectType": "ApplyStatus", "Status": "DamageOverTime", "Magnitude": 10, "DurationTurns": 2, "Chance": 25 } ] }
       ]
     }
   ]
