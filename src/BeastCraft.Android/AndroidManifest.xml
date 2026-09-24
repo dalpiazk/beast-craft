@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The package id, version and SDK levels come from BeastCraft.Android.csproj; the activity from MainActivity's attribute. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <uses-feature android:glEsVersion="0x00020000" android:required="true" />
+  <application android:hardwareAccelerated="true" android:isGame="true" android:label="Beast Craft" />
+</manifest>

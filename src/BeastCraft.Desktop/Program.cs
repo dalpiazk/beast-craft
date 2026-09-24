@@ -1,4 +1,5 @@
 using System;
+using BeastCraft.Game;
 
 namespace BeastCraft.Desktop
 {
@@ -7,7 +8,7 @@ namespace BeastCraft.Desktop
         [STAThread]
         public static int Main(string[] args)
         {
-            SpikeOptions options = SpikeOptions.Parse(args, out string error);
+            ViewerOptions options = ViewerOptions.Parse(args, out string error);
             if (options == null)
             {
                 Console.Error.WriteLine(error);
@@ -15,7 +16,7 @@ namespace BeastCraft.Desktop
                 return 2;
             }
 
-            using (SpikeGame game = new SpikeGame(options))
+            using (BattleViewerGame game = new BattleViewerGame(options, ViewerHost.Desktop()))
             {
                 game.Run();
                 if (game.FailureMessage != null)

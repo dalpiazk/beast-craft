@@ -2,7 +2,7 @@ using System;
 using System.Globalization;
 using BeastCraft.Presentation.Content;
 
-namespace BeastCraft.Desktop
+namespace BeastCraft.Game
 {
     /// <summary>
     /// The command line.
@@ -19,7 +19,7 @@ namespace BeastCraft.Desktop
     ///   --content DIR       the content root (default: Content/ beside the app, or the repo's)
     /// </code>
     /// </summary>
-    public sealed class SpikeOptions
+    public sealed class ViewerOptions
     {
         public string ScreenshotPath;
         public int Turns = 1;
@@ -36,9 +36,9 @@ namespace BeastCraft.Desktop
             get { return !string.IsNullOrEmpty(ScreenshotPath); }
         }
 
-        public static SpikeOptions Parse(string[] args, out string error)
+        public static ViewerOptions Parse(string[] args, out string error)
         {
-            SpikeOptions options = new SpikeOptions();
+            ViewerOptions options = new ViewerOptions();
             error = null;
             for (int i = 0; i < args.Length; i++)
             {

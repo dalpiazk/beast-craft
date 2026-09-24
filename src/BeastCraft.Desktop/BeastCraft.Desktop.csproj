@@ -8,9 +8,11 @@
         dotnet run (project src/BeastCraft.Desktop, Release); see the README for the
         screenshot mode's arguments.
 
-    Everything that is not drawing lives in src/BeastCraft.Presentation (engine-neutral) and the
-    game rules in src/BeastCraft.Core, so an Android host can reuse both. The content (data JSON and
-    the pixel art) is copied from BeastCraft/Assets/_Project into Content/ beside the executable.
+    A thin host: the viewer itself (drawing, input, scaling) is src/BeastCraft.Game, shared with the
+    Android host; everything that is not drawing lives in src/BeastCraft.Presentation
+    (engine-neutral) and the game rules in src/BeastCraft.Core. The content (data JSON and the pixel
+    art) is copied from BeastCraft/Assets/_Project into Content/ beside the executable and read as
+    plain files (FileContentSource).
   -->
 
   <PropertyGroup>
@@ -34,6 +36,7 @@
   <ItemGroup>
     <ProjectReference Include="..\BeastCraft.Core\BeastCraft.Core.csproj" />
     <ProjectReference Include="..\BeastCraft.Presentation\BeastCraft.Presentation.csproj" />
+    <ProjectReference Include="..\BeastCraft.Game\BeastCraft.Game.csproj" />
   </ItemGroup>
 
   <!-- The content, copied beside the executable (GameContent.FindRoot looks there first). -->

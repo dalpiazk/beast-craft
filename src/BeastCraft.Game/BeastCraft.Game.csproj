@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    BeastCraft.Game: the MonoGame code every host shares: the battle viewer (BattleViewerGame:
+    drawing, keyboard and touch input, integer scaling with letterboxing), the sprite atlas and the
+    pixel text, and the APK-asset content source. The hosts are thin: src/BeastCraft.Desktop
+    (DesktopGL) and src/BeastCraft.Android (MonoGame.Framework.Android) each reference this library
+    plus their own MonoGame platform package.
+
+    This is MonoGame's own pattern for shared game code (the 3.8.5 "2D Starter Kit" template's Core
+    project): a plain net10.0 class library that compiles against one MonoGame platform package
+    with PrivateAssets="All", so the reference never flows to a host: every platform package
+    ships the same MonoGame.Framework assembly and API, and each host brings its own at runtime.
+    The starter kit compiles against MonoGame.Framework.Native; this compiles against DesktopGL
+    instead, which the desktop host restores anyway, so the CI build (Desktop, which builds this)
+    downloads nothing new. A library rather than a shared project (.shproj/.projitems) because it
+    compiles once, is format-checked and built by CI as a normal csproj, and keeps the hosts'
+    project files trivial.
+
+    net10.0 and C# 9, like the desktop host.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <EnableNETAnalyzers>false</EnableNETAnalyzers>
+    <RootNamespace>BeastCraft.Game</RootNamespace>
+    <AssemblyName>BeastCraft.Game</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.5.1">
+      <PrivateAssets>All</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\BeastCraft.Core\BeastCraft.Core.csproj" />
+    <ProjectReference Include="..\BeastCraft.Presentation\BeastCraft.Presentation.csproj" />
+  </ItemGroup>
+
+</Project>
