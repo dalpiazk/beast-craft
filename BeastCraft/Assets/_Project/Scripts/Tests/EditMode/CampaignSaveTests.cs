@@ -51,7 +51,7 @@ namespace BeastCraft.Tests.EditMode
         {
             PlayerSave save = PlayerSave.CreateNew();
 
-            Assert.AreEqual(3, PlayerSave.CurrentSchemaVersion);
+            Assert.AreEqual(4, PlayerSave.CurrentSchemaVersion);
             Assert.IsTrue(save.Campaign.IsUnlocked(CampaignProgress.StartingRegionId));
             Assert.AreEqual(1, save.Campaign.Regions.Count);
             Assert.IsEmpty(save.Campaign.Seals);
@@ -109,7 +109,7 @@ namespace BeastCraft.Tests.EditMode
             Assert.IsTrue(migrated.Success, migrated.Error);
             Assert.IsTrue(migrated.Migrated);
             Assert.AreEqual(2, migrated.SourceVersion);
-            Assert.AreEqual(3, migrated.Save.SchemaVersion);
+            Assert.AreEqual(PlayerSave.CurrentSchemaVersion, migrated.Save.SchemaVersion, "2 -> 3 -> current");
             Assert.IsEmpty(migrated.Issues, string.Join("\n", migrated.Issues));
             Assert.AreEqual(40, migrated.Save.FindBeast("b1").Progress.Level, "a beast above the starting cap keeps its level");
             Assert.AreEqual(120, migrated.Save.FindBeast("b1").Progress.Xp);
@@ -120,7 +120,7 @@ namespace BeastCraft.Tests.EditMode
 
             SaveSerializer serializer = NewSerializer(Catalog);
             string v3 = serializer.Serialize(migrated.Save);
-            StringAssert.Contains("\"SchemaVersion\":3", v3);
+            StringAssert.Contains("\"SchemaVersion\":" + PlayerSave.CurrentSchemaVersion, v3);
             SaveLoadResult reloaded = serializer.Deserialize(v3);
             Assert.IsTrue(reloaded.Success, reloaded.Error);
             Assert.IsFalse(reloaded.Migrated);

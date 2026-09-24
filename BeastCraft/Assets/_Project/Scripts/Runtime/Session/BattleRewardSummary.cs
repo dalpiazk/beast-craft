@@ -69,5 +69,8 @@ namespace BeastCraft.Session
 
         /// <summary>The materials granted (empty unless the battle was a player victory). Never null.</summary>
         public LootResult Loot { get; internal set; } = new LootResult();
+
+        /// <summary>Gold added to the wallet (0 unless the battle was a player victory and the drop table pays gold).</summary>
+        public int GoldGained { get; internal set; }
     }
 }

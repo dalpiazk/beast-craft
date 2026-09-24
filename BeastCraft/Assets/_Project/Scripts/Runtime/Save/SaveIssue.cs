@@ -58,7 +58,19 @@ namespace BeastCraft.Save
         DuplicateCampaignEntry,
 
         /// <summary>The expedition in progress is inconsistent (nodes, links, current or cleared node, region not unlocked).</summary>
-        InvalidMapRun
+        InvalidMapRun,
+
+        /// <summary>A held consumable id is empty or not in the economy catalog, or held in two stacks.</summary>
+        UnknownConsumable,
+
+        /// <summary>A cosmetic key (unlocked, or chosen in an appearance) names no known category or option, or a category of the wrong owner.</summary>
+        UnknownCosmetic,
+
+        /// <summary>An appearance wears a look that is neither free (default or starter) nor unlocked.</summary>
+        CosmeticNotUnlocked,
+
+        /// <summary>A frozen Trader visit is inconsistent (no key, a key twice, an item id missing, counts or price out of range).</summary>
+        InvalidShopVisit
     }
 
     /// <summary>

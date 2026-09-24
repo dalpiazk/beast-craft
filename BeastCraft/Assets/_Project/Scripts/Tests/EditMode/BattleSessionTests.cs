@@ -23,7 +23,7 @@ namespace BeastCraft.Tests.EditMode
     /// deterministically per seed; rewards land in the save (practice XP, first-clear drops, avatar
     /// XP) and the save still round-trips; a bad setup is a clear error, never an exception.
     /// </summary>
-    public class BattleSessionTests
+    public partial class BattleSessionTests
     {
         private const string Shape = "squad";
         private const int EncounterLevel = 8;

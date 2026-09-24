@@ -6,6 +6,7 @@ using BeastCraft.Battle.Grid;
 using BeastCraft.Battle.Placement;
 using BeastCraft.Bonds;
 using BeastCraft.Creatures;
+using BeastCraft.Economy;
 using BeastCraft.Encounters;
 using BeastCraft.Progression;
 using BeastCraft.Save;
@@ -213,7 +214,23 @@ namespace BeastCraft.Session
         public static BattleRewardSummary ApplyRewards(PlayerSave save, BattleSessionResult result, BattleContent content, string shape, int encounterLevel,
                                                        DropTable dropTable, int beastLevelCap, Random rng = null)
         {
+            return ApplyRewards(save, result, content, shape, encounterLevel, dropTable, beastLevelCap, null, rng);
+        }
+
+        /// <summary>
+        /// <see cref="ApplyRewards(PlayerSave, BattleSessionResult, BattleContent, string, int, DropTable, int, Random)"/>
+        /// with the caller's economy <paramref name="modifiers"/> (null = <see cref="RewardModifiers.None"/>).
+        /// On a clear the battle also pays gold (<see cref="PostBattleAward.AwardGold"/>: the drop
+        /// table's <c>Gold</c> with the first-clear bonus when the material roll was a first clear,
+        /// then the modifiers' multiplier and bonus) into the <see cref="Wallet"/>, on its own seed
+        /// stream (<c>LootRoller.DeriveSeed(result.Seed, PostBattleAward.GoldStream)</c>), so the
+        /// material rolls are exactly those of a gold-free table.
+        /// </summary>
+        public static BattleRewardSummary ApplyRewards(PlayerSave save, BattleSessionResult result, BattleContent content, string shape, int encounterLevel,
+                                                       DropTable dropTable, int beastLevelCap, RewardModifiers modifiers, Random rng = null)
+        {
             BattleRewardSummary summary = new BattleRewardSummary();
+            RewardModifiers mods = modifiers ?? RewardModifiers.None;
 
             if (save == null || result == null)
             {
@@ -255,6 +272,12 @@ namespace BeastCraft.Session
             summary.SkillLevelsGained = PostBattleAward.AwardPractice(result.Battle, books, skillLookup, avatarBook, skillLookup, passiveLookup);
             summary.Loot = PostBattleAward.AwardDrops(result.Battle, dropTable, shape, encounterLevel, save.Materials,
                                                       rng ?? new Random(LootRoller.DeriveSeed(result.Seed, 0)));
+            if (result.Outcome == BattleOutcome.PlayerVictory && dropTable != null && dropTable.Gold.PaysGold)
+            {
+                int gold = PostBattleAward.AwardGold(result.Battle, dropTable, shape, encounterLevel, summary.Loot.FirstClear, mods.GoldMultiplier, mods.BonusGold,
+                                                     new Random(LootRoller.DeriveSeed(result.Seed, PostBattleAward.GoldStream)));
+                summary.GoldGained = Wallet.Add(save, gold);
+            }
 
             foreach (KeyValuePair<string, string> pair in result.TeamUnitIds)
             {
@@ -320,6 +343,17 @@ namespace BeastCraft.Session
         public static BattleRewardSummary ApplyRewards(PlayerSave save, BattleSessionResult result, BattleContent content, DropTable dropTable, int beastLevelCap,
                                                        Random rng = null)
         {
+            return ApplyRewards(save, result, content, dropTable, beastLevelCap, null, rng);
+        }
+
+        /// <summary>
+        /// <see cref="ApplyRewards(PlayerSave, BattleSessionResult, BattleContent, DropTable, int, Random)"/>
+        /// with the caller's economy <paramref name="modifiers"/> (the campaign passes
+        /// <c>CampaignRules.RewardModifiersFor(node)</c>).
+        /// </summary>
+        public static BattleRewardSummary ApplyRewards(PlayerSave save, BattleSessionResult result, BattleContent content, DropTable dropTable, int beastLevelCap,
+                                                       RewardModifiers modifiers, Random rng = null)
+        {
             if (result != null && result.Success && (string.IsNullOrEmpty(result.ShapeId) || result.EncounterLevel < 1))
             {
                 return new BattleRewardSummary
@@ -328,7 +362,8 @@ namespace BeastCraft.Session
                 };
             }
 
-            return ApplyRewards(save, result, content, result == null ? null : result.ShapeId, result == null ? 0 : result.EncounterLevel, dropTable, beastLevelCap, rng);
+            return ApplyRewards(save, result, content, result == null ? null : result.ShapeId, result == null ? 0 : result.EncounterLevel, dropTable, beastLevelCap, modifiers,
+                                rng);
         }
 
         private static void NoteBanked(BattleRewardSummary summary, string beastId, int before, int after)

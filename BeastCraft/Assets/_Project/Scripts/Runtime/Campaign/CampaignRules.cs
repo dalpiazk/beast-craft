@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using BeastCraft.Battle;
+using BeastCraft.Economy;
 using BeastCraft.Encounters;
 using BeastCraft.Progression;
 using BeastCraft.Save;
@@ -159,6 +160,46 @@ namespace BeastCraft.Campaign
             }
 
             return choices;
+        }
+
+        /// <summary>A den's (Elite's) gold multiplier (<see cref="RewardModifiersFor"/>).</summary>
+        public const double EliteGoldMultiplier = 1.5;
+
+        /// <summary>The flat gold a pass (Gate) adds to its clear.</summary>
+        public const int GateBonusGold = 5;
+
+        /// <summary>The flat gold a lair (Boss) adds to its clear.</summary>
+        public const int BossBonusGold = 10;
+
+        /// <summary>
+        /// The economy reward modifiers a clear of <paramref name="node"/> pays with, for
+        /// <c>BattleSession.ApplyRewards(..., modifiers)</c>: a den (Elite) x<see cref="EliteGoldMultiplier"/>
+        /// gold, a pass (Gate) +<see cref="GateBonusGold"/>, a lair (Boss) +<see cref="BossBonusGold"/>;
+        /// anything else <see cref="RewardModifiers.None"/>'s values. A fresh object each call (the
+        /// caller may attach the gear and cosmetic libraries).
+        /// </summary>
+        public static RewardModifiers RewardModifiersFor(MapNode node)
+        {
+            RewardModifiers modifiers = new RewardModifiers();
+            if (node == null)
+            {
+                return modifiers;
+            }
+
+            if (node.Type == MapNodeType.Elite)
+            {
+                modifiers.GoldMultiplier = EliteGoldMultiplier;
+            }
+            else if (node.Type == MapNodeType.Gate)
+            {
+                modifiers.BonusGold = GateBonusGold;
+            }
+            else if (node.Type == MapNodeType.Boss)
+            {
+                modifiers.BonusGold = BossBonusGold;
+            }
+
+            return modifiers;
         }
 
         /// <summary>The battle seed of attempt <paramref name="attempt"/> (0 = the first) at <paramref name="node"/>: <c>LootRoller.DeriveSeed(EncounterSeed, attempt)</c>.</summary>

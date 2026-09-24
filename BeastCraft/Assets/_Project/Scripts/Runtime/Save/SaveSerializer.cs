@@ -21,6 +21,7 @@ namespace BeastCraft.Save
         private readonly ISaveJsonSerializer _json;
         private readonly ISaveContentCatalog _catalog;
         private readonly ISaveGearCatalog _gearCatalog;
+        private readonly ISaveEconomyCatalog _economyCatalog;
         private readonly Dictionary<int, ISaveMigration> _migrations = new Dictionary<int, ISaveMigration>();
 
         /// <param name="json">The JSON engine. Required.</param>
@@ -31,8 +32,9 @@ namespace BeastCraft.Save
         /// overridable so migration chains can be tested ahead of a real schema bump.
         /// </param>
         /// <param name="gearCatalog">Gear definitions to validate owned and worn gear against; null runs only the structural gear checks.</param>
+        /// <param name="economyCatalog">Consumables and cosmetics to validate the economy against; null runs only the structural economy checks.</param>
         public SaveSerializer(ISaveJsonSerializer json, ISaveContentCatalog catalog = null, IEnumerable<ISaveMigration> migrations = null, int currentVersion = PlayerSave.CurrentSchemaVersion,
-                              ISaveGearCatalog gearCatalog = null)
+                              ISaveGearCatalog gearCatalog = null, ISaveEconomyCatalog economyCatalog = null)
         {
             if (json == null)
             {
@@ -47,6 +49,7 @@ namespace BeastCraft.Save
             _json = json;
             _catalog = catalog;
             _gearCatalog = gearCatalog;
+            _economyCatalog = economyCatalog;
             CurrentVersion = currentVersion;
 
             foreach (ISaveMigration migration in migrations ?? SaveMigrations.All())
@@ -156,7 +159,7 @@ namespace BeastCraft.Save
 
             save.SchemaVersion = CurrentVersion;
             save.EnsureInitialized();
-            return SaveLoadResult.Loaded(save, sourceVersion, sourceVersion < CurrentVersion, SaveValidator.Validate(save, _catalog, _gearCatalog));
+            return SaveLoadResult.Loaded(save, sourceVersion, sourceVersion < CurrentVersion, SaveValidator.Validate(save, _catalog, _gearCatalog, _economyCatalog));
         }
 
         /// <summary>Just the version field of a save, read before anything else so migrations can be chosen.</summary>

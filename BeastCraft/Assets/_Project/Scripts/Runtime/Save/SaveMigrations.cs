@@ -13,6 +13,9 @@ namespace BeastCraft.Save
     /// <see cref="OwnedBeast.EquippedGear"/>): <see cref="AddGear"/>.</item>
     /// <item>2 to 3: the region campaign (<see cref="PlayerSave.Campaign"/>) and the level-cap bank
     /// (<c>BeastProgress.BankedXp</c>): <see cref="AddCampaign"/>.</item>
+    /// <item>3 to 4: the economy (<see cref="PlayerSave.Gold"/>, <see cref="PlayerSave.Consumables"/>,
+    /// <see cref="PlayerSave.Shops"/>, <see cref="PlayerSave.Cosmetics"/>,
+    /// <see cref="PlayerSave.AvatarAppearance"/>, <see cref="OwnedBeast.Appearance"/>): <see cref="AddEconomy"/>.</item>
     /// </list>
     /// </summary>
     public static class SaveMigrations
@@ -20,7 +23,7 @@ namespace BeastCraft.Save
         /// <summary>A fresh list of every step (callers may append to it).</summary>
         public static List<ISaveMigration> All()
         {
-            return new List<ISaveMigration> { new AddGear(), new AddCampaign() };
+            return new List<ISaveMigration> { new AddGear(), new AddCampaign(), new AddEconomy() };
         }
 
         /// <summary>
@@ -62,6 +65,28 @@ namespace BeastCraft.Save
                 save.EnsureInitialized();
                 save.Campaign.Unlock(CampaignProgress.StartingRegionId);
                 save.SchemaVersion = 3;
+                return serializer.ToJson(save);
+            }
+        }
+
+        /// <summary>
+        /// Schema 3 to 4: a v3 save has no economy. The upgrade reads it into the current type (no
+        /// gold, no consumables, no Trader visits, no cosmetic unlocks — defaults and starter looks
+        /// are free anyway — and every appearance at its defaults), fills in anything missing and
+        /// writes it back. Nothing else moves.
+        /// </summary>
+        public sealed class AddEconomy : ISaveMigration
+        {
+            public int FromVersion
+            {
+                get { return 3; }
+            }
+
+            public string Upgrade(string json, ISaveJsonSerializer serializer)
+            {
+                PlayerSave save = serializer.FromJson<PlayerSave>(json);
+                save.EnsureInitialized();
+                save.SchemaVersion = 4;
                 return serializer.ToJson(save);
             }
         }

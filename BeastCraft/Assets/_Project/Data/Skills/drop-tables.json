@@ -1,12 +1,16 @@
 {
-  "_readme": "Material drop tables: which skill-training materials (ids from skill-library.json Materials) a CLEARED battle drops, by encounter shape x level band. Every Drops entry rolls independently (Chance percent, then MinQty-MaxQty uniform). Pity: after Threshold consecutive clears of a shape whose cell can drop that tier without dropping it, the next clear forces it. The first clear of each (shape, band) grants FirstClearMaterialId once. Tuned against the balance simulator's pacing mode (dotnet run --project Tooling/BalanceSim -c Release -- --mode pacing; see docs/balance/pacing-report.md and docs/balance/tuning-log.md), not confirmed balance. Edit here, then in Unity run Beast Craft/Data/Import Drop Tables (after Import Skill Library). See docs/design/battle-system.md, 'Material economy'.",
-  "SchemaVersion": 1,
+  "_readme": "Material drop tables: which skill-training materials (ids from skill-library.json Materials) a CLEARED battle drops, by encounter shape x level band. Every Drops entry rolls independently (Chance percent, then MinQty-MaxQty uniform). Pity: after Threshold consecutive clears of a shape whose cell can drop that tier without dropping it, the next clear forces it. The first clear of each (shape, band) grants FirstClearMaterialId once. Tuned against the balance simulator's pacing mode (dotnet run --project Tooling/BalanceSim -c Release -- --mode pacing; see docs/balance/pacing-report.md and docs/balance/tuning-log.md), not confirmed balance. Edit here, then in Unity run Beast Craft/Data/Import Drop Tables (after Import Skill Library). See docs/design/battle-system.md, 'Material economy'. Schema 2 adds the economy (docs/design/economy-and-shop.md): Gold (a clear pays round((Base + PerLevel x level) x the shape's multiplier x (1 +/- VariancePct%)) + FirstClearBonus on a cell's first clear, then the caller's reward modifiers; on its own seed stream so the material rolls never move), GearDrops (per shape and rarity, ChancePerMille per clear, a piece of the encounter level's gear band) and CosmeticDrops (a low per-mille chance per clear of a look not yet unlocked). Paced by --mode campaign (docs/balance/campaign-pacing-report.md).",
+  "SchemaVersion": 2,
   "Shapes": [ "solo", "elite", "squad", "horde" ],
   "Pity": [
     { "Tier": 1, "Threshold": 8 },
     { "Tier": 2, "Threshold": 15 },
     { "Tier": 3, "Threshold": 25 }
   ],
+  "Gold": {
+    "Base": 10, "PerLevel": 2, "VariancePct": 10, "FirstClearBonus": 5,
+    "ShapeMultipliers": [ { "Shape": "solo", "Multiplier": 1.2 }, { "Shape": "elite", "Multiplier": 1.5 }, { "Shape": "squad", "Multiplier": 1.0 }, { "Shape": "horde", "Multiplier": 1.1 } ]
+  },
   "Bands": [
     {
       "MinLevel": 1, "MaxLevel": 3, "FirstClearMaterialId": "essence_shard", "FirstClearQuantity": 1,

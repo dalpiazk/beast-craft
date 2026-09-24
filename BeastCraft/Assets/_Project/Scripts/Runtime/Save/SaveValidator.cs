@@ -34,11 +34,25 @@ namespace BeastCraft.Save
         /// </summary>
         public static List<SaveIssue> Validate(PlayerSave save, ISaveContentCatalog catalog, ISaveGearCatalog gearCatalog)
         {
+            return Validate(save, catalog, gearCatalog, null);
+        }
+
+        /// <summary>
+        /// <see cref="Validate(PlayerSave, ISaveContentCatalog, ISaveGearCatalog)"/> plus the economy
+        /// checks (schema 4): gold in range, consumable stacks (known ids with
+        /// <paramref name="economyCatalog"/>, 1 to the max stack, one stack per id), frozen Trader
+        /// visits, cosmetic unlocks (known keys, each once) and appearances (known categories of the
+        /// right owner, known options, each free or unlocked). Without an economy catalog only the
+        /// structural checks run.
+        /// </summary>
+        public static List<SaveIssue> Validate(PlayerSave save, ISaveContentCatalog catalog, ISaveGearCatalog gearCatalog, ISaveEconomyCatalog economyCatalog)
+        {
             List<SaveIssue> issues = ValidateCore(save, catalog);
 
             if (save != null)
             {
                 ValidateGear(save, gearCatalog, issues);
+                SaveEconomyValidator.Validate(save, economyCatalog, issues);
             }
 
             return issues;
