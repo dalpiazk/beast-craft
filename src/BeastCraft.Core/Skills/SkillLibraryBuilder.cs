@@ -11,7 +11,7 @@ namespace BeastCraft.Skills
     /// Copies <see cref="SkillLibraryData"/> entries onto the runtime objects: the one field mapping
     /// shared by the Editor importer (which applies it to existing or new assets, keeping their
     /// GUIDs) and the balance simulator (which applies it to fresh in-memory instances). Only the
-    /// authored-in-JSON fields are written; an asset's <c>Icon</c> is never touched.
+    /// authored-in-JSON fields are written (the icon's art key included: <c>ArtKey</c>).
     /// <para>
     /// Expects data that passed <see cref="SkillLibraryValidator.Validate(SkillLibraryData)"/>: an enum
     /// string that does not parse falls back to the field's default rather than throwing, in keeping
@@ -26,6 +26,7 @@ namespace BeastCraft.Skills
             skill.SkillId = data.SkillId;
             skill.DisplayName = data.DisplayName;
             skill.Description = data.Description;
+            skill.ArtKey = string.IsNullOrEmpty(data.ArtKey) ? null : data.ArtKey;
             skill.ResourceCost = data.ResourceCost;
             skill.Cooldown = data.Cooldown;
             skill.InitialCooldown = data.InitialCooldown < 0 ? SkillSO.UseCooldownAsInitial : data.InitialCooldown;
@@ -48,6 +49,7 @@ namespace BeastCraft.Skills
             passive.PassiveId = data.PassiveId;
             passive.DisplayName = data.DisplayName;
             passive.Description = data.Description;
+            passive.ArtKey = string.IsNullOrEmpty(data.ArtKey) ? null : data.ArtKey;
             passive.Trigger = SkillLibraryValidator.ParseOr(data.Trigger, PassiveTrigger.Aura);
             passive.HpThresholdPercent = data.HpThresholdPercent;
             passive.ProcChance = data.ProcChance;

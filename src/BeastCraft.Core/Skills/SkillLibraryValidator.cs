@@ -226,6 +226,7 @@ namespace BeastCraft.Skills
                 }
 
                 CheckText(s.DisplayName, s.Description, label, errors);
+                CheckArtKey(s.ArtKey, label, errors);
                 CheckEnum<SkillTargetShape>(s.TargetShape, label, "TargetShape", errors);
                 CheckEnum<SkillTargetSide>(s.TargetSide, label, "TargetSide", errors);
                 CheckEnum<SkillTargetingCriterion>(s.TargetingCriterion, label, "TargetingCriterion", errors);
@@ -292,6 +293,7 @@ namespace BeastCraft.Skills
                 }
 
                 CheckText(p.DisplayName, p.Description, label, errors);
+                CheckArtKey(p.ArtKey, label, errors);
                 CheckEnum<PassiveTrigger>(p.Trigger, label, "Trigger", errors);
                 CheckEnum<PassiveTarget>(p.TargetScope, label, "TargetScope", errors);
                 CheckEnum<Element>(p.Element, label, "Element", errors);
@@ -1161,6 +1163,19 @@ namespace BeastCraft.Skills
             if (string.IsNullOrEmpty(description))
             {
                 errors.Add(label + ": Description is empty.");
+            }
+        }
+
+        /// <summary>
+        /// An icon art key, when there is one, is well formed (lowercase snake_case segments joined
+        /// by '/'); whether it names a sprite in the art manifest is <c>ArtReferenceValidator</c>'s
+        /// check (this validator does not read the manifest).
+        /// </summary>
+        private static void CheckArtKey(string artKey, string label, List<string> errors)
+        {
+            if (!string.IsNullOrEmpty(artKey) && !Vfx.ArtReferenceValidator.IsWellFormed(artKey))
+            {
+                errors.Add(label + ": ArtKey '" + artKey + "' is not lowercase snake_case segments joined by '/'.");
             }
         }
 

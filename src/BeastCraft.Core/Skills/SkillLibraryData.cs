@@ -113,6 +113,15 @@ namespace BeastCraft.Skills
 
         public string Description;
 
+        /// <summary>
+        /// The skill's icon: an art key naming a sprite's <c>ArtKey</c> in the art manifest
+        /// (<c>content/art/pixel/pixel-art-manifest.json</c>), e.g. <c>"skill/ember_shot"</c>, shown in
+        /// the battle skill strip, the skill card and skill lists. Presentation only (never read by the
+        /// battle). Optional in the DTO (an enemy-library skill may have none), but every shipped
+        /// beast skill and avatar active names one (<c>ArtReferenceValidator</c>).
+        /// </summary>
+        public string ArtKey;
+
         public int ResourceCost;
 
         /// <summary>Turns between uses; 0 or 1 fires every turn (see <c>SkillLoadout</c>).</summary>
@@ -218,6 +227,15 @@ namespace BeastCraft.Skills
         public string DisplayName;
 
         public string Description;
+
+        /// <summary>
+        /// The skill's icon: an art key naming a sprite's <c>ArtKey</c> in the art manifest
+        /// (<c>content/art/pixel/pixel-art-manifest.json</c>), e.g. <c>"skill/keen_eye"</c>, shown in
+        /// the battle skill strip, the skill card and skill lists. Presentation only (never read by the
+        /// battle). Optional in the DTO (an enemy-library skill may have none), but every shipped
+        /// avatar passive names one (<c>ArtReferenceValidator</c>).
+        /// </summary>
+        public string ArtKey;
 
         /// <summary>A <c>PassiveTrigger</c> name. Missing: <c>Aura</c>.</summary>
         public string Trigger;

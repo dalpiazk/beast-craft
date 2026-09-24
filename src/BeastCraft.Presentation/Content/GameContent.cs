@@ -153,7 +153,7 @@ namespace BeastCraft.Presentation.Content
 
             HashSet<string> known = KnownSkills(skills, enemyLibrary);
             Prefix(errors, "vfx-library.json", VfxLibraryValidator.Validate(vfx, known, art));
-            Prefix(errors, "art keys", ArtReferenceValidator.Validate(roster, enemyLibrary, art));
+            Prefix(errors, "art keys", ArtReferenceValidator.Validate(roster, enemyLibrary, skills, art));
             if (errors.Count > 0)
             {
                 return null;

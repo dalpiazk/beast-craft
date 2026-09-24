@@ -154,11 +154,8 @@ namespace BeastCraft.Game
                 _draw.Fill(Pixel, new Vector2(card.X + thickness, card.Y + thickness), new Vector2(card.Width - 2f * thickness, card.Height - 2f * thickness),
                            Ink("K", Color.Black));
 
-                // Placeholder icon: an element-coloured tile and the skill's initial (skills have no art yet).
                 Rect icon = new Rect(card.X + 14f, card.Y + 14f, 72f, 72f);
-                _draw.Fill(Pixel, new Vector2(icon.X, icon.Y), new Vector2(icon.Width, icon.Height), ElementColor(skill.Element));
-                string initial = string.IsNullOrEmpty(skill.DisplayName) ? "?" : skill.DisplayName.Substring(0, 1);
-                _text.DrawCentered(_draw, initial, icon.Center.X + 2f, icon.Y + 16f, 40f, Ink("4", Color.White), shadow);
+                DrawSkillIcon(skill, icon, shadow);
 
                 int cooldown = unit.Skills == null ? 0 : unit.Skills.RemainingCooldown(i);
                 string state = firing ? "CAST" : cooldown <= 0 ? "READY" : "CD " + cooldown.ToString(CultureInfo.InvariantCulture);
@@ -200,11 +197,12 @@ namespace BeastCraft.Game
             _draw.Fill(Pixel, new Vector2(panel.X + 4f, panel.Y + 4f), new Vector2(panel.Width - 8f, panel.Height - 8f), Ink("K", Color.Black) * 0.94f);
 
             bool allies = footprint.Side == SkillTargetSide.Ally;
-            _text.Draw(_draw, _text.Fit(skill.DisplayName ?? skill.SkillId, Medium, panel.Width - 40f), new Vector2(panel.X + 20f, panel.Y + 20f), Medium,
+            DrawSkillIcon(skill, new Rect(panel.X + 20f, panel.Y + 18f, 56f, 56f), shadow);
+            _text.Draw(_draw, _text.Fit(skill.DisplayName ?? skill.SkillId, Medium, panel.Width - 116f), new Vector2(panel.X + 92f, panel.Y + 20f), Medium,
                        Ink("y", Color.Gold), shadow);
             string what = ShapeLabel(skill) + "  " + (footprint.IsGlobal ? (allies ? "EVERY ALLY" : "EVERY FOE") : allies ? "ALLIES" : "FOES") + "  CD " +
                           skill.Cooldown.ToString(CultureInfo.InvariantCulture);
-            _text.Draw(_draw, _text.Fit(what, Small, panel.Width - 40f), new Vector2(panel.X + 20f, panel.Y + 52f), Small, Ink("3", Color.Gray), shadow);
+            _text.Draw(_draw, _text.Fit(what, Small, panel.Width - 116f), new Vector2(panel.X + 92f, panel.Y + 52f), Small, Ink("3", Color.Gray), shadow);
 
             // The diagram, in its own hex space (tile (0, 0) = the caster's anchor) fitted to the card.
             Rect area = new Rect(panel.X + 20f, panel.Y + 80f, panel.Width - 40f, panel.Height - 100f);
@@ -284,6 +282,29 @@ namespace BeastCraft.Game
                                      box.Y + (box.Height - sprite.Data.FrameHeight * k) / 2f + sprite.Pivot.Y * k);
             DrawCharacter(sprite, at, 1f, Color.White, flip);
             _draw.UnitSize = unit;
+        }
+
+        /// <summary>
+        /// A skill's icon fitted to <paramref name="box"/>: its art (<see cref="SkillSO.ArtKey"/> looked
+        /// up in the manifest), else — a skill with no icon, such as an enemy-library one — an
+        /// element-coloured tile with the skill's initial.
+        /// </summary>
+        private void DrawSkillIcon(SkillSO skill, Rect box, Color shadow)
+        {
+            ArtSprite art = _atlas.ByArtKey(skill.ArtKey);
+            if (art != null && art.Data.FrameWidth > 0)
+            {
+                float ppu = art.Data.PixelsPerUnit > 0f ? art.Data.PixelsPerUnit : _draw.UnitSize;
+                float scale = Math.Min(box.Width / art.Data.FrameWidth, box.Height / Math.Max(1, art.Data.FrameHeight)) * ppu / _draw.UnitSize;
+                Vector2 pivot = new Vector2(box.Center.X - art.Data.FrameWidth * scale * _draw.UnitSize / ppu / 2f + art.Pivot.X * scale * _draw.UnitSize / ppu,
+                                            box.Center.Y - art.Data.FrameHeight * scale * _draw.UnitSize / ppu / 2f + art.Pivot.Y * scale * _draw.UnitSize / ppu);
+                _draw.DrawSprite(art, 0, pivot, scale, Color.White);
+                return;
+            }
+
+            _draw.Fill(Pixel, new Vector2(box.X, box.Y), new Vector2(box.Width, box.Height), ElementColor(skill.Element));
+            string initial = string.IsNullOrEmpty(skill.DisplayName) ? "?" : skill.DisplayName.Substring(0, 1);
+            _text.DrawCentered(_draw, initial, box.Center.X + 2f, box.Y + box.Height * 0.22f, box.Height * 0.55f, Ink("4", Color.White), shadow);
         }
 
         /// <summary>The unit whose skills the strip shows: the one acting now, else the next to act.</summary>

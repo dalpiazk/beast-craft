@@ -50,8 +50,13 @@ namespace BeastCraft.Avatar
 
         public string Description;
 
-        /// <summary>Icon shown in the avatar's passive slots. Engine-neutral art key the host renderer resolves (null = none).</summary>
-        public string Icon;
+        /// <summary>
+        /// The passive's icon, shown in the avatar's passive slots: an engine-neutral art key (a
+        /// sprite's <c>ArtKey</c> in the art manifest, e.g. <c>skill/keen_eye</c>) the host renderer
+        /// resolves; null = none. Authored in the skill library (<c>PassiveData.ArtKey</c>).
+        /// Presentation only.
+        /// </summary>
+        public string ArtKey;
 
         /// <summary>
         /// How this passive levels: max level, magnitude growth per level and breakthrough gates.

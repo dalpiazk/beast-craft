@@ -59,6 +59,12 @@ Generated kinds (no grid rows; the header drives an integer-only generator):
                 texture: <tile sprite>   fill the hex by tiling that sprite, or
                 fill: <char>             fill it with one colour, and/or
                 edge: <char>             draw its 1px rim in that colour.
+
+Skill icons (no sprite files): one 24x24 placeholder per skill, avatar active and passive in
+content/data/Skills/skill-library.json that names an ArtKey (skill/<id>): a disc in its element's
+colours (avatar actives lilac, passives peach) with the skill's initial in a 5x7 pixel font,
+named skill_<id>, category skill. Regenerated from the library on every build, so a new skill
+gets its icon by running this script.
 """
 import json
 import pathlib
@@ -330,6 +336,119 @@ def hex_frame(meta, w, h, built):
     return [grid]
 
 
+
+# ---------------------------------------------------------------------------------------------
+# Skill icons (placeholders generated from the skill library)
+# ---------------------------------------------------------------------------------------------
+
+SKILLS = REPO / "content" / "data" / "Skills" / "skill-library.json"
+ICON = 24
+
+# dark (lower-right shade), mid (fill), light (upper-left rim) per element; the viewer's element
+# colours are the mids.
+ICON_RAMPS = {
+    "Fire": ("r", "o", "y"), "Water": ("b", "c", "C"), "Earth": ("n", "m", "M"),
+    "Air": ("g", "A", "a"), "Lightning": ("q", "h", "Y"), "Ice": ("c", "C", "4"),
+    "Nature": ("g", "G", "l"), "Metal": ("1", "2", "3"), "Light": ("M", "H", "w"),
+    "Dark": ("p", "P", "u"), "None": ("p", "P", "u"),
+}
+ACTIVE_RAMP = ("P", "u", "4")
+PASSIVE_RAMP = ("S", "s", "4")
+
+FONT_5X7 = {  # 7 rows of 5, top to bottom
+    "A": ".###.#...##...#######...##...##...#",
+    "B": "####.#...##...#####.#...##...#####.",
+    "C": ".###.#...##....#....#....#...#.###.",
+    "D": "####.#...##...##...##...##...#####.",
+    "E": "######....#....####.#....#....#####",
+    "F": "######....#....####.#....#....#....",
+    "G": ".###.#...##....#.####...##...#.####",
+    "H": "#...##...##...#######...##...##...#",
+    "I": ".###...#....#....#....#....#...###.",
+    "J": "..###...#....#....#.#..#.#..#..##..",
+    "K": "#...##..#.#.#..##...#.#..#..#.#...#",
+    "L": "#....#....#....#....#....#....#####",
+    "M": "#...###.###.#.##.#.##...##...##...#",
+    "N": "#...###..##.#.##..###...##...##...#",
+    "O": ".###.#...##...##...##...##...#.###.",
+    "P": "####.#...##...#####.#....#....#....",
+    "Q": ".###.#...##...##...##.#.##..#..##.#",
+    "R": "####.#...##...#####.#.#..#..#.#...#",
+    "S": ".#####....#.....###.....#....#####.",
+    "T": "#####..#....#....#....#....#....#..",
+    "U": "#...##...##...##...##...##...#.###.",
+    "V": "#...##...##...##...##...#.#.#...#..",
+    "W": "#...##...##...##.#.##.#.###.###...#",
+    "X": "#...##...#.#.#...#...#.#.#...##...#",
+    "Y": "#...##...#.#.#...#....#....#....#..",
+    "Z": "#####....#...#...#...#...#....#####",
+}
+
+
+def skill_entries():
+    """(id, display name, ramp, kind label) for every skill-library entry that names an ArtKey."""
+    data = json.loads(SKILLS.read_text(encoding="utf-8"))
+    out = []
+    for group, id_key, ramp_of in (("BeastSkills", "SkillId", lambda e: ICON_RAMPS.get(e.get("Element") or "None", ICON_RAMPS["None"])),
+                                   ("AvatarActives", "SkillId", lambda e: ACTIVE_RAMP),
+                                   ("AvatarPassives", "PassiveId", lambda e: PASSIVE_RAMP)):
+        for e in data.get(group, []):
+            key = e.get("ArtKey") or ""
+            if not key:
+                continue
+            if not key.startswith("skill/"):
+                sys.exit(f"{e[id_key]}: skill ArtKey {key!r} does not start with 'skill/'")
+            out.append((key[len("skill/"):], key, e.get("DisplayName") or e[id_key], ramp_of(e), group))
+    return out
+
+
+def skill_icon_grid(initial, ramp):
+    """A 24x24 disc: dark K rim, fill shaded dark lower-right / light upper-left, and the initial
+    (5x7, doubled) in w with a K outline, centred. Integer only."""
+    dark, mid, light = ramp
+    w = h = ICON
+    grid = [[TRANSPARENT] * w for _ in range(h)]
+    outer = w - 2                              # doubled units: radius 11 px
+    for y in range(h):
+        for x in range(w):
+            d2 = ellipse_d2(x, y, w, h)
+            if d2 > outer * outer:
+                continue
+            ch = mid
+            dx, dy = 2 * x + 1 - w, 2 * y + 1 - h
+            inner = outer - 6                  # a 3 px shading band inside the rim
+            if d2 > inner * inner:
+                ch = light if dx + dy < 0 else dark
+            grid[y][x] = ch
+    glyph = FONT_5X7.get(initial.upper())
+    if glyph is not None:
+        ox, oy = (w - 10) // 2, (h - 14) // 2
+        pixels = set()
+        for gy in range(7):
+            for gx in range(5):
+                if glyph[gy * 5 + gx] == "#":
+                    for sy in range(2):
+                        for sx in range(2):
+                            pixels.add((ox + gx * 2 + sx, oy + gy * 2 + sy))
+        for (px, py) in pixels:
+            for ddx, ddy in ((1, 0), (-1, 0), (0, 1), (0, -1), (1, 1)):
+                q = (px + ddx, py + ddy)
+                if q not in pixels and 0 <= q[0] < w and 0 <= q[1] < h:
+                    grid[q[1]][q[0]] = OUTLINE
+        for (px, py) in pixels:
+            grid[py][px] = "w"
+    return grid
+
+
+def skill_icon_sprites():
+    """The generated skill icons as (meta, size, frames), like parse_sprite's."""
+    sprites = []
+    for skill_id, key, name, ramp, group in skill_entries():
+        initial = next((c for c in name if c.isalpha()), "?")
+        meta = {"name": f"skill_{skill_id}", "label": name, "kind": "skill", "artkey": key, "outline": "auto"}
+        sprites.append((meta, (ICON, ICON), [skill_icon_grid(initial, ramp)]))
+    return sprites
+
 # ---------------------------------------------------------------------------------------------
 
 GENERATORS = {"ring": ring_frames, "disc": disc_frames, "blob": blob_frames}
@@ -359,6 +478,7 @@ def build():
     PREVIEW.mkdir(exist_ok=True)
 
     parsed = [parse_sprite(path, colors) for path in sorted((ROOT / "sprites").glob("*.txt"))]
+    parsed += skill_icon_sprites()
     # Derived sprites (hexes built from tiles, aliases of built sprites) go after everything they
     # may depend on.
     parsed.sort(key=lambda p: (2 if "alias" in p[0] else 1 if p[0]["kind"] == "hex" else 0, p[0]["name"]))
@@ -536,6 +656,7 @@ SECTIONS = [
     ("Map tiles 16x16 (2x2 tiled) + marker", ("tile", "marker")),
     ("Hex tiles 32x36 + particles", ("hex", "particle")),
     ("VFX layers (rings, glows, decals, rays, glyphs) + status icons", ("fx", "icon")),
+    ("Skill icons 24x24 (generated placeholders)", ("skill",)),
 ]
 
 
