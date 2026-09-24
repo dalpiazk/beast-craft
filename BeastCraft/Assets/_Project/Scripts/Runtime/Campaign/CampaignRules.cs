@@ -33,8 +33,8 @@ namespace BeastCraft.Campaign
     /// <item><b>Rest ("Camp")</b>: trains one chosen beast by what a standing fielded beast earns for
     /// a clear at the node's level (after the level-gap falloff, under the cap), since battles
     /// already start at full HP.</item>
-    /// <item><b>Shop ("Trader")</b>: opens the <see cref="IShopService"/> (a stub until the economy
-    /// lane's gold and stock land) and marks the node visited.</item>
+    /// <item><b>Shop ("Trader")</b>: opens the <see cref="IShopService"/> (the economy's
+    /// <c>ShopService</c>: gold, frozen stock) and marks the node visited.</item>
     /// </list>
     /// <para>
     /// Replays are allowed: a stage already cleared can be started again with a new seed (the
@@ -359,8 +359,10 @@ namespace BeastCraft.Campaign
         }
 
         /// <summary>
-        /// Visits Shop node <paramref name="nodeId"/>: opens <paramref name="shop"/> (null or the stub
-        /// offers nothing; the economy lane's shop will sell) and marks the node cleared and current.
+        /// Visits Shop node <paramref name="nodeId"/>: opens <paramref name="shop"/> (the economy's
+        /// <c>ShopService</c> rolls and freezes the trading post's stock; null or the stub offers
+        /// nothing) and marks the node cleared and current; buying happens through the shop with the
+        /// same <see cref="ShopContext"/> (<see cref="ShopContextFor"/>).
         /// <see cref="CampaignResult.ShopOpened"/> says whether a shop was offered.
         /// </summary>
         public static CampaignResult Trade(PlayerSave save, RegionLibrary library, int nodeId, IShopService shop)
@@ -377,9 +379,16 @@ namespace BeastCraft.Campaign
             }
 
             CampaignResult result = CampaignResult.Done(CampaignOutcome.Visited, node);
-            result.ShopOpened = shop != null && shop.Open(save, new ShopContext(run.RegionId, run.Stage, node.NodeId, node.Level, node.EncounterSeed));
+            result.ShopOpened = shop != null && shop.Open(save, ShopContextFor(run, node));
             Clear(run, node);
             return result;
+        }
+
+        /// <summary>The <see cref="ShopContext"/> of trading post <paramref name="node"/> on <paramref name="run"/> (its region, stage, id, level and seed).</summary>
+        public static ShopContext ShopContextFor(MapRun run, MapNode node)
+        {
+            return new ShopContext(run == null ? string.Empty : run.RegionId, run == null ? 0 : run.Stage, node == null ? -1 : node.NodeId, node == null ? 1 : node.Level,
+                                   node == null ? 0 : node.EncounterSeed);
         }
 
         /// <summary>Abandons the expedition in progress (nothing it cleared is kept; stage progress already earned stays).</summary>

@@ -577,6 +577,21 @@ namespace BeastCraft.Tests.EditMode
                 Context = context;
                 return true;
             }
+
+            public BeastCraft.Economy.ShopVisit GetStock(PlayerSave save, ShopContext context)
+            {
+                return null;
+            }
+
+            public BeastCraft.Economy.ShopPurchaseResult TryBuy(PlayerSave save, ShopContext context, int listingIndex, string targetBeastId = null)
+            {
+                return new ShopServiceStub().TryBuy(save, context, listingIndex, targetBeastId);
+            }
+
+            public BeastCraft.Economy.ShopSaleResult TrySellGear(PlayerSave save, string gearInstanceId)
+            {
+                return new ShopServiceStub().TrySellGear(save, gearInstanceId);
+            }
         }
     }
 }
