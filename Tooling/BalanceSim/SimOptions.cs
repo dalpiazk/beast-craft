@@ -280,6 +280,12 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <summary><c>--encounters-file</c>: the legacy fixed encounters (<c>Tooling/BalanceSim/encounters.json</c>), or null to find it.</summary>
         public string EncountersPath;
 
+        /// <summary>
+        /// <c>--write-difficulty</c>: also write the calibrated multipliers as the game's
+        /// <c>encounter-difficulty.json</c> to this path (never changes the report). Null = don't.
+        /// </summary>
+        public string WriteDifficultyPath;
+
         /// <summary><c>--enemy-library</c>: the game's enemy library, or null to find it by walking up.</summary>
         public string EnemyLibraryPath;
 
@@ -507,6 +513,8 @@ namespace BeastCraft.Tooling.BalanceSim
             "                             stats on the medium curve (Speed included: 100 at level 100, so its ATB gauge\n" +
             "                             keeps pace with the beasts') and is its damage-formula level.\n" +
             "  --out <path>               Also write the Markdown report to this file.\n" +
+            "  --write-difficulty <path>  PvE, generated set, one seed: also write the calibrated multipliers as the game's\n" +
+            "                             encounter-difficulty.json (BeastCraft/Assets/_Project/Data/Encounters/). Report unchanged.\n" +
             "  --self-check               Run everything twice and fail unless both reports are identical; also checks the\n" +
             "                             PvE battle loop against BattleTurnExecutor.RunBattle.\n" +
             "  --timings                  Print a wall-clock breakdown (per PvE cell and calibration step, PvP, report, GC)\n" +
@@ -864,6 +872,13 @@ namespace BeastCraft.Tooling.BalanceSim
                         }
 
                         break;
+                    case "--write-difficulty":
+                        if (!TryNext(args, ref i, arg, out options.WriteDifficultyPath, out error))
+                        {
+                            return null;
+                        }
+
+                        break;
                     case "--roster":
                         if (!TryNext(args, ref i, arg, out options.RosterPath, out error))
                         {
@@ -965,6 +980,12 @@ namespace BeastCraft.Tooling.BalanceSim
             if (seedGiven && options.Seeds != null)
             {
                 error = "--seed and --seeds cannot be combined.";
+                return null;
+            }
+
+            if (options.WriteDifficultyPath != null && (!options.RunPve || options.EncounterSet != EncounterSet.Generated || options.Seeds != null))
+            {
+                error = "--write-difficulty needs PvE, the generated encounter set and a single seed (not --seeds).";
                 return null;
             }
 

@@ -96,6 +96,12 @@ namespace BeastCraft.Tooling.BalanceSim
             Console.Error.WriteLine("Runtime: " + run.Seconds.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) +
                                     " s for one full run (" + Environment.ProcessorCount + " logical processors).");
 
+            if (!string.IsNullOrEmpty(options.WriteDifficultyPath))
+            {
+                DifficultyWriter.Write(options.WriteDifficultyPath, options, run.Encounters, run.Cells);
+                Console.Error.WriteLine("Difficulty table written to " + Path.GetFullPath(options.WriteDifficultyPath));
+            }
+
             if (!string.IsNullOrEmpty(options.OutPath))
             {
                 WriteReport(options.OutPath, run.Report);
