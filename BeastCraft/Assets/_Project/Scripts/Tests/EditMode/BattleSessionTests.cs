@@ -436,7 +436,7 @@ namespace BeastCraft.Tests.EditMode
             return asset;
         }
 
-        /// <summary>The authored content as runtime assets, mapped as the importers map it.</summary>
+        /// <summary>The authored content as runtime assets, through the importers' own builders.</summary>
         private BattleContent BuildContent(BeastRosterData roster, SkillLibraryData library)
         {
             Dictionary<string, SkillSO> skills = new Dictionary<string, SkillSO>(StringComparer.Ordinal);
@@ -450,33 +450,12 @@ namespace BeastCraft.Tests.EditMode
                 skills[data.SkillId] = BuildSkill(data);
             }
 
-            Dictionary<string, GrowthRateCurve> curves = new Dictionary<string, GrowthRateCurve>(StringComparer.Ordinal);
-            foreach (GrowthCurveData data in roster.GrowthCurves)
+            List<CreatureSpeciesSO> species = BeastRosterBuilder.BuildAll(roster, out Dictionary<string, GrowthRateCurve> curves);
+            _created.AddRange(curves.Values);
+            foreach (CreatureSpeciesSO beast in species)
             {
-                GrowthRateCurve curve = Create<GrowthRateCurve>();
-                curve.CurveId = data.CurveId;
-                curve.Curve = data.ToAnimationCurve();
-                curve.MaxLevel = data.MaxLevel;
-                curves[data.CurveId] = curve;
-            }
-
-            List<CreatureSpeciesSO> species = new List<CreatureSpeciesSO>();
-            foreach (SpeciesData data in roster.Species)
-            {
-                CreatureSpeciesSO beast = Create<CreatureSpeciesSO>();
-                beast.name = data.SpeciesId;
-                beast.SpeciesId = data.SpeciesId;
-                beast.BaseStats = data.BaseStats;
-                beast.GrowthRate = curves[data.GrowthCurveId];
-                beast.Elements = new Element[data.Elements.Length];
-                for (int i = 0; i < data.Elements.Length; i++)
-                {
-                    BeastRosterValidator.TryParseElement(data.Elements[i], out beast.Elements[i]);
-                }
-
-                BeastRosterValidator.TryParseStance(data.Stance, out beast.Stance);
-
-                SpeciesKitData kit = Array.Find(library.SpeciesKits, k => k.SpeciesId == data.SpeciesId);
+                _created.Add(beast);
+                SpeciesKitData kit = Array.Find(library.SpeciesKits, k => k.SpeciesId == beast.SpeciesId);
                 if (kit != null)
                 {
                     foreach (string skillId in kit.DefaultLoadout)
@@ -484,8 +463,6 @@ namespace BeastCraft.Tests.EditMode
                         beast.DefaultLoadout.Add(skills[skillId]);
                     }
                 }
-
-                species.Add(beast);
             }
 
             List<PassiveSkillSO> passives = new List<PassiveSkillSO>();
