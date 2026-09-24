@@ -561,7 +561,8 @@ namespace BeastCraft.Desktop
                 Color team = unit.Team == BattleTeam.Player ? _atlas.Palette("C", Color.LightBlue) : _atlas.Palette("u", Color.Pink);
                 _batch.Draw(_atlas.Pixel, new Rectangle(PanelX, y + 1, 3, 3), team);
                 _text.Draw(_batch, Name(unit.Id), PanelX + 6, y, ink, 1, shadow);
-                string hp = unit.CurrentHp.ToString(CultureInfo.InvariantCulture) + "/" + unit.Stats.Hp.ToString(CultureInfo.InvariantCulture);
+                int shown = _animation != null ? _animation.ShownHp(unit.Id, _clockMs) : unit.CurrentHp;
+                string hp = shown.ToString(CultureInfo.InvariantCulture) + "/" + unit.Stats.Hp.ToString(CultureInfo.InvariantCulture);
                 _text.Draw(_batch, hp, VirtualWidth - 6 - PixelText.Measure(hp), y, dim, 1, shadow);
                 y += 8;
             }
