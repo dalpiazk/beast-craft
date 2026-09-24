@@ -359,7 +359,8 @@ dotnet format Tooling/EditModeTests --verify-no-changes
 
 `Tooling/EditModeTests/EditModeTests.csproj` (net10.0, C# 9, NUnit 3) globs in the real
 `Scripts/Runtime`, `Scripts/Editor` and `Scripts/Tests/EditMode` sources and runs the whole EditMode
-suite. It is local-only — deliberately not a CI job, for the Actions budget — and no substitute for
+suite. CI runs it too (format check, then `dotnet test --configuration Release`), as a final gate
+after a green local run, and it is no substitute for
 Unity's Test Runner, which exercises the real `JsonUtility` and asset serialization. The authored
 JSON data is not copied; the tests find it by walking up from the output directory.
 
