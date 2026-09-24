@@ -7,7 +7,7 @@ namespace BeastCraft.Vfx
     /// <summary>
     /// Holds the content's art references to the art manifest: every species' and enemy's
     /// <c>ArtKey</c> (<see cref="SpeciesData.ArtKey"/>, <see cref="EnemyData.ArtKey"/>) must name a
-    /// sprite's <see cref="PixelSpriteData.ArtKey"/> in the manifest. (The VFX library's sheets are
+    /// sprite's <see cref="ArtSpriteData.ArtKey"/> in the manifest. (The VFX library's sheets are
     /// held to the manifest by <see cref="VfxLibraryValidator"/>.) Presentation only: nothing here
     /// can change a battle. Returns every problem found (empty = valid); never throws.
     /// </summary>
@@ -18,7 +18,7 @@ namespace BeastCraft.Vfx
         /// <paramref name="art"/>. With <paramref name="requireKeys"/> every species and enemy must
         /// have one (the shipped content does); otherwise a missing key is allowed.
         /// </summary>
-        public static List<string> Validate(BeastRosterData roster, EnemyLibraryData enemies, PixelArtManifestData art, bool requireKeys = false)
+        public static List<string> Validate(BeastRosterData roster, EnemyLibraryData enemies, ArtManifestData art, bool requireKeys = false)
         {
             List<string> errors = new List<string>();
             if (art == null)
@@ -67,7 +67,7 @@ namespace BeastCraft.Vfx
             return true;
         }
 
-        private static void Check(string key, string at, PixelArtManifestData art, bool required, List<string> errors)
+        private static void Check(string key, string at, ArtManifestData art, bool required, List<string> errors)
         {
             if (string.IsNullOrEmpty(key))
             {

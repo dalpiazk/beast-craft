@@ -38,7 +38,7 @@ namespace BeastCraft.Tests.EditMode
         {
             string root = GameContent.FindRoot();
             VfxLibraryData data = FieldJson.FromJson<VfxLibraryData>(File.ReadAllText(GameContent.PathOf(root, VfxLibraryData.ProjectRelativePath)));
-            PixelArtManifestData art = FieldJson.FromJson<PixelArtManifestData>(File.ReadAllText(GameContent.PathOf(root, PixelArtManifestData.ProjectRelativePath)));
+            ArtManifestData art = FieldJson.FromJson<ArtManifestData>(File.ReadAllText(GameContent.PathOf(root, ArtManifestData.ProjectRelativePath)));
 
             List<string> errors = VfxLibraryValidator.Validate(data, Content.KnownSkillIds, art);
 
@@ -126,7 +126,7 @@ namespace BeastCraft.Tests.EditMode
         {
             VfxLibraryData data = Minimal();
             data.ElementDefaults[0].Effect.Flipbook.Sheet = "missing_sheet";
-            AssertError(data, "sheet 'missing_sheet' is not in the pixel-art manifest");
+            AssertError(data, "sheet 'missing_sheet' is not in the art manifest");
 
             data = Minimal();
             data.ElementDefaults[0].Effect.Flipbook.FrameWidth = 16;
@@ -229,16 +229,16 @@ namespace BeastCraft.Tests.EditMode
             };
         }
 
-        internal static PixelArtManifestData Art()
+        internal static ArtManifestData Art()
         {
-            return new PixelArtManifestData
+            return new ArtManifestData
             {
                 SchemaVersion = 1,
                 Palette = new Dictionary<string, string> { { "a", "#ffffff" }, { "b", "#ff0000" } },
                 Sprites = new[]
                 {
-                    new PixelSpriteData { Name = "burst", FrameWidth = 8, FrameHeight = 8, Frames = 4 },
-                    new PixelSpriteData { Name = "dot", FrameWidth = 3, FrameHeight = 3, Frames = 1 }
+                    new ArtSpriteData { Name = "burst", FrameWidth = 8, FrameHeight = 8, Frames = 4 },
+                    new ArtSpriteData { Name = "dot", FrameWidth = 3, FrameHeight = 3, Frames = 1 }
                 }
             };
         }

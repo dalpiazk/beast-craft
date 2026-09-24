@@ -17,7 +17,7 @@ namespace BeastCraft.Tests.EditMode
         [Test]
         public void RelativeOf_StripsTheProjectPrefix_AndKeepsForwardSlashes()
         {
-            Assert.AreEqual("art/pixel/pixel-art-manifest.json", GameContent.RelativeOf(PixelArtManifestData.ProjectRelativePath));
+            Assert.AreEqual("art/pixel/pixel-art-manifest.json", GameContent.RelativeOf(ArtManifestData.ProjectRelativePath));
             Assert.AreEqual("data/x.json", GameContent.RelativeOf("data/x.json"));
         }
 

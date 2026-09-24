@@ -39,8 +39,8 @@ namespace BeastCraft.Tests.EditMode
             List<string> errors = VfxLibraryValidator.Validate(data, Content.KnownSkillIds, Content.Art);
             Assert.IsEmpty(errors, string.Join("\n", errors));
 
-            string folder = Path.GetDirectoryName(GameContent.PathOf(GameContent.FindRoot(), PixelArtManifestData.ProjectRelativePath));
-            foreach (PixelSpriteData sprite in Content.Art.Sprites)
+            string folder = Path.GetDirectoryName(GameContent.PathOf(GameContent.FindRoot(), ArtManifestData.ProjectRelativePath));
+            foreach (ArtSpriteData sprite in Content.Art.Sprites)
             {
                 Assert.IsTrue(File.Exists(Path.Combine(folder, sprite.File)), sprite.Name + ": " + sprite.File);
             }
@@ -57,8 +57,8 @@ namespace BeastCraft.Tests.EditMode
         [Test]
         public void EnemiesWithoutArtOfTheirOwn_AliasAnotherSprite_WithATint()
         {
-            PixelSpriteData archer = Content.Art.FindByArtKey("enemy/archer");
-            PixelSpriteData brute = Content.Art.FindByArtKey("enemy/brute");
+            ArtSpriteData archer = Content.Art.FindByArtKey("enemy/archer");
+            ArtSpriteData brute = Content.Art.FindByArtKey("enemy/brute");
 
             Assert.IsNotNull(archer);
             Assert.AreEqual(brute.File, archer.File);
@@ -69,9 +69,9 @@ namespace BeastCraft.Tests.EditMode
         [Test]
         public void Validate_ReportsAMissingKey_OnlyWhenKeysAreRequired_AndAnUnknownOne_Always()
         {
-            PixelArtManifestData art = new PixelArtManifestData
+            ArtManifestData art = new ArtManifestData
             {
-                Sprites = new[] { new PixelSpriteData { Name = "a", File = "a.png", ArtKey = "beast/a" } }
+                Sprites = new[] { new ArtSpriteData { Name = "a", File = "a.png", ArtKey = "beast/a" } }
             };
             BeastRosterData roster = new BeastRosterData
             {

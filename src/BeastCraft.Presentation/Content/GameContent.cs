@@ -19,7 +19,7 @@ namespace BeastCraft.Presentation.Content
     /// through the game's own validators and builders — the same mapping the tests and the balance
     /// simulator use (<see cref="BeastRosterBuilder"/>, <see cref="SkillLibraryBuilder"/>,
     /// <see cref="EnemyCatalog"/>, <see cref="EncounterLibrary"/>) — plus the VFX library and the
-    /// pixel-art manifest.
+    /// art manifest (<see cref="ArtManifestData"/>, normalized to schema v2).
     /// <para>
     /// The <em>content root</em> is the folder holding <c>data/</c> and <c>art/pixel/</c>: in the
     /// repo, <c>content/</c>; in a built host, the <c>Content</c> folder it copies
@@ -57,7 +57,7 @@ namespace BeastCraft.Presentation.Content
 
         public VfxLibrary Vfx { get; private set; }
 
-        public PixelArtManifestData Art { get; private set; }
+        public ArtManifestData Art { get; private set; }
 
         /// <summary>Every skill id a skill can have: beast skills, avatar actives and enemy-library skills.</summary>
         public HashSet<string> KnownSkillIds { get; private set; }
@@ -137,11 +137,13 @@ namespace BeastCraft.Presentation.Content
             EncounterDifficultyData difficulty = Read<EncounterDifficultyData>(root, EncounterDifficultyData.ProjectRelativePath, errors);
             DropTableData dropTables = Read<DropTableData>(root, DropTableData.ProjectRelativePath, errors);
             VfxLibraryData vfx = Read<VfxLibraryData>(root, VfxLibraryData.ProjectRelativePath, errors);
-            PixelArtManifestData art = Read<PixelArtManifestData>(root, PixelArtManifestData.ProjectRelativePath, errors);
+            ArtManifestData art = ArtManifestData.Normalize(Read<ArtManifestData>(root, ArtManifestData.ProjectRelativePath, errors));
             if (errors.Count > 0)
             {
                 return null;
             }
+
+            Prefix(errors, "pixel-art-manifest.json", ArtManifestValidator.Validate(art));
 
             Prefix(errors, "beast-roster.json", BeastRosterValidator.Validate(roster));
             Prefix(errors, "skill-library.json", SkillLibraryValidator.Validate(skills, roster));

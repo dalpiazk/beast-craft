@@ -19,7 +19,7 @@ platform-independent. `build.py` fails loudly on an unknown colour char or an ov
 | Path | What | Committed |
 | --- | --- | --- |
 | `content/art/pixel/<name>.png` | 1x sprite; multi-frame = horizontal strip | yes (Git LFS) |
-| `content/art/pixel/pixel-art-manifest.json` | every sprite (file, frame size, frames, frame ms, kind, ArtKey) + the palette | yes |
+| `content/art/pixel/pixel-art-manifest.json` | the art manifest, schema v2: every sprite (file, frame size, frames, pivot, pixels per unit, filter, premultiplied, category, ArtKey, tint, clips) + the palette | yes |
 | `Tooling/PixelArt/preview/` | x8 previews, GIFs, tiling checks, map mock, `contact_sheet.png` | no (ignored) |
 
 The desktop app (`src/BeastCraft.Desktop`) copies `content/art/pixel` to `Content/art/pixel` beside its executable and

@@ -7,8 +7,9 @@ namespace BeastCraft.Vfx
     // The skill VFX library (Data/Vfx/vfx-library.json): how each skill LOOKS when it fires.
     // Presentation data only -- nothing here is read by the battle, and changing it can never
     // change a battle's outcome. Plain serializable data (public fields), read with FieldJson.
-    // Sheets are named by the pixel-art manifest's sprite Name and colours by palette char
-    // (content/art/pixel/pixel-art-manifest.json, written by Tooling/PixelArt/build.py). The rules are in
+    // Sheets are named by the art manifest's sprite Name and colours by palette char
+    // (ArtManifestData: content/art/pixel/pixel-art-manifest.json, written by
+    // Tooling/PixelArt/build.py). The rules are in
     // VfxLibraryValidator; the timeline that plays a spec is BeastCraft.Presentation.VfxTimeline.
     // ------------------------------------------------------------------------------------------
 
@@ -97,7 +98,7 @@ namespace BeastCraft.Vfx
     [Serializable]
     public class VfxSpriteData
     {
-        /// <summary>A sprite Name in the pixel-art manifest.</summary>
+        /// <summary>A sprite Name in the art manifest.</summary>
         public string Sheet;
 
         /// <summary>A palette char to tint with, or null/empty for the sprite's own colours.</summary>
@@ -114,7 +115,7 @@ namespace BeastCraft.Vfx
     [Serializable]
     public class VfxFlipbookData
     {
-        /// <summary>A sprite Name in the pixel-art manifest.</summary>
+        /// <summary>A sprite Name in the art manifest.</summary>
         public string Sheet;
 
         /// <summary>Frame size in pixels; must equal the manifest's.</summary>
@@ -140,7 +141,7 @@ namespace BeastCraft.Vfx
     [Serializable]
     public class VfxParticleData
     {
-        /// <summary>The particle sprite: a sprite Name in the pixel-art manifest.</summary>
+        /// <summary>The particle sprite: a sprite Name in the art manifest.</summary>
         public string Sheet;
 
         /// <summary>How many (1-64).</summary>
@@ -200,83 +201,5 @@ namespace BeastCraft.Vfx
 
         /// <summary>How far it rises (0-40 virtual pixels).</summary>
         public int RisePx = 12;
-    }
-
-    /// <summary>
-    /// The pixel-art manifest (<c>content/art/pixel/pixel-art-manifest.json</c>, written by
-    /// <c>Tooling/PixelArt/build.py</c>) as far as the VFX checks and the renderer need it.
-    /// </summary>
-    [Serializable]
-    public class PixelArtManifestData
-    {
-        /// <summary>The manifest's path relative to the repository root.</summary>
-        public const string ProjectRelativePath = "content/art/pixel/pixel-art-manifest.json";
-
-        public int SchemaVersion;
-
-        /// <summary>Palette char to <c>#rrggbb</c>.</summary>
-        public Dictionary<string, string> Palette = new Dictionary<string, string>();
-
-        public PixelSpriteData[] Sprites = new PixelSpriteData[0];
-
-        /// <summary>The sprite named <paramref name="name"/>, or null.</summary>
-        public PixelSpriteData Find(string name)
-        {
-            if (string.IsNullOrEmpty(name) || Sprites == null)
-            {
-                return null;
-            }
-
-            foreach (PixelSpriteData sprite in Sprites)
-            {
-                if (sprite != null && string.Equals(sprite.Name, name, StringComparison.Ordinal))
-                {
-                    return sprite;
-                }
-            }
-
-            return null;
-        }
-
-        /// <summary>The first sprite whose <see cref="PixelSpriteData.ArtKey"/> is <paramref name="artKey"/>, or null.</summary>
-        public PixelSpriteData FindByArtKey(string artKey)
-        {
-            if (string.IsNullOrEmpty(artKey) || Sprites == null)
-            {
-                return null;
-            }
-
-            foreach (PixelSpriteData sprite in Sprites)
-            {
-                if (sprite != null && string.Equals(sprite.ArtKey, artKey, StringComparison.Ordinal))
-                {
-                    return sprite;
-                }
-            }
-
-            return null;
-        }
-    }
-
-    /// <summary>One sprite of the manifest: a PNG strip of <see cref="Frames"/> frames.</summary>
-    [Serializable]
-    public class PixelSpriteData
-    {
-        public string Name;
-        public string File;
-        public int FrameWidth;
-        public int FrameHeight;
-        public int Frames;
-        public int FrameMs;
-        public string Kind;
-        public string Label;
-        public string ArtKey;
-
-        /// <summary>
-        /// A colour (<c>#rrggbb</c>) the sprite is multiplied by when drawn, or null/empty for its
-        /// own colours. An alias entry (a placeholder reusing another sprite's <see cref="File"/>
-        /// under its own <see cref="ArtKey"/>) carries one so the reuse is told apart.
-        /// </summary>
-        public string Tint;
     }
 }

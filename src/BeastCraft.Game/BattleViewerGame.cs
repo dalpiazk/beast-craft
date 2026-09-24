@@ -53,6 +53,7 @@ namespace BeastCraft.Game
         private readonly ViewerHost _host;
         private readonly GraphicsDeviceManager _graphics;
         private SpriteBatch _batch;
+        private SpriteRenderer _draw;
         private RenderTarget2D _frame;
         private SpriteAtlas _atlas;
         private PixelText _text;
@@ -66,6 +67,7 @@ namespace BeastCraft.Game
         private TurnAnimation _animation;
         private int _clockMs;
         private int _idleMs;
+        private int _idleClockMs;
         private bool _auto;
         private KeyboardState _previousKeys;
         private bool _previousBack;
@@ -107,6 +109,7 @@ namespace BeastCraft.Game
         protected override void LoadContent()
         {
             _batch = new SpriteBatch(GraphicsDevice);
+            _draw = new SpriteRenderer(_batch) { UnitSize = HexLayout.ColumnStep };
             _frame = new RenderTarget2D(GraphicsDevice, VirtualWidth, VirtualHeight);
             _text = new PixelText(GraphicsDevice);
 
@@ -176,6 +179,7 @@ namespace BeastCraft.Game
             }
 
             int elapsed = (int)gameTime.ElapsedGameTime.TotalMilliseconds;
+            _idleClockMs += elapsed;
 
             if (_animation != null)
             {
@@ -439,42 +443,33 @@ namespace BeastCraft.Game
             Vec2 shake = vfx == null ? Vec2.Zero : vfx.Shake;
             Matrix camera = Matrix.CreateTranslation((float)Math.Round(shake.X), (float)Math.Round(shake.Y), 0f);
 
-            _batch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp, null, null, null, camera);
+            _draw.SetTransform(camera);
+            _draw.SetBlend(BlendState.AlphaBlend);
             DrawBoard();
             DrawUnits(beat, vfx);
             if (vfx != null)
             {
                 DrawVfx(beat, vfx, false);
-            }
-
-            _batch.End();
-
-            if (vfx != null)
-            {
-                _batch.Begin(SpriteSortMode.Deferred, BlendState.Additive, SamplerState.PointClamp, null, null, null, camera);
+                _draw.SetBlend(BlendState.Additive);
                 DrawVfx(beat, vfx, true);
                 DrawFlash(beat, vfx);
-                _batch.End();
-
-                _batch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp, null, null, null, camera);
+                _draw.SetBlend(BlendState.AlphaBlend);
                 DrawDamageNumbers(beat, vfx);
-                _batch.End();
             }
 
-            _batch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp);
+            _draw.SetTransform(Matrix.Identity);
             DrawHud(beat);
-            _batch.End();
+            _draw.Flush();
         }
 
         private void DrawBoard()
         {
-            Texture2D grass = _atlas.Texture("hex_grass");
-            Texture2D rock = _atlas.Texture("hex_scorched");
+            ArtSprite grass = _atlas.Sprite("hex_grass");
+            ArtSprite rock = _atlas.Sprite("hex_scorched");
             foreach (HexCoordinate tile in _playback.Grid.Tiles)
             {
-                (int x, int y) = _layout.TileTopLeft(tile);
-                Texture2D texture = _playback.Grid.IsInDeploymentZone(tile, BattleTeam.Enemy) ? rock : grass;
-                _batch.Draw(texture, new Vector2(x, y), Color.White);
+                ArtSprite sprite = _playback.Grid.IsInDeploymentZone(tile, BattleTeam.Enemy) ? rock : grass;
+                _draw.DrawSprite(sprite, 0, At(_layout.Center(tile)), 1f, Color.White);
             }
         }
 
@@ -485,8 +480,8 @@ namespace BeastCraft.Game
             units.Sort((a, b) => Center(a).Y.CompareTo(Center(b).Y));
 
             string actor = _animation == null ? null : _animation.Turn.Turn.Unit.Id;
-            Texture2D mask = _atlas.Texture("hex_mask");
-            Texture2D outline = _atlas.Texture("hex_outline");
+            ArtSprite mask = _atlas.Sprite("hex_mask");
+            ArtSprite outline = _atlas.Sprite("hex_outline");
 
             // Footprints first, so every sprite stands on top of every tile tint.
             foreach (UnitSnapshot unit in units)
@@ -499,11 +494,11 @@ namespace BeastCraft.Game
                 Color team = unit.Team == BattleTeam.Player ? _atlas.Palette("c", Color.Blue) : _atlas.Palette("r", Color.Red);
                 foreach (HexCoordinate tile in Footprints.Tiles(Position(unit), unit.Footprint))
                 {
-                    (int x, int y) = _layout.TileTopLeft(tile);
-                    _batch.Draw(mask, new Vector2(x, y), team * 0.35f);
+                    Vector2 at = At(_layout.Center(tile));
+                    _draw.DrawSprite(mask, 0, at, 1f, team * 0.35f);
                     if (unit.Id == actor)
                     {
-                        _batch.Draw(outline, new Vector2(x, y), _atlas.Palette("Y", Color.Yellow));
+                        _draw.DrawSprite(outline, 0, at, 1f, _atlas.Palette("Y", Color.Yellow));
                     }
                 }
             }
@@ -515,18 +510,14 @@ namespace BeastCraft.Game
                     continue;
                 }
 
-                Vec2 center = Center(unit);
-                int scale = unit.Footprint == UnitFootprint.Single ? 1 : 2;
-                Texture2D sprite = _atlas.Texture(SpriteFor(unit.Id));
-                int size = 32 * scale;
-                Vector2 at = new Vector2((int)Math.Round(center.X) - size / 2, (int)Math.Round(center.Y) - size + 8 * scale);
-                SpriteEffects flip = unit.Team == BattleTeam.Enemy ? SpriteEffects.FlipHorizontally : SpriteEffects.None;
+                Vector2 at = At(Center(unit));
+                float scale = UnitScale(unit);
                 bool fading = _animation != null && _animation.ShownFading(unit.Id, _clockMs);
-                Color tint = _atlas.TintOf(SpriteFor(unit.Id));
-                _batch.Draw(sprite, at, null, fading ? tint * 0.4f : tint, 0f, Vector2.Zero, scale, flip, 0f);
+                ArtSprite sprite = SpriteFor(unit.Id);
+                DrawUnitSprite(sprite, unit, at, fading ? Color.White * 0.4f : Color.White);
 
                 int hp = _animation != null ? _animation.ShownHp(unit.Id, _clockMs) : unit.Hp;
-                DrawHpBar((int)at.X + size / 2, (int)at.Y - 3, scale == 1 ? 24 : 40, hp, unit.MaxHp);
+                DrawHpBar((int)at.X, (int)Math.Round(at.Y - HeadHeight(sprite, scale)) - 3, scale <= 1f ? 24 : 40, hp, unit.MaxHp);
             }
         }
 
@@ -535,9 +526,9 @@ namespace BeastCraft.Game
             int x = centerX - width / 2;
             float fraction = maxHp <= 0 ? 0f : Math.Max(0f, Math.Min(1f, hp / (float)maxHp));
             string fill = fraction > 0.5f ? "l" : fraction > 0.25f ? "y" : "o";
-            _batch.Draw(_atlas.Pixel, new Rectangle(x - 1, y - 1, width + 2, 4), _atlas.Palette("K", Color.Black));
-            _batch.Draw(_atlas.Pixel, new Rectangle(x, y, width, 2), _atlas.Palette("1", Color.DarkGray));
-            _batch.Draw(_atlas.Pixel, new Rectangle(x, y, (int)Math.Ceiling(width * fraction), 2), _atlas.Palette(fill, Color.Green));
+            _draw.Fill(_atlas.Pixel, new Rectangle(x - 1, y - 1, width + 2, 4), _atlas.Palette("K", Color.Black));
+            _draw.Fill(_atlas.Pixel, new Rectangle(x, y, width, 2), _atlas.Palette("1", Color.DarkGray));
+            _draw.Fill(_atlas.Pixel, new Rectangle(x, y, (int)Math.Ceiling(width * fraction), 2), _atlas.Palette(fill, Color.Green));
         }
 
         private void DrawVfx(ScheduledBeat beat, VfxFrame vfx, bool additivePass)
@@ -589,12 +580,7 @@ namespace BeastCraft.Game
                     continue;
                 }
 
-                Vec2 center = Center(unit);
-                int scale = unit.Footprint == UnitFootprint.Single ? 1 : 2;
-                int size = 32 * scale;
-                Vector2 at = new Vector2((int)Math.Round(center.X) - size / 2, (int)Math.Round(center.Y) - size + 8 * scale);
-                SpriteEffects flip = unit.Team == BattleTeam.Enemy ? SpriteEffects.FlipHorizontally : SpriteEffects.None;
-                _batch.Draw(_atlas.Texture(SpriteFor(unit.Id)), at, null, tint, 0f, Vector2.Zero, scale, flip, 0f);
+                DrawUnitSprite(SpriteFor(unit.Id), unit, At(Center(unit)), tint);
             }
         }
 
@@ -614,92 +600,130 @@ namespace BeastCraft.Game
                 // Above the unit's head: a big unit is drawn at twice the size.
                 bool big = _animation.Turn.After.TryGetValue(number.UnitId ?? string.Empty, out UnitSnapshot unit) && unit.Footprint != UnitFootprint.Single;
                 int lift = big ? 66 : 38;
-                _text.DrawCentered(_batch, text, (int)Math.Round(number.Position.X), (int)Math.Round(number.Position.Y) - lift, color, 2,
+                _text.DrawCentered(_draw.Batch(SamplerState.PointClamp), text, (int)Math.Round(number.Position.X), (int)Math.Round(number.Position.Y) - lift, color, 2,
                                    _atlas.Palette("K", Color.Black) * number.Alpha);
             }
         }
 
         private void DrawCentered(string sheet, int frame, Vec2 at, int scale, Color color)
         {
-            Texture2D texture = _atlas.Texture(sheet);
-            if (texture == null)
+            _draw.DrawSprite(_atlas.Sprite(sheet), frame, At(at), scale, color);
+        }
+
+        /// <summary>
+        /// A unit's sprite, pivot (feet) on <paramref name="at"/>, facing the other side, at its
+        /// footprint's size; a sprite with an <c>idle</c> clip plays it on the viewer's clock.
+        /// </summary>
+        private void DrawUnitSprite(ArtSprite sprite, UnitSnapshot unit, Vector2 at, Color color)
+        {
+            if (sprite == null)
             {
                 return;
             }
 
-            Rectangle source = _atlas.Frame(sheet, frame);
-            Vector2 position = new Vector2((int)Math.Round(at.X) - source.Width * scale / 2, (int)Math.Round(at.Y) - source.Height * scale / 2);
-            _batch.Draw(texture, position, source, color, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
+            bool flip = unit.Team == BattleTeam.Enemy;
+            ArtAnimationData idle = sprite.Data.Animation("idle");
+            ArtSprite sheet = idle == null ? null : _atlas.Sprite(string.IsNullOrEmpty(idle.Sheet) ? sprite.Name : idle.Sheet);
+            if (sheet != null)
+            {
+                _draw.DrawFrame(sprite, sheet.Texture, sheet.Frame(idle.FrameAt(_clockMs + _idleClockMs)), at, UnitScale(unit), color, flip, 0f);
+                return;
+            }
+
+            _draw.DrawSprite(sprite, 0, at, UnitScale(unit), color, flip);
+        }
+
+        /// <summary>A unit's draw scale: one hex for a one-tile unit, two for a large one.</summary>
+        private static float UnitScale(UnitSnapshot unit)
+        {
+            return unit.Footprint == UnitFootprint.Single ? 1f : 2f;
+        }
+
+        /// <summary>How far a sprite drawn at <paramref name="scale"/> reaches above its pivot, in board pixels.</summary>
+        private float HeadHeight(ArtSprite sprite, float scale)
+        {
+            if (sprite == null)
+            {
+                return 24f * scale;
+            }
+
+            return sprite.Pivot.Y / Math.Max(1f, sprite.Data.PixelsPerUnit) * _draw.UnitSize * scale;
+        }
+
+        private static Vector2 At(Vec2 point)
+        {
+            return new Vector2((float)Math.Round(point.X), (float)Math.Round(point.Y));
         }
 
         private void DrawHud(ScheduledBeat beat)
         {
             Color ink = _atlas.Palette("4", Color.White);
+            SpriteBatch batch = _draw.Batch(SamplerState.PointClamp);
             Color dim = _atlas.Palette("3", Color.Gray);
             Color gold = _atlas.Palette("y", Color.Gold);
             Color shadow = _atlas.Palette("K", Color.Black);
 
             int turnNumber = _playback.Played.Count;
-            _text.Draw(_batch, _host.HudTitle, 6, 4, gold, 1, shadow);
-            _text.Draw(_batch, "TURN " + turnNumber + "   SEED " + _options.Seed.ToString(CultureInfo.InvariantCulture), 200, 4, ink, 1, shadow);
+            _text.Draw(batch, _host.HudTitle, 6, 4, gold, 1, shadow);
+            _text.Draw(batch, "TURN " + turnNumber + "   SEED " + _options.Seed.ToString(CultureInfo.InvariantCulture), 200, 4, ink, 1, shadow);
 
             // Right-hand panel: the acting unit and its skill, the turn order, the log.
-            _batch.Draw(_atlas.Pixel, new Rectangle(PanelX - 6, 0, VirtualWidth - PanelX + 6, VirtualHeight), _atlas.Palette("p", Color.Purple) * 0.55f);
+            batch.Draw(_atlas.Pixel, new Rectangle(PanelX - 6, 0, VirtualWidth - PanelX + 6, VirtualHeight), _atlas.Palette("p", Color.Purple) * 0.55f);
             int y = 16;
             if (_animation != null)
             {
-                _text.Draw(_batch, "NOW: " + Name(_animation.Turn.Turn.Unit.Id), PanelX, y, gold, 1, shadow);
+                _text.Draw(batch, "NOW: " + Name(_animation.Turn.Turn.Unit.Id), PanelX, y, gold, 1, shadow);
                 y += 8;
                 if (beat != null)
                 {
-                    _text.Draw(_batch, beat.Beat.SkillName ?? beat.Beat.SkillId, PanelX + 8, y, ink, 1, shadow);
+                    _text.Draw(batch, beat.Beat.SkillName ?? beat.Beat.SkillId, PanelX + 8, y, ink, 1, shadow);
                 }
 
                 y += 10;
             }
 
-            _text.Draw(_batch, "TURN ORDER", PanelX, y, dim, 1, shadow);
+            _text.Draw(batch, "TURN ORDER", PanelX, y, dim, 1, shadow);
             y += 8;
             foreach (BattleUnit unit in _playback.Forecast(8))
             {
                 Color team = unit.Team == BattleTeam.Player ? _atlas.Palette("C", Color.LightBlue) : _atlas.Palette("u", Color.Pink);
-                _batch.Draw(_atlas.Pixel, new Rectangle(PanelX, y + 1, 3, 3), team);
-                _text.Draw(_batch, Name(unit.Id), PanelX + 6, y, ink, 1, shadow);
+                batch.Draw(_atlas.Pixel, new Rectangle(PanelX, y + 1, 3, 3), team);
+                _text.Draw(batch, Name(unit.Id), PanelX + 6, y, ink, 1, shadow);
                 int shown = _animation != null ? _animation.ShownHp(unit.Id, _clockMs) : unit.CurrentHp;
                 string hp = shown.ToString(CultureInfo.InvariantCulture) + "/" + unit.Stats.Hp.ToString(CultureInfo.InvariantCulture);
-                _text.Draw(_batch, hp, VirtualWidth - 6 - PixelText.Measure(hp), y, dim, 1, shadow);
+                _text.Draw(batch, hp, VirtualWidth - 6 - PixelText.Measure(hp), y, dim, 1, shadow);
                 y += 8;
             }
 
             y += 6;
-            _text.Draw(_batch, "LOG", PanelX, y, dim, 1, shadow);
+            _text.Draw(batch, "LOG", PanelX, y, dim, 1, shadow);
             y += 8;
             int first = Math.Max(0, _log.Count - 18);
             for (int i = first; i < _log.Count; i++)
             {
-                _text.Draw(_batch, _log[i], PanelX, y, ink, 1, shadow);
+                _text.Draw(batch, _log[i], PanelX, y, ink, 1, shadow);
                 y += 7;
             }
 
             if (_playback.IsOver && (_animation == null || _clockMs >= _animation.DurationMs))
             {
                 string banner = _playback.Outcome == BattleOutcome.PlayerVictory ? "VICTORY" : _playback.Outcome == BattleOutcome.EnemyVictory ? "DEFEAT" : "STALEMATE";
-                _batch.Draw(_atlas.Pixel, new Rectangle(0, VirtualHeight / 2 - 18, PanelX - 6, 36), shadow * 0.75f);
-                _text.DrawCentered(_batch, banner, BoardAreaWidth / 2, VirtualHeight / 2 - 10, gold, 4);
+                batch.Draw(_atlas.Pixel, new Rectangle(0, VirtualHeight / 2 - 18, PanelX - 6, 36), shadow * 0.75f);
+                _text.DrawCentered(batch, banner, BoardAreaWidth / 2, VirtualHeight / 2 - 10, gold, 4);
             }
 
             string help = _host.Touch
                               ? "TAP: STEP   TWO FINGERS: AUTO " + (_auto ? "ON" : "OFF") + "   BACK: QUIT"
                               : "SPACE: STEP   A: AUTO " + (_auto ? "ON" : "OFF") + "   ESC: QUIT";
-            _text.Draw(_batch, help, 6, VirtualHeight - 9, dim, 1, shadow);
+            _text.Draw(batch, help, 6, VirtualHeight - 9, dim, 1, shadow);
 
             if (_host.Touch)
             {
                 Rectangle button = AutoButton();
-                _batch.Draw(_atlas.Pixel, button, shadow * 0.8f);
-                _batch.Draw(_atlas.Pixel, new Rectangle(button.X + 1, button.Y + 1, button.Width - 2, button.Height - 2),
+                batch.Draw(_atlas.Pixel, button, shadow * 0.8f);
+                batch.Draw(_atlas.Pixel, new Rectangle(button.X + 1, button.Y + 1, button.Width - 2, button.Height - 2),
                             (_auto ? gold : dim) * 0.35f);
-                _text.DrawCentered(_batch, _auto ? "AUTO: ON" : "AUTO: OFF", button.Center.X, button.Y + 4, _auto ? gold : ink, 2, shadow);
+                _text.DrawCentered(batch, _auto ? "AUTO: ON" : "AUTO: OFF", button.Center.X, button.Y + 4, _auto ? gold : ink, 2, shadow);
             }
         }
 
@@ -730,13 +754,13 @@ namespace BeastCraft.Game
         /// <summary>
         /// The sprite a unit is drawn with: its species' or enemy's ArtKey (data) looked up in the art
         /// manifest; the content validator holds every shipped key to an entry, so the fallback (the
-        /// first enemy sprite) only shows for content loaded without one.
+        /// brute) only shows for content loaded without one.
         /// </summary>
-        private string SpriteFor(string unitId)
+        private ArtSprite SpriteFor(string unitId)
         {
             string id = _speciesByUnit.TryGetValue(unitId, out string species) ? species : null;
             string artKey = _content.Battle.GetSpecies(id)?.ArtKey ?? _content.Enemies.Get(id)?.ArtKey;
-            return _atlas.NameOfArtKey(artKey) ?? _atlas.NameOfArtKey("enemy/brute");
+            return _atlas.ByArtKey(artKey) ?? _atlas.ByArtKey("enemy/brute");
         }
 
         private string Name(string unitId)

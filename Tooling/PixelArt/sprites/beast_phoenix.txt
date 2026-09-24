@@ -5,6 +5,7 @@
 # outline: auto
 # autoshade: yes
 # artkey: beast/phoenix
+# clip: idle beast_phoenix_idle
 ................................
 ............Y..Y................
 .Y..........yY.yY.............Y.

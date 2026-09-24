@@ -9,7 +9,7 @@ namespace BeastCraft.Vfx
     /// Checks <c>vfx-library.json</c> (<see cref="VfxLibraryData"/>): the schema version; exactly one
     /// default per <see cref="Element"/> (<c>None</c> included), so every skill has an effect; skill
     /// ids unique and, given the known ids, resolving to a real skill; and every effect sane — a
-    /// known motion, a projectile that takes time to fly, sheets that exist in the pixel-art manifest
+    /// known motion, a projectile that takes time to fly, sheets that exist in the art manifest
     /// with the frame size the spec claims and enough frames, colours that are palette chars, and
     /// every number inside the ranges below (so a typo cannot freeze the game for ten seconds or
     /// shake the board off the screen). Returns every problem found (empty = valid); never throws.
@@ -35,9 +35,9 @@ namespace BeastCraft.Vfx
         /// <summary>
         /// Validates <paramref name="data"/>. <paramref name="knownSkillIds"/> (null skips the check)
         /// are the ids a skill entry may name; <paramref name="art"/> (null skips the sheet and
-        /// palette checks) is the pixel-art manifest the sheets and colours must exist in.
+        /// palette checks) is the art manifest the sheets and colours must exist in.
         /// </summary>
-        public static List<string> Validate(VfxLibraryData data, ICollection<string> knownSkillIds, PixelArtManifestData art)
+        public static List<string> Validate(VfxLibraryData data, ICollection<string> knownSkillIds, ArtManifestData art)
         {
             List<string> errors = new List<string>();
             if (data == null)
@@ -121,7 +121,7 @@ namespace BeastCraft.Vfx
         }
 
         /// <summary>The checks on one effect; <paramref name="at"/> prefixes every message.</summary>
-        public static void ValidateEffect(VfxEffectData effect, string at, PixelArtManifestData art, List<string> errors)
+        public static void ValidateEffect(VfxEffectData effect, string at, ArtManifestData art, List<string> errors)
         {
             if (effect == null)
             {
@@ -193,9 +193,9 @@ namespace BeastCraft.Vfx
             }
         }
 
-        private static void ValidateFlipbook(VfxFlipbookData flipbook, string at, PixelArtManifestData art, List<string> errors)
+        private static void ValidateFlipbook(VfxFlipbookData flipbook, string at, ArtManifestData art, List<string> errors)
         {
-            PixelSpriteData sheet = Sheet(flipbook.Sheet, at, art, errors);
+            ArtSpriteData sheet = Sheet(flipbook.Sheet, at, art, errors);
             Range(flipbook.Fps, 1, MaxFps, at + " Fps", errors);
             Range(flipbook.Scale, 1, MaxScale, at + " Scale", errors);
             Color(flipbook.Tint, true, at + " Tint", art, errors);
@@ -227,7 +227,7 @@ namespace BeastCraft.Vfx
             }
         }
 
-        private static void ValidateParticles(VfxParticleData particles, string at, PixelArtManifestData art, List<string> errors)
+        private static void ValidateParticles(VfxParticleData particles, string at, ArtManifestData art, List<string> errors)
         {
             Sheet(particles.Sheet, at, art, errors);
             Range(particles.Count, 1, MaxParticles, at + " Count", errors);
@@ -253,7 +253,7 @@ namespace BeastCraft.Vfx
             }
         }
 
-        private static PixelSpriteData Sheet(string name, string at, PixelArtManifestData art, List<string> errors)
+        private static ArtSpriteData Sheet(string name, string at, ArtManifestData art, List<string> errors)
         {
             if (string.IsNullOrEmpty(name))
             {
@@ -266,16 +266,21 @@ namespace BeastCraft.Vfx
                 return null;
             }
 
-            PixelSpriteData sheet = art.Find(name);
+            ArtSpriteData sheet = art.Find(name);
             if (sheet == null)
             {
-                errors.Add(at + ": sheet '" + name + "' is not in the pixel-art manifest.");
+                errors.Add(at + ": sheet '" + name + "' is not in the art manifest.");
+            }
+            else if (sheet.Kind == ArtSpriteKind.Spine)
+            {
+                errors.Add(at + ": sheet '" + name + "' is a spine skeleton, not a sprite sheet.");
+                return null;
             }
 
             return sheet;
         }
 
-        private static void Color(string ch, bool optional, string at, PixelArtManifestData art, List<string> errors)
+        private static void Color(string ch, bool optional, string at, ArtManifestData art, List<string> errors)
         {
             if (string.IsNullOrEmpty(ch))
             {
