@@ -17,8 +17,9 @@ namespace BeastCraft.Editor.Data
     /// only a missing one is created. Running it twice changes nothing the second time.
     /// </para>
     /// <para>
-    /// The JSON owns identity, text, elements, base stats, stance and the growth-curve link on a
-    /// species, and the whole of a growth curve. It does NOT touch a species' icon, evolution options, learnable
+    /// The JSON owns identity, text, elements, base stats, stance, footprint and the growth-curve
+    /// link on a species, and the whole of a growth curve; the field mapping is
+    /// <see cref="BeastRosterBuilder"/>'s, shared with everything that builds the roster outside the Editor. It does NOT touch a species' icon, evolution options, learnable
     /// skills or customization schema — those are authored on the asset and survive a re-import.
     /// Nothing is ever deleted: a species removed from the JSON leaves its asset behind, logged.
     /// </para>
@@ -82,8 +83,7 @@ namespace BeastCraft.Editor.Data
                     AssetDatabase.CreateAsset(curve, CurvesFolder + "/" + ToPascalCase(curveData.CurveId) + ".asset");
                 }
 
-                curve.Curve = curveData.ToAnimationCurve();
-                curve.MaxLevel = curveData.MaxLevel;
+                BeastRosterBuilder.ApplyCurve(curveData, curve);
                 EditorUtility.SetDirty(curve);
                 result[curveData.CurveId] = curve;
             }
@@ -105,19 +105,7 @@ namespace BeastCraft.Editor.Data
                     AssetDatabase.CreateAsset(species, SpeciesFolder + "/" + ToPascalCase(speciesData.SpeciesId) + ".asset");
                 }
 
-                species.DisplayName = speciesData.DisplayName;
-                species.Description = speciesData.Description;
-                species.BaseStats = speciesData.BaseStats;
-                species.GrowthRate = curves[speciesData.GrowthCurveId];
-
-                Element[] elements = new Element[speciesData.Elements.Length];
-                for (int i = 0; i < elements.Length; i++)
-                {
-                    BeastRosterValidator.TryParseElement(speciesData.Elements[i], out elements[i]);
-                }
-
-                species.Elements = elements;
-                BeastRosterValidator.TryParseStance(speciesData.Stance, out species.Stance);
+                BeastRosterBuilder.ApplySpecies(speciesData, species, curves[speciesData.GrowthCurveId]);
                 EditorUtility.SetDirty(species);
                 imported.Add(speciesData.SpeciesId);
             }

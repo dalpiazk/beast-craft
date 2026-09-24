@@ -111,6 +111,13 @@ Tooling/CiStubs/**/bin/
 Tooling/BalanceSim/**/bin/
 
 # ---------------------------------------------------------------------------
+# Tooling/EditModeTests -- the local-only dotnet runner for the EditMode tests.
+# Same story again: keep its csproj, ignore its bin/ (obj/ is caught above).
+# ---------------------------------------------------------------------------
+!Tooling/EditModeTests/*.csproj
+Tooling/EditModeTests/bin/
+
+# ---------------------------------------------------------------------------
 # OS cruft
 # ---------------------------------------------------------------------------
 .DS_Store

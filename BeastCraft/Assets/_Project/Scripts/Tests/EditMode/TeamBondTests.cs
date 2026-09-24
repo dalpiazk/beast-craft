@@ -698,27 +698,61 @@ namespace BeastCraft.Tests.EditMode
 
             switch (fault)
             {
-                case "Condition": bond.Condition = value; break;
-                case "Scope": bond.Scope = value; break;
-                case "OneElement": bond.Elements = new[] { "Air" }; break;
-                case "DuplicateElement": bond.Elements = new[] { "Air", "Air", "Fire" }; break;
-                case "NoneElement": bond.Elements = new[] { "Air", "None" }; break;
-                case "TierTooLow": bond.Tiers[0].MinCount = 1; break;
-                case "TierAboveSet": bond.Tiers[0].MinCount = 3; break;
+                case "Condition":
+                    bond.Condition = value;
+                    break;
+                case "Scope":
+                    bond.Scope = value;
+                    break;
+                case "OneElement":
+                    bond.Elements = new[] { "Air" };
+                    break;
+                case "DuplicateElement":
+                    bond.Elements = new[] { "Air", "Air", "Fire" };
+                    break;
+                case "NoneElement":
+                    bond.Elements = new[] { "Air", "None" };
+                    break;
+                case "TierTooLow":
+                    bond.Tiers[0].MinCount = 1;
+                    break;
+                case "TierAboveSet":
+                    bond.Tiers[0].MinCount = 3;
+                    break;
                 case "TiersNotRising":
                     bond.Condition = "Stance";
                     bond.Elements = new string[0];
                     bond.Stance = "Vanguard";
                     bond.Tiers = new[] { bond.Tiers[0], new TeamBondTierData { MinCount = 2, Effects = bond.Tiers[0].Effects } };
                     break;
-                case "NoTiers": bond.Tiers = new TeamBondTierData[0]; break;
-                case "DamageEffect": effect.EffectType = "Damage"; effect.Magnitude = 50; break;
-                case "DebuffEffect": effect.EffectType = "DebuffStat"; break;
-                case "StunEffect": effect.EffectType = "ApplyStatus"; effect.Status = "Stun"; effect.DurationTurns = 1; break;
-                case "LowChance": effect.Chance = 50; break;
-                case "HpBuff": effect.AffectedStat = "HP"; break;
-                case "DuplicateId": bond.BondId = library.BeastSkills[0].SkillId; break;
-                case "StanceWithElements": bond.Condition = "Stance"; bond.Stance = "Ranged"; break;
+                case "NoTiers":
+                    bond.Tiers = new TeamBondTierData[0];
+                    break;
+                case "DamageEffect":
+                    effect.EffectType = "Damage";
+                    effect.Magnitude = 50;
+                    break;
+                case "DebuffEffect":
+                    effect.EffectType = "DebuffStat";
+                    break;
+                case "StunEffect":
+                    effect.EffectType = "ApplyStatus";
+                    effect.Status = "Stun";
+                    effect.DurationTurns = 1;
+                    break;
+                case "LowChance":
+                    effect.Chance = 50;
+                    break;
+                case "HpBuff":
+                    effect.AffectedStat = "HP";
+                    break;
+                case "DuplicateId":
+                    bond.BondId = library.BeastSkills[0].SkillId;
+                    break;
+                case "StanceWithElements":
+                    bond.Condition = "Stance";
+                    bond.Stance = "Ranged";
+                    break;
             }
 
             List<TeamBondData> bonds = new List<TeamBondData>(library.TeamBonds) { bond };

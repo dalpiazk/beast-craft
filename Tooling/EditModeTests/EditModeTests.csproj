@@ -1,0 +1,59 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Local-only runner for the Beast Craft EditMode test suite, without Unity.
+
+        dotnet test Tooling/EditModeTests
+
+    Like CiLint it owns no source of its own: it globs in the real Runtime, Editor and
+    Tests/EditMode scripts and compiles them against UnityStub. Unlike CiLint it compiles the stub
+    SOURCES directly (not via a ProjectReference) with UNITYSTUB_SYSTEM_TEXT_JSON defined, which
+    swaps the stub's compile-only JsonUtility for a working System.Text.Json implementation that
+    follows JsonUtility's rules. CiLint and BalanceSim keep the stub's default behaviour.
+
+    Deliberately NOT a CI job (Actions budget): run it locally before pushing. It is no substitute
+    for Unity's own Test Runner, which exercises the real JsonUtility and asset serialization.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <!-- Unity 6000.0 ships C# 9. -->
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <EnableNETAnalyzers>false</EnableNETAnalyzers>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <RootNamespace>BeastCraft.Tests.EditMode</RootNamespace>
+    <DefineConstants>$(DefineConstants);UNITYSTUB_SYSTEM_TEXT_JSON</DefineConstants>
+  </PropertyGroup>
+
+  <!--
+    Paths are relative to this csproj: Tooling/EditModeTests -> repo root is two levels up. The
+    Editor glob mirrors the test assembly definition, which references BeastCraft.Editor. The data
+    JSON files are not copied: the tests find them by walking up from the output directory.
+  -->
+  <ItemGroup>
+    <Compile Include="..\CiStubs\UnityStub\*.cs">
+      <Link>UnityStub\%(Filename)%(Extension)</Link>
+    </Compile>
+    <Compile Include="..\..\BeastCraft\Assets\_Project\Scripts\Runtime\**\*.cs">
+      <Link>GameSource\Runtime\%(RecursiveDir)%(Filename)%(Extension)</Link>
+    </Compile>
+    <Compile Include="..\..\BeastCraft\Assets\_Project\Scripts\Editor\**\*.cs">
+      <Link>GameSource\Editor\%(RecursiveDir)%(Filename)%(Extension)</Link>
+    </Compile>
+    <Compile Include="..\..\BeastCraft\Assets\_Project\Scripts\Tests\EditMode\**\*.cs">
+      <Link>GameSource\Tests\EditMode\%(RecursiveDir)%(Filename)%(Extension)</Link>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <!-- NUnit 3, matching the Unity Test Framework's nunit.framework. -->
+    <PackageReference Include="NUnit" Version="3.14.0" />
+    <PackageReference Include="NUnit3TestAdapter" Version="4.6.0" />
+  </ItemGroup>
+
+</Project>

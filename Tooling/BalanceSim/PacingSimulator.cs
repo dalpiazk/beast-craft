@@ -20,7 +20,9 @@ namespace BeastCraft.Tooling.BalanceSim
     /// spends the materials. The report gives the p10 / p50 / p90 battle counts for the focus skill
     /// to reach levels 5, 10, 15 and 20 and checks the medians against <see cref="Gates"/>. It also
     /// levels the avatar through <see cref="AvatarProgression.AwardBattle"/> and checks its median
-    /// level stays within <see cref="AvatarLevelTolerance"/> of the encounter level.
+    /// level stays within <see cref="AvatarLevelTolerance"/> of the encounter level, and does the
+    /// same for a beast fielded in every battle through <see cref="BeastProgression.AwardBattle"/>
+    /// (<see cref="BeastLevelTolerance"/>), knocked out in <see cref="KnockoutChance"/> of battles.
     /// <para>
     /// <strong>Campaign model</strong> (the constants below; README.md, "Pacing"): battle
     /// <c>i</c> (0-based) is fought at encounter level <c>min(100, 1 + i / BattlesPerLevel)</c>;
@@ -40,7 +42,8 @@ namespace BeastCraft.Tooling.BalanceSim
     /// <para>
     /// Deterministic: campaign <c>r</c> of base seed <c>s</c> is seeded
     /// <c>LootRoller.DeriveSeed(s, r)</c> and each of its battles <c>DeriveSeed(campaign, i)</c>,
-    /// drawn in a fixed order (shape, clear, focus uses, secondary uses, then the loot rolls).
+    /// drawn in a fixed order (shape, clear, focus uses, secondary uses, the loot rolls, then the
+    /// fielded beast's knockout -- drawn last so it leaves every earlier draw unchanged).
     /// </para>
     /// </summary>
     public static class PacingSimulator
@@ -116,6 +119,19 @@ namespace BeastCraft.Tooling.BalanceSim
         /// falling behind it).
         /// </summary>
         public const int AvatarLevelTolerance = 3;
+
+        /// <summary>
+        /// Beast pacing target: at every 50-battle checkpoint the median level of a beast fielded in
+        /// every battle is within this many levels of the encounter level, like the avatar.
+        /// </summary>
+        public const int BeastLevelTolerance = 3;
+
+        /// <summary>
+        /// Share of battles the fielded beast is knocked out in (drawn every battle, independent of
+        /// the clear). A knocked-out beast earns participation XP only, so this is what the beast
+        /// curve is tuned against. A modelling assumption, not measured from the PvE simulation.
+        /// </summary>
+        public const double KnockoutChance = 0.2;
 
         /// <summary>
         /// Loads the skill library's materials and the drop tables, runs the Monte Carlo (twice with
@@ -251,6 +267,9 @@ namespace BeastCraft.Tooling.BalanceSim
             /// <summary>The avatar's level after each battle.</summary>
             public int[] AvatarLevelAfter;
 
+            /// <summary>The fielded beast's level after each battle.</summary>
+            public int[] BeastLevelAfter;
+
             /// <summary>Materials gained per tier (index = tier).</summary>
             public int[] GainedByTier;
 
@@ -274,10 +293,12 @@ namespace BeastCraft.Tooling.BalanceSim
             SkillProgress secondary = new SkillProgress("secondary");
             MaterialInventory inventory = new MaterialInventory();
             AvatarProgress avatar = new AvatarProgress();
+            BeastProgress beast = new BeastProgress("fielded", 1);
             Campaign campaign = new Campaign
             {
                 FocusLevelAfter = new int[battles],
                 AvatarLevelAfter = new int[battles],
+                BeastLevelAfter = new int[battles],
                 GainedByTier = new int[model.MaxTier + 1],
                 FirstOfTier = new int[model.MaxTier + 1]
             };
@@ -333,6 +354,11 @@ namespace BeastCraft.Tooling.BalanceSim
                 }
 
                 Spend(model, secondary, definition, inventory, Reserve(model, focus, definition));
+
+                // Drawn last, after the loot, so adding the beast left every earlier draw (and the report above) unchanged.
+                bool knockedOut = rng.NextDouble() < KnockoutChance;
+                BeastProgression.AwardBattle(beast, cleared ? BattleOutcome.PlayerVictory : BattleOutcome.EnemyVictory, level, knockedOut);
+                campaign.BeastLevelAfter[i] = beast.Level;
 
                 campaign.FocusLevelAfter[i] = focus.Level;
                 for (int l = 2; l <= focus.Level && l < campaign.FocusReached.Length; l++)
@@ -564,6 +590,29 @@ namespace BeastCraft.Tooling.BalanceSim
                 if (!ok)
                 {
                     misses.Add("Avatar at battle " + b + ": median level " + p50 + " vs encounter level " + encounter + ".");
+                }
+
+                sb.Append("| ").Append(b).Append(" | ").Append(encounter).Append(" | ").Append(LevelPercentile(levels, 10)).Append(" | ").Append(p50)
+                  .Append(" | ").Append(LevelPercentile(levels, 90)).Append(" | ").Append(ok ? "ok" : "**MISS**").Append(" |\n");
+            }
+
+            sb.Append("\n## Beast level\n\n");
+            sb.Append("`BeastProgression.AwardBattle` after every battle for a beast fielded in all of them (").Append(BeastProgression.ParticipationXp)
+              .Append(" XP win or lose, knocked out or not, + ").Append(BeastProgression.ClearBaseXp).Append(" + ").Append(BeastProgression.ClearXpPerEnemyLevel)
+              .Append(" x encounter level on a clear it is still standing for; knocked out in ").Append(Pct(KnockoutChance * 100.0))
+              .Append(" of battles; a level costs ").Append(BeastProgression.XpCurveBase).Append(" + ").Append(BeastProgression.XpCurvePerLevel)
+              .Append(" x level). Benched beasts earn nothing. Target: median within ").Append(BeastLevelTolerance)
+              .Append(" levels of the encounter level at every checkpoint.\n\n");
+            sb.Append("| Battle | Encounter level | p10 | p50 | p90 | Verdict |\n| ---: | ---: | ---: | ---: | ---: | --- |\n");
+            for (int b = 50; b <= options.PacingBattles; b += 50)
+            {
+                List<int> levels = campaigns.ConvertAll(c => c.BeastLevelAfter[b - 1]);
+                int encounter = Math.Min(100, 1 + ((b - 1) / BattlesPerLevel));
+                int p50 = LevelPercentile(levels, 50);
+                bool ok = Math.Abs(p50 - encounter) <= BeastLevelTolerance;
+                if (!ok)
+                {
+                    misses.Add("Beast at battle " + b + ": median level " + p50 + " vs encounter level " + encounter + ".");
                 }
 
                 sb.Append("| ").Append(b).Append(" | ").Append(encounter).Append(" | ").Append(LevelPercentile(levels, 10)).Append(" | ").Append(p50)
