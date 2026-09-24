@@ -12,11 +12,10 @@
 # Source / text
 # ---------------------------------------------------------------------------
 *.cs        text diff=csharp
-*.shader    text
-*.shadergraph text
-*.hlsl      text
-*.cginc     text
-*.compute   text
+*.csproj    text
+*.props     text
+*.targets   text
+*.sln       text
 *.json      text
 *.jsonc     text
 *.md        text
@@ -31,16 +30,6 @@
 *.ps1       text eol=crlf
 .gitattributes text
 .gitignore  text
-
-# Unity text-serialized assets: keep as text, but never merge automatically.
-*.unity     text merge=unityyamlmerge eol=lf
-*.prefab    text merge=unityyamlmerge eol=lf
-*.asset     text merge=unityyamlmerge eol=lf
-*.mat       text merge=unityyamlmerge eol=lf
-*.anim      text merge=unityyamlmerge eol=lf
-*.controller text merge=unityyamlmerge eol=lf
-*.meta      text merge=unityyamlmerge eol=lf
-*.asmdef    text
 
 # ---------------------------------------------------------------------------
 # Git LFS -- images / art source
@@ -74,7 +63,6 @@
 *.ttf       filter=lfs diff=lfs merge=lfs -text
 *.otf       filter=lfs diff=lfs merge=lfs -text
 *.zip       filter=lfs diff=lfs merge=lfs -text
-*.unitypackage filter=lfs diff=lfs merge=lfs -text
 
 # ---------------------------------------------------------------------------
 # Golden files are compared byte for byte by Tooling/EditModeTests, so they

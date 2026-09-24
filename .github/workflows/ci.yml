@@ -1,6 +1,6 @@
 # ---------------------------------------------------------------------------
-# The game runtime is engine-neutral C# (src/BeastCraft.Core, netstandard2.1);
-# the Unity project under BeastCraft/ is legacy and no longer built. This job
+# The game runtime is engine-neutral C# (src/BeastCraft.Core, netstandard2.1)
+# and its content lives under content/ (data JSON, pixel art). This job
 # format-checks and compiles the runtime, the engine-neutral presentation layer
 # (src/BeastCraft.Presentation), the shared MonoGame viewer (src/BeastCraft.Game)
 # and the MonoGame DesktopGL host (src/BeastCraft.Desktop), then format-checks

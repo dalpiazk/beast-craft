@@ -9,6 +9,6 @@ characters in a consistent three-quarter pose, environments at the target
 parallax layer size). Prompts describe style by its qualities only — original IP,
 no living artists, studios, franchises or characters named. Output from this
 stage is a **raw** generation: it goes to `sprite-cleanup/` before it is allowed
-anywhere near `BeastCraft/Assets/_Project/Art/`, and it is named per the
+anywhere near `content/art/`, and it is named per the
 `<category>_<subject>_<variant>_<state>.png` convention in the parent README.
 No scripts yet — templates and configs land in a later step.

@@ -6,9 +6,9 @@ invoked at runtime.**
 The Beast Craft client makes **zero AI calls at runtime**. Every sprite sheet,
 music loop, ambience bed and sound effect in the shipped build is a static file
 that was generated *offline*, on a developer machine, reviewed by a human, and
-then committed into the Unity project. The pipeline in this folder is the set of
+then committed under `content/`. The pipeline in this folder is the set of
 prompt templates, configs and (later) scripts used to produce those files. The
-Unity project has no dependency on it — you can delete this folder and the game
+game has no dependency on it — you can delete this folder and the game
 still builds and runs.
 
 ---
@@ -31,7 +31,7 @@ still builds and runs.
   are no published commercial terms for it, so any Lyria-derived audio is a
   licensing liability. Use it to block out a mood or temp-track a scene, then
   regenerate the final asset in Stable Audio before it enters
-  `BeastCraft/Assets/`.
+  `content/`.
 - Gemini image generation runs on the **paid API tier**, not the free tier, for
   the commercial-use terms.
 - All art is **original IP**. Prompts must not name living artists, studios,
@@ -44,18 +44,18 @@ still builds and runs.
 
 ## Where output goes
 
-Generated and cleaned assets land in the Unity project, never in `Pipeline/`:
+Generated and cleaned assets land in the game's `content/` tree, never in `Pipeline/`:
 
 ```
-BeastCraft/Assets/_Project/Art/Characters/     player + NPC sprites
-BeastCraft/Assets/_Project/Art/Creatures/      collectible creature sprites
-BeastCraft/Assets/_Project/Art/Environments/   backdrops, tiles, props
-BeastCraft/Assets/_Project/Art/UI/             icons, frames, buttons
-BeastCraft/Assets/_Project/Art/KeyArt/         promo / store / title art
+content/art/characters/     player + NPC sprites
+content/art/creatures/      collectible creature sprites
+content/art/environments/   backdrops, tiles, props
+content/art/ui/             icons, frames, buttons
+content/art/keyart/         promo / store / title art
 
-BeastCraft/Assets/_Project/Audio/Music/        score, battle and theme loops
-BeastCraft/Assets/_Project/Audio/Ambient/      environmental beds
-BeastCraft/Assets/_Project/Audio/SFX/          one-shots
+content/audio/music/        score, battle and theme loops
+content/audio/ambient/      environmental beds
+content/audio/sfx/          one-shots
 ```
 
 Raw, unreviewed generations stay out of the repo (see `.gitignore`: `out/`,
@@ -66,8 +66,8 @@ asset is committed.
 
 ## Naming conventions
 
-These are the contract between the pipeline and the Unity project. Importers,
-addressable labels and data-asset references will assume them, so treat a
+These are the contract between the pipeline and the game. Loaders, manifests
+and data references will assume them, so treat a
 rename as a breaking change.
 
 ### Art
@@ -99,8 +99,8 @@ key_titlescreen_base_static.png
 ```
 
 Multi-frame animation ships as a sprite sheet under the single `_state` name
-(`crt_emberfox_stage1_idle.png` is the whole idle strip); frame slicing is a
-Unity import setting, not a filename concern.
+(`crt_emberfox_stage1_idle.png` is the whole idle strip); frame slicing is
+metadata (a manifest), not a filename concern.
 
 ### Audio
 
@@ -125,7 +125,7 @@ sfx_ui_confirm_oneshot.wav
 ```
 
 Deliver audio as `.wav` (48 kHz, 16-bit or 24-bit). Compression to Vorbis/AAC is
-a Unity import setting per platform — do not pre-compress source files.
+a per-platform build step — do not pre-compress source files.
 
 ---
 
