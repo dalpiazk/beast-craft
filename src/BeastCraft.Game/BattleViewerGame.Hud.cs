@@ -2,8 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using BeastCraft.Battle;
+using BeastCraft.Battle.Grid;
 using BeastCraft.Creatures;
 using BeastCraft.Game.Rendering;
+using BeastCraft.Presentation.Board;
 using BeastCraft.Presentation.Layout;
 using BeastCraft.Presentation.Playback;
 using Microsoft.Xna.Framework;
@@ -46,6 +48,7 @@ namespace BeastCraft.Game
             DrawToast(shadow);
             DrawSkillStrip(beat, shadow);
             DrawControls(shadow);
+            DrawSkillDiagram(shadow);
 
             if (_playback.IsOver && (_animation == null || _clockMs >= _animation.DurationMs))
             {
@@ -171,6 +174,78 @@ namespace BeastCraft.Game
                     y += _text.LineHeight(Small);
                 }
             }
+        }
+
+        /// <summary>
+        /// The selected (hovered or tapped) skill's card: its name, shape, side and cooldown, and a
+        /// hex diagram of its range and area (<see cref="SkillFootprint"/>, for the acting unit's own
+        /// footprint): the caster gold, the tiles it may pick a target on tinted, the tiles it hits
+        /// in its side's colour, the example target outlined. Drawn over the foot of the board, above
+        /// the strip — the seed of a skill detail card.
+        /// </summary>
+        private void DrawSkillDiagram(Color shadow)
+        {
+            int selected = SelectedSkill();
+            BattleUnit unit = ActingUnit();
+            if (selected < 0 || unit == null)
+            {
+                return;
+            }
+
+            SkillSO skill = ActingSkills()[selected];
+            SkillFootprint footprint = SkillFootprint.Of(skill, unit.Footprint);
+            Rect board = _screen.Board;
+            Rect panel = new Rect(board.Right - 460f, board.Bottom - 470f, 460f, 460f);
+            _draw.Fill(Pixel, new Vector2(panel.X, panel.Y), new Vector2(panel.Width, panel.Height), Ink("Y", Color.Yellow));
+            _draw.Fill(Pixel, new Vector2(panel.X + 4f, panel.Y + 4f), new Vector2(panel.Width - 8f, panel.Height - 8f), Ink("K", Color.Black) * 0.94f);
+
+            bool allies = footprint.Side == SkillTargetSide.Ally;
+            _text.Draw(_draw, _text.Fit(skill.DisplayName ?? skill.SkillId, Medium, panel.Width - 40f), new Vector2(panel.X + 20f, panel.Y + 20f), Medium,
+                       Ink("y", Color.Gold), shadow);
+            string what = ShapeLabel(skill) + "  " + (footprint.IsGlobal ? (allies ? "EVERY ALLY" : "EVERY FOE") : allies ? "ALLIES" : "FOES") + "  CD " +
+                          skill.Cooldown.ToString(CultureInfo.InvariantCulture);
+            _text.Draw(_draw, _text.Fit(what, Small, panel.Width - 40f), new Vector2(panel.X + 20f, panel.Y + 52f), Small, Ink("3", Color.Gray), shadow);
+
+            // The diagram, in its own hex space (tile (0, 0) = the caster's anchor) fitted to the card.
+            Rect area = new Rect(panel.X + 20f, panel.Y + 80f, panel.Width - 40f, panel.Height - 100f);
+            int radius = Math.Min(6, footprint.Extent);
+            BoardFit fit = PortraitLayout.FitBoard(radius, area);
+            Matrix canvas = Matrix.CreateScale(_canvasFit.Scale) * Matrix.CreateTranslation(_canvasFit.OffsetX, _canvasFit.OffsetY, 0f);
+            _draw.SetTransform(Matrix.CreateScale(fit.Scale) * Matrix.CreateTranslation(fit.OriginX, fit.OriginY, 0f) * canvas);
+
+            HashSet<HexCoordinate> caster = new HashSet<HexCoordinate>(footprint.Caster);
+            HashSet<HexCoordinate> reach = new HashSet<HexCoordinate>(footprint.Reach);
+            HashSet<HexCoordinate> hits = new HashSet<HexCoordinate>(footprint.Area);
+            Color sideColor = allies ? Ink("l", Color.LightGreen) : Ink("o", Color.OrangeRed);
+            ArtSprite mask = _atlas.Sprite("hex_mask");
+            ArtSprite outline = _atlas.Sprite("hex_outline");
+            foreach (HexCoordinate tile in SkillFootprint.Disc(HexCoordinate.Zero, radius))
+            {
+                Vector2 at = At(_layout.Center(tile));
+                Color fill = Ink("1", Color.DarkGray);
+                if (caster.Contains(tile))
+                {
+                    fill = Ink("y", Color.Gold);
+                }
+                else if (hits.Contains(tile) || (footprint.IsGlobal && tile != HexCoordinate.Zero))
+                {
+                    fill = sideColor * (footprint.IsGlobal ? 0.6f : 0.95f);
+                }
+                else if (reach.Contains(tile))
+                {
+                    fill = Ink("c", Color.Blue) * 0.7f;
+                }
+
+                _draw.DrawSprite(mask, 0, at, 1f, fill);
+                _draw.DrawSprite(outline, 0, at, 1f, Ink("K", Color.Black) * 0.6f);
+            }
+
+            if (footprint.Focus.HasValue)
+            {
+                _draw.DrawSprite(outline, 0, At(_layout.Center(footprint.Focus.Value)), 1f, Ink("Y", Color.Yellow));
+            }
+
+            _draw.SetTransform(canvas);
         }
 
         /// <summary>Pause/play, the three speeds and skip.</summary>
