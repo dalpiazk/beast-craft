@@ -4,7 +4,7 @@
 # size: 32x32
 # outline: auto
 # autoshade: yes
-# artkey: beast/phoenix/idle
+# artkey: beast/phoenix
 ................................
 ............Y..Y................
 .Y..........yY.yY.............Y.

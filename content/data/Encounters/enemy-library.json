@@ -5,6 +5,7 @@
   "Enemies": [
     {
       "EnemyId": "giant",
+      "ArtKey": "enemy/giant",
       "DisplayName": "Giant",
       "Description": "A hill-sized elder of the wild, woken cross by the Gloam. It fills seven hexes, hits hard up close and at range, and every few turns stomps or roars at everything around it.",
       "Role": "boss",
@@ -22,6 +23,7 @@
     },
     {
       "EnemyId": "champion",
+      "ArtKey": "enemy/champion",
       "DisplayName": "Champion",
       "Description": "The strongest creature of its pack, swollen with Gloam until it fills three hexes. It cleaves the front line, hexes whichever foe is weakest and sends out shockwaves.",
       "Role": "mini-boss",
@@ -38,6 +40,7 @@
     },
     {
       "EnemyId": "brute",
+      "ArtKey": "enemy/brute",
       "DisplayName": "Brute",
       "Description": "A thick-hided, horned creature that plants itself in the way. Blows barely dent it, and it smashes whatever is nearest.",
       "Role": "melee tank",
@@ -50,6 +53,7 @@
     },
     {
       "EnemyId": "stalker",
+      "ArtKey": "enemy/stalker",
       "DisplayName": "Stalker",
       "Description": "A lean, shadowy hunter that circles wide and pounces on whichever foe has the least HP left.",
       "Role": "fast melee hunter",
@@ -62,6 +66,7 @@
     },
     {
       "EnemyId": "archer",
+      "ArtKey": "enemy/archer",
       "DisplayName": "Archer",
       "Description": "Gloamed wild folk who keep to high ground and loose arrows from three hexes away. Frail once caught.",
       "Role": "ranged physical",
@@ -74,6 +79,7 @@
     },
     {
       "EnemyId": "caster",
+      "ArtKey": "enemy/caster",
       "DisplayName": "Caster",
       "Description": "A gloamed hedge-mage who hangs back and hurls spiteful bolts at the weakest foe, which may leave it burning.",
       "Role": "ranged special",
@@ -86,6 +92,7 @@
     },
     {
       "EnemyId": "shaman",
+      "ArtKey": "enemy/shaman",
       "DisplayName": "Shaman",
       "Description": "A wild-folk elder with a gnarled staff who wades in close and calls squalls down on groups of foes.",
       "Role": "area special",
@@ -99,6 +106,7 @@
     },
     {
       "EnemyId": "swarmling",
+      "ArtKey": "enemy/swarmling",
       "DisplayName": "Swarmling",
       "Description": "A tiny scuttling mite that comes by the dozen. Each bite is small; the swarm is not.",
       "Role": "swarm",
@@ -111,6 +119,7 @@
     },
     {
       "EnemyId": "stingling",
+      "ArtKey": "enemy/stingling",
       "DisplayName": "Stingling",
       "Description": "A buzzing, wasp-like pest. Its sting is small but may leave a lingering poison.",
       "Role": "swarm",

@@ -89,5 +89,13 @@ namespace BeastCraft.Encounters
         /// repeat a beast skill's id; they are never looked up globally).
         /// </summary>
         public SkillData[] Skills = new SkillData[0];
+
+        /// <summary>
+        /// Presentation only: the art key the viewer draws this enemy with (a sprite's
+        /// <c>ArtKey</c> in the art manifest), e.g. <c>"enemy/giant"</c>. Optional, but every shipped
+        /// enemy sets one; an enemy without art of its own points at a manifest alias entry (another
+        /// sprite plus a tint). Never read by battles.
+        /// </summary>
+        public string ArtKey;
     }
 }

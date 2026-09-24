@@ -132,5 +132,14 @@ namespace BeastCraft.Creatures.Roster
         /// ignored. Missing, empty or <c>"Single"</c> is the only accepted value.
         /// </summary>
         public string Footprint;
+
+        /// <summary>
+        /// Presentation only: the art the viewer draws this species with, as a key into the art
+        /// manifest (<c>content/art/pixel/pixel-art-manifest.json</c>, a sprite's <c>ArtKey</c>),
+        /// e.g. <c>"beast/phoenix"</c>. Optional (missing: the viewer has no art for it), but every
+        /// shipped species sets one and a test holds each to an existing manifest entry
+        /// (<c>ArtReferenceValidator</c>). Never read by battles.
+        /// </summary>
+        public string ArtKey;
     }
 }

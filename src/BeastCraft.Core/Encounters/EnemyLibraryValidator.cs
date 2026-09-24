@@ -101,6 +101,11 @@ namespace BeastCraft.Encounters
                     errors.Add(where + ": DisplayName is empty.");
                 }
 
+                if (!string.IsNullOrEmpty(enemy.ArtKey) && !Vfx.ArtReferenceValidator.IsWellFormed(enemy.ArtKey))
+                {
+                    errors.Add(where + ": ArtKey '" + enemy.ArtKey + "' is not lowercase snake_case segments joined by '/'.");
+                }
+
                 if (!(enemy.Threat > 0.0))
                 {
                     errors.Add(where + ": Threat must be above 0.");

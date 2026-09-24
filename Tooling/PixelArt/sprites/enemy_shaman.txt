@@ -1,0 +1,6 @@
+# name: enemy_shaman
+# label: Shaman (alias of enemy_brute_gloamed, tinted)
+# kind: enemy
+# alias: enemy_brute_gloamed
+# tint: u
+# artkey: enemy/shaman

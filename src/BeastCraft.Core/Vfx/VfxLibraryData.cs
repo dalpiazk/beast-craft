@@ -237,6 +237,25 @@ namespace BeastCraft.Vfx
 
             return null;
         }
+
+        /// <summary>The first sprite whose <see cref="PixelSpriteData.ArtKey"/> is <paramref name="artKey"/>, or null.</summary>
+        public PixelSpriteData FindByArtKey(string artKey)
+        {
+            if (string.IsNullOrEmpty(artKey) || Sprites == null)
+            {
+                return null;
+            }
+
+            foreach (PixelSpriteData sprite in Sprites)
+            {
+                if (sprite != null && string.Equals(sprite.ArtKey, artKey, StringComparison.Ordinal))
+                {
+                    return sprite;
+                }
+            }
+
+            return null;
+        }
     }
 
     /// <summary>One sprite of the manifest: a PNG strip of <see cref="Frames"/> frames.</summary>
@@ -252,5 +271,12 @@ namespace BeastCraft.Vfx
         public string Kind;
         public string Label;
         public string ArtKey;
+
+        /// <summary>
+        /// A colour (<c>#rrggbb</c>) the sprite is multiplied by when drawn, or null/empty for its
+        /// own colours. An alias entry (a placeholder reusing another sprite's <see cref="File"/>
+        /// under its own <see cref="ArtKey"/>) carries one so the reuse is told apart.
+        /// </summary>
+        public string Tint;
     }
 }

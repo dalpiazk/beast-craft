@@ -41,8 +41,13 @@ loads the PNGs at runtime (`Texture2D.FromStream`), indexed by the manifest. The
 - Beasts (32x32), the whole roster: Phoenix (+ 2-frame idle), Leviathan, Golem, Griffin,
   Thunderbird, Frost Wyrm, Treant, Tarasque, Kirin, Basilisk. The seven after the style test are
   simple placeholders in the same style.
-- Enemies (32x32): Gloamed Brute, Champion, Giant, Swarmling. The desktop viewer draws the
-  others (archer, caster, shaman, stalker, stingling) with the brute as a stand-in.
+- Enemies (32x32): Gloamed Brute, Champion, Giant, Swarmling. The others (archer, caster, shaman,
+  stalker, stingling) are **alias** entries (`# alias:` + `# tint:`, no PNG of their own): the
+  manifest lists them under their own ArtKey with another sprite's File and a Tint, so the data
+  (`enemy-library.json` ArtKey) already names final art that does not exist yet.
+- Every species and enemy names its art by `ArtKey` in the data (`beast/<id>`, `enemy/<id>`);
+  the viewer looks the key up in the manifest, and `ArtReferenceValidator` (run on content load
+  and by the tests) holds every key to an entry.
 - Hex tiles (32x36 pointy-top; columns 32 px apart, rows 27 px apart): grass, scorched rock, and a
   white mask and outline the game tints (team zones, highlights).
 - FX: `fx_fire_burst` (8-frame flipbook), `fx_hit_burst` (6 frames, white, tinted per element),

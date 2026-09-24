@@ -1,0 +1,6 @@
+# name: enemy_stingling
+# label: Stingling (alias of enemy_swarmling, tinted)
+# kind: enemy
+# alias: enemy_swarmling
+# tint: Y
+# artkey: enemy/stingling

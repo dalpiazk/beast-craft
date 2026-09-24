@@ -522,7 +522,8 @@ namespace BeastCraft.Game
                 Vector2 at = new Vector2((int)Math.Round(center.X) - size / 2, (int)Math.Round(center.Y) - size + 8 * scale);
                 SpriteEffects flip = unit.Team == BattleTeam.Enemy ? SpriteEffects.FlipHorizontally : SpriteEffects.None;
                 bool fading = _animation != null && _animation.ShownFading(unit.Id, _clockMs);
-                _batch.Draw(sprite, at, null, fading ? Color.White * 0.4f : Color.White, 0f, Vector2.Zero, scale, flip, 0f);
+                Color tint = _atlas.TintOf(SpriteFor(unit.Id));
+                _batch.Draw(sprite, at, null, fading ? tint * 0.4f : tint, 0f, Vector2.Zero, scale, flip, 0f);
 
                 int hp = _animation != null ? _animation.ShownHp(unit.Id, _clockMs) : unit.Hp;
                 DrawHpBar((int)at.X + size / 2, (int)at.Y - 3, scale == 1 ? 24 : 40, hp, unit.MaxHp);
@@ -726,19 +727,16 @@ namespace BeastCraft.Game
             return _animation != null ? _animation.UnitCenter(unit.Id, _clockMs) : _layout.FootprintCenter(unit.Position, unit.Footprint);
         }
 
+        /// <summary>
+        /// The sprite a unit is drawn with: its species' or enemy's ArtKey (data) looked up in the art
+        /// manifest; the content validator holds every shipped key to an entry, so the fallback (the
+        /// first enemy sprite) only shows for content loaded without one.
+        /// </summary>
         private string SpriteFor(string unitId)
         {
-            string species = _speciesByUnit.TryGetValue(unitId, out string id) ? id : null;
-            string[] candidates = { "beast_" + species, "enemy_" + species, species == "brute" ? "enemy_brute_gloamed" : null };
-            foreach (string candidate in candidates)
-            {
-                if (candidate != null && _atlas.Texture(candidate) != null)
-                {
-                    return candidate;
-                }
-            }
-
-            return "enemy_brute_gloamed";
+            string id = _speciesByUnit.TryGetValue(unitId, out string species) ? species : null;
+            string artKey = _content.Battle.GetSpecies(id)?.ArtKey ?? _content.Enemies.Get(id)?.ArtKey;
+            return _atlas.NameOfArtKey(artKey) ?? _atlas.NameOfArtKey("enemy/brute");
         }
 
         private string Name(string unitId)

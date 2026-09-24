@@ -224,6 +224,11 @@ namespace BeastCraft.Creatures.Roster
                     errors.Add(label + ": DisplayName is empty.");
                 }
 
+                if (!string.IsNullOrEmpty(s.ArtKey) && !Vfx.ArtReferenceValidator.IsWellFormed(s.ArtKey))
+                {
+                    errors.Add(label + ": ArtKey '" + s.ArtKey + "' is not lowercase snake_case segments joined by '/'.");
+                }
+
                 if (s.Elements == null || s.Elements.Length == 0)
                 {
                     errors.Add(label + ": needs at least one element.");

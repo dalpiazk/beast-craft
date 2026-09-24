@@ -34,6 +34,7 @@
   "Species": [
     {
       "SpeciesId": "phoenix",
+      "ArtKey": "beast/phoenix",
       "DisplayName": "Phoenix",
       "Description": "A proud bird of living flame that burns brightest just before it falls. It strikes hard from afar and sets foes smouldering, and once a battle wraps itself in renewing fire, but it has little to stand behind up close.",
       "Elements": [ "Fire" ],
@@ -43,6 +44,7 @@
     },
     {
       "SpeciesId": "leviathan",
+      "ArtKey": "beast/leviathan",
       "DisplayName": "Leviathan",
       "Description": "A calm serpent of the deep whose coils could cradle a ship. Its whirlpools drag enemies to it, and it shields itself in its scales and simply outlasts whatever breaks against it.",
       "Elements": [ "Water" ],
@@ -52,6 +54,7 @@
     },
     {
       "SpeciesId": "golem",
+      "ArtKey": "beast/golem",
       "DisplayName": "Golem",
       "Description": "A hillside that learned to stand. Slow and stubborn, it plants itself up front, dares every nearby enemy to strike it and raises walls of granite around its friends. Nothing gets past it.",
       "Elements": [ "Earth" ],
@@ -61,6 +64,7 @@
     },
     {
       "SpeciesId": "griffin",
+      "ArtKey": "beast/griffin",
       "DisplayName": "Griffin",
       "Description": "Half eagle, half lion, all wind. Bold and restless, it is across the field before the enemy has turned, rakes with talons and lances of air, and is gone again before the blow lands.",
       "Elements": [ "Air" ],
@@ -70,6 +74,7 @@
     },
     {
       "SpeciesId": "thunderbird",
+      "ArtKey": "beast/thunderbird",
       "DisplayName": "Thunderbird",
       "Description": "Its wingbeat is the thunder and its dive is the lightning. Nothing acts before it, and it opens every fight with one great dive from the clouds, though it cannot take many hits back.",
       "Elements": [ "Lightning" ],
@@ -79,6 +84,7 @@
     },
     {
       "SpeciesId": "frost_wyrm",
+      "ArtKey": "beast/frost_wyrm",
       "DisplayName": "Frost Wyrm",
       "Description": "An old dragon wrapped in rime, with a dry sense of humour. It never hurries; it simply makes the battlefield colder, slowing and freezing its foes, and waits for the cold to win.",
       "Elements": [ "Ice" ],
@@ -88,6 +94,7 @@
     },
     {
       "SpeciesId": "treant",
+      "ArtKey": "beast/treant",
       "DisplayName": "Treant",
       "Description": "A gentle forest guardian with roots older than kingdoms. It shelters its allies under bark, mends whichever friend is worst off and lashes enemies with thorned vines.",
       "Elements": [ "Nature" ],
@@ -97,6 +104,7 @@
     },
     {
       "SpeciesId": "tarasque",
+      "ArtKey": "beast/tarasque",
       "DisplayName": "Tarasque",
       "Description": "A grumpy river-beast in a shell of iron plates and spines. Where the Golem only endures, the Tarasque endures and bites back, cracking armour and crushing whatever stands in front of it.",
       "Elements": [ "Metal" ],
@@ -106,6 +114,7 @@
     },
     {
       "SpeciesId": "kirin",
+      "ArtKey": "beast/kirin",
       "DisplayName": "Kirin",
       "Description": "A serene, luminous beast said to walk without bending the grass. It shuns claws and horns and fights with light instead, healing and blessing its team and calling down pillars of radiance.",
       "Elements": [ "Light" ],
@@ -115,6 +124,7 @@
     },
     {
       "SpeciesId": "basilisk",
+      "ArtKey": "beast/basilisk",
       "DisplayName": "Basilisk",
       "Description": "A sly serpent-king whose gaze reaches farther than any fang and can turn a foe to stone. It slips through shadow to find the weakest enemy, and cannot afford to be found in turn.",
       "Elements": [ "Dark" ],

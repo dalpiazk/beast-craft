@@ -23,21 +23,41 @@ namespace BeastCraft.Game.Rendering
         private readonly Dictionary<string, Texture2D> _textures = new Dictionary<string, Texture2D>(StringComparer.Ordinal);
         private readonly Dictionary<string, PixelSpriteData> _sprites = new Dictionary<string, PixelSpriteData>(StringComparer.Ordinal);
         private readonly Dictionary<string, Color> _palette = new Dictionary<string, Color>(StringComparer.Ordinal);
+        private readonly Dictionary<string, string> _byArtKey = new Dictionary<string, string>(StringComparer.Ordinal);
+        private readonly Dictionary<string, Color> _tints = new Dictionary<string, Color>(StringComparer.Ordinal);
 
         public SpriteAtlas(GraphicsDevice device, GameContent content)
         {
             string manifest = GameContent.RelativeOf(PixelArtManifestData.ProjectRelativePath);
             string folder = manifest.Substring(0, manifest.LastIndexOf('/') + 1);
+            // An alias entry reuses another sprite's file: each file is loaded once.
+            Dictionary<string, Texture2D> byFile = new Dictionary<string, Texture2D>(StringComparer.Ordinal);
             foreach (PixelSpriteData sprite in content.Art.Sprites)
             {
-                using (Stream stream = content.Source.Open(folder + sprite.File))
+                if (!byFile.TryGetValue(sprite.File, out Texture2D texture))
                 {
-                    Texture2D texture = Texture2D.FromStream(device, stream);
-                    Premultiply(texture);
-                    _textures[sprite.Name] = texture;
-                    _sprites[sprite.Name] = sprite;
+                    using (Stream stream = content.Source.Open(folder + sprite.File))
+                    {
+                        texture = Texture2D.FromStream(device, stream);
+                        Premultiply(texture);
+                        byFile.Add(sprite.File, texture);
+                    }
+                }
+
+                _textures[sprite.Name] = texture;
+                _sprites[sprite.Name] = sprite;
+                if (!string.IsNullOrEmpty(sprite.ArtKey) && !_byArtKey.ContainsKey(sprite.ArtKey))
+                {
+                    _byArtKey.Add(sprite.ArtKey, sprite.Name);
+                }
+
+                if (!string.IsNullOrEmpty(sprite.Tint))
+                {
+                    _tints[sprite.Name] = ParseHex(sprite.Tint);
                 }
             }
+
+            _files = new List<Texture2D>(byFile.Values);
 
             foreach (KeyValuePair<string, string> entry in content.Art.Palette)
             {
@@ -48,6 +68,8 @@ namespace BeastCraft.Game.Rendering
             Pixel.SetData(new[] { Color.White });
         }
 
+        private readonly List<Texture2D> _files;
+
         /// <summary>A 1x1 white texture for rectangles and bars.</summary>
         public Texture2D Pixel { get; }
 
@@ -55,6 +77,18 @@ namespace BeastCraft.Game.Rendering
         public Texture2D Texture(string name)
         {
             return name != null && _textures.TryGetValue(name, out Texture2D texture) ? texture : null;
+        }
+
+        /// <summary>The name of the sprite whose ArtKey is <paramref name="artKey"/>, or null.</summary>
+        public string NameOfArtKey(string artKey)
+        {
+            return artKey != null && _byArtKey.TryGetValue(artKey, out string name) ? name : null;
+        }
+
+        /// <summary>The colour sprite <paramref name="name"/> is multiplied by (its manifest Tint; white without one).</summary>
+        public Color TintOf(string name)
+        {
+            return name != null && _tints.TryGetValue(name, out Color tint) ? tint : Color.White;
         }
 
         /// <summary>The manifest entry of sprite <paramref name="name"/>, or null.</summary>
@@ -84,7 +118,7 @@ namespace BeastCraft.Game.Rendering
 
         public void Dispose()
         {
-            foreach (Texture2D texture in _textures.Values)
+            foreach (Texture2D texture in _files)
             {
                 texture.Dispose();
             }
