@@ -36,6 +36,7 @@ namespace BeastCraft.Tooling.BalanceSim
 
             List<EncounterShape> shapes = catalogs[0].Shapes;
             string unit = options.EncounterSet == EncounterSet.Generated ? "shape" : "encounter";
+            AppendCalibration(report, options, seeds, catalogs, cells);
             report.AppendLine("## PvE marginal clear rate over seeds");
             report.AppendLine();
             report.AppendLine("Points of clear rate, levels averaged, exactly as each seed's \"Marginal clear rate by shape\" table. Per " + unit +
@@ -43,6 +44,10 @@ namespace BeastCraft.Tooling.BalanceSim
                               " in that " + unit + ".");
             report.AppendLine("Overall: mean, sample standard deviation and range over seeds, then each seed's value. Sorted by overall mean. **Bold** = mean above +" +
                               SimOptions.Format(options.MarginalThreshold) + ", _italic_ = below -" + SimOptions.Format(options.MarginalThreshold) + ".");
+            report.AppendLine("Normalized: the mean and SD over seeds of each seed's normalized overall marginal (every cell's marginal x 0.25 / (p (1 - p)),");
+            report.AppendLine("p = the cell's no-scouting clear rate, then averaged like the raw one: the marginal at a 50% cell). The balance guard reads it:");
+            report.AppendLine("within +/-" + SimOptions.Format(SimOptions.GuardElemental) + " `elemental`, +/-" + SimOptions.Format(SimOptions.GuardNeutral) +
+                              " `neutral` (**!** = outside).");
             report.AppendLine();
 
             foreach (KitMode mode in options.Modes)
@@ -57,6 +62,68 @@ namespace BeastCraft.Tooling.BalanceSim
             return report.ToString();
         }
 
+        /// <summary>
+        /// "PvE calibration over seeds": per kit mode and shape, levels averaged then seeds averaged,
+        /// the calibrated multiplier, the scouted-pick rate the calibration aimed at the target (a
+        /// scouted-pick calibration only) and the no-scouting rate (the mean of every team).
+        /// </summary>
+        private static void AppendCalibration(StringBuilder report, SimOptions options, List<int> seeds, List<EncounterCatalog> catalogs, List<List<PveCell>> cells)
+        {
+            int n = seeds.Count;
+            bool picked = options.CalibratesOnPick;
+            List<EncounterShape> shapes = catalogs[0].Shapes;
+            report.AppendLine("## PvE calibration over seeds");
+            report.AppendLine();
+            report.AppendLine(picked
+                ? "Calibrated on the " + PveReport.PickerName(options) + " (`--calibrate-on " + SimOptions.CalibrationName(options.EffectiveCalibrateOn) +
+                  "`): **Scouted** = the picked team's clear rate (the calibrated number), **No scouting** = the mean over every team, **Gap** ="
+                : "Calibrated on the mean of every team (`--calibrate-on mean`): **No scouting** = that mean, the calibrated number.");
+            report.AppendLine(picked
+                ? "scouted minus no scouting. Per shape: levels averaged, then seeds; the multiplier's range is over every level and seed."
+                : "Per shape: levels averaged, then seeds; the multiplier's range is over every level and seed.");
+            report.AppendLine();
+            report.AppendLine(picked ? "| Kit mode | Shape | Multiplier | Range | Scouted | No scouting | Gap |" : "| Kit mode | Shape | Multiplier | Range | No scouting |");
+            report.AppendLine(picked ? "| --- | --- | ---: | --- | ---: | ---: | ---: |" : "| --- | --- | ---: | --- | ---: |");
+            foreach (KitMode mode in options.Modes)
+            {
+                for (int e = 0; e <= shapes.Count; e++)
+                {
+                    double multiplier = 0.0;
+                    double scouted = 0.0;
+                    double none = 0.0;
+                    double low = double.MaxValue;
+                    double high = double.MinValue;
+                    int parts = 0;
+                    for (int s = 0; s < n; s++)
+                    {
+                        EncounterShape shape = e < shapes.Count ? catalogs[s].Shapes[e] : null;
+                        List<PveCell> part = cells[s].FindAll(c => c.Mode == mode && (shape == null || c.Shape == shape));
+                        foreach (PveCell cell in part)
+                        {
+                            multiplier += cell.Multiplier;
+                            scouted += picked ? cell.ScoutedClearRate : 0.0;
+                            none += cell.ClearRate;
+                            low = Math.Min(low, cell.Multiplier);
+                            high = Math.Max(high, cell.Multiplier);
+                            parts++;
+                        }
+                    }
+
+                    parts = Math.Max(1, parts);
+                    multiplier /= parts;
+                    scouted /= parts;
+                    none /= parts;
+                    string row = "| `" + SimOptions.ModeName(mode) + "` | " + (e < shapes.Count ? "`" + shapes[e].Id + "`" : "overall") + " | x" +
+                                 SimOptions.FormatMultiplier(multiplier) + " | x" + SimOptions.FormatMultiplier(low) + "-" + SimOptions.FormatMultiplier(high) + " | ";
+                    report.AppendLine(picked
+                        ? row + SimOptions.Format(scouted) + "% | " + SimOptions.Format(none) + "% | " + SimOptions.Signed(scouted - none) + " |"
+                        : row + SimOptions.Format(none) + "% |");
+                }
+            }
+
+            report.AppendLine();
+        }
+
         private static void AppendMode(StringBuilder report, SimOptions options, IReadOnlyList<CreatureSpeciesSO> species, List<int> seeds,
                                        List<EncounterShape> shapes, List<EncounterCatalog> catalogs, List<PveSimulator> simulators, List<List<PveCell>> cells,
                                        KitMode mode)
@@ -68,9 +135,11 @@ namespace BeastCraft.Tooling.BalanceSim
             // [seed][shape][beast] and [seed][beast].
             double[][][] byShape = new double[n][][];
             double[][] overall = new double[n][];
+            double[][] normalized = new double[n][];
             for (int s = 0; s < n; s++)
             {
-                PveReport.Marginals(options.ForSeed(seeds[s]), species, catalogs[s].Shapes, simulators[s], cells[s], mode, out byShape[s], out overall[s]);
+                PveReport.Marginals(options.ForSeed(seeds[s]), species, catalogs[s].Shapes, simulators[s], cells[s], mode, out byShape[s], out overall[s],
+                                    out normalized[s]);
             }
 
             double[][] shapeMean = new double[shapes.Count][];
@@ -123,6 +192,22 @@ namespace BeastCraft.Tooling.BalanceSim
                 sd[b] = n > 1 ? Math.Sqrt(squares / (n - 1)) : double.NaN;
             }
 
+            double[] normalizedMean = new double[beasts];
+            double[] normalizedSd = new double[beasts];
+            for (int b = 0; b < beasts; b++)
+            {
+                double[] values = new double[n];
+                for (int s = 0; s < n; s++)
+                {
+                    values[s] = normalized[s][b];
+                    normalizedMean[b] += normalized[s][b] / n;
+                }
+
+                normalizedSd[b] = n > 1 ? Math.Sqrt(TeamReport.Variance(values, true)) : double.NaN;
+            }
+
+            double guard = SimOptions.Guard(mode);
+
             List<int> overallOrder = PveReport.Order(beasts, b => mean[b]);
 
             report.AppendLine("### `" + SimOptions.ModeName(mode) + "`");
@@ -135,8 +220,8 @@ namespace BeastCraft.Tooling.BalanceSim
                 rule.Append(" ---: |");
             }
 
-            header.Append(" Overall mean | SD | Range |");
-            rule.Append(" ---: | ---: | ---: |");
+            header.Append(" Overall mean | SD | Range | Normalized mean | Normalized SD |");
+            rule.Append(" ---: | ---: | ---: | ---: | ---: |");
             foreach (int seed in seeds)
             {
                 header.Append(" " + seed.ToString(CultureInfo.InvariantCulture) + " |");
@@ -154,7 +239,9 @@ namespace BeastCraft.Tooling.BalanceSim
                 }
 
                 row.Append(" " + PveReport.Marked(options, mean[b]) + " | " + (double.IsNaN(sd[b]) ? "-" : SimOptions.Format(sd[b])) + " | " +
-                           SimOptions.Signed(low[b]) + " … " + SimOptions.Signed(high[b]) + " |");
+                           SimOptions.Signed(low[b]) + " … " + SimOptions.Signed(high[b]) + " | " + SimOptions.Signed(normalizedMean[b]) +
+                           (Math.Abs(normalizedMean[b]) > guard ? " **!**" : string.Empty) + " | " +
+                           (double.IsNaN(normalizedSd[b]) ? "-" : SimOptions.Format(normalizedSd[b])) + " |");
                 for (int s = 0; s < n; s++)
                 {
                     row.Append(" " + SimOptions.Signed(overall[s][b]) + " |");
@@ -189,6 +276,19 @@ namespace BeastCraft.Tooling.BalanceSim
             report.AppendLine("- Overall means: " + SimOptions.Signed(mean[overallOrder[beasts - 1]]) + " … " + SimOptions.Signed(mean[overallOrder[0]]) +
                               "; outside +/-" + SimOptions.Format(options.MarginalThreshold) + " on the mean: " +
                               (outside.Count == 0 ? "none" : string.Join(", ", outside)) + ".");
+            List<string> outsideGuard = new List<string>();
+            List<int> normalizedOrder = PveReport.Order(beasts, b => normalizedMean[b]);
+            foreach (int b in normalizedOrder)
+            {
+                if (Math.Abs(normalizedMean[b]) > guard)
+                {
+                    outsideGuard.Add(species[b].DisplayName + " " + SimOptions.Signed(normalizedMean[b]));
+                }
+            }
+
+            report.AppendLine("- Normalized overall means: " + SimOptions.Signed(normalizedMean[normalizedOrder[beasts - 1]]) + " … " +
+                              SimOptions.Signed(normalizedMean[normalizedOrder[0]]) + "; guard +/-" + SimOptions.Format(guard) + ": " +
+                              (outsideGuard.Count == 0 ? "every beast inside" : "outside: " + string.Join(", ", outsideGuard)) + ".");
             report.AppendLine("- Top " + SimOptions.NicheBand + " in at least one " + unit + " on the means: " + (beasts - noNiche.Count) + " of " + beasts +
                               (noNiche.Count == 0 ? string.Empty : " (not: " + string.Join(", ", noNiche) + ")") + ".");
             report.AppendLine();

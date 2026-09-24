@@ -1107,9 +1107,19 @@ largest against a lone giant or an elite group (+25 to +30 points); against squa
 whose mixed elements dilute any counter, it is +16 to +19 and simply bringing a strong lineup does
 better. The counter-pick fields every beast in every shape (between about 13% and 63% of picks each); none
 becomes a must-pick or a never-pick. See `docs/balance/tuning-log.md`,
-"Scouting and counter-picking", for the numbers and pick rates. Difficulty is still calibrated
-against the average team, not the counter-picked one; whether it should be is an open question for
-when encounters are authored.
+"Scouting and counter-picking", for the numbers and pick rates.
+
+**Difficulty assumes the player scouts (decision).** Encounter difficulty is tuned for a player who
+reads the preview and counter-picks, not for the average of every possible team: the simulator now
+calibrates each shape, level and kit mode so the team its bond-aware picker fields (the counter-pick
+above plus active team bonds) clears about 50% (`--calibrate-on bonds`, the default; README
+"Difficulty calibration"). Not scouting is then visibly worse, and by how much is itself a design
+number the report tracks as the **no-scouting** rate: on three seeds the average team clears about
+25% of `elemental` encounters so calibrated (about 10% against a lone giant, 22% against an elite
+group, 26% against a squad and 43% against a horde) and about 42% in the `neutral` control, where
+the chart gives the pick nothing to exploit. Per-beast balance is judged on marginals normalized to
+a 50% cell, since the lower average-team clear rate shrinks raw marginals. See
+`docs/balance/tuning-log.md`, "Scouting-based calibration".
 
 ## Damage formula — TUNABLE STARTING DEFAULTS, NOT CONFIRMED BALANCE
 

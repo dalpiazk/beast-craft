@@ -297,6 +297,12 @@ namespace BeastCraft.Tooling.BalanceSim
                 problems.AddRange(ScoutedPicker.Check(options, species, pve, cells));
             }
 
+            if (problems.Count == 0 && options.RunPve)
+            {
+                // A calibration miss is flagged in the report; only --self-check treats it as a failure.
+                problems.AddRange(ScoutedPicker.CheckCalibration(options, species, pve, cells, options.SelfCheck));
+            }
+
             TimeSpan pveTime = clock.Elapsed;
             if (options.RunPvp)
             {

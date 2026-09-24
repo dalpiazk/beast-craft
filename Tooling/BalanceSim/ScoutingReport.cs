@@ -89,7 +89,8 @@ namespace BeastCraft.Tooling.BalanceSim
             report.AppendLine("## PvE scouted picking over seeds");
             report.AppendLine();
             report.AppendLine("Each seed's \"PvE scouted picking\" figures, averaged over the seeds: mean clear rate (mean uplift over the seed's");
-            report.AppendLine("baseline, the average team). The heuristic column also gives the sample SD of its uplift over seeds. Pick rates are");
+            report.AppendLine((options.CalibratesOnPick ? "no-scouting rate" : "baseline") +
+                              ", the average team). The heuristic column also gives the sample SD of its uplift over seeds. Pick rates are");
             report.AppendLine("the mean share of picks fielding the beast; **0** / **100** = never / always, in every seed.");
             report.AppendLine();
             foreach (KitMode mode in options.Modes)
@@ -158,9 +159,22 @@ namespace BeastCraft.Tooling.BalanceSim
             report.AppendLine("What seeing the encounter is worth. Before a battle the player sees an `EncounterPreview` (enemy groups with their");
             report.AppendLine("elements, stances and counts; `--scouted-detail " + SimOptions.DetailName(options.ScoutedDetail) + "` here) and picks a team for it. Each strategy");
             report.AppendLine("below fields one of the " + simulator.Teams.Count + " simulated teams per composition, and that team's recorded result against the");
-            report.AppendLine("composition is the outcome: a regrouping of battles already run, at the same calibrated difficulty (still aimed at");
-            report.AppendLine("the average team). **Baseline** = the mean over every team (the unscouted player); the other columns give the");
-            report.AppendLine("clear rate and, in brackets, the uplift over the baseline in points.");
+            if (options.CalibratesOnPick)
+            {
+                string calibrated = options.EffectiveCalibrateOn == CalibrationTarget.Bonds ? "Heuristic + bonds" : "Heuristic";
+                report.AppendLine("composition is the outcome: a regrouping of the every-team battles at the calibrated difficulty, which is aimed at");
+                report.AppendLine("the **" + calibrated + "** pick (over " + options.CalibrateSamples + " battles per composition; its column here rests on " +
+                                  options.PveSamples + " per composition and level, so it sits");
+                report.AppendLine("within noise of the target). **No scouting** = the mean over every team (the unscouted player); the other columns");
+                report.AppendLine("give the clear rate and, in brackets, the uplift over no scouting in points.");
+            }
+            else
+            {
+                report.AppendLine("composition is the outcome: a regrouping of battles already run, at the same calibrated difficulty (still aimed at");
+                report.AppendLine("the average team). **Baseline** = the mean over every team (the unscouted player); the other columns give the");
+                report.AppendLine("clear rate and, in brackets, the uplift over the baseline in points.");
+            }
+
             report.AppendLine();
             if (ScoutedPicker.Runs(options, ScoutedPicker.RandomIndex))
             {
@@ -210,7 +224,7 @@ namespace BeastCraft.Tooling.BalanceSim
 
         private static void AppendRateHeader(StringBuilder report, SimOptions options, bool aggregate)
         {
-            StringBuilder header = new StringBuilder("| Shape | Baseline |");
+            StringBuilder header = new StringBuilder("| Shape | " + (options.CalibratesOnPick ? "No scouting" : "Baseline") + " |");
             StringBuilder rule = new StringBuilder("| --- | ---: |");
             for (int k = 0; k < ScoutedPicker.StrategyCount; k++)
             {

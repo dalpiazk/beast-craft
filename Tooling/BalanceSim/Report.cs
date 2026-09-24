@@ -65,6 +65,13 @@ namespace BeastCraft.Tooling.BalanceSim
                                   SimOptions.DetailName(options.ScoutedDetail) + "`; post-processing of the same battles, see \"PvE scouted picking\"");
             }
 
+            if (options.RunPve && options.CalibratesOnPick)
+            {
+                report.AppendLine("- Difficulty (PvE, `--calibrate-on " + SimOptions.CalibrationName(options.EffectiveCalibrateOn) + "`): calibrated so the team the " +
+                                  PveReport.PickerName(options) + " fields per composition clears " + SimOptions.Format(options.TargetClearRate) +
+                                  "% (the player scouts and counter-picks); the average team's no-scouting rate is reported beside it, see \"Calibrated difficulty\"");
+            }
+
             report.AppendLine();
 
             if (options.KitSource == KitSource.Library)

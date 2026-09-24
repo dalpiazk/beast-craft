@@ -2408,3 +2408,92 @@ units other than the three bosses, and footprints in hand-authored encounters, a
 
 Reproduce: `dotnet run --project Tooling/BalanceSim -c Release -- --seeds 12345,777,4242 --out out/footprints.md`
 (about 150 s).
+
+## Scouting-based calibration
+
+Design decision (milestone 2): encounter difficulty assumes the player **scouts and counter-picks**.
+The simulator used to calibrate each (shape, level, kit mode) so the *average* of the 210 teams
+cleared 50%; "Scouting and counter-picking" showed a scouting player then clears about 70%. It now
+calibrates so the team the **bond-aware scouted picker** (heuristic + bonds) fields against each
+composition clears 50% (`--calibrate-on bonds`, the default; README "Difficulty calibration"), and
+reports the average team's rate beside it as the **no-scouting** rate. No beast, skill, bond, avatar
+or enemy data changed.
+
+How: the picks depend on the preview alone, so they are worked out once per shape
+(`ScoutedPicker.PicksFor`). Each search step runs only the picked team per composition,
+`--calibrate-samples` (16) times: 8 x 16 = 128 battles a step (SE about 4.4 points) instead of 1680.
+The picked battles are seeded like the every-team ones (sample 0 is exactly the picked team's
+every-team battle; the self-check verifies it). Same bracket and 8 bisections. At the chosen
+multiplier every team runs once, and every metric, the composition and bond sections, scouting and
+the no-scouting rate come from that run. `--calibrate-on heuristic` aims the plain counter-pick;
+`--calibrate-on mean` is the old calibration and **reproduces the committed report byte for byte**
+(`cmp` against `git show HEAD:docs/balance/tuned-report.md`: identical, SHA-256 `d14cda26...`).
+
+**Normalized marginals.** At a cell clear rate p a beast's marginal scales with p (1 - p), so the
+lower average-team rate shrinks raw marginals (most in the boss shapes, p about 10-20%). The report
+and the aggregate add **normalized** = marginal x 0.25 / (p (1 - p)) per cell (p = the no-scouting
+rate), averaged like the raw one; the flags and the balance guard (3-seed mean within +/-4
+`elemental`, +/-7 `neutral`) now read it. It amplifies noise by the same factor (about 2x at 13%),
+so the normalized SDs over seeds run 1.3-4.8 in `elemental`, against 0.8-4.3 raw before.
+
+**Calibration** (`--seeds 12345,777,4242`, default arguments; levels averaged, then seeds):
+
+| Kit mode | Shape | Multiplier before (mean) | Multiplier now | Scouted | No scouting | Gap |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| `elemental` | `solo` | x0.941 | x1.153 | 49.6% | 10.3% | +39.3 |
+| `elemental` | `elite` | x0.864 | x0.982 | 50.1% | 21.9% | +28.2 |
+| `elemental` | `squad` | x1.224 | x1.340 | 50.3% | 26.0% | +24.3 |
+| `elemental` | `horde` | x1.138 | x1.176 | 48.7% | 42.7% | +6.0 |
+| `elemental` | overall | x1.042 | x1.163 | 49.7% | 25.2% | +24.4 |
+| `neutral` | `solo` | x0.902 | x0.930 | 48.4% | 28.6% | +19.8 |
+| `neutral` | `elite` | x0.843 | x0.841 | 50.9% | 50.1% | +0.7 |
+| `neutral` | `squad` | x1.215 | x1.233 | 50.3% | 43.6% | +6.8 |
+| `neutral` | `horde` | x1.165 | x1.173 | 49.7% | 46.9% | +2.8 |
+| `neutral` | overall | x1.031 | x1.044 | 49.8% | 42.3% | +7.5 |
+
+- **Not scouting costs about 25 points** in `elemental`: the average team clears about a quarter
+  of encounters calibrated for the scouting player, a lone giant about one in ten. The gap is the
+  counter-pick's value, as before (+20 to +25 on the old calibration), now read from the other side
+  (and somewhat larger). Hordes, whose mixed elements dilute any counter, barely move (+6).
+- **`neutral` is the control**: with the chart off the bond-aware pick knows only bonds, and the
+  gap is +0.7 (elite) to +20 (solo); +7.5 overall.
+- **Misses are level-1 steps.** Four of 72 cells over the three seeds end more than 10 points off
+  (seed 12345 `neutral` `solo` L1 35.9%; 777 `neutral` `elite` L1 66.4%; 4242 `elemental` `horde`
+  L1 39.1% and `neutral` `solo` L1 63.3%): in each the picked teams' rate jumps across 50% between
+  two multipliers less than 1% apart (a single stat rounding at level 1, which the few picked
+  teams react to alike, where 210 teams averaged it out). They are flagged in the report and pass
+  the self-check, which fails only a miss that is not such a step.
+- In the scouting section the **Heuristic + bonds** column now sits at the target (48.3%
+  `elemental` overall over seeds, on one battle per composition and level against the
+  calibration's 16), and the plain heuristic reaches 51.4%: the two pickers are worth about the
+  same, as before.
+
+**Guard** (3-seed mean overall marginal; before = `--calibrate-on mean`, the continuity run, which
+reproduces the "Large enemies (footprints)" after-column exactly; after = the new default, raw and
+normalized; the guard reads the normalized figure):
+
+| Beast | Stance | `elemental` before | raw | normalized | `neutral` before | raw | normalized |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Golem | Vanguard | +1.6 | +1.6 | +3.4 | +5.8 | +4.1 | +4.8 |
+| Phoenix | Ranged | +1.1 | +1.7 | +2.1 | -0.4 | -0.8 | -1.3 |
+| Tarasque | Vanguard | +1.0 | +0.3 | +2.3 | -3.6 | -2.9 | -3.4 |
+| Frost Wyrm | Vanguard | +0.7 | +1.2 | -0.7 | -1.5 | +0.2 | 0.0 |
+| Treant | Vanguard | +0.7 | +1.3 | +2.7 | +1.3 | +1.7 | +2.2 |
+| Kirin | Ranged | +0.5 | +0.5 | +0.8 | -0.5 | -0.6 | -0.9 |
+| Basilisk | Ranged | +0.4 | +0.2 | +1.5 | +1.9 | +1.6 | +2.0 |
+| Leviathan | Vanguard | -0.9 | -0.9 | -2.3 | +0.6 | +0.1 | +0.4 |
+| Thunderbird | Skirmisher | -2.4 | -2.9 | **-5.0** | +2.0 | +1.3 | +1.0 |
+| Griffin | Skirmisher | -2.6 | -3.1 | **-4.8** | -5.6 | -4.8 | -4.9 |
+
+`neutral` is inside the guard (-4.9 ... +4.8). **`elemental` is not: Thunderbird -5.0 and Griffin
+-4.8 are outside +/-4** (the raw means, -2.9 and -3.1, would pass). Both Skirmishers already sat at
+the bottom on the old calibration (-2.4 / -2.6); the normalization weights the boss shapes up (x2.7
+`solo`, x1.5 `elite` at their mean p), and both are weakest there (`elite` -4.1 / -5.6 raw, Griffin `horde` -8.9).
+**Not tuned here**: the retune under the new calibration is stage D (Griffin / Thunderbird are on
+its list already).
+
+**Runtime.** The default run fell from about 52 s to 11 s (PvE about 10 s), `--self-check` to 22 s,
+three seeds from about 150 s to 33 s; `--calibrate-on mean` costs what the default did (3 seeds 166 s).
+
+Reproduce: `dotnet run --project Tooling/BalanceSim -c Release -- --seeds 12345,777,4242 --out out/scoutcal.md`
+(about 35 s) and the continuity run with `--calibrate-on mean` added (about 170 s).

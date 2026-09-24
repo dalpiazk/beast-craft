@@ -95,8 +95,9 @@ namespace BeastCraft.Tooling.BalanceSim
         public bool Reused;
 
         /// <summary>
-        /// With <c>--calibrate-sample</c>: true for the one evaluation of every team at the chosen
-        /// multiplier that follows the sampled search (the others then cover only the sample).
+        /// With a scouted-pick calibration (<c>--calibrate-on heuristic|bonds</c>) or
+        /// <c>--calibrate-sample</c>: true for the one evaluation of every team at the chosen
+        /// multiplier that follows the search (the others then cover only the picked teams or the sample).
         /// </summary>
         public bool Final;
     }
@@ -111,7 +112,43 @@ namespace BeastCraft.Tooling.BalanceSim
         public int Level;
         public EncounterShape Shape;
         public double Multiplier;
+
+        /// <summary>
+        /// The mean clear rate of every team over every composition at <see cref="Multiplier"/>: what
+        /// <c>--calibrate-on mean</c> aims at the target, and otherwise the no-scouting rate (the
+        /// player who does not look at the encounter and brings a random team).
+        /// </summary>
         public double ClearRate;
+
+        /// <summary>What the calibration aimed at the target (<see cref="SimOptions.EffectiveCalibrateOn"/>).</summary>
+        public CalibrationTarget CalibratedOn;
+
+        /// <summary>
+        /// Scouted-pick calibration only: the picked team's clear rate at <see cref="Multiplier"/>,
+        /// over <see cref="CalibrationSamples"/> battles per composition (the calibrated number);
+        /// NaN with <c>--calibrate-on mean</c>.
+        /// </summary>
+        public double ScoutedClearRate = double.NaN;
+
+        /// <summary>Scouted-pick calibration only: per composition, the team index the picker fields; null with <c>--calibrate-on mean</c>.</summary>
+        public int[] Picks;
+
+        /// <summary>Scouted-pick calibration only: battles per composition per search step (<c>--calibrate-samples</c>).</summary>
+        public int CalibrationSamples;
+
+        /// <summary>
+        /// Scouted-pick calibration only: the picked teams' battles at <see cref="Multiplier"/>
+        /// (<see cref="PveSimulator.RunPicked"/>: composition <c>c</c>, sample <c>s</c> at
+        /// <c>c * CalibrationSamples + s</c>), behind <see cref="ScoutedClearRate"/>; null otherwise.
+        /// </summary>
+        public PveBattle[] PickedBattles;
+
+        /// <summary>The rate the calibration aimed at the target: <see cref="ScoutedClearRate"/>, or <see cref="ClearRate"/> with <c>--calibrate-on mean</c>.</summary>
+        public double CalibratedRate
+        {
+            get { return CalibratedOn == CalibrationTarget.Mean ? ClearRate : ScoutedClearRate; }
+        }
+
         public List<CalibrationPoint> Evaluations = new List<CalibrationPoint>();
 
         /// <summary>
@@ -263,13 +300,37 @@ namespace BeastCraft.Tooling.BalanceSim
         /// depend only on the inputs. Battles are random (damage variance and crits), so each team
         /// fights each composition <see cref="Samples"/> times with distinct seeds and the clear rate
         /// is over all of them.
+        /// <para>
+        /// What is aimed at the target is <see cref="SimOptions.EffectiveCalibrateOn"/>: by default
+        /// the team the bond-aware scouted picker fields against each composition (the player is
+        /// assumed to scout and counter-pick), whose battles alone are run at each step,
+        /// <c>--calibrate-samples</c> times per composition (<see cref="RunPicked"/>); the chosen
+        /// multiplier then runs every team once, which every metric and the no-scouting rate
+        /// (<see cref="PveCell.ClearRate"/>) come from. <c>--calibrate-on mean</c> aims the mean of
+        /// every team at the target instead (every team at every step), exactly as before scouting.
+        /// </para>
         /// </summary>
         public PveCell RunCell(KitMode mode, int level, EncounterShape shape)
         {
-            PveCell cell = new PveCell { Mode = mode, Level = level, Shape = shape, Samples = Samples, TeamCount = Teams.Count };
+            CalibrationTarget calibrateOn = _options.EffectiveCalibrateOn;
+            PveCell cell = new PveCell { Mode = mode, Level = level, Shape = shape, Samples = Samples, TeamCount = Teams.Count, CalibratedOn = calibrateOn };
             double target = _options.TargetClearRate;
             PveBattle[] best = null;
             double bestGap = double.MaxValue;
+            double bestRate = double.NaN;
+
+            // --calibrate-on heuristic|bonds: the search runs only the team the picker fields against
+            // each composition (the picks depend on the preview alone, so once per shape), each
+            // CalibrateSamples times; the chosen multiplier then runs every team once (below).
+            int[] picks = null;
+            int pickSamples = 0;
+            if (calibrateOn != CalibrationTarget.Mean)
+            {
+                picks = ScoutedPicker.PicksFor(_options, _species, Teams, TeamBonds, shape, ScoutedPicker.StrategyFor(calibrateOn));
+                pickSamples = _options.CalibrateSamples;
+                cell.Picks = picks;
+                cell.CalibrationSamples = pickSamples;
+            }
 
             // The multiplier reaches a battle only through Scale(enemy stats), and every battle's
             // seed ignores it, so two multipliers that scale every enemy of the shape to the same
@@ -279,9 +340,9 @@ namespace BeastCraft.Tooling.BalanceSim
             List<int[]> evaluatedScales = new List<int[]>();
             List<PveBattle[]> evaluatedBattles = new List<PveBattle[]>();
 
-            // --calibrate-sample: the search evaluates a subset of the teams, and only the chosen
-            // multiplier is then run with every team (below).
-            int[] searchTeams = CalibrationTeams;
+            // --calibrate-sample (mean only): the search evaluates a subset of the teams, and only the
+            // chosen multiplier is then run with every team (below).
+            int[] searchTeams = picks == null ? CalibrationTeams : null;
 
             double Evaluate(double multiplier)
             {
@@ -299,7 +360,8 @@ namespace BeastCraft.Tooling.BalanceSim
                 bool reused = battles != null;
                 if (!reused)
                 {
-                    battles = searchTeams == null ? RunAllTeams(mode, level, shape, multiplier) : RunTeams(mode, level, shape, multiplier, searchTeams);
+                    battles = picks != null ? RunPicked(mode, level, shape, multiplier, picks, pickSamples)
+                        : searchTeams == null ? RunAllTeams(mode, level, shape, multiplier) : RunTeams(mode, level, shape, multiplier, searchTeams);
                     evaluatedScales.Add(scale);
                     evaluatedBattles.Add(battles);
                 }
@@ -325,6 +387,7 @@ namespace BeastCraft.Tooling.BalanceSim
                 {
                     bestGap = gap;
                     best = battles;
+                    bestRate = rate;
                     cell.Multiplier = multiplier;
                     cell.ClearRate = rate;
                 }
@@ -386,7 +449,13 @@ namespace BeastCraft.Tooling.BalanceSim
                 }
             }
 
-            if (searchTeams != null)
+            if (picks != null)
+            {
+                cell.ScoutedClearRate = bestRate;
+                cell.PickedBattles = best;
+            }
+
+            if (searchTeams != null || picks != null)
             {
                 System.Diagnostics.Stopwatch clock = System.Diagnostics.Stopwatch.StartNew();
                 best = RunAllTeams(mode, level, shape, cell.Multiplier);
@@ -409,6 +478,31 @@ namespace BeastCraft.Tooling.BalanceSim
 
             cell.Battles = best;
             return cell;
+        }
+
+        /// <summary>
+        /// The scouted-pick calibration's battles: against each composition <c>c</c> of the shape, the
+        /// picked team <paramref name="picks"/>[c], <paramref name="samples"/> times (samples 0 to
+        /// n-1), stored at <c>c * samples + s</c>. Each battle is the one <see cref="RunAllTeams"/>
+        /// would play for that team and sample, seed and all, so sample 0 is exactly the all-teams
+        /// battle of the picked team.
+        /// </summary>
+        public PveBattle[] RunPicked(KitMode mode, int level, EncounterShape shape, double multiplier, int[] picks, int samples)
+        {
+            PveBattle[] battles = new PveBattle[shape.Compositions.Count * samples];
+            bool[] playersWinTies = new bool[shape.Compositions.Count];
+            for (int c = 0; c < shape.Compositions.Count; c++)
+            {
+                playersWinTies[c] = PlayersWinTies(mode, level, shape.Compositions[c].Id)[picks[c]];
+            }
+
+            Parallel.For(0, battles.Length, i =>
+            {
+                int c = i / samples;
+                battles[i] = RunBattle(mode, level, shape.Compositions[c], multiplier, picks[c], i % samples, false, playersWinTies[c], out _);
+            });
+
+            return battles;
         }
 
         /// <summary>

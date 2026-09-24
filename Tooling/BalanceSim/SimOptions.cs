@@ -28,6 +28,19 @@ namespace BeastCraft.Tooling.BalanceSim
         Library = 1
     }
 
+    /// <summary>What the PvE difficulty calibration aims at the target clear rate (<c>--calibrate-on</c>).</summary>
+    public enum CalibrationTarget
+    {
+        /// <summary>The mean over every team (the unscouted player): the calibration before scouting existed.</summary>
+        Mean = 0,
+
+        /// <summary>The team the element counter-pick heuristic fields per composition (<see cref="ScoutedPicker.Pick"/>).</summary>
+        Heuristic = 1,
+
+        /// <summary>The team the bond-aware picker fields per composition (<see cref="ScoutedPicker.PickWithBonds"/>); the default.</summary>
+        Bonds = 2
+    }
+
     /// <summary>
     /// Every tunable the simulator has, in one place. The constants are the defaults; the CLI
     /// overrides the subset exposed by <see cref="Parse"/>.
@@ -142,6 +155,22 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <summary>A calibrated clear rate further than this from the target is reported as a calibration miss.</summary>
         public const double CalibrationTolerance = 10.0;
 
+        /// <summary>
+        /// <c>--calibrate-samples</c> default: battles per composition the picked team fights at each
+        /// step of a scouted-pick calibration (8 compositions x 16 = 128 battles per step, a
+        /// binomial standard error of about 4.4 points at 50%).
+        /// </summary>
+        public const int DefaultCalibrateSamples = 16;
+
+        /// <summary>
+        /// The balance guard on the multi-seed mean of each beast's normalized overall marginal
+        /// (<see cref="PveReport.NormalizationFactor"/>): within +/- this in <c>elemental</c>...
+        /// </summary>
+        public const double GuardElemental = 4.0;
+
+        /// <summary>... and within +/- this in <c>neutral</c>.</summary>
+        public const double GuardNeutral = 7.0;
+
         // ------------------------------------------------------------------------------------
         // Generated encounters (EncounterGenerator). Compositions per shape, and the weights of
         // the element schemes a composition is assigned (see ElementScheme).
@@ -235,6 +264,16 @@ namespace BeastCraft.Tooling.BalanceSim
         /// </summary>
         public int CalibrateSample;
 
+        /// <summary>
+        /// <c>--calibrate-on</c>: whose clear rate the difficulty search aims at the target. The
+        /// bond-aware scouted pick by default (see <see cref="EffectiveCalibrateOn"/> for its
+        /// fallback); <see cref="CalibrationTarget.Mean"/> is the calibration before scouting.
+        /// </summary>
+        public CalibrationTarget CalibrateOn = CalibrationTarget.Bonds;
+
+        /// <summary><c>--calibrate-samples</c>: battles per composition per step of a scouted-pick calibration.</summary>
+        public int CalibrateSamples = DefaultCalibrateSamples;
+
         /// <summary>The PvE avatar preset (<c>--avatar</c>); the library avatar by default, <see cref="AvatarPresets.None"/> fields none.</summary>
         public string AvatarPreset = AvatarPresets.Library;
 
@@ -307,6 +346,42 @@ namespace BeastCraft.Tooling.BalanceSim
             get { return Bonds && KitSource == KitSource.Library && Library != null && Library.TeamBonds.Count > 0; }
         }
 
+        /// <summary>
+        /// The calibration target this run actually uses: <see cref="CalibrateOn"/>, except that the
+        /// bond-aware pick falls back to the plain heuristic when bonds are not active
+        /// (<c>--bonds off</c> or <c>--skill-kit standard</c>), where it has no bonds to weigh.
+        /// </summary>
+        public CalibrationTarget EffectiveCalibrateOn
+        {
+            get { return CalibrateOn == CalibrationTarget.Bonds && !BondsActive ? CalibrationTarget.Heuristic : CalibrateOn; }
+        }
+
+        /// <summary>Whether the difficulty is calibrated on a scouted pick (anything but <c>--calibrate-on mean</c>).</summary>
+        public bool CalibratesOnPick
+        {
+            get { return CalibrateOn != CalibrationTarget.Mean; }
+        }
+
+        /// <summary>The <c>--calibrate-on</c> spelling of <paramref name="target"/>.</summary>
+        public static string CalibrationName(CalibrationTarget target)
+        {
+            switch (target)
+            {
+                case CalibrationTarget.Mean:
+                    return "mean";
+                case CalibrationTarget.Heuristic:
+                    return "heuristic";
+                default:
+                    return "bonds";
+            }
+        }
+
+        /// <summary>The guard on a beast's normalized overall marginal (multi-seed mean) in <paramref name="mode"/>.</summary>
+        public static double Guard(KitMode mode)
+        {
+            return mode == KitMode.Elemental ? GuardElemental : GuardNeutral;
+        }
+
         /// <summary>Whether this run fields anything from the skill library.</summary>
         public bool NeedsLibrary
         {
@@ -375,10 +450,17 @@ namespace BeastCraft.Tooling.BalanceSim
             "                             PvE battle loop against BattleTurnExecutor.RunBattle.\n" +
             "  --timings                  Print a wall-clock breakdown (per PvE cell and calibration step, PvP, report, GC)\n" +
             "                             to stderr. Never changes the report.\n" +
-            "  --calibrate-sample <n>     Opt-in speed-up that CHANGES results: the difficulty search evaluates a seeded\n" +
-            "                             subset of n teams (e.g. 50 of 210), then the chosen multiplier runs once with every\n" +
-            "                             team; the report's numbers all come from that full run (default: off, every team at\n" +
-            "                             every step).\n" +
+            "  --calibrate-on <t>         bonds | heuristic | mean (default bonds): whose PvE clear rate the difficulty is\n" +
+            "                             calibrated to --target-clear. bonds / heuristic = the team that scouted picker fields\n" +
+            "                             per composition (the player is assumed to scout and counter-pick; bonds falls back to\n" +
+            "                             heuristic when bonds are off or with --skill-kit standard); mean = the mean of every\n" +
+            "                             team (the unscouted player; the calibration before scouting).\n" +
+            "  --calibrate-samples <n>    Scouted-pick calibration: battles per composition the picked team fights at each\n" +
+            "                             search step (default 16). The chosen multiplier then runs once with every team.\n" +
+            "  --calibrate-sample <n>     --calibrate-on mean only. Opt-in speed-up that CHANGES results: the difficulty search\n" +
+            "                             evaluates a seeded subset of n teams (e.g. 50 of 210), then the chosen multiplier runs\n" +
+            "                             once with every team; the report's numbers all come from that full run (default: off,\n" +
+            "                             every team at every step).\n" +
             "  --help                     Show this text.\n";
 
         /// <summary>Parses the command line. Returns null and fills <paramref name="error"/> on bad input.</summary>
@@ -411,6 +493,36 @@ namespace BeastCraft.Tooling.BalanceSim
                         if (!TryNextInt(args, ref i, arg, 1, out options.CalibrateSample, out error))
                         {
                             return null;
+                        }
+
+                        break;
+                    case "--calibrate-samples":
+                        if (!TryNextInt(args, ref i, arg, 1, out options.CalibrateSamples, out error))
+                        {
+                            return null;
+                        }
+
+                        break;
+                    case "--calibrate-on":
+                        if (!TryNext(args, ref i, arg, out text, out error))
+                        {
+                            return null;
+                        }
+
+                        switch (text.ToLowerInvariant())
+                        {
+                            case "mean":
+                                options.CalibrateOn = CalibrationTarget.Mean;
+                                break;
+                            case "heuristic":
+                                options.CalibrateOn = CalibrationTarget.Heuristic;
+                                break;
+                            case "bonds":
+                                options.CalibrateOn = CalibrationTarget.Bonds;
+                                break;
+                            default:
+                                error = "--calibrate-on expects bonds, heuristic or mean, got '" + text + "'.";
+                                return null;
                         }
 
                         break;
@@ -744,6 +856,12 @@ namespace BeastCraft.Tooling.BalanceSim
             if (seedGiven && options.Seeds != null)
             {
                 error = "--seed and --seeds cannot be combined.";
+                return null;
+            }
+
+            if (options.CalibrateSample > 0 && options.CalibratesOnPick)
+            {
+                error = "--calibrate-sample only applies with --calibrate-on mean (a scouted-pick calibration already searches on the picked teams alone).";
                 return null;
             }
 
