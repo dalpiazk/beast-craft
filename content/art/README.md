@@ -3,7 +3,7 @@
 | Folder | What | Shipped |
 | --- | --- | --- |
 | `pixel/` | The code-generated pixel placeholders (`Tooling/PixelArt`) and **the art manifest**, `pixel-art-manifest.json`, which indexes every sprite the game draws, including the illustrated ones below. | yes |
-| `beasts/<id>/<id>.png` | Illustrated in-game beast sprites: about 512 px tall, straight alpha, feet pivot, linear filter. Exported from the masters by `Tooling/ArtLab/scripts/export_ingame.py`. Listed in the manifest through `Tooling/PixelArt/illustrated.json`. | yes |
+| `beasts/<id>/<id>.png` | Illustrated in-game beast sprites: 512x512 frames (504 px on the longer side), straight alpha, feet pivot, linear filter. Exported from the masters by `Tooling/ArtLab/scripts/export_ingame.py`. Listed in the manifest through `Tooling/PixelArt/illustrated.json`. | yes |
 | `source/<id>/` | Archival masters of the illustrated beasts. Not loaded by the game and not copied into builds. | no |
 
 All PNGs are stored in Git LFS (see `.gitattributes`).
