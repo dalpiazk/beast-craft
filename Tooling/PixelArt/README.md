@@ -27,9 +27,33 @@ loads the PNGs at runtime (`Texture2D.FromStream`), indexed by the manifest. The
 (`content/data/Vfx/vfx-library.json`) names sheets by sprite `Name` and colours by palette char, and
 `VfxLibraryValidator` checks both against this manifest.
 
+## Illustrated sprites in the same manifest
+The game reads **one** art manifest, so the illustrated beasts (the starter trio's AI-assisted art,
+`content/art/beasts/<id>/<id>.png`) are listed in it too. They are not built from text grids:
+- `Tooling/ArtLab/scripts/export_ingame.py` exports each PNG from its master
+  (`content/art/source/<id>/character.png`) and prints its feet pivot.
+- `illustrated.json` (hand-kept, beside this README) lists each one: Name, File (relative to
+  `content/art/pixel/`, so `../beasts/<id>/<id>.png`), Category, Label, ArtKey, PivotX/PivotY and
+  **WorldHeight**, the in-game height from the feet to the top of the art in world units (1 = one hex
+  column step; the pixel placeholders stand about 0.75 tall).
+- `build.py` merges those entries into the manifest, sorted by name with the generated ones: it reads
+  each PNG's size and the top row of its art, and writes `Filter: "linear"`, `Premultiplied: false`
+  and `PixelsPerUnit = (PivotY - top row) / WorldHeight`.
+
+So a species' size is a data decision: change its WorldHeight and rebuild. `build.py` only reads
+those PNGs, so the rebuild still leaves `git status` clean. The species' `ArtKey` in
+`content/data/Creatures/beast-roster.json` picks the illustrated entry (`beast/<id>/illustrated`)
+or the pixel placeholder (`beast/<id>`), which stays in the manifest.
+
+Why merge a hand-kept file here instead of a second manifest: the loader, the validators
+(`ArtManifestValidator`, `ArtReferenceValidator`, `VfxLibraryValidator`) and both hosts already
+index one file, and every entry stays in one schema-v2 list. Hand-editing the generated manifest
+would be overwritten by the next build.
+
 ## Files
 | Path | What |
 | --- | --- |
+| `illustrated.json` | the hand-kept illustrated sprites merged into the manifest (see above) |
 | `palette.json` | 31 colours + transparent, shading ramps, element -> colours map |
 | `STYLE.md` | style rules (outline, light, ramps, dithering, sizes, rarity) |
 | `sprites/*.txt` | the source art (edit these) |

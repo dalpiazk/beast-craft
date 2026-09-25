@@ -53,7 +53,7 @@ namespace BeastCraft.Tests.EditMode
         [Test]
         public void ArtKey_ReachesTheRuntimeSpecies_ForBeastsAndEnemies()
         {
-            Assert.AreEqual("beast/phoenix", Content.Battle.GetSpecies("phoenix").ArtKey);
+            Assert.AreEqual("beast/phoenix/illustrated", Content.Battle.GetSpecies("phoenix").ArtKey);
             Assert.AreEqual("enemy/giant", Content.Enemies.Species("giant", Element.Water).ArtKey);
             Assert.AreEqual("enemy/archer", Content.Enemies.Get("archer").ArtKey);
         }
@@ -241,7 +241,7 @@ namespace BeastCraft.Tests.EditMode
                 data.ArtKey = key;
             }
 
-            Assert.AreEqual("beast/golem", with.ArtKey);
+            Assert.AreEqual("beast/golem/illustrated", with.ArtKey);
             Assert.IsNull(without.ArtKey);
             without.ArtKey = with.ArtKey;
             Assert.AreEqual(FieldJson.ToJson(with), FieldJson.ToJson(without));

@@ -61,6 +61,47 @@ namespace BeastCraft.Vfx
             return null;
         }
 
+        /// <summary>
+        /// A sprite's <see cref="ArtSpriteData.File"/> (relative to the manifest's folder, forward
+        /// slashes, <c>..</c> allowed: the illustrated beasts live in <c>art/beasts/</c> beside
+        /// <c>art/pixel/</c>) as a path relative to the content root, with every <c>.</c> and
+        /// <c>..</c> resolved (<c>../beasts/golem/golem.png</c> is <c>art/beasts/golem/golem.png</c>).
+        /// Null when it is empty, rooted, uses backslashes or climbs out of the content root.
+        /// </summary>
+        public static string ResolveFile(string file)
+        {
+            if (string.IsNullOrEmpty(file) || file.IndexOf('\\') >= 0 || file.IndexOf(':') >= 0 || file[0] == '/')
+            {
+                return null;
+            }
+
+            const string content = "content/";
+            List<string> parts = new List<string>(ProjectRelativePath.Substring(content.Length).Split('/'));
+            parts.RemoveAt(parts.Count - 1);
+            foreach (string part in file.Split('/'))
+            {
+                if (part.Length == 0 || part == ".")
+                {
+                    continue;
+                }
+
+                if (part == "..")
+                {
+                    if (parts.Count == 0)
+                    {
+                        return null;
+                    }
+
+                    parts.RemoveAt(parts.Count - 1);
+                    continue;
+                }
+
+                parts.Add(part);
+            }
+
+            return parts.Count == 0 ? null : string.Join("/", parts);
+        }
+
         /// <summary>The first sprite whose <see cref="ArtSpriteData.ArtKey"/> is <paramref name="artKey"/>, or null.</summary>
         public ArtSpriteData FindByArtKey(string artKey)
         {
