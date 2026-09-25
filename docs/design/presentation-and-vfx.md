@@ -339,8 +339,10 @@ example target outlined.
 ## Skill detail card and glossary
 
 Tapping (or clicking; hovering previews) a skill in the strip opens its **detail card** over the
-lower board (`PortraitLayout.SkillDetail`, with `SkillDetailIcon`, `SkillDetailDiagram` and
-`SkillDetailText`). `SkillCard.Of(skill, glossary)` (Presentation, pure) works out everything it
+lower board: `SkillCardLayout` places it on the board's foot (inside `PortraitLayout.SkillDetail`),
+as tall as its content, with the stats, power and scaling lines word-wrapped to the card's full
+width above the split, then the range diagram beside the wrapped description (a word wider than a
+line is broken between characters). `SkillCard.Of(skill, glossary)` (Presentation, pure) works out everything it
 shows from the skill's data: the icon (`ArtKey`), name, element and damage-category tags, target
 tags (Ally, Enemy, Self: the shape and side, a burst or whole-team skill covering its caster),
 cooldown ("Every turn" at 0 or 1), range ("Melee", "Range 3", "Line 4", "Burst 2 around self",
@@ -359,8 +361,11 @@ case-aware — a lowercase form also matches with a capital first letter, a form
 name) only exactly — the longest form winning, then the earlier term: deterministic.
 `RichTextLayout` wraps the spans to the text area (a phrase keeps its term across a line break;
 words of one kind merge into one run) and hit-tests taps (`TermAt`). Terms are drawn in their
-category's colour and underlined; tapping one opens its definition in a popup above it
-(`PortraitLayout.PopupNear`); any tap closes it, and a tap off the card closes the card.
+category's colour and underlined; tapping one opens its definition in a popup
+(`PopupPlacement`, via `SkillCardLayout.PlacePopup`) that never covers the term or the description
+block: below them when it fits inside the card, else flipped above, clamped into the card (which
+lies inside the safe area), with a small pointer toward the term. Any tap — on the popup or
+elsewhere — closes it, and a tap off the card closes the card.
 `GlossaryValidator` (on every content load, and tested) checks the file (unique snake_case ids and
 names, a category, a definition, no form in two terms) and that **every term used in skill text
 resolves** (each mark in a beast skill's, avatar active's, passive's or enemy-library skill's name

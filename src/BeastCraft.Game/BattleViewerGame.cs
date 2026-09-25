@@ -540,7 +540,7 @@ namespace BeastCraft.Game
                 return;
             }
 
-            // The pinned skill card: a tap closes an open definition, or opens the tapped term's.
+            // The pinned skill card: any tap (on the popup or anywhere else) closes an open definition; else a tap on a term opens its.
             IReadOnlyList<SkillSO> skills = ActingSkills();
             bool pinned = _selectedSkill >= 0 && _selectedSkill < skills.Count;
             if (pinned && _popupTerm != null)
@@ -551,8 +551,7 @@ namespace BeastCraft.Game
 
             if (pinned && _screen.SkillDetail.Contains(at.X, at.Y))
             {
-                Rect text = _screen.SkillDetailText;
-                _popupTerm = CardTextLayout(SkillCard.Of(skills[_selectedSkill], _content.Glossary)).TermAt(at.X - text.X, at.Y - text.Y);
+                _popupTerm = CardLayout(SkillCard.Of(skills[_selectedSkill], _content.Glossary)).TermAt(at.X, at.Y);
                 return;
             }
 

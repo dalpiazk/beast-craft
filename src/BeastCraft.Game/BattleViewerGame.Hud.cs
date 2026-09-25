@@ -25,7 +25,6 @@ namespace BeastCraft.Game
         private const float Small = 15f;
         private const float Medium = 20f;
         private const float Large = 25f;
-        private const float DescriptionSize = 21f;
 
         private Texture2D _pixel;
         private GlossaryTerm _popupTerm;
@@ -229,7 +228,7 @@ namespace BeastCraft.Game
 
         /// <summary>
         /// The skill detail card of the selected (hovered or tapped) skill, grown from the old
-        /// range-diagram card (<see cref="SkillCard"/>, laid out by <see cref="PortraitLayout.SkillDetail"/>):
+        /// range-diagram card (<see cref="SkillCard"/>, laid out by <see cref="SkillCardLayout"/>):
         /// icon, name, element / category / target tags, cooldown, range and uses, one power line
         /// per effect and the level scaling, the hex range diagram, and the description as rich
         /// text with its glossary terms highlighted (tap one for its definition).
@@ -245,60 +244,42 @@ namespace BeastCraft.Game
 
             SkillSO skill = ActingSkills()[selected];
             SkillCard card = SkillCard.Of(skill, _content.Glossary);
-            Rect panel = _screen.SkillDetail;
+            SkillCardLayout layout = CardLayout(card);
+            Rect panel = layout.Card;
             _draw.Fill(Pixel, new Vector2(panel.X, panel.Y), new Vector2(panel.Width, panel.Height), Ink("Y", Color.Yellow));
             _draw.Fill(Pixel, new Vector2(panel.X + 5f, panel.Y + 5f), new Vector2(panel.Width - 10f, panel.Height - 10f), Ink("K", Color.Black) * 0.96f);
 
-            Rect icon = _screen.SkillDetailIcon;
-            DrawSkillIcon(skill, icon, shadow);
-            float left = icon.Right + 28f;
-            float right = panel.Right - 28f;
-            _text.Draw(_draw, _text.Fit(card.Name, 34f, right - left), new Vector2(left, icon.Y + 8f), 34f, Ink("y", Color.Gold), shadow);
+            DrawSkillIcon(skill, layout.Icon, shadow);
+            Rect name = layout.Name;
+            _text.Draw(_draw, _text.Fit(card.Name, SkillCardLayout.NameSize, name.Width), new Vector2(name.X, name.Y), SkillCardLayout.NameSize, Ink("y", Color.Gold),
+                       shadow);
 
             // Tags: element, damage category, then who it lands on.
-            float x = left;
-            float chipY = icon.Y + 70f;
+            float x = name.X;
             if (card.Element != null)
             {
-                x = DrawChip(card.Element, x, chipY, ElementColor(skill.Element));
+                x = DrawChip(card.Element, x, layout.ChipsY, ElementColor(skill.Element));
             }
 
             if (card.Category != null)
             {
-                x = DrawChip(card.Category, x, chipY, Ink("2", Color.Gray));
+                x = DrawChip(card.Category, x, layout.ChipsY, Ink("2", Color.Gray));
             }
 
             foreach (string target in card.Targets)
             {
                 Color tint = target == "Enemy" ? Ink("r", Color.DarkRed) : target == "Ally" ? Ink("g", Color.DarkGreen) : Ink("q", Color.Chocolate);
-                x = DrawChip(target, x, chipY, tint);
+                x = DrawChip(target, x, layout.ChipsY, tint);
             }
 
-            // Cooldown, range and uses; then a line per effect and the scaling.
-            float y = icon.Bottom + 22f;
-            string stats = card.Cooldown + "   |   " + card.Range + (card.Uses != null ? "   |   " + card.Uses : string.Empty);
-            _text.Draw(_draw, _text.Fit(stats, 21f, right - panel.X - 28f), new Vector2(panel.X + 28f, y), 21f, Ink("4", Color.White), shadow);
-            y += 40f;
-            float powerBottom = _screen.SkillDetailDiagram.Y - 34f;
-            foreach (string line in card.Power)
-            {
-                if (y + 20f > powerBottom)
-                {
-                    break;
-                }
+            // Cooldown, range and uses; a line per effect; the scaling: all wrapped to the card's width.
+            DrawPlain(layout.Stats, layout.StatsAt, SkillCardLayout.StatsSize, Ink("4", Color.White), shadow);
+            DrawPlain(layout.Power, layout.PowerAt, SkillCardLayout.PowerSize, Ink("C", Color.LightBlue), shadow);
+            DrawPlain(layout.Scaling, layout.ScalingAt, SkillCardLayout.ScalingSize, Ink("3", Color.Gray), shadow);
 
-                _text.Draw(_draw, _text.Fit(line, 19f, right - panel.X - 28f), new Vector2(panel.X + 28f, y), 19f, Ink("C", Color.LightBlue), shadow);
-                y += 32f;
-            }
-
-            if (card.Scaling != null && y + 18f <= powerBottom + 16f)
-            {
-                _text.Draw(_draw, _text.Fit(card.Scaling, 16f, right - panel.X - 28f), new Vector2(panel.X + 28f, y + 2f), 16f, Ink("3", Color.Gray), shadow);
-            }
-
-            DrawRangeDiagram(skill, unit.Footprint, _screen.SkillDetailDiagram);
-            DrawRichText(CardTextLayout(card), _screen.SkillDetailText, shadow);
-            DrawGlossaryPopup(card, shadow);
+            DrawRangeDiagram(skill, unit.Footprint, layout.Diagram);
+            DrawRichText(layout, shadow);
+            DrawGlossaryPopup(layout, shadow);
         }
 
         /// <summary>A tag chip with its top-left at (<paramref name="x"/>, <paramref name="y"/>); returns where the next one starts.</summary>
@@ -311,47 +292,57 @@ namespace BeastCraft.Game
             return x + width + 12f;
         }
 
-        /// <summary>The card description laid out in its text area (the same layout the taps are tested against).</summary>
-        private RichTextLayout CardTextLayout(SkillCard card)
+        /// <summary>The card's layout for the current text renderer (the same one taps are tested against).</summary>
+        private SkillCardLayout CardLayout(SkillCard card)
         {
-            Rect area = _screen.SkillDetailText;
-            int lines = (int)((area.Height - 40f) / _text.LineHeight(DescriptionSize));
-            return RichTextLayout.Of(card.Description, s => _text.Measure(s, DescriptionSize), area.Width, _text.LineHeight(DescriptionSize), lines);
+            return SkillCardLayout.Of(card, _screen.SkillDetail, (s, size) => _text.Measure(s, size), size => _text.LineHeight(size));
         }
 
-        /// <summary>Rich text: plain runs in white, glossary terms in their category's colour and underlined; a hint under it when there are terms.</summary>
-        private void DrawRichText(RichTextLayout layout, Rect area, Color shadow)
+        /// <summary>A wrapped plain-text layout's runs, relative to <paramref name="origin"/>.</summary>
+        private void DrawPlain(RichTextLayout layout, Vec2 origin, float size, Color color, Color shadow)
         {
-            bool terms = false;
             foreach (RichRun run in layout.Runs)
+            {
+                _text.Draw(_draw, run.Text, new Vector2(origin.X + run.X, origin.Y + run.Y), size, color, shadow);
+            }
+        }
+
+        /// <summary>The description: plain runs in white, glossary terms in their category's colour and underlined; the hint under it when there are terms.</summary>
+        private void DrawRichText(SkillCardLayout layout, Color shadow)
+        {
+            Rect area = layout.Text;
+            RichTextLayout text = layout.Description;
+            const float size = SkillCardLayout.DescriptionSize;
+            foreach (RichRun run in text.Runs)
             {
                 Vector2 at = new Vector2(area.X + run.X, area.Y + run.Y);
                 if (run.Term == null)
                 {
-                    _text.Draw(_draw, run.Text, at, DescriptionSize, Ink("4", Color.White), shadow);
+                    _text.Draw(_draw, run.Text, at, size, Ink("4", Color.White), shadow);
                     continue;
                 }
 
-                terms = true;
                 Color color = TermColor(run.Term);
-                bool open = _popupTerm == run.Term;
-                if (open)
+                if (_popupTerm == run.Term)
                 {
-                    _draw.Fill(Pixel, new Vector2(at.X - 4f, at.Y - 6f), new Vector2(run.Width + 8f, layout.LineHeight - 2f), color * 0.3f);
+                    _draw.Fill(Pixel, new Vector2(at.X - 4f, at.Y - 6f), new Vector2(run.Width + 8f, text.LineHeight - 2f), color * 0.3f);
                 }
 
-                _text.Draw(_draw, run.Text, at, DescriptionSize, color, shadow);
-                _draw.Fill(Pixel, new Vector2(at.X, at.Y + DescriptionSize + 7f), new Vector2(run.Width, 3f), color);
+                _text.Draw(_draw, run.Text, at, size, color, shadow);
+                _draw.Fill(Pixel, new Vector2(at.X, at.Y + size + 7f), new Vector2(run.Width, 3f), color);
             }
 
-            if (terms)
+            if (layout.HintY.HasValue)
             {
-                _text.Draw(_draw, "Tap a highlighted word to learn it", new Vector2(area.X, area.Bottom - 22f), 15f, Ink("3", Color.Gray), shadow);
+                _text.Draw(_draw, "Tap a highlighted word to learn it", new Vector2(area.X, layout.HintY.Value), SkillCardLayout.HintSize, Ink("3", Color.Gray), shadow);
             }
         }
 
-        /// <summary>The open glossary term's definition, in a popup over its word (or the text area's middle).</summary>
-        private void DrawGlossaryPopup(SkillCard card, Color shadow)
+        /// <summary>
+        /// The open glossary term's definition in a popup clear of the term and the description
+        /// (<see cref="SkillCardLayout.PlacePopup"/>: below them, else above), with a pointer toward the term.
+        /// </summary>
+        private void DrawGlossaryPopup(SkillCardLayout layout, Color shadow)
         {
             if (_popupTerm == null)
             {
@@ -362,28 +353,33 @@ namespace BeastCraft.Game
             const float size = 20f;
             RichTextLayout definition = RichTextLayout.Of(new[] { new RichSpan(_popupTerm.Definition ?? string.Empty, null) }, s => _text.Measure(s, size), width - 48f,
                                                           _text.LineHeight(size));
-            float height = 104f + definition.Height;
-            Rect popup = _screen.PopupNear(PopupAnchor(card), width, height);
+            PopupPlacement place = layout.PlacePopup(_popupTerm, width, 104f + definition.Height);
+            Rect popup = place.Rect;
             Color color = TermColor(_popupTerm);
             _draw.Fill(Pixel, new Vector2(popup.X, popup.Y), new Vector2(popup.Width, popup.Height), color);
             _draw.Fill(Pixel, new Vector2(popup.X + 4f, popup.Y + 4f), new Vector2(popup.Width - 8f, popup.Height - 8f), Ink("p", Color.Purple));
+
+            // The pointer: a stepped triangle in the gap, pointing at the term.
+            float half = PopupPlacement.PointerHalfWidth;
+            for (int step = 0; step < 4; step++)
+            {
+                float w = 2f * half * (4 - step) / 4f;
+                float y = place.Below ? popup.Y - 4f * (step + 1) : popup.Bottom + 4f * step;
+                _draw.Fill(Pixel, new Vector2(place.PointerX - w / 2f, y), new Vector2(w, 4f), color);
+            }
+
             _text.Draw(_draw, _popupTerm.Term, new Vector2(popup.X + 24f, popup.Y + 22f), 28f, color, shadow);
             _text.DrawRight(_draw, (_popupTerm.Category ?? string.Empty).ToUpperInvariant(), popup.Right - 24f, popup.Y + 30f, 15f, Ink("3", Color.Gray), shadow);
             foreach (RichRun run in definition.Runs)
             {
                 _text.Draw(_draw, run.Text, new Vector2(popup.X + 24f + run.X, popup.Y + 80f + run.Y), size, Ink("4", Color.White), shadow);
             }
-        }
 
-        /// <summary>Where the open term sits on the card (its first run), or the text area when it is not in the text.</summary>
-        private Rect PopupAnchor(SkillCard card)
-        {
-            Rect area = _screen.SkillDetailText;
-            RichTextLayout layout = CardTextLayout(card);
-            RichRun? run = layout.RunOf(_popupTerm);
-            return run.HasValue
-                       ? new Rect(area.X + run.Value.X, area.Y + run.Value.Y - 6f, run.Value.Width, layout.LineHeight)
-                       : new Rect(area.X, area.Y, area.Width, 1f);
+            if (_options.Screenshot)
+            {
+                Console.WriteLine("Glossary popup for " + _popupTerm.TermId + ": " + (place.Below ? "below" : "above") + " the description" + (place.Fits ? string.Empty : " (clamped)") +
+                                  " at " + popup + ".");
+            }
         }
 
         /// <summary>A glossary term's colour by category: statuses gold, stances sky, combat terms peach, passives lilac.</summary>

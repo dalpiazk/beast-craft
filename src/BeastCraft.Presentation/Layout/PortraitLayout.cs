@@ -211,10 +211,6 @@ namespace BeastCraft.Presentation.Layout
             Controls = new Rect(Margin, 1774f, CanvasWidth - 2f * Margin, 120f);
             SettingsButton = new Rect(CanvasWidth - Margin - 64f, 12f, 64f, 64f);
             SkillDetail = new Rect(Margin, 560f, CanvasWidth - 2f * Margin, 856f);
-            SkillDetailIcon = new Rect(SkillDetail.X + 28f, SkillDetail.Y + 28f, 120f, 120f);
-            SkillDetailDiagram = new Rect(SkillDetail.X + 28f, SkillDetail.Y + 380f, 440f, SkillDetail.Height - 408f);
-            SkillDetailText = new Rect(SkillDetailDiagram.Right + 28f, SkillDetailDiagram.Y, SkillDetail.Right - 28f - SkillDetailDiagram.Right - 28f,
-                                       SkillDetailDiagram.Height);
             SettingsPanel = new Rect(Margin + 96f, 520f, CanvasWidth - 2f * Margin - 192f, 520f);
         }
 
@@ -236,20 +232,11 @@ namespace BeastCraft.Presentation.Layout
         public Rect Controls { get; }
 
         /// <summary>
-        /// The skill detail card, over the lower part of the board, opened by tapping a skill in
-        /// the strip: icon, name and tags across the top, then its cooldown, range and power lines,
-        /// then the hex range diagram (left) beside the description (right).
+        /// The most room the skill detail card may take, over the lower part of the board (opened
+        /// by tapping a skill in the strip): the card sits on its foot, as tall as its content;
+        /// what goes where is <c>Cards.SkillCardLayout</c>.
         /// </summary>
         public Rect SkillDetail { get; }
-
-        /// <summary>The card's icon, top left.</summary>
-        public Rect SkillDetailIcon { get; }
-
-        /// <summary>The card's hex range diagram, bottom left.</summary>
-        public Rect SkillDetailDiagram { get; }
-
-        /// <summary>The card's description (rich text with glossary terms), bottom right.</summary>
-        public Rect SkillDetailText { get; }
 
         /// <summary>The gear button at the header's right end: opens and closes the settings overlay.</summary>
         public Rect SettingsButton { get; }
@@ -305,28 +292,6 @@ namespace BeastCraft.Presentation.Layout
             float scale = Math.Min(area.Width / width, area.Height / needHeight);
             Vec2 center = area.Center;
             return new BoardFit(scale, center.X, center.Y);
-        }
-
-        /// <summary>
-        /// Where a popup of <paramref name="width"/> x <paramref name="height"/> goes for something
-        /// at <paramref name="anchor"/> (a tapped glossary term): above it, a small gap away, when
-        /// there is room below the header, else below it; centred on it horizontally; always inside
-        /// the canvas's margins.
-        /// </summary>
-        public Rect PopupNear(Rect anchor, float width, float height)
-        {
-            const float gap = 12f;
-            width = Math.Min(width, CanvasWidth - 2f * Margin);
-            float x = anchor.Center.X - width / 2f;
-            x = Math.Max(Margin, Math.Min(CanvasWidth - Margin - width, x));
-            float y = anchor.Y - gap - height;
-            if (y < Header.Bottom)
-            {
-                y = anchor.Bottom + gap;
-            }
-
-            y = Math.Max(Margin, Math.Min(CanvasHeight - Margin - height, y));
-            return new Rect(x, y, width, height);
         }
 
         /// <summary>

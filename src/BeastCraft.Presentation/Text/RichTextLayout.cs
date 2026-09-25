@@ -36,7 +36,8 @@ namespace BeastCraft.Presentation.Text
 
     /// <summary>
     /// Rich text (<see cref="Glossary.Parse"/>) laid out into lines of a given width: words are
-    /// packed greedily (a word wider than the line gets a line of its own), a term's words keep
+    /// packed greedily, a word wider than a whole line is broken between characters (as many as
+    /// fit on each line, at least one), a newline starts a new line, a term's words keep
     /// their term even when a phrase breaks across lines, and consecutive words of the same term
     /// on one line are merged into one run, so each run is one draw call and one tap target. Pure
     /// maths over a measuring function (the renderer's text width at the drawn size); the
@@ -113,9 +114,34 @@ namespace BeastCraft.Presentation.Text
                     }
 
                     string word = text.Substring(i, end - i);
+                    i = end;
                     float w = measure(word);
                     if (!lineEmpty && x + w > width)
                     {
+                        line++;
+                        x = 0f;
+                        lineEmpty = true;
+                    }
+
+                    // A word wider than a whole line: break it between characters.
+                    while (w > width && word.Length > 1)
+                    {
+                        int fit = 1;
+                        while (fit < word.Length && measure(word.Substring(0, fit + 1)) <= width)
+                        {
+                            fit++;
+                        }
+
+                        if (maxLines > 0 && line >= maxLines)
+                        {
+                            layout.Lines = maxLines;
+                            return layout;
+                        }
+
+                        string piece = word.Substring(0, fit);
+                        layout.Place(piece, 0f, line, measure(piece), span.Term, measure);
+                        word = word.Substring(fit);
+                        w = measure(word);
                         line++;
                         x = 0f;
                         lineEmpty = true;
@@ -130,7 +156,6 @@ namespace BeastCraft.Presentation.Text
                     layout.Place(word, x, line, w, span.Term, measure);
                     x += w;
                     lineEmpty = false;
-                    i = end;
                 }
             }
 
@@ -174,7 +199,7 @@ namespace BeastCraft.Presentation.Text
         private void Place(string word, float x, int line, float width, GlossaryTerm term, Func<string, float> measure)
         {
             int last = _runs.Count - 1;
-            if (last >= 0 && _runs[last].Line == line && _runs[last].Term == term)
+            if (last >= 0 && _runs[last].Line == line && _runs[last].Term == term && x > 0f)
             {
                 // The same term (or plain text) continues on this line: one run, re-measured whole.
                 RichRun previous = _runs[last];

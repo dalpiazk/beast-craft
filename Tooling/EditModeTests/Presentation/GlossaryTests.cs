@@ -360,42 +360,201 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
-        public void PopupNear_SitsAboveItsAnchor_ElseBelow_AlwaysOnTheCanvas()
+        public void Popup_GoesBelowTheTermAndItsBlock_WhenThereIsRoom()
         {
-            PortraitLayout layout = new PortraitLayout();
+            Rect bounds = new Rect(0f, 0f, 1000f, 1000f);
+            Rect term = new Rect(400f, 200f, 80f, 30f);
+            Rect block = new Rect(300f, 180f, 500f, 120f);
 
-            Rect above = layout.PopupNear(new Rect(500f, 1000f, 80f, 30f), 600f, 200f);
-            Assert.AreEqual(1000f - 12f - 200f, above.Y);
-            Assert.AreEqual(540f, above.Center.X, 1e-3f);
+            PopupPlacement place = PopupPlacement.Place(term, block, 600f, 200f, bounds);
 
-            Rect below = layout.PopupNear(new Rect(500f, 100f, 80f, 30f), 600f, 200f);
-            Assert.AreEqual(142f, below.Y, "no room above the header: below it");
-
-            Rect edge = layout.PopupNear(new Rect(1040f, 1000f, 30f, 30f), 600f, 200f);
-            Assert.AreEqual(PortraitLayout.CanvasWidth - PortraitLayout.Margin, edge.Right, 1e-3f);
-            Rect wide = layout.PopupNear(new Rect(0f, 1000f, 30f, 30f), 5000f, 200f);
-            Assert.AreEqual(PortraitLayout.Margin, wide.X);
-            Assert.AreEqual(PortraitLayout.CanvasWidth - 2f * PortraitLayout.Margin, wide.Width);
+            Assert.IsTrue(place.Below);
+            Assert.IsTrue(place.Fits);
+            Assert.AreEqual(block.Bottom + PopupPlacement.DefaultGap, place.Rect.Y);
+            Assert.AreEqual(term.Center.X, place.Rect.Center.X, 1e-3f, "centred on the term");
+            Assert.IsFalse(PopupPlacement.Overlaps(place.Rect, term));
+            Assert.IsFalse(PopupPlacement.Overlaps(place.Rect, block));
+            Assert.AreEqual(term.Center.X, place.PointerX, 1e-3f);
         }
 
         [Test]
-        public void TheDetailCard_FitsOverTheBoard_ItsPartsInside()
+        public void Popup_FlipsAbove_WhenBelowWouldLeaveTheBounds()
+        {
+            Rect bounds = new Rect(0f, 0f, 1000f, 1000f);
+            Rect term = new Rect(400f, 800f, 80f, 30f);
+            Rect block = new Rect(300f, 760f, 500f, 120f);
+
+            PopupPlacement place = PopupPlacement.Place(term, block, 600f, 200f, bounds);
+
+            Assert.IsFalse(place.Below);
+            Assert.IsTrue(place.Fits);
+            Assert.AreEqual(block.Y - PopupPlacement.DefaultGap - 200f, place.Rect.Y);
+            Assert.IsFalse(PopupPlacement.Overlaps(place.Rect, term));
+            Assert.IsFalse(PopupPlacement.Overlaps(place.Rect, block));
+        }
+
+        [Test]
+        public void Popup_IsClampedIntoTheBounds()
+        {
+            Rect bounds = new Rect(100f, 100f, 800f, 800f);
+
+            PopupPlacement right = PopupPlacement.Place(new Rect(860f, 300f, 30f, 30f), new Rect(), 600f, 200f, bounds);
+            Assert.AreEqual(bounds.Right, right.Rect.Right, 1e-3f, "a term at the right edge");
+            Assert.LessOrEqual(right.PointerX, right.Rect.Right - PopupPlacement.PointerHalfWidth);
+            Assert.AreEqual(875f, right.PointerX, 1e-3f, "the pointer still points at the term");
+
+            PopupPlacement left = PopupPlacement.Place(new Rect(105f, 300f, 30f, 30f), new Rect(), 600f, 200f, bounds);
+            Assert.AreEqual(bounds.X, left.Rect.X);
+            Assert.GreaterOrEqual(left.PointerX, left.Rect.X + PopupPlacement.PointerHalfWidth);
+
+            PopupPlacement wide = PopupPlacement.Place(new Rect(400f, 300f, 30f, 30f), new Rect(), 5000f, 200f, bounds);
+            Assert.AreEqual(bounds.X, wide.Rect.X);
+            Assert.AreEqual(bounds.Width, wide.Rect.Width, "shrunk to the bounds");
+
+            // No room either side: the roomier side, clamped inside the bounds.
+            Rect block = new Rect(200f, 300f, 400f, 450f);
+            PopupPlacement cramped = PopupPlacement.Place(new Rect(300f, 700f, 40f, 30f), block, 400f, 300f, bounds);
+            Assert.IsFalse(cramped.Fits);
+            Assert.IsFalse(cramped.Below, "200 px above beats 150 below");
+            Assert.AreEqual(bounds.Y, cramped.Rect.Y);
+            Assert.LessOrEqual(cramped.Rect.Bottom, bounds.Bottom);
+        }
+
+        [Test]
+        public void Layout_BreaksAnUnbrokenWordWiderThanTheLine()
+        {
+            string word = new string('W', 37);
+            RichTextLayout layout = RichTextLayout.Of(new[] { new RichSpan("Before " + word + " after", null) }, s => 10f * s.Length, 100f, 20f);
+
+            StringBuilder pieces = new StringBuilder();
+            foreach (RichRun run in layout.Runs)
+            {
+                Assert.LessOrEqual(run.X + run.Width, 100f + 1e-3f, "'" + run.Text + "' fits its line");
+                if (run.Text.Contains("W"))
+                {
+                    pieces.Append(run.Text.Replace(" after", string.Empty).Trim());
+                }
+            }
+
+            Assert.AreEqual(word, pieces.ToString(), "the word is all there, in order, broken between characters");
+            Assert.AreEqual("Before", layout.Runs[0].Text.Trim());
+            Assert.AreEqual(1, layout.Runs[1].Line, "the long word starts on a fresh line");
+            Assert.AreEqual(6, layout.Lines, "Before / 10 / 10 / 10 / 7 / after");
+            Assert.AreEqual(1, RichTextLayout.Of(new[] { new RichSpan("W", null) }, s => 500f, 100f, 20f).Lines, "a single glyph wider than the line still gets one");
+        }
+
+        [Test]
+        public void CardLayout_WrapsLongPowerLines_WithinTheCard()
+        {
+            SkillCard card = SkillCard.Of(Content.Battle.GetSkill("ember_shot"), Content.Glossary);
+            PortraitLayout screen = new PortraitLayout();
+            // A wide face, so the power lines must wrap.
+            SkillCardLayout layout = SkillCardLayout.Of(card, screen.SkillDetail, (s, size) => s.Length * size * 1.3f, size => size * 1.5f);
+
+            Assert.Greater(layout.Power.Lines, card.Power.Count, "a power line too long for the card wraps");
+            StringBuilder text = new StringBuilder();
+            foreach (RichRun run in layout.Power.Runs)
+            {
+                Assert.LessOrEqual(layout.PowerAt.X + run.X + run.Width, layout.Card.Right - SkillCardLayout.Padding + 1e-3f);
+                text.Append(run.Text).Append(' ');
+            }
+
+            foreach (string line in card.Power)
+            {
+                foreach (string word in line.Split(' '))
+                {
+                    StringAssert.Contains(word, text.ToString(), "nothing is cut");
+                }
+            }
+
+            Assert.LessOrEqual(layout.ScalingAt.Y + layout.Scaling.Height, layout.Diagram.Y, "power and scaling sit above the split");
+            Assert.AreEqual(layout.Diagram.Y, layout.Text.Y);
+            Assert.LessOrEqual(layout.Diagram.Right, layout.Text.X);
+        }
+
+        [Test]
+        public void CardLayout_SitsOnTheBoardsFoot_AsTallAsItsContent()
+        {
+            PortraitLayout screen = new PortraitLayout();
+            foreach (SkillData data in Content.SkillLibrary.BeastSkills)
+            {
+                SkillCard card = SkillCard.Of(Content.Battle.GetSkill(data.SkillId), Content.Glossary);
+                SkillCardLayout layout = SkillCardLayout.Of(card, screen.SkillDetail, (s, size) => s.Length * size * 0.55f, size => size * 1.3f);
+
+                Assert.AreEqual(screen.SkillDetail.Bottom, layout.Card.Bottom, 1e-3f, data.SkillId);
+                Assert.GreaterOrEqual(layout.Card.Y, screen.SkillDetail.Y - 1e-3f, data.SkillId);
+                Assert.GreaterOrEqual(layout.Diagram.Height, SkillCardLayout.MinSplitHeight - 1e-3f);
+                Assert.LessOrEqual(layout.DescriptionBlock.Bottom, layout.Text.Bottom + 1e-3f);
+                Assert.Less(layout.Card.Height, screen.SkillDetail.Height, data.SkillId + ": no taller than it needs");
+            }
+        }
+
+        [Test]
+        public void GlossaryPopup_NeverCoversTheTermOrTheDescription_OnAnyRealSkill()
+        {
+            PortraitLayout screen = new PortraitLayout();
+            int below = 0;
+            int above = 0;
+            foreach (SkillData data in Content.SkillLibrary.BeastSkills)
+            {
+                SkillCard card = SkillCard.Of(Content.Battle.GetSkill(data.SkillId), Content.Glossary);
+                SkillCardLayout layout = SkillCardLayout.Of(card, screen.SkillDetail, (s, size) => s.Length * size * 0.55f, size => size * 1.3f);
+                foreach (GlossaryTerm term in Content.Glossary.TermsIn(data.Description))
+                {
+                    foreach (float height in new[] { 160f, 230f })
+                    {
+                        PopupPlacement place = layout.PlacePopup(term, 600f, height);
+                        Rect termRect = layout.TermRect(term).Value;
+                        string at = data.SkillId + " / " + term.TermId + " / " + height;
+
+                        Assert.IsTrue(place.Fits, at);
+                        Assert.IsFalse(PopupPlacement.Overlaps(place.Rect, termRect), at + ": the term stays visible");
+                        Assert.IsFalse(PopupPlacement.Overlaps(place.Rect, layout.DescriptionBlock), at + ": the description stays visible");
+                        Assert.GreaterOrEqual(place.Rect.X, layout.Card.X);
+                        Assert.LessOrEqual(place.Rect.Right, layout.Card.Right);
+                        Assert.GreaterOrEqual(place.Rect.Y, layout.Card.Y);
+                        Assert.LessOrEqual(place.Rect.Bottom, layout.Card.Bottom);
+                        Assert.AreEqual(place.Below, place.Rect.Y > termRect.Y, at);
+                        if (place.Below)
+                        {
+                            below++;
+                        }
+                        else
+                        {
+                            above++;
+                        }
+                    }
+                }
+            }
+
+            Assert.Greater(below, 0, "short descriptions leave room below");
+            Assert.Greater(above, 0, "longer ones flip above");
+        }
+
+        [Test]
+        public void CardLayout_HitTestsTermsInCanvasPixels()
+        {
+            PortraitLayout screen = new PortraitLayout();
+            SkillCard card = SkillCard.Of(Content.Battle.GetSkill("ember_shot"), Content.Glossary);
+            SkillCardLayout layout = SkillCardLayout.Of(card, screen.SkillDetail, (s, size) => s.Length * size * 0.55f, size => size * 1.3f);
+            GlossaryTerm burn = Content.Glossary.Find("burn");
+            Rect rect = layout.TermRect(burn).Value;
+
+            Assert.AreSame(burn, layout.TermAt(rect.Center.X, rect.Center.Y));
+            Assert.IsNull(layout.TermAt(layout.Text.X + 1f, layout.Text.Y + 1f), "the first word is plain");
+            Assert.IsNull(layout.TermRect(Content.Glossary.Find("stun")));
+            Assert.IsTrue(layout.PlacePopup(Content.Glossary.Find("stun"), 600f, 200f).Fits, "a term not in the text anchors on the column");
+        }
+
+        [Test]
+        public void TheDetailCardRoom_LiesOverTheBoard()
         {
             PortraitLayout layout = new PortraitLayout();
             Rect card = layout.SkillDetail;
 
             Assert.GreaterOrEqual(card.Y, layout.Board.Y);
             Assert.LessOrEqual(card.Bottom, layout.Board.Bottom);
-            foreach (Rect part in new[] { layout.SkillDetailIcon, layout.SkillDetailDiagram, layout.SkillDetailText })
-            {
-                Assert.GreaterOrEqual(part.X, card.X);
-                Assert.GreaterOrEqual(part.Y, card.Y);
-                Assert.LessOrEqual(part.Right, card.Right);
-                Assert.LessOrEqual(part.Bottom, card.Bottom);
-            }
-
-            Assert.LessOrEqual(layout.SkillDetailDiagram.Right, layout.SkillDetailText.X, "diagram and text side by side");
-            Assert.GreaterOrEqual(layout.SkillDetailText.Width, 400f, "room for a readable line");
+            Assert.AreEqual(layout.Board.Width, card.Width);
         }
     }
 }
