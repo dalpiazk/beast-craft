@@ -179,8 +179,10 @@ namespace BeastCraft.Tooling.BalanceSim
                 return 2;
             }
 
+            // The mainline campaign (and every table and gate of the report) never sees a post-game
+            // region: it plays the regions.json it would play without them.
             World world = new World(new PacingSimulator.Model(library.Materials, DropTableBuilder.Build(tables, DropTableBuilder.TierLookup(library.Materials))),
-                                    RegionLibrary.Build(regions), EncounterLibrary.Build(encounters));
+                                    RegionLibrary.Build(MainlineOnly(regions)), EncounterLibrary.Build(encounters));
             world.Economy = CampaignEconomyModel.World.Load(library, errors);
             if (world.Economy == null)
             {
@@ -261,6 +263,20 @@ namespace BeastCraft.Tooling.BalanceSim
             }
 
             return 0;
+        }
+
+        /// <summary>A copy of <paramref name="data"/> with only its mainline regions (post-game ones, <see cref="RegionData.IsPostGame"/>, dropped).</summary>
+        public static RegionLibraryData MainlineOnly(RegionLibraryData data)
+        {
+            return new RegionLibraryData
+            {
+                SchemaVersion = data.SchemaVersion,
+                StartingLevelCap = data.StartingLevelCap,
+                LevelCapMargin = data.LevelCapMargin,
+                MapRules = data.MapRules,
+                Seals = data.Seals,
+                Regions = Array.FindAll(data.Regions ?? new RegionData[0], region => region != null && !region.IsPostGame)
+            };
         }
 
         /// <summary>The fixed inputs of every campaign.</summary>

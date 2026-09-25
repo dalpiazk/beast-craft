@@ -608,6 +608,18 @@
           "MinRegion": 1,
           "UnlockId": "",
           "ArtKey": "cosmetic/kirin_horn/starlit"
+        },
+        {
+          "OptionId": "dawnshade",
+          "DisplayName": "Dawnshade Horn",
+          "IsDefault": false,
+          "SortOrder": 9,
+          "SupportsPaletteShader": true,
+          "Rarity": 1,
+          "Source": "boss",
+          "MinRegion": 1,
+          "UnlockId": "r11",
+          "ArtKey": "cosmetic/kirin_horn/dawnshade"
         }
       ]
     },
@@ -2759,6 +2771,18 @@
           "MinRegion": 1,
           "UnlockId": "",
           "ArtKey": "cosmetic/basilisk_crown/starlit"
+        },
+        {
+          "OptionId": "dawnshade",
+          "DisplayName": "Dawnshade Crown",
+          "IsDefault": false,
+          "SortOrder": 9,
+          "SupportsPaletteShader": true,
+          "Rarity": 1,
+          "Source": "boss",
+          "MinRegion": 1,
+          "UnlockId": "r11",
+          "ArtKey": "cosmetic/basilisk_crown/dawnshade"
         }
       ]
     },

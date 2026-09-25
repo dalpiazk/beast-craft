@@ -164,6 +164,14 @@ namespace BeastCraft.Tooling.BalanceSim
         /// </summary>
         public List<EncounterShape> PanelShapes = new List<EncounterShape>();
 
+        /// <summary>
+        /// The post-game shapes (<see cref="EncounterShapeData.PostGame"/>; generated set only), kept
+        /// out of <see cref="Shapes"/> so the mainline run and its report never see them: their
+        /// compositions are drawn after every mainline shape's (file order), and they are calibrated
+        /// only at level 100, only for <c>--write-difficulty</c> (<see cref="PostGameCalibration"/>).
+        /// </summary>
+        public List<EncounterShape> PostGameShapes = new List<EncounterShape>();
+
         /// <summary>Every composition of every shape, in shape then composition order.</summary>
         public List<Encounter> AllCompositions
         {
@@ -322,11 +330,12 @@ namespace BeastCraft.Tooling.BalanceSim
                     return null;
                 }
 
+                ShareRecipeCompositions(all);
                 foreach (EncounterShape shape in all)
                 {
                     if (options.EncounterFilter == null || options.EncounterFilter.Contains(shape.Id))
                     {
-                        catalog.Shapes.Add(shape);
+                        (shape.Data != null && shape.Data.PostGame ? catalog.PostGameShapes : catalog.Shapes).Add(shape);
                     }
                 }
 
@@ -368,6 +377,68 @@ namespace BeastCraft.Tooling.BalanceSim
             }
 
             return catalog;
+        }
+
+        /// <summary>
+        /// A post-game shape whose recipe (arena, threat budget, distinct types, variants) is exactly
+        /// its <see cref="EncounterShapeData.DropShapeId"/> shape's is calibrated over that mainline
+        /// shape's own compositions (the same lineups and, since battles are seeded by composition id,
+        /// the same battles), so a post-game shape, its Hard twin and the mainline shape sit on one
+        /// clear-rate curve: a lower target can only land on a higher multiplier (up to the search's
+        /// step), which a fresh set of eight lineups per shape does not guarantee. A post-game shape
+        /// with a recipe of its own keeps its own compositions.
+        /// </summary>
+        private static void ShareRecipeCompositions(List<EncounterShape> shapes)
+        {
+            foreach (EncounterShape shape in shapes)
+            {
+                if (shape.Data == null || !shape.Data.PostGame || string.IsNullOrEmpty(shape.Data.DropShapeId))
+                {
+                    continue;
+                }
+
+                EncounterShape mainline = shapes.Find(s => s.Id == shape.Data.DropShapeId);
+                if (mainline != null && mainline.Data != null && SameRecipe(shape.Data, mainline.Data))
+                {
+                    shape.Compositions = mainline.Compositions;
+                }
+            }
+        }
+
+        /// <summary>Whether two shapes draw exactly the same lineups (everything but ids, text, target and post-game fields).</summary>
+        public static bool SameRecipe(EncounterShapeData a, EncounterShapeData b)
+        {
+            if (a.Arena != b.Arena || a.ThreatMin != b.ThreatMin || a.ThreatMax != b.ThreatMax || a.MinDistinctTypes != b.MinDistinctTypes)
+            {
+                return false;
+            }
+
+            EncounterVariantData[] va = a.Variants ?? new EncounterVariantData[0];
+            EncounterVariantData[] vb = b.Variants ?? new EncounterVariantData[0];
+            if (va.Length != vb.Length)
+            {
+                return false;
+            }
+
+            for (int v = 0; v < va.Length; v++)
+            {
+                EncounterSlotData[] sa = va[v].Slots ?? new EncounterSlotData[0];
+                EncounterSlotData[] sb = vb[v].Slots ?? new EncounterSlotData[0];
+                if (va[v].Weight != vb[v].Weight || sa.Length != sb.Length)
+                {
+                    return false;
+                }
+
+                for (int s = 0; s < sa.Length; s++)
+                {
+                    if (sa[s].Min != sb[s].Min || sa[s].Max != sb[s].Max || string.Join(",", sa[s].Types ?? new string[0]) != string.Join(",", sb[s].Types ?? new string[0]))
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            return true;
         }
 
         /// <summary>
