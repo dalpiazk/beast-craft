@@ -2492,6 +2492,74 @@ taunted almost permanently; bosses resist half of it). Whether one skill should 
 allows it; this draft gives every skill exactly one owner). The resource cost (`ResourceCost`) is
 0 everywhere until the resource itself is designed.
 
+## Post-game region — DRAFT CONTENT, TUNABLE STARTING VALUES
+
+The campaign's ten regions cover levels 1-100; **r11 Duskmeridian** (DRAFT name and text, see
+[content-bible.md](content-bible.md), "Post-game region") is the Light / Dark **post-game** region
+after the Worldcrown. It is data (`regions.json`, `encounter-library.json`, `encounter-difficulty.json`,
+`cosmetic-library.json`, `location-names.json`) plus the few rules below; producer decisions D1-D9
+of the design pass are recorded here.
+
+- **Post-game regions (D1).** `RegionData.IsPostGame` puts a region outside the contiguous 1-100 band.
+  `RegionLibraryValidator` checks the mainline band exactly as before (a golden test pins its error
+  text; post-game regions are skipped by that pass) and then runs a separate post-game pass:
+  `MinLevel == MaxLevel == 100`, no seal, an earlier required region, a complete `HardMode`, and only
+  post-game shapes (`EncounterShapeData.PostGame`), which no mainline region may draw.
+- **r11.** Unlocked by r10's boss (`RequiresRegionId: "r10"`, the usual unlock). Flat level 100: every
+  node, Gate and the Boss is level 100 (no elite or gate offset, so nothing sits above the true cap).
+  No seal and no cap raise. Four stages. Its own map rules: Battle 55 / Elite 30 / Shop 5 / Rest 10
+  (mainline 70 / 15 / 8 / 7), 2-6 Elites per map (mainline 1-3), so "harder" also means more dens.
+  Battle nodes draw squad 45 / horde 40 (no solo).
+- **Difficulty, chosen per run.** The player picks **Normal** (the default) or **Hard** when an r11
+  expedition starts: `CampaignRules.StartRun(save, regions, regionId, [stage,] seed, difficulty)`,
+  stored on the run as `MapRun.Difficulty` (save schema 6; see progression-and-saves.md). Hard is
+  refused outside a post-game region, and the save validator rejects a stored Hard there. On Hard the
+  map is generated from the region's `HardMode` (Hard shapes, Hard elite shape, Hard boss template);
+  with the same weights in the same order, a seed draws the same map on either difficulty, only with
+  the harder ids.
+- **Targets (scouted, bond-aware pick, typical gear, level 100).** Normal: squad / horde 65%, elite
+  45%, boss about 35%. Hard: squad / horde 50%, elite 30%, boss about 20%. (Mainline: 80 / 80 / 60, bosses
+  50.)
+- **Mechanism: post-game shapes (D5).** Six shapes, `squad_postgame`, `horde_postgame`,
+  `elite_postgame` and their `_hard` twins, copy the mainline recipes with the lower `TargetClear`s.
+  They are calibrated by the documented `--write-difficulty` command (`--gear typical`) at level 100
+  only, on their mainline shape's own compositions (same lineups, same battles, so the three sit on
+  one clear-rate curve), and appended to `encounter-difficulty.json` after every mainline cell; the
+  shared mainline cells (which r10 uses at level 100) are untouched. Elemental multipliers at level
+  100:
+
+  | Shape | Mainline (r10) | Post-game Normal | Post-game Hard |
+  | --- | ---: | ---: | ---: |
+  | squad | x1.223 (80%) | x1.266 (65.6% measured) | x1.359 (50.0%) |
+  | horde | x1.188 (80%) | x1.242 (64.1%) | x1.281 (51.6%) |
+  | elite | x1.156 (60%) | x1.219 (45.3%) | x1.242 (30.5%) |
+
+- **Boss (D4).** DRAFT twin giants, one Light and one Dark, mirroring `boss_r10_apex_pair` (one
+  `giant` group of two, shape `elite`, Large arena): `boss_r11_dusk_and_dawn` (Normal,
+  `DifficultyOverride` x0.711) and `boss_r11_dusk_and_dawn_hard` (Hard, x0.723), both "Dusk and Dawn".
+  Calibrated with the tuning log's boss recipe, both on the Normal template's battles (the lineups are
+  identical). The pair's clear rate falls off a cliff around x0.711-0.713 (41% to 29% at 256 samples a
+  step), so Normal sits at 36-41% and Hard at about 18-25% depending on the sample count; see the
+  tuning log.
+- **Rewards.** Loot is Normal's on both difficulties: each post-game shape pays out as the mainline
+  shape its `DropShapeId` names (`EncounterLibrary.DropShapeOf`, `EncounterPlan.DropShapeId`), so
+  `drop-tables.json` is unchanged and r11 draws the 81-100 band (D7); no new gear tier (D6: the boss
+  pays the band's epic on the region's first clear, as every lair); no XP mechanic (D8: at level 100
+  overflow XP is discarded as it already is); idle rates unchanged (D9: `ProgressLevel` already reaches
+  100 at r10's boss). **Hard's only extra reward is looks**: a new cosmetic source, `boss_hard`,
+  unlocked by any Hard boss clear of its post-game region (the first included; never sold, never
+  dropped). DRAFT looks: Normal lair Dawnshade Horn (Kirin, Light) and Dawnshade Crown (Basilisk,
+  Dark); Hard Radiant Dawnshade Horn and Eclipse Dawnshade Crown. No badge: the cosmetic system has no
+  badge or title slot (deferred).
+- **Pacing.** `--mode campaign` keeps post-game regions out of every mainline table and gate and adds
+  a separately seeded "Post-game" section (docs/balance/campaign-pacing-report.md): r11 on Normal
+  clears 56% of its battles (squad / horde 65%, elites and gates 45%, boss 34%) and takes 66 battles
+  (p50; p10-p90 56-77) from the first stage to the boss; on Hard 41% (50% / 30% / 21%) and 90 battles
+  (75-108).
+- **Open.** Every name and text is DRAFT. The Hard boss sits close to the Normal one in stats (the
+  cliff above); a champion-escort variant or a larger Hard gap is a producer call. No prestige or XP
+  overflow system; no badge.
+
 ## Next steps
 
 The grid and turn-manager scaffolding landed against decisions 1–3: a `BeastCraft.Battle.Grid`
