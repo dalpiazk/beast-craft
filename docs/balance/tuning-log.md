@@ -3179,7 +3179,7 @@ Reproduce: the guard, `dotnet run --project Tooling/BalanceSim -c Release -- --m
 report, `dotnet run --project Tooling/BalanceSim -c Release -- --panel 16x4 --avatar-value --out
 docs/balance/tuned-report.md --write-difficulty content/data/Encounters/encounter-difficulty.json`;
 the level gap, `dotnet run --project Tooling/BalanceSim -c Release -- --mode pve --levels
-10,30,50,70,90 --level-gap -5,-3,-2,0,2,3,5 --out docs/balance/level-gap-report.md`.
+10,30,50,70,90 --level-gap -5,-3,-2,0,2,3,5 --gap-mix 0 --out docs/balance/level-gap-report.md`.
 
 ## Level-gap mix and the team suggester
 
@@ -3431,3 +3431,46 @@ stage-2 pass moves from the node level to one above (within 1 everywhere, target
 cut of the avatar's battle XP rises 14.7% -> 21.7%. Every gate is still met. User decisions recorded
 with it: a lighter player's larger idle share is accepted, and paying at the progress level at claim
 time is kept; both rely on local-only play (docs/design/progression-and-saves.md, "Idle rewards").
+
+## Post-game region r11 (Duskmeridian): Normal and Hard calibration
+
+The post-game region r11 (DRAFT; battle-system.md, "Post-game region") is fought at a flat level 100
+on Normal or Hard. Its six post-game shapes copy the mainline recipes with lower targets (Normal:
+squad / horde 65%, elite 45%; Hard: 50%, 50%, 30%) and are calibrated by the shipping table's command
+(`--panel 16x4 --avatar-value --gear typical --write-difficulty`) at level 100 only, each on its
+mainline shape's own compositions (a first run drew eight fresh lineups per post-game shape and put
+the Hard squad and horde *below* Normal, x1.277 < x1.313 and x1.094 < x1.207: eight lineups are too
+few to order two nearby targets; on one shared set the three targets sit on one curve). Their cells
+are appended after the mainline cells; the mainline cells, targets and `_readme` are byte-identical
+(the diff adds a JSON comma to the last mainline target and cell), and `tuned-report.md` is
+byte-identical (the report run never sees a post-game shape).
+
+| Shape (level 100) | Mainline | Normal | scouted | Hard | scouted |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| squad, elemental | x1.223 | x1.266 | 65.6% | x1.359 | 50.0% |
+| horde, elemental | x1.188 | x1.242 | 64.1% | x1.281 | 51.6% |
+| elite, elemental | x1.156 | x1.219 | 45.3% | x1.242 | 30.5% |
+| squad, neutral | x1.207 | x1.246 | 63.3% | x1.281 | 50.0% |
+| horde, neutral | x1.188 | x1.227 | 64.8% | x1.262 | 48.4% |
+| elite, neutral | x0.867 | x0.904 | 44.5% | x0.934 | 29.7% |
+
+**Boss.** The twin giants (Light + Dark, the r10 apex pair's structure) with the boss recipe above
+(fixed set, `--kit elemental --scouted bonds --gear typical`, level 100), both targets on the Normal
+template's battles (the Hard template fields the same lineup, so one seed stream gives one curve; the
+first try on each template's own seeds put Hard at x0.723 and Normal at x0.711, near-equal, 18.8% vs
+35.9%). The recipe reproduces r10's shipped x0.863 at 50.0% exactly. The curve has a cliff: at 256
+samples a step, x0.703 51.6%, x0.711 41.0%, x0.713 28.9%, x0.715 27.3%, x0.719 27.7%, x0.723 18.4%,
+x0.750 3.1%.
+
+| Boss | Target | Shipped | Scouted at 64 samples | Scouted at 256 samples |
+| --- | ---: | ---: | ---: | ---: |
+| boss_r11_dusk_and_dawn (Normal) | 35% | **x0.711** | 35.9% | 41.0% |
+| boss_r11_dusk_and_dawn_hard (Hard) | 20% | **x0.723** | 25.0% (its 64-sample search stopped at x0.719) | 18.4% |
+
+Pacing (`--mode campaign`, the appended "Post-game" section; clear chance by target at gap 0):
+Normal 56.3% of battles cleared, 66 battles to clear r11 (p50; 56-77), 2 boss attempts (p50); Hard
+40.8%, 90 battles (75-108), 3 boss attempts. The mainline report is byte-identical above it.
+
+Reproduce: the table command above; the boss rows as in "Boss re-calibration after the combat merge"
+with `--encounters boss_r11_dusk_and_dawn --levels 100 --target-clear 35` (and `20`), `--calibrate-samples
+64` (and `256`); `-- --mode campaign --self-check --out docs/balance/campaign-pacing-report.md`.

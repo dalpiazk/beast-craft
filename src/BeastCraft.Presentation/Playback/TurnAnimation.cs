@@ -9,7 +9,7 @@ namespace BeastCraft.Presentation.Playback
 {
     /// <summary>
     /// An on-apply effect played on top of a beat (<see cref="VfxLibraryData.EffectDefaults"/>): a
-    /// status that newly landed on a target (a stun, a shield, a burn...) or a knockback, from the
+    /// status that landed on a target (a stun, a shield, a burn...) or a knockback, from the
     /// beat's impact.
     /// </summary>
     public sealed class BeatOverlay
@@ -82,12 +82,17 @@ namespace BeastCraft.Presentation.Playback
     /// <para>
     /// A beat's effect resolves skill override, then its primary effect type's default, then its
     /// element's (<see cref="VfxLibrary.Resolve(string, BeastCraft.Creatures.Element, string)"/>);
-    /// its area is every tile its targets stand on (<see cref="VfxArea"/>). Each status that newly
-    /// lands on a target (and each knockback) adds that effect type's on-apply overlay at the
-    /// impact, and a unit's lasting statuses (<see cref="ShownStatusKeys"/>) switch from the
+    /// its area is every tile its targets stand on (<see cref="VfxArea"/>). Each status that lands
+    /// on a target (and each knockback) adds that effect type's on-apply overlay at the impact —
+    /// every time it lands: a second skill, or the same skill again, applying a status the unit
+    /// already has plays it again in full. A unit's lasting statuses (<see cref="ShownStatusKeys"/>) switch from the
     /// before-snapshot's to the after-snapshot's when the first hit on it lands — so an aura
     /// appears with the blow that applied it and stays exactly as long as the battle keeps the
     /// status.
+    /// </para>
+    /// <para>
+    /// The player's effects settings (<see cref="VfxSettings"/>) go to every timeline, beats and
+    /// overlays alike, so a turn is a pure function of the turn, the library, the seed and the settings.
     /// </para>
     /// </summary>
     public sealed class TurnAnimation
@@ -105,15 +110,15 @@ namespace BeastCraft.Presentation.Playback
         private readonly HexLayout _layout;
         private readonly List<ScheduledBeat> _beats = new List<ScheduledBeat>();
 
-        public TurnAnimation(PlayedTurn turn, HexLayout layout, VfxLibrary vfx, int seed)
+        public TurnAnimation(PlayedTurn turn, HexLayout layout, VfxLibrary vfx, int seed, VfxSettings settings = null)
         {
             _turn = turn ?? throw new ArgumentNullException(nameof(turn));
             _layout = layout;
+            Settings = settings ?? VfxSettings.Default;
             string actor = turn.Turn.Unit.Id;
             MoveMs = turn.Turn.StartPosition != turn.Turn.EndPosition ? WalkMs : 0;
 
             int clock = MoveMs;
-            HashSet<string> claimed = new HashSet<string>(StringComparer.Ordinal);
             for (int i = 0; i < turn.Beats.Count; i++)
             {
                 SkillBeat beat = turn.Beats[i];
@@ -132,8 +137,8 @@ namespace BeastCraft.Presentation.Playback
                 Vec2 from = actor == beat.CasterId && turn.After.ContainsKey(actor) ? CenterAfter(actor) : targets.Count > 0 ? targets[0].Position : Vec2.Zero;
                 int beatSeed = unchecked(seed * 997 + turn.Index * 31 + i);
                 VfxArea area = tiles.Count > 0 ? VfxArea.OfTiles(tiles, layout) : null;
-                VfxTimeline timeline = new VfxTimeline(effect, from, targets, beatSeed, area);
-                List<BeatOverlay> overlays = Overlays(beat, from, timeline.ImpactMs, vfx, beatSeed, claimed);
+                VfxTimeline timeline = new VfxTimeline(effect, from, targets, beatSeed, area, Settings);
+                List<BeatOverlay> overlays = Overlays(beat, from, timeline.ImpactMs, vfx, beatSeed);
                 ScheduledBeat scheduled = new ScheduledBeat(beat, clock, timeline, overlays);
                 _beats.Add(scheduled);
                 clock += scheduled.DurationMs + GapMs;
@@ -146,6 +151,9 @@ namespace BeastCraft.Presentation.Playback
         {
             get { return _turn; }
         }
+
+        /// <summary>The effects settings every timeline of the turn plays with.</summary>
+        public VfxSettings Settings { get; }
 
         /// <summary>The walk's length (0 when the unit stayed put).</summary>
         public int MoveMs { get; }
@@ -203,13 +211,16 @@ namespace BeastCraft.Presentation.Playback
         }
 
         /// <summary>
-        /// The on-apply overlays of <paramref name="beat"/>: for each of its targets, every lasting
-        /// effect key the target has after the turn and not before that this beat's skill can apply
-        /// (the first such beat claims it), and a knockback when the skill knocks back and the target
-        /// moved — each an overlay of that key's on-apply effect from the beat's impact. The beat's
-        /// own primary key is not repeated (its main effect already is that key's).
+        /// The on-apply overlays of <paramref name="beat"/>: every lasting effect and knockback that
+        /// landed on one of its targets (<see cref="SkillBeat.Applied"/>, the battle's own record) —
+        /// each time it lands, whether or not the target already had it and whatever an earlier beat
+        /// applied — each an overlay of that key's on-apply effect from the beat's impact. A
+        /// knockback shows only on a target that really moved and is still standing. The beat's own
+        /// primary key is not repeated (its main effect already is that key's). A beat without a
+        /// record (built by hand) falls back to the keys the target shows after the turn and not
+        /// before that the skill can apply.
         /// </summary>
-        private List<BeatOverlay> Overlays(SkillBeat beat, Vec2 from, int impactMs, VfxLibrary vfx, int seed, HashSet<string> claimed)
+        private List<BeatOverlay> Overlays(SkillBeat beat, Vec2 from, int impactMs, VfxLibrary vfx, int seed)
         {
             List<BeatOverlay> overlays = new List<BeatOverlay>();
             if (vfx == null)
@@ -217,10 +228,45 @@ namespace BeastCraft.Presentation.Playback
                 return overlays;
             }
 
-            for (int t = 0; t < beat.Targets.Count; t++)
+            foreach (BeatApplied landed in beat.Applied ?? SnapshotApplied(beat))
             {
-                string unitId = beat.Targets[t].UnitId;
+                string unitId = landed.UnitId;
+                string key = landed.Key;
                 if (!_turn.After.TryGetValue(unitId, out UnitSnapshot after) || !_turn.Before.TryGetValue(unitId, out UnitSnapshot before))
+                {
+                    continue;
+                }
+
+                if (key == VfxEffectKey.Knockback && (unitId == _turn.Turn.Unit.Id || before.Position == after.Position || after.Defeated))
+                {
+                    continue;
+                }
+
+                VfxEffectData effect = vfx.OnApply(key);
+                if (effect == null || key == beat.PrimaryKey)
+                {
+                    continue;
+                }
+
+                VfxTarget target = new VfxTarget(unitId, CenterAfter(unitId), 0, false);
+                VfxTimeline timeline = new VfxTimeline(effect, from, new[] { target }, unchecked(seed * 7 + overlays.Count + 1),
+                                                       VfxArea.OfTiles(Footprints.Tiles(after.Position, after.Footprint), _layout), Settings);
+                overlays.Add(new BeatOverlay(key, unitId, impactMs, timeline));
+            }
+
+            return overlays;
+        }
+
+        /// <summary>
+        /// For a beat with no record of what landed: per target, the lasting keys it shows after the
+        /// turn and not before that the skill can apply, and a knockback when the skill knocks back.
+        /// </summary>
+        private List<BeatApplied> SnapshotApplied(SkillBeat beat)
+        {
+            List<BeatApplied> applied = new List<BeatApplied>();
+            foreach (BeatTarget target in beat.Targets)
+            {
+                if (!_turn.After.TryGetValue(target.UnitId, out UnitSnapshot after) || !_turn.Before.TryGetValue(target.UnitId, out UnitSnapshot before))
                 {
                     continue;
                 }
@@ -231,33 +277,21 @@ namespace BeastCraft.Presentation.Playback
                     added.Remove(had);
                 }
 
-                if (unitId != _turn.Turn.Unit.Id && before.Position != after.Position && !after.Defeated)
-                {
-                    added.Add(VfxEffectKey.Knockback);
-                }
-
+                added.Add(VfxEffectKey.Knockback);
                 foreach (string key in added)
                 {
-                    VfxEffectData effect = vfx.OnApply(key);
-                    bool fromThisSkill = false;
                     foreach (string own in beat.EffectKeys)
                     {
-                        fromThisSkill |= own == key;
+                        if (own == key)
+                        {
+                            applied.Add(new BeatApplied(target.UnitId, key));
+                            break;
+                        }
                     }
-
-                    if (effect == null || !fromThisSkill || key == beat.PrimaryKey || !claimed.Add(unitId + "|" + key))
-                    {
-                        continue;
-                    }
-
-                    VfxTarget target = new VfxTarget(unitId, CenterAfter(unitId), 0, false);
-                    VfxTimeline timeline = new VfxTimeline(effect, from, new[] { target }, unchecked(seed * 7 + overlays.Count + 1),
-                                                           VfxArea.OfTiles(Footprints.Tiles(after.Position, after.Footprint), _layout));
-                    overlays.Add(new BeatOverlay(key, unitId, impactMs, timeline));
                 }
             }
 
-            return overlays;
+            return applied;
         }
 
         /// <summary>The beat playing at <paramref name="ms"/> (null in a walk or a gap).</summary>

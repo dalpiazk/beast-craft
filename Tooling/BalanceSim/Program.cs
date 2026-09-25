@@ -121,7 +121,9 @@ namespace BeastCraft.Tooling.BalanceSim
 
             if (!string.IsNullOrEmpty(options.WriteDifficultyPath))
             {
-                DifficultyWriter.Write(options.WriteDifficultyPath, options, run.Encounters, run.Cells);
+                // Post-game shapes are calibrated only here, after the report, so they never touch it.
+                List<PveCell> postGame = PostGameCalibration.Run(options, run.Pve, run.Encounters);
+                DifficultyWriter.Write(options.WriteDifficultyPath, options, run.Encounters, run.Cells, postGame);
                 Console.Error.WriteLine("Difficulty table written to " + Path.GetFullPath(options.WriteDifficultyPath));
             }
 

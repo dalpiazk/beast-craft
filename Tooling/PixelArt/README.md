@@ -58,6 +58,11 @@ loads the PNGs at runtime (`Texture2D.FromStream`), indexed by the manifest. The
   its tail) and `fx_glyphs` (4 rune frames).
 - Status icons (9x9): `icon_stun`, `icon_shield`, `icon_burn`, `icon_poison`, `icon_taunt`,
   `icon_buff`, `icon_debuff`, drawn above a unit's HP bar while the status lasts.
+- Skill icons (24x24, `skill_<id>`, ArtKey `skill/<id>`): cheap generated placeholders, one per
+  beast skill, avatar active and passive in `content/data/Skills/skill-library.json` that names an
+  `ArtKey` — a disc in the skill's element colours (avatar actives lilac, passives peach) with its
+  initial. No source files: `build.py` reads the skill library, so a new or renamed skill gets its
+  icon on the next build. `ArtReferenceValidator` holds every skill's icon key to the manifest.
 - Items, map tiles and the camp marker from the style test.
 
 Generated kinds (`fx` bursts, `hex` tiles) have no grid rows: their header drives an

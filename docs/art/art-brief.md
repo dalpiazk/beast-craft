@@ -165,12 +165,16 @@ Heal, Buff, Debuff, Burn (DamageOverTime/fire), Poison (DamageOverTime/nature), 
 | r08 Deepwild | Nature — ancient towering forest |
 | r09 Cinder Throne | Fire/Earth/Metal — volcanic, black glass |
 | r10 Worldcrown | Fire/Water — summit, twin elements |
+| r11 Duskmeridian (post-game, Phase 3) | Light/Dark — endless gold-and-violet evening, dawn and dusk in one sky |
 
 ### UI kit
 
 Frames (portrait, item, skill card), buttons (primary/secondary/disabled states), HP/shield/XP
 bars, turn-order portrait ring (active/upcoming/KO states), skill detail card **with hex-range
-diagram area** (needs a clean vector-friendly hex grid treatment), region map node icons.
+diagram area** (needs a clean vector-friendly hex grid treatment) and a small glossary
+definition popup (tags as chips; highlighted terms in the description), region map node icons. The UI
+typeface is already chosen — **Fredoka SemiBold** (SIL OFL, bundled with the game) — so frames,
+buttons and cards should be designed around its rounded letterforms; no font needs to be supplied.
 
 ## 4. Phasing for quotes
 
@@ -188,6 +192,11 @@ total), remaining 7 element VFX sets (Water, Air, Lightning, Ice, Nature, Metal,
 discrete beast categories; colour pickers excluded).
 
 **Phase 3** — 10 DRAFT region bosses, quoted only after the draft boss designs are approved.
+
+**Phase 3, post-game (DRAFT)** — r11 Duskmeridian tileset + background (Light/Dark); the post-game
+twin boss "Dusk and Dawn" (two giants, Light and Dark; Normal and Hard share the silhouette pass);
+its four lair looks: Dawnshade Horn (Kirin) and Dawnshade Crown (Basilisk), plus the Hard-only
+variants Radiant Dawnshade Horn and Eclipse Dawnshade Crown.
 
 **Post-launch** — remaining 113 beast cosmetic options as drops (212 options total in data).
 
@@ -210,6 +219,9 @@ discrete beast categories; colour pickers excluded).
 | Status-effect VFX (burst + aura) | 10 | | |
 | Region tileset + background | 1 (P1) / 10 total | | |
 | Core UI kit | 1 set | | |
+| Post-game region r11 tileset + background (Light/Dark) | 1 (P3) | | |
+| Post-game twin boss silhouette pass (Dusk and Dawn; Normal and Hard share it) | 1 (P3, quote after design approval) | | |
+| Post-game lair looks: Dawnshade Horn / Crown + Hard variants (Radiant / Eclipse) | 4 options (P3) | | |
 
 ## 5. Budget ballparks (rough, pending real quotes)
 

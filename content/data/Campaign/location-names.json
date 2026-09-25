@@ -91,6 +91,15 @@
       "TradingPost": [ "Summit Market", "Last Trader", "Cloudtop Bazaar", "Highroad Stall", "Crown Exchange", "Wayfarer Cart", "Star Barter", "Skyline Stall" ],
       "Pass": [ "Crown Gate", "Sky Stair", "Final Bridge", "Summit Pass", "Cloudsea Crossing", "Twin Spring Gap", "Gloamgate", "Highest Arch" ],
       "Lair": [ "The Worldcrown", "Summit Crown", "Twin Springs", "Crownseal Dais", "Steam Throne", "Gloam Wellspring", "Tidefire Basin", "Everpeak" ]
+    },
+    {
+      "RegionId": "r11",
+      "Wilds": [ "Dawnfield Road", "Duskgrass Vale", "Halo Meadow", "Shadefern Slope", "Meridian Plain", "Radiant Heath", "Shadow Orchard", "Evenlight Steppe" ],
+      "Den": [ "Dawnlit Den", "Duskhollow Den", "Halo Grotto", "Shade Warren", "Radiant Burrow", "Shadow Nook", "Eclipse Den", "Sunshade Cave" ],
+      "Camp": [ "Meridian Camp", "Dawnrise Rest", "Duskfire Camp", "Halo Hearth", "Shadetree Camp", "Lantern Rest", "Evenlight Camp", "Starshade Shelter" ],
+      "TradingPost": [ "Meridian Market", "Dawn Bazaar", "Dusk Stall", "Halo Exchange", "Shadecart Trader", "Lantern Stall", "Evening Barter", "Evenglow Wagon" ],
+      "Pass": [ "Dawn Gate", "Dusk Stair", "Halo Arch", "Shadow Ford", "Meridian Bridge", "Radiant Pass", "Shade Gap", "Evenfall Crossing" ],
+      "Lair": [ "Meridian Dais", "Dawndusk Court", "Halo Throne", "Shadow Crown", "Radiant Basin", "Eclipse Ring", "Twin Light Hall", "Evenfall Altar" ]
     }
   ]
 }

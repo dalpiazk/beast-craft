@@ -106,6 +106,12 @@ namespace BeastCraft.Presentation.Layout
             return new Rect(OffsetX, OffsetY, canvasWidth * Scale, canvasHeight * Scale);
         }
 
+        /// <summary>A canvas rectangle in screen pixels (e.g. the board area, to clip the zoomed board to).</summary>
+        public Rect ToScreen(Rect canvas)
+        {
+            return new Rect(OffsetX + canvas.X * Scale, OffsetY + canvas.Y * Scale, canvas.Width * Scale, canvas.Height * Scale);
+        }
+
         /// <summary>A screen point in canvas pixels (the inverse of the fit), for hit-testing taps and clicks.</summary>
         public Vec2 ToCanvas(float screenX, float screenY)
         {
@@ -192,6 +198,9 @@ namespace BeastCraft.Presentation.Layout
 
         public const int ControlCount = 5;
 
+        /// <summary>The rows of the settings overlay: effects intensity, screen shake, flashes, close.</summary>
+        public const int SettingsRowCount = 4;
+
         public PortraitLayout()
         {
             Header = new Rect(Margin, 16f, CanvasWidth - 2f * Margin, 56f);
@@ -200,6 +209,9 @@ namespace BeastCraft.Presentation.Layout
             Toast = new Rect(Margin, 1438f, CanvasWidth - 2f * Margin, 64f);
             SkillStrip = new Rect(Margin, 1514f, CanvasWidth - 2f * Margin, 244f);
             Controls = new Rect(Margin, 1774f, CanvasWidth - 2f * Margin, 120f);
+            SettingsButton = new Rect(CanvasWidth - Margin - 64f, 12f, 64f, 64f);
+            SkillDetail = new Rect(Margin, 560f, CanvasWidth - 2f * Margin, 856f);
+            SettingsPanel = new Rect(Margin + 96f, 520f, CanvasWidth - 2f * Margin - 192f, 520f);
         }
 
         public Rect Canvas
@@ -218,6 +230,31 @@ namespace BeastCraft.Presentation.Layout
         public Rect SkillStrip { get; }
 
         public Rect Controls { get; }
+
+        /// <summary>
+        /// The most room the skill detail card may take, over the lower part of the board (opened
+        /// by tapping a skill in the strip): the card sits on its foot, as tall as its content;
+        /// what goes where is <c>Cards.SkillCardLayout</c>.
+        /// </summary>
+        public Rect SkillDetail { get; }
+
+        /// <summary>The gear button at the header's right end: opens and closes the settings overlay.</summary>
+        public Rect SettingsButton { get; }
+
+        /// <summary>The settings overlay's panel, over the board.</summary>
+        public Rect SettingsPanel { get; }
+
+        /// <summary>
+        /// Row <paramref name="index"/> of the settings overlay, top to bottom under its title: 0
+        /// effects intensity (cycles Full, Reduced, Minimal), 1 screen shake, 2 flashes, 3 close.
+        /// </summary>
+        public Rect SettingsRow(int index)
+        {
+            Rect body = new Rect(SettingsPanel.X + 32f, SettingsPanel.Y + 96f, SettingsPanel.Width - 64f, SettingsPanel.Height - 128f);
+            const float gap = 20f;
+            float height = (body.Height - gap * (SettingsRowCount - 1)) / SettingsRowCount;
+            return new Rect(body.X, body.Y + index * (height + gap), body.Width, height);
+        }
 
         /// <summary>The <paramref name="index"/>th of <paramref name="count"/> portrait slots in the turn-order bar (square, left to right, under its label).</summary>
         public Rect TurnOrderSlot(int index, int count)

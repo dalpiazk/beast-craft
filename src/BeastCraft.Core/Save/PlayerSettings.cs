@@ -25,5 +25,20 @@ namespace BeastCraft.Save
         /// preview is not a setting: it is always shown.
         /// </summary>
         public bool TeamSuggestionsEnabled = true;
+
+        /// <summary>
+        /// How much of each skill's visual effect the battle plays: Full (the default), Reduced or
+        /// Minimal (see <see cref="Save.EffectsIntensity"/>). Presentation only.
+        /// </summary>
+        public EffectsIntensity EffectsIntensity = EffectsIntensity.Full;
+
+        /// <summary>Whether hits shake the battle camera. On by default.</summary>
+        public bool ScreenShake = true;
+
+        /// <summary>
+        /// Whether effects may flash (accessibility): the white hit flash on a struck unit and the
+        /// bright additive bursts. On by default; off leaves every effect's other parts playing.
+        /// </summary>
+        public bool Flashes = true;
     }
 }

@@ -6,8 +6,11 @@ using BeastCraft.Battle.Grid;
 using BeastCraft.Creatures;
 using BeastCraft.Game.Rendering;
 using BeastCraft.Presentation.Board;
+using BeastCraft.Presentation.Cards;
 using BeastCraft.Presentation.Layout;
 using BeastCraft.Presentation.Playback;
+using BeastCraft.Presentation.Text;
+using BeastCraft.Save;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
@@ -24,6 +27,7 @@ namespace BeastCraft.Game
         private const float Large = 25f;
 
         private Texture2D _pixel;
+        private GlossaryTerm _popupTerm;
 
         /// <summary>A 1x1 white texture for rectangles and bars (made on first use, so a failure screen has one too).</summary>
         private Texture2D Pixel
@@ -48,7 +52,7 @@ namespace BeastCraft.Game
             DrawToast(shadow);
             DrawSkillStrip(beat, shadow);
             DrawControls(shadow);
-            DrawSkillDiagram(shadow);
+            DrawSkillCard(shadow);
 
             if (_playback.IsOver && (_animation == null || _clockMs >= _animation.DurationMs))
             {
@@ -56,6 +60,45 @@ namespace BeastCraft.Game
                 Rect board = _screen.Board;
                 _draw.Fill(Pixel, new Vector2(board.X, board.Center.Y - 70f), new Vector2(board.Width, 140f), shadow * 0.75f);
                 _text.DrawCentered(_draw, banner, board.Center.X, board.Center.Y - 30f, 60f, Ink("y", Color.Gold), shadow);
+            }
+
+            DrawSettings(shadow);
+        }
+
+        /// <summary>
+        /// The settings overlay, when open: a panel over the board with one row per effects setting
+        /// (tap to change) and a close row; the rest of the screen dimmed.
+        /// </summary>
+        private void DrawSettings(Color shadow)
+        {
+            if (!_settingsOpen)
+            {
+                return;
+            }
+
+            _draw.Fill(Pixel, new Rectangle(0, 0, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight), shadow * 0.55f);
+            Rect panel = _screen.SettingsPanel;
+            _draw.Fill(Pixel, new Vector2(panel.X, panel.Y), new Vector2(panel.Width, panel.Height), Ink("y", Color.Gold));
+            _draw.Fill(Pixel, new Vector2(panel.X + 5f, panel.Y + 5f), new Vector2(panel.Width - 10f, panel.Height - 10f), Ink("p", Color.Purple));
+            _text.DrawCentered(_draw, "EFFECTS SETTINGS", panel.Center.X, panel.Y + 36f, Large, Ink("y", Color.Gold), shadow);
+
+            string intensity = _settings.EffectsIntensity == EffectsIntensity.Minimal ? "MINIMAL" : _settings.EffectsIntensity == EffectsIntensity.Reduced ? "REDUCED" : "FULL";
+            string[] labels = { "EFFECTS", "SCREEN SHAKE", "FLASHES", null };
+            string[] values = { intensity, _settings.ScreenShake ? "ON" : "OFF", _settings.Flashes ? "ON" : "OFF", null };
+            for (int i = 0; i < PortraitLayout.SettingsRowCount; i++)
+            {
+                Rect row = _screen.SettingsRow(i);
+                bool close = labels[i] == null;
+                _draw.Fill(Pixel, new Vector2(row.X, row.Y), new Vector2(row.Width, row.Height), close ? Ink("2", Color.Gray) : Ink("1", Color.DarkGray));
+                if (close)
+                {
+                    _text.DrawCentered(_draw, "CLOSE", row.Center.X, row.Center.Y - 12f, Large, Ink("4", Color.White), shadow);
+                    continue;
+                }
+
+                _text.Draw(_draw, labels[i], new Vector2(row.X + 24f, row.Center.Y - 12f), Large, Ink("4", Color.White), shadow);
+                bool on = values[i] != "OFF";
+                _text.DrawRight(_draw, values[i], row.Right - 24f, row.Center.Y - 12f, Large, on ? Ink("l", Color.LightGreen) : Ink("o", Color.OrangeRed), shadow);
             }
         }
 
@@ -65,7 +108,17 @@ namespace BeastCraft.Game
             _text.Draw(_draw, _host.HudTitle, new Vector2(header.X, header.Y + 12f), Large, Ink("y", Color.Gold), shadow);
             string turn = "TURN " + _playback.Played.Count.ToString(CultureInfo.InvariantCulture) + "  SEED " +
                           _options.Seed.ToString(CultureInfo.InvariantCulture);
-            _text.DrawRight(_draw, turn, header.Right, header.Y + 16f, Medium, Ink("3", Color.Gray), shadow);
+            Rect gear = _screen.SettingsButton;
+            _text.DrawRight(_draw, turn, gear.X - 20f, header.Y + 16f, Medium, Ink("3", Color.Gray), shadow);
+
+            // The settings gear (opens the effects settings overlay).
+            _draw.Fill(Pixel, new Vector2(gear.X, gear.Y), new Vector2(gear.Width, gear.Height), _settingsOpen ? Ink("y", Color.Gold) : Ink("2", Color.Gray));
+            _draw.Fill(Pixel, new Vector2(gear.X + 3f, gear.Y + 3f), new Vector2(gear.Width - 6f, gear.Height - 6f), Ink("p", Color.Purple));
+            ArtSprite icon = _atlas.ByArtKey("ui/gear");
+            if (icon != null)
+            {
+                DrawIcon(icon, gear.Inset(10f));
+            }
         }
 
         /// <summary>The acting unit (this turn's, else the next to act) and the ones after it, as portraits.</summary>
@@ -154,11 +207,8 @@ namespace BeastCraft.Game
                 _draw.Fill(Pixel, new Vector2(card.X + thickness, card.Y + thickness), new Vector2(card.Width - 2f * thickness, card.Height - 2f * thickness),
                            Ink("K", Color.Black));
 
-                // Placeholder icon: an element-coloured tile and the skill's initial (skills have no art yet).
                 Rect icon = new Rect(card.X + 14f, card.Y + 14f, 72f, 72f);
-                _draw.Fill(Pixel, new Vector2(icon.X, icon.Y), new Vector2(icon.Width, icon.Height), ElementColor(skill.Element));
-                string initial = string.IsNullOrEmpty(skill.DisplayName) ? "?" : skill.DisplayName.Substring(0, 1);
-                _text.DrawCentered(_draw, initial, icon.Center.X + 2f, icon.Y + 16f, 40f, Ink("4", Color.White), shadow);
+                DrawSkillIcon(skill, icon, shadow);
 
                 int cooldown = unit.Skills == null ? 0 : unit.Skills.RemainingCooldown(i);
                 string state = firing ? "CAST" : cooldown <= 0 ? "READY" : "CD " + cooldown.ToString(CultureInfo.InvariantCulture);
@@ -177,13 +227,13 @@ namespace BeastCraft.Game
         }
 
         /// <summary>
-        /// The selected (hovered or tapped) skill's card: its name, shape, side and cooldown, and a
-        /// hex diagram of its range and area (<see cref="SkillFootprint"/>, for the acting unit's own
-        /// footprint): the caster gold, the tiles it may pick a target on tinted, the tiles it hits
-        /// in its side's colour, the example target outlined. Drawn over the foot of the board, above
-        /// the strip — the seed of a skill detail card.
+        /// The skill detail card of the selected (hovered or tapped) skill, grown from the old
+        /// range-diagram card (<see cref="SkillCard"/>, laid out by <see cref="SkillCardLayout"/>):
+        /// icon, name, element / category / target tags, cooldown, range and uses, one power line
+        /// per effect and the level scaling, the hex range diagram, and the description as rich
+        /// text with its glossary terms highlighted (tap one for its definition).
         /// </summary>
-        private void DrawSkillDiagram(Color shadow)
+        private void DrawSkillCard(Color shadow)
         {
             int selected = SelectedSkill();
             BattleUnit unit = ActingUnit();
@@ -193,23 +243,174 @@ namespace BeastCraft.Game
             }
 
             SkillSO skill = ActingSkills()[selected];
-            SkillFootprint footprint = SkillFootprint.Of(skill, unit.Footprint);
-            Rect board = _screen.Board;
-            Rect panel = new Rect(board.Right - 460f, board.Bottom - 470f, 460f, 460f);
+            SkillCard card = SkillCard.Of(skill, _content.Glossary);
+            SkillCardLayout layout = CardLayout(card);
+            Rect panel = layout.Card;
             _draw.Fill(Pixel, new Vector2(panel.X, panel.Y), new Vector2(panel.Width, panel.Height), Ink("Y", Color.Yellow));
-            _draw.Fill(Pixel, new Vector2(panel.X + 4f, panel.Y + 4f), new Vector2(panel.Width - 8f, panel.Height - 8f), Ink("K", Color.Black) * 0.94f);
+            _draw.Fill(Pixel, new Vector2(panel.X + 5f, panel.Y + 5f), new Vector2(panel.Width - 10f, panel.Height - 10f), Ink("K", Color.Black) * 0.96f);
 
+            DrawSkillIcon(skill, layout.Icon, shadow);
+            Rect name = layout.Name;
+            _text.Draw(_draw, _text.Fit(card.Name, SkillCardLayout.NameSize, name.Width), new Vector2(name.X, name.Y), SkillCardLayout.NameSize, Ink("y", Color.Gold),
+                       shadow);
+
+            // Tags: element, damage category, then who it lands on.
+            float x = name.X;
+            if (card.Element != null)
+            {
+                x = DrawChip(card.Element, x, layout.ChipsY, ElementColor(skill.Element));
+            }
+
+            if (card.Category != null)
+            {
+                x = DrawChip(card.Category, x, layout.ChipsY, Ink("2", Color.Gray));
+            }
+
+            foreach (string target in card.Targets)
+            {
+                Color tint = target == "Enemy" ? Ink("r", Color.DarkRed) : target == "Ally" ? Ink("g", Color.DarkGreen) : Ink("q", Color.Chocolate);
+                x = DrawChip(target, x, layout.ChipsY, tint);
+            }
+
+            // Cooldown, range and uses; a line per effect; the scaling: all wrapped to the card's width.
+            DrawPlain(layout.Stats, layout.StatsAt, SkillCardLayout.StatsSize, Ink("4", Color.White), shadow);
+            DrawPlain(layout.Power, layout.PowerAt, SkillCardLayout.PowerSize, Ink("C", Color.LightBlue), shadow);
+            DrawPlain(layout.Scaling, layout.ScalingAt, SkillCardLayout.ScalingSize, Ink("3", Color.Gray), shadow);
+
+            DrawRangeDiagram(skill, unit.Footprint, layout.Diagram);
+            DrawRichText(layout, shadow);
+            DrawGlossaryPopup(layout, shadow);
+        }
+
+        /// <summary>A tag chip with its top-left at (<paramref name="x"/>, <paramref name="y"/>); returns where the next one starts.</summary>
+        private float DrawChip(string label, float x, float y, Color fill)
+        {
+            const float size = 17f;
+            float width = _text.Measure(label, size) + 28f;
+            _draw.Fill(Pixel, new Vector2(x, y), new Vector2(width, 36f), fill);
+            _text.Draw(_draw, label, new Vector2(x + 14f, y + 10f), size, Ink("4", Color.White), Ink("K", Color.Black));
+            return x + width + 12f;
+        }
+
+        /// <summary>The card's layout for the current text renderer (the same one taps are tested against).</summary>
+        private SkillCardLayout CardLayout(SkillCard card)
+        {
+            return SkillCardLayout.Of(card, _screen.SkillDetail, (s, size) => _text.Measure(s, size), size => _text.LineHeight(size));
+        }
+
+        /// <summary>A wrapped plain-text layout's runs, relative to <paramref name="origin"/>.</summary>
+        private void DrawPlain(RichTextLayout layout, Vec2 origin, float size, Color color, Color shadow)
+        {
+            foreach (RichRun run in layout.Runs)
+            {
+                _text.Draw(_draw, run.Text, new Vector2(origin.X + run.X, origin.Y + run.Y), size, color, shadow);
+            }
+        }
+
+        /// <summary>The description: plain runs in white, glossary terms in their category's colour and underlined; the hint under it when there are terms.</summary>
+        private void DrawRichText(SkillCardLayout layout, Color shadow)
+        {
+            Rect area = layout.Text;
+            RichTextLayout text = layout.Description;
+            const float size = SkillCardLayout.DescriptionSize;
+            foreach (RichRun run in text.Runs)
+            {
+                Vector2 at = new Vector2(area.X + run.X, area.Y + run.Y);
+                if (run.Term == null)
+                {
+                    _text.Draw(_draw, run.Text, at, size, Ink("4", Color.White), shadow);
+                    continue;
+                }
+
+                Color color = TermColor(run.Term);
+                if (_popupTerm == run.Term)
+                {
+                    _draw.Fill(Pixel, new Vector2(at.X - 4f, at.Y - 6f), new Vector2(run.Width + 8f, text.LineHeight - 2f), color * 0.3f);
+                }
+
+                _text.Draw(_draw, run.Text, at, size, color, shadow);
+                _draw.Fill(Pixel, new Vector2(at.X, at.Y + size + 7f), new Vector2(run.Width, 3f), color);
+            }
+
+            if (layout.HintY.HasValue)
+            {
+                _text.Draw(_draw, "Tap a highlighted word to learn it", new Vector2(area.X, layout.HintY.Value), SkillCardLayout.HintSize, Ink("3", Color.Gray), shadow);
+            }
+        }
+
+        /// <summary>
+        /// The open glossary term's definition in a popup clear of the term and the description
+        /// (<see cref="SkillCardLayout.PlacePopup"/>: below them, else above), with a pointer toward the term.
+        /// </summary>
+        private void DrawGlossaryPopup(SkillCardLayout layout, Color shadow)
+        {
+            if (_popupTerm == null)
+            {
+                return;
+            }
+
+            const float width = 600f;
+            const float size = 20f;
+            RichTextLayout definition = RichTextLayout.Of(new[] { new RichSpan(_popupTerm.Definition ?? string.Empty, null) }, s => _text.Measure(s, size), width - 48f,
+                                                          _text.LineHeight(size));
+            PopupPlacement place = layout.PlacePopup(_popupTerm, width, 104f + definition.Height);
+            Rect popup = place.Rect;
+            Color color = TermColor(_popupTerm);
+            _draw.Fill(Pixel, new Vector2(popup.X, popup.Y), new Vector2(popup.Width, popup.Height), color);
+            _draw.Fill(Pixel, new Vector2(popup.X + 4f, popup.Y + 4f), new Vector2(popup.Width - 8f, popup.Height - 8f), Ink("p", Color.Purple));
+
+            // The pointer: a stepped triangle in the gap, pointing at the term.
+            float half = PopupPlacement.PointerHalfWidth;
+            for (int step = 0; step < 4; step++)
+            {
+                float w = 2f * half * (4 - step) / 4f;
+                float y = place.Below ? popup.Y - 4f * (step + 1) : popup.Bottom + 4f * step;
+                _draw.Fill(Pixel, new Vector2(place.PointerX - w / 2f, y), new Vector2(w, 4f), color);
+            }
+
+            _text.Draw(_draw, _popupTerm.Term, new Vector2(popup.X + 24f, popup.Y + 22f), 28f, color, shadow);
+            _text.DrawRight(_draw, (_popupTerm.Category ?? string.Empty).ToUpperInvariant(), popup.Right - 24f, popup.Y + 30f, 15f, Ink("3", Color.Gray), shadow);
+            foreach (RichRun run in definition.Runs)
+            {
+                _text.Draw(_draw, run.Text, new Vector2(popup.X + 24f + run.X, popup.Y + 80f + run.Y), size, Ink("4", Color.White), shadow);
+            }
+
+            if (_options.Screenshot)
+            {
+                Console.WriteLine("Glossary popup for " + _popupTerm.TermId + ": " + (place.Below ? "below" : "above") + " the description" + (place.Fits ? string.Empty : " (clamped)") +
+                                  " at " + popup + ".");
+            }
+        }
+
+        /// <summary>A glossary term's colour by category: statuses gold, stances sky, combat terms peach, passives lilac.</summary>
+        private Color TermColor(GlossaryTerm term)
+        {
+            switch (term.Category)
+            {
+                case "Stance":
+                    return Ink("C", Color.LightBlue);
+                case "Combat":
+                    return Ink("s", Color.PeachPuff);
+                case "Passive":
+                    return Ink("u", Color.Plum);
+                default:
+                    return Ink("Y", Color.Yellow);
+            }
+        }
+
+        /// <summary>
+        /// A hex diagram of the skill's range and area (<see cref="SkillFootprint"/>, for the
+        /// acting unit's own footprint) fitted to <paramref name="area"/>: the caster gold, the
+        /// tiles it may pick a target on tinted, the tiles it hits in its side's colour, the example
+        /// target outlined.
+        /// </summary>
+        private void DrawRangeDiagram(SkillSO skill, UnitFootprint casterFootprint, Rect area)
+        {
+            SkillFootprint footprint = SkillFootprint.Of(skill, casterFootprint);
             bool allies = footprint.Side == SkillTargetSide.Ally;
-            _text.Draw(_draw, _text.Fit(skill.DisplayName ?? skill.SkillId, Medium, panel.Width - 40f), new Vector2(panel.X + 20f, panel.Y + 20f), Medium,
-                       Ink("y", Color.Gold), shadow);
-            string what = ShapeLabel(skill) + "  " + (footprint.IsGlobal ? (allies ? "EVERY ALLY" : "EVERY FOE") : allies ? "ALLIES" : "FOES") + "  CD " +
-                          skill.Cooldown.ToString(CultureInfo.InvariantCulture);
-            _text.Draw(_draw, _text.Fit(what, Small, panel.Width - 40f), new Vector2(panel.X + 20f, panel.Y + 52f), Small, Ink("3", Color.Gray), shadow);
-
-            // The diagram, in its own hex space (tile (0, 0) = the caster's anchor) fitted to the card.
-            Rect area = new Rect(panel.X + 20f, panel.Y + 80f, panel.Width - 40f, panel.Height - 100f);
+            _draw.Fill(Pixel, new Vector2(area.X, area.Y), new Vector2(area.Width, area.Height), Ink("p", Color.Purple) * 0.6f);
             int radius = Math.Min(6, footprint.Extent);
-            BoardFit fit = PortraitLayout.FitBoard(radius, area);
+            BoardFit fit = PortraitLayout.FitBoard(radius, area.Inset(12f));
             Matrix canvas = Matrix.CreateScale(_canvasFit.Scale) * Matrix.CreateTranslation(_canvasFit.OffsetX, _canvasFit.OffsetY, 0f);
             _draw.SetTransform(Matrix.CreateScale(fit.Scale) * Matrix.CreateTranslation(fit.OriginX, fit.OriginY, 0f) * canvas);
 
@@ -284,6 +485,35 @@ namespace BeastCraft.Game
                                      box.Y + (box.Height - sprite.Data.FrameHeight * k) / 2f + sprite.Pivot.Y * k);
             DrawCharacter(sprite, at, 1f, Color.White, flip);
             _draw.UnitSize = unit;
+        }
+
+        /// <summary>An icon sprite (its pivot at its centre) scaled to fit <paramref name="box"/>, centred.</summary>
+        private void DrawIcon(ArtSprite art, Rect box)
+        {
+            float ppu = art.Data.PixelsPerUnit > 0f ? art.Data.PixelsPerUnit : _draw.UnitSize;
+            float scale = Math.Min(box.Width / art.Data.FrameWidth, box.Height / Math.Max(1, art.Data.FrameHeight)) * ppu / _draw.UnitSize;
+            float k = scale * _draw.UnitSize / ppu;
+            Vector2 pivot = new Vector2(box.Center.X - art.Data.FrameWidth * k / 2f + art.Pivot.X * k, box.Center.Y - art.Data.FrameHeight * k / 2f + art.Pivot.Y * k);
+            _draw.DrawSprite(art, 0, pivot, scale, Color.White);
+        }
+
+        /// <summary>
+        /// A skill's icon fitted to <paramref name="box"/>: its art (<see cref="SkillSO.ArtKey"/> looked
+        /// up in the manifest), else — a skill with no icon, such as an enemy-library one — an
+        /// element-coloured tile with the skill's initial.
+        /// </summary>
+        private void DrawSkillIcon(SkillSO skill, Rect box, Color shadow)
+        {
+            ArtSprite art = _atlas.ByArtKey(skill.ArtKey);
+            if (art != null && art.Data.FrameWidth > 0)
+            {
+                DrawIcon(art, box);
+                return;
+            }
+
+            _draw.Fill(Pixel, new Vector2(box.X, box.Y), new Vector2(box.Width, box.Height), ElementColor(skill.Element));
+            string initial = string.IsNullOrEmpty(skill.DisplayName) ? "?" : skill.DisplayName.Substring(0, 1);
+            _text.DrawCentered(_draw, initial, box.Center.X + 2f, box.Y + box.Height * 0.22f, box.Height * 0.55f, Ink("4", Color.White), shadow);
         }
 
         /// <summary>The unit whose skills the strip shows: the one acting now, else the next to act.</summary>

@@ -90,6 +90,7 @@ stay plain UI labels ("Kirin Horn", "Hair Colour").
 | r08 Deepwild | Nature (oldest forest) | Deepwild Heart (Root Seal) | Elderroot | Elderroot Blossoms (Treant), Elderroot Cloak (avatar) |
 | r09 Cinder Throne | Fire, Earth and Metal (volcanic) | Cinder King (Cinder Seal) | Magmavein | Magmavein Runes (Golem) |
 | r10 Worldcrown | Fire and Water (the summit) | Flame and Flood (Crown Seal) | Summit | Summit Scales (Basilisk), Summit Regalia (avatar) |
+| r11 Duskmeridian (post-game) | Light and Dark (endless evening) | Dusk and Dawn (no Seal) | Dawnshade | Dawnshade Horn (Kirin), Dawnshade Crown (Basilisk); Hard-only (`boss_hard`): Radiant Dawnshade Horn, Eclipse Dawnshade Crown |
 
 r09's "Magmavein" covers the whole volcano: magma for the Fire giant, the vein for the stone and iron
 champions (Earth, Metal). r07's "Stormcrown" is the Thunder Court's crown (its lair names include

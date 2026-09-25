@@ -17,8 +17,13 @@ namespace BeastCraft.Battle
 
         public string Description;
 
-        /// <summary>Icon shown in the battle action bar and skill lists. Engine-neutral art key the host renderer resolves (null = none).</summary>
-        public string Icon;
+        /// <summary>
+        /// The skill's icon, shown in the battle skill strip, the skill card and skill lists: an
+        /// engine-neutral art key (a sprite's <c>ArtKey</c> in the art manifest, e.g.
+        /// <c>skill/ember_shot</c>) the host renderer resolves; null = none. Authored in the skill
+        /// library (<c>SkillData.ArtKey</c>). Presentation only: the battle never reads it.
+        /// </summary>
+        public string ArtKey;
 
         /// <summary>
         /// Cost in the per-creature battle resource. The resource's name ("mana" / "focus" /

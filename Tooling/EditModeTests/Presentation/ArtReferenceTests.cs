@@ -1,18 +1,22 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using BeastCraft.Avatar;
+using BeastCraft.Battle;
 using BeastCraft.Creatures;
 using BeastCraft.Creatures.Roster;
 using BeastCraft.Encounters;
 using BeastCraft.Presentation.Content;
+using BeastCraft.Skills;
 using BeastCraft.Vfx;
 using NUnit.Framework;
 
 namespace BeastCraft.Tests.EditMode
 {
     /// <summary>
-    /// The content's art references: every species' and enemy's <c>ArtKey</c> (presentation only)
-    /// names an entry of the real art manifest, every VFX sheet is in it, every manifest file exists,
+    /// The content's art references: every species' and enemy's <c>ArtKey</c> and every skill's,
+    /// avatar active's and passive's icon key (presentation only) names an entry of the real art
+    /// manifest, every VFX sheet is in it, every manifest file exists,
     /// and <see cref="ArtReferenceValidator"/>'s rules one by one.
     /// </summary>
     public class ArtReferenceTests
@@ -92,6 +96,105 @@ namespace BeastCraft.Tests.EditMode
             Assert.IsTrue(loose.Exists(e => e.Contains("'e'") && e.Contains("enemy/e")));
             Assert.AreEqual(3, strict.Count);
             Assert.IsTrue(strict.Exists(e => e.Contains("'b'") && e.Contains("no ArtKey")));
+        }
+
+        [Test]
+        public void EveryShippedSkillActiveAndPassive_HasAnIconKey_InTheManifest()
+        {
+            List<string> errors = ArtReferenceValidator.Validate(Content.Roster, Content.EnemyLibrary, Content.SkillLibrary, Content.Art, requireKeys: true);
+
+            Assert.IsEmpty(errors, string.Join("\n", errors));
+            foreach (SkillData skill in Content.SkillLibrary.BeastSkills)
+            {
+                Assert.AreEqual("skill/" + skill.SkillId, skill.ArtKey, skill.SkillId);
+                Assert.AreEqual("skill", Content.Art.FindByArtKey(skill.ArtKey).Category, skill.SkillId);
+            }
+
+            foreach (SkillData skill in Content.SkillLibrary.AvatarActives)
+            {
+                Assert.AreEqual("skill/" + skill.SkillId, skill.ArtKey, skill.SkillId);
+            }
+
+            foreach (PassiveData passive in Content.SkillLibrary.AvatarPassives)
+            {
+                Assert.AreEqual("skill/" + passive.PassiveId, passive.ArtKey, passive.PassiveId);
+            }
+        }
+
+        [Test]
+        public void Validate_HoldsSkillIconKeys_ToTheManifest_AndRequiresThemOnlyForTheSkillLibrary()
+        {
+            ArtManifestData art = new ArtManifestData
+            {
+                Sprites = new[] { new ArtSpriteData { Name = "s", File = "s.png", ArtKey = "skill/known" }, new ArtSpriteData { Name = "e", File = "e.png", ArtKey = "enemy/e" } }
+            };
+            SkillLibraryData skills = new SkillLibraryData
+            {
+                BeastSkills = new[] { new SkillData { SkillId = "a", ArtKey = "skill/known" }, new SkillData { SkillId = "b" } },
+                AvatarActives = new[] { new SkillData { SkillId = "c", ArtKey = "skill/nope" } },
+                AvatarPassives = new[] { new PassiveData { PassiveId = "p" }, new PassiveData { PassiveId = "q", ArtKey = "skill/gone" } }
+            };
+            EnemyLibraryData enemies = new EnemyLibraryData
+            {
+                Enemies = new[]
+                {
+                    new EnemyData { EnemyId = "e", ArtKey = "enemy/e", Skills = new[] { new SkillData { SkillId = "bite" }, new SkillData { SkillId = "claw", ArtKey = "skill/claw" } } }
+                }
+            };
+
+            List<string> loose = ArtReferenceValidator.Validate(null, enemies, skills, art);
+            List<string> strict = ArtReferenceValidator.Validate(null, enemies, skills, art, requireKeys: true);
+
+            Assert.AreEqual(3, loose.Count, string.Join("\n", loose));
+            Assert.IsTrue(loose.Exists(e => e.Contains("Avatar active 'c'") && e.Contains("skill/nope")));
+            Assert.IsTrue(loose.Exists(e => e.Contains("Avatar passive 'q'") && e.Contains("skill/gone")));
+            Assert.IsTrue(loose.Exists(e => e.Contains("skill 'claw'") && e.Contains("skill/claw")), "an enemy skill's icon, when set, is checked");
+            Assert.AreEqual(5, strict.Count, string.Join("\n", strict));
+            Assert.IsTrue(strict.Exists(e => e.Contains("Beast skill 'b'") && e.Contains("no ArtKey")));
+            Assert.IsTrue(strict.Exists(e => e.Contains("Avatar passive 'p'") && e.Contains("no ArtKey")));
+            Assert.IsFalse(strict.Exists(e => e.Contains("'bite'")), "enemy-library skills never need an icon");
+        }
+
+        [Test]
+        public void SkillIconKey_ReachesTheRuntimeSkillAndPassive_AndIsPresentationOnly()
+        {
+            SkillData data = Array.Find(Content.SkillLibrary.BeastSkills, s => s.SkillId == "ember_shot");
+            SkillSO with = new SkillSO();
+            SkillSO without = new SkillSO();
+            SkillLibraryBuilder.ApplySkill(data, with);
+            string key = data.ArtKey;
+            data.ArtKey = null;
+            try
+            {
+                SkillLibraryBuilder.ApplySkill(data, without);
+            }
+            finally
+            {
+                data.ArtKey = key;
+            }
+
+            Assert.AreEqual("skill/ember_shot", with.ArtKey);
+            Assert.IsNull(without.ArtKey);
+            without.ArtKey = with.ArtKey;
+            Assert.AreEqual(FieldJson.ToJson(with), FieldJson.ToJson(without));
+
+            PassiveSkillSO passive = new PassiveSkillSO();
+            SkillLibraryBuilder.ApplyPassive(Content.SkillLibrary.AvatarPassives[0], passive);
+            Assert.AreEqual("skill/" + passive.PassiveId, passive.ArtKey);
+        }
+
+        [Test]
+        public void SkillLibraryValidator_RefusesAMalformedIconKey()
+        {
+            SkillLibraryData skills = FieldJson.FromJson<SkillLibraryData>(File.ReadAllText(GameContent.PathOf(GameContent.FindRoot(), SkillLibraryData.ProjectRelativePath)));
+            Assert.IsEmpty(SkillLibraryValidator.Validate(skills, Content.Roster));
+
+            skills.BeastSkills[0].ArtKey = "Skill/Boulder";
+            skills.AvatarPassives[0].ArtKey = "skill//keen";
+            List<string> errors = SkillLibraryValidator.Validate(skills, Content.Roster);
+
+            Assert.AreEqual(2, errors.Count, string.Join("\n", errors));
+            Assert.IsTrue(errors.TrueForAll(e => e.Contains("ArtKey")));
         }
 
         [TestCase("beast/phoenix", true)]

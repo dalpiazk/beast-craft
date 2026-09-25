@@ -13,10 +13,23 @@ namespace BeastCraft.Tooling.BalanceSim
     /// <c>encounter-difficulty.json</c> (<see cref="EncounterDifficultyData"/>), one cell per
     /// (kit mode, shape, level), in kit-mode, shape (file order) and level order. Deterministic text:
     /// the same run writes the same bytes. The report is not touched.
+    /// <para>
+    /// Post-game shapes (<see cref="EncounterCatalog.PostGameShapes"/>, <paramref name="postGameCells"/>
+    /// from <see cref="PostGameCalibration"/>) come after every mainline entry: their targets after the
+    /// mainline targets, their cells (kit mode, then shape, at level 100) after every mainline cell.
+    /// The mainline text — the <c>_readme</c> (its target summary names the mainline shapes only),
+    /// every target and every cell — is byte-for-byte what it is without them; the only other change
+    /// is the comma JSON needs after the last mainline target and the last mainline cell.
+    /// </para>
     /// </summary>
     public static class DifficultyWriter
     {
         public static void Write(string path, SimOptions options, EncounterCatalog encounters, List<PveCell> cells)
+        {
+            Write(path, options, encounters, cells, null);
+        }
+
+        public static void Write(string path, SimOptions options, EncounterCatalog encounters, List<PveCell> cells, List<PveCell> postGameCells)
         {
             StringBuilder json = new StringBuilder();
             json.Append("{\n");
@@ -30,6 +43,15 @@ namespace BeastCraft.Tooling.BalanceSim
             foreach (EncounterShape shape in encounters.Shapes)
             {
                 targets.Add("    { \"Shape\": " + Quote(shape.Id) + ", \"TargetClear\": " + Number(options.TargetFor(shape)) + " }");
+            }
+
+            bool postGame = postGameCells != null && postGameCells.Count > 0;
+            if (postGame)
+            {
+                foreach (EncounterShape shape in encounters.PostGameShapes)
+                {
+                    targets.Add("    { \"Shape\": " + Quote(shape.Id) + ", \"TargetClear\": " + Number(options.TargetFor(shape)) + " }");
+                }
             }
 
             json.Append(string.Join(",\n", targets)).Append("\n  ],\n");
@@ -50,6 +72,25 @@ namespace BeastCraft.Tooling.BalanceSim
                             {
                                 rows.Add("    { \"KitMode\": " + Quote(SimOptions.ModeName(mode)) + ", \"Shape\": " + Quote(shape.Id) + ", \"Level\": " +
                                          level.ToString(CultureInfo.InvariantCulture) + ", \"Multiplier\": " + Number(cell.Multiplier) + ", \"TargetClear\": " +
+                                         Number(options.TargetFor(shape)) + " }");
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (postGame)
+            {
+                foreach (KitMode mode in options.Modes)
+                {
+                    foreach (EncounterShape shape in encounters.PostGameShapes)
+                    {
+                        foreach (PveCell cell in postGameCells)
+                        {
+                            if (cell.Mode == mode && cell.Shape == shape)
+                            {
+                                rows.Add("    { \"KitMode\": " + Quote(SimOptions.ModeName(mode)) + ", \"Shape\": " + Quote(shape.Id) + ", \"Level\": " +
+                                         cell.Level.ToString(CultureInfo.InvariantCulture) + ", \"Multiplier\": " + Number(cell.Multiplier) + ", \"TargetClear\": " +
                                          Number(options.TargetFor(shape)) + " }");
                             }
                         }

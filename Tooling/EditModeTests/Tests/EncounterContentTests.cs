@@ -44,12 +44,21 @@ namespace BeastCraft.Tests.EditMode
         public void AuthoredEncounterLibrary_ShapeIdsAreExactlyTheDropTableShapes()
         {
             List<string> shapes = new List<string>();
+            List<string> postGame = new List<string>();
+            EncounterLibrary library = EncounterLibrary.Build(LoadEncounterLibrary());
             foreach (EncounterShapeData shape in LoadEncounterLibrary().Shapes)
             {
-                shapes.Add(shape.ShapeId);
+                (shape.PostGame ? postGame : shapes).Add(shape.ShapeId);
             }
 
-            CollectionAssert.AreEquivalent(DropTableTests.LoadTables().Shapes, shapes);
+            CollectionAssert.AreEquivalent(DropTableTests.LoadTables().Shapes, shapes, "the mainline shapes are the drop tables' shapes");
+            CollectionAssert.AreEquivalent(new[] { "squad_postgame", "horde_postgame", "elite_postgame", "squad_postgame_hard", "horde_postgame_hard", "elite_postgame_hard" },
+                                           postGame);
+            foreach (string shape in postGame)
+            {
+                string mainline = shape.Substring(0, shape.IndexOf("_postgame", System.StringComparison.Ordinal));
+                Assert.AreEqual(mainline, library.DropShapeOf(shape), shape + " pays out as its mainline shape, on Normal and Hard alike");
+            }
         }
 
         [Test]

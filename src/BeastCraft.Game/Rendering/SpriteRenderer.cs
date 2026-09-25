@@ -23,9 +23,12 @@ namespace BeastCraft.Game.Rendering
         private BlendState _blend = BlendState.AlphaBlend;
         private SamplerState _sampler = SamplerState.PointClamp;
         private Matrix _transform = Matrix.Identity;
+        private Rectangle? _clip;
         private BlendState _openBlend;
         private SamplerState _openSampler;
         private Matrix _openTransform;
+        private Rectangle? _openClip;
+        private RasterizerState _scissor;
 
         public SpriteRenderer(SpriteBatch batch)
         {
@@ -43,10 +46,28 @@ namespace BeastCraft.Game.Rendering
             Batches = 0;
         }
 
+        /// <summary>
+        /// How many render-target pixels one unit of the current transform's space spans (its
+        /// uniform scale): text is rasterised at the size it lands on screen.
+        /// </summary>
+        public float TransformScale
+        {
+            get { return (float)Math.Sqrt(_transform.M11 * _transform.M11 + _transform.M12 * _transform.M12); }
+        }
+
         /// <summary>The transform every later draw uses (until the next call).</summary>
         public void SetTransform(Matrix transform)
         {
             _transform = transform;
+        }
+
+        /// <summary>
+        /// Clips every later draw to <paramref name="clip"/> (render-target pixels), or not at all
+        /// with null (the default): the zoomed board stays inside its area.
+        /// </summary>
+        public void SetClip(Rectangle? clip)
+        {
+            _clip = clip;
         }
 
         /// <summary>The blend every later draw uses: alpha (the default) or additive.</summary>
@@ -115,17 +136,26 @@ namespace BeastCraft.Game.Rendering
 
         private void Ensure(SamplerState sampler)
         {
-            if (_open && _openBlend == _blend && _openSampler == sampler && _openTransform == _transform)
+            if (_open && _openBlend == _blend && _openSampler == sampler && _openTransform == _transform && _openClip == _clip)
             {
                 return;
             }
 
             Flush();
-            _batch.Begin(SpriteSortMode.Deferred, _blend, sampler, null, RasterizerState.CullNone, null, _transform);
+            RasterizerState rasterizer = RasterizerState.CullNone;
+            if (_clip.HasValue)
+            {
+                _scissor ??= new RasterizerState { CullMode = CullMode.None, ScissorTestEnable = true };
+                _batch.GraphicsDevice.ScissorRectangle = _clip.Value;
+                rasterizer = _scissor;
+            }
+
+            _batch.Begin(SpriteSortMode.Deferred, _blend, sampler, null, rasterizer, null, _transform);
             _open = true;
             _openBlend = _blend;
             _openSampler = sampler;
             _openTransform = _transform;
+            _openClip = _clip;
             Batches++;
         }
 

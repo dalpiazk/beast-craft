@@ -29,8 +29,9 @@ beast-craft/
 │   │                       encounter libraries, the generated difficulty table), Campaign/,
 │   │                       Items/, Economy/, Cosmetics/, Idle/, Vfx/vfx-library.json (skill VFX,
 │   │                       presentation only)
-│   └── art/pixel/          the generated placeholder pixel art (PNGs in Git LFS) + manifest
-│                           (written by Tooling/PixelArt)
+│   ├── art/pixel/          the generated placeholder pixel art (PNGs in Git LFS) + manifest
+│   │                       (written by Tooling/PixelArt)
+│   └── fonts/              the UI typeface, Fredoka SemiBold (Git LFS), and its OFL.txt
 ├── Pipeline/       OFFLINE, build-time-only asset generation. Never runs at runtime.
 ├── Tooling/        BalanceSim/: local-only headless balance simulator over the real
 │                   battle code. EditModeTests/: the `dotnet test` runner and the test
@@ -44,7 +45,9 @@ beast-craft/
 Every data file is addressed by its repo-relative path (`ProjectRelativePath`,
 e.g. `content/data/Creatures/beast-roster.json`). The hosts copy `content/` into
 a `Content/` folder beside the executable (desktop) or into the APK's assets
-(Android), keeping the same `data/` and `art/pixel/` layout.
+(Android), keeping the same `data/`, `art/pixel/` and `fonts/` layout.
+Third-party licences (the font, FontStashSharp, MonoGame) are listed in
+[`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md).
 
 ---
 
@@ -209,10 +212,16 @@ dotnet run --project src/BeastCraft.Desktop -c Release
 **Space** plays the next turn (or finishes the one playing), **A** toggles
 auto-play, **1**/**2**/**3** set the speed, **S** skips to the result, **Tab**
 cycles the selected skill, **Esc** quits; the on-screen PLAY/PAUSE, x1/x2/x3 and
-SKIP buttons do the same, and hovering or clicking a skill card shows its range
-diagram. Each fired skill plays its VFX from `content/data/Vfx/vfx-library.json`
+SKIP buttons do the same, and clicking a skill card opens its detail card (tags,
+cooldown, range, power, the range diagram and the description with its glossary
+terms highlighted: click one for its definition). Each fired skill plays its VFX from `content/data/Vfx/vfx-library.json`
 (schema v2: layered effects, per-effect-type defaults with status auras and icons);
 Phoenix's Ember Shot, Flame Wave and Rebirth Flame carry the full layer stack.
+The camera frames each turn by itself (the acting unit, its targets and the
+effect's area) and eases back to the whole arena between turns; there is no
+manual zoom or pan. The gear at the top right opens the effects settings
+(intensity Full / Reduced / Minimal, screen shake, flashes), saved with the
+player settings.
 
 Screenshot mode renders one frame to a PNG and exits (it still opens a window
 briefly, for the graphics device):
@@ -224,11 +233,13 @@ dotnet run --project src/BeastCraft.Desktop -c Release -- --screenshot diagram.p
 
 `--turns N` plays N turns and shows the Nth; `--skill ID` then carries on to the
 first turn that fires that skill; `--at MS` picks the moment inside that turn
-(default: the skill's VFX mid-play); `--select-skill N` shows the acting unit's
-Nth skill card with its range diagram; `--scale K` renders K x 540x960 (default
+(default: the skill's VFX mid-play); `--select-skill N` opens the acting unit's
+Nth skill's detail card (with its range diagram) and `--glossary TERM` a glossary
+term's definition on it; `--scale K` renders K x 540x960 (default
 2: 1080x1920); `--safe-inset L,T,R,B` fakes a phone's cutout insets;
 `--encounter ID`, `--speed S`, `--seed S`, `--level L`, `--enemy-level L` and
-`--content DIR` adjust the rest. The design (portrait canvas and safe area, art
+`--content DIR` adjust the rest; `--effects full|reduced|minimal`, `--no-shake`,
+`--no-flashes` and `--show-settings` set the effects settings for the shot. The design (portrait canvas and safe area, art
 manifest v2 and ArtKey, the VFX schema, range diagrams, how Spine would plug in)
 and the art pipeline are in
 [`docs/design/presentation-and-vfx.md`](docs/design/presentation-and-vfx.md);

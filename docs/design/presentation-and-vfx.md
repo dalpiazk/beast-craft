@@ -80,9 +80,12 @@ Rules the spike keeps, and later hosts must keep:
 2. Each fired skill (`SkillBeat`) plays its effect in order, 90 ms apart: optional projectile
    (caster -> each target) -> impact -> hit-stop -> the effect's layers (flipbooks, decals,
    rings, bursts, particles, glyphs), screen shake, hit flash, floating damage number (the sum of
-   the skill's `DamageHit.Roll.Amount` on that target; `!` on a critical). Each status that newly
-   lands on a target (a burn, a stun, a shield...) and each knockback adds that effect type's
-   on-apply overlay from the impact.
+   the skill's `DamageHit.Roll.Amount` on that target; `!` on a critical). Each status or stat
+   change that lands on a target (a burn, a stun, a shield, a buff...) and each knockback adds that
+   effect type's on-apply overlay from the impact — every time it lands: a second skill, or the same
+   one again, applying a status the unit already has plays the overlay again in full. What landed
+   comes from the battle's own record (`SkillActivation.Applied`: every non-damage effect that
+   passed its chance roll, a record nothing in the battle reads), carried on `SkillBeat.Applied`.
 3. Each target's HP bar drops when that beat lands; its status auras and icons switch to the
    after-turn set at the same moment (the acting unit's own ticks happen as its turn begins); a
    unit felled this turn fades after its fatal hit and disappears when that beat ends.
@@ -90,8 +93,32 @@ Rules the spike keeps, and later hosts must keep:
 
 Simplifications, on purpose: all skills of a turn fire from the unit's end tile; knock-backs and
 pulls snap at the turn's start; heal numbers are not shown (heals settle at the end of the
-turn); a status applied by two skills in one turn plays its overlay on the first; the avatar is
-left out (it has no tile).
+turn); the avatar is left out (it has no tile).
+
+### Effects settings (`VfxSettings`)
+
+The player's effects settings live in Core's `PlayerSettings` (`EffectsIntensity` Full / Reduced /
+Minimal, `ScreenShake`, `Flashes`; persisted by `PlayerSettingsStore`, and an older settings file
+loads as Full, on, on). `VfxSettings.From(settings)` hands them to `TurnAnimation`, which passes
+them to every `VfxTimeline` (beats and overlays): an input like the seed, so a turn stays a pure,
+deterministic function of the turn, the library, the seed and the settings. They drop parts of an
+effect (and the time those parts took) but never move its impact, and what still plays is drawn
+exactly as at Full (a halved burst is the full burst's first half).
+
+| Setting | What plays |
+| --- | --- |
+| Full | everything authored |
+| Reduced | no `Glyphs` layers and no `Particles` layers (the secondary bursts); the effect's own particle burst at half its count |
+| Minimal | only the damage number, the hit flash (if Flashes is on) and one simple burst (the effect's own particles, else its first particle layer's, at half the count); no projectile, flipbook, layers or shake |
+| ScreenShake off | no shake at any intensity |
+| Flashes off (accessibility) | no hit flash, and no bright additive bursts: additive flipbooks (the effect's own and `Flipbook` layers) and additive `RadialBurst` layers |
+
+In the viewer, the **gear** at the header's right end (`PortraitLayout.SettingsButton`) opens a
+small overlay (`SettingsPanel`, `SettingsRow`): tap Effects to cycle Full, Reduced, Minimal, tap
+Screen shake or Flashes to toggle, Close (or tap outside) to close. A change is saved at once (the
+default save folder's `settings` slot) and applies from the next turn played. The desktop host's
+`--effects full|reduced|minimal`, `--no-shake`, `--no-flashes` and `--show-settings` set them for
+screenshots (which never read or write the saved settings).
 
 ## The portrait screen (`PortraitLayout`)
 
@@ -115,22 +142,52 @@ Bands, top to bottom (all pure layout maths, tested headless):
 | --- | --- | --- |
 | Header | y 16-72 | title; turn and seed |
 | Turn order | y 84-260 | up to 8 portrait tiles: the acting unit first (gold, "NOW"; "NEXT" between turns), then the forecast; team-coloured borders, HP bars |
-| Board | y 276-1426 | the arena, fitted: `FitBoard(radius)` scales the hex board plus sprite headroom to the band and centres it, so the Large arena (radius 7) and its hordes fit (x2.15 there, x2.86 for Medium) |
+| Board | y 276-1426 | the arena, framed by the auto camera (below); its fit-all view is `FitBoard(radius)`, which scales the hex board plus sprite headroom to the band and centres it, so the Large arena (radius 7) and its hordes fit (x2.15 there, x2.86 for Medium) |
 | Toast | y 1438-1502 | the log collapsed to its latest line (and a count) |
-| Skill strip | y 1514-1758 | the acting unit's skills as cards: placeholder icon, name, shape and range, cooldown/READY/CAST; the firing and the selected one marked |
+| Skill strip | y 1514-1758 | the acting unit's skills as cards: icon (the skill's `ArtKey`), name, shape and range, cooldown/READY/CAST; the firing and the selected one marked |
 | Controls | y 1774-1894 | PLAY/PAUSE (auto-play), x1 / x2 / x3 speed, SKIP (resolve the rest of the battle and show the result) |
 
 Input: desktop keys (Space step/finish turn, A auto, 1-3 speed, S skip, Tab cycle the selected
-skill, Esc quit) and the mouse (click buttons and cards, hover a card to show its diagram);
+skill, Esc quit) and the mouse (click buttons and cards; click a skill for its detail card, hover to
+preview it);
 touch taps are hit-tested on the canvas (a button, a card, else the board steps), two fingers
 toggle auto, Back quits. The desktop window opens at 540x960; `--screenshot` renders K x 540x960
 (default 1080x1920).
 
 **Text.** Every string goes through `ITextRenderer` (`Measure`, `LineHeight`, `Draw`, sized by
-cap height in the current space). `PixelText` implements it with the built-in 3x5 font at the
-nearest whole-number multiple. A real typeface replaces it without touching layout code: e.g. a
-TTF rasterised into a glyph atlas at start-up (a runtime rasteriser such as FontStashSharp — a
-NuGet dependency to weigh before adding) or a pre-baked SpriteFont.
+cap height in the current space, placed by the capitals' top). The UI typeface is **Fredoka
+SemiBold** (`content/fonts/Fredoka-SemiBold.ttf`, SIL Open Font License 1.1, its `OFL.txt`
+beside it; see `THIRD-PARTY-NOTICES.md`): rounded and warm, it suits the chibi tone and reads well
+small. `TtfText` (BeastCraft.Game) rasterises it at run time with **FontStashSharp** (Zlib licence)
+into a glyph atlas, at the size the text lands on screen (the current transform's scale, rounded to
+a few sizes so the zooming camera does not fill the atlas), with linear filtering and a drop shadow;
+the HUD, skill strip and cards use it. Both hosts ship the font and its licence (desktop:
+`Content/fonts/` beside the executable; Android: APK assets `Content/fonts/`). `PixelText` (the
+built-in 3x5 font) is only the fallback when the TTF cannot be loaded (missing, or an un-pulled Git
+LFS pointer).
+
+## The auto camera (`CameraRig`, `TurnCamera`)
+
+There is no manual zoom or pan: the camera frames the action by itself. `CameraRig`
+(Presentation, pure and tested) holds the framing maths for one arena in the board band: a view
+is a board-space centre and a zoom (a multiple of the fit-all scale, so zoom 1 is exactly the old
+`FitBoard` view); `Frame(boxes)` fits board-space boxes plus `Padding` (28 board px), zoom clamped
+between fit-all and `MaxZoom` (x2), itself capped at an absolute `MaxScale` (5.5 canvas px per
+board px) so a small arena that already fits big is not blown up; `Clamp` keeps what the view
+shows inside the arena's bounds (tiles plus sprite headroom), centring on an axis where it shows
+more than the arena; `Ease` moves between views with smoothstep. A unit's box is its sprite, HP
+bar and icons (`UnitBox`: twice the size for a multi-hex unit); an effect's area is its circle.
+
+`TurnCamera` is the camera over one turn, a pure function of the turn clock (the same played
+clock as `TurnAnimation`, so x2/x3 speed it up): from the view the turn began with it eases
+(`EaseMs` 360) to frame the acting unit's walk, then — `LeadMs` (150) before each beat — the
+caster, every target and on-apply overlay unit, and the effect's area; it holds the last framing
+to the turn's end. Between turns and when idle, the host eases back toward the fit-all view
+(`ReturnMs` 700, on the played clock); skip cuts straight to fit-all, and finishing a turn early
+(Space) jumps the camera with it. A hit that spreads over a horde, or an all-enemies skill, needs
+the whole arena and so stays at fit-all. The renderer applies the view as its board transform
+(`CameraRig.Fit`) and clips the board to its band with a scissor rectangle (`SpriteRenderer.SetClip`).
+Screenshots start each shown turn from fit-all, so they stay reproducible.
 
 ## Art manifest v2 (`content/art/pixel/pixel-art-manifest.json`)
 
@@ -175,6 +232,15 @@ stingling) is an **alias** entry: `Tooling/PixelArt`'s `# alias:` + `# tint:` he
 under its own ArtKey with another sprite's `File` and a `Tint`, so the data already names the
 final art and only the manifest changes when it arrives. Keys name a character, not a pose:
 poses and actions are its clips (or its Spine animations).
+
+Skills use the same mechanism for their icons: every beast skill, avatar active and avatar
+passive in `skill-library.json` has an `ArtKey` (`skill/<id>`), carried by `SkillData` /
+`PassiveData` and `SkillLibraryBuilder` onto `SkillSO.ArtKey` / `PassiveSkillSO.ArtKey` (the
+old, unused `Icon` string is gone). `ArtReferenceValidator` holds every skill-library key to the
+manifest (required for shipped content; an enemy-library skill's is checked when it has one, and
+the viewer falls back to an element-coloured tile with the initial). The placeholders are
+generated by `Tooling/PixelArt/build.py` from the skill library itself: a 24x24 disc in the
+element's colours with the skill's initial.
 
 ## The VFX library (`content/data/Vfx/vfx-library.json`, schema v2)
 
@@ -267,9 +333,45 @@ Line, the six arms for Cross, the disc(s) for AreaBurst, the caster for Self) an
 `IsGlobal` for AllEnemies/AllAllies. Multi-hex casters follow the battle's rules (bursts and
 crosses from every tile, ranges from the nearest), and a test holds the fixed shapes to
 `SkillTargetResolver` on a board full of units. It is unbounded (a battle clips to the board).
-The viewer shows the selected skill's card over the foot of the board: name, shape, side,
-cooldown and the diagram (caster gold, reach blue, area in the side's colour, the example target
-outlined) — the seed of a skill detail card.
+The skill detail card (below) draws it: caster gold, reach blue, area in the side's colour, the
+example target outlined.
+
+## Skill detail card and glossary
+
+Tapping (or clicking; hovering previews) a skill in the strip opens its **detail card** over the
+lower board: `SkillCardLayout` places it on the board's foot (inside `PortraitLayout.SkillDetail`),
+as tall as its content, with the stats, power and scaling lines word-wrapped to the card's full
+width above the split, then the range diagram beside the wrapped description (a word wider than a
+line is broken between characters). `SkillCard.Of(skill, glossary)` (Presentation, pure) works out everything it
+shows from the skill's data: the icon (`ArtKey`), name, element and damage-category tags, target
+tags (Ally, Enemy, Self: the shape and side, a burst or whole-team skill covering its caster),
+cooldown ("Every turn" at 0 or 1), range ("Melee", "Range 3", "Line 4", "Burst 2 around self",
+"Whole field", "Self") and uses (once per battle, ready at once), one power line per effect from
+the data (damage and heals as a percent of the attacking stat, a shield of Defense, a burn or
+poison per turn, a knockback in hexes, a buff or debuff with its duration, stacks and chance) and
+the level scaling (`MagnitudeGrowthPerLevel`, `MaxLevel`); then the range diagram beside the
+description as rich text.
+
+**Glossary.** `content/data/Glossary/glossary.json` (`GlossaryData`; `Glossary`) lists the terms:
+the statuses (Stun, Shield, Taunt, Burn, Poison, Cleanse, Knockback, Slow), Crit, Heal, Aura and the
+stances (Vanguard, Ranged, Skirmisher), each with its `Forms` and a `Definition`. `Glossary.Parse`
+turns skill text into spans: explicit `[[shown words|Term]]` markup first (for a phrase that names a
+term in other words: "[[turn the target to stone|Stun]]"), then every form standing as a whole word,
+case-aware — a lowercase form also matches with a capital first letter, a form with a capital (a
+name) only exactly — the longest form winning, then the earlier term: deterministic.
+`RichTextLayout` wraps the spans to the text area (a phrase keeps its term across a line break;
+words of one kind merge into one run) and hit-tests taps (`TermAt`). Terms are drawn in their
+category's colour and underlined; tapping one opens its definition in a popup
+(`PopupPlacement`, via `SkillCardLayout.PlacePopup`) that never covers the term or the description
+block: below them when it fits inside the card, else flipped above, clamped into the card (which
+lies inside the safe area), with a small pointer toward the term. Any tap — on the popup or
+elsewhere — closes it, and a tap off the card closes the card.
+`GlossaryValidator` (on every content load, and tested) checks the file (unique snake_case ids and
+names, a category, a definition, no form in two terms) and that **every term used in skill text
+resolves** (each mark in a beast skill's, avatar active's, passive's or enemy-library skill's name
+or description names a term and is closed) and that every skill-library skill that applies a status
+or a cleanse names it in its description. Desktop screenshots: `--select-skill N` opens the card,
+`--glossary TERM` its definition.
 
 ## Spine later (`Kind: "spine"`)
 
@@ -343,15 +445,8 @@ Building needs a Mac with Xcode, out of reach of this setup and the Linux CI run
 
 ### Later
 
-Spine characters (above); a real typeface behind `ITextRenderer`; illustrated skill icons and
-UI; audio; the content pipeline (atlases, compression) only if load times demand it; a
+Spine characters (above); illustrated skill icons and UI; audio; the content pipeline (atlases, compression) only if load times demand it; a
 shader-based hit flash; heal numbers.
 
 ## Open questions
 
-- Skill icons: an `ArtKey` on skills too (`SkillSO.Icon` exists but is unused), or icons keyed by
-  skill id in the manifest?
-- Should the board rotate or pan for very large future arenas, or is fit-to-width enough in
-  portrait (the Large arena draws hexes at about 69 px on a 1080 px-wide phone)?
-- Per-status overlays when two skills in one turn apply the same status: attribute to the first
-  (today) or play on each?

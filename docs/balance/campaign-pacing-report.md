@@ -221,3 +221,47 @@ economy design): L5 15-20, L10 ~80 +/-10%, L15 ~180 +/-10%, L20 at least 270.
 ## Verdict
 
 Every gate is met.
+
+## Post-game
+
+The post-game regions, outside every table and gate above: each played from its first stage through its boss, 1000 times per difficulty,
+by a team at the level cap (every node is level 100, so every battle is at gap 0), on Normal and on Hard (the player's choice when an expedition
+starts). Seeded apart from the campaigns above (stream 1347375956); Normal and Hard share each run's seeds, so they walk the same maps with harder ids.
+Clear chance: a generated node at its post-game shape's `TargetClear`, the boss at 35.0% (Normal) or 20.0% (Hard); an Elite is taken whenever offered; a loss retries the node.
+No XP, loot or economy is modelled: nothing levels at the cap, and Hard pays Normal's loot (its extra reward is looks).
+
+### r11 Duskmeridian, Normal
+
+Level 100, 4 stages; Battle shapes `squad_postgame` 65.0%, `horde_postgame` 65.0%; Elites and Gates `elite_postgame` 45.0%; boss `boss_r11_dusk_and_dawn` 35.0%.
+
+| Encounters | Fought (mean) | Cleared (mean) | Clear rate |
+| --- | ---: | ---: | ---: |
+| Battle (squad / horde) | 40.2 | 26.0 | 64.7% |
+| Elite and Gate | 23.0 | 10.2 | 44.5% |
+| Boss | 2.9 | 1.0 | 34.2% |
+| **All** | 66.1 | 37.2 | 56.3% |
+
+| To clear the region | p10 | p50 | p90 | Mean |
+| --- | ---: | ---: | ---: | ---: |
+| Battles (losses included) | 56 | 66 | 77 | 66.1 |
+| Boss attempts | 1 | 2 | 6 | 2.9 |
+
+Elites taken: 7.2 per region (1.8 per stage); nodes still lost after 200 tries: 0.
+
+### r11 Duskmeridian, Hard
+
+Level 100, 4 stages; Battle shapes `squad_postgame_hard` 50.0%, `horde_postgame_hard` 50.0%; Elites and Gates `elite_postgame_hard` 30.0%; boss `boss_r11_dusk_and_dawn_hard` 20.0%.
+
+| Encounters | Fought (mean) | Cleared (mean) | Clear rate |
+| --- | ---: | ---: | ---: |
+| Battle (squad / horde) | 52.5 | 26.0 | 49.5% |
+| Elite and Gate | 33.7 | 10.2 | 30.2% |
+| Boss | 4.8 | 1.0 | 20.8% |
+| **All** | 91.0 | 37.2 | 40.8% |
+
+| To clear the region | p10 | p50 | p90 | Mean |
+| --- | ---: | ---: | ---: | ---: |
+| Battles (losses included) | 75 | 90 | 108 | 91.0 |
+| Boss attempts | 1 | 3 | 11 | 4.8 |
+
+Elites taken: 7.2 per region (1.8 per stage); nodes still lost after 200 tries: 0.

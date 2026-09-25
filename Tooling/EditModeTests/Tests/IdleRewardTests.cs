@@ -103,7 +103,7 @@ namespace BeastCraft.Tests.EditMode
             Assert.AreEqual(4, migrated.SourceVersion);
             Assert.IsEmpty(migrated.Issues, string.Join("\n", migrated.Issues));
             PlayerSave save = migrated.Save;
-            Assert.AreEqual(5, save.SchemaVersion);
+            Assert.AreEqual(PlayerSave.CurrentSchemaVersion, save.SchemaVersion, "4 -> 5 -> current");
             Assert.IsNotNull(save.Idle);
             Assert.IsFalse(save.Idle.HasStarted, "a migrated save's clock starts at its first claim");
             Assert.AreEqual(0, save.Idle.ClaimIndex);

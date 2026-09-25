@@ -310,7 +310,7 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
-        public void NewStatuses_PlayTheirOnApplyOverlay_FromTheImpact()
+        public void LandedStatuses_PlayTheirOnApplyOverlay_FromTheImpact()
         {
             bool burn = false;
             bool stun = false;
@@ -324,7 +324,13 @@ namespace BeastCraft.Tests.EditMode
                         Assert.GreaterOrEqual(beat.DurationMs, overlay.OffsetMs + overlay.Timeline.DurationMs);
                         Assert.AreNotEqual(beat.Beat.PrimaryKey, overlay.Key, "the main effect already is the primary key's");
                         CollectionAssert.Contains(beat.Beat.EffectKeys, overlay.Key, "only what the skill can apply");
-                        Assert.IsTrue(animation.Turn.After[overlay.UnitId].StatusKeys().Contains(overlay.Key) || overlay.Key == VfxEffectKey.Knockback);
+                        bool landed = false;
+                        foreach (BeatApplied applied in beat.Beat.Applied)
+                        {
+                            landed |= applied.UnitId == overlay.UnitId && applied.Key == overlay.Key;
+                        }
+
+                        Assert.IsTrue(landed, "the overlay is a status that landed on that unit");
                         burn |= overlay.Key == VfxEffectKey.Burn && beat.Beat.SkillId == "ember_shot";
                         stun |= overlay.Key == VfxEffectKey.Stun;
                     }

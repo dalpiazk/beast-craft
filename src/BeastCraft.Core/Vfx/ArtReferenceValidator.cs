@@ -1,13 +1,16 @@
 using System.Collections.Generic;
 using BeastCraft.Creatures.Roster;
 using BeastCraft.Encounters;
+using BeastCraft.Skills;
 
 namespace BeastCraft.Vfx
 {
     /// <summary>
     /// Holds the content's art references to the art manifest: every species' and enemy's
-    /// <c>ArtKey</c> (<see cref="SpeciesData.ArtKey"/>, <see cref="EnemyData.ArtKey"/>) must name a
-    /// sprite's <see cref="ArtSpriteData.ArtKey"/> in the manifest. (The VFX library's sheets are
+    /// <c>ArtKey</c> (<see cref="SpeciesData.ArtKey"/>, <see cref="EnemyData.ArtKey"/>) and every
+    /// skill's and passive's icon key (<see cref="SkillData.ArtKey"/>, <see cref="PassiveData.ArtKey"/>)
+    /// must name a sprite's <see cref="ArtSpriteData.ArtKey"/> in the manifest. Enemy-library
+    /// skills' icons are checked when they have one, never required. (The VFX library's sheets are
     /// held to the manifest by <see cref="VfxLibraryValidator"/>.) Presentation only: nothing here
     /// can change a battle. Returns every problem found (empty = valid); never throws.
     /// </summary>
@@ -19,6 +22,17 @@ namespace BeastCraft.Vfx
         /// have one (the shipped content does); otherwise a missing key is allowed.
         /// </summary>
         public static List<string> Validate(BeastRosterData roster, EnemyLibraryData enemies, ArtManifestData art, bool requireKeys = false)
+        {
+            return Validate(roster, enemies, null, art, requireKeys);
+        }
+
+        /// <summary>
+        /// As <see cref="Validate(BeastRosterData, EnemyLibraryData, ArtManifestData, bool)"/>, and
+        /// also every beast skill's, avatar active's and avatar passive's icon key in
+        /// <paramref name="skills"/> (required too with <paramref name="requireKeys"/>) and every
+        /// enemy-library skill's that has one.
+        /// </summary>
+        public static List<string> Validate(BeastRosterData roster, EnemyLibraryData enemies, SkillLibraryData skills, ArtManifestData art, bool requireKeys = false)
         {
             List<string> errors = new List<string>();
             if (art == null)
@@ -40,6 +54,26 @@ namespace BeastCraft.Vfx
                 if (enemy != null)
                 {
                     Check(enemy.ArtKey, "Enemy '" + enemy.EnemyId + "'", art, requireKeys, errors);
+                    foreach (SkillData skill in enemy.Skills ?? new SkillData[0])
+                    {
+                        if (skill != null)
+                        {
+                            Check(skill.ArtKey, "Enemy '" + enemy.EnemyId + "' skill '" + skill.SkillId + "'", art, false, errors);
+                        }
+                    }
+                }
+            }
+
+            if (skills != null)
+            {
+                CheckSkills(skills.BeastSkills, "Beast skill", art, requireKeys, errors);
+                CheckSkills(skills.AvatarActives, "Avatar active", art, requireKeys, errors);
+                foreach (PassiveData passive in skills.AvatarPassives ?? new PassiveData[0])
+                {
+                    if (passive != null)
+                    {
+                        Check(passive.ArtKey, "Avatar passive '" + passive.PassiveId + "'", art, requireKeys, errors);
+                    }
                 }
             }
 
@@ -65,6 +99,17 @@ namespace BeastCraft.Vfx
             }
 
             return true;
+        }
+
+        private static void CheckSkills(SkillData[] skills, string kind, ArtManifestData art, bool required, List<string> errors)
+        {
+            foreach (SkillData skill in skills ?? new SkillData[0])
+            {
+                if (skill != null)
+                {
+                    Check(skill.ArtKey, kind + " '" + skill.SkillId + "'", art, required, errors);
+                }
+            }
         }
 
         private static void Check(string key, string at, ArtManifestData art, bool required, List<string> errors)

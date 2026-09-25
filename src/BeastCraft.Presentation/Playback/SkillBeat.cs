@@ -25,6 +25,21 @@ namespace BeastCraft.Presentation.Playback
         public bool Crit { get; }
     }
 
+    /// <summary>One status (or other lasting effect) that landed on a target of a <see cref="SkillBeat"/>.</summary>
+    public readonly struct BeatApplied
+    {
+        public BeatApplied(string unitId, string key)
+        {
+            UnitId = unitId;
+            Key = key;
+        }
+
+        public string UnitId { get; }
+
+        /// <summary>The effect type that landed (<see cref="VfxEffectKey"/>): a status, a buff or debuff, a knockback.</summary>
+        public string Key { get; }
+    }
+
     /// <summary>
     /// One skill going off within a turn, as the viewer plays it: who cast what, of which element,
     /// at whom, for how much. Read from a <see cref="BattleTurnResult"/> after the fact; building
@@ -33,8 +48,9 @@ namespace BeastCraft.Presentation.Playback
     public sealed class SkillBeat
     {
         public SkillBeat(string casterId, string skillId, string skillName, Element element, IReadOnlyList<BeatTarget> targets,
-                         string primaryKey = null, IReadOnlyList<string> effectKeys = null)
+                         string primaryKey = null, IReadOnlyList<string> effectKeys = null, IReadOnlyList<BeatApplied> applied = null)
         {
+            Applied = applied;
             CasterId = casterId;
             SkillId = skillId;
             SkillName = skillName;
@@ -62,6 +78,15 @@ namespace BeastCraft.Presentation.Playback
 
         /// <summary>Every effect type the skill can apply (<see cref="VfxEffectKey"/>), each once: what its on-apply overlays may be.</summary>
         public IReadOnlyList<string> EffectKeys { get; }
+
+        /// <summary>
+        /// Each lasting effect (a status, a buff or debuff; <see cref="VfxEffectKey.Lasting"/>) and
+        /// knockback that actually landed, per target in landing order, once per target and key —
+        /// from the battle's own record (<see cref="SkillActivation.Applied"/>), so a status landing
+        /// again on a unit that already had it counts too. Null when unknown (a beat built by hand):
+        /// the viewer then falls back to what the snapshots show newly added.
+        /// </summary>
+        public IReadOnlyList<BeatApplied> Applied { get; }
 
         /// <summary>
         /// Every skill that fired on <paramref name="turn"/>, in firing order: a beast's fired slots
@@ -147,8 +172,19 @@ namespace BeastCraft.Presentation.Playback
                 }
             }
 
+            List<BeatApplied> applied = new List<BeatApplied>();
+            HashSet<string> seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (AppliedEffect landed in activation.Applied)
+            {
+                string key = landed.Target == null || skill == null ? null : VfxLibrary.KeyOf(landed.Effect, skill.Element);
+                if (key != null && (VfxEffectKey.IsLasting(key) || key == VfxEffectKey.Knockback) && seen.Add(landed.Target.Id + "|" + key))
+                {
+                    applied.Add(new BeatApplied(landed.Target.Id, key));
+                }
+            }
+
             return new SkillBeat(casterId, skill == null ? null : skill.SkillId, skill == null ? null : skill.DisplayName,
-                                 skill == null ? Element.None : skill.Element, targets, VfxLibrary.PrimaryKey(skill), keys);
+                                 skill == null ? Element.None : skill.Element, targets, VfxLibrary.PrimaryKey(skill), keys, applied);
         }
     }
 }

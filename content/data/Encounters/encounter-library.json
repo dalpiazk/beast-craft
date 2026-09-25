@@ -1,5 +1,5 @@
 {
-  "_readme": "GAME CONTENT: how PvE encounters are put together from enemy-library.json. Shapes are generated encounters: the runtime EncounterGenerator picks a variant (by Weight), draws each slot's count in [Min, Max] and each unit's type uniformly from Types, and keeps the draw only if its summed enemy Threat is inside [ThreatMin, ThreatMax], it has at least MinDistinctTypes types and it seats on the arena; units are placed front to back (Vanguard, Skirmisher, Ranged; library order within a stance). Each lineup then draws an element scheme by SchemeWeights (Uniform: one element for the whole team; PerType: one per type; PerUnit: one per unit; None), with elements dealt from a shuffled deck of the ten so every element is dealt before any repeats. Shape ids are drop-tables.json's shape ids (the validator requires the two sets to match): a cleared encounter pays out from its shape's drop cell. Templates are authored fixed encounters ({ EncounterId, DisplayName, Description, ShapeId, Arena, Groups: [{ EnemyId, Count, Elements }], DifficultyOverride, Draft }; Elements are cycled over the group, empty = no element; DifficultyOverride 0 = use the shape's calibrated difficulty; Draft true = placeholder text/design pending producer review, never shown to the player). The ten region bosses (regions.json's BossTemplateId) are the only templates, DRAFT placeholders pending producer review; each DifficultyOverride is calibrated so a scouting team at the boss's level wearing typical gear clears about 50% (docs/balance/tuning-log.md). Difficulty: every enemy's HP, Attack, Defense, SpecialAttack and SpecialDefense are multiplied by the shape's calibrated multiplier at the encounter's level (encounter-difficulty.json, written by the balance simulator's --write-difficulty, interpolated between the calibrated levels) times DifficultyScale. PENDING PRODUCER REVIEW: DifficultyScale is 1.0 and the table is calibrated so a player who scouts and counter-picks (the simulator's bond-aware heuristic pick) wearing typical gear (the balance simulator's --gear typical, a user decision) clears each shape's TargetClear (the tiered targets, a user decision: squad and horde 80%, elite 60%, solo 50%; encounter-difficulty.json records the target of every cell); whether the campaign should be that hard, and how a map node picks a shape and a level, are producer decisions not made here. Validated by EncounterLibraryValidator (the Editor importer Beast Craft/Data/Import Encounters, the EditMode tests, Tooling/BalanceSim): every shape's worst case (each slot at Max, each unit its slot's largest type) and every template must fit its arena's enemy deployment zone. The shapes and weights came over unchanged from the balance simulator's former fixtures; see docs/design/battle-system.md, 'Encounter direction'. Boss names and descriptions follow docs/design/content-bible.md; each boss carries Draft: true until the producer signs it off (the validator rejects a [DRAFT] marker in DisplayName/Description, which are player-facing); the calibration note that used to sit in each Description is this readme's (each DifficultyOverride clears about 50% for a scouting team at the boss's level in typical gear).",
+  "_readme": "GAME CONTENT: how PvE encounters are put together from enemy-library.json. Shapes are generated encounters: the runtime EncounterGenerator picks a variant (by Weight), draws each slot's count in [Min, Max] and each unit's type uniformly from Types, and keeps the draw only if its summed enemy Threat is inside [ThreatMin, ThreatMax], it has at least MinDistinctTypes types and it seats on the arena; units are placed front to back (Vanguard, Skirmisher, Ranged; library order within a stance). Each lineup then draws an element scheme by SchemeWeights (Uniform: one element for the whole team; PerType: one per type; PerUnit: one per unit; None), with elements dealt from a shuffled deck of the ten so every element is dealt before any repeats. Shape ids are drop-tables.json's shape ids (the validator requires the two sets to match): a cleared encounter pays out from its shape's drop cell. POST-GAME shapes (PostGame: true; the six *_postgame and *_postgame_hard shapes, drawn only by the post-game region r11, regions.json IsPostGame) are the exception: each pays out as the mainline shape its DropShapeId names (the same loot as that shape, on Normal and Hard alike), is calibrated by the balance simulator at level 100 only (TargetClear: squad and horde 65, elite 45 on Normal; 50, 50 and 30 on Hard), and stays out of the mainline report; its cells are appended to encounter-difficulty.json after the mainline ones. Any mainline rebalance must re-run --write-difficulty so they follow. Templates are authored fixed encounters ({ EncounterId, DisplayName, Description, ShapeId, Arena, Groups: [{ EnemyId, Count, Elements }], DifficultyOverride, Draft }; Elements are cycled over the group, empty = no element; DifficultyOverride 0 = use the shape's calibrated difficulty; Draft true = placeholder text/design pending producer review, never shown to the player). The region bosses (regions.json's BossTemplateId, and the post-game region's HardMode.BossTemplateId) are the only templates, DRAFT placeholders pending producer review; each mainline DifficultyOverride is calibrated so a scouting team at the boss's level wearing typical gear clears about 50%, the post-game twins (boss_r11_dusk_and_dawn, boss_r11_dusk_and_dawn_hard) about 35% on Normal and about 20% on Hard (docs/balance/tuning-log.md). Difficulty: every enemy's HP, Attack, Defense, SpecialAttack and SpecialDefense are multiplied by the shape's calibrated multiplier at the encounter's level (encounter-difficulty.json, written by the balance simulator's --write-difficulty, interpolated between the calibrated levels) times DifficultyScale. PENDING PRODUCER REVIEW: DifficultyScale is 1.0 and the table is calibrated so a player who scouts and counter-picks (the simulator's bond-aware heuristic pick) wearing typical gear (the balance simulator's --gear typical, a user decision) clears each shape's TargetClear (the tiered targets, a user decision: squad and horde 80%, elite 60%, solo 50%; encounter-difficulty.json records the target of every cell); whether the campaign should be that hard, and how a map node picks a shape and a level, are producer decisions not made here. Validated by EncounterLibraryValidator (the Editor importer Beast Craft/Data/Import Encounters, the EditMode tests, Tooling/BalanceSim): every shape's worst case (each slot at Max, each unit its slot's largest type) and every template must fit its arena's enemy deployment zone. The shapes and weights came over unchanged from the balance simulator's former fixtures; see docs/design/battle-system.md, 'Encounter direction'. Boss names and descriptions follow docs/design/content-bible.md; each boss carries Draft: true until the producer signs it off (the validator rejects a [DRAFT] marker in DisplayName/Description, which are player-facing); the calibration note that used to sit in each Description is this readme's (each mainline DifficultyOverride clears about 50% for a scouting team at the boss's level in typical gear; the post-game twins about 35% on Normal and 20% on Hard).",
   "SchemaVersion": 1,
   "DifficultyScale": 1.0,
   "SchemeWeights": [
@@ -60,6 +60,98 @@
       "TargetClear": 80,
       "Variants": [
         { "Label": "swarm + ranged support", "Weight": 1, "Slots": [ { "Types": [ "swarmling", "stingling" ], "Min": 14, "Max": 20 }, { "Types": [ "archer", "caster" ], "Min": 2, "Max": 4 } ] }
+      ]
+    },
+    {
+      "ShapeId": "squad_postgame",
+      "DisplayName": "Post-game squad",
+      "Description": "Post-game (Duskmeridian, level 100): the squad recipe, calibrated harder. Pays out as a squad.",
+      "Arena": "Medium",
+      "ThreatMin": 10,
+      "ThreatMax": 12,
+      "MinDistinctTypes": 3,
+      "TargetClear": 65,
+      "PostGame": true,
+      "DropShapeId": "squad",
+      "Variants": [
+        { "Label": "mixed", "Weight": 1, "Slots": [ { "Types": [ "brute", "stalker", "archer", "caster", "shaman" ], "Min": 4, "Max": 6 } ] }
+      ]
+    },
+    {
+      "ShapeId": "horde_postgame",
+      "DisplayName": "Post-game horde",
+      "Description": "Post-game (Duskmeridian, level 100): the horde recipe, calibrated harder. Pays out as a horde.",
+      "Arena": "Large",
+      "ThreatMin": 12.5,
+      "ThreatMax": 14,
+      "MinDistinctTypes": 3,
+      "TargetClear": 65,
+      "PostGame": true,
+      "DropShapeId": "horde",
+      "Variants": [
+        { "Label": "swarm + ranged support", "Weight": 1, "Slots": [ { "Types": [ "swarmling", "stingling" ], "Min": 14, "Max": 20 }, { "Types": [ "archer", "caster" ], "Min": 2, "Max": 4 } ] }
+      ]
+    },
+    {
+      "ShapeId": "elite_postgame",
+      "DisplayName": "Post-game elite",
+      "Description": "Post-game (Duskmeridian, level 100): the elite recipe (dens and passes), calibrated harder. Pays out as an elite.",
+      "Arena": "Medium",
+      "ThreatMin": 14,
+      "ThreatMax": 17,
+      "MinDistinctTypes": 2,
+      "TargetClear": 45,
+      "PostGame": true,
+      "DropShapeId": "elite",
+      "Variants": [
+        { "Label": "giant + escort", "Weight": 2, "Slots": [ { "Types": [ "giant" ], "Min": 1, "Max": 1 }, { "Types": [ "brute", "stalker", "archer", "caster", "shaman" ], "Min": 2, "Max": 2 } ] },
+        { "Label": "two champions + escort", "Weight": 1, "Slots": [ { "Types": [ "champion" ], "Min": 2, "Max": 2 }, { "Types": [ "brute", "stalker", "archer", "caster", "shaman" ], "Min": 1, "Max": 2 } ] }
+      ]
+    },
+    {
+      "ShapeId": "squad_postgame_hard",
+      "DisplayName": "Post-game squad (Hard)",
+      "Description": "Post-game (Duskmeridian, level 100): the squad recipe, calibrated harder still, for Hard. Pays out as a squad.",
+      "Arena": "Medium",
+      "ThreatMin": 10,
+      "ThreatMax": 12,
+      "MinDistinctTypes": 3,
+      "TargetClear": 50,
+      "PostGame": true,
+      "DropShapeId": "squad",
+      "Variants": [
+        { "Label": "mixed", "Weight": 1, "Slots": [ { "Types": [ "brute", "stalker", "archer", "caster", "shaman" ], "Min": 4, "Max": 6 } ] }
+      ]
+    },
+    {
+      "ShapeId": "horde_postgame_hard",
+      "DisplayName": "Post-game horde (Hard)",
+      "Description": "Post-game (Duskmeridian, level 100): the horde recipe, calibrated harder still, for Hard. Pays out as a horde.",
+      "Arena": "Large",
+      "ThreatMin": 12.5,
+      "ThreatMax": 14,
+      "MinDistinctTypes": 3,
+      "TargetClear": 50,
+      "PostGame": true,
+      "DropShapeId": "horde",
+      "Variants": [
+        { "Label": "swarm + ranged support", "Weight": 1, "Slots": [ { "Types": [ "swarmling", "stingling" ], "Min": 14, "Max": 20 }, { "Types": [ "archer", "caster" ], "Min": 2, "Max": 4 } ] }
+      ]
+    },
+    {
+      "ShapeId": "elite_postgame_hard",
+      "DisplayName": "Post-game elite (Hard)",
+      "Description": "Post-game (Duskmeridian, level 100): the elite recipe (dens and passes), calibrated harder still, for Hard. Pays out as an elite.",
+      "Arena": "Medium",
+      "ThreatMin": 14,
+      "ThreatMax": 17,
+      "MinDistinctTypes": 2,
+      "TargetClear": 30,
+      "PostGame": true,
+      "DropShapeId": "elite",
+      "Variants": [
+        { "Label": "giant + escort", "Weight": 2, "Slots": [ { "Types": [ "giant" ], "Min": 1, "Max": 1 }, { "Types": [ "brute", "stalker", "archer", "caster", "shaman" ], "Min": 2, "Max": 2 } ] },
+        { "Label": "two champions + escort", "Weight": 1, "Slots": [ { "Types": [ "champion" ], "Min": 2, "Max": 2 }, { "Types": [ "brute", "stalker", "archer", "caster", "shaman" ], "Min": 1, "Max": 2 } ] }
       ]
     }
   ],
@@ -162,6 +254,26 @@
       "Arena": "Large",
       "Groups": [ { "EnemyId": "giant", "Count": 2, "Elements": [ "Fire", "Water" ] } ],
       "DifficultyOverride": 0.863,
+      "Draft": true
+    },
+    {
+      "EncounterId": "boss_r11_dusk_and_dawn",
+      "DisplayName": "Dusk and Dawn",
+      "Description": "Two ancient giants, one of radiant dawn and one of deepest dusk, who keep the endless evening beyond the Worldcrown in balance. They test every bond that comes this far.",
+      "ShapeId": "elite",
+      "Arena": "Large",
+      "Groups": [ { "EnemyId": "giant", "Count": 2, "Elements": [ "Light", "Dark" ] } ],
+      "DifficultyOverride": 0.711,
+      "Draft": true
+    },
+    {
+      "EncounterId": "boss_r11_dusk_and_dawn_hard",
+      "DisplayName": "Dusk and Dawn",
+      "Description": "The twin giants of Duskmeridian with halo and shadow at full blaze: the same pair, fiercer than any creature in the Farwild. Only the boldest Beastbinders ask for this.",
+      "ShapeId": "elite",
+      "Arena": "Large",
+      "Groups": [ { "EnemyId": "giant", "Count": 2, "Elements": [ "Light", "Dark" ] } ],
+      "DifficultyOverride": 0.723,
       "Draft": true
     }
   ]

@@ -15,7 +15,8 @@ namespace BeastCraft.Save
     /// beast and the avatar wears (schema 2), the region campaign: seals, region progress and
     /// the expedition in progress (schema 3), and the economy: gold, consumables, the Traders' frozen
     /// stock, cosmetic unlocks and the avatar's and every beast's appearance (schema 4), and the idle
-    /// (AFK) reward clock (schema 5).
+    /// (AFK) reward clock (schema 5), and the difficulty of the expedition in progress
+    /// (<c>MapRun.Difficulty</c>, schema 6).
     /// <para>
     /// <strong>JsonUtility-compatible by construction.</strong> Every type reachable from here is
     /// <c>[Serializable]</c> with public fields, and every map is a list (<c>JsonUtility</c> drops
@@ -35,7 +36,7 @@ namespace BeastCraft.Save
     public class PlayerSave
     {
         /// <summary>The schema this code writes, and the newest it reads.</summary>
-        public const int CurrentSchemaVersion = 5;
+        public const int CurrentSchemaVersion = 6;
 
         /// <summary>The schema the data is in. 0 (or missing) is never valid.</summary>
         public int SchemaVersion = CurrentSchemaVersion;

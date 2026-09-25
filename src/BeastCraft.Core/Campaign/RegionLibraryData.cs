@@ -7,7 +7,9 @@ namespace BeastCraft.Campaign
     /// cover levels 1-100 in turn; each is played as <see cref="RegionData.Stages"/> expeditions,
     /// each a seeded node map (<see cref="NodeMapGenerator"/>) that ends at a Gate (every stage but
     /// the last) or at the region's Boss, whose clear grants a seal (<see cref="SealData"/>) that
-    /// raises the beast level cap. <see cref="RegionLibraryValidator"/> holds the rules;
+    /// raises the beast level cap. Post-game regions (<see cref="RegionData.IsPostGame"/>) follow
+    /// the ten, outside that band: flat level 100, no seal, playable on <see cref="RunDifficulty.Hard"/>.
+    /// <see cref="RegionLibraryValidator"/> holds the rules;
     /// <see cref="RegionLibrary"/> is the built, indexed form.
     /// <para>
     /// JsonUtility-compatible: arrays, no nullable fields; node types are member names checked by the
@@ -40,7 +42,10 @@ namespace BeastCraft.Campaign
         /// <summary>The seals: key items, each raising the beast level cap.</summary>
         public SealData[] Seals = new SealData[0];
 
-        /// <summary>The regions, in campaign order, levels contiguous from 1 to 100.</summary>
+        /// <summary>
+        /// The regions, in campaign order: the mainline ones, levels contiguous from 1 to 100, and
+        /// after them any post-game ones (<see cref="RegionData.IsPostGame"/>, flat level 100).
+        /// </summary>
         public RegionData[] Regions = new RegionData[0];
     }
 
@@ -86,6 +91,12 @@ namespace BeastCraft.Campaign
 
         /// <summary>The encounter shape Elite nodes and generated Gates draw.</summary>
         public string EliteShapeId;
+
+        /// <summary>A copy of these rules (<see cref="NodeWeights"/> shared, not cloned).</summary>
+        public MapRulesData Copy()
+        {
+            return (MapRulesData)MemberwiseClone();
+        }
     }
 
     /// <summary>One node type's draw weight.</summary>
@@ -155,6 +166,57 @@ namespace BeastCraft.Campaign
 
         /// <summary>This region's own map rules when their <see cref="MapRulesData.Layers"/> is above 0; otherwise the library's.</summary>
         public MapRulesData MapRules = new MapRulesData();
+
+        /// <summary>
+        /// A post-game region: outside the contiguous 1-100 campaign band, fought at a flat
+        /// <see cref="RegionLibraryValidator.MaxLevel"/> (<see cref="MinLevel"/> ==
+        /// <see cref="MaxLevel"/> == 100), with no seal (the cap is already at its peak). Validated in
+        /// its own pass (<see cref="RegionLibraryValidator"/>), after the mainline band, which never
+        /// sees it; draws only post-game shapes (<c>EncounterShapeData.PostGame</c>); the only kind of
+        /// region an expedition may start on <see cref="RunDifficulty.Hard"/> (<see cref="HardMode"/>).
+        /// False (the default) for the ten mainline regions.
+        /// </summary>
+        public bool IsPostGame;
+
+        /// <summary>
+        /// A post-game region's <see cref="RunDifficulty.Hard"/> encounters (<see cref="RegionLibrary.RegionFor"/>):
+        /// the shapes Battle nodes draw, the shape Elites and generated Gates use, and the boss
+        /// template. Empty (every field unset) on a mainline region.
+        /// </summary>
+        public RegionHardModeData HardMode = new RegionHardModeData();
+
+        /// <summary>A copy of this region (arrays and <see cref="MapRules"/> shared, not cloned).</summary>
+        public RegionData Copy()
+        {
+            return (RegionData)MemberwiseClone();
+        }
+    }
+
+    /// <summary>
+    /// What a post-game region fields on <see cref="RunDifficulty.Hard"/>, in place of its Normal
+    /// <see cref="RegionData.ShapeWeights"/>, its map rules' <see cref="MapRulesData.EliteShapeId"/>
+    /// and its <see cref="RegionData.BossTemplateId"/>. Everything else (map rules, levels, stages,
+    /// rewards) is the region's own. With the same weights, in the same order, as the Normal
+    /// <see cref="RegionData.ShapeWeights"/>, a seed generates the same map on either difficulty,
+    /// only with the harder shape and boss ids.
+    /// </summary>
+    [Serializable]
+    public class RegionHardModeData
+    {
+        /// <summary>The Hard shapes Battle nodes draw, weighted (post-game shapes).</summary>
+        public ShapeWeightData[] ShapeWeights = new ShapeWeightData[0];
+
+        /// <summary>The Hard shape Elite nodes and generated Gates draw (a post-game shape).</summary>
+        public string EliteShapeId = string.Empty;
+
+        /// <summary>The Hard boss's <c>encounter-library.json</c> template (with its own <c>DifficultyOverride</c>).</summary>
+        public string BossTemplateId = string.Empty;
+
+        /// <summary>Whether anything is authored (a mainline region must leave it all unset).</summary>
+        public bool IsSet
+        {
+            get { return (ShapeWeights != null && ShapeWeights.Length > 0) || !string.IsNullOrEmpty(EliteShapeId) || !string.IsNullOrEmpty(BossTemplateId); }
+        }
     }
 
     /// <summary>One encounter shape's draw weight on Battle nodes.</summary>

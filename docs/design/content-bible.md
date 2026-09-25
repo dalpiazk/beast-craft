@@ -140,6 +140,30 @@ Map locations (`location-names.json`, eight names per kind per region, drawn by 
 | Pass | Gate | The guarded way on to the next part of the region. |
 | Lair | Boss | Where the region's guardian keeps its Seal. |
 
+## Post-game region (DRAFT)
+
+**r11 Duskmeridian** — Light and Dark, the post-game region (all text DRAFT pending producer
+review; answers "Light and Dark have no home region yet" above). Beyond the Worldcrown, once the
+Crown Seal has stemmed the Gloam at its source, the last of the haze thins into an endless
+gold-and-violet evening where radiant dawn and deep dusk share one sky. Light and Dark are two edges of
+the same evening here, never good against evil: the Kirin and the Basilisk are both at home. The
+eldest creatures of the Farwild gather to test any bond whole enough to reach them.
+
+| Region | Levels | Flavour | Boss |
+| --- | --- | --- | --- |
+| r11 Duskmeridian (post-game) | 100 | Light and Dark: an endless gold-and-violet evening | Dusk and Dawn (no Seal) |
+
+- **Boss: Dusk and Dawn.** Two ancient giants, one of radiant dawn and one of deepest dusk, who keep
+  the evening in balance (the Worldcrown's Flame and Flood, mirrored). On Hard the same pair comes
+  "with halo and shadow at full blaze". There is no Seal to claim: the binding limit is already at its
+  peak, and the reward is the challenge itself (and a few looks).
+- **Difficulty words.** The player chooses Normal or Hard when setting out; Hard text leans on
+  *radiant* and *eclipse* (Light and Dark at full strength), never on grimness.
+- **Looks.** Signature word **Dawnshade** (dawn = Light, shade = Dark): Dawnshade Horn (Kirin),
+  Dawnshade Crown (Basilisk); Hard-only: Radiant Dawnshade Horn, Eclipse Dawnshade Crown.
+- **Map names** (`location-names.json`, r11): dawn, dusk, halo, shade, meridian and lantern words
+  (Dawnfield Road, Halo Grotto, Meridian Market, Dawndusk Court).
+
 ## Tone
 
 Warm, adventurous, slightly whimsical mythic fantasy for all ages: wonder first, danger second,
@@ -181,7 +205,11 @@ never grim. Picture a travel journal with sketches in the margins.
 | Beast, region, boss, Seal description | 1–2 sentences, ≤ ~280 characters |
 
 Mechanical hints must match the data exactly (targets, range in hexes, durations, chances, once per
-battle). When the numbers change, the description changes with them; when a description would need
+battle). Skill and passive descriptions are shown as rich text: the battle glossary's terms
+(`content/data/Glossary/glossary.json`: stun, shield, taunt, burn, poison, crit, the stances...) are
+highlighted wherever they appear, and a skill that applies a status must name it — in the glossary's
+words, or by marking a phrase that says it differently as `[[turn the target to stone|Stun]]` (the
+marks never show; the validator checks every one). When the numbers change, the description changes with them; when a description would need
 a mechanic that does not exist, say what the skill really does instead.
 
 Boss templates carry `"Draft": true` in `encounter-library.json` until the producer signs the bosses off

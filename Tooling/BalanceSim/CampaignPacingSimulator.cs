@@ -49,6 +49,12 @@ namespace BeastCraft.Tooling.BalanceSim
     /// ends. A modelling assumption, not measured from the PvE simulation.
     /// </para>
     /// <para>
+    /// <strong>Post-game regions</strong> (<see cref="RegionData.IsPostGame"/>) are never played by
+    /// these campaigns (<see cref="MainlineOnly"/>), so every mainline table and gate is what it is
+    /// without them; <see cref="PostGamePacing"/> plays them apart, on Normal and Hard, with its own
+    /// seeds, and its "Post-game" section is appended after the mainline report.
+    /// </para>
+    /// <para>
     /// Deterministic: campaign <c>r</c> of base seed <c>s</c> is seeded
     /// <c>LootRoller.DeriveSeed(s, r)</c>; each stage's map seed is <c>DeriveSeed(campaign, 1000 +
     /// stage index)</c>; every other draw comes from one <see cref="System.Random"/> per campaign in
@@ -179,8 +185,10 @@ namespace BeastCraft.Tooling.BalanceSim
                 return 2;
             }
 
+            // The mainline campaign (and every table and gate of the report) never sees a post-game
+            // region: it plays the regions.json it would play without them.
             World world = new World(new PacingSimulator.Model(library.Materials, DropTableBuilder.Build(tables, DropTableBuilder.TierLookup(library.Materials))),
-                                    RegionLibrary.Build(regions), EncounterLibrary.Build(encounters));
+                                    RegionLibrary.Build(MainlineOnly(regions)), EncounterLibrary.Build(encounters));
             world.Economy = CampaignEconomyModel.World.Load(library, errors);
             if (world.Economy == null)
             {
@@ -216,12 +224,14 @@ namespace BeastCraft.Tooling.BalanceSim
             List<int> seeds = options.Seeds ?? new List<int> { options.Seed };
 
             DateTime start = DateTime.UtcNow;
-            string report = BuildReport(options, world, seeds, out List<string> misses);
+            // The post-game section (post-game regions only, its own seeds) is appended after the
+            // mainline report, which it can never change.
+            string report = BuildReport(options, world, seeds, out List<string> misses) + PostGamePacing.Build(options, regions, world.Encounters, seeds);
             double seconds = (DateTime.UtcNow - start).TotalSeconds;
 
             if (options.SelfCheck)
             {
-                string second = BuildReport(options, world, seeds, out List<string> _);
+                string second = BuildReport(options, world, seeds, out List<string> _) + PostGamePacing.Build(options, regions, world.Encounters, seeds);
                 if (!string.Equals(report, second, StringComparison.Ordinal))
                 {
                     Console.Error.WriteLine("Self-check failed: two campaign runs with identical inputs produced different reports.");
@@ -261,6 +271,20 @@ namespace BeastCraft.Tooling.BalanceSim
             }
 
             return 0;
+        }
+
+        /// <summary>A copy of <paramref name="data"/> with only its mainline regions (post-game ones, <see cref="RegionData.IsPostGame"/>, dropped).</summary>
+        public static RegionLibraryData MainlineOnly(RegionLibraryData data)
+        {
+            return new RegionLibraryData
+            {
+                SchemaVersion = data.SchemaVersion,
+                StartingLevelCap = data.StartingLevelCap,
+                LevelCapMargin = data.LevelCapMargin,
+                MapRules = data.MapRules,
+                Seals = data.Seals,
+                Regions = Array.FindAll(data.Regions ?? new RegionData[0], region => region != null && !region.IsPostGame)
+            };
         }
 
         /// <summary>The fixed inputs of every campaign.</summary>
@@ -709,8 +733,8 @@ namespace BeastCraft.Tooling.BalanceSim
             }
         }
 
-        /// <summary>The route policy (see the class remarks).</summary>
-        private static MapNode Choose(List<MapNode> choices, double teamLevel, Random rng)
+        /// <summary>The route policy (see the class remarks; the post-game section walks it too).</summary>
+        internal static MapNode Choose(List<MapNode> choices, double teamLevel, Random rng)
         {
             List<MapNode> pick = choices.FindAll(n => n.Type == MapNodeType.Gate || n.Type == MapNodeType.Boss);
             if (pick.Count == 0)

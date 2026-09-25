@@ -578,6 +578,33 @@ namespace BeastCraft.Tests.EditMode
             SkillEffectApplier.Apply(new SkillActivation(skill, new[] { target }), caster);
         }
 
+        [Test]
+        public void Activation_RecordsEveryLandedNonDamageEffect_ForTheViewer_NotTheMisses()
+        {
+            SkillEffect hit = new SkillEffect { EffectType = SkillEffectType.Damage, Magnitude = 20f };
+            SkillEffect stun = new SkillEffect { EffectType = SkillEffectType.ApplyStatus, Status = StatusType.Stun, DurationTurns = 1 };
+            SkillEffect maybe = new SkillEffect { EffectType = SkillEffectType.ApplyStatus, Status = StatusType.Taunt, DurationTurns = 2, Chance = 50 };
+            BattleUnit caster = Unit("p1", BattleTeam.Player, HexCoordinate.Zero);
+            BattleUnit a = Unit("e1", BattleTeam.Enemy, new HexCoordinate(1, 0));
+            BattleUnit b = Unit("e2", BattleTeam.Enemy, new HexCoordinate(2, 0));
+            SkillActivation activation = new SkillActivation(Skill(hit, stun, maybe), new[] { a, b });
+
+            Assert.IsEmpty(activation.Applied);
+            SkillEffectApplier.Apply(activation, caster); // no rng: the 50% taunt never lands
+
+            Assert.AreEqual(2, activation.Applied.Count, "the stun on each target; not the damage, not the missed taunt");
+            Assert.AreSame(a, activation.Applied[0].Target);
+            Assert.AreSame(stun, activation.Applied[0].Effect);
+            Assert.AreSame(b, activation.Applied[1].Target);
+            Assert.AreEqual(2, activation.Hits.Count);
+            Assert.AreEqual(StatusType.Stun, a.Statuses[0].Type);
+
+            // Landing again on a unit that already has it is recorded again.
+            SkillActivation again = new SkillActivation(Skill(stun), new[] { a });
+            SkillEffectApplier.Apply(again, caster);
+            Assert.AreEqual(1, again.Applied.Count);
+        }
+
         private SkillSO Skill(params SkillEffect[] effects)
         {
             SkillSO skill = new SkillSO();

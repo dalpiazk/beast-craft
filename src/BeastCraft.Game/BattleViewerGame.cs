@@ -5,9 +5,14 @@ using System.IO;
 using BeastCraft.Battle;
 using BeastCraft.Game.Rendering;
 using BeastCraft.Presentation.Board;
+using BeastCraft.Presentation.Camera;
+using BeastCraft.Presentation.Cards;
 using BeastCraft.Presentation.Content;
 using BeastCraft.Presentation.Layout;
 using BeastCraft.Presentation.Playback;
+using BeastCraft.Presentation.Text;
+using BeastCraft.Presentation.Vfx;
+using BeastCraft.Save;
 using BeastCraft.Session;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -28,7 +33,9 @@ namespace BeastCraft.Game
     /// Desktop: Space steps (or finishes the turn playing), A toggles auto-play, 1-3 set the speed,
     /// S skips to the end, Tab cycles the selected skill, Esc quits; the mouse clicks the buttons
     /// and hovers or clicks the skills. Touch (<see cref="ViewerHost.Touch"/>): tap a button or a
-    /// skill, tap the board to step, two fingers toggle auto-play, Back quits. With
+    /// skill to open its detail card (tap a highlighted word for its definition; tap off the card to
+    /// close it), tap the gear for the effects settings, tap the board to step, two fingers toggle
+    /// auto-play, Back quits. With
     /// <c>--screenshot</c> it renders a single frame to a PNG and exits (<see cref="ViewerOptions"/>).
     /// </para>
     /// <para>
@@ -60,6 +67,14 @@ namespace BeastCraft.Game
         private Dictionary<string, string> _names;
         private BoardFit _boardFit;
         private CanvasFit _canvasFit;
+        private CameraRig _camera;
+        private TurnCamera _turnCamera;
+        private CameraView _cameraRest;
+        private int _cameraIdleMs;
+        private PlayerSettings _settings = new PlayerSettings();
+        private PlayerSettingsStore _settingsStore;
+        private VfxSettings _vfxSettings = VfxSettings.Default;
+        private bool _settingsOpen;
 
         private TurnAnimation _animation;
         private int _clockMs;
@@ -126,6 +141,8 @@ namespace BeastCraft.Game
             }
 
             _atlas = new SpriteAtlas(GraphicsDevice, _content);
+            LoadFont();
+            LoadSettings();
 
             BattleSetup setup = DemoBattle.Create(_content, _options.Seed, out _speciesByUnit, out string error, null, _options.Encounter,
                                                   _options.Level, _options.EnemyLevel);
@@ -137,7 +154,9 @@ namespace BeastCraft.Game
             }
 
             _playback = new BattlePlayback(run);
-            _boardFit = _screen.FitBoard(_playback.Grid.Radius);
+            _camera = new CameraRig(_playback.Grid.Radius, _screen.Board);
+            _cameraRest = _camera.FitAll;
+            _boardFit = _camera.Fit(_cameraRest);
             _names = UnitNames(_content, _speciesByUnit);
 
             if (_options.Screenshot)
@@ -191,6 +210,7 @@ namespace BeastCraft.Game
             {
                 int count = ActingSkills().Count;
                 _selectedSkill = count == 0 || _selectedSkill + 1 >= count ? -1 : _selectedSkill + 1;
+                _popupTerm = null;
             }
 
             _previousKeys = keys;
@@ -218,13 +238,17 @@ namespace BeastCraft.Game
 
                 if (_clockMs >= _animation.DurationMs)
                 {
+                    _cameraRest = CameraNow();
+                    _cameraIdleMs = 0;
                     _animation = null;
+                    _turnCamera = null;
                     _idleMs = 0;
                 }
             }
             else
             {
                 _idleMs += played;
+                _cameraIdleMs += played;
                 if (step || (_auto && _idleMs >= AutoPauseMs))
                 {
                     PlayNextTurn();
@@ -262,15 +286,40 @@ namespace BeastCraft.Game
                 return;
             }
 
-            _animation = new TurnAnimation(turn, _layout, _content.Vfx, _options.Seed);
+            CameraView from = CameraNow();
+            _animation = new TurnAnimation(turn, _layout, _content.Vfx, _options.Seed, _vfxSettings);
+            _turnCamera = new TurnCamera(_animation, _layout, _camera, from);
             _clockMs = 0;
             Log(turn);
+        }
+
+        /// <summary>
+        /// Where the camera looks now: the turn's own framing while one plays
+        /// (<see cref="TurnCamera"/>), else easing back from where the last turn left it toward the
+        /// whole arena (<see cref="CameraSettings.ReturnMs"/>, on the played clock, so it respects
+        /// the speed).
+        /// </summary>
+        private CameraView CameraNow()
+        {
+            if (_camera == null)
+            {
+                return default;
+            }
+
+            if (_animation != null && _turnCamera != null)
+            {
+                return _turnCamera.Sample(_clockMs);
+            }
+
+            return _camera.Ease(_cameraRest, _camera.FitAll, _cameraIdleMs, _camera.Settings.ReturnMs);
         }
 
         /// <summary>The skip button: plays every remaining turn at once and shows the result.</summary>
         private void SkipToEnd()
         {
             _animation = null;
+            _turnCamera = null;
+            _cameraRest = _camera.FitAll;
             PlayedTurn turn;
             while ((turn = _playback.Advance()) != null)
             {
@@ -320,8 +369,19 @@ namespace BeastCraft.Game
                 return;
             }
 
-            _animation = new TurnAnimation(shown, _layout, _content.Vfx, _options.Seed);
+            _animation = new TurnAnimation(shown, _layout, _content.Vfx, _options.Seed, _vfxSettings);
+            _turnCamera = new TurnCamera(_animation, _layout, _camera, _camera.FitAll);
             _clockMs = _options.AtMs ?? _animation.MidVfxMs(beatIndex);
+            if (!string.IsNullOrEmpty(_options.Glossary))
+            {
+                _popupTerm = _content.Glossary.Find(_options.Glossary);
+                if (_popupTerm == null)
+                {
+                    Fail("No glossary term '" + _options.Glossary + "'.");
+                    return;
+                }
+            }
+
             Console.WriteLine("Screenshot: turn " + (shown.Index + 1) + " (" + Name(shown.Turn.Unit.Id) + "), " + _clockMs + " ms into its " +
                               _animation.DurationMs + " ms animation" +
                               (_playback.IsOver ? "; the battle ended: " + _playback.Outcome : string.Empty) + ".");
@@ -403,7 +463,7 @@ namespace BeastCraft.Game
         {
             MouseState mouse = Mouse.GetState();
             Vec2 at = _canvasFit.Scale > 0f ? _canvasFit.ToCanvas(mouse.X, mouse.Y) : new Vec2(-1f, -1f);
-            _hoveredSkill = IsActive ? SkillCardAt(at) : -1;
+            _hoveredSkill = IsActive && !_settingsOpen ? SkillCardAt(at) : -1;
             if (IsActive && mouse.LeftButton == ButtonState.Released && _previousMouse.LeftButton == ButtonState.Pressed)
             {
                 Tap(at, ref step);
@@ -448,9 +508,53 @@ namespace BeastCraft.Game
             _gestureTouches = 0;
         }
 
-        /// <summary>A tap or click at canvas point <paramref name="at"/>: a control, a skill card, else the board (step).</summary>
+        /// <summary>
+        /// A tap or click at canvas point <paramref name="at"/>: the settings gear, the settings
+        /// overlay while it is open (a row changes that setting; anywhere else closes it), a
+        /// control, a skill card, else the board (step).
+        /// </summary>
         private void Tap(Vec2 at, ref bool step)
         {
+            if (_screen.SettingsButton.Contains(at.X, at.Y))
+            {
+                _settingsOpen = !_settingsOpen;
+                return;
+            }
+
+            if (_settingsOpen)
+            {
+                for (int row = 0; row < PortraitLayout.SettingsRowCount; row++)
+                {
+                    if (_screen.SettingsRow(row).Contains(at.X, at.Y))
+                    {
+                        ChangeSetting(row);
+                        return;
+                    }
+                }
+
+                if (!_screen.SettingsPanel.Contains(at.X, at.Y))
+                {
+                    _settingsOpen = false;
+                }
+
+                return;
+            }
+
+            // The pinned skill card: any tap (on the popup or anywhere else) closes an open definition; else a tap on a term opens its.
+            IReadOnlyList<SkillSO> skills = ActingSkills();
+            bool pinned = _selectedSkill >= 0 && _selectedSkill < skills.Count;
+            if (pinned && _popupTerm != null)
+            {
+                _popupTerm = null;
+                return;
+            }
+
+            if (pinned && _screen.SkillDetail.Contains(at.X, at.Y))
+            {
+                _popupTerm = CardLayout(SkillCard.Of(skills[_selectedSkill], _content.Glossary)).TermAt(at.X, at.Y);
+                return;
+            }
+
             for (int i = 0; i < PortraitLayout.ControlCount; i++)
             {
                 if (!_screen.Control(i).Contains(at.X, at.Y))
@@ -478,13 +582,93 @@ namespace BeastCraft.Game
             if (card >= 0)
             {
                 _selectedSkill = card == _selectedSkill ? -1 : card;
+                _popupTerm = null;
                 return;
             }
 
             if (_screen.Board.Contains(at.X, at.Y) || _screen.Toast.Contains(at.X, at.Y))
             {
+                // Off the card: close it; with no card open, step.
+                if (pinned)
+                {
+                    _selectedSkill = -1;
+                    return;
+                }
+
                 step = true;
             }
+        }
+
+        /// <summary>
+        /// The UI font (<see cref="GameContent.UiFontPath"/>) in place of the pixel font, which
+        /// stays only as the fallback when the TTF cannot be loaded.
+        /// </summary>
+        private void LoadFont()
+        {
+            TtfText font = TtfText.TryLoad(_content.Source, GameContent.UiFontPath, out string error);
+            if (font == null)
+            {
+                Console.WriteLine("UI font not loaded (" + error + "); using the pixel font.");
+                return;
+            }
+
+            _text.Dispose();
+            _text = font;
+        }
+
+        /// <summary>
+        /// The effects settings: the saved ones (<see cref="PlayerSettingsStore"/> in the default
+        /// save folder) in a window, the defaults in a screenshot; then the command-line flags on top.
+        /// </summary>
+        private void LoadSettings()
+        {
+            _settings = new PlayerSettings();
+            if (!_options.Screenshot)
+            {
+                try
+                {
+                    _settingsStore = new PlayerSettingsStore(SaveLocations.Default(), new JsonSaveSerializer(true));
+                    _settings = _settingsStore.Load();
+                }
+                catch (Exception)
+                {
+                    // No writable save folder: play with the defaults and remember nothing.
+                    _settingsStore = null;
+                }
+            }
+
+            _options.ApplyTo(_settings);
+            _vfxSettings = VfxSettings.From(_settings);
+            _settingsOpen = _options.ShowSettings;
+        }
+
+        /// <summary>
+        /// A settings-overlay row tapped: 0 cycles the effects intensity (Full, Reduced, Minimal),
+        /// 1 toggles screen shake, 2 flashes, 3 closes. A change is saved at once and applies from
+        /// the next turn played.
+        /// </summary>
+        private void ChangeSetting(int row)
+        {
+            switch (row)
+            {
+                case 0:
+                    _settings.EffectsIntensity = _settings.EffectsIntensity == EffectsIntensity.Full
+                                                     ? EffectsIntensity.Reduced
+                                                     : _settings.EffectsIntensity == EffectsIntensity.Reduced ? EffectsIntensity.Minimal : EffectsIntensity.Full;
+                    break;
+                case 1:
+                    _settings.ScreenShake = !_settings.ScreenShake;
+                    break;
+                case 2:
+                    _settings.Flashes = !_settings.Flashes;
+                    break;
+                default:
+                    _settingsOpen = false;
+                    return;
+            }
+
+            _vfxSettings = VfxSettings.From(_settings);
+            _settingsStore?.Save(_settings);
         }
 
         private int SkillCardAt(Vec2 at)

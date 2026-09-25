@@ -310,6 +310,9 @@ namespace BeastCraft.Battle
                 return;
             }
 
+            // A record for the viewer only (SkillActivation.Applied); it changes nothing here.
+            activation?.RecordApplied(new AppliedEffect(target, effect));
+
             switch (effect.EffectType)
             {
                 case SkillEffectType.Heal:

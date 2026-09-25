@@ -143,10 +143,25 @@ namespace BeastCraft.Economy
         /// <summary>Unlocks every boss-exclusive look <paramref name="regionId"/>'s lair grants. Returns the keys newly unlocked.</summary>
         public static List<string> UnlockBossLooks(PlayerSave save, CosmeticLibrary library, string regionId)
         {
+            return UnlockSourceLooks(save, library, CosmeticLibrary.SourceBoss, regionId);
+        }
+
+        /// <summary>
+        /// Unlocks every Hard-only look (<see cref="CosmeticLibrary.SourceBossHard"/>) of post-game
+        /// region <paramref name="regionId"/>'s lair: what a boss clear on <c>RunDifficulty.Hard</c>
+        /// adds (<c>CampaignRules.ResolveBattle</c>). Idempotent. Returns the keys newly unlocked.
+        /// </summary>
+        public static List<string> UnlockHardBossLooks(PlayerSave save, CosmeticLibrary library, string regionId)
+        {
+            return UnlockSourceLooks(save, library, CosmeticLibrary.SourceBossHard, regionId);
+        }
+
+        private static List<string> UnlockSourceLooks(PlayerSave save, CosmeticLibrary library, string source, string regionId)
+        {
             List<string> unlocked = new List<string>();
             foreach (CosmeticOption option in AllOptions(library))
             {
-                if (option.Source == CosmeticLibrary.SourceBoss && string.Equals(option.UnlockId, regionId, StringComparison.Ordinal) && Unlock(save, library, option.Key))
+                if (option.Source == source && string.Equals(option.UnlockId, regionId, StringComparison.Ordinal) && Unlock(save, library, option.Key))
                 {
                     unlocked.Add(option.Key);
                 }

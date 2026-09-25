@@ -25,6 +25,7 @@ namespace BeastCraft.Save
         private readonly HashSet<string> _materials;
         private readonly HashSet<string> _regions;
         private readonly HashSet<string> _seals;
+        private readonly HashSet<string> _postGameRegions;
 
         /// <summary>A catalog of exactly these ids, which does not check region or seal ids. A null sequence is empty.</summary>
         public SaveContentCatalog(IEnumerable<string> speciesIds, IEnumerable<string> skillIds, IEnumerable<string> passiveIds, IEnumerable<string> materialIds)
@@ -39,6 +40,17 @@ namespace BeastCraft.Save
         /// </summary>
         public SaveContentCatalog(IEnumerable<string> speciesIds, IEnumerable<string> skillIds, IEnumerable<string> passiveIds, IEnumerable<string> materialIds,
                                   IEnumerable<string> regionIds, IEnumerable<string> sealIds)
+            : this(speciesIds, skillIds, passiveIds, materialIds, regionIds, sealIds, null)
+        {
+        }
+
+        /// <summary>
+        /// The six-list catalog plus the post-game region ids (<c>regions.json</c> <c>IsPostGame</c>):
+        /// given them, only those answer <see cref="IsPostGameRegion"/>; null leaves it unchecked (every
+        /// non-empty id may be played on Hard as far as the save validator can tell).
+        /// </summary>
+        public SaveContentCatalog(IEnumerable<string> speciesIds, IEnumerable<string> skillIds, IEnumerable<string> passiveIds, IEnumerable<string> materialIds,
+                                  IEnumerable<string> regionIds, IEnumerable<string> sealIds, IEnumerable<string> postGameRegionIds)
         {
             _species = ToSet(speciesIds);
             _skills = ToSet(skillIds);
@@ -46,6 +58,7 @@ namespace BeastCraft.Save
             _materials = ToSet(materialIds);
             _regions = regionIds == null ? null : ToSet(regionIds);
             _seals = sealIds == null ? null : ToSet(sealIds);
+            _postGameRegions = postGameRegionIds == null ? null : ToSet(postGameRegionIds);
         }
 
         /// <summary>
@@ -94,7 +107,7 @@ namespace BeastCraft.Save
 
         /// <summary>
         /// <see cref="FromData(BeastRosterData, SkillLibraryData)"/> plus every region and seal id in
-        /// <paramref name="regions"/> (<c>regions.json</c>), which are then checked. A null
+        /// <paramref name="regions"/> (<c>regions.json</c>), and which regions are post-game, which are then checked. A null
         /// <paramref name="regions"/> leaves them unchecked.
         /// </summary>
         public static SaveContentCatalog FromData(BeastRosterData roster, SkillLibraryData library, RegionLibraryData regions)
@@ -107,9 +120,14 @@ namespace BeastCraft.Save
 
             List<string> regionIds = new List<string>();
             List<string> sealIds = new List<string>();
+            List<string> postGameIds = new List<string>();
             foreach (RegionData region in regions.Regions ?? new RegionData[0])
             {
                 regionIds.Add(region == null ? null : region.RegionId);
+                if (region != null && region.IsPostGame)
+                {
+                    postGameIds.Add(region.RegionId);
+                }
             }
 
             foreach (SealData seal in regions.Seals ?? new SealData[0])
@@ -117,7 +135,7 @@ namespace BeastCraft.Save
                 sealIds.Add(seal == null ? null : seal.SealId);
             }
 
-            return new SaveContentCatalog(content._species, content._skills, content._passives, content._materials, regionIds, sealIds);
+            return new SaveContentCatalog(content._species, content._skills, content._passives, content._materials, regionIds, sealIds, postGameIds);
         }
 
         public bool IsKnownSpecies(string speciesId)
@@ -148,6 +166,11 @@ namespace BeastCraft.Save
         public bool IsKnownSeal(string sealId)
         {
             return _seals == null ? !string.IsNullOrEmpty(sealId) : Contains(_seals, sealId);
+        }
+
+        public bool IsPostGameRegion(string regionId)
+        {
+            return _postGameRegions == null ? !string.IsNullOrEmpty(regionId) : Contains(_postGameRegions, regionId);
         }
 
         private static void AddSkillIds(List<string> into, SkillData[] skills)

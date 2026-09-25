@@ -5,6 +5,7 @@ using BeastCraft.Battle;
 using BeastCraft.Battle.Grid;
 using BeastCraft.Game.Rendering;
 using BeastCraft.Presentation.Board;
+using BeastCraft.Presentation.Camera;
 using BeastCraft.Presentation.Layout;
 using BeastCraft.Presentation.Playback;
 using BeastCraft.Presentation.Vfx;
@@ -23,7 +24,7 @@ namespace BeastCraft.Game
         /// <summary>
         /// Draws one frame onto a <paramref name="width"/> x <paramref name="height"/> target: the
         /// portrait canvas fitted inside <paramref name="insets"/> (black bars around it), the board
-        /// through its own fit (<see cref="PortraitLayout.FitBoard(int)"/>, shaken by the VFX) and
+        /// through the auto camera's fit (<see cref="CameraRig.Fit"/>, shaken by the VFX) and
         /// the HUD in canvas pixels.
         /// </summary>
         private void RenderScene(int width, int height, SafeInsets insets)
@@ -57,6 +58,10 @@ namespace BeastCraft.Game
             Rect board = _screen.Board;
             _draw.Fill(Pixel, new Vector2(board.X, board.Y), new Vector2(board.Width, board.Height), Ink("p", Color.Purple) * 0.35f);
 
+            // The auto camera (CameraRig / TurnCamera): the board zoomed and panned onto the action, clipped to its area.
+            _boardFit = _camera.Fit(CameraNow());
+            Rect clip = _canvasFit.ToScreen(board);
+            _draw.SetClip(new Rectangle((int)Math.Floor(clip.X), (int)Math.Floor(clip.Y), (int)Math.Ceiling(clip.Width), (int)Math.Ceiling(clip.Height)));
             Matrix boardSpace = Matrix.CreateTranslation(shake.X, shake.Y, 0f) * Matrix.CreateScale(_boardFit.Scale) *
                                 Matrix.CreateTranslation(_boardFit.OriginX, _boardFit.OriginY, 0f) * canvas;
             _draw.SetTransform(boardSpace);
@@ -79,6 +84,7 @@ namespace BeastCraft.Game
                 DrawDamageNumbers(beat, vfx);
             }
 
+            _draw.SetClip(null);
             _draw.SetTransform(canvas);
             _draw.UnitSize = HexLayout.ColumnStep;
             DrawHud(beat);
@@ -307,7 +313,7 @@ namespace BeastCraft.Game
                 }
             }
 
-            VfxParticleData particles = effect.Particles;
+            VfxParticleData particles = timeline.BurstSpec;
             if (particles != null && particles.Additive == additivePass)
             {
                 foreach (ParticleState particle in vfx.Particles)

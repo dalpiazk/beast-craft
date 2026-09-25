@@ -549,7 +549,7 @@ the bands of the mean target. `!` marks a miss, and a line per mode counts the t
 `--self-check`, the loop-parity replay also runs each level at its widest in-range gap.
 
 ```sh
-dotnet run --project Tooling/BalanceSim -c Release -- --mode pve --levels 10,30,50,70,90 --level-gap -5,-3,-2,0,2,3,5 --out docs/balance/level-gap-report.md
+dotnet run --project Tooling/BalanceSim -c Release -- --mode pve --levels 10,30,50,70,90 --level-gap -5,-3,-2,0,2,3,5 --gap-mix 0 --out docs/balance/level-gap-report.md
 ```
 
 Cost: each nonzero gap adds about 128 + 336 battles per cell (a sixth of a calibration); the
@@ -1012,3 +1012,20 @@ with `--idle-hours-per-day 0` the report is the pre-idle report plus an "Idle re
 The report's "Idle rewards" section gives the rates, idle's share of each region's income and the
 campaign gates: idle at most 15% of all gold and of all materials (by XP value) and at most 10% of all
 beast XP (p50; the lead / user ceilings). See docs/design/progression-and-saves.md, "Idle rewards".
+
+## Post-game regions and shapes
+
+Post-game shapes (`encounter-library.json` `PostGame: true`, drawn only by post-game regions such as
+r11) never enter the PvE run or its report: `EncounterLoader` keeps them in
+`EncounterCatalog.PostGameShapes` (their compositions are drawn after every mainline shape's, so the
+mainline draws do not move; a post-game shape whose recipe is its `DropShapeId` shape's reuses that
+shape's compositions, so Normal, Hard and the mainline shape share one clear-rate curve).
+`--write-difficulty` then calibrates each at level 100 only (`PostGameCalibration`, the run's
+calibration target and gear, one stderr line per cell) and appends their targets and cells after the
+mainline ones (`DifficultyWriter`); the mainline text of the table is unchanged but for the comma JSON
+needs after its last target and cell. `--mode campaign` plays only the mainline regions
+(`CampaignPacingSimulator.MainlineOnly`) and appends a "Post-game" section (`PostGamePacing`): each
+post-game region from its first stage to its boss, on Normal and on Hard, `--runs` times per base seed
+on the seed stream `0x504F5354` (so the mainline campaigns never move), at gap 0 with the post-game
+targets and the boss at 35% (Normal) / 20% (Hard), reporting clear rates by tier and battles and boss
+attempts to clear.

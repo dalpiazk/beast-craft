@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using BeastCraft.Presentation.Board;
+using BeastCraft.Save;
 using BeastCraft.Vfx;
 
 namespace BeastCraft.Presentation.Vfx
@@ -102,6 +103,12 @@ namespace BeastCraft.Presentation.Vfx
     /// flipbooks, ground decals, shockwave rings growing to the area's radius, radial bursts,
     /// particle bursts and circling glyphs.
     /// </para>
+    /// <para>
+    /// The player's effects settings (<see cref="VfxSettings"/>: intensity, screen shake, flashes)
+    /// are an input like the seed: they drop parts of the effect (and the time those parts took)
+    /// but never move the impact, and a part that still plays is drawn exactly as at Full (a
+    /// halved burst is the Full burst's first half).
+    /// </para>
     /// </summary>
     public sealed class VfxTimeline
     {
@@ -113,17 +120,21 @@ namespace BeastCraft.Presentation.Vfx
         private readonly VfxLayerData[] _layers;
         private readonly VfxArea _area;
         private readonly int _seed;
+        private readonly VfxSettings _settings;
+        private readonly VfxParticleData _burstSpec;
 
         /// <param name="effect">The spec (from the VFX library). Null plays nothing.</param>
         /// <param name="caster">Where the effect starts.</param>
         /// <param name="targets">Where it lands (empty: it lands on the caster).</param>
         /// <param name="seed">Seeds the particles and the shake.</param>
         /// <param name="area">The affected hexes as a circle (null: around the targets' positions).</param>
-        public VfxTimeline(VfxEffectData effect, Vec2 caster, IReadOnlyList<VfxTarget> targets, int seed, VfxArea area = null)
+        /// <param name="settings">The player's effects settings (null: <see cref="VfxSettings.Default"/>, everything).</param>
+        public VfxTimeline(VfxEffectData effect, Vec2 caster, IReadOnlyList<VfxTarget> targets, int seed, VfxArea area = null, VfxSettings settings = null)
         {
             _effect = effect ?? new VfxEffectData();
             _caster = caster;
             _seed = seed;
+            _settings = settings ?? VfxSettings.Default;
             _targets = new List<VfxTarget>(targets ?? new VfxTarget[0]);
             if (_targets.Count == 0)
             {
@@ -147,12 +158,13 @@ namespace BeastCraft.Presentation.Vfx
             ImpactMs = _effect.Motion == VfxMotion.Projectile ? Math.Max(0, _effect.TravelMs) : 0;
             HitStopEndMs = ImpactMs + Math.Max(0, _effect.HitStopMs);
 
+            _burstSpec = BurstSpecFor(_effect, _layers, _settings);
             int after = FlipbookDurationMs;
             for (int i = 0; i < _targets.Count; i++)
             {
-                if (_effect.Particles != null)
+                if (_burstSpec != null)
                 {
-                    ParticleBurst burst = new ParticleBurst(_effect.Particles, _targets[i].Position, unchecked(seed * 31 + i));
+                    ParticleBurst burst = new ParticleBurst(_burstSpec, _targets[i].Position, unchecked(seed * 31 + i), _settings.ParticleCount(_burstSpec.Count));
                     _bursts.Add(burst);
                     after = Math.Max(after, burst.DurationMs);
                 }
@@ -162,7 +174,7 @@ namespace BeastCraft.Presentation.Vfx
             for (int l = 0; l < _layers.Length; l++)
             {
                 VfxLayerData layer = _layers[l];
-                if (layer == null)
+                if (layer == null || !LayerPlays(layer, _settings))
                 {
                     continue;
                 }
@@ -181,8 +193,8 @@ namespace BeastCraft.Presentation.Vfx
                 }
             }
 
-            end = Math.Max(end, ImpactMs + (_effect.ScreenShake == null ? 0 : _effect.ScreenShake.DurationMs));
-            end = Math.Max(end, ImpactMs + (_effect.HitFlash == null ? 0 : _effect.HitFlash.DurationMs));
+            end = Math.Max(end, ImpactMs + (_effect.ScreenShake == null || !Shakes ? 0 : _effect.ScreenShake.DurationMs));
+            end = Math.Max(end, ImpactMs + (_effect.HitFlash == null || !_settings.Flashes ? 0 : _effect.HitFlash.DurationMs));
             end = Math.Max(end, ImpactMs + (_effect.DamageNumber == null ? 0 : _effect.DamageNumber.RiseMs));
             DurationMs = Math.Max(end, HitStopEndMs);
         }
@@ -196,14 +208,89 @@ namespace BeastCraft.Presentation.Vfx
         /// <summary>When everything has finished.</summary>
         public int DurationMs { get; }
 
-        /// <summary>How long the flipbook plays once released (0 without one).</summary>
+        /// <summary>How long the flipbook plays once released (0 without one, or when the settings drop it).</summary>
         public int FlipbookDurationMs
         {
             get
             {
                 VfxFlipbookData flipbook = _effect.Flipbook;
-                return flipbook == null || flipbook.Fps < 1 || flipbook.Frames < 1 ? 0 : (flipbook.Frames * 1000 + flipbook.Fps - 1) / flipbook.Fps;
+                return flipbook == null || flipbook.Fps < 1 || flipbook.Frames < 1 || !FlipbookPlays
+                           ? 0
+                           : (flipbook.Frames * 1000 + flipbook.Fps - 1) / flipbook.Fps;
             }
+        }
+
+        /// <summary>The settings this timeline plays with.</summary>
+        public VfxSettings Settings
+        {
+            get { return _settings; }
+        }
+
+        /// <summary>
+        /// The particle spec of the burst on each target (<see cref="VfxFrame.Particles"/>): the
+        /// effect's own; at Minimal, failing that, its first particle layer's (the one simple
+        /// burst). Null when there is none. Draw the particles with this spec's sheet and colours.
+        /// </summary>
+        public VfxParticleData BurstSpec
+        {
+            get { return _burstSpec; }
+        }
+
+        private bool FlipbookPlays
+        {
+            get
+            {
+                return _settings.Intensity != EffectsIntensity.Minimal && (_settings.Flashes || _effect.Flipbook == null || !_effect.Flipbook.Additive);
+            }
+        }
+
+        private bool Shakes
+        {
+            get { return _settings.ScreenShake && _settings.Intensity != EffectsIntensity.Minimal; }
+        }
+
+        /// <summary>
+        /// Whether <paramref name="layer"/> plays under <paramref name="settings"/>: never at
+        /// Minimal; not a glyph ring or a secondary particle burst at Reduced; not a bright additive
+        /// burst (an additive flipbook or radial burst) with flashes off.
+        /// </summary>
+        public static bool LayerPlays(VfxLayerData layer, VfxSettings settings)
+        {
+            if (layer == null)
+            {
+                return false;
+            }
+
+            settings = settings ?? VfxSettings.Default;
+            if (settings.Intensity == EffectsIntensity.Minimal)
+            {
+                return false;
+            }
+
+            if (settings.Intensity == EffectsIntensity.Reduced && (layer.Type == VfxLayerType.Glyphs || layer.Type == VfxLayerType.Particles))
+            {
+                return false;
+            }
+
+            return settings.Flashes || layer.Blend != VfxBlend.Additive || (layer.Type != VfxLayerType.Flipbook && layer.Type != VfxLayerType.RadialBurst);
+        }
+
+        private static VfxParticleData BurstSpecFor(VfxEffectData effect, VfxLayerData[] layers, VfxSettings settings)
+        {
+            if (effect.Particles != null || settings.Intensity != EffectsIntensity.Minimal)
+            {
+                return effect.Particles;
+            }
+
+            foreach (VfxLayerData layer in layers)
+            {
+                if (layer != null && layer.Type == VfxLayerType.Particles && layer.Particles != null)
+                {
+                    return layer.Particles;
+                }
+            }
+
+            return null;
         }
 
         /// <summary>The targets, in order.</summary>
@@ -250,10 +337,13 @@ namespace BeastCraft.Presentation.Vfx
 
             if (ms < ImpactMs)
             {
-                float t = ms / (float)ImpactMs;
-                foreach (VfxTarget target in _targets)
+                if (_settings.Intensity != EffectsIntensity.Minimal)
                 {
-                    frame.Projectiles.Add(Vec2.Lerp(_caster, target.Position, t));
+                    float t = ms / (float)ImpactMs;
+                    foreach (VfxTarget target in _targets)
+                    {
+                        frame.Projectiles.Add(Vec2.Lerp(_caster, target.Position, t));
+                    }
                 }
 
                 return frame;
@@ -265,7 +355,7 @@ namespace BeastCraft.Presentation.Vfx
             int released = Math.Max(0, ms - HitStopEndMs);
 
             VfxFlipbookData flipbook = _effect.Flipbook;
-            if (flipbook != null && flipbook.Fps > 0)
+            if (flipbook != null && flipbook.Fps > 0 && FlipbookPlays)
             {
                 int index = (int)((long)released * flipbook.Fps / 1000);
                 frame.FlipbookFrame = index < flipbook.Frames ? index : -1;
@@ -277,7 +367,7 @@ namespace BeastCraft.Presentation.Vfx
             }
 
             VfxShakeData shake = _effect.ScreenShake;
-            if (shake != null && shake.DurationMs > 0 && sinceImpact < shake.DurationMs)
+            if (shake != null && shake.DurationMs > 0 && sinceImpact < shake.DurationMs && Shakes)
             {
                 float strength = shake.Amplitude * (1f - sinceImpact / (float)shake.DurationMs);
                 int bucket = sinceImpact / 16;      // a new offset every ~frame, the same one for the whole bucket
@@ -285,7 +375,7 @@ namespace BeastCraft.Presentation.Vfx
             }
 
             VfxFlashData flash = _effect.HitFlash;
-            if (flash != null && flash.DurationMs > 0 && sinceImpact < flash.DurationMs)
+            if (flash != null && flash.DurationMs > 0 && sinceImpact < flash.DurationMs && _settings.Flashes)
             {
                 frame.FlashAlpha = 1f - sinceImpact / (float)flash.DurationMs;
             }
@@ -320,7 +410,7 @@ namespace BeastCraft.Presentation.Vfx
             for (int l = 0; l < _layers.Length; l++)
             {
                 VfxLayerData layer = _layers[l];
-                if (layer == null || layer.DurationMs <= 0)
+                if (layer == null || layer.DurationMs <= 0 || !LayerPlays(layer, _settings))
                 {
                     continue;
                 }
