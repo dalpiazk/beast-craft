@@ -549,7 +549,7 @@ the bands of the mean target. `!` marks a miss, and a line per mode counts the t
 `--self-check`, the loop-parity replay also runs each level at its widest in-range gap.
 
 ```sh
-dotnet run --project Tooling/BalanceSim -c Release -- --mode pve --levels 10,30,50,70,90 --level-gap -5,-3,-2,0,2,3,5 --out docs/balance/level-gap-report.md
+dotnet run --project Tooling/BalanceSim -c Release -- --mode pve --levels 10,30,50,70,90 --level-gap -5,-3,-2,0,2,3,5 --gap-mix 0 --out docs/balance/level-gap-report.md
 ```
 
 Cost: each nonzero gap adds about 128 + 336 battles per cell (a sixth of a calibration); the

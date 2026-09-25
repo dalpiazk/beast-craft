@@ -3179,7 +3179,7 @@ Reproduce: the guard, `dotnet run --project Tooling/BalanceSim -c Release -- --m
 report, `dotnet run --project Tooling/BalanceSim -c Release -- --panel 16x4 --avatar-value --out
 docs/balance/tuned-report.md --write-difficulty content/data/Encounters/encounter-difficulty.json`;
 the level gap, `dotnet run --project Tooling/BalanceSim -c Release -- --mode pve --levels
-10,30,50,70,90 --level-gap -5,-3,-2,0,2,3,5 --out docs/balance/level-gap-report.md`.
+10,30,50,70,90 --level-gap -5,-3,-2,0,2,3,5 --gap-mix 0 --out docs/balance/level-gap-report.md`.
 
 ## Level-gap mix and the team suggester
 
