@@ -1,0 +1,176 @@
+{
+ "beast": "golem",
+ "element": "Earth",
+ "canvas": [
+  1792,
+  2304
+ ],
+ "order_back_to_front": [
+  "legs_back",
+  "body",
+  "legs_front",
+  "stones",
+  "head"
+ ],
+ "character": {
+  "file": "character.png",
+  "full_canvas_file": "character_full.png",
+  "pivot": [
+   801,
+   2027
+  ],
+  "pivot_local": [
+   856,
+   1306
+  ],
+  "note": "character.png is cropped so the feet pivot is its bottom centre"
+ },
+ "parts": {
+  "legs_back": {
+   "file": "parts/legs_back.png",
+   "parent": "body",
+   "offset": [
+    1070,
+    1518
+   ],
+   "size": [
+    400,
+    467
+   ],
+   "pivot": [
+    1230,
+    1634
+   ],
+   "pivot_local": [
+    160,
+    116
+   ]
+  },
+  "body": {
+   "file": "parts/body.png",
+   "parent": null,
+   "offset": [
+    338,
+    887
+   ],
+   "size": [
+    1310,
+    1103
+   ],
+   "pivot": [
+    801,
+    2027
+   ],
+   "pivot_local": [
+    463,
+    1140
+   ]
+  },
+  "legs_front": {
+   "file": "parts/legs_front.png",
+   "parent": "body",
+   "offset": [
+    479,
+    1520
+   ],
+   "size": [
+    605,
+    508
+   ],
+   "pivot": [
+    884,
+    1599
+   ],
+   "pivot_local": [
+    405,
+    79
+   ]
+  },
+  "stones": {
+   "file": "parts/stones.png",
+   "parent": "body",
+   "offset": [
+    814,
+    732
+   ],
+   "size": [
+    622,
+    318
+   ],
+   "pivot": [
+    1069,
+    972
+   ],
+   "pivot_local": [
+    255,
+    240
+   ]
+  },
+  "head": {
+   "file": "parts/head.png",
+   "parent": "body",
+   "offset": [
+    167,
+    1004
+   ],
+   "size": [
+    293,
+    398
+   ],
+   "pivot": [
+    394,
+    1230
+   ],
+   "pivot_local": [
+    227,
+    226
+   ]
+  }
+ },
+ "root_pivot_note": "root part 'body' pivots at the feet ground contact; child pivots = centre of contact with the parent. Canvas px (2x finals).",
+ "mask_stats": {
+  "fg_px": 1233107,
+  "overlap_px": 35524,
+  "orphan_px": 416510,
+  "island_px": 53,
+  "reclip_px": 72902,
+  "auto_fixed_pct": 36.66,
+  "sam_iou": {
+   "legs_back": {
+    "iou": 0.77,
+    "src": "sam"
+   },
+   "body": {
+    "iou": 0.562,
+    "src": "sam"
+   },
+   "legs_front": {
+    "iou": 0.629,
+    "src": "polygon"
+   },
+   "stones": {
+    "iou": 0.887,
+    "src": "sam"
+   },
+   "head": {
+    "iou": 0.915,
+    "src": "sam"
+   }
+  },
+  "inpaint": {
+   "legs_back": {
+    "px": 3780,
+    "s": 16.7,
+    "retries": 0,
+    "cool_reverted_px": 1905
+   },
+   "body": {
+    "px": 192269,
+    "s": 22.2,
+    "retries": 0,
+    "cool_reverted_px": 0
+   }
+  },
+  "recompose_mae": 0.23
+ }
+}

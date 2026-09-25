@@ -1,0 +1,238 @@
+{
+ "beast": "kirin",
+ "element": "Light",
+ "canvas": [
+  1792,
+  2304
+ ],
+ "order_back_to_front": [
+  "tail",
+  "legs_back",
+  "legs_front",
+  "body",
+  "mane",
+  "head",
+  "horn"
+ ],
+ "character": {
+  "file": "character.png",
+  "full_canvas_file": "character_full.png",
+  "pivot": [
+   1068,
+   2048
+  ],
+  "pivot_local": [
+   671,
+   1831
+  ],
+  "note": "character.png is cropped so the feet pivot is its bottom centre"
+ },
+ "parts": {
+  "tail": {
+   "file": "parts/tail.png",
+   "parent": "body",
+   "offset": [
+    1250,
+    1099
+   ],
+   "size": [
+    445,
+    267
+   ],
+   "pivot": [
+    1370,
+    1232
+   ],
+   "pivot_local": [
+    120,
+    133
+   ]
+  },
+  "legs_back": {
+   "file": "parts/legs_back.png",
+   "parent": "body",
+   "offset": [
+    1197,
+    1448
+   ],
+   "size": [
+    237,
+    595
+   ],
+   "pivot": [
+    1296,
+    1494
+   ],
+   "pivot_local": [
+    99,
+    46
+   ]
+  },
+  "legs_front": {
+   "file": "parts/legs_front.png",
+   "parent": "body",
+   "offset": [
+    700,
+    1448
+   ],
+   "size": [
+    304,
+    601
+   ],
+   "pivot": [
+    836,
+    1503
+   ],
+   "pivot_local": [
+    136,
+    55
+   ]
+  },
+  "body": {
+   "file": "parts/body.png",
+   "parent": null,
+   "offset": [
+    640,
+    930
+   ],
+   "size": [
+    819,
+    630
+   ],
+   "pivot": [
+    1068,
+    2048
+   ],
+   "pivot_local": [
+    428,
+    1118
+   ]
+  },
+  "mane": {
+   "file": "parts/mane.png",
+   "parent": "body",
+   "offset": [
+    794,
+    612
+   ],
+   "size": [
+    230,
+    505
+   ],
+   "pivot": [
+    907,
+    1030
+   ],
+   "pivot_local": [
+    113,
+    418
+   ]
+  },
+  "head": {
+   "file": "parts/head.png",
+   "parent": "body",
+   "offset": [
+    447,
+    548
+   ],
+   "size": [
+    413,
+    420
+   ],
+   "pivot": [
+    742,
+    959
+   ],
+   "pivot_local": [
+    295,
+    411
+   ]
+  },
+  "horn": {
+   "file": "parts/horn.png",
+   "parent": "head",
+   "offset": [
+    632,
+    262
+   ],
+   "size": [
+    390,
+    360
+   ],
+   "pivot": [
+    686,
+    595
+   ],
+   "pivot_local": [
+    54,
+    333
+   ]
+  }
+ },
+ "root_pivot_note": "root part 'body' pivots at the feet ground contact; child pivots = centre of contact with the parent. Canvas px (2x finals).",
+ "mask_stats": {
+  "fg_px": 720207,
+  "overlap_px": 21780,
+  "orphan_px": 161699,
+  "island_px": 512,
+  "reclip_px": 3071,
+  "auto_fixed_pct": 25.55,
+  "sam_iou": {
+   "tail": {
+    "iou": 0.913,
+    "src": "sam"
+   },
+   "legs_back": {
+    "iou": 0.806,
+    "src": "sam"
+   },
+   "legs_front": {
+    "iou": 0.807,
+    "src": "sam"
+   },
+   "body": {
+    "iou": 0.348,
+    "src": "sam"
+   },
+   "mane": {
+    "iou": 0.396,
+    "src": "sam"
+   },
+   "head": {
+    "iou": 0.578,
+    "src": "sam"
+   },
+   "horn": {
+    "iou": 0.945,
+    "src": "sam"
+   }
+  },
+  "inpaint": {
+   "tail": {
+    "px": 7554,
+    "s": 12.9,
+    "retries": 0,
+    "cool_reverted_px": 321
+   },
+   "legs_back": {
+    "px": 6326,
+    "s": 6.0,
+    "retries": 0,
+    "cool_reverted_px": 169
+   },
+   "legs_front": {
+    "px": 6358,
+    "s": 6.1,
+    "retries": 0,
+    "cool_reverted_px": 0
+   },
+   "body": {
+    "px": 15182,
+    "s": 6.1,
+    "retries": 0,
+    "cool_reverted_px": 2349
+   }
+  },
+  "recompose_mae": 0.21
+ }
+}

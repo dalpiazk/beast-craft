@@ -1,0 +1,207 @@
+{
+ "beast": "phoenix",
+ "element": "Fire",
+ "canvas": [
+  1792,
+  2304
+ ],
+ "order_back_to_front": [
+  "back_wing",
+  "tail",
+  "legs",
+  "body",
+  "head",
+  "front_wing"
+ ],
+ "character": {
+  "file": "character.png",
+  "full_canvas_file": "character_full.png",
+  "pivot": [
+   702,
+   2208
+  ],
+  "pivot_local": [
+   924,
+   2135
+  ],
+  "note": "character.png is cropped so the feet pivot is its bottom centre"
+ },
+ "parts": {
+  "back_wing": {
+   "file": "parts/back_wing.png",
+   "parent": "body",
+   "offset": [
+    154,
+    1072
+   ],
+   "size": [
+    241,
+    619
+   ],
+   "pivot": [
+    319,
+    1507
+   ],
+   "pivot_local": [
+    165,
+    435
+   ]
+  },
+  "tail": {
+   "file": "parts/tail.png",
+   "parent": "body",
+   "offset": [
+    987,
+    1593
+   ],
+   "size": [
+    629,
+    559
+   ],
+   "pivot": [
+    1168,
+    1733
+   ],
+   "pivot_local": [
+    181,
+    140
+   ]
+  },
+  "legs": {
+   "file": "parts/legs.png",
+   "parent": "body",
+   "offset": [
+    256,
+    1934
+   ],
+   "size": [
+    760,
+    275
+   ],
+   "pivot": [
+    652,
+    1936
+   ],
+   "pivot_local": [
+    396,
+    2
+   ]
+  },
+  "body": {
+   "file": "parts/body.png",
+   "parent": null,
+   "offset": [
+    235,
+    950
+   ],
+   "size": [
+    1249,
+    1044
+   ],
+   "pivot": [
+    702,
+    2208
+   ],
+   "pivot_local": [
+    467,
+    1258
+   ]
+  },
+  "head": {
+   "file": "parts/head.png",
+   "parent": "body",
+   "offset": [
+    340,
+    84
+   ],
+   "size": [
+    720,
+    1183
+   ],
+   "pivot": [
+    718,
+    1183
+   ],
+   "pivot_local": [
+    378,
+    1099
+   ]
+  },
+  "front_wing": {
+   "file": "parts/front_wing.png",
+   "parent": "body",
+   "offset": [
+    942,
+    954
+   ],
+   "size": [
+    591,
+    721
+   ],
+   "pivot": [
+    1163,
+    1505
+   ],
+   "pivot_local": [
+    221,
+    551
+   ]
+  }
+ },
+ "root_pivot_note": "root part 'body' pivots at the feet ground contact; child pivots = centre of contact with the parent. Canvas px (2x finals).",
+ "mask_stats": {
+  "fg_px": 1649740,
+  "overlap_px": 13412,
+  "orphan_px": 262174,
+  "island_px": 2521,
+  "reclip_px": 30312,
+  "auto_fixed_pct": 16.86,
+  "sam_iou": {
+   "back_wing": {
+    "iou": 0.831,
+    "src": "sam"
+   },
+   "tail": {
+    "iou": 0.751,
+    "src": "polygon"
+   },
+   "legs": {
+    "iou": 0.631,
+    "src": "sam"
+   },
+   "body": {
+    "iou": 0.439,
+    "src": "sam"
+   },
+   "head": {
+    "iou": 0.658,
+    "src": "sam"
+   },
+   "front_wing": {
+    "iou": 0.345,
+    "src": "sam"
+   }
+  },
+  "inpaint": {
+   "back_wing": {
+    "px": 3484,
+    "s": 12.4,
+    "retries": 0,
+    "cool_reverted_px": 0
+   },
+   "tail": {
+    "px": 1422,
+    "s": 12.1,
+    "retries": 0,
+    "cool_reverted_px": 0
+   },
+   "body": {
+    "px": 193728,
+    "s": 16.7,
+    "retries": 0,
+    "cool_reverted_px": 181
+   }
+  },
+  "recompose_mae": 0.17
+ }
+}
