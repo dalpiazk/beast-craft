@@ -49,6 +49,12 @@ namespace BeastCraft.Tooling.BalanceSim
     /// ends. A modelling assumption, not measured from the PvE simulation.
     /// </para>
     /// <para>
+    /// <strong>Post-game regions</strong> (<see cref="RegionData.IsPostGame"/>) are never played by
+    /// these campaigns (<see cref="MainlineOnly"/>), so every mainline table and gate is what it is
+    /// without them; <see cref="PostGamePacing"/> plays them apart, on Normal and Hard, with its own
+    /// seeds, and its "Post-game" section is appended after the mainline report.
+    /// </para>
+    /// <para>
     /// Deterministic: campaign <c>r</c> of base seed <c>s</c> is seeded
     /// <c>LootRoller.DeriveSeed(s, r)</c>; each stage's map seed is <c>DeriveSeed(campaign, 1000 +
     /// stage index)</c>; every other draw comes from one <see cref="System.Random"/> per campaign in
@@ -218,12 +224,14 @@ namespace BeastCraft.Tooling.BalanceSim
             List<int> seeds = options.Seeds ?? new List<int> { options.Seed };
 
             DateTime start = DateTime.UtcNow;
-            string report = BuildReport(options, world, seeds, out List<string> misses);
+            // The post-game section (post-game regions only, its own seeds) is appended after the
+            // mainline report, which it can never change.
+            string report = BuildReport(options, world, seeds, out List<string> misses) + PostGamePacing.Build(options, regions, world.Encounters, seeds);
             double seconds = (DateTime.UtcNow - start).TotalSeconds;
 
             if (options.SelfCheck)
             {
-                string second = BuildReport(options, world, seeds, out List<string> _);
+                string second = BuildReport(options, world, seeds, out List<string> _) + PostGamePacing.Build(options, regions, world.Encounters, seeds);
                 if (!string.Equals(report, second, StringComparison.Ordinal))
                 {
                     Console.Error.WriteLine("Self-check failed: two campaign runs with identical inputs produced different reports.");
@@ -725,8 +733,8 @@ namespace BeastCraft.Tooling.BalanceSim
             }
         }
 
-        /// <summary>The route policy (see the class remarks).</summary>
-        private static MapNode Choose(List<MapNode> choices, double teamLevel, Random rng)
+        /// <summary>The route policy (see the class remarks; the post-game section walks it too).</summary>
+        internal static MapNode Choose(List<MapNode> choices, double teamLevel, Random rng)
         {
             List<MapNode> pick = choices.FindAll(n => n.Type == MapNodeType.Gate || n.Type == MapNodeType.Boss);
             if (pick.Count == 0)
