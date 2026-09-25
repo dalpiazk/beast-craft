@@ -338,7 +338,9 @@ namespace BeastCraft.Save
         }
 
         /// <summary>
-        /// The expedition in progress: no nodes without a run; with one, a known and unlocked region,
+        /// The expedition in progress: no nodes (and a Normal difficulty) without a run; with one, a
+        /// known and unlocked region, a defined difficulty that is Hard only in a post-game region
+        /// (with a catalog, <see cref="ISaveContentCatalog.IsPostGameRegion"/>),
         /// nodes whose ids are their indices, known types, levels 1-100, links only to nodes one layer
         /// up, a current node and a retried node on the map (or -1) and cleared nodes on the map, each once.
         /// </summary>
@@ -358,12 +360,27 @@ namespace BeastCraft.Save
                     issues.Add(new SaveIssue(SaveIssueKind.InvalidMapRun, "Campaign.ActiveRun", null, "no expedition (RegionId is empty) but nodes or cleared nodes are stored"));
                 }
 
+                if (run.Difficulty != RunDifficulty.Normal)
+                {
+                    issues.Add(new SaveIssue(SaveIssueKind.InvalidMapRun, "Campaign.ActiveRun.Difficulty", null, "no expedition (RegionId is empty) but a difficulty other than Normal is stored"));
+                }
+
                 return;
             }
 
             if (CheckRegionId(run.RegionId, "Campaign.ActiveRun.RegionId", catalog, issues) && !campaign.IsUnlocked(run.RegionId))
             {
                 issues.Add(new SaveIssue(SaveIssueKind.InvalidMapRun, "Campaign.ActiveRun.RegionId", run.RegionId, "the expedition's region '" + run.RegionId + "' is not unlocked"));
+            }
+
+            if (!Enum.IsDefined(typeof(RunDifficulty), run.Difficulty))
+            {
+                issues.Add(new SaveIssue(SaveIssueKind.InvalidMapRun, "Campaign.ActiveRun.Difficulty", run.RegionId, "unknown difficulty " + (int)run.Difficulty));
+            }
+            else if (run.Difficulty == RunDifficulty.Hard && catalog != null && !catalog.IsPostGameRegion(run.RegionId))
+            {
+                issues.Add(new SaveIssue(SaveIssueKind.InvalidMapRun, "Campaign.ActiveRun.Difficulty", run.RegionId,
+                                         "a Hard expedition in '" + run.RegionId + "', which is not a post-game region (Hard is for post-game regions only)"));
             }
 
             CheckRange(issues, "Campaign.ActiveRun.Stage", run.Stage, 0, int.MaxValue);

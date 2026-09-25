@@ -12,8 +12,10 @@ namespace BeastCraft.Economy
     /// discrete category with option ids unique within it, exactly one default (Source
     /// <c>default</c>, <c>IsDefault</c>), at least one starter look, every other option from a known
     /// source, rarity 0-1, MinRegion 1-10 and an art key; a <c>boss</c> option naming (given the
-    /// regions) a known region, a <c>milestone</c> option a milestone of the file, every other
-    /// option no unlock id. Milestones: ids unique, kind <c>BeastLevel</c> / <c>AvatarLevel</c> (1-100)
+    /// regions) a known region, a <c>boss_hard</c> option (a post-game lair's Hard-only look) a known
+    /// post-game region, a <c>milestone</c> option a milestone of the file, every other option no
+    /// unlock id. Boss, Hard boss and milestone looks are never sold: the Trader stocks
+    /// <c>shop</c> looks only. Milestones: ids unique, kind <c>BeastLevel</c> / <c>AvatarLevel</c> (1-100)
     /// or <c>BossesCleared</c> (1-10). With the roster, every species has at least one category;
     /// the avatar always must. No stats anywhere — looks never change a battle.
     /// </summary>
@@ -29,6 +31,16 @@ namespace BeastCraft.Economy
 
         /// <summary>Every problem; empty = importable. <paramref name="speciesIds"/> and <paramref name="regionIds"/> (null = not checked) are the roster's and <c>regions.json</c>'s.</summary>
         public static List<string> Validate(CosmeticLibraryData data, ICollection<string> speciesIds, ICollection<string> regionIds)
+        {
+            return Validate(data, speciesIds, regionIds, null);
+        }
+
+        /// <summary>
+        /// <see cref="Validate(CosmeticLibraryData, ICollection{string}, ICollection{string})"/>, and
+        /// with <paramref name="postGameRegionIds"/> (<c>regions.json</c>'s post-game regions; null = not
+        /// checked) every Hard boss look (<see cref="CosmeticLibrary.SourceBossHard"/>) names one of them.
+        /// </summary>
+        public static List<string> Validate(CosmeticLibraryData data, ICollection<string> speciesIds, ICollection<string> regionIds, ICollection<string> postGameRegionIds)
         {
             List<string> errors = new List<string>();
             if (data == null)
@@ -119,7 +131,7 @@ namespace BeastCraft.Economy
                     continue;
                 }
 
-                ValidateOptions(c, at, milestones, regionIds, errors);
+                ValidateOptions(c, at, milestones, regionIds, postGameRegionIds, errors);
             }
 
             if (!scopes.Contains(CosmeticLibrary.AvatarScope))
@@ -141,7 +153,8 @@ namespace BeastCraft.Economy
             return errors;
         }
 
-        private static void ValidateOptions(CosmeticCategoryData c, string at, HashSet<string> milestones, ICollection<string> regionIds, List<string> errors)
+        private static void ValidateOptions(CosmeticCategoryData c, string at, HashSet<string> milestones, ICollection<string> regionIds, ICollection<string> postGameRegionIds,
+                                            List<string> errors)
         {
             CosmeticOptionData[] options = c.Options ?? new CosmeticOptionData[0];
             if (options.Length < 2)
@@ -194,16 +207,22 @@ namespace BeastCraft.Economy
                 }
 
                 bool boss = o.Source == CosmeticLibrary.SourceBoss;
+                bool bossHard = o.Source == CosmeticLibrary.SourceBossHard;
                 bool milestone = o.Source == CosmeticLibrary.SourceMilestone;
                 if (boss && (string.IsNullOrEmpty(o.UnlockId) || (regionIds != null && !regionIds.Contains(o.UnlockId))))
                 {
                     errors.Add(where + ": a boss look names the region whose lair grants it (UnlockId).");
                 }
+                else if (bossHard && (string.IsNullOrEmpty(o.UnlockId) || (regionIds != null && !regionIds.Contains(o.UnlockId)) ||
+                                      (postGameRegionIds != null && !postGameRegionIds.Contains(o.UnlockId))))
+                {
+                    errors.Add(where + ": a Hard boss look names the post-game region whose lair grants it on Hard (UnlockId).");
+                }
                 else if (milestone && !milestones.Contains(o.UnlockId ?? string.Empty))
                 {
                     errors.Add(where + ": a milestone look names a milestone of the file (UnlockId).");
                 }
-                else if (!boss && !milestone && !string.IsNullOrEmpty(o.UnlockId))
+                else if (!boss && !bossHard && !milestone && !string.IsNullOrEmpty(o.UnlockId))
                 {
                     errors.Add(where + ": only boss and milestone looks have an UnlockId.");
                 }

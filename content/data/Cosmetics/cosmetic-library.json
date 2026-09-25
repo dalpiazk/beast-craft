@@ -1,5 +1,5 @@
 {
-  "_readme": "GAME CONTENT, DRAFT PENDING PRODUCER REVIEW (every name; no art yet: ArtKey is a placeholder key). Look and milestone names: DRAFT content pass; naming rules in docs/design/content-items.md. Cosmetics are PURELY visual (no stats). Looks are PER SPECIES (each beast species has its own categories: two or three parts, e.g. wings where it has them, and a tint colour; lead/user decision) plus the avatar's categories. Category ids are global (unlock keys are 'categoryId/optionId', account-wide). Each discrete category has exactly one default (Source default) and at least one starter look (free from the start); the rest come from: shop (the Trader sells it, from MinRegion; common or rare price tier), boss (a region lair's first clear, UnlockId = the region; never sold), milestone (UnlockId = a Milestones entry: BeastLevel = a beast of that species reaches the level (any beast for an avatar look), AvatarLevel, BossesCleared), drop (a low chance per won battle, drop-tables.json CosmeticDrops, from MinRegion; a future idle/AFK mechanism may also roll it), premium (reserved for a future purchase: never obtainable with gold or play in v1). Colour pickers are free. Validated by CosmeticLibraryValidator; Editor: Beast Craft/Data/Import Cosmetics (categories, the avatar schema, each species' schema). See docs/design/economy-and-shop.md, 'Cosmetics'.",
+  "_readme": "GAME CONTENT, DRAFT PENDING PRODUCER REVIEW (every name; no art yet: ArtKey is a placeholder key). Look and milestone names: DRAFT content pass; naming rules in docs/design/content-items.md. Cosmetics are PURELY visual (no stats). Looks are PER SPECIES (each beast species has its own categories: two or three parts, e.g. wings where it has them, and a tint colour; lead/user decision) plus the avatar's categories. Category ids are global (unlock keys are 'categoryId/optionId', account-wide). Each discrete category has exactly one default (Source default) and at least one starter look (free from the start); the rest come from: shop (the Trader sells it, from MinRegion; common or rare price tier), boss (a region lair's first clear, UnlockId = the region; never sold), boss_hard (a post-game lair cleared on Hard, UnlockId = the post-game region; never sold: Hard's only extra reward, e.g. r11's Radiant Dawnshade Horn and Eclipse Dawnshade Crown beside the Normal Dawnshade looks), milestone (UnlockId = a Milestones entry: BeastLevel = a beast of that species reaches the level (any beast for an avatar look), AvatarLevel, BossesCleared), drop (a low chance per won battle, drop-tables.json CosmeticDrops, from MinRegion; a future idle/AFK mechanism may also roll it), premium (reserved for a future purchase: never obtainable with gold or play in v1). Colour pickers are free. Validated by CosmeticLibraryValidator; Editor: Beast Craft/Data/Import Cosmetics (categories, the avatar schema, each species' schema). See docs/design/economy-and-shop.md, 'Cosmetics'.",
   "SchemaVersion": 1,
   "Categories": [
     {
@@ -620,6 +620,18 @@
           "MinRegion": 1,
           "UnlockId": "r11",
           "ArtKey": "cosmetic/kirin_horn/dawnshade"
+        },
+        {
+          "OptionId": "radiant_dawnshade",
+          "DisplayName": "Radiant Dawnshade Horn",
+          "IsDefault": false,
+          "SortOrder": 10,
+          "SupportsPaletteShader": true,
+          "Rarity": 1,
+          "Source": "boss_hard",
+          "MinRegion": 1,
+          "UnlockId": "r11",
+          "ArtKey": "cosmetic/kirin_horn/radiant_dawnshade"
         }
       ]
     },
@@ -2783,6 +2795,18 @@
           "MinRegion": 1,
           "UnlockId": "r11",
           "ArtKey": "cosmetic/basilisk_crown/dawnshade"
+        },
+        {
+          "OptionId": "eclipse_dawnshade",
+          "DisplayName": "Eclipse Dawnshade Crown",
+          "IsDefault": false,
+          "SortOrder": 10,
+          "SupportsPaletteShader": true,
+          "Rarity": 1,
+          "Source": "boss_hard",
+          "MinRegion": 1,
+          "UnlockId": "r11",
+          "ArtKey": "cosmetic/basilisk_crown/eclipse_dawnshade"
         }
       ]
     },
