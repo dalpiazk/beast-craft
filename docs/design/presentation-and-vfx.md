@@ -154,10 +154,16 @@ toggle auto, Back quits. The desktop window opens at 540x960; `--screenshot` ren
 (default 1080x1920).
 
 **Text.** Every string goes through `ITextRenderer` (`Measure`, `LineHeight`, `Draw`, sized by
-cap height in the current space). `PixelText` implements it with the built-in 3x5 font at the
-nearest whole-number multiple. A real typeface replaces it without touching layout code: e.g. a
-TTF rasterised into a glyph atlas at start-up (a runtime rasteriser such as FontStashSharp — a
-NuGet dependency to weigh before adding) or a pre-baked SpriteFont.
+cap height in the current space, placed by the capitals' top). The UI typeface is **Fredoka
+SemiBold** (`content/fonts/Fredoka-SemiBold.ttf`, SIL Open Font License 1.1, its `OFL.txt`
+beside it; see `THIRD-PARTY-NOTICES.md`): rounded and warm, it suits the chibi tone and reads well
+small. `TtfText` (BeastCraft.Game) rasterises it at run time with **FontStashSharp** (Zlib licence)
+into a glyph atlas, at the size the text lands on screen (the current transform's scale, rounded to
+a few sizes so the zooming camera does not fill the atlas), with linear filtering and a drop shadow;
+the HUD, skill strip and cards use it. Both hosts ship the font and its licence (desktop:
+`Content/fonts/` beside the executable; Android: APK assets `Content/fonts/`). `PixelText` (the
+built-in 3x5 font) is only the fallback when the TTF cannot be loaded (missing, or an un-pulled Git
+LFS pointer).
 
 ## The auto camera (`CameraRig`, `TurnCamera`)
 
@@ -402,8 +408,7 @@ Building needs a Mac with Xcode, out of reach of this setup and the Linux CI run
 
 ### Later
 
-Spine characters (above); a real typeface behind `ITextRenderer`; illustrated skill icons and
-UI; audio; the content pipeline (atlases, compression) only if load times demand it; a
+Spine characters (above); illustrated skill icons and UI; audio; the content pipeline (atlases, compression) only if load times demand it; a
 shader-based hit flash; heal numbers.
 
 ## Open questions

@@ -33,6 +33,17 @@ namespace BeastCraft.Presentation.Content
         /// <summary>The prefix of every data file's ProjectRelativePath, which a content root already stands for.</summary>
         public const string ProjectPrefix = "content/";
 
+        /// <summary>
+        /// The UI typeface, content-root relative: Fredoka SemiBold (SIL Open Font License 1.1,
+        /// <see cref="UiFontLicensePath"/>), a rounded, friendly face for the HUD and cards. Hosts
+        /// ship it (and its licence) beside the data; the viewer falls back to the built-in pixel
+        /// font when it cannot load it.
+        /// </summary>
+        public const string UiFontPath = "fonts/Fredoka-SemiBold.ttf";
+
+        /// <summary>The UI font's licence (the OFL requires it to travel with the font).</summary>
+        public const string UiFontLicensePath = "fonts/OFL.txt";
+
         private GameContent()
         {
         }

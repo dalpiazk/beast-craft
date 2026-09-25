@@ -170,7 +170,9 @@ Heal, Buff, Debuff, Burn (DamageOverTime/fire), Poison (DamageOverTime/nature), 
 
 Frames (portrait, item, skill card), buttons (primary/secondary/disabled states), HP/shield/XP
 bars, turn-order portrait ring (active/upcoming/KO states), skill detail card **with hex-range
-diagram area** (needs a clean vector-friendly hex grid treatment), region map node icons.
+diagram area** (needs a clean vector-friendly hex grid treatment), region map node icons. The UI
+typeface is already chosen — **Fredoka SemiBold** (SIL OFL, bundled with the game) — so frames,
+buttons and cards should be designed around its rounded letterforms; no font needs to be supplied.
 
 ## 4. Phasing for quotes
 

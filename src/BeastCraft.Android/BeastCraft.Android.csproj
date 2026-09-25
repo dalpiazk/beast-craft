@@ -52,6 +52,8 @@
   <ItemGroup>
     <AndroidAsset Include="..\..\content\data\**\*.json" Link="Assets\Content\data\%(RecursiveDir)%(Filename)%(Extension)" />
     <AndroidAsset Include="..\..\content\art\pixel\*.png;..\..\content\art\pixel\*.json" Link="Assets\Content\art\pixel\%(Filename)%(Extension)" />
+    <!-- The UI font and its licence (SIL OFL 1.1: the licence travels with the font). -->
+    <AndroidAsset Include="..\..\content\fonts\*.ttf;..\..\content\fonts\OFL.txt" Link="Assets\Content\fonts\%(Filename)%(Extension)" />
   </ItemGroup>
 
 </Project>

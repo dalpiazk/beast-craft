@@ -32,6 +32,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!--
+      The UI font's rasteriser (TtfText): FontStashSharp, Zlib licence (with StbTrueTypeSharp and
+      StbImageSharp, MIT/Unlicense, and Cyotek.Drawing.BitmapFont, MIT); see THIRD-PARTY-NOTICES.md.
+      It references MonoGame.Framework but ships none, so each host's own platform package serves it;
+      unlike the MonoGame reference it must flow to the hosts (they load it at run time).
+    -->
+    <PackageReference Include="FontStashSharp.MonoGame" Version="1.6.1" />
     <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.5.1">
       <PrivateAssets>All</PrivateAssets>
     </PackageReference>

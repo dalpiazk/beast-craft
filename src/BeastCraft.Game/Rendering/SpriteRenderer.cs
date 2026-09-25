@@ -46,6 +46,15 @@ namespace BeastCraft.Game.Rendering
             Batches = 0;
         }
 
+        /// <summary>
+        /// How many render-target pixels one unit of the current transform's space spans (its
+        /// uniform scale): text is rasterised at the size it lands on screen.
+        /// </summary>
+        public float TransformScale
+        {
+            get { return (float)Math.Sqrt(_transform.M11 * _transform.M11 + _transform.M12 * _transform.M12); }
+        }
+
         /// <summary>The transform every later draw uses (until the next call).</summary>
         public void SetTransform(Matrix transform)
         {

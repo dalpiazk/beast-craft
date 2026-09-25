@@ -29,8 +29,9 @@ beast-craft/
 │   │                       encounter libraries, the generated difficulty table), Campaign/,
 │   │                       Items/, Economy/, Cosmetics/, Idle/, Vfx/vfx-library.json (skill VFX,
 │   │                       presentation only)
-│   └── art/pixel/          the generated placeholder pixel art (PNGs in Git LFS) + manifest
-│                           (written by Tooling/PixelArt)
+│   ├── art/pixel/          the generated placeholder pixel art (PNGs in Git LFS) + manifest
+│   │                       (written by Tooling/PixelArt)
+│   └── fonts/              the UI typeface, Fredoka SemiBold (Git LFS), and its OFL.txt
 ├── Pipeline/       OFFLINE, build-time-only asset generation. Never runs at runtime.
 ├── Tooling/        BalanceSim/: local-only headless balance simulator over the real
 │                   battle code. EditModeTests/: the `dotnet test` runner and the test
@@ -44,7 +45,9 @@ beast-craft/
 Every data file is addressed by its repo-relative path (`ProjectRelativePath`,
 e.g. `content/data/Creatures/beast-roster.json`). The hosts copy `content/` into
 a `Content/` folder beside the executable (desktop) or into the APK's assets
-(Android), keeping the same `data/` and `art/pixel/` layout.
+(Android), keeping the same `data/`, `art/pixel/` and `fonts/` layout.
+Third-party licences (the font, FontStashSharp, MonoGame) are listed in
+[`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md).
 
 ---
 

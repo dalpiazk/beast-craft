@@ -137,6 +137,7 @@ namespace BeastCraft.Game
             }
 
             _atlas = new SpriteAtlas(GraphicsDevice, _content);
+            LoadFont();
             LoadSettings();
 
             BattleSetup setup = DemoBattle.Create(_content, _options.Seed, out _speciesByUnit, out string error, null, _options.Encounter,
@@ -558,6 +559,23 @@ namespace BeastCraft.Game
             {
                 step = true;
             }
+        }
+
+        /// <summary>
+        /// The UI font (<see cref="GameContent.UiFontPath"/>) in place of the pixel font, which
+        /// stays only as the fallback when the TTF cannot be loaded.
+        /// </summary>
+        private void LoadFont()
+        {
+            TtfText font = TtfText.TryLoad(_content.Source, GameContent.UiFontPath, out string error);
+            if (font == null)
+            {
+                Console.WriteLine("UI font not loaded (" + error + "); using the pixel font.");
+                return;
+            }
+
+            _text.Dispose();
+            _text = font;
         }
 
         /// <summary>
