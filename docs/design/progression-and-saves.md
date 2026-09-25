@@ -203,8 +203,13 @@ untouched, and one device's settings apply to every save slot.
 - **`PlayerSettings`** — `[Serializable]`, public fields, JsonUtility-safe: `SchemaVersion`
   (`CurrentSchemaVersion` = 1) and `TeamSuggestionsEnabled` (default **true**: whether the game may
   suggest a counter team after repeated losses; see `docs/design/battle-system.md`, "Encounter
-  preview", `TeamSuggestionPolicy`). New settings are added as fields with defaults: a key an older
-  file lacks keeps its default, so a purely additive setting needs no version bump.
+  preview", `TeamSuggestionPolicy`), and the battle effects settings: `EffectsIntensity` (`Full`
+  (default), `Reduced` or `Minimal`, stored as its number), `ScreenShake` (default **true**) and
+  `Flashes` (default **true**; accessibility: the hit flash and bright additive bursts), all
+  presentation only (see `docs/design/presentation-and-vfx.md`, "Effects settings"). New settings
+  are added as fields with defaults: a key an older file lacks keeps its default, so a purely
+  additive setting needs no version bump (a file from before the effects settings loads as Full,
+  shake on, flashes on).
 - **`PlayerSettingsStore(storage, json)`** — saves and loads through the same `ISaveStorage` and
   `ISaveJsonSerializer` as the game saves (`FileSaveStorage` in the game, so the atomic write and the
   one-generation backup apply), in the reserved slot **`settings`** (`PlayerSettingsStore.SlotName`).

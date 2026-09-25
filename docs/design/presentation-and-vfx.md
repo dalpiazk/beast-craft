@@ -80,9 +80,12 @@ Rules the spike keeps, and later hosts must keep:
 2. Each fired skill (`SkillBeat`) plays its effect in order, 90 ms apart: optional projectile
    (caster -> each target) -> impact -> hit-stop -> the effect's layers (flipbooks, decals,
    rings, bursts, particles, glyphs), screen shake, hit flash, floating damage number (the sum of
-   the skill's `DamageHit.Roll.Amount` on that target; `!` on a critical). Each status that newly
-   lands on a target (a burn, a stun, a shield...) and each knockback adds that effect type's
-   on-apply overlay from the impact.
+   the skill's `DamageHit.Roll.Amount` on that target; `!` on a critical). Each status or stat
+   change that lands on a target (a burn, a stun, a shield, a buff...) and each knockback adds that
+   effect type's on-apply overlay from the impact — every time it lands: a second skill, or the same
+   one again, applying a status the unit already has plays the overlay again in full. What landed
+   comes from the battle's own record (`SkillActivation.Applied`: every non-damage effect that
+   passed its chance roll, a record nothing in the battle reads), carried on `SkillBeat.Applied`.
 3. Each target's HP bar drops when that beat lands; its status auras and icons switch to the
    after-turn set at the same moment (the acting unit's own ticks happen as its turn begins); a
    unit felled this turn fades after its fatal hit and disappears when that beat ends.
@@ -90,8 +93,32 @@ Rules the spike keeps, and later hosts must keep:
 
 Simplifications, on purpose: all skills of a turn fire from the unit's end tile; knock-backs and
 pulls snap at the turn's start; heal numbers are not shown (heals settle at the end of the
-turn); a status applied by two skills in one turn plays its overlay on the first; the avatar is
-left out (it has no tile).
+turn); the avatar is left out (it has no tile).
+
+### Effects settings (`VfxSettings`)
+
+The player's effects settings live in Core's `PlayerSettings` (`EffectsIntensity` Full / Reduced /
+Minimal, `ScreenShake`, `Flashes`; persisted by `PlayerSettingsStore`, and an older settings file
+loads as Full, on, on). `VfxSettings.From(settings)` hands them to `TurnAnimation`, which passes
+them to every `VfxTimeline` (beats and overlays): an input like the seed, so a turn stays a pure,
+deterministic function of the turn, the library, the seed and the settings. They drop parts of an
+effect (and the time those parts took) but never move its impact, and what still plays is drawn
+exactly as at Full (a halved burst is the full burst's first half).
+
+| Setting | What plays |
+| --- | --- |
+| Full | everything authored |
+| Reduced | no `Glyphs` layers and no `Particles` layers (the secondary bursts); the effect's own particle burst at half its count |
+| Minimal | only the damage number, the hit flash (if Flashes is on) and one simple burst (the effect's own particles, else its first particle layer's, at half the count); no projectile, flipbook, layers or shake |
+| ScreenShake off | no shake at any intensity |
+| Flashes off (accessibility) | no hit flash, and no bright additive bursts: additive flipbooks (the effect's own and `Flipbook` layers) and additive `RadialBurst` layers |
+
+In the viewer, the **gear** at the header's right end (`PortraitLayout.SettingsButton`) opens a
+small overlay (`SettingsPanel`, `SettingsRow`): tap Effects to cycle Full, Reduced, Minimal, tap
+Screen shake or Flashes to toggle, Close (or tap outside) to close. A change is saved at once (the
+default save folder's `settings` slot) and applies from the next turn played. The desktop host's
+`--effects full|reduced|minimal`, `--no-shake`, `--no-flashes` and `--show-settings` set them for
+screenshots (which never read or write the saved settings).
 
 ## The portrait screen (`PortraitLayout`)
 
@@ -381,5 +408,3 @@ shader-based hit flash; heal numbers.
 
 ## Open questions
 
-- Per-status overlays when two skills in one turn apply the same status: attribute to the first
-  (today) or play on each?

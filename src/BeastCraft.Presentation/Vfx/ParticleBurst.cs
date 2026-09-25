@@ -40,19 +40,28 @@ namespace BeastCraft.Presentation.Vfx
         private readonly int[] _lifeMs;
         private readonly int[] _color;
 
-        public ParticleBurst(VfxParticleData spec, Vec2 origin, int seed)
+        /// <param name="spec">The burst's spec (null: no particles).</param>
+        /// <param name="origin">Where it bursts from.</param>
+        /// <param name="seed">Seeds every particle.</param>
+        /// <param name="count">
+        /// How many particles to play (null: the spec's <c>Count</c>). The first
+        /// <paramref name="count"/> are exactly the full burst's first ones (the same draws), so a
+        /// reduced burst is a subset of the full one.
+        /// </param>
+        public ParticleBurst(VfxParticleData spec, Vec2 origin, int seed, int? count = null)
         {
             _origin = origin;
-            int count = spec == null ? 0 : Math.Max(0, spec.Count);
+            int full = spec == null ? 0 : Math.Max(0, spec.Count);
+            int played = count.HasValue ? Math.Max(0, Math.Min(full, count.Value)) : full;
             int colors = spec == null || spec.Colors == null ? 0 : spec.Colors.Length;
             _gravity = spec == null ? 0f : spec.Gravity;
-            _vx = new float[count];
-            _vy = new float[count];
-            _lifeMs = new int[count];
-            _color = new int[count];
+            _vx = new float[played];
+            _vy = new float[played];
+            _lifeMs = new int[played];
+            _color = new int[played];
 
             DeterministicRandom random = new DeterministicRandom(seed);
-            for (int i = 0; i < count; i++)
+            for (int i = 0; i < played; i++)
             {
                 double angle = random.NextFloat() * Math.PI * 2.0;
                 float speed = spec.SpeedMin + (spec.SpeedMax - spec.SpeedMin) * random.NextFloat();

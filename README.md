@@ -213,6 +213,11 @@ SKIP buttons do the same, and hovering or clicking a skill card shows its range
 diagram. Each fired skill plays its VFX from `content/data/Vfx/vfx-library.json`
 (schema v2: layered effects, per-effect-type defaults with status auras and icons);
 Phoenix's Ember Shot, Flame Wave and Rebirth Flame carry the full layer stack.
+The camera frames each turn by itself (the acting unit, its targets and the
+effect's area) and eases back to the whole arena between turns; there is no
+manual zoom or pan. The gear at the top right opens the effects settings
+(intensity Full / Reduced / Minimal, screen shake, flashes), saved with the
+player settings.
 
 Screenshot mode renders one frame to a PNG and exits (it still opens a window
 briefly, for the graphics device):
@@ -228,7 +233,8 @@ first turn that fires that skill; `--at MS` picks the moment inside that turn
 Nth skill card with its range diagram; `--scale K` renders K x 540x960 (default
 2: 1080x1920); `--safe-inset L,T,R,B` fakes a phone's cutout insets;
 `--encounter ID`, `--speed S`, `--seed S`, `--level L`, `--enemy-level L` and
-`--content DIR` adjust the rest. The design (portrait canvas and safe area, art
+`--content DIR` adjust the rest; `--effects full|reduced|minimal`, `--no-shake`,
+`--no-flashes` and `--show-settings` set the effects settings for the shot. The design (portrait canvas and safe area, art
 manifest v2 and ArtKey, the VFX schema, range diagrams, how Spine would plug in)
 and the art pipeline are in
 [`docs/design/presentation-and-vfx.md`](docs/design/presentation-and-vfx.md);

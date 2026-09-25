@@ -79,6 +79,34 @@ namespace BeastCraft.Battle
         // Allocated on the first hit, so the many activations that deal no damage stay cheap.
         private List<DamageHit> _hits;
 
+        /// <summary>
+        /// Every non-damage effect that passed its chance check, in the order it landed
+        /// (target-major, then authored effect order): a heal, a buff or debuff, a status, a
+        /// cleanse. A record for presentation (the viewer plays an effect's on-apply VFX each time
+        /// one lands, even on a unit that already had that status); nothing in the battle reads it.
+        /// Never <c>null</c>; empty until the activation is applied.
+        /// </summary>
+        public IReadOnlyList<AppliedEffect> Applied
+        {
+            get { return (IReadOnlyList<AppliedEffect>)_applied ?? NoApplied; }
+        }
+
+        private static readonly AppliedEffect[] NoApplied = new AppliedEffect[0];
+
+        // Allocated on the first landed effect, like the hits.
+        private List<AppliedEffect> _applied;
+
+        /// <summary>Appends one landed non-damage effect. Called by <see cref="SkillEffectApplier"/> only.</summary>
+        internal void RecordApplied(AppliedEffect applied)
+        {
+            if (_applied == null)
+            {
+                _applied = new List<AppliedEffect>();
+            }
+
+            _applied.Add(applied);
+        }
+
         /// <summary>Appends one landed damage effect. Called by <see cref="SkillEffectApplier"/> only.</summary>
         internal void RecordHit(DamageHit hit)
         {
@@ -89,5 +117,21 @@ namespace BeastCraft.Battle
 
             _hits.Add(hit);
         }
+    }
+
+    /// <summary>One non-damage effect that landed on a target (see <see cref="SkillActivation.Applied"/>).</summary>
+    public readonly struct AppliedEffect
+    {
+        public AppliedEffect(BattleUnit target, SkillEffect effect)
+        {
+            Target = target;
+            Effect = effect;
+        }
+
+        /// <summary>Who it landed on.</summary>
+        public BattleUnit Target { get; }
+
+        /// <summary>The effect as authored (magnitudes unscaled).</summary>
+        public SkillEffect Effect { get; }
     }
 }

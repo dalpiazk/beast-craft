@@ -2176,6 +2176,23 @@
       "PixelsPerUnit": 32,
       "Filter": "point",
       "Premultiplied": false
+    },
+    {
+      "Name": "ui_gear",
+      "File": "ui_gear.png",
+      "Kind": "sprite",
+      "Category": "ui",
+      "Label": "UI: settings gear",
+      "ArtKey": "ui/gear",
+      "FrameWidth": 16,
+      "FrameHeight": 16,
+      "Frames": 1,
+      "FrameMs": 0,
+      "PivotX": 8,
+      "PivotY": 8,
+      "PixelsPerUnit": 32,
+      "Filter": "point",
+      "Premultiplied": false
     }
   ]
 }

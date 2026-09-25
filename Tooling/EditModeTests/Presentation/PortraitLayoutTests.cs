@@ -131,6 +131,34 @@ namespace BeastCraft.Tests.EditMode
             }
         }
 
+        [Test]
+        public void SettingsGear_SitsInTheHeader_AndItsRowsStackInsideThePanel()
+        {
+            PortraitLayout layout = new PortraitLayout();
+            Rect gear = layout.SettingsButton;
+
+            Assert.GreaterOrEqual(gear.Y, 0f);
+            Assert.LessOrEqual(gear.Bottom, layout.TurnOrder.Y, "clear of the turn-order band");
+            Assert.LessOrEqual(gear.Right, PortraitLayout.CanvasWidth - PortraitLayout.Margin + 1e-3f);
+            Assert.GreaterOrEqual(gear.Width, 56f, "a comfortable touch target");
+
+            Rect panel = layout.SettingsPanel;
+            Assert.GreaterOrEqual(panel.Y, layout.Board.Y);
+            Assert.LessOrEqual(panel.Bottom, layout.Board.Bottom);
+            for (int i = 0; i < PortraitLayout.SettingsRowCount; i++)
+            {
+                Rect row = layout.SettingsRow(i);
+                Assert.GreaterOrEqual(row.X, panel.X);
+                Assert.LessOrEqual(row.Right, panel.Right);
+                Assert.LessOrEqual(row.Bottom, panel.Bottom);
+                Assert.GreaterOrEqual(row.Height, 72f, "a comfortable touch target");
+                if (i > 0)
+                {
+                    Assert.Greater(row.Y, layout.SettingsRow(i - 1).Bottom, "rows do not overlap");
+                }
+            }
+        }
+
         [TestCase(ArenaSize.Small)]
         [TestCase(ArenaSize.Medium)]
         [TestCase(ArenaSize.Large)]

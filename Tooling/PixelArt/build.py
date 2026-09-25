@@ -23,7 +23,7 @@ for byte (integer-only geometry, no system RNG, no timestamps, LF-only JSON).
 Sprite file format (see STYLE.md):
   # name: phoenix              header lines start with '#', "key: value"
   # label: Phoenix (Fire)
-  # kind: beast | enemy | item | tile | marker | particle | fx | hex
+  # kind: beast | enemy | item | tile | marker | particle | fx | hex | icon | ui
   # size: 32x32
   # outline: auto | none       auto = 1px K outline around the silhouette (4-neighbour)
   # autoshade: yes | no        yes = rim-light/shade the *mid* colour of each ramp
@@ -656,7 +656,7 @@ SECTIONS = [
     ("Map tiles 16x16 (2x2 tiled) + marker", ("tile", "marker")),
     ("Hex tiles 32x36 + particles", ("hex", "particle")),
     ("VFX layers (rings, glows, decals, rays, glyphs) + status icons", ("fx", "icon")),
-    ("Skill icons 24x24 (generated placeholders)", ("skill",)),
+    ("Skill icons 24x24 (generated placeholders) + UI", ("skill", "ui")),
 ]
 
 

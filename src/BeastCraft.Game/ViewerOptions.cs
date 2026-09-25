@@ -2,6 +2,7 @@ using System;
 using System.Globalization;
 using BeastCraft.Presentation.Content;
 using BeastCraft.Presentation.Layout;
+using BeastCraft.Save;
 
 namespace BeastCraft.Game
 {
@@ -23,7 +24,14 @@ namespace BeastCraft.Game
     ///   --enemy-level L     the encounter's level (default DemoBattle.DefaultEncounterLevel)
     ///   --encounter ID      the encounter template to fight (default DemoBattle.DefaultEncounterId)
     ///   --content DIR       the content root (default: Content/ beside the app, or the repo's)
+    ///   --effects LEVEL     effects intensity: full, reduced or minimal (default: the saved
+    ///                       setting; a screenshot uses full unless told)
+    ///   --no-shake          screen shake off
+    ///   --no-flashes        hit flashes and bright bursts off
+    ///   --show-settings     open the settings overlay (for screenshots)
     /// </code>
+    /// In a screenshot the effects settings come from these flags only (the saved settings are
+    /// neither read nor written); in a window they override the saved ones until changed there.
     /// </summary>
     public sealed class ViewerOptions
     {
@@ -40,6 +48,10 @@ namespace BeastCraft.Game
         public int EnemyLevel = DemoBattle.DefaultEncounterLevel;
         public string Encounter = DemoBattle.DefaultEncounterId;
         public string ContentRoot;
+        public EffectsIntensity? Effects;
+        public bool NoShake;
+        public bool NoFlashes;
+        public bool ShowSettings;
 
         public bool Screenshot
         {
@@ -108,6 +120,19 @@ namespace BeastCraft.Game
                         options.ContentRoot = value;
                         i++;
                         break;
+                    case "--effects":
+                        options.Effects = Intensity(value, ref error);
+                        i++;
+                        break;
+                    case "--no-shake":
+                        options.NoShake = true;
+                        break;
+                    case "--no-flashes":
+                        options.NoFlashes = true;
+                        break;
+                    case "--show-settings":
+                        options.ShowSettings = true;
+                        break;
                     default:
                         error = "Unknown argument '" + flag + "'.";
                         break;
@@ -126,6 +151,41 @@ namespace BeastCraft.Game
             }
 
             return options;
+        }
+
+        /// <summary>Applies the effects flags to <paramref name="settings"/> (unset flags leave it as it is).</summary>
+        public void ApplyTo(PlayerSettings settings)
+        {
+            if (Effects.HasValue)
+            {
+                settings.EffectsIntensity = Effects.Value;
+            }
+
+            if (NoShake)
+            {
+                settings.ScreenShake = false;
+            }
+
+            if (NoFlashes)
+            {
+                settings.Flashes = false;
+            }
+        }
+
+        private static EffectsIntensity Intensity(string value, ref string error)
+        {
+            switch ((value ?? string.Empty).ToLowerInvariant())
+            {
+                case "full":
+                    return EffectsIntensity.Full;
+                case "reduced":
+                    return EffectsIntensity.Reduced;
+                case "minimal":
+                    return EffectsIntensity.Minimal;
+                default:
+                    error = "--effects needs full, reduced or minimal.";
+                    return EffectsIntensity.Full;
+            }
         }
 
         private static SafeInsets Insets(string value, ref string error)

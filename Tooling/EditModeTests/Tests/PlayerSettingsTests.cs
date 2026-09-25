@@ -109,6 +109,50 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
+        public void EffectsSettings_DefaultToFull_ShakeOn_FlashesOn()
+        {
+            PlayerSettings settings = new PlayerSettings();
+
+            Assert.AreEqual(EffectsIntensity.Full, settings.EffectsIntensity);
+            Assert.IsTrue(settings.ScreenShake);
+            Assert.IsTrue(settings.Flashes);
+        }
+
+        [Test]
+        public void EffectsSettings_RoundTripThroughTheStore()
+        {
+            FileSaveStorage storage = new FileSaveStorage(_root);
+            PlayerSettingsStore store = new PlayerSettingsStore(storage, new JsonSaveSerializer());
+
+            Assert.IsTrue(store.Save(new PlayerSettings { EffectsIntensity = EffectsIntensity.Minimal, ScreenShake = false, Flashes = false }));
+            PlayerSettings loaded = new PlayerSettingsStore(new FileSaveStorage(_root), new JsonSaveSerializer()).Load();
+
+            Assert.AreEqual(EffectsIntensity.Minimal, loaded.EffectsIntensity);
+            Assert.IsFalse(loaded.ScreenShake);
+            Assert.IsFalse(loaded.Flashes);
+            Assert.IsTrue(loaded.TeamSuggestionsEnabled);
+
+            Assert.IsTrue(store.Save(new PlayerSettings { EffectsIntensity = EffectsIntensity.Reduced }));
+            Assert.AreEqual(EffectsIntensity.Reduced, store.Load().EffectsIntensity);
+        }
+
+        [Test]
+        public void ASettingsFileFromBeforeTheEffectsSettings_LoadsFullShakeAndFlashesOn()
+        {
+            // Exactly what an earlier build wrote: no effects keys.
+            Directory.CreateDirectory(_root);
+            FileSaveStorage storage = new FileSaveStorage(_root);
+            File.WriteAllText(storage.GetSlotPath(PlayerSettingsStore.SlotName), "{\"SchemaVersion\":1,\"TeamSuggestionsEnabled\":false}");
+            PlayerSettingsStore store = new PlayerSettingsStore(storage, new JsonSaveSerializer());
+
+            Assert.IsTrue(store.TryLoad(out PlayerSettings settings), "the old file is read, not replaced by defaults");
+            Assert.IsFalse(settings.TeamSuggestionsEnabled, "its own setting is kept");
+            Assert.AreEqual(EffectsIntensity.Full, settings.EffectsIntensity);
+            Assert.IsTrue(settings.ScreenShake);
+            Assert.IsTrue(settings.Flashes);
+        }
+
+        [Test]
         public void TheSettingsSlot_IsNeverAGameSave()
         {
             FileSaveStorage storage = new FileSaveStorage(_root);

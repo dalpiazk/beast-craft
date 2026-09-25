@@ -8,6 +8,7 @@ using BeastCraft.Game.Rendering;
 using BeastCraft.Presentation.Board;
 using BeastCraft.Presentation.Layout;
 using BeastCraft.Presentation.Playback;
+using BeastCraft.Save;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
@@ -57,6 +58,45 @@ namespace BeastCraft.Game
                 _draw.Fill(Pixel, new Vector2(board.X, board.Center.Y - 70f), new Vector2(board.Width, 140f), shadow * 0.75f);
                 _text.DrawCentered(_draw, banner, board.Center.X, board.Center.Y - 30f, 60f, Ink("y", Color.Gold), shadow);
             }
+
+            DrawSettings(shadow);
+        }
+
+        /// <summary>
+        /// The settings overlay, when open: a panel over the board with one row per effects setting
+        /// (tap to change) and a close row; the rest of the screen dimmed.
+        /// </summary>
+        private void DrawSettings(Color shadow)
+        {
+            if (!_settingsOpen)
+            {
+                return;
+            }
+
+            _draw.Fill(Pixel, new Rectangle(0, 0, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight), shadow * 0.55f);
+            Rect panel = _screen.SettingsPanel;
+            _draw.Fill(Pixel, new Vector2(panel.X, panel.Y), new Vector2(panel.Width, panel.Height), Ink("y", Color.Gold));
+            _draw.Fill(Pixel, new Vector2(panel.X + 5f, panel.Y + 5f), new Vector2(panel.Width - 10f, panel.Height - 10f), Ink("p", Color.Purple));
+            _text.DrawCentered(_draw, "EFFECTS SETTINGS", panel.Center.X, panel.Y + 36f, Large, Ink("y", Color.Gold), shadow);
+
+            string intensity = _settings.EffectsIntensity == EffectsIntensity.Minimal ? "MINIMAL" : _settings.EffectsIntensity == EffectsIntensity.Reduced ? "REDUCED" : "FULL";
+            string[] labels = { "EFFECTS", "SCREEN SHAKE", "FLASHES", null };
+            string[] values = { intensity, _settings.ScreenShake ? "ON" : "OFF", _settings.Flashes ? "ON" : "OFF", null };
+            for (int i = 0; i < PortraitLayout.SettingsRowCount; i++)
+            {
+                Rect row = _screen.SettingsRow(i);
+                bool close = labels[i] == null;
+                _draw.Fill(Pixel, new Vector2(row.X, row.Y), new Vector2(row.Width, row.Height), close ? Ink("2", Color.Gray) : Ink("1", Color.DarkGray));
+                if (close)
+                {
+                    _text.DrawCentered(_draw, "CLOSE", row.Center.X, row.Center.Y - 12f, Large, Ink("4", Color.White), shadow);
+                    continue;
+                }
+
+                _text.Draw(_draw, labels[i], new Vector2(row.X + 24f, row.Center.Y - 12f), Large, Ink("4", Color.White), shadow);
+                bool on = values[i] != "OFF";
+                _text.DrawRight(_draw, values[i], row.Right - 24f, row.Center.Y - 12f, Large, on ? Ink("l", Color.LightGreen) : Ink("o", Color.OrangeRed), shadow);
+            }
         }
 
         private void DrawHeader(Color shadow)
@@ -65,7 +105,17 @@ namespace BeastCraft.Game
             _text.Draw(_draw, _host.HudTitle, new Vector2(header.X, header.Y + 12f), Large, Ink("y", Color.Gold), shadow);
             string turn = "TURN " + _playback.Played.Count.ToString(CultureInfo.InvariantCulture) + "  SEED " +
                           _options.Seed.ToString(CultureInfo.InvariantCulture);
-            _text.DrawRight(_draw, turn, header.Right, header.Y + 16f, Medium, Ink("3", Color.Gray), shadow);
+            Rect gear = _screen.SettingsButton;
+            _text.DrawRight(_draw, turn, gear.X - 20f, header.Y + 16f, Medium, Ink("3", Color.Gray), shadow);
+
+            // The settings gear (opens the effects settings overlay).
+            _draw.Fill(Pixel, new Vector2(gear.X, gear.Y), new Vector2(gear.Width, gear.Height), _settingsOpen ? Ink("y", Color.Gold) : Ink("2", Color.Gray));
+            _draw.Fill(Pixel, new Vector2(gear.X + 3f, gear.Y + 3f), new Vector2(gear.Width - 6f, gear.Height - 6f), Ink("p", Color.Purple));
+            ArtSprite icon = _atlas.ByArtKey("ui/gear");
+            if (icon != null)
+            {
+                DrawIcon(icon, gear.Inset(10f));
+            }
         }
 
         /// <summary>The acting unit (this turn's, else the next to act) and the ones after it, as portraits.</summary>
@@ -284,6 +334,16 @@ namespace BeastCraft.Game
             _draw.UnitSize = unit;
         }
 
+        /// <summary>An icon sprite (its pivot at its centre) scaled to fit <paramref name="box"/>, centred.</summary>
+        private void DrawIcon(ArtSprite art, Rect box)
+        {
+            float ppu = art.Data.PixelsPerUnit > 0f ? art.Data.PixelsPerUnit : _draw.UnitSize;
+            float scale = Math.Min(box.Width / art.Data.FrameWidth, box.Height / Math.Max(1, art.Data.FrameHeight)) * ppu / _draw.UnitSize;
+            float k = scale * _draw.UnitSize / ppu;
+            Vector2 pivot = new Vector2(box.Center.X - art.Data.FrameWidth * k / 2f + art.Pivot.X * k, box.Center.Y - art.Data.FrameHeight * k / 2f + art.Pivot.Y * k);
+            _draw.DrawSprite(art, 0, pivot, scale, Color.White);
+        }
+
         /// <summary>
         /// A skill's icon fitted to <paramref name="box"/>: its art (<see cref="SkillSO.ArtKey"/> looked
         /// up in the manifest), else — a skill with no icon, such as an enemy-library one — an
@@ -294,11 +354,7 @@ namespace BeastCraft.Game
             ArtSprite art = _atlas.ByArtKey(skill.ArtKey);
             if (art != null && art.Data.FrameWidth > 0)
             {
-                float ppu = art.Data.PixelsPerUnit > 0f ? art.Data.PixelsPerUnit : _draw.UnitSize;
-                float scale = Math.Min(box.Width / art.Data.FrameWidth, box.Height / Math.Max(1, art.Data.FrameHeight)) * ppu / _draw.UnitSize;
-                Vector2 pivot = new Vector2(box.Center.X - art.Data.FrameWidth * scale * _draw.UnitSize / ppu / 2f + art.Pivot.X * scale * _draw.UnitSize / ppu,
-                                            box.Center.Y - art.Data.FrameHeight * scale * _draw.UnitSize / ppu / 2f + art.Pivot.Y * scale * _draw.UnitSize / ppu);
-                _draw.DrawSprite(art, 0, pivot, scale, Color.White);
+                DrawIcon(art, box);
                 return;
             }
 

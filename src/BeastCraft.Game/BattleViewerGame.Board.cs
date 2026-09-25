@@ -313,7 +313,7 @@ namespace BeastCraft.Game
                 }
             }
 
-            VfxParticleData particles = effect.Particles;
+            VfxParticleData particles = timeline.BurstSpec;
             if (particles != null && particles.Additive == additivePass)
             {
                 foreach (ParticleState particle in vfx.Particles)
