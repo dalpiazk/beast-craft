@@ -14,7 +14,8 @@ namespace BeastCraft.Encounters
     /// the producer authors some.</item>
     /// </list>
     /// Shape ids are the drop tables' shape ids (<c>drop-tables.json</c>): a cleared encounter pays
-    /// out from its shape's cell. How a map node picks a shape and a level is not decided here.
+    /// out from its shape's cell (a post-game shape from its <see cref="EncounterShapeData.DropShapeId"/>'s).
+    /// How a map node picks a shape and a level is not decided here.
     /// <para>
     /// JsonUtility-compatible: arrays (never dictionaries), no nullable fields; enums are member
     /// names checked by <see cref="EncounterLibraryValidator"/>.
@@ -98,6 +99,22 @@ namespace BeastCraft.Encounters
 
         /// <summary>Alternative recipes; the generator picks one per draw, weighted by <see cref="EncounterVariantData.Weight"/>.</summary>
         public EncounterVariantData[] Variants = new EncounterVariantData[0];
+
+        /// <summary>
+        /// A post-game shape: drawn only by post-game regions (<c>RegionData.IsPostGame</c>, flat level
+        /// 100), calibrated by the balance simulator at level 100 only and kept out of its mainline
+        /// report (its cells are appended to <c>encounter-difficulty.json</c> after the mainline ones).
+        /// A post-game shape pays out as a mainline shape (<see cref="DropShapeId"/>). False for the
+        /// four mainline shapes.
+        /// </summary>
+        public bool PostGame;
+
+        /// <summary>
+        /// The drop-table shape a clear of this shape pays out from (<see cref="EncounterLibrary.DropShapeOf"/>):
+        /// "" (the default) = this shape's own id. Only a post-game shape sets it, naming the mainline
+        /// shape it pays as (so a harder shape never pays more, and drop-tables.json stays mainline).
+        /// </summary>
+        public string DropShapeId = string.Empty;
     }
 
     /// <summary>One recipe of a shape.</summary>

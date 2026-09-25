@@ -23,6 +23,15 @@ namespace BeastCraft.Campaign
     /// <item>With the encounter library: every Battle shape, the elite shape, and every gate and boss
     /// template exists.</item>
     /// </list>
+    /// Everything above is the MAINLINE pass: it skips post-game regions
+    /// (<see cref="RegionData.IsPostGame"/>) entirely, so its messages for the ten mainline regions
+    /// are the same whether or not post-game regions follow them (a golden test holds that). A
+    /// second, <b>post-game pass</b> then checks every post-game region: its id (unique across both
+    /// passes), not the first region, requiring an earlier region, <c>MinLevel == MaxLevel ==</c>
+    /// <see cref="MaxLevel"/>, no seal, its map rules, shapes, gates and boss as above, and a complete
+    /// <see cref="RegionData.HardMode"/>; with the encounter library, every shape a post-game region
+    /// draws (Normal and Hard) is a post-game shape (<c>EncounterShapeData.PostGame</c>) and no
+    /// mainline region draws one; a mainline region authors no <see cref="RegionData.HardMode"/>.
     /// Balance (how many battles a region takes, whether the cap bites) is the balance simulator's
     /// <c>--mode campaign</c>, not this.
     /// </summary>
@@ -53,16 +62,22 @@ namespace BeastCraft.Campaign
             }
 
             HashSet<string> shapes = null;
+            HashSet<string> postGameShapes = null;
             HashSet<string> templates = null;
             if (encounters != null)
             {
                 shapes = new HashSet<string>(StringComparer.Ordinal);
+                postGameShapes = new HashSet<string>(StringComparer.Ordinal);
                 templates = new HashSet<string>(StringComparer.Ordinal);
                 foreach (EncounterShapeData shape in encounters.Shapes ?? new EncounterShapeData[0])
                 {
                     if (shape != null && !string.IsNullOrEmpty(shape.ShapeId))
                     {
                         shapes.Add(shape.ShapeId);
+                        if (shape.PostGame)
+                        {
+                            postGameShapes.Add(shape.ShapeId);
+                        }
                     }
                 }
 
@@ -88,7 +103,8 @@ namespace BeastCraft.Campaign
                 errors.Add("LevelCapMargin must be 0 or more.");
             }
 
-            ValidateRegions(data, seals, shapes, templates, errors);
+            HashSet<string> seen = ValidateRegions(data, seals, shapes, templates, errors);
+            ValidatePostGameRegions(data, seen, shapes, postGameShapes, templates, errors);
             return errors;
         }
 
@@ -143,17 +159,18 @@ namespace BeastCraft.Campaign
             return byId;
         }
 
-        private static void ValidateRegions(RegionLibraryData data, Dictionary<string, SealData> seals, HashSet<string> shapes, HashSet<string> templates,
-                                            List<string> errors)
+        /// <summary>The mainline pass (post-game regions skipped). Returns the mainline region ids seen.</summary>
+        private static HashSet<string> ValidateRegions(RegionLibraryData data, Dictionary<string, SealData> seals, HashSet<string> shapes, HashSet<string> templates,
+                                                       List<string> errors)
         {
+            HashSet<string> seen = new HashSet<string>(StringComparer.Ordinal);
             RegionData[] regions = data.Regions;
             if (regions == null || regions.Length == 0)
             {
                 errors.Add("No Regions.");
-                return;
+                return seen;
             }
 
-            HashSet<string> seen = new HashSet<string>(StringComparer.Ordinal);
             HashSet<string> grantedSeals = new HashSet<string>(StringComparer.Ordinal);
             int expectedMin = 1;
             int previousCap = data.StartingLevelCap;
@@ -165,6 +182,12 @@ namespace BeastCraft.Campaign
                 if (region == null)
                 {
                     errors.Add("Region #" + i + " is null.");
+                    continue;
+                }
+
+                if (region.IsPostGame)
+                {
+                    // The post-game pass's (ValidatePostGameRegions).
                     continue;
                 }
 
@@ -269,7 +292,7 @@ namespace BeastCraft.Campaign
                     errors.Add(where + ": seal '" + seal.SealId + "' caps at " + seal.LevelCap + ", below " + previousCapSource + " (" + previousCap + "); caps must not fall.");
                 }
 
-                RegionData next = i + 1 < regions.Length ? regions[i + 1] : null;
+                RegionData next = NextMainline(regions, i);
                 if (next != null && seal.LevelCap < Math.Min(MaxLevel, next.MaxLevel))
                 {
                     errors.Add(where + ": seal '" + seal.SealId + "' caps at " + seal.LevelCap + ", below the next region's max level " + next.MaxLevel + ".");
@@ -283,6 +306,199 @@ namespace BeastCraft.Campaign
             {
                 errors.Add("The last region must end at level " + MaxLevel + ".");
             }
+
+            return seen;
+        }
+
+        /// <summary>
+        /// The entry after <paramref name="index"/> the seal check looks at: the next entry that is not a
+        /// post-game region (a null entry counts, as it always has), or null at the end.
+        /// </summary>
+        private static RegionData NextMainline(RegionData[] regions, int index)
+        {
+            for (int j = index + 1; j < regions.Length; j++)
+            {
+                if (regions[j] == null || !regions[j].IsPostGame)
+                {
+                    return regions[j];
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// The post-game pass (see the class remarks). <paramref name="mainline"/> is the mainline
+        /// pass's ids; post-game ids are added to it as they are checked. Adds no message when the
+        /// library has no post-game region and no mainline region misuses a post-game field or shape.
+        /// </summary>
+        private static void ValidatePostGameRegions(RegionLibraryData data, HashSet<string> mainline, HashSet<string> shapes, HashSet<string> postGameShapes,
+                                                    HashSet<string> templates, List<string> errors)
+        {
+            RegionData[] regions = data.Regions ?? new RegionData[0];
+            HashSet<string> seen = new HashSet<string>(mainline, StringComparer.Ordinal);
+            HashSet<string> earlier = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < regions.Length; i++)
+            {
+                RegionData region = regions[i];
+                if (region == null)
+                {
+                    continue;
+                }
+
+                string where = "Region '" + region.RegionId + "'";
+                if (!region.IsPostGame)
+                {
+                    if (region.HardMode != null && region.HardMode.IsSet)
+                    {
+                        errors.Add(where + ": only a post-game region (IsPostGame) has a HardMode.");
+                    }
+
+                    if (postGameShapes != null)
+                    {
+                        MapRulesData rules = region.MapRules != null && region.MapRules.Layers > 0 ? region.MapRules : data.MapRules;
+                        foreach (string shape in DrawnShapes(region.ShapeWeights, rules == null ? null : rules.EliteShapeId))
+                        {
+                            if (postGameShapes.Contains(shape))
+                            {
+                                errors.Add(where + ": shape '" + shape + "' is a post-game shape; only post-game regions draw it.");
+                            }
+                        }
+                    }
+
+                    if (!string.IsNullOrEmpty(region.RegionId))
+                    {
+                        earlier.Add(region.RegionId);
+                    }
+
+                    continue;
+                }
+
+                where = "Post-game region '" + region.RegionId + "'";
+                if (!BeastRosterValidator.IsSnakeCaseId(region.RegionId))
+                {
+                    errors.Add(where + ": RegionId must be lowercase snake_case.");
+                }
+                else if (!seen.Add(region.RegionId))
+                {
+                    errors.Add(where + ": duplicate RegionId.");
+                }
+
+                if (i == 0)
+                {
+                    errors.Add(where + ": the first region cannot be a post-game region.");
+                }
+
+                if (string.IsNullOrEmpty(region.RequiresRegionId) || !earlier.Contains(region.RequiresRegionId))
+                {
+                    errors.Add(where + ": RequiresRegionId '" + region.RequiresRegionId + "' must name an earlier region.");
+                }
+
+                if (region.MinLevel != MaxLevel || region.MaxLevel != MaxLevel)
+                {
+                    errors.Add(where + ": MinLevel and MaxLevel must both be " + MaxLevel + " (a post-game region is fought at the level cap), not " + region.MinLevel +
+                               "-" + region.MaxLevel + ".");
+                }
+
+                if (region.Stages < 1)
+                {
+                    errors.Add(where + ": Stages must be at least 1.");
+                }
+
+                if (!string.IsNullOrEmpty(region.BossRewardSealId))
+                {
+                    errors.Add(where + ": BossRewardSealId must be empty (no seal: the level cap is already at its peak).");
+                }
+
+                MapRulesData ownRules = region.MapRules != null && region.MapRules.Layers > 0 ? region.MapRules : data.MapRules;
+                if (region.MapRules != null && region.MapRules.Layers > 0)
+                {
+                    ValidateRules(region.MapRules, where + " MapRules", shapes, errors);
+                }
+
+                ValidateShapeWeights(region, where, shapes, errors);
+
+                string[] gates = region.GateTemplateIds ?? new string[0];
+                if (gates.Length > Math.Max(0, region.Stages - 1))
+                {
+                    errors.Add(where + ": more GateTemplateIds (" + gates.Length + ") than gate stages (" + Math.Max(0, region.Stages - 1) + ").");
+                }
+
+                foreach (string gate in gates)
+                {
+                    if (!string.IsNullOrEmpty(gate) && templates != null && !templates.Contains(gate))
+                    {
+                        errors.Add(where + ": gate template '" + gate + "' is not in the encounter library.");
+                    }
+                }
+
+                CheckBossTemplate(region.BossTemplateId, where + ": ", templates, errors);
+
+                RegionHardModeData hard = region.HardMode ?? new RegionHardModeData();
+                RegionData hardRegion = region.Copy();
+                hardRegion.ShapeWeights = hard.ShapeWeights;
+                ValidateShapeWeights(hardRegion, where + " HardMode", shapes, errors);
+                if (string.IsNullOrEmpty(hard.EliteShapeId))
+                {
+                    errors.Add(where + " HardMode: no EliteShapeId.");
+                }
+                else if (shapes != null && !shapes.Contains(hard.EliteShapeId))
+                {
+                    errors.Add(where + " HardMode: EliteShapeId '" + hard.EliteShapeId + "' is not in the encounter library.");
+                }
+
+                CheckBossTemplate(hard.BossTemplateId, where + " HardMode: ", templates, errors);
+
+                if (postGameShapes != null)
+                {
+                    List<string> drawn = DrawnShapes(region.ShapeWeights, ownRules == null ? null : ownRules.EliteShapeId);
+                    drawn.AddRange(DrawnShapes(hard.ShapeWeights, hard.EliteShapeId));
+                    foreach (string shape in drawn)
+                    {
+                        if (shapes.Contains(shape) && !postGameShapes.Contains(shape))
+                        {
+                            errors.Add(where + ": shape '" + shape + "' is a mainline shape; a post-game region draws only post-game shapes (PostGame).");
+                        }
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(region.RegionId))
+                {
+                    earlier.Add(region.RegionId);
+                }
+            }
+        }
+
+        private static void CheckBossTemplate(string templateId, string where, HashSet<string> templates, List<string> errors)
+        {
+            if (string.IsNullOrEmpty(templateId))
+            {
+                errors.Add(where + "no BossTemplateId.");
+            }
+            else if (templates != null && !templates.Contains(templateId))
+            {
+                errors.Add(where + "boss template '" + templateId + "' is not in the encounter library.");
+            }
+        }
+
+        /// <summary>Every distinct shape id <paramref name="weights"/> and <paramref name="eliteShapeId"/> name, in order.</summary>
+        private static List<string> DrawnShapes(ShapeWeightData[] weights, string eliteShapeId)
+        {
+            List<string> drawn = new List<string>();
+            foreach (ShapeWeightData weight in weights ?? new ShapeWeightData[0])
+            {
+                if (weight != null && !string.IsNullOrEmpty(weight.ShapeId) && !drawn.Contains(weight.ShapeId))
+                {
+                    drawn.Add(weight.ShapeId);
+                }
+            }
+
+            if (!string.IsNullOrEmpty(eliteShapeId) && !drawn.Contains(eliteShapeId))
+            {
+                drawn.Add(eliteShapeId);
+            }
+
+            return drawn;
         }
 
         private static void ValidateShapeWeights(RegionData region, string where, HashSet<string> shapes, List<string> errors)
