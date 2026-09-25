@@ -34,7 +34,7 @@
   "Species": [
     {
       "SpeciesId": "phoenix",
-      "ArtKey": "beast/phoenix",
+      "ArtKey": "beast/phoenix/illustrated",
       "DisplayName": "Phoenix",
       "Description": "A proud bird of living flame that burns brightest just before it falls. It strikes hard from afar and sets foes smouldering, and once a battle wraps itself in renewing fire, but it has little to stand behind up close.",
       "Elements": [ "Fire" ],
@@ -54,7 +54,7 @@
     },
     {
       "SpeciesId": "golem",
-      "ArtKey": "beast/golem",
+      "ArtKey": "beast/golem/illustrated",
       "DisplayName": "Golem",
       "Description": "A hillside that learned to stand. Slow and stubborn, it plants itself up front, dares every nearby enemy to strike it and raises walls of granite around its friends. Nothing gets past it.",
       "Elements": [ "Earth" ],
@@ -114,7 +114,7 @@
     },
     {
       "SpeciesId": "kirin",
-      "ArtKey": "beast/kirin",
+      "ArtKey": "beast/kirin/illustrated",
       "DisplayName": "Kirin",
       "Description": "A serene, luminous beast said to walk without bending the grass. It shuns claws and horns and fights with light instead, healing and blessing its team and calling down pillars of radiance.",
       "Elements": [ "Light" ],

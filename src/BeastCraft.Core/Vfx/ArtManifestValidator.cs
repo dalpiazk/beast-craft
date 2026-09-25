@@ -5,7 +5,8 @@ namespace BeastCraft.Vfx
 {
     /// <summary>
     /// Checks the art manifest (<see cref="ArtManifestData"/>), after <see cref="ArtManifestData.Normalize"/>:
-    /// a readable schema version; unique, non-empty names and files; a known kind; positive frame
+    /// a readable schema version; unique, non-empty names; files that resolve inside the content
+    /// root (<see cref="ArtManifestData.ResolveFile"/>); a known kind; positive frame
     /// sizes and counts; a pivot on the frame, a positive pixels-per-unit and a known filter; tints
     /// as <c>#rrggbb</c>; every clip naming an existing sheet, in-range frames and a sane rate; the
     /// palette as <c>#rrggbb</c> by single chars. A <c>spine</c> entry is only checked for a name and
@@ -62,6 +63,10 @@ namespace BeastCraft.Vfx
                 if (string.IsNullOrEmpty(sprite.File))
                 {
                     errors.Add(at + ": no File.");
+                }
+                else if (ArtManifestData.ResolveFile(sprite.File) == null)
+                {
+                    errors.Add(at + ": File '" + sprite.File + "' is not a relative path (forward slashes) inside the content root.");
                 }
 
                 if (sprite.Kind == ArtSpriteKind.Spine)

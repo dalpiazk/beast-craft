@@ -5,8 +5,9 @@ using NUnit.Framework;
 namespace BeastCraft.Tests.EditMode
 {
     /// <summary>
-    /// The art manifest's schema v2 (<see cref="ArtManifestData"/>): the shipped placeholder
-    /// manifest, reading a v1 manifest, <see cref="ArtManifestValidator"/>'s rules, the reserved
+    /// The art manifest's schema v2 (<see cref="ArtManifestData"/>): the shipped manifest (pixel
+    /// placeholders plus the illustrated starter trio), file paths resolved against the manifest's
+    /// folder, reading a v1 manifest, <see cref="ArtManifestValidator"/>'s rules, the reserved
     /// <c>spine</c> kind and clip timing.
     /// </summary>
     public class ArtManifestTests
@@ -23,7 +24,7 @@ namespace BeastCraft.Tests.EditMode
 }";
 
         [Test]
-        public void ShippedManifest_IsV2_Valid_AndPixelPlaceholders()
+        public void ShippedManifest_IsV2_Valid_PixelPlaceholders_PlusIllustratedBeasts()
         {
             ArtManifestData art = VfxLibraryTests.Content.Art;
 
@@ -32,10 +33,17 @@ namespace BeastCraft.Tests.EditMode
             foreach (ArtSpriteData sprite in art.Sprites)
             {
                 Assert.AreEqual(ArtSpriteKind.Sprite, sprite.Kind, sprite.Name);
+                Assert.IsFalse(sprite.Premultiplied, sprite.Name + ": PNGs are straight alpha, premultiplied on load");
+                Assert.IsFalse(string.IsNullOrEmpty(sprite.Category), sprite.Name);
+                if (sprite.Filter == ArtFilter.Linear)
+                {
+                    StringAssert.StartsWith("../beasts/", sprite.File, sprite.Name);
+                    Assert.AreEqual("beast", sprite.Category, sprite.Name);
+                    continue;
+                }
+
                 Assert.AreEqual(ArtFilter.Point, sprite.Filter, sprite.Name);
                 Assert.AreEqual(ArtManifestData.ReferencePixelsPerUnit, sprite.PixelsPerUnit, sprite.Name);
-                Assert.IsFalse(sprite.Premultiplied, sprite.Name);
-                Assert.IsFalse(string.IsNullOrEmpty(sprite.Category), sprite.Name);
             }
 
             ArtSpriteData phoenix = art.FindByArtKey("beast/phoenix");
@@ -46,6 +54,54 @@ namespace BeastCraft.Tests.EditMode
             Assert.AreEqual("beast_phoenix_idle", idle.Sheet);
             CollectionAssert.AreEqual(new[] { 0, 1 }, idle.Frames);
             Assert.AreEqual(18f, art.Find("hex_grass").PivotY, "a tile's pivot is its centre");
+        }
+
+        [TestCase("phoenix")]
+        [TestCase("golem")]
+        [TestCase("kirin")]
+        public void StarterTrio_DrawsItsIllustratedSprite_LinearFeetPivot_AboutAHexTall(string species)
+        {
+            ArtManifestData art = VfxLibraryTests.Content.Art;
+            string key = VfxLibraryTests.Content.Battle.GetSpecies(species).ArtKey;
+            ArtSpriteData sprite = art.FindByArtKey(key);
+
+            Assert.AreEqual("beast/" + species + "/illustrated", key);
+            Assert.IsNotNull(sprite, key);
+            Assert.AreEqual(ArtFilter.Linear, sprite.Filter);
+            Assert.AreEqual("../beasts/" + species + "/" + species + ".png", sprite.File);
+            Assert.AreEqual("art/beasts/" + species + "/" + species + ".png", ArtManifestData.ResolveFile(sprite.File));
+            Assert.AreEqual(sprite.FrameWidth / 2f, sprite.PivotX, "the feet are the frame's horizontal centre");
+            Assert.Greater(sprite.PivotY, sprite.FrameHeight * 0.9f, "the feet are at the bottom of the frame");
+            Assert.GreaterOrEqual(sprite.FrameHeight, 512, "about 512 px tall: twice its largest on-screen size");
+            float height = HeightUnits(sprite);
+            Assert.That(height, Is.InRange(0.75f, 1.5f), "world units from the feet to the top of the frame");
+            Assert.IsNotNull(art.FindByArtKey("beast/" + species), "the pixel placeholder stays in the manifest");
+        }
+
+        [TestCase("beast_a.png", "art/pixel/beast_a.png")]
+        [TestCase("../beasts/golem/golem.png", "art/beasts/golem/golem.png")]
+        [TestCase("./sub/../x.png", "art/pixel/x.png")]
+        [TestCase("../../fonts/OFL.txt", "fonts/OFL.txt")]
+        [TestCase("../../../outside.png", null)]
+        [TestCase("/rooted.png", null)]
+        [TestCase("..\\beasts\\golem.png", null)]
+        [TestCase("C:/x.png", null)]
+        [TestCase("", null)]
+        public void ResolveFile_IsRelativeToTheManifestFolder_AndStaysInTheContentRoot(string file, string expected)
+        {
+            Assert.AreEqual(expected, ArtManifestData.ResolveFile(file));
+        }
+
+        [Test]
+        public void Validator_RefusesAFileOutsideTheContentRoot()
+        {
+            ArtManifestData art = Valid();
+            art.Sprites[0].File = "../../../beast_a.png";
+
+            List<string> errors = ArtManifestValidator.Validate(art);
+
+            Assert.AreEqual(1, errors.Count, string.Join("\n", errors));
+            StringAssert.Contains("inside the content root", errors[0]);
         }
 
         [Test]
@@ -132,6 +188,12 @@ namespace BeastCraft.Tests.EditMode
             Assert.AreEqual(3, clip.FrameAt(-50));
             Assert.AreEqual(4, clip.FrameAt(100));
             Assert.AreEqual(4, clip.FrameAt(10000));
+        }
+
+        /// <summary>World units from the pivot (feet) to the frame's top.</summary>
+        private static float HeightUnits(ArtSpriteData sprite)
+        {
+            return sprite.PivotY / sprite.PixelsPerUnit;
         }
 
         private static ArtManifestData Valid()

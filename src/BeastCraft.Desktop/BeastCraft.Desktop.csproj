@@ -11,7 +11,7 @@
     A thin host: the viewer itself (drawing, input, scaling) is src/BeastCraft.Game, shared with the
     Android host; everything that is not drawing lives in src/BeastCraft.Presentation
     (engine-neutral) and the game rules in src/BeastCraft.Core. The content (data JSON and the pixel
-    art, and the UI font with its licence) is copied from content/ into Content/ beside the
+    art, the illustrated beast sprites and the UI font with its licence) is copied from content/ into Content/ beside the
     executable and read as plain files (FileContentSource). Text is the TTF UI font through
     FontStashSharp (BeastCraft.Game's TtfText), the built-in pixel font only as a fallback.
   -->
@@ -44,6 +44,8 @@
   <ItemGroup>
     <None Include="..\..\content\data\**\*.json" Link="Content\data\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\content\art\pixel\*.png;..\..\content\art\pixel\*.json" Link="Content\art\pixel\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The illustrated beast sprites, which the manifest names as ../beasts/<id>/<id>.png (content/art/source holds archival masters and is not copied). -->
+    <None Include="..\..\content\art\beasts\**\*.png" Link="Content\art\beasts\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <!-- The UI font and its licence (SIL OFL 1.1: the licence travels with the font). -->
     <None Include="..\..\content\fonts\*.ttf;..\..\content\fonts\OFL.txt" Link="Content\fonts\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

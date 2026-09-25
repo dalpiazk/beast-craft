@@ -201,11 +201,12 @@ Windows first, and it builds on Linux). It fights one real PvE battle through th
 game's own session code — Phoenix, Golem, Kirin and Frost Wyrm (level 20) against
 the Hollow Warden encounter (a champion and two brutes, level 10), seed 20260933 —
 and draws it in **portrait**: a fixed 1080x1920 canvas scaled to the window and
-letterboxed (the window opens at 540x960 and can be resized). The art is
-throwaway pixel placeholders; the final art is illustrated.
+letterboxed (the window opens at 540x960 and can be resized). Phoenix, Golem and
+Kirin draw with their final illustrated art (AI-assisted, producer-approved); the
+rest is throwaway pixel placeholders until its art is made.
 
 ```
-git lfs install && git lfs pull          # the placeholder art is in Git LFS
+git lfs install && git lfs pull          # the art is in Git LFS
 dotnet run --project src/BeastCraft.Desktop -c Release
 ```
 
@@ -243,8 +244,10 @@ term's definition on it; `--scale K` renders K x 540x960 (default
 manifest v2 and ArtKey, the VFX schema, range diagrams, how Spine would plug in)
 and the art pipeline are in
 [`docs/design/presentation-and-vfx.md`](docs/design/presentation-and-vfx.md);
-regenerating the art is in [`Tooling/PixelArt/README.md`](Tooling/PixelArt/README.md).
-The art and animation brief for freelance quoting (DRAFT) is [`docs/art/art-brief.md`](docs/art/art-brief.md).
+regenerating the placeholders and the manifest is in [`Tooling/PixelArt/README.md`](Tooling/PixelArt/README.md),
+and the AI-assisted beast pipeline (setup, models and licences, recipe, provenance) in
+[`Tooling/ArtLab/README.md`](Tooling/ArtLab/README.md). The art and animation brief (approach: AI-assisted,
+producer as art director) is [`docs/art/art-brief.md`](docs/art/art-brief.md).
 
 ### Running on Android
 

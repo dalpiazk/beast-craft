@@ -34,10 +34,13 @@ namespace BeastCraft.Tests.EditMode
             CollectionAssert.AreEquivalent(VfxLibraryTests.Content.KnownSkillIds, viaSource.KnownSkillIds);
             Assert.AreEqual(VfxLibraryTests.Content.Art.Sprites.Length, viaSource.Art.Sprites.Length);
 
-            string folder = "art/pixel/";
-            using (Stream png = viaSource.Source.Open(folder + viaSource.Art.Sprites[0].File))
+            // A pixel placeholder beside the manifest and an illustrated beast in art/beasts/, both opened as the atlas does.
+            foreach (string key in new[] { "beast/golem", "beast/golem/illustrated" })
             {
-                Assert.Greater(png.Length, 8);
+                using (Stream png = viaSource.Source.Open(ArtManifestData.ResolveFile(viaSource.Art.FindByArtKey(key).File)))
+                {
+                    Assert.Greater(png.Length, 8, key);
+                }
             }
         }
 

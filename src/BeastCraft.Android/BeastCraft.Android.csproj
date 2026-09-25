@@ -3,7 +3,7 @@
   <!--
     BeastCraft.Android: the MonoGame Android host. A thin activity (MainActivity) around the shared
     viewer in src/BeastCraft.Game, full screen and locked to portrait with touch controls; the content (data
-    JSON and pixel art) is packaged as APK assets under Content/ and read through MonoGame's
+    JSON, pixel art and the illustrated beast sprites) is packaged as APK assets under Content/ and read through MonoGame's
     TitleContainer (TitleContainerContentSource).
 
     LOCAL BUILD ONLY, not built by CI: it needs the .NET Android workload, a JDK (17) and the
@@ -52,6 +52,8 @@
   <ItemGroup>
     <AndroidAsset Include="..\..\content\data\**\*.json" Link="Assets\Content\data\%(RecursiveDir)%(Filename)%(Extension)" />
     <AndroidAsset Include="..\..\content\art\pixel\*.png;..\..\content\art\pixel\*.json" Link="Assets\Content\art\pixel\%(Filename)%(Extension)" />
+    <!-- The illustrated beast sprites, which the manifest names as ../beasts/<id>/<id>.png (content/art/source holds archival masters and is not packaged). -->
+    <AndroidAsset Include="..\..\content\art\beasts\**\*.png" Link="Assets\Content\art\beasts\%(RecursiveDir)%(Filename)%(Extension)" />
     <!-- The UI font and its licence (SIL OFL 1.1: the licence travels with the font). -->
     <AndroidAsset Include="..\..\content\fonts\*.ttf;..\..\content\fonts\OFL.txt" Link="Assets\Content\fonts\%(Filename)%(Extension)" />
   </ItemGroup>

@@ -1,0 +1,35 @@
+{
+  "_readme": "HAND-KEPT. The illustrated sprites build.py merges into content/art/pixel/pixel-art-manifest.json (schema v2) beside the generated pixel placeholders. The PNGs are not built here: they are exported from the masters in content/art/source/<id>/ by Tooling/ArtLab/scripts/export_ingame.py. Per sprite: Name (unique in the manifest), File (relative to content/art/pixel/), Category, Label, ArtKey (the species' ArtKey in content/data/Creatures/beast-roster.json names it), PivotX/PivotY (the feet, px from the frame's top-left, as export_ingame.py prints them) and WorldHeight: the in-game height from the feet to the top of the art, in world units (1 = one hex column step; the pixel placeholders stand about 0.75 tall). WorldHeight is the species-size knob: build.py derives PixelsPerUnit = (PivotY - the art's top row) / WorldHeight, so a new value needs only a rebuild. FrameWidth/FrameHeight are read from the PNG; Filter is linear and Premultiplied false (straight-alpha PNGs, premultiplied on load).",
+  "Sprites": [
+    {
+      "Name": "beast_golem_illustrated",
+      "File": "../beasts/golem/golem.png",
+      "Category": "beast",
+      "Label": "Golem (Earth, illustrated)",
+      "ArtKey": "beast/golem/illustrated",
+      "PivotX": 256,
+      "PivotY": 508,
+      "WorldHeight": 1.0
+    },
+    {
+      "Name": "beast_kirin_illustrated",
+      "File": "../beasts/kirin/kirin.png",
+      "Category": "beast",
+      "Label": "Kirin (Light, illustrated)",
+      "ArtKey": "beast/kirin/illustrated",
+      "PivotX": 256,
+      "PivotY": 508,
+      "WorldHeight": 1.15
+    },
+    {
+      "Name": "beast_phoenix_illustrated",
+      "File": "../beasts/phoenix/phoenix.png",
+      "Category": "beast",
+      "Label": "Phoenix (Fire, illustrated)",
+      "ArtKey": "beast/phoenix/illustrated",
+      "PivotX": 256,
+      "PivotY": 508,
+      "WorldHeight": 1.25
+    }
+  ]
+}
