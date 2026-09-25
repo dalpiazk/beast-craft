@@ -1,0 +1,176 @@
+## authored
+## authored (no encounter library)
+## mixed
+MapRules: Layers must be at least 3 (a start row, a middle, the top).
+MapRules: RestLayer must be -1 (none) or 1 to Layers - 2.
+MapRules: node weight type 'Gate' must be Battle, Elite, Shop or Rest.
+MapRules: NodeWeights must include Battle (the fallback type).
+Seal 'seal_r02': DisplayName is empty.
+Seal 'seal_r03': Description is empty.
+Region 'start': the first region must be 'r01' (the region every save starts with).
+Region 'r02': RequiresRegionId 'r01' must name an earlier region.
+Region 'r03': MinLevel 25 should be 21 (levels are contiguous from 1).
+Region 'r04': RequiresRegionId 'r09' must name an earlier region.
+Region 'r05': shape 'nope' is not in the encounter library.
+Region 'r06': boss template 'no_boss' is not in the encounter library.
+Region 'r07': seal 'seal_r07' caps at 50, below seal 'seal_r06' (72); caps must not fall.
+Region 'r07': seal 'seal_r07' caps at 50, below the next region's max level 80.
+## mixed (no encounter library)
+MapRules: Layers must be at least 3 (a start row, a middle, the top).
+MapRules: RestLayer must be -1 (none) or 1 to Layers - 2.
+MapRules: node weight type 'Gate' must be Battle, Elite, Shop or Rest.
+MapRules: NodeWeights must include Battle (the fallback type).
+Seal 'seal_r02': DisplayName is empty.
+Seal 'seal_r03': Description is empty.
+Region 'start': the first region must be 'r01' (the region every save starts with).
+Region 'r02': RequiresRegionId 'r01' must name an earlier region.
+Region 'r03': MinLevel 25 should be 21 (levels are contiguous from 1).
+Region 'r04': RequiresRegionId 'r09' must name an earlier region.
+Region 'r07': seal 'seal_r07' caps at 50, below seal 'seal_r06' (72); caps must not fall.
+Region 'r07': seal 'seal_r07' caps at 50, below the next region's max level 80.
+## first region requires another
+Region 'r01': the first region cannot require another.
+## first region requires another (no encounter library)
+Region 'r01': the first region cannot require another.
+## level gap and short end
+Region 'r05': MinLevel 43 should be 41 (levels are contiguous from 1).
+The last region must end at level 100.
+## level gap and short end (no encounter library)
+Region 'r05': MinLevel 43 should be 41 (levels are contiguous from 1).
+The last region must end at level 100.
+## max level past 100
+Region 'r10': MaxLevel 101 must be between MinLevel and 100.
+The last region must end at level 100.
+## max level past 100 (no encounter library)
+Region 'r10': MaxLevel 101 must be between MinLevel and 100.
+The last region must end at level 100.
+## duplicate and malformed ids
+Region 'r03': duplicate RegionId.
+Region 'r03': RequiresRegionId 'r03' must name an earlier region.
+Region 'r05': RequiresRegionId 'r04' must name an earlier region.
+Region 'R7': RegionId must be lowercase snake_case.
+Region 'r08': RequiresRegionId 'r07' must name an earlier region.
+## duplicate and malformed ids (no encounter library)
+Region 'r03': duplicate RegionId.
+Region 'r03': RequiresRegionId 'r03' must name an earlier region.
+Region 'r05': RequiresRegionId 'r04' must name an earlier region.
+Region 'R7': RegionId must be lowercase snake_case.
+Region 'r08': RequiresRegionId 'r07' must name an earlier region.
+## null region
+Region #5 is null.
+Region 'r07': RequiresRegionId 'r06' must name an earlier region.
+Region 'r07': MinLevel 61 should be 51 (levels are contiguous from 1).
+## null region (no encounter library)
+Region #5 is null.
+Region 'r07': RequiresRegionId 'r06' must name an earlier region.
+Region 'r07': MinLevel 61 should be 51 (levels are contiguous from 1).
+## stages, gates and boss
+Region 'r02': Stages must be at least 1.
+Region 'r03': more GateTemplateIds (4) than gate stages (3).
+Region 'r03': gate template 'a' is not in the encounter library.
+Region 'r03': gate template 'b' is not in the encounter library.
+Region 'r03': gate template 'c' is not in the encounter library.
+Region 'r03': gate template 'd' is not in the encounter library.
+Region 'r04': gate template 'no_gate' is not in the encounter library.
+Region 'r05': no BossTemplateId.
+## stages, gates and boss (no encounter library)
+Region 'r02': Stages must be at least 1.
+Region 'r03': more GateTemplateIds (4) than gate stages (3).
+Region 'r05': no BossTemplateId.
+## shape weights
+Region 'r02': no ShapeWeights (Battle nodes need a shape).
+Region 'r03': shape 'squad' is weighted twice.
+Region 'r03': shape 'squad' needs a positive Weight.
+Region 'r03': a shape weight has no ShapeId.
+## shape weights (no encounter library)
+Region 'r02': no ShapeWeights (Battle nodes need a shape).
+Region 'r03': shape 'squad' is weighted twice.
+Region 'r03': shape 'squad' needs a positive Weight.
+Region 'r03': a shape weight has no ShapeId.
+## region map rules override
+Region 'r07' MapRules: Layers must be at least 3 (a start row, a middle, the top).
+Region 'r07' MapRules: Lanes must be at least 1.
+Region 'r07' MapRules: Paths must be at least 1.
+Region 'r07' MapRules: RestLayer must be -1 (none) or 1 to Layers - 2.
+Region 'r07' MapRules: EliteMinLayer must be at least 1 (the start row is always a Battle).
+Region 'r07' MapRules: need 0 <= MinElites <= MaxElites.
+Region 'r07' MapRules: MaxShops must be 0 or more.
+Region 'r07' MapRules: level offsets must be 0 or more.
+Region 'r07' MapRules: EliteShapeId 'nope' is not in the encounter library.
+Region 'r07' MapRules: node type Elite needs a positive Weight.
+Region 'r07' MapRules: node type Elite is weighted twice.
+Region 'r07' MapRules: NodeWeights must include Battle (the fallback type).
+## region map rules override (no encounter library)
+Region 'r07' MapRules: Layers must be at least 3 (a start row, a middle, the top).
+Region 'r07' MapRules: Lanes must be at least 1.
+Region 'r07' MapRules: Paths must be at least 1.
+Region 'r07' MapRules: RestLayer must be -1 (none) or 1 to Layers - 2.
+Region 'r07' MapRules: EliteMinLayer must be at least 1 (the start row is always a Battle).
+Region 'r07' MapRules: need 0 <= MinElites <= MaxElites.
+Region 'r07' MapRules: MaxShops must be 0 or more.
+Region 'r07' MapRules: level offsets must be 0 or more.
+Region 'r07' MapRules: node type Elite needs a positive Weight.
+Region 'r07' MapRules: node type Elite is weighted twice.
+Region 'r07' MapRules: NodeWeights must include Battle (the fallback type).
+## seals
+Seal 'Seal 1': SealId must be lowercase snake_case.
+Seal 'seal_r09': LevelCap 101 must be 1-100.
+Seal #9 is null.
+Region 'r01': BossRewardSealId 'seal_r01' is not a seal.
+Region 'r03': BossRewardSealId 'seal_nope' is not a seal.
+Region 'r05': seal 'seal_r04' is already granted by another boss.
+Region 'r05': seal 'seal_r04' caps at 52, below the next region's max level 60.
+Region 'r08': seal 'seal_r08' caps at 75, below seal 'seal_r07' (82); caps must not fall.
+Region 'r08': seal 'seal_r08' caps at 75, below the next region's max level 90.
+Region 'r10': BossRewardSealId 'seal_r10' is not a seal.
+## seals (no encounter library)
+Seal 'Seal 1': SealId must be lowercase snake_case.
+Seal 'seal_r09': LevelCap 101 must be 1-100.
+Seal #9 is null.
+Region 'r01': BossRewardSealId 'seal_r01' is not a seal.
+Region 'r03': BossRewardSealId 'seal_nope' is not a seal.
+Region 'r05': seal 'seal_r04' is already granted by another boss.
+Region 'r05': seal 'seal_r04' caps at 52, below the next region's max level 60.
+Region 'r08': seal 'seal_r08' caps at 75, below seal 'seal_r07' (82); caps must not fall.
+Region 'r08': seal 'seal_r08' caps at 75, below the next region's max level 90.
+Region 'r10': BossRewardSealId 'seal_r10' is not a seal.
+## duplicate seal
+Seal 'seal_r05': duplicate SealId.
+Region 'r06': BossRewardSealId 'seal_r06' is not a seal.
+## duplicate seal (no encounter library)
+Seal 'seal_r05': duplicate SealId.
+Region 'r06': BossRewardSealId 'seal_r06' is not a seal.
+## caps
+LevelCapMargin must be 0 or more.
+StartingLevelCap 5 is below the first region's max level 10.
+## caps (no encounter library)
+LevelCapMargin must be 0 or more.
+StartingLevelCap 5 is below the first region's max level 10.
+## no seals
+No Seals.
+Region 'r01': BossRewardSealId 'seal_r01' is not a seal.
+Region 'r02': BossRewardSealId 'seal_r02' is not a seal.
+Region 'r03': BossRewardSealId 'seal_r03' is not a seal.
+Region 'r04': BossRewardSealId 'seal_r04' is not a seal.
+Region 'r05': BossRewardSealId 'seal_r05' is not a seal.
+Region 'r06': BossRewardSealId 'seal_r06' is not a seal.
+Region 'r07': BossRewardSealId 'seal_r07' is not a seal.
+Region 'r08': BossRewardSealId 'seal_r08' is not a seal.
+Region 'r09': BossRewardSealId 'seal_r09' is not a seal.
+Region 'r10': BossRewardSealId 'seal_r10' is not a seal.
+## no seals (no encounter library)
+No Seals.
+Region 'r01': BossRewardSealId 'seal_r01' is not a seal.
+Region 'r02': BossRewardSealId 'seal_r02' is not a seal.
+Region 'r03': BossRewardSealId 'seal_r03' is not a seal.
+Region 'r04': BossRewardSealId 'seal_r04' is not a seal.
+Region 'r05': BossRewardSealId 'seal_r05' is not a seal.
+Region 'r06': BossRewardSealId 'seal_r06' is not a seal.
+Region 'r07': BossRewardSealId 'seal_r07' is not a seal.
+Region 'r08': BossRewardSealId 'seal_r08' is not a seal.
+Region 'r09': BossRewardSealId 'seal_r09' is not a seal.
+Region 'r10': BossRewardSealId 'seal_r10' is not a seal.
+## no regions
+No Regions.
+## no regions (no encounter library)
+No Regions.
