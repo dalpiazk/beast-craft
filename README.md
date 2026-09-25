@@ -212,8 +212,9 @@ dotnet run --project src/BeastCraft.Desktop -c Release
 **Space** plays the next turn (or finishes the one playing), **A** toggles
 auto-play, **1**/**2**/**3** set the speed, **S** skips to the result, **Tab**
 cycles the selected skill, **Esc** quits; the on-screen PLAY/PAUSE, x1/x2/x3 and
-SKIP buttons do the same, and hovering or clicking a skill card shows its range
-diagram. Each fired skill plays its VFX from `content/data/Vfx/vfx-library.json`
+SKIP buttons do the same, and clicking a skill card opens its detail card (tags,
+cooldown, range, power, the range diagram and the description with its glossary
+terms highlighted: click one for its definition). Each fired skill plays its VFX from `content/data/Vfx/vfx-library.json`
 (schema v2: layered effects, per-effect-type defaults with status auras and icons);
 Phoenix's Ember Shot, Flame Wave and Rebirth Flame carry the full layer stack.
 The camera frames each turn by itself (the acting unit, its targets and the
@@ -232,8 +233,9 @@ dotnet run --project src/BeastCraft.Desktop -c Release -- --screenshot diagram.p
 
 `--turns N` plays N turns and shows the Nth; `--skill ID` then carries on to the
 first turn that fires that skill; `--at MS` picks the moment inside that turn
-(default: the skill's VFX mid-play); `--select-skill N` shows the acting unit's
-Nth skill card with its range diagram; `--scale K` renders K x 540x960 (default
+(default: the skill's VFX mid-play); `--select-skill N` opens the acting unit's
+Nth skill's detail card (with its range diagram) and `--glossary TERM` a glossary
+term's definition on it; `--scale K` renders K x 540x960 (default
 2: 1080x1920); `--safe-inset L,T,R,B` fakes a phone's cutout insets;
 `--encounter ID`, `--speed S`, `--seed S`, `--level L`, `--enemy-level L` and
 `--content DIR` adjust the rest; `--effects full|reduced|minimal`, `--no-shake`,

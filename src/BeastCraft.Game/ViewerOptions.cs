@@ -29,6 +29,8 @@ namespace BeastCraft.Game
     ///   --no-shake          screen shake off
     ///   --no-flashes        hit flashes and bright bursts off
     ///   --show-settings     open the settings overlay (for screenshots)
+    ///   --glossary TERM     with --select-skill: open that glossary term's definition (a TermId
+    ///                       or Term, e.g. burn)
     /// </code>
     /// In a screenshot the effects settings come from these flags only (the saved settings are
     /// neither read nor written); in a window they override the saved ones until changed there.
@@ -52,6 +54,7 @@ namespace BeastCraft.Game
         public bool NoShake;
         public bool NoFlashes;
         public bool ShowSettings;
+        public string Glossary;
 
         public bool Screenshot
         {
@@ -132,6 +135,10 @@ namespace BeastCraft.Game
                         break;
                     case "--show-settings":
                         options.ShowSettings = true;
+                        break;
+                    case "--glossary":
+                        options.Glossary = value;
+                        i++;
                         break;
                     default:
                         error = "Unknown argument '" + flag + "'.";

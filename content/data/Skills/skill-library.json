@@ -1,5 +1,5 @@
 {
-  "_readme": "Source of truth for every authored skill: beast skills, the avatar's active skills and passives, the skill-training materials, and each species' learnable skills and default loadout. Drafted against a power budget and tuned with the roster against the balance simulator (default loadouts; see docs/balance/tuning-log.md), not confirmed balance. Edit here, then in Unity run Beast Craft/Data/Import Skill Library (after Import Beast Roster). Enums are member names (case-sensitive). Missing fields take the DTO defaults in SkillLibraryData.cs; note a missing TargetingCriterion means Distance (nearest), not Random. Damage Magnitude is power, a percent of the attacking stat; Heal is a percent of the caster's SpecialAttack (x HealScale, the avatar's for its skills and passives); a Shield is a percent of the caster's Defense; a DamageOverTime is a per-turn power; a Knockback is whole hexes. DefaultLoadout order is fire priority. TeamBonds are composition-triggered team behaviours for the player's team (never enemies): a Stance, Elements (distinct elements of the set the team covers), Species or DistinctStances condition, tiers by rising MinCount (the highest reached applies; tiers replace, not stack), each with battle-start Effects (BuffStat or a Shield status only, Chance 100, applied by each recipient to itself; Scope Members = the beasts that meet the condition, Team = every beast, Others = every beast that does not meet it) and/or an in-battle Reaction: when its Trigger happens (EnemyTargetsAlly, AllyCrit, AllyHitByEnemy, MemberHit, MemberCrit, AllyBelowHpPercent, AllyTurnStartAfflicted, AllyDefeated), the first member that is alive, unstunned, in Range, off its Cooldown (its own turns) and under its caps (MaxPerMember, MaxPerTriggerUnit, MaxPerBattle) passes a Chance roll and casts the reaction's Effects on its Target (Self, TriggeringAlly, TriggerTarget, Attacker, EnemiesNearReactor, Team), or with Action Intercept takes an enemy's single-target hit in an adjacent ally's place. Reactions never chain. A PerCount (scaling) bond has one tier (MinCount 1 or more) whose magnitudes apply once per counted member, up to MaxCount stacks, and no reaction. See docs/design/battle-system.md, 'Team bonds'. The first 3 AvatarActives are the avatar's default actives. See docs/design/battle-system.md, 'Beast skill kits'. Display text (names, descriptions) is DRAFT pending producer review; tone, naming and length rules are in docs/design/content-bible.md.",
+  "_readme": "Source of truth for every authored skill: beast skills, the avatar's active skills and passives, the skill-training materials, and each species' learnable skills and default loadout. Drafted against a power budget and tuned with the roster against the balance simulator (default loadouts; see docs/balance/tuning-log.md), not confirmed balance. Edit here, then in Unity run Beast Craft/Data/Import Skill Library (after Import Beast Roster). Enums are member names (case-sensitive). Missing fields take the DTO defaults in SkillLibraryData.cs; note a missing TargetingCriterion means Distance (nearest), not Random. Damage Magnitude is power, a percent of the attacking stat; Heal is a percent of the caster's SpecialAttack (x HealScale, the avatar's for its skills and passives); a Shield is a percent of the caster's Defense; a DamageOverTime is a per-turn power; a Knockback is whole hexes. DefaultLoadout order is fire priority. TeamBonds are composition-triggered team behaviours for the player's team (never enemies): a Stance, Elements (distinct elements of the set the team covers), Species or DistinctStances condition, tiers by rising MinCount (the highest reached applies; tiers replace, not stack), each with battle-start Effects (BuffStat or a Shield status only, Chance 100, applied by each recipient to itself; Scope Members = the beasts that meet the condition, Team = every beast, Others = every beast that does not meet it) and/or an in-battle Reaction: when its Trigger happens (EnemyTargetsAlly, AllyCrit, AllyHitByEnemy, MemberHit, MemberCrit, AllyBelowHpPercent, AllyTurnStartAfflicted, AllyDefeated), the first member that is alive, unstunned, in Range, off its Cooldown (its own turns) and under its caps (MaxPerMember, MaxPerTriggerUnit, MaxPerBattle) passes a Chance roll and casts the reaction's Effects on its Target (Self, TriggeringAlly, TriggerTarget, Attacker, EnemiesNearReactor, Team), or with Action Intercept takes an enemy's single-target hit in an adjacent ally's place. Reactions never chain. A PerCount (scaling) bond has one tier (MinCount 1 or more) whose magnitudes apply once per counted member, up to MaxCount stacks, and no reaction. See docs/design/battle-system.md, 'Team bonds'. The first 3 AvatarActives are the avatar's default actives. See docs/design/battle-system.md, 'Beast skill kits'. Display text (names, descriptions) is DRAFT pending producer review; tone, naming and length rules are in docs/design/content-bible.md. Descriptions are shown as rich text: glossary terms (content/data/Glossary/glossary.json: a status, crit, a stance...) are highlighted wherever one of their Forms appears as a whole word, and a phrase that names a term in other words is marked [[shown text|Term]] (validated: every marked term must exist, and a skill that applies a status must name it).",
   "SchemaVersion": 3,
   "Materials": [
     { "MaterialId": "essence_shard", "DisplayName": "Essence Shard", "Description": "A sliver of battle essence that glitters like frost. Feeds a skill a little XP; opens its first breakthrough (level 5).", "Tier": 1, "XpValue": 250 },
@@ -79,7 +79,7 @@
     {
       "SkillId": "tectonic_shove",
       "DisplayName": "Tectonic Shove",
-      "Description": "A shoulder charge that sends an adjacent foe skidding two hexes back.",
+      "Description": "A shoulder charge that sends an adjacent foe [[skidding two hexes back|Knockback]].",
       "ArtKey": "skill/tectonic_shove",
       "TargetShape": "SingleTarget",
       "Range": 1,
@@ -220,7 +220,7 @@
     {
       "SkillId": "tidal_wave",
       "DisplayName": "Tidal Wave",
-      "Description": "A wall of water down a three-hex line that may knock the front rank back.",
+      "Description": "A wall of water down a three-hex line that may [[knock the front rank back|Knockback]].",
       "ArtKey": "skill/tidal_wave",
       "TargetShape": "Line",
       "Range": 3,
@@ -364,7 +364,7 @@
     {
       "SkillId": "entangling_roots",
       "DisplayName": "Entangling Roots",
-      "Description": "Roots burst from the ground and may hold the target fast for a turn.",
+      "Description": "Roots burst from the ground and may [[hold the target fast|Stun]] for a turn.",
       "ArtKey": "skill/entangling_roots",
       "TargetShape": "SingleTarget",
       "Range": 2,
@@ -552,7 +552,7 @@
     {
       "SkillId": "juggernaut_charge",
       "DisplayName": "Juggernaut Charge",
-      "Description": "A two-hex charge that flattens the line and shoves the front of it back.",
+      "Description": "A two-hex charge that flattens the line and [[shoves the front of it back|Knockback]].",
       "ArtKey": "skill/juggernaut_charge",
       "TargetShape": "Line",
       "Range": 2,
@@ -908,7 +908,7 @@
     {
       "SkillId": "gust",
       "DisplayName": "Gust",
-      "Description": "A beat of great wings that hurls everything adjacent two hexes away.",
+      "Description": "A beat of great wings that [[hurls everything adjacent two hexes away|Knockback]].",
       "ArtKey": "skill/gust",
       "TargetShape": "AreaBurst",
       "Range": 1,
@@ -1122,7 +1122,7 @@
     {
       "SkillId": "sunfire_nova",
       "DisplayName": "Sunfire Nova",
-      "Description": "A cross of white fire three hexes out along every axis.",
+      "Description": "A cross of white fire three hexes out along every axis that leaves its targets burning.",
       "ArtKey": "skill/sunfire_nova",
       "TargetShape": "Cross",
       "Range": 3,
@@ -1333,7 +1333,7 @@
     {
       "SkillId": "petrifying_gaze",
       "DisplayName": "Petrifying Gaze",
-      "Description": "A glance that may turn the target to stone for a turn.",
+      "Description": "A glance that may [[turn the target to stone|Stun]] for a turn.",
       "ArtKey": "skill/petrifying_gaze",
       "TargetShape": "SingleTarget",
       "Range": 3,

@@ -181,7 +181,11 @@ never grim. Picture a travel journal with sketches in the margins.
 | Beast, region, boss, Seal description | 1–2 sentences, ≤ ~280 characters |
 
 Mechanical hints must match the data exactly (targets, range in hexes, durations, chances, once per
-battle). When the numbers change, the description changes with them; when a description would need
+battle). Skill and passive descriptions are shown as rich text: the battle glossary's terms
+(`content/data/Glossary/glossary.json`: stun, shield, taunt, burn, poison, crit, the stances...) are
+highlighted wherever they appear, and a skill that applies a status must name it — in the glossary's
+words, or by marking a phrase that says it differently as `[[turn the target to stone|Stun]]` (the
+marks never show; the validator checks every one). When the numbers change, the description changes with them; when a description would need
 a mechanic that does not exist, say what the skill really does instead.
 
 Boss templates carry `"Draft": true` in `encounter-library.json` until the producer signs the bosses off

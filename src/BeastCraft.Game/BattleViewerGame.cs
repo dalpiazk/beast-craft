@@ -6,9 +6,11 @@ using BeastCraft.Battle;
 using BeastCraft.Game.Rendering;
 using BeastCraft.Presentation.Board;
 using BeastCraft.Presentation.Camera;
+using BeastCraft.Presentation.Cards;
 using BeastCraft.Presentation.Content;
 using BeastCraft.Presentation.Layout;
 using BeastCraft.Presentation.Playback;
+using BeastCraft.Presentation.Text;
 using BeastCraft.Presentation.Vfx;
 using BeastCraft.Save;
 using BeastCraft.Session;
@@ -31,7 +33,9 @@ namespace BeastCraft.Game
     /// Desktop: Space steps (or finishes the turn playing), A toggles auto-play, 1-3 set the speed,
     /// S skips to the end, Tab cycles the selected skill, Esc quits; the mouse clicks the buttons
     /// and hovers or clicks the skills. Touch (<see cref="ViewerHost.Touch"/>): tap a button or a
-    /// skill, tap the board to step, two fingers toggle auto-play, Back quits. With
+    /// skill to open its detail card (tap a highlighted word for its definition; tap off the card to
+    /// close it), tap the gear for the effects settings, tap the board to step, two fingers toggle
+    /// auto-play, Back quits. With
     /// <c>--screenshot</c> it renders a single frame to a PNG and exits (<see cref="ViewerOptions"/>).
     /// </para>
     /// <para>
@@ -206,6 +210,7 @@ namespace BeastCraft.Game
             {
                 int count = ActingSkills().Count;
                 _selectedSkill = count == 0 || _selectedSkill + 1 >= count ? -1 : _selectedSkill + 1;
+                _popupTerm = null;
             }
 
             _previousKeys = keys;
@@ -367,6 +372,16 @@ namespace BeastCraft.Game
             _animation = new TurnAnimation(shown, _layout, _content.Vfx, _options.Seed, _vfxSettings);
             _turnCamera = new TurnCamera(_animation, _layout, _camera, _camera.FitAll);
             _clockMs = _options.AtMs ?? _animation.MidVfxMs(beatIndex);
+            if (!string.IsNullOrEmpty(_options.Glossary))
+            {
+                _popupTerm = _content.Glossary.Find(_options.Glossary);
+                if (_popupTerm == null)
+                {
+                    Fail("No glossary term '" + _options.Glossary + "'.");
+                    return;
+                }
+            }
+
             Console.WriteLine("Screenshot: turn " + (shown.Index + 1) + " (" + Name(shown.Turn.Unit.Id) + "), " + _clockMs + " ms into its " +
                               _animation.DurationMs + " ms animation" +
                               (_playback.IsOver ? "; the battle ended: " + _playback.Outcome : string.Empty) + ".");
@@ -525,6 +540,22 @@ namespace BeastCraft.Game
                 return;
             }
 
+            // The pinned skill card: a tap closes an open definition, or opens the tapped term's.
+            IReadOnlyList<SkillSO> skills = ActingSkills();
+            bool pinned = _selectedSkill >= 0 && _selectedSkill < skills.Count;
+            if (pinned && _popupTerm != null)
+            {
+                _popupTerm = null;
+                return;
+            }
+
+            if (pinned && _screen.SkillDetail.Contains(at.X, at.Y))
+            {
+                Rect text = _screen.SkillDetailText;
+                _popupTerm = CardTextLayout(SkillCard.Of(skills[_selectedSkill], _content.Glossary)).TermAt(at.X - text.X, at.Y - text.Y);
+                return;
+            }
+
             for (int i = 0; i < PortraitLayout.ControlCount; i++)
             {
                 if (!_screen.Control(i).Contains(at.X, at.Y))
@@ -552,11 +583,19 @@ namespace BeastCraft.Game
             if (card >= 0)
             {
                 _selectedSkill = card == _selectedSkill ? -1 : card;
+                _popupTerm = null;
                 return;
             }
 
             if (_screen.Board.Contains(at.X, at.Y) || _screen.Toast.Contains(at.X, at.Y))
             {
+                // Off the card: close it; with no card open, step.
+                if (pinned)
+                {
+                    _selectedSkill = -1;
+                    return;
+                }
+
                 step = true;
             }
         }

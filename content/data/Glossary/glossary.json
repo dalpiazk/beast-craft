@@ -1,0 +1,104 @@
+{
+  "_readme": "The battle glossary: the terms the skill detail card highlights in skill text, and what tapping one shows. Presentation only (never read by the battle). Each term: TermId (stable lowercase snake_case), Term (the name shown as the definition's title, and what [[shown text|Term]] markup in a description names), Category (Status, Combat, Stance or Passive), Forms (the words that are highlighted wherever they appear in skill text as a whole word: a form written in lowercase also matches with a capital first letter, at the start of a sentence; a form with a capital, a proper name such as a stance, matches only exactly; the longest form wins, then the earlier term) and Definition (one or two plain sentences, true to the rules in docs/design/battle-system.md). No form may belong to two terms. Validated by BeastCraft.Presentation.Text.GlossaryValidator on every content load: the file itself, every [[...]] mark in skill text names a term, and every beast skill, avatar active and passive that applies a status names it in its description.",
+  "SchemaVersion": 1,
+  "Terms": [
+    {
+      "TermId": "stun",
+      "Term": "Stun",
+      "Category": "Status",
+      "Forms": [ "stun", "stuns", "stunned", "frozen" ],
+      "Definition": "A stunned unit loses its next turn: it cannot move or use skills, and its cooldowns do not count down. Being frozen or turned to stone is a stun."
+    },
+    {
+      "TermId": "shield",
+      "Term": "Shield",
+      "Category": "Status",
+      "Forms": [ "shield", "shields", "shielded" ],
+      "Definition": "Soaks up damage before any HP is lost, for a few turns. Its strength is a share of the caster's Defense; a unit keeps only its strongest shield."
+    },
+    {
+      "TermId": "taunt",
+      "Term": "Taunt",
+      "Category": "Status",
+      "Forms": [ "taunt", "taunts", "taunted", "taunting" ],
+      "Definition": "A taunted enemy must aim its single-target and line skills at the unit that taunted it, walking toward it if it is out of reach, until the taunt ends."
+    },
+    {
+      "TermId": "burn",
+      "Term": "Burn",
+      "Category": "Status",
+      "Forms": [ "burn", "burns", "burning", "burned" ],
+      "Definition": "Fire damage over time: the unit loses a fixed amount of HP at the start of each of its turns while it lasts. Burns can stack."
+    },
+    {
+      "TermId": "poison",
+      "Term": "Poison",
+      "Category": "Status",
+      "Forms": [ "poison", "poisons", "poisoned" ],
+      "Definition": "Damage over time from anything but fire: the unit loses a fixed amount of HP at the start of each of its turns while it lasts. Poison can stack."
+    },
+    {
+      "TermId": "cleanse",
+      "Term": "Cleanse",
+      "Category": "Status",
+      "Forms": [ "cleanse", "cleanses", "cleansed", "cleansing" ],
+      "Definition": "Clears every stun, burn and poison from the unit at once. Shields and taunts stay."
+    },
+    {
+      "TermId": "knockback",
+      "Term": "Knockback",
+      "Category": "Status",
+      "Forms": [ "knockback", "knockbacks", "knock back", "knocks back", "knocked back" ],
+      "Definition": "Pushes the unit a number of hexes straight away from the caster, stopping early at a blocked or occupied tile or the edge of the arena."
+    },
+    {
+      "TermId": "slow",
+      "Term": "Slow",
+      "Category": "Status",
+      "Forms": [ "slow", "slows", "slowed", "slowing", "chill", "chills", "chilled" ],
+      "Definition": "Lowers the unit's Speed for a few turns, so it acts less often."
+    },
+    {
+      "TermId": "crit",
+      "Term": "Crit",
+      "Category": "Combat",
+      "Forms": [ "crit", "crits", "critical", "critical hit", "critical hits" ],
+      "Definition": "A critical hit deals one and a half times the damage. Every hit rolls its own chance to crit, from the attacker's crit chance."
+    },
+    {
+      "TermId": "heal",
+      "Term": "Heal",
+      "Category": "Combat",
+      "Forms": [ "heal", "heals", "healed", "healing" ],
+      "Definition": "Restores HP, never above the unit's maximum. A heal's strength scales with the healer's Special Attack."
+    },
+    {
+      "TermId": "aura",
+      "Term": "Aura",
+      "Category": "Passive",
+      "Forms": [ "Aura" ],
+      "Definition": "A passive that is always on: its effect holds for the whole battle."
+    },
+    {
+      "TermId": "vanguard",
+      "Term": "Vanguard",
+      "Category": "Stance",
+      "Forms": [ "Vanguard", "Vanguards" ],
+      "Definition": "The front-line stance: walks straight in, stands between the enemy and its more fragile allies, and never retreats."
+    },
+    {
+      "TermId": "ranged",
+      "Term": "Ranged",
+      "Category": "Stance",
+      "Forms": [ "Ranged" ],
+      "Definition": "Keeps its distance: approaches only as far as its skills need, never walks into melee, and backs away from nearby enemies."
+    },
+    {
+      "TermId": "skirmisher",
+      "Term": "Skirmisher",
+      "Category": "Stance",
+      "Forms": [ "Skirmisher", "Skirmishers" ],
+      "Definition": "Hit and run: closes in and strikes like a Vanguard, then spends any movement left retreating."
+    }
+  ]
+}

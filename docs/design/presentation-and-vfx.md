@@ -148,7 +148,8 @@ Bands, top to bottom (all pure layout maths, tested headless):
 | Controls | y 1774-1894 | PLAY/PAUSE (auto-play), x1 / x2 / x3 speed, SKIP (resolve the rest of the battle and show the result) |
 
 Input: desktop keys (Space step/finish turn, A auto, 1-3 speed, S skip, Tab cycle the selected
-skill, Esc quit) and the mouse (click buttons and cards, hover a card to show its diagram);
+skill, Esc quit) and the mouse (click buttons and cards; click a skill for its detail card, hover to
+preview it);
 touch taps are hit-tested on the canvas (a button, a card, else the board steps), two fingers
 toggle auto, Back quits. The desktop window opens at 540x960; `--screenshot` renders K x 540x960
 (default 1080x1920).
@@ -332,9 +333,40 @@ Line, the six arms for Cross, the disc(s) for AreaBurst, the caster for Self) an
 `IsGlobal` for AllEnemies/AllAllies. Multi-hex casters follow the battle's rules (bursts and
 crosses from every tile, ranges from the nearest), and a test holds the fixed shapes to
 `SkillTargetResolver` on a board full of units. It is unbounded (a battle clips to the board).
-The viewer shows the selected skill's card over the foot of the board: name, shape, side,
-cooldown and the diagram (caster gold, reach blue, area in the side's colour, the example target
-outlined) — the seed of a skill detail card.
+The skill detail card (below) draws it: caster gold, reach blue, area in the side's colour, the
+example target outlined.
+
+## Skill detail card and glossary
+
+Tapping (or clicking; hovering previews) a skill in the strip opens its **detail card** over the
+lower board (`PortraitLayout.SkillDetail`, with `SkillDetailIcon`, `SkillDetailDiagram` and
+`SkillDetailText`). `SkillCard.Of(skill, glossary)` (Presentation, pure) works out everything it
+shows from the skill's data: the icon (`ArtKey`), name, element and damage-category tags, target
+tags (Ally, Enemy, Self: the shape and side, a burst or whole-team skill covering its caster),
+cooldown ("Every turn" at 0 or 1), range ("Melee", "Range 3", "Line 4", "Burst 2 around self",
+"Whole field", "Self") and uses (once per battle, ready at once), one power line per effect from
+the data (damage and heals as a percent of the attacking stat, a shield of Defense, a burn or
+poison per turn, a knockback in hexes, a buff or debuff with its duration, stacks and chance) and
+the level scaling (`MagnitudeGrowthPerLevel`, `MaxLevel`); then the range diagram beside the
+description as rich text.
+
+**Glossary.** `content/data/Glossary/glossary.json` (`GlossaryData`; `Glossary`) lists the terms:
+the statuses (Stun, Shield, Taunt, Burn, Poison, Cleanse, Knockback, Slow), Crit, Heal, Aura and the
+stances (Vanguard, Ranged, Skirmisher), each with its `Forms` and a `Definition`. `Glossary.Parse`
+turns skill text into spans: explicit `[[shown words|Term]]` markup first (for a phrase that names a
+term in other words: "[[turn the target to stone|Stun]]"), then every form standing as a whole word,
+case-aware — a lowercase form also matches with a capital first letter, a form with a capital (a
+name) only exactly — the longest form winning, then the earlier term: deterministic.
+`RichTextLayout` wraps the spans to the text area (a phrase keeps its term across a line break;
+words of one kind merge into one run) and hit-tests taps (`TermAt`). Terms are drawn in their
+category's colour and underlined; tapping one opens its definition in a popup above it
+(`PortraitLayout.PopupNear`); any tap closes it, and a tap off the card closes the card.
+`GlossaryValidator` (on every content load, and tested) checks the file (unique snake_case ids and
+names, a category, a definition, no form in two terms) and that **every term used in skill text
+resolves** (each mark in a beast skill's, avatar active's, passive's or enemy-library skill's name
+or description names a term and is closed) and that every skill-library skill that applies a status
+or a cleanse names it in its description. Desktop screenshots: `--select-skill N` opens the card,
+`--glossary TERM` its definition.
 
 ## Spine later (`Kind: "spine"`)
 
