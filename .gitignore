@@ -52,6 +52,16 @@ Pipeline/**/_scratch/
 Tooling/PixelArt/preview/
 
 # ---------------------------------------------------------------------------
+# Tooling/ArtLab -- models, the venv and outputs live outside the repo
+# (%LOCALAPPDATA%\BeastCraftArtLab); these catch a lab folder pointed inside it.
+# ---------------------------------------------------------------------------
+Tooling/ArtLab/models/
+Tooling/ArtLab/work/
+Tooling/ArtLab/out/
+*.safetensors
+*.ckpt
+
+# ---------------------------------------------------------------------------
 # OS cruft
 # ---------------------------------------------------------------------------
 .DS_Store
