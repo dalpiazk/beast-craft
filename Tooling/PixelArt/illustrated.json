@@ -7,9 +7,9 @@
       "Category": "beast",
       "Label": "Golem (Earth, illustrated)",
       "ArtKey": "beast/golem/illustrated",
-      "PivotX": 512,
+      "PivotX": 256,
       "PivotY": 508,
-      "WorldHeight": 0.9
+      "WorldHeight": 1.0
     },
     {
       "Name": "beast_kirin_illustrated",
@@ -19,7 +19,7 @@
       "ArtKey": "beast/kirin/illustrated",
       "PivotX": 256,
       "PivotY": 508,
-      "WorldHeight": 1.05
+      "WorldHeight": 1.15
     },
     {
       "Name": "beast_phoenix_illustrated",
@@ -29,7 +29,7 @@
       "ArtKey": "beast/phoenix/illustrated",
       "PivotX": 256,
       "PivotY": 508,
-      "WorldHeight": 1.2
+      "WorldHeight": 1.25
     }
   ]
 }
