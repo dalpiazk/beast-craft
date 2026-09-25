@@ -72,7 +72,8 @@ Models, the venv and outputs never go into the repo.
 | `madebyollin/sdxl-vae-fp16-fix` | the VAE | **MIT** | a half-precision-safe SDXL VAE (fewer NaN/black images) |
 | `xinsir/controlnet-canny-sdxl-1.0` | `diffusion_pytorch_model.safetensors`, `config.json` | **Apache-2.0** | canny ControlNet: layout edges in exploration, the pick's own lines in the lock |
 | `xinsir/controlnet-tile-sdxl-1.0` | `diffusion_pytorch_model.safetensors`, `config.json` | **Apache-2.0** | tile ControlNet in the detail pass |
-| `h94/IP-Adapter` | `sdxl_models/ip-adapter_sdxl_vit-h.safetensors`, `models/image_encoder/` (OpenCLIP ViT-H/14) | **Apache-2.0** | InstantStyle (the adapter on the style block only), from our own style references |
+| `h94/IP-Adapter` | `sdxl_models/ip-adapter_sdxl_vit-h.safetensors` | **Apache-2.0** | InstantStyle (the adapter on the style block only), from our own style references |
+| `laion/CLIP-ViT-H-14-laion2B-s32B-b79K` (OpenCLIP ViT-H/14, LAION-2B) | the image encoder, downloaded as h94/IP-Adapter's `models/image_encoder/` | **MIT** (model card `license: mit`) | encodes the style references for the IP-Adapter |
 | `facebook/sam2.1-hiera-small` | the transformers `model.safetensors` | **Apache-2.0** | character masks and rig-part masks |
 
 About 15 GB on disk in total. **What the RAIL++-M licence means for us:** it places use restrictions on the *model*

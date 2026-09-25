@@ -42,7 +42,8 @@ repository. How each asset was made is recorded in `Tooling/ArtLab/provenance/`.
 | madebyollin/sdxl-vae-fp16-fix | the SDXL VAE, half-precision safe | MIT |
 | xinsir/controlnet-canny-sdxl-1.0 | edge-guided generation (the design lock) | Apache-2.0 |
 | xinsir/controlnet-tile-sdxl-1.0 | the tiled detail pass | Apache-2.0 |
-| h94/IP-Adapter (`ip-adapter_sdxl_vit-h` + its OpenCLIP ViT-H/14 image encoder) | style conditioning (InstantStyle) from our own style references | Apache-2.0 |
+| h94/IP-Adapter (`sdxl_models/ip-adapter_sdxl_vit-h.safetensors`) | style conditioning (InstantStyle) from our own style references | Apache-2.0 |
+| laion/CLIP-ViT-H-14-laion2B-s32B-b79K (OpenCLIP ViT-H/14, LAION-2B; the image encoder, as redistributed in h94/IP-Adapter `models/image_encoder/`) | encodes the style references for the IP-Adapter | MIT (model card metadata `license: mit`, https://huggingface.co/laion/CLIP-ViT-H-14-laion2B-s32B-b79K) |
 | facebook/sam2.1-hiera-small | character and rig-part masks | Apache-2.0 |
 
 **On the CreativeML Open RAIL++-M licence.** It places use-based restrictions on the *model* and its
