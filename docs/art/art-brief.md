@@ -165,6 +165,7 @@ Heal, Buff, Debuff, Burn (DamageOverTime/fire), Poison (DamageOverTime/nature), 
 | r08 Deepwild | Nature — ancient towering forest |
 | r09 Cinder Throne | Fire/Earth/Metal — volcanic, black glass |
 | r10 Worldcrown | Fire/Water — summit, twin elements |
+| r11 Duskmeridian (post-game, Phase 3) | Light/Dark — endless gold-and-violet evening, dawn and dusk in one sky |
 
 ### UI kit
 
@@ -192,6 +193,11 @@ discrete beast categories; colour pickers excluded).
 
 **Phase 3** — 10 DRAFT region bosses, quoted only after the draft boss designs are approved.
 
+**Phase 3, post-game (DRAFT)** — r11 Duskmeridian tileset + background (Light/Dark); the post-game
+twin boss "Dusk and Dawn" (two giants, Light and Dark; Normal and Hard share the silhouette pass);
+its four lair looks: Dawnshade Horn (Kirin) and Dawnshade Crown (Basilisk), plus the Hard-only
+variants Radiant Dawnshade Horn and Eclipse Dawnshade Crown.
+
 **Post-launch** — remaining 113 beast cosmetic options as drops (212 options total in data).
 
 **Sign-off:** the producer approves the style sheet before Phase 1, and each phase's deliveries.
@@ -213,6 +219,9 @@ discrete beast categories; colour pickers excluded).
 | Status-effect VFX (burst + aura) | 10 | | |
 | Region tileset + background | 1 (P1) / 10 total | | |
 | Core UI kit | 1 set | | |
+| Post-game region r11 tileset + background (Light/Dark) | 1 (P3) | | |
+| Post-game twin boss silhouette pass (Dusk and Dawn; Normal and Hard share it) | 1 (P3, quote after design approval) | | |
+| Post-game lair looks: Dawnshade Horn / Crown + Hard variants (Radiant / Eclipse) | 4 options (P3) | | |
 
 ## 5. Budget ballparks (rough, pending real quotes)
 

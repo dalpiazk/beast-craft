@@ -43,12 +43,17 @@ namespace BeastCraft.Tests.EditMode
             }
 
             List<string> regions = new List<string>();
+            List<string> postGame = new List<string>();
             foreach (RegionData region in CampaignMapTests.LoadRegions().Regions)
             {
                 regions.Add(region.RegionId);
+                if (region.IsPostGame)
+                {
+                    postGame.Add(region.RegionId);
+                }
             }
 
-            List<string> errors = CosmeticLibraryValidator.Validate(_data, species, regions);
+            List<string> errors = CosmeticLibraryValidator.Validate(_data, species, regions, postGame);
             Assert.IsEmpty(errors, string.Join("\n", errors));
             foreach (string id in species)
             {

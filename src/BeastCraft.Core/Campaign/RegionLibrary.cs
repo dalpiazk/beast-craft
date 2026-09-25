@@ -79,6 +79,72 @@ namespace BeastCraft.Campaign
             return region != null && region.MapRules != null && region.MapRules.Layers > 0 ? region.MapRules : Data.MapRules ?? new MapRulesData();
         }
 
+        /// <summary>Whether an expedition into <paramref name="region"/> may be played on <paramref name="difficulty"/>: Normal anywhere, Hard only in a post-game region.</summary>
+        public static bool Allows(RegionData region, RunDifficulty difficulty)
+        {
+            return region != null && (difficulty == RunDifficulty.Normal || (difficulty == RunDifficulty.Hard && region.IsPostGame));
+        }
+
+        /// <summary>
+        /// <paramref name="region"/> as an expedition on <paramref name="difficulty"/> fields it: itself
+        /// on Normal; on Hard (a post-game region only) a copy whose <see cref="RegionData.ShapeWeights"/>
+        /// and <see cref="RegionData.BossTemplateId"/> are its <see cref="RegionData.HardMode"/>'s. Null
+        /// when the difficulty is not allowed there (<see cref="Allows"/>).
+        /// </summary>
+        public RegionData RegionFor(RegionData region, RunDifficulty difficulty)
+        {
+            if (!Allows(region, difficulty))
+            {
+                return null;
+            }
+
+            if (difficulty == RunDifficulty.Normal)
+            {
+                return region;
+            }
+
+            RegionHardModeData hard = region.HardMode ?? new RegionHardModeData();
+            RegionData copy = region.Copy();
+            copy.ShapeWeights = hard.ShapeWeights ?? new ShapeWeightData[0];
+            copy.BossTemplateId = hard.BossTemplateId ?? string.Empty;
+            return copy;
+        }
+
+        /// <summary>
+        /// The map rules an expedition into <paramref name="region"/> on <paramref name="difficulty"/>
+        /// uses: <see cref="RulesFor(RegionData)"/>, on Hard with the <see cref="RegionData.HardMode"/>'s
+        /// <see cref="RegionHardModeData.EliteShapeId"/>. Null when the difficulty is not allowed there.
+        /// </summary>
+        public MapRulesData RulesFor(RegionData region, RunDifficulty difficulty)
+        {
+            if (!Allows(region, difficulty))
+            {
+                return null;
+            }
+
+            MapRulesData rules = RulesFor(region);
+            if (difficulty == RunDifficulty.Normal)
+            {
+                return rules;
+            }
+
+            MapRulesData copy = rules.Copy();
+            copy.EliteShapeId = region.HardMode == null ? string.Empty : region.HardMode.EliteShapeId ?? string.Empty;
+            return copy;
+        }
+
+        /// <summary>The mainline regions (not <see cref="RegionData.IsPostGame"/>), in campaign order.</summary>
+        public List<RegionData> MainlineRegions()
+        {
+            return _order.FindAll(region => !region.IsPostGame);
+        }
+
+        /// <summary>The post-game regions (<see cref="RegionData.IsPostGame"/>), in campaign order.</summary>
+        public List<RegionData> PostGameRegions()
+        {
+            return _order.FindAll(region => region.IsPostGame);
+        }
+
         /// <summary>The regions whose <see cref="RegionData.RequiresRegionId"/> is <paramref name="regionId"/>, in campaign order.</summary>
         public List<RegionData> UnlockedBy(string regionId)
         {

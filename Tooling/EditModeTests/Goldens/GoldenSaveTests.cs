@@ -8,15 +8,20 @@ using NUnit.Framework;
 namespace BeastCraft.Tests.EditMode
 {
     /// <summary>
-    /// Golden save fixtures for every schema version (1-5): each committed input is loaded (and
+    /// Golden save fixtures for every schema version (1-6): each committed input is loaded (and
     /// migrated) by <see cref="SaveSerializer"/> and written back, and the text must equal the
     /// committed expected output byte for byte. The fixtures and outputs were captured on the
     /// Unity-era JsonUtility serializer; the engine-neutral serializer must reproduce them exactly.
     /// <para>
-    /// <c>rich-v5</c> is a save with every field of every save DTO filled (generated once, by
-    /// reflection, then frozen as a file); <c>rich-v1</c>..<c>rich-v4</c> are the same text stamped
-    /// with an older SchemaVersion, so every migration runs over every field. The <c>min-v*</c>
-    /// inputs are the small hand-written saves of each era the migration tests use.
+    /// <c>rich-v5</c> is a schema-5 save with every field of every save DTO filled (generated once,
+    /// by reflection, then frozen as a file); <c>rich-v1</c>..<c>rich-v4</c> are the same text stamped
+    /// with an older SchemaVersion, so every migration runs over every field. <c>rich-v6</c> is the
+    /// schema-6 save generated the same way (it adds <c>MapRun.Difficulty</c>), and is the one that
+    /// must round-trip unchanged. The <c>min-v*</c> inputs are the small hand-written saves of each
+    /// era the migration tests use. Schema 6 (the expedition's difficulty) changed every older
+    /// expected output in exactly two places: <c>"SchemaVersion":5</c> became <c>6</c>, and
+    /// <c>,"Difficulty":0</c> follows <c>"NodeAttemptsNodeId"</c> in the <c>ActiveRun</c>; no input
+    /// of schema 1-5 changed.
     /// </para>
     /// </summary>
     public class GoldenSaveTests
@@ -49,7 +54,8 @@ namespace BeastCraft.Tests.EditMode
             "\"ActiveRun\":{\"RegionId\":\"\",\"Stage\":0,\"Seed\":0,\"Nodes\":[],\"CurrentNodeId\":-1,\"Cleared\":[],\"Attempts\":0,\"NodeAttempts\":0}}," +
             "\"Gold\":77,\"Consumables\":[],\"Shops\":[],\"Cosmetics\":{\"Unlocked\":[]}," +
             "\"AvatarAppearance\":{\"OptionEntries\":[],\"ColorEntries\":[]}}",
-            "{\"SchemaVersion\":5}"
+            "{\"SchemaVersion\":5}",
+            "{\"SchemaVersion\":6}"
         };
 
         private static SaveSerializer NewSerializer()
@@ -57,28 +63,36 @@ namespace BeastCraft.Tests.EditMode
             return new SaveSerializer(new JsonSaveSerializer());
         }
 
+        /// <summary>The frozen schema-5 rich save (never rewritten: schema 6 left every older input as it was).</summary>
         private static string RichV5()
+        {
+            return GoldenFiles.Read("Saves/rich-v5.input.json");
+        }
+
+        /// <summary>The frozen schema-6 rich save (captured by reflection in update mode).</summary>
+        private static string RichV6()
         {
             if (GoldenFiles.Updating)
             {
                 PlayerSave save = new PlayerSave();
                 int seed = 1;
                 Populate(save, ref seed, 0);
-                GoldenFiles.Write("Saves/rich-v5.input.json", NewSerializer().Serialize(save));
+                GoldenFiles.Write("Saves/rich-v6.input.json", NewSerializer().Serialize(save));
             }
 
-            return GoldenFiles.Read("Saves/rich-v5.input.json");
+            return GoldenFiles.Read("Saves/rich-v6.input.json");
         }
 
         [Test]
-        public void RichV5_RoundTripsByteIdentical()
+        public void RichV6_RoundTripsByteIdentical()
         {
-            string input = RichV5();
+            string input = RichV6();
             SaveLoadResult result = NewSerializer().Deserialize(input);
 
             Assert.IsTrue(result.Success, result.Error);
             Assert.IsFalse(result.Migrated);
             Assert.AreEqual(input, NewSerializer().Serialize(result.Save), "a current-schema save must write back exactly as read");
+            StringAssert.Contains("\"Difficulty\":", input, "the rich save fills the schema-6 field");
         }
 
         [TestCase(1)]
@@ -86,9 +100,10 @@ namespace BeastCraft.Tests.EditMode
         [TestCase(3)]
         [TestCase(4)]
         [TestCase(5)]
+        [TestCase(6)]
         public void RichSave_LoadsAndMigrates_ToTheGoldenText(int version)
         {
-            string input = RichV5().Replace("\"SchemaVersion\":5", "\"SchemaVersion\":" + version);
+            string input = version == 6 ? RichV6() : RichV5().Replace("\"SchemaVersion\":5", "\"SchemaVersion\":" + version);
             AssertGolden("rich-v" + version, input, version);
         }
 
@@ -97,6 +112,7 @@ namespace BeastCraft.Tests.EditMode
         [TestCase(3)]
         [TestCase(4)]
         [TestCase(5)]
+        [TestCase(6)]
         public void MinimalSave_LoadsAndMigrates_ToTheGoldenText(int version)
         {
             AssertGolden("min-v" + version, MinimalInputs[version - 1], version);
@@ -128,7 +144,7 @@ namespace BeastCraft.Tests.EditMode
             Assert.AreEqual(output, NewSerializer().Serialize(again.Save));
         }
 
-        // ---- Deterministic fill of every serialized field (used only to capture rich-v5) ----
+        // ---- Deterministic fill of every serialized field (used only to capture the rich saves) ----
 
         private static void Populate(object target, ref int seed, int depth)
         {

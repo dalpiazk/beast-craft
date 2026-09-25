@@ -220,6 +220,16 @@ and, very rarely, of looks: one roll per claim at 0.08% per full 8-hour claim fr
 pool** (the progress level's region's `drop` looks not yet owned; user decision: no idle-exclusive
 looks), about 0.04 looks per campaign.
 
+### Post-game looks (`boss_hard`, DRAFT)
+
+The post-game region r11 adds two lair looks (`boss`, `UnlockId: "r11"`: Dawnshade Horn, Dawnshade
+Crown) and a seventh source, **`boss_hard`**: a look unlocked by clearing a post-game lair on **Hard**
+(any Hard clear, the first included; `CosmeticRules.UnlockHardBossLooks`), never sold and never
+dropped (the Trader stocks `shop` looks only; the validator requires a `boss_hard` look to name a
+post-game region). r11's: Radiant Dawnshade Horn (Kirin) and Eclipse Dawnshade Crown (Basilisk).
+Hard pays Normal's loot; these looks are its only extra reward. No badge (the system has no badge or
+title slot). See battle-system.md, "Post-game region".
+
 ## Pacing (`--mode campaign`)
 
 `CampaignEconomyModel` plays the economy inside the campaign model on its own random stream: gold,

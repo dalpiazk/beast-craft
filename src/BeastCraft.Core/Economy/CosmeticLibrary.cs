@@ -23,11 +23,18 @@ namespace BeastCraft.Economy
         public const string SourceDrop = "drop";
         public const string SourcePremium = "premium";
 
+        /// <summary>
+        /// A post-game lair's Hard-only look: unlocked by clearing the boss of the region its
+        /// <c>UnlockId</c> names on <c>RunDifficulty.Hard</c> (any Hard clear, the first included);
+        /// never sold, never dropped. Hard's only extra reward (its loot is Normal's).
+        /// </summary>
+        public const string SourceBossHard = "boss_hard";
+
         /// <summary>A category's <see cref="CosmeticCategory.Scope"/> for the avatar.</summary>
         public const string AvatarScope = "avatar";
 
         /// <summary>Every source name, in the validator's order.</summary>
-        public static readonly string[] Sources = { SourceDefault, SourceStarter, SourceShop, SourceBoss, SourceMilestone, SourceDrop, SourcePremium };
+        public static readonly string[] Sources = { SourceDefault, SourceStarter, SourceShop, SourceBoss, SourceMilestone, SourceDrop, SourcePremium, SourceBossHard };
 
         private readonly List<CosmeticCategory> _categories = new List<CosmeticCategory>();
         private readonly Dictionary<string, CosmeticCategory> _byId = new Dictionary<string, CosmeticCategory>(StringComparer.Ordinal);

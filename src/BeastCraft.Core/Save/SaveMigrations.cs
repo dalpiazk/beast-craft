@@ -17,6 +17,7 @@ namespace BeastCraft.Save
     /// <see cref="PlayerSave.Shops"/>, <see cref="PlayerSave.Cosmetics"/>,
     /// <see cref="PlayerSave.AvatarAppearance"/>, <see cref="OwnedBeast.Appearance"/>): <see cref="AddEconomy"/>.</item>
     /// <item>4 to 5: the idle reward clock (<see cref="PlayerSave.Idle"/>): <see cref="AddIdle"/>.</item>
+    /// <item>5 to 6: the expedition's difficulty (<see cref="MapRun.Difficulty"/>): <see cref="AddRunDifficulty"/>.</item>
     /// </list>
     /// </summary>
     public static class SaveMigrations
@@ -24,7 +25,7 @@ namespace BeastCraft.Save
         /// <summary>A fresh list of every step (callers may append to it).</summary>
         public static List<ISaveMigration> All()
         {
-            return new List<ISaveMigration> { new AddGear(), new AddCampaign(), new AddEconomy(), new AddIdle() };
+            return new List<ISaveMigration> { new AddGear(), new AddCampaign(), new AddEconomy(), new AddIdle(), new AddRunDifficulty() };
         }
 
         /// <summary>
@@ -113,5 +114,29 @@ namespace BeastCraft.Save
                 return serializer.ToJson(save);
             }
         }
+
+        /// <summary>
+        /// Schema 5 to 6: a v5 expedition has no difficulty. The upgrade reads it into the current
+        /// type and sets the expedition in progress (if any) to <see cref="RunDifficulty.Normal"/> —
+        /// the only difficulty that existed — fills in anything missing and writes it back. Nothing
+        /// else moves.
+        /// </summary>
+        public sealed class AddRunDifficulty : ISaveMigration
+        {
+            public int FromVersion
+            {
+                get { return 5; }
+            }
+
+            public string Upgrade(string json, ISaveJsonSerializer serializer)
+            {
+                PlayerSave save = serializer.FromJson<PlayerSave>(json);
+                save.EnsureInitialized();
+                save.Campaign.ActiveRun.Difficulty = RunDifficulty.Normal;
+                save.SchemaVersion = 6;
+                return serializer.ToJson(save);
+            }
+        }
+
     }
 }

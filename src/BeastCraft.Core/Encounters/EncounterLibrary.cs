@@ -119,6 +119,17 @@ namespace BeastCraft.Encounters
             return template.DifficultyOverride > 0.0 ? template.DifficultyOverride : Multiplier(template.ShapeId, level);
         }
 
+        /// <summary>
+        /// The drop-table shape a clear of <paramref name="shapeId"/> pays out from: its
+        /// <see cref="EncounterShapeData.DropShapeId"/> when set (a post-game shape pays as a mainline
+        /// one), otherwise the id itself (also for an unknown id).
+        /// </summary>
+        public string DropShapeOf(string shapeId)
+        {
+            EncounterShapeData shape = GetShape(shapeId);
+            return shape != null && !string.IsNullOrEmpty(shape.DropShapeId) ? shape.DropShapeId : shapeId;
+        }
+
         /// <summary>The shape with <paramref name="shapeId"/>, or null.</summary>
         public EncounterShapeData GetShape(string shapeId)
         {

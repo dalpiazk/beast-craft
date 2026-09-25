@@ -51,6 +51,15 @@ namespace BeastCraft.Campaign
         /// </summary>
         public int NodeAttemptsNodeId = -1;
 
+        /// <summary>
+        /// The difficulty the expedition was started on (<see cref="CampaignRules.StartRun(BeastCraft.Save.PlayerSave, RegionLibrary, string, int, int, RunDifficulty)"/>):
+        /// <see cref="RunDifficulty.Hard"/> only in a post-game region, where the map was generated
+        /// from the region's <see cref="RegionData.HardMode"/> and a boss clear also unlocks the Hard
+        /// looks. Added in save schema 6 (written as its number, after every older field); older saves
+        /// migrate to <see cref="RunDifficulty.Normal"/>. Reset to Normal with the run.
+        /// </summary>
+        public RunDifficulty Difficulty = RunDifficulty.Normal;
+
         /// <summary>The node with <paramref name="nodeId"/>, or null.</summary>
         public MapNode Find(int nodeId)
         {
@@ -75,6 +84,7 @@ namespace BeastCraft.Campaign
             Attempts = 0;
             NodeAttempts = 0;
             NodeAttemptsNodeId = -1;
+            Difficulty = RunDifficulty.Normal;
         }
 
         /// <summary>Replaces null lists and strings with empty ones and drops null nodes. Returns how many things were repaired.</summary>

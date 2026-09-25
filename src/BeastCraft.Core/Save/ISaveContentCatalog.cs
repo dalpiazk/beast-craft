@@ -24,5 +24,11 @@ namespace BeastCraft.Save
 
         /// <summary>Whether <paramref name="sealId"/> is a known <c>regions.json</c> <c>SealId</c> (added with save schema 3).</summary>
         bool IsKnownSeal(string sealId);
+
+        /// <summary>
+        /// Whether <paramref name="regionId"/> is a post-game region (<c>regions.json</c>
+        /// <c>IsPostGame</c>), the only kind a Hard expedition may be in (added with save schema 6).
+        /// </summary>
+        bool IsPostGameRegion(string regionId);
     }
 }

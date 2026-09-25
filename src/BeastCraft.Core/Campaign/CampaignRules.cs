@@ -126,19 +126,36 @@ namespace BeastCraft.Campaign
             return Math.Min(Math.Max(0, progress.StagesCleared), stages - 1);
         }
 
-        /// <summary>Starts an expedition into <paramref name="regionId"/> at its <see cref="NextStage"/>.</summary>
+        /// <summary>Starts a <see cref="RunDifficulty.Normal"/> expedition into <paramref name="regionId"/> at its <see cref="NextStage"/>.</summary>
         public static CampaignResult StartRun(PlayerSave save, RegionLibrary library, string regionId, int seed)
         {
-            return StartRun(save, library, regionId, NextStage(save, library, regionId), seed);
+            return StartRun(save, library, regionId, NextStage(save, library, regionId), seed, RunDifficulty.Normal);
+        }
+
+        /// <summary>Starts an expedition on <paramref name="difficulty"/> into <paramref name="regionId"/> at its <see cref="NextStage"/>.</summary>
+        public static CampaignResult StartRun(PlayerSave save, RegionLibrary library, string regionId, int seed, RunDifficulty difficulty)
+        {
+            return StartRun(save, library, regionId, NextStage(save, library, regionId), seed, difficulty);
+        }
+
+        /// <summary>A <see cref="RunDifficulty.Normal"/> expedition into stage <paramref name="stage"/> of <paramref name="regionId"/>.</summary>
+        public static CampaignResult StartRun(PlayerSave save, RegionLibrary library, string regionId, int stage, int seed)
+        {
+            return StartRun(save, library, regionId, stage, seed, RunDifficulty.Normal);
         }
 
         /// <summary>
-        /// Starts an expedition into stage <paramref name="stage"/> of <paramref name="regionId"/>,
-        /// its map generated from <paramref name="seed"/>. Refused when an expedition is already in
-        /// progress (retreat first), the region is unknown or locked, or the stage is past the first
-        /// uncleared one.
+        /// Starts an expedition into stage <paramref name="stage"/> of <paramref name="regionId"/> on
+        /// <paramref name="difficulty"/> (the player's choice when starting; stored on the run as
+        /// <see cref="MapRun.Difficulty"/>), its map generated from <paramref name="seed"/> with the
+        /// region and rules of that difficulty (<see cref="RegionLibrary.RegionFor"/>,
+        /// <see cref="RegionLibrary.RulesFor(RegionData, RunDifficulty)"/>: on Hard, the region's
+        /// <see cref="RegionData.HardMode"/> shapes and boss). Refused when an expedition is already in
+        /// progress (retreat first), the region is unknown or locked, the stage is past the first
+        /// uncleared one, or the difficulty is not allowed there (Hard outside a post-game region, or
+        /// an undefined value).
         /// </summary>
-        public static CampaignResult StartRun(PlayerSave save, RegionLibrary library, string regionId, int stage, int seed)
+        public static CampaignResult StartRun(PlayerSave save, RegionLibrary library, string regionId, int stage, int seed, RunDifficulty difficulty)
         {
             if (save == null || library == null)
             {
@@ -168,12 +185,18 @@ namespace BeastCraft.Campaign
                 return CampaignResult.Refused("Stage " + stage + " of '" + regionId + "' is not reachable yet (next is " + next + ").");
             }
 
+            if (!Enum.IsDefined(typeof(RunDifficulty), difficulty) || !RegionLibrary.Allows(region, difficulty))
+            {
+                return CampaignResult.Refused("Difficulty " + difficulty + " is not available in '" + regionId + "' (Hard is for post-game regions only).");
+            }
+
             MapRun run = save.Campaign.ActiveRun;
             run.Clear();
             run.RegionId = regionId;
             run.Stage = stage;
             run.Seed = seed;
-            run.Nodes = NodeMapGenerator.Generate(region, library.RulesFor(region), stage, seed);
+            run.Difficulty = difficulty;
+            run.Nodes = NodeMapGenerator.Generate(library.RegionFor(region, difficulty), library.RulesFor(region, difficulty), stage, seed);
             save.Campaign.CurrentRegionId = regionId;
             return CampaignResult.Done(CampaignOutcome.Started, null);
         }
@@ -362,6 +385,14 @@ namespace BeastCraft.Campaign
                         result.CosmeticsUnlocked.AddRange(CosmeticRules.UnlockBossLooks(save, economy.Cosmetics, region.RegionId));
                     }
                 }
+
+                if (run.Difficulty == RunDifficulty.Hard && economy != null && economy.Cosmetics != null)
+                {
+                    // Every Hard clear (the first included) unlocks the Hard-only looks not yet owned;
+                    // the loot is Normal's (the gear above is the first clear's either way).
+                    result.CosmeticsUnlocked.AddRange(CosmeticRules.UnlockHardBossLooks(save, economy.Cosmetics, region.RegionId));
+                }
+
                 if (!string.IsNullOrEmpty(region.BossRewardSealId))
                 {
                     CampaignResult seal = GrantSeal(save, library, region.BossRewardSealId);

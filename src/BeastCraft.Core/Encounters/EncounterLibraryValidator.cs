@@ -16,7 +16,9 @@ namespace BeastCraft.Encounters
     /// front-to-back order (<see cref="EncounterFit.ComparePlacement"/>), and every template seats on
     /// its arena's enemy deployment zone the way a battle packs it (<see cref="EncounterFit"/>: a
     /// seven-tile enemy never fits a Small arena); and the shape ids are exactly the drop tables'
-    /// shape ids, so every cleared encounter has a drop cell.
+    /// shape ids, so every cleared encounter has a drop cell — except post-game shapes
+    /// (<see cref="EncounterShapeData.PostGame"/>), which each pay out as a mainline shape named by
+    /// <see cref="EncounterShapeData.DropShapeId"/>.
     /// </summary>
     public static class EncounterLibraryValidator
     {
@@ -98,10 +100,14 @@ namespace BeastCraft.Encounters
                 ValidateTemplate(library.Templates[i], i, byId, shapeIds, templateIds, errors);
             }
 
+            // Post-game shapes pay out as a mainline shape (DropShapeId); only shapes that pay as
+            // themselves are matched against the drop tables.
+            HashSet<string> payingShapes = ValidateDropShapes(library.Shapes, shapeIds, errors);
+
             if (dropTables != null)
             {
                 HashSet<string> dropShapes = new HashSet<string>(dropTables.Shapes ?? new string[0], StringComparer.Ordinal);
-                foreach (string id in shapeIds)
+                foreach (string id in payingShapes)
                 {
                     if (!dropShapes.Contains(id))
                     {
@@ -111,7 +117,7 @@ namespace BeastCraft.Encounters
 
                 foreach (string id in dropShapes)
                 {
-                    if (!shapeIds.Contains(id))
+                    if (!payingShapes.Contains(id))
                     {
                         errors.Add("drop-tables.json shape '" + id + "' is not a shape in the encounter library.");
                     }
@@ -119,6 +125,62 @@ namespace BeastCraft.Encounters
             }
 
             return errors;
+        }
+
+        /// <summary>
+        /// The drop-shape rules: a post-game shape (<see cref="EncounterShapeData.PostGame"/>) names in
+        /// <see cref="EncounterShapeData.DropShapeId"/> another shape of the library that is neither
+        /// post-game nor itself aliased; a mainline shape names none. Returns the shapes that pay out as
+        /// themselves (every shape without a <see cref="EncounterShapeData.DropShapeId"/>), in which
+        /// the drop tables' shapes are matched. Without post-game shapes that is every shape id.
+        /// </summary>
+        private static HashSet<string> ValidateDropShapes(EncounterShapeData[] shapes, HashSet<string> shapeIds, List<string> errors)
+        {
+            HashSet<string> paying = new HashSet<string>(shapeIds, StringComparer.Ordinal);
+            Dictionary<string, EncounterShapeData> byId = new Dictionary<string, EncounterShapeData>(StringComparer.Ordinal);
+            foreach (EncounterShapeData shape in shapes ?? new EncounterShapeData[0])
+            {
+                if (shape != null && !string.IsNullOrEmpty(shape.ShapeId) && !byId.ContainsKey(shape.ShapeId))
+                {
+                    byId.Add(shape.ShapeId, shape);
+                }
+            }
+
+            foreach (EncounterShapeData shape in shapes ?? new EncounterShapeData[0])
+            {
+                if (shape == null)
+                {
+                    continue;
+                }
+
+                string where = "Shape '" + shape.ShapeId + "'";
+                bool aliased = !string.IsNullOrEmpty(shape.DropShapeId);
+                if (aliased && shape.ShapeId != null)
+                {
+                    paying.Remove(shape.ShapeId);
+                }
+
+                if (!shape.PostGame)
+                {
+                    if (aliased)
+                    {
+                        errors.Add(where + ": only a post-game shape (PostGame) pays out as another shape (DropShapeId).");
+                    }
+
+                    continue;
+                }
+
+                if (!aliased)
+                {
+                    errors.Add(where + ": a post-game shape names the mainline shape it pays out as (DropShapeId).");
+                }
+                else if (!byId.TryGetValue(shape.DropShapeId, out EncounterShapeData target) || target.PostGame || !string.IsNullOrEmpty(target.DropShapeId))
+                {
+                    errors.Add(where + ": DropShapeId '" + shape.DropShapeId + "' must name a mainline shape of this library.");
+                }
+            }
+
+            return paying;
         }
 
         /// <summary>Parses an <see cref="ArenaSize"/> name exactly as written (names only; missing is not an arena).</summary>

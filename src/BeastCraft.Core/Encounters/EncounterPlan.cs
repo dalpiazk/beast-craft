@@ -21,10 +21,11 @@ namespace BeastCraft.Encounters
     /// </summary>
     public sealed class EncounterPlan
     {
-        private EncounterPlan(string shapeId, string encounterId, int level, double multiplier, ArenaSize arena, ElementScheme? scheme,
+        private EncounterPlan(string shapeId, string dropShapeId, string encounterId, int level, double multiplier, ArenaSize arena, ElementScheme? scheme,
                               IReadOnlyList<EncounterLineupEnemy> enemies, EnemyCatalog catalog)
         {
             ShapeId = shapeId;
+            DropShapeId = dropShapeId;
             EncounterId = encounterId;
             Level = level;
             Multiplier = multiplier;
@@ -34,8 +35,15 @@ namespace BeastCraft.Encounters
             Catalog = catalog;
         }
 
-        /// <summary>The shape: the difficulty row and the drop-table cell.</summary>
+        /// <summary>The shape: the difficulty row (and, for a mainline shape, the drop-table cell).</summary>
         public string ShapeId { get; }
+
+        /// <summary>
+        /// The drop-table shape a clear pays out from (<see cref="EncounterLibrary.DropShapeOf"/>): the
+        /// shape itself, or for a post-game shape the mainline shape it pays as. What
+        /// <see cref="ToSetup"/> hands the rewards.
+        /// </summary>
+        public string DropShapeId { get; }
 
         /// <summary>The template's id, or null for a generated encounter.</summary>
         public string EncounterId { get; }
@@ -76,7 +84,7 @@ namespace BeastCraft.Encounters
             }
 
             int clamped = ClampLevel(level);
-            return new EncounterPlan(lineup.ShapeId, null, clamped, library.Multiplier(lineup.ShapeId, clamped), lineup.Arena, lineup.ElementScheme,
+            return new EncounterPlan(lineup.ShapeId, library.DropShapeOf(lineup.ShapeId), null, clamped, library.Multiplier(lineup.ShapeId, clamped), lineup.Arena, lineup.ElementScheme,
                                      lineup.Enemies, enemies);
         }
 
@@ -117,20 +125,20 @@ namespace BeastCraft.Encounters
             }
 
             int clamped = ClampLevel(level);
-            return new EncounterPlan(template.ShapeId, template.EncounterId, clamped, library.TemplateMultiplier(template, clamped),
+            return new EncounterPlan(template.ShapeId, library.DropShapeOf(template.ShapeId), template.EncounterId, clamped, library.TemplateMultiplier(template, clamped),
                                      EncounterLibrary.ParseArena(template.Arena), null, lineup, enemies);
         }
 
         /// <summary>
-        /// What <see cref="BattleSession.Run"/> fights: the arena, the shape and level (copied into the
-        /// result for the rewards), and one <see cref="EnemySpec"/> per enemy — the enemy id as its
+        /// What <see cref="BattleSession.Run"/> fights: the arena, the drop shape (<see cref="DropShapeId"/>)
+        /// and level (copied into the result for the rewards), and one <see cref="EnemySpec"/> per enemy — the enemy id as its
         /// species (resolved through <see cref="BattleContent.Enemies"/>), the plan's level, the unit's
         /// element, the plan's multiplier, the enemy's status resist and its catalog kit — auto-placed
         /// front to back in plan order. The content must carry the same enemy catalog.
         /// </summary>
         public EncounterSetup ToSetup()
         {
-            EncounterSetup setup = new EncounterSetup { Arena = Arena, ShapeId = ShapeId, EncounterLevel = Level };
+            EncounterSetup setup = new EncounterSetup { Arena = Arena, ShapeId = DropShapeId, EncounterLevel = Level };
             foreach (EncounterLineupEnemy enemy in Enemies)
             {
                 EnemyData data = Catalog.Get(enemy.EnemyId);

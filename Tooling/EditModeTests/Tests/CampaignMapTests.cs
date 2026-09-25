@@ -38,7 +38,9 @@ namespace BeastCraft.Tests.EditMode
             List<string> errors = RegionLibraryValidator.Validate(_data, EncounterContentTests.LoadEncounterLibrary());
 
             Assert.IsEmpty(errors, string.Join("\n", errors));
-            Assert.AreEqual(10, _regions.Regions.Count);
+            Assert.AreEqual(11, _regions.Regions.Count, "ten mainline regions and the post-game region");
+            Assert.AreEqual(10, _regions.MainlineRegions().Count);
+            CollectionAssert.AreEqual(new[] { "r11" }, _regions.PostGameRegions().ConvertAll(r => r.RegionId));
             Assert.AreEqual(CampaignProgress.StartingRegionId, _regions.Regions[0].RegionId);
             Assert.AreEqual(12, _data.StartingLevelCap, "first region max 10 + margin 2");
             foreach (RegionData region in _regions.Regions)
