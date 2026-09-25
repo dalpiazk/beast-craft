@@ -3,7 +3,8 @@
 How the game is drawn: which code owns what, how a battle becomes pictures, the portrait screen,
 the art manifest, the skill VFX data, the placeholder art pipeline, and the hosts (desktop,
 Android; iOS planned). Status: **spike**: one battle viewer on desktop and Android with
-throwaway pixel-art placeholders, built so the final art can drop in.
+throwaway pixel-art placeholders, built so the final art can drop in; the first final art, the
+illustrated starter trio (Phoenix, Golem, Kirin), draws beside them (see "Illustrated sprites").
 
 **Art direction (user decision):** the final art is hand-drawn chibi characters, Studio
 Ghibli-inspired, at Sword x Staff's quality — illustrated, **not** pixel art. The recommended
@@ -12,7 +13,9 @@ Everything below is style-agnostic on purpose: the pixel placeholders go through
 manifest, renderer and VFX schema that illustrated PNGs (and later Spine) will. Do not polish
 the placeholders.
 
-The art and animation brief for freelance quoting (DRAFT): [`docs/art/art-brief.md`](../art/art-brief.md).
+The art and animation brief: [`docs/art/art-brief.md`](../art/art-brief.md). Since 2026-09-25 the beast
+art is made with an AI-assisted pipeline (`Tooling/ArtLab/`) with the producer as art director; the
+brief's commissioning sections are superseded.
 
 ## Architecture: Core -> battle results -> presentation
 
@@ -196,13 +199,13 @@ Screenshots start each shown turn from fit-all, so they stay reproducible.
 
 | Field | Meaning |
 | --- | --- |
-| `Name`, `File` | unique name (VFX specs name sheets by it); the PNG, relative to the manifest's folder |
+| `Name`, `File` | unique name (VFX specs name sheets by it); the PNG, relative to the manifest's folder, forward slashes, `..` allowed but never out of the content root (`ArtManifestData.ResolveFile`: `../beasts/golem/golem.png` is `art/beasts/golem/golem.png`) |
 | `Kind` | `sprite` (a PNG strip) or `spine` (reserved; see below) |
 | `Category`, `Label` | what it is for (`beast`, `enemy`, `fx`, `hex`, `icon`...), a caption |
 | `ArtKey` | the key game data names the art by (see "ArtKey") |
 | `FrameWidth`, `FrameHeight`, `Frames`, `FrameMs` | a horizontal strip of equal frames |
 | `PivotX`, `PivotY` | the anchor in source pixels: a character's feet (placed on the tile centre), an effect's centre |
-| `PixelsPerUnit` | source pixels per world unit (one hex column step): 32 for the placeholders, e.g. 512 for a beast illustrated one hex wide |
+| `PixelsPerUnit` | source pixels per world unit (one hex column step): 32 for the placeholders; for an illustrated beast, derived from its `WorldHeight` (385-436 for the trio) |
 | `Filter` | `point` (pixel art) or `linear` (illustrated art); the renderer picks the sampler per batch |
 | `Premultiplied` | `false` = straight alpha, premultiplied on load (SpriteBatch blends premultiplied) |
 | `Tint` | optional `#rrggbb` multiplier (alias entries) |
@@ -219,10 +222,42 @@ needs another filter or blend (so point-filtered placeholders and linear illustr
 frame), and draws every sprite by its pivot at `UnitSize / PixelsPerUnit x scale`. Large units
 (Triangle, Hex7) draw at two units. A clip plays on the viewer's clock (the phoenix's `idle`).
 
+## Illustrated sprites (linear filter)
+
+The starter trio's final art (AI-assisted, producer-approved: `Tooling/ArtLab/`, provenance in
+`Tooling/ArtLab/provenance/`) is the first illustrated art in the game. It goes through the same
+manifest, atlas and renderer as the placeholders; only the entry's numbers differ.
+
+- **Files.** `content/art/beasts/<id>/<id>.png`, one 512x512 frame each: the transparent master
+  (`content/art/source/<id>/character.png`, feet pivot at its bottom centre) downscaled with Lanczos
+  in premultiplied space to 504 px on its longer side, padded 4 px, centred on a power-of-two square.
+  Feet pivot (256, 508). Both hosts copy `content/art/beasts/**` (not the masters) beside the pixel art.
+- **Why 512.** The closest camera zoom is 5.5 canvas px per board px (`CameraSettings.MaxScale`), so a
+  world unit is at most 176 px on the 1080-wide canvas; the tallest beast (1.25 units) is about 220 px
+  there (about 290 px on a 1440-wide screen). 512 px is about twice that, the usual 2x headroom.
+- **Filter and alpha.** `Filter: "linear"`, `Premultiplied: false`: the PNGs are straight alpha, and
+  `SpriteAtlas` premultiplies them on load (SpriteBatch blends premultiplied). A linear sprite also
+  gets a **mip chain**, box-filtered from the premultiplied pixels (transparent pixels add no colour,
+  so no dark fringes), and `LinearClamp` samples it trilinearly: at fit-all a beast is 70-140 px tall,
+  4-7x smaller than its PNG, and without mips its outline would shimmer and break up. The frames are
+  power-of-two so the mips work on GLES 2 too; the pixel art keeps point sampling and no mips.
+- **Outline at board size.** The master's bold plum contour is about 3 px at 504 px and thinned out at
+  fit-all, so the in-game copies get a contour-only line pass (`export_ingame.py --line-px 6`); the
+  masters are unchanged.
+- **Size is data.** `Tooling/PixelArt/illustrated.json` gives each sprite a `WorldHeight` (world units
+  from the feet to the top of the art) and `build.py` writes `PixelsPerUnit = art height / WorldHeight`
+  into the manifest. Defaults: Phoenix 1.25, Kirin 1.15, Golem 1.0: the Golem is the bulkiest (about
+  1.14 units wide against the Phoenix's 0.86), and all three stand taller than the 0.75-unit placeholders.
+  Tune by editing the number and rebuilding.
+- **Which art a species uses** is its `ArtKey`: the trio name `beast/<id>/illustrated`; their pixel
+  placeholders stay in the manifest under `beast/<id>`, and the other seven species still use theirs.
+- **Portraits.** The turn-order portrait fits the whole frame, so the equal square frames give the three
+  beasts equal portraits.
+
 ## ArtKey (data -> art)
 
 Every species (`beast-roster.json`) and enemy (`enemy-library.json`) carries an optional,
-presentation-only `ArtKey` (`beast/phoenix`, `enemy/giant`), carried through the DTOs, builders
+presentation-only `ArtKey` (`beast/phoenix/illustrated`, `beast/leviathan`, `enemy/giant`), carried through the DTOs, builders
 and `EnemyCatalog` onto `CreatureSpeciesSO.ArtKey`. The viewer draws a unit with the manifest
 entry whose `ArtKey` matches — no more `beast_<id>` naming convention. Every shipped entry has
 one, and `ArtReferenceValidator` (on content load, and a test with keys required) holds each to
@@ -386,14 +421,17 @@ viewer's moments to animations (`idle`, `move` during the walk, `attack` at a be
 species and enemies keep their `ArtKey`, and only the manifest entry behind it switches from a
 sprite to a skeleton. VFX stay flipbook layers either way.
 
-## Art pipeline (`Tooling/PixelArt`) — placeholders only
+## Art pipeline (`Tooling/PixelArt`) — placeholders, and the manifest for all art
+
+The illustrated beasts are made by `Tooling/ArtLab` (see "Illustrated sprites"); `Tooling/PixelArt`
+still writes the one manifest, merging them in from its hand-kept `illustrated.json`.
 
 Sprites are text grids (one char per palette colour) in `Tooling/PixelArt/sprites/*.txt`;
 `build.py` (Python 3 + Pillow 12.3.0) adds the auto-outline and rim shading, runs the
 integer-only generators (`fx` burst flipbooks; `ring`, `disc` and `blob` VFX textures; `hex`
 tiles), resolves aliases, and writes the PNGs (Git LFS) plus the v2 manifest to
 `content/art/pixel/`. With the pinned Pillow it regenerates them byte for byte. The hosts copy
-`content/data/**/*.json` and `content/art/pixel/*` into `Content/` (desktop, beside the exe) or
+`content/data/**/*.json`, `content/art/pixel/*` and `content/art/beasts/**/*.png` into `Content/` (desktop, beside the exe) or
 the APK's assets; `GameContent.FindRoot` looks beside the exe first and falls back to the repo.
 
 Placeholder content: all ten roster beasts, four enemies (five more as tinted aliases), 32x36

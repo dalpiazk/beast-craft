@@ -1,12 +1,35 @@
-> **DRAFT — for freelance quoting only.** Numbers derived from `content/data/` and `docs/design/` on
-> 2026-09-24. All display text in the data is itself DRAFT pending producer sign-off; do not
-> treat names/lore below as final.
+> **Approach changed on 2026-09-25: beast art is made in-house with an AI-assisted pipeline, with the
+> producer as art director** (section 0). The brief was first written for freelance quoting: the vision,
+> the technical specs and the asset list still apply; the commissioning sections (the quote phasing and
+> table, the budget ballparks and the contract checklist) are **superseded** and kept for the record.
+> Numbers derived from `content/data/` and `docs/design/` on 2026-09-24. All display text in the data is
+> itself DRAFT pending producer sign-off; do not treat names/lore below as final.
 
 # Beast Craft — Art & Animation Brief
 
 Beast Craft is a mobile-first (Android now, iOS later; desktop too) turn-based hex-grid PvE
 creature-tactics game built in MonoGame. You control a Beastbinder (an avatar who never fights
 directly) commanding a roster of ten mythic beasts against wild, Gloam-corrupted creatures.
+
+## 0. Approach: AI-assisted pipeline, producer as art director (2026-09-25)
+
+- **Who makes the art.** The beasts are generated and finished by the local pipeline in `Tooling/ArtLab/`
+  (an SDXL anime model steered by our own approved style references, a design lock, a detail pass, a
+  deterministic line pass, rig parts and an in-game export). The **producer is the art director**: every
+  design is a producer pick from a candidate sheet, with a personality word and notes, and every final is
+  producer-approved before it goes in the game.
+- **Per asset:** candidate sheet → producer pick + notes → lock → finish → parts → in-game export
+  (`Tooling/ArtLab/README.md`). Prompts, seeds, settings, the chosen candidate and the producer's decision
+  are recorded per asset in `Tooling/ArtLab/provenance/` (the AI-disclosure and copyright record).
+- **Done:** the starter trio, **Phoenix (Fierce), Golem (Cute) and Kirin (Mystic)**, approved and in the
+  game: `content/art/beasts/<id>/` (in-game sprites), `content/art/source/<id>/` (full-resolution masters,
+  rig parts and the design pick). The other seven beasts keep their pixel placeholders until theirs are made.
+- **Where it differs from the specs below:** the in-game beasts are currently single illustrated sprites
+  (linear filter, 512x512 frames, feet pivot, straight-alpha PNGs premultiplied on load; see
+  `docs/design/presentation-and-vfx.md`) with machine-cut rig parts archived beside them, not Spine rigs. The
+  Spine plan (section 2) stays the target for animation; an artist pass on the parts' joints is advised first.
+- **The models are tools only** (licences in `THIRD-PARTY-NOTICES.md` and `Tooling/ArtLab/README.md`);
+  none ships with the game.
 
 ## 1. Vision & tone
 
@@ -51,18 +74,21 @@ Wonder first, danger second — never grim (per `docs/design/content-bible.md`, 
 
 ### 10 beasts (species)
 
-| Species | Element | Stance | Visual/personality cue |
-| --- | --- | --- | --- |
-| Phoenix | Fire | Ranged | Proud flame bird, strikes from afar, renews itself in fire |
-| Leviathan | Water | Vanguard | Calm deep serpent, coils, shields in scales, outlasts |
-| Golem | Earth | Vanguard | Stone hillside given legs, slow, stubborn wall for allies |
-| Griffin | Air | Skirmisher | Eagle/lion hybrid, bold, hit-and-run with talons |
-| Thunderbird | Lightning | Skirmisher | Storm-diving opener, glass-cannon speedster |
-| Frost Wyrm | Ice | Vanguard | Old, wry dragon in rime, slows/freezes, patient |
-| Treant | Nature | Vanguard | Gentle forest guardian, shelters and mends allies |
-| Tarasque | Metal | Vanguard | Grumpy armored river-beast, endures and bites back |
-| Kirin | Light | Ranged | Serene luminous healer, fights with light not claws |
-| Basilisk | Dark | Ranged | Sly shadow-serpent, gaze attack, hunts the weak |
+| Species | Element | Stance | Personality (producer-approved) | Visual/personality cue | Art |
+| --- | --- | --- | --- | --- | --- |
+| Phoenix | Fire | Ranged | **Fierce** | Proud flame bird, strikes from afar, renews itself in fire | final (AI-assisted) |
+| Leviathan | Water | Vanguard | **Serene, regal** | Calm deep serpent, coils, shields in scales, outlasts | pixel placeholder |
+| Golem | Earth | Vanguard | **Cute** | Stone hillside given legs, slow, stubborn wall for allies | final (AI-assisted) |
+| Griffin | Air | Skirmisher | **Bold, brave** | Eagle/lion hybrid, bold, hit-and-run with talons | pixel placeholder |
+| Thunderbird | Lightning | Skirmisher | **Wild, energetic** | Storm-diving opener, glass-cannon speedster | pixel placeholder |
+| Frost Wyrm | Ice | Vanguard | **Wise, wry** | Old, wry dragon in rime, slows/freezes, patient | pixel placeholder |
+| Treant | Nature | Vanguard | **Gentle** | Gentle forest guardian, shelters and mends allies | pixel placeholder |
+| Tarasque | Metal | Vanguard | **Grumpy** | Grumpy armored river-beast, endures and bites back | pixel placeholder |
+| Kirin | Light | Ranged | **Mystic** | Serene luminous healer, fights with light not claws | final (AI-assisted) |
+| Basilisk | Dark | Ranged | **Sly** | Sly shadow-serpent, gaze attack, hunts the weak | pixel placeholder |
+
+The personality word is part of each beast's art direction: it goes into the candidate brief and the
+prompt (the Golem's `curious`, `round face, big amber eyes` came from **Cute**).
 
 Each beast needs a **Spine skeleton with skin support** and the animation set: **idle, move,
 attack, cast, hit, KO, victory** (7 clips x 10 beasts = 70 clips).
@@ -178,6 +204,10 @@ buttons and cards should be designed around its rounded letterforms; no font nee
 
 ## 4. Phasing for quotes
 
+> **SUPERSEDED (2026-09-25)** by the AI-assisted pipeline (section 0). Kept for the record and in case
+> parts of the work (Spine animation, UI kit, VFX) are commissioned later. The phase *order* still guides
+> production: Phase 1's three beasts are the approved starter trio.
+
 **Phase 1 — vertical slice**
 - 3 beasts: Phoenix, Golem, Kirin (confirmed)
 - 2 enemy archetypes (Brute, Archer)
@@ -225,6 +255,8 @@ variants Radiant Dawnshade Horn and Eclipse Dawnshade Crown.
 
 ## 5. Budget ballparks (rough, pending real quotes)
 
+> **SUPERSEDED (2026-09-25)**: no beast illustrations are being commissioned. Kept for the record.
+
 | Item | Range |
 | --- | --- |
 | Chibi character illustration | $35-100 / character |
@@ -235,6 +267,9 @@ variants Radiant Dawnshade Horn and Eclipse Dawnshade Crown.
 | **Spine Professional license** | **$369 per animating artist** — each animator needs their own non-Education seat |
 
 ## 6. Licensing & contract checklist
+
+> **SUPERSEDED (2026-09-25)** for the beasts, which are made in-house (section 0). Keep it for any work that
+> is commissioned later. Its AI line is answered by decision 10.
 
 - [ ] Work-for-hire / full IP assignment to [studio] (placeholder: producer's legal entity name), not a license
 - [ ] All source files delivered (PSD layers, Spine project files, raw VFX flipbook frames)
@@ -255,6 +290,17 @@ variants Radiant Dawnshade Horn and Eclipse Dawnshade Crown.
 6. No time-zone preference; async reviews, written feedback, 24-48h cycles.
 7. Spine pinned to the latest stable editor version `spine-monogame` supports at kickoff (same major.minor).
 8. Bosses are Phase 3, quoted after draft boss designs are approved.
+
+9. **Approach (2026-09-25):** beast art is made with the AI-assisted pipeline in `Tooling/ArtLab/`, with
+   the producer as art director (pick, personality word, notes, final approval). Commissioning is superseded.
+10. **AI-assisted assets are approved by the producer** for in-game use, each one individually (recorded
+    in `Tooling/ArtLab/provenance/`), **with disclosure where a store requires it**: Steam's Content Survey
+    asks developers to disclose pre-generated AI content, so the Steam submission discloses it; check the
+    other stores' policies at submission. Human IP-likeness review of every candidate stays mandatory.
+11. **Personality words** (producer-approved): Phoenix Fierce, Golem Cute, Kirin Mystic, Leviathan serene
+    and regal, Griffin bold and brave, Thunderbird wild and energetic, Frost Wyrm wise and wry, Treant
+    gentle, Tarasque grumpy, Basilisk sly. The starter trio's art is final; the seven others keep their
+    pixel placeholders until their art is made.
 
 **Remaining question:** which 3 options per beast category ship at launch (artist can quote the
 count now; the producer picks the specific options before Phase 2).

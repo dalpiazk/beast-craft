@@ -63,29 +63,33 @@ source. In text, "Seal" is always capitalised; "binding limit" is lower case.
 
 ## The ten beasts
 
-Stance, element and kit come from the data; the personality follows them.
+Stance, element and kit come from the data; the personality follows them. Each beast also has a
+producer-approved **personality word** (in brackets after its name): the art direction for its look and
+pose, which the art pipeline puts into the beast's brief and prompt (`docs/art/art-brief.md`). The
+Phoenix, Golem and Kirin have final art made to their words; the other seven keep pixel placeholders
+until theirs are made.
 
-- **Phoenix** (Fire, Ranged). Proud, bright and a little reckless. A bird of living flame that
+- **Phoenix** [*Fierce*] (Fire, Ranged). Proud, bright and a little reckless. A bird of living flame that
   strikes from afar with burning bolts, and once a battle wraps itself in renewing fire. Fragile up
   close, and knows it.
-- **Leviathan** (Water, Vanguard). Calm, patient, unhurried. A sea-serpent whose whirlpools drag
+- **Leviathan** [*Serene, regal*] (Water, Vanguard). Calm, patient, unhurried. A sea-serpent whose whirlpools drag
   enemies to it; it shields itself in its coils and simply outlasts whatever breaks against it.
-- **Golem** (Earth, Vanguard). Stubborn and loyal, few words. A hillside that learned to stand: slow,
+- **Golem** [*Cute*] (Earth, Vanguard). Stubborn and loyal, few words. A hillside that learned to stand: slow,
   immovable, it challenges every enemy nearby and raises granite walls around its friends.
-- **Griffin** (Air, Skirmisher). Bold and restless, loves an open sky. Half eagle, half lion, it
+- **Griffin** [*Bold, brave*] (Air, Skirmisher). Bold and restless, loves an open sky. Half eagle, half lion, it
   darts in with talons and lances of wind, hurls enemies aside with its wings, and is gone again.
-- **Thunderbird** (Lightning, Skirmisher). Excitable, fastest of all. Its wingbeat is thunder: it
+- **Thunderbird** [*Wild, energetic*] (Lightning, Skirmisher). Excitable, fastest of all. Its wingbeat is thunder: it
   opens every fight with one great dive, then crackles through swarms with chained lightning.
   Hits first; cannot take many hits back.
-- **Frost Wyrm** (Ice, Vanguard). Old, dry-humoured, never hurries. A dragon wrapped in rime
+- **Frost Wyrm** [*Wise, wry*] (Ice, Vanguard). Old, dry-humoured, never hurries. A dragon wrapped in rime
   that chills and slows everything near it and waits for the cold to win.
-- **Treant** (Nature, Vanguard). Gentle and protective, the team's grandparent. A walking tree that
+- **Treant** [*Gentle*] (Nature, Vanguard). Gentle and protective, the team's grandparent. A walking tree that
   shelters allies under bark, mends the worst-hurt friend and lashes enemies with thorned vines.
-- **Tarasque** (Metal, Vanguard). Grumpy, dependable, hits back. A river-beast in a shell of iron
+- **Tarasque** [*Grumpy*] (Metal, Vanguard). Grumpy, dependable, hits back. A river-beast in a shell of iron
   plates and spines; where the Golem only endures, the Tarasque cracks armour and crushes.
-- **Kirin** (Light, Ranged). Serene and kind. A luminous deer-like beast that shuns horns and claws:
+- **Kirin** [*Mystic*] (Light, Ranged). Serene and kind. A luminous deer-like beast that shuns horns and claws:
   it heals the whole team, blesses it, and calls down a single pillar of judging light.
-- **Basilisk** (Dark, Ranged). Sly, clever, secretly soft-hearted. A serpent-king whose gaze can
+- **Basilisk** [*Sly*] (Dark, Ranged). Sly, clever, secretly soft-hearted. A serpent-king whose gaze can
   turn a foe to stone; it slips through shadow to find the weakest enemy and finish the fight.
   Dark is an element like any other, not wickedness: the Basilisk is a friend.
 
