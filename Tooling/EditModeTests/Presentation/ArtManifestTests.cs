@@ -81,7 +81,9 @@ namespace BeastCraft.Tests.EditMode
             Assert.Greater(sprite.PivotY, sprite.FrameHeight * 0.9f, "the feet are at the bottom of the frame");
             Assert.GreaterOrEqual(sprite.FrameHeight, 512, "about 512 px tall: twice its largest on-screen size");
             float height = HeightUnits(sprite);
-            Assert.That(height, Is.InRange(0.75f, 1.5f), "world units from the feet to the top of the frame");
+            // World units from the feet to the top of the square frame: a tall beast fills it, so this is
+            // about its height; the low, long basilisk fills it only in width (its art is ~0.65 tall).
+            Assert.That(height, Is.InRange(0.75f, 1.75f), "world units from the feet to the top of the frame");
             Assert.IsNotNull(art.FindByArtKey("beast/" + species), "the pixel placeholder stays in the manifest");
         }
 

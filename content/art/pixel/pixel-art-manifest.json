@@ -65,7 +65,7 @@
       "FrameMs": 0,
       "PivotX": 256,
       "PivotY": 508,
-      "PixelsPerUnit": 354.545,
+      "PixelsPerUnit": 300.0,
       "Filter": "linear",
       "Premultiplied": false
     },
