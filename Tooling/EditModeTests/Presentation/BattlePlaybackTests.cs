@@ -39,6 +39,27 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
+        public void DemoBattle_CanFightAGeneratedShape_OnAnyArenaItSeatsOn()
+        {
+            BattleSetup horde = DemoBattle.Create(VfxLibraryTests.Content, DemoBattle.DefaultSeed, out _, out string error, null, "horde", 50, 50);
+            Assert.IsNotNull(horde, error);
+            Assert.AreEqual(ArenaSize.Large, horde.Encounter.Arena, "a horde is drawn for its own arena");
+            Assert.GreaterOrEqual(horde.Encounter.Enemies.Count, 16);
+            BattlePlayback large = new BattlePlayback(BattleSession.Begin(horde));
+            Assert.AreEqual(11, large.Grid.Width);
+
+            BattleSetup squad = DemoBattle.Create(VfxLibraryTests.Content, DemoBattle.DefaultSeed, out _, out error, null, "squad", 30, 30, ArenaSize.Small);
+            Assert.IsNotNull(squad, error);
+            Assert.AreEqual(ArenaSize.Small, squad.Encounter.Arena, "--arena overrides the shape's own");
+            BattlePlayback small = new BattlePlayback(BattleSession.Begin(squad));
+            Assert.AreEqual((5, 7), (small.Grid.Width, small.Grid.Height));
+            Assert.IsNotNull(small.Advance(), "the squad seats on the Small arena and fights");
+
+            Assert.IsNull(DemoBattle.Create(VfxLibraryTests.Content, DemoBattle.DefaultSeed, out _, out error, null, "no_such_encounter"));
+            StringAssert.Contains("no_such_encounter", error);
+        }
+
+        [Test]
         public void Stepping_IsExactlyBattleSessionRun()
         {
             BattleSessionResult run = BattleSession.Run(Demo(out _));
@@ -188,7 +209,8 @@ namespace BeastCraft.Tests.EditMode
                 Assert.AreEqual(tile, layout.TileAt(centre.X + 7f, centre.Y - 7f), "a point inside the tile maps to it");
             }
 
-            Assert.AreEqual((11 * 32, 36 + 10 * 27), HexLayout.BoardSize(5));
+            Assert.AreEqual((8 * 32 + 16, 36 + 10 * 27), HexLayout.BoardSize(8, 11), "Medium: eight columns, the odd rows half a column further right");
+            Assert.AreEqual((11 * 32, 36 + 10 * 27), HexLayout.DiscSize(5));
             Assert.AreEqual(layout.Center(new HexCoordinate(2, -1)), layout.FootprintCenter(new HexCoordinate(2, -1), UnitFootprint.Hex7));
             Vec2 triangle = layout.FootprintCenter(HexCoordinate.Zero, UnitFootprint.Triangle);
             Assert.AreEqual((320f + 352f + 336f) / 3f, triangle.X, 1e-3);

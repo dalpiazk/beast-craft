@@ -137,8 +137,9 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <summary>
         /// The two start tiles: the player tile is the most central tile of the player's deployment
         /// zone (closest to the board's centre, then closest to the vertical centre line, first in
-        /// the zone's stable order on a tie), and the enemy tile is its point mirror, which the
-        /// board's 180-degree symmetry guarantees is in the enemy zone.
+        /// the zone's stable order on a tie), and the enemy tile is its mirror image across the
+        /// centre line, <c>(Q + R, -R)</c>: the same screen column on the mirrored row, which the
+        /// board's top-to-bottom symmetry (see <see cref="HexGrid"/>) guarantees is in the enemy zone.
         /// </summary>
         public static void FindStartTiles(HexGrid grid, out HexCoordinate playerTile, out HexCoordinate enemyTile)
         {
@@ -159,7 +160,7 @@ namespace BeastCraft.Tooling.BalanceSim
                 }
             }
 
-            enemyTile = new HexCoordinate(-playerTile.Q, -playerTile.R);
+            enemyTile = new HexCoordinate(playerTile.Q + playerTile.R, -playerTile.R);
             if (!grid.IsInDeploymentZone(enemyTile, BattleTeam.Enemy))
             {
                 throw new InvalidOperationException("Mirrored enemy start tile " + enemyTile + " is outside the enemy deployment zone.");

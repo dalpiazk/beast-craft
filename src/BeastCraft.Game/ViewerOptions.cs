@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using BeastCraft.Battle.Grid;
 using BeastCraft.Presentation.Content;
 using BeastCraft.Presentation.Layout;
 using BeastCraft.Save;
@@ -10,7 +11,8 @@ namespace BeastCraft.Game
     /// The command line.
     /// <code>
     ///   --screenshot PATH   render one frame to PATH (PNG) and exit, after:
-    ///   --turns N           playing N turns (the Nth is the one shown; default 1)
+    ///   --turns N           playing N turns (the Nth is the one shown; default 1; 0 = the opening
+    ///                       board before any turn, in the fit-all view)
     ///   --skill ID          ...then on, up to the first turn that fires skill ID (e.g. ember_shot)
     ///   --at MS             show that turn MS into its animation (default: its first matching
     ///                       beat mid-VFX: after the hit-stop, part-way through the flipbook)
@@ -22,7 +24,10 @@ namespace BeastCraft.Game
     ///   --seed S            the battle's seed (default DemoBattle.DefaultSeed)
     ///   --level L           the team's level (default DemoBattle.DefaultLevel)
     ///   --enemy-level L     the encounter's level (default DemoBattle.DefaultEncounterLevel)
-    ///   --encounter ID      the encounter template to fight (default DemoBattle.DefaultEncounterId)
+    ///   --encounter ID      the encounter template to fight (default DemoBattle.DefaultEncounterId),
+    ///                       or a shape id (e.g. horde) for a generated lineup drawn with the seed
+    ///   --arena SIZE        fight on Small, Medium or Large instead of the encounter's own arena
+    ///                       (the lineup must seat on it)
     ///   --team A,B,...      the team's species ids, 1 to 6 (default DemoBattle.DefaultTeam), e.g.
     ///                       to look at other beasts' art; which battle it is changes, the rules do not
     ///   --content DIR       the content root (default: Content/ beside the app, or the repo's)
@@ -51,6 +56,7 @@ namespace BeastCraft.Game
         public int Level = DemoBattle.DefaultLevel;
         public int EnemyLevel = DemoBattle.DefaultEncounterLevel;
         public string Encounter = DemoBattle.DefaultEncounterId;
+        public ArenaSize? Arena;
         public string[] Team;
         public string ContentRoot;
         public EffectsIntensity? Effects;
@@ -79,7 +85,7 @@ namespace BeastCraft.Game
                         i++;
                         break;
                     case "--turns":
-                        options.Turns = Int(value, flag, 1, ref error);
+                        options.Turns = Int(value, flag, 0, ref error);
                         i++;
                         break;
                     case "--skill":
@@ -120,6 +126,18 @@ namespace BeastCraft.Game
                         break;
                     case "--encounter":
                         options.Encounter = value;
+                        i++;
+                        break;
+                    case "--arena":
+                        if (Enum.TryParse(value ?? string.Empty, true, out ArenaSize arena) && Enum.IsDefined(typeof(ArenaSize), arena))
+                        {
+                            options.Arena = arena;
+                        }
+                        else
+                        {
+                            error = "--arena needs Small, Medium or Large.";
+                        }
+
                         i++;
                         break;
                     case "--team":

@@ -145,7 +145,7 @@ namespace BeastCraft.Game
             LoadSettings();
 
             BattleSetup setup = DemoBattle.Create(_content, _options.Seed, out _speciesByUnit, out string error, _options.Team, _options.Encounter,
-                                                  _options.Level, _options.EnemyLevel);
+                                                  _options.Level, _options.EnemyLevel, _options.Arena);
             BattleSessionRun run = setup == null ? null : BattleSession.Begin(setup);
             if (run == null || run.Battle == null)
             {
@@ -154,7 +154,7 @@ namespace BeastCraft.Game
             }
 
             _playback = new BattlePlayback(run);
-            _camera = new CameraRig(_playback.Grid.Radius, _screen.Board);
+            _camera = new CameraRig(_playback.Grid.Width, _playback.Grid.Height, _screen.Board);
             _cameraRest = _camera.FitAll;
             _boardFit = _camera.Fit(_cameraRest);
             _names = UnitNames(_content, _speciesByUnit);

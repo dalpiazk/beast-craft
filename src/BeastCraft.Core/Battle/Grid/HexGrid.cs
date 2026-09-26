@@ -4,9 +4,35 @@ using System.Collections.Generic;
 namespace BeastCraft.Battle.Grid
 {
     /// <summary>
-    /// A hexagon-shaped board of hex tiles, centred on <see cref="HexCoordinate.Zero"/> and sized
-    /// by an <see cref="ArenaSize"/> preset. Owns the set of legal tiles, which unit stands on each
-    /// of them, and which of them are blocked by terrain.
+    /// A rectangular board of pointy-top hex tiles, <see cref="Width"/> tiles across and
+    /// <see cref="Height"/> rows deep, centred on <see cref="HexCoordinate.Zero"/> and sized by an
+    /// <see cref="ArenaSize"/> preset. Owns the set of legal tiles, which unit stands on each of
+    /// them, and which of them are blocked by terrain.
+    /// <para>
+    /// <strong>Shape.</strong> The board is an <em>odd-r offset rectangle</em>: every row holds
+    /// exactly <see cref="Width"/> tiles, rows run from <see cref="MinRow"/> (the enemy's edge, the
+    /// top of the screen) to <see cref="MaxRow"/> (the player's edge, the bottom), and odd rows sit
+    /// half a tile to the right of even ones (<see cref="ColumnOf"/>, <see cref="FromOffset"/>).
+    /// Only the <em>legality</em> of a tile is rectangular: addresses stay axial
+    /// (<see cref="HexCoordinate"/>), and neighbours, distance and range are the same cube maths as
+    /// ever. The left and right edges zigzag by half a tile from row to row, which is how any
+    /// rectangle of pointy-top hexes looks. Every straight hex line crosses the board in one piece
+    /// (a line that leaves it never re-enters), as it did on the hexagon.
+    /// </para>
+    /// <para>
+    /// <strong>Why odd-r.</strong> Every preset has an odd number of rows centred on the
+    /// <c>R = 0</c> row, so rows <c>R</c> and <c>-R</c> always have the same parity and line up
+    /// tile for tile: the enemy half is the player half reflected top to bottom (<c>(Q, R)</c> to
+    /// <c>(Q + R, -R)</c>, a symmetry of the hex grid that keeps each tile's screen column and every
+    /// distance), which is what keeps the two deployment zones fair. Odd-r rather than even-r keeps
+    /// the even rows, the centre row among them, unshifted, so tile (0, 0) is column 0 and
+    /// <c>Q</c> still runs along the centre row. The columns (<see cref="MinColumn"/> to
+    /// <see cref="MaxColumn"/>, <c>-(Width / 2)</c> up) put each side's <em>front</em> row
+    /// symmetrically about the board's vertical centre line (the screen x of tile (0, 0)), the line
+    /// <see cref="Placement.DeploymentPacker.FrontOrder"/> fills outward from: the front rows are
+    /// even on Small and Large (odd widths, so the even rows are the centred ones) and odd on Medium
+    /// (an even width, whose odd rows are the centred ones).
+    /// </para>
     /// <para>
     /// Occupancy (a unit stands here) and terrain blocking (scenery sits here) are tracked
     /// separately and mean different things, so a tile can be either, both or neither.
@@ -16,7 +42,7 @@ namespace BeastCraft.Battle.Grid
     /// Also owns which tiles each side may deploy onto before the fight starts — see
     /// <see cref="IsInDeploymentZone"/>. That sits here rather than in a type of its own because it
     /// is the same kind of fact as terrain blocking and occupancy: a per-tile property of this
-    /// board, derived from this board's own <see cref="Radius"/>, that several callers need to ask
+    /// board, derived from this board's own <see cref="Height"/>, that several callers need to ask
     /// about without carrying a second object around.
     /// </para>
     /// <para>
@@ -34,17 +60,17 @@ namespace BeastCraft.Battle.Grid
     /// </summary>
     public class HexGrid
     {
-        // Ring radius, in hex steps from the centre tile, for each arena preset.
-        //
-        // TUNABLE IMPLEMENTATION DEFAULTS, NOT CONFIRMED BALANCE. What the producer confirmed is
-        // that there are exactly three presets and that an encounter fixes one of them. These
-        // radii are an engineering placeholder, picked so each preset comfortably seats its
-        // battle format (1 / up to 4 / up to 6 beasts per side) with room to manoeuvre. Tile
-        // count is 1 + 3r(r+1): 37 tiles at r=3, 91 at r=5, 169 at r=7. Expect them to move once
-        // encounter design and movement ranges give them something to be balanced against.
-        private const int SmallRadius = 3;
-        private const int MediumRadius = 5;
-        private const int LargeRadius = 7;
+        // Width x height, in tiles, for each arena preset: portrait-fit rectangles close to the old
+        // hexagons' 37 / 91 / 169 tiles (a producer decision). What is confirmed is that there are
+        // exactly three presets, that an encounter fixes one of them, and these dimensions; how
+        // deep each side deploys is still a tunable default (see DeploymentZoneDepth). Every
+        // height is odd, so the board is centred on the R = 0 row.
+        private const int SmallWidth = 5;
+        private const int SmallHeight = 7;
+        private const int MediumWidth = 8;
+        private const int MediumHeight = 11;
+        private const int LargeWidth = 11;
+        private const int LargeHeight = 15;
 
         private readonly Dictionary<string, HexCoordinate> _tilesByOccupant;
 
@@ -54,64 +80,89 @@ namespace BeastCraft.Battle.Grid
         // _occupantByIndex holds the id on every tile the footprint covers.
         private readonly Dictionary<string, UnitFootprint> _footprintByOccupant;
 
-        // Built on first use of Tiles, in the same insertion order as ever: bounds checks are
-        // arithmetic (see IsInBounds), so most boards never need the set at all.
+        // Built on first use of Tiles, row by row from the top: bounds checks are arithmetic (see
+        // IsInBounds), so most boards never need the set at all.
         private HashSet<HexCoordinate> _tiles;
 
         // Occupancy and terrain blocking by tile, indexed by TileIndex, so the hot queries
         // (IsPassable, IsOccupied, IsBlocked -- asked once per neighbour by every path search) are
         // an array read instead of a hash lookup. _tilesByOccupant is the same occupancy keyed by
         // unit id; every write goes to both.
-        private readonly int _span;
         private readonly string[] _occupantByIndex;
         private readonly bool[] _blockedByIndex;
 
         // Smallest |R| that still counts as a deployment row. Derived from DeploymentZoneDepth and
         // held because every zone query tests against it. Floored at 1 so the two zones can never
-        // meet in the middle and share the R == 0 row, whatever Radius turns out to be.
+        // meet in the middle and share the R == 0 row, whatever the height turns out to be.
         private readonly int _deploymentRowThreshold;
 
         public HexGrid(ArenaSize size)
         {
             Size = size;
-            Radius = RadiusFor(size);
-            DeploymentZoneDepth = Math.Max(1, (Radius + 1) / 2);
-            _deploymentRowThreshold = Math.Max(1, (Radius - DeploymentZoneDepth) + 1);
+            int width;
+            int height;
+            DimensionsFor(size, out width, out height);
+            Width = width;
+            Height = height;
+            MinRow = -((height - 1) / 2);
+            MaxRow = MinRow + height - 1;
+            MinColumn = -(width / 2);
+            MaxColumn = MinColumn + width - 1;
+
+            int rowsPerSide = Math.Min(-MinRow, MaxRow);
+            DeploymentZoneDepth = Math.Max(1, (rowsPerSide + 1) / 2);
+            _deploymentRowThreshold = Math.Max(1, (rowsPerSide - DeploymentZoneDepth) + 1);
 
             _tilesByOccupant = new Dictionary<string, HexCoordinate>(StringComparer.Ordinal);
             _footprintByOccupant = new Dictionary<string, UnitFootprint>(StringComparer.Ordinal);
 
-            _span = (2 * Radius) + 1;
-            _occupantByIndex = new string[_span * _span];
-            _blockedByIndex = new bool[_span * _span];
+            _occupantByIndex = new string[width * height];
+            _blockedByIndex = new bool[width * height];
         }
 
         /// <summary>The preset this board was built from.</summary>
         public ArenaSize Size { get; }
 
-        /// <summary>Distance in hex steps from the centre tile to the outermost ring.</summary>
-        public int Radius { get; }
+        /// <summary>Tiles per row; every row holds the same number.</summary>
+        public int Width { get; }
+
+        /// <summary>Rows, from <see cref="MinRow"/> (top, the enemy's edge) to <see cref="MaxRow"/> (bottom, the player's).</summary>
+        public int Height { get; }
+
+        /// <summary>The top row's <c>R</c>: the enemy's back row.</summary>
+        public int MinRow { get; }
+
+        /// <summary>The bottom row's <c>R</c>: the player's back row.</summary>
+        public int MaxRow { get; }
+
+        /// <summary>The leftmost offset column (<see cref="ColumnOf"/>), the same on every row.</summary>
+        public int MinColumn { get; }
+
+        /// <summary>The rightmost offset column (<see cref="ColumnOf"/>), the same on every row.</summary>
+        public int MaxColumn { get; }
 
         /// <summary>
         /// How many rows deep each side's deployment zone reaches in from its own edge of the
-        /// board, counted in whole <c>R</c> rows. The remaining <c>2 * (Radius -
-        /// DeploymentZoneDepth) + 1</c> rows in the middle are a neutral no-deploy band that
-        /// belongs to neither side.
+        /// board, counted in whole <c>R</c> rows: 2 on Small, 3 on Medium, 4 on Large. The
+        /// remaining <c>Height - 2 * DeploymentZoneDepth</c> rows in the middle (3 / 5 / 7) are a
+        /// neutral no-deploy band that belongs to neither side.
         /// <para>
-        /// TUNABLE IMPLEMENTATION DEFAULT, NOT CONFIRMED BALANCE — exactly like the radius
-        /// constants above, and for the same reason. Nothing about deployment geometry has been
-        /// through encounter design; what is settled (decision 2) is only how many beasts a format
-        /// deploys, not where they may stand. This is <c>ceil(Radius / 2)</c>, picked so roughly
-        /// half the board is contested ground and each side still has real depth to arrange itself
-        /// in. Expect it to move once encounter design gives it something to be balanced against.
+        /// TUNABLE IMPLEMENTATION DEFAULT, NOT CONFIRMED BALANCE. Nothing about deployment
+        /// geometry has been through encounter design; what is settled (decision 2) is only how
+        /// many beasts a format deploys, not where they may stand. This is <c>ceil(h / 2)</c> for the
+        /// <c>h = (Height - 1) / 2</c> rows on each side of the centre line — the same 2 / 3 / 4 rows
+        /// the hexagonal arenas had — so roughly half the board is contested ground and each side
+        /// still has real depth to arrange itself in. It is also the fit constraint on large units:
+        /// a seven-tile (<see cref="UnitFootprint.Hex7"/>) unit is three rows tall, so it fits the
+        /// Medium and Large zones but never Small's.
         /// </para>
         /// </summary>
         public int DeploymentZoneDepth { get; }
 
-        /// <summary>Total number of legal tiles on the board.</summary>
+        /// <summary>Total number of legal tiles on the board: <c>Width * Height</c>.</summary>
         public int TileCount
         {
-            get { return 1 + (3 * Radius * (Radius + 1)); }
+            get { return Width * Height; }
         }
 
         /// <summary>Every legal tile on the board, in no guaranteed order.</summary>
@@ -130,12 +181,12 @@ namespace BeastCraft.Battle.Grid
 
         /// <summary>
         /// The size of the dense index space <see cref="TileIndex"/> maps into: every legal tile
-        /// has an index in <c>[0, TileIndexCapacity)</c> (some indices name no tile). Lets a search
-        /// keep per-tile state in plain arrays rather than hash maps.
+        /// has an index in <c>[0, TileIndexCapacity)</c> (on a rectangle every index names a tile).
+        /// Lets a search keep per-tile state in plain arrays rather than hash maps.
         /// </summary>
         public int TileIndexCapacity
         {
-            get { return _span * _span; }
+            get { return Width * Height; }
         }
 
         /// <summary>
@@ -149,32 +200,60 @@ namespace BeastCraft.Battle.Grid
                 return -1;
             }
 
-            return ((coordinate.Q + Radius) * _span) + coordinate.R + Radius;
+            return ((coordinate.R - MinRow) * Width) + ColumnOf(coordinate) - MinColumn;
         }
 
-        /// <summary>The radius a given preset maps to. See the radius constants for the caveat.</summary>
-        public static int RadiusFor(ArenaSize size)
+        /// <summary>
+        /// The width and height, in tiles, a preset maps to: Small 5 x 7 (35 tiles), Medium 8 x 11
+        /// (88), Large 11 x 15 (165). An unrecognised value reads as Medium.
+        /// </summary>
+        public static void DimensionsFor(ArenaSize size, out int width, out int height)
         {
             switch (size)
             {
                 case ArenaSize.Small:
-                    return SmallRadius;
-                case ArenaSize.Medium:
-                    return MediumRadius;
+                    width = SmallWidth;
+                    height = SmallHeight;
+                    return;
                 case ArenaSize.Large:
-                    return LargeRadius;
+                    width = LargeWidth;
+                    height = LargeHeight;
+                    return;
                 default:
-                    return MediumRadius;
+                    width = MediumWidth;
+                    height = MediumHeight;
+                    return;
             }
+        }
+
+        /// <summary>
+        /// A tile's odd-r offset column, <c>Q + floor(R / 2)</c>: the tiles of one column stack
+        /// straight down the even rows and sit half a tile further right on the odd rows.
+        /// </summary>
+        public static int ColumnOf(HexCoordinate coordinate)
+        {
+            // An arithmetic shift floors, negative rows included.
+            return coordinate.Q + (coordinate.R >> 1);
+        }
+
+        /// <summary>The tile in offset <paramref name="column"/> of row <paramref name="row"/>: the inverse of <see cref="ColumnOf"/>.</summary>
+        public static HexCoordinate FromOffset(int column, int row)
+        {
+            return new HexCoordinate(column - (row >> 1), row);
         }
 
         /// <summary>True when the coordinate names a tile that exists on this board.</summary>
         public bool IsInBounds(HexCoordinate coordinate)
         {
-            // The board is the hexagon of radius Radius: exactly the tiles GenerateTiles lists.
-            int q = coordinate.Q;
+            // The board is the offset rectangle: exactly the tiles GenerateTiles lists.
             int r = coordinate.R;
-            return q >= -Radius && q <= Radius && r >= -Radius && r <= Radius && q + r >= -Radius && q + r <= Radius;
+            if (r < MinRow || r > MaxRow)
+            {
+                return false;
+            }
+
+            int column = ColumnOf(coordinate);
+            return column >= MinColumn && column <= MaxColumn;
         }
 
         /// <summary>
@@ -524,26 +603,23 @@ namespace BeastCraft.Battle.Grid
         /// <para>
         /// The board is split into three bands along the axial <c>R</c> axis:
         /// <see cref="BattleTeam.Player"/> owns the <see cref="DeploymentZoneDepth"/> rows with the
-        /// most positive <c>R</c>, <see cref="BattleTeam.Enemy"/> owns the mirror-image rows with
-        /// the most negative <c>R</c>, and the rows between them are neutral and belong to nobody.
+        /// most positive <c>R</c> (the bottom of the screen), <see cref="BattleTeam.Enemy"/> owns the
+        /// mirror-image rows with the most negative <c>R</c> (the top), and the rows between them
+        /// are neutral and belong to nobody.
         /// </para>
         /// <para>
-        /// <strong>Why <c>R</c>.</strong> All three cube axes split a hexagon into two congruent
-        /// regions — negating every cube component is a 180° rotation that maps the board onto
-        /// itself and each zone exactly onto the other — so symmetry does not pick between them.
-        /// <c>R</c> is chosen because it is the axis <see cref="HexCoordinate"/> already calls the
-        /// "row" axis: a constant-<c>R</c> band is a single straight run of tiles across the board,
-        /// so the front line reads as a straight line and "your half / their half" is legible
-        /// without a diagram. Splitting on <c>Q</c> or the implied <c>S</c> is geometrically
-        /// identical but lands the front line on a diagonal, which is harder to read and harder to
-        /// describe to a player.
+        /// <strong>Why <c>R</c>.</strong> <c>R</c> is the axis <see cref="HexCoordinate"/> calls the
+        /// "row" axis and the one the rectangle's straight edges run along: a constant-<c>R</c> band
+        /// is a single straight run of <see cref="Width"/> tiles across the board, so the front line
+        /// reads as a straight line and "your half / their half" is legible without a diagram. The
+        /// two zones are mirror images: reflecting the board top to bottom (<c>(Q, R)</c> to
+        /// <c>(Q + R, -R)</c>; see the class notes) maps each exactly onto the other.
         /// </para>
         /// <para>
         /// A pure shape query, like <see cref="GetTilesInRange"/>: terrain and occupancy are
         /// ignored, because a blocked or taken tile is still on this side of the board. Off-board
         /// tiles are in nobody's zone. Any <paramref name="team"/> value other than
-        /// <see cref="BattleTeam.Player"/> is read as the enemy side, matching how
-        /// <see cref="RadiusFor"/> handles an unrecognised enum.
+        /// <see cref="BattleTeam.Player"/> is read as the enemy side.
         /// </para>
         /// </summary>
         public bool IsInDeploymentZone(HexCoordinate coordinate, BattleTeam team)
@@ -562,40 +638,30 @@ namespace BeastCraft.Battle.Grid
         }
 
         /// <summary>
-        /// Every tile <paramref name="team"/> may deploy onto, ordered by row and then along the
-        /// row so the result is stable run to run — unlike <see cref="Tiles"/>, which is a set.
-        /// Built from <see cref="IsInDeploymentZone"/>'s rule and carries all of its caveats:
-        /// terrain and occupancy are ignored, so a caller that wants only the tiles a unit could
-        /// actually stand on must filter this itself.
+        /// Every tile <paramref name="team"/> may deploy onto, ordered by row (top first) and then
+        /// left to right along the row, so the result is stable run to run — unlike
+        /// <see cref="Tiles"/>, which is a set. Built from <see cref="IsInDeploymentZone"/>'s rule and
+        /// carries all of its caveats: terrain and occupancy are ignored, so a caller that wants only
+        /// the tiles a unit could actually stand on must filter this itself.
         /// <para>
-        /// Sizing, against the radii the presets actually use (row <c>R</c> of a hexagon of radius
-        /// <c>n</c> holds <c>2n + 1 - |R|</c> tiles): Small (radius 3, depth 2) gives 9 tiles per
-        /// side, Medium (radius 5, depth 3) gives 21, Large (radius 7, depth 4) gives 38. The
-        /// smallest of those still seats <see cref="BattleFormat.LargeGroup"/>'s six beasts with
-        /// three tiles to spare, so every format fits on every arena preset.
+        /// Sizing: every row holds <see cref="Width"/> tiles, so a side gets
+        /// <c>Width * DeploymentZoneDepth</c>: Small (5 x 2) 10 tiles, Medium (8 x 3) 24, Large
+        /// (11 x 4) 44. The smallest still seats <see cref="BattleFormat.LargeGroup"/>'s six beasts
+        /// with four tiles to spare, so every format fits on every arena preset, and Large's seats
+        /// the largest horde the encounter library draws (20 swarm enemies and 4 ranged).
         /// </para>
         /// </summary>
         public IReadOnlyList<HexCoordinate> GetDeploymentZone(BattleTeam team)
         {
             List<HexCoordinate> results = new List<HexCoordinate>();
-            int lowestRow = team == BattleTeam.Player ? _deploymentRowThreshold : -Radius;
-            int highestRow = team == BattleTeam.Player ? Radius : -_deploymentRowThreshold;
+            int lowestRow = team == BattleTeam.Player ? _deploymentRowThreshold : MinRow;
+            int highestRow = team == BattleTeam.Player ? MaxRow : -_deploymentRowThreshold;
 
             for (int r = lowestRow; r <= highestRow; r++)
             {
-                // A hexagon centred on the origin is symmetric under swapping the two axial axes,
-                // so the clamp that bounds r for a given q bounds q for a given r unchanged.
-                int lowerQ;
-                int upperQ;
-                RingRowBounds(Radius, r, out lowerQ, out upperQ);
-
-                for (int q = lowerQ; q <= upperQ; q++)
+                for (int column = MinColumn; column <= MaxColumn; column++)
                 {
-                    HexCoordinate candidate = new HexCoordinate(q, r);
-                    if (IsInBounds(candidate))
-                    {
-                        results.Add(candidate);
-                    }
+                    results.Add(FromOffset(column, r));
                 }
             }
 
@@ -637,23 +703,18 @@ namespace BeastCraft.Battle.Grid
         }
 
         /// <summary>
-        /// Builds the tile set: a hexagon of hexes of <see cref="Radius"/> rings around the
-        /// origin. The r-bounds clamp each q-column so the result is a hexagon rather than a
-        /// rhombus.
+        /// Builds the tile set: the offset rectangle, <see cref="Width"/> tiles on each of the
+        /// <see cref="Height"/> rows, row by row from the top and left to right along each row.
         /// </summary>
         private HashSet<HexCoordinate> GenerateTiles()
         {
             HashSet<HexCoordinate> tiles = new HashSet<HexCoordinate>();
 
-            for (int q = -Radius; q <= Radius; q++)
+            for (int r = MinRow; r <= MaxRow; r++)
             {
-                int lowerR;
-                int upperR;
-                RingRowBounds(Radius, q, out lowerR, out upperR);
-
-                for (int r = lowerR; r <= upperR; r++)
+                for (int column = MinColumn; column <= MaxColumn; column++)
                 {
-                    tiles.Add(new HexCoordinate(q, r));
+                    tiles.Add(FromOffset(column, r));
                 }
             }
 
@@ -661,15 +722,13 @@ namespace BeastCraft.Battle.Grid
         }
 
         /// <summary>
-        /// The inclusive r-range to walk for one q-column of a hexagon of
+        /// The inclusive r-range to walk for one q-column of a hexagon (a range disc) of
         /// <paramref name="radius"/> rings centred on the origin.
         /// <para>
         /// Sweeping q from <c>-radius</c> to <c>+radius</c> and r across the whole of that same
         /// span would trace a rhombus; clamping r against the implied third cube axis
         /// (<c>-q - r</c>, which must also stay within the radius) is what shears the rhombus back
-        /// into a hexagon. Shared by <see cref="GenerateTiles"/> and
-        /// <see cref="GetTilesInRange"/>, which describe the same shape at different radii, so the
-        /// board's own bounds and a range query can never disagree about what a hexagon is.
+        /// into a hexagon. <see cref="GetTilesInRange"/> walks it and keeps the in-bounds tiles.
         /// </para>
         /// </summary>
         private static void RingRowBounds(int radius, int q, out int lowerR, out int upperR)

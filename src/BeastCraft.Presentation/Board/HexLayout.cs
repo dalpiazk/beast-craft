@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using BeastCraft.Battle.Grid;
+using BeastCraft.Presentation.Layout;
 
 namespace BeastCraft.Presentation.Board
 {
@@ -39,17 +40,75 @@ namespace BeastCraft.Presentation.Board
         public int OriginY { get; }
 
         /// <summary>
-        /// A layout that centres the board (a hexagon around tile (0, 0), as every arena is) in the
-        /// given screen rectangle, on whole pixels. A board bigger than the rectangle
-        /// (<see cref="BoardSize"/>) overflows it evenly.
+        /// A layout with tile (0, 0) at the centre of the given screen rectangle, on whole pixels.
+        /// (An arena's tiles can sit a quarter column off centre: see <see cref="BoardBounds"/>.)
         /// </summary>
         public static HexLayout Centered(int areaX, int areaY, int areaWidth, int areaHeight)
         {
             return new HexLayout(areaX + areaWidth / 2, areaY + areaHeight / 2);
         }
 
-        /// <summary>The board's pixel size for a hexagon board of <paramref name="radius"/>: (width, height).</summary>
-        public static (int Width, int Height) BoardSize(int radius)
+        /// <summary>
+        /// The pixel bounds of every tile sprite of a <paramref name="width"/> x
+        /// <paramref name="height"/> arena (<see cref="HexGrid"/>'s odd-r offset rectangle), in board
+        /// space: tile (0, 0)'s centre is the origin. The odd rows jut half a column right of the
+        /// even ones, so the box is <c>width + 1/2</c> columns wide, and for every preset it sits a
+        /// quarter column off the origin (right on odd widths, left on even ones).
+        /// </summary>
+        public static Rect BoardBounds(int width, int height)
+        {
+            int w = Math.Max(1, width);
+            int h = Math.Max(1, height);
+            int minColumn = -(w / 2);
+            int maxColumn = minColumn + w - 1;
+            int minRow = -((h - 1) / 2);
+            int maxRow = minRow + h - 1;
+
+            // Leftmost centre: an even row's first column (row 0 is always on the board). Rightmost:
+            // an odd row's last column, half a step further right, whenever there is an odd row.
+            float left = minColumn * ColumnStep - TileWidth / 2f;
+            float right = maxColumn * ColumnStep + (h > 1 ? ColumnStep / 2f : 0f) + TileWidth / 2f;
+            float top = minRow * RowStep - TileHeight / 2f;
+            float bottom = maxRow * RowStep + TileHeight / 2f;
+            return new Rect(left, top, right - left, bottom - top);
+        }
+
+        /// <summary>The pixel size of a <paramref name="width"/> x <paramref name="height"/> arena's tiles (<see cref="BoardBounds"/>): (width, height).</summary>
+        public static (int Width, int Height) BoardSize(int width, int height)
+        {
+            Rect bounds = BoardBounds(width, height);
+            return ((int)bounds.Width, (int)bounds.Height);
+        }
+
+        /// <summary>
+        /// The off-board tiles that fill the half-tile notches along a <paramref name="width"/> x
+        /// <paramref name="height"/> arena's zigzag sides: one per row, just past the row's short
+        /// end (left of every odd row, right of every even row), so that drawn clipped to
+        /// <see cref="BoardBounds"/> their inner halves square off both sides. Decoration only:
+        /// none of them is on the board. Top to bottom.
+        /// </summary>
+        public static List<HexCoordinate> EdgeNotches(int width, int height)
+        {
+            int w = Math.Max(1, width);
+            int h = Math.Max(1, height);
+            int minColumn = -(w / 2);
+            int maxColumn = minColumn + w - 1;
+            int minRow = -((h - 1) / 2);
+            List<HexCoordinate> notches = new List<HexCoordinate>(h);
+            for (int row = minRow; row < minRow + h; row++)
+            {
+                bool odd = (row & 1) != 0;
+                notches.Add(HexGrid.FromOffset(odd ? minColumn - 1 : maxColumn + 1, row));
+            }
+
+            return notches;
+        }
+
+        /// <summary>
+        /// The pixel size of a hexagon of hexes of <paramref name="radius"/> rings (a range
+        /// diagram's disc, not an arena): (width, height).
+        /// </summary>
+        public static (int Width, int Height) DiscSize(int radius)
         {
             int r = Math.Max(0, radius);
             return ((2 * r + 1) * ColumnStep, TileHeight + 2 * r * RowStep);

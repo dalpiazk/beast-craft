@@ -645,11 +645,24 @@ namespace BeastCraft.Tooling.BalanceSim
                 return rate;
             }
 
-            // Bracket: clear rate falls as the multiplier rises. Double or halve from 1 until the
-            // target sits between two evaluated multipliers, then bisect.
+            // --pin-difficulty: one evaluation at the pinned multiplier, no search (reading its
+            // rate as the target leaves easy == hard, which skips the bracket and the bisection).
+            // The battles are the ones a search would have fought there: seeds ignore the multiplier.
             double easy = 1.0;
             double hard = 1.0;
-            double rateAtOne = Evaluate(1.0);
+            double rateAtOne;
+            if (_options.TryPinnedMultiplier(mode, shape.Id, level, out double pinned))
+            {
+                Evaluate(pinned);
+                rateAtOne = target;
+            }
+            else
+            {
+                rateAtOne = Evaluate(1.0);
+            }
+
+            // Bracket: clear rate falls as the multiplier rises. Double or halve from 1 until the
+            // target sits between two evaluated multipliers, then bisect.
             if (rateAtOne > target)
             {
                 double m = 1.0;

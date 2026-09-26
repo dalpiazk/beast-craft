@@ -145,7 +145,7 @@ Bands, top to bottom (all pure layout maths, tested headless):
 | --- | --- | --- |
 | Header | y 16-72 | title; turn and seed |
 | Turn order | y 84-260 | up to 8 portrait tiles: the acting unit first (gold, "NOW"; "NEXT" between turns), then the forecast; team-coloured borders, HP bars |
-| Board | y 276-1426 | the arena, framed by the auto camera (below); its fit-all view is `FitBoard(radius)`, which scales the hex board plus sprite headroom to the band and centres it, so the Large arena (radius 7) and its hordes fit (x2.15 there, x2.86 for Medium) |
+| Board | y 276-1426 | the arena, framed by the auto camera (below); its fit-all view is `FitBoard(width, height)`, which scales the arena's frame (`BoardFrame`: its tiles plus 36 board px of sprite headroom above and a 6 px margin below and to the sides) to the band and centres it. Every preset is about as wide for its height as the band (0.89 against 0.90), so fit-all fills it top to bottom and 87-93% across: x4.79 Small, x3.30 Medium, x2.52 Large (the Large hexagon it replaced was drawn at x2.15) |
 | Toast | y 1438-1502 | the log collapsed to its latest line (and a count) |
 | Skill strip | y 1514-1758 | the acting unit's skills as cards: icon (the skill's `ArtKey`), name, shape and range, cooldown/READY/CAST; the firing and the selected one marked |
 | Controls | y 1774-1894 | PLAY/PAUSE (auto-play), x1 / x2 / x3 speed, SKIP (resolve the rest of the battle and show the result) |
@@ -169,6 +169,20 @@ the HUD, skill strip and cards use it. Both hosts ship the font and its licence 
 built-in 3x5 font) is only the fallback when the TTF cannot be loaded (missing, or an un-pulled Git
 LFS pointer).
 
+### Arena
+
+Each arena is a rectangle of pointy-top hexes, `Width x Height` tiles (battle-system.md, "Arenas":
+5 x 7, 8 x 11, 11 x 15). `HexLayout.BoardBounds(width, height)` is the box of its tile sprites in
+board space (tile (0, 0)'s centre the origin; `Width + 1/2` columns wide, because odd rows sit half a
+column right, so it is a quarter column off the origin), and `BoardSize` its size. The board is drawn
+so the edge is a clean rectangle, not the zigzag of alternate rows: under the tiles a plate (dark
+soil, the box plus `BoardEdgeMargin`, 6 px) on which the end rows' pointed tops and bottoms sit; then
+the tiles (stone in the enemy's deployment rows, grass elsewhere); then, clipped to the box, one
+dimmed (x0.47) half tile in each side notch (`HexLayout.EdgeNotches`: left of every odd row, right of
+every even row, each centred on the box edge so exactly its inner half shows). The notch halves are
+decoration, never on the board. The range diagram (below) keeps its own hex disc: it is a legend for
+the skill's shape, not the arena.
+
 ## The auto camera (`CameraRig`, `TurnCamera`)
 
 There is no manual zoom or pan: the camera frames the action by itself. `CameraRig`
@@ -177,7 +191,7 @@ is a board-space centre and a zoom (a multiple of the fit-all scale, so zoom 1 i
 `FitBoard` view); `Frame(boxes)` fits board-space boxes plus `Padding` (28 board px), zoom clamped
 between fit-all and `MaxZoom` (x2), itself capped at an absolute `MaxScale` (5.5 canvas px per
 board px) so a small arena that already fits big is not blown up; `Clamp` keeps what the view
-shows inside the arena's bounds (tiles plus sprite headroom), centring on an axis where it shows
+shows inside the arena's bounds (`PortraitLayout.BoardFrame`: tiles plus sprite headroom), centring on an axis where it shows
 more than the arena; `Ease` moves between views with smoothstep. A unit's box is its sprite, HP
 bar and icons (`UnitBox`: twice the size for a multi-hex unit); an effect's area is its circle.
 
@@ -371,7 +385,8 @@ Line, the six arms for Cross, the disc(s) for AreaBurst, the caster for Self) an
 crosses from every tile, ranges from the nearest), and a test holds the fixed shapes to
 `SkillTargetResolver` on a board full of units. It is unbounded (a battle clips to the board).
 The skill detail card (below) draws it: caster gold, reach blue, area in the side's colour, the
-example target outlined.
+example target outlined, on a hex-of-hexes backdrop (`PortraitLayout.FitDisc`) whatever the
+arena's shape: the diagram teaches the shape and range, not the board.
 
 ## Skill detail card and glossary
 

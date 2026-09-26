@@ -69,12 +69,12 @@ namespace BeastCraft.Tests.EditMode
         }
 
         /// <summary>
-        /// A seven-tile Ranged enemy behind one to four Vanguard singles on a Medium arena. Largest
-        /// first, four singles and the boss seat (it takes the middle row and the singles fill in
+        /// A seven-tile Ranged enemy behind one to five Vanguard singles on a Medium arena. Largest
+        /// first, five singles and the boss seat (it takes the middle row and the singles fill in
         /// around it), which is all the old descending-size check tried. But the generator places
-        /// Vanguards first: four singles take the middle of the front row and the boss then fits
-        /// nowhere, so every four-brute draw fails its fit safety net. The validator must check the
-        /// generator's order, at every count, and refuse the variant.
+        /// Vanguards first: five singles take the middle of the eight-tile front row and the boss
+        /// then fits nowhere, so every five-brute draw fails its fit safety net. The validator must
+        /// check the generator's order, at every count, and refuse the variant.
         /// </summary>
         [Test]
         public void Validate_RefusesALargeRangedEnemyTheGeneratorCannotSeatBehindItsScreen()
@@ -84,7 +84,7 @@ namespace BeastCraft.Tests.EditMode
 
             List<UnitFootprint> largestFirst = new List<UnitFootprint> { UnitFootprint.Hex7 };
             List<UnitFootprint> generatorOrder = new List<UnitFootprint>();
-            for (int i = 0; i < 4; i++)
+            for (int i = 0; i < 5; i++)
             {
                 largestFirst.Add(UnitFootprint.Single);
                 generatorOrder.Add(UnitFootprint.Single);
@@ -95,12 +95,12 @@ namespace BeastCraft.Tests.EditMode
             Assert.IsFalse(EncounterFit.Fits(ArenaSize.Medium, generatorOrder), "in the generator's order it does not");
 
             List<string> errors = EncounterLibraryValidator.Validate(library, enemies, Drops("duel", "boss"));
-            Assert.IsTrue(errors.Exists(e => e.Contains("variant 'screen': 5 enemies it can draw (4 x Single, 1 x Hex7") && e.Contains("do not fit the Medium")),
+            Assert.IsTrue(errors.Exists(e => e.Contains("variant 'screen': 6 enemies it can draw (5 x Single, 1 x Hex7") && e.Contains("do not fit the Medium")),
                           string.Join("\n", errors));
 
-            library.Shapes[1].Variants[0].Slots[0].Min = 4;
+            library.Shapes[1].Variants[0].Slots[0].Min = 5;
             EncounterGenerator generator = new EncounterGenerator(EncounterLibrary.Build(library), EnemyCatalog.Build(enemies, null), 3);
-            Assert.IsNull(generator.Draw("boss"), "with exactly four brutes the generator can never seat it");
+            Assert.IsNull(generator.Draw("boss"), "with exactly five brutes the generator can never seat it");
         }
 
         /// <summary>The same lineup with the boss a Vanguard: the generator places it first, so it seats and the validator accepts it.</summary>
@@ -291,7 +291,7 @@ namespace BeastCraft.Tests.EditMode
             return EnemyLibraryTests.Library(wyvern, EnemyLibraryTests.Brute(), EnemyLibraryTests.Archer(), EnemyLibraryTests.Giant());
         }
 
-        /// <summary><see cref="Library"/> with <c>boss</c> replaced by one variant, <c>screen</c>: one to four brutes and one wyvern.</summary>
+        /// <summary><see cref="Library"/> with <c>boss</c> replaced by one variant, <c>screen</c>: one to five brutes and one wyvern.</summary>
         private static EncounterLibraryData ScreenLibrary()
         {
             EncounterLibraryData library = Library();
@@ -306,7 +306,7 @@ namespace BeastCraft.Tests.EditMode
                     Weight = 1,
                     Slots = new[]
                     {
-                        new EncounterSlotData { Types = new[] { "brute" }, Min = 1, Max = 4 },
+                        new EncounterSlotData { Types = new[] { "brute" }, Min = 1, Max = 5 },
                         new EncounterSlotData { Types = new[] { "wyvern" }, Min = 1, Max = 1 }
                     }
                 }

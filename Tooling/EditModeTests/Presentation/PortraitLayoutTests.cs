@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using BeastCraft.Battle.Grid;
 using BeastCraft.Presentation.Board;
 using BeastCraft.Presentation.Layout;
@@ -166,7 +168,7 @@ namespace BeastCraft.Tests.EditMode
         {
             PortraitLayout layout = new PortraitLayout();
             HexGrid grid = new HexGrid(size);
-            BoardFit fit = layout.FitBoard(grid.Radius);
+            BoardFit fit = layout.FitBoard(grid.Width, grid.Height);
             HexLayout hexes = new HexLayout(0, 0);
 
             foreach (HexCoordinate tile in grid.Tiles)
@@ -178,10 +180,19 @@ namespace BeastCraft.Tests.EditMode
                 Assert.IsTrue(layout.Board.Contains(center.X + halfW - 0.01f, center.Y + halfH - 0.01f), size + " " + tile);
             }
 
+            Rect frame = PortraitLayout.BoardFrame(grid.Width, grid.Height);
+            Vec2 middle = fit.ToCanvas(frame.Center);
+            Assert.AreEqual(layout.Board.Center.X, middle.X, 1e-3f, "the arena's frame, not tile (0, 0), is centred");
+            Assert.AreEqual(layout.Board.Center.Y, middle.Y, 1e-3f);
+            Assert.AreEqual(layout.Board.Height, frame.Height * fit.Scale, 1e-2f, "a portrait arena fills the board area top to bottom");
+            Assert.Greater(frame.Width * fit.Scale, 0.85f * layout.Board.Width, "and most of it across (the headroom is the rest)");
+            Assert.Greater(fit.Scale, 2.4f, "even the large arena (a horde) draws its hexes at over twice the placeholder size");
+
+            Rect tilesBox = HexLayout.BoardBounds(grid.Width, grid.Height);
+            Assert.AreEqual(PortraitLayout.BoardHeadroomTop, tilesBox.Y - frame.Y, 1e-3f, "headroom above the top row");
+            Assert.AreEqual(PortraitLayout.BoardEdgeMargin, frame.Bottom - tilesBox.Bottom, 1e-3f);
+
             Vec2 origin = fit.ToCanvas(Vec2.Zero);
-            Assert.AreEqual(layout.Board.Center.X, origin.X, 1e-3f);
-            Assert.AreEqual(layout.Board.Center.Y, origin.Y, 1e-3f);
-            Assert.Greater(fit.Scale, 2f, "even the large arena (a horde) draws its hexes at over twice the placeholder size");
 
             Vec2 back = fit.ToBoard(origin.X + 64f, origin.Y - 32f);
             Assert.AreEqual(64f / fit.Scale, back.X, 1e-3f);
@@ -192,7 +203,46 @@ namespace BeastCraft.Tests.EditMode
         public void TheLargeArena_IsDrawnSmallerThanTheMedium()
         {
             PortraitLayout layout = new PortraitLayout();
-            Assert.Less(layout.FitBoard(new HexGrid(ArenaSize.Large).Radius).Scale, layout.FitBoard(new HexGrid(ArenaSize.Medium).Radius).Scale);
+            Assert.Less(layout.FitBoard(11, 15).Scale, layout.FitBoard(8, 11).Scale);
+        }
+
+        [TestCase(ArenaSize.Small)]
+        [TestCase(ArenaSize.Medium)]
+        [TestCase(ArenaSize.Large)]
+        public void TheTilesBox_AndTheNotchFillers_SquareOffTheZigzagSides(ArenaSize size)
+        {
+            HexGrid grid = new HexGrid(size);
+            HexLayout hexes = new HexLayout(0, 0);
+            Rect box = HexLayout.BoardBounds(grid.Width, grid.Height);
+
+            float left = float.MaxValue;
+            float right = float.MinValue;
+            float top = float.MaxValue;
+            float bottom = float.MinValue;
+            foreach (HexCoordinate tile in grid.Tiles)
+            {
+                Vec2 c = hexes.Center(tile);
+                left = Math.Min(left, c.X - HexLayout.TileWidth / 2f);
+                right = Math.Max(right, c.X + HexLayout.TileWidth / 2f);
+                top = Math.Min(top, c.Y - HexLayout.TileHeight / 2f);
+                bottom = Math.Max(bottom, c.Y + HexLayout.TileHeight / 2f);
+            }
+
+            Assert.AreEqual((left, top, right, bottom), (box.X, box.Y, box.Right, box.Bottom), "the box is exactly the tile sprites'");
+            Assert.AreEqual(grid.Width * HexLayout.ColumnStep + HexLayout.ColumnStep / 2, (int)box.Width, "W columns and the odd rows' half step");
+
+            List<HexCoordinate> notches = HexLayout.EdgeNotches(grid.Width, grid.Height);
+            Assert.AreEqual(grid.Height, notches.Count, "one per row");
+            for (int i = 0; i < notches.Count; i++)
+            {
+                HexCoordinate notch = notches[i];
+                Assert.AreEqual(grid.MinRow + i, notch.R, "top to bottom");
+                Assert.IsFalse(grid.IsInBounds(notch), notch + " is decoration, off the board");
+                Vec2 c = hexes.Center(notch);
+                bool odd = (notch.R & 1) != 0;
+                Assert.AreEqual(odd ? box.X : box.Right, c.X, 1e-3f, "centred on the box edge, so exactly its inner half shows");
+                Assert.IsTrue(grid.IsInBounds(notch + new HexCoordinate(odd ? 1 : -1, 0)), "beside the row's end tile");
+            }
         }
     }
 }

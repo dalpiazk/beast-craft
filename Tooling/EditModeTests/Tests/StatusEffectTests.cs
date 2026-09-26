@@ -517,11 +517,11 @@ namespace BeastCraft.Tests.EditMode
         public void Knockback_StopsAtTheBoardEdge_AndDoesNothingWithoutAGrid()
         {
             HexGrid grid = new HexGrid(ArenaSize.Medium);
-            BattleUnit caster = Place(grid, Unit("p1", BattleTeam.Player, new HexCoordinate(3, 0)));
-            BattleUnit target = Place(grid, Unit("e1", BattleTeam.Enemy, new HexCoordinate(4, 0)));
+            BattleUnit caster = Place(grid, Unit("p1", BattleTeam.Player, new HexCoordinate(1, 0)));
+            BattleUnit target = Place(grid, Unit("e1", BattleTeam.Enemy, new HexCoordinate(2, 0)));
 
             Knock(caster, target, 5, grid);
-            Assert.AreEqual(new HexCoordinate(5, 0), target.Position, "Medium radius 5");
+            Assert.AreEqual(new HexCoordinate(3, 0), target.Position, "Medium's centre row ends at Q = 3 (columns -4 to 3)");
 
             BattleUnit loose = Unit("e2", BattleTeam.Enemy, new HexCoordinate(1, 0));
             Knock(Unit("p2", BattleTeam.Player, HexCoordinate.Zero), loose, 2, null);

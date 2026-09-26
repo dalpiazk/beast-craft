@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using BeastCraft.Battle.Grid;
 using BeastCraft.Encounters;
 using BeastCraft.Save;
 using BeastCraft.Session;
@@ -45,11 +46,14 @@ namespace BeastCraft.Presentation.Content
         /// <summary>
         /// The setup, and which species each battle unit is (unit id to species or enemy id), for
         /// choosing its sprite. Null with <paramref name="error"/> set when a species or the
-        /// encounter is unknown.
+        /// encounter is unknown. <paramref name="encounterId"/> is a template, else a shape id (one
+        /// generated lineup of that shape, drawn with <paramref name="seed"/>);
+        /// <paramref name="arena"/>, when set, fights it on that arena instead of its own (the
+        /// lineup must seat there, or the battle cannot begin).
         /// </summary>
         public static BattleSetup Create(GameContent content, int seed, out Dictionary<string, string> speciesByUnit, out string error,
                                          IReadOnlyList<string> team = null, string encounterId = DefaultEncounterId, int level = DefaultLevel,
-                                         int encounterLevel = DefaultEncounterLevel)
+                                         int encounterLevel = DefaultEncounterLevel, ArenaSize? arena = null)
         {
             speciesByUnit = new Dictionary<string, string>(StringComparer.Ordinal);
             error = null;
@@ -80,14 +84,21 @@ namespace BeastCraft.Presentation.Content
                 speciesByUnit[BattleSession.BeastUnitIdPrefix + beastId] = kit.SpeciesId;
             }
 
-            EncounterPlan plan = EncounterPlan.FromTemplate(content.Encounters, content.Enemies, encounterId, encounterLevel);
+            // A template, else a shape id: one generated lineup of that shape, drawn with the seed.
+            EncounterPlan plan = EncounterPlan.FromTemplate(content.Encounters, content.Enemies, encounterId, encounterLevel) ??
+                                 EncounterPlan.Generate(content.Encounters, content.Enemies, encounterId, encounterLevel, seed);
             if (plan == null)
             {
-                error = "Unknown encounter template '" + encounterId + "'.";
+                error = "Unknown encounter template or shape '" + encounterId + "'.";
                 return null;
             }
 
             setup.Encounter = plan.ToSetup();
+            if (arena.HasValue)
+            {
+                setup.Encounter.Arena = arena.Value;
+            }
+
             for (int i = 0; i < setup.Encounter.Enemies.Count; i++)
             {
                 EnemySpec spec = setup.Encounter.Enemies[i];

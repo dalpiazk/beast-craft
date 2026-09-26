@@ -312,6 +312,45 @@ open choice any more.
 Small, Medium, and Large.** There is no single global arena size; each encounter declares which of
 the three presets it uses.
 
+#### Arenas — DECIDED (rectangular, portrait-fit)
+
+Each preset is a **rectangle of pointy-top hexes**, taller than wide so it fills the phone's portrait
+board area (producer decision; it replaced the hexagons of radius 3 / 5 / 7):
+
+| Preset | Width x height | Tiles | Was (hexagon) | Used by |
+| --- | --- | ---: | ---: | --- |
+| Small | 5 x 7 | 35 | 37 | nothing yet |
+| Medium | 8 x 11 | 88 | 91 | `solo`, `elite`, `squad` (and their post-game copies); bosses r01-r03 |
+| Large | 11 x 15 | 165 | 169 | `horde`s; bosses r04-r11 |
+
+- **Shape.** An *odd-r offset rectangle* (`HexGrid`): every row holds exactly `Width` tiles, rows run
+  from the enemy's edge at the top (`MinRow`) to the player's at the bottom (`MaxRow`), and odd rows
+  sit half a tile right of even ones, so the left and right edges zigzag by half a tile. The screen
+  squares them off: the tiles sit on a plate and each half-tile notch is filled with a dimmed,
+  off-board half tile (presentation-and-vfx.md, "Arena"). Only the *legality* of a tile is
+  rectangular — coordinates stay axial `(Q, R)` with tile (0, 0) on the centre row, and neighbours,
+  distance, range, lines, knockback and pathfinding are the same cube maths as on the hexagon. Every
+  straight hex line crosses the board in one piece, and on an empty board a shortest path between
+  any two tiles stays on the board (both tested), so nothing that walks or aims needed to change.
+- **Why odd-r.** Every height is odd and centred on the `R = 0` row, so rows `R` and `-R` have the
+  same parity and line up tile for tile: the enemy half is the player half reflected top to bottom
+  (`(Q, R)` → `(Q + R, -R)`, a symmetry of the hex grid that keeps each tile's screen column and every
+  distance). Odd-r rather than even-r keeps the even rows — the centre row among them — unshifted, so
+  tile (0, 0) is column 0; the columns run from `-(Width / 2)`, which centres each side's *front* row
+  on the board's vertical centre line (the front rows are even on Small and Large, whose odd widths
+  centre the even rows, and odd on Medium, whose even width centres the odd rows).
+- **Deployment** is unchanged in depth: 2 / 3 / 4 rows a side (10 / 24 / 44 tiles), with a 3 / 5 /
+  7-row neutral band (see "Deployment zones"). Each side's front row is the very row the hexagon had
+  (Medium 8 tiles, Large 11, the same screen columns); what narrowed is the middle (the hexagons'
+  centre rows were 11 and 15 wide). A seven-tile giant is three rows tall, so it fits Medium and Large
+  but never Small, as before; Medium's eight-wide zone now seats two giants side by side (three need
+  Large). The largest horde (20 swarm enemies and 4 ranged) is Large-only and seats with 20 tiles to
+  spare.
+- **Balance.** Measured before re-calibrating (tuning log, "Rectangular arenas: shape effect"): the
+  Medium shapes barely move; Large hordes got 4-5 points easier at the old multipliers (a swarm
+  surrounds fewer beasts on the narrower middle), and the per-beast guard did not move. The difficulty
+  table was re-calibrated on the rectangles ("Rectangular arenas: re-calibration").
+
 *Background.* A **square grid** would have been simpler on every axis: tile art authors as a single
 repeated quad, movement and line-of-sight use standard 4- or 8-directional rules, and pathfinding is
 textbook. A **hexagonal grid** is more tactically interesting — flanking and positioning read better
@@ -1181,7 +1220,7 @@ The changes from v1, each with its theme:
 | Nature → Fire | 0.5x | 1x | Now neutral |
 
 **These values are a tunable starting default, not producer-confirmed balance** — the same standing
-as the arena radii and the deployment-zone split. The set of elements is fixed; which pairs are
+as the deployment-zone split. The set of elements is fixed; which pairs are
 strong, mild or weak, and whether 2x / 1.25x / 0.5x are the right sizes, may still move as balance
 work measures real fights. `ElementChart` (`Strong`, `Mild`, `Weak` and its rows) is the single
 place to change them.
@@ -1551,29 +1590,30 @@ tiles each side may deploy onto, and whether a proposed set of starting position
 The board is split into three bands along the axial **`R` axis**. The player owns the
 `HexGrid.DeploymentZoneDepth` rows with the most positive `R`, the enemy owns the mirror-image rows
 with the most negative `R`, and the rows between them are a **neutral no-deploy band** belonging to
-neither side. Depth is `ceil(Radius / 2)`, so it scales with the arena preset rather than being
-fixed:
+neither side. Depth is `ceil(h / 2)` for the `h = (Height - 1) / 2` rows on each side of the centre
+line, so it scales with the arena preset rather than being fixed (the same 2 / 3 / 4 rows the
+hexagonal arenas had):
 
-| Preset | Radius | Depth | Tiles per zone | Neutral band |
+| Preset | Width x height | Depth | Tiles per zone | Neutral band |
 | --- | --- | --- | --- | --- |
-| Small | 3 | 2 | 9 | 19 |
-| Medium | 5 | 3 | 21 | 49 |
-| Large | 7 | 4 | 38 | 93 |
+| Small | 5 x 7 | 2 | 10 | 3 rows, 15 tiles |
+| Medium | 8 x 11 | 3 | 24 | 5 rows, 40 tiles |
+| Large | 11 x 15 | 4 | 44 | 7 rows, 77 tiles |
 
-The smallest of those seats `BattleFormat.LargeGroup`'s six beasts with three tiles to spare, so
-**every format fits on every arena preset** — checked against the radii the presets actually use
-(row `R` of a hexagon of radius `n` holds `2n + 1 - |R|` tiles), not assumed.
+Every row holds `Width` tiles, so a zone is `Width x Depth`. The smallest seats
+`BattleFormat.LargeGroup`'s six beasts with four tiles to spare, so **every format fits on every
+arena preset**. `DeploymentPacker.FrontOrder` seats a side front row first, then outward from the
+board's vertical centre line (the screen column of tile (0, 0), `|2Q + R|`), which the front row is
+centred on (see "Arenas").
 
-**Why `R`.** All three cube axes split a hexagon into two congruent regions — negating every cube
-component is a 180° rotation that maps the board onto itself and each zone exactly onto the other —
-so symmetry alone does not pick between `Q`, `R` and the implied `S`. `R` wins because it is the
-axis `HexCoordinate` already calls the "row" axis: a constant-`R` band is a single straight run of
-tiles across the board, so the front line reads as a straight line and "your half / their half" is
-legible without a diagram. `Q` or `S` would be geometrically identical but would land the front line
-on a diagonal, which is harder to read and harder to describe to a player.
+**Why `R`.** `R` is the axis `HexCoordinate` calls the "row" axis and the one the rectangle's
+straight edges run along: a constant-`R` band is a single straight run of tiles across the board, so
+the front line reads as a straight line and "your half / their half" is legible without a diagram.
+The two zones are mirror images: reflecting the board top to bottom (`(Q, R)` → `(Q + R, -R)`) maps
+each exactly onto the other, so neither side is favoured.
 
-**This is a tunable implementation default, exactly like the hex radii backing each arena preset,
-and for the same reason.** Nothing about deployment geometry has been through encounter design. What
+**The split is a tunable implementation default** (the arena sizes themselves are a producer
+decision). Nothing about deployment geometry has been through encounter design. What
 the producer confirmed (decision 2) is how many beasts a format deploys, not where they may stand.
 The three-band split and the half-the-board depth were picked so roughly half the board is contested
 ground and each side still has real depth to arrange itself in; expect both to move once encounter
@@ -2563,7 +2603,8 @@ of the design pass are recorded here.
 ## Next steps
 
 The grid and turn-manager scaffolding landed against decisions 1–3: a `BeastCraft.Battle.Grid`
-namespace holding the arena-size presets, axial hex coordinates, a hexagon-shaped board with
+namespace holding the arena-size presets, axial hex coordinates, a board (a hexagon then; a
+portrait rectangle since "Arenas") with
 occupancy tracking and A* pathfinding over it, plus a `BattleFormat` enum for the Solo/4/6 party
 sizes, a minimal `BattleUnit`, and a speed-sorted `TurnManager` (since replaced by the ATB gauge,
 decision 3 amended).
@@ -2864,10 +2905,10 @@ within the stat budget to keep the balance guard (tuning log, "Behaviour bonds a
 difficulty").
 
 Every pass so far is deliberately **data structures and algorithms only** — no MonoBehaviours, no
-scene or prefab wiring, and no committed `.asset` instances (the roster's are generated in-Editor). The hex radii backing each arena preset
-are placeholder implementation defaults chosen to be tunable, not producer-confirmed balance
-numbers, and the deployment-zone split, the effect rules and the element chart above are the same
-kind of default, as is the damage formula.
+scene or prefab wiring, and no committed `.asset` instances (the roster's are generated in-Editor). The arena sizes are a
+producer decision ("Arenas"); the deployment-zone split, the effect rules and the element chart
+above are placeholder implementation defaults chosen to be tunable, not producer-confirmed balance
+numbers, as is the damage formula.
 Still to come: confirming or revising the third tuning pass (and, if needed, the damage formula and
 element chart), deciding the design questions it raised above — a design decision the reports inform
 rather than make — and extending the simulator once authored skills, real encounters and the avatar

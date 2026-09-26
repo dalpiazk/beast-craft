@@ -64,6 +64,7 @@ dotnet run --project Tooling/BalanceSim -c Release -- [options]
 | `--drop-tables <path>` | found by walking up | Path to `drop-tables.json`: rolled by `--mode pacing`; in PvE the encounter library's shape ids are checked against it. |
 | `--encounters-file <path>` | found by walking up | Path to the legacy fixed set's `encounters.json` (beside this file). |
 | `--write-difficulty <path>` | off | PvE, generated set, one seed: also write the calibrated multipliers as the game's `encounter-difficulty.json` (see "Difficulty table for the game"). Never changes the report. |
+| `--pin-difficulty <path>` | off | PvE, generated set. **Changes results.** No calibration search: every cell (post-game ones too) fights at the multiplier that `encounter-difficulty.json`-format file gives it (`{seed}` in the path is the run's seed, so a `--seeds` run pins each seed to its own table; a missing cell stops the run). Measures a change at a *stale* calibration, e.g. an arena change before re-calibrating (docs/balance/tuning-log.md, "Rectangular arenas: shape effect"). Pinned to the table a run wrote itself (`--write-difficulty`, same arguments), the report is that run's byte for byte except the header line and the "Evaluations" column. |
 | `--avatar <preset>` | `library` | PvE only. `library` (the committed report's setting) fields the skill library's default avatar: its first three actives and `AvatarDefaultPassives`, at `--skill-level`. `support` fields a fixture avatar with three passive skills beside every player team (`AvatarPresets.cs`; not authored content). `none` fields no avatar. `library` and `support` add an "Avatar passives" section with firings per battle and the avatar's turns and active casts per battle. See `docs/design/battle-system.md`, "Avatar passives" and "Beast skill kits". |
 | `--avatar-level <n>` | encounter level | PvE only. The fielded avatar's level, 1-100: its fixture stats on the medium curve (Speed included) and its damage-formula level. By default each battle's encounter level (the avatar levels alongside the encounters; see `--mode pacing`, "Avatar level"). |
 | `--out <path>` | none | Also write the report to this file (it always goes to stdout). |
@@ -90,7 +91,7 @@ Two reports are committed, both the default arguments:
   the ATB turn order, so its battle lengths are in rounds.
 - `docs/balance/tuned-report.md` — the current roster and skill library after the third tuning pass
   and its element chart v2 follow-up (see `docs/balance/tuning-log.md`, "Retune with authored kits,
-  avatar passives, sqrt speed and mitigation", "Element chart v2", "Thunderbird range vs move" and "Niche pass: Thunderbird opener, Phoenix/Frost Wyrm lifts, remaining negatives", then "Team bonds"; "Scouting and counter-picking" added the scouted-picking section, no balance change; "Avatar gauge" moved the avatar onto its own ATB gauge, no tuning; "Large enemies (footprints)" made the giant, colossus and champion multi-hex, no tuning beyond the bosses' range parity; "Scouting-based calibration" calibrates the difficulty on the bond-aware scouted pick instead of the average team, no balance change; "Scaling bonds" added three per-count stance bonds; milestone 2's final retune: "Avatar retune", "Thunderbird in `elite`", "Beast retune under the scouted calibration" and "Level-gap re-check"), under the real game setup (every beast's authored default loadout, the library
+  avatar passives, sqrt speed and mitigation", "Element chart v2", "Thunderbird range vs move" and "Niche pass: Thunderbird opener, Phoenix/Frost Wyrm lifts, remaining negatives", then "Team bonds"; "Scouting and counter-picking" added the scouted-picking section, no balance change; "Avatar gauge" moved the avatar onto its own ATB gauge, no tuning; "Large enemies (footprints)" made the giant, colossus and champion multi-hex, no tuning beyond the bosses' range parity; "Scouting-based calibration" calibrates the difficulty on the bond-aware scouted pick instead of the average team, no balance change; "Scaling bonds" added three per-count stance bonds; milestone 2's final retune: "Avatar retune", "Thunderbird in `elite`", "Beast retune under the scouted calibration" and "Level-gap re-check"; "Rectangular arenas: re-calibration" moved the arenas to portrait rectangles and re-calibrated, no beast change), under the real game setup (every beast's authored default loadout, the library
   avatar with its passives, the library's team bonds, skill level 1), the current Runtime (the square-root ATB turn order, the
   mitigation damage formula, `SpecialAttack`-scaled heals, combat stances, variance and crits) and
   the generated encounters. Regenerate it, and the game's difficulty table with it, whenever the
@@ -272,8 +273,14 @@ cooldown 2 weighted `Attack` about twice as heavily.
 
   The bosses (giant, champion and the fixed colossus) carry `StatusResist` 50. No fixture skill uses
   the other fields yet, so the reports are unchanged.
+- **Arenas.** The game's own boards (`HexGrid`; `docs/design/battle-system.md`, "Arenas"): portrait
+  rectangles of pointy-top hexes, Medium 8 x 11 (the `solo`, `elite` and `squad` shapes and bosses
+  r01-r03) and Large 11 x 15 (the `horde`s and bosses r04-r11); Small 5 x 7 is unused by the content.
+  Deployment is 3 rows deep on Medium (24 tiles a side) and 4 on Large (44), with a 5- and 7-row
+  neutral band between. Until "Rectangular arenas" in the tuning log they were hexagons of radius 5
+  and 7 (21 and 38 tiles a side); nothing in the simulator depends on the shape.
 - **Placement.** Each side takes the front-most tiles of its own deployment zone (front row first,
-  then outward from the centre line). Enemies are placed in lineup order by `DeploymentPacker`: each
+  then outward from the board's vertical centre line, which the front row is centred on). Enemies are placed in lineup order by `DeploymentPacker`: each
   takes the front-most anchor where its whole footprint fits the zone on free tiles, so one-tile
   enemies take exactly the front-most tiles and a `Hex7` boss on a Medium board sits centred on the
   middle row of the enemy zone, its escort filling the tiles around it (the layout is worked out once
@@ -727,8 +734,9 @@ Kirin and Leviathan.
 
 Every pair of distinct species is played twice per level and kit mode with the sides swapped (each
 game `--samples` times), on a
-Medium board, one beast per side: the most central tile of the player zone against its point
-mirror. Mirror matches are skipped. `TurnManager` breaks initiative ties on the ordinal unit id,
+Medium board, one beast per side: the most central tile of the player zone against its mirror image
+across the centre line (`(Q, R)` to `(Q + R, -R)`, the same screen column; the board's top-to-bottom
+symmetry). Mirror matches are skipped. `TurnManager` breaks initiative ties on the ordinal unit id,
 and the ids are fixed per side (`p` / `e`), so playing each pairing both ways gives each beast the
 tie-break exactly once. Battle length is reported in normalized time and total turns. Stalemates and mutual defeats count as games but not wins.
 
