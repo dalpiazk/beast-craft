@@ -438,7 +438,7 @@ namespace BeastCraft.Tests.EditMode
         public void Giant_RoutesOnlyWhereItsFootprintFits()
         {
             // A three-row channel (R = -1, 0, 1): a Hex7 can travel only along its middle row, and
-            // a one-tile pillar at (0, 1) forces it to wait rather than squeeze past.
+            // a one-tile pillar at (2, 1) forces it to wait rather than squeeze past.
             HexGrid grid = new HexGrid(ArenaSize.Large);
             foreach (HexCoordinate tile in new List<HexCoordinate>(grid.Tiles))
             {
@@ -448,25 +448,25 @@ namespace BeastCraft.Tests.EditMode
                 }
             }
 
-            BattleUnit giant = Place(grid, Large("g", BattleTeam.Enemy, UnitFootprint.Hex7, 4, new HexCoordinate(-5, 0), Skill(1)));
-            BattleUnit beast = Place(grid, Unit("b", BattleTeam.Player, CombatStance.Vanguard, 0, new HexCoordinate(4, 0)));
+            BattleUnit giant = Place(grid, Large("g", BattleTeam.Enemy, UnitFootprint.Hex7, 4, new HexCoordinate(-4, 0), Skill(1)));
+            BattleUnit beast = Place(grid, Unit("b", BattleTeam.Player, CombatStance.Vanguard, 0, new HexCoordinate(5, 1)));
 
             BattleTurnResult turn = Turn(giant, new List<BattleUnit> { giant, beast }, grid);
             Assert.AreEqual(4, turn.MovementSpent);
-            Assert.AreEqual(new HexCoordinate(-1, 0), giant.Position, "straight along the middle row");
+            Assert.AreEqual(new HexCoordinate(0, 0), giant.Position, "straight along the middle row");
             AssertCovers(grid, giant);
 
-            IReadOnlyList<HexCoordinate> path = HexPathfinder.FindPath(grid, giant.Position, new HexCoordinate(2, 0), "g", UnitFootprint.Hex7);
+            IReadOnlyList<HexCoordinate> path = HexPathfinder.FindPath(grid, giant.Position, new HexCoordinate(3, 0), "g", UnitFootprint.Hex7);
             Assert.AreEqual(4, path.Count);
             foreach (HexCoordinate anchor in path)
             {
                 Assert.IsTrue(grid.CanStand(anchor, UnitFootprint.Hex7, "g"), anchor.ToString());
             }
 
-            grid.SetBlocked(new HexCoordinate(1, 1), true);
-            CollectionAssert.IsEmpty(HexPathfinder.FindPath(grid, giant.Position, new HexCoordinate(2, 0), "g", UnitFootprint.Hex7),
+            grid.SetBlocked(new HexCoordinate(2, 1), true);
+            CollectionAssert.IsEmpty(HexPathfinder.FindPath(grid, giant.Position, new HexCoordinate(3, 0), "g", UnitFootprint.Hex7),
                                      "a one-tile pillar in the channel stops a seven-tile unit");
-            Assert.IsNotEmpty(HexPathfinder.FindPath(grid, new HexCoordinate(3, 1), new HexCoordinate(0, 1), "x"), "but not a one-tile one");
+            Assert.IsNotEmpty(HexPathfinder.FindPath(grid, new HexCoordinate(4, 1), new HexCoordinate(1, 1), "x"), "but not a one-tile one");
         }
 
         [Test]
@@ -600,11 +600,12 @@ namespace BeastCraft.Tests.EditMode
                            "a Small zone is two rows deep");
             Assert.IsTrue(DeploymentPacker.TryPack(new HexGrid(ArenaSize.Small), BattleTeam.Enemy, new[] { UnitFootprint.Triangle }, anchors, covered));
 
-            // Medium's 21-tile zone: two giants would need five rows.
-            Assert.IsFalse(DeploymentPacker.TryPack(new HexGrid(ArenaSize.Medium), BattleTeam.Enemy, new[] { UnitFootprint.Hex7, UnitFootprint.Hex7 }, anchors, covered));
-            Assert.AreEqual(1, anchors.Count, "the first fitted; the second is where it failed");
+            // Medium's 24-tile zone, eight wide: two giants seat side by side, a third does not.
+            Assert.IsTrue(DeploymentPacker.TryPack(new HexGrid(ArenaSize.Medium), BattleTeam.Enemy, new[] { UnitFootprint.Hex7, UnitFootprint.Hex7 }, anchors, covered));
+            Assert.IsFalse(DeploymentPacker.TryPack(new HexGrid(ArenaSize.Medium), BattleTeam.Enemy, new[] { UnitFootprint.Hex7, UnitFootprint.Hex7, UnitFootprint.Hex7 }, anchors, covered));
+            Assert.AreEqual(2, anchors.Count, "the first two fitted; the third is where it failed");
 
-            UnitFootprint[] overfull = new UnitFootprint[22];
+            UnitFootprint[] overfull = new UnitFootprint[25];
             Assert.IsFalse(DeploymentPacker.TryPack(new HexGrid(ArenaSize.Medium), BattleTeam.Enemy, overfull, anchors, covered));
         }
 
@@ -621,7 +622,7 @@ namespace BeastCraft.Tests.EditMode
             for (int round = 0; round < 300; round++)
             {
                 HexGrid grid = RandomBoard(rng, sizes[rng.Next(sizes.Length)]);
-                int radius = grid.Radius;
+                int radius = Span(grid);
 
                 for (int q = 0; q < 20; q++)
                 {
@@ -701,10 +702,22 @@ namespace BeastCraft.Tests.EditMode
         // Helpers.
         // ---------------------------------------------------------------------------------------
 
+        /// <summary>The largest |Q| or |R| of any tile on the board, so random coordinates in +/- this cover it (and some off-board tiles too).</summary>
+        private static int Span(HexGrid grid)
+        {
+            int span = 0;
+            foreach (HexCoordinate tile in grid.Tiles)
+            {
+                span = Math.Max(span, Math.Max(Math.Abs(tile.Q), Math.Abs(tile.R)));
+            }
+
+            return span;
+        }
+
         private static HexGrid RandomBoard(Random rng, ArenaSize size)
         {
             HexGrid grid = new HexGrid(size);
-            int radius = grid.Radius;
+            int radius = Span(grid);
             int ops = rng.Next(0, 120);
             for (int op = 0; op < ops; op++)
             {

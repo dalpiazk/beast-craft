@@ -24,13 +24,14 @@ namespace BeastCraft.Tests.EditMode
         private static readonly PortraitLayout Screen = new PortraitLayout();
         private static readonly HexLayout Layout = new HexLayout(0, 0);
 
-        [TestCase(3)]
-        [TestCase(5)]
-        [TestCase(7)]
-        public void FitAll_IsTheFixedBoardFit(int radius)
+        [TestCase(ArenaSize.Small)]
+        [TestCase(ArenaSize.Medium)]
+        [TestCase(ArenaSize.Large)]
+        public void FitAll_IsTheFixedBoardFit(ArenaSize size)
         {
-            CameraRig rig = new CameraRig(radius, Screen.Board);
-            BoardFit fixedFit = Screen.FitBoard(radius);
+            HexGrid grid = new HexGrid(size);
+            CameraRig rig = new CameraRig(grid.Width, grid.Height, Screen.Board);
+            BoardFit fixedFit = Screen.FitBoard(grid.Width, grid.Height);
             BoardFit fit = rig.Fit(rig.FitAll);
 
             Assert.AreEqual(fixedFit.Scale, fit.Scale, Tolerance);
@@ -43,7 +44,7 @@ namespace BeastCraft.Tests.EditMode
         [Test]
         public void Frame_OneUnitMidArena_ZoomsToTheLimit_CentredOnIt()
         {
-            CameraRig rig = new CameraRig(7, Screen.Board);
+            CameraRig rig = LargeRig();
             Rect unit = CameraRig.UnitBox(Layout.Center(new HexCoordinate(1, 0)), 1f);
 
             CameraView view = rig.Frame(new[] { unit });
@@ -57,7 +58,7 @@ namespace BeastCraft.Tests.EditMode
         [Test]
         public void Frame_TwoUnitsApart_FitsBothWithPadding_BetweenTheLimits()
         {
-            CameraRig rig = new CameraRig(7, Screen.Board);
+            CameraRig rig = LargeRig();
             Rect a = CameraRig.UnitBox(Layout.Center(new HexCoordinate(-5, 2)), 1f);
             Rect b = CameraRig.UnitBox(Layout.Center(new HexCoordinate(5, -2)), 1f);
 
@@ -72,9 +73,10 @@ namespace BeastCraft.Tests.EditMode
         [Test]
         public void Frame_AHordeOfTwoDozenAcrossTheLargestArena_ShowsThemAll()
         {
-            CameraRig rig = new CameraRig(7, Screen.Board);
+            CameraRig rig = LargeRig();
+            HexGrid grid = new HexGrid(ArenaSize.Large);
             List<Rect> horde = new List<Rect>();
-            foreach (HexCoordinate tile in SkillFootprint.Disc(HexCoordinate.Zero, 7))
+            foreach (HexCoordinate tile in grid.Tiles)
             {
                 if (horde.Count < 24 && (tile.Q + 2 * tile.R) % 5 == 0)
                 {
@@ -82,16 +84,17 @@ namespace BeastCraft.Tests.EditMode
                 }
             }
 
-            // The arena's far left and right edges and its top and bottom rows.
-            horde.Add(CameraRig.UnitBox(Layout.Center(new HexCoordinate(7, 0)), 1f));
-            horde.Add(CameraRig.UnitBox(Layout.Center(new HexCoordinate(-7, 0)), 1f));
-            horde.Add(CameraRig.UnitBox(Layout.Center(new HexCoordinate(0, -7)), 1f));
-            horde.Add(CameraRig.UnitBox(Layout.Center(new HexCoordinate(0, 7)), 1f));
+            // The arena's far left and right edges (an even row's first tile, an odd row's last)
+            // and its top and bottom rows.
+            horde.Add(CameraRig.UnitBox(Layout.Center(HexGrid.FromOffset(grid.MaxColumn, 1)), 1f));
+            horde.Add(CameraRig.UnitBox(Layout.Center(HexGrid.FromOffset(grid.MinColumn, 0)), 1f));
+            horde.Add(CameraRig.UnitBox(Layout.Center(HexGrid.FromOffset(0, grid.MinRow)), 1f));
+            horde.Add(CameraRig.UnitBox(Layout.Center(HexGrid.FromOffset(0, grid.MaxRow)), 1f));
 
             CameraView view = rig.Frame(horde);
 
             Assert.GreaterOrEqual(horde.Count, 24);
-            Assert.AreEqual(1f, view.Zoom, Tolerance, "a horde spread over the arena needs the whole of it");
+            Assert.Less(view.Zoom, 1.1f, "a horde spread over the arena needs about the whole of it (the headroom is all it can trim)");
             Rect seen = rig.Visible(view);
             foreach (Rect unit in horde)
             {
@@ -102,8 +105,9 @@ namespace BeastCraft.Tests.EditMode
         [Test]
         public void Frame_AUnitInTheCorner_IsClampedToTheArena()
         {
-            CameraRig rig = new CameraRig(7, Screen.Board);
-            Rect corner = CameraRig.UnitBox(Layout.Center(new HexCoordinate(7, -7)), 1f);
+            CameraRig rig = LargeRig();
+            HexGrid grid = new HexGrid(ArenaSize.Large);
+            Rect corner = CameraRig.UnitBox(Layout.Center(HexGrid.FromOffset(grid.MaxColumn, grid.MinRow)), 1f);
 
             CameraView view = rig.Frame(new[] { corner });
             Rect seen = rig.Visible(view);
@@ -117,7 +121,7 @@ namespace BeastCraft.Tests.EditMode
         [Test]
         public void Clamp_KeepsZoomInItsLimits_AndCentresWhatIsWiderThanTheArena()
         {
-            CameraRig rig = new CameraRig(5, Screen.Board);
+            CameraRig rig = new CameraRig(8, 11, Screen.Board);
 
             Assert.AreEqual(1f, rig.Clamp(new CameraView(new Vec2(500f, -500f), 0.2f)).Zoom);
             Assert.AreEqual(rig.MaxZoomFor, rig.Clamp(new CameraView(Vec2.Zero, 99f)).Zoom);
@@ -126,12 +130,13 @@ namespace BeastCraft.Tests.EditMode
             Assert.AreEqual(rig.Bounds.Center.Y, far.Center.Y, Tolerance);
         }
 
-        [TestCase(3)]
-        [TestCase(5)]
-        [TestCase(7)]
-        public void MaxZoom_IsCappedByAbsoluteScale_AndNeverBelowFitAll(int radius)
+        [TestCase(ArenaSize.Small)]
+        [TestCase(ArenaSize.Medium)]
+        [TestCase(ArenaSize.Large)]
+        public void MaxZoom_IsCappedByAbsoluteScale_AndNeverBelowFitAll(ArenaSize size)
         {
-            CameraRig rig = new CameraRig(radius, Screen.Board);
+            HexGrid grid = new HexGrid(size);
+            CameraRig rig = new CameraRig(grid.Width, grid.Height, Screen.Board);
 
             Assert.GreaterOrEqual(rig.MaxZoomFor, 1f);
             Assert.LessOrEqual(rig.MaxZoomFor, rig.Settings.MaxZoom + Tolerance);
@@ -141,7 +146,7 @@ namespace BeastCraft.Tests.EditMode
         [Test]
         public void MultiHexUnits_TakeTwiceTheRoom_SoTheCameraStaysFurtherOut()
         {
-            CameraRig rig = new CameraRig(7, new Rect(0f, 0f, 300f, 300f), new CameraSettings { MaxZoom = 10f, MaxScale = 100f });
+            CameraRig rig = new CameraRig(11, 15, new Rect(0f, 0f, 300f, 300f), new CameraSettings { MaxZoom = 10f, MaxScale = 100f });
             Vec2 feet = Layout.FootprintCenter(new HexCoordinate(0, 0), UnitFootprint.Triangle);
             Rect small = CameraRig.UnitBox(feet, 1f);
             Rect big = CameraRig.UnitBox(feet, 2f);
@@ -154,7 +159,7 @@ namespace BeastCraft.Tests.EditMode
         [Test]
         public void Ease_StartsAndEndsExactly_IsSmooth_AndDeterministic()
         {
-            CameraRig rig = new CameraRig(7, Screen.Board);
+            CameraRig rig = LargeRig();
             CameraView from = rig.FitAll;
             CameraView to = rig.Frame(new[] { CameraRig.UnitBox(Layout.Center(new HexCoordinate(2, 1)), 1f) });
 
@@ -183,8 +188,8 @@ namespace BeastCraft.Tests.EditMode
             BattleSetup setup = DemoBattle.Create(content, DemoBattle.DefaultSeed, out _, out string error, null, "boss_r08_deepwild_heart");
             Assert.IsNotNull(setup, error);
             BattlePlayback playback = new BattlePlayback(BattleSession.Begin(setup));
-            CameraRig rig = new CameraRig(playback.Grid.Radius, Screen.Board);
-            Assert.AreEqual(7, playback.Grid.Radius, "the largest arena");
+            CameraRig rig = new CameraRig(playback.Grid.Width, playback.Grid.Height, Screen.Board);
+            Assert.AreEqual(ArenaSize.Large, playback.Grid.Size, "the largest arena");
 
             CameraView now = rig.FitAll;
             int framedBeats = 0;
@@ -251,7 +256,7 @@ namespace BeastCraft.Tests.EditMode
             BattleSetup setup = DemoBattle.Create(content, DemoBattle.DefaultSeed, out _, out string error);
             Assert.IsNotNull(setup, error);
             BattlePlayback playback = new BattlePlayback(BattleSession.Begin(setup));
-            CameraRig rig = new CameraRig(playback.Grid.Radius, Screen.Board);
+            CameraRig rig = new CameraRig(playback.Grid.Width, playback.Grid.Height, Screen.Board);
 
             PlayedTurn turn = playback.Advance();
             TurnAnimation animation = new TurnAnimation(turn, Layout, null, 1);
@@ -261,6 +266,12 @@ namespace BeastCraft.Tests.EditMode
 
             Assert.IsTrue(rig.Visible(camera.Sample(animation.DurationMs)).Contains(feet.X, feet.Y));
             Assert.AreEqual(rig.FitAll, camera.Sample(-5), "before the turn: where it started");
+        }
+
+        private static CameraRig LargeRig()
+        {
+            HexGrid grid = new HexGrid(ArenaSize.Large);
+            return new CameraRig(grid.Width, grid.Height, Screen.Board);
         }
 
         private static bool NextShotBefore(TurnCamera camera, ScheduledBeat beat, int ms)

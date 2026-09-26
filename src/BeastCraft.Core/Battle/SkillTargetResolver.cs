@@ -572,8 +572,9 @@ namespace BeastCraft.Battle
 
         /// <summary>
         /// Walks one arm outward from the origin, adding each tile but the origin itself. Stops at
-        /// the board edge: the board is a convex hexagon, so once an arm leaves it, it never
-        /// re-enters and there is nothing further out to add.
+        /// the board edge: every straight hex line crosses the board in one piece (see
+        /// <see cref="HexGrid"/>), so once an arm leaves it, it never re-enters and there is
+        /// nothing further out to add.
         /// </summary>
         private static void AddArm(HashSet<HexCoordinate> footprint, HexGrid grid, HexCoordinate origin, HexCoordinate direction, int range)
         {

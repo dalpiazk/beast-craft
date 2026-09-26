@@ -10,7 +10,7 @@ namespace BeastCraft.Tests.EditMode
     /// <see cref="BattleTurnExecutor"/>'s two board rules: defeated units leave the grid the moment
     /// they fall, and a unit whose target is out of reach this turn makes a partial approach.
     /// <para>
-    /// Most tests run on a "corridor": a Medium board (radius 5) with every tile off the
+    /// Most tests run on a "corridor": a Large board (Q from -5 to 5 along its centre row) with every tile off the
     /// <c>R == 0</c> row blocked by terrain, so the only walkable tiles are <c>(-5, 0)</c> to
     /// <c>(5, 0)</c> in a straight line and every route is forced. Every skill aims at the nearest
     /// eligible unit and has cooldown 1, so it is offered every turn. Units have 10 in every combat
@@ -327,10 +327,10 @@ namespace BeastCraft.Tests.EditMode
             return new HexCoordinate(q, 0);
         }
 
-        /// <summary>A Medium board whose only walkable tiles are the <c>R == 0</c> row.</summary>
+        /// <summary>A Large board whose only walkable tiles are the <c>R == 0</c> row (Q from -5 to 5).</summary>
         private static HexGrid Corridor()
         {
-            HexGrid grid = new HexGrid(ArenaSize.Medium);
+            HexGrid grid = new HexGrid(ArenaSize.Large);
             foreach (HexCoordinate tile in new List<HexCoordinate>(grid.Tiles))
             {
                 if (tile.R != 0)

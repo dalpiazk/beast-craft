@@ -154,7 +154,7 @@ namespace BeastCraft.Game
             }
 
             _playback = new BattlePlayback(run);
-            _camera = new CameraRig(_playback.Grid.Radius, _screen.Board);
+            _camera = new CameraRig(_playback.Grid.Width, _playback.Grid.Height, _screen.Board);
             _cameraRest = _camera.FitAll;
             _boardFit = _camera.Fit(_cameraRest);
             _names = UnitNames(_content, _speciesByUnit);

@@ -13,7 +13,7 @@ namespace BeastCraft.Tests.EditMode
     /// allies and never retreats. The plain-rule behaviour of a Vanguard with no fragile allies is
     /// covered by <see cref="BattleTurnExecutorMovementTests"/>, whose units are all Vanguards.
     /// <para>
-    /// Same conventions as that fixture: a "corridor" is a Medium board whose only walkable tiles
+    /// Same conventions as that fixture: a "corridor" is a Large board whose only walkable tiles
     /// are the <c>R == 0</c> row, every skill aims at the nearest eligible unit with cooldown 1,
     /// and units have 10 in every combat stat at level 1, so HP 500 survives everything here.
     /// Enemies have move 0 and no skills: they are only there to be approached or fled.
@@ -305,10 +305,10 @@ namespace BeastCraft.Tests.EditMode
             return new HexCoordinate(q, 0);
         }
 
-        /// <summary>A Medium board whose only walkable tiles are the <c>R == 0</c> row.</summary>
+        /// <summary>A Large board whose only walkable tiles are the <c>R == 0</c> row (Q from -5 to 5).</summary>
         private static HexGrid Corridor()
         {
-            HexGrid grid = new HexGrid(ArenaSize.Medium);
+            HexGrid grid = new HexGrid(ArenaSize.Large);
             foreach (HexCoordinate tile in new List<HexCoordinate>(grid.Tiles))
             {
                 if (tile.R != 0)

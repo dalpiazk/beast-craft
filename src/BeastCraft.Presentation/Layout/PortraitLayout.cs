@@ -275,23 +275,39 @@ namespace BeastCraft.Presentation.Layout
         }
 
         /// <summary>
-        /// The fit of a hexagon arena of <paramref name="radius"/> into <see cref="Board"/>: its
-        /// tiles (<see cref="HexLayout.BoardSize"/>) plus <see cref="BoardHeadroom"/> above and
-        /// below, as large as fits, centred.
+        /// The fit of a <paramref name="width"/> x <paramref name="height"/> arena into
+        /// <see cref="Board"/>: its tiles (<see cref="HexLayout.BoardBounds"/>) plus
+        /// <see cref="BoardHeadroom"/> above and below, as large as fits, centred.
         /// </summary>
-        public BoardFit FitBoard(int radius)
+        public BoardFit FitBoard(int width, int height)
         {
-            return FitBoard(radius, Board);
+            return FitBoard(width, height, Board);
         }
 
-        /// <summary>The fit of a hexagon arena of <paramref name="radius"/> into <paramref name="area"/>.</summary>
-        public static BoardFit FitBoard(int radius, Rect area)
+        /// <summary>The fit of a <paramref name="width"/> x <paramref name="height"/> arena into <paramref name="area"/>.</summary>
+        public static BoardFit FitBoard(int width, int height, Rect area)
         {
-            (int width, int height) = HexLayout.BoardSize(radius);
-            float needHeight = height + 2f * BoardHeadroom;
-            float scale = Math.Min(area.Width / width, area.Height / needHeight);
+            return Fit(HexLayout.BoardBounds(width, height), area);
+        }
+
+        /// <summary>
+        /// The fit of a hexagon of hexes of <paramref name="radius"/> rings around tile (0, 0) into
+        /// <paramref name="area"/> (a range diagram's legend, not an arena), with a board's headroom.
+        /// </summary>
+        public static BoardFit FitDisc(int radius, Rect area)
+        {
+            (int width, int height) = HexLayout.DiscSize(radius);
+            return Fit(new Rect(-width / 2f, -height / 2f, width, height), area);
+        }
+
+        /// <summary>Board-space <paramref name="tiles"/> plus <see cref="BoardHeadroom"/> above and below, scaled to fit <paramref name="area"/> and centred in it.</summary>
+        private static BoardFit Fit(Rect tiles, Rect area)
+        {
+            float needHeight = tiles.Height + 2f * BoardHeadroom;
+            float scale = Math.Min(area.Width / tiles.Width, area.Height / needHeight);
             Vec2 center = area.Center;
-            return new BoardFit(scale, center.X, center.Y);
+            Vec2 middle = tiles.Center;
+            return new BoardFit(scale, center.X - middle.X * scale, center.Y - middle.Y * scale);
         }
 
         /// <summary>

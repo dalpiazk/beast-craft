@@ -15,7 +15,7 @@ namespace BeastCraft.Battle.Grid
     /// </summary>
     public readonly struct HexCoordinate : IEquatable<HexCoordinate>
     {
-        /// <summary>The origin tile, at the centre of a hexagon-shaped board.</summary>
+        /// <summary>The origin tile, at the centre of the board.</summary>
         public static readonly HexCoordinate Zero = new HexCoordinate(0, 0);
 
         /// <summary>

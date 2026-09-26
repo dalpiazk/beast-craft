@@ -188,7 +188,8 @@ namespace BeastCraft.Tests.EditMode
                 Assert.AreEqual(tile, layout.TileAt(centre.X + 7f, centre.Y - 7f), "a point inside the tile maps to it");
             }
 
-            Assert.AreEqual((11 * 32, 36 + 10 * 27), HexLayout.BoardSize(5));
+            Assert.AreEqual((8 * 32 + 16, 36 + 10 * 27), HexLayout.BoardSize(8, 11), "Medium: eight columns, the odd rows half a column further right");
+            Assert.AreEqual((11 * 32, 36 + 10 * 27), HexLayout.DiscSize(5));
             Assert.AreEqual(layout.Center(new HexCoordinate(2, -1)), layout.FootprintCenter(new HexCoordinate(2, -1), UnitFootprint.Hex7));
             Vec2 triangle = layout.FootprintCenter(HexCoordinate.Zero, UnitFootprint.Triangle);
             Assert.AreEqual((320f + 352f + 336f) / 3f, triangle.X, 1e-3);

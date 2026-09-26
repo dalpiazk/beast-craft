@@ -8,7 +8,7 @@ namespace BeastCraft.Presentation.Camera
     /// <summary>
     /// Where the battle camera looks: the board-space point at the centre of the board area, and
     /// the zoom as a multiple of the fit-all scale (1 = the whole arena fits, as
-    /// <see cref="PortraitLayout.FitBoard(int)"/> places it; 2 = everything twice as big).
+    /// <see cref="PortraitLayout.FitBoard(int, int)"/> places it; 2 = everything twice as big).
     /// </summary>
     public readonly struct CameraView : IEquatable<CameraView>
     {
@@ -92,18 +92,19 @@ namespace BeastCraft.Presentation.Camera
     public sealed class CameraRig
     {
         /// <summary>
-        /// A rig for a hexagon arena of <paramref name="radius"/> shown in <paramref name="area"/>
-        /// (canvas pixels), with <paramref name="settings"/> (null: the defaults).
+        /// A rig for a <paramref name="width"/> x <paramref name="height"/> arena (in tiles, as
+        /// the <see cref="BeastCraft.Battle.Grid.HexGrid"/> has them) shown in
+        /// <paramref name="area"/> (canvas pixels), with <paramref name="settings"/> (null: the
+        /// defaults).
         /// </summary>
-        public CameraRig(int radius, Rect area, CameraSettings settings = null)
+        public CameraRig(int width, int height, Rect area, CameraSettings settings = null)
         {
             Settings = settings ?? new CameraSettings();
             Area = area;
-            BoardFit fit = PortraitLayout.FitBoard(radius, area);
+            BoardFit fit = PortraitLayout.FitBoard(width, height, area);
             FitScale = fit.Scale;
-            (int width, int height) = HexLayout.BoardSize(radius);
-            float fullHeight = height + 2f * PortraitLayout.BoardHeadroom;
-            Bounds = new Rect(-width / 2f, -fullHeight / 2f, width, fullHeight);
+            Rect tiles = HexLayout.BoardBounds(width, height);
+            Bounds = new Rect(tiles.X, tiles.Y - PortraitLayout.BoardHeadroom, tiles.Width, tiles.Height + 2f * PortraitLayout.BoardHeadroom);
             MaxZoomFor = Math.Max(1f, Math.Min(Settings.MaxZoom, Settings.MaxScale / Math.Max(0.0001f, FitScale)));
         }
 
@@ -115,7 +116,7 @@ namespace BeastCraft.Presentation.Camera
         /// <summary>Canvas pixels per board pixel at zoom 1 (fit-all).</summary>
         public float FitScale { get; }
 
-        /// <summary>The arena's bounds in board space: every tile plus the sprite headroom above and below (centred on tile (0, 0)).</summary>
+        /// <summary>The arena's bounds in board space (tile (0, 0)'s centre the origin): every tile plus the sprite headroom above and below.</summary>
         public Rect Bounds { get; }
 
         /// <summary>The effective closest zoom for this arena (see <see cref="CameraSettings.MaxScale"/>).</summary>

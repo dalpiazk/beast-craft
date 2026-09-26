@@ -410,7 +410,7 @@ namespace BeastCraft.Game
             bool allies = footprint.Side == SkillTargetSide.Ally;
             _draw.Fill(Pixel, new Vector2(area.X, area.Y), new Vector2(area.Width, area.Height), Ink("p", Color.Purple) * 0.6f);
             int radius = Math.Min(6, footprint.Extent);
-            BoardFit fit = PortraitLayout.FitBoard(radius, area.Inset(12f));
+            BoardFit fit = PortraitLayout.FitDisc(radius, area.Inset(12f));
             Matrix canvas = Matrix.CreateScale(_canvasFit.Scale) * Matrix.CreateTranslation(_canvasFit.OffsetX, _canvasFit.OffsetY, 0f);
             _draw.SetTransform(Matrix.CreateScale(fit.Scale) * Matrix.CreateTranslation(fit.OriginX, fit.OriginY, 0f) * canvas);
 

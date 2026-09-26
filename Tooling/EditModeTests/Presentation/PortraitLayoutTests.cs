@@ -166,7 +166,7 @@ namespace BeastCraft.Tests.EditMode
         {
             PortraitLayout layout = new PortraitLayout();
             HexGrid grid = new HexGrid(size);
-            BoardFit fit = layout.FitBoard(grid.Radius);
+            BoardFit fit = layout.FitBoard(grid.Width, grid.Height);
             HexLayout hexes = new HexLayout(0, 0);
 
             foreach (HexCoordinate tile in grid.Tiles)
@@ -178,10 +178,12 @@ namespace BeastCraft.Tests.EditMode
                 Assert.IsTrue(layout.Board.Contains(center.X + halfW - 0.01f, center.Y + halfH - 0.01f), size + " " + tile);
             }
 
-            Vec2 origin = fit.ToCanvas(Vec2.Zero);
-            Assert.AreEqual(layout.Board.Center.X, origin.X, 1e-3f);
-            Assert.AreEqual(layout.Board.Center.Y, origin.Y, 1e-3f);
+            Vec2 middle = fit.ToCanvas(HexLayout.BoardBounds(grid.Width, grid.Height).Center);
+            Assert.AreEqual(layout.Board.Center.X, middle.X, 1e-3f, "the tiles' box, not tile (0, 0), is centred");
+            Assert.AreEqual(layout.Board.Center.Y, middle.Y, 1e-3f);
             Assert.Greater(fit.Scale, 2f, "even the large arena (a horde) draws its hexes at over twice the placeholder size");
+
+            Vec2 origin = fit.ToCanvas(Vec2.Zero);
 
             Vec2 back = fit.ToBoard(origin.X + 64f, origin.Y - 32f);
             Assert.AreEqual(64f / fit.Scale, back.X, 1e-3f);
@@ -192,7 +194,7 @@ namespace BeastCraft.Tests.EditMode
         public void TheLargeArena_IsDrawnSmallerThanTheMedium()
         {
             PortraitLayout layout = new PortraitLayout();
-            Assert.Less(layout.FitBoard(new HexGrid(ArenaSize.Large).Radius).Scale, layout.FitBoard(new HexGrid(ArenaSize.Medium).Radius).Scale);
+            Assert.Less(layout.FitBoard(11, 15).Scale, layout.FitBoard(8, 11).Scale);
         }
     }
 }
