@@ -21,6 +21,15 @@ namespace BeastCraft.Game
     /// <summary>The frame, and the board half of it: tiles, units and VFX, in board space.</summary>
     public sealed partial class BattleViewerGame
     {
+        /// <summary>Board pixels the plate under the tiles reaches past their box (<see cref="DrawBoard"/>).</summary>
+        private const float BoardPlateMargin = PortraitLayout.BoardEdgeMargin;
+
+        /// <summary>The plate under the tiles: a dark soil the tiles' outlines sit on, so the arena's edge is a clean rectangle.</summary>
+        private static readonly Color BoardPlate = new Color(0x2b, 0x22, 0x1c);
+
+        /// <summary>The dimming of the off-board half tiles that square off the zigzag sides.</summary>
+        private static readonly Color NotchTint = new Color(120, 120, 120);
+
         /// <summary>
         /// Draws one frame onto a <paramref name="width"/> x <paramref name="height"/> target: the
         /// portrait canvas fitted inside <paramref name="insets"/> (black bars around it), the board
@@ -65,7 +74,7 @@ namespace BeastCraft.Game
             Matrix boardSpace = Matrix.CreateTranslation(shake.X, shake.Y, 0f) * Matrix.CreateScale(_boardFit.Scale) *
                                 Matrix.CreateTranslation(_boardFit.OriginX, _boardFit.OriginY, 0f) * canvas;
             _draw.SetTransform(boardSpace);
-            DrawBoard();
+            DrawBoard(boardSpace, clip);
             DrawUnits(frames);
             foreach ((VfxTimeline timeline, VfxFrame frame) in frames)
             {
@@ -102,15 +111,49 @@ namespace BeastCraft.Game
             }
         }
 
-        private void DrawBoard()
+        /// <summary>
+        /// The arena: a rectangle. Under the tiles, a plate a few pixels bigger than their box
+        /// (<see cref="HexLayout.BoardBounds"/>) in a dark soil colour, so the pointed tops
+        /// and bottoms of the end rows sit on a straight edge; the tiles; then, clipped to the box, a
+        /// dimmed half tile in each side notch (<see cref="HexLayout.EdgeNotches"/>), so the zigzag
+        /// sides read as straight walls of the same ground rather than a ragged edge. The dimmed
+        /// halves are off the board: nothing ever stands there.
+        /// </summary>
+        private void DrawBoard(Matrix boardSpace, Rect areaClip)
         {
+            HexGrid grid = _playback.Grid;
             ArtSprite grass = _atlas.Sprite("hex_grass");
             ArtSprite rock = _atlas.Sprite("hex_scorched");
-            foreach (HexCoordinate tile in _playback.Grid.Tiles)
+            Rect box = HexLayout.BoardBounds(grid.Width, grid.Height);
+
+            _draw.Fill(Pixel, new Vector2(box.X - BoardPlateMargin, box.Y - BoardPlateMargin),
+                       new Vector2(box.Width + 2f * BoardPlateMargin, box.Height + 2f * BoardPlateMargin), BoardPlate);
+
+            foreach (HexCoordinate tile in grid.Tiles)
             {
-                ArtSprite sprite = _playback.Grid.IsInDeploymentZone(tile, BattleTeam.Enemy) ? rock : grass;
+                ArtSprite sprite = grid.IsInDeploymentZone(tile, BattleTeam.Enemy) ? rock : grass;
                 _draw.DrawSprite(sprite, 0, At(_layout.Center(tile)), 1f, Color.White);
             }
+
+            // The notch fillers, clipped to the tiles' box (in render-target pixels, inside the board area's clip).
+            Vector2 topLeft = Vector2.Transform(new Vector2(box.X, box.Y), boardSpace);
+            Vector2 bottomRight = Vector2.Transform(new Vector2(box.Right, box.Bottom), boardSpace);
+            float left = Math.Max(topLeft.X, areaClip.X);
+            float top = Math.Max(topLeft.Y, areaClip.Y);
+            float right = Math.Min(bottomRight.X, areaClip.Right);
+            float bottom = Math.Min(bottomRight.Y, areaClip.Bottom);
+            if (right > left && bottom > top)
+            {
+                _draw.SetClip(new Rectangle((int)Math.Ceiling(left), (int)Math.Ceiling(top), (int)Math.Floor(right) - (int)Math.Ceiling(left),
+                                            (int)Math.Floor(bottom) - (int)Math.Ceiling(top)));
+                foreach (HexCoordinate notch in HexLayout.EdgeNotches(grid.Width, grid.Height))
+                {
+                    bool enemySide = notch.R <= grid.MinRow + grid.DeploymentZoneDepth - 1;
+                    _draw.DrawSprite(enemySide ? rock : grass, 0, At(_layout.Center(notch)), 1f, NotchTint);
+                }
+            }
+
+            _draw.SetClip(new Rectangle((int)Math.Floor(areaClip.X), (int)Math.Floor(areaClip.Y), (int)Math.Ceiling(areaClip.Width), (int)Math.Ceiling(areaClip.Height)));
         }
 
         /// <summary>The beat's main frame and each of its on-apply overlays' frames at the viewer's clock (empty with no beat).</summary>

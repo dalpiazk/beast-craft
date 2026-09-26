@@ -145,7 +145,7 @@ namespace BeastCraft.Game
             LoadSettings();
 
             BattleSetup setup = DemoBattle.Create(_content, _options.Seed, out _speciesByUnit, out string error, _options.Team, _options.Encounter,
-                                                  _options.Level, _options.EnemyLevel);
+                                                  _options.Level, _options.EnemyLevel, _options.Arena);
             BattleSessionRun run = setup == null ? null : BattleSession.Begin(setup);
             if (run == null || run.Battle == null)
             {

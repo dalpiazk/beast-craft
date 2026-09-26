@@ -81,6 +81,30 @@ namespace BeastCraft.Presentation.Board
         }
 
         /// <summary>
+        /// The off-board tiles that fill the half-tile notches along a <paramref name="width"/> x
+        /// <paramref name="height"/> arena's zigzag sides: one per row, just past the row's short
+        /// end (left of every odd row, right of every even row), so that drawn clipped to
+        /// <see cref="BoardBounds"/> their inner halves square off both sides. Decoration only:
+        /// none of them is on the board. Top to bottom.
+        /// </summary>
+        public static List<HexCoordinate> EdgeNotches(int width, int height)
+        {
+            int w = Math.Max(1, width);
+            int h = Math.Max(1, height);
+            int minColumn = -(w / 2);
+            int maxColumn = minColumn + w - 1;
+            int minRow = -((h - 1) / 2);
+            List<HexCoordinate> notches = new List<HexCoordinate>(h);
+            for (int row = minRow; row < minRow + h; row++)
+            {
+                bool odd = (row & 1) != 0;
+                notches.Add(HexGrid.FromOffset(odd ? minColumn - 1 : maxColumn + 1, row));
+            }
+
+            return notches;
+        }
+
+        /// <summary>
         /// The pixel size of a hexagon of hexes of <paramref name="radius"/> rings (a range
         /// diagram's disc, not an arena): (width, height).
         /// </summary>

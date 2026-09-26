@@ -39,6 +39,27 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
+        public void DemoBattle_CanFightAGeneratedShape_OnAnyArenaItSeatsOn()
+        {
+            BattleSetup horde = DemoBattle.Create(VfxLibraryTests.Content, DemoBattle.DefaultSeed, out _, out string error, null, "horde", 50, 50);
+            Assert.IsNotNull(horde, error);
+            Assert.AreEqual(ArenaSize.Large, horde.Encounter.Arena, "a horde is drawn for its own arena");
+            Assert.GreaterOrEqual(horde.Encounter.Enemies.Count, 16);
+            BattlePlayback large = new BattlePlayback(BattleSession.Begin(horde));
+            Assert.AreEqual(11, large.Grid.Width);
+
+            BattleSetup squad = DemoBattle.Create(VfxLibraryTests.Content, DemoBattle.DefaultSeed, out _, out error, null, "squad", 30, 30, ArenaSize.Small);
+            Assert.IsNotNull(squad, error);
+            Assert.AreEqual(ArenaSize.Small, squad.Encounter.Arena, "--arena overrides the shape's own");
+            BattlePlayback small = new BattlePlayback(BattleSession.Begin(squad));
+            Assert.AreEqual((5, 7), (small.Grid.Width, small.Grid.Height));
+            Assert.IsNotNull(small.Advance(), "the squad seats on the Small arena and fights");
+
+            Assert.IsNull(DemoBattle.Create(VfxLibraryTests.Content, DemoBattle.DefaultSeed, out _, out error, null, "no_such_encounter"));
+            StringAssert.Contains("no_such_encounter", error);
+        }
+
+        [Test]
         public void Stepping_IsExactlyBattleSessionRun()
         {
             BattleSessionResult run = BattleSession.Run(Demo(out _));

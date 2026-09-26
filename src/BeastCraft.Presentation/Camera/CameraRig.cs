@@ -103,8 +103,7 @@ namespace BeastCraft.Presentation.Camera
             Area = area;
             BoardFit fit = PortraitLayout.FitBoard(width, height, area);
             FitScale = fit.Scale;
-            Rect tiles = HexLayout.BoardBounds(width, height);
-            Bounds = new Rect(tiles.X, tiles.Y - PortraitLayout.BoardHeadroom, tiles.Width, tiles.Height + 2f * PortraitLayout.BoardHeadroom);
+            Bounds = PortraitLayout.BoardFrame(width, height);
             MaxZoomFor = Math.Max(1f, Math.Min(Settings.MaxZoom, Settings.MaxScale / Math.Max(0.0001f, FitScale)));
         }
 
@@ -116,7 +115,7 @@ namespace BeastCraft.Presentation.Camera
         /// <summary>Canvas pixels per board pixel at zoom 1 (fit-all).</summary>
         public float FitScale { get; }
 
-        /// <summary>The arena's bounds in board space (tile (0, 0)'s centre the origin): every tile plus the sprite headroom above and below.</summary>
+        /// <summary>The arena's bounds in board space (tile (0, 0)'s centre the origin): <see cref="PortraitLayout.BoardFrame"/>, every tile plus the sprite headroom above and the edge margin around.</summary>
         public Rect Bounds { get; }
 
         /// <summary>The effective closest zoom for this arena (see <see cref="CameraSettings.MaxScale"/>).</summary>

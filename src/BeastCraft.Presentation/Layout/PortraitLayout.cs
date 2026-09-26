@@ -191,10 +191,25 @@ namespace BeastCraft.Presentation.Layout
         public const float Margin = 24f;
 
         /// <summary>
-        /// Board pixels of headroom above the top row and below the bottom one: a sprite stands with
-        /// its feet on its tile centre and reaches up about a tile and a half (large units: three).
+        /// Board pixels of headroom above the arena's top row. A sprite stands with its feet on its
+        /// tile centre and reaches up about a tile (<see cref="Camera.CameraRig.UnitBox"/>: 36 px, HP
+        /// bar included); a large unit reaches twice that but its feet are at least half a row in
+        /// (a champion's anchor row is below its top tiles, a giant's anchor a row in), so no sprite
+        /// on the arena reaches more than 36 px above the top row's tiles.
         /// </summary>
-        public const float BoardHeadroom = 48f;
+        public const float BoardHeadroomTop = 36f;
+
+        /// <summary>
+        /// Board pixels of margin below the bottom row and either side of the arena's tiles: the
+        /// plate the tiles sit on shows past them (a sprite's feet stay inside its tile).
+        /// </summary>
+        public const float BoardEdgeMargin = 6f;
+
+        /// <summary>
+        /// Board pixels of headroom above and below a range diagram's hex disc
+        /// (<see cref="FitDisc"/>): room for the caster standing in its middle.
+        /// </summary>
+        public const float DiscHeadroom = 48f;
 
         public const int ControlCount = 5;
 
@@ -275,9 +290,22 @@ namespace BeastCraft.Presentation.Layout
         }
 
         /// <summary>
+        /// What the fit-all view of a <paramref name="width"/> x <paramref name="height"/> arena
+        /// shows, in board space (tile (0, 0)'s centre the origin): its tiles
+        /// (<see cref="HexLayout.BoardBounds"/>), <see cref="BoardHeadroomTop"/> above them and
+        /// <see cref="BoardEdgeMargin"/> below and to either side. Every preset is about as wide for
+        /// its height as <see cref="Board"/> (0.89 against 0.90), so this fills the board area.
+        /// </summary>
+        public static Rect BoardFrame(int width, int height)
+        {
+            Rect tiles = HexLayout.BoardBounds(width, height);
+            return new Rect(tiles.X - BoardEdgeMargin, tiles.Y - BoardHeadroomTop, tiles.Width + 2f * BoardEdgeMargin,
+                            tiles.Height + BoardHeadroomTop + BoardEdgeMargin);
+        }
+
+        /// <summary>
         /// The fit of a <paramref name="width"/> x <paramref name="height"/> arena into
-        /// <see cref="Board"/>: its tiles (<see cref="HexLayout.BoardBounds"/>) plus
-        /// <see cref="BoardHeadroom"/> above and below, as large as fits, centred.
+        /// <see cref="Board"/>: its <see cref="BoardFrame"/>, as large as fits, centred.
         /// </summary>
         public BoardFit FitBoard(int width, int height)
         {
@@ -287,26 +315,26 @@ namespace BeastCraft.Presentation.Layout
         /// <summary>The fit of a <paramref name="width"/> x <paramref name="height"/> arena into <paramref name="area"/>.</summary>
         public static BoardFit FitBoard(int width, int height, Rect area)
         {
-            return Fit(HexLayout.BoardBounds(width, height), area);
+            return Fit(BoardFrame(width, height), area);
         }
 
         /// <summary>
         /// The fit of a hexagon of hexes of <paramref name="radius"/> rings around tile (0, 0) into
-        /// <paramref name="area"/> (a range diagram's legend, not an arena), with a board's headroom.
+        /// <paramref name="area"/> (a range diagram's legend, not an arena), with
+        /// <see cref="DiscHeadroom"/> above and below.
         /// </summary>
         public static BoardFit FitDisc(int radius, Rect area)
         {
             (int width, int height) = HexLayout.DiscSize(radius);
-            return Fit(new Rect(-width / 2f, -height / 2f, width, height), area);
+            return Fit(new Rect(-width / 2f, -height / 2f - DiscHeadroom, width, height + 2f * DiscHeadroom), area);
         }
 
-        /// <summary>Board-space <paramref name="tiles"/> plus <see cref="BoardHeadroom"/> above and below, scaled to fit <paramref name="area"/> and centred in it.</summary>
-        private static BoardFit Fit(Rect tiles, Rect area)
+        /// <summary>Board-space <paramref name="frame"/> scaled to fit <paramref name="area"/> and centred in it.</summary>
+        private static BoardFit Fit(Rect frame, Rect area)
         {
-            float needHeight = tiles.Height + 2f * BoardHeadroom;
-            float scale = Math.Min(area.Width / tiles.Width, area.Height / needHeight);
+            float scale = Math.Min(area.Width / frame.Width, area.Height / frame.Height);
             Vec2 center = area.Center;
-            Vec2 middle = tiles.Center;
+            Vec2 middle = frame.Center;
             return new BoardFit(scale, center.X - middle.X * scale, center.Y - middle.Y * scale);
         }
 
