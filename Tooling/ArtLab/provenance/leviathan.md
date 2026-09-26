@@ -10,8 +10,12 @@ disclose where a store requires it (see `docs/art/art-brief.md`).
 | Design source | `content/art/source/leviathan/design_pick.png` (candidate #1, `leviathan_t15`, paperised and colour-locked, without its lines) |
 
 Tools: local only (Intel Arc 140V, XPU, bf16); no cloud service, nothing uploaded, no new downloads. Models and
-licences: `../README.md`. Script names below are the art-lab round's working scripts (the trio's scripts, adapted:
-`lock2.py`, `facemask.py`, `chain.sh`, `offpal.py`); see "Changes vs the trio recipe".
+licences: `../README.md`. Scripts: `../scripts/seven/` (as run for the seven finals; see its `common.py` for the
+paths: one beast's folder in `ARTLAB_OUT`, the trio finals in `ARTLAB_FINALS`). Shared: `gen4.py` (prep),
+`lock2.py`, `facemask.py`, `chain.sh` (`detail_pass.py`, `finish.py`), `offpal.py`, `rigparts.py` with
+`leviathan_parts.json`, `parts_sheet.py`, and `despeck.py` (the neck retouch); see "Changes vs the trio recipe". The
+candidate-sheet scripts (`cand.py`, `layouts5.py`, `sheet5.py`) are not in the repo; their settings are recorded
+below.
 
 ## 1. Candidate sheet (remaining-seven round)
 - **Style refs:** the three approved finals (phoenix, golem, kirin), equally weighted, InstantStyle

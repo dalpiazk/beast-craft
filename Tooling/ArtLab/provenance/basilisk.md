@@ -10,8 +10,11 @@ disclose where a store requires it (see `docs/art/art-brief.md`).
 | Design source | `content/art/source/basilisk/design_pick.png` (round-2 candidate #7, `basilisk_v2_L2`, after the far-front leg recolour) |
 
 Tools: local only (Intel Arc 140V, XPU, bf16); no cloud service, nothing uploaded, no new downloads. Models and
-licences: `../README.md`. The scripts are the adapted set described in `leviathan.md`, plus `basfix.py` and
-`farhind.py`.
+licences: `../README.md`. Scripts: `../scripts/seven/` (as run for the seven finals; see its `common.py` for the
+paths: one beast's folder in `ARTLAB_OUT`, the trio finals in `ARTLAB_FINALS`). Shared: `gen4.py` (prep),
+`lock2.py`, `facemask.py`, `chain.sh` (`detail_pass.py`, `finish.py`), `offpal.py`, `rigparts.py` with
+`basilisk_parts.json`, `parts_sheet.py`; the fixes `basfix.py` and `farhind.py`. The candidate-sheet scripts
+(`cand.py`, `layouts5.py`, `sheet5.py`) are not in the repo; their settings are recorded below.
 
 ## 1. Candidate sheets
 - **Round 1** (`basilisk_candidates.png`, reference only): 16 serpent-king candidates (layouts L0-L11, text seeds

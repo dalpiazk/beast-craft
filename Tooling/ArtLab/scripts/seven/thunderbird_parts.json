@@ -1,0 +1,295 @@
+{
+ "_note": "1x (896x1152) coords; doubled to final px by rigparts.load_parts_json. Flying pose: character.png keeps the trio convention (bottom-centre = lowest point = tail tip); the talon point is recorded as feet_pivot. v2: head clip tightened (polygon fallback took wing/body chunks), body clip widened. v3: head = hand polygon (crest+face+beak); SAM split the white face from the eyes/beak.",
+ "feet_pivot_1x": [
+  460,
+  755
+ ],
+ "parts": {
+  "tail": {
+   "pos": [
+    [
+     470,
+     900
+    ],
+    [
+     400,
+     830
+    ],
+    [
+     540,
+     790
+    ],
+    [
+     470,
+     960
+    ]
+   ],
+   "neg": [
+    [
+     450,
+     620
+    ]
+   ],
+   "clip": [
+    [
+     330,
+     765
+    ],
+    [
+     620,
+     720
+    ],
+    [
+     620,
+     1012
+    ],
+    [
+     330,
+     1012
+    ]
+   ]
+  },
+  "wing_right": {
+   "pos": [
+    [
+     650,
+     300
+    ],
+    [
+     700,
+     450
+    ],
+    [
+     560,
+     560
+    ],
+    [
+     600,
+     250
+    ]
+   ],
+   "neg": [
+    [
+     420,
+     620
+    ],
+    [
+     250,
+     400
+    ]
+   ],
+   "clip": [
+    [
+     440,
+     110
+    ],
+    [
+     840,
+     110
+    ],
+    [
+     840,
+     690
+    ],
+    [
+     520,
+     690
+    ],
+    [
+     470,
+     560
+    ],
+    [
+     470,
+     420
+    ]
+   ]
+  },
+  "wing_left": {
+   "pos": [
+    [
+     200,
+     350
+    ],
+    [
+     250,
+     500
+    ],
+    [
+     150,
+     280
+    ],
+    [
+     330,
+     600
+    ]
+   ],
+   "neg": [
+    [
+     420,
+     620
+    ],
+    [
+     650,
+     400
+    ]
+   ],
+   "clip": [
+    [
+     90,
+     210
+    ],
+    [
+     430,
+     210
+    ],
+    [
+     420,
+     460
+    ],
+    [
+     360,
+     540
+    ],
+    [
+     330,
+     690
+    ],
+    [
+     200,
+     640
+    ],
+    [
+     90,
+     480
+    ]
+   ]
+  },
+  "body": {
+   "pos": [
+    [
+     450,
+     680
+    ],
+    [
+     420,
+     700
+    ],
+    [
+     480,
+     600
+    ],
+    [
+     380,
+     690
+    ],
+    [
+     500,
+     700
+    ]
+   ],
+   "neg": [
+    [
+     200,
+     400
+    ],
+    [
+     700,
+     400
+    ],
+    [
+     470,
+     900
+    ],
+    [
+     405,
+     600
+    ]
+   ],
+   "clip": [
+    [
+     325,
+     540
+    ],
+    [
+     540,
+     540
+    ],
+    [
+     545,
+     775
+    ],
+    [
+     420,
+     778
+    ],
+    [
+     330,
+     720
+    ]
+   ]
+  },
+  "head": {
+   "pos": [
+    [
+     405,
+     600
+    ]
+   ],
+   "neg": [],
+   "poly_only": true,
+   "clip": [
+    [
+     350,
+     462
+    ],
+    [
+     480,
+     462
+    ],
+    [
+     478,
+     560
+    ],
+    [
+     455,
+     640
+    ],
+    [
+     410,
+     664
+    ],
+    [
+     355,
+     642
+    ]
+   ]
+  }
+ },
+ "order": [
+  "tail",
+  "wing_right",
+  "wing_left",
+  "body",
+  "head"
+ ],
+ "parent": {
+  "body": null,
+  "head": "body",
+  "wing_left": "body",
+  "wing_right": "body",
+  "tail": "body"
+ },
+ "extend": [
+  "tail",
+  "wing_right",
+  "wing_left",
+  "body"
+ ],
+ "desc": {
+  "tail": "blue grey tail feathers with yellow tips",
+  "wing_right": "blue grey storm bird wing",
+  "wing_left": "blue grey storm bird wing",
+  "body": "blue grey feathered bird body"
+ }
+}

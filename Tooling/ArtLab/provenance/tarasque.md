@@ -10,8 +10,12 @@ disclose where a store requires it (see `docs/art/art-brief.md`).
 | Design source | `content/art/source/tarasque/design_pick.png` (candidate #2, `tarasque_L2`, with the V3 legs in the 1,3,4,2 order) |
 
 Tools: local only (Intel Arc 140V, XPU, bf16); no cloud service, nothing uploaded, no new downloads. Models and
-licences: `../README.md`. The scripts are the adapted set described in `leviathan.md`, plus `legfix.py`,
-`legcomp.py`, `legswap.py`, `legcomp4.py` and `chinfix3.py` (`chinfix.py`, `chinfix2.py`: rejected attempts).
+licences: `../README.md`. Scripts: `../scripts/seven/` (as run for the seven finals; see its `common.py` for the
+paths: one beast's folder in `ARTLAB_OUT`, the trio finals in `ARTLAB_FINALS`). Shared: `gen4.py` (prep),
+`lock2.py`, `facemask.py`, `chain.sh` (`detail_pass.py`, `finish.py`), `offpal.py`, `rigparts.py` with
+`tarasque_parts.json`, `parts_sheet.py`; the fixes `legfix.py`, `legcomp.py`, `legswap.py`, `legcomp4.py` and
+`chinfix3.py` (`chinfix.py`, `chinfix2.py`: rejected attempts). The candidate-sheet scripts (`cand.py`,
+`layouts5.py`, `sheet5.py`) are not in the repo; their settings are recorded below.
 
 ## 1. Candidate sheet (remaining-seven round)
 - **Generated:** 16 candidates: colour-mass layouts L0-L11 and text seeds 11-14, all 20 steps; 12 shown on

@@ -31,6 +31,9 @@ Nothing here needs the network once the models are downloaded; `common.py` sets 
 | `scripts/rmblack.py` | Deletes NaN/black outputs so a fresh process redoes them |
 | `scripts/archive_rig.py` | Copies a rig into `content/art/source/<beast>/` (lossless re-save) |
 | `scripts/export_ingame.py` | The in-game sprite for `content/art/beasts/<beast>/` |
+| `scripts/seven/` | The scripts **as run** for the other seven finals (Leviathan, Thunderbird, Griffin, Frost Wyrm, Treant, Tarasque, Basilisk), kept apart because they differ from the trio's cleaned-up set above (the trio finals as style refs, XPU math SDPA and no VAE tiling, `rigparts.py`'s inpaint validator and pivot overrides). Paths from `BEASTCRAFT_ARTLAB`, `ARTLAB_OUT` (one beast's folder), `ARTLAB_WORK` and `ARTLAB_FINALS` (see its `common.py`). Each file's first line names what it produced |
+| `scripts/seven/` shared | `common.py`, `beasts.py`, `gen4.py` (prep, lock), `lock2.py` (pick-init lock), `colour.py`, `masks.py`, `sketches_soft.py`, `detail_pass.py`, `line_pass.py`, `finish.py`, `golem_face.py`, `facemask.py`, `chain.sh` (the finish chain), `offpal.py`, `despeck.py`, `rigparts.py` + `<beast>_parts.json`, `parts_sheet.py` |
+| `scripts/seven/` fixes | Griffin `wingfix.py` (round 1, rejected), `wingfix2.py`, `tailfix.py`, `streakfix.py`; Frost Wyrm `frostfix.py`; Tarasque `legfix.py`, `legcomp.py`, `legswap.py`, `legcomp4.py`, `chinfix3.py` (`chinfix.py`, `chinfix2.py` rejected); Basilisk `basfix.py`, `farhind.py` |
 | `refs/` | The three style references (our own approved round-2 images `d_406`, `a_104`, `b_208`) |
 | `provenance/` | Per final: prompts, seeds, settings, the chosen candidate and the producer's decision |
 | `requirements.txt` | The package versions used |

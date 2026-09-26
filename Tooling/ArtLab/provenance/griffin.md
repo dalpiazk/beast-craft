@@ -10,8 +10,12 @@ disclose where a store requires it (see `docs/art/art-brief.md`).
 | Design source | `content/art/source/griffin/design_pick.png` (candidate #1, `griffin_L8`, after the V2 wing fix and the tail rotation) |
 
 Tools: local only (Intel Arc 140V, XPU, bf16); no cloud service, nothing uploaded, no new downloads. Models and
-licences: `../README.md`. The scripts are the adapted set described in `leviathan.md`, plus `wingfix2.py`,
-`tailfix.py` and `streakfix.py`.
+licences: `../README.md`. Scripts: `../scripts/seven/` (as run for the seven finals; see its `common.py` for the
+paths: one beast's folder in `ARTLAB_OUT`, the trio finals in `ARTLAB_FINALS`). Shared: `gen4.py` (prep),
+`lock2.py`, `facemask.py`, `chain.sh` (`detail_pass.py`, `finish.py`), `offpal.py`, `rigparts.py` with
+`griffin_parts.json`, `parts_sheet.py`; the fixes `wingfix.py` (round 1, rejected), `wingfix2.py`, `tailfix.py` and
+`streakfix.py`. The candidate-sheet scripts (`cand.py`, `layouts5.py`, `sheet5.py`) are not in the repo; their
+settings are recorded below.
 
 ## 1. Candidate sheet (remaining-seven round)
 - **Generated:** 21 candidates: colour-mass layouts L0-L13 and text seeds 1-3, 11-14 and 15-16 (L12/L13, t15/t16 at

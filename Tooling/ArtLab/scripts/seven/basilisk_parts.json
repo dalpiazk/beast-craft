@@ -1,0 +1,13 @@
+{"_note": "1x coords (doubled by rigparts). Lizard: 4 legs (near hind 422-516, far hind 505-545, far front 528-590, near front 640-735).",
+ "parts": {
+  "tail":       {"pos": [[150, 900], [300, 920], [80, 880]], "neg": [[600, 800], [460, 960]], "clip": [[40, 850], [420, 820], [430, 960], [300, 975], [40, 910]]},
+  "leg_far_b":  {"pos": [[525, 950]], "neg": [[460, 960], [560, 960]], "poly_only": true, "clip": [[503, 900], [540, 900], [545, 995], [500, 995]]},
+  "leg_far_f":  {"pos": [[555, 920], [575, 985]], "neg": [[680, 950], [460, 960]], "clip": [[528, 855], [590, 850], [615, 1002], [540, 1002], [530, 960]]},
+  "body":       {"pos": [[500, 820], [600, 800], [650, 880]], "neg": [[150, 900], [780, 700], [460, 980]], "clip": [[380, 690], [760, 690], [760, 935], [380, 935]]},
+  "leg_near_b": {"pos": [[460, 960], [430, 930], [480, 985]], "neg": [[560, 960], [600, 800]], "clip": [[400, 880], [510, 880], [515, 1000], [400, 1000]]},
+  "leg_near_f": {"pos": [[680, 960], [700, 990], [650, 900]], "neg": [[560, 960], [780, 700]], "clip": [[620, 870], [760, 870], [770, 1005], [620, 1005]]},
+  "head":       {"pos": [[780, 715], [720, 700], [700, 640]], "neg": [[600, 850]], "clip": [[610, 570], [860, 590], [860, 770], [700, 790], [610, 760]]}},
+ "order": ["tail", "leg_far_b", "leg_far_f", "body", "leg_near_b", "leg_near_f", "head"],
+ "parent": {"body": null, "head": "body", "tail": "body", "leg_far_b": "body", "leg_far_f": "body", "leg_near_b": "body", "leg_near_f": "body"},
+ "extend": ["tail", "leg_far_b", "leg_far_f", "body"],
+ "desc": {"tail": "deep plum lizard tail with gold spines", "leg_far_b": "dark plum lizard leg", "leg_far_f": "dark plum lizard leg", "body": "deep plum scaled lizard body"}}

@@ -10,7 +10,11 @@ disclose where a store requires it (see `docs/art/art-brief.md`).
 | Design source | `content/art/source/treant/design_pick.png` (candidate #8, `treant_L7`, paperised and colour-locked, without its lines) |
 
 Tools: local only (Intel Arc 140V, XPU, bf16); no cloud service, nothing uploaded, no new downloads. Models and
-licences: `../README.md`. The scripts are the adapted set described in `leviathan.md`.
+licences: `../README.md`. Scripts: `../scripts/seven/` (as run for the seven finals; see its `common.py` for the
+paths: one beast's folder in `ARTLAB_OUT`, the trio finals in `ARTLAB_FINALS`). Shared: `gen4.py` (prep),
+`lock2.py`, `facemask.py`, `chain.sh` (`detail_pass.py`, `finish.py`), `offpal.py`, `rigparts.py` with
+`treant_parts.json`, `parts_sheet.py`. The candidate-sheet scripts (`cand.py`, `layouts5.py`, `sheet5.py`) are not
+in the repo; their settings are recorded below.
 
 ## 1. Candidate sheet (remaining-seven round)
 - **Generated:** 16 candidates: colour-mass layouts L0-L11 and text seeds 11-14, all 20 steps; 12 shown on

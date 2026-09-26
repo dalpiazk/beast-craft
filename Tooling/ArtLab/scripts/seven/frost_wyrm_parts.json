@@ -1,0 +1,10 @@
+{"_note": "1x coords, doubled by rigparts.load_parts_json. Head includes the swept-back horns.",
+ "parts": {
+  "tail": {"pos": [[700, 930], [620, 960], [760, 880]], "neg": [[380, 800], [560, 700]], "clip": [[555, 790], [805, 770], [805, 1015], [520, 1015]]},
+  "fin":  {"pos": [[570, 650], [600, 760], [540, 600]], "neg": [[380, 800], [700, 930], [380, 420]], "clip": [[478, 548], [665, 548], [665, 862], [488, 862]]},
+  "body": {"pos": [[380, 800], [300, 900], [450, 950], [350, 650]], "neg": [[700, 930], [380, 420], [580, 700]], "clip": [[200, 525], [600, 525], [625, 1022], [200, 1022]]},
+  "head": {"pos": [[330, 450], [420, 400], [520, 300], [250, 460]], "neg": [[380, 800]], "clip": [[165, 200], [615, 200], [615, 560], [165, 560]]}},
+ "order": ["tail", "fin", "body", "head"],
+ "parent": {"body": null, "head": "body", "fin": "body", "tail": "body"},
+ "extend": ["tail", "fin", "body"],
+ "desc": {"tail": "pale ice blue dragon tail", "fin": "ice crystal fin", "body": "pale ice blue dragon body"}}
