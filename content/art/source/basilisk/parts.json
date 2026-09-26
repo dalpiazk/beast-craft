@@ -1,0 +1,232 @@
+{
+ "beast": "basilisk",
+ "element": "Dark",
+ "canvas": [
+  1792,
+  2304
+ ],
+ "order_back_to_front": [
+  "tail",
+  "leg_far_b",
+  "leg_far_f",
+  "body",
+  "leg_near_b",
+  "leg_near_f",
+  "head"
+ ],
+ "character": {
+  "file": "character.png",
+  "full_canvas_file": "character_full.png",
+  "pivot": [
+   1193,
+   2020
+  ],
+  "pivot_local": [
+   1126,
+   890
+  ],
+  "note": "character.png is cropped so the feet pivot is its bottom centre"
+ },
+ "parts": {
+  "tail": {
+   "file": "parts/tail.png",
+   "parent": "body",
+   "offset": [
+    107,
+    1626
+   ],
+   "size": [
+    755,
+    316
+   ],
+   "pivot": [
+    844,
+    1674
+   ],
+   "pivot_local": [
+    737,
+    48
+   ]
+  },
+  "leg_far_b": {
+   "file": "parts/leg_far_b.png",
+   "parent": "body",
+   "offset": [
+    1022,
+    1786
+   ],
+   "size": [
+    81,
+    209
+   ],
+   "pivot": [
+    1055,
+    1838
+   ],
+   "pivot_local": [
+    33,
+    52
+   ]
+  },
+  "leg_far_f": {
+   "file": "parts/leg_far_f.png",
+   "parent": "body",
+   "offset": [
+    1085,
+    1872
+   ],
+   "size": [
+    144,
+    147
+   ],
+   "pivot": [
+    1121,
+    1874
+   ],
+   "pivot_local": [
+    36,
+    2
+   ]
+  },
+  "body": {
+   "file": "parts/body.png",
+   "parent": null,
+   "offset": [
+    801,
+    1179
+   ],
+   "size": [
+    686,
+    706
+   ],
+   "pivot": [
+    1193,
+    2020
+   ],
+   "pivot_local": [
+    392,
+    841
+   ]
+  },
+  "leg_near_b": {
+   "file": "parts/leg_near_b.png",
+   "parent": "body",
+   "offset": [
+    788,
+    1748
+   ],
+   "size": [
+    246,
+    242
+   ],
+   "pivot": [
+    965,
+    1770
+   ],
+   "pivot_local": [
+    177,
+    22
+   ]
+  },
+  "leg_near_f": {
+   "file": "parts/leg_near_f.png",
+   "parent": "body",
+   "offset": [
+    1239,
+    1728
+   ],
+   "size": [
+    223,
+    293
+   ],
+   "pivot": [
+    1301,
+    1763
+   ],
+   "pivot_local": [
+    62,
+    35
+   ]
+  },
+  "head": {
+   "file": "parts/head.png",
+   "parent": "body",
+   "offset": [
+    1208,
+    1169
+   ],
+   "size": [
+    480,
+    414
+   ],
+   "pivot": [
+    1290,
+    1437
+   ],
+   "pivot_local": [
+    82,
+    268
+   ]
+  }
+ },
+ "root_pivot_note": "root part 'body' pivots at the feet ground contact; child pivots = centre of contact with the parent. Canvas px (2x finals).",
+ "mask_stats": {
+  "fg_px": 505443,
+  "overlap_px": 28675,
+  "orphan_px": 200283,
+  "island_px": 139,
+  "reclip_px": 27601,
+  "auto_fixed_pct": 45.33,
+  "sam_iou": {
+   "tail": {
+    "iou": 0.494,
+    "src": "sam"
+   },
+   "leg_far_b": {
+    "iou": 0.0,
+    "src": "polygon"
+   },
+   "leg_far_f": {
+    "iou": 0.703,
+    "src": "sam"
+   },
+   "body": {
+    "iou": 0.3,
+    "src": "sam"
+   },
+   "leg_near_b": {
+    "iou": 0.652,
+    "src": "polygon"
+   },
+   "leg_near_f": {
+    "iou": 0.696,
+    "src": "sam"
+   },
+   "head": {
+    "iou": 0.593,
+    "src": "sam"
+   }
+  },
+  "inpaint": {
+   "tail": {
+    "px": 4123,
+    "s": 72.1,
+    "retries": 6,
+    "cool_reverted_px": 7002
+   },
+   "leg_far_b": {
+    "px": 1472,
+    "s": 64.7,
+    "retries": 6,
+    "cool_reverted_px": 3068
+   },
+   "body": {
+    "px": 56042,
+    "s": 131.2,
+    "retries": 6,
+    "cool_reverted_px": 48845
+   }
+  },
+  "recompose_mae": 0.03
+ }
+}

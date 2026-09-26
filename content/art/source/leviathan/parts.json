@@ -1,0 +1,157 @@
+{
+ "beast": "leviathan",
+ "element": "Water",
+ "canvas": [
+  1792,
+  2304
+ ],
+ "order_back_to_front": [
+  "coil",
+  "fin",
+  "body",
+  "head"
+ ],
+ "character": {
+  "file": "character.png",
+  "full_canvas_file": "character_full.png",
+  "pivot": [
+   911,
+   2117
+  ],
+  "pivot_local": [
+   623,
+   1963
+  ],
+  "note": "character.png is cropped so the feet pivot is its bottom centre"
+ },
+ "parts": {
+  "coil": {
+   "file": "parts/coil.png",
+   "parent": "body",
+   "offset": [
+    334,
+    1546
+   ],
+   "size": [
+    771,
+    572
+   ],
+   "pivot": [
+    1068,
+    1887
+   ],
+   "pivot_local": [
+    734,
+    341
+   ]
+  },
+  "fin": {
+   "file": "parts/fin.png",
+   "parent": "body",
+   "offset": [
+    693,
+    1353
+   ],
+   "size": [
+    399,
+    419
+   ],
+   "pivot": [
+    1051,
+    1472
+   ],
+   "pivot_local": [
+    358,
+    119
+   ]
+  },
+  "body": {
+   "file": "parts/body.png",
+   "parent": null,
+   "offset": [
+    782,
+    985
+   ],
+   "size": [
+    709,
+    1121
+   ],
+   "pivot": [
+    911,
+    2117
+   ],
+   "pivot_local": [
+    129,
+    1132
+   ]
+  },
+  "head": {
+   "file": "parts/head.png",
+   "parent": "body",
+   "offset": [
+    421,
+    195
+   ],
+   "size": [
+    921,
+    983
+   ],
+   "pivot": [
+    888,
+    1079
+   ],
+   "pivot_local": [
+    467,
+    884
+   ]
+  }
+ },
+ "root_pivot_note": "root part 'body' pivots at the feet ground contact; child pivots = centre of contact with the parent. Canvas px (2x finals).",
+ "mask_stats": {
+  "fg_px": 1226394,
+  "overlap_px": 45296,
+  "orphan_px": 198998,
+  "island_px": 1705,
+  "reclip_px": 10239,
+  "auto_fixed_pct": 20.06,
+  "sam_iou": {
+   "coil": {
+    "iou": 0.723,
+    "src": "sam"
+   },
+   "fin": {
+    "iou": 0.888,
+    "src": "sam"
+   },
+   "body": {
+    "iou": 0.51,
+    "src": "sam"
+   },
+   "head": {
+    "iou": 0.481,
+    "src": "sam"
+   }
+  },
+  "inpaint": {
+   "coil": {
+    "px": 46934,
+    "s": 77.2,
+    "retries": 6,
+    "cool_reverted_px": 0
+   },
+   "fin": {
+    "px": 847,
+    "s": 14.2,
+    "retries": 0,
+    "cool_reverted_px": 0
+   },
+   "body": {
+    "px": 10594,
+    "s": 9.3,
+    "retries": 0,
+    "cool_reverted_px": 0
+   }
+  },
+  "recompose_mae": 0.09
+ }
+}

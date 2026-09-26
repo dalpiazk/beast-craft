@@ -65,9 +65,8 @@ source. In text, "Seal" is always capitalised; "binding limit" is lower case.
 
 Stance, element and kit come from the data; the personality follows them. Each beast also has a
 producer-approved **personality word** (in brackets after its name): the art direction for its look and
-pose, which the art pipeline puts into the beast's brief and prompt (`docs/art/art-brief.md`). The
-Phoenix, Golem and Kirin have final art made to their words; the other seven keep pixel placeholders
-until theirs are made.
+pose, which the art pipeline puts into the beast's brief and prompt (`docs/art/art-brief.md`). All
+ten beasts have final art made to their words.
 
 - **Phoenix** [*Fierce*] (Fire, Ranged). Proud, bright and a little reckless. A bird of living flame that
   strikes from afar with burning bolts, and once a battle wraps itself in renewing fire. Fragile up
@@ -89,8 +88,9 @@ until theirs are made.
   plates and spines; where the Golem only endures, the Tarasque cracks armour and crushes.
 - **Kirin** [*Mystic*] (Light, Ranged). Serene and kind. A luminous deer-like beast that shuns horns and claws:
   it heals the whole team, blesses it, and calls down a single pillar of judging light.
-- **Basilisk** [*Sly*] (Dark, Ranged). Sly, clever, secretly soft-hearted. A serpent-king whose gaze can
-  turn a foe to stone; it slips through shadow to find the weakest enemy and finish the fight.
+- **Basilisk** [*Sly*] (Dark, Ranged). Sly, clever, secretly soft-hearted. A crested lizard-king, low on
+  four legs, whose gaze can turn a foe to stone; it slips through shadow to find the weakest enemy
+  and finish the fight.
   Dark is an element like any other, not wickedness: the Basilisk is a friend.
 
 ## Enemies: the gloamed

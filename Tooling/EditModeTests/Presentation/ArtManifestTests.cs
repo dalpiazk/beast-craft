@@ -6,7 +6,7 @@ namespace BeastCraft.Tests.EditMode
 {
     /// <summary>
     /// The art manifest's schema v2 (<see cref="ArtManifestData"/>): the shipped manifest (pixel
-    /// placeholders plus the illustrated starter trio), file paths resolved against the manifest's
+    /// placeholders plus the ten illustrated beasts), file paths resolved against the manifest's
     /// folder, reading a v1 manifest, <see cref="ArtManifestValidator"/>'s rules, the reserved
     /// <c>spine</c> kind and clip timing.
     /// </summary>
@@ -57,9 +57,16 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [TestCase("phoenix")]
+        [TestCase("leviathan")]
         [TestCase("golem")]
+        [TestCase("griffin")]
+        [TestCase("thunderbird")]
+        [TestCase("frost_wyrm")]
+        [TestCase("treant")]
+        [TestCase("tarasque")]
         [TestCase("kirin")]
-        public void StarterTrio_DrawsItsIllustratedSprite_LinearFeetPivot_AboutAHexTall(string species)
+        [TestCase("basilisk")]
+        public void EveryBeast_DrawsItsIllustratedSprite_LinearFeetPivot_AboutAHexTall(string species)
         {
             ArtManifestData art = VfxLibraryTests.Content.Art;
             string key = VfxLibraryTests.Content.Battle.GetSpecies(species).ArtKey;
@@ -74,7 +81,9 @@ namespace BeastCraft.Tests.EditMode
             Assert.Greater(sprite.PivotY, sprite.FrameHeight * 0.9f, "the feet are at the bottom of the frame");
             Assert.GreaterOrEqual(sprite.FrameHeight, 512, "about 512 px tall: twice its largest on-screen size");
             float height = HeightUnits(sprite);
-            Assert.That(height, Is.InRange(0.75f, 1.5f), "world units from the feet to the top of the frame");
+            // World units from the feet to the top of the square frame: a tall beast fills it, so this is
+            // about its height; the low, long basilisk fills it only in width (its art is ~0.65 tall).
+            Assert.That(height, Is.InRange(0.75f, 1.75f), "world units from the feet to the top of the frame");
             Assert.IsNotNull(art.FindByArtKey("beast/" + species), "the pixel placeholder stays in the manifest");
         }
 

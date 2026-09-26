@@ -144,7 +144,7 @@ namespace BeastCraft.Game
             LoadFont();
             LoadSettings();
 
-            BattleSetup setup = DemoBattle.Create(_content, _options.Seed, out _speciesByUnit, out string error, null, _options.Encounter,
+            BattleSetup setup = DemoBattle.Create(_content, _options.Seed, out _speciesByUnit, out string error, _options.Team, _options.Encounter,
                                                   _options.Level, _options.EnemyLevel);
             BattleSessionRun run = setup == null ? null : BattleSession.Begin(setup);
             if (run == null || run.Battle == null)

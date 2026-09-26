@@ -23,6 +23,8 @@ namespace BeastCraft.Game
     ///   --level L           the team's level (default DemoBattle.DefaultLevel)
     ///   --enemy-level L     the encounter's level (default DemoBattle.DefaultEncounterLevel)
     ///   --encounter ID      the encounter template to fight (default DemoBattle.DefaultEncounterId)
+    ///   --team A,B,...      the team's species ids, 1 to 6 (default DemoBattle.DefaultTeam), e.g.
+    ///                       to look at other beasts' art; which battle it is changes, the rules do not
     ///   --content DIR       the content root (default: Content/ beside the app, or the repo's)
     ///   --effects LEVEL     effects intensity: full, reduced or minimal (default: the saved
     ///                       setting; a screenshot uses full unless told)
@@ -49,6 +51,7 @@ namespace BeastCraft.Game
         public int Level = DemoBattle.DefaultLevel;
         public int EnemyLevel = DemoBattle.DefaultEncounterLevel;
         public string Encounter = DemoBattle.DefaultEncounterId;
+        public string[] Team;
         public string ContentRoot;
         public EffectsIntensity? Effects;
         public bool NoShake;
@@ -117,6 +120,10 @@ namespace BeastCraft.Game
                         break;
                     case "--encounter":
                         options.Encounter = value;
+                        i++;
+                        break;
+                    case "--team":
+                        options.Team = TeamIds(value, ref error);
                         i++;
                         break;
                     case "--content":
@@ -193,6 +200,23 @@ namespace BeastCraft.Game
                     error = "--effects needs full, reduced or minimal.";
                     return EffectsIntensity.Full;
             }
+        }
+
+        private static string[] TeamIds(string value, ref string error)
+        {
+            string[] ids = (value ?? string.Empty).Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+            if (ids.Length < 1 || ids.Length > 6)
+            {
+                error = "--team needs 1 to 6 species ids, comma-separated.";
+                return null;
+            }
+
+            for (int i = 0; i < ids.Length; i++)
+            {
+                ids[i] = ids[i].Trim();
+            }
+
+            return ids;
         }
 
         private static SafeInsets Insets(string value, ref string error)

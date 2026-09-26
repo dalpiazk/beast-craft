@@ -2,6 +2,26 @@
   "_readme": "HAND-KEPT. The illustrated sprites build.py merges into content/art/pixel/pixel-art-manifest.json (schema v2) beside the generated pixel placeholders. The PNGs are not built here: they are exported from the masters in content/art/source/<id>/ by Tooling/ArtLab/scripts/export_ingame.py. Per sprite: Name (unique in the manifest), File (relative to content/art/pixel/), Category, Label, ArtKey (the species' ArtKey in content/data/Creatures/beast-roster.json names it), PivotX/PivotY (the feet, px from the frame's top-left, as export_ingame.py prints them) and WorldHeight: the in-game height from the feet to the top of the art, in world units (1 = one hex column step; the pixel placeholders stand about 0.75 tall). WorldHeight is the species-size knob: build.py derives PixelsPerUnit = (PivotY - the art's top row) / WorldHeight, so a new value needs only a rebuild. FrameWidth/FrameHeight are read from the PNG; Filter is linear and Premultiplied false (straight-alpha PNGs, premultiplied on load).",
   "Sprites": [
     {
+      "Name": "beast_basilisk_illustrated",
+      "File": "../beasts/basilisk/basilisk.png",
+      "Category": "beast",
+      "Label": "Basilisk (Dark, illustrated)",
+      "ArtKey": "beast/basilisk/illustrated",
+      "PivotX": 256,
+      "PivotY": 508,
+      "WorldHeight": 0.65
+    },
+    {
+      "Name": "beast_frost_wyrm_illustrated",
+      "File": "../beasts/frost_wyrm/frost_wyrm.png",
+      "Category": "beast",
+      "Label": "Frost Wyrm (Ice, illustrated)",
+      "ArtKey": "beast/frost_wyrm/illustrated",
+      "PivotX": 256,
+      "PivotY": 508,
+      "WorldHeight": 1.2
+    },
+    {
       "Name": "beast_golem_illustrated",
       "File": "../beasts/golem/golem.png",
       "Category": "beast",
@@ -10,6 +30,16 @@
       "PivotX": 256,
       "PivotY": 508,
       "WorldHeight": 1.0
+    },
+    {
+      "Name": "beast_griffin_illustrated",
+      "File": "../beasts/griffin/griffin.png",
+      "Category": "beast",
+      "Label": "Griffin (Air, illustrated)",
+      "ArtKey": "beast/griffin/illustrated",
+      "PivotX": 256,
+      "PivotY": 508,
+      "WorldHeight": 1.25
     },
     {
       "Name": "beast_kirin_illustrated",
@@ -22,6 +52,16 @@
       "WorldHeight": 1.15
     },
     {
+      "Name": "beast_leviathan_illustrated",
+      "File": "../beasts/leviathan/leviathan.png",
+      "Category": "beast",
+      "Label": "Leviathan (Water, illustrated)",
+      "ArtKey": "beast/leviathan/illustrated",
+      "PivotX": 256,
+      "PivotY": 508,
+      "WorldHeight": 1.3
+    },
+    {
       "Name": "beast_phoenix_illustrated",
       "File": "../beasts/phoenix/phoenix.png",
       "Category": "beast",
@@ -30,6 +70,36 @@
       "PivotX": 256,
       "PivotY": 508,
       "WorldHeight": 1.25
+    },
+    {
+      "Name": "beast_tarasque_illustrated",
+      "File": "../beasts/tarasque/tarasque.png",
+      "Category": "beast",
+      "Label": "Tarasque (Metal, illustrated)",
+      "ArtKey": "beast/tarasque/illustrated",
+      "PivotX": 256,
+      "PivotY": 508,
+      "WorldHeight": 1.05
+    },
+    {
+      "Name": "beast_thunderbird_illustrated",
+      "File": "../beasts/thunderbird/thunderbird.png",
+      "Category": "beast",
+      "Label": "Thunderbird (Lightning, illustrated)",
+      "ArtKey": "beast/thunderbird/illustrated",
+      "PivotX": 256,
+      "PivotY": 508,
+      "WorldHeight": 1.25
+    },
+    {
+      "Name": "beast_treant_illustrated",
+      "File": "../beasts/treant/treant.png",
+      "Category": "beast",
+      "Label": "Treant (Nature, illustrated)",
+      "ArtKey": "beast/treant/illustrated",
+      "PivotX": 256,
+      "PivotY": 508,
+      "WorldHeight": 1.4
     }
   ]
 }

@@ -238,7 +238,8 @@ first turn that fires that skill; `--at MS` picks the moment inside that turn
 Nth skill's detail card (with its range diagram) and `--glossary TERM` a glossary
 term's definition on it; `--scale K` renders K x 540x960 (default
 2: 1080x1920); `--safe-inset L,T,R,B` fakes a phone's cutout insets;
-`--encounter ID`, `--speed S`, `--seed S`, `--level L`, `--enemy-level L` and
+`--team A,B,...` fields 1 to 6 species instead of the default four (to look at
+other beasts' art); `--encounter ID`, `--speed S`, `--seed S`, `--level L`, `--enemy-level L` and
 `--content DIR` adjust the rest; `--effects full|reduced|minimal`, `--no-shake`,
 `--no-flashes` and `--show-settings` set the effects settings for the shot. The design (portrait canvas and safe area, art
 manifest v2 and ArtKey, the VFX schema, range diagrams, how Spine would plug in)

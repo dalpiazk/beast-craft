@@ -3,8 +3,8 @@
 How the game is drawn: which code owns what, how a battle becomes pictures, the portrait screen,
 the art manifest, the skill VFX data, the placeholder art pipeline, and the hosts (desktop,
 Android; iOS planned). Status: **spike**: one battle viewer on desktop and Android with
-throwaway pixel-art placeholders, built so the final art can drop in; the first final art, the
-illustrated starter trio (Phoenix, Golem, Kirin), draws beside them (see "Illustrated sprites").
+throwaway pixel-art placeholders, built so the final art can drop in; the final art of all ten
+beasts (illustrated, AI-assisted) draws beside them (see "Illustrated sprites").
 
 **Art direction (user decision):** the final art is hand-drawn chibi characters, Studio
 Ghibli-inspired, at Sword x Staff's quality — illustrated, **not** pixel art. The recommended
@@ -205,7 +205,7 @@ Screenshots start each shown turn from fit-all, so they stay reproducible.
 | `ArtKey` | the key game data names the art by (see "ArtKey") |
 | `FrameWidth`, `FrameHeight`, `Frames`, `FrameMs` | a horizontal strip of equal frames |
 | `PivotX`, `PivotY` | the anchor in source pixels: a character's feet (placed on the tile centre), an effect's centre |
-| `PixelsPerUnit` | source pixels per world unit (one hex column step): 32 for the placeholders; for an illustrated beast, derived from its `WorldHeight` (385-436 for the trio) |
+| `PixelsPerUnit` | source pixels per world unit (one hex column step): 32 for the placeholders; for an illustrated beast, derived from its `WorldHeight` (300-437 for the ten beasts) |
 | `Filter` | `point` (pixel art) or `linear` (illustrated art); the renderer picks the sampler per batch |
 | `Premultiplied` | `false` = straight alpha, premultiplied on load (SpriteBatch blends premultiplied) |
 | `Tint` | optional `#rrggbb` multiplier (alias entries) |
@@ -224,8 +224,8 @@ frame), and draws every sprite by its pivot at `UnitSize / PixelsPerUnit x scale
 
 ## Illustrated sprites (linear filter)
 
-The starter trio's final art (AI-assisted, producer-approved: `Tooling/ArtLab/`, provenance in
-`Tooling/ArtLab/provenance/`) is the first illustrated art in the game. It goes through the same
+The ten beasts' final art (AI-assisted, producer-approved: `Tooling/ArtLab/`, provenance in
+`Tooling/ArtLab/provenance/`; the starter trio first, then the other seven) is the illustrated art in the game. It goes through the same
 manifest, atlas and renderer as the placeholders; only the entry's numbers differ.
 
 - **Files.** `content/art/beasts/<id>/<id>.png`, one 512x512 frame each: the transparent master
@@ -233,8 +233,8 @@ manifest, atlas and renderer as the placeholders; only the entry's numbers diffe
   in premultiplied space to 504 px on its longer side, padded 4 px, centred on a power-of-two square.
   Feet pivot (256, 508). Both hosts copy `content/art/beasts/**` (not the masters) beside the pixel art.
 - **Why 512.** The closest camera zoom is 5.5 canvas px per board px (`CameraSettings.MaxScale`), so a
-  world unit is at most 176 px on the 1080-wide canvas; the tallest beast (1.25 units) is about 220 px
-  there (about 290 px on a 1440-wide screen). 512 px is about twice that, the usual 2x headroom.
+  world unit is at most 176 px on the 1080-wide canvas; the tallest beast (the Treant, 1.4 units) is about
+  250 px there (about 330 px on a 1440-wide screen). 512 px is about twice that, the usual 2x headroom.
 - **Filter and alpha.** `Filter: "linear"`, `Premultiplied: false`: the PNGs are straight alpha, and
   `SpriteAtlas` premultiplies them on load (SpriteBatch blends premultiplied). A linear sprite also
   gets a **mip chain**, box-filtered from the premultiplied pixels (transparent pixels add no colour,
@@ -246,13 +246,15 @@ manifest, atlas and renderer as the placeholders; only the entry's numbers diffe
   masters are unchanged.
 - **Size is data.** `Tooling/PixelArt/illustrated.json` gives each sprite a `WorldHeight` (world units
   from the feet to the top of the art) and `build.py` writes `PixelsPerUnit = art height / WorldHeight`
-  into the manifest. Defaults: Phoenix 1.25, Kirin 1.15, Golem 1.0: the Golem is the bulkiest (about
-  1.14 units wide against the Phoenix's 0.86), and all three stand taller than the 0.75-unit placeholders.
-  Tune by editing the number and rebuilding.
-- **Which art a species uses** is its `ArtKey`: the trio name `beast/<id>/illustrated`; their pixel
-  placeholders stay in the manifest under `beast/<id>`, and the other seven species still use theirs.
-- **Portraits.** The turn-order portrait fits the whole frame, so the equal square frames give the three
-  beasts equal portraits.
+  into the manifest. Current values: Treant 1.4, Leviathan 1.3, Phoenix 1.25, Thunderbird 1.25, Griffin
+  1.25, Frost Wyrm 1.2, Kirin 1.15, Tarasque 1.05, Golem 1.0, Basilisk 0.65. The Tarasque is the bulkiest
+  (about 1.3 units wide; the Golem about 1.14, the Phoenix 0.86) and the Basilisk the lowest (about 1.2
+  units long); all but the Basilisk stand taller than the 0.75-unit placeholders. Checked on the board in
+  mixed teams (`--team`). Tune by editing the number and rebuilding.
+- **Which art a species uses** is its `ArtKey`: every species names `beast/<id>/illustrated`; the pixel
+  placeholders stay in the manifest under `beast/<id>`.
+- **Portraits.** The turn-order portrait fits the whole frame, so the equal square frames give every
+  beast an equal portrait box; a long, low beast (the Basilisk) fills it only in width and reads small.
 
 ## ArtKey (data -> art)
 

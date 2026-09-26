@@ -1,0 +1,193 @@
+{
+ "beast": "thunderbird",
+ "element": "Lightning",
+ "canvas": [
+  1792,
+  2304
+ ],
+ "order_back_to_front": [
+  "tail",
+  "wing_right",
+  "wing_left",
+  "body",
+  "head"
+ ],
+ "character": {
+  "file": "character.png",
+  "full_canvas_file": "character_full.png",
+  "pivot": [
+   953,
+   2004
+  ],
+  "pivot_local": [
+   805,
+   1809
+  ],
+  "note": "character.png is cropped so the feet pivot is its bottom centre"
+ },
+ "parts": {
+  "tail": {
+   "file": "parts/tail.png",
+   "parent": "body",
+   "offset": [
+    692,
+    1456
+   ],
+   "size": [
+    490,
+    549
+   ],
+   "pivot": [
+    996,
+    1502
+   ],
+   "pivot_local": [
+    304,
+    46
+   ]
+  },
+  "wing_right": {
+   "file": "parts/wing_right.png",
+   "parent": "body",
+   "offset": [
+    919,
+    240
+   ],
+   "size": [
+    729,
+    1104
+   ],
+   "pivot": [
+    1017,
+    1122
+   ],
+   "pivot_local": [
+    98,
+    882
+   ]
+  },
+  "wing_left": {
+   "file": "parts/wing_left.png",
+   "parent": "body",
+   "offset": [
+    196,
+    454
+   ],
+   "size": [
+    538,
+    878
+   ],
+   "pivot": [
+    690,
+    1293
+   ],
+   "pivot_local": [
+    494,
+    839
+   ]
+  },
+  "body": {
+   "file": "parts/body.png",
+   "parent": null,
+   "offset": [
+    683,
+    767
+   ],
+   "size": [
+    423,
+    787
+   ],
+   "pivot": [
+    953,
+    2004
+   ],
+   "pivot_local": [
+    270,
+    1237
+   ]
+  },
+  "head": {
+   "file": "parts/head.png",
+   "parent": "body",
+   "offset": [
+    698,
+    916
+   ],
+   "size": [
+    273,
+    414
+   ],
+   "pivot": [
+    871,
+    1218
+   ],
+   "pivot_local": [
+    173,
+    302
+   ]
+  }
+ },
+ "root_pivot_note": "root part 'body' pivots at the feet ground contact; child pivots = centre of contact with the parent. Canvas px (2x finals).",
+ "mask_stats": {
+  "fg_px": 898851,
+  "overlap_px": 30264,
+  "orphan_px": 202903,
+  "island_px": 365,
+  "reclip_px": 9056,
+  "auto_fixed_pct": 25.98,
+  "sam_iou": {
+   "tail": {
+    "iou": 0.552,
+    "src": "sam"
+   },
+   "wing_right": {
+    "iou": 0.358,
+    "src": "sam"
+   },
+   "wing_left": {
+    "iou": 0.754,
+    "src": "sam"
+   },
+   "body": {
+    "iou": 0.327,
+    "src": "sam"
+   },
+   "head": {
+    "iou": 0.0,
+    "src": "polygon"
+   }
+  },
+  "inpaint": {
+   "tail": {
+    "px": 8203,
+    "s": 16.2,
+    "retries": 0,
+    "cool_reverted_px": 0
+   },
+   "wing_right": {
+    "px": 23678,
+    "s": 50.6,
+    "retries": 3,
+    "cool_reverted_px": 0
+   },
+   "wing_left": {
+    "px": 4115,
+    "s": 24.2,
+    "retries": 1,
+    "cool_reverted_px": 0
+   },
+   "body": {
+    "px": 64917,
+    "s": 9.8,
+    "retries": 0,
+    "cool_reverted_px": 0
+   }
+  },
+  "recompose_mae": 0.27
+ },
+ "feet_pivot": [
+  920,
+  1510
+ ],
+ "feet_pivot_note": "flying pose: talon/body-underside anchor (canvas px); character.png bottom-centre = lowest point (tail tip), trio convention"
+}

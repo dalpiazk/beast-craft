@@ -1,0 +1,195 @@
+{
+ "beast": "tarasque",
+ "element": "Metal",
+ "canvas": [
+  1792,
+  2304
+ ],
+ "order_back_to_front": [
+  "leg_far_l",
+  "leg_far_r",
+  "body",
+  "leg_near_l",
+  "leg_near_r",
+  "head"
+ ],
+ "character": {
+  "file": "character.png",
+  "full_canvas_file": "character_full.png",
+  "pivot": [
+   911,
+   2018
+  ],
+  "pivot_local": [
+   860,
+   1386
+  ],
+  "note": "character.png is cropped so the feet pivot is its bottom centre"
+ },
+ "parts": {
+  "leg_far_l": {
+   "file": "parts/leg_far_l.png",
+   "parent": "body",
+   "offset": [
+    698,
+    1872
+   ],
+   "size": [
+    180,
+    143
+   ],
+   "pivot": [
+    818,
+    1800
+   ],
+   "pivot_local": [
+    120,
+    -72
+   ]
+  },
+  "leg_far_r": {
+   "file": "parts/leg_far_r.png",
+   "parent": "body",
+   "offset": [
+    1345,
+    1872
+   ],
+   "size": [
+    194,
+    143
+   ],
+   "pivot": [
+    1410,
+    1790
+   ],
+   "pivot_local": [
+    65,
+    -82
+   ]
+  },
+  "body": {
+   "file": "parts/body.png",
+   "parent": null,
+   "offset": [
+    116,
+    671
+   ],
+   "size": [
+    1612,
+    1217
+   ],
+   "pivot": [
+    911,
+    2018
+   ],
+   "pivot_local": [
+    795,
+    1347
+   ]
+  },
+  "leg_near_l": {
+   "file": "parts/leg_near_l.png",
+   "parent": "body",
+   "offset": [
+    286,
+    1826
+   ],
+   "size": [
+    239,
+    186
+   ],
+   "pivot": [
+    490,
+    1790
+   ],
+   "pivot_local": [
+    204,
+    -36
+   ]
+  },
+  "leg_near_r": {
+   "file": "parts/leg_near_r.png",
+   "parent": "body",
+   "offset": [
+    988,
+    1881
+   ],
+   "size": [
+    223,
+    138
+   ],
+   "pivot": [
+    1084,
+    1790
+   ],
+   "pivot_local": [
+    96,
+    -91
+   ]
+  },
+  "head": {
+   "file": "parts/head.png",
+   "parent": "body",
+   "offset": [
+    155,
+    1080
+   ],
+   "size": [
+    887,
+    794
+   ],
+   "pivot": [
+    749,
+    1394
+   ],
+   "pivot_local": [
+    594,
+    314
+   ]
+  }
+ },
+ "root_pivot_note": "root part 'body' pivots at the feet ground contact; child pivots = centre of contact with the parent. Canvas px (2x finals).",
+ "mask_stats": {
+  "fg_px": 1426532,
+  "overlap_px": 568742,
+  "orphan_px": 23863,
+  "island_px": 553,
+  "reclip_px": 0,
+  "auto_fixed_pct": 41.58,
+  "sam_iou": {
+   "leg_far_l": {
+    "iou": 0.935,
+    "src": "sam"
+   },
+   "leg_far_r": {
+    "iou": 0.807,
+    "src": "sam"
+   },
+   "body": {
+    "iou": 0.549,
+    "src": "polygon"
+   },
+   "leg_near_l": {
+    "iou": 0.917,
+    "src": "sam"
+   },
+   "leg_near_r": {
+    "iou": 0.703,
+    "src": "sam"
+   },
+   "head": {
+    "iou": 0.0,
+    "src": "polygon"
+   }
+  },
+  "inpaint": {
+   "body": {
+    "px": 553680,
+    "s": 194.2,
+    "retries": 6,
+    "cool_reverted_px": 77666
+   }
+  },
+  "recompose_mae": 0.02
+ }
+}
