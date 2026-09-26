@@ -170,6 +170,29 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
+        public void EveryStraightLine_CrossesTheBoardInOnePiece()
+        {
+            // What lets a Line or Cross arm stop at the first off-board tile (SkillTargetResolver).
+            foreach (ArenaSize size in Sizes)
+            {
+                HexGrid grid = new HexGrid(size);
+                foreach (HexCoordinate start in grid.Tiles)
+                {
+                    foreach (HexCoordinate direction in HexCoordinate.AxialDirections)
+                    {
+                        bool left = false;
+                        for (int step = 1; step <= 40; step++)
+                        {
+                            bool inBounds = grid.IsInBounds(start + new HexCoordinate(direction.Q * step, direction.R * step));
+                            Assert.IsFalse(left && inBounds, size + ": the line from " + start + " along " + direction + " re-enters at step " + step);
+                            left |= !inBounds;
+                        }
+                    }
+                }
+            }
+        }
+
+        [Test]
         public void RangeQuery_IsTheDiscClippedToTheRectangle()
         {
             HexGrid grid = new HexGrid(ArenaSize.Medium);
