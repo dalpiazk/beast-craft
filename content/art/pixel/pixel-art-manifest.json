@@ -53,6 +53,23 @@
       "Premultiplied": false
     },
     {
+      "Name": "beast_basilisk_illustrated",
+      "File": "../beasts/basilisk/basilisk.png",
+      "Kind": "sprite",
+      "Category": "beast",
+      "Label": "Basilisk (Dark, illustrated)",
+      "ArtKey": "beast/basilisk/illustrated",
+      "FrameWidth": 512,
+      "FrameHeight": 512,
+      "Frames": 1,
+      "FrameMs": 0,
+      "PivotX": 256,
+      "PivotY": 508,
+      "PixelsPerUnit": 354.545,
+      "Filter": "linear",
+      "Premultiplied": false
+    },
+    {
       "Name": "beast_frost_wyrm",
       "File": "beast_frost_wyrm.png",
       "Kind": "sprite",
@@ -67,6 +84,23 @@
       "PivotY": 24,
       "PixelsPerUnit": 32,
       "Filter": "point",
+      "Premultiplied": false
+    },
+    {
+      "Name": "beast_frost_wyrm_illustrated",
+      "File": "../beasts/frost_wyrm/frost_wyrm.png",
+      "Kind": "sprite",
+      "Category": "beast",
+      "Label": "Frost Wyrm (Ice, illustrated)",
+      "ArtKey": "beast/frost_wyrm/illustrated",
+      "FrameWidth": 512,
+      "FrameHeight": 512,
+      "Frames": 1,
+      "FrameMs": 0,
+      "PivotX": 256,
+      "PivotY": 508,
+      "PixelsPerUnit": 416.667,
+      "Filter": "linear",
       "Premultiplied": false
     },
     {
@@ -121,6 +155,23 @@
       "Premultiplied": false
     },
     {
+      "Name": "beast_griffin_illustrated",
+      "File": "../beasts/griffin/griffin.png",
+      "Kind": "sprite",
+      "Category": "beast",
+      "Label": "Griffin (Air, illustrated)",
+      "ArtKey": "beast/griffin/illustrated",
+      "FrameWidth": 512,
+      "FrameHeight": 512,
+      "Frames": 1,
+      "FrameMs": 0,
+      "PivotX": 256,
+      "PivotY": 508,
+      "PixelsPerUnit": 398.4,
+      "Filter": "linear",
+      "Premultiplied": false
+    },
+    {
       "Name": "beast_kirin",
       "File": "beast_kirin.png",
       "Kind": "sprite",
@@ -169,6 +220,23 @@
       "PivotY": 24,
       "PixelsPerUnit": 32,
       "Filter": "point",
+      "Premultiplied": false
+    },
+    {
+      "Name": "beast_leviathan_illustrated",
+      "File": "../beasts/leviathan/leviathan.png",
+      "Kind": "sprite",
+      "Category": "beast",
+      "Label": "Leviathan (Water, illustrated)",
+      "ArtKey": "beast/leviathan/illustrated",
+      "FrameWidth": 512,
+      "FrameHeight": 512,
+      "Frames": 1,
+      "FrameMs": 0,
+      "PivotX": 256,
+      "PivotY": 508,
+      "PixelsPerUnit": 383.846,
+      "Filter": "linear",
       "Premultiplied": false
     },
     {
@@ -252,6 +320,23 @@
       "Premultiplied": false
     },
     {
+      "Name": "beast_tarasque_illustrated",
+      "File": "../beasts/tarasque/tarasque.png",
+      "Kind": "sprite",
+      "Category": "beast",
+      "Label": "Tarasque (Metal, illustrated)",
+      "ArtKey": "beast/tarasque/illustrated",
+      "FrameWidth": 512,
+      "FrameHeight": 512,
+      "Frames": 1,
+      "FrameMs": 0,
+      "PivotX": 256,
+      "PivotY": 508,
+      "PixelsPerUnit": 381.905,
+      "Filter": "linear",
+      "Premultiplied": false
+    },
+    {
       "Name": "beast_thunderbird",
       "File": "beast_thunderbird.png",
       "Kind": "sprite",
@@ -269,6 +354,23 @@
       "Premultiplied": false
     },
     {
+      "Name": "beast_thunderbird_illustrated",
+      "File": "../beasts/thunderbird/thunderbird.png",
+      "Kind": "sprite",
+      "Category": "beast",
+      "Label": "Thunderbird (Lightning, illustrated)",
+      "ArtKey": "beast/thunderbird/illustrated",
+      "FrameWidth": 512,
+      "FrameHeight": 512,
+      "Frames": 1,
+      "FrameMs": 0,
+      "PivotX": 256,
+      "PivotY": 508,
+      "PixelsPerUnit": 401.6,
+      "Filter": "linear",
+      "Premultiplied": false
+    },
+    {
       "Name": "beast_treant",
       "File": "beast_treant.png",
       "Kind": "sprite",
@@ -283,6 +385,23 @@
       "PivotY": 24,
       "PixelsPerUnit": 32,
       "Filter": "point",
+      "Premultiplied": false
+    },
+    {
+      "Name": "beast_treant_illustrated",
+      "File": "../beasts/treant/treant.png",
+      "Kind": "sprite",
+      "Category": "beast",
+      "Label": "Treant (Nature, illustrated)",
+      "ArtKey": "beast/treant/illustrated",
+      "FrameWidth": 512,
+      "FrameHeight": 512,
+      "Frames": 1,
+      "FrameMs": 0,
+      "PivotX": 256,
+      "PivotY": 508,
+      "PixelsPerUnit": 358.571,
+      "Filter": "linear",
       "Premultiplied": false
     },
     {

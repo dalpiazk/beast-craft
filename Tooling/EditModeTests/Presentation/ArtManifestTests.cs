@@ -6,7 +6,7 @@ namespace BeastCraft.Tests.EditMode
 {
     /// <summary>
     /// The art manifest's schema v2 (<see cref="ArtManifestData"/>): the shipped manifest (pixel
-    /// placeholders plus the illustrated starter trio), file paths resolved against the manifest's
+    /// placeholders plus the ten illustrated beasts), file paths resolved against the manifest's
     /// folder, reading a v1 manifest, <see cref="ArtManifestValidator"/>'s rules, the reserved
     /// <c>spine</c> kind and clip timing.
     /// </summary>
@@ -57,9 +57,16 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [TestCase("phoenix")]
+        [TestCase("leviathan")]
         [TestCase("golem")]
+        [TestCase("griffin")]
+        [TestCase("thunderbird")]
+        [TestCase("frost_wyrm")]
+        [TestCase("treant")]
+        [TestCase("tarasque")]
         [TestCase("kirin")]
-        public void StarterTrio_DrawsItsIllustratedSprite_LinearFeetPivot_AboutAHexTall(string species)
+        [TestCase("basilisk")]
+        public void EveryBeast_DrawsItsIllustratedSprite_LinearFeetPivot_AboutAHexTall(string species)
         {
             ArtManifestData art = VfxLibraryTests.Content.Art;
             string key = VfxLibraryTests.Content.Battle.GetSpecies(species).ArtKey;
