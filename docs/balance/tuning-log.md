@@ -3556,3 +3556,89 @@ and, per seed, `-- --mode pve --seed N --target-clear 50 --write-difficulty
 content/data/Encounters/encounter-difficulty.json --write-difficulty <scratch>` (at main's shipping
 table; the post-game rates are on stderr) and `-- --mode pve --seeds 12345,777,4242,2024,99
 --target-clear 50 --pin-difficulty "<dir>/main-guard-pin-{seed}.json"`.
+
+## Rectangular arenas: re-calibration
+
+The documented commands on the rectangular arenas, no roster, skill or content change: the shipping
+table (`--panel 16x4 --avatar-value --gear typical --write-difficulty
+content/data/Encounters/encounter-difficulty.json`, post-game cells included), the gearless
+`tuned-report.md`, `level-gap-report.md` (`--gap-mix 0`), `pacing-report.md` and
+`campaign-pacing-report.md` (both byte-identical: neither fights a battle), and the guard (five
+seeds, `--target-clear 50`).
+
+**Shipping table** (typical gear; the game reads `elemental`). Only the Large hordes move, as the
+shape-effect run predicted; every Medium cell keeps its multiplier bar four `neutral` ones (one
+bisection step each; the game does not read `neutral`):
+
+| Cell | Target | Old | New | Scouted at new |
+| --- | ---: | ---: | ---: | ---: |
+| `elemental` `horde` L1 | 80 | x1.313 | **x1.359** (+3.6%) | 85.2% |
+| `elemental` `horde` L50 | 80 | x1.250 | **x1.266** (+1.3%) | 79.7% |
+| `elemental` `horde` L100 | 80 | x1.188 | x1.188 | 80.5% |
+| `elemental` `horde_postgame` L100 (Normal) | 65 | x1.242 | **x1.258** (+1.3%) | 63.3% |
+| `elemental` `horde_postgame_hard` L100 (Hard) | 50 | x1.281 | **x1.344** (+4.9%) | 48.4% |
+| `neutral` `horde` L50 / L100 | 80 | x1.250 / x1.188 | x1.273 / x1.219 | 80.5% / 78.9% |
+| `neutral` `horde_postgame` / `_hard` | 65 / 50 | x1.227 / x1.262 | x1.266 / x1.313 | 64.8% / 50.8% |
+| `neutral` `solo` L50, `elite` L50, `squad_postgame_hard`, `elite_postgame_hard` | | x0.980, x0.887, x1.281, x0.934 | x0.977, x0.885, x1.273, x0.938 | 49.2%, 59.4%, 50.0%, 29.7% |
+
+Every other cell, `elemental` `solo` / `elite` / `squad` and their post-game copies included, is
+unchanged. The hordes needed only 1-5% more because the curve is steep there: at level 100 the old
+x1.188 still clears 80.5%. **Targets:** every mainline cell's scouted clear is within 5 points of its
+tier (squad / horde 80, elite 60, solo 50) except `elemental` `horde` L1 at 85.2%, the search's
+closest evaluated step (128 battles a step, +/-3.5 points at 80%; main's `horde` L100 landed a
+step off the same way, "Shipping difficulty table in typical gear"), flagged, not hand-edited; every
+post-game cell within 1.7 points of its Normal / Hard target (Normal 65 / 65 / 45: 65.6, 63.3,
+45.3%; Hard 50 / 50 / 30: 50.0, 48.4, 30.5%, `elemental`).
+
+**The committed report** (gearless, tiered targets): multipliers move by at most one or two search
+steps (`elemental` `horde` x1.250 / x1.219 / x1.238 -> x1.313 / x1.238 / x1.242; `solo` L50 x1.266
+-> x1.250; `squad` L1 x1.207 -> x1.219; `neutral` `horde` L50 / L100 +0.6%, `solo` L100 -1.6%,
+`elite` L1 / L100 -0.5%), and every cell's scouted clear is within 5 points of its target (widest:
+`neutral` `solo` L1 45.3%, `neutral` `elite` L1 63.3%, `elemental` `horde` L1 82.8%).
+
+**Guard** (five seeds, `--target-clear 50`, over the level-gap mix), main -> rectangles:
+
+| Beast | `elemental` normalized | `neutral` normalized |
+| --- | ---: | ---: |
+| Treant | +2.1 -> +2.0 | -0.5 -> -0.8 |
+| Kirin | +2.0 -> +1.8 | -1.1 -> -0.7 |
+| Basilisk | +1.7 -> +1.3 | +0.6 -> +0.6 |
+| Thunderbird | +0.8 -> +1.1 | +5.2 -> +5.3 |
+| Griffin | +0.4 -> +0.9 | +3.8 -> +4.4 |
+| Golem | +0.5 -> +0.6 | +1.0 -> +1.1 |
+| Tarasque | -1.2 -> -1.1 | -3.6 -> -3.9 |
+| Frost Wyrm | -0.9 -> -1.3 | -0.3 -> -1.0 |
+| Leviathan | -1.9 -> -2.3 | -0.8 -> -0.8 |
+| Phoenix | -3.4 -> -3.1 | -4.2 -> -4.4 |
+
+- `elemental`: **-3.1 … +2.0**, every beast inside +/-4 (was -3.4 … +2.1); top 3 in some shape
+  **8 of 10**, the same two out as on main (Kirin, Leviathan); gap 0 -3.0 … +3.4, 9 of 10.
+- `neutral`: **-4.4 … +5.3**, inside +/-7 (was -4.2 … +5.2); top 3 in some shape **8 of 10** (was 8):
+  Kirin now takes `horde` 3rd (+2.4) and Treant drops to 4th there (+1.9), so the two out are
+  Leviathan and Treant (were Leviathan and Kirin); gap 0 -5.8 … +5.7, 8 of 10 (was 9).
+- The top 3 of every shape is the same three beasts as on main in `elemental` (`solo` Griffin,
+  Treant, Basilisk; `elite` Golem, Treant, Basilisk; `squad` Thunderbird, Tarasque, Phoenix; `horde`
+  Frost Wyrm, Treant, Thunderbird; only the order within a shape moves) and in `neutral` but for
+  `horde`'s third place (Kirin for Treant).
+- Every beast moves by 0.7 normalized points or less; no beast retune.
+
+**Level gap** (`level-gap-report.md`, all-shape cells meeting their band): `elemental` 25 -> 24 of
+35 (L70 -2 now 79.1% against at least 80.5, and +3 at L70 / L90 about 1-3 points under 0.4 T, while L70
+and L90 +5 now meet theirs), `neutral` 27 -> 27; shape cells 90 -> 87 and 106 -> 104 of 140. The
+same misses as before (a couple of levels under costs more than the band allows; over-levelled
+`elemental` falls just short of T + 0.4 (100 - T) at -2), not new ones in kind.
+
+**Boss overrides** (the templates' `DifficultyOverride`s are not in the table; recipe as in "Boss
+re-calibration after the combat merge": fixed set, `--kit elemental --scouted bonds --gear typical
+--calibrate-samples 64`, target 50%, r11 35% / 20%). Run on main the recipe reproduces all twelve
+shipped overrides exactly; on the rectangles ten land on the same multiplier and two a step lower,
+r01 Hollow Warden x1.430 -> x1.414 (-1.1%) and r06 Frost Matriarch x1.063 -> x1.047 (-1.5%), inside
+the recipe's step and noise (64 samples, about +/-6 points). A boss fight is decided on the front
+rows, which did not change. The overrides are kept.
+
+Reproduce: the commands above, as in the Tooling README (the table, the report, `--mode pve --levels
+10,30,50,70,90 --level-gap -5,-3,-2,0,2,3,5 --gap-mix 0`, `--mode pacing --self-check`, `--mode
+campaign --self-check`); the guard `-- --mode pve --seeds 12345,777,4242,2024,99 --target-clear 50`;
+the bosses per template `-- --mode pve --kit elemental --encounter-set fixed --encounters-file
+<scratch> --encounters <id> --levels <level> --calibrate-samples 64 --scouted bonds --gear typical
+--target-clear <50|35|20>`, the scratch file being the templates written as fixed encounters.
