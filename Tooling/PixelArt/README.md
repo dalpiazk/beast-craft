@@ -28,7 +28,7 @@ loads the PNGs at runtime (`Texture2D.FromStream`), indexed by the manifest. The
 `VfxLibraryValidator` checks both against this manifest.
 
 ## Illustrated sprites in the same manifest
-The game reads **one** art manifest, so the illustrated beasts (the starter trio's AI-assisted art,
+The game reads **one** art manifest, so the illustrated beasts (all ten beasts' AI-assisted art,
 `content/art/beasts/<id>/<id>.png`) are listed in it too. They are not built from text grids:
 - `Tooling/ArtLab/scripts/export_ingame.py` exports each PNG from its master
   (`content/art/source/<id>/character.png`) and prints its feet pivot.

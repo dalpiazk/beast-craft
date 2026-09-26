@@ -21,9 +21,12 @@ directly) commanding a roster of ten mythic beasts against wild, Gloam-corrupted
 - **Per asset:** candidate sheet → producer pick + notes → lock → finish → parts → in-game export
   (`Tooling/ArtLab/README.md`). Prompts, seeds, settings, the chosen candidate and the producer's decision
   are recorded per asset in `Tooling/ArtLab/provenance/` (the AI-disclosure and copyright record).
-- **Done:** the starter trio, **Phoenix (Fierce), Golem (Cute) and Kirin (Mystic)**, approved and in the
-  game: `content/art/beasts/<id>/` (in-game sprites), `content/art/source/<id>/` (full-resolution masters,
-  rig parts and the design pick). The other seven beasts keep their pixel placeholders until theirs are made.
+- **Done: all ten beasts are final**, approved and in the game: the starter trio, **Phoenix (Fierce), Golem
+  (Cute) and Kirin (Mystic)** (2026-09-25), then **Leviathan (Serene, regal), Thunderbird (Wild, energetic),
+  Griffin (Bold, brave), Frost Wyrm (Wise, wry), Treant (Gentle), Tarasque (Grumpy) and Basilisk (Sly)**
+  (2026-09-26). Files: `content/art/beasts/<id>/` (in-game sprites), `content/art/source/<id>/`
+  (full-resolution masters, rig parts and the design pick). The pixel placeholders stay in the manifest.
+- **Before the animation pass:** the known touch-ups per beast are listed in `docs/art/touch-ups.md`.
 - **Where it differs from the specs below:** the in-game beasts are currently single illustrated sprites
   (linear filter, 512x512 frames, feet pivot, straight-alpha PNGs premultiplied on load; see
   `docs/design/presentation-and-vfx.md`) with machine-cut rig parts archived beside them, not Spine rigs. The
@@ -77,15 +80,15 @@ Wonder first, danger second — never grim (per `docs/design/content-bible.md`, 
 | Species | Element | Stance | Personality (producer-approved) | Visual/personality cue | Art |
 | --- | --- | --- | --- | --- | --- |
 | Phoenix | Fire | Ranged | **Fierce** | Proud flame bird, strikes from afar, renews itself in fire | final (AI-assisted) |
-| Leviathan | Water | Vanguard | **Serene, regal** | Calm deep serpent, coils, shields in scales, outlasts | pixel placeholder |
+| Leviathan | Water | Vanguard | **Serene, regal** | Calm deep serpent, coils, shields in scales, outlasts | final (AI-assisted) |
 | Golem | Earth | Vanguard | **Cute** | Stone hillside given legs, slow, stubborn wall for allies | final (AI-assisted) |
-| Griffin | Air | Skirmisher | **Bold, brave** | Eagle/lion hybrid, bold, hit-and-run with talons | pixel placeholder |
-| Thunderbird | Lightning | Skirmisher | **Wild, energetic** | Storm-diving opener, glass-cannon speedster | pixel placeholder |
-| Frost Wyrm | Ice | Vanguard | **Wise, wry** | Old, wry dragon in rime, slows/freezes, patient | pixel placeholder |
-| Treant | Nature | Vanguard | **Gentle** | Gentle forest guardian, shelters and mends allies | pixel placeholder |
-| Tarasque | Metal | Vanguard | **Grumpy** | Grumpy armored river-beast, endures and bites back | pixel placeholder |
+| Griffin | Air | Skirmisher | **Bold, brave** | Eagle/lion hybrid, bold, hit-and-run with talons | final (AI-assisted) |
+| Thunderbird | Lightning | Skirmisher | **Wild, energetic** | Storm-diving opener, glass-cannon speedster | final (AI-assisted) |
+| Frost Wyrm | Ice | Vanguard | **Wise, wry** | Old, wry dragon in rime, slows/freezes, patient | final (AI-assisted) |
+| Treant | Nature | Vanguard | **Gentle** | Gentle forest guardian, shelters and mends allies | final (AI-assisted) |
+| Tarasque | Metal | Vanguard | **Grumpy** | Grumpy armored river-beast, endures and bites back | final (AI-assisted) |
 | Kirin | Light | Ranged | **Mystic** | Serene luminous healer, fights with light not claws | final (AI-assisted) |
-| Basilisk | Dark | Ranged | **Sly** | Sly shadow-serpent, gaze attack, hunts the weak | pixel placeholder |
+| Basilisk | Dark | Ranged | **Sly** | Sly crested shadow-lizard (four legs; snake bodies rejected), gaze attack, hunts the weak | final (AI-assisted) |
 
 The personality word is part of each beast's art direction: it goes into the candidate brief and the
 prompt (the Golem's `curious`, `round face, big amber eyes` came from **Cute**).
@@ -299,8 +302,8 @@ variants Radiant Dawnshade Horn and Eclipse Dawnshade Crown.
     other stores' policies at submission. Human IP-likeness review of every candidate stays mandatory.
 11. **Personality words** (producer-approved): Phoenix Fierce, Golem Cute, Kirin Mystic, Leviathan serene
     and regal, Griffin bold and brave, Thunderbird wild and energetic, Frost Wyrm wise and wry, Treant
-    gentle, Tarasque grumpy, Basilisk sly. The starter trio's art is final; the seven others keep their
-    pixel placeholders until their art is made.
+    gentle, Tarasque grumpy, Basilisk sly. All ten beasts' art is final (the trio 2026-09-25, the other
+    seven 2026-09-26), each approved individually (`Tooling/ArtLab/provenance/<id>.md`).
 
 **Remaining question:** which 3 options per beast category ship at launch (artist can quote the
 count now; the producer picks the specific options before Phase 2).

@@ -1,6 +1,6 @@
 # Beast Craft art lab (AI-assisted beast art)
 
-The local, offline pipeline that made the starter trio (Phoenix, Golem, Kirin): an SDXL anime model steered by our
+The local, offline pipeline that made the ten beasts (the starter trio Phoenix, Golem, Kirin, then the other seven): an SDXL anime model steered by our
 own approved style references, a design lock, a detail pass, a deterministic line pass, rig parts and the in-game
 export. **The producer is the art director**: every design is a producer pick, and every final is producer-approved
 (see `docs/art/art-brief.md` for the policy and the store-disclosure rule). How each final was made is recorded in
