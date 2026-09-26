@@ -1,0 +1,207 @@
+{
+ "beast": "griffin",
+ "element": "Air",
+ "canvas": [
+  1792,
+  2304
+ ],
+ "order_back_to_front": [
+  "tail",
+  "legs_back",
+  "body",
+  "legs_front",
+  "wings",
+  "head"
+ ],
+ "character": {
+  "file": "character.png",
+  "full_canvas_file": "character_full.png",
+  "pivot": [
+   679,
+   2106
+  ],
+  "pivot_local": [
+   734,
+   1878
+  ],
+  "note": "character.png is cropped so the feet pivot is its bottom centre"
+ },
+ "parts": {
+  "tail": {
+   "file": "parts/tail.png",
+   "parent": "body",
+   "offset": [
+    109,
+    1193
+   ],
+   "size": [
+    496,
+    425
+   ],
+   "pivot": [
+    584,
+    1551
+   ],
+   "pivot_local": [
+    475,
+    358
+   ]
+  },
+  "legs_back": {
+   "file": "parts/legs_back.png",
+   "parent": "body",
+   "offset": [
+    525,
+    1700
+   ],
+   "size": [
+    311,
+    407
+   ],
+   "pivot": [
+    677,
+    1736
+   ],
+   "pivot_local": [
+    152,
+    36
+   ]
+  },
+  "body": {
+   "file": "parts/body.png",
+   "parent": null,
+   "offset": [
+    0,
+    344
+   ],
+   "size": [
+    1154,
+    1428
+   ],
+   "pivot": [
+    679,
+    2106
+   ],
+   "pivot_local": [
+    679,
+    1762
+   ]
+  },
+  "legs_front": {
+   "file": "parts/legs_front.png",
+   "parent": "body",
+   "offset": [
+    758,
+    1528
+   ],
+   "size": [
+    609,
+    531
+   ],
+   "pivot": [
+    952,
+    1661
+   ],
+   "pivot_local": [
+    194,
+    133
+   ]
+  },
+  "wings": {
+   "file": "parts/wings.png",
+   "parent": "body",
+   "offset": [
+    68,
+    277
+   ],
+   "size": [
+    609,
+    1081
+   ],
+   "pivot": [
+    379,
+    870
+   ],
+   "pivot_local": [
+    311,
+    593
+   ]
+  },
+  "head": {
+   "file": "parts/head.png",
+   "parent": "body",
+   "offset": [
+    632,
+    663
+   ],
+   "size": [
+    580,
+    463
+   ],
+   "pivot": [
+    793,
+    991
+   ],
+   "pivot_local": [
+    161,
+    328
+   ]
+  }
+ },
+ "root_pivot_note": "root part 'body' pivots at the feet ground contact; child pivots = centre of contact with the parent. Canvas px (2x finals).",
+ "mask_stats": {
+  "fg_px": 1101710,
+  "overlap_px": 79848,
+  "orphan_px": 208568,
+  "island_px": 1976,
+  "reclip_px": 26505,
+  "auto_fixed_pct": 26.36,
+  "sam_iou": {
+   "tail": {
+    "iou": 0.799,
+    "src": "sam"
+   },
+   "legs_back": {
+    "iou": 0.429,
+    "src": "sam"
+   },
+   "body": {
+    "iou": 0.442,
+    "src": "sam"
+   },
+   "legs_front": {
+    "iou": 0.682,
+    "src": "sam"
+   },
+   "wings": {
+    "iou": 0.729,
+    "src": "sam"
+   },
+   "head": {
+    "iou": 0.501,
+    "src": "sam"
+   }
+  },
+  "inpaint": {
+   "tail": {
+    "px": 1899,
+    "s": 17.8,
+    "retries": 0,
+    "cool_reverted_px": 99
+   },
+   "legs_back": {
+    "px": 5324,
+    "s": 23.0,
+    "retries": 1,
+    "cool_reverted_px": 204
+   },
+   "body": {
+    "px": 452087,
+    "s": 36.8,
+    "retries": 0,
+    "cool_reverted_px": 245
+   }
+  },
+  "recompose_mae": 0.27
+ }
+}

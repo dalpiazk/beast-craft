@@ -1,0 +1,157 @@
+{
+ "beast": "frost_wyrm",
+ "element": "Ice",
+ "canvas": [
+  1792,
+  2304
+ ],
+ "order_back_to_front": [
+  "tail",
+  "fin",
+  "body",
+  "head"
+ ],
+ "character": {
+  "file": "character.png",
+  "full_canvas_file": "character_full.png",
+  "pivot": [
+   879,
+   2024
+  ],
+  "pivot_local": [
+   732,
+   1556
+  ],
+  "note": "character.png is cropped so the feet pivot is its bottom centre"
+ },
+ "parts": {
+  "tail": {
+   "file": "parts/tail.png",
+   "parent": "body",
+   "offset": [
+    1119,
+    1661
+   ],
+   "size": [
+    449,
+    310
+   ],
+   "pivot": [
+    1158,
+    1868
+   ],
+   "pivot_local": [
+    39,
+    207
+   ]
+  },
+  "fin": {
+   "file": "parts/fin.png",
+   "parent": "body",
+   "offset": [
+    951,
+    1141
+   ],
+   "size": [
+    367,
+    578
+   ],
+   "pivot": [
+    1064,
+    1540
+   ],
+   "pivot_local": [
+    113,
+    399
+   ]
+  },
+  "body": {
+   "file": "parts/body.png",
+   "parent": null,
+   "offset": [
+    446,
+    1065
+   ],
+   "size": [
+    784,
+    960
+   ],
+   "pivot": [
+    879,
+    2024
+   ],
+   "pivot_local": [
+    433,
+    959
+   ]
+  },
+  "head": {
+   "file": "parts/head.png",
+   "parent": "body",
+   "offset": [
+    394,
+    505
+   ],
+   "size": [
+    784,
+    628
+   ],
+   "pivot": [
+    774,
+    1098
+   ],
+   "pivot_local": [
+    380,
+    593
+   ]
+  }
+ },
+ "root_pivot_note": "root part 'body' pivots at the feet ground contact; child pivots = centre of contact with the parent. Canvas px (2x finals).",
+ "mask_stats": {
+  "fg_px": 932243,
+  "overlap_px": 7560,
+  "orphan_px": 125592,
+  "island_px": 1346,
+  "reclip_px": 474,
+  "auto_fixed_pct": 14.43,
+  "sam_iou": {
+   "tail": {
+    "iou": 0.617,
+    "src": "sam"
+   },
+   "fin": {
+    "iou": 0.717,
+    "src": "sam"
+   },
+   "body": {
+    "iou": 0.688,
+    "src": "sam"
+   },
+   "head": {
+    "iou": 0.599,
+    "src": "sam"
+   }
+  },
+  "inpaint": {
+   "tail": {
+    "px": 5454,
+    "s": 18.0,
+    "retries": 0,
+    "cool_reverted_px": 9598
+   },
+   "fin": {
+    "px": 8203,
+    "s": 24.3,
+    "retries": 1,
+    "cool_reverted_px": 10552
+   },
+   "body": {
+    "px": 3780,
+    "s": 54.1,
+    "retries": 6,
+    "cool_reverted_px": 8302
+   }
+  },
+  "recompose_mae": 0.1
+ }
+}
