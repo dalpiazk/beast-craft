@@ -14,7 +14,8 @@ namespace BeastCraft.Encounters
     /// (<see cref="MinCells"/>-<see cref="MaxCells"/>); balanced-count fairness (as many cells on the
     /// enemy half as on the player half, and left as right of the board's vertical centre line, each
     /// to within one); connectivity (the free tiles form one region, so no pocket is walled off from
-    /// either side); and encounter fit (every authored template of that arena, bosses and post-game
+    /// either side); large units crossing (a Triangle champion or a Hex7 giant deployed in the enemy
+    /// zone can still walk to the player's front row: <see cref="LargeUnitCrosses"/>); and encounter fit (every authored template of that arena, bosses and post-game
     /// ones included, still seats on the obstructed board: <see cref="EncounterFit.Fits(HexGrid, IReadOnlyList{UnitFootprint})"/>).
     /// Returns every problem found (empty = valid); never throws.
     /// </summary>
@@ -159,6 +160,14 @@ namespace BeastCraft.Encounters
                 errors.Add(at + ": the obstacles wall off " + (free - reached) + " of the " + free + " free tiles; the free board must be one connected region.");
             }
 
+            foreach (UnitFootprint footprint in new[] { UnitFootprint.Triangle, UnitFootprint.Hex7 })
+            {
+                if (!LargeUnitCrosses(grid, footprint))
+                {
+                    errors.Add(at + ": a " + footprint + " enemy deployed in its zone can no longer walk to the player's front row (the obstacles leave it no way through).");
+                }
+            }
+
             if (encounters != null && enemies != null)
             {
                 foreach (EncounterTemplateData template in encounters.Templates ?? new EncounterTemplateData[0])
@@ -205,6 +214,58 @@ namespace BeastCraft.Encounters
             }
 
             return footprints;
+        }
+
+        /// <summary>
+        /// Whether a multi-hex enemy of <paramref name="footprint"/> that can deploy in the enemy zone
+        /// can still walk (anchor to adjacent anchor, its whole footprint on free tiles each step, as
+        /// <see cref="HexGrid.CanStand"/>) to a stand touching the player's deployment zone: obstacles
+        /// must never trap a boss or a champion on its own side. True when the footprint cannot deploy
+        /// on this arena at all (a giant on Small).
+        /// </summary>
+        public static bool LargeUnitCrosses(HexGrid grid, UnitFootprint footprint)
+        {
+            List<HexCoordinate> starts = new List<HexCoordinate>();
+            foreach (HexCoordinate tile in grid.Tiles)
+            {
+                if (grid.FitsDeploymentZone(tile, footprint, BattleTeam.Enemy) && grid.CanStand(tile, footprint, null))
+                {
+                    starts.Add(tile);
+                }
+            }
+
+            if (starts.Count == 0)
+            {
+                return true;
+            }
+
+            HashSet<HexCoordinate> seen = new HashSet<HexCoordinate>(starts);
+            Queue<HexCoordinate> open = new Queue<HexCoordinate>(starts);
+            while (open.Count > 0)
+            {
+                HexCoordinate anchor = open.Dequeue();
+                foreach (HexCoordinate tile in BeastCraft.Battle.Grid.Footprints.Tiles(anchor, footprint))
+                {
+                    foreach (HexCoordinate next in tile.Neighbors())
+                    {
+                        if (grid.IsInDeploymentZone(next, BattleTeam.Player) || grid.IsInDeploymentZone(tile, BattleTeam.Player))
+                        {
+                            return true;
+                        }
+                    }
+                }
+
+                foreach (HexCoordinate step in anchor.Neighbors())
+                {
+                    if (!seen.Contains(step) && grid.CanStand(step, footprint, null))
+                    {
+                        seen.Add(step);
+                        open.Enqueue(step);
+                    }
+                }
+            }
+
+            return false;
         }
 
         private static int CountFree(HexGrid grid)

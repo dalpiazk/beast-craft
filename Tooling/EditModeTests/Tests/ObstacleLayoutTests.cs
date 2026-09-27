@@ -97,6 +97,19 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
+        public void Validator_RefusesALayoutThatTrapsAGiantOrAChampion()
+        {
+            // Five stones across Medium's neutral band leave one-hex gaps: a seven-hex giant cannot squeeze through.
+            AssertRejected(Layout("Medium", Cell(-2, -2), Cell(1, -1), Cell(-2, 1), Cell(2, 2), Cell(0, 0)), "a Hex7 enemy deployed in its zone can no longer walk");
+            // Two stumps either side of Small's centre row wall the three-hex champion in.
+            AssertRejected(Layout("Small", Cell(-1, 0), Cell(1, 0)), "a Triangle enemy deployed in its zone can no longer walk");
+
+            HexGrid open = new HexGrid(ArenaSize.Medium);
+            Assert.IsTrue(ObstacleLayoutValidator.LargeUnitCrosses(open, UnitFootprint.Hex7));
+            Assert.IsTrue(ObstacleLayoutValidator.LargeUnitCrosses(new HexGrid(ArenaSize.Small), UnitFootprint.Hex7), "a giant never deploys on Small: nothing to trap");
+        }
+
+        [Test]
         public void Validator_ChecksTheEntryFields()
         {
             BattleLayoutEntryData unknownRegion = GoodMedium();

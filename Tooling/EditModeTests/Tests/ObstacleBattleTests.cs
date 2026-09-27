@@ -47,7 +47,7 @@ namespace BeastCraft.Tests.EditMode
                 Layouts = new[]
                 {
                     Entry("a", "Small", Cell(-2, 0), Cell(2, 0)), Entry("b", "Small", Cell(0, -1), Cell(-1, 1)),
-                    Entry("a", "Medium", Cell(-3, -1), Cell(2, -1), Cell(-3, 1), Cell(2, 1)), Entry("b", "Medium", Cell(-2, 0), Cell(1, 0), Cell(0, -2), Cell(-1, 2)),
+                    Entry("a", "Medium", Cell(-3, -1), Cell(2, -1), Cell(-3, 1), Cell(2, 1)), Entry("b", "Medium", Cell(-4, -2), Cell(-3, -1), Cell(2, 1), Cell(3, 2)),
                     Entry("a", "Large", Cell(-4, -2), Cell(3, -2), Cell(-4, 2), Cell(3, 2), Cell(-1, -3), Cell(0, 3)),
                     Entry("b", "Large", Cell(-2, -1), Cell(2, 1), Cell(-3, 1), Cell(1, -1), Cell(0, 0))
                 }

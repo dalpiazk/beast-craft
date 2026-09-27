@@ -48,14 +48,14 @@ library plus Pillow), or `--all [--images <folder of <id>_preview.png>]`; the pl
 | [ ] | `content/art/backdrops/r01/sun1/medium.png` | Medium (8 x 11) | 165, 582, 1110 x 1248 | 0.11469, 0.22751, 0.77062 x 0.48766 | (-4, 0) (3, 0) (1, -2) (-2, 2) | rocks |
 | [ ] | `content/art/backdrops/r01/sun1/large.png` | Large (11 x 15) | 147, 548, 1146 x 1289 | 0.10216, 0.21392, 0.79567 x 0.50351 | (-3, -1) (3, 1) (0, -3) (0, 3) (-1, 0) | rocks |
 | [ ] | `content/art/backdrops/r01/sun3/small.png` | Small (5 x 7) | 199, 649, 1041 x 1171 | 0.13849, 0.25333, 0.72302 x 0.45754 | (-1, -1) (2, 1) | rocks |
-| [ ] | `content/art/backdrops/r01/sun3/medium.png` | Medium (8 x 11) | 165, 582, 1110 x 1248 | 0.11469, 0.22751, 0.77062 x 0.48766 | (-1, -2) (2, -1) (-2, 1) (1, 2) (0, 0) | rocks |
-| [ ] | `content/art/backdrops/r01/sun3/large.png` | Large (11 x 15) | 147, 548, 1146 x 1289 | 0.10216, 0.21392, 0.79567 x 0.50351 | (-2, -2) (4, -2) (-4, 2) (2, 2) (0, -1) (0, 1) | rocks |
-| [ ] | `content/art/backdrops/r01/ruin0/small.png` | Small (5 x 7) | 199, 649, 1041 x 1171 | 0.13849, 0.25333, 0.72302 x 0.45754 | (-1, 0) (1, 0) | fallen stone rubble or broken pillar stumps |
-| [ ] | `content/art/backdrops/r01/ruin0/medium.png` | Medium (8 x 11) | 165, 582, 1110 x 1248 | 0.11469, 0.22751, 0.77062 x 0.48766 | (-2, -1) (3, -1) (-3, 1) (2, 1) (0, 0) | fallen stone rubble or broken pillar stumps |
+| [ ] | `content/art/backdrops/r01/sun3/medium.png` | Medium (8 x 11) | 165, 582, 1110 x 1248 | 0.11469, 0.22751, 0.77062 x 0.48766 | (-3, -1) (4, -2) (-4, 2) (3, 1) (-1, 0) | rocks |
+| [ ] | `content/art/backdrops/r01/sun3/large.png` | Large (11 x 15) | 147, 548, 1146 x 1289 | 0.10216, 0.21392, 0.79567 x 0.50351 | (-4, -2) (6, -2) (-5, 2) (3, 2) (-2, -1) (3, 1) | rocks |
+| [ ] | `content/art/backdrops/r01/ruin0/small.png` | Small (5 x 7) | 199, 649, 1041 x 1171 | 0.13849, 0.25333, 0.72302 x 0.45754 | (-2, 1) (2, -1) | fallen stone rubble or broken pillar stumps |
+| [ ] | `content/art/backdrops/r01/ruin0/medium.png` | Medium (8 x 11) | 165, 582, 1110 x 1248 | 0.11469, 0.22751, 0.77062 x 0.48766 | (-3, -1) (4, -1) (-4, 1) (3, 1) (1, -2) | fallen stone rubble or broken pillar stumps |
 | [ ] | `content/art/backdrops/r01/ruin0/large.png` | Large (11 x 15) | 147, 548, 1146 x 1289 | 0.10216, 0.21392, 0.79567 x 0.50351 | (-2, -2) (3, -2) (-4, 2) (1, 2) (-4, 0) (4, 0) | fallen stone rubble or broken pillar stumps |
 | [ ] | `content/art/backdrops/r01/ruin2/small.png` | Small (5 x 7) | 199, 649, 1041 x 1171 | 0.13849, 0.25333, 0.72302 x 0.45754 | (1, -1) (-1, 1) | fallen stone rubble or broken pillar stumps |
-| [ ] | `content/art/backdrops/r01/ruin2/medium.png` | Medium (8 x 11) | 165, 582, 1110 x 1248 | 0.11469, 0.22751, 0.77062 x 0.48766 | (-2, -2) (0, -1) (1, 1) (2, 2) | fallen stone rubble or broken pillar stumps |
-| [ ] | `content/art/backdrops/r01/ruin2/large.png` | Large (11 x 15) | 147, 548, 1146 x 1289 | 0.10216, 0.21392, 0.79567 x 0.50351 | (-2, -3) (-1, -2) (0, -1) (0, 1) (2, 2) (3, 3) | fallen stone rubble or broken pillar stumps |
+| [ ] | `content/art/backdrops/r01/ruin2/medium.png` | Medium (8 x 11) | 165, 582, 1110 x 1248 | 0.11469, 0.22751, 0.77062 x 0.48766 | (-3, -2) (-2, -1) (2, 1) (2, 2) | fallen stone rubble or broken pillar stumps |
+| [ ] | `content/art/backdrops/r01/ruin2/large.png` | Large (11 x 15) | 147, 548, 1146 x 1289 | 0.10216, 0.21392, 0.79567 x 0.50351 | (-3, -3) (-3, -2) (-2, -1) (2, 1) (2, 2) (3, 3) | fallen stone rubble or broken pillar stumps |
 | [ ] | `content/art/backdrops/r01/dusk2/small.png` | Small (5 x 7) | 199, 649, 1041 x 1171 | 0.13849, 0.25333, 0.72302 x 0.45754 | (0, 0) | mossy boulders or a fallen bough |
 | [ ] | `content/art/backdrops/r01/dusk2/medium.png` | Medium (8 x 11) | 165, 582, 1110 x 1248 | 0.11469, 0.22751, 0.77062 x 0.48766 | (-3, 0) (2, 0) | mossy boulders or a fallen bough |
 | [ ] | `content/art/backdrops/r01/dusk2/large.png` | Large (11 x 15) | 147, 548, 1146 x 1289 | 0.10216, 0.21392, 0.79567 x 0.50351 | (-3, -1) (3, 1) (-3, 2) (2, -2) | mossy boulders or a fallen bough |
