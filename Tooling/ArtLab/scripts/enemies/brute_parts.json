@@ -1,0 +1,79 @@
+{
+ "_note": "1x coords, hand polygons + hand-set pivots (brute, Verdant Hollow enemy).",
+ "parts": {
+  "body": {
+   "pos": [
+    [
+     450,
+     705
+    ]
+   ],
+   "neg": [],
+   "poly_only": true,
+   "clip": [
+    [
+     80,
+     380
+    ],
+    [
+     820,
+     380
+    ],
+    [
+     820,
+     1030
+    ],
+    [
+     80,
+     1030
+    ]
+   ]
+  },
+  "head": {
+   "pos": [
+    [
+     460,
+     915
+    ]
+   ],
+   "neg": [],
+   "poly_only": true,
+   "clip": [
+    [
+     320,
+     820
+    ],
+    [
+     600,
+     820
+    ],
+    [
+     610,
+     1010
+    ],
+    [
+     310,
+     1010
+    ]
+   ],
+   "pivot": [
+    460,
+    830
+   ]
+  }
+ },
+ "order": [
+  "body",
+  "head"
+ ],
+ "parent": {
+  "body": null,
+  "head": "body"
+ },
+ "extend": [
+  "body"
+ ],
+ "desc": {
+  "body": "mossy furry creature body"
+ }
+}

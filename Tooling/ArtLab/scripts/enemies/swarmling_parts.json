@@ -1,0 +1,79 @@
+{
+ "_note": "1x coords, hand polygons + hand-set pivots (swarmling, Verdant Hollow enemy).",
+ "parts": {
+  "feet": {
+   "pos": [
+    [
+     430,
+     987
+    ]
+   ],
+   "neg": [],
+   "poly_only": true,
+   "clip": [
+    [
+     200,
+     955
+    ],
+    [
+     660,
+     955
+    ],
+    [
+     660,
+     1020
+    ],
+    [
+     200,
+     1020
+    ]
+   ],
+   "pivot": [
+    430,
+    955
+   ]
+  },
+  "body": {
+   "pos": [
+    [
+     450,
+     712
+    ]
+   ],
+   "neg": [],
+   "poly_only": true,
+   "clip": [
+    [
+     80,
+     460
+    ],
+    [
+     820,
+     460
+    ],
+    [
+     820,
+     965
+    ],
+    [
+     80,
+     965
+    ]
+   ]
+  }
+ },
+ "order": [
+  "feet",
+  "body"
+ ],
+ "parent": {
+  "feet": "body",
+  "body": null
+ },
+ "extend": [
+  "body"
+ ],
+ "desc": {
+  "body": "mossy furry creature body"
+ }
+}

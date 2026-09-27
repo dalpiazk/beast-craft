@@ -1,0 +1,10 @@
+{"_note": "1x coords (doubled by rigparts). Enemy Archer (Verdant Hollow): bow + fist as one part; fletching = ELEMENT ACCENT.",
+ "parts": {
+  "legs":  {"pos": [[380, 930], [520, 930]], "neg": [], "poly_only": true, "clip": [[330, 880], [580, 880], [590, 1005], [320, 1005]], "pivot": [455, 880]},
+  "body":  {"pos": [[450, 760], [400, 700]], "neg": [], "poly_only": true, "clip": [[340, 640], [660, 640], [680, 880], [330, 880], [330, 760]], "pivot": [455, 880]},
+  "head":  {"pos": [[440, 480]], "neg": [], "poly_only": true, "clip": [[250, 330], [640, 330], [640, 650], [250, 650]], "pivot": [445, 640]},
+  "bow":   {"pos": [[320, 800]], "neg": [], "poly_only": true, "clip": [[228, 620], [360, 620], [440, 780], [440, 815], [360, 980], [228, 980]], "pivot": [376, 776]}},
+ "order": ["legs", "body", "head", "bow"],
+ "parent": {"body": null, "head": "body", "legs": "body", "bow": "body"},
+ "extend": ["legs", "body"],
+ "desc": {"legs": "pale furry legs", "body": "green leaf cloak body"}}

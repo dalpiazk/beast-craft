@@ -26,7 +26,12 @@ directly) commanding a roster of ten mythic beasts against wild, Gloam-corrupted
   Griffin (Bold, brave), Frost Wyrm (Wise, wry), Treant (Gentle), Tarasque (Grumpy) and Basilisk (Sly)**
   (2026-09-26). Files: `content/art/beasts/<id>/` (in-game sprites), `content/art/source/<id>/`
   (full-resolution masters, rig parts and the design pick). The pixel placeholders stay in the manifest.
-- **Before the animation pass:** the known touch-ups per beast are listed in `docs/art/touch-ups.md`.
+- **Done: the nine enemy types' Verdant Hollow variants are final** (2026-09-27), approved and in the game:
+  Giant, Champion, Brute, Stalker, Archer, Caster, Shaman, Swarmling and Stingling (section 3, "9 enemy
+  archetypes"). Files: `content/art/enemies/<type>/` (the in-game sprite and its element-accent overlay),
+  `content/art/source/enemies/<type>/hollow/` (masters, rig parts, the design pick and the accent mask);
+  provenance in `Tooling/ArtLab/provenance/enemies/`. Later regions add their own variant of each type.
+- **Before the animation pass:** the known touch-ups per beast and enemy are listed in `docs/art/touch-ups.md`.
 - **Where it differs from the specs below:** the in-game beasts are currently single illustrated sprites
   (linear filter, 512x512 frames, feet pivot, straight-alpha PNGs premultiplied on load; see
   `docs/design/presentation-and-vfx.md`) with machine-cut rig parts archived beside them, not Spine rigs. The
@@ -103,21 +108,24 @@ must exist as a Spine skin/attachment swap on the shared skeleton, not a new rig
 
 ### 9 enemy archetypes
 
-| Archetype | Role | Footprint |
-| --- | --- | --- |
-| Giant | Boss | **Hex7** (7-tile, huge) |
-| Champion | Mini-boss | **Triangle** (3-tile) |
-| Brute | Melee tank | Single |
-| Stalker | Fast melee hunter | Single |
-| Archer | Ranged physical | Single |
-| Caster | Ranged special | Single |
-| Shaman | Area special | Single |
-| Swarmling | Swarm (tiny) | Single |
-| Stingling | Swarm (tiny) | Single |
+| Archetype | Role | Footprint | Verdant Hollow design (producer pick) | Element accent | Art |
+| --- | --- | --- | --- | --- | --- |
+| Giant | Boss | **Hex7** (7-tile, huge) | cross, sleepy-grumpy shaggy moss elder (Giant sheet #11, `giant_t11`) | moss fur patches | final (AI-assisted) |
+| Champion | Mini-boss | **Triangle** (3-tile) | swaggering moss-crowned ram leader with two wisping tails (`brute_L1`) | moss crown and mantle | final (AI-assisted) |
+| Brute | Melee tank | Single | stubborn round ram-horned tank (`brute_L11`) | horns | final (AI-assisted) |
+| Stalker | Fast melee hunter | Single | sneaky lean antlered hunter (`brute_L3`) | antlers | final (AI-assisted) |
+| Archer | Ranged physical | Single | watchful folk in a carved-bark mask and leaf hood (Archer sheet #1, `archer_L10`) | arrow fletching | final (AI-assisted) |
+| Caster | Ranged special | Single | spiteful two-legged antlered beast, orb between its antlers (`brute_L8`) | the orb | final (AI-assisted) |
+| Shaman | Area special | Single | gnarled antlered elder with a root staff (Shaman sheet #11, `shaman_L1`) | mushroom cap on the staff | final (AI-assisted) |
+| Swarmling | Swarm (tiny) | Single | skittery round horned puff (`brute_L4`) | horns | final (AI-assisted) |
+| Stingling | Swarm (tiny) | Single | buzzy owl-like pest with a glowing barb (`shaman_t14`) | the barb | final (AI-assisted) |
 
 Same 7-clip animation set per archetype (idle/move/attack/cast/hit/KO/victory as applicable).
-**Element variants are palette/skin swaps**, not new rigs — enemies can appear in any of the 10
-elements via recolor.
+**Element variants are an accent recolour**, not new rigs or copies: each enemy's art is a base plus an
+element-accent overlay the game tints per element (`docs/design/presentation-and-vfx.md`, "Element
+accents"). **Region variants** are new art per type (the Hollow's are mossy; a future cold region gets
+its own, e.g. the unassigned Giant sheet #10 kept for it), named per region in `enemy-library.json`.
+Sizes follow the producer's lineup (section "Enemy sizes" of the presentation doc).
 
 ### 10 DRAFT region bosses (later-phase work)
 
@@ -304,6 +312,10 @@ variants Radiant Dawnshade Horn and Eclipse Dawnshade Crown.
     and regal, Griffin bold and brave, Thunderbird wild and energetic, Frost Wyrm wise and wry, Treant
     gentle, Tarasque grumpy, Basilisk sly. All ten beasts' art is final (the trio 2026-09-25, the other
     seven 2026-09-26), each approved individually (`Tooling/ArtLab/provenance/<id>.md`).
+
+12. **Enemies (2026-09-27):** the nine types' Verdant Hollow variants are made with the same pipeline and
+    approved individually (`Tooling/ArtLab/provenance/enemies/<type>.md`). Element variants are a tinted
+    accent overlay, not new art; region variants are new art per type, added region by region.
 
 **Remaining question:** which 3 options per beast category ship at launch (artist can quote the
 count now; the producer picks the specific options before Phase 2).

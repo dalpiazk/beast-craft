@@ -1,0 +1,206 @@
+{
+ "_note": "1x coords (doubled by rigparts). Giant = t11 (shaggy moss-fur elder, seated). Limbs: 2 front paws (bottom centre), hind foot with toes (right), far hind leg (left, dusk). Crown crystals REMOVED (producer); ELEMENT ACCENT = mossy/lichen green fur patches (work/accent_mask.npy).",
+ "parts": {
+  "hind_foot": {
+   "pos": [
+    [
+     740,
+     1010
+    ]
+   ],
+   "neg": [],
+   "poly_only": true,
+   "clip": [
+    [
+     560,
+     975
+    ],
+    [
+     860,
+     970
+    ],
+    [
+     880,
+     1065
+    ],
+    [
+     560,
+     1065
+    ]
+   ],
+   "pivot": [
+    640,
+    960
+   ]
+  },
+  "body": {
+   "pos": [
+    [
+     450,
+     700
+    ],
+    [
+     300,
+     750
+    ],
+    [
+     600,
+     700
+    ]
+   ],
+   "neg": [
+    [
+     330,
+     300
+    ]
+   ],
+   "clip": [
+    [
+     20,
+     430
+    ],
+    [
+     880,
+     430
+    ],
+    [
+     880,
+     975
+    ],
+    [
+     600,
+     975
+    ],
+    [
+     560,
+     1000
+    ],
+    [
+     300,
+     985
+    ],
+    [
+     20,
+     1000
+    ]
+   ]
+  },
+  "front_paws": {
+   "pos": [
+    [
+     410,
+     1030
+    ]
+   ],
+   "neg": [],
+   "poly_only": true,
+   "clip": [
+    [
+     280,
+     985
+    ],
+    [
+     540,
+     985
+    ],
+    [
+     545,
+     1065
+    ],
+    [
+     270,
+     1065
+    ]
+   ],
+   "pivot": [
+    415,
+    975
+   ]
+  },
+  "head": {
+   "pos": [
+    [
+     300,
+     400
+    ],
+    [
+     330,
+     300
+    ],
+    [
+     420,
+     380
+    ]
+   ],
+   "neg": [
+    [
+     450,
+     750
+    ]
+   ],
+   "poly_only": true,
+   "clip": [
+    [
+     120,
+     330
+    ],
+    [
+     240,
+     290
+    ],
+    [
+     360,
+     285
+    ],
+    [
+     470,
+     310
+    ],
+    [
+     520,
+     345
+    ],
+    [
+     510,
+     470
+    ],
+    [
+     380,
+     510
+    ],
+    [
+     220,
+     500
+    ],
+    [
+     120,
+     440
+    ]
+   ],
+   "pivot": [
+    340,
+    480
+   ]
+  }
+ },
+ "order": [
+  "hind_foot",
+  "body",
+  "front_paws",
+  "head"
+ ],
+ "parent": {
+  "body": null,
+  "head": "body",
+  "hind_foot": "body",
+  "front_paws": "body"
+ },
+ "extend": [
+  "hind_foot",
+  "body"
+ ],
+ "desc": {
+  "hind_foot": "mossy green fur foot",
+  "body": "shaggy mossy green fur body"
+ }
+}

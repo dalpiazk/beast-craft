@@ -4,7 +4,9 @@
 | --- | --- | --- |
 | `pixel/` | The code-generated pixel placeholders (`Tooling/PixelArt`) and **the art manifest**, `pixel-art-manifest.json`, which indexes every sprite the game draws, including the illustrated ones below. | yes |
 | `beasts/<id>/<id>.png` | Illustrated in-game beast sprites: 512x512 frames (504 px on the longer side), straight alpha, feet pivot, linear filter. Exported from the masters by `Tooling/ArtLab/scripts/export_ingame.py`. Listed in the manifest through `Tooling/PixelArt/illustrated.json`. | yes |
+| `enemies/<type>/<type>_<region>.png`, `..._accent.png` | Illustrated in-game enemy sprites, one art variant per region (only `hollow`, Verdant Hollow, so far), each with its element-accent overlay (same frame; white where the accent is, alpha = how much of the pixel is accent colour). Exported like the beasts by `export_ingame.py --accent-mask`; listed through `illustrated.json`. | yes |
 | `source/<id>/` | Archival masters of the illustrated beasts. Not loaded by the game and not copied into builds. | no |
+| `source/enemies/<type>/<region>/` | Archival masters of the illustrated enemies, as `source/<id>/` plus `accent_mask.png` (the element-accent region, 8-bit, the size of `character.png`). | no |
 
 All PNGs are stored in Git LFS (see `.gitattributes`).
 
