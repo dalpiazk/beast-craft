@@ -5,6 +5,7 @@ using BeastCraft.Battle;
 using BeastCraft.Battle.Grid;
 using BeastCraft.Creatures;
 using BeastCraft.Game.Rendering;
+using BeastCraft.Presentation.Art;
 using BeastCraft.Presentation.Board;
 using BeastCraft.Presentation.Cards;
 using BeastCraft.Presentation.Layout;
@@ -48,7 +49,7 @@ namespace BeastCraft.Game
         {
             Color shadow = Ink("K", Color.Black);
             DrawHeader(shadow);
-            DrawTurnOrder(shadow);
+            DrawTurnOrder(beat, shadow);
             DrawToast(shadow);
             DrawSkillStrip(beat, shadow);
             DrawControls(shadow);
@@ -121,8 +122,11 @@ namespace BeastCraft.Game
             }
         }
 
-        /// <summary>The acting unit (this turn's, else the next to act) and the ones after it, as portraits.</summary>
-        private void DrawTurnOrder(Color shadow)
+        /// <summary>
+        /// The acting unit (this turn's, else the next to act) and the ones after it, as portraits;
+        /// while a skill fires, its framed icon as a badge on the "now acting" portrait.
+        /// </summary>
+        private void DrawTurnOrder(ScheduledBeat beat, Color shadow)
         {
             Rect band = _screen.TurnOrder;
             _text.DrawRight(_draw, "TURN ORDER", band.Right, band.Y + 8f, Small, Ink("3", Color.Gray), shadow);
@@ -162,6 +166,12 @@ namespace BeastCraft.Game
                 if (current)
                 {
                     _text.DrawCentered(_draw, _animation != null ? "NOW" : "NEXT", slot.Center.X, band.Y + 8f, Small, Ink("Y", Color.Yellow), shadow);
+                    SkillSO firing = beat == null ? null : FindSkill(unit, beat.Beat.SkillId);
+                    if (firing != null)
+                    {
+                        float badge = slot.Width * 0.5f;
+                        DrawSkillIcon(firing, new Rect(slot.Right - badge - 2f, slot.Y + 2f, badge, badge), shadow, SourceOf(unit, firing));
+                    }
                 }
             }
         }
@@ -209,8 +219,8 @@ namespace BeastCraft.Game
                 _draw.Fill(Pixel, new Vector2(card.X + thickness, card.Y + thickness), new Vector2(card.Width - 2f * thickness, card.Height - 2f * thickness),
                            Ink("K", Color.Black));
 
-                Rect icon = new Rect(card.X + 14f, card.Y + 14f, 72f, 72f);
-                DrawSkillIcon(skill, icon, shadow);
+                Rect icon = new Rect(card.X + 10f, card.Y + 10f, 80f, 80f);
+                DrawSkillIcon(skill, icon, shadow, SourceOf(unit, skill));
 
                 int cooldown = unit.Skills == null ? 0 : unit.Skills.RemainingCooldown(i);
                 string state = firing ? "CAST" : cooldown <= 0 ? "READY" : "CD " + cooldown.ToString(CultureInfo.InvariantCulture);
@@ -251,7 +261,7 @@ namespace BeastCraft.Game
             _draw.Fill(Pixel, new Vector2(panel.X, panel.Y), new Vector2(panel.Width, panel.Height), Ink("Y", Color.Yellow));
             _draw.Fill(Pixel, new Vector2(panel.X + 5f, panel.Y + 5f), new Vector2(panel.Width - 10f, panel.Height - 10f), Ink("K", Color.Black) * 0.96f);
 
-            DrawSkillIcon(skill, layout.Icon, shadow);
+            DrawSkillIcon(skill, layout.Icon, shadow, SourceOf(unit, skill));
             Rect name = layout.Name;
             _text.Draw(_draw, _text.Fit(card.Name, SkillCardLayout.NameSize, name.Width), new Vector2(name.X, name.Y), SkillCardLayout.NameSize, Ink("y", Color.Gold),
                        shadow);
@@ -489,22 +499,51 @@ namespace BeastCraft.Game
             _draw.UnitSize = unit;
         }
 
-        /// <summary>An icon sprite (its pivot at its centre) scaled to fit <paramref name="box"/>, centred.</summary>
-        private void DrawIcon(ArtSprite art, Rect box)
+        /// <summary>An icon sprite (its pivot at its centre) scaled to fit <paramref name="box"/>, centred, multiplied by <paramref name="color"/> (white: its own colours).</summary>
+        private void DrawIcon(ArtSprite art, Rect box, Color? color = null)
         {
             float ppu = art.Data.PixelsPerUnit > 0f ? art.Data.PixelsPerUnit : _draw.UnitSize;
             float scale = Math.Min(box.Width / art.Data.FrameWidth, box.Height / Math.Max(1, art.Data.FrameHeight)) * ppu / _draw.UnitSize;
             float k = scale * _draw.UnitSize / ppu;
             Vector2 pivot = new Vector2(box.Center.X - art.Data.FrameWidth * k / 2f + art.Pivot.X * k, box.Center.Y - art.Data.FrameHeight * k / 2f + art.Pivot.Y * k);
-            _draw.DrawSprite(art, 0, pivot, scale, Color.White);
+            _draw.DrawSprite(art, 0, pivot, scale, color ?? Color.White);
         }
 
         /// <summary>
-        /// A skill's icon fitted to <paramref name="box"/>: its art (<see cref="SkillSO.ArtKey"/> looked
-        /// up in the manifest), else — a skill with no icon, such as an enemy-library one — an
-        /// element-coloured tile with the skill's initial.
+        /// A skill's icon in <paramref name="box"/>, framed as <c>battle-art.json</c>'s
+        /// <see cref="SkillIconStyleData"/> says, back to front: its rarity's ring (by
+        /// <paramref name="source"/>, or the skill's own override), the icon, then the round frame,
+        /// each a sprite centred in the box at its scale. The icon is its art (<see cref="SkillSO.ArtKey"/>
+        /// looked up in the manifest: an illustrated one linear-filtered and mipmapped like the
+        /// sprites), else an element-coloured tile with the skill's initial. Without a style, the bare
+        /// icon fills the box.
         /// </summary>
-        private void DrawSkillIcon(SkillSO skill, Rect box, Color shadow)
+        private void DrawSkillIcon(SkillSO skill, Rect box, Color shadow, SkillIconSource source)
+        {
+            SkillIconStyleData style = _content.BattleArt?.SkillIcons;
+            if (style == null)
+            {
+                DrawBareSkillIcon(skill, box, shadow);
+                return;
+            }
+
+            SkillRarityData rarity = style.RarityFor(skill.ArtKey, source);
+            ArtSprite ring = rarity == null ? null : _atlas.ByArtKey(rarity.Ring);
+            if (ring != null)
+            {
+                DrawIcon(ring, Scaled(box, style.RingScale), string.IsNullOrEmpty(rarity.Tint) ? Color.White : Ink(rarity.Tint, Color.White));
+            }
+
+            DrawBareSkillIcon(skill, Scaled(box, style.IconScale), shadow);
+            ArtSprite frame = _atlas.ByArtKey(style.Frame);
+            if (frame != null)
+            {
+                DrawIcon(frame, Scaled(box, style.FrameScale));
+            }
+        }
+
+        /// <summary>The icon alone fitted to <paramref name="box"/>: its art, else an element-coloured tile with the skill's initial.</summary>
+        private void DrawBareSkillIcon(SkillSO skill, Rect box, Color shadow)
         {
             ArtSprite art = _atlas.ByArtKey(skill.ArtKey);
             if (art != null && art.Data.FrameWidth > 0)
@@ -516,6 +555,46 @@ namespace BeastCraft.Game
             _draw.Fill(Pixel, new Vector2(box.X, box.Y), new Vector2(box.Width, box.Height), ElementColor(skill.Element));
             string initial = string.IsNullOrEmpty(skill.DisplayName) ? "?" : skill.DisplayName.Substring(0, 1);
             _text.DrawCentered(_draw, initial, box.Center.X + 2f, box.Y + box.Height * 0.22f, box.Height * 0.55f, Ink("4", Color.White), shadow);
+        }
+
+        /// <summary><paramref name="box"/> scaled by <paramref name="k"/> about its centre.</summary>
+        private static Rect Scaled(Rect box, float k)
+        {
+            float w = box.Width * k;
+            float h = box.Height * k;
+            return new Rect(box.Center.X - w / 2f, box.Center.Y - h / 2f, w, h);
+        }
+
+        /// <summary>Where <paramref name="skill"/> of <paramref name="unit"/> comes from: an enemy's, an avatar active, else a beast skill.</summary>
+        private SkillIconSource SourceOf(BattleUnit unit, SkillSO skill)
+        {
+            if (unit != null && unit.Team == BattleTeam.Enemy)
+            {
+                return SkillIconSource.Enemy;
+            }
+
+            return Array.Exists(_content.SkillLibrary.AvatarActives ?? new Skills.SkillData[0], s => s != null && s.SkillId == skill.SkillId)
+                       ? SkillIconSource.Avatar
+                       : SkillIconSource.Beast;
+        }
+
+        /// <summary>The skill of <paramref name="unit"/>'s loadout with id <paramref name="skillId"/>, or null.</summary>
+        private static SkillSO FindSkill(BattleUnit unit, string skillId)
+        {
+            if (unit == null || unit.Skills == null || skillId == null)
+            {
+                return null;
+            }
+
+            foreach (SkillSO skill in unit.Skills.Skills)
+            {
+                if (skill != null && skill.SkillId == skillId)
+                {
+                    return skill;
+                }
+            }
+
+            return null;
         }
 
         /// <summary>The unit whose skills the strip shows: the one acting now, else the next to act.</summary>

@@ -16,6 +16,8 @@ namespace BeastCraft.Presentation.Art
     /// the pixel-tile board (the fallback).</item>
     /// <item><see cref="Board"/>: the overlays drawn over a backdrop: the soft hex grid and the
     /// two deployment-zone tints, and the scrim behind the HUD bands.</item>
+    /// <item><see cref="SkillIcons"/>: the round frame and rarity ring every skill icon is drawn
+    /// in (the skill strip, the skill detail card, the turn order's "now acting" badge).</item>
     /// </list>
     /// </summary>
     [Serializable]
@@ -34,6 +36,9 @@ namespace BeastCraft.Presentation.Art
 
         /// <summary>The overlays over a backdrop (null: the defaults).</summary>
         public BoardOverlayData Board = new BoardOverlayData();
+
+        /// <summary>How skill icons are framed in the HUD (null: bare icons).</summary>
+        public SkillIconStyleData SkillIcons;
 
         /// <summary>
         /// The backdrop for <paramref name="regionId"/>'s <paramref name="arena"/>, or null when
@@ -128,5 +133,117 @@ namespace BeastCraft.Presentation.Art
         /// the backdrop's margin runs under the header, turn order, skills and controls.
         /// </summary>
         public float HudScrimAlpha = 0.45f;
+    }
+
+    /// <summary>Where a skill comes from, which picks its default rarity (<see cref="SkillIconStyleData.RarityFor"/>).</summary>
+    public enum SkillIconSource
+    {
+        /// <summary>A beast skill (<c>skill-library.json</c> BeastSkills).</summary>
+        Beast = 0,
+
+        /// <summary>An avatar active or passive.</summary>
+        Avatar = 1,
+
+        /// <summary>An enemy-library skill.</summary>
+        Enemy = 2
+    }
+
+    /// <summary>
+    /// A skill icon's layers, back to front: its rarity's ring (<see cref="RingScale"/> of the box),
+    /// the icon itself (<see cref="IconScale"/>), then the round frame over its edge
+    /// (<see cref="FrameScale"/>), each centred in the box. The frame and the rings are manifest
+    /// sprites (by ArtKey), so the art lane paints them; a rarity may tint its ring.
+    /// </summary>
+    [Serializable]
+    public class SkillIconStyleData
+    {
+        /// <summary>The round frame drawn over every icon: a sprite's ArtKey (empty = none).</summary>
+        public string Frame;
+
+        /// <summary>The frame's diameter as a fraction of the icon's box (0.2-1.5).</summary>
+        public float FrameScale = 0.9f;
+
+        /// <summary>The icon's diameter as a fraction of the box (0.2-1.5).</summary>
+        public float IconScale = 0.76f;
+
+        /// <summary>The rarity ring's diameter as a fraction of the box (0.2-1.5).</summary>
+        public float RingScale = 1f;
+
+        /// <summary>The rarities, each with its ring.</summary>
+        public SkillRarityData[] Rarities = new SkillRarityData[0];
+
+        /// <summary>The rarity of a beast skill, an avatar skill and an enemy skill without an override.</summary>
+        public string BeastRarity;
+
+        public string AvatarRarity;
+
+        public string EnemyRarity;
+
+        /// <summary>A skill's own rarity, by its icon's ArtKey.</summary>
+        public SkillRarityOverrideData[] Overrides = new SkillRarityOverrideData[0];
+
+        /// <summary>The rarity named <paramref name="id"/>, or null.</summary>
+        public SkillRarityData Rarity(string id)
+        {
+            if (string.IsNullOrEmpty(id) || Rarities == null)
+            {
+                return null;
+            }
+
+            foreach (SkillRarityData rarity in Rarities)
+            {
+                if (rarity != null && string.Equals(rarity.Rarity, id, StringComparison.Ordinal))
+                {
+                    return rarity;
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// The rarity of the skill whose icon is <paramref name="skillArtKey"/>: its override, else
+        /// its source's default; null when neither names a rarity.
+        /// </summary>
+        public SkillRarityData RarityFor(string skillArtKey, SkillIconSource source)
+        {
+            if (!string.IsNullOrEmpty(skillArtKey) && Overrides != null)
+            {
+                foreach (SkillRarityOverrideData entry in Overrides)
+                {
+                    if (entry != null && string.Equals(entry.ArtKey, skillArtKey, StringComparison.Ordinal))
+                    {
+                        return Rarity(entry.Rarity);
+                    }
+                }
+            }
+
+            return Rarity(source == SkillIconSource.Enemy ? EnemyRarity : source == SkillIconSource.Avatar ? AvatarRarity : BeastRarity);
+        }
+    }
+
+    /// <summary>One rarity: its id and its ring.</summary>
+    [Serializable]
+    public class SkillRarityData
+    {
+        /// <summary>Lowercase snake_case id (<c>common</c>, <c>rare</c>, ...).</summary>
+        public string Rarity;
+
+        /// <summary>The ring: a sprite's ArtKey.</summary>
+        public string Ring;
+
+        /// <summary>A palette char the ring is multiplied by (empty = its own colours).</summary>
+        public string Tint;
+    }
+
+    /// <summary>One skill's own rarity.</summary>
+    [Serializable]
+    public class SkillRarityOverrideData
+    {
+        /// <summary>The skill's icon ArtKey (<c>skill/&lt;id&gt;</c>, <c>skill/enemy/&lt;enemy&gt;/&lt;skill&gt;</c>).</summary>
+        public string ArtKey;
+
+        /// <summary>A <see cref="SkillRarityData.Rarity"/>.</summary>
+        public string Rarity;
     }
 }

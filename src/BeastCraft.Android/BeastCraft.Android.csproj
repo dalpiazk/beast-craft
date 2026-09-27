@@ -58,6 +58,8 @@
     <AndroidAsset Include="..\..\content\art\enemies\**\*.png" Link="Assets\Content\art\enemies\%(RecursiveDir)%(Filename)%(Extension)" />
     <!-- The painted art slots (docs/art/hollow-art-slots.md): battle backdrops, the skill-icon frame and rings, painted VFX frames. -->
     <AndroidAsset Include="..\..\content\art\backdrops\**\*.png" Link="Assets\Content\art\backdrops\%(RecursiveDir)%(Filename)%(Extension)" />
+    <AndroidAsset Include="..\..\content\art\ui\**\*.png" Link="Assets\Content\art\ui\%(RecursiveDir)%(Filename)%(Extension)" />
+    <AndroidAsset Include="..\..\content\art\icons\**\*.png" Link="Assets\Content\art\icons\%(RecursiveDir)%(Filename)%(Extension)" />
     <!-- The UI font and its licence (SIL OFL 1.1: the licence travels with the font). -->
     <AndroidAsset Include="..\..\content\fonts\*.ttf;..\..\content\fonts\OFL.txt" Link="Assets\Content\fonts\%(Filename)%(Extension)" />
   </ItemGroup>

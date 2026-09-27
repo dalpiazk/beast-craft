@@ -74,8 +74,11 @@ Generated kinds (no grid rows; the header drives an integer-only generator):
 Skill icons (no sprite files): one 24x24 placeholder per skill, avatar active and passive in
 content/data/Skills/skill-library.json that names an ArtKey (skill/<id>): a disc in its element's
 colours (avatar actives lilac, passives peach) with the skill's initial in a 5x7 pixel font,
-named skill_<id>, category skill. Regenerated from the library on every build, so a new skill
-gets its icon by running this script.
+named skill_<id>, category skill; and per enemy skill in content/data/Encounters/enemy-library.json
+(ArtKey skill/enemy/<enemy>/<skill>, the Gloam's lilac, named skill_enemy_<enemy>_<skill>).
+Regenerated from the libraries on every build, so a new skill gets its icon by running this script.
+A painted icon (content/art/icons/skills/<id>.png, or enemy/<enemy>_<skill>.png) takes over its key
+in the manifest: linear, centre pivot (docs/art/hollow-art-slots.md).
 """
 import json
 import pathlib
@@ -354,6 +357,8 @@ def hex_frame(meta, w, h, built):
 # ---------------------------------------------------------------------------------------------
 
 SKILLS = REPO / "content" / "data" / "Skills" / "skill-library.json"
+ENEMIES = REPO / "content" / "data" / "Encounters" / "enemy-library.json"
+PAINTED_ICONS = REPO / "content" / "art" / "icons" / "skills"   # painted skill icons: <id>.png, enemy/<enemy>_<skill>.png
 ICON = 24
 
 # dark (lower-right shade), mid (fill), light (upper-left rim) per element; the viewer's element
@@ -365,6 +370,7 @@ ICON_RAMPS = {
     "Dark": ("p", "P", "u"), "None": ("p", "P", "u"),
 }
 ACTIVE_RAMP = ("P", "u", "4")
+ENEMY_RAMP = ("p", "P", "u")
 PASSIVE_RAMP = ("S", "s", "4")
 
 FONT_5X7 = {  # 7 rows of 5, top to bottom
@@ -411,6 +417,16 @@ def skill_entries():
             if not key.startswith("skill/"):
                 sys.exit(f"{e[id_key]}: skill ArtKey {key!r} does not start with 'skill/'")
             out.append((key[len("skill/"):], key, e.get("DisplayName") or e[id_key], ramp_of(e), group))
+    # Enemy skills take their unit's element in battle, so their placeholder is the Gloam's lilac (ArtKey
+    # skill/enemy/<enemy>/<skill>; sprite skill_enemy_<enemy>_<skill>).
+    for enemy in json.loads(ENEMIES.read_text(encoding="utf-8")).get("Enemies", []):
+        for e in enemy.get("Skills", []):
+            key = e.get("ArtKey") or ""
+            if not key:
+                continue
+            if not key.startswith("skill/"):
+                sys.exit(f"{enemy['EnemyId']}/{e['SkillId']}: skill ArtKey {key!r} does not start with 'skill/'")
+            out.append((key[len("skill/"):].replace("/", "_"), key, e.get("DisplayName") or e["SkillId"], ENEMY_RAMP, "Enemies"))
     return out
 
 
@@ -747,6 +763,37 @@ def painted_entries():
     return entries
 
 
+def painted_icon_entries():
+    """Painted skill icons, found by file name: content/art/icons/skills/<skill id>.png for a beast skill, avatar active
+    or passive (ArtKey skill/<id>) and content/art/icons/skills/enemy/<enemy>_<skill>.png for an enemy skill (ArtKey
+    skill/enemy/<enemy>/<skill>); each replaces the generated 24x24 placeholder of its key. Linear, centre pivot,
+    one hex across (the HUD sizes an icon to its box). docs/art/hollow-art-slots.md lists the files."""
+    by_file = {}
+    for skill_id, key, name, ramp, group in skill_entries():
+        rel = ("enemy/" + key[len("skill/enemy/"):].replace("/", "_") if group == "Enemies" else skill_id) + ".png"
+        by_file[rel] = (skill_id, key, name)
+    entries = []
+    for rel, (skill_id, key, name) in sorted(by_file.items()):
+        path = PAINTED_ICONS / rel
+        if not path.is_file():
+            continue
+        with Image.open(path) as im:
+            w, h = im.size
+        entries.append({
+            "Name": f"skill_{skill_id}_painted", "File": f"../icons/skills/{rel}", "Kind": "sprite", "Category": "skill",
+            "Label": f"{name} (painted icon)", "ArtKey": key, "FrameWidth": w, "FrameHeight": h, "Frames": 1, "FrameMs": 0,
+            "PivotX": w / 2, "PivotY": h / 2, "PixelsPerUnit": float(w), "Filter": "linear", "Premultiplied": False,
+        })
+        print(f"painted icon {key} {w}x{h}")
+    if PAINTED_ICONS.is_dir():
+        known = set(by_file)
+        for path in sorted(PAINTED_ICONS.rglob("*.png")):
+            rel = path.relative_to(PAINTED_ICONS).as_posix()
+            if rel not in known:
+                sys.exit(f"content/art/icons/skills/{rel}: no skill has that icon slot (docs/art/hollow-art-slots.md)")
+    return entries
+
+
 def element_accents():
     """illustrated.json's ElementAccents: element name -> palette char, the colour an accent overlay is drawn in."""
     if not ILLUSTRATED.exists():
@@ -758,7 +805,11 @@ def write_manifest(data, sprites):
     """The game's index of the art: PascalCase fields like the rest of the game data."""
     palette = {ch: hexv for ch, hexv in data["colors"].items() if hexv is not None}
     by_name = {m["name"]: (m, ims) for m, ims in sprites}
-    entries = [sprite_entry(m, ims, palette, by_name) for m, ims in sprites] + illustrated_entries() + painted_entries()
+    painted = painted_entries() + painted_icon_entries()
+    claimed = {e["ArtKey"] for e in painted if e["ArtKey"]}
+    # A painted skill icon replaces its generated placeholder in the manifest (the placeholder PNG stays on disk).
+    entries = [sprite_entry(m, ims, palette, by_name) for m, ims in sprites if m.get("artkey", "") not in claimed]
+    entries += illustrated_entries() + painted
     names = [e["Name"] for e in entries]
     if len(set(names)) != len(names):
         sys.exit("illustrated.json repeats a sprite name")

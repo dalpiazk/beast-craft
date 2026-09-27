@@ -9,8 +9,9 @@ namespace BeastCraft.Vfx
     /// Holds the content's art references to the art manifest: every species' and enemy's
     /// <c>ArtKey</c> (<see cref="SpeciesData.ArtKey"/>, <see cref="EnemyData.ArtKey"/>) and every
     /// skill's and passive's icon key (<see cref="SkillData.ArtKey"/>, <see cref="PassiveData.ArtKey"/>)
-    /// must name a sprite's <see cref="ArtSpriteData.ArtKey"/> in the manifest. Enemy-library
-    /// skills' icons are checked when they have one, never required. (The VFX library's sheets are
+    /// must name a sprite's <see cref="ArtSpriteData.ArtKey"/> in the manifest, and so must every
+    /// enemy-library skill's icon key (<c>skill/enemy/&lt;enemy&gt;/&lt;skill&gt;</c>; required, like the
+    /// others, only with <c>requireKeys</c>). (The VFX library's sheets are
     /// held to the manifest by <see cref="VfxLibraryValidator"/>.) Presentation only: nothing here
     /// can change a battle. Returns every problem found (empty = valid); never throws.
     /// </summary>
@@ -19,7 +20,7 @@ namespace BeastCraft.Vfx
         /// <summary>
         /// Validates <paramref name="roster"/>'s and <paramref name="enemies"/>' art keys against
         /// <paramref name="art"/>. With <paramref name="requireKeys"/> every species and enemy must
-        /// have one (the shipped content does); otherwise a missing key is allowed.
+        /// have one, and so must every enemy skill (the shipped content does); otherwise a missing key is allowed.
         /// </summary>
         public static List<string> Validate(BeastRosterData roster, EnemyLibraryData enemies, ArtManifestData art, bool requireKeys = false)
         {
@@ -29,8 +30,7 @@ namespace BeastCraft.Vfx
         /// <summary>
         /// As <see cref="Validate(BeastRosterData, EnemyLibraryData, ArtManifestData, bool)"/>, and
         /// also every beast skill's, avatar active's and avatar passive's icon key in
-        /// <paramref name="skills"/> (required too with <paramref name="requireKeys"/>) and every
-        /// enemy-library skill's that has one.
+        /// <paramref name="skills"/> (required too with <paramref name="requireKeys"/>).
         /// </summary>
         public static List<string> Validate(BeastRosterData roster, EnemyLibraryData enemies, SkillLibraryData skills, ArtManifestData art, bool requireKeys = false)
         {
@@ -66,7 +66,7 @@ namespace BeastCraft.Vfx
                     {
                         if (skill != null)
                         {
-                            Check(skill.ArtKey, "Enemy '" + enemy.EnemyId + "' skill '" + skill.SkillId + "'", art, false, errors);
+                            Check(skill.ArtKey, "Enemy '" + enemy.EnemyId + "' skill '" + skill.SkillId + "'", art, requireKeys, errors);
                         }
                     }
                 }

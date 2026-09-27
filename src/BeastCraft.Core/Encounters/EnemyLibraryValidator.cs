@@ -237,6 +237,11 @@ namespace BeastCraft.Encounters
                     errors.Add(label + ": duplicate SkillId in this enemy's kit.");
                 }
 
+                if (!string.IsNullOrEmpty(skill.ArtKey) && !Vfx.ArtReferenceValidator.IsWellFormed(skill.ArtKey))
+                {
+                    errors.Add(label + ": ArtKey '" + skill.ArtKey + "' is not lowercase snake_case segments joined by '/'.");
+                }
+
                 bool shapeOk = SkillLibraryValidator.CheckEnum<SkillTargetShape>(skill.TargetShape, label, "TargetShape", errors);
                 SkillLibraryValidator.CheckEnum<SkillTargetSide>(skill.TargetSide, label, "TargetSide", errors);
                 bool criterionOk = SkillLibraryValidator.CheckEnum<SkillTargetingCriterion>(skill.TargetingCriterion, label, "TargetingCriterion", errors);

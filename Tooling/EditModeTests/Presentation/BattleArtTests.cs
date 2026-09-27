@@ -241,6 +241,97 @@ namespace BeastCraft.Tests.EditMode
             Assert.IsNotEmpty(BattleArtValidator.Validate(null, regions, art));
         }
 
+        [Test]
+        public void SkillIcons_ShippedStyle_FramesEveryIcon_WithPaintableSprites()
+        {
+            SkillIconStyleData style = Content.BattleArt.SkillIcons;
+            Assert.IsNotNull(style);
+            ArtSpriteData frame = Content.Art.FindByArtKey(style.Frame);
+            Assert.IsNotNull(frame, style.Frame);
+            Assert.AreEqual(ArtFilter.Linear, frame.Filter, "painted UI is linear-filtered and mipmapped");
+            Assert.AreEqual("ui", frame.Category);
+            Assert.That(style.IconScale, Is.LessThan(style.FrameScale), "the frame's rim covers the icon's edge");
+            Assert.That(style.FrameScale, Is.LessThanOrEqualTo(style.RingScale), "the ring shows around the frame");
+
+            CollectionAssert.AreEqual(new[] { "common", "rare", "epic", "legendary", "gloam" }, Array.ConvertAll(style.Rarities, r => r.Rarity));
+            foreach (SkillRarityData rarity in style.Rarities)
+            {
+                ArtSpriteData ring = Content.Art.FindByArtKey(rarity.Ring);
+                Assert.IsNotNull(ring, rarity.Ring);
+                Assert.AreEqual(ArtFilter.Linear, ring.Filter);
+                Assert.AreEqual(frame.FrameWidth, ring.FrameWidth, "frame and rings share one square canvas");
+                Assert.AreEqual(frame.FrameHeight, ring.FrameHeight);
+            }
+        }
+
+        [Test]
+        public void SkillIcons_Rarity_BySource_UnlessOverridden()
+        {
+            SkillIconStyleData style = Content.BattleArt.SkillIcons;
+            Assert.AreEqual("common", style.RarityFor("skill/ember_shot", SkillIconSource.Beast).Rarity);
+            Assert.AreEqual("rare", style.RarityFor("skill/ember_shot", SkillIconSource.Avatar).Rarity);
+            Assert.AreEqual("gloam", style.RarityFor("skill/enemy/giant/quake", SkillIconSource.Enemy).Rarity);
+
+            SkillIconStyleData custom = new SkillIconStyleData
+            {
+                Rarities = style.Rarities,
+                BeastRarity = "common",
+                Overrides = new[] { new SkillRarityOverrideData { ArtKey = "skill/rebirth_flame", Rarity = "legendary" } }
+            };
+            Assert.AreEqual("legendary", custom.RarityFor("skill/rebirth_flame", SkillIconSource.Beast).Rarity, "an override wins");
+            Assert.AreEqual("common", custom.RarityFor("skill/ember_shot", SkillIconSource.Beast).Rarity);
+            Assert.IsNull(custom.RarityFor("skill/ember_shot", SkillIconSource.Enemy), "no enemy default: no ring");
+            Assert.IsNull(custom.Rarity("mythic"));
+        }
+
+        [Test]
+        public void SkillIcons_Validator_ChecksEveryRule()
+        {
+            SkillRarityData common = new SkillRarityData { Rarity = "common", Ring = "ui/skill_icon/ring/common" };
+            SkillIconStyleData style = new SkillIconStyleData
+            {
+                Frame = "ui/skill_icon/missing",
+                FrameScale = 2f,
+                IconScale = 0.1f,
+                Rarities = new[] { common, common, new SkillRarityData { Rarity = "Rare", Ring = "ui/nope", Tint = "~" } },
+                BeastRarity = "common",
+                EnemyRarity = "mythic",
+                Overrides = new[]
+                {
+                    new SkillRarityOverrideData { ArtKey = "skill/ember_shot", Rarity = "epic" }, new SkillRarityOverrideData { ArtKey = "skill/ember_shot", Rarity = "common" },
+                    new SkillRarityOverrideData { ArtKey = "skill/nothing_here", Rarity = "common" }
+                }
+            };
+            string text = string.Join("\n", BattleArtValidator.Validate(new BattleArtData { SchemaVersion = 1, SkillIcons = style }, Content.Regions, Content.Art));
+
+            StringAssert.Contains("SkillIcons Frame: ArtKey 'ui/skill_icon/missing' is not a sprite", text);
+            StringAssert.Contains("FrameScale", text);
+            StringAssert.Contains("IconScale", text);
+            StringAssert.Contains("rarity 'common' is listed twice", text);
+            StringAssert.Contains("rarity 'Rare': Rarity must be lowercase", text);
+            StringAssert.Contains("rarity 'Rare' Ring: ArtKey 'ui/nope'", text);
+            StringAssert.Contains("rarity 'Rare' Tint", text);
+            StringAssert.Contains("EnemyRarity 'mythic' is not a rarity", text);
+            StringAssert.Contains("override 'skill/ember_shot': Rarity 'epic' is not a rarity", text);
+            StringAssert.Contains("override 'skill/ember_shot' is listed twice", text);
+            StringAssert.Contains("override 'skill/nothing_here': no skill icon", text);
+            Assert.IsFalse(text.Contains("BeastRarity"), text);
+            Assert.IsEmpty(BattleArtValidator.Validate(new BattleArtData { SchemaVersion = 1, SkillIcons = Content.BattleArt.SkillIcons }, Content.Regions, Content.Art));
+        }
+
+        [Test]
+        public void ArtKeys_AreUniqueInTheManifest_SoAPaintedIconReplacesItsPlaceholder()
+        {
+            HashSet<string> keys = new HashSet<string>(StringComparer.Ordinal);
+            foreach (ArtSpriteData sprite in Content.Art.Sprites)
+            {
+                if (!string.IsNullOrEmpty(sprite.ArtKey))
+                {
+                    Assert.IsTrue(keys.Add(sprite.ArtKey), sprite.ArtKey + " is listed twice");
+                }
+            }
+        }
+
         private static BattleBackdropData Backdrop(string region, string arena, float x, float y, float width, float height)
         {
             return new BattleBackdropData { RegionId = region, Arena = arena, ArtKey = "backdrop/" + region + "/" + arena.ToLowerInvariant(), BoardRect = Rect(x, y, width, height) };

@@ -234,6 +234,12 @@
   "Painted": [
     { "Name": "backdrop_r01_small", "File": "../backdrops/r01/small.png", "Category": "backdrop", "Label": "Verdant Hollow backdrop (Small arena)", "ArtKey": "backdrop/r01/small", "WorldWidth": 1 },
     { "Name": "backdrop_r01_medium", "File": "../backdrops/r01/medium.png", "Category": "backdrop", "Label": "Verdant Hollow backdrop (Medium arena)", "ArtKey": "backdrop/r01/medium", "WorldWidth": 1 },
-    { "Name": "backdrop_r01_large", "File": "../backdrops/r01/large.png", "Category": "backdrop", "Label": "Verdant Hollow backdrop (Large arena)", "ArtKey": "backdrop/r01/large", "WorldWidth": 1 }
+    { "Name": "backdrop_r01_large", "File": "../backdrops/r01/large.png", "Category": "backdrop", "Label": "Verdant Hollow backdrop (Large arena)", "ArtKey": "backdrop/r01/large", "WorldWidth": 1 },
+    { "Name": "ui_skill_icon_frame", "File": "../ui/skill_icon/frame.png", "Category": "ui", "Label": "Skill icon frame", "ArtKey": "ui/skill_icon/frame", "WorldWidth": 1 },
+    { "Name": "ui_skill_icon_ring_common", "File": "../ui/skill_icon/ring_common.png", "Category": "ui", "Label": "Skill icon rarity ring (common)", "ArtKey": "ui/skill_icon/ring/common", "WorldWidth": 1 },
+    { "Name": "ui_skill_icon_ring_rare", "File": "../ui/skill_icon/ring_rare.png", "Category": "ui", "Label": "Skill icon rarity ring (rare)", "ArtKey": "ui/skill_icon/ring/rare", "WorldWidth": 1 },
+    { "Name": "ui_skill_icon_ring_epic", "File": "../ui/skill_icon/ring_epic.png", "Category": "ui", "Label": "Skill icon rarity ring (epic)", "ArtKey": "ui/skill_icon/ring/epic", "WorldWidth": 1 },
+    { "Name": "ui_skill_icon_ring_legendary", "File": "../ui/skill_icon/ring_legendary.png", "Category": "ui", "Label": "Skill icon rarity ring (legendary)", "ArtKey": "ui/skill_icon/ring/legendary", "WorldWidth": 1 },
+    { "Name": "ui_skill_icon_ring_gloam", "File": "../ui/skill_icon/ring_gloam.png", "Category": "ui", "Label": "Skill icon rarity ring (gloam)", "ArtKey": "ui/skill_icon/ring/gloam", "WorldWidth": 1 }
   ]
 }

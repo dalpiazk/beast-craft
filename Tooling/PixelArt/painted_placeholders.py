@@ -171,10 +171,60 @@ def backdrops(force):
         guide(img, width, height, b["BoardRect"]).save(PREVIEW / f"backdrop_guide_{region}_{arena.lower()}.png")
 
 
+ICON = 256                            # skill-icon layers: frame and rarity rings share one square canvas
+RARITY_COLORS = {                     # (light, mid, dark)
+    "common": ((236, 232, 222), (184, 178, 168), (104, 98, 92)),
+    "rare": ((170, 220, 255), (70, 150, 226), (26, 70, 140)),
+    "epic": ((226, 186, 255), (160, 100, 220), (84, 40, 140)),
+    "legendary": ((255, 240, 170), (242, 190, 70), (150, 96, 20)),
+    "gloam": ((214, 176, 250), (122, 75, 166), (58, 36, 88)),
+}
+FRAME_COLORS = ((238, 214, 164), (185, 140, 88), (96, 64, 40))
+
+
+def ring(size, inner, outer, colors, glow=0.0, samples=4):
+    """A soft round band from inner to outer (fractions of the radius): lit upper-left, shaded lower-right,
+    anti-aliased by supersampling; with glow, a faint halo fading past the outer edge."""
+    light, mid, dark = colors
+    img = Image.new("RGBA", (size, size))
+    px = img.load()
+    half = size / 2
+    for y in range(size):
+        for x in range(size):
+            cover = 0.0
+            for sy in range(samples):
+                for sx in range(samples):
+                    dx = (x + (sx + 0.5) / samples - half) / half
+                    dy = (y + (sy + 0.5) / samples - half) / half
+                    r = (dx * dx + dy * dy) ** 0.5
+                    if inner <= r <= outer:
+                        cover += 1
+            cover /= samples * samples
+            dx, dy = (x + 0.5 - half) / half, (y + 0.5 - half) / half
+            r = (dx * dx + dy * dy) ** 0.5
+            halo = glow * max(0.0, 1 - (r - outer) / 0.08) if r > outer else 0.0
+            a = max(cover, halo * 0.6)
+            if a <= 0:
+                continue
+            across = (r - inner) / max(1e-6, outer - inner)          # 0 inner edge .. 1 outer edge
+            lit = smooth(0.5 - 0.45 * (dx + dy) / max(1e-6, r))       # upper-left light
+            bevel = 1 - abs(across - 0.45) * 1.6
+            c = mix(mix(dark, mid, lit), light, max(0.0, bevel) * lit * 0.8)
+            px[x, y] = c + (round(255 * min(1.0, a)),)
+    return img
+
+
+def icon_layers(force):
+    save(ring(ICON, 0.82, 0.985, FRAME_COLORS), ART / "ui" / "skill_icon" / "frame.png", force)
+    for name, colors in RARITY_COLORS.items():
+        save(ring(ICON, 0.86, 0.975, colors, glow=1.0), ART / "ui" / "skill_icon" / f"ring_{name}.png", force)
+
+
 def main():
     force = "--force" in sys.argv
     PREVIEW.mkdir(exist_ok=True)
     backdrops(force)
+    icon_layers(force)
 
 
 if __name__ == "__main__":

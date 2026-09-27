@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using BeastCraft.Battle.Grid;
 using BeastCraft.Campaign;
+using BeastCraft.Creatures.Roster;
 using BeastCraft.Presentation.Layout;
 using BeastCraft.Vfx;
 
@@ -16,12 +17,16 @@ namespace BeastCraft.Presentation.Art
     /// <see cref="BackdropPlacement.AspectTolerance"/>) and reaching the canvas edges at the fit-all
     /// view (<see cref="BackdropPlacement.CanvasAtFitAll"/>) with room for the largest screen shake
     /// (<see cref="VfxLibraryValidator.MaxShakeAmplitude"/> board px) to spare; the overlay colours palette chars and
-    /// its numbers in range. Returns every problem found (empty = valid); never throws.
+    /// its numbers in range; the skill-icon style's frame and ring sprites in the manifest, its
+    /// rarities unique and every default and override naming one. Returns every problem found
+    /// (empty = valid); never throws.
     /// </summary>
     public static class BattleArtValidator
     {
         public const float MinGridWidth = 0.5f;
         public const float MaxGridWidth = 6f;
+        public const float MinIconScale = 0.2f;
+        public const float MaxIconScale = 1.5f;
 
         /// <summary>
         /// Validates <paramref name="data"/>. <paramref name="regions"/> (null skips the check) holds
@@ -123,7 +128,102 @@ namespace BeastCraft.Presentation.Art
             Range(board.PlayerZoneAlpha, 0f, 1f, "Board PlayerZoneAlpha", errors);
             Range(board.EnemyZoneAlpha, 0f, 1f, "Board EnemyZoneAlpha", errors);
             Range(board.HudScrimAlpha, 0f, 1f, "Board HudScrimAlpha", errors);
+            if (data.SkillIcons != null)
+            {
+                ValidateSkillIcons(data.SkillIcons, art, errors);
+            }
+
             return errors;
+        }
+
+        /// <summary>The skill-icon style: its frame and rings in the manifest, rarities unique and named, scales in range.</summary>
+        private static void ValidateSkillIcons(SkillIconStyleData style, ArtManifestData art, List<string> errors)
+        {
+            if (!string.IsNullOrEmpty(style.Frame))
+            {
+                Sprite(style.Frame, "SkillIcons Frame", art, errors);
+            }
+
+            Range(style.FrameScale, MinIconScale, MaxIconScale, "SkillIcons FrameScale", errors);
+            Range(style.IconScale, MinIconScale, MaxIconScale, "SkillIcons IconScale", errors);
+            Range(style.RingScale, MinIconScale, MaxIconScale, "SkillIcons RingScale", errors);
+
+            HashSet<string> ids = new HashSet<string>(StringComparer.Ordinal);
+            SkillRarityData[] rarities = style.Rarities ?? new SkillRarityData[0];
+            for (int i = 0; i < rarities.Length; i++)
+            {
+                SkillRarityData rarity = rarities[i];
+                if (rarity == null)
+                {
+                    errors.Add("SkillIcons Rarities[" + i + "] is null.");
+                    continue;
+                }
+
+                string at = "SkillIcons rarity '" + rarity.Rarity + "'";
+                if (!BeastRosterValidator.IsSnakeCaseId(rarity.Rarity))
+                {
+                    errors.Add(at + ": Rarity must be lowercase snake_case.");
+                }
+                else if (!ids.Add(rarity.Rarity))
+                {
+                    errors.Add(at + " is listed twice.");
+                }
+
+                Sprite(rarity.Ring, at + " Ring", art, errors);
+                if (!string.IsNullOrEmpty(rarity.Tint))
+                {
+                    Color(rarity.Tint, at + " Tint", art, errors);
+                }
+            }
+
+            foreach ((string name, string id) in new[] { ("BeastRarity", style.BeastRarity), ("AvatarRarity", style.AvatarRarity), ("EnemyRarity", style.EnemyRarity) })
+            {
+                if (!string.IsNullOrEmpty(id) && !ids.Contains(id))
+                {
+                    errors.Add("SkillIcons " + name + " '" + id + "' is not a rarity.");
+                }
+            }
+
+            HashSet<string> keys = new HashSet<string>(StringComparer.Ordinal);
+            foreach (SkillRarityOverrideData entry in style.Overrides ?? new SkillRarityOverrideData[0])
+            {
+                if (entry == null)
+                {
+                    errors.Add("SkillIcons Overrides has a null entry.");
+                    continue;
+                }
+
+                string at = "SkillIcons override '" + entry.ArtKey + "'";
+                if (!ArtReferenceValidator.IsWellFormed(entry.ArtKey))
+                {
+                    errors.Add(at + ": ArtKey is not lowercase snake_case segments joined by '/'.");
+                }
+                else if (!keys.Add(entry.ArtKey))
+                {
+                    errors.Add(at + " is listed twice.");
+                }
+                else if (art != null && art.FindByArtKey(entry.ArtKey) == null)
+                {
+                    errors.Add(at + ": no skill icon has that ArtKey in the art manifest.");
+                }
+
+                if (!ids.Contains(entry.Rarity ?? string.Empty))
+                {
+                    errors.Add(at + ": Rarity '" + entry.Rarity + "' is not a rarity.");
+                }
+            }
+        }
+
+        private static void Sprite(string artKey, string at, ArtManifestData art, List<string> errors)
+        {
+            if (!ArtReferenceValidator.IsWellFormed(artKey))
+            {
+                errors.Add(at + ": ArtKey '" + artKey + "' is not lowercase snake_case segments joined by '/'.");
+            }
+            else if (art != null && (art.FindByArtKey(artKey) == null || art.FindByArtKey(artKey).Kind != ArtSpriteKind.Sprite))
+            {
+                errors.Add(at + ": ArtKey '" + artKey + "' is not a sprite in the art manifest.");
+            }
         }
 
         /// <summary>An <see cref="ArenaSize"/> name, exactly as written.</summary>
