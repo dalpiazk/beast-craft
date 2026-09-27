@@ -101,7 +101,11 @@ namespace BeastCraft.Presentation.Vfx
     /// their <see cref="VfxLayerData.DurationMs"/>, anchored on each target, on the caster, or once
     /// on the affected area (<see cref="Area"/>), and come out as <see cref="VfxFrame.Sprites"/>:
     /// flipbooks, ground decals, shockwave rings growing to the area's radius, radial bursts,
-    /// particle bursts and circling glyphs.
+    /// particle bursts and circling glyphs. A layer (or a layer's particles) may instead draw a
+    /// single painted frame (<see cref="VfxPaintedData"/>) animated by scale, rotation, alpha and
+    /// tint curves over its life (<see cref="VfxPainted"/>): the same sprites, placed and timed as
+    /// the type places them, so painted layers keep the flipbook path's determinism and its
+    /// effects-settings rules.
     /// </para>
     /// <para>
     /// The player's effects settings (<see cref="VfxSettings"/>: intensity, screen shake, flashes)
@@ -435,12 +439,15 @@ namespace BeastCraft.Presentation.Vfx
                     }
 
                     string[] colors = layer.Particles.Colors ?? new string[0];
-                    foreach (ParticleBurst burst in bursts)
+                    VfxPaintedData paintedParticles = layer.Particles.Painted;
+                    for (int b = 0; b < bursts.Count; b++)
                     {
-                        foreach (ParticleState particle in burst.Sample(t))
+                        foreach (ParticleState particle in bursts[b].Sample(t))
                         {
                             string tint = colors.Length == 0 ? null : colors[particle.ColorIndex];
-                            sprites.Add(new VfxSprite(layer.Particles.Sheet, 0, particle.Position, scale, 0f, 0f, particle.Alpha * envelope, tint, additive, ground));
+                            VfxSprite sprite = new VfxSprite(layer.Particles.Sheet, 0, particle.Position, scale, 0f, 0f, particle.Alpha * envelope, tint, additive, ground);
+                            float spin = paintedParticles != null && paintedParticles.RandomSpin ? VfxPainted.SpinOf(_seed, l * 31 + b, particle.Index) : 0f;
+                            sprites.Add(VfxPainted.Apply(paintedParticles, sprite, 1f - particle.Alpha, envelope, sprite.Alpha, spin));
                         }
                     }
 
@@ -448,6 +455,7 @@ namespace BeastCraft.Presentation.Vfx
                 }
 
                 List<Vec2> anchors = Anchors(layer);
+                int first = sprites.Count;
                 for (int a = 0; a < anchors.Count; a++)
                 {
                     Vec2 at = anchors[a];
@@ -503,6 +511,16 @@ namespace BeastCraft.Presentation.Vfx
 
                                 break;
                             }
+                    }
+                }
+
+                if (layer.Painted != null)
+                {
+                    // A painted layer: every sprite it made is the painted frame, animated by its curves over the layer's life.
+                    for (int i = first; i < sprites.Count; i++)
+                    {
+                        float spin = layer.Painted.RandomSpin ? VfxPainted.SpinOf(_seed, l, i - first) : 0f;
+                        sprites[i] = VfxPainted.Apply(layer.Painted, sprites[i], p, envelope, sprites[i].Alpha, spin);
                     }
                 }
             }

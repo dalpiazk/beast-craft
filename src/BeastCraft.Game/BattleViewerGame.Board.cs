@@ -304,9 +304,25 @@ namespace BeastCraft.Game
         }
 
         /// <summary>
+        /// Additive blending for premultiplied colours (One + One): a painted frame's soft alpha is
+        /// already in its colour (the atlas premultiplies on load), so the source is not multiplied
+        /// by alpha again as <see cref="BlendState.Additive"/> would (which the pixel flipbooks keep).
+        /// </summary>
+        private static readonly BlendState PremultipliedAdditive = new BlendState
+        {
+            Name = "PremultipliedAdditive",
+            ColorSourceBlend = Blend.One,
+            AlphaSourceBlend = Blend.One,
+            ColorDestinationBlend = Blend.One,
+            AlphaDestinationBlend = Blend.One
+        };
+
+        /// <summary>
         /// One layer or aura sprite: its frame (wrapped to the sheet), at its size (a ring or decal
         /// spans <see cref="VfxSprite.SizePx"/> board pixels, whatever the texture's resolution) or
-        /// scale, turned, tinted, faded, in its blend.
+        /// scale, turned, tinted (blended between its two tints for a painted frame's tint curve),
+        /// faded, in its blend. A painted frame (<see cref="VfxSprite.Painted"/>) is drawn with its
+        /// manifest filter (linear, mipmapped) and premultiplied blending.
         /// </summary>
         private void DrawVfxSprite(VfxSprite sprite)
         {
@@ -323,10 +339,15 @@ namespace BeastCraft.Game
                 scale = sprite.SizePx / Math.Max(1f, natural);
             }
 
-            _draw.SetBlend(sprite.Additive ? BlendState.Additive : BlendState.AlphaBlend);
+            _draw.SetBlend(sprite.Additive ? sprite.Painted ? PremultipliedAdditive : BlendState.Additive : BlendState.AlphaBlend);
             int frame = art.Data.Frames <= 0 ? 0 : ((sprite.Frame % art.Data.Frames) + art.Data.Frames) % art.Data.Frames;
-            _draw.DrawSprite(art, frame, new Vector2(sprite.Position.X, sprite.Position.Y), scale, Ink(sprite.Tint, Color.White) * sprite.Alpha, false,
-                             sprite.Rotation);
+            Color tint = Ink(sprite.Tint, Color.White);
+            if (sprite.TintMix > 0f && sprite.TintTo != sprite.Tint)
+            {
+                tint = Color.Lerp(tint, Ink(sprite.TintTo, Color.White), Math.Min(1f, sprite.TintMix));
+            }
+
+            _draw.DrawSprite(art, frame, new Vector2(sprite.Position.X, sprite.Position.Y), scale, tint * sprite.Alpha, false, sprite.Rotation);
         }
 
         /// <summary>The lasting effect keys a unit shows now (its statuses and stat changes), as the turn animation has them.</summary>
@@ -514,6 +535,16 @@ namespace BeastCraft.Game
                 foreach (ParticleState particle in vfx.Particles)
                 {
                     string ch = particles.Colors.Length == 0 ? null : particles.Colors[particle.ColorIndex];
+                    if (particles.Painted != null)
+                    {
+                        // A painted burst: its one frame per particle, its curves over the particle's life.
+                        VfxSprite sprite = new VfxSprite(null, 0, particle.Position, 1f, 0f, 0f, particle.Alpha, ch, additivePass, false);
+                        float spin = particles.Painted.RandomSpin ? VfxPainted.SpinOf(0, -1, particle.Index) : 0f;
+                        DrawVfxSprite(VfxPainted.Apply(particles.Painted, sprite, 1f - particle.Alpha, 1f, particle.Alpha, spin));
+                        _draw.SetBlend(additivePass ? BlendState.Additive : BlendState.AlphaBlend);
+                        continue;
+                    }
+
                     DrawCentered(particles.Sheet, 0, particle.Position, 1, Ink(ch, Color.White) * particle.Alpha);
                 }
             }

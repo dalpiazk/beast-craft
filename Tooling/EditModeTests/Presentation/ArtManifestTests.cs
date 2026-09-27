@@ -33,7 +33,8 @@ namespace BeastCraft.Tests.EditMode
             foreach (ArtSpriteData sprite in art.Sprites)
             {
                 Assert.AreEqual(ArtSpriteKind.Sprite, sprite.Kind, sprite.Name);
-                Assert.IsFalse(sprite.Premultiplied, sprite.Name + ": PNGs are straight alpha, premultiplied on load");
+                Assert.IsTrue(!sprite.Premultiplied || sprite.Filter == ArtFilter.Linear,
+                              sprite.Name + ": pixel PNGs are straight alpha, premultiplied on load (a painted slot may ship premultiplied)");
                 Assert.IsFalse(string.IsNullOrEmpty(sprite.Category), sprite.Name);
                 if (sprite.Filter == ArtFilter.Linear)
                 {

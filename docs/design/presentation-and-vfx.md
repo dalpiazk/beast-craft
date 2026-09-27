@@ -479,6 +479,34 @@ embers at the caster, plus its Shield overlay) carry the full stack. Every effec
 default, and the demo battle (Phoenix, Golem, Kirin, Frost Wyrm; seed 20260933, picked so it
 happens) shows a burn, heal, taunt, shield, stun and buffs/debuffs with their auras and icons.
 
+### Painted frames (`Painted`: one hero frame, animated by curves)
+
+Every layer type can draw a **single painted frame** instead of a flipbook sheet: `Painted`
+(`VfxPaintedData`) on a layer (Flipbook, GroundDecal, Shockwave, RadialBurst, Glyphs), on a particle
+spec (`Particles.Painted`, the effect's own burst or a Particles layer's) and on an aura (the status
+auras and the Gloam `EnemyAura`). Its `Sheet` is a manifest sprite of one frame, linear-filtered
+(mipmapped on load); the part's own `Sheet` becomes optional and a painted Flipbook layer needs no
+`Frames`. Keyframed curves (`[{ "T": 0-1, "V": value }]`, piecewise linear, clamped) animate it over
+a normalized time — the layer's duration, each particle's own life, or an aura's pulse (looping):
+`Scale` multiplies its size, `Rotation` adds turns, `Alpha` multiplies the layer's fade in/out and,
+when given, replaces the type's own fade (a shockwave's or ray's fade-out, a particle's life fade, an
+aura's breathing), and `Tint` (palette chars) blends between keys; `RandomSpin` starts each sprite of
+a multi-sprite part at its own seeded angle. The timeline places painted sprites exactly as the type
+places its flipbook sprites (`VfxPainted.Apply` on the same `VfxSprite`s), so determinism and the
+effects settings are unchanged: a painted layer plays or drops exactly as its flipbook would.
+Painted sprites are premultiplied (the atlas premultiplies straight-alpha PNGs on load) and blend
+premultiplied, additive as One + One (the pixel flipbooks keep `BlendState.Additive`).
+
+The shipped library uses the painted slots: every element default but `None` draws a charge-up of
+painted glyphs at the caster, then a painted ground decal, shockwave ring and burst on the target
+(the pixel hit flipbook is gone from them) and painted embers for its burst; the status defaults
+draw the painted status frame on apply and as their aura (stun, shield, burn, poison, taunt,
+cleanse, heal, buff, debuff). Phoenix's three skills keep their pixel flipbooks (the flipbook path
+stays). The frames are painted slots (`content/art/vfx/<element>/{burst,ring,decal,glyph,ember}.png`,
+`content/art/vfx/status/<status>.png`; see [`docs/art/hollow-art-slots.md`](../art/hollow-art-slots.md))
+with generated placeholders at half size: the manifest sizes each by `WorldWidth`, so the painting
+drops in at any resolution.
+
 ## Range diagrams (`SkillFootprint`)
 
 `SkillFootprint.Of(skill, casterFootprint)` is a pure function of the Core skill data

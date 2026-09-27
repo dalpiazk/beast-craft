@@ -8,12 +8,16 @@ namespace BeastCraft.Presentation.Vfx
     /// <summary>One particle at one moment: where it is, its colour (index into the spec's Colors) and opacity.</summary>
     public readonly struct ParticleState
     {
-        public ParticleState(Vec2 position, int colorIndex, float alpha)
+        public ParticleState(Vec2 position, int colorIndex, float alpha, int index = 0)
         {
             Position = position;
             ColorIndex = colorIndex;
             Alpha = alpha;
+            Index = index;
         }
+
+        /// <summary>Which particle of its burst this is (0-based, fixed for its life): a painted particle's own spin.</summary>
+        public int Index { get; }
 
         public Vec2 Position { get; }
 
@@ -111,7 +115,7 @@ namespace BeastCraft.Presentation.Vfx
                 }
 
                 Vec2 position = new Vec2(_origin.X + _vx[i] * t, _origin.Y + _vy[i] * t + 0.5f * _gravity * t * t);
-                alive.Add(new ParticleState(position, _color[i], 1f - ms / (float)_lifeMs[i]));
+                alive.Add(new ParticleState(position, _color[i], 1f - ms / (float)_lifeMs[i], i));
             }
 
             return alive;

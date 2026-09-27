@@ -15,8 +15,9 @@ namespace BeastCraft.Vfx
     /// shake the board off the screen). Schema v2 adds layers (a known type, anchor, blend and
     /// depth; timing, scale, radius and counts in range; the type's sheet in the manifest with
     /// enough frames) and effect-type defaults (known keys, each at most once; an aura only on a
-    /// lasting status, with its sheets in the manifest). Returns every problem found (empty =
-    /// valid); never throws.
+    /// lasting status, with its sheets in the manifest), and painted frames (<see cref="ValidatePainted"/>:
+    /// one linear frame in the manifest, curves in order and in range). Returns every problem found
+    /// (empty = valid); never throws.
     /// </summary>
     public static class VfxLibraryValidator
     {
@@ -51,6 +52,7 @@ namespace BeastCraft.Vfx
         public const float MinAuraAlpha = 0.05f;
         public const int MinAuraFrameMs = 40;
         public const int MaxAuraFrameMs = 2000;
+        public const float MaxPaintedTurns = 8f;
 
         /// <summary>
         /// Validates <paramref name="data"/>. <paramref name="knownSkillIds"/> (null skips the check)
@@ -154,9 +156,9 @@ namespace BeastCraft.Vfx
             if (data.EnemyAura != null)
             {
                 ValidateAura(data.EnemyAura, "EnemyAura", art, errors);
-                if (string.IsNullOrEmpty(data.EnemyAura.Sheet))
+                if (string.IsNullOrEmpty(data.EnemyAura.Sheet) && data.EnemyAura.Painted == null)
                 {
-                    errors.Add("EnemyAura: needs a Sheet (it has no status to show an icon for).");
+                    errors.Add("EnemyAura: needs a Sheet or a Painted frame (it has no status to show an icon for).");
                 }
             }
 
@@ -311,6 +313,11 @@ namespace BeastCraft.Vfx
 
             if (layer.Type == VfxLayerType.Particles)
             {
+                if (layer.Painted != null)
+                {
+                    errors.Add(at + ": a Particles layer's painted look is its Particles' Painted, not the layer's.");
+                }
+
                 if (layer.Particles == null)
                 {
                     errors.Add(at + ": no Particles.");
@@ -323,7 +330,12 @@ namespace BeastCraft.Vfx
                 return;
             }
 
-            ArtSpriteData sheet = Sheet(layer.Sheet, at, art, errors);
+            ArtSpriteData sheet = layer.Painted != null && string.IsNullOrEmpty(layer.Sheet) ? null : Sheet(layer.Sheet, at, art, errors);
+            if (layer.Painted != null)
+            {
+                ValidatePainted(layer.Painted, at + " Painted", art, errors);
+            }
+
             Color(layer.Tint, true, at + " Tint", art, errors);
             Range(layer.Scale, MinLayerScale, MaxLayerScale, at + " Scale", errors);
             if (layer.EndScale != 0f)
@@ -334,7 +346,7 @@ namespace BeastCraft.Vfx
             Range(layer.StartRadius, 0f, MaxLayerRadius, at + " StartRadius", errors);
             Range(layer.EndRadius, -MaxLayerRadius, MaxLayerRadius, at + " EndRadius", errors);
 
-            if (layer.Type == VfxLayerType.Flipbook)
+            if (layer.Type == VfxLayerType.Flipbook && layer.Painted == null)
             {
                 Range(layer.Fps, 1, MaxFps, at + " Fps", errors);
                 if (layer.Frames < 1)
@@ -362,14 +374,19 @@ namespace BeastCraft.Vfx
         /// <summary>The checks on an aura; <paramref name="at"/> prefixes every message.</summary>
         public static void ValidateAura(VfxAuraData aura, string at, ArtManifestData art, List<string> errors)
         {
-            if (string.IsNullOrEmpty(aura.Sheet) && string.IsNullOrEmpty(aura.Icon))
+            if (string.IsNullOrEmpty(aura.Sheet) && aura.Painted == null && string.IsNullOrEmpty(aura.Icon))
             {
-                errors.Add(at + ": has neither a Sheet nor an Icon.");
+                errors.Add(at + ": has neither a Sheet nor an Icon (nor a Painted frame).");
             }
 
             if (!string.IsNullOrEmpty(aura.Sheet))
             {
                 Sheet(aura.Sheet, at, art, errors);
+            }
+
+            if (aura.Painted != null)
+            {
+                ValidatePainted(aura.Painted, at + " Painted", art, errors);
             }
 
             if (!string.IsNullOrEmpty(aura.Icon))
@@ -433,7 +450,16 @@ namespace BeastCraft.Vfx
 
         private static void ValidateParticles(VfxParticleData particles, string at, ArtManifestData art, List<string> errors)
         {
-            Sheet(particles.Sheet, at, art, errors);
+            if (particles.Painted == null || !string.IsNullOrEmpty(particles.Sheet))
+            {
+                Sheet(particles.Sheet, at, art, errors);
+            }
+
+            if (particles.Painted != null)
+            {
+                ValidatePainted(particles.Painted, at + " Painted", art, errors);
+            }
+
             Range(particles.Count, 1, MaxParticles, at + " Count", errors);
             Range(particles.SpeedMin, 0f, MaxParticleSpeed, at + " SpeedMin", errors);
             Range(particles.SpeedMax, 0f, MaxParticleSpeed, at + " SpeedMax", errors);
@@ -454,6 +480,73 @@ namespace BeastCraft.Vfx
             for (int i = 0; i < particles.Colors.Length; i++)
             {
                 Color(particles.Colors[i], false, at + " Colors[" + i + "]", art, errors);
+            }
+        }
+
+        /// <summary>
+        /// The checks on a painted frame: its sheet in the manifest as one linear-filtered frame;
+        /// every curve's keys at T 0-1 in ascending order, values in range (scale 0-8, rotation
+        /// -8 to 8 turns, alpha 0-1) and tint keys palette chars.
+        /// </summary>
+        public static void ValidatePainted(VfxPaintedData painted, string at, ArtManifestData art, List<string> errors)
+        {
+            ArtSpriteData sheet = Sheet(painted.Sheet, at, art, errors);
+            if (sheet != null && sheet.Frames != 1)
+            {
+                errors.Add(at + ": sheet '" + sheet.Name + "' has " + sheet.Frames + " frames; a painted frame is one.");
+            }
+
+            if (sheet != null && sheet.Filter != ArtFilter.Linear)
+            {
+                errors.Add(at + ": sheet '" + sheet.Name + "' is " + sheet.Filter + "-filtered; a painted frame is " + ArtFilter.Linear + ".");
+            }
+
+            Curve(painted.Scale, 0f, MaxLayerScale, at + " Scale", errors);
+            Curve(painted.Rotation, -MaxPaintedTurns, MaxPaintedTurns, at + " Rotation", errors);
+            Curve(painted.Alpha, 0f, 1f, at + " Alpha", errors);
+            VfxTintKey[] tint = painted.Tint ?? new VfxTintKey[0];
+            float last = 0f;
+            for (int i = 0; i < tint.Length; i++)
+            {
+                string key = at + " Tint[" + i + "]";
+                if (tint[i] == null)
+                {
+                    errors.Add(key + " is null.");
+                    continue;
+                }
+
+                Range(tint[i].T, 0f, 1f, key + " T", errors);
+                if (tint[i].T < last)
+                {
+                    errors.Add(key + ": keys must be in ascending T.");
+                }
+
+                last = Math.Max(last, tint[i].T);
+                Color(tint[i].Color, false, key + " Color", art, errors);
+            }
+        }
+
+        private static void Curve(VfxCurveKey[] keys, float min, float max, string at, List<string> errors)
+        {
+            float last = 0f;
+            VfxCurveKey[] list = keys ?? new VfxCurveKey[0];
+            for (int i = 0; i < list.Length; i++)
+            {
+                string key = at + "[" + i + "]";
+                if (list[i] == null)
+                {
+                    errors.Add(key + " is null.");
+                    continue;
+                }
+
+                Range(list[i].T, 0f, 1f, key + " T", errors);
+                Range(list[i].V, min, max, key + " V", errors);
+                if (list[i].T < last)
+                {
+                    errors.Add(key + ": keys must be in ascending T.");
+                }
+
+                last = Math.Max(last, list[i].T);
             }
         }
 

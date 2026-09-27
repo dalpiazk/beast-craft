@@ -10,6 +10,10 @@ the manifest from illustrated.json's "Painted" list; a slot's data never names a
   content/art/backdrops/<region>/<arena>.png   battle backdrops: a soft green gradient with low-frequency
                                                noise and a lighter clearing where the board sits (read from
                                                content/data/Vfx/battle-art.json's BoardRect), half the final size
+  content/art/ui/skill_icon/*.png              the skill-icon frame and rarity rings (final size)
+  content/art/vfx/<element>/<kind>.png         painted VFX hero frames per element (burst, ring, decal, glyph,
+                                               ember) and content/art/vfx/status/<status>.png per status: soft
+                                               shapes in the element's or status's colours, half the final size
 
 and LOCAL PREVIEWS (git-ignored) under Tooling/PixelArt/preview/:
   backdrop_guide_<region>_<arena>.png          the backdrop with the arena's hex tiles drawn where the engine
@@ -20,10 +24,11 @@ overwrites a file that is not a placeholder: a slot whose PNG has no "BeastCraft
 is left alone (the painted art has landed), unless --force.
 """
 import json
+import math
 import pathlib
 import sys
 
-from PIL import Image, ImageDraw, PngImagePlugin
+from PIL import Image, ImageDraw, ImageFilter, PngImagePlugin
 
 ROOT = pathlib.Path(__file__).resolve().parent
 REPO = ROOT.parent.parent
@@ -214,6 +219,180 @@ def ring(size, inner, outer, colors, glow=0.0, samples=4):
     return img
 
 
+# The painted VFX hero frames: per element, and per status (docs/art/hollow-art-slots.md). Placeholders at
+# half the final size; the manifest sizes them by WorldWidth, so the final art drops in at any resolution.
+ELEMENTS = {                          # (glow, mid, deep)
+    "fire": ((255, 226, 150), (242, 110, 40), (140, 30, 30)),
+    "water": ((200, 236, 255), (60, 150, 220), (30, 60, 140)),
+    "earth": ((240, 214, 160), (180, 130, 80), (90, 60, 40)),
+    "air": ((226, 255, 244), (110, 200, 180), (40, 110, 100)),
+    "lightning": ((255, 250, 190), (255, 200, 60), (180, 110, 30)),
+    "ice": ((236, 250, 255), (150, 220, 245), (70, 140, 200)),
+    "nature": ((226, 255, 170), (120, 200, 80), (40, 100, 50)),
+    "metal": ((240, 240, 248), (170, 170, 190), (90, 90, 110)),
+    "light": ((255, 255, 230), (255, 230, 150), (200, 160, 80)),
+    "dark": ((220, 180, 255), (130, 80, 190), (50, 30, 80)),
+}
+STATUSES = {
+    "stun": (255, 230, 90), "shield": (140, 210, 255), "burn": (255, 130, 50), "poison": (140, 220, 90),
+    "taunt": (240, 90, 70), "cleanse": (250, 250, 255), "heal": (150, 240, 130), "buff": (130, 230, 170),
+    "debuff": (190, 120, 240),
+}
+VFX_SIZES = {"burst": 256, "ring": 256, "decal": 256, "glyph": 128, "ember": 64, "status": 256}
+
+
+def soft(size, draw_fn, blur, supersample=2):
+    """A greyscale coverage mask drawn by draw_fn(draw, s) on a supersampled canvas of side s, downsampled and blurred."""
+    big = size * supersample
+    mask = Image.new("L", (big, big), 0)
+    draw_fn(ImageDraw.Draw(mask), big)
+    mask = mask.resize((size, size), Image.LANCZOS)
+    return mask.filter(ImageFilter.GaussianBlur(blur)) if blur > 0 else mask
+
+
+def colorize(mask, color, core=None, core_mask=None):
+    """RGBA: color at the mask's alpha; with core, a brighter colour where core_mask is (a hot centre)."""
+    img = Image.new("RGBA", mask.size, color + (0,))
+    img.putalpha(mask)
+    if core is not None:
+        hot = Image.new("RGBA", mask.size, core + (0,))
+        hot.putalpha(core_mask)
+        img = Image.alpha_composite(img, hot)
+    return img
+
+
+def disc(cx, cy, r):
+    return [cx - r, cy - r, cx + r, cy + r]
+
+
+def burst_frame(colors, size):
+    glow, mid, _ = colors
+
+    def rays(d, s):
+        c = s / 2
+        for i in range(10):
+            a = i * math.pi * 2 / 10 + (0.12 if i % 2 else 0)
+            long = s * (0.47 if i % 2 == 0 else 0.34)
+            w = 0.16
+            d.polygon([(c + math.cos(a - w) * s * 0.08, c + math.sin(a - w) * s * 0.08), (c + math.cos(a) * long, c + math.sin(a) * long),
+                       (c + math.cos(a + w) * s * 0.08, c + math.sin(a + w) * s * 0.08)], fill=255)
+        d.ellipse(disc(c, c, s * 0.2), fill=255)
+
+    body = soft(size, rays, size * 0.02)
+    core = soft(size, lambda d, s: d.ellipse(disc(s / 2, s / 2, s * 0.14), fill=255), size * 0.05)
+    return colorize(body, mid, glow, core)
+
+
+def ring_frame(colors, size):
+    glow, mid, _ = colors
+
+    def band(d, s):
+        c = s / 2
+        d.ellipse(disc(c, c, s * 0.46), fill=255)
+        d.ellipse(disc(c, c, s * 0.38), fill=0)
+
+    body = soft(size, band, size * 0.015)
+    inner = soft(size, lambda d, s: (d.ellipse(disc(s / 2, s / 2, s * 0.43), fill=255), d.ellipse(disc(s / 2, s / 2, s * 0.41), fill=0)), size * 0.01)
+    return colorize(body, mid, glow, inner)
+
+
+def decal_frame(colors, size, seed):
+    _, mid, deep = colors
+
+    def blob(d, s):
+        c = s / 2
+        pts = []
+        for i in range(24):
+            a = i * math.pi * 2 / 24
+            r = s * (0.36 + 0.08 * ((mix32(seed, i) % 1000) / 1000.0))
+            pts.append((c + math.cos(a) * r, c + math.sin(a) * r * 0.9))
+        d.polygon(pts, fill=205)
+        d.ellipse(disc(c, c, s * 0.2), fill=235)
+
+    body = soft(size, blob, size * 0.03)
+    return colorize(body, mix(deep, mid, 0.25))
+
+
+def glyph_frame(colors, size):
+    glow, mid, _ = colors
+
+    def rune(d, s):
+        c = s / 2
+        w = max(2, int(s * 0.06))
+        d.ellipse(disc(c, c, s * 0.4), outline=255, width=w)
+        d.polygon([(c, c - s * 0.26), (c + s * 0.23, c + s * 0.14), (c - s * 0.23, c + s * 0.14)], outline=255, width=w)
+        d.line([(c, c - s * 0.26), (c, c + s * 0.14)], fill=255, width=w)
+
+    body = soft(size, rune, size * 0.012)
+    halo = soft(size, rune, size * 0.05)
+    return colorize(halo, mid, glow, body)
+
+
+def ember_frame(colors, size):
+    glow, mid, _ = colors
+    body = soft(size, lambda d, s: d.ellipse(disc(s / 2, s / 2, s * 0.3), fill=255), size * 0.1)
+    core = soft(size, lambda d, s: d.ellipse(disc(s / 2, s / 2, s * 0.12), fill=255), size * 0.05)
+    return colorize(body, mid, glow, core)
+
+
+def status_frame(name, color, size):
+    """A soft symbol per status: the placeholder reads at a glance, the painting replaces it."""
+    white = (255, 255, 255)
+
+    def symbol(d, s):
+        c = s / 2
+        w = max(2, int(s * 0.07))
+        if name == "stun":
+            for i in range(5):
+                a = i * math.pi * 2 / 5 - math.pi / 2
+                x, y = c + math.cos(a) * s * 0.3, c + math.sin(a) * s * 0.14
+                star = [(x + math.cos(b * math.pi / 5 - math.pi / 2) * s * (0.07 if b % 2 == 0 else 0.03),
+                         y + math.sin(b * math.pi / 5 - math.pi / 2) * s * (0.07 if b % 2 == 0 else 0.03)) for b in range(10)]
+                d.polygon(star, fill=255)
+        elif name == "shield":
+            pts = [(c + math.cos(math.pi / 6 + i * math.pi / 3) * s * 0.4, c + math.sin(math.pi / 6 + i * math.pi / 3) * s * 0.4) for i in range(6)]
+            d.polygon(pts, outline=255, width=w)
+            d.polygon([(x * 0.85 + c * 0.15, y * 0.85 + c * 0.15) for x, y in pts], fill=90)
+        elif name == "burn":
+            d.polygon([(c, c - s * 0.4), (c + s * 0.22, c + s * 0.05), (c + s * 0.16, c + s * 0.3), (c - s * 0.16, c + s * 0.3), (c - s * 0.22, c + s * 0.05)], fill=255)
+            d.ellipse(disc(c, c + s * 0.14, s * 0.2), fill=255)
+        elif name == "poison":
+            for (x, y, r) in ((0.42, 0.58, 0.16), (0.62, 0.42, 0.11), (0.6, 0.66, 0.08)):
+                d.ellipse(disc(s * x, s * y, s * r), outline=255, width=w)
+        elif name == "taunt":
+            for dx in (-0.12, 0.12):
+                d.rectangle([c + s * dx - s * 0.04, c - s * 0.32, c + s * dx + s * 0.04, c + s * 0.1], fill=255)
+                d.ellipse(disc(c + s * dx, c + s * 0.24, s * 0.05), fill=255)
+        elif name == "cleanse":
+            d.polygon([(c, c - s * 0.42), (c + s * 0.08, c - s * 0.08), (c + s * 0.42, c), (c + s * 0.08, c + s * 0.08), (c, c + s * 0.42),
+                       (c - s * 0.08, c + s * 0.08), (c - s * 0.42, c), (c - s * 0.08, c - s * 0.08)], fill=255)
+        elif name == "heal":
+            d.rectangle([c - s * 0.09, c - s * 0.34, c + s * 0.09, c + s * 0.34], fill=255)
+            d.rectangle([c - s * 0.34, c - s * 0.09, c + s * 0.34, c + s * 0.09], fill=255)
+        elif name in ("buff", "debuff"):
+            k = -1 if name == "buff" else 1
+            d.polygon([(c, c + k * s * 0.38), (c + s * 0.3, c + k * s * 0.02), (c + s * 0.12, c + k * s * 0.02), (c + s * 0.12, c - k * s * 0.34),
+                       (c - s * 0.12, c - k * s * 0.34), (c - s * 0.12, c + k * s * 0.02), (c - s * 0.3, c + k * s * 0.02)], fill=255)
+
+    halo = soft(size, symbol, size * 0.045)
+    body = soft(size, symbol, size * 0.008)
+    glow = soft(size, lambda d, s: d.ellipse(disc(s / 2, s / 2, s * 0.44), fill=70), size * 0.08)
+    base = colorize(glow, color)
+    return Image.alpha_composite(base, colorize(halo, color, mix(color, white, 0.6), body))
+
+
+def vfx_frames(force):
+    for i, (element, colors) in enumerate(ELEMENTS.items()):
+        folder = ART / "vfx" / element
+        save(burst_frame(colors, VFX_SIZES["burst"]), folder / "burst.png", force)
+        save(ring_frame(colors, VFX_SIZES["ring"]), folder / "ring.png", force)
+        save(decal_frame(colors, VFX_SIZES["decal"], 5200 + i), folder / "decal.png", force)
+        save(glyph_frame(colors, VFX_SIZES["glyph"]), folder / "glyph.png", force)
+        save(ember_frame(colors, VFX_SIZES["ember"]), folder / "ember.png", force)
+    for name, color in STATUSES.items():
+        save(status_frame(name, color, VFX_SIZES["status"]), ART / "vfx" / "status" / f"{name}.png", force)
+
+
 def icon_layers(force):
     save(ring(ICON, 0.82, 0.985, FRAME_COLORS), ART / "ui" / "skill_icon" / "frame.png", force)
     for name, colors in RARITY_COLORS.items():
@@ -225,6 +404,7 @@ def main():
     PREVIEW.mkdir(exist_ok=True)
     backdrops(force)
     icon_layers(force)
+    vfx_frames(force)
 
 
 if __name__ == "__main__":

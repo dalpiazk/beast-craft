@@ -55,7 +55,7 @@ copied into the manifest: the colour each element tints an overlay (see `docs/de
 
 **Painted slots** (`illustrated.json`'s `Painted` list: the art slots of `docs/art/hollow-art-slots.md` that are
 not characters standing on a tile, such as the battle backdrops `content/art/backdrops/<region>/<arena>.png` and the
-skill-icon frame and rarity rings `content/art/ui/skill_icon/`) are
+skill-icon frame and rarity rings `content/art/ui/skill_icon/` and the painted VFX hero frames `content/art/vfx/`) are
 merged the same way: frame size from the PNG, `PixelsPerUnit = FrameWidth / WorldWidth`, pivot `PivotU/PivotV`
 (fractions, default the centre), `Filter: "linear"`. Until a slot is painted its PNG is a placeholder written by
 `painted_placeholders.py` (same venv; soft, deterministic, tagged with a `BeastCraft-Placeholder` PNG text chunk, and
