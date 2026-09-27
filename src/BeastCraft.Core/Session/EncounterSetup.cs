@@ -85,6 +85,15 @@ namespace BeastCraft.Session
         /// <summary>The encounter level, copied into <see cref="BattleSessionResult.EncounterLevel"/> for the rewards (0 = not set).</summary>
         public int EncounterLevel;
 
+        /// <summary>
+        /// The campaign region the battle is fought in (a <c>regions.json</c> RegionId), or null for
+        /// none. It picks the battlefield: one of the region's layouts for <see cref="Arena"/>
+        /// (<c>battle-layouts.json</c>, <see cref="Encounters.BattleLayouts.Pick"/> on the battle's
+        /// seed), whose obstacles block movement and standing. A region without layouts (and null)
+        /// fights on the open board.
+        /// </summary>
+        public string RegionId;
+
         /// <summary>Enemies the session builds, in order.</summary>
         public List<EnemySpec> Enemies = new List<EnemySpec>();
 

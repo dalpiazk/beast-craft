@@ -22,7 +22,17 @@ namespace BeastCraft.Encounters
         /// </summary>
         public static bool Fits(ArenaSize arena, IReadOnlyList<UnitFootprint> footprints)
         {
-            return DeploymentPacker.TryPack(new HexGrid(arena), BattleTeam.Enemy, footprints, new List<HexCoordinate>(), new List<HexCoordinate>());
+            return Fits(new HexGrid(arena), footprints);
+        }
+
+        /// <summary>
+        /// As <see cref="Fits(ArenaSize, IReadOnlyList{UnitFootprint})"/> on an already obstructed
+        /// board (a battle layout's obstacles set with <see cref="HexGrid.SetBlocked"/>): whether the
+        /// lineup still seats. On an unobstructed board the two agree.
+        /// </summary>
+        public static bool Fits(HexGrid grid, IReadOnlyList<UnitFootprint> footprints)
+        {
+            return DeploymentPacker.TryPack(grid, BattleTeam.Enemy, footprints, new List<HexCoordinate>(), new List<HexCoordinate>());
         }
 
         /// <summary>Front-to-back placement rank: melee screen first (Vanguard 0, Skirmisher 1), ranged at the back (2).</summary>

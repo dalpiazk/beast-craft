@@ -63,6 +63,12 @@ namespace BeastCraft.Presentation.Content
 
         public EnemyLibraryData EnemyLibrary { get; private set; }
 
+        /// <summary>The battlefield obstacles of each region's backdrops (battle-layouts.json), also on <see cref="BattleContent.Layouts"/>.</summary>
+        public BattleLayoutData Layouts
+        {
+            get { return Battle == null ? null : Battle.Layouts; }
+        }
+
         /// <summary>The campaign regions (regions.json): what an enemy's per-region art is keyed by.</summary>
         public RegionLibraryData Regions { get; private set; }
 
@@ -164,6 +170,7 @@ namespace BeastCraft.Presentation.Content
             GlossaryData glossaryData = Read<GlossaryData>(root, GlossaryData.ProjectRelativePath, errors);
             RegionLibraryData regions = Read<RegionLibraryData>(root, RegionLibraryData.ProjectRelativePath, errors);
             BattleArtData battleArt = Read<BattleArtData>(root, BattleArtData.ProjectRelativePath, errors);
+            BattleLayoutData layouts = Read<BattleLayoutData>(root, BattleLayoutData.ProjectRelativePath, errors);
             if (errors.Count > 0)
             {
                 return null;
@@ -176,6 +183,7 @@ namespace BeastCraft.Presentation.Content
             Prefix(errors, "enemy-library.json", EnemyLibraryValidator.Validate(enemyLibrary, roster, regions));
             Prefix(errors, "encounter-library.json", EncounterLibraryValidator.Validate(encounterLibrary, enemyLibrary, dropTables));
             Prefix(errors, "encounter-difficulty.json", EncounterDifficultyTable.Validate(difficulty, encounterLibrary));
+            Prefix(errors, "battle-layouts.json", ObstacleLayoutValidator.Validate(layouts, regions, encounterLibrary, enemyLibrary));
 
             HashSet<string> known = KnownSkills(skills, enemyLibrary);
             Prefix(errors, "vfx-library.json", VfxLibraryValidator.Validate(vfx, known, art));
@@ -240,7 +248,7 @@ namespace BeastCraft.Presentation.Content
                 EnemyLibrary = enemyLibrary,
                 Regions = regions,
                 Enemies = enemies,
-                Battle = new BattleContent(species, built.Values, passives, bonds, null, null, enemies),
+                Battle = new BattleContent(species, built.Values, passives, bonds, null, null, enemies) { Layouts = layouts },
                 Encounters = EncounterLibrary.Build(encounterLibrary, EncounterDifficultyTable.Build(difficulty)),
                 Vfx = VfxLibrary.Build(vfx),
                 Art = art,
