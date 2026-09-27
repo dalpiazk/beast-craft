@@ -332,6 +332,45 @@ namespace BeastCraft.Tests.EditMode
             }
         }
 
+        [Test]
+        public void ArtSlotChecklist_ListsEveryPaintedSlot_AndEveryListedPlaceholderExists()
+        {
+            string content = GameContent.FindRoot();
+            string checklist = File.ReadAllText(Path.Combine(Path.GetDirectoryName(content), "docs", "art", "hollow-art-slots.md"));
+            HashSet<string> listed = new HashSet<string>(StringComparer.Ordinal);
+            foreach (System.Text.RegularExpressions.Match match in System.Text.RegularExpressions.Regex.Matches(checklist, @"`content/(art/[a-z0-9_/]+\.png)`"))
+            {
+                listed.Add(match.Groups[1].Value);
+            }
+
+            int painted = 0;
+            foreach (ArtSpriteData sprite in Content.Art.Sprites)
+            {
+                string file = ArtManifestData.ResolveFile(sprite.File);
+                if (file.StartsWith("art/backdrops/", StringComparison.Ordinal) || file.StartsWith("art/ui/", StringComparison.Ordinal) ||
+                    file.StartsWith("art/vfx/", StringComparison.Ordinal))
+                {
+                    Assert.IsTrue(listed.Contains(file), file + " (" + sprite.Name + ") is a painted slot missing from docs/art/hollow-art-slots.md");
+                    painted++;
+                }
+            }
+
+            Assert.AreEqual(3 + 6 + 59, painted, "backdrops, icon frame and rings, VFX hero frames");
+            int icons = 0;
+            foreach (string file in listed)
+            {
+                if (file.StartsWith("art/icons/skills/", StringComparison.Ordinal))
+                {
+                    icons++;
+                    continue;
+                }
+
+                Assert.IsTrue(File.Exists(Path.Combine(content, file.Replace('/', Path.DirectorySeparatorChar))), file + " is listed but has no placeholder");
+            }
+
+            Assert.AreEqual(60 + 6 + 10 + 15, icons, "a slot per beast skill, avatar active, avatar passive and enemy skill");
+        }
+
         private static BattleBackdropData Backdrop(string region, string arena, float x, float y, float width, float height)
         {
             return new BattleBackdropData { RegionId = region, Arena = arena, ArtKey = "backdrop/" + region + "/" + arena.ToLowerInvariant(), BoardRect = Rect(x, y, width, height) };
