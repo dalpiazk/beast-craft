@@ -17,7 +17,9 @@ Tooling/ArtLab/scripts/export_ingame.py into content/art/beasts/, and the hand-k
 lists them (name, file, ArtKey, feet pivot, WorldHeight). build.py merges those entries into the
 same manifest, sorted by name with the rest: it reads each PNG's size and the top row of its art and
 derives PixelsPerUnit = (PivotY - top row) / WorldHeight, so a species' in-game height is one number
-in illustrated.json and a rebuild. It never writes those PNGs, so the rebuild stays byte-for-byte.
+in illustrated.json and a rebuild. It never writes those PNGs, so the rebuild stays byte-for-byte. An entry with an
+AccentFile (the illustrated enemies) also gets its element-accent overlay as a sprite of its own, <Name>_accent, and
+illustrated.json's ElementAccents (element -> palette char) is copied into the manifest.
 
 and LOCAL PREVIEWS (git-ignored) under Tooling/PixelArt/preview/:
   <name>_x8.png, <name>.gif (multi-frame), <name>_tiled_x4.png (tiles), map_mock_x4.png,
@@ -627,7 +629,7 @@ def illustrated_entries():
             sys.exit(f"illustrated {s['Name']}: pivot {px},{py} is off its {w}x{h} frame's art")
         if not s["WorldHeight"] > 0:
             sys.exit(f"illustrated {s['Name']}: WorldHeight must be above 0")
-        entries.append({
+        entry = {
             "Name": s["Name"],
             "File": s["File"],
             "Kind": "sprite",
@@ -643,9 +645,40 @@ def illustrated_entries():
             "PixelsPerUnit": round((py - bbox[1]) / s["WorldHeight"], 3),
             "Filter": "linear",
             "Premultiplied": False,
-        })
-        print(f"illustrated {s['Name']:22s} {w}x{h} height {s['WorldHeight']} -> {entries[-1]['PixelsPerUnit']} px/unit")
+        }
+        entries.append(entry)
+        print(f"illustrated {s['Name']:22s} {w}x{h} height {s['WorldHeight']} -> {entry['PixelsPerUnit']} px/unit")
+        if "AccentFile" in s:
+            entries.append(accent_entry(s, entry))
     return entries
+
+
+def accent_entry(s, base):
+    """An illustrated sprite's element-accent overlay (AccentFile): its own manifest sprite, named <Name>_accent, placed
+    exactly as its base (same frame, pivot and PixelsPerUnit); the base names it (Accent) with the element its art is
+    drawn in (AccentElement) and that colour (AccentNative)."""
+    path = (OUT / s["AccentFile"]).resolve()
+    if not path.is_file():
+        sys.exit(f"illustrated {s['Name']}: AccentFile {s['AccentFile']} is not a file")
+    with Image.open(path) as im:
+        if im.size != (base["FrameWidth"], base["FrameHeight"]):
+            sys.exit(f"illustrated {s['Name']}: AccentFile is {im.size[0]}x{im.size[1]}, its base "
+                     f"{base['FrameWidth']}x{base['FrameHeight']}")
+    name = s["Name"] + "_accent"
+    base["Accent"] = name
+    base["AccentElement"] = s["AccentElement"]
+    base["AccentNative"] = s["AccentNative"]
+    entry = dict(base, Name=name, File=s["AccentFile"], Category="accent", Label=s["Label"] + " accent overlay", ArtKey="")
+    for key in ("Accent", "AccentElement", "AccentNative"):
+        del entry[key]
+    return entry
+
+
+def element_accents():
+    """illustrated.json's ElementAccents: element name -> palette char, the colour an accent overlay is drawn in."""
+    if not ILLUSTRATED.exists():
+        return None
+    return json.loads(ILLUSTRATED.read_text(encoding="utf-8")).get("ElementAccents")
 
 
 def write_manifest(data, sprites):
@@ -666,12 +699,23 @@ def write_manifest(data, sprites):
                    "Tint), the pivot (PivotX/PivotY: pixels from the frame's top-left; a character's feet), "
                    "PixelsPerUnit (source pixels per hex column step), Filter (point for the pixel art, linear "
                    "for illustrated art, whose File is relative to this folder), Premultiplied (false: straight alpha, premultiplied on load) and "
-                   "optional Animations (named clips); plus the palette (char -> colour) that VFX colours are "
-                   "named from.",
+                   "optional Animations (named clips); an enemy's illustrated sprite may name an Accent: its "
+                   "element-accent overlay sprite (same frame, pivot and PixelsPerUnit), drawn over it multiplied by "
+                   "the unit's element colour, with AccentElement (the element the art is drawn in) and AccentNative "
+                   "(that colour, #rrggbb); plus the palette (char -> colour) that VFX colours are named from, and "
+                   "ElementAccents (element -> palette char: the accent colour of every other element).",
         "SchemaVersion": 2,
         "Palette": palette,
         "Sprites": entries,
     }
+    accents = element_accents()
+    if accents is not None:
+        for element, ch in accents.items():
+            if ch not in palette:
+                sys.exit(f"illustrated.json ElementAccents {element}: {ch!r} is not a palette char")
+        manifest = {k: v for k, v in manifest.items() if k != "Sprites"}
+        manifest["ElementAccents"] = accents
+        manifest["Sprites"] = entries
     text = json.dumps(manifest, indent=2, ensure_ascii=True) + "\n"
     (OUT / MANIFEST).write_bytes(text.encode("ascii"))
 

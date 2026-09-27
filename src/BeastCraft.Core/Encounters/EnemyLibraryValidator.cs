@@ -106,6 +106,8 @@ namespace BeastCraft.Encounters
                     errors.Add(where + ": ArtKey '" + enemy.ArtKey + "' is not lowercase snake_case segments joined by '/'.");
                 }
 
+                ValidateRegionArt(enemy, where, errors);
+
                 if (!(enemy.Threat > 0.0))
                 {
                     errors.Add(where + ": Threat must be above 0.");
@@ -115,6 +117,33 @@ namespace BeastCraft.Encounters
             }
 
             return errors;
+        }
+
+        /// <summary>
+        /// <see cref="EnemyData.RegionArt"/>: each entry a region id, at most once, with a well-formed
+        /// art key (the art reference validator checks the key is in the manifest). Presentation only.
+        /// </summary>
+        private static void ValidateRegionArt(EnemyData enemy, string where, List<string> errors)
+        {
+            HashSet<string> regions = new HashSet<string>(StringComparer.Ordinal);
+            foreach (EnemyRegionArtData variant in enemy.RegionArt ?? new EnemyRegionArtData[0])
+            {
+                if (variant == null || string.IsNullOrEmpty(variant.RegionId))
+                {
+                    errors.Add(where + ": a RegionArt entry has no RegionId.");
+                    continue;
+                }
+
+                if (!regions.Add(variant.RegionId))
+                {
+                    errors.Add(where + ": RegionArt lists region '" + variant.RegionId + "' twice.");
+                }
+
+                if (!Vfx.ArtReferenceValidator.IsWellFormed(variant.ArtKey))
+                {
+                    errors.Add(where + ": RegionArt '" + variant.RegionId + "' ArtKey '" + variant.ArtKey + "' is not lowercase snake_case segments joined by '/'.");
+                }
+            }
         }
 
         /// <summary>

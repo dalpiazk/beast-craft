@@ -9,7 +9,11 @@ namespace BeastCraft.Vfx
     /// root (<see cref="ArtManifestData.ResolveFile"/>); a known kind; positive frame
     /// sizes and counts; a pivot on the frame, a positive pixels-per-unit and a known filter; tints
     /// as <c>#rrggbb</c>; every clip naming an existing sheet, in-range frames and a sane rate; the
-    /// palette as <c>#rrggbb</c> by single chars. A <c>spine</c> entry is only checked for a name and
+    /// palette as <c>#rrggbb</c> by single chars; every accent overlay (<see cref="ArtSpriteData.Accent"/>)
+    /// an existing sprite of the same frame size, frames, pivot and pixels-per-unit, with a known
+    /// <see cref="ArtSpriteData.AccentElement"/> and a <c>#rrggbb</c> <see cref="ArtSpriteData.AccentNative"/>;
+    /// <see cref="ArtManifestData.ElementAccents"/> keyed by known element names (not <c>None</c>)
+    /// naming palette chars. A <c>spine</c> entry is only checked for a name and
     /// a file (the renderer skips it). Returns every problem found (empty = valid); never throws.
     /// </summary>
     public static class ArtManifestValidator
@@ -36,6 +40,19 @@ namespace BeastCraft.Vfx
                 if (entry.Key == null || entry.Key.Length != 1 || !IsHexColor(entry.Value))
                 {
                     errors.Add("Palette '" + entry.Key + "': needs a single char and a #rrggbb colour (is '" + entry.Value + "').");
+                }
+            }
+
+            foreach (KeyValuePair<string, string> entry in data.ElementAccents ?? new Dictionary<string, string>())
+            {
+                if (!IsElement(entry.Key))
+                {
+                    errors.Add("ElementAccents '" + entry.Key + "': not an element.");
+                }
+
+                if (entry.Value == null || data.Palette == null || !data.Palette.ContainsKey(entry.Value))
+                {
+                    errors.Add("ElementAccents '" + entry.Key + "': '" + entry.Value + "' is not a palette char.");
                 }
             }
 
@@ -110,6 +127,14 @@ namespace BeastCraft.Vfx
 
             foreach (ArtSpriteData sprite in sprites)
             {
+                if (sprite != null && !string.IsNullOrEmpty(sprite.Accent))
+                {
+                    ValidateAccent(data, sprite, errors);
+                }
+            }
+
+            foreach (ArtSpriteData sprite in sprites)
+            {
                 if (sprite == null || sprite.Animations == null)
                 {
                     continue;
@@ -159,6 +184,43 @@ namespace BeastCraft.Vfx
             }
 
             return errors;
+        }
+
+        /// <summary>An accent overlay must lie exactly on its base: same frame size, frames, pivot and scale.</summary>
+        private static void ValidateAccent(ArtManifestData data, ArtSpriteData sprite, List<string> errors)
+        {
+            string at = "Sprite '" + sprite.Name + "' Accent '" + sprite.Accent + "'";
+            ArtSpriteData accent = data.Find(sprite.Accent);
+            if (accent == null || accent == sprite)
+            {
+                errors.Add(at + ": not another sprite in the manifest.");
+            }
+            else if (accent.FrameWidth != sprite.FrameWidth || accent.FrameHeight != sprite.FrameHeight || accent.Frames != sprite.Frames)
+            {
+                errors.Add(at + ": is " + accent.FrameWidth + "x" + accent.FrameHeight + " x" + accent.Frames + ", its base " + sprite.FrameWidth + "x" +
+                           sprite.FrameHeight + " x" + sprite.Frames + "; an overlay must match its base's size.");
+            }
+            else if (accent.PivotX != sprite.PivotX || accent.PivotY != sprite.PivotY || accent.PixelsPerUnit != sprite.PixelsPerUnit)
+            {
+                errors.Add(at + ": its pivot and PixelsPerUnit must match its base's.");
+            }
+
+            if (!IsElement(sprite.AccentElement))
+            {
+                errors.Add(at + ": AccentElement '" + sprite.AccentElement + "' is not an element.");
+            }
+
+            if (!IsHexColor(sprite.AccentNative))
+            {
+                errors.Add(at + ": AccentNative '" + sprite.AccentNative + "' is not #rrggbb.");
+            }
+        }
+
+        /// <summary>Whether <paramref name="name"/> is an <c>Element</c> member's name, exactly as written, other than <c>None</c>.</summary>
+        private static bool IsElement(string name)
+        {
+            return !string.IsNullOrEmpty(name) && name != "None" && Enum.TryParse(name, false, out Creatures.Element element) &&
+                   Enum.IsDefined(typeof(Creatures.Element), element) && element.ToString() == name;
         }
 
         /// <summary>Whether <paramref name="text"/> is <c>#rrggbb</c>.</summary>

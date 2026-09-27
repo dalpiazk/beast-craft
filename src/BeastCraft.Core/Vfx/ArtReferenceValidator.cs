@@ -54,6 +54,14 @@ namespace BeastCraft.Vfx
                 if (enemy != null)
                 {
                     Check(enemy.ArtKey, "Enemy '" + enemy.EnemyId + "'", art, requireKeys, errors);
+                    foreach (EnemyRegionArtData variant in enemy.RegionArt ?? new EnemyRegionArtData[0])
+                    {
+                        if (variant != null)
+                        {
+                            Check(variant.ArtKey, "Enemy '" + enemy.EnemyId + "' region '" + variant.RegionId + "'", art, true, errors);
+                        }
+                    }
+
                     foreach (SkillData skill in enemy.Skills ?? new SkillData[0])
                     {
                         if (skill != null)
