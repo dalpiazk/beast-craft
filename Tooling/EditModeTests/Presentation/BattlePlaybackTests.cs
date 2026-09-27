@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Text;
 using BeastCraft.Battle;
 using BeastCraft.Battle.Grid;
+using BeastCraft.Creatures;
 using BeastCraft.Presentation.Board;
 using BeastCraft.Presentation.Content;
 using BeastCraft.Presentation.Playback;
@@ -57,6 +58,24 @@ namespace BeastCraft.Tests.EditMode
 
             Assert.IsNull(DemoBattle.Create(VfxLibraryTests.Content, DemoBattle.DefaultSeed, out _, out error, null, "no_such_encounter"));
             StringAssert.Contains("no_such_encounter", error);
+        }
+
+        [Test]
+        public void DemoBattle_Lineup_FieldsExactlyThoseEnemies_InTheirElements()
+        {
+            string[] lineup = { "brute:Fire", "brute:Water", "brute:Nature", "brute:Dark" };
+            BattleSetup setup = DemoBattle.Create(VfxLibraryTests.Content, DemoBattle.DefaultSeed, out Dictionary<string, string> species, out string error,
+                                                  lineup: lineup);
+
+            Assert.IsNotNull(setup, error);
+            Assert.AreEqual(4, setup.Encounter.Enemies.Count);
+            Assert.AreEqual(Element.Water, setup.Encounter.Enemies[1].Element);
+            Assert.AreEqual("brute", species["enemy4"]);
+            BattlePlayback playback = new BattlePlayback(BattleSession.Begin(setup));
+            Assert.AreEqual(Element.Dark, playback.Current["enemy4"].Element, "the snapshot carries the element the accent is tinted by");
+
+            Assert.IsNull(DemoBattle.Create(VfxLibraryTests.Content, DemoBattle.DefaultSeed, out _, out error, lineup: new[] { "brute:Moss" }));
+            StringAssert.Contains("brute:Moss", error);
         }
 
         [Test]

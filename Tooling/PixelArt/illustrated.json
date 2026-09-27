@@ -1,5 +1,17 @@
 {
-  "_readme": "HAND-KEPT. The illustrated sprites build.py merges into content/art/pixel/pixel-art-manifest.json (schema v2) beside the generated pixel placeholders. The PNGs are not built here: they are exported from the masters in content/art/source/<id>/ by Tooling/ArtLab/scripts/export_ingame.py. Per sprite: Name (unique in the manifest), File (relative to content/art/pixel/), Category, Label, ArtKey (the species' ArtKey in content/data/Creatures/beast-roster.json names it), PivotX/PivotY (the feet, px from the frame's top-left, as export_ingame.py prints them) and WorldHeight: the in-game height from the feet to the top of the art, in world units (1 = one hex column step; the pixel placeholders stand about 0.75 tall). WorldHeight is the species-size knob: build.py derives PixelsPerUnit = (PivotY - the art's top row) / WorldHeight, so a new value needs only a rebuild. FrameWidth/FrameHeight are read from the PNG; Filter is linear and Premultiplied false (straight-alpha PNGs, premultiplied on load).",
+  "_readme": "HAND-KEPT. The illustrated sprites build.py merges into content/art/pixel/pixel-art-manifest.json (schema v2) beside the generated pixel placeholders. The PNGs are not built here: they are exported from the masters in content/art/source/<id>/ (enemies: content/art/source/enemies/<type>/<region variant>/) by Tooling/ArtLab/scripts/export_ingame.py. Per sprite: Name (unique in the manifest), File (relative to content/art/pixel/), Category, Label, ArtKey (the species' ArtKey in content/data/Creatures/beast-roster.json, or the enemy's in content/data/Encounters/enemy-library.json, names it), PivotX/PivotY (the feet, px from the frame's top-left, as export_ingame.py prints them) and WorldHeight: the in-game height from the feet to the top of the art, in world units (1 = one hex column step; the pixel placeholders stand about 0.75 tall). WorldHeight is the species-size knob: build.py derives PixelsPerUnit = (PivotY - the art's top row) / WorldHeight, so a new value needs only a rebuild. FrameWidth/FrameHeight are read from the PNG; Filter is linear and Premultiplied false (straight-alpha PNGs, premultiplied on load). Enemies (Category enemy) also name AccentFile: the element-accent overlay export_ingame.py --accent-mask wrote beside the sprite (same frame); build.py lists it as its own sprite <Name>_accent and gives the base Accent (that name), AccentElement (the element the art is drawn in: Verdant Hollow art is Nature) and AccentNative (the accent's own colour, #rrggbb, as export_ingame.py printed it; the split is baked against it, so change it only with a re-export). The viewer draws the base, then the overlay multiplied by the unit's element colour: AccentNative for AccentElement (or no element), else the palette colour ElementAccents names for that element. An enemy's WorldHeight follows the lineup rule (docs/design/presentation-and-vfx.md, Enemy sizes): 0.95 of its footprint's width wide (one hex; the Champion's triangle 1.75, the Giant's Hex7 flower 2.5; the swarm units 0.55 of a hex), capped at 1.7 tall for a one-hex unit.",
+  "ElementAccents": {
+    "Fire": "o",
+    "Water": "c",
+    "Earth": "M",
+    "Air": "A",
+    "Lightning": "y",
+    "Ice": "C",
+    "Nature": "l",
+    "Metal": "3",
+    "Light": "Y",
+    "Dark": "P"
+  },
   "Sprites": [
     {
       "Name": "beast_basilisk_illustrated",
@@ -100,6 +112,123 @@
       "PivotX": 256,
       "PivotY": 508,
       "WorldHeight": 1.4
+    },
+    {
+      "Name": "enemy_archer_hollow",
+      "File": "../enemies/archer/archer_hollow.png",
+      "Category": "enemy",
+      "Label": "Archer (Verdant Hollow, illustrated)",
+      "ArtKey": "enemy/archer/hollow",
+      "PivotX": 256,
+      "PivotY": 508,
+      "WorldHeight": 0.94,
+      "AccentFile": "../enemies/archer/archer_hollow_accent.png",
+      "AccentElement": "Nature",
+      "AccentNative": "#fcda98"
+    },
+    {
+      "Name": "enemy_brute_hollow",
+      "File": "../enemies/brute/brute_hollow.png",
+      "Category": "enemy",
+      "Label": "Brute (Verdant Hollow, illustrated)",
+      "ArtKey": "enemy/brute/hollow",
+      "PivotX": 256,
+      "PivotY": 508,
+      "WorldHeight": 0.88,
+      "AccentFile": "../enemies/brute/brute_hollow_accent.png",
+      "AccentElement": "Nature",
+      "AccentNative": "#ddae77"
+    },
+    {
+      "Name": "enemy_caster_hollow",
+      "File": "../enemies/caster/caster_hollow.png",
+      "Category": "enemy",
+      "Label": "Caster (Verdant Hollow, illustrated)",
+      "ArtKey": "enemy/caster/hollow",
+      "PivotX": 256,
+      "PivotY": 508,
+      "WorldHeight": 1.25,
+      "AccentFile": "../enemies/caster/caster_hollow_accent.png",
+      "AccentElement": "Nature",
+      "AccentNative": "#ceee90"
+    },
+    {
+      "Name": "enemy_champion_hollow",
+      "File": "../enemies/champion/champion_hollow.png",
+      "Category": "enemy",
+      "Label": "Champion (Verdant Hollow, illustrated)",
+      "ArtKey": "enemy/champion/hollow",
+      "PivotX": 256,
+      "PivotY": 508,
+      "WorldHeight": 1.7,
+      "AccentFile": "../enemies/champion/champion_hollow_accent.png",
+      "AccentElement": "Nature",
+      "AccentNative": "#c9df68"
+    },
+    {
+      "Name": "enemy_giant_hollow",
+      "File": "../enemies/giant/giant_hollow.png",
+      "Category": "enemy",
+      "Label": "Giant (Verdant Hollow, illustrated)",
+      "ArtKey": "enemy/giant/hollow",
+      "PivotX": 256,
+      "PivotY": 508,
+      "WorldHeight": 2.37,
+      "AccentFile": "../enemies/giant/giant_hollow_accent.png",
+      "AccentElement": "Nature",
+      "AccentNative": "#c6d294"
+    },
+    {
+      "Name": "enemy_shaman_hollow",
+      "File": "../enemies/shaman/shaman_hollow.png",
+      "Category": "enemy",
+      "Label": "Shaman (Verdant Hollow, illustrated)",
+      "ArtKey": "enemy/shaman/hollow",
+      "PivotX": 256,
+      "PivotY": 508,
+      "WorldHeight": 1.32,
+      "AccentFile": "../enemies/shaman/shaman_hollow_accent.png",
+      "AccentElement": "Nature",
+      "AccentNative": "#d5e286"
+    },
+    {
+      "Name": "enemy_stalker_hollow",
+      "File": "../enemies/stalker/stalker_hollow.png",
+      "Category": "enemy",
+      "Label": "Stalker (Verdant Hollow, illustrated)",
+      "ArtKey": "enemy/stalker/hollow",
+      "PivotX": 256,
+      "PivotY": 508,
+      "WorldHeight": 1.03,
+      "AccentFile": "../enemies/stalker/stalker_hollow_accent.png",
+      "AccentElement": "Nature",
+      "AccentNative": "#d7a685"
+    },
+    {
+      "Name": "enemy_stingling_hollow",
+      "File": "../enemies/stingling/stingling_hollow.png",
+      "Category": "enemy",
+      "Label": "Stingling (Verdant Hollow, illustrated)",
+      "ArtKey": "enemy/stingling/hollow",
+      "PivotX": 256,
+      "PivotY": 508,
+      "WorldHeight": 0.73,
+      "AccentFile": "../enemies/stingling/stingling_hollow_accent.png",
+      "AccentElement": "Nature",
+      "AccentNative": "#b2da7c"
+    },
+    {
+      "Name": "enemy_swarmling_hollow",
+      "File": "../enemies/swarmling/swarmling_hollow.png",
+      "Category": "enemy",
+      "Label": "Swarmling (Verdant Hollow, illustrated)",
+      "ArtKey": "enemy/swarmling/hollow",
+      "PivotX": 256,
+      "PivotY": 508,
+      "WorldHeight": 0.39,
+      "AccentFile": "../enemies/swarmling/swarmling_hollow_accent.png",
+      "AccentElement": "Nature",
+      "AccentNative": "#e98e64"
     }
   ]
 }

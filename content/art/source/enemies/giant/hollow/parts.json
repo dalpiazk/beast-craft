@@ -1,0 +1,145 @@
+{
+ "beast": "giant",
+ "element": "any (gloamed enemy)",
+ "canvas": [
+  1792,
+  2304
+ ],
+ "order_back_to_front": [
+  "hind_foot",
+  "body",
+  "front_paws",
+  "head"
+ ],
+ "character": {
+  "file": "character.png",
+  "full_canvas_file": "character_full.png",
+  "pivot": [
+   1169,
+   2134
+  ],
+  "pivot_local": [
+   1014,
+   1550
+  ],
+  "note": "character.png is cropped so the feet pivot is its bottom centre"
+ },
+ "parts": {
+  "hind_foot": {
+   "file": "parts/hind_foot.png",
+   "parent": "body",
+   "offset": [
+    1108,
+    1951
+   ],
+   "size": [
+    580,
+    184
+   ],
+   "pivot": [
+    1308,
+    1966
+   ],
+   "pivot_local": [
+    200,
+    15
+   ]
+  },
+  "body": {
+   "file": "parts/body.png",
+   "parent": null,
+   "offset": [
+    195,
+    735
+   ],
+   "size": [
+    1431,
+    1323
+   ],
+   "pivot": [
+    1169,
+    2134
+   ],
+   "pivot_local": [
+    974,
+    1399
+   ]
+  },
+  "front_paws": {
+   "file": "parts/front_paws.png",
+   "parent": "body",
+   "offset": [
+    541,
+    1970
+   ],
+   "size": [
+    557,
+    132
+   ],
+   "pivot": [
+    830,
+    1979
+   ],
+   "pivot_local": [
+    289,
+    9
+   ]
+  },
+  "head": {
+   "file": "parts/head.png",
+   "parent": "body",
+   "offset": [
+    273,
+    593
+   ],
+   "size": [
+    776,
+    429
+   ],
+   "pivot": [
+    720,
+    951
+   ],
+   "pivot_local": [
+    447,
+    358
+   ]
+  }
+ },
+ "root_pivot_note": "root part 'body' pivots at the feet ground contact; child pivots = centre of contact with the parent. Canvas px (2x finals).",
+ "mask_stats": {
+  "fg_px": 1626083,
+  "overlap_px": 107726,
+  "orphan_px": 29192,
+  "island_px": 0,
+  "reclip_px": 5672,
+  "auto_fixed_pct": 8.42,
+  "sam_iou": {
+   "hind_foot": {
+    "iou": 0.0,
+    "src": "polygon"
+   },
+   "body": {
+    "iou": 0.06,
+    "src": "polygon"
+   },
+   "front_paws": {
+    "iou": 0.0,
+    "src": "polygon"
+   },
+   "head": {
+    "iou": 0.0,
+    "src": "polygon"
+   }
+  },
+  "inpaint": {
+   "body": {
+    "px": 166167,
+    "s": 155.1,
+    "retries": 6,
+    "cool_reverted_px": 106316
+   }
+  },
+  "recompose_mae": 0.01
+ }
+}

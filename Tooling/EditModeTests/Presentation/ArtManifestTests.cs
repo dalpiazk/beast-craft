@@ -37,8 +37,9 @@ namespace BeastCraft.Tests.EditMode
                 Assert.IsFalse(string.IsNullOrEmpty(sprite.Category), sprite.Name);
                 if (sprite.Filter == ArtFilter.Linear)
                 {
-                    StringAssert.StartsWith("../beasts/", sprite.File, sprite.Name);
-                    Assert.AreEqual("beast", sprite.Category, sprite.Name);
+                    bool beast = sprite.File.StartsWith("../beasts/", System.StringComparison.Ordinal);
+                    Assert.IsTrue(beast || sprite.File.StartsWith("../enemies/", System.StringComparison.Ordinal), sprite.Name + ": " + sprite.File);
+                    CollectionAssert.Contains(beast ? new[] { "beast" } : new[] { "enemy", "accent" }, sprite.Category, sprite.Name);
                     continue;
                 }
 
@@ -85,6 +86,106 @@ namespace BeastCraft.Tests.EditMode
             // about its height; the low, long basilisk fills it only in width (its art is ~0.65 tall).
             Assert.That(height, Is.InRange(0.75f, 1.75f), "world units from the feet to the top of the frame");
             Assert.IsNotNull(art.FindByArtKey("beast/" + species), "the pixel placeholder stays in the manifest");
+        }
+
+        [TestCase("giant", 2.37f)]
+        [TestCase("champion", 1.7f)]
+        [TestCase("shaman", 1.32f)]
+        [TestCase("caster", 1.25f)]
+        [TestCase("stalker", 1.03f)]
+        [TestCase("archer", 0.94f)]
+        [TestCase("brute", 0.88f)]
+        [TestCase("stingling", 0.73f)]
+        [TestCase("swarmling", 0.39f)]
+        public void EveryEnemy_DrawsItsHollowSprite_WithAnAccentOverlayOfItsSize(string enemy, float worldHeight)
+        {
+            ArtManifestData art = VfxLibraryTests.Content.Art;
+            string key = VfxLibraryTests.Content.Enemies.Get(enemy).ArtKey;
+            ArtSpriteData sprite = art.FindByArtKey(key);
+
+            Assert.AreEqual("enemy/" + enemy + "/hollow", key);
+            Assert.IsNotNull(sprite, key);
+            Assert.AreEqual(ArtFilter.Linear, sprite.Filter);
+            Assert.AreEqual("../enemies/" + enemy + "/" + enemy + "_hollow.png", sprite.File);
+            Assert.AreEqual(sprite.FrameWidth / 2f, sprite.PivotX, "the feet are the frame's horizontal centre");
+            Assert.AreEqual(sprite.FrameHeight - 4f, sprite.PivotY, "the feet are at the bottom of the frame");
+
+            ArtSpriteData accent = art.Find(sprite.Accent);
+            Assert.IsNotNull(accent, sprite.Accent);
+            Assert.AreEqual("accent", accent.Category);
+            Assert.AreEqual("../enemies/" + enemy + "/" + enemy + "_hollow_accent.png", accent.File);
+            Assert.AreEqual(sprite.FrameWidth, accent.FrameWidth);
+            Assert.AreEqual(sprite.FrameHeight, accent.FrameHeight);
+            Assert.AreEqual(sprite.PixelsPerUnit, accent.PixelsPerUnit);
+            Assert.AreEqual(sprite.Frames, accent.Frames, "the overlay draws the base's frame, so it has as many");
+            Assert.AreEqual("Nature", sprite.AccentElement, "the Verdant Hollow art is drawn in Nature");
+            Assert.IsTrue(ArtManifestValidator.IsHexColor(sprite.AccentNative), sprite.AccentNative);
+            Assert.IsNotNull(art.FindByArtKey("enemy/" + enemy), "the pixel placeholder stays in the manifest");
+
+            // WorldHeight (illustrated.json, the lineup's relative sizes) times PixelsPerUnit is the art's
+            // height in source px: it fills most of the 504 px content height or width, inside the frame.
+            Assert.That(worldHeight * sprite.PixelsPerUnit, Is.InRange(sprite.PivotY * 0.6f, sprite.PivotY), "the art fits its frame");
+        }
+
+        [Test]
+        public void AccentTint_ComesFromData_TheArtsOwnColourForItsElement()
+        {
+            ArtManifestData art = VfxLibraryTests.Content.Art;
+            ArtSpriteData brute = art.FindByArtKey("enemy/brute/hollow");
+
+            Assert.AreEqual(brute.AccentNative, art.AccentTint(brute, "Nature"), "Nature draws the approved art as is");
+            Assert.AreEqual(brute.AccentNative, art.AccentTint(brute, "None"));
+            Assert.AreEqual(brute.AccentNative, art.AccentTint(brute, null));
+            Assert.AreEqual(art.Palette[art.ElementAccents["Fire"]], art.AccentTint(brute, "Fire"));
+            Assert.AreEqual(art.Palette[art.ElementAccents["Dark"]], art.AccentTint(brute, "Dark"));
+            Assert.AreEqual(10, art.ElementAccents.Count, "every element but None has an accent colour");
+            Assert.IsNull(art.AccentTint(art.FindByArtKey("beast/golem/illustrated"), "Fire"), "a beast has no accent overlay");
+
+            // The colour is data: change the palette char and the tint follows.
+            ArtManifestData edited = Valid();
+            edited.Palette["o"] = "#ff0000";
+            edited.Palette["q"] = "#00ff00";
+            edited.ElementAccents = new Dictionary<string, string> { { "Fire", "o" } };
+            ArtSpriteData big = edited.Find("big");
+            big.Accent = "big_accent";
+            big.AccentElement = "Nature";
+            big.AccentNative = "#123456";
+            Assert.AreEqual("#ff0000", edited.AccentTint(big, "Fire"));
+            edited.ElementAccents["Fire"] = "q";
+            Assert.AreEqual("#00ff00", edited.AccentTint(big, "Fire"));
+            Assert.AreEqual("#123456", edited.AccentTint(big, "Water"), "an element the data does not colour keeps the art's own");
+        }
+
+        [Test]
+        public void Validator_RequiresTheAccentOverlay_ToMatchItsBase()
+        {
+            ArtManifestData art = WithAccent();
+            Assert.IsEmpty(ArtManifestValidator.Validate(art), string.Join("\n", ArtManifestValidator.Validate(art)));
+
+            art.Find("big_accent").FrameWidth = 256;
+            List<string> errors = ArtManifestValidator.Validate(art);
+            Assert.AreEqual(1, errors.Count, string.Join("\n", errors));
+            StringAssert.Contains("must match its base's size", errors[0]);
+
+            art = WithAccent();
+            art.Find("big_accent").Frames = 2;
+            StringAssert.Contains("must match its base's size", string.Join("\n", ArtManifestValidator.Validate(art)), "the frame counts must match too");
+
+            art = WithAccent();
+            art.Find("big_accent").PivotY = 400;
+            StringAssert.Contains("pivot", string.Join("\n", ArtManifestValidator.Validate(art)));
+
+            art = WithAccent();
+            art.Find("big").Accent = "nope";
+            art.Find("big").AccentElement = "Moss";
+            art.Find("big").AccentNative = "green";
+            art.ElementAccents = new Dictionary<string, string> { { "None", "K" }, { "Fire", "?" } };
+            string all = string.Join("\n", ArtManifestValidator.Validate(art));
+            StringAssert.Contains("not another sprite", all);
+            StringAssert.Contains("AccentElement 'Moss'", all);
+            StringAssert.Contains("AccentNative 'green'", all);
+            StringAssert.Contains("ElementAccents 'None': not an element", all);
+            StringAssert.Contains("ElementAccents 'Fire': '?' is not a palette char", all);
         }
 
         [TestCase("beast_a.png", "art/pixel/beast_a.png")]
@@ -203,6 +304,33 @@ namespace BeastCraft.Tests.EditMode
         private static float HeightUnits(ArtSpriteData sprite)
         {
             return sprite.PivotY / sprite.PixelsPerUnit;
+        }
+
+        /// <summary><see cref="Valid"/> plus an accent overlay for its <c>big</c> sprite, and an element palette.</summary>
+        private static ArtManifestData WithAccent()
+        {
+            ArtManifestData art = Valid();
+            ArtSpriteData big = art.Find("big");
+            big.Accent = "big_accent";
+            big.AccentElement = "Nature";
+            big.AccentNative = "#8fb85a";
+            ArtSpriteData accent = new ArtSpriteData
+            {
+                Name = "big_accent",
+                File = "big_accent.png",
+                Kind = ArtSpriteKind.Sprite,
+                Category = "accent",
+                FrameWidth = big.FrameWidth,
+                FrameHeight = big.FrameHeight,
+                Frames = 1,
+                PivotX = big.PivotX,
+                PivotY = big.PivotY,
+                PixelsPerUnit = big.PixelsPerUnit,
+                Filter = ArtFilter.Linear
+            };
+            art.Sprites = new List<ArtSpriteData>(art.Sprites) { accent }.ToArray();
+            art.ElementAccents = new Dictionary<string, string> { { "Fire", "K" } };
+            return art;
         }
 
         private static ArtManifestData Valid()

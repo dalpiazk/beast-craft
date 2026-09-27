@@ -1,0 +1,261 @@
+{
+ "archer": {
+  "pers": "Watchful",
+  "head": "watchful, alert, masked",
+  "subj": "small furry forest folk, carved bark mask, leaf hood, two arms, curved twig bow, arrow, quiver, violet haze",
+  "cneg": "red, blue, cyan, yellow",
+  "ipneg": "human, elf, bokoblin, korok, decidueye, pokemon, beard, gore",
+  "sw": [
+   [
+    "7a6a52",
+    3
+   ],
+   [
+    "4e4234",
+    2
+   ],
+   [
+    "a8967a",
+    2
+   ],
+   [
+    "6f8a4e",
+    2
+   ],
+   [
+    "8fb85a",
+    2
+   ],
+   [
+    "8f86a0",
+    2
+   ],
+   [
+    "e8e6a8",
+    1
+   ]
+  ]
+ },
+ "brute": {
+  "pers": "Stubborn",
+  "head": "stubborn, scowl, feral",
+  "subj": "mossy horned forest beast, thick hide, heavy quadruped, big curled ram horns, four legs, violet haze",
+  "cneg": "red, blue, cyan, yellow",
+  "ipneg": "pokemon, tauros, minotaur, monster hunter, tree face, gore",
+  "sw": [
+   [
+    "7a6450",
+    3
+   ],
+   [
+    "4e3e32",
+    2
+   ],
+   [
+    "a8927a",
+    2
+   ],
+   [
+    "6f8a4e",
+    2
+   ],
+   [
+    "8fb85a",
+    2
+   ],
+   [
+    "8f86a0",
+    2
+   ],
+   [
+    "e8e6a8",
+    1
+   ]
+  ]
+ },
+ "stalker": {
+  "pers": "Sneaky",
+  "head": "sneaky, sly, narrowed eyes, lean hunter",
+  "subj": "lean mossy forest hunter beast, four slender legs, tall antlers, bushy tail, pale fur, violet haze",
+  "cneg": "red, blue, cyan, yellow",
+  "ipneg": "pokemon, wolf, fox, deer, monster hunter, gore",
+  "sw": [
+   [
+    "7a6450",
+    3
+   ],
+   [
+    "4e3e32",
+    2
+   ],
+   [
+    "a8927a",
+    2
+   ],
+   [
+    "6f8a4e",
+    2
+   ],
+   [
+    "8fb85a",
+    2
+   ],
+   [
+    "8f86a0",
+    2
+   ],
+   [
+    "e8e6a8",
+    1
+   ]
+  ]
+ },
+ "caster": {
+  "pers": "Spiteful",
+  "head": "spiteful, smug, narrowed eyes",
+  "subj": "round mossy beast, two short legs, tall wispy antlers, glowing spell orb between the antlers, violet haze",
+  "cneg": "red, blue, cyan, yellow",
+  "ipneg": "pokemon, human, rabbit, hamster, gore",
+  "sw": [
+   [
+    "7a6450",
+    3
+   ],
+   [
+    "4e3e32",
+    2
+   ],
+   [
+    "a8927a",
+    2
+   ],
+   [
+    "6f8a4e",
+    2
+   ],
+   [
+    "8fb85a",
+    2
+   ],
+   [
+    "8f86a0",
+    2
+   ],
+   [
+    "e8e6a8",
+    1
+   ]
+  ]
+ },
+ "champion": {
+  "pers": "Swaggering",
+  "head": "swaggering, cocky, big",
+  "subj": "big mossy horned beast leader, heavy body, moss crown, curled horns, sturdy legs, violet haze",
+  "cneg": "red, blue, cyan, yellow",
+  "ipneg": "pokemon, sheep, human, gore",
+  "sw": [
+   [
+    "7a6450",
+    3
+   ],
+   [
+    "4e3e32",
+    2
+   ],
+   [
+    "a8927a",
+    2
+   ],
+   [
+    "6f8a4e",
+    2
+   ],
+   [
+    "8fb85a",
+    2
+   ],
+   [
+    "8f86a0",
+    2
+   ],
+   [
+    "e8e6a8",
+    1
+   ]
+  ]
+ },
+ "swarmling": {
+  "pers": "Skittery",
+  "head": "skittery, cute creepy, glowing eyes",
+  "subj": "small round mossy mite beast, ram horns, fern tufts, short legs, glowing eyes, bold outline",
+  "cneg": "red, blue, cyan, yellow",
+  "ipneg": "pokemon, sheep, slime, gore",
+  "sw": [
+   [
+    "7a6450",
+    3
+   ],
+   [
+    "4e3e32",
+    2
+   ],
+   [
+    "a8927a",
+    2
+   ],
+   [
+    "6f8a4e",
+    2
+   ],
+   [
+    "8fb85a",
+    2
+   ],
+   [
+    "8f86a0",
+    2
+   ],
+   [
+    "e8e6a8",
+    1
+   ]
+  ]
+ },
+ "stingling": {
+  "pers": "Buzzy",
+  "head": "buzzy, pesky, glowing eyes",
+  "subj": "fluffy forest pest creature, leafy tufts, glowing eyes, small stinger tail, two legs, violet haze",
+  "cneg": "red, blue, cyan, yellow",
+  "ipneg": "pokemon, owl, human, wizard, staff, stick, gore",
+  "sw": [
+   [
+    "766850",
+    3
+   ],
+   [
+    "4a4032",
+    2
+   ],
+   [
+    "a4947a",
+    2
+   ],
+   [
+    "6f8a4e",
+    2
+   ],
+   [
+    "8fb85a",
+    2
+   ],
+   [
+    "8f86a0",
+    2
+   ],
+   [
+    "e8e6a8",
+    1
+   ]
+  ]
+ }
+}

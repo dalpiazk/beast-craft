@@ -1,0 +1,147 @@
+{
+ "_note": "1x coords, hand polygons + hand-set pivots (stingling, Verdant Hollow enemy).",
+ "parts": {
+  "legs": {
+   "pos": [
+    [
+     510,
+     947
+    ]
+   ],
+   "neg": [],
+   "poly_only": true,
+   "clip": [
+    [
+     400,
+     880
+    ],
+    [
+     620,
+     880
+    ],
+    [
+     620,
+     1015
+    ],
+    [
+     400,
+     1015
+    ]
+   ],
+   "pivot": [
+    510,
+    885
+   ]
+  },
+  "stinger": {
+   "pos": [
+    [
+     692,
+     867
+    ]
+   ],
+   "neg": [],
+   "poly_only": true,
+   "clip": [
+    [
+     585,
+     815
+    ],
+    [
+     800,
+     815
+    ],
+    [
+     800,
+     920
+    ],
+    [
+     585,
+     920
+    ]
+   ],
+   "pivot": [
+    600,
+    870
+   ]
+  },
+  "body": {
+   "pos": [
+    [
+     485,
+     725
+    ]
+   ],
+   "neg": [],
+   "poly_only": true,
+   "clip": [
+    [
+     250,
+     540
+    ],
+    [
+     720,
+     540
+    ],
+    [
+     720,
+     910
+    ],
+    [
+     250,
+     910
+    ]
+   ]
+  },
+  "head": {
+   "pos": [
+    [
+     425,
+     320
+    ]
+   ],
+   "neg": [],
+   "poly_only": true,
+   "clip": [
+    [
+     110,
+     80
+    ],
+    [
+     740,
+     80
+    ],
+    [
+     740,
+     560
+    ],
+    [
+     110,
+     560
+    ]
+   ],
+   "pivot": [
+    440,
+    560
+   ]
+  }
+ },
+ "order": [
+  "legs",
+  "stinger",
+  "body",
+  "head"
+ ],
+ "parent": {
+  "legs": "body",
+  "stinger": "body",
+  "body": null,
+  "head": "body"
+ },
+ "extend": [
+  "body"
+ ],
+ "desc": {
+  "body": "mossy furry creature body"
+ }
+}

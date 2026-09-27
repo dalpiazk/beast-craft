@@ -1,0 +1,117 @@
+{
+ "_note": "1x coords, hand polygons + hand-set pivots (stalker, Verdant Hollow enemy).",
+ "parts": {
+  "legs": {
+   "pos": [
+    [
+     470,
+     952
+    ]
+   ],
+   "neg": [],
+   "poly_only": true,
+   "clip": [
+    [
+     250,
+     880
+    ],
+    [
+     690,
+     880
+    ],
+    [
+     690,
+     1025
+    ],
+    [
+     250,
+     1025
+    ]
+   ],
+   "pivot": [
+    470,
+    880
+   ]
+  },
+  "body": {
+   "pos": [
+    [
+     410,
+     730
+    ]
+   ],
+   "neg": [],
+   "poly_only": true,
+   "clip": [
+    [
+     60,
+     560
+    ],
+    [
+     760,
+     560
+    ],
+    [
+     760,
+     900
+    ],
+    [
+     60,
+     900
+    ]
+   ]
+  },
+  "head": {
+   "pos": [
+    [
+     556,
+     496
+    ]
+   ],
+   "neg": [],
+   "poly_only": true,
+   "clip": [
+    [
+     430,
+     220
+    ],
+    [
+     720,
+     220
+    ],
+    [
+     720,
+     740
+    ],
+    [
+     480,
+     740
+    ],
+    [
+     430,
+     560
+    ]
+   ],
+   "pivot": [
+    560,
+    720
+   ]
+  }
+ },
+ "order": [
+  "legs",
+  "body",
+  "head"
+ ],
+ "parent": {
+  "legs": "body",
+  "body": null,
+  "head": "body"
+ },
+ "extend": [
+  "body"
+ ],
+ "desc": {
+  "body": "mossy furry creature body"
+ }
+}

@@ -1,0 +1,95 @@
+{
+ "beast": "champion",
+ "element": "any (gloamed enemy)",
+ "canvas": [
+  1792,
+  2304
+ ],
+ "order_back_to_front": [
+  "body",
+  "head"
+ ],
+ "character": {
+  "file": "character.png",
+  "full_canvas_file": "character_full.png",
+  "pivot": [
+   766,
+   2109
+  ],
+  "pivot_local": [
+   1023,
+   1668
+  ],
+  "note": "character.png is cropped so the feet pivot is its bottom centre"
+ },
+ "parts": {
+  "body": {
+   "file": "parts/body.png",
+   "parent": null,
+   "offset": [
+    207,
+    488
+   ],
+   "size": [
+    1535,
+    1622
+   ],
+   "pivot": [
+    766,
+    2109
+   ],
+   "pivot_local": [
+    559,
+    1621
+   ]
+  },
+  "head": {
+   "file": "parts/head.png",
+   "parent": "body",
+   "offset": [
+    340,
+    1120
+   ],
+   "size": [
+    602,
+    642
+   ],
+   "pivot": [
+    665,
+    1431
+   ],
+   "pivot_local": [
+    325,
+    311
+   ]
+  }
+ },
+ "root_pivot_note": "root part 'body' pivots at the feet ground contact; child pivots = centre of contact with the parent. Canvas px (2x finals).",
+ "mask_stats": {
+  "fg_px": 1361165,
+  "overlap_px": 358979,
+  "orphan_px": 2056,
+  "island_px": 0,
+  "reclip_px": 0,
+  "auto_fixed_pct": 26.52,
+  "sam_iou": {
+   "body": {
+    "iou": 0.0,
+    "src": "polygon"
+   },
+   "head": {
+    "iou": 0.0,
+    "src": "polygon"
+   }
+  },
+  "inpaint": {
+   "body": {
+    "px": 359056,
+    "s": 141.6,
+    "retries": 6,
+    "cool_reverted_px": 21704
+   }
+  },
+  "recompose_mae": 0.02
+ }
+}

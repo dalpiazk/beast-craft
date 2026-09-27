@@ -91,11 +91,51 @@ namespace BeastCraft.Encounters
         public SkillData[] Skills = new SkillData[0];
 
         /// <summary>
-        /// Presentation only: the art key the viewer draws this enemy with (a sprite's
-        /// <c>ArtKey</c> in the art manifest), e.g. <c>"enemy/giant"</c>. Optional, but every shipped
-        /// enemy sets one; an enemy without art of its own points at a manifest alias entry (another
-        /// sprite plus a tint). Never read by battles.
+        /// Presentation only: the art key the viewer draws this enemy with by default (a sprite's
+        /// <c>ArtKey</c> in the art manifest), e.g. <c>"enemy/giant/hollow"</c>: the art for any
+        /// region <see cref="RegionArt"/> does not name. Optional, but every shipped enemy sets one;
+        /// an enemy without art of its own points at a manifest alias entry (another sprite plus a
+        /// tint). Never read by battles.
         /// </summary>
+        public string ArtKey;
+
+        /// <summary>
+        /// Presentation only: per-region art variants (a region's creatures are drawn in its look,
+        /// e.g. the Verdant Hollow's mossy brute), each a region id (<c>regions.json</c>'s
+        /// <c>RegionId</c>) and the art key to draw the enemy with there. Optional; a region it does
+        /// not list uses <see cref="ArtKey"/> (<see cref="ArtKeyFor"/>). Never read by battles.
+        /// </summary>
+        public EnemyRegionArtData[] RegionArt = new EnemyRegionArtData[0];
+
+        /// <summary>
+        /// The art key for this enemy in region <paramref name="regionId"/>: its <see cref="RegionArt"/>
+        /// entry for that region, else the default <see cref="ArtKey"/> (also for a null or empty region).
+        /// </summary>
+        public string ArtKeyFor(string regionId)
+        {
+            if (!string.IsNullOrEmpty(regionId) && RegionArt != null)
+            {
+                foreach (EnemyRegionArtData variant in RegionArt)
+                {
+                    if (variant != null && string.Equals(variant.RegionId, regionId, StringComparison.Ordinal) && !string.IsNullOrEmpty(variant.ArtKey))
+                    {
+                        return variant.ArtKey;
+                    }
+                }
+            }
+
+            return ArtKey;
+        }
+    }
+
+    /// <summary>One region's art variant of an enemy type (<see cref="EnemyData.RegionArt"/>). Presentation only.</summary>
+    [Serializable]
+    public class EnemyRegionArtData
+    {
+        /// <summary>A <c>regions.json</c> <c>RegionId</c>, at most once per enemy.</summary>
+        public string RegionId;
+
+        /// <summary>The art key (a sprite's <c>ArtKey</c> in the art manifest) to draw the enemy with in that region.</summary>
         public string ArtKey;
     }
 }

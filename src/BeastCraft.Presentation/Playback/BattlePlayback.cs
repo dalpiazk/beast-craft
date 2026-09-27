@@ -69,6 +69,7 @@ namespace BeastCraft.Presentation.Playback
             Hp = unit.CurrentHp;
             MaxHp = unit.Stats.Hp;
             Defeated = unit.IsDefeated;
+            Element = unit.Elements.Count > 0 ? unit.Elements[0] : Element.None;
 
             StatusSnapshot[] statuses = unit.Statuses.Count == 0 ? NoStatuses : new StatusSnapshot[unit.Statuses.Count];
             for (int i = 0; i < statuses.Length; i++)
@@ -91,8 +92,9 @@ namespace BeastCraft.Presentation.Playback
 
         /// <summary>A snapshot from explicit values (tests, tools).</summary>
         public UnitSnapshot(string id, BattleTeam team, HexCoordinate position, UnitFootprint footprint, int hp, int maxHp, bool defeated,
-                            IReadOnlyList<StatusSnapshot> statuses = null, IReadOnlyList<ModifierSnapshot> modifiers = null)
+                            IReadOnlyList<StatusSnapshot> statuses = null, IReadOnlyList<ModifierSnapshot> modifiers = null, Element element = Element.None)
         {
+            Element = element;
             Id = id;
             Team = team;
             Position = position;
@@ -117,6 +119,9 @@ namespace BeastCraft.Presentation.Playback
         public int MaxHp { get; }
 
         public bool Defeated { get; }
+
+        /// <summary>The unit's first element (None without one): what an enemy's accent overlay is tinted by. Presentation only.</summary>
+        public Element Element { get; }
 
         /// <summary>The statuses on the unit, in the order they were applied.</summary>
         public IReadOnlyList<StatusSnapshot> Statuses { get; }

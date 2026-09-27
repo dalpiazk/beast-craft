@@ -40,7 +40,39 @@ namespace BeastCraft.Vfx
         /// <summary>Palette char to <c>#rrggbb</c>: the colours VFX specs name.</summary>
         public Dictionary<string, string> Palette = new Dictionary<string, string>();
 
+        /// <summary>
+        /// Element name (an <c>Element</c> member, exactly as written) to a palette char: the colour
+        /// an illustrated enemy's accent overlay (<see cref="ArtSpriteData.Accent"/>) is multiplied
+        /// by for a unit of that element (<see cref="AccentTint"/>). Presentation only.
+        /// </summary>
+        public Dictionary<string, string> ElementAccents = new Dictionary<string, string>();
+
         public ArtSpriteData[] Sprites = new ArtSpriteData[0];
+
+        /// <summary>
+        /// The colour (<c>#rrggbb</c>) <paramref name="sprite"/>'s accent overlay is drawn in for a
+        /// unit of element <paramref name="element"/> (an <c>Element</c> member name): the art's own
+        /// accent colour (<see cref="ArtSpriteData.AccentNative"/>) for the element the art is drawn
+        /// in (<see cref="ArtSpriteData.AccentElement"/>), for no element (null, empty or
+        /// <c>None</c>) and for an element <see cref="ElementAccents"/> does not colour; else the
+        /// palette colour <see cref="ElementAccents"/> names. Null for a sprite without an accent.
+        /// </summary>
+        public string AccentTint(ArtSpriteData sprite, string element)
+        {
+            if (sprite == null || string.IsNullOrEmpty(sprite.Accent))
+            {
+                return null;
+            }
+
+            if (string.IsNullOrEmpty(element) || element == "None" || string.Equals(element, sprite.AccentElement, StringComparison.Ordinal) ||
+                ElementAccents == null || !ElementAccents.TryGetValue(element, out string ch) || ch == null || Palette == null ||
+                !Palette.TryGetValue(ch, out string color))
+            {
+                return sprite.AccentNative;
+            }
+
+            return color;
+        }
 
         /// <summary>The sprite named <paramref name="name"/>, or null.</summary>
         public ArtSpriteData Find(string name)
@@ -228,6 +260,24 @@ namespace BeastCraft.Vfx
         /// under its own <see cref="ArtKey"/>) carries one so the reuse is told apart.
         /// </summary>
         public string Tint;
+
+        /// <summary>
+        /// An illustrated enemy's element-accent overlay: the Name of another sprite with the same
+        /// frame size, frame count, pivot and pixels-per-unit (white where the accent is, its alpha
+        /// how much of each pixel is accent colour), drawn over this one multiplied by the unit's
+        /// element colour (<see cref="ArtManifestData.AccentTint"/>). Null/empty = no overlay.
+        /// </summary>
+        public string Accent;
+
+        /// <summary>With <see cref="Accent"/>: the element the art is drawn in (an <c>Element</c> name; Verdant Hollow art is <c>Nature</c>).</summary>
+        public string AccentElement;
+
+        /// <summary>
+        /// With <see cref="Accent"/>: the accent's own colour (<c>#rrggbb</c>). The overlay was split
+        /// against it (Tooling/ArtLab/scripts/export_ingame.py), so the base plus the overlay in this
+        /// colour is the art as drawn.
+        /// </summary>
+        public string AccentNative;
 
         /// <summary>Named clips (idle, attack, hit, ...). Optional: without one the sprite is frame 0.</summary>
         public ArtAnimationData[] Animations = new ArtAnimationData[0];

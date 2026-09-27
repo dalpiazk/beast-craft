@@ -45,6 +45,14 @@ those PNGs, so the rebuild still leaves `git status` clean. The species' `ArtKey
 `content/data/Creatures/beast-roster.json` picks the illustrated entry (`beast/<id>/illustrated`)
 or the pixel placeholder (`beast/<id>`), which stays in the manifest.
 
+The illustrated **enemies** (the Verdant Hollow variants, `content/art/enemies/<type>/<type>_hollow.png`) are listed
+the same way, `ArtKey` `enemy/<type>/hollow` (named by `enemy-library.json`), plus `AccentFile` (the element-accent
+overlay `export_ingame.py --accent-mask` wrote beside the sprite), `AccentElement` and `AccentNative`: `build.py`
+lists the overlay as its own sprite `<Name>_accent` (same frame, pivot and PixelsPerUnit; it refuses a size
+mismatch) and names it from the base (`Accent`). `illustrated.json`'s `ElementAccents` (element -> palette char) is
+copied into the manifest: the colour each element tints an overlay (see `docs/design/presentation-and-vfx.md`,
+"Element accents").
+
 Why merge a hand-kept file here instead of a second manifest: the loader, the validators
 (`ArtManifestValidator`, `ArtReferenceValidator`, `VfxLibraryValidator`) and both hosts already
 index one file, and every entry stays in one schema-v2 list. Hand-editing the generated manifest
@@ -79,7 +87,8 @@ would be overwritten by the next build.
 - VFX layer textures (VFX schema v2; white/grey, tinted and sized in game): `fx_ring` (shockwave
   ring, generator `ring`), `fx_aura_ring` (ground aura ellipse), `fx_glow` (soft disc, generator
   `disc`), `fx_scorch` (ground decal, generator `blob`), `fx_ray` (radial-burst streak, pivot at
-  its tail) and `fx_glyphs` (4 rune frames).
+  its tail), `fx_glyphs` (4 rune frames) and `fx_gloam_haze` (the Gloam haze under every enemy: an 8-frame
+  looping ground wisp, generator `haze`).
 - Status icons (9x9): `icon_stun`, `icon_shield`, `icon_burn`, `icon_poison`, `icon_taunt`,
   `icon_buff`, `icon_debuff`, drawn above a unit's HP bar while the status lasts.
 - Skill icons (24x24, `skill_<id>`, ArtKey `skill/<id>`): cheap generated placeholders, one per

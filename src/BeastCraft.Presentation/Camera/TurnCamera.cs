@@ -155,7 +155,7 @@ namespace BeastCraft.Presentation.Camera
             }
 
             Vec2 feet = layout.FootprintCenter(unit.Position, unit.Footprint);
-            boxes.Add(CameraRig.UnitBox(feet, unit.Footprint == UnitFootprint.Single ? 1f : 2f));
+            boxes.Add(CameraRig.UnitBox(feet, HexLayout.FootprintWidth(unit.Footprint)));
         }
     }
 }

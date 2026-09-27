@@ -64,6 +64,9 @@ namespace BeastCraft.Game
         private GameContent _content;
         private BattlePlayback _playback;
         private Dictionary<string, string> _speciesByUnit;
+
+        /// <summary>The region whose enemy art is drawn (<c>--region</c>, else the encounter's, else r01).</summary>
+        private string _regionId = DemoBattle.DefaultRegionId;
         private Dictionary<string, string> _names;
         private BoardFit _boardFit;
         private CanvasFit _canvasFit;
@@ -144,8 +147,15 @@ namespace BeastCraft.Game
             LoadFont();
             LoadSettings();
 
+            _regionId = _options.Region ?? (_options.Lineup == null ? DemoBattle.RegionOf(_content, _options.Encounter) : null) ?? DemoBattle.DefaultRegionId;
+            if (!DemoBattle.IsRegion(_content, _regionId))
+            {
+                Fail("Unknown region '" + _regionId + "'.");
+                return;
+            }
+
             BattleSetup setup = DemoBattle.Create(_content, _options.Seed, out _speciesByUnit, out string error, _options.Team, _options.Encounter,
-                                                  _options.Level, _options.EnemyLevel, _options.Arena);
+                                                  _options.Level, _options.EnemyLevel, _options.Arena, _options.Lineup);
             BattleSessionRun run = setup == null ? null : BattleSession.Begin(setup);
             if (run == null || run.Battle == null)
             {

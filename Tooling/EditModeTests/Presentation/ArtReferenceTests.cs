@@ -54,12 +54,96 @@ namespace BeastCraft.Tests.EditMode
         public void ArtKey_ReachesTheRuntimeSpecies_ForBeastsAndEnemies()
         {
             Assert.AreEqual("beast/phoenix/illustrated", Content.Battle.GetSpecies("phoenix").ArtKey);
-            Assert.AreEqual("enemy/giant", Content.Enemies.Species("giant", Element.Water).ArtKey);
-            Assert.AreEqual("enemy/archer", Content.Enemies.Get("archer").ArtKey);
+            Assert.AreEqual("enemy/giant/hollow", Content.Enemies.Species("giant", Element.Water).ArtKey);
+            Assert.AreEqual("enemy/archer/hollow", Content.Enemies.Get("archer").ArtKey);
         }
 
         [Test]
-        public void EnemiesWithoutArtOfTheirOwn_AliasAnotherSprite_WithATint()
+        public void EnemyArt_IsKeyedByRegion_WithADefault()
+        {
+            EnemyData brute = Content.Enemies.Get("brute");
+
+            Assert.AreEqual("enemy/brute/hollow", brute.ArtKey, "the default is the Verdant Hollow art");
+            Assert.AreEqual("enemy/brute/hollow", brute.ArtKeyFor("r01"));
+            Assert.AreEqual("enemy/brute/hollow", brute.ArtKeyFor("r02"), "a region without a variant draws the default");
+            Assert.AreEqual("enemy/brute/hollow", brute.ArtKeyFor(null));
+
+            EnemyData twoRegions = new EnemyData
+            {
+                EnemyId = "e",
+                ArtKey = "enemy/e/hollow",
+                RegionArt = new[] { new EnemyRegionArtData { RegionId = "r01", ArtKey = "enemy/e/hollow" }, new EnemyRegionArtData { RegionId = "r02", ArtKey = "enemy/e/ember" } }
+            };
+            Assert.AreEqual("enemy/e/ember", twoRegions.ArtKeyFor("r02"));
+            Assert.AreEqual("enemy/e/hollow", twoRegions.ArtKeyFor("r03"));
+        }
+
+        [Test]
+        public void TheViewer_ResolvesEnemyArtByRegion_AndFallsBackToTheDefault()
+        {
+            EnemyData brute = Content.Enemies.Get("brute");
+            EnemyRegionArtData[] shipped = brute.RegionArt;
+            try
+            {
+                // A fake second-region variant (the pixel placeholder stands in for its art).
+                brute.RegionArt = new[] { shipped[0], new EnemyRegionArtData { RegionId = "r02", ArtKey = "enemy/brute" } };
+
+                Assert.AreEqual("enemy/brute", DemoBattle.ArtKeyOf(Content, "brute", "r02"), "the region's own variant");
+                Assert.AreEqual("enemy/brute/hollow", DemoBattle.ArtKeyOf(Content, "brute", "r01"));
+                Assert.AreEqual("enemy/brute/hollow", DemoBattle.ArtKeyOf(Content, "brute", "r03"), "no variant: the default");
+                Assert.AreEqual("beast/phoenix/illustrated", DemoBattle.ArtKeyOf(Content, "phoenix", "r02"), "a beast keeps its own art");
+            }
+            finally
+            {
+                brute.RegionArt = shipped;
+            }
+
+            Assert.AreEqual("r02", DemoBattle.RegionOf(Content, "boss_r02_ember_twins"), "a region boss belongs to its region");
+            Assert.IsNull(DemoBattle.RegionOf(Content, "squad"), "a generated shape has no region of its own");
+            Assert.IsTrue(DemoBattle.IsRegion(Content, DemoBattle.DefaultRegionId));
+        }
+
+        [Test]
+        public void RegionArt_RegionIds_MustBeRegionsInRegionsJson()
+        {
+            EnemyLibraryData library = FieldJson.FromJson<EnemyLibraryData>(File.ReadAllText(GameContent.PathOf(GameContent.FindRoot(), EnemyLibraryData.ProjectRelativePath)));
+            Assert.IsEmpty(EnemyLibraryValidator.Validate(library, null, Content.Regions), "the shipped library names only real regions");
+
+            library.Enemies[0].RegionArt = new[] { new EnemyRegionArtData { RegionId = "r1", ArtKey = library.Enemies[0].ArtKey } };
+            List<string> errors = EnemyLibraryValidator.Validate(library, null, Content.Regions);
+
+            Assert.AreEqual(1, errors.Count, string.Join("\n", errors));
+            StringAssert.Contains("'r1' is not a region in regions.json", errors[0]);
+            Assert.IsEmpty(EnemyLibraryValidator.Validate(library, null), "without regions.json the id is not cross-checked");
+        }
+
+        [Test]
+        public void RegionArt_NeedsARegionOnce_AndAKnownKey()
+        {
+            EnemyData enemy = new EnemyData
+            {
+                EnemyId = "e",
+                ArtKey = "enemy/e",
+                RegionArt = new[]
+                {
+                    new EnemyRegionArtData { RegionId = "r01", ArtKey = "enemy/e" }, new EnemyRegionArtData { RegionId = "r01", ArtKey = "enemy/e" },
+                    new EnemyRegionArtData { RegionId = "", ArtKey = "enemy/e" }, new EnemyRegionArtData { RegionId = "r02", ArtKey = "enemy/missing" }
+                }
+            };
+            EnemyLibraryData library = new EnemyLibraryData { Enemies = new[] { enemy } };
+            ArtManifestData art = new ArtManifestData { Sprites = new[] { new ArtSpriteData { Name = "e", File = "e.png", ArtKey = "enemy/e" } } };
+
+            List<string> shape = EnemyLibraryValidator.Validate(library, null);
+            List<string> keys = ArtReferenceValidator.Validate(null, library, art);
+
+            Assert.IsTrue(shape.Exists(e => e.Contains("'r01' twice")), string.Join("\n", shape));
+            Assert.IsTrue(shape.Exists(e => e.Contains("no RegionId")), string.Join("\n", shape));
+            Assert.AreEqual(1, keys.Count, string.Join("\n", keys));
+            StringAssert.Contains("enemy/missing", keys[0]);
+        }
+
+        [Test]
+        public void EnemyPixelPlaceholders_StayInTheManifest_AliasesTinted()
         {
             ArtSpriteData archer = Content.Art.FindByArtKey("enemy/archer");
             ArtSpriteData brute = Content.Art.FindByArtKey("enemy/brute");

@@ -1,4 +1,4 @@
-# Beast art: known touch-ups before the animation pass
+# Beast and enemy art: known touch-ups before the animation pass
 
 All ten beasts' art is final and approved for the game (`docs/art/art-brief.md`), as single illustrated sprites.
 The rig parts in `content/art/source/<id>/` are machine-cut, so this list is for the **animation pass** (Spine or
@@ -17,6 +17,24 @@ today. Details and coordinates are in each beast's `Tooling/ArtLab/provenance/<i
 | Tarasque | The leg parts are straight polygon cuts at the belly. | when the legs swing |
 | Golem | The head part includes the front moss tuft; a tiny detached flower-sprig outline sits left of the head. | head turns |
 | All | Machine-cut joints: an artist pass on every part's joint edges is advised before animating. | any rotation |
+
+## Enemies (Verdant Hollow variants)
+The nine enemy types' Hollow art is final too (2026-09-27); masters and machine-cut parts in
+`content/art/source/enemies/<type>/hollow/`, details in `Tooling/ArtLab/provenance/enemies/<type>.md`.
+
+| Enemy | Touch-up | Where it shows |
+| --- | --- | --- |
+| Stalker | The added **far hind leg is thin and flat-painted** beside the rendered legs (repainted solid after the lock, still flatter). An artist paint-over. | the still sprite, at close zoom |
+| Shaman | A lower branch of the viewer-left **antler landed in the `body` part**, not `head`. Move it before the head rotates. | head turns |
+| Giant | The **front paws are short stubs** under the fur mass, reading through their claws; the far hind leg reads mainly as a dusk-purple fold. A clearer paw pass if the limbs must read at fit-all. | the still sprite |
+| Archer | The **bow string is thin**: it reads at full size but faintly at board size. Thicken it or add a light edge. | the still sprite, at board size |
+| Archer | The **accent mask marks the fletching as painted before the lock**; the lock re-grew the arrow, so the element tint covers only a few fletching pixels and barely reads in game. Re-cut the mask on the final (or let the producer pick a larger accent, e.g. the leaf hood). | element tints |
+| Stingling | The glowing **barb is small and flatter** than the painterly fur; its element tint reads as a glint at board size. A bigger, rendered barb if the element must read. | element tints, close zoom |
+| Caster | The orb picked up a small teardrop tail in the lock and its bottom edge is flat. | close zoom |
+| Giant | The accent (moss patches) is patchy, so a non-Nature tint shows as blotches over the fur. A smoother accent mask if that reads badly. | element tints |
+| All nine | Machine-cut parts (mostly hand polygons); only two parts for the Brute and Champion (body, head) and the Swarmling (body, feet). | any rotation |
+
+Intended, not to fix: the Champion's two tails; the Caster's two legs and no arms.
 
 ## Already fixed (for the record)
 | Beast | Fix |

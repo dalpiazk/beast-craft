@@ -1,0 +1,503 @@
+{
+ "archer": {
+  "src": "archer_L10 (Archer sheet #1)",
+  "accent": "arrow fletching (at the draw hand)",
+  "ba_note": "Old straight stick replaced by ONE curved twig bow with a taut string; bow hand grips it, draw hand holds the string; fletching = accent.",
+  "crop": [
+   120,
+   330,
+   720,
+   1020
+  ],
+  "marks": [
+   [
+    "eye",
+    384,
+    595
+   ],
+   [
+    "eye",
+    499,
+    589
+   ],
+   [
+    "limb",
+    320,
+    800
+   ],
+   [
+    "limb",
+    499,
+    768
+   ],
+   [
+    "limb",
+    384,
+    973
+   ],
+   [
+    "limb",
+    538,
+    973
+   ],
+   [
+    "item",
+    314,
+    819
+   ]
+  ],
+  "counts": [
+   "faces: 1 (carved bark mask)",
+   "eyes: 2 (dim glow slits)",
+   "mouth: hidden under the mask",
+   "arms: 2, hands: 2",
+   " - bow hand grips the bow",
+   " - draw hand on the string",
+   "legs: 2",
+   "bow: 1, intact, strung (purple ring)",
+   "accent: arrow fletching"
+  ]
+ },
+ "brute": {
+  "src": "brute_L11 (Brute sheet #2)",
+  "accent": "the curled ram horns",
+  "accent_from_final": true,
+  "accent_boxes": [
+   [
+    [
+     140,
+     620,
+     380,
+     900
+    ],
+    [
+     20,
+     55
+    ],
+    0.22
+   ],
+   [
+    [
+     500,
+     620,
+     740,
+     880
+    ],
+    [
+     20,
+     55
+    ],
+    0.22
+   ]
+  ],
+  "ba_note": "Design kept as picked (no edit); locked, colour-locked, face-protected detail pass, bold plum lines.",
+  "crop": [
+   120,
+   420,
+   780,
+   1020
+  ],
+  "marks": [
+   [
+    "eye",
+    397,
+    915
+   ],
+   [
+    "eye",
+    525,
+    915
+   ],
+   [
+    "mouth",
+    454,
+    979
+   ],
+   [
+    "limb",
+    326,
+    973
+   ],
+   [
+    "limb",
+    384,
+    985
+   ],
+   [
+    "limb",
+    525,
+    992
+   ],
+   [
+    "limb",
+    582,
+    973
+   ],
+   [
+    "item",
+    243,
+    781
+   ],
+   [
+    "item",
+    614,
+    742
+   ]
+  ],
+  "counts": [
+   "faces: 1 (stubborn scowl)",
+   "eyes: 2 (dim glow)",
+   "mouth: 1 (clenched scowl)",
+   "legs: 4 (short paws under the body)",
+   "horns: 2 curled ram horns (purple)",
+   "accent: horns"
+  ]
+ },
+ "stalker": {
+  "src": "brute_L3 (Brute sheet #10)",
+  "accent": "the tall antlers",
+  "accent_from_final": true,
+  "accent_boxes": [
+   [
+    [
+     430,
+     230,
+     700,
+     560
+    ],
+    [
+     0,
+     60
+    ],
+    0.18
+   ],
+   [
+    [
+     430,
+     230,
+     700,
+     560
+    ],
+    [
+     300,
+     360
+    ],
+    0.12
+   ]
+  ],
+  "ba_note": "Design kept; a far hind leg added so 4 legs read (the candidate showed 3); antlers = accent.",
+  "crop": [
+   60,
+   220,
+   780,
+   1030
+  ],
+  "marks": [
+   [
+    "eye",
+    590,
+    630
+   ],
+   [
+    "eye",
+    660,
+    635
+   ],
+   [
+    "mouth",
+    620,
+    690
+   ],
+   [
+    "limb",
+    300,
+    990
+   ],
+   [
+    "limb",
+    387,
+    996
+   ],
+   [
+    "limb",
+    450,
+    1000
+   ],
+   [
+    "limb",
+    620,
+    1000
+   ],
+   [
+    "item",
+    520,
+    330
+   ]
+  ],
+  "counts": [
+   "faces: 1 (sly, narrowed eyes)",
+   "eyes: 2 (dim glow)",
+   "mouth: 1 (small smirk)",
+   "legs: 4 (2 near, far hind leg darker between)",
+   "tail: 1 (bushy, mossy)",
+   "antlers: 2 = accent (purple ring)"
+  ]
+ },
+ "caster": {
+  "src": "brute_L8 (Brute sheet #6)",
+  "accent": "the spell orb glowing between the antlers",
+  "ba_note": "Design kept (two-legged antlered beast caster); a glowing spell orb painted between the antlers = accent.",
+  "crop": [
+   120,
+   150,
+   800,
+   1030
+  ],
+  "marks": [
+   [
+    "eye",
+    582,
+    819
+   ],
+   [
+    "eye",
+    704,
+    806
+   ],
+   [
+    "mouth",
+    640,
+    864
+   ],
+   [
+    "limb",
+    320,
+    998
+   ],
+   [
+    "limb",
+    582,
+    986
+   ],
+   [
+    "item",
+    499,
+    416
+   ]
+  ],
+  "counts": [
+   "faces: 1 (spiteful, smug)",
+   "eyes: 2 (dim, half-lidded)",
+   "mouth: 1 (smirk)",
+   "legs: 2 (as drawn, per producer)",
+   "arms: none (beast caster)",
+   "antlers: 2",
+   "spell orb between the antlers = accent (purple ring)"
+  ]
+ },
+ "champion": {
+  "src": "brute_L1 (Brute sheet #1)",
+  "accent": "the moss crown and mantle",
+  "accent_from_final": true,
+  "accent_boxes": [
+   [
+    [
+     128,
+     470,
+     800,
+     930
+    ],
+    [
+     55,
+     150
+    ],
+    0.25
+   ]
+  ],
+  "ba_note": "Design kept; scaled 1.22x about the feet (scripts/scalefix.py) so it fills a 3-hex footprint and reads big and swaggering.",
+  "crop": [
+   90,
+   230,
+   880,
+   1060
+  ],
+  "marks": [
+   [
+    "eye",
+    247,
+    722
+   ],
+   [
+    "eye",
+    334,
+    726
+   ],
+   [
+    "limb",
+    307,
+    1018
+   ],
+   [
+    "limb",
+    420,
+    1034
+   ],
+   [
+    "limb",
+    555,
+    1015
+   ],
+   [
+    "item",
+    154,
+    730
+   ],
+   [
+    "item",
+    435,
+    717
+   ]
+  ],
+  "counts": [
+   "faces: 1 (pale mask, smug half-lids)",
+   "eyes: 2 (dim red slits)",
+   "mouth: none drawn (dotted muzzle)",
+   "legs: 4 (3 feet visible;",
+   " far hind hidden behind the body)",
+   "horns: 2 curled ram horns",
+   "tail: 1 forked gloam-violet wisp",
+   "accent: moss crown + mantle"
+  ]
+ },
+ "swarmling": {
+  "src": "brute_L4 (Brute sheet #4)",
+  "accent": "the curled rust horns",
+  "accent_from_final": true,
+  "preview64": true,
+  "accent_boxes": [
+   [
+    [
+     125,
+     630,
+     290,
+     860
+    ],
+    [
+     0,
+     40
+    ],
+    0.3
+   ],
+   [
+    [
+     595,
+     645,
+     740,
+     860
+    ],
+    [
+     0,
+     40
+    ],
+    0.3
+   ]
+  ],
+  "ba_note": "Design kept; extra-heavy outer line (about 2.5x the house weight) so the silhouette holds at 64 px on the board.",
+  "crop": [
+   90,
+   470,
+   810,
+   1040
+  ],
+  "marks": [
+   [
+    "eye",
+    339,
+    902
+   ],
+   [
+    "eye",
+    518,
+    902
+   ],
+   [
+    "item",
+    192,
+    742
+   ],
+   [
+    "item",
+    678,
+    755
+   ],
+   [
+    "limb",
+    300,
+    995
+   ],
+   [
+    "limb",
+    560,
+    995
+   ]
+  ],
+  "counts": [
+   "faces: 1 (skittery glare)",
+   "eyes: 2 (violet glow slits)",
+   "mouth: none drawn (tiny muzzle)",
+   "legs: 2 stubby front legs (hind hidden)",
+   "horns: 2 curled rust horns",
+   "moss crest on the back",
+   "accent: horns"
+  ]
+ },
+ "stingling": {
+  "src": "shaman_t14 (Shaman sheet #14)",
+  "accent": "the glowing stinger barb",
+  "preview64": true,
+  "ba_note": "Stick removed (scripts/stingfix.py), 2 short legs kept, a curved stinger tail added; the barb was repainted post-lock as a glowing green thorn (scripts/barb2x.py).",
+  "crop": [
+   140,
+   80,
+   800,
+   1030
+  ],
+  "marks": [
+   [
+    "eye",
+    429,
+    474
+   ],
+   [
+    "eye",
+    602,
+    474
+   ],
+   [
+    "limb",
+    467,
+    973
+   ],
+   [
+    "limb",
+    570,
+    973
+   ],
+   [
+    "item",
+    760,
+    850
+   ]
+  ],
+  "counts": [
+   "faces: 1 (buzzy glare)",
+   "eyes: 2 (amber glow)",
+   "mouth: hidden in the ruff",
+   "legs: 2 (short, with feet)",
+   "arms: none (no stick, no weapon)",
+   "tail: 1 stinger with a glowing barb",
+   "stick: removed",
+   "accent: stinger barb glow"
+  ]
+ }
+}

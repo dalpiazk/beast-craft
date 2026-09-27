@@ -99,17 +99,21 @@ Enemies are **gloamed** creatures and wild folk, never roster beasts. Their elem
 type may carry any of the ten — so names and descriptions stay element-free ("a Fire Giant" is the
 game combining the element with the type, not a separate enemy).
 
+DRAFT, pending producer review: the lore follows the Verdant Hollow art (the first art variant; see
+`docs/art/art-brief.md`). A region's art may dress a type differently (the Hollow's are mossy), so the
+lore names only what every variant keeps (horns, antlers, a barb) and stays element-free.
+
 | Type | Role | Lore |
 | --- | --- | --- |
 | Giant | boss (seven hexes) | Hill-sized elders of the wild that sleep for centuries; the Gloam woke them cross. They crush, glare, stamp the ground and roar. |
 | Champion | mini-boss (three hexes) | The strongest creature of a pack, swollen with Gloam. Cleaves the front line and hexes the weakest. |
 | Brute | melee tank | Thick-hided horned beasts that plant themselves in the way and smash. |
-| Stalker | fast melee hunter | Lean, shadowy hunters that circle wide and pounce on whoever is hurt worst. |
+| Stalker | fast melee hunter | Lean, antlered hunters that circle wide and pounce on whoever is hurt worst. |
 | Archer | ranged physical | Gloamed wild folk who keep to high ground and loose arrows from afar. |
-| Caster | ranged special | Gloamed hedge-mages whose spiteful bolts seek the weakest and may leave it burning. |
+| Caster | ranged special | Round, two-legged antlered beasts whose spiteful bolts spark from an orb between their antlers, seek the weakest and may leave it burning. |
 | Shaman | area special | Wild-folk elders with gnarled staffs, calling squalls down on groups. |
-| Swarmling | swarm (bite) | Tiny scuttling mites that come in dozens; each bite is small, the swarm is not. |
-| Stingling | swarm (sting) | Buzzing, wasp-like pests whose sting may leave a lingering poison. |
+| Swarmling | swarm (bite) | Tiny horned critters, round and tufted, that come in dozens; each bite is small, the swarm is not. |
+| Stingling | swarm (sting) | Small, owl-like pests of the woods whose glowing tail barb may leave a lingering poison. |
 
 ## Regions
 

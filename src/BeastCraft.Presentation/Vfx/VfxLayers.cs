@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using BeastCraft.Battle.Grid;
 using BeastCraft.Presentation.Board;
+using BeastCraft.Save;
 using BeastCraft.Vfx;
 
 namespace BeastCraft.Presentation.Vfx
@@ -140,8 +141,10 @@ namespace BeastCraft.Presentation.Vfx
 
         /// <summary>
         /// The aura sprite of <paramref name="aura"/> on a unit whose feet are at
-        /// <paramref name="feet"/>, drawn at <paramref name="unitScale"/> (2 for a large unit),
-        /// <paramref name="ms"/> into the viewer's clock. False when the aura has no sprite.
+        /// <paramref name="feet"/>, drawn at <paramref name="unitScale"/> (its footprint's width in
+        /// hexes, <see cref="HexLayout.FootprintWidth"/>), <paramref name="ms"/> into the viewer's
+        /// clock: pulsing to <see cref="VfxAuraData.Alpha"/>, and looping its sheet's frames every
+        /// <see cref="VfxAuraData.FrameMs"/> when set. False when the aura has no sprite.
         /// </summary>
         public static bool TrySample(VfxAuraData aura, Vec2 feet, float unitScale, int ms, out VfxSprite sprite)
         {
@@ -155,10 +158,34 @@ namespace BeastCraft.Presentation.Vfx
             double phase = (Math.Max(0, ms) % pulse) / (double)pulse;
             float wave = (float)Math.Sin(phase * Math.PI * 2.0);
             float scale = aura.Scale * unitScale * (0.92f + 0.08f * wave);
-            float alpha = 0.7f + 0.3f * wave;
+            float alpha = (0.7f + 0.3f * wave) * aura.Alpha;
+            int frame = aura.FrameMs > 0 ? Math.Max(0, ms) / aura.FrameMs : 0;
             bool ground = aura.Depth != VfxDepth.Over;
             Vec2 at = ground ? feet : new Vec2(feet.X, feet.Y - OverLift * unitScale);
-            sprite = new VfxSprite(aura.Sheet, 0, at, scale, 0f, 0f, alpha, aura.Tint, aura.Blend == VfxBlend.Additive, ground);
+            sprite = new VfxSprite(aura.Sheet, frame, at, scale, 0f, 0f, alpha, aura.Tint, aura.Blend == VfxBlend.Additive, ground);
+            return true;
+        }
+
+        /// <summary>
+        /// The Gloam haze every standing enemy wears (<see cref="VfxLibraryData.EnemyAura"/>), as
+        /// <see cref="TrySample"/>, under the effects setting: Full as authored, Reduced at half the
+        /// opacity, Minimal none (false).
+        /// </summary>
+        public static bool TrySampleEnemyAura(VfxAuraData aura, Vec2 feet, float unitScale, int ms, VfxSettings settings, out VfxSprite sprite)
+        {
+            EffectsIntensity intensity = settings == null ? EffectsIntensity.Full : settings.Intensity;
+            if (intensity == EffectsIntensity.Minimal || !TrySample(aura, feet, unitScale, ms, out sprite))
+            {
+                sprite = default;
+                return false;
+            }
+
+            if (intensity == EffectsIntensity.Reduced)
+            {
+                sprite = new VfxSprite(sprite.Sheet, sprite.Frame, sprite.Position, sprite.Scale, sprite.SizePx, sprite.Rotation, sprite.Alpha * 0.5f, sprite.Tint,
+                                       sprite.Additive, sprite.Ground);
+            }
+
             return true;
         }
     }

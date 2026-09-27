@@ -26,6 +26,28 @@ namespace BeastCraft.Encounters
         /// <param name="roster">The beast roster, for the growth curve and the id-collision check. Null skips both.</param>
         public static List<string> Validate(EnemyLibraryData library, BeastRosterData roster)
         {
+            return Validate(library, roster, null);
+        }
+
+        /// <summary>
+        /// As <see cref="Validate(EnemyLibraryData, BeastRosterData)"/>; with <paramref name="regions"/>,
+        /// every <see cref="EnemyData.RegionArt"/> region id must be a region in regions.json.
+        /// </summary>
+        public static List<string> Validate(EnemyLibraryData library, BeastRosterData roster, Campaign.RegionLibraryData regions)
+        {
+            HashSet<string> knownRegions = null;
+            if (regions != null)
+            {
+                knownRegions = new HashSet<string>(StringComparer.Ordinal);
+                foreach (Campaign.RegionData region in regions.Regions ?? new Campaign.RegionData[0])
+                {
+                    if (region != null && !string.IsNullOrEmpty(region.RegionId))
+                    {
+                        knownRegions.Add(region.RegionId);
+                    }
+                }
+            }
+
             List<string> errors = new List<string>();
 
             if (library == null)
@@ -106,6 +128,8 @@ namespace BeastCraft.Encounters
                     errors.Add(where + ": ArtKey '" + enemy.ArtKey + "' is not lowercase snake_case segments joined by '/'.");
                 }
 
+                ValidateRegionArt(enemy, where, knownRegions, errors);
+
                 if (!(enemy.Threat > 0.0))
                 {
                     errors.Add(where + ": Threat must be above 0.");
@@ -115,6 +139,38 @@ namespace BeastCraft.Encounters
             }
 
             return errors;
+        }
+
+        /// <summary>
+        /// <see cref="EnemyData.RegionArt"/>: each entry a region id (in regions.json when known), at most once, with a well-formed
+        /// art key (the art reference validator checks the key is in the manifest). Presentation only.
+        /// </summary>
+        private static void ValidateRegionArt(EnemyData enemy, string where, HashSet<string> knownRegions, List<string> errors)
+        {
+            HashSet<string> regions = new HashSet<string>(StringComparer.Ordinal);
+            foreach (EnemyRegionArtData variant in enemy.RegionArt ?? new EnemyRegionArtData[0])
+            {
+                if (variant == null || string.IsNullOrEmpty(variant.RegionId))
+                {
+                    errors.Add(where + ": a RegionArt entry has no RegionId.");
+                    continue;
+                }
+
+                if (!regions.Add(variant.RegionId))
+                {
+                    errors.Add(where + ": RegionArt lists region '" + variant.RegionId + "' twice.");
+                }
+
+                if (knownRegions != null && !knownRegions.Contains(variant.RegionId))
+                {
+                    errors.Add(where + ": RegionArt region '" + variant.RegionId + "' is not a region in regions.json.");
+                }
+
+                if (!Vfx.ArtReferenceValidator.IsWellFormed(variant.ArtKey))
+                {
+                    errors.Add(where + ": RegionArt '" + variant.RegionId + "' ArtKey '" + variant.ArtKey + "' is not lowercase snake_case segments joined by '/'.");
+                }
+            }
         }
 
         /// <summary>

@@ -193,7 +193,8 @@ between fit-all and `MaxZoom` (x2), itself capped at an absolute `MaxScale` (5.5
 board px) so a small arena that already fits big is not blown up; `Clamp` keeps what the view
 shows inside the arena's bounds (`PortraitLayout.BoardFrame`: tiles plus sprite headroom), centring on an axis where it shows
 more than the arena; `Ease` moves between views with smoothstep. A unit's box is its sprite, HP
-bar and icons (`UnitBox`: twice the size for a multi-hex unit); an effect's area is its circle.
+bar and icons (`UnitBox`, scaled by the footprint's width: `HexLayout.FootprintWidth`, 1, 1.75 or 2.5
+hexes); an effect's area is its circle.
 
 `TurnCamera` is the camera over one turn, a pure function of the turn clock (the same played
 clock as `TurnAnimation`, so x2/x3 speed it up): from the view the turn began with it eases
@@ -219,11 +220,15 @@ Screenshots start each shown turn from fit-all, so they stay reproducible.
 | `ArtKey` | the key game data names the art by (see "ArtKey") |
 | `FrameWidth`, `FrameHeight`, `Frames`, `FrameMs` | a horizontal strip of equal frames |
 | `PivotX`, `PivotY` | the anchor in source pixels: a character's feet (placed on the tile centre), an effect's centre |
-| `PixelsPerUnit` | source pixels per world unit (one hex column step): 32 for the placeholders; for an illustrated beast, derived from its `WorldHeight` (300-437 for the ten beasts) |
+| `PixelsPerUnit` | source pixels per world unit (one hex column step): 32 for the placeholders; for an illustrated sprite, derived from its `WorldHeight` (300-437 for the ten beasts, 162-915 for the enemies) |
 | `Filter` | `point` (pixel art) or `linear` (illustrated art); the renderer picks the sampler per batch |
 | `Premultiplied` | `false` = straight alpha, premultiplied on load (SpriteBatch blends premultiplied) |
 | `Tint` | optional `#rrggbb` multiplier (alias entries) |
 | `Animations` | optional named clips: `{ Name, Sheet (another strip, or this one), Frames[], Fps, Loop }` |
+| `Accent`, `AccentElement`, `AccentNative` | an illustrated enemy's element-accent overlay: another sprite's `Name` (same frame size, frames, pivot and `PixelsPerUnit`, which the validator requires), the element the art is drawn in and the accent's own colour (see "Element accents") |
+
+The manifest also carries `ElementAccents` (element name -> palette char), the colour an accent
+overlay takes for each element but `None`.
 
 Schema v1 still reads: `ArtManifestData.Normalize` maps it to exactly what v1 meant (centre
 pivot, 32 px per unit, point filter, straight alpha; v1's `Kind` becomes `Category`).
@@ -233,8 +238,12 @@ quarters down; the phoenix's idle strip is its `idle` clip).
 **Renderer.** `SpriteAtlas` loads every `sprite` entry once per file; `SpriteRenderer` keeps one
 SpriteBatch open while blend, sampler and transform stay the same and restarts it when a sprite
 needs another filter or blend (so point-filtered placeholders and linear illustrations can share a
-frame), and draws every sprite by its pivot at `UnitSize / PixelsPerUnit x scale`. Large units
-(Triangle, Hex7) draw at two units. A clip plays on the viewer's clock (the phoenix's `idle`).
+frame), and draws every sprite by its pivot at `UnitSize / PixelsPerUnit x scale`. Every unit draws
+at scale 1: its size is its art's `WorldHeight`, and a multi-hex enemy's pivot sits on its
+footprint's visual centre (`HexLayout.FootprintCenter`, the mean of its tiles' centres), so there is
+no size multiplier for large units (the old "drawn at two units" rule is gone). Its HP bar sits on the
+art's top opaque row (`ArtSprite.ArtTop`, read on load), not the frame's top. A clip plays on the
+viewer's clock (the phoenix's `idle`).
 
 ## Illustrated sprites (linear filter)
 
@@ -269,6 +278,49 @@ manifest, atlas and renderer as the placeholders; only the entry's numbers diffe
   placeholders stay in the manifest under `beast/<id>`.
 - **Portraits.** The turn-order portrait fits the whole frame, so the equal square frames give every
   beast an equal portrait box; a long, low beast (the Basilisk) fills it only in width and reads small.
+
+### Enemy sizes
+
+The nine enemy types' Verdant Hollow art (2026-09-27; `content/art/enemies/<type>/<type>_hollow.png`, masters in
+`content/art/source/enemies/<type>/hollow/`) is exported and filtered exactly as the beasts' (512x512, feet
+pivot (256, 508), contour pass `--line-px 6`; the Swarmling keeps its heavier master line). Their `WorldHeight`
+follows the lineup the producer approved (`Tooling/ArtLab/scripts/enemies/lineup.py`): each is drawn **0.95 of
+its footprint's width** wide — one hex for a one-hex unit (capped at 1.7 hexes tall; none reaches it), 0.55 of that
+for the swarm units, 1.75 hexes for the Champion on its triangle and 2.5 for the Giant on its Hex7 flower — so
+the height is the art's aspect times that width: Giant 2.37, Champion 1.7, Shaman 1.32, Caster 1.25, Stalker
+1.03, Archer 0.94, Brute 0.88, Stingling 0.73, Swarmling 0.39. The ground auras, HP bar width and camera box of a
+unit scale by the same footprint width (`HexLayout.FootprintWidth`).
+
+### Element accents (enemy overlays)
+
+Any enemy type can carry any element, and its art shows it without shaders or a baked copy per element:
+each illustrated enemy is two sprites, a **base** and an **accent overlay** of the same frame, and the viewer
+draws the base and then the overlay multiplied by the unit's element colour (`DrawCharacter`; the turn-order
+portrait too, not the hit flash).
+
+- **The split** (`Tooling/ArtLab/scripts/export_ingame.py --accent-mask`, from the finals' accent mask aligned to
+  the master by `accent_mask_master.py`): in the accent region each pixel's colour C is read as a grey part
+  plus k times the art's own accent colour N (least squares, then clamped so the base stays in range, times
+  the mask feathered 4 master px); the overlay is white at alpha k, and the base is what remains,
+  (C - kN) / (1 - k). So the base plus the overlay tinted N is the art (the grey part stays in the base,
+  neutral wherever the fit is exact), and any other tint T gives C + k(T - N): shading and highlights are
+  kept, the accent's hue is swapped. Only opaque pixels get overlay (a soft silhouette edge would also cover
+  what lies behind the unit).
+- **Fidelity.** Drawn in its own colour, every enemy's composite matches its approved art to **0/255 per
+  channel** in the 8-bit offline check over paper (`export_ingame.py` prints it; `--compare DIR` writes the
+  side-by-side); on the GPU only the usual 8-bit blending rounding is added.
+- **The colour is data.** The manifest's `AccentTint(sprite, element)`: the art's own `AccentNative` for its
+  `AccentElement` (the Hollow art is Nature) and for no element, else the palette colour `ElementAccents` names
+  (Fire `o`, Water `c`, Earth `M`, Air `A`, Lightning `y`, Ice `C`, Nature `l`, Metal `3`, Light `Y`, Dark `P`:
+  the lighter member of each element's colour). A Nature enemy therefore looks exactly like the approved art,
+  whose accent is not always green: the Brute's and Swarmling's horns are brown and rust, the Stalker's
+  antlers a warm brown.
+- **Accent regions** (the finals' choice): Giant moss patches, Champion moss crown and mantle, Brute and
+  Swarmling horns, Stalker antlers, Caster orb, Shaman mushroom cap, Archer fletching, Stingling barb. The
+  Archer's and Stingling's are small, so their element reads faintly (docs/art/touch-ups.md).
+- **Region variants.** A type's art for a region is its `RegionArt` entry in `enemy-library.json`
+  (`EnemyData.ArtKeyFor(region)`, the default `ArtKey` otherwise); each variant is its own base + overlay pair
+  with its own `AccentElement` and `AccentNative`. Only the Hollow (`r01`) exists, and it is the default.
 
 ## ArtKey (data -> art)
 
@@ -326,7 +378,17 @@ may have an `Aura`: `{ Sheet, Tint, Scale, PulseMs, Blend, Depth (Ground at the 
 Icon, IconTint }`. While a unit's snapshot carries the status (`UnitSnapshot.Statuses` /
 `Modifiers` -> `StatusKeys()`), its aura pulses and its icon sits above its HP bar; the set
 switches at the blow that applied or removed it (`TurnAnimation.ShownStatusKeys`), so an aura
-lasts exactly as long as the battle keeps the status (tested against the demo battle).
+lasts exactly as long as the battle keeps the status (tested against the demo battle). An aura may also
+set `Alpha` (its peak opacity, 0.05-1; default 1) and `FrameMs` (its sheet's frames loop, one every FrameMs,
+40-2000; 0 = the first frame, still).
+
+**The Gloam haze.** The library's top-level `EnemyAura` is what every standing enemy wears: the finals'
+violet haze is faint at board size, so a shared, subtle ground haze (`fx_gloam_haze`, an 8-frame looping wisp
+from `build.py`'s `haze` generator, tinted `u`, `Alpha` 0.6, `Blend` Alpha, `Depth` Ground) is drawn at each
+enemy's feet, under every unit and so behind its sprite, sized to its footprint's width and on its own phase
+(from its unit id) so a horde does not breathe in step. It follows the effects setting
+(`VfxAuraSampler.TrySampleEnemyAura`): as authored under Full, half as opaque under Reduced, none under
+Minimal. Presentation only.
 
 **An effect** (every part but `Motion` optional; ranges enforced by `VfxLibraryValidator`):
 
@@ -445,13 +507,14 @@ still writes the one manifest, merging them in from its hand-kept `illustrated.j
 
 Sprites are text grids (one char per palette colour) in `Tooling/PixelArt/sprites/*.txt`;
 `build.py` (Python 3 + Pillow 12.3.0) adds the auto-outline and rim shading, runs the
-integer-only generators (`fx` burst flipbooks; `ring`, `disc` and `blob` VFX textures; `hex`
-tiles), resolves aliases, and writes the PNGs (Git LFS) plus the v2 manifest to
+integer-only generators (`fx` burst flipbooks; `ring`, `disc` and `blob` VFX textures; the looping
+`haze`; `hex` tiles), resolves aliases, and writes the PNGs (Git LFS) plus the v2 manifest to
 `content/art/pixel/`. With the pinned Pillow it regenerates them byte for byte. The hosts copy
-`content/data/**/*.json`, `content/art/pixel/*` and `content/art/beasts/**/*.png` into `Content/` (desktop, beside the exe) or
+`content/data/**/*.json`, `content/art/pixel/*`, `content/art/beasts/**/*.png` and `content/art/enemies/**/*.png` into `Content/` (desktop, beside the exe) or
 the APK's assets; `GameContent.FindRoot` looks beside the exe first and falls back to the repo.
 
-Placeholder content: all ten roster beasts, four enemies (five more as tinted aliases), 32x36
+Placeholder content (the illustrated beasts and enemies replace them on the board; the placeholders stay
+in the manifest under their old keys): all ten roster beasts, four enemies (five more as tinted aliases), 32x36
 pointy-top hex tiles, the fire and hit bursts, two particles, the VFX layer textures (ring,
 aura ring, glow, scorch, ray, glyphs) and seven 9x9 status icons. They are throwaway: the final
 art is illustrated, and new pixel enemies are not to be drawn.

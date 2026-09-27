@@ -2,6 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using BeastCraft.Battle.Grid;
+using BeastCraft.Campaign;
+using BeastCraft.Creatures;
+using BeastCraft.Creatures.Roster;
 using BeastCraft.Encounters;
 using BeastCraft.Save;
 using BeastCraft.Session;
@@ -19,6 +22,9 @@ namespace BeastCraft.Presentation.Content
     public static class DemoBattle
     {
         public const string DefaultEncounterId = "boss_r01_hollow_warden";
+
+        /// <summary>The region the demo shows when nothing says otherwise: the Verdant Hollow, the only one with enemy art so far.</summary>
+        public const string DefaultRegionId = "r01";
 
         /// <summary>
         /// The team's level. A small party against a boss tuned for a fuller one needs the edge: at
@@ -50,10 +56,16 @@ namespace BeastCraft.Presentation.Content
         /// generated lineup of that shape, drawn with <paramref name="seed"/>);
         /// <paramref name="arena"/>, when set, fights it on that arena instead of its own (the
         /// lineup must seat there, or the battle cannot begin).
+        /// <para>
+        /// <paramref name="lineup"/>, when set, fields exactly those enemies instead (each
+        /// <c>enemy_id:Element</c>, e.g. <c>brute:Fire</c>; no element = none) at the squad's
+        /// difficulty, on <paramref name="arena"/> or Medium: for looking at one enemy type's art
+        /// across elements. Which battle it is changes; the rules do not.
+        /// </para>
         /// </summary>
         public static BattleSetup Create(GameContent content, int seed, out Dictionary<string, string> speciesByUnit, out string error,
                                          IReadOnlyList<string> team = null, string encounterId = DefaultEncounterId, int level = DefaultLevel,
-                                         int encounterLevel = DefaultEncounterLevel, ArenaSize? arena = null)
+                                         int encounterLevel = DefaultEncounterLevel, ArenaSize? arena = null, IReadOnlyList<string> lineup = null)
         {
             speciesByUnit = new Dictionary<string, string>(StringComparer.Ordinal);
             error = null;
@@ -84,6 +96,22 @@ namespace BeastCraft.Presentation.Content
                 speciesByUnit[BattleSession.BeastUnitIdPrefix + beastId] = kit.SpeciesId;
             }
 
+            if (lineup != null && lineup.Count > 0)
+            {
+                setup.Encounter = Lineup(content, lineup, encounterLevel, arena ?? ArenaSize.Medium, out error);
+                if (setup.Encounter == null)
+                {
+                    return null;
+                }
+
+                for (int i = 0; i < setup.Encounter.Enemies.Count; i++)
+                {
+                    speciesByUnit["enemy" + (i + 1).ToString(CultureInfo.InvariantCulture)] = setup.Encounter.Enemies[i].SpeciesId;
+                }
+
+                return setup;
+            }
+
             // A template, else a shape id: one generated lineup of that shape, drawn with the seed.
             EncounterPlan plan = EncounterPlan.FromTemplate(content.Encounters, content.Enemies, encounterId, encounterLevel) ??
                                  EncounterPlan.Generate(content.Encounters, content.Enemies, encounterId, encounterLevel, seed);
@@ -107,6 +135,65 @@ namespace BeastCraft.Presentation.Content
             }
 
             return setup;
+        }
+
+        /// <summary>
+        /// The region an encounter belongs to, when the data says: the region whose boss (or Hard-mode
+        /// boss) template it is. Null for a generated shape, which any region can draw.
+        /// </summary>
+        public static string RegionOf(GameContent content, string encounterId)
+        {
+            foreach (RegionData region in content?.Regions?.Regions ?? new RegionData[0])
+            {
+                if (region != null && !string.IsNullOrEmpty(encounterId) &&
+                    (region.BossTemplateId == encounterId || (region.HardMode != null && region.HardMode.BossTemplateId == encounterId)))
+                {
+                    return region.RegionId;
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>Whether <paramref name="regionId"/> is a region in regions.json.</summary>
+        public static bool IsRegion(GameContent content, string regionId)
+        {
+            return Array.Exists(content?.Regions?.Regions ?? new RegionData[0], r => r != null && r.RegionId == regionId);
+        }
+
+        /// <summary>
+        /// The art key a unit of <paramref name="speciesOrEnemyId"/> is drawn with in region
+        /// <paramref name="regionId"/>: a roster species' own key, else the enemy's art for that
+        /// region (<see cref="EnemyData.ArtKeyFor"/>, falling back to its default). Presentation only.
+        /// </summary>
+        public static string ArtKeyOf(GameContent content, string speciesOrEnemyId, string regionId)
+        {
+            string key = content?.Battle?.GetSpecies(speciesOrEnemyId)?.ArtKey;
+            return key ?? content?.Enemies?.Get(speciesOrEnemyId)?.ArtKeyFor(regionId);
+        }
+
+        /// <summary>The <c>--lineup</c> encounter: each <c>enemy_id[:Element]</c> once, at the squad's calibrated difficulty.</summary>
+        private static EncounterSetup Lineup(GameContent content, IReadOnlyList<string> lineup, int level, ArenaSize arena, out string error)
+        {
+            error = null;
+            const string shape = "squad";
+            EncounterSetup encounter = new EncounterSetup { Arena = arena, ShapeId = shape, EncounterLevel = level };
+            double multiplier = content.Encounters.Multiplier(shape, level);
+            foreach (string entry in lineup)
+            {
+                string[] parts = (entry ?? string.Empty).Split(':');
+                EnemyData enemy = content.Enemies.Get(parts[0].Trim());
+                Element element = Element.None;
+                if (enemy == null || parts.Length > 2 || (parts.Length == 2 && !BeastRosterValidator.TryParseElement(parts[1].Trim(), out element)))
+                {
+                    error = "Unknown lineup entry '" + entry + "' (enemy_id or enemy_id:Element).";
+                    return null;
+                }
+
+                encounter.Enemies.Add(new EnemySpec(enemy.EnemyId, level) { Element = element, StatMultiplier = multiplier, StatusResist = enemy.StatusResist });
+            }
+
+            return encounter;
         }
     }
 }
