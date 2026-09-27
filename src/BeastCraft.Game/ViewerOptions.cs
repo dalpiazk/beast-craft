@@ -30,6 +30,9 @@ namespace BeastCraft.Game
     ///                       (the lineup must seat on it)
     ///   --team A,B,...      the team's species ids, 1 to 6 (default DemoBattle.DefaultTeam), e.g.
     ///                       to look at other beasts' art; which battle it is changes, the rules do not
+    ///   --lineup E:EL,...   field exactly these enemies instead of the encounter (enemy_id:Element,
+    ///                       e.g. brute:Fire,brute:Water; up to 24), e.g. to look at one enemy's
+    ///                       art in several elements; which battle it is changes, the rules do not
     ///   --content DIR       the content root (default: Content/ beside the app, or the repo's)
     ///   --effects LEVEL     effects intensity: full, reduced or minimal (default: the saved
     ///                       setting; a screenshot uses full unless told)
@@ -58,6 +61,7 @@ namespace BeastCraft.Game
         public string Encounter = DemoBattle.DefaultEncounterId;
         public ArenaSize? Arena;
         public string[] Team;
+        public string[] Lineup;
         public string ContentRoot;
         public EffectsIntensity? Effects;
         public bool NoShake;
@@ -142,6 +146,15 @@ namespace BeastCraft.Game
                         break;
                     case "--team":
                         options.Team = TeamIds(value, ref error);
+                        i++;
+                        break;
+                    case "--lineup":
+                        options.Lineup = (value ?? string.Empty).Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+                        if (options.Lineup.Length < 1 || options.Lineup.Length > 24)
+                        {
+                            error = "--lineup needs 1 to 24 enemies, comma-separated (enemy_id or enemy_id:Element).";
+                        }
+
                         i++;
                         break;
                     case "--content":

@@ -50,6 +50,13 @@ namespace BeastCraft.Vfx
 
         /// <summary>Per-skill effects, by skill id (beast skills, avatar actives and enemy-library skills).</summary>
         public VfxSkillEffectData[] Skills = new VfxSkillEffectData[0];
+
+        /// <summary>
+        /// The look every enemy wears while it stands (null = none): the shared Gloam haze, a looping
+        /// wisp at its feet drawn behind its sprite, sized to its footprint. Presentation only; the
+        /// viewer thins it under the Reduced effects setting and drops it under Minimal.
+        /// </summary>
+        public VfxAuraData EnemyAura;
     }
 
     /// <summary>One effect type's defaults: what applying it looks like, and what it looks like while it lasts.</summary>
@@ -126,6 +133,15 @@ namespace BeastCraft.Vfx
 
         /// <summary><c>Ground</c> (under the unit, at its feet) or <c>Over</c> (on it).</summary>
         public string Depth = VfxDepth.Ground;
+
+        /// <summary>Opacity (0.05-1) at the peak of the pulse: 1 for a status aura; lower for a faint haze.</summary>
+        public float Alpha = 1f;
+
+        /// <summary>
+        /// 0: the sheet's first frame, still. Above 0 (40-2000): the sheet's frames loop, one every
+        /// this many ms (a drifting wisp).
+        /// </summary>
+        public int FrameMs;
 
         /// <summary>A sprite Name of the status icon shown above the HP bar (null/empty = none).</summary>
         public string Icon;

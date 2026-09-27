@@ -214,7 +214,7 @@ namespace BeastCraft.Presentation.Camera
         /// <summary>
         /// The box a unit takes up on screen, feet at <paramref name="feet"/>: its sprite (a hex
         /// wide, reaching about a tile and a half up) with its HP bar and status icons over it, at
-        /// <paramref name="scale"/> (1 for a one-tile unit, 2 for a large one).
+        /// <paramref name="scale"/> (its footprint's width in hexes, <see cref="HexLayout.FootprintWidth"/>).
         /// </summary>
         public static Rect UnitBox(Vec2 feet, float scale)
         {

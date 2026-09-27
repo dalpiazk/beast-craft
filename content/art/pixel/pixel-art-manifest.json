@@ -959,6 +959,23 @@
       "Premultiplied": false
     },
     {
+      "Name": "fx_gloam_haze",
+      "File": "fx_gloam_haze.png",
+      "Kind": "sprite",
+      "Category": "fx",
+      "Label": "Gloam haze (looping ground wisps under every enemy; white, tinted violet)",
+      "ArtKey": "fx/layer/gloam_haze",
+      "FrameWidth": 64,
+      "FrameHeight": 24,
+      "Frames": 8,
+      "FrameMs": 160,
+      "PivotX": 32,
+      "PivotY": 12,
+      "PixelsPerUnit": 32,
+      "Filter": "point",
+      "Premultiplied": false
+    },
+    {
       "Name": "fx_glow",
       "File": "fx_glow.png",
       "Kind": "sprite",

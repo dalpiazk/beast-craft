@@ -152,7 +152,9 @@ namespace BeastCraft.Game
                 _draw.Fill(Pixel, new Vector2(slot.X, slot.Y), new Vector2(slot.Width, slot.Height), border);
                 _draw.Fill(Pixel, new Vector2(slot.X + thickness, slot.Y + thickness), new Vector2(slot.Width - 2f * thickness, slot.Height - 2f * thickness),
                            Ink("1", Color.DarkGray));
-                DrawFitted(SpriteFor(unit.Id), slot.Inset(thickness + 6f), unit.Team == BattleTeam.Enemy);
+                ArtSprite portrait = SpriteFor(unit.Id);
+                DrawFitted(portrait, slot.Inset(thickness + 6f), unit.Team == BattleTeam.Enemy,
+                           AccentColor(portrait, unit.Elements.Count > 0 ? unit.Elements[0] : Creatures.Element.None));
 
                 int hp = _animation != null ? _animation.ShownHp(unit.Id, _clockMs) : unit.CurrentHp;
                 float barWidth = slot.Width - 2f * thickness - 12f;
@@ -468,7 +470,7 @@ namespace BeastCraft.Game
         /// A character sprite scaled so its whole frame fits <paramref name="box"/>, centred (a
         /// turn-order portrait): whatever its source size, since it is placed by pixels-per-unit.
         /// </summary>
-        private void DrawFitted(ArtSprite sprite, Rect box, bool flip)
+        private void DrawFitted(ArtSprite sprite, Rect box, bool flip, Color? accent = null)
         {
             if (sprite == null)
             {
@@ -483,7 +485,7 @@ namespace BeastCraft.Game
             float pivotX = flip ? sprite.Data.FrameWidth - sprite.Pivot.X : sprite.Pivot.X;
             Vector2 at = new Vector2(box.X + (box.Width - sprite.Data.FrameWidth * k) / 2f + pivotX * k,
                                      box.Y + (box.Height - sprite.Data.FrameHeight * k) / 2f + sprite.Pivot.Y * k);
-            DrawCharacter(sprite, at, 1f, Color.White, flip);
+            DrawCharacter(sprite, at, 1f, Color.White, flip, accent);
             _draw.UnitSize = unit;
         }
 

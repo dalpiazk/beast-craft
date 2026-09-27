@@ -15,9 +15,10 @@ namespace BeastCraft.Game.Rendering
     /// <summary>One loaded sprite: its texture and its manifest entry (pivot, scale, filter, tint, clips).</summary>
     public sealed class ArtSprite
     {
-        internal ArtSprite(ArtSpriteData data, Texture2D texture, Color tint)
+        internal ArtSprite(ArtSpriteData data, Texture2D texture, Color tint, int artTop)
         {
             Data = data;
+            ArtTop = artTop;
             Texture = texture;
             Tint = tint;
             Sampler = data.Filter == ArtFilter.Point ? SamplerState.PointClamp : SamplerState.LinearClamp;
@@ -36,6 +37,12 @@ namespace BeastCraft.Game.Rendering
 
         /// <summary>The anchor in source pixels from the frame's top-left.</summary>
         public Vector2 Pivot { get; }
+
+        /// <summary>
+        /// The first row of frame 0 with any opaque pixel (source px from the frame's top): where the
+        /// art's head is, which a square illustrated frame can leave well below the frame's top.
+        /// </summary>
+        public int ArtTop { get; }
 
         public string Name
         {
@@ -73,6 +80,7 @@ namespace BeastCraft.Game.Rendering
         {
             // An alias entry reuses another sprite's file: each file is loaded once.
             Dictionary<string, Texture2D> byFile = new Dictionary<string, Texture2D>(StringComparer.Ordinal);
+            Dictionary<string, int> topByFile = new Dictionary<string, int>(StringComparer.Ordinal);
             foreach (ArtSpriteData sprite in content.Art.Sprites)
             {
                 if (sprite.Kind != ArtSpriteKind.Sprite)
@@ -87,14 +95,15 @@ namespace BeastCraft.Game.Rendering
                         texture = Texture2D.FromStream(device, stream);
                     }
 
-                    texture = Prepare(device, texture, !sprite.Premultiplied, sprite.Filter == ArtFilter.Linear);
+                    texture = Prepare(device, texture, !sprite.Premultiplied, sprite.Filter == ArtFilter.Linear, sprite.FrameWidth, out int top);
 
                     byFile.Add(sprite.File, texture);
+                    topByFile.Add(sprite.File, top);
                     _files.Add(texture);
                 }
 
                 Color tint = string.IsNullOrEmpty(sprite.Tint) ? Color.White : ParseHex(sprite.Tint);
-                _sprites[sprite.Name] = new ArtSprite(sprite, texture, tint);
+                _sprites[sprite.Name] = new ArtSprite(sprite, texture, tint, topByFile[sprite.File]);
                 if (!string.IsNullOrEmpty(sprite.ArtKey) && !_byArtKey.ContainsKey(sprite.ArtKey))
                 {
                     _byArtKey.Add(sprite.ArtKey, sprite.Name);
@@ -145,18 +154,20 @@ namespace BeastCraft.Game.Rendering
         /// The loaded texture premultiplied (when <paramref name="premultiply"/>) and, with
         /// <paramref name="mipmaps"/>, copied into a mipmapped texture whose levels are
         /// <see cref="Downsample"/>d from the level above (the loaded one is disposed).
+        /// <paramref name="top"/>: the art's top row in frame 0 (<see cref="ArtTopRow"/>).
         /// </summary>
-        private static Texture2D Prepare(GraphicsDevice device, Texture2D texture, bool premultiply, bool mipmaps)
+        private static Texture2D Prepare(GraphicsDevice device, Texture2D texture, bool premultiply, bool mipmaps, int frameWidth, out int top)
         {
+            int width = texture.Width;
+            int height = texture.Height;
+            Color[] data = new Color[width * height];
+            texture.GetData(data);
+            top = ArtTopRow(data, width, height, frameWidth);
             if (!premultiply && !mipmaps)
             {
                 return texture;
             }
 
-            int width = texture.Width;
-            int height = texture.Height;
-            Color[] data = new Color[width * height];
-            texture.GetData(data);
             if (premultiply)
             {
                 for (int i = 0; i < data.Length; i++)
@@ -216,6 +227,24 @@ namespace BeastCraft.Game.Rendering
             width = w;
             height = h;
             return result;
+        }
+
+        /// <summary>The first row with a non-transparent pixel in the leftmost <paramref name="frameWidth"/> columns (frame 0); 0 if none.</summary>
+        private static int ArtTopRow(Color[] data, int width, int height, int frameWidth)
+        {
+            int w = Math.Min(width, Math.Max(1, frameWidth));
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    if (data[y * width + x].A > 0)
+                    {
+                        return y;
+                    }
+                }
+            }
+
+            return 0;
         }
 
         /// <summary><c>#rrggbb</c> to a colour.</summary>

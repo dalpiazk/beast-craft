@@ -48,6 +48,9 @@ namespace BeastCraft.Vfx
         public const float MaxAuraScale = 4f;
         public const int MinPulseMs = 200;
         public const int MaxPulseMs = 4000;
+        public const float MinAuraAlpha = 0.05f;
+        public const int MinAuraFrameMs = 40;
+        public const int MaxAuraFrameMs = 2000;
 
         /// <summary>
         /// Validates <paramref name="data"/>. <paramref name="knownSkillIds"/> (null skips the check)
@@ -145,6 +148,15 @@ namespace BeastCraft.Vfx
                     }
 
                     ValidateAura(entry.Aura, at + " Aura", art, errors);
+                }
+            }
+
+            if (data.EnemyAura != null)
+            {
+                ValidateAura(data.EnemyAura, "EnemyAura", art, errors);
+                if (string.IsNullOrEmpty(data.EnemyAura.Sheet))
+                {
+                    errors.Add("EnemyAura: needs a Sheet (it has no status to show an icon for).");
                 }
             }
 
@@ -369,6 +381,11 @@ namespace BeastCraft.Vfx
             Color(aura.IconTint, true, at + " IconTint", art, errors);
             Range(aura.Scale, MinAuraScale, MaxAuraScale, at + " Scale", errors);
             Range(aura.PulseMs, MinPulseMs, MaxPulseMs, at + " PulseMs", errors);
+            Range(aura.Alpha, MinAuraAlpha, 1f, at + " Alpha", errors);
+            if (aura.FrameMs != 0)
+            {
+                Range(aura.FrameMs, MinAuraFrameMs, MaxAuraFrameMs, at + " FrameMs", errors);
+            }
             if (aura.Blend != VfxBlend.Alpha && aura.Blend != VfxBlend.Additive)
             {
                 errors.Add(at + ": Blend '" + aura.Blend + "' is not Alpha or Additive.");

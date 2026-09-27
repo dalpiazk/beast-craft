@@ -62,6 +62,9 @@ Generated kinds (no grid rows; the header drives an integer-only generator):
                 a filled disc in bands, its last band dithered: glows.
   kind: fx      generator: blob, ramp: <chars centre -> edge>, seed: <int>
                 a ragged filled disc with a few specks: ground decals (scorch, frost, ooze).
+  kind: fx      generator: haze, frames: N, ramp: <chars centre -> edge>, seed: <int>, density: <percent>
+                a looping ground haze: sparse drifting specks in an ellipse, thinning to its rim (the Gloam
+                haze under every enemy).
   These are drawn white/grey so the VFX data can tint them (tints multiply).
   kind: hex     a pointy-top hex (size 32x36; rows step 27 px, columns 32 px):
                 texture: <tile sprite>   fill the hex by tiling that sprite, or
@@ -460,7 +463,35 @@ def skill_icon_sprites():
 
 # ---------------------------------------------------------------------------------------------
 
-GENERATORS = {"ring": ring_frames, "disc": disc_frames, "blob": blob_frames}
+def haze_frames(meta, w, h):
+    """A looping ground haze: sparse specks in an ellipse, densest at the centre and thinning to nothing at the rim,
+    drifting sideways one w/frames step per frame so the last frame wraps into the first (the noise field repeats
+    every w px). Coarse 2x1 specks read as wisps rather than grain. Integer only."""
+    n = int(meta.get("frames", "8"))
+    ramp = meta["ramp"].split()
+    seed = int(meta.get("seed", "1"))
+    peak = int(meta.get("density", "60"))        # percent of pixels filled at the centre
+    outer = w - 1
+    frames = []
+    for f in range(n):
+        shift = f * w // n
+        grid = [[TRANSPARENT] * w for _ in range(h)]
+        for y in range(h):
+            for x in range(w):
+                d2 = ellipse_d2(x, y, w, h)
+                if d2 >= outer * outer:
+                    continue
+                density = peak * (outer * outer - d2) // (outer * outer)      # linear in d2: soft falloff
+                u = ((x + shift) % w) // 2
+                if hash32(seed, u, y) % 100 >= density:
+                    continue
+                band = min(len(ramp) - 1, d2 * len(ramp) // (outer * outer))
+                grid[y][x] = ramp[band]
+        frames.append(grid)
+    return frames
+
+
+GENERATORS = {"ring": ring_frames, "disc": disc_frames, "blob": blob_frames, "haze": haze_frames}
 
 
 def to_image(grid, colors):

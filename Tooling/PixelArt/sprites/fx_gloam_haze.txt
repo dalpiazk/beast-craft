@@ -1,0 +1,13 @@
+# name: fx_gloam_haze
+# label: Gloam haze (looping ground wisps under every enemy; white, tinted violet)
+# kind: fx
+# size: 64x24
+# outline: none
+# generator: haze
+# frames: 8
+# frame_ms: 160
+# ramp: w 3 2
+# seed: 7
+# density: 55
+# pivot: 32,12
+# artkey: fx/layer/gloam_haze

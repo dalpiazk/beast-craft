@@ -425,9 +425,64 @@ namespace BeastCraft.Tests.EditMode
             Assert.IsFalse(VfxAuraSampler.TrySample(new VfxAuraData { Icon = "i" }, feet, 1f, 0, out _), "an icon-only aura draws no sprite");
         }
 
+        [Test]
+        public void Aura_AlphaAndFrameMs_FadeItAndLoopItsFrames()
+        {
+            VfxAuraData aura = new VfxAuraData { Sheet = "haze", PulseMs = 1000, Alpha = 0.5f, FrameMs = 100 };
+
+            Assert.IsTrue(VfxAuraSampler.TrySample(aura, Vec2.Zero, 1f, 250, out VfxSprite peak));
+            Assert.AreEqual(0.5f, peak.Alpha, 1e-5f, "the pulse peaks at Alpha");
+            Assert.AreEqual(2, peak.Frame, "one frame every FrameMs (the renderer wraps it to the sheet)");
+            aura.FrameMs = 0;
+            Assert.IsTrue(VfxAuraSampler.TrySample(aura, Vec2.Zero, 1f, 250, out VfxSprite still));
+            Assert.AreEqual(0, still.Frame, "FrameMs 0: the first frame, still");
+        }
+
+        [Test]
+        public void EnemyAura_FollowsTheEffectsSetting_AndTheFootprint()
+        {
+            VfxAuraData haze = VfxLibraryTests.Content.Vfx.EnemyAura;
+            Assert.IsNotNull(haze, "the shipped library gives every enemy the Gloam haze");
+            Assert.AreEqual("fx_gloam_haze", haze.Sheet);
+            Assert.AreEqual(VfxDepth.Ground, haze.Depth, "behind the sprite, at its feet");
+            Assert.Greater(VfxLibraryTests.Content.Art.Find(haze.Sheet).Frames, 1, "a looping wisp");
+
+            const int ms = 650;
+            Assert.IsTrue(VfxAuraSampler.TrySampleEnemyAura(haze, Vec2.Zero, 1f, ms, new VfxSettings(BeastCraft.Save.EffectsIntensity.Full, true, true), out VfxSprite full));
+            Assert.IsTrue(VfxAuraSampler.TrySampleEnemyAura(haze, Vec2.Zero, 1f, ms, new VfxSettings(BeastCraft.Save.EffectsIntensity.Reduced, true, true), out VfxSprite reduced));
+            Assert.IsFalse(VfxAuraSampler.TrySampleEnemyAura(haze, Vec2.Zero, 1f, ms, new VfxSettings(BeastCraft.Save.EffectsIntensity.Minimal, true, true), out _), "none under Minimal");
+            Assert.LessOrEqual(full.Alpha, haze.Alpha, "subtle: never past its authored opacity");
+            Assert.AreEqual(full.Alpha * 0.5f, reduced.Alpha, 1e-5f, "half as opaque under Reduced");
+
+            Assert.IsTrue(VfxAuraSampler.TrySampleEnemyAura(haze, Vec2.Zero, HexLayout.FootprintWidth(UnitFootprint.Hex7), ms, null, out VfxSprite giant));
+            Assert.AreEqual(full.Scale * 2.5f, giant.Scale, 1e-4f, "sized to the footprint's width");
+        }
+
+        [TestCase(UnitFootprint.Single, 1f)]
+        [TestCase(UnitFootprint.Triangle, 1.75f)]
+        [TestCase(UnitFootprint.Hex7, 2.5f)]
+        public void FootprintWidth_IsTheEnemyArtsLineupWidth(UnitFootprint footprint, float hexes)
+        {
+            Assert.AreEqual(hexes, HexLayout.FootprintWidth(footprint));
+        }
+
         // ------------------------------------------------------------------------------------------
         // Validation
         // ------------------------------------------------------------------------------------------
+
+        [Test]
+        public void Validator_CoversTheEnemyAura()
+        {
+            VfxLibraryData data = VfxLibraryTests.Minimal();
+            data.EnemyAura = new VfxAuraData { Sheet = "", Icon = "", Alpha = 0f, FrameMs = 5 };
+
+            List<string> errors = VfxLibraryValidator.Validate(data, new[] { "zap" }, VfxLibraryTests.Art());
+
+            string all = string.Join("\n", errors);
+            StringAssert.Contains("EnemyAura: needs a Sheet", all);
+            StringAssert.Contains("EnemyAura Alpha", all);
+            StringAssert.Contains("EnemyAura FrameMs", all);
+        }
 
         [Test]
         public void Validator_CoversLayersEffectDefaultsAndAuras()

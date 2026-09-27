@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using BeastCraft.Battle.Grid;
+using BeastCraft.Creatures;
+using BeastCraft.Creatures.Roster;
 using BeastCraft.Encounters;
 using BeastCraft.Save;
 using BeastCraft.Session;
@@ -50,10 +52,16 @@ namespace BeastCraft.Presentation.Content
         /// generated lineup of that shape, drawn with <paramref name="seed"/>);
         /// <paramref name="arena"/>, when set, fights it on that arena instead of its own (the
         /// lineup must seat there, or the battle cannot begin).
+        /// <para>
+        /// <paramref name="lineup"/>, when set, fields exactly those enemies instead (each
+        /// <c>enemy_id:Element</c>, e.g. <c>brute:Fire</c>; no element = none) at the squad's
+        /// difficulty, on <paramref name="arena"/> or Medium: for looking at one enemy type's art
+        /// across elements. Which battle it is changes; the rules do not.
+        /// </para>
         /// </summary>
         public static BattleSetup Create(GameContent content, int seed, out Dictionary<string, string> speciesByUnit, out string error,
                                          IReadOnlyList<string> team = null, string encounterId = DefaultEncounterId, int level = DefaultLevel,
-                                         int encounterLevel = DefaultEncounterLevel, ArenaSize? arena = null)
+                                         int encounterLevel = DefaultEncounterLevel, ArenaSize? arena = null, IReadOnlyList<string> lineup = null)
         {
             speciesByUnit = new Dictionary<string, string>(StringComparer.Ordinal);
             error = null;
@@ -84,6 +92,22 @@ namespace BeastCraft.Presentation.Content
                 speciesByUnit[BattleSession.BeastUnitIdPrefix + beastId] = kit.SpeciesId;
             }
 
+            if (lineup != null && lineup.Count > 0)
+            {
+                setup.Encounter = Lineup(content, lineup, encounterLevel, arena ?? ArenaSize.Medium, out error);
+                if (setup.Encounter == null)
+                {
+                    return null;
+                }
+
+                for (int i = 0; i < setup.Encounter.Enemies.Count; i++)
+                {
+                    speciesByUnit["enemy" + (i + 1).ToString(CultureInfo.InvariantCulture)] = setup.Encounter.Enemies[i].SpeciesId;
+                }
+
+                return setup;
+            }
+
             // A template, else a shape id: one generated lineup of that shape, drawn with the seed.
             EncounterPlan plan = EncounterPlan.FromTemplate(content.Encounters, content.Enemies, encounterId, encounterLevel) ??
                                  EncounterPlan.Generate(content.Encounters, content.Enemies, encounterId, encounterLevel, seed);
@@ -107,6 +131,30 @@ namespace BeastCraft.Presentation.Content
             }
 
             return setup;
+        }
+
+        /// <summary>The <c>--lineup</c> encounter: each <c>enemy_id[:Element]</c> once, at the squad's calibrated difficulty.</summary>
+        private static EncounterSetup Lineup(GameContent content, IReadOnlyList<string> lineup, int level, ArenaSize arena, out string error)
+        {
+            error = null;
+            const string shape = "squad";
+            EncounterSetup encounter = new EncounterSetup { Arena = arena, ShapeId = shape, EncounterLevel = level };
+            double multiplier = content.Encounters.Multiplier(shape, level);
+            foreach (string entry in lineup)
+            {
+                string[] parts = (entry ?? string.Empty).Split(':');
+                EnemyData enemy = content.Enemies.Get(parts[0].Trim());
+                Element element = Element.None;
+                if (enemy == null || parts.Length > 2 || (parts.Length == 2 && !BeastRosterValidator.TryParseElement(parts[1].Trim(), out element)))
+                {
+                    error = "Unknown lineup entry '" + entry + "' (enemy_id or enemy_id:Element).";
+                    return null;
+                }
+
+                encounter.Enemies.Add(new EnemySpec(enemy.EnemyId, level) { Element = element, StatMultiplier = multiplier, StatusResist = enemy.StatusResist });
+            }
+
+            return encounter;
         }
     }
 }

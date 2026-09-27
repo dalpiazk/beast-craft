@@ -228,7 +228,8 @@ namespace BeastCraft.Game
         {
             foreach (string key in StatusKeys(unit))
             {
-                if (VfxAuraSampler.TrySample(_content.Vfx.Aura(key), new Vec2(feet.X, feet.Y), UnitScale(unit), _clockMs + _idleClockMs, out VfxSprite sprite) &&
+                if (VfxAuraSampler.TrySample(_content.Vfx.Aura(key), new Vec2(feet.X, feet.Y), HexLayout.FootprintWidth(unit.Footprint), _clockMs + _idleClockMs,
+                                             out VfxSprite sprite) &&
                     sprite.Ground == ground)
                 {
                     DrawVfxSprite(sprite);
@@ -236,6 +237,28 @@ namespace BeastCraft.Game
             }
 
             _draw.SetBlend(BlendState.AlphaBlend);
+        }
+
+        /// <summary>
+        /// The Gloam haze under a standing enemy (the VFX library's <c>EnemyAura</c>), sized to its
+        /// footprint, each enemy on its own phase so a crowd does not breathe in step. Thinned under
+        /// Reduced effects, gone under Minimal. Presentation only.
+        /// </summary>
+        private void DrawEnemyHaze(UnitSnapshot unit, Vector2 feet)
+        {
+            int phase = 0;
+            foreach (char c in unit.Id ?? string.Empty)
+            {
+                phase = (phase * 31 + c) % 100003;
+            }
+
+            if (unit.Team == BattleTeam.Enemy &&
+                VfxAuraSampler.TrySampleEnemyAura(_content.Vfx.EnemyAura, new Vec2(feet.X, feet.Y), HexLayout.FootprintWidth(unit.Footprint),
+                                                  _clockMs + _idleClockMs + phase, _vfxSettings, out VfxSprite sprite))
+            {
+                DrawVfxSprite(sprite);
+                _draw.SetBlend(BlendState.AlphaBlend);
+            }
         }
 
         /// <summary>The status icons of <paramref name="unit"/>'s lasting effects, in a row centred above its HP bar.</summary>
@@ -292,12 +315,14 @@ namespace BeastCraft.Game
                 }
             }
 
-            // Then everything that lies on the ground: decals and ground rings, and ground auras.
+            // Then everything that lies on the ground: decals and ground rings, the enemies' Gloam haze
+            // and ground auras.
             DrawLayerSprites(frames, true);
             foreach (UnitSnapshot unit in units)
             {
                 if (Standing(unit))
                 {
+                    DrawEnemyHaze(unit, At(Center(unit)));
                     DrawAuras(unit, At(Center(unit)), true);
                 }
             }
@@ -310,15 +335,14 @@ namespace BeastCraft.Game
                 }
 
                 Vector2 at = At(Center(unit));
-                float scale = UnitScale(unit);
                 bool fading = _animation != null && _animation.ShownFading(unit.Id, _clockMs);
                 ArtSprite sprite = SpriteFor(unit.Id);
                 DrawUnitSprite(sprite, unit, at, fading ? Color.White * 0.4f : Color.White);
                 DrawAuras(unit, at, false);
 
                 int hp = _animation != null ? _animation.ShownHp(unit.Id, _clockMs) : unit.Hp;
-                float barY = (float)Math.Round(at.Y - HeadHeight(sprite, scale)) - 4f;
-                DrawHpBar(at.X, barY, scale <= 1f ? 24f : 40f, 3f, hp, unit.MaxHp);
+                float barY = (float)Math.Round(at.Y - HeadHeight(sprite, 1f)) - 4f;
+                DrawHpBar(at.X, barY, unit.Footprint == UnitFootprint.Single ? 24f : 40f, 3f, hp, unit.MaxHp);
                 DrawStatusIcons(unit, at.X, barY);
             }
         }
@@ -380,7 +404,7 @@ namespace BeastCraft.Game
             {
                 if (_animation.Turn.After.TryGetValue(target.UnitId, out UnitSnapshot unit))
                 {
-                    DrawUnitSprite(SpriteFor(unit.Id), unit, At(Center(unit)), tint);
+                    DrawUnitSprite(SpriteFor(unit.Id), unit, At(Center(unit)), tint, false);
                 }
             }
         }
@@ -398,9 +422,9 @@ namespace BeastCraft.Game
                 string ch = number.Crit && !string.IsNullOrEmpty(spec.CritColor) ? spec.CritColor : spec.Color;
                 string text = number.Value.ToString(CultureInfo.InvariantCulture) + (number.Crit ? "!" : string.Empty);
                 Color color = Ink(ch, Color.White) * number.Alpha;
-                // Above the unit's head: a big unit is drawn at twice the size.
+                // Above the unit's head: a big unit's art is taller than a hex (its WorldHeight).
                 bool big = _animation.Turn.After.TryGetValue(number.UnitId ?? string.Empty, out UnitSnapshot unit) && unit.Footprint != UnitFootprint.Single;
-                float lift = big ? 66f : 38f;
+                float lift = big ? Math.Max(38f, HeadHeight(SpriteFor(unit.Id), 1f) + 2f) : 38f;
                 _text.DrawCentered(_draw, text, (float)Math.Round(number.Position.X), (float)Math.Round(number.Position.Y) - lift, 10f, color,
                                    Ink("K", Color.Black) * number.Alpha);
             }
@@ -412,16 +436,24 @@ namespace BeastCraft.Game
         }
 
         /// <summary>
-        /// A unit's sprite, pivot (feet) on <paramref name="at"/>, facing the other side, at its
-        /// footprint's size; a sprite with an <c>idle</c> clip plays it on the viewer's clock.
+        /// A unit's sprite, pivot (feet) on <paramref name="at"/> (its footprint's visual centre),
+        /// facing the other side, at its art's own size (the manifest's PixelsPerUnit, from its
+        /// WorldHeight: a multi-hex enemy's art is drawn to cover its footprint, not scaled up); a
+        /// sprite with an <c>idle</c> clip plays it on the viewer's clock. With
+        /// <paramref name="accent"/>, an enemy's accent overlay is drawn over it in its element's colour.
         /// </summary>
-        private void DrawUnitSprite(ArtSprite sprite, UnitSnapshot unit, Vector2 at, Color color)
+        private void DrawUnitSprite(ArtSprite sprite, UnitSnapshot unit, Vector2 at, Color color, bool accent = true)
         {
-            DrawCharacter(sprite, at, UnitScale(unit), color, unit.Team == BattleTeam.Enemy);
+            DrawCharacter(sprite, at, 1f, color, unit.Team == BattleTeam.Enemy, accent ? AccentColor(sprite, unit.Element) : null);
         }
 
-        /// <summary>A character sprite with its pivot on <paramref name="at"/>, playing its <c>idle</c> clip when it has one.</summary>
-        private void DrawCharacter(ArtSprite sprite, Vector2 at, float scale, Color color, bool flip)
+        /// <summary>
+        /// A character sprite with its pivot on <paramref name="at"/>, playing its <c>idle</c> clip when
+        /// it has one; then, when <paramref name="accent"/> is set and the sprite names an accent
+        /// overlay (<see cref="ArtSpriteData.Accent"/>), the overlay in the same place multiplied by
+        /// that colour (and by <paramref name="color"/>, so a fading unit's overlay fades with it).
+        /// </summary>
+        private void DrawCharacter(ArtSprite sprite, Vector2 at, float scale, Color color, bool flip, Color? accent = null)
         {
             if (sprite == null)
             {
@@ -433,19 +465,30 @@ namespace BeastCraft.Game
             if (sheet != null)
             {
                 _draw.DrawFrame(sprite, sheet.Texture, sheet.Frame(idle.FrameAt(_clockMs + _idleClockMs)), at, scale, color, flip, 0f);
-                return;
+            }
+            else
+            {
+                _draw.DrawSprite(sprite, 0, at, scale, color, flip);
             }
 
-            _draw.DrawSprite(sprite, 0, at, scale, color, flip);
+            ArtSprite overlay = accent.HasValue ? _atlas.Sprite(sprite.Data.Accent) : null;
+            if (overlay != null)
+            {
+                _draw.DrawSprite(overlay, 0, at, scale, new Color(accent.Value.ToVector4() * color.ToVector4()), flip);
+            }
         }
 
-        /// <summary>A unit's draw scale: one hex for a one-tile unit, two for a large one.</summary>
-        private static float UnitScale(UnitSnapshot unit)
+        /// <summary>
+        /// The colour an enemy sprite's accent overlay is drawn in for a unit of <paramref name="element"/>
+        /// (data: <see cref="ArtManifestData.AccentTint"/>), or null for a sprite without one.
+        /// </summary>
+        private Color? AccentColor(ArtSprite sprite, Creatures.Element element)
         {
-            return unit.Footprint == UnitFootprint.Single ? 1f : 2f;
+            string hex = sprite == null ? null : _content.Art.AccentTint(sprite.Data, element.ToString());
+            return hex == null ? (Color?)null : SpriteAtlas.ParseHex(hex);
         }
 
-        /// <summary>How far a sprite drawn at <paramref name="scale"/> reaches above its pivot, in the current space's pixels.</summary>
+        /// <summary>How far a sprite's art (from its top opaque row) drawn at <paramref name="scale"/> reaches above its pivot, in the current space's pixels.</summary>
         private float HeadHeight(ArtSprite sprite, float scale)
         {
             if (sprite == null)
@@ -453,7 +496,7 @@ namespace BeastCraft.Game
                 return 24f * scale;
             }
 
-            return sprite.Pivot.Y / Math.Max(1f, sprite.Data.PixelsPerUnit) * _draw.UnitSize * scale;
+            return (sprite.Pivot.Y - sprite.ArtTop) / Math.Max(1f, sprite.Data.PixelsPerUnit) * _draw.UnitSize * scale;
         }
 
         private bool Standing(UnitSnapshot unit)
