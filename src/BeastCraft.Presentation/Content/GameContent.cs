@@ -189,6 +189,7 @@ namespace BeastCraft.Presentation.Content
             Prefix(errors, "vfx-library.json", VfxLibraryValidator.Validate(vfx, known, art));
             Prefix(errors, "art keys", ArtReferenceValidator.Validate(roster, enemyLibrary, skills, art));
             Prefix(errors, "battle-art.json", BattleArtValidator.Validate(battleArt, regions, art));
+            Prefix(errors, "battle-art.json", BattleArtValidator.ValidateLayouts(battleArt, layouts));
             Prefix(errors, "glossary.json", GlossaryValidator.Validate(glossaryData));
             Glossary glossary = Glossary.Build(glossaryData);
             Prefix(errors, "skill text", GlossaryValidator.ValidateText(glossary, skills, enemyLibrary));

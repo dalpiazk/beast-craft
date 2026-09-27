@@ -209,6 +209,7 @@ namespace BeastCraft.Tests.EditMode
             List<string> errors = ObstacleLayoutValidator.Validate(Content.Layouts, Content.Regions, EncounterLibraryDataOf(), Content.EnemyLibrary);
             Assert.IsEmpty(errors, string.Join("\n", errors));
 
+            Assert.AreEqual(18, Content.Layouts.Layouts.Length, "the six Hollow paintings on the three arenas");
             foreach (BattleLayoutEntryData layout in Content.Layouts.Layouts)
             {
                 ObstacleLayoutValidator.TryParseArena(layout.Arena, out ArenaSize arena);

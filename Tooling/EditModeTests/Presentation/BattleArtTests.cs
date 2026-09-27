@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using BeastCraft.Battle.Grid;
 using BeastCraft.Campaign;
+using BeastCraft.Encounters;
 using BeastCraft.Presentation.Art;
 using BeastCraft.Presentation.Board;
 using BeastCraft.Presentation.Camera;
@@ -39,16 +40,59 @@ namespace BeastCraft.Tests.EditMode
             List<string> errors = BattleArtValidator.Validate(data, Content.Regions, Content.Art);
 
             Assert.IsEmpty(errors, string.Join("\n", errors));
+            Assert.IsEmpty(BattleArtValidator.ValidateLayouts(data, Content.Layouts), string.Join("\n", BattleArtValidator.ValidateLayouts(data, Content.Layouts)));
             foreach (ArenaSize arena in new[] { ArenaSize.Small, ArenaSize.Medium, ArenaSize.Large })
             {
-                BattleBackdropData backdrop = Content.BattleArt.Backdrop("r01", arena);
-                Assert.IsNotNull(backdrop, arena.ToString());
-                Assert.AreEqual("backdrop/r01/" + arena.ToString().ToLowerInvariant(), backdrop.ArtKey);
-                ArtSpriteData image = Content.Art.FindByArtKey(backdrop.ArtKey);
-                Assert.IsNotNull(image, backdrop.ArtKey);
-                Assert.AreEqual(ArtFilter.Linear, image.Filter, "painted art is linear-filtered (and mipmapped)");
-                Assert.AreEqual("backdrop", image.Category, "backdrops load on first use (SpriteAtlas.DeferredCategory)");
+                Assert.IsNotNull(Content.BattleArt.Backdrop("r01", arena), arena.ToString());
+                foreach (string id in new[] { "sun0", "sun1", "sun3", "ruin0", "ruin2", "dusk2" })
+                {
+                    string key = "backdrop/r01/" + id + "/" + arena.ToString().ToLowerInvariant();
+                    BattleBackdropData backdrop = Content.BattleArt.BackdropByArtKey(key);
+                    Assert.IsNotNull(backdrop, key);
+                    Assert.AreEqual(arena.ToString(), backdrop.Arena);
+                    ArtSpriteData image = Content.Art.FindByArtKey(backdrop.ArtKey);
+                    Assert.IsNotNull(image, backdrop.ArtKey);
+                    Assert.AreEqual(ArtFilter.Linear, image.Filter, "painted art is linear-filtered (and mipmapped)");
+                    Assert.AreEqual("backdrop", image.Category, "backdrops load on first use (SpriteAtlas.DeferredCategory)");
+                    Assert.IsNotNull(Array.Find(Content.Layouts.Layouts, l => l.ArtKey == key), key + " has its obstacle layout");
+                }
             }
+
+            Assert.AreEqual(18, Content.BattleArt.Backdrops.Length, "six Hollow paintings, each on the three arenas");
+        }
+
+        [Test]
+        public void Backdrops_AndLayouts_AreHeldToEachOther()
+        {
+            BattleArtData art = new BattleArtData
+            {
+                Backdrops = new[]
+                {
+                    new BattleBackdropData { RegionId = "r01", Arena = "Small", ArtKey = "backdrop/r01/a/small" },
+                    new BattleBackdropData { RegionId = "r01", Arena = "Small", ArtKey = "backdrop/r01/b/small" },
+                    new BattleBackdropData { RegionId = "r02", Arena = "Small", ArtKey = "backdrop/r02/a/small" }
+                }
+            };
+            BattleLayoutData layouts = new BattleLayoutData
+            {
+                Layouts = new[]
+                {
+                    new BattleLayoutEntryData { RegionId = "r01", Arena = "Small", ArtKey = "backdrop/r01/a/small" },
+                    new BattleLayoutEntryData { RegionId = "r01", Arena = "Medium", ArtKey = "backdrop/r01/b/small" },
+                    new BattleLayoutEntryData { RegionId = "r01", Arena = "Large", ArtKey = "backdrop/r01/c/large" }
+                }
+            };
+
+            string text = string.Join("\n", BattleArtValidator.ValidateLayouts(art, layouts));
+            StringAssert.Contains("Layout 'backdrop/r01/b/small': its backdrop is r01 Small, the layout r01 Medium", text);
+            StringAssert.Contains("Layout 'backdrop/r01/c/large': no backdrop has that ArtKey", text);
+            Assert.IsFalse(text.Contains("backdrop/r02/a/small"), "a region without layouts may have backdrops without them");
+            Assert.AreEqual(art.Backdrops[1], art.BackdropByArtKey("backdrop/r01/b/small"));
+            Assert.IsNull(art.BackdropByArtKey("backdrop/r01/z/small"));
+
+            layouts.Layouts = new[] { layouts.Layouts[0] };
+            StringAssert.Contains("Backdrop 'backdrop/r01/b/small': region r01 has battle layouts, but none for this painting",
+                                  string.Join("\n", BattleArtValidator.ValidateLayouts(art, layouts)));
         }
 
         [Test]
@@ -355,7 +399,7 @@ namespace BeastCraft.Tests.EditMode
                 }
             }
 
-            Assert.AreEqual(3 + 6 + 59, painted, "backdrops, icon frame and rings, VFX hero frames");
+            Assert.AreEqual(18 + 6 + 59, painted, "backdrops, icon frame and rings, VFX hero frames");
             int icons = 0;
             foreach (string file in listed)
             {

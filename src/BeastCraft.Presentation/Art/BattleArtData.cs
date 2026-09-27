@@ -31,7 +31,7 @@ namespace BeastCraft.Presentation.Art
 
         public int SchemaVersion;
 
-        /// <summary>Painted backdrops, at most one per (RegionId, Arena).</summary>
+        /// <summary>Painted backdrops: any number per (RegionId, Arena), each ArtKey once.</summary>
         public BattleBackdropData[] Backdrops = new BattleBackdropData[0];
 
         /// <summary>The overlays over a backdrop (null: the defaults).</summary>
@@ -41,8 +41,31 @@ namespace BeastCraft.Presentation.Art
         public SkillIconStyleData SkillIcons;
 
         /// <summary>
-        /// The backdrop for <paramref name="regionId"/>'s <paramref name="arena"/>, or null when
-        /// there is none (the viewer then draws the pixel-tile board).
+        /// The backdrop whose ArtKey is <paramref name="artKey"/> (a battle layout's: the painting
+        /// its obstacles are painted on), or null.
+        /// </summary>
+        public BattleBackdropData BackdropByArtKey(string artKey)
+        {
+            if (string.IsNullOrEmpty(artKey) || Backdrops == null)
+            {
+                return null;
+            }
+
+            foreach (BattleBackdropData backdrop in Backdrops)
+            {
+                if (backdrop != null && string.Equals(backdrop.ArtKey, artKey, StringComparison.Ordinal))
+                {
+                    return backdrop;
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// The first backdrop for <paramref name="regionId"/>'s <paramref name="arena"/>, or null when
+        /// there is none (the viewer then draws the pixel-tile board). A region with battle layouts has
+        /// several (one per painting): a battle draws its own layout's (<see cref="BackdropByArtKey"/>).
         /// </summary>
         public BattleBackdropData Backdrop(string regionId, ArenaSize arena)
         {

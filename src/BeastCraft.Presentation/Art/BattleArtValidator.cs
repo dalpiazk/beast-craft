@@ -11,8 +11,8 @@ namespace BeastCraft.Presentation.Art
 {
     /// <summary>
     /// Checks <c>battle-art.json</c> (<see cref="BattleArtData"/>): the schema version; every backdrop
-    /// for a known region (<c>regions.json</c>) and an <see cref="ArenaSize"/> name, at most once per
-    /// pair, naming a well-formed <c>ArtKey</c> of a sprite in the art manifest; its board rect inside
+    /// for a known region (<c>regions.json</c>) and an <see cref="ArenaSize"/> name (a region's arena
+    /// may have several paintings), each ArtKey once, a well-formed <c>ArtKey</c> of a sprite in the art manifest; its board rect inside
     /// the image and not empty; the image drawn undistorted (its pixels square to within
     /// <see cref="BackdropPlacement.AspectTolerance"/>) and reaching the canvas edges at the fit-all
     /// view (<see cref="BackdropPlacement.CanvasAtFitAll"/>) with room for the largest screen shake
@@ -70,9 +70,9 @@ namespace BeastCraft.Presentation.Art
                     errors.Add(at + ": Arena '" + backdrop.Arena + "' is not Small, Medium or Large.");
                 }
 
-                if (!seen.Add(backdrop.RegionId + "|" + backdrop.Arena))
+                if (!seen.Add(backdrop.ArtKey ?? string.Empty))
                 {
-                    errors.Add(at + " is listed twice.");
+                    errors.Add(at + ": ArtKey '" + backdrop.ArtKey + "' is listed twice.");
                 }
 
                 ValidateRect(backdrop.BoardRect, at, errors, out bool rectOk);
@@ -224,6 +224,54 @@ namespace BeastCraft.Presentation.Art
             {
                 errors.Add(at + ": ArtKey '" + artKey + "' is not a sprite in the art manifest.");
             }
+        }
+
+        /// <summary>
+        /// The backdrops held to the battle layouts (<c>battle-layouts.json</c>): every layout's ArtKey
+        /// is a backdrop of the same region and arena (the painting its obstacles are painted on), and
+        /// every backdrop of a region that has layouts has one (a battle there always stands on a
+        /// layout, so a painting without one would never be drawn, and its rocks would block nothing).
+        /// </summary>
+        public static List<string> ValidateLayouts(BattleArtData data, Encounters.BattleLayoutData layouts)
+        {
+            List<string> errors = new List<string>();
+            if (data == null || layouts == null)
+            {
+                return errors;
+            }
+
+            HashSet<string> regions = new HashSet<string>(StringComparer.Ordinal);
+            HashSet<string> keys = new HashSet<string>(StringComparer.Ordinal);
+            foreach (Encounters.BattleLayoutEntryData layout in layouts.Layouts ?? new Encounters.BattleLayoutEntryData[0])
+            {
+                if (layout == null)
+                {
+                    continue;
+                }
+
+                regions.Add(layout.RegionId ?? string.Empty);
+                keys.Add(layout.ArtKey ?? string.Empty);
+                BattleBackdropData backdrop = data.BackdropByArtKey(layout.ArtKey);
+                if (backdrop == null)
+                {
+                    errors.Add("Layout '" + layout.ArtKey + "': no backdrop has that ArtKey.");
+                }
+                else if (backdrop.RegionId != layout.RegionId || backdrop.Arena != layout.Arena)
+                {
+                    errors.Add("Layout '" + layout.ArtKey + "': its backdrop is " + backdrop.RegionId + " " + backdrop.Arena + ", the layout " + layout.RegionId + " " +
+                               layout.Arena + ".");
+                }
+            }
+
+            foreach (BattleBackdropData backdrop in data.Backdrops ?? new BattleBackdropData[0])
+            {
+                if (backdrop != null && regions.Contains(backdrop.RegionId ?? string.Empty) && !keys.Contains(backdrop.ArtKey ?? string.Empty))
+                {
+                    errors.Add("Backdrop '" + backdrop.ArtKey + "': region " + backdrop.RegionId + " has battle layouts, but none for this painting.");
+                }
+            }
+
+            return errors;
         }
 
         /// <summary>An <see cref="ArenaSize"/> name, exactly as written.</summary>

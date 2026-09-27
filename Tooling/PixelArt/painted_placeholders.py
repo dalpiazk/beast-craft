@@ -7,16 +7,19 @@ Writes simple, soft, deterministic stand-ins for art the art lane will paint, at
 so the engine support works now and the painted art drops in later as files (build.py merges them into
 the manifest from illustrated.json's "Painted" list; a slot's data never names a size in pixels):
 
-  content/art/backdrops/<region>/<arena>.png   battle backdrops: a soft green gradient with low-frequency
-                                               noise and a lighter clearing where the board sits (read from
-                                               content/data/Vfx/battle-art.json's BoardRect), half the final size
+  content/art/backdrops/<region>/<id>/<arena>.png  battle backdrops: a soft gradient with low-frequency noise and
+                                               a lighter clearing where the board sits (read from
+                                               content/data/Vfx/battle-art.json's BoardRect), in the backdrop
+                                               family's colours (sun*, ruin*, dusk*), with its layout's obstacles
+                                               (content/data/Encounters/battle-layouts.json) painted on their hexes
+                                               as rocks, stone stumps or mossy boulders; 3/8 of the final size
   content/art/ui/skill_icon/*.png              the skill-icon frame and rarity rings (final size)
   content/art/vfx/<element>/<kind>.png         painted VFX hero frames per element (burst, ring, decal, glyph,
                                                ember) and content/art/vfx/status/<status>.png per status: soft
                                                shapes in the element's or status's colours, half the final size
 
 and LOCAL PREVIEWS (git-ignored) under Tooling/PixelArt/preview/:
-  backdrop_guide_<region>_<arena>.png          the backdrop with the arena's hex tiles drawn where the engine
+  backdrop_guide_<region>_<id>_<arena>.png     the backdrop with the arena's hex tiles drawn where the engine
                                                will put them (a painting guide for the art lane)
 
 Deterministic: integer hash noise, Pillow's own resampling, no system RNG, no timestamps. Never
@@ -40,7 +43,14 @@ MARK = "BeastCraft-Placeholder"
 # HexLayout (src/BeastCraft.Presentation/Board/HexLayout.cs) and HexGrid.DimensionsFor.
 TILE_W, TILE_H, COL, ROW = 32, 36, 32, 27
 ARENAS = {"Small": (5, 7), "Medium": (8, 11), "Large": (11, 15)}
-BACKDROP_SIZE = (720, 1280)          # placeholders at half the final 1440x2560
+BACKDROP_SIZE = (540, 960)           # placeholders at 3/8 of the final 1440x2560 (board rects are fractions)
+LAYOUTS = REPO / "content" / "data" / "Encounters" / "battle-layouts.json"
+# Per backdrop family (by the id's prefix): canopy, floor, clearing colours, and the obstacle look.
+FAMILIES = {
+    "sun": ((30, 58, 34), (70, 118, 58), (134, 176, 92), "rock"),
+    "ruin": ((38, 44, 40), (84, 92, 80), (142, 146, 128), "rubble"),
+    "dusk": ((22, 22, 44), (46, 58, 72), (86, 104, 110), "boulder"),
+}
 
 
 def hash32(*values):
@@ -105,15 +115,15 @@ def smooth(t):
     return t * t * (3 - 2 * t)
 
 
-def backdrop(region, arena, rect, seed):
-    """A soft green forest floor: dark canopy at the edges, a lighter mossy clearing under the board."""
+def backdrop(region, arena, rect, seed, family="sun"):
+    """A soft forest floor in the family's colours: dark canopy at the edges, a lighter clearing under the board."""
     w, h = BACKDROP_SIZE
     big = value_noise((w, h), (9, 16), seed)
     fine = value_noise((w, h), (45, 80), seed + 7)
     bx, by, bw, bh = rect["X"] * w, rect["Y"] * h, rect["Width"] * w, rect["Height"] * h
     cx, cy = bx + bw / 2, by + bh / 2
     rx, ry = bw * 0.62, bh * 0.60
-    canopy, moss, meadow = (22, 44, 32), (52, 92, 52), (104, 146, 78)
+    canopy, moss, meadow = FAMILIES[family][:3]
     big_px, fine_px = big.load(), fine.load()
     img = Image.new("RGB", (w, h))
     px = img.load()
@@ -166,14 +176,46 @@ def save(img, path, force):
     return True
 
 
+def obstacle(img, cells, width, height, rect, look, seed):
+    """Paints each obstacle cell: a grey rock (meadow), a squared stone stump with rubble (ruins) or a dark mossy
+    boulder (dusk), sitting on its hex with a soft shadow, so the placeholder shows the blocked hexes."""
+    w, h = img.size
+    left, top, tw, th = board_bounds(width, height)
+    sx, sy = rect["Width"] * w / tw, rect["Height"] * h / th
+    ox, oy = rect["X"] * w - left * sx, rect["Y"] * h - top * sy
+    d = ImageDraw.Draw(img, "RGBA")
+    for i, (q, r) in enumerate(cells):
+        x, y = ox + (COL * q + COL / 2 * r) * sx, oy + ROW * r * sy
+        rx, ry = TILE_W / 2 * sx * 0.78, TILE_H / 2 * sy * 0.62
+        d.ellipse([x - rx, y - ry * 0.35, x + rx, y + ry * 0.75], fill=(0, 0, 0, 90))
+        jitter = (mix32(seed, i) % 7) - 3
+        if look == "rubble":
+            d.rectangle([x - rx * 0.55, y - ry * 1.3, x + rx * 0.55, y + ry * 0.35], fill=(150, 148, 136, 255), outline=(70, 66, 60, 255), width=2)
+            d.rectangle([x - rx * 0.55, y - ry * 1.3, x + rx * 0.55, y - ry * 1.0], fill=(186, 182, 168, 255))
+            d.polygon([(x - rx, y + ry * 0.4), (x - rx * 0.5, y - ry * 0.1 + jitter), (x - rx * 0.2, y + ry * 0.45)], fill=(120, 118, 108, 255))
+            d.polygon([(x + rx * 0.3, y + ry * 0.45), (x + rx * 0.7, y + jitter), (x + rx, y + ry * 0.4)], fill=(128, 124, 112, 255))
+        else:
+            base, light = ((118, 122, 128), (178, 182, 186)) if look == "rock" else ((52, 66, 58), (96, 128, 88))
+            d.ellipse([x - rx, y - ry * 1.15 + jitter, x + rx, y + ry * 0.5], fill=base + (255,), outline=(36, 34, 40, 255), width=2)
+            d.ellipse([x - rx * 0.6, y - ry * 1.0 + jitter, x + rx * 0.2, y - ry * 0.3], fill=light + (255,))
+    return img
+
+
 def backdrops(force):
     data = json.loads(BATTLE_ART.read_text(encoding="utf-8"))
+    layouts = {l["ArtKey"]: l for l in json.loads(LAYOUTS.read_text(encoding="utf-8"))["Layouts"]}
     for i, b in enumerate(data["Backdrops"]):
         region, arena = b["RegionId"], b["Arena"]
+        bid = b["ArtKey"].split("/")[2]
+        family = next(f for f in FAMILIES if bid.startswith(f))
         width, height = ARENAS[arena]
-        img = backdrop(region, arena, b["BoardRect"], 4100 + i)
-        save(img, ART / "backdrops" / region / f"{arena.lower()}.png", force)
-        guide(img, width, height, b["BoardRect"]).save(PREVIEW / f"backdrop_guide_{region}_{arena.lower()}.png")
+        img = backdrop(region, arena, b["BoardRect"], 4100 + i, family)
+        layout = layouts.get(b["ArtKey"])
+        if layout is not None:
+            cells = [(c["Q"], c["R"]) for c in layout["Cells"]]
+            obstacle(img, cells, width, height, b["BoardRect"], FAMILIES[family][3], 6100 + i)
+        save(img, ART / "backdrops" / region / bid / f"{arena.lower()}.png", force)
+        guide(img, width, height, b["BoardRect"]).save(PREVIEW / f"backdrop_guide_{region}_{bid}_{arena.lower()}.png")
 
 
 ICON = 256                            # skill-icon layers: frame and rarity rings share one square canvas

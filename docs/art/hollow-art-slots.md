@@ -19,28 +19,51 @@ colours** (the data does not tint them).
 
 Tick a box when the painted file has landed.
 
-## 1. Battle backdrops (3)
+## 1. Battle backdrops (18)
 
-One painting per arena size of the Verdant Hollow (r01), portrait **1440 x 2560** (9:16), opaque. The board
-(the arena's hex tiles) sits inside the painting at the **board rect** below; everything around it is decorative
-margin that runs under the HUD to the screen edges (the top ~14% and bottom ~26% sit under the turn order and the
-skill strip, behind a dark scrim), with a 4% bleed past the canvas on every side for the screen shake. Paint the
-ground inside the board rect as walkable, fairly even terrain (the game draws a faint hex grid, the deployment
-zones and the units over it: enemy rows at the top, the player's at the bottom); keep strong detail and
+The Verdant Hollow (r01) keeps six paintings, each recomposed three times, once per arena size: the sunlit
+meadows sun0, sun1, sun3, the ruins ruin0, ruin2 and the dusk glade dusk2. Portrait **1440 x 2560** (9:16), opaque.
+The board (the arena's hex tiles) sits inside the painting at the **board rect** below; everything around it is
+decorative margin that runs under the HUD to the screen edges (the top ~14% and bottom ~26% sit under the turn
+order and the skill strip, behind a dark scrim), with a 4% bleed past the canvas on every side for the screen shake.
+Paint the ground inside the board rect as walkable, fairly even terrain (the game draws a faint hex grid, the
+deployment zones and the units over it: enemy rows at the top, the player's at the bottom); keep strong detail and
 landmarks in the margins. The camera zooms up to about 2x into the board, so the board area should hold up at
-that zoom. Painting guides with the exact hexes: run the placeholder script, then see
-`Tooling/PixelArt/preview/backdrop_guide_r01_<arena>.png` (the hexes are drawn where the engine puts them; the
-guide is at the placeholders' half size).
+that zoom.
 
-| Done | File | Arena | Size | Board rect in px (x, y, w x h) | Board rect (fractions, `battle-art.json`) |
-| --- | --- | --- | --- | --- | --- |
-| [ ] | `content/art/backdrops/r01/small.png` | Small (5 x 7 hexes) | 1440 x 2560 | 199, 649, 1041 x 1171 | 0.13849, 0.25333, 0.72302 x 0.45754 |
-| [ ] | `content/art/backdrops/r01/medium.png` | Medium (8 x 11 hexes) | 1440 x 2560 | 165, 582, 1110 x 1248 | 0.11469, 0.22751, 0.77062 x 0.48766 |
-| [ ] | `content/art/backdrops/r01/large.png` | Large (11 x 15 hexes) | 1440 x 2560 | 147, 548, 1146 x 1289 | 0.10216, 0.21392, 0.79567 x 0.50351 |
+**Obstacles.** Each painting's obstacles are battle data (`content/data/Encounters/battle-layouts.json`): they
+block movement and standing (never line of sight). Paint one obstacle on **exactly** each listed hex (Q, R axial;
+R < 0 the enemy side), sitting inside its hex and reading clearly as impassable, and **no other** prop that looks
+like one anywhere on the board: rocks on the sunlit meadows, fallen stone rubble or broken pillar stumps on the ruins,
+mossy boulders or a fallen bough on the dusk glade (a bough spans only its own listed hexes). Review overlays with
+the exact hexes: `python Tooling/ArtLab/scripts/layout_overlay.py <painting.png> --layout <ArtKey>` (standard
+library plus Pillow), or `--all [--images <folder of <id>_preview.png>]`; the placeholders already show them.
+
+| Done | File | Arena | Board rect in px (x, y, w x h) | Board rect (fractions) | Obstacles (Q, R) | Motif |
+| --- | --- | --- | --- | --- | --- | --- |
+| [ ] | `content/art/backdrops/r01/sun0/small.png` | Small (5 x 7) | 199, 649, 1041 x 1171 | 0.13849, 0.25333, 0.72302 x 0.45754 | (-2, 0) (2, 0) | rocks |
+| [ ] | `content/art/backdrops/r01/sun0/medium.png` | Medium (8 x 11) | 165, 582, 1110 x 1248 | 0.11469, 0.22751, 0.77062 x 0.48766 | (-2, -1) (4, -1) (-2, 1) (2, 1) | rocks |
+| [ ] | `content/art/backdrops/r01/sun0/large.png` | Large (11 x 15) | 147, 548, 1146 x 1289 | 0.10216, 0.21392, 0.79567 x 0.50351 | (-3, -2) (5, -2) (-4, 2) (2, 2) (2, -3) (-2, 3) | rocks |
+| [ ] | `content/art/backdrops/r01/sun1/small.png` | Small (5 x 7) | 199, 649, 1041 x 1171 | 0.13849, 0.25333, 0.72302 x 0.45754 | (0, -1) (1, 1) | rocks |
+| [ ] | `content/art/backdrops/r01/sun1/medium.png` | Medium (8 x 11) | 165, 582, 1110 x 1248 | 0.11469, 0.22751, 0.77062 x 0.48766 | (-4, 0) (3, 0) (1, -2) (-2, 2) | rocks |
+| [ ] | `content/art/backdrops/r01/sun1/large.png` | Large (11 x 15) | 147, 548, 1146 x 1289 | 0.10216, 0.21392, 0.79567 x 0.50351 | (-3, -1) (3, 1) (0, -3) (0, 3) (-1, 0) | rocks |
+| [ ] | `content/art/backdrops/r01/sun3/small.png` | Small (5 x 7) | 199, 649, 1041 x 1171 | 0.13849, 0.25333, 0.72302 x 0.45754 | (-1, -1) (2, 1) | rocks |
+| [ ] | `content/art/backdrops/r01/sun3/medium.png` | Medium (8 x 11) | 165, 582, 1110 x 1248 | 0.11469, 0.22751, 0.77062 x 0.48766 | (-1, -2) (2, -1) (-2, 1) (1, 2) (0, 0) | rocks |
+| [ ] | `content/art/backdrops/r01/sun3/large.png` | Large (11 x 15) | 147, 548, 1146 x 1289 | 0.10216, 0.21392, 0.79567 x 0.50351 | (-2, -2) (4, -2) (-4, 2) (2, 2) (0, -1) (0, 1) | rocks |
+| [ ] | `content/art/backdrops/r01/ruin0/small.png` | Small (5 x 7) | 199, 649, 1041 x 1171 | 0.13849, 0.25333, 0.72302 x 0.45754 | (-1, 0) (1, 0) | fallen stone rubble or broken pillar stumps |
+| [ ] | `content/art/backdrops/r01/ruin0/medium.png` | Medium (8 x 11) | 165, 582, 1110 x 1248 | 0.11469, 0.22751, 0.77062 x 0.48766 | (-2, -1) (3, -1) (-3, 1) (2, 1) (0, 0) | fallen stone rubble or broken pillar stumps |
+| [ ] | `content/art/backdrops/r01/ruin0/large.png` | Large (11 x 15) | 147, 548, 1146 x 1289 | 0.10216, 0.21392, 0.79567 x 0.50351 | (-2, -2) (3, -2) (-4, 2) (1, 2) (-4, 0) (4, 0) | fallen stone rubble or broken pillar stumps |
+| [ ] | `content/art/backdrops/r01/ruin2/small.png` | Small (5 x 7) | 199, 649, 1041 x 1171 | 0.13849, 0.25333, 0.72302 x 0.45754 | (1, -1) (-1, 1) | fallen stone rubble or broken pillar stumps |
+| [ ] | `content/art/backdrops/r01/ruin2/medium.png` | Medium (8 x 11) | 165, 582, 1110 x 1248 | 0.11469, 0.22751, 0.77062 x 0.48766 | (-2, -2) (0, -1) (1, 1) (2, 2) | fallen stone rubble or broken pillar stumps |
+| [ ] | `content/art/backdrops/r01/ruin2/large.png` | Large (11 x 15) | 147, 548, 1146 x 1289 | 0.10216, 0.21392, 0.79567 x 0.50351 | (-2, -3) (-1, -2) (0, -1) (0, 1) (2, 2) (3, 3) | fallen stone rubble or broken pillar stumps |
+| [ ] | `content/art/backdrops/r01/dusk2/small.png` | Small (5 x 7) | 199, 649, 1041 x 1171 | 0.13849, 0.25333, 0.72302 x 0.45754 | (0, 0) | mossy boulders or a fallen bough |
+| [ ] | `content/art/backdrops/r01/dusk2/medium.png` | Medium (8 x 11) | 165, 582, 1110 x 1248 | 0.11469, 0.22751, 0.77062 x 0.48766 | (-3, 0) (2, 0) | mossy boulders or a fallen bough |
+| [ ] | `content/art/backdrops/r01/dusk2/large.png` | Large (11 x 15) | 147, 548, 1146 x 1289 | 0.10216, 0.21392, 0.79567 x 0.50351 | (-3, -1) (3, 1) (-3, 2) (2, -2) | mossy boulders or a fallen bough |
 
 Hex geometry inside the board rect: pointy-top hexes, 32 x 36 board px each, columns 32 px apart, rows 27 px apart,
 odd rows shifted half a column right; the board rect is the box of every tile (the arena's `Width + 1/2` columns
-wide). ArtKeys `backdrop/r01/<arena>` (category `backdrop`, loaded on first use).
+wide); a hex's centre is at board px (32 Q + 16 R, 27 R) from tile (0, 0)'s. ArtKeys `backdrop/r01/<id>/<arena>`
+(category `backdrop`, loaded on first use). The placeholders are 3/8 size.
 
 ## 2. Skill icon frame and rarity rings (6)
 
