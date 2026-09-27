@@ -368,7 +368,7 @@ fallen bough on its dusk glade, tree stumps, mossy fallen logs or a big mushroom
   arena), its obstacle hexes as axial cells. The painting and the layout go together: each battle
   backdrop in `battle-art.json` has exactly one layout, and the art lane paints the obstacles on
   exactly its hexes (`docs/art/hollow-art-slots.md`). The Verdant Hollow has eight paintings (sunlit
-  meadows sun0 / sun1 / sun3, ruins ruin0 / ruin2, dusk glade dusk2, forest shroom0 / shroom2), each
+  meadows sun0 / sun1 / sun3, ruins ruin0 / ruin2, dusk glade dusk2, forest canopy2 / shroom0), each
   on all three arenas: 24 layouts.
 - **Which battlefield.** `EncounterSetup.RegionId` names the region a battle is fought in
   (`EncounterPlan.ToSetup(regionId)`). `BattleSession` picks one of the region's layouts for the

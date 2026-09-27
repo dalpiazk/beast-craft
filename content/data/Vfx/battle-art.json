@@ -23,9 +23,9 @@
     { "RegionId": "r01", "Arena": "Small", "ArtKey": "backdrop/r01/shroom0/small", "BoardRect": { "X": 0.13849, "Y": 0.25333, "Width": 0.72302, "Height": 0.45754 } },
     { "RegionId": "r01", "Arena": "Medium", "ArtKey": "backdrop/r01/shroom0/medium", "BoardRect": { "X": 0.11469, "Y": 0.22751, "Width": 0.77062, "Height": 0.48766 } },
     { "RegionId": "r01", "Arena": "Large", "ArtKey": "backdrop/r01/shroom0/large", "BoardRect": { "X": 0.10216, "Y": 0.21392, "Width": 0.79567, "Height": 0.50351 } },
-    { "RegionId": "r01", "Arena": "Small", "ArtKey": "backdrop/r01/shroom2/small", "BoardRect": { "X": 0.13849, "Y": 0.25333, "Width": 0.72302, "Height": 0.45754 } },
-    { "RegionId": "r01", "Arena": "Medium", "ArtKey": "backdrop/r01/shroom2/medium", "BoardRect": { "X": 0.11469, "Y": 0.22751, "Width": 0.77062, "Height": 0.48766 } },
-    { "RegionId": "r01", "Arena": "Large", "ArtKey": "backdrop/r01/shroom2/large", "BoardRect": { "X": 0.10216, "Y": 0.21392, "Width": 0.79567, "Height": 0.50351 } }
+    { "RegionId": "r01", "Arena": "Small", "ArtKey": "backdrop/r01/canopy2/small", "BoardRect": { "X": 0.13849, "Y": 0.25333, "Width": 0.72302, "Height": 0.45754 } },
+    { "RegionId": "r01", "Arena": "Medium", "ArtKey": "backdrop/r01/canopy2/medium", "BoardRect": { "X": 0.11469, "Y": 0.22751, "Width": 0.77062, "Height": 0.48766 } },
+    { "RegionId": "r01", "Arena": "Large", "ArtKey": "backdrop/r01/canopy2/large", "BoardRect": { "X": 0.10216, "Y": 0.21392, "Width": 0.79567, "Height": 0.50351 } }
   ],
   "Board": {
     "GridColor": "4",

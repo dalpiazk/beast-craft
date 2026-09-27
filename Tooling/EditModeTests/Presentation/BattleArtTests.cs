@@ -44,7 +44,7 @@ namespace BeastCraft.Tests.EditMode
             foreach (ArenaSize arena in new[] { ArenaSize.Small, ArenaSize.Medium, ArenaSize.Large })
             {
                 Assert.IsNotNull(Content.BattleArt.Backdrop("r01", arena), arena.ToString());
-                foreach (string id in new[] { "sun0", "sun1", "sun3", "ruin0", "ruin2", "dusk2", "shroom0", "shroom2" })
+                foreach (string id in new[] { "sun0", "sun1", "sun3", "ruin0", "ruin2", "dusk2", "shroom0", "canopy2" })
                 {
                     string key = "backdrop/r01/" + id + "/" + arena.ToString().ToLowerInvariant();
                     BattleBackdropData backdrop = Content.BattleArt.BackdropByArtKey(key);
