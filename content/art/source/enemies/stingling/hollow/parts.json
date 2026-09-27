@@ -1,0 +1,138 @@
+{
+ "beast": "stingling",
+ "element": "any (gloamed enemy)",
+ "canvas": [
+  1792,
+  2304
+ ],
+ "order_back_to_front": [
+  "legs",
+  "stinger",
+  "body",
+  "head"
+ ],
+ "character": {
+  "file": "character.png",
+  "full_canvas_file": "character_full.png",
+  "pivot": [
+   1044,
+   2014
+  ],
+  "pivot_local": [
+   737,
+   1831
+  ],
+  "note": "character.png is cropped so the feet pivot is its bottom centre"
+ },
+ "parts": {
+  "legs": {
+   "file": "parts/legs.png",
+   "parent": "body",
+   "offset": [
+    860,
+    1822
+   ],
+   "size": [
+    366,
+    193
+   ],
+   "pivot": [
+    1011,
+    1821
+   ],
+   "pivot_local": [
+    151,
+    -1
+   ]
+  },
+  "stinger": {
+   "file": "parts/stinger.png",
+   "parent": "body",
+   "offset": [
+    1442,
+    1655
+   ],
+   "size": [
+    164,
+    107
+   ],
+   "pivot": [
+    1441,
+    1725
+   ],
+   "pivot_local": [
+    -1,
+    70
+   ]
+  },
+  "body": {
+   "file": "parts/body.png",
+   "parent": null,
+   "offset": [
+    537,
+    1122
+   ],
+   "size": [
+    905,
+    700
+   ],
+   "pivot": [
+    1044,
+    2014
+   ],
+   "pivot_local": [
+    507,
+    892
+   ]
+  },
+  "head": {
+   "file": "parts/head.png",
+   "parent": "body",
+   "offset": [
+    317,
+    193
+   ],
+   "size": [
+    1135,
+    936
+   ],
+   "pivot": [
+    948,
+    1121
+   ],
+   "pivot_local": [
+    631,
+    928
+   ]
+  }
+ },
+ "root_pivot_note": "root part 'body' pivots at the feet ground contact; child pivots = centre of contact with the parent. Canvas px (2x finals).",
+ "mask_stats": {
+  "fg_px": 1294050,
+  "overlap_px": 75585,
+  "orphan_px": 2170,
+  "island_px": 127,
+  "reclip_px": 0,
+  "auto_fixed_pct": 6.02,
+  "sam_iou": {
+   "legs": {
+    "iou": 0.0,
+    "src": "polygon"
+   },
+   "stinger": {
+    "iou": 0.0,
+    "src": "polygon"
+   },
+   "body": {
+    "iou": 0.0,
+    "src": "polygon"
+   },
+   "head": {
+    "iou": 0.0,
+    "src": "polygon"
+   }
+  },
+  "inpaint": {},
+  "recompose_mae": 0.03
+ }
+}

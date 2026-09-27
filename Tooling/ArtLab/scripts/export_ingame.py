@@ -1,7 +1,7 @@
 """In-game export: a rig's transparent character.png (feet pivot = bottom centre) -> the game sprite.
 
   python export_ingame.py SRC_character.png OUT.png [--content-size 504] [--pad 4] [--line-px 0]
-                          [--preview DIR]
+                          [--preview DIR] [--accent-mask MASK.png [--accent-native RRGGBB] [--compare DIR]]
 
 CPU only (Pillow, NumPy, OpenCV; no torch), deterministic.
 
@@ -20,6 +20,15 @@ CPU only (Pillow, NumPy, OpenCV; no torch), deterministic.
    the turn-order portrait, which fits the whole frame, the same size for every beast.
 4. Clear the colour under alpha 0 (straight alpha: invisible; it compresses better).
 
+5. Optional `--accent-mask MASK.png` (softened by a `--accent-feather` px Gaussian at the master's size, default 4) (an enemy's element-accent region: 8-bit, the master's size, 255 = accent):
+   split the sprite into a BASE (OUT.png) and an ACCENT OVERLAY (OUT_accent.png, the same frame and pivot) that the
+   viewer draws over the base multiplied by the unit's element colour (docs/design/presentation-and-vfx.md,
+   "Element accents"). See accent_split() for the maths: in the accent region every pixel C is read as a grey part
+   plus k times the art's own accent colour N (least squares, kept feasible), the overlay is white at alpha k and the
+   base keeps the rest, so base + overlay tinted N reproduces the art (checked and printed: the maximum per-channel
+   difference over paper, 0-255), and any other tint T gives C + k (T - N). N is the region's own colour
+   (`--accent-native`, else measured from the region and printed): the manifest's AccentNative.
+
 Prints the frame size and the pivot (px from the top-left): the feet, which Tooling/PixelArt/illustrated.json
 records for the art manifest.
 
@@ -31,7 +40,7 @@ import pathlib
 import sys
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageFilter
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
@@ -98,6 +107,112 @@ def preview(sprite, out_dir, name):
         bg.convert("RGB").resize((p.width * 3, p.height * 3), Image.NEAREST).save(out_dir / f"{name}_{label}_x3.png")
 
 
+def hex_rgb(h):
+    h = h.lstrip("#")
+    return np.array([int(h[i:i + 2], 16) for i in (0, 2, 4)], np.float64) / 255
+
+
+def measure_native(rgba, mask):
+    """The accent region's own colour: the mean of its most saturated quarter, scaled so its brightest channel is
+    that quarter's 90th-percentile brightness. Rounded to 8 bits (the manifest stores it as #rrggbb)."""
+    a = rgba[..., 3] / 255.0
+    sel = (mask > 0.5) & (a > 0.5)
+    px = rgba[..., :3][sel] / 255.0
+    sat = px.max(1) - px.min(1)
+    coloured = px[sat >= np.percentile(sat, 75)]
+    mean = coloured.mean(0)
+    bright = np.percentile(coloured.max(1), 90)
+    n = np.clip(mean * (bright / max(mean.max(), 1e-6)), 0, 1)
+    return np.round(n * 255) / 255
+
+
+def accent_split(rgba, mask, native):
+    """rgba: the framed sprite (uint8 HxWx4, straight alpha); mask: accent weight 0-1 (HxW); native: N (3, 0-1).
+    Per pixel with colour C and alpha A in the region: least squares C ~ g*(1,1,1) + b*N (g, b >= 0); k = b, clamped
+    so the base below stays in 0-1 (C - kN >= 0 and C - kN <= 1 - kA), times the mask weight. Overlay: white, alpha
+    kA (8-bit). Base: (C - k'N) / (1 - k'A) with k' from the quantised overlay alpha, so drawing the overlay tinted N
+    over the base gives back C. Only fully opaque pixels get overlay: at a soft silhouette edge (A < 1) the overlay
+    would also cover a share of whatever lies behind the unit, which no base colour can undo, so the edge keeps the
+    art's own colour. Returns (base uint8, overlay uint8, k)."""
+    c = rgba[..., :3].astype(np.float64) / 255
+    a = rgba[..., 3].astype(np.float64) / 255
+    n = np.asarray(native, np.float64)
+    one = np.ones(3)
+    # normal equations for [g, b] against the basis (1, N)
+    m11, m12, m22 = 3.0, n.sum(), (n * n).sum()
+    r1, r2 = c.sum(-1), (c * n).sum(-1)
+    det = m11 * m22 - m12 * m12
+    g = (m22 * r1 - m12 * r2) / det
+    b = (m11 * r2 - m12 * r1) / det
+    b = np.where(g < 0, r2 / m22, b)                       # no grey part: project onto N alone
+    k = np.clip(b, 0, None)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        lo = np.where(n > 0, c / np.where(n > 0, n, 1), np.inf).min(-1)                  # C - kN >= 0
+        den = a[..., None] - n
+        hi = np.where(den > 0, (1 - c) / np.where(den > 0, den, 1), np.inf).min(-1)    # C - kN <= 1 - kA
+    k = np.minimum(np.minimum(k, lo), np.minimum(hi, 0.98)) * np.clip(mask, 0, 1)
+    k = np.where(a >= 1, k, 0)                              # opaque pixels only: see the docstring
+    oa = np.round(k * a * 255).astype(np.uint8)
+    overlay = np.zeros_like(rgba)
+    overlay[..., :3] = np.where(oa[..., None] > 0, 255, 0)
+    overlay[..., 3] = oa
+    kq = np.where(a > 0, oa / 255 / np.where(a > 0, a, 1), 0)
+    base_c = (c - kq[..., None] * n) / (1 - kq * a)[..., None]
+    base = rgba.copy()
+    region = oa > 0
+    base[..., :3][region] = np.round(np.clip(base_c[region], 0, 1) * 255).astype(np.uint8)
+    return base, overlay, k
+
+
+def composite(base, overlay, tint, paper):
+    """base, then overlay multiplied by tint, over paper (straight alpha in, 0-1 RGB out), as the viewer blends."""
+    ba = base[..., 3:4] / 255.0
+    oa = overlay[..., 3:4] / 255.0
+    out = paper * (1 - ba) + base[..., :3] / 255.0 * ba
+    return out * (1 - oa) + (overlay[..., :3] / 255.0) * np.asarray(tint) * oa
+
+
+def fidelity(sprite, base, overlay, native, paper=(246 / 255, 238 / 255, 224 / 255)):
+    """Max and mean per-channel |difference| (0-255, 8-bit output) between the art and base + overlay tinted N."""
+    p = np.asarray(paper)
+    sa = sprite[..., 3:4] / 255.0
+    orig = p * (1 - sa) + sprite[..., :3] / 255.0 * sa
+    diff = np.abs(np.round(orig * 255) - np.round(composite(base, overlay, native, p) * 255))
+    return int(diff.max()), float(diff.mean()), diff
+
+
+def export_accent(framed, mask_src, a, out, sprite_size, offset):
+    """The accent mask downscaled exactly as the sprite (premultiplied Lanczos) and framed the same, then split."""
+    m = Image.open(mask_src).convert("L")
+    if a.accent_feather > 0:   # soften the hard mask edge (master px) so a tinted region fades into the art
+        m = m.filter(ImageFilter.GaussianBlur(a.accent_feather))
+    m = m.resize(sprite_size, Image.LANCZOS)
+    canvas = Image.new("L", framed.size, 0)
+    canvas.paste(m, offset)
+    mask = np.asarray(canvas, np.float64) / 255
+    rgba = np.asarray(framed).copy()
+    native = hex_rgb(a.accent_native) if a.accent_native else measure_native(rgba, mask)
+    base, overlay, k = accent_split(rgba, mask, native)
+    worst, mean, diff = fidelity(rgba, base, overlay, native)
+    Image.fromarray(base).save(out, optimize=True)
+    acc = out.with_name(out.stem + "_accent.png")
+    Image.fromarray(overlay).save(acc, optimize=True)
+    hexn = "".join(f"{round(v * 255):02x}" for v in native)
+    print(f"{acc.name}: accent native #{hexn}, overlay coverage {(overlay[..., 3] > 0).mean() * 100:.1f}% of the frame, "
+          f"Nature-tint fidelity max {worst}/255, mean {mean:.3f}")
+    if a.compare:
+        d = pathlib.Path(a.compare)
+        d.mkdir(parents=True, exist_ok=True)
+        p = np.array([246, 238, 224]) / 255.0
+        sa = rgba[..., 3:4] / 255.0
+        orig = (p * (1 - sa) + rgba[..., :3] / 255.0 * sa) * 255
+        comp = composite(base, overlay, native, p) * 255
+        amp = np.clip(255 - diff.max(-1, keepdims=True).repeat(3, -1) * 16, 0, 255)
+        sheet = np.concatenate([orig, comp, amp], 1).astype(np.uint8)
+        Image.fromarray(sheet).save(d / f"{out.stem}_nature_check.png")
+    return hexn, worst
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("src")
@@ -106,6 +221,10 @@ def main():
     ap.add_argument("--pad", type=int, default=4)
     ap.add_argument("--line-px", type=float, default=0.0)
     ap.add_argument("--preview")
+    ap.add_argument("--accent-mask")
+    ap.add_argument("--accent-native")
+    ap.add_argument("--accent-feather", type=float, default=4.0)
+    ap.add_argument("--compare")
     a = ap.parse_args()
 
     master = Image.open(a.src).convert("RGBA")
@@ -116,6 +235,10 @@ def main():
         sprite = thicken(sprite, a.line_px, out.parent)
     framed, pivot = frame(sprite, a.pad)
     framed.save(out, optimize=True)
+    if a.accent_mask:
+        x0 = framed.width // 2 - sprite.width // 2
+        y0 = framed.height - a.pad - sprite.height
+        export_accent(framed, a.accent_mask, a, out, sprite.size, (x0, y0))
     if a.preview:
         preview(framed, pathlib.Path(a.preview), out.stem)
     print(f"{out.name}: content {sprite.width}x{sprite.height}, frame {framed.width}x{framed.height}, "

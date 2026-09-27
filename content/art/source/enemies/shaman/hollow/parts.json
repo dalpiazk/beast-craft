@@ -1,0 +1,145 @@
+{
+ "beast": "shaman",
+ "element": "any (gloamed enemy)",
+ "canvas": [
+  1792,
+  2304
+ ],
+ "order_back_to_front": [
+  "legs",
+  "body",
+  "head",
+  "staff"
+ ],
+ "character": {
+  "file": "character.png",
+  "full_canvas_file": "character_full.png",
+  "pivot": [
+   842,
+   2024
+  ],
+  "pivot_local": [
+   690,
+   1619
+  ],
+  "note": "character.png is cropped so the feet pivot is its bottom centre"
+ },
+ "parts": {
+  "legs": {
+   "file": "parts/legs.png",
+   "parent": "body",
+   "offset": [
+    788,
+    1688
+   ],
+   "size": [
+    402,
+    322
+   ],
+   "pivot": [
+    995,
+    1687
+   ],
+   "pivot_local": [
+    207,
+    -1
+   ]
+  },
+  "body": {
+   "file": "parts/body.png",
+   "parent": null,
+   "offset": [
+    544,
+    1208
+   ],
+   "size": [
+    734,
+    481
+   ],
+   "pivot": [
+    842,
+    2024
+   ],
+   "pivot_local": [
+    298,
+    816
+   ]
+  },
+  "head": {
+   "file": "parts/head.png",
+   "parent": "body",
+   "offset": [
+    393,
+    446
+   ],
+   "size": [
+    1103,
+    1007
+   ],
+   "pivot": [
+    1000,
+    1366
+   ],
+   "pivot_local": [
+    607,
+    920
+   ]
+  },
+  "staff": {
+   "file": "parts/staff.png",
+   "parent": "body",
+   "offset": [
+    516,
+    860
+   ],
+   "size": [
+    230,
+    1165
+   ],
+   "pivot": [
+    692,
+    1486
+   ],
+   "pivot_local": [
+    176,
+    626
+   ]
+  }
+ },
+ "root_pivot_note": "root part 'body' pivots at the feet ground contact; child pivots = centre of contact with the parent. Canvas px (2x finals).",
+ "mask_stats": {
+  "fg_px": 731780,
+  "overlap_px": 155959,
+  "orphan_px": 156704,
+  "island_px": 1032,
+  "reclip_px": 39464,
+  "auto_fixed_pct": 42.87,
+  "sam_iou": {
+   "legs": {
+    "iou": 0.869,
+    "src": "sam"
+   },
+   "body": {
+    "iou": 0.45,
+    "src": "sam"
+   },
+   "head": {
+    "iou": 0.664,
+    "src": "polygon"
+   },
+   "staff": {
+    "iou": 0.0,
+    "src": "polygon"
+   }
+  },
+  "inpaint": {
+   "body": {
+    "px": 120076,
+    "s": 42.4,
+    "retries": 0,
+    "cool_reverted_px": 56900
+   }
+  },
+  "recompose_mae": 0.07
+ }
+}

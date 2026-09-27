@@ -1,0 +1,120 @@
+{
+ "beast": "caster",
+ "element": "any (gloamed enemy)",
+ "canvas": [
+  1792,
+  2304
+ ],
+ "order_back_to_front": [
+  "feet",
+  "body",
+  "antlers"
+ ],
+ "character": {
+  "file": "character.png",
+  "full_canvas_file": "character_full.png",
+  "pivot": [
+   892,
+   2060
+  ],
+  "pivot_local": [
+   679,
+   1727
+  ],
+  "note": "character.png is cropped so the feet pivot is its bottom centre"
+ },
+ "parts": {
+  "feet": {
+   "file": "parts/feet.png",
+   "parent": "body",
+   "offset": [
+    488,
+    1922
+   ],
+   "size": [
+    807,
+    139
+   ],
+   "pivot": [
+    826,
+    1925
+   ],
+   "pivot_local": [
+    338,
+    3
+   ]
+  },
+  "body": {
+   "file": "parts/body.png",
+   "parent": null,
+   "offset": [
+    267,
+    1185
+   ],
+   "size": [
+    1294,
+    819
+   ],
+   "pivot": [
+    892,
+    2060
+   ],
+   "pivot_local": [
+    625,
+    875
+   ]
+  },
+  "antlers": {
+   "file": "parts/antlers.png",
+   "parent": "body",
+   "offset": [
+    501,
+    344
+   ],
+   "size": [
+    979,
+    898
+   ],
+   "pivot": [
+    961,
+    1232
+   ],
+   "pivot_local": [
+    460,
+    888
+   ]
+  }
+ },
+ "root_pivot_note": "root part 'body' pivots at the feet ground contact; child pivots = centre of contact with the parent. Canvas px (2x finals).",
+ "mask_stats": {
+  "fg_px": 1024497,
+  "overlap_px": 76044,
+  "orphan_px": 15721,
+  "island_px": 0,
+  "reclip_px": 2222,
+  "auto_fixed_pct": 8.96,
+  "sam_iou": {
+   "feet": {
+    "iou": 0.0,
+    "src": "polygon"
+   },
+   "body": {
+    "iou": 0.0,
+    "src": "polygon"
+   },
+   "antlers": {
+    "iou": 0.0,
+    "src": "polygon"
+   }
+  },
+  "inpaint": {
+   "body": {
+    "px": 19403,
+    "s": 25.3,
+    "retries": 0,
+    "cool_reverted_px": 1385
+   }
+  },
+  "recompose_mae": 0.08
+ }
+}
