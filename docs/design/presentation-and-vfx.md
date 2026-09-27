@@ -211,6 +211,19 @@ anti-aliased hex (`SoftHex`, which the unit footprints use there too, the acting
 lines). A region or arena with no backdrop draws the pixel-tile board above (the fallback). The
 slots the art lane paints are listed in [`docs/art/hollow-art-slots.md`](../art/hollow-art-slots.md).
 
+**Obstacles** (battle-system.md, "Obstacles"). A region's arena may hold several paintings; each has
+one battle layout (`battle-layouts.json`) whose obstacles are painted on exactly its hexes. The viewer
+fights its battle in its region (`--region`, else the encounter's, else r01; `DemoBattle.Create(...,
+regionId)`), so the battle picks a layout from its seed, and the viewer draws that layout's painting
+(`BattleArtData.BackdropByArtKey`, from the session result's `Layout`): the rocks on screen are the
+tiles the battle blocks. The painting is the read, so obstacle hexes get no fill; an optional faint
+outline (`ObstacleOutlineColor` / `ObstacleOutlineAlpha`, off by default) can be turned on in data.
+On the pixel-tile fallback an obstacle tile is darkened. Between turns the **movement preview** tints
+the tiles the next unit could move to (`MovementPreview.Reach`: `CanStand` steps within its move
+range on the battle's own board, so never an obstacle or an occupied tile; `MoveReachColor` /
+`MoveReachAlpha`), and a unit's **walk** is animated along a route round the obstacles
+(`MovementPreview.WalkPath`, in `TurnAnimation`) rather than a straight line over them.
+
 ## The auto camera (`CameraRig`, `TurnCamera`)
 
 There is no manual zoom or pan: the camera frames the action by itself. `CameraRig`

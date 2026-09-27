@@ -35,7 +35,11 @@
     "PlayerZoneAlpha": 0.16,
     "EnemyZoneColor": "r",
     "EnemyZoneAlpha": 0.14,
-    "HudScrimAlpha": 0.45
+    "HudScrimAlpha": 0.45,
+    "ObstacleOutlineColor": "K",
+    "ObstacleOutlineAlpha": 0,
+    "MoveReachColor": "Y",
+    "MoveReachAlpha": 0.22
   },
   "SkillIcons": {
     "Frame": "ui/skill_icon/frame",

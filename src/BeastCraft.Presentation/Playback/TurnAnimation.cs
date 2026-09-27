@@ -110,13 +110,33 @@ namespace BeastCraft.Presentation.Playback
         private readonly HexLayout _layout;
         private readonly List<ScheduledBeat> _beats = new List<ScheduledBeat>();
 
+        /// <summary>The walk's route as footprint centres (empty: a straight line from the before to the after position).</summary>
+        private readonly List<Vec2> _walk = new List<Vec2>();
+
         public TurnAnimation(PlayedTurn turn, HexLayout layout, VfxLibrary vfx, int seed, VfxSettings settings = null)
+            : this(turn, layout, vfx, seed, settings, null)
+        {
+        }
+
+        /// <summary>
+        /// As the other constructor, on <paramref name="board"/> (the battle's grid, its obstacles
+        /// blocked): the acting unit's walk follows a route round the obstacles
+        /// (<see cref="MovementPreview.WalkPath"/>) instead of a straight line over them.
+        /// </summary>
+        public TurnAnimation(PlayedTurn turn, HexLayout layout, VfxLibrary vfx, int seed, VfxSettings settings, HexGrid board)
         {
             _turn = turn ?? throw new ArgumentNullException(nameof(turn));
             _layout = layout;
             Settings = settings ?? VfxSettings.Default;
             string actor = turn.Turn.Unit.Id;
             MoveMs = turn.Turn.StartPosition != turn.Turn.EndPosition ? WalkMs : 0;
+            if (MoveMs > 0 && board != null && turn.Before.TryGetValue(actor, out UnitSnapshot walker))
+            {
+                foreach (HexCoordinate step in MovementPreview.WalkPath(board, turn.Turn.StartPosition, turn.Turn.EndPosition, walker.Footprint))
+                {
+                    _walk.Add(layout.FootprintCenter(step, walker.Footprint));
+                }
+            }
 
             int clock = MoveMs;
             for (int i = 0; i < turn.Beats.Count; i++)
@@ -328,8 +348,17 @@ namespace BeastCraft.Presentation.Playback
         {
             if (unitId == _turn.Turn.Unit.Id && MoveMs > 0 && ms < MoveMs && _turn.Before.TryGetValue(unitId, out UnitSnapshot before))
             {
+                float t = Math.Max(0, ms) / (float)MoveMs;
+                if (_walk.Count > 2)
+                {
+                    // Along the route round the obstacles, an equal share of the walk per step.
+                    float along = t * (_walk.Count - 1);
+                    int step = Math.Min(_walk.Count - 2, (int)along);
+                    return Vec2.Lerp(_walk[step], _walk[step + 1], along - step);
+                }
+
                 Vec2 from = _layout.FootprintCenter(before.Position, before.Footprint);
-                return Vec2.Lerp(from, CenterAfter(unitId), Math.Max(0, ms) / (float)MoveMs);
+                return Vec2.Lerp(from, CenterAfter(unitId), t);
             }
 
             return CenterAfter(unitId);

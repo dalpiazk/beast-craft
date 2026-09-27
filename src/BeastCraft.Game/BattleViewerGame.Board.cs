@@ -73,7 +73,10 @@ namespace BeastCraft.Game
             }
 
             Rect board = _screen.Board;
-            BattleBackdropData backdrop = _content.BattleArt?.Backdrop(_regionId, _playback.Grid.Size);
+            // The backdrop the battle's obstacles are painted on (its layout's ArtKey); with no layout, the region's first for the arena.
+            BattleBackdropData backdrop = _battleLayout != null
+                                              ? _content.BattleArt?.BackdropByArtKey(_battleLayout.ArtKey)
+                                              : _content.BattleArt?.Backdrop(_regionId, _playback.Grid.Size);
             ArtSprite backdropArt = backdrop == null ? null : _atlas.ByArtKey(backdrop.ArtKey);
             if (backdropArt == null)
             {
@@ -190,6 +193,17 @@ namespace BeastCraft.Game
                 }
             }
 
+            if (style.ObstacleOutlineAlpha > 0f)
+            {
+                foreach (HexCoordinate tile in grid.Tiles)
+                {
+                    if (grid.IsBlocked(tile))
+                    {
+                        DrawHexOutline(_layout.Center(tile), 3f, Ink(style.ObstacleOutlineColor, Color.Black) * style.ObstacleOutlineAlpha);
+                    }
+                }
+            }
+
             Color player = Ink(style.PlayerZoneColor, Color.Blue) * style.PlayerZoneAlpha;
             Color enemy = Ink(style.EnemyZoneColor, Color.Red) * style.EnemyZoneAlpha;
             foreach (HexCoordinate tile in grid.Tiles)
@@ -199,6 +213,38 @@ namespace BeastCraft.Game
                 if (mine || theirs)
                 {
                     DrawSoftHex(_layout.Center(tile), mine ? player : enemy);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Between turns, the tiles the next unit to act could move to this turn
+        /// (<see cref="MovementPreview.Reach"/> on the battle's own board: never an obstacle or an
+        /// occupied tile), faintly tinted (<see cref="BoardOverlayData.MoveReachColor"/> / <c>Alpha</c>).
+        /// </summary>
+        private void DrawMovementPreview(bool painted)
+        {
+            BoardOverlayData style = _content.BattleArt?.Board ?? new BoardOverlayData();
+            BattleUnit next = _animation == null && !_playback.IsOver ? ActingUnit() : null;
+            if (next == null || style.MoveReachAlpha <= 0f)
+            {
+                return;
+            }
+
+            Color tint = Ink(style.MoveReachColor, Color.Yellow) * style.MoveReachAlpha;
+            ArtSprite mask = _atlas.Sprite("hex_mask");
+            foreach (HexCoordinate anchor in MovementPreview.Reach(_playback.Grid, next.Position, next.Footprint, next.Id, next.MoveRange))
+            {
+                foreach (HexCoordinate tile in Footprints.Tiles(anchor, next.Footprint))
+                {
+                    if (painted)
+                    {
+                        DrawSoftHex(_layout.Center(tile), tint);
+                    }
+                    else
+                    {
+                        _draw.DrawSprite(mask, 0, At(_layout.Center(tile)), 1f, tint);
+                    }
                 }
             }
         }
@@ -245,6 +291,16 @@ namespace BeastCraft.Game
             {
                 ArtSprite sprite = grid.IsInDeploymentZone(tile, BattleTeam.Enemy) ? rock : grass;
                 _draw.DrawSprite(sprite, 0, At(_layout.Center(tile)), 1f, Color.White);
+            }
+
+            // An obstacle on the pixel board (no painting to show it): its tile darkened to a rock.
+            ArtSprite mask = _atlas.Sprite("hex_mask");
+            foreach (HexCoordinate tile in grid.Tiles)
+            {
+                if (grid.IsBlocked(tile))
+                {
+                    _draw.DrawSprite(mask, 0, At(_layout.Center(tile)), 1f, Ink("1", Color.DimGray) * 0.9f);
+                }
             }
 
             // The notch fillers, clipped to the tiles' box (in render-target pixels, inside the board area's clip).
@@ -432,6 +488,8 @@ namespace BeastCraft.Game
             string actor = ActingUnit() == null ? null : ActingUnit().Id;
             ArtSprite mask = _atlas.Sprite("hex_mask");
             ArtSprite outline = _atlas.Sprite("hex_outline");
+
+            DrawMovementPreview(painted);
 
             // Footprints first, so every sprite stands on top of every tile tint.
             foreach (UnitSnapshot unit in units)

@@ -128,6 +128,10 @@ namespace BeastCraft.Presentation.Art
             Range(board.PlayerZoneAlpha, 0f, 1f, "Board PlayerZoneAlpha", errors);
             Range(board.EnemyZoneAlpha, 0f, 1f, "Board EnemyZoneAlpha", errors);
             Range(board.HudScrimAlpha, 0f, 1f, "Board HudScrimAlpha", errors);
+            Color(board.ObstacleOutlineColor, "Board ObstacleOutlineColor", art, errors);
+            Range(board.ObstacleOutlineAlpha, 0f, 1f, "Board ObstacleOutlineAlpha", errors);
+            Color(board.MoveReachColor, "Board MoveReachColor", art, errors);
+            Range(board.MoveReachAlpha, 0f, 1f, "Board MoveReachAlpha", errors);
             if (data.SkillIcons != null)
             {
                 ValidateSkillIcons(data.SkillIcons, art, errors);

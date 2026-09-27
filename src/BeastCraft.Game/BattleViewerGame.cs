@@ -65,7 +65,13 @@ namespace BeastCraft.Game
         private BattlePlayback _playback;
         private Dictionary<string, string> _speciesByUnit;
 
-        /// <summary>The region whose enemy art is drawn (<c>--region</c>, else the encounter's, else r01).</summary>
+        /// <summary>The battle's layout (its obstacles and the backdrop they are painted on), or null on the open board.</summary>
+        private Encounters.BattleLayoutEntryData _battleLayout;
+
+        /// <summary>
+        /// The region the battle is fought in (<c>--region</c>, else the encounter's, else r01): its
+        /// enemy art, and its battlefield layouts (the obstacles, and the backdrop drawn).
+        /// </summary>
         private string _regionId = DemoBattle.DefaultRegionId;
         private Dictionary<string, string> _names;
         private BoardFit _boardFit;
@@ -155,7 +161,7 @@ namespace BeastCraft.Game
             }
 
             BattleSetup setup = DemoBattle.Create(_content, _options.Seed, out _speciesByUnit, out string error, _options.Team, _options.Encounter,
-                                                  _options.Level, _options.EnemyLevel, _options.Arena, _options.Lineup);
+                                                  _options.Level, _options.EnemyLevel, _options.Arena, _options.Lineup, _regionId);
             BattleSessionRun run = setup == null ? null : BattleSession.Begin(setup);
             if (run == null || run.Battle == null)
             {
@@ -164,6 +170,12 @@ namespace BeastCraft.Game
             }
 
             _playback = new BattlePlayback(run);
+            _battleLayout = run.Result.Layout;
+            if (_battleLayout != null)
+            {
+                Console.WriteLine("Battlefield: " + _battleLayout.ArtKey + " (" + _battleLayout.Cells.Length + " obstacles).");
+            }
+
             _camera = new CameraRig(_playback.Grid.Width, _playback.Grid.Height, _screen.Board);
             _cameraRest = _camera.FitAll;
             _boardFit = _camera.Fit(_cameraRest);
@@ -298,7 +310,7 @@ namespace BeastCraft.Game
             }
 
             CameraView from = CameraNow();
-            _animation = new TurnAnimation(turn, _layout, _content.Vfx, _options.Seed, _vfxSettings);
+            _animation = new TurnAnimation(turn, _layout, _content.Vfx, _options.Seed, _vfxSettings, _playback.Grid);
             _turnCamera = new TurnCamera(_animation, _layout, _camera, from);
             _clockMs = 0;
             Log(turn);
@@ -380,7 +392,7 @@ namespace BeastCraft.Game
                 return;
             }
 
-            _animation = new TurnAnimation(shown, _layout, _content.Vfx, _options.Seed, _vfxSettings);
+            _animation = new TurnAnimation(shown, _layout, _content.Vfx, _options.Seed, _vfxSettings, _playback.Grid);
             _turnCamera = new TurnCamera(_animation, _layout, _camera, _camera.FitAll);
             _clockMs = _options.AtMs ?? _animation.MidVfxMs(beatIndex);
             if (!string.IsNullOrEmpty(_options.Glossary))

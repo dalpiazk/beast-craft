@@ -156,6 +156,24 @@ namespace BeastCraft.Presentation.Art
         /// the backdrop's margin runs under the header, turn order, skills and controls.
         /// </summary>
         public float HudScrimAlpha = 0.45f;
+
+        /// <summary>
+        /// A faint outline on each obstacle hex (a palette char), for when the painting alone reads
+        /// ambiguously. Off by default (<see cref="ObstacleOutlineAlpha"/> 0): the painted rock is the read.
+        /// </summary>
+        public string ObstacleOutlineColor = "K";
+
+        /// <summary>The obstacle outline's opacity (0-1; 0 = none, the default).</summary>
+        public float ObstacleOutlineAlpha;
+
+        /// <summary>
+        /// The movement preview between turns: the tiles the next unit to act could move to this
+        /// turn (never an obstacle or an occupied tile), tinted in this palette char.
+        /// </summary>
+        public string MoveReachColor = "Y";
+
+        /// <summary>The movement preview's opacity (0-1; 0 = none).</summary>
+        public float MoveReachAlpha = 0.12f;
     }
 
     /// <summary>Where a skill comes from, which picks its default rarity (<see cref="SkillIconStyleData.RarityFor"/>).</summary>
