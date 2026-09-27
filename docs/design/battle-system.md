@@ -355,7 +355,8 @@ board area (producer decision; it replaced the hexagons of radius 3 / 5 / 7):
 
 A region's battles are fought among **obstacles** painted on its backdrops: rocks on the Verdant
 Hollow's sunlit meadows, fallen stone rubble or broken pillar stumps on its ruins, mossy boulders or a
-fallen bough on its dusk glade (producer decisions).
+fallen bough on its dusk glade, tree stumps, mossy fallen logs or a big mushroom cluster in its forest
+(producer decisions).
 
 - **Rule.** An obstacle hex is `HexGrid`-blocked terrain: nothing is deployed on it, walks onto or
   through it (paths go round it) or is knocked back onto it (a knockback stops at the last free hex,
@@ -366,9 +367,9 @@ fallen bough on its dusk glade (producer decisions).
 - **Data.** `content/data/Encounters/battle-layouts.json`: one layout per (region, painted backdrop,
   arena), its obstacle hexes as axial cells. The painting and the layout go together: each battle
   backdrop in `battle-art.json` has exactly one layout, and the art lane paints the obstacles on
-  exactly its hexes (`docs/art/hollow-art-slots.md`). The Verdant Hollow has six paintings (sunlit
-  meadows sun0 / sun1 / sun3, ruins ruin0 / ruin2, dusk glade dusk2), each on all three arenas: 18
-  layouts.
+  exactly its hexes (`docs/art/hollow-art-slots.md`). The Verdant Hollow has eight paintings (sunlit
+  meadows sun0 / sun1 / sun3, ruins ruin0 / ruin2, dusk glade dusk2, forest shroom0 / shroom2), each
+  on all three arenas: 24 layouts.
 - **Which battlefield.** `EncounterSetup.RegionId` names the region a battle is fought in
   (`EncounterPlan.ToSetup(regionId)`). `BattleSession` picks one of the region's layouts for the
   arena from the battle's seed on its own stream (`BattleLayouts.Pick`: `LootRoller.DeriveSeed(seed,

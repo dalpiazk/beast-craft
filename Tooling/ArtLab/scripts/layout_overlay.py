@@ -18,7 +18,7 @@ image is a 9:16 slot image (1440 x 2560, or a placeholder at another 9:16 size),
 of another shape (the tiles' box centred, 94% of the image's width or 80% of its height, whichever is smaller, keeping
 the hexes' true proportions), labelled "approximate" in the output.
 
---all: one PNG per layout into --out-dir, over <images>/<id>_preview.png when --images holds the candidate preview
+--all: one PNG per layout into --out-dir, over <images>/<id>_preview.png when a --images folder (several: ';'-separated) holds the candidate preview
 of the layout's backdrop id (backdrop/r01/<id>/<arena>), else over the repo's slot image
 content/art/backdrops/<region>/<id>/<arena>.png.
 """
@@ -148,7 +148,7 @@ def main():
     parser.add_argument("--out")
     parser.add_argument("--board-rect", help="X,Y,W,H in fractions of the image")
     parser.add_argument("--all", action="store_true")
-    parser.add_argument("--images", help="--all: a folder of <id>_preview.png candidate paintings")
+    parser.add_argument("--images", help="--all: folders of <id>_preview.png candidate paintings, separated by ';'")
     parser.add_argument("--out-dir", default="layout-overlays")
     parser.add_argument("--repo", default=str(pathlib.Path(__file__).resolve().parents[3]))
     args = parser.parse_args()
@@ -160,8 +160,9 @@ def main():
         out_dir.mkdir(parents=True, exist_ok=True)
         for layout in layouts:
             _, region, bid, arena = layout["ArtKey"].split("/")
-            candidate = pathlib.Path(args.images) / (bid + "_preview.png") if args.images else None
-            path = candidate if candidate is not None and candidate.is_file() else repo / "content/art/backdrops" / region / bid / (arena + ".png")
+            candidates = [pathlib.Path(folder) / (bid + "_preview.png") for folder in (args.images or "").split(";") if folder]
+            found = [c for c in candidates if c.is_file()]
+            path = found[0] if found else repo / "content/art/backdrops" / region / bid / (arena + ".png")
             with Image.open(path) as im:
                 rect, approximate = rect_for(im, layout, backdrops, None)
                 out = overlay(im, layout, rect, approximate)

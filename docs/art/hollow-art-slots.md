@@ -19,10 +19,11 @@ colours** (the data does not tint them).
 
 Tick a box when the painted file has landed.
 
-## 1. Battle backdrops (18)
+## 1. Battle backdrops (24)
 
-The Verdant Hollow (r01) keeps six paintings, each recomposed three times, once per arena size: the sunlit
-meadows sun0, sun1, sun3, the ruins ruin0, ruin2 and the dusk glade dusk2. Portrait **1440 x 2560** (9:16), opaque.
+The Verdant Hollow (r01) keeps eight paintings, each recomposed three times, once per arena size: the sunlit
+meadows sun0, sun1, sun3, the ruins ruin0, ruin2, the dusk glade dusk2 and the forest shroom0, shroom2 (the forest
+retries #3 and #9). Portrait **1440 x 2560** (9:16), opaque.
 The board (the arena's hex tiles) sits inside the painting at the **board rect** below; everything around it is
 decorative margin that runs under the HUD to the screen edges (the top ~14% and bottom ~26% sit under the turn
 order and the skill strip, behind a dark scrim), with a 4% bleed past the canvas on every side for the screen shake.
@@ -35,7 +36,8 @@ that zoom.
 block movement and standing (never line of sight). Paint one obstacle on **exactly** each listed hex (Q, R axial;
 R < 0 the enemy side), sitting inside its hex and reading clearly as impassable, and **no other** prop that looks
 like one anywhere on the board: rocks on the sunlit meadows, fallen stone rubble or broken pillar stumps on the ruins,
-mossy boulders or a fallen bough on the dusk glade (a bough spans only its own listed hexes). Review overlays with
+mossy boulders or a fallen bough on the dusk glade, tree stumps, mossy fallen logs or a big mushroom cluster in the
+forest (a bough or a log spans only its own listed hexes, e.g. two neighbouring ones). Review overlays with
 the exact hexes: `python Tooling/ArtLab/scripts/layout_overlay.py <painting.png> --layout <ArtKey>` (standard
 library plus Pillow), or `--all [--images <folder of <id>_preview.png>]`; the placeholders already show them.
 
@@ -59,6 +61,12 @@ library plus Pillow), or `--all [--images <folder of <id>_preview.png>]`; the pl
 | [ ] | `content/art/backdrops/r01/dusk2/small.png` | Small (5 x 7) | 199, 649, 1041 x 1171 | 0.13849, 0.25333, 0.72302 x 0.45754 | (0, 0) | mossy boulders or a fallen bough |
 | [ ] | `content/art/backdrops/r01/dusk2/medium.png` | Medium (8 x 11) | 165, 582, 1110 x 1248 | 0.11469, 0.22751, 0.77062 x 0.48766 | (-3, 0) (2, 0) | mossy boulders or a fallen bough |
 | [ ] | `content/art/backdrops/r01/dusk2/large.png` | Large (11 x 15) | 147, 548, 1146 x 1289 | 0.10216, 0.21392, 0.79567 x 0.50351 | (-3, -1) (3, 1) (-3, 2) (2, -2) | mossy boulders or a fallen bough |
+| [ ] | `content/art/backdrops/r01/shroom0/small.png` | Small (5 x 7) | 199, 649, 1041 x 1171 | 0.13849, 0.25333, 0.72302 x 0.45754 | (2, -1) (-2, 0) | tree stumps, mossy fallen logs or a big mushroom cluster |
+| [ ] | `content/art/backdrops/r01/shroom0/medium.png` | Medium (8 x 11) | 165, 582, 1110 x 1248 | 0.11469, 0.22751, 0.77062 x 0.48766 | (-3, -1) (-4, 0) (3, 1) (3, 0) | tree stumps, mossy fallen logs or a big mushroom cluster |
+| [ ] | `content/art/backdrops/r01/shroom0/large.png` | Large (11 x 15) | 147, 548, 1146 x 1289 | 0.10216, 0.21392, 0.79567 x 0.50351 | (-4, -1) (-4, 1) (5, -1) (5, 1) (1, -3) (0, 3) | tree stumps, mossy fallen logs or a big mushroom cluster |
+| [ ] | `content/art/backdrops/r01/shroom2/small.png` | Small (5 x 7) | 199, 649, 1041 x 1171 | 0.13849, 0.25333, 0.72302 x 0.45754 | (3, -1) (-2, 1) | tree stumps, mossy fallen logs or a big mushroom cluster |
+| [ ] | `content/art/backdrops/r01/shroom2/medium.png` | Medium (8 x 11) | 165, 582, 1110 x 1248 | 0.11469, 0.22751, 0.77062 x 0.48766 | (-4, 1) (-4, 2) (4, -2) (3, -1) (-1, 0) | tree stumps, mossy fallen logs or a big mushroom cluster |
+| [ ] | `content/art/backdrops/r01/shroom2/large.png` | Large (11 x 15) | 147, 548, 1146 x 1289 | 0.10216, 0.21392, 0.79567 x 0.50351 | (-3, -3) (4, 3) (-3, 0) (3, 0) (-6, 2) (5, -2) (1, -2) | tree stumps, mossy fallen logs or a big mushroom cluster |
 
 Hex geometry inside the board rect: pointy-top hexes, 32 x 36 board px each, columns 32 px apart, rows 27 px apart,
 odd rows shifted half a column right; the board rect is the box of every tile (the arena's `Width + 1/2` columns

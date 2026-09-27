@@ -44,7 +44,7 @@ namespace BeastCraft.Tests.EditMode
             foreach (ArenaSize arena in new[] { ArenaSize.Small, ArenaSize.Medium, ArenaSize.Large })
             {
                 Assert.IsNotNull(Content.BattleArt.Backdrop("r01", arena), arena.ToString());
-                foreach (string id in new[] { "sun0", "sun1", "sun3", "ruin0", "ruin2", "dusk2" })
+                foreach (string id in new[] { "sun0", "sun1", "sun3", "ruin0", "ruin2", "dusk2", "shroom0", "shroom2" })
                 {
                     string key = "backdrop/r01/" + id + "/" + arena.ToString().ToLowerInvariant();
                     BattleBackdropData backdrop = Content.BattleArt.BackdropByArtKey(key);
@@ -58,7 +58,7 @@ namespace BeastCraft.Tests.EditMode
                 }
             }
 
-            Assert.AreEqual(18, Content.BattleArt.Backdrops.Length, "six Hollow paintings, each on the three arenas");
+            Assert.AreEqual(24, Content.BattleArt.Backdrops.Length, "eight Hollow paintings, each on the three arenas");
         }
 
         [Test]
@@ -399,7 +399,7 @@ namespace BeastCraft.Tests.EditMode
                 }
             }
 
-            Assert.AreEqual(18 + 6 + 59, painted, "backdrops, icon frame and rings, VFX hero frames");
+            Assert.AreEqual(24 + 6 + 59, painted, "backdrops, icon frame and rings, VFX hero frames");
             int icons = 0;
             foreach (string file in listed)
             {

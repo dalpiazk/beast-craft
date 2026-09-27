@@ -10,9 +10,9 @@ the manifest from illustrated.json's "Painted" list; a slot's data never names a
   content/art/backdrops/<region>/<id>/<arena>.png  battle backdrops: a soft gradient with low-frequency noise and
                                                a lighter clearing where the board sits (read from
                                                content/data/Vfx/battle-art.json's BoardRect), in the backdrop
-                                               family's colours (sun*, ruin*, dusk*), with its layout's obstacles
+                                               family's colours (sun*, ruin*, dusk*, shroom*), with its layout's obstacles
                                                (content/data/Encounters/battle-layouts.json) painted on their hexes
-                                               as rocks, stone stumps or mossy boulders; 3/8 of the final size
+                                               as rocks, stone stumps, mossy boulders or a tree stump under a mushroom cluster; 3/8 of the final size
   content/art/ui/skill_icon/*.png              the skill-icon frame and rarity rings (final size)
   content/art/vfx/<element>/<kind>.png         painted VFX hero frames per element (burst, ring, decal, glyph,
                                                ember) and content/art/vfx/status/<status>.png per status: soft
@@ -50,6 +50,7 @@ FAMILIES = {
     "sun": ((30, 58, 34), (70, 118, 58), (134, 176, 92), "rock"),
     "ruin": ((38, 44, 40), (84, 92, 80), (142, 146, 128), "rubble"),
     "dusk": ((22, 22, 44), (46, 58, 72), (86, 104, 110), "boulder"),
+    "shroom": ((26, 40, 22), (62, 84, 44), (112, 132, 72), "mushroom"),
 }
 
 
@@ -189,7 +190,14 @@ def obstacle(img, cells, width, height, rect, look, seed):
         rx, ry = TILE_W / 2 * sx * 0.78, TILE_H / 2 * sy * 0.62
         d.ellipse([x - rx, y - ry * 0.35, x + rx, y + ry * 0.75], fill=(0, 0, 0, 90))
         jitter = (mix32(seed, i) % 7) - 3
-        if look == "rubble":
+        if look == "mushroom":
+            d.rectangle([x - rx * 0.5, y - ry * 0.4, x + rx * 0.5, y + ry * 0.4], fill=(110, 78, 50, 255), outline=(52, 36, 24, 255), width=2)
+            d.ellipse([x - rx * 0.5, y - ry * 0.55, x + rx * 0.5, y - ry * 0.25], fill=(176, 140, 96, 255))
+            for k, (mx, my) in enumerate(((-0.7, -0.6), (0.55, -0.8), (0.1, -1.1))):
+                cx, cy = x + mx * rx, y + my * ry + jitter
+                d.ellipse([cx - rx * 0.32, cy - ry * 0.28, cx + rx * 0.32, cy + ry * 0.12], fill=(196, 72, 58, 255), outline=(90, 30, 26, 255), width=1)
+                d.ellipse([cx - rx * 0.1, cy - ry * 0.18, cx - rx * 0.02, cy - ry * 0.1], fill=(250, 236, 220, 255))
+        elif look == "rubble":
             d.rectangle([x - rx * 0.55, y - ry * 1.3, x + rx * 0.55, y + ry * 0.35], fill=(150, 148, 136, 255), outline=(70, 66, 60, 255), width=2)
             d.rectangle([x - rx * 0.55, y - ry * 1.3, x + rx * 0.55, y - ry * 1.0], fill=(186, 182, 168, 255))
             d.polygon([(x - rx, y + ry * 0.4), (x - rx * 0.5, y - ry * 0.1 + jitter), (x - rx * 0.2, y + ry * 0.45)], fill=(120, 118, 108, 255))
