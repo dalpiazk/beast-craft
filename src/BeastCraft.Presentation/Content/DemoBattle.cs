@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using BeastCraft.Battle.Grid;
+using BeastCraft.Campaign;
 using BeastCraft.Creatures;
 using BeastCraft.Creatures.Roster;
 using BeastCraft.Encounters;
@@ -21,6 +22,9 @@ namespace BeastCraft.Presentation.Content
     public static class DemoBattle
     {
         public const string DefaultEncounterId = "boss_r01_hollow_warden";
+
+        /// <summary>The region the demo shows when nothing says otherwise: the Verdant Hollow, the only one with enemy art so far.</summary>
+        public const string DefaultRegionId = "r01";
 
         /// <summary>
         /// The team's level. A small party against a boss tuned for a fuller one needs the edge: at
@@ -131,6 +135,41 @@ namespace BeastCraft.Presentation.Content
             }
 
             return setup;
+        }
+
+        /// <summary>
+        /// The region an encounter belongs to, when the data says: the region whose boss (or Hard-mode
+        /// boss) template it is. Null for a generated shape, which any region can draw.
+        /// </summary>
+        public static string RegionOf(GameContent content, string encounterId)
+        {
+            foreach (RegionData region in content?.Regions?.Regions ?? new RegionData[0])
+            {
+                if (region != null && !string.IsNullOrEmpty(encounterId) &&
+                    (region.BossTemplateId == encounterId || (region.HardMode != null && region.HardMode.BossTemplateId == encounterId)))
+                {
+                    return region.RegionId;
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>Whether <paramref name="regionId"/> is a region in regions.json.</summary>
+        public static bool IsRegion(GameContent content, string regionId)
+        {
+            return Array.Exists(content?.Regions?.Regions ?? new RegionData[0], r => r != null && r.RegionId == regionId);
+        }
+
+        /// <summary>
+        /// The art key a unit of <paramref name="speciesOrEnemyId"/> is drawn with in region
+        /// <paramref name="regionId"/>: a roster species' own key, else the enemy's art for that
+        /// region (<see cref="EnemyData.ArtKeyFor"/>, falling back to its default). Presentation only.
+        /// </summary>
+        public static string ArtKeyOf(GameContent content, string speciesOrEnemyId, string regionId)
+        {
+            string key = content?.Battle?.GetSpecies(speciesOrEnemyId)?.ArtKey;
+            return key ?? content?.Enemies?.Get(speciesOrEnemyId)?.ArtKeyFor(regionId);
         }
 
         /// <summary>The <c>--lineup</c> encounter: each <c>enemy_id[:Element]</c> once, at the squad's calibrated difficulty.</summary>

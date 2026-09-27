@@ -6,6 +6,7 @@ using BeastCraft.Battle.Grid;
 using BeastCraft.Game.Rendering;
 using BeastCraft.Presentation.Board;
 using BeastCraft.Presentation.Camera;
+using BeastCraft.Presentation.Content;
 using BeastCraft.Presentation.Layout;
 using BeastCraft.Presentation.Playback;
 using BeastCraft.Presentation.Vfx;
@@ -462,19 +463,26 @@ namespace BeastCraft.Game
 
             ArtAnimationData idle = sprite.Data.Animation("idle");
             ArtSprite sheet = idle == null ? null : _atlas.Sprite(string.IsNullOrEmpty(idle.Sheet) ? sprite.Name : idle.Sheet);
+            int frame = 0;
             if (sheet != null)
             {
-                _draw.DrawFrame(sprite, sheet.Texture, sheet.Frame(idle.FrameAt(_clockMs + _idleClockMs)), at, scale, color, flip, 0f);
+                frame = idle.FrameAt(_clockMs + _idleClockMs);
+                _draw.DrawFrame(sprite, sheet.Texture, sheet.Frame(frame), at, scale, color, flip, 0f);
             }
             else
             {
                 _draw.DrawSprite(sprite, 0, at, scale, color, flip);
             }
 
+            // The overlay shows the same frame as the base: the manifest validator holds an accent to its
+            // base's frame count (a clip on another sheet has no overlay frames, so it keeps frame 0).
             ArtSprite overlay = accent.HasValue ? _atlas.Sprite(sprite.Data.Accent) : null;
             if (overlay != null)
             {
-                _draw.DrawSprite(overlay, 0, at, scale, new Color(accent.Value.ToVector4() * color.ToVector4()), flip);
+                System.Diagnostics.Debug.Assert(overlay.Data.Frames == sprite.Data.Frames, "an accent overlay has its base's frame count");
+                bool ownFrames = sheet == null || sheet == sprite;
+                int overlayFrame = ownFrames ? Math.Min(frame, Math.Max(0, overlay.Data.Frames - 1)) : 0;
+                _draw.DrawSprite(overlay, overlayFrame, at, scale, new Color(accent.Value.ToVector4() * color.ToVector4()), flip);
             }
         }
 
@@ -527,8 +535,8 @@ namespace BeastCraft.Game
         private ArtSprite SpriteFor(string unitId)
         {
             string id = unitId != null && _speciesByUnit.TryGetValue(unitId, out string species) ? species : null;
-            string artKey = _content.Battle.GetSpecies(id)?.ArtKey ?? _content.Enemies.Get(id)?.ArtKey;
-            return _atlas.ByArtKey(artKey) ?? _atlas.ByArtKey("enemy/brute");
+            string artKey = DemoBattle.ArtKeyOf(_content, id, _regionId);
+            return _atlas.ByArtKey(artKey) ?? _atlas.ByArtKey(_content.Enemies.Get(id)?.ArtKey) ?? _atlas.ByArtKey("enemy/brute");
         }
 
         private Color TeamColor(BattleTeam team)

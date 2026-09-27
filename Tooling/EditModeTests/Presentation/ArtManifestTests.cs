@@ -117,6 +117,7 @@ namespace BeastCraft.Tests.EditMode
             Assert.AreEqual(sprite.FrameWidth, accent.FrameWidth);
             Assert.AreEqual(sprite.FrameHeight, accent.FrameHeight);
             Assert.AreEqual(sprite.PixelsPerUnit, accent.PixelsPerUnit);
+            Assert.AreEqual(sprite.Frames, accent.Frames, "the overlay draws the base's frame, so it has as many");
             Assert.AreEqual("Nature", sprite.AccentElement, "the Verdant Hollow art is drawn in Nature");
             Assert.IsTrue(ArtManifestValidator.IsHexColor(sprite.AccentNative), sprite.AccentNative);
             Assert.IsNotNull(art.FindByArtKey("enemy/" + enemy), "the pixel placeholder stays in the manifest");
@@ -165,6 +166,10 @@ namespace BeastCraft.Tests.EditMode
             List<string> errors = ArtManifestValidator.Validate(art);
             Assert.AreEqual(1, errors.Count, string.Join("\n", errors));
             StringAssert.Contains("must match its base's size", errors[0]);
+
+            art = WithAccent();
+            art.Find("big_accent").Frames = 2;
+            StringAssert.Contains("must match its base's size", string.Join("\n", ArtManifestValidator.Validate(art)), "the frame counts must match too");
 
             art = WithAccent();
             art.Find("big_accent").PivotY = 400;

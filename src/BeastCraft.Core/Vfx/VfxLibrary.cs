@@ -106,10 +106,10 @@ namespace BeastCraft.Vfx
             return effectKey != null && _byType.TryGetValue(effectKey, out VfxEffectTypeDefaultData entry) ? entry.Effect : null;
         }
 
-        /// <summary>The aura of lasting effect <paramref name="effectKey"/> (a status or a stat change), or null.</summary>
         /// <summary>The look every standing enemy wears (the Gloam haze; <see cref="VfxLibraryData.EnemyAura"/>), or null.</summary>
         public VfxAuraData EnemyAura { get; private set; }
 
+        /// <summary>The aura of lasting effect <paramref name="effectKey"/> (a status or a stat change), or null.</summary>
         public VfxAuraData Aura(string effectKey)
         {
             return effectKey != null && _byType.TryGetValue(effectKey, out VfxEffectTypeDefaultData entry) ? entry.Aura : null;

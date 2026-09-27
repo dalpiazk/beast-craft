@@ -4,6 +4,7 @@ using System.IO;
 using BeastCraft.Avatar;
 using BeastCraft.Battle;
 using BeastCraft.Bonds;
+using BeastCraft.Campaign;
 using BeastCraft.Creatures;
 using BeastCraft.Creatures.Roster;
 using BeastCraft.Encounters;
@@ -60,6 +61,9 @@ namespace BeastCraft.Presentation.Content
         public SkillLibraryData SkillLibrary { get; private set; }
 
         public EnemyLibraryData EnemyLibrary { get; private set; }
+
+        /// <summary>The campaign regions (regions.json): what an enemy's per-region art is keyed by.</summary>
+        public RegionLibraryData Regions { get; private set; }
 
         public BattleContent Battle { get; private set; }
 
@@ -154,6 +158,7 @@ namespace BeastCraft.Presentation.Content
             VfxLibraryData vfx = Read<VfxLibraryData>(root, VfxLibraryData.ProjectRelativePath, errors);
             ArtManifestData art = ArtManifestData.Normalize(Read<ArtManifestData>(root, ArtManifestData.ProjectRelativePath, errors));
             GlossaryData glossaryData = Read<GlossaryData>(root, GlossaryData.ProjectRelativePath, errors);
+            RegionLibraryData regions = Read<RegionLibraryData>(root, RegionLibraryData.ProjectRelativePath, errors);
             if (errors.Count > 0)
             {
                 return null;
@@ -163,7 +168,7 @@ namespace BeastCraft.Presentation.Content
 
             Prefix(errors, "beast-roster.json", BeastRosterValidator.Validate(roster));
             Prefix(errors, "skill-library.json", SkillLibraryValidator.Validate(skills, roster));
-            Prefix(errors, "enemy-library.json", EnemyLibraryValidator.Validate(enemyLibrary, roster));
+            Prefix(errors, "enemy-library.json", EnemyLibraryValidator.Validate(enemyLibrary, roster, regions));
             Prefix(errors, "encounter-library.json", EncounterLibraryValidator.Validate(encounterLibrary, enemyLibrary, dropTables));
             Prefix(errors, "encounter-difficulty.json", EncounterDifficultyTable.Validate(difficulty, encounterLibrary));
 
@@ -227,6 +232,7 @@ namespace BeastCraft.Presentation.Content
                 Roster = roster,
                 SkillLibrary = skills,
                 EnemyLibrary = enemyLibrary,
+                Regions = regions,
                 Enemies = enemies,
                 Battle = new BattleContent(species, built.Values, passives, bonds, null, null, enemies),
                 Encounters = EncounterLibrary.Build(encounterLibrary, EncounterDifficultyTable.Build(difficulty)),

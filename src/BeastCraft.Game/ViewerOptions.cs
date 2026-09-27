@@ -33,6 +33,8 @@ namespace BeastCraft.Game
     ///   --lineup E:EL,...   field exactly these enemies instead of the encounter (enemy_id:Element,
     ///                       e.g. brute:Fire,brute:Water; up to 24), e.g. to look at one enemy's
     ///                       art in several elements; which battle it is changes, the rules do not
+    ///   --region ID         the region whose enemy art to draw (default: the encounter's region when
+    ///                       it is a region boss, else r01, the Verdant Hollow)
     ///   --content DIR       the content root (default: Content/ beside the app, or the repo's)
     ///   --effects LEVEL     effects intensity: full, reduced or minimal (default: the saved
     ///                       setting; a screenshot uses full unless told)
@@ -62,6 +64,7 @@ namespace BeastCraft.Game
         public ArenaSize? Arena;
         public string[] Team;
         public string[] Lineup;
+        public string Region;
         public string ContentRoot;
         public EffectsIntensity? Effects;
         public bool NoShake;
@@ -146,6 +149,15 @@ namespace BeastCraft.Game
                         break;
                     case "--team":
                         options.Team = TeamIds(value, ref error);
+                        i++;
+                        break;
+                    case "--region":
+                        options.Region = value;
+                        if (string.IsNullOrEmpty(value))
+                        {
+                            error = "--region needs a region id (e.g. r01).";
+                        }
+
                         i++;
                         break;
                     case "--lineup":

@@ -135,7 +135,6 @@ namespace BeastCraft.Presentation.Board
             return (x - TileWidth / 2, y - TileHeight / 2);
         }
 
-        /// <summary>The centre of a unit of <paramref name="footprint"/> anchored on <paramref name="anchor"/>: the mean of its tiles' centres.</summary>
         /// <summary>
         /// How many hexes wide a unit on <paramref name="footprint"/> is drawn: 1 for a one-tile unit,
         /// 1.75 for the three-tile triangle, 2.5 for the seven-tile flower (the enemy art's lineup:
@@ -155,6 +154,7 @@ namespace BeastCraft.Presentation.Board
             }
         }
 
+        /// <summary>The centre of a unit of <paramref name="footprint"/> anchored on <paramref name="anchor"/>: the mean of its tiles' centres.</summary>
         public Vec2 FootprintCenter(HexCoordinate anchor, UnitFootprint footprint)
         {
             List<HexCoordinate> tiles = Footprints.Tiles(anchor, footprint);
