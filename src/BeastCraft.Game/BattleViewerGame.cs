@@ -178,6 +178,7 @@ namespace BeastCraft.Game
         protected override void UnloadContent()
         {
             _atlas?.Dispose();
+            _softHex?.Dispose();
             _text?.Dispose();
             _pixel?.Dispose();
             _batch?.Dispose();

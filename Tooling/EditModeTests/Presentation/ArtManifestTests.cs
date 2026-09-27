@@ -37,9 +37,19 @@ namespace BeastCraft.Tests.EditMode
                 Assert.IsFalse(string.IsNullOrEmpty(sprite.Category), sprite.Name);
                 if (sprite.Filter == ArtFilter.Linear)
                 {
-                    bool beast = sprite.File.StartsWith("../beasts/", System.StringComparison.Ordinal);
-                    Assert.IsTrue(beast || sprite.File.StartsWith("../enemies/", System.StringComparison.Ordinal), sprite.Name + ": " + sprite.File);
-                    CollectionAssert.Contains(beast ? new[] { "beast" } : new[] { "enemy", "accent" }, sprite.Category, sprite.Name);
+                    // Illustrated characters, and the painted slots (docs/art/hollow-art-slots.md), each in its own folder.
+                    string folder = sprite.File.Split('/')[1];
+                    Dictionary<string, string[]> categories = new Dictionary<string, string[]>
+                    {
+                        { "beasts", new[] { "beast" } },
+                        { "enemies", new[] { "enemy", "accent" } },
+                        { "backdrops", new[] { "backdrop" } },
+                        { "ui", new[] { "ui" } },
+                        { "icons", new[] { "skill" } },
+                        { "vfx", new[] { "fx" } }
+                    };
+                    Assert.IsTrue(sprite.File.StartsWith("../", System.StringComparison.Ordinal) && categories.ContainsKey(folder), sprite.Name + ": " + sprite.File);
+                    CollectionAssert.Contains(categories[folder], sprite.Category, sprite.Name);
                     continue;
                 }
 

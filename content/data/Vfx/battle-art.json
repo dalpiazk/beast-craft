@@ -1,0 +1,19 @@
+{
+  "_readme": "How the battle screen dresses the board (presentation only; never read by the battle). Backdrops: a painted backdrop per region and arena size, the RegionArt pattern of enemy-library.json (RegionId, a regions.json id, and ArtKey, a sprite's ArtKey in content/art/pixel/pixel-art-manifest.json: backdrop/<region>/<arena>), plus Arena (Small 5x7, Medium 8x11, Large 11x15) and BoardRect: where the arena's tiles box (HexLayout.BoardBounds) lies in the image, as fractions of the image (X, Y from its top-left, Width, Height). The rest of the image is decorative margin that runs under the HUD to the canvas edges; the images are 9:16 and, at the fit-all camera view, cover the 1080x1920 canvas plus a 4% bleed on every side (room for the screen shake). A region and arena with no entry draws the pixel-tile board. Board: the overlays drawn over a backdrop, in this order, under the units: the hex grid (GridColor, a palette char; GridAlpha 0-1; GridWidth in canvas px, 0.5-6), then the deployment-zone tints (PlayerZoneColor/Alpha, EnemyZoneColor/Alpha), and HudScrimAlpha, the dark scrim behind the HUD bands. The art slots and exact sizes: docs/art/hollow-art-slots.md. Rules: BeastCraft.Presentation.Art.BattleArtValidator.",
+  "SchemaVersion": 1,
+  "Backdrops": [
+    { "RegionId": "r01", "Arena": "Small", "ArtKey": "backdrop/r01/small", "BoardRect": { "X": 0.13849, "Y": 0.25333, "Width": 0.72302, "Height": 0.45754 } },
+    { "RegionId": "r01", "Arena": "Medium", "ArtKey": "backdrop/r01/medium", "BoardRect": { "X": 0.11469, "Y": 0.22751, "Width": 0.77062, "Height": 0.48766 } },
+    { "RegionId": "r01", "Arena": "Large", "ArtKey": "backdrop/r01/large", "BoardRect": { "X": 0.10216, "Y": 0.21392, "Width": 0.79567, "Height": 0.50351 } }
+  ],
+  "Board": {
+    "GridColor": "4",
+    "GridAlpha": 0.22,
+    "GridWidth": 1.5,
+    "PlayerZoneColor": "c",
+    "PlayerZoneAlpha": 0.16,
+    "EnemyZoneColor": "r",
+    "EnemyZoneAlpha": 0.14,
+    "HudScrimAlpha": 0.45
+  }
+}

@@ -705,6 +705,48 @@ def accent_entry(s, base):
     return entry
 
 
+def painted_entries():
+    """illustrated.json's Painted list: painted art that is not a character standing on a tile (battle backdrops,
+    painted VFX frames, the skill-icon frame and rings, painted icons). Frame size is read from the PNG (one frame);
+    PixelsPerUnit = FrameWidth / WorldWidth (the world units the frame spans across), so a repaint at another
+    resolution draws the same size; the pivot is PivotU/PivotV, fractions of the frame (default its centre);
+    Filter linear (mipmapped in game); Premultiplied as the entry says (default false: straight alpha,
+    premultiplied on load)."""
+    if not ILLUSTRATED.exists():
+        return []
+    entries = []
+    for s in json.loads(ILLUSTRATED.read_text(encoding="utf-8")).get("Painted", []):
+        path = (OUT / s["File"]).resolve()
+        if not path.is_file():
+            sys.exit(f"painted {s['Name']}: {s['File']} is not a file")
+        with Image.open(path) as im:
+            w, h = im.size
+        if not s["WorldWidth"] > 0:
+            sys.exit(f"painted {s['Name']}: WorldWidth must be above 0")
+        u, v = s.get("PivotU", 0.5), s.get("PivotV", 0.5)
+        if not (0 <= u <= 1 and 0 <= v <= 1):
+            sys.exit(f"painted {s['Name']}: PivotU/PivotV must be fractions of the frame (0-1)")
+        entries.append({
+            "Name": s["Name"],
+            "File": s["File"],
+            "Kind": "sprite",
+            "Category": s["Category"],
+            "Label": s["Label"],
+            "ArtKey": s.get("ArtKey", ""),
+            "FrameWidth": w,
+            "FrameHeight": h,
+            "Frames": 1,
+            "FrameMs": 0,
+            "PivotX": round(u * w, 3),
+            "PivotY": round(v * h, 3),
+            "PixelsPerUnit": round(w / s["WorldWidth"], 3),
+            "Filter": "linear",
+            "Premultiplied": bool(s.get("Premultiplied", False)),
+        })
+        print(f"painted {s['Name']:22s} {w}x{h} across {s['WorldWidth']} -> {entries[-1]['PixelsPerUnit']} px/unit")
+    return entries
+
+
 def element_accents():
     """illustrated.json's ElementAccents: element name -> palette char, the colour an accent overlay is drawn in."""
     if not ILLUSTRATED.exists():
@@ -716,7 +758,7 @@ def write_manifest(data, sprites):
     """The game's index of the art: PascalCase fields like the rest of the game data."""
     palette = {ch: hexv for ch, hexv in data["colors"].items() if hexv is not None}
     by_name = {m["name"]: (m, ims) for m, ims in sprites}
-    entries = [sprite_entry(m, ims, palette, by_name) for m, ims in sprites] + illustrated_entries()
+    entries = [sprite_entry(m, ims, palette, by_name) for m, ims in sprites] + illustrated_entries() + painted_entries()
     names = [e["Name"] for e in entries]
     if len(set(names)) != len(names):
         sys.exit("illustrated.json repeats a sprite name")
@@ -733,7 +775,8 @@ def write_manifest(data, sprites):
                    "optional Animations (named clips); an enemy's illustrated sprite may name an Accent: its "
                    "element-accent overlay sprite (same frame, pivot and PixelsPerUnit), drawn over it multiplied by "
                    "the unit's element colour, with AccentElement (the element the art is drawn in) and AccentNative "
-                   "(that colour, #rrggbb); plus the palette (char -> colour) that VFX colours are named from, and "
+                   "(that colour, #rrggbb); painted art (illustrated.json's Painted list: battle backdrops and the other "
+                   "painted slots of docs/art/hollow-art-slots.md) is listed the same way, Filter linear; plus the palette (char -> colour) that VFX colours are named from, and "
                    "ElementAccents (element -> palette char: the accent colour of every other element).",
         "SchemaVersion": 2,
         "Palette": palette,

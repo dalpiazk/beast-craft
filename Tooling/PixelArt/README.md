@@ -53,6 +53,14 @@ mismatch) and names it from the base (`Accent`). `illustrated.json`'s `ElementAc
 copied into the manifest: the colour each element tints an overlay (see `docs/design/presentation-and-vfx.md`,
 "Element accents").
 
+**Painted slots** (`illustrated.json`'s `Painted` list: the art slots of `docs/art/hollow-art-slots.md` that are
+not characters standing on a tile, such as the battle backdrops `content/art/backdrops/<region>/<arena>.png`) are
+merged the same way: frame size from the PNG, `PixelsPerUnit = FrameWidth / WorldWidth`, pivot `PivotU/PivotV`
+(fractions, default the centre), `Filter: "linear"`. Until a slot is painted its PNG is a placeholder written by
+`painted_placeholders.py` (same venv; soft, deterministic, tagged with a `BeastCraft-Placeholder` PNG text chunk, and
+it never overwrites a file without that tag), which also writes painting guides (`preview/backdrop_guide_*.png`: the
+backdrop with the arena's hexes where the engine draws them). Run it, then `build.py`.
+
 Why merge a hand-kept file here instead of a second manifest: the loader, the validators
 (`ArtManifestValidator`, `ArtReferenceValidator`, `VfxLibraryValidator`) and both hosts already
 index one file, and every entry stays in one schema-v2 list. Hand-editing the generated manifest

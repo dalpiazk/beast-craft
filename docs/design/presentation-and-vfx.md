@@ -183,6 +183,34 @@ every even row, each centred on the box edge so exactly its inner half shows). T
 decoration, never on the board. The range diagram (below) keeps its own hex disc: it is a legend for
 the skill's shape, not the arena.
 
+### Painted backdrops (`battle-art.json`, `BackdropPlacement`)
+
+An arena can instead stand on a **painted backdrop**: `content/data/Vfx/battle-art.json`
+(`BattleArtData`, checked by `BattleArtValidator`) lists one per region and arena size, the
+`RegionArt` pattern of `enemy-library.json` — `RegionId`, `Arena` (Small, Medium, Large) and an
+`ArtKey` naming a manifest sprite (`backdrop/<region>/<arena>`, category `backdrop`, linear filter
+and mipmaps like the illustrated sprites) — plus `BoardRect`: where the arena's tiles box
+(`HexLayout.BoardBounds`) lies in the image, in **fractions** of the image, so a repaint at another
+resolution keeps its data. `BackdropPlacement.ImageRect` maps it: the tiles box `B` and the board rect
+`(bx, by, bw, bh)` give the whole image in board space as `(B.X - bx/bw * B.Width, B.Y - by/bh * B.Height,
+B.Width/bw, B.Height/bh)`. The viewer draws it through the camera's board transform (so it zooms,
+pans and shakes with the board) but clipped to the **canvas**, not the board band: its margins run
+under the HUD to the canvas edges, with a soft dark scrim (`HudScrimAlpha`) behind the HUD bands. The
+fit-all view and the camera are unchanged (they frame the board, `BoardFrame`); the validator holds
+every backdrop to cover the whole canvas at fit-all plus the largest screen shake (8 board px) on each
+side, and since the camera only zooms in from fit-all and stays inside the arena, every view it takes
+shows only backdrop (tested for every arena at every zoom). The r01 images are 9:16 and at fit-all
+map onto the canvas plus a 4% bleed; the placeholders (`Tooling/PixelArt/painted_placeholders.py`: a
+soft green gradient with noise and a clearing where the board sits) are half the final 1440x2560.
+Only the arena shown is loaded (`SpriteAtlas.DeferredCategory`).
+
+Over a backdrop, in order and under the units, the `Board` overlays: a soft **hex grid** (every tile
+edge once, `HexGridLines`, `GridColor` / `GridAlpha` and `GridWidth` in canvas pixels whatever the
+zoom), then the **deployment-zone tints** (`PlayerZoneColor/Alpha`, `EnemyZoneColor/Alpha`) on an
+anti-aliased hex (`SoftHex`, which the unit footprints use there too, the acting unit outlined in
+lines). A region or arena with no backdrop draws the pixel-tile board above (the fallback). The
+slots the art lane paints are listed in [`docs/art/hollow-art-slots.md`](../art/hollow-art-slots.md).
+
 ## The auto camera (`CameraRig`, `TurnCamera`)
 
 There is no manual zoom or pan: the camera frames the action by itself. `CameraRig`
@@ -510,7 +538,7 @@ Sprites are text grids (one char per palette colour) in `Tooling/PixelArt/sprite
 integer-only generators (`fx` burst flipbooks; `ring`, `disc` and `blob` VFX textures; the looping
 `haze`; `hex` tiles), resolves aliases, and writes the PNGs (Git LFS) plus the v2 manifest to
 `content/art/pixel/`. With the pinned Pillow it regenerates them byte for byte. The hosts copy
-`content/data/**/*.json`, `content/art/pixel/*`, `content/art/beasts/**/*.png` and `content/art/enemies/**/*.png` into `Content/` (desktop, beside the exe) or
+`content/data/**/*.json`, `content/art/pixel/*`, `content/art/beasts/**/*.png`, `content/art/enemies/**/*.png` and the painted slots' folders (`content/art/backdrops/`, ...) into `Content/` (desktop, beside the exe) or
 the APK's assets; `GameContent.FindRoot` looks beside the exe first and falls back to the repo.
 
 Placeholder content (the illustrated beasts and enemies replace them on the board; the placeholders stay

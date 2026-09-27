@@ -1,0 +1,254 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using BeastCraft.Battle.Grid;
+using BeastCraft.Campaign;
+using BeastCraft.Presentation.Art;
+using BeastCraft.Presentation.Board;
+using BeastCraft.Presentation.Camera;
+using BeastCraft.Presentation.Content;
+using BeastCraft.Presentation.Layout;
+using BeastCraft.Vfx;
+using NUnit.Framework;
+
+namespace BeastCraft.Tests.EditMode
+{
+    /// <summary>
+    /// The painted battle backdrops (<see cref="BattleArtData"/>, <c>battle-art.json</c>): the shipped
+    /// data is valid and dresses every Verdant Hollow arena; a region or arena without a backdrop
+    /// falls back (no entry: the pixel-tile board); the board rect maps onto the arena's tiles box
+    /// exactly and independently of the image's resolution (<see cref="BackdropPlacement"/>); every
+    /// camera view the rig can take stays inside the image, so the margins reach the canvas edges;
+    /// the grid overlay draws each tile edge once (<see cref="HexGridLines"/>); and
+    /// <see cref="BattleArtValidator"/>'s rules one by one.
+    /// </summary>
+    public class BattleArtTests
+    {
+        private const float Tolerance = 0.01f;
+
+        private static GameContent Content
+        {
+            get { return VfxLibraryTests.Content; }
+        }
+
+        [Test]
+        public void ShippedBattleArt_IsValid_AndDressesEveryHollowArena()
+        {
+            string root = GameContent.FindRoot();
+            BattleArtData data = FieldJson.FromJson<BattleArtData>(File.ReadAllText(GameContent.PathOf(root, BattleArtData.ProjectRelativePath)));
+            List<string> errors = BattleArtValidator.Validate(data, Content.Regions, Content.Art);
+
+            Assert.IsEmpty(errors, string.Join("\n", errors));
+            foreach (ArenaSize arena in new[] { ArenaSize.Small, ArenaSize.Medium, ArenaSize.Large })
+            {
+                BattleBackdropData backdrop = Content.BattleArt.Backdrop("r01", arena);
+                Assert.IsNotNull(backdrop, arena.ToString());
+                Assert.AreEqual("backdrop/r01/" + arena.ToString().ToLowerInvariant(), backdrop.ArtKey);
+                ArtSpriteData image = Content.Art.FindByArtKey(backdrop.ArtKey);
+                Assert.IsNotNull(image, backdrop.ArtKey);
+                Assert.AreEqual(ArtFilter.Linear, image.Filter, "painted art is linear-filtered (and mipmapped)");
+                Assert.AreEqual("backdrop", image.Category, "backdrops load on first use (SpriteAtlas.DeferredCategory)");
+            }
+        }
+
+        [Test]
+        public void NoBackdrop_FallsBackToThePixelBoard()
+        {
+            Assert.IsNull(Content.BattleArt.Backdrop("r02", ArenaSize.Medium), "a region without a backdrop draws the pixel tiles");
+            Assert.IsNull(Content.BattleArt.Backdrop(null, ArenaSize.Medium));
+            Assert.IsNull(Content.BattleArt.Backdrop(string.Empty, ArenaSize.Small));
+
+            BattleArtData onlyMedium = new BattleArtData
+            {
+                SchemaVersion = 1,
+                Backdrops = new[] { Backdrop("r01", "Medium", 0.1f, 0.2f, 0.8f, 0.5f) }
+            };
+            Assert.IsNotNull(onlyMedium.Backdrop("r01", ArenaSize.Medium));
+            Assert.IsNull(onlyMedium.Backdrop("r01", ArenaSize.Large), "an arena size without one falls back too");
+            Assert.IsNull(new BattleArtData { Backdrops = null }.Backdrop("r01", ArenaSize.Medium));
+        }
+
+        [TestCase(ArenaSize.Small)]
+        [TestCase(ArenaSize.Medium)]
+        [TestCase(ArenaSize.Large)]
+        public void BoardRect_LandsExactlyOnTheTilesBox(ArenaSize arena)
+        {
+            HexGrid.DimensionsFor(arena, out int width, out int height);
+            BattleBackdropData backdrop = Backdrop("r01", arena.ToString(), 0.125f, 0.25f, 0.75f, 0.5f);
+            Rect tiles = HexLayout.BoardBounds(width, height);
+
+            foreach ((int w, int h) in new[] { (720, 1280), (1440, 2560), (100, 100) })
+            {
+                Vec2 topLeft = BackdropPlacement.ImageToBoard(backdrop, width, height, w, h, 0.125f * w, 0.25f * h);
+                Vec2 bottomRight = BackdropPlacement.ImageToBoard(backdrop, width, height, w, h, 0.875f * w, 0.75f * h);
+                Assert.AreEqual(tiles.X, topLeft.X, Tolerance, w + "x" + h);
+                Assert.AreEqual(tiles.Y, topLeft.Y, Tolerance);
+                Assert.AreEqual(tiles.Right, bottomRight.X, Tolerance);
+                Assert.AreEqual(tiles.Bottom, bottomRight.Y, Tolerance);
+            }
+
+            // The whole image: the tiles box over three quarters of its width, half its height.
+            Rect image = BackdropPlacement.ImageRect(backdrop, width, height);
+            Assert.AreEqual(tiles.Width / 0.75f, image.Width, Tolerance);
+            Assert.AreEqual(tiles.Height / 0.5f, image.Height, Tolerance);
+            Assert.AreEqual(tiles.X - 0.125f * image.Width, image.X, Tolerance);
+            Assert.AreEqual(tiles.Y - 0.25f * image.Height, image.Y, Tolerance);
+        }
+
+        [Test]
+        public void ImageRect_WorkedExample_AndDegenerateRect()
+        {
+            // Small: tiles box (-80, -99, 176x198). A rect of (0.25, 0.25, 0.5x0.5) doubles it around itself.
+            BattleBackdropData backdrop = Backdrop("r01", "Small", 0.25f, 0.25f, 0.5f, 0.5f);
+            Rect image = BackdropPlacement.ImageRect(backdrop, 5, 7);
+            Assert.AreEqual(-168f, image.X, Tolerance);
+            Assert.AreEqual(-198f, image.Y, Tolerance);
+            Assert.AreEqual(352f, image.Width, Tolerance);
+            Assert.AreEqual(396f, image.Height, Tolerance);
+
+            Assert.AreEqual(1f, BackdropPlacement.PixelAspect(backdrop, 5, 7, 176, 198), 0.0001f, "a 176x198 image keeps square pixels");
+            Assert.AreEqual(2f, BackdropPlacement.PixelAspect(backdrop, 5, 7, 88, 198), 0.0001f, "half as wide: stretched twice across");
+
+            Rect tiles = HexLayout.BoardBounds(5, 7);
+            Rect fallback = BackdropPlacement.ImageRect(Backdrop("r01", "Small", 0f, 0f, 0f, 0f), 5, 7);
+            Assert.AreEqual(tiles.X, fallback.X);
+            Assert.AreEqual(tiles.Width, fallback.Width);
+        }
+
+        [TestCase(ArenaSize.Small)]
+        [TestCase(ArenaSize.Medium)]
+        [TestCase(ArenaSize.Large)]
+        public void EveryCameraView_ShowsOnlyBackdrop_ToTheCanvasEdges(ArenaSize arena)
+        {
+            PortraitLayout screen = new PortraitLayout();
+            HexGrid.DimensionsFor(arena, out int width, out int height);
+            BattleBackdropData backdrop = Content.BattleArt.Backdrop("r01", arena);
+            Rect image = BackdropPlacement.ImageRect(backdrop, width, height);
+            CameraRig rig = new CameraRig(width, height, screen.Board);
+            Rect bounds = rig.Bounds;
+
+            // Fit-all is the fixed board fit: the tiles land where the portrait layout puts them.
+            Rect canvas = BackdropPlacement.CanvasAtFitAll(width, height, screen);
+            Assert.IsTrue(BackdropPlacement.Covers(image, canvas), arena + ": " + image + " vs " + canvas);
+            Assert.AreEqual((float)PortraitLayout.CanvasWidth / PortraitLayout.CanvasHeight, canvas.Width / canvas.Height, 0.001f);
+
+            // Every framing the camera can take: the corners and centre at every zoom, clamped as the rig clamps.
+            foreach (float zoom in new[] { 1f, 1.5f, rig.MaxZoomFor })
+            {
+                foreach (Vec2 at in new[]
+                         {
+                             new Vec2(bounds.X, bounds.Y), new Vec2(bounds.Right, bounds.Y), new Vec2(bounds.X, bounds.Bottom), new Vec2(bounds.Right, bounds.Bottom),
+                             bounds.Center
+                         })
+                {
+                    BoardFit fit = rig.Fit(rig.Clamp(new CameraView(at, zoom)));
+                    Vec2 topLeft = fit.ToBoard(0f, 0f);
+                    Vec2 bottomRight = fit.ToBoard(PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight);
+                    Rect seen = new Rect(topLeft.X, topLeft.Y, bottomRight.X - topLeft.X, bottomRight.Y - topLeft.Y);
+                    Assert.IsTrue(BackdropPlacement.Covers(image, seen), arena + " zoom " + zoom + " at " + at + ": " + seen + " outside " + image);
+                }
+            }
+        }
+
+        [Test]
+        public void GridLines_DrawEveryEdgeOnce()
+        {
+            HexLayout layout = new HexLayout(0, 0);
+            Assert.AreEqual(6, HexGridLines.Of(new[] { HexCoordinate.Zero }, layout).Count);
+            Assert.AreEqual(11, HexGridLines.Of(new[] { HexCoordinate.Zero, new HexCoordinate(1, 0) }, layout).Count, "a shared edge once");
+            Assert.AreEqual(11, HexGridLines.Of(new[] { HexCoordinate.Zero, new HexCoordinate(0, 1) }, layout).Count, "diagonal neighbours too");
+
+            foreach (ArenaSize arena in new[] { ArenaSize.Small, ArenaSize.Medium, ArenaSize.Large })
+            {
+                HexGrid grid = new HexGrid(arena);
+                HashSet<HexCoordinate> tiles = new HashSet<HexCoordinate>(grid.Tiles);
+                int pairs = 0;
+                foreach (HexCoordinate tile in tiles)
+                {
+                    foreach (HexCoordinate next in new[] { new HexCoordinate(tile.Q + 1, tile.R), new HexCoordinate(tile.Q, tile.R + 1), new HexCoordinate(tile.Q - 1, tile.R + 1) })
+                    {
+                        if (tiles.Contains(next))
+                        {
+                            pairs++;
+                        }
+                    }
+                }
+
+                List<Segment> segments = HexGridLines.Of(grid.Tiles, layout);
+                Assert.AreEqual(6 * tiles.Count - pairs, segments.Count, arena.ToString());
+                foreach (Segment segment in segments)
+                {
+                    Assert.That(segment.Length, Is.InRange(17.9f, 18.4f), "every edge a hex side (18 or sqrt(16^2 + 9^2))");
+                }
+            }
+        }
+
+        [Test]
+        public void GridLines_CornersMeetTheNeighboursCorners()
+        {
+            HexLayout layout = new HexLayout(0, 0);
+            Vec2[] a = HexGridLines.Corners(layout, HexCoordinate.Zero);
+            Vec2[] right = HexGridLines.Corners(layout, new HexCoordinate(1, 0));
+            Vec2[] below = HexGridLines.Corners(layout, new HexCoordinate(0, 1));
+            Assert.AreEqual(a[1], right[5]);
+            Assert.AreEqual(a[2], right[4]);
+            Assert.AreEqual(a[2], below[0]);
+            Assert.AreEqual(a[3], below[5]);
+        }
+
+        [Test]
+        public void Validator_ChecksEveryRule()
+        {
+            RegionLibraryData regions = Content.Regions;
+            ArtManifestData art = Content.Art;
+            BattleBackdropData good = Content.BattleArt.Backdrop("r01", ArenaSize.Medium);
+            BattleBackdropData Copy(string region, string arenaName, string key, BattleArtRect rect)
+            {
+                return new BattleBackdropData { RegionId = region, Arena = arenaName, ArtKey = key, BoardRect = rect };
+            }
+
+            List<string> Errors(params BattleBackdropData[] backdrops)
+            {
+                return BattleArtValidator.Validate(new BattleArtData { SchemaVersion = 1, Backdrops = backdrops }, regions, art);
+            }
+
+            Assert.IsEmpty(Errors(good));
+            StringAssert.Contains("SchemaVersion", string.Join("\n", BattleArtValidator.Validate(new BattleArtData { SchemaVersion = 7 }, regions, art)));
+            StringAssert.Contains("not a region", string.Join("\n", Errors(Copy("r99", "Medium", good.ArtKey, good.BoardRect))));
+            StringAssert.Contains("not Small, Medium or Large", string.Join("\n", Errors(Copy("r01", "medium", good.ArtKey, good.BoardRect))));
+            StringAssert.Contains("listed twice", string.Join("\n", Errors(good, good)));
+            StringAssert.Contains("not lowercase", string.Join("\n", Errors(Copy("r01", "Medium", "Backdrop/R01", good.BoardRect))));
+            StringAssert.Contains("not a sprite in the art manifest", string.Join("\n", Errors(Copy("r01", "Medium", "backdrop/r01/huge", good.BoardRect))));
+            StringAssert.Contains("inside the image", string.Join("\n", Errors(Copy("r01", "Medium", good.ArtKey, Rect(0.5f, 0.2f, 0.7f, 0.4f)))));
+            StringAssert.Contains("inside the image", string.Join("\n", Errors(Copy("r01", "Medium", good.ArtKey, Rect(0.1f, 0.2f, 0f, 0.4f)))));
+            StringAssert.Contains("no BoardRect", string.Join("\n", Errors(Copy("r01", "Medium", good.ArtKey, null))));
+            StringAssert.Contains("stretched",
+                                  string.Join("\n", Errors(Copy("r01", "Medium", good.ArtKey, Rect(good.BoardRect.X, good.BoardRect.Y, good.BoardRect.Width * 0.9f, good.BoardRect.Height)))));
+            StringAssert.Contains("canvas edges", string.Join("\n", Errors(Copy("r01", "Medium", good.ArtKey, Rect(0f, 0f, 1f, 1f)))), "a board rect over the whole image leaves no margin");
+
+            BattleArtData overlay = new BattleArtData
+            {
+                SchemaVersion = 1,
+                Board = new BoardOverlayData { GridColor = "#ffffff", PlayerZoneColor = "~", GridAlpha = 1.5f, GridWidth = 0.1f, EnemyZoneAlpha = -0.1f, HudScrimAlpha = 2f }
+            };
+            string text = string.Join("\n", BattleArtValidator.Validate(overlay, regions, art));
+            StringAssert.Contains("GridColor", text);
+            StringAssert.Contains("PlayerZoneColor", text);
+            StringAssert.Contains("GridAlpha", text);
+            StringAssert.Contains("GridWidth", text);
+            StringAssert.Contains("EnemyZoneAlpha", text);
+            StringAssert.Contains("HudScrimAlpha", text);
+            Assert.IsNotEmpty(BattleArtValidator.Validate(null, regions, art));
+        }
+
+        private static BattleBackdropData Backdrop(string region, string arena, float x, float y, float width, float height)
+        {
+            return new BattleBackdropData { RegionId = region, Arena = arena, ArtKey = "backdrop/" + region + "/" + arena.ToLowerInvariant(), BoardRect = Rect(x, y, width, height) };
+        }
+
+        private static BattleArtRect Rect(float x, float y, float width, float height)
+        {
+            return new BattleArtRect { X = x, Y = y, Width = width, Height = height };
+        }
+    }
+}

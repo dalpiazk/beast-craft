@@ -8,6 +8,7 @@ using BeastCraft.Campaign;
 using BeastCraft.Creatures;
 using BeastCraft.Creatures.Roster;
 using BeastCraft.Encounters;
+using BeastCraft.Presentation.Art;
 using BeastCraft.Presentation.Text;
 using BeastCraft.Progression;
 using BeastCraft.Session;
@@ -74,6 +75,9 @@ namespace BeastCraft.Presentation.Content
         public VfxLibrary Vfx { get; private set; }
 
         public ArtManifestData Art { get; private set; }
+
+        /// <summary>How the board is dressed (<see cref="BattleArtData.ProjectRelativePath"/>): painted backdrops per region and arena, and their overlays.</summary>
+        public BattleArtData BattleArt { get; private set; }
 
         /// <summary>The battle glossary (<see cref="GlossaryData.ProjectRelativePath"/>): the terms the skill card highlights.</summary>
         public Glossary Glossary { get; private set; }
@@ -159,6 +163,7 @@ namespace BeastCraft.Presentation.Content
             ArtManifestData art = ArtManifestData.Normalize(Read<ArtManifestData>(root, ArtManifestData.ProjectRelativePath, errors));
             GlossaryData glossaryData = Read<GlossaryData>(root, GlossaryData.ProjectRelativePath, errors);
             RegionLibraryData regions = Read<RegionLibraryData>(root, RegionLibraryData.ProjectRelativePath, errors);
+            BattleArtData battleArt = Read<BattleArtData>(root, BattleArtData.ProjectRelativePath, errors);
             if (errors.Count > 0)
             {
                 return null;
@@ -175,6 +180,7 @@ namespace BeastCraft.Presentation.Content
             HashSet<string> known = KnownSkills(skills, enemyLibrary);
             Prefix(errors, "vfx-library.json", VfxLibraryValidator.Validate(vfx, known, art));
             Prefix(errors, "art keys", ArtReferenceValidator.Validate(roster, enemyLibrary, skills, art));
+            Prefix(errors, "battle-art.json", BattleArtValidator.Validate(battleArt, regions, art));
             Prefix(errors, "glossary.json", GlossaryValidator.Validate(glossaryData));
             Glossary glossary = Glossary.Build(glossaryData);
             Prefix(errors, "skill text", GlossaryValidator.ValidateText(glossary, skills, enemyLibrary));
@@ -238,6 +244,7 @@ namespace BeastCraft.Presentation.Content
                 Encounters = EncounterLibrary.Build(encounterLibrary, EncounterDifficultyTable.Build(difficulty)),
                 Vfx = VfxLibrary.Build(vfx),
                 Art = art,
+                BattleArt = battleArt,
                 Glossary = glossary,
                 KnownSkillIds = known
             };
