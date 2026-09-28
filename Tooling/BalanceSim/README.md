@@ -1061,9 +1061,9 @@ attempts to clear.
 
 The shipping table assumes typical gear and a scouted pick of three from the whole roster. A new
 player has three starters and no gear, so the campaign eases the first regions
-(`regions.json` `StageDifficultyScale`: per stage, a scale on the multiplier of every campaign battle
-in that stage, applied by `CampaignRules.PlanFor` with the run; see `docs/design/battle-system.md`,
-"Early-region easing"). The calibration never sees it. `--mode newplayer` (`NewPlayerReport.cs`)
+(`regions.json` `EasingShapeScales`, each kind of fight's full discount, times each stage's
+`StageEasing` weight, applied by `CampaignRules.PlanFor` with the run; see
+`docs/design/battle-system.md`, "Early-region easing"). The calibration never sees it. `--mode newplayer` (`NewPlayerReport.cs`)
 measures the curve and writes `docs/balance/new-player-report.md`:
 
 - **Profile.** Every one-per-stance trio of the roster (30), all three fielded, no scouting, the
@@ -1074,7 +1074,8 @@ measures the curve and writes `docs/balance/new-player-report.md`:
   level up) at the level of the stage's middle row, at the table's multiplier (interpolated as the
   game does), on the region's own battlefields (`--obstacles` per region, as `BattleSession` picks
   them): the clear rate with the stage's scale off and on, and the scale the trio mean needs to reach
-  the shape's target (a bisection); the last stage adds the region's boss at its own override.
+  the shape's target (a bisection), which is how the full per-shape discounts are fitted; the last
+  stage adds the region's boss at its own override (the `boss` discount).
 - **First node.** Map seeds 1..`--map-seeds` (default 60): a fresh save's first r01 expedition, its
   Next battle node (`MapViewModel.Recommended`'s rule), planned by `CampaignRules.PlanFor` with the
   run, fought by every trio with and without the easing.

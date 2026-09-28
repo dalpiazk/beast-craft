@@ -309,8 +309,10 @@ namespace BeastCraft.Campaign
         /// <summary>
         /// <see cref="PlanFor(MapNode, EncounterLibrary, EnemyCatalog)"/> for a node of
         /// <paramref name="run"/>'s map, eased for a new player: the plan's multiplier times the
-        /// run's stage's <see cref="RegionLibrary.DifficultyScaleFor"/> (<see cref="EncounterPlan.Scaled"/>;
-        /// the early regions' <see cref="RegionData.StageDifficultyScale"/>, 1 elsewhere). What a
+        /// run's stage's <see cref="RegionLibrary.DifficultyScaleFor"/> for the plan's shape (an
+        /// authored template, the boss, as <see cref="RegionLibraryData.EasingBossId"/>;
+        /// <see cref="EncounterPlan.Scaled"/>; the early regions' <see cref="RegionData.StageEasing"/>
+        /// of <see cref="RegionLibraryData.EasingShapeScales"/>, 1 elsewhere). What a
         /// campaign battle fights; the easing is campaign-only (the calibration and any plan built
         /// outside a run never see it). Null <paramref name="run"/> or <paramref name="regions"/> = no easing.
         /// </summary>
@@ -322,7 +324,8 @@ namespace BeastCraft.Campaign
                 return plan;
             }
 
-            return plan.Scaled(regions.DifficultyScaleFor(run.RegionId, run.Stage));
+            string shapeKey = string.IsNullOrEmpty(plan.EncounterId) ? plan.ShapeId : RegionLibraryData.EasingBossId;
+            return plan.Scaled(regions.DifficultyScaleFor(run.RegionId, run.Stage, shapeKey));
         }
 
         private static EncounterPlan UnscaledPlan(MapNode node, EncounterLibrary encounters, EnemyCatalog enemies)

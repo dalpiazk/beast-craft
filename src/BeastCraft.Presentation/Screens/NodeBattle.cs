@@ -91,7 +91,7 @@ namespace BeastCraft.Presentation.Screens
                 return null;
             }
 
-            // Eased in the early regions for a new player (RegionData.StageDifficultyScale).
+            // Eased in the early regions for a new player (RegionData.StageEasing of RegionLibraryData.EasingShapeScales).
             EncounterPlan plan = CampaignRules.PlanFor(run, node, session.Content.Encounters, session.Content.Enemies, session.Content.Campaign);
             if (plan == null)
             {

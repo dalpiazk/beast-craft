@@ -74,21 +74,51 @@ namespace BeastCraft.Campaign
         }
 
         /// <summary>
-        /// The early-region easing of stage <paramref name="stage"/> of <paramref name="regionId"/>
-        /// (<see cref="RegionData.StageDifficultyScale"/>): the scale a campaign battle there fields its
-        /// enemies' calibrated multiplier at. 1 for an unknown region, a region without easing, or a
-        /// stage past its entries (and for a non-positive entry, which the validator refuses).
+        /// How much of the full early-region discount stage <paramref name="stage"/> of
+        /// <paramref name="regionId"/> gets (<see cref="RegionData.StageEasing"/>), 0-1: 0 for an unknown
+        /// region, a region without easing or a stage past its entries.
         /// </summary>
-        public double DifficultyScaleFor(string regionId, int stage)
+        public double EasingWeight(string regionId, int stage)
         {
             RegionData region = GetRegion(regionId);
-            double[] scales = region == null ? null : region.StageDifficultyScale;
-            if (scales == null || stage < 0 || stage >= scales.Length || !(scales[stage] > 0.0))
+            double[] weights = region == null ? null : region.StageEasing;
+            if (weights == null || stage < 0 || stage >= weights.Length || double.IsNaN(weights[stage]))
             {
-                return 1.0;
+                return 0.0;
             }
 
-            return scales[stage];
+            return Math.Max(0.0, Math.Min(1.0, weights[stage]));
+        }
+
+        /// <summary>
+        /// The full early-region discount of <paramref name="shapeKey"/> (a shape id, or
+        /// <see cref="RegionLibraryData.EasingBossId"/>; <see cref="RegionLibraryData.EasingShapeScales"/>):
+        /// 1 when not listed (never eased).
+        /// </summary>
+        public double FullEasingScale(string shapeKey)
+        {
+            foreach (ShapeScaleData entry in Data.EasingShapeScales ?? new ShapeScaleData[0])
+            {
+                if (entry != null && string.Equals(entry.ShapeId, shapeKey, StringComparison.Ordinal) && entry.Scale > 0.0 && entry.Scale <= 1.0)
+                {
+                    return entry.Scale;
+                }
+            }
+
+            return 1.0;
+        }
+
+        /// <summary>
+        /// The early-region easing of a campaign battle of <paramref name="shapeKey"/> (a shape id, or
+        /// <see cref="RegionLibraryData.EasingBossId"/> for an authored template) in stage
+        /// <paramref name="stage"/> of <paramref name="regionId"/>: the scale its enemies' calibrated
+        /// multiplier is fielded at, 1 - <see cref="EasingWeight"/> x (1 - <see cref="FullEasingScale"/>).
+        /// 1 where there is no easing.
+        /// </summary>
+        public double DifficultyScaleFor(string regionId, int stage, string shapeKey)
+        {
+            double weight = EasingWeight(regionId, stage);
+            return weight <= 0.0 ? 1.0 : 1.0 - (weight * (1.0 - FullEasingScale(shapeKey)));
         }
 
         /// <summary>The region's own map rules when it overrides them (<see cref="MapRulesData.Layers"/> above 0), otherwise the library's.</summary>

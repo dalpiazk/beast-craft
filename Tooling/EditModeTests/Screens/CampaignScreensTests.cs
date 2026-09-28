@@ -526,13 +526,13 @@ namespace BeastCraft.Tests.EditMode
             GameSession session = NewSession();
             MapRun run = session.Save.Campaign.ActiveRun;
             MapNode node = CampaignRules.Choices(run)[0];
-            double scale = Content.Campaign.DifficultyScaleFor(run.RegionId, run.Stage);
             Assert.AreEqual("r01", run.RegionId);
-            Assert.Less(scale, 1.0, "r01 is eased for a new player");
 
             NodeBattle battle = new EncounterViewModel(session, node.NodeId).Start(out string error);
             Assert.IsNotNull(battle, error);
             EncounterPlan plain = CampaignRules.PlanFor(node, Content.Encounters, Content.Enemies);
+            double scale = Content.Campaign.DifficultyScaleFor(run.RegionId, run.Stage, plain.ShapeId);
+            Assert.Less(scale, 1.0, "r01 is eased for a new player, by the node's shape");
             Assert.AreEqual(scale, battle.Plan.DifficultyScale, 1e-12);
             Assert.AreEqual(plain.Multiplier * scale, battle.Plan.Multiplier, 1e-12);
             foreach (EnemySpec enemy in battle.Setup.Encounter.Enemies)

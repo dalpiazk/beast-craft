@@ -266,25 +266,30 @@ typical gear. A new player starts with three beasts (one per stance, player-pick
 no gear, so the first regions carry a **difficulty discount that fades out by region 3**, instead of
 calibrating per owned roster.
 
-- **Data.** `regions.json` `StageDifficultyScale` (`RegionData`): per region, one scale per stage;
-  empty = 1. Validated by `RegionLibraryValidator`: one entry per stage, each above 0 and at most 1,
-  never falling in campaign order, reaching 1 before it stops, none on a post-game region.
+- **Data.** `regions.json`: `EasingShapeScales` (library level) holds each kind of fight's **full
+  discount**, a scale on the stat multiplier (`squad`, `horde`, `solo`, `elite`, and `boss` for the
+  authored templates; a kind not listed is never eased), and each region's `StageEasing` how much of
+  it applies per stage (1 = all, 0 = none): scale = 1 - weight x (1 - full). Validated by
+  `RegionLibraryValidator`: known shapes once each, scales in (0, 1]; `StageEasing` empty or one
+  weight per stage in [0, 1], never rising in campaign order, reaching 0 before it stops, none on a
+  post-game region.
 - **Rule.** `CampaignRules.PlanFor(run, node, encounters, enemies, regions)` multiplies the node's
-  plan by its stage's scale (`RegionLibrary.DifficultyScaleFor`, `EncounterPlan.Scaled`; the plan
-  records it as `DifficultyScale`): every campaign battle of that expedition, battles, dens, the pass
-  and the boss alike. `NodeBattle` plans with it. **Campaign battles only**: the calibrated table,
-  the simulator's calibration and any plan built outside a run are unscaled.
-- **Curve.** r01 x0.77 in every stage; r02 x0.80, x0.86, x0.93, x1.00; nothing after. Measured by the
-  simulator's `--mode newplayer` (`docs/balance/new-player-report.md`): every one-per-stance trio, no
-  gear, no scouting, at the node's level. The scale each shape needs is flat across levels (`squad`
-  about x0.83, `horde` x0.77, `solo` x0.77, `elite` x0.74), so r01 holds x0.77: ordinary fights about
-  80-90%, `solo` about 50%, dens about 50% (under their 60%), the r01 boss about 74%. The first node of
-  a new game (map seeds 1-60): `squad` and `horde` 87-95%, a level-1 `solo` 36%.
+  plan by `RegionLibrary.DifficultyScaleFor(region, stage, shape)` (the boss template as `boss`;
+  `EncounterPlan.Scaled`, recorded as the plan's `DifficultyScale`): every campaign battle of that
+  expedition. `NodeBattle` plans with it. **Campaign battles only**: the calibrated table, the
+  simulator's calibration and any plan built outside a run are unscaled.
+- **Curve.** Full discounts `squad` x0.82, `horde` x0.77, `solo` x0.77, `elite` x0.75, `boss` x0.83,
+  fitted with the simulator's `--mode newplayer` (`docs/balance/new-player-report.md`: every
+  one-per-stance trio, no gear, no scouting, at the node's level); the need is flat across levels, so
+  r01 takes all of it in every stage (`StageEasing` 1, 1, 1, 1) and r02 fades it out (1, 0.67, 0.33,
+  0); nothing after. New-player trio means in r01: `squad` 79-83%, `horde` 79-88%, `solo` 47-52%,
+  `elite` 58-64%, the Hollow Warden 52%; r02's first stage the same (83 / 81 / 50 / 53%). The first
+  node of a new game (map seeds 1-60): `squad` 83-87%, `horde` 87-88%, a level-1 `solo` 36-37%.
 - **Open (flagged).** The need does not fall with level and gear barely moves it; what closes the gap
   is having beasts to pick from. A player with only the three starters falls off through r02's fade
-  (r02's last stage: `squad` 37%, `horde` 18%). The starter / recruit design decides whether the fade
-  holds or the easing lasts longer. See `docs/balance/tuning-log.md`, "Early-region easing" and
-  "First-node experience".
+  (r02's last stage: `squad` 37%, `horde` 18%). **Open item for the Kinship PR** (the starter / recruit
+  design): whether the fade holds or the easing lasts longer. See `docs/balance/tuning-log.md`,
+  "Early-region easing", "First-node experience" and "Early-region easing per shape".
 
 ## Data-driven foundation already in place
 

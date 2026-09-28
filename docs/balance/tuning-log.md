@@ -4022,3 +4022,53 @@ one-per-stance trio at level 1, no gear, beside the Beastbinder. Two measurement
 against their 80%; unscaled a new player would win about a third of them. A level-1 `solo` start (7
 seeds) stays under its 50% at 36-37% (the per-stage table's r01 stage 1 `solo`, at level 2, is 49%):
 flagged, a map-generation or first-node rule (no `solo` on row 0) rather than a bigger discount.
+
+## Early-region easing per shape
+
+Lead decision after "Early-region easing": the shapes need different discounts (the measured need is
+`squad` about x0.83, `horde` x0.77, `solo` x0.77, `elite` x0.74, the r01 boss x0.85), so the easing is
+per shape instead of one scale per stage. This supersedes that section's data and curve; its method,
+its measurement and its flag stand.
+
+**Data** (`regions.json`, compact): `EasingShapeScales` at the library level, each kind of fight's
+**full discount** (`boss` = the authored templates; a kind not listed is never eased), and per region
+`StageEasing`, one weight per stage (1 = the full discount, 0 = none): scale = 1 - weight x (1 - full).
+`RegionLibraryValidator`: known shapes (or `boss`) once each, scales in (0, 1]; weights empty or one per
+stage in [0, 1], never rising in campaign order, reaching 0 before the easing stops, none on a
+post-game region. `CampaignRules.PlanFor(run, ...)` looks the scale up by the plan's shape (a template
+as `boss`); `StageDifficultyScale` is gone.
+
+**Fit** (`--mode newplayer`, the same profile and battles): each full discount is the scale the
+new-player trio mean needs to meet its tier, averaged over r01's four stages (the need is flat), the
+boss's set a step easier than its 50% need for the 50-60% band:
+
+| Kind | Tier | Need (r01 stages) | Full discount | r01 trio mean, stages 1-4 |
+| --- | ---: | --- | ---: | --- |
+| `squad` | 80% | x0.81-0.83 | **x0.82** | 78.6 / 80.4 / 82.7 / 80.3% |
+| `horde` | 80% | x0.75-0.79 | **x0.77** | 88.4 / 79.5 / 82.3 / 79.3% |
+| `solo` | 50% | x0.76-0.78 | **x0.77** | 49.4 / 46.8 / 52.1 / 50.4% |
+| `elite` | 60% | x0.74-0.76 | **x0.75** | 59.0 / 58.0 / 63.5 / 60.9% |
+| `boss` (Hollow Warden) | 50-60% | x0.85 | **x0.83** | 52.2% (single trios 0-100%) |
+
+**Ramp:** r01 `StageEasing` 1, 1, 1, 1; r02 1, 0.67, 0.33, 0 (x1.00 by r02's last stage, as before; r02's
+first stage keeps the full discount so the region opens on the tiers). New-player trio means in r02
+(`squad` / `horde` / `solo` / `elite`): stage 1 82.8 / 81.0 / 50.3 / 52.9%, stage 2 67.8 / 52.3 / 25.4 /
+25.4%, stage 3 49.6 / 34.5 / 19.8 / 10.5%, stage 4 (unscaled) 36.9 / 17.7 / 6.8 / 4.6%; the r02 boss 25.2%
+(unscaled). Within r01 every kind of fight is now on its tier (the one-scale curve had `squad` at
+~90%, dens ~51% and the boss 74%).
+
+**First node** (the game path as in "First-node experience": `GameSession` with map seeds 1-60,
+`MapViewModel.Recommended`, `BattleSession.Run` with `NodeBattle`'s setup, attempts 0-3, every trio at
+level 1; the simulator's first-node section agrees): `squad` (28 seeds, x0.82) **83.2%** (66-96; the
+simulator 86.8%), `horde` (25, x0.77) **87.5%** (78-99; 87.1%), `solo` (7, x0.77) **37.3%** (14-79; 36.0%),
+against 35.5 / 23.9 / 6.0% unscaled. The level-1 `solo` start stays under its 50%, as flagged.
+
+**Open item for the Kinship PR (unchanged, not tuned here):** the roster-limited fall-off. The need
+does not fall with level and typical gear barely moves it (r03 still needs about x0.8); what closes the
+gap is having beasts to pick from. A player who owns only the three starters meets the tiers through
+r01 and r02's first stage, then falls off through r02's fade and meets the unscaled table in r03. The
+Kinship PR (the starter / recruit design) decides whether players own more beasts by then or the
+easing lasts longer.
+
+Reproduce: `-- --mode newplayer --compositions 16 --samples 2 --map-seeds 60 --out
+docs/balance/new-player-report.md`; the "Required" column is each shape's need.
