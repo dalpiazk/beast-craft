@@ -118,8 +118,27 @@ namespace BeastCraft.Game
             get { return _ctx?.Session; }
         }
 
-        /// <summary>The app is going to the background or closing: autosave (a no-op before a game is loaded).</summary>
+        /// <summary>
+        /// Guards the save against two threads: the game loop (<see cref="Update"/> and
+        /// <see cref="Draw"/>, which change and autosave it) and a platform lifecycle callback
+        /// (Android's OnPause calls <see cref="OnBackgrounded"/>). Invariant: the save is only read,
+        /// changed or written while holding this lock, so a background autosave never serialises a
+        /// half-applied battle or claim, and OnPause stays synchronous — it waits for the frame in
+        /// flight, then writes the save before returning, before Android may stop the process.
+        /// (Monitor locks are re-entrant: on hosts whose loop runs on the UI thread nothing waits.)
+        /// </summary>
+        private readonly object _saveGate = new object();
+
+        /// <summary>The app is going to the background or closing: autosave (a no-op before a game is loaded). Synchronous; see <see cref="_saveGate"/>.</summary>
         public void OnBackgrounded()
+        {
+            lock (_saveGate)
+            {
+                Background();
+            }
+        }
+
+        private void Background()
         {
             GameSession session = _ctx?.Session;
             if (session == null || _options.Screenshot || !string.IsNullOrEmpty(_options.WalkthroughDir))
@@ -256,6 +275,14 @@ namespace BeastCraft.Game
 
         protected override void Update(GameTime gameTime)
         {
+            lock (_saveGate)
+            {
+                UpdateFrame(gameTime);
+            }
+        }
+
+        private void UpdateFrame(GameTime gameTime)
+        {
             if (FailureMessage != null || (_options.IsDemo && _options.Screenshot))
             {
                 base.Update(gameTime);
@@ -304,6 +331,14 @@ namespace BeastCraft.Game
         }
 
         protected override void Draw(GameTime gameTime)
+        {
+            lock (_saveGate)
+            {
+                DrawFrame(gameTime);
+            }
+        }
+
+        private void DrawFrame(GameTime gameTime)
         {
             if (_options.IsDemo && _options.Screenshot)
             {

@@ -175,5 +175,12 @@ notification is an opt-in Android hook.
   stage's battles are won about 40-50% of the time against the calibrated 80% (squad, horde) and
   50% (solo): the calibration assumes typical gear and a scouted pick from the full ten-species
   roster — a balance question, not a screens one.
+- **The battle crash window.** `NodeBattle.Begin` spends the chosen consumable and autosaves (the
+  Core's rule: a battle begun cannot hand the item back by being abandoned); `Complete` pays out
+  and autosaves again. If the process dies in between — killed mid-battle, or before the results
+  are applied — the consumable stays spent and the battle's rewards (and its loss count) are
+  never recorded: on the next Continue the location is simply still there to fight. Nothing is
+  duplicated. A refund would need a pending-battle marker in the save (a schema change), so it is
+  left for a later PR.
 - Roster, Grove, Avatar and Inventory are placeholders; Trader and Camp locations are "coming soon".
 - One save slot; no region list (the next region starts automatically after a boss).

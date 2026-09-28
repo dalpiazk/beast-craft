@@ -158,6 +158,30 @@ namespace BeastCraft.Presentation.Screens
             return run;
         }
 
+        /// <summary>Whether <see cref="Complete"/> has run (the battle is paid out).</summary>
+        public bool IsCompleted
+        {
+            get { return _completed; }
+        }
+
+        /// <summary>
+        /// Claims the battle screen's one hand-back to the results: true the first time (after the
+        /// battle was begun), false ever after — so Back, Continue and Enter racing, or a re-entrant
+        /// call from the results callback, hand it back once.
+        /// </summary>
+        public bool TryHandBack()
+        {
+            if (_run == null || _handedBack)
+            {
+                return false;
+            }
+
+            _handedBack = true;
+            return true;
+        }
+
+        private bool _handedBack;
+
         /// <summary>
         /// Pays the finished battle out and records it on the map (see the class remarks), autosaves,
         /// and returns the results. The battle is played out first if it is not over. Once only.

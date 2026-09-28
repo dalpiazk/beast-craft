@@ -101,7 +101,6 @@ namespace BeastCraft.Game.Screens
         private MouseState _previousMouse;
         private int _gestureTouches;
         private Vector2 _gestureEnd;
-        private bool _handedBack;
         private readonly List<string> _log = new List<string>();
 
         private BattleScreen(ScreenContext ctx, BattleSessionRun run, Dictionary<string, string> speciesByUnit, string regionId, int seed, string hudTitle,
@@ -375,13 +374,14 @@ namespace BeastCraft.Game.Screens
         /// <summary>A decided campaign battle goes back for its results (once).</summary>
         public void HandBack()
         {
-            if (_campaign == null || _handedBack)
+            // The battle's one-shot hand-back (NodeBattle.TryHandBack), claimed before the callback
+            // runs, so a second Back, tap or Enter, or a re-entrant call from the callback, is a no-op.
+            if (_campaign == null || !_campaign.TryHandBack())
             {
                 return;
             }
 
             SkipToEnd();
-            _handedBack = true;
             _finished?.Invoke(_campaign);
         }
 

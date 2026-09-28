@@ -520,6 +520,62 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
+        public void NodeBattle_CompletedTwice_Throws_AndPaysOutOnce()
+        {
+            GameSession session = NewSession();
+            foreach (string id in new[] { "b1", "b2", "b3", "b4" })
+            {
+                session.Save.FindBeast(id).Progress.Level = 5;
+            }
+
+            MapNode node = CampaignRules.Choices(session.Save.Campaign.ActiveRun)[0];
+            NodeBattle battle = new EncounterViewModel(session, node.NodeId).Start(out string error);
+            Assert.IsNotNull(battle, error);
+            Assert.IsFalse(battle.IsCompleted);
+            ResultsViewModel results = battle.Complete();
+            Assert.IsTrue(battle.IsCompleted);
+
+            string before = new JsonSaveSerializer().ToJson(session.Save);
+            int saves = session.AutosaveCount;
+            Assert.Throws<InvalidOperationException>(() => battle.Complete());
+            Assert.AreEqual(before, new JsonSaveSerializer().ToJson(session.Save), "no second pay-out: gold, XP, drops and the map unchanged");
+            Assert.AreEqual(saves, session.AutosaveCount);
+            Assert.AreEqual(results.GoldTotal, session.Save.Gold);
+        }
+
+        [Test]
+        public void NodeBattle_HandsBackOnce_EvenReentrantly()
+        {
+            GameSession session = NewSession();
+            MapNode node = CampaignRules.Choices(session.Save.Campaign.ActiveRun)[0];
+            EncounterViewModel encounter = new EncounterViewModel(session, node.NodeId);
+            Assert.IsFalse(encounter.Battle.TryHandBack(), "nothing to hand back before the battle begins");
+
+            NodeBattle battle = encounter.Start(out string error);
+            Assert.IsNotNull(battle, error);
+            int handed = 0;
+
+            // The battle screen's HandBack: claim the hand-back, then run the results callback, which
+            // (re-entrantly) tries again, as a second Back or tap in the same frame would.
+            void HandBack()
+            {
+                if (!battle.TryHandBack())
+                {
+                    return;
+                }
+
+                handed++;
+                HandBack();
+                battle.Complete();
+            }
+
+            HandBack();
+            HandBack();
+            Assert.AreEqual(1, handed);
+            Assert.IsTrue(battle.IsCompleted);
+        }
+
+        [Test]
         public void NodeBattle_SpendsTheConsumable_AsTheBattleBegins()
         {
             GameSession session = NewSession();
