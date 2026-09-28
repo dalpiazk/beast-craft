@@ -142,7 +142,12 @@ namespace BeastCraft.Tooling.BalanceSim
         // ------------------------------------------------------------------------------------
         // PvE (team vs encounter) setup.
         // ------------------------------------------------------------------------------------
-        public const int DefaultTeamSize = 4;
+        /// <summary>
+        /// <c>--team-size</c> default: three beasts beside the avatar (producer decision), the game's
+        /// party size (<see cref="TeamSuggester.DefaultTeamSize"/>, <c>CampaignRules.PartySize</c>):
+        /// C(10, 3) = 120 teams. Was 4 (210 teams) until "Team size 3" in the tuning log.
+        /// </summary>
+        public const int DefaultTeamSize = TeamSuggester.DefaultTeamSize;
         public const int MaxTeamSize = 6;
         public const double DefaultTargetClearRate = 50.0;
 
@@ -178,7 +183,7 @@ namespace BeastCraft.Tooling.BalanceSim
 
         /// <summary>
         /// <c>--level-gap-teams</c> default: how many teams (a seeded subset) the no-scouting rate at
-        /// each nonzero level gap is measured over (42 of 210 x 8 compositions = 336 battles).
+        /// each nonzero level gap is measured over (42 of the 120 three-beast teams x 8 compositions = 336 battles).
         /// </summary>
         public const int DefaultLevelGapTeams = 42;
 
@@ -589,6 +594,18 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <summary><c>--mode campaign</c>: run the region-campaign pacing model (<see cref="CampaignPacingSimulator"/>) instead of PvE / PvP.</summary>
         public bool RunCampaign;
 
+        /// <summary>
+        /// <c>--mode newplayer</c>: the new-player report (<see cref="NewPlayerReport"/>): one-per-stance
+        /// trios through r01-r03 with and without the early-region easing, and the first node.
+        /// </summary>
+        public bool RunNewPlayer;
+
+        /// <summary><c>--map-seeds</c>: newplayer: the first-node section's map seeds, 1..n.</summary>
+        public int NewPlayerMapSeeds = NewPlayerReport.DefaultMapSeeds;
+
+        /// <summary><c>--difficulty</c>: newplayer: the difficulty table fought at, or null for the game's <c>encounter-difficulty.json</c>.</summary>
+        public string NewPlayerDifficultyPath;
+
         /// <summary><c>--regions</c>: the campaign's regions.json, or null to find it by walking up.</summary>
         public string RegionsPath;
 
@@ -760,10 +777,14 @@ namespace BeastCraft.Tooling.BalanceSim
             "\n" +
             "Usage: dotnet run --project Tooling/BalanceSim -c Release -- [options]\n" +
             "\n" +
-            "  --mode <m>                 pve | pvp | both | pacing | campaign (default both). pve = team vs encounter (primary);\n" +
-            "                             pvp = the 1v1 round-robin (secondary); pacing = the skill-progression / material\n" +
-            "                             economy model (Monte Carlo campaigns; see README.md, \"Pacing\"); campaign = the region\n" +
-            "                             campaign model (node maps, level cap, bench; docs/design/progression-and-saves.md).\n" +
+            "  --mode <m>                 pve | pvp | both | pacing | campaign | newplayer (default both). pve = team vs encounter\n" +
+            "                             (primary); pvp = the 1v1 round-robin (secondary); pacing = the skill-progression /\n" +
+            "                             material economy model (Monte Carlo campaigns; see README.md, \"Pacing\"); campaign = the\n" +
+            "                             region campaign model (node maps, level cap, bench; docs/design/progression-and-saves.md);\n" +
+            "                             newplayer = one-per-stance trios through r01-r03 with and without the early-region\n" +
+            "                             easing, and the first node (README.md, \"New-player easing\").\n" +
+            "  --map-seeds <n>            newplayer: map seeds 1..n for the first-node section (default 60).\n" +
+            "  --difficulty <path>        newplayer: the difficulty table fought at (default: the game's encounter-difficulty.json).\n" +
             "  --battles <n>              pacing: battles per campaign (default 500).\n" +
             "  --runs <n>                 pacing / campaign: campaigns per base seed (default 1000; --seeds pools every seed's).\n" +
             "  --regions <path>           campaign: regions.json (default: found by walking up from the working directory).\n" +
@@ -796,7 +817,7 @@ namespace BeastCraft.Tooling.BalanceSim
             "                             legacy hand-authored boss, swarm and pack simulator fixtures (encounters.json).\n" +
             "  --compositions <n>         Generated compositions per shape (default 8).\n" +
             "  --encounters <list>        Comma-separated shape ids (generated) or encounter ids (fixed) (default all).\n" +
-            "  --team-size <n>            Beasts per player team, 1-6 (default 4); every combination is fielded.\n" +
+            "  --team-size <n>            Beasts per player team, 1-6 (default 3); every combination is fielded.\n" +
             "  --target-clear <t>         Clear rate(s) the difficulty calibration aims for: a percentage for every shape (the\n" +
             "                             legacy uniform target, e.g. 50) or shape=pct pairs (e.g. squad=80,elite=60) overriding\n" +
             "                             the library. Default: each shape's TargetClear in encounter-library.json (the game's\n" +
@@ -882,7 +903,7 @@ namespace BeastCraft.Tooling.BalanceSim
             "                             S >= 2. Default: off (the committed tuned report uses 16x4).\n" +
             "  --panel-level <n>          The panel's level, one of --levels (default 50).\n" +
             "  --calibrate-sample <n>     --calibrate-on mean only. Opt-in speed-up that CHANGES results: the difficulty search\n" +
-            "                             evaluates a seeded subset of n teams (e.g. 50 of 210), then the chosen multiplier runs\n" +
+            "                             evaluates a seeded subset of n teams (e.g. 30 of 120), then the chosen multiplier runs\n" +
             "                             once with every team; the report's numbers all come from that full run (default: off,\n" +
             "                             every team at every step).\n" +
             "  --help                     Show this text.\n";
@@ -1002,6 +1023,20 @@ namespace BeastCraft.Tooling.BalanceSim
                         break;
                     case "--mode":
                         if (!TryNext(args, ref i, arg, out text, out error) || !TryParseSimMode(text, options, out error))
+                        {
+                            return null;
+                        }
+
+                        break;
+                    case "--map-seeds":
+                        if (!TryNextInt(args, ref i, arg, 1, out options.NewPlayerMapSeeds, out error))
+                        {
+                            return null;
+                        }
+
+                        break;
+                    case "--difficulty":
+                        if (!TryNext(args, ref i, arg, out options.NewPlayerDifficultyPath, out error))
                         {
                             return null;
                         }
@@ -1753,8 +1788,14 @@ namespace BeastCraft.Tooling.BalanceSim
                     options.RunPvp = false;
                     options.RunCampaign = true;
                     return true;
+                case "newplayer":
+                    // PvE's loading (roster, library, encounters) with the new-player report instead of the PvE report.
+                    options.RunPve = true;
+                    options.RunPvp = false;
+                    options.RunNewPlayer = true;
+                    return true;
                 default:
-                    error = "--mode expects pve, pvp, both, pacing or campaign, got '" + text + "'.";
+                    error = "--mode expects pve, pvp, both, pacing, campaign or newplayer, got '" + text + "'.";
                     return false;
             }
         }

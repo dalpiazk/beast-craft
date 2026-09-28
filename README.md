@@ -215,7 +215,7 @@ dotnet run --project src/BeastCraft.Desktop -c Release
 **New Game** gives you the starter beasts and an expedition into the Verdant
 Hollow; **Continue** (the primary button once there is a save) loads it and
 claims the idle rewards. On the **map**, drag to scroll, tap a glowing location
-(or **Next battle**) to see its encounter for free, pick up to four beasts and
+(or **Next battle**) to see its encounter for free, pick up to three beasts and
 one consumable, and **Start Battle**; the battle plays by itself, then the
 results pay out and the map moves on. **Esc** is Back (the title asks before
 quitting); the mouse clicks and drags like a finger. The game autosaves when a
@@ -238,7 +238,7 @@ screens are built is [`docs/design/screens.md`](docs/design/screens.md).
 Any of the battle flags below (or `--screen demo`) runs the old battle viewer
 instead: one real PvE battle through the
 game's own session code — Phoenix, Golem, Kirin and Frost Wyrm (level 20) against
-the Hollow Warden encounter (a champion and two brutes, level 10), seed 20260933 —
+the Hollow Warden encounter (a champion and two brutes, level 10), seed 20260932 —
 in **portrait**. Every beast draws with its final illustrated art (AI-assisted,
 producer-approved).
 

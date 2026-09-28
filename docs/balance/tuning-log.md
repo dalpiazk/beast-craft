@@ -3773,3 +3773,302 @@ Reproduce: the commands above (`--obstacles r01` is the default), as in the Tool
 `-- --mode pve --seeds 12345,777,4242,2024,99 --target-clear 50`; the boss `-- --mode pve --kit
 elemental --encounter-set fixed --encounters-file <scratch> --encounters boss_r01_hollow_warden
 --levels 10 --calibrate-samples 64 --scouted bonds --gear typical [--obstacles none]`.
+
+## Team size 3: shape effect
+
+Producer decision: a battle fields **three beasts plus the Beastbinder** (was four plus the avatar).
+`TeamSuggester.DefaultTeamSize` = 3 is the one constant: the campaign's party size
+(`CampaignRules.PartySize`, `GameSession.PartySize`: the party picker, the encounter screen's start
+team, Next battle), the suggester's default and the simulator's `--team-size` default (C(10,3) = 120
+teams, each beast in 36; was 210 and 84). The campaign pacing model already fielded three. This
+section measures what the smaller team alone does at the **old** (four-beast) calibration; the next
+re-calibrates.
+
+**Method** as in "Rectangular arenas: shape effect": main's own tables pinned (`--pin-difficulty`),
+written by main's runs (the gearless report's, each guard seed's, and the shipping table for typical
+gear; main reproduces its committed report byte for byte), then the same commands with three-beast
+teams. Clear rate at the old multipliers, levels 1 / 50 / 100 averaged:
+
+| Kit mode | Shape | Scouted (gearless, report) | No scouting | Scouted (typical gear, shipping table) |
+| --- | --- | ---: | ---: | ---: |
+| `elemental` | `solo` | 48.4 -> **6.0** (-42.4) | 6.5 -> 0.6 | 48.7 -> **3.1** |
+| `elemental` | `elite` | 61.2 -> **16.1** (-45.1) | 12.0 -> 2.3 | 61.2 -> **19.3** |
+| `elemental` | `squad` | 80.7 -> **56.0** (-24.7) | 62.1 -> 21.2 | 80.5 -> **53.4** |
+| `elemental` | `horde` | 79.9 -> **33.1** (-46.8) | 53.6 -> 12.3 | 79.4 -> **37.8** |
+| `neutral` | `solo` | 49.2 -> 1.8 (-47.4) | 39.1 -> 1.1 | 53.9 -> 2.1 |
+| `neutral` | `elite` | 59.9 -> 3.4 (-56.5) | 64.3 -> 6.4 | 55.5 -> 1.8 |
+| `neutral` | `squad` | 78.9 -> 16.1 (-62.8) | 75.2 -> 14.1 | 79.2 -> 24.5 |
+| `neutral` | `horde` | 77.1 -> 18.0 (-59.1) | 64.3 -> 11.5 | 80.2 -> 27.3 |
+
+The post-game cells (typical gear, the shipping multipliers, `elemental`): `squad_postgame` 64.8 ->
+43.0%, `horde_postgame` 65.6 -> 34.4%, `elite_postgame` 45.3 -> 7.0%; Hard 50.0 -> 32.8%, 50.0 -> 26.6%,
+30.5 -> 4.7%. The avatar alone cannot carry a fight any more (no-avatar scouted `squad` 46.4 -> 17.4%).
+
+**A quarter less team is a large difficulty change**, about 25 points of clear rate in `squad` and
+40-55 in every other cell: every calibrated cell falls to 2-56%. **The per-beast guard is not
+readable at the stale calibration**: five seeds at `--target-clear 50`, each pinned to its own main
+table, put every cell at 1-25% (scouted `elemental` 4.6 / 16.3 / 24.5 / 22.2%, `neutral` 1-3%), where
+the normalization (0.25 / p(1 - p)) blows the raw marginals (`elemental` -1.0 … +0.8, `neutral` -1.7 …
++1.6) up to -7.3 … +5.9 and -8.0 … +6.5 with seed SDs of 4-8 points. The guard is judged after the
+re-calibration below.
+
+Reproduce: on main, `-- --panel 16x4 --avatar-value --write-difficulty <dir>/main-tuned-pin.json` and,
+per seed, `-- --mode pve --seed N --target-clear 50 --write-difficulty <dir>/main-guard-pin-N.json`;
+then on this branch `-- --panel 16x4 --avatar-value --pin-difficulty <dir>/main-tuned-pin.json`, `--
+--mode pve --gear typical --pin-difficulty <main's encounter-difficulty.json> --write-difficulty
+<scratch>` (post-game rates on stderr) and `-- --mode pve --seeds 12345,777,4242,2024,99 --target-clear
+50 --pin-difficulty "<dir>/main-guard-pin-{seed}.json"`.
+
+## Team size 3: re-calibration
+
+The documented commands with three-beast teams, no roster, skill, bond or shape change: the shipping
+table (`--mode pve --gear typical --write-difficulty content/data/Encounters/encounter-difficulty.json`,
+the same bytes as the `--panel 16x4 --avatar-value` form, post-game cells included), the gearless
+`tuned-report.md`, `level-gap-report.md` (`--gap-mix 0`), `pacing-report.md` and
+`campaign-pacing-report.md` (both byte-identical: neither fights a battle, and the campaign model
+already fielded three), the guard (five seeds, `--target-clear 50`) and the boss overrides (below).
+TeamSuggester parity holds on every run (32 of 32 compositions).
+
+**Shipping table** (typical gear; the game reads `elemental`): every enemy about 10-18% weaker.
+
+| Cell | Target | Old | New | Scouted at new |
+| --- | ---: | ---: | ---: | ---: |
+| `elemental` `solo` L1 / L50 / L100 | 50 | x1.309 / x1.297 / x1.312 | x1.086 / x1.094 / x1.074 | 47.7 / 51.6 / 49.2% |
+| `elemental` `elite` L1 / L50 / L100 | 60 | x1.133 / x1.152 / x1.141 | x0.980 / x0.977 / x0.984 | 60.2 / 59.4 / 59.4% |
+| `elemental` `squad` L1 / L50 / L100 | 80 | x1.250 / x1.203 / x1.219 | x1.125 / x1.086 / x1.090 | 79.7 / 79.7 / 79.7% |
+| `elemental` `horde` L1 / L50 / L100 | 80 | x1.273 / x1.285 / x1.238 | x1.094 / x1.063 / x1.086 | 79.7 / 79.7 / 81.3% |
+| `elemental` `squad_postgame` / `_hard` | 65 / 50 | x1.273 / x1.375 | x1.164 / x1.234 | 63.3 / 49.2% |
+| `elemental` `horde_postgame` / `_hard` | 65 / 50 | x1.297 / x1.359 | x1.141 / x1.184 | 66.4 / 49.2% |
+| `elemental` `elite_postgame` / `_hard` | 45 / 30 | x1.211 / x1.242 | x1.047 / x1.109 | 45.3 / 29.7% |
+
+**Targets:** every `elemental` mainline cell within 2.3 points of its tier (squad / horde 80, elite
+60, solo 50) and every post-game cell within 1.7 of Normal / Hard (65 / 65 / 45; 50 / 50 / 30). The
+`neutral` cells (not read by the game) move by 13-17% too; three land a search step or two off: `solo`
+L1 41.4% (50), `elite` L1 67.2% (60), `squad` L1 85.2% (80), flagged, not hand-edited. Post-game
+`neutral` within 1.6.
+
+**The committed report** (gearless, tiered targets): `elemental` `solo` x1.253 -> x1.055, `elite`
+x1.118 -> x0.965, `squad` x1.203 -> x1.081, `horde` x1.250 -> x1.060 (levels averaged); `neutral` 13-16%
+down. Every `elemental` cell within 2 points of its target; `neutral` `elite` L50 at 53.9% (60) is the
+one cell more than 5 off (the search's closest step). The no-scouting player loses more than the
+scout: `elemental` `squad` no scouting 62.1 -> 42.6% at the target (the gap to the scouted pick +18.6 ->
++36.6), `horde` 53.6 -> 47.4%; with three slots a bad lineup has no fourth beast to cover for it.
+
+**Guard** (five seeds, `--target-clear 50`, over the level-gap mix), main -> three beasts:
+
+| Beast | `elemental` normalized | `neutral` normalized |
+| --- | ---: | ---: |
+| Treant | +1.5 -> **+3.8** | -1.0 -> -1.5 |
+| Kirin | +3.1 -> +3.2 | +0.8 -> **+5.4** |
+| Golem | -0.1 -> +2.7 | +1.2 -> +3.4 |
+| Griffin | +0.5 -> +1.2 | +4.0 -> +5.3 |
+| Thunderbird | +1.3 -> -0.8 | +4.4 -> +0.6 |
+| Phoenix | -1.5 -> -1.4 | -3.3 -> -2.7 |
+| Basilisk | +1.9 -> -1.6 | +1.5 -> +0.9 |
+| Tarasque | -1.9 -> -1.7 | -4.4 -> **-6.2** |
+| Frost Wyrm | -2.4 -> -3.0 | -1.7 -> -2.4 |
+| Leviathan | -2.4 -> -2.4 | -1.6 -> -2.7 |
+
+- `elemental`: **-3.0 … +3.8**, every beast inside +/-4 (was -2.4 … +3.1); Treant at +3.8 is the one
+  near the edge. Top 3 in some shape **8 of 10** (was 9; not Basilisk, Leviathan). Gap 0 -4.2 … +4.6
+  (Kirin +4.6 and Leviathan -4.2 outside on the equal-level line alone; the guard reads the mix).
+- `neutral`: **-6.2 … +5.4**, inside +/-7 (was -4.4 … +4.4); top 3 in some shape **9 of 10** (was 6;
+  not Leviathan). Raw overall means outside +/-5: Kirin +5.3, Griffin +5.1, Tarasque -5.6. Gap 0 -7.6
+  … +7.2 (Tarasque, Kirin).
+- The guard holds; no beast retune. Beasts move by up to 4.6 normalized points (`elemental` Basilisk
+  -3.5, Golem +2.8, Treant +2.3; `neutral` Kirin +4.6, Thunderbird -3.8), more than any arena change
+  did: a third of a team is a bigger share of the fight, so each beast's own kit weighs more.
+  Flagged for the lead, not chased: Treant (`elemental` +3.8), Tarasque (`neutral` -6.2).
+
+**Bonds** (the report's "PvE team bonds" and panel; every bond still achievable, none trivial):
+
+| Bond | Condition | Teams active of 120 (was of 210) | Reactions / battle `elemental` (was) | Panel excess `elemental` (was) |
+| --- | --- | ---: | ---: | ---: |
+| `guardian` | 2+ / 3 Vanguards | 60, 50.0% (155, 73.8%); tier 2: 10 | 0.54 (0.86) | -0.1 (0.0) |
+| `pack_hunters` | 2 Skirmishers | 8, 6.7% (28, 13.3%) | 0.95 (1.18) | +1.7 (+0.7) |
+| `crossfire` | 2+ / 3 Ranged | 22, 18.3% (70, 33.3%); tier 2: 1 | 1.22 (0.96) | +0.3 (0.0) |
+| element pairs (x5) | two named elements | 8 each, 6.7% (28 each) | 0.75-4.50 (0.67-4.76) | -0.6 … +5.9 (+0.2 … +3.5) |
+| `combined_arms` | 3 distinct stances | 30, 25.0% (105, 50.0%) | 1.72 (1.74) | -0.4 (-0.1) |
+
+- A team now carries at most **two** bonds (was four): 80 teams one, 40 two. A one-per-stance trio
+  (`combined_arms`) can carry no stance bond, and a stance bond (two of a stance) rules out
+  `combined_arms`: the two families now exclude each other.
+- The top stance tiers need a whole team of one stance: `guardian` tier 2 (three of the five
+  Vanguards, 10 teams) and `crossfire` tier 2 (Phoenix, Kirin and Basilisk, the only three Ranged: one
+  team) are rare but reachable. `pack_hunters` needs both Skirmishers (Griffin and Thunderbird: 8
+  teams). Nothing is impossible; nothing is on by default (the most common, `guardian`, is half the teams).
+- Behaviour: `guardian` intercepts less (0.86 -> 0.54 a battle: fewer allies to cover); `winter_grove`'s
+  panel excess grows (+3.5 -> +5.9 `elemental`, +7.7 -> +9.7 `neutral`: its shield and heal matter more
+  when each beast is a third of the team). The suggester's `BondWeights` were fitted to the four-beast
+  panel and are unchanged; re-fitting them is a lead call.
+
+**Level gap** (`level-gap-report.md`, all-shape cells meeting their band): `elemental` 27 -> 26 of 35,
+`neutral` 29 -> 28; shape cells 98 -> 83 and 106 -> 101 of 140. The same kinds of miss (a couple of
+levels over falls short of T + 0.4 (100 - T); +3 under falls below the band's floor).
+
+**Boss overrides.** The boss recipe ("Boss re-calibration after the combat merge": fixed set, `--kit
+elemental --scouted bonds --gear typical --calibrate-samples 64`, the Hollow's obstacles for r01 and the
+open board for the rest; target 50%, r11 35% / 20% on the Normal template's battles) reproduces main's
+overrides with four beasts (r01 x1.391 on the obstacles, as logged; r05 x0.963 exactly). With three,
+every boss needs 8-23% less, so the overrides move (content, `encounter-library.json`):
+
+| Boss | Level | Old | New | Scouted at new |
+| --- | ---: | ---: | ---: | ---: |
+| r01 Hollow Warden | 10 | x1.430 | **x1.188** | 53.1% |
+| r02 Ember Twins | 20 | x1.031 | **x0.840** | 50.0% |
+| r03 Tide Colossus | 30 | x1.219 | **x1.125** | 53.1% |
+| r04 Storm Titan | 40 | x1.078 | **x0.984** | 45.3% |
+| r05 Rust Knights | 50 | x0.963 | **x0.875** | 48.4% |
+| r06 Frost Matriarch | 60 | x1.063 | **x0.906** | 53.1% |
+| r07 Thunder Court | 70 | x0.883 | **x0.680** | 51.6% |
+| r08 Deepwild Heart | 80 | x1.055 | **x0.809** | 51.6% |
+| r09 Cinder King | 90 | x0.922 | **x0.801** | 51.6% |
+| r10 Apex Pair | 100 | x0.863 | **x0.748** | 50.0% |
+| r11 Dusk and Dawn (Normal, 35%) | 100 | x0.711 | **x0.563** | 29.7% |
+| r11 Dusk and Dawn (Hard, 20%) | 100 | x0.723 | **x0.574** | 14.1% |
+
+Every mainline boss lands within 5 points of 50% (64 samples, about +/-6). The r11 twins sit on the
+cliff logged for them before ("Post-game region r11"): the closest steps are 5-6 points under their
+targets, Hard still above Normal; flagged, not hand-tuned. The demo battle (the Hollow Warden against a
+four-beast team at level 20, a viewer fixture) re-picks its seed by its own rule (the first from
+20260924 at which every showcase status shows and the team wins): 20260933 -> 20260932.
+
+Reproduce: the commands above, as in the Tooling README; the guard `-- --mode pve --seeds
+12345,777,4242,2024,99 --target-clear 50`; the bosses per template `-- --mode pve --kit elemental
+--encounter-set fixed --encounters-file <scratch> --encounters <id> --levels <level> --calibrate-samples
+64 --scouted bonds --gear typical --target-clear <50|35|20> [--obstacles none]`, the scratch file being the
+templates written as fixed encounters (each group its enemy-library entry plus `Count` and `Elements`).
+
+## Early-region easing
+
+Producer decision: a **difficulty discount in regions 1-2 that fades out by region 3**, instead of
+calibrating per owned roster. The shipping table assumes typical gear and a scouted pick from the
+whole roster; a new player (three starters, one per stance, player-picked: a later PR) has neither.
+
+**Data and rule.** `regions.json` `StageDifficultyScale`: per region, one scale per stage, multiplied
+into the stat multiplier of every campaign battle fought in that stage's expedition (generated nodes,
+elites, passes and the boss alike) by `CampaignRules.PlanFor(run, node, ...)` (`EncounterPlan.Scaled`;
+`NodeBattle` plans with it). Campaign battles only: the calibrated table, the simulator's calibration
+and any plan built outside a run are unscaled. `RegionLibraryValidator`: empty or one entry per stage,
+each in (0, 1], never falling in campaign order, reaching 1 before it stops, none on a post-game
+region.
+
+**Measurement** (`--mode newplayer`, new; `docs/balance/new-player-report.md`). The new-player
+profile: every one-per-stance trio of the roster (30: five Vanguards x two Skirmishers x three Ranged;
+min, mean and max over them), all three fielded (the only pick three beasts allow), no scouting, the
+library avatar, team and avatar at the node's level (the campaign pacing model's fielded median sits
+at the node level at every gate and boss), no gear in r01-r02 and typical gear from r03. Per stage:
+each shape the stage draws at its middle row's level (the elite one up), 16 compositions x 2 battles
+per trio, on each region's own battlefields, at the shipping table's multiplier; and the scale the
+trio mean needs to reach the shape's tier (a bisection on the scale).
+
+Unscaled, the new player is far below the tiers everywhere (trio means, r01-r02): `squad` 27-38%,
+`horde` 16-21%, `solo` 5-8%, `elite` 4-6%, with single trios from 0% to 69%. The **scale each shape
+needs is flat across levels**: `squad` x0.81-0.85, `horde` x0.75-0.79, `solo` x0.75-0.78, `elite`
+x0.73-0.76 in every stage of r01-r02 (and x0.75-0.87 in r03 with typical gear: the band-1-20 commons
+are worth little next to the missing pick). One scale per stage has to split the shapes; **x0.77** is
+the one that puts the ordinary fights at or over their 80% and `solo` on its 50%:
+
+| r01 stage | `squad` | `horde` | `solo` | `elite` (60%) | boss (50%) |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 (x0.77) | 91.3% (78-100) | 88.4% (69-100) | 49.4% (22-69) | 50.7% (31-72) | |
+| 2 (x0.77) | 89.2% (72-100) | 79.5% (59-100) | 46.8% (31-66) | 45.4% (25-78) | |
+| 3 (x0.77) | 90.3% (69-100) | 82.3% (69-94) | 52.1% (34-72) | 57.2% (31-88) | |
+| 4 (x0.77) | 88.8% (75-100) | 79.3% (50-97) | 50.4% (25-72) | 52.5% (25-72) | Hollow Warden 74.1% (9-100), unscaled 2.3% |
+
+(trio mean, lowest-highest trio). The dens (`elite`) sit 3-15 points under their 60% and the r01 boss
+well over its 50% (it needs x0.85 alone); both are the price of one scale per stage.
+
+**The curve:** r01 `[0.77, 0.77, 0.77, 0.77]` (the measured need, held flat because it is flat), r02
+`[0.80, 0.86, 0.93, 1.00]` (the fade the producer asked for, reaching 1 at r02's last stage), nothing
+from r03. What the fade does to the same profile in r02 (trio means `squad` / `horde` / `solo` /
+`elite`): stage 1 87 / 74 / 40 / 34%, stage 2 70 / 50 / 25 / 20%, stage 3 56 / 35 / 20 / 9%, stage 4 (x1.00)
+37 / 18 / 7 / 5%, the r02 boss 25% (unscaled; it needs x0.92).
+
+**Flag: the fade is not earned by gear.** The measured need does not fall with level, and typical
+gear barely moves it (r03, typical gear, x1.00: `squad` 43-48%, `horde` 18-25%, `solo` 7-9%, `elite`
+6%). What closes the gap is the pick: the calibration's player scouts and picks three from ten, and a
+three-beast owner cannot. A player who still owns only the three starters meets the tiers in r01 but
+falls off through r02 and hits the unscaled table in r03. The fade is right only if the player owns
+more beasts to pick from by r02-r03 (the campaign model's recruit arrives at region 5); the starter /
+recruit PR should decide either that or a longer easing. Not tuned here.
+
+Reproduce: `dotnet run --project Tooling/BalanceSim -c Release -- --mode newplayer --compositions 16
+--samples 2 --map-seeds 60 --out docs/balance/new-player-report.md` (about 5 minutes; the "Required"
+column is the bisection; `--difficulty <path>` fights another table).
+
+## First-node experience (three beasts, early-region easing)
+
+The screens PR's check (the first reachable node of a new game across map seeds; it found 1 win in
+39 at level 1 before the Beastbinder was fielded) re-run with the new-player profile: map seeds 1-60,
+each fresh save's first r01 expedition and its **Next battle** node (the lowest-level reachable
+battle, a plain battle before a den, then furthest left: `MapViewModel.Recommended`; always a row-0
+battle at level 1), planned by `CampaignRules.PlanFor` with the run (x0.77), fought by every
+one-per-stance trio at level 1, no gear, beside the Beastbinder. Two measurements that agree:
+
+- `--mode newplayer`'s "First node" section (the simulator's battles, 2 per trio and seed);
+- the game's own path, as the screens PR measured it: `GameSession.NewGame` with the map seed,
+  `MapViewModel.Recommended`, and `BattleSession.Run` with `NodeBattle`'s setup (the campaign avatar
+  profile, the region's obstacles, `CampaignRules.BattleSeed` of attempts 0-3), each trio's three
+  beasts at level 1 in their default loadouts (a throwaway harness, not committed).
+
+| Shape (seeds of 60) | Target | Win, eased (sim) | Win, eased (game path) | Win, no easing (game path) | Starter trio (griffin/phoenix/golem), eased / not (game path) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `squad` (28) | 80% | 94.6% (82-100) | 92.2% (83-99) | 35.5% (18-71) | 90.2% / 33.9% |
+| `horde` (25) | 80% | 87.1% (74-96) | 87.5% (78-99) | 23.9% (11-38) | 88.0% / 32.0% |
+| `solo` (7) | 50% | 36.0% (7-79) | 37.3% (14-79) | 6.0% (0-14) | 42.9% / 0.0% |
+
+(trio mean, lowest-highest trio). The ordinary first fights (53 of 60 seeds) now clear at 87-95%
+against their 80%; unscaled a new player would win about a third of them. A level-1 `solo` start (7
+seeds) stays under its 50% at 36-37% (the per-stage table's r01 stage 1 `solo`, at level 2, is 49%):
+flagged, a map-generation or first-node rule (no `solo` on row 0) rather than a bigger discount.
+
+## Early-region easing per shape
+
+Lead decision after "Early-region easing": the shapes need different discounts (the measured need is
+`squad` about x0.83, `horde` x0.77, `solo` x0.77, `elite` x0.74, the r01 boss x0.85), so the easing is
+per shape instead of one scale per stage. This supersedes that section's data and curve; its method,
+its measurement and its flag stand.
+
+**Data** (`regions.json`, compact): `EasingShapeScales` at the library level, each kind of fight's
+**full discount** (`boss` = the authored templates; a kind not listed is never eased), and per region
+`StageEasing`, one weight per stage (1 = the full discount, 0 = none): scale = 1 - weight x (1 - full).
+`RegionLibraryValidator`: known shapes (or `boss`) once each, scales in (0, 1]; weights empty or one per
+stage in [0, 1], never rising in campaign order, reaching 0 before the easing stops, none on a
+post-game region. `CampaignRules.PlanFor(run, ...)` looks the scale up by the plan's shape (a template
+as `boss`); `StageDifficultyScale` is gone.
+
+**Fit** (`--mode newplayer`, the same profile and battles): each full discount is the scale the
+new-player trio mean needs to meet its tier, averaged over r01's four stages (the need is flat), the
+boss's set a step easier than its 50% need for the 50-60% band:
+
+| Kind | Tier | Need (r01 stages) | Full discount | r01 trio mean, stages 1-4 |
+| --- | ---: | --- | ---: | --- |
+| `squad` | 80% | x0.81-0.83 | **x0.82** | 78.6 / 80.4 / 82.7 / 80.3% |
+| `horde` | 80% | x0.75-0.79 | **x0.77** | 88.4 / 79.5 / 82.3 / 79.3% |
+| `solo` | 50% | x0.76-0.78 | **x0.77** | 49.4 / 46.8 / 52.1 / 50.4% |
+| `elite` | 60% | x0.74-0.76 | **x0.75** | 59.0 / 58.0 / 63.5 / 60.9% |
+| `boss` (Hollow Warden) | 50-60% | x0.85 | **x0.83** | 52.2% (single trios 0-100%) |
+
+**Ramp:** r01 `StageEasing` 1, 1, 1, 1; r02 1, 0.67, 0.33, 0 (x1.00 by r02's last stage, as before; r02's
+first stage keeps the full discount so the region opens on the tiers). New-player trio means in r02
+(`squad` / `horde` / `solo` / `elite`): stage 1 82.8 / 81.0 / 50.3 / 52.9%, stage 2 67.8 / 52.3 / 25.4 /
+25.4%, stage 3 49.6 / 34.5 / 19.8 / 10.5%, stage 4 (unscaled) 36.9 / 17.7 / 6.8 / 4.6%; the r02 boss 25.2%
+(unscaled). Within r01 every kind of fight is now on its tier (the one-scale curve had `squad` at
+~90%, dens ~51% and the boss 74%).
+
+**First node** (the game path as in "First-node experience": `GameSession` with map seeds 1-60,
+`MapViewModel.Recommended`, `BattleSession.Run` with `NodeBattle`'s setup, attempts 0-3, every trio at
+level 1; the simulator's first-node section agrees): `squad` (28 seeds, x0.82) **83.2%** (66-96; the
+simulator 86.8%), `horde` (25, x0.77) **87.5%** (78-99; 87.1%), `solo` (7, x0.77) **37.3%** (14-79; 36.0%),
+against 35.5 / 23.9 / 6.0% unscaled. The level-1 `solo` start stays under its 50%, as flagged.
+
+**Open item for the Kinship PR (unchanged, not tuned here):** the roster-limited fall-off. The need
+does not fall with level and typical gear barely moves it (r03 still needs about x0.8); what closes the
+gap is having beasts to pick from. A player who owns only the three starters meets the tiers through
+r01 and r02's first stage, then falls off through r02's fade and meets the unscaled table in r03. The
+Kinship PR (the starter / recruit design) decides whether players own more beasts by then or the
+easing lasts longer.
+
+Reproduce: `-- --mode newplayer --compositions 16 --samples 2 --map-seeds 60 --out
+docs/balance/new-player-report.md`; the "Required" column is each shape's need.

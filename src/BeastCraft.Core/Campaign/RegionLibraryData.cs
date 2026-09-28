@@ -43,6 +43,20 @@ namespace BeastCraft.Campaign
         public SealData[] Seals = new SealData[0];
 
         /// <summary>
+        /// Early-region easing (producer decision), per kind of fight: the FULL discount, a scale on
+        /// the stat multiplier, of each shape (an <c>encounter-library.json</c> shape id) and of the
+        /// authored templates (the bosses, id <see cref="EasingBossId"/>); a kind not listed is
+        /// never eased. How much of it applies is each region's <see cref="RegionData.StageEasing"/>.
+        /// The calibrated table assumes typical gear and a scouted pick from the whole roster; a new
+        /// player has neither, and each kind of fight needs its own discount (measured by the balance
+        /// simulator's <c>--mode newplayer</c>).
+        /// </summary>
+        public ShapeScaleData[] EasingShapeScales = new ShapeScaleData[0];
+
+        /// <summary>The <see cref="EasingShapeScales"/> id of an authored template (a region boss or gate).</summary>
+        public const string EasingBossId = "boss";
+
+        /// <summary>
         /// The regions, in campaign order: the mainline ones, levels contiguous from 1 to 100, and
         /// after them any post-game ones (<see cref="RegionData.IsPostGame"/>, flat level 100).
         /// </summary>
@@ -185,6 +199,19 @@ namespace BeastCraft.Campaign
         /// </summary>
         public RegionHardModeData HardMode = new RegionHardModeData();
 
+        /// <summary>
+        /// Early-region easing (producer decision): per stage (index = stage), how much of the full
+        /// per-shape discount (<see cref="RegionLibraryData.EasingShapeScales"/>) a campaign battle in
+        /// that stage's expedition gets: 1 = all of it, 0 = none; the scale is
+        /// <c>1 - weight x (1 - full scale)</c>. Empty (the default) = 0 everywhere; otherwise one
+        /// entry per stage in [0, 1], never rising from stage to stage or region to region, and
+        /// reaching 0 before the easing stops. Mainline regions only. Read by
+        /// <see cref="RegionLibrary.DifficultyScaleFor"/> and applied by
+        /// <see cref="CampaignRules.PlanFor(MapRun, MapNode, Encounters.EncounterLibrary, Encounters.EnemyCatalog, RegionLibrary)"/>;
+        /// the balance simulator's calibration never sees it.
+        /// </summary>
+        public double[] StageEasing = new double[0];
+
         /// <summary>A copy of this region (arrays and <see cref="MapRules"/> shared, not cloned).</summary>
         public RegionData Copy()
         {
@@ -217,6 +244,17 @@ namespace BeastCraft.Campaign
         {
             get { return (ShapeWeights != null && ShapeWeights.Length > 0) || !string.IsNullOrEmpty(EliteShapeId) || !string.IsNullOrEmpty(BossTemplateId); }
         }
+    }
+
+    /// <summary>One kind of fight's full early-region discount (<see cref="RegionLibraryData.EasingShapeScales"/>).</summary>
+    [Serializable]
+    public class ShapeScaleData
+    {
+        /// <summary>An <c>encounter-library.json</c> shape id, or <see cref="RegionLibraryData.EasingBossId"/> for the authored templates.</summary>
+        public string ShapeId;
+
+        /// <summary>The scale on the stat multiplier at the full discount, above 0 and at most 1.</summary>
+        public double Scale;
     }
 
     /// <summary>One encounter shape's draw weight on Battle nodes.</summary>

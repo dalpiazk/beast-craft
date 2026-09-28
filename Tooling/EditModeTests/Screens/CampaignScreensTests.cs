@@ -9,6 +9,7 @@ using BeastCraft.Presentation.Board;
 using BeastCraft.Presentation.Content;
 using BeastCraft.Presentation.Screens;
 using BeastCraft.Save;
+using BeastCraft.Session;
 using NUnit.Framework;
 
 namespace BeastCraft.Tests.EditMode
@@ -354,20 +355,21 @@ namespace BeastCraft.Tests.EditMode
             MapNode node = CampaignRules.Choices(session.Save.Campaign.ActiveRun)[0];
             EncounterViewModel encounter = new EncounterViewModel(session, node.NodeId);
 
+            Assert.AreEqual(3, GameSession.PartySize, "three beasts beside the Beastbinder");
             Assert.AreEqual(GameSession.PartySize, encounter.Team.Count, "starts with a full party");
-            CollectionAssert.AreEqual(new[] { "b1", "b2", "b3", "b4" }, encounter.Team);
+            CollectionAssert.AreEqual(new[] { "b1", "b2", "b3" }, encounter.Team);
             Assert.IsTrue(encounter.CanStart);
-            Assert.IsFalse(encounter.ToggleMember("b5", out string full));
+            Assert.IsFalse(encounter.ToggleMember("b4", out string full));
             StringAssert.Contains("full", full);
             Assert.IsFalse(encounter.ToggleMember("nobody", out _));
 
             Assert.IsTrue(encounter.ToggleMember("b2", out _));
             Assert.IsTrue(encounter.ToggleMember("b5", out _));
-            CollectionAssert.AreEqual(new[] { "b1", "b3", "b4", "b5" }, encounter.Team, "a new member joins at the back");
-            Assert.AreEqual(3, encounter.Owned.Find(m => m.BeastId == "b5").PartyIndex);
+            CollectionAssert.AreEqual(new[] { "b1", "b3", "b5" }, encounter.Team, "a new member joins at the back");
+            Assert.AreEqual(2, encounter.Owned.Find(m => m.BeastId == "b5").PartyIndex);
             Assert.IsFalse(encounter.Owned.Find(m => m.BeastId == "b2").Selected);
 
-            foreach (string id in new[] { "b1", "b3", "b4", "b5" })
+            foreach (string id in new[] { "b1", "b3", "b5" })
             {
                 encounter.ToggleMember(id, out _);
             }
@@ -425,7 +427,7 @@ namespace BeastCraft.Tests.EditMode
         public void NodeBattle_Won_ClearsTheNode_PaysOut_AndConsolidatesTheResults()
         {
             GameSession session = NewSession();
-            foreach (string id in new[] { "b1", "b2", "b3", "b4" })
+            foreach (string id in new[] { "b1", "b2", "b3" })
             {
                 // Four levels over the location's level 1: a sure win that still pays some XP (the falloff's 5%).
                 session.Save.FindBeast(id).Progress.Level = 5;
@@ -461,7 +463,7 @@ namespace BeastCraft.Tests.EditMode
             Assert.IsTrue(run.IsCleared(node.NodeId));
             Assert.AreEqual(node.NodeId, run.CurrentNodeId);
 
-            Assert.AreEqual(4, results.Team.Count);
+            Assert.AreEqual(GameSession.PartySize, results.Team.Count);
             foreach (BeastResultRow row in results.Team)
             {
                 OwnedBeast beast = session.Save.FindBeast(row.BeastId);
@@ -495,7 +497,6 @@ namespace BeastCraft.Tests.EditMode
             EncounterViewModel encounter = new EncounterViewModel(session, node.NodeId);
             encounter.ToggleMember("b1", out _);
             encounter.ToggleMember("b2", out _);
-            encounter.ToggleMember("b3", out _);
 
             NodeBattle battle = encounter.Start(out string error);
             Assert.IsNotNull(battle, error);
@@ -516,7 +517,28 @@ namespace BeastCraft.Tests.EditMode
             EncounterViewModel retry = new EncounterViewModel(session, node.NodeId);
             Assert.AreEqual(1, retry.Attempt);
             Assert.AreEqual(CampaignRules.BattleSeed(node, 1), retry.Battle.Seed, "a new battle seed for the retry");
-            CollectionAssert.AreEqual(new[] { "b4" }, retry.Team, "the last team is remembered");
+            CollectionAssert.AreEqual(new[] { "b3" }, retry.Team, "the last team is remembered");
+        }
+
+        [Test]
+        public void NodeBattle_InTheFirstRegion_FieldsTheEasedMultiplier()
+        {
+            GameSession session = NewSession();
+            MapRun run = session.Save.Campaign.ActiveRun;
+            MapNode node = CampaignRules.Choices(run)[0];
+            Assert.AreEqual("r01", run.RegionId);
+
+            NodeBattle battle = new EncounterViewModel(session, node.NodeId).Start(out string error);
+            Assert.IsNotNull(battle, error);
+            EncounterPlan plain = CampaignRules.PlanFor(node, Content.Encounters, Content.Enemies);
+            double scale = Content.Campaign.DifficultyScaleFor(run.RegionId, run.Stage, plain.ShapeId);
+            Assert.Less(scale, 1.0, "r01 is eased for a new player, by the node's shape");
+            Assert.AreEqual(scale, battle.Plan.DifficultyScale, 1e-12);
+            Assert.AreEqual(plain.Multiplier * scale, battle.Plan.Multiplier, 1e-12);
+            foreach (EnemySpec enemy in battle.Setup.Encounter.Enemies)
+            {
+                Assert.AreEqual(plain.Multiplier * scale, enemy.StatMultiplier, 1e-12, "the battle fields the eased multiplier");
+            }
         }
 
         [Test]

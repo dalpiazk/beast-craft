@@ -26,7 +26,8 @@ its own.
 
 Before the fight starts, the player **positions the deployed beasts on the grid**. This is the only
 point at which the player moves a piece by hand. Party size is fixed by the battle format (1 / up to
-4 / up to 6, see decision 2 below) and the board by the arena preset (see decision 1).
+4 / up to 6, see decision 2 below; campaign battles field three beasts plus the Beastbinder) and the
+board by the arena preset (see decision 1).
 
 Positioning is therefore a real decision with real consequences, because everything afterwards is
 resolved from where the beasts are standing: which enemies a short-range beast can reach on turn
@@ -220,7 +221,9 @@ seed and the map node) and keeps it separate from the battle's seed. Everything 
    the same multipliers (the tuned report's "Difficulty by shape": about 7-10% of `solo` and
    `elite`, 50-60% of `squad` and `horde`, `elemental`). Being over-levelled must make every fight
    easier, and the simulator checks it (`--level-gap`, bands relative to the target). Changing a
-   target means re-running the simulator's `--write-difficulty`.
+   target means re-running the simulator's `--write-difficulty`. The table assumes three beasts
+   beside the Beastbinder (decision 2's amendment) and is eased for new players in the first two
+   regions ("Early-region easing" below).
 2. **Which authored encounters exist.** `Templates` holds the ten DRAFT region bosses (placeholders
    pending producer review); the tests also build example templates in memory.
 3. **How a map node picks a shape and a level.** `EncounterPlan` takes both from its caller.
@@ -255,6 +258,38 @@ squad / horde ~80, elite ~60).
 
 Full rules, save shape and pacing: `docs/design/progression-and-saves.md`, "Region campaign" and
 "Beast and avatar level"; numbers: `docs/balance/campaign-pacing-report.md` (`--mode campaign`).
+
+### Early-region easing — DECIDED (producer); curve measured, TUNABLE
+
+The calibrated table assumes a player who scouts and picks three beasts from the whole roster in
+typical gear. A new player starts with three beasts (one per stance, player-picked: a later PR) and
+no gear, so the first regions carry a **difficulty discount that fades out by region 3**, instead of
+calibrating per owned roster.
+
+- **Data.** `regions.json`: `EasingShapeScales` (library level) holds each kind of fight's **full
+  discount**, a scale on the stat multiplier (`squad`, `horde`, `solo`, `elite`, and `boss` for the
+  authored templates; a kind not listed is never eased), and each region's `StageEasing` how much of
+  it applies per stage (1 = all, 0 = none): scale = 1 - weight x (1 - full). Validated by
+  `RegionLibraryValidator`: known shapes once each, scales in (0, 1]; `StageEasing` empty or one
+  weight per stage in [0, 1], never rising in campaign order, reaching 0 before it stops, none on a
+  post-game region.
+- **Rule.** `CampaignRules.PlanFor(run, node, encounters, enemies, regions)` multiplies the node's
+  plan by `RegionLibrary.DifficultyScaleFor(region, stage, shape)` (the boss template as `boss`;
+  `EncounterPlan.Scaled`, recorded as the plan's `DifficultyScale`): every campaign battle of that
+  expedition. `NodeBattle` plans with it. **Campaign battles only**: the calibrated table, the
+  simulator's calibration and any plan built outside a run are unscaled.
+- **Curve.** Full discounts `squad` x0.82, `horde` x0.77, `solo` x0.77, `elite` x0.75, `boss` x0.83,
+  fitted with the simulator's `--mode newplayer` (`docs/balance/new-player-report.md`: every
+  one-per-stance trio, no gear, no scouting, at the node's level); the need is flat across levels, so
+  r01 takes all of it in every stage (`StageEasing` 1, 1, 1, 1) and r02 fades it out (1, 0.67, 0.33,
+  0); nothing after. New-player trio means in r01: `squad` 79-83%, `horde` 79-88%, `solo` 47-52%,
+  `elite` 58-64%, the Hollow Warden 52%; r02's first stage the same (83 / 81 / 50 / 53%). The first
+  node of a new game (map seeds 1-60): `squad` 83-87%, `horde` 87-88%, a level-1 `solo` 36-37%.
+- **Open (flagged).** The need does not fall with level and gear barely moves it; what closes the gap
+  is having beasts to pick from. A player with only the three starters falls off through r02's fade
+  (r02's last stage: `squad` 37%, `horde` 18%). **Open item for the Kinship PR** (the starter / recruit
+  design): whether the fade holds or the easing lasts longer. See `docs/balance/tuning-log.md`,
+  "Early-region easing", "First-node experience" and "Early-region easing per shape".
 
 ## Data-driven foundation already in place
 
@@ -410,6 +445,16 @@ keeps each unit's decision meaningful and readable on a small screen; a larger o
 composition and role play at the cost of turn length. Supporting all three formats rather than
 picking one size means the encounter designer can choose the pacing per fight — a tight duel, a
 standard squad fight, or a full set-piece — instead of the whole game being tuned to a single shape.
+
+*Amendment: three beasts plus the Beastbinder (producer decision).* Campaign battles field **three
+beasts** beside the avatar (`CampaignRules.PartySize` = `TeamSuggester.DefaultTeamSize` = 3: the
+party picker, the encounter screen, Next battle, the team suggestion). The format stays `SmallGroup`
+(up to four) and the formats themselves are unchanged. The difficulty is calibrated with three: the
+balance simulator's default team is three (C(10,3) = 120 teams), and the table, the tuned report and
+the boss overrides were re-calibrated for it (enemies about 10-18% weaker than with four; the
+per-beast guard held). Team bonds keep their conditions: a three-beast team carries at most two, and
+the three-stance `combined_arms` and the two-of-a-stance bonds now exclude each other. See
+`docs/balance/tuning-log.md`, "Team size 3: shape effect" and "Team size 3: re-calibration".
 
 ### 3. Turn order model — DECIDED — AMENDED: ATB speed gauge, square-root fill
 
@@ -2762,8 +2807,8 @@ Blast) and a Burst split into equal physical and special halves (area, radius 2,
 cooldown 2). It runs in an `elemental` mode (kit in the beast's element) and a `neutral` mode (kit
 `Element.None`).
 
-Its **primary mode is PvE, team versus encounter**, following the direction above. Every 4-beast
-combination of the roster (210 teams) fights encounters generated from the game's encounter content
+Its **primary mode is PvE, team versus encounter**, following the direction above. Every 3-beast
+combination of the roster (120 teams; 4-beast, 210 teams, until "Team size 3") fights encounters generated from the game's encounter content
 (`content/data/Encounters/`; simulator fixtures in
 `Tooling/BalanceSim/encounters.json` until "Encounters as game content" above). Until the
 mixed-encounter change below they were three fixed encounters: `boss` (one Colossus with very high

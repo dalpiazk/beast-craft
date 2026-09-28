@@ -20,6 +20,10 @@ namespace BeastCraft.Campaign
     /// <item>Seals: a DisplayName and Description (player-facing), caps 1-100, each granted by at most one boss; the starting cap covers the first
     /// region; following the regions in order, the caps never fall and each covers the next
     /// region's max level.</item>
+    /// <item>Early-region easing: <see cref="RegionLibraryData.EasingShapeScales"/> known shapes (or
+    /// the boss id), once each, scales in (0, 1]; <see cref="RegionData.StageEasing"/> none, or one
+    /// weight per stage in [0, 1], never rising in campaign order, reaching 0 before it stops; none
+    /// on a post-game region.</item>
     /// <item>With the encounter library: every Battle shape, the elite shape, and every gate and boss
     /// template exists.</item>
     /// </list>
@@ -92,6 +96,7 @@ namespace BeastCraft.Campaign
 
             ValidateRules(data.MapRules, "MapRules", shapes, errors);
             Dictionary<string, SealData> seals = ValidateSeals(data.Seals, errors);
+            ValidateEasingScales(data.EasingShapeScales, shapes, errors);
 
             if (data.StartingLevelCap < 1 || data.StartingLevelCap > MaxLevel)
             {
@@ -175,6 +180,7 @@ namespace BeastCraft.Campaign
             int expectedMin = 1;
             int previousCap = data.StartingLevelCap;
             string previousCapSource = "StartingLevelCap";
+            double previousWeight = double.NaN;
 
             for (int i = 0; i < regions.Length; i++)
             {
@@ -247,6 +253,7 @@ namespace BeastCraft.Campaign
                 }
 
                 ValidateShapeWeights(region, where, shapes, errors);
+                ValidateEasing(region, where, ref previousWeight, errors);
 
                 string[] gates = region.GateTemplateIds ?? new string[0];
                 if (gates.Length > Math.Max(0, region.Stages - 1))
@@ -308,6 +315,86 @@ namespace BeastCraft.Campaign
             }
 
             return seen;
+        }
+
+        /// <summary>
+        /// A mainline region's <see cref="RegionData.StageEasing"/>: empty (no easing), or one weight
+        /// per stage in [0, 1], never above the one before it in campaign order
+        /// (<paramref name="previousWeight"/>: the last weight so far, NaN before any); a region without
+        /// easing after one with it must follow an easing that ended at 0, since it plays unscaled.
+        /// </summary>
+        private static void ValidateEasing(RegionData region, string where, ref double previousWeight, List<string> errors)
+        {
+            double[] weights = region.StageEasing ?? new double[0];
+            if (weights.Length == 0)
+            {
+                if (previousWeight > 0.0)
+                {
+                    errors.Add(where + ": no StageEasing after an easing that ended at " + previousWeight.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture) +
+                               "; the easing must reach 0 before it stops.");
+                }
+
+                previousWeight = double.IsNaN(previousWeight) ? double.NaN : 0.0;
+                return;
+            }
+
+            // A region with no stages is already refused (Stages must be at least 1).
+            if (weights.Length != region.Stages && region.Stages >= 1)
+            {
+                errors.Add(where + ": StageEasing has " + weights.Length + " entries; it needs one per stage (" + region.Stages + ") or none.");
+            }
+
+            for (int s = 0; s < weights.Length; s++)
+            {
+                double weight = weights[s];
+                if (double.IsNaN(weight) || weight < 0.0 || weight > 1.0)
+                {
+                    errors.Add(where + ": StageEasing[" + s + "] " + weight.ToString(System.Globalization.CultureInfo.InvariantCulture) + " must be between 0 and 1.");
+                    continue;
+                }
+
+                if (weight > previousWeight)
+                {
+                    errors.Add(where + ": StageEasing[" + s + "] " + weight.ToString(System.Globalization.CultureInfo.InvariantCulture) +
+                               " is above the stage before it (" + previousWeight.ToString(System.Globalization.CultureInfo.InvariantCulture) + "); the easing only fades out.");
+                }
+
+                previousWeight = weight;
+            }
+        }
+
+        /// <summary>
+        /// <see cref="RegionLibraryData.EasingShapeScales"/>: each id a known shape (when the encounter
+        /// library is given) or <see cref="RegionLibraryData.EasingBossId"/>, listed once, with a scale
+        /// above 0 and at most 1.
+        /// </summary>
+        private static void ValidateEasingScales(ShapeScaleData[] scales, HashSet<string> shapes, List<string> errors)
+        {
+            HashSet<string> seen = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < (scales ?? new ShapeScaleData[0]).Length; i++)
+            {
+                ShapeScaleData entry = scales[i];
+                if (entry == null)
+                {
+                    errors.Add("EasingShapeScales #" + i + " is null.");
+                    continue;
+                }
+
+                string where = "EasingShapeScales '" + entry.ShapeId + "'";
+                if (string.IsNullOrEmpty(entry.ShapeId) || !seen.Add(entry.ShapeId))
+                {
+                    errors.Add(where + ": missing or repeated ShapeId.");
+                }
+                else if (shapes != null && entry.ShapeId != RegionLibraryData.EasingBossId && !shapes.Contains(entry.ShapeId))
+                {
+                    errors.Add(where + ": not a shape in the encounter library (or '" + RegionLibraryData.EasingBossId + "' for the authored templates).");
+                }
+
+                if (!(entry.Scale > 0.0) || entry.Scale > 1.0)
+                {
+                    errors.Add(where + ": Scale " + entry.Scale.ToString(System.Globalization.CultureInfo.InvariantCulture) + " must be above 0 and at most 1.");
+                }
+            }
         }
 
         /// <summary>
@@ -408,6 +495,11 @@ namespace BeastCraft.Campaign
                 if (!string.IsNullOrEmpty(region.BossRewardSealId))
                 {
                     errors.Add(where + ": BossRewardSealId must be empty (no seal: the level cap is already at its peak).");
+                }
+
+                if (region.StageEasing != null && region.StageEasing.Length > 0)
+                {
+                    errors.Add(where + ": StageEasing must be empty (the early-region easing is for mainline regions).");
                 }
 
                 MapRulesData ownRules = region.MapRules != null && region.MapRules.Layers > 0 ? region.MapRules : data.MapRules;

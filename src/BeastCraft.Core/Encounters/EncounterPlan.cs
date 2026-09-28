@@ -51,8 +51,36 @@ namespace BeastCraft.Encounters
         /// <summary>The encounter level every enemy fights at (1-100).</summary>
         public int Level { get; }
 
-        /// <summary>The stat multiplier every enemy is fielded with (<see cref="EnemyScaling"/>).</summary>
+        /// <summary>
+        /// The stat multiplier every enemy is fielded with (<see cref="EnemyScaling"/>): the library's
+        /// (<see cref="EncounterLibrary.Multiplier"/> or <see cref="EncounterLibrary.TemplateMultiplier"/>)
+        /// times <see cref="DifficultyScale"/>.
+        /// </summary>
         public double Multiplier { get; }
+
+        /// <summary>
+        /// The scale applied on top of the library's multiplier (<see cref="Scaled"/>): the campaign's
+        /// early-region easing (<c>RegionLibrary.DifficultyScaleFor</c>); 1 for an unscaled plan.
+        /// </summary>
+        public double DifficultyScale { get; private set; } = 1.0;
+
+        /// <summary>
+        /// This plan with its enemies fielded at <see cref="Multiplier"/> x <paramref name="scale"/>
+        /// (a copy; this plan is unchanged): the campaign's early-region easing. A scale that is not
+        /// above 0, or is exactly 1, returns this plan itself.
+        /// </summary>
+        public EncounterPlan Scaled(double scale)
+        {
+            if (!(scale > 0.0) || scale == 1.0)
+            {
+                return this;
+            }
+
+            return new EncounterPlan(ShapeId, DropShapeId, EncounterId, Level, Multiplier * scale, Arena, ElementScheme, Enemies, Catalog)
+            {
+                DifficultyScale = DifficultyScale * scale
+            };
+        }
 
         public ArenaSize Arena { get; }
 

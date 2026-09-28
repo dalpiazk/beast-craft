@@ -32,7 +32,7 @@ Title ──Continue / New Game──▶ Home (Map tab) ──tap a location / N
   Trader and Camp locations say "coming soon" (Shop/Camp/Idle PR).
 - **Encounter** (`EncounterScreen`, `EncounterViewModel`): the full preview, free — every enemy
   (type, element, stance, level, count), the arena and the battlefield it will really be fought on
-  (the same seeded layout pick the session makes) — then the party (up to 4, deployment order), one
+  (the same seeded layout pick the session makes) — then the party (up to 3 beside the Beastbinder, deployment order), one
   consumable, the team-suggestion banner after 3 losses there (dismissible; the settings toggle is
   respected), and Start Battle.
 - **Battle** (`BattleScreen`): the old viewer, now one screen. A campaign battle

@@ -213,6 +213,14 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
+        public void TeamSize_DefaultsToThree_TheCampaignPartySize()
+        {
+            Assert.AreEqual(3, TeamSuggester.DefaultTeamSize, "three beasts beside the Beastbinder (producer decision)");
+            Assert.AreEqual(TeamSuggester.DefaultTeamSize, new TeamSuggestionRequest().TeamSize);
+            Assert.AreEqual(TeamSuggester.DefaultTeamSize, BeastCraft.Campaign.CampaignRules.PartySize);
+        }
+
+        [Test]
         public void Combinations_AreLexicographic()
         {
             List<int[]> all = TeamSuggester.Combinations(5, 3);
@@ -222,6 +230,7 @@ namespace BeastCraft.Tests.EditMode
             CollectionAssert.AreEqual(new[] { 0, 1, 3 }, all[1]);
             CollectionAssert.AreEqual(new[] { 2, 3, 4 }, all[9]);
             Assert.AreEqual(210, TeamSuggester.Combinations(10, 4).Count);
+            Assert.AreEqual(120, TeamSuggester.Combinations(10, TeamSuggester.DefaultTeamSize).Count);
             Assert.IsEmpty(TeamSuggester.Combinations(2, 3));
         }
 

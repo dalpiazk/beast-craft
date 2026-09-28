@@ -49,6 +49,13 @@ namespace BeastCraft.Campaign
     /// </summary>
     public static class CampaignRules
     {
+        /// <summary>
+        /// How many beasts a campaign battle fields beside the Beastbinder (producer decision: three
+        /// plus the avatar; <see cref="TeamSuggester.DefaultTeamSize"/>, the size the encounter
+        /// difficulty is calibrated with).
+        /// </summary>
+        public const int PartySize = TeamSuggester.DefaultTeamSize;
+
         /// <summary>The beast level cap for <paramref name="save"/>'s seals (<see cref="LevelCaps.BeastCap"/>).</summary>
         public static int BeastCap(PlayerSave save, RegionLibrary library)
         {
@@ -295,6 +302,33 @@ namespace BeastCraft.Campaign
         /// (so a retry fields the same lineup). Null for Rest and Shop nodes or unknown content.
         /// </summary>
         public static EncounterPlan PlanFor(MapNode node, EncounterLibrary encounters, EnemyCatalog enemies)
+        {
+            return PlanFor(null, node, encounters, enemies, null);
+        }
+
+        /// <summary>
+        /// <see cref="PlanFor(MapNode, EncounterLibrary, EnemyCatalog)"/> for a node of
+        /// <paramref name="run"/>'s map, eased for a new player: the plan's multiplier times the
+        /// run's stage's <see cref="RegionLibrary.DifficultyScaleFor"/> for the plan's shape (an
+        /// authored template, the boss, as <see cref="RegionLibraryData.EasingBossId"/>;
+        /// <see cref="EncounterPlan.Scaled"/>; the early regions' <see cref="RegionData.StageEasing"/>
+        /// of <see cref="RegionLibraryData.EasingShapeScales"/>, 1 elsewhere). What a
+        /// campaign battle fights; the easing is campaign-only (the calibration and any plan built
+        /// outside a run never see it). Null <paramref name="run"/> or <paramref name="regions"/> = no easing.
+        /// </summary>
+        public static EncounterPlan PlanFor(MapRun run, MapNode node, EncounterLibrary encounters, EnemyCatalog enemies, RegionLibrary regions)
+        {
+            EncounterPlan plan = UnscaledPlan(node, encounters, enemies);
+            if (plan == null || run == null || regions == null)
+            {
+                return plan;
+            }
+
+            string shapeKey = string.IsNullOrEmpty(plan.EncounterId) ? plan.ShapeId : RegionLibraryData.EasingBossId;
+            return plan.Scaled(regions.DifficultyScaleFor(run.RegionId, run.Stage, shapeKey));
+        }
+
+        private static EncounterPlan UnscaledPlan(MapNode node, EncounterLibrary encounters, EnemyCatalog enemies)
         {
             if (node == null || !node.IsBattle)
             {
@@ -557,7 +591,7 @@ namespace BeastCraft.Campaign
         /// not a battle, or the content cannot build its encounter. Pure; changes nothing.
         /// </summary>
         public static CampaignTeamSuggestion SuggestionFor(PlayerSave save, int nodeId, PlayerSettings settings, EncounterLibrary encounters, BattleContent content,
-                                                           int teamSize = 4)
+                                                           int teamSize = PartySize)
         {
             if (save == null || save.Campaign == null || !save.Campaign.HasActiveRun || content == null || content.Enemies == null)
             {
