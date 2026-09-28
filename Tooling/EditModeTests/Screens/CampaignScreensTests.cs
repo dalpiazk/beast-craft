@@ -9,6 +9,7 @@ using BeastCraft.Presentation.Board;
 using BeastCraft.Presentation.Content;
 using BeastCraft.Presentation.Screens;
 using BeastCraft.Save;
+using BeastCraft.Session;
 using NUnit.Framework;
 
 namespace BeastCraft.Tests.EditMode
@@ -517,6 +518,27 @@ namespace BeastCraft.Tests.EditMode
             Assert.AreEqual(1, retry.Attempt);
             Assert.AreEqual(CampaignRules.BattleSeed(node, 1), retry.Battle.Seed, "a new battle seed for the retry");
             CollectionAssert.AreEqual(new[] { "b3" }, retry.Team, "the last team is remembered");
+        }
+
+        [Test]
+        public void NodeBattle_InTheFirstRegion_FieldsTheEasedMultiplier()
+        {
+            GameSession session = NewSession();
+            MapRun run = session.Save.Campaign.ActiveRun;
+            MapNode node = CampaignRules.Choices(run)[0];
+            double scale = Content.Campaign.DifficultyScaleFor(run.RegionId, run.Stage);
+            Assert.AreEqual("r01", run.RegionId);
+            Assert.Less(scale, 1.0, "r01 is eased for a new player");
+
+            NodeBattle battle = new EncounterViewModel(session, node.NodeId).Start(out string error);
+            Assert.IsNotNull(battle, error);
+            EncounterPlan plain = CampaignRules.PlanFor(node, Content.Encounters, Content.Enemies);
+            Assert.AreEqual(scale, battle.Plan.DifficultyScale, 1e-12);
+            Assert.AreEqual(plain.Multiplier * scale, battle.Plan.Multiplier, 1e-12);
+            foreach (EnemySpec enemy in battle.Setup.Encounter.Enemies)
+            {
+                Assert.AreEqual(plain.Multiplier * scale, enemy.StatMultiplier, 1e-12, "the battle fields the eased multiplier");
+            }
         }
 
         [Test]

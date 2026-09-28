@@ -13,7 +13,8 @@ namespace BeastCraft.Presentation.Screens
 {
     /// <summary>
     /// One campaign battle at a map location, from the pick to the pay-out, through the campaign's
-    /// own rules: the node's encounter (<see cref="CampaignRules.PlanFor"/>) fought in the node's
+    /// own rules: the node's encounter (<see cref="CampaignRules.PlanFor(MapRun, MapNode, EncounterLibrary, EnemyCatalog, RegionLibrary)"/>,
+    /// with the early regions' easing) fought in the node's
     /// region (its backdrops and obstacles) with the attempt's seed
     /// (<see cref="CampaignRules.BattleSeed"/> of the losses there so far), begun through
     /// <see cref="BattleSession.Begin"/> (autosaved: the node was entered and its consumable
@@ -90,7 +91,8 @@ namespace BeastCraft.Presentation.Screens
                 return null;
             }
 
-            EncounterPlan plan = CampaignRules.PlanFor(node, session.Content.Encounters, session.Content.Enemies);
+            // Eased in the early regions for a new player (RegionData.StageDifficultyScale).
+            EncounterPlan plan = CampaignRules.PlanFor(run, node, session.Content.Encounters, session.Content.Enemies, session.Content.Campaign);
             if (plan == null)
             {
                 error = "The encounter could not be built.";

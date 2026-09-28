@@ -185,6 +185,19 @@ namespace BeastCraft.Campaign
         /// </summary>
         public RegionHardModeData HardMode = new RegionHardModeData();
 
+        /// <summary>
+        /// Early-region easing (producer decision): per stage (index = stage), a scale on the stat
+        /// multiplier of every campaign battle fought in that stage's expedition, on top of the
+        /// calibrated table (<c>encounter-difficulty.json</c>, which assumes typical gear and a
+        /// scouted pick from the full roster; a new player has neither). Empty (the default) = 1
+        /// everywhere; otherwise one entry per stage, each above 0 and at most 1, never falling
+        /// from stage to stage or from region to region, and ending at 1 before the easing stops.
+        /// Mainline regions only. Read by <see cref="RegionLibrary.DifficultyScaleFor"/> and applied
+        /// by <see cref="CampaignRules.PlanFor(MapRun, MapNode, Encounters.EncounterLibrary, Encounters.EnemyCatalog, RegionLibrary)"/>;
+        /// the balance simulator's calibration never sees it.
+        /// </summary>
+        public double[] StageDifficultyScale = new double[0];
+
         /// <summary>A copy of this region (arrays and <see cref="MapRules"/> shared, not cloned).</summary>
         public RegionData Copy()
         {

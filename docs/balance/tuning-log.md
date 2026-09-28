@@ -3938,3 +3938,61 @@ Reproduce: the commands above, as in the Tooling README; the guard `-- --mode pv
 --encounter-set fixed --encounters-file <scratch> --encounters <id> --levels <level> --calibrate-samples
 64 --scouted bonds --gear typical --target-clear <50|35|20> [--obstacles none]`, the scratch file being the
 templates written as fixed encounters (each group its enemy-library entry plus `Count` and `Elements`).
+
+## Early-region easing
+
+Producer decision: a **difficulty discount in regions 1-2 that fades out by region 3**, instead of
+calibrating per owned roster. The shipping table assumes typical gear and a scouted pick from the
+whole roster; a new player (three starters, one per stance, player-picked: a later PR) has neither.
+
+**Data and rule.** `regions.json` `StageDifficultyScale`: per region, one scale per stage, multiplied
+into the stat multiplier of every campaign battle fought in that stage's expedition (generated nodes,
+elites, passes and the boss alike) by `CampaignRules.PlanFor(run, node, ...)` (`EncounterPlan.Scaled`;
+`NodeBattle` plans with it). Campaign battles only: the calibrated table, the simulator's calibration
+and any plan built outside a run are unscaled. `RegionLibraryValidator`: empty or one entry per stage,
+each in (0, 1], never falling in campaign order, reaching 1 before it stops, none on a post-game
+region.
+
+**Measurement** (`--mode newplayer`, new; `docs/balance/new-player-report.md`). The new-player
+profile: every one-per-stance trio of the roster (30: five Vanguards x two Skirmishers x three Ranged;
+min, mean and max over them), all three fielded (the only pick three beasts allow), no scouting, the
+library avatar, team and avatar at the node's level (the campaign pacing model's fielded median sits
+at the node level at every gate and boss), no gear in r01-r02 and typical gear from r03. Per stage:
+each shape the stage draws at its middle row's level (the elite one up), 16 compositions x 2 battles
+per trio, on each region's own battlefields, at the shipping table's multiplier; and the scale the
+trio mean needs to reach the shape's tier (a bisection on the scale).
+
+Unscaled, the new player is far below the tiers everywhere (trio means, r01-r02): `squad` 27-38%,
+`horde` 16-21%, `solo` 5-8%, `elite` 4-6%, with single trios from 0% to 69%. The **scale each shape
+needs is flat across levels**: `squad` x0.81-0.85, `horde` x0.75-0.79, `solo` x0.75-0.78, `elite`
+x0.73-0.76 in every stage of r01-r02 (and x0.75-0.87 in r03 with typical gear: the band-1-20 commons
+are worth little next to the missing pick). One scale per stage has to split the shapes; **x0.77** is
+the one that puts the ordinary fights at or over their 80% and `solo` on its 50%:
+
+| r01 stage | `squad` | `horde` | `solo` | `elite` (60%) | boss (50%) |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 (x0.77) | 91.3% (78-100) | 88.4% (69-100) | 49.4% (22-69) | 50.7% (31-72) | |
+| 2 (x0.77) | 89.2% (72-100) | 79.5% (59-100) | 46.8% (31-66) | 45.4% (25-78) | |
+| 3 (x0.77) | 90.3% (69-100) | 82.3% (69-94) | 52.1% (34-72) | 57.2% (31-88) | |
+| 4 (x0.77) | 88.8% (75-100) | 79.3% (50-97) | 50.4% (25-72) | 52.5% (25-72) | Hollow Warden 74.1% (9-100), unscaled 2.3% |
+
+(trio mean, lowest-highest trio). The dens (`elite`) sit 3-15 points under their 60% and the r01 boss
+well over its 50% (it needs x0.85 alone); both are the price of one scale per stage.
+
+**The curve:** r01 `[0.77, 0.77, 0.77, 0.77]` (the measured need, held flat because it is flat), r02
+`[0.80, 0.86, 0.93, 1.00]` (the fade the producer asked for, reaching 1 at r02's last stage), nothing
+from r03. What the fade does to the same profile in r02 (trio means `squad` / `horde` / `solo` /
+`elite`): stage 1 87 / 74 / 40 / 34%, stage 2 70 / 50 / 25 / 20%, stage 3 56 / 35 / 20 / 9%, stage 4 (x1.00)
+37 / 18 / 7 / 5%, the r02 boss 25% (unscaled; it needs x0.92).
+
+**Flag: the fade is not earned by gear.** The measured need does not fall with level, and typical
+gear barely moves it (r03, typical gear, x1.00: `squad` 43-48%, `horde` 18-25%, `solo` 7-9%, `elite`
+6%). What closes the gap is the pick: the calibration's player scouts and picks three from ten, and a
+three-beast owner cannot. A player who still owns only the three starters meets the tiers in r01 but
+falls off through r02 and hits the unscaled table in r03. The fade is right only if the player owns
+more beasts to pick from by r02-r03 (the campaign model's recruit arrives at region 5); the starter /
+recruit PR should decide either that or a longer easing. Not tuned here.
+
+Reproduce: `dotnet run --project Tooling/BalanceSim -c Release -- --mode newplayer --compositions 16
+--samples 2 --map-seeds 60 --out docs/balance/new-player-report.md` (about 5 minutes; the "Required"
+column is the bisection; `--difficulty <path>` fights another table).

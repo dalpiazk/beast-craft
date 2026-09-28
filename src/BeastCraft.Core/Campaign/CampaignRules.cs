@@ -303,6 +303,30 @@ namespace BeastCraft.Campaign
         /// </summary>
         public static EncounterPlan PlanFor(MapNode node, EncounterLibrary encounters, EnemyCatalog enemies)
         {
+            return PlanFor(null, node, encounters, enemies, null);
+        }
+
+        /// <summary>
+        /// <see cref="PlanFor(MapNode, EncounterLibrary, EnemyCatalog)"/> for a node of
+        /// <paramref name="run"/>'s map, eased for a new player: the plan's multiplier times the
+        /// run's stage's <see cref="RegionLibrary.DifficultyScaleFor"/> (<see cref="EncounterPlan.Scaled"/>;
+        /// the early regions' <see cref="RegionData.StageDifficultyScale"/>, 1 elsewhere). What a
+        /// campaign battle fights; the easing is campaign-only (the calibration and any plan built
+        /// outside a run never see it). Null <paramref name="run"/> or <paramref name="regions"/> = no easing.
+        /// </summary>
+        public static EncounterPlan PlanFor(MapRun run, MapNode node, EncounterLibrary encounters, EnemyCatalog enemies, RegionLibrary regions)
+        {
+            EncounterPlan plan = UnscaledPlan(node, encounters, enemies);
+            if (plan == null || run == null || regions == null)
+            {
+                return plan;
+            }
+
+            return plan.Scaled(regions.DifficultyScaleFor(run.RegionId, run.Stage));
+        }
+
+        private static EncounterPlan UnscaledPlan(MapNode node, EncounterLibrary encounters, EnemyCatalog enemies)
+        {
             if (node == null || !node.IsBattle)
             {
                 return null;

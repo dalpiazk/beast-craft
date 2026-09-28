@@ -73,6 +73,24 @@ namespace BeastCraft.Campaign
             return !string.IsNullOrEmpty(sealId) && _seals.TryGetValue(sealId, out SealData seal) ? seal : null;
         }
 
+        /// <summary>
+        /// The early-region easing of stage <paramref name="stage"/> of <paramref name="regionId"/>
+        /// (<see cref="RegionData.StageDifficultyScale"/>): the scale a campaign battle there fields its
+        /// enemies' calibrated multiplier at. 1 for an unknown region, a region without easing, or a
+        /// stage past its entries (and for a non-positive entry, which the validator refuses).
+        /// </summary>
+        public double DifficultyScaleFor(string regionId, int stage)
+        {
+            RegionData region = GetRegion(regionId);
+            double[] scales = region == null ? null : region.StageDifficultyScale;
+            if (scales == null || stage < 0 || stage >= scales.Length || !(scales[stage] > 0.0))
+            {
+                return 1.0;
+            }
+
+            return scales[stage];
+        }
+
         /// <summary>The region's own map rules when it overrides them (<see cref="MapRulesData.Layers"/> above 0), otherwise the library's.</summary>
         public MapRulesData RulesFor(RegionData region)
         {

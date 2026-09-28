@@ -20,6 +20,9 @@ namespace BeastCraft.Campaign
     /// <item>Seals: a DisplayName and Description (player-facing), caps 1-100, each granted by at most one boss; the starting cap covers the first
     /// region; following the regions in order, the caps never fall and each covers the next
     /// region's max level.</item>
+    /// <item>Early-region easing (<see cref="RegionData.StageDifficultyScale"/>): none, or one scale per
+    /// stage in (0, 1], never falling in campaign order, reaching 1 before it stops; none on a
+    /// post-game region.</item>
     /// <item>With the encounter library: every Battle shape, the elite shape, and every gate and boss
     /// template exists.</item>
     /// </list>
@@ -175,6 +178,7 @@ namespace BeastCraft.Campaign
             int expectedMin = 1;
             int previousCap = data.StartingLevelCap;
             string previousCapSource = "StartingLevelCap";
+            double previousScale = 0.0;
 
             for (int i = 0; i < regions.Length; i++)
             {
@@ -247,6 +251,7 @@ namespace BeastCraft.Campaign
                 }
 
                 ValidateShapeWeights(region, where, shapes, errors);
+                ValidateEasing(region, where, ref previousScale, errors);
 
                 string[] gates = region.GateTemplateIds ?? new string[0];
                 if (gates.Length > Math.Max(0, region.Stages - 1))
@@ -308,6 +313,52 @@ namespace BeastCraft.Campaign
             }
 
             return seen;
+        }
+
+        /// <summary>
+        /// A mainline region's <see cref="RegionData.StageDifficultyScale"/>: empty (1 everywhere), or
+        /// one entry per stage, each above 0 and at most 1, never below the one before it in campaign
+        /// order (<paramref name="previousScale"/>: the last entry so far, 0 before any; a region
+        /// without easing after one with it must follow an easing that ended at 1, since it plays at 1).
+        /// </summary>
+        private static void ValidateEasing(RegionData region, string where, ref double previousScale, List<string> errors)
+        {
+            double[] scales = region.StageDifficultyScale ?? new double[0];
+            if (scales.Length == 0)
+            {
+                if (previousScale > 0.0 && previousScale < 1.0)
+                {
+                    errors.Add(where + ": no StageDifficultyScale after an easing that ended at " + previousScale.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture) +
+                               "; the easing must reach 1 before it stops.");
+                }
+
+                previousScale = previousScale > 0.0 ? 1.0 : 0.0;
+                return;
+            }
+
+            // A region with no stages is already refused (Stages must be at least 1).
+            if (scales.Length != region.Stages && region.Stages >= 1)
+            {
+                errors.Add(where + ": StageDifficultyScale has " + scales.Length + " entries; it needs one per stage (" + region.Stages + ") or none.");
+            }
+
+            for (int s = 0; s < scales.Length; s++)
+            {
+                double scale = scales[s];
+                if (!(scale > 0.0) || scale > 1.0 || double.IsNaN(scale))
+                {
+                    errors.Add(where + ": StageDifficultyScale[" + s + "] " + scale.ToString(System.Globalization.CultureInfo.InvariantCulture) + " must be above 0 and at most 1.");
+                    continue;
+                }
+
+                if (scale < previousScale)
+                {
+                    errors.Add(where + ": StageDifficultyScale[" + s + "] " + scale.ToString(System.Globalization.CultureInfo.InvariantCulture) +
+                               " is below the stage before it (" + previousScale.ToString(System.Globalization.CultureInfo.InvariantCulture) + "); the easing only fades out.");
+                }
+
+                previousScale = scale;
+            }
         }
 
         /// <summary>
@@ -408,6 +459,11 @@ namespace BeastCraft.Campaign
                 if (!string.IsNullOrEmpty(region.BossRewardSealId))
                 {
                     errors.Add(where + ": BossRewardSealId must be empty (no seal: the level cap is already at its peak).");
+                }
+
+                if (region.StageDifficultyScale != null && region.StageDifficultyScale.Length > 0)
+                {
+                    errors.Add(where + ": StageDifficultyScale must be empty (the early-region easing is for mainline regions).");
                 }
 
                 MapRulesData ownRules = region.MapRules != null && region.MapRules.Layers > 0 ? region.MapRules : data.MapRules;

@@ -104,6 +104,11 @@ namespace BeastCraft.Tooling.BalanceSim
                 return 1;
             }
 
+            if (options.RunNewPlayer)
+            {
+                return NewPlayerReport.Run(options, species, curves);
+            }
+
             if (options.Seeds != null)
             {
                 return RunSeeds(options, species, curves);
