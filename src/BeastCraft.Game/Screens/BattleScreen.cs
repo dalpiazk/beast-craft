@@ -77,6 +77,9 @@ namespace BeastCraft.Game.Screens
         /// </summary>
         private readonly string _regionId;
 
+        /// <summary>Whether the battle-start hints were offered.</summary>
+        private bool _hintedStart;
+
         /// <summary>The region the units are drawn in (its enemy art): the battlefield, or on an open board the region it stands in for.</summary>
         private readonly string _artRegionId;
 
@@ -233,6 +236,22 @@ namespace BeastCraft.Game.Screens
 
         public override void Update(float elapsedMs, FrameInput input)
         {
+            if (Ctx.Stack.TopModal is HintModal)
+            {
+                // A tutorial hint pauses the battle until it is dismissed.
+                return;
+            }
+
+            if (_campaign != null && !_hintedStart)
+            {
+                _hintedStart = true;
+                ShowHints(BeastCraft.Tutorial.HintTriggers.BattleStart, _campaign.Node.NodeId);
+                if (Ctx.Stack.TopModal is HintModal)
+                {
+                    return;
+                }
+            }
+
             if (input != null)
             {
                 KeyboardState keys = input.Keys;
@@ -337,6 +356,10 @@ namespace BeastCraft.Game.Screens
             _turnCamera = new TurnCamera(_animation, _layout, _camera, from);
             _clockMs = 0;
             Log(turn);
+            if (_campaign != null)
+            {
+                HintTurn(turn);
+            }
         }
 
         /// <summary>
@@ -358,6 +381,32 @@ namespace BeastCraft.Game.Screens
             }
 
             return _camera.Ease(_cameraRest, _camera.FitAll, _cameraIdleMs, _camera.Settings.ReturnMs);
+        }
+
+        /// <summary>A played turn's tutorial moments: the first critical hit, the first status landing.</summary>
+        private void HintTurn(PlayedTurn turn)
+        {
+            bool crit = false;
+            bool status = false;
+            foreach (SkillBeat beat in turn.Beats)
+            {
+                foreach (BeatTarget target in beat.Targets ?? new BeatTarget[0])
+                {
+                    crit |= target.Crit;
+                }
+
+                status |= beat.Applied != null && beat.Applied.Count > 0;
+            }
+
+            if (crit)
+            {
+                ShowHints(BeastCraft.Tutorial.HintTriggers.BattleCrit, _campaign.Node.NodeId);
+            }
+
+            if (status)
+            {
+                ShowHints(BeastCraft.Tutorial.HintTriggers.BattleStatus, _campaign.Node.NodeId);
+            }
         }
 
         /// <summary>The skip button: plays every remaining turn at once and shows the result.</summary>

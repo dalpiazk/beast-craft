@@ -83,11 +83,10 @@ namespace BeastCraft.Game.Screens
             StartNewGame();
         }
 
-        /// <summary>A new game straight away (no question), then the map.</summary>
+        /// <summary>A new game straight away (no question): the first beast's pick, then Hearthglen's map (or the skip's three picks).</summary>
         public void StartNewGame()
         {
-            _model.NewGame("golem");
-            Ctx.Stack.Push(new HomeScreen(Ctx));
+            Ctx.Stack.Push(new StarterPickScreen(Ctx));
         }
 
         public void OpenSettings()

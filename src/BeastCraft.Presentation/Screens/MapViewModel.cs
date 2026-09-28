@@ -5,6 +5,7 @@ using BeastCraft.Presentation.Board;
 using BeastCraft.Presentation.Layout;
 using BeastCraft.Presentation.Vfx;
 using BeastCraft.Save;
+using BeastCraft.Tutorial;
 
 namespace BeastCraft.Presentation.Screens
 {
@@ -295,6 +296,9 @@ namespace BeastCraft.Presentation.Screens
 
         /// <summary>The beast level cap ("binding limit") the owned seals give.</summary>
         public int BindingLimit;
+
+        /// <summary>Hearthglen: the header counts the beasts bonded (of three) instead of a seal's stages.</summary>
+        public bool IsTutorial;
     }
 
     /// <summary>What a tap on a location does.</summary>
@@ -309,7 +313,16 @@ namespace BeastCraft.Presentation.Screens
         ComingSoon,
 
         /// <summary>Not reachable (or already cleared): show the message as a toast.</summary>
-        Refused
+        Refused,
+
+        /// <summary>A story location: play its mentor scene (<see cref="StoryViewModel"/>).</summary>
+        Story,
+
+        /// <summary>A Camp: open the camp (<see cref="CampViewModel"/>).</summary>
+        Camp,
+
+        /// <summary>A beast is waiting to join: make the pick first (<see cref="StarterPickViewModel"/>).</summary>
+        Pick
     }
 
     public sealed class MapTapResult
@@ -424,7 +437,7 @@ namespace BeastCraft.Presentation.Screens
             MapNodeView best = null;
             foreach (MapNodeView node in Nodes)
             {
-                if (node.State != MapNodeState.Reachable || node.Type == MapNodeType.Rest || node.Type == MapNodeType.Shop)
+                if (node.State != MapNodeState.Reachable || node.Type == MapNodeType.Rest || node.Type == MapNodeType.Shop || node.Type == MapNodeType.Story)
                 {
                     continue;
                 }
@@ -482,9 +495,19 @@ namespace BeastCraft.Presentation.Screens
                 return new MapTapResult { Kind = MapTapKind.ComingSoon, NodeId = nodeId, Message = "The trader's stall opens soon." };
             }
 
+            if (_session.PendingPick > 0)
+            {
+                return new MapTapResult { Kind = MapTapKind.Pick, NodeId = nodeId, Message = "A beast is waiting to join you: choose it first." };
+            }
+
             if (node.Type == MapNodeType.Rest)
             {
-                return new MapTapResult { Kind = MapTapKind.ComingSoon, NodeId = nodeId, Message = "Camp opens soon." };
+                return new MapTapResult { Kind = MapTapKind.Camp, NodeId = nodeId };
+            }
+
+            if (node.Type == MapNodeType.Story)
+            {
+                return new MapTapResult { Kind = MapTapKind.Story, NodeId = nodeId };
             }
 
             return new MapTapResult { Kind = MapTapKind.Preview, NodeId = nodeId };
@@ -505,6 +528,10 @@ namespace BeastCraft.Presentation.Screens
                     return "Pass";
                 case MapNodeType.Boss:
                     return "Lair";
+                case MapNodeType.Story:
+                    return "Shrine";
+                case MapNodeType.Trial:
+                    return "Trial";
                 default:
                     return "Wilds";
             }
@@ -553,6 +580,25 @@ namespace BeastCraft.Presentation.Screens
             SealData seal = region == null || string.IsNullOrEmpty(region.BossRewardSealId) ? null : _session.Content.Campaign.GetSeal(region.BossRewardSealId);
             int stages = Math.Max(1, region?.Stages ?? 1);
             int cleared = progress == null ? 0 : progress.BossCleared ? stages : Math.Min(stages, progress.StagesCleared);
+            if (region != null && region.IsTutorial)
+            {
+                int owned = _session.Save.Beasts.Count;
+                return new RegionHeaderView
+                {
+                    RegionId = run.RegionId,
+                    Name = region.DisplayName,
+                    LevelBand = "Lv " + region.MinLevel + "-" + region.MaxLevel,
+                    Stage = 0,
+                    Stages = StarterPicks.PickCount,
+                    StageText = "Your first steps",
+                    StagesCleared = Math.Min(owned, StarterPicks.PickCount),
+                    IsTutorial = true,
+                    SealName = "Beasts bonded",
+                    SealProgress = Math.Min(owned, StarterPicks.PickCount) / (float)StarterPicks.PickCount,
+                    BindingLimit = CampaignRules.BeastCap(_session.Save, _session.Content.Campaign)
+                };
+            }
+
             return new RegionHeaderView
             {
                 RegionId = run.RegionId,

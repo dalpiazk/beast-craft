@@ -58,5 +58,11 @@ namespace BeastCraft.Save
         /// hosts ignore it). Off by default.
         /// </summary>
         public bool IdleNotifications;
+
+        /// <summary>
+        /// Whether the tutorial hints show (each at most once; <c>PlayerSave.Tutorial.SeenHintIds</c>).
+        /// On by default; a hint's own "Turn hints off" and the settings row switch it.
+        /// </summary>
+        public bool TutorialHints = true;
     }
 }

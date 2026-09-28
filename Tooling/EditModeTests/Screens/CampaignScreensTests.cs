@@ -273,7 +273,7 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
-        public void Map_Taps_PreviewABattle_RefuseALockedOne_AndSayCampAndTraderAreComingSoon()
+        public void Map_Taps_PreviewABattle_RefuseALockedOne_OpenTheCamp_AndSayTheTraderIsComingSoon()
         {
             GameSession session = NewSession();
             MapViewModel map = new MapViewModel(session);
@@ -298,9 +298,15 @@ namespace BeastCraft.Tests.EditMode
                 MapNode parent = run.Nodes.Find(n => Array.IndexOf(n.Next, target.NodeId) >= 0);
                 run.CurrentNodeId = parent.NodeId;
                 map.Refresh();
-                MapTapResult soon = map.Tap(target.NodeId);
-                Assert.AreEqual(MapTapKind.ComingSoon, soon.Kind, type.ToString());
-                StringAssert.Contains("soon", soon.Message);
+                MapTapResult tap = map.Tap(target.NodeId);
+                if (type == MapNodeType.Rest)
+                {
+                    Assert.AreEqual(MapTapKind.Camp, tap.Kind, "camps open the camp (training) everywhere");
+                    continue;
+                }
+
+                Assert.AreEqual(MapTapKind.ComingSoon, tap.Kind, type.ToString());
+                StringAssert.Contains("soon", tap.Message);
             }
         }
 

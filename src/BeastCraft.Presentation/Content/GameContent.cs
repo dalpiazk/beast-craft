@@ -16,6 +16,7 @@ using BeastCraft.Presentation.Ui;
 using BeastCraft.Progression;
 using BeastCraft.Session;
 using BeastCraft.Skills;
+using BeastCraft.Tutorial;
 using BeastCraft.Vfx;
 
 namespace BeastCraft.Presentation.Content
@@ -115,6 +116,12 @@ namespace BeastCraft.Presentation.Content
         /// <summary>The UI toolkit's house style (<see cref="UiStyleData.ProjectRelativePath"/>): colours, panels, buttons and text sizes.</summary>
         public UiStyle Style { get; private set; }
 
+        /// <summary>The tutorial hints (<c>content/data/Tutorial/hints.json</c>).</summary>
+        public HintBook Hints { get; private set; }
+
+        /// <summary>The NPC dialogue: the mentor's scenes (<c>content/data/Npc/dialogue.json</c>).</summary>
+        public DialogueBook Dialogue { get; private set; }
+
         /// <summary>A file of the content root by its ProjectRelativePath (<c>content/...</c>).</summary>
         public static string PathOf(string root, string projectRelativePath)
         {
@@ -201,6 +208,8 @@ namespace BeastCraft.Presentation.Content
             CosmeticLibraryData cosmeticData = Read<CosmeticLibraryData>(root, CosmeticLibraryData.ProjectRelativePath, errors);
             UiStyleData style = Read<UiStyleData>(root, UiStyleData.ProjectRelativePath, errors);
             IdleRewardsData idleData = Read<IdleRewardsData>(root, IdleRewardsData.ProjectRelativePath, errors);
+            HintLibraryData hints = Read<HintLibraryData>(root, HintLibraryData.ProjectRelativePath, errors);
+            DialogueLibraryData dialogue = Read<DialogueLibraryData>(root, DialogueLibraryData.ProjectRelativePath, errors);
             if (errors.Count > 0)
             {
                 return null;
@@ -222,6 +231,9 @@ namespace BeastCraft.Presentation.Content
             Prefix(errors, "cosmetic-library.json", CosmeticLibraryValidator.Validate(cosmeticData));
             Prefix(errors, "ui-style.json", UiStyleValidator.Validate(style));
             Prefix(errors, "idle-rewards.json", IdleRewardsValidator.Validate(idleData, dropTables));
+            Prefix(errors, "hints.json", HintValidator.Validate(hints));
+            Prefix(errors, "dialogue.json", DialogueValidator.Validate(dialogue));
+            Prefix(errors, "dialogue.json", DialogueValidator.ValidateScenes(dialogue, regions));
 
             HashSet<string> known = KnownSkills(skills, enemyLibrary);
             Prefix(errors, "vfx-library.json", VfxLibraryValidator.Validate(vfx, known, art));
@@ -308,7 +320,9 @@ namespace BeastCraft.Presentation.Content
                 Drops = drops,
                 Idle = new IdleContent { Rewards = IdleRewardsBuilder.Build(idleData), DropTable = drops, Cosmetics = economy.Cosmetics, Regions = campaign },
                 Economy = economy,
-                Style = UiStyle.Build(style)
+                Style = UiStyle.Build(style),
+                Hints = HintBook.Build(hints),
+                Dialogue = DialogueBook.Build(dialogue)
             };
         }
 
