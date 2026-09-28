@@ -601,6 +601,20 @@ namespace BeastCraft.Game.Ui
                     Line(P(0.12f, 0.82f), P(0.88f, 0.82f), t, ink);
                     Line(P(0.5f, 0.82f), P(0.5f, 0.52f), t * 0.8f, ink);
                     break;
+                case "grove":
+                    Line(P(0.5f, 0.86f), P(0.5f, 0.5f), t * 1.3f, ink);
+                    Disc(P(0.5f, 0.36f), s * 0.2f, ink);
+                    Disc(P(0.32f, 0.48f), s * 0.15f, ink);
+                    Disc(P(0.68f, 0.48f), s * 0.15f, ink);
+                    Line(P(0.24f, 0.88f), P(0.76f, 0.88f), t, ink);
+                    break;
+                case "hourglass":
+                    Line(P(0.26f, 0.16f), P(0.74f, 0.16f), t, ink);
+                    Line(P(0.26f, 0.84f), P(0.74f, 0.84f), t, ink);
+                    Polyline(new[] { P(0.32f, 0.18f), P(0.5f, 0.5f), P(0.32f, 0.82f) }, t * 0.8f, ink);
+                    Polyline(new[] { P(0.68f, 0.18f), P(0.5f, 0.5f), P(0.68f, 0.82f) }, t * 0.8f, ink);
+                    Disc(P(0.5f, 0.72f), s * 0.1f, ink);
+                    break;
                 case "map":
                     Polyline(new[] { P(0.16f, 0.26f), P(0.39f, 0.18f), P(0.61f, 0.26f), P(0.84f, 0.18f), P(0.84f, 0.74f), P(0.61f, 0.82f), P(0.39f, 0.74f), P(0.16f, 0.82f) },
                              t * 0.8f, ink, true);

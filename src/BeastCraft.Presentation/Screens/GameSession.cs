@@ -1,8 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Globalization;
 using BeastCraft.Campaign;
 using BeastCraft.Creatures;
+using BeastCraft.Idle;
 using BeastCraft.Presentation.Content;
+using BeastCraft.Progression;
 using BeastCraft.Save;
 using BeastCraft.Skills;
 
@@ -20,7 +24,95 @@ namespace BeastCraft.Presentation.Screens
         Results,
 
         /// <summary>The app went to the background or is closing (Android pause, desktop close).</summary>
-        Background
+        Background,
+
+        /// <summary>Idle rewards were claimed (on Continue, on resume, or from the map's idle chip).</summary>
+        IdleClaim
+    }
+
+    /// <summary>
+    /// The clocks the idle rewards are measured with: the wall clock (UTC) and a monotonic clock
+    /// (time since the device booted, which the player cannot set; <see cref="IdleRewardCalculator"/>).
+    /// </summary>
+    public interface IGameClock
+    {
+        DateTime UtcNow { get; }
+
+        /// <summary>Time since boot (negative: not available).</summary>
+        TimeSpan Monotonic { get; }
+    }
+
+    /// <summary>
+    /// The device's clocks: <see cref="DateTime.UtcNow"/> and, for the monotonic one, the host's
+    /// (Android's <c>elapsedRealtime</c>, which counts deep sleep) or else <see cref="Stopwatch"/>'s
+    /// timestamp (time since boot on desktop).
+    /// </summary>
+    public sealed class SystemGameClock : IGameClock
+    {
+        private readonly Func<TimeSpan> _monotonic;
+
+        public SystemGameClock(Func<TimeSpan> monotonic = null)
+        {
+            _monotonic = monotonic;
+        }
+
+        public DateTime UtcNow
+        {
+            get { return DateTime.UtcNow; }
+        }
+
+        public TimeSpan Monotonic
+        {
+            get { return _monotonic != null ? _monotonic() : TimeSpan.FromSeconds(Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency); }
+        }
+    }
+
+    /// <summary>A clock that moves only when told (tests, scripted runs).</summary>
+    public sealed class ManualGameClock : IGameClock
+    {
+        public ManualGameClock(DateTime utcNow, TimeSpan monotonic)
+        {
+            UtcNow = utcNow;
+            Monotonic = monotonic;
+        }
+
+        public DateTime UtcNow { get; private set; }
+
+        public TimeSpan Monotonic { get; private set; }
+
+        public void Advance(TimeSpan by)
+        {
+            UtcNow += by;
+            Monotonic += by;
+        }
+    }
+
+    /// <summary>What an idle claim paid, for the toast.</summary>
+    public sealed class IdleClaimView
+    {
+        public IdleClaimResult Result;
+        public int Gold;
+        public int Xp;
+        public int Levels;
+        public int Materials;
+        public string Look;
+
+        /// <summary>The toast text; null when nothing was paid (a claim of nothing is silent).</summary>
+        public string Message;
+    }
+
+    /// <summary>The map's idle chip: how long the rewards have been piling up, or that they are full.</summary>
+    public sealed class IdleStatusView
+    {
+        public bool Started;
+        public double Hours;
+        public int CapHours;
+        public bool Capped;
+
+        /// <summary>Whether a claim now would pay anything (time has passed and there is a progress level).</summary>
+        public bool Claimable;
+
+        public string Text;
     }
 
     /// <summary>What <see cref="GameSession.Continue"/> found.</summary>
@@ -64,8 +156,10 @@ namespace BeastCraft.Presentation.Screens
         /// <param name="content">The loaded content (regions, drops, economy included).</param>
         /// <param name="storage">Where the save and the settings live.</param>
         /// <param name="seeds">Where new expedition map seeds come from (the clock in the game; fixed in tests).</param>
-        public GameSession(GameContent content, ISaveStorage storage, Func<int> seeds = null)
+        /// <param name="clock">The clocks idle rewards are measured with (the device's by default).</param>
+        public GameSession(GameContent content, ISaveStorage storage, Func<int> seeds = null, IGameClock clock = null)
         {
+            Clock = clock ?? new SystemGameClock();
             Content = content ?? throw new ArgumentNullException(nameof(content));
             _storage = storage ?? throw new ArgumentNullException(nameof(storage));
             JsonSaveSerializer json = new JsonSaveSerializer(true);
@@ -76,6 +170,15 @@ namespace BeastCraft.Presentation.Screens
         }
 
         public GameContent Content { get; }
+
+        /// <summary>The clocks idle rewards are measured with.</summary>
+        public IGameClock Clock { get; set; }
+
+        /// <summary>What the claim on the last Continue paid (its toast), or null.</summary>
+        public IdleClaimView LastContinueClaim { get; private set; }
+
+        /// <summary>The app came back from the background: the map claims the idle rewards when it next shows (cleared by every claim).</summary>
+        public bool ResumeClaimPending { get; set; }
 
         /// <summary>The save being played, or null before New Game or Continue.</summary>
         public PlayerSave Save { get; private set; }
@@ -111,6 +214,9 @@ namespace BeastCraft.Presentation.Screens
             LastTeam.Clear();
             DismissedSuggestions.Clear();
             EnsureExpedition();
+
+            // The first claim only starts the idle clock.
+            IdleRewardCalculator.Claim(Save, Content.Idle, Clock.UtcNow, Clock.Monotonic, Party());
             Autosave(AutosaveReason.NewGame);
         }
 
@@ -139,6 +245,9 @@ namespace BeastCraft.Presentation.Screens
                 Autosave(AutosaveReason.Results);
             }
 
+            // Welcome back: the idle rewards are claimed straight away.
+            LastContinueClaim = ClaimIdle();
+
             return new LoadOutcome
             {
                 Success = true,
@@ -165,6 +274,129 @@ namespace BeastCraft.Presentation.Screens
             }
 
             return LastAutosaveOk;
+        }
+
+        /// <summary>
+        /// The party idle XP goes to: the team last taken into battle, else the first
+        /// <see cref="PartySize"/> beasts.
+        /// </summary>
+        public List<string> Party()
+        {
+            List<string> party = LastTeam.FindAll(id => Save?.FindBeast(id) != null);
+            if (party.Count == 0 && Save != null)
+            {
+                for (int i = 0; i < Save.Beasts.Count && party.Count < PartySize; i++)
+                {
+                    party.Add(Save.Beasts[i].BeastId);
+                }
+            }
+
+            return party;
+        }
+
+        /// <summary>
+        /// Claims the idle rewards now (<see cref="IdleRewardCalculator.Claim"/> with <see cref="Clock"/>
+        /// and <see cref="Party"/>) and autosaves when it paid anything. The view's message is null
+        /// when nothing was paid (the first claim only starts the clock; before the first clear there
+        /// is no rate). Null before a game is loaded.
+        /// </summary>
+        public IdleClaimView ClaimIdle()
+        {
+            if (Save == null)
+            {
+                return null;
+            }
+
+            ResumeClaimPending = false;
+            IdleClaimResult result = IdleRewardCalculator.Claim(Save, Content.Idle, Clock.UtcNow, Clock.Monotonic, Party());
+            IdleClaimView view = new IdleClaimView { Result = result, Gold = result.GoldGained, Look = result.CosmeticDropped };
+            foreach (KeyValuePair<string, int> offered in result.XpOffered)
+            {
+                int percent = result.FalloffPercent.TryGetValue(offered.Key, out int p) ? p : 100;
+                view.Xp += offered.Value * percent / 100;
+            }
+
+            foreach (int levels in result.LevelsGained.Values)
+            {
+                view.Levels += levels;
+            }
+
+            foreach (MaterialStack stack in result.Loot.Drops)
+            {
+                view.Materials += stack.Quantity;
+            }
+
+            List<string> parts = new List<string>();
+            if (view.Gold > 0)
+            {
+                parts.Add("+" + view.Gold + " gold");
+            }
+
+            if (view.Xp > 0)
+            {
+                parts.Add("+" + view.Xp + " XP" + (view.Levels > 0 ? " (" + view.Levels + (view.Levels == 1 ? " level up)" : " level ups)") : string.Empty));
+            }
+
+            if (view.Materials > 0)
+            {
+                parts.Add(view.Materials + (view.Materials == 1 ? " material" : " materials"));
+            }
+
+            if (view.Look != null)
+            {
+                parts.Add("a new look");
+            }
+
+            if (parts.Count > 0)
+            {
+                view.Message = "While you were away: " + string.Join(", ", parts) + (result.Capped ? " (idle was full)" : string.Empty) + ".";
+                Autosave(AutosaveReason.IdleClaim);
+            }
+
+            return view;
+        }
+
+        /// <summary>The map's idle chip: see <see cref="IdleStatusView"/>. Changes nothing.</summary>
+        public IdleStatusView IdleStatus()
+        {
+            IdleStatusView status = new IdleStatusView { Text = "Idle" };
+            if (Save == null || Content.Idle?.Rewards == null)
+            {
+                return status;
+            }
+
+            IdleClaimPreview preview = IdleRewardCalculator.Preview(Save, Content.Idle, Clock.UtcNow, Clock.Monotonic);
+            status.Started = Save.Idle.HasStarted;
+            status.Hours = preview.Hours;
+            status.CapHours = preview.CapHours;
+            status.Capped = preview.Capped;
+            status.Claimable = status.Started && preview.ProgressLevel > 0 && (preview.Gold > 0 || preview.XpPerPartyBeast > 0);
+            int minutes = (int)Math.Floor(preview.Hours * 60.0);
+            if (preview.ProgressLevel <= 0)
+            {
+                status.Text = "Idle: win a battle to start";
+            }
+            else if (status.Capped)
+            {
+                status.Text = "Idle full (" + preview.CapHours + "h)";
+            }
+            else
+            {
+                status.Text = "Idle " + (minutes >= 60 ? minutes / 60 + "h " + (minutes % 60).ToString("00", CultureInfo.InvariantCulture) + "m" : minutes + "m");
+            }
+
+            return status;
+        }
+
+        /// <summary>When the idle rewards will reach their cap (UTC), for a notification; null before the clock starts.</summary>
+        public DateTime? IdleCapUtc()
+        {
+            if (Save == null || Save.Idle == null || !Save.Idle.HasStarted || Content.Idle?.Rewards == null)
+            {
+                return null;
+            }
+
+            return new DateTime(Save.Idle.LastClaimUtcTicks, DateTimeKind.Utc).AddHours(Content.Idle.Rewards.CapHours);
         }
 
         public bool SaveSettings()

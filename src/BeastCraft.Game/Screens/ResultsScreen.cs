@@ -48,10 +48,11 @@ namespace BeastCraft.Game.Screens
             get { return _model; }
         }
 
-        /// <summary>Back to the map (it refreshes as it shows).</summary>
+        /// <summary>Back to the map (it refreshes as it shows) — or, with auto-advance on after a win, on to the next encounter.</summary>
         public void Continue()
         {
             Ctx.Stack.Pop();
+            (Ctx.Stack.Top as HomeScreen)?.AutoAdvance(_model.Victory);
         }
 
         public override bool HandleBack()

@@ -275,13 +275,15 @@ namespace BeastCraft.Game.Screens
         {
             _model = model;
             UiStyle style = ctx.Style;
-            Rect card = new Rect(90f, 470f, 900f, 900f);
+            int count = model.Rows().Count;
+            float height = 160f + count * 128f + 170f;
+            Rect card = new Rect(90f, (PortraitLayout.CanvasHeight - height) / 2f, 900f, height);
             Panel panel = Ui.Add(new Panel { Bounds = card, StyleKey = "modal" });
             panel.Add(new Label { Bounds = new Rect(card.X, card.Y + 50f, card.Width, 60f), Text = "Settings", Size = style.TextSizes.Heading, ColorKey = "plum", Align = TextAlign.Center });
-            for (int i = 0; i < SettingsViewModel.RowCount; i++)
+            for (int i = 0; i < count; i++)
             {
                 int row = i;
-                Button button = panel.Add(new Button { Id = "row" + i, Bounds = new Rect(card.X + 60f, card.Y + 160f + i * 150f, card.Width - 120f, 120f), StyleKey = "secondary" });
+                Button button = panel.Add(new Button { Id = "row" + i, Bounds = new Rect(card.X + 60f, card.Y + 150f + i * 128f, card.Width - 120f, 106f), StyleKey = "secondary" });
                 button.Clicked += () => _model.Change(row);
                 _rows.Add(button);
             }

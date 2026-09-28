@@ -9,6 +9,7 @@ using BeastCraft.Creatures;
 using BeastCraft.Creatures.Roster;
 using BeastCraft.Economy;
 using BeastCraft.Encounters;
+using BeastCraft.Idle;
 using BeastCraft.Presentation.Art;
 using BeastCraft.Presentation.Text;
 using BeastCraft.Presentation.Ui;
@@ -105,6 +106,9 @@ namespace BeastCraft.Presentation.Content
         /// <summary>The economy: gear, consumables and cosmetics (the reward modifiers' gear and looks, and the consumables a battle may use).</summary>
         public EconomyContent Economy { get; private set; }
 
+        /// <summary>The idle (AFK) rewards (idle-rewards.json and what a claim pays out of), for <see cref="IdleRewardCalculator"/>.</summary>
+        public IdleContent Idle { get; private set; }
+
         /// <summary>The UI toolkit's house style (<see cref="UiStyleData.ProjectRelativePath"/>): colours, panels, buttons and text sizes.</summary>
         public UiStyle Style { get; private set; }
 
@@ -193,6 +197,7 @@ namespace BeastCraft.Presentation.Content
             ConsumableLibraryData consumableData = Read<ConsumableLibraryData>(root, ConsumableLibraryData.ProjectRelativePath, errors);
             CosmeticLibraryData cosmeticData = Read<CosmeticLibraryData>(root, CosmeticLibraryData.ProjectRelativePath, errors);
             UiStyleData style = Read<UiStyleData>(root, UiStyleData.ProjectRelativePath, errors);
+            IdleRewardsData idleData = Read<IdleRewardsData>(root, IdleRewardsData.ProjectRelativePath, errors);
             if (errors.Count > 0)
             {
                 return null;
@@ -213,6 +218,7 @@ namespace BeastCraft.Presentation.Content
             Prefix(errors, "consumable-library.json", ConsumableLibraryValidator.Validate(consumableData));
             Prefix(errors, "cosmetic-library.json", CosmeticLibraryValidator.Validate(cosmeticData));
             Prefix(errors, "ui-style.json", UiStyleValidator.Validate(style));
+            Prefix(errors, "idle-rewards.json", IdleRewardsValidator.Validate(idleData, dropTables));
 
             HashSet<string> known = KnownSkills(skills, enemyLibrary);
             Prefix(errors, "vfx-library.json", VfxLibraryValidator.Validate(vfx, known, art));
@@ -271,6 +277,8 @@ namespace BeastCraft.Presentation.Content
             GearLibrary gear = GearLibrary.Build(gearData);
             ConsumableLibrary consumables = ConsumableLibrary.Build(consumableData);
             EconomyContent economy = new EconomyContent { Gear = gear, Consumables = consumables, Cosmetics = CosmeticLibrary.Build(cosmeticData) };
+            RegionLibrary campaign = RegionLibrary.Build(regions);
+            DropTable drops = DropTableBuilder.Build(dropTables, DropTableBuilder.TierLookup(skills.Materials));
 
             return new GameContent
             {
@@ -291,9 +299,10 @@ namespace BeastCraft.Presentation.Content
                 BattleArt = battleArt,
                 Glossary = glossary,
                 KnownSkillIds = known,
-                Campaign = RegionLibrary.Build(regions),
+                Campaign = campaign,
                 LocationNames = LocationNameTable.Build(locationNames),
-                Drops = DropTableBuilder.Build(dropTables, DropTableBuilder.TierLookup(skills.Materials)),
+                Drops = drops,
+                Idle = new IdleContent { Rewards = IdleRewardsBuilder.Build(idleData), DropTable = drops, Cosmetics = economy.Cosmetics, Regions = campaign },
                 Economy = economy,
                 Style = UiStyle.Build(style)
             };

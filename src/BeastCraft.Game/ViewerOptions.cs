@@ -12,7 +12,7 @@ namespace BeastCraft.Game
     /// <code>
     /// The game (it starts at the title screen):
     ///   --screen NAME       start at a screen instead of the title, for debugging: title, map,
-    ///                       encounter, battle, results, roster, camp, avatar, inventory, settings
+    ///                       encounter, battle, results, roster, grove, avatar, inventory, settings
     ///                       (a new game or the save is set up as needed; the battle is the first
     ///                       reachable location's). With --screenshot: render that screen to PATH
     ///                       and exit (on a throwaway in-memory save).
@@ -97,7 +97,7 @@ namespace BeastCraft.Game
         public bool DemoFlags;
 
         /// <summary>The screens <c>--screen</c> accepts.</summary>
-        public static readonly string[] ScreenNames = { "title", "map", "encounter", "battle", "results", "roster", "camp", "avatar", "inventory", "settings", "demo" };
+        public static readonly string[] ScreenNames = { "title", "map", "encounter", "battle", "results", "roster", "grove", "avatar", "inventory", "settings", "demo" };
 
         /// <summary>
         /// Where the app starts: <c>--screen</c>'s screen, else the battle demo when a demo flag

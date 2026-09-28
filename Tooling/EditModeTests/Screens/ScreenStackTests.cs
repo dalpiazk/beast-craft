@@ -169,12 +169,12 @@ namespace BeastCraft.Tests.EditMode
             Assert.IsTrue(home.TabAvailable);
             Assert.IsFalse(home.HandleBack(), "on the Map, back is the stack's");
 
-            home.Select(HomeTab.Camp);
+            home.Select(HomeTab.Grove);
             Assert.IsFalse(home.TabAvailable, "coming soon");
             StringAssert.Contains("idle rewards", home.ComingSoon);
             Assert.IsTrue(home.HandleBack());
             Assert.AreEqual(HomeTab.Map, home.Tab);
-            CollectionAssert.AreEqual(new[] { "Map", "Roster", "Camp", "Avatar", "Inventory" }, HomeViewModel.TabNames);
+            CollectionAssert.AreEqual(new[] { "Map", "Roster", "Grove", "Avatar", "Inventory" }, HomeViewModel.TabNames, "the Camp tab is the Grove (producer rename)");
         }
     }
 }

@@ -14,13 +14,16 @@ namespace BeastCraft.Game.Screens
     using Color = Microsoft.Xna.Framework.Color;
 
     /// <summary>
-    /// Home: the bottom nav (<see cref="HomeViewModel"/>: Map, Roster, Camp, Avatar, Inventory) over
+    /// Home: the bottom nav (<see cref="HomeViewModel"/>: Map, Roster, Grove, Avatar, Inventory) over
     /// the current tab. The Map tab is the region map (<see cref="MapViewModel"/>): a painted-style
     /// meadow (placeholder: a soft gradient with blobs) the finger drags up and down, the stage's
     /// locations placed on it (<see cref="MapLayout"/>) and joined by winding trails, each drawn by
     /// type and state, and the region header (name, level band, the seal's progress, the binding
     /// limit). Tapping a reachable location opens its encounter; a Trader or Camp says it is coming
-    /// soon. The other tabs show a coming-soon page.
+    /// soon. Two one-tap shortcuts sit on the map: the idle chip (how long the idle rewards have
+    /// piled up; tap to claim) and Next battle (the recommended location's encounter, the last team
+    /// already picked). Coming back to the app claims the idle rewards here. The other tabs show a
+    /// coming-soon page.
     /// </summary>
     public sealed class HomeScreen : GameScreen
     {
@@ -32,7 +35,10 @@ namespace BeastCraft.Game.Screens
         private readonly Tabs _tabs;
         private readonly Group _page;
         private readonly Button _gear;
+        private readonly Button _idle;
+        private readonly Button _next;
         private readonly List<Hotspot> _spots = new List<Hotspot>();
+        private float _idleRefreshMs;
 
         public HomeScreen(ScreenContext ctx) : base(ctx)
         {
@@ -41,10 +47,13 @@ namespace BeastCraft.Game.Screens
             _page = Ui.Add(new Group { Id = "page", Bounds = new Rect(0, 0, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight), Visible = false });
             Ui.Add(new Panel { Id = "header", Bounds = HeaderBox, StyleKey = "header" });
             _gear = AddButton(null, "gear", new Rect(HeaderBox.Right - 120f, HeaderBox.Y + 24f, 96f, 96f), null, "ghost", OpenSettings, "gear");
+            _idle = AddButton(null, "idle", new Rect(HeaderBox.Right - 420f, HeaderBox.Bottom + 18f, 420f, 84f), "Idle", "chip", ClaimIdle, "hourglass");
+            _next = AddButton(null, "next-battle", new Rect(NavBox.X + 90f, NavBox.Y - 150f, NavBox.Width - 180f, 124f), "Next battle", "primary", OpenRecommended,
+                              "battle");
             Ui.Add(new Panel { Id = "nav-panel", Bounds = NavBox, StyleKey = "nav" });
             _tabs = Ui.Add(new Tabs { Id = "nav", Bounds = NavBox.Inset(10f) });
             _tabs.Items.AddRange(HomeViewModel.TabNames);
-            _tabs.Glyphs.AddRange(new[] { "map", "roster", "camp", "avatar", "inventory" });
+            _tabs.Glyphs.AddRange(new[] { "map", "roster", "grove", "avatar", "inventory" });
             _tabs.Changed += index => SelectTab((HomeTab)index);
         }
 
@@ -91,6 +100,82 @@ namespace BeastCraft.Game.Screens
                 spot.Clicked += s => TapNode((int)s.Tag);
                 _spots.Add(spot);
             }
+
+            MapNodeView next = _map.Recommended();
+            _next.Tag = next?.NodeId;
+            _next.Text = next == null ? "Next battle" : "Next: " + next.Name;
+            RefreshIdle();
+            ShowTab();
+        }
+
+        public override void Update(float elapsedMs, FrameInput input)
+        {
+            base.Update(elapsedMs, input);
+            if (Ctx.Session.ResumeClaimPending)
+            {
+                ClaimIdle(true);
+            }
+
+            _idleRefreshMs -= elapsedMs;
+            if (_idleRefreshMs <= 0f)
+            {
+                RefreshIdle();
+            }
+        }
+
+        /// <summary>The idle chip's tap (and the claim on coming back): claim, and say what it paid.</summary>
+        public void ClaimIdle()
+        {
+            ClaimIdle(false);
+        }
+
+        private void ClaimIdle(bool quiet)
+        {
+            IdleClaimView claim = Ctx.Session.ClaimIdle();
+            if (claim?.Message != null)
+            {
+                Ctx.Game.Toast(claim.Message);
+            }
+            else if (!quiet)
+            {
+                Ctx.Game.Toast(Ctx.Session.IdleStatus().Started ? "Nothing to collect yet." : "The idle clock has started.");
+            }
+
+            RefreshIdle();
+        }
+
+        /// <summary>Next battle: the recommended location's encounter, the last team already picked.</summary>
+        public void OpenRecommended()
+        {
+            MapNodeView next = _map.Recommended();
+            if (next == null)
+            {
+                Ctx.Game.Toast("No battle is reachable: rest or trade first.");
+                return;
+            }
+
+            TapNode(next.NodeId);
+        }
+
+        /// <summary>After results: with auto-advance on and a win, straight on to the next encounter.</summary>
+        public bool AutoAdvance(bool victory)
+        {
+            int target = _map.AutoAdvanceTarget(Ctx.Session.Settings, victory);
+            if (target < 0)
+            {
+                return false;
+            }
+
+            TapNode(target);
+            return true;
+        }
+
+        private void RefreshIdle()
+        {
+            _idleRefreshMs = 1000f;
+            IdleStatusView status = Ctx.Session.IdleStatus();
+            _idle.Text = status.Text;
+            _idle.Selected = status.Capped;
         }
 
         public override bool HandleBack()
@@ -112,7 +197,7 @@ namespace BeastCraft.Game.Screens
 
         public void OpenSettings()
         {
-            Ctx.Stack.PushModal(new SettingsModal(Ctx, new SettingsViewModel(Ctx.Session.Settings, Ctx.Session.SaveSettings)));
+            Ctx.Stack.PushModal(new SettingsModal(Ctx, Ctx.Game.NewSettingsModel()));
         }
 
         /// <summary>A tap on location <paramref name="nodeId"/>: its encounter, or a toast.</summary>
@@ -151,6 +236,8 @@ namespace BeastCraft.Game.Screens
             _page.Visible = !map;
             Ui.Find("header").Visible = map;
             _gear.Visible = map;
+            _idle.Visible = map;
+            _next.Visible = map && _next.Tag != null;
         }
 
         // ------------------------------------------------------------------------------------------
@@ -414,7 +501,7 @@ namespace BeastCraft.Game.Screens
             Vec2 c = new Vec2(card.Center.X, card.Y + 250f);
             Painter.Disc(c, 150f, Painter.C("plum"));
             Painter.Disc(c, 140f, Painter.C("gold"));
-            string[] glyphs = { "map", "roster", "camp", "avatar", "inventory" };
+            string[] glyphs = { "map", "roster", "grove", "avatar", "inventory" };
             Painter.Glyph(glyphs[(int)_home.Tab], new Rect(c.X - 100f, c.Y - 100f, 200f, 200f), Painter.C("plum"));
             Painter.TextIn(_home.TabName, new Rect(card.X, card.Y + 450f, card.Width, 60f), Ctx.Style.TextSizes.Heading + 8f, Painter.C("plum"), TextAlign.Center);
             Rect badge = new Rect(card.Center.X - 160f, card.Y + 540f, 320f, 64f);

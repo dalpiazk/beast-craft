@@ -2,5 +2,7 @@
 <!-- The package id, version and SDK levels come from BeastCraft.Android.csproj; the activity from MainActivity's attribute. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
   <uses-feature android:glEsVersion="0x00020000" android:required="true" />
+  <!-- The idle-full notification (off by default; asked for at run time on Android 13+ when the player turns it on). -->
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
   <application android:hardwareAccelerated="true" android:isGame="true" android:label="Beast Craft" />
 </manifest>

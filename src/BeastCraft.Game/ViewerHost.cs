@@ -50,6 +50,18 @@ namespace BeastCraft.Game
         /// </summary>
         public string SaveRoot;
 
+        /// <summary>
+        /// The monotonic clock the idle rewards are measured with (time since boot, counting deep
+        /// sleep: Android's <c>elapsedRealtime</c>). Null: the desktop's (<see cref="System.Diagnostics.Stopwatch"/>).
+        /// </summary>
+        public Func<TimeSpan> MonotonicClock;
+
+        /// <summary>
+        /// Posts the "idle rewards are full" local notification (Android). Null: the host has none
+        /// (desktop), and the setting is hidden.
+        /// </summary>
+        public IIdleNotifier IdleNotifier;
+
         /// <summary>The desktop spike: a tall window, the keyboard and mouse, and the content as files.</summary>
         public static ViewerHost Desktop()
         {
@@ -65,5 +77,23 @@ namespace BeastCraft.Game
         {
             return new ViewerHost { HudTitle = hudTitle, Touch = true, Content = content, SafeArea = safeArea, SaveRoot = saveRoot };
         }
+    }
+
+    /// <summary>
+    /// The platform seam for the "idle rewards are full" local notification (the player's
+    /// <c>PlayerSettings.IdleNotifications</c>, off by default). The game schedules one when it goes
+    /// to the background (at the moment the idle cap fills) and cancels it when it comes back.
+    /// Android implements it (an inexact alarm that posts the notification); desktop has none.
+    /// </summary>
+    public interface IIdleNotifier
+    {
+        /// <summary>Asks for the permission to post notifications, where the platform needs one (Android 13+).</summary>
+        void RequestPermission();
+
+        /// <summary>Posts the notification at <paramref name="utc"/> (replacing any scheduled one).</summary>
+        void Schedule(DateTime utc);
+
+        /// <summary>Cancels the scheduled notification and removes a posted one.</summary>
+        void Cancel();
     }
 }

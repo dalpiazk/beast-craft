@@ -133,7 +133,7 @@ namespace BeastCraft.Tests.EditMode
         {
             UiRoot root = new UiRoot();
             Tabs tabs = root.Add(new Tabs { Bounds = new Rect(0, 1800, 1000, 100) });
-            tabs.Items.AddRange(new[] { "Map", "Roster", "Camp", "Avatar", "Inventory" });
+            tabs.Items.AddRange(new[] { "Map", "Roster", "Grove", "Avatar", "Inventory" });
             List<int> changes = new List<int>();
             tabs.Changed += changes.Add;
 

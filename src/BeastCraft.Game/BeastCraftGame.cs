@@ -93,9 +93,10 @@ namespace BeastCraft.Game
                 Window.Title = host.WindowTitle;
             }
 
-            // Leaving the app (Android pause, desktop focus loss or close) saves the game.
+            // Leaving the app (Android pause, desktop focus loss or close) saves the game; coming back claims the idle rewards.
             Deactivated += (sender, args) => OnBackgrounded();
             Exiting += (sender, args) => OnBackgrounded();
+            Activated += (sender, args) => OnResumed();
         }
 
         /// <summary>Set when the game could not start, a screenshot could not be written, or a scripted run failed.</summary>
@@ -116,10 +117,50 @@ namespace BeastCraft.Game
         /// <summary>The app is going to the background or closing: autosave (a no-op before a game is loaded).</summary>
         public void OnBackgrounded()
         {
-            if (!_options.Screenshot && string.IsNullOrEmpty(_options.WalkthroughDir))
+            GameSession session = _ctx?.Session;
+            if (session == null || _options.Screenshot || !string.IsNullOrEmpty(_options.WalkthroughDir))
             {
-                _ctx?.Session?.Autosave(AutosaveReason.Background);
+                return;
             }
+
+            session.Autosave(AutosaveReason.Background);
+            DateTime? full = session.IdleCapUtc();
+            if (_host.IdleNotifier != null && session.Settings.IdleNotifications && full.HasValue && full.Value > DateTime.UtcNow)
+            {
+                _host.IdleNotifier.Schedule(full.Value);
+            }
+        }
+
+        /// <summary>
+        /// The app is back in front: cancel the idle notification, and claim the idle rewards once
+        /// the map is showing (<see cref="GameSession.ResumeClaimPending"/>).
+        /// </summary>
+        public void OnResumed()
+        {
+            _host.IdleNotifier?.Cancel();
+            if (_ctx?.Session?.Save != null && string.IsNullOrEmpty(_options.WalkthroughDir) && !_options.Screenshot)
+            {
+                _ctx.Session.ResumeClaimPending = true;
+            }
+        }
+
+        /// <summary>The settings modal's view-model, with the host's notifications (and their permission) wired in.</summary>
+        public SettingsViewModel NewSettingsModel()
+        {
+            GameSession session = _ctx.Session;
+            SettingsViewModel model = new SettingsViewModel(session.Settings, session.SaveSettings, _host.IdleNotifier != null);
+            model.IdleNotificationsChanged += on =>
+            {
+                if (on)
+                {
+                    _host.IdleNotifier?.RequestPermission();
+                }
+                else
+                {
+                    _host.IdleNotifier?.Cancel();
+                }
+            };
+            return model;
         }
 
         /// <summary>Stops with <paramref name="message"/> (a screenshot or scripted run exits; a window shows it).</summary>
@@ -180,7 +221,7 @@ namespace BeastCraft.Game
                 return;
             }
 
-            _ctx.Session = new GameSession(_content, Storage(scripted), SeedSource(scripted));
+            _ctx.Session = new GameSession(_content, Storage(scripted), SeedSource(scripted), new SystemGameClock(_host.MonotonicClock));
             if (_options.StarterLevel.HasValue)
             {
                 _ctx.Session.StarterLevel = _options.StarterLevel.Value;
@@ -636,8 +677,13 @@ namespace BeastCraft.Game
             Step("05-battle-decided", () => Battle().SkipToEnd());
             Step("06-results", () => Battle().HandBack());
             Step("07-map-after", () => Results().Continue());
-            Step("08-coming-soon", () => Home().SelectTab(HomeTab.Roster));
-            Step("09-settings", () =>
+            Step("08-next-battle", () => Home().OpenRecommended());
+            Step("09-coming-soon", () =>
+            {
+                _stack.Pop();
+                Home().SelectTab(HomeTab.Grove);
+            });
+            Step("10-settings", () =>
             {
                 Home().SelectTab(HomeTab.Map);
                 Home().OpenSettings();
@@ -662,7 +708,7 @@ namespace BeastCraft.Game
                     break;
             }
 
-            if (screen == "roster" || screen == "camp" || screen == "avatar" || screen == "inventory")
+            if (screen == "roster" || screen == "grove" || screen == "avatar" || screen == "inventory")
             {
                 HomeTab tab = (HomeTab)Array.IndexOf(HomeViewModel.TabNames, char.ToUpperInvariant(screen[0]) + screen.Substring(1));
                 steps.Add(() => Home().SelectTab(tab));

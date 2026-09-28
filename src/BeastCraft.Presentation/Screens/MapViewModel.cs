@@ -4,6 +4,7 @@ using BeastCraft.Campaign;
 using BeastCraft.Presentation.Board;
 using BeastCraft.Presentation.Layout;
 using BeastCraft.Presentation.Vfx;
+using BeastCraft.Save;
 
 namespace BeastCraft.Presentation.Screens
 {
@@ -411,6 +412,49 @@ namespace BeastCraft.Presentation.Screens
             List<MapNodeView> reachable = Nodes.FindAll(n => n.State == MapNodeState.Reachable);
             reachable.Sort((a, b) => a.NodeId.CompareTo(b.NodeId));
             return reachable;
+        }
+
+        /// <summary>
+        /// The map's "Next battle": the reachable battle location to fight next — the lowest level,
+        /// a plain battle before a den on a tie, then the one furthest left — or null when none is
+        /// reachable (only a Camp or Trader ahead).
+        /// </summary>
+        public MapNodeView Recommended()
+        {
+            MapNodeView best = null;
+            foreach (MapNodeView node in Nodes)
+            {
+                if (node.State != MapNodeState.Reachable || node.Type == MapNodeType.Rest || node.Type == MapNodeType.Shop)
+                {
+                    continue;
+                }
+
+                if (best == null || Rank(node).CompareTo(Rank(best)) < 0)
+                {
+                    best = node;
+                }
+            }
+
+            return best;
+        }
+
+        /// <summary>
+        /// Where the results' Continue goes on to with auto-advance (<see cref="PlayerSettings.AutoAdvance"/>):
+        /// after a win, the <see cref="Recommended"/> location's id; otherwise −1 (stop at the map).
+        /// </summary>
+        public int AutoAdvanceTarget(PlayerSettings settings, bool victory)
+        {
+            if (settings == null || !settings.AutoAdvance || !victory)
+            {
+                return -1;
+            }
+
+            return Recommended()?.NodeId ?? -1;
+        }
+
+        private static (int, int, float) Rank(MapNodeView node)
+        {
+            return (node.Level, node.Type == MapNodeType.Battle ? 0 : 1, node.Position.X);
         }
 
         /// <summary>What a tap on location <paramref name="nodeId"/> does. Changes nothing.</summary>

@@ -205,6 +205,7 @@ namespace BeastCraft.Game.Screens
             BattleScreen screen = new BattleScreen(ctx, battle.Run, battle.SpeciesByUnit, battle.RegionId, battle.Seed, title, battle, finished);
             screen.LoadSettings(ctx.Session.Settings, ctx.Session.SaveSettings);
             screen._auto = true;
+            screen._speed = SettingsViewModel.Speed(ctx.Session.Settings);
             return screen;
         }
 
@@ -242,7 +243,7 @@ namespace BeastCraft.Game.Screens
                 {
                     if (Pressed(keys, Keys.D0 + speed) || Pressed(keys, Keys.NumPad0 + speed))
                     {
-                        _speed = speed;
+                        SetSpeed(speed);
                     }
                 }
 
@@ -614,7 +615,7 @@ namespace BeastCraft.Game.Screens
                 }
                 else
                 {
-                    _speed = i;
+                    SetSpeed(i);
                 }
 
                 return;
@@ -638,6 +639,17 @@ namespace BeastCraft.Game.Screens
                 }
 
                 step = true;
+            }
+        }
+
+        /// <summary>The playback speed (1-3); in a campaign battle it is also the player's saved preference (<see cref="PlayerSettings.BattleSpeed"/>).</summary>
+        private void SetSpeed(int speed)
+        {
+            _speed = speed;
+            if (_campaign != null && _settings.BattleSpeed != speed)
+            {
+                _settings.BattleSpeed = speed;
+                _saveSettings?.Invoke();
             }
         }
 

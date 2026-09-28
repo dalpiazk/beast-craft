@@ -71,6 +71,12 @@ namespace BeastCraft.Game.Screens
                     Ctx.Stack.PushModal(new ConfirmModal(Ctx, "Save restored", outcome.Message, null, "OK", null));
                 }
 
+                // Continue claimed the idle rewards: say what they paid (nothing is silent).
+                if (Ctx.Session.LastContinueClaim?.Message != null)
+                {
+                    Ctx.Game.Toast(Ctx.Session.LastContinueClaim.Message);
+                }
+
                 return;
             }
 
@@ -86,7 +92,7 @@ namespace BeastCraft.Game.Screens
 
         public void OpenSettings()
         {
-            Ctx.Stack.PushModal(new SettingsModal(Ctx, new SettingsViewModel(Ctx.Session.Settings, Ctx.Session.SaveSettings)));
+            Ctx.Stack.PushModal(new SettingsModal(Ctx, Ctx.Game.NewSettingsModel()));
         }
 
         private void NewGame()

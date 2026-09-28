@@ -39,31 +39,34 @@ namespace BeastCraft.Presentation.Screens
         }
     }
 
-    /// <summary>The bottom-nav tabs, left to right (producer decision): Map is home.</summary>
+    /// <summary>
+    /// The bottom-nav tabs, left to right (producer decisions): Map is home; the team base is the
+    /// Grove (the map's Camp locations keep their name).
+    /// </summary>
     public enum HomeTab
     {
         Map = 0,
         Roster = 1,
-        Camp = 2,
+        Grove = 2,
         Avatar = 3,
         Inventory = 4
     }
 
     /// <summary>
-    /// The home screen's bottom nav: Map, Roster, Camp, Avatar, Inventory. Only Map works in this
+    /// The home screen's bottom nav: Map, Roster, Grove, Avatar, Inventory. Only Map works in this
     /// build; the others show a "coming soon" page. Back on another tab returns to the Map; on the
     /// Map it is not handled here (the stack pops back to the title).
     /// </summary>
     public sealed class HomeViewModel
     {
-        public static readonly string[] TabNames = { "Map", "Roster", "Camp", "Avatar", "Inventory" };
+        public static readonly string[] TabNames = { "Map", "Roster", "Grove", "Avatar", "Inventory" };
 
         /// <summary>What each coming-soon tab will hold (shown on its placeholder page).</summary>
         public static readonly string[] ComingSoonText =
         {
             null,
             "Browse your beasts, their stats, skills and gear.",
-            "Your team base: organise the party, set skills and gear, and claim idle rewards.",
+            "Your team base: organise the party and claim idle rewards; later your beasts' habitat, a garden and expeditions.",
             "Your Beastbinder: level, skills, gear and looks.",
             "Materials, consumables and spare gear."
         };
@@ -127,32 +130,58 @@ namespace BeastCraft.Presentation.Screens
         public const int ScreenShake = 1;
         public const int Flashes = 2;
         public const int TeamSuggestions = 3;
-        public const int RowCount = 4;
+        public const int BattleSpeed = 4;
+        public const int AutoAdvance = 5;
+        public const int IdleNotifications = 6;
+        public const int RowCount = 7;
 
         private readonly PlayerSettings _settings;
         private readonly Func<bool> _save;
 
-        public SettingsViewModel(PlayerSettings settings, Func<bool> save)
+        /// <param name="notificationsAvailable">Whether the host can post notifications (Android): otherwise that row is hidden.</param>
+        public SettingsViewModel(PlayerSettings settings, Func<bool> save, bool notificationsAvailable = false)
         {
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
             _save = save;
+            NotificationsAvailable = notificationsAvailable;
         }
 
         public int Saves { get; private set; }
 
+        public bool NotificationsAvailable { get; }
+
+        /// <summary>Raised after the idle-notification setting changes (the host asks for the permission, or cancels).</summary>
+        public event Action<bool> IdleNotificationsChanged;
+
+        /// <summary>The rows, by the row constants (the notification row only where the host has notifications).</summary>
         public List<SettingRow> Rows()
         {
             string intensity = _settings.EffectsIntensity == EffectsIntensity.Minimal ? "Minimal" : _settings.EffectsIntensity == EffectsIntensity.Reduced ? "Reduced" : "Full";
-            return new List<SettingRow>
+            List<SettingRow> rows = new List<SettingRow>
             {
                 new SettingRow { Label = "Effects", Value = intensity, On = true },
                 new SettingRow { Label = "Screen shake", Value = _settings.ScreenShake ? "On" : "Off", On = _settings.ScreenShake },
                 new SettingRow { Label = "Flashes", Value = _settings.Flashes ? "On" : "Off", On = _settings.Flashes },
-                new SettingRow { Label = "Team suggestions", Value = _settings.TeamSuggestionsEnabled ? "On" : "Off", On = _settings.TeamSuggestionsEnabled }
+                new SettingRow { Label = "Team suggestions", Value = _settings.TeamSuggestionsEnabled ? "On" : "Off", On = _settings.TeamSuggestionsEnabled },
+                new SettingRow { Label = "Battle speed", Value = "x" + Speed(_settings), On = true },
+                new SettingRow { Label = "Auto next battle", Value = _settings.AutoAdvance ? "On" : "Off", On = _settings.AutoAdvance }
             };
+            if (NotificationsAvailable)
+            {
+                rows.Add(new SettingRow { Label = "Idle full alert", Value = _settings.IdleNotifications ? "On" : "Off", On = _settings.IdleNotifications });
+            }
+
+            return rows;
         }
 
-        /// <summary>Changes row <paramref name="row"/>'s setting (effects cycle Full, Reduced, Minimal; the rest toggle) and saves.</summary>
+        /// <summary>The battle speed a setting holds, 1-3 (anything else reads as 1).</summary>
+        public static int Speed(PlayerSettings settings)
+        {
+            int speed = settings == null ? 1 : settings.BattleSpeed;
+            return speed >= 1 && speed <= 3 ? speed : 1;
+        }
+
+        /// <summary>Changes row <paramref name="row"/>'s setting (effects cycle Full, Reduced, Minimal; speed x1, x2, x3; the rest toggle) and saves.</summary>
         public void Change(int row)
         {
             switch (row)
@@ -171,6 +200,20 @@ namespace BeastCraft.Presentation.Screens
                 case TeamSuggestions:
                     _settings.TeamSuggestionsEnabled = !_settings.TeamSuggestionsEnabled;
                     break;
+                case BattleSpeed:
+                    _settings.BattleSpeed = Speed(_settings) % 3 + 1;
+                    break;
+                case AutoAdvance:
+                    _settings.AutoAdvance = !_settings.AutoAdvance;
+                    break;
+                case IdleNotifications:
+                    if (!NotificationsAvailable)
+                    {
+                        return;
+                    }
+
+                    _settings.IdleNotifications = !_settings.IdleNotifications;
+                    break;
                 default:
                     return;
             }
@@ -178,6 +221,11 @@ namespace BeastCraft.Presentation.Screens
             if (_save == null || _save())
             {
                 Saves++;
+            }
+
+            if (row == IdleNotifications)
+            {
+                IdleNotificationsChanged?.Invoke(_settings.IdleNotifications);
             }
         }
     }

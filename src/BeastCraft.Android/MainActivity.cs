@@ -1,3 +1,4 @@
+using System;
 using Android.App;
 using Android.Content.PM;
 using Android.OS;
@@ -43,8 +44,12 @@ namespace BeastCraft.Android
                 Window.Attributes.LayoutInDisplayCutoutMode = LayoutInDisplayCutoutMode.ShortEdges;
             }
 
-            _game = new BeastCraftGame(new ViewerOptions(),
-                                       ViewerHost.Mobile("BEAST CRAFT", new TitleContainerContentSource("Content"), () => _insets.Value, FilesDir?.AbsolutePath));
+            ViewerHost host = ViewerHost.Mobile("BEAST CRAFT", new TitleContainerContentSource("Content"), () => _insets.Value, FilesDir?.AbsolutePath);
+
+            // Idle time counts deep sleep (elapsedRealtime), and the idle-full notification is Android's.
+            host.MonotonicClock = () => TimeSpan.FromMilliseconds(SystemClock.ElapsedRealtime());
+            host.IdleNotifier = new AndroidIdleNotifier(this);
+            _game = new BeastCraftGame(new ViewerOptions(), host);
             // MonoGame's Exit() on Android only moves the task to the back; finish the activity so
             // Back really quits.
             _game.Exiting += (sender, args) => Finish();

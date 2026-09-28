@@ -40,5 +40,23 @@ namespace BeastCraft.Save
         /// bright additive bursts. On by default; off leaves every effect's other parts playing.
         /// </summary>
         public bool Flashes = true;
+
+        /// <summary>
+        /// The battle playback speed a campaign battle starts at: 1, 2 or 3 (x1/x2/x3; anything else
+        /// reads as 1). Changed from the battle's speed buttons or the settings. Presentation only.
+        /// </summary>
+        public int BattleSpeed = 1;
+
+        /// <summary>
+        /// After a won battle's results, go straight on to the next recommended location's encounter
+        /// instead of stopping at the map. Off by default.
+        /// </summary>
+        public bool AutoAdvance;
+
+        /// <summary>
+        /// A local notification when the idle rewards reach their cap (the Android host only; other
+        /// hosts ignore it). Off by default.
+        /// </summary>
+        public bool IdleNotifications;
     }
 }
