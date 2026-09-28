@@ -37,7 +37,11 @@ Title ──Continue / New Game──▶ Home (Map tab) ──tap a location / N
   respected), and Start Battle.
 - **Battle** (`BattleScreen`): the old viewer, now one screen. A campaign battle
   (`NodeBattle`, through `CampaignRules` and `BattleSession`, fought in the node's region so its
-  backdrops and obstacles apply) plays by itself at the saved speed; Back offers to skip to the
+  backdrops and obstacles apply) fields the chosen beasts **and the Beastbinder** (the avatar, as
+  the difficulty was calibrated: `CampaignAvatar` mirrors the balance simulator's avatar — its
+  default arts and passives, its stat fixture — off the board, in the turn order, its arts playing
+  on their targets, shown as a portrait badge with its art cooldowns at the board's foot). It plays
+  by itself at the saved speed; Back offers to skip to the
   result; once decided, Continue hands it back.
 - **Results** (`ResultsScreen`, `ResultsViewModel`): one consolidated summary — XP bars (before →
   after, level-ups), the bench's share, gold, drops, the first-clear bonus, XP banked at the
@@ -167,8 +171,9 @@ notification is an opt-in Android hook.
 
 ## Known gaps (for the next PRs)
 
-- The avatar sits out campaign battles (the battle screen has no avatar tile yet), as in the demo.
-- The starter team is the campaign pacing model's (six beasts at level 1); the first stage's
-  battles are hard at level 1 — a balance question, not a screens one.
+- The starter team is the campaign pacing model's (six beasts at level 1, no gear); the first
+  stage's battles are won about 40-50% of the time against the calibrated 80% (squad, horde) and
+  50% (solo): the calibration assumes typical gear and a scouted pick from the full ten-species
+  roster — a balance question, not a screens one.
 - Roster, Grove, Avatar and Inventory are placeholders; Trader and Camp locations are "coming soon".
 - One save slot; no region list (the next region starts automatically after a boss).

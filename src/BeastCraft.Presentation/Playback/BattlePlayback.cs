@@ -241,6 +241,12 @@ namespace BeastCraft.Presentation.Playback
             get { return _run.Grid; }
         }
 
+        /// <summary>The avatar (the Beastbinder: in the turn order, off the board), or null when it sits out.</summary>
+        public BattleUnit Avatar
+        {
+            get { return _run.Avatar; }
+        }
+
         /// <summary>The turns played so far.</summary>
         public IReadOnlyList<PlayedTurn> Played
         {

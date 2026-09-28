@@ -725,6 +725,11 @@ namespace BeastCraft.Game.Screens
 
         private string UnitName(string unitId)
         {
+            if (_playback.Avatar != null && unitId == _playback.Avatar.Id)
+            {
+                return CampaignAvatar.DisplayName;
+            }
+
             return unitId != null && _names.TryGetValue(unitId, out string name) ? name : unitId;
         }
 

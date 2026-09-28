@@ -118,6 +118,11 @@ namespace BeastCraft.Presentation.Screens
 
         public int ConsumablesSpent { get; private set; }
 
+        /// <summary>XP the Beastbinder (avatar) earned fighting beside the team, and levels gained.</summary>
+        public int AvatarXp { get; private set; }
+
+        public int AvatarLevelsGained { get; private set; }
+
         internal static ResultsViewModel Build(GameSession session, NodeBattle battle, BattleSessionResult result, BattleRewardSummary summary, CampaignResult campaign,
                                                Dictionary<string, (int Level, int Xp)> before)
         {
@@ -133,7 +138,9 @@ namespace BeastCraft.Presentation.Screens
                 BindingLimit = CampaignRules.BeastCap(save, session.Content.Campaign),
                 MapOutcome = campaign.Outcome,
                 LevelsReleased = campaign.LevelsReleased,
-                ConsumablesSpent = summary.ConsumablesSpent.Count
+                ConsumablesSpent = summary.ConsumablesSpent.Count,
+                AvatarXp = summary.AvatarXpGained,
+                AvatarLevelsGained = summary.AvatarLevelsGained
             };
             view.Title = result.Outcome == BattleOutcome.PlayerVictory ? "Victory!" : result.Outcome == BattleOutcome.EnemyVictory ? "Defeat" : "Stalemate";
 

@@ -444,6 +444,11 @@ namespace BeastCraft.Tests.EditMode
             Assert.AreEqual(CampaignRules.BattleSeed(node, 0), battle.Setup.Seed);
             Assert.AreEqual(battle.Layout, battle.Run.Result.Layout, "the preview's battlefield is the battle's");
             Assert.AreEqual("phoenix", battle.SpeciesByUnit["beast:b2"]);
+            Assert.IsTrue(battle.Setup.IncludeAvatar, "the Beastbinder fights beside the team, as the difficulty was calibrated");
+            Assert.IsNotNull(battle.Run.Avatar);
+            Assert.AreEqual(CampaignAvatar.UnitId, battle.Run.Avatar.Id);
+            Assert.AreEqual(3, battle.Run.Avatar.Skills.Skills.Count, "its default arts");
+            Assert.Greater(battle.Run.Avatar.Stats.Attack, 1, "the simulator's stat fixture, not the no-stats avatar");
 
             ResultsViewModel results = battle.Complete();
 
@@ -468,6 +473,7 @@ namespace BeastCraft.Tests.EditMode
             }
 
             Assert.Greater(results.BenchXp, 0, "the bench shares the XP");
+            Assert.Greater(results.AvatarXp, 0, "the Beastbinder earns XP too");
             Assert.Greater(results.Gold, 0);
             Assert.AreEqual(session.Save.Gold, results.GoldTotal);
             Assert.IsTrue(results.FirstClear, "the first clear of its cell");

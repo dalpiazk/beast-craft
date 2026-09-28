@@ -118,8 +118,9 @@ namespace BeastCraft.Presentation.Screens
                 Save = _session.Save,
                 Content = _session.Content.Battle,
                 Seed = Seed,
-                // The battle viewer has no avatar tile yet (as the demo battle): the avatar sits out.
-                IncludeAvatar = false,
+                // The Beastbinder fights beside the team, off the board, as the difficulty was calibrated.
+                IncludeAvatar = true,
+                AvatarProfile = CampaignAvatar.Profile(_session.Content),
                 Encounter = Plan.ToSetup(RegionId),
                 TeamBeastIds = new List<string>(team ?? new string[0])
             };

@@ -83,7 +83,7 @@ namespace BeastCraft.Game.Screens
                 y += 200f;
             }
 
-            int lines = 2 + _model.Drops.Count + (_model.FirstClear ? 1 : 0) + (_model.FirstClearGear != null ? 1 : 0) + (_model.XpBanked > 0 ? 1 : 0) + (_model.BenchXp > 0 ? 1 : 0);
+            int lines = 2 + (_model.AvatarXp > 0 ? 1 : 0) + _model.Drops.Count + (_model.FirstClear ? 1 : 0) + (_model.FirstClearGear != null ? 1 : 0) + (_model.XpBanked > 0 ? 1 : 0) + (_model.BenchXp > 0 ? 1 : 0);
             _rewards = _scroll.Add(new Panel { Bounds = new Rect(Pad, y + 10f, width, 90f + lines * 52f), StyleKey = "panel" });
             y = _rewards.Bounds.Bottom + 30f;
 
@@ -206,6 +206,11 @@ namespace BeastCraft.Game.Screens
             if (_model.Drops.Count == 0)
             {
                 Line("seal", _model.Victory ? "No drops this time" : "No drops (no clear)", "inkSoft");
+            }
+
+            if (_model.AvatarXp > 0)
+            {
+                Line("avatar", CampaignAvatar.DisplayName + " +" + _model.AvatarXp + " XP" + (_model.AvatarLevelsGained > 0 ? " (level up!)" : string.Empty), "inkSoft");
             }
 
             if (_model.BenchXp > 0)

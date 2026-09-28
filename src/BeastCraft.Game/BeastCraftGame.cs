@@ -38,8 +38,12 @@ namespace BeastCraft.Game
     // The namespace BeastCraft.Game would win over Microsoft.Xna.Framework.Game here, hence the full name.
     public sealed class BeastCraftGame : Microsoft.Xna.Framework.Game
     {
-        /// <summary>The map seed scripted runs (walkthrough, --screen screenshots) draw their expedition with.</summary>
-        public const int ScriptedMapSeed = 20260927;
+        /// <summary>
+        /// The map seed scripted runs (walkthrough, --screen screenshots) draw their expedition with:
+        /// one whose first location the starter team wins at level 1, so the walkthrough shows a
+        /// victory (<c>--map-seed 20260927</c> shows the defeat path).
+        /// </summary>
+        public const int ScriptedMapSeed = 4;
 
         private readonly ViewerOptions _options;
         private readonly ViewerHost _host;
