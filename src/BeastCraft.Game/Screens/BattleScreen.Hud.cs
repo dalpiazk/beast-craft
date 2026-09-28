@@ -15,34 +15,24 @@ using BeastCraft.Save;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
-namespace BeastCraft.Game
+namespace BeastCraft.Game.Screens
 {
     // BeastCraft.Color (Core's engine-neutral colour) would win over a file-level using here.
     using Color = Microsoft.Xna.Framework.Color;
 
     /// <summary>The HUD half of the frame, in canvas pixels: header, turn order, toast, skill strip, controls.</summary>
-    public sealed partial class BattleViewerGame
+    public sealed partial class BattleScreen
     {
         private const float Small = 15f;
         private const float Medium = 20f;
         private const float Large = 25f;
 
-        private Texture2D _pixel;
         private GlossaryTerm _popupTerm;
 
-        /// <summary>A 1x1 white texture for rectangles and bars (made on first use, so a failure screen has one too).</summary>
+        /// <summary>A 1x1 white texture for rectangles and bars (the host's).</summary>
         private Texture2D Pixel
         {
-            get
-            {
-                if (_pixel == null)
-                {
-                    _pixel = new Texture2D(GraphicsDevice, 1, 1);
-                    _pixel.SetData(new[] { Color.White });
-                }
-
-                return _pixel;
-            }
+            get { return Ctx.Pixel; }
         }
 
         private void DrawHud(ScheduledBeat beat)
@@ -61,9 +51,21 @@ namespace BeastCraft.Game
                 Rect board = _screen.Board;
                 _draw.Fill(Pixel, new Vector2(board.X, board.Center.Y - 70f), new Vector2(board.Width, 140f), shadow * 0.75f);
                 _text.DrawCentered(_draw, banner, board.Center.X, board.Center.Y - 30f, 60f, Ink("y", Color.Gold), shadow);
+                DrawContinue();
             }
 
             DrawSettings(shadow);
+        }
+
+        /// <summary>A decided campaign battle's Continue button (to the results), under the result banner.</summary>
+        private void DrawContinue()
+        {
+            if (_campaign == null)
+            {
+                return;
+            }
+
+            Ctx.Painter.Button(ContinueButton, "Continue", Ctx.Style.Button("primary"), false, true, false);
         }
 
         /// <summary>
@@ -106,9 +108,9 @@ namespace BeastCraft.Game
         private void DrawHeader(Color shadow)
         {
             Rect header = _screen.Header;
-            _text.Draw(_draw, _host.HudTitle, new Vector2(header.X, header.Y + 12f), Large, Ink("y", Color.Gold), shadow);
+            _text.Draw(_draw, _text.Fit(_hudTitle, Large, 520f), new Vector2(header.X, header.Y + 12f), Large, Ink("y", Color.Gold), shadow);
             string turn = "TURN " + _playback.Played.Count.ToString(CultureInfo.InvariantCulture) + "  SEED " +
-                          _options.Seed.ToString(CultureInfo.InvariantCulture);
+                          _seed.ToString(CultureInfo.InvariantCulture);
             Rect gear = _screen.SettingsButton;
             _text.DrawRight(_draw, turn, gear.X - 20f, header.Y + 16f, Medium, Ink("3", Color.Gray), shadow);
 
@@ -204,8 +206,8 @@ namespace BeastCraft.Game
                 return;
             }
 
-            _text.Draw(_draw, Name(unit.Id), new Vector2(strip.X, strip.Y + 8f), Medium, Ink("y", Color.Gold), shadow);
-            _text.Draw(_draw, "SKILLS", new Vector2(strip.X + _text.Measure(Name(unit.Id), Medium) + 20f, strip.Y + 12f), Small, Ink("3", Color.Gray), shadow);
+            _text.Draw(_draw, UnitName(unit.Id), new Vector2(strip.X, strip.Y + 8f), Medium, Ink("y", Color.Gold), shadow);
+            _text.Draw(_draw, "SKILLS", new Vector2(strip.X + _text.Measure(UnitName(unit.Id), Medium) + 20f, strip.Y + 12f), Small, Ink("3", Color.Gray), shadow);
 
             int shown = SelectedSkill();
             for (int i = 0; i < skills.Count; i++)

@@ -15,13 +15,13 @@ using BeastCraft.Vfx;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
-namespace BeastCraft.Game
+namespace BeastCraft.Game.Screens
 {
     // BeastCraft.Color (Core's engine-neutral colour) would win over a file-level using here.
     using Color = Microsoft.Xna.Framework.Color;
 
     /// <summary>The frame, and the board half of it: tiles, units and VFX, in board space.</summary>
-    public sealed partial class BattleViewerGame
+    public sealed partial class BattleScreen
     {
         /// <summary>Board pixels the plate under the tiles reaches past their box (<see cref="DrawBoard"/>).</summary>
         private const float BoardPlateMargin = PortraitLayout.BoardEdgeMargin;
@@ -39,29 +39,21 @@ namespace BeastCraft.Game
         private Texture2D _softHex;
 
         /// <summary>
-        /// Draws one frame onto a <paramref name="width"/> x <paramref name="height"/> target: the
-        /// portrait canvas fitted inside <paramref name="insets"/> (black bars around it), the board
-        /// through the auto camera's fit (<see cref="CameraRig.Fit"/>, shaken by the VFX) and
-        /// the HUD in canvas pixels.
+        /// Draws one frame of the battle on the portrait canvas the host has fitted to the target
+        /// inside its safe area (<see cref="ScreenContext.CanvasFit"/>; the host clears the black
+        /// bars around it): the board through the auto camera's fit (<see cref="CameraRig.Fit"/>,
+        /// shaken by the VFX) and the HUD in canvas pixels.
         /// </summary>
-        private void RenderScene(int width, int height, SafeInsets insets)
+        public override void Draw()
         {
-            _canvasFit = CanvasFit.Of(PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight, width, height, insets);
-            GraphicsDevice.Clear(Color.Black);
-            Matrix canvas = Matrix.CreateScale(_canvasFit.Scale) * Matrix.CreateTranslation(_canvasFit.OffsetX, _canvasFit.OffsetY, 0f);
+            _canvasFit = Ctx.CanvasFit;
+            Matrix canvas = Ctx.CanvasMatrix;
 
-            _draw.ResetStats();
             _draw.SetBlend(BlendState.AlphaBlend);
             _draw.SetTransform(canvas);
             _draw.UnitSize = HexLayout.ColumnStep;
             _draw.Fill(Pixel, new Rectangle(0, 0, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight), Ink("K", new Color(0x1c, 0x14, 0x28)));
 
-            if (FailureMessage != null || _playback == null)
-            {
-                DrawFailure();
-                _draw.Flush();
-                return;
-            }
 
             ScheduledBeat beat = _animation == null ? null : _animation.BeatAt(_clockMs);
             VfxFrame vfx = beat == null ? null : beat.Timeline.Sample(_clockMs - beat.StartMs);
@@ -127,17 +119,6 @@ namespace BeastCraft.Game
             _draw.UnitSize = HexLayout.ColumnStep;
             DrawHud(beat);
             _draw.Flush();
-        }
-
-        private void DrawFailure()
-        {
-            float y = 200f;
-            foreach (string line in (FailureMessage ?? "NO BATTLE").Split('\n'))
-            {
-                _text.Draw(_draw, _text.Fit(line, 15f, PortraitLayout.CanvasWidth - 2f * PortraitLayout.Margin), new Vector2(PortraitLayout.Margin, y), 15f,
-                           Color.White);
-                y += _text.LineHeight(15f);
-            }
         }
 
         /// <summary>
@@ -252,7 +233,7 @@ namespace BeastCraft.Game
         /// <summary>A tile-sized, anti-aliased hex (<see cref="SoftHex"/>) on <paramref name="center"/> in <paramref name="color"/> (premultiplied).</summary>
         private void DrawSoftHex(Vec2 center, Color color)
         {
-            _softHex ??= SoftHex.Create(GraphicsDevice);
+            _softHex ??= SoftHex.Create(Ctx.Device);
             _draw.DrawCentered(_softHex, new Vector2(center.X, center.Y), new Vector2(HexLayout.TileWidth, HexLayout.TileHeight), color);
         }
 

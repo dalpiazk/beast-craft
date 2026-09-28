@@ -95,6 +95,9 @@ namespace BeastCraft.Presentation.Screens
         /// <summary>Whether the last autosave was written.</summary>
         public bool LastAutosaveOk { get; private set; }
 
+        /// <summary>The level New Game's starter beasts start at (<see cref="StarterSave.StartingLevel"/>; a debug flag may raise it).</summary>
+        public int StarterLevel { get; set; } = StarterSave.StartingLevel;
+
         /// <summary>The team last taken into a battle this session (the encounter screen starts from it).</summary>
         public List<string> LastTeam { get; } = new List<string>();
 
@@ -104,7 +107,7 @@ namespace BeastCraft.Presentation.Screens
         /// <summary>A brand-new game: the starter beasts and avatar (<see cref="StarterSave"/>), an expedition into the first region, saved.</summary>
         public void NewGame()
         {
-            Save = StarterSave.Create(Content);
+            Save = StarterSave.Create(Content, StarterLevel);
             LastTeam.Clear();
             DismissedSuggestions.Clear();
             EnsureExpedition();
@@ -221,6 +224,12 @@ namespace BeastCraft.Presentation.Screens
 
         public static PlayerSave Create(GameContent content)
         {
+            return Create(content, StartingLevel);
+        }
+
+        /// <summary>The starter save with the beasts at <paramref name="level"/> (a debug knob: <c>--starter-level</c>).</summary>
+        public static PlayerSave Create(GameContent content, int level)
+        {
             PlayerSave save = PlayerSave.CreateNew();
             SkillLibraryData library = content.SkillLibrary;
             int next = 1;
@@ -232,7 +241,7 @@ namespace BeastCraft.Presentation.Screens
                     continue;
                 }
 
-                OwnedBeast beast = OwnedBeast.Create("b" + next++, speciesId, StartingLevel);
+                OwnedBeast beast = OwnedBeast.Create("b" + next++, speciesId, Math.Max(1, level));
                 for (int slot = 0; slot < kit.DefaultLoadout.Length && slot < beast.Skills.SlotCount; slot++)
                 {
                     beast.Skills.Learn(kit.DefaultLoadout[slot]);

@@ -107,7 +107,7 @@ namespace BeastCraft.Presentation.Screens
         public const float TopPad = 380f;
 
         /// <summary>Room below the bottom row (the trailhead, above the bottom nav).</summary>
-        public const float BottomPad = 420f;
+        public const float BottomPad = 520f;
 
         public const float SideMargin = 170f;
 
@@ -151,7 +151,7 @@ namespace BeastCraft.Presentation.Screens
             float bottomY = layout.WorldHeight - BottomPad;
             float phase = (DeterministicRandom.Hash(seed, 7) % 628) / 100f;
             float laneStep = lanes > 1 ? (WorldWidth - 2f * SideMargin) / (lanes - 1) : 0f;
-            layout.Trailhead = new Vec2(WorldWidth / 2f + Meander(-1, phase) * 0.5f, bottomY + RowStep * 0.95f);
+            layout.Trailhead = new Vec2(WorldWidth / 2f + Meander(-1, phase) * 0.5f, bottomY + RowStep * 1.35f);
 
             foreach (MapNode node in nodes ?? new MapNode[0])
             {

@@ -9,12 +9,12 @@ using Microsoft.Xna.Framework;
 namespace BeastCraft.Android
 {
     /// <summary>
-    /// The Android host: MonoGame's activity around the shared <see cref="BattleViewerGame"/>, full
+    /// The Android host: MonoGame's activity around the shared <see cref="BeastCraftGame"/>, full
     /// screen and locked to portrait, with the content read from the APK's assets
-    /// (<see cref="TitleContainerContentSource"/>). The window extends under a display cutout
-    /// (notch, punch-hole) and reports the cutout's safe insets to the viewer, which letterboxes its
-    /// 1080x1920 canvas inside them. Tap the buttons and skills, tap the board to step, two fingers
-    /// toggle auto-play, Back quits.
+    /// (<see cref="TitleContainerContentSource"/>) and the save in the app's files directory. The
+    /// window extends under a display cutout (notch, punch-hole) and reports the cutout's safe insets
+    /// to the game, which letterboxes its 1080x1920 canvas inside them. It starts at the title; Back
+    /// goes back (the title asks before quitting), and pausing the app autosaves.
     /// </summary>
     [Activity(
         Label = "Beast Craft",
@@ -27,7 +27,7 @@ namespace BeastCraft.Android
                                ConfigChanges.ScreenLayout | ConfigChanges.SmallestScreenSize | ConfigChanges.UiMode)]
     public class MainActivity : AndroidGameActivity
     {
-        private BattleViewerGame _game;
+        private BeastCraftGame _game;
         private View _view;
 
         // Written on the UI thread when the layout settles, read by the game loop every frame.
@@ -43,8 +43,8 @@ namespace BeastCraft.Android
                 Window.Attributes.LayoutInDisplayCutoutMode = LayoutInDisplayCutoutMode.ShortEdges;
             }
 
-            _game = new BattleViewerGame(new ViewerOptions(),
-                                         ViewerHost.Mobile("BEAST CRAFT", new TitleContainerContentSource("Content"), () => _insets.Value));
+            _game = new BeastCraftGame(new ViewerOptions(),
+                                       ViewerHost.Mobile("BEAST CRAFT", new TitleContainerContentSource("Content"), () => _insets.Value, FilesDir?.AbsolutePath));
             // MonoGame's Exit() on Android only moves the task to the back; finish the activity so
             // Back really quits.
             _game.Exiting += (sender, args) => Finish();
@@ -52,6 +52,13 @@ namespace BeastCraft.Android
             _view.ViewTreeObserver.GlobalLayout += (sender, args) => ReadInsets();
             SetContentView(_view);
             _game.Run();
+        }
+
+        /// <summary>Going to the background (home, another app, the screen off): autosave before Android may stop the process.</summary>
+        protected override void OnPause()
+        {
+            _game?.OnBackgrounded();
+            base.OnPause();
         }
 
         /// <summary>The display cutout's safe insets (API 28+), in the view's pixels, as the back buffer is.</summary>

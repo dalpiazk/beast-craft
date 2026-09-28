@@ -162,6 +162,23 @@ namespace BeastCraft.Game.Rendering
             _batch.Draw(texture, at, null, color, 0f, new Vector2(texture.Width / 2f, texture.Height / 2f), scale, SpriteEffects.None, 0f);
         }
 
+        /// <summary>
+        /// The <paramref name="source"/> region of <paramref name="texture"/> stretched over the
+        /// rectangle at <paramref name="topLeft"/> of <paramref name="size"/>, linear-filtered: the UI
+        /// painter's rounded corners and soft shapes (engine-made textures, premultiplied).
+        /// </summary>
+        public void DrawRegion(Texture2D texture, Rectangle source, Vector2 topLeft, Vector2 size, Color color)
+        {
+            if (size.X <= 0f || size.Y <= 0f)
+            {
+                return;
+            }
+
+            Ensure(SamplerState.LinearClamp);
+            Vector2 scale = new Vector2(size.X / source.Width, size.Y / source.Height);
+            _batch.Draw(texture, topLeft, source, color, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
+        }
+
         /// <summary>A solid rectangle (the atlas's 1x1 pixel stretched).</summary>
         public void Fill(Texture2D pixel, Rectangle rectangle, Color color)
         {

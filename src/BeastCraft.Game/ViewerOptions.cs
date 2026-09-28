@@ -10,6 +10,22 @@ namespace BeastCraft.Game
     /// <summary>
     /// The command line.
     /// <code>
+    /// The game (it starts at the title screen):
+    ///   --screen NAME       start at a screen instead of the title, for debugging: title, map,
+    ///                       encounter, battle, results, roster, camp, avatar, inventory, settings
+    ///                       (a new game or the save is set up as needed; the battle is the first
+    ///                       reachable location's). With --screenshot: render that screen to PATH
+    ///                       and exit (on a throwaway in-memory save).
+    ///   --walkthrough DIR   scripted screenshots of the core loop on a fresh save in a temporary
+    ///                       folder: title, map, encounter, battle, results, map again, a coming-soon
+    ///                       tab and the settings, as numbered PNGs in DIR; then exit
+    ///   --save-dir DIR      keep the save and settings under DIR instead of the per-user folder
+    ///   --map-seed N        the seed new expedition maps are drawn with (default: the clock;
+    ///                       scripted runs use a fixed one)
+    ///   --starter-level L   a new game's starter beasts start at level L (debug; default 1)
+    ///
+    /// The battle demo (any of the flags below except the effects ones starts it instead of the
+    /// title, as the viewer always has; so does --screen demo):
     ///   --screenshot PATH   render one frame to PATH (PNG) and exit, after:
     ///   --turns N           playing N turns (the Nth is the one shown; default 1; 0 = the opening
     ///                       board before any turn, in the fit-all view)
@@ -71,6 +87,40 @@ namespace BeastCraft.Game
         public bool NoFlashes;
         public bool ShowSettings;
         public string Glossary;
+        public string Screen;
+        public string WalkthroughDir;
+        public string SaveDir;
+        public int? MapSeed;
+        public int? StarterLevel;
+
+        /// <summary>A flag of the battle demo was given (not counting the effects settings): start in the demo battle.</summary>
+        public bool DemoFlags;
+
+        /// <summary>The screens <c>--screen</c> accepts.</summary>
+        public static readonly string[] ScreenNames = { "title", "map", "encounter", "battle", "results", "roster", "camp", "avatar", "inventory", "settings", "demo" };
+
+        /// <summary>
+        /// Where the app starts: <c>--screen</c>'s screen, else the battle demo when a demo flag
+        /// (or a bare <c>--screenshot</c>) was given, else the title.
+        /// </summary>
+        public string StartScreen
+        {
+            get
+            {
+                if (!string.IsNullOrEmpty(Screen))
+                {
+                    return Screen;
+                }
+
+                return DemoFlags || Screenshot ? "demo" : "title";
+            }
+        }
+
+        /// <summary>Whether this run is the battle demo (the old viewer) rather than the game.</summary>
+        public bool IsDemo
+        {
+            get { return StartScreen == "demo" && string.IsNullOrEmpty(WalkthroughDir); }
+        }
 
         public bool Screenshot
         {
@@ -85,8 +135,48 @@ namespace BeastCraft.Game
             {
                 string flag = args[i];
                 string value = i + 1 < args.Length ? args[i + 1] : null;
+                if (Array.IndexOf(GameFlags, flag) < 0)
+                {
+                    options.DemoFlags |= Array.IndexOf(NeutralFlags, flag) < 0;
+                }
+
                 switch (flag)
                 {
+                    case "--screen":
+                        options.Screen = (value ?? string.Empty).ToLowerInvariant();
+                        if (Array.IndexOf(ScreenNames, options.Screen) < 0)
+                        {
+                            error = "--screen needs one of: " + string.Join(", ", ScreenNames) + ".";
+                        }
+
+                        i++;
+                        break;
+                    case "--walkthrough":
+                        options.WalkthroughDir = value;
+                        if (string.IsNullOrEmpty(value))
+                        {
+                            error = "--walkthrough needs a folder for the screenshots.";
+                        }
+
+                        i++;
+                        break;
+                    case "--save-dir":
+                        options.SaveDir = value;
+                        if (string.IsNullOrEmpty(value))
+                        {
+                            error = "--save-dir needs a folder.";
+                        }
+
+                        i++;
+                        break;
+                    case "--map-seed":
+                        options.MapSeed = Int(value, flag, int.MinValue, ref error);
+                        i++;
+                        break;
+                    case "--starter-level":
+                        options.StarterLevel = Math.Min(100, Int(value, flag, 1, ref error));
+                        i++;
+                        break;
                     case "--screenshot":
                         options.ScreenshotPath = value;
                         i++;
@@ -209,6 +299,12 @@ namespace BeastCraft.Game
 
             return options;
         }
+
+        /// <summary>The game's own flags (never the demo's).</summary>
+        private static readonly string[] GameFlags = { "--screen", "--walkthrough", "--save-dir", "--map-seed", "--starter-level" };
+
+        /// <summary>Flags that serve the game and the demo alike (they do not start the demo).</summary>
+        private static readonly string[] NeutralFlags = { "--screenshot", "--scale", "--safe-inset", "--content", "--effects", "--no-shake", "--no-flashes" };
 
         /// <summary>Applies the effects flags to <paramref name="settings"/> (unset flags leave it as it is).</summary>
         public void ApplyTo(PlayerSettings settings)
