@@ -113,7 +113,7 @@ namespace BeastCraft.Presentation.Screens
             {
                 Line("Skill power", Number(Power) + "%"),
                 Line(a + " vs " + d, Attack.ToString(CultureInfo.InvariantCulture) + " vs " + Defense.ToString(CultureInfo.InvariantCulture)),
-                Line("Base A²/(A+D)", Base.ToString("0.##", CultureInfo.InvariantCulture)),
+                Line("Base: power x A²/(A+D)", Base.ToString("0.##", CultureInfo.InvariantCulture)),
                 Line("Element", DerivedStats.Times(ElementMultiplier)),
                 Line("Crit", Crit ? DerivedStats.Times(CritMultiplier) : "no"),
                 Line("Variance roll", VariancePercent.ToString(CultureInfo.InvariantCulture) + "%"),
@@ -454,7 +454,7 @@ namespace BeastCraft.Presentation.Screens
         private void AddActivation(int turnNumber, BattleUnit caster, SkillActivation activation, string via)
         {
             string skill = activation.Skill?.DisplayName ?? activation.Skill?.SkillId ?? "?";
-            string source = via == null ? skill : via == "art" ? skill + " (art)" : via + ": " + skill;
+            string source = via == null || via == skill ? skill : via == "art" ? skill + " (art)" : via + ": " + skill;
             string casterName = caster == null ? via ?? "?" : Name(caster);
             if (activation.Targets.Count == 0)
             {

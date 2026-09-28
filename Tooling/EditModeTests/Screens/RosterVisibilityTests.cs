@@ -526,14 +526,18 @@ namespace BeastCraft.Tests.EditMode
             }
 
             Assert.IsTrue(insight.Enemies.Exists(e => e.Gap != 0), "the team is over the first location's level");
+            CollectionAssert.AllItemsAreUnique(insight.ColumnElements, "one column per enemy element");
+            CollectionAssert.AreEquivalent(insight.Enemies.Select(e => e.Element).Distinct(), insight.ColumnElements);
+            Assert.AreEqual(encounter.Enemies.Sum(e => e.Count), insight.ColumnCounts.Sum());
             for (int r = 0; r < insight.Team.Count; r++)
             {
                 CreatureSpeciesSO species = Content.Battle.GetSpecies(insight.Team[r].SpeciesId);
-                for (int c = 0; c < insight.Enemies.Count; c++)
+                Assert.AreEqual(insight.ColumnElements.Count, insight.Matrix[r].Count);
+                for (int c = 0; c < insight.ColumnElements.Count; c++)
                 {
                     MatchupCellView cell = insight.Matrix[r][c];
-                    Assert.AreEqual(ElementChart.GetMultiplier(insight.TeamAttack[r], insight.Enemies[c].Element), cell.Dealt);
-                    Assert.AreEqual(ElementChart.GetMultiplier(insight.Enemies[c].Element, species.Elements), cell.Taken);
+                    Assert.AreEqual(ElementChart.GetMultiplier(insight.TeamAttack[r], insight.ColumnElements[c]), cell.Dealt);
+                    Assert.AreEqual(ElementChart.GetMultiplier(insight.ColumnElements[c], species.Elements), cell.Taken);
                     Assert.AreEqual(Math.Sign(Math.Sign(cell.Dealt - 1f) - Math.Sign(cell.Taken - 1f)), cell.Verdict);
                 }
             }

@@ -174,6 +174,9 @@ namespace BeastCraft.Game.Screens
                     float barWidth = slot.Width - 2f * thickness - 12f;
                     DrawHpBar(slot.Center.X, slot.Bottom - thickness - 12f, barWidth, 6f, hp, unit.Stats.Hp);
                 }
+
+                // The thin ATB gauge under the portrait: how full the unit's turn meter is now.
+                DrawGauge(new Rect(slot.X + 4f, slot.Bottom + 6f, slot.Width - 8f, 8f), _playback.GaugeFraction(unit));
                 if (current)
                 {
                     _text.DrawCentered(_draw, _animation != null ? "NOW" : "NEXT", slot.Center.X, band.Y + 8f, Small, Ink("Y", Color.Yellow), shadow);
@@ -184,6 +187,17 @@ namespace BeastCraft.Game.Screens
                         DrawSkillIcon(firing, new Rect(slot.Right - badge - 2f, slot.Y + 2f, badge, badge), shadow, SourceOf(unit, firing));
                     }
                 }
+            }
+        }
+
+        /// <summary>A unit's ATB gauge fill (0-1) as a thin gold bar on a dark track.</summary>
+        private void DrawGauge(Rect box, float fraction)
+        {
+            _draw.Fill(Pixel, new Vector2(box.X, box.Y), new Vector2(box.Width, box.Height), Ink("1", Color.DarkGray));
+            float fill = Math.Max(0f, Math.Min(1f, fraction)) * box.Width;
+            if (fill > 0f)
+            {
+                _draw.Fill(Pixel, new Vector2(box.X, box.Y), new Vector2(fill, box.Height), Ink("y", Color.Gold));
             }
         }
 
@@ -235,7 +249,7 @@ namespace BeastCraft.Game.Screens
             }
         }
 
-        /// <summary>The log, collapsed to its latest line.</summary>
+        /// <summary>The log, collapsed to its latest line (tap it for the full log and each hit's breakdown).</summary>
         private void DrawToast(Color shadow)
         {
             if (_log.Count == 0)
@@ -245,7 +259,7 @@ namespace BeastCraft.Game.Screens
 
             Rect toast = _screen.Toast;
             _draw.Fill(Pixel, new Vector2(toast.X, toast.Y), new Vector2(toast.Width, toast.Height), Ink("p", Color.Purple) * 0.8f);
-            string count = "#" + _log.Count.ToString(CultureInfo.InvariantCulture);
+            string count = "LOG #" + _log.Count.ToString(CultureInfo.InvariantCulture);
             float countWidth = _text.Measure(count, Small);
             _text.Draw(_draw, _text.Fit(_log[_log.Count - 1], Medium, toast.Width - countWidth - 48f), new Vector2(toast.X + 16f, toast.Y + 22f), Medium,
                        Ink("4", Color.White), shadow);

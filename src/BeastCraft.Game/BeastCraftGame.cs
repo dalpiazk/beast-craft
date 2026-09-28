@@ -971,12 +971,43 @@ namespace BeastCraft.Game
                 steps.Add(() => Home().SelectTab(tab));
             }
 
-            if (screen == "encounter" || screen == "battle" || screen == "results")
+            if (screen == "beast-detail" || screen == "beast-derived" || screen == "beast-skills" || screen == "beast-gear")
+            {
+                int detailTab = screen == "beast-skills" ? 1 : screen == "beast-gear" ? 2 : 0;
+                steps.Add(() =>
+                {
+                    Home().SelectTab(HomeTab.Roster);
+                    Home().Roster.Open(Home().Roster.Model.Owned[0].BeastId);
+                    Top<BeastDetailScreen>().SelectTab(detailTab);
+                    if (screen == "beast-derived")
+                    {
+                        // The derived numbers: the turn rates, the element matchups, crits, the level-gap curve.
+                        Top<BeastDetailScreen>().ScrollPage(1f);
+                    }
+                });
+            }
+
+            if (screen == "element-chart")
+            {
+                steps.Add(() => _stack.Push(new ElementChartScreen(_ctx, GlossaryScreen.TeamElements(_ctx))));
+            }
+
+            if (screen == "glossary")
+            {
+                steps.Add(() => _stack.Push(new GlossaryScreen(_ctx, "level_gap")));
+            }
+
+            if (screen == "encounter" || screen == "encounter-insight" || screen == "battle" || screen == "results" || screen == "battle-log" || screen == "results-log")
             {
                 steps.Add(() => Home().OpenFirstEncounter());
             }
 
-            if (screen == "battle" || screen == "results")
+            if (screen == "encounter-insight")
+            {
+                steps.Add(() => Encounter().ScrollToInsight());
+            }
+
+            if (screen == "battle" || screen == "results" || screen == "battle-log" || screen == "results-log")
             {
                 steps.Add(() => Encounter().StartBattle());
             }
@@ -986,9 +1017,25 @@ namespace BeastCraft.Game
                 steps.Add(() => Battle().ShowTurn(3));
             }
 
-            if (screen == "results")
+            if (screen == "battle-log")
+            {
+                // Far enough in for hits to log.
+                steps.Add(() => Battle().ShowTurn(14));
+            }
+
+            if (screen == "battle-log")
+            {
+                steps.Add(() => Battle().OpenLog().OpenHit(-1));
+            }
+
+            if (screen == "results" || screen == "results-log")
             {
                 steps.Add(() => Battle().HandBack());
+            }
+
+            if (screen == "results-log")
+            {
+                steps.Add(() => Results().OpenLog().OpenHit(-1));
             }
 
             for (int i = 0; i < steps.Count; i++)

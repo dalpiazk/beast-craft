@@ -236,9 +236,9 @@ namespace BeastCraft.Game.Screens
 
         public override void Update(float elapsedMs, FrameInput input)
         {
-            if (Ctx.Stack.TopModal is HintModal)
+            if (Ctx.Stack.TopModal is HintModal || Ctx.Stack.TopModal is BattleLogModal)
             {
-                // A tutorial hint pauses the battle until it is dismissed.
+                // A tutorial hint, or the battle log, pauses the battle until it is closed.
                 return;
             }
 
@@ -422,6 +422,18 @@ namespace BeastCraft.Game.Screens
             }
 
             _auto = false;
+        }
+
+        /// <summary>
+        /// The battle log so far (<see cref="BattleLogViewModel"/> over the turns played), as a modal
+        /// over the battle, which waits while it is open.
+        /// </summary>
+        public BattleLogModal OpenLog()
+        {
+            BattleLogViewModel log = BattleLogViewModel.Build(_playback.Battle, _playback.Units, BattleLogViewModel.NamesFor(_content, _speciesByUnit, _playback.Avatar?.Id));
+            BattleLogModal modal = new BattleLogModal(Ctx, log, "Battle log: turn " + _playback.Played.Count.ToString(CultureInfo.InvariantCulture));
+            Ctx.Stack.PushModal(modal);
+            return modal;
         }
 
         /// <summary>A decided campaign battle goes back for its results (once).</summary>
@@ -679,6 +691,13 @@ namespace BeastCraft.Game.Screens
             {
                 _selectedSkill = card == _selectedSkill ? -1 : card;
                 _popupTerm = null;
+                return;
+            }
+
+            if (_screen.Toast.Contains(at.X, at.Y) && _log.Count > 0)
+            {
+                // The log strip opens the full battle log (its breakdowns); it collapses back on close.
+                OpenLog();
                 return;
             }
 

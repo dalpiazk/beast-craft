@@ -32,7 +32,7 @@ namespace BeastCraft.Presentation.Screens
         public List<SkillCard> Skills = new List<SkillCard>();
     }
 
-    /// <summary>One cell of the matchup matrix: a team beast (row) against an enemy group (column).</summary>
+    /// <summary>One cell of the matchup matrix: a team beast (row) against an enemy element (column).</summary>
     public sealed class MatchupCellView
     {
         /// <summary>The beast's hits on the enemy (its attacking element against the enemy's).</summary>
@@ -64,7 +64,13 @@ namespace BeastCraft.Presentation.Screens
         /// <summary>The team beasts' attacking elements, by row.</summary>
         public List<Element> TeamAttack = new List<Element>();
 
-        /// <summary>[row][column]: team beast by enemy group.</summary>
+        /// <summary>The matrix's columns: the enemies' distinct elements, in the order they first appear (a matchup depends only on the element).</summary>
+        public List<Element> ColumnElements = new List<Element>();
+
+        /// <summary>How many enemies carry each column's element.</summary>
+        public List<int> ColumnCounts = new List<int>();
+
+        /// <summary>[row][column]: team beast by enemy element.</summary>
         public List<List<MatchupCellView>> Matrix = new List<List<MatchupCellView>>();
 
         /// <summary>The team's elements (for the element chart's highlight).</summary>
@@ -127,6 +133,16 @@ namespace BeastCraft.Presentation.Screens
                 }
 
                 view.Enemies.Add(enemy);
+                int column = view.ColumnElements.IndexOf(group.Element);
+                if (column < 0)
+                {
+                    view.ColumnElements.Add(group.Element);
+                    view.ColumnCounts.Add(group.Count);
+                }
+                else
+                {
+                    view.ColumnCounts[column] += group.Count;
+                }
             }
 
             for (int r = 0; r < view.Team.Count; r++)
@@ -134,12 +150,12 @@ namespace BeastCraft.Presentation.Screens
                 CreatureSpeciesSO species = content.Battle.GetSpecies(view.Team[r].SpeciesId);
                 IReadOnlyList<Element> defend = species?.Elements ?? new Element[0];
                 List<MatchupCellView> row = new List<MatchupCellView>();
-                foreach (EnemyInsightView enemy in view.Enemies)
+                foreach (Element element in view.ColumnElements)
                 {
-                    float dealt = ElementChart.GetMultiplier(view.TeamAttack[r], enemy.Element);
+                    float dealt = ElementChart.GetMultiplier(view.TeamAttack[r], element);
 
                     // An enemy's kit carries its own element (EnemyCatalog.Kit).
-                    float taken = ElementChart.GetMultiplier(enemy.Element, defend);
+                    float taken = ElementChart.GetMultiplier(element, defend);
                     row.Add(new MatchupCellView { Dealt = dealt, Taken = taken, Verdict = Math.Sign(Math.Sign(dealt - 1f) - Math.Sign(taken - 1f)) });
                 }
 
