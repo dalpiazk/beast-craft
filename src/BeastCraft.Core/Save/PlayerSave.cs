@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using BeastCraft.Campaign;
 using BeastCraft.Customization;
+using BeastCraft.Discovery;
 using BeastCraft.Economy;
 using BeastCraft.Idle;
 using BeastCraft.Progression;
@@ -17,8 +18,10 @@ namespace BeastCraft.Save
     /// the expedition in progress (schema 3), and the economy: gold, consumables, the Traders' frozen
     /// stock, cosmetic unlocks and the avatar's and every beast's appearance (schema 4), and the idle
     /// (AFK) reward clock (schema 5), the difficulty of the expedition in progress
-    /// (<c>MapRun.Difficulty</c>, schema 6), and the onboarding state: Hearthglen cleared and the
-    /// tutorial hints seen (<see cref="Tutorial"/>, schema 7).
+    /// (<c>MapRun.Difficulty</c>, schema 6), the onboarding state: Hearthglen cleared and the
+    /// tutorial hints seen (<see cref="Tutorial"/>, schema 7), and the discovery layer: each region's
+    /// fog, points of interest found and discovery seed (<c>RegionProgress</c>), the Kinship sites
+    /// claimed, the shrines' Grove unlocks and the lore found (<see cref="Discovery"/>, schema 8).
     /// <para>
     /// <strong>JsonUtility-compatible by construction.</strong> Every type reachable from here is
     /// <c>[Serializable]</c> with public fields, and every map is a list (<c>JsonUtility</c> drops
@@ -38,7 +41,7 @@ namespace BeastCraft.Save
     public class PlayerSave
     {
         /// <summary>The schema this code writes, and the newest it reads.</summary>
-        public const int CurrentSchemaVersion = 7;
+        public const int CurrentSchemaVersion = 8;
 
         /// <summary>The schema the data is in. 0 (or missing) is never valid.</summary>
         public int SchemaVersion = CurrentSchemaVersion;
@@ -107,6 +110,13 @@ namespace BeastCraft.Save
         /// from before it that owns a beast counts Hearthglen as cleared.
         /// </summary>
         public TutorialProgress Tutorial = new TutorialProgress();
+
+        /// <summary>
+        /// The discovery layer's account-wide state: Kinship sites claimed (and a won trial's pending
+        /// choice), the Grove unlocks the shrines granted, the lore found
+        /// (<see cref="DiscoveryProgress"/>). Added in schema 8.
+        /// </summary>
+        public DiscoveryProgress Discovery = new DiscoveryProgress();
 
         /// <summary>
         /// A blank save: no beasts, avatar level 1, nothing learned or held, the first campaign region
@@ -327,6 +337,13 @@ namespace BeastCraft.Save
             }
 
             repaired += Tutorial.EnsureInitialized();
+            if (Discovery == null)
+            {
+                Discovery = new DiscoveryProgress();
+                repaired++;
+            }
+
+            repaired += Discovery.EnsureInitialized();
             return repaired;
         }
 

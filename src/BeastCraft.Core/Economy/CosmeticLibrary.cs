@@ -30,11 +30,17 @@ namespace BeastCraft.Economy
         /// </summary>
         public const string SourceBossHard = "boss_hard";
 
+        /// <summary>
+        /// An exploration reward (the discovery layer, <c>discovery.json</c>): a region's 100% reward
+        /// (UnlockId = the region) or a cache's look (UnlockId = the cache); never sold, never dropped.
+        /// </summary>
+        public const string SourceDiscovery = "discovery";
+
         /// <summary>A category's <see cref="CosmeticCategory.Scope"/> for the avatar.</summary>
         public const string AvatarScope = "avatar";
 
         /// <summary>Every source name, in the validator's order.</summary>
-        public static readonly string[] Sources = { SourceDefault, SourceStarter, SourceShop, SourceBoss, SourceMilestone, SourceDrop, SourcePremium, SourceBossHard };
+        public static readonly string[] Sources = { SourceDefault, SourceStarter, SourceShop, SourceBoss, SourceMilestone, SourceDrop, SourcePremium, SourceBossHard, SourceDiscovery };
 
         private readonly List<CosmeticCategory> _categories = new List<CosmeticCategory>();
         private readonly Dictionary<string, CosmeticCategory> _byId = new Dictionary<string, CosmeticCategory>(StringComparer.Ordinal);

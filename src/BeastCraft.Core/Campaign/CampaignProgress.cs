@@ -157,11 +157,21 @@ namespace BeastCraft.Campaign
             }
 
             repaired += ActiveRun.EnsureInitialized();
+            foreach (RegionProgress region in Regions)
+            {
+                repaired += region.EnsureInitialized();
+            }
+
             return repaired;
         }
     }
 
-    /// <summary>One unlocked region's progress: how many of its stages are cleared and whether its boss is.</summary>
+    /// <summary>
+    /// One unlocked region's progress: how many of its stages are cleared and whether its boss is,
+    /// and (schema 8) its discovery layer: the seed its points of interest are laid out from, the
+    /// fog lifted on each stage's map, the points of interest found and whether the region's 100%
+    /// reward was granted (<see cref="MapFog"/>, <c>BeastCraft.Discovery</c>).
+    /// </summary>
     [Serializable]
     public class RegionProgress
     {
@@ -173,5 +183,136 @@ namespace BeastCraft.Campaign
 
         /// <summary>Whether the region's boss has been beaten (its seal granted, the regions it opens unlocked).</summary>
         public bool BossCleared;
+
+        /// <summary>
+        /// The seed the region's points of interest are laid out from (<c>PoiLayout</c>), independent of
+        /// any expedition's map seed so a replay (a new map) never moves them or re-rolls what they
+        /// hold. Assigned once, by the first expedition into the region
+        /// (<see cref="CampaignRules.StartRun(BeastCraft.Save.PlayerSave, RegionLibrary, string, int, int, RunDifficulty)"/>);
+        /// 0 = not yet assigned. Added in schema 8.
+        /// </summary>
+        public int DiscoverySeed;
+
+        /// <summary>
+        /// The fog lifted on each stage's map, one entry per stage visited (<see cref="MapFog"/>): never
+        /// fogged again, whatever map a replay draws. Added in schema 8.
+        /// </summary>
+        public List<StageFog> Fog = new List<StageFog>();
+
+        /// <summary>The points of interest found (visited; a Kinship site once its beast joined), by <c>PoiId</c>, in order. Added in schema 8.</summary>
+        public List<string> FoundPoiIds = new List<string>();
+
+        /// <summary>Whether the region's 100% exploration reward has been granted (<c>DiscoveryRules.TryComplete</c>). Added in schema 8.</summary>
+        public bool Completed;
+
+        /// <summary>The fog of stage <paramref name="stage"/>, or null when none of it has been seen.</summary>
+        public StageFog FindFog(int stage)
+        {
+            if (Fog == null)
+            {
+                return null;
+            }
+
+            for (int i = 0; i < Fog.Count; i++)
+            {
+                if (Fog[i] != null && Fog[i].Stage == stage)
+                {
+                    return Fog[i];
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>The fog of stage <paramref name="stage"/>, added (all fogged) when missing.</summary>
+        public StageFog FogOf(int stage)
+        {
+            StageFog fog = FindFog(stage);
+            if (fog == null)
+            {
+                if (Fog == null)
+                {
+                    Fog = new List<StageFog>();
+                }
+
+                fog = new StageFog { Stage = stage };
+                Fog.Add(fog);
+            }
+
+            return fog;
+        }
+
+        /// <summary>Whether point of interest <paramref name="poiId"/> has been found.</summary>
+        public bool HasFound(string poiId)
+        {
+            return !string.IsNullOrEmpty(poiId) && FoundPoiIds != null && FoundPoiIds.Contains(poiId);
+        }
+
+        /// <summary>Records <paramref name="poiId"/> as found. False when it already was, or the id is empty.</summary>
+        public bool MarkFound(string poiId)
+        {
+            if (string.IsNullOrEmpty(poiId) || HasFound(poiId))
+            {
+                return false;
+            }
+
+            if (FoundPoiIds == null)
+            {
+                FoundPoiIds = new List<string>();
+            }
+
+            FoundPoiIds.Add(poiId);
+            return true;
+        }
+
+        /// <summary>Replaces null lists with empty ones and drops null or repeated entries. Returns how many things were repaired.</summary>
+        public int EnsureInitialized()
+        {
+            int repaired = 0;
+            if (Fog == null)
+            {
+                Fog = new List<StageFog>();
+                repaired++;
+            }
+
+            repaired += Fog.RemoveAll(fog => fog == null);
+            foreach (StageFog fog in Fog)
+            {
+                if (fog.Cells == null)
+                {
+                    fog.Cells = string.Empty;
+                    repaired++;
+                }
+            }
+
+            if (FoundPoiIds == null)
+            {
+                FoundPoiIds = new List<string>();
+                repaired++;
+            }
+
+            HashSet<string> seen = new HashSet<string>(StringComparer.Ordinal);
+            repaired += FoundPoiIds.RemoveAll(id => string.IsNullOrEmpty(id) || !seen.Add(id));
+            return repaired;
+        }
+    }
+
+    /// <summary>
+    /// The fog lifted on one stage's map (<see cref="MapFog"/>): which cells of the stage's fog grid
+    /// have been seen, as a bit set written in hexadecimal (cell <c>i</c> is bit <c>i % 4</c> of hex
+    /// digit <c>i / 4</c>; compact, and JsonUtility-safe), and the highest row a location was
+    /// cleared on (a Kinship site calls to a player who has walked up to its row). Save data.
+    /// </summary>
+    [Serializable]
+    public class StageFog
+    {
+        /// <summary>The stage, 0-based.</summary>
+        public int Stage;
+
+        /// <summary>The highest map row (layer) a location was cleared on in any expedition of the stage; −1 before any.</summary>
+        public int DeepestLayer = -1;
+
+        /// <summary>The seen cells as a hexadecimal bit set ("" = all fogged). Read and written through <see cref="MapFog"/>.</summary>
+        public string Cells = string.Empty;
     }
 }

@@ -230,8 +230,24 @@ namespace BeastCraft.Campaign
                             ? FixedMap(region, seed)
                             : NodeMapGenerator.Generate(library.RegionFor(region, difficulty), library.RulesFor(region, difficulty), stage, seed);
             save.Campaign.CurrentRegionId = regionId;
+            if (!region.IsTutorial)
+            {
+                // The discovery layer: the region's own seed, assigned once (never the map's, which a
+                // replay re-rolls), and the trailhead's fog lifted. No random draw: the pacing never moves.
+                RegionProgress progress = save.Campaign.FindRegion(regionId);
+                if (progress.DiscoverySeed == 0)
+                {
+                    progress.DiscoverySeed = Math.Max(1, LootRoller.DeriveSeed(seed, DiscoverySeedStream));
+                }
+
+                MapFog.StartStage(progress, MapFog.GridFor(library.RulesFor(region, difficulty)), stage);
+            }
+
             return CampaignResult.Done(CampaignOutcome.Started, null);
         }
+
+        /// <summary>The <see cref="LootRoller.DeriveSeed"/> stream a region's <see cref="RegionProgress.DiscoverySeed"/> is drawn from (off its first expedition's seed).</summary>
+        public const int DiscoverySeedStream = 0x44495343;
 
         /// <summary>
         /// A tutorial region's map, built from its authored <see cref="RegionData.FixedNodes"/> (never
@@ -503,6 +519,7 @@ namespace BeastCraft.Campaign
             }
 
             Clear(run, node);
+            RevealAround(save, library, run, node);
             if (region.IsTutorial)
             {
                 CampaignResult cleared = CampaignResult.Done(CampaignOutcome.Cleared, node);
@@ -612,6 +629,7 @@ namespace BeastCraft.Campaign
             }
 
             Clear(run, node);
+            RevealAround(save, library, run, node);
             return FinishIfLast(save, library, run, node, result);
         }
 
@@ -827,6 +845,7 @@ namespace BeastCraft.Campaign
             CampaignResult result = CampaignResult.Done(CampaignOutcome.Visited, node);
             result.ShopOpened = shop != null && shop.Open(save, ShopContextFor(run, node));
             Clear(run, node);
+            RevealAround(save, library, run, node);
             return result;
         }
 
@@ -1019,6 +1038,22 @@ namespace BeastCraft.Campaign
             {
                 result.GearGranted = item.GearId;
             }
+        }
+
+        /// <summary>
+        /// Lifts the fog around <paramref name="node"/>, just cleared on <paramref name="run"/>'s stage
+        /// (<see cref="MapFog.OnCleared"/>); nothing in a tutorial region (no fog there).
+        /// </summary>
+        private static void RevealAround(PlayerSave save, RegionLibrary library, MapRun run, MapNode node)
+        {
+            RegionData region = library.GetRegion(run.RegionId);
+            RegionProgress progress = save.Campaign.FindRegion(run.RegionId);
+            if (region == null || region.IsTutorial || progress == null)
+            {
+                return;
+            }
+
+            MapFog.OnCleared(progress, MapFog.GridFor(library.RulesFor(region, run.Difficulty)), run.Stage, node, run.Nodes);
         }
 
         private static void Clear(MapRun run, MapNode node)

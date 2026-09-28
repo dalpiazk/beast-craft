@@ -247,6 +247,76 @@
       "Draft": true
     },
     {
+      "EncounterId": "kin_trial_r01",
+      "DisplayName": "Mossbound Trial",
+      "Description": "A mossy champion keeps the kinship stone, a horned brute and a lean stalker at its side. Stand firm and a beast of the Hollow may choose you.",
+      "ShapeId": "elite",
+      "Arena": "Medium",
+      "Groups": [ { "EnemyId": "champion", "Count": 1, "Elements": [ "Nature" ] }, { "EnemyId": "brute", "Count": 1, "Elements": [ ] }, { "EnemyId": "stalker", "Count": 1, "Elements": [ ] } ],
+      "DifficultyOverride": 0.7,
+      "Draft": true
+    },
+    {
+      "EncounterId": "kin_trial_r02",
+      "DisplayName": "Cinderglow Trial",
+      "Description": "A smouldering champion stands guard at the glowing stone with an archer and a caster behind it. Win and a beast of the ridges may answer.",
+      "ShapeId": "elite",
+      "Arena": "Medium",
+      "Groups": [ { "EnemyId": "champion", "Count": 1, "Elements": [ "Fire" ] }, { "EnemyId": "archer", "Count": 1, "Elements": [ ] }, { "EnemyId": "caster", "Count": 1, "Elements": [ ] } ],
+      "DifficultyOverride": 0.7,
+      "Draft": true
+    },
+    {
+      "EncounterId": "kin_trial_r03",
+      "DisplayName": "Tidewrack Trial",
+      "Description": "A brine-soaked champion rises from the pool by the stone, a shaman and a brute wading after it. Win and a beast of the tides may choose you.",
+      "ShapeId": "elite",
+      "Arena": "Medium",
+      "Groups": [ { "EnemyId": "champion", "Count": 1, "Elements": [ "Water" ] }, { "EnemyId": "shaman", "Count": 1, "Elements": [ ] }, { "EnemyId": "brute", "Count": 1, "Elements": [ ] } ],
+      "DifficultyOverride": 0.7,
+      "Draft": true
+    },
+    {
+      "EncounterId": "kin_trial_r04",
+      "DisplayName": "Galecrest Trial",
+      "Description": "A gale-wrapped champion swoops down on the still stone with two stalkers circling. Win and a beast of the crags may answer.",
+      "ShapeId": "elite",
+      "Arena": "Medium",
+      "Groups": [ { "EnemyId": "champion", "Count": 1, "Elements": [ "Air" ] }, { "EnemyId": "stalker", "Count": 2, "Elements": [ ] } ],
+      "DifficultyOverride": 0.7,
+      "Draft": true
+    },
+    {
+      "EncounterId": "kin_trial_r05",
+      "DisplayName": "Ironroot Trial",
+      "Description": "A rust-plated champion guards the rooted stone, a brute and an archer beside it. Win and a beast of the iron wood may choose you.",
+      "ShapeId": "elite",
+      "Arena": "Medium",
+      "Groups": [ { "EnemyId": "champion", "Count": 1, "Elements": [ "Metal" ] }, { "EnemyId": "brute", "Count": 1, "Elements": [ ] }, { "EnemyId": "archer", "Count": 1, "Elements": [ ] } ],
+      "DifficultyOverride": 0.7,
+      "Draft": true
+    },
+    {
+      "EncounterId": "kin_trial_r06_rime",
+      "DisplayName": "Rimeglass Trial",
+      "Description": "A frost-bright champion keeps the glassy stone with a caster and a stalker. Win and a beast of the frozen lake may answer.",
+      "ShapeId": "elite",
+      "Arena": "Medium",
+      "Groups": [ { "EnemyId": "champion", "Count": 1, "Elements": [ "Ice" ] }, { "EnemyId": "caster", "Count": 1, "Elements": [ ] }, { "EnemyId": "stalker", "Count": 1, "Elements": [ ] } ],
+      "DifficultyOverride": 0.7,
+      "Draft": true
+    },
+    {
+      "EncounterId": "kin_trial_r06_shade",
+      "DisplayName": "Deepshade Trial",
+      "Description": "A dusk-cloaked champion rises from the shadow of the dark stone, a shaman and an archer behind it. Win and the last beast may choose you.",
+      "ShapeId": "elite",
+      "Arena": "Medium",
+      "Groups": [ { "EnemyId": "champion", "Count": 1, "Elements": [ "Dark" ] }, { "EnemyId": "shaman", "Count": 1, "Elements": [ ] }, { "EnemyId": "archer", "Count": 1, "Elements": [ ] } ],
+      "DifficultyOverride": 0.7,
+      "Draft": true
+    },
+    {
       "EncounterId": "boss_r01_hollow_warden",
       "DisplayName": "Mossjaw the Warden",
       "Description": "A moss-backed champion that once guarded the Hollow's Seal for the first Beastbinders and now guards it from everyone. Two horned brutes stamp at its side.",

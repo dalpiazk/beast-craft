@@ -461,7 +461,7 @@ namespace BeastCraft.Tests.EditMode
             PlayerSave v6 = TestSaves.SixStarters(Content);
             v6.Tutorial = new TutorialProgress();
             SaveSerializer serializer = new SaveSerializer(new JsonSaveSerializer(), SaveContentCatalog.FromData(Content.Roster, Content.SkillLibrary, Content.Regions));
-            string json = serializer.Serialize(v6).Replace("\"SchemaVersion\":7", "\"SchemaVersion\":6");
+            string json = serializer.Serialize(v6).Replace("\"SchemaVersion\":" + PlayerSave.CurrentSchemaVersion, "\"SchemaVersion\":6");
             json = json.Substring(0, json.IndexOf(",\"Tutorial\":", StringComparison.Ordinal)) + "}";
 
             SaveLoadResult loaded = serializer.Deserialize(json);

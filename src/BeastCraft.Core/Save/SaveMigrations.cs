@@ -1,5 +1,7 @@
+using System;
 using System.Collections.Generic;
 using BeastCraft.Campaign;
+using BeastCraft.Progression;
 
 namespace BeastCraft.Save
 {
@@ -19,6 +21,8 @@ namespace BeastCraft.Save
     /// <item>4 to 5: the idle reward clock (<see cref="PlayerSave.Idle"/>): <see cref="AddIdle"/>.</item>
     /// <item>5 to 6: the expedition's difficulty (<see cref="MapRun.Difficulty"/>): <see cref="AddRunDifficulty"/>.</item>
     /// <item>6 to 7: the onboarding state (<see cref="PlayerSave.Tutorial"/>): <see cref="AddTutorial"/>.</item>
+    /// <item>7 to 8: the discovery layer (<see cref="PlayerSave.Discovery"/>, each region's fog, points of
+    /// interest found and discovery seed): <see cref="AddDiscovery"/>.</item>
     /// </list>
     /// </summary>
     public static class SaveMigrations
@@ -26,7 +30,7 @@ namespace BeastCraft.Save
         /// <summary>A fresh list of every step (callers may append to it).</summary>
         public static List<ISaveMigration> All()
         {
-            return new List<ISaveMigration> { new AddGear(), new AddCampaign(), new AddEconomy(), new AddIdle(), new AddRunDifficulty(), new AddTutorial() };
+            return new List<ISaveMigration> { new AddGear(), new AddCampaign(), new AddEconomy(), new AddIdle(), new AddRunDifficulty(), new AddTutorial(), new AddDiscovery() };
         }
 
         /// <summary>
@@ -172,6 +176,105 @@ namespace BeastCraft.Save
 
                 save.SchemaVersion = 7;
                 return serializer.ToJson(save);
+            }
+        }
+
+        /// <summary>
+        /// Schema 7 to 8: a v7 save has no discovery layer. The upgrade reads it into the current type
+        /// (no Kinship site claimed, no Grove unlock, no lore, nothing found) and gives every unlocked
+        /// campaign region its discovery seed: the expedition in progress's map seed for its region,
+        /// else one derived from the region id (<see cref="MigratedDiscoverySeed"/>), so the upgrade is
+        /// deterministic. Ground already explored is not fogged again: every stage cleared before fog
+        /// existed (and a cleared boss's last stage) is revealed whole, and the expedition in
+        /// progress has its trailhead and every location it cleared revealed as if played with fog.
+        /// No beast is touched and no Kinship site is claimed: a site never offers a beast the player
+        /// owns, so a save that owns six beasts meets its four missing species at the next sites, and a
+        /// site with nothing left to offer is a lore and cache stop instead. Tutorial regions have no fog.
+        /// </summary>
+        public sealed class AddDiscovery : ISaveMigration
+        {
+            /// <summary>The <c>LootRoller.DeriveSeed</c> stream a migrated region's seed is drawn on.</summary>
+            public const int MigrationStream = 0x4D494752;
+
+            /// <summary>The shipped regions' map shape (<c>regions.json</c> <c>MapRules</c>: 11 layers, 4 lanes), frozen for the migration.</summary>
+            public const int DefaultMapRows = 10;
+
+            /// <summary>See <see cref="DefaultMapRows"/>.</summary>
+            public const int DefaultLanes = 4;
+
+            public int FromVersion
+            {
+                get { return 7; }
+            }
+
+            public string Upgrade(string json, ISaveJsonSerializer serializer)
+            {
+                PlayerSave save = serializer.FromJson<PlayerSave>(json);
+                save.EnsureInitialized();
+                MapRun run = save.Campaign.ActiveRun;
+                foreach (RegionProgress progress in save.Campaign.Regions)
+                {
+                    if (string.IsNullOrEmpty(progress.RegionId) || progress.RegionId == CampaignProgress.TutorialRegionId)
+                    {
+                        continue;
+                    }
+
+                    bool active = save.Campaign.HasActiveRun && run.RegionId == progress.RegionId;
+                    if (progress.DiscoverySeed == 0)
+                    {
+                        progress.DiscoverySeed = active && run.Seed != 0 ? Math.Max(1, LootRoller.DeriveSeed(run.Seed, CampaignRules.DiscoverySeedStream))
+                                                     : MigratedDiscoverySeed(progress.RegionId);
+                    }
+
+                    // Stages explored before fog existed stay explored (read off the expedition's map, else
+                    // the shipped regions' shape; a region with other rules is corrected on its next expedition).
+                    FogGrid grid = MigrationGrid(run, active);
+                    int explored = progress.BossCleared ? progress.StagesCleared + 1 : progress.StagesCleared;
+                    for (int stage = 0; stage < explored; stage++)
+                    {
+                        MapFog.RevealAll(progress.FogOf(stage), grid);
+                    }
+
+                    if (active)
+                    {
+                        MapFog.StartStage(progress, grid, run.Stage);
+                        foreach (int nodeId in run.Cleared)
+                        {
+                            MapFog.OnCleared(progress, grid, run.Stage, run.Find(nodeId), run.Nodes);
+                        }
+                    }
+                }
+
+                save.SchemaVersion = 8;
+                return serializer.ToJson(save);
+            }
+
+            /// <summary>A migrated region's discovery seed: derived from its id alone (stable across runs and machines), never 0.</summary>
+            public static int MigratedDiscoverySeed(string regionId)
+            {
+                int hash = 17;
+                foreach (char c in regionId ?? string.Empty)
+                {
+                    hash = unchecked((hash * 31) + c);
+                }
+
+                return Math.Max(1, LootRoller.DeriveSeed(hash, MigrationStream));
+            }
+
+            private static FogGrid MigrationGrid(MapRun run, bool active)
+            {
+                int rows = 0;
+                int lanes = 0;
+                if (active)
+                {
+                    foreach (MapNode node in run.Nodes)
+                    {
+                        rows = Math.Max(rows, node.Layer);
+                        lanes = Math.Max(lanes, node.Lane + 1);
+                    }
+                }
+
+                return rows > 0 ? new FogGrid(rows, Math.Max(lanes, 1)) : new FogGrid(DefaultMapRows, DefaultLanes);
             }
         }
 
