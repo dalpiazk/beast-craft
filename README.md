@@ -215,7 +215,7 @@ dotnet run --project src/BeastCraft.Desktop -c Release
 **New Game** gives you the starter beasts and an expedition into the Verdant
 Hollow; **Continue** (the primary button once there is a save) loads it and
 claims the idle rewards. On the **map**, drag to scroll, tap a glowing location
-(or **Next battle**) to see its encounter for free, pick up to four beasts and
+(or **Next battle**) to see its encounter for free, pick up to three beasts and
 one consumable, and **Start Battle**; the battle plays by itself, then the
 results pay out and the map moves on. **Esc** is Back (the title asks before
 quitting); the mouse clicks and drags like a finger. The game autosaves when a
