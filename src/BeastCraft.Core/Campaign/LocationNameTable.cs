@@ -95,6 +95,10 @@ namespace BeastCraft.Campaign
                     return "Pass";
                 case LocationKind.Lair:
                     return "Lair";
+                case LocationKind.Shrine:
+                    return "Shrine";
+                case LocationKind.KinshipSite:
+                    return "Kinship Site";
                 default:
                     return "Wilds";
             }

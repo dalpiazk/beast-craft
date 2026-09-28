@@ -131,7 +131,7 @@ namespace BeastCraft.Presentation.Screens
             {
                 Outcome = result.Outcome,
                 NodeId = battle.Node.NodeId,
-                Subtitle = session.Content.LocationNames?.Resolve(battle.Node) ?? MapViewModel.KindLabel(battle.Node.Type),
+                Subtitle = session.LocationName(battle.Node),
                 Gold = summary.GoldGained,
                 GoldTotal = save.Gold,
                 FirstClear = summary.Loot.FirstClear,

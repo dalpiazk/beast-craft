@@ -15,6 +15,7 @@ namespace BeastCraft.Campaign
         private readonly Dictionary<string, RegionData> _regions = new Dictionary<string, RegionData>(StringComparer.Ordinal);
         private readonly Dictionary<string, SealData> _seals = new Dictionary<string, SealData>(StringComparer.Ordinal);
         private readonly List<RegionData> _order = new List<RegionData>();
+        private readonly List<RegionData> _tutorials = new List<RegionData>();
 
         private RegionLibrary(RegionLibraryData data)
         {
@@ -24,7 +25,7 @@ namespace BeastCraft.Campaign
         /// <summary>The authored data.</summary>
         public RegionLibraryData Data { get; }
 
-        /// <summary>Every region, in campaign order.</summary>
+        /// <summary>Every campaign region, in campaign order (the tutorial regions are not among them: <see cref="TutorialRegions"/>).</summary>
         public IReadOnlyList<RegionData> Regions
         {
             get { return _order; }
@@ -58,7 +59,58 @@ namespace BeastCraft.Campaign
                 }
             }
 
+            // The onboarding regions: found by id like any region, never in the campaign order.
+            foreach (RegionData region in library.Data.TutorialRegions ?? new RegionData[0])
+            {
+                if (region != null && !string.IsNullOrEmpty(region.RegionId) && !library._regions.ContainsKey(region.RegionId))
+                {
+                    library._regions.Add(region.RegionId, region);
+                    library._tutorials.Add(region);
+                }
+            }
+
             return library;
+        }
+
+        /// <summary>The onboarding regions (<see cref="RegionLibraryData.TutorialRegions"/>), in file order.</summary>
+        public IReadOnlyList<RegionData> TutorialRegions
+        {
+            get { return _tutorials; }
+        }
+
+        /// <summary>Hearthglen (<see cref="CampaignProgress.TutorialRegionId"/>), or null when the library has none.</summary>
+        public RegionData Tutorial
+        {
+            get { return GetRegion(CampaignProgress.TutorialRegionId) is RegionData region && region.IsTutorial ? region : null; }
+        }
+
+        /// <summary>Whether <paramref name="regionId"/> is an onboarding region (<see cref="RegionData.IsTutorial"/>).</summary>
+        public bool IsTutorial(string regionId)
+        {
+            RegionData region = GetRegion(regionId);
+            return region != null && region.IsTutorial;
+        }
+
+        /// <summary>
+        /// The region whose battlefields (painted backdrops, obstacle layouts) a battle in
+        /// <paramref name="regionId"/> is fought on: its <see cref="RegionData.BattlefieldRegionId"/>
+        /// when set, else itself.
+        /// </summary>
+        public string BattlefieldRegionOf(string regionId)
+        {
+            RegionData region = GetRegion(regionId);
+            return region != null && !string.IsNullOrEmpty(region.BattlefieldRegionId) ? region.BattlefieldRegionId : regionId;
+        }
+
+        /// <summary>
+        /// Tutorial region <paramref name="regionId"/>'s authored location <paramref name="nodeId"/>
+        /// (<see cref="RegionData.FixedNodes"/>; the node id is its index), or null.
+        /// </summary>
+        public FixedNodeData FixedNode(string regionId, int nodeId)
+        {
+            RegionData region = GetRegion(regionId);
+            FixedNodeData[] nodes = region == null ? null : region.FixedNodes;
+            return nodes != null && nodeId >= 0 && nodeId < nodes.Length ? nodes[nodeId] : null;
         }
 
         /// <summary>The region with <paramref name="regionId"/>, or null.</summary>
@@ -208,10 +260,12 @@ namespace BeastCraft.Campaign
             return unlocked;
         }
 
-        /// <summary>Every region id, in campaign order (for a save catalog).</summary>
+        /// <summary>Every region id, in campaign order, then the tutorial regions' (for a save catalog).</summary>
         public List<string> RegionIds()
         {
-            return _order.ConvertAll(region => region.RegionId);
+            List<string> ids = _order.ConvertAll(region => region.RegionId);
+            ids.AddRange(_tutorials.ConvertAll(region => region.RegionId));
+            return ids;
         }
 
         /// <summary>Every seal id, in file order (for a save catalog).</summary>

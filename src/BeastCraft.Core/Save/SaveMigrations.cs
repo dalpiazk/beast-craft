@@ -18,6 +18,7 @@ namespace BeastCraft.Save
     /// <see cref="PlayerSave.AvatarAppearance"/>, <see cref="OwnedBeast.Appearance"/>): <see cref="AddEconomy"/>.</item>
     /// <item>4 to 5: the idle reward clock (<see cref="PlayerSave.Idle"/>): <see cref="AddIdle"/>.</item>
     /// <item>5 to 6: the expedition's difficulty (<see cref="MapRun.Difficulty"/>): <see cref="AddRunDifficulty"/>.</item>
+    /// <item>6 to 7: the onboarding state (<see cref="PlayerSave.Tutorial"/>): <see cref="AddTutorial"/>.</item>
     /// </list>
     /// </summary>
     public static class SaveMigrations
@@ -25,7 +26,7 @@ namespace BeastCraft.Save
         /// <summary>A fresh list of every step (callers may append to it).</summary>
         public static List<ISaveMigration> All()
         {
-            return new List<ISaveMigration> { new AddGear(), new AddCampaign(), new AddEconomy(), new AddIdle(), new AddRunDifficulty() };
+            return new List<ISaveMigration> { new AddGear(), new AddCampaign(), new AddEconomy(), new AddIdle(), new AddRunDifficulty(), new AddTutorial() };
         }
 
         /// <summary>
@@ -134,6 +135,42 @@ namespace BeastCraft.Save
                 save.EnsureInitialized();
                 save.Campaign.ActiveRun.Difficulty = RunDifficulty.Normal;
                 save.SchemaVersion = 6;
+                return serializer.ToJson(save);
+            }
+        }
+
+        /// <summary>
+        /// Schema 6 to 7: a v6 save has no onboarding state. The upgrade reads it into the current type
+        /// (no hints seen). A save that owns any beast was made before Hearthglen existed: it counts
+        /// Hearthglen as cleared — never offered, no pick pending — and keeps (or gets) the first
+        /// campaign region unlocked, so nothing re-gates a returning player and no beast is touched.
+        /// A save with no beast at all and no expedition in progress (only tools and tests ever wrote
+        /// one) starts Hearthglen like a new game: Hearthglen unlocked instead of the first campaign
+        /// region, its New Game pick pending.
+        /// </summary>
+        public sealed class AddTutorial : ISaveMigration
+        {
+            public int FromVersion
+            {
+                get { return 6; }
+            }
+
+            public string Upgrade(string json, ISaveJsonSerializer serializer)
+            {
+                PlayerSave save = serializer.FromJson<PlayerSave>(json);
+                save.EnsureInitialized();
+                if (save.Beasts.Count > 0)
+                {
+                    save.Tutorial.HearthglenCleared = true;
+                    save.Campaign.Unlock(CampaignProgress.StartingRegionId);
+                }
+                else if (!save.Campaign.HasActiveRun)
+                {
+                    save.Campaign.Lock(CampaignProgress.StartingRegionId);
+                    save.Campaign.Unlock(CampaignProgress.TutorialRegionId);
+                }
+
+                save.SchemaVersion = 7;
                 return serializer.ToJson(save);
             }
         }

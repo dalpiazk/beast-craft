@@ -62,6 +62,9 @@ namespace BeastCraft.Presentation.Content
 
         public BeastRosterData Roster { get; private set; }
 
+        /// <summary>Every beast species, built, in roster order (the pickers list them in this order).</summary>
+        public List<CreatureSpeciesSO> Species { get; private set; }
+
         public SkillLibraryData SkillLibrary { get; private set; }
 
         public EnemyLibraryData EnemyLibrary { get; private set; }
@@ -285,6 +288,7 @@ namespace BeastCraft.Presentation.Content
                 Root = root.Location,
                 Source = root,
                 Roster = roster,
+                Species = species,
                 SkillLibrary = skills,
                 EnemyLibrary = enemyLibrary,
                 Regions = regions,

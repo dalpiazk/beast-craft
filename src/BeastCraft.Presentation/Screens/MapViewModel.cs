@@ -377,7 +377,7 @@ namespace BeastCraft.Presentation.Screens
                     State = state,
                     Position = Layout.Positions[node.NodeId],
                     Radius = node.Type == MapNodeType.Boss || node.Type == MapNodeType.Gate ? MapLayout.BigNodeRadius : MapLayout.NodeRadius,
-                    Name = _session.Content.LocationNames?.Resolve(node) ?? LocationNameTable.FallbackName(node.Kind),
+                    Name = _session.LocationName(node),
                     Level = node.Level,
                     Layer = node.Layer,
                     KindLabel = KindLabel(node.Type)

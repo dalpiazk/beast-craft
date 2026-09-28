@@ -91,6 +91,12 @@ namespace BeastCraft.Presentation.Screens
                 return null;
             }
 
+            if (session.PendingPick > 0)
+            {
+                error = "A beast is waiting to join you: choose it first.";
+                return null;
+            }
+
             // Eased in the early regions for a new player (RegionData.StageEasing of RegionLibraryData.EasingShapeScales).
             EncounterPlan plan = CampaignRules.PlanFor(run, node, session.Content.Encounters, session.Content.Enemies, session.Content.Campaign);
             if (plan == null)
@@ -99,7 +105,8 @@ namespace BeastCraft.Presentation.Screens
                 return null;
             }
 
-            return new NodeBattle(session, node, plan, run.RegionId, CampaignRules.LossesAt(run, nodeId));
+            // Fought on the region's battlefields (Hearthglen borrows Verdant Hollow's: RegionData.BattlefieldRegionId).
+            return new NodeBattle(session, node, plan, session.Content.Campaign.BattlefieldRegionOf(run.RegionId), CampaignRules.LossesAt(run, nodeId));
         }
 
         /// <summary>

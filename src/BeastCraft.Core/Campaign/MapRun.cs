@@ -205,10 +205,13 @@ namespace BeastCraft.Campaign
             get { return X != 0f || Y != 0f; }
         }
 
-        /// <summary>Whether the node is fought (Battle, Elite, Gate, Boss).</summary>
+        /// <summary>Whether the node is fought (Battle, Elite, Gate, Boss, and a tutorial's Trial).</summary>
         public bool IsBattle
         {
-            get { return Type == MapNodeType.Battle || Type == MapNodeType.Elite || Type == MapNodeType.Gate || Type == MapNodeType.Boss; }
+            get
+            {
+                return Type == MapNodeType.Battle || Type == MapNodeType.Elite || Type == MapNodeType.Gate || Type == MapNodeType.Boss || Type == MapNodeType.Trial;
+            }
         }
     }
 }

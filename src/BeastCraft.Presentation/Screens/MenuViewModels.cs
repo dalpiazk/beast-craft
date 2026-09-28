@@ -33,9 +33,16 @@ namespace BeastCraft.Presentation.Screens
             return _session.Continue();
         }
 
-        public void NewGame()
+        /// <summary>A new game in Hearthglen with <paramref name="firstSpeciesId"/> as the New Game pick.</summary>
+        public bool NewGame(string firstSpeciesId)
         {
-            _session.NewGame();
+            return _session.NewGame(firstSpeciesId);
+        }
+
+        /// <summary>A new game that skips Hearthglen, with the three picks made in a row.</summary>
+        public bool NewGameSkippingTutorial(IReadOnlyList<string> species)
+        {
+            return _session.NewGameSkippingTutorial(species);
         }
     }
 

@@ -61,6 +61,67 @@ namespace BeastCraft.Campaign
         /// after them any post-game ones (<see cref="RegionData.IsPostGame"/>, flat level 100).
         /// </summary>
         public RegionData[] Regions = new RegionData[0];
+
+        /// <summary>
+        /// The onboarding (tutorial) regions, kept apart from <see cref="Regions"/> so the mainline
+        /// band, its calibration and every tool that walks the campaign never see them: today one,
+        /// Hearthglen (<c>r00</c>, <see cref="CampaignProgress.TutorialRegionId"/>). Each is
+        /// <see cref="RegionData.IsTutorial"/>, played once as one expedition over its authored
+        /// <see cref="RegionData.FixedNodes"/> (no <see cref="NodeMapGenerator"/>, no seed), every
+        /// fight a fixed template at its own <c>DifficultyOverride</c> (never the calibrated table, never
+        /// the early-region easing); clearing its last location unlocks the first mainline region.
+        /// Validated in their own pass (<see cref="RegionLibraryValidator"/>).
+        /// </summary>
+        public RegionData[] TutorialRegions = new RegionData[0];
+    }
+
+    /// <summary>
+    /// One authored location of a tutorial region's fixed map (<see cref="RegionData.FixedNodes"/>),
+    /// in path order: the node id is its index, each leads to the next, the last ends the region.
+    /// </summary>
+    [Serializable]
+    public class FixedNodeData
+    {
+        /// <summary>A <see cref="MapNodeType"/> name: Story, Battle, Trial or Rest.</summary>
+        public string Type;
+
+        /// <summary>The location's display name (DRAFT text; tutorial locations are named here, not in <c>location-names.json</c>).</summary>
+        public string Name;
+
+        /// <summary>The encounter level (a Rest: the level Camp training pays at), within the region's band.</summary>
+        public int Level = 1;
+
+        /// <summary>A Battle's or Trial's <c>encounter-library.json</c> template (with its own <c>DifficultyOverride</c>); "" otherwise.</summary>
+        public string TemplateId = string.Empty;
+
+        /// <summary>A Trial's beast pick (<c>StarterPicks</c>): 2 or 3, each exactly once, in order; 0 elsewhere.</summary>
+        public int PickStep;
+
+        /// <summary>The dialogue scene a Story location plays (<c>dialogue.json</c>); "" for none.</summary>
+        public string SceneId = string.Empty;
+
+        /// <summary>Which column of the map the location sits in (0 = left), for the spatial map's layout.</summary>
+        public int Lane;
+
+        /// <summary>
+        /// A <see cref="LocationKind"/> key (<see cref="LocationKinds.Key"/>) the location is presented as;
+        /// "" = its type's (<see cref="LocationKinds.For"/>).
+        /// </summary>
+        public string Kind = string.Empty;
+
+        /// <summary>Consumables a Story location hands over when visited (the first visit only: the region is played once).</summary>
+        public ItemGrantData[] Grants = new ItemGrantData[0];
+    }
+
+    /// <summary>A quantity of one consumable (<see cref="FixedNodeData.Grants"/>).</summary>
+    [Serializable]
+    public class ItemGrantData
+    {
+        /// <summary>A <c>consumable-library.json</c> ConsumableId.</summary>
+        public string ConsumableId;
+
+        /// <summary>How many, at least 1.</summary>
+        public int Quantity = 1;
     }
 
     /// <summary>
@@ -211,6 +272,22 @@ namespace BeastCraft.Campaign
         /// the balance simulator's calibration never sees it.
         /// </summary>
         public double[] StageEasing = new double[0];
+
+        /// <summary>
+        /// An onboarding region (only in <see cref="RegionLibraryData.TutorialRegions"/>): one
+        /// expedition over its <see cref="FixedNodes"/>, played once. False for every campaign region.
+        /// </summary>
+        public bool IsTutorial;
+
+        /// <summary>A tutorial region's authored map, in path order (<see cref="FixedNodeData"/>). Empty elsewhere.</summary>
+        public FixedNodeData[] FixedNodes = new FixedNodeData[0];
+
+        /// <summary>
+        /// A tutorial region fights on another region's battlefields (its painted backdrops and
+        /// obstacle layouts; <c>battle-layouts.json</c>): that mainline region's id. "" = its own
+        /// (<see cref="RegionLibrary.BattlefieldRegionOf"/>).
+        /// </summary>
+        public string BattlefieldRegionId = string.Empty;
 
         /// <summary>A copy of this region (arrays and <see cref="MapRules"/> shared, not cloned).</summary>
         public RegionData Copy()

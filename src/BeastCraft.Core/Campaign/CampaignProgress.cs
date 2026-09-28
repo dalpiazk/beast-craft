@@ -18,8 +18,19 @@ namespace BeastCraft.Campaign
     [Serializable]
     public class CampaignProgress
     {
-        /// <summary>The region every new (or migrated) save starts with unlocked: the first of <c>regions.json</c>.</summary>
+        /// <summary>
+        /// The first campaign region (the first of <c>regions.json</c> <c>Regions</c>): unlocked when
+        /// Hearthglen is cleared or skipped (<c>StarterPicks</c>), and on every save migrated from before
+        /// Hearthglen existed.
+        /// </summary>
         public const string StartingRegionId = "r01";
+
+        /// <summary>
+        /// Hearthglen, the onboarding region (<c>regions.json</c> <c>TutorialRegions</c>): the one region a
+        /// brand-new save starts with unlocked (<c>PlayerSave.CreateNew</c>). Unlocked only while it is
+        /// being played: clearing (or skipping) it removes its entry and unlocks <see cref="StartingRegionId"/>.
+        /// </summary>
+        public const string TutorialRegionId = "r00";
 
         /// <summary>Owned seal ids (<c>regions.json</c> <c>Seals</c>), in the order granted. Each at most once.</summary>
         public List<string> Seals = new List<string>();
@@ -79,6 +90,13 @@ namespace BeastCraft.Campaign
 
             Regions.Add(new RegionProgress { RegionId = regionId });
             return true;
+        }
+
+        /// <summary>Locks <paramref name="regionId"/> again (drops its entry). False when it was not unlocked.</summary>
+        public bool Lock(string regionId)
+        {
+            RegionProgress progress = FindRegion(regionId);
+            return progress != null && Regions.Remove(progress);
         }
 
         /// <summary>Whether <paramref name="sealId"/> is owned.</summary>

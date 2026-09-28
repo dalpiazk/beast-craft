@@ -8,6 +8,7 @@ using BeastCraft.Encounters;
 using BeastCraft.Progression;
 using BeastCraft.Save;
 using BeastCraft.Session;
+using BeastCraft.Tutorial;
 
 namespace BeastCraft.Campaign
 {
@@ -45,6 +46,14 @@ namespace BeastCraft.Campaign
     /// Replays are allowed: a stage already cleared can be started again with a new seed (the
     /// level-gap falloff makes old content pay little or no XP; drops still roll). Every method is
     /// non-throwing and returns a <see cref="CampaignResult"/>; a refused call changes nothing.
+    /// </para>
+    /// <para>
+    /// <strong>Hearthglen</strong> (a tutorial region, <see cref="RegionData.IsTutorial"/>) is played
+    /// once, as one expedition over its authored <see cref="RegionData.FixedNodes"/> (no generator;
+    /// every fight a fixed template at its own difficulty, never eased): Story locations are visited
+    /// (<see cref="Visit"/>), Trials are battles whose win lets a beast join (<see cref="StarterPicks"/>;
+    /// no location can be entered while that pick waits), and clearing the last location completes
+    /// it (<see cref="CompleteTutorial"/>: the first campaign region unlocked). It is not replayable.
     /// </para>
     /// </summary>
     public static class CampaignRules
@@ -197,15 +206,67 @@ namespace BeastCraft.Campaign
                 return CampaignResult.Refused("Difficulty " + difficulty + " is not available in '" + regionId + "' (Hard is for post-game regions only).");
             }
 
+            if (region.IsTutorial && save.Tutorial.HearthglenCleared)
+            {
+                return CampaignResult.Refused("'" + regionId + "' is already behind you (it is played once).");
+            }
+
             MapRun run = save.Campaign.ActiveRun;
             run.Clear();
             run.RegionId = regionId;
             run.Stage = stage;
             run.Seed = seed;
             run.Difficulty = difficulty;
-            run.Nodes = NodeMapGenerator.Generate(library.RegionFor(region, difficulty), library.RulesFor(region, difficulty), stage, seed);
+            run.Nodes = region.IsTutorial
+                            ? FixedMap(region, seed)
+                            : NodeMapGenerator.Generate(library.RegionFor(region, difficulty), library.RulesFor(region, difficulty), stage, seed);
             save.Campaign.CurrentRegionId = regionId;
             return CampaignResult.Done(CampaignOutcome.Started, null);
+        }
+
+        /// <summary>
+        /// A tutorial region's map, built from its authored <see cref="RegionData.FixedNodes"/> (never
+        /// the generator): node i on row i, leading to node i + 1, its type, level, template and
+        /// lane as authored, its location kind (the authored one, else its type's), a map position from
+        /// its lane and row, a label key <c>{region}/{kind}/{i}</c>, and its encounter seed drawn from
+        /// <paramref name="seed"/> (battle seeds only: the map itself does not depend on it).
+        /// </summary>
+        public static List<MapNode> FixedMap(RegionData region, int seed)
+        {
+            List<MapNode> nodes = new List<MapNode>();
+            FixedNodeData[] fixedNodes = region == null ? new FixedNodeData[0] : region.FixedNodes ?? new FixedNodeData[0];
+            int maxLane = 0;
+            foreach (FixedNodeData data in fixedNodes)
+            {
+                maxLane = Math.Max(maxLane, data == null ? 0 : data.Lane);
+            }
+
+            for (int i = 0; i < fixedNodes.Length; i++)
+            {
+                FixedNodeData data = fixedNodes[i] ?? new FixedNodeData();
+                Enum.TryParse(data.Type, false, out MapNodeType type);
+                LocationKind kind = !string.IsNullOrEmpty(data.Kind) && LocationKinds.TryParseKey(data.Kind, out LocationKind authored) ? authored : LocationKinds.For(type);
+                float x = maxLane == 0 ? 0.5f : 0.15f + 0.7f * Math.Max(0, Math.Min(maxLane, data.Lane)) / maxLane;
+                float y = fixedNodes.Length <= 1 ? 0.5f : 0.05f + 0.9f * i / (fixedNodes.Length - 1);
+                nodes.Add(new MapNode
+                {
+                    NodeId = i,
+                    Layer = i,
+                    Lane = Math.Max(0, data.Lane),
+                    Type = type,
+                    Level = Math.Max(1, data.Level),
+                    ShapeId = string.Empty,
+                    TemplateId = data.TemplateId ?? string.Empty,
+                    EncounterSeed = LootRoller.DeriveSeed(seed, i),
+                    Next = i + 1 < fixedNodes.Length ? new[] { i + 1 } : new int[0],
+                    Kind = kind,
+                    X = x,
+                    Y = y,
+                    LabelKey = region.RegionId + "/" + LocationKinds.Key(kind) + "/" + i
+                });
+            }
+
+            return nodes;
         }
 
         /// <summary>
@@ -390,6 +451,14 @@ namespace BeastCraft.Campaign
             }
 
             Clear(run, node);
+            if (region.IsTutorial)
+            {
+                CampaignResult cleared = CampaignResult.Done(CampaignOutcome.Cleared, node);
+                FixedNodeData authored = library.FixedNode(run.RegionId, node.NodeId);
+                cleared.PickStep = node.Type == MapNodeType.Trial && authored != null ? authored.PickStep : 0;
+                return FinishIfLast(save, library, run, node, cleared);
+            }
+
             RegionProgress progress = save.Campaign.FindRegion(run.RegionId);
             if (node.Type == MapNodeType.Gate)
             {
@@ -485,6 +554,169 @@ namespace BeastCraft.Campaign
             result.XpTrained = BeastProgression.BattleXp(BattleOutcome.PlayerVictory, node.Level, false, beast.Progress.Level);
             result.LevelsGained = BeastProgression.AwardBattle(beast.Progress, BattleOutcome.PlayerVictory, node.Level, false, result.BeastLevelCap);
             Clear(run, node);
+            return FinishIfLast(save, library, run, node, result);
+        }
+
+        /// <summary>
+        /// Visits Story location <paramref name="nodeId"/> (a tutorial region's): its authored grants
+        /// (<see cref="FixedNodeData.Grants"/>) are added to the held consumables, each stack up to its
+        /// <c>MaxStack</c> (<paramref name="consumables"/> resolves them; null or an unknown id grants
+        /// nothing), and the location is cleared and becomes current. The scene it plays is the
+        /// game's to show. Visiting the region's last location completes it
+        /// (<see cref="CompleteTutorial"/>).
+        /// </summary>
+        public static CampaignResult Visit(PlayerSave save, RegionLibrary library, int nodeId, Func<string, ConsumableSO> consumables)
+        {
+            CampaignResult refused = CheckNode(save, library, nodeId, out MapRun run, out MapNode node, out RegionData _);
+            if (refused != null)
+            {
+                return refused;
+            }
+
+            if (node.Type != MapNodeType.Story)
+            {
+                return CampaignResult.Refused("Node " + nodeId + " is a " + node.Type + " node, not a story.");
+            }
+
+            CampaignResult result = CampaignResult.Done(CampaignOutcome.Visited, node);
+            FixedNodeData authored = library.FixedNode(run.RegionId, nodeId);
+            Grant(save, authored == null ? null : authored.Grants, consumables, result);
+            Clear(run, node);
+            return FinishIfLast(save, library, run, node, result);
+        }
+
+        /// <summary>
+        /// Hearthglen is behind the player: <see cref="TutorialProgress.HearthglenCleared"/>, an
+        /// expedition in a tutorial region ended, every tutorial region locked again (they are played
+        /// once) and the first campaign region (<see cref="CampaignProgress.StartingRegionId"/>)
+        /// unlocked. Returns whether that region was newly unlocked. No XP, gold or items: those came
+        /// from playing it (<see cref="SkipTutorial"/> grants the items instead). Idempotent. The
+        /// balance tools start every modelled player here (a save that begins in the first campaign
+        /// region, exactly as before Hearthglen existed).
+        /// </summary>
+        public static bool CompleteTutorial(PlayerSave save, RegionLibrary library)
+        {
+            if (save == null)
+            {
+                return false;
+            }
+
+            save.EnsureInitialized();
+            save.Tutorial.HearthglenCleared = true;
+            string runRegion = save.Campaign.ActiveRun.RegionId;
+            if (save.Campaign.HasActiveRun && (runRegion == CampaignProgress.TutorialRegionId || (library != null && library.IsTutorial(runRegion))))
+            {
+                save.Campaign.ActiveRun.Clear();
+            }
+
+            save.Campaign.Lock(CampaignProgress.TutorialRegionId);
+            if (library != null)
+            {
+                foreach (RegionData tutorial in library.TutorialRegions)
+                {
+                    save.Campaign.Lock(tutorial.RegionId);
+                }
+            }
+
+            if (save.Campaign.CurrentRegionId == CampaignProgress.TutorialRegionId || (library != null && library.IsTutorial(save.Campaign.CurrentRegionId)))
+            {
+                save.Campaign.CurrentRegionId = string.Empty;
+            }
+
+            return save.Campaign.Unlock(CampaignProgress.StartingRegionId);
+        }
+
+        /// <summary>
+        /// Skips Hearthglen (the player's choice at New Game; the three picks are made first,
+        /// <see cref="StarterPicks.NewGameSkippingTutorial"/>): its completion rewards — every item its
+        /// Story locations would have handed over (<see cref="TutorialRewards"/>) — are granted, it is
+        /// marked skipped and completed (<see cref="CompleteTutorial"/>). The fights' XP and gold are
+        /// not (they were not fought). Refused once Hearthglen is cleared.
+        /// </summary>
+        public static CampaignResult SkipTutorial(PlayerSave save, RegionLibrary library, Func<string, ConsumableSO> consumables)
+        {
+            if (save == null)
+            {
+                return CampaignResult.Refused("No save.");
+            }
+
+            save.EnsureInitialized();
+            if (save.Tutorial.HearthglenCleared)
+            {
+                return CampaignResult.Refused("Hearthglen is already behind you.");
+            }
+
+            CampaignResult result = CampaignResult.Done(CampaignOutcome.TutorialCleared, null);
+            Grant(save, TutorialRewards(library), consumables, result);
+            save.Tutorial.Skipped = true;
+            if (CompleteTutorial(save, library))
+            {
+                result.UnlockedRegionIds.Add(CampaignProgress.StartingRegionId);
+            }
+
+            return result;
+        }
+
+        /// <summary>Everything Hearthglen's Story locations hand over (<see cref="FixedNodeData.Grants"/>), in path order: its completion rewards.</summary>
+        public static List<ItemGrantData> TutorialRewards(RegionLibrary library)
+        {
+            List<ItemGrantData> grants = new List<ItemGrantData>();
+            RegionData tutorial = library == null ? null : library.Tutorial;
+            foreach (FixedNodeData node in tutorial == null ? new FixedNodeData[0] : tutorial.FixedNodes ?? new FixedNodeData[0])
+            {
+                foreach (ItemGrantData grant in node == null ? new ItemGrantData[0] : node.Grants ?? new ItemGrantData[0])
+                {
+                    if (grant != null)
+                    {
+                        grants.Add(grant);
+                    }
+                }
+            }
+
+            return grants;
+        }
+
+        private static void Grant(PlayerSave save, IEnumerable<ItemGrantData> grants, Func<string, ConsumableSO> consumables, CampaignResult result)
+        {
+            if (grants == null || consumables == null)
+            {
+                return;
+            }
+
+            foreach (ItemGrantData grant in grants)
+            {
+                ConsumableSO consumable = grant == null ? null : consumables(grant.ConsumableId);
+                if (consumable == null || grant.Quantity <= 0)
+                {
+                    continue;
+                }
+
+                int room = Math.Max(0, Math.Min(grant.Quantity, consumable.MaxStack - ConsumableInventory.Quantity(save, grant.ConsumableId)));
+                if (room > 0 && ConsumableInventory.TryAdd(save, grant.ConsumableId, room, consumable.MaxStack))
+                {
+                    result.ItemsGranted.Add(new ConsumableStack(grant.ConsumableId, room));
+                }
+            }
+        }
+
+        /// <summary>
+        /// When <paramref name="node"/> (just cleared) is a tutorial region's last location, completes
+        /// the region (<see cref="CompleteTutorial"/>) and says so in <paramref name="result"/>
+        /// (<see cref="CampaignOutcome.TutorialCleared"/>, the first campaign region unlocked).
+        /// </summary>
+        private static CampaignResult FinishIfLast(PlayerSave save, RegionLibrary library, MapRun run, MapNode node, CampaignResult result)
+        {
+            if (!library.IsTutorial(run.RegionId) || (node.Next != null && node.Next.Length > 0))
+            {
+                return result;
+            }
+
+            result.Outcome = CampaignOutcome.TutorialCleared;
+            if (CompleteTutorial(save, library))
+            {
+                result.UnlockedRegionIds.Add(CampaignProgress.StartingRegionId);
+            }
+
             return result;
         }
 
@@ -587,11 +819,14 @@ namespace BeastCraft.Campaign
         /// <paramref name="content"/> at its level; unknown species are skipped) against the node's
         /// encounter (<see cref="PlanFor"/>: its <see cref="EncounterPlan.Preview"/>, the always-free
         /// <c>Full</c> preview, and whether its enemies' kits can afflict the team), with
-        /// <paramref name="content"/>'s team bonds. Null also when there is no expedition, the node is
-        /// not a battle, or the content cannot build its encounter. Pure; changes nothing.
+        /// <paramref name="content"/>'s team bonds. The encounter is the one the battle will field:
+        /// planned with the run and <paramref name="regions"/>, so the early-region easing applies
+        /// exactly as in <see cref="PlanFor(MapRun, MapNode, EncounterLibrary, EnemyCatalog, RegionLibrary)"/>
+        /// (null <paramref name="regions"/> = unscaled). Null also when there is no expedition, the node
+        /// is not a battle, or the content cannot build its encounter. Pure; changes nothing.
         /// </summary>
         public static CampaignTeamSuggestion SuggestionFor(PlayerSave save, int nodeId, PlayerSettings settings, EncounterLibrary encounters, BattleContent content,
-                                                           int teamSize = PartySize)
+                                                           RegionLibrary regions, int teamSize = PartySize)
         {
             if (save == null || save.Campaign == null || !save.Campaign.HasActiveRun || content == null || content.Enemies == null)
             {
@@ -605,7 +840,7 @@ namespace BeastCraft.Campaign
                 return null;
             }
 
-            EncounterPlan plan = PlanFor(run.Find(nodeId), encounters, content.Enemies);
+            EncounterPlan plan = PlanFor(run, run.Find(nodeId), encounters, content.Enemies, regions);
             if (plan == null)
             {
                 return null;
@@ -648,7 +883,7 @@ namespace BeastCraft.Campaign
                 beastIds.Add(ownedIds[member]);
             }
 
-            return new CampaignTeamSuggestion(nodeId, losses, suggestion, beastIds);
+            return new CampaignTeamSuggestion(nodeId, losses, suggestion, beastIds, plan);
         }
 
         private static CampaignResult CheckNode(PlayerSave save, RegionLibrary library, int nodeId, out MapRun run, out MapNode node, out RegionData region)
@@ -677,6 +912,11 @@ namespace BeastCraft.Campaign
             if (!CanEnter(run, nodeId))
             {
                 return CampaignResult.Refused("Node " + nodeId + " cannot be entered from where the player stands.");
+            }
+
+            if (region.IsTutorial && StarterPicks.PendingStep(save, library) > 0)
+            {
+                return CampaignResult.Refused("A beast is waiting to join: make the pick first.");
             }
 
             node = run.Find(nodeId);
@@ -734,7 +974,10 @@ namespace BeastCraft.Campaign
         Retreated,
 
         /// <summary>A seal was granted (or was already owned).</summary>
-        SealGranted
+        SealGranted,
+
+        /// <summary>A tutorial region's last location was reached (or it was skipped): it is completed and the first campaign region unlocked.</summary>
+        TutorialCleared
     }
 
     /// <summary>The result of a <see cref="CampaignRules"/> call.</summary>
@@ -745,7 +988,7 @@ namespace BeastCraft.Campaign
         }
 
         /// <summary>What happened.</summary>
-        public CampaignOutcome Outcome { get; private set; }
+        public CampaignOutcome Outcome { get; internal set; }
 
         /// <summary>Whether anything was done (not <see cref="CampaignOutcome.Refused"/>).</summary>
         public bool Success
@@ -786,6 +1029,12 @@ namespace BeastCraft.Campaign
         /// <summary>Cosmetic looks a lair's first clear unlocked (its boss-exclusive looks, then milestones such as bosses beaten).</summary>
         public List<string> CosmeticsUnlocked { get; } = new List<string>();
 
+        /// <summary>Consumables a Story location (or a tutorial skip) handed over, as added (capped at each stack's maximum).</summary>
+        public List<ConsumableStack> ItemsGranted { get; } = new List<ConsumableStack>();
+
+        /// <summary>A won Trial's beast pick (2 or 3; <see cref="StarterPicks"/>), now pending; 0 otherwise.</summary>
+        public int PickStep { get; internal set; }
+
         internal static CampaignResult Refused(string error)
         {
             return new CampaignResult { Outcome = CampaignOutcome.Refused, Error = error };
@@ -800,13 +1049,17 @@ namespace BeastCraft.Campaign
     /// <summary>A team suggested before a fight (<see cref="CampaignRules.SuggestionFor"/>).</summary>
     public sealed class CampaignTeamSuggestion
     {
-        public CampaignTeamSuggestion(int nodeId, int losses, TeamSuggestion suggestion, IReadOnlyList<string> beastIds)
+        public CampaignTeamSuggestion(int nodeId, int losses, TeamSuggestion suggestion, IReadOnlyList<string> beastIds, EncounterPlan plan = null)
         {
             NodeId = nodeId;
             Losses = losses;
             Suggestion = suggestion;
             BeastIds = beastIds;
+            Plan = plan;
         }
+
+        /// <summary>The encounter the suggestion was made against: the one the battle fields (eased like it).</summary>
+        public EncounterPlan Plan { get; }
 
         /// <summary>The map location the suggestion is for.</summary>
         public int NodeId { get; }

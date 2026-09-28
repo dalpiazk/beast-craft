@@ -32,35 +32,55 @@ namespace BeastCraft.Tests.EditMode
 
         private static GameSession NewSession(ISaveStorage storage = null)
         {
-            GameSession session = new GameSession(Content, storage ?? new MemorySaveStorage(), () => MapSeed);
-            session.NewGame();
-            return session;
+            return TestSaves.Started(new GameSession(Content, storage ?? new MemorySaveStorage(), () => MapSeed));
         }
 
         // ------------------------------------------------------------------ save flow
 
         [Test]
-        public void NewGame_CreatesTheStarterSave_StartsRegionOne_AndAutosaves()
+        public void NewGame_WithTheFirstPick_StartsHearthglen_AndAutosaves()
         {
             MemorySaveStorage storage = new MemorySaveStorage();
             GameSession session = new GameSession(Content, storage, () => MapSeed);
             Assert.IsFalse(session.HasSave);
             Assert.IsFalse(session.Autosave(AutosaveReason.Background), "nothing to save before a game");
+            Assert.IsFalse(session.NewGame("no_such_beast"), "an unknown pick starts nothing");
+            Assert.IsFalse(session.HasSave);
 
-            session.NewGame();
+            Assert.IsTrue(session.NewGame("golem"));
 
             Assert.IsTrue(session.HasSave);
             Assert.AreEqual(1, session.AutosaveCount);
             Assert.AreEqual(AutosaveReason.NewGame, session.LastAutosaveReason);
             PlayerSave save = session.Save;
-            CollectionAssert.AreEqual(StarterSave.Species, save.Beasts.ConvertAll(b => b.Progress.SpeciesId));
-            Assert.IsTrue(save.Beasts.TrueForAll(b => b.Progress.Level == 1 && b.Skills.GetEquipped(0) != null), "level 1, default loadouts worn");
+            CollectionAssert.AreEqual(new[] { "golem" }, save.Beasts.ConvertAll(b => b.Progress.SpeciesId), "one beast: the New Game pick");
+            Assert.IsTrue(save.Beasts.TrueForAll(b => b.Progress.Level == 1 && b.Skills.GetEquipped(0) != null), "level 1, default loadout worn");
             Assert.AreEqual(1, save.Avatar.Level);
             Assert.IsNotNull(save.AvatarSkills.Actives.GetEquipped(0), "the avatar's default loadout");
+            Assert.IsFalse(save.Tutorial.HearthglenCleared);
             Assert.IsTrue(save.Campaign.HasActiveRun);
+            Assert.AreEqual("r00", save.Campaign.ActiveRun.RegionId, "a new game starts in Hearthglen");
+            Assert.IsFalse(save.Campaign.IsUnlocked("r01"), "Verdant Hollow opens when Hearthglen is cleared");
+            Assert.AreEqual(0, session.PendingPick);
+        }
+
+        [Test]
+        public void NewGame_SkippingTheTutorial_MakesTheThreePicks_AndStartsRegionOne()
+        {
+            GameSession session = new GameSession(Content, new MemorySaveStorage(), () => MapSeed);
+            Assert.IsFalse(session.NewGameSkippingTutorial(new[] { "golem", "griffin", "phoenix" }), "Vanguard's next stance is Ranged, not Skirmisher");
+            Assert.IsFalse(session.HasSave);
+
+            Assert.IsTrue(session.NewGameSkippingTutorial(new[] { "golem", "phoenix", "griffin" }));
+
+            PlayerSave save = session.Save;
+            CollectionAssert.AreEqual(new[] { "golem", "phoenix", "griffin" }, save.Beasts.ConvertAll(b => b.Progress.SpeciesId));
+            Assert.IsTrue(save.Tutorial.HearthglenCleared);
+            Assert.IsTrue(save.Tutorial.Skipped);
             Assert.AreEqual("r01", save.Campaign.ActiveRun.RegionId);
             Assert.AreEqual(0, save.Campaign.ActiveRun.Stage);
             Assert.AreEqual(MapSeed, save.Campaign.ActiveRun.Seed);
+            Assert.IsFalse(save.Campaign.IsUnlocked("r00"));
         }
 
         [Test]
@@ -165,7 +185,7 @@ namespace BeastCraft.Tests.EditMode
             TitleViewModel fresh = new TitleViewModel(new GameSession(Content, storage, () => MapSeed));
             Assert.IsFalse(fresh.CanContinue);
             Assert.IsFalse(fresh.NewGameNeedsConfirm);
-            fresh.NewGame();
+            fresh.NewGame("griffin");
             Assert.IsTrue(fresh.CanContinue);
             Assert.IsTrue(new TitleViewModel(new GameSession(Content, storage, () => 1)).NewGameNeedsConfirm);
         }

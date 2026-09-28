@@ -22,7 +22,7 @@ namespace BeastCraft.Tests.EditMode
         /// <summary>The mainline regions, in campaign order.</summary>
         internal static readonly string[] MainlineRegionIds = { "r01", "r02", "r03", "r04", "r05", "r06", "r07", "r08", "r09", "r10" };
 
-        /// <summary>The authored library cut down to the mainline regions (the post-game ones dropped).</summary>
+        /// <summary>The authored library cut down to the mainline regions (the post-game and tutorial ones dropped).</summary>
         internal static RegionLibraryData LoadMainline()
         {
             RegionLibraryData data = CampaignMapTests.LoadRegions();
@@ -36,6 +36,7 @@ namespace BeastCraft.Tests.EditMode
             }
 
             data.Regions = mainline.ToArray();
+            data.TutorialRegions = new RegionData[0];
             return data;
         }
 

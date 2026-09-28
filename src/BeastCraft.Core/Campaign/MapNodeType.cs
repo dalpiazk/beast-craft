@@ -21,6 +21,18 @@ namespace BeastCraft.Campaign
         Gate = 4,
 
         /// <summary>The top of the region's last stage: the region boss, whose clear grants its seal.</summary>
-        Boss = 5
+        Boss = 5,
+
+        /// <summary>
+        /// A tutorial region's story beat (<see cref="RegionData.FixedNodes"/>): no battle; the mentor
+        /// speaks (<see cref="CampaignRules.Visit"/>), sometimes handing over items.
+        /// </summary>
+        Story = 6,
+
+        /// <summary>
+        /// A tutorial region's trial: a fixed-template battle whose win lets a new beast join
+        /// (<c>StarterPicks</c>, the node's <see cref="FixedNodeData.PickStep"/>).
+        /// </summary>
+        Trial = 7
     }
 }

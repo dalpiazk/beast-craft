@@ -157,6 +157,96 @@
   ],
   "Templates": [
     {
+      "EncounterId": "hg_meadow_scamps",
+      "DisplayName": "Meadow Scamps",
+      "Description": "Two gloam-dazed scamps tumbling through the clover, snapping at anything that moves. They are more lost than fierce.",
+      "ShapeId": "squad",
+      "Arena": "Small",
+      "Groups": [ { "EnemyId": "swarmling", "Count": 2, "Elements": [ ] } ],
+      "DifficultyOverride": 0.5,
+      "Draft": true
+    },
+    {
+      "EncounterId": "hg_hedgerow_pests",
+      "DisplayName": "Hedgerow Pests",
+      "Description": "A buzzing knot of stinglings and a scamp that have made the old hedgerow their own. One of them hums with the green of the meadow.",
+      "ShapeId": "squad",
+      "Arena": "Small",
+      "Groups": [ { "EnemyId": "swarmling", "Count": 1, "Elements": [ ] }, { "EnemyId": "stingling", "Count": 1, "Elements": [ "Nature" ] }, { "EnemyId": "stingling", "Count": 1, "Elements": [ ] } ],
+      "DifficultyOverride": 0.5,
+      "Draft": true
+    },
+    {
+      "EncounterId": "hg_tumbledown_wall",
+      "DisplayName": "Tumbledown Wall",
+      "Description": "An archer has taken the tumbled stones as a lookout, with a stingling darting between the rocks below.",
+      "ShapeId": "squad",
+      "Arena": "Small",
+      "Groups": [ { "EnemyId": "stingling", "Count": 1, "Elements": [ ] }, { "EnemyId": "archer", "Count": 1, "Elements": [ ] } ],
+      "DifficultyOverride": 0.5,
+      "Draft": true
+    },
+    {
+      "EncounterId": "hg_trial_bramble",
+      "DisplayName": "Bramble Trial",
+      "Description": "A horned brute stands at the kinship stone, stamping in the brambles. Stand your ground beside your beast and another may choose to join you.",
+      "ShapeId": "elite",
+      "Arena": "Small",
+      "Groups": [ { "EnemyId": "brute", "Count": 1, "Elements": [ ] } ],
+      "DifficultyOverride": 0.5,
+      "Draft": true
+    },
+    {
+      "EncounterId": "hg_brookside_rabble",
+      "DisplayName": "Brookside Rabble",
+      "Description": "Scamps splash in the mill race while a caster mutters over the water. The mill wheel has stopped turning to listen.",
+      "ShapeId": "squad",
+      "Arena": "Medium",
+      "Groups": [ { "EnemyId": "swarmling", "Count": 2, "Elements": [ ] }, { "EnemyId": "caster", "Count": 1, "Elements": [ ] } ],
+      "DifficultyOverride": 0.5,
+      "Draft": true
+    },
+    {
+      "EncounterId": "hg_orchard_raiders",
+      "DisplayName": "Orchard Raiders",
+      "Description": "A brute shakes the apple trees while an archer and a stingling help themselves to the windfalls. A draught of courage would not go amiss.",
+      "ShapeId": "squad",
+      "Arena": "Medium",
+      "Groups": [ { "EnemyId": "brute", "Count": 1, "Elements": [ ] }, { "EnemyId": "stingling", "Count": 1, "Elements": [ ] }, { "EnemyId": "archer", "Count": 1, "Elements": [ ] } ],
+      "DifficultyOverride": 0.5,
+      "Draft": true
+    },
+    {
+      "EncounterId": "hg_trial_grove",
+      "DisplayName": "Grove Trial",
+      "Description": "An old shaman keeps the second kinship stone, two scamps at its heels. Show it a team that stands together and a third beast will answer.",
+      "ShapeId": "elite",
+      "Arena": "Medium",
+      "Groups": [ { "EnemyId": "shaman", "Count": 1, "Elements": [ ] }, { "EnemyId": "swarmling", "Count": 2, "Elements": [ ] } ],
+      "DifficultyOverride": 0.5,
+      "Draft": true
+    },
+    {
+      "EncounterId": "hg_ridge_prowlers",
+      "DisplayName": "Ridge Prowlers",
+      "Description": "A stalker slinks along the ridge path with an archer and a pair of scamps. Your whole team, at last, can meet them together.",
+      "ShapeId": "squad",
+      "Arena": "Medium",
+      "Groups": [ { "EnemyId": "stalker", "Count": 1, "Elements": [ ] }, { "EnemyId": "swarmling", "Count": 2, "Elements": [ ] }, { "EnemyId": "archer", "Count": 1, "Elements": [ ] } ],
+      "DifficultyOverride": 0.5,
+      "Draft": true
+    },
+    {
+      "EncounterId": "hg_gloam_at_the_hedge",
+      "DisplayName": "The Gloam at the Hedge",
+      "Description": "At the far hedge the shimmer thickens, and something big comes out of it: a champion of the vale, gloamed and bewildered, with two stinglings in its wake. Calm it, and the way to Verdant Hollow is open.",
+      "ShapeId": "elite",
+      "Arena": "Medium",
+      "Groups": [ { "EnemyId": "champion", "Count": 1, "Elements": [ ] }, { "EnemyId": "stingling", "Count": 2, "Elements": [ ] } ],
+      "DifficultyOverride": 0.5,
+      "Draft": true
+    },
+    {
       "EncounterId": "boss_r01_hollow_warden",
       "DisplayName": "Mossjaw the Warden",
       "Description": "A moss-backed champion that once guarded the Hollow's Seal for the first Beastbinders and now guards it from everyone. Two horned brutes stamp at its side.",

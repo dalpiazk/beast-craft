@@ -8,7 +8,7 @@ using NUnit.Framework;
 namespace BeastCraft.Tests.EditMode
 {
     /// <summary>
-    /// Golden save fixtures for every schema version (1-6): each committed input is loaded (and
+    /// Golden save fixtures for every schema version (1-7): each committed input is loaded (and
     /// migrated) by <see cref="SaveSerializer"/> and written back, and the text must equal the
     /// committed expected output byte for byte. The fixtures and outputs were captured on the
     /// Unity-era JsonUtility serializer; the engine-neutral serializer must reproduce them exactly.
@@ -22,6 +22,14 @@ namespace BeastCraft.Tests.EditMode
     /// expected output in exactly two places: <c>"SchemaVersion":5</c> became <c>6</c>, and
     /// <c>,"Difficulty":0</c> follows <c>"NodeAttemptsNodeId"</c> in the <c>ActiveRun</c>; no input
     /// of schema 1-5 changed.
+    /// </para>
+    /// <para>
+    /// Schema 7 (the onboarding state, <c>PlayerSave.Tutorial</c>) froze <c>rich-v6</c> as an input and
+    /// added <c>rich-v7</c>, the schema-7 save generated the same way, which is now the one that must
+    /// round-trip unchanged. Every older expected output changed in exactly these places:
+    /// <c>"SchemaVersion":6</c> became <c>7</c>, <c>,"Tutorial":{...}</c> follows <c>"Idle"</c> (a save
+    /// that owns a beast counting Hearthglen as cleared), and the beast-less <c>min-v5</c>/<c>min-v6</c>
+    /// start Hearthglen (<c>r00</c> unlocked instead of <c>r01</c>). No input changed.
     /// </para>
     /// </summary>
     public class GoldenSaveTests
@@ -55,7 +63,8 @@ namespace BeastCraft.Tests.EditMode
             "\"Gold\":77,\"Consumables\":[],\"Shops\":[],\"Cosmetics\":{\"Unlocked\":[]}," +
             "\"AvatarAppearance\":{\"OptionEntries\":[],\"ColorEntries\":[]}}",
             "{\"SchemaVersion\":5}",
-            "{\"SchemaVersion\":6}"
+            "{\"SchemaVersion\":6}",
+            "{\"SchemaVersion\":7}"
         };
 
         private static SaveSerializer NewSerializer()
@@ -69,30 +78,37 @@ namespace BeastCraft.Tests.EditMode
             return GoldenFiles.Read("Saves/rich-v5.input.json");
         }
 
-        /// <summary>The frozen schema-6 rich save (captured by reflection in update mode).</summary>
+        /// <summary>The frozen schema-6 rich save (captured by reflection before schema 7; never rewritten).</summary>
         private static string RichV6()
+        {
+            return GoldenFiles.Read("Saves/rich-v6.input.json");
+        }
+
+        /// <summary>The frozen schema-7 rich save (captured by reflection in update mode).</summary>
+        private static string RichV7()
         {
             if (GoldenFiles.Updating)
             {
                 PlayerSave save = new PlayerSave();
                 int seed = 1;
                 Populate(save, ref seed, 0);
-                GoldenFiles.Write("Saves/rich-v6.input.json", NewSerializer().Serialize(save));
+                GoldenFiles.Write("Saves/rich-v7.input.json", NewSerializer().Serialize(save));
             }
 
-            return GoldenFiles.Read("Saves/rich-v6.input.json");
+            return GoldenFiles.Read("Saves/rich-v7.input.json");
         }
 
         [Test]
-        public void RichV6_RoundTripsByteIdentical()
+        public void RichV7_RoundTripsByteIdentical()
         {
-            string input = RichV6();
+            string input = RichV7();
             SaveLoadResult result = NewSerializer().Deserialize(input);
 
             Assert.IsTrue(result.Success, result.Error);
             Assert.IsFalse(result.Migrated);
             Assert.AreEqual(input, NewSerializer().Serialize(result.Save), "a current-schema save must write back exactly as read");
             StringAssert.Contains("\"Difficulty\":", input, "the rich save fills the schema-6 field");
+            StringAssert.Contains("\"SeenHintIds\":[", input, "the rich save fills the schema-7 fields");
         }
 
         [TestCase(1)]
@@ -101,9 +117,10 @@ namespace BeastCraft.Tests.EditMode
         [TestCase(4)]
         [TestCase(5)]
         [TestCase(6)]
+        [TestCase(7)]
         public void RichSave_LoadsAndMigrates_ToTheGoldenText(int version)
         {
-            string input = version == 6 ? RichV6() : RichV5().Replace("\"SchemaVersion\":5", "\"SchemaVersion\":" + version);
+            string input = version == 7 ? RichV7() : version == 6 ? RichV6() : RichV5().Replace("\"SchemaVersion\":5", "\"SchemaVersion\":" + version);
             AssertGolden("rich-v" + version, input, version);
         }
 
@@ -113,6 +130,7 @@ namespace BeastCraft.Tests.EditMode
         [TestCase(4)]
         [TestCase(5)]
         [TestCase(6)]
+        [TestCase(7)]
         public void MinimalSave_LoadsAndMigrates_ToTheGoldenText(int version)
         {
             AssertGolden("min-v" + version, MinimalInputs[version - 1], version);

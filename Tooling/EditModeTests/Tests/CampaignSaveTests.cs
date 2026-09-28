@@ -51,7 +51,7 @@ namespace BeastCraft.Tests.EditMode
         {
             PlayerSave save = PlayerSave.CreateNew();
 
-            Assert.AreEqual(6, PlayerSave.CurrentSchemaVersion);
+            Assert.AreEqual(7, PlayerSave.CurrentSchemaVersion);
             Assert.AreEqual(RunDifficulty.Normal, save.Campaign.ActiveRun.Difficulty);
             Assert.IsTrue(save.Campaign.IsUnlocked(CampaignProgress.StartingRegionId));
             Assert.AreEqual(1, save.Campaign.Regions.Count);

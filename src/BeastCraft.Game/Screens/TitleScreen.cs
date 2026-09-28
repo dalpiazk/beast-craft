@@ -86,7 +86,7 @@ namespace BeastCraft.Game.Screens
         /// <summary>A new game straight away (no question), then the map.</summary>
         public void StartNewGame()
         {
-            _model.NewGame();
+            _model.NewGame("golem");
             Ctx.Stack.Push(new HomeScreen(Ctx));
         }
 

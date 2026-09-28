@@ -98,7 +98,7 @@ namespace BeastCraft.Presentation.Screens
 
             GameContent content = session.Content;
             MapNode node = Battle.Node;
-            Title = content.LocationNames?.Resolve(node) ?? MapViewModel.KindLabel(node.Type);
+            Title = session.LocationName(node);
             KindLabel = MapViewModel.KindLabel(node.Type);
             Level = Battle.Plan.Level;
             Arena = Battle.Plan.Arena.ToString();
@@ -185,7 +185,7 @@ namespace BeastCraft.Presentation.Screens
                 }
             }
 
-            CampaignTeamSuggestion suggestion = CampaignRules.SuggestionFor(session.Save, nodeId, session.Settings, content.Encounters, content.Battle, PartySize);
+            CampaignTeamSuggestion suggestion = CampaignRules.SuggestionFor(session.Save, nodeId, session.Settings, content.Encounters, content.Battle, content.Campaign, PartySize);
             if (suggestion != null && !session.DismissedSuggestions.Contains(SuggestionKey()))
             {
                 Suggestion = new SuggestionView { Losses = suggestion.Losses };
