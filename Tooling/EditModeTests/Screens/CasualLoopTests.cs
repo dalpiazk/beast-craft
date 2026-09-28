@@ -26,9 +26,7 @@ namespace BeastCraft.Tests.EditMode
 
         private static GameSession NewSession(ManualGameClock clock, ISaveStorage storage = null)
         {
-            GameSession session = new GameSession(Content, storage ?? new MemorySaveStorage(), () => MapSeed, clock);
-            session.NewGame();
-            return session;
+            return TestSaves.Started(new GameSession(Content, storage ?? new MemorySaveStorage(), () => MapSeed, clock));
         }
 
         /// <summary>Marks the first reachable location cleared: the progress level idle pays at.</summary>

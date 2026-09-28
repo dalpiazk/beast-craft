@@ -63,14 +63,14 @@ namespace BeastCraft.Progression
         /// <paramref name="result"/> is a <see cref="BattleOutcome.PlayerVictory"/>. Returns the
         /// loot (empty otherwise, never null).
         /// </summary>
-        public static LootResult AwardDrops(BattleResult result, DropTable table, string shape, int level, MaterialInventory inventory, Random rng)
+        public static LootResult AwardDrops(BattleResult result, DropTable table, string shape, int level, MaterialInventory inventory, Random rng, string clearScope = null)
         {
             if (result == null || result.Outcome != BattleOutcome.PlayerVictory)
             {
                 return new LootResult();
             }
 
-            return LootRoller.RollClear(table, shape, level, inventory, rng);
+            return LootRoller.RollClear(table, shape, level, inventory, rng, clearScope);
         }
 
         /// <summary>The <see cref="LootRoller.DeriveSeed"/> stream a battle's gold is rolled on (materials are stream 0).</summary>

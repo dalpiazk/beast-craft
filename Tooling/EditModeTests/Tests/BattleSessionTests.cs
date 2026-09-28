@@ -611,7 +611,7 @@ namespace BeastCraft.Tests.EditMode
             LoseAt(save, node, 2);
 
             Assert.AreEqual(2, CampaignRules.LossesAt(save.Campaign.ActiveRun, node.NodeId));
-            Assert.IsNull(CampaignRules.SuggestionFor(save, node.NodeId, new PlayerSettings(), SuggestionEncounters(), _content, 3));
+            Assert.IsNull(CampaignRules.SuggestionFor(save, node.NodeId, new PlayerSettings(), SuggestionEncounters(), _content, null, 3));
         }
 
         [Test]
@@ -621,7 +621,7 @@ namespace BeastCraft.Tests.EditMode
             LoseAt(save, node, 3);
             EncounterLibrary encounters = SuggestionEncounters();
 
-            CampaignTeamSuggestion suggestion = CampaignRules.SuggestionFor(save, node.NodeId, null, encounters, _content, 3);
+            CampaignTeamSuggestion suggestion = CampaignRules.SuggestionFor(save, node.NodeId, null, encounters, _content, null, 3);
 
             Assert.IsNotNull(suggestion, "three losses and suggestions on by default");
             Assert.AreEqual(node.NodeId, suggestion.NodeId);
@@ -668,7 +668,27 @@ namespace BeastCraft.Tests.EditMode
             PlayerSave save = CampaignSave(out MapNode node);
             LoseAt(save, node, 5);
 
-            Assert.IsNull(CampaignRules.SuggestionFor(save, node.NodeId, new PlayerSettings { TeamSuggestionsEnabled = false }, SuggestionEncounters(), _content, 3));
+            Assert.IsNull(CampaignRules.SuggestionFor(save, node.NodeId, new PlayerSettings { TeamSuggestionsEnabled = false }, SuggestionEncounters(), _content, null, 3));
+        }
+
+        [Test]
+        public void SuggestionFor_PlansTheEncounterTheBattleFields_TheEasedPlan()
+        {
+            PlayerSave save = CampaignSave(out MapNode node);
+            LoseAt(save, node, 3);
+            EncounterLibrary encounters = SuggestionEncounters();
+            RegionLibrary regions = CampaignRegions();
+
+            CampaignTeamSuggestion suggestion = CampaignRules.SuggestionFor(save, node.NodeId, null, encounters, _content, regions, 3);
+            EncounterPlan eased = CampaignRules.PlanFor(save.Campaign.ActiveRun, node, encounters, _enemies, regions);
+            EncounterPlan unscaled = CampaignRules.PlanFor(node, encounters, _enemies);
+
+            Assert.IsNotNull(suggestion);
+            Assert.Less(eased.DifficultyScale, 1.0, "r01's first stage is eased");
+            Assert.AreEqual(eased.Multiplier, suggestion.Plan.Multiplier, "the suggestion reads the plan the battle fields (NodeBattle: PlanFor with the run)");
+            Assert.AreEqual(eased.DifficultyScale, suggestion.Plan.DifficultyScale);
+            Assert.AreNotEqual(unscaled.Multiplier, suggestion.Plan.Multiplier);
+            Assert.AreEqual(1.0, CampaignRules.SuggestionFor(save, node.NodeId, null, encounters, _content, null, 3).Plan.DifficultyScale, "no regions: unscaled");
         }
 
         [Test]
@@ -685,7 +705,7 @@ namespace BeastCraft.Tests.EditMode
             Assert.AreEqual(0, CampaignRules.LossesAt(run, node.NodeId), "a loss elsewhere restarts the count");
             Assert.AreEqual(1, CampaignRules.LossesAt(run, other.NodeId));
             Assert.AreEqual(4, run.Attempts, "the run still counts every loss");
-            Assert.IsNull(CampaignRules.SuggestionFor(save, node.NodeId, null, SuggestionEncounters(), _content, 3));
+            Assert.IsNull(CampaignRules.SuggestionFor(save, node.NodeId, null, SuggestionEncounters(), _content, null, 3));
 
             CampaignRules.ResolveBattle(save, CampaignRegions(), other.NodeId, BattleOutcome.PlayerVictory);
             Assert.AreEqual(0, CampaignRules.LossesAt(run, other.NodeId));

@@ -1,5 +1,5 @@
 {
-  "_readme": "GAME CONTENT: how PvE encounters are put together from enemy-library.json. Shapes are generated encounters: the runtime EncounterGenerator picks a variant (by Weight), draws each slot's count in [Min, Max] and each unit's type uniformly from Types, and keeps the draw only if its summed enemy Threat is inside [ThreatMin, ThreatMax], it has at least MinDistinctTypes types and it seats on the arena; units are placed front to back (Vanguard, Skirmisher, Ranged; library order within a stance). Each lineup then draws an element scheme by SchemeWeights (Uniform: one element for the whole team; PerType: one per type; PerUnit: one per unit; None), with elements dealt from a shuffled deck of the ten so every element is dealt before any repeats. Shape ids are drop-tables.json's shape ids (the validator requires the two sets to match): a cleared encounter pays out from its shape's drop cell. POST-GAME shapes (PostGame: true; the six *_postgame and *_postgame_hard shapes, drawn only by the post-game region r11, regions.json IsPostGame) are the exception: each pays out as the mainline shape its DropShapeId names (the same loot as that shape, on Normal and Hard alike), is calibrated by the balance simulator at level 100 only (TargetClear: squad and horde 65, elite 45 on Normal; 50, 50 and 30 on Hard), and stays out of the mainline report; its cells are appended to encounter-difficulty.json after the mainline ones. Any mainline rebalance must re-run --write-difficulty so they follow. Templates are authored fixed encounters ({ EncounterId, DisplayName, Description, ShapeId, Arena, Groups: [{ EnemyId, Count, Elements }], DifficultyOverride, Draft }; Elements are cycled over the group, empty = no element; DifficultyOverride 0 = use the shape's calibrated difficulty; Draft true = placeholder text/design pending producer review, never shown to the player). The region bosses (regions.json's BossTemplateId, and the post-game region's HardMode.BossTemplateId) are the only templates, DRAFT placeholders pending producer review; each mainline DifficultyOverride is calibrated so a scouting team of three beasts (beside the Beastbinder) at the boss's level wearing typical gear clears about 50%, the post-game twins (boss_r11_dusk_and_dawn, boss_r11_dusk_and_dawn_hard) about 35% on Normal and about 20% on Hard (docs/balance/tuning-log.md). Difficulty: every enemy's HP, Attack, Defense, SpecialAttack and SpecialDefense are multiplied by the shape's calibrated multiplier at the encounter's level (encounter-difficulty.json, written by the balance simulator's --write-difficulty, interpolated between the calibrated levels) times DifficultyScale. PENDING PRODUCER REVIEW: DifficultyScale is 1.0 and the table is calibrated so a player who scouts and counter-picks (the simulator's bond-aware heuristic pick) wearing typical gear (the balance simulator's --gear typical, a user decision) clears each shape's TargetClear (the tiered targets, a user decision: squad and horde 80%, elite 60%, solo 50%; encounter-difficulty.json records the target of every cell); whether the campaign should be that hard, and how a map node picks a shape and a level, are producer decisions not made here. Validated by EncounterLibraryValidator (the Editor importer Beast Craft/Data/Import Encounters, the EditMode tests, Tooling/BalanceSim): every shape's worst case (each slot at Max, each unit its slot's largest type) and every template must fit its arena's enemy deployment zone. The shapes and weights came over unchanged from the balance simulator's former fixtures; see docs/design/battle-system.md, 'Encounter direction'. Boss names and descriptions follow docs/design/content-bible.md; each boss carries Draft: true until the producer signs it off (the validator rejects a [DRAFT] marker in DisplayName/Description, which are player-facing); the calibration note that used to sit in each Description is this readme's (each mainline DifficultyOverride clears about 50% for a scouting team at the boss's level in typical gear; the post-game twins about 35% on Normal and 20% on Hard).",
+  "_readme": "GAME CONTENT: how PvE encounters are put together from enemy-library.json. Shapes are generated encounters: the runtime EncounterGenerator picks a variant (by Weight), draws each slot's count in [Min, Max] and each unit's type uniformly from Types, and keeps the draw only if its summed enemy Threat is inside [ThreatMin, ThreatMax], it has at least MinDistinctTypes types and it seats on the arena; units are placed front to back (Vanguard, Skirmisher, Ranged; library order within a stance). Each lineup then draws an element scheme by SchemeWeights (Uniform: one element for the whole team; PerType: one per type; PerUnit: one per unit; None), with elements dealt from a shuffled deck of the ten so every element is dealt before any repeats. Shape ids are drop-tables.json's shape ids (the validator requires the two sets to match): a cleared encounter pays out from its shape's drop cell. POST-GAME shapes (PostGame: true; the six *_postgame and *_postgame_hard shapes, drawn only by the post-game region r11, regions.json IsPostGame) are the exception: each pays out as the mainline shape its DropShapeId names (the same loot as that shape, on Normal and Hard alike), is calibrated by the balance simulator at level 100 only (TargetClear: squad and horde 65, elite 45 on Normal; 50, 50 and 30 on Hard), and stays out of the mainline report; its cells are appended to encounter-difficulty.json after the mainline ones. Any mainline rebalance must re-run --write-difficulty so they follow. Templates are authored fixed encounters ({ EncounterId, DisplayName, Description, ShapeId, Arena, Groups: [{ EnemyId, Count, Elements }], DifficultyOverride, Draft }; Elements are cycled over the group, empty = no element; DifficultyOverride 0 = use the shape's calibrated difficulty; Draft true = placeholder text/design pending producer review, never shown to the player). Hearthglen's fixed fights (hg_*, regions.json TutorialRegions FixedNodes; docs/design/area-zero.md) are templates too, each with its own DifficultyOverride tuned by the balance simulator's --mode hearthglen (docs/balance/hearthglen-report.md). The region bosses (regions.json's BossTemplateId, and the post-game region's HardMode.BossTemplateId) are the only templates, DRAFT placeholders pending producer review; each mainline DifficultyOverride is calibrated so a scouting team of three beasts (beside the Beastbinder) at the boss's level wearing typical gear clears about 50%, the post-game twins (boss_r11_dusk_and_dawn, boss_r11_dusk_and_dawn_hard) about 35% on Normal and about 20% on Hard (docs/balance/tuning-log.md). Difficulty: every enemy's HP, Attack, Defense, SpecialAttack and SpecialDefense are multiplied by the shape's calibrated multiplier at the encounter's level (encounter-difficulty.json, written by the balance simulator's --write-difficulty, interpolated between the calibrated levels) times DifficultyScale. PENDING PRODUCER REVIEW: DifficultyScale is 1.0 and the table is calibrated so a player who scouts and counter-picks (the simulator's bond-aware heuristic pick) wearing typical gear (the balance simulator's --gear typical, a user decision) clears each shape's TargetClear (the tiered targets, a user decision: squad and horde 80%, elite 60%, solo 50%; encounter-difficulty.json records the target of every cell); whether the campaign should be that hard, and how a map node picks a shape and a level, are producer decisions not made here. Validated by EncounterLibraryValidator (the Editor importer Beast Craft/Data/Import Encounters, the EditMode tests, Tooling/BalanceSim): every shape's worst case (each slot at Max, each unit its slot's largest type) and every template must fit its arena's enemy deployment zone. The shapes and weights came over unchanged from the balance simulator's former fixtures; see docs/design/battle-system.md, 'Encounter direction'. Boss names and descriptions follow docs/design/content-bible.md; each boss carries Draft: true until the producer signs it off (the validator rejects a [DRAFT] marker in DisplayName/Description, which are player-facing); the calibration note that used to sit in each Description is this readme's (each mainline DifficultyOverride clears about 50% for a scouting team at the boss's level in typical gear; the post-game twins about 35% on Normal and 20% on Hard).",
   "SchemaVersion": 1,
   "DifficultyScale": 1.0,
   "SchemeWeights": [
@@ -156,6 +156,96 @@
     }
   ],
   "Templates": [
+    {
+      "EncounterId": "hg_meadow_scamps",
+      "DisplayName": "Meadow Scamps",
+      "Description": "Two gloam-dazed scamps tumbling through the clover, snapping at anything that moves. They are more lost than fierce.",
+      "ShapeId": "squad",
+      "Arena": "Small",
+      "Groups": [ { "EnemyId": "swarmling", "Count": 2, "Elements": [ ] } ],
+      "DifficultyOverride": 1.73,
+      "Draft": true
+    },
+    {
+      "EncounterId": "hg_hedgerow_pests",
+      "DisplayName": "Hedgerow Pests",
+      "Description": "A buzzing knot of stinglings and a scamp that have made the old hedgerow their own. One of them hums with the green of the meadow.",
+      "ShapeId": "squad",
+      "Arena": "Small",
+      "Groups": [ { "EnemyId": "swarmling", "Count": 1, "Elements": [ ] }, { "EnemyId": "stingling", "Count": 1, "Elements": [ "Nature" ] }, { "EnemyId": "stingling", "Count": 1, "Elements": [ ] } ],
+      "DifficultyOverride": 1.29,
+      "Draft": true
+    },
+    {
+      "EncounterId": "hg_tumbledown_wall",
+      "DisplayName": "Tumbledown Wall",
+      "Description": "An archer has taken the tumbled stones as a lookout, with a stingling darting between the rocks below.",
+      "ShapeId": "squad",
+      "Arena": "Small",
+      "Groups": [ { "EnemyId": "stingling", "Count": 1, "Elements": [ ] }, { "EnemyId": "archer", "Count": 1, "Elements": [ ] } ],
+      "DifficultyOverride": 0.73,
+      "Draft": true
+    },
+    {
+      "EncounterId": "hg_trial_bramble",
+      "DisplayName": "Bramble Trial",
+      "Description": "A horned brute stands at the kinship stone, stamping in the brambles. Stand your ground beside your beast and another may choose to join you.",
+      "ShapeId": "elite",
+      "Arena": "Small",
+      "Groups": [ { "EnemyId": "brute", "Count": 1, "Elements": [ ] } ],
+      "DifficultyOverride": 0.83,
+      "Draft": true
+    },
+    {
+      "EncounterId": "hg_brookside_rabble",
+      "DisplayName": "Brookside Rabble",
+      "Description": "Scamps splash in the mill race while a caster mutters over the water. The mill wheel has stopped turning to listen.",
+      "ShapeId": "squad",
+      "Arena": "Medium",
+      "Groups": [ { "EnemyId": "swarmling", "Count": 2, "Elements": [ ] }, { "EnemyId": "caster", "Count": 1, "Elements": [ ] } ],
+      "DifficultyOverride": 1.03,
+      "Draft": true
+    },
+    {
+      "EncounterId": "hg_orchard_raiders",
+      "DisplayName": "Orchard Raiders",
+      "Description": "A brute shakes the apple trees while an archer and a stingling help themselves to the windfalls. A draught of courage would not go amiss.",
+      "ShapeId": "squad",
+      "Arena": "Medium",
+      "Groups": [ { "EnemyId": "brute", "Count": 1, "Elements": [ ] }, { "EnemyId": "stingling", "Count": 1, "Elements": [ ] }, { "EnemyId": "archer", "Count": 1, "Elements": [ ] } ],
+      "DifficultyOverride": 0.83,
+      "Draft": true
+    },
+    {
+      "EncounterId": "hg_trial_grove",
+      "DisplayName": "Grove Trial",
+      "Description": "An old shaman keeps the second kinship stone, two scamps at its heels. Show it a team that stands together and a third beast will answer.",
+      "ShapeId": "elite",
+      "Arena": "Medium",
+      "Groups": [ { "EnemyId": "shaman", "Count": 1, "Elements": [ ] }, { "EnemyId": "swarmling", "Count": 2, "Elements": [ ] } ],
+      "DifficultyOverride": 1.12,
+      "Draft": true
+    },
+    {
+      "EncounterId": "hg_ridge_prowlers",
+      "DisplayName": "Ridge Prowlers",
+      "Description": "A stalker slinks along the ridge path with an archer and a pair of scamps. Your whole team, at last, can meet them together.",
+      "ShapeId": "squad",
+      "Arena": "Medium",
+      "Groups": [ { "EnemyId": "stalker", "Count": 1, "Elements": [ ] }, { "EnemyId": "swarmling", "Count": 2, "Elements": [ ] }, { "EnemyId": "archer", "Count": 1, "Elements": [ ] } ],
+      "DifficultyOverride": 0.95,
+      "Draft": true
+    },
+    {
+      "EncounterId": "hg_gloam_at_the_hedge",
+      "DisplayName": "The Gloam at the Hedge",
+      "Description": "At the far hedge the shimmer thickens, and something big comes out of it: a champion of the vale, gloamed and bewildered, with two stinglings in its wake. Calm it, and the way to Verdant Hollow is open.",
+      "ShapeId": "elite",
+      "Arena": "Medium",
+      "Groups": [ { "EnemyId": "champion", "Count": 1, "Elements": [ ] }, { "EnemyId": "stingling", "Count": 2, "Elements": [ ] } ],
+      "DifficultyOverride": 0.93,
+      "Draft": true
+    },
     {
       "EncounterId": "boss_r01_hollow_warden",
       "DisplayName": "Mossjaw the Warden",

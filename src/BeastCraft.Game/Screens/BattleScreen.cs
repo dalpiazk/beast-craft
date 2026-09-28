@@ -77,6 +77,12 @@ namespace BeastCraft.Game.Screens
         /// </summary>
         private readonly string _regionId;
 
+        /// <summary>Whether the battle-start hints were offered.</summary>
+        private bool _hintedStart;
+
+        /// <summary>The region the units are drawn in (its enemy art): the battlefield, or on an open board the region it stands in for.</summary>
+        private readonly string _artRegionId;
+
         private readonly Dictionary<string, string> _names;
         private BoardFit _boardFit;
         private CanvasFit _canvasFit;
@@ -104,8 +110,9 @@ namespace BeastCraft.Game.Screens
         private readonly List<string> _log = new List<string>();
 
         private BattleScreen(ScreenContext ctx, BattleSessionRun run, Dictionary<string, string> speciesByUnit, string regionId, int seed, string hudTitle,
-                             NodeBattle campaign, Action<NodeBattle> finished) : base(ctx)
+                             NodeBattle campaign, Action<NodeBattle> finished, string artRegionId = null) : base(ctx)
         {
+            _artRegionId = artRegionId ?? regionId;
             _options = ctx.Options;
             _draw = ctx.Draw;
             _atlas = ctx.Atlas;
@@ -201,7 +208,7 @@ namespace BeastCraft.Game.Screens
         /// </summary>
         public static BattleScreen Campaign(ScreenContext ctx, NodeBattle battle, string title, Action<NodeBattle> finished)
         {
-            BattleScreen screen = new BattleScreen(ctx, battle.Run, battle.SpeciesByUnit, battle.RegionId, battle.Seed, title, battle, finished);
+            BattleScreen screen = new BattleScreen(ctx, battle.Run, battle.SpeciesByUnit, battle.RegionId, battle.Seed, title, battle, finished, battle.ArtRegionId);
             screen.LoadSettings(ctx.Session.Settings, ctx.Session.SaveSettings);
             screen._auto = true;
             screen._speed = SettingsViewModel.Speed(ctx.Session.Settings);
@@ -229,6 +236,22 @@ namespace BeastCraft.Game.Screens
 
         public override void Update(float elapsedMs, FrameInput input)
         {
+            if (Ctx.Stack.TopModal is HintModal)
+            {
+                // A tutorial hint pauses the battle until it is dismissed.
+                return;
+            }
+
+            if (_campaign != null && !_hintedStart)
+            {
+                _hintedStart = true;
+                ShowHints(BeastCraft.Tutorial.HintTriggers.BattleStart, _campaign.Node.NodeId);
+                if (Ctx.Stack.TopModal is HintModal)
+                {
+                    return;
+                }
+            }
+
             if (input != null)
             {
                 KeyboardState keys = input.Keys;
@@ -333,6 +356,10 @@ namespace BeastCraft.Game.Screens
             _turnCamera = new TurnCamera(_animation, _layout, _camera, from);
             _clockMs = 0;
             Log(turn);
+            if (_campaign != null)
+            {
+                HintTurn(turn);
+            }
         }
 
         /// <summary>
@@ -354,6 +381,32 @@ namespace BeastCraft.Game.Screens
             }
 
             return _camera.Ease(_cameraRest, _camera.FitAll, _cameraIdleMs, _camera.Settings.ReturnMs);
+        }
+
+        /// <summary>A played turn's tutorial moments: the first critical hit, the first status landing.</summary>
+        private void HintTurn(PlayedTurn turn)
+        {
+            bool crit = false;
+            bool status = false;
+            foreach (SkillBeat beat in turn.Beats)
+            {
+                foreach (BeatTarget target in beat.Targets ?? new BeatTarget[0])
+                {
+                    crit |= target.Crit;
+                }
+
+                status |= beat.Applied != null && beat.Applied.Count > 0;
+            }
+
+            if (crit)
+            {
+                ShowHints(BeastCraft.Tutorial.HintTriggers.BattleCrit, _campaign.Node.NodeId);
+            }
+
+            if (status)
+            {
+                ShowHints(BeastCraft.Tutorial.HintTriggers.BattleStatus, _campaign.Node.NodeId);
+            }
         }
 
         /// <summary>The skip button: plays every remaining turn at once and shows the result.</summary>

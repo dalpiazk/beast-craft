@@ -70,7 +70,13 @@ namespace BeastCraft.Game.Screens
                                               ? _content.BattleArt?.BackdropByArtKey(_battleLayout.ArtKey)
                                               : _content.BattleArt?.Backdrop(_regionId, _playback.Grid.Size);
             ArtSprite backdropArt = backdrop == null ? null : _atlas.ByArtKey(backdrop.ArtKey);
-            if (backdropArt == null)
+            if (backdropArt == null && _campaign != null && string.IsNullOrEmpty(_regionId))
+            {
+                // An open-board campaign fight (the first Hearthglen meadows): a placeholder meadow until
+                // the vale's own painted backdrop lands (docs/design/area-zero.md, art slots).
+                DrawMeadow(board);
+            }
+            else if (backdropArt == null)
             {
                 _draw.Fill(Pixel, new Vector2(board.X, board.Y), new Vector2(board.Width, board.Height), Ink("p", Color.Purple) * 0.35f);
             }
@@ -729,10 +735,24 @@ namespace BeastCraft.Game.Screens
         /// manifest; the content validator holds every shipped key to an entry, so the fallback (the
         /// brute) only shows for content loaded without one.
         /// </summary>
+        /// <summary>A soft placeholder meadow behind an open-board campaign fight: bands of the map's greens.</summary>
+        private void DrawMeadow(Rect board)
+        {
+            const int bands = 24;
+            Color top = Painter.C("map_meadow");
+            Color bottom = Painter.C("map_grass");
+            float step = board.Height / bands;
+            for (int i = 0; i < bands; i++)
+            {
+                Color band = Color.Lerp(top, bottom, (i + 0.5f) / bands);
+                _draw.Fill(Pixel, new Vector2(board.X, board.Y + i * step), new Vector2(board.Width, step + 1f), band);
+            }
+        }
+
         private ArtSprite SpriteFor(string unitId)
         {
             string id = unitId != null && _speciesByUnit.TryGetValue(unitId, out string species) ? species : null;
-            string artKey = DemoBattle.ArtKeyOf(_content, id, _regionId);
+            string artKey = DemoBattle.ArtKeyOf(_content, id, _artRegionId);
             return _atlas.ByArtKey(artKey) ?? _atlas.ByArtKey(_content.Enemies.Get(id)?.ArtKey) ?? _atlas.ByArtKey("enemy/brute");
         }
 

@@ -33,9 +33,16 @@ namespace BeastCraft.Presentation.Screens
             return _session.Continue();
         }
 
-        public void NewGame()
+        /// <summary>A new game in Hearthglen with <paramref name="firstSpeciesId"/> as the New Game pick.</summary>
+        public bool NewGame(string firstSpeciesId)
         {
-            _session.NewGame();
+            return _session.NewGame(firstSpeciesId);
+        }
+
+        /// <summary>A new game that skips Hearthglen, with the three picks made in a row.</summary>
+        public bool NewGameSkippingTutorial(IReadOnlyList<string> species)
+        {
+            return _session.NewGameSkippingTutorial(species);
         }
     }
 
@@ -132,8 +139,9 @@ namespace BeastCraft.Presentation.Screens
         public const int TeamSuggestions = 3;
         public const int BattleSpeed = 4;
         public const int AutoAdvance = 5;
-        public const int IdleNotifications = 6;
-        public const int RowCount = 7;
+        public const int TutorialHints = 6;
+        public const int IdleNotifications = 7;
+        public const int RowCount = 8;
 
         private readonly PlayerSettings _settings;
         private readonly Func<bool> _save;
@@ -164,7 +172,8 @@ namespace BeastCraft.Presentation.Screens
                 new SettingRow { Label = "Flashes", Value = _settings.Flashes ? "On" : "Off", On = _settings.Flashes },
                 new SettingRow { Label = "Team suggestions", Value = _settings.TeamSuggestionsEnabled ? "On" : "Off", On = _settings.TeamSuggestionsEnabled },
                 new SettingRow { Label = "Battle speed", Value = "x" + Speed(_settings), On = true },
-                new SettingRow { Label = "Auto next battle", Value = _settings.AutoAdvance ? "On" : "Off", On = _settings.AutoAdvance }
+                new SettingRow { Label = "Auto next battle", Value = _settings.AutoAdvance ? "On" : "Off", On = _settings.AutoAdvance },
+                new SettingRow { Label = "Tutorial hints", Value = _settings.TutorialHints ? "On" : "Off", On = _settings.TutorialHints }
             };
             if (NotificationsAvailable)
             {
@@ -205,6 +214,9 @@ namespace BeastCraft.Presentation.Screens
                     break;
                 case AutoAdvance:
                     _settings.AutoAdvance = !_settings.AutoAdvance;
+                    break;
+                case TutorialHints:
+                    _settings.TutorialHints = !_settings.TutorialHints;
                     break;
                 case IdleNotifications:
                     if (!NotificationsAvailable)

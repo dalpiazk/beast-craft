@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using BeastCraft.Campaign;
 using BeastCraft.Game.Rendering;
 using BeastCraft.Game.Screens;
 using BeastCraft.Game.Ui;
@@ -716,31 +717,213 @@ namespace BeastCraft.Game
             _script.Enqueue((capture, step));
         }
 
-        /// <summary>The core loop, captured: title, map, encounter, battle, results, the map again, a coming-soon tab, the settings.</summary>
+        /// <summary>
+        /// The new player's first session, captured: the title, the first beast's pick, Hearthglen's
+        /// map with its hints, the Keeper's shrine, the first fight (encounter, battle and results, with
+        /// their hints), the first trial and its pick, the second trial's pick, the camp (the Keeper's
+        /// scene, then the training and catch-up), the finale, the Keeper's farewell, the way on, and
+        /// Verdant Hollow's map; then a coming-soon tab and the settings. Fights between the captured
+        /// ones are fought headless (retried until won, as a player would).
+        /// </summary>
         private void Walkthrough()
         {
             Step("01-title", () => { });
-            Step("02-map", () => Title().StartNewGame());
-            Step("03-encounter", () => Home().OpenFirstEncounter());
-            Step("04-battle", () =>
+            Step("02-starter-pick", () => Title().StartNewGame());
+            Step("03-starter-selected", () => Pick().Select("golem"));
+            Step("04-hearthglen-map-hint", () => Pick().Confirm());
+            Step("05-keeper-shrine", () =>
             {
+                DismissHints();
+                Home().OpenStory(0);
+            });
+            Step("06-first-encounter-hint", () =>
+            {
+                Modal<StoryModal>().Finish();
+                DismissHints();
+                Home().TapNode(1);
+            });
+            Step("07-first-encounter-party-hint", () => Modal<HintModal>().Dismiss());
+            Step("08-battle-hint", () =>
+            {
+                DismissHints();
                 Encounter().StartBattle();
+                Battle().Update(16f, null);
+            });
+            Step("09-battle", () =>
+            {
+                DismissHints();
                 Battle().ShowTurn(3);
             });
-            Step("05-battle-decided", () => Battle().SkipToEnd());
-            Step("06-results", () => Battle().HandBack());
-            Step("07-map-after", () => Results().Continue());
-            Step("08-next-battle", () => Home().OpenRecommended());
-            Step("09-coming-soon", () =>
+            Step("10-results-hint", () =>
             {
-                _stack.Pop();
-                Home().SelectTab(HomeTab.Grove);
+                DismissHints();
+                Battle().SkipToEnd();
+                Battle().HandBack();
             });
-            Step("10-settings", () =>
+            Step("11-map-after", () =>
+            {
+                DismissHints();
+                bool won = Results().Model.Victory;
+                Results().Continue();
+                DismissHints();
+                if (!won)
+                {
+                    FightToWin(1);
+                    Home().Enter();
+                    DismissHints();
+                }
+            });
+            Step("12-trial-encounter", () =>
+            {
+                FightToWin(2);
+                FightToWin(3);
+                Home().Enter();
+                DismissHints();
+                Home().TapNode(4);
+            });
+            Step("13-trial-pick-second", () =>
+            {
+                DismissHints();
+                _stack.Pop();
+                FightToWin(4);
+                Home().Enter();
+            });
+            Step("14-trial-pick-second-chosen", () =>
+            {
+                DismissHints();
+                TrialPickModal pick = Modal<TrialPickModal>();
+                pick.Select(pick.Model.Options[0].SpeciesId);
+            });
+            Step("15-map-two-beasts", () =>
+            {
+                Modal<TrialPickModal>().Confirm();
+                DismissHints();
+            });
+            Step("16-trial-pick-third", () =>
+            {
+                FightToWin(5);
+                FightToWin(6);
+                FightToWin(7);
+                Home().Enter();
+                DismissHints();
+                TrialPickModal pick = Modal<TrialPickModal>();
+                pick.Select(pick.Model.Options[0].SpeciesId);
+            });
+            Step("17-camp-keeper", () =>
+            {
+                Modal<TrialPickModal>().Confirm();
+                DismissHints();
+                Home().TapNode(8);
+            });
+            Step("18-camp", () =>
+            {
+                Modal<StoryModal>().Finish();
+                DismissHints();
+            });
+            Step("19-camp-trained", () => Modal<CampModal>().Train());
+            Step("20-finale-encounter", () =>
+            {
+                Modal<CampModal>().Train();
+                FightToWin(9);
+                Home().Enter();
+                DismissHints();
+                Home().TapNode(10);
+            });
+            Step("21-finale-battle", () =>
+            {
+                DismissHints();
+                Encounter().StartBattle();
+                DismissHints();
+                Battle().ShowTurn(4);
+            });
+            Step("22-finale-results", () =>
+            {
+                Battle().SkipToEnd();
+                Battle().HandBack();
+                DismissHints();
+                if (!Results().Model.Victory)
+                {
+                    Results().Continue();
+                    FightToWin(10);
+                    Home().Enter();
+                }
+            });
+            Step("23-keeper-farewell", () =>
+            {
+                if (_stack.Top is ResultsScreen)
+                {
+                    Results().Continue();
+                }
+
+                DismissHints();
+                Home().OpenStory(11);
+            });
+            Step("24-the-way-on", () => Modal<StoryModal>().Finish());
+            Step("25-verdant-hollow-map", () =>
+            {
+                Modal<RegionCardModal>().Onward();
+                DismissHints();
+            });
+            Step("26-coming-soon", () => Home().SelectTab(HomeTab.Grove));
+            Step("27-settings", () =>
             {
                 Home().SelectTab(HomeTab.Map);
                 Home().OpenSettings();
             });
+        }
+
+        /// <summary>Dismisses every tutorial hint showing (each may bring the next one due).</summary>
+        private void DismissHints()
+        {
+            for (int guard = 0; guard < 20 && _stack.TopModal is HintModal hint; guard++)
+            {
+                hint.Dismiss();
+            }
+        }
+
+        /// <summary>
+        /// Fights location <paramref name="nodeId"/> headless with every owned beast (the walkthrough's
+        /// uncaptured fights), retrying a loss as a player would, until it is won; then any pick it
+        /// earned is made (the first option).
+        /// </summary>
+        private void FightToWin(int nodeId)
+        {
+            GameSession session = _ctx.Session;
+            for (int attempt = 0; attempt < 12; attempt++)
+            {
+                NodeBattle battle = NodeBattle.For(session, nodeId, out string error);
+                if (battle == null)
+                {
+                    throw new InvalidOperationException("Location " + nodeId + ": " + error);
+                }
+
+                if (battle.Begin(session.Save.Beasts.ConvertAll(b => b.BeastId), null, out error) == null)
+                {
+                    throw new InvalidOperationException("Location " + nodeId + ": " + error);
+                }
+
+                ResultsViewModel results = battle.Complete();
+                Console.WriteLine("Walkthrough fight at " + results.Subtitle + ": " + results.Outcome + ".");
+                if (results.Victory)
+                {
+                    return;
+                }
+            }
+
+            throw new InvalidOperationException("Location " + nodeId + " was not won in 12 attempts.");
+        }
+
+        /// <summary>A scripted new game past Hearthglen (the skip: Golem, Phoenix, Griffin), on the first campaign region's map.</summary>
+        private void StartScriptedGame()
+        {
+            Title().StartNewGame();
+            Pick().Skip();
+            (_stack.TopModal as ConfirmModal)?.TapWidget("confirm");
+            foreach (string species in new[] { "golem", "phoenix", "griffin" })
+            {
+                Pick().Select(species);
+                Pick().Confirm();
+            }
         }
 
         /// <summary>Scripts the way to <paramref name="screen"/> (capturing it to <paramref name="capture"/> when given).</summary>
@@ -756,8 +939,29 @@ namespace BeastCraft.Game
                 case "settings":
                     steps.Add(() => Title().OpenSettings());
                     break;
+                case "starter-pick":
+                    steps.Add(() => Title().StartNewGame());
+                    break;
+                case "hearthglen":
+                    steps.Add(() =>
+                    {
+                        Title().StartNewGame();
+                        Pick().Select("golem");
+                        Pick().Confirm();
+                    });
+                    break;
                 default:
-                    steps.Add(() => Title().EnterGame(_ctx.Session.HasSave && capture == null));
+                    steps.Add(() =>
+                    {
+                        if (_ctx.Session.HasSave && capture == null)
+                        {
+                            Title().EnterGame(true);
+                        }
+                        else
+                        {
+                            StartScriptedGame();
+                        }
+                    });
                     break;
             }
 
@@ -811,6 +1015,16 @@ namespace BeastCraft.Game
         private HomeScreen Home()
         {
             return Top<HomeScreen>();
+        }
+
+        private StarterPickScreen Pick()
+        {
+            return Top<StarterPickScreen>();
+        }
+
+        private T Modal<T>() where T : class
+        {
+            return _stack.TopModal as T ?? throw new InvalidOperationException("Expected the " + typeof(T).Name + " modal, but the top modal is " + (_stack.TopModal?.Name ?? "none") + ".");
         }
 
         private EncounterScreen Encounter()

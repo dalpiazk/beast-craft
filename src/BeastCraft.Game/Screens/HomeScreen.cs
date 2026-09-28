@@ -106,6 +106,34 @@ namespace BeastCraft.Game.Screens
             _next.Text = next == null ? "Next battle" : "Next: " + next.Name;
             RefreshIdle();
             ShowTab();
+            OfferPendingPick();
+        }
+
+        /// <summary>
+        /// A beast waiting to join (a won trial's pick, or a save with no beast at all) is offered before
+        /// anything else; otherwise the map's hints.
+        /// </summary>
+        private void OfferPendingPick()
+        {
+            int pending = Ctx.Session.PendingPick;
+            if (pending == 1)
+            {
+                Ctx.Stack.Push(new StarterPickScreen(Ctx));
+                return;
+            }
+
+            if (pending > 1)
+            {
+                if (!Ctx.Stack.IsOpen("trial-pick"))
+                {
+                    Ctx.Stack.PushModal(new TrialPickModal(Ctx, Enter));
+                    ShowHints(BeastCraft.Tutorial.HintTriggers.PickOpen, -1, pending);
+                }
+
+                return;
+            }
+
+            ShowHints(BeastCraft.Tutorial.HintTriggers.MapOpen);
         }
 
         public override void Update(float elapsedMs, FrameInput input)
@@ -209,6 +237,16 @@ namespace BeastCraft.Game.Screens
                 case MapTapKind.Preview:
                     Ctx.Stack.Push(new EncounterScreen(Ctx, nodeId));
                     break;
+                case MapTapKind.Story:
+                    OpenStory(nodeId);
+                    break;
+                case MapTapKind.Camp:
+                    OpenCamp(nodeId);
+                    break;
+                case MapTapKind.Pick:
+                    Ctx.Game.Toast(tap.Message);
+                    OfferPendingPick();
+                    break;
                 case MapTapKind.ComingSoon:
                 case MapTapKind.Refused:
                     Ctx.Game.Toast(tap.Message);
@@ -216,10 +254,63 @@ namespace BeastCraft.Game.Screens
             }
         }
 
+        /// <summary>A story location: the mentor's scene, then the visit (gifts; at Hearthglen's end, the way on).</summary>
+        public void OpenStory(int nodeId)
+        {
+            MapRun run = Ctx.Session.Save.Campaign.ActiveRun;
+            FixedNodeData authored = Ctx.Content.Campaign.FixedNode(run.RegionId, nodeId);
+            StoryViewModel story = new StoryViewModel(Ctx.Session, nodeId, authored?.SceneId);
+            Ctx.Stack.PushModal(new StoryModal(Ctx, story, true, result => AfterStory(result)));
+        }
+
+        private void AfterStory(CampaignResult result)
+        {
+            if (result == null || !result.Success)
+            {
+                Ctx.Game.Toast(result?.Error ?? "Nothing happens.");
+                return;
+            }
+
+            string gifts = StoryViewModel.GiftText(Ctx.Session, result);
+            if (gifts.Length > 0)
+            {
+                Ctx.Game.Toast("The Keeper gave you " + gifts + ".");
+            }
+
+            if (result.Outcome == CampaignOutcome.TutorialCleared)
+            {
+                RegionData next = Ctx.Content.Campaign.GetRegion(CampaignProgress.StartingRegionId);
+                Ctx.Stack.PushModal(new RegionCardModal(Ctx, next, Enter));
+                return;
+            }
+
+            Enter();
+            ShowHints(BeastCraft.Tutorial.HintTriggers.StoryDone, nodeId: result.Node?.NodeId ?? -1);
+        }
+
+        /// <summary>A camp: its scene (if any), then the camp itself (train a beast; Hearthglen's catch-up).</summary>
+        public void OpenCamp(int nodeId)
+        {
+            CampViewModel camp = new CampViewModel(Ctx.Session, nodeId);
+            void OpenIt()
+            {
+                Ctx.Stack.PushModal(new CampModal(Ctx, camp, Enter));
+                ShowHints(BeastCraft.Tutorial.HintTriggers.CampOpen, nodeId);
+            }
+
+            if (!string.IsNullOrEmpty(camp.SceneId))
+            {
+                Ctx.Stack.PushModal(new StoryModal(Ctx, new StoryViewModel(Ctx.Session, nodeId, camp.SceneId), false, _ => OpenIt()));
+                return;
+            }
+
+            OpenIt();
+        }
+
         /// <summary>The first reachable battle location's encounter (scripted walkthroughs).</summary>
         public void OpenFirstEncounter()
         {
-            MapNodeView node = _map.Reachable().Find(n => n.Type != MapNodeType.Rest && n.Type != MapNodeType.Shop);
+            MapNodeView node = _map.Reachable().Find(n => n.Type != MapNodeType.Rest && n.Type != MapNodeType.Shop && n.Type != MapNodeType.Story);
             if (node == null)
             {
                 throw new InvalidOperationException("No reachable battle on the map.");
@@ -427,7 +518,8 @@ namespace BeastCraft.Game.Screens
                     continue;
                 }
 
-                string text = node.Name + (node.Type == MapNodeType.Rest || node.Type == MapNodeType.Shop ? string.Empty : "  Lv " + node.Level.ToString(CultureInfo.InvariantCulture));
+                string text = node.Name + (node.Type == MapNodeType.Rest || node.Type == MapNodeType.Shop || node.Type == MapNodeType.Story ? string.Empty
+                                               : "  Lv " + node.Level.ToString(CultureInfo.InvariantCulture));
                 float width = Math.Min(460f, Ctx.Text.Measure(text, size) + 40f);
                 Rect below = Clamp(new Rect(c.X - width / 2f, c.Y + node.Radius + 14f, width, 44f));
                 Rect above = Clamp(new Rect(c.X - width / 2f, c.Y - node.Radius - 58f, width, 44f));
@@ -477,7 +569,7 @@ namespace BeastCraft.Game.Screens
             Painter.Glyph("seal", seal.Inset(6f), header.SealOwned ? Painter.C("gold") : Painter.C("moss"));
             string sealName = header.SealName ?? "No seal";
             Painter.TextIn(sealName, new Rect(seal.Right + 18f, box.Y + 144f, 380f, 28f), Ctx.Style.TextSizes.Small + 3f, Painter.C("ink"), TextAlign.Left);
-            string progress = header.SealOwned ? "Claimed" : header.StagesCleared + " / " + header.Stages + " stages";
+            string progress = header.IsTutorial ? header.StagesCleared + " / " + header.Stages + " beasts" : header.SealOwned ? "Claimed" : header.StagesCleared + " / " + header.Stages + " stages";
             Painter.Progress(new Rect(seal.Right + 18f, box.Y + 184f, 380f, 30f), header.SealProgress, -1f, "gold", "gold", "track", progress);
 
             // The binding limit (the beast level cap the seals give).
@@ -529,7 +621,10 @@ namespace BeastCraft.Game.Screens
                 case MapNodeType.Shop:
                     return "node_shop";
                 case MapNodeType.Rest:
+                case MapNodeType.Story:
                     return "node_camp";
+                case MapNodeType.Trial:
+                    return "node_elite";
                 default:
                     return "node_battle";
             }
@@ -550,6 +645,10 @@ namespace BeastCraft.Game.Screens
                     return "shop";
                 case MapNodeType.Rest:
                     return "camp";
+                case MapNodeType.Story:
+                    return "grove";
+                case MapNodeType.Trial:
+                    return "star";
                 default:
                     return "battle";
             }

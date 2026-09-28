@@ -107,7 +107,7 @@ namespace BeastCraft.Save
 
         /// <summary>
         /// <see cref="FromData(BeastRosterData, SkillLibraryData)"/> plus every region and seal id in
-        /// <paramref name="regions"/> (<c>regions.json</c>), and which regions are post-game, which are then checked. A null
+        /// <paramref name="regions"/> (<c>regions.json</c>, the tutorial regions included), and which regions are post-game, which are then checked. A null
         /// <paramref name="regions"/> leaves them unchecked.
         /// </summary>
         public static SaveContentCatalog FromData(BeastRosterData roster, SkillLibraryData library, RegionLibraryData regions)
@@ -128,6 +128,11 @@ namespace BeastCraft.Save
                 {
                     postGameIds.Add(region.RegionId);
                 }
+            }
+
+            foreach (RegionData region in regions.TutorialRegions ?? new RegionData[0])
+            {
+                regionIds.Add(region == null ? null : region.RegionId);
             }
 
             foreach (SealData seal in regions.Seals ?? new SealData[0])

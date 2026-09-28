@@ -109,6 +109,11 @@ namespace BeastCraft.Tooling.BalanceSim
                 return NewPlayerReport.Run(options, species, curves);
             }
 
+            if (options.RunHearthglen)
+            {
+                return HearthglenReport.Run(options, species, curves);
+            }
+
             if (options.Seeds != null)
             {
                 return RunSeeds(options, species, curves);

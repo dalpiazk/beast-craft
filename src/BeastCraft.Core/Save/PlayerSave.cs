@@ -5,6 +5,7 @@ using BeastCraft.Customization;
 using BeastCraft.Economy;
 using BeastCraft.Idle;
 using BeastCraft.Progression;
+using BeastCraft.Tutorial;
 
 namespace BeastCraft.Save
 {
@@ -15,8 +16,9 @@ namespace BeastCraft.Save
     /// beast and the avatar wears (schema 2), the region campaign: seals, region progress and
     /// the expedition in progress (schema 3), and the economy: gold, consumables, the Traders' frozen
     /// stock, cosmetic unlocks and the avatar's and every beast's appearance (schema 4), and the idle
-    /// (AFK) reward clock (schema 5), and the difficulty of the expedition in progress
-    /// (<c>MapRun.Difficulty</c>, schema 6).
+    /// (AFK) reward clock (schema 5), the difficulty of the expedition in progress
+    /// (<c>MapRun.Difficulty</c>, schema 6), and the onboarding state: Hearthglen cleared and the
+    /// tutorial hints seen (<see cref="Tutorial"/>, schema 7).
     /// <para>
     /// <strong>JsonUtility-compatible by construction.</strong> Every type reachable from here is
     /// <c>[Serializable]</c> with public fields, and every map is a list (<c>JsonUtility</c> drops
@@ -36,7 +38,7 @@ namespace BeastCraft.Save
     public class PlayerSave
     {
         /// <summary>The schema this code writes, and the newest it reads.</summary>
-        public const int CurrentSchemaVersion = 6;
+        public const int CurrentSchemaVersion = 7;
 
         /// <summary>The schema the data is in. 0 (or missing) is never valid.</summary>
         public int SchemaVersion = CurrentSchemaVersion;
@@ -100,8 +102,17 @@ namespace BeastCraft.Save
         public IdleState Idle = new IdleState();
 
         /// <summary>
-        /// A brand-new player: no beasts, avatar level 1, nothing learned or held, the starting
-        /// region (<see cref="CampaignProgress.StartingRegionId"/>) unlocked.
+        /// The onboarding state: whether Hearthglen (the tutorial region) is behind the player, and
+        /// the tutorial hints seen (<see cref="TutorialProgress"/>). Added in schema 7; a save migrated
+        /// from before it that owns a beast counts Hearthglen as cleared.
+        /// </summary>
+        public TutorialProgress Tutorial = new TutorialProgress();
+
+        /// <summary>
+        /// A blank save: no beasts, avatar level 1, nothing learned or held, the first campaign region
+        /// (<see cref="CampaignProgress.StartingRegionId"/>) unlocked — the starting point of the
+        /// balance tools and the tests. A player's New Game is <see cref="StarterPicks.NewGame"/>
+        /// (Hearthglen, the onboarding region, instead) or <see cref="StarterPicks.NewGameSkippingTutorial"/>.
         /// </summary>
         public static PlayerSave CreateNew()
         {
@@ -309,6 +320,13 @@ namespace BeastCraft.Save
                 repaired++;
             }
 
+            if (Tutorial == null)
+            {
+                Tutorial = new TutorialProgress();
+                repaired++;
+            }
+
+            repaired += Tutorial.EnsureInitialized();
             return repaired;
         }
 

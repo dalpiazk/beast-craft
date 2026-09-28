@@ -1166,6 +1166,19 @@ namespace BeastCraft.Tooling.BalanceSim
         public PveBattle RunBattle(KitMode mode, int teamLevel, int enemyLevel, Encounter encounter, double multiplier, int teamIndex, int sample,
                                    bool useRunBattle, bool playersWinTies, bool withAvatar, out List<BattleUnit> finalUnits)
         {
+            return RunBattle(mode, teamLevel, enemyLevel, encounter, multiplier, teamIndex, sample, useRunBattle, playersWinTies, withAvatar, null, 0, out finalUnits);
+        }
+
+        /// <summary>
+        /// <see cref="RunBattle(KitMode, int, int, Encounter, double, int, int, bool, bool, bool, out List{BattleUnit})"/>
+        /// with each team member at its own level (<paramref name="memberLevels"/>, indexed like
+        /// <see cref="Teams"/>[<paramref name="teamIndex"/>]; null = all at <paramref name="teamLevel"/>)
+        /// and the avatar at <paramref name="avatarLevel"/> (0 = as usual): the Hearthglen report's
+        /// picks, which join at different times. The seed and the tie split stay the team level's.
+        /// </summary>
+        public PveBattle RunBattle(KitMode mode, int teamLevel, int enemyLevel, Encounter encounter, double multiplier, int teamIndex, int sample,
+                                   bool useRunBattle, bool playersWinTies, bool withAvatar, int[] memberLevels, int avatarLevel, out List<BattleUnit> finalUnits)
+        {
             int level = teamLevel;
             int[] team = Teams[teamIndex];
             int[] slots = SlotOrders[teamIndex];
@@ -1210,8 +1223,9 @@ namespace BeastCraft.Tooling.BalanceSim
                 int member = slots[s];
                 int speciesIndex = team[member];
                 string id = playerPrefix + "p" + (s + 1).ToString(System.Globalization.CultureInfo.InvariantCulture);
-                members[member] = BattleUnitFactory.CreateBeast(id, BattleTeam.Player, _species[speciesIndex], level,
-                                                                GearFor == null ? null : GearFor(_species[speciesIndex], level), playerTiles[s],
+                int memberLevel = memberLevels == null ? level : memberLevels[member];
+                members[member] = BattleUnitFactory.CreateBeast(id, BattleTeam.Player, _species[speciesIndex], memberLevel,
+                                                                GearFor == null ? null : GearFor(_species[speciesIndex], memberLevel), playerTiles[s],
                                                                 BeastLoadout(speciesIndex, mode));
                 requests.Add(new PlacementRequest(id, playerTiles[s]));
             }
@@ -1256,7 +1270,7 @@ namespace BeastCraft.Tooling.BalanceSim
                                         new Random(BeastCraft.Progression.LootRoller.DeriveSeed(battleSeed, BeastCraft.Progression.PostBattleAward.ConsumableStream)));
             }
             PassiveLoadout passives = null;
-            BattleUnit avatar = withAvatar ? Avatar.Build(_options.AvatarLevel > 0 ? _options.AvatarLevel : level, out passives) : null;
+            BattleUnit avatar = withAvatar ? Avatar.Build(avatarLevel > 0 ? avatarLevel : _options.AvatarLevel > 0 ? _options.AvatarLevel : level, out passives) : null;
 
             // The avatar fills its own ATB gauge: it is in the turn order, never in the targeting roster.
             TurnManager turnManager = new TurnManager(avatar == null ? units : new List<BattleUnit>(units) { avatar });

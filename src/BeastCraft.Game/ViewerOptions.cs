@@ -97,7 +97,7 @@ namespace BeastCraft.Game
         public bool DemoFlags;
 
         /// <summary>The screens <c>--screen</c> accepts.</summary>
-        public static readonly string[] ScreenNames = { "title", "map", "encounter", "battle", "results", "roster", "grove", "avatar", "inventory", "settings", "demo" };
+        public static readonly string[] ScreenNames = { "title", "starter-pick", "hearthglen", "map", "encounter", "battle", "results", "roster", "grove", "avatar", "inventory", "settings", "demo" };
 
         /// <summary>
         /// Where the app starts: <c>--screen</c>'s screen, else the battle demo when a demo flag

@@ -157,6 +157,41 @@ namespace BeastCraft.Game.Screens
             return (parent ?? Ui).Add(new Label { Bounds = bounds, Text = text ?? string.Empty, Size = size, ColorKey = color, Align = align, Wrap = wrap });
         }
 
+        /// <summary>
+        /// Shows the tutorial hint due for <paramref name="trigger"/> here (<see cref="HintService.Next"/>),
+        /// pointing at its anchor widget on this screen; once dismissed, the next one due for the same
+        /// moment follows. Nothing when hints are off, none is due, or a hint is already showing.
+        /// </summary>
+        public void ShowHints(string trigger, int nodeId = -1, int pickStep = 0)
+        {
+            if (Ctx.Session == null || (Ctx.Stack.TopModal as HintModal) != null)
+            {
+                return;
+            }
+
+            BeastCraft.Tutorial.HintData hint = HintService.Next(Ctx.Session, trigger, nodeId, pickStep);
+            if (hint == null)
+            {
+                return;
+            }
+
+            Ctx.Stack.PushModal(new HintModal(Ctx, hint, AnchorRect(hint.Anchor), () => ShowHints(trigger, nodeId, pickStep)));
+        }
+
+        /// <summary>Where widget <paramref name="id"/> sits on the canvas (scrolling included), or null (no such live widget).</summary>
+        public Rect? AnchorRect(string id)
+        {
+            Widget widget = string.IsNullOrEmpty(id) ? null : Ui.Find(id);
+            if (widget == null || !widget.IsLive())
+            {
+                return null;
+            }
+
+            Vec2 a = widget.ToCanvas(new Vec2(widget.Bounds.X, widget.Bounds.Y));
+            Vec2 b = widget.ToCanvas(new Vec2(widget.Bounds.Right, widget.Bounds.Bottom));
+            return new Rect(a.X, a.Y, b.X - a.X, b.Y - a.Y);
+        }
+
         /// <summary>Taps the widget with <paramref name="id"/> (scripted walkthroughs); false when there is none or it is not live.</summary>
         public bool TapWidget(string id)
         {

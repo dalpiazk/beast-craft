@@ -43,6 +43,12 @@ namespace BeastCraft.Game.Screens
             get { return "results"; }
         }
 
+        public override void Enter()
+        {
+            base.Enter();
+            ShowHints(BeastCraft.Tutorial.HintTriggers.ResultsOpen, _model.NodeId);
+        }
+
         public ResultsViewModel Model
         {
             get { return _model; }

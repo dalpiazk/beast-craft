@@ -36,6 +36,9 @@ namespace BeastCraft.Campaign
     /// <see cref="RegionData.HardMode"/>; with the encounter library, every shape a post-game region
     /// draws (Normal and Hard) is a post-game shape (<c>EncounterShapeData.PostGame</c>) and no
     /// mainline region draws one; a mainline region authors no <see cref="RegionData.HardMode"/>.
+    /// A third, <b>tutorial pass</b> checks <see cref="RegionLibraryData.TutorialRegions"/> (Hearthglen):
+    /// see <see cref="ValidateTutorialRegions"/>. With no tutorial region it adds nothing, so the
+    /// mainline and post-game messages are unchanged by it.
     /// Balance (how many battles a region takes, whether the cap bites) is the balance simulator's
     /// <c>--mode campaign</c>, not this.
     /// </summary>
@@ -110,7 +113,251 @@ namespace BeastCraft.Campaign
 
             HashSet<string> seen = ValidateRegions(data, seals, shapes, templates, errors);
             ValidatePostGameRegions(data, seen, shapes, postGameShapes, templates, errors);
+            ValidateTutorialRegions(data, encounters, errors);
             return errors;
+        }
+
+        /// <summary>The node types a tutorial region's fixed map may use.</summary>
+        private static readonly MapNodeType[] TutorialNodeTypes = { MapNodeType.Story, MapNodeType.Battle, MapNodeType.Trial, MapNodeType.Rest };
+
+        /// <summary>
+        /// The tutorial pass, over <see cref="RegionLibraryData.TutorialRegions"/>: each flagged
+        /// <see cref="RegionData.IsTutorial"/> (and no campaign region is), with a snake_case id unique
+        /// across every region; one stage, requiring nothing, no seal, no gates or boss, no shapes, no
+        /// easing (its fights bypass it), no Hard mode; levels 1 to at most the starting level cap; a
+        /// battlefield region that is a campaign region; and a fixed map of at least three locations:
+        /// known types (Story, Battle, Trial, Rest), a name, levels inside the band, a lane 0-3, a known
+        /// location-kind key when one is given, Story grants of a consumable id and a positive quantity,
+        /// fights (Battle and Trial) naming a template — which, with the encounter library, exists and
+        /// has its own <c>DifficultyOverride</c> above 0 (never the calibrated table) — and nothing
+        /// else naming one, Trials carrying pick steps 2 then 3 exactly once each (and no other location
+        /// a pick step), a Rest before the last location and a Story as the last.
+        /// </summary>
+        public static void ValidateTutorialRegions(RegionLibraryData data, EncounterLibraryData encounters, List<string> errors)
+        {
+            RegionData[] tutorials = data.TutorialRegions ?? new RegionData[0];
+            HashSet<string> ids = new HashSet<string>(StringComparer.Ordinal);
+            foreach (RegionData region in data.Regions ?? new RegionData[0])
+            {
+                if (region == null)
+                {
+                    continue;
+                }
+
+                if (!string.IsNullOrEmpty(region.RegionId))
+                {
+                    ids.Add(region.RegionId);
+                }
+
+                if (region.IsTutorial || (region.FixedNodes != null && region.FixedNodes.Length > 0))
+                {
+                    errors.Add("Region '" + region.RegionId + "': IsTutorial and FixedNodes belong to TutorialRegions only.");
+                }
+            }
+
+            Dictionary<string, EncounterTemplateData> templates = null;
+            if (encounters != null)
+            {
+                templates = new Dictionary<string, EncounterTemplateData>(StringComparer.Ordinal);
+                foreach (EncounterTemplateData template in encounters.Templates ?? new EncounterTemplateData[0])
+                {
+                    if (template != null && !string.IsNullOrEmpty(template.EncounterId) && !templates.ContainsKey(template.EncounterId))
+                    {
+                        templates.Add(template.EncounterId, template);
+                    }
+                }
+            }
+
+            HashSet<string> mainline = new HashSet<string>(ids, StringComparer.Ordinal);
+            for (int i = 0; i < tutorials.Length; i++)
+            {
+                RegionData region = tutorials[i];
+                if (region == null)
+                {
+                    errors.Add("TutorialRegions #" + i + " is null.");
+                    continue;
+                }
+
+                string where = "Tutorial region '" + region.RegionId + "'";
+                if (!BeastRosterValidator.IsSnakeCaseId(region.RegionId))
+                {
+                    errors.Add(where + ": RegionId must be lowercase snake_case.");
+                }
+                else if (!ids.Add(region.RegionId))
+                {
+                    errors.Add(where + ": duplicate RegionId.");
+                }
+
+                if (!region.IsTutorial)
+                {
+                    errors.Add(where + ": IsTutorial must be true.");
+                }
+
+                if (string.IsNullOrWhiteSpace(region.DisplayName) || string.IsNullOrWhiteSpace(region.Description))
+                {
+                    errors.Add(where + ": DisplayName and Description must not be empty.");
+                }
+
+                if (region.Stages != 1)
+                {
+                    errors.Add(where + ": Stages must be 1 (a tutorial region is one expedition).");
+                }
+
+                if (!string.IsNullOrEmpty(region.RequiresRegionId))
+                {
+                    errors.Add(where + ": RequiresRegionId must be empty (a new game starts there).");
+                }
+
+                if (!string.IsNullOrEmpty(region.BossRewardSealId) || !string.IsNullOrEmpty(region.BossTemplateId) ||
+                    (region.GateTemplateIds != null && region.GateTemplateIds.Length > 0))
+                {
+                    errors.Add(where + ": no seal, boss or gate templates (its fights are its fixed locations).");
+                }
+
+                if (region.ShapeWeights != null && region.ShapeWeights.Length > 0)
+                {
+                    errors.Add(where + ": ShapeWeights must be empty (every fight is a fixed template).");
+                }
+
+                if (region.StageEasing != null && region.StageEasing.Length > 0)
+                {
+                    errors.Add(where + ": StageEasing must be empty (its fights have their own difficulty and are never eased).");
+                }
+
+                if (region.IsPostGame || (region.HardMode != null && region.HardMode.IsSet))
+                {
+                    errors.Add(where + ": a tutorial region is not post-game and has no HardMode.");
+                }
+
+                if (region.MinLevel < 1 || region.MaxLevel < region.MinLevel || region.MaxLevel > data.StartingLevelCap)
+                {
+                    errors.Add(where + ": levels " + region.MinLevel + "-" + region.MaxLevel + " must be 1 or more and at most StartingLevelCap " + data.StartingLevelCap + ".");
+                }
+
+                if (!string.IsNullOrEmpty(region.BattlefieldRegionId) && !mainline.Contains(region.BattlefieldRegionId))
+                {
+                    errors.Add(where + ": BattlefieldRegionId '" + region.BattlefieldRegionId + "' is not a campaign region.");
+                }
+
+                ValidateFixedNodes(region, where, templates, errors);
+            }
+        }
+
+        private static void ValidateFixedNodes(RegionData region, string where, Dictionary<string, EncounterTemplateData> templates, List<string> errors)
+        {
+            FixedNodeData[] nodes = region.FixedNodes ?? new FixedNodeData[0];
+            if (nodes.Length < 3)
+            {
+                errors.Add(where + ": FixedNodes needs at least 3 locations.");
+                return;
+            }
+
+            List<int> picks = new List<int>();
+            bool rest = false;
+            for (int n = 0; n < nodes.Length; n++)
+            {
+                FixedNodeData node = nodes[n];
+                string at = where + " FixedNodes[" + n + "]";
+                if (node == null)
+                {
+                    errors.Add(at + " is null.");
+                    continue;
+                }
+
+                bool known = Enum.TryParse(node.Type, false, out MapNodeType type) && Array.IndexOf(TutorialNodeTypes, type) >= 0 && Enum.IsDefined(typeof(MapNodeType), type);
+                if (!known)
+                {
+                    errors.Add(at + ": Type '" + node.Type + "' must be Story, Battle, Trial or Rest.");
+                    continue;
+                }
+
+                if (string.IsNullOrWhiteSpace(node.Name))
+                {
+                    errors.Add(at + ": Name is empty.");
+                }
+
+                if (node.Level < region.MinLevel || node.Level > region.MaxLevel)
+                {
+                    errors.Add(at + ": Level " + node.Level + " is outside the region's " + region.MinLevel + "-" + region.MaxLevel + ".");
+                }
+
+                if (node.Lane < 0 || node.Lane > 3)
+                {
+                    errors.Add(at + ": Lane " + node.Lane + " must be 0-3.");
+                }
+
+                if (!string.IsNullOrEmpty(node.Kind) && !LocationKinds.TryParseKey(node.Kind, out LocationKind _))
+                {
+                    errors.Add(at + ": Kind '" + node.Kind + "' is not a location kind key.");
+                }
+
+                bool fight = type == MapNodeType.Battle || type == MapNodeType.Trial;
+                if (fight)
+                {
+                    if (string.IsNullOrEmpty(node.TemplateId))
+                    {
+                        errors.Add(at + ": a " + type + " names its encounter template (TemplateId).");
+                    }
+                    else if (templates != null)
+                    {
+                        if (!templates.TryGetValue(node.TemplateId, out EncounterTemplateData template))
+                        {
+                            errors.Add(at + ": template '" + node.TemplateId + "' is not in the encounter library.");
+                        }
+                        else if (!(template.DifficultyOverride > 0.0))
+                        {
+                            errors.Add(at + ": template '" + node.TemplateId + "' needs its own DifficultyOverride (tutorial fights never use the calibrated table).");
+                        }
+                    }
+                }
+                else if (!string.IsNullOrEmpty(node.TemplateId))
+                {
+                    errors.Add(at + ": only a Battle or Trial names a template.");
+                }
+
+                if (!fight && (node.OpenBoard || node.AdaptiveElements))
+                {
+                    errors.Add(at + ": only a Battle or Trial has OpenBoard or AdaptiveElements.");
+                }
+
+                if (type == MapNodeType.Trial)
+                {
+                    picks.Add(node.PickStep);
+                }
+                else if (node.PickStep != 0)
+                {
+                    errors.Add(at + ": only a Trial has a PickStep.");
+                }
+
+                if (type != MapNodeType.Story && node.Grants != null && node.Grants.Length > 0)
+                {
+                    errors.Add(at + ": only a Story hands items over (Grants).");
+                }
+
+                foreach (ItemGrantData grant in node.Grants ?? new ItemGrantData[0])
+                {
+                    if (grant == null || string.IsNullOrEmpty(grant.ConsumableId) || grant.Quantity < 1)
+                    {
+                        errors.Add(at + ": a grant needs a ConsumableId and a Quantity of at least 1.");
+                    }
+                }
+
+                rest |= type == MapNodeType.Rest && n < nodes.Length - 1;
+                if (n == nodes.Length - 1 && type != MapNodeType.Story)
+                {
+                    errors.Add(at + ": the last location must be a Story (the way on to the campaign).");
+                }
+            }
+
+            if (picks.Count != 2 || picks[0] != 2 || picks[1] != 3)
+            {
+                errors.Add(where + ": the Trials must carry PickStep 2, then 3 (one each), not [" + string.Join(", ", picks) + "].");
+            }
+
+            if (!rest)
+            {
+                errors.Add(where + ": FixedNodes needs a Rest (Camp) before the last location.");
+            }
         }
 
         private static Dictionary<string, SealData> ValidateSeals(SealData[] seals, List<string> errors)

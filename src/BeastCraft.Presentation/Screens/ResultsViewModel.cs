@@ -123,6 +123,9 @@ namespace BeastCraft.Presentation.Screens
 
         public int AvatarLevelsGained { get; private set; }
 
+        /// <summary>A won trial's pick (2 or 3), now waiting on the map; 0 otherwise.</summary>
+        public int PickStep { get; private set; }
+
         internal static ResultsViewModel Build(GameSession session, NodeBattle battle, BattleSessionResult result, BattleRewardSummary summary, CampaignResult campaign,
                                                Dictionary<string, (int Level, int Xp)> before)
         {
@@ -131,7 +134,7 @@ namespace BeastCraft.Presentation.Screens
             {
                 Outcome = result.Outcome,
                 NodeId = battle.Node.NodeId,
-                Subtitle = session.Content.LocationNames?.Resolve(battle.Node) ?? MapViewModel.KindLabel(battle.Node.Type),
+                Subtitle = session.LocationName(battle.Node),
                 Gold = summary.GoldGained,
                 GoldTotal = save.Gold,
                 FirstClear = summary.Loot.FirstClear,
@@ -229,6 +232,11 @@ namespace BeastCraft.Presentation.Screens
             }
 
             view.Losses = campaign.Outcome == CampaignOutcome.Lost ? CampaignRules.LossesAt(save.Campaign.ActiveRun, battle.Node.NodeId) : 0;
+            view.PickStep = campaign.PickStep;
+            if (campaign.PickStep > 0)
+            {
+                view.Notes.Add("A beast stirs by the kinship stone. It wants to join you.");
+            }
             view.BuildNotes(session);
             return view;
         }
@@ -245,6 +253,9 @@ namespace BeastCraft.Presentation.Screens
                     break;
                 case CampaignOutcome.RegionCleared:
                     Notes.Add("The lair is cleared: the region is yours!");
+                    break;
+                case CampaignOutcome.TutorialCleared:
+                    Notes.Add("Hearthglen is behind you. Verdant Hollow is open.");
                     break;
                 case CampaignOutcome.Lost:
                     RetryNote = "You can try " + Subtitle + " again (a fresh battle each time) or take another trail.";

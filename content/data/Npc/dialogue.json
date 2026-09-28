@@ -1,0 +1,25 @@
+{
+  "_readme": "GAME CONTENT, DRAFT PENDING PRODUCER REVIEW (every name and line). The NPC dialogue layer (docs/design/area-zero.md; the model is the Grove design's DialogueLineData { NpcId, Conditions, Text, Priority }, so the Grove's condition-resolved lines join this file later): Npcs (NpcId, DisplayName, PortraitKey = an art-manifest key, '' = a placeholder portrait), Lines (LineId, NpcId, Conditions, Text, Priority; a scene's own lines carry scene:{SceneId}, so the Grove's resolution never picks them) and Scenes (SceneId, Title, LineIds: an ordered run of lines a story location plays, regions.json FixedNodes SceneId). v1 cast: the Grove Keeper, Hearthglen's mentor, who later tends the Grove hub. Validated by BeastCraft.Tutorial.DialogueValidator (content load and the EditMode tests). Tone: content-bible.md (warm, wonder first; nobody dies).",
+  "SchemaVersion": 1,
+  "Npcs": [
+    { "NpcId": "grove_keeper", "DisplayName": "The Grove Keeper", "PortraitKey": "" }
+  ],
+  "Lines": [
+    { "LineId": "hg_shrine_1", "NpcId": "grove_keeper", "Conditions": [ "scene:hg_shrine" ], "Text": "There you are. I am the Grove Keeper; I have tended this shrine since before the old oak by the mill was an acorn.", "Priority": 0 },
+    { "LineId": "hg_shrine_2", "NpcId": "grove_keeper", "Conditions": [ "scene:hg_shrine" ], "Text": "Your beast chose you. That is how every Beastbinder begins: not with a leash, but with a promise.", "Priority": 0 },
+    { "LineId": "hg_shrine_3", "NpcId": "grove_keeper", "Conditions": [ "scene:hg_shrine" ], "Text": "Hold out your hand. There: a small mending light, your first binder art. You will never strike in a fight; you will keep your friends standing.", "Priority": 0 },
+    { "LineId": "hg_shrine_4", "NpcId": "grove_keeper", "Conditions": [ "scene:hg_shrine" ], "Text": "Take these Fury Draughts, for when a fight turns against you. And go gently: the hedgerows are restless, and the Gloam's shimmer has reached the far hedge.", "Priority": 0 },
+    { "LineId": "hg_camp_1", "NpcId": "grove_keeper", "Conditions": [ "scene:hg_camp" ], "Text": "Rest here a while. The lanterns keep the haze at bay.", "Priority": 0 },
+    { "LineId": "hg_camp_2", "NpcId": "grove_keeper", "Conditions": [ "scene:hg_camp" ], "Text": "The miller says the Seals are only an old story. They are not. One sleeps in Verdant Hollow, just past the ridge.", "Priority": 0 },
+    { "LineId": "hg_camp_3", "NpcId": "grove_keeper", "Conditions": [ "scene:hg_camp" ], "Text": "Your newest friends are keen to keep up. Sit with them a while, and they will stand as tall as your first.", "Priority": 0 },
+    { "LineId": "hg_farewell_1", "NpcId": "grove_keeper", "Conditions": [ "scene:hg_farewell" ], "Text": "You calmed it. See how the haze slipped off, and the creature wandered home, dazed but whole? That is your work now.", "Priority": 0 },
+    { "LineId": "hg_farewell_2", "NpcId": "grove_keeper", "Conditions": [ "scene:hg_farewell" ], "Text": "Verdant Hollow starts past this ridge, and the Gloam is thicker there. Some places lie off the path: explore, and the map will fill in.", "Priority": 0 },
+    { "LineId": "hg_farewell_3", "NpcId": "grove_keeper", "Conditions": [ "scene:hg_farewell" ], "Text": "When you need a quiet place, find me at the Grove. And listen for kinship stones in the wild: more beasts are waiting to meet you.", "Priority": 0 },
+    { "LineId": "keeper_default", "NpcId": "grove_keeper", "Conditions": [ ], "Text": "The wild remembers kindness. So do I.", "Priority": -1 }
+  ],
+  "Scenes": [
+    { "SceneId": "hg_shrine", "Title": "The Keeper's Shrine", "LineIds": [ "hg_shrine_1", "hg_shrine_2", "hg_shrine_3", "hg_shrine_4" ] },
+    { "SceneId": "hg_camp", "Title": "Lantern Camp", "LineIds": [ "hg_camp_1", "hg_camp_2", "hg_camp_3" ] },
+    { "SceneId": "hg_farewell", "Title": "Hollow's Edge", "LineIds": [ "hg_farewell_1", "hg_farewell_2", "hg_farewell_3" ] }
+  ]
+}

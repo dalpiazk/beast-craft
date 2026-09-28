@@ -27,7 +27,16 @@ namespace BeastCraft.Campaign
         Pass = 4,
 
         /// <summary>The region boss's lair: a <see cref="MapNodeType.Boss"/>.</summary>
-        Lair = 5
+        Lair = 5,
+
+        /// <summary>A shrine where the mentor waits: a tutorial's <see cref="MapNodeType.Story"/>.</summary>
+        Shrine = 6,
+
+        /// <summary>
+        /// A kinship site, where a beast is won over by a trial: a tutorial's
+        /// <see cref="MapNodeType.Trial"/> (the Kinship sites of later regions reuse it).
+        /// </summary>
+        KinshipSite = 7
     }
 
     /// <summary>Helpers over <see cref="LocationKind"/>.</summary>
@@ -48,12 +57,19 @@ namespace BeastCraft.Campaign
                     return LocationKind.Pass;
                 case MapNodeType.Boss:
                     return LocationKind.Lair;
+                case MapNodeType.Story:
+                    return LocationKind.Shrine;
+                case MapNodeType.Trial:
+                    return LocationKind.KinshipSite;
                 default:
                     return LocationKind.Wilds;
             }
         }
 
-        /// <summary>The kind's lowercase key, as used in <see cref="MapNode.LabelKey"/> (<c>wilds</c>, <c>den</c>, <c>camp</c>, <c>trading_post</c>, <c>pass</c>, <c>lair</c>).</summary>
+        /// <summary>
+        /// The kind's lowercase key, as used in <see cref="MapNode.LabelKey"/> (<c>wilds</c>, <c>den</c>,
+        /// <c>camp</c>, <c>trading_post</c>, <c>pass</c>, <c>lair</c>, <c>shrine</c>, <c>kinship_site</c>).
+        /// </summary>
         public static string Key(LocationKind kind)
         {
             switch (kind)
@@ -68,6 +84,10 @@ namespace BeastCraft.Campaign
                     return "pass";
                 case LocationKind.Lair:
                     return "lair";
+                case LocationKind.Shrine:
+                    return "shrine";
+                case LocationKind.KinshipSite:
+                    return "kinship_site";
                 default:
                     return "wilds";
             }
@@ -95,6 +115,12 @@ namespace BeastCraft.Campaign
                     return true;
                 case "lair":
                     kind = LocationKind.Lair;
+                    return true;
+                case "shrine":
+                    kind = LocationKind.Shrine;
+                    return true;
+                case "kinship_site":
+                    kind = LocationKind.KinshipSite;
                     return true;
                 default:
                     kind = LocationKind.Wilds;

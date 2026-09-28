@@ -82,6 +82,22 @@ namespace BeastCraft.Encounters
             };
         }
 
+        /// <summary>
+        /// This plan with every enemy of element <paramref name="element"/> (a copy; this plan is
+        /// unchanged): an adaptive fight's element (<c>ElementAdaptation</c>). Level, multiplier and
+        /// arena are kept.
+        /// </summary>
+        public EncounterPlan WithElement(Element element)
+        {
+            List<EncounterLineupEnemy> enemies = new List<EncounterLineupEnemy>();
+            foreach (EncounterLineupEnemy enemy in Enemies)
+            {
+                enemies.Add(new EncounterLineupEnemy(enemy.EnemyId, enemy.DisplayName, element, enemy.Stance));
+            }
+
+            return new EncounterPlan(ShapeId, DropShapeId, EncounterId, Level, Multiplier, Arena, ElementScheme, enemies, Catalog) { DifficultyScale = DifficultyScale };
+        }
+
         public ArenaSize Arena { get; }
 
         /// <summary>How a generated encounter's elements were drawn; null for a template (authored elements).</summary>

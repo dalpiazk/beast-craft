@@ -46,6 +46,12 @@ namespace BeastCraft.Game.Screens
             get { return "encounter"; }
         }
 
+        public override void Enter()
+        {
+            base.Enter();
+            ShowHints(BeastCraft.Tutorial.HintTriggers.EncounterOpen, _model.NodeId);
+        }
+
         public EncounterViewModel Model
         {
             get { return _model; }

@@ -148,6 +148,29 @@ Map locations (`location-names.json`, eight names per kind per region, drawn by 
 | Pass | Gate | The guarded way on to the next part of the region. |
 | Lair | Boss | Where the region's guardian keeps its Seal. |
 
+## Hearthglen, the home vale (DRAFT)
+
+Before Verdant Hollow: **Hearthglen** (r00), the onboarding region, a sheltered vale below the tree
+line where the Hollow begins — warm hedgerows, clover meadows, an old mill, an orchard and a shrine.
+The Gloam is only a faint shimmer at the far hedge; the creatures here are dazed rather than fierce.
+Played once, in about 20-25 minutes (docs/design/area-zero.md).
+
+- **The Grove Keeper** (the mentor; later the keeper of the Grove hub): old, warm and unhurried,
+  talks about the wild as a friend, never lectures. Speaks in short, kind sentences with a small image
+  in them ("since before the old oak by the mill was an acorn"). Never gives mechanical instructions:
+  those are the hints' job. Lines in `content/data/Npc/dialogue.json`.
+- **Locations** (named in `regions.json` `TutorialRegions`, not `location-names.json`): Keeper's
+  Shrine, Clover Meadow, Hedgerow Lane, Tumbledown Wall, Bramble Stone and Grove Stone (the two
+  kinship stones), Brookside Mill, Old Orchard, Lantern Camp, Ridge Path, The Far Hedge, Hollow's Edge.
+- **Fights** (`encounter-library.json`, `hg_*`, Draft): Meadow Scamps, Hedgerow Pests, Tumbledown
+  Wall, the Bramble and Grove trials, Brookside Rabble, Orchard Raiders, Ridge Prowlers, and the
+  finale, The Gloam at the Hedge: a champion of the vale, gloamed and bewildered, calmed rather than
+  beaten — "the haze slipped off, and the creature wandered home, dazed but whole".
+- **Kinship stones**: old standing stones where a wild beast may choose to join a Beastbinder who
+  proves their bond (the trials); the later regions' Kinship sites reuse the idea.
+- **Hints** (`content/data/Tutorial/hints.json`): second person, one or two short sentences, plain
+  words, a light touch of wonder; they explain one thing each and point at it.
+
 ## Post-game region (DRAFT)
 
 **r11 Duskmeridian** — Light and Dark, the post-game region (all text DRAFT pending producer

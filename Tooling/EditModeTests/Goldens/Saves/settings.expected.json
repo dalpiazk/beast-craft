@@ -1,2 +1,2 @@
-{"SchemaVersion":1,"TeamSuggestionsEnabled":false,"EffectsIntensity":0,"ScreenShake":true,"Flashes":true,"BattleSpeed":1,"AutoAdvance":false,"IdleNotifications":false}
-{"SchemaVersion":1,"TeamSuggestionsEnabled":true,"EffectsIntensity":0,"ScreenShake":true,"Flashes":true,"BattleSpeed":1,"AutoAdvance":false,"IdleNotifications":false}
+{"SchemaVersion":1,"TeamSuggestionsEnabled":false,"EffectsIntensity":0,"ScreenShake":true,"Flashes":true,"BattleSpeed":1,"AutoAdvance":false,"IdleNotifications":false,"TutorialHints":true}
+{"SchemaVersion":1,"TeamSuggestionsEnabled":true,"EffectsIntensity":0,"ScreenShake":true,"Flashes":true,"BattleSpeed":1,"AutoAdvance":false,"IdleNotifications":false,"TutorialHints":true}

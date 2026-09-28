@@ -289,6 +289,58 @@ progress was started on (`CampaignRules.StartRun(..., difficulty)`; see "Post-ga
   changed in exactly two places, both from writing schema 6: `"SchemaVersion":5` became `6`, and
   `,"Difficulty":0` now follows `"NodeAttemptsNodeId"` in the `ActiveRun` (15 bytes per file).
 
+### Schema 7: the onboarding state (`PlayerSave.Tutorial`)
+
+Save schema **7** adds `PlayerSave.Tutorial`, a `TutorialProgress` (namespace `BeastCraft.Tutorial`),
+written after `Idle`: `HearthglenCleared` (Hearthglen, the tutorial region r00, is behind the player:
+played through, skipped, or migrated), `Skipped` (the player took the skip) and `SeenHintIds` (every
+tutorial hint shown and dismissed, in order, each once; see [area-zero.md](area-zero.md)).
+`CurrentSchemaVersion` is **7**.
+
+- *New games.* `PlayerSave.CreateNew()` is still a blank save with the first campaign region
+  unlocked (the balance tools' and the tests' starting point). A player's New Game is
+  `StarterPicks.NewGame(firstSpecies, …)`: a blank save whose only unlocked region is Hearthglen
+  (`CampaignProgress.TutorialRegionId`), the avatar's starting kit, and the first pick at level 1;
+  or `StarterPicks.NewGameSkippingTutorial(threePicks, …)`: the three picks, Hearthglen's completion
+  rewards, and the first campaign region unlocked. The fixed six-beast `StarterSave` is gone.
+- *Hearthglen is played once.* `CampaignRules.CompleteTutorial` (reaching its last location, or the
+  skip) sets `HearthglenCleared`, ends a Hearthglen expedition, **locks Hearthglen again** (removes its
+  `RegionProgress`, so no campaign rule ever counts it — idle's progress level, the bosses-beaten
+  milestone) and unlocks `r01`. `StartRun` refuses Hearthglen once cleared.
+- *Migration.* `SaveMigrations.AddTutorial` (6 to 7): a save that owns any beast was made before
+  Hearthglen existed, so it counts Hearthglen as cleared (never offered, no pick pending) and keeps
+  (or gets) `r01` unlocked; no beast is touched. A save with no beast and no expedition (only tools
+  and tests wrote one) starts Hearthglen like a new game (r00 unlocked instead of r01, the New Game
+  pick pending).
+- *Golden saves.* `rich-v6.input.json` is now frozen (never regenerated); the new `rich-v7.input.json`
+  (every field filled by reflection) must round-trip byte-identical; new `min-v7`. No input changed;
+  every older expected output changed only by `"SchemaVersion":7`, the appended `,"Tutorial":{…}`
+  (`"HearthglenCleared":true` wherever a beast is owned) and, for the beast-less `min-v5`/`min-v6`,
+  Hearthglen unlocked instead of Verdant Hollow.
+- *Settings.* `PlayerSettings.TutorialHints` (default **true**; additive, no settings version bump).
+
+### Hearthglen's rules (`StarterPicks`, `CampaignRules`)
+
+- **Picks.** The 1st any of the ten; the 2nd any beast of the next stance in the cycle
+  Vanguard → Ranged → Skirmisher → Vanguard after the 1st's; the 3rd any beast of the remaining
+  stance; never a species twice; every pick joins at level 1 (`StarterPicks.JoinLevel`) with its
+  default loadout (`StarterPicks.AddBeast`). `StarterPicks.PendingStep(save, regions)`: 1 with no
+  beast, else the next pick while a cleared trial (`FixedNodeData.PickStep`) is ahead of the beasts
+  owned; `CampaignRules` refuses every Hearthglen location while a pick waits.
+- **The fixed map.** `CampaignRules.StartRun` builds a tutorial region's map from its `FixedNodes`
+  (`CampaignRules.FixedMap`: node i on row i, linked to i + 1; its type, level, template, lane and
+  location kind as authored; a label key `r00/{kind}/{i}`; the seed only draws encounter seeds).
+  `Visit` plays a Story location (its `Grants` added to the consumables); a Trial is a battle whose
+  win reports its `PickStep`; clearing the last location completes Hearthglen
+  (`CampaignOutcome.TutorialCleared`).
+- **Camp catch-up.** `Camp` in a tutorial region trains the chosen beast, then raises every beast
+  below the leader to the leader's level (`CampaignResult.CaughtUp`).
+- **Fights.** `PlanFor` never eases a tutorial region's templates (they carry their own
+  `DifficultyOverride`); `PlanFor(save, run, node, …, species)` gives an `AdaptiveElements` location's
+  enemies the element neutral against every owned beast (`ElementAdaptation`). `RewardModifiersFor(run,
+  node, regions)` scopes a Hearthglen clear's first-clear bonus to its own cells
+  (`RewardModifiers.FirstClearScope` = `r00`, recorded as `r00/{shape}` by `LootRoller.ClearKey`).
+
 ---
 
 ## Beast and avatar level
@@ -387,7 +439,10 @@ DRAFT pending producer review** (names, level bands, map rules, bosses).
 
 ### `regions.json`
 
-`{SchemaVersion, StartingLevelCap, LevelCapMargin, MapRules, Seals[], Regions[]}` — the usual
+`{SchemaVersion, StartingLevelCap, LevelCapMargin, MapRules, Seals[], Regions[], TutorialRegions[]}` —
+`TutorialRegions` holds Hearthglen (r00, `IsTutorial`, a fixed map; [area-zero.md](area-zero.md)),
+kept out of `Regions` so the mainline band, its calibration and every campaign tool never see it,
+and validated in its own pass. The usual
 Data / build / validator / SO pattern: `RegionLibraryData`, `RegionLibrary.Build` (indexed regions and
 seals, each region's effective rules, which regions a boss unlocks), `RegionLibraryValidator`,
 `RegionLibrarySO`, and the Editor importer (Beast Craft/Data/Import Regions, validated against
@@ -458,7 +513,10 @@ keep their left-to-right order, so the paths read as routes across the region.
 | `Camp(save, regions, nodeId, beastId)` | Rest node: trains one chosen beast by a standing clear at the node's level (falloff, cap). Battles already start at full HP, so there is no healing. A travelling trader also waits at every camp: the game opens the shop with `ShopContextFor(run, campNode)` (the economy's pacing assumes it; see [economy-and-shop.md](economy-and-shop.md)). |
 | `Trade(save, regions, nodeId, shop)` | Shop node (a trading post): opens the `IShopService` — the economy's `ShopService`, whose stock is rolled once and frozen into the save; `ShopServiceStub` or null offers nothing — and marks the node visited. Buying and selling go through the shop with `ShopContextFor(run, node)`. |
 | `ResolveBattle(save, regions, nodeId, outcome, economy)` | As `ResolveBattle`, plus the economy's first-clear rewards: a pass's (Gate's) first clear grants a guaranteed common, a lair's (Boss's) an epic (a rare below band 41) and its boss-exclusive looks, then milestone looks (`CampaignResult.GearGranted`, `CosmeticsUnlocked`). |
-| `RewardModifiersFor(node)` | The economy's reward modifiers for `ApplyRewards`: dens (Elite) gold x1.5, passes +5, lairs +10. |
+| `RewardModifiersFor(node)` | The economy's reward modifiers for `ApplyRewards`: dens (Elite) gold x1.5, passes +5, lairs +10. `RewardModifiersFor(run, node, regions)` also scopes a tutorial region's first clears to its own cells. |
+| `Visit(save, regions, nodeId, consumables)` | Story node (Hearthglen): its authored gifts, the node cleared; the region's last location completes it. |
+| `CompleteTutorial` / `SkipTutorial` | Hearthglen behind the player (see "Schema 7"); the skip also grants its completion rewards. |
+| `SuggestionFor(save, nodeId, settings, encounters, content, regions)` | The team suggestion after 3 losses, planned against the eased plan the battle will field (the run and regions threaded through). |
 | `Retreat(save)` | Abandons the expedition (stage progress already earned stays). |
 | `GrantSeal(save, regions, sealId)` | Adds the seal and releases every beast's bank at the new cap. Bosses call it; it is also the hook for future story-event seals. |
 | `BeastCap(save, regions)` | `LevelCaps.BeastCap(save.Campaign.Seals, regions)`. |

@@ -9,6 +9,7 @@ using BeastCraft.Presentation.Content;
 using BeastCraft.Progression;
 using BeastCraft.Save;
 using BeastCraft.Skills;
+using BeastCraft.Tutorial;
 
 namespace BeastCraft.Presentation.Screens
 {
@@ -198,8 +199,8 @@ namespace BeastCraft.Presentation.Screens
         /// <summary>Whether the last autosave was written.</summary>
         public bool LastAutosaveOk { get; private set; }
 
-        /// <summary>The level New Game's starter beasts start at (<see cref="StarterSave.StartingLevel"/>; a debug flag may raise it).</summary>
-        public int StarterLevel { get; set; } = StarterSave.StartingLevel;
+        /// <summary>The level New Game's picks join at (<see cref="StarterPicks.JoinLevel"/>; a debug flag may raise it).</summary>
+        public int StarterLevel { get; set; } = StarterPicks.JoinLevel;
 
         /// <summary>The team last taken into a battle this session (the encounter screen starts from it).</summary>
         public List<string> LastTeam { get; } = new List<string>();
@@ -207,17 +208,99 @@ namespace BeastCraft.Presentation.Screens
         /// <summary>Encounter locations whose team suggestion the player dismissed this session.</summary>
         public HashSet<string> DismissedSuggestions { get; } = new HashSet<string>(StringComparer.Ordinal);
 
-        /// <summary>A brand-new game: the starter beasts and avatar (<see cref="StarterSave"/>), an expedition into the first region, saved.</summary>
-        public void NewGame()
+        /// <summary>
+        /// A brand-new game in Hearthglen (<see cref="StarterPicks.NewGame"/>): the avatar's starting
+        /// kit and the New Game pick <paramref name="firstSpeciesId"/>, the Hearthglen expedition
+        /// started, saved. False (nothing changes) for a species that is not a legal first pick.
+        /// </summary>
+        public bool NewGame(string firstSpeciesId)
         {
-            Save = StarterSave.Create(Content, StarterLevel);
+            PlayerSave save = StarterPicks.NewGame(firstSpeciesId, Content.Species, Content.SkillLibrary, out string _, StarterLevel);
+            if (save == null)
+            {
+                return false;
+            }
+
+            StartWith(save);
+            return true;
+        }
+
+        /// <summary>
+        /// A brand-new game that skips Hearthglen (<see cref="StarterPicks.NewGameSkippingTutorial"/>):
+        /// the three picks (one per stance, in the stance cycle's order), Hearthglen's completion
+        /// rewards, an expedition into the first campaign region, saved. False (nothing changes) when
+        /// the picks are not legal.
+        /// </summary>
+        public bool NewGameSkippingTutorial(IReadOnlyList<string> species)
+        {
+            PlayerSave save = StarterPicks.NewGameSkippingTutorial(species, Content.Species, Content.SkillLibrary, Content.Campaign, Content.Battle.GetConsumable,
+                                                                   out string _, StarterLevel);
+            if (save == null)
+            {
+                return false;
+            }
+
+            StartWith(save);
+            return true;
+        }
+
+        /// <summary>
+        /// Plays <paramref name="save"/> as a new game: the session's per-game state reset, an
+        /// expedition started where it belongs (<see cref="EnsureExpedition"/>), the idle clock started
+        /// (the first claim only starts it), saved. New Game's two paths end here; tests and debug
+        /// runs start from a save they built.
+        /// </summary>
+        public void StartWith(PlayerSave save)
+        {
+            Save = save ?? throw new ArgumentNullException(nameof(save));
+            Save.EnsureInitialized();
             LastTeam.Clear();
             DismissedSuggestions.Clear();
             EnsureExpedition();
-
-            // The first claim only starts the idle clock.
             IdleRewardCalculator.Claim(Save, Content.Idle, Clock.UtcNow, Clock.Monotonic, Party());
             Autosave(AutosaveReason.NewGame);
+        }
+
+        /// <summary>The pick waiting to be made (1-3; <see cref="StarterPicks.PendingStep"/>), or 0.</summary>
+        public int PendingPick
+        {
+            get { return Save == null ? 0 : StarterPicks.PendingStep(Save, Content.Campaign); }
+        }
+
+        /// <summary>
+        /// Makes the pending pick (<see cref="StarterPicks.Pick"/>): <paramref name="speciesId"/> joins at
+        /// <see cref="StarterLevel"/>, and the game is saved. The result says why when refused.
+        /// </summary>
+        public PickResult Pick(string speciesId)
+        {
+            PickResult result = StarterPicks.Pick(Save, Content.Campaign, Content.Species, Content.SkillLibrary, speciesId, StarterLevel);
+            if (result.Success)
+            {
+                Autosave(AutosaveReason.Results);
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// A map location's display name: a tutorial location's authored name
+        /// (<see cref="FixedNodeData.Name"/>), else the location-name table's (<see cref="LocationNameTable"/>).
+        /// </summary>
+        public string LocationName(MapNode node)
+        {
+            if (node == null)
+            {
+                return string.Empty;
+            }
+
+            MapRun run = Save?.Campaign?.ActiveRun;
+            FixedNodeData authored = run == null ? null : Content.Campaign.FixedNode(run.RegionId, node.NodeId);
+            if (authored != null && !string.IsNullOrEmpty(authored.Name))
+            {
+                return authored.Name;
+            }
+
+            return Content.LocationNames?.Resolve(node) ?? LocationNameTable.FallbackName(node.Kind);
         }
 
         /// <summary>
@@ -406,7 +489,8 @@ namespace BeastCraft.Presentation.Screens
 
         /// <summary>
         /// Makes sure an expedition is in progress: when none is, starts one (a new map seed) into
-        /// the first unlocked region whose boss still stands, else the region last played.
+        /// Hearthglen while it is not behind the player, else the first unlocked region whose boss
+        /// still stands, else the region last played.
         /// </summary>
         public CampaignResult EnsureExpedition()
         {
@@ -421,6 +505,12 @@ namespace BeastCraft.Presentation.Screens
         /// <summary>The region an expedition starts into: see <see cref="EnsureExpedition"/>.</summary>
         public string NextRegionId()
         {
+            RegionData tutorial = Content.Campaign.Tutorial;
+            if (tutorial != null && Save?.Tutorial != null && !Save.Tutorial.HearthglenCleared && Save.Campaign.IsUnlocked(tutorial.RegionId))
+            {
+                return tutorial.RegionId;
+            }
+
             foreach (RegionProgress progress in Save?.Campaign?.Regions ?? new List<RegionProgress>())
             {
                 if (progress != null && !progress.BossCleared && Content.Campaign.GetRegion(progress.RegionId) != null)
@@ -438,66 +528,6 @@ namespace BeastCraft.Presentation.Screens
         {
             CreatureSpeciesSO species = beast?.Progress == null ? null : Content.Battle.GetSpecies(beast.Progress.SpeciesId);
             return species?.DisplayName ?? beast?.Progress?.SpeciesId ?? "?";
-        }
-    }
-
-    /// <summary>
-    /// The save a new player starts with. The starter roster is the campaign pacing model's
-    /// (<c>Tooling/BalanceSim</c> <c>--mode campaign</c>: three fielded beasts and three on the
-    /// bench, all at level 1): Griffin, Phoenix, Golem, Kirin, Treant and Tarasque, each knowing and
-    /// wearing its species' default loadout. The avatar starts at level 1 with the skill library's
-    /// default loadout (its first three actives and its default passives) learned and equipped.
-    /// </summary>
-    public static class StarterSave
-    {
-        public static readonly string[] Species = { "griffin", "phoenix", "golem", "kirin", "treant", "tarasque" };
-
-        public const int StartingLevel = 1;
-
-        public static PlayerSave Create(GameContent content)
-        {
-            return Create(content, StartingLevel);
-        }
-
-        /// <summary>The starter save with the beasts at <paramref name="level"/> (a debug knob: <c>--starter-level</c>).</summary>
-        public static PlayerSave Create(GameContent content, int level)
-        {
-            PlayerSave save = PlayerSave.CreateNew();
-            SkillLibraryData library = content.SkillLibrary;
-            int next = 1;
-            foreach (string speciesId in Species)
-            {
-                SpeciesKitData kit = Array.Find(library.SpeciesKits ?? new SpeciesKitData[0], k => k != null && k.SpeciesId == speciesId);
-                if (kit == null || content.Battle.GetSpecies(speciesId) == null)
-                {
-                    continue;
-                }
-
-                OwnedBeast beast = OwnedBeast.Create("b" + next++, speciesId, Math.Max(1, level));
-                for (int slot = 0; slot < kit.DefaultLoadout.Length && slot < beast.Skills.SlotCount; slot++)
-                {
-                    beast.Skills.Learn(kit.DefaultLoadout[slot]);
-                    beast.Skills.Equip(slot, kit.DefaultLoadout[slot]);
-                }
-
-                save.Beasts.Add(beast);
-            }
-
-            SkillData[] actives = library.AvatarActives ?? new SkillData[0];
-            for (int i = 0; i < actives.Length && i < SkillLibraryData.AvatarDefaultActiveCount && i < save.AvatarSkills.Actives.SlotCount; i++)
-            {
-                save.AvatarSkills.Actives.Learn(actives[i].SkillId);
-                save.AvatarSkills.Actives.Equip(i, actives[i].SkillId);
-            }
-
-            string[] passives = library.AvatarDefaultPassives ?? new string[0];
-            for (int i = 0; i < passives.Length && i < save.AvatarSkills.Passives.SlotCount; i++)
-            {
-                save.AvatarSkills.Passives.Learn(passives[i]);
-                save.AvatarSkills.Passives.Equip(i, passives[i]);
-            }
-
-            return save;
         }
     }
 }
