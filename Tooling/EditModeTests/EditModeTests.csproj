@@ -44,6 +44,8 @@
     <Compile Include="Goldens\*.cs" />
     <!-- Tests of src/BeastCraft.Presentation and the VFX library (Core's BeastCraft.Vfx). -->
     <Compile Include="Presentation\*.cs" />
+    <!-- The screens' engine-neutral half: the UI toolkit, navigation and the view-models (src/BeastCraft.Presentation/Ui and Screens). -->
+    <Compile Include="Screens\*.cs" />
   </ItemGroup>
 
   <ItemGroup>

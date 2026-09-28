@@ -1,0 +1,47 @@
+{
+  "_readme": "PRESENTATION ONLY: the UI toolkit's house style (src/BeastCraft.Presentation/Ui/UiStyle.cs, validated by UiStyleValidator on content load). Rounded, friendly shapes: warm plum outlines on cream panels. Colors: named #RRGGBB or #RRGGBBAA; Panels and Buttons name a colour key (or give #hex). Radius and OutlineWidth are canvas pixels on the 1080x1920 portrait canvas; TextSizes are cap heights in canvas pixels. Placeholder values until the UI art lands (docs/design/screens.md).",
+  "SchemaVersion": 1,
+  "Colors": [
+    { "Key": "plum", "Hex": "#5B3A5E" },
+    { "Key": "plumDeep", "Hex": "#3F2842" },
+    { "Key": "plumSoft", "Hex": "#8A6A8C" },
+    { "Key": "cream", "Hex": "#FFF4DF" },
+    { "Key": "creamDeep", "Hex": "#F3E2C3" },
+    { "Key": "parchment", "Hex": "#EBD6B0" },
+    { "Key": "ink", "Hex": "#3D2940" },
+    { "Key": "inkSoft", "Hex": "#7A6478" },
+    { "Key": "white", "Hex": "#FFFFFF" },
+    { "Key": "gold", "Hex": "#F2C14E" },
+    { "Key": "goldDeep", "Hex": "#D99A2B" },
+    { "Key": "peach", "Hex": "#F2A65A" },
+    { "Key": "leaf", "Hex": "#7FB069" },
+    { "Key": "leafDeep", "Hex": "#5C8E4A" },
+    { "Key": "moss", "Hex": "#A7C98A" },
+    { "Key": "berry", "Hex": "#C8556B" },
+    { "Key": "sky", "Hex": "#9BD1E5" },
+    { "Key": "stone", "Hex": "#CBBFB4" },
+    { "Key": "stoneDeep", "Hex": "#9C8F86" },
+    { "Key": "track", "Hex": "#E4D3B8" },
+    { "Key": "scrim", "Hex": "#2A1A2C99" },
+    { "Key": "shadow", "Hex": "#3F284240" }
+  ],
+  "Panels": [
+    { "Key": "panel", "Fill": "cream", "Outline": "plum", "OutlineWidth": 5, "Radius": 28, "Shadow": "shadow" },
+    { "Key": "card", "Fill": "creamDeep", "Outline": "plumSoft", "OutlineWidth": 4, "Radius": 22, "Shadow": "" },
+    { "Key": "modal", "Fill": "cream", "Outline": "plum", "OutlineWidth": 6, "Radius": 36, "Shadow": "shadow" },
+    { "Key": "toast", "Fill": "plum", "Outline": "gold", "OutlineWidth": 4, "Radius": 30, "Shadow": "shadow" },
+    { "Key": "header", "Fill": "#FFF4DFE6", "Outline": "plum", "OutlineWidth": 5, "Radius": 30, "Shadow": "shadow" },
+    { "Key": "nav", "Fill": "plum", "Outline": "plumDeep", "OutlineWidth": 5, "Radius": 36, "Shadow": "shadow" },
+    { "Key": "banner", "Fill": "gold", "Outline": "plum", "OutlineWidth": 5, "Radius": 24, "Shadow": "" },
+    { "Key": "slot", "Fill": "parchment", "Outline": "plumSoft", "OutlineWidth": 4, "Radius": 20, "Shadow": "" }
+  ],
+  "Buttons": [
+    { "Key": "primary", "Fill": "leaf", "PressedFill": "leafDeep", "DisabledFill": "stone", "SelectedFill": "leafDeep", "Outline": "plum", "Text": "white", "DisabledText": "cream", "OutlineWidth": 5, "Radius": 34, "TextSize": 30 },
+    { "Key": "secondary", "Fill": "cream", "PressedFill": "creamDeep", "DisabledFill": "stone", "SelectedFill": "gold", "Outline": "plum", "Text": "ink", "DisabledText": "inkSoft", "OutlineWidth": 5, "Radius": 34, "TextSize": 28 },
+    { "Key": "ghost", "Fill": "#FFF4DF00", "PressedFill": "#5B3A5E26", "DisabledFill": "#FFF4DF00", "SelectedFill": "#5B3A5E26", "Outline": "plumSoft", "Text": "ink", "DisabledText": "inkSoft", "OutlineWidth": 3, "Radius": 26, "TextSize": 22 },
+    { "Key": "nav", "Fill": "#5B3A5E00", "PressedFill": "plumDeep", "DisabledFill": "#5B3A5E00", "SelectedFill": "gold", "Outline": "#5B3A5E00", "Text": "cream", "DisabledText": "plumSoft", "OutlineWidth": 0, "Radius": 26, "TextSize": 17 },
+    { "Key": "chip", "Fill": "cream", "PressedFill": "creamDeep", "DisabledFill": "stone", "SelectedFill": "gold", "Outline": "plumSoft", "Text": "ink", "DisabledText": "inkSoft", "OutlineWidth": 4, "Radius": 22, "TextSize": 20 },
+    { "Key": "danger", "Fill": "berry", "PressedFill": "plum", "DisabledFill": "stone", "SelectedFill": "plum", "Outline": "plum", "Text": "white", "DisabledText": "cream", "OutlineWidth": 5, "Radius": 34, "TextSize": 28 }
+  ],
+  "TextSizes": { "Small": 17, "Body": 22, "Heading": 32, "Title": 64 }
+}
