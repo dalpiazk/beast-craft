@@ -75,7 +75,8 @@ namespace BeastCraft.Campaign
         /// How far the player has got: the level of the highest cleared map location — a region's
         /// boss (its max level) once beaten, else the pass (Gate) of its last cleared stage, and any
         /// battle location cleared in the expedition in progress — over every unlocked region
-        /// <paramref name="library"/> knows. 0 when nothing is cleared (or no save or library). What
+        /// <paramref name="library"/> knows, and Hearthglen's max level once played through (a skipped
+        /// Hearthglen counts nothing). 0 when nothing is cleared (or no save or library). What
         /// the idle rewards are paid at (<c>Idle.IdleRewardCalculator</c>).
         /// </summary>
         public static int ProgressLevel(PlayerSave save, RegionLibrary library)
@@ -106,6 +107,14 @@ namespace BeastCraft.Campaign
                     int gate = NodeMapGenerator.RowLevel(region, rules, progress.StagesCleared - 1, rules.Layers - 1) + rules.GateLevelOffset;
                     best = Math.Max(best, gate);
                 }
+            }
+
+            // Hearthglen, played through (not skipped), counts at its max level once behind the player:
+            // its region entry is gone by then (it is played once), so the flag stands in for it.
+            RegionData tutorial = library.Tutorial;
+            if (tutorial != null && save.Tutorial != null && save.Tutorial.HearthglenCleared && !save.Tutorial.Skipped)
+            {
+                best = Math.Max(best, tutorial.MaxLevel);
             }
 
             MapRun run = save.Campaign.ActiveRun;

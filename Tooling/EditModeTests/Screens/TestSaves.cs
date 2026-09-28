@@ -24,7 +24,9 @@ namespace BeastCraft.Tests.EditMode
                 StarterPicks.AddBeast(save, content.SkillLibrary, species, level);
             }
 
+            // Past Hearthglen without having played its fights (as the skip): nothing counts toward idle yet.
             save.Tutorial.HearthglenCleared = true;
+            save.Tutorial.Skipped = true;
             return save;
         }
 

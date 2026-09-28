@@ -114,6 +114,14 @@ Hearthglen's normal XP lands players in Verdant Hollow around level 3. `--mode n
 91.0%, solo 68.1%; the first node squad 96.8%, horde 97.8%; stages 2-4 unchanged (their levels are
 already above 3). No easing changed (squad stays under 97%); see the tuning log.
 
+## Idle rewards
+
+A played Hearthglen counts toward the idle rewards' progress level (`CampaignRules.ProgressLevel`):
+its cleared fights while it is played, then its max level (3) once behind the player
+(`HearthglenCleared` and not `Skipped`), so the idle chip pays right after the tutorial. A skip
+counts nothing; the campaign tools' blank saves are unaffected (the campaign pacing report
+regenerates byte-identical).
+
 ## Save (schema 7)
 
 `PlayerSave.Tutorial` (`TutorialProgress`): `HearthglenCleared`, `Skipped`, `SeenHintIds`. The

@@ -267,9 +267,27 @@ namespace BeastCraft.Tests.EditMode
             Assert.IsTrue(save.Campaign.IsUnlocked("r01"), "r00 -> r01");
             Assert.IsFalse(save.Campaign.IsUnlocked("r00"), "played once");
             Assert.IsFalse(CampaignRules.StartRun(save, Regions, "r00", 1).Success);
-            Assert.AreEqual(0, CampaignRules.ProgressLevel(save, Regions), "Hearthglen leaves no trace the campaign's pacing reads");
+            Assert.AreEqual(Regions.Tutorial.MaxLevel, CampaignRules.ProgressLevel(save, Regions), "a played Hearthglen counts toward idle rewards");
             Assert.IsTrue(CampaignRules.StartRun(save, Regions, "r01", 3).Success);
             Assert.AreEqual(0, StarterPicks.PendingStep(save, Regions));
+        }
+
+        [Test]
+        public void ProgressLevel_CountsHearthglen_DuringAndAfter_ButNotASkip_AndIdlePaysRightAway()
+        {
+            PlayerSave save = PlayTo(3, "golem", "kirin", "griffin");
+            Assert.AreEqual(1, CampaignRules.ProgressLevel(save, Regions), "Hearthglen's cleared fights count while it is played");
+            CampaignRules.CompleteTutorial(save, Regions);
+            Assert.AreEqual(3, CampaignRules.ProgressLevel(save, Regions), "its max level once behind the player");
+            Assert.IsTrue(CampaignRules.StartRun(save, Regions, "r01", 2).Success);
+            Assert.AreEqual(3, CampaignRules.ProgressLevel(save, Regions), "before the first r01 win");
+            Idle.IdleContent idle = Content.Idle;
+            Assert.IsNotNull(idle.Rewards.BandFor(3), "the idle bands cover level 1 and up");
+
+            PlayerSave skipped = StarterPicks.NewGameSkippingTutorial(new[] { "golem", "kirin", "griffin" }, Roster, Content.SkillLibrary, Regions,
+                                                                      Content.Battle.GetConsumable, out string _);
+            Assert.AreEqual(0, CampaignRules.ProgressLevel(skipped, Regions), "a skip cleared no fights");
+            Assert.AreEqual(0, CampaignRules.ProgressLevel(PlayerSave.CreateNew(), Regions), "the tools' blank save is unchanged");
         }
 
         [Test]
