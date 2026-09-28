@@ -163,7 +163,7 @@
       "ShapeId": "squad",
       "Arena": "Small",
       "Groups": [ { "EnemyId": "swarmling", "Count": 2, "Elements": [ ] } ],
-      "DifficultyOverride": 0.5,
+      "DifficultyOverride": 1.73,
       "Draft": true
     },
     {
@@ -173,7 +173,7 @@
       "ShapeId": "squad",
       "Arena": "Small",
       "Groups": [ { "EnemyId": "swarmling", "Count": 1, "Elements": [ ] }, { "EnemyId": "stingling", "Count": 1, "Elements": [ "Nature" ] }, { "EnemyId": "stingling", "Count": 1, "Elements": [ ] } ],
-      "DifficultyOverride": 0.5,
+      "DifficultyOverride": 1.29,
       "Draft": true
     },
     {
@@ -183,7 +183,7 @@
       "ShapeId": "squad",
       "Arena": "Small",
       "Groups": [ { "EnemyId": "stingling", "Count": 1, "Elements": [ ] }, { "EnemyId": "archer", "Count": 1, "Elements": [ ] } ],
-      "DifficultyOverride": 0.5,
+      "DifficultyOverride": 0.73,
       "Draft": true
     },
     {
@@ -193,7 +193,7 @@
       "ShapeId": "elite",
       "Arena": "Small",
       "Groups": [ { "EnemyId": "brute", "Count": 1, "Elements": [ ] } ],
-      "DifficultyOverride": 0.5,
+      "DifficultyOverride": 0.83,
       "Draft": true
     },
     {
@@ -203,7 +203,7 @@
       "ShapeId": "squad",
       "Arena": "Medium",
       "Groups": [ { "EnemyId": "swarmling", "Count": 2, "Elements": [ ] }, { "EnemyId": "caster", "Count": 1, "Elements": [ ] } ],
-      "DifficultyOverride": 0.5,
+      "DifficultyOverride": 1.03,
       "Draft": true
     },
     {
@@ -213,7 +213,7 @@
       "ShapeId": "squad",
       "Arena": "Medium",
       "Groups": [ { "EnemyId": "brute", "Count": 1, "Elements": [ ] }, { "EnemyId": "stingling", "Count": 1, "Elements": [ ] }, { "EnemyId": "archer", "Count": 1, "Elements": [ ] } ],
-      "DifficultyOverride": 0.5,
+      "DifficultyOverride": 0.83,
       "Draft": true
     },
     {
@@ -223,7 +223,7 @@
       "ShapeId": "elite",
       "Arena": "Medium",
       "Groups": [ { "EnemyId": "shaman", "Count": 1, "Elements": [ ] }, { "EnemyId": "swarmling", "Count": 2, "Elements": [ ] } ],
-      "DifficultyOverride": 0.5,
+      "DifficultyOverride": 1.12,
       "Draft": true
     },
     {
@@ -233,7 +233,7 @@
       "ShapeId": "squad",
       "Arena": "Medium",
       "Groups": [ { "EnemyId": "stalker", "Count": 1, "Elements": [ ] }, { "EnemyId": "swarmling", "Count": 2, "Elements": [ ] }, { "EnemyId": "archer", "Count": 1, "Elements": [ ] } ],
-      "DifficultyOverride": 0.5,
+      "DifficultyOverride": 0.95,
       "Draft": true
     },
     {
@@ -243,7 +243,7 @@
       "ShapeId": "elite",
       "Arena": "Medium",
       "Groups": [ { "EnemyId": "champion", "Count": 1, "Elements": [ ] }, { "EnemyId": "stingling", "Count": 2, "Elements": [ ] } ],
-      "DifficultyOverride": 0.5,
+      "DifficultyOverride": 1.02,
       "Draft": true
     },
     {

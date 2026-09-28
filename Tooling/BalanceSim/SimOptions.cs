@@ -600,6 +600,15 @@ namespace BeastCraft.Tooling.BalanceSim
         /// </summary>
         public bool RunNewPlayer;
 
+        /// <summary>
+        /// <c>--mode hearthglen</c>: the Hearthglen report (<see cref="HearthglenReport"/>): every fixed
+        /// tutorial fight against every legal pick combination.
+        /// </summary>
+        public bool RunHearthglen;
+
+        /// <summary><c>--tune</c>: hearthglen: also search each fight's DifficultyOverride for its target and print the suggestions.</summary>
+        public bool HearthglenTune;
+
         /// <summary><c>--map-seeds</c>: newplayer: the first-node section's map seeds, 1..n.</summary>
         public int NewPlayerMapSeeds = NewPlayerReport.DefaultMapSeeds;
 
@@ -777,13 +786,17 @@ namespace BeastCraft.Tooling.BalanceSim
             "\n" +
             "Usage: dotnet run --project Tooling/BalanceSim -c Release -- [options]\n" +
             "\n" +
-            "  --mode <m>                 pve | pvp | both | pacing | campaign | newplayer (default both). pve = team vs encounter\n" +
+            "  --mode <m>                 pve | pvp | both | pacing | campaign | newplayer | hearthglen (default both). pve = team vs encounter\n" +
             "                             (primary); pvp = the 1v1 round-robin (secondary); pacing = the skill-progression /\n" +
             "                             material economy model (Monte Carlo campaigns; see README.md, \"Pacing\"); campaign = the\n" +
             "                             region campaign model (node maps, level cap, bench; docs/design/progression-and-saves.md);\n" +
             "                             newplayer = one-per-stance trios through r01-r03 with and without the early-region\n" +
             "                             easing, and the first node (README.md, \"New-player easing\").\n" +
             "  --map-seeds <n>            newplayer: map seeds 1..n for the first-node section (default 60).\n" +
+            "                             hearthglen = every fixed Hearthglen (r00, tutorial) fight against every legal pick:\n" +
+            "                             the 10 solo picks, every (1st, 2nd) pair and every trio in pick order, at the levels\n" +
+            "                             the picks have reached there (docs/balance/hearthglen-report.md).\n" +
+            "  --tune                     hearthglen: also search each fight's DifficultyOverride for its target.\n" +
             "  --difficulty <path>        newplayer: the difficulty table fought at (default: the game's encounter-difficulty.json).\n" +
             "  --battles <n>              pacing: battles per campaign (default 500).\n" +
             "  --runs <n>                 pacing / campaign: campaigns per base seed (default 1000; --seeds pools every seed's).\n" +
@@ -940,6 +953,9 @@ namespace BeastCraft.Tooling.BalanceSim
                         break;
                     case "--turn-detail":
                         options.TurnDetail = true;
+                        break;
+                    case "--tune":
+                        options.HearthglenTune = true;
                         break;
                     case "--calibrate-sample":
                         if (!TryNextInt(args, ref i, arg, 1, out options.CalibrateSample, out error))
@@ -1794,8 +1810,14 @@ namespace BeastCraft.Tooling.BalanceSim
                     options.RunPvp = false;
                     options.RunNewPlayer = true;
                     return true;
+                case "hearthglen":
+                    // PvE's loading, then the Hearthglen (tutorial region) report instead of the PvE report.
+                    options.RunPve = true;
+                    options.RunPvp = false;
+                    options.RunHearthglen = true;
+                    return true;
                 default:
-                    error = "--mode expects pve, pvp, both, pacing, campaign or newplayer, got '" + text + "'.";
+                    error = "--mode expects pve, pvp, both, pacing, campaign, newplayer or hearthglen, got '" + text + "'.";
                     return false;
             }
         }
