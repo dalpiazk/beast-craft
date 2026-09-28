@@ -19,8 +19,11 @@ beast-craft/
 │   │                       Vfx data, Common)
 │   ├── BeastCraft.Presentation/  engine-neutral presentation: content loading, hex layout,
 │   │                       battle playback, VFX timeline/layers/auras, portrait layout, range
-│   │                       diagrams, pixel font (netstandard2.1)
-│   ├── BeastCraft.Game/    the shared MonoGame battle viewer (portrait canvas, drawing, input; net10.0)
+│   │                       diagrams, pixel font, the UI toolkit (Ui/) and the screens'
+│   │                       view-models and navigation (Screens/) (netstandard2.1)
+│   ├── BeastCraft.Game/    the shared MonoGame game: the screen stack host, the screens (title,
+│   │                       map, encounter, battle, results), the UI painter (portrait canvas,
+│   │                       drawing, input; net10.0)
 │   ├── BeastCraft.Desktop/ the MonoGame DesktopGL host (desktop spike, net10.0)
 │   └── BeastCraft.Android/ the MonoGame Android host (net10.0-android; local build, not in CI)
 ├── content/        the game's authored content, read by the hosts, the tests and the simulator
@@ -88,9 +91,10 @@ rules and the asset naming contract.
 ## Status
 
 **Pre-alpha: a headless, deterministic battle and progression core with its
-data and tooling, and a MonoGame desktop spike that renders one real battle
-in portrait with throwaway pixel-art placeholders and layered skill VFX. No
-playable game yet.**
+data and tooling, and a first playable core loop on desktop and Android —
+title, the region map, an encounter's preview and team, the battle (layered
+skill VFX, painted backdrops), the results, autosave — with code-drawn
+placeholder UI until the UI art lands.**
 
 ### What exists
 
@@ -182,37 +186,70 @@ The numbers are simulator-tuned starting points, not confirmed balance — see
 
 ### What does not exist yet
 
-- Anything the player sees or touches beyond the spike's battle viewer (desktop
-  and Android): no menus, map, team building or audio; the spike's art is
+- The screens beyond the core loop (see [`docs/design/screens.md`](docs/design/screens.md)):
+  the Roster, Grove, Avatar and Inventory tabs are "coming soon" pages; the
+  Trader and Camp locations say "coming soon"; no audio. The UI is code-drawn
   placeholder.
 - Encounters as game data — the only encounters are the balance simulator's
   generator and its `Tooling/BalanceSim/encounters.json`.
 - Gear content — the gear schemas and save support exist, but `content/data/Gear/` and
   `content/data/AvatarGear/` are empty.
-- Narrative and IAP code (idle rewards have their rules in
-  `src/BeastCraft.Core/Idle` but no UI), and the offline art compositor.
+- Narrative and IAP code (idle rewards are claimed on Continue, on resume
+  and from the map's idle chip, but have no screen of their own yet), and the
+  offline art compositor.
 - Tests that drive the MonoGame viewer itself (the suite covers the core and
   the engine-neutral presentation layer).
 
-### Running the game (desktop spike)
+### Running the game (desktop)
 
 `src/BeastCraft.Desktop` is a MonoGame DesktopGL app (MonoGame 3.8.5.1, net10.0;
-Windows first, and it builds on Linux). It fights one real PvE battle through the
-game's own session code — Phoenix, Golem, Kirin and Frost Wyrm (level 20) against
-the Hollow Warden encounter (a champion and two brutes, level 10), seed 20260933 —
-and draws it in **portrait**: a fixed 1080x1920 canvas scaled to the window and
-letterboxed (the window opens at 540x960 and can be resized). Phoenix, Golem and
-Kirin draw with their final illustrated art (AI-assisted, producer-approved); the
-rest is throwaway pixel placeholders until its art is made.
+Windows first, and it builds on Linux). It starts at the **title**; the window
+opens at 540x960 (the portrait 1080x1920 canvas at half size, letterboxed) and
+can be resized.
 
 ```
 git lfs install && git lfs pull          # the art is in Git LFS
 dotnet run --project src/BeastCraft.Desktop -c Release
 ```
 
+**New Game** gives you the starter beasts and an expedition into the Verdant
+Hollow; **Continue** (the primary button once there is a save) loads it and
+claims the idle rewards. On the **map**, drag to scroll, tap a glowing location
+(or **Next battle**) to see its encounter for free, pick up to four beasts and
+one consumable, and **Start Battle**; the battle plays by itself, then the
+results pay out and the map moves on. **Esc** is Back (the title asks before
+quitting); the mouse clicks and drags like a finger. The game autosaves when a
+battle starts, after its results and when the window loses focus or closes, to
+`%LOCALAPPDATA%\BeastCraft\saves\slot1.save` (with a `.bak` of the previous
+write, which Continue falls back to with a message if the main file is torn).
+
+Debug flags: `--screen NAME` starts at a screen (`title`, `map`, `encounter`,
+`battle`, `results`, `roster`, `grove`, `avatar`, `inventory`, `settings`),
+setting up a game as needed; with `--screenshot PATH` it renders that screen and
+exits (on a throwaway in-memory save). `--walkthrough DIR` takes numbered
+screenshots of the whole loop on a fresh save in a temporary folder (title, map,
+encounter, battle, results, map, Next battle, a coming-soon tab, settings).
+`--save-dir DIR` keeps the save elsewhere, `--map-seed N` fixes the expedition
+maps and `--starter-level L` starts a new game's beasts at level L. How the
+screens are built is [`docs/design/screens.md`](docs/design/screens.md).
+
+#### The battle demo
+
+Any of the battle flags below (or `--screen demo`) runs the old battle viewer
+instead: one real PvE battle through the
+game's own session code — Phoenix, Golem, Kirin and Frost Wyrm (level 20) against
+the Hollow Warden encounter (a champion and two brutes, level 10), seed 20260933 —
+in **portrait**. Every beast draws with its final illustrated art (AI-assisted,
+producer-approved).
+
+```
+dotnet run --project src/BeastCraft.Desktop -c Release -- --team phoenix,golem,kirin,frost_wyrm
+```
+
 **Space** plays the next turn (or finishes the one playing), **A** toggles
 auto-play, **1**/**2**/**3** set the speed, **S** skips to the result, **Tab**
-cycles the selected skill, **Esc** quits; the on-screen PLAY/PAUSE, x1/x2/x3 and
+cycles the selected skill, **Esc** quits (in the game, a battle's Esc offers to
+skip to the result instead); the on-screen PLAY/PAUSE, x1/x2/x3 and
 SKIP buttons do the same, and clicking a skill card opens its detail card (tags,
 cooldown, range, power, the range diagram and the description with its glossary
 terms highlighted: click one for its definition). Each fired skill plays its VFX from `content/data/Vfx/vfx-library.json`
@@ -252,12 +289,16 @@ producer as art director) is [`docs/art/art-brief.md`](docs/art/art-brief.md).
 
 ### Running on Android
 
-`src/BeastCraft.Android` runs the same battle viewer (the shared
-`src/BeastCraft.Game`) on Android: full screen and **locked to portrait**, the
-1080x1920 canvas letterboxed inside the display cutout's safe area. **Tap** the
-buttons and skill cards, tap the board to play the next turn (or finish the one
-playing), a **two-finger tap** toggles auto-play, **Back** quits. It is a
-**local build only**; CI does not build it.
+`src/BeastCraft.Android` runs the same game (the shared `src/BeastCraft.Game`) on
+Android: full screen and **locked to portrait**, the 1080x1920 canvas
+letterboxed inside the display cutout's safe area. It starts at the title;
+**tap** and **drag** as on desktop (in battle, tap the board to play the next
+turn, a **two-finger tap** toggles auto-play), and **Back** goes back (it closes
+a modal first; the title asks before quitting). The save lives in the app's
+files directory and is written when a battle starts, after its results and when
+the app is paused; coming back claims the idle rewards. An optional "idle full"
+notification (off by default; Settings) asks for the notification permission on
+Android 13+. It is a **local build only**; CI does not build it.
 The package ID `com.example.beastcraft` is a temporary placeholder; the real
 package ID is decided at release time.
 

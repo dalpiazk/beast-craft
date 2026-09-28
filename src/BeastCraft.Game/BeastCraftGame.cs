@@ -475,7 +475,21 @@ namespace BeastCraft.Game
             bool back = GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed;
             bool pressed = back && !_previousBack;
             _previousBack = back;
-            return pressed || esc;
+            bool requested = _backRequested;
+            _backRequested = false;
+            return pressed || esc || requested;
+        }
+
+        private volatile bool _backRequested;
+
+        /// <summary>
+        /// The platform's Back, when it does not arrive as a key (Android 13+ routes Back through
+        /// <c>OnBackInvokedCallback</c>; without one the system just sends the app to the background).
+        /// Handled on the next update. Thread-safe.
+        /// </summary>
+        public void RequestBack()
+        {
+            _backRequested = true;
         }
 
         /// <summary>The mouse's left button, or the first finger, as press / move / release in canvas pixels to <paramref name="ui"/>.</summary>

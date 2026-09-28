@@ -53,11 +53,26 @@ namespace BeastCraft.Android
             // MonoGame's Exit() on Android only moves the task to the back; finish the activity so
             // Back really quits.
             _game.Exiting += (sender, args) => Finish();
+
+            // Android 13+ delivers Back as a callback, not a key: without one the system only sends
+            // the app to the background. Route it to the game's stack (the title asks before quitting).
+            if (Build.VERSION.SdkInt >= BuildVersionCodes.Tiramisu)
+            {
+                OnBackInvokedDispatcher.RegisterOnBackInvokedCallback(0, new BackCallback(_game));
+            }
             _view = (View)_game.Services.GetService(typeof(View));
             _view.ViewTreeObserver.GlobalLayout += (sender, args) => ReadInsets();
             SetContentView(_view);
             _game.Run();
         }
+
+        /// <summary>Back on Android 12 and older, when the key did not reach the game first.</summary>
+#pragma warning disable CS0672, CS0618, CA1422 // OnBackPressed is the pre-33 path; 33+ uses BackCallback.
+        public override void OnBackPressed()
+        {
+            _game?.RequestBack();
+        }
+#pragma warning restore CS0672, CS0618, CA1422
 
         /// <summary>Going to the background (home, another app, the screen off): autosave before Android may stop the process.</summary>
         protected override void OnPause()
@@ -78,6 +93,22 @@ namespace BeastCraft.Android
             _insets = new SafeInsetsBox(cutout == null
                                             ? SafeInsets.None
                                             : new SafeInsets(cutout.SafeInsetLeft, cutout.SafeInsetTop, cutout.SafeInsetRight, cutout.SafeInsetBottom));
+        }
+
+        /// <summary>Back (Android 13+) handed to the game's screen stack.</summary>
+        private sealed class BackCallback : Java.Lang.Object, global::Android.Window.IOnBackInvokedCallback
+        {
+            private readonly BeastCraftGame _game;
+
+            public BackCallback(BeastCraftGame game)
+            {
+                _game = game;
+            }
+
+            public void OnBackInvoked()
+            {
+                _game.RequestBack();
+            }
         }
 
         /// <summary>A reference holder so the struct can be swapped atomically between threads.</summary>
