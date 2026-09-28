@@ -21,6 +21,11 @@ namespace BeastCraft.Tests.EditMode
     /// avatar's arts, the passives' and bonds' hits, the final HP of every unit, the outcome and the
     /// elapsed ticks — across map seeds and team levels (so level gaps apply both ways). Any change
     /// to a draw or a number moves the hash.
+    /// <para>
+    /// Widened (the Roster review's note) to every <see cref="AppliedEffect"/> too — its target, effect
+    /// type, stat, status and recorded <see cref="AppliedEffect.Amount"/> — and re-captured on
+    /// <c>main</c> (797ed05) before the Kinship and discovery work touched anything.
+    /// </para>
     /// </summary>
     public class BattleRecordInvarianceTests
     {
@@ -29,16 +34,16 @@ namespace BeastCraft.Tests.EditMode
             get { return VfxLibraryTests.Content; }
         }
 
-        [TestCase(11, 1, "BADC552C12274E6F")]
-        [TestCase(12, 3, "9A99CF8C3D183998")]
-        [TestCase(13, 6, "6DB98AB971216E32")]
-        [TestCase(14, 2, "849E84CE8CE3BD02")]
-        [TestCase(15, 9, "16AD76B8B27919F8")]
+        [TestCase(11, 1, "13DEFBC79EAAE23C")]
+        [TestCase(12, 3, "CEF71BC5CF7DCA18")]
+        [TestCase(13, 6, "A87D8691636CACAD")]
+        [TestCase(14, 2, "16E5CA36007EAF14")]
+        [TestCase(15, 9, "094DFA3C0AF03197")]
         public void CampaignBattle_Fingerprint_IsUnchangedByTheLogRecording(int mapSeed, int teamLevel, string expected)
         {
             string text = Fingerprint(mapSeed, teamLevel);
             string hash = Fnv(text);
-            TestContext.WriteLine(mapSeed + "/" + teamLevel + ": " + hash + " (" + text.Length + " chars)");
+            TestContext.WriteLine(mapSeed + "/" + teamLevel + ": " + hash + " (" + text.Length + " chars, " + (text.Split(" e ").Length - 1) + " applied effects)");
             Assert.AreEqual(expected, hash);
         }
 
@@ -129,6 +134,12 @@ namespace BeastCraft.Tests.EditMode
             {
                 text.Append(tag).Append(" h ").Append(hit.Target.Id).Append(' ').Append(hit.Roll.Amount).Append(hit.Roll.IsCrit ? "c" : string.Empty).Append(' ')
                     .Append(hit.Roll.VariancePercent).Append(' ').Append(hit.Absorbed).Append('\n');
+            }
+
+            foreach (AppliedEffect applied in activation.Applied)
+            {
+                text.Append(tag).Append(" e ").Append(applied.Target?.Id).Append(' ').Append(applied.Effect?.EffectType).Append(' ').Append(applied.Effect?.AffectedStat)
+                    .Append(' ').Append(applied.Effect?.Status).Append(' ').Append(applied.Amount).Append('\n');
             }
         }
 
