@@ -11,8 +11,8 @@ design pass; the decisions are summarised at the end.
 ```
 Title ──Continue / New Game──▶ Home (Map tab) ──tap a location / Next battle──▶ Encounter
   ▲  Back: "Leave?"             │  idle chip, header, bottom nav                   │ Start Battle
-  │                             │  (Roster, Grove, Avatar, Inventory:              ▼
-  └──────── Back ───────────────┘   "coming soon")                               Battle ──decided──▶ Results
+  │                             │  (Roster ─▶ beast detail; Grove, Avatar,         ▼
+  └──────── Back ───────────────┘   Inventory: "coming soon")                    Battle ──decided──▶ Results
                                 ▲                                                                   │
                                 └─────────────────────── Continue (or auto-advance) ────────────────┘
 ```
@@ -28,7 +28,7 @@ Title ──Continue / New Game──▶ Home (Map tab) ──tap a location / N
   could only be restored from its `.bak` says so; one that cannot be loaded says why. Back asks
   before quitting.
 - **Home** (`HomeScreen`, `HomeViewModel`, `MapViewModel`): the bottom nav — **Map, Roster, Grove,
-  Avatar, Inventory** (only Map works yet) — over the region map. The map is *spatial*: the stage's
+  Avatar, Inventory** (Map and Roster work; see "Roster and visibility" below) — over the region map. The map is *spatial*: the stage's
   node map (rows and lanes, the internal pacing model) is laid out by `MapLayout` as places on a
   painted-style meadow (placeholder: a soft gradient and blobs), joined by winding trails; it is
   never drawn as a graph. Locations show their type (Battle, Den, Pass, Lair, Trader, Camp) and
@@ -54,6 +54,72 @@ Title ──Continue / New Game──▶ Home (Map tab) ──tap a location / N
   limit, and what the map made of it (cleared, a stage or region won with its seal, or the retry
   note after a loss). Continue returns to the map, or with *Auto next battle* on after a win,
   straight on to the next encounter.
+
+## Roster and visibility (the Theorycrafter's screens)
+
+From the "Theorycrafter" persona review: transparent stat matrices, predictable targeting rules,
+visible mechanics. Everything here is presentation: every number is read from the Core rule it
+describes (never re-derived), and battle rules and the balance simulator are unchanged (the tuned
+report and the difficulty table regenerate byte-identical).
+
+- **Roster tab** (`RosterPage`, `RosterViewModel`): every owned beast as an illustrated card (level,
+  stance, element; a leaf check when it is in the last party), sortable (Joined, Level, Name,
+  Element, Stance: the Sort chip cycles), then a dark silhouette for every species not yet found,
+  "Found through Kinship" (the compendium's seed). A card opens the beast's detail screen.
+- **Beast detail** (`BeastDetailScreen`, `BeastDetailViewModel`), three tabs:
+  - *Stats*: HP, Atk, Def, SpA, SpD, Speed and Crit as base (the species at its level,
+    `StatCalculator.GetBaseStatsAtLevel`), gear and total (`StatCalculator.ComputeStats`), each
+    worn piece's bonuses; **turns per 100 gauge ticks** (`TurnManager.FillRateForSpeed` over
+    `ActionThreshold`: the square-root ATB fill) for the beast, the rest of the party and the
+    level-matched average enemy (the mean over the enemy library at the beast's level; Speed is
+    never scaled by the difficulty multiplier); the **element chart both ways** (its attacking
+    element, its first equipped damaging skill's, against each of the ten; each of the ten
+    against it); **crits** (the clamped chance, the multiplier, the expected factor); the
+    **level-gap curve** for enemies 5 levels below to 5 above, dealt and taken
+    (`DamageFormula.GetLevelMultiplier`).
+  - *Skills*: the three slots, each a card with its **targeting rule in words**
+    (`SkillCard.TargetingRuleText`, generated from `TargetShape`, `TargetSide`,
+    `TargetingCriterion`/`TargetingOrder`/`TargetingStat` and `Range`, e.g. "Targets the enemy
+    with the lowest HP% within 3 hexes.") and how **taunt** overrides it (`TauntRuleText`: only an
+    enemy-side single-target or line skill is redirected), its tags, cooldown, power lines, level,
+    tier, XP and the next breakthrough's gate. *Change* puts another learned skill in the slot (a
+    skill already in another slot swaps: `SkillBook.Equip`/`SwapSlots`; the last skill cannot be
+    taken off); *Upgrade* lists every material with its tier and XP: *Train* feeds one
+    (`SkillProgression.ApplyMaterial`, refused at the tier's cap), *Break through* at the gate
+    needs the gate's material tier or better (`TryBreakthrough`), each spending one. The kit's
+    other skills follow, learned (Equip) or taught by a skill tome from a level.
+  - *Gear & bonds*: each slot's worn piece (Take off) and the player's other pieces for it (Equip,
+    or why not: worn by another beast, level too low; `GearRules`); the stance's behaviour (its
+    glossary definition); the bonds it takes part in, with the owned partners that count and the
+    tier the current party reaches; the looks it wears (editing is the wardrobe's, later).
+  Every change autosaves (`AutosaveReason.BeastEdit`).
+- **Element chart** (`ElementChartScreen`, `ElementChartViewModel`): the 10x10 matrix of
+  `ElementChart` (rows attack, columns defend), Strong x2, Mild x1.25, Weak x0.5, Neutral, the team's
+  elements' rows and columns highlighted. From the glossary, the detail screen and the encounter.
+- **Glossary** (`GlossaryScreen`): every term (combat first: ATB, gauge, level gap, execute,
+  variance, element chart, crit, heal; then statuses, stances, passives), opened at a term by the
+  screens' "?" buttons, with the way to the element chart. The terms are data
+  (`content/data/Glossary/glossary.json`); a test keeps the level-gap, variance and gauge numbers
+  true to the Core constants.
+- **Encounter preview additions** (`EncounterInsightView`): a **level-gap indicator** on every
+  enemy card (the gap to the chosen team's mean level, and "You x1.12 - It x0.88": the multiplier
+  on the team's hits and on the enemy's), a colour-coded **element matrix** (team beasts by the
+  enemies' distinct elements, each cell dealt over taken, green when it favours the team), and
+  **each enemy type's skills** with their targeting rules.
+- **Battle log** (`BattleLogViewModel`, `BattleLogModal`): rebuilt from the battle's own records —
+  the turn results, each `DamageHit`'s `DamageBreakdown` and each `AppliedEffect`'s amount (both
+  recorded by Core as presentation data: no draws, no outcome change; a fingerprint test pins whole
+  battles against `main`) — as one line per event: turns, hits, heals, shields, statuses and stat
+  changes, damage over time, bond activations and reactions, passives, the Beastbinder's arts,
+  falls. A hit opens its **damage breakdown**: skill power, attack vs defence, the
+  power x A²/(A+D) base, element, crit (and its multiplier), the variance roll, the level gap,
+  execute, the final amount (and the shield's share); fed back to `DamageFormula.Compute` the
+  components give the amount exactly (tested across seeds). Filter chips: All, each of the team,
+  the Beastbinder, and one chip that steps through the enemies. In battle the log strip opens it
+  (the battle waits while it is open); after, the Results screen's *Battle log*.
+- **ATB display**: a thin gauge under every portrait of the turn-order bar
+  (`BattlePlayback.GaugeFraction`: the unit's gauge over the action threshold), beside the
+  predicted next actors (`TurnManager.PredictNextActors`).
 
 **Saves.** `GameSession` owns the loaded `PlayerSave` and writes it to one slot through
 `SaveStore` over an `ISaveStorage`: `FileSaveStorage` under `SaveLocations` in the game (the
@@ -155,8 +221,10 @@ them.
 ## Debugging
 
 - `--screen NAME` starts at a screen (`title`, `map`, `encounter`, `battle`, `results`, `roster`,
-  `grove`, `avatar`, `inventory`, `settings`; `demo` is the battle demo); with `--screenshot PATH`
-  it renders it and exits, on a throwaway in-memory save.
+  `grove`, `avatar`, `inventory`, `settings`; `demo` is the battle demo; the roster-visibility
+  screens `beast-detail`, `beast-derived`, `beast-skills`, `beast-gear`, `encounter-insight`,
+  `element-chart`, `glossary`, `battle-log`, `results-log`); with `--screenshot PATH` it renders
+  it and exits, on a throwaway in-memory save (`--starter-level 6` shows a level gap).
 - `--walkthrough DIR` captures a new player's first session (the starter pick, Hearthglen with its
   hints, the trials, the camp, the finale, the way on to Verdant Hollow) as numbered PNGs on a fresh
   save in a temporary folder; `--screen starter-pick` and `--screen hearthglen` start there, and the
@@ -191,6 +259,9 @@ notification is an opt-in Android hook.
   never recorded: on the next Continue the location is simply still there to fight. Nothing is
   duplicated. A refund would need a pending-battle marker in the save (a schema change), so it is
   left for a later PR.
-- Roster, Grove, Avatar and Inventory are placeholders; Trader locations are "coming soon" (Camp
-  locations open the minimal camp: train a beast, the idle chip).
+- Grove, Avatar and Inventory are placeholders; Trader locations are "coming soon" (Camp
+  locations open the minimal camp: train a beast, the idle chip). The roster's looks are shown,
+  not edited (the wardrobe is a later PR). Skill tomes are only sold by the trader (coming soon),
+  so a beast's kit beyond its default loadout stays locked for now; gear comes from drops and
+  first clears.
 - One save slot; no region list (the next region starts automatically after a boss).
