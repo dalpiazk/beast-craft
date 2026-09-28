@@ -28,7 +28,10 @@ namespace BeastCraft.Presentation.Screens
         Background,
 
         /// <summary>Idle rewards were claimed (on Continue, on resume, or from the map's idle chip).</summary>
-        IdleClaim
+        IdleClaim,
+
+        /// <summary>A beast's skills or gear were changed on its detail screen (a swap, an upgrade, gear on or off).</summary>
+        BeastEdit
     }
 
     /// <summary>

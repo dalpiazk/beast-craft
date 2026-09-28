@@ -288,6 +288,28 @@ namespace BeastCraft.Presentation.Playback
             get { return _run.Result; }
         }
 
+        /// <summary>The battle itself (its turns so far, for the battle log). Read only: never step it from here.</summary>
+        public BattleRun Battle
+        {
+            get { return _run.Battle; }
+        }
+
+        /// <summary>
+        /// How full <paramref name="unit"/>'s ATB gauge is now, 0-1 (<see cref="TurnManager.GetGauge"/>
+        /// over <see cref="TurnManager.ActionThreshold"/>): the turn-order bar's thin gauge. Read only.
+        /// </summary>
+        public float GaugeFraction(BattleUnit unit)
+        {
+            TurnManager turns = _run.Battle.TurnManager;
+            if (turns == null || unit == null || unit.IsDefeated)
+            {
+                return 0f;
+            }
+
+            double fraction = (double)turns.GetGauge(unit) / TurnManager.ActionThreshold;
+            return (float)(fraction < 0.0 ? 0.0 : fraction > 1.0 ? 1.0 : fraction);
+        }
+
         /// <summary>The next <paramref name="count"/> turns as they would fall now (living units only): the turn-order forecast.</summary>
         public List<BattleUnit> Forecast(int count)
         {

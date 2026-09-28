@@ -1,0 +1,81 @@
+boulder_slam: Targets the nearest enemy within 1 hex. | Taunt overrides the pick: while taunted, it must pick the taunter whenever the taunter is in range, and walks toward it when it is not.
+stone_challenge: Hits every enemy within 3 hexes of itself. | Taunt has no effect: it hits every enemy in its area and picks no one.
+granite_bulwark: Affects every ally, itself included, within 2 hexes of itself. | Taunt has no effect: it never aims at an enemy.
+tectonic_shove: Targets the nearest enemy within 1 hex. | Taunt overrides the pick: while taunted, it must pick the taunter whenever the taunter is in range, and walks toward it when it is not.
+quake: Hits every enemy within 2 hexes of itself. | Taunt has no effect: it hits every enemy in its area and picks no one.
+stoneskin: Affects only itself. | Taunt has no effect: it never aims at an enemy.
+serpent_bite: Targets the nearest enemy within 1 hex. | Taunt overrides the pick: while taunted, it must pick the taunter whenever the taunter is in range, and walks toward it when it is not.
+undertow: Hits every enemy within 3 hexes of itself. | Taunt has no effect: it hits every enemy in its area and picks no one.
+deep_shell: Affects only itself. | Taunt has no effect: it never aims at an enemy.
+tidal_wave: Picks the nearest enemy within 3 hexes, then strikes a straight line 3 hexes long toward it, hitting every enemy on the line. | Taunt overrides the pick: while taunted, it must pick the taunter whenever the taunter is in range, and walks toward it when it is not.
+maelstrom: Hits every enemy within 2 hexes of itself. | Taunt has no effect: it hits every enemy in its area and picks no one.
+tidal_renewal: Affects every ally, itself included, within 2 hexes of itself. | Taunt has no effect: it never aims at an enemy.
+thorn_lash: Targets the nearest enemy within 2 hexes. | Taunt overrides the pick: while taunted, it must pick the taunter whenever the taunter is in range, and walks toward it when it is not.
+verdant_mend: Targets the ally (itself included) with the lowest HP% within 3 hexes. | Taunt has no effect: it never aims at an enemy.
+bark_ward: Affects every ally, itself included, within 2 hexes of itself. | Taunt has no effect: it never aims at an enemy.
+entangling_roots: Targets the nearest enemy within 2 hexes. | Taunt overrides the pick: while taunted, it must pick the taunter whenever the taunter is in range, and walks toward it when it is not.
+spore_cloud: Hits every enemy within 2 hexes of itself. | Taunt has no effect: it hits every enemy in its area and picks no one.
+lifebloom: Affects every ally on the field, itself included, at any range. | Taunt has no effect: it never aims at an enemy.
+sunder: Targets the nearest enemy within 1 hex. | Taunt overrides the pick: while taunted, it must pick the taunter whenever the taunter is in range, and walks toward it when it is not.
+iron_crush: Targets the nearest enemy within 1 hex. | Taunt overrides the pick: while taunted, it must pick the taunter whenever the taunter is in range, and walks toward it when it is not.
+iron_fortress: Affects only itself. | Taunt has no effect: it never aims at an enemy.
+spiked_carapace: Affects only itself. | Taunt has no effect: it never aims at an enemy.
+shrapnel_burst: Hits every enemy within 1 hex of itself. | Taunt has no effect: it hits every enemy in its area and picks no one.
+juggernaut_charge: Picks the nearest enemy within 2 hexes, then strikes a straight line 2 hexes long toward it, hitting every enemy on the line. | Taunt overrides the pick: while taunted, it must pick the taunter whenever the taunter is in range, and walks toward it when it is not.
+rime_bolt: Targets the nearest enemy within 2 hexes. | Taunt overrides the pick: while taunted, it must pick the taunter whenever the taunter is in range, and walks toward it when it is not.
+deep_freeze: Targets the nearest enemy within 2 hexes. | Taunt overrides the pick: while taunted, it must pick the taunter whenever the taunter is in range, and walks toward it when it is not.
+frost_breath: Hits every enemy within 2 hexes of itself. | Taunt has no effect: it hits every enemy in its area and picks no one.
+blizzard: Hits every enemy on the six straight lines running 3 hexes out from itself. | Taunt has no effect: it hits every enemy in its area and picks no one.
+ice_armor: Affects only itself. | Taunt has no effect: it never aims at an enemy.
+absolute_zero: Hits every enemy on the field, at any range. | Taunt has no effect: it hits every enemy in its area and picks no one.
+thunder_talons: Targets the enemy with the least HP left within 2 hexes. | Taunt overrides the pick: while taunted, it must pick the taunter whenever the taunter is in range, and walks toward it when it is not.
+chain_lightning: Hits every enemy within 2 hexes of itself. | Taunt has no effect: it hits every enemy in its area and picks no one.
+static_charge: Affects only itself. | Taunt has no effect: it never aims at an enemy.
+storm_dive: Targets the nearest enemy within 3 hexes. | Taunt overrides the pick: while taunted, it must pick the taunter whenever the taunter is in range, and walks toward it when it is not.
+thunderclap: Hits every enemy within 1 hex of itself. | Taunt has no effect: it hits every enemy in its area and picks no one.
+plasma_barrage: Picks the nearest enemy within 4 hexes, then strikes a straight line 4 hexes long toward it, hitting every enemy on the line. | Taunt overrides the pick: while taunted, it must pick the taunter whenever the taunter is in range, and walks toward it when it is not.
+gale_talon: Targets the nearest enemy within 1 hex. | Taunt overrides the pick: while taunted, it must pick the taunter whenever the taunter is in range, and walks toward it when it is not.
+wind_lance: Picks the nearest enemy within 3 hexes, then strikes a straight line 3 hexes long toward it, hitting every enemy on the line. | Taunt overrides the pick: while taunted, it must pick the taunter whenever the taunter is in range, and walks toward it when it is not.
+gust: Hits every enemy within 1 hex of itself. | Taunt has no effect: it hits every enemy in its area and picks no one.
+tailwind: Affects only itself. | Taunt has no effect: it never aims at an enemy.
+updraft: Affects every ally on the field, itself included, at any range. | Taunt has no effect: it never aims at an enemy.
+sky_rend: Targets the nearest enemy within 1 hex. | Taunt overrides the pick: while taunted, it must pick the taunter whenever the taunter is in range, and walks toward it when it is not.
+ember_shot: Targets the nearest enemy within 3 hexes. | Taunt overrides the pick: while taunted, it must pick the taunter whenever the taunter is in range, and walks toward it when it is not.
+flame_wave: Picks the nearest enemy within 4 hexes, then strikes a straight line 4 hexes long toward it, hitting every enemy on the line. | Taunt overrides the pick: while taunted, it must pick the taunter whenever the taunter is in range, and walks toward it when it is not.
+rebirth_flame: Affects only itself. | Taunt has no effect: it never aims at an enemy.
+blaze_bolt: Targets the nearest enemy within 4 hexes. | Taunt overrides the pick: while taunted, it must pick the taunter whenever the taunter is in range, and walks toward it when it is not.
+firestorm: Hits every enemy on the field, at any range. | Taunt has no effect: it hits every enemy in its area and picks no one.
+sunfire_nova: Hits every enemy on the six straight lines running 3 hexes out from itself. | Taunt has no effect: it hits every enemy in its area and picks no one.
+sacred_spring: Affects every ally on the field, itself included, at any range. | Taunt has no effect: it never aims at an enemy.
+blessing: Affects every ally on the field, itself included, at any range. | Taunt has no effect: it never aims at an enemy.
+radiant_bolt: Targets the nearest enemy within 3 hexes. | Taunt overrides the pick: while taunted, it must pick the taunter whenever the taunter is in range, and walks toward it when it is not.
+judgment: Targets the nearest enemy within 4 hexes. | Taunt overrides the pick: while taunted, it must pick the taunter whenever the taunter is in range, and walks toward it when it is not.
+purifying_ward: Affects every ally on the field, itself included, at any range. | Taunt has no effect: it never aims at an enemy.
+halo: Affects every ally, itself included, within 2 hexes of itself. | Taunt has no effect: it never aims at an enemy.
+venom_spit: Targets the nearest enemy within 3 hexes. | Taunt overrides the pick: while taunted, it must pick the taunter whenever the taunter is in range, and walks toward it when it is not.
+coup_de_grace: Targets the enemy with the lowest HP% within 3 hexes. | Taunt overrides the pick: while taunted, it must pick the taunter whenever the taunter is in range, and walks toward it when it is not.
+petrifying_gaze: Targets the nearest enemy within 3 hexes. | Taunt overrides the pick: while taunted, it must pick the taunter whenever the taunter is in range, and walks toward it when it is not.
+eclipse_fang: Targets the nearest enemy within 3 hexes. | Taunt overrides the pick: while taunted, it must pick the taunter whenever the taunter is in range, and walks toward it when it is not.
+predator_focus: Affects only itself. | Taunt has no effect: it never aims at an enemy.
+miasma: Hits every enemy on the six straight lines running 3 hexes out from itself. | Taunt has no effect: it hits every enemy in its area and picks no one.
+rallying_cry: Affects every ally on the field, itself included, at any range. | Taunt has no effect: it never aims at an enemy.
+mending_light: Affects every ally on the field, itself included, at any range. | Taunt has no effect: it never aims at an enemy.
+aegis: Affects every ally on the field, itself included, at any range. | Taunt has no effect: it never aims at an enemy.
+hex_of_frailty: Hits every enemy on the field, at any range. | Taunt has no effect: it hits every enemy in its area and picks no one.
+battle_focus: Affects every ally on the field, itself included, at any range. | Taunt has no effect: it never aims at an enemy.
+slowing_field: Hits every enemy on the field, at any range. | Taunt has no effect: it hits every enemy in its area and picks no one.
+giant/crush: Targets the nearest enemy within 1 hex. | Taunt overrides the pick: while taunted, it must pick the taunter whenever the taunter is in range, and walks toward it when it is not.
+giant/gaze: Targets the nearest enemy within 2 hexes. | Taunt overrides the pick: while taunted, it must pick the taunter whenever the taunter is in range, and walks toward it when it is not.
+giant/quake: Hits every enemy within 1 hex of itself. | Taunt has no effect: it hits every enemy in its area and picks no one.
+giant/roar: Hits every enemy within 1 hex of itself. | Taunt has no effect: it hits every enemy in its area and picks no one.
+champion/cleave: Targets the nearest enemy within 1 hex. | Taunt overrides the pick: while taunted, it must pick the taunter whenever the taunter is in range, and walks toward it when it is not.
+champion/hex: Targets the enemy with the least HP left within 2 hexes. | Taunt overrides the pick: while taunted, it must pick the taunter whenever the taunter is in range, and walks toward it when it is not.
+champion/shockwave: Hits every enemy within 2 hexes of itself. | Taunt has no effect: it hits every enemy in its area and picks no one.
+brute/smash: Targets the nearest enemy within 1 hex. | Taunt overrides the pick: while taunted, it must pick the taunter whenever the taunter is in range, and walks toward it when it is not.
+stalker/shadow_claw: Targets the enemy with the least HP left within 1 hex. | Taunt overrides the pick: while taunted, it must pick the taunter whenever the taunter is in range, and walks toward it when it is not.
+archer/arrow: Targets the nearest enemy within 3 hexes. | Taunt overrides the pick: while taunted, it must pick the taunter whenever the taunter is in range, and walks toward it when it is not.
+caster/bolt: Targets the enemy with the least HP left within 3 hexes. | Taunt overrides the pick: while taunted, it must pick the taunter whenever the taunter is in range, and walks toward it when it is not.
+shaman/staff: Targets the nearest enemy within 1 hex. | Taunt overrides the pick: while taunted, it must pick the taunter whenever the taunter is in range, and walks toward it when it is not.
+shaman/storm: Hits every enemy within 2 hexes of itself. | Taunt has no effect: it hits every enemy in its area and picks no one.
+swarmling/bite: Targets the nearest enemy within 1 hex. | Taunt overrides the pick: while taunted, it must pick the taunter whenever the taunter is in range, and walks toward it when it is not.
+stingling/sting: Targets the nearest enemy within 1 hex. | Taunt overrides the pick: while taunted, it must pick the taunter whenever the taunter is in range, and walks toward it when it is not.

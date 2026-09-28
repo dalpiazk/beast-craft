@@ -53,6 +53,12 @@ namespace BeastCraft.Presentation.Cards
         /// <summary>The description as rich text.</summary>
         public IReadOnlyList<RichSpan> Description { get; private set; }
 
+        /// <summary>Who the skill picks, in plain words, from its data (<see cref="TargetingRuleText"/>).</summary>
+        public string TargetingRule { get; private set; }
+
+        /// <summary>How a taunt changes that pick (<see cref="TauntRuleText"/>).</summary>
+        public string TauntRule { get; private set; }
+
         /// <summary>The card for <paramref name="skill"/>, its text parsed with <paramref name="glossary"/> (null: plain text).</summary>
         public static SkillCard Of(SkillSO skill, Glossary glossary)
         {
@@ -87,8 +93,103 @@ namespace BeastCraft.Presentation.Cards
                 Uses = UsesText(skill.MaxUsesPerBattle, skill.InitialCooldown, skill.Cooldown),
                 Power = power,
                 Scaling = ScalingText(skill.Progression),
-                Description = glossary.Parse(skill.Description)
+                Description = glossary.Parse(skill.Description),
+                TargetingRule = TargetingRuleText(skill),
+                TauntRule = TauntRuleText(skill)
             };
+        }
+
+        /// <summary>
+        /// The skill's targeting rule in plain words, generated from its data the way
+        /// <see cref="SkillTargetResolver"/> reads it: the shape, the side, the pick rule
+        /// (<see cref="SkillSO.TargetingCriterion"/>, <see cref="SkillSO.TargetingOrder"/> and, for a
+        /// stat pick, <see cref="SkillSO.TargetingStat"/>) and the range, e.g. "Targets the enemy
+        /// with the lowest HP% within 3 hexes." Range is measured from the caster's nearest tile to
+        /// the target's; area and whole-field shapes hit everyone eligible and pick no one.
+        /// </summary>
+        public static string TargetingRuleText(SkillSO skill)
+        {
+            if (skill == null)
+            {
+                return string.Empty;
+            }
+
+            bool ally = skill.TargetSide == SkillTargetSide.Ally;
+            string side = ally ? "ally" : "enemy";
+            string sides = ally ? "allies" : "enemies";
+            switch (skill.TargetShape)
+            {
+                case SkillTargetShape.Self:
+                    return "Affects only itself.";
+                case SkillTargetShape.AllEnemies:
+                    return "Hits every enemy on the field, at any range.";
+                case SkillTargetShape.AllAllies:
+                    return "Affects every ally on the field, itself included, at any range.";
+                case SkillTargetShape.AreaBurst:
+                    return (ally ? "Affects" : "Hits") + " every " + side + (ally ? ", itself included," : string.Empty) + " within " + Hexes(skill.Range) + " of itself.";
+                case SkillTargetShape.Cross:
+                    return (ally ? "Affects" : "Hits") + " every " + side + " on the six straight lines running " + Hexes(skill.Range) + " out from itself.";
+                case SkillTargetShape.Line:
+                    return "Picks " + Pick(skill, side, sides) + " within " + Hexes(skill.Range) + ", then strikes a straight line " + Hexes(skill.Range) +
+                           " long toward it, hitting every " + side + " on the line.";
+                default:
+                    return "Targets " + Pick(skill, side, sides) + " within " + Hexes(skill.Range) + ".";
+            }
+        }
+
+        /// <summary>
+        /// How a taunt changes the skill's pick, from its data: an enemy-side picking skill
+        /// (single target or line) must pick the taunter while it is alive and within range (and the
+        /// caster walks toward it when it is not); area, whole-field, self and ally skills are not
+        /// redirected.
+        /// </summary>
+        public static string TauntRuleText(SkillSO skill)
+        {
+            if (skill == null)
+            {
+                return string.Empty;
+            }
+
+            bool picks = skill.TargetShape == SkillTargetShape.SingleTarget || skill.TargetShape == SkillTargetShape.Line;
+            if (picks && skill.TargetSide == SkillTargetSide.Enemy)
+            {
+                return "Taunt overrides the pick: while taunted, it must pick the taunter whenever the taunter is in range, and walks toward it when it is not.";
+            }
+
+            if (skill.TargetShape == SkillTargetShape.Self || skill.TargetSide == SkillTargetSide.Ally || skill.TargetShape == SkillTargetShape.AllAllies)
+            {
+                return "Taunt has no effect: it never aims at an enemy.";
+            }
+
+            return "Taunt has no effect: it hits every enemy in its area and picks no one.";
+        }
+
+        /// <summary>The pick among the candidates, e.g. "the enemy with the lowest HP%", "a random ally (itself included)".</summary>
+        private static string Pick(SkillSO skill, string side, string sides)
+        {
+            string who = skill.TargetSide == SkillTargetSide.Ally ? side + " (itself included)" : side;
+            bool lowest = skill.TargetingOrder == SkillTargetingOrder.Lowest;
+            switch (skill.TargetingCriterion)
+            {
+                case SkillTargetingCriterion.Random:
+                    return "a random " + who;
+                case SkillTargetingCriterion.Distance:
+                    return "the " + (lowest ? "nearest " : "farthest ") + who;
+                case SkillTargetingCriterion.CurrentHp:
+                    return "the " + who + " with the " + (lowest ? "least" : "most") + " HP left";
+                case SkillTargetingCriterion.HpFraction:
+                    return "the " + who + " with the " + (lowest ? "lowest" : "highest") + " HP%";
+                case SkillTargetingCriterion.Stat:
+                    string stat = skill.TargetingStat == StatType.HP ? "max HP" : StatName(skill.TargetingStat);
+                    return "the " + who + " with the " + (lowest ? "lowest " : "highest ") + stat;
+                default:
+                    return "one of the " + sides;
+            }
+        }
+
+        private static string Hexes(int range)
+        {
+            return range == 1 ? "1 hex" : Int(range) + " hexes";
         }
 
         /// <summary>
