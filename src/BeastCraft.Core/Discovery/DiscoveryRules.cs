@@ -29,6 +29,27 @@ namespace BeastCraft.Discovery
         public EncounterLibrary Encounters;
 
         public EnemyCatalog Enemies;
+
+        private readonly Dictionary<string, List<PointOfInterest>> _layouts = new Dictionary<string, List<PointOfInterest>>(StringComparer.Ordinal);
+
+        /// <summary>
+        /// <see cref="PoiLayout.ForRegion"/> of <see cref="Library"/> and <see cref="Regions"/>, memoized per
+        /// region and seed (a layout never changes for its inputs; callers must not change the points).
+        /// </summary>
+        public List<PointOfInterest> Layout(string regionId, int seed)
+        {
+            string key = (regionId ?? string.Empty) + "/" + seed.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            lock (_layouts)
+            {
+                if (!_layouts.TryGetValue(key, out List<PointOfInterest> points))
+                {
+                    points = PoiLayout.ForRegion(Library, Regions, regionId, seed);
+                    _layouts[key] = points;
+                }
+
+                return new List<PointOfInterest>(points);
+            }
+        }
     }
 
     /// <summary>How a point of interest shows on the map.</summary>
@@ -151,7 +172,7 @@ namespace BeastCraft.Discovery
                 return new List<PointOfInterest>();
             }
 
-            return PoiLayout.ForRegion(content.Library, content.Regions, regionId, progress.DiscoverySeed);
+            return content.Layout(regionId, progress.DiscoverySeed);
         }
 
         /// <summary>The points of interest on the map of the expedition in progress (none outside a discovery region).</summary>
@@ -357,7 +378,7 @@ namespace BeastCraft.Discovery
                 completion.LocationsExplored += cleared ? layers : Math.Min(layers, (fog == null ? -1 : fog.DeepestLayer) + 1);
             }
 
-            List<PointOfInterest> points = PoiLayout.ForRegion(content.Library, content.Regions, regionId, progress.DiscoverySeed);
+            List<PointOfInterest> points = content.Layout(regionId, progress.DiscoverySeed);
             completion.PoisTotal = points.Count;
             foreach (PointOfInterest point in points)
             {

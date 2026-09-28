@@ -46,6 +46,7 @@ dotnet run --project Tooling/BalanceSim -c Release -- [options]
 | `--team-size <n>` | `3` | Beasts per PvE team, 1-6. Every combination of the roster is fielded (C(10,3) = 120). The default is the game's party size (three beasts beside the Beastbinder, `TeamSuggester.DefaultTeamSize`; four, 210 teams, until "Team size 3" in the tuning log). |
 | `--map-seeds <n>` | `60` | `--mode newplayer`: the first-node section's map seeds, 1..n. |
 | `--difficulty <path>` | the game's | `--mode newplayer`: the difficulty table the new player fights (`encounter-difficulty.json` format). |
+| `--kinship-only` | off | `--mode newplayer`: only the Kinship sections (roster growth, the trials); with `--tune`, each trial's multiplier for its floor. For tuning; the committed report is the full run. |
 | `--target-clear <t>` | library | Clear rate the difficulty calibration aims for (the scouted pick's by default; see `--calibrate-on`). By default each shape's own `TargetClear` in `encounter-library.json` (the game's tiered targets: `squad` and `horde` 80, `elite` 60, `solo` 50; 50 for a fixed-set encounter). A single percentage (e.g. `50`) is the legacy uniform target for every shape (the balance guard is judged at `--target-clear 50`); `shape=pct` pairs (e.g. `squad=70,solo=45`) override single shapes. |
 | `--calibrate-on <t>` | `bonds` | Whose clear rate the PvE difficulty is calibrated to `--target-clear`. `bonds`: the team the bond-aware scouted picker (heuristic + bonds) fields against each composition, i.e. the player scouts and counter-picks; falls back to `heuristic` when bonds are not active (`--bonds off`, `--skill-kit standard`). `heuristic`: the plain element counter-pick. `mean`: the mean of every team (the unscouted player), the calibration before scouting; it reproduces the pre-scouting report byte for byte. See "Difficulty calibration". |
 | `--calibrate-samples <n>` | `16` | Scouted-pick calibration only: battles per composition the picked team fights at each search step (8 compositions x 16 = 128 battles per step, a binomial SE of about 4.4 points at 50%). Raise it if a cell's search is non-monotone. |
@@ -1100,3 +1101,12 @@ measures the curve and writes `docs/balance/new-player-report.md`:
   `--difficulty <path>` fights another table; `--start-level N` fields the trio and avatar never below
   level N (a player arriving from Hearthglen around level 3; the committed report is level 1). About 5
   minutes; deterministic like every other mode.
+- **Roster growth** (the Kinship flow): the same stages for the player who owns the trio plus the
+  Kinship recruits reached by then (each site's first offer: four beasts in r01, five in r02, six in
+  r03), fielding the scouted heuristic's three per composition, a lagging recruit weighed as the game's
+  suggester does (`TeamSuggester.LevelWeight`), the recruits `NewPlayerReport.RecruitLag` levels below
+  the trio (the campaign model's bench gap); "Caught up" is the same at equal level (an upper bound).
+- **Kinship trials**: each site's `kin_trial_*` template at its middle row's level plus its offset,
+  16 seeded copies, fought by every trio with the recruits of the sites before it, the weakest trio
+  targeted at `NewPlayerReport.TrialFloor` (50%); `--tune` bisects each template's multiplier for it.
+  The full run takes about 15 minutes.

@@ -10,8 +10,10 @@ namespace BeastCraft.Tests.EditMode
     /// <summary>
     /// The early-region easing (<see cref="RegionData.StageEasing"/> of <see cref="RegionLibraryData.EasingShapeScales"/>): the authored curve,
     /// the validator's rules, and that <see cref="CampaignRules.PlanFor(MapRun, MapNode, EncounterLibrary, EnemyCatalog, RegionLibrary)"/>
-    /// applies it to campaign battles in r01-r02 only. The curve itself is measured by the balance
-    /// simulator's <c>--mode newplayer</c> (docs/balance/tuning-log.md, "Early-region easing").
+    /// applies it to campaign battles in r01-r03 only. The curve itself is measured by the balance
+    /// simulator's <c>--mode newplayer</c> (docs/balance/tuning-log.md, "Early-region easing", and
+    /// "Kinship: roster growth and the r02 fall-off", which kept the full discount through r02 and moved
+    /// the fade into r03's first stages).
     /// </summary>
     public class EarlyRegionEasingTests
     {
@@ -31,7 +33,7 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
-        public void AuthoredCurve_EasesEachShapeInR01_AndFadesToNothingByTheEndOfR02()
+        public void AuthoredCurve_EasesEachShapeFullyThroughR02_AndFadesToNothingInR03()
         {
             foreach (string key in new[] { "squad", "horde", "solo", "elite", RegionLibraryData.EasingBossId })
             {
@@ -44,17 +46,22 @@ namespace BeastCraft.Tests.EditMode
 
             RegionData r01 = _regions.GetRegion("r01");
             RegionData r02 = _regions.GetRegion("r02");
+            RegionData r03 = _regions.GetRegion("r03");
             Assert.AreEqual(r01.Stages, r01.StageEasing.Length);
             Assert.AreEqual(r02.Stages, r02.StageEasing.Length);
+            Assert.AreEqual(r03.Stages, r03.StageEasing.Length);
             Assert.AreEqual(1.0, _regions.EasingWeight("r01", 0), "r01's first stage gets the full discount");
-            Assert.AreEqual(0.0, _regions.EasingWeight("r02", r02.Stages - 1), "the easing is gone by the end of r02");
-            Assert.AreEqual(1.0, _regions.DifficultyScaleFor("r02", r02.Stages - 1, "elite"));
+            Assert.AreEqual(1.0, _regions.EasingWeight("r02", r02.Stages - 1), "the full discount lasts through r02 (the roster-limited fall-off)");
+            Assert.AreEqual(0.0, _regions.EasingWeight("r03", r03.Stages - 1), "the easing is gone by the end of r03");
+            Assert.AreEqual(1.0, _regions.DifficultyScaleFor("r03", r03.Stages - 1, "elite"));
             Assert.AreEqual(_regions.FullEasingScale("elite"), _regions.DifficultyScaleFor("r01", 0, "elite"), 1e-12);
-            double half = _regions.EasingWeight("r02", 1);
-            Assert.AreEqual(1.0 - (half * (1.0 - _regions.FullEasingScale("horde"))), _regions.DifficultyScaleFor("r02", 1, "horde"), 1e-12, "a partial weight scales the discount");
+            double part = _regions.EasingWeight("r03", 0);
+            Assert.Less(part, 1.0);
+            Assert.Greater(part, 0.0);
+            Assert.AreEqual(1.0 - (part * (1.0 - _regions.FullEasingScale("horde"))), _regions.DifficultyScaleFor("r03", 0, "horde"), 1e-12, "a partial weight scales the discount");
 
             double previous = 1.0;
-            foreach (double weight in new List<double>(r01.StageEasing).Concat(r02.StageEasing))
+            foreach (double weight in new List<double>(r01.StageEasing).Concat(r02.StageEasing).Concat(r03.StageEasing))
             {
                 Assert.LessOrEqual(weight, previous, "the easing only fades out");
                 previous = weight;
@@ -62,9 +69,9 @@ namespace BeastCraft.Tests.EditMode
 
             foreach (RegionData region in _regions.Regions)
             {
-                if (region.RegionId != "r01" && region.RegionId != "r02")
+                if (region.RegionId != "r01" && region.RegionId != "r02" && region.RegionId != "r03")
                 {
-                    Assert.IsEmpty(region.StageEasing, region.RegionId + ": no easing after r02");
+                    Assert.IsEmpty(region.StageEasing, region.RegionId + ": no easing after r03");
                     for (int stage = 0; stage < region.Stages; stage++)
                     {
                         Assert.AreEqual(1.0, _regions.DifficultyScaleFor(region.RegionId, stage, "squad"), region.RegionId);
@@ -103,8 +110,8 @@ namespace BeastCraft.Tests.EditMode
             Assert.That(errors, Has.Some.Contains("Post-game region 'r11': StageEasing must be empty"));
 
             RegionLibraryData unfinished = CampaignMapTests.LoadRegions();
-            unfinished.Regions[1].StageEasing = new[] { 1.0, 0.5, 0.25, 0.25 };
-            Assert.That(RegionLibraryValidator.Validate(unfinished), Has.Some.Contains("Region 'r03': no StageEasing after an easing that ended at 0.25"));
+            unfinished.Regions[2].StageEasing = new[] { 1.0, 0.5, 0.25, 0.25 };
+            Assert.That(RegionLibraryValidator.Validate(unfinished), Has.Some.Contains("Region 'r04': no StageEasing after an easing that ended at 0.25"));
         }
 
         [Test]

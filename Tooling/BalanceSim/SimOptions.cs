@@ -615,6 +615,12 @@ namespace BeastCraft.Tooling.BalanceSim
         /// </summary>
         public int NewPlayerStartLevel;
 
+        /// <summary>
+        /// <c>--kinship-only</c>: newplayer: only the Kinship sections (roster growth and the trials),
+        /// for tuning; the committed report is the full run.
+        /// </summary>
+        public bool NewPlayerKinshipOnly;
+
         /// <summary><c>--map-seeds</c>: newplayer: the first-node section's map seeds, 1..n.</summary>
         public int NewPlayerMapSeeds = NewPlayerReport.DefaultMapSeeds;
 
@@ -804,6 +810,7 @@ namespace BeastCraft.Tooling.BalanceSim
             "                             the picks have reached there (docs/balance/hearthglen-report.md).\n" +
             "  --tune                     hearthglen: also search each fight's DifficultyOverride for its target.\n" +
             "  --start-level <n>          newplayer: the trio and avatar never fight below level n (a player arriving from Hearthglen).\n" +
+            "  --kinship-only             newplayer: only the Kinship sections (roster growth, trials); with --tune, each trial's multiplier for its target.\n" +
             "  --difficulty <path>        newplayer: the difficulty table fought at (default: the game's encounter-difficulty.json).\n" +
             "  --battles <n>              pacing: battles per campaign (default 500).\n" +
             "  --runs <n>                 pacing / campaign: campaigns per base seed (default 1000; --seeds pools every seed's).\n" +
@@ -963,6 +970,9 @@ namespace BeastCraft.Tooling.BalanceSim
                         break;
                     case "--tune":
                         options.HearthglenTune = true;
+                        break;
+                    case "--kinship-only":
+                        options.NewPlayerKinshipOnly = true;
                         break;
                     case "--start-level":
                         if (!TryNextInt(args, ref i, arg, 1, out options.NewPlayerStartLevel, out error))

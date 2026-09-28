@@ -27,8 +27,6 @@ namespace BeastCraft.Discovery
 
         public const int MaxTextLength = 280;
 
-        public static readonly string[] BondKinds = { "stance", "element", "no_knockout" };
-
         public static List<string> Validate(DiscoveryLibraryData data, RegionLibraryData regions, EncounterLibraryData encounters, ICollection<string> speciesIds,
                                             ICollection<string> materialIds, CosmeticLibraryData cosmetics)
         {

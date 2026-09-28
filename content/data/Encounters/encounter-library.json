@@ -253,7 +253,7 @@
       "ShapeId": "elite",
       "Arena": "Medium",
       "Groups": [ { "EnemyId": "champion", "Count": 1, "Elements": [ "Nature" ] }, { "EnemyId": "brute", "Count": 1, "Elements": [ ] }, { "EnemyId": "stalker", "Count": 1, "Elements": [ ] } ],
-      "DifficultyOverride": 0.7,
+      "DifficultyOverride": 0.851,
       "Draft": true
     },
     {
@@ -263,7 +263,7 @@
       "ShapeId": "elite",
       "Arena": "Medium",
       "Groups": [ { "EnemyId": "champion", "Count": 1, "Elements": [ "Fire" ] }, { "EnemyId": "archer", "Count": 1, "Elements": [ ] }, { "EnemyId": "caster", "Count": 1, "Elements": [ ] } ],
-      "DifficultyOverride": 0.7,
+      "DifficultyOverride": 0.867,
       "Draft": true
     },
     {
@@ -273,7 +273,7 @@
       "ShapeId": "elite",
       "Arena": "Medium",
       "Groups": [ { "EnemyId": "champion", "Count": 1, "Elements": [ "Water" ] }, { "EnemyId": "shaman", "Count": 1, "Elements": [ ] }, { "EnemyId": "brute", "Count": 1, "Elements": [ ] } ],
-      "DifficultyOverride": 0.7,
+      "DifficultyOverride": 0.927,
       "Draft": true
     },
     {
@@ -283,7 +283,7 @@
       "ShapeId": "elite",
       "Arena": "Medium",
       "Groups": [ { "EnemyId": "champion", "Count": 1, "Elements": [ "Air" ] }, { "EnemyId": "stalker", "Count": 2, "Elements": [ ] } ],
-      "DifficultyOverride": 0.7,
+      "DifficultyOverride": 0.933,
       "Draft": true
     },
     {
@@ -293,7 +293,7 @@
       "ShapeId": "elite",
       "Arena": "Medium",
       "Groups": [ { "EnemyId": "champion", "Count": 1, "Elements": [ "Metal" ] }, { "EnemyId": "brute", "Count": 1, "Elements": [ ] }, { "EnemyId": "archer", "Count": 1, "Elements": [ ] } ],
-      "DifficultyOverride": 0.7,
+      "DifficultyOverride": 0.791,
       "Draft": true
     },
     {
@@ -303,7 +303,7 @@
       "ShapeId": "elite",
       "Arena": "Medium",
       "Groups": [ { "EnemyId": "champion", "Count": 1, "Elements": [ "Ice" ] }, { "EnemyId": "caster", "Count": 1, "Elements": [ ] }, { "EnemyId": "stalker", "Count": 1, "Elements": [ ] } ],
-      "DifficultyOverride": 0.7,
+      "DifficultyOverride": 0.895,
       "Draft": true
     },
     {
@@ -313,7 +313,7 @@
       "ShapeId": "elite",
       "Arena": "Medium",
       "Groups": [ { "EnemyId": "champion", "Count": 1, "Elements": [ "Dark" ] }, { "EnemyId": "shaman", "Count": 1, "Elements": [ ] }, { "EnemyId": "archer", "Count": 1, "Elements": [ ] } ],
-      "DifficultyOverride": 0.7,
+      "DifficultyOverride": 0.878,
       "Draft": true
     },
     {

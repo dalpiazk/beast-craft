@@ -57,7 +57,7 @@
       "GateTemplateIds": [ ],
       "BossTemplateId": "boss_r02_ember_twins",
       "BossRewardSealId": "seal_r02",
-      "StageEasing": [ 1, 0.67, 0.33, 0 ]
+      "StageEasing": [ 1, 1, 1, 1 ]
     },
     {
       "RegionId": "r03",
@@ -70,7 +70,8 @@
       "ShapeWeights": [ { "ShapeId": "squad", "Weight": 45 }, { "ShapeId": "horde", "Weight": 40 }, { "ShapeId": "solo", "Weight": 15 } ],
       "GateTemplateIds": [ ],
       "BossTemplateId": "boss_r03_tide_colossus",
-      "BossRewardSealId": "seal_r03"
+      "BossRewardSealId": "seal_r03",
+      "StageEasing": [ 0.67, 0.33, 0, 0 ]
     },
     {
       "RegionId": "r04",
