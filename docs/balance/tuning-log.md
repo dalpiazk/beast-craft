@@ -4072,3 +4072,51 @@ easing lasts longer.
 
 Reproduce: `-- --mode newplayer --compositions 16 --samples 2 --map-seeds 60 --out
 docs/balance/new-player-report.md`; the "Required" column is each shape's need.
+
+## Hearthglen (r00): fixed fights, camp catch-up, adaptive finale
+
+The onboarding region's nine fixed templates (`hg_*`), tuned with the new `--mode hearthglen`
+(`docs/balance/hearthglen-report.md`): every fight against every legal pick combination in pick order
+(10 solo picks, 31 (1st, 2nd) pairs, 90 ordered trios), at the level profile a player who wins every
+fight reaches (normal XP; the camp trains the newest pick, then catches everyone up to the leader),
+beside the library avatar, no gear, the first two fights on the open board and the rest on r01's
+battlefields, 16 seeded copies x 2 samples per combination.
+
+**Round 1 (no catch-up, finale target ~70% for every trio): not reachable.** At a mean of 70% the
+weakest trio sat at 6-35% in every fight tried (seven finale compositions: champion + 2 stinglings,
+2 brutes + archer + caster, 4 swarmlings + 2 stinglings, shaman + stalker + archer, brute + 2 archers,
+champion alone, 3 brutes); with every beast forced level the weakest was still 28-37%: the spread is
+the species', not only the pick order's (up to 56 points for one trio across its three orders).
+Stopped and reported.
+
+**Round 2 (producer):** the camp catch-up, a floor target (the finale's weakest trio about 60% or
+more; a high mean is fine; regular fights 90%+ for every combination), and the finale's enemies
+taking the element neutral against the player's beasts (`ElementAdaptation`):
+
+| Fight | Lv | Party | Multiplier | Min / mean / max | Edge (weakest at target) |
+| --- | ---: | --- | ---: | --- | ---: |
+| `hg_meadow_scamps` (open board) | 1 | 1st | x1.73 | 100 / 100 / 100% | x2.17 |
+| `hg_hedgerow_pests` (open board) | 1 | 1st | x1.29 | 100 / 100 / 100% | x1.49 |
+| `hg_tumbledown_wall` | 2 | 1st | x0.73 | 100 / 100 / 100% | x0.91 |
+| `hg_trial_bramble` | 2 | 1st | x0.83 | 100 / 100 / 100% | x1.04 |
+| `hg_brookside_rabble` | 2 | pair | x1.03 | 100 / 100 / 100% | x1.28 |
+| `hg_orchard_raiders` | 2 | pair | x0.83 | 100 / 100 / 100% | x1.04 |
+| `hg_trial_grove` | 3 | pair | x1.12 | 100 / 100 / 100% | x1.40 |
+| `hg_ridge_prowlers` | 3 | trio | x0.95 | 100 / 100 / 100% | x1.33 |
+| `hg_gloam_at_the_hedge` (finale) | 3 | trio | x0.93 | **65.6 / 97.9 / 100%** | x0.94 (weakest 60%) |
+
+Regular fights sit at about 0.8x their edge (the multiplier whose weakest combination still clears
+90%), so every combination clears them. The finale's curve is a cliff at level 3 (x0.92: weakest
+93.8%; x0.93: 65.6%; x0.938: 53.1%); x0.93 holds across seeds (weakest 65.6 / 84.4 / 68.8% at seeds
+12345 / 777 / 2026). **Element adaptation**, with vs without (the template's authored, element-less
+lineup) at the same multiplier: at the untuned x1.02 the weakest trio rose from 31.3% to 53.1% (mean
+89.0 to 91.1%); at the tuned x0.93, 65.6 / 97.9% with it and 65.6 / 98.2% without — the weakest trios
+there are weak for reasons other than the chart.
+
+**Arriving in Verdant Hollow around level 3** (`--mode newplayer --start-level 3`: the trio and avatar
+never below level 3, the enemies at the node's level): r01 stage 1 `squad` 86.8% (68.8-100; at level 1
+78.6%), `horde` 91.0%, `solo` 68.1%, `elite` 59.0% (level 3 already); first node `squad` 96.8%,
+`horde` 97.8%, `solo` 90.2%. Stages 2-4 are unchanged (their nodes are level 4 and up). No easing
+changed: `squad` stays under the 97% line the producer set (the first-node `horde` at 97.8% is
+reported, not acted on). Skipping Hearthglen arrives at level 1: exactly the committed new-player
+report, which regenerates byte-identical.

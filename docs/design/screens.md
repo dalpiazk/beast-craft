@@ -17,8 +17,14 @@ Title ──Continue / New Game──▶ Home (Map tab) ──tap a location / N
                                 └─────────────────────── Continue (or auto-advance) ────────────────┘
 ```
 
+- **Starter pick** (`StarterPickScreen`, `StarterPickViewModel`): New Game's first beast, any of the
+  ten (illustrated portraits, stance and element, a personality blurb, the stance explainer), then
+  Hearthglen; or "Skip the tutorial": the same picker three times, one stance at a time, then Verdant
+  Hollow. Hearthglen's own screens — the trial pick (`TrialPickModal`), the Keeper's dialogue box
+  (`StoryModal`), the camp (`CampModal`, every region), the tutorial hints (`HintModal`, anchored to a
+  widget, pausing a battle) and the way on (`RegionCardModal`) — are in [area-zero.md](area-zero.md).
 - **Title** (`TitleScreen`, `TitleViewModel`): Continue (primary when a save exists; it claims the
-  idle rewards and toasts them), New Game (asks before replacing a save), Settings. A save that
+  idle rewards and toasts them), New Game (asks before replacing a save; then the starter pick), Settings. A save that
   could only be restored from its `.bak` says so; one that cannot be loaded says why. Back asks
   before quitting.
 - **Home** (`HomeScreen`, `HomeViewModel`, `MapViewModel`): the bottom nav — **Map, Roster, Grove,
@@ -151,7 +157,10 @@ them.
 - `--screen NAME` starts at a screen (`title`, `map`, `encounter`, `battle`, `results`, `roster`,
   `grove`, `avatar`, `inventory`, `settings`; `demo` is the battle demo); with `--screenshot PATH`
   it renders it and exits, on a throwaway in-memory save.
-- `--walkthrough DIR` captures the loop as numbered PNGs on a fresh save in a temporary folder.
+- `--walkthrough DIR` captures a new player's first session (the starter pick, Hearthglen with its
+  hints, the trials, the camp, the finale, the way on to Verdant Hollow) as numbered PNGs on a fresh
+  save in a temporary folder; `--screen starter-pick` and `--screen hearthglen` start there, and the
+  other scripted screens start past Hearthglen (the skip: Golem, Phoenix, Griffin).
 - `--map-seed N` fixes new expedition maps; `--starter-level L` starts a new game's beasts at level
   L; `--save-dir DIR` keeps the save elsewhere.
 - Any battle-demo flag (`--turns`, `--skill`, `--team`, `--encounter`, …) runs the old battle
@@ -182,5 +191,6 @@ notification is an opt-in Android hook.
   never recorded: on the next Continue the location is simply still there to fight. Nothing is
   duplicated. A refund would need a pending-battle marker in the save (a schema change), so it is
   left for a later PR.
-- Roster, Grove, Avatar and Inventory are placeholders; Trader and Camp locations are "coming soon".
+- Roster, Grove, Avatar and Inventory are placeholders; Trader locations are "coming soon" (Camp
+  locations open the minimal camp: train a beast, the idle chip).
 - One save slot; no region list (the next region starts automatically after a boss).

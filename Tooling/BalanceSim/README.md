@@ -1057,6 +1057,23 @@ on the seed stream `0x504F5354` (so the mainline campaigns never move), at gap 0
 targets and the boss at 35% (Normal) / 20% (Hard), reporting clear rates by tier and battles and boss
 attempts to clear.
 
+## Hearthglen (`--mode hearthglen`)
+
+Hearthglen (r00, the tutorial region; `docs/design/area-zero.md`) fight by fight
+(`HearthglenReport.cs`, writing `docs/balance/hearthglen-report.md`): every fixed fight — its
+template at its node's level and its own `DifficultyOverride` — against every legal pick combination
+in pick order (`StarterPicks`): the 10 solo picks before the first trial, the 31 (1st, 2nd) pairs
+before the second, the 90 ordered trios after (each one-per-stance trio from each stance it can
+start from). Every owned beast is fielded, at the level profile a player who wins every fight once
+reaches (`BeastProgression` / `AvatarProgression`; the camp trains the newest pick, then catches every
+pick up to the leader), beside the library avatar, no gear; `OpenBoard` fights on the open board, the
+rest on the region's `BattlefieldRegionId` layouts; an `AdaptiveElements` fight's enemies take the
+element neutral against the combination (and the report adds the same fight with the authored
+elements, for comparison). `--compositions` sets the seeded copies of each lineup (the committed
+report: 16) and `--samples` the battles per copy (2). Targets: at least 90% for every combination in
+every regular fight; the finale's weakest trio at 60% or more. `--tune` also bisects each fight's
+multiplier to the edge where its weakest combination meets its target. About 30 seconds.
+
 ## New-player easing (`--mode newplayer`)
 
 The shipping table assumes typical gear and a scouted pick of three from the whole roster. A new
@@ -1080,4 +1097,6 @@ measures the curve and writes `docs/balance/new-player-report.md`:
   Next battle node (`MapViewModel.Recommended`'s rule), planned by `CampaignRules.PlanFor` with the
   run, fought by every trio with and without the easing.
 - `--compositions` and `--samples` set the battles (the committed report: 16 x 2 per trio and cell);
-  `--difficulty <path>` fights another table. About 5 minutes; deterministic like every other mode.
+  `--difficulty <path>` fights another table; `--start-level N` fields the trio and avatar never below
+  level N (a player arriving from Hearthglen around level 3; the committed report is level 1). About 5
+  minutes; deterministic like every other mode.

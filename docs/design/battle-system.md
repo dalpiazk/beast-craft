@@ -259,6 +259,30 @@ squad / horde ~80, elite ~60).
 Full rules, save shape and pacing: `docs/design/progression-and-saves.md`, "Region campaign" and
 "Beast and avatar level"; numbers: `docs/balance/campaign-pacing-report.md` (`--mode campaign`).
 
+### Hearthglen's fights — BUILT; DRAFT content (see [area-zero.md](area-zero.md))
+
+Before Verdant Hollow, a new player plays **Hearthglen** (r00), the onboarding region: nine fixed
+fights at levels 1-3 on a fixed map, each an authored template (`hg_*`) at its **own
+`DifficultyOverride`** — never the calibrated table and never the early-region easing (the region
+validator requires the override and forbids easing on a tutorial region). The party grows through
+the region: the 1st pick fights alone (beside the Beastbinder) until the first kinship trial, the
+(1st, 2nd) pair until the second, then the trio; every owned beast is fielded. Three rules exist for
+these fights only:
+
+- **Open boards.** The fights before the obstacle beat stand on the open board
+  (`FixedNodeData.OpenBoard`); the rest on Verdant Hollow's painted battlefields and obstacle
+  layouts (`BattlefieldRegionId`), drawn with the Hollow's enemy art either way.
+- **Adaptive elements.** The finale's enemies (`AdaptiveElements`) all take one element that is
+  neutral (1x both ways) against every owned beast's elements — the first such element in `Element`
+  order, `None` if there were none (`ElementAdaptation`) — so the chart neither punishes nor favours
+  any pick combination. Deterministic, independent of pick order.
+- **Camp catch-up.** Hearthglen's camp trains a beast and then raises every beast to the leader's
+  level, so the stance order a player picked in does not decide the finale.
+
+Targets (producer): at least 90% for every legal combination in every regular fight; the finale's
+weakest trio about 60% or more (measured: every regular fight 100%, the finale 65.6% weakest,
+97.9% mean; `docs/balance/hearthglen-report.md`, `--mode hearthglen`).
+
 ### Early-region easing — DECIDED (producer); curve measured, TUNABLE
 
 The calibrated table assumes a player who scouts and picks three beasts from the whole roster in
