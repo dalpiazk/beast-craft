@@ -3996,3 +3996,29 @@ recruit PR should decide either that or a longer easing. Not tuned here.
 Reproduce: `dotnet run --project Tooling/BalanceSim -c Release -- --mode newplayer --compositions 16
 --samples 2 --map-seeds 60 --out docs/balance/new-player-report.md` (about 5 minutes; the "Required"
 column is the bisection; `--difficulty <path>` fights another table).
+
+## First-node experience (three beasts, early-region easing)
+
+The screens PR's check (the first reachable node of a new game across map seeds; it found 1 win in
+39 at level 1 before the Beastbinder was fielded) re-run with the new-player profile: map seeds 1-60,
+each fresh save's first r01 expedition and its **Next battle** node (the lowest-level reachable
+battle, a plain battle before a den, then furthest left: `MapViewModel.Recommended`; always a row-0
+battle at level 1), planned by `CampaignRules.PlanFor` with the run (x0.77), fought by every
+one-per-stance trio at level 1, no gear, beside the Beastbinder. Two measurements that agree:
+
+- `--mode newplayer`'s "First node" section (the simulator's battles, 2 per trio and seed);
+- the game's own path, as the screens PR measured it: `GameSession.NewGame` with the map seed,
+  `MapViewModel.Recommended`, and `BattleSession.Run` with `NodeBattle`'s setup (the campaign avatar
+  profile, the region's obstacles, `CampaignRules.BattleSeed` of attempts 0-3), each trio's three
+  beasts at level 1 in their default loadouts (a throwaway harness, not committed).
+
+| Shape (seeds of 60) | Target | Win, eased (sim) | Win, eased (game path) | Win, no easing (game path) | Starter trio (griffin/phoenix/golem), eased / not (game path) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `squad` (28) | 80% | 94.6% (82-100) | 92.2% (83-99) | 35.5% (18-71) | 90.2% / 33.9% |
+| `horde` (25) | 80% | 87.1% (74-96) | 87.5% (78-99) | 23.9% (11-38) | 88.0% / 32.0% |
+| `solo` (7) | 50% | 36.0% (7-79) | 37.3% (14-79) | 6.0% (0-14) | 42.9% / 0.0% |
+
+(trio mean, lowest-highest trio). The ordinary first fights (53 of 60 seeds) now clear at 87-95%
+against their 80%; unscaled a new player would win about a third of them. A level-1 `solo` start (7
+seeds) stays under its 50% at 36-37% (the per-stage table's r01 stage 1 `solo`, at level 2, is 49%):
+flagged, a map-generation or first-node rule (no `solo` on row 0) rather than a bigger discount.
