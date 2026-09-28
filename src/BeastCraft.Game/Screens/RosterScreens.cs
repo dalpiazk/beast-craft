@@ -340,8 +340,7 @@ namespace BeastCraft.Game.Screens
             y = Card(y, 150f + _model.Stats.Count * 56f + Math.Max(1, _model.GearContributions.Count) * 44f + 30f, "panel", DrawStatTable);
             float turnsTop = y;
             y = Card(y, 230f + _model.TurnRates.Count * 56f, "panel", DrawTurnRates);
-            AddButton(_scroll, "glossary-atb", new Rect(PortraitLayout.CanvasWidth - Pad - 150f, turnsTop + 22f, 120f, 70f), "ATB?", "chip",
-                      () => Ctx.Stack.Push(new GlossaryScreen(Ctx, "atb")));
+            AddButton(_scroll, "glossary-atb", new Rect(PortraitLayout.CanvasWidth - Pad - 150f, turnsTop + 22f, 120f, 70f), "ATB?", "chip", OpenTurnsHelp);
             y = Card(y, 330f, "panel", DrawElements);
             AddButton(_scroll, "element-chart-2", new Rect(PortraitLayout.CanvasWidth - Pad - 250f, y - 26f - 330f + 22f, 220f, 70f), "Full chart", "chip", OpenChart);
             y = Card(y, 190f, "panel", DrawCrits);
@@ -349,6 +348,15 @@ namespace BeastCraft.Game.Screens
             AddButton(_scroll, "glossary-gap", new Rect(PortraitLayout.CanvasWidth - Pad - 150f, y - 26f - 290f + 22f, 120f, 70f), "Gap?", "chip",
                       () => Ctx.Stack.Push(new GlossaryScreen(Ctx, "level_gap")));
             return y;
+        }
+
+        /// <summary>The Turns panel's "?": what its columns mean, how the average enemy is taken, and the way to the glossary.</summary>
+        public void OpenTurnsHelp()
+        {
+            string text = "Speed: the stat. Fill: gauge points a tick (100 x the square root of Speed). Turns: turns per 100 ticks (a turn costs 100,000). " +
+                          "vs: turns relative to this beast. The average enemy is the plain, unweighted mean over every enemy type at this beast's level " +
+                          "(difficulty never scales Speed).";
+            Ctx.Stack.PushModal(new ConfirmModal(Ctx, "Turns (ATB)", text, "Close", "Glossary", () => Ctx.Stack.Push(new GlossaryScreen(Ctx, "atb")), "secondary"));
         }
 
         private void DrawIdentity(Rect box)

@@ -180,6 +180,39 @@ namespace BeastCraft.Battle
         }
 
         /// <summary>
+        /// <see cref="PredictNextActors"/> with when each predicted turn falls: the gauge ticks from
+        /// now (<see cref="ElapsedTicks"/>) until it, 0 for <see cref="CurrentUnit"/> and for any
+        /// unit already queued at the same instant. The same pure projection (the manager's state
+        /// is untouched; presentation only, read by the turn-order bar).
+        /// </summary>
+        public IReadOnlyList<KeyValuePair<BattleUnit, long>> PredictNextTurns(int count)
+        {
+            List<KeyValuePair<BattleUnit, long>> forecast = new List<KeyValuePair<BattleUnit, long>>();
+            if (_current == null || count <= 0)
+            {
+                return forecast;
+            }
+
+            Dictionary<BattleUnit, long> gauges = new Dictionary<BattleUnit, long>(_gauges);
+            BattleUnit actor = _current;
+            long ticks = 0;
+
+            while (actor != null)
+            {
+                forecast.Add(new KeyValuePair<BattleUnit, long>(actor, ticks));
+                if (forecast.Count >= count)
+                {
+                    break;
+                }
+
+                gauges[actor] -= ActionThreshold;
+                actor = Step(gauges, ref ticks);
+            }
+
+            return forecast;
+        }
+
+        /// <summary>
         /// The next <paramref name="count"/> turns, starting with <see cref="CurrentUnit"/>, as they
         /// would fall if nobody's Speed changed and nobody fell — the forecast a turn-order UI
         /// shows. A pure projection: the manager's own state is untouched, and the real order can

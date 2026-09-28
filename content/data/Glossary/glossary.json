@@ -112,7 +112,7 @@
       "Term": "Gauge",
       "Category": "Combat",
       "Forms": [ "gauge", "gauges" ],
-      "Definition": "The turn meter behind the ATB order. It fills by 100 x the square root of Speed each tick, and a turn costs 100,000 points: a Speed 100 unit acts once every 100 ticks. The turn-order bar shows each unit's fill."
+      "Definition": "The turn meter behind the ATB order. It fills by 100 x the square root of Speed each tick, and a turn costs 100,000 points: a Speed 100 unit acts once every 100 ticks. The turn-order bar shows the predicted order and, under each portrait, the ticks until that turn (+0: acting now, or queued at the same instant)."
     },
     {
       "TermId": "level_gap",

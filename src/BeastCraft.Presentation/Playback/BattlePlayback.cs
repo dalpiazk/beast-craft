@@ -295,19 +295,31 @@ namespace BeastCraft.Presentation.Playback
         }
 
         /// <summary>
-        /// How full <paramref name="unit"/>'s ATB gauge is now, 0-1 (<see cref="TurnManager.GetGauge"/>
-        /// over <see cref="TurnManager.ActionThreshold"/>): the turn-order bar's thin gauge. Read only.
+        /// The turn-order forecast with timing: the next <paramref name="count"/> turns (living units
+        /// only) and the gauge ticks from now until each (<see cref="TurnManager.PredictNextTurns"/>;
+        /// 0 = acting now, or queued at this same instant). Read only.
         /// </summary>
-        public float GaugeFraction(BattleUnit unit)
+        public List<KeyValuePair<BattleUnit, long>> ForecastTimed(int count)
         {
-            TurnManager turns = _run.Battle.TurnManager;
-            if (turns == null || unit == null || unit.IsDefeated)
+            List<KeyValuePair<BattleUnit, long>> forecast = new List<KeyValuePair<BattleUnit, long>>();
+            if (IsOver || _run.Battle.TurnManager == null)
             {
-                return 0f;
+                return forecast;
             }
 
-            double fraction = (double)turns.GetGauge(unit) / TurnManager.ActionThreshold;
-            return (float)(fraction < 0.0 ? 0.0 : fraction > 1.0 ? 1.0 : fraction);
+            foreach (KeyValuePair<BattleUnit, long> turn in _run.Battle.TurnManager.PredictNextTurns(count * 3))
+            {
+                if (turn.Key != null && !turn.Key.IsDefeated)
+                {
+                    forecast.Add(turn);
+                    if (forecast.Count == count)
+                    {
+                        break;
+                    }
+                }
+            }
+
+            return forecast;
         }
 
         /// <summary>The next <paramref name="count"/> turns as they would fall now (living units only): the turn-order forecast.</summary>

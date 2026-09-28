@@ -114,6 +114,40 @@ namespace BeastCraft.Presentation.Screens
             return multiplier > 1f ? (multiplier >= ElementChart.Strong ? MatchupKind.Strong : MatchupKind.Mild) : MatchupKind.Weak;
         }
 
+        /// <summary>
+        /// An element's two-letter badge code, distinct for all ten (Light "Li", Lightning "Lt");
+        /// "-" for none. Every element badge (the chart, the detail screen, the encounter, the
+        /// roster) shows it.
+        /// </summary>
+        public static string Code(Element element)
+        {
+            switch (element)
+            {
+                case Element.Fire:
+                    return "Fi";
+                case Element.Water:
+                    return "Wa";
+                case Element.Earth:
+                    return "Ea";
+                case Element.Air:
+                    return "Ai";
+                case Element.Lightning:
+                    return "Lt";
+                case Element.Ice:
+                    return "Ic";
+                case Element.Nature:
+                    return "Na";
+                case Element.Metal:
+                    return "Me";
+                case Element.Light:
+                    return "Li";
+                case Element.Dark:
+                    return "Da";
+                default:
+                    return "-";
+            }
+        }
+
         /// <summary>The legend: each kind's label and multiplier.</summary>
         public static string Label(MatchupKind kind)
         {

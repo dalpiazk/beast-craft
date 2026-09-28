@@ -117,9 +117,15 @@ report and the difficulty table regenerate byte-identical).
   components give the amount exactly (tested across seeds). Filter chips: All, each of the team,
   the Beastbinder, and one chip that steps through the enemies. In battle the log strip opens it
   (the battle waits while it is open); after, the Results screen's *Battle log*.
-- **ATB display**: a thin gauge under every portrait of the turn-order bar
-  (`BattlePlayback.GaugeFraction`: the unit's gauge over the action threshold), beside the
-  predicted next actors (`TurnManager.PredictNextActors`).
+- **ATB display**: under every portrait of the turn-order bar (the predicted next actors), the
+  gauge ticks until that turn ("+0": now, or queued at the same instant) and a thin bar of it
+  relative to the farthest turn shown (`BattlePlayback.ForecastTimed` over
+  `TurnManager.PredictNextTurns`, a read-only projection of `PredictNextActors` with timing).
+- **Element badges**: every element badge shows a distinct two-letter code
+  (`ElementChartViewModel.Code`: Fi, Wa, Ea, Ai, Lt, Ic, Na, Me, Li, Da), so Light and Lightning
+  never read alike.
+- **Help**: the Turns panel's "?" explains its columns and that the average enemy is the plain,
+  unweighted mean over every enemy type at the beast's level.
 
 **Saves.** `GameSession` owns the loaded `PlayerSave` and writes it to one slot through
 `SaveStore` over an `ISaveStorage`: `FileSaveStorage` under `SaveLocations` in the game (the

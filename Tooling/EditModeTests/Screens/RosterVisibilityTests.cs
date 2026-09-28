@@ -178,6 +178,32 @@ namespace BeastCraft.Tests.EditMode
             Assert.AreEqual(DerivedStats.TurnsPer100Ticks(speedB) * ticks / 100.0, countB, 1.5);
         }
 
+        [Test]
+        public void PredictNextTurns_IsTheActorForecast_WithTheTicksEachTurnReallyFallsAt()
+        {
+            BattleUnit a = new BattleUnit("a", BattleTeam.Player, new StatBlock(10, 1, 1, 1, 1, 81), HexCoordinate.Zero);
+            BattleUnit b = new BattleUnit("b", BattleTeam.Enemy, new StatBlock(10, 1, 1, 1, 1, 49), HexCoordinate.Zero);
+            BattleUnit c = new BattleUnit("c", BattleTeam.Enemy, new StatBlock(10, 1, 1, 1, 1, 49), HexCoordinate.Zero);
+            TurnManager turns = new TurnManager(new[] { a, b, c });
+            turns.AdvanceTurn();
+            long start = turns.ElapsedTicks;
+            long gauge = turns.GetGauge(a);
+
+            IReadOnlyList<KeyValuePair<BattleUnit, long>> timed = turns.PredictNextTurns(12);
+            CollectionAssert.AreEqual(turns.PredictNextActors(12), timed.Select(t => t.Key).ToList(), "the same order");
+            Assert.AreEqual(0, timed[0].Value, "the current unit acts now");
+            CollectionAssert.IsOrdered(timed.Select(t => t.Value).ToList());
+            Assert.AreEqual(start, turns.ElapsedTicks, "a pure projection");
+            Assert.AreEqual(gauge, turns.GetGauge(a));
+
+            foreach (KeyValuePair<BattleUnit, long> turn in timed)
+            {
+                Assert.AreSame(turn.Key, turns.CurrentUnit);
+                Assert.AreEqual(start + turn.Value, turns.ElapsedTicks, "the tick it really falls at");
+                turns.AdvanceTurn();
+            }
+        }
+
         // ------------------------------------------------------------------ skills: swap and upgrade
 
         [Test]
@@ -497,6 +523,10 @@ namespace BeastCraft.Tests.EditMode
             Assert.Greater(strong, 0);
             Assert.Greater(mild, 0);
             Assert.Greater(weak, 0);
+            List<string> codes = ElementChartViewModel.Elements.Select(ElementChartViewModel.Code).ToList();
+            CollectionAssert.AllItemsAreUnique(codes, "every badge reads differently");
+            Assert.IsTrue(codes.TrueForAll(c => c.Length == 2));
+            Assert.AreNotEqual(ElementChartViewModel.Code(Element.Light), ElementChartViewModel.Code(Element.Lightning));
             Assert.AreEqual(ElementChart.Strong, chart.Cell(Element.Fire, Element.Nature).Multiplier);
             Assert.AreEqual(MatchupKind.Mild, chart.Cell(Element.Light, Element.Water).Kind);
             Assert.AreEqual(MatchupKind.Weak, chart.Cell(Element.Fire, Element.Water).Kind);

@@ -126,32 +126,41 @@ namespace BeastCraft.Game.Screens
         }
 
         /// <summary>
-        /// The acting unit (this turn's, else the next to act) and the ones after it, as portraits;
-        /// while a skill fires, its framed icon as a badge on the "now acting" portrait.
+        /// The acting unit (this turn's, else the next to act) and the ones after it, as portraits,
+        /// each with the gauge ticks until its turn (<see cref="BattlePlayback.ForecastTimed"/>) as a
+        /// label and a bar; while a skill fires, its framed icon as a badge on the "now acting" portrait.
         /// </summary>
         private void DrawTurnOrder(ScheduledBeat beat, Color shadow)
         {
             Rect band = _screen.TurnOrder;
             _text.DrawRight(_draw, "TURN ORDER", band.Right, band.Y + 8f, Small, Ink("3", Color.Gray), shadow);
 
-            List<BattleUnit> order = new List<BattleUnit>();
+            // The order, with the gauge ticks until each turn (the animating turn is now: 0).
+            List<KeyValuePair<BattleUnit, long>> order = new List<KeyValuePair<BattleUnit, long>>();
             if (_animation != null)
             {
-                order.Add(_animation.Turn.Turn.Unit);
+                order.Add(new KeyValuePair<BattleUnit, long>(_animation.Turn.Turn.Unit, 0));
             }
 
             const int slots = 8;
-            foreach (BattleUnit unit in _playback.Forecast(slots))
+            foreach (KeyValuePair<BattleUnit, long> turn in _playback.ForecastTimed(slots))
             {
                 if (order.Count < slots)
                 {
-                    order.Add(unit);
+                    order.Add(turn);
                 }
+            }
+
+            long farthest = 0;
+            foreach (KeyValuePair<BattleUnit, long> turn in order)
+            {
+                farthest = Math.Max(farthest, turn.Value);
             }
 
             for (int i = 0; i < order.Count; i++)
             {
-                BattleUnit unit = order[i];
+                BattleUnit unit = order[i].Key;
+                long ticks = order[i].Value;
                 Rect slot = _screen.TurnOrderSlot(i, slots);
                 bool current = i == 0;
                 Color border = current ? Ink("Y", Color.Yellow) : TeamColor(unit.Team);
@@ -175,8 +184,15 @@ namespace BeastCraft.Game.Screens
                     DrawHpBar(slot.Center.X, slot.Bottom - thickness - 12f, barWidth, 6f, hp, unit.Stats.Hp);
                 }
 
-                // The thin ATB gauge under the portrait: how full the unit's turn meter is now.
-                DrawGauge(new Rect(slot.X + 4f, slot.Bottom + 6f, slot.Width - 8f, 8f), _playback.GaugeFraction(unit));
+                // Time to this turn: a thin bar under the portrait (empty = now, full = the farthest
+                // turn shown) and the gauge ticks until it, so units queued at the same instant read
+                // as such rather than as a row of full gauges.
+                DrawGauge(new Rect(slot.X + 4f, slot.Bottom + 6f, slot.Width - 8f, 8f), farthest <= 0 ? 0f : (float)ticks / farthest);
+                if (!current)
+                {
+                    string when = ticks <= 0 ? "+0" : "+" + ticks.ToString(CultureInfo.InvariantCulture);
+                    _text.DrawCentered(_draw, when, slot.Center.X, slot.Y + thickness + 2f, Small, Ink("4", Color.White), shadow);
+                }
                 if (current)
                 {
                     _text.DrawCentered(_draw, _animation != null ? "NOW" : "NEXT", slot.Center.X, band.Y + 8f, Small, Ink("Y", Color.Yellow), shadow);
@@ -190,7 +206,7 @@ namespace BeastCraft.Game.Screens
             }
         }
 
-        /// <summary>A unit's ATB gauge fill (0-1) as a thin gold bar on a dark track.</summary>
+        /// <summary>A unit's time to its turn (0-1 of the farthest shown) as a thin gold bar on a dark track.</summary>
         private void DrawGauge(Rect box, float fraction)
         {
             _draw.Fill(Pixel, new Vector2(box.X, box.Y), new Vector2(box.Width, box.Height), Ink("1", Color.DarkGray));

@@ -686,15 +686,18 @@ namespace BeastCraft.Game.Ui
             }
         }
 
-        /// <summary>An element as a tinted disc with its initial (the element "icon" until the art lands).</summary>
+        /// <summary>
+        /// An element as a tinted disc with its two-letter code (<see cref="Presentation.Screens.ElementChartViewModel.Code"/>:
+        /// distinct for all ten, so Light and Lightning never read alike), the element "icon" until the art lands.
+        /// </summary>
         public void ElementBadge(Element element, Rect box)
         {
             float r = Math.Min(box.Width, box.Height) / 2f;
             Disc(box.Center, r, C("plum"));
             Disc(box.Center, r - 3f, C(ElementKey(element)));
-            string letter = element == Element.None ? "-" : element.ToString().Substring(0, 1);
-            float size = r * 0.95f;
-            _text.DrawCentered(_draw, letter, box.Center.X, box.Center.Y - size / 2f, size, C("white"), C("plum", 0.6f));
+            string code = Presentation.Screens.ElementChartViewModel.Code(element);
+            float size = Math.Max(11f, r * 0.72f);
+            _text.DrawCentered(_draw, _text.Fit(code, size, 2f * r - 6f), box.Center.X, box.Center.Y - size / 2f, size, C("white"), C("plum", 0.75f));
         }
 
         private static Texture2D MakeDisc(GraphicsDevice device, bool soft)
