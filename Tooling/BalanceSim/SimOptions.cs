@@ -142,7 +142,12 @@ namespace BeastCraft.Tooling.BalanceSim
         // ------------------------------------------------------------------------------------
         // PvE (team vs encounter) setup.
         // ------------------------------------------------------------------------------------
-        public const int DefaultTeamSize = 4;
+        /// <summary>
+        /// <c>--team-size</c> default: three beasts beside the avatar (producer decision), the game's
+        /// party size (<see cref="TeamSuggester.DefaultTeamSize"/>, <c>CampaignRules.PartySize</c>):
+        /// C(10, 3) = 120 teams. Was 4 (210 teams) until "Team size 3" in the tuning log.
+        /// </summary>
+        public const int DefaultTeamSize = TeamSuggester.DefaultTeamSize;
         public const int MaxTeamSize = 6;
         public const double DefaultTargetClearRate = 50.0;
 
@@ -178,7 +183,7 @@ namespace BeastCraft.Tooling.BalanceSim
 
         /// <summary>
         /// <c>--level-gap-teams</c> default: how many teams (a seeded subset) the no-scouting rate at
-        /// each nonzero level gap is measured over (42 of 210 x 8 compositions = 336 battles).
+        /// each nonzero level gap is measured over (42 of the 120 three-beast teams x 8 compositions = 336 battles).
         /// </summary>
         public const int DefaultLevelGapTeams = 42;
 
@@ -796,7 +801,7 @@ namespace BeastCraft.Tooling.BalanceSim
             "                             legacy hand-authored boss, swarm and pack simulator fixtures (encounters.json).\n" +
             "  --compositions <n>         Generated compositions per shape (default 8).\n" +
             "  --encounters <list>        Comma-separated shape ids (generated) or encounter ids (fixed) (default all).\n" +
-            "  --team-size <n>            Beasts per player team, 1-6 (default 4); every combination is fielded.\n" +
+            "  --team-size <n>            Beasts per player team, 1-6 (default 3); every combination is fielded.\n" +
             "  --target-clear <t>         Clear rate(s) the difficulty calibration aims for: a percentage for every shape (the\n" +
             "                             legacy uniform target, e.g. 50) or shape=pct pairs (e.g. squad=80,elite=60) overriding\n" +
             "                             the library. Default: each shape's TargetClear in encounter-library.json (the game's\n" +
@@ -882,7 +887,7 @@ namespace BeastCraft.Tooling.BalanceSim
             "                             S >= 2. Default: off (the committed tuned report uses 16x4).\n" +
             "  --panel-level <n>          The panel's level, one of --levels (default 50).\n" +
             "  --calibrate-sample <n>     --calibrate-on mean only. Opt-in speed-up that CHANGES results: the difficulty search\n" +
-            "                             evaluates a seeded subset of n teams (e.g. 50 of 210), then the chosen multiplier runs\n" +
+            "                             evaluates a seeded subset of n teams (e.g. 30 of 120), then the chosen multiplier runs\n" +
             "                             once with every team; the report's numbers all come from that full run (default: off,\n" +
             "                             every team at every step).\n" +
             "  --help                     Show this text.\n";

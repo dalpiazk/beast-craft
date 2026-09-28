@@ -143,10 +143,10 @@ namespace BeastCraft.Presentation.Screens
         public const string SlotName = "slot1";
 
         /// <summary>
-        /// How many beasts a campaign battle fields: the standard squad fight
-        /// (<c>BattleFormat.SmallGroup</c>, the team suggester's default size).
+        /// How many beasts a campaign battle fields beside the Beastbinder
+        /// (<see cref="CampaignRules.PartySize"/>: three, the size the difficulty is calibrated with).
         /// </summary>
-        public const int PartySize = 4;
+        public const int PartySize = CampaignRules.PartySize;
 
         private readonly ISaveStorage _storage;
         private readonly SaveStore _store;

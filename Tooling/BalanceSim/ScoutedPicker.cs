@@ -120,7 +120,7 @@ namespace BeastCraft.Tooling.BalanceSim
     /// <strong>Oracle.</strong> Per composition, the team with the best recorded clear rate against
     /// it (ties: the team's clear rate over the whole cell, then the lower team index): an upper
     /// bound, and with one battle per team and composition an inflated one (it keeps the luckiest
-    /// of 210 coin flips).
+    /// of 120 coin flips at the default team size).
     /// </para>
     /// <para>
     /// <strong>Best team.</strong> Reported with the oracle: the one lineup that did best in the same

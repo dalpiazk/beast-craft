@@ -49,6 +49,13 @@ namespace BeastCraft.Campaign
     /// </summary>
     public static class CampaignRules
     {
+        /// <summary>
+        /// How many beasts a campaign battle fields beside the Beastbinder (producer decision: three
+        /// plus the avatar; <see cref="TeamSuggester.DefaultTeamSize"/>, the size the encounter
+        /// difficulty is calibrated with).
+        /// </summary>
+        public const int PartySize = TeamSuggester.DefaultTeamSize;
+
         /// <summary>The beast level cap for <paramref name="save"/>'s seals (<see cref="LevelCaps.BeastCap"/>).</summary>
         public static int BeastCap(PlayerSave save, RegionLibrary library)
         {
@@ -557,7 +564,7 @@ namespace BeastCraft.Campaign
         /// not a battle, or the content cannot build its encounter. Pure; changes nothing.
         /// </summary>
         public static CampaignTeamSuggestion SuggestionFor(PlayerSave save, int nodeId, PlayerSettings settings, EncounterLibrary encounters, BattleContent content,
-                                                           int teamSize = 4)
+                                                           int teamSize = PartySize)
         {
             if (save == null || save.Campaign == null || !save.Campaign.HasActiveRun || content == null || content.Enemies == null)
             {

@@ -33,8 +33,8 @@ namespace BeastCraft.Battle.Scouting
         /// <summary>The beasts the player owns, in the order the caller wants ties broken (earlier wins).</summary>
         public IReadOnlyList<TeamSuggestionCandidate> Owned;
 
-        /// <summary>Beasts per team (the battle format's size); fewer when the player owns fewer distinct species.</summary>
-        public int TeamSize = 4;
+        /// <summary>Beasts per team; fewer when the player owns fewer distinct species. Defaults to <see cref="TeamSuggester.DefaultTeamSize"/>.</summary>
+        public int TeamSize = TeamSuggester.DefaultTeamSize;
 
         /// <summary>Fewest Vanguards a suggested team fields, when the owned beasts allow it.</summary>
         public int MinVanguards = TeamSuggester.DefaultMinVanguards;
@@ -103,14 +103,21 @@ namespace BeastCraft.Battle.Scouting
     /// team can meet the minimum, the best team overall.
     /// </para>
     /// <para>
-    /// <strong>Cost.</strong> C(distinct species, team size) bond resolutions: 210 for the ten-species
-    /// starter roster and a team of four. A much larger collection should prune to the best-scored
+    /// <strong>Cost.</strong> C(distinct species, team size) bond resolutions: 120 for the ten-species
+    /// roster and a team of three. A much larger collection should prune to the best-scored
     /// beasts first (not needed yet).
     /// </para>
     /// </summary>
     public static class TeamSuggester
     {
         public const int DefaultMinVanguards = 1;
+
+        /// <summary>
+        /// Beasts a team fields beside the Beastbinder (producer decision: three beasts plus the
+        /// avatar); the campaign's party size (<c>CampaignRules.PartySize</c>) and the balance
+        /// simulator's default <c>--team-size</c>, which the encounter difficulty is calibrated with.
+        /// </summary>
+        public const int DefaultTeamSize = 3;
 
         /// <summary>Weight of the beast's attack multiplier into each enemy.</summary>
         public const double OffenceWeight = 1.0;
