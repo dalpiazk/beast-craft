@@ -55,6 +55,10 @@ namespace BeastCraft.Tests.EditMode
             Assert.AreEqual(0.0, _regions.EasingWeight("r03", r03.Stages - 1), "the easing is gone by the end of r03");
             Assert.AreEqual(1.0, _regions.DifficultyScaleFor("r03", r03.Stages - 1, "elite"));
             Assert.AreEqual(_regions.FullEasingScale("elite"), _regions.DifficultyScaleFor("r01", 0, "elite"), 1e-12);
+            Assert.AreEqual(0.92, _regions.DifficultyScaleFor("r02", r02.Stages - 1, RegionLibraryData.EasingBossId), 1e-12, "r02's boss takes its own scale (BossScale)");
+            Assert.AreEqual(_regions.FullEasingScale("elite"), _regions.DifficultyScaleFor("r02", r02.Stages - 1, "elite"), 1e-12, "the rest of r02's last stage keeps the full discount");
+            Assert.AreEqual(_regions.FullEasingScale(RegionLibraryData.EasingBossId), _regions.DifficultyScaleFor("r01", r01.Stages - 1, RegionLibraryData.EasingBossId), 1e-12,
+                            "r01's boss takes the shared boss discount");
             double part = _regions.EasingWeight("r03", 0);
             Assert.Less(part, 1.0);
             Assert.Greater(part, 0.0);
@@ -97,6 +101,8 @@ namespace BeastCraft.Tests.EditMode
             data.Regions[0].StageEasing = new[] { 1.0, 1.0 };
             data.Regions[1].StageEasing = new[] { 0.5, 0.75, 1.2, -0.1 };
             data.Regions[10].StageEasing = new[] { 1.0, 1.0, 1.0, 1.0 };
+            data.Regions[3].BossScale = 0.9;
+            data.Regions[10].BossScale = 0.9;
 
             List<string> errors = RegionLibraryValidator.Validate(data, EncounterContentTests.LoadEncounterLibrary());
 
@@ -108,6 +114,8 @@ namespace BeastCraft.Tests.EditMode
             Assert.That(errors, Has.Some.Contains("StageEasing[2] 1.2 must be between 0 and 1"));
             Assert.That(errors, Has.Some.Contains("StageEasing[3] -0.1 must be between 0 and 1"));
             Assert.That(errors, Has.Some.Contains("Post-game region 'r11': StageEasing must be empty"));
+            Assert.That(errors, Has.Some.Contains("Region 'r04': BossScale 0.9 must be 0 (none), or in (0, 1] on a region whose last stage is eased"));
+            Assert.That(errors, Has.Some.Contains("Post-game region 'r11': BossScale must be 0"));
 
             RegionLibraryData unfinished = CampaignMapTests.LoadRegions();
             unfinished.Regions[2].StageEasing = new[] { 1.0, 0.5, 0.25, 0.25 };

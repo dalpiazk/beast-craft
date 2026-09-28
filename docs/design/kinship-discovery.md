@@ -151,7 +151,8 @@ tuning log's "Kinship: roster growth, trials and the r02 fall-off".
   stay short. The scale each fight needs stays at the full discount through r02 and r03. So the easing
   was **extended**: r02 `StageEasing` 1, 1, 1, 1 (was 1, 0.67, 0.33, 0), and the fade moved into r03
   (0.67, 0.33, 0, 0; was none). r02 now: `squad` 80-82%, `horde` 78-82%, `solo` 58-62%, `elite` 53-58%
-  every stage (dens a little under 60%, as in r01). The calibrated table and the tuned report are
+  every stage (dens a little under 60%, as in r01). The r02 boss has its own scale (`regions.json`
+  `BossScale` 0.92, instead of the shared x0.83 that gave 93%): the new player wins it 56%. The calibrated table and the tuned report are
   unchanged (the easing is campaign-only).
 
 ## Screens
@@ -212,8 +213,6 @@ This build's calls (for review):
   not shrink with a bigger roster); the easing now ends in r03. Calibrate for the owned roster, or ease longer?
 - Bond conditions are flavour only; a small look for meeting them would be a PR B item.
 - Kinship sites are placed on fixed stages; a stage left behind needs Revisit (the region progress panel).
-- The r02 boss (Ember Twins) now takes the full `boss` discount too: the new player wins it 93% (its
-  need is x0.92, target 50-60%). A per-region boss weight would fix it; not done here.
 - r03 stages 3-4 are unscaled again and the new player (six beasts, typical gear) sits far under the
   tiers there (`squad` ~40%, `horde` ~24%): the gap is structural (the calibration's player picks from
   all ten), so easing longer or calibrating for the owned roster is a producer call.

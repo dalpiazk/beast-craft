@@ -4181,8 +4181,12 @@ beasts barely move it, and the scale each fight needs stays the full discount (`
 | 4 | 80.4% | 81.6% | 58.5% | 55.8% |
 
 r03 (grown): stage 1 75.6 / 58.1 / 42.9 / 34.9%, stage 2 55.2 / 43.6 / 26.0 / 12.7%, stages 3-4
-unscaled about 40 / 24 / 11 / 7% (as before this PR). **Flags:** the r02 boss (Ember Twins) now takes
-the full `boss` discount: 93.4% (its need is x0.92; it was 25.2% unscaled); and the new player stays far
+unscaled about 40 / 24 / 11 / 7% (as before this PR). **The r02 boss** (Ember Twins) took the full
+`boss` discount with the extended curve (x0.83: 93.4%, far over its 50-60%; its need is x0.92), so a
+region may now set its own boss scale (`regions.json` `BossScale`, the lair's scale in place of the
+shared discount; validated: mainline, last stage eased): r02 `BossScale` **0.92**, new player **56.1%**
+(0-100 by trio; unscaled 25.2%). Nothing else moved (the new-player report changed in that one row; the
+campaign report is byte-identical). **Flag:** the new player stays far
 under the tiers from r03's third stage on — the gap is structural (the calibration picks from all ten
 with typical gear), not a roster-size problem, so easing further or calibrating for the owned roster
 is a producer decision. The calibrated table and `tuned-report.md` regenerate byte-identical (the

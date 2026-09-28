@@ -181,6 +181,14 @@ namespace BeastCraft.Campaign
         public double DifficultyScaleFor(string regionId, int stage, string shapeKey)
         {
             double weight = EasingWeight(regionId, stage);
+            RegionData region = GetRegion(regionId);
+            if (weight > 0.0 && region != null && region.BossScale > 0.0 && region.BossScale <= 1.0 && stage == Math.Max(1, region.Stages) - 1 &&
+                string.Equals(shapeKey, RegionLibraryData.EasingBossId, StringComparison.Ordinal))
+            {
+                // The region's own boss scale (RegionData.BossScale) in place of the shared boss discount.
+                return region.BossScale;
+            }
+
             return weight <= 0.0 ? 1.0 : 1.0 - (weight * (1.0 - FullEasingScale(shapeKey)));
         }
 

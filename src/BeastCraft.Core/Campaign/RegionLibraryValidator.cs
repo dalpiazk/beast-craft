@@ -573,6 +573,13 @@ namespace BeastCraft.Campaign
         private static void ValidateEasing(RegionData region, string where, ref double previousWeight, List<string> errors)
         {
             double[] weights = region.StageEasing ?? new double[0];
+            if (region.BossScale != 0.0 && (double.IsNaN(region.BossScale) || region.BossScale < 0.0 || region.BossScale > 1.0 || weights.Length == 0 ||
+                                            weights[weights.Length - 1] <= 0.0))
+            {
+                errors.Add(where + ": BossScale " + region.BossScale.ToString(System.Globalization.CultureInfo.InvariantCulture) +
+                           " must be 0 (none), or in (0, 1] on a region whose last stage is eased.");
+            }
+
             if (weights.Length == 0)
             {
                 if (previousWeight > 0.0)
@@ -747,6 +754,11 @@ namespace BeastCraft.Campaign
                 if (region.StageEasing != null && region.StageEasing.Length > 0)
                 {
                     errors.Add(where + ": StageEasing must be empty (the early-region easing is for mainline regions).");
+                }
+
+                if (region.BossScale != 0.0)
+                {
+                    errors.Add(where + ": BossScale must be 0 (the early-region easing is for mainline regions).");
                 }
 
                 MapRulesData ownRules = region.MapRules != null && region.MapRules.Layers > 0 ? region.MapRules : data.MapRules;

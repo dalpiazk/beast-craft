@@ -288,6 +288,15 @@ namespace BeastCraft.Campaign
         public double[] StageEasing = new double[0];
 
         /// <summary>
+        /// A per-region override of the early-region easing for the region's boss (its lair, the last
+        /// stage's authored template): the scale the boss is fielded at, in (0, 1], instead of the
+        /// stage's weight of the library's <c>boss</c> discount. 0 (the default) = no override. For a
+        /// boss whose own need differs from the shared discount (r02's Ember Twins: x0.92, measured by
+        /// <c>--mode newplayer</c>). Mainline regions only; only where <see cref="StageEasing"/> eases the last stage.
+        /// </summary>
+        public double BossScale;
+
+        /// <summary>
         /// An onboarding region (only in <see cref="RegionLibraryData.TutorialRegions"/>): one
         /// expedition over its <see cref="FixedNodes"/>, played once. False for every campaign region.
         /// </summary>
