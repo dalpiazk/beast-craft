@@ -4,6 +4,10 @@
 > table, the budget ballparks and the contract checklist) are **superseded** and kept for the record.
 > Numbers derived from `content/data/` and `docs/design/` on 2026-09-24. All display text in the data is
 > itself DRAFT pending producer sign-off; do not treat names/lore below as final.
+>
+> **The Verdant Hollow presentation pass** (battle backdrops, skill-icon frame and rarity rings, painted
+> skill icons, painted VFX hero frames per element and status) is specified slot by slot, with exact file
+> names, sizes and pivots, in [`hollow-art-slots.md`](hollow-art-slots.md).
 
 # Beast Craft — Art & Animation Brief
 

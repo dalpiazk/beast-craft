@@ -78,6 +78,14 @@ namespace BeastCraft.Tooling.BalanceSim
                                   " (the player scouts and counter-picks); the average team's no-scouting rate is reported beside it, see \"Calibrated difficulty\"");
             }
 
+            if (options.RunPve)
+            {
+                report.AppendLine(options.ObstaclesRegion == null
+                                      ? "- Obstacles (PvE, `--obstacles none`): every battle on the open board"
+                                      : "- Obstacles (PvE, `--obstacles " + options.ObstaclesRegion + "`): every battle stands on one of " + options.ObstaclesRegion +
+                                        "'s battle layouts for its arena (`battle-layouts.json`), picked from its seed as the game picks it; region-agnostic calibration");
+            }
+
             if (options.RunPve && options.PinDifficultyPath != null)
             {
                 report.AppendLine("- Difficulty pinned (PvE, `--pin-difficulty " + options.PinDifficultyPath + "`): no calibration search; every cell fights at " +

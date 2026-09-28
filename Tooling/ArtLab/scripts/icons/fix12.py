@@ -1,0 +1,11 @@
+import pathlib
+b=pathlib.Path('briefs.py'); t=b.read_text()
+t=t.replace('METALD = dict(', 'LIGHTD = dict(PAL["Light"], bg_in=(168, 108, 48), bg_out=(52, 30, 18))   # darker amber ground for the Light rerolls\nMETALD = dict(',1)
+t=t.replace('"MetalD": METALD}','"MetalD": METALD, "LightD": LIGHTD}')
+t=t.replace('"sacred_spring":    ("Light", "fountain", {}, "a spring of golden light welling up, fountain")','"sacred_spring":    ("LightD", "fountain", {}, "a fountain of golden light welling up from a spring pool, dark amber background")')
+t=t.replace('"radiant_bolt":     ("Light", "lance",','"radiant_bolt":     ("LightD", "lance",')
+t=t.replace('"one single clean spear of golden light"','"one single clean bright spear of golden light, dark amber background"')
+b.write_text(t)
+q=pathlib.Path('batch.py'); u=q.read_text()
+u=u.replace('"updraft", "sky_rend"]   # producer','"updraft", "sky_rend", "radiant_bolt", "sacred_spring"]   # producer')
+q.write_text(u)

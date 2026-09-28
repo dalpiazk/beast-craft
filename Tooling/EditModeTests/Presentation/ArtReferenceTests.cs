@@ -203,10 +203,37 @@ namespace BeastCraft.Tests.EditMode
             {
                 Assert.AreEqual("skill/" + passive.PassiveId, passive.ArtKey, passive.PassiveId);
             }
+
+            int enemySkills = 0;
+            foreach (EnemyData enemy in Content.EnemyLibrary.Enemies)
+            {
+                foreach (SkillData skill in enemy.Skills)
+                {
+                    Assert.AreEqual("skill/enemy/" + enemy.EnemyId + "/" + skill.SkillId, skill.ArtKey, enemy.EnemyId + "/" + skill.SkillId);
+                    Assert.AreEqual("skill", Content.Art.FindByArtKey(skill.ArtKey).Category, skill.ArtKey);
+                    enemySkills++;
+                }
+            }
+
+            Assert.AreEqual(15, enemySkills);
+            Assert.AreEqual("skill/enemy/giant/quake", Content.Enemies.Kit("giant", Element.Earth)[2].ArtKey, "an enemy's runtime skill carries its icon");
         }
 
         [Test]
-        public void Validate_HoldsSkillIconKeys_ToTheManifest_AndRequiresThemOnlyForTheSkillLibrary()
+        public void EnemyLibraryValidator_RefusesAMalformedSkillIconKey()
+        {
+            EnemyLibraryData enemies = FieldJson.FromJson<EnemyLibraryData>(File.ReadAllText(GameContent.PathOf(GameContent.FindRoot(), EnemyLibraryData.ProjectRelativePath)));
+            Assert.IsEmpty(EnemyLibraryValidator.Validate(enemies, Content.Roster, Content.Regions));
+
+            enemies.Enemies[0].Skills[0].ArtKey = "Skill/Enemy/Crush";
+            List<string> errors = EnemyLibraryValidator.Validate(enemies, Content.Roster, Content.Regions);
+
+            Assert.AreEqual(1, errors.Count, string.Join("\n", errors));
+            StringAssert.Contains("ArtKey 'Skill/Enemy/Crush'", errors[0]);
+        }
+
+        [Test]
+        public void Validate_HoldsSkillIconKeys_ToTheManifest_AndRequiresThem_EnemySkillsToo()
         {
             ArtManifestData art = new ArtManifestData
             {
@@ -233,10 +260,10 @@ namespace BeastCraft.Tests.EditMode
             Assert.IsTrue(loose.Exists(e => e.Contains("Avatar active 'c'") && e.Contains("skill/nope")));
             Assert.IsTrue(loose.Exists(e => e.Contains("Avatar passive 'q'") && e.Contains("skill/gone")));
             Assert.IsTrue(loose.Exists(e => e.Contains("skill 'claw'") && e.Contains("skill/claw")), "an enemy skill's icon, when set, is checked");
-            Assert.AreEqual(5, strict.Count, string.Join("\n", strict));
+            Assert.AreEqual(6, strict.Count, string.Join("\n", strict));
             Assert.IsTrue(strict.Exists(e => e.Contains("Beast skill 'b'") && e.Contains("no ArtKey")));
             Assert.IsTrue(strict.Exists(e => e.Contains("Avatar passive 'p'") && e.Contains("no ArtKey")));
-            Assert.IsFalse(strict.Exists(e => e.Contains("'bite'")), "enemy-library skills never need an icon");
+            Assert.IsTrue(strict.Exists(e => e.Contains("Enemy 'e' skill 'bite'") && e.Contains("no ArtKey")), "enemy skills need an icon too");
         }
 
         [Test]

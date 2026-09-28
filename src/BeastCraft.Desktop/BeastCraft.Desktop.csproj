@@ -48,6 +48,11 @@
     <None Include="..\..\content\art\beasts\**\*.png" Link="Content\art\beasts\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <!-- The illustrated enemy sprites and their accent overlays (../enemies/<type>/<type>_<region>[_accent].png). -->
     <None Include="..\..\content\art\enemies\**\*.png" Link="Content\art\enemies\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The painted art slots (docs/art/hollow-art-slots.md): battle backdrops, the skill-icon frame and rings, painted VFX frames. -->
+    <None Include="..\..\content\art\backdrops\**\*.png" Link="Content\art\backdrops\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\content\art\vfx\**\*.png" Link="Content\art\vfx\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\content\art\ui\**\*.png" Link="Content\art\ui\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\content\art\icons\**\*.png" Link="Content\art\icons\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <!-- The UI font and its licence (SIL OFL 1.1: the licence travels with the font). -->
     <None Include="..\..\content\fonts\*.ttf;..\..\content\fonts\OFL.txt" Link="Content\fonts\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

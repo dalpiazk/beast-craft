@@ -15,7 +15,17 @@ namespace BeastCraft.Presentation.Vfx
     public readonly struct VfxSprite
     {
         public VfxSprite(string sheet, int frame, Vec2 position, float scale, float sizePx, float rotation, float alpha, string tint, bool additive, bool ground)
+            : this(sheet, frame, position, scale, sizePx, rotation, alpha, tint, additive, ground, tint, 0f, false)
         {
+        }
+
+        /// <summary>A sprite with a blended tint (<paramref name="tint"/> to <paramref name="tintTo"/> by <paramref name="tintMix"/>), painted or not.</summary>
+        public VfxSprite(string sheet, int frame, Vec2 position, float scale, float sizePx, float rotation, float alpha, string tint, bool additive, bool ground,
+                         string tintTo, float tintMix, bool painted)
+        {
+            TintTo = tintTo;
+            TintMix = tintMix;
+            Painted = painted;
             Sheet = sheet;
             Frame = frame;
             Position = position;
@@ -56,6 +66,18 @@ namespace BeastCraft.Presentation.Vfx
 
         /// <summary>Drawn under the units (a decal, a ground aura) rather than over them.</summary>
         public bool Ground { get; }
+
+        /// <summary>The second tint <see cref="Tint"/> blends toward (a painted frame's tint curve between two keys); equal to it otherwise.</summary>
+        public string TintTo { get; }
+
+        /// <summary>How far from <see cref="Tint"/> to <see cref="TintTo"/> (0-1).</summary>
+        public float TintMix { get; }
+
+        /// <summary>
+        /// A painted frame (<see cref="VfxPaintedData"/>): linear-filtered art the renderer blends
+        /// premultiplied (additive as One + One), rather than a flipbook frame.
+        /// </summary>
+        public bool Painted { get; }
     }
 
     /// <summary>
@@ -144,12 +166,14 @@ namespace BeastCraft.Presentation.Vfx
         /// <paramref name="feet"/>, drawn at <paramref name="unitScale"/> (its footprint's width in
         /// hexes, <see cref="HexLayout.FootprintWidth"/>), <paramref name="ms"/> into the viewer's
         /// clock: pulsing to <see cref="VfxAuraData.Alpha"/>, and looping its sheet's frames every
-        /// <see cref="VfxAuraData.FrameMs"/> when set. False when the aura has no sprite.
+        /// <see cref="VfxAuraData.FrameMs"/> when set. A painted aura (<see cref="VfxAuraData.Painted"/>)
+        /// draws its one frame with its curves over the pulse (a Scale or Alpha curve replaces the
+        /// breathing; its Alpha curve is times the aura's Alpha). False when the aura has no sprite.
         /// </summary>
         public static bool TrySample(VfxAuraData aura, Vec2 feet, float unitScale, int ms, out VfxSprite sprite)
         {
             sprite = default;
-            if (aura == null || string.IsNullOrEmpty(aura.Sheet))
+            if (aura == null || (string.IsNullOrEmpty(aura.Sheet) && aura.Painted == null))
             {
                 return false;
             }
@@ -157,12 +181,15 @@ namespace BeastCraft.Presentation.Vfx
             int pulse = Math.Max(1, aura.PulseMs);
             double phase = (Math.Max(0, ms) % pulse) / (double)pulse;
             float wave = (float)Math.Sin(phase * Math.PI * 2.0);
-            float scale = aura.Scale * unitScale * (0.92f + 0.08f * wave);
+            VfxPaintedData painted = aura.Painted;
+            bool breathes = painted == null || !VfxPainted.Has(painted.Scale);
+            float scale = aura.Scale * unitScale * (breathes ? 0.92f + 0.08f * wave : 1f);
             float alpha = (0.7f + 0.3f * wave) * aura.Alpha;
             int frame = aura.FrameMs > 0 ? Math.Max(0, ms) / aura.FrameMs : 0;
             bool ground = aura.Depth != VfxDepth.Over;
             Vec2 at = ground ? feet : new Vec2(feet.X, feet.Y - OverLift * unitScale);
             sprite = new VfxSprite(aura.Sheet, frame, at, scale, 0f, 0f, alpha, aura.Tint, aura.Blend == VfxBlend.Additive, ground);
+            sprite = VfxPainted.Apply(painted, sprite, (float)phase, aura.Alpha, alpha);
             return true;
         }
 
@@ -183,7 +210,7 @@ namespace BeastCraft.Presentation.Vfx
             if (intensity == EffectsIntensity.Reduced)
             {
                 sprite = new VfxSprite(sprite.Sheet, sprite.Frame, sprite.Position, sprite.Scale, sprite.SizePx, sprite.Rotation, sprite.Alpha * 0.5f, sprite.Tint,
-                                       sprite.Additive, sprite.Ground);
+                                       sprite.Additive, sprite.Ground, sprite.TintTo, sprite.TintMix, sprite.Painted);
             }
 
             return true;

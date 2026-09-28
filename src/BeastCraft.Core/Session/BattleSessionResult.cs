@@ -43,6 +43,16 @@ namespace BeastCraft.Session
         /// <summary>The encounter's <see cref="EncounterSetup.EncounterLevel"/> (0 when the setup named none).</summary>
         public int EncounterLevel { get; internal set; }
 
+        /// <summary>The encounter's <see cref="EncounterSetup.RegionId"/> (null when the setup named none).</summary>
+        public string RegionId { get; internal set; }
+
+        /// <summary>
+        /// The battlefield layout the battle is fought on (<see cref="Encounters.BattleLayouts.Pick"/>
+        /// for the region, arena and seed), whose obstacles are blocked on <see cref="Grid"/>; null
+        /// on the open board. Its ArtKey is the painted backdrop a viewer draws.
+        /// </summary>
+        public Encounters.BattleLayoutEntryData Layout { get; internal set; }
+
         /// <summary>The finished battle (outcome, turns, activations), or null on failure.</summary>
         public BattleResult Battle { get; internal set; }
 

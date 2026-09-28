@@ -389,6 +389,61 @@ namespace BeastCraft.Tooling.BalanceSim
 
         /// <summary><c>--encounter-library</c>: the game's encounter library, or null to find it by walking up.</summary>
         public string EncounterLibraryPath;
+
+        /// <summary>
+        /// <c>--obstacles &lt;region|none&gt;</c>: every PvE battle stands on one of this region's battle
+        /// layouts for its arena (<c>battle-layouts.json</c>), picked from the battle's seed exactly as
+        /// <c>BattleSession</c> picks it (<see cref="BattleLayouts.Pick"/>): region-agnostic, the whole
+        /// table is calibrated off one region's mix. Default <c>r01</c> (the Verdant Hollow, the only
+        /// region with layouts); <c>none</c> = every battle on the open board (the pre-obstacle sim).
+        /// </summary>
+        public string ObstaclesRegion = DefaultObstaclesRegion;
+
+        public const string DefaultObstaclesRegion = "r01";
+
+        /// <summary><c>--battle-layouts</c>: the game's battle layouts, or null to find them by walking up.</summary>
+        public string BattleLayoutsPath;
+
+        private static readonly Dictionary<string, BattleLayoutData> LayoutCache = new Dictionary<string, BattleLayoutData>(StringComparer.Ordinal);
+
+        /// <summary>
+        /// The battle layouts the PvE battles pick from (<see cref="ObstaclesRegion"/>), loaded and
+        /// validated on first use; null for <c>--obstacles none</c>. Throws when the file is missing or invalid.
+        /// </summary>
+        public BattleLayoutData Layouts
+        {
+            get
+            {
+                if (ObstaclesRegion == null)
+                {
+                    return null;
+                }
+
+                string path = RosterLoader.ResolveFile(BattleLayoutsPath, BattleLayoutData.ProjectRelativePath);
+                if (path == null || !System.IO.File.Exists(path))
+                {
+                    throw new InvalidOperationException("Could not find battle-layouts.json; run from inside the repo, pass --battle-layouts or --obstacles none.");
+                }
+
+                lock (LayoutCache)
+                {
+                    if (!LayoutCache.TryGetValue(path, out BattleLayoutData data))
+                    {
+                        data = System.Text.Json.JsonSerializer.Deserialize<BattleLayoutData>(System.IO.File.ReadAllText(path),
+                                                                                            new System.Text.Json.JsonSerializerOptions { IncludeFields = true });
+                        List<string> errors = ObstacleLayoutValidator.Validate(data, null, null, null);
+                        if (errors.Count > 0)
+                        {
+                            throw new InvalidOperationException(path + " is invalid:\n  " + string.Join("\n  ", errors));
+                        }
+
+                        LayoutCache.Add(path, data);
+                    }
+
+                    return data;
+                }
+            }
+        }
         public bool SelfCheck;
         public bool ShowHelp;
 
@@ -785,6 +840,10 @@ namespace BeastCraft.Tooling.BalanceSim
             "  --pin-difficulty <path>    PvE, generated set: no calibration search; every cell fights at the multiplier this\n" +
             "                             encounter-difficulty.json gives it ({seed} in the path = the run's seed). Measures a\n" +
             "                             change at a stale calibration. Default: off (calibrate).\n" +
+            "  --obstacles <region|none>  PvE: every battle stands on one of this region's battle layouts for its arena\n" +
+            "                             (content/data/Encounters/battle-layouts.json), picked from the battle's seed as the\n" +
+            "                             game picks it; region-agnostic calibration off that mix. Default r01; none = open boards.\n" +
+            "  --battle-layouts <path>    battle-layouts.json (default: found by walking up from the working directory).\n" +
             "  --self-check               Run everything twice and fail unless both reports are identical; also checks the\n" +
             "                             PvE battle loop against BattleTurnExecutor.RunBattle.\n" +
             "  --timings                  Print a wall-clock breakdown (per PvE cell and calibration step, PvP, report, GC)\n" +
@@ -1252,6 +1311,21 @@ namespace BeastCraft.Tooling.BalanceSim
                             return null;
                         }
 
+                        break;
+                    case "--battle-layouts":
+                        if (!TryNext(args, ref i, arg, out options.BattleLayoutsPath, out error))
+                        {
+                            return null;
+                        }
+
+                        break;
+                    case "--obstacles":
+                        if (!TryNext(args, ref i, arg, out string obstacles, out error))
+                        {
+                            return null;
+                        }
+
+                        options.ObstaclesRegion = obstacles == "none" ? null : obstacles;
                         break;
                     case "--bonds":
                         if (!TryNext(args, ref i, arg, out text, out error))

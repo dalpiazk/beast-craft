@@ -351,6 +351,42 @@ board area (producer decision; it replaced the hexagons of radius 3 / 5 / 7):
   surrounds fewer beasts on the narrower middle), and the per-beast guard did not move. The difficulty
   table was re-calibrated on the rectangles ("Rectangular arenas: re-calibration").
 
+#### Obstacles — DECIDED (block movement and standing only)
+
+A region's battles are fought among **obstacles** painted on its backdrops: rocks on the Verdant
+Hollow's sunlit meadows, fallen stone rubble or broken pillar stumps on its ruins, mossy boulders or a
+fallen bough on its dusk glade, tree stumps, mossy fallen logs or a big mushroom cluster in its forest
+(producer decisions).
+
+- **Rule.** An obstacle hex is `HexGrid`-blocked terrain: nothing is deployed on it, walks onto or
+  through it (paths go round it) or is knocked back onto it (a knockback stops at the last free hex,
+  as at the board's edge). That is all it does: there is **no line of sight** anywhere, so every
+  skill passes over obstacles, and an area effect covers an obstacle hex harmlessly. The rules were
+  already in the engine (placement, `HexPathfinder` / `CanStand`, knockback); what is new is the data
+  and the per-battle pick.
+- **Data.** `content/data/Encounters/battle-layouts.json`: one layout per (region, painted backdrop,
+  arena), its obstacle hexes as axial cells. The painting and the layout go together: each battle
+  backdrop in `battle-art.json` has exactly one layout, and the art lane paints the obstacles on
+  exactly its hexes (`docs/art/hollow-art-slots.md`). The Verdant Hollow has eight paintings (sunlit
+  meadows sun0 / sun1 / sun3, ruins ruin0 / ruin2, dusk glade dusk2, forest canopy2 / shroom0), each
+  on all three arenas: 24 layouts.
+- **Which battlefield.** `EncounterSetup.RegionId` names the region a battle is fought in
+  (`EncounterPlan.ToSetup(regionId)`). `BattleSession` picks one of the region's layouts for the
+  arena from the battle's seed on its own stream (`BattleLayouts.Pick`: `LootRoller.DeriveSeed(seed,
+  5)` mod the number of layouts, in file order) and blocks its cells before anyone is placed; the
+  result carries the layout, whose painting the viewer draws. No region, or a region without
+  layouts, fights on the open board, exactly as before.
+- **Validity** (`ObstacleLayoutValidator`, on content load): obstacles only in the neutral band,
+  never in a deployment zone (so every shape, template and boss seats exactly as on the open board;
+  every authored template is re-packed on the obstructed board to prove it); density Small 0-2,
+  Medium 2-5, Large 3-8; balanced-count fairness (enemy half against player half, and left against
+  right of the vertical centre line, each within one); the free board one connected region; and a
+  champion (Triangle) or giant (Hex7) deployed in the enemy zone can still walk to the player's front
+  row (obstacles never trap a large unit on its own side, which would make it a sitting target).
+- **Balance.** The balance simulator samples r01's layouts for every PvE battle the way the game
+  picks them (`--obstacles r01`, the default): one region-agnostic difficulty table calibrated off
+  the Hollow's mix (tuning log, "Battlefield obstacles").
+
 *Background.* A **square grid** would have been simpler on every axis: tile art authors as a single
 repeated quad, movement and line-of-sight use standard 4- or 8-directional rules, and pathfinding is
 textbook. A **hexagonal grid** is more tactically interesting — flanking and positioning read better

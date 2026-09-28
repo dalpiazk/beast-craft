@@ -53,6 +53,15 @@ mismatch) and names it from the base (`Accent`). `illustrated.json`'s `ElementAc
 copied into the manifest: the colour each element tints an overlay (see `docs/design/presentation-and-vfx.md`,
 "Element accents").
 
+**Painted slots** (`illustrated.json`'s `Painted` list: the art slots of `docs/art/hollow-art-slots.md` that are
+not characters standing on a tile, such as the battle backdrops `content/art/backdrops/<region>/<arena>.png` and the
+skill-icon frame and rarity rings `content/art/ui/skill_icon/` and the painted VFX hero frames `content/art/vfx/`) are
+merged the same way: frame size from the PNG, `PixelsPerUnit = FrameWidth / WorldWidth`, pivot `PivotU/PivotV`
+(fractions, default the centre), `Filter: "linear"`. Until a slot is painted its PNG is a placeholder written by
+`painted_placeholders.py` (same venv; soft, deterministic, tagged with a `BeastCraft-Placeholder` PNG text chunk, and
+it never overwrites a file without that tag), which also writes painting guides (`preview/backdrop_guide_*.png`: the
+backdrop with the arena's hexes where the engine draws them). Run it, then `build.py`.
+
 Why merge a hand-kept file here instead of a second manifest: the loader, the validators
 (`ArtManifestValidator`, `ArtReferenceValidator`, `VfxLibraryValidator`) and both hosts already
 index one file, and every entry stays in one schema-v2 list. Hand-editing the generated manifest
@@ -94,7 +103,10 @@ would be overwritten by the next build.
 - Skill icons (24x24, `skill_<id>`, ArtKey `skill/<id>`): cheap generated placeholders, one per
   beast skill, avatar active and passive in `content/data/Skills/skill-library.json` that names an
   `ArtKey` — a disc in the skill's element colours (avatar actives lilac, passives peach) with its
-  initial. No source files: `build.py` reads the skill library, so a new or renamed skill gets its
+  initial; and one per enemy skill in `content/data/Encounters/enemy-library.json` (`skill_enemy_<enemy>_<skill>`,
+  ArtKey `skill/enemy/<enemy>/<skill>`, the Gloam's lilac). A painted icon dropped at
+  `content/art/icons/skills/<id>.png` (enemy: `enemy/<enemy>_<skill>.png`) takes over its key on the next build
+  (linear, centre pivot) and its placeholder leaves the manifest. No source files: `build.py` reads the skill library, so a new or renamed skill gets its
   icon on the next build. `ArtReferenceValidator` holds every skill's icon key to the manifest.
 - Items, map tiles and the camp marker from the style test.
 

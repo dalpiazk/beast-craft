@@ -66,7 +66,8 @@ namespace BeastCraft.Game.Rendering
     /// sprite (illustrated art, drawn several times smaller than its PNG at board size) also gets
     /// a mip chain, box-filtered from the premultiplied pixels, so the linear sampler's mip level
     /// keeps its outline and detail from shimmering or breaking up; <c>point</c> pixel art has
-    /// none. Files are opened at <see cref="ArtManifestData.ResolveFile"/>. Entries of kind
+    /// none. Files are opened at <see cref="ArtManifestData.ResolveFile"/>. Battle backdrops
+    /// (<see cref="DeferredCategory"/>) load on first use, so only the arena shown costs memory. Entries of kind
     /// <c>spine</c> are reserved and skipped: a Spine renderer would load them beside this.
     /// </summary>
     public sealed class SpriteAtlas : IDisposable
@@ -75,12 +76,16 @@ namespace BeastCraft.Game.Rendering
         private readonly Dictionary<string, Color> _palette = new Dictionary<string, Color>(StringComparer.Ordinal);
         private readonly Dictionary<string, string> _byArtKey = new Dictionary<string, string>(StringComparer.Ordinal);
         private readonly List<Texture2D> _files = new List<Texture2D>();
+        private readonly Dictionary<string, ArtSpriteData> _deferred = new Dictionary<string, ArtSpriteData>(StringComparer.Ordinal);
+        private readonly Dictionary<string, Texture2D> _byFile = new Dictionary<string, Texture2D>(StringComparer.Ordinal);
+        private readonly Dictionary<string, int> _topByFile = new Dictionary<string, int>(StringComparer.Ordinal);
+        private readonly GraphicsDevice _device;
+        private readonly GameContent _content;
 
         public SpriteAtlas(GraphicsDevice device, GameContent content)
         {
-            // An alias entry reuses another sprite's file: each file is loaded once.
-            Dictionary<string, Texture2D> byFile = new Dictionary<string, Texture2D>(StringComparer.Ordinal);
-            Dictionary<string, int> topByFile = new Dictionary<string, int>(StringComparer.Ordinal);
+            _device = device;
+            _content = content;
             foreach (ArtSpriteData sprite in content.Art.Sprites)
             {
                 if (sprite.Kind != ArtSpriteKind.Sprite)
@@ -88,22 +93,15 @@ namespace BeastCraft.Game.Rendering
                     continue;
                 }
 
-                if (!byFile.TryGetValue(sprite.File, out Texture2D texture))
+                if (sprite.Category == DeferredCategory)
                 {
-                    using (Stream stream = content.Source.Open(ArtManifestData.ResolveFile(sprite.File)))
-                    {
-                        texture = Texture2D.FromStream(device, stream);
-                    }
-
-                    texture = Prepare(device, texture, !sprite.Premultiplied, sprite.Filter == ArtFilter.Linear, sprite.FrameWidth, out int top);
-
-                    byFile.Add(sprite.File, texture);
-                    topByFile.Add(sprite.File, top);
-                    _files.Add(texture);
+                    _deferred[sprite.Name] = sprite;
+                }
+                else
+                {
+                    Load(sprite);
                 }
 
-                Color tint = string.IsNullOrEmpty(sprite.Tint) ? Color.White : ParseHex(sprite.Tint);
-                _sprites[sprite.Name] = new ArtSprite(sprite, texture, tint, topByFile[sprite.File]);
                 if (!string.IsNullOrEmpty(sprite.ArtKey) && !_byArtKey.ContainsKey(sprite.ArtKey))
                 {
                     _byArtKey.Add(sprite.ArtKey, sprite.Name);
@@ -119,13 +117,52 @@ namespace BeastCraft.Game.Rendering
             Pixel.SetData(new[] { Color.White });
         }
 
+        /// <summary>
+        /// The category whose sprites load on first use rather than up front: battle backdrops, a few
+        /// large painted images of which a battle draws one.
+        /// </summary>
+        public const string DeferredCategory = "backdrop";
+
+        /// <summary>Loads <paramref name="sprite"/>'s file (once per file: an alias entry reuses another's) and indexes it by name.</summary>
+        private ArtSprite Load(ArtSpriteData sprite)
+        {
+            if (!_byFile.TryGetValue(sprite.File, out Texture2D texture))
+            {
+                using (Stream stream = _content.Source.Open(ArtManifestData.ResolveFile(sprite.File)))
+                {
+                    texture = Texture2D.FromStream(_device, stream);
+                }
+
+                texture = Prepare(_device, texture, !sprite.Premultiplied, sprite.Filter == ArtFilter.Linear, sprite.FrameWidth, out int top);
+
+                _byFile.Add(sprite.File, texture);
+                _topByFile.Add(sprite.File, top);
+                _files.Add(texture);
+            }
+
+            Color tint = string.IsNullOrEmpty(sprite.Tint) ? Color.White : ParseHex(sprite.Tint);
+            ArtSprite loaded = new ArtSprite(sprite, texture, tint, _topByFile[sprite.File]);
+            _sprites[sprite.Name] = loaded;
+            return loaded;
+        }
+
         /// <summary>A 1x1 white texture for rectangles and bars.</summary>
         public Texture2D Pixel { get; }
 
-        /// <summary>The sprite named <paramref name="name"/>, or null.</summary>
+        /// <summary>The sprite named <paramref name="name"/> (a deferred one is loaded now), or null.</summary>
         public ArtSprite Sprite(string name)
         {
-            return name != null && _sprites.TryGetValue(name, out ArtSprite sprite) ? sprite : null;
+            if (name == null)
+            {
+                return null;
+            }
+
+            if (_sprites.TryGetValue(name, out ArtSprite sprite))
+            {
+                return sprite;
+            }
+
+            return _deferred.TryGetValue(name, out ArtSpriteData data) ? Load(data) : null;
         }
 
         /// <summary>The sprite whose ArtKey is <paramref name="artKey"/> (a species' or enemy's), or null.</summary>

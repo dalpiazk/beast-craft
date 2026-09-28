@@ -1,5 +1,5 @@
 {
-  "_readme": "Skill VFX (presentation only; never read by the battle). Schema v2 (v1 still reads). A skill's effect resolves: its own entry (Skills, by skill id: beast skills, avatar actives, enemy-library skills), else the default of its primary effect type (EffectDefaults, by Key: Heal, Shield, Taunt, Stun, Burn (damage over time from a Fire source), Poison (from any other), Cleanse, BuffStat, DebuffStat, Knockback; a skill that deals damage has none and looks like its element), else its element's default (ElementDefaults: exactly one per Element, None included). Each EffectDefaults entry: Effect, played when that effect lands (also on every target a status newly lands on, and on a knocked-back target), and Aura, shown on the unit while the status or stat change lasts (Sheet at its feet (Depth Ground) or over it (Over), pulsing every PulseMs; Icon above its HP bar). An effect: Motion Projectile (flies caster -> target over TravelMs, optionally drawing Projectile) or Instant; then at impact, per target: HitStopMs freeze, Flipbook, Particles, ScreenShake (Amplitude virtual px, DurationMs), HitFlash, DamageNumber; and Layers, composited in order, each timed from the hit-stop's release (StartMs, negative = before the impact; DurationMs) with its own Blend (Alpha or Additive), Anchor (Target: each target; Area: once, the centre of every hex the targets stand on; Caster) and Depth (Ground under the units, else Over): Flipbook (Frames at Fps, Scale -> EndScale), GroundDecal (a scorch sized to EndRadius hexes, fading over FadeOutMs), Shockwave (a ring growing StartRadius -> EndRadius hexes; EndRadius 0 = the affected area's radius), RadialBurst (Count sprites flying out along their rays), Particles (a burst), Glyphs (Count rune frames circling at StartRadius, rising RisePx, turning Spin times). Sheets are sprite Names and colours palette chars from content/art/pixel/pixel-art-manifest.json; tints multiply, so tinted sheets are drawn white (Tooling/PixelArt). EnemyAura (optional): the Gloam haze every standing enemy wears, an aura (as above, plus Alpha: its peak opacity, 0.05-1, and FrameMs: its sheet's frames loop one every FrameMs, 40-2000, 0 = still) at its feet under every unit, sized to its footprint's width (1, 1.75 or 2.5 hexes), each enemy on its own phase; half as opaque under the Reduced effects setting and off under Minimal. Presentation only. Ranges and rules: BeastCraft.Vfx.VfxLibraryValidator.",
+  "_readme": "Skill VFX (presentation only; never read by the battle). Schema v2 (v1 still reads). A skill's effect resolves: its own entry (Skills, by skill id: beast skills, avatar actives, enemy-library skills), else the default of its primary effect type (EffectDefaults, by Key: Heal, Shield, Taunt, Stun, Burn (damage over time from a Fire source), Poison (from any other), Cleanse, BuffStat, DebuffStat, Knockback; a skill that deals damage has none and looks like its element), else its element's default (ElementDefaults: exactly one per Element, None included). Each EffectDefaults entry: Effect, played when that effect lands (also on every target a status newly lands on, and on a knocked-back target), and Aura, shown on the unit while the status or stat change lasts (Sheet at its feet (Depth Ground) or over it (Over), pulsing every PulseMs; Icon above its HP bar). An effect: Motion Projectile (flies caster -> target over TravelMs, optionally drawing Projectile) or Instant; then at impact, per target: HitStopMs freeze, Flipbook, Particles, ScreenShake (Amplitude virtual px, DurationMs), HitFlash, DamageNumber; and Layers, composited in order, each timed from the hit-stop's release (StartMs, negative = before the impact; DurationMs) with its own Blend (Alpha or Additive), Anchor (Target: each target; Area: once, the centre of every hex the targets stand on; Caster) and Depth (Ground under the units, else Over): Flipbook (Frames at Fps, Scale -> EndScale), GroundDecal (a scorch sized to EndRadius hexes, fading over FadeOutMs), Shockwave (a ring growing StartRadius -> EndRadius hexes; EndRadius 0 = the affected area's radius), RadialBurst (Count sprites flying out along their rays), Particles (a burst), Glyphs (Count rune frames circling at StartRadius, rising RisePx, turning Spin times). Sheets are sprite Names and colours palette chars from content/art/pixel/pixel-art-manifest.json; tints multiply, so tinted sheets are drawn white (Tooling/PixelArt). EnemyAura (optional): the Gloam haze every standing enemy wears, an aura (as above, plus Alpha: its peak opacity, 0.05-1, and FrameMs: its sheet's frames loop one every FrameMs, 40-2000, 0 = still) at its feet under every unit, sized to its footprint's width (1, 1.75 or 2.5 hexes), each enemy on its own phase; half as opaque under the Reduced effects setting and off under Minimal. Presentation only. Painted (on a layer of any type but Particles, on a Particles spec, or on an aura): a single painted hero frame (Sheet: a manifest sprite of one frame, Filter linear; the layer's own Sheet is then optional and a Flipbook layer needs no Frames) animated by keyframed curves over a normalized time (a layer's duration, a particle's life, an aura's pulse): Scale (multiplies its size), Rotation (turns), Alpha (times the layer's fade in/out; given, it replaces the type's own fade, a particle's life fade or an aura's breathing) and Tint (palette chars, blended); RandomSpin starts each sprite of a multi-sprite part at its own seeded angle. Painted frames are drawn linear-filtered with premultiplied blending (additive as One + One). The element defaults draw the painted per-element frames (burst, ring, decal, glyph, ember) and the status defaults the painted status frames (docs/art/hollow-art-slots.md); Phoenix's three skills keep their pixel flipbooks. Ranges and rules: BeastCraft.Vfx.VfxLibraryValidator.",
   "SchemaVersion": 2,
   "EnemyAura": {
     "Sheet": "fx_gloam_haze",
@@ -77,16 +77,6 @@
           "Scale": 2,
           "Additive": true
         },
-        "Flipbook": {
-          "Sheet": "fx_hit_burst",
-          "FrameWidth": 24,
-          "FrameHeight": 24,
-          "Frames": 6,
-          "Fps": 16,
-          "Tint": "o",
-          "Scale": 1,
-          "Additive": false
-        },
         "Particles": {
           "Sheet": "fx_spark",
           "Count": 8,
@@ -99,7 +89,12 @@
             "r"
           ],
           "Gravity": 60,
-          "Additive": true
+          "Additive": true,
+          "Painted": {
+            "Sheet": "fx_painted_fire_ember",
+            "Scale": [ { "T": 0, "V": 1.0 }, { "T": 1, "V": 0.35 } ],
+            "RandomSpin": true
+          }
         },
         "ScreenShake": {
           "Amplitude": 1,
@@ -115,7 +110,75 @@
           "CritColor": "Y",
           "RiseMs": 700,
           "RisePx": 12
-        }
+        },
+        "Layers": [
+          {
+            "Type": "Glyphs",
+            "Anchor": "Caster",
+            "StartMs": -240,
+            "DurationMs": 340,
+            "Blend": "Additive",
+            "Scale": 1.0,
+            "FadeInMs": 80,
+            "FadeOutMs": 140,
+            "StartRadius": 0.55,
+            "EndRadius": 0.45,
+            "Count": 3,
+            "RisePx": 6,
+            "Spin": 0.3,
+            "Painted": {
+              "Sheet": "fx_painted_fire_glyph",
+              "Scale": [ { "T": 0, "V": 0.6 }, { "T": 0.4, "V": 1.0 } ],
+              "RandomSpin": true
+            }
+          },
+          {
+            "Type": "GroundDecal",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 700,
+            "Blend": "Alpha",
+            "Scale": 1.0,
+            "FadeOutMs": 450,
+            "StartRadius": 0.7,
+            "EndRadius": 0.7,
+            "Painted": {
+              "Sheet": "fx_painted_fire_decal",
+              "Scale": [ { "T": 0, "V": 0.7 }, { "T": 0.15, "V": 1.0 } ],
+              "Alpha": [ { "T": 0, "V": 0.85 }, { "T": 1, "V": 0.85 } ]
+            }
+          },
+          {
+            "Type": "Shockwave",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 420,
+            "Blend": "Additive",
+            "Scale": 1.0,
+            "StartRadius": 0.25,
+            "EndRadius": 1.0,
+            "Painted": {
+              "Sheet": "fx_painted_fire_ring",
+              "Alpha": [ { "T": 0, "V": 0.95 }, { "T": 0.6, "V": 0.5 }, { "T": 1, "V": 0 } ]
+            }
+          },
+          {
+            "Type": "Flipbook",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 360,
+            "Blend": "Additive",
+            "Scale": 0.8,
+            "Frames": 0,
+            "Fps": 12,
+            "Painted": {
+              "Sheet": "fx_painted_fire_burst",
+              "Scale": [ { "T": 0, "V": 0.35 }, { "T": 0.3, "V": 1.0 }, { "T": 1, "V": 1.25 } ],
+              "Rotation": [ { "T": 0, "V": 0 }, { "T": 1, "V": 0.08 } ],
+              "Alpha": [ { "T": 0, "V": 1 }, { "T": 0.45, "V": 0.9 }, { "T": 1, "V": 0 } ]
+            }
+          }
+        ]
       }
     },
     {
@@ -129,16 +192,6 @@
           "Scale": 2,
           "Additive": true
         },
-        "Flipbook": {
-          "Sheet": "fx_hit_burst",
-          "FrameWidth": 24,
-          "FrameHeight": 24,
-          "Frames": 6,
-          "Fps": 16,
-          "Tint": "c",
-          "Scale": 1,
-          "Additive": false
-        },
         "Particles": {
           "Sheet": "fx_spark",
           "Count": 8,
@@ -151,7 +204,12 @@
             "b"
           ],
           "Gravity": 60,
-          "Additive": true
+          "Additive": true,
+          "Painted": {
+            "Sheet": "fx_painted_water_ember",
+            "Scale": [ { "T": 0, "V": 1.0 }, { "T": 1, "V": 0.35 } ],
+            "RandomSpin": true
+          }
         },
         "ScreenShake": {
           "Amplitude": 1,
@@ -167,7 +225,75 @@
           "CritColor": "Y",
           "RiseMs": 700,
           "RisePx": 12
-        }
+        },
+        "Layers": [
+          {
+            "Type": "Glyphs",
+            "Anchor": "Caster",
+            "StartMs": -240,
+            "DurationMs": 340,
+            "Blend": "Additive",
+            "Scale": 1.0,
+            "FadeInMs": 80,
+            "FadeOutMs": 140,
+            "StartRadius": 0.55,
+            "EndRadius": 0.45,
+            "Count": 3,
+            "RisePx": 6,
+            "Spin": 0.3,
+            "Painted": {
+              "Sheet": "fx_painted_water_glyph",
+              "Scale": [ { "T": 0, "V": 0.6 }, { "T": 0.4, "V": 1.0 } ],
+              "RandomSpin": true
+            }
+          },
+          {
+            "Type": "GroundDecal",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 700,
+            "Blend": "Alpha",
+            "Scale": 1.0,
+            "FadeOutMs": 450,
+            "StartRadius": 0.7,
+            "EndRadius": 0.7,
+            "Painted": {
+              "Sheet": "fx_painted_water_decal",
+              "Scale": [ { "T": 0, "V": 0.7 }, { "T": 0.15, "V": 1.0 } ],
+              "Alpha": [ { "T": 0, "V": 0.85 }, { "T": 1, "V": 0.85 } ]
+            }
+          },
+          {
+            "Type": "Shockwave",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 420,
+            "Blend": "Additive",
+            "Scale": 1.0,
+            "StartRadius": 0.25,
+            "EndRadius": 1.0,
+            "Painted": {
+              "Sheet": "fx_painted_water_ring",
+              "Alpha": [ { "T": 0, "V": 0.95 }, { "T": 0.6, "V": 0.5 }, { "T": 1, "V": 0 } ]
+            }
+          },
+          {
+            "Type": "Flipbook",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 360,
+            "Blend": "Additive",
+            "Scale": 0.8,
+            "Frames": 0,
+            "Fps": 12,
+            "Painted": {
+              "Sheet": "fx_painted_water_burst",
+              "Scale": [ { "T": 0, "V": 0.35 }, { "T": 0.3, "V": 1.0 }, { "T": 1, "V": 1.25 } ],
+              "Rotation": [ { "T": 0, "V": 0 }, { "T": 1, "V": 0.08 } ],
+              "Alpha": [ { "T": 0, "V": 1 }, { "T": 0.45, "V": 0.9 }, { "T": 1, "V": 0 } ]
+            }
+          }
+        ]
       }
     },
     {
@@ -181,16 +307,6 @@
           "Scale": 2,
           "Additive": true
         },
-        "Flipbook": {
-          "Sheet": "fx_hit_burst",
-          "FrameWidth": 24,
-          "FrameHeight": 24,
-          "Frames": 6,
-          "Fps": 16,
-          "Tint": "M",
-          "Scale": 1,
-          "Additive": false
-        },
         "Particles": {
           "Sheet": "fx_spark",
           "Count": 8,
@@ -203,7 +319,12 @@
             "n"
           ],
           "Gravity": 60,
-          "Additive": true
+          "Additive": true,
+          "Painted": {
+            "Sheet": "fx_painted_earth_ember",
+            "Scale": [ { "T": 0, "V": 1.0 }, { "T": 1, "V": 0.35 } ],
+            "RandomSpin": true
+          }
         },
         "ScreenShake": {
           "Amplitude": 1,
@@ -219,7 +340,75 @@
           "CritColor": "Y",
           "RiseMs": 700,
           "RisePx": 12
-        }
+        },
+        "Layers": [
+          {
+            "Type": "Glyphs",
+            "Anchor": "Caster",
+            "StartMs": -240,
+            "DurationMs": 340,
+            "Blend": "Additive",
+            "Scale": 1.0,
+            "FadeInMs": 80,
+            "FadeOutMs": 140,
+            "StartRadius": 0.55,
+            "EndRadius": 0.45,
+            "Count": 3,
+            "RisePx": 6,
+            "Spin": 0.3,
+            "Painted": {
+              "Sheet": "fx_painted_earth_glyph",
+              "Scale": [ { "T": 0, "V": 0.6 }, { "T": 0.4, "V": 1.0 } ],
+              "RandomSpin": true
+            }
+          },
+          {
+            "Type": "GroundDecal",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 700,
+            "Blend": "Alpha",
+            "Scale": 1.0,
+            "FadeOutMs": 450,
+            "StartRadius": 0.7,
+            "EndRadius": 0.7,
+            "Painted": {
+              "Sheet": "fx_painted_earth_decal",
+              "Scale": [ { "T": 0, "V": 0.7 }, { "T": 0.15, "V": 1.0 } ],
+              "Alpha": [ { "T": 0, "V": 0.85 }, { "T": 1, "V": 0.85 } ]
+            }
+          },
+          {
+            "Type": "Shockwave",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 420,
+            "Blend": "Additive",
+            "Scale": 1.0,
+            "StartRadius": 0.25,
+            "EndRadius": 1.0,
+            "Painted": {
+              "Sheet": "fx_painted_earth_ring",
+              "Alpha": [ { "T": 0, "V": 0.95 }, { "T": 0.6, "V": 0.5 }, { "T": 1, "V": 0 } ]
+            }
+          },
+          {
+            "Type": "Flipbook",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 360,
+            "Blend": "Additive",
+            "Scale": 0.8,
+            "Frames": 0,
+            "Fps": 12,
+            "Painted": {
+              "Sheet": "fx_painted_earth_burst",
+              "Scale": [ { "T": 0, "V": 0.35 }, { "T": 0.3, "V": 1.0 }, { "T": 1, "V": 1.25 } ],
+              "Rotation": [ { "T": 0, "V": 0 }, { "T": 1, "V": 0.08 } ],
+              "Alpha": [ { "T": 0, "V": 1 }, { "T": 0.45, "V": 0.9 }, { "T": 1, "V": 0 } ]
+            }
+          }
+        ]
       }
     },
     {
@@ -233,16 +422,6 @@
           "Scale": 2,
           "Additive": true
         },
-        "Flipbook": {
-          "Sheet": "fx_hit_burst",
-          "FrameWidth": 24,
-          "FrameHeight": 24,
-          "Frames": 6,
-          "Fps": 16,
-          "Tint": "a",
-          "Scale": 1,
-          "Additive": false
-        },
         "Particles": {
           "Sheet": "fx_spark",
           "Count": 8,
@@ -255,7 +434,12 @@
             "4"
           ],
           "Gravity": 60,
-          "Additive": true
+          "Additive": true,
+          "Painted": {
+            "Sheet": "fx_painted_air_ember",
+            "Scale": [ { "T": 0, "V": 1.0 }, { "T": 1, "V": 0.35 } ],
+            "RandomSpin": true
+          }
         },
         "ScreenShake": {
           "Amplitude": 1,
@@ -271,7 +455,75 @@
           "CritColor": "Y",
           "RiseMs": 700,
           "RisePx": 12
-        }
+        },
+        "Layers": [
+          {
+            "Type": "Glyphs",
+            "Anchor": "Caster",
+            "StartMs": -240,
+            "DurationMs": 340,
+            "Blend": "Additive",
+            "Scale": 1.0,
+            "FadeInMs": 80,
+            "FadeOutMs": 140,
+            "StartRadius": 0.55,
+            "EndRadius": 0.45,
+            "Count": 3,
+            "RisePx": 6,
+            "Spin": 0.3,
+            "Painted": {
+              "Sheet": "fx_painted_air_glyph",
+              "Scale": [ { "T": 0, "V": 0.6 }, { "T": 0.4, "V": 1.0 } ],
+              "RandomSpin": true
+            }
+          },
+          {
+            "Type": "GroundDecal",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 700,
+            "Blend": "Alpha",
+            "Scale": 1.0,
+            "FadeOutMs": 450,
+            "StartRadius": 0.7,
+            "EndRadius": 0.7,
+            "Painted": {
+              "Sheet": "fx_painted_air_decal",
+              "Scale": [ { "T": 0, "V": 0.7 }, { "T": 0.15, "V": 1.0 } ],
+              "Alpha": [ { "T": 0, "V": 0.85 }, { "T": 1, "V": 0.85 } ]
+            }
+          },
+          {
+            "Type": "Shockwave",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 420,
+            "Blend": "Additive",
+            "Scale": 1.0,
+            "StartRadius": 0.25,
+            "EndRadius": 1.0,
+            "Painted": {
+              "Sheet": "fx_painted_air_ring",
+              "Alpha": [ { "T": 0, "V": 0.95 }, { "T": 0.6, "V": 0.5 }, { "T": 1, "V": 0 } ]
+            }
+          },
+          {
+            "Type": "Flipbook",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 360,
+            "Blend": "Additive",
+            "Scale": 0.8,
+            "Frames": 0,
+            "Fps": 12,
+            "Painted": {
+              "Sheet": "fx_painted_air_burst",
+              "Scale": [ { "T": 0, "V": 0.35 }, { "T": 0.3, "V": 1.0 }, { "T": 1, "V": 1.25 } ],
+              "Rotation": [ { "T": 0, "V": 0 }, { "T": 1, "V": 0.08 } ],
+              "Alpha": [ { "T": 0, "V": 1 }, { "T": 0.45, "V": 0.9 }, { "T": 1, "V": 0 } ]
+            }
+          }
+        ]
       }
     },
     {
@@ -285,16 +537,6 @@
           "Scale": 2,
           "Additive": true
         },
-        "Flipbook": {
-          "Sheet": "fx_hit_burst",
-          "FrameWidth": 24,
-          "FrameHeight": 24,
-          "Frames": 6,
-          "Fps": 16,
-          "Tint": "Y",
-          "Scale": 1,
-          "Additive": false
-        },
         "Particles": {
           "Sheet": "fx_spark",
           "Count": 8,
@@ -307,7 +549,12 @@
             "P"
           ],
           "Gravity": 60,
-          "Additive": true
+          "Additive": true,
+          "Painted": {
+            "Sheet": "fx_painted_lightning_ember",
+            "Scale": [ { "T": 0, "V": 1.0 }, { "T": 1, "V": 0.35 } ],
+            "RandomSpin": true
+          }
         },
         "ScreenShake": {
           "Amplitude": 1,
@@ -323,7 +570,75 @@
           "CritColor": "Y",
           "RiseMs": 700,
           "RisePx": 12
-        }
+        },
+        "Layers": [
+          {
+            "Type": "Glyphs",
+            "Anchor": "Caster",
+            "StartMs": -240,
+            "DurationMs": 340,
+            "Blend": "Additive",
+            "Scale": 1.0,
+            "FadeInMs": 80,
+            "FadeOutMs": 140,
+            "StartRadius": 0.55,
+            "EndRadius": 0.45,
+            "Count": 3,
+            "RisePx": 6,
+            "Spin": 0.3,
+            "Painted": {
+              "Sheet": "fx_painted_lightning_glyph",
+              "Scale": [ { "T": 0, "V": 0.6 }, { "T": 0.4, "V": 1.0 } ],
+              "RandomSpin": true
+            }
+          },
+          {
+            "Type": "GroundDecal",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 700,
+            "Blend": "Alpha",
+            "Scale": 1.0,
+            "FadeOutMs": 450,
+            "StartRadius": 0.7,
+            "EndRadius": 0.7,
+            "Painted": {
+              "Sheet": "fx_painted_lightning_decal",
+              "Scale": [ { "T": 0, "V": 0.7 }, { "T": 0.15, "V": 1.0 } ],
+              "Alpha": [ { "T": 0, "V": 0.85 }, { "T": 1, "V": 0.85 } ]
+            }
+          },
+          {
+            "Type": "Shockwave",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 420,
+            "Blend": "Additive",
+            "Scale": 1.0,
+            "StartRadius": 0.25,
+            "EndRadius": 1.0,
+            "Painted": {
+              "Sheet": "fx_painted_lightning_ring",
+              "Alpha": [ { "T": 0, "V": 0.95 }, { "T": 0.6, "V": 0.5 }, { "T": 1, "V": 0 } ]
+            }
+          },
+          {
+            "Type": "Flipbook",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 360,
+            "Blend": "Additive",
+            "Scale": 0.8,
+            "Frames": 0,
+            "Fps": 12,
+            "Painted": {
+              "Sheet": "fx_painted_lightning_burst",
+              "Scale": [ { "T": 0, "V": 0.35 }, { "T": 0.3, "V": 1.0 }, { "T": 1, "V": 1.25 } ],
+              "Rotation": [ { "T": 0, "V": 0 }, { "T": 1, "V": 0.08 } ],
+              "Alpha": [ { "T": 0, "V": 1 }, { "T": 0.45, "V": 0.9 }, { "T": 1, "V": 0 } ]
+            }
+          }
+        ]
       }
     },
     {
@@ -337,16 +652,6 @@
           "Scale": 2,
           "Additive": true
         },
-        "Flipbook": {
-          "Sheet": "fx_hit_burst",
-          "FrameWidth": 24,
-          "FrameHeight": 24,
-          "Frames": 6,
-          "Fps": 16,
-          "Tint": "C",
-          "Scale": 1,
-          "Additive": false
-        },
         "Particles": {
           "Sheet": "fx_spark",
           "Count": 8,
@@ -359,7 +664,12 @@
             "c"
           ],
           "Gravity": 60,
-          "Additive": true
+          "Additive": true,
+          "Painted": {
+            "Sheet": "fx_painted_ice_ember",
+            "Scale": [ { "T": 0, "V": 1.0 }, { "T": 1, "V": 0.35 } ],
+            "RandomSpin": true
+          }
         },
         "ScreenShake": {
           "Amplitude": 1,
@@ -375,7 +685,75 @@
           "CritColor": "Y",
           "RiseMs": 700,
           "RisePx": 12
-        }
+        },
+        "Layers": [
+          {
+            "Type": "Glyphs",
+            "Anchor": "Caster",
+            "StartMs": -240,
+            "DurationMs": 340,
+            "Blend": "Additive",
+            "Scale": 1.0,
+            "FadeInMs": 80,
+            "FadeOutMs": 140,
+            "StartRadius": 0.55,
+            "EndRadius": 0.45,
+            "Count": 3,
+            "RisePx": 6,
+            "Spin": 0.3,
+            "Painted": {
+              "Sheet": "fx_painted_ice_glyph",
+              "Scale": [ { "T": 0, "V": 0.6 }, { "T": 0.4, "V": 1.0 } ],
+              "RandomSpin": true
+            }
+          },
+          {
+            "Type": "GroundDecal",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 700,
+            "Blend": "Alpha",
+            "Scale": 1.0,
+            "FadeOutMs": 450,
+            "StartRadius": 0.7,
+            "EndRadius": 0.7,
+            "Painted": {
+              "Sheet": "fx_painted_ice_decal",
+              "Scale": [ { "T": 0, "V": 0.7 }, { "T": 0.15, "V": 1.0 } ],
+              "Alpha": [ { "T": 0, "V": 0.85 }, { "T": 1, "V": 0.85 } ]
+            }
+          },
+          {
+            "Type": "Shockwave",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 420,
+            "Blend": "Additive",
+            "Scale": 1.0,
+            "StartRadius": 0.25,
+            "EndRadius": 1.0,
+            "Painted": {
+              "Sheet": "fx_painted_ice_ring",
+              "Alpha": [ { "T": 0, "V": 0.95 }, { "T": 0.6, "V": 0.5 }, { "T": 1, "V": 0 } ]
+            }
+          },
+          {
+            "Type": "Flipbook",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 360,
+            "Blend": "Additive",
+            "Scale": 0.8,
+            "Frames": 0,
+            "Fps": 12,
+            "Painted": {
+              "Sheet": "fx_painted_ice_burst",
+              "Scale": [ { "T": 0, "V": 0.35 }, { "T": 0.3, "V": 1.0 }, { "T": 1, "V": 1.25 } ],
+              "Rotation": [ { "T": 0, "V": 0 }, { "T": 1, "V": 0.08 } ],
+              "Alpha": [ { "T": 0, "V": 1 }, { "T": 0.45, "V": 0.9 }, { "T": 1, "V": 0 } ]
+            }
+          }
+        ]
       }
     },
     {
@@ -389,16 +767,6 @@
           "Scale": 2,
           "Additive": true
         },
-        "Flipbook": {
-          "Sheet": "fx_hit_burst",
-          "FrameWidth": 24,
-          "FrameHeight": 24,
-          "Frames": 6,
-          "Fps": 16,
-          "Tint": "l",
-          "Scale": 1,
-          "Additive": false
-        },
         "Particles": {
           "Sheet": "fx_spark",
           "Count": 8,
@@ -411,7 +779,12 @@
             "g"
           ],
           "Gravity": 60,
-          "Additive": true
+          "Additive": true,
+          "Painted": {
+            "Sheet": "fx_painted_nature_ember",
+            "Scale": [ { "T": 0, "V": 1.0 }, { "T": 1, "V": 0.35 } ],
+            "RandomSpin": true
+          }
         },
         "ScreenShake": {
           "Amplitude": 1,
@@ -427,7 +800,75 @@
           "CritColor": "Y",
           "RiseMs": 700,
           "RisePx": 12
-        }
+        },
+        "Layers": [
+          {
+            "Type": "Glyphs",
+            "Anchor": "Caster",
+            "StartMs": -240,
+            "DurationMs": 340,
+            "Blend": "Additive",
+            "Scale": 1.0,
+            "FadeInMs": 80,
+            "FadeOutMs": 140,
+            "StartRadius": 0.55,
+            "EndRadius": 0.45,
+            "Count": 3,
+            "RisePx": 6,
+            "Spin": 0.3,
+            "Painted": {
+              "Sheet": "fx_painted_nature_glyph",
+              "Scale": [ { "T": 0, "V": 0.6 }, { "T": 0.4, "V": 1.0 } ],
+              "RandomSpin": true
+            }
+          },
+          {
+            "Type": "GroundDecal",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 700,
+            "Blend": "Alpha",
+            "Scale": 1.0,
+            "FadeOutMs": 450,
+            "StartRadius": 0.7,
+            "EndRadius": 0.7,
+            "Painted": {
+              "Sheet": "fx_painted_nature_decal",
+              "Scale": [ { "T": 0, "V": 0.7 }, { "T": 0.15, "V": 1.0 } ],
+              "Alpha": [ { "T": 0, "V": 0.85 }, { "T": 1, "V": 0.85 } ]
+            }
+          },
+          {
+            "Type": "Shockwave",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 420,
+            "Blend": "Additive",
+            "Scale": 1.0,
+            "StartRadius": 0.25,
+            "EndRadius": 1.0,
+            "Painted": {
+              "Sheet": "fx_painted_nature_ring",
+              "Alpha": [ { "T": 0, "V": 0.95 }, { "T": 0.6, "V": 0.5 }, { "T": 1, "V": 0 } ]
+            }
+          },
+          {
+            "Type": "Flipbook",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 360,
+            "Blend": "Additive",
+            "Scale": 0.8,
+            "Frames": 0,
+            "Fps": 12,
+            "Painted": {
+              "Sheet": "fx_painted_nature_burst",
+              "Scale": [ { "T": 0, "V": 0.35 }, { "T": 0.3, "V": 1.0 }, { "T": 1, "V": 1.25 } ],
+              "Rotation": [ { "T": 0, "V": 0 }, { "T": 1, "V": 0.08 } ],
+              "Alpha": [ { "T": 0, "V": 1 }, { "T": 0.45, "V": 0.9 }, { "T": 1, "V": 0 } ]
+            }
+          }
+        ]
       }
     },
     {
@@ -441,16 +882,6 @@
           "Scale": 2,
           "Additive": true
         },
-        "Flipbook": {
-          "Sheet": "fx_hit_burst",
-          "FrameWidth": 24,
-          "FrameHeight": 24,
-          "Frames": 6,
-          "Fps": 16,
-          "Tint": "3",
-          "Scale": 1,
-          "Additive": false
-        },
         "Particles": {
           "Sheet": "fx_spark",
           "Count": 8,
@@ -463,7 +894,12 @@
             "2"
           ],
           "Gravity": 60,
-          "Additive": true
+          "Additive": true,
+          "Painted": {
+            "Sheet": "fx_painted_metal_ember",
+            "Scale": [ { "T": 0, "V": 1.0 }, { "T": 1, "V": 0.35 } ],
+            "RandomSpin": true
+          }
         },
         "ScreenShake": {
           "Amplitude": 1,
@@ -479,7 +915,75 @@
           "CritColor": "Y",
           "RiseMs": 700,
           "RisePx": 12
-        }
+        },
+        "Layers": [
+          {
+            "Type": "Glyphs",
+            "Anchor": "Caster",
+            "StartMs": -240,
+            "DurationMs": 340,
+            "Blend": "Additive",
+            "Scale": 1.0,
+            "FadeInMs": 80,
+            "FadeOutMs": 140,
+            "StartRadius": 0.55,
+            "EndRadius": 0.45,
+            "Count": 3,
+            "RisePx": 6,
+            "Spin": 0.3,
+            "Painted": {
+              "Sheet": "fx_painted_metal_glyph",
+              "Scale": [ { "T": 0, "V": 0.6 }, { "T": 0.4, "V": 1.0 } ],
+              "RandomSpin": true
+            }
+          },
+          {
+            "Type": "GroundDecal",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 700,
+            "Blend": "Alpha",
+            "Scale": 1.0,
+            "FadeOutMs": 450,
+            "StartRadius": 0.7,
+            "EndRadius": 0.7,
+            "Painted": {
+              "Sheet": "fx_painted_metal_decal",
+              "Scale": [ { "T": 0, "V": 0.7 }, { "T": 0.15, "V": 1.0 } ],
+              "Alpha": [ { "T": 0, "V": 0.85 }, { "T": 1, "V": 0.85 } ]
+            }
+          },
+          {
+            "Type": "Shockwave",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 420,
+            "Blend": "Additive",
+            "Scale": 1.0,
+            "StartRadius": 0.25,
+            "EndRadius": 1.0,
+            "Painted": {
+              "Sheet": "fx_painted_metal_ring",
+              "Alpha": [ { "T": 0, "V": 0.95 }, { "T": 0.6, "V": 0.5 }, { "T": 1, "V": 0 } ]
+            }
+          },
+          {
+            "Type": "Flipbook",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 360,
+            "Blend": "Additive",
+            "Scale": 0.8,
+            "Frames": 0,
+            "Fps": 12,
+            "Painted": {
+              "Sheet": "fx_painted_metal_burst",
+              "Scale": [ { "T": 0, "V": 0.35 }, { "T": 0.3, "V": 1.0 }, { "T": 1, "V": 1.25 } ],
+              "Rotation": [ { "T": 0, "V": 0 }, { "T": 1, "V": 0.08 } ],
+              "Alpha": [ { "T": 0, "V": 1 }, { "T": 0.45, "V": 0.9 }, { "T": 1, "V": 0 } ]
+            }
+          }
+        ]
       }
     },
     {
@@ -493,16 +997,6 @@
           "Scale": 2,
           "Additive": true
         },
-        "Flipbook": {
-          "Sheet": "fx_hit_burst",
-          "FrameWidth": 24,
-          "FrameHeight": 24,
-          "Frames": 6,
-          "Fps": 16,
-          "Tint": "w",
-          "Scale": 1,
-          "Additive": false
-        },
         "Particles": {
           "Sheet": "fx_spark",
           "Count": 8,
@@ -515,7 +1009,12 @@
             "h"
           ],
           "Gravity": 60,
-          "Additive": true
+          "Additive": true,
+          "Painted": {
+            "Sheet": "fx_painted_light_ember",
+            "Scale": [ { "T": 0, "V": 1.0 }, { "T": 1, "V": 0.35 } ],
+            "RandomSpin": true
+          }
         },
         "ScreenShake": {
           "Amplitude": 1,
@@ -531,7 +1030,75 @@
           "CritColor": "Y",
           "RiseMs": 700,
           "RisePx": 12
-        }
+        },
+        "Layers": [
+          {
+            "Type": "Glyphs",
+            "Anchor": "Caster",
+            "StartMs": -240,
+            "DurationMs": 340,
+            "Blend": "Additive",
+            "Scale": 1.0,
+            "FadeInMs": 80,
+            "FadeOutMs": 140,
+            "StartRadius": 0.55,
+            "EndRadius": 0.45,
+            "Count": 3,
+            "RisePx": 6,
+            "Spin": 0.3,
+            "Painted": {
+              "Sheet": "fx_painted_light_glyph",
+              "Scale": [ { "T": 0, "V": 0.6 }, { "T": 0.4, "V": 1.0 } ],
+              "RandomSpin": true
+            }
+          },
+          {
+            "Type": "GroundDecal",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 700,
+            "Blend": "Alpha",
+            "Scale": 1.0,
+            "FadeOutMs": 450,
+            "StartRadius": 0.7,
+            "EndRadius": 0.7,
+            "Painted": {
+              "Sheet": "fx_painted_light_decal",
+              "Scale": [ { "T": 0, "V": 0.7 }, { "T": 0.15, "V": 1.0 } ],
+              "Alpha": [ { "T": 0, "V": 0.85 }, { "T": 1, "V": 0.85 } ]
+            }
+          },
+          {
+            "Type": "Shockwave",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 420,
+            "Blend": "Additive",
+            "Scale": 1.0,
+            "StartRadius": 0.25,
+            "EndRadius": 1.0,
+            "Painted": {
+              "Sheet": "fx_painted_light_ring",
+              "Alpha": [ { "T": 0, "V": 0.95 }, { "T": 0.6, "V": 0.5 }, { "T": 1, "V": 0 } ]
+            }
+          },
+          {
+            "Type": "Flipbook",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 360,
+            "Blend": "Additive",
+            "Scale": 0.8,
+            "Frames": 0,
+            "Fps": 12,
+            "Painted": {
+              "Sheet": "fx_painted_light_burst",
+              "Scale": [ { "T": 0, "V": 0.35 }, { "T": 0.3, "V": 1.0 }, { "T": 1, "V": 1.25 } ],
+              "Rotation": [ { "T": 0, "V": 0 }, { "T": 1, "V": 0.08 } ],
+              "Alpha": [ { "T": 0, "V": 1 }, { "T": 0.45, "V": 0.9 }, { "T": 1, "V": 0 } ]
+            }
+          }
+        ]
       }
     },
     {
@@ -545,16 +1112,6 @@
           "Scale": 2,
           "Additive": true
         },
-        "Flipbook": {
-          "Sheet": "fx_hit_burst",
-          "FrameWidth": 24,
-          "FrameHeight": 24,
-          "Frames": 6,
-          "Fps": 16,
-          "Tint": "u",
-          "Scale": 1,
-          "Additive": false
-        },
         "Particles": {
           "Sheet": "fx_spark",
           "Count": 8,
@@ -567,7 +1124,12 @@
             "p"
           ],
           "Gravity": 60,
-          "Additive": true
+          "Additive": true,
+          "Painted": {
+            "Sheet": "fx_painted_dark_ember",
+            "Scale": [ { "T": 0, "V": 1.0 }, { "T": 1, "V": 0.35 } ],
+            "RandomSpin": true
+          }
         },
         "ScreenShake": {
           "Amplitude": 1,
@@ -583,7 +1145,75 @@
           "CritColor": "Y",
           "RiseMs": 700,
           "RisePx": 12
-        }
+        },
+        "Layers": [
+          {
+            "Type": "Glyphs",
+            "Anchor": "Caster",
+            "StartMs": -240,
+            "DurationMs": 340,
+            "Blend": "Additive",
+            "Scale": 1.0,
+            "FadeInMs": 80,
+            "FadeOutMs": 140,
+            "StartRadius": 0.55,
+            "EndRadius": 0.45,
+            "Count": 3,
+            "RisePx": 6,
+            "Spin": 0.3,
+            "Painted": {
+              "Sheet": "fx_painted_dark_glyph",
+              "Scale": [ { "T": 0, "V": 0.6 }, { "T": 0.4, "V": 1.0 } ],
+              "RandomSpin": true
+            }
+          },
+          {
+            "Type": "GroundDecal",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 700,
+            "Blend": "Alpha",
+            "Scale": 1.0,
+            "FadeOutMs": 450,
+            "StartRadius": 0.7,
+            "EndRadius": 0.7,
+            "Painted": {
+              "Sheet": "fx_painted_dark_decal",
+              "Scale": [ { "T": 0, "V": 0.7 }, { "T": 0.15, "V": 1.0 } ],
+              "Alpha": [ { "T": 0, "V": 0.85 }, { "T": 1, "V": 0.85 } ]
+            }
+          },
+          {
+            "Type": "Shockwave",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 420,
+            "Blend": "Additive",
+            "Scale": 1.0,
+            "StartRadius": 0.25,
+            "EndRadius": 1.0,
+            "Painted": {
+              "Sheet": "fx_painted_dark_ring",
+              "Alpha": [ { "T": 0, "V": 0.95 }, { "T": 0.6, "V": 0.5 }, { "T": 1, "V": 0 } ]
+            }
+          },
+          {
+            "Type": "Flipbook",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 360,
+            "Blend": "Additive",
+            "Scale": 0.8,
+            "Frames": 0,
+            "Fps": 12,
+            "Painted": {
+              "Sheet": "fx_painted_dark_burst",
+              "Scale": [ { "T": 0, "V": 0.35 }, { "T": 0.3, "V": 1.0 }, { "T": 1, "V": 1.25 } ],
+              "Rotation": [ { "T": 0, "V": 0 }, { "T": 1, "V": 0.08 } ],
+              "Alpha": [ { "T": 0, "V": 1 }, { "T": 0.45, "V": 0.9 }, { "T": 1, "V": 0 } ]
+            }
+          }
+        ]
       }
     }
   ],
@@ -599,15 +1229,16 @@
             "Type": "Flipbook",
             "Anchor": "Target",
             "StartMs": 0,
-            "DurationMs": 520,
+            "DurationMs": 460,
             "Blend": "Additive",
-            "Sheet": "fx_glow",
-            "Tint": "l",
             "Scale": 1.0,
-            "EndScale": 2.2,
-            "FadeOutMs": 520,
-            "Frames": 1,
-            "Fps": 1
+            "Frames": 0,
+            "Fps": 12,
+            "Painted": {
+              "Sheet": "fx_painted_status_heal",
+              "Scale": [ { "T": 0, "V": 0.5 }, { "T": 0.35, "V": 1.1 }, { "T": 1, "V": 1.0 } ],
+              "Alpha": [ { "T": 0, "V": 0 }, { "T": 0.15, "V": 1 }, { "T": 0.7, "V": 0.9 }, { "T": 1, "V": 0 } ]
+            }
           },
           {
             "Type": "Glyphs",
@@ -673,27 +1304,30 @@
             "Type": "Flipbook",
             "Anchor": "Target",
             "StartMs": 0,
-            "DurationMs": 380,
+            "DurationMs": 460,
             "Blend": "Additive",
-            "Sheet": "fx_glow",
-            "Tint": "C",
-            "Scale": 1.4,
-            "EndScale": 1.0,
-            "FadeOutMs": 380,
-            "Frames": 1,
-            "Fps": 1
+            "Scale": 1.0,
+            "Frames": 0,
+            "Fps": 12,
+            "Painted": {
+              "Sheet": "fx_painted_status_shield",
+              "Scale": [ { "T": 0, "V": 0.5 }, { "T": 0.35, "V": 1.1 }, { "T": 1, "V": 1.0 } ],
+              "Alpha": [ { "T": 0, "V": 0 }, { "T": 0.15, "V": 1 }, { "T": 0.7, "V": 0.9 }, { "T": 1, "V": 0 } ]
+            }
           }
         ]
       },
       "Aura": {
-        "Sheet": "fx_aura_ring",
-        "Tint": "C",
         "Scale": 1.0,
         "PulseMs": 1400,
         "Blend": "Additive",
         "Depth": "Ground",
         "Icon": "icon_shield",
-        "IconTint": ""
+        "IconTint": "",
+        "Painted": {
+          "Sheet": "fx_painted_status_shield",
+          "Alpha": [ { "T": 0, "V": 0.5249999999999999 }, { "T": 0.5, "V": 0.7 }, { "T": 1, "V": 0.5249999999999999 } ]
+        }
       }
     },
     {
@@ -732,18 +1366,35 @@
             "StartRadius": 0.3,
             "EndRadius": 1.0,
             "Count": 6
+          },
+          {
+            "Type": "Flipbook",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 460,
+            "Blend": "Additive",
+            "Scale": 1.0,
+            "Frames": 0,
+            "Fps": 12,
+            "Painted": {
+              "Sheet": "fx_painted_status_taunt",
+              "Scale": [ { "T": 0, "V": 0.5 }, { "T": 0.35, "V": 1.1 }, { "T": 1, "V": 1.0 } ],
+              "Alpha": [ { "T": 0, "V": 0 }, { "T": 0.15, "V": 1 }, { "T": 0.7, "V": 0.9 }, { "T": 1, "V": 0 } ]
+            }
           }
         ]
       },
       "Aura": {
-        "Sheet": "fx_aura_ring",
-        "Tint": "r",
         "Scale": 1.0,
         "PulseMs": 900,
         "Blend": "Additive",
         "Depth": "Ground",
         "Icon": "icon_taunt",
-        "IconTint": ""
+        "IconTint": "",
+        "Painted": {
+          "Sheet": "fx_painted_status_taunt",
+          "Alpha": [ { "T": 0, "V": 0.5249999999999999 }, { "T": 0.5, "V": 0.7 }, { "T": 1, "V": 0.5249999999999999 } ]
+        }
       }
     },
     {
@@ -779,27 +1430,32 @@
             "Type": "Flipbook",
             "Anchor": "Target",
             "StartMs": 0,
-            "DurationMs": 300,
+            "DurationMs": 460,
             "Blend": "Additive",
-            "Sheet": "fx_glow",
-            "Tint": "Y",
-            "Scale": 0.8,
-            "EndScale": 1.6,
-            "FadeOutMs": 300,
-            "Frames": 1,
-            "Fps": 1
+            "Scale": 1.0,
+            "Frames": 0,
+            "Fps": 12,
+            "Painted": {
+              "Sheet": "fx_painted_status_stun",
+              "Scale": [ { "T": 0, "V": 0.5 }, { "T": 0.35, "V": 1.1 }, { "T": 1, "V": 1.0 } ],
+              "Alpha": [ { "T": 0, "V": 0 }, { "T": 0.15, "V": 1 }, { "T": 0.7, "V": 0.9 }, { "T": 1, "V": 0 } ]
+            }
           }
         ]
       },
       "Aura": {
-        "Sheet": "fx_glow",
-        "Tint": "Y",
         "Scale": 0.6,
         "PulseMs": 600,
         "Blend": "Additive",
         "Depth": "Over",
         "Icon": "icon_stun",
-        "IconTint": ""
+        "IconTint": "",
+        "Painted": {
+          "Sheet": "fx_painted_status_stun",
+          "Scale": [ { "T": 0, "V": 1.0 }, { "T": 1, "V": 1.0 } ],
+          "Alpha": [ { "T": 0, "V": 0.675 }, { "T": 0.5, "V": 0.9 }, { "T": 1, "V": 0.675 } ],
+          "Rotation": [ { "T": 0, "V": 0 }, { "T": 1, "V": 1 } ]
+        }
       }
     },
     {
@@ -841,18 +1497,35 @@
               "Gravity": -60,
               "Additive": true
             }
+          },
+          {
+            "Type": "Flipbook",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 460,
+            "Blend": "Additive",
+            "Scale": 1.0,
+            "Frames": 0,
+            "Fps": 12,
+            "Painted": {
+              "Sheet": "fx_painted_status_burn",
+              "Scale": [ { "T": 0, "V": 0.5 }, { "T": 0.35, "V": 1.1 }, { "T": 1, "V": 1.0 } ],
+              "Alpha": [ { "T": 0, "V": 0 }, { "T": 0.15, "V": 1 }, { "T": 0.7, "V": 0.9 }, { "T": 1, "V": 0 } ]
+            }
           }
         ]
       },
       "Aura": {
-        "Sheet": "fx_glow",
-        "Tint": "o",
         "Scale": 0.9,
         "PulseMs": 700,
         "Blend": "Additive",
         "Depth": "Ground",
         "Icon": "icon_burn",
-        "IconTint": ""
+        "IconTint": "",
+        "Painted": {
+          "Sheet": "fx_painted_status_burn",
+          "Alpha": [ { "T": 0, "V": 0.5249999999999999 }, { "T": 0.5, "V": 0.7 }, { "T": 1, "V": 0.5249999999999999 } ]
+        }
       }
     },
     {
@@ -866,15 +1539,16 @@
             "Type": "Flipbook",
             "Anchor": "Target",
             "StartMs": 0,
-            "DurationMs": 420,
+            "DurationMs": 460,
             "Blend": "Additive",
-            "Sheet": "fx_glow",
-            "Tint": "G",
-            "Scale": 0.8,
-            "EndScale": 1.6,
-            "FadeOutMs": 420,
-            "Frames": 1,
-            "Fps": 1
+            "Scale": 1.0,
+            "Frames": 0,
+            "Fps": 12,
+            "Painted": {
+              "Sheet": "fx_painted_status_poison",
+              "Scale": [ { "T": 0, "V": 0.5 }, { "T": 0.35, "V": 1.1 }, { "T": 1, "V": 1.0 } ],
+              "Alpha": [ { "T": 0, "V": 0 }, { "T": 0.15, "V": 1 }, { "T": 0.7, "V": 0.9 }, { "T": 1, "V": 0 } ]
+            }
           },
           {
             "Type": "Particles",
@@ -899,14 +1573,16 @@
         ]
       },
       "Aura": {
-        "Sheet": "fx_aura_ring",
-        "Tint": "G",
         "Scale": 1.0,
         "PulseMs": 1000,
         "Blend": "Additive",
         "Depth": "Ground",
         "Icon": "icon_poison",
-        "IconTint": ""
+        "IconTint": "",
+        "Painted": {
+          "Sheet": "fx_painted_status_poison",
+          "Alpha": [ { "T": 0, "V": 0.5249999999999999 }, { "T": 0.5, "V": 0.7 }, { "T": 1, "V": 0.5249999999999999 } ]
+        }
       }
     },
     {
@@ -943,6 +1619,21 @@
             "Count": 4,
             "RisePx": 14,
             "Spin": -0.5
+          },
+          {
+            "Type": "Flipbook",
+            "Anchor": "Target",
+            "StartMs": 0,
+            "DurationMs": 460,
+            "Blend": "Additive",
+            "Scale": 1.0,
+            "Frames": 0,
+            "Fps": 12,
+            "Painted": {
+              "Sheet": "fx_painted_status_cleanse",
+              "Scale": [ { "T": 0, "V": 0.5 }, { "T": 0.35, "V": 1.1 }, { "T": 1, "V": 1.0 } ],
+              "Alpha": [ { "T": 0, "V": 0 }, { "T": 0.15, "V": 1 }, { "T": 0.7, "V": 0.9 }, { "T": 1, "V": 0 } ]
+            }
           }
         ]
       }
@@ -958,15 +1649,16 @@
             "Type": "Flipbook",
             "Anchor": "Target",
             "StartMs": 0,
-            "DurationMs": 360,
+            "DurationMs": 460,
             "Blend": "Additive",
-            "Sheet": "fx_glow",
-            "Tint": "l",
-            "Scale": 0.8,
-            "EndScale": 1.5,
-            "FadeOutMs": 360,
-            "Frames": 1,
-            "Fps": 1
+            "Scale": 1.0,
+            "Frames": 0,
+            "Fps": 12,
+            "Painted": {
+              "Sheet": "fx_painted_status_buff",
+              "Scale": [ { "T": 0, "V": 0.5 }, { "T": 0.35, "V": 1.1 }, { "T": 1, "V": 1.0 } ],
+              "Alpha": [ { "T": 0, "V": 0 }, { "T": 0.15, "V": 1 }, { "T": 0.7, "V": 0.9 }, { "T": 1, "V": 0 } ]
+            }
           },
           {
             "Type": "Glyphs",
@@ -987,12 +1679,16 @@
         ]
       },
       "Aura": {
-        "Scale": 1.0,
+        "Scale": 0.6,
         "PulseMs": 1200,
         "Blend": "Additive",
-        "Depth": "Ground",
+        "Depth": "Over",
         "Icon": "icon_buff",
-        "IconTint": ""
+        "IconTint": "",
+        "Painted": {
+          "Sheet": "fx_painted_status_buff",
+          "Alpha": [ { "T": 0, "V": 0.3375 }, { "T": 0.5, "V": 0.45 }, { "T": 1, "V": 0.3375 } ]
+        }
       }
     },
     {
@@ -1006,15 +1702,16 @@
             "Type": "Flipbook",
             "Anchor": "Target",
             "StartMs": 0,
-            "DurationMs": 360,
+            "DurationMs": 460,
             "Blend": "Additive",
-            "Sheet": "fx_glow",
-            "Tint": "u",
-            "Scale": 1.5,
-            "EndScale": 0.8,
-            "FadeOutMs": 360,
-            "Frames": 1,
-            "Fps": 1
+            "Scale": 1.0,
+            "Frames": 0,
+            "Fps": 12,
+            "Painted": {
+              "Sheet": "fx_painted_status_debuff",
+              "Scale": [ { "T": 0, "V": 1.3 }, { "T": 0.35, "V": 0.8800000000000001 }, { "T": 1, "V": 0.8 } ],
+              "Alpha": [ { "T": 0, "V": 0 }, { "T": 0.15, "V": 1 }, { "T": 0.7, "V": 0.9 }, { "T": 1, "V": 0 } ]
+            }
           },
           {
             "Type": "Particles",
@@ -1039,12 +1736,16 @@
         ]
       },
       "Aura": {
-        "Scale": 1.0,
+        "Scale": 0.6,
         "PulseMs": 1200,
         "Blend": "Additive",
-        "Depth": "Ground",
+        "Depth": "Over",
         "Icon": "icon_debuff",
-        "IconTint": ""
+        "IconTint": "",
+        "Painted": {
+          "Sheet": "fx_painted_status_debuff",
+          "Alpha": [ { "T": 0, "V": 0.3375 }, { "T": 0.5, "V": 0.45 }, { "T": 1, "V": 0.3375 } ]
+        }
       }
     },
     {

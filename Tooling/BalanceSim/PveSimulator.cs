@@ -327,12 +327,16 @@ namespace BeastCraft.Tooling.BalanceSim
         private readonly SkillInstance[][] _elementalLibraryKits;
         private readonly SkillInstance[][] _neutralLibraryKits;
 
+        /// <summary>The battle layouts every battle picks its obstacles from (<c>--obstacles</c>), or null for open boards.</summary>
+        private readonly BattleLayoutData _layouts;
+
         /// <summary>The avatar passives' authored effects: a shield whose origin is one of these came from a passive (<c>--avatar-value</c>).</summary>
         private readonly HashSet<SkillEffect> _passiveEffects;
 
         public PveSimulator(SimOptions options, IReadOnlyList<CreatureSpeciesSO> species)
         {
             _options = options;
+            _layouts = options.Layouts;
             _species = species;
             GearFor = options.GearKits == null || options.Gear == GearProfile.None ? null : (s, l) => options.GearKits.For(s, l, options.Gear);
             // Every species shares the medium curve; the avatar's fixture stats follow it too.
@@ -1166,6 +1170,12 @@ namespace BeastCraft.Tooling.BalanceSim
             int[] team = Teams[teamIndex];
             int[] slots = SlotOrders[teamIndex];
             HexGrid grid = new HexGrid(encounter.Arena);
+
+            // The battlefield, as BattleSession builds it: one of --obstacles' region's layouts for the
+            // arena, picked from the battle's seed on its own stream, blocked before anyone is placed
+            // (obstacles are never in a deployment zone, so the placement below is the open board's).
+            int battleSeed = DeriveSeed(_options.Seed, mode, level, encounter.Id, teamIndex, sample);
+            BattleLayouts.Apply(grid, BattleLayouts.Pick(_layouts, _options.ObstaclesRegion, encounter.Arena, battleSeed));
             List<BattleUnit> units = new List<BattleUnit>();
             string playerPrefix = playersWinTies ? TieWinnerPrefix : TieLoserPrefix;
             string enemyPrefix = playersWinTies ? TieLoserPrefix : TieWinnerPrefix;
@@ -1238,7 +1248,6 @@ namespace BeastCraft.Tooling.BalanceSim
                 battle.MemberEscortDamage = new int[team.Length];
             }
 
-            int battleSeed = DeriveSeed(_options.Seed, mode, level, encounter.Id, teamIndex, sample);
             Random rng = new Random(battleSeed);
             if (Consumable != null)
             {

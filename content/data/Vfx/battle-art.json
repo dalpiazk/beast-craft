@@ -1,0 +1,61 @@
+{
+  "_readme": "How the battle screen dresses the board (presentation only; never read by the battle). Backdrops: the painted backdrops of each region and arena size (several per arena; each ArtKey once; a region with battle layouts has exactly one layout per backdrop in content/data/Encounters/battle-layouts.json, whose obstacles are painted on it, and a battle draws its own layout's backdrop), the RegionArt pattern of enemy-library.json (RegionId, a regions.json id, and ArtKey, a sprite's ArtKey in content/art/pixel/pixel-art-manifest.json: backdrop/<region>/<id>/<arena>), plus Arena (Small 5x7, Medium 8x11, Large 11x15) and BoardRect: where the arena's tiles box (HexLayout.BoardBounds) lies in the image, as fractions of the image (X, Y from its top-left, Width, Height). The rest of the image is decorative margin that runs under the HUD to the canvas edges; the images are 9:16 and, at the fit-all camera view, cover the 1080x1920 canvas plus a 4% bleed on every side (room for the screen shake). A region and arena with no entry draws the pixel-tile board. Board: the overlays drawn over a backdrop, in this order, under the units: the hex grid (GridColor, a palette char; GridAlpha 0-1; GridWidth in canvas px, 0.5-6), then the deployment-zone tints (PlayerZoneColor/Alpha, EnemyZoneColor/Alpha), HudScrimAlpha, the dark scrim behind the HUD bands, ObstacleOutlineColor/Alpha (a faint outline on obstacle hexes; off, alpha 0, by default: the painted obstacle is the read) and MoveReachColor/Alpha (the movement preview between turns: the tiles the next unit could move to). SkillIcons: how every skill icon is framed in the HUD (the skill strip, the skill detail card and the turn order's now-acting badge): layers back to front, each centred in the icon's box, the rarity's Ring (RingScale of the box), the icon (IconScale; the skill's ArtKey), the round Frame (FrameScale); Frame and each Ring are sprites' ArtKeys (painted slots), a rarity may Tint its ring (a palette char). A skill's rarity: its Overrides entry (by the skill's icon ArtKey), else BeastRarity / AvatarRarity / EnemyRarity by where it comes from. The art slots and exact sizes: docs/art/hollow-art-slots.md. Rules: BeastCraft.Presentation.Art.BattleArtValidator.",
+  "SchemaVersion": 1,
+  "Backdrops": [
+    { "RegionId": "r01", "Arena": "Small", "ArtKey": "backdrop/r01/sun0/small", "BoardRect": { "X": 0.13849, "Y": 0.25333, "Width": 0.72302, "Height": 0.45754 } },
+    { "RegionId": "r01", "Arena": "Medium", "ArtKey": "backdrop/r01/sun0/medium", "BoardRect": { "X": 0.11469, "Y": 0.22751, "Width": 0.77062, "Height": 0.48766 } },
+    { "RegionId": "r01", "Arena": "Large", "ArtKey": "backdrop/r01/sun0/large", "BoardRect": { "X": 0.10216, "Y": 0.21392, "Width": 0.79567, "Height": 0.50351 } },
+    { "RegionId": "r01", "Arena": "Small", "ArtKey": "backdrop/r01/sun1/small", "BoardRect": { "X": 0.13849, "Y": 0.25333, "Width": 0.72302, "Height": 0.45754 } },
+    { "RegionId": "r01", "Arena": "Medium", "ArtKey": "backdrop/r01/sun1/medium", "BoardRect": { "X": 0.11469, "Y": 0.22751, "Width": 0.77062, "Height": 0.48766 } },
+    { "RegionId": "r01", "Arena": "Large", "ArtKey": "backdrop/r01/sun1/large", "BoardRect": { "X": 0.10216, "Y": 0.21392, "Width": 0.79567, "Height": 0.50351 } },
+    { "RegionId": "r01", "Arena": "Small", "ArtKey": "backdrop/r01/sun3/small", "BoardRect": { "X": 0.13849, "Y": 0.25333, "Width": 0.72302, "Height": 0.45754 } },
+    { "RegionId": "r01", "Arena": "Medium", "ArtKey": "backdrop/r01/sun3/medium", "BoardRect": { "X": 0.11469, "Y": 0.22751, "Width": 0.77062, "Height": 0.48766 } },
+    { "RegionId": "r01", "Arena": "Large", "ArtKey": "backdrop/r01/sun3/large", "BoardRect": { "X": 0.10216, "Y": 0.21392, "Width": 0.79567, "Height": 0.50351 } },
+    { "RegionId": "r01", "Arena": "Small", "ArtKey": "backdrop/r01/ruin0/small", "BoardRect": { "X": 0.13849, "Y": 0.25333, "Width": 0.72302, "Height": 0.45754 } },
+    { "RegionId": "r01", "Arena": "Medium", "ArtKey": "backdrop/r01/ruin0/medium", "BoardRect": { "X": 0.11469, "Y": 0.22751, "Width": 0.77062, "Height": 0.48766 } },
+    { "RegionId": "r01", "Arena": "Large", "ArtKey": "backdrop/r01/ruin0/large", "BoardRect": { "X": 0.10216, "Y": 0.21392, "Width": 0.79567, "Height": 0.50351 } },
+    { "RegionId": "r01", "Arena": "Small", "ArtKey": "backdrop/r01/ruin2/small", "BoardRect": { "X": 0.13849, "Y": 0.25333, "Width": 0.72302, "Height": 0.45754 } },
+    { "RegionId": "r01", "Arena": "Medium", "ArtKey": "backdrop/r01/ruin2/medium", "BoardRect": { "X": 0.11469, "Y": 0.22751, "Width": 0.77062, "Height": 0.48766 } },
+    { "RegionId": "r01", "Arena": "Large", "ArtKey": "backdrop/r01/ruin2/large", "BoardRect": { "X": 0.10216, "Y": 0.21392, "Width": 0.79567, "Height": 0.50351 } },
+    { "RegionId": "r01", "Arena": "Small", "ArtKey": "backdrop/r01/dusk2/small", "BoardRect": { "X": 0.13849, "Y": 0.25333, "Width": 0.72302, "Height": 0.45754 } },
+    { "RegionId": "r01", "Arena": "Medium", "ArtKey": "backdrop/r01/dusk2/medium", "BoardRect": { "X": 0.11469, "Y": 0.22751, "Width": 0.77062, "Height": 0.48766 } },
+    { "RegionId": "r01", "Arena": "Large", "ArtKey": "backdrop/r01/dusk2/large", "BoardRect": { "X": 0.10216, "Y": 0.21392, "Width": 0.79567, "Height": 0.50351 } },
+    { "RegionId": "r01", "Arena": "Small", "ArtKey": "backdrop/r01/shroom0/small", "BoardRect": { "X": 0.13849, "Y": 0.25333, "Width": 0.72302, "Height": 0.45754 } },
+    { "RegionId": "r01", "Arena": "Medium", "ArtKey": "backdrop/r01/shroom0/medium", "BoardRect": { "X": 0.11469, "Y": 0.22751, "Width": 0.77062, "Height": 0.48766 } },
+    { "RegionId": "r01", "Arena": "Large", "ArtKey": "backdrop/r01/shroom0/large", "BoardRect": { "X": 0.10216, "Y": 0.21392, "Width": 0.79567, "Height": 0.50351 } },
+    { "RegionId": "r01", "Arena": "Small", "ArtKey": "backdrop/r01/canopy2/small", "BoardRect": { "X": 0.13849, "Y": 0.25333, "Width": 0.72302, "Height": 0.45754 } },
+    { "RegionId": "r01", "Arena": "Medium", "ArtKey": "backdrop/r01/canopy2/medium", "BoardRect": { "X": 0.11469, "Y": 0.22751, "Width": 0.77062, "Height": 0.48766 } },
+    { "RegionId": "r01", "Arena": "Large", "ArtKey": "backdrop/r01/canopy2/large", "BoardRect": { "X": 0.10216, "Y": 0.21392, "Width": 0.79567, "Height": 0.50351 } }
+  ],
+  "Board": {
+    "GridColor": "4",
+    "GridAlpha": 0.22,
+    "GridWidth": 1.5,
+    "PlayerZoneColor": "c",
+    "PlayerZoneAlpha": 0.16,
+    "EnemyZoneColor": "r",
+    "EnemyZoneAlpha": 0.14,
+    "HudScrimAlpha": 0.45,
+    "ObstacleOutlineColor": "K",
+    "ObstacleOutlineAlpha": 0,
+    "MoveReachColor": "Y",
+    "MoveReachAlpha": 0.22
+  },
+  "SkillIcons": {
+    "Frame": "ui/skill_icon/frame",
+    "FrameScale": 0.9,
+    "IconScale": 0.76,
+    "RingScale": 1.0,
+    "Rarities": [
+      { "Rarity": "common", "Ring": "ui/skill_icon/ring/common" },
+      { "Rarity": "rare", "Ring": "ui/skill_icon/ring/rare" },
+      { "Rarity": "epic", "Ring": "ui/skill_icon/ring/epic" },
+      { "Rarity": "legendary", "Ring": "ui/skill_icon/ring/legendary" },
+      { "Rarity": "gloam", "Ring": "ui/skill_icon/ring/gloam" }
+    ],
+    "BeastRarity": "common",
+    "AvatarRarity": "rare",
+    "EnemyRarity": "gloam",
+    "Overrides": []
+  }
+}

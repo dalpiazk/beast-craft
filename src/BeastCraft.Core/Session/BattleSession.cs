@@ -87,6 +87,7 @@ namespace BeastCraft.Session
             EncounterSetup encounter = setup.Encounter;
             result.ShapeId = encounter == null ? null : encounter.ShapeId;
             result.EncounterLevel = encounter == null ? 0 : encounter.EncounterLevel;
+            result.RegionId = encounter == null ? null : encounter.RegionId;
 
             if (save == null)
             {
@@ -128,6 +129,12 @@ namespace BeastCraft.Session
             }
 
             HexGrid grid = new HexGrid(encounter.Arena);
+
+            // The battlefield: one of the region's layouts for this arena, picked on its own stream of
+            // the seed, its obstacles blocked before anyone is placed (they are never in a deployment
+            // zone: ObstacleLayoutValidator). No layout, the open board.
+            result.Layout = BattleLayouts.Pick(content.Layouts, encounter.RegionId, encounter.Arena, setup.Seed);
+            BattleLayouts.Apply(grid, result.Layout);
             List<BattleUnit> units = new List<BattleUnit>();
 
             if (!PlaceEnemies(grid, encounter, enemies, units, errors))

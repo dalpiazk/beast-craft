@@ -18,6 +18,10 @@ namespace BeastCraft.Vfx
     // stat buff/debuff, knockback), each an on-apply effect plus an optional aura and icon shown
     // while the status lasts. A skill's effect resolves: its own entry, else its effect type's
     // default, else its element's default (damage-by-element). v1 files still read.
+    //
+    // Painted (VfxPaintedData, on a layer, a particle burst or an aura): a single painted hero
+    // frame animated procedurally by scale, rotation, alpha and tint curves, as an alternative to
+    // a flipbook sheet. The painted art slots are listed in docs/art/hollow-art-slots.md.
     // ------------------------------------------------------------------------------------------
 
     /// <summary>The whole library: one default per element, per-effect-type defaults, then per-skill overrides.</summary>
@@ -148,6 +152,13 @@ namespace BeastCraft.Vfx
 
         /// <summary>A palette char to tint the icon with (null/empty = its own colours).</summary>
         public string IconTint;
+
+        /// <summary>
+        /// A single painted frame instead of <see cref="Sheet"/>'s frames (null = the sheet), its
+        /// curves running over one pulse (0-1, looping): a Scale or Alpha curve replaces the
+        /// built-in breathing, a Rotation curve turns it, a Tint curve colours it.
+        /// </summary>
+        public VfxPaintedData Painted;
     }
 
     /// <summary>An element's default effect.</summary>
@@ -278,6 +289,67 @@ namespace BeastCraft.Vfx
 
         /// <summary>Particles: the burst (its own sheet, count, speeds, lifetime, colours, gravity; its Additive is ignored for <see cref="Blend"/>).</summary>
         public VfxParticleData Particles;
+
+        /// <summary>
+        /// Any type but <c>Particles</c> (whose painted look is <see cref="VfxParticleData.Painted"/>):
+        /// a single painted frame drawn in place of <see cref="Sheet"/>'s frames (then optional),
+        /// animated by its curves over the layer's duration (0-1); a Flipbook layer then needs no
+        /// Frames. Null = the sheet, as before.
+        /// </summary>
+        public VfxPaintedData Painted;
+    }
+
+    /// <summary>
+    /// A single painted frame (a hero frame: one linear-filtered sprite, not a flipbook) animated
+    /// procedurally by keyframed curves over a normalized time t (0-1: a layer's duration, a
+    /// particle's life, an aura's pulse). Each curve is keys (T 0-1, ascending) evaluated piecewise
+    /// linearly and clamped at its ends; an empty curve leaves that property as the part draws it.
+    /// Presentation only, and a pure function of t, so the timeline stays deterministic.
+    /// </summary>
+    [Serializable]
+    public class VfxPaintedData
+    {
+        /// <summary>The painted frame: a sprite Name in the art manifest (one frame, linear filter).</summary>
+        public string Sheet;
+
+        /// <summary>Multiplies the part's size (0-8); empty = 1. Given, it also replaces an aura's built-in breathing.</summary>
+        public VfxCurveKey[] Scale = new VfxCurveKey[0];
+
+        /// <summary>Turns (1 = a full turn, -8 to 8) added to the part's own rotation; empty = none.</summary>
+        public VfxCurveKey[] Rotation = new VfxCurveKey[0];
+
+        /// <summary>
+        /// Opacity (0-1) times the layer's fade in/out; given, it replaces the type's own fade (a
+        /// shockwave's or radial burst's fade-out, a particle's life fade, an aura's breathing).
+        /// </summary>
+        public VfxCurveKey[] Alpha = new VfxCurveKey[0];
+
+        /// <summary>Palette chars over t, blended in between; empty = the part's own Tint.</summary>
+        public VfxTintKey[] Tint = new VfxTintKey[0];
+
+        /// <summary>
+        /// Each sprite of a multi-sprite part (particles, glyphs, radial-burst rays) starts at its own
+        /// angle, drawn from the effect's seed (deterministic); false = all start upright (rays along their ray).
+        /// </summary>
+        public bool RandomSpin;
+    }
+
+    /// <summary>A curve key: at time <see cref="T"/> (0-1) the value is <see cref="V"/>.</summary>
+    [Serializable]
+    public class VfxCurveKey
+    {
+        public float T;
+
+        public float V;
+    }
+
+    /// <summary>A tint key: at time <see cref="T"/> (0-1) the colour is <see cref="Color"/> (a palette char).</summary>
+    [Serializable]
+    public class VfxTintKey
+    {
+        public float T;
+
+        public string Color;
     }
 
     /// <summary>The layer type names (<see cref="VfxLayerData.Type"/>).</summary>
@@ -401,6 +473,13 @@ namespace BeastCraft.Vfx
         public float Gravity;
 
         public bool Additive = true;
+
+        /// <summary>
+        /// A single painted frame drawn for every particle in place of <see cref="Sheet"/> (then
+        /// optional), its curves running over each particle's own life (0 birth, 1 death); a Tint
+        /// curve replaces the particle's colour from <see cref="Colors"/>. Null = the sheet.
+        /// </summary>
+        public VfxPaintedData Painted;
     }
 
     /// <summary>A decaying screen shake.</summary>

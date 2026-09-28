@@ -120,6 +120,48 @@ namespace BeastCraft.Game.Rendering
             _batch.Draw(texture, at, source, tint, rotation, origin, k, flipX ? SpriteEffects.FlipHorizontally : SpriteEffects.None, 0f);
         }
 
+        /// <summary>
+        /// Frame 0 of <paramref name="sprite"/> stretched over the rectangle at <paramref name="topLeft"/>
+        /// of <paramref name="size"/> (in the current transform's space), whatever its pivot and
+        /// pixels-per-unit: a backdrop placed by its board rect.
+        /// </summary>
+        public void DrawStretched(ArtSprite sprite, Vector2 topLeft, Vector2 size, Color color)
+        {
+            if (sprite == null || sprite.Data.FrameWidth <= 0 || sprite.Data.FrameHeight <= 0)
+            {
+                return;
+            }
+
+            Ensure(sprite.Sampler);
+            Vector2 scale = new Vector2(size.X / sprite.Data.FrameWidth, size.Y / sprite.Data.FrameHeight);
+            _batch.Draw(sprite.Texture, topLeft, sprite.Frame(0), Multiply(sprite.Tint, color), 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
+        }
+
+        /// <summary>A straight line from <paramref name="from"/> to <paramref name="to"/>, <paramref name="thickness"/> across (the 1x1 pixel stretched and turned).</summary>
+        public void Line(Texture2D pixel, Vector2 from, Vector2 to, float thickness, Color color)
+        {
+            Vector2 d = to - from;
+            float length = d.Length();
+            if (length <= 0f || thickness <= 0f)
+            {
+                return;
+            }
+
+            Ensure(SamplerState.LinearClamp);
+            _batch.Draw(pixel, from, null, color, (float)Math.Atan2(d.Y, d.X), new Vector2(0f, 0.5f), new Vector2(length, thickness), SpriteEffects.None, 0f);
+        }
+
+        /// <summary>
+        /// A texture (not a manifest sprite) with its centre on <paramref name="at"/>, drawn
+        /// <paramref name="size"/> across and down, linear-filtered: an engine-made mask such as the soft hex.
+        /// </summary>
+        public void DrawCentered(Texture2D texture, Vector2 at, Vector2 size, Color color)
+        {
+            Ensure(SamplerState.LinearClamp);
+            Vector2 scale = new Vector2(size.X / texture.Width, size.Y / texture.Height);
+            _batch.Draw(texture, at, null, color, 0f, new Vector2(texture.Width / 2f, texture.Height / 2f), scale, SpriteEffects.None, 0f);
+        }
+
         /// <summary>A solid rectangle (the atlas's 1x1 pixel stretched).</summary>
         public void Fill(Texture2D pixel, Rectangle rectangle, Color color)
         {

@@ -3642,3 +3642,134 @@ campaign --self-check`); the guard `-- --mode pve --seeds 12345,777,4242,2024,99
 the bosses per template `-- --mode pve --kit elemental --encounter-set fixed --encounters-file
 <scratch> --encounters <id> --levels <level> --calibrate-samples 64 --scouted bonds --gear typical
 --target-clear <50|35|20>`, the scratch file being the templates written as fixed encounters.
+
+## Battlefield obstacles: shape effect
+
+Producer decision: battles in a region are fought among **obstacles** painted on its backdrops, which
+block movement and standing only (no line of sight; battle-system.md, "Obstacles"). The Verdant Hollow
+(r01) has eight paintings on three arenas, 24 layouts (`battle-layouts.json`): the sunlit meadows sun0 /
+sun1 / sun3, the ruins ruin0 / ruin2, the dusk glade dusk2 and the forest canopy2 / shroom0; 1-2
+obstacles on Small, 2-5 on Medium, 4-6 on Large, all in the neutral band. The simulator samples them the
+way the game picks them (`--obstacles r01`, the default: each battle's layout from its own seed,
+region-agnostic, the one table calibrated off the Hollow's mix; `--obstacles none` is the open-board
+simulator, whose report is the committed one byte for byte bar the new header line). This section
+measures the obstacles at the **old** calibration; the next re-calibrates.
+
+**Method** as in "Rectangular arenas: shape effect": main's own tables pinned (`--pin-difficulty`),
+written by the open-board runs (`--obstacles none --write-difficulty`): the gearless report's, each
+guard seed's, and the shipping table for typical gear. Same battle seeds on both sides; each cell keeps
+its sampling noise (128 picked-team battles, about +/-4 points).
+
+**A first set of layouts trapped the big enemies.** On five of the first layouts a seven-hex giant (and
+on one Small layout a three-hex champion) could not squeeze between the obstacles and stood in its zone
+as a target: `solo` and `elite` got 10-33 points easier at the old multipliers (`elemental` `solo`
+no-scouting 7.3 -> 40.4%). The validator now requires a Triangle and a Hex7 enemy deployed in the
+enemy zone to be able to walk to the player's front row (`ObstacleLayoutValidator.LargeUnitCrosses`),
+the offending layouts were re-authored toward the flanks, and everything below is on the final
+24-layout mix (the forest pair corrected to canopy2 and shroom0, the producer's picks #3 and #9).
+
+**Small, mixed moves.** Clear rate at the old multipliers, levels 1 / 50 / 100 averaged; scouted = the
+bond-aware pick, no scouting = every team:
+
+| Kit mode | Shape | Scouted (gearless, report) | No scouting | Scouted (typical gear, shipping table) |
+| --- | --- | ---: | ---: | ---: |
+| `elemental` | `solo` | 51.3 -> 55.7 (+4.4) | 7.3 -> 8.6 (+1.2) | 49.5 -> 54.5 (+5.0) |
+| `elemental` | `elite` | 59.4 -> 62.0 (+2.6) | 10.3 -> 12.3 (+2.1) | 59.1 -> 57.0 (-2.1) |
+| `elemental` | `squad` | 79.2 -> 76.3 (-2.9) | 57.6 -> 58.8 (+1.2) | 79.2 -> 77.3 (-1.8) |
+| `elemental` | `horde` | 81.0 -> 76.8 (-4.2) | 47.5 -> 50.8 (+3.3) | 81.8 -> 81.8 (0.0) |
+| `neutral` | `solo` | 48.4 -> 56.3 (+7.8) | 41.8 -> 47.1 (+5.3) | 51.3 -> 57.0 (+5.8) |
+| `neutral` | `elite` | 60.9 -> 66.7 (+5.7) | 62.8 -> 69.5 (+6.8) | 63.3 -> 66.2 (+2.9) |
+| `neutral` | `squad` | 79.4 -> 80.5 (+1.1) | 75.1 -> 76.5 (+1.4) | 80.5 -> 80.2 (-0.3) |
+| `neutral` | `horde` | 80.0 -> 81.8 (+1.8) | 63.6 -> 66.0 (+2.5) | 80.2 -> 80.5 (+0.2) |
+
+Big enemies lose a little (they detour round rocks while the team shoots), swarms reach the line a
+little slower (no-scouting `horde` +2.5 to +3.3), and a `squad`'s picked team loses a little. The
+post-game cells move more (typical gear, the shipping multipliers, `elemental`): `horde_postgame` 63.3 ->
+**72.7%** (target 65) and `horde_postgame_hard` 48.4 -> **56.3%** (target 50); `elite_postgame` 45.3 ->
+39.1 (45); `squad_postgame(_hard)` within 0.8.
+
+**The per-beast guard does not move.** Five seeds (12345 / 777 / 4242 / 2024 / 99), `--target-clear
+50`, over the level-gap mix, each seed pinned to its own main table: every beast within 1.4 normalized
+points of main (`elemental` -3.1 … +2.0 -> -2.4 … +2.7, inside +/-4, top 3 in some shape 8 -> 9 of 10;
+`neutral` -4.4 … +5.3 -> -4.5 … +4.3, inside +/-7, 8 -> 7 of 10). A difficulty change, not a balance
+change: re-calibrate the table, no beast retune.
+
+Reproduce: on this branch, `-- --panel 16x4 --avatar-value --obstacles none --write-difficulty
+<dir>/main-tuned-pin.json` and, per seed, `-- --mode pve --seed N --target-clear 50 --obstacles none
+--write-difficulty <dir>/main-guard-pin-N.json`; then `-- --panel 16x4 --avatar-value --pin-difficulty
+<dir>/main-tuned-pin.json`, `-- --mode pve --gear typical --pin-difficulty <main's
+encounter-difficulty.json> --write-difficulty <scratch>` with and without `--obstacles none` (post-game
+rates on stderr), and `-- --mode pve --seeds 12345,777,4242,2024,99 --target-clear 50 --pin-difficulty
+"<dir>/main-guard-pin-{seed}.json"`.
+
+## Battlefield obstacles: re-calibration
+
+The documented commands with the obstacles on (`--obstacles r01`, the default), no roster, skill or
+content change: the shipping table (`--panel 16x4 --avatar-value --gear typical --write-difficulty
+content/data/Encounters/encounter-difficulty.json`, post-game cells included), the gearless
+`tuned-report.md`, `level-gap-report.md` (`--gap-mix 0`), `pacing-report.md` and
+`campaign-pacing-report.md` (both byte-identical: neither fights a battle), and the guard.
+
+**Shipping table** (typical gear; the game reads `elemental`):
+
+| Cell | Target | Old | New | Scouted at new |
+| --- | ---: | ---: | ---: | ---: |
+| `elemental` `solo` L1 / L50 / L100 | 50 | x1.297 / x1.273 / x1.297 | x1.309 / x1.297 / x1.312 | 45.3 / 50.8 / 50.0% |
+| `elemental` `elite` L1 / L50 / L100 | 60 | x1.141 / x1.156 / x1.156 | x1.133 / x1.152 / x1.141 | 62.5 / 60.9 / 60.2% |
+| `elemental` `squad` L1 / L50 / L100 | 80 | x1.250 / x1.211 / x1.223 | x1.250 / x1.203 / x1.219 | 78.9 / 79.7 / 82.8% |
+| `elemental` `horde` L1 / L50 / L100 | 80 | x1.359 / x1.266 / x1.188 | **x1.273** / x1.285 / **x1.238** | 81.3 / 78.9 / 78.1% |
+| `elemental` `horde_postgame` (Normal) | 65 | x1.258 | **x1.297** | 65.6% |
+| `elemental` `horde_postgame_hard` (Hard) | 50 | x1.344 | x1.359 | 50.0% |
+| `elemental` `squad_postgame` / `_hard` | 65 / 50 | x1.266 / x1.359 | x1.273 / x1.375 | 64.8 / 50.0% |
+| `elemental` `elite_postgame` / `_hard` | 45 / 30 | x1.219 / x1.242 | x1.211 / x1.242 | 45.3 / 30.5% |
+
+`neutral` cells move by up to 2.6% (the game does not read them). The two large moves are the hordes at
+the ends: L1 x1.359 -> x1.273 (-6.3%; the old table's L1 had landed a search step high, 85.2%,
+"Rectangular arenas: re-calibration") and L100 x1.188 -> x1.238 (+4.2%), plus `horde_postgame` +3.1%.
+**Targets:** every mainline cell within 5 points of its tier (widest `elemental` `solo` L1 45.3%);
+every post-game cell within 4 points (`neutral` `horde_postgame_hard` 53.9% against 50, the rest within
+1.6).
+
+**The committed report** (gearless, tiered targets): multipliers move by one or two search steps
+(`elemental` `solo` +0.3 to +1.3%, `squad` -0.7 to -1.3%, `horde` L1 x1.313 -> x1.250 and L50 x1.238 ->
+x1.258; `neutral` `solo` +1.6 to +3.4%, `elite` L1 +2.3%, `horde` L1 +2.6%); every cell's scouted clear
+within 5 points of its target but `neutral` `horde` L1 at 74.2% (80; the search's closest step, flagged).
+
+**Guard** (five seeds, `--target-clear 50`, over the level-gap mix), main -> obstacles:
+
+| Beast | `elemental` normalized | `neutral` normalized |
+| --- | ---: | ---: |
+| Kirin | +1.8 -> +3.1 | -0.7 -> +0.8 |
+| Basilisk | +1.3 -> +1.9 | +0.6 -> +1.5 |
+| Treant | +2.0 -> +1.5 | -0.8 -> -1.0 |
+| Thunderbird | +1.1 -> +1.3 | +5.3 -> +4.4 |
+| Griffin | +0.9 -> +0.5 | +4.4 -> +4.0 |
+| Golem | +0.6 -> -0.1 | +1.1 -> +1.2 |
+| Tarasque | -1.1 -> -1.9 | -3.9 -> -4.4 |
+| Phoenix | -3.1 -> -1.5 | -4.4 -> -3.3 |
+| Frost Wyrm | -1.3 -> -2.4 | -1.0 -> -1.7 |
+| Leviathan | -2.3 -> -2.4 | -0.8 -> -1.6 |
+
+- `elemental`: **-2.4 … +3.1**, every beast inside +/-4 (was -3.1 … +2.0); top 3 in some shape **9 of
+  10** (was 8; only Leviathan out); gap 0 -3.6 … +5.4, Kirin +5.4 outside +/-4 on the equal-level line
+  alone (was +3.4; the guard reads the mix).
+- `neutral`: **-4.4 … +4.4**, inside +/-7 (was -4.4 … +5.3); top 3 in some shape **6 of 10** (was 8;
+  not Kirin, Treant, Leviathan, Phoenix): Kirin is 4th in `horde` (+2.8 against Thunderbird's +2.8 and
+  Golem's +3.0) and Phoenix 4th in `squad` (+2.0 against Griffin's +2.2), both inside the seed noise of
+  the shape means (SD 1-2 points); no beast is bottom 3 in every shape (the "no niche" flag fires for
+  nobody). Flagged for the next balance pass, as in "Level-gap mix and the team suggester", not chased here.
+- Every beast moves by 1.6 normalized points or less; no beast retune.
+
+**Level gap** (`level-gap-report.md`, all-shape cells meeting their band): `elemental` 24 -> 27 of 35,
+`neutral` 27 -> 29; shape cells 87 -> 98 and 104 -> 106 of 140. The same kinds of miss as before.
+
+**Boss override** (r01's Hollow Warden is the only boss that fights among obstacles; the others'
+regions have no layouts, so their fights are unchanged). The boss recipe ("Boss re-calibration after
+the combat merge"; typical gear, 64 samples) gives x1.414 on the open board (as in "Rectangular arenas:
+re-calibration"; the shipped override is x1.430) and x1.391 on the Hollow's layouts (-1.6% of the
+open-board result, inside the recipe's step and noise, as r06's -1.5% was): the override is kept.
+
+Reproduce: the commands above (`--obstacles r01` is the default), as in the Tooling README; the guard
+`-- --mode pve --seeds 12345,777,4242,2024,99 --target-clear 50`; the boss `-- --mode pve --kit
+elemental --encounter-set fixed --encounters-file <scratch> --encounters boss_r01_hollow_warden
+--levels 10 --calibrate-samples 64 --scouted bonds --gear typical [--obstacles none]`.

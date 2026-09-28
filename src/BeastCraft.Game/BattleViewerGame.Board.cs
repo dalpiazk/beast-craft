@@ -4,6 +4,7 @@ using System.Globalization;
 using BeastCraft.Battle;
 using BeastCraft.Battle.Grid;
 using BeastCraft.Game.Rendering;
+using BeastCraft.Presentation.Art;
 using BeastCraft.Presentation.Board;
 using BeastCraft.Presentation.Camera;
 using BeastCraft.Presentation.Content;
@@ -30,6 +31,12 @@ namespace BeastCraft.Game
 
         /// <summary>The dimming of the off-board half tiles that square off the zigzag sides.</summary>
         private static readonly Color NotchTint = new Color(120, 120, 120);
+
+        /// <summary>Every tile edge of the arena once (<see cref="HexGridLines"/>), made on first use.</summary>
+        private List<Segment> _gridLines;
+
+        /// <summary>The anti-aliased hex mask the zone and footprint tints use over a backdrop (<see cref="SoftHex"/>).</summary>
+        private Texture2D _softHex;
 
         /// <summary>
         /// Draws one frame onto a <paramref name="width"/> x <paramref name="height"/> target: the
@@ -66,17 +73,38 @@ namespace BeastCraft.Game
             }
 
             Rect board = _screen.Board;
-            _draw.Fill(Pixel, new Vector2(board.X, board.Y), new Vector2(board.Width, board.Height), Ink("p", Color.Purple) * 0.35f);
+            // The backdrop the battle's obstacles are painted on (its layout's ArtKey); with no layout, the region's first for the arena.
+            BattleBackdropData backdrop = _battleLayout != null
+                                              ? _content.BattleArt?.BackdropByArtKey(_battleLayout.ArtKey)
+                                              : _content.BattleArt?.Backdrop(_regionId, _playback.Grid.Size);
+            ArtSprite backdropArt = backdrop == null ? null : _atlas.ByArtKey(backdrop.ArtKey);
+            if (backdropArt == null)
+            {
+                _draw.Fill(Pixel, new Vector2(board.X, board.Y), new Vector2(board.Width, board.Height), Ink("p", Color.Purple) * 0.35f);
+            }
 
             // The auto camera (CameraRig / TurnCamera): the board zoomed and panned onto the action, clipped to its area.
             _boardFit = _camera.Fit(CameraNow());
-            Rect clip = _canvasFit.ToScreen(board);
-            _draw.SetClip(new Rectangle((int)Math.Floor(clip.X), (int)Math.Floor(clip.Y), (int)Math.Ceiling(clip.Width), (int)Math.Ceiling(clip.Height)));
             Matrix boardSpace = Matrix.CreateTranslation(shake.X, shake.Y, 0f) * Matrix.CreateScale(_boardFit.Scale) *
                                 Matrix.CreateTranslation(_boardFit.OriginX, _boardFit.OriginY, 0f) * canvas;
+            if (backdropArt != null)
+            {
+                DrawBackdrop(backdrop, backdropArt, boardSpace, canvas);
+            }
+
+            Rect clip = _canvasFit.ToScreen(board);
+            _draw.SetClip(new Rectangle((int)Math.Floor(clip.X), (int)Math.Floor(clip.Y), (int)Math.Ceiling(clip.Width), (int)Math.Ceiling(clip.Height)));
             _draw.SetTransform(boardSpace);
-            DrawBoard(boardSpace, clip);
-            DrawUnits(frames);
+            if (backdropArt != null)
+            {
+                DrawBoardOverlay(_content.BattleArt.Board ?? new BoardOverlayData());
+            }
+            else
+            {
+                DrawBoard(boardSpace, clip);
+            }
+
+            DrawUnits(frames, backdropArt != null);
             foreach ((VfxTimeline timeline, VfxFrame frame) in frames)
             {
                 DrawVfx(timeline, frame, false);
@@ -113,6 +141,135 @@ namespace BeastCraft.Game
         }
 
         /// <summary>
+        /// A painted backdrop (<see cref="BattleBackdropData"/>): the whole image through the board
+        /// transform, placed so its board rect lies on the arena's tiles
+        /// (<see cref="BackdropPlacement.ImageRect"/>), so it zooms, pans and shakes with the board;
+        /// clipped to the canvas, not the board band, so its margins run under the HUD to the canvas
+        /// edges. Then, in canvas space, a soft dark scrim over the HUD bands above and below the
+        /// board so their text reads over the painting.
+        /// </summary>
+        private void DrawBackdrop(BattleBackdropData backdrop, ArtSprite art, Matrix boardSpace, Matrix canvas)
+        {
+            Rect screen = _canvasFit.ToScreen(_screen.Canvas);
+            _draw.SetClip(new Rectangle((int)Math.Floor(screen.X), (int)Math.Floor(screen.Y), (int)Math.Ceiling(screen.Width), (int)Math.Ceiling(screen.Height)));
+            _draw.SetTransform(boardSpace);
+            Rect image = BackdropPlacement.ImageRect(backdrop, _playback.Grid.Width, _playback.Grid.Height);
+            _draw.DrawStretched(art, new Vector2(image.X, image.Y), new Vector2(image.Width, image.Height), Color.White);
+
+            _draw.SetTransform(canvas);
+            float alpha = (_content.BattleArt.Board ?? new BoardOverlayData()).HudScrimAlpha;
+            Rect board = _screen.Board;
+            Color scrim = Ink("K", Color.Black);
+            const float fade = 48f;
+            const int steps = 12;
+            _draw.Fill(Pixel, new Vector2(0f, 0f), new Vector2(PortraitLayout.CanvasWidth, board.Y - fade / 2f), scrim * alpha);
+            _draw.Fill(Pixel, new Vector2(0f, board.Bottom + fade / 2f), new Vector2(PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight - board.Bottom - fade / 2f),
+                       scrim * alpha);
+            for (int i = 0; i < steps; i++)
+            {
+                float k = alpha * (steps - i - 0.5f) / steps;
+                float step = fade / steps;
+                _draw.Fill(Pixel, new Vector2(0f, board.Y - fade / 2f + i * step), new Vector2(PortraitLayout.CanvasWidth, step), scrim * k);
+                _draw.Fill(Pixel, new Vector2(0f, board.Bottom + fade / 2f - (i + 1) * step), new Vector2(PortraitLayout.CanvasWidth, step), scrim * k);
+            }
+        }
+
+        /// <summary>
+        /// Over a painted backdrop, in board space: the soft hex grid (every tile edge once,
+        /// <see cref="HexGridLines"/>, a constant thickness in canvas pixels whatever the zoom), then
+        /// the two deployment zones' tints on their tiles. Styling is data (<see cref="BoardOverlayData"/>).
+        /// </summary>
+        private void DrawBoardOverlay(BoardOverlayData style)
+        {
+            HexGrid grid = _playback.Grid;
+            if (style.GridAlpha > 0f)
+            {
+                _gridLines ??= HexGridLines.Of(grid.Tiles, _layout);
+                float thickness = style.GridWidth / Math.Max(0.0001f, _boardFit.Scale);
+                Color line = Ink(style.GridColor, Color.White) * style.GridAlpha;
+                foreach (Segment segment in _gridLines)
+                {
+                    _draw.Line(Pixel, new Vector2(segment.From.X, segment.From.Y), new Vector2(segment.To.X, segment.To.Y), thickness, line);
+                }
+            }
+
+            if (style.ObstacleOutlineAlpha > 0f)
+            {
+                foreach (HexCoordinate tile in grid.Tiles)
+                {
+                    if (grid.IsBlocked(tile))
+                    {
+                        DrawHexOutline(_layout.Center(tile), 3f, Ink(style.ObstacleOutlineColor, Color.Black) * style.ObstacleOutlineAlpha);
+                    }
+                }
+            }
+
+            Color player = Ink(style.PlayerZoneColor, Color.Blue) * style.PlayerZoneAlpha;
+            Color enemy = Ink(style.EnemyZoneColor, Color.Red) * style.EnemyZoneAlpha;
+            foreach (HexCoordinate tile in grid.Tiles)
+            {
+                bool mine = grid.IsInDeploymentZone(tile, BattleTeam.Player);
+                bool theirs = grid.IsInDeploymentZone(tile, BattleTeam.Enemy);
+                if (mine || theirs)
+                {
+                    DrawSoftHex(_layout.Center(tile), mine ? player : enemy);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Between turns, the tiles the next unit to act could move to this turn
+        /// (<see cref="MovementPreview.Reach"/> on the battle's own board: never an obstacle or an
+        /// occupied tile), faintly tinted (<see cref="BoardOverlayData.MoveReachColor"/> / <c>Alpha</c>).
+        /// </summary>
+        private void DrawMovementPreview(bool painted)
+        {
+            BoardOverlayData style = _content.BattleArt?.Board ?? new BoardOverlayData();
+            BattleUnit next = _animation == null && !_playback.IsOver ? ActingUnit() : null;
+            if (next == null || style.MoveReachAlpha <= 0f)
+            {
+                return;
+            }
+
+            Color tint = Ink(style.MoveReachColor, Color.Yellow) * style.MoveReachAlpha;
+            ArtSprite mask = _atlas.Sprite("hex_mask");
+            foreach (HexCoordinate anchor in MovementPreview.Reach(_playback.Grid, next.Position, next.Footprint, next.Id, next.MoveRange))
+            {
+                foreach (HexCoordinate tile in Footprints.Tiles(anchor, next.Footprint))
+                {
+                    if (painted)
+                    {
+                        DrawSoftHex(_layout.Center(tile), tint);
+                    }
+                    else
+                    {
+                        _draw.DrawSprite(mask, 0, At(_layout.Center(tile)), 1f, tint);
+                    }
+                }
+            }
+        }
+
+        /// <summary>A tile-sized, anti-aliased hex (<see cref="SoftHex"/>) on <paramref name="center"/> in <paramref name="color"/> (premultiplied).</summary>
+        private void DrawSoftHex(Vec2 center, Color color)
+        {
+            _softHex ??= SoftHex.Create(GraphicsDevice);
+            _draw.DrawCentered(_softHex, new Vector2(center.X, center.Y), new Vector2(HexLayout.TileWidth, HexLayout.TileHeight), color);
+        }
+
+        /// <summary>A tile's six edges as lines <paramref name="width"/> canvas pixels thick (the acting unit's outline over a backdrop).</summary>
+        private void DrawHexOutline(Vec2 center, float width, Color color)
+        {
+            Vec2[] corners = HexGridLines.Corners(new HexLayout(0, 0), HexCoordinate.Zero);
+            float thickness = width / Math.Max(0.0001f, _boardFit.Scale);
+            for (int i = 0; i < corners.Length; i++)
+            {
+                Vec2 a = corners[i];
+                Vec2 b = corners[(i + 1) % corners.Length];
+                _draw.Line(Pixel, new Vector2(center.X + a.X, center.Y + a.Y), new Vector2(center.X + b.X, center.Y + b.Y), thickness, color);
+            }
+        }
+
+        /// <summary>
         /// The arena: a rectangle. Under the tiles, a plate a few pixels bigger than their box
         /// (<see cref="HexLayout.BoardBounds"/>) in a dark soil colour, so the pointed tops
         /// and bottoms of the end rows sit on a straight edge; the tiles; then, clipped to the box, a
@@ -134,6 +291,16 @@ namespace BeastCraft.Game
             {
                 ArtSprite sprite = grid.IsInDeploymentZone(tile, BattleTeam.Enemy) ? rock : grass;
                 _draw.DrawSprite(sprite, 0, At(_layout.Center(tile)), 1f, Color.White);
+            }
+
+            // An obstacle on the pixel board (no painting to show it): its tile darkened to a rock.
+            ArtSprite mask = _atlas.Sprite("hex_mask");
+            foreach (HexCoordinate tile in grid.Tiles)
+            {
+                if (grid.IsBlocked(tile))
+                {
+                    _draw.DrawSprite(mask, 0, At(_layout.Center(tile)), 1f, Ink("1", Color.DimGray) * 0.9f);
+                }
             }
 
             // The notch fillers, clipped to the tiles' box (in render-target pixels, inside the board area's clip).
@@ -193,9 +360,25 @@ namespace BeastCraft.Game
         }
 
         /// <summary>
+        /// Additive blending for premultiplied colours (One + One): a painted frame's soft alpha is
+        /// already in its colour (the atlas premultiplies on load), so the source is not multiplied
+        /// by alpha again as <see cref="BlendState.Additive"/> would (which the pixel flipbooks keep).
+        /// </summary>
+        private static readonly BlendState PremultipliedAdditive = new BlendState
+        {
+            Name = "PremultipliedAdditive",
+            ColorSourceBlend = Blend.One,
+            AlphaSourceBlend = Blend.One,
+            ColorDestinationBlend = Blend.One,
+            AlphaDestinationBlend = Blend.One
+        };
+
+        /// <summary>
         /// One layer or aura sprite: its frame (wrapped to the sheet), at its size (a ring or decal
         /// spans <see cref="VfxSprite.SizePx"/> board pixels, whatever the texture's resolution) or
-        /// scale, turned, tinted, faded, in its blend.
+        /// scale, turned, tinted (blended between its two tints for a painted frame's tint curve),
+        /// faded, in its blend. A painted frame (<see cref="VfxSprite.Painted"/>) is drawn with its
+        /// manifest filter (linear, mipmapped) and premultiplied blending.
         /// </summary>
         private void DrawVfxSprite(VfxSprite sprite)
         {
@@ -212,10 +395,15 @@ namespace BeastCraft.Game
                 scale = sprite.SizePx / Math.Max(1f, natural);
             }
 
-            _draw.SetBlend(sprite.Additive ? BlendState.Additive : BlendState.AlphaBlend);
+            _draw.SetBlend(sprite.Additive ? sprite.Painted ? PremultipliedAdditive : BlendState.Additive : BlendState.AlphaBlend);
             int frame = art.Data.Frames <= 0 ? 0 : ((sprite.Frame % art.Data.Frames) + art.Data.Frames) % art.Data.Frames;
-            _draw.DrawSprite(art, frame, new Vector2(sprite.Position.X, sprite.Position.Y), scale, Ink(sprite.Tint, Color.White) * sprite.Alpha, false,
-                             sprite.Rotation);
+            Color tint = Ink(sprite.Tint, Color.White);
+            if (sprite.TintMix > 0f && sprite.TintTo != sprite.Tint)
+            {
+                tint = Color.Lerp(tint, Ink(sprite.TintTo, Color.White), Math.Min(1f, sprite.TintMix));
+            }
+
+            _draw.DrawSprite(art, frame, new Vector2(sprite.Position.X, sprite.Position.Y), scale, tint * sprite.Alpha, false, sprite.Rotation);
         }
 
         /// <summary>The lasting effect keys a unit shows now (its statuses and stat changes), as the turn animation has them.</summary>
@@ -286,7 +474,12 @@ namespace BeastCraft.Game
             }
         }
 
-        private void DrawUnits(List<(VfxTimeline Timeline, VfxFrame Frame)> frames)
+        /// <summary>
+        /// The units, sorted back to front: their footprint tints (the pixel hex mask, or over a
+        /// backdrop, <paramref name="painted"/>, the soft hex and a line outline for the one acting),
+        /// the ground layers and auras, then each sprite with its auras, HP bar and status icons.
+        /// </summary>
+        private void DrawUnits(List<(VfxTimeline Timeline, VfxFrame Frame)> frames, bool painted)
         {
             IReadOnlyDictionary<string, UnitSnapshot> state = _animation != null ? _animation.Turn.After : _playback.Current;
             List<UnitSnapshot> units = new List<UnitSnapshot>(state.Values);
@@ -295,6 +488,8 @@ namespace BeastCraft.Game
             string actor = ActingUnit() == null ? null : ActingUnit().Id;
             ArtSprite mask = _atlas.Sprite("hex_mask");
             ArtSprite outline = _atlas.Sprite("hex_outline");
+
+            DrawMovementPreview(painted);
 
             // Footprints first, so every sprite stands on top of every tile tint.
             foreach (UnitSnapshot unit in units)
@@ -307,6 +502,17 @@ namespace BeastCraft.Game
                 Color team = TeamColor(unit.Team);
                 foreach (HexCoordinate tile in Footprints.Tiles(Position(unit), unit.Footprint))
                 {
+                    if (painted)
+                    {
+                        DrawSoftHex(_layout.Center(tile), team * 0.3f);
+                        if (unit.Id == actor)
+                        {
+                            DrawHexOutline(_layout.Center(tile), 3f, Ink("Y", Color.Yellow));
+                        }
+
+                        continue;
+                    }
+
                     Vector2 at = At(_layout.Center(tile));
                     _draw.DrawSprite(mask, 0, at, 1f, team * 0.35f);
                     if (unit.Id == actor)
@@ -387,6 +593,16 @@ namespace BeastCraft.Game
                 foreach (ParticleState particle in vfx.Particles)
                 {
                     string ch = particles.Colors.Length == 0 ? null : particles.Colors[particle.ColorIndex];
+                    if (particles.Painted != null)
+                    {
+                        // A painted burst: its one frame per particle, its curves over the particle's life.
+                        VfxSprite sprite = new VfxSprite(null, 0, particle.Position, 1f, 0f, 0f, particle.Alpha, ch, additivePass, false);
+                        float spin = particles.Painted.RandomSpin ? VfxPainted.SpinOf(0, -1, particle.Index) : 0f;
+                        DrawVfxSprite(VfxPainted.Apply(particles.Painted, sprite, 1f - particle.Alpha, 1f, particle.Alpha, spin));
+                        _draw.SetBlend(additivePass ? BlendState.Additive : BlendState.AlphaBlend);
+                        continue;
+                    }
+
                     DrawCentered(particles.Sheet, 0, particle.Position, 1, Ink(ch, Color.White) * particle.Alpha);
                 }
             }

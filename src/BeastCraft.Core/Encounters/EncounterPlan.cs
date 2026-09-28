@@ -138,7 +138,16 @@ namespace BeastCraft.Encounters
         /// </summary>
         public EncounterSetup ToSetup()
         {
-            EncounterSetup setup = new EncounterSetup { Arena = Arena, ShapeId = DropShapeId, EncounterLevel = Level };
+            return ToSetup(null);
+        }
+
+        /// <summary>
+        /// <see cref="ToSetup()"/> fought in <paramref name="regionId"/> (<see cref="EncounterSetup.RegionId"/>:
+        /// the region's battlefield layouts and their obstacles; null = none).
+        /// </summary>
+        public EncounterSetup ToSetup(string regionId)
+        {
+            EncounterSetup setup = new EncounterSetup { Arena = Arena, ShapeId = DropShapeId, EncounterLevel = Level, RegionId = regionId };
             foreach (EncounterLineupEnemy enemy in Enemies)
             {
                 EnemyData data = Catalog.Get(enemy.EnemyId);

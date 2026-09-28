@@ -62,10 +62,16 @@ namespace BeastCraft.Presentation.Content
         /// difficulty, on <paramref name="arena"/> or Medium: for looking at one enemy type's art
         /// across elements. Which battle it is changes; the rules do not.
         /// </para>
+        /// <para>
+        /// <paramref name="regionId"/> is the region the battle is fought in
+        /// (<see cref="EncounterSetup.RegionId"/>): it picks one of the region's battlefield
+        /// layouts, whose obstacles block movement; null (the default) fights on the open board.
+        /// </para>
         /// </summary>
         public static BattleSetup Create(GameContent content, int seed, out Dictionary<string, string> speciesByUnit, out string error,
                                          IReadOnlyList<string> team = null, string encounterId = DefaultEncounterId, int level = DefaultLevel,
-                                         int encounterLevel = DefaultEncounterLevel, ArenaSize? arena = null, IReadOnlyList<string> lineup = null)
+                                         int encounterLevel = DefaultEncounterLevel, ArenaSize? arena = null, IReadOnlyList<string> lineup = null,
+                                         string regionId = null)
         {
             speciesByUnit = new Dictionary<string, string>(StringComparer.Ordinal);
             error = null;
@@ -104,6 +110,8 @@ namespace BeastCraft.Presentation.Content
                     return null;
                 }
 
+                setup.Encounter.RegionId = regionId;
+
                 for (int i = 0; i < setup.Encounter.Enemies.Count; i++)
                 {
                     speciesByUnit["enemy" + (i + 1).ToString(CultureInfo.InvariantCulture)] = setup.Encounter.Enemies[i].SpeciesId;
@@ -121,7 +129,7 @@ namespace BeastCraft.Presentation.Content
                 return null;
             }
 
-            setup.Encounter = plan.ToSetup();
+            setup.Encounter = plan.ToSetup(regionId);
             if (arena.HasValue)
             {
                 setup.Encounter.Arena = arena.Value;

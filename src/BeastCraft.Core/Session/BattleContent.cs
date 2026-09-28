@@ -73,6 +73,14 @@ namespace BeastCraft.Session
             AddAll(_consumables, consumables, c => c.ConsumableId);
         }
 
+        /// <summary>
+        /// The battlefield layouts (<c>battle-layouts.json</c>): the obstacles of each region's
+        /// painted backdrops, one of which <see cref="BattleSession"/> puts on the board of a battle
+        /// in that region (<see cref="EncounterSetup.RegionId"/>). Null (the default) = no obstacles
+        /// anywhere, every battle on the open board.
+        /// </summary>
+        public Encounters.BattleLayoutData Layouts { get; set; }
+
         /// <summary>The consumable with <paramref name="consumableId"/>, or null. Usable as a <c>Func&lt;string, ConsumableSO&gt;</c> lookup.</summary>
         public ConsumableSO GetConsumable(string consumableId)
         {
