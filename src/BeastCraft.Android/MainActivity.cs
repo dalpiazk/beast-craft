@@ -1,3 +1,4 @@
+using System;
 using Android.App;
 using Android.Content.PM;
 using Android.OS;
@@ -9,12 +10,12 @@ using Microsoft.Xna.Framework;
 namespace BeastCraft.Android
 {
     /// <summary>
-    /// The Android host: MonoGame's activity around the shared <see cref="BattleViewerGame"/>, full
+    /// The Android host: MonoGame's activity around the shared <see cref="BeastCraftGame"/>, full
     /// screen and locked to portrait, with the content read from the APK's assets
-    /// (<see cref="TitleContainerContentSource"/>). The window extends under a display cutout
-    /// (notch, punch-hole) and reports the cutout's safe insets to the viewer, which letterboxes its
-    /// 1080x1920 canvas inside them. Tap the buttons and skills, tap the board to step, two fingers
-    /// toggle auto-play, Back quits.
+    /// (<see cref="TitleContainerContentSource"/>) and the save in the app's files directory. The
+    /// window extends under a display cutout (notch, punch-hole) and reports the cutout's safe insets
+    /// to the game, which letterboxes its 1080x1920 canvas inside them. It starts at the title; Back
+    /// goes back (the title asks before quitting), and pausing the app autosaves.
     /// </summary>
     [Activity(
         Label = "Beast Craft",
@@ -27,7 +28,7 @@ namespace BeastCraft.Android
                                ConfigChanges.ScreenLayout | ConfigChanges.SmallestScreenSize | ConfigChanges.UiMode)]
     public class MainActivity : AndroidGameActivity
     {
-        private BattleViewerGame _game;
+        private BeastCraftGame _game;
         private View _view;
 
         // Written on the UI thread when the layout settles, read by the game loop every frame.
@@ -43,15 +44,41 @@ namespace BeastCraft.Android
                 Window.Attributes.LayoutInDisplayCutoutMode = LayoutInDisplayCutoutMode.ShortEdges;
             }
 
-            _game = new BattleViewerGame(new ViewerOptions(),
-                                         ViewerHost.Mobile("BEAST CRAFT", new TitleContainerContentSource("Content"), () => _insets.Value));
+            ViewerHost host = ViewerHost.Mobile("BEAST CRAFT", new TitleContainerContentSource("Content"), () => _insets.Value, FilesDir?.AbsolutePath);
+
+            // Idle time counts deep sleep (elapsedRealtime), and the idle-full notification is Android's.
+            host.MonotonicClock = () => TimeSpan.FromMilliseconds(SystemClock.ElapsedRealtime());
+            host.IdleNotifier = new AndroidIdleNotifier(this);
+            _game = new BeastCraftGame(new ViewerOptions(), host);
             // MonoGame's Exit() on Android only moves the task to the back; finish the activity so
             // Back really quits.
             _game.Exiting += (sender, args) => Finish();
+
+            // Android 13+ delivers Back as a callback, not a key: without one the system only sends
+            // the app to the background. Route it to the game's stack (the title asks before quitting).
+            if (Build.VERSION.SdkInt >= BuildVersionCodes.Tiramisu)
+            {
+                OnBackInvokedDispatcher.RegisterOnBackInvokedCallback(0, new BackCallback(_game));
+            }
             _view = (View)_game.Services.GetService(typeof(View));
             _view.ViewTreeObserver.GlobalLayout += (sender, args) => ReadInsets();
             SetContentView(_view);
             _game.Run();
+        }
+
+        /// <summary>Back on Android 12 and older, when the key did not reach the game first.</summary>
+#pragma warning disable CS0672, CS0618, CA1422 // OnBackPressed is the pre-33 path; 33+ uses BackCallback.
+        public override void OnBackPressed()
+        {
+            _game?.RequestBack();
+        }
+#pragma warning restore CS0672, CS0618, CA1422
+
+        /// <summary>Going to the background (home, another app, the screen off): autosave before Android may stop the process.</summary>
+        protected override void OnPause()
+        {
+            _game?.OnBackgrounded();
+            base.OnPause();
         }
 
         /// <summary>The display cutout's safe insets (API 28+), in the view's pixels, as the back buffer is.</summary>
@@ -66,6 +93,22 @@ namespace BeastCraft.Android
             _insets = new SafeInsetsBox(cutout == null
                                             ? SafeInsets.None
                                             : new SafeInsets(cutout.SafeInsetLeft, cutout.SafeInsetTop, cutout.SafeInsetRight, cutout.SafeInsetBottom));
+        }
+
+        /// <summary>Back (Android 13+) handed to the game's screen stack.</summary>
+        private sealed class BackCallback : Java.Lang.Object, global::Android.Window.IOnBackInvokedCallback
+        {
+            private readonly BeastCraftGame _game;
+
+            public BackCallback(BeastCraftGame game)
+            {
+                _game = game;
+            }
+
+            public void OnBackInvoked()
+            {
+                _game.RequestBack();
+            }
         }
 
         /// <summary>A reference holder so the struct can be swapped atomically between threads.</summary>

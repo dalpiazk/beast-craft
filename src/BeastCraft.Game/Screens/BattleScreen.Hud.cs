@@ -15,34 +15,24 @@ using BeastCraft.Save;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
-namespace BeastCraft.Game
+namespace BeastCraft.Game.Screens
 {
     // BeastCraft.Color (Core's engine-neutral colour) would win over a file-level using here.
     using Color = Microsoft.Xna.Framework.Color;
 
     /// <summary>The HUD half of the frame, in canvas pixels: header, turn order, toast, skill strip, controls.</summary>
-    public sealed partial class BattleViewerGame
+    public sealed partial class BattleScreen
     {
         private const float Small = 15f;
         private const float Medium = 20f;
         private const float Large = 25f;
 
-        private Texture2D _pixel;
         private GlossaryTerm _popupTerm;
 
-        /// <summary>A 1x1 white texture for rectangles and bars (made on first use, so a failure screen has one too).</summary>
+        /// <summary>A 1x1 white texture for rectangles and bars (the host's).</summary>
         private Texture2D Pixel
         {
-            get
-            {
-                if (_pixel == null)
-                {
-                    _pixel = new Texture2D(GraphicsDevice, 1, 1);
-                    _pixel.SetData(new[] { Color.White });
-                }
-
-                return _pixel;
-            }
+            get { return Ctx.Pixel; }
         }
 
         private void DrawHud(ScheduledBeat beat)
@@ -50,6 +40,7 @@ namespace BeastCraft.Game
             Color shadow = Ink("K", Color.Black);
             DrawHeader(shadow);
             DrawTurnOrder(beat, shadow);
+            DrawAvatarBadge(beat, shadow);
             DrawToast(shadow);
             DrawSkillStrip(beat, shadow);
             DrawControls(shadow);
@@ -61,9 +52,21 @@ namespace BeastCraft.Game
                 Rect board = _screen.Board;
                 _draw.Fill(Pixel, new Vector2(board.X, board.Center.Y - 70f), new Vector2(board.Width, 140f), shadow * 0.75f);
                 _text.DrawCentered(_draw, banner, board.Center.X, board.Center.Y - 30f, 60f, Ink("y", Color.Gold), shadow);
+                DrawContinue();
             }
 
             DrawSettings(shadow);
+        }
+
+        /// <summary>A decided campaign battle's Continue button (to the results), under the result banner.</summary>
+        private void DrawContinue()
+        {
+            if (_campaign == null)
+            {
+                return;
+            }
+
+            Ctx.Painter.Button(ContinueButton, "Continue", Ctx.Style.Button("primary"), false, true, false);
         }
 
         /// <summary>
@@ -106,9 +109,9 @@ namespace BeastCraft.Game
         private void DrawHeader(Color shadow)
         {
             Rect header = _screen.Header;
-            _text.Draw(_draw, _host.HudTitle, new Vector2(header.X, header.Y + 12f), Large, Ink("y", Color.Gold), shadow);
+            _text.Draw(_draw, _text.Fit(_hudTitle, Large, 520f), new Vector2(header.X, header.Y + 12f), Large, Ink("y", Color.Gold), shadow);
             string turn = "TURN " + _playback.Played.Count.ToString(CultureInfo.InvariantCulture) + "  SEED " +
-                          _options.Seed.ToString(CultureInfo.InvariantCulture);
+                          _seed.ToString(CultureInfo.InvariantCulture);
             Rect gear = _screen.SettingsButton;
             _text.DrawRight(_draw, turn, gear.X - 20f, header.Y + 16f, Medium, Ink("3", Color.Gray), shadow);
 
@@ -156,13 +159,21 @@ namespace BeastCraft.Game
                 _draw.Fill(Pixel, new Vector2(slot.X, slot.Y), new Vector2(slot.Width, slot.Height), border);
                 _draw.Fill(Pixel, new Vector2(slot.X + thickness, slot.Y + thickness), new Vector2(slot.Width - 2f * thickness, slot.Height - 2f * thickness),
                            Ink("1", Color.DarkGray));
-                ArtSprite portrait = SpriteFor(unit.Id);
-                DrawFitted(portrait, slot.Inset(thickness + 6f), unit.Team == BattleTeam.Enemy,
-                           AccentColor(portrait, unit.Elements.Count > 0 ? unit.Elements[0] : Creatures.Element.None));
+                if (unit == _playback.Avatar)
+                {
+                    // The Beastbinder has no tile or sprite yet: its portrait badge.
+                    DrawAvatarPortrait(slot.Inset(thickness + 6f));
+                }
+                else
+                {
+                    ArtSprite portrait = SpriteFor(unit.Id);
+                    DrawFitted(portrait, slot.Inset(thickness + 6f), unit.Team == BattleTeam.Enemy,
+                               AccentColor(portrait, unit.Elements.Count > 0 ? unit.Elements[0] : Creatures.Element.None));
 
-                int hp = _animation != null ? _animation.ShownHp(unit.Id, _clockMs) : unit.CurrentHp;
-                float barWidth = slot.Width - 2f * thickness - 12f;
-                DrawHpBar(slot.Center.X, slot.Bottom - thickness - 12f, barWidth, 6f, hp, unit.Stats.Hp);
+                    int hp = _animation != null ? _animation.ShownHp(unit.Id, _clockMs) : unit.CurrentHp;
+                    float barWidth = slot.Width - 2f * thickness - 12f;
+                    DrawHpBar(slot.Center.X, slot.Bottom - thickness - 12f, barWidth, 6f, hp, unit.Stats.Hp);
+                }
                 if (current)
                 {
                     _text.DrawCentered(_draw, _animation != null ? "NOW" : "NEXT", slot.Center.X, band.Y + 8f, Small, Ink("Y", Color.Yellow), shadow);
@@ -172,6 +183,54 @@ namespace BeastCraft.Game
                         float badge = slot.Width * 0.5f;
                         DrawSkillIcon(firing, new Rect(slot.Right - badge - 2f, slot.Y + 2f, badge, badge), shadow, SourceOf(unit, firing));
                     }
+                }
+            }
+        }
+
+        /// <summary>The Beastbinder's placeholder portrait: a gold-rimmed plum disc with the avatar glyph.</summary>
+        private void DrawAvatarPortrait(Rect box)
+        {
+            float r = Math.Min(box.Width, box.Height) / 2f;
+            Ctx.Painter.Disc(box.Center, r, Ctx.Painter.C("gold"));
+            Ctx.Painter.Disc(box.Center, r - 4f, Ctx.Painter.C("plum"));
+            Ctx.Painter.Glyph("avatar", Scaled(box, 0.62f), Ctx.Painter.C("cream"));
+        }
+
+        /// <summary>
+        /// The Beastbinder, off the board: a portrait badge at the board's bottom-left with its arts
+        /// and their cooldowns (ready, or turns left); lit while it acts. It fights from here — it
+        /// fills its own turn gauge and its arts play on their targets.
+        /// </summary>
+        private void DrawAvatarBadge(ScheduledBeat beat, Color shadow)
+        {
+            BattleUnit avatar = _playback.Avatar;
+            if (avatar == null)
+            {
+                return;
+            }
+
+            Rect board = _screen.Board;
+            IReadOnlyList<SkillSO> arts = avatar.Skills == null ? (IReadOnlyList<SkillSO>)new SkillSO[0] : avatar.Skills.Skills;
+            float width = 150f + arts.Count * 92f;
+            Rect badge = new Rect(board.X + 12f, board.Bottom - 124f, width, 112f);
+            bool acting = _animation != null && _animation.Turn.Turn.Unit == avatar;
+            Ctx.Painter.Framed(badge, 56f, 4f, acting ? Ctx.Painter.C("gold") : Ctx.Painter.C("plum"), Ctx.Painter.C("plumDeep", 0.85f));
+            DrawAvatarPortrait(new Rect(badge.X + 8f, badge.Y + 8f, 96f, 96f));
+            _text.Draw(_draw, UnitName(avatar.Id), new Vector2(badge.X + 112f, badge.Y + 12f), Small, Ink("y", Color.Gold), shadow);
+            for (int i = 0; i < arts.Count; i++)
+            {
+                Rect icon = new Rect(badge.X + 112f + i * 92f, badge.Y + 38f, 64f, 64f);
+                bool firing = beat != null && acting && beat.Beat.SkillId == arts[i].SkillId;
+                int cooldown = avatar.Skills.RemainingCooldown(i);
+                DrawSkillIcon(arts[i], icon, shadow, SkillIconSource.Avatar);
+                if (cooldown > 0 && !firing)
+                {
+                    _draw.Fill(Pixel, new Vector2(icon.X, icon.Y), new Vector2(icon.Width, icon.Height), shadow * 0.55f);
+                    _text.DrawCentered(_draw, cooldown.ToString(CultureInfo.InvariantCulture), icon.Center.X, icon.Center.Y - 11f, Medium, Ink("4", Color.White), shadow);
+                }
+                else if (firing)
+                {
+                    Ctx.Painter.Arc(icon.Center, icon.Width / 2f + 4f, 4f, Ctx.Painter.C("gold"));
                 }
             }
         }
@@ -204,8 +263,8 @@ namespace BeastCraft.Game
                 return;
             }
 
-            _text.Draw(_draw, Name(unit.Id), new Vector2(strip.X, strip.Y + 8f), Medium, Ink("y", Color.Gold), shadow);
-            _text.Draw(_draw, "SKILLS", new Vector2(strip.X + _text.Measure(Name(unit.Id), Medium) + 20f, strip.Y + 12f), Small, Ink("3", Color.Gray), shadow);
+            _text.Draw(_draw, UnitName(unit.Id), new Vector2(strip.X, strip.Y + 8f), Medium, Ink("y", Color.Gold), shadow);
+            _text.Draw(_draw, "SKILLS", new Vector2(strip.X + _text.Measure(UnitName(unit.Id), Medium) + 20f, strip.Y + 12f), Small, Ink("3", Color.Gray), shadow);
 
             int shown = SelectedSkill();
             for (int i = 0; i < skills.Count; i++)

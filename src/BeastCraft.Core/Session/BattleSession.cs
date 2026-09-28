@@ -737,6 +737,20 @@ namespace BeastCraft.Session
             }
         }
 
+        /// <summary>Whether any tile <paramref name="footprint"/> would cover from <paramref name="anchor"/> is an obstacle (off-board tiles are left to the placement).</summary>
+        private static bool CoversBlocked(HexGrid grid, HexCoordinate anchor, UnitFootprint footprint)
+        {
+            foreach (HexCoordinate tile in Footprints.Tiles(anchor, footprint))
+            {
+                if (grid.IsInBounds(tile) && grid.IsBlocked(tile))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private static bool PlaceEnemies(HexGrid grid, EncounterSetup encounter, List<ResolvedEnemy> enemies, List<BattleUnit> units, List<string> errors)
         {
             // Explicit positions and prebuilt units first, so auto-placement packs around them.
@@ -744,6 +758,14 @@ namespace BeastCraft.Session
             {
                 foreach (BattleUnit unit in encounter.PrebuiltEnemies)
                 {
+                    // HexGrid's single-tile overload does not refuse a terrain-blocked tile, so check
+                    // every tile of the footprint against the layout's obstacles first.
+                    if (CoversBlocked(grid, unit.Position, unit.Footprint))
+                    {
+                        errors.Add("Prebuilt enemy '" + unit.Id + "' cannot stand at " + unit.Position + ": an obstacle blocks it.");
+                        continue;
+                    }
+
                     if (!grid.TryPlaceUnit(unit.Id, unit.Position, unit.Footprint))
                     {
                         errors.Add("Prebuilt enemy '" + unit.Id + "' cannot stand at " + unit.Position + ".");

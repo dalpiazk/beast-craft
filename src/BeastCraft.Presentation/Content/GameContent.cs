@@ -7,9 +7,12 @@ using BeastCraft.Bonds;
 using BeastCraft.Campaign;
 using BeastCraft.Creatures;
 using BeastCraft.Creatures.Roster;
+using BeastCraft.Economy;
 using BeastCraft.Encounters;
+using BeastCraft.Idle;
 using BeastCraft.Presentation.Art;
 using BeastCraft.Presentation.Text;
+using BeastCraft.Presentation.Ui;
 using BeastCraft.Progression;
 using BeastCraft.Session;
 using BeastCraft.Skills;
@@ -91,6 +94,24 @@ namespace BeastCraft.Presentation.Content
         /// <summary>Every skill id a skill can have: beast skills, avatar actives and enemy-library skills.</summary>
         public HashSet<string> KnownSkillIds { get; private set; }
 
+        /// <summary>The campaign's regions, seals and map rules, built (<see cref="RegionLibrary"/>): what the region map and <see cref="CampaignRules"/> read.</summary>
+        public RegionLibrary Campaign { get; private set; }
+
+        /// <summary>The region map's location names (location-names.json), resolved from each node's <c>LabelKey</c>.</summary>
+        public LocationNameTable LocationNames { get; private set; }
+
+        /// <summary>The material and gold drop tables (drop-tables.json), built with the skill library's material tiers: what a clear pays out.</summary>
+        public DropTable Drops { get; private set; }
+
+        /// <summary>The economy: gear, consumables and cosmetics (the reward modifiers' gear and looks, and the consumables a battle may use).</summary>
+        public EconomyContent Economy { get; private set; }
+
+        /// <summary>The idle (AFK) rewards (idle-rewards.json and what a claim pays out of), for <see cref="IdleRewardCalculator"/>.</summary>
+        public IdleContent Idle { get; private set; }
+
+        /// <summary>The UI toolkit's house style (<see cref="UiStyleData.ProjectRelativePath"/>): colours, panels, buttons and text sizes.</summary>
+        public UiStyle Style { get; private set; }
+
         /// <summary>A file of the content root by its ProjectRelativePath (<c>content/...</c>).</summary>
         public static string PathOf(string root, string projectRelativePath)
         {
@@ -171,6 +192,12 @@ namespace BeastCraft.Presentation.Content
             RegionLibraryData regions = Read<RegionLibraryData>(root, RegionLibraryData.ProjectRelativePath, errors);
             BattleArtData battleArt = Read<BattleArtData>(root, BattleArtData.ProjectRelativePath, errors);
             BattleLayoutData layouts = Read<BattleLayoutData>(root, BattleLayoutData.ProjectRelativePath, errors);
+            LocationNameTableData locationNames = Read<LocationNameTableData>(root, LocationNameTableData.ProjectRelativePath, errors);
+            GearLibraryData gearData = Read<GearLibraryData>(root, GearLibraryData.ProjectRelativePath, errors);
+            ConsumableLibraryData consumableData = Read<ConsumableLibraryData>(root, ConsumableLibraryData.ProjectRelativePath, errors);
+            CosmeticLibraryData cosmeticData = Read<CosmeticLibraryData>(root, CosmeticLibraryData.ProjectRelativePath, errors);
+            UiStyleData style = Read<UiStyleData>(root, UiStyleData.ProjectRelativePath, errors);
+            IdleRewardsData idleData = Read<IdleRewardsData>(root, IdleRewardsData.ProjectRelativePath, errors);
             if (errors.Count > 0)
             {
                 return null;
@@ -184,6 +211,14 @@ namespace BeastCraft.Presentation.Content
             Prefix(errors, "encounter-library.json", EncounterLibraryValidator.Validate(encounterLibrary, enemyLibrary, dropTables));
             Prefix(errors, "encounter-difficulty.json", EncounterDifficultyTable.Validate(difficulty, encounterLibrary));
             Prefix(errors, "battle-layouts.json", ObstacleLayoutValidator.Validate(layouts, regions, encounterLibrary, enemyLibrary));
+            Prefix(errors, "regions.json", RegionLibraryValidator.Validate(regions, encounterLibrary));
+            Prefix(errors, "location-names.json", LocationNameTableValidator.Validate(locationNames, regions));
+            Prefix(errors, "drop-tables.json", DropTableValidator.Validate(dropTables, skills.Materials));
+            Prefix(errors, "gear-library.json", GearLibraryValidator.Validate(gearData));
+            Prefix(errors, "consumable-library.json", ConsumableLibraryValidator.Validate(consumableData));
+            Prefix(errors, "cosmetic-library.json", CosmeticLibraryValidator.Validate(cosmeticData));
+            Prefix(errors, "ui-style.json", UiStyleValidator.Validate(style));
+            Prefix(errors, "idle-rewards.json", IdleRewardsValidator.Validate(idleData, dropTables));
 
             HashSet<string> known = KnownSkills(skills, enemyLibrary);
             Prefix(errors, "vfx-library.json", VfxLibraryValidator.Validate(vfx, known, art));
@@ -239,6 +274,11 @@ namespace BeastCraft.Presentation.Content
 
             curves.TryGetValue(enemyLibrary.GrowthCurveId ?? string.Empty, out GrowthRateCurve enemyCurve);
             EnemyCatalog enemies = EnemyCatalog.Build(enemyLibrary, enemyCurve);
+            GearLibrary gear = GearLibrary.Build(gearData);
+            ConsumableLibrary consumables = ConsumableLibrary.Build(consumableData);
+            EconomyContent economy = new EconomyContent { Gear = gear, Consumables = consumables, Cosmetics = CosmeticLibrary.Build(cosmeticData) };
+            RegionLibrary campaign = RegionLibrary.Build(regions);
+            DropTable drops = DropTableBuilder.Build(dropTables, DropTableBuilder.TierLookup(skills.Materials));
 
             return new GameContent
             {
@@ -249,13 +289,22 @@ namespace BeastCraft.Presentation.Content
                 EnemyLibrary = enemyLibrary,
                 Regions = regions,
                 Enemies = enemies,
-                Battle = new BattleContent(species, built.Values, passives, bonds, null, null, enemies) { Layouts = layouts },
+                Battle = new BattleContent(species, built.Values, passives, bonds, gear.BeastGearAssets, gear.AvatarGearAssets, enemies, consumables.All)
+                {
+                    Layouts = layouts
+                },
                 Encounters = EncounterLibrary.Build(encounterLibrary, EncounterDifficultyTable.Build(difficulty)),
                 Vfx = VfxLibrary.Build(vfx),
                 Art = art,
                 BattleArt = battleArt,
                 Glossary = glossary,
-                KnownSkillIds = known
+                KnownSkillIds = known,
+                Campaign = campaign,
+                LocationNames = LocationNameTable.Build(locationNames),
+                Drops = drops,
+                Idle = new IdleContent { Rewards = IdleRewardsBuilder.Build(idleData), DropTable = drops, Cosmetics = economy.Cosmetics, Regions = campaign },
+                Economy = economy,
+                Style = UiStyle.Build(style)
             };
         }
 

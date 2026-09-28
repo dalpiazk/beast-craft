@@ -145,6 +145,45 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
+        public void Session_RefusesAPrebuiltEnemyOnAnObstacle_AndSeatsOneBesideIt()
+        {
+            WithLayouts(Fixture(), () =>
+            {
+                BattleSetup probe = DemoBattle.Create(Content, 3, out _, out string error, null, "squad", 30, 30, ArenaSize.Medium, null, "r01");
+                Assert.IsNull(error, error);
+                BattleLayoutEntryData layout = BattleLayouts.Pick(Content.Battle.Layouts, "r01", ArenaSize.Medium, 3);
+                HexCoordinate rock = layout.Coordinates()[0];
+                HexGrid open = new HexGrid(ArenaSize.Medium);
+                HexCoordinate free = HexCoordinate.Zero;
+                foreach (HexCoordinate tile in open.Tiles)
+                {
+                    if (!layout.Coordinates().Contains(tile) && !open.IsInDeploymentZone(tile, BattleTeam.Player) && !open.IsInDeploymentZone(tile, BattleTeam.Enemy))
+                    {
+                        free = tile;
+                        break;
+                    }
+                }
+
+                foreach ((HexCoordinate at, bool refused) in new[] { (rock, true), (free, false) })
+                {
+                    BattleSetup setup = DemoBattle.Create(Content, 3, out _, out _, null, "squad", 30, 30, ArenaSize.Medium, null, "r01");
+                    setup.Encounter.PrebuiltEnemies.Add(Unit("prebuilt", BattleTeam.Enemy, 2, at, Skill(1)));
+                    BattleSessionRun run = BattleSession.Begin(setup);
+
+                    if (refused)
+                    {
+                        Assert.IsNull(run.Battle, "a prebuilt enemy on an obstacle is refused");
+                        StringAssert.Contains("an obstacle blocks it", run.Result.Error);
+                        continue;
+                    }
+
+                    Assert.IsNotNull(run.Battle, run.Result.Error);
+                    Assert.AreEqual("prebuilt", run.Grid.GetOccupant(at));
+                }
+            });
+        }
+
+        [Test]
         public void Knockback_StopsAtTheLastFreeHex_BeforeAnObstacle()
         {
             HexGrid grid = new HexGrid(ArenaSize.Medium);
