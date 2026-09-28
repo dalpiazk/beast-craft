@@ -103,13 +103,14 @@ namespace BeastCraft.Tooling.BalanceSim
         }
 
         /// <summary>
-        /// The documented command that writes the committed (shipping) table: the tuned report's command
-        /// with <c>--gear typical</c> (user decision: the shipping difficulty assumes the gear a player
-        /// normally wears) and no <c>--out</c>. The committed tuned report itself stays gearless
-        /// (<c>-- --panel 16x4 --avatar-value --out docs/balance/tuned-report.md</c>).
+        /// The documented command that writes the committed (shipping) table: the typical-team calibration
+        /// (<see cref="TypicalCalibration"/>, <c>--mode typical</c>; producer decision: the targets are hit by a
+        /// typical team from the owned roster, in typical gear) with its report. The committed tuned report stays the
+        /// gearless full-roster scouted calibration (<c>-- --panel 16x4 --avatar-value --out docs/balance/tuned-report.md</c>),
+        /// the per-beast balance measure.
         /// </summary>
-        public const string Command = "dotnet run --project Tooling/BalanceSim -c Release -- --panel 16x4 --avatar-value --gear typical " +
-                                      "--write-difficulty content/data/Encounters/encounter-difficulty.json";
+        public const string Command = "dotnet run --project Tooling/BalanceSim -c Release -- --mode typical --gear typical " +
+                                      "--write-difficulty content/data/Encounters/encounter-difficulty.json --out docs/balance/typical-team-report.md";
 
         private static string Readme(SimOptions options, EncounterCatalog encounters)
         {
@@ -148,6 +149,10 @@ namespace BeastCraft.Tooling.BalanceSim
                     return "the average of every team (a player who does not scout)";
                 case CalibrationTarget.Heuristic:
                     return "the team a scouting player's heuristic pick fields per encounter";
+                case CalibrationTarget.Typical:
+                    return "the typical team: per owned roster (every one-per-stance trio plus the Kinship recruits reached by the level, recruits " +
+                           "lagging), the median reasonable team (two or more stances, a Vanguard), no scouting, skills at the pacing model's typical level; " +
+                           "the mean over the rosters (Tooling/BalanceSim --mode typical, docs/balance/typical-team-report.md)";
                 default:
                     return "the team a scouting player's bond-aware heuristic pick fields per encounter";
             }

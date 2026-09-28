@@ -75,7 +75,9 @@ namespace BeastCraft.Tooling.BalanceSim
                 report.AppendLine("- Difficulty (PvE, `--calibrate-on " + SimOptions.CalibrationName(options.EffectiveCalibrateOn) + "`): calibrated so the team the " +
                                   PveReport.PickerName(options) + " fields per composition clears " + options.TargetSummary(encounters.Shapes) +
                                   (options.UniformTarget ? " (`--target-clear`)" : " (the shapes' `TargetClear`)") +
-                                  " (the player scouts and counter-picks); the average team's no-scouting rate is reported beside it, see \"Calibrated difficulty\"");
+                                  " (the player scouts and counter-picks); the average team's no-scouting rate is reported beside it, see \"Calibrated difficulty\". " +
+                                  "This is the per-beast balance measure (the whole roster, scouted); the shipping difficulty table is calibrated on the " +
+                                  "typical team from the owned roster instead (`--mode typical`, docs/balance/typical-team-report.md)");
             }
 
             if (options.RunPve)

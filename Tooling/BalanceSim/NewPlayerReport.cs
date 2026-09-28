@@ -86,6 +86,9 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <summary>The map row a Kinship trial's measured level is read at (sites sit above rows 2-6).</summary>
         public const int TrialRow = 4;
 
+        /// <summary>Seeded copies of a template's lineup per team and sample (a boss, a trial: one lineup gives one battle otherwise).</summary>
+        public const int BossCopies = 16;
+
         public static int Run(SimOptions options, List<CreatureSpeciesSO> species, Dictionary<string, GrowthRateCurve> curves)
         {
             List<string> errors = new List<string>();
@@ -146,16 +149,25 @@ namespace BeastCraft.Tooling.BalanceSim
 
             PveSimulator probe = new PveSimulator(options, species);
             context.Trios = Trios(probe.Teams, species);
+            context.Skills = SkillCurve.Build(options, out string skillError);
+            if (context.Skills == null)
+            {
+                Console.Error.WriteLine(skillError);
+                return 2;
+            }
+
+            context.Cache = new SimulatorCache(options, species);
+            context.Model = new TypicalTeamModel(species, probe.Teams, context.Discovery, regions);
 
             StringBuilder report = new StringBuilder();
             Header(report, context);
             if (!options.NewPlayerKinshipOnly)
             {
-                PerStage(report, context);
+                RegionTable(report, context);
+                EarlyRegions(report, context);
                 FirstNode(report, context);
             }
 
-            RosterGrowth(report, context);
             KinshipTrials(report, context);
 
             string text = report.ToString().Replace("\r\n", "\n");
@@ -186,6 +198,9 @@ namespace BeastCraft.Tooling.BalanceSim
             public EnemyCatalog Enemies;
             public int[] Trios;
             public DiscoveryLibrary Discovery;
+            public SkillCurve Skills;
+            public SimulatorCache Cache;
+            public TypicalTeamModel Model;
             public readonly Dictionary<string, PveSimulator> Simulators = new Dictionary<string, PveSimulator>(StringComparer.Ordinal);
 
             /// <summary>A simulator fighting on <paramref name="regionId"/>'s battlefields (as the game does) in the profile's gear there.</summary>
@@ -321,87 +336,10 @@ namespace BeastCraft.Tooling.BalanceSim
             return string.Join("/", parts);
         }
 
-        private static void PerStage(StringBuilder report, Context context)
+        /// <summary>A template's lineup as a shape of <see cref="BossCopies"/> seeded copies (one lineup gives one battle otherwise).</summary>
+        public static EncounterShape TemplateShape(EnemyCatalog enemies, EncounterPlan plan)
         {
-            report.AppendLine("## Clear rate per stage (new-player profile)");
-            report.AppendLine();
-            report.AppendLine("Trio mean (lowest-highest trio). Off = the calibrated multiplier; on = times the stage's authored scale for the shape.");
-            report.AppendLine();
-            report.AppendLine("| Region | Stage | Shape | Level | Target | Table | Scale | Off | On | Required |");
-            report.AppendLine("| --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |");
-
-            foreach (string regionId in Regions)
-            {
-                RegionData region = context.Regions.GetRegion(regionId);
-                if (region == null)
-                {
-                    continue;
-                }
-
-                MapRulesData rules = context.Regions.RulesFor(region);
-                PveSimulator pve = context.For(regionId);
-                for (int stage = 0; stage < region.Stages; stage++)
-                {
-                    int rowLevel = NodeMapGenerator.RowLevel(region, rules, stage, MiddleRow);
-                    List<string> shapeIds = new List<string>();
-                    foreach (ShapeWeightData weight in region.ShapeWeights ?? new ShapeWeightData[0])
-                    {
-                        shapeIds.Add(weight.ShapeId);
-                    }
-
-                    shapeIds.Add(rules.EliteShapeId);
-                    foreach (string shapeId in shapeIds)
-                    {
-                        EncounterShape shape = context.Catalog.Shapes.Find(s => s.Id == shapeId);
-                        if (shape == null)
-                        {
-                            continue;
-                        }
-
-                        int level = shapeId == rules.EliteShapeId ? rowLevel + rules.EliteLevelOffset : rowLevel;
-                        double scale = context.Regions.DifficultyScaleFor(regionId, stage, shapeId);
-                        double target = context.Options.TargetFor(shape);
-                        double multiplier = context.Library.Multiplier(shapeId, level);
-                        double[] off = Rates(context, pve, level, shape, multiplier, out double offMean);
-                        string on = "-";
-                        if (scale != 1.0)
-                        {
-                            double[] eased = Rates(context, pve, level, shape, multiplier * scale, out double onMean);
-                            on = Spread(eased, onMean);
-                        }
-
-                        string required = RequiredScale(context, pve, level, shape, multiplier, target, offMean);
-                        report.AppendLine("| " + regionId + " | " + (stage + 1) + " | `" + shapeId + "` | " + level + " | " + SimOptions.Format(target) + "% | " +
-                                          "x" + SimOptions.FormatMultiplier(multiplier) + " | x" + scale.ToString("0.00", CultureInfo.InvariantCulture) + " | " +
-                                          Spread(off, offMean) + " | " + (scale != 1.0 ? on : "(= off)") + " | " + required + " |");
-                    }
-
-                    if (stage == region.Stages - 1)
-                    {
-                        BossRow(report, context, pve, region, context.Regions.DifficultyScaleFor(regionId, stage, RegionLibraryData.EasingBossId));
-                    }
-                }
-            }
-
-            report.AppendLine();
-            report.AppendLine("The boss row is the region's boss template at its max level and its own `DifficultyOverride` (target 50%), fought " +
-                              BossCopies + " times over per trio and");
-            report.AppendLine("sample (seeded copies of the one lineup).");
-            report.AppendLine();
-        }
-
-        /// <summary>Seeded copies of a boss lineup per trio and sample in the boss row (one lineup gives one battle otherwise).</summary>
-        public const int BossCopies = 16;
-
-        private static void BossRow(StringBuilder report, Context context, PveSimulator pve, RegionData region, double scale)
-        {
-            EncounterPlan plan = EncounterPlan.FromTemplate(context.Library, context.Enemies, region.BossTemplateId, region.MaxLevel);
-            if (plan == null)
-            {
-                return;
-            }
-
-            EnemyFactory factory = new EnemyFactory(context.Enemies);
+            EnemyFactory factory = new EnemyFactory(enemies);
             EncounterShape shape = new EncounterShape { Id = plan.EncounterId, Arena = plan.Arena };
             for (int copy = 1; copy <= BossCopies; copy++)
             {
@@ -414,51 +352,181 @@ namespace BeastCraft.Tooling.BalanceSim
                 shape.Compositions.Add(encounter);
             }
 
-            const double target = SimOptions.DefaultTargetClearRate;
-            double[] off = Rates(context, pve, plan.Level, shape, plan.Multiplier, out double offMean);
-            string on = "(= off)";
-            if (scale != 1.0)
-            {
-                double[] eased = Rates(context, pve, plan.Level, shape, plan.Multiplier * scale, out double onMean);
-                on = Spread(eased, onMean);
-            }
-
-            string required = RequiredScale(context, pve, plan.Level, shape, plan.Multiplier, target, offMean);
-            report.AppendLine("| " + region.RegionId + " | " + region.Stages + " | boss `" + plan.EncounterId + "` | " + plan.Level + " | " + SimOptions.Format(target) + "% | " +
-                              "x" + SimOptions.FormatMultiplier(plan.Multiplier) + " | x" + scale.ToString("0.00", CultureInfo.InvariantCulture) + " | " +
-                              Spread(off, offMean) + " | " + on + " | " + required + " |");
+            return shape;
         }
 
-        private static string RequiredScale(Context context, PveSimulator pve, int level, EncounterShape shape, double multiplier, double target, double atOne)
+        /// <summary>The shape ids a stage of <paramref name="region"/> draws: its battle shapes, then the elite shape.</summary>
+        private static List<string> StageShapes(RegionData region, MapRulesData rules)
         {
-            if (atOne >= target)
+            List<string> shapeIds = new List<string>();
+            foreach (ShapeWeightData weight in region.ShapeWeights ?? new ShapeWeightData[0])
             {
-                return "1.00+";
+                shapeIds.Add(weight.ShapeId);
             }
 
-            Rates(context, pve, level, shape, multiplier * MinScale, out double easiest);
-            if (easiest < target)
-            {
-                return "<" + MinScale.ToString("0.00", CultureInfo.InvariantCulture);
-            }
+            shapeIds.Add(rules.EliteShapeId);
+            return shapeIds;
+        }
 
-            double lo = MinScale;
-            double hi = 1.0;
-            for (int step = 0; step < ScaleBisections; step++)
+        private static string Pct(double value)
+        {
+            return SimOptions.Format(value) + "%";
+        }
+
+        private static string Range(TypicalTeamModel.Measure measure)
+        {
+            return SimOptions.Format(measure.Typical) + "% (" + SimOptions.Format(measure.TypicalMin) + "-" + SimOptions.Format(measure.TypicalMax) + ")";
+        }
+
+        /// <summary>
+        /// "Typical, weak and strong picks by region": every mainline region at its second stage's middle row (the elite
+        /// shape a level up) and its boss, at the shipping table (the boss at its override), no easing, typical gear, on
+        /// the region's own battlefields: the typical team (the calibrated number, here out of sample: other
+        /// compositions, a level between two calibrated bands), the weak pick, the scouted pick and the strong pick.
+        /// </summary>
+        private static void RegionTable(StringBuilder report, Context context)
+        {
+            SimOptions options = context.Options;
+            report.AppendLine("## Typical, weak and strong picks by region (no easing)");
+            report.AppendLine();
+            report.AppendLine("Each mainline region at its second stage's middle row (" + MiddleRow + "; `elite` a level up) and its boss, at the shipping table");
+            report.AppendLine("(the boss at its own `DifficultyOverride`), no easing, typical gear, on the region's own battlefields. The owned roster and the");
+            report.AppendLine("picks are the typical-team calibration's (`--mode typical`, docs/balance/typical-team-report.md): Typical = the median");
+            report.AppendLine("reasonable team of each roster, mean over the rosters (lowest-highest roster); Weak = the roster's lower-quartile team;");
+            report.AppendLine("Scouted = the game's suggester over what the roster owns; Strong = the scouted pick with upgraded skills. Skills at the");
+            report.AppendLine("pacing model's typical level (Strong: upgraded). " + options.Compositions + " compositions (not the calibration's " + TypicalCalibrationCompositions +
+                              "), " + options.PveSamples + " battle(s) per team and composition.");
+            report.AppendLine();
+            report.AppendLine("| Region | Level | Owned | Skills | Shape | Target | Multiplier | Typical | Weak | Scouted | Strong |");
+            report.AppendLine("| --- | ---: | ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |");
+            foreach (RegionData region in context.Regions.MainlineRegions())
             {
-                double mid = (lo + hi) / 2.0;
-                Rates(context, pve, level, shape, multiplier * mid, out double rate);
-                if (rate >= target)
+                MapRulesData rules = context.Regions.RulesFor(region);
+                int rowLevel = NodeMapGenerator.RowLevel(region, rules, Math.Min(1, region.Stages - 1), MiddleRow);
+                foreach (string shapeId in StageShapes(region, rules))
                 {
-                    lo = mid;
+                    EncounterShape shape = context.Catalog.Shapes.Find(s => s.Id == shapeId);
+                    if (shape == null)
+                    {
+                        continue;
+                    }
+
+                    int level = shapeId == rules.EliteShapeId ? rowLevel + rules.EliteLevelOffset : rowLevel;
+                    PickRow(report, context, region, level, shape, context.Options.TargetFor(shape), context.Library.Multiplier(shapeId, level), "`" + shapeId + "`");
                 }
-                else
+
+                EncounterPlan plan = EncounterPlan.FromTemplate(context.Library, context.Enemies, region.BossTemplateId, region.MaxLevel);
+                if (plan != null)
                 {
-                    hi = mid;
+                    PickRow(report, context, region, plan.Level, TemplateShape(context.Enemies, plan), SimOptions.DefaultTargetClearRate, plan.Multiplier,
+                            "boss `" + plan.EncounterId + "`");
                 }
             }
 
-            return "x" + lo.ToString("0.00", CultureInfo.InvariantCulture);
+            report.AppendLine();
+        }
+
+        /// <summary>The calibration's compositions per shape (<c>--mode typical</c> runs at the default).</summary>
+        private const int TypicalCalibrationCompositions = SimOptions.DefaultCompositions;
+
+        private static void PickRow(StringBuilder report, Context context, RegionData region, int level, EncounterShape shape, double target, double multiplier, string label)
+        {
+            int samples = context.Options.PveSamples;
+            TypicalTeamModel.Band band = context.Model.BandAt(level);
+            PveSimulator typical = context.Cache.Get(context.Skills.Typical(level), region.RegionId, GearProfile.Typical);
+            PveSimulator upgraded = context.Cache.Get(context.Skills.Upgraded(level), region.RegionId, GearProfile.Typical);
+            TypicalTeamModel.Measure measure = context.Model.Evaluate(typical, band, shape, multiplier, samples);
+            double scouted = context.Model.EvaluateScouted(typical, context.Options, band, shape, multiplier, samples, out double _, out double _);
+            double strong = context.Model.EvaluateScouted(upgraded, context.Options, band, shape, multiplier, samples, out double _, out double _);
+            report.AppendLine("| " + region.RegionId + " | " + level + " | " + (3 + band.Sites) + " | " + context.Skills.Typical(level) + " / " + context.Skills.Upgraded(level) + " | " +
+                              label + " | " + Pct(target) + " | x" + SimOptions.FormatMultiplier(multiplier) + " | " + Range(measure) + " | " + Pct(measure.Weak) + " | " +
+                              Pct(scouted) + " | " + Pct(strong) + " |");
+            Console.Error.WriteLine("New player, " + region.RegionId + " L" + level + " " + shape.Id + ": typical " + Pct(measure.Typical) + ", weak " + Pct(measure.Weak) +
+                                    ", scouted " + Pct(scouted) + ", strong " + Pct(strong) + ".");
+        }
+
+        /// <summary>
+        /// "The new player in r01-r03": every stage of <see cref="Regions"/> (its shapes at the middle row, the elite a
+        /// level up, the boss on the last stage) for the typical team from the roster owned there, in typical gear
+        /// (the table's assumption) and with no gear (a player arriving from Hearthglen has none), unscaled and at the
+        /// authored easing, and the scale the no-gear typical team needs for the target.
+        /// </summary>
+        private static void EarlyRegions(StringBuilder report, Context context)
+        {
+            report.AppendLine("## The new player in r01-r03 (the early-region easing)");
+            report.AppendLine();
+            report.AppendLine("Every stage of r01-r03 (its shapes at the middle row's level, `elite` a level up; the boss on the last stage at its");
+            report.AppendLine("override), the typical team from the roster owned there (as above: no scouting, typical skills), on the region's");
+            report.AppendLine("battlefields. Typical gear = the table's assumption (should sit on the target); No gear = a player arriving from");
+            report.AppendLine("Hearthglen (who has none); Scale = the authored easing (`regions.json` `StageEasing` x `EasingShapeScales`, a boss its");
+            report.AppendLine("`BossScale`); Required = the scale the no-gear typical team needs for the target (bisection from x" + SimOptions.Format(MinScale) + ", " + ScaleBisections +
+                              " halvings; `1.00+` = met unscaled).");
+            report.AppendLine();
+            report.AppendLine("| Region | Stage | Owned | Shape | Level | Target | Multiplier | Typical gear | No gear | Scale | No gear, eased | Required (no gear) |");
+            report.AppendLine("| --- | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |");
+            foreach (string regionId in Regions)
+            {
+                RegionData region = context.Regions.GetRegion(regionId);
+                if (region == null)
+                {
+                    continue;
+                }
+
+                MapRulesData rules = context.Regions.RulesFor(region);
+                for (int stage = 0; stage < region.Stages; stage++)
+                {
+                    int rowLevel = NodeMapGenerator.RowLevel(region, rules, stage, MiddleRow);
+                    foreach (string shapeId in StageShapes(region, rules))
+                    {
+                        EncounterShape shape = context.Catalog.Shapes.Find(s => s.Id == shapeId);
+                        if (shape == null)
+                        {
+                            continue;
+                        }
+
+                        int level = shapeId == rules.EliteShapeId ? rowLevel + rules.EliteLevelOffset : rowLevel;
+                        EarlyRow(report, context, region, stage, level, shape, context.Options.TargetFor(shape), context.Library.Multiplier(shapeId, level),
+                                 context.Regions.DifficultyScaleFor(regionId, stage, shapeId), "`" + shapeId + "`");
+                    }
+
+                    if (stage == region.Stages - 1)
+                    {
+                        EncounterPlan plan = EncounterPlan.FromTemplate(context.Library, context.Enemies, region.BossTemplateId, region.MaxLevel);
+                        if (plan != null)
+                        {
+                            EarlyRow(report, context, region, stage, plan.Level, TemplateShape(context.Enemies, plan), SimOptions.DefaultTargetClearRate, plan.Multiplier,
+                                     context.Regions.DifficultyScaleFor(regionId, stage, RegionLibraryData.EasingBossId), "boss `" + plan.EncounterId + "`");
+                        }
+                    }
+                }
+            }
+
+            report.AppendLine();
+        }
+
+        private static void EarlyRow(StringBuilder report, Context context, RegionData region, int stage, int level, EncounterShape shape, double target, double multiplier,
+                                     double scale, string label)
+        {
+            int samples = context.Options.PveSamples;
+            int teamLevel = Math.Max(level, context.Options.NewPlayerStartLevel);
+            TypicalTeamModel.Band band = context.Model.BandAt(level, teamLevel);
+            int skill = context.Skills.Typical(teamLevel);
+            PveSimulator geared = context.Cache.Get(skill, region.RegionId, GearProfile.Typical);
+            PveSimulator bare = context.Cache.Get(skill, region.RegionId, GearProfile.None);
+            TypicalTeamModel.Measure withGear = context.Model.Evaluate(geared, band, shape, multiplier, samples);
+            TypicalTeamModel.Measure noGear = context.Model.Evaluate(bare, band, shape, multiplier, samples);
+            string eased = "(= no gear)";
+            if (scale != 1.0)
+            {
+                eased = Range(context.Model.Evaluate(bare, band, shape, multiplier * scale, samples));
+            }
+
+            string required = Required(x => context.Model.Evaluate(bare, band, shape, multiplier * x, samples).Typical, target, noGear.Typical);
+            report.AppendLine("| " + region.RegionId + " | " + (stage + 1) + " | " + (3 + band.Sites) + " | " + label + " | " + level + " | " + Pct(target) + " | x" +
+                              SimOptions.FormatMultiplier(multiplier) + " | " + Range(withGear) + " | " + Range(noGear) + " | x" + scale.ToString("0.00", CultureInfo.InvariantCulture) +
+                              " | " + eased + " | " + required + " |");
+            Console.Error.WriteLine("New player, " + region.RegionId + " stage " + (stage + 1) + " " + shape.Id + ": typical gear " + Pct(withGear.Typical) + ", no gear " +
+                                    Pct(noGear.Typical) + ", required " + required + ".");
         }
 
         private static void FirstNode(StringBuilder report, Context context)
@@ -532,7 +600,7 @@ namespace BeastCraft.Tooling.BalanceSim
             report.AppendLine("| Shape | Level | Seeds | Target | Multiplier (eased) | Scale | Win, eased | Win, no easing | Starter trio, eased |");
             report.AppendLine("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |");
             keys.Sort(StringComparer.Ordinal);
-            PveSimulator pve = context.For(regionId);
+            PveSimulator pve = context.Cache.Get(context.Skills.Typical(1), regionId, GearProfile.None);
             int starter = Array.FindIndex(context.Trios, t => TeamName(pve.Teams[t], context.Species) == StarterName(pve.Teams[t], context.Species));
             foreach (string key in keys)
             {
@@ -729,82 +797,6 @@ namespace BeastCraft.Tooling.BalanceSim
             return "x" + lo.ToString("0.00", CultureInfo.InvariantCulture);
         }
 
-        private static void RosterGrowth(StringBuilder report, Context context)
-        {
-            report.AppendLine("## Roster growth: the Kinship recruits (new-player profile)");
-            report.AppendLine();
-            report.AppendLine("The per-stage table again, for the player who owns the trio plus the Kinship recruits reached by then (each site's first");
-            report.AppendLine("offered beast: four beasts in r01, five in r02, six in r03), fielding the scouted heuristic's three of them per composition (the");
-            report.AppendLine("preview is free, the heuristic weighing a lagging recruit as the game's suggester does); a recruit fights " +
-                              string.Join(" / ", Array.ConvertAll(RecruitLag, l => l.ToString(CultureInfo.InvariantCulture))) + " levels below the trio in");
-            report.AppendLine("r01 / r02 / ... (the campaign model's bench gap at the boss). Trio = the trio-only rate at the authored scale (the \"On\" column");
-            report.AppendLine("above); Grown = with the recruits, at the authored scale; Caught up = the same with the recruits at the trio's level (an upper");
-            report.AppendLine("bound); Grown off = Grown unscaled; Required = the scale Grown's mean needs for the shape's target.");
-            report.AppendLine();
-            report.AppendLine("| Region | Stage | Owned | Shape | Level | Target | Scale | Trio | Grown | Caught up | Grown off | Required |");
-            report.AppendLine("| --- | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |");
-            for (int r = 0; r < Regions.Length; r++)
-            {
-                string regionId = Regions[r];
-                RegionData region = context.Regions.GetRegion(regionId);
-                if (region == null)
-                {
-                    continue;
-                }
-
-                MapRulesData rules = context.Regions.RulesFor(region);
-                PveSimulator pve = context.For(regionId);
-                int lag = RecruitLag[Math.Min(r, RecruitLag.Length - 1)];
-                for (int stage = 0; stage < region.Stages; stage++)
-                {
-                    int rowLevel = NodeMapGenerator.RowLevel(region, rules, stage, MiddleRow);
-                    int ownedCount = Owned(context, 0, regionId, stage).Count;
-                    int stageCopy = stage;
-                    List<string> shapeIds = new List<string>();
-                    foreach (ShapeWeightData weight in region.ShapeWeights ?? new ShapeWeightData[0])
-                    {
-                        shapeIds.Add(weight.ShapeId);
-                    }
-
-                    shapeIds.Add(rules.EliteShapeId);
-                    foreach (string shapeId in shapeIds)
-                    {
-                        EncounterShape shape = context.Catalog.Shapes.Find(s => s.Id == shapeId);
-                        if (shape == null)
-                        {
-                            continue;
-                        }
-
-                        int level = shapeId == rules.EliteShapeId ? rowLevel + rules.EliteLevelOffset : rowLevel;
-                        double scale = context.Regions.DifficultyScaleFor(regionId, stage, shapeId);
-                        double target = context.Options.TargetFor(shape);
-                        double multiplier = context.Library.Multiplier(shapeId, level);
-                        Func<int, List<int>> owned = k => Owned(context, k, regionId, stageCopy);
-                        double[] trio = Rates(context, pve, level, shape, multiplier * scale, out double trioMean);
-                        double[] grown = RatesOwned(context, pve, level, shape, multiplier * scale, owned, lag, out double grownMean);
-                        double[] caughtUp = RatesOwned(context, pve, level, shape, multiplier * scale, owned, 0, out double caughtUpMean);
-                        double[] grownOff = scale == 1.0 ? grown : RatesOwned(context, pve, level, shape, multiplier, owned, lag, out _);
-                        double grownOffMean = 0.0;
-                        foreach (double rate in grownOff)
-                        {
-                            grownOffMean += rate / grownOff.Length;
-                        }
-
-                        string required = Required(x =>
-                        {
-                            RatesOwned(context, pve, level, shape, multiplier * x, owned, lag, out double m);
-                            return m;
-                        }, target, grownOffMean);
-                        report.AppendLine("| " + regionId + " | " + (stage + 1) + " | " + ownedCount + " | `" + shapeId + "` | " + level + " | " + SimOptions.Format(target) + "% | x" +
-                                          scale.ToString("0.00", CultureInfo.InvariantCulture) + " | " + Spread(trio, trioMean) + " | " + Spread(grown, grownMean) + " | " +
-                                          Spread(caughtUp, caughtUpMean) + " | " + Spread(grownOff, grownOffMean) + " | " + required + " |");
-                    }
-                }
-            }
-
-            report.AppendLine();
-        }
-
         private static void KinshipTrials(StringBuilder report, Context context)
         {
             report.AppendLine("## Kinship trials (new-player profile)");
@@ -896,7 +888,7 @@ namespace BeastCraft.Tooling.BalanceSim
             return (node.Level, node.Type == MapNodeType.Battle ? 0 : 1, node.X);
         }
 
-        private static T Read<T>(string explicitPath, string repoRelativePath, JsonSerializerOptions json, List<string> errors) where T : class
+        public static T Read<T>(string explicitPath, string repoRelativePath, JsonSerializerOptions json, List<string> errors) where T : class
         {
             string path = RosterLoader.ResolveFile(explicitPath, repoRelativePath);
             if (path == null || !File.Exists(path))

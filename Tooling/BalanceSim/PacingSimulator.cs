@@ -77,6 +77,15 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <summary>See <see cref="FocusUsesMin"/>.</summary>
         public const int FocusUsesMax = 9;
 
+        /// <summary>The encounter levels the "Team skill level" table lists (the typical calibration's level bands).</summary>
+        public static readonly int[] SkillLevelRows = { 1, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100 };
+
+        /// <summary>
+        /// Practice uses a battle of a fielded skill the policy never feeds (<see cref="Campaign.KitLevelAfter"/>): the
+        /// mean of <see cref="FocusUsesMin"/>-<see cref="FocusUsesMax"/>, credited every battle without a draw.
+        /// </summary>
+        public const int KitUses = (FocusUsesMin + FocusUsesMax) / 2;
+
         /// <summary>Encounter shapes and their weights in the campaign mix (the generated PvE shapes).</summary>
         public static readonly KeyValuePair<string, int>[] ShapeWeights =
         {
@@ -139,43 +148,13 @@ namespace BeastCraft.Tooling.BalanceSim
         /// </summary>
         public static int Run(SimOptions options)
         {
-            string libraryPath = SkillLibraryKits.ResolvePath(options.SkillLibraryPath);
-            string tablesPath = RosterLoader.ResolveFile(options.DropTablesPath, DropTablesRepoRelativePath);
-            if (libraryPath == null || !File.Exists(libraryPath) || tablesPath == null || !File.Exists(tablesPath))
+            Model model = LoadModel(options, out string loadError);
+            if (model == null)
             {
-                Console.Error.WriteLine("Could not find " + SkillLibraryKits.RepoRelativePath + " or " + DropTablesRepoRelativePath +
-                                        "; run from inside the repo or pass --skill-library / --drop-tables.");
+                Console.Error.WriteLine(loadError);
                 return 2;
             }
 
-            SkillLibraryData library;
-            DropTableData tables;
-            try
-            {
-                JsonSerializerOptions json = new JsonSerializerOptions { IncludeFields = true };
-                library = JsonSerializer.Deserialize<SkillLibraryData>(File.ReadAllText(libraryPath), json);
-                tables = JsonSerializer.Deserialize<DropTableData>(File.ReadAllText(tablesPath), json);
-            }
-            catch (Exception exception)
-            {
-                Console.Error.WriteLine("Could not read the skill library or drop tables: " + exception.Message);
-                return 2;
-            }
-
-            List<string> errors = SkillLibraryValidator.Validate(library);
-            errors.AddRange(DropTableValidator.Validate(tables, library.Materials));
-            if (errors.Count > 0)
-            {
-                Console.Error.WriteLine("Drop tables '" + tablesPath + "' (or the skill library) are invalid:");
-                foreach (string error in errors)
-                {
-                    Console.Error.WriteLine("  " + error);
-                }
-
-                return 2;
-            }
-
-            Model model = new Model(library.Materials, DropTableBuilder.Build(tables, DropTableBuilder.TierLookup(library.Materials)));
             List<int> seeds = options.Seeds ?? new List<int> { options.Seed };
 
             DateTime start = DateTime.UtcNow;
@@ -227,6 +206,47 @@ namespace BeastCraft.Tooling.BalanceSim
             return 0;
         }
 
+        /// <summary>
+        /// The skill library's materials and the drop tables as a <see cref="Model"/>, validated as the game
+        /// validates them; null with <paramref name="error"/> set when either is missing, unreadable or invalid.
+        /// </summary>
+        public static Model LoadModel(SimOptions options, out string error)
+        {
+            error = null;
+            string libraryPath = SkillLibraryKits.ResolvePath(options.SkillLibraryPath);
+            string tablesPath = RosterLoader.ResolveFile(options.DropTablesPath, DropTablesRepoRelativePath);
+            if (libraryPath == null || !File.Exists(libraryPath) || tablesPath == null || !File.Exists(tablesPath))
+            {
+                error = "Could not find " + SkillLibraryKits.RepoRelativePath + " or " + DropTablesRepoRelativePath +
+                        "; run from inside the repo or pass --skill-library / --drop-tables.";
+                return null;
+            }
+
+            SkillLibraryData library;
+            DropTableData tables;
+            try
+            {
+                JsonSerializerOptions json = new JsonSerializerOptions { IncludeFields = true };
+                library = JsonSerializer.Deserialize<SkillLibraryData>(File.ReadAllText(libraryPath), json);
+                tables = JsonSerializer.Deserialize<DropTableData>(File.ReadAllText(tablesPath), json);
+            }
+            catch (Exception exception)
+            {
+                error = "Could not read the skill library or drop tables: " + exception.Message;
+                return null;
+            }
+
+            List<string> errors = SkillLibraryValidator.Validate(library);
+            errors.AddRange(DropTableValidator.Validate(tables, library.Materials));
+            if (errors.Count > 0)
+            {
+                error = "Drop tables '" + tablesPath + "' (or the skill library) are invalid: " + string.Join("; ", errors);
+                return null;
+            }
+
+            return new Model(library.Materials, DropTableBuilder.Build(tables, DropTableBuilder.TierLookup(library.Materials)));
+        }
+
         /// <summary>The fixed inputs of every campaign: the materials (as the game builds them) and the drop table.</summary>
         public sealed class Model
         {
@@ -269,6 +289,15 @@ namespace BeastCraft.Tooling.BalanceSim
             /// <summary>The fielded beast's level after each battle.</summary>
             public int[] BeastLevelAfter;
 
+            /// <summary>The secondary (spill-over) skill's level after each battle.</summary>
+            public int[] SecondaryLevelAfter;
+
+            /// <summary>
+            /// The level after each battle of a fielded skill fed nothing (practice alone, <see cref="KitUses"/> uses a
+            /// battle): it waits at its first gate. The same in every campaign (no draw).
+            /// </summary>
+            public int[] KitLevelAfter;
+
             /// <summary>Materials gained per tier (index = tier).</summary>
             public int[] GainedByTier;
 
@@ -290,6 +319,7 @@ namespace BeastCraft.Tooling.BalanceSim
             SkillProgressionDefinition definition = new SkillProgressionDefinition();
             SkillProgress focus = new SkillProgress("focus");
             SkillProgress secondary = new SkillProgress("secondary");
+            SkillProgress kit = new SkillProgress("kit");
             MaterialInventory inventory = new MaterialInventory();
             AvatarProgress avatar = new AvatarProgress();
             BeastProgress beast = new BeastProgress("fielded", 1);
@@ -298,6 +328,8 @@ namespace BeastCraft.Tooling.BalanceSim
                 FocusLevelAfter = new int[battles],
                 AvatarLevelAfter = new int[battles],
                 BeastLevelAfter = new int[battles],
+                SecondaryLevelAfter = new int[battles],
+                KitLevelAfter = new int[battles],
                 GainedByTier = new int[model.MaxTier + 1],
                 FirstOfTier = new int[model.MaxTier + 1]
             };
@@ -360,6 +392,9 @@ namespace BeastCraft.Tooling.BalanceSim
                 campaign.BeastLevelAfter[i] = beast.Level;
 
                 campaign.FocusLevelAfter[i] = focus.Level;
+                campaign.SecondaryLevelAfter[i] = secondary.Level;
+                SkillProgression.AwardPractice(kit, definition, KitUses);
+                campaign.KitLevelAfter[i] = kit.Level;
                 for (int l = 2; l <= focus.Level && l < campaign.FocusReached.Length; l++)
                 {
                     if (campaign.FocusReached[l] == 0)
@@ -572,6 +607,22 @@ namespace BeastCraft.Tooling.BalanceSim
                 List<int> levels = campaigns.ConvertAll(c => c.FocusLevelAfter[b - 1]);
                 sb.Append("| ").Append(b).Append(" | ").Append(Math.Min(100, 1 + ((b - 1) / BattlesPerLevel))).Append(" | ")
                   .Append(LevelPercentile(levels, 10)).Append(" | ").Append(LevelPercentile(levels, 50)).Append(" | ").Append(LevelPercentile(levels, 90)).Append(" |\n");
+            }
+
+            SkillCurve curve = SkillCurve.FromCampaigns(campaigns, options.PacingBattles);
+            sb.Append("\n## Team skill level (the difficulty's skill assumption)\n\n");
+            sb.Append("The fielded team's ").Append(SkillCurve.TeamSkills).Append(" skills (three beasts, three default skills each) by encounter level, read after the model's middle\n");
+            sb.Append("battle at the level: the focus and the secondary skill at their p50, the other seven by practice alone (")
+              .Append(KitUses).Append(" uses a battle, never fed, so\n");
+            sb.Append("they wait at their first gate). Typical = the mean of the nine, rounded: the skill level `--mode typical` calibrates the\n");
+            sb.Append("difficulty table with (every beast and avatar skill). Upgraded = the focus skill's level for every skill (the strong pick).\n\n");
+            sb.Append("| Encounter level | Focus p50 | Secondary p50 | Practice only | Team mean | Typical | Upgraded |\n");
+            sb.Append("| ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n");
+            foreach (int level in SkillLevelRows)
+            {
+                sb.Append("| ").Append(level).Append(" | ").Append(curve.Focus(level)).Append(" | ").Append(curve.Secondary(level)).Append(" | ")
+                  .Append(curve.PracticeOnly(level)).Append(" | ").Append(curve.TeamMean(level).ToString("0.00", CultureInfo.InvariantCulture)).Append(" | ")
+                  .Append(curve.Typical(level)).Append(" | ").Append(curve.Upgraded(level)).Append(" |\n");
             }
 
             sb.Append("\n## Avatar level\n\n");
