@@ -310,26 +310,33 @@ namespace BeastCraft.Battle
                 return;
             }
 
-            // A record for the viewer only (SkillActivation.Applied); it changes nothing here.
-            activation?.RecordApplied(new AppliedEffect(target, effect));
+            // What the effect came to, for the viewer's record (SkillActivation.Applied) only: read
+            // off the target around the handler, it takes no draws and changes nothing.
+            int amount = 0;
 
             switch (effect.EffectType)
             {
                 case SkillEffectType.Heal:
+                    int hpBefore = target.CurrentHp;
                     ApplyHeal(caster, target, magnitude);
+                    amount = target.CurrentHp - hpBefore;
                     break;
 
                 case SkillEffectType.BuffStat:
-                    ApplyStatChange(target, effect, magnitude, 1);
+                    amount = ApplyStatChange(target, effect, magnitude, 1);
                     break;
 
                 case SkillEffectType.DebuffStat:
-                    ApplyStatChange(target, effect, magnitude, -1);
+                    amount = ApplyStatChange(target, effect, magnitude, -1);
                     break;
 
                 case SkillEffectType.ApplyStatus:
                     // Every status rule lives in StatusEffects; StatusType.None applies nothing.
+                    int shieldBefore = StatusEffects.ShieldPoints(target);
+                    ActiveStatus lastBefore = target.Statuses.Count == 0 ? null : target.Statuses[target.Statuses.Count - 1];
+                    HexCoordinate positionBefore = target.Position;
                     StatusEffects.Apply(activation.Skill, caster, target, effect, magnitude, grid);
+                    amount = StatusAmount(target, effect, shieldBefore, lastBefore, positionBefore);
                     break;
 
                 case SkillEffectType.Cleanse:
@@ -340,6 +347,35 @@ namespace BeastCraft.Battle
                     // An effect type added to the enum without an arm here. Ignored rather than
                     // thrown, matching this namespace's non-throwing stance.
                     break;
+            }
+
+            // A record for the viewer only (SkillActivation.Applied); it changes nothing here.
+            activation?.RecordApplied(new AppliedEffect(target, effect, amount));
+        }
+
+        /// <summary>
+        /// What an <see cref="SkillEffectType.ApplyStatus"/> effect came to on
+        /// <paramref name="target"/>, for the battle log: a shield's points when it took (its shield
+        /// changed), a damage over time's per-turn amount when a new one was added, a knockback's
+        /// hexes moved; 0 otherwise. Reads the unit only.
+        /// </summary>
+        private static int StatusAmount(BattleUnit target, SkillEffect effect, int shieldBefore, ActiveStatus lastBefore, HexCoordinate positionBefore)
+        {
+            switch (effect.Status)
+            {
+                case StatusType.Shield:
+                    int shield = StatusEffects.ShieldPoints(target);
+                    return shield != shieldBefore ? shield : 0;
+
+                case StatusType.DamageOverTime:
+                    ActiveStatus last = target.Statuses.Count == 0 ? null : target.Statuses[target.Statuses.Count - 1];
+                    return last != null && last != lastBefore && last.Type == StatusType.DamageOverTime && last.Origin == effect ? last.Amount : 0;
+
+                case StatusType.Knockback:
+                    return positionBefore.Distance(target.Position);
+
+                default:
+                    return 0;
             }
         }
 
@@ -528,7 +564,7 @@ namespace BeastCraft.Battle
         /// up moving the stat by nothing, since reverting zero is a no-op.
         /// </para>
         /// </summary>
-        private static void ApplyStatChange(BattleUnit target, SkillEffect effect, float magnitude, int sign)
+        private static int ApplyStatChange(BattleUnit target, SkillEffect effect, float magnitude, int sign)
         {
             if (effect.DurationTurns > 0)
             {
@@ -544,6 +580,8 @@ namespace BeastCraft.Battle
             {
                 target.ActiveStatModifiers.Add(new ActiveStatModifier(effect.AffectedStat, applied, effect.DurationTurns, effect));
             }
+
+            return applied;
         }
 
         /// <summary>

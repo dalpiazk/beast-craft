@@ -254,7 +254,11 @@ namespace BeastCraft.Battle
             float multiplier = ElementChart.GetMultiplier(skill.Element, target.Elements);
             double level = GetLevelMultiplier(caster.Level, target.Level);
 
-            return new DamageRoll(Compute(power, attack, defense, multiplier, variancePercent, isCrit, bonusMultiplier, level), isCrit, variancePercent);
+            int amount = Compute(power, attack, defense, multiplier, variancePercent, isCrit, bonusMultiplier, level);
+
+            // The components are recorded for the battle log (presentation only): no draws, no effect on the amount.
+            return new DamageRoll(amount, isCrit, variancePercent, new DamageBreakdown(power, attack, defense, skill.Category, multiplier, GetCritMultiplier(0f),
+                                                                                       bonusMultiplier, level));
         }
 
         /// <summary>
@@ -486,10 +490,8 @@ namespace BeastCraft.Battle
     public readonly struct DamageRoll
     {
         public DamageRoll(int amount, bool isCrit, int variancePercent)
+            : this(amount, isCrit, variancePercent, default(DamageBreakdown))
         {
-            Amount = amount;
-            IsCrit = isCrit;
-            VariancePercent = variancePercent;
         }
 
         /// <summary>The whole HP the hit is worth, before it is clamped to the target's remaining HP.</summary>
@@ -500,5 +502,82 @@ namespace BeastCraft.Battle
 
         /// <summary>The variance roll in whole percent; <see cref="DamageFormula.NeutralVariancePercent"/> on the deterministic fallback.</summary>
         public int VariancePercent { get; }
+
+        /// <summary>
+        /// What the hit was made of (the battle log's damage breakdown): recorded by
+        /// <see cref="DamageFormula.Roll(BattleUnit, BattleUnit, SkillSO, float, System.Random, double)"/>
+        /// as it computed the amount. Presentation data only — it takes no draws and changes nothing.
+        /// <see cref="DamageBreakdown.IsRecorded"/> is false on a roll built by hand.
+        /// </summary>
+        public DamageBreakdown Breakdown { get; }
+
+        /// <summary>A roll with its recorded components (<see cref="Breakdown"/>).</summary>
+        public DamageRoll(int amount, bool isCrit, int variancePercent, DamageBreakdown breakdown)
+        {
+            Amount = amount;
+            IsCrit = isCrit;
+            VariancePercent = variancePercent;
+            Breakdown = breakdown;
+        }
+    }
+
+    /// <summary>
+    /// The inputs one damage hit was computed from, as <see cref="DamageFormula"/> read them at the
+    /// moment it landed: the power (level-scaled), the attacking and defending stats (current
+    /// effective, picked by the category), the element multiplier, the crit multiplier a crit
+    /// applies, the execute bonus and the level-gap multiplier. Recorded on every
+    /// <see cref="DamageRoll"/> for the battle log's damage breakdown; feeding them (with the roll's
+    /// crit and variance) back to
+    /// <see cref="DamageFormula.Compute(float, int, int, float, int, bool, double, double)"/> gives the
+    /// hit's amount exactly. Additive, presentation-only data: nothing in the battle reads it.
+    /// </summary>
+    public readonly struct DamageBreakdown
+    {
+        public DamageBreakdown(float power, int attack, int defense, DamageCategory category, float elementMultiplier, float critMultiplier, double executeMultiplier,
+                               double levelMultiplier)
+        {
+            IsRecorded = true;
+            Power = power;
+            Attack = attack;
+            Defense = defense;
+            Category = category;
+            ElementMultiplier = elementMultiplier;
+            CritMultiplier = critMultiplier;
+            ExecuteMultiplier = executeMultiplier;
+            LevelMultiplier = levelMultiplier;
+        }
+
+        /// <summary>False on a roll built without components (a hand-built <see cref="DamageRoll"/>).</summary>
+        public bool IsRecorded { get; }
+
+        /// <summary>The effect's power, a percent of the attacking stat, already scaled for the skill's level.</summary>
+        public float Power { get; }
+
+        /// <summary>The caster's attacking stat (<c>Attack</c> or <c>SpecialAttack</c>) as the hit landed.</summary>
+        public int Attack { get; }
+
+        /// <summary>The target's defending stat (<c>Defense</c> or <c>SpecialDefense</c>) as the hit landed.</summary>
+        public int Defense { get; }
+
+        /// <summary>Which pair of stats the hit read.</summary>
+        public DamageCategory Category { get; }
+
+        /// <summary>The element chart's multiplier: the skill's element against the target's elements.</summary>
+        public float ElementMultiplier { get; }
+
+        /// <summary>What a crit multiplies the hit by (applied only when the roll crit).</summary>
+        public float CritMultiplier { get; }
+
+        /// <summary>The execute bonus at the target's HP as the hit landed (1 when none).</summary>
+        public double ExecuteMultiplier { get; }
+
+        /// <summary>The level-gap multiplier, caster's level against the target's (1 at equal levels).</summary>
+        public double LevelMultiplier { get; }
+
+        /// <summary>The un-truncated base, <c>Power / 100 * A * A / (A + D)</c> (<see cref="DamageFormula.ComputeBase"/>).</summary>
+        public double Base
+        {
+            get { return DamageFormula.ComputeBase(Power, Attack, Defense); }
+        }
     }
 }
