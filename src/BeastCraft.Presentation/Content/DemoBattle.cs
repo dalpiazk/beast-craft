@@ -28,7 +28,7 @@ namespace BeastCraft.Presentation.Content
 
         /// <summary>
         /// The team's level. A small party against a boss tuned for a fuller one needs the edge: at
-        /// 20 against the encounter's 10 the default seed is a 21-turn player victory.
+        /// 20 against the encounter's 10 the default seed is a 19-turn player victory.
         /// </summary>
         public const int DefaultLevel = 20;
 
@@ -40,7 +40,7 @@ namespace BeastCraft.Presentation.Content
         /// the showcase statuses all happen (a burn, a heal, a taunt, a shield and a stun) and the team
         /// wins. The rules are untouched; only which battle the demo shows is chosen.
         /// </summary>
-        public const int DefaultSeed = 20260933;
+        public const int DefaultSeed = 20260932;
 
         /// <summary>
         /// The default team: Phoenix leads (its fire skills are the fully authored VFX: burn, and its

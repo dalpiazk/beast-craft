@@ -238,7 +238,7 @@ screens are built is [`docs/design/screens.md`](docs/design/screens.md).
 Any of the battle flags below (or `--screen demo`) runs the old battle viewer
 instead: one real PvE battle through the
 game's own session code — Phoenix, Golem, Kirin and Frost Wyrm (level 20) against
-the Hollow Warden encounter (a champion and two brutes, level 10), seed 20260933 —
+the Hollow Warden encounter (a champion and two brutes, level 10), seed 20260932 —
 in **portrait**. Every beast draws with its final illustrated art (AI-assisted,
 producer-approved).
 

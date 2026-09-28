@@ -489,7 +489,7 @@ area and ring radius, the resolution order, overlays, aura lifetime, the validat
 glow, a ring on the area, the 8-frame fire burst, radial rays, embers), Flame Wave (area-sized
 scorch, ring and rays along the line) and Rebirth Flame (glyphs, ring, glow, fire and rising
 embers at the caster, plus its Shield overlay) carry the full stack. Every effect type has a
-default, and the demo battle (Phoenix, Golem, Kirin, Frost Wyrm; seed 20260933, picked so it
+default, and the demo battle (Phoenix, Golem, Kirin, Frost Wyrm; seed 20260932, picked so it
 happens) shows a burn, heal, taunt, shield, stun and buffs/debuffs with their auras and icons.
 
 ### Painted frames (`Painted`: one hero frame, animated by curves)
