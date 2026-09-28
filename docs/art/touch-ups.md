@@ -36,6 +36,19 @@ The nine enemy types' Hollow art is final too (2026-09-27); masters and machine-
 
 Intended, not to fix: the Champion's two tails; the Caster's two legs and no arms.
 
+## Skill icons and the Hollow presentation
+The 91 skill icons, the icon frame and the five rarity rings are final (2026-09-27, Treatment B, Frame 1;
+`Tooling/ArtLab/provenance/icons.md`). The producer stopped the rerolls after round 3 ("not aiming for perfect").
+
+| Slot | Touch-up | Where it shows |
+| --- | --- | --- |
+| Thorn Lash (`skill/thorn_lash`) | Borderline at the producer review (the pass-1 reroll seed was kept; pass 2 lost the thorns). | skill strip, 64 px |
+| Sunder (`skill/sunder`) | Borderline at the producer review; accepted as is. Repaint if it reads badly at strip size. | skill strip, 64 px |
+| Great Cleave (`skill/enemy/champion/cleave`) | Borderline at the producer review; accepted as is. Repaint if it reads badly at badge size. | "now acting" badge, enemy turns |
+
+Still placeholders or pending (`docs/art/hollow-art-slots.md`): the 24 battle backdrops, the 59 VFX hero frames,
+the region map art, and the Archer accent re-cut (above).
+
 ## Already fixed (for the record)
 | Beast | Fix |
 | --- | --- |

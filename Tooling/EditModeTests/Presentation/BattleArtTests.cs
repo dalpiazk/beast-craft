@@ -415,6 +415,46 @@ namespace BeastCraft.Tests.EditMode
             Assert.AreEqual(60 + 6 + 10 + 15, icons, "a slot per beast skill, avatar active, avatar passive and enemy skill");
         }
 
+        [Test]
+        public void EverySkillArtKey_ResolvesToItsPaintedIcon()
+        {
+            string content = GameContent.FindRoot();
+            List<string> keys = new List<string>();
+            foreach (BeastCraft.Skills.SkillData skill in Content.SkillLibrary.BeastSkills)
+            {
+                keys.Add(skill.ArtKey);
+            }
+
+            foreach (BeastCraft.Skills.SkillData skill in Content.SkillLibrary.AvatarActives)
+            {
+                keys.Add(skill.ArtKey);
+            }
+
+            foreach (BeastCraft.Skills.PassiveData passive in Content.SkillLibrary.AvatarPassives)
+            {
+                keys.Add(passive.ArtKey);
+            }
+
+            foreach (EnemyData enemy in Content.EnemyLibrary.Enemies)
+            {
+                foreach (BeastCraft.Skills.SkillData skill in enemy.Skills)
+                {
+                    keys.Add(skill.ArtKey);
+                }
+            }
+
+            Assert.AreEqual(91, keys.Count, "60 beast skills, 6 avatar actives, 10 avatar passives, 15 enemy skills");
+            foreach (string key in keys)
+            {
+                ArtSpriteData sprite = Content.Art.FindByArtKey(key);
+                Assert.IsNotNull(sprite, key);
+                string file = ArtManifestData.ResolveFile(sprite.File);
+                Assert.IsTrue(file.StartsWith("art/icons/skills/", StringComparison.Ordinal), key + " draws " + file + ", not its painted icon");
+                Assert.AreEqual(ArtFilter.Linear, sprite.Filter, key);
+                Assert.IsTrue(File.Exists(Path.Combine(content, file.Replace('/', Path.DirectorySeparatorChar))), file);
+            }
+        }
+
         private static BattleBackdropData Backdrop(string region, string arena, float x, float y, float width, float height)
         {
             return new BattleBackdropData { RegionId = region, Arena = arena, ArtKey = "backdrop/" + region + "/" + arena.ToLowerInvariant(), BoardRect = Rect(x, y, width, height) };

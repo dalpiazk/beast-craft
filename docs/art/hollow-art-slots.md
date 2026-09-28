@@ -19,6 +19,12 @@ colours** (the data does not tint them).
 
 Tick a box when the painted file has landed.
 
+**Status (2026-09-27).** Landed: the 91 skill icons and the frame and the five rarity rings (sections 2 and 3;
+Treatment B, Frame 1; `Tooling/ArtLab/provenance/icons.md`). Borderline but accepted ("not aiming for perfect"):
+**Thorn Lash**, **Sunder** and **Great Cleave** (see `docs/art/touch-ups.md`). Still placeholders: the 24
+backdrops (section 1) and the 59 VFX hero frames (section 4). Pending outside this list: the region map art and the
+Archer's accent mask re-cut (`docs/art/touch-ups.md`).
+
 ## 1. Battle backdrops (24)
 
 The Verdant Hollow (r01) keeps eight paintings, each recomposed three times, once per arena size: the sunlit
@@ -78,18 +84,18 @@ wide); a hex's centre is at board px (32 Q + 16 R, 27 R) from tile (0, 0)'s. Art
 Every skill icon in the HUD (skill strip, skill detail card, the "now acting" badge on the turn order) is drawn in
 three layers centred in its box, back to front: the **rarity ring** (1.00 of the box), the **icon** (0.76), the round
 **frame** (0.90) over the icon's edge. All six files share one square **256 x 256** canvas, centre pivot, transparent
-outside the circle. Placeholders are at final size. Guide for the circles (fractions of the canvas radius, as the
+outside the circle. **Landed** (Frame 1: a bronze frame, coloured rings), replacing the final-size placeholders. Guide for the circles (fractions of the canvas radius, as the
 placeholders are drawn): frame band 0.82-0.985 (its inner edge covers the icon's rim), ring band 0.86-0.975 with a
 soft outer glow (it shows around the frame).
 
 | Done | File | ArtKey | What |
 | --- | --- | --- | --- |
-| [ ] | `content/art/ui/skill_icon/frame.png` | `ui/skill_icon/frame` | the round frame every icon sits in |
-| [ ] | `content/art/ui/skill_icon/ring_common.png` | `ui/skill_icon/ring/common` | rarity ring: beast skills (default) |
-| [ ] | `content/art/ui/skill_icon/ring_rare.png` | `ui/skill_icon/ring/rare` | rarity ring: avatar actives and passives (default) |
-| [ ] | `content/art/ui/skill_icon/ring_epic.png` | `ui/skill_icon/ring/epic` | rarity ring: a skill given this rarity by an override |
-| [ ] | `content/art/ui/skill_icon/ring_legendary.png` | `ui/skill_icon/ring/legendary` | rarity ring: a skill given this rarity by an override |
-| [ ] | `content/art/ui/skill_icon/ring_gloam.png` | `ui/skill_icon/ring/gloam` | rarity ring: enemy skills (default) |
+| [x] | `content/art/ui/skill_icon/frame.png` | `ui/skill_icon/frame` | the round frame every icon sits in |
+| [x] | `content/art/ui/skill_icon/ring_common.png` | `ui/skill_icon/ring/common` | rarity ring: beast skills (default) |
+| [x] | `content/art/ui/skill_icon/ring_rare.png` | `ui/skill_icon/ring/rare` | rarity ring: avatar actives and passives (default) |
+| [x] | `content/art/ui/skill_icon/ring_epic.png` | `ui/skill_icon/ring/epic` | rarity ring: a skill given this rarity by an override |
+| [x] | `content/art/ui/skill_icon/ring_legendary.png` | `ui/skill_icon/ring/legendary` | rarity ring: a skill given this rarity by an override |
+| [x] | `content/art/ui/skill_icon/ring_gloam.png` | `ui/skill_icon/ring/gloam` | rarity ring: enemy skills (default) |
 
 ## 3. Skill icons (91)
 
@@ -99,116 +105,120 @@ Round painted icons, **256 x 256**, centre pivot, the motif filling the canvas's
 `build.py` finds `content/art/icons/skills/<id>.png` (enemy: `content/art/icons/skills/enemy/<enemy>_<skill>.png`),
 lists it under the skill's ArtKey and retires the 24 x 24 pixel placeholder; it refuses a file no skill claims.
 
+**Landed:** all 91 (Treatment B, `Tooling/ArtLab/provenance/icons.md`), so every skill's ArtKey resolves to its
+painted icon and the pixel stand-ins are out of the manifest. Borderline, a later repaint if they read badly in play:
+Thorn Lash, Sunder and Great Cleave (`champion_cleave`).
+
 ### Beast skills (60)
 
 | Done | File | ArtKey | Skill | Element / kind |
 | --- | --- | --- | --- | --- |
-| [ ] | `content/art/icons/skills/boulder_slam.png` | `skill/boulder_slam` | Boulder Slam | Earth |
-| [ ] | `content/art/icons/skills/stone_challenge.png` | `skill/stone_challenge` | Stone Challenge | Earth |
-| [ ] | `content/art/icons/skills/granite_bulwark.png` | `skill/granite_bulwark` | Granite Bulwark | Earth |
-| [ ] | `content/art/icons/skills/tectonic_shove.png` | `skill/tectonic_shove` | Tectonic Shove | Earth |
-| [ ] | `content/art/icons/skills/quake.png` | `skill/quake` | Quake | Earth |
-| [ ] | `content/art/icons/skills/stoneskin.png` | `skill/stoneskin` | Stoneskin | Earth |
-| [ ] | `content/art/icons/skills/serpent_bite.png` | `skill/serpent_bite` | Serpent Bite | Water |
-| [ ] | `content/art/icons/skills/undertow.png` | `skill/undertow` | Undertow | Water |
-| [ ] | `content/art/icons/skills/deep_shell.png` | `skill/deep_shell` | Deep Shell | Water |
-| [ ] | `content/art/icons/skills/tidal_wave.png` | `skill/tidal_wave` | Tidal Wave | Water |
-| [ ] | `content/art/icons/skills/maelstrom.png` | `skill/maelstrom` | Maelstrom | Water |
-| [ ] | `content/art/icons/skills/tidal_renewal.png` | `skill/tidal_renewal` | Tidal Renewal | Water |
-| [ ] | `content/art/icons/skills/thorn_lash.png` | `skill/thorn_lash` | Thorn Lash | Nature |
-| [ ] | `content/art/icons/skills/verdant_mend.png` | `skill/verdant_mend` | Verdant Mend | Nature |
-| [ ] | `content/art/icons/skills/bark_ward.png` | `skill/bark_ward` | Bark Ward | Nature |
-| [ ] | `content/art/icons/skills/entangling_roots.png` | `skill/entangling_roots` | Entangling Roots | Nature |
-| [ ] | `content/art/icons/skills/spore_cloud.png` | `skill/spore_cloud` | Spore Cloud | Nature |
-| [ ] | `content/art/icons/skills/lifebloom.png` | `skill/lifebloom` | Lifebloom | Nature |
-| [ ] | `content/art/icons/skills/sunder.png` | `skill/sunder` | Sunder | Metal |
-| [ ] | `content/art/icons/skills/iron_crush.png` | `skill/iron_crush` | Iron Crush | Metal |
-| [ ] | `content/art/icons/skills/iron_fortress.png` | `skill/iron_fortress` | Iron Fortress | Metal |
-| [ ] | `content/art/icons/skills/spiked_carapace.png` | `skill/spiked_carapace` | Spiked Carapace | Metal |
-| [ ] | `content/art/icons/skills/shrapnel_burst.png` | `skill/shrapnel_burst` | Shrapnel Burst | Metal |
-| [ ] | `content/art/icons/skills/juggernaut_charge.png` | `skill/juggernaut_charge` | Juggernaut Charge | Metal |
-| [ ] | `content/art/icons/skills/rime_bolt.png` | `skill/rime_bolt` | Rime Bolt | Ice |
-| [ ] | `content/art/icons/skills/deep_freeze.png` | `skill/deep_freeze` | Deep Freeze | Ice |
-| [ ] | `content/art/icons/skills/frost_breath.png` | `skill/frost_breath` | Frost Breath | Ice |
-| [ ] | `content/art/icons/skills/blizzard.png` | `skill/blizzard` | Blizzard | Ice |
-| [ ] | `content/art/icons/skills/ice_armor.png` | `skill/ice_armor` | Ice Armor | Ice |
-| [ ] | `content/art/icons/skills/absolute_zero.png` | `skill/absolute_zero` | Absolute Zero | Ice |
-| [ ] | `content/art/icons/skills/thunder_talons.png` | `skill/thunder_talons` | Thunder Talons | Lightning |
-| [ ] | `content/art/icons/skills/chain_lightning.png` | `skill/chain_lightning` | Chain Lightning | Lightning |
-| [ ] | `content/art/icons/skills/static_charge.png` | `skill/static_charge` | Static Charge | Lightning |
-| [ ] | `content/art/icons/skills/storm_dive.png` | `skill/storm_dive` | Storm Dive | Lightning |
-| [ ] | `content/art/icons/skills/thunderclap.png` | `skill/thunderclap` | Thunderclap | Lightning |
-| [ ] | `content/art/icons/skills/plasma_barrage.png` | `skill/plasma_barrage` | Plasma Barrage | Lightning |
-| [ ] | `content/art/icons/skills/gale_talon.png` | `skill/gale_talon` | Gale Talon | Air |
-| [ ] | `content/art/icons/skills/wind_lance.png` | `skill/wind_lance` | Wind Lance | Air |
-| [ ] | `content/art/icons/skills/gust.png` | `skill/gust` | Gust | Air |
-| [ ] | `content/art/icons/skills/tailwind.png` | `skill/tailwind` | Tailwind | Air |
-| [ ] | `content/art/icons/skills/updraft.png` | `skill/updraft` | Updraft | Air |
-| [ ] | `content/art/icons/skills/sky_rend.png` | `skill/sky_rend` | Sky Rend | Air |
-| [ ] | `content/art/icons/skills/ember_shot.png` | `skill/ember_shot` | Ember Shot | Fire |
-| [ ] | `content/art/icons/skills/flame_wave.png` | `skill/flame_wave` | Flame Wave | Fire |
-| [ ] | `content/art/icons/skills/rebirth_flame.png` | `skill/rebirth_flame` | Rebirth Flame | Fire |
-| [ ] | `content/art/icons/skills/blaze_bolt.png` | `skill/blaze_bolt` | Blaze Bolt | Fire |
-| [ ] | `content/art/icons/skills/firestorm.png` | `skill/firestorm` | Firestorm | Fire |
-| [ ] | `content/art/icons/skills/sunfire_nova.png` | `skill/sunfire_nova` | Sunfire Nova | Fire |
-| [ ] | `content/art/icons/skills/sacred_spring.png` | `skill/sacred_spring` | Sacred Spring | Light |
-| [ ] | `content/art/icons/skills/blessing.png` | `skill/blessing` | Blessing | Light |
-| [ ] | `content/art/icons/skills/radiant_bolt.png` | `skill/radiant_bolt` | Radiant Bolt | Light |
-| [ ] | `content/art/icons/skills/judgment.png` | `skill/judgment` | Judgment | Light |
-| [ ] | `content/art/icons/skills/purifying_ward.png` | `skill/purifying_ward` | Purifying Ward | Light |
-| [ ] | `content/art/icons/skills/halo.png` | `skill/halo` | Halo | Light |
-| [ ] | `content/art/icons/skills/venom_spit.png` | `skill/venom_spit` | Venom Spit | Dark |
-| [ ] | `content/art/icons/skills/coup_de_grace.png` | `skill/coup_de_grace` | Shadow Pounce | Dark |
-| [ ] | `content/art/icons/skills/petrifying_gaze.png` | `skill/petrifying_gaze` | Petrifying Gaze | Dark |
-| [ ] | `content/art/icons/skills/eclipse_fang.png` | `skill/eclipse_fang` | Eclipse Fang | Dark |
-| [ ] | `content/art/icons/skills/predator_focus.png` | `skill/predator_focus` | Predator Focus | Dark |
-| [ ] | `content/art/icons/skills/miasma.png` | `skill/miasma` | Miasma | Dark |
+| [x] | `content/art/icons/skills/boulder_slam.png` | `skill/boulder_slam` | Boulder Slam | Earth |
+| [x] | `content/art/icons/skills/stone_challenge.png` | `skill/stone_challenge` | Stone Challenge | Earth |
+| [x] | `content/art/icons/skills/granite_bulwark.png` | `skill/granite_bulwark` | Granite Bulwark | Earth |
+| [x] | `content/art/icons/skills/tectonic_shove.png` | `skill/tectonic_shove` | Tectonic Shove | Earth |
+| [x] | `content/art/icons/skills/quake.png` | `skill/quake` | Quake | Earth |
+| [x] | `content/art/icons/skills/stoneskin.png` | `skill/stoneskin` | Stoneskin | Earth |
+| [x] | `content/art/icons/skills/serpent_bite.png` | `skill/serpent_bite` | Serpent Bite | Water |
+| [x] | `content/art/icons/skills/undertow.png` | `skill/undertow` | Undertow | Water |
+| [x] | `content/art/icons/skills/deep_shell.png` | `skill/deep_shell` | Deep Shell | Water |
+| [x] | `content/art/icons/skills/tidal_wave.png` | `skill/tidal_wave` | Tidal Wave | Water |
+| [x] | `content/art/icons/skills/maelstrom.png` | `skill/maelstrom` | Maelstrom | Water |
+| [x] | `content/art/icons/skills/tidal_renewal.png` | `skill/tidal_renewal` | Tidal Renewal | Water |
+| [x] | `content/art/icons/skills/thorn_lash.png` | `skill/thorn_lash` | Thorn Lash | Nature |
+| [x] | `content/art/icons/skills/verdant_mend.png` | `skill/verdant_mend` | Verdant Mend | Nature |
+| [x] | `content/art/icons/skills/bark_ward.png` | `skill/bark_ward` | Bark Ward | Nature |
+| [x] | `content/art/icons/skills/entangling_roots.png` | `skill/entangling_roots` | Entangling Roots | Nature |
+| [x] | `content/art/icons/skills/spore_cloud.png` | `skill/spore_cloud` | Spore Cloud | Nature |
+| [x] | `content/art/icons/skills/lifebloom.png` | `skill/lifebloom` | Lifebloom | Nature |
+| [x] | `content/art/icons/skills/sunder.png` | `skill/sunder` | Sunder | Metal |
+| [x] | `content/art/icons/skills/iron_crush.png` | `skill/iron_crush` | Iron Crush | Metal |
+| [x] | `content/art/icons/skills/iron_fortress.png` | `skill/iron_fortress` | Iron Fortress | Metal |
+| [x] | `content/art/icons/skills/spiked_carapace.png` | `skill/spiked_carapace` | Spiked Carapace | Metal |
+| [x] | `content/art/icons/skills/shrapnel_burst.png` | `skill/shrapnel_burst` | Shrapnel Burst | Metal |
+| [x] | `content/art/icons/skills/juggernaut_charge.png` | `skill/juggernaut_charge` | Juggernaut Charge | Metal |
+| [x] | `content/art/icons/skills/rime_bolt.png` | `skill/rime_bolt` | Rime Bolt | Ice |
+| [x] | `content/art/icons/skills/deep_freeze.png` | `skill/deep_freeze` | Deep Freeze | Ice |
+| [x] | `content/art/icons/skills/frost_breath.png` | `skill/frost_breath` | Frost Breath | Ice |
+| [x] | `content/art/icons/skills/blizzard.png` | `skill/blizzard` | Blizzard | Ice |
+| [x] | `content/art/icons/skills/ice_armor.png` | `skill/ice_armor` | Ice Armor | Ice |
+| [x] | `content/art/icons/skills/absolute_zero.png` | `skill/absolute_zero` | Absolute Zero | Ice |
+| [x] | `content/art/icons/skills/thunder_talons.png` | `skill/thunder_talons` | Thunder Talons | Lightning |
+| [x] | `content/art/icons/skills/chain_lightning.png` | `skill/chain_lightning` | Chain Lightning | Lightning |
+| [x] | `content/art/icons/skills/static_charge.png` | `skill/static_charge` | Static Charge | Lightning |
+| [x] | `content/art/icons/skills/storm_dive.png` | `skill/storm_dive` | Storm Dive | Lightning |
+| [x] | `content/art/icons/skills/thunderclap.png` | `skill/thunderclap` | Thunderclap | Lightning |
+| [x] | `content/art/icons/skills/plasma_barrage.png` | `skill/plasma_barrage` | Plasma Barrage | Lightning |
+| [x] | `content/art/icons/skills/gale_talon.png` | `skill/gale_talon` | Gale Talon | Air |
+| [x] | `content/art/icons/skills/wind_lance.png` | `skill/wind_lance` | Wind Lance | Air |
+| [x] | `content/art/icons/skills/gust.png` | `skill/gust` | Gust | Air |
+| [x] | `content/art/icons/skills/tailwind.png` | `skill/tailwind` | Tailwind | Air |
+| [x] | `content/art/icons/skills/updraft.png` | `skill/updraft` | Updraft | Air |
+| [x] | `content/art/icons/skills/sky_rend.png` | `skill/sky_rend` | Sky Rend | Air |
+| [x] | `content/art/icons/skills/ember_shot.png` | `skill/ember_shot` | Ember Shot | Fire |
+| [x] | `content/art/icons/skills/flame_wave.png` | `skill/flame_wave` | Flame Wave | Fire |
+| [x] | `content/art/icons/skills/rebirth_flame.png` | `skill/rebirth_flame` | Rebirth Flame | Fire |
+| [x] | `content/art/icons/skills/blaze_bolt.png` | `skill/blaze_bolt` | Blaze Bolt | Fire |
+| [x] | `content/art/icons/skills/firestorm.png` | `skill/firestorm` | Firestorm | Fire |
+| [x] | `content/art/icons/skills/sunfire_nova.png` | `skill/sunfire_nova` | Sunfire Nova | Fire |
+| [x] | `content/art/icons/skills/sacred_spring.png` | `skill/sacred_spring` | Sacred Spring | Light |
+| [x] | `content/art/icons/skills/blessing.png` | `skill/blessing` | Blessing | Light |
+| [x] | `content/art/icons/skills/radiant_bolt.png` | `skill/radiant_bolt` | Radiant Bolt | Light |
+| [x] | `content/art/icons/skills/judgment.png` | `skill/judgment` | Judgment | Light |
+| [x] | `content/art/icons/skills/purifying_ward.png` | `skill/purifying_ward` | Purifying Ward | Light |
+| [x] | `content/art/icons/skills/halo.png` | `skill/halo` | Halo | Light |
+| [x] | `content/art/icons/skills/venom_spit.png` | `skill/venom_spit` | Venom Spit | Dark |
+| [x] | `content/art/icons/skills/coup_de_grace.png` | `skill/coup_de_grace` | Shadow Pounce | Dark |
+| [x] | `content/art/icons/skills/petrifying_gaze.png` | `skill/petrifying_gaze` | Petrifying Gaze | Dark |
+| [x] | `content/art/icons/skills/eclipse_fang.png` | `skill/eclipse_fang` | Eclipse Fang | Dark |
+| [x] | `content/art/icons/skills/predator_focus.png` | `skill/predator_focus` | Predator Focus | Dark |
+| [x] | `content/art/icons/skills/miasma.png` | `skill/miasma` | Miasma | Dark |
 
 ### Avatar actives (6)
 
 | Done | File | ArtKey | Skill | Element / kind |
 | --- | --- | --- | --- | --- |
-| [ ] | `content/art/icons/skills/rallying_cry.png` | `skill/rallying_cry` | Rallying Cry | avatar active |
-| [ ] | `content/art/icons/skills/mending_light.png` | `skill/mending_light` | Mending Light | avatar active |
-| [ ] | `content/art/icons/skills/aegis.png` | `skill/aegis` | Aegis | avatar active |
-| [ ] | `content/art/icons/skills/hex_of_frailty.png` | `skill/hex_of_frailty` | Hex of Frailty | avatar active |
-| [ ] | `content/art/icons/skills/battle_focus.png` | `skill/battle_focus` | Battle Focus | avatar active |
-| [ ] | `content/art/icons/skills/slowing_field.png` | `skill/slowing_field` | Slowing Field | avatar active |
+| [x] | `content/art/icons/skills/rallying_cry.png` | `skill/rallying_cry` | Rallying Cry | avatar active |
+| [x] | `content/art/icons/skills/mending_light.png` | `skill/mending_light` | Mending Light | avatar active |
+| [x] | `content/art/icons/skills/aegis.png` | `skill/aegis` | Aegis | avatar active |
+| [x] | `content/art/icons/skills/hex_of_frailty.png` | `skill/hex_of_frailty` | Hex of Frailty | avatar active |
+| [x] | `content/art/icons/skills/battle_focus.png` | `skill/battle_focus` | Battle Focus | avatar active |
+| [x] | `content/art/icons/skills/slowing_field.png` | `skill/slowing_field` | Slowing Field | avatar active |
 
 ### Avatar passives (10)
 
 | Done | File | ArtKey | Skill | Element / kind |
 | --- | --- | --- | --- | --- |
-| [ ] | `content/art/icons/skills/keen_eye.png` | `skill/keen_eye` | Keen Eye | avatar passive |
-| [ ] | `content/art/icons/skills/iron_will.png` | `skill/iron_will` | Iron Will | avatar passive |
-| [ ] | `content/art/icons/skills/opening_ward.png` | `skill/opening_ward` | Opening Ward | avatar passive |
-| [ ] | `content/art/icons/skills/battle_hymn.png` | `skill/battle_hymn` | Battle Hymn | avatar passive |
-| [ ] | `content/art/icons/skills/withering_curse.png` | `skill/withering_curse` | Withering Curse | avatar passive |
-| [ ] | `content/art/icons/skills/bloodlust.png` | `skill/bloodlust` | Rising Fervor | avatar passive |
-| [ ] | `content/art/icons/skills/vengeance.png` | `skill/vengeance` | Kindred Resolve | avatar passive |
-| [ ] | `content/art/icons/skills/storm_call.png` | `skill/storm_call` | Storm Call | avatar passive |
-| [ ] | `content/art/icons/skills/verdant_pulse.png` | `skill/verdant_pulse` | Verdant Pulse | avatar passive |
-| [ ] | `content/art/icons/skills/last_stand.png` | `skill/last_stand` | Last Stand | avatar passive |
+| [x] | `content/art/icons/skills/keen_eye.png` | `skill/keen_eye` | Keen Eye | avatar passive |
+| [x] | `content/art/icons/skills/iron_will.png` | `skill/iron_will` | Iron Will | avatar passive |
+| [x] | `content/art/icons/skills/opening_ward.png` | `skill/opening_ward` | Opening Ward | avatar passive |
+| [x] | `content/art/icons/skills/battle_hymn.png` | `skill/battle_hymn` | Battle Hymn | avatar passive |
+| [x] | `content/art/icons/skills/withering_curse.png` | `skill/withering_curse` | Withering Curse | avatar passive |
+| [x] | `content/art/icons/skills/bloodlust.png` | `skill/bloodlust` | Rising Fervor | avatar passive |
+| [x] | `content/art/icons/skills/vengeance.png` | `skill/vengeance` | Kindred Resolve | avatar passive |
+| [x] | `content/art/icons/skills/storm_call.png` | `skill/storm_call` | Storm Call | avatar passive |
+| [x] | `content/art/icons/skills/verdant_pulse.png` | `skill/verdant_pulse` | Verdant Pulse | avatar passive |
+| [x] | `content/art/icons/skills/last_stand.png` | `skill/last_stand` | Last Stand | avatar passive |
 
 ### Enemy skills (15)
 
 | Done | File | ArtKey | Skill | Enemy |
 | --- | --- | --- | --- | --- |
-| [ ] | `content/art/icons/skills/enemy/giant_crush.png` | `skill/enemy/giant/crush` | Crushing Fist | giant |
-| [ ] | `content/art/icons/skills/enemy/giant_gaze.png` | `skill/enemy/giant/gaze` | Baleful Glare | giant |
-| [ ] | `content/art/icons/skills/enemy/giant_quake.png` | `skill/enemy/giant/quake` | Ground Stomp | giant |
-| [ ] | `content/art/icons/skills/enemy/giant_roar.png` | `skill/enemy/giant/roar` | Dread Roar | giant |
-| [ ] | `content/art/icons/skills/enemy/champion_cleave.png` | `skill/enemy/champion/cleave` | Great Cleave | champion |
-| [ ] | `content/art/icons/skills/enemy/champion_hex.png` | `skill/enemy/champion/hex` | Gloam Hex | champion |
-| [ ] | `content/art/icons/skills/enemy/champion_shockwave.png` | `skill/enemy/champion/shockwave` | Shockwave | champion |
-| [ ] | `content/art/icons/skills/enemy/brute_smash.png` | `skill/enemy/brute/smash` | Smash | brute |
-| [ ] | `content/art/icons/skills/enemy/stalker_shadow_claw.png` | `skill/enemy/stalker/shadow_claw` | Ambush Claw | stalker |
-| [ ] | `content/art/icons/skills/enemy/archer_arrow.png` | `skill/enemy/archer/arrow` | Arrow Shot | archer |
-| [ ] | `content/art/icons/skills/enemy/caster_bolt.png` | `skill/enemy/caster/bolt` | Spite Bolt | caster |
-| [ ] | `content/art/icons/skills/enemy/shaman_staff.png` | `skill/enemy/shaman/staff` | Staff Rap | shaman |
-| [ ] | `content/art/icons/skills/enemy/shaman_storm.png` | `skill/enemy/shaman/storm` | Squall | shaman |
-| [ ] | `content/art/icons/skills/enemy/swarmling_bite.png` | `skill/enemy/swarmling/bite` | Bite | swarmling |
-| [ ] | `content/art/icons/skills/enemy/stingling_sting.png` | `skill/enemy/stingling/sting` | Sting | stingling |
+| [x] | `content/art/icons/skills/enemy/giant_crush.png` | `skill/enemy/giant/crush` | Crushing Fist | giant |
+| [x] | `content/art/icons/skills/enemy/giant_gaze.png` | `skill/enemy/giant/gaze` | Baleful Glare | giant |
+| [x] | `content/art/icons/skills/enemy/giant_quake.png` | `skill/enemy/giant/quake` | Ground Stomp | giant |
+| [x] | `content/art/icons/skills/enemy/giant_roar.png` | `skill/enemy/giant/roar` | Dread Roar | giant |
+| [x] | `content/art/icons/skills/enemy/champion_cleave.png` | `skill/enemy/champion/cleave` | Great Cleave | champion |
+| [x] | `content/art/icons/skills/enemy/champion_hex.png` | `skill/enemy/champion/hex` | Gloam Hex | champion |
+| [x] | `content/art/icons/skills/enemy/champion_shockwave.png` | `skill/enemy/champion/shockwave` | Shockwave | champion |
+| [x] | `content/art/icons/skills/enemy/brute_smash.png` | `skill/enemy/brute/smash` | Smash | brute |
+| [x] | `content/art/icons/skills/enemy/stalker_shadow_claw.png` | `skill/enemy/stalker/shadow_claw` | Ambush Claw | stalker |
+| [x] | `content/art/icons/skills/enemy/archer_arrow.png` | `skill/enemy/archer/arrow` | Arrow Shot | archer |
+| [x] | `content/art/icons/skills/enemy/caster_bolt.png` | `skill/enemy/caster/bolt` | Spite Bolt | caster |
+| [x] | `content/art/icons/skills/enemy/shaman_staff.png` | `skill/enemy/shaman/staff` | Staff Rap | shaman |
+| [x] | `content/art/icons/skills/enemy/shaman_storm.png` | `skill/enemy/shaman/storm` | Squall | shaman |
+| [x] | `content/art/icons/skills/enemy/swarmling_bite.png` | `skill/enemy/swarmling/bite` | Bite | swarmling |
+| [x] | `content/art/icons/skills/enemy/stingling_sting.png` | `skill/enemy/stingling/sting` | Sting | stingling |
 
 ## 4. VFX hero frames (59)
 
