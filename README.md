@@ -187,9 +187,10 @@ The numbers are simulator-tuned starting points, not confirmed balance — see
 ### What does not exist yet
 
 - The screens beyond the core loop (see [`docs/design/screens.md`](docs/design/screens.md)):
-  the Roster, Grove, Avatar and Inventory tabs are "coming soon" pages; the
-  Trader and Camp locations say "coming soon"; no audio. The UI is code-drawn
-  placeholder.
+  the Grove, Avatar and Inventory tabs are "coming soon" pages (the Roster tab,
+  the beast detail screen, the element chart, the glossary and the battle log
+  exist: "Roster and visibility" there); the Trader location says "coming
+  soon"; no audio. The UI is code-drawn placeholder.
 - Encounters as game data — the only encounters are the balance simulator's
   generator and its `Tooling/BalanceSim/encounters.json`.
 - Gear content — the gear schemas and save support exist, but `content/data/Gear/` and

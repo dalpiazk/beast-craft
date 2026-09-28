@@ -12,7 +12,8 @@ namespace BeastCraft.Game.Screens
     /// The one consolidated results screen (<see cref="ResultsViewModel"/>): victory or defeat, each
     /// team beast's XP bar filling from before to after (level-ups called out), the bench's share,
     /// gold, drops, the first-clear bonus and banked XP, and what happened on the map (cleared, a
-    /// stage or region won with its seal, or the retry note). Continue (or Back) returns to the map.
+    /// stage or region won with its seal, or the retry note), and the battle log (every hit's damage
+    /// breakdown, filterable by unit). Continue (or Back) returns to the map.
     /// </summary>
     public sealed class ResultsScreen : GameScreen
     {
@@ -100,7 +101,19 @@ namespace BeastCraft.Game.Screens
             }
 
             _notes = _scroll.Add(new Panel { Bounds = new Rect(Pad, y, width, noteHeight), StyleKey = _model.Victory ? "card" : "slot" });
-            _scroll.ContentHeight = _notes.Bounds.Bottom + 30f;
+            y = _notes.Bounds.Bottom + 30f;
+
+            // The whole battle's log: every hit with its damage breakdown, filterable by unit.
+            AddButton(_scroll, "battle-log", new Rect(Pad + 120f, y, width - 240f, 110f), "Battle log", "secondary", () => OpenLog());
+            _scroll.ContentHeight = y + 140f;
+        }
+
+        /// <summary>The post-battle log (every hit's damage breakdown, filterable by unit).</summary>
+        public BattleLogModal OpenLog()
+        {
+            BattleLogModal modal = new BattleLogModal(Ctx, _model.Log, "Battle log: " + _model.Subtitle);
+            Ctx.Stack.PushModal(modal);
+            return modal;
         }
 
         public override void Draw()

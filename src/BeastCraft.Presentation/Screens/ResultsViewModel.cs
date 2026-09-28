@@ -126,6 +126,27 @@ namespace BeastCraft.Presentation.Screens
         /// <summary>A won trial's pick (2 or 3), now waiting on the map; 0 otherwise.</summary>
         public int PickStep { get; private set; }
 
+        private BattleLogViewModel _log;
+        private Func<BattleLogViewModel> _buildLog;
+
+        /// <summary>
+        /// The whole battle's log (every hit with its damage breakdown, heals, shields, statuses,
+        /// bond reactions, the Beastbinder's arts), filterable by unit; built on first use from the
+        /// battle's own records. Empty when the battle is not at hand.
+        /// </summary>
+        public BattleLogViewModel Log
+        {
+            get
+            {
+                if (_log == null)
+                {
+                    _log = _buildLog?.Invoke() ?? new BattleLogViewModel(null);
+                }
+
+                return _log;
+            }
+        }
+
         internal static ResultsViewModel Build(GameSession session, NodeBattle battle, BattleSessionResult result, BattleRewardSummary summary, CampaignResult campaign,
                                                Dictionary<string, (int Level, int Xp)> before)
         {
@@ -146,6 +167,11 @@ namespace BeastCraft.Presentation.Screens
                 AvatarLevelsGained = summary.AvatarLevelsGained
             };
             view.Title = result.Outcome == BattleOutcome.PlayerVictory ? "Victory!" : result.Outcome == BattleOutcome.EnemyVictory ? "Defeat" : "Stalemate";
+            BattleRun run = battle.Run?.Battle;
+            if (run != null)
+            {
+                view._buildLog = () => BattleLogViewModel.Build(run, run.Units, BattleLogViewModel.NamesFor(session.Content, battle.SpeciesByUnit, run.Avatar?.Id));
+            }
 
             HashSet<string> knockedOut = new HashSet<string>(StringComparer.Ordinal);
             foreach (KeyValuePair<string, string> pair in result.TeamUnitIds)

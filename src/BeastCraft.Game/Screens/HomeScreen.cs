@@ -22,8 +22,8 @@ namespace BeastCraft.Game.Screens
     /// limit). Tapping a reachable location opens its encounter; a Trader or Camp says it is coming
     /// soon. Two one-tap shortcuts sit on the map: the idle chip (how long the idle rewards have
     /// piled up; tap to claim) and Next battle (the recommended location's encounter, the last team
-    /// already picked). Coming back to the app claims the idle rewards here. The other tabs show a
-    /// coming-soon page.
+    /// already picked). Coming back to the app claims the idle rewards here. The Roster tab is the
+    /// roster page (<see cref="RosterPage"/>); the other tabs show a coming-soon page.
     /// </summary>
     public sealed class HomeScreen : GameScreen
     {
@@ -34,6 +34,7 @@ namespace BeastCraft.Game.Screens
         private readonly ScrollView _scroll;
         private readonly Tabs _tabs;
         private readonly Group _page;
+        private readonly RosterPage _roster;
         private readonly Button _gear;
         private readonly Button _idle;
         private readonly Button _next;
@@ -45,6 +46,8 @@ namespace BeastCraft.Game.Screens
             _map = new MapViewModel(ctx.Session);
             _scroll = Ui.Add(new ScrollView { Id = "map", Bounds = new Rect(0, 0, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight) });
             _page = Ui.Add(new Group { Id = "page", Bounds = new Rect(0, 0, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight), Visible = false });
+            _roster = new RosterPage(ctx, Ui, new Rect(0, 0, PortraitLayout.CanvasWidth, NavBox.Y - 20f));
+            _roster.Root.Visible = false;
             Ui.Add(new Panel { Id = "header", Bounds = HeaderBox, StyleKey = "header" });
             _gear = AddButton(null, "gear", new Rect(HeaderBox.Right - 120f, HeaderBox.Y + 24f, 96f, 96f), null, "ghost", OpenSettings, "gear");
             _idle = AddButton(null, "idle", new Rect(HeaderBox.Right - 420f, HeaderBox.Bottom + 18f, 420f, 84f), "Idle", "chip", ClaimIdle, "hourglass");
@@ -319,12 +322,25 @@ namespace BeastCraft.Game.Screens
             TapNode(node.NodeId);
         }
 
+        /// <summary>The Roster tab's page.</summary>
+        public RosterPage Roster
+        {
+            get { return _roster; }
+        }
+
         private void ShowTab()
         {
             _tabs.Selected = (int)_home.Tab;
-            bool map = _home.TabAvailable;
+            bool map = _home.Tab == HomeTab.Map;
+            bool roster = _home.Tab == HomeTab.Roster;
             _scroll.Visible = map;
-            _page.Visible = !map;
+            _page.Visible = !_home.TabAvailable;
+            _roster.Root.Visible = roster;
+            if (roster)
+            {
+                _roster.Refresh();
+            }
+
             Ui.Find("header").Visible = map;
             _gear.Visible = map;
             _idle.Visible = map;
@@ -337,15 +353,19 @@ namespace BeastCraft.Game.Screens
 
         public override void Draw()
         {
-            if (!_home.TabAvailable)
+            if (_home.Tab != HomeTab.Map)
             {
                 Gradient("cream", "creamDeep", new Rect(0, 0, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight));
             }
 
             base.Draw();
-            if (_home.TabAvailable)
+            if (_home.Tab == HomeTab.Map)
             {
                 DrawHeader();
+            }
+            else if (_home.Tab == HomeTab.Roster)
+            {
+                _roster.DrawHeader();
             }
             else
             {
@@ -358,6 +378,12 @@ namespace BeastCraft.Game.Screens
             if (widget == _scroll)
             {
                 DrawMap();
+                return;
+            }
+
+            if (_roster.Root.Visible)
+            {
+                _roster.DrawCustom(widget);
             }
         }
 

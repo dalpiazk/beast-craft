@@ -162,12 +162,17 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
-        public void HomeNav_BackFromAnotherTab_ReturnsToTheMap_AndOnlyTheMapWorks()
+        public void HomeNav_BackFromAnotherTab_ReturnsToTheMap_AndOnlyTheMapAndRosterWork()
         {
             HomeViewModel home = new HomeViewModel();
             Assert.AreEqual(HomeTab.Map, home.Tab);
             Assert.IsTrue(home.TabAvailable);
             Assert.IsFalse(home.HandleBack(), "on the Map, back is the stack's");
+
+            home.Select(HomeTab.Roster);
+            Assert.IsTrue(home.TabAvailable, "the roster is built");
+            Assert.IsTrue(home.HandleBack());
+            Assert.AreEqual(HomeTab.Map, home.Tab);
 
             home.Select(HomeTab.Grove);
             Assert.IsFalse(home.TabAvailable, "coming soon");

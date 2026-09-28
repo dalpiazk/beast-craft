@@ -123,9 +123,16 @@ namespace BeastCraft.Battle
     public readonly struct AppliedEffect
     {
         public AppliedEffect(BattleUnit target, SkillEffect effect)
+            : this(target, effect, 0)
+        {
+        }
+
+        /// <summary>An effect that landed with what it came to (<see cref="Amount"/>).</summary>
+        public AppliedEffect(BattleUnit target, SkillEffect effect, int amount)
         {
             Target = target;
             Effect = effect;
+            Amount = amount;
         }
 
         /// <summary>Who it landed on.</summary>
@@ -133,5 +140,13 @@ namespace BeastCraft.Battle
 
         /// <summary>The effect as authored (magnitudes unscaled).</summary>
         public SkillEffect Effect { get; }
+
+        /// <summary>
+        /// What the effect came to on this target, for the battle log (presentation only; nothing in
+        /// the battle reads it): a heal's HP actually restored, a shield's points (0 when a larger
+        /// shield was kept), a damage over time's per-turn amount, a stat change's applied delta
+        /// (signed), a knockback's hexes moved; 0 otherwise.
+        /// </summary>
+        public int Amount { get; }
     }
 }
