@@ -201,7 +201,9 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <summary>Per-trio clear rates (percent) of <paramref name="shape"/> at <paramref name="multiplier"/>, and their mean.</summary>
         private static double[] Rates(Context context, PveSimulator pve, int level, EncounterShape shape, double multiplier, out double mean)
         {
-            PveBattle[] battles = pve.RunTeams(KitMode.Elemental, level, shape, multiplier, context.Trios);
+            // --start-level: the team (and the avatar) never below it, the enemies at the node's level.
+            int team = Math.Max(level, context.Options.NewPlayerStartLevel);
+            PveBattle[] battles = pve.RunTeams(KitMode.Elemental, team, shape, multiplier, context.Trios, level - team);
             int count = context.Trios.Length;
             int samples = pve.Samples;
             int[] cleared = new int[count];
@@ -264,6 +266,12 @@ namespace BeastCraft.Tooling.BalanceSim
             report.AppendLine("  required = the scale the trio mean needs to reach the shape's target (bisection from x" + SimOptions.Format(MinScale) + ", " + ScaleBisections +
                               " halvings; `<` = not reached, `1.00+` = already there unscaled).");
             report.AppendLine("- Trios: " + string.Join(", ", names) + ".");
+            if (options.NewPlayerStartLevel > 0)
+            {
+                report.AppendLine("- `--start-level " + options.NewPlayerStartLevel + "`: the trio and the avatar never fight below level " + options.NewPlayerStartLevel +
+                                  " (a player arriving from Hearthglen); the enemies stay at the node's level.");
+            }
+
             report.AppendLine();
         }
 

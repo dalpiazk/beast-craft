@@ -26,6 +26,13 @@ namespace BeastCraft.Economy
         /// </summary>
         public CosmeticLibrary Cosmetics;
 
+        /// <summary>
+        /// Where the clear's first-clear bonus is recorded (<see cref="Progression.LootRoller.ClearKey"/>):
+        /// "" (the default) = the shared (shape, level band) cell; a tutorial region's id keeps its own
+        /// cells, so Hearthglen never uses up Verdant Hollow's first-clear bonuses.
+        /// </summary>
+        public string FirstClearScope = string.Empty;
+
         /// <summary>The <see cref="Gear"/> and <see cref="Cosmetics"/> of <paramref name="economy"/> on these modifiers (for chaining).</summary>
         public RewardModifiers With(EconomyContent economy)
         {

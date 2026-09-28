@@ -341,7 +341,7 @@ namespace BeastCraft.Session
 
             summary.SkillLevelsGained = PostBattleAward.AwardPractice(result.Battle, books, skillLookup, avatarBook, skillLookup, passiveLookup);
             summary.Loot = PostBattleAward.AwardDrops(result.Battle, dropTable, shape, encounterLevel, save.Materials,
-                                                      rng ?? new Random(LootRoller.DeriveSeed(result.Seed, 0)));
+                                                      rng ?? new Random(LootRoller.DeriveSeed(result.Seed, 0)), mods.FirstClearScope);
             if (result.Outcome == BattleOutcome.PlayerVictory && dropTable != null && dropTable.Gold.PaysGold)
             {
                 int gold = PostBattleAward.AwardGold(result.Battle, dropTable, shape, encounterLevel, summary.Loot.FirstClear, mods.GoldMultiplier, mods.BonusGold,

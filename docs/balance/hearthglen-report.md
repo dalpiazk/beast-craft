@@ -11,25 +11,28 @@ legal pick: its fixed templates at their own `DifficultyOverride` (never the cal
   never full here), so the fights before the first trial are fought by the 10 solo picks, those before the second by
   the 31 legal (1st, 2nd) pairs, and the rest by the 90 trios in pick order (each one-per-stance trio three times: once per stance it can start from).
 - Levels: every pick joins at level 1; the profile below is a player who wins every fight once (the Core's XP rules; the camp trains
-  the newest pick). The library avatar (as calibrated) at its own profile level. No gear, no consumable.
-- Battles: 16 seeded copies of each lineup x 2 battle(s) per combination (seed 12345), on r01's battlefields (`BattlefieldRegionId`), elemental kits.
-- Targets (producer decision): at least 90.0% for every combination in every fight but the finale; the finale about 70.0% for every trio (mean within +/-5.0, every trio within +/-10.0 points), so stance order does not matter.
+  the newest pick, then catches every pick up to the leader's level). The library avatar (as calibrated) at its own profile level.
+  No gear, no consumable.
+- Battles: 16 seeded copies of each lineup x 2 battle(s) per combination (seed 12345), elemental kits; the `OpenBoard` fights on the open board, the rest on r01's battlefields (`BattlefieldRegionId`). The finale's enemies take the element neutral against the
+  combination's beasts (`AdaptiveElements`, `ElementAdaptation`).
+- Targets (producer decisions, round 2): at least 90.0% for every combination in every fight but the finale; the finale's
+  weakest trio at about 60.0% or more (a high mean is fine).
 
 ## Fights
 
-Clear rate over the combinations: min, mean and max; below = combinations under the target (the finale: outside its band).
+Clear rate over the combinations: min, mean and max; below = combinations under the target.
 
 | # | Location | Template | Lv | Party (levels) | Multiplier | Target | Min | Mean | Max | Below | Met | Tuned |
 | ---: | --- | --- | ---: | --- | ---: | --- | ---: | ---: | ---: | ---: | --- | ---: |
-| 1 | Clover Meadow | `hg_meadow_scamps` | 1 | 1st Lv 1; avatar Lv 1 | x1.730 | >= 90.0% | 100.0% | 100.0% | 100.0% | 0/10 | yes | x2.166 |
-| 2 | Hedgerow Lane | `hg_hedgerow_pests` | 1 | 1st Lv 1; avatar Lv 1 | x1.290 | >= 90.0% | 100.0% | 100.0% | 100.0% | 0/10 | yes | x1.607 |
+| 1 | Clover Meadow (open board) | `hg_meadow_scamps` | 1 | 1st Lv 1; avatar Lv 1 | x1.730 | >= 90.0% | 100.0% | 100.0% | 100.0% | 0/10 | yes | x2.166 |
+| 2 | Hedgerow Lane (open board) | `hg_hedgerow_pests` | 1 | 1st Lv 1; avatar Lv 1 | x1.290 | >= 90.0% | 100.0% | 100.0% | 100.0% | 0/10 | yes | x1.493 |
 | 3 | Tumbledown Wall | `hg_tumbledown_wall` | 2 | 1st Lv 1; avatar Lv 1 | x0.730 | >= 90.0% | 100.0% | 100.0% | 100.0% | 0/10 | yes | x0.913 |
 | 4 | Bramble Stone | `hg_trial_bramble` | 2 | 1st Lv 2; avatar Lv 1 | x0.830 | >= 90.0% | 100.0% | 100.0% | 100.0% | 0/10 | yes | x1.043 |
 | 5 | Brookside Mill | `hg_brookside_rabble` | 2 | 1st Lv 2, 2nd Lv 1; avatar Lv 2 | x1.030 | >= 90.0% | 100.0% | 100.0% | 100.0% | 0/31 | yes | x1.282 |
 | 6 | Old Orchard | `hg_orchard_raiders` | 2 | 1st Lv 2, 2nd Lv 1; avatar Lv 2 | x0.830 | >= 90.0% | 100.0% | 100.0% | 100.0% | 0/31 | yes | x1.036 |
 | 7 | Grove Stone | `hg_trial_grove` | 3 | 1st Lv 3, 2nd Lv 1; avatar Lv 2 | x1.120 | >= 90.0% | 100.0% | 100.0% | 100.0% | 0/31 | yes | x1.397 |
-| 9 | Ridge Path | `hg_ridge_prowlers` | 3 | 1st Lv 3, 2nd Lv 2, 3rd Lv 1; avatar Lv 3 | x0.950 | >= 90.0% | 100.0% | 100.0% | 100.0% | 0/90 | yes | x1.184 |
-| 10 | The Far Hedge | `hg_gloam_at_the_hedge` | 3 | 1st Lv 3, 2nd Lv 2, 3rd Lv 1; avatar Lv 3 | x1.020 | ~70.0% | 9.4% | 75.0% | 100.0% | 71/90 | **no** | x1.023 |
+| 9 | Ridge Path | `hg_ridge_prowlers` | 3 | 1st Lv 3, 2nd Lv 3, 3rd Lv 3; avatar Lv 3 | x0.950 | >= 90.0% | 100.0% | 100.0% | 100.0% | 0/90 | yes | x1.334 |
+| 10 | The Far Hedge | `hg_gloam_at_the_hedge` | 3 | 1st Lv 3, 2nd Lv 3, 3rd Lv 3; avatar Lv 3 | x0.930 | weakest >= 60.0% | 65.6% | 97.9% | 100.0% | 0/90 | yes | x0.938 |
 
 ## Weakest combinations per fight
 
@@ -41,42 +44,45 @@ Clear rate over the combinations: min, mean and max; below = combinations under 
 - `hg_orchard_raiders`: phoenix > griffin 100.0%; phoenix > thunderbird 100.0%; leviathan > phoenix 100.0%; leviathan > kirin 100.0%; leviathan > basilisk 100.0%.
 - `hg_trial_grove`: phoenix > griffin 100.0%; phoenix > thunderbird 100.0%; leviathan > phoenix 100.0%; leviathan > kirin 100.0%; leviathan > basilisk 100.0%.
 - `hg_ridge_prowlers`: phoenix > griffin > leviathan 100.0%; phoenix > griffin > golem 100.0%; phoenix > griffin > frost_wyrm 100.0%; phoenix > griffin > treant 100.0%; phoenix > griffin > tarasque 100.0%.
-- `hg_gloam_at_the_hedge`: frost_wyrm > phoenix > thunderbird 9.4%; thunderbird > frost_wyrm > phoenix 12.5%; frost_wyrm > kirin > thunderbird 18.8%; frost_wyrm > basilisk > thunderbird 21.9%; thunderbird > frost_wyrm > kirin 25.0%.
+- `hg_gloam_at_the_hedge`: thunderbird > frost_wyrm > kirin 65.6%; frost_wyrm > kirin > thunderbird 65.6%; kirin > thunderbird > frost_wyrm 65.6%; thunderbird > treant > basilisk 90.6%; treant > basilisk > thunderbird 90.6%.
 
 ## Finale by trio
 
-`hg_gloam_at_the_hedge`: each one-per-stance trio's clear rate from each stance it can start from (pick order), and the spread.
+Element adaptation: with it (the game) min 65.6%, mean 97.9%, max 100.0%; with the template's authored elements instead, min 65.6%, mean 98.2%, max 100.0% (the same multiplier).
 
-| Trio | From Vanguard | From Ranged | From Skirmisher | Spread |
-| --- | ---: | ---: | ---: | ---: |
-| basilisk/frost_wyrm/griffin | 78.1% | 87.5% | 56.3% | 31.3 |
-| basilisk/frost_wyrm/thunderbird | 21.9% | 59.4% | 56.3% | 37.5 |
-| basilisk/golem/griffin | 100.0% | 96.9% | 96.9% | 3.1 |
-| basilisk/golem/thunderbird | 90.6% | 50.0% | 90.6% | 40.6 |
-| basilisk/griffin/leviathan | 100.0% | 87.5% | 81.3% | 18.8 |
-| basilisk/griffin/tarasque | 68.8% | 81.3% | 93.8% | 25.0 |
-| basilisk/griffin/treant | 81.3% | 96.9% | 81.3% | 15.6 |
-| basilisk/leviathan/thunderbird | 96.9% | 59.4% | 93.8% | 37.5 |
-| basilisk/tarasque/thunderbird | 31.3% | 62.5% | 62.5% | 31.3 |
-| basilisk/thunderbird/treant | 78.1% | 56.3% | 46.9% | 31.3 |
-| frost_wyrm/griffin/kirin | 50.0% | 96.9% | 81.3% | 46.9 |
-| frost_wyrm/griffin/phoenix | 50.0% | 90.6% | 71.9% | 40.6 |
-| frost_wyrm/kirin/thunderbird | 18.8% | 75.0% | 25.0% | 56.3 |
-| frost_wyrm/phoenix/thunderbird | 9.4% | 37.5% | 12.5% | 28.1 |
-| golem/griffin/kirin | 100.0% | 100.0% | 84.4% | 15.6 |
-| golem/griffin/phoenix | 96.9% | 90.6% | 75.0% | 21.9 |
-| golem/kirin/thunderbird | 96.9% | 84.4% | 100.0% | 15.6 |
-| golem/phoenix/thunderbird | 90.6% | 87.5% | 78.1% | 12.5 |
-| griffin/kirin/leviathan | 96.9% | 100.0% | 84.4% | 15.6 |
-| griffin/kirin/tarasque | 100.0% | 96.9% | 71.9% | 28.1 |
-| griffin/kirin/treant | 93.8% | 96.9% | 81.3% | 15.6 |
-| griffin/leviathan/phoenix | 87.5% | 87.5% | 75.0% | 12.5 |
-| griffin/phoenix/tarasque | 87.5% | 100.0% | 87.5% | 12.5 |
-| griffin/phoenix/treant | 75.0% | 81.3% | 71.9% | 9.4 |
-| kirin/leviathan/thunderbird | 84.4% | 90.6% | 87.5% | 6.3 |
-| kirin/tarasque/thunderbird | 75.0% | 81.3% | 78.1% | 6.3 |
-| kirin/thunderbird/treant | 87.5% | 87.5% | 62.5% | 25.0 |
-| leviathan/phoenix/thunderbird | 59.4% | 75.0% | 71.9% | 15.6 |
-| phoenix/tarasque/thunderbird | 40.6% | 59.4% | 65.6% | 25.0 |
-| phoenix/thunderbird/treant | 43.8% | 43.8% | 37.5% | 6.3 |
+`hg_gloam_at_the_hedge`: each one-per-stance trio's clear rate from each stance it can start from (pick order), the spread,
+and the element its enemies take.
+
+| Trio | From Vanguard | From Ranged | From Skirmisher | Spread | Enemy element |
+| --- | ---: | ---: | ---: | ---: | --- |
+| basilisk/frost_wyrm/griffin | 100.0% | 100.0% | 100.0% | 0.0 | Water |
+| basilisk/frost_wyrm/thunderbird | 96.9% | 96.9% | 96.9% | 0.0 | Ice |
+| basilisk/golem/griffin | 100.0% | 100.0% | 100.0% | 0.0 | Dark |
+| basilisk/golem/thunderbird | 100.0% | 100.0% | 100.0% | 0.0 | None |
+| basilisk/griffin/leviathan | 100.0% | 100.0% | 100.0% | 0.0 | Water |
+| basilisk/griffin/tarasque | 100.0% | 100.0% | 100.0% | 0.0 | None |
+| basilisk/griffin/treant | 100.0% | 100.0% | 100.0% | 0.0 | None |
+| basilisk/leviathan/thunderbird | 96.9% | 96.9% | 96.9% | 0.0 | Ice |
+| basilisk/tarasque/thunderbird | 100.0% | 100.0% | 100.0% | 0.0 | None |
+| basilisk/thunderbird/treant | 90.6% | 90.6% | 90.6% | 0.0 | None |
+| frost_wyrm/griffin/kirin | 100.0% | 100.0% | 100.0% | 0.0 | None |
+| frost_wyrm/griffin/phoenix | 100.0% | 100.0% | 100.0% | 0.0 | None |
+| frost_wyrm/kirin/thunderbird | 65.6% | 65.6% | 65.6% | 0.0 | None |
+| frost_wyrm/phoenix/thunderbird | 93.8% | 93.8% | 93.8% | 0.0 | Lightning |
+| golem/griffin/kirin | 100.0% | 100.0% | 100.0% | 0.0 | None |
+| golem/griffin/phoenix | 100.0% | 100.0% | 100.0% | 0.0 | None |
+| golem/kirin/thunderbird | 100.0% | 100.0% | 100.0% | 0.0 | None |
+| golem/phoenix/thunderbird | 96.9% | 96.9% | 96.9% | 0.0 | None |
+| griffin/kirin/leviathan | 100.0% | 100.0% | 100.0% | 0.0 | None |
+| griffin/kirin/tarasque | 100.0% | 100.0% | 100.0% | 0.0 | None |
+| griffin/kirin/treant | 96.9% | 96.9% | 96.9% | 0.0 | None |
+| griffin/leviathan/phoenix | 100.0% | 100.0% | 100.0% | 0.0 | None |
+| griffin/phoenix/tarasque | 100.0% | 100.0% | 100.0% | 0.0 | None |
+| griffin/phoenix/treant | 100.0% | 100.0% | 100.0% | 0.0 | None |
+| kirin/leviathan/thunderbird | 100.0% | 100.0% | 100.0% | 0.0 | None |
+| kirin/tarasque/thunderbird | 100.0% | 100.0% | 100.0% | 0.0 | None |
+| kirin/thunderbird/treant | 100.0% | 100.0% | 100.0% | 0.0 | None |
+| leviathan/phoenix/thunderbird | 100.0% | 100.0% | 100.0% | 0.0 | None |
+| phoenix/tarasque/thunderbird | 100.0% | 100.0% | 100.0% | 0.0 | None |
+| phoenix/thunderbird/treant | 100.0% | 100.0% | 100.0% | 0.0 | None |
 

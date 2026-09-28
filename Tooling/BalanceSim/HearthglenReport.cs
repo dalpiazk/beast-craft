@@ -31,23 +31,27 @@ namespace BeastCraft.Tooling.BalanceSim
     /// <para>
     /// <strong>Levels.</strong> The level profile a player who wins every fight once reaches, by the
     /// Core's own XP rules (<see cref="BeastProgression"/>, <see cref="AvatarProgression"/>): every
-    /// pick joins at level 1; each fight pays its winners; the camp trains the newest pick.
+    /// pick joins at level 1; each fight pays its winners; the camp trains the newest pick and then
+    /// catches every pick up to the leader's level (Hearthglen's camp, <c>CampaignRules.Camp</c>).
     /// </para>
     /// <para>
-    /// <strong>Targets</strong> (producer decision): at least <see cref="RegularTarget"/>% for every
-    /// combination in every fight but the finale; the finale (the last fight) about
-    /// <see cref="FinaleTarget"/>% for every trio (within <see cref="FinaleBand"/> points), so the
-    /// stance a player starts from does not matter. <c>--tune</c> also searches each fight's
-    /// multiplier for its target (the regular fights: the highest multiplier whose weakest
-    /// combination still clears <see cref="RegularTarget"/>%; the finale: the mean at
-    /// <see cref="FinaleTarget"/>%).
+    /// <strong>Battlefields and elements</strong> as the game fights them: the fights authored
+    /// <c>OpenBoard</c> on the open board, the rest on the region's battlefields; an
+    /// <c>AdaptiveElements</c> fight (the finale) with every enemy of the element neutral against the
+    /// combination's beasts (<see cref="ElementAdaptation"/>), and reported again with the template's
+    /// authored elements for comparison.
+    /// </para>
+    /// <para>
+    /// <strong>Targets</strong> (producer decisions, round 2): at least <see cref="RegularTarget"/>% for
+    /// every combination in every fight but the finale; the finale's WEAKEST trio at about
+    /// <see cref="FinaleFloor"/>% or more (a high mean is fine). <c>--tune</c> also searches each
+    /// fight's multiplier: the highest whose weakest combination still clears its target.
     /// </para>
     /// </summary>
     public static class HearthglenReport
     {
         public const double RegularTarget = 90.0;
-        public const double FinaleTarget = 70.0;
-        public const double FinaleBand = 10.0;
+        public const double FinaleFloor = 60.0;
 
         /// <summary>Tuning: the multipliers searched and the bisection steps.</summary>
         public const double MinMultiplier = 0.1;
@@ -145,17 +149,19 @@ namespace BeastCraft.Tooling.BalanceSim
             /// <summary>Per party size (1-3): every legal combination, as roster indices in pick order.</summary>
             public readonly Dictionary<int, List<int[]>> Combinations = new Dictionary<int, List<int[]>>();
 
-            public readonly Dictionary<int, PveSimulator> Simulators = new Dictionary<int, PveSimulator>();
+            public readonly Dictionary<string, PveSimulator> Simulators = new Dictionary<string, PveSimulator>(StringComparer.Ordinal);
 
-            public PveSimulator For(int size)
+            /// <summary>A simulator for parties of <paramref name="size"/> on <paramref name="battlefield"/>'s layouts (null = the open board).</summary>
+            public PveSimulator For(int size, string battlefield)
             {
-                if (!Simulators.TryGetValue(size, out PveSimulator pve))
+                string key = size + "|" + (battlefield ?? "open");
+                if (!Simulators.TryGetValue(key, out PveSimulator pve))
                 {
                     SimOptions copy = Options.ForSeed(Options.Seed);
                     copy.TeamSize = size;
-                    copy.ObstaclesRegion = Battlefield;
+                    copy.ObstaclesRegion = battlefield;
                     pve = new PveSimulator(copy, Species) { GearFor = null };
-                    Simulators.Add(size, pve);
+                    Simulators.Add(key, pve);
                 }
 
                 return pve;
@@ -193,14 +199,23 @@ namespace BeastCraft.Tooling.BalanceSim
             public double Mean;
             public double Max;
             public double Suggested;
+            public string Battlefield;
+            public bool Adaptive;
+
+            /// <summary>An adaptive fight's rates with the template's authored elements instead (for comparison); null otherwise.</summary>
+            public double[] AuthoredRates;
+
+            /// <summary>Per combination, the adapted element (adaptive fights).</summary>
+            public Element[] Elements;
+
+            public double Target
+            {
+                get { return Finale ? FinaleFloor : RegularTarget; }
+            }
 
             public bool Pass
             {
-                get
-                {
-                    return Finale ? Math.Abs(Mean - FinaleTarget) <= FinaleBand / 2.0 && Min >= FinaleTarget - FinaleBand && Max <= FinaleTarget + FinaleBand
-                               : Min >= RegularTarget;
-                }
+                get { return Min >= Target; }
             }
         }
 
@@ -233,6 +248,20 @@ namespace BeastCraft.Tooling.BalanceSim
                 else if (node.Type == MapNodeType.Rest)
                 {
                     BeastProgression.AwardBattle(picks[picks.Count - 1], BattleOutcome.PlayerVictory, node.Level, false, cap);
+                    int leader = 0;
+                    foreach (BeastProgress pick in picks)
+                    {
+                        leader = Math.Max(leader, pick.Level);
+                    }
+
+                    foreach (BeastProgress pick in picks)
+                    {
+                        if (pick.Level < leader)
+                        {
+                            pick.Level = leader;
+                            pick.Xp = 0;
+                        }
+                    }
                 }
             }
 
@@ -274,22 +303,65 @@ namespace BeastCraft.Tooling.BalanceSim
             Levels levels = context.Profile[node.NodeId];
             int size = levels.Picks.Length;
             EncounterPlan plan = EncounterPlan.FromTemplate(context.Library, context.Enemies, node.TemplateId, node.Level);
+            FixedNodeData authored = context.Regions.FixedNode(CampaignProgress.TutorialRegionId, node.NodeId);
             FightResult fight = new FightResult
             {
                 Node = node,
-                Authored = context.Regions.FixedNode(CampaignProgress.TutorialRegionId, node.NodeId),
+                Authored = authored,
                 Plan = plan,
                 Finale = finale,
                 Levels = levels,
-                Combinations = context.Combinations[size]
+                Combinations = context.Combinations[size],
+                Battlefield = context.Regions.BattlefieldFor(CampaignProgress.TutorialRegionId, node.NodeId),
+                Adaptive = authored != null && authored.AdaptiveElements
             };
 
-            EncounterShape shape = Copies(context, plan);
-            fight.Rates = Rates(context, size, levels, node.Level, shape, plan.Multiplier, fight.Combinations);
+            // Per combination, the lineup it fights: the authored one, or (adaptive) its element's copy.
+            fight.Elements = new Element[fight.Combinations.Count];
+            EncounterShape authoredShape = Copies(context, plan);
+            Dictionary<Element, EncounterShape> adapted = new Dictionary<Element, EncounterShape>();
+            EncounterShape[] shapes = new EncounterShape[fight.Combinations.Count];
+            for (int k = 0; k < shapes.Length; k++)
+            {
+                if (!fight.Adaptive)
+                {
+                    shapes[k] = authoredShape;
+                    continue;
+                }
+
+                List<CreatureSpeciesSO> team = new List<CreatureSpeciesSO>();
+                foreach (int s in fight.Combinations[k])
+                {
+                    team.Add(context.Species[s]);
+                }
+
+                Element element = ElementAdaptation.NeutralElement(ElementAdaptation.ElementsOf(team));
+                fight.Elements[k] = element;
+                if (!adapted.TryGetValue(element, out EncounterShape shape))
+                {
+                    shape = Copies(context, plan.WithElement(element));
+                    adapted.Add(element, shape);
+                }
+
+                shapes[k] = shape;
+            }
+
+            fight.Rates = Rates(context, size, levels, node.Level, fight.Battlefield, shapes, plan.Multiplier, fight.Combinations);
             Summarize(fight.Rates, out fight.Min, out fight.Mean, out fight.Max);
+            if (fight.Adaptive)
+            {
+                EncounterShape[] plain = new EncounterShape[shapes.Length];
+                for (int k = 0; k < plain.Length; k++)
+                {
+                    plain[k] = authoredShape;
+                }
+
+                fight.AuthoredRates = Rates(context, size, levels, node.Level, fight.Battlefield, plain, plan.Multiplier, fight.Combinations);
+            }
+
             if (context.Options.HearthglenTune)
             {
-                fight.Suggested = Tune(context, size, levels, node.Level, shape, fight.Combinations, finale);
+                fight.Suggested = Tune(context, size, levels, node.Level, fight.Battlefield, shapes, fight.Combinations, fight.Target);
             }
 
             return fight;
@@ -302,7 +374,8 @@ namespace BeastCraft.Tooling.BalanceSim
             EncounterShape shape = new EncounterShape { Id = plan.EncounterId, Arena = plan.Arena };
             for (int copy = 1; copy <= Math.Max(1, context.Options.Compositions); copy++)
             {
-                Encounter encounter = new Encounter { Id = plan.EncounterId + "-" + copy.ToString("00", CultureInfo.InvariantCulture), Arena = plan.Arena };
+                string element = plan.Enemies.Count > 0 && plan.Enemies[0].Element != Element.None && plan.ElementScheme == null && IsUniform(plan) ? "-" + plan.Enemies[0].Element : string.Empty;
+                Encounter encounter = new Encounter { Id = plan.EncounterId + element + "-" + copy.ToString("00", CultureInfo.InvariantCulture), Arena = plan.Arena };
                 for (int i = 0; i < plan.Enemies.Count; i++)
                 {
                     encounter.Enemies.Add(factory.Slot(plan.Enemies[i].EnemyId, plan.Enemies[i].Element, i + 1));
@@ -314,11 +387,12 @@ namespace BeastCraft.Tooling.BalanceSim
             return shape;
         }
 
-        /// <summary>Each combination's clear rate (percent) over every copy and sample, at <paramref name="multiplier"/>.</summary>
-        private static double[] Rates(Context context, int size, Levels levels, int level, EncounterShape shape, double multiplier, List<int[]> combinations)
+        /// <summary>Each combination's clear rate (percent) over every copy and sample of its lineup (<paramref name="shapes"/>, per combination), at <paramref name="multiplier"/>.</summary>
+        private static double[] Rates(Context context, int size, Levels levels, int level, string battlefield, EncounterShape[] shapes, double multiplier,
+                                      List<int[]> combinations)
         {
-            PveSimulator pve = context.For(size);
-            int copies = shape.Compositions.Count;
+            PveSimulator pve = context.For(size, battlefield);
+            int copies = shapes[0].Compositions.Count;
             int samples = pve.Samples;
             int[] teamIndex = new int[combinations.Count];
             int[][] memberLevels = new int[combinations.Count][];
@@ -336,10 +410,16 @@ namespace BeastCraft.Tooling.BalanceSim
                 }
             }
 
-            bool[][] ties = new bool[copies][];
-            for (int c = 0; c < copies; c++)
+            Dictionary<string, bool[]> ties = new Dictionary<string, bool[]>(StringComparer.Ordinal);
+            foreach (EncounterShape shape in shapes)
             {
-                ties[c] = pve.PlayersWinTies(KitMode.Elemental, level, shape.Compositions[c].Id);
+                foreach (Encounter composition in shape.Compositions)
+                {
+                    if (!ties.ContainsKey(composition.Id))
+                    {
+                        ties.Add(composition.Id, pve.PlayersWinTies(KitMode.Elemental, level, composition.Id));
+                    }
+                }
             }
 
             int[] cleared = new int[combinations.Count];
@@ -350,7 +430,8 @@ namespace BeastCraft.Tooling.BalanceSim
                 int c = (i / samples) % copies;
                 int sample = i % samples;
                 int t = teamIndex[k];
-                PveBattle battle = pve.RunBattle(KitMode.Elemental, level, level, shape.Compositions[c], multiplier, t, sample, false, ties[c][t], true, memberLevels[k],
+                Encounter encounter = shapes[k].Compositions[c];
+                PveBattle battle = pve.RunBattle(KitMode.Elemental, level, level, encounter, multiplier, t, sample, false, ties[encounter.Id][t], true, memberLevels[k],
                                                  levels.Avatar, out _);
                 if (battle.Cleared)
                 {
@@ -367,15 +448,15 @@ namespace BeastCraft.Tooling.BalanceSim
             return rates;
         }
 
-        private static double Tune(Context context, int size, Levels levels, int level, EncounterShape shape, List<int[]> combinations, bool finale)
+        private static double Tune(Context context, int size, Levels levels, int level, string battlefield, EncounterShape[] shapes, List<int[]> combinations, double target)
         {
             double lo = MinMultiplier;
             double hi = MaxMultiplier;
             for (int step = 0; step < TuneSteps; step++)
             {
                 double mid = Math.Sqrt(lo * hi);
-                Summarize(Rates(context, size, levels, level, shape, mid, combinations), out double min, out double mean, out double _);
-                bool easyEnough = finale ? mean >= FinaleTarget : min >= RegularTarget;
+                Summarize(Rates(context, size, levels, level, battlefield, shapes, mid, combinations), out double min, out double _, out double _);
+                bool easyEnough = min >= target;
                 if (easyEnough)
                 {
                     lo = mid;
@@ -387,6 +468,19 @@ namespace BeastCraft.Tooling.BalanceSim
             }
 
             return lo;
+        }
+
+        private static bool IsUniform(EncounterPlan plan)
+        {
+            foreach (EncounterLineupEnemy enemy in plan.Enemies)
+            {
+                if (enemy.Element != plan.Enemies[0].Element)
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         private static void Summarize(double[] rates, out double min, out double mean, out double max)
@@ -460,17 +554,19 @@ namespace BeastCraft.Tooling.BalanceSim
             report.AppendLine("  the " + context.Combinations[2].Count + " legal (1st, 2nd) pairs, and the rest by the " + context.Combinations[3].Count +
                               " trios in pick order (each one-per-stance trio three times: once per stance it can start from).");
             report.AppendLine("- Levels: every pick joins at level 1; the profile below is a player who wins every fight once (the Core's XP rules; the camp trains");
-            report.AppendLine("  the newest pick). The library avatar (as calibrated) at its own profile level. No gear, no consumable.");
+            report.AppendLine("  the newest pick, then catches every pick up to the leader's level). The library avatar (as calibrated) at its own profile level.");
+            report.AppendLine("  No gear, no consumable.");
             report.AppendLine("- Battles: " + options.Compositions + " seeded copies of each lineup x " + options.PveSamples + " battle(s) per combination (seed " +
-                              options.Seed.ToString(CultureInfo.InvariantCulture) + "), on " + context.Battlefield + "'s battlefields (`BattlefieldRegionId`), elemental kits.");
-            report.AppendLine("- Targets (producer decision): at least " + Pct(RegularTarget) + " for every combination in every fight but the finale; the finale about " +
-                              Pct(FinaleTarget) + " for every trio (mean within +/-" + SimOptions.Format(FinaleBand / 2.0) + ", every trio within +/-" + SimOptions.Format(FinaleBand) +
-                              " points), so stance order does not matter.");
+                              options.Seed.ToString(CultureInfo.InvariantCulture) + "), elemental kits; the `OpenBoard` fights on the open board, the rest on " +
+                              context.Battlefield + "'s battlefields (`BattlefieldRegionId`). The finale's enemies take the element neutral against the");
+            report.AppendLine("  combination's beasts (`AdaptiveElements`, `ElementAdaptation`).");
+            report.AppendLine("- Targets (producer decisions, round 2): at least " + Pct(RegularTarget) + " for every combination in every fight but the finale; the finale's");
+            report.AppendLine("  weakest trio at about " + Pct(FinaleFloor) + " or more (a high mean is fine).");
             report.AppendLine();
 
             report.AppendLine("## Fights");
             report.AppendLine();
-            report.AppendLine("Clear rate over the combinations: min, mean and max; below = combinations under the target (the finale: outside its band).");
+            report.AppendLine("Clear rate over the combinations: min, mean and max; below = combinations under the target.");
             report.AppendLine();
             report.AppendLine("| # | Location | Template | Lv | Party (levels) | Multiplier | Target | Min | Mean | Max | Below | Met |" + (options.HearthglenTune ? " Tuned |" : string.Empty));
             report.AppendLine("| ---: | --- | --- | ---: | --- | ---: | --- | ---: | ---: | ---: | ---: | --- |" + (options.HearthglenTune ? " ---: |" : string.Empty));
@@ -479,12 +575,13 @@ namespace BeastCraft.Tooling.BalanceSim
                 int below = 0;
                 foreach (double rate in fight.Rates)
                 {
-                    below += fight.Finale ? (Math.Abs(rate - FinaleTarget) > FinaleBand ? 1 : 0) : (rate < RegularTarget ? 1 : 0);
+                    below += rate < fight.Target ? 1 : 0;
                 }
 
-                report.AppendLine("| " + fight.Node.NodeId + " | " + (fight.Authored?.Name ?? string.Empty) + " | `" + fight.Node.TemplateId + "` | " + fight.Node.Level + " | " +
+                report.AppendLine("| " + fight.Node.NodeId + " | " + (fight.Authored?.Name ?? string.Empty) + (fight.Battlefield == null ? " (open board)" : string.Empty) + " | `" +
+                                  fight.Node.TemplateId + "` | " + fight.Node.Level + " | " +
                                   fight.Levels.Describe() + " | x" + fight.Plan.Multiplier.ToString("0.000", CultureInfo.InvariantCulture) + " | " +
-                                  (fight.Finale ? "~" + Pct(FinaleTarget) : ">= " + Pct(RegularTarget)) + " | " + Pct(fight.Min) + " | " + Pct(fight.Mean) + " | " +
+                                  (fight.Finale ? "weakest >= " : ">= ") + Pct(fight.Target) + " | " + Pct(fight.Min) + " | " + Pct(fight.Mean) + " | " +
                                   Pct(fight.Max) + " | " + below + "/" + fight.Rates.Length + " | " + (fight.Pass ? "yes" : "**no**") + " |" +
                                   (options.HearthglenTune ? " x" + fight.Suggested.ToString("0.000", CultureInfo.InvariantCulture) + " |" : string.Empty));
             }
@@ -516,11 +613,22 @@ namespace BeastCraft.Tooling.BalanceSim
                 report.AppendLine();
                 report.AppendLine("## Finale by trio");
                 report.AppendLine();
-                report.AppendLine("`" + finale.Node.TemplateId + "`: each one-per-stance trio's clear rate from each stance it can start from (pick order), and the spread.");
+                if (finale.AuthoredRates != null)
+                {
+                    Summarize(finale.AuthoredRates, out double amin, out double amean, out double amax);
+                    report.AppendLine("Element adaptation: with it (the game) min " + Pct(finale.Min) + ", mean " + Pct(finale.Mean) + ", max " + Pct(finale.Max) +
+                                      "; with the template's authored elements instead, min " + Pct(amin) + ", mean " + Pct(amean) + ", max " + Pct(amax) +
+                                      " (the same multiplier).");
+                    report.AppendLine();
+                }
+
+                report.AppendLine("`" + finale.Node.TemplateId + "`: each one-per-stance trio's clear rate from each stance it can start from (pick order), the spread,");
+                report.AppendLine("and the element its enemies take.");
                 report.AppendLine();
-                report.AppendLine("| Trio | From Vanguard | From Ranged | From Skirmisher | Spread |");
-                report.AppendLine("| --- | ---: | ---: | ---: | ---: |");
+                report.AppendLine("| Trio | From Vanguard | From Ranged | From Skirmisher | Spread | Enemy element |");
+                report.AppendLine("| --- | ---: | ---: | ---: | ---: | --- |");
                 Dictionary<string, double[]> byTrio = new Dictionary<string, double[]>(StringComparer.Ordinal);
+                Dictionary<string, Element> elementOf = new Dictionary<string, Element>(StringComparer.Ordinal);
                 List<string> trios = new List<string>();
                 for (int k = 0; k < finale.Combinations.Count; k++)
                 {
@@ -541,6 +649,7 @@ namespace BeastCraft.Tooling.BalanceSim
                     }
 
                     rates[Array.IndexOf(StarterPicks.StanceCycle, context.Species[order[0]].Stance)] = finale.Rates[k];
+                    elementOf[key] = finale.Elements[k];
                 }
 
                 trios.Sort(StringComparer.Ordinal);
@@ -548,7 +657,8 @@ namespace BeastCraft.Tooling.BalanceSim
                 {
                     double[] rates = byTrio[trio];
                     Summarize(rates, out double min, out double _, out double max);
-                    report.AppendLine("| " + trio + " | " + Pct(rates[0]) + " | " + Pct(rates[1]) + " | " + Pct(rates[2]) + " | " + SimOptions.Format(max - min) + " |");
+                    report.AppendLine("| " + trio + " | " + Pct(rates[0]) + " | " + Pct(rates[1]) + " | " + Pct(rates[2]) + " | " + SimOptions.Format(max - min) + " | " +
+                                      (finale.Adaptive ? elementOf[trio].ToString() : "authored") + " |");
                 }
             }
 

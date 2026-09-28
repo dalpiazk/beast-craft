@@ -29,12 +29,13 @@ namespace BeastCraft.Presentation.Screens
         private BattleSessionRun _run;
         private bool _completed;
 
-        private NodeBattle(GameSession session, MapNode node, EncounterPlan plan, string regionId, int attempt)
+        private NodeBattle(GameSession session, MapNode node, EncounterPlan plan, string regionId, string artRegionId, int attempt)
         {
             _session = session;
             Node = node;
             Plan = plan;
             RegionId = regionId;
+            ArtRegionId = artRegionId;
             Attempt = attempt;
             Seed = CampaignRules.BattleSeed(node, attempt);
             Layout = BattleLayouts.Pick(session.Content.Battle.Layouts, regionId, plan.Arena, Seed);
@@ -44,8 +45,11 @@ namespace BeastCraft.Presentation.Screens
 
         public EncounterPlan Plan { get; }
 
-        /// <summary>The region the battle is fought in (its backdrops and obstacles).</summary>
+        /// <summary>The region the battle is fought in (its backdrops and obstacles); null on the open board.</summary>
         public string RegionId { get; }
+
+        /// <summary>The region whose art (enemy looks, backdrops) the battle is drawn with, open board or not.</summary>
+        public string ArtRegionId { get; }
 
         /// <summary>Losses at this location so far: this fight's attempt number (0 = the first).</summary>
         public int Attempt { get; }
@@ -98,15 +102,19 @@ namespace BeastCraft.Presentation.Screens
             }
 
             // Eased in the early regions for a new player (RegionData.StageEasing of RegionLibraryData.EasingShapeScales).
-            EncounterPlan plan = CampaignRules.PlanFor(run, node, session.Content.Encounters, session.Content.Enemies, session.Content.Campaign);
+            EncounterPlan plan = CampaignRules.PlanFor(session.Save, run, node, session.Content.Encounters, session.Content.Enemies, session.Content.Campaign,
+                                                       session.Content.Battle.GetSpecies);
             if (plan == null)
             {
                 error = "The encounter could not be built.";
                 return null;
             }
 
-            // Fought on the region's battlefields (Hearthglen borrows Verdant Hollow's: RegionData.BattlefieldRegionId).
-            return new NodeBattle(session, node, plan, session.Content.Campaign.BattlefieldRegionOf(run.RegionId), CampaignRules.LossesAt(run, nodeId));
+            // Fought on the region's battlefields (Hearthglen borrows Verdant Hollow's: RegionData.BattlefieldRegionId),
+            // or on the open board where authored (FixedNodeData.OpenBoard); drawn with that region's art either way.
+            RegionLibrary regions = session.Content.Campaign;
+            return new NodeBattle(session, node, plan, regions.BattlefieldFor(run.RegionId, nodeId), regions.BattlefieldRegionOf(run.RegionId),
+                                  CampaignRules.LossesAt(run, nodeId));
         }
 
         /// <summary>
@@ -219,7 +227,7 @@ namespace BeastCraft.Presentation.Screens
             }
 
             int cap = CampaignRules.BeastCap(save, content.Campaign);
-            RewardModifiers modifiers = CampaignRules.RewardModifiersFor(Node).With(content.Economy);
+            RewardModifiers modifiers = CampaignRules.RewardModifiersFor(save.Campaign.ActiveRun, Node, content.Campaign).With(content.Economy);
             BattleRewardSummary summary = BattleSession.ApplyRewards(save, result, content.Battle, content.Drops, cap, modifiers);
             CampaignResult campaign = CampaignRules.ResolveBattle(save, content.Campaign, Node.NodeId, result.Outcome, content.Economy);
             _session.Autosave(AutosaveReason.Results);

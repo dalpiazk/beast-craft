@@ -318,6 +318,122 @@ namespace BeastCraft.Tests.EditMode
             Assert.IsEmpty(SaveValidator.Validate(save, SaveContentCatalog.FromData(Content.Roster, Content.SkillLibrary, Content.Regions)));
         }
 
+        // ------------------------------------------------------------------ round 2: catch-up, first clears, boards, elements
+
+        /// <summary>Plays a fresh Hearthglen (1st pick <paramref name="first"/>) up to, not into, node <paramref name="stopAt"/>, making each pick.</summary>
+        private static PlayerSave PlayTo(int stopAt, string first, string second, string third)
+        {
+            PlayerSave save = StarterPicks.NewGame(first, Roster, Content.SkillLibrary, out string _);
+            CampaignRules.StartRun(save, Regions, "r00", 5);
+            MapRun run = save.Campaign.ActiveRun;
+            for (int nodeId = 0; nodeId < stopAt; nodeId++)
+            {
+                MapNode node = run.Find(nodeId);
+                CampaignResult result = node.IsBattle ? CampaignRules.ResolveBattle(save, Regions, nodeId, BattleOutcome.PlayerVictory)
+                                        : node.Type == MapNodeType.Rest ? CampaignRules.Camp(save, Regions, nodeId, save.Beasts[save.Beasts.Count - 1].BeastId)
+                                        : CampaignRules.Visit(save, Regions, nodeId, Content.Battle.GetConsumable);
+                Assert.IsTrue(result.Success, nodeId + ": " + result.Error);
+                if (result.PickStep > 0)
+                {
+                    Assert.IsTrue(StarterPicks.Pick(save, Regions, Roster, Content.SkillLibrary, result.PickStep == 2 ? second : third).Success);
+                }
+            }
+
+            return save;
+        }
+
+        [Test]
+        public void TheCamp_CatchesEveryPickUpToTheLeader_InHearthglenOnly()
+        {
+            int camp = Regions.Tutorial.FixedNodes.Length - 4;
+            Assert.AreEqual("Rest", Regions.Tutorial.FixedNodes[camp].Type);
+            PlayerSave save = PlayTo(camp, "golem", "kirin", "griffin");
+            save.Beasts[0].Progress.Level = 3; // the rules alone pay no battle XP: stand in for the fights' pay
+            save.Beasts[1].Progress.Level = 2;
+            int leader = save.Beasts[0].Progress.Level;
+            Assert.Greater(leader, save.Beasts[2].Progress.Level, "the newest pick trails before the camp");
+
+            CampaignResult result = CampaignRules.Camp(save, Regions, camp, save.Beasts[2].BeastId);
+
+            Assert.IsTrue(result.Success, result.Error);
+            Assert.IsTrue(save.Beasts.TrueForAll(b => b.Progress.Level == leader), "every pick stands level with the leader");
+            CollectionAssert.IsNotEmpty(result.CaughtUp);
+
+            // A campaign camp trains only.
+            PlayerSave campaign = TestSaves.SixStarters(Content);
+            campaign.Beasts[0].Progress.Level = 5;
+            Assert.IsTrue(CampaignRules.StartRun(campaign, Regions, "r01", 3).Success);
+            MapRun run = campaign.Campaign.ActiveRun;
+            MapNode rest = run.Nodes.Find(n => n.Type == MapNodeType.Rest);
+            MapNode before = run.Nodes.Find(n => Array.IndexOf(n.Next, rest.NodeId) >= 0);
+            run.Cleared.Add(before.NodeId);
+            run.CurrentNodeId = before.NodeId;
+            CampaignResult trained = CampaignRules.Camp(campaign, Regions, rest.NodeId, campaign.Beasts[1].BeastId);
+            Assert.IsTrue(trained.Success, trained.Error);
+            CollectionAssert.IsEmpty(trained.CaughtUp);
+            Assert.AreEqual(1, campaign.Beasts[2].Progress.Level);
+        }
+
+        [Test]
+        public void HearthglenClears_KeepTheirOwnFirstClearCells()
+        {
+            MapRun r00 = new MapRun { RegionId = "r00" };
+            MapRun r01 = new MapRun { RegionId = "r01" };
+            MapNode node = new MapNode { Type = MapNodeType.Battle };
+            Assert.AreEqual("r00", CampaignRules.RewardModifiersFor(r00, node, Regions).FirstClearScope);
+            Assert.AreEqual(string.Empty, CampaignRules.RewardModifiersFor(r01, node, Regions).FirstClearScope);
+
+            Progression.MaterialInventory inventory = new Progression.MaterialInventory();
+            Progression.LootResult first = Progression.LootRoller.RollClear(Content.Drops, "squad", 2, inventory, new Random(1), "r00");
+            Assert.IsTrue(first.FirstClear);
+            Assert.IsTrue(inventory.HasCleared("r00/squad", Content.Drops.BandForLevel(2).MinLevel));
+            Assert.IsFalse(inventory.HasCleared("squad", Content.Drops.BandForLevel(2).MinLevel), "Verdant Hollow's cell is untouched");
+            Assert.IsTrue(Progression.LootRoller.RollClear(Content.Drops, "squad", 2, inventory, new Random(1)).FirstClear, "so r01's first clear still pays its bonus");
+            Assert.IsFalse(Progression.LootRoller.RollClear(Content.Drops, "squad", 2, inventory, new Random(1), "r00").FirstClear);
+        }
+
+        [Test]
+        public void TheFirstFights_AreOnTheOpenBoard_TheLaterOnesOnHollowLayouts()
+        {
+            Assert.IsNull(Regions.BattlefieldFor("r00", 1));
+            Assert.IsNull(Regions.BattlefieldFor("r00", 2));
+            int obstacles = Array.FindIndex(Regions.Tutorial.FixedNodes, n => n.TemplateId == "hg_tumbledown_wall");
+            for (int nodeId = obstacles; nodeId < Regions.Tutorial.FixedNodes.Length; nodeId++)
+            {
+                Assert.AreEqual("r01", Regions.BattlefieldFor("r00", nodeId), "from the obstacle beat on: " + nodeId);
+            }
+
+            Assert.AreEqual("r01", Regions.BattlefieldFor("r01", 4), "campaign regions: their own battlefields");
+        }
+
+        [Test]
+        public void TheFinaleElement_IsNeutralAgainstEveryLegalTrio_AndDeterministic()
+        {
+            foreach (CreatureSpeciesSO a in Roster)
+            {
+                foreach (CreatureSpeciesSO b in StarterPicks.Options(new[] { a.SpeciesId }, Roster))
+                {
+                    foreach (CreatureSpeciesSO c in StarterPicks.Options(new[] { a.SpeciesId, b.SpeciesId }, Roster))
+                    {
+                        List<Element> team = ElementAdaptation.ElementsOf(new[] { a, b, c });
+                        Element chosen = ElementAdaptation.NeutralElement(team);
+                        Assert.IsTrue(ElementAdaptation.IsNeutral(chosen, team), a.SpeciesId + "/" + b.SpeciesId + "/" + c.SpeciesId + ": " + chosen);
+                        Assert.AreEqual(chosen, ElementAdaptation.NeutralElement(ElementAdaptation.ElementsOf(new[] { c, a, b })), "pick order does not matter");
+                    }
+                }
+            }
+
+            Assert.AreEqual(Element.Fire, ElementAdaptation.NeutralElement(new Element[0]));
+
+            PlayerSave save = PlayTo(Regions.Tutorial.FixedNodes.Length - 2, "golem", "kirin", "griffin");
+            MapRun run = save.Campaign.ActiveRun;
+            MapNode finale = run.Find(Regions.Tutorial.FixedNodes.Length - 2);
+            EncounterPlan plan = CampaignRules.PlanFor(save, run, finale, Content.Encounters, Content.Enemies, Regions, Content.Battle.GetSpecies);
+            Element expected = ElementAdaptation.NeutralElement(ElementAdaptation.ElementsOf(save.Beasts.ConvertAll(o => Content.Battle.GetSpecies(o.Progress.SpeciesId))));
+            Assert.IsTrue(new List<EncounterLineupEnemy>(plan.Enemies).TrueForAll(e => e.Element == expected), "every finale enemy takes the adapted element");
+            Assert.AreEqual(Content.Encounters.GetTemplate(finale.TemplateId).DifficultyOverride, plan.Multiplier);
+        }
+
         // ------------------------------------------------------------------ migration (schema 6 -> 7)
 
         [Test]

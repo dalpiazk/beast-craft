@@ -132,7 +132,7 @@ namespace BeastCraft.Presentation.Screens
                     Stance = group.Stance,
                     Count = group.Count,
                     Level = Battle.Plan.Level,
-                    ArtKey = match == null ? null : DemoBattle.ArtKeyOf(content, match.EnemyId, Battle.RegionId)
+                    ArtKey = match == null ? null : DemoBattle.ArtKeyOf(content, match.EnemyId, Battle.ArtRegionId)
                 });
             }
 

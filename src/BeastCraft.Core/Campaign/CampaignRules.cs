@@ -351,6 +351,23 @@ namespace BeastCraft.Campaign
             return modifiers;
         }
 
+        /// <summary>
+        /// <see cref="RewardModifiersFor(MapNode)"/> for a node of <paramref name="run"/>: a tutorial
+        /// region's clears also record their first clears in its own cells
+        /// (<see cref="RewardModifiers.FirstClearScope"/> = the region id), so Hearthglen never uses up
+        /// the campaign's first-clear bonuses.
+        /// </summary>
+        public static RewardModifiers RewardModifiersFor(MapRun run, MapNode node, RegionLibrary regions)
+        {
+            RewardModifiers modifiers = RewardModifiersFor(node);
+            if (run != null && regions != null && regions.IsTutorial(run.RegionId))
+            {
+                modifiers.FirstClearScope = run.RegionId;
+            }
+
+            return modifiers;
+        }
+
         /// <summary>The battle seed of attempt <paramref name="attempt"/> (0 = the first) at <paramref name="node"/>: <c>LootRoller.DeriveSeed(EncounterSeed, attempt)</c>.</summary>
         public static int BattleSeed(MapNode node, int attempt)
         {
@@ -387,6 +404,32 @@ namespace BeastCraft.Campaign
 
             string shapeKey = string.IsNullOrEmpty(plan.EncounterId) ? plan.ShapeId : RegionLibraryData.EasingBossId;
             return plan.Scaled(regions.DifficultyScaleFor(run.RegionId, run.Stage, shapeKey));
+        }
+
+        /// <summary>
+        /// What a campaign battle at <paramref name="node"/> really fields for <paramref name="save"/>:
+        /// <see cref="PlanFor(MapRun, MapNode, EncounterLibrary, EnemyCatalog, RegionLibrary)"/>, and at a
+        /// tutorial location authored <see cref="FixedNodeData.AdaptiveElements"/> (the Hearthglen finale)
+        /// every enemy takes the element neutral against every owned beast's elements
+        /// (<see cref="ElementAdaptation.NeutralElement"/>; <paramref name="species"/> resolves them).
+        /// </summary>
+        public static EncounterPlan PlanFor(PlayerSave save, MapRun run, MapNode node, EncounterLibrary encounters, EnemyCatalog enemies, RegionLibrary regions,
+                                            Func<string, CreatureSpeciesSO> species)
+        {
+            EncounterPlan plan = PlanFor(run, node, encounters, enemies, regions);
+            FixedNodeData authored = plan == null || run == null || regions == null ? null : regions.FixedNode(run.RegionId, node.NodeId);
+            if (authored == null || !authored.AdaptiveElements || save == null || species == null)
+            {
+                return plan;
+            }
+
+            List<CreatureSpeciesSO> owned = new List<CreatureSpeciesSO>();
+            foreach (OwnedBeast beast in save.Beasts)
+            {
+                owned.Add(beast == null || beast.Progress == null ? null : species(beast.Progress.SpeciesId));
+            }
+
+            return plan.WithElement(ElementAdaptation.NeutralElement(ElementAdaptation.ElementsOf(owned)));
         }
 
         private static EncounterPlan UnscaledPlan(MapNode node, EncounterLibrary encounters, EnemyCatalog enemies)
@@ -528,7 +571,8 @@ namespace BeastCraft.Campaign
         /// Camps at Rest node <paramref name="nodeId"/>, training <paramref name="beastId"/>: it earns
         /// what a standing fielded beast earns for a clear at the node's level
         /// (<c>BeastProgression.AwardBattle</c>: falloff on its level, under the cap). The node is
-        /// cleared and becomes current. Refused for an unknown beast.
+        /// cleared and becomes current. Refused for an unknown beast. In a tutorial region the camp
+        /// also catches every beast up to the leader's level (<see cref="CampaignResult.CaughtUp"/>).
         /// </summary>
         public static CampaignResult Camp(PlayerSave save, RegionLibrary library, int nodeId, string beastId)
         {
@@ -553,8 +597,39 @@ namespace BeastCraft.Campaign
             result.BeastLevelCap = BeastCap(save, library);
             result.XpTrained = BeastProgression.BattleXp(BattleOutcome.PlayerVictory, node.Level, false, beast.Progress.Level);
             result.LevelsGained = BeastProgression.AwardBattle(beast.Progress, BattleOutcome.PlayerVictory, node.Level, false, result.BeastLevelCap);
+            if (library.IsTutorial(run.RegionId))
+            {
+                CatchUp(save, result);
+            }
+
             Clear(run, node);
             return FinishIfLast(save, library, run, node, result);
+        }
+
+        /// <summary>
+        /// Hearthglen's camp catch-up (producer decision): after the training, every beast below the
+        /// leader (the highest level owned) is raised to the leader's level, its XP toward the next
+        /// level reset to 0 (banked XP untouched), so the picks that joined later stand level with the
+        /// first and the order the stances were picked in does not decide the finale. Tutorial camps
+        /// only (<see cref="Camp"/>). The raised beasts' ids go in <see cref="CampaignResult.CaughtUp"/>.
+        /// </summary>
+        private static void CatchUp(PlayerSave save, CampaignResult result)
+        {
+            int leader = 0;
+            foreach (OwnedBeast owned in save.Beasts)
+            {
+                leader = Math.Max(leader, owned.Progress.Level);
+            }
+
+            foreach (OwnedBeast owned in save.Beasts)
+            {
+                if (owned.Progress.Level < leader)
+                {
+                    owned.Progress.Level = leader;
+                    owned.Progress.Xp = 0;
+                    result.CaughtUp.Add(owned.BeastId);
+                }
+            }
         }
 
         /// <summary>
@@ -840,7 +915,7 @@ namespace BeastCraft.Campaign
                 return null;
             }
 
-            EncounterPlan plan = PlanFor(run, run.Find(nodeId), encounters, content.Enemies, regions);
+            EncounterPlan plan = PlanFor(save, run, run.Find(nodeId), encounters, content.Enemies, regions, content.GetSpecies);
             if (plan == null)
             {
                 return null;
@@ -1031,6 +1106,9 @@ namespace BeastCraft.Campaign
 
         /// <summary>Consumables a Story location (or a tutorial skip) handed over, as added (capped at each stack's maximum).</summary>
         public List<ConsumableStack> ItemsGranted { get; } = new List<ConsumableStack>();
+
+        /// <summary>Beasts a tutorial camp raised to the leader's level (<c>CampaignRules.Camp</c>'s catch-up), by id.</summary>
+        public List<string> CaughtUp { get; } = new List<string>();
 
         /// <summary>A won Trial's beast pick (2 or 3; <see cref="StarterPicks"/>), now pending; 0 otherwise.</summary>
         public int PickStep { get; internal set; }

@@ -109,6 +109,20 @@ namespace BeastCraft.Campaign
         /// </summary>
         public string Kind = string.Empty;
 
+        /// <summary>
+        /// A fight on the open board (no obstacles), for the fights before the obstacle tutorial beat;
+        /// false = the region's battlefields (<see cref="RegionData.BattlefieldRegionId"/>).
+        /// </summary>
+        public bool OpenBoard;
+
+        /// <summary>
+        /// The enemies' element adapts to the player's team (<c>ElementAdaptation</c>): one element
+        /// neutral (1x both ways) against every owned beast's elements, chosen deterministically, in
+        /// place of the template's authored elements. For the finale, so the element chart neither
+        /// punishes nor favours any pick.
+        /// </summary>
+        public bool AdaptiveElements;
+
         /// <summary>Consumables a Story location hands over when visited (the first visit only: the region is played once).</summary>
         public ItemGrantData[] Grants = new ItemGrantData[0];
     }

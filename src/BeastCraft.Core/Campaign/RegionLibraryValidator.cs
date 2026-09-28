@@ -315,6 +315,11 @@ namespace BeastCraft.Campaign
                     errors.Add(at + ": only a Battle or Trial names a template.");
                 }
 
+                if (!fight && (node.OpenBoard || node.AdaptiveElements))
+                {
+                    errors.Add(at + ": only a Battle or Trial has OpenBoard or AdaptiveElements.");
+                }
+
                 if (type == MapNodeType.Trial)
                 {
                     picks.Add(node.PickStep);

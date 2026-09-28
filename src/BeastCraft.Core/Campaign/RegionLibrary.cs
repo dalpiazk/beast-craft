@@ -103,6 +103,17 @@ namespace BeastCraft.Campaign
         }
 
         /// <summary>
+        /// The battlefield region a fight at <paramref name="nodeId"/> of <paramref name="regionId"/>'s
+        /// map stands on: null for an authored open-board location (<see cref="FixedNodeData.OpenBoard"/>),
+        /// else <see cref="BattlefieldRegionOf"/>.
+        /// </summary>
+        public string BattlefieldFor(string regionId, int nodeId)
+        {
+            FixedNodeData node = FixedNode(regionId, nodeId);
+            return node != null && node.OpenBoard ? null : BattlefieldRegionOf(regionId);
+        }
+
+        /// <summary>
         /// Tutorial region <paramref name="regionId"/>'s authored location <paramref name="nodeId"/>
         /// (<see cref="RegionData.FixedNodes"/>; the node id is its index), or null.
         /// </summary>

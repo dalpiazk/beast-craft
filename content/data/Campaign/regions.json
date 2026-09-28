@@ -214,8 +214,8 @@
       "BattlefieldRegionId": "r01",
       "FixedNodes": [
         { "Type": "Story", "Name": "Keeper's Shrine", "Level": 1, "Lane": 1, "SceneId": "hg_shrine", "Grants": [ { "ConsumableId": "fury_draught", "Quantity": 2 } ] },
-        { "Type": "Battle", "Name": "Clover Meadow", "Level": 1, "Lane": 0, "TemplateId": "hg_meadow_scamps" },
-        { "Type": "Battle", "Name": "Hedgerow Lane", "Level": 1, "Lane": 1, "TemplateId": "hg_hedgerow_pests" },
+        { "Type": "Battle", "Name": "Clover Meadow", "Level": 1, "Lane": 0, "TemplateId": "hg_meadow_scamps", "OpenBoard": true },
+        { "Type": "Battle", "Name": "Hedgerow Lane", "Level": 1, "Lane": 1, "TemplateId": "hg_hedgerow_pests", "OpenBoard": true },
         { "Type": "Battle", "Name": "Tumbledown Wall", "Level": 2, "Lane": 2, "TemplateId": "hg_tumbledown_wall" },
         { "Type": "Trial", "Name": "Bramble Stone", "Level": 2, "Lane": 1, "TemplateId": "hg_trial_bramble", "PickStep": 2 },
         { "Type": "Battle", "Name": "Brookside Mill", "Level": 2, "Lane": 0, "TemplateId": "hg_brookside_rabble" },
@@ -223,7 +223,7 @@
         { "Type": "Trial", "Name": "Grove Stone", "Level": 3, "Lane": 2, "TemplateId": "hg_trial_grove", "PickStep": 3 },
         { "Type": "Rest", "Name": "Lantern Camp", "Level": 3, "Lane": 1, "SceneId": "hg_camp" },
         { "Type": "Battle", "Name": "Ridge Path", "Level": 3, "Lane": 0, "TemplateId": "hg_ridge_prowlers" },
-        { "Type": "Battle", "Name": "The Far Hedge", "Level": 3, "Lane": 1, "TemplateId": "hg_gloam_at_the_hedge", "Kind": "den" },
+        { "Type": "Battle", "Name": "The Far Hedge", "Level": 3, "Lane": 1, "TemplateId": "hg_gloam_at_the_hedge", "Kind": "den", "AdaptiveElements": true },
         { "Type": "Story", "Name": "Hollow's Edge", "Level": 3, "Lane": 1, "SceneId": "hg_farewell" }
       ]
     }

@@ -609,6 +609,12 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <summary><c>--tune</c>: hearthglen: also search each fight's DifficultyOverride for its target and print the suggestions.</summary>
         public bool HearthglenTune;
 
+        /// <summary>
+        /// <c>--start-level</c>: newplayer: the level the trio (and the avatar) arrive at; they never fight
+        /// below it (0, the default = at the node's level, the report as committed).
+        /// </summary>
+        public int NewPlayerStartLevel;
+
         /// <summary><c>--map-seeds</c>: newplayer: the first-node section's map seeds, 1..n.</summary>
         public int NewPlayerMapSeeds = NewPlayerReport.DefaultMapSeeds;
 
@@ -797,6 +803,7 @@ namespace BeastCraft.Tooling.BalanceSim
             "                             the 10 solo picks, every (1st, 2nd) pair and every trio in pick order, at the levels\n" +
             "                             the picks have reached there (docs/balance/hearthglen-report.md).\n" +
             "  --tune                     hearthglen: also search each fight's DifficultyOverride for its target.\n" +
+            "  --start-level <n>          newplayer: the trio and avatar never fight below level n (a player arriving from Hearthglen).\n" +
             "  --difficulty <path>        newplayer: the difficulty table fought at (default: the game's encounter-difficulty.json).\n" +
             "  --battles <n>              pacing: battles per campaign (default 500).\n" +
             "  --runs <n>                 pacing / campaign: campaigns per base seed (default 1000; --seeds pools every seed's).\n" +
@@ -956,6 +963,13 @@ namespace BeastCraft.Tooling.BalanceSim
                         break;
                     case "--tune":
                         options.HearthglenTune = true;
+                        break;
+                    case "--start-level":
+                        if (!TryNextInt(args, ref i, arg, 1, out options.NewPlayerStartLevel, out error))
+                        {
+                            return null;
+                        }
+
                         break;
                     case "--calibrate-sample":
                         if (!TryNextInt(args, ref i, arg, 1, out options.CalibrateSample, out error))

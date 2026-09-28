@@ -41,6 +41,26 @@ namespace BeastCraft.Progression
         /// </summary>
         public static LootResult RollClear(DropTable table, string shape, int level, MaterialInventory inventory, Random rng)
         {
+            return RollClear(table, shape, level, inventory, rng, null);
+        }
+
+        /// <summary>
+        /// The key a clear of <paramref name="shape"/> records its first clear under
+        /// (<see cref="MaterialInventory.ClearedCells"/>): the shape itself, or
+        /// <c>{scope}/{shape}</c> for a scoped clear (a tutorial region's own cells).
+        /// </summary>
+        public static string ClearKey(string shape, string scope)
+        {
+            return string.IsNullOrEmpty(scope) ? shape : scope + "/" + shape;
+        }
+
+        /// <summary>
+        /// <see cref="RollClear(DropTable, string, int, MaterialInventory, Random)"/> with the first clear
+        /// recorded under <see cref="ClearKey"/> of <paramref name="clearScope"/> (null or "" = the shared cell).
+        /// The drops, pity and bonus are the cell's either way.
+        /// </summary>
+        public static LootResult RollClear(DropTable table, string shape, int level, MaterialInventory inventory, Random rng, string clearScope)
+        {
             LootResult result = new LootResult();
             if (table == null || inventory == null || rng == null)
             {
@@ -75,7 +95,7 @@ namespace BeastCraft.Progression
                 }
             }
 
-            if (inventory.MarkCleared(shape, band.MinLevel) && !string.IsNullOrEmpty(band.FirstClearMaterialId))
+            if (inventory.MarkCleared(ClearKey(shape, clearScope), band.MinLevel) && !string.IsNullOrEmpty(band.FirstClearMaterialId))
             {
                 result.FirstClear = true;
                 result.Add(band.FirstClearMaterialId, band.FirstClearQuantity);

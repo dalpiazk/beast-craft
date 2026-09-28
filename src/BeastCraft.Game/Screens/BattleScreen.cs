@@ -77,6 +77,9 @@ namespace BeastCraft.Game.Screens
         /// </summary>
         private readonly string _regionId;
 
+        /// <summary>The region the units are drawn in (its enemy art): the battlefield, or on an open board the region it stands in for.</summary>
+        private readonly string _artRegionId;
+
         private readonly Dictionary<string, string> _names;
         private BoardFit _boardFit;
         private CanvasFit _canvasFit;
@@ -104,8 +107,9 @@ namespace BeastCraft.Game.Screens
         private readonly List<string> _log = new List<string>();
 
         private BattleScreen(ScreenContext ctx, BattleSessionRun run, Dictionary<string, string> speciesByUnit, string regionId, int seed, string hudTitle,
-                             NodeBattle campaign, Action<NodeBattle> finished) : base(ctx)
+                             NodeBattle campaign, Action<NodeBattle> finished, string artRegionId = null) : base(ctx)
         {
+            _artRegionId = artRegionId ?? regionId;
             _options = ctx.Options;
             _draw = ctx.Draw;
             _atlas = ctx.Atlas;
@@ -201,7 +205,7 @@ namespace BeastCraft.Game.Screens
         /// </summary>
         public static BattleScreen Campaign(ScreenContext ctx, NodeBattle battle, string title, Action<NodeBattle> finished)
         {
-            BattleScreen screen = new BattleScreen(ctx, battle.Run, battle.SpeciesByUnit, battle.RegionId, battle.Seed, title, battle, finished);
+            BattleScreen screen = new BattleScreen(ctx, battle.Run, battle.SpeciesByUnit, battle.RegionId, battle.Seed, title, battle, finished, battle.ArtRegionId);
             screen.LoadSettings(ctx.Session.Settings, ctx.Session.SaveSettings);
             screen._auto = true;
             screen._speed = SettingsViewModel.Speed(ctx.Session.Settings);
