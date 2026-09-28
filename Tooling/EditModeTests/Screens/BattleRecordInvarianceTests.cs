@@ -26,6 +26,17 @@ namespace BeastCraft.Tests.EditMode
     /// type, stat, status and recorded <see cref="AppliedEffect.Amount"/> — and re-captured on
     /// <c>main</c> (797ed05) before the Kinship and discovery work touched anything.
     /// </para>
+    /// <para>
+    /// Re-captured twice more for the producer's never-blocked retune (docs/balance/tuning-log.md,
+    /// "Never-blocked targets"): first for <see cref="DamageFormula.LevelDifferenceCap"/> and its k/q
+    /// steepened (every case here fields a team level away from the node's own level, so the level-gap
+    /// term moves every hash) and the shipping difficulty table recalibrated on the new targets (85%
+    /// squad/horde, 75% elite/solo/boss); then again for the trimmed early-region easing (r01 only,
+    /// fading to nothing by its own last stage; r02 and r03 need none, adaptive assist covers what is
+    /// left) and adaptive assist itself, both of which move a campaign battle's stat multiplier for
+    /// any of these that land in r01-r03. All legitimate outcome changes; the recording invariant
+    /// itself is untouched.
+    /// </para>
     /// </summary>
     public class BattleRecordInvarianceTests
     {
@@ -34,11 +45,11 @@ namespace BeastCraft.Tests.EditMode
             get { return VfxLibraryTests.Content; }
         }
 
-        [TestCase(11, 1, "13DEFBC79EAAE23C")]
-        [TestCase(12, 3, "CEF71BC5CF7DCA18")]
-        [TestCase(13, 6, "A87D8691636CACAD")]
-        [TestCase(14, 2, "16E5CA36007EAF14")]
-        [TestCase(15, 9, "094DFA3C0AF03197")]
+        [TestCase(11, 1, "A26CCB2D494EDB3C")]
+        [TestCase(12, 3, "BCE0BB77DD8DD464")]
+        [TestCase(13, 6, "4C5AB52AD8241523")]
+        [TestCase(14, 2, "7A34C70929E43DDA")]
+        [TestCase(15, 9, "4B2AA0ECD29B149C")]
         public void CampaignBattle_Fingerprint_IsUnchangedByTheLogRecording(int mapSeed, int teamLevel, string expected)
         {
             string text = Fingerprint(mapSeed, teamLevel);

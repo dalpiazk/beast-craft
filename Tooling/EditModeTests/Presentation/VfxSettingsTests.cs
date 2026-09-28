@@ -318,10 +318,15 @@ namespace BeastCraft.Tests.EditMode
         {
             int overlays = 0;
             int again = 0;
-            foreach (int seed in new[] { DemoBattle.DefaultSeed, 7, 99 })
+            // encounterLevel 19 (not the default 10) and more seeds (not just DefaultSeed, 7, 99): the
+            // producer's never-blocked retune (steeper DamageFormula.LevelDifferenceCap) and the boss's
+            // own recalibrated DifficultyOverride (docs/balance/tuning-log.md, "Never-blocked targets")
+            // together end the default 10-level-gap battle before a status has a chance to land twice on
+            // the same unit; a smaller gap and more seeds give at least one battle where it still does.
+            foreach (int seed in new[] { DemoBattle.DefaultSeed, 7, 99, 1, 2, 3, 4, 5, 6, 8, 9, 10 })
             {
                 GameContent content = VfxLibraryTests.Content;
-                BattlePlayback playback = new BattlePlayback(BattleSession.Begin(DemoBattle.Create(content, seed, out _, out _)));
+                BattlePlayback playback = new BattlePlayback(BattleSession.Begin(DemoBattle.Create(content, seed, out _, out _, encounterLevel: 19)));
                 PlayedTurn turn;
                 while ((turn = playback.Advance()) != null)
                 {

@@ -415,9 +415,12 @@ namespace BeastCraft.Campaign
         /// run's stage's <see cref="RegionLibrary.DifficultyScaleFor"/> for the plan's shape (an
         /// authored template, the boss, as <see cref="RegionLibraryData.EasingBossId"/>;
         /// <see cref="EncounterPlan.Scaled"/>; the early regions' <see cref="RegionData.StageEasing"/>
-        /// of <see cref="RegionLibraryData.EasingShapeScales"/>, 1 elsewhere). What a
-        /// campaign battle fights; the easing is campaign-only (the calibration and any plan built
-        /// outside a run never see it). Null <paramref name="run"/> or <paramref name="regions"/> = no easing.
+        /// of <see cref="RegionLibraryData.EasingShapeScales"/>, 1 elsewhere), then adaptive assist on
+        /// top (<see cref="EncounterPlan.WithAssist"/>, <see cref="RegionLibrary.AssistScaleFor"/> of
+        /// the consecutive losses at this node, <see cref="LossesAt"/>; off on
+        /// <see cref="RunDifficulty.Hard"/>). What a campaign battle fights; both are campaign-only
+        /// (the calibration and any plan built outside a run never see either). Null
+        /// <paramref name="run"/> or <paramref name="regions"/> = no easing and no assist.
         /// </summary>
         public static EncounterPlan PlanFor(MapRun run, MapNode node, EncounterLibrary encounters, EnemyCatalog enemies, RegionLibrary regions)
         {
@@ -428,7 +431,17 @@ namespace BeastCraft.Campaign
             }
 
             string shapeKey = string.IsNullOrEmpty(plan.EncounterId) ? plan.ShapeId : RegionLibraryData.EasingBossId;
-            return plan.Scaled(regions.DifficultyScaleFor(run.RegionId, run.Stage, shapeKey));
+            plan = plan.Scaled(regions.DifficultyScaleFor(run.RegionId, run.Stage, shapeKey));
+
+            // Adaptive assist (producer decision, "assist + guidance"): off on post-game Hard, on everywhere
+            // else, so it never softens the harder post-game difficulty players opted into.
+            if (run.Difficulty != RunDifficulty.Hard)
+            {
+                int losses = LossesAt(run, node.NodeId);
+                plan = plan.WithAssist(regions.AssistScaleFor(run.RegionId, shapeKey, losses));
+            }
+
+            return plan;
         }
 
         /// <summary>

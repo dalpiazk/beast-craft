@@ -47,17 +47,23 @@ namespace BeastCraft.Tooling.BalanceSim
 
         public const double PostGameBossHard = 20.0;
 
-        /// <summary>A mainline boss template's target.</summary>
-        public const double BossTarget = 50.0;
+        /// <summary>A mainline boss template's target: the producer's never-blocked tier for elites and bosses (75%; docs/balance/tuning-log.md, "Never-blocked targets").</summary>
+        public const double BossTarget = 75.0;
 
-        public static int Run(SimOptions options, List<CreatureSpeciesSO> species, Dictionary<string, GrowthRateCurve> curves)
+        /// <summary>
+        /// Everything <see cref="Run"/> and <see cref="AssistFloorCalibration.Run"/> share: the content
+        /// loaded, the owned-roster model built over the simulator's teams. Null (with
+        /// <paramref name="errors"/>) on any content or skill-library problem; the caller reports it
+        /// (the exit code differs: 2 for the skill library, otherwise the caller's "invalid" message).
+        /// </summary>
+        internal static Context BuildContext(SimOptions options, List<CreatureSpeciesSO> species, Dictionary<string, GrowthRateCurve> curves, out EncounterCatalog catalog,
+                                             out List<string> errors)
         {
-            Stopwatch clock = Stopwatch.StartNew();
-            List<string> errors = new List<string>();
-            EncounterCatalog catalog = EncounterLoader.Load(options, curves, errors);
+            errors = new List<string>();
+            catalog = EncounterLoader.Load(options, curves, errors);
             if (catalog == null)
             {
-                return Fail("Encounters are invalid:", errors);
+                return null;
             }
 
             JsonSerializerOptions json = new JsonSerializerOptions { IncludeFields = true };
@@ -68,7 +74,8 @@ namespace BeastCraft.Tooling.BalanceSim
             DiscoveryLibraryData discoveryData = NewPlayerReport.Read<DiscoveryLibraryData>(null, DiscoveryLibraryData.ProjectRelativePath, json, errors);
             if (errors.Count > 0)
             {
-                return Fail("Could not read the content:", errors);
+                catalog = null;
+                return null;
             }
 
             if (options.GearKits == null)
@@ -76,15 +83,17 @@ namespace BeastCraft.Tooling.BalanceSim
                 options.GearKits = GearKits.Load(options.GearLibraryPath, species, errors);
                 if (options.GearKits == null)
                 {
-                    return Fail("The gear library is invalid:", errors);
+                    catalog = null;
+                    return null;
                 }
             }
 
             SkillCurve skills = SkillCurve.Build(options, out string skillError);
             if (skills == null)
             {
-                Console.Error.WriteLine(skillError);
-                return 2;
+                errors.Add(skillError);
+                catalog = null;
+                return null;
             }
 
             curves.TryGetValue(enemyData.GrowthCurveId ?? string.Empty, out GrowthRateCurve curve);
@@ -103,10 +112,23 @@ namespace BeastCraft.Tooling.BalanceSim
             PveSimulator probe = context.Simulator(1, options.ObstaclesRegion);
             if (probe == null)
             {
-                return Fail("The skill library is invalid:", context.Errors);
+                errors.AddRange(context.Errors);
+                catalog = null;
+                return null;
             }
 
             context.Model = new TypicalTeamModel(species, probe.Teams, DiscoveryLibrary.Build(discoveryData), context.Regions);
+            return context;
+        }
+
+        public static int Run(SimOptions options, List<CreatureSpeciesSO> species, Dictionary<string, GrowthRateCurve> curves)
+        {
+            Stopwatch clock = Stopwatch.StartNew();
+            Context context = BuildContext(options, species, curves, out EncounterCatalog catalog, out List<string> errors);
+            if (context == null)
+            {
+                return Fail("Could not read the content:", errors);
+            }
 
             List<int> levels = new List<int>(options.LevelsGiven ? options.Levels : new List<int>(DefaultLevels));
             levels.Sort();
@@ -178,7 +200,7 @@ namespace BeastCraft.Tooling.BalanceSim
         }
 
         /// <summary>Everything the calibration shares: the content, the model and a simulator per (skill level, battlefield region).</summary>
-        private sealed class Context
+        internal sealed class Context
         {
             public SimOptions Options;
             public List<CreatureSpeciesSO> Species;

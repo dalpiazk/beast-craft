@@ -57,6 +57,25 @@ namespace BeastCraft.Campaign
         public const string EasingBossId = "boss";
 
         /// <summary>
+        /// Adaptive assist (producer decision, "assist + guidance"): each consecutive loss at a
+        /// campaign location multiplies that fight's stat multiplier by <c>1 - AssistStep</c> again
+        /// (compounding, <see cref="RegionLibrary.AssistScaleFor"/>), down to a floor per kind of
+        /// fight (<see cref="AssistFloorScales"/>). 0 or not above 0 disables assist everywhere. A
+        /// data-driven step (about 0.10, i.e. -10% per loss); tuned so the WEAK owned-roster pick
+        /// (Tooling/BalanceSim --mode typical) reaches about 70% at the floor (bosses about 60%),
+        /// see docs/balance/tuning-log.md, "Never-blocked targets". Every mainline and post-game
+        /// Normal region; off on post-game Hard (<see cref="Save.RunDifficulty.Hard"/>).
+        /// </summary>
+        public double AssistStep;
+
+        /// <summary>
+        /// The floor each kind of fight's assist reaches (<see cref="RegionLibrary.AssistFloorScale"/>):
+        /// same shape ids as <see cref="EasingShapeScales"/> (a shape, or <see cref="EasingBossId"/> for
+        /// an authored template); a kind not listed is never assisted. Scale in (0, 1].
+        /// </summary>
+        public ShapeScaleData[] AssistFloorScales = new ShapeScaleData[0];
+
+        /// <summary>
         /// The regions, in campaign order: the mainline ones, levels contiguous from 1 to 100, and
         /// after them any post-game ones (<see cref="RegionData.IsPostGame"/>, flat level 100).
         /// </summary>
@@ -295,6 +314,17 @@ namespace BeastCraft.Campaign
         /// <c>--mode newplayer</c>). Mainline regions only; only where <see cref="StageEasing"/> eases the last stage.
         /// </summary>
         public double BossScale;
+
+        /// <summary>
+        /// A per-region override of adaptive assist's floor for the region's boss, in place of the
+        /// shared <c>boss</c> entry of <see cref="AssistFloorScales"/>: in (0, 1], or 0 (the default)
+        /// for none. Mirrors <see cref="BossScale"/> for assist. For a boss whose own need differs from
+        /// the shared floor (a post-game Normal boss: its typical target is already lower than a
+        /// mainline boss's, so the shared floor under-assists it; measured by
+        /// <c>--mode assistfloor</c>). Any region (mainline or post-game Normal; post-game Hard is
+        /// never assisted).
+        /// </summary>
+        public double AssistBossFloorScale;
 
         /// <summary>
         /// An onboarding region (only in <see cref="RegionLibraryData.TutorialRegions"/>): one

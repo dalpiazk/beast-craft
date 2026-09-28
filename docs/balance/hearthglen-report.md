@@ -26,11 +26,11 @@ Clear rate over the combinations: min, mean and max; below = combinations under 
 | ---: | --- | --- | ---: | --- | ---: | --- | ---: | ---: | ---: | ---: | --- | ---: |
 | 1 | Clover Meadow (open board) | `hg_meadow_scamps` | 1 | 1st Lv 1; avatar Lv 1 | x1.730 | >= 90.0% | 100.0% | 100.0% | 100.0% | 0/10 | yes | x2.166 |
 | 2 | Hedgerow Lane (open board) | `hg_hedgerow_pests` | 1 | 1st Lv 1; avatar Lv 1 | x1.290 | >= 90.0% | 100.0% | 100.0% | 100.0% | 0/10 | yes | x1.493 |
-| 3 | Tumbledown Wall | `hg_tumbledown_wall` | 2 | 1st Lv 1; avatar Lv 1 | x0.730 | >= 90.0% | 100.0% | 100.0% | 100.0% | 0/10 | yes | x0.913 |
+| 3 | Tumbledown Wall | `hg_tumbledown_wall` | 2 | 1st Lv 1; avatar Lv 1 | x0.730 | >= 90.0% | 100.0% | 100.0% | 100.0% | 0/10 | yes | x0.860 |
 | 4 | Bramble Stone | `hg_trial_bramble` | 2 | 1st Lv 2; avatar Lv 1 | x0.830 | >= 90.0% | 100.0% | 100.0% | 100.0% | 0/10 | yes | x1.043 |
 | 5 | Brookside Mill | `hg_brookside_rabble` | 2 | 1st Lv 2, 2nd Lv 1; avatar Lv 2 | x1.030 | >= 90.0% | 100.0% | 100.0% | 100.0% | 0/31 | yes | x1.282 |
-| 6 | Old Orchard | `hg_orchard_raiders` | 2 | 1st Lv 2, 2nd Lv 1; avatar Lv 2 | x0.830 | >= 90.0% | 100.0% | 100.0% | 100.0% | 0/31 | yes | x1.036 |
-| 7 | Grove Stone | `hg_trial_grove` | 3 | 1st Lv 3, 2nd Lv 1; avatar Lv 2 | x1.120 | >= 90.0% | 100.0% | 100.0% | 100.0% | 0/31 | yes | x1.397 |
+| 6 | Old Orchard | `hg_orchard_raiders` | 2 | 1st Lv 2, 2nd Lv 1; avatar Lv 2 | x0.830 | >= 90.0% | 100.0% | 100.0% | 100.0% | 0/31 | yes | x1.023 |
+| 7 | Grove Stone | `hg_trial_grove` | 3 | 1st Lv 3, 2nd Lv 1; avatar Lv 2 | x1.120 | >= 90.0% | 100.0% | 100.0% | 100.0% | 0/31 | yes | x1.299 |
 | 9 | Ridge Path | `hg_ridge_prowlers` | 3 | 1st Lv 3, 2nd Lv 3, 3rd Lv 3; avatar Lv 3 | x0.950 | >= 90.0% | 100.0% | 100.0% | 100.0% | 0/90 | yes | x1.334 |
 | 10 | The Far Hedge | `hg_gloam_at_the_hedge` | 3 | 1st Lv 3, 2nd Lv 3, 3rd Lv 3; avatar Lv 3 | x0.930 | weakest >= 60.0% | 65.6% | 97.9% | 100.0% | 0/90 | yes | x0.938 |
 

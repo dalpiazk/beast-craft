@@ -192,6 +192,60 @@ namespace BeastCraft.Campaign
             return weight <= 0.0 ? 1.0 : 1.0 - (weight * (1.0 - FullEasingScale(shapeKey)));
         }
 
+        /// <summary>
+        /// The floor <paramref name="shapeKey"/>'s adaptive assist reaches
+        /// (<see cref="RegionLibraryData.AssistFloorScales"/>): 1 when not listed (never assisted).
+        /// </summary>
+        public double AssistFloorScale(string shapeKey)
+        {
+            foreach (ShapeScaleData entry in Data.AssistFloorScales ?? new ShapeScaleData[0])
+            {
+                if (entry != null && string.Equals(entry.ShapeId, shapeKey, StringComparison.Ordinal) && entry.Scale > 0.0 && entry.Scale <= 1.0)
+                {
+                    return entry.Scale;
+                }
+            }
+
+            return 1.0;
+        }
+
+        /// <summary>
+        /// Adaptive assist for <paramref name="shapeKey"/> in <paramref name="regionId"/> after
+        /// <paramref name="losses"/> consecutive losses at the same location
+        /// (<see cref="CampaignRules.LossesAt"/>): 1 at 0 losses, else <c>max(floor, (1 - AssistStep) ^
+        /// losses)</c> (<see cref="RegionLibraryData.AssistStep"/>) — one more step of the same size
+        /// each loss, compounding, clamped at the floor. The floor is the region's own
+        /// <see cref="RegionData.AssistBossFloorScale"/> for its boss (<see cref="RegionLibraryData.EasingBossId"/>)
+        /// when it sets one, else the shared <see cref="AssistFloorScale"/>. 1 when the library has no
+        /// step or no floor for the shape (never assisted).
+        /// </summary>
+        public double AssistScaleFor(string regionId, string shapeKey, int losses)
+        {
+            if (losses <= 0)
+            {
+                return 1.0;
+            }
+
+            double step = Math.Max(0.0, Math.Min(1.0, Data.AssistStep));
+            if (step <= 0.0)
+            {
+                return 1.0;
+            }
+
+            RegionData region = GetRegion(regionId);
+            double floor = region != null && string.Equals(shapeKey, RegionLibraryData.EasingBossId, StringComparison.Ordinal) && region.AssistBossFloorScale > 0.0 &&
+                           region.AssistBossFloorScale <= 1.0
+                ? region.AssistBossFloorScale
+                : AssistFloorScale(shapeKey);
+            if (floor >= 1.0)
+            {
+                return 1.0;
+            }
+
+            double scale = Math.Pow(1.0 - step, losses);
+            return Math.Max(floor, scale);
+        }
+
         /// <summary>The region's own map rules when it overrides them (<see cref="MapRulesData.Layers"/> above 0), otherwise the library's.</summary>
         public MapRulesData RulesFor(RegionData region)
         {

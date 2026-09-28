@@ -4195,3 +4195,179 @@ easing and the trials are campaign-only).
 Reproduce: `-- --mode campaign --self-check --out docs/balance/campaign-pacing-report.md`; `-- --mode
 newplayer --compositions 16 --samples 2 --map-seeds 60 --out docs/balance/new-player-report.md` (about
 15 minutes); `-- --mode newplayer --compositions 16 --samples 2 --kinship-only --tune` for the trials.
+
+## Never-blocked targets
+
+Producer decision, in the producer's words: "A player should never be blocked. If they are even, they
+should be able to win most of the time. Those odds should quickly climb if they are over levelled.
+More than 3 levels above an enemy and the player should be at 100% win rate." A target table followed:
+
+| Your level vs the enemy | Weak-reasonable pick | Typical pick | Strong pick |
+| --- | ---: | ---: | ---: |
+| Equal | ~70% (bosses ~60%) | ~85% (bosses/elites ~75%) | ~95%+ |
+| +1 | ~80% | | |
+| +2 | ~90%+ | | |
+| +3 | ~97% | | |
+| +4 or more | 100% | 100% | 100% |
+
+This supersedes the scouted-optimal calibration and the extended r01-r03 easing. Four changes, each
+below: the equal-level targets (typical 85% squad/horde, 75% elite/solo/boss, up from 80/60/50), the
+level-gap formula (steepened so a 4-level gap decides the fight either way), the early-region easing
+(shrunk: only r01 keeps a small remainder), and adaptive assist (new: a per-location losing streak
+eases a fight further, since a single flat multiplier cannot make every pick quality hit its own
+target at once).
+
+### The level-gap formula
+
+`DamageFormula.GetLevelMultiplier`'s constants (`docs/design/battle-system.md`, "Level difference"):
+`LevelDifferencePerLevel` (k) 0.012 -> **0.05**, `LevelDifferenceConvex` (q) 0.009 -> **0.045**,
+`LevelDifferenceCap` 0.4 -> **0.875** (7/8, not a rounder number, so 1 +/- cap are exact in double —
+0.125 and 1.875 — matching what the glossary prints). The cap is reached (saturates) at a 4-level gap
+(0.05 x 4 + 0.045 x 4 x 4 = 0.92, past 0.875), so "+4 or more is 100%" is the same continuous,
+odd-around-1 formula simply saturating from there, not a branch; a 4-level-under fight is exactly as
+decisive the other way (the formula does not know which side is the player), meeting "keep the
+existing negative-gap behaviour ... well below the equal-level rate" by construction. Equal levels
+stay exactly 1 (unconditionally), so an equal-level battle is bit-identical to before.
+
+Fallout, all legitimate outcome changes (nothing here is a bug): 5 campaign-battle recording-invariance
+golden hashes moved (any battle with a level gap); 3 VFX demo-battle tests needed a different
+level/seed so their fixed scripted fight still ran long enough to show every status (the stock
+20-vs-10 boss demo now wins in a handful of turns); one consumable test's fixture enemies were
+levelled up so the fight does not end in one alpha strike before the poison DoT ticks; one stale
+"the calibrated squad is tougher than raw stats" (multiplier > 1) assertion was removed (see below,
+it often is not, by design).
+
+### Typical-team calibration on the new targets
+
+Re-ran `--mode typical` (the owned-roster population from the Kinship-discovery calibration,
+unchanged) against `TargetClear` 85 (squad/horde) and 75 (elite/solo; `encounter-library.json`) and
+`TypicalCalibration.BossTarget` 75 (bosses share the elite/solo tier). New shipping multipliers, mean
+over levels 10-100 (before -> after; `docs/balance/typical-team-report.md`):
+
+| Shape | Target | Typical (hits target) | Weak | Best | Scouted | Strong | Multiplier |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| `solo` | 75.0% | 74.1% | 38.2% | 98.2% | 96.9% | 98.6% | x0.820 -> x0.638 |
+| `elite` | 75.0% | 75.4% | 43.5% | 98.2% | 95.7% | 98.4% | x0.740 -> x0.591 |
+| `squad` | 85.0% | 85.3% | 39.8% | 99.6% | 97.7% | 98.9% | x0.904 -> x0.738 |
+| `horde` | 85.0% | 85.0% | 44.8% | 99.4% | 98.1% | 99.2% | x0.894 -> x0.705 |
+
+All 12 region-boss `DifficultyOverride`s recalibrated to the new 75% target and hand-authored into
+`encounter-library.json` from the report's After column (e.g. `boss_r01_hollow_warden` x1.016 ->
+x0.906 down to `boss_r10_apex_pair` x0.566 -> x0.436; the post-game twins keep their own lower
+targets, 35% Normal / 20% Hard, scaled the same way). The per-beast balance guard (the full-roster
+scouted panel, uniform 50% target, `±4 elemental / ±7 neutral`) is untouched by any of this — it is
+computed at equal levels, where the level-gap term is exactly 1, and it does not read
+`encounter-library.json`'s `TargetClear`; re-run to confirm: `elemental` normalized means -3.0..+3.8
+(inside ±4 for every beast), `neutral` -6.2..+5.4 (inside ±7). **Guard passes.**
+
+**Flag — the weak pick falls far short of ~70% at higher levels, structurally, not a target miss.**
+The calibration has one lever (the multiplier, tuned to the TYPICAL pick); weak and strong are
+measured outcomes of the roster's own composition spread, not independently reachable. Squad weak
+falls off a cliff at level 60 (68.2% at L50, roster 8 owned -> 11.8% at L60, roster the full 10) even
+though the multiplier barely moved (x0.711 -> x0.686): once the whole roster is owned, the pool of
+"reasonable" (2+ stances, 1+ Vanguard) 3-beast combinations includes every possible pick, and the
+bottom quartile now contains genuinely bad combinations (a low-offence Vanguard such as Golem paired
+with two beasts the roster's own synergy data marks anti-synergistic, or a Vanguard + 2 Ranged team
+with no Skirmisher screen) that simply were not in the population before. Region bosses collapse even
+harder (weak hits 0.0% from r07 on): a boss is one fixed lineup, 16 seeded copies, so there is no
+composition variety to average a bad pick against. This is recorded as measured, per the producer's
+instruction, and is exactly what adaptive assist (below) exists to cover — a losing streak is the
+signal that a player's particular pick is one of these bad ones, and eases precisely that fight
+without touching the calibration or the good picks.
+
+### Early-region easing: shrunk to r01 only
+
+Re-measured `--mode newplayer` against the new table (`docs/balance/new-player-report.md`, "The new
+player in r01-r03"). With no gear, the typical team from the roster owned there now sits close to
+target almost everywhere (e.g. r01 stage 1: squad 74.5%, horde 69.5%, solo 65.7%, elite 67.4% against
+85/85/75/75%); the scale still needed ("Required") ranges only x0.80-x0.97, and every r01-r03 boss row
+reads `1.00+` (needs no discount at all). This is a large change from the old x0.75-x0.83 full
+discounts (a scouted-optimal, whole-roster baseline needed a much bigger crutch than a typical-owned-
+roster one). Per shape, the worst (lowest) Required seen across r01's four stages, rounded to the
+measured value:
+
+| Shape | Old full discount | New full discount | Worst stage |
+| --- | ---: | ---: | --- |
+| `squad` | 0.82 | **0.88** | r01 stage 2 |
+| `horde` | 0.77 | **0.83** | r01 stage 2 |
+| `solo` | 0.77 | **0.92** | r01 stage 3 |
+| `elite` | 0.75 | **0.93** | r01 stage 4 |
+| `boss` | 0.83 | **none** | every r01-r03 boss row is `1.00+` |
+
+r02 and r03's own worst-stage Required (0.80-0.96) is similarly mild and, unlike r01, adaptive assist
+alone comfortably covers it (a struggling player only needs it after losing, not on the first try), so
+**r02 and r03 carry no easing at all** — removing both the r02 extension (58b37a3, `StageEasing`
+`[1,1,1,1]`) and the r02 `BossScale` 0.92 (b88e3b6). r01 keeps `StageEasing` `[1, 1, 1, 0]`: the full
+(now much smaller) discount for its first three stages, fully faded out by its own last stage
+(needed so a later, easing-free region is valid content: `RegionLibraryValidator` requires a fade to
+reach 0 before it stops). No region sets `BossScale`; `boss` is not in `EasingShapeScales` at all, so
+no boss anywhere gets early-region easing — bosses are covered by adaptive assist only. Hearthglen is
+untouched throughout (its own fixed `DifficultyOverride`s, never the table or the easing).
+
+Per-region typical / weak / strong table (no easing, typical gear, out of sample — `docs/balance/
+new-player-report.md`, "Typical, weak and strong picks by region"): typical sits close to its target
+at every mainline region's own calibrated level; weak repeats the structural fall-off above from r03
+on (roster growing toward the full 10); strong and scouted sit 90-100% throughout. See that report
+for the full table (11 regions x 4-5 rows each).
+
+### Adaptive assist
+
+Producer decision ("assist + guidance"): rather than lean further on a blanket, always-on regional
+discount, a struggling player's *specific* fight eases, and only after they have actually struggled
+at it. `MapRun.NodeAttempts` / `NodeAttemptsNodeId` (already tracking per-location consecutive losses
+for the team-suggestion's 3-loss rule, `CampaignRules.LossesAt`) drives a second, independent discount
+layered on top of any early-region easing: each consecutive loss at the same location multiplies that
+fight's stat multiplier by `(1 - AssistStep)` again (compounding), down to a floor per kind of fight
+(`RegionLibrary.AssistScaleFor`, `regions.json` `AssistStep` / `AssistFloorScales`). It resets on a
+win, changes no reward or XP, and is off on post-game Hard (`RunDifficulty.Hard`) — the difficulty a
+player opted into on purpose is never softened. `EncounterPlan.AssistScale` tracks just this portion
+(apart from `DifficultyScale`, which carries both), so the preview can show "The wilds ease a little
+(-x%)" (`EncounterViewModel.AssistNote`) without also describing the early-region easing.
+
+**The floor** (`--mode assistfloor`, new; `docs/balance/assist-floor-report.md`): the multiplier at
+which the WEAK owned-roster pick reaches 70% (an ordinary fight) or 60% (a region boss), checked at
+levels 10/30/50/70/90 for each shape and at every region's own boss (not one representative point —
+the weak-pick shortfall is worst late game, per the flag above, so a single level would understate
+it), shipping the *minimum* (strongest) scale needed across them:
+
+| Shape | Shipped floor scale | Binding level | Expected attempts (equal level, assist on) |
+| --- | ---: | ---: | ---: |
+| `solo` | 0.753 | L70 | 2.46 (bar: <= 3) |
+| `elite` | 0.761 | L70 | 2.32 |
+| `squad` | 0.750 | L70 | 2.89 |
+| `horde` | 0.880 | L90 | 2.25 |
+| `boss` (10 mainline bosses, shared) | 0.772 | `boss_r07_thunder_court` | 1.68-3.66 (bar: <= 5) |
+| `boss_r11_dusk_and_dawn` (its own `AssistBossFloorScale`) | 0.753 | (its own need) | 4.91 |
+
+Every shape and every boss meets the producer's attempts bar. r11 Duskmeridian Normal needs its own,
+stronger floor (`RegionData.AssistBossFloorScale`, mirroring `BossScale` for the early-region easing):
+its typical target is already lower than a mainline boss's (35% Normal, not 75%), so the shared 0.772
+under-assists it — the same schema gap `BossScale` already exists to close for the early-region
+easing. `AssistStep` ships at 0.10 (about -10% a loss, the producer's own figure); "expected attempts"
+is a closed-form estimate (the shipping and floor weak rates linearly interpolated over the losses it
+takes to reach the floor, then a geometric tail at the floor rate), not a fresh simulation of every
+intermediate loss — cheap enough to check against the bar, not exact.
+
+Campaign-pacing gates (`--mode campaign --self-check`, including the grind probe) were re-run and are
+untouched: the Monte Carlo pacing model draws each battle's clear from its own tiered clear-chance
+table (independent of `encounter-difficulty.json` and `DamageFormula`), so `campaign-pacing-report.md`
+regenerates byte-identical. Every gate still reads `ok`; grind probe p50 0.00 levels at both check
+points (target < 0.05 / < 0.50).
+
+### Guidance
+
+The preview ALWAYS shows matchup warnings now, not only in the opt-in Theorycrafter insight panel:
+`BeastCraft.Battle.Scouting.MatchupWarnings.For(preview, team, teamLevel, encounterLevel)` (Core, pure,
+tested) flags no Vanguard, no Skirmisher, an element disadvantage (the team's mean
+`TeamSuggester.ScoreBeast` at or below 0 against the encounter) and being under-levelled by N, in that
+order; wired as `EncounterViewModel.Warnings`, recomputed from the current pick on every read. The
+one-tap recommended team keeps its existing 3-loss rule and settings toggle unchanged
+(`TeamSuggestionPolicy`, `CampaignRules.SuggestionFor`) — a separate mechanism reading the same
+`LossesAt` counter as adaptive assist, not touched by this pass.
+
+Reproduce: `-- --mode typical --gear typical --write-difficulty content/data/Encounters/encounter-difficulty.json
+--out docs/balance/typical-team-report.md` (about an hour); `-- --mode assistfloor --gear typical --out
+docs/balance/assist-floor-report.md` (about 45 minutes); `-- --mode newplayer --compositions 16
+--samples 2 --map-seeds 60 --out docs/balance/new-player-report.md` (about 15 minutes); `-- --mode
+campaign --self-check --out docs/balance/campaign-pacing-report.md` (about 2 s); `-- --mode pve
+--seeds 12345,777,4242,2024,99 --target-clear 50` for the per-beast guard.

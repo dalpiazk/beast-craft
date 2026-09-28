@@ -502,7 +502,11 @@ namespace BeastCraft.Tests.EditMode
             Assert.IsTrue(result.Success, result.Error);
             Assert.AreEqual("squad", result.ShapeId);
             Assert.AreEqual(EncounterLevel, result.EncounterLevel);
-            Assert.Greater(plan.Multiplier, 1.0, "the calibrated squad is tougher than the raw stats");
+            // The typical-team calibration (docs/balance/typical-team-report.md) generally sits a little
+            // under 1.0 at this level and shape (a typical owned-roster pick, not the old scouted-optimal
+            // whole-roster pick, needs less enemy toughness to hit the same target), so this no longer
+            // asserts a toughness direction; the per-enemy stat check below still exercises the real scaling.
+            Assert.Greater(plan.Multiplier, 0.0, "the plan carries a positive multiplier");
 
             for (int i = 0; i < plan.Enemies.Count; i++)
             {

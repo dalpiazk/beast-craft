@@ -144,16 +144,19 @@ tuning log's "Kinship: roster growth, trials and the r02 fall-off".
   162-198, 270+). Caches pay about 940 gold and 9 shards over a campaign.
 - **Kinship trials**: tuned so the weakest trio (with the recruits it has by then) wins at least half
   the time: trio means 93-97%, weakest 50-63% (`DifficultyOverride` 0.79-0.93).
-- **The r02 fall-off, re-measured** (`--mode newplayer`, new "Roster growth" section: the trio plus the
-  recruits reached — four beasts in r01, five in r02, six in r03 — picking three per fight, recruits
-  3-5 levels behind). Owning more beasts barely moves it: with the old curve r02 stages 2-4 still fell to
-  `squad` 68 / 52 / 37%, `horde` 54 / 38 / 21% (targets 80%), and even recruits caught up to the trio
-  stay short. The scale each fight needs stays at the full discount through r02 and r03. So the easing
-  was **extended**: r02 `StageEasing` 1, 1, 1, 1 (was 1, 0.67, 0.33, 0), and the fade moved into r03
-  (0.67, 0.33, 0, 0; was none). r02 now: `squad` 80-82%, `horde` 78-82%, `solo` 58-62%, `elite` 53-58%
-  every stage (dens a little under 60%, as in r01). The r02 boss has its own scale (`regions.json`
-  `BossScale` 0.92, instead of the shared x0.83 that gave 93%): the new player wins it 56%. The calibrated table and the tuned report are
-  unchanged (the easing is campaign-only).
+- **The r02 fall-off — resolved by calibrating on the owned roster** (superseding the paragraph this
+  once was: the r02 easing extension and its `BossScale` are gone; see `docs/balance/tuning-log.md`,
+  "Never-blocked targets"). The open question below ("calibrate for the owned roster, or ease longer?")
+  is answered: the shipping table is now calibrated on the TYPICAL team from the roster a player
+  actually owns at that point (`Tooling/BalanceSim --mode typical`, a producer decision), not a
+  scouted pick from the whole roster, so the Kinship roster-flow gap that easing used to paper over
+  mostly does not exist any more. Only r01 keeps a small remainder (`EasingShapeScales` x0.88/0.83/
+  0.92/0.93, fading to 0 by its own last stage); r02 and r03 need none. What gap is left — mainly a
+  genuinely unlucky pick, which the typical-team model's own "weak" measure shows can still fall well
+  short even of the new, softer targets — is adaptive assist's job instead: a per-location losing
+  streak eases that specific fight, resetting on a win (see battle-system.md, "Adaptive assist and
+  guidance"). The calibrated table and the tuned report are unaffected by any of this (a producer
+  factor, not a roster question).
 
 ## Screens
 
@@ -203,16 +206,16 @@ This build's calls (for review):
 - A trial pays no XP or loot; its difficulty is tuned so the weakest trio still wins about half the time.
 - Hearthglen stays fully revealed; r07+ show no fog or points.
 - Completion counts map rows walked (not individual locations: a replay's map changes them).
-- The early-region easing keeps its full discount through r02 and fades in r03 (see "Balance").
+- The early-region easing is r01 only now, fading to nothing by its own last stage; r02 and r03 need
+  none (see "Balance").
 
 ## Open questions
 
 - The seventh site can only offer the last beast (7 sites, 7 unowned): a choice of one. Add an eighth
   species, or accept it as "the last beast chooses you"?
-- The new player still sits below the calibrated tiers from r03 on without the easing (the need does
-  not shrink with a bigger roster); the easing now ends in r03. Calibrate for the owned roster, or ease longer?
+- ~~The new player still sits below the calibrated tiers from r03 on without the easing... Calibrate
+  for the owned roster, or ease longer?~~ **Resolved**: calibrate for the owned roster
+  (`--mode typical`, a producer decision), plus adaptive assist for what is still left after a loss;
+  see "Balance" and `docs/balance/tuning-log.md`, "Never-blocked targets".
 - Bond conditions are flavour only; a small look for meeting them would be a PR B item.
 - Kinship sites are placed on fixed stages; a stage left behind needs Revisit (the region progress panel).
-- r03 stages 3-4 are unscaled again and the new player (six beasts, typical gear) sits far under the
-  tiers there (`squad` ~40%, `horde` ~24%): the gap is structural (the calibration's player picks from
-  all ten), so easing longer or calibrating for the owned roster is a producer call.

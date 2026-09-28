@@ -619,7 +619,14 @@ namespace BeastCraft.Tooling.BalanceSim
         /// </summary>
         public bool RunTypical;
 
-        /// <summary><c>--typical-samples</c>: typical: battles per team and composition at each search step.</summary>
+        /// <summary>
+        /// <c>--mode assistfloor</c>: the adaptive-assist floor per kind of fight
+        /// (<see cref="AssistFloorCalibration"/>), what <c>regions.json</c> <c>AssistFloorScales</c>
+        /// should author.
+        /// </summary>
+        public bool RunAssistFloor;
+
+        /// <summary><c>--typical-samples</c>: typical (and assistfloor): battles per team and composition at each search step.</summary>
         public int TypicalSamples = TypicalCalibration.DefaultSamples;
 
         /// <summary>Whether <c>--levels</c> was given (<c>--mode typical</c> otherwise calibrates its own level bands).</summary>
@@ -1886,8 +1893,14 @@ namespace BeastCraft.Tooling.BalanceSim
                     options.RunPvp = false;
                     options.RunTypical = true;
                     return true;
+                case "assistfloor":
+                    // PvE's loading, then the adaptive-assist floor calibration instead of the PvE report.
+                    options.RunPve = true;
+                    options.RunPvp = false;
+                    options.RunAssistFloor = true;
+                    return true;
                 default:
-                    error = "--mode expects pve, pvp, both, pacing, campaign, newplayer, hearthglen or typical, got '" + text + "'.";
+                    error = "--mode expects pve, pvp, both, pacing, campaign, newplayer, hearthglen, typical or assistfloor, got '" + text + "'.";
                     return false;
             }
         }

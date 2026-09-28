@@ -244,6 +244,26 @@ namespace BeastCraft.Presentation.Screens
         /// <summary>A Kinship trial's optional bond condition in words (flavour), or null.</summary>
         public string BondText { get; }
 
+        /// <summary>
+        /// "The wilds ease a little (-x%)" while adaptive assist is active at this location
+        /// (<see cref="Encounters.EncounterPlan.AssistScale"/> below 1, producer decision "assist +
+        /// guidance"; a consecutive-loss discount, <see cref="Campaign.RegionLibrary.AssistScaleFor"/>);
+        /// null when it is not (a fresh location, or post-game Hard, which is never assisted).
+        /// </summary>
+        public string AssistNote
+        {
+            get
+            {
+                if (Battle == null || !(Battle.Plan.AssistScale < 1.0))
+                {
+                    return null;
+                }
+
+                int percent = (int)Math.Round((1.0 - Battle.Plan.AssistScale) * 100.0);
+                return "The wilds ease a little (-" + percent.ToString(System.Globalization.CultureInfo.InvariantCulture) + "%).";
+            }
+        }
+
         public int Level { get; }
 
         public string Arena { get; }
@@ -279,6 +299,40 @@ namespace BeastCraft.Presentation.Screens
 
         /// <summary>The suggestion banner, or null (none offered, the setting is off, or it was dismissed).</summary>
         public SuggestionView Suggestion { get; private set; }
+
+        /// <summary>
+        /// The ALWAYS-shown matchup warnings for the picked <see cref="Team"/> against this encounter
+        /// (<see cref="MatchupWarnings.For"/>, producer decision "assist + guidance"): no Vanguard, no
+        /// Skirmisher, an element disadvantage, under-levelled by N. Recomputed from the current pick
+        /// every read (cheap: at most <see cref="PartySize"/> beasts), so it always reflects
+        /// <see cref="ToggleMember"/>. Empty with no team or on an error (<see cref="Battle"/> null).
+        /// </summary>
+        public List<string> Warnings
+        {
+            get
+            {
+                if (Battle == null)
+                {
+                    return new List<string>();
+                }
+
+                List<CreatureSpeciesSO> team = new List<CreatureSpeciesSO>();
+                int levelSum = 0;
+                foreach (string beastId in _team)
+                {
+                    OwnedBeast beast = _session.Save.FindBeast(beastId);
+                    CreatureSpeciesSO species = beast == null ? null : _session.Content.Battle.GetSpecies(beast.Progress.SpeciesId);
+                    if (species != null)
+                    {
+                        team.Add(species);
+                        levelSum += beast.Progress.Level;
+                    }
+                }
+
+                int teamLevel = team.Count > 0 ? levelSum / team.Count : 0;
+                return MatchupWarnings.For(Battle.Plan.Preview(ScoutingDetail.Full), team, teamLevel, Battle.Plan.Level);
+            }
+        }
 
         /// <summary>
         /// Adds a beast to the party (at the end) or takes it out. Refused (false, with

@@ -190,18 +190,30 @@ namespace BeastCraft.Battle
         /// <c>k</c> of <see cref="GetLevelMultiplier"/>: how much each level the caster has over the
         /// target adds to a hit (and each level under takes off), as a fraction. Tuned with the
         /// balance simulator's <c>--level-gap</c> sweep; see the tuning log, "Level-difference
-        /// modifier".
+        /// modifier" and "Never-blocked targets" (the producer's never-blocked / quickly-climbing
+        /// retune: a 4+ level gap now saturates the cap, see <see cref="LevelDifferenceCap"/>).
         /// </summary>
-        public const double LevelDifferencePerLevel = 0.012;
+        public const double LevelDifferencePerLevel = 0.05;
 
         /// <summary>
         /// <c>q</c> of <see cref="GetLevelMultiplier"/>: a convex term <c>q * delta * |delta|</c> that
-        /// makes a wide gap bite harder than a narrow one. 0 disables it.
+        /// makes a wide gap bite harder than a narrow one. 0 disables it. Sized with
+        /// <see cref="LevelDifferencePerLevel"/> so the cap is already reached by a 4-level gap
+        /// (0.05 x 4 + 0.045 x 4 x 4 = 0.92, past the 0.875 cap): the producer's "+4 or more is an
+        /// out-class" is the same continuous, odd-around-1 formula simply saturating from there on,
+        /// not a branch.
         /// </summary>
-        public const double LevelDifferenceConvex = 0.009;
+        public const double LevelDifferenceConvex = 0.045;
 
-        /// <summary>The level multiplier never leaves [1 - cap, 1 + cap], however wide the gap.</summary>
-        public const double LevelDifferenceCap = 0.4;
+        /// <summary>
+        /// The level multiplier never leaves [1 - cap, 1 + cap], however wide the gap: at the cap the
+        /// higher-level side hits for 1.875x and the lower-level side for 0.125x (effectively
+        /// out-classed). Raised from 0.4 so a 4-level-or-more gap reliably decides the fight either
+        /// way (the producer's "never blocked at equal level, guaranteed win 4+ levels over"
+        /// decision). 0.875 (7/8) rather than a rounder number so 1 +/- cap are exact in double
+        /// (0.125 and 1.875), matching what the glossary prints.
+        /// </summary>
+        public const double LevelDifferenceCap = 0.875;
 
         /// <summary>The crit chance is clamped to at least this (percent) when rolled.</summary>
         public const int MinCritChance = 0;

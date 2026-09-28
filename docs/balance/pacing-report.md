@@ -40,6 +40,28 @@ Practice only ignores the gates (a skill cannot pass one without a material). Ne
 | 450 | 90 | 20 | 20 | 20 |
 | 500 | 100 | 20 | 20 | 20 |
 
+## Team skill level (the difficulty's skill assumption)
+
+The fielded team's 9 skills (three beasts, three default skills each) by encounter level, read after the model's middle
+battle at the level: the focus and the secondary skill at their p50, the other seven by practice alone (6 uses a battle, never fed, so
+they wait at their first gate). Typical = the mean of the nine, rounded: the skill level `--mode typical` calibrates the
+difficulty table with (every beast and avatar skill). Upgraded = the focus skill's level for every skill (the strong pick).
+
+| Encounter level | Focus p50 | Secondary p50 | Practice only | Team mean | Typical | Upgraded |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 | 3 | 2 | 2 | 2.11 | 2 | 3 |
+| 5 | 6 | 4 | 4 | 4.22 | 4 | 6 |
+| 10 | 8 | 5 | 5 | 5.33 | 5 | 8 |
+| 20 | 10 | 7 | 5 | 5.78 | 6 | 10 |
+| 30 | 13 | 8 | 5 | 6.22 | 6 | 13 |
+| 40 | 15 | 10 | 5 | 6.67 | 7 | 15 |
+| 50 | 18 | 11 | 5 | 7.11 | 7 | 18 |
+| 60 | 19 | 12 | 5 | 7.33 | 7 | 19 |
+| 70 | 20 | 17 | 5 | 8.00 | 8 | 20 |
+| 80 | 20 | 20 | 5 | 8.33 | 8 | 20 |
+| 90 | 20 | 20 | 5 | 8.33 | 8 | 20 |
+| 100 | 20 | 20 | 5 | 8.33 | 8 | 20 |
+
 ## Avatar level
 
 `AvatarProgression.AwardBattle` after every battle (8 XP win or lose, + 50 + 5 x encounter level on a clear, after the level-gap falloff; a level costs 200 + 16 x level). Target: median within 3 levels of the encounter level at every checkpoint.

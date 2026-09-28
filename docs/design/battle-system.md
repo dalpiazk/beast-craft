@@ -283,37 +283,73 @@ Targets (producer): at least 90% for every legal combination in every regular fi
 weakest trio about 60% or more (measured: every regular fight 100%, the finale 65.6% weakest,
 97.9% mean; `docs/balance/hearthglen-report.md`, `--mode hearthglen`).
 
-### Early-region easing — DECIDED (producer); curve measured, TUNABLE
+### Early-region easing — DECIDED (producer); shrunk for the typical-team calibration and adaptive assist
 
-The calibrated table assumes a player who scouts and picks three beasts from the whole roster in
-typical gear. A new player starts with three beasts (one per stance, player-picked: a later PR) and
-no gear, so the first regions carry a **difficulty discount that fades out by region 3**, instead of
-calibrating per owned roster.
+The shipping table is calibrated on the TYPICAL team from the beasts the player actually owns at that
+point (`Tooling/BalanceSim --mode typical`, a producer decision — not a scouted, whole-roster pick;
+see "Never-blocked targets" below), so the gap a new player faces is now small. What easing remains
+is a small, r01-only remainder; adaptive assist (below) covers what is left, per location, only after
+a player actually struggles.
 
 - **Data.** `regions.json`: `EasingShapeScales` (library level) holds each kind of fight's **full
-  discount**, a scale on the stat multiplier (`squad`, `horde`, `solo`, `elite`, and `boss` for the
-  authored templates; a kind not listed is never eased), and each region's `StageEasing` how much of
-  it applies per stage (1 = all, 0 = none): scale = 1 - weight x (1 - full). Validated by
-  `RegionLibraryValidator`: known shapes once each, scales in (0, 1]; `StageEasing` empty or one
-  weight per stage in [0, 1], never rising in campaign order, reaching 0 before it stops, none on a
-  post-game region.
+  discount**, a scale on the stat multiplier (`squad`, `horde`, `solo`, `elite`; `boss` for the
+  authored templates is not listed — a region boss needs none); a kind not listed is never eased. Each
+  region's `StageEasing` says how much of it applies per stage (1 = all, 0 = none): scale = 1 - weight
+  x (1 - full). Validated by `RegionLibraryValidator`: known shapes once each, scales in (0, 1];
+  `StageEasing` empty or one weight per stage in [0, 1], never rising in campaign order, reaching 0
+  before it stops, none on a post-game region.
 - **Rule.** `CampaignRules.PlanFor(run, node, encounters, enemies, regions)` multiplies the node's
   plan by `RegionLibrary.DifficultyScaleFor(region, stage, shape)` (the boss template as `boss`;
   `EncounterPlan.Scaled`, recorded as the plan's `DifficultyScale`): every campaign battle of that
   expedition. `NodeBattle` plans with it. **Campaign battles only**: the calibrated table, the
   simulator's calibration and any plan built outside a run are unscaled.
-- **Curve.** Full discounts `squad` x0.82, `horde` x0.77, `solo` x0.77, `elite` x0.75, `boss` x0.83,
-  fitted with the simulator's `--mode newplayer` (`docs/balance/new-player-report.md`: every
-  one-per-stance trio, no gear, no scouting, at the node's level); the need is flat across levels, so
-  r01 takes all of it in every stage (`StageEasing` 1, 1, 1, 1) and r02 fades it out (1, 0.67, 0.33,
-  0); nothing after. New-player trio means in r01: `squad` 79-83%, `horde` 79-88%, `solo` 47-52%,
-  `elite` 58-64%, the Hollow Warden 52%; r02's first stage the same (83 / 81 / 50 / 53%). The first
-  node of a new game (map seeds 1-60): `squad` 83-87%, `horde` 87-88%, a level-1 `solo` 36-37%.
-- **Open (flagged).** The need does not fall with level and gear barely moves it; what closes the gap
-  is having beasts to pick from. A player with only the three starters falls off through r02's fade
-  (r02's last stage: `squad` 37%, `horde` 18%). **Open item for the Kinship PR** (the starter / recruit
-  design): whether the fade holds or the easing lasts longer. See `docs/balance/tuning-log.md`,
-  "Early-region easing", "First-node experience" and "Early-region easing per shape".
+- **Curve.** Full discounts `squad` x0.88, `horde` x0.83, `solo` x0.92, `elite` x0.93 — much smaller
+  than the old scouted-optimal-calibration discounts (x0.82/0.77/0.77/0.75), fitted the same way
+  (`--mode newplayer`, the typical team from the owned roster, no gear): only r01 needs any of it
+  (`StageEasing` `[1, 1, 1, 0]`, fully faded out by its own last stage); **r02 and r03 need none**
+  (empty `StageEasing`) — the old r02 extension and its `BossScale` are gone. No region boss anywhere
+  gets early-region easing (`boss` is not in `EasingShapeScales`); a struggling player's boss attempt
+  is covered by adaptive assist instead.
+- **Closed.** The old open item (whether a roster-limited new player needs the fade to hold longer)
+  is superseded: the typical-team calibration already targets the owned roster directly, so the gap
+  it used to paper over mostly does not exist any more; what small gap remains, and the much larger
+  one a genuinely unlucky pick can still hit (see "Never-blocked targets", the weak-pick flag), is
+  adaptive assist's job — a per-location mechanism, not a blanket regional one. See
+  `docs/balance/tuning-log.md`, "Never-blocked targets".
+
+### Adaptive assist and guidance — DECIDED (producer, "assist + guidance")
+
+Producer decision, following directly from the never-blocked framing: a struggling player should not
+need a blanket regional discount forever, but a *specific* fight they keep losing should ease, and the
+preview should tell them plainly why a fight might be hard.
+
+- **Adaptive assist.** Each consecutive loss at the same campaign location (`MapRun.NodeAttempts` /
+  `NodeAttemptsNodeId`, already tracked for the team-suggestion's 3-loss rule,
+  `CampaignRules.LossesAt`) multiplies that fight's stat multiplier by `1 - AssistStep` again
+  (compounding), down to a floor per kind of fight (`RegionLibrary.AssistScaleFor`; `regions.json`
+  `AssistStep`, about -10% a loss, and `AssistFloorScales`, the same shape list as the early-region
+  easing but **including** `boss` — unlike the early-region easing, adaptive assist does cover region
+  bosses). A region can set its own boss floor (`RegionData.AssistBossFloorScale`, mirroring
+  `BossScale`) when its own need differs from the shared one (a post-game Normal boss: its typical
+  target is already lower than a mainline boss's). It resets on a win, never changes rewards or XP,
+  and is off on post-game Hard — a difficulty the player opted into is never softened.
+  `EncounterPlan.AssistScale` tracks just this discount (apart from `DifficultyScale`, which carries
+  both this and the early-region easing), so the preview can show "The wilds ease a little (-x%)"
+  (`EncounterViewModel.AssistNote`) without conflating the two. The floor is chosen
+  (`Tooling/BalanceSim --mode assistfloor`) so a WEAK reasonable pick reaches about 70% for an
+  ordinary fight or 60% for a boss there, checked at several levels and at every region's own boss
+  (not one point — the weak pick's shortfall is worst late game): expected attempts to clear, weak
+  pick, equal level, assist on — 2.25-2.89 for the four shapes, 1.68-4.91 for every region boss,
+  both within the producer's bar (<= 3 ordinary, <= 5 boss). See `docs/balance/tuning-log.md`,
+  "Never-blocked targets", for the full floor table and why the weak pick needs this at all (a
+  structural fall-off once the whole roster is owned, not a target miss).
+- **Guidance.** The preview ALWAYS shows matchup warnings now (`BeastCraft.Battle.Scouting.
+  MatchupWarnings.For`, Core, pure): no Vanguard, no Skirmisher, an element disadvantage (the picked
+  team's mean `TeamSuggester.ScoreBeast` against the encounter at or below 0) and under-levelled by N,
+  independent of the opt-in Theorycrafter insight panel. `EncounterViewModel.Warnings` recomputes them
+  from the current pick on every read. The one-tap recommended team is unchanged (its own 3-loss rule
+  and settings toggle, `TeamSuggestionPolicy` / `CampaignRules.SuggestionFor`): a separate mechanism
+  that happens to read the same `LossesAt` counter as adaptive assist.
 
 ## Data-driven foundation already in place
 
@@ -1446,7 +1482,7 @@ damage = max(1, truncate(base × ElementChart multiplier × crit × roll / 100 �
 crit   = max(MinCritMultiplier, CritMultiplier) = 1.5 on a critical hit, else 1
 roll   = a whole percent, uniform on [90, 110]
 level  = clamp(1 + k × d + q × d × |d|, 1 − cap, 1 + cap),  d = caster level − target level
-         (k = 0.012, q = 0.009, cap = 0.4; exactly 1 between equal levels)
+         (k = 0.05, q = 0.045, cap = 0.875; exactly 1 between equal levels)
 ```
 
 - **`Power` is a percent of the attacking stat.** It is the `Damage` effect's
@@ -1469,28 +1505,42 @@ level  = clamp(1 + k × d + q × d × |d|, 1 − cap, 1 + cap),  d = caster leve
   now also carries a **level-difference multiplier** of the caster's level minus the target's,
   `d`: `clamp(1 + k d + q d |d|, 1 − cap, 1 + cap)` (`DamageFormula.GetLevelMultiplier`). It
   applies **both ways** (an under-levelled team hits softer *and* is hit harder), to beasts,
-  enemies and the avatar alike (the avatar at its own level, `AvatarProgress.Level`). The convex
-  `q` term keeps a small gap mild and makes a wide one decisive: ×1.02 / 1.06 / 1.12 / 1.29 / 1.4
-  (cap) at 1 / 2 / 3 / 5 / 7+ levels over, ×0.98 / 0.94 / 0.88 / 0.72 / 0.6 under. Equal levels
+  enemies and the avatar alike (the avatar at its own level, `AvatarProgress.Level`). **AMENDED
+  again (the producer's never-blocked decision: "a player should never be blocked; if they are
+  even they should win most of the time, and those odds should climb quickly over-levelled — more
+  than 3 levels above and 100%").** The convex `q` term now saturates the cap at a 4-level gap
+  (0.05 × 4 + 0.045 × 4 × 4 = 0.92, past 0.875), so "+4 or more is 100%" falls out of the same
+  continuous, odd-around-1 formula simply reaching its cap, not a branch: ×1.10 / 1.28 / 1.56 / 1.875
+  (cap, from 4 on) at 1 / 2 / 3 / 4+ levels over, ×0.91 / 0.72 / 0.45 / 0.125 (floor, from 4 on) under
+  (docs/balance/tuning-log.md, "Never-blocked targets"). Equal levels
   are exactly 1 and are **not multiplied at all**, so an equal-level battle is bit-identical to the
-  formula without the term (the committed balance report did not move). **Damage over time**
+  formula without the term. **Damage over time**
   inherits it (its per-turn amount is computed through the formula when applied); **heals, shields,
   stat changes, status chance and knockback do not** read level. It takes **no random draws**.
   Raw overloads: `Compute(power, attack, defense, element[, variancePercent, isCrit[, execute[,
   levelMultiplier]]])` (the eight-argument form takes the level multiplier; exactly 1 is the
   identity) and `ComputeBase(power, attack, defense)`.
-- **How k, q and cap were chosen** (tuning log, "Level-difference modifier"). Calibrated on the
-  scouted pick at equal levels (50%), the targets were: 2-3 levels under ≈ 20-35%, 5+ under < 10%,
-  at every level band. A `--level-gap` sweep of linear `k` ∈ {0.025, 0.03, 0.035, 0.04} × cap ∈
-  {0.3, 0.4} missed "< 10% at 5 under" at levels 50-90 for every `k` that kept 3 under above 20%;
+- **How k, q and cap were chosen, first pass** (tuning log, "Level-difference modifier"). Calibrated
+  on the scouted pick at equal levels (50%), the targets were: 2-3 levels under ≈ 20-35%, 5+ under
+  < 10%, at every level band. A `--level-gap` sweep of linear `k` ∈ {0.025, 0.03, 0.035, 0.04} × cap
+  ∈ {0.3, 0.4} missed "< 10% at 5 under" at levels 50-90 for every `k` that kept 3 under above 20%;
   the convex term fixed it (first k = 0.025, q = 0.005). The milestone-2 final retune (a stronger
   avatar, the beast retune) left 3 under at level 50 on the 20% edge and 5 under at level 70 at 10.6%,
-  so the curve was made more convex at the same 3-level multiplier: **k = 0.012, q = 0.009**.
-  Measured (3 seeds, `elemental`, every shape averaged, the scouted team): 2 under 30-31%, 3 under
-  20-25%, 5 under 6-9% at levels 30-90. **Level 10** is steeper (25% / 17% / 3%): there a level is a
-  large share of stats, so the stats already do most of the work. The `neutral` control mode is
-  steeper throughout (3 under ≈ 9-14%). The cap binds from 7 levels apart (6 is ×1.396), where a
-  clear is already rare (≤ 4%).
+  so the curve was made more convex at the same 3-level multiplier: k = 0.012, q = 0.009, cap = 0.4.
+- **Retuned for the producer's never-blocked decision** (tuning log, "Never-blocked targets"): the
+  old curve barely moved a scouted-pick clear rate at all a couple of levels over (e.g. `elemental`
+  `squad` at level 50, 2 over: 79.7% -> 82.8%, +3 points), nowhere near "quickly climb to 100% by +4".
+  **k = 0.05, q = 0.045, cap = 0.875** instead, sized so the cap is reached (saturates) at exactly a
+  4-level gap; a rounder cap was rejected because 1 ± cap must be exact in double (0.875 = 7/8 gives
+  0.125 / 1.875 exactly, avoiding a floating-point artifact string in the glossary and the battle
+  log). Re-measured (`--level-gap`, `elemental` `squad`, the scouted whole-roster pick, the new 85%
+  target, level 50): equal levels 85.2%; 2 under 30.5%, 3 under 3.9% (well under the equal-level
+  rate, the producer's actual bar — not a specific percent); 2 over 98.4%, 3 over 100.0%. The
+  `neutral` control mode saturates even faster (2 over already 100.0% at every level from 10). The
+  under-level side stays punishing by the same construction (the formula is odd
+  around 1, so steepening it for the over-level side steepens the under-level side by the same
+  amount) — not retuned separately, per the producer's "keep the existing negative-gap behaviour...
+  well below the equal-level rate", which this comfortably clears.
 - The element multiplier is the skill's element against the target's elements, exactly as before.
   The caster's own elements still do nothing.
 - **Arithmetic.** The base is computed in double precision (basic IEEE operations only, one division
@@ -1508,9 +1558,9 @@ level  = clamp(1 + k × d + q × d × |d|, 1 − cap, 1 + cap),  d = caster leve
 | `GlobalScale` | 1.0 | A uniform multiplier on every hit, the lever for overall fight length. |
 | `MinimumDamage` | 1 | The floor for any positive-power hit. |
 | `CritMultiplier` / `MinCritMultiplier` | 1.5 / 1.3 | See "Variance and critical hits". |
-| `LevelDifferencePerLevel` (k) | 0.012 | Linear part of the level-difference multiplier, per level of difference. |
-| `LevelDifferenceConvex` (q) | 0.009 | Convex part: `q × d × |d|`, so a wide gap bites harder than a narrow one. |
-| `LevelDifferenceCap` | 0.4 | The level multiplier stays within [0.6, 1.4]. |
+| `LevelDifferencePerLevel` (k) | 0.05 | Linear part of the level-difference multiplier, per level of difference. |
+| `LevelDifferenceConvex` (q) | 0.045 | Convex part: `q × d × |d|`, so a wide gap bites harder than a narrow one; saturates the cap at a 4-level gap. |
+| `LevelDifferenceCap` | 0.875 | The level multiplier stays within [0.125, 1.875] (7/8, exact in double). |
 
 **How the constants were chosen.** `DefenseWeight` and `GlobalScale` start at 1, as in the
 reference, and the balance simulator's kit and enemy powers were **rescaled instead** so that a

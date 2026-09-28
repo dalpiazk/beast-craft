@@ -184,9 +184,12 @@ namespace BeastCraft.Tests.EditMode
             for (int seed = 1; seed <= 8; seed++)
             {
                 BattleSetup plain = Setup(save, seed);
+                ToughenEnemies(plain);
                 BattleSetup empty = Setup(save, seed);
+                ToughenEnemies(empty);
                 empty.Consumables = new List<string>();
                 BattleSetup venom = Setup(save, seed);
+                ToughenEnemies(venom);
                 venom.Consumables.Add("venom_flask");
                 ConsumableInventory.TryAdd(save, "venom_flask", 1, 3); // each venom battle spends one
 
@@ -202,6 +205,21 @@ namespace BeastCraft.Tests.EditMode
             int before = team[0].Stats.Defense;
             ConsumableLoadout.Apply(new[] { _consumables.Get("iron_tonic") }, team, new List<BattleUnit>(), null, new System.Random(1));
             Assert.Greater(team[0].Stats.Defense, before, "the tonic's percent Defense buff landed");
+        }
+
+        /// <summary>
+        /// Raises the setup's enemies to level 20 (well over the level-10 team) so the fight lasts
+        /// long enough for a poison consumable to matter: the level-gap formula's steeper cap (see
+        /// <see cref="DamageFormula.LevelDifferenceCap"/>, the producer's never-blocked retune) now
+        /// wins a same- or lower-level fight in one alpha strike, before the venom's per-turn tick
+        /// ever lands.
+        /// </summary>
+        private static void ToughenEnemies(BattleSetup setup)
+        {
+            foreach (EnemySpec enemy in setup.Encounter.Enemies)
+            {
+                enemy.Level = 20;
+            }
         }
 
         [Test]
