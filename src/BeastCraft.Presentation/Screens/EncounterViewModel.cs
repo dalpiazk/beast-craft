@@ -85,10 +85,24 @@ namespace BeastCraft.Presentation.Screens
         private readonly List<string> _team = new List<string>();
         private string _consumable;
 
-        public EncounterViewModel(GameSession session, int nodeId)
+        public EncounterViewModel(GameSession session, int nodeId) : this(session, NodeBattle.For(session, nodeId, out string error), error, nodeId)
+        {
+        }
+
+        /// <summary>
+        /// The preview of the Kinship trial at point of interest <paramref name="poiId"/>
+        /// (<see cref="NodeBattle.ForKinship"/>): the same page, titled by the site, with the site's
+        /// words and its optional bond condition as a banner, no team suggestion.
+        /// </summary>
+        public static EncounterViewModel ForKinship(GameSession session, string poiId)
+        {
+            return new EncounterViewModel(session, NodeBattle.ForKinship(session, poiId, out string error), error, -1);
+        }
+
+        private EncounterViewModel(GameSession session, NodeBattle battle, string error, int nodeId)
         {
             _session = session ?? throw new ArgumentNullException(nameof(session));
-            Battle = NodeBattle.For(session, nodeId, out string error);
+            Battle = battle;
             Error = error;
             NodeId = nodeId;
             if (Battle == null)
@@ -100,6 +114,14 @@ namespace BeastCraft.Presentation.Screens
             MapNode node = Battle.Node;
             Title = session.LocationName(node);
             KindLabel = MapViewModel.KindLabel(node.Type);
+            if (Battle.IsKinshipTrial)
+            {
+                Discovery.KinshipSiteData site = Discovery.KinshipRules.SiteOf(content.Discovery, Battle.Trial);
+                Title = site?.Name ?? "Kinship trial";
+                KindLabel = "Kinship trial";
+                Banner = site?.Intro;
+                BondText = site?.BondText;
+            }
             Level = Battle.Plan.Level;
             Arena = Battle.Plan.Arena.ToString();
             Attempt = Battle.Attempt;
@@ -185,7 +207,8 @@ namespace BeastCraft.Presentation.Screens
                 }
             }
 
-            CampaignTeamSuggestion suggestion = CampaignRules.SuggestionFor(session.Save, nodeId, session.Settings, content.Encounters, content.Battle, content.Campaign, PartySize);
+            CampaignTeamSuggestion suggestion = Battle.IsKinshipTrial ? null
+                                                : CampaignRules.SuggestionFor(session.Save, nodeId, session.Settings, content.Encounters, content.Battle, content.Campaign, PartySize);
             if (suggestion != null && !session.DismissedSuggestions.Contains(SuggestionKey()))
             {
                 Suggestion = new SuggestionView { Losses = suggestion.Losses };
@@ -214,6 +237,12 @@ namespace BeastCraft.Presentation.Screens
         public string Title { get; }
 
         public string KindLabel { get; }
+
+        /// <summary>A Kinship trial's words (the site's intro), shown as a banner; null for a map location.</summary>
+        public string Banner { get; }
+
+        /// <summary>A Kinship trial's optional bond condition in words (flavour), or null.</summary>
+        public string BondText { get; }
 
         public int Level { get; }
 

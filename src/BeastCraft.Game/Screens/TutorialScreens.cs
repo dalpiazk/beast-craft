@@ -233,22 +233,35 @@ namespace BeastCraft.Game.Screens
     }
 
     /// <summary>
-    /// A trial's beast pick (the Kinship "choice" popup, on the toolkit): the pending pick's options (the
-    /// required stance only), one card each; the choice joins the team and the map carries on. It cannot
-    /// be closed without choosing: the pick is the trial's reward.
+    /// A trial's beast pick (the Kinship "choice" popup, on the toolkit): the pending pick's options, one
+    /// card each — Hearthglen's (the required stance only, <see cref="StarterPickViewModel"/>) or a Kinship
+    /// site's choice of two (<see cref="KinshipPickViewModel"/>); the choice joins the team and the map
+    /// carries on. It cannot be closed without choosing: the pick is the trial's reward.
     /// </summary>
     public sealed class TrialPickModal : GameModal
     {
-        private readonly StarterPickViewModel _model;
+        private readonly IBeastPicker _model;
+        private readonly string _name;
         private readonly Action _done;
         private readonly Dictionary<Widget, PickOptionView> _rows = new Dictionary<Widget, PickOptionView>();
         private readonly Button _confirm;
         private readonly Rect _card;
         private string _selected;
 
-        public TrialPickModal(ScreenContext ctx, Action done) : base(ctx)
+        public TrialPickModal(ScreenContext ctx, Action done) : this(ctx, new StarterPickViewModel(ctx.Session, PickMode.Trial), "trial-pick", done)
         {
-            _model = new StarterPickViewModel(ctx.Session, PickMode.Trial);
+        }
+
+        /// <summary>A Kinship site's choice (the pending one).</summary>
+        public static TrialPickModal Kinship(ScreenContext ctx, Action done)
+        {
+            return new TrialPickModal(ctx, new KinshipPickViewModel(ctx.Session), "kinship-pick", done);
+        }
+
+        private TrialPickModal(ScreenContext ctx, IBeastPicker model, string name, Action done) : base(ctx)
+        {
+            _model = model;
+            _name = name;
             _done = done;
             float rowHeight = 190f;
             float height = 330f + _model.Options.Count * (rowHeight + 16f) + 180f;
@@ -274,10 +287,10 @@ namespace BeastCraft.Game.Screens
 
         public override string Name
         {
-            get { return "trial-pick"; }
+            get { return _name; }
         }
 
-        public StarterPickViewModel Model
+        public IBeastPicker Model
         {
             get { return _model; }
         }
@@ -316,7 +329,7 @@ namespace BeastCraft.Game.Screens
             }
 
             Close();
-            Ctx.Game.Toast(option?.Name + " joins your team at level 1!");
+            Ctx.Game.Toast(_model.JoinedMessage(option));
             _done?.Invoke();
         }
 

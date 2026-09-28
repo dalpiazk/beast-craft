@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using BeastCraft.Battle;
 using BeastCraft.Campaign;
+using BeastCraft.Discovery;
 using BeastCraft.Economy;
 using BeastCraft.Encounters;
 using BeastCraft.Presentation.Content;
@@ -22,6 +23,14 @@ namespace BeastCraft.Presentation.Screens
     /// cap with the node's reward modifiers and the economy's gear and looks,
     /// <see cref="CampaignRules.ResolveBattle"/> (a win clears the node; a loss counts toward the
     /// retry rules), an autosave, and the consolidated <see cref="ResultsViewModel"/>.
+    /// <para>
+    /// A <strong>Kinship trial</strong> (<see cref="ForKinship"/>) is fought the same way at a point of
+    /// interest instead of a location: its site's template at the point's level
+    /// (<see cref="KinshipRules.PlanFor"/>, never eased), on the region's battlefields, with the trial's
+    /// retry seed (<see cref="KinshipRules.BattleSeed"/>). Its <see cref="Complete"/> pays nothing (a
+    /// trial is not a clear: no XP, gold or loot; a consumable taken is spent) and reports the outcome
+    /// to <see cref="KinshipRules.ResolveTrial"/>: a win leaves the choice of beasts pending.
+    /// </para>
     /// </summary>
     public sealed class NodeBattle
     {
@@ -29,8 +38,9 @@ namespace BeastCraft.Presentation.Screens
         private BattleSessionRun _run;
         private bool _completed;
 
-        private NodeBattle(GameSession session, MapNode node, EncounterPlan plan, string regionId, string artRegionId, int attempt)
+        private NodeBattle(GameSession session, MapNode node, EncounterPlan plan, string regionId, string artRegionId, int attempt, PointOfInterest trial = null)
         {
+            Trial = trial;
             _session = session;
             Node = node;
             Plan = plan;
@@ -42,6 +52,15 @@ namespace BeastCraft.Presentation.Screens
         }
 
         public MapNode Node { get; }
+
+        /// <summary>The Kinship site's point of interest when this is its trial (<see cref="ForKinship"/>); null for a map location.</summary>
+        public PointOfInterest Trial { get; }
+
+        /// <summary>Whether this is a Kinship trial.</summary>
+        public bool IsKinshipTrial
+        {
+            get { return Trial != null; }
+        }
 
         public EncounterPlan Plan { get; }
 
@@ -115,6 +134,55 @@ namespace BeastCraft.Presentation.Screens
             RegionLibrary regions = session.Content.Campaign;
             return new NodeBattle(session, node, plan, regions.BattlefieldFor(run.RegionId, nodeId), regions.BattlefieldRegionOf(run.RegionId),
                                   CampaignRules.LossesAt(run, nodeId));
+        }
+
+        /// <summary>
+        /// The Kinship trial at point of interest <paramref name="poiId"/> of the expedition in progress's
+        /// map; null with <paramref name="error"/> when it cannot be fought now
+        /// (<see cref="KinshipRules.Challengeable"/>). Its <see cref="Node"/> is a stand-in (type Trial,
+        /// id −1, the point's level, the template, the point's seed): never on the map.
+        /// </summary>
+        public static NodeBattle ForKinship(GameSession session, string poiId, out string error)
+        {
+            error = null;
+            if (session?.Save == null)
+            {
+                error = "No game.";
+                return null;
+            }
+
+            PointOfInterest poi = KinshipRules.Challengeable(session.Save, session.Content.Discovery, poiId, out KinshipSiteData site, out error);
+            if (poi == null)
+            {
+                return null;
+            }
+
+            if (session.PendingPick > 0)
+            {
+                error = "A beast is waiting to join you: choose it first.";
+                return null;
+            }
+
+            EncounterPlan plan = KinshipRules.PlanFor(session.Content.Discovery, poi);
+            if (plan == null)
+            {
+                error = "The trial could not be built.";
+                return null;
+            }
+
+            MapNode stand = new MapNode
+            {
+                NodeId = -1,
+                Type = MapNodeType.Trial,
+                Kind = LocationKind.KinshipSite,
+                Level = poi.Level,
+                TemplateId = site.TemplateId,
+                EncounterSeed = poi.Seed,
+                LabelKey = poi.PoiId
+            };
+            RegionLibrary regions = session.Content.Campaign;
+            string regionId = session.Save.Campaign.ActiveRun.RegionId;
+            return new NodeBattle(session, stand, plan, regions.BattlefieldRegionOf(regionId), regions.BattlefieldRegionOf(regionId), session.Save.Discovery.KinshipLosses, poi);
         }
 
         /// <summary>
@@ -219,6 +287,21 @@ namespace BeastCraft.Presentation.Screens
             BattleSessionResult result = _run.Finish();
             PlayerSave save = _session.Save;
             GameContent content = _session.Content;
+            if (Trial != null)
+            {
+                bool knockedOut = false;
+                foreach (KeyValuePair<string, string> pair in result.TeamUnitIds)
+                {
+                    foreach (BattleUnit unit in result.Units ?? new List<BattleUnit>())
+                    {
+                        knockedOut |= unit != null && unit.Id == pair.Value && unit.IsDefeated;
+                    }
+                }
+
+                KinshipResult trial = KinshipRules.ResolveTrial(save, content.Discovery, Trial.PoiId, result.Outcome, Setup.TeamBeastIds, knockedOut);
+                _session.Autosave(AutosaveReason.Results);
+                return ResultsViewModel.BuildTrial(_session, this, result, trial);
+            }
 
             Dictionary<string, (int Level, int Xp)> before = new Dictionary<string, (int, int)>(StringComparer.Ordinal);
             foreach (OwnedBeast beast in save.Beasts)
@@ -230,6 +313,7 @@ namespace BeastCraft.Presentation.Screens
             RewardModifiers modifiers = CampaignRules.RewardModifiersFor(save.Campaign.ActiveRun, Node, content.Campaign).With(content.Economy);
             BattleRewardSummary summary = BattleSession.ApplyRewards(save, result, content.Battle, content.Drops, cap, modifiers);
             CampaignResult campaign = CampaignRules.ResolveBattle(save, content.Campaign, Node.NodeId, result.Outcome, content.Economy);
+            _session.CheckCompletion();
             _session.Autosave(AutosaveReason.Results);
             return ResultsViewModel.Build(_session, this, result, summary, campaign, before);
         }

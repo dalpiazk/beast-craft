@@ -156,7 +156,7 @@ namespace BeastCraft.Game.Screens
                     Painter.TextIn("LEVEL UP!", badge, style.TextSizes.Body, Painter.C("plum"), TextAlign.Center);
                 }
 
-                string xp = "+" + row.XpGained.ToString(CultureInfo.InvariantCulture) + " XP";
+                string xp = _model.IsKinshipTrial ? "Trial" : "+" + row.XpGained.ToString(CultureInfo.InvariantCulture) + " XP";
                 Painter.TextIn(xp, new Rect(box.Right - 220f, box.Y + 112f, 196f, 40f), style.TextSizes.Body, Painter.C("leafDeep"), TextAlign.Right);
                 string note = row.KnockedOut ? "Knocked out (share only)" : row.Banked > 0 ? "+" + row.Banked + " banked at the limit" : row.FalloffPercent < 100 ? row.FalloffPercent + "% (out-levelled)" : null;
                 if (note != null)
@@ -204,6 +204,14 @@ namespace BeastCraft.Game.Screens
                 Painter.Glyph(glyph, new Rect(box.X + 40f, y - 4f, 40f, 40f), Painter.C(glyph == "coin" ? "goldDeep" : "plumSoft"));
                 Painter.TextIn(text, new Rect(box.X + 96f, y, box.Width - 136f, size), size, Painter.C(color), TextAlign.Left, false);
                 y += 52f;
+            }
+
+            if (_model.IsKinshipTrial)
+            {
+                // A Kinship trial pays no XP or loot: its reward is the beast that joins.
+                Line("kinship", _model.Victory ? "A beast will join you" : "The stone waits for you", _model.Victory ? "leafDeep" : "inkSoft");
+                Line("seal", "Trials pay no XP or loot", "inkSoft");
+                return;
             }
 
             Line("coin", "+" + _model.Gold + " gold  (" + _model.GoldTotal + " held)");

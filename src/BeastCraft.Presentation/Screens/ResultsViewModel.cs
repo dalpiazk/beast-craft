@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using BeastCraft.Battle;
 using BeastCraft.Battle.Scouting;
 using BeastCraft.Campaign;
+using BeastCraft.Discovery;
 using BeastCraft.Economy;
 using BeastCraft.Progression;
 using BeastCraft.Save;
@@ -117,6 +118,14 @@ namespace BeastCraft.Presentation.Screens
         public List<string> Notes { get; } = new List<string>();
 
         public int ConsumablesSpent { get; private set; }
+
+        /// <summary>A Kinship trial's results (no XP or loot: a won trial leaves the choice of beasts pending).</summary>
+        public bool IsKinshipTrial { get; private set; }
+
+        /// <summary>A won trial: the beasts offered (their names), and whether the site's bond condition was met.</summary>
+        public List<string> KinshipOffer { get; } = new List<string>();
+
+        public bool BondMet { get; private set; }
 
         /// <summary>XP the Beastbinder (avatar) earned fighting beside the team, and levels gained.</summary>
         public int AvatarXp { get; private set; }
@@ -265,6 +274,83 @@ namespace BeastCraft.Presentation.Screens
             }
             view.BuildNotes(session);
             return view;
+        }
+
+        /// <summary>
+        /// A Kinship trial's results (<see cref="NodeBattle.ForKinship"/>): the team's rows without XP (a
+        /// trial pays nothing), and what the site made of it — on a win the beasts offered and the bond
+        /// condition's flavour line, on a loss the retry note.
+        /// </summary>
+        internal static ResultsViewModel BuildTrial(GameSession session, NodeBattle battle, BattleSessionResult result, KinshipResult trial)
+        {
+            PlayerSave save = session.Save;
+            ResultsViewModel view = new ResultsViewModel
+            {
+                Outcome = result.Outcome,
+                NodeId = -1,
+                Subtitle = trial?.Site?.Name ?? "Kinship trial",
+                GoldTotal = save.Gold,
+                BindingLimit = CampaignRules.BeastCap(save, session.Content.Campaign),
+                MapOutcome = result.Outcome == BattleOutcome.PlayerVictory ? CampaignOutcome.Cleared : CampaignOutcome.Lost,
+                ConsumablesSpent = result.ConsumablesUsed?.Count ?? 0,
+                IsKinshipTrial = true,
+                BondMet = trial != null && trial.BondMet
+            };
+            view.Title = result.Outcome == BattleOutcome.PlayerVictory ? "Trial won!" : "Not this time";
+            BattleRun run = battle.Run?.Battle;
+            if (run != null)
+            {
+                view._buildLog = () => BattleLogViewModel.Build(run, run.Units, BattleLogViewModel.NamesFor(session.Content, battle.SpeciesByUnit, run.Avatar?.Id));
+            }
+
+            foreach (KeyValuePair<string, string> pair in result.TeamUnitIds)
+            {
+                OwnedBeast beast = save.FindBeast(pair.Key);
+                BattleUnit unit = FindUnit(result.Units, pair.Value);
+                if (beast != null)
+                {
+                    view.Team.Add(new BeastResultRow
+                    {
+                        BeastId = beast.BeastId,
+                        SpeciesId = beast.Progress.SpeciesId,
+                        Name = session.BeastName(beast),
+                        LevelBefore = beast.Progress.Level,
+                        LevelAfter = beast.Progress.Level,
+                        FractionBefore = Fraction(beast.Progress.Level, beast.Progress.Xp),
+                        FractionAfter = Fraction(beast.Progress.Level, beast.Progress.Xp),
+                        KnockedOut = unit != null && unit.IsDefeated
+                    });
+                }
+            }
+
+            if (trial != null && trial.Outcome == KinshipOutcome.Won)
+            {
+                foreach (string species in trial.Offer)
+                {
+                    view.KinshipOffer.Add(session.Content.Battle.GetSpecies(species)?.DisplayName ?? species);
+                }
+
+                view.Notes.Add(view.KinshipOffer.Count > 1
+                                   ? string.Join(" and ", view.KinshipOffer) + " step out to meet you. Choose who joins your team."
+                                   : view.KinshipOffer[0] + " steps out to meet you and joins your team.");
+                if (!string.IsNullOrEmpty(trial.Site?.BondCondition))
+                {
+                    view.Notes.Add(view.BondMet ? "The bond rings true: " + BondFlavour(trial.Site) : "The trial is won, if not quite as the stone hoped. " + BondFlavour(trial.Site));
+                }
+            }
+            else
+            {
+                view.RetryNote = "The trial waits for you: try again whenever you like (a fresh battle each time). A trial pays no XP.";
+                view.Notes.Add(view.RetryNote);
+            }
+
+            return view;
+        }
+
+        private static string BondFlavour(KinshipSiteData site)
+        {
+            string text = site?.BondText ?? string.Empty;
+            return text.StartsWith("Bond: ", StringComparison.Ordinal) ? char.ToUpperInvariant(text[6]) + text.Substring(7) : text;
         }
 
         private void BuildNotes(GameSession session)

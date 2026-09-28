@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using BeastCraft.Campaign;
+using BeastCraft.Discovery;
 using BeastCraft.Presentation.Board;
 using BeastCraft.Presentation.Layout;
 using BeastCraft.Presentation.Vfx;
@@ -58,6 +59,36 @@ namespace BeastCraft.Presentation.Screens
 
         /// <summary>A short label for the type: Wilds, Den, Pass, Lair, Trader, Camp.</summary>
         public string KindLabel;
+
+        /// <summary>Under the fog (not drawn): a locked or bypassed location on ground not yet seen (<see cref="MapFog"/>).</summary>
+        public bool Hidden;
+    }
+
+    /// <summary>One point of interest as the map draws it (<see cref="PointOfInterest"/>; hidden ones are not listed).</summary>
+    public sealed class PoiView
+    {
+        public string PoiId;
+        public PoiKind Kind;
+        public PoiState State;
+
+        /// <summary>Where it sits in map-world pixels (between the trail's rows and lanes).</summary>
+        public Vec2 Position;
+
+        public float Radius = MapLayout.PoiRadius;
+
+        /// <summary>Its name (the shrine's, the lore stone's title, the cache's, the Kinship site's; "Vista").</summary>
+        public string Name;
+
+        /// <summary>A short label for the kind: Shrine, Lore stone, Cache, Kinship, Vista.</summary>
+        public string KindLabel;
+
+        public int Level;
+
+        /// <summary>Whether it can be visited now (seen and not yet found).</summary>
+        public bool Visitable
+        {
+            get { return State == PoiState.Revealed; }
+        }
     }
 
     /// <summary>A winding trail between two locations: points along a curve, in map-world pixels.</summary>
@@ -134,6 +165,30 @@ namespace BeastCraft.Presentation.Screens
 
         public List<MapBlob> Blobs { get; } = new List<MapBlob>();
 
+        /// <summary>A point of interest's marker radius.</summary>
+        public const float PoiRadius = 44f;
+
+        private float _phase;
+        private float _laneStep;
+        private float _bottomY;
+        private int _lanes = 1;
+
+        /// <summary>
+        /// The map-world centre of fog-grid cell (<paramref name="halfRow"/>, <paramref name="col"/>)
+        /// (<see cref="MapFog"/>): its row between the trail's rows, its column between the lanes, swayed
+        /// by the same meander as the trail, so the fog and the points of interest follow the map's own
+        /// shape (on every replay's map alike).
+        /// </summary>
+        public Vec2 CellCenter(int halfRow, int col)
+        {
+            float layer = halfRow / 2f;
+            float lanePos = (col - 1) / 2f;
+            float x = _lanes > 1 ? SideMargin + lanePos * _laneStep : WorldWidth / 2f + (lanePos * 160f);
+            x += Meander(layer, _phase);
+            x = Math.Max(SideMargin * 0.45f, Math.Min(WorldWidth - SideMargin * 0.45f, x));
+            return new Vec2(x, _bottomY - layer * RowStep);
+        }
+
         /// <summary>Lays out <paramref name="nodes"/> (a map run's) for map seed <paramref name="seed"/>.</summary>
         public static MapLayout Of(IReadOnlyList<MapNode> nodes, int seed)
         {
@@ -153,6 +208,10 @@ namespace BeastCraft.Presentation.Screens
             float bottomY = layout.WorldHeight - BottomPad;
             float phase = (DeterministicRandom.Hash(seed, 7) % 628) / 100f;
             float laneStep = lanes > 1 ? (WorldWidth - 2f * SideMargin) / (lanes - 1) : 0f;
+            layout._phase = phase;
+            layout._laneStep = laneStep;
+            layout._bottomY = bottomY;
+            layout._lanes = lanes;
             layout.Trailhead = new Vec2(WorldWidth / 2f + Meander(-1, phase) * 0.5f, bottomY + RowStep * 1.35f);
 
             foreach (MapNode node in nodes ?? new MapNode[0])
@@ -221,7 +280,7 @@ namespace BeastCraft.Presentation.Screens
         }
 
         /// <summary>A gentle side-to-side sway of the trail by row.</summary>
-        private static float Meander(int layer, float phase)
+        private static float Meander(float layer, float phase)
         {
             return (float)Math.Sin(layer * 0.85 + phase) * 70f;
         }
@@ -299,6 +358,15 @@ namespace BeastCraft.Presentation.Screens
 
         /// <summary>Hearthglen: the header counts the beasts bonded (of three) instead of a seal's stages.</summary>
         public bool IsTutorial;
+
+        /// <summary>The region's exploration, 0-100 (<see cref="DiscoveryRules.Completion"/>: map rows walked plus points found), or −1 without a discovery layer.</summary>
+        public int CompletionPercent = -1;
+
+        /// <summary>e.g. "Explored 42%" ("" without a discovery layer).</summary>
+        public string CompletionText = string.Empty;
+
+        /// <summary>Whether the region's 100% reward has been granted.</summary>
+        public bool CompletionRewarded;
     }
 
     /// <summary>What a tap on a location does.</summary>
@@ -322,13 +390,29 @@ namespace BeastCraft.Presentation.Screens
         Camp,
 
         /// <summary>A beast is waiting to join: make the pick first (<see cref="StarterPickViewModel"/>).</summary>
-        Pick
+        Pick,
+
+        /// <summary>A point of interest: show its popup (<see cref="PoiViewModel"/>).</summary>
+        Poi,
+
+        /// <summary>A Kinship site: open its trial's preview (<see cref="EncounterViewModel.ForKinship"/>).</summary>
+        KinshipTrial,
+
+        /// <summary>A won trial's choice waits: make it first (<see cref="KinshipPickViewModel"/>).</summary>
+        KinshipChoice,
+
+        /// <summary>The pass or lair while a Kinship site on this map is unclaimed: ask before leaving it behind, then preview.</summary>
+        ConfirmLeave
     }
 
     public sealed class MapTapResult
     {
         public MapTapKind Kind;
         public int NodeId = -1;
+
+        /// <summary>The point of interest tapped (<see cref="MapTapKind.Poi"/>, <see cref="MapTapKind.KinshipTrial"/>).</summary>
+        public string PoiId;
+
         public string Message;
     }
 
@@ -354,6 +438,18 @@ namespace BeastCraft.Presentation.Screens
 
         public List<MapNodeView> Nodes { get; } = new List<MapNodeView>();
 
+        /// <summary>The points of interest seen on this map (hidden ones are not listed).</summary>
+        public List<PoiView> Pois { get; } = new List<PoiView>();
+
+        /// <summary>Whether the map has fog (a discovery region; Hearthglen and the later regions are shown fully revealed).</summary>
+        public bool HasFog { get; private set; }
+
+        /// <summary>The map-world centres of the fog cells still unseen (the fog is painted over them).</summary>
+        public List<Vec2> FogCells { get; } = new List<Vec2>();
+
+        /// <summary>The fog grid's cell spacing in map-world pixels (half a row, half a lane), for the fog's brush size.</summary>
+        public Vec2 FogCellSize { get; private set; }
+
         public List<MapPathView> Paths
         {
             get { return Layout?.Paths ?? new List<MapPathView>(); }
@@ -368,6 +464,9 @@ namespace BeastCraft.Presentation.Screens
             _session.EnsureExpedition();
             MapRun run = _session.Save?.Campaign?.ActiveRun;
             Nodes.Clear();
+            Pois.Clear();
+            FogCells.Clear();
+            HasFog = false;
             if (run == null || string.IsNullOrEmpty(run.RegionId))
             {
                 Layout = MapLayout.Of(new MapNode[0], 0);
@@ -377,6 +476,11 @@ namespace BeastCraft.Presentation.Screens
 
             Layout = MapLayout.Of(run.Nodes, run.Seed);
             Header = BuildHeader(run);
+            DiscoveryContent discovery = _session.Content.Discovery;
+            RegionProgress progress = _session.Save.Campaign.FindRegion(run.RegionId);
+            HasFog = DiscoveryRules.HasDiscovery(discovery, run.RegionId) && progress != null;
+            FogGrid grid = HasFog ? DiscoveryRules.GridOf(discovery, run.RegionId) : default;
+            StageFog fog = HasFog ? progress.FindFog(run.Stage) : null;
             MapNode current = run.Find(run.CurrentNodeId);
             int currentLayer = current == null ? -1 : current.Layer;
             float focus = float.MaxValue;
@@ -393,7 +497,8 @@ namespace BeastCraft.Presentation.Screens
                     Name = _session.LocationName(node),
                     Level = node.Level,
                     Layer = node.Layer,
-                    KindLabel = KindLabel(node.Type)
+                    KindLabel = KindLabel(node.Type),
+                    Hidden = HasFog && (state == MapNodeState.Locked || state == MapNodeState.Bypassed) && !MapFog.IsRevealed(fog, grid, node)
                 };
                 Nodes.Add(view);
                 if (state == MapNodeState.Current || (current == null && state == MapNodeState.Reachable))
@@ -412,6 +517,115 @@ namespace BeastCraft.Presentation.Screens
             {
                 path.State = PathState(run, path);
             }
+
+            if (!HasFog)
+            {
+                return;
+            }
+
+            // The fog over the cells not yet seen, and the points of interest seen.
+            FogCellSize = new Vec2(Math.Max(60f, Math.Abs(Layout.CellCenter(0, 2).X - Layout.CellCenter(0, 1).X)), MapLayout.RowStep / 2f);
+            for (int halfRow = 0; halfRow < grid.HalfRows; halfRow++)
+            {
+                for (int col = 0; col < grid.Cols; col++)
+                {
+                    if (!MapFog.IsRevealed(fog, grid.Index(halfRow, col)))
+                    {
+                        FogCells.Add(Layout.CellCenter(halfRow, col));
+                    }
+                }
+            }
+
+            foreach (PointOfInterest poi in DiscoveryRules.PointsOnMap(_session.Save, discovery))
+            {
+                PoiState poiState = DiscoveryRules.StateOf(_session.Save, discovery, poi);
+                if (poiState == PoiState.Hidden)
+                {
+                    continue;
+                }
+
+                Pois.Add(new PoiView
+                {
+                    PoiId = poi.PoiId,
+                    Kind = poi.Kind,
+                    State = poiState,
+                    Position = Layout.CellCenter(poi.HalfRow, poi.Col),
+                    Name = PoiViewModel.NameOf(_session, poi),
+                    KindLabel = PoiKindLabel(poi.Kind),
+                    Level = poi.Level
+                });
+            }
+        }
+
+        public PoiView FindPoi(string poiId)
+        {
+            return Pois.Find(p => p.PoiId == poiId);
+        }
+
+        /// <summary>A point of interest kind's short label.</summary>
+        public static string PoiKindLabel(PoiKind kind)
+        {
+            switch (kind)
+            {
+                case PoiKind.Shrine:
+                    return "Shrine";
+                case PoiKind.LoreStone:
+                    return "Lore stone";
+                case PoiKind.Cache:
+                    return "Cache";
+                case PoiKind.KinshipSite:
+                    return "Kinship";
+                default:
+                    return "Vista";
+            }
+        }
+
+        /// <summary>What a tap on point of interest <paramref name="poiId"/> does. Changes nothing.</summary>
+        public MapTapResult TapPoi(string poiId)
+        {
+            PoiView poi = FindPoi(poiId);
+            if (poi == null)
+            {
+                return new MapTapResult { Kind = MapTapKind.None };
+            }
+
+            if (poi.State == PoiState.Found)
+            {
+                return new MapTapResult { Kind = MapTapKind.Poi, PoiId = poiId };
+            }
+
+            if (_session.PendingPick > 0)
+            {
+                return new MapTapResult { Kind = MapTapKind.Pick, PoiId = poiId, Message = "A beast is waiting to join you: choose it first." };
+            }
+
+            if (_session.PendingKinship)
+            {
+                return new MapTapResult { Kind = MapTapKind.KinshipChoice, PoiId = poiId, Message = "A beast is waiting to join you: choose it first." };
+            }
+
+            if (poi.Kind == PoiKind.KinshipSite)
+            {
+                KinshipSiteData site = _session.Content.Discovery.Library.Site(PointOfInterest.Find(DiscoveryRules.PointsOnMap(_session.Save, _session.Content.Discovery), poiId)?.RefId);
+                bool offers = site != null && KinshipRules.Offer(_session.Save, site, _session.Content.Discovery.Roster).Count > 0;
+                return new MapTapResult { Kind = offers ? MapTapKind.KinshipTrial : MapTapKind.Poi, PoiId = poiId };
+            }
+
+            return new MapTapResult { Kind = MapTapKind.Poi, PoiId = poiId };
+        }
+
+        /// <summary>A Kinship site on this map that is seen, unclaimed and still has a beast to offer, or null.</summary>
+        public PoiView UnclaimedKinship()
+        {
+            foreach (PoiView poi in Pois)
+            {
+                if (poi.Kind == PoiKind.KinshipSite && poi.State == PoiState.Revealed && TapPoi(poi.PoiId).Kind == MapTapKind.KinshipTrial)
+                {
+                    return poi;
+                }
+            }
+
+            return null;
         }
 
         public MapNodeView Find(int nodeId)
@@ -457,7 +671,7 @@ namespace BeastCraft.Presentation.Screens
         /// </summary>
         public int AutoAdvanceTarget(PlayerSettings settings, bool victory)
         {
-            if (settings == null || !settings.AutoAdvance || !victory)
+            if (settings == null || !settings.AutoAdvance || !victory || _session.PendingKinship)
             {
                 return -1;
             }
@@ -472,6 +686,15 @@ namespace BeastCraft.Presentation.Screens
 
         /// <summary>What a tap on location <paramref name="nodeId"/> does. Changes nothing.</summary>
         public MapTapResult Tap(int nodeId)
+        {
+            return Tap(nodeId, false);
+        }
+
+        /// <summary>
+        /// What a tap on location <paramref name="nodeId"/> does; <paramref name="leaveConfirmed"/> skips the
+        /// question before leaving an unclaimed Kinship site behind (the player said yes). Changes nothing.
+        /// </summary>
+        public MapTapResult Tap(int nodeId, bool leaveConfirmed)
         {
             MapNodeView node = Find(nodeId);
             if (node == null)
@@ -498,6 +721,27 @@ namespace BeastCraft.Presentation.Screens
             if (_session.PendingPick > 0)
             {
                 return new MapTapResult { Kind = MapTapKind.Pick, NodeId = nodeId, Message = "A beast is waiting to join you: choose it first." };
+            }
+
+            if (_session.PendingKinship)
+            {
+                return new MapTapResult { Kind = MapTapKind.KinshipChoice, NodeId = nodeId, Message = "A beast is waiting to join you: choose it first." };
+            }
+
+            if (!leaveConfirmed && (node.Type == MapNodeType.Gate || node.Type == MapNodeType.Boss))
+            {
+                PoiView kinship = UnclaimedKinship();
+                if (kinship != null)
+                {
+                    return new MapTapResult
+                    {
+                        Kind = MapTapKind.ConfirmLeave,
+                        NodeId = nodeId,
+                        PoiId = kinship.PoiId,
+                        Message = "The " + kinship.Name + " is still waiting on this map. Clearing the " + node.KindLabel.ToLowerInvariant() +
+                                  " ends this expedition: you can come back to it by revisiting the stage."
+                    };
+                }
             }
 
             if (node.Type == MapNodeType.Rest)
@@ -599,8 +843,12 @@ namespace BeastCraft.Presentation.Screens
                 };
             }
 
+            RegionCompletion completion = DiscoveryRules.Completion(_session.Save, _session.Content.Discovery, run.RegionId);
             return new RegionHeaderView
             {
+                CompletionPercent = completion?.Percent ?? -1,
+                CompletionText = completion == null ? string.Empty : "Explored " + completion.Percent + "%",
+                CompletionRewarded = completion != null && completion.Rewarded,
                 RegionId = run.RegionId,
                 Name = region?.DisplayName ?? run.RegionId,
                 LevelBand = region == null ? string.Empty : "Lv " + region.MinLevel + "-" + region.MaxLevel,

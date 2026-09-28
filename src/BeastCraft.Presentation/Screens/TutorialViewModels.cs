@@ -38,7 +38,7 @@ namespace BeastCraft.Presentation.Screens
     /// options for the current step (<see cref="StarterPicks.Options"/>) with their stance, element, art and
     /// blurb, and the stance explainer; <see cref="Choose"/> makes the pick through the session.
     /// </summary>
-    public sealed class StarterPickViewModel
+    public sealed class StarterPickViewModel : IBeastPicker
     {
         /// <summary>The stances, what each does in a fight (the pickers' explainer).</summary>
         public static readonly string[] StanceExplainer =
@@ -150,6 +150,26 @@ namespace BeastCraft.Presentation.Screens
             }
         }
 
+        /// <summary>The toast once a trial's pick has joined.</summary>
+        public string JoinedMessage(PickOptionView option)
+        {
+            return (option?.Name ?? "A beast") + " joins your team at level 1!";
+        }
+
+        /// <summary>A species as a picker's option.</summary>
+        public static PickOptionView OptionOf(CreatureSpeciesSO species)
+        {
+            return new PickOptionView
+            {
+                SpeciesId = species.SpeciesId,
+                Name = species.DisplayName ?? species.SpeciesId,
+                Stance = species.Stance,
+                Element = species.Elements != null && species.Elements.Length > 0 ? species.Elements[0] : Element.None,
+                Blurb = species.Description,
+                ArtKey = species.ArtKey
+            };
+        }
+
         /// <summary>The skip's Back: undo the last pick (false when none was made).</summary>
         public bool Undo()
         {
@@ -171,15 +191,7 @@ namespace BeastCraft.Presentation.Screens
             RequiredStance = first == null ? (CombatStance?)null : StarterPicks.RequiredStance(Step, first.Stance);
             foreach (CreatureSpeciesSO species in StarterPicks.Options(_picked, roster))
             {
-                Options.Add(new PickOptionView
-                {
-                    SpeciesId = species.SpeciesId,
-                    Name = species.DisplayName ?? species.SpeciesId,
-                    Stance = species.Stance,
-                    Element = species.Elements != null && species.Elements.Length > 0 ? species.Elements[0] : Element.None,
-                    Blurb = species.Description,
-                    ArtKey = species.ArtKey
-                });
+                Options.Add(OptionOf(species));
             }
         }
     }

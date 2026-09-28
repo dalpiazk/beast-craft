@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Globalization;
 using BeastCraft.Campaign;
 using BeastCraft.Creatures;
+using BeastCraft.Discovery;
 using BeastCraft.Idle;
 using BeastCraft.Presentation.Content;
 using BeastCraft.Progression;
@@ -524,6 +525,123 @@ namespace BeastCraft.Presentation.Screens
 
             string current = Save?.Campaign?.CurrentRegionId;
             return string.IsNullOrEmpty(current) ? CampaignProgress.StartingRegionId : current;
+        }
+
+        // ------------------------------------------------------------------ The discovery layer
+
+        /// <summary>
+        /// Messages for the map to toast when it next shows (a region's 100% reward earned in a battle, a
+        /// visit or a Kinship choice); the map drains them.
+        /// </summary>
+        public List<string> PendingToasts { get; } = new List<string>();
+
+        /// <summary>Whether a won Kinship trial's choice is waiting (<see cref="KinshipRules.Pending"/>).</summary>
+        public bool PendingKinship
+        {
+            get { return Save != null && Save.Discovery.HasPendingKinship && Content.Discovery.Library.Site(Save.Discovery.PendingKinshipId) != null; }
+        }
+
+        /// <summary>
+        /// Grants <paramref name="regionId"/>'s (default: the region last played) 100% exploration reward
+        /// when it has just been earned (<see cref="DiscoveryRules.TryComplete"/>) and queues its toast.
+        /// Returns the reward, or null.
+        /// </summary>
+        public CompletionReward CheckCompletion(string regionId = null)
+        {
+            if (Save == null)
+            {
+                return null;
+            }
+
+            regionId = regionId ?? (Save.Campaign.HasActiveRun ? Save.Campaign.ActiveRun.RegionId : Save.Campaign.CurrentRegionId);
+            CompletionReward reward = DiscoveryRules.TryComplete(Save, Content.Discovery, regionId);
+            if (reward != null)
+            {
+                string region = Content.Campaign.GetRegion(regionId)?.DisplayName ?? regionId;
+                List<string> parts = new List<string>();
+                if (reward.Look != null)
+                {
+                    parts.Add("the " + LookName(reward.Look));
+                }
+
+                if (reward.Gold > 0)
+                {
+                    parts.Add(reward.Gold + " gold");
+                }
+
+                PendingToasts.Add(region + " fully explored! " + (parts.Count > 0 ? "You earned " + string.Join(" and ", parts) + "." : string.Empty));
+            }
+
+            return reward;
+        }
+
+        /// <summary>A look's display name from its cosmetic key.</summary>
+        public string LookName(string key)
+        {
+            return Content.Economy?.Cosmetics?.GetOption(key)?.DisplayName ?? key;
+        }
+
+        /// <summary>
+        /// Visits point of interest <paramref name="poiId"/> on the map (<see cref="DiscoveryRules.Visit"/>),
+        /// then checks the region's 100% and autosaves. The result says why when refused.
+        /// </summary>
+        public DiscoveryResult VisitPoi(string poiId)
+        {
+            DiscoveryResult result = DiscoveryRules.Visit(Save, Content.Discovery, poiId);
+            if (result.Success)
+            {
+                CheckCompletion();
+                Autosave(AutosaveReason.Results);
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Makes the pending Kinship choice (<see cref="KinshipRules.Choose"/>): <paramref name="speciesId"/>
+        /// joins, the site is claimed, the region's 100% checked, the game saved.
+        /// </summary>
+        public KinshipResult ChooseKinship(string speciesId)
+        {
+            KinshipResult result = KinshipRules.Choose(Save, Content.Discovery, speciesId);
+            if (result.Success)
+            {
+                CheckCompletion();
+                Autosave(AutosaveReason.Results);
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Replays stage <paramref name="stage"/> of the region in progress (to explore what the fog still
+        /// hides): the expedition in progress is abandoned (its stage progress stays; the fog never comes
+        /// back) and a new one starts on a new map. Refused beyond the first uncleared stage.
+        /// </summary>
+        public CampaignResult ReplayStage(int stage)
+        {
+            if (Save == null || !Save.Campaign.HasActiveRun)
+            {
+                return null;
+            }
+
+            string regionId = Save.Campaign.ActiveRun.RegionId;
+            if (stage < 0 || stage > CampaignRules.NextStage(Save, Content.Campaign, regionId))
+            {
+                return null;
+            }
+
+            MapRun previous = Save.Campaign.ActiveRun;
+            int oldStage = previous.Stage;
+            CampaignRules.Retreat(Save);
+            CampaignResult started = CampaignRules.StartRun(Save, Content.Campaign, regionId, stage, _seeds());
+            if (!started.Success)
+            {
+                CampaignRules.StartRun(Save, Content.Campaign, regionId, oldStage, _seeds());
+            }
+
+            Autosave(AutosaveReason.Results);
+            return started;
         }
 
         /// <summary>A display name for an owned beast: its species' name.</summary>
