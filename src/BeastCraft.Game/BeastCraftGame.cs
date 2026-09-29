@@ -983,9 +983,73 @@ namespace BeastCraft.Game
                 });
             }
 
+            if (screen == "avatar-skills" || screen == "avatar-gear" || screen == "avatar-wardrobe")
+            {
+                AvatarTab tab = screen == "avatar-gear" ? AvatarTab.Gear : screen == "avatar-wardrobe" ? AvatarTab.Wardrobe : AvatarTab.Skills;
+                steps.Add(() =>
+                {
+                    Home().SelectTab(HomeTab.Avatar);
+                    Top<AvatarScreen>().SelectTab(tab);
+                });
+            }
+
+            if (screen == "inventory-materials" || screen == "inventory-looks")
+            {
+                InventoryTab tab = screen == "inventory-looks" ? InventoryTab.Looks : InventoryTab.Materials;
+                steps.Add(() =>
+                {
+                    Home().SelectTab(HomeTab.Inventory);
+                    Top<InventoryScreen>().SelectTab(tab);
+                });
+            }
+
+            if (screen == "shop-sell")
+            {
+                steps.Add(() =>
+                {
+                    SetupShop();
+                    Top<ShopScreen>().SelectTab(ShopTab.Sell);
+                });
+            }
+
+            // A verification aid, not a player-facing screen: the BeastPickerModal (equip gear to a
+            // beast, buy a tome for one) at the full ten-species roster, to check it scrolls its rows
+            // instead of overflowing past Close at a large roster size.
+            if (screen == "picker10")
+            {
+                steps.Add(() =>
+                {
+                    GameSession session = _ctx.Session;
+                    foreach (BeastCraft.Creatures.CreatureSpeciesSO species in session.Content.Species)
+                    {
+                        BeastCraft.Tutorial.StarterPicks.AddBeast(session.Save, session.Content.SkillLibrary, species.SpeciesId, 1);
+                    }
+
+                    BeastCraft.Battle.GearSO piece = null;
+                    foreach (BeastCraft.Battle.GearSO candidate in session.Content.Economy.Gear.BeastGearAssets)
+                    {
+                        if (candidate.MinimumLevel <= 1)
+                        {
+                            piece = candidate;
+                            break;
+                        }
+                    }
+
+                    string instanceId = session.Save.Gear.AddBeastGear(piece.GearId);
+                    session.Autosave(AutosaveReason.PlayerEdit);
+                    Home().SelectTab(HomeTab.Inventory);
+                    Top<InventoryScreen>().TapWidget("equip-" + instanceId);
+                });
+            }
+
             if (screen == "soothe")
             {
                 steps.Add(() => SetupSoothe());
+            }
+
+            if (screen == "shop")
+            {
+                steps.Add(() => SetupShop());
             }
 
             if (screen == "colour-forms")
@@ -1010,20 +1074,12 @@ namespace BeastCraft.Game
 
             if (screen == "achievements")
             {
-                steps.Add(() =>
-                {
-                    Home().SelectTab(HomeTab.Avatar);
-                    Home().OpenAchievements();
-                });
+                steps.Add(() => _stack.Push(new AchievementsScreen(_ctx)));
             }
 
             if (screen == "look-tokens")
             {
-                steps.Add(() =>
-                {
-                    Home().SelectTab(HomeTab.Avatar);
-                    Home().OpenLookTokenShop();
-                });
+                steps.Add(() => _stack.Push(new LookTokenShopScreen(_ctx)));
             }
 
             if (screen == "beast-detail" || screen == "beast-derived" || screen == "beast-skills" || screen == "beast-gear")
@@ -1224,6 +1280,36 @@ namespace BeastCraft.Game
             if (soothing != null && soothing.ItemIds != null && soothing.ItemIds.Length > 0)
             {
                 session.Save.Grove.Items.Add(soothing.ItemIds[0], 5);
+            }
+
+            Home().TapNode(target.NodeId);
+        }
+
+        /// <summary>Walks the current expedition (camping through Rest nodes, winning any Elite in the way) until a Shop node is reachable, then opens its Trader.</summary>
+        private void SetupShop()
+        {
+            GameSession session = _ctx.Session;
+            Home().Enter();
+            MapNodeView target = Home().Map.Reachable().Find(n => n.Type == MapNodeType.Shop);
+            for (int guard = 0; guard < 40 && target == null; guard++)
+            {
+                MapNodeView next = Home().Map.Reachable()[0];
+                if (next.Type == MapNodeType.Rest)
+                {
+                    CampaignRules.Camp(session.Save, session.Content.Campaign, next.NodeId, session.Save.Beasts[0].BeastId);
+                }
+                else if (next.Type != MapNodeType.Shop)
+                {
+                    CampaignRules.ResolveBattle(session.Save, session.Content.Campaign, next.NodeId, BeastCraft.Battle.BattleOutcome.PlayerVictory);
+                }
+
+                Home().Enter();
+                target = Home().Map.Reachable().Find(n => n.Type == MapNodeType.Shop);
+            }
+
+            if (target == null)
+            {
+                throw new InvalidOperationException("No Shop location found for --screen shop.");
             }
 
             Home().TapNode(target.NodeId);

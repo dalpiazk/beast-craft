@@ -377,7 +377,7 @@ namespace BeastCraft.Presentation.Screens
         /// <summary>Open the encounter preview for it.</summary>
         Preview,
 
-        /// <summary>A Trader or Camp: not built yet (PR 3); show the message as a toast.</summary>
+        /// <summary>Not produced today (kept for any future location type); show the message as a toast.</summary>
         ComingSoon,
 
         /// <summary>Not reachable (or already cleared): show the message as a toast.</summary>
@@ -388,6 +388,9 @@ namespace BeastCraft.Presentation.Screens
 
         /// <summary>A Camp: open the camp (<see cref="CampViewModel"/>).</summary>
         Camp,
+
+        /// <summary>A Trader: open the shop (<see cref="ShopViewModel"/>).</summary>
+        Shop,
 
         /// <summary>A beast is waiting to join: make the pick first (<see cref="StarterPickViewModel"/>).</summary>
         Pick,
@@ -420,7 +423,7 @@ namespace BeastCraft.Presentation.Screens
     /// The Map tab: the current region and stage as a spatial map (<see cref="MapLayout"/>), every
     /// location's state (cleared, current, reachable, locked, bypassed), the trails, and the region
     /// header (name, level band, the seal's progress, the binding limit). A tap on a reachable
-    /// battle location opens its encounter preview; a Trader or Camp says it is coming soon.
+    /// battle location opens its encounter preview; a Camp opens the camp; a Trader opens the shop.
     /// </summary>
     public sealed class MapViewModel
     {
@@ -713,11 +716,6 @@ namespace BeastCraft.Presentation.Screens
                     return new MapTapResult { Kind = MapTapKind.Refused, NodeId = nodeId, Message = "Clear the way to " + node.Name + " first." };
             }
 
-            if (node.Type == MapNodeType.Shop)
-            {
-                return new MapTapResult { Kind = MapTapKind.ComingSoon, NodeId = nodeId, Message = "The trader's stall opens soon." };
-            }
-
             if (_session.PendingPick > 0)
             {
                 return new MapTapResult { Kind = MapTapKind.Pick, NodeId = nodeId, Message = "A beast is waiting to join you: choose it first." };
@@ -752,6 +750,11 @@ namespace BeastCraft.Presentation.Screens
             if (node.Type == MapNodeType.Story)
             {
                 return new MapTapResult { Kind = MapTapKind.Story, NodeId = nodeId };
+            }
+
+            if (node.Type == MapNodeType.Shop)
+            {
+                return new MapTapResult { Kind = MapTapKind.Shop, NodeId = nodeId };
             }
 
             return new MapTapResult { Kind = MapTapKind.Preview, NodeId = nodeId };

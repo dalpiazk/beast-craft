@@ -273,7 +273,7 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
-        public void Map_Taps_PreviewABattle_RefuseALockedOne_OpenTheCamp_AndSayTheTraderIsComingSoon()
+        public void Map_Taps_PreviewABattle_RefuseALockedOne_OpenTheCamp_AndOpenTheTrader()
         {
             GameSession session = NewSession();
             MapViewModel map = new MapViewModel(session);
@@ -305,8 +305,7 @@ namespace BeastCraft.Tests.EditMode
                     continue;
                 }
 
-                Assert.AreEqual(MapTapKind.ComingSoon, tap.Kind, type.ToString());
-                StringAssert.Contains("soon", tap.Message);
+                Assert.AreEqual(MapTapKind.Shop, tap.Kind, type.ToString());
             }
         }
 

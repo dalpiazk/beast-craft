@@ -12,9 +12,9 @@ design pass; the decisions are summarised at the end.
 Title ──Continue / New Game──▶ Home (Map tab) ──tap a location / Next battle──▶ Encounter
   ▲  Back: "Leave?"             │  idle chip, header, bottom nav                   │ Start Battle
   │                             │  (Roster ─▶ beast detail, compendium;            ▼
-  └──────── Back ───────────────┘   Avatar ─▶ achievements, look tokens;        Battle ──decided──▶ Results
-                                     Grove ─▶ Glade/Garden/Board/Npc;                                 │
-                                     Inventory: "coming soon")                                        │
+  └──────── Back ───────────────┘   Grove ─▶ Glade/Garden/Board/Npc;           Battle ──decided──▶ Results
+                                     Avatar ─▶ Overview/Skills/Gear/Wardrobe;                         │
+                                     Inventory ─▶ Gear/Materials/Looks)                                │
                                 ▲                                                                     │
                                 └───────────────────── Continue (or auto-advance) ────────────────────┘
 ```
@@ -30,17 +30,20 @@ Title ──Continue / New Game──▶ Home (Map tab) ──tap a location / N
   could only be restored from its `.bak` says so; one that cannot be loaded says why. Back asks
   before quitting.
 - **Home** (`HomeScreen`, `HomeViewModel`, `MapViewModel`): the bottom nav — **Map, Roster, Grove,
-  Avatar, Inventory** (Map, Roster, Grove and Avatar work; see "Roster and visibility" below and "The
-  Grove" further down) — over the region map. Grove pushes `GroveScreen` instead of showing inline
-  (`HomeScreen.SelectTab`), the same way the Roster tab's "Compendium" chip pushes a screen without
-  changing the Roster tab's own selection. The map is *spatial*: the stage's
-  node map (rows and lanes, the internal pacing model) is laid out by `MapLayout` as places on a
-  painted-style meadow (placeholder: a soft gradient and blobs), joined by winding trails; it is
+  Avatar, Inventory** — over the region map. Map and Roster show inline (see "Roster and visibility"
+  below); Grove, Avatar and Inventory each push their own full screen (`GroveScreen`, `AvatarScreen`,
+  `InventoryScreen`) instead of showing inline (`HomeScreen.SelectTab`), the same way the Roster
+  tab's "Compendium" chip pushes a screen without changing the Roster tab's own selection — so the
+  nav bar keeps showing whichever of Map/Roster was selected underneath. The map is *spatial*: the
+  stage's node map (rows and lanes, the internal pacing model) is laid out by `MapLayout` as places
+  on a painted-style meadow (placeholder: a soft gradient and blobs), joined by winding trails; it is
   never drawn as a graph. Locations show their type (Battle, Den, Pass, Lair, Trader, Camp) and
   state (reachable, cleared, where you stand, locked, bypassed). The header shows the region, its
   level band, the stage, the seal's progress and the binding limit. The idle chip claims idle
   rewards in one tap; **Next battle** opens the recommended location with the last team picked.
-  Trader and Camp locations say "coming soon" (Shop/Camp/Idle PR).
+  Camp locations open the camp (`CampModal`, which also has its own "Trade" button to the travelling
+  trader); Trader locations open the Trader (`ShopScreen`) — see "Avatar, Inventory and the Trader"
+  below.
 - **Encounter** (`EncounterScreen`, `EncounterViewModel`): the full preview, free — every enemy
   (type, element, stance, level, count), the arena and the battlefield it will really be fought on
   (the same seeded layout pick the session makes) — then the party (up to 3 beside the Beastbinder, deployment order), one
@@ -184,9 +187,9 @@ power).
   affordable or not, bought directly with `CosmeticRules.SpendLookToken` — disabled when it is already
   owned or the balance falls short. Reached from the Avatar tab and from a beast's Gear & bonds tab
   ("Look shop", beside its worn looks — the existing, display-only cosmetics UI).
-- **Avatar tab**: no longer a bare "coming soon" page. A minimal identity card (level, equipped title)
-  and the way to the achievements/title screen and the look-token shop; its skills and gear are a later
-  PR (the full Beastbinder screen).
+- **Avatar tab**: pushes the full `AvatarScreen` (Overview, Skills, Gear, Wardrobe — see "Avatar,
+  Inventory and the Trader" below), whose Overview tab carries the achievements/title and look-token
+  shop buttons the old minimal identity card had.
 - **Toasts**: `DiscoveryResult.TitlesEarned` / `LookTokens` (a point of interest's visit toast),
   `CompletionReward.TitlesEarned` / `LookTokens` (the region 100% toast), `KinshipResult.TitlesEarned`
   (a Kinship join's toast) and `CampaignResult.TitlesEarned` (a Results screen note) each add
@@ -263,6 +266,72 @@ the app comes back (the map claims it when it next shows) and from the idle chip
 nothing is silent. The optional "idle full" notification is a host seam (`IIdleNotifier`), off by
 default, implemented on Android only.
 
+## Avatar, Inventory and the Trader
+
+Full design pass and the Core-rule survey it started from: [avatar-inventory-shop.md](avatar-inventory-shop.md).
+Everything here is presentation over Core rules that already existed (`AvatarProgression`,
+`SkillBook`, `GearRules`, `CosmeticRules`, `ShopService`); the tuned and campaign-pacing reports are
+byte-identical. Built on the shared component layer below ("Shared components").
+
+- **Avatar tab** (`AvatarScreen`, `AvatarHubViewModel` and its four children in
+  `src/BeastCraft.Presentation/Screens/AvatarViewModels.cs`), reached by pushing from the Home tab
+  bar's Avatar slot: one screen, an inner `Tabs` strip (Overview / Skills / Gear / Wardrobe).
+  - *Overview*: level and XP bar, the titled display name (`AchievementsViewModel.TitledName`, reused
+    rather than re-derived), the base-vs-total stat block (`CampaignAvatar.Profile(content)
+    .GetStatsAtLevel(level)` through the same `StatCalculator.ComputeStats`/`CollectModifiers`
+    pipeline `BattleAvatar.Create` uses in battle — WYSIWYG with what actually fights), and the
+    Achievements/titles and Look-token shop buttons the old minimal identity card had.
+  - *Skills*: the three equipped actives and three equipped passives (`AvatarSkillBook`), each a card
+    (`SkillCard.Of` for actives — the same card a beast's skill slot uses, since avatar actives and
+    beast skills share one `SkillSO` id space; a small passive summary, reusing `SkillCard.PowerLine`
+    for its effect lines). *Change* opens a `ChoiceModal` of the avatar's other known actives/passives
+    for that slot (`SkillBook.Equip`/`SwapSlots`; the last one in a book cannot be taken off). No
+    "learn" here: avatar actives and passives are learned only from the Trader.
+  - *Gear*: the three avatar slots (Weapon/Armor/Trinket), Equip/Take off through
+    `GearRules.EquipAvatarGear`/`UnequipAvatarGear` against `_session.Content.Battle` — the same call
+    shape the beast detail screen's Gear & bonds tab already uses, generalized to the avatar.
+  - *Wardrobe*: every avatar cosmetic category (`CosmeticCategory.IsAvatar`) as owned/locked chips
+    with Wear (`CosmeticRules.TrySetOption(save, null, categoryId, optionId, library)` — `beastId:
+    null` is the established meaning "the avatar" throughout `CosmeticRules`), plus a curated
+    six-swatch colour row per colour category (`AvatarWardrobeViewModel.Swatches`, UI-only presets
+    over the always-free `TrySetColor`; no colour-picker widget exists in the toolkit yet, flagged in
+    the design doc).
+- **Inventory tab** (`InventoryScreen`, `InventoryHubViewModel` and its three children in
+  `src/BeastCraft.Presentation/Screens/InventoryViewModels.cs`): Gear / Materials / Looks.
+  - *Gear*: every owned gear instance (beast and avatar), a filter chip row (All/Beast/Avatar) and a
+    cycling Sort chip (Rarity/Level/Name, the Roster tab's own Sort-chip idiom). Equip opens a
+    `BeastPickerModal` for beast gear (one `GearRules.EquipBeastGear` call per pick, the rule itself
+    reports why not) or equips directly for avatar gear; Sell (unworn only) calls
+    `ShopService.TrySellGear` — reachable from anywhere, since selling needs no `ShopContext`.
+  - *Materials*: held skill materials, Grove items and consumables as three read-only counted lists —
+    no Core rule exists for "using" any of them from here (materials are spent through skill
+    training, Grove items through the Grove's own screens, consumables chosen at the Encounter
+    screen), so no action is offered.
+  - *Looks*: the look-token balance with a button to the existing Look-token shop screen, and a
+    per-category owned/total count across every category (avatar and every species) — a small
+    Collector "collection" summary.
+- **The Trader** (`ShopScreen`, `ShopViewModel`): reached by tapping a Shop map node
+  (`MapTapKind.Shop`, `MapViewModel.Tap` — no longer `ComingSoon`) and from the Camp modal's "Trade"
+  button (the camp's travelling trader, economy-and-shop.md). Two tabs:
+  - *Stock*: every current listing (`ShopService.GetStock`), grouped by category, each row's Buy
+    button disabled with the reason read off the listing's own state (sold out, not enough gold,
+    already known) rather than a second speculative `TryBuy` call. A `BeastSkill` (tome) listing
+    opens a `BeastPickerModal` first; every other category buys directly
+    (`ShopService.TryBuy(save, context, listingIndex, targetBeastId)`).
+  - *Sell*: the same unworn-gear rows and rule the Inventory Gear tab's Sell uses.
+  - **Opening**: a Shop node calls `CampaignRules.Trade(save, regions, nodeId, session.Content.Shop)`
+    once (rolls/freezes stock, marks the node visited/cleared, reveals fog — unchanged Core
+    behaviour); the camp trader calls `ShopService.Open` alone over the camp's own node
+    (`CampaignRules.ShopContextFor(run, campNode)`), since `Trade` refuses a non-Shop node type by
+    design and the camp itself is never cleared by trading. `GameContent.Shop` (a `ShopService` built
+    from `shop-tables.json` over `Economy` and `SkillLibrary.SpeciesKits`) is new load-time wiring —
+    `ShopService` was fully built and tested but never constructed anywhere before this PR.
+- **"New" markers**: not built. A true "new since you last looked" marker needs a persisted "seen"
+  set (no such save field or convention exists); flagged as a producer decision in the design doc
+  rather than mislabelling "unworn" as "new".
+- Screenshots: `--screen avatar | avatar-skills | avatar-gear | avatar-wardrobe | inventory |
+  inventory-materials | inventory-looks | shop | shop-sell`.
+
 ## Architecture
 
 ```
@@ -327,6 +396,33 @@ Until the UI art lands, icons are small code-drawn glyphs (battle, den, pass, la
 the nav tabs, lock, check, …) in `UiPainter.Glyph`; an art key from the manifest can replace any of
 them.
 
+### Shared components
+
+Every hand-built page before Avatar/Inventory/Shop (the beast detail screen, Grove, Compendium)
+re-implemented the same handful of composites for itself — a top-bar height constant, a private
+`Card(y, height, style, draw)` plus its own `Dictionary<Widget, Action<Rect>>`, a hand-drawn beast or
+item card, a chip row, a section heading, a stat table — and that duplication is what caused the
+layout bugs (clipped rows, header/divider collisions, tab overlap) those screens hit. Avatar,
+Inventory and Shop are built instead on a small shared layer,
+`src/BeastCraft.Game/Screens/Components/ScreenComponents.cs` (namespace
+`BeastCraft.Game.Screens.Components`), which wraps the widgets above rather than replacing them:
+
+| Component | What it is |
+|---|---|
+| `HeaderMetrics` | The two standard header heights (`Standard` — back button + title + subtitle; `Tall` — + a stat/identity line) and the page padding, as one source of truth. |
+| `ScreenHeader` | Builds the back button; `Paint` draws the fixed wash + divider + title/subtitle over whatever a scroll view painted underneath, and repaints the back button (both live above the header line). |
+| `SectionHeader` | A card's heading line. |
+| `CardList` | The `Card`/drawer-dictionary pair every page rebuilt for itself, now written once: wraps one `ScrollView`, `Begin()`/`Card(...)`/`End(y)` to rebuild it (keeping the scroll position), `TryDraw` for the screen's `DrawCustom`. |
+| `ChipRow` | A wrapping row of chip buttons (a filter, a sort cycle) from a label list. |
+| `StatTable` | A name column plus up to two right-aligned numeric columns with headers (the Avatar Overview's base/total stats). |
+| `ItemRow` | A list row's text (title, subtitle, a detail/disabled-reason line) — Inventory's and the Trader's listings. |
+| `ActionRow` | One or more buttons stacked and right-aligned in an area, each bound to `Enabled`. |
+| `BeastCard` / `BeastPickerModal` | A small portrait-or-placeholder beside a name and subtitle, and a titled modal list of them — equip gear to a beast, buy a tome for one. |
+
+This PR does not migrate Roster/beast-detail, Grove or Compendium onto these components (a separate
+follow-up refactor); new full-page screens should build on this layer rather than hand-rolling their
+own `Card`/chip-row/stat-table again.
+
 ## How to add a screen
 
 1. **The view-model** in `src/BeastCraft.Presentation/Screens`: what the screen shows, as plain
@@ -354,8 +450,10 @@ them.
   `element-chart`, `glossary`, `battle-log`, `results-log`; the discovery layer's
   `kinship-map`, `kinship-poi`, `kinship-trial`, `kinship-choice`, `region-progress`; the Collector
   persona's `compendium`, `achievements`, `look-tokens`; the Grove's `grove-glade`, `grove-garden`,
-  `grove-board`, `grove-npc`, `soothe`, `colour-forms`); with `--screenshot PATH` it renders it and
-  exits, on a throwaway in-memory save (`--starter-level 6` shows a level gap).
+  `grove-board`, `grove-npc`, `soothe`, `colour-forms`; the Avatar/Inventory/Trader screens'
+  `avatar-skills`, `avatar-gear`, `avatar-wardrobe`, `inventory-materials`, `inventory-looks`,
+  `shop`, `shop-sell`); with `--screenshot PATH` it renders it and exits, on a throwaway in-memory
+  save (`--starter-level 6` shows a level gap).
 - `--walkthrough DIR` captures a new player's first session (the starter pick, Hearthglen with its
   hints, the trials, the camp, the finale, the way on to Verdant Hollow) as numbered PNGs on a fresh
   save in a temporary folder; `--screen starter-pick` and `--screen hearthglen` start there, and the
@@ -390,13 +488,13 @@ notification is an opt-in Android hook.
   never recorded: on the next Continue the location is simply still there to fight. Nothing is
   duplicated. A refund would need a pending-battle marker in the save (a schema change), so it is
   left for a later PR.
-- Inventory is a placeholder; Grove is built (D4 — see "The Grove" above). Avatar is a minimal
-  identity card (level, equipped title, the way to achievements/titles and the look-token shop) — its
-  skills and gear are a later PR (the full Beastbinder screen). Trader locations are "coming soon" (Camp locations open the minimal
-  camp: train a beast, the idle chip). The roster's looks are shown, not edited beyond the
-  look-token shop's direct purchases (the full wardrobe — editing a beast's or the avatar's worn
-  looks — is a later PR). Skill tomes are only sold by the trader (coming soon), so a beast's kit
-  beyond its default loadout stays locked for now; gear comes from drops and first clears.
+- Grove is built (D4 — see "The Grove" above); Avatar, Inventory and the Trader are built (see
+  "Avatar, Inventory and the Trader" above). The roster's own looks are still shown, not edited
+  beyond the look-token shop's direct purchases and the avatar's own wardrobe (editing a *beast's*
+  worn looks beyond its colour forms is a later PR). No "new since you last looked" marker on
+  Inventory (flagged in avatar-inventory-shop.md — needs a small save addition). No colour-picker
+  widget in the toolkit yet: the avatar wardrobe's colour categories use a curated six-swatch preset
+  row over the always-free `TrySetColor` rather than a full picker.
 - One save slot; no region list (the next region starts automatically after a boss).
 - The Grove has no Android local-notification hook (only the in-app toast on entering Home): the
   idle-full notification's `IIdleNotifier` seam exists, a Grove-readiness one does not yet — a

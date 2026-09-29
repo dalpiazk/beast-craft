@@ -114,6 +114,9 @@ namespace BeastCraft.Presentation.Content
         /// <summary>The economy: gear, consumables and cosmetics (the reward modifiers' gear and looks, and the consumables a battle may use).</summary>
         public EconomyContent Economy { get; private set; }
 
+        /// <summary>The Trader (<see cref="ShopService"/>), built from <c>shop-tables.json</c> over <see cref="Economy"/> and <see cref="SkillLibrary"/>'s species kits.</summary>
+        public ShopService Shop { get; private set; }
+
         /// <summary>The idle (AFK) rewards (idle-rewards.json and what a claim pays out of), for <see cref="IdleRewardCalculator"/>.</summary>
         public IdleContent Idle { get; private set; }
 
@@ -225,6 +228,7 @@ namespace BeastCraft.Presentation.Content
             GearLibraryData gearData = Read<GearLibraryData>(root, GearLibraryData.ProjectRelativePath, errors);
             ConsumableLibraryData consumableData = Read<ConsumableLibraryData>(root, ConsumableLibraryData.ProjectRelativePath, errors);
             CosmeticLibraryData cosmeticData = Read<CosmeticLibraryData>(root, CosmeticLibraryData.ProjectRelativePath, errors);
+            ShopTableData shopTableData = Read<ShopTableData>(root, ShopTableData.ProjectRelativePath, errors);
             UiStyleData style = Read<UiStyleData>(root, UiStyleData.ProjectRelativePath, errors);
             IdleRewardsData idleData = Read<IdleRewardsData>(root, IdleRewardsData.ProjectRelativePath, errors);
             HintLibraryData hints = Read<HintLibraryData>(root, HintLibraryData.ProjectRelativePath, errors);
@@ -253,6 +257,7 @@ namespace BeastCraft.Presentation.Content
             Prefix(errors, "gear-library.json", GearLibraryValidator.Validate(gearData));
             Prefix(errors, "consumable-library.json", ConsumableLibraryValidator.Validate(consumableData));
             Prefix(errors, "cosmetic-library.json", CosmeticLibraryValidator.Validate(cosmeticData));
+            Prefix(errors, "shop-tables.json", ShopTableValidator.Validate(shopTableData, skills, dropTables));
             Prefix(errors, "ui-style.json", UiStyleValidator.Validate(style));
             Prefix(errors, "idle-rewards.json", IdleRewardsValidator.Validate(idleData, dropTables));
             Prefix(errors, "hints.json", HintValidator.Validate(hints));
@@ -324,6 +329,7 @@ namespace BeastCraft.Presentation.Content
             GearLibrary gear = GearLibrary.Build(gearData);
             ConsumableLibrary consumables = ConsumableLibrary.Build(consumableData);
             EconomyContent economy = new EconomyContent { Gear = gear, Consumables = consumables, Cosmetics = CosmeticLibrary.Build(cosmeticData) };
+            ShopService shop = new ShopService(shopTableData, economy, skills.SpeciesKits);
             RegionLibrary campaign = RegionLibrary.Build(regions);
             DropTable drops = DropTableBuilder.Build(dropTables, DropTableBuilder.TierLookup(skills.Materials));
 
@@ -352,6 +358,7 @@ namespace BeastCraft.Presentation.Content
                 Drops = drops,
                 Idle = new IdleContent { Rewards = IdleRewardsBuilder.Build(idleData), DropTable = drops, Cosmetics = economy.Cosmetics, Regions = campaign },
                 Economy = economy,
+                Shop = shop,
                 Style = UiStyle.Build(style),
                 Hints = HintBook.Build(hints),
                 Dialogue = DialogueBook.Build(dialogue),
