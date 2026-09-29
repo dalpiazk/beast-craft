@@ -3115,6 +3115,456 @@
       "ValueType": "ColorPicker",
       "DefaultColor": "#5E548E",
       "Options": []
+    },
+    {
+      "CategoryId": "kirin_colour_form",
+      "DisplayName": "Kirin Colour Form",
+      "Scope": "kirin",
+      "ValueType": "DiscreteOption",
+      "DefaultColor": "#FFFFFF",
+      "Options": [
+        {
+          "OptionId": "natural",
+          "DisplayName": "Kirin's Own Colours",
+          "IsDefault": true,
+          "SortOrder": 0,
+          "SupportsPaletteShader": false,
+          "Rarity": 0,
+          "Source": "default",
+          "MinRegion": 1,
+          "UnlockId": "",
+          "ArtKey": "cosmetic/kirin_colour_form/natural"
+        },
+        {
+          "OptionId": "dusk",
+          "DisplayName": "Duskbound Kirin",
+          "IsDefault": false,
+          "SortOrder": 1,
+          "SupportsPaletteShader": false,
+          "Rarity": 0,
+          "Source": "starter",
+          "MinRegion": 1,
+          "UnlockId": "",
+          "ArtKey": "cosmetic/kirin_colour_form/dusk"
+        },
+        {
+          "OptionId": "sunwash",
+          "DisplayName": "Sunwash Kirin",
+          "IsDefault": false,
+          "SortOrder": 2,
+          "SupportsPaletteShader": false,
+          "Rarity": 0,
+          "Source": "grove",
+          "MinRegion": 1,
+          "UnlockId": "kirin_colour_sunwash",
+          "ArtKey": "cosmetic/kirin_colour_form/sunwash"
+        }
+      ]
+    },
+    {
+      "CategoryId": "phoenix_colour_form",
+      "DisplayName": "Phoenix Colour Form",
+      "Scope": "phoenix",
+      "ValueType": "DiscreteOption",
+      "DefaultColor": "#FFFFFF",
+      "Options": [
+        {
+          "OptionId": "natural",
+          "DisplayName": "Phoenix's Own Colours",
+          "IsDefault": true,
+          "SortOrder": 0,
+          "SupportsPaletteShader": false,
+          "Rarity": 0,
+          "Source": "default",
+          "MinRegion": 1,
+          "UnlockId": "",
+          "ArtKey": "cosmetic/phoenix_colour_form/natural"
+        },
+        {
+          "OptionId": "dusk",
+          "DisplayName": "Duskbound Phoenix",
+          "IsDefault": false,
+          "SortOrder": 1,
+          "SupportsPaletteShader": false,
+          "Rarity": 0,
+          "Source": "starter",
+          "MinRegion": 1,
+          "UnlockId": "",
+          "ArtKey": "cosmetic/phoenix_colour_form/dusk"
+        },
+        {
+          "OptionId": "duskrose",
+          "DisplayName": "Duskrose Phoenix",
+          "IsDefault": false,
+          "SortOrder": 2,
+          "SupportsPaletteShader": false,
+          "Rarity": 0,
+          "Source": "grove",
+          "MinRegion": 1,
+          "UnlockId": "phoenix_colour_duskrose",
+          "ArtKey": "cosmetic/phoenix_colour_form/duskrose"
+        }
+      ]
+    },
+    {
+      "CategoryId": "leviathan_colour_form",
+      "DisplayName": "Leviathan Colour Form",
+      "Scope": "leviathan",
+      "ValueType": "DiscreteOption",
+      "DefaultColor": "#FFFFFF",
+      "Options": [
+        {
+          "OptionId": "natural",
+          "DisplayName": "Leviathan's Own Colours",
+          "IsDefault": true,
+          "SortOrder": 0,
+          "SupportsPaletteShader": false,
+          "Rarity": 0,
+          "Source": "default",
+          "MinRegion": 1,
+          "UnlockId": "",
+          "ArtKey": "cosmetic/leviathan_colour_form/natural"
+        },
+        {
+          "OptionId": "dusk",
+          "DisplayName": "Duskbound Leviathan",
+          "IsDefault": false,
+          "SortOrder": 1,
+          "SupportsPaletteShader": false,
+          "Rarity": 0,
+          "Source": "starter",
+          "MinRegion": 1,
+          "UnlockId": "",
+          "ArtKey": "cosmetic/leviathan_colour_form/dusk"
+        },
+        {
+          "OptionId": "mossgreen",
+          "DisplayName": "Mossgreen Leviathan",
+          "IsDefault": false,
+          "SortOrder": 2,
+          "SupportsPaletteShader": false,
+          "Rarity": 0,
+          "Source": "grove",
+          "MinRegion": 1,
+          "UnlockId": "leviathan_colour_mossgreen",
+          "ArtKey": "cosmetic/leviathan_colour_form/mossgreen"
+        }
+      ]
+    },
+    {
+      "CategoryId": "griffin_colour_form",
+      "DisplayName": "Griffin Colour Form",
+      "Scope": "griffin",
+      "ValueType": "DiscreteOption",
+      "DefaultColor": "#FFFFFF",
+      "Options": [
+        {
+          "OptionId": "natural",
+          "DisplayName": "Griffin's Own Colours",
+          "IsDefault": true,
+          "SortOrder": 0,
+          "SupportsPaletteShader": false,
+          "Rarity": 0,
+          "Source": "default",
+          "MinRegion": 1,
+          "UnlockId": "",
+          "ArtKey": "cosmetic/griffin_colour_form/natural"
+        },
+        {
+          "OptionId": "dusk",
+          "DisplayName": "Duskbound Griffin",
+          "IsDefault": false,
+          "SortOrder": 1,
+          "SupportsPaletteShader": false,
+          "Rarity": 0,
+          "Source": "starter",
+          "MinRegion": 1,
+          "UnlockId": "",
+          "ArtKey": "cosmetic/griffin_colour_form/dusk"
+        },
+        {
+          "OptionId": "coralblush",
+          "DisplayName": "Coralblush Griffin",
+          "IsDefault": false,
+          "SortOrder": 2,
+          "SupportsPaletteShader": false,
+          "Rarity": 0,
+          "Source": "grove",
+          "MinRegion": 1,
+          "UnlockId": "griffin_colour_coralblush",
+          "ArtKey": "cosmetic/griffin_colour_form/coralblush"
+        }
+      ]
+    },
+    {
+      "CategoryId": "tarasque_colour_form",
+      "DisplayName": "Tarasque Colour Form",
+      "Scope": "tarasque",
+      "ValueType": "DiscreteOption",
+      "DefaultColor": "#FFFFFF",
+      "Options": [
+        {
+          "OptionId": "natural",
+          "DisplayName": "Tarasque's Own Colours",
+          "IsDefault": true,
+          "SortOrder": 0,
+          "SupportsPaletteShader": false,
+          "Rarity": 0,
+          "Source": "default",
+          "MinRegion": 1,
+          "UnlockId": "",
+          "ArtKey": "cosmetic/tarasque_colour_form/natural"
+        },
+        {
+          "OptionId": "dusk",
+          "DisplayName": "Duskbound Tarasque",
+          "IsDefault": false,
+          "SortOrder": 1,
+          "SupportsPaletteShader": false,
+          "Rarity": 0,
+          "Source": "starter",
+          "MinRegion": 1,
+          "UnlockId": "",
+          "ArtKey": "cosmetic/tarasque_colour_form/dusk"
+        },
+        {
+          "OptionId": "frostsilver",
+          "DisplayName": "Frostsilver Tarasque",
+          "IsDefault": false,
+          "SortOrder": 2,
+          "SupportsPaletteShader": false,
+          "Rarity": 0,
+          "Source": "grove",
+          "MinRegion": 1,
+          "UnlockId": "tarasque_colour_frostsilver",
+          "ArtKey": "cosmetic/tarasque_colour_form/frostsilver"
+        }
+      ]
+    },
+    {
+      "CategoryId": "frost_wyrm_colour_form",
+      "DisplayName": "Frost Wyrm Colour Form",
+      "Scope": "frost_wyrm",
+      "ValueType": "DiscreteOption",
+      "DefaultColor": "#FFFFFF",
+      "Options": [
+        {
+          "OptionId": "natural",
+          "DisplayName": "Frost Wyrm's Own Colours",
+          "IsDefault": true,
+          "SortOrder": 0,
+          "SupportsPaletteShader": false,
+          "Rarity": 0,
+          "Source": "default",
+          "MinRegion": 1,
+          "UnlockId": "",
+          "ArtKey": "cosmetic/frost_wyrm_colour_form/natural"
+        },
+        {
+          "OptionId": "dusk",
+          "DisplayName": "Duskbound Frost Wyrm",
+          "IsDefault": false,
+          "SortOrder": 1,
+          "SupportsPaletteShader": false,
+          "Rarity": 0,
+          "Source": "starter",
+          "MinRegion": 1,
+          "UnlockId": "",
+          "ArtKey": "cosmetic/frost_wyrm_colour_form/dusk"
+        },
+        {
+          "OptionId": "embergold",
+          "DisplayName": "Embergold Frost Wyrm",
+          "IsDefault": false,
+          "SortOrder": 2,
+          "SupportsPaletteShader": false,
+          "Rarity": 0,
+          "Source": "grove",
+          "MinRegion": 1,
+          "UnlockId": "frost_wyrm_colour_embergold",
+          "ArtKey": "cosmetic/frost_wyrm_colour_form/embergold"
+        }
+      ]
+    },
+    {
+      "CategoryId": "thunderbird_colour_form",
+      "DisplayName": "Thunderbird Colour Form",
+      "Scope": "thunderbird",
+      "ValueType": "DiscreteOption",
+      "DefaultColor": "#FFFFFF",
+      "Options": [
+        {
+          "OptionId": "natural",
+          "DisplayName": "Thunderbird's Own Colours",
+          "IsDefault": true,
+          "SortOrder": 0,
+          "SupportsPaletteShader": false,
+          "Rarity": 0,
+          "Source": "default",
+          "MinRegion": 1,
+          "UnlockId": "",
+          "ArtKey": "cosmetic/thunderbird_colour_form/natural"
+        },
+        {
+          "OptionId": "dusk",
+          "DisplayName": "Duskbound Thunderbird",
+          "IsDefault": false,
+          "SortOrder": 1,
+          "SupportsPaletteShader": false,
+          "Rarity": 0,
+          "Source": "starter",
+          "MinRegion": 1,
+          "UnlockId": "",
+          "ArtKey": "cosmetic/thunderbird_colour_form/dusk"
+        },
+        {
+          "OptionId": "willowsage",
+          "DisplayName": "Willowsage Thunderbird",
+          "IsDefault": false,
+          "SortOrder": 2,
+          "SupportsPaletteShader": false,
+          "Rarity": 0,
+          "Source": "grove",
+          "MinRegion": 1,
+          "UnlockId": "thunderbird_colour_willowsage",
+          "ArtKey": "cosmetic/thunderbird_colour_form/willowsage"
+        }
+      ]
+    },
+    {
+      "CategoryId": "treant_colour_form",
+      "DisplayName": "Treant Colour Form",
+      "Scope": "treant",
+      "ValueType": "DiscreteOption",
+      "DefaultColor": "#FFFFFF",
+      "Options": [
+        {
+          "OptionId": "natural",
+          "DisplayName": "Treant's Own Colours",
+          "IsDefault": true,
+          "SortOrder": 0,
+          "SupportsPaletteShader": false,
+          "Rarity": 0,
+          "Source": "default",
+          "MinRegion": 1,
+          "UnlockId": "",
+          "ArtKey": "cosmetic/treant_colour_form/natural"
+        },
+        {
+          "OptionId": "dusk",
+          "DisplayName": "Duskbound Treant",
+          "IsDefault": false,
+          "SortOrder": 1,
+          "SupportsPaletteShader": false,
+          "Rarity": 0,
+          "Source": "starter",
+          "MinRegion": 1,
+          "UnlockId": "",
+          "ArtKey": "cosmetic/treant_colour_form/dusk"
+        },
+        {
+          "OptionId": "starlilac",
+          "DisplayName": "Starlilac Treant",
+          "IsDefault": false,
+          "SortOrder": 2,
+          "SupportsPaletteShader": false,
+          "Rarity": 0,
+          "Source": "grove",
+          "MinRegion": 1,
+          "UnlockId": "treant_colour_starlilac",
+          "ArtKey": "cosmetic/treant_colour_form/starlilac"
+        }
+      ]
+    },
+    {
+      "CategoryId": "golem_colour_form",
+      "DisplayName": "Golem Colour Form",
+      "Scope": "golem",
+      "ValueType": "DiscreteOption",
+      "DefaultColor": "#FFFFFF",
+      "Options": [
+        {
+          "OptionId": "natural",
+          "DisplayName": "Golem's Own Colours",
+          "IsDefault": true,
+          "SortOrder": 0,
+          "SupportsPaletteShader": false,
+          "Rarity": 0,
+          "Source": "default",
+          "MinRegion": 1,
+          "UnlockId": "",
+          "ArtKey": "cosmetic/golem_colour_form/natural"
+        },
+        {
+          "OptionId": "dusk",
+          "DisplayName": "Duskbound Golem",
+          "IsDefault": false,
+          "SortOrder": 1,
+          "SupportsPaletteShader": false,
+          "Rarity": 0,
+          "Source": "starter",
+          "MinRegion": 1,
+          "UnlockId": "",
+          "ArtKey": "cosmetic/golem_colour_form/dusk"
+        },
+        {
+          "OptionId": "honeyamber",
+          "DisplayName": "Honeyamber Golem",
+          "IsDefault": false,
+          "SortOrder": 2,
+          "SupportsPaletteShader": false,
+          "Rarity": 0,
+          "Source": "grove",
+          "MinRegion": 1,
+          "UnlockId": "golem_colour_honeyamber",
+          "ArtKey": "cosmetic/golem_colour_form/honeyamber"
+        }
+      ]
+    },
+    {
+      "CategoryId": "basilisk_colour_form",
+      "DisplayName": "Basilisk Colour Form",
+      "Scope": "basilisk",
+      "ValueType": "DiscreteOption",
+      "DefaultColor": "#FFFFFF",
+      "Options": [
+        {
+          "OptionId": "natural",
+          "DisplayName": "Basilisk's Own Colours",
+          "IsDefault": true,
+          "SortOrder": 0,
+          "SupportsPaletteShader": false,
+          "Rarity": 0,
+          "Source": "default",
+          "MinRegion": 1,
+          "UnlockId": "",
+          "ArtKey": "cosmetic/basilisk_colour_form/natural"
+        },
+        {
+          "OptionId": "dusk",
+          "DisplayName": "Duskbound Basilisk",
+          "IsDefault": false,
+          "SortOrder": 1,
+          "SupportsPaletteShader": false,
+          "Rarity": 0,
+          "Source": "starter",
+          "MinRegion": 1,
+          "UnlockId": "",
+          "ArtKey": "cosmetic/basilisk_colour_form/dusk"
+        },
+        {
+          "OptionId": "cloudpearl",
+          "DisplayName": "Cloudpearl Basilisk",
+          "IsDefault": false,
+          "SortOrder": 2,
+          "SupportsPaletteShader": false,
+          "Rarity": 0,
+          "Source": "grove",
+          "MinRegion": 1,
+          "UnlockId": "basilisk_colour_cloudpearl",
+          "ArtKey": "cosmetic/basilisk_colour_form/cloudpearl"
+        }
+      ]
     }
   ],
   "Milestones": [

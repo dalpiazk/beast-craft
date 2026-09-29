@@ -1,5 +1,5 @@
 {
-  "_readme": "GAME CONTENT, DRAFT PENDING PRODUCER REVIEW (every name and title). The Collector persona (PR B, docs/design/compendium-achievements.md): deterministic achievements only, no RNG anywhere, and no combat power ever from any of this — each one is met by checking existing save state (a region's boss beaten, its discovery layer or lore complete, Kinship sites claimed, distinct species owned, the compendium's own completion, an avatar or beast level) and awards a text TITLE the player can own and equip (display only; never a stat). Kind is one of BossCleared, AllBossesCleared, RegionExplored, AllRegionsExplored, KinshipSitesClaimed, AllKinshipClaimed, BeastsOwned, RegionLoreComplete, AllLoreFound, CompendiumPercent, AvatarLevel, BeastLevel, SideStoryComplete (BeastCraft.Progression.AchievementKinds; SideStoryComplete added for the Grove design's D2, dialogue.json's NPC side stories). RegionId is used by the region-scoped kinds only; Threshold by the threshold kinds only; StoryId by SideStoryComplete only, naming a dialogue.json SideStories entry (the validator checks which). Evaluated idempotently (BeastCraft.Progression.AchievementRules.Evaluate) after a Kinship join, a discovery visit or completion, and a region boss clear. Validated by AchievementLibraryValidator; see docs/design/compendium-achievements.md.",
+  "_readme": "GAME CONTENT, DRAFT PENDING PRODUCER REVIEW (every name and title). The Collector persona (PR B, docs/design/compendium-achievements.md): deterministic achievements only, no RNG anywhere, and no combat power ever from any of this \u2014 each one is met by checking existing save state (a region's boss beaten, its discovery layer or lore complete, Kinship sites claimed, distinct species owned, the compendium's own completion, an avatar or beast level) and awards a text TITLE the player can own and equip (display only; never a stat). Kind is one of BossCleared, AllBossesCleared, RegionExplored, AllRegionsExplored, KinshipSitesClaimed, AllKinshipClaimed, BeastsOwned, RegionLoreComplete, AllLoreFound, CompendiumPercent, AvatarLevel, BeastLevel, SideStoryComplete (BeastCraft.Progression.AchievementKinds; SideStoryComplete added for the Grove design's D2, dialogue.json's NPC side stories). RegionId is used by the region-scoped kinds only; Threshold by the threshold kinds only; StoryId by SideStoryComplete only, naming a dialogue.json SideStories entry (the validator checks which). Evaluated idempotently (BeastCraft.Progression.AchievementRules.Evaluate) after a Kinship join, a discovery visit or completion, and a region boss clear. Validated by AchievementLibraryValidator; see docs/design/compendium-achievements.md.",
   "SchemaVersion": 1,
   "Achievements": [
     {
@@ -211,6 +211,16 @@
       "StoryId": "trader_roads",
       "TitleId": "title_fellow_traveller",
       "TitleText": "Fellow Traveller"
+    },
+    {
+      "AchievementId": "peacekeeper",
+      "DisplayName": "Peacekeeper",
+      "Kind": "LocationsSoothed",
+      "RegionId": "",
+      "Threshold": 3,
+      "StoryId": "",
+      "TitleId": "title_peacekeeper",
+      "TitleText": "Peacekeeper"
     }
   ]
 }
