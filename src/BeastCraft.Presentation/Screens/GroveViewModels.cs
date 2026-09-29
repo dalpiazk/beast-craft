@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using BeastCraft.Common;
 using BeastCraft.Creatures;
 using BeastCraft.Economy;
 using BeastCraft.Expeditions;
@@ -70,7 +69,7 @@ namespace BeastCraft.Presentation.Screens
                 hash = unchecked((hash * 31) + c);
             }
 
-            double hue = (Math.Abs(hash) % 360) / 360.0;
+            double hue = ((hash & 0x7fffffff) % 360) / 360.0;
             (byte r, byte g, byte b) = HsvToRgb(hue, 0.32, 0.93);
             return "#" + r.ToString("X2", CultureInfo.InvariantCulture) + g.ToString("X2", CultureInfo.InvariantCulture) + b.ToString("X2", CultureInfo.InvariantCulture);
         }
@@ -295,9 +294,6 @@ namespace BeastCraft.Presentation.Screens
             Beasts.Clear();
             DateTime nowUtc = _session.Clock.UtcNow;
             TimeSpan nowMono = _session.Clock.Monotonic;
-            long nowTicks = OfflineClock.UtcTicks(nowUtc);
-            long nowMonoMs = OfflineClock.MonotonicMs(nowMono);
-            long cooldownMs = (long)(Math.Max(1, library.Data.DailyCooldownHours) * 3600000.0);
             foreach (OwnedBeast beast in save.Beasts)
             {
                 CreatureSpeciesSO species = _session.Content.Battle.GetSpecies(beast.Progress.SpeciesId);
@@ -309,10 +305,8 @@ namespace BeastCraft.Presentation.Screens
                 BeastAffinityState state = save.Grove.FindAffinity(beast.BeastId);
                 int tier = state?.Tier ?? 0;
                 AffinityTierData next = library.Tier(species.SpeciesId, tier + 1);
-                bool canFeed = state == null || state.LastFeedUtcTicks <= 0 ||
-                               OfflineClock.ElapsedMs(state.LastFeedUtcTicks, state.LastFeedMonotonicMs, nowTicks, nowMonoMs, out bool _) >= cooldownMs;
-                bool canPlay = state == null || state.LastPlayUtcTicks <= 0 ||
-                               OfflineClock.ElapsedMs(state.LastPlayUtcTicks, state.LastPlayMonotonicMs, nowTicks, nowMonoMs, out bool _) >= cooldownMs;
+                bool canFeed = GroveRules.CanFeed(save, library, beast.BeastId, nowUtc, nowMono);
+                bool canPlay = GroveRules.CanPlay(save, library, beast.BeastId, nowUtc, nowMono);
                 Beasts.Add(new GladeBeastRow
                 {
                     BeastId = beast.BeastId,
@@ -973,8 +967,12 @@ namespace BeastCraft.Presentation.Screens
                 return;
             }
 
-            DialogueLineData line = NpcRules.ResolveAndMark(save, book, SelectedNpcId, facts);
+            DialogueLineData line = NpcRules.ResolveAndMark(save, book, SelectedNpcId, facts, out bool newlySeen);
             TalkLine = line?.Text;
+            if (newlySeen)
+            {
+                _session.Autosave(AutosaveReason.PlayerEdit);
+            }
 
             foreach (RequestData request in book.RequestsFor(SelectedNpcId))
             {

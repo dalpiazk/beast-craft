@@ -230,5 +230,56 @@ namespace BeastCraft.Tests.EditMode
 
             Assert.AreEqual("story", forced.Kind, "pity must force the non-common entry once the counter is at PityAt - 1");
         }
+
+        // ---- Seed: never the wall clock (the player controls it) ----
+
+        [Test]
+        public void Send_SameStateSameDestination_YieldsTheSameSeed_RegardlessOfTheClock()
+        {
+            ExpeditionLibrary library = ExpeditionLibrary.Build(SyntheticData());
+            PlayerSave saveA = SaveWithBeasts("b1", "b2");
+            PlayerSave saveB = SaveWithBeasts("b1", "b2");
+            // Same persisted state (both fresh saves, SendCount 0, IdleSeed 0), wildly different clocks.
+            DateTime laterClock = T0 + TimeSpan.FromDays(400);
+
+            ExpeditionRules.Send(saveA, library, "meadow", new[] { "b1", "b2" }, T0, M0);
+            ExpeditionRules.Send(saveB, library, "meadow", new[] { "b1", "b2" }, laterClock, M0);
+
+            Assert.AreEqual(saveA.Expeditions.FindActive("meadow").Seed, saveB.Expeditions.FindActive("meadow").Seed,
+                            "identical persisted state must roll the same seed no matter what the wall clock reads");
+        }
+
+        [Test]
+        public void Send_SuccessiveSends_YieldDifferentSeeds()
+        {
+            ExpeditionLibrary library = ExpeditionLibrary.Build(SyntheticData());
+            PlayerSave save = SaveWithBeasts("b1", "b2");
+
+            ExpeditionRules.Send(save, library, "meadow", new[] { "b1", "b2" }, T0, M0);
+            int firstSeed = save.Expeditions.FindActive("meadow").Seed;
+            ExpeditionRules.Collect(save, library, "meadow", T0 + TimeSpan.FromHours(2), M0 + TimeSpan.FromHours(2));
+
+            // Sent again to the very same destination, at the very same instant: only the persisted
+            // send counter changed, but that alone must move the seed.
+            ExpeditionRules.Send(save, library, "meadow", new[] { "b1", "b2" }, T0, M0);
+            int secondSeed = save.Expeditions.FindActive("meadow").Seed;
+
+            Assert.AreNotEqual(firstSeed, secondSeed);
+        }
+
+        [Test]
+        public void Send_IncrementsThePersistentSendCounter_WhichNeverResets()
+        {
+            ExpeditionLibrary library = ExpeditionLibrary.Build(SyntheticData());
+            PlayerSave save = SaveWithBeasts("b1", "b2");
+
+            Assert.AreEqual(0, save.Expeditions.SendCount);
+            ExpeditionRules.Send(save, library, "meadow", new[] { "b1", "b2" }, T0, M0);
+            Assert.AreEqual(1, save.Expeditions.SendCount);
+
+            ExpeditionRules.Collect(save, library, "meadow", T0 + TimeSpan.FromHours(2), M0 + TimeSpan.FromHours(2));
+            ExpeditionRules.Send(save, library, "meadow", new[] { "b1", "b2" }, T0, M0);
+            Assert.AreEqual(2, save.Expeditions.SendCount, "the counter climbs on every send and never falls back");
+        }
     }
 }

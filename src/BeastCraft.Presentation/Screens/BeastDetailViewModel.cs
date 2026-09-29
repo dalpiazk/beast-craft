@@ -918,7 +918,7 @@ namespace BeastCraft.Presentation.Screens
                 return CosmeticResult.UnknownOption;
             }
 
-            CosmeticResult result = CosmeticRules.TrySetOption(_session.Save, BeastId, row.CosmeticCategoryId, row.CosmeticOptionId, _session.Content.Economy.Cosmetics);
+            CosmeticResult result = CosmeticRules.TrySetOption(_session.Save, BeastId, row.CosmeticCategoryId, row.CosmeticOptionId, _session.Content.Economy?.Cosmetics);
             if (result == CosmeticResult.Set)
             {
                 _session.Autosave(AutosaveReason.BeastEdit);
@@ -931,7 +931,7 @@ namespace BeastCraft.Presentation.Screens
         /// <summary>Switches this beast back to its species' free natural colour (the category's <c>"natural"</c> default option).</summary>
         public CosmeticResult WearNaturalColour(string categoryId)
         {
-            CosmeticResult result = CosmeticRules.TrySetOption(_session.Save, BeastId, categoryId, "natural", _session.Content.Economy.Cosmetics);
+            CosmeticResult result = CosmeticRules.TrySetOption(_session.Save, BeastId, categoryId, "natural", _session.Content.Economy?.Cosmetics);
             if (result == CosmeticResult.Set)
             {
                 _session.Autosave(AutosaveReason.BeastEdit);

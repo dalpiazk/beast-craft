@@ -476,6 +476,56 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
+        public void TryUnlockColourForm_RefusesAMispairedCosmeticKey_WithoutConsumingTheItem()
+        {
+            // A content error — the form names a category/option that does not resolve — must be caught
+            // BEFORE the item is spent, so a bad content pairing never destroys the player's item for
+            // nothing (it can be fixed and retried).
+            PlayerSave save = SaveWithBeast();
+            ColourFormData form = new ColourFormData
+            {
+                ColourFormId = "test_bad_form",
+                SpeciesId = "phoenix",
+                ItemId = "test_mispair_item",
+                ItemCount = 1,
+                CosmeticCategoryId = "not_a_real_category",
+                CosmeticOptionId = "not_a_real_option"
+            };
+            GroveLibrary library = GroveLibrary.Build(new GroveLibraryData { ColourForms = new[] { form } });
+            save.Grove.Items.Add(form.ItemId, form.ItemCount);
+
+            ColourFormResult result = GroveRules.TryUnlockColourForm(save, library, Content.Economy.Cosmetics, form.ColourFormId);
+
+            Assert.IsFalse(result.Success);
+            Assert.AreEqual(form.ItemCount, save.Grove.Items.GetCount(form.ItemId), "a content mis-pairing must never destroy the item");
+        }
+
+        [Test]
+        public void TryUnlockColourForm_RefusesAFreeCosmeticKey_WithoutConsumingTheItem()
+        {
+            // Naming a real but free option (the "natural" default, never spendable through this path)
+            // is the same class of content error: caught before the item is spent.
+            PlayerSave save = SaveWithBeast();
+            ColourFormData realForm = Content.GroveLibrary.Data.ColourForms[0];
+            ColourFormData mispaired = new ColourFormData
+            {
+                ColourFormId = "test_free_form",
+                SpeciesId = realForm.SpeciesId,
+                ItemId = "test_free_item",
+                ItemCount = 1,
+                CosmeticCategoryId = realForm.CosmeticCategoryId,
+                CosmeticOptionId = "natural"
+            };
+            GroveLibrary library = GroveLibrary.Build(new GroveLibraryData { ColourForms = new[] { mispaired } });
+            save.Grove.Items.Add(mispaired.ItemId, mispaired.ItemCount);
+
+            ColourFormResult result = GroveRules.TryUnlockColourForm(save, library, Content.Economy.Cosmetics, mispaired.ColourFormId);
+
+            Assert.IsFalse(result.Success);
+            Assert.AreEqual(mispaired.ItemCount, save.Grove.Items.GetCount(mispaired.ItemId));
+        }
+
+        [Test]
         public void BuildFacts_EmitsColourFormOwned_OnlyOnceUnlocked()
         {
             ColourFormData form = Content.GroveLibrary.Data.ColourForms[0];

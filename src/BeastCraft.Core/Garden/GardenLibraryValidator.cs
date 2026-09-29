@@ -169,11 +169,18 @@ namespace BeastCraft.Garden
                     errors.Add(at + ": needs at least one input.");
                 }
 
+                HashSet<string> inputVarietyIds = new HashSet<string>(StringComparer.Ordinal);
                 foreach (RecipeInputData input in recipe.Inputs ?? new RecipeInputData[0])
                 {
                     if (input == null || input.Count <= 0 || string.IsNullOrEmpty(input.VarietyId) || !varieties.ContainsKey(input.VarietyId))
                     {
                         errors.Add(at + ": every input needs a known VarietyId and a positive Count.");
+                        continue;
+                    }
+
+                    if (!inputVarietyIds.Add(input.VarietyId))
+                    {
+                        errors.Add(at + ": VarietyId '" + input.VarietyId + "' is repeated across this recipe's inputs.");
                     }
                 }
 

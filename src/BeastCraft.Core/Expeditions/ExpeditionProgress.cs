@@ -25,6 +25,14 @@ namespace BeastCraft.Expeditions
 
         public List<ExpeditionPityCounter> Pity = new List<ExpeditionPityCounter>();
 
+        /// <summary>
+        /// How many expeditions have ever been sent from this save (never decreases): mixed into every
+        /// <see cref="ActiveExpedition.Seed"/> (<c>ExpeditionRules.SeedFrom</c>) so no two sends ever
+        /// draw the same outcome roll, even to the same destination at the same wall-clock instant —
+        /// the seed must never be player-controlled, and the player controls the clock.
+        /// </summary>
+        public int SendCount;
+
         /// <summary>The expedition away at <paramref name="destinationId"/>, or null (none away there).</summary>
         public ActiveExpedition FindActive(string destinationId)
         {
@@ -96,6 +104,13 @@ namespace BeastCraft.Expeditions
             repaired += Pity.RemoveAll(counter => counter == null || string.IsNullOrEmpty(counter.DestinationId));
             HashSet<string> pityKeys = new HashSet<string>(StringComparer.Ordinal);
             repaired += Pity.RemoveAll(counter => !pityKeys.Add(counter.DestinationId));
+
+            if (SendCount < 0)
+            {
+                SendCount = 0;
+                repaired++;
+            }
+
             return repaired;
         }
     }

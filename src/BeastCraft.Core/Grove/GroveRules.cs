@@ -155,6 +155,44 @@ namespace BeastCraft.Grove
             return DoAction(save, library, beastId, false, nowUtc, nowMonotonic, cosmetics);
         }
 
+        /// <summary>Whether <paramref name="beastId"/> can be fed right now (its <c>DailyCooldownHours</c> has elapsed, or it has never been fed).</summary>
+        public static bool CanFeed(PlayerSave save, GroveLibrary library, string beastId, DateTime nowUtc, TimeSpan nowMonotonic)
+        {
+            return CooldownElapsed(save, library, beastId, true, nowUtc, nowMonotonic);
+        }
+
+        /// <summary>Whether <paramref name="beastId"/> can be played with right now (its <c>DailyCooldownHours</c> has elapsed, or it has never been played with).</summary>
+        public static bool CanPlay(PlayerSave save, GroveLibrary library, string beastId, DateTime nowUtc, TimeSpan nowMonotonic)
+        {
+            return CooldownElapsed(save, library, beastId, false, nowUtc, nowMonotonic);
+        }
+
+        /// <summary>
+        /// The shared cooldown check behind <see cref="CanFeed"/>/<see cref="CanPlay"/> and
+        /// <see cref="DoAction"/>'s own refusal, so the Glade view (which shows the same "already fed /
+        /// played today" state ahead of the tap) never re-derives this math on its own.
+        /// </summary>
+        private static bool CooldownElapsed(PlayerSave save, GroveLibrary library, string beastId, bool isFeed, DateTime nowUtc, TimeSpan nowMonotonic)
+        {
+            if (save?.Grove == null || library == null)
+            {
+                return false;
+            }
+
+            BeastAffinityState state = save.Grove.FindAffinity(beastId);
+            long lastUtc = isFeed ? state?.LastFeedUtcTicks ?? 0 : state?.LastPlayUtcTicks ?? 0;
+            long lastMono = isFeed ? state?.LastFeedMonotonicMs ?? 0 : state?.LastPlayMonotonicMs ?? 0;
+            if (lastUtc <= 0)
+            {
+                return true;
+            }
+
+            long nowTicks = OfflineClock.UtcTicks(nowUtc);
+            long nowMonoMs = OfflineClock.MonotonicMs(nowMonotonic);
+            long cooldownMs = (long)(Math.Max(1, library.Data.DailyCooldownHours) * MsPerHour);
+            return OfflineClock.ElapsedMs(lastUtc, lastMono, nowTicks, nowMonoMs, out bool _) >= cooldownMs;
+        }
+
         private static GroveActionResult DoAction(PlayerSave save, GroveLibrary library, string beastId, bool isFeed, DateTime nowUtc, TimeSpan nowMonotonic,
                                                    CosmeticLibrary cosmetics)
         {
@@ -170,16 +208,14 @@ namespace BeastCraft.Grove
             }
 
             save.EnsureInitialized();
-            BeastAffinityState state = save.Grove.AffinityOf(beastId);
-            long nowTicks = OfflineClock.UtcTicks(nowUtc);
-            long nowMonoMs = OfflineClock.MonotonicMs(nowMonotonic);
-            long lastUtc = isFeed ? state.LastFeedUtcTicks : state.LastPlayUtcTicks;
-            long lastMono = isFeed ? state.LastFeedMonotonicMs : state.LastPlayMonotonicMs;
-            long cooldownMs = (long)(Math.Max(1, library.Data.DailyCooldownHours) * MsPerHour);
-            if (lastUtc > 0 && OfflineClock.ElapsedMs(lastUtc, lastMono, nowTicks, nowMonoMs, out bool _) < cooldownMs)
+            if (!CooldownElapsed(save, library, beastId, isFeed, nowUtc, nowMonotonic))
             {
                 return GroveActionResult.Refused(isFeed ? "This beast has already been fed today." : "This beast has already played today.");
             }
+
+            BeastAffinityState state = save.Grove.AffinityOf(beastId);
+            long nowTicks = OfflineClock.UtcTicks(nowUtc);
+            long nowMonoMs = OfflineClock.MonotonicMs(nowMonotonic);
 
             if (isFeed)
             {
@@ -478,13 +514,22 @@ namespace BeastCraft.Grove
                 return ColourFormResult.Refused("Unknown colour form.");
             }
 
+            // Resolve the cosmetic key BEFORE spending the item: a content mis-pairing (the form names a
+            // category/option that does not exist, or one that is free and so never spendable through
+            // this path) must refuse and leave the item untouched, not destroy it for nothing.
+            string key = CosmeticCollection.Key(form.CosmeticCategoryId, form.CosmeticOptionId);
+            CosmeticOption option = cosmetics.GetOption(key);
+            if (option == null || option.IsFree)
+            {
+                return ColourFormResult.Refused("Unknown colour form (content error).");
+            }
+
             save.EnsureInitialized();
             if (!save.Grove.Items.TryConsume(form.ItemId, form.ItemCount))
             {
                 return ColourFormResult.Refused("Not enough " + form.ItemId + ".");
             }
 
-            string key = CosmeticCollection.Key(form.CosmeticCategoryId, form.CosmeticOptionId);
             bool newlyUnlocked = CosmeticRules.UnlockOrRefund(save, cosmetics, key, out int tokensGranted);
             return ColourFormResult.Succeeded(newlyUnlocked, tokensGranted);
         }

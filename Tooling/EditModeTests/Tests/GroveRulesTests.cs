@@ -249,6 +249,26 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
+        public void CanFeed_AndCanPlay_MatchWhatFeedAndPlayWouldActuallyDo()
+        {
+            // The Glade view reads GroveRules.CanFeed/CanPlay to show "already fed/played today" ahead
+            // of the tap, instead of re-deriving the cooldown math itself; this checks the two agree.
+            PlayerSave save = SaveWithBeast();
+            GroveLibrary library = GroveLibrary.Build(SyntheticData());
+
+            Assert.IsTrue(GroveRules.CanFeed(save, library, "b1", T0, M0), "never fed yet");
+            Assert.IsTrue(GroveRules.CanPlay(save, library, "b1", T0, M0), "never played yet");
+
+            GroveRules.Feed(save, library, "b1", T0, M0);
+            Assert.IsFalse(GroveRules.CanFeed(save, library, "b1", T0 + TimeSpan.FromHours(1), M0 + TimeSpan.FromHours(1)));
+            Assert.IsTrue(GroveRules.CanPlay(save, library, "b1", T0 + TimeSpan.FromHours(1), M0 + TimeSpan.FromHours(1)), "feeding never touches Play's own cooldown");
+            Assert.IsFalse(GroveRules.Feed(save, library, "b1", T0 + TimeSpan.FromHours(1), M0 + TimeSpan.FromHours(1)).Success, "CanFeed must match what Feed itself refuses");
+
+            Assert.IsTrue(GroveRules.CanFeed(save, library, "b1", T0 + TimeSpan.FromHours(21), M0 + TimeSpan.FromHours(21)), "cooldown elapsed");
+            Assert.IsTrue(GroveRules.Feed(save, library, "b1", T0 + TimeSpan.FromHours(21), M0 + TimeSpan.FromHours(21)).Success, "CanFeed must match what Feed itself allows");
+        }
+
+        [Test]
         public void TierUp_AppliesTheTiersReward_DecorThenLoreThenIdleAnimAtTier5()
         {
             PlayerSave save = SaveWithBeast();

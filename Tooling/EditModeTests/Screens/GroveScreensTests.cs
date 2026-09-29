@@ -304,6 +304,26 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
+        public void NpcPanelViewModel_Refresh_AutosavesOnlyWhenANewLineIsActuallySeen()
+        {
+            GameSession session = NewSession();
+            int savesBeforeConstruct = session.AutosaveCount;
+            NpcPanelViewModel model = new NpcPanelViewModel(session);
+
+            // Constructing it resolves and marks the first NPC's line seen for the first time ever: a
+            // genuine save-affecting change, so this must autosave.
+            Assert.Greater(session.AutosaveCount, savesBeforeConstruct, "the first-ever resolved line must autosave");
+
+            int savesAfterFirstLine = session.AutosaveCount;
+            model.Refresh();
+            model.Refresh();
+
+            // Nothing changed (the same line resolves and is already marked seen): refreshing again
+            // must not autosave, or every screen re-render would write the save file for nothing.
+            Assert.AreEqual(savesAfterFirstLine, session.AutosaveCount, "no new line seen: Refresh must not autosave again");
+        }
+
+        [Test]
         public void NpcPanelViewModel_Request_FulfilEnabledOnlyWhenItemHeld_ThenFulfils()
         {
             GameSession session = NewSession();
@@ -502,6 +522,21 @@ namespace BeastCraft.Tests.EditMode
             Assert.AreEqual(a, b, "deterministic: the same id always yields the same colour");
             Assert.AreNotEqual(a, c);
             Assert.That(a, Does.Match("^#[0-9A-F]{6}$"));
+        }
+
+        [Test]
+        public void ColourFormPresentation_TintHex_NeverThrows_EvenWhenTheHashIsIntMinValue()
+        {
+            // "xdygugiv鬋￡" is crafted so the FNV-ish id hash (hash = 17; hash = hash*31 + c)
+            // lands exactly on int.MinValue: Math.Abs(int.MinValue) throws OverflowException (its
+            // negation cannot be represented as a positive Int32), which is exactly the bug this
+            // regresses — TintHex must map it to a valid hue with no exception, e.g. via `hash &
+            // 0x7fffffff` instead of Math.Abs.
+            string id = "xdygugiv鬋￡";
+
+            string hex = null;
+            Assert.DoesNotThrow(() => hex = ColourFormPresentation.TintHex(id));
+            Assert.That(hex, Does.Match("^#[0-9A-F]{6}$"));
         }
 
         [Test]

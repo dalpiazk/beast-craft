@@ -192,17 +192,36 @@ namespace BeastCraft.Garden
             }
 
             save.Grove.EnsureInitialized();
+
+            // Sum the required count per distinct VarietyId first: a recipe naming the same variety
+            // in two input rows must check (and later consume) their combined total, not each row
+            // against the held count alone (which would under-count what the craft actually spends).
+            Dictionary<string, int> required = new Dictionary<string, int>(StringComparer.Ordinal);
             foreach (RecipeInputData input in recipe.Inputs ?? new RecipeInputData[0])
             {
-                if (input == null || save.Grove.Items.GetCount(input.VarietyId) < input.Count)
+                if (input == null || string.IsNullOrEmpty(input.VarietyId) || input.Count <= 0)
                 {
                     return GardenActionResult.Refused("Not enough " + (input == null ? "?" : input.VarietyId) + ".");
                 }
+
+                required.TryGetValue(input.VarietyId, out int soFar);
+                required[input.VarietyId] = soFar + input.Count;
             }
 
-            foreach (RecipeInputData input in recipe.Inputs)
+            foreach (KeyValuePair<string, int> entry in required)
             {
-                save.Grove.Items.TryConsume(input.VarietyId, input.Count);
+                if (save.Grove.Items.GetCount(entry.Key) < entry.Value)
+                {
+                    return GardenActionResult.Refused("Not enough " + entry.Key + ".");
+                }
+            }
+
+            foreach (KeyValuePair<string, int> entry in required)
+            {
+                if (!save.Grove.Items.TryConsume(entry.Key, entry.Value))
+                {
+                    return GardenActionResult.Refused("Not enough " + entry.Key + ".");
+                }
             }
 
             switch (recipe.Output)

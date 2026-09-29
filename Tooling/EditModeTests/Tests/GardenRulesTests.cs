@@ -60,6 +60,19 @@ namespace BeastCraft.Tests.EditMode
                     {
                         RecipeId = "recipe_dye", Output = "dye", OutputId = "dye_test",
                         Inputs = new[] { new RecipeInputData { VarietyId = "alpha_pure", Count = 2 } }
+                    },
+                    new RecipeData
+                    {
+                        RecipeId = "recipe_dupe", Output = "dye", OutputId = "dye_dupe",
+                        // The same VarietyId split across two input rows (2 + 1 = 3 total): a content
+                        // author should never write this (the validator now rejects it), but the rule
+                        // itself must still sum the rows correctly rather than checking/consuming each
+                        // in isolation.
+                        Inputs = new[]
+                        {
+                            new RecipeInputData { VarietyId = "alpha_pure", Count = 2 },
+                            new RecipeInputData { VarietyId = "alpha_pure", Count = 1 }
+                        }
                     }
                 }
             };
@@ -220,6 +233,37 @@ namespace BeastCraft.Tests.EditMode
             GardenLibrary library = GardenLibrary.Build(SyntheticData());
 
             Assert.IsFalse(GardenRules.Craft(save, library, "no_such_recipe").Success);
+        }
+
+        [Test]
+        public void Craft_SumsARepeatedInputVarietyAcrossRows_BeforeCheckingAndConsuming()
+        {
+            PlayerSave save = FreshSave();
+            GardenLibrary library = GardenLibrary.Build(SyntheticData());
+
+            // recipe_dupe needs 3 alpha_pure total (2 + 1 rows). Holding only 2 must refuse and change
+            // nothing (the old per-row check would have let this through with 2 held).
+            save.Grove.Items.Add("alpha_pure", 2);
+            Assert.IsFalse(GardenRules.Craft(save, library, "recipe_dupe").Success);
+            Assert.AreEqual(2, save.Grove.Items.GetCount("alpha_pure"), "a refused craft must not consume anything");
+            Assert.AreEqual(0, save.Grove.Items.GetCount("dye_dupe"));
+
+            save.Grove.Items.Add("alpha_pure", 1);
+            Assert.IsTrue(GardenRules.Craft(save, library, "recipe_dupe").Success);
+            Assert.AreEqual(0, save.Grove.Items.GetCount("alpha_pure"), "all 3 required are consumed, not just one row's worth");
+            Assert.AreEqual(1, save.Grove.Items.GetCount("dye_dupe"));
+        }
+
+        // ---- Content: no recipe may repeat a VarietyId across its own inputs ----
+
+        [Test]
+        public void ValidateRecipes_RejectsARepeatedVarietyIdWithinOneRecipe()
+        {
+            GardenLibraryData data = SyntheticData();
+            List<string> errors = GardenLibraryValidator.Validate(data, null, null, null);
+
+            Assert.IsTrue(errors.Exists(e => e.Contains("recipe_dupe") && e.Contains("repeated")),
+                          "recipe_dupe's two alpha_pure rows must be flagged:\n" + string.Join("\n", errors));
         }
     }
 }

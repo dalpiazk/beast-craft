@@ -83,13 +83,15 @@ namespace BeastCraft.Expeditions
                 return ExpeditionActionResult.Refused("Send 1 to " + destination.PartySize + " beasts.");
             }
 
+            int sendIndex = save.Expeditions.SendCount;
+            save.Expeditions.SendCount = sendIndex + 1;
             ActiveExpedition active = new ActiveExpedition
             {
                 DestinationId = destinationId,
                 BeastIds = party,
                 StartUtcTicks = OfflineClock.UtcTicks(nowUtc),
                 StartMonotonicMs = OfflineClock.MonotonicMs(nowMonotonic),
-                Seed = SeedFrom(nowUtc, destinationId, save.Expeditions.Active.Count)
+                Seed = SeedFrom(save, destinationId, sendIndex)
             };
             save.Expeditions.Active.Add(active);
             return ExpeditionActionResult.Succeeded();
@@ -223,16 +225,24 @@ namespace BeastCraft.Expeditions
             return chosen;
         }
 
-        private static int SeedFrom(DateTime nowUtc, string destinationId, int salt)
+        /// <summary>
+        /// One Send's outcome-roll seed: <paramref name="destinationId"/> mixed with
+        /// <paramref name="sendIndex"/> (<see cref="ExpeditionProgress.SendCount"/> at the time of this
+        /// send) and the save's own stable seed (<c>PlayerSave.Idle.IdleSeed</c>) — the same
+        /// "never the wall clock" idiom <see cref="GroveRules.RollGift"/> uses for a beast's
+        /// <c>GiftSeed</c>. Deliberately takes no <see cref="DateTime"/>: the wall clock is
+        /// player-controlled, so it must never be able to decide (or re-roll, by resending at a
+        /// different clock reading) an outcome.
+        /// </summary>
+        private static int SeedFrom(PlayerSave save, string destinationId, int sendIndex)
         {
-            long ticks = OfflineClock.UtcTicks(nowUtc);
-            int hash = unchecked((int)(ticks ^ (ticks >> 32)) * 31 + salt);
+            int hash = unchecked(save.Idle.IdleSeed * 31);
             foreach (char c in destinationId ?? string.Empty)
             {
                 hash = unchecked((hash * 31) + c);
             }
 
-            int seed = LootRoller.DeriveSeed(hash, SeedStream);
+            int seed = LootRoller.DeriveSeed(LootRoller.DeriveSeed(hash, sendIndex), SeedStream);
             return seed == 0 ? 1 : seed;
         }
 

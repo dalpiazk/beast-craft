@@ -49,7 +49,7 @@ namespace BeastCraft.Game.Screens
             AddButton(null, "back", new Rect(Pad, 40f, 110f, 110f), null, "secondary", () => Ctx.Stack.Pop(), "back");
             Ui.Add(new Panel { Id = "tabs-panel", Bounds = new Rect(Pad, TabsY, PortraitLayout.CanvasWidth - 2f * Pad, TabsHeight), StyleKey = "nav" });
             _tabs = Ui.Add(new Tabs { Id = "grove-tabs", Bounds = new Rect(Pad, TabsY, PortraitLayout.CanvasWidth - 2f * Pad, TabsHeight).Inset(6f) });
-            _tabs.Items.AddRange(new[] { "Glade", "Garden", "Board", "Npc" });
+            _tabs.Items.AddRange(new[] { "Glade", "Garden", "Board", "Folk" });
             _tabs.Glyphs.AddRange(new[] { "grove", "lore", "map", "kinship" });
             _tabs.Changed += index => SelectTab((GroveTab)index);
             BuildAll();
@@ -721,6 +721,7 @@ namespace BeastCraft.Game.Screens
         private readonly Action<string> _onDone;
         private readonly List<string> _selected = new List<string>();
         private readonly Dictionary<Button, string> _chips = new Dictionary<Button, string>();
+        private Button _send;
 
         public SendPartyModal(ScreenContext ctx, BoardViewModel board, string destinationId, string title, int partySize, Action<string> onDone) : base(ctx)
         {
@@ -754,8 +755,16 @@ namespace BeastCraft.Game.Screens
                 y += 108f;
             }
 
-            Button send = panel.Add(new Button { Id = "send", Bounds = new Rect(card.X + 60f, card.Bottom - 150f, (width - 140f) / 2f, 100f), Text = "Send", StyleKey = "primary" });
+            Button send = panel.Add(new Button
+            {
+                Id = "send",
+                Bounds = new Rect(card.X + 60f, card.Bottom - 150f, (width - 140f) / 2f, 100f),
+                Text = "Send",
+                StyleKey = "primary",
+                Enabled = false
+            });
             send.Clicked += Confirm;
+            _send = send;
             Button cancel = panel.Add(new Button
             {
                 Id = "cancel",
@@ -775,6 +784,7 @@ namespace BeastCraft.Game.Screens
             {
                 _selected.Remove(beastId);
                 chip.Selected = false;
+                _send.Enabled = _selected.Count > 0;
                 return;
             }
 
@@ -785,6 +795,7 @@ namespace BeastCraft.Game.Screens
 
             _selected.Add(beastId);
             chip.Selected = true;
+            _send.Enabled = _selected.Count > 0;
         }
 
         private void Confirm()

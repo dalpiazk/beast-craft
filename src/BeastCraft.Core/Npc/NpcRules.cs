@@ -189,6 +189,18 @@ namespace BeastCraft.Npc
         /// </summary>
         public static DialogueLineData ResolveAndMark(PlayerSave save, DialogueBook book, string npcId, ICollection<string> facts)
         {
+            return ResolveAndMark(save, book, npcId, facts, out bool _);
+        }
+
+        /// <summary>
+        /// <see cref="ResolveAndMark(PlayerSave, DialogueBook, string, ICollection{string})"/>, also
+        /// reporting whether the resolved line was newly added to <see cref="NpcProgress.Dialogue"/>'s
+        /// <c>LinesSeen</c> (false when it was already seen, or nothing resolved) — so a caller can
+        /// autosave only when this call actually changed the save.
+        /// </summary>
+        public static DialogueLineData ResolveAndMark(PlayerSave save, DialogueBook book, string npcId, ICollection<string> facts, out bool newlySeen)
+        {
+            newlySeen = false;
             if (save == null || book == null)
             {
                 return null;
@@ -201,6 +213,7 @@ namespace BeastCraft.Npc
                 if (!save.Npc.Dialogue.LinesSeen.Contains(line.LineId))
                 {
                     save.Npc.Dialogue.LinesSeen.Add(line.LineId);
+                    newlySeen = true;
                 }
             }
 

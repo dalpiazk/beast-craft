@@ -389,8 +389,17 @@ namespace BeastCraft.Game.Ui
 
                 Color ink = C(selected ? "plumDeep" : "cream");
                 float g = Math.Min(item.Width, item.Height) * 0.46f;
-                Glyph(i < tabs.Glyphs.Count ? tabs.Glyphs[i] : null, new Rect(item.Center.X - g / 2f, item.Y + item.Height * 0.12f, g, g), ink);
-                _text.DrawCentered(_draw, _text.Fit(tabs.Items[i], style.TextSize, item.Width - 8f), item.Center.X, item.Bottom - item.Height * 0.3f, style.TextSize, ink);
+                float iconTop = item.Y + item.Height * 0.12f;
+                Glyph(i < tabs.Glyphs.Count ? tabs.Glyphs[i] : null, new Rect(item.Center.X - g / 2f, iconTop, g, g), ink);
+
+                // Centre the label (DrawCentered's y is the text's TOP, not its middle) in the band
+                // below the icon, clamped so it never runs past item's own bottom edge — otherwise it
+                // sits on, or past, the selected pill's edge instead of fully inside it.
+                float labelBandTop = iconTop + g;
+                float labelHeight = _text.LineHeight(style.TextSize);
+                float labelTop = labelBandTop + (item.Bottom - labelBandTop - labelHeight) / 2f;
+                labelTop = Math.Min(labelTop, item.Bottom - labelHeight);
+                _text.DrawCentered(_draw, _text.Fit(tabs.Items[i], style.TextSize, item.Width - 8f), item.Center.X, labelTop, style.TextSize, ink);
             }
         }
 
