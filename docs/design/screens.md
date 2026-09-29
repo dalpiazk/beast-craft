@@ -401,27 +401,40 @@ them.
 Every hand-built page before Avatar/Inventory/Shop (the beast detail screen, Grove, Compendium)
 re-implemented the same handful of composites for itself — a top-bar height constant, a private
 `Card(y, height, style, draw)` plus its own `Dictionary<Widget, Action<Rect>>`, a hand-drawn beast or
-item card, a chip row, a section heading, a stat table — and that duplication is what caused the
-layout bugs (clipped rows, header/divider collisions, tab overlap) those screens hit. Avatar,
-Inventory and Shop are built instead on a small shared layer,
-`src/BeastCraft.Game/Screens/Components/ScreenComponents.cs` (namespace
-`BeastCraft.Game.Screens.Components`), which wraps the widgets above rather than replacing them:
+item card, a chip row, a section heading, a stat table, an inner tab strip with its own guessed
+height — and that duplication is what caused the layout bugs (clipped rows, header/divider
+collisions, tab overlap) those screens hit. Avatar, Inventory and Shop were built first on a small
+shared layer, `src/BeastCraft.Game/Screens/Components/ScreenComponents.cs` (namespace
+`BeastCraft.Game.Screens.Components`), which wraps the widgets above rather than replacing them; a
+follow-up refactor then moved the beast detail screen, Grove, Compendium/Achievements/Look-token shop
+and the Encounter/Glossary headers onto it too, so it is now the whole app's one out-of-combat layout
+layer (the battle screen and the map's own painted rendering stay their own thing — a fixed-camera
+board with per-frame effects has nothing in common with a scrolling card list):
 
 | Component | What it is |
 |---|---|
-| `HeaderMetrics` | The two standard header heights (`Standard` — back button + title + subtitle; `Tall` — + a stat/identity line) and the page padding, as one source of truth. |
-| `ScreenHeader` | Builds the back button; `Paint` draws the fixed wash + divider + title/subtitle over whatever a scroll view painted underneath, and repaints the back button (both live above the header line). |
+| `HeaderMetrics` | The standard header heights (`Compact` — back + title, no room to spare, the encounter/glossary shape; `Standard` — back + title + subtitle, most screens; `Roomy` — + two extra lines with more breathing room, Achievements' shape; `Tall` — + a stat/identity line, the beast detail screen's shape) and the page padding, as one source of truth. |
+| `ScreenHeader` | Builds the back button; `Paint` draws the fixed wash + divider + title/subtitle over whatever a scroll view painted underneath, and repaints the back button (both live above the header line). A screen whose title sits somewhere other than the fixed position (Glossary's lower, centred title) calls `Paint` with an empty title for the wash alone and draws its own title over it, the same way the beast detail screen's "no such beast" case does. |
+| `TabStrip` | The inner tab strip (Avatar's Overview/Skills/Gear/Wardrobe, Inventory's Gear/Materials/Looks, the Trader's Stock/Sell, Grove's Glade/Garden/Board/Npc) at one shared height, so it never has to guess how much room its icon-and-label layout needs (Grove's own strip had been widened to work around a now-fixed `UiPainter.Tabs` label-clamp bug, not a real layout need). |
 | `SectionHeader` | A card's heading line. |
-| `CardList` | The `Card`/drawer-dictionary pair every page rebuilt for itself, now written once: wraps one `ScrollView`, `Begin()`/`Card(...)`/`End(y)` to rebuild it (keeping the scroll position), `TryDraw` for the screen's `DrawCustom`. |
+| `CardList` | The `Card`/drawer-dictionary pair every page rebuilt for itself, now written once: wraps one `ScrollView`, `Begin()`/`Card(...)`/`End(y)` to rebuild it (keeping the scroll position), `TryDraw` for the screen's `DrawCustom`; `TrackDraw` registers a drawer for a widget the screen added itself (an irregular grid cell, e.g. the Grove Garden's plots) rather than through `Card`. Every screen on `CardList` now advances by its one fixed card gap (26px) rather than each screen's own hand-picked value (16-30px before) — wider than most, so it only ever adds air, never removes it. |
 | `ChipRow` | A wrapping row of chip buttons (a filter, a sort cycle) from a label list. |
 | `StatTable` | A name column plus up to two right-aligned numeric columns with headers (the Avatar Overview's base/total stats). |
 | `ItemRow` | A list row's text (title, subtitle, a detail/disabled-reason line) — Inventory's and the Trader's listings. |
 | `ActionRow` | One or more buttons stacked and right-aligned in an area, each bound to `Enabled`. |
 | `BeastCard` / `BeastPickerModal` | A small portrait-or-placeholder beside a name and subtitle, and a titled modal list of them — equip gear to a beast, buy a tome for one. |
 
-This PR does not migrate Roster/beast-detail, Grove or Compendium onto these components (a separate
-follow-up refactor); new full-page screens should build on this layer rather than hand-rolling their
-own `Card`/chip-row/stat-table again.
+Left off this layer, deliberately: `ElementChartScreen` (no wash/divider at all — title text drawn
+straight over the background, a genuinely different shape, not a duplicate of `ScreenHeader`'s);
+`ResultsScreen` and `StarterPickScreen` (a full-bleed banner/gradient with a centred title, no back
+button, no wash — their own shape, not `ScreenHeader`'s); the Discovery layer's `PoiModal` /
+`RegionProgressModal`, `ChoiceModal`, `SettingsModal` and the other `GameModal` subclasses (each
+already a small, self-contained centred card with its own one-off sizing, not a second copy of a
+`CardList` or `ScreenHeader` shape); `HomeScreen`'s own map/nav chrome (already its own thing, not a
+hand-rolled copy of these components); `BattleLogModal` (shared with the battle screen, which is out
+of scope for this refactor, so left untouched to avoid any visual change rippling into it). New
+full-page screens should build on this layer rather than hand-rolling their own
+`Card`/chip-row/stat-table/tab-strip again.
 
 ## How to add a screen
 
