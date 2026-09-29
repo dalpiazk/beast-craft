@@ -8,7 +8,7 @@ using NUnit.Framework;
 namespace BeastCraft.Tests.EditMode
 {
     /// <summary>
-    /// Golden save fixtures for every schema version (1-11): each committed input is loaded (and
+    /// Golden save fixtures for every schema version (1-12): each committed input is loaded (and
     /// migrated) by <see cref="SaveSerializer"/> and written back, and the text must equal the
     /// committed expected output byte for byte. The fixtures and outputs were captured on the
     /// Unity-era JsonUtility serializer; the engine-neutral serializer must reproduce them exactly.
@@ -83,6 +83,16 @@ namespace BeastCraft.Tests.EditMode
     /// became <c>11</c>, and <c>,"PendingBattleConsumables":[]</c> follows <c>"Npc"</c>'s closing brace
     /// (nothing pending: an older save never recorded a battle in progress). No input changed.
     /// </para>
+    /// <para>
+    /// Schema 12 (the "new" markers' seen list, <c>PlayerSave.Seen</c>) froze <c>rich-v11</c> as an input and
+    /// added <c>rich-v12</c>, which is now the one that must round-trip unchanged. Every older expected output
+    /// changed in exactly these places: <c>"SchemaVersion":11</c> became <c>12</c>, and
+    /// <c>,"Seen":{"Gear":[...],"Looks":[...]}</c> follows <c>"PendingBattleConsumables"</c>, listing the gear instance
+    /// ids and unlocked look keys that save already owned (the migration marks them seen). And the placed decor's
+    /// <c>X</c>/<c>Y</c> (now fractions of the habitat canvas, clamped to 0-1 on load) read 1 in <c>rich-v10</c> and
+    /// <c>rich-v11</c>, whose reflection-filled 64-65 were out of range. <c>rich-v12</c>'s capture fills them in range.
+    /// No input changed.
+    /// </para>
     /// </summary>
     public class GoldenSaveTests
     {
@@ -120,7 +130,8 @@ namespace BeastCraft.Tests.EditMode
             "{\"SchemaVersion\":8}",
             "{\"SchemaVersion\":9}",
             "{\"SchemaVersion\":10}",
-            "{\"SchemaVersion\":11}"
+            "{\"SchemaVersion\":11}",
+            "{\"SchemaVersion\":12}"
         };
 
         private static SaveSerializer NewSerializer()
@@ -164,24 +175,30 @@ namespace BeastCraft.Tests.EditMode
             return GoldenFiles.Read("Saves/rich-v10.input.json");
         }
 
-        /// <summary>The frozen schema-11 rich save (captured by reflection in update mode).</summary>
+        /// <summary>The frozen schema-11 rich save (captured by reflection before schema 12; never rewritten).</summary>
         private static string RichV11()
+        {
+            return GoldenFiles.Read("Saves/rich-v11.input.json");
+        }
+
+        /// <summary>The frozen schema-12 rich save (captured by reflection in update mode).</summary>
+        private static string RichV12()
         {
             if (GoldenFiles.Updating)
             {
                 PlayerSave save = new PlayerSave();
                 int seed = 1;
                 Populate(save, ref seed, 0);
-                GoldenFiles.Write("Saves/rich-v11.input.json", NewSerializer().Serialize(save));
+                GoldenFiles.Write("Saves/rich-v12.input.json", NewSerializer().Serialize(save));
             }
 
-            return GoldenFiles.Read("Saves/rich-v11.input.json");
+            return GoldenFiles.Read("Saves/rich-v12.input.json");
         }
 
         [Test]
-        public void RichV11_RoundTripsByteIdentical()
+        public void RichV12_RoundTripsByteIdentical()
         {
-            string input = RichV11();
+            string input = RichV12();
             SaveLoadResult result = NewSerializer().Deserialize(input);
 
             Assert.IsTrue(result.Success, result.Error);
@@ -202,6 +219,7 @@ namespace BeastCraft.Tests.EditMode
             StringAssert.Contains("\"ChaptersCompleted\":[", input, "the rich save fills the schema-10 NPC dialogue layer's fields (D2)");
             StringAssert.Contains("\"LocationsSoothed\":", input, "the rich save fills the schema-10 peaceful-clears field (D3)");
             StringAssert.Contains("\"PendingBattleConsumables\":[\"", input, "the rich save fills the schema-11 crash-refund field");
+            StringAssert.Contains("\"Seen\":{\"Gear\":[\"", input, "the rich save fills the schema-12 seen list");
         }
 
         [TestCase(1)]
@@ -215,9 +233,11 @@ namespace BeastCraft.Tests.EditMode
         [TestCase(9)]
         [TestCase(10)]
         [TestCase(11)]
+        [TestCase(12)]
         public void RichSave_LoadsAndMigrates_ToTheGoldenText(int version)
         {
-            string input = version == 11 ? RichV11()
+            string input = version == 12 ? RichV12()
+                            : version == 11 ? RichV11()
                             : version == 10 ? RichV10()
                             : version == 9 ? RichV9()
                             : version == 8 ? RichV8()
@@ -238,6 +258,7 @@ namespace BeastCraft.Tests.EditMode
         [TestCase(9)]
         [TestCase(10)]
         [TestCase(11)]
+        [TestCase(12)]
         public void MinimalSave_LoadsAndMigrates_ToTheGoldenText(int version)
         {
             AssertGolden("min-v" + version, MinimalInputs[version - 1], version);
@@ -281,6 +302,11 @@ namespace BeastCraft.Tests.EditMode
                 }
 
                 object value = Make(field.FieldType, ref seed, depth + 1);
+                if (target is Grove.PlacedDecorEntry && value is float fraction)
+                {
+                    // Decor sits at fractions of its habitat canvas (0-1, clamped on load since schema 12).
+                    value = (float)Math.Round(fraction / 100f, 4);
+                }
 
                 if (value != null)
                 {

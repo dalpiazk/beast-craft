@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using BeastCraft.Game.Screens.Components;
+using BeastCraft.Presentation.Board;
 using BeastCraft.Presentation.Cards;
 using BeastCraft.Presentation.Layout;
 using BeastCraft.Presentation.Screens;
@@ -56,8 +57,15 @@ namespace BeastCraft.Game.Screens
             BuildAll();
         }
 
+        public override void Exit()
+        {
+            _hub.Wardrobe.SaveSeen();
+            base.Exit();
+        }
+
         public void SelectTab(AvatarTab tab)
         {
+            _hub.Wardrobe.SaveSeen();
             _hub.Select(tab);
             ShowTab();
         }
@@ -385,6 +393,17 @@ namespace BeastCraft.Game.Screens
                             Build();
                         };
                     }
+
+                    string pickId = category.CategoryId;
+                    Button custom = _wardrobe.Add(new Button
+                    {
+                        Id = "custom-colour-" + category.CategoryId,
+                        Bounds = new Rect(HeaderMetrics.Pad + 40f + AvatarWardrobeViewModel.Swatches.Length * 100f + 10f, top + 110f, 220f, 64f),
+                        Text = Loc("ui.avatar.custom_colour"),
+                        StyleKey = "chip"
+                    });
+                    int pickIndex = _hub.Wardrobe.Categories.FindAll(c => c.IsColor).FindIndex(c => c.CategoryId == pickId);
+                    custom.Clicked += () => OpenColourPicker(pickIndex);
                 }
                 else
                 {
@@ -422,6 +441,18 @@ namespace BeastCraft.Game.Screens
             _wardrobe.End(y);
         }
 
+        /// <summary>Opens the custom colour picker for the <paramref name="index"/>th colour category (the Custom chip; scripted screenshots).</summary>
+        public void OpenColourPicker(int index)
+        {
+            WardrobeCategoryRow category = _hub.Wardrobe.Categories.FindAll(c => c.IsColor)[index];
+            string categoryId = category.CategoryId;
+            Ctx.Stack.PushModal(new ColourPickerModal(Ctx, category.DisplayName, _hub.Wardrobe.CurrentHsv(categoryId), colour =>
+            {
+                _hub.Wardrobe.SetColorHsv(categoryId, colour);
+                Build();
+            }));
+        }
+
         private void DrawColorCategory(Rect box, WardrobeCategoryRow category)
         {
             SectionHeader.Draw(Ctx, box, category.DisplayName);
@@ -441,6 +472,11 @@ namespace BeastCraft.Game.Screens
         private void DrawOptionCategory(Rect box, WardrobeCategoryRow category)
         {
             SectionHeader.Draw(Ctx, box, category.DisplayName);
+            if (category.HasNew)
+            {
+                Painter.NewDot(new Vec2(box.Right - 30f, box.Y + 30f));
+            }
+
             float x = box.X + 40f;
             float w = box.Width - 300f;
             float body = Ctx.Style.TextSizes.Body;
@@ -455,6 +491,15 @@ namespace BeastCraft.Game.Screens
             {
                 WardrobeOptionRow option = category.Options[i];
                 float y = box.Y + 90f + i * 96f;
+                if (option.IsNew)
+                {
+                    Painter.NewDot(new Vec2(box.X + 20f, y + 18f));
+                    if (_wardrobe.OnScreen(new Rect(box.X, y, box.Width, 96f)))
+                    {
+                        _hub.Wardrobe.MarkSeen(option.Key);
+                    }
+                }
+
                 Painter.TextIn(option.Name, new Rect(x, y, w, body), body, Painter.C(option.Worn ? "leafDeep" : "ink"), TextAlign.Left);
                 string status = option.Worn ? Loc("ui.beast.worn") : option.Owned ? Loc("ui.beast.owned") : option.TokenPurchasable ? Loc("ui.avatar.token_price", option.TokenPrice) : Loc("ui.grove.locked");
                 Painter.TextIn(status, new Rect(x, y + 40f, w, small), small, Painter.C(option.Worn ? "leafDeep" : option.Owned ? "goldDeep" : "inkSoft"), TextAlign.Left);
@@ -471,6 +516,11 @@ namespace BeastCraft.Game.Screens
             base.Draw();
             AvatarOverviewViewModel overview = _hub.Overview;
             _header.Paint(Ctx, Ui, Loc("ui.avatar.title"), Loc("ui.tutorial.beast_level", overview.DisplayName, overview.Level));
+            if (_hub.Wardrobe.AnyNew || _hub.Wardrobe.Categories.Exists(category => category.HasNew))
+            {
+                Rect wardrobeTab = _tabs.ItemBounds((int)AvatarTab.Wardrobe);
+                Painter.NewDot(new Vec2(wardrobeTab.Right - 30f, wardrobeTab.Y + 26f));
+            }
         }
 
         protected override void DrawCustom(Widget widget)

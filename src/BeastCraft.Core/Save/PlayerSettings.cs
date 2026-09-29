@@ -60,6 +60,12 @@ namespace BeastCraft.Save
         public bool IdleNotifications;
 
         /// <summary>
+        /// A local notification when something in the Grove is ready: a plot grown or an expedition back (the Android host
+        /// only; other hosts ignore it). Off by default.
+        /// </summary>
+        public bool GroveNotifications;
+
+        /// <summary>
         /// Whether the tutorial hints show (each at most once; <c>PlayerSave.Tutorial.SeenHintIds</c>).
         /// On by default; a hint's own "Turn hints off" and the settings row switch it.
         /// </summary>

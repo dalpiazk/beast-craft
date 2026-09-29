@@ -59,10 +59,10 @@ namespace BeastCraft.Game
         public Func<TimeSpan> MonotonicClock;
 
         /// <summary>
-        /// Posts the "idle rewards are full" local notification (Android). Null: the host has none
-        /// (desktop), and the setting is hidden.
+        /// Posts the local notifications (Android): idle rewards full, and something ready in the Grove. Null: the host
+        /// has none (desktop), and their settings are hidden.
         /// </summary>
-        public IIdleNotifier IdleNotifier;
+        public ILocalNotifier Notifier;
 
         /// <summary>
         /// Vibrates the device (Android). Null: the host has none (desktop): the game uses
@@ -95,21 +95,42 @@ namespace BeastCraft.Game
         }
     }
 
+    /// <summary>Which local notification (each has its own channel and alarm, so one never replaces the other).</summary>
+    public enum LocalNotification
+    {
+        /// <summary>The idle rewards are full (<c>PlayerSettings.IdleNotifications</c>).</summary>
+        IdleFull = 0,
+
+        /// <summary>A Grove plot has grown or an expedition is back (<c>PlayerSettings.GroveNotifications</c>).</summary>
+        GroveReady = 1
+    }
+
+    /// <summary>A notification's words, from the game's text table (the host has no content of its own when it fires).</summary>
+    public sealed class LocalNotificationText
+    {
+        public string Title;
+        public string Body;
+
+        /// <summary>The channel's name and description (Android shows them in the app's notification settings).</summary>
+        public string Channel;
+
+        public string ChannelDescription;
+    }
+
     /// <summary>
-    /// The platform seam for the "idle rewards are full" local notification (the player's
-    /// <c>PlayerSettings.IdleNotifications</c>, off by default). The game schedules one when it goes
-    /// to the background (at the moment the idle cap fills) and cancels it when it comes back.
-    /// Android implements it (an inexact alarm that posts the notification); desktop has none.
+    /// The platform seam for the local notifications (each off by default in the settings). The game schedules one
+    /// when it goes to the background (the idle cap filling, the Grove's next thing ready) and cancels them when it
+    /// comes back. Android implements it (an inexact alarm per notification that posts it); desktop has none.
     /// </summary>
-    public interface IIdleNotifier
+    public interface ILocalNotifier
     {
         /// <summary>Asks for the permission to post notifications, where the platform needs one (Android 13+).</summary>
         void RequestPermission();
 
-        /// <summary>Posts the notification at <paramref name="utc"/> (replacing any scheduled one).</summary>
-        void Schedule(DateTime utc);
+        /// <summary>Posts <paramref name="kind"/> at <paramref name="utc"/> with <paramref name="text"/> (replacing any of that kind already scheduled).</summary>
+        void Schedule(LocalNotification kind, DateTime utc, LocalNotificationText text);
 
-        /// <summary>Cancels the scheduled notification and removes a posted one.</summary>
-        void Cancel();
+        /// <summary>Cancels <paramref name="kind"/>'s scheduled notification and removes a posted one.</summary>
+        void Cancel(LocalNotification kind);
     }
 }

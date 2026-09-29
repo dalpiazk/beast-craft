@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using BeastCraft.Avatar;
 using BeastCraft.Battle;
 using BeastCraft.Creatures;
@@ -84,6 +85,9 @@ namespace BeastCraft.Presentation.Screens
         public string WornBy;
 
         public bool CanSell => WornBy == null;
+
+        /// <summary>Owned and not seen yet (<see cref="SeenRules.IsNewGear"/>), as the list was built: the row shows a dot.</summary>
+        public bool IsNew;
     }
 
     /// <summary>
@@ -95,6 +99,7 @@ namespace BeastCraft.Presentation.Screens
     public sealed class InventoryGearViewModel
     {
         private readonly GameSession _session;
+        private bool _seenChanged;
 
         public InventoryGearViewModel(GameSession session)
         {
@@ -181,6 +186,45 @@ namespace BeastCraft.Presentation.Screens
             }
         }
 
+        /// <summary>Whether any owned gear (beast or avatar, whatever the filter) is not seen yet: the Gear tab shows a dot.</summary>
+        public bool AnyNew
+        {
+            get
+            {
+                PlayerSave save = _session.Save;
+                if (save?.Gear == null)
+                {
+                    return false;
+                }
+
+                foreach (OwnedGear gear in save.Gear.BeastGear.Concat(save.Gear.AvatarGear))
+                {
+                    if (gear != null && SeenRules.IsNewGear(save, gear.InstanceId))
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+        }
+
+        /// <summary>Records <paramref name="instanceId"/> as seen (its row has been on screen); <see cref="SaveSeen"/> writes it.</summary>
+        public void MarkSeen(string instanceId)
+        {
+            _seenChanged |= SeenRules.MarkGearSeen(_session.Save, instanceId);
+        }
+
+        /// <summary>Autosaves when rows were seen since the last call (the screen calls it as it leaves or switches tab).</summary>
+        public void SaveSeen()
+        {
+            if (_seenChanged)
+            {
+                _seenChanged = false;
+                _session.Autosave(AutosaveReason.PlayerEdit);
+            }
+        }
+
         private InventoryGearRow Row(string instanceId, string gearId, bool avatar, string name, string slotName, int rarity, int minimumLevel, List<StatModifier> modifiers, string wornBy)
         {
             InventoryGearRow row = new InventoryGearRow
@@ -192,7 +236,8 @@ namespace BeastCraft.Presentation.Screens
                 SlotName = slotName,
                 Rarity = rarity,
                 MinimumLevel = minimumLevel,
-                WornBy = wornBy
+                WornBy = wornBy,
+                IsNew = SeenRules.IsNewGear(_session.Save, instanceId)
             };
             foreach (StatModifier modifier in modifiers ?? new List<StatModifier>())
             {

@@ -31,6 +31,8 @@ namespace BeastCraft.Save
     /// before schema 10 shipped — see <see cref="AddGrove"/>'s own remarks.</item>
     /// <item>10 to 11: the consumables spent on a battle in progress (<see cref="PlayerSave.PendingBattleConsumables"/>),
     /// so a battle the process died in hands them back: <see cref="AddPendingBattle"/>.</item>
+    /// <item>11 to 12: the gear and looks already seen (<see cref="PlayerSave.Seen"/>), for the "new" dots; everything
+    /// owned then counts as seen: <see cref="AddSeen"/>.</item>
     /// </list>
     /// </summary>
     public static class SaveMigrations
@@ -41,7 +43,7 @@ namespace BeastCraft.Save
             return new List<ISaveMigration>
             {
                 new AddGear(), new AddCampaign(), new AddEconomy(), new AddIdle(), new AddRunDifficulty(), new AddTutorial(), new AddDiscovery(), new AddCompendium(),
-                new AddGrove(), new AddPendingBattle()
+                new AddGrove(), new AddPendingBattle(), new AddSeen()
             };
         }
 
@@ -365,6 +367,29 @@ namespace BeastCraft.Save
                 PlayerSave save = serializer.FromJson<PlayerSave>(json);
                 save.EnsureInitialized();
                 save.SchemaVersion = 11;
+                return serializer.ToJson(save);
+            }
+        }
+
+        /// <summary>
+        /// Schema 11 to 12: a v11 save has no seen list. The upgrade reads it into the current type and
+        /// marks every gear instance and unlocked look it owns as seen (<see cref="SeenRules.MarkAllOwnedSeen"/>),
+        /// so an updated save shows nothing as new; only what is earned after the update gets a dot.
+        /// Nothing else moves.
+        /// </summary>
+        public sealed class AddSeen : ISaveMigration
+        {
+            public int FromVersion
+            {
+                get { return 11; }
+            }
+
+            public string Upgrade(string json, ISaveJsonSerializer serializer)
+            {
+                PlayerSave save = serializer.FromJson<PlayerSave>(json);
+                save.EnsureInitialized();
+                SeenRules.MarkAllOwnedSeen(save);
+                save.SchemaVersion = 12;
                 return serializer.ToJson(save);
             }
         }

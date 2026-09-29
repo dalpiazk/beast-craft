@@ -212,7 +212,7 @@ namespace BeastCraft.Tests.EditMode
             Assert.AreEqual(1, session.Settings.BattleSpeed, "x3 wraps to x1");
             Assert.AreEqual(1, SettingsViewModel.Speed(new PlayerSettings { BattleSpeed = 9 }), "out of range reads as x1");
 
-            Assert.AreEqual(SettingsViewModel.RowCount - 2, desktop.Rows().Count, "no notification or vibration row on desktop");
+            Assert.AreEqual(SettingsViewModel.RowCount - 3, desktop.Rows().Count, "no notification (idle, Grove) or vibration row on desktop");
             Assert.IsNull(desktop.Row(SettingsViewModel.IdleNotifications));
             desktop.Change(SettingsViewModel.IdleNotifications);
             Assert.IsFalse(session.Settings.IdleNotifications);

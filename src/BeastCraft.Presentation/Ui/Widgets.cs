@@ -323,6 +323,102 @@ namespace BeastCraft.Presentation.Ui
         }
     }
 
+    /// <summary>
+    /// Something the player drags about (a Grove decor piece on its habitat canvas): a press that moves more than
+    /// <see cref="DragThreshold"/> drags it instead of tapping it, and wins over any <see cref="ScrollView"/> it sits in
+    /// (the scroll never starts). <see cref="Moved"/> reports how far the pointer is from where it went down, in this
+    /// widget's own space (the space its <see cref="Widget.Bounds"/> are in); the owner moves <see cref="Widget.Bounds"/> as
+    /// it sees fit (<see cref="StartBounds"/> is where it was) and commits on <see cref="Dropped"/>. A press that does not
+    /// move is an ordinary tap (<see cref="Clicked"/>).
+    /// </summary>
+    public class Draggable : Widget
+    {
+        /// <summary>How far (canvas px) a press moves before it is a drag rather than a tap.</summary>
+        public const float DragThreshold = 10f;
+
+        /// <summary>Whether a drag is under way.</summary>
+        public bool Dragging { get; private set; }
+
+        /// <summary>The bounds when the drag started.</summary>
+        public Rect StartBounds { get; private set; }
+
+        /// <summary>Where the press went down, canvas pixels (set by <see cref="UiRoot"/> as it lands).</summary>
+        public Vec2 PressedAt { get; internal set; }
+
+        /// <summary>The pointer moved: how far from where it went down (x, y).</summary>
+        public event Action<Draggable, Vec2> Moved;
+
+        /// <summary>The drag ended (released, or cancelled by a modal).</summary>
+        public event Action<Draggable> Dropped;
+
+        public event Action Clicked;
+
+        public override bool Interactive
+        {
+            get { return true; }
+        }
+
+        public override void Click(Vec2 canvasPoint)
+        {
+            Clicked?.Invoke();
+        }
+
+        internal void BeginDrag()
+        {
+            Dragging = true;
+            StartBounds = Bounds;
+        }
+
+        internal void DragBy(Vec2 delta)
+        {
+            Moved?.Invoke(this, delta);
+        }
+
+        internal void EndDrag()
+        {
+            if (!Dragging)
+            {
+                return;
+            }
+
+            Dragging = false;
+            Dropped?.Invoke(this);
+        }
+    }
+
+    /// <summary>
+    /// A horizontal value bar, 0-1 across its width: a tap sets the value where it lands, a drag follows the pointer
+    /// (<see cref="Draggable"/>, so it wins over a scroll). <see cref="Changed"/> reports every new value; the screen
+    /// draws the bar (a colour picker's hue, saturation and value).
+    /// </summary>
+    public sealed class SliderBar : Draggable
+    {
+        public SliderBar()
+        {
+            Moved += (bar, delta) => Set(PressedAt.X + delta.X);
+            Clicked += () => Set(PressedAt.X);
+        }
+
+        /// <summary>The value, 0 (left) to 1 (right).</summary>
+        public float Value;
+
+        public event Action<float> Changed;
+
+        /// <summary>The value at canvas x <paramref name="canvasX"/> (clamped to the bar).</summary>
+        public float ValueAt(float canvasX)
+        {
+            float left = ToCanvas(new Vec2(Bounds.X, Bounds.Y)).X;
+            float t = Bounds.Width <= 0f ? 0f : (canvasX - left) / Bounds.Width;
+            return t < 0f ? 0f : t > 1f ? 1f : t;
+        }
+
+        private void Set(float canvasX)
+        {
+            Value = ValueAt(canvasX);
+            Changed?.Invoke(Value);
+        }
+    }
+
     /// <summary>An invisible tappable area (a node on the map, a card): the screen draws what it stands for.</summary>
     public sealed class Hotspot : Widget
     {
@@ -579,6 +675,7 @@ namespace BeastCraft.Presentation.Ui
 
         private Widget _pressed;
         private ScrollView _scroll;
+        private Draggable _draggable;
         private Vec2 _downAt;
         private bool _dragging;
 
@@ -612,12 +709,37 @@ namespace BeastCraft.Presentation.Ui
             }
 
             _scroll = hit?.ScrollAncestor();
+
+            // A draggable wins over the scroll it sits in: that scroll never starts from this press.
+            _draggable = _pressed as Draggable;
+            if (_draggable != null)
+            {
+                _draggable.PressedAt = point;
+                _scroll = null;
+            }
         }
 
         public void OnPointerMove(Vec2 point)
         {
             if (!PointerDown)
             {
+                return;
+            }
+
+            if (_draggable != null)
+            {
+                Vec2 delta = new Vec2(point.X - _downAt.X, point.Y - _downAt.Y);
+                if (!_dragging && delta.X * delta.X + delta.Y * delta.Y > Draggable.DragThreshold * Draggable.DragThreshold)
+                {
+                    _dragging = true;
+                    _draggable.BeginDrag();
+                }
+
+                if (_dragging)
+                {
+                    _draggable.DragBy(delta);
+                }
+
                 return;
             }
 
@@ -650,6 +772,16 @@ namespace BeastCraft.Presentation.Ui
             PointerDown = false;
             if (_dragging)
             {
+                if (_draggable != null)
+                {
+                    Draggable dropped = _draggable;
+                    _draggable = null;
+                    _pressed = null;
+                    _dragging = false;
+                    dropped.EndDrag();
+                    return null;
+                }
+
                 _dragging = false;
                 _scroll.EndDrag(NowMs);
                 _scroll = null;
@@ -659,6 +791,7 @@ namespace BeastCraft.Presentation.Ui
             Widget pressed = _pressed;
             _pressed = null;
             _scroll = null;
+            _draggable = null;
             Widget hit = HitTest(point)?.InteractiveSelfOrAncestor();
             if (pressed == null || hit != pressed || !pressed.IsLive())
             {
@@ -681,13 +814,21 @@ namespace BeastCraft.Presentation.Ui
         {
             if (_dragging)
             {
-                _scroll?.EndDrag(NowMs);
+                if (_draggable != null)
+                {
+                    _draggable.EndDrag();
+                }
+                else
+                {
+                    _scroll?.EndDrag(NowMs);
+                }
             }
 
             PointerDown = false;
             _dragging = false;
             _pressed = null;
             _scroll = null;
+            _draggable = null;
         }
 
         public override void Tick(float elapsedMs)

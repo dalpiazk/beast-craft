@@ -453,6 +453,13 @@ namespace BeastCraft.Game.Ui
             RoundedRect(box, 0f, color);
         }
 
+        /// <summary>The "new" marker: a small berry dot ringed in white, centred on <paramref name="center"/>.</summary>
+        public void NewDot(Vec2 center)
+        {
+            Disc(center, 13f, C("white"));
+            Disc(center, 9f, C("berry"));
+        }
+
         public void Disc(Vec2 center, float radius, Color color)
         {
             if (radius <= 0f)

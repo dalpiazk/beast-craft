@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using BeastCraft.Game.Screens.Components;
+using BeastCraft.Presentation.Board;
 using BeastCraft.Presentation.Layout;
 using BeastCraft.Presentation.Screens;
 using BeastCraft.Presentation.Ui;
@@ -53,8 +54,15 @@ namespace BeastCraft.Game.Screens
             BuildAll();
         }
 
+        public override void Exit()
+        {
+            _hub.Gear.SaveSeen();
+            base.Exit();
+        }
+
         public void SelectTab(InventoryTab tab)
         {
+            _hub.Gear.SaveSeen();
             _hub.Select(tab);
             ShowTab();
         }
@@ -112,7 +120,18 @@ namespace BeastCraft.Game.Screens
             {
                 InventoryGearRow captured = row;
                 float top = y;
-                y = _gearList.Card(y, ItemRow.Height, "card", box => ItemRow.Draw(Ctx, box, RowData(captured), 240f));
+                y = _gearList.Card(y, ItemRow.Height, "card", box =>
+                {
+                    ItemRow.Draw(Ctx, box, RowData(captured), 240f);
+                    if (captured.IsNew)
+                    {
+                        Painter.NewDot(new Vec2(box.X + 20f, box.Y + 20f));
+                        if (_gearList.OnScreen(box))
+                        {
+                            _hub.Gear.MarkSeen(captured.InstanceId);
+                        }
+                    }
+                });
                 List<ActionButtonData> actions = new List<ActionButtonData>();
                 if (row.WornBy == null)
                 {
@@ -250,6 +269,11 @@ namespace BeastCraft.Game.Screens
             Gradient("cream", "creamDeep", new Rect(0, 0, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight));
             base.Draw();
             _header.Paint(Ctx, Ui, Loc("ui.inventory.title"), Loc("ui.encounter.reward_gold", Ctx.Session.Save.Gold));
+            if (_hub.Gear.AnyNew || _hub.Gear.Gear.Exists(row => row.IsNew))
+            {
+                Rect gearTab = _tabs.ItemBounds((int)InventoryTab.Gear);
+                Painter.NewDot(new Vec2(gearTab.Right - 30f, gearTab.Y + 26f));
+            }
         }
 
         protected override void DrawCustom(Widget widget)

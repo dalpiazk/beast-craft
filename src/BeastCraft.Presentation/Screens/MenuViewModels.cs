@@ -167,7 +167,7 @@ namespace BeastCraft.Presentation.Screens
     /// <summary>
     /// The settings modal (the battle's effects settings, the team-suggestion toggle, sound and
     /// haptics): each row cycles or toggles its setting, which is saved at once. The rows that need
-    /// the host (the idle alert, haptics) show only where it has them.
+    /// the host (the idle and Grove alerts, haptics) show only where it has them.
     /// </summary>
     public sealed class SettingsViewModel
     {
@@ -184,7 +184,8 @@ namespace BeastCraft.Presentation.Screens
         public const int SfxVolume = 10;
         public const int Mute = 11;
         public const int Haptics = 12;
-        public const int RowCount = 13;
+        public const int GroveNotifications = 13;
+        public const int RowCount = 14;
 
         /// <summary>A volume row's step: each tap takes it down a quarter, and from 0 back to 100.</summary>
         public const int VolumeStep = 25;
@@ -216,7 +217,10 @@ namespace BeastCraft.Presentation.Screens
         /// <summary>Raised after the idle-notification setting changes (the host asks for the permission, or cancels).</summary>
         public event Action<bool> IdleNotificationsChanged;
 
-        /// <summary>The rows in display order (the idle alert and haptics rows only where the host has them); <see cref="Row"/> finds one by id.</summary>
+        /// <summary>Raised after the Grove-notification setting changes (the host asks for the permission, or cancels).</summary>
+        public event Action<bool> GroveNotificationsChanged;
+
+        /// <summary>The rows in display order (the alert rows and the haptics row only where the host has them); <see cref="Row"/> finds one by id.</summary>
         public List<SettingRow> Rows()
         {
             string intensity = _text.Get(_settings.EffectsIntensity == EffectsIntensity.Minimal ? "ui.settings.effects_minimal" : _settings.EffectsIntensity == EffectsIntensity.Reduced ? "ui.settings.effects_reduced" : "ui.settings.effects_full");
@@ -233,6 +237,7 @@ namespace BeastCraft.Presentation.Screens
             if (NotificationsAvailable)
             {
                 rows.Add(new SettingRow { Id = IdleNotifications, Label = _text.Get("ui.settings.idle_alert"), Value = OnOff(_settings.IdleNotifications), On = _settings.IdleNotifications });
+                rows.Add(new SettingRow { Id = GroveNotifications, Label = _text.Get("ui.settings.grove_alert"), Value = OnOff(_settings.GroveNotifications), On = _settings.GroveNotifications });
             }
 
             rows.Add(VolumeRow(MasterVolume, "ui.settings.master_volume", _settings.MasterVolume));
@@ -318,6 +323,14 @@ namespace BeastCraft.Presentation.Screens
 
                     _settings.IdleNotifications = !_settings.IdleNotifications;
                     break;
+                case GroveNotifications:
+                    if (!NotificationsAvailable)
+                    {
+                        return;
+                    }
+
+                    _settings.GroveNotifications = !_settings.GroveNotifications;
+                    break;
                 case MasterVolume:
                     _settings.MasterVolume = NextVolume(_settings.MasterVolume);
                     break;
@@ -350,6 +363,11 @@ namespace BeastCraft.Presentation.Screens
             if (row == IdleNotifications)
             {
                 IdleNotificationsChanged?.Invoke(_settings.IdleNotifications);
+            }
+
+            if (row == GroveNotifications)
+            {
+                GroveNotificationsChanged?.Invoke(_settings.GroveNotifications);
             }
         }
     }

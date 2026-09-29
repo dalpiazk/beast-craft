@@ -132,8 +132,37 @@ namespace BeastCraft.Grove
                 return GroveActionResult.Refused(RulesText.Get("ui.rules.grove.decor_full"));
             }
 
-            save.Grove.PlacedDecor.Add(new PlacedDecorEntry { HabitatId = habitatId, DecorId = decorId, X = x, Y = y, Rotation = rotation });
+            save.Grove.PlacedDecor.Add(new PlacedDecorEntry { HabitatId = habitatId, DecorId = decorId, X = ClampUnit(x), Y = ClampUnit(y), Rotation = rotation });
             return GroveActionResult.Succeeded(0, 0);
+        }
+
+        /// <summary>
+        /// Moves placed decor <paramref name="decorId"/> to (<paramref name="x"/>, <paramref name="y"/>) in its habitat: fractions
+        /// of the habitat canvas, 0-1 from the top left (clamped; a NaN reads as 0). Refuses decor that is not placed or whose
+        /// habitat the content no longer has. Rotation is untouched.
+        /// </summary>
+        public static GroveActionResult MoveDecor(PlayerSave save, GroveLibrary library, string decorId, float x, float y)
+        {
+            if (save == null || library == null)
+            {
+                return GroveActionResult.Refused("No save or Grove content.");
+            }
+
+            PlacedDecorEntry entry = save.Grove?.PlacedDecor?.Find(placed => placed != null && placed.DecorId == decorId);
+            if (entry == null || library.Habitat(entry.HabitatId) == null)
+            {
+                return GroveActionResult.Refused(RulesText.Get("ui.rules.grove.decor_not_placed"));
+            }
+
+            entry.X = ClampUnit(x);
+            entry.Y = ClampUnit(y);
+            return GroveActionResult.Succeeded(0, 0);
+        }
+
+        /// <summary>A decor coordinate clamped to 0-1 (NaN reads as 0).</summary>
+        public static float ClampUnit(float value)
+        {
+            return float.IsNaN(value) ? 0f : value < 0f ? 0f : value > 1f ? 1f : value;
         }
 
         /// <summary>Removes decor <paramref name="decorId"/> from wherever it is placed (it stays owned). Returns whether anything was removed.</summary>

@@ -222,9 +222,9 @@ is unaffected.
   children in `src/BeastCraft.Presentation/Screens/GroveViewModels.cs`): one screen, an inner `Tabs`
   strip (Glade / Garden / Board / Npc), reached by pushing from the Home tab bar's Grove slot
   (`HomeScreen.SelectTab`) rather than showing inline.
-- **Glade**: habitat chips (locked ones dimmed) select which habitat's decor grid shows — a simple
-  4-column slot grid, not free drag (a producer-reviewable simplification, see grove.md §5 and §10:
-  no drag primitive exists to reuse, and the Core cap is a count per habitat, not a layout). Every
+- **Glade**: habitat chips (locked ones dimmed) select which habitat's decor grid shows — a
+  4-column slot grid to place and remove, and below it a habitat canvas where each piece is dragged to
+  move it (#46; grove.md §5). Every
   owned beast is a card: portrait (its worn colour form's tint applied, see below), affinity tier and
   XP bar, Feed/Play (disabled on cooldown) and, once any gift is pending, Collect/Collect all.
 - **Garden**: plots as a 2-column grid (empty → a seed-picker `ChoiceModal`; growing → a progress bar;
@@ -267,8 +267,8 @@ Continue falls back to the `.bak` with a message when the main file is torn.
 **Idle.** `GameSession.ClaimIdle` runs `IdleRewardCalculator.Claim` with the device's clocks
 (`IGameClock`: the wall clock plus a monotonic one, Android's `elapsedRealtime`), on Continue, when
 the app comes back (the map claims it when it next shows) and from the idle chip; a claim of
-nothing is silent. The optional "idle full" notification is a host seam (`IIdleNotifier`), off by
-default, implemented on Android only.
+nothing is silent. The optional "idle full" and "Grove ready" notifications go through a host seam
+(`ILocalNotifier`, one channel and alarm each), both off by default, implemented on Android only.
 
 ## Avatar, Inventory and the Trader
 
@@ -298,8 +298,8 @@ byte-identical. Built on the shared component layer below ("Shared components").
     with Wear (`CosmeticRules.TrySetOption(save, null, categoryId, optionId, library)` — `beastId:
     null` is the established meaning "the avatar" throughout `CosmeticRules`), plus a curated
     six-swatch colour row per colour category (`AvatarWardrobeViewModel.Swatches`, UI-only presets
-    over the always-free `TrySetColor`; no colour-picker widget exists in the toolkit yet, flagged in
-    the design doc).
+    over the always-free `TrySetColor`) and a Custom chip that opens the HSV picker (`ColourPickerModal`).
+    New looks carry a dot until seen (schema 12).
 - **Inventory tab** (`InventoryScreen`, `InventoryHubViewModel` and its three children in
   `src/BeastCraft.Presentation/Screens/InventoryViewModels.cs`): Gear / Materials / Looks.
   - *Gear*: every owned gear instance (beast and avatar), a filter chip row (All/Beast/Avatar) and a
@@ -510,11 +510,6 @@ notification is an opt-in Android hook.
 - Grove is built (D4 — see "The Grove" above); Avatar, Inventory and the Trader are built (see
   "Avatar, Inventory and the Trader" above). The roster's own looks are still shown, not edited
   beyond the look-token shop's direct purchases and the avatar's own wardrobe (editing a *beast's*
-  worn looks beyond its colour forms is a later PR). No "new since you last looked" marker on
-  Inventory (flagged in avatar-inventory-shop.md — needs a small save addition). No colour-picker
-  widget in the toolkit yet: the avatar wardrobe's colour categories use a curated six-swatch preset
-  row over the always-free `TrySetColor` rather than a full picker.
+  worn looks beyond its colour forms is a later PR). New gear and looks carry a "new" dot until
+  seen (schema 12), and the wardrobe's colour categories have an HSV picker beside the six swatches (#46).
 - No region list (the next region starts automatically after a boss).
-- The Grove has no Android local-notification hook (only the in-app toast on entering Home): the
-  idle-full notification's `IIdleNotifier` seam exists, a Grove-readiness one does not yet — a
-  natural, separable follow-up.

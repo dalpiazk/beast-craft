@@ -26,6 +26,13 @@ namespace BeastCraft.Game.Screens
         private static readonly float ContentTop = TabStrip.ContentTop(HeaderMetrics.Standard, 20f);
         private const float ChipHeight = 78f;
 
+        /// <summary>The Glade's habitat canvas height, and a decor piece's size on it.</summary>
+        private const float HabitatCanvasHeight = 560f;
+
+        private const float PieceWidth = 240f;
+
+        private const float PieceHeight = 120f;
+
         private readonly GroveHubViewModel _hub;
         private readonly ScreenHeader _header;
         private readonly Tabs _tabs;
@@ -183,6 +190,7 @@ namespace BeastCraft.Game.Screens
 
                 int rows = (_hub.Glade.Slots.Count + cols - 1) / cols;
                 y += rows * (cell + 16f) + 20f;
+                y = BuildHabitatCanvas(y, width);
             }
 
             AddLabel(_glade.Scroll, new Rect(Pad, y, width, Heading), Loc("ui.grove.beasts"), Heading, "plum");
@@ -248,6 +256,61 @@ namespace BeastCraft.Game.Screens
             float frac = beast.NextTierXp > 0 ? Math.Min(1f, (float)beast.Xp / beast.NextTierXp) : 1f;
             Painter.Progress(new Rect(labelX, box.Y + 128f, box.Width - (labelX - box.X) - 20f, 28f), frac, -1f, "gold", "gold", "track",
                              beast.Tier <= 0 ? null : Loc("ui.grove.tier", beast.Tier));
+        }
+
+        /// <summary>
+        /// The habitat canvas (a placeholder panel until the habitat art lands): each placed piece at its X/Y, dragged to
+        /// move it (<see cref="GladeViewModel.MoveDecor"/>, 0-1 fractions of the canvas). The slot grid above still places
+        /// and removes. Returns the y below it.
+        /// </summary>
+        /// <summary>Scrolls the Glade page to <paramref name="fraction"/> (0-1) of the way down (scripted screenshots).</summary>
+        public void ScrollGlade(float fraction)
+        {
+            _glade.Scroll.ScrollTo(_glade.Scroll.MaxScroll * Math.Max(0f, Math.Min(1f, fraction)));
+        }
+
+        private float BuildHabitatCanvas(float y, float width)
+        {
+            Rect canvas = new Rect(Pad, y, width, HabitatCanvasHeight);
+            _glade.Add(new Panel { Id = "habitat-canvas", Bounds = canvas, StyleKey = "slot" });
+            foreach (DecorSlotRow slot in _hub.Glade.Slots)
+            {
+                if (slot.DecorId == null)
+                {
+                    continue;
+                }
+
+                DecorSlotRow captured = slot;
+                Draggable piece = _glade.Add(new Draggable
+                {
+                    Id = "decor-" + slot.DecorId,
+                    Bounds = new Rect(canvas.X + slot.X * (canvas.Width - PieceWidth), canvas.Y + slot.Y * (canvas.Height - PieceHeight), PieceWidth, PieceHeight)
+                });
+                _glade.TrackDraw(piece, box => DrawPiece(box, captured, piece.Dragging));
+                piece.Moved += (dragged, delta) =>
+                {
+                    float px = Math.Max(canvas.X, Math.Min(canvas.Right - PieceWidth, dragged.StartBounds.X + delta.X));
+                    float py = Math.Max(canvas.Y, Math.Min(canvas.Bottom - PieceHeight, dragged.StartBounds.Y + delta.Y));
+                    dragged.Bounds = new Rect(px, py, PieceWidth, PieceHeight);
+                };
+                piece.Dropped += dropped =>
+                {
+                    float fx = (dropped.Bounds.X - canvas.X) / Math.Max(1f, canvas.Width - PieceWidth);
+                    float fy = (dropped.Bounds.Y - canvas.Y) / Math.Max(1f, canvas.Height - PieceHeight);
+                    _hub.Glade.MoveDecor(captured.DecorId, fx, fy);
+                    BuildGlade();
+                };
+            }
+
+            y += HabitatCanvasHeight + 12f;
+            AddLabel(_glade.Scroll, new Rect(Pad, y, width, Small + 2f), Loc("ui.grove.drag_hint"), Small + 2f, "inkSoft");
+            return y + LineH(Small + 2f) + 20f;
+        }
+
+        private void DrawPiece(Rect box, DecorSlotRow piece, bool dragging)
+        {
+            Painter.Framed(box, 18f, 4f, Painter.C(dragging ? "gold" : "plum"), Painter.C("cream"));
+            Painter.TextIn(piece.DisplayName, box.Inset(10f), Small + 1f, Painter.C("ink"), TextAlign.Center);
         }
 
         private void TapSlot(DecorSlotRow slot)

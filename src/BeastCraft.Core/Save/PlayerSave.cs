@@ -53,7 +53,7 @@ namespace BeastCraft.Save
     public class PlayerSave
     {
         /// <summary>The schema this code writes, and the newest it reads.</summary>
-        public const int CurrentSchemaVersion = 11;
+        public const int CurrentSchemaVersion = 12;
 
         /// <summary>The schema the data is in. 0 (or missing) is never valid.</summary>
         public int SchemaVersion = CurrentSchemaVersion;
@@ -183,6 +183,12 @@ namespace BeastCraft.Save
         /// (<c>Economy.BattleConsumableRefund</c>). Empty between battles. Added in schema 11.
         /// </summary>
         public List<string> PendingBattleConsumables = new List<string>();
+
+        /// <summary>
+        /// The gear and looks the player has already seen on screen, for the "new" dots (<see cref="SeenItems"/>,
+        /// <see cref="SeenRules"/>). Added in schema 12; the migration marks everything owned then as seen.
+        /// </summary>
+        public SeenItems Seen = new SeenItems();
 
         /// <summary>
         /// A blank save: no beasts, avatar level 1, nothing learned or held, the first campaign region
@@ -459,6 +465,24 @@ namespace BeastCraft.Save
             if (PendingBattleConsumables == null)
             {
                 PendingBattleConsumables = new List<string>();
+                repaired++;
+            }
+
+            if (Seen == null)
+            {
+                Seen = new SeenItems();
+                repaired++;
+            }
+
+            if (Seen.Gear == null)
+            {
+                Seen.Gear = new List<string>();
+                repaired++;
+            }
+
+            if (Seen.Looks == null)
+            {
+                Seen.Looks = new List<string>();
                 repaired++;
             }
 

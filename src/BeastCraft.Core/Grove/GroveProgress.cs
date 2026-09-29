@@ -122,6 +122,18 @@ namespace BeastCraft.Grove
             repaired += PlacedDecor.RemoveAll(entry => entry == null || string.IsNullOrEmpty(entry.HabitatId) || string.IsNullOrEmpty(entry.DecorId));
             HashSet<string> placed = new HashSet<string>(StringComparer.Ordinal);
             repaired += PlacedDecor.RemoveAll(entry => !placed.Add(entry.DecorId));
+            foreach (PlacedDecorEntry entry in PlacedDecor)
+            {
+                // X and Y are fractions of the habitat canvas (GroveRules.MoveDecor).
+                float x = GroveRules.ClampUnit(entry.X);
+                float y = GroveRules.ClampUnit(entry.Y);
+                if (x != entry.X || y != entry.Y)
+                {
+                    entry.X = x;
+                    entry.Y = y;
+                    repaired++;
+                }
+            }
 
             if (Affinity == null)
             {

@@ -46,9 +46,9 @@ namespace BeastCraft.Android
 
             ViewerHost host = ViewerHost.Mobile("BEAST CRAFT", new TitleContainerContentSource("Content"), () => _insets.Value, FilesDir?.AbsolutePath);
 
-            // Idle time counts deep sleep (elapsedRealtime), and the idle-full notification is Android's.
+            // Idle time counts deep sleep (elapsedRealtime), and the idle-full and Grove-ready notifications are Android's.
             host.MonotonicClock = () => TimeSpan.FromMilliseconds(SystemClock.ElapsedRealtime());
-            host.IdleNotifier = new AndroidIdleNotifier(this);
+            host.Notifier = new AndroidNotifier(this);
             // Light haptics on hits, knockouts and key confirms (on by default, a settings toggle). UNVERIFIED: see AndroidHaptics.
             host.Haptics = new AndroidHaptics(this);
 

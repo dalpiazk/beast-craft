@@ -225,7 +225,8 @@ untouched, and one device's settings apply to every save slot.
   presentation only (see `docs/design/presentation-and-vfx.md`, "Effects settings"), and the sound and
   haptics settings (see `docs/design/audio.md`, "Settings"): `MasterVolume`, `MusicVolume` and
   `SfxVolume` (0-100, default **100**), `Muted` (default off) and `Haptics` (default **on**; hidden where
-  the host cannot vibrate). New settings
+  the host cannot vibrate), and `GroveNotifications` (default off; the Android "something is ready in
+  the Grove" notification, hidden where the host has no notifications). New settings
   are added as fields with defaults: a key an older file lacks keeps its default, so a purely
   additive setting needs no version bump (a file from before the effects settings loads as Full,
   shake on, flashes on).
@@ -575,6 +576,28 @@ the item. Schema 11 records what the battle in progress spent, so it can be hand
   reflection with `BEASTCRAFT_UPDATE_GOLDENS=1`) is the one that must round-trip. Every older
   expected output changed in exactly two places: `"SchemaVersion":10` became `11`, and
   `,"PendingBattleConsumables":[]` follows `"Npc"`'s closing brace. No input changed.
+
+### Schema 12: the "new" markers' seen list (`PlayerSave.Seen`)
+
+The Inventory's Gear tab and the Avatar's wardrobe mark gear and looks the player has not looked at yet
+(#46; avatar-inventory-shop.md, "New markers"). Schema 12 records what has been seen.
+`CurrentSchemaVersion` is **12**.
+
+- `PlayerSave.Seen` (`SeenItems`: `Gear`, a list of gear instance ids, and `Looks`, a list of unlocked look
+  keys `"categoryId/optionId"`; written last, after `"PendingBattleConsumables"`).
+- *Rules* (`Save.SeenRules`). Owned gear or an unlocked look not in the list is new; a key is added once its
+  row has been on screen (the screen saves when it is left or its tab changes). Presentation state only.
+- *Migration.* `SaveMigrations.AddSeen` (11 to 12) marks every gear instance and unlocked look the save
+  already owns as seen (`SeenRules.MarkAllOwnedSeen`), so an updated save shows nothing as new.
+- *Decor positions* ride on the same step (no field change): a placed piece's `X`/`Y` are now fractions
+  0-1 of the habitat canvas (`GroveRules.MoveDecor`), and `GroveProgress.EnsureInitialized` clamps them
+  on load.
+- *Golden saves.* `rich-v11.input.json` is frozen as an input and `rich-v12.input.json` (captured by
+  reflection with `BEASTCRAFT_UPDATE_GOLDENS=1`, its decor positions filled in range) is the one that must
+  round-trip. Every older expected output changed in exactly these places: `"SchemaVersion":11` became
+  `12`, `,"Seen":{"Gear":[...],"Looks":[...]}` follows `"PendingBattleConsumables"` (listing what that
+  save already owned), and in `rich-v10` and `rich-v11` the placed decor's out-of-range `X`/`Y` read `1`.
+  No input changed.
 
 ### Save slots, backup and export (#59)
 

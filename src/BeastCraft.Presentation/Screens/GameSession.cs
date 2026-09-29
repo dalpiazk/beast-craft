@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using BeastCraft.Campaign;
+using BeastCraft.Common;
 using BeastCraft.Creatures;
 using BeastCraft.Discovery;
 using BeastCraft.Economy;
@@ -801,6 +802,54 @@ namespace BeastCraft.Presentation.Screens
             }
 
             return new DateTime(Save.Idle.LastClaimUtcTicks, DateTimeKind.Utc).AddHours(Content.Idle.Rewards.CapHours);
+        }
+
+        /// <summary>
+        /// When the Grove next has something ready (for the "Grove" local notification, <c>PlayerSettings.GroveNotifications</c>):
+        /// the earliest moment a planted plot finishes growing or an expedition comes back, of those not ready yet. Each
+        /// time left is measured the way the Grove measures it (<see cref="OfflineClock.ElapsedMs"/>: the monotonic clock
+        /// where it is trusted), then counted from now. Gifts are left out. Null when nothing is on its way.
+        /// </summary>
+        public DateTime? GroveReadyUtc()
+        {
+            if (Save == null)
+            {
+                return null;
+            }
+
+            DateTime now = Clock.UtcNow;
+            long nowTicks = OfflineClock.UtcTicks(now);
+            long nowMono = OfflineClock.MonotonicMs(Clock.Monotonic);
+            double soonest = double.MaxValue;
+            foreach (PlotState plot in Save.Garden?.Plots ?? new List<PlotState>())
+            {
+                SeedSpeciesData seed = plot == null ? null : Content.GardenLibrary?.Seed(plot.SeedId);
+                if (seed != null)
+                {
+                    long elapsed = OfflineClock.ElapsedMs(plot.StartUtcTicks, plot.StartMonotonicMs, nowTicks, nowMono, out bool _);
+                    soonest = Soonest(soonest, Math.Max(1, seed.GrowthHours) * MsPerHour - elapsed);
+                }
+            }
+
+            foreach (ActiveExpedition active in Save.Expeditions?.Active ?? new List<ActiveExpedition>())
+            {
+                DestinationData destination = active == null ? null : Content.ExpeditionLibrary?.Destination(active.DestinationId);
+                if (destination != null)
+                {
+                    long elapsed = OfflineClock.ElapsedMs(active.StartUtcTicks, active.StartMonotonicMs, nowTicks, nowMono, out bool _);
+                    soonest = Soonest(soonest, destination.DurationHours * MsPerHour - elapsed);
+                }
+            }
+
+            return soonest == double.MaxValue ? (DateTime?)null : now.AddMilliseconds(soonest);
+        }
+
+        private const double MsPerHour = 3600000.0;
+
+        /// <summary>The sooner of <paramref name="soonest"/> and <paramref name="remainingMs"/>, counting only time still to go.</summary>
+        private static double Soonest(double soonest, double remainingMs)
+        {
+            return remainingMs > 0.0 && remainingMs < soonest ? remainingMs : soonest;
         }
 
         public bool SaveSettings()

@@ -144,6 +144,11 @@ namespace BeastCraft.Presentation.Screens
         public string DecorId;
 
         public string DisplayName;
+
+        /// <summary>Where a placed piece sits on the habitat canvas, fractions 0-1 from the top left (<see cref="GroveRules.MoveDecor"/>).</summary>
+        public float X;
+
+        public float Y;
     }
 
     /// <summary>An owned decor piece not currently placed anywhere, offered for the selected habitat.</summary>
@@ -273,7 +278,7 @@ namespace BeastCraft.Presentation.Screens
                     }
 
                     DecorData data = library.Decor(entry.DecorId);
-                    Slots.Add(new DecorSlotRow { Index = index++, DecorId = entry.DecorId, DisplayName = data?.DisplayName ?? entry.DecorId });
+                    Slots.Add(new DecorSlotRow { Index = index++, DecorId = entry.DecorId, DisplayName = data?.DisplayName ?? entry.DecorId, X = entry.X, Y = entry.Y });
                 }
 
                 for (; index < selected.SlotCount; index++)
@@ -359,6 +364,19 @@ namespace BeastCraft.Presentation.Screens
             return Apply(count > 0, count > 0 ? Text.Format(count == 1 ? "ui.grove.gifts_collected_one" : "ui.grove.gifts_collected", count) : Text.Get("ui.grove.no_gifts"));
         }
 
+        /// <summary>Moves placed decor <paramref name="decorId"/> on the habitat canvas (<see cref="GroveRules.MoveDecor"/>; 0-1 fractions). Autosaves on success; no toast.</summary>
+        public bool MoveDecor(string decorId, float x, float y)
+        {
+            GroveActionResult result = GroveRules.MoveDecor(_session.Save, _session.Content.GroveLibrary, decorId, x, y);
+            if (result.Success)
+            {
+                _session.Autosave(AutosaveReason.PlayerEdit);
+                Refresh();
+            }
+
+            return result.Success;
+        }
+
         public GladeActionOutcome PlaceDecor(string decorId)
         {
             if (string.IsNullOrEmpty(SelectedHabitatId))
@@ -366,7 +384,11 @@ namespace BeastCraft.Presentation.Screens
                 return GladeActionOutcome.Of(false, Text.Get("ui.grove.no_habitat"));
             }
 
-            GroveActionResult result = GroveRules.PlaceDecor(_session.Save, _session.Content.GroveLibrary, SelectedHabitatId, decorId, 0f, 0f, 0);
+            // A new piece goes on the canvas beside the others (the next free column, halfway down); the player drags it from there.
+            HabitatData habitat = _session.Content.GroveLibrary.Habitat(SelectedHabitatId);
+            int slots = Math.Max(1, habitat?.SlotCount ?? 1);
+            float x = (_session.Save.Grove.PlacedCountIn(SelectedHabitatId) + 0.5f) / slots;
+            GroveActionResult result = GroveRules.PlaceDecor(_session.Save, _session.Content.GroveLibrary, SelectedHabitatId, decorId, x, 0.5f, 0);
             return Apply(result.Success, result.Success ? Text.Get("ui.grove.placed") : result.Error);
         }
 

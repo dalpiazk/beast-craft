@@ -153,20 +153,45 @@ namespace BeastCraft.Game
             }
 
             session.Autosave(AutosaveReason.Background);
-            DateTime? full = session.IdleCapUtc();
-            if (_host.IdleNotifier != null && session.Settings.IdleNotifications && full.HasValue && full.Value > DateTime.UtcNow)
+            if (_host.Notifier == null)
             {
-                _host.IdleNotifier.Schedule(full.Value);
+                return;
+            }
+
+            DateTime? full = session.IdleCapUtc();
+            if (session.Settings.IdleNotifications && full.HasValue && full.Value > DateTime.UtcNow)
+            {
+                _host.Notifier.Schedule(LocalNotification.IdleFull, full.Value, NotificationText(LocalNotification.IdleFull));
+            }
+
+            DateTime? grove = session.GroveReadyUtc();
+            if (session.Settings.GroveNotifications && grove.HasValue && grove.Value > DateTime.UtcNow)
+            {
+                _host.Notifier.Schedule(LocalNotification.GroveReady, grove.Value, NotificationText(LocalNotification.GroveReady));
             }
         }
 
+        /// <summary>A local notification's words from the text table (<c>ui.notify.*</c>; the Grove's reuse its ready toast).</summary>
+        private LocalNotificationText NotificationText(LocalNotification kind)
+        {
+            bool grove = kind == LocalNotification.GroveReady;
+            return new LocalNotificationText
+            {
+                Title = _ctx.Loc("ui.title.name"),
+                Body = _ctx.Loc(grove ? "ui.grove.ready_toast" : "ui.notify.idle_body"),
+                Channel = _ctx.Loc(grove ? "ui.notify.grove_channel" : "ui.notify.idle_channel"),
+                ChannelDescription = _ctx.Loc(grove ? "ui.notify.grove_channel_desc" : "ui.notify.idle_channel_desc")
+            };
+        }
+
         /// <summary>
-        /// The app is back in front: cancel the idle notification, and claim the idle rewards once
+        /// The app is back in front: cancel the local notifications (idle and Grove), and claim the idle rewards once
         /// the map is showing (<see cref="GameSession.ResumeClaimPending"/>).
         /// </summary>
         public void OnResumed()
         {
-            _host.IdleNotifier?.Cancel();
+            _host.Notifier?.Cancel(LocalNotification.IdleFull);
+            _host.Notifier?.Cancel(LocalNotification.GroveReady);
             if (_ctx?.Session?.Save != null && string.IsNullOrEmpty(_options.WalkthroughDir) && !_options.Screenshot)
             {
                 _ctx.Session.ResumeClaimPending = true;
@@ -177,19 +202,23 @@ namespace BeastCraft.Game
         public SettingsViewModel NewSettingsModel()
         {
             GameSession session = _ctx.Session;
-            SettingsViewModel model = new SettingsViewModel(session.Settings, session.Content.Text, session.SaveSettings, _host.IdleNotifier != null, _host.Haptics != null);
-            model.IdleNotificationsChanged += on =>
-            {
-                if (on)
-                {
-                    _host.IdleNotifier?.RequestPermission();
-                }
-                else
-                {
-                    _host.IdleNotifier?.Cancel();
-                }
-            };
+            SettingsViewModel model = new SettingsViewModel(session.Settings, session.Content.Text, session.SaveSettings, _host.Notifier != null, _host.Haptics != null);
+            model.IdleNotificationsChanged += on => NotificationSettingChanged(LocalNotification.IdleFull, on);
+            model.GroveNotificationsChanged += on => NotificationSettingChanged(LocalNotification.GroveReady, on);
             return model;
+        }
+
+        /// <summary>A notification setting turned on (ask for the permission) or off (cancel it).</summary>
+        private void NotificationSettingChanged(LocalNotification kind, bool on)
+        {
+            if (on)
+            {
+                _host.Notifier?.RequestPermission();
+            }
+            else
+            {
+                _host.Notifier?.Cancel(kind);
+            }
         }
 
         /// <summary>Stops with <paramref name="message"/> (a screenshot or scripted run exits; a window shows it).</summary>
@@ -1073,6 +1102,55 @@ namespace BeastCraft.Game
                 {
                     SetupShop();
                     Top<ShopScreen>().SelectTab(ShopTab.Sell);
+                });
+            }
+
+            // Verification aids for #46, not player-facing screens: the Glade's habitat canvas with placed decor, the
+            // wardrobe's colour picker, and the Inventory with a new (unseen) piece of gear.
+            if (screen == "grove-canvas")
+            {
+                steps.Add(() =>
+                {
+                    GameSession session = _ctx.Session;
+                    session.Save.Grove.HabitatsUnlocked.Add("mossy_glade");
+                    GladeViewModel glade = new GladeViewModel(session);
+                    glade.SelectHabitat("mossy_glade");
+                    string[] pieces = { "firefly_lantern", "ember_brazier", "wind_chimes" };
+                    for (int i = 0; i < pieces.Length; i++)
+                    {
+                        session.Save.Grove.UnlockedDecorIds.Add(pieces[i]);
+                        glade.PlaceDecor(pieces[i]);
+                        glade.MoveDecor(pieces[i], 0.15f + 0.35f * i, 0.2f + 0.3f * i);
+                    }
+
+                    Home().SelectTab(HomeTab.Grove);
+                    Top<GroveScreen>().SelectTab(GroveTab.Glade);
+                    Top<GroveScreen>().ScrollGlade(1f);
+                });
+            }
+
+            if (screen == "colour-picker")
+            {
+                steps.Add(() =>
+                {
+                    Home().SelectTab(HomeTab.Avatar);
+                    Top<AvatarScreen>().SelectTab(AvatarTab.Wardrobe);
+                    Top<AvatarScreen>().OpenColourPicker(0);
+                });
+            }
+
+            if (screen == "inventory-new")
+            {
+                steps.Add(() =>
+                {
+                    GameSession session = _ctx.Session;
+                    foreach (BeastCraft.Battle.GearSO candidate in session.Content.Economy.Gear.BeastGearAssets)
+                    {
+                        session.Save.Gear.AddBeastGear(candidate.GearId);
+                        break;
+                    }
+
+                    Home().SelectTab(HomeTab.Inventory);
                 });
             }
 

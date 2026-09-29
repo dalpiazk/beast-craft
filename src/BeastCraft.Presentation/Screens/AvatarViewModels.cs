@@ -7,6 +7,7 @@ using BeastCraft.Economy;
 using BeastCraft.Localization;
 using BeastCraft.Presentation.Cards;
 using BeastCraft.Presentation.Content;
+using BeastCraft.Presentation.Ui;
 using BeastCraft.Progression;
 using BeastCraft.Save;
 
@@ -538,6 +539,9 @@ namespace BeastCraft.Presentation.Screens
         public bool Worn;
         public bool TokenPurchasable;
         public int TokenPrice;
+
+        /// <summary>Unlocked and not seen yet (<see cref="SeenRules.IsNewLook"/>), as the list was built: the row shows a dot.</summary>
+        public bool IsNew;
     }
 
     public sealed class WardrobeCategoryRow
@@ -547,6 +551,9 @@ namespace BeastCraft.Presentation.Screens
         public bool IsColor;
         public string WornColorHex;
         public List<WardrobeOptionRow> Options = new List<WardrobeOptionRow>();
+
+        /// <summary>Whether any of its options was new as the list was built: the category shows a dot.</summary>
+        public bool HasNew;
     }
 
     /// <summary>
@@ -554,15 +561,16 @@ namespace BeastCraft.Presentation.Screens
     /// discrete looks with Wear (<see cref="CosmeticRules.TrySetOption"/> against the avatar,
     /// <c>beastId: null</c> — the established meaning throughout <see cref="CosmeticRules"/>) and
     /// colour categories as a small curated swatch row (<see cref="Swatches"/>: UI-only presets over
-    /// the existing free <see cref="CosmeticRules.TrySetColor"/> rule; no colour-picker widget exists
-    /// in the toolkit, see avatar-inventory-shop.md).
+    /// the existing free <see cref="CosmeticRules.TrySetColor"/> rule) plus a custom HSV colour (<see cref="SetColorHsv"/>, the
+    /// picker modal). New looks are flagged until seen (<see cref="WardrobeOptionRow.IsNew"/>, schema 12).
     /// </summary>
     public sealed class AvatarWardrobeViewModel
     {
-        /// <summary>Six curated presets offered for every colour category (a picker widget is a later PR).</summary>
+        /// <summary>Six curated presets offered for every colour category (quick picks beside the HSV picker).</summary>
         public static readonly string[] Swatches = { "#F5E6C8", "#8B5E3C", "#3C2A21", "#E8B4B8", "#4A6B5A", "#2E3A59" };
 
         private readonly GameSession _session;
+        private bool _seenChanged;
 
         public AvatarWardrobeViewModel(GameSession session)
         {
@@ -608,12 +616,67 @@ namespace BeastCraft.Presentation.Screens
                             Owned = CosmeticRules.IsUsable(save, option),
                             Worn = worn != null && worn.OptionId == option.OptionId,
                             TokenPurchasable = option.TokenPurchasable,
-                            TokenPrice = option.TokenPrice
+                            TokenPrice = option.TokenPrice,
+                            IsNew = SeenRules.IsNewLook(save, option.Key)
                         });
                     }
                 }
 
+                row.HasNew = row.Options.Exists(option => option.IsNew);
                 Categories.Add(row);
+            }
+        }
+
+        /// <summary>Whether any avatar look is unlocked and not seen yet: the Wardrobe tab shows a dot.</summary>
+        public bool AnyNew
+        {
+            get
+            {
+                PlayerSave save = _session.Save;
+                CosmeticLibrary library = _session.Content.Economy?.Cosmetics;
+                if (save == null || library == null)
+                {
+                    return false;
+                }
+
+                foreach (CosmeticCategory category in library.Categories)
+                {
+                    if (category != null && category.IsAvatar && !category.IsColor && AnyNewIn(save, category))
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+        }
+
+        private static bool AnyNewIn(PlayerSave save, CosmeticCategory category)
+        {
+            foreach (CosmeticOption option in category.Options)
+            {
+                if (option != null && SeenRules.IsNewLook(save, option.Key))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>Records look <paramref name="key"/> as seen (its row has been on screen); <see cref="SaveSeen"/> writes it.</summary>
+        public void MarkSeen(string key)
+        {
+            _seenChanged |= SeenRules.MarkLookSeen(_session.Save, key);
+        }
+
+        /// <summary>Autosaves when rows were seen since the last call (the screen calls it as it leaves or switches tab).</summary>
+        public void SaveSeen()
+        {
+            if (_seenChanged)
+            {
+                _seenChanged = false;
+                _session.Autosave(AutosaveReason.PlayerEdit);
             }
         }
 
@@ -641,6 +704,25 @@ namespace BeastCraft.Presentation.Screens
 
             Refresh();
             return result;
+        }
+
+        /// <summary>Colour category <paramref name="categoryId"/>'s current colour as HSV (the picker opens on it); black for an unknown category.</summary>
+        public Hsv CurrentHsv(string categoryId)
+        {
+            CosmeticCategory category = _session.Content.Economy?.Cosmetics?.GetCategory(categoryId);
+            if (category == null)
+            {
+                return new Hsv(0f, 0f, 0f);
+            }
+
+            BeastCraft.Color color = CosmeticRules.AppearanceOf(_session.Save, null)?.GetColor(categoryId) ?? category.DefaultColor;
+            return Hsv.FromRgb(color.r, color.g, color.b);
+        }
+
+        /// <summary>Sets <paramref name="categoryId"/>'s colour to a picked <paramref name="colour"/> (opaque; <see cref="CosmeticRules.TrySetColor"/>, always free). Autosaves on success.</summary>
+        public CosmeticResult SetColorHsv(string categoryId, Hsv colour)
+        {
+            return SetColor(categoryId, colour.ToHex());
         }
 
         private static string HexOf(BeastCraft.Color color)

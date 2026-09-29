@@ -207,6 +207,12 @@ namespace BeastCraft.Game.Screens.Components
             return y + height + 26f;
         }
 
+        /// <summary>Whether <paramref name="content"/> (in the scroll's content space, as a card's draw gets it) is at least partly on screen now.</summary>
+        public bool OnScreen(Rect content)
+        {
+            return _scroll.Visible && content.Bottom > _scroll.ScrollY && content.Y < _scroll.ScrollY + _scroll.Bounds.Height;
+        }
+
         /// <summary>Adds any other widget (a button, a hotspot) straight to the scroll's content.</summary>
         public T Add<T>(T widget) where T : Widget
         {
