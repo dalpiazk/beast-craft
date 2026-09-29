@@ -146,6 +146,31 @@ namespace BeastCraft.Tests.EditMode
         }
 
         /// <summary>
+        /// Core's rules read their player text from the table the content loads with (<see cref="RulesText"/>):
+        /// a refusal and a location's fallback name come from <c>ui.rules.*</c>, so another locale's table
+        /// changes them too.
+        /// </summary>
+        [Test]
+        public void TheRules_ReadTheirTextFromTheLoadedTable()
+        {
+            GameContent content = GameContent.Load(Root, new List<string>());
+            Assert.AreSame(content.Text, RulesText.Table, "loading the content hands Core the table");
+            Assert.AreEqual("Trading Post", LocationNameTable.FallbackName(LocationKind.TradingPost));
+            Assert.AreEqual("Not enough moonpetal.", RulesText.Format("ui.rules.not_enough", "moonpetal"));
+
+            StringTable previous = RulesText.Table;
+            try
+            {
+                RulesText.Table = new StringTable("test", new Dictionary<string, string> { { "ui.rules.location.trading_post", "Handelsplatz" } });
+                Assert.AreEqual("Handelsplatz", LocationNameTable.FallbackName(LocationKind.TradingPost));
+            }
+            finally
+            {
+                RulesText.Table = previous;
+            }
+        }
+
+        /// <summary>
         /// Every <c>ui.*</c> string is a valid <see cref="StringTable.Format"/> pattern: its placeholders
         /// are <c>{0}</c>, <c>{1}</c>... with no gaps (a translation may reorder them, never invent one), no
         /// stray brace, and no em or en dash (the copy rules, content-bible.md).

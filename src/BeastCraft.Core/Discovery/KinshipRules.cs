@@ -4,6 +4,7 @@ using BeastCraft.Battle;
 using BeastCraft.Campaign;
 using BeastCraft.Creatures;
 using BeastCraft.Encounters;
+using BeastCraft.Localization;
 using BeastCraft.Progression;
 using BeastCraft.Save;
 using BeastCraft.Tutorial;
@@ -220,25 +221,25 @@ namespace BeastCraft.Discovery
             site = SiteOf(content, poi);
             if (site == null)
             {
-                error = "There is no trial here.";
+                error = RulesText.Get("ui.rules.kinship.no_trial");
                 return null;
             }
 
             if (save.Discovery.HasPendingKinship)
             {
-                error = "A beast is waiting to join you: choose it first.";
+                error = RulesText.Get("ui.map.pick_first");
                 return null;
             }
 
             if (save.Discovery.HasClaimed(site.SiteId))
             {
-                error = "You have already bonded here.";
+                error = RulesText.Get("ui.rules.kinship.already_bonded");
                 return null;
             }
 
             if (Offer(save, site, content.Roster).Count == 0)
             {
-                error = "No beast is left to answer here.";
+                error = RulesText.Get("ui.rules.kinship.none_left");
                 return null;
             }
 
@@ -286,7 +287,7 @@ namespace BeastCraft.Discovery
             KinshipSiteData site = save == null || content == null || !save.Discovery.HasPendingKinship ? null : content.Library.Site(save.Discovery.PendingKinshipId);
             if (site == null)
             {
-                return KinshipResult.Refused("No beast is waiting to join.");
+                return KinshipResult.Refused(RulesText.Get("ui.rules.pick.none_waiting"));
             }
 
             return new KinshipResult
@@ -314,7 +315,7 @@ namespace BeastCraft.Discovery
 
             if (!pending.Offer.Contains(speciesId ?? string.Empty))
             {
-                return KinshipResult.Refused("That beast is not offered here.");
+                return KinshipResult.Refused(RulesText.Get("ui.rules.kinship.not_offered"));
             }
 
             OwnedBeast beast = StarterPicks.AddBeast(save, content.Skills, speciesId, pending.JoinLevel);

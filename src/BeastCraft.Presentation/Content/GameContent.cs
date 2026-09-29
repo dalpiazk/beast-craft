@@ -342,6 +342,9 @@ namespace BeastCraft.Presentation.Content
             RegionLibrary campaign = RegionLibrary.Build(regions);
             DropTable drops = DropTableBuilder.Build(dropTables, DropTableBuilder.TierLookup(skills.Materials));
 
+            // Core's rules read their player text (refusals, fallback names) from the same table.
+            RulesText.Table = text;
+
             return new GameContent
             {
                 Root = root.Location,

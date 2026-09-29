@@ -7,6 +7,7 @@ using BeastCraft.Creatures;
 using BeastCraft.Economy;
 using BeastCraft.Encounters;
 using BeastCraft.Grove;
+using BeastCraft.Localization;
 using BeastCraft.Progression;
 using BeastCraft.Save;
 using BeastCraft.Session;
@@ -682,14 +683,14 @@ namespace BeastCraft.Campaign
 
             if (region.IsTutorial)
             {
-                return CampaignResult.Refused("Hearthglen's fights are never soothed.");
+                return CampaignResult.Refused(RulesText.Get("ui.rules.soothe.hearthglen"));
             }
 
             SoothingRegionData soothing = grove == null ? null : grove.Soothing(run.RegionId);
             string[] accepted = soothing == null ? new string[0] : soothing.ItemIds ?? new string[0];
             if (string.IsNullOrEmpty(itemId) || Array.IndexOf(accepted, itemId) < 0)
             {
-                return CampaignResult.Refused("That item does not soothe this location.");
+                return CampaignResult.Refused(RulesText.Get("ui.rules.soothe.wrong_item"));
             }
 
             List<KeyValuePair<string, string>> teamUnitIds = new List<KeyValuePair<string, string>>();
@@ -709,12 +710,12 @@ namespace BeastCraft.Campaign
 
             if (teamUnitIds.Count == 0)
             {
-                return CampaignResult.Refused("No owned beast in the team to award the clear to.");
+                return CampaignResult.Refused(RulesText.Get("ui.rules.soothe.no_beast"));
             }
 
             if (save.Grove == null || !save.Grove.Items.TryConsume(itemId, 1))
             {
-                return CampaignResult.Refused("Not enough of that item.");
+                return CampaignResult.Refused(RulesText.Get("ui.rules.soothe.not_enough"));
             }
 
             EncounterPlan plan = PlanFor(node, encounters, enemyCatalog);
@@ -1189,7 +1190,7 @@ namespace BeastCraft.Campaign
 
             if (region.IsTutorial && StarterPicks.PendingStep(save, library) > 0)
             {
-                return CampaignResult.Refused("A beast is waiting to join: make the pick first.");
+                return CampaignResult.Refused(RulesText.Get("ui.rules.pick.make_pick_first"));
             }
 
             node = run.Find(nodeId);

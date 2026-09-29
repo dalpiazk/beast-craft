@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using BeastCraft.Localization;
 
 namespace BeastCraft.Campaign
 {
@@ -80,27 +81,27 @@ namespace BeastCraft.Campaign
             return name.Length > 0 ? name : FallbackName(node.Kind);
         }
 
-        /// <summary>The generic name of a kind, used when the table has no name for a key: Wilds, Den, Camp, Trading Post, Pass or Lair.</summary>
+        /// <summary>The generic name of a kind, used when the table has no name for a key: Wilds, Den, Camp, Trading Post, Pass or Lair (<c>ui.rules.location.*</c>, <see cref="RulesText"/>).</summary>
         public static string FallbackName(LocationKind kind)
         {
             switch (kind)
             {
                 case LocationKind.Den:
-                    return "Den";
+                    return RulesText.Get("ui.rules.location.den");
                 case LocationKind.Camp:
-                    return "Camp";
+                    return RulesText.Get("ui.rules.location.camp");
                 case LocationKind.TradingPost:
-                    return "Trading Post";
+                    return RulesText.Get("ui.rules.location.trading_post");
                 case LocationKind.Pass:
-                    return "Pass";
+                    return RulesText.Get("ui.rules.location.pass");
                 case LocationKind.Lair:
-                    return "Lair";
+                    return RulesText.Get("ui.rules.location.lair");
                 case LocationKind.Shrine:
-                    return "Shrine";
+                    return RulesText.Get("ui.rules.location.shrine");
                 case LocationKind.KinshipSite:
-                    return "Kinship Site";
+                    return RulesText.Get("ui.rules.location.kinship_site");
                 default:
-                    return "Wilds";
+                    return RulesText.Get("ui.rules.location.wilds");
             }
         }
 

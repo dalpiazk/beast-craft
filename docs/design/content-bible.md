@@ -337,9 +337,16 @@ the list separator). The EditMode tests fail on a `ui.*` key `en.json` lacks, on
 skipped placeholder number, a stray brace, an em dash), and on a literal that reads as words passed to a
 screen's drawing, toast, button, label or message in the screens, view-models or skill card.
 
+Core's rules hand the player some text of their own: refusals a toast shows (the garden, grove, board,
+folk, discovery, Kinship, starter-pick and soothe rules) and a location's generic name when the name
+table has none. Those are `ui.rules.*` keys, read through `RulesText`, whose table is set when the
+content loads (the rules are static and take no content).
+
 What is still English in code, on purpose: logs, exceptions, validator messages and the debug viewer's
-command line; enum names shown as-is (elements, stances, a passive's trigger); the element badges'
-two-letter codes (placeholders until the icons land); the desktop window title.
+command line; guard refusals only a code or content error can reach (they name raw ids, "No save or
+Garden content."); the save loader's technical diagnostics (schema numbers, "not valid UTF-8"), which the
+keyed "save not loaded" messages quote; enum names shown as-is (elements, stances, a passive's trigger);
+the element badges' two-letter codes (placeholders until the icons land); the desktop window title.
 
 **Missing keys.** A key the table lacks is logged once and shows as `[missing: key]` in a Debug build,
 so it stands out on screen; a Release build shows the key itself.

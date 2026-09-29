@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using BeastCraft.Common;
 using BeastCraft.Economy;
+using BeastCraft.Localization;
 using BeastCraft.Progression;
 using BeastCraft.Save;
 
@@ -107,28 +108,28 @@ namespace BeastCraft.Grove
             HabitatData habitat = library.Habitat(habitatId);
             if (habitat == null || !IsHabitatUnlocked(save, habitat))
             {
-                return GroveActionResult.Refused("That habitat is not unlocked.");
+                return GroveActionResult.Refused(RulesText.Get("ui.rules.grove.habitat_locked"));
             }
 
             DecorData decor = library.Decor(decorId);
             if (decor == null || !IsDecorUnlocked(save, decorId))
             {
-                return GroveActionResult.Refused("That decor is not unlocked.");
+                return GroveActionResult.Refused(RulesText.Get("ui.rules.grove.decor_locked"));
             }
 
             if (!string.IsNullOrEmpty(decor.HabitatScope) && decor.HabitatScope != habitatId)
             {
-                return GroveActionResult.Refused("That decor cannot be placed in this habitat.");
+                return GroveActionResult.Refused(RulesText.Get("ui.rules.grove.decor_wrong_habitat"));
             }
 
             if (save.Grove.IsPlaced(decorId))
             {
-                return GroveActionResult.Refused("That decor is already placed.");
+                return GroveActionResult.Refused(RulesText.Get("ui.rules.grove.decor_placed"));
             }
 
             if (save.Grove.PlacedCountIn(habitatId) >= habitat.SlotCount)
             {
-                return GroveActionResult.Refused("This habitat's decor slots are full.");
+                return GroveActionResult.Refused(RulesText.Get("ui.rules.grove.decor_full"));
             }
 
             save.Grove.PlacedDecor.Add(new PlacedDecorEntry { HabitatId = habitatId, DecorId = decorId, X = x, Y = y, Rotation = rotation });
@@ -204,13 +205,13 @@ namespace BeastCraft.Grove
             OwnedBeast beast = save.FindBeast(beastId);
             if (beast == null)
             {
-                return GroveActionResult.Refused("Unknown beast.");
+                return GroveActionResult.Refused(RulesText.Get("ui.rules.grove.unknown_beast"));
             }
 
             save.EnsureInitialized();
             if (!CooldownElapsed(save, library, beastId, isFeed, nowUtc, nowMonotonic))
             {
-                return GroveActionResult.Refused(isFeed ? "This beast has already been fed today." : "This beast has already played today.");
+                return GroveActionResult.Refused(RulesText.Get(isFeed ? "ui.rules.grove.fed_today" : "ui.rules.grove.played_today"));
             }
 
             BeastAffinityState state = save.Grove.AffinityOf(beastId);
@@ -511,7 +512,7 @@ namespace BeastCraft.Grove
             ColourFormData form = library.ColourForm(colourFormId);
             if (form == null)
             {
-                return ColourFormResult.Refused("Unknown colour form.");
+                return ColourFormResult.Refused(RulesText.Get("ui.rules.grove.unknown_colour_form"));
             }
 
             // Resolve the cosmetic key BEFORE spending the item: a content mis-pairing (the form names a
@@ -527,7 +528,7 @@ namespace BeastCraft.Grove
             save.EnsureInitialized();
             if (!save.Grove.Items.TryConsume(form.ItemId, form.ItemCount))
             {
-                return ColourFormResult.Refused("Not enough " + form.ItemId + ".");
+                return ColourFormResult.Refused(RulesText.Format("ui.rules.not_enough", form.ItemId));
             }
 
             bool newlyUnlocked = CosmeticRules.UnlockOrRefund(save, cosmetics, key, out int tokensGranted);

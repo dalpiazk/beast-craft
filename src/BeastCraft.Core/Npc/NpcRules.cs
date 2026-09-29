@@ -5,6 +5,7 @@ using BeastCraft.Economy;
 using BeastCraft.Expeditions;
 using BeastCraft.Garden;
 using BeastCraft.Grove;
+using BeastCraft.Localization;
 using BeastCraft.Save;
 using BeastCraft.Tutorial;
 
@@ -255,7 +256,7 @@ namespace BeastCraft.Npc
             save.EnsureInitialized();
             if (!CanFulfillRequest(save, request, facts))
             {
-                return NpcActionResult.Refused("That request cannot be fulfilled yet.");
+                return NpcActionResult.Refused(RulesText.Get("ui.rules.npc.request_not_ready"));
             }
 
             save.Grove.Items.TryConsume(request.ItemId, request.Count);
@@ -363,7 +364,7 @@ namespace BeastCraft.Npc
             save.EnsureInitialized();
             if (!CanFulfillChapter(save, story, facts))
             {
-                return NpcActionResult.Refused("That chapter cannot be completed yet.");
+                return NpcActionResult.Refused(RulesText.Get("ui.rules.npc.chapter_not_ready"));
             }
 
             SideStoryChapterData chapter = CurrentChapter(save, story);
