@@ -1,6 +1,6 @@
 # Grove: Beast Grove, Wildgarden, Expeditions
 
-**Status: D1 and D2 BUILT (Core, content, save, tests); D3 and D4 not started — see §11.**
+**Status: D1, D2 and D3 BUILT (Core, content, save, sim, tests); D4 not started — see §11.**
 **DRAFT — every DisplayName, Title and Text pending producer review.** This is the design pass
 reconciled against `main` at commit `8829dbf` (the draft this replaces was written against an older
 `main`, schema 7, before the Kinship/discovery layer, the compendium and look tokens existed). It
@@ -264,26 +264,89 @@ trinket — cross-checked against `garden-library.json`/`expedition-library.json
 resolves for its kind, every condition's kind is known, ids are unique, ids are snake_case, text
 follows the content bible's length and tone rules, and every side story's chapter chain is acyclic.
 
-## 7. Peaceful clears ("soothing") and colour evolutions (D3 — not built in this PR)
+## 7. Peaceful clears ("soothing") and colour evolutions (D3 — status: BUILT)
 
-**Producer additions, carried forward verbatim:**
+**Peaceful clears.** `Campaign.CampaignRules.Soothe` (Core, next to `ResolveBattle`, whose clear path
+it reuses): refused for anything but a plain `MapNodeType.Battle` location — never an Elite den, a
+Gate, a Boss, a Kinship trial or a tutorial Story/Trial (Hearthglen's fights are refused twice over:
+the tutorial-region check, and Hearthglen's own fights are `Trial`-typed, so the node-type check alone
+already excludes them) — or for a region with no soothing item set, an item not in it, or a team
+naming no owned beast. On success it consumes one item from `Grove.GroveItemInventory.TryConsume` (the
+same seam D2's NPC requests read) and pays out **exactly** what a combat win at that node grants — the
+named team's full beast XP (the clear bonus, as if none were knocked out; every other owned beast's
+bench XP), gold, material and gear/cosmetic drops, first-clear bonuses — by building a synthetic,
+already-won `Session.BattleSessionResult` (a `BattleResult(PlayerVictory, …)`, one not-defeated
+`Battle.BattleUnit` per named beast) and handing it to the very same `Session.BattleSession
+.ApplyRewards` a fought battle pays through, seeded with `CampaignRules.BattleSeed(node,
+LossesAt(run, node))` — this node's *current-attempt* seed, the same one a real attempt right now
+would use — so a soothe can never reroll or improve on what fighting would have paid (RNG stream
+parity, the producer's own ask). No battle is simulated, so no skill practice XP is credited and the
+avatar does not take part (a deliberate D3 scope decision: the ask was "full beast XP", not avatar
+XP). The node then clears exactly as a win does (`Clear`, `RevealAround`: reveal, and a loss streak at
+that node resets), `Campaign.CampaignProgress.LocationsSoothed` counts it (never decreases, account-
+wide, replays included — the `location_soothed` NPC fact, cascading like `decor_placed_count`), and
+`achievements` (when given) evaluates as usual.
 
-- **Peaceful clears.** ORDINARY battle locations only (never elites, gates, bosses or Kinship trials)
-  can be cleared by giving the right Grove item: the location counts as cleared, the path opens, and
-  the player gets FULL rewards including full beast XP. D3 reads `GroveItemInventory`/`TryConsume`
-  the same way D2's NPC requests do — no new inventory. The pacing sim must account for peaceful
-  clears (a soothed ordinary fight still pays full XP, so pacing is roughly unchanged) but must still
-  require winning gates and bosses by combat; this is a `Tooling/BalanceSim` change for D3, not D1 —
-  D1 makes no pacing change at all (confirmed identical reports, see the PR).
-- **Colour evolutions.** Grove outputs (plant varieties, and especially the `"dye"` recipe outputs
-  this PR's `garden-library.json` already ships — see §2) can permanently shift a beast into a
-  collectible colour variant, reusing the accent-overlay tint technique; NPCs react to them and
-  requests may ask to see one. D1 already gives D3 its raw material: dyes are ordinary
-  `GroveItemInventory` entries, so D3 only needs the beast-side accent-mask/save-flag work, not a new
-  economy.
-- **Filed away, not decided** (conflicts with "no combat power"): Grove items granting a battle bonus
-  (e.g. a full speed bar at the start). Revisit with a balance plan; nothing in this PR or its data
-  shapes assumes it will happen.
+Data-driven, per region (`Grove.GroveLibraryData.Soothing`, `SoothingRegionData {RegionId, ItemIds[]}`
+— a few Wildgarden varieties per region, so the player has a choice; cross-validated by
+`GroveLibraryValidator.ValidateSoothingAndColourForms` against every mainline and post-game region of
+`regions.json` (full coverage required) and every item id against `garden-library.json`/
+`expedition-library.json`, the same two-pass shape as D2's `DialogueValidator
+.ValidateRequestsAndSideStories`). **Producer-reviewable: per-region, not per-enemy-family** — simpler
+to author and to look up at the one call site that has `run.RegionId` on hand; a family-scoped table
+would need the encounter shape too, for no clear player-facing benefit v1. Content: 3 Wildgarden
+varieties per region, 11 regions (10 mainline + the post-game region — soothing works there too;
+nothing in the design restricted it to mainline). One achievement, `LocationsSoothed` (threshold 3,
+"Peacekeeper" title); one Grove Keeper dialogue line reacting to the first soothe.
+
+**Colour evolutions.** **Producer-reviewable, the cleanest model found**: reuses the *existing*
+per-species cosmetic system (`Economy.CosmeticLibrary`/`CosmeticRules`, already live behind the Avatar
+screen's sibling — every roster species already has its own `cosmetic-library.json` categories, e.g.
+`kirin_horn`) end to end, adding **no new save shape at all**. A colour form
+(`Grove.GroveLibraryData.ColourForms`, `ColourFormData {ColourFormId, SpeciesId, CosmeticCategoryId,
+CosmeticOptionId, ItemId, ItemCount}`) names a species-scoped `DiscreteOption` cosmetic category/option
+pair (`Source = "grove"`, `UnlockId` = the row's own `ColourFormId` — cross-validated by
+`ValidateSoothingAndColourForms`, the same `CheckLook` idiom D1/D2 already used for a Grove-sourced
+look) and the Grove item (a grown variety or a crafted dye) it costs. `Grove.GroveRules
+.TryUnlockColourForm` spends the item (`GroveItemInventory.TryConsume`) and unlocks the option
+account-wide through the **existing** `CosmeticRules.UnlockOrRefund` (already-owned grants look tokens
+instead of wasting the item, exactly D1's "don't waste a found reward" stance); *applying* it to a
+specific beast, and switching an owned beast back to its default colour or to another owned form, is
+the **existing** `CosmeticRules.TrySetOption`/`OwnedBeast.Appearance` — no new method, since it already
+does precisely "owned once per species, worn per beast instance, switchable freely". This is why no
+save field was needed: `PlayerSave.Cosmetics` (ownership) and `OwnedBeast.Appearance` (which owned
+form each beast wears) already had the exact shape "owned colour forms per species + which is applied
+per instance" needs. `Npc.NpcRules.BuildFacts` emits `colour_form_owned:{id}` by checking
+`save.Cosmetics.Has` against each authored form's key — no new save list to maintain either. Content:
+one collectible colour form per roster species (10; each its species' existing cosmetic categories
+gain a third: `{species}_colour_form`, `natural` default + a free `dusk` starter alongside the
+grove-locked dye form — a `DiscreteOption` category needs both per `CosmeticLibraryValidator`, and a
+free starter gives the player something to try in that category before ever visiting the Wildgarden).
+One Wandering Scholar NPC request (`colour_form_owned:phoenix_colour_duskrose` as a condition) asks to
+see an owned colour form.
+
+**Rendering (a tiny presentation seam, not a screen).** No accent-mask pipeline exists for roster
+beasts today (`docs/design/presentation-and-vfx.md`, "Element accents": the base+overlay split is an
+*enemy*-only technique, built for element accents, not shipped for any of the ten roster beasts) — the
+art dependency the design flagged. A whole-sprite tint fallback (multiplying the beast's existing plain
+sprite by a per-form colour, the same `Tint` mechanic the art manifest already uses for alias sprites)
+is the documented seam for D4: read the applied form via `CosmeticRules.Worn(save, beastId,
+"{species}_colour_form", cosmetics)`, and if its `ArtKey`/data carries a tint colour, multiply the
+beast's draw call by it; per-species accent masks remain the better long-term answer once that art
+exists. Nothing in D3 depends on this — it is Core/content/save only, with a documented, not-yet-taken
+hook for whichever of D4's screens draws beasts.
+
+**Pacing (`Tooling/BalanceSim`).** `--mode campaign --soothe-fraction <f>` (0-1, default 0 = off, the
+default `campaign-pacing-report.md` untouched — confirmed byte-identical): that fraction of ordinary
+Battle-node fights is resolved as a guaranteed, never-knocked-out clear (the same XP/gold/loot payout
+the model already pays a win) instead of the clear-chance roll; Elites, Gates and Bosses are always the
+existing roll. A probe run (`--soothe-fraction 0.5`) confirmed the producer's ask directly: every
+"levels at every gate and boss" row stays "ok", identical to the default report — see
+`docs/balance/tuning-log.md`, "Grove D3: peaceful clears (soothing) — pacing probe".
+
+**Filed away, not decided** (conflicts with "no combat power"): Grove items granting a battle bonus
+(e.g. a full speed bar at the start). Revisit with a balance plan; nothing in this PR or its data
+shapes assumes it will happen.
 
 ## 8. Map influence — still "needs more thought" (unchanged from the draft)
 
@@ -342,11 +405,18 @@ constrained the choice — flagged for review, not hidden:
    `ResolveAndMark`), save (`PlayerSave.Npc`, folded into schema 10 in place), request fulfilment and
    chapter chains reading `GroveItemInventory`, `AchievementKinds.SideStoryComplete`. No screens — see
    §6.
-3. **D3 — Soothing and colour evolutions.** Peaceful-clear rule (ordinary locations, full rewards),
-   colour-variant save flags and accent masks, the `Tooling/BalanceSim` pacing check for soothed
-   clears.
+3. **D3 — Soothing and colour evolutions. Status: BUILT.** `CampaignRules.Soothe` (ordinary locations
+   only, reward parity with a combat win via `BattleSession.ApplyRewards`), `Grove.GroveLibraryData
+   .Soothing`/`ColourForms` + validator, `Grove.GroveRules.TryUnlockColourForm` (reusing the existing
+   `Economy.CosmeticRules` ownership/selection shape — no new save field), `CampaignProgress
+   .LocationsSoothed` (schema 10, extended in place; goldens regenerated), two new NPC condition kinds
+   (`location_soothed`, `colour_form_owned`), one achievement, the `Tooling/BalanceSim
+   --soothe-fraction` pacing probe (default report unchanged). No screens — see §5. The whole-sprite
+   tint fallback for colour forms (no accent-mask art exists for roster beasts yet) is a documented,
+   not-yet-taken seam for D4.
 4. **D4 — Grove screens.** Hub, Glade, Garden, Board, the Grove tab's real content (replacing the
-   placeholder), toasts, the Android local-notification hook. Art integration once assets exist.
+   placeholder), toasts, the Android local-notification hook, the colour-form tint hook (§7). Art
+   integration once assets exist.
 
 Risks carried forward: JsonUtility's list-only constraint on nested data (mitigated throughout by the
 existing flat-list idiom, including the flat `(SpeciesId, Tier)` affinity table); the "two

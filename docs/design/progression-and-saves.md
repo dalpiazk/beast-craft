@@ -397,8 +397,8 @@ here is read by battle, stats or campaign difficulty; `docs/balance/tuned-report
   `PendingGifts`, capped at `GroveRules.MaxPendingGifts` (3)), `LoreIds` (the Grove's own small lore
   codex — affinity and gift flavour, kept separate from `DiscoveryProgress.LoreIds`) and `Items`
   (`Grove.GroveItemInventory`: a generic counted pool, keyed by id — what the Wildgarden grows and
-  crafts and the Board's expeditions find; the seam a later PR reads for peaceful clears and colour
-  evolutions, see `grove.md`, "Producer additions").
+  crafts and the Board's expeditions find; the seam D3 reads for peaceful clears and colour
+  evolutions, see `grove.md`, §7).
 - `PlayerSave.Garden` (`Garden.GardenProgress`, written after `Grove`): `Plots` (`{PlotId, SeedId,
   StartUtcTicks, StartMonotonicMs}`; no entry for a plot id means it is empty) and
   `VarietiesDiscovered` (the herbarium).
@@ -465,8 +465,9 @@ touched, `ChaptersCompleted` in the order completed).
   (affinity tier — any beast and per species, cascading up to the current tier —, herbarium variety
   found/count, decor placed count, habitat unlocked, an expedition story unlocked, a region's boss
   cleared, Grove/dialogue lore found, a Grove item held, a side-story chapter or story complete).
-  Deliberately one small, growable list: D3 adds new kinds (e.g. a colour form owned, a location
-  soothed) the same way, without touching `DialogueBook.Resolve` or this shape.
+  Deliberately one small, growable list: D3 added `colour_form_owned` and `location_soothed` the same
+  way (a new kind constant plus a new fact emitted from `BuildFacts`), without touching
+  `DialogueBook.Resolve` or this shape.
 - *Rules.* `Npc.NpcRules`: deterministic, non-throwing, refuse-and-no-op on bad input (the same
   idiom). `ResolveAndMark` wraps `DialogueBook.Resolve` and records the line seen.
   `IsRequestAvailable`/`CanFulfillRequest`/`FulfillRequest` consume a request's Grove item
@@ -488,6 +489,49 @@ touched, `ChaptersCompleted` in the order completed).
   changed in exactly one additional place: `,"Npc":{"Dialogue":{"LinesSeen":[]},
   "RequestsFulfilled":[],"LoreIds":[],"SideStories":[]}` after `"Expeditions"`'s closing brace. No
   other input or migration changed.
+
+#### Schema 10, extended in place: peaceful clears (D3)
+
+`grove.md`'s D3 (peaceful clears / "soothing"; colour evolutions) landed before schema 11, so it too
+was folded into schema 10 in place. Only peaceful clears need a save field — colour evolutions add
+none at all (see below).
+
+- `Campaign.CampaignProgress.LocationsSoothed` (an `int`, written directly after `ActiveRun`'s closing
+  brace inside `"Campaign"`): how many ordinary battle locations have ever been soothed with a Grove
+  item instead of fought (`CampaignRules.Soothe`); never decreases, account-wide, replays included.
+  Read by `Npc.NpcRules.BuildFacts` for the `location_soothed` NPC condition (a cascading count fact,
+  like `decor_placed_count`) and by the `LocationsSoothed` achievement kind.
+- *Rules.* `Campaign.CampaignRules.Soothe(save, regions, grove, encounters, enemyCatalog, nodeId,
+  itemId, teamBeastIds, dropTable, economy, out rewards, achievements)`: refuses anything but a plain
+  `MapNodeType.Battle` node, a region with no `Grove.GroveLibraryData.Soothing` entry, an item not in
+  it, or an empty team. On success it consumes the item (`GroveItemInventory.TryConsume`) and pays the
+  reward through `Session.BattleSession.ApplyRewards` itself — a synthetic, already-won
+  `BattleSessionResult` (one not-defeated `BattleUnit` per named beast, `BattleSeed(node,
+  LossesAt(run, node))` as its seed) rather than a re-implementation — so a soothe's gold/loot/XP is
+  byte-for-byte what a real win at that node, right now, would pay (RNG stream parity). The node
+  clears exactly as a win does (`Clear`, `RevealAround`, the loss streak resets) and
+  `LocationsSoothed` increments once.
+- *Validation.* `Grove.GroveLibraryValidator.ValidateSoothingAndColourForms` (a second pass over
+  `grove-library.json`, after `garden-library.json`/`expedition-library.json` are themselves valid —
+  the same two-pass shape as D2's `DialogueValidator.ValidateRequestsAndSideStories`): every mainline
+  and post-game region has exactly one `Soothing` entry naming at least one real Grove item; every
+  `Grove.ColourFormData` has a unique id, a known species, a positive item count, an item that
+  resolves, and a `CosmeticCategoryId`/`CosmeticOptionId` that resolve to a `"grove"`-sourced look
+  scoped to that species whose `UnlockId` is the row's own id (`CheckLook`, the same idiom D1/D2 used).
+  `SaveValidator` reports `Campaign.LocationsSoothed` out of range (non-negative) alongside the rest of
+  `ValidateCampaign`.
+- *Golden saves.* `rich-v10.input.json` was regenerated again; every expected output changed in
+  exactly one additional place: `,"LocationsSoothed":0` after `ActiveRun`'s closing brace, inside
+  `"Campaign"`. No other input or migration changed.
+- **Colour evolutions add no save field.** A colour form's account-wide ownership and which one a
+  beast currently wears reuse the *existing* per-species cosmetic shape end to end:
+  `PlayerSave.Cosmetics` (`Economy.CosmeticCollection`, schema 4) and `OwnedBeast.Appearance`
+  (`Customization.CustomizationSelection`, schema 4) already model "owned once per species, worn per
+  beast instance, switchable freely" — exactly what "owned colour forms per beast species/instance"
+  needed. `Grove.GroveRules.TryUnlockColourForm` spends a Grove item to unlock a form's cosmetic
+  option through the existing `Economy.CosmeticRules.UnlockOrRefund`; wearing/switching it on a
+  specific beast is the existing `CosmeticRules.TrySetOption` — no new Core method for that half
+  either. See `grove.md`, "Colour evolutions" for the full reasoning.
 
 ### Hearthglen's rules (`StarterPicks`, `CampaignRules`)
 
