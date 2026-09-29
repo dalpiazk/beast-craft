@@ -17,9 +17,7 @@ namespace BeastCraft.Game.Screens
     /// </summary>
     public sealed class AvatarScreen : GameScreen
     {
-        private const float TabsY = HeaderMetrics.Standard + 12f;
-        private const float TabsHeight = 96f;
-        private const float ContentTop = TabsY + TabsHeight + 16f;
+        private static readonly float ContentTop = TabStrip.ContentTop(HeaderMetrics.Standard);
 
         private static readonly string[] TabNames = { "Overview", "Skills", "Gear", "Wardrobe" };
         private static readonly string[] TabGlyphs = { "avatar", "star", "gear", "roster" };
@@ -42,12 +40,7 @@ namespace BeastCraft.Game.Screens
             _wardrobe = new CardList(Ui.Add(new ScrollView { Id = "wardrobe-page", Bounds = page, Visible = false }));
 
             _header = new ScreenHeader(Ui, HeaderMetrics.Standard, () => Ctx.Stack.Pop());
-            float tabsWidth = PortraitLayout.CanvasWidth - 2f * HeaderMetrics.Pad;
-            Ui.Add(new Panel { Id = "tabs-panel", Bounds = new Rect(HeaderMetrics.Pad, TabsY, tabsWidth, TabsHeight), StyleKey = "nav" });
-            _tabs = Ui.Add(new Tabs { Id = "avatar-tabs", Bounds = new Rect(HeaderMetrics.Pad, TabsY, tabsWidth, TabsHeight).Inset(6f) });
-            _tabs.Items.AddRange(TabNames);
-            _tabs.Glyphs.AddRange(TabGlyphs);
-            _tabs.Changed += index => SelectTab((AvatarTab)index);
+            _tabs = TabStrip.Build(Ui, "avatar-tabs", HeaderMetrics.Standard, TabNames, TabGlyphs, index => SelectTab((AvatarTab)index));
 
             BuildAll();
         }

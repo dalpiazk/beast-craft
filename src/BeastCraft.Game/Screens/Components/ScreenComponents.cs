@@ -89,15 +89,19 @@ namespace BeastCraft.Game.Screens.Components
     /// <summary>
     /// The inner tab strip a full-page screen with more than one tab shows under its
     /// <see cref="ScreenHeader"/> (Avatar's Overview/Skills/Gear/Wardrobe, Inventory's Gear/
-    /// Materials/Looks, the Trader's Stock/Sell, Grove's Glade/Garden/Board/Npc, the beast detail
-    /// screen's Stats/Skills/Gear &amp; bonds) — one height for all of them, so a strip never has to
-    /// guess how much room its icon-above-label layout needs (Grove's own strip used to sit at
-    /// 170px, almost twice this, worked around from an old layout bug; the bug was in
-    /// <c>UiPainter.Tabs</c>'s label placement, fixed since, so every strip can share this height).
+    /// Materials/Looks, the Trader's Stock/Sell, Grove's Glade/Garden/Board/Npc) — one height for
+    /// all of them, sized so <see cref="UiPainter.Tabs"/>'s icon-above-label layout reads clearly:
+    /// a readable icon and the label sitting with even air above and below it inside the selected
+    /// pill, the same proportions the home bottom nav (<c>HomeScreen.NavHeight</c>, 170px, the same
+    /// painter) reads at. <see cref="Height"/> is shorter than that (a full-page screen's strip sits
+    /// under a header rather than at the canvas edge, so it can afford to be tighter), but well past
+    /// the old 96px, which cramped the icon down to a sliver and pushed the label to sit right on the
+    /// selected pill's bottom edge — Grove's own strip had briefly been widened to 170px to work
+    /// around exactly that, before this shared height replaced the workaround everywhere.
     /// </summary>
     public static class TabStrip
     {
-        public const float Height = 96f;
+        public const float Height = 136f;
         public const float Gap = 12f;
 
         /// <summary>The strip's own y, right under a header of <paramref name="headerHeight"/>.</summary>
