@@ -147,7 +147,7 @@
       "Term": "Adaptive assist",
       "Category": "Combat",
       "Forms": [ "assist", "adaptive assist", "the wilds ease" ],
-      "Definition": "Lose the same fight twice in a row and it eases a little each time, down to a floor; win it and the ease resets. Rewards and XP never change. It never applies on Hard difficulty in the post-game."
+      "Definition": "Lose a fight and it eases a little; lose it again and it eases a little more, down to a floor; win it and the ease resets. Rewards and XP never change. It never applies on Hard difficulty in the post-game, or in Hearthglen."
     },
     {
       "TermId": "matchup_warnings",

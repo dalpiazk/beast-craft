@@ -211,6 +211,42 @@ namespace BeastCraft.Tests.EditMode
             Assert.Less(normal.AssistScale, 1.0, "the same location on Normal is assisted");
         }
 
+        [Test]
+        public void PlanFor_NeverAssists_InHearthglen_ButStillAssistsANormalRegion()
+        {
+            RegionLibraryData data = CampaignMapTests.LoadRegions();
+            Assume.That(data.AssistStep, Is.GreaterThan(0.0), "the shipped curve actually assists something");
+            RegionLibrary regions = RegionLibrary.Build(data);
+            EncounterLibrary encounters = EncounterLibrary.Build(EncounterContentTests.LoadEncounterLibrary(), EncounterDifficultyTable.Build(EncounterContentTests.Load<EncounterDifficultyData>(EncounterDifficultyData.ProjectRelativePath)));
+            EnemyCatalog enemies = EnemyCatalog.Build(EncounterContentTests.LoadEnemyLibrary(), null);
+
+            // Hearthglen: a fixed-map battle node, retried 1, 2 and 5 times. Its own hg_* template
+            // difficulty and the shared "boss" assist floor (shapeKey resolves to EasingBossId for a
+            // templated fight) would otherwise ease it further on top of its own catch-up.
+            List<MapNode> hearthglenNodes = CampaignRules.FixedMap(regions.Tutorial, 7);
+            MapNode hearthglenNode = hearthglenNodes.Find(n => n.IsBattle);
+            Assume.That(hearthglenNode, Is.Not.Null, "Hearthglen has at least one battle node");
+            MapRun hearthglenRun = new MapRun { RegionId = CampaignProgress.TutorialRegionId };
+
+            foreach (int losses in new[] { 1, 2, 5 })
+            {
+                hearthglenRun.NodeAttemptsNodeId = hearthglenNode.NodeId;
+                hearthglenRun.NodeAttempts = losses;
+                EncounterPlan plan = CampaignRules.PlanFor(hearthglenRun, hearthglenNode, encounters, enemies, regions);
+                Assert.AreEqual(1.0, plan.AssistScale, 1e-9, "Hearthglen after " + losses + " loss(es) is never assisted: it has its own catch-up");
+            }
+
+            // A normal (non-tutorial) region node: the same repeated losses DO get assisted.
+            MapRun normalRun = new MapRun { RegionId = "r01", Stage = 0, Seed = 3 };
+            normalRun.Nodes = NodeMapGenerator.Generate(regions, "r01", 0, 3);
+            MapNode normalNode = normalRun.Nodes.Find(n => n.IsBattle);
+            Assume.That(normalNode, Is.Not.Null, "the seed draws a battle node in r01");
+            normalRun.NodeAttemptsNodeId = normalNode.NodeId;
+            normalRun.NodeAttempts = 2;
+            EncounterPlan normalPlan = CampaignRules.PlanFor(normalRun, normalNode, encounters, enemies, regions);
+            Assert.Less(normalPlan.AssistScale, 1.0, "a normal region node is still assisted after repeated losses");
+        }
+
         // ---------------------------------------------------------------------------------------
         // MatchupWarnings
         // ---------------------------------------------------------------------------------------

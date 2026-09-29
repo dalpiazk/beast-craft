@@ -418,7 +418,9 @@ namespace BeastCraft.Campaign
         /// of <see cref="RegionLibraryData.EasingShapeScales"/>, 1 elsewhere), then adaptive assist on
         /// top (<see cref="EncounterPlan.WithAssist"/>, <see cref="RegionLibrary.AssistScaleFor"/> of
         /// the consecutive losses at this node, <see cref="LossesAt"/>; off on
-        /// <see cref="RunDifficulty.Hard"/>). What a campaign battle fights; both are campaign-only
+        /// <see cref="RunDifficulty.Hard"/> and off in Hearthglen, <see cref="RegionLibrary.IsTutorial"/>
+        /// — the tutorial already has its own catch-up, a 60% finale floor and adaptive finale elements,
+        /// see docs/balance/hearthglen-report.md). What a campaign battle fights; both are campaign-only
         /// (the calibration and any plan built outside a run never see either). Null
         /// <paramref name="run"/> or <paramref name="regions"/> = no easing and no assist.
         /// </summary>
@@ -433,9 +435,11 @@ namespace BeastCraft.Campaign
             string shapeKey = string.IsNullOrEmpty(plan.EncounterId) ? plan.ShapeId : RegionLibraryData.EasingBossId;
             plan = plan.Scaled(regions.DifficultyScaleFor(run.RegionId, run.Stage, shapeKey));
 
-            // Adaptive assist (producer decision, "assist + guidance"): off on post-game Hard, on everywhere
-            // else, so it never softens the harder post-game difficulty players opted into.
-            if (run.Difficulty != RunDifficulty.Hard)
+            // Adaptive assist (producer decision, "assist + guidance"): off on post-game Hard, so it
+            // never softens the harder post-game difficulty players opted into, and off in Hearthglen,
+            // which already has its own catch-up, a 60% finale floor and adaptive finale elements
+            // (docs/balance/hearthglen-report.md) — a second, unrelated ease would double up on it.
+            if (run.Difficulty != RunDifficulty.Hard && !regions.IsTutorial(run.RegionId))
             {
                 int losses = LossesAt(run, node.NodeId);
                 plan = plan.WithAssist(regions.AssistScaleFor(run.RegionId, shapeKey, losses));

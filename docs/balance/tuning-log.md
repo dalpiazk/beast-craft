@@ -4252,9 +4252,11 @@ over levels 10-100 (before -> after; `docs/balance/typical-team-report.md`):
 | `horde` | 85.0% | 85.0% | 44.8% | 99.4% | 98.1% | 99.2% | x0.894 -> x0.705 |
 
 All 12 region-boss `DifficultyOverride`s recalibrated to the new 75% target and hand-authored into
-`encounter-library.json` from the report's After column (e.g. `boss_r01_hollow_warden` x1.016 ->
-x0.906 down to `boss_r10_apex_pair` x0.566 -> x0.436; the post-game twins keep their own lower
-targets, 35% Normal / 20% Hard, scaled the same way). The per-beast balance guard (the full-roster
+`encounter-library.json` from the report's After column (e.g. `boss_r01_hollow_warden`'s previous
+calibration on this branch x1.016 -> x0.906, down to `boss_r10_apex_pair` x0.566 -> x0.436 — the
+report's Before figures, the computed multiplier at the old 60% boss target, not the hand-authored
+override the file shipped before this pass; the post-game twins keep their own lower targets, 35%
+Normal / 20% Hard, scaled the same way). The per-beast balance guard (the full-roster
 scouted panel, uniform 50% target, `±4 elemental / ±7 neutral`) is untouched by any of this — it is
 computed at equal levels, where the level-gap term is exactly 1, and it does not read
 `encounter-library.json`'s `TargetClear`; re-run to confirm: `elemental` normalized means -3.0..+3.8
@@ -4320,7 +4322,10 @@ layered on top of any early-region easing: each consecutive loss at the same loc
 fight's stat multiplier by `(1 - AssistStep)` again (compounding), down to a floor per kind of fight
 (`RegionLibrary.AssistScaleFor`, `regions.json` `AssistStep` / `AssistFloorScales`). It resets on a
 win, changes no reward or XP, and is off on post-game Hard (`RunDifficulty.Hard`) — the difficulty a
-player opted into on purpose is never softened. `EncounterPlan.AssistScale` tracks just this portion
+player opted into on purpose is never softened. It is also off in Hearthglen (`RegionLibrary.IsTutorial`,
+`CampaignRules.PlanFor`): the tutorial already has its own catch-up, a 60% finale floor and adaptive
+finale elements (`docs/balance/hearthglen-report.md`), so a second, unrelated ease would double up on
+it rather than help. `EncounterPlan.AssistScale` tracks just this portion
 (apart from `DifficultyScale`, which carries both), so the preview can show "The wilds ease a little
 (-x%)" (`EncounterViewModel.AssistNote`) without also describing the early-region easing.
 

@@ -248,7 +248,8 @@ namespace BeastCraft.Presentation.Screens
         /// "The wilds ease a little (-x%)" while adaptive assist is active at this location
         /// (<see cref="Encounters.EncounterPlan.AssistScale"/> below 1, producer decision "assist +
         /// guidance"; a consecutive-loss discount, <see cref="Campaign.RegionLibrary.AssistScaleFor"/>);
-        /// null when it is not (a fresh location, or post-game Hard, which is never assisted).
+        /// null when it is not (a fresh location, post-game Hard, or Hearthglen, none of which are
+        /// ever assisted — Hearthglen has its own catch-up instead).
         /// </summary>
         public string AssistNote
         {

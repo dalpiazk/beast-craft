@@ -17,6 +17,9 @@ legal pick: its fixed templates at their own `DifficultyOverride` (never the cal
   combination's beasts (`AdaptiveElements`, `ElementAdaptation`).
 - Targets (producer decisions, round 2): at least 90.0% for every combination in every fight but the finale; the finale's
   weakest trio at about 60.0% or more (a high mean is fine).
+- Adaptive assist (`docs/balance/tuning-log.md`, "Adaptive assist") never applies here: `CampaignRules.PlanFor` gates it
+  off in Hearthglen (`RegionLibrary.IsTutorial`) because this catch-up, the 60% finale floor and the finale's adaptive
+  elements already cover it.
 
 ## Fights
 
