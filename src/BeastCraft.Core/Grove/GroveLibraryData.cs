@@ -48,6 +48,62 @@ namespace BeastCraft.Grove
 
         /// <summary>The Grove's own lore entries (an affinity or gift reward), separate from the discovery layer's.</summary>
         public GroveLoreEntryData[] Lore = new GroveLoreEntryData[0];
+
+        /// <summary>
+        /// Which Grove items soothe an ordinary battle location of each region (D3's "peaceful
+        /// clears" — docs/design/grove.md, "Peaceful clears"): one entry per mainline and post-game
+        /// region (never a tutorial region — Hearthglen's fights are never soothed).
+        /// </summary>
+        public SoothingRegionData[] Soothing = new SoothingRegionData[0];
+
+        /// <summary>
+        /// Collectible colour variants a species' beasts can permanently take (D3's "colour
+        /// evolutions" — docs/design/grove.md, "Colour evolutions"), purely cosmetic: each spends a
+        /// Grove item once to unlock account-wide (<c>Economy.CosmeticRules.UnlockOrRefund</c>,
+        /// through <see cref="Grove.GroveRules.TryUnlockColourForm"/>), reusing the existing
+        /// per-species cosmetic category/option shape (<c>cosmetic-library.json</c>, <c>Scope</c> =
+        /// <see cref="ColourFormData.SpeciesId"/>) rather than a new save shape — any beast of the
+        /// species can then wear it (<c>Economy.CosmeticRules.TrySetOption</c>), and switch between
+        /// every form it owns, exactly like any other look.
+        /// </summary>
+        public ColourFormData[] ColourForms = new ColourFormData[0];
+    }
+
+    /// <summary>Which Grove items soothe an ordinary battle location of one region (<see cref="GroveLibraryData.Soothing"/>).</summary>
+    [Serializable]
+    public class SoothingRegionData
+    {
+        public string RegionId;
+
+        /// <summary>Grove item ids (a grown variety or a crafted dye); holding any one of them, in enough quantity, soothes the location. At least one.</summary>
+        public string[] ItemIds = new string[0];
+    }
+
+    /// <summary>
+    /// One collectible colour variant of a species (<see cref="GroveLibraryData.ColourForms"/>): the
+    /// species-scoped cosmetic option it unlocks, and the Grove item it costs.
+    /// </summary>
+    [Serializable]
+    public class ColourFormData
+    {
+        public string ColourFormId;
+
+        public string SpeciesId;
+
+        /// <summary>The form's own name (DRAFT), shown wherever a colour form is offered or listed.</summary>
+        public string DisplayName;
+
+        /// <summary>A <c>cosmetic-library.json</c> category id, <c>Scope</c> = <see cref="SpeciesId"/>.</summary>
+        public string CosmeticCategoryId;
+
+        /// <summary>The option within <see cref="CosmeticCategoryId"/>; its <c>Source</c> is <c>"grove"</c> and its <c>UnlockId</c> is this row's <see cref="ColourFormId"/>.</summary>
+        public string CosmeticOptionId;
+
+        /// <summary>The Grove item (a grown variety or a crafted dye) spent to unlock it.</summary>
+        public string ItemId;
+
+        /// <summary>How many of <see cref="ItemId"/> the unlock costs. At least 1.</summary>
+        public int ItemCount = 1;
     }
 
     /// <summary>A habitat: a home for beasts, with its own decor slots.</summary>

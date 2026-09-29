@@ -236,6 +236,173 @@ namespace BeastCraft.Grove
             return errors;
         }
 
+        /// <summary>
+        /// Validates <see cref="GroveLibraryData.Soothing"/> and <see cref="GroveLibraryData.ColourForms"/>
+        /// (D3): every non-tutorial region of <paramref name="regions"/> has exactly one
+        /// <see cref="SoothingRegionData"/> entry, each naming at least one Grove item (a
+        /// <paramref name="garden"/> variety or dye, or an <paramref name="expedition"/> trinket) that
+        /// resolves; every colour form has a unique snake_case id, a known species, a positive
+        /// <see cref="ColourFormData.ItemCount"/>, an <see cref="ColourFormData.ItemId"/> that resolves,
+        /// and a <see cref="ColourFormData.CosmeticCategoryId"/>/<see cref="ColourFormData.CosmeticOptionId"/>
+        /// that resolve in <paramref name="cosmetics"/> to a <c>"grove"</c> look scoped to that species
+        /// whose <c>UnlockId</c> is this row's <see cref="ColourFormData.ColourFormId"/>. Called
+        /// separately from <see cref="Validate"/> (after <c>garden-library.json</c> and
+        /// <c>expedition-library.json</c> are themselves validated), the same two-pass shape as
+        /// <c>Tutorial.DialogueValidator.ValidateRequestsAndSideStories</c>.
+        /// </summary>
+        public static List<string> ValidateSoothingAndColourForms(GroveLibraryData data, Campaign.RegionLibraryData regions, Garden.GardenLibraryData garden,
+                                                                    Expeditions.ExpeditionLibraryData expedition, CosmeticLibraryData cosmetics)
+        {
+            List<string> errors = new List<string>();
+            if (data == null)
+            {
+                return errors;
+            }
+
+            HashSet<string> groveItemIds = GroveItemIds(garden, expedition);
+
+            HashSet<string> regionIds = new HashSet<string>(StringComparer.Ordinal);
+            foreach (Campaign.RegionData region in regions == null ? new Campaign.RegionData[0] : regions.Regions ?? new Campaign.RegionData[0])
+            {
+                if (region != null && !string.IsNullOrEmpty(region.RegionId))
+                {
+                    regionIds.Add(region.RegionId);
+                }
+            }
+
+            HashSet<string> seenRegions = new HashSet<string>(StringComparer.Ordinal);
+            foreach (SoothingRegionData row in data.Soothing ?? new SoothingRegionData[0])
+            {
+                string at = "Soothing[" + (row == null ? "?" : row.RegionId) + "]";
+                if (row == null || string.IsNullOrEmpty(row.RegionId) || (regions != null && !regionIds.Contains(row.RegionId)))
+                {
+                    errors.Add(at + ": RegionId must be a known mainline or post-game region (not a tutorial region).");
+                    continue;
+                }
+
+                if (!seenRegions.Add(row.RegionId))
+                {
+                    errors.Add(at + ": region '" + row.RegionId + "' is listed twice.");
+                }
+
+                string[] items = row.ItemIds ?? new string[0];
+                if (items.Length == 0)
+                {
+                    errors.Add(at + ": needs at least one Grove item that soothes it.");
+                }
+
+                foreach (string itemId in items)
+                {
+                    if (string.IsNullOrEmpty(itemId) || !groveItemIds.Contains(itemId))
+                    {
+                        errors.Add(at + ": item '" + itemId + "' is not a Grove item (a Wildgarden variety, a crafted dye or an expedition trinket).");
+                    }
+                }
+            }
+
+            if (regions != null)
+            {
+                foreach (string regionId in regionIds)
+                {
+                    if (!seenRegions.Contains(regionId))
+                    {
+                        errors.Add("Soothing: region '" + regionId + "' has no soothing item set.");
+                    }
+                }
+            }
+
+            HashSet<string> formIds = new HashSet<string>(StringComparer.Ordinal);
+            foreach (ColourFormData form in data.ColourForms ?? new ColourFormData[0])
+            {
+                string at = "ColourForms[" + (form == null ? "?" : form.ColourFormId) + "]";
+                if (form == null || !IsSnakeCase(form.ColourFormId) || !formIds.Add(form.ColourFormId))
+                {
+                    errors.Add(at + ": needs a unique snake_case ColourFormId.");
+                    continue;
+                }
+
+                CheckName(errors, at + ": DisplayName", form.DisplayName);
+                if (string.IsNullOrEmpty(form.ItemId) || !groveItemIds.Contains(form.ItemId))
+                {
+                    errors.Add(at + ": ItemId '" + form.ItemId + "' is not a Grove item (a Wildgarden variety or a crafted dye).");
+                }
+
+                if (form.ItemCount < 1)
+                {
+                    errors.Add(at + ": ItemCount must be at least 1.");
+                }
+
+                CheckColourFormLook(errors, at, form, cosmetics);
+            }
+
+            return errors;
+        }
+
+        private static void CheckColourFormLook(List<string> errors, string at, ColourFormData form, CosmeticLibraryData cosmetics)
+        {
+            if (string.IsNullOrEmpty(form.CosmeticCategoryId) || string.IsNullOrEmpty(form.CosmeticOptionId))
+            {
+                errors.Add(at + ": needs a CosmeticCategoryId and CosmeticOptionId.");
+                return;
+            }
+
+            if (cosmetics == null)
+            {
+                return;
+            }
+
+            CosmeticCategoryData category = Array.Find(cosmetics.Categories ?? new CosmeticCategoryData[0], c => c != null && c.CategoryId == form.CosmeticCategoryId);
+            if (category == null || category.Scope != form.SpeciesId)
+            {
+                errors.Add(at + ": CosmeticCategoryId '" + form.CosmeticCategoryId + "' is not a cosmetic category scoped to species '" + form.SpeciesId + "'.");
+                return;
+            }
+
+            CosmeticOptionData option = Array.Find(category.Options ?? new CosmeticOptionData[0], o => o != null && o.OptionId == form.CosmeticOptionId);
+            if (option == null || option.Source != CosmeticLibrary.SourceGrove || option.UnlockId != form.ColourFormId)
+            {
+                errors.Add(at + ": CosmeticOptionId '" + form.CosmeticOptionId + "' must be a grove look whose UnlockId is '" + form.ColourFormId + "'.");
+            }
+        }
+
+        /// <summary>Every <c>Grove.GroveItemInventory</c> id the content can grant: Wildgarden varieties, crafted dyes and expedition trinkets.</summary>
+        private static HashSet<string> GroveItemIds(Garden.GardenLibraryData garden, Expeditions.ExpeditionLibraryData expedition)
+        {
+            HashSet<string> ids = new HashSet<string>(StringComparer.Ordinal);
+            foreach (Garden.VarietyData variety in garden == null ? new Garden.VarietyData[0] : garden.Varieties ?? new Garden.VarietyData[0])
+            {
+                if (variety != null && !string.IsNullOrEmpty(variety.VarietyId))
+                {
+                    ids.Add(variety.VarietyId);
+                }
+            }
+
+            foreach (Garden.RecipeData recipe in garden == null ? new Garden.RecipeData[0] : garden.Recipes ?? new Garden.RecipeData[0])
+            {
+                if (recipe != null && recipe.Output == "dye" && !string.IsNullOrEmpty(recipe.OutputId))
+                {
+                    ids.Add(recipe.OutputId);
+                }
+            }
+
+            foreach (Expeditions.ExpeditionOutcomeTableData table in expedition == null
+                                                                          ? new Expeditions.ExpeditionOutcomeTableData[0]
+                                                                          : expedition.OutcomeTables ?? new Expeditions.ExpeditionOutcomeTableData[0])
+            {
+                foreach (Expeditions.ExpeditionOutcomeEntryData entry in table == null
+                                                                              ? new Expeditions.ExpeditionOutcomeEntryData[0]
+                                                                              : table.Entries ?? new Expeditions.ExpeditionOutcomeEntryData[0])
+                {
+                    if (entry != null && entry.Kind == "trinket" && !string.IsNullOrEmpty(entry.Id))
+                    {
+                        ids.Add(entry.Id);
+                    }
+                }
+            }
+
+            return ids;
+        }
+
         private static void ValidateGiftEntries(List<string> errors, string at, GiftEntryData[] entries, Dictionary<string, DecorData> decor,
                                                  Dictionary<string, GroveLoreEntryData> lore, CosmeticLibraryData cosmetics)
         {

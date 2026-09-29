@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
 using BeastCraft.Battle;
+using BeastCraft.Battle.Grid;
 using BeastCraft.Battle.Scouting;
 using BeastCraft.Creatures;
 using BeastCraft.Economy;
 using BeastCraft.Encounters;
+using BeastCraft.Grove;
 using BeastCraft.Progression;
 using BeastCraft.Save;
 using BeastCraft.Session;
@@ -625,6 +627,125 @@ namespace BeastCraft.Campaign
             }
 
             return Finish(CampaignResult.Done(CampaignOutcome.Cleared, node));
+        }
+
+        /// <summary>
+        /// Soothes ordinary battle location <paramref name="nodeId"/> with a held Grove item instead
+        /// of fighting it (docs/design/grove.md, "Peaceful clears" — D3): the calming gift lifts the
+        /// Gloam. Refused for anything but a plain <see cref="MapNodeType.Battle"/> location — never
+        /// an Elite den, a Gate, a Boss, a Kinship trial or a tutorial Story/Trial — for a region with
+        /// no soothing item set (<see cref="GroveLibraryData.Soothing"/>) authored, for an
+        /// <paramref name="itemId"/> not in that set, or without <paramref name="teamBeastIds"/>
+        /// naming at least one owned beast.
+        /// <para>
+        /// On success: consumes one <paramref name="itemId"/> from <see cref="GroveItemInventory.TryConsume"/>,
+        /// then pays out exactly what a combat win at this node would — <paramref name="teamBeastIds"/>'
+        /// full beast XP (the clear bonus, as if none were knocked out), every other owned beast's
+        /// bench XP, gold, material and (with <paramref name="economy"/>) gear and cosmetic drops,
+        /// first-clear bonuses included — through the very same <see cref="Session.BattleSession.ApplyRewards"/>
+        /// a fought battle pays through, on this node's current-attempt seed
+        /// (<see cref="BattleSeed"/> of <see cref="LossesAt"/>): the same seed a real attempt right
+        /// now would use, so a soothe can never reroll or improve on what fighting would have paid
+        /// (RNG stream parity — the design's own ask). No battle is simulated (no skill practice XP;
+        /// the avatar does not take part, so it earns no XP from a soothe — a deliberate scope
+        /// decision, since the design's ask was "full beast XP", not avatar XP), so <paramref name="rewards"/>
+        /// carries the payout the same shape <c>NodeBattle.Complete</c> reports for a real battle.
+        /// </para>
+        /// <para>
+        /// Then clears the node the same way a win does (<see cref="Clear"/>, <see cref="RevealAround"/>:
+        /// reveal, and a loss streak at this node resets, exactly as for a win), records it in
+        /// <see cref="CampaignProgress.LocationsSoothed"/> (the <c>location_soothed</c> NPC fact), and
+        /// evaluates <paramref name="achievements"/> when given (idempotent), same as
+        /// <see cref="ResolveBattle"/>. A refused call — including one that fails after consuming the
+        /// item — changes nothing; the item is refunded first.
+        /// </para>
+        /// </summary>
+        public static CampaignResult Soothe(PlayerSave save, RegionLibrary library, GroveLibrary grove, EncounterLibrary encounters, EnemyCatalog enemyCatalog, int nodeId,
+                                            string itemId, IReadOnlyList<string> teamBeastIds, DropTable dropTable, EconomyContent economy, out BattleRewardSummary rewards,
+                                            AchievementContent achievements = null)
+        {
+            rewards = null;
+            CampaignResult refused = CheckNode(save, library, nodeId, out MapRun run, out MapNode node, out RegionData region);
+            if (refused != null)
+            {
+                return refused;
+            }
+
+            if (node.Type != MapNodeType.Battle)
+            {
+                return CampaignResult.Refused("Node " + nodeId + " is a " + node.Type + " node; only an ordinary battle location can be soothed.");
+            }
+
+            if (region.IsTutorial)
+            {
+                return CampaignResult.Refused("Hearthglen's fights are never soothed.");
+            }
+
+            SoothingRegionData soothing = grove == null ? null : grove.Soothing(run.RegionId);
+            string[] accepted = soothing == null ? new string[0] : soothing.ItemIds ?? new string[0];
+            if (string.IsNullOrEmpty(itemId) || Array.IndexOf(accepted, itemId) < 0)
+            {
+                return CampaignResult.Refused("That item does not soothe this location.");
+            }
+
+            List<KeyValuePair<string, string>> teamUnitIds = new List<KeyValuePair<string, string>>();
+            List<BattleUnit> units = new List<BattleUnit>();
+            HashSet<string> seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (string beastId in teamBeastIds ?? new List<string>())
+            {
+                if (string.IsNullOrEmpty(beastId) || !seen.Add(beastId) || save.FindBeast(beastId) == null)
+                {
+                    continue;
+                }
+
+                string unitId = BattleSession.BeastUnitIdPrefix + beastId;
+                teamUnitIds.Add(new KeyValuePair<string, string>(beastId, unitId));
+                units.Add(new BattleUnit(unitId, BattleTeam.Player, default, default));
+            }
+
+            if (teamUnitIds.Count == 0)
+            {
+                return CampaignResult.Refused("No owned beast in the team to award the clear to.");
+            }
+
+            if (save.Grove == null || !save.Grove.Items.TryConsume(itemId, 1))
+            {
+                return CampaignResult.Refused("Not enough of that item.");
+            }
+
+            EncounterPlan plan = PlanFor(node, encounters, enemyCatalog);
+            if (plan == null)
+            {
+                save.Grove.Items.Add(itemId, 1);
+                return CampaignResult.Refused("The encounter could not be built.");
+            }
+
+            BattleSessionResult synthetic = new BattleSessionResult
+            {
+                Seed = BattleSeed(node, LossesAt(run, nodeId)),
+                ShapeId = plan.DropShapeId,
+                EncounterLevel = plan.Level,
+                RegionId = run.RegionId,
+                Battle = new BattleResult(BattleOutcome.PlayerVictory, 0, new List<BattleTurnResult>()),
+                TeamUnitIds = teamUnitIds,
+                Units = units
+            };
+
+            int cap = BeastCap(save, library);
+            RewardModifiers modifiers = RewardModifiersFor(run, node, library).With(economy);
+            rewards = BattleSession.ApplyRewards(save, synthetic, null, dropTable, cap, modifiers);
+
+            Clear(run, node);
+            RevealAround(save, library, run, node);
+            save.Campaign.LocationsSoothed++;
+
+            CampaignResult result = CampaignResult.Done(CampaignOutcome.Cleared, node);
+            if (achievements != null)
+            {
+                result.TitlesEarned.AddRange(AchievementRules.Evaluate(save, achievements));
+            }
+
+            return result;
         }
 
         /// <summary>

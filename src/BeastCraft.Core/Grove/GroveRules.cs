@@ -448,6 +448,70 @@ namespace BeastCraft.Grove
             list.Add(id);
             return true;
         }
+
+        // ---- Colour forms (D3) ----
+
+        /// <summary>
+        /// Spends <paramref name="library"/>'s colour form <paramref name="colourFormId"/>'s
+        /// <see cref="ColourFormData.ItemId"/>/<see cref="ColourFormData.ItemCount"/> from
+        /// <see cref="GroveProgress.Items"/> to unlock its cosmetic option account-wide
+        /// (<c>Economy.CosmeticRules.UnlockOrRefund</c>) — reusing the existing per-species cosmetic
+        /// shape rather than a new save field (docs/design/grove.md, "Colour evolutions"): the
+        /// cleanest model for "owned per species, switchable per beast", since
+        /// <c>Economy.CosmeticRules.TrySetOption</c> already does exactly that. Refused for an
+        /// unknown form or not enough of its item; consuming it when it is already owned still
+        /// spends the item but grants <see cref="CosmeticLibrary.DuplicateLookTokens"/> look tokens
+        /// instead of wasting it (the same "don't waste a found reward" stance as every other Grove
+        /// unlock). Applying/switching an owned form on a specific beast is
+        /// <c>Economy.CosmeticRules.TrySetOption</c> directly — no separate method here.
+        /// </summary>
+        public static ColourFormResult TryUnlockColourForm(PlayerSave save, GroveLibrary library, CosmeticLibrary cosmetics, string colourFormId)
+        {
+            if (save == null || library == null || cosmetics == null)
+            {
+                return ColourFormResult.Refused("No save or content.");
+            }
+
+            ColourFormData form = library.ColourForm(colourFormId);
+            if (form == null)
+            {
+                return ColourFormResult.Refused("Unknown colour form.");
+            }
+
+            save.EnsureInitialized();
+            if (!save.Grove.Items.TryConsume(form.ItemId, form.ItemCount))
+            {
+                return ColourFormResult.Refused("Not enough " + form.ItemId + ".");
+            }
+
+            string key = CosmeticCollection.Key(form.CosmeticCategoryId, form.CosmeticOptionId);
+            bool newlyUnlocked = CosmeticRules.UnlockOrRefund(save, cosmetics, key, out int tokensGranted);
+            return ColourFormResult.Succeeded(newlyUnlocked, tokensGranted);
+        }
+    }
+
+    /// <summary>What <see cref="GroveRules.TryUnlockColourForm"/> did.</summary>
+    public sealed class ColourFormResult
+    {
+        public bool Success { get; private set; } = true;
+
+        public string Error { get; private set; }
+
+        /// <summary>Whether the form was newly unlocked (false when it was already owned — see <see cref="TokensGranted"/>).</summary>
+        public bool NewlyUnlocked { get; private set; }
+
+        /// <summary>Look tokens granted instead, when the form was already owned; 0 otherwise.</summary>
+        public int TokensGranted { get; private set; }
+
+        internal static ColourFormResult Succeeded(bool newlyUnlocked, int tokensGranted)
+        {
+            return new ColourFormResult { NewlyUnlocked = newlyUnlocked, TokensGranted = tokensGranted };
+        }
+
+        internal static ColourFormResult Refused(string error)
+        {
+            return new ColourFormResult { Success = false, Error = error };
+        }
     }
 
     /// <summary>What a Grove action (<see cref="GroveRules.Feed"/>, <see cref="GroveRules.Play"/>, <see cref="GroveRules.PlaceDecor"/>) did.</summary>

@@ -150,6 +150,28 @@ namespace BeastCraft.Npc
                 }
             }
 
+            for (int n = 1; n <= save.Campaign.LocationsSoothed; n++)
+            {
+                facts.Add(NpcConditionKinds.LocationSoothed + ":" + Int(n));
+            }
+
+            if (grove != null)
+            {
+                foreach (Grove.ColourFormData form in grove.Data.ColourForms ?? new Grove.ColourFormData[0])
+                {
+                    if (form == null || string.IsNullOrEmpty(form.ColourFormId))
+                    {
+                        continue;
+                    }
+
+                    string key = CosmeticCollection.Key(form.CosmeticCategoryId, form.CosmeticOptionId);
+                    if (save.Cosmetics != null && save.Cosmetics.Has(key))
+                    {
+                        facts.Add(NpcConditionKinds.ColourFormOwned + ":" + form.ColourFormId);
+                    }
+                }
+            }
+
             return facts;
         }
 

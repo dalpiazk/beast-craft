@@ -119,6 +119,9 @@ namespace BeastCraft.Progression
                 case AchievementKinds.SideStoryComplete:
                     return Npc.NpcRules.IsSideStoryComplete(save, content.Dialogue, def.StoryId);
 
+                case AchievementKinds.LocationsSoothed:
+                    return save.Campaign != null && save.Campaign.LocationsSoothed >= def.Threshold;
+
                 default:
                     return false;
             }

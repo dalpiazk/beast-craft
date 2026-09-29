@@ -262,6 +262,8 @@ namespace BeastCraft.Presentation.Content
             Prefix(errors, "grove-library.json", GroveLibraryValidator.Validate(groveData, discovery, SpeciesIds(roster), cosmeticData));
             Prefix(errors, "garden-library.json", GardenLibraryValidator.Validate(gardenData, discovery, groveData, cosmeticData));
             Prefix(errors, "expedition-library.json", ExpeditionLibraryValidator.Validate(expeditionData, groveData, cosmeticData));
+            Prefix(errors, "grove-library.json",
+                   GroveLibraryValidator.ValidateSoothingAndColourForms(groveData, regions, gardenData, expeditionData, cosmeticData));
             Prefix(errors, "dialogue.json", DialogueValidator.ValidateRequestsAndSideStories(dialogue, groveData, gardenData, expeditionData, cosmeticData));
             Prefix(errors, "achievements.json", AchievementLibraryValidator.Validate(achievementData, regions, discovery, SpeciesIds(roster), dialogue));
 

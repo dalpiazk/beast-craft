@@ -196,6 +196,8 @@ namespace BeastCraft.Presentation.Screens
                     return "Reach level " + def.Threshold + " with any beast.";
                 case AchievementKinds.SideStoryComplete:
                     return "Complete " + SideStoryName(session, def.StoryId) + ".";
+                case AchievementKinds.LocationsSoothed:
+                    return "Soothe " + def.Threshold + " location" + (def.Threshold == 1 ? string.Empty : "s") + " with a Grove gift.";
                 default:
                     return string.Empty;
             }

@@ -98,11 +98,18 @@ namespace BeastCraft.Progression
         /// <summary><see cref="AchievementData.StoryId"/>'s NPC side story (<c>Tutorial.SideStoryData</c>) complete, every chapter. Added for the Grove design's D2.</summary>
         public const string SideStoryComplete = "SideStoryComplete";
 
+        /// <summary>
+        /// At least <see cref="Threshold"/> ordinary battle locations soothed with a Grove item
+        /// instead of fought (<c>Campaign.CampaignProgress.LocationsSoothed</c>). Added for the
+        /// Grove design's D3 ("peaceful clears").
+        /// </summary>
+        public const string LocationsSoothed = "LocationsSoothed";
+
         /// <summary>Every kind name, in validation order.</summary>
         public static readonly string[] All =
         {
             BossCleared, AllBossesCleared, RegionExplored, AllRegionsExplored, KinshipSitesClaimed, AllKinshipClaimed, BeastsOwned, RegionLoreComplete, AllLoreFound,
-            CompendiumPercent, AvatarLevel, BeastLevel, SideStoryComplete
+            CompendiumPercent, AvatarLevel, BeastLevel, SideStoryComplete, LocationsSoothed
         };
 
         /// <summary>Whether <paramref name="kind"/> is scoped to a side story (needs <see cref="AchievementData.StoryId"/>).</summary>
@@ -120,7 +127,7 @@ namespace BeastCraft.Progression
         /// <summary>Whether <paramref name="kind"/> is a threshold kind (needs a positive <see cref="AchievementData.Threshold"/>).</summary>
         public static bool IsThreshold(string kind)
         {
-            return kind == KinshipSitesClaimed || kind == BeastsOwned || kind == CompendiumPercent || kind == AvatarLevel || kind == BeastLevel;
+            return kind == KinshipSitesClaimed || kind == BeastsOwned || kind == CompendiumPercent || kind == AvatarLevel || kind == BeastLevel || kind == LocationsSoothed;
         }
     }
 }

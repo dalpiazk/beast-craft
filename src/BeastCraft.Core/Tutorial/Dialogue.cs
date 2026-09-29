@@ -246,11 +246,26 @@ namespace BeastCraft.Tutorial
         /// <summary>A side story has been completed in full (<c>side_story_complete:trader_roads</c>).</summary>
         public const string SideStoryComplete = "side_story_complete";
 
+        /// <summary>
+        /// At least this many ordinary battle locations have ever been soothed with a Grove item
+        /// instead of fought (<c>location_soothed:1</c>; <c>Campaign.CampaignProgress.LocationsSoothed</c>,
+        /// cascading like <see cref="DecorPlacedCount"/>). Added for the Grove design's D3.
+        /// </summary>
+        public const string LocationSoothed = "location_soothed";
+
+        /// <summary>
+        /// A beast colour form is owned account-wide (<c>colour_form_owned:phoenix_ember_bloom</c>;
+        /// <c>Grove.ColourFormData.ColourFormId</c>, checked against <c>PlayerSave.Cosmetics</c> — no
+        /// new save shape, see <c>Grove.GroveLibraryData.ColourForms</c>). Added for the Grove
+        /// design's D3.
+        /// </summary>
+        public const string ColourFormOwned = "colour_form_owned";
+
         /// <summary>Every known kind, for <see cref="DialogueValidator"/>'s allow-list check.</summary>
         public static readonly string[] All =
         {
             Scene, AffinityTierSpecies, AffinityTierAny, VarietyDiscovered, VarietyCount, DecorPlacedCount, HabitatUnlocked, ExpeditionStory, RegionCleared,
-            GroveLoreFound, NpcLoreFound, ItemHeld, SideStoryChapter, SideStoryComplete
+            GroveLoreFound, NpcLoreFound, ItemHeld, SideStoryChapter, SideStoryComplete, LocationSoothed, ColourFormOwned
         };
 
         /// <summary>Whether <paramref name="condition"/>'s <c>"kind:"</c> prefix is a known kind.</summary>

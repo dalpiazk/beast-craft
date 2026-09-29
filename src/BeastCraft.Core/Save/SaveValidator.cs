@@ -516,6 +516,7 @@ namespace BeastCraft.Save
                 CheckRegionId(campaign.CurrentRegionId, "Campaign.CurrentRegionId", catalog, issues);
             }
 
+            CheckRange(issues, "Campaign.LocationsSoothed", campaign.LocationsSoothed, 0, int.MaxValue);
             ValidateRun(campaign, catalog, issues);
         }
 

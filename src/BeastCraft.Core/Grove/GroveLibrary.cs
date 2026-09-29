@@ -14,6 +14,10 @@ namespace BeastCraft.Grove
         // (SpeciesId, Tier) -> row.
         private readonly Dictionary<string, AffinityTierData> _tiers = new Dictionary<string, AffinityTierData>(StringComparer.Ordinal);
 
+        private readonly Dictionary<string, SoothingRegionData> _soothing = new Dictionary<string, SoothingRegionData>(StringComparer.Ordinal);
+        private readonly Dictionary<string, ColourFormData> _colourForms = new Dictionary<string, ColourFormData>(StringComparer.Ordinal);
+        private readonly Dictionary<string, List<ColourFormData>> _colourFormsBySpecies = new Dictionary<string, List<ColourFormData>>(StringComparer.Ordinal);
+
         private GroveLibrary(GroveLibraryData data)
         {
             Data = data;
@@ -62,6 +66,34 @@ namespace BeastCraft.Grove
                 if (tier != null && !string.IsNullOrEmpty(tier.SpeciesId))
                 {
                     library._tiers[TierKey(tier.SpeciesId, tier.Tier)] = tier;
+                }
+            }
+
+            foreach (SoothingRegionData region in library.Data.Soothing ?? new SoothingRegionData[0])
+            {
+                if (region != null && !string.IsNullOrEmpty(region.RegionId))
+                {
+                    library._soothing[region.RegionId] = region;
+                }
+            }
+
+            foreach (ColourFormData form in library.Data.ColourForms ?? new ColourFormData[0])
+            {
+                if (form == null || string.IsNullOrEmpty(form.ColourFormId))
+                {
+                    continue;
+                }
+
+                library._colourForms[form.ColourFormId] = form;
+                if (!string.IsNullOrEmpty(form.SpeciesId))
+                {
+                    if (!library._colourFormsBySpecies.TryGetValue(form.SpeciesId, out List<ColourFormData> list))
+                    {
+                        list = new List<ColourFormData>();
+                        library._colourFormsBySpecies[form.SpeciesId] = list;
+                    }
+
+                    list.Add(form);
                 }
             }
 
@@ -137,6 +169,24 @@ namespace BeastCraft.Grove
         private static string TierKey(string speciesId, int tier)
         {
             return speciesId + "/" + tier.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        /// <summary><paramref name="regionId"/>'s soothing item set, or null (that region has none authored).</summary>
+        public SoothingRegionData Soothing(string regionId)
+        {
+            return regionId != null && _soothing.TryGetValue(regionId, out SoothingRegionData region) ? region : null;
+        }
+
+        /// <summary>Colour form <paramref name="colourFormId"/>, or null.</summary>
+        public ColourFormData ColourForm(string colourFormId)
+        {
+            return colourFormId != null && _colourForms.TryGetValue(colourFormId, out ColourFormData form) ? form : null;
+        }
+
+        /// <summary>Every colour form of <paramref name="speciesId"/>, in file order (empty for a species with none).</summary>
+        public IReadOnlyList<ColourFormData> ColourFormsFor(string speciesId)
+        {
+            return speciesId != null && _colourFormsBySpecies.TryGetValue(speciesId, out List<ColourFormData> list) ? list : (IReadOnlyList<ColourFormData>)new ColourFormData[0];
         }
     }
 }
