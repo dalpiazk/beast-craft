@@ -1,0 +1,616 @@
+{
+  "_readme": "GAME CONTENT, DRAFT PENDING PRODUCER REVIEW (every DisplayName, Title and Text; no art yet: ArtKey is a placeholder key). The Grove (docs/design/grove.md): habitats and decor unlock from a shrine's GroveUnlockId (discovery.json), starting from the account's first save, from an affinity tier, or from a Wildgarden recipe (garden-library.json); a habitat's SlotCount bounds how much decor it can hold. Affinity: Feed/Play grant flat Xp with a daily cooldown each (no stacking, no decay); AffinityTiers is a flat (SpeciesId, Tier) table, one row per species per tier 1-5, XpThreshold ascending; a tier's reward is none, a shared decor piece, a species-specific Grove lore entry, or (tier 5) an idle-animation flag derived from the tier itself. Gifts: every beast rolls from its species' gift table, or \"default\" when it has none of its own; GiftHoursByTier narrows the wait as affinity grows; PityAt guarantees a non-common item within that many common rolls. \"look\" reward kinds are mechanically wired up (GroveRules, the validator) but not authored here yet, to avoid touching the Avatar screen's live cosmetic content out of this PR's no-screens scope; a later PR adds the actual cosmetic content. Validated by BeastCraft.Grove.GroveLibraryValidator (content load and the EditMode tests).",
+  "SchemaVersion": 1,
+  "FeedXp": 10,
+  "PlayXp": 15,
+  "DailyCooldownHours": 20,
+  "GiftHoursByTier": [
+    6,
+    5,
+    4,
+    3,
+    2
+  ],
+  "Habitats": [
+    {
+      "HabitatId": "mossy_glade",
+      "DisplayName": "Mossy Glade",
+      "UnlockSource": "shrine",
+      "UnlockId": "grove_habitat_mossy_glade",
+      "SlotCount": 12,
+      "ArtKey": "grove/habitats/mossy_glade"
+    },
+    {
+      "HabitatId": "tide_pool",
+      "DisplayName": "Tide Pool",
+      "UnlockSource": "shrine",
+      "UnlockId": "grove_habitat_tide_pool",
+      "SlotCount": 12,
+      "ArtKey": "grove/habitats/tide_pool"
+    },
+    {
+      "HabitatId": "snow_hollow",
+      "DisplayName": "Snow Hollow",
+      "UnlockSource": "shrine",
+      "UnlockId": "grove_habitat_snow_hollow",
+      "SlotCount": 12,
+      "ArtKey": "grove/habitats/snow_hollow"
+    }
+  ],
+  "Decor": [
+    {
+      "DecorId": "firefly_lantern",
+      "DisplayName": "Firefly Lantern",
+      "HabitatScope": "",
+      "Source": "shrine",
+      "UnlockId": "grove_decor_firefly_lantern",
+      "ArtKey": "grove/decor/firefly_lantern",
+      "SortOrder": 1
+    },
+    {
+      "DecorId": "ember_brazier",
+      "DisplayName": "Ember Brazier",
+      "HabitatScope": "",
+      "Source": "shrine",
+      "UnlockId": "grove_decor_ember_brazier",
+      "ArtKey": "grove/decor/ember_brazier",
+      "SortOrder": 2
+    },
+    {
+      "DecorId": "driftwood_arch",
+      "DisplayName": "Driftwood Arch",
+      "HabitatScope": "tide_pool",
+      "Source": "shrine",
+      "UnlockId": "grove_decor_driftwood_arch",
+      "ArtKey": "grove/decor/driftwood_arch",
+      "SortOrder": 3
+    },
+    {
+      "DecorId": "wind_chimes",
+      "DisplayName": "Wind Chimes",
+      "HabitatScope": "",
+      "Source": "shrine",
+      "UnlockId": "grove_decor_wind_chimes",
+      "ArtKey": "grove/decor/wind_chimes",
+      "SortOrder": 4
+    },
+    {
+      "DecorId": "iron_bell",
+      "DisplayName": "Iron Bell",
+      "HabitatScope": "",
+      "Source": "shrine",
+      "UnlockId": "grove_decor_iron_bell",
+      "ArtKey": "grove/decor/iron_bell",
+      "SortOrder": 5
+    },
+    {
+      "DecorId": "ice_lantern",
+      "DisplayName": "Ice Lantern",
+      "HabitatScope": "snow_hollow",
+      "Source": "shrine",
+      "UnlockId": "grove_decor_ice_lantern",
+      "ArtKey": "grove/decor/ice_lantern",
+      "SortOrder": 6
+    },
+    {
+      "DecorId": "mossy_stone",
+      "DisplayName": "Mossy Stone",
+      "HabitatScope": "",
+      "Source": "starter",
+      "UnlockId": "",
+      "ArtKey": "grove/decor/mossy_stone",
+      "SortOrder": 7
+    },
+    {
+      "DecorId": "garden_bench",
+      "DisplayName": "Garden Bench",
+      "HabitatScope": "",
+      "Source": "starter",
+      "UnlockId": "",
+      "ArtKey": "grove/decor/garden_bench",
+      "SortOrder": 8
+    },
+    {
+      "DecorId": "clay_pot",
+      "DisplayName": "Clay Pot",
+      "HabitatScope": "",
+      "Source": "starter",
+      "UnlockId": "",
+      "ArtKey": "grove/decor/clay_pot",
+      "SortOrder": 9
+    },
+    {
+      "DecorId": "affinity_charm_stand",
+      "DisplayName": "Charm Stand",
+      "HabitatScope": "",
+      "Source": "affinity",
+      "UnlockId": "",
+      "ArtKey": "grove/decor/affinity_charm_stand",
+      "SortOrder": 10
+    },
+    {
+      "DecorId": "affinity_bond_banner",
+      "DisplayName": "Bond Banner",
+      "HabitatScope": "",
+      "Source": "affinity",
+      "UnlockId": "",
+      "ArtKey": "grove/decor/affinity_bond_banner",
+      "SortOrder": 11
+    },
+    {
+      "DecorId": "pressed_petal_frame",
+      "DisplayName": "Pressed Petal Frame",
+      "HabitatScope": "",
+      "Source": "garden_craft",
+      "UnlockId": "recipe_petal_frame",
+      "ArtKey": "grove/decor/pressed_petal_frame",
+      "SortOrder": 12
+    },
+    {
+      "DecorId": "herbarium_shelf",
+      "DisplayName": "Herbarium Shelf",
+      "HabitatScope": "",
+      "Source": "garden_craft",
+      "UnlockId": "recipe_herbarium_shelf",
+      "ArtKey": "grove/decor/herbarium_shelf",
+      "SortOrder": 13
+    }
+  ],
+  "AffinityTiers": [
+    {
+      "SpeciesId": "phoenix",
+      "Tier": 1,
+      "XpThreshold": 50,
+      "RewardKind": "none",
+      "RewardId": ""
+    },
+    {
+      "SpeciesId": "phoenix",
+      "Tier": 2,
+      "XpThreshold": 150,
+      "RewardKind": "decor",
+      "RewardId": "affinity_charm_stand"
+    },
+    {
+      "SpeciesId": "phoenix",
+      "Tier": 3,
+      "XpThreshold": 300,
+      "RewardKind": "lore",
+      "RewardId": "affinity_lore_phoenix"
+    },
+    {
+      "SpeciesId": "phoenix",
+      "Tier": 4,
+      "XpThreshold": 500,
+      "RewardKind": "decor",
+      "RewardId": "affinity_bond_banner"
+    },
+    {
+      "SpeciesId": "phoenix",
+      "Tier": 5,
+      "XpThreshold": 800,
+      "RewardKind": "idle_anim",
+      "RewardId": ""
+    },
+    {
+      "SpeciesId": "leviathan",
+      "Tier": 1,
+      "XpThreshold": 50,
+      "RewardKind": "none",
+      "RewardId": ""
+    },
+    {
+      "SpeciesId": "leviathan",
+      "Tier": 2,
+      "XpThreshold": 150,
+      "RewardKind": "decor",
+      "RewardId": "affinity_charm_stand"
+    },
+    {
+      "SpeciesId": "leviathan",
+      "Tier": 3,
+      "XpThreshold": 300,
+      "RewardKind": "lore",
+      "RewardId": "affinity_lore_leviathan"
+    },
+    {
+      "SpeciesId": "leviathan",
+      "Tier": 4,
+      "XpThreshold": 500,
+      "RewardKind": "decor",
+      "RewardId": "affinity_bond_banner"
+    },
+    {
+      "SpeciesId": "leviathan",
+      "Tier": 5,
+      "XpThreshold": 800,
+      "RewardKind": "idle_anim",
+      "RewardId": ""
+    },
+    {
+      "SpeciesId": "golem",
+      "Tier": 1,
+      "XpThreshold": 50,
+      "RewardKind": "none",
+      "RewardId": ""
+    },
+    {
+      "SpeciesId": "golem",
+      "Tier": 2,
+      "XpThreshold": 150,
+      "RewardKind": "decor",
+      "RewardId": "affinity_charm_stand"
+    },
+    {
+      "SpeciesId": "golem",
+      "Tier": 3,
+      "XpThreshold": 300,
+      "RewardKind": "lore",
+      "RewardId": "affinity_lore_golem"
+    },
+    {
+      "SpeciesId": "golem",
+      "Tier": 4,
+      "XpThreshold": 500,
+      "RewardKind": "decor",
+      "RewardId": "affinity_bond_banner"
+    },
+    {
+      "SpeciesId": "golem",
+      "Tier": 5,
+      "XpThreshold": 800,
+      "RewardKind": "idle_anim",
+      "RewardId": ""
+    },
+    {
+      "SpeciesId": "griffin",
+      "Tier": 1,
+      "XpThreshold": 50,
+      "RewardKind": "none",
+      "RewardId": ""
+    },
+    {
+      "SpeciesId": "griffin",
+      "Tier": 2,
+      "XpThreshold": 150,
+      "RewardKind": "decor",
+      "RewardId": "affinity_charm_stand"
+    },
+    {
+      "SpeciesId": "griffin",
+      "Tier": 3,
+      "XpThreshold": 300,
+      "RewardKind": "lore",
+      "RewardId": "affinity_lore_griffin"
+    },
+    {
+      "SpeciesId": "griffin",
+      "Tier": 4,
+      "XpThreshold": 500,
+      "RewardKind": "decor",
+      "RewardId": "affinity_bond_banner"
+    },
+    {
+      "SpeciesId": "griffin",
+      "Tier": 5,
+      "XpThreshold": 800,
+      "RewardKind": "idle_anim",
+      "RewardId": ""
+    },
+    {
+      "SpeciesId": "thunderbird",
+      "Tier": 1,
+      "XpThreshold": 50,
+      "RewardKind": "none",
+      "RewardId": ""
+    },
+    {
+      "SpeciesId": "thunderbird",
+      "Tier": 2,
+      "XpThreshold": 150,
+      "RewardKind": "decor",
+      "RewardId": "affinity_charm_stand"
+    },
+    {
+      "SpeciesId": "thunderbird",
+      "Tier": 3,
+      "XpThreshold": 300,
+      "RewardKind": "lore",
+      "RewardId": "affinity_lore_thunderbird"
+    },
+    {
+      "SpeciesId": "thunderbird",
+      "Tier": 4,
+      "XpThreshold": 500,
+      "RewardKind": "decor",
+      "RewardId": "affinity_bond_banner"
+    },
+    {
+      "SpeciesId": "thunderbird",
+      "Tier": 5,
+      "XpThreshold": 800,
+      "RewardKind": "idle_anim",
+      "RewardId": ""
+    },
+    {
+      "SpeciesId": "frost_wyrm",
+      "Tier": 1,
+      "XpThreshold": 50,
+      "RewardKind": "none",
+      "RewardId": ""
+    },
+    {
+      "SpeciesId": "frost_wyrm",
+      "Tier": 2,
+      "XpThreshold": 150,
+      "RewardKind": "decor",
+      "RewardId": "affinity_charm_stand"
+    },
+    {
+      "SpeciesId": "frost_wyrm",
+      "Tier": 3,
+      "XpThreshold": 300,
+      "RewardKind": "lore",
+      "RewardId": "affinity_lore_frost_wyrm"
+    },
+    {
+      "SpeciesId": "frost_wyrm",
+      "Tier": 4,
+      "XpThreshold": 500,
+      "RewardKind": "decor",
+      "RewardId": "affinity_bond_banner"
+    },
+    {
+      "SpeciesId": "frost_wyrm",
+      "Tier": 5,
+      "XpThreshold": 800,
+      "RewardKind": "idle_anim",
+      "RewardId": ""
+    },
+    {
+      "SpeciesId": "treant",
+      "Tier": 1,
+      "XpThreshold": 50,
+      "RewardKind": "none",
+      "RewardId": ""
+    },
+    {
+      "SpeciesId": "treant",
+      "Tier": 2,
+      "XpThreshold": 150,
+      "RewardKind": "decor",
+      "RewardId": "affinity_charm_stand"
+    },
+    {
+      "SpeciesId": "treant",
+      "Tier": 3,
+      "XpThreshold": 300,
+      "RewardKind": "lore",
+      "RewardId": "affinity_lore_treant"
+    },
+    {
+      "SpeciesId": "treant",
+      "Tier": 4,
+      "XpThreshold": 500,
+      "RewardKind": "decor",
+      "RewardId": "affinity_bond_banner"
+    },
+    {
+      "SpeciesId": "treant",
+      "Tier": 5,
+      "XpThreshold": 800,
+      "RewardKind": "idle_anim",
+      "RewardId": ""
+    },
+    {
+      "SpeciesId": "tarasque",
+      "Tier": 1,
+      "XpThreshold": 50,
+      "RewardKind": "none",
+      "RewardId": ""
+    },
+    {
+      "SpeciesId": "tarasque",
+      "Tier": 2,
+      "XpThreshold": 150,
+      "RewardKind": "decor",
+      "RewardId": "affinity_charm_stand"
+    },
+    {
+      "SpeciesId": "tarasque",
+      "Tier": 3,
+      "XpThreshold": 300,
+      "RewardKind": "lore",
+      "RewardId": "affinity_lore_tarasque"
+    },
+    {
+      "SpeciesId": "tarasque",
+      "Tier": 4,
+      "XpThreshold": 500,
+      "RewardKind": "decor",
+      "RewardId": "affinity_bond_banner"
+    },
+    {
+      "SpeciesId": "tarasque",
+      "Tier": 5,
+      "XpThreshold": 800,
+      "RewardKind": "idle_anim",
+      "RewardId": ""
+    },
+    {
+      "SpeciesId": "kirin",
+      "Tier": 1,
+      "XpThreshold": 50,
+      "RewardKind": "none",
+      "RewardId": ""
+    },
+    {
+      "SpeciesId": "kirin",
+      "Tier": 2,
+      "XpThreshold": 150,
+      "RewardKind": "decor",
+      "RewardId": "affinity_charm_stand"
+    },
+    {
+      "SpeciesId": "kirin",
+      "Tier": 3,
+      "XpThreshold": 300,
+      "RewardKind": "lore",
+      "RewardId": "affinity_lore_kirin"
+    },
+    {
+      "SpeciesId": "kirin",
+      "Tier": 4,
+      "XpThreshold": 500,
+      "RewardKind": "decor",
+      "RewardId": "affinity_bond_banner"
+    },
+    {
+      "SpeciesId": "kirin",
+      "Tier": 5,
+      "XpThreshold": 800,
+      "RewardKind": "idle_anim",
+      "RewardId": ""
+    },
+    {
+      "SpeciesId": "basilisk",
+      "Tier": 1,
+      "XpThreshold": 50,
+      "RewardKind": "none",
+      "RewardId": ""
+    },
+    {
+      "SpeciesId": "basilisk",
+      "Tier": 2,
+      "XpThreshold": 150,
+      "RewardKind": "decor",
+      "RewardId": "affinity_charm_stand"
+    },
+    {
+      "SpeciesId": "basilisk",
+      "Tier": 3,
+      "XpThreshold": 300,
+      "RewardKind": "lore",
+      "RewardId": "affinity_lore_basilisk"
+    },
+    {
+      "SpeciesId": "basilisk",
+      "Tier": 4,
+      "XpThreshold": 500,
+      "RewardKind": "decor",
+      "RewardId": "affinity_bond_banner"
+    },
+    {
+      "SpeciesId": "basilisk",
+      "Tier": 5,
+      "XpThreshold": 800,
+      "RewardKind": "idle_anim",
+      "RewardId": ""
+    }
+  ],
+  "GiftTables": [
+    {
+      "SpeciesId": "default",
+      "Entries": [
+        {
+          "ItemKind": "decor",
+          "ItemId": "affinity_charm_stand",
+          "Weight": 40,
+          "IsCommon": true
+        },
+        {
+          "ItemKind": "lore",
+          "ItemId": "gift_lore_wander",
+          "Weight": 30,
+          "IsCommon": true
+        },
+        {
+          "ItemKind": "lore",
+          "ItemId": "gift_lore_hearth",
+          "Weight": 15,
+          "IsCommon": true
+        },
+        {
+          "ItemKind": "decor",
+          "ItemId": "affinity_bond_banner",
+          "Weight": 10,
+          "IsCommon": false
+        },
+        {
+          "ItemKind": "lore",
+          "ItemId": "gift_lore_season",
+          "Weight": 5,
+          "IsCommon": false
+        }
+      ],
+      "PityAt": 5
+    }
+  ],
+  "Lore": [
+    {
+      "LoreId": "affinity_lore_phoenix",
+      "Title": "Phoenix at Ease",
+      "Text": "It naps in the warmest patch of sun it can find, feathers banked low like embers."
+    },
+    {
+      "LoreId": "affinity_lore_leviathan",
+      "Title": "Leviathan at Ease",
+      "Text": "It curls loosely by the water's edge now, unbothered when you sit close."
+    },
+    {
+      "LoreId": "affinity_lore_golem",
+      "Title": "Golem at Ease",
+      "Text": "Moss has started to soften its shoulders. It leans into a scratch like a boulder settling."
+    },
+    {
+      "LoreId": "affinity_lore_griffin",
+      "Title": "Griffin at Ease",
+      "Text": "It brings you the shiniest pebble it can find and waits, very pleased with itself."
+    },
+    {
+      "LoreId": "affinity_lore_thunderbird",
+      "Title": "Thunderbird at Ease",
+      "Text": "The air hums faintly when it is glad to see you, a small private thunder."
+    },
+    {
+      "LoreId": "affinity_lore_frost_wyrm",
+      "Title": "Frost Wyrm at Ease",
+      "Text": "Frost patterns bloom gently on the ground where it rests beside you."
+    },
+    {
+      "LoreId": "affinity_lore_treant",
+      "Title": "Treant at Ease",
+      "Text": "New leaves have budded along one arm. It holds very still so you can look."
+    },
+    {
+      "LoreId": "affinity_lore_tarasque",
+      "Title": "Tarasque at Ease",
+      "Text": "Its plates click together in a slow, contented rhythm when you visit."
+    },
+    {
+      "LoreId": "affinity_lore_kirin",
+      "Title": "Kirin at Ease",
+      "Text": "It leaves a faint trail of soft light on the grass wherever it has walked."
+    },
+    {
+      "LoreId": "affinity_lore_basilisk",
+      "Title": "Basilisk at Ease",
+      "Text": "It no longer looks away when you meet its eyes. That took a while."
+    },
+    {
+      "LoreId": "gift_lore_wander",
+      "Title": "A Wandering Gift",
+      "Text": "Every beast seems to bring something different when it is happy \u2014 a feather, a pebble, a leaf held very carefully."
+    },
+    {
+      "LoreId": "gift_lore_hearth",
+      "Title": "Small Kindnesses",
+      "Text": "A fed, played-with beast starts leaving little things by the gate, as if trading favours back."
+    },
+    {
+      "LoreId": "gift_lore_season",
+      "Title": "What the Season Brings",
+      "Text": "Some gifts only turn up after a beast has been settled in a good while. Patience, it seems, is its own reward."
+    }
+  ]
+}
