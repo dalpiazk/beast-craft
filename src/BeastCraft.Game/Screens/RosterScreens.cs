@@ -48,7 +48,7 @@ namespace BeastCraft.Game.Screens
             };
             Button glossary = Root.Add(new Button { Id = "roster-glossary", Bounds = new Rect(area.Right - 520f, area.Y + 70f, 100f, 84f), Text = "?", StyleKey = "chip" });
             glossary.Clicked += () => ctx.Stack.Push(new GlossaryScreen(ctx, null));
-            Button compendium = Root.Add(new Button { Id = "roster-compendium", Bounds = new Rect(area.X + 48f, area.Y + 168f, area.Width - 96f, 70f), Text = "Compendium", StyleKey = "chip" });
+            Button compendium = Root.Add(new Button { Id = "roster-compendium", Bounds = new Rect(area.X + 48f, area.Y + 168f, area.Width - 96f, 70f), Text = ctx.Loc("ui.roster.compendium"), StyleKey = "chip" });
             compendium.Clicked += OpenCompendium;
             _scroll = Root.Add(new ScrollView { Id = "roster", Bounds = new Rect(area.X, area.Y + 294f, area.Width, area.Height - 294f) });
         }
@@ -83,7 +83,7 @@ namespace BeastCraft.Game.Screens
         {
             _scroll.ClearChildren();
             _cards.Clear();
-            _sort.Text = "Sort: " + _model.SortName;
+            _sort.Text = _ctx.Loc("ui.roster.sort", _model.SortName);
             float width = PortraitLayout.CanvasWidth - 2f * Pad;
             float cardWidth = (width - 2f * 20f) / 3f;
             float y = 10f;
@@ -117,8 +117,8 @@ namespace BeastCraft.Game.Screens
         {
             UiPainter painter = _ctx.Painter;
             Rect area = Root.Bounds;
-            painter.TextIn("Roster", new Rect(area.X + 60f, area.Y + 54f, 400f, _ctx.Style.TextSizes.Heading), _ctx.Style.TextSizes.Heading, painter.C("plum"), TextAlign.Left);
-            string count = _model.Owned.Count + " beasts  -  " + _model.Silhouettes.Count + " still to find";
+            painter.TextIn(_ctx.Loc("ui.roster.title"), new Rect(area.X + 60f, area.Y + 54f, 400f, _ctx.Style.TextSizes.Heading), _ctx.Style.TextSizes.Heading, painter.C("plum"), TextAlign.Left);
+            string count = _ctx.Loc("ui.roster.count", _model.Owned.Count, _model.Silhouettes.Count);
             painter.TextIn(count, new Rect(area.X + 60f, area.Y + 120f, 460f, 30f), _ctx.Style.TextSizes.Body, painter.C("inkSoft"), TextAlign.Left);
         }
 
@@ -131,8 +131,8 @@ namespace BeastCraft.Game.Screens
             {
                 if (_model.Silhouettes.Count > 0)
                 {
-                    painter.TextIn("Not yet found", new Rect(Pad, _silhouettesY, 600f, style.TextSizes.Heading - 4f), style.TextSizes.Heading - 4f, painter.C("plum"), TextAlign.Left);
-                    painter.TextIn("for the compendium", new Rect(PortraitLayout.CanvasWidth - Pad - 400f, _silhouettesY + 6f, 400f, 26f), style.TextSizes.Small + 2f,
+                    painter.TextIn(_ctx.Loc("ui.roster.not_found"), new Rect(Pad, _silhouettesY, 600f, style.TextSizes.Heading - 4f), style.TextSizes.Heading - 4f, painter.C("plum"), TextAlign.Left);
+                    painter.TextIn(_ctx.Loc("ui.roster.for_compendium"), new Rect(PortraitLayout.CanvasWidth - Pad - 400f, _silhouettesY + 6f, 400f, 26f), style.TextSizes.Small + 2f,
                                    painter.C("inkSoft"), TextAlign.Right);
                 }
 
@@ -159,9 +159,9 @@ namespace BeastCraft.Game.Screens
             painter.Art(painter.Sprite(entry.ArtKey), portrait, false, string.IsNullOrEmpty(tintHex) ? (Color?)null : painter.C(tintHex));
             painter.TextIn(entry.Name, new Rect(card.X + 12f, card.Y + 232f, card.Width - 24f, 34f), style.TextSizes.Body + 2f, painter.C("ink"), TextAlign.Center);
             painter.ElementBadge(entry.Element, new Rect(card.X + 18f, card.Y + 284f, 48f, 48f));
-            painter.TextIn("Lv " + entry.Level.ToString(CultureInfo.InvariantCulture), new Rect(card.X + 76f, card.Y + 280f, card.Width - 90f, 26f), style.TextSizes.Body,
+            painter.TextIn(_ctx.Loc("ui.common.level", entry.Level), new Rect(card.X + 76f, card.Y + 280f, card.Width - 90f, 26f), style.TextSizes.Body,
                            painter.C("plum"), TextAlign.Left);
-            painter.TextIn(entry.Stance + "  -  " + entry.Element, new Rect(card.X + 76f, card.Y + 314f, card.Width - 90f, 24f), style.TextSizes.Small, painter.C("inkSoft"),
+            painter.TextIn(_ctx.Loc("ui.common.pair", entry.Stance, entry.Element), new Rect(card.X + 76f, card.Y + 314f, card.Width - 90f, 24f), style.TextSizes.Small, painter.C("inkSoft"),
                            TextAlign.Left);
             if (entry.InParty)
             {
@@ -189,7 +189,7 @@ namespace BeastCraft.Game.Screens
         private const float Pad = HeaderMetrics.Pad;
         private const float TopBar = HeaderMetrics.Tall;
 
-        private static readonly string[] TabNames = { "Stats", "Skills", "Gear & bonds" };
+        private static readonly string[] TabKeys = { "ui.beast.tab_stats", "ui.beast.tab_skills", "ui.beast.tab_gear" };
 
         private readonly BeastDetailViewModel _model;
         private readonly ScreenHeader _header;
@@ -205,13 +205,13 @@ namespace BeastCraft.Game.Screens
             _scroll = Ui.Add(new ScrollView { Id = "page", Bounds = new Rect(0, TopBar, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight - TopBar) });
             _cards = new CardList(_scroll);
             _header = new ScreenHeader(Ui, TopBar, () => Ctx.Stack.Pop());
-            AddButton(null, "element-chart", new Rect(PortraitLayout.CanvasWidth - Pad - 300f, 40f, 180f, 90f), "Chart", "chip", OpenChart);
+            AddButton(null, "element-chart", new Rect(PortraitLayout.CanvasWidth - Pad - 300f, 40f, 180f, 90f), Loc("ui.beast.chart"), "chip", OpenChart);
             AddButton(null, "glossary", new Rect(PortraitLayout.CanvasWidth - Pad - 100f, 40f, 100f, 90f), "?", "chip", () => Ctx.Stack.Push(new GlossaryScreen(Ctx, null)));
             float tabWidth = (PortraitLayout.CanvasWidth - 2f * Pad - 2f * 16f) / 3f;
-            for (int i = 0; i < TabNames.Length; i++)
+            for (int i = 0; i < TabKeys.Length; i++)
             {
                 int index = i;
-                _tabs.Add(AddButton(null, "tab-" + i, new Rect(Pad + i * (tabWidth + 16f), 214f, tabWidth, 92f), TabNames[i], "chip", () => SelectTab(index)));
+                _tabs.Add(AddButton(null, "tab-" + i, new Rect(Pad + i * (tabWidth + 16f), 214f, tabWidth, 92f), Loc(TabKeys[i]), "chip", () => SelectTab(index)));
             }
 
             Build();
@@ -236,7 +236,7 @@ namespace BeastCraft.Game.Screens
 
         public void SelectTab(int tab)
         {
-            _tab = Math.Max(0, Math.Min(TabNames.Length - 1, tab));
+            _tab = Math.Max(0, Math.Min(TabKeys.Length - 1, tab));
             _scroll.ScrollTo(0f);
             Build();
         }
@@ -337,12 +337,12 @@ namespace BeastCraft.Game.Screens
             y = _cards.Card(y, 150f + _model.Stats.Count * 56f + Math.Max(1, _model.GearContributions.Count) * 44f + 30f, "panel", DrawStatTable);
             float turnsTop = y;
             y = _cards.Card(y, 230f + _model.TurnRates.Count * 56f, "panel", DrawTurnRates);
-            AddButton(_scroll, "glossary-atb", new Rect(PortraitLayout.CanvasWidth - Pad - 150f, turnsTop + 22f, 120f, 70f), "ATB?", "chip", OpenTurnsHelp);
+            AddButton(_scroll, "glossary-atb", new Rect(PortraitLayout.CanvasWidth - Pad - 150f, turnsTop + 22f, 120f, 70f), Loc("ui.beast.atb_help"), "chip", OpenTurnsHelp);
             y = _cards.Card(y, 330f, "panel", DrawElements);
-            AddButton(_scroll, "element-chart-2", new Rect(PortraitLayout.CanvasWidth - Pad - 250f, y - 26f - 330f + 22f, 220f, 70f), "Full chart", "chip", OpenChart);
+            AddButton(_scroll, "element-chart-2", new Rect(PortraitLayout.CanvasWidth - Pad - 250f, y - 26f - 330f + 22f, 220f, 70f), Loc("ui.beast.full_chart"), "chip", OpenChart);
             y = _cards.Card(y, 190f, "panel", DrawCrits);
             y = _cards.Card(y, 290f, "panel", DrawLevelGap);
-            AddButton(_scroll, "glossary-gap", new Rect(PortraitLayout.CanvasWidth - Pad - 150f, y - 26f - 290f + 22f, 120f, 70f), "Gap?", "chip",
+            AddButton(_scroll, "glossary-gap", new Rect(PortraitLayout.CanvasWidth - Pad - 150f, y - 26f - 290f + 22f, 120f, 70f), Loc("ui.beast.gap_help"), "chip",
                       () => Ctx.Stack.Push(new GlossaryScreen(Ctx, "level_gap")));
             return y;
         }
@@ -350,10 +350,8 @@ namespace BeastCraft.Game.Screens
         /// <summary>The Turns panel's "?": what its columns mean, how the average enemy is taken, and the way to the glossary.</summary>
         public void OpenTurnsHelp()
         {
-            string text = "Speed: the stat. Fill: gauge points a tick (100 x the square root of Speed). Turns: turns per 100 ticks (a turn costs 100,000). " +
-                          "vs: turns relative to this beast. The average enemy is the plain, unweighted mean over every enemy type at this beast's level " +
-                          "(difficulty never scales Speed).";
-            Ctx.Stack.PushModal(new ConfirmModal(Ctx, "Turns (ATB)", text, "Close", "Glossary", () => Ctx.Stack.Push(new GlossaryScreen(Ctx, "atb")), "secondary"));
+            string text = Loc("ui.beast.turns_help");
+            Ctx.Stack.PushModal(new ConfirmModal(Ctx, Loc("ui.beast.turns_title"), text, Loc("ui.common.close"), Loc("ui.beast.glossary"), () => Ctx.Stack.Push(new GlossaryScreen(Ctx, "atb")), "secondary"));
         }
 
         private void DrawIdentity(Rect box)
@@ -373,11 +371,11 @@ namespace BeastCraft.Game.Screens
                 x += badge + 10f;
             }
 
-            Painter.TextIn(string.Join(" / ", Array.ConvertAll(ToArray(_model.Elements), e => e.ToString())) + "  -  " + _model.Stance, new Rect(x + 6f, y + 8f, box.Right - x - 36f, 30f),
+            Painter.TextIn(Loc("ui.common.pair", string.Join(" / ", Array.ConvertAll(ToArray(_model.Elements), e => e.ToString())), _model.Stance), new Rect(x + 6f, y + 8f, box.Right - x - 36f, 30f),
                            Body, Painter.C("ink"), TextAlign.Left);
             x = box.X + 400f;
             y += 76f;
-            Painter.Progress(new Rect(x, y, w, 40f), _model.XpFraction, -1f, "leaf", "moss", "track", "Lv " + _model.Level + "   " + _model.XpText);
+            Painter.Progress(new Rect(x, y, w, 40f), _model.XpFraction, -1f, "leaf", "moss", "track", Loc("ui.beast.level_xp", _model.Level, _model.XpText));
             y += 66f;
             Wrapped(_model.Description, x, y, w, Body, "inkSoft");
         }
@@ -395,10 +393,10 @@ namespace BeastCraft.Game.Screens
 
         private void DrawStatTable(Rect box)
         {
-            SectionHeader.Draw(Ctx, box, "Stats");
+            SectionHeader.Draw(Ctx, box, Loc("ui.beast.stats"));
             float[] cols = { box.X + 40f, box.X + 330f, box.X + 560f, box.X + 790f };
             float y = box.Y + 90f;
-            string[] head = { "Stat", "Base", "Gear", "Total" };
+            string[] head = { Loc("ui.beast.col_stat"), Loc("ui.beast.col_base"), Loc("ui.beast.col_gear"), Loc("ui.beast.col_total") };
             for (int i = 0; i < head.Length; i++)
             {
                 Painter.TextIn(head[i], new Rect(cols[i], y, 200f, 28f), Ctx.Style.TextSizes.Small + 2f, Painter.C("inkSoft"), i == 0 ? TextAlign.Left : TextAlign.Right);
@@ -419,13 +417,13 @@ namespace BeastCraft.Game.Screens
             y += 10f;
             if (_model.GearContributions.Count == 0)
             {
-                Painter.TextIn("No gear worn.", new Rect(cols[0], y, box.Width - 80f, Body), Body, Painter.C("inkSoft"), TextAlign.Left);
+                Painter.TextIn(Loc("ui.beast.no_gear_worn"), new Rect(cols[0], y, box.Width - 80f, Body), Body, Painter.C("inkSoft"), TextAlign.Left);
                 return;
             }
 
             foreach (GearView gear in _model.GearContributions)
             {
-                string text = gear.Name + ": " + string.Join(", ", gear.Bonuses) + (gear.Inactive ? " (inactive below Lv " + gear.MinimumLevel + ")" : string.Empty);
+                string text = gear.Inactive ? Loc("ui.beast.gear_line_inactive", gear.Name, string.Join(Loc("ui.common.list_sep"), gear.Bonuses), gear.MinimumLevel) : Loc("ui.beast.gear_line", gear.Name, string.Join(Loc("ui.common.list_sep"), gear.Bonuses));
                 Painter.TextIn(text, new Rect(cols[0], y, box.Width - 80f, Body), Body - 1f, Painter.C("inkSoft"), TextAlign.Left);
                 y += 44f;
             }
@@ -433,12 +431,12 @@ namespace BeastCraft.Game.Screens
 
         private void DrawTurnRates(Rect box)
         {
-            SectionHeader.Draw(Ctx, box, "Turns (ATB)");
-            Wrapped("Turns per 100 gauge ticks. Each tick the gauge fills 100 x the square root of Speed (Fill); a turn costs 100,000.", box.X + 40f, box.Y + 100f,
+            SectionHeader.Draw(Ctx, box, Loc("ui.beast.turns_title"));
+            Wrapped(Loc("ui.beast.turns_note"), box.X + 40f, box.Y + 100f,
                     box.Width - 80f, Ctx.Style.TextSizes.Small + 1f, "inkSoft");
             float[] cols = { box.X + 40f, box.X + 520f, box.X + 680f, box.X + 850f, box.X + 980f };
             float y = box.Y + 166f;
-            string[] head = { "Unit", "Speed", "Fill", "Turns", "vs" };
+            string[] head = { Loc("ui.beast.col_unit"), Loc("ui.beast.col_speed"), Loc("ui.beast.col_fill"), Loc("ui.beast.col_turns"), Loc("ui.beast.col_vs") };
             for (int i = 0; i < head.Length; i++)
             {
                 Painter.TextIn(head[i], new Rect(cols[i] - (i == 0 ? 0f : 150f), y, 150f, 26f), Ctx.Style.TextSizes.Small + 2f, Painter.C("inkSoft"), i == 0 ? TextAlign.Left : TextAlign.Right);
@@ -460,12 +458,12 @@ namespace BeastCraft.Game.Screens
 
         private void DrawElements(Rect box)
         {
-            SectionHeader.Draw(Ctx, box, "Elements");
+            SectionHeader.Draw(Ctx, box, Loc("ui.beast.elements"));
             float cell = (box.Width - 250f) / 10f;
             float x0 = box.X + 210f;
             float y = box.Y + 96f;
-            Painter.TextIn("Its " + _model.AttackElement + " hits", new Rect(box.X + 30f, y + 60f, 180f, 26f), Ctx.Style.TextSizes.Small + 1f, Painter.C("ink"), TextAlign.Left);
-            Painter.TextIn("Hits on it", new Rect(box.X + 30f, y + 150f, 180f, 26f), Ctx.Style.TextSizes.Small + 1f, Painter.C("ink"), TextAlign.Left);
+            Painter.TextIn(Loc("ui.beast.its_hits", _model.AttackElement), new Rect(box.X + 30f, y + 60f, 180f, 26f), Ctx.Style.TextSizes.Small + 1f, Painter.C("ink"), TextAlign.Left);
+            Painter.TextIn(Loc("ui.beast.hits_on_it"), new Rect(box.X + 30f, y + 150f, 180f, 26f), Ctx.Style.TextSizes.Small + 1f, Painter.C("ink"), TextAlign.Left);
             for (int i = 0; i < _model.Matchups.Count; i++)
             {
                 ElementMatchView match = _model.Matchups[i];
@@ -487,25 +485,24 @@ namespace BeastCraft.Game.Screens
 
         private void DrawCrits(Rect box)
         {
-            SectionHeader.Draw(Ctx, box, "Critical hits");
+            SectionHeader.Draw(Ctx, box, Loc("ui.beast.crits"));
             float y = box.Y + 96f;
-            string text = "Chance " + _model.CritChance + "%   -   a crit hits " + DerivedStats.Times(_model.CritMultiplier) + "   -   on average " +
-                          DerivedStats.Times(Math.Round(_model.ExpectedCritFactor, 3));
+            string text = Loc("ui.beast.crit_line", _model.CritChance, DerivedStats.Times(_model.CritMultiplier), DerivedStats.Times(Math.Round(_model.ExpectedCritFactor, 3)));
             Painter.TextIn(text, new Rect(box.X + 40f, y, box.Width - 80f, Body), Body, Painter.C("ink"), TextAlign.Left);
-            Painter.TextIn("Every hit rolls its own crit, then a 90-110% variance roll.", new Rect(box.X + 40f, y + 50f, box.Width - 80f, 24f), Ctx.Style.TextSizes.Small + 1f,
+            Painter.TextIn(Loc("ui.beast.crit_note"), new Rect(box.X + 40f, y + 50f, box.Width - 80f, 24f), Ctx.Style.TextSizes.Small + 1f,
                            Painter.C("inkSoft"), TextAlign.Left);
         }
 
         private void DrawLevelGap(Rect box)
         {
-            SectionHeader.Draw(Ctx, box, "Level gap (enemy level - " + _model.Level + ")");
+            SectionHeader.Draw(Ctx, box, Loc("ui.beast.level_gap", _model.Level));
             int count = _model.LevelGap.Count;
             float cell = (box.Width - 250f) / Math.Max(1, count);
             float x0 = box.X + 210f;
             float y = box.Y + 96f;
-            Painter.TextIn("Enemy lv", new Rect(box.X + 30f, y, 170f, 26f), Ctx.Style.TextSizes.Small + 1f, Painter.C("inkSoft"), TextAlign.Left);
-            Painter.TextIn("You deal", new Rect(box.X + 30f, y + 62f, 170f, 26f), Ctx.Style.TextSizes.Small + 1f, Painter.C("ink"), TextAlign.Left);
-            Painter.TextIn("You take", new Rect(box.X + 30f, y + 134f, 170f, 26f), Ctx.Style.TextSizes.Small + 1f, Painter.C("ink"), TextAlign.Left);
+            Painter.TextIn(Loc("ui.beast.enemy_lv"), new Rect(box.X + 30f, y, 170f, 26f), Ctx.Style.TextSizes.Small + 1f, Painter.C("inkSoft"), TextAlign.Left);
+            Painter.TextIn(Loc("ui.beast.you_deal"), new Rect(box.X + 30f, y + 62f, 170f, 26f), Ctx.Style.TextSizes.Small + 1f, Painter.C("ink"), TextAlign.Left);
+            Painter.TextIn(Loc("ui.beast.you_take"), new Rect(box.X + 30f, y + 134f, 170f, 26f), Ctx.Style.TextSizes.Small + 1f, Painter.C("ink"), TextAlign.Left);
             for (int i = 0; i < count; i++)
             {
                 LevelGapPoint point = _model.LevelGap[i];
@@ -521,7 +518,7 @@ namespace BeastCraft.Game.Screens
 
         private float BuildSkills(float y)
         {
-            AddLabel(_scroll, new Rect(Pad, y, Width, 40f), "Equipped (" + BeastCraft.Progression.BeastSkillBook.EquipSlotCount + " slots)", Ctx.Style.TextSizes.Heading - 4f, "plum");
+            AddLabel(_scroll, new Rect(Pad, y, Width, 40f), Loc("ui.beast.equipped", BeastCraft.Progression.BeastSkillBook.EquipSlotCount), Ctx.Style.TextSizes.Heading - 4f, "plum");
             y += 60f;
             for (int slot = 0; slot < _model.Slots.Count; slot++)
             {
@@ -530,14 +527,14 @@ namespace BeastCraft.Game.Screens
                 float height = entry.Skill == null ? 170f : SkillCardHeight(entry.Card) + 280f;
                 float top = y;
                 y = _cards.Card(y, height, "panel", box => DrawSkillEntry(box, entry, index));
-                AddButton(_scroll, "change-" + slot, new Rect(Pad + Width - 460f, top + 24f, 200f, 76f), entry.Skill == null ? "Fill" : "Change", "chip", () => ChooseSkill(index));
+                AddButton(_scroll, "change-" + slot, new Rect(Pad + Width - 460f, top + 24f, 200f, 76f), Loc(entry.Skill == null ? "ui.beast.fill" : "ui.beast.change"), "chip", () => ChooseSkill(index));
                 if (entry.Skill != null)
                 {
-                    AddButton(_scroll, "upgrade-" + slot, new Rect(Pad + Width - 240f, top + 24f, 210f, 76f), "Upgrade", "primary", () => Upgrade(entry.SkillId));
+                    AddButton(_scroll, "upgrade-" + slot, new Rect(Pad + Width - 240f, top + 24f, 210f, 76f), Loc("ui.beast.upgrade"), "primary", () => Upgrade(entry.SkillId));
                 }
             }
 
-            AddLabel(_scroll, new Rect(Pad, y, Width, 40f), "Its kit (skill tomes teach the rest)", Ctx.Style.TextSizes.Heading - 4f, "plum");
+            AddLabel(_scroll, new Rect(Pad, y, Width, 40f), Loc("ui.beast.kit"), Ctx.Style.TextSizes.Heading - 4f, "plum");
             y += 60f;
             foreach (SkillEntryView entry in _model.Learnable)
             {
@@ -552,7 +549,7 @@ namespace BeastCraft.Game.Screens
                 y = _cards.Card(y, 150f + rule, entry.Known ? "card" : "slot", box => DrawKitEntry(box, captured));
                 if (entry.Known)
                 {
-                    AddButton(_scroll, "equip-" + entry.SkillId, new Rect(Pad + Width - 240f, top + 20f, 210f, 70f), "Equip", "chip", () => ChooseSlot(captured.SkillId));
+                    AddButton(_scroll, "equip-" + entry.SkillId, new Rect(Pad + Width - 240f, top + 20f, 210f, 70f), Loc("ui.beast.equip"), "chip", () => ChooseSlot(captured.SkillId));
                 }
             }
 
@@ -569,10 +566,10 @@ namespace BeastCraft.Game.Screens
         private void DrawSkillEntry(Rect box, SkillEntryView entry, int slot)
         {
             UiStyle style = Ctx.Style;
-            Painter.TextIn("Slot " + (slot + 1), new Rect(box.X + 36f, box.Y + 26f, 200f, 26f), style.TextSizes.Small + 2f, Painter.C("inkSoft"), TextAlign.Left);
+            Painter.TextIn(Loc("ui.beast.slot", slot + 1), new Rect(box.X + 36f, box.Y + 26f, 200f, 26f), style.TextSizes.Small + 2f, Painter.C("inkSoft"), TextAlign.Left);
             if (entry.Skill == null)
             {
-                Painter.TextIn("Empty", new Rect(box.X + 36f, box.Y + 80f, 400f, Body), Body, Painter.C("inkSoft"), TextAlign.Left);
+                Painter.TextIn(Loc("ui.beast.empty"), new Rect(box.X + 36f, box.Y + 80f, 400f, Body), Body, Painter.C("inkSoft"), TextAlign.Left);
                 return;
             }
 
@@ -582,8 +579,20 @@ namespace BeastCraft.Game.Screens
             float w = box.Width - 72f;
             Painter.TextIn(card.Name, new Rect(x, box.Y + 62f, w - 460f, style.TextSizes.Heading - 4f), style.TextSizes.Heading - 4f, Painter.C("plum"), TextAlign.Left);
             float y = box.Y + 116f;
-            string tags = (card.Element ?? "No element") + (card.Category != null ? "  -  " + card.Category : string.Empty) + "  -  " + card.Range + "  -  " + card.Cooldown +
-                          (card.Uses != null ? "  -  " + card.Uses : string.Empty);
+            List<string> parts = new List<string> { card.Element ?? Loc("ui.beast.no_element") };
+            if (card.Category != null)
+            {
+                parts.Add(card.Category);
+            }
+
+            parts.Add(card.Range);
+            parts.Add(card.Cooldown);
+            if (card.Uses != null)
+            {
+                parts.Add(card.Uses);
+            }
+
+            string tags = string.Join(Loc("ui.common.dash_sep"), parts);
             Painter.TextIn(tags, new Rect(x, y, w, style.TextSizes.Small + 2f), style.TextSizes.Small + 2f, Painter.C("inkSoft"), TextAlign.Left);
             y += 44f;
             y = Wrapped(card.TargetingRule, x, y, w, Body, "ink");
@@ -599,13 +608,13 @@ namespace BeastCraft.Game.Screens
             if (progress != null)
             {
                 float value = progress.XpToNext <= 0 ? 1f : Math.Min(1f, (float)progress.Xp / progress.XpToNext);
-                string xp = progress.XpToNext <= 0 ? "max" : progress.Xp + " / " + progress.XpToNext + " XP";
+                string xp = progress.XpToNext <= 0 ? Loc("ui.beast.max") : Loc("ui.beast.xp_of", progress.Xp, progress.XpToNext);
                 Painter.Progress(new Rect(x, y, w, 40f), value, -1f, progress.AwaitingBreakthrough ? "gold" : "leaf", "moss", "track",
-                                 "Lv " + progress.Level + " / " + progress.LevelCap + "   tier " + progress.Tier + "/" + progress.TierCount + "   " + xp);
+                                 Loc("ui.beast.skill_progress", progress.Level, progress.LevelCap, progress.Tier, progress.TierCount, xp));
                 y += 54f;
                 Painter.TextIn(progress.GateText, new Rect(x, y, w, style.TextSizes.Small + 2f), style.TextSizes.Small + 2f,
                                Painter.C(progress.AwaitingBreakthrough ? "goldDeep" : "inkSoft"), TextAlign.Left);
-                Painter.TextIn("Power x" + progress.PowerMultiplier.ToString("0.00", CultureInfo.InvariantCulture) + "  -  " + (card.Scaling ?? string.Empty),
+                Painter.TextIn(Loc("ui.beast.power_scaling", progress.PowerMultiplier.ToString("0.00", CultureInfo.InvariantCulture), card.Scaling ?? string.Empty),
                                new Rect(x, y + 38f, w, style.TextSizes.Small + 2f), style.TextSizes.Small + 2f, Painter.C("inkSoft"), TextAlign.Left);
             }
         }
@@ -616,8 +625,8 @@ namespace BeastCraft.Game.Screens
             float x = box.X + 36f;
             float w = box.Width - 72f;
             Painter.TextIn(entry.Card.Name, new Rect(x, box.Y + 26f, w - 260f, Body + 4f), Body + 4f, Painter.C(entry.Known ? "plum" : "inkSoft"), TextAlign.Left);
-            string state = entry.Known ? "Learned, Lv " + entry.Progress.Level : "A skill tome teaches it from Lv " + entry.LearnLevel;
-            Painter.TextIn(state + "  -  " + entry.Card.Range + "  -  " + entry.Card.Cooldown, new Rect(x, box.Y + 72f, w - 260f, style.TextSizes.Small + 2f), style.TextSizes.Small + 2f,
+            string state = entry.Known ? Loc("ui.beast.learned", entry.Progress.Level) : Loc("ui.beast.tome_teaches", entry.LearnLevel);
+            Painter.TextIn(string.Join(Loc("ui.common.dash_sep"), state, entry.Card.Range, entry.Card.Cooldown), new Rect(x, box.Y + 72f, w - 260f, style.TextSizes.Small + 2f), style.TextSizes.Small + 2f,
                            Painter.C("inkSoft"), TextAlign.Left);
             Wrapped(entry.Card.TargetingRule, x, box.Y + 114f, w, Body, entry.Known ? "ink" : "inkSoft");
         }
@@ -634,16 +643,16 @@ namespace BeastCraft.Game.Screens
                 }
 
                 string id = entry.SkillId;
-                string label = entry.Card.Name + (entry.EquippedSlot >= 0 ? "  (swap with slot " + (entry.EquippedSlot + 1) + ")" : string.Empty);
+                string label = entry.EquippedSlot >= 0 ? Loc("ui.beast.swap_with", entry.Card.Name, entry.EquippedSlot + 1) : entry.Card.Name;
                 options.Add(new ChoiceOption(label, true, null, () => Apply(_model.EquipSkill(slot, id, out string message), message)));
             }
 
             if (_model.Slots[slot].Skill != null)
             {
-                options.Add(new ChoiceOption("Empty the slot", true, null, () => Apply(_model.UnequipSkill(slot, out string message), message)));
+                options.Add(new ChoiceOption(Loc("ui.beast.empty_slot"), true, null, () => Apply(_model.UnequipSkill(slot, out string message), message)));
             }
 
-            Ctx.Stack.PushModal(new ChoiceModal(Ctx, "Slot " + (slot + 1), options.Count == 0 ? "No other skill learned yet: skill tomes teach them." : "Pick a skill for this slot.",
+            Ctx.Stack.PushModal(new ChoiceModal(Ctx, Loc("ui.beast.slot", slot + 1), Loc(options.Count == 0 ? "ui.beast.no_other_skill" : "ui.beast.pick_skill"),
                                                 options));
         }
 
@@ -654,11 +663,11 @@ namespace BeastCraft.Game.Screens
             for (int slot = 0; slot < _model.Slots.Count; slot++)
             {
                 int index = slot;
-                string held = _model.Slots[slot].Card?.Name ?? "empty";
-                options.Add(new ChoiceOption("Slot " + (slot + 1) + " (" + held + ")", true, null, () => Apply(_model.EquipSkill(index, skillId, out string message), message)));
+                string held = _model.Slots[slot].Card?.Name ?? Loc("ui.beast.empty_lower");
+                options.Add(new ChoiceOption(Loc("ui.beast.slot_holding", slot + 1, held), true, null, () => Apply(_model.EquipSkill(index, skillId, out string message), message)));
             }
 
-            Ctx.Stack.PushModal(new ChoiceModal(Ctx, "Equip where?", "It replaces the slot's skill, which stays learned.", options));
+            Ctx.Stack.PushModal(new ChoiceModal(Ctx, Loc("ui.beast.equip_where"), Loc("ui.beast.equip_where_body"), options));
         }
 
         /// <summary>Training and breakthroughs for <paramref name="skillId"/>: each material held, its XP and tier, what it can do now and why not.</summary>
@@ -675,22 +684,23 @@ namespace BeastCraft.Game.Screens
             foreach (MaterialOptionView material in _model.Materials(skillId))
             {
                 string id = material.MaterialId;
-                string held = material.Name + " x" + material.Owned + " (tier " + material.Tier + ", +" + material.XpValue + " XP)";
+                string held = Loc("ui.beast.material", material.Name, material.Owned, material.Tier, material.XpValue);
                 if (progress.AwaitingBreakthrough)
                 {
-                    options.Add(new ChoiceOption("Break through: " + held, material.CanBreakthrough, material.Reason,
+                    options.Add(new ChoiceOption(Loc("ui.beast.break_through", held), material.CanBreakthrough, material.Reason,
                                                  () => Apply(_model.Breakthrough(skillId, id, out string message), message)));
                 }
                 else
                 {
-                    options.Add(new ChoiceOption("Train: " + held, material.CanTrain, material.Reason, () => Apply(_model.Train(skillId, id, out string message), message)));
+                    options.Add(new ChoiceOption(Loc("ui.beast.train", held), material.CanTrain, material.Reason, () => Apply(_model.Train(skillId, id, out string message), message)));
                 }
             }
 
-            string text = "Lv " + progress.Level + " (tier " + progress.Tier + "): " + (progress.XpToNext > 0 ? progress.Xp + " / " + progress.XpToNext + " XP to Lv " + (progress.Level + 1) : "max level") +
-                          ". Power x" + progress.PowerMultiplier.ToString("0.00", CultureInfo.InvariantCulture) + (progress.NextPowerMultiplier > progress.PowerMultiplier
-                              ? ", next level x" + progress.NextPowerMultiplier.ToString("0.00", CultureInfo.InvariantCulture)
-                              : string.Empty) + ". " + progress.GateText + ".";
+            string xpText = progress.XpToNext > 0 ? Loc("ui.beast.upgrade_xp", progress.Xp, progress.XpToNext, progress.Level + 1) : Loc("ui.beast.max_level");
+            string next = progress.NextPowerMultiplier > progress.PowerMultiplier
+                              ? Loc("ui.beast.next_level_power", progress.NextPowerMultiplier.ToString("0.00", CultureInfo.InvariantCulture))
+                              : string.Empty;
+            string text = Loc("ui.beast.upgrade_text", progress.Level, progress.Tier, xpText, progress.PowerMultiplier.ToString("0.00", CultureInfo.InvariantCulture), next, progress.GateText);
             Ctx.Stack.PushModal(new ChoiceModal(Ctx, entry.Card.Name, text, options));
         }
 
@@ -716,7 +726,7 @@ namespace BeastCraft.Game.Screens
                 y = _cards.Card(y, height, "panel", box => DrawGearSlot(box, captured));
                 if (slot.Worn != null)
                 {
-                    AddButton(_scroll, "unequip-" + slot.Slot, new Rect(Pad + Width - 260f, top + 22f, 230f, 76f), "Take off", "secondary", () =>
+                    AddButton(_scroll, "unequip-" + slot.Slot, new Rect(Pad + Width - 260f, top + 22f, 230f, 76f), Loc("ui.beast.take_off"), "secondary", () =>
                     {
                         Apply(_model.UnequipGear(captured.Slot, out string message), message);
                     });
@@ -730,7 +740,7 @@ namespace BeastCraft.Game.Screens
                         continue;
                     }
 
-                    Button equip = AddButton(_scroll, "equip-" + option.InstanceId, new Rect(Pad + Width - 220f, top + 128f + i * 96f, 190f, 76f), "Equip", "chip", () =>
+                    Button equip = AddButton(_scroll, "equip-" + option.InstanceId, new Rect(Pad + Width - 220f, top + 128f + i * 96f, 190f, 76f), Loc("ui.beast.equip"), "chip", () =>
                     {
                         Apply(_model.EquipGear(captured.Slot, option.InstanceId, out string message), message);
                     });
@@ -741,7 +751,7 @@ namespace BeastCraft.Game.Screens
             string stance = _model.StanceBehaviour ?? string.Empty;
             y = _cards.Card(y, 130f + Lines(stance, Body, Width - 80f) * Line, "card", box =>
             {
-                SectionHeader.Draw(Ctx, box, "Stance: " + _model.Stance);
+                SectionHeader.Draw(Ctx, box, Loc("ui.beast.stance", _model.Stance));
                 Wrapped(stance, box.X + 40f, box.Y + 90f, box.Width - 80f, Body, "ink");
             });
 
@@ -754,7 +764,7 @@ namespace BeastCraft.Game.Screens
             y = _cards.Card(y, _model.Bonds.Count == 0 ? 170f : bondsHeight, "panel", DrawBonds);
             float looksTop = y;
             y = _cards.Card(y, 150f + Math.Max(1, _model.Looks.Count) * 48f, "card", DrawLooks);
-            AddButton(_scroll, "look-token-shop", new Rect(Pad + Width - 260f, looksTop + 24f, 220f, 76f), "Look shop", "chip", () => Ctx.Stack.Push(new LookTokenShopScreen(Ctx)));
+            AddButton(_scroll, "look-token-shop", new Rect(Pad + Width - 260f, looksTop + 24f, 220f, 76f), Loc("ui.beast.look_shop"), "chip", () => Ctx.Stack.Push(new LookTokenShopScreen(Ctx)));
 
             if (_model.ColourForms.Count > 0)
             {
@@ -768,17 +778,17 @@ namespace BeastCraft.Game.Screens
                     float rowY = colourTop + 88f + i * rowHeight;
                     if (!form.Owned)
                     {
-                        Button unlock = AddButton(_scroll, "unlock-colour-" + id, new Rect(Pad + Width - 230f, rowY, 190f, 76f), "Unlock", "chip", () =>
+                        Button unlock = AddButton(_scroll, "unlock-colour-" + id, new Rect(Pad + Width - 230f, rowY, 190f, 76f), Loc("ui.beast.unlock"), "chip", () =>
                         {
                             ColourFormResult result = _model.UnlockColourForm(id);
-                            Ctx.Game.Toast(result.Success ? "Unlocked! Wear it below." : result.Error);
+                            Ctx.Game.Toast(result.Success ? Loc("ui.beast.unlocked") : result.Error);
                             Build();
                         });
                         unlock.Enabled = form.ItemHeld >= form.ItemCount;
                     }
                     else if (!form.Worn)
                     {
-                        AddButton(_scroll, "wear-colour-" + id, new Rect(Pad + Width - 230f, rowY, 190f, 76f), "Wear", "chip", () =>
+                        AddButton(_scroll, "wear-colour-" + id, new Rect(Pad + Width - 230f, rowY, 190f, 76f), Loc("ui.beast.wear"), "chip", () =>
                         {
                             _model.WearColourForm(id);
                             Build();
@@ -787,7 +797,7 @@ namespace BeastCraft.Game.Screens
                     else
                     {
                         string categoryId = form.CosmeticCategoryId;
-                        AddButton(_scroll, "unwear-colour-" + id, new Rect(Pad + Width - 260f, rowY, 220f, 76f), "Wear natural", "secondary", () =>
+                        AddButton(_scroll, "unwear-colour-" + id, new Rect(Pad + Width - 260f, rowY, 220f, 76f), Loc("ui.beast.wear_natural"), "secondary", () =>
                         {
                             _model.WearNaturalColour(categoryId);
                             Build();
@@ -804,11 +814,13 @@ namespace BeastCraft.Game.Screens
             SectionHeader.Draw(Ctx, box, slot.SlotName);
             float x = box.X + 40f;
             float w = box.Width - 80f;
-            string worn = slot.Worn == null ? "Nothing worn" : "Wearing " + slot.Worn.Name + ": " + string.Join(", ", slot.Worn.Bonuses) + (slot.Worn.Inactive ? " (inactive)" : string.Empty);
+            string worn = slot.Worn == null
+                               ? Loc("ui.beast.nothing_worn")
+                               : Loc(slot.Worn.Inactive ? "ui.beast.wearing_inactive" : "ui.beast.wearing", slot.Worn.Name, string.Join(Loc("ui.common.list_sep"), slot.Worn.Bonuses));
             Painter.TextIn(worn, new Rect(x, box.Y + 80f, w - 260f, Body), Body - 1f, Painter.C(slot.Worn == null ? "inkSoft" : "leafDeep"), TextAlign.Left);
             if (slot.Options.Count == 0)
             {
-                Painter.TextIn("No gear for this slot yet: battles and traders give it.", new Rect(x, box.Y + 138f, w, Body), Body - 1f, Painter.C("inkSoft"), TextAlign.Left);
+                Painter.TextIn(Loc("ui.beast.no_gear_for_slot"), new Rect(x, box.Y + 138f, w, Body), Body - 1f, Painter.C("inkSoft"), TextAlign.Left);
                 return;
             }
 
@@ -816,22 +828,23 @@ namespace BeastCraft.Game.Screens
             {
                 GearView option = slot.Options[i];
                 float y = box.Y + 128f + i * 96f;
-                Painter.TextIn(option.Name + (option.MinimumLevel > 1 ? "  (Lv " + option.MinimumLevel + ")" : string.Empty), new Rect(x, y + 4f, w - 250f, Body), Body,
+                Painter.TextIn(option.MinimumLevel > 1 ? Loc("ui.beast.gear_min_level", option.Name, option.MinimumLevel) : option.Name, new Rect(x, y + 4f, w - 250f, Body), Body,
                                Painter.C("ink"), TextAlign.Left);
-                string note = string.Join(", ", option.Bonuses) + (option.Reason != null ? "  -  " + option.Reason : string.Empty);
+                string bonuses = string.Join(Loc("ui.common.list_sep"), option.Bonuses);
+                string note = option.Reason != null ? Loc("ui.common.pair", bonuses, option.Reason) : bonuses;
                 Painter.TextIn(note, new Rect(x, y + 44f, w - 250f, Ctx.Style.TextSizes.Small + 1f), Ctx.Style.TextSizes.Small + 1f, Painter.C("inkSoft"), TextAlign.Left);
             }
         }
 
         private void DrawBonds(Rect box)
         {
-            SectionHeader.Draw(Ctx, box, "Bonds it takes part in");
+            SectionHeader.Draw(Ctx, box, Loc("ui.beast.bonds"));
             float x = box.X + 40f;
             float w = box.Width - 80f;
             float y = box.Y + 90f;
             if (_model.Bonds.Count == 0)
             {
-                Painter.TextIn("None.", new Rect(x, y, w, Body), Body, Painter.C("inkSoft"), TextAlign.Left);
+                Painter.TextIn(Loc("ui.beast.none"), new Rect(x, y, w, Body), Body, Painter.C("inkSoft"), TextAlign.Left);
                 return;
             }
 
@@ -839,11 +852,11 @@ namespace BeastCraft.Game.Screens
             foreach (BondView bond in _model.Bonds)
             {
                 string tiers = string.Join("/", bond.TierCounts.ConvertAll(c => c.ToString(CultureInfo.InvariantCulture)));
-                Painter.TextIn(bond.Name + (bond.PartyTier > 0 ? "  -  active in your party (tier " + bond.PartyTier + ")" : string.Empty), new Rect(x, y, w, Body), Body,
+                Painter.TextIn(bond.PartyTier > 0 ? Loc("ui.beast.bond_active", bond.Name, bond.PartyTier) : bond.Name, new Rect(x, y, w, Body), Body,
                                Painter.C(bond.PartyTier > 0 ? "leafDeep" : "plum"), TextAlign.Left);
                 y += 42f;
-                string partners = bond.Partners.Count == 0 ? "no partner owned yet" : "with " + string.Join(", ", bond.Partners);
-                Painter.TextIn(bond.Condition + ", tiers at " + tiers + "  -  " + partners, new Rect(x, y, w, small), small, Painter.C("ink"), TextAlign.Left);
+                string partners = bond.Partners.Count == 0 ? Loc("ui.beast.no_partner") : Loc("ui.beast.with_partners", string.Join(Loc("ui.common.list_sep"), bond.Partners));
+                Painter.TextIn(Loc("ui.beast.bond_tiers", bond.Condition, tiers, partners), new Rect(x, y, w, small), small, Painter.C("ink"), TextAlign.Left);
                 y += 38f;
                 y = Wrapped(bond.Description, x, y, w, small, "inkSoft") + 40f;
             }
@@ -851,35 +864,35 @@ namespace BeastCraft.Game.Screens
 
         private void DrawLooks(Rect box)
         {
-            SectionHeader.Draw(Ctx, box, "Looks worn");
+            SectionHeader.Draw(Ctx, box, Loc("ui.beast.looks_worn"));
             float y = box.Y + 90f;
             if (_model.Looks.Count == 0)
             {
-                Painter.TextIn("Default look.", new Rect(box.X + 40f, y, box.Width - 80f, Body), Body, Painter.C("inkSoft"), TextAlign.Left);
+                Painter.TextIn(Loc("ui.beast.default_look"), new Rect(box.X + 40f, y, box.Width - 80f, Body), Body, Painter.C("inkSoft"), TextAlign.Left);
             }
 
             foreach (LookView look in _model.Looks)
             {
-                Painter.TextIn(look.Category + ": " + look.Option, new Rect(box.X + 40f, y, box.Width - 80f, Body), Body, Painter.C("ink"), TextAlign.Left);
+                Painter.TextIn(Loc("ui.common.label_value", look.Category, look.Option), new Rect(box.X + 40f, y, box.Width - 80f, Body), Body, Painter.C("ink"), TextAlign.Left);
                 y += 48f;
             }
 
-            Painter.TextIn("Changing looks comes with the wardrobe.", new Rect(box.X + 40f, box.Bottom - 50f, box.Width - 80f, 24f), Ctx.Style.TextSizes.Small + 1f,
+            Painter.TextIn(Loc("ui.beast.wardrobe_note"), new Rect(box.X + 40f, box.Bottom - 50f, box.Width - 80f, 24f), Ctx.Style.TextSizes.Small + 1f,
                            Painter.C("inkSoft"), TextAlign.Left);
         }
 
         /// <summary>The species' colour forms (docs/design/grove.md, "Colour evolutions" — D3/D4): locked, owned, or worn.</summary>
         private void DrawColourForms(Rect box)
         {
-            SectionHeader.Draw(Ctx, box, "Colour forms");
+            SectionHeader.Draw(Ctx, box, Loc("ui.beast.colour_forms"));
             float y = box.Y + 90f;
             const float rowHeight = 96f;
             foreach (ColourFormRow form in _model.ColourForms)
             {
                 Painter.TextIn(form.DisplayName, new Rect(box.X + 40f, y, box.Width - 300f, Body), Body, Painter.C(form.Worn ? "leafDeep" : "ink"), TextAlign.Left);
-                string status = form.Worn ? "Worn"
-                               : form.Owned ? "Owned"
-                               : form.ItemDisplay + "  " + form.ItemHeld + " / " + form.ItemCount;
+                string status = form.Worn ? Loc("ui.beast.worn")
+                               : form.Owned ? Loc("ui.beast.owned")
+                               : Loc("ui.beast.item_progress", form.ItemDisplay, form.ItemHeld, form.ItemCount);
                 Painter.TextIn(status, new Rect(box.X + 40f, y + 42f, box.Width - 300f, Ctx.Style.TextSizes.Small + 1f), Ctx.Style.TextSizes.Small + 1f,
                                Painter.C(form.Worn ? "leafDeep" : form.Owned ? "goldDeep" : form.ItemHeld >= form.ItemCount ? "goldDeep" : "berry"), TextAlign.Left);
                 y += rowHeight;
@@ -898,11 +911,11 @@ namespace BeastCraft.Game.Screens
             {
                 _header.Paint(Ctx, Ui, string.Empty);
                 RepaintExtras();
-                Painter.TextIn("No such beast.", new Rect(180f, 60f, 600f, Ctx.Style.TextSizes.Heading), Ctx.Style.TextSizes.Heading, Painter.C("berry"), TextAlign.Left);
+                Painter.TextIn(Loc("ui.beast.no_such_beast"), new Rect(180f, 60f, 600f, Ctx.Style.TextSizes.Heading), Ctx.Style.TextSizes.Heading, Painter.C("berry"), TextAlign.Left);
                 return;
             }
 
-            _header.Paint(Ctx, Ui, _model.Name, "Lv " + _model.Level + "  -  " + _model.Stance + "  -  " + _model.Element);
+            _header.Paint(Ctx, Ui, _model.Name, string.Join(Loc("ui.common.dash_sep"), Loc("ui.common.level", _model.Level), _model.Stance, _model.Element));
             RepaintExtras();
         }
 
@@ -982,7 +995,7 @@ namespace BeastCraft.Game.Screens
                 }
             }
 
-            Button close = panel.Add(new Button { Id = "close", Bounds = new Rect(card.Center.X - 200f, card.Bottom - 140f, 400f, 100f), Text = "Close", StyleKey = "secondary" });
+            Button close = panel.Add(new Button { Id = "close", Bounds = new Rect(card.Center.X - 200f, card.Bottom - 140f, 400f, 100f), Text = ctx.Loc("ui.common.close"), StyleKey = "secondary" });
             close.Clicked += Close;
             Name = "choice:" + title;
         }

@@ -4458,3 +4458,100 @@ computed as if the avatar earned its XP, so a `--soothe-fraction 0.5 --runs 200`
 reproduces the exact same figures byte-for-byte (63710 ordinary Battle nodes, 31851 soothed, 50.0%;
 every gate/boss row still "ok") — nothing here needed to change, only `CampaignRules.Soothe` (and its
 unit test) did.
+
+## r11 boss curve at today's calibration (#44, measurement only)
+
+The twin giants' first calibration ("Post-game region r11") logged a cliff on the fixed-set recipe: at
+256 samples a step the Normal boss fell 41.0% -> 28.9% between x0.711 and x0.713, about 12 points in one
+0.002 step. Since then the overrides were re-calibrated on the typical team (x0.437 Normal, x0.454 Hard;
+`typical-team-report.md`, "Region bosses", which reads 38.7% and 22.0% typical there) and the level-gap,
+targets and assist passes landed. This re-measures the same recipe's curve with today's code to see
+whether the cliff is still there. Nothing is changed: no `DifficultyOverride`, no
+`AssistBossFloorScale`, no report file. The one-hour `--mode typical` and assist-floor runs were not
+needed (below).
+
+Recipe: the fixed-set PvE run, `--kit elemental --scouted bonds --gear typical --calibrate-samples 256`,
+level 100, each boss template written as a fixed encounter (the giant's enemy-library entry, `Count` 2,
+`Elements` Light, Dark, Large arena), pinned at each multiplier (`--pin-difficulty`, a one-cell table
+whose `Shape` is the encounter id; the tool now accepts the fixed set for this, a flag-check change
+only). Seeds exclude the multiplier, so each boss is one seed stream and one curve. Normal on
+`boss_r11_dusk_and_dawn`'s battles, Hard on `boss_r11_dusk_and_dawn_hard`'s (the first calibration
+measured both on the Normal template's). Clear = the bond-aware scouted pick, 256 battles a step (SE
+about 3 points at 50%); no-scouting = every team's mean at the pinned multiplier.
+
+**Around the shipped overrides.** Flat: the scouted pick clears every battle.
+
+| Multiplier | Normal scouted | Normal no-scouting | Hard scouted | Hard no-scouting |
+| ---: | ---: | ---: | ---: | ---: |
+| x0.425 | 100.0% | 100.0% | | |
+| x0.430 | 100.0% | 99.8% | | |
+| x0.435 | 100.0% | 99.7% | | |
+| **x0.437** (Normal, shipped) | **100.0%** | **99.7%** | | |
+| x0.440 | 100.0% | 99.7% | 100.0% | 99.8% |
+| x0.445 | 100.0% | 99.7% | 100.0% | 99.8% |
+| x0.450 | 100.0% | 99.5% | 100.0% | 99.8% |
+| **x0.454** (Hard, shipped) | | | **100.0%** | **99.8%** |
+| x0.455 | | | 100.0% | 99.8% |
+| x0.460 | | | 100.0% | 99.7% |
+| x0.465 | | | 100.0% | 99.3% |
+
+**The whole curve** (Normal, scouted): x0.500 99.2%, x0.525 96.9%, x0.550 87.1%, x0.575 68.8%, x0.600
+58.6%, x0.625 44.9%, x0.650 28.1%, x0.675 19.1%, x0.700 6.6%, x0.725 1.6%, x0.750 0.0%. Hard (its own
+seeds): x0.500 98.8%, x0.550 91.0%, x0.600 66.4%, x0.625 53.5%, x0.650 36.3%, x0.675 23.4%, x0.700
+12.1%, x0.750 0.0%. On this recipe Normal now crosses 35% at x0.640-0.642 and Hard 20% at x0.680-0.686.
+
+**Before and after at the old cliff** (Normal, scouted, 256 samples):
+
+| Multiplier | Before (first calibration) | After (today) |
+| ---: | ---: | ---: |
+| x0.703 | 51.6% | 6.3% |
+| x0.711 | 41.0% | 4.3% |
+| x0.713 | 28.9% | 2.7% |
+| x0.715 | 27.3% | 3.1% |
+| x0.719 | 27.7% | 3.1% |
+| x0.723 | 18.4% | 1.6% |
+| x0.750 | 3.1% | 0.0% |
+
+**Fine steps** (0.002 apart) where the curve is steepest and where it crosses the targets:
+
+| Normal | scouted | Normal | scouted | Hard | scouted |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| x0.552 | 87.1% | x0.624 | 45.3% | x0.670 | 23.8% |
+| x0.554 | 86.7% | x0.626 | 45.3% | x0.672 | 24.2% |
+| x0.556 | 82.8% | x0.628 | 44.9% | x0.674 | 23.4% |
+| x0.558 | 81.6% | x0.630 | 41.0% | x0.676 | 22.7% |
+| x0.560 | 81.6% | x0.632 | 40.2% | x0.678 | 22.3% |
+| x0.562 | 81.3% | x0.634 | 40.6% | x0.680 | 20.7% |
+| x0.564 | 77.0% | x0.636 | 40.6% | x0.682 | 20.7% |
+| x0.566 | 76.2% | x0.638 | 36.3% | x0.684 | 21.1% |
+| x0.568 | 75.8% | x0.640 | 35.9% | x0.686 | 21.1% |
+| x0.570 | 74.6% | x0.642 | 34.8% | x0.688 | 17.6% |
+| x0.572 | 69.5% | x0.644 | 34.4% | x0.690 | 18.0% |
+| x0.574 | 69.5% | x0.646 | 28.9% | x0.692 | 17.6% |
+| x0.576 | 68.8% | x0.648 | 28.9% | x0.694 | 17.2% |
+
+What it says:
+
+- **The shipped overrides sit nowhere near this recipe's drop.** At x0.437 and x0.454 the scouted
+  whole-roster pick clears 100% and the no-scouting mean 99.5-99.8%; the curve only starts to fall
+  past x0.50. The overrides are calibrated to the typical team from the owned roster, not to this
+  pick, so the whole curve has moved (the old x0.711 now reads 4.3%). There is no cliff at today's
+  calibration on this recipe.
+- **The curve still moves in steps.** It is flat for a few thousandths and then drops 4-6 points in a
+  single 0.002 step (x0.570 -> x0.572 -5.1, x0.636 -> x0.638 -4.3, x0.644 -> x0.646 -5.5, x0.686 ->
+  x0.688 -3.5 on Hard). Enemy stats are whole numbers (`EnemyScaling`), so the battles only change
+  where a scaled stat ticks over, and one fixed lineup has few such points. The old 12-point step is
+  gone; the largest step now is about 5.5 points.
+
+**Flag.** The step structure (about 5 points per 0.002 at its worst) is still there on the fixed-set
+recipe, but not around the shipped overrides, where this recipe is saturated at 100%. Whether the
+typical-team curve (the one the overrides are calibrated on) has a step of that size at x0.437 or
+x0.454 is not measured here: the same integer-stat mechanism applies, so a typical re-run with a fine
+sweep around the overrides is the check if it matters. Nothing retuned.
+
+Reproduce: for each multiplier M, a one-cell pin table `{"SchemaVersion":2,"Targets":[],"Cells":[{"KitMode":"elemental","Shape":"<id>","Level":100,"Multiplier":M,"TargetClear":<35|20>}]}`
+and `-- --mode pve --kit elemental --encounter-set fixed --encounters-file <scratch> --encounters <id>
+--levels 100 --calibrate-samples 256 --scouted bonds --gear typical --target-clear <35|20>
+--pin-difficulty <pin>`, reading "Calibrated difficulty"'s Scouted and No-scouting columns; the
+scratch file being the two r11 templates written as fixed encounters (each group the giant's
+enemy-library entry plus `Count` 2 and `Elements` Light, Dark; Large arena).

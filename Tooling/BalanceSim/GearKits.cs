@@ -68,7 +68,7 @@ namespace BeastCraft.Tooling.BalanceSim
             GearLibraryData data;
             try
             {
-                data = JsonSerializer.Deserialize<GearLibraryData>(File.ReadAllText(resolved), new JsonSerializerOptions { IncludeFields = true });
+                data = JsonSerializer.Deserialize<GearLibraryData>(BeastCraft.Localization.ContentText.ReadFile(resolved), new JsonSerializerOptions { IncludeFields = true });
             }
             catch (Exception exception)
             {

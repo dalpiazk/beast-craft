@@ -124,8 +124,13 @@ sfx_creature_capture_oneshot.wav
 sfx_ui_confirm_oneshot.wav
 ```
 
-Deliver audio as `.wav` (48 kHz, 16-bit or 24-bit). Compression to Vorbis/AAC is
-a per-platform build step — do not pre-compress source files.
+Deliver audio masters as `.wav` (48 kHz, 16-bit or 24-bit); do not pre-compress
+them, and keep them out of `content/`. The encode step
+(`audio-generation/Normalize-Audio.ps1`) writes the shipped files from them:
+sound effects as 16-bit mono WAV (`sfx_<name>_oneshot.wav`, peak normalised),
+music and ambience as OGG Vorbis quality 4-5 (`mus_...` and `amb_..._loop.ogg`,
+-16 LUFS). The cue list, loudness targets and layered stems are in
+[`docs/design/audio.md`](../docs/design/audio.md).
 
 ---
 
@@ -133,13 +138,14 @@ a per-platform build step — do not pre-compress source files.
 
 - [`art-generation/`](art-generation/README.md) — Gemini prompt templates and
   per-category generation configs.
-- [`audio-generation/`](audio-generation/README.md) — Stable Audio prompt
-  templates and loop/one-shot configs.
+- [`audio-generation/`](audio-generation/README.md) — the audio encode,
+  provenance and loudness-check scripts (PowerShell + ffmpeg), and later the
+  Stable Audio prompt templates.
 - [`sprite-cleanup/`](sprite-cleanup/README.md) — rembg / GIMP post-processing
   recipes that turn a raw generation into an import-ready sprite.
 
 ## Status
 
-Structure and conventions only. Generation scripts land in a later step; for now
-these folders define *where things go and what they are called*, not *how they
-are made*.
+Structure and conventions, plus the audio post-processing scripts
+(`audio-generation/`: encode, provenance, loudness check). Generation scripts
+land in a later step; nothing here calls a generation API.

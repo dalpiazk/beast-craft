@@ -40,12 +40,12 @@ namespace BeastCraft.Presentation.Screens
     /// </summary>
     public sealed class StarterPickViewModel : IBeastPicker
     {
-        /// <summary>The stances, what each does in a fight (the pickers' explainer).</summary>
-        public static readonly string[] StanceExplainer =
+        /// <summary>The stances, what each does in a fight (the pickers' explainer), as text keys: "Stance: what it does".</summary>
+        public static readonly string[] StanceExplainerKeys =
         {
-            "Vanguard: holds the front line",
-            "Ranged: strikes from the back",
-            "Skirmisher: darts round the side"
+            "ui.tutorial.stance_vanguard",
+            "ui.tutorial.stance_ranged",
+            "ui.tutorial.stance_skirmisher"
         };
 
         private readonly GameSession _session;
@@ -88,10 +88,10 @@ namespace BeastCraft.Presentation.Screens
             {
                 if (Mode == PickMode.Trial)
                 {
-                    return Step == 2 ? "A second beast answers" : "A third beast answers";
+                    return _session.Content.Text.Get(Step == 2 ? "ui.tutorial.second_beast" : "ui.tutorial.third_beast");
                 }
 
-                return Mode == PickMode.Skip ? "Choose beast " + Step + " of " + StarterPicks.PickCount : "Choose your first beast";
+                return Mode == PickMode.Skip ? _session.Content.Text.Format("ui.tutorial.choose_step", Step, StarterPicks.PickCount) : _session.Content.Text.Get("ui.tutorial.choose_first_beast");
             }
         }
 
@@ -101,10 +101,10 @@ namespace BeastCraft.Presentation.Screens
             {
                 if (RequiredStance == null)
                 {
-                    return "Any of the ten. The next two join as you go, one stance at a time.";
+                    return _session.Content.Text.Get("ui.tutorial.any_of_ten");
                 }
 
-                return "Any " + RequiredStance.Value + " beast (the stance after " + (Step == 2 ? "your first" : "your second") + "'s).";
+                return _session.Content.Text.Format(Step == 2 ? "ui.tutorial.stance_after_first" : "ui.tutorial.stance_after_second", RequiredStance.Value);
             }
         }
 
@@ -140,7 +140,7 @@ namespace BeastCraft.Presentation.Screens
 
                     if (!_session.NewGameSkippingTutorial(_picked))
                     {
-                        error = "Those picks could not start a game.";
+                        error = _session.Content.Text.Get("ui.tutorial.picks_failed");
                         _picked.Clear();
                         Refresh();
                         return false;
@@ -153,7 +153,7 @@ namespace BeastCraft.Presentation.Screens
         /// <summary>The toast once a trial's pick has joined.</summary>
         public string JoinedMessage(PickOptionView option)
         {
-            return (option?.Name ?? "A beast") + " joins your team at level 1!";
+            return _session.Content.Text.Format("ui.discovery.joined", option?.Name ?? _session.Content.Text.Get("ui.discovery.a_beast"), 1);
         }
 
         /// <summary>A species as a picker's option.</summary>
@@ -272,10 +272,10 @@ namespace BeastCraft.Presentation.Screens
             foreach (ConsumableStack stack in result?.ItemsGranted ?? new List<ConsumableStack>())
             {
                 string name = session.Content.Battle.GetConsumable(stack.ConsumableId)?.DisplayName ?? stack.ConsumableId;
-                parts.Add(stack.Quantity + " " + name + (stack.Quantity > 1 && !name.EndsWith("s", StringComparison.Ordinal) ? "s" : string.Empty));
+                parts.Add(session.Content.Text.Format("ui.story.gift", stack.Quantity, name + (stack.Quantity > 1 && !name.EndsWith("s", StringComparison.Ordinal) ? "s" : string.Empty)));
             }
 
-            return string.Join(", ", parts);
+            return string.Join(session.Content.Text.Get("ui.common.list_sep"), parts);
         }
     }
 
@@ -312,7 +312,7 @@ namespace BeastCraft.Presentation.Screens
             NodeId = nodeId;
             MapRun run = session.Save.Campaign.ActiveRun;
             MapNode node = run.Find(nodeId);
-            Title = node == null ? "Camp" : session.LocationName(node);
+            Title = node == null ? session.Content.Text.Get("ui.map.kind_camp") : session.LocationName(node);
             Level = node?.Level ?? 1;
             IsTutorial = session.Content.Campaign.IsTutorial(run.RegionId);
             FixedNodeData authored = session.Content.Campaign.FixedNode(run.RegionId, nodeId);
@@ -347,8 +347,8 @@ namespace BeastCraft.Presentation.Screens
             get
             {
                 return IsTutorial
-                           ? "Train one beast: it earns what a win here would pay. The Keeper then brings every beast up to your strongest one's level."
-                           : "Train one beast: it earns what a win here would pay. Then the trail goes on.";
+                           ? _session.Content.Text.Get("ui.camp.intro_tutorial")
+                           : _session.Content.Text.Get("ui.camp.intro");
             }
         }
 
@@ -365,12 +365,14 @@ namespace BeastCraft.Presentation.Screens
             Done = true;
             OwnedBeast beast = _session.Save.FindBeast(beastId);
             Summary.Clear();
-            string extra = GameSession.ExtraRewardText(result.TitlesEarned, 0);
-            Summary.Add(_session.BeastName(beast) + " trained: +" + result.XpTrained + " XP" + (result.LevelsGained > 0 ? ", up to Lv " + beast.Progress.Level : string.Empty) + "." + extra);
+            string extra = GameSession.ExtraRewardText(_session.Content.Text, result.TitlesEarned, 0);
+            Summary.Add((result.LevelsGained > 0
+                             ? _session.Content.Text.Format("ui.camp.trained_level", _session.BeastName(beast), result.XpTrained, beast.Progress.Level)
+                             : _session.Content.Text.Format("ui.camp.trained", _session.BeastName(beast), result.XpTrained)) + extra);
             foreach (string id in result.CaughtUp)
             {
                 OwnedBeast caught = _session.Save.FindBeast(id);
-                Summary.Add(_session.BeastName(caught) + " caught up to Lv " + caught.Progress.Level + ".");
+                Summary.Add(_session.Content.Text.Format("ui.camp.caught_up", _session.BeastName(caught), caught.Progress.Level));
             }
 
             _session.Autosave(AutosaveReason.Results);

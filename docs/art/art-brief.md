@@ -8,6 +8,11 @@
 > **The Verdant Hollow presentation pass** (battle backdrops, skill-icon frame and rarity rings, painted
 > skill icons, painted VFX hero frames per element and status) is specified slot by slot, with exact file
 > names, sizes and pivots, in [`hollow-art-slots.md`](hollow-art-slots.md).
+>
+> **Direction for new art set on 2026-09-29** (#49): five art pillars and a shared palette (section 1)
+> apply to all new art: the region 2 batch, Grove art and the UI kit. The existing beasts and enemies stay
+> as they are until a touch-up pass. Other standing producer decisions are in
+> [`docs/design/decisions.md`](../design/decisions.md).
 
 # Beast Craft — Art & Animation Brief
 
@@ -48,10 +53,77 @@ directly) commanding a roster of ten mythic beasts against wild, Gloam-corrupted
 **Quality bar:** hand-drawn chibi proportions; clean dark linework; soft 2-3-band cel shading;
 painterly backgrounds with a warm meadow/sky palette; rounded, friendly UI; layered, readable AoE
 effects; smooth skeletal idles. Mood word: *Studio Ghibli-inspired warmth* — a feeling to aim
-for, never a style or design to copy. The producer will attach a mood board of several references.
+for, never a style or design to copy. The mood board is below.
 
 **Keywords:** warm, adventurous, gently whimsical, "travel journal with sketches in the margins."
 Wonder first, danger second — never grim (per `docs/design/content-bible.md`, Tone).
+
+### Art pillars (2026-09-29)
+
+The goal is a modern, hand-painted look, not a code-drawn one: the current build's flat lighting, drawn
+UI, pixel placeholders and static sprites read as dated. These five pillars are the direction for **all
+new art** (the region 2 batch, Grove art, the UI kit). The existing beasts and enemies stay as they are
+until a touch-up pass (`docs/art/touch-ups.md`).
+
+1. **Warm daylight.** One light direction per scene, a warm key light, cool and slightly saturated
+   shadows. No pure black anywhere; the darkest value is ink plum.
+2. **Painted, not plastic.** Gouache-like washes, paper and brush texture. No glossy bevels, chrome or
+   hard gradients, on UI as much as on backgrounds.
+3. **A world that breathes.** Wind in grass and cloth, drifting clouds, floating motes, breathing idles.
+   Kept quiet and slow, and it respects the effects settings: Reduced and Minimal cut it down the same way
+   they cut VFX (`docs/design/presentation-and-vfx.md`).
+4. **Small human details.** Stitched cloth, pressed leaves, hand-lettered notes: the travel journal the
+   keywords describe.
+5. **Readable first.** The board, HP and skills always read at 1080x1920 on a phone. When a pillar
+   fights readability, readability wins.
+
+### Palette (2026-09-29)
+
+Shared neutrals and accents, used across every region and the UI:
+
+| Name | Hex | Use |
+| --- | --- | --- |
+| Ink plum | `#2E2A45` | darkest value, lines and text (in place of black) |
+| Journal paper | `#F6EEDC` | lightest value, panels and paper surfaces |
+| Meadow sage | `#8FAE8B` | ground, foliage, calm UI surfaces |
+| Sky teal | `#6FB3B8` | sky, water, secondary UI |
+| Apricot accent | `#F2A968` | warm key light, primary highlights and calls to action |
+| Cool shadow | `#7C7AAE` | shadow tint |
+
+- **Per region:** a 5-6 colour key palette plus a colour grade, set with the region's art (r01 Verdant
+  Hollow first, then the region 2 batch). Region palettes sit on top of the shared neutrals, not in place
+  of them.
+- **Element colours are reserved for VFX and UI accents** (skill rings, element chips, accent overlays).
+  Backgrounds and UI chrome do not use them as base colours, so an element always reads as an element.
+
+### Line work
+
+The current beasts and enemies use clean dark outlines. **Tinted line work** (lines derived from the fill
+colour, thinner) is **pending a one-beast test**: an ArtLab tinted-line pass on one beast (for example the
+Griffin), shown before and after. Whether to redo all ten beasts and the enemies is decided from that test.
+Until then, new character art keeps the current outline treatment; backgrounds and UI follow the pillars.
+
+### Prompt-safe vocabulary
+
+Describe the look by its qualities only. These phrases are safe to use in prompts and briefs:
+
+- "gouache background, soft wet-blended washes, details painted last"
+- "towering white cumulus, deep blue sky, warm afternoon sun"
+- "lush layered greens fading to blue-grey haze in the distance"
+- "hand-drawn characters, tinted lines, two-tone soft shading, flat colour areas"
+- "quiet everyday details: stitched cloth, worn wood, wildflowers, drifting leaves"
+
+The rule from `Pipeline/README.md` still holds: **prompts never name studios, franchises, characters or
+artists.** That includes every title in the mood board below.
+
+### Mood board (internal)
+
+References to **borrow from, never copy**: take the finish, light and mood, never a design, silhouette or
+layout. AFK Journey, Cult of the Lamb, HD-2D titles, Tiny Glade, Monument Valley 3, Europa, Mika and the
+Witch's Mountain, Wanderstop, Legends of Kingdom Rush, Pokemon Sleep, Dordogne, TOEM.
+
+This list is for internal docs only. **Keep studio and game names out of store listings, store metadata,
+ads and asset names**, as well as out of prompts.
 
 **Do:**
 - Rounded, friendly silhouettes; chibi proportions (big heads/eyes, short limbs) on beasts and avatar.
@@ -279,7 +351,7 @@ variants Radiant Dawnshade Horn and Eclipse Dawnshade Crown.
 | Illustration + rig bundle | $250-400 / character (full 7-clip animation set costs more) |
 | VFX starter pack (per element, ~5 layers) | $50-150 |
 | Icon (skill/item) | get quotes — no reliable public range found |
-| **Spine Professional license** | **$369 per animating artist** — each animator needs their own non-Education seat |
+| **Spine Professional license** | **$449 list per animating artist** ($379 on sale, as of 2026-09); each animator needs their own non-Education seat. Spine Enterprise is required once annual revenue reaches $500k |
 
 ## 6. Licensing & contract checklist
 
@@ -320,6 +392,13 @@ variants Radiant Dawnshade Horn and Eclipse Dawnshade Crown.
 12. **Enemies (2026-09-27):** the nine types' Verdant Hollow variants are made with the same pipeline and
     approved individually (`Tooling/ArtLab/provenance/enemies/<type>.md`). Element variants are a tinted
     accent overlay, not new art; region variants are new art per type, added region by region.
+
+13. **Art direction (2026-09-29, #49):** the five pillars and the palette (section 1) are the direction for
+    all new art: the region 2 batch, Grove art and the UI kit. Existing beasts and enemies stay until a
+    touch-up pass. The prompt-safe vocabulary, the mood board and the Spine price correction go ahead as
+    written.
+14. **Tinted line work (2026-09-29):** test on one beast first (for example the Griffin), before and
+    after. Redoing all ten beasts and the enemies is decided from that test.
 
 **Remaining question:** which 3 options per beast category ship at launch (artist can quote the
 count now; the producer picks the specific options before Phase 2).

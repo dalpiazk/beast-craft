@@ -3,9 +3,11 @@ using System.Collections.Generic;
 using System.IO;
 using BeastCraft.Campaign;
 using BeastCraft.Discovery;
+using BeastCraft.Game.Audio;
 using BeastCraft.Game.Rendering;
 using BeastCraft.Game.Screens;
 using BeastCraft.Game.Ui;
+using BeastCraft.Presentation.Audio;
 using BeastCraft.Presentation.Board;
 using BeastCraft.Presentation.Content;
 using BeastCraft.Presentation.Layout;
@@ -56,11 +58,19 @@ namespace BeastCraft.Game
         private SpriteBatch _batch;
         private SpriteRenderer _draw;
         private SpriteAtlas _atlas;
+#if DEBUG || PERF_OVERLAY
+        private Diagnostics.PerfOverlay _perf;
+        private double _perfElapsedMs;
+        private long _perfFrames;
+        private bool _perfF3;
+#endif
         private ITextRenderer _text;
         private Texture2D _pixel;
         private UiPainter _painter;
         private GameContent _content;
         private ScreenContext _ctx;
+        private AudioDirector _audio;
+        private readonly List<IDisposable> _audioPlayers = new List<IDisposable>();
         private KeyboardState _previousKeys;
         private MouseState _previousMouse;
         private bool _previousBack;
@@ -149,20 +159,45 @@ namespace BeastCraft.Game
             }
 
             session.Autosave(AutosaveReason.Background);
-            DateTime? full = session.IdleCapUtc();
-            if (_host.IdleNotifier != null && session.Settings.IdleNotifications && full.HasValue && full.Value > DateTime.UtcNow)
+            if (_host.Notifier == null)
             {
-                _host.IdleNotifier.Schedule(full.Value);
+                return;
+            }
+
+            DateTime? full = session.IdleCapUtc();
+            if (session.Settings.IdleNotifications && full.HasValue && full.Value > DateTime.UtcNow)
+            {
+                _host.Notifier.Schedule(LocalNotification.IdleFull, full.Value, NotificationText(LocalNotification.IdleFull));
+            }
+
+            DateTime? grove = session.GroveReadyUtc();
+            if (session.Settings.GroveNotifications && grove.HasValue && grove.Value > DateTime.UtcNow)
+            {
+                _host.Notifier.Schedule(LocalNotification.GroveReady, grove.Value, NotificationText(LocalNotification.GroveReady));
             }
         }
 
+        /// <summary>A local notification's words from the text table (<c>ui.notify.*</c>; the Grove's reuse its ready toast).</summary>
+        private LocalNotificationText NotificationText(LocalNotification kind)
+        {
+            bool grove = kind == LocalNotification.GroveReady;
+            return new LocalNotificationText
+            {
+                Title = _ctx.Loc("ui.title.name"),
+                Body = _ctx.Loc(grove ? "ui.grove.ready_toast" : "ui.notify.idle_body"),
+                Channel = _ctx.Loc(grove ? "ui.notify.grove_channel" : "ui.notify.idle_channel"),
+                ChannelDescription = _ctx.Loc(grove ? "ui.notify.grove_channel_desc" : "ui.notify.idle_channel_desc")
+            };
+        }
+
         /// <summary>
-        /// The app is back in front: cancel the idle notification, and claim the idle rewards once
+        /// The app is back in front: cancel the local notifications (idle and Grove), and claim the idle rewards once
         /// the map is showing (<see cref="GameSession.ResumeClaimPending"/>).
         /// </summary>
         public void OnResumed()
         {
-            _host.IdleNotifier?.Cancel();
+            _host.Notifier?.Cancel(LocalNotification.IdleFull);
+            _host.Notifier?.Cancel(LocalNotification.GroveReady);
             if (_ctx?.Session?.Save != null && string.IsNullOrEmpty(_options.WalkthroughDir) && !_options.Screenshot)
             {
                 _ctx.Session.ResumeClaimPending = true;
@@ -173,19 +208,24 @@ namespace BeastCraft.Game
         public SettingsViewModel NewSettingsModel()
         {
             GameSession session = _ctx.Session;
-            SettingsViewModel model = new SettingsViewModel(session.Settings, session.SaveSettings, _host.IdleNotifier != null);
-            model.IdleNotificationsChanged += on =>
-            {
-                if (on)
-                {
-                    _host.IdleNotifier?.RequestPermission();
-                }
-                else
-                {
-                    _host.IdleNotifier?.Cancel();
-                }
-            };
+            SettingsViewModel model = new SettingsViewModel(session.Settings, session.Content.Text, session.SaveSettings, _host.Notifier != null, _host.Haptics != null);
+            model.IdleNotificationsChanged += on => NotificationSettingChanged(LocalNotification.IdleFull, on);
+            model.GroveNotificationsChanged += on => NotificationSettingChanged(LocalNotification.GroveReady, on);
+            model.ConsentChanged += () => session.Telemetry.Apply();
             return model;
+        }
+
+        /// <summary>A notification setting turned on (ask for the permission) or off (cancel it).</summary>
+        private void NotificationSettingChanged(LocalNotification kind, bool on)
+        {
+            if (on)
+            {
+                _host.Notifier?.RequestPermission();
+            }
+            else
+            {
+                _host.Notifier?.Cancel(kind);
+            }
         }
 
         /// <summary>Stops with <paramref name="message"/> (a screenshot or scripted run exits; a window shows it).</summary>
@@ -239,6 +279,23 @@ namespace BeastCraft.Game
                 Stack = _stack,
                 Toast = _toast
             };
+            _audio = CreateAudio(scripted);
+            _ctx.Audio = _audio;
+#if DEBUG || PERF_OVERLAY
+            // The frame-time overlay (#64): off unless asked for, so scripted screenshots stay as they are.
+            _perf = new Diagnostics.PerfOverlay { Visible = _options.PerfOverlay };
+            if (_options.PerfSeconds.HasValue)
+            {
+                // A measurement run keeps full speed when its window is not focused (MonoGame sleeps 20 ms a frame then).
+                InactiveSleepTime = TimeSpan.Zero;
+            }
+#else
+            if (_options.PerfOverlay || _options.PerfSeconds.HasValue)
+            {
+                Console.WriteLine("The frame-time overlay is not in this build (build Debug, or Release with -p:PerfOverlay=true).");
+            }
+#endif
+            _stack.TopChanged += top => _audio.ScreenChanged(top?.Name, RegionOf(top));
 
             if (_options.IsDemo)
             {
@@ -247,6 +304,7 @@ namespace BeastCraft.Game
             }
 
             _ctx.Session = new GameSession(_content, Storage(scripted), SeedSource(scripted), new SystemGameClock(_host.MonotonicClock));
+            _ctx.Session.Telemetry.Use(_host.Analytics, _host.CrashReporter);
             if (_options.StarterLevel.HasValue)
             {
                 _ctx.Session.StarterLevel = _options.StarterLevel.Value;
@@ -268,6 +326,11 @@ namespace BeastCraft.Game
 
         protected override void UnloadContent()
         {
+            foreach (IDisposable player in _audioPlayers)
+            {
+                player.Dispose();
+            }
+
             _painter?.Dispose();
             _atlas?.Dispose();
             _text?.Dispose();
@@ -277,10 +340,16 @@ namespace BeastCraft.Game
 
         protected override void Update(GameTime gameTime)
         {
+#if DEBUG || PERF_OVERLAY
+            _perf?.OnUpdate();
+#endif
             lock (_saveGate)
             {
                 UpdateFrame(gameTime);
             }
+#if DEBUG || PERF_OVERLAY
+            PerfTick(gameTime);
+#endif
         }
 
         private void UpdateFrame(GameTime gameTime)
@@ -292,6 +361,7 @@ namespace BeastCraft.Game
             }
 
             float elapsed = (float)gameTime.ElapsedGameTime.TotalMilliseconds;
+            _audio?.Update(elapsed);
             if (_script.Count > 0 || _exitAfterScript)
             {
                 // Scripted: one step a frame, each drawn (and captured) before the next.
@@ -332,6 +402,34 @@ namespace BeastCraft.Game
             base.Update(gameTime);
         }
 
+#if DEBUG || PERF_OVERLAY
+        /// <summary>F3 toggles the frame-time overlay; with --perf-seconds, the summary is printed and the app exits once the time is up.</summary>
+        private void PerfTick(GameTime gameTime)
+        {
+            if (_perf == null)
+            {
+                return;
+            }
+
+            KeyboardState keys = Keyboard.GetState();
+            if (keys.IsKeyDown(Keys.F3) && !_perfF3)
+            {
+                _perf.Visible = !_perf.Visible;
+            }
+
+            _perfF3 = keys.IsKeyDown(Keys.F3);
+            _perfElapsedMs += gameTime.ElapsedGameTime.TotalMilliseconds;
+            if (_options.PerfSeconds.HasValue && _perfElapsedMs >= _options.PerfSeconds.Value * 1000.0)
+            {
+                _perf.TextureBytes = _atlas?.TextureBytes ?? 0;
+                Console.WriteLine(_perf.Summary());
+                _options.PerfSeconds = null;
+                Exit();
+            }
+        }
+
+#endif
+
         protected override void Draw(GameTime gameTime)
         {
             lock (_saveGate)
@@ -359,6 +457,17 @@ namespace BeastCraft.Game
             PresentationParameters back = GraphicsDevice.PresentationParameters;
             RenderScene(back.BackBufferWidth, back.BackBufferHeight, _host.SafeArea != null ? _host.SafeArea() : _options.SafeInsets);
             base.Draw(gameTime);
+#if DEBUG || PERF_OVERLAY
+            if (_perf != null)
+            {
+                if (_perfFrames++ % 60 == 0)
+                {
+                    _perf.TextureBytes = _atlas?.TextureBytes ?? 0;
+                }
+
+                _perf.OnDrawEnd(GraphicsDevice.Metrics);
+            }
+#endif
         }
 
         /// <summary>The back button: the stack's rule; at the root it quits.</summary>
@@ -415,6 +524,9 @@ namespace BeastCraft.Game
                 _painter.Fill(new Rect(0, 0, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight), _painter.C("cream", veil * 0.85f));
             }
 
+#if DEBUG || PERF_OVERLAY
+            _perf?.Draw(_draw, _text, _pixel);
+#endif
             _draw.Flush();
         }
 
@@ -571,7 +683,7 @@ namespace BeastCraft.Game
                     else if (touch.State == TouchLocationState.Released && _touchId == touch.Id)
                     {
                         _touchId = -1;
-                        ui.OnPointerUp(at);
+                        _audio?.Clicked(ui.OnPointerUp(at));
                     }
                 }
 
@@ -595,7 +707,7 @@ namespace BeastCraft.Game
             }
             else if (_pointerDown)
             {
-                ui.OnPointerUp(point);
+                _audio?.Clicked(ui.OnPointerUp(point));
             }
 
             _pointerDown = down;
@@ -655,6 +767,50 @@ namespace BeastCraft.Game
             }
 
             return () => Environment.TickCount;
+        }
+
+        /// <summary>
+        /// The sound: MonoGame's effects and music players over the content's cues, and the host's haptics
+        /// (none on desktop). Scripted runs (screenshots, the walkthrough) are silent and still, so they
+        /// stay deterministic and need no audio device; a device that cannot play falls back to silence.
+        /// </summary>
+        private AudioDirector CreateAudio(bool scripted)
+        {
+            Func<PlayerSettings> settings = () => _ctx?.Session?.Settings;
+            if (scripted)
+            {
+                return new AudioDirector(_content.AudioCues, null, null, null, settings);
+            }
+
+            IAudio effects = null;
+            IMusicPlayer music = null;
+            try
+            {
+                MonoGameAudio sfx = new MonoGameAudio(_content.AudioCues, _content.Source);
+                _audioPlayers.Add(sfx);
+                effects = sfx;
+                MonoGameMusicPlayer player = new MonoGameMusicPlayer(_content.AudioCues, _content.Source);
+                _audioPlayers.Add(player);
+                music = player;
+            }
+            catch (Exception e)
+            {
+                Console.Error.WriteLine("[Audio] No sound on this device: " + e.Message);
+            }
+
+            return new AudioDirector(_content.AudioCues, effects, music, _host.Haptics, settings);
+        }
+
+        /// <summary>The region whose music a screen plays: a battle's own, else the expedition's (or the last region played).</summary>
+        private string RegionOf(IScreen screen)
+        {
+            if (screen is BattleScreen battle)
+            {
+                return battle.RegionId;
+            }
+
+            CampaignProgress campaign = _ctx?.Session?.Save?.Campaign;
+            return campaign == null ? null : campaign.HasActiveRun ? campaign.ActiveRun.RegionId : campaign.CurrentRegionId;
         }
 
         /// <summary>The battle demo: the command line's battle as the only screen (Back quits), with the saved effects settings (the defaults in a screenshot).</summary>
@@ -944,6 +1100,13 @@ namespace BeastCraft.Game
                 case "starter-pick":
                     steps.Add(() => Title().StartNewGame());
                     break;
+                case "save-slots":
+                    steps.Add(() =>
+                    {
+                        StartScriptedGame();
+                        _stack.Push(new SaveSlotsScreen(_ctx));
+                    });
+                    break;
                 case "hearthglen":
                     steps.Add(() =>
                     {
@@ -955,7 +1118,7 @@ namespace BeastCraft.Game
                 default:
                     steps.Add(() =>
                     {
-                        if (_ctx.Session.HasSave && capture == null)
+                        if (_ctx.Session.AnySave && capture == null)
                         {
                             Title().EnterGame(true);
                         }
@@ -1009,6 +1172,55 @@ namespace BeastCraft.Game
                 {
                     SetupShop();
                     Top<ShopScreen>().SelectTab(ShopTab.Sell);
+                });
+            }
+
+            // Verification aids for #46, not player-facing screens: the Glade's habitat canvas with placed decor, the
+            // wardrobe's colour picker, and the Inventory with a new (unseen) piece of gear.
+            if (screen == "grove-canvas")
+            {
+                steps.Add(() =>
+                {
+                    GameSession session = _ctx.Session;
+                    session.Save.Grove.HabitatsUnlocked.Add("mossy_glade");
+                    GladeViewModel glade = new GladeViewModel(session);
+                    glade.SelectHabitat("mossy_glade");
+                    string[] pieces = { "firefly_lantern", "ember_brazier", "wind_chimes" };
+                    for (int i = 0; i < pieces.Length; i++)
+                    {
+                        session.Save.Grove.UnlockedDecorIds.Add(pieces[i]);
+                        glade.PlaceDecor(pieces[i]);
+                        glade.MoveDecor(pieces[i], 0.15f + 0.35f * i, 0.2f + 0.3f * i);
+                    }
+
+                    Home().SelectTab(HomeTab.Grove);
+                    Top<GroveScreen>().SelectTab(GroveTab.Glade);
+                    Top<GroveScreen>().ScrollGlade(1f);
+                });
+            }
+
+            if (screen == "colour-picker")
+            {
+                steps.Add(() =>
+                {
+                    Home().SelectTab(HomeTab.Avatar);
+                    Top<AvatarScreen>().SelectTab(AvatarTab.Wardrobe);
+                    Top<AvatarScreen>().OpenColourPicker(0);
+                });
+            }
+
+            if (screen == "inventory-new")
+            {
+                steps.Add(() =>
+                {
+                    GameSession session = _ctx.Session;
+                    foreach (BeastCraft.Battle.GearSO candidate in session.Content.Economy.Gear.BeastGearAssets)
+                    {
+                        session.Save.Gear.AddBeastGear(candidate.GearId);
+                        break;
+                    }
+
+                    Home().SelectTab(HomeTab.Inventory);
                 });
             }
 
@@ -1152,6 +1364,41 @@ namespace BeastCraft.Game
             if (screen == "region-progress")
             {
                 steps.Add(() => Home().OpenRegionProgress());
+            }
+
+            // Verification aids for #60, not player-facing screens: r11 on Hard, on the map (the header badge and the
+            // Normal or Hard chip) and in the encounter preview (the badge), every earlier boss down.
+            if (screen == "map-hard" || screen == "encounter-hard")
+            {
+                steps.Add(() =>
+                {
+                    PlayerSave save = _ctx.Session.Save;
+                    save.Tutorial.HearthglenCleared = true;
+                    foreach (RegionData region in _ctx.Content.Campaign.Regions)
+                    {
+                        if (!region.IsPostGame && !region.IsTutorial)
+                        {
+                            save.Campaign.Unlock(region.RegionId);
+                            save.Campaign.FindRegion(region.RegionId).BossCleared = true;
+                        }
+                    }
+
+                    save.Campaign.Unlock("r11");
+                    CampaignRules.Retreat(save);
+                    CampaignRules.StartRun(save, _ctx.Content.Campaign, "r11", 0, 7, RunDifficulty.Hard);
+                    Home().Enter();
+                });
+            }
+
+            // A verification aid for #62: the one-time consent screen over the map (scripted runs never offer it by themselves).
+            if (screen == "consent")
+            {
+                steps.Add(() => _stack.PushModal(new ConsentModal(_ctx, new ConsentViewModel(_ctx.Session), null)));
+            }
+
+            if (screen == "encounter-hard")
+            {
+                steps.Add(() => Home().OpenFirstEncounter());
             }
 
             if (screen == "encounter" || screen == "encounter-insight" || screen == "battle" || screen == "results" || screen == "battle-log" || screen == "results-log")

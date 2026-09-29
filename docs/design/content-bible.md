@@ -290,3 +290,63 @@ no draft marker goes in a `DisplayName` or `Description` (the encounter validato
 
 Items, consumables, materials and looks have their own appendix: [content-items.md](content-items.md)
 (gear prefixes, boss-look signature words per region, milestone titles).
+
+## Text keys and en.json (#50)
+
+Every player-facing text field in `content/data/` holds a **stable key**, not the English itself:
+`"DisplayName": "creature.phoenix.name"`. The English lives in one place,
+`content/data/Localization/en.json` (`"creature.phoenix.name": "Phoenix"`), and the game resolves the
+keys as it loads the content, so every screen shows the same text it always did. English is the only
+locale; which languages come next is decided after launch (docs/design/decisions.md). A later locale is
+a `<locale>.json` beside `en.json` with the same keys.
+
+**Which fields are player-facing.** A field is keyed when the player reads its text: names
+(`DisplayName`, `Name`, `TitleText`, `Term`, the map location names), descriptions and definitions,
+dialogue, lore, story and hint text and titles, bond and intro lines, herbarium entries, codex
+categories, and the glossary's matching word forms (a translation needs its own). Everything else stays
+a literal: ids and references (`...Id`, `Look`, `Conditions`), art and asset keys (`ArtKey`, `Sheet`,
+`Icon`), enum names (`Kind`, `Stance`, `Element`, `Type`), colours and style keys, designer-only labels
+no screen shows (an encounter shape variant's `Label`, an enemy's `Role`) and every `_readme`. The list
+of files, arrays and fields is `src/BeastCraft.Core/Localization/ContentTextRules.cs`.
+
+**Keys** are built from ids the data already has: `<kind>.<id>.<field>`, for example
+`creature.phoenix.name`, `skill.ember_shot.desc`, `enemy.giant.skill.crush.name`, `hint.h_preview.text`.
+Field short names: `DisplayName` and `Name` are `name`, `Description` is `desc`, `TitleText` is `title`,
+`BondText` is `bond`, `HerbariumEntry` is `herbarium`, anything else in snake case. A list of strings adds
+the index: `location.r01.wilds.3`, which is `location.` plus the map node's `LabelKey` (`r01/wilds/3`)
+with dots, and `glossary.stun.forms.0`. A Hearthglen fixed location has no id, so it is keyed by its
+place in the list (`region.r00.node.4`). Keys never change once shipped, like ids.
+
+**Writing and editing text.**
+- To change existing text, edit `en.json`.
+- To add content, write the English straight into the data file as always, then run
+  `dotnet run --project Tooling/ContentKeys`. The tool moves each new literal into `en.json`, puts its
+  key in the data file (editing only that value, so the file's layout is untouched) and leaves fields
+  that already hold their key alone. `-- --check` reports without writing.
+- The EditMode tests fail on a raw literal in a player-facing field, a key `en.json` lacks, an `en.json`
+  key nothing uses, a text-looking field no rule covers, and (once there are other locales) a locale
+  missing an English key.
+
+**Screens.** The screens' own text (button labels, messages, the view-models' lines, the skill card's
+generated rules, the battle log) is keyed `ui.<screen>.<name>` in the same table and looked up through
+`GameContent.Text` (a screen's `Loc`, a view-model's `Text`, `StringTable.Format` for values). Values use
+numbered placeholders, `{0}`, `{1}`, in any order a translation needs (`"ui.beast.slot": "Slot {0}"`); a
+count that changes the wording gets one key per form (`ui.grove.gifts_collected_one`,
+`ui.grove.gifts_collected`). Words shared across screens live under `ui.common.*` (Close, Cancel, `Lv {0}`,
+the list separator). The EditMode tests fail on a `ui.*` key `en.json` lacks, on a malformed pattern (a
+skipped placeholder number, a stray brace, an em dash), and on a literal that reads as words passed to a
+screen's drawing, toast, button, label or message in the screens, view-models or skill card.
+
+Core's rules hand the player some text of their own: refusals a toast shows (the garden, grove, board,
+folk, discovery, Kinship, starter-pick and soothe rules) and a location's generic name when the name
+table has none. Those are `ui.rules.*` keys, read through `RulesText`, whose table is set when the
+content loads (the rules are static and take no content).
+
+What is still English in code, on purpose: logs, exceptions, validator messages and the debug viewer's
+command line; guard refusals only a code or content error can reach (they name raw ids, "No save or
+Garden content."); the save loader's technical diagnostics (schema numbers, "not valid UTF-8"), which the
+keyed "save not loaded" messages quote; enum names shown as-is (elements, stances, a passive's trigger);
+the element badges' two-letter codes (placeholders until the icons land); the desktop window title.
+
+**Missing keys.** A key the table lacks is logged once and shows as `[missing: key]` in a Debug build,
+so it stands out on screen; a Release build shows the key itself.

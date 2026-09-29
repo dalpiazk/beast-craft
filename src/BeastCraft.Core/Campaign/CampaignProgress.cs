@@ -55,6 +55,13 @@ namespace BeastCraft.Campaign
         /// </summary>
         public int LocationsSoothed;
 
+        /// <summary>
+        /// The difficulty the player last chose for a post-game region (the map header's Normal or Hard choice): the next
+        /// expedition there starts on it, across restarts. Normal by default; ignored outside a post-game region (Hard is
+        /// still refused there). Added in schema 12 (folded into that step before it shipped).
+        /// </summary>
+        public RunDifficulty PreferredDifficulty = RunDifficulty.Normal;
+
         /// <summary>Whether an expedition is in progress.</summary>
         public bool HasActiveRun
         {
@@ -174,6 +181,13 @@ namespace BeastCraft.Campaign
                 LocationsSoothed = 0;
                 repaired++;
             }
+
+            if (!Enum.IsDefined(typeof(RunDifficulty), PreferredDifficulty))
+            {
+                PreferredDifficulty = RunDifficulty.Normal;
+                repaired++;
+            }
+
             foreach (RegionProgress region in Regions)
             {
                 repaired += region.EnsureInitialized();

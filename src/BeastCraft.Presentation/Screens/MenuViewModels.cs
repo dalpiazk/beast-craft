@@ -1,12 +1,15 @@
 using System;
 using System.Collections.Generic;
+using BeastCraft.Localization;
+using BeastCraft.Presentation.Audio;
 using BeastCraft.Save;
 
 namespace BeastCraft.Presentation.Screens
 {
     /// <summary>
-    /// The title screen: Continue (only when a save exists), New Game (asking first when it would
-    /// replace a save) and Settings; Back asks before quitting.
+    /// The title screen: Continue (only when a save exists: the most recently played slot), Save
+    /// slots (the slot list, when any slot holds a save), New Game (in the first empty slot; when all
+    /// three hold a game the slot list asks which to replace) and Settings; Back asks before quitting.
     /// </summary>
     public sealed class TitleViewModel
     {
@@ -19,18 +22,38 @@ namespace BeastCraft.Presentation.Screens
 
         public bool CanContinue
         {
-            get { return _session.HasSave; }
+            get { return _session.AnySave; }
         }
 
-        /// <summary>Whether New Game should ask first (it would replace the save in the slot).</summary>
+        /// <summary>Whether the slot list is offered (some slot holds a save).</summary>
+        public bool CanManageSlots
+        {
+            get { return _session.AnySave; }
+        }
+
+        /// <summary>Whether New Game must replace a save (every slot holds one): the slot list asks which.</summary>
         public bool NewGameNeedsConfirm
         {
-            get { return _session.HasSave; }
+            get { return _session.FirstEmptySlot() == null; }
         }
 
+        /// <summary>Continues the most recently played slot.</summary>
         public LoadOutcome Continue()
         {
+            string slot = _session.MostRecentSlot();
+            if (slot != null)
+            {
+                _session.UseSlot(slot);
+            }
+
             return _session.Continue();
+        }
+
+        /// <summary>Moves to the first empty slot for a new game. False when every slot holds a save (the current slot stays).</summary>
+        public bool PrepareNewGame()
+        {
+            string slot = _session.FirstEmptySlot();
+            return slot != null && _session.UseSlot(slot);
         }
 
         /// <summary>A new game in Hearthglen with <paramref name="firstSpeciesId"/> as the New Game pick.</summary>
@@ -71,16 +94,20 @@ namespace BeastCraft.Presentation.Screens
     /// </summary>
     public sealed class HomeViewModel
     {
+        /// <summary>The tabs' ids, in <see cref="HomeTab"/> order (also the <c>--screen</c> names); their labels are <see cref="TabKeys"/>.</summary>
         public static readonly string[] TabNames = { "Map", "Roster", "Grove", "Avatar", "Inventory" };
 
-        /// <summary>What each coming-soon tab will hold (shown on its placeholder page). Grove's is unused — see the class remarks.</summary>
-        public static readonly string[] ComingSoonText =
+        /// <summary>The tabs' labels as text keys (<c>ui.home.tab_*</c>), in <see cref="HomeTab"/> order.</summary>
+        public static readonly string[] TabKeys = { "ui.home.tab_map", "ui.home.tab_roster", "ui.home.tab_grove", "ui.home.tab_avatar", "ui.home.tab_inventory" };
+
+        /// <summary>What each coming-soon tab will hold (shown on its placeholder page), as text keys. Grove's is unused — see the class remarks.</summary>
+        public static readonly string[] ComingSoonKeys =
         {
             null,
             null,
-            "Your team base: organise the party and claim idle rewards; your beasts' habitat, a garden and expeditions.",
+            "ui.home.coming_soon_grove",
             null,
-            "Materials, consumables and spare gear."
+            "ui.home.coming_soon_inventory"
         };
 
         public HomeTab Tab { get; private set; } = HomeTab.Map;
@@ -91,14 +118,16 @@ namespace BeastCraft.Presentation.Screens
             get { return Tab == HomeTab.Map || Tab == HomeTab.Roster || Tab == HomeTab.Grove || Tab == HomeTab.Avatar; }
         }
 
-        public string TabName
+        /// <summary>The current tab's label key (<see cref="TabKeys"/>).</summary>
+        public string TabNameKey
         {
-            get { return TabNames[(int)Tab]; }
+            get { return TabKeys[(int)Tab]; }
         }
 
-        public string ComingSoon
+        /// <summary>The current tab's placeholder text key (<see cref="ComingSoonKeys"/>; null for none).</summary>
+        public string ComingSoonKey
         {
-            get { return ComingSoonText[(int)Tab]; }
+            get { return ComingSoonKeys[(int)Tab]; }
         }
 
         public void Select(HomeTab tab)
@@ -125,6 +154,9 @@ namespace BeastCraft.Presentation.Screens
     /// <summary>One row of the settings modal.</summary>
     public sealed class SettingRow
     {
+        /// <summary>Which setting (the <see cref="SettingsViewModel"/> row constants); <see cref="SettingsViewModel.Change"/> takes it.</summary>
+        public int Id;
+
         public string Label;
         public string Value;
 
@@ -133,8 +165,9 @@ namespace BeastCraft.Presentation.Screens
     }
 
     /// <summary>
-    /// The settings modal (the battle's effects settings, plus the team-suggestion toggle): each
-    /// row cycles or toggles its setting, which is saved at once.
+    /// The settings modal (the battle's effects settings, the team-suggestion toggle, sound and
+    /// haptics): each row cycles or toggles its setting, which is saved at once. The rows that need
+    /// the host (the idle and Grove alerts, haptics) show only where it has them.
     /// </summary>
     public sealed class SettingsViewModel
     {
@@ -146,46 +179,102 @@ namespace BeastCraft.Presentation.Screens
         public const int AutoAdvance = 5;
         public const int TutorialHints = 6;
         public const int IdleNotifications = 7;
-        public const int RowCount = 8;
+        public const int MasterVolume = 8;
+        public const int MusicVolume = 9;
+        public const int SfxVolume = 10;
+        public const int Mute = 11;
+        public const int Haptics = 12;
+        public const int GroveNotifications = 13;
+        public const int Analytics = 14;
+        public const int CrashReports = 15;
+        public const int RowCount = 16;
+
+        /// <summary>A volume row's step: each tap takes it down a quarter, and from 0 back to 100.</summary>
+        public const int VolumeStep = 25;
 
         private readonly PlayerSettings _settings;
         private readonly Func<bool> _save;
+        private readonly StringTable _text;
 
+        /// <param name="settings">The settings the rows change.</param>
+        /// <param name="text">The text table the labels come from (<c>ui.settings.*</c>; <c>GameContent.Text</c>).</param>
+        /// <param name="save">Saves the settings after each change.</param>
         /// <param name="notificationsAvailable">Whether the host can post notifications (Android): otherwise that row is hidden.</param>
-        public SettingsViewModel(PlayerSettings settings, Func<bool> save, bool notificationsAvailable = false)
+        /// <param name="hapticsAvailable">Whether the host can vibrate (Android): otherwise that row is hidden.</param>
+        public SettingsViewModel(PlayerSettings settings, StringTable text, Func<bool> save, bool notificationsAvailable = false, bool hapticsAvailable = false)
         {
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+            _text = text ?? throw new ArgumentNullException(nameof(text));
             _save = save;
             NotificationsAvailable = notificationsAvailable;
+            HapticsAvailable = hapticsAvailable;
         }
 
         public int Saves { get; private set; }
 
         public bool NotificationsAvailable { get; }
 
+        public bool HapticsAvailable { get; }
+
         /// <summary>Raised after the idle-notification setting changes (the host asks for the permission, or cancels).</summary>
         public event Action<bool> IdleNotificationsChanged;
 
-        /// <summary>The rows, by the row constants (the notification row only where the host has notifications).</summary>
+        /// <summary>Raised after the Grove-notification setting changes (the host asks for the permission, or cancels).</summary>
+        public event Action<bool> GroveNotificationsChanged;
+
+        /// <summary>Raised after a consent setting (analytics, crash reports) changes: the session's telemetry starts or stops to match.</summary>
+        public event Action ConsentChanged;
+
+        /// <summary>The rows in display order (the alert rows and the haptics row only where the host has them); <see cref="Row"/> finds one by id.</summary>
         public List<SettingRow> Rows()
         {
-            string intensity = _settings.EffectsIntensity == EffectsIntensity.Minimal ? "Minimal" : _settings.EffectsIntensity == EffectsIntensity.Reduced ? "Reduced" : "Full";
+            string intensity = _text.Get(_settings.EffectsIntensity == EffectsIntensity.Minimal ? "ui.settings.effects_minimal" : _settings.EffectsIntensity == EffectsIntensity.Reduced ? "ui.settings.effects_reduced" : "ui.settings.effects_full");
             List<SettingRow> rows = new List<SettingRow>
             {
-                new SettingRow { Label = "Effects", Value = intensity, On = true },
-                new SettingRow { Label = "Screen shake", Value = _settings.ScreenShake ? "On" : "Off", On = _settings.ScreenShake },
-                new SettingRow { Label = "Flashes", Value = _settings.Flashes ? "On" : "Off", On = _settings.Flashes },
-                new SettingRow { Label = "Team suggestions", Value = _settings.TeamSuggestionsEnabled ? "On" : "Off", On = _settings.TeamSuggestionsEnabled },
-                new SettingRow { Label = "Battle speed", Value = "x" + Speed(_settings), On = true },
-                new SettingRow { Label = "Auto next battle", Value = _settings.AutoAdvance ? "On" : "Off", On = _settings.AutoAdvance },
-                new SettingRow { Label = "Tutorial hints", Value = _settings.TutorialHints ? "On" : "Off", On = _settings.TutorialHints }
+                new SettingRow { Id = Effects, Label = _text.Get("ui.settings.effects"), Value = intensity, On = true },
+                new SettingRow { Id = ScreenShake, Label = _text.Get("ui.settings.screen_shake"), Value = OnOff(_settings.ScreenShake), On = _settings.ScreenShake },
+                new SettingRow { Id = Flashes, Label = _text.Get("ui.settings.flashes"), Value = OnOff(_settings.Flashes), On = _settings.Flashes },
+                new SettingRow { Id = TeamSuggestions, Label = _text.Get("ui.settings.team_suggestions"), Value = OnOff(_settings.TeamSuggestionsEnabled), On = _settings.TeamSuggestionsEnabled },
+                new SettingRow { Id = BattleSpeed, Label = _text.Get("ui.settings.battle_speed"), Value = _text.Format("ui.settings.speed_value", Speed(_settings)), On = true },
+                new SettingRow { Id = AutoAdvance, Label = _text.Get("ui.settings.auto_advance"), Value = OnOff(_settings.AutoAdvance), On = _settings.AutoAdvance },
+                new SettingRow { Id = TutorialHints, Label = _text.Get("ui.settings.tutorial_hints"), Value = OnOff(_settings.TutorialHints), On = _settings.TutorialHints }
             };
             if (NotificationsAvailable)
             {
-                rows.Add(new SettingRow { Label = "Idle full alert", Value = _settings.IdleNotifications ? "On" : "Off", On = _settings.IdleNotifications });
+                rows.Add(new SettingRow { Id = IdleNotifications, Label = _text.Get("ui.settings.idle_alert"), Value = OnOff(_settings.IdleNotifications), On = _settings.IdleNotifications });
+                rows.Add(new SettingRow { Id = GroveNotifications, Label = _text.Get("ui.settings.grove_alert"), Value = OnOff(_settings.GroveNotifications), On = _settings.GroveNotifications });
             }
 
+            rows.Add(VolumeRow(MasterVolume, "ui.settings.master_volume", _settings.MasterVolume));
+            rows.Add(VolumeRow(MusicVolume, "ui.settings.music_volume", _settings.MusicVolume));
+            rows.Add(VolumeRow(SfxVolume, "ui.settings.sfx_volume", _settings.SfxVolume));
+            rows.Add(new SettingRow { Id = Mute, Label = _text.Get("ui.settings.mute"), Value = OnOff(_settings.Muted), On = !_settings.Muted });
+            if (HapticsAvailable)
+            {
+                rows.Add(new SettingRow { Id = Haptics, Label = _text.Get("ui.settings.haptics"), Value = OnOff(_settings.Haptics), On = _settings.Haptics });
+            }
+
+            rows.Add(new SettingRow { Id = Analytics, Label = _text.Get("ui.settings.analytics"), Value = OnOff(_settings.AnalyticsConsent), On = _settings.AnalyticsConsent });
+            rows.Add(new SettingRow { Id = CrashReports, Label = _text.Get("ui.settings.crash_reports"), Value = OnOff(_settings.CrashReportConsent), On = _settings.CrashReportConsent });
+
             return rows;
+        }
+
+        /// <summary>The row for setting <paramref name="id"/>, or null when it is not shown here.</summary>
+        public SettingRow Row(int id)
+        {
+            return Rows().Find(row => row.Id == id);
+        }
+
+        private SettingRow VolumeRow(int id, string labelKey, int volume)
+        {
+            int percent = (int)Math.Round(MusicMix.Percent(volume) * 100f);
+            return new SettingRow { Id = id, Label = _text.Get(labelKey), Value = _text.Format("ui.settings.volume_value", percent), On = percent > 0 && !_settings.Muted };
+        }
+
+        private string OnOff(bool on)
+        {
+            return _text.Get(on ? "ui.settings.on" : "ui.settings.off");
         }
 
         /// <summary>The battle speed a setting holds, 1-3 (anything else reads as 1).</summary>
@@ -195,7 +284,18 @@ namespace BeastCraft.Presentation.Screens
             return speed >= 1 && speed <= 3 ? speed : 1;
         }
 
-        /// <summary>Changes row <paramref name="row"/>'s setting (effects cycle Full, Reduced, Minimal; speed x1, x2, x3; the rest toggle) and saves.</summary>
+        /// <summary>The next volume down in <see cref="VolumeStep"/>s, wrapping from 0 to 100 (an off-step value rounds down first).</summary>
+        public static int NextVolume(int volume)
+        {
+            int clamped = Math.Max(0, Math.Min(100, volume));
+            return clamped == 0 ? 100 : (clamped - 1) / VolumeStep * VolumeStep;
+        }
+
+        /// <summary>
+        /// Changes setting <paramref name="row"/> (a row constant): effects cycle Full, Reduced, Minimal;
+        /// speed x1, x2, x3; a volume steps down a quarter at a time (<see cref="NextVolume"/>); the rest
+        /// toggle. Saves.
+        /// </summary>
         public void Change(int row)
         {
             switch (row)
@@ -231,6 +331,40 @@ namespace BeastCraft.Presentation.Screens
 
                     _settings.IdleNotifications = !_settings.IdleNotifications;
                     break;
+                case GroveNotifications:
+                    if (!NotificationsAvailable)
+                    {
+                        return;
+                    }
+
+                    _settings.GroveNotifications = !_settings.GroveNotifications;
+                    break;
+                case MasterVolume:
+                    _settings.MasterVolume = NextVolume(_settings.MasterVolume);
+                    break;
+                case MusicVolume:
+                    _settings.MusicVolume = NextVolume(_settings.MusicVolume);
+                    break;
+                case SfxVolume:
+                    _settings.SfxVolume = NextVolume(_settings.SfxVolume);
+                    break;
+                case Mute:
+                    _settings.Muted = !_settings.Muted;
+                    break;
+                case Haptics:
+                    if (!HapticsAvailable)
+                    {
+                        return;
+                    }
+
+                    _settings.Haptics = !_settings.Haptics;
+                    break;
+                case Analytics:
+                    _settings.AnalyticsConsent = !_settings.AnalyticsConsent;
+                    break;
+                case CrashReports:
+                    _settings.CrashReportConsent = !_settings.CrashReportConsent;
+                    break;
                 default:
                     return;
             }
@@ -244,6 +378,56 @@ namespace BeastCraft.Presentation.Screens
             {
                 IdleNotificationsChanged?.Invoke(_settings.IdleNotifications);
             }
+
+            if (row == GroveNotifications)
+            {
+                GroveNotificationsChanged?.Invoke(_settings.GroveNotifications);
+            }
+
+            if (row == Analytics || row == CrashReports)
+            {
+                ConsentChanged?.Invoke();
+            }
+        }
+    }
+
+    /// <summary>
+    /// The one-time consent screen (#62): shown once, after the first starter pick and before play, until the
+    /// player answers it. Both choices start off; the player turns on what they agree to and continues, and
+    /// can change either later in the settings. Nothing is set up or sent before that (<see cref="GameSession.Telemetry"/>).
+    /// </summary>
+    public sealed class ConsentViewModel
+    {
+        private readonly GameSession _session;
+
+        public ConsentViewModel(GameSession session)
+        {
+            _session = session ?? throw new ArgumentNullException(nameof(session));
+            Analytics = session.Settings.AnalyticsConsent;
+            CrashReports = session.Settings.CrashReportConsent;
+        }
+
+        /// <summary>Whether the screen still has to be shown (never answered).</summary>
+        public static bool ShouldAsk(PlayerSettings settings)
+        {
+            return settings != null && !settings.ConsentAsked;
+        }
+
+        /// <summary>The analytics choice on the screen (off until the player turns it on).</summary>
+        public bool Analytics { get; set; }
+
+        /// <summary>The crash-report choice on the screen (off until the player turns it on).</summary>
+        public bool CrashReports { get; set; }
+
+        /// <summary>Stores both choices, marks the screen answered, saves the settings and starts only what was agreed to.</summary>
+        public void Confirm()
+        {
+            PlayerSettings settings = _session.Settings;
+            settings.AnalyticsConsent = Analytics;
+            settings.CrashReportConsent = CrashReports;
+            settings.ConsentAsked = true;
+            _session.SaveSettings();
+            _session.Telemetry.Apply();
         }
     }
 }

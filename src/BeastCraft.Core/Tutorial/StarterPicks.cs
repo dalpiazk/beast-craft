@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using BeastCraft.Campaign;
 using BeastCraft.Creatures;
+using BeastCraft.Localization;
 using BeastCraft.Save;
 using BeastCraft.Skills;
 
@@ -117,13 +118,13 @@ namespace BeastCraft.Tutorial
             int count = picked == null ? 0 : picked.Count;
             if (count >= PickCount)
             {
-                reason = "All " + PickCount + " beasts are already picked.";
+                reason = RulesText.Format("ui.rules.pick.all_picked", PickCount);
                 return false;
             }
 
             if (Contains(picked, speciesId))
             {
-                reason = species.DisplayName + " is already in your team.";
+                reason = RulesText.Format("ui.rules.pick.in_team", species.DisplayName);
                 return false;
             }
 
@@ -133,7 +134,7 @@ namespace BeastCraft.Tutorial
                 CombatStance? required = first == null ? null : RequiredStance(count + 1, first.Stance);
                 if (!required.HasValue || species.Stance != required.Value)
                 {
-                    reason = "This pick must be a " + (required.HasValue ? required.Value.ToString() : "?") + " beast.";
+                    reason = RulesText.Format("ui.rules.pick.must_be", required.HasValue ? required.Value.ToString() : "?");
                     return false;
                 }
             }
@@ -233,7 +234,7 @@ namespace BeastCraft.Tutorial
             int step = PendingStep(save, regions);
             if (step == 0)
             {
-                return PickResult.Refused("No beast is waiting to join.");
+                return PickResult.Refused(RulesText.Get("ui.rules.pick.none_waiting"));
             }
 
             List<string> picked = Picked(save);
@@ -333,7 +334,7 @@ namespace BeastCraft.Tutorial
         {
             if (species == null || species.Count != PickCount)
             {
-                error = "Pick " + PickCount + " beasts, one of each stance.";
+                error = RulesText.Format("ui.rules.pick.one_of_each", PickCount);
                 return null;
             }
 

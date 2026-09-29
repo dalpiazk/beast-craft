@@ -19,8 +19,30 @@ namespace BeastCraft.Save
             }
 
             ValidateConsumables(save.Consumables, catalog, issues);
+            ValidatePendingBattle(save.PendingBattleConsumables, catalog, issues);
             ValidateShops(save.Shops, issues);
             ValidateCosmetics(save, catalog, issues);
+        }
+
+        /// <summary>
+        /// The mid-battle crash refund record (schema 11): every entry a consumable id (known, with a catalog). The same id may
+        /// appear more than once (each entry is one unit owed).
+        /// </summary>
+        private static void ValidatePendingBattle(List<string> pending, ISaveEconomyCatalog catalog, List<SaveIssue> issues)
+        {
+            for (int i = 0; i < (pending == null ? 0 : pending.Count); i++)
+            {
+                string id = pending[i];
+                string path = "PendingBattleConsumables[" + i + "]";
+                if (string.IsNullOrEmpty(id))
+                {
+                    issues.Add(new SaveIssue(SaveIssueKind.InvalidValue, path, id, "empty consumable id"));
+                }
+                else if (catalog != null && !catalog.TryGetConsumable(id, out int _))
+                {
+                    issues.Add(new SaveIssue(SaveIssueKind.UnknownConsumable, path, id, "unknown consumable '" + id + "'"));
+                }
+            }
         }
 
         private static void ValidateConsumables(List<ConsumableStack> stacks, ISaveEconomyCatalog catalog, List<SaveIssue> issues)

@@ -29,6 +29,11 @@ namespace BeastCraft.Save
     /// <see cref="PlayerSave.Garden"/>, <see cref="PlayerSave.Expeditions"/>, <see cref="PlayerSave.Npc"/>):
     /// <see cref="AddGrove"/>. The NPC dialogue layer (D2) was folded into this same migration in place,
     /// before schema 10 shipped — see <see cref="AddGrove"/>'s own remarks.</item>
+    /// <item>10 to 11: the consumables spent on a battle in progress (<see cref="PlayerSave.PendingBattleConsumables"/>),
+    /// so a battle the process died in hands them back: <see cref="AddPendingBattle"/>.</item>
+    /// <item>11 to 12: the gear and looks already seen (<see cref="PlayerSave.Seen"/>), for the "new" dots; everything
+    /// owned then counts as seen; and the post-game difficulty preference (<see cref="CampaignProgress.PreferredDifficulty"/>),
+    /// taken from the expedition in progress: <see cref="AddSeen"/>.</item>
     /// </list>
     /// </summary>
     public static class SaveMigrations
@@ -39,7 +44,7 @@ namespace BeastCraft.Save
             return new List<ISaveMigration>
             {
                 new AddGear(), new AddCampaign(), new AddEconomy(), new AddIdle(), new AddRunDifficulty(), new AddTutorial(), new AddDiscovery(), new AddCompendium(),
-                new AddGrove()
+                new AddGrove(), new AddPendingBattle(), new AddSeen()
             };
         }
 
@@ -341,6 +346,53 @@ namespace BeastCraft.Save
                 PlayerSave save = serializer.FromJson<PlayerSave>(json);
                 save.EnsureInitialized();
                 save.SchemaVersion = 10;
+                return serializer.ToJson(save);
+            }
+        }
+
+        /// <summary>
+        /// Schema 10 to 11: a v10 save records no battle in progress. The upgrade reads it into the
+        /// current type (<see cref="PlayerSave.PendingBattleConsumables"/> empty: nothing to hand back,
+        /// since a v10 save never recorded what a battle spent), fills in anything missing and writes it
+        /// back. Nothing else moves.
+        /// </summary>
+        public sealed class AddPendingBattle : ISaveMigration
+        {
+            public int FromVersion
+            {
+                get { return 10; }
+            }
+
+            public string Upgrade(string json, ISaveJsonSerializer serializer)
+            {
+                PlayerSave save = serializer.FromJson<PlayerSave>(json);
+                save.EnsureInitialized();
+                save.SchemaVersion = 11;
+                return serializer.ToJson(save);
+            }
+        }
+
+        /// <summary>
+        /// Schema 11 to 12: a v11 save has no seen list. The upgrade reads it into the current type and
+        /// marks every gear instance and unlocked look it owns as seen (<see cref="SeenRules.MarkAllOwnedSeen"/>),
+        /// so an updated save shows nothing as new; only what is earned after the update gets a dot. It also sets
+        /// <see cref="CampaignProgress.PreferredDifficulty"/> (folded into this step before schema 12 shipped) to the
+        /// difficulty of the expedition in progress, else Normal. Nothing else moves.
+        /// </summary>
+        public sealed class AddSeen : ISaveMigration
+        {
+            public int FromVersion
+            {
+                get { return 11; }
+            }
+
+            public string Upgrade(string json, ISaveJsonSerializer serializer)
+            {
+                PlayerSave save = serializer.FromJson<PlayerSave>(json);
+                save.EnsureInitialized();
+                SeenRules.MarkAllOwnedSeen(save);
+                save.Campaign.PreferredDifficulty = save.Campaign.HasActiveRun ? save.Campaign.ActiveRun.Difficulty : RunDifficulty.Normal;
+                save.SchemaVersion = 12;
                 return serializer.ToJson(save);
             }
         }

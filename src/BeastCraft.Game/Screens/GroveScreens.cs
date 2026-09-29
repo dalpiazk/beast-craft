@@ -26,6 +26,13 @@ namespace BeastCraft.Game.Screens
         private static readonly float ContentTop = TabStrip.ContentTop(HeaderMetrics.Standard, 20f);
         private const float ChipHeight = 78f;
 
+        /// <summary>The Glade's habitat canvas height, and a decor piece's size on it.</summary>
+        private const float HabitatCanvasHeight = 560f;
+
+        private const float PieceWidth = 240f;
+
+        private const float PieceHeight = 120f;
+
         private readonly GroveHubViewModel _hub;
         private readonly ScreenHeader _header;
         private readonly Tabs _tabs;
@@ -44,7 +51,7 @@ namespace BeastCraft.Game.Screens
             _npc = new CardList(Ui.Add(new ScrollView { Id = "npc-page", Bounds = page, Visible = false }));
 
             _header = new ScreenHeader(Ui, HeaderMetrics.Standard, () => Ctx.Stack.Pop());
-            _tabs = TabStrip.Build(Ui, "grove-tabs", HeaderMetrics.Standard, new[] { "Glade", "Garden", "Board", "Folk" }, new[] { "grove", "lore", "map", "kinship" },
+            _tabs = TabStrip.Build(Ui, "grove-tabs", HeaderMetrics.Standard, new[] { Loc("ui.grove.tab_glade"), Loc("ui.grove.tab_garden"), Loc("ui.grove.tab_board"), Loc("ui.grove.tab_folk") }, new[] { "grove", "lore", "map", "kinship" },
                                    index => SelectTab((GroveTab)index));
             BuildAll();
         }
@@ -134,14 +141,14 @@ namespace BeastCraft.Game.Screens
             _glade.Begin();
             float width = Width;
             float y = 10f;
-            AddLabel(_glade.Scroll, new Rect(Pad, y, width, Heading), "Habitats", Heading, "plum");
+            AddLabel(_glade.Scroll, new Rect(Pad, y, width, Heading), Loc("ui.grove.habitats"), Heading, "plum");
             y += LineH(Heading) + 16f;
 
             float x = Pad;
             float chipSize = Ctx.Style.Button("chip").TextSize;
             foreach (HabitatRow habitat in _hub.Glade.Habitats)
             {
-                string text = habitat.DisplayName + (habitat.Unlocked ? string.Empty : " (locked)");
+                string text = habitat.Unlocked ? habitat.DisplayName : Loc("ui.grove.habitat_locked", habitat.DisplayName);
                 float w = Math.Min(width, Ctx.Text.Measure(text, chipSize) + 60f);
                 if (x + w > Pad + width)
                 {
@@ -165,7 +172,7 @@ namespace BeastCraft.Game.Screens
             HabitatRow selected = _hub.Glade.Habitats.Find(h => h.HabitatId == _hub.Glade.SelectedHabitatId);
             if (selected != null)
             {
-                AddLabel(_glade.Scroll, new Rect(Pad, y, width, Body), "Decor (" + selected.PlacedCount + " / " + selected.SlotCount + ")", Body, "ink");
+                AddLabel(_glade.Scroll, new Rect(Pad, y, width, Body), Loc("ui.grove.decor_count", selected.PlacedCount, selected.SlotCount), Body, "ink");
                 y += LineH(Body) + 12f;
 
                 const int cols = 4;
@@ -178,18 +185,19 @@ namespace BeastCraft.Game.Screens
                     Rect bounds = new Rect(Pad + col * (cell + 16f), y + row * (cell + 16f), cell, cell);
                     string label = slot.DecorId == null ? "+" : slot.DisplayName;
                     Button b = AddButton(_glade.Scroll, "slot-" + i, bounds, label, slot.DecorId == null ? "slot" : "card", () => TapSlot(slot));
-                    b.Caption = slot.DecorId == null ? "empty" : null;
+                    b.Caption = slot.DecorId == null ? Loc("ui.grove.slot_empty") : null;
                 }
 
                 int rows = (_hub.Glade.Slots.Count + cols - 1) / cols;
                 y += rows * (cell + 16f) + 20f;
+                y = BuildHabitatCanvas(y, width);
             }
 
-            AddLabel(_glade.Scroll, new Rect(Pad, y, width, Heading), "Beasts", Heading, "plum");
+            AddLabel(_glade.Scroll, new Rect(Pad, y, width, Heading), Loc("ui.grove.beasts"), Heading, "plum");
             y += LineH(Heading) + 16f;
             if (_hub.Glade.Beasts.Count == 0)
             {
-                AddLabel(_glade.Scroll, new Rect(Pad, y, width, Body), "No beasts yet.", Body, "inkSoft");
+                AddLabel(_glade.Scroll, new Rect(Pad, y, width, Body), Loc("ui.grove.no_beasts"), Body, "inkSoft");
                 y += LineH(Body) + 16f;
             }
 
@@ -199,14 +207,14 @@ namespace BeastCraft.Game.Screens
                 float top = y;
                 y = _glade.Card(y, height, "card", box => DrawBeastCard(box, beast));
                 string bid = beast.BeastId;
-                Button feed = AddButton(_glade.Scroll, "feed-" + bid, new Rect(Pad + width - 460f, top + 24f, 210f, 76f), "Feed", "chip", () =>
+                Button feed = AddButton(_glade.Scroll, "feed-" + bid, new Rect(Pad + width - 460f, top + 24f, 210f, 76f), Loc("ui.grove.feed"), "chip", () =>
                 {
                     GladeActionOutcome o = _hub.Glade.Feed(bid);
                     Ctx.Game.Toast(o.Message);
                     BuildGlade();
                 });
                 feed.Enabled = beast.CanFeed;
-                Button play = AddButton(_glade.Scroll, "play-" + bid, new Rect(Pad + width - 230f, top + 24f, 210f, 76f), "Play", "chip", () =>
+                Button play = AddButton(_glade.Scroll, "play-" + bid, new Rect(Pad + width - 230f, top + 24f, 210f, 76f), Loc("ui.grove.play"), "chip", () =>
                 {
                     GladeActionOutcome o = _hub.Glade.Play(bid);
                     Ctx.Game.Toast(o.Message);
@@ -215,14 +223,14 @@ namespace BeastCraft.Game.Screens
                 play.Enabled = beast.CanPlay;
                 if (beast.PendingGifts > 0)
                 {
-                    Button gift = AddButton(_glade.Scroll, "gift-" + bid, new Rect(Pad + width - 460f, top + 112f, 210f, 76f), "Collect gift (" + beast.PendingGifts + ")",
+                    Button gift = AddButton(_glade.Scroll, "gift-" + bid, new Rect(Pad + width - 460f, top + 112f, 210f, 76f), Loc("ui.grove.collect_gift", beast.PendingGifts),
                                             "primary", () =>
                     {
                         GladeActionOutcome o = _hub.Glade.CollectGift(bid);
                         Ctx.Game.Toast(o.Message);
                         BuildGlade();
                     });
-                    AddButton(_glade.Scroll, "gift-all-" + bid, new Rect(Pad + width - 230f, top + 112f, 210f, 76f), "Collect all", "chip", () =>
+                    AddButton(_glade.Scroll, "gift-all-" + bid, new Rect(Pad + width - 230f, top + 112f, 210f, 76f), Loc("ui.grove.collect_all"), "chip", () =>
                     {
                         GladeActionOutcome o = _hub.Glade.CollectAllGifts(bid);
                         Ctx.Game.Toast(o.Message);
@@ -243,11 +251,66 @@ namespace BeastCraft.Game.Screens
             float labelW = Math.Max(60f, box.Width - 540f);
             Painter.TextIn(beast.Name, new Rect(labelX, box.Y + 20f, labelW, Body + 2f), Body + 2f, Painter.C("ink"), TextAlign.Left);
             Painter.ElementBadge(beast.Element, new Rect(labelX, box.Y + 66f, 40f, 40f));
-            string tierText = beast.Tier <= 0 ? "Not yet bonded" : "Tier " + beast.Tier + (beast.NextTierXp > 0 ? "  (" + beast.Xp + " / " + beast.NextTierXp + " XP)" : "  (max)");
+            string tierText = beast.Tier <= 0 ? Loc("ui.grove.not_bonded") : beast.NextTierXp > 0 ? Loc("ui.grove.tier_xp", beast.Tier, beast.Xp, beast.NextTierXp) : Loc("ui.grove.tier_max", beast.Tier);
             Painter.TextIn(tierText, new Rect(labelX + 56f, box.Y + 72f, labelW - 56f, Small + 2f), Small + 2f, Painter.C("inkSoft"), TextAlign.Left);
             float frac = beast.NextTierXp > 0 ? Math.Min(1f, (float)beast.Xp / beast.NextTierXp) : 1f;
             Painter.Progress(new Rect(labelX, box.Y + 128f, box.Width - (labelX - box.X) - 20f, 28f), frac, -1f, "gold", "gold", "track",
-                             beast.Tier <= 0 ? null : "Tier " + beast.Tier);
+                             beast.Tier <= 0 ? null : Loc("ui.grove.tier", beast.Tier));
+        }
+
+        /// <summary>
+        /// The habitat canvas (a placeholder panel until the habitat art lands): each placed piece at its X/Y, dragged to
+        /// move it (<see cref="GladeViewModel.MoveDecor"/>, 0-1 fractions of the canvas). The slot grid above still places
+        /// and removes. Returns the y below it.
+        /// </summary>
+        /// <summary>Scrolls the Glade page to <paramref name="fraction"/> (0-1) of the way down (scripted screenshots).</summary>
+        public void ScrollGlade(float fraction)
+        {
+            _glade.Scroll.ScrollTo(_glade.Scroll.MaxScroll * Math.Max(0f, Math.Min(1f, fraction)));
+        }
+
+        private float BuildHabitatCanvas(float y, float width)
+        {
+            Rect canvas = new Rect(Pad, y, width, HabitatCanvasHeight);
+            _glade.Add(new Panel { Id = "habitat-canvas", Bounds = canvas, StyleKey = "slot" });
+            foreach (DecorSlotRow slot in _hub.Glade.Slots)
+            {
+                if (slot.DecorId == null)
+                {
+                    continue;
+                }
+
+                DecorSlotRow captured = slot;
+                Draggable piece = _glade.Add(new Draggable
+                {
+                    Id = "decor-" + slot.DecorId,
+                    Bounds = new Rect(canvas.X + slot.X * (canvas.Width - PieceWidth), canvas.Y + slot.Y * (canvas.Height - PieceHeight), PieceWidth, PieceHeight)
+                });
+                _glade.TrackDraw(piece, box => DrawPiece(box, captured, piece.Dragging));
+                piece.Moved += (dragged, delta) =>
+                {
+                    float px = Math.Max(canvas.X, Math.Min(canvas.Right - PieceWidth, dragged.StartBounds.X + delta.X));
+                    float py = Math.Max(canvas.Y, Math.Min(canvas.Bottom - PieceHeight, dragged.StartBounds.Y + delta.Y));
+                    dragged.Bounds = new Rect(px, py, PieceWidth, PieceHeight);
+                };
+                piece.Dropped += dropped =>
+                {
+                    float fx = (dropped.Bounds.X - canvas.X) / Math.Max(1f, canvas.Width - PieceWidth);
+                    float fy = (dropped.Bounds.Y - canvas.Y) / Math.Max(1f, canvas.Height - PieceHeight);
+                    _hub.Glade.MoveDecor(captured.DecorId, fx, fy);
+                    BuildGlade();
+                };
+            }
+
+            y += HabitatCanvasHeight + 12f;
+            AddLabel(_glade.Scroll, new Rect(Pad, y, width, Small + 2f), Loc("ui.grove.drag_hint"), Small + 2f, "inkSoft");
+            return y + LineH(Small + 2f) + 20f;
+        }
+
+        private void DrawPiece(Rect box, DecorSlotRow piece, bool dragging)
+        {
+            Painter.Framed(box, 18f, 4f, Painter.C(dragging ? "gold" : "plum"), Painter.C("cream"));
+            Painter.TextIn(piece.DisplayName, box.Inset(10f), Small + 1f, Painter.C("ink"), TextAlign.Center);
         }
 
         private void TapSlot(DecorSlotRow slot)
@@ -274,11 +337,11 @@ namespace BeastCraft.Game.Screens
 
             if (options.Count == 0)
             {
-                Ctx.Game.Toast("No decor to place yet: grow, craft or find some.");
+                Ctx.Game.Toast(Loc("ui.grove.no_decor"));
                 return;
             }
 
-            Ctx.Stack.PushModal(new ChoiceModal(Ctx, "Place decor", "Pick a piece for this slot.", options));
+            Ctx.Stack.PushModal(new ChoiceModal(Ctx, Loc("ui.grove.place_decor"), Loc("ui.grove.place_decor_body"), options));
         }
 
         // ------------------------------------------------------------------------------------------
@@ -290,7 +353,7 @@ namespace BeastCraft.Game.Screens
             _garden.Begin();
             float width = Width;
             float y = 10f;
-            AddLabel(_garden.Scroll, new Rect(Pad, y, width, Heading), "Plots", Heading, "plum");
+            AddLabel(_garden.Scroll, new Rect(Pad, y, width, Heading), Loc("ui.grove.plots"), Heading, "plum");
             y += LineH(Heading) + 16f;
 
             const int cols = 2;
@@ -313,7 +376,7 @@ namespace BeastCraft.Game.Screens
             int plotRows = (_hub.Garden.Plots.Count + cols - 1) / cols;
             y += plotRows * (plotHeight + 20f) + 10f;
 
-            AddLabel(_garden.Scroll, new Rect(Pad, y, width, Heading), "Herbarium", Heading, "plum");
+            AddLabel(_garden.Scroll, new Rect(Pad, y, width, Heading), Loc("ui.grove.herbarium"), Heading, "plum");
             y += LineH(Heading) + 16f;
             foreach (HerbariumRow row in _hub.Garden.Herbarium)
             {
@@ -323,7 +386,7 @@ namespace BeastCraft.Game.Screens
             }
 
             y += 10f;
-            AddLabel(_garden.Scroll, new Rect(Pad, y, width, Heading), "Recipes", Heading, "plum");
+            AddLabel(_garden.Scroll, new Rect(Pad, y, width, Heading), Loc("ui.grove.recipes"), Heading, "plum");
             y += LineH(Heading) + 16f;
             foreach (RecipeRow recipe in _hub.Garden.Recipes)
             {
@@ -331,7 +394,7 @@ namespace BeastCraft.Game.Screens
                 float top = y;
                 y = _garden.Card(y, height, "panel", box => DrawRecipe(box, recipe));
                 string rid = recipe.RecipeId;
-                Button craft = AddButton(_garden.Scroll, "craft-" + rid, new Rect(Pad + width - 220f, top + height / 2f - 38f, 190f, 76f), "Craft", "chip", () =>
+                Button craft = AddButton(_garden.Scroll, "craft-" + rid, new Rect(Pad + width - 220f, top + height / 2f - 38f, 190f, 76f), Loc("ui.grove.craft"), "chip", () =>
                 {
                     GardenActionOutcome o = _hub.Garden.Craft(rid);
                     Ctx.Game.Toast(o.Message);
@@ -341,17 +404,17 @@ namespace BeastCraft.Game.Screens
             }
 
             y += 10f;
-            AddLabel(_garden.Scroll, new Rect(Pad, y, width, Heading), "Grove items", Heading, "plum");
+            AddLabel(_garden.Scroll, new Rect(Pad, y, width, Heading), Loc("ui.grove.items"), Heading, "plum");
             y += LineH(Heading) + 16f;
             if (_hub.Garden.Inventory.Count == 0)
             {
-                AddLabel(_garden.Scroll, new Rect(Pad, y, width, Body), "Nothing grown or crafted yet.", Body, "inkSoft");
+                AddLabel(_garden.Scroll, new Rect(Pad, y, width, Body), Loc("ui.grove.no_items"), Body, "inkSoft");
                 y += LineH(Body) + 10f;
             }
 
             foreach (GroveItemRow item in _hub.Garden.Inventory)
             {
-                AddLabel(_garden.Scroll, new Rect(Pad, y, width, Body), item.DisplayName + "  x" + item.Quantity, Body, "ink");
+                AddLabel(_garden.Scroll, new Rect(Pad, y, width, Body), Loc("ui.grove.item_count", item.DisplayName, item.Quantity), Body, "ink");
                 y += LineH(Body) + 8f;
             }
 
@@ -362,15 +425,15 @@ namespace BeastCraft.Game.Screens
         {
             if (plot.SeedId == null)
             {
-                Painter.TextIn("Empty plot", new Rect(box.X, box.Y + 60f, box.Width, Body), Body, Painter.C("inkSoft"), TextAlign.Center);
-                Painter.TextIn("Tap to plant", new Rect(box.X, box.Bottom - 44f, box.Width, 30f), Small, Painter.C("plum"), TextAlign.Center);
+                Painter.TextIn(Loc("ui.grove.empty_plot"), new Rect(box.X, box.Y + 60f, box.Width, Body), Body, Painter.C("inkSoft"), TextAlign.Center);
+                Painter.TextIn(Loc("ui.grove.tap_to_plant"), new Rect(box.X, box.Bottom - 44f, box.Width, 30f), Small, Painter.C("plum"), TextAlign.Center);
                 return;
             }
 
             Painter.TextIn(plot.SeedName, new Rect(box.X + 16f, box.Y + 16f, box.Width - 32f, Body), Body, Painter.C("ink"), TextAlign.Center);
             if (plot.Ready)
             {
-                Painter.TextIn("Ready! Tap to harvest.", new Rect(box.X, box.Y + 70f, box.Width, Body), Body, Painter.C("leafDeep"), TextAlign.Center);
+                Painter.TextIn(Loc("ui.grove.ready_harvest"), new Rect(box.X, box.Y + 70f, box.Width, Body), Body, Painter.C("leafDeep"), TextAlign.Center);
             }
             else
             {
@@ -405,7 +468,7 @@ namespace BeastCraft.Game.Screens
                 foreach (SeedOptionRow seed in _hub.Garden.AvailableSeeds)
                 {
                     string id = seed.SeedId;
-                    options.Add(new ChoiceOption(seed.DisplayName + " (" + seed.GrowthHours + "h)", true, null, () =>
+                    options.Add(new ChoiceOption(Loc("ui.grove.seed_hours", seed.DisplayName, seed.GrowthHours), true, null, () =>
                     {
                         GardenActionOutcome o = _hub.Garden.Plant(plot.PlotId, id);
                         Ctx.Game.Toast(o.Message);
@@ -415,17 +478,17 @@ namespace BeastCraft.Game.Screens
 
                 if (options.Count == 0)
                 {
-                    Ctx.Game.Toast("No seeds unlocked yet.");
+                    Ctx.Game.Toast(Loc("ui.grove.no_seeds"));
                     return;
                 }
 
-                Ctx.Stack.PushModal(new ChoiceModal(Ctx, "Plant", "Pick a seed for this plot.", options));
+                Ctx.Stack.PushModal(new ChoiceModal(Ctx, Loc("ui.grove.plant"), Loc("ui.grove.plant_body"), options));
                 return;
             }
 
             if (!plot.Ready)
             {
-                Ctx.Game.Toast("Still growing.");
+                Ctx.Game.Toast(Loc("ui.grove.still_growing"));
                 return;
             }
 
@@ -439,20 +502,20 @@ namespace BeastCraft.Game.Screens
 
             List<ChoiceOption> ready = new List<ChoiceOption>
             {
-                new ChoiceOption("Harvest alone", true, null, () =>
+                new ChoiceOption(Loc("ui.grove.harvest_alone"), true, null, () =>
                 {
                     GardenActionOutcome o = _hub.Garden.Harvest(plot.PlotId);
                     Ctx.Game.Toast(o.Message);
                     BuildGarden();
                 }),
-                new ChoiceOption("Pick for cross-pollination", true, null, () =>
+                new ChoiceOption(Loc("ui.grove.pick_cross"), true, null, () =>
                 {
                     GardenActionOutcome o = _hub.Garden.PickForCross(plot.PlotId);
                     Ctx.Game.Toast(o.Message);
                     BuildGarden();
                 })
             };
-            Ctx.Stack.PushModal(new ChoiceModal(Ctx, "Ready to harvest", "Harvest it alone, or pick it (then tap another ready plot) to cross-pollinate.", ready));
+            Ctx.Stack.PushModal(new ChoiceModal(Ctx, Loc("ui.grove.ready_title"), Loc("ui.grove.ready_body"), ready));
         }
 
         // ------------------------------------------------------------------------------------------
@@ -464,7 +527,7 @@ namespace BeastCraft.Game.Screens
             _board.Begin();
             float width = Width;
             float y = 10f;
-            AddLabel(_board.Scroll, new Rect(Pad, y, width, Heading), "Destinations", Heading, "plum");
+            AddLabel(_board.Scroll, new Rect(Pad, y, width, Heading), Loc("ui.grove.destinations"), Heading, "plum");
             y += LineH(Heading) + 16f;
 
             foreach (DestinationRow dest in _hub.Board.Destinations)
@@ -476,11 +539,11 @@ namespace BeastCraft.Game.Screens
                 string did = dest.DestinationId;
                 if (dest.State == DestinationState.Available)
                 {
-                    AddButton(_board.Scroll, "send-" + did, new Rect(Pad + width - 230f, top + height - 90f, 190f, 76f), "Send", "primary", () => OpenSend(dest));
+                    AddButton(_board.Scroll, "send-" + did, new Rect(Pad + width - 230f, top + height - 90f, 190f, 76f), Loc("ui.grove.send"), "primary", () => OpenSend(dest));
                 }
                 else if (dest.State == DestinationState.Ready)
                 {
-                    AddButton(_board.Scroll, "collect-" + did, new Rect(Pad + width - 230f, top + height - 90f, 190f, 76f), "Collect", "primary", () =>
+                    AddButton(_board.Scroll, "collect-" + did, new Rect(Pad + width - 230f, top + height - 90f, 190f, 76f), Loc("ui.grove.collect"), "primary", () =>
                     {
                         BoardActionOutcome o = _hub.Board.Collect(did);
                         Ctx.Game.Toast(o.Message);
@@ -499,16 +562,16 @@ namespace BeastCraft.Game.Screens
             switch (dest.State)
             {
                 case DestinationState.Locked:
-                    stateText = "Locked";
+                    stateText = Loc("ui.grove.locked");
                     break;
                 case DestinationState.Available:
-                    stateText = dest.PartySize + " beast" + (dest.PartySize == 1 ? string.Empty : "s") + ", " + dest.DurationHours + "h away";
+                    stateText = Loc(dest.PartySize == 1 ? "ui.grove.dest_idle_one" : "ui.grove.dest_idle", dest.PartySize, dest.DurationHours);
                     break;
                 case DestinationState.Away:
-                    stateText = "Away: " + string.Join(", ", dest.AwayBeastNames) + "  -  back in " + dest.HoursRemaining.ToString("0.0") + "h";
+                    stateText = Loc("ui.grove.dest_away", string.Join(Loc("ui.common.list_sep"), dest.AwayBeastNames), dest.HoursRemaining.ToString("0.0"));
                     break;
                 default:
-                    stateText = "Ready to collect!";
+                    stateText = Loc("ui.grove.dest_ready");
                     break;
             }
 
@@ -519,7 +582,7 @@ namespace BeastCraft.Game.Screens
 
         private void OpenSend(DestinationRow dest)
         {
-            Ctx.Stack.PushModal(new SendPartyModal(Ctx, _hub.Board, dest.DestinationId, "Send to " + dest.DisplayName, dest.PartySize, message =>
+            Ctx.Stack.PushModal(new SendPartyModal(Ctx, _hub.Board, dest.DestinationId, Loc("ui.grove.send_to", dest.DisplayName), dest.PartySize, message =>
             {
                 Ctx.Game.Toast(message);
                 BuildBoard();
@@ -565,11 +628,11 @@ namespace BeastCraft.Game.Screens
                 y = _npc.Card(y, height, "banner", box => DrawWrapped(box, _hub.Npc.TalkLine, "ink", 20f));
             }
 
-            AddLabel(_npc.Scroll, new Rect(Pad, y, width, Heading), "Requests", Heading, "plum");
+            AddLabel(_npc.Scroll, new Rect(Pad, y, width, Heading), Loc("ui.grove.requests"), Heading, "plum");
             y += LineH(Heading) + 16f;
             if (_hub.Npc.Requests.Count == 0)
             {
-                AddLabel(_npc.Scroll, new Rect(Pad, y, width, Body), "Nothing asked right now.", Body, "inkSoft");
+                AddLabel(_npc.Scroll, new Rect(Pad, y, width, Body), Loc("ui.grove.no_requests"), Body, "inkSoft");
                 y += LineH(Body) + 16f;
             }
 
@@ -582,7 +645,7 @@ namespace BeastCraft.Game.Screens
                 if (!req.Fulfilled)
                 {
                     string rid = req.RequestId;
-                    Button fulfil = AddButton(_npc.Scroll, "fulfil-" + rid, new Rect(Pad + width - 230f, top + height / 2f - 38f, 190f, 76f), "Fulfil", "chip", () =>
+                    Button fulfil = AddButton(_npc.Scroll, "fulfil-" + rid, new Rect(Pad + width - 230f, top + height / 2f - 38f, 190f, 76f), Loc("ui.grove.fulfil"), "chip", () =>
                     {
                         NpcActionOutcome o = _hub.Npc.FulfillRequest(rid);
                         Ctx.Game.Toast(o.Message);
@@ -593,17 +656,17 @@ namespace BeastCraft.Game.Screens
             }
 
             y += 10f;
-            AddLabel(_npc.Scroll, new Rect(Pad, y, width, Heading), "Story", Heading, "plum");
+            AddLabel(_npc.Scroll, new Rect(Pad, y, width, Heading), Loc("ui.grove.story"), Heading, "plum");
             y += LineH(Heading) + 16f;
             if (_hub.Npc.SideStories.Count == 0)
             {
-                AddLabel(_npc.Scroll, new Rect(Pad, y, width, Body), "No side story here.", Body, "inkSoft");
+                AddLabel(_npc.Scroll, new Rect(Pad, y, width, Body), Loc("ui.grove.no_story"), Body, "inkSoft");
                 y += LineH(Body) + 16f;
             }
 
             foreach (SideStoryRow story in _hub.Npc.SideStories)
             {
-                string text = story.Complete ? "Complete." : story.CurrentText ?? "Nothing new yet.";
+                string text = story.Complete ? Loc("ui.grove.story_complete") : story.CurrentText ?? Loc("ui.grove.story_nothing_new");
                 int lines = Math.Max(1, Painter.Wrap(text, Small + 1f, width - 48f).Count);
                 float height = 30f + LineH(Body) + lines * LineH(Small + 1f) + 20f + (story.CanAdvance ? 96f : 10f);
                 float top = y;
@@ -611,7 +674,7 @@ namespace BeastCraft.Game.Screens
                 if (story.CanAdvance)
                 {
                     string sid = story.StoryId;
-                    AddButton(_npc.Scroll, "advance-" + sid, new Rect(Pad + width - 260f, top + height - 86f, 220f, 70f), "Continue", "chip", () =>
+                    AddButton(_npc.Scroll, "advance-" + sid, new Rect(Pad + width - 260f, top + height - 86f, 220f, 70f), Loc("ui.grove.continue"), "chip", () =>
                     {
                         NpcActionOutcome o = _hub.Npc.AdvanceSideStory(sid);
                         Ctx.Game.Toast(o.Message);
@@ -625,7 +688,7 @@ namespace BeastCraft.Game.Screens
 
         private void DrawRequest(Rect box, NpcRequestRow req)
         {
-            Painter.TextIn(req.Fulfilled ? "Fulfilled" : req.ItemDisplay + "  " + req.Held + " / " + req.Count, new Rect(box.X + 24f, box.Y + 14f, box.Width - 280f, Small + 2f),
+            Painter.TextIn(req.Fulfilled ? Loc("ui.grove.fulfilled") : Loc("ui.beast.item_progress", req.ItemDisplay, req.Held, req.Count), new Rect(box.X + 24f, box.Y + 14f, box.Width - 280f, Small + 2f),
                            Small + 2f, Painter.C(req.Fulfilled ? "leafDeep" : req.CanFulfill ? "goldDeep" : "berry"), TextAlign.Left);
             float y = box.Y + 14f + LineH(Small + 2f) + 4f;
             foreach (string line in Painter.Wrap(req.Text, Small + 1f, box.Width - 48f))
@@ -637,7 +700,7 @@ namespace BeastCraft.Game.Screens
 
         private void DrawSideStory(Rect box, SideStoryRow story, string text)
         {
-            Painter.TextIn(story.DisplayName + "  (" + story.ChaptersCompleted + " / " + story.ChapterCount + ")", new Rect(box.X + 24f, box.Y + 14f, box.Width - 48f, Body),
+            Painter.TextIn(Loc("ui.grove.story_progress", story.DisplayName, story.ChaptersCompleted, story.ChapterCount), new Rect(box.X + 24f, box.Y + 14f, box.Width - 48f, Body),
                            Body, Painter.C(story.Complete ? "leafDeep" : "plum"), TextAlign.Left);
             float y = box.Y + 14f + LineH(Body) + 6f;
             foreach (string line in Painter.Wrap(text, Small + 1f, box.Width - 48f))
@@ -648,7 +711,7 @@ namespace BeastCraft.Game.Screens
 
             if (story.CanAdvance && !string.IsNullOrEmpty(story.ItemDisplay))
             {
-                Painter.TextIn(story.ItemDisplay + "  " + story.ItemHeld + " / " + story.ItemCount, new Rect(box.X + 24f, box.Bottom - 92f, box.Width - 280f, Small + 1f),
+                Painter.TextIn(Loc("ui.beast.item_progress", story.ItemDisplay, story.ItemHeld, story.ItemCount), new Rect(box.X + 24f, box.Bottom - 92f, box.Width - 280f, Small + 1f),
                                Small + 1f, Painter.C(story.ItemHeld >= story.ItemCount ? "leafDeep" : "berry"), TextAlign.Left);
             }
         }
@@ -661,7 +724,7 @@ namespace BeastCraft.Game.Screens
         {
             Gradient("cream", "creamDeep", new Rect(0, 0, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight));
             base.Draw();
-            _header.Paint(Ctx, Ui, "Grove");
+            _header.Paint(Ctx, Ui, Loc("ui.grove.title"));
         }
 
         protected override void DrawCustom(Widget widget)
@@ -718,7 +781,7 @@ namespace BeastCraft.Game.Screens
             panel.Add(new Label
             {
                 Bounds = new Rect(card.X + 60f, card.Y + 108f, width - 120f, 40f),
-                Text = "Send up to " + _partySize + ". Beasts stay available for battle the whole time.",
+                Text = Loc("ui.grove.send_up_to", _partySize),
                 Size = style.TextSizes.Small + 2f,
                 ColorKey = "inkSoft",
                 Align = TextAlign.Center,
@@ -738,7 +801,7 @@ namespace BeastCraft.Game.Screens
             {
                 Id = "send",
                 Bounds = new Rect(card.X + 60f, card.Bottom - 150f, (width - 140f) / 2f, 100f),
-                Text = "Send",
+                Text = Loc("ui.grove.send"),
                 StyleKey = "primary",
                 Enabled = false
             });
@@ -748,7 +811,7 @@ namespace BeastCraft.Game.Screens
             {
                 Id = "cancel",
                 Bounds = new Rect(card.X + 80f + (width - 140f) / 2f, card.Bottom - 150f, (width - 140f) / 2f, 100f),
-                Text = "Cancel",
+                Text = Loc("ui.common.cancel"),
                 StyleKey = "secondary"
             });
             cancel.Clicked += Close;

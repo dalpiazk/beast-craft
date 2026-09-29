@@ -19,7 +19,7 @@ namespace BeastCraft.Game.Screens
     {
         private static readonly float ContentTop = TabStrip.ContentTop(HeaderMetrics.Standard);
 
-        private static readonly string[] TabNames = { "Stock", "Sell" };
+        private static readonly string[] TabKeys = { "ui.shop.tab_stock", "ui.shop.tab_sell" };
         private static readonly string[] TabGlyphs = { "shop", "coin" };
 
         private readonly ShopViewModel _model;
@@ -36,7 +36,7 @@ namespace BeastCraft.Game.Screens
             _sell = new CardList(Ui.Add(new ScrollView { Id = "sell-page", Bounds = page, Visible = false }));
 
             _header = new ScreenHeader(Ui, HeaderMetrics.Standard, () => Ctx.Stack.Pop());
-            _tabs = TabStrip.Build(Ui, "shop-tabs", HeaderMetrics.Standard, TabNames, TabGlyphs, index => SelectTab((ShopTab)index));
+            _tabs = TabStrip.Build(Ui, "shop-tabs", HeaderMetrics.Standard, Array.ConvertAll(TabKeys, key => Loc(key)), TabGlyphs, index => SelectTab((ShopTab)index));
 
             BuildAll();
         }
@@ -94,7 +94,7 @@ namespace BeastCraft.Game.Screens
             float y = 10f;
             if (_model.Listings.Count == 0)
             {
-                y = _stock.Card(y, 110f, "card", box => Painter.TextIn("Nothing in stock.", new Rect(box.X + 40f, box.Y + 34f, box.Width - 80f, Ctx.Style.TextSizes.Body), Ctx.Style.TextSizes.Body,
+                y = _stock.Card(y, 110f, "card", box => Painter.TextIn(Loc("ui.shop.nothing_in_stock"), new Rect(box.X + 40f, box.Y + 34f, box.Width - 80f, Ctx.Style.TextSizes.Body), Ctx.Style.TextSizes.Body,
                                                                         Painter.C("inkSoft"), TextAlign.Left));
             }
 
@@ -114,44 +114,44 @@ namespace BeastCraft.Game.Screens
                     y = _stock.Card(y, ItemRow.Height, "panel", box => ItemRow.Draw(Ctx, box, StockRowData(captured), 240f));
                     bool enabled = captured.DisabledReason == null;
                     ActionRow.Build(_stock.Scroll, new Rect(HeaderMetrics.Pad + _stock.Width - 220f, top + 40f, 220f, ItemRow.Height - 60f), 190f, 70f,
-                                    new List<ActionButtonData> { new ActionButtonData { Id = "buy-" + captured.Index, Text = "Buy " + captured.Price, Enabled = enabled, OnClick = () => Buy(captured) } });
+                                    new List<ActionButtonData> { new ActionButtonData { Id = "buy-" + captured.Index, Text = Loc("ui.shop.buy_price", captured.Price), Enabled = enabled, OnClick = () => Buy(captured) } });
                 }
             }
 
             _stock.End(y);
         }
 
-        private static string CategoryLabel(ShopCategory category)
+        private string CategoryLabel(ShopCategory category)
         {
             switch (category)
             {
                 case ShopCategory.Material:
-                    return "Materials";
+                    return Loc("ui.shop.cat_materials");
                 case ShopCategory.BeastGear:
-                    return "Beast gear";
+                    return Loc("ui.shop.cat_beast_gear");
                 case ShopCategory.AvatarGear:
-                    return "Avatar gear";
+                    return Loc("ui.shop.cat_avatar_gear");
                 case ShopCategory.BeastSkill:
-                    return "Skill tomes";
+                    return Loc("ui.shop.cat_tomes");
                 case ShopCategory.AvatarSkill:
-                    return "Avatar actives";
+                    return Loc("ui.shop.cat_avatar_actives");
                 case ShopCategory.AvatarPassive:
-                    return "Avatar passives";
+                    return Loc("ui.shop.cat_avatar_passives");
                 case ShopCategory.Consumable:
-                    return "Consumables";
+                    return Loc("ui.shop.cat_consumables");
                 default:
-                    return "Looks";
+                    return Loc("ui.shop.cat_looks");
             }
         }
 
-        private static ItemRowData StockRowData(ShopListingRow row)
+        private ItemRowData StockRowData(ShopListingRow row)
         {
-            string qty = row.Remaining > 0 ? row.Remaining + " left" : "Sold out";
+            string qty = row.Remaining > 0 ? Loc("ui.shop.left", row.Remaining) : Loc("ui.shop.reason_sold_out");
             return new ItemRowData
             {
                 Title = row.Name,
                 Subtitle = row.Detail,
-                Detail = row.DisabledReason ?? (row.Price + " gold   " + qty),
+                Detail = row.DisabledReason ?? Loc("ui.shop.price_qty", row.Price, qty),
                 DetailColor = row.DisabledReason != null ? "berry" : "goldDeep"
             };
         }
@@ -167,7 +167,7 @@ namespace BeastCraft.Game.Screens
                 }
 
                 int index = row.Index;
-                Ctx.Stack.PushModal(new BeastPickerModal(Ctx, "Teach " + row.Name, "No beasts owned yet.", options, beastId =>
+                Ctx.Stack.PushModal(new BeastPickerModal(Ctx, Loc("ui.shop.teach", row.Name), Loc("ui.shop.no_beasts"), options, beastId =>
                 {
                     _model.Buy(index, beastId, out string message);
                     Ctx.Game.Toast(message);
@@ -191,7 +191,7 @@ namespace BeastCraft.Game.Screens
             float y = 10f;
             if (_model.SellableGear.Count == 0)
             {
-                y = _sell.Card(y, 110f, "card", box => Painter.TextIn("No spare gear to sell.", new Rect(box.X + 40f, box.Y + 34f, box.Width - 80f, Ctx.Style.TextSizes.Body),
+                y = _sell.Card(y, 110f, "card", box => Painter.TextIn(Loc("ui.shop.no_spare_gear"), new Rect(box.X + 40f, box.Y + 34f, box.Width - 80f, Ctx.Style.TextSizes.Body),
                                                                        Ctx.Style.TextSizes.Body, Painter.C("inkSoft"), TextAlign.Left));
             }
 
@@ -201,15 +201,15 @@ namespace BeastCraft.Game.Screens
                 float top = y;
                 y = _sell.Card(y, ItemRow.Height, "card", box => ItemRow.Draw(Ctx, box, SellRowData(captured), 220f));
                 ActionRow.Build(_sell.Scroll, new Rect(HeaderMetrics.Pad + _sell.Width - 220f, top + 40f, 220f, ItemRow.Height - 60f), 190f, 70f,
-                                new List<ActionButtonData> { new ActionButtonData { Id = "sell-" + row.InstanceId, Text = "Sell", OnClick = () => Sell(captured) } });
+                                new List<ActionButtonData> { new ActionButtonData { Id = "sell-" + row.InstanceId, Text = Loc("ui.shop.sell"), OnClick = () => Sell(captured) } });
             }
 
             _sell.End(y);
         }
 
-        private static ItemRowData SellRowData(InventoryGearRow row)
+        private ItemRowData SellRowData(InventoryGearRow row)
         {
-            return new ItemRowData { Title = row.Name, Subtitle = row.Bonuses.Count == 0 ? null : string.Join(", ", row.Bonuses), Detail = "Unworn", DetailColor = "inkSoft" };
+            return new ItemRowData { Title = row.Name, Subtitle = row.Bonuses.Count == 0 ? null : string.Join(Loc("ui.common.list_sep"), row.Bonuses), Detail = Loc("ui.shop.unworn"), DetailColor = "inkSoft" };
         }
 
         private void Sell(InventoryGearRow row)
@@ -227,7 +227,7 @@ namespace BeastCraft.Game.Screens
         {
             Gradient("cream", "creamDeep", new Rect(0, 0, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight));
             base.Draw();
-            _header.Paint(Ctx, Ui, "Trader", _model.Gold + " gold");
+            _header.Paint(Ctx, Ui, Loc("ui.shop.title"), Loc("ui.encounter.reward_gold", _model.Gold));
         }
 
         protected override void DrawCustom(Widget widget)

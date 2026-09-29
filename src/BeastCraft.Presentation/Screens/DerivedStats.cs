@@ -4,6 +4,7 @@ using System.Globalization;
 using BeastCraft.Battle;
 using BeastCraft.Creatures;
 using BeastCraft.Encounters;
+using BeastCraft.Localization;
 
 namespace BeastCraft.Presentation.Screens
 {
@@ -204,25 +205,52 @@ namespace BeastCraft.Presentation.Screens
         }
 
         /// <summary>A stat's short label: HP, Atk, Def, SpA, SpD, Speed, Move, Crit.</summary>
-        public static string ShortName(StatType stat)
+        public static string ShortName(StatType stat, StringTable text)
         {
             switch (stat)
             {
+                case StatType.HP:
+                    return text.Get("ui.stat.short_hp");
                 case StatType.Attack:
-                    return "Atk";
+                    return text.Get("ui.stat.short_attack");
                 case StatType.Defense:
-                    return "Def";
+                    return text.Get("ui.stat.short_defense");
                 case StatType.SpecialAttack:
-                    return "SpA";
+                    return text.Get("ui.stat.short_special_attack");
                 case StatType.SpecialDefense:
-                    return "SpD";
+                    return text.Get("ui.stat.short_special_defense");
+                case StatType.Speed:
+                    return text.Get("ui.stat.short_speed");
                 case StatType.MoveRange:
-                    return "Move";
+                    return text.Get("ui.stat.short_move");
                 case StatType.CritChance:
-                    return "Crit";
+                    return text.Get("ui.stat.short_crit");
                 default:
                     return stat.ToString();
             }
+        }
+
+        /// <summary>A gear modifier's bonuses as short lines: "+12 Atk" for a flat bonus, "+5% SpD" for a percent one (flat first).</summary>
+        public static List<string> BonusLines(StatModifier modifier, StringTable text)
+        {
+            List<string> lines = new List<string>();
+            if (modifier == null)
+            {
+                return lines;
+            }
+
+            if (modifier.FlatBonus != 0)
+            {
+                lines.Add(text.Format("ui.stat.flat_bonus", (modifier.FlatBonus > 0 ? "+" : string.Empty) + modifier.FlatBonus.ToString(CultureInfo.InvariantCulture), ShortName(modifier.Stat, text)));
+            }
+
+            if (modifier.PercentBonus != 0f)
+            {
+                lines.Add(text.Format("ui.stat.percent_bonus", (modifier.PercentBonus > 0f ? "+" : string.Empty) + (modifier.PercentBonus * 100f).ToString("0.##", CultureInfo.InvariantCulture),
+                                      ShortName(modifier.Stat, text)));
+            }
+
+            return lines;
         }
     }
 }

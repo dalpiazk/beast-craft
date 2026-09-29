@@ -14,7 +14,7 @@
   "Habitats": [
     {
       "HabitatId": "mossy_glade",
-      "DisplayName": "Mossy Glade",
+      "DisplayName": "habitat.mossy_glade.name",
       "UnlockSource": "shrine",
       "UnlockId": "grove_habitat_mossy_glade",
       "SlotCount": 12,
@@ -22,7 +22,7 @@
     },
     {
       "HabitatId": "tide_pool",
-      "DisplayName": "Tide Pool",
+      "DisplayName": "habitat.tide_pool.name",
       "UnlockSource": "shrine",
       "UnlockId": "grove_habitat_tide_pool",
       "SlotCount": 12,
@@ -30,7 +30,7 @@
     },
     {
       "HabitatId": "snow_hollow",
-      "DisplayName": "Snow Hollow",
+      "DisplayName": "habitat.snow_hollow.name",
       "UnlockSource": "shrine",
       "UnlockId": "grove_habitat_snow_hollow",
       "SlotCount": 12,
@@ -40,7 +40,7 @@
   "Decor": [
     {
       "DecorId": "firefly_lantern",
-      "DisplayName": "Firefly Lantern",
+      "DisplayName": "decor.firefly_lantern.name",
       "HabitatScope": "",
       "Source": "shrine",
       "UnlockId": "grove_decor_firefly_lantern",
@@ -49,7 +49,7 @@
     },
     {
       "DecorId": "ember_brazier",
-      "DisplayName": "Ember Brazier",
+      "DisplayName": "decor.ember_brazier.name",
       "HabitatScope": "",
       "Source": "shrine",
       "UnlockId": "grove_decor_ember_brazier",
@@ -58,7 +58,7 @@
     },
     {
       "DecorId": "driftwood_arch",
-      "DisplayName": "Driftwood Arch",
+      "DisplayName": "decor.driftwood_arch.name",
       "HabitatScope": "tide_pool",
       "Source": "shrine",
       "UnlockId": "grove_decor_driftwood_arch",
@@ -67,7 +67,7 @@
     },
     {
       "DecorId": "wind_chimes",
-      "DisplayName": "Wind Chimes",
+      "DisplayName": "decor.wind_chimes.name",
       "HabitatScope": "",
       "Source": "shrine",
       "UnlockId": "grove_decor_wind_chimes",
@@ -76,7 +76,7 @@
     },
     {
       "DecorId": "iron_bell",
-      "DisplayName": "Iron Bell",
+      "DisplayName": "decor.iron_bell.name",
       "HabitatScope": "",
       "Source": "shrine",
       "UnlockId": "grove_decor_iron_bell",
@@ -85,7 +85,7 @@
     },
     {
       "DecorId": "ice_lantern",
-      "DisplayName": "Ice Lantern",
+      "DisplayName": "decor.ice_lantern.name",
       "HabitatScope": "snow_hollow",
       "Source": "shrine",
       "UnlockId": "grove_decor_ice_lantern",
@@ -94,7 +94,7 @@
     },
     {
       "DecorId": "mossy_stone",
-      "DisplayName": "Mossy Stone",
+      "DisplayName": "decor.mossy_stone.name",
       "HabitatScope": "",
       "Source": "starter",
       "UnlockId": "",
@@ -103,7 +103,7 @@
     },
     {
       "DecorId": "garden_bench",
-      "DisplayName": "Garden Bench",
+      "DisplayName": "decor.garden_bench.name",
       "HabitatScope": "",
       "Source": "starter",
       "UnlockId": "",
@@ -112,7 +112,7 @@
     },
     {
       "DecorId": "clay_pot",
-      "DisplayName": "Clay Pot",
+      "DisplayName": "decor.clay_pot.name",
       "HabitatScope": "",
       "Source": "starter",
       "UnlockId": "",
@@ -121,7 +121,7 @@
     },
     {
       "DecorId": "affinity_charm_stand",
-      "DisplayName": "Charm Stand",
+      "DisplayName": "decor.affinity_charm_stand.name",
       "HabitatScope": "",
       "Source": "affinity",
       "UnlockId": "",
@@ -130,7 +130,7 @@
     },
     {
       "DecorId": "affinity_bond_banner",
-      "DisplayName": "Bond Banner",
+      "DisplayName": "decor.affinity_bond_banner.name",
       "HabitatScope": "",
       "Source": "affinity",
       "UnlockId": "",
@@ -139,7 +139,7 @@
     },
     {
       "DecorId": "pressed_petal_frame",
-      "DisplayName": "Pressed Petal Frame",
+      "DisplayName": "decor.pressed_petal_frame.name",
       "HabitatScope": "",
       "Source": "garden_craft",
       "UnlockId": "recipe_petal_frame",
@@ -148,7 +148,7 @@
     },
     {
       "DecorId": "herbarium_shelf",
-      "DisplayName": "Herbarium Shelf",
+      "DisplayName": "decor.herbarium_shelf.name",
       "HabitatScope": "",
       "Source": "garden_craft",
       "UnlockId": "recipe_herbarium_shelf",
@@ -549,68 +549,68 @@
   "Lore": [
     {
       "LoreId": "affinity_lore_phoenix",
-      "Title": "Phoenix at Ease",
-      "Text": "It naps in the warmest patch of sun it can find, feathers banked low like embers."
+      "Title": "grove_lore.affinity_lore_phoenix.title",
+      "Text": "grove_lore.affinity_lore_phoenix.text"
     },
     {
       "LoreId": "affinity_lore_leviathan",
-      "Title": "Leviathan at Ease",
-      "Text": "It curls loosely by the water's edge now, unbothered when you sit close."
+      "Title": "grove_lore.affinity_lore_leviathan.title",
+      "Text": "grove_lore.affinity_lore_leviathan.text"
     },
     {
       "LoreId": "affinity_lore_golem",
-      "Title": "Golem at Ease",
-      "Text": "Moss has started to soften its shoulders. It leans into a scratch like a boulder settling."
+      "Title": "grove_lore.affinity_lore_golem.title",
+      "Text": "grove_lore.affinity_lore_golem.text"
     },
     {
       "LoreId": "affinity_lore_griffin",
-      "Title": "Griffin at Ease",
-      "Text": "It brings you the shiniest pebble it can find and waits, very pleased with itself."
+      "Title": "grove_lore.affinity_lore_griffin.title",
+      "Text": "grove_lore.affinity_lore_griffin.text"
     },
     {
       "LoreId": "affinity_lore_thunderbird",
-      "Title": "Thunderbird at Ease",
-      "Text": "The air hums faintly when it is glad to see you, a small private thunder."
+      "Title": "grove_lore.affinity_lore_thunderbird.title",
+      "Text": "grove_lore.affinity_lore_thunderbird.text"
     },
     {
       "LoreId": "affinity_lore_frost_wyrm",
-      "Title": "Frost Wyrm at Ease",
-      "Text": "Frost patterns bloom gently on the ground where it rests beside you."
+      "Title": "grove_lore.affinity_lore_frost_wyrm.title",
+      "Text": "grove_lore.affinity_lore_frost_wyrm.text"
     },
     {
       "LoreId": "affinity_lore_treant",
-      "Title": "Treant at Ease",
-      "Text": "New leaves have budded along one arm. It holds very still so you can look."
+      "Title": "grove_lore.affinity_lore_treant.title",
+      "Text": "grove_lore.affinity_lore_treant.text"
     },
     {
       "LoreId": "affinity_lore_tarasque",
-      "Title": "Tarasque at Ease",
-      "Text": "Its plates click together in a slow, contented rhythm when you visit."
+      "Title": "grove_lore.affinity_lore_tarasque.title",
+      "Text": "grove_lore.affinity_lore_tarasque.text"
     },
     {
       "LoreId": "affinity_lore_kirin",
-      "Title": "Kirin at Ease",
-      "Text": "It leaves a faint trail of soft light on the grass wherever it has walked."
+      "Title": "grove_lore.affinity_lore_kirin.title",
+      "Text": "grove_lore.affinity_lore_kirin.text"
     },
     {
       "LoreId": "affinity_lore_basilisk",
-      "Title": "Basilisk at Ease",
-      "Text": "It no longer looks away when you meet its eyes. That took a while."
+      "Title": "grove_lore.affinity_lore_basilisk.title",
+      "Text": "grove_lore.affinity_lore_basilisk.text"
     },
     {
       "LoreId": "gift_lore_wander",
-      "Title": "A Wandering Gift",
-      "Text": "Every beast seems to bring something different when it is happy \u2014 a feather, a pebble, a leaf held very carefully."
+      "Title": "grove_lore.gift_lore_wander.title",
+      "Text": "grove_lore.gift_lore_wander.text"
     },
     {
       "LoreId": "gift_lore_hearth",
-      "Title": "Small Kindnesses",
-      "Text": "A fed, played-with beast starts leaving little things by the gate, as if trading favours back."
+      "Title": "grove_lore.gift_lore_hearth.title",
+      "Text": "grove_lore.gift_lore_hearth.text"
     },
     {
       "LoreId": "gift_lore_season",
-      "Title": "What the Season Brings",
-      "Text": "Some gifts only turn up after a beast has been settled in a good while. Patience, it seems, is its own reward."
+      "Title": "grove_lore.gift_lore_season.title",
+      "Text": "grove_lore.gift_lore_season.text"
     }
   ],
   "Soothing": [
@@ -707,7 +707,7 @@
     {
       "ColourFormId": "kirin_colour_sunwash",
       "SpeciesId": "kirin",
-      "DisplayName": "Sunwash Kirin",
+      "DisplayName": "colour_form.kirin_colour_sunwash.name",
       "CosmeticCategoryId": "kirin_colour_form",
       "CosmeticOptionId": "sunwash",
       "ItemId": "dye_sunwash",
@@ -716,7 +716,7 @@
     {
       "ColourFormId": "phoenix_colour_duskrose",
       "SpeciesId": "phoenix",
-      "DisplayName": "Duskrose Phoenix",
+      "DisplayName": "colour_form.phoenix_colour_duskrose.name",
       "CosmeticCategoryId": "phoenix_colour_form",
       "CosmeticOptionId": "duskrose",
       "ItemId": "dye_duskrose",
@@ -725,7 +725,7 @@
     {
       "ColourFormId": "leviathan_colour_mossgreen",
       "SpeciesId": "leviathan",
-      "DisplayName": "Mossgreen Leviathan",
+      "DisplayName": "colour_form.leviathan_colour_mossgreen.name",
       "CosmeticCategoryId": "leviathan_colour_form",
       "CosmeticOptionId": "mossgreen",
       "ItemId": "dye_mossgreen",
@@ -734,7 +734,7 @@
     {
       "ColourFormId": "griffin_colour_coralblush",
       "SpeciesId": "griffin",
-      "DisplayName": "Coralblush Griffin",
+      "DisplayName": "colour_form.griffin_colour_coralblush.name",
       "CosmeticCategoryId": "griffin_colour_form",
       "CosmeticOptionId": "coralblush",
       "ItemId": "dye_coralblush",
@@ -743,7 +743,7 @@
     {
       "ColourFormId": "tarasque_colour_frostsilver",
       "SpeciesId": "tarasque",
-      "DisplayName": "Frostsilver Tarasque",
+      "DisplayName": "colour_form.tarasque_colour_frostsilver.name",
       "CosmeticCategoryId": "tarasque_colour_form",
       "CosmeticOptionId": "frostsilver",
       "ItemId": "dye_frostsilver",
@@ -752,7 +752,7 @@
     {
       "ColourFormId": "frost_wyrm_colour_embergold",
       "SpeciesId": "frost_wyrm",
-      "DisplayName": "Embergold Frost Wyrm",
+      "DisplayName": "colour_form.frost_wyrm_colour_embergold.name",
       "CosmeticCategoryId": "frost_wyrm_colour_form",
       "CosmeticOptionId": "embergold",
       "ItemId": "dye_embergold",
@@ -761,7 +761,7 @@
     {
       "ColourFormId": "thunderbird_colour_willowsage",
       "SpeciesId": "thunderbird",
-      "DisplayName": "Willowsage Thunderbird",
+      "DisplayName": "colour_form.thunderbird_colour_willowsage.name",
       "CosmeticCategoryId": "thunderbird_colour_form",
       "CosmeticOptionId": "willowsage",
       "ItemId": "dye_willowsage",
@@ -770,7 +770,7 @@
     {
       "ColourFormId": "treant_colour_starlilac",
       "SpeciesId": "treant",
-      "DisplayName": "Starlilac Treant",
+      "DisplayName": "colour_form.treant_colour_starlilac.name",
       "CosmeticCategoryId": "treant_colour_form",
       "CosmeticOptionId": "starlilac",
       "ItemId": "dye_starlilac",
@@ -779,7 +779,7 @@
     {
       "ColourFormId": "golem_colour_honeyamber",
       "SpeciesId": "golem",
-      "DisplayName": "Honeyamber Golem",
+      "DisplayName": "colour_form.golem_colour_honeyamber.name",
       "CosmeticCategoryId": "golem_colour_form",
       "CosmeticOptionId": "honeyamber",
       "ItemId": "dye_honeyamber",
@@ -788,7 +788,7 @@
     {
       "ColourFormId": "basilisk_colour_cloudpearl",
       "SpeciesId": "basilisk",
-      "DisplayName": "Cloudpearl Basilisk",
+      "DisplayName": "colour_form.basilisk_colour_cloudpearl.name",
       "CosmeticCategoryId": "basilisk_colour_form",
       "CosmeticOptionId": "cloudpearl",
       "ItemId": "dye_cloudpearl",

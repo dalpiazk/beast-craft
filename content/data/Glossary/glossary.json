@@ -4,157 +4,157 @@
   "Terms": [
     {
       "TermId": "stun",
-      "Term": "Stun",
+      "Term": "glossary.stun.term",
       "Category": "Status",
-      "Forms": [ "stun", "stuns", "stunned", "frozen" ],
-      "Definition": "A stunned unit loses its next turn: it cannot move or use skills, and its cooldowns do not count down. Being frozen or turned to stone is a stun."
+      "Forms": [ "glossary.stun.forms.0", "glossary.stun.forms.1", "glossary.stun.forms.2", "glossary.stun.forms.3" ],
+      "Definition": "glossary.stun.definition"
     },
     {
       "TermId": "shield",
-      "Term": "Shield",
+      "Term": "glossary.shield.term",
       "Category": "Status",
-      "Forms": [ "shield", "shields", "shielded" ],
-      "Definition": "Soaks up damage before any HP is lost, for a few turns. Its strength is a share of the caster's Defense; a unit keeps only its strongest shield."
+      "Forms": [ "glossary.shield.forms.0", "glossary.shield.forms.1", "glossary.shield.forms.2" ],
+      "Definition": "glossary.shield.definition"
     },
     {
       "TermId": "taunt",
-      "Term": "Taunt",
+      "Term": "glossary.taunt.term",
       "Category": "Status",
-      "Forms": [ "taunt", "taunts", "taunted", "taunting" ],
-      "Definition": "A taunted enemy must aim its single-target and line skills at the unit that taunted it, walking toward it if it is out of reach, until the taunt ends."
+      "Forms": [ "glossary.taunt.forms.0", "glossary.taunt.forms.1", "glossary.taunt.forms.2", "glossary.taunt.forms.3" ],
+      "Definition": "glossary.taunt.definition"
     },
     {
       "TermId": "burn",
-      "Term": "Burn",
+      "Term": "glossary.burn.term",
       "Category": "Status",
-      "Forms": [ "burn", "burns", "burning", "burned" ],
-      "Definition": "Fire damage over time: the unit loses a fixed amount of HP at the start of each of its turns while it lasts. Burns can stack."
+      "Forms": [ "glossary.burn.forms.0", "glossary.burn.forms.1", "glossary.burn.forms.2", "glossary.burn.forms.3" ],
+      "Definition": "glossary.burn.definition"
     },
     {
       "TermId": "poison",
-      "Term": "Poison",
+      "Term": "glossary.poison.term",
       "Category": "Status",
-      "Forms": [ "poison", "poisons", "poisoned" ],
-      "Definition": "Damage over time from anything but fire: the unit loses a fixed amount of HP at the start of each of its turns while it lasts. Poison can stack."
+      "Forms": [ "glossary.poison.forms.0", "glossary.poison.forms.1", "glossary.poison.forms.2" ],
+      "Definition": "glossary.poison.definition"
     },
     {
       "TermId": "cleanse",
-      "Term": "Cleanse",
+      "Term": "glossary.cleanse.term",
       "Category": "Status",
-      "Forms": [ "cleanse", "cleanses", "cleansed", "cleansing" ],
-      "Definition": "Clears every stun, burn and poison from the unit at once. Shields and taunts stay."
+      "Forms": [ "glossary.cleanse.forms.0", "glossary.cleanse.forms.1", "glossary.cleanse.forms.2", "glossary.cleanse.forms.3" ],
+      "Definition": "glossary.cleanse.definition"
     },
     {
       "TermId": "knockback",
-      "Term": "Knockback",
+      "Term": "glossary.knockback.term",
       "Category": "Status",
-      "Forms": [ "knockback", "knockbacks", "knock back", "knocks back", "knocked back" ],
-      "Definition": "Pushes the unit a number of hexes straight away from the caster, stopping early at a blocked or occupied tile or the edge of the arena."
+      "Forms": [ "glossary.knockback.forms.0", "glossary.knockback.forms.1", "glossary.knockback.forms.2", "glossary.knockback.forms.3", "glossary.knockback.forms.4" ],
+      "Definition": "glossary.knockback.definition"
     },
     {
       "TermId": "slow",
-      "Term": "Slow",
+      "Term": "glossary.slow.term",
       "Category": "Status",
-      "Forms": [ "slow", "slows", "slowed", "slowing", "chill", "chills", "chilled" ],
-      "Definition": "Lowers the unit's Speed for a few turns, so it acts less often."
+      "Forms": [ "glossary.slow.forms.0", "glossary.slow.forms.1", "glossary.slow.forms.2", "glossary.slow.forms.3", "glossary.slow.forms.4", "glossary.slow.forms.5", "glossary.slow.forms.6" ],
+      "Definition": "glossary.slow.definition"
     },
     {
       "TermId": "crit",
-      "Term": "Crit",
+      "Term": "glossary.crit.term",
       "Category": "Combat",
-      "Forms": [ "crit", "crits", "critical", "critical hit", "critical hits" ],
-      "Definition": "A critical hit deals one and a half times the damage. Every hit rolls its own chance to crit, from the attacker's crit chance."
+      "Forms": [ "glossary.crit.forms.0", "glossary.crit.forms.1", "glossary.crit.forms.2", "glossary.crit.forms.3", "glossary.crit.forms.4" ],
+      "Definition": "glossary.crit.definition"
     },
     {
       "TermId": "heal",
-      "Term": "Heal",
+      "Term": "glossary.heal.term",
       "Category": "Combat",
-      "Forms": [ "heal", "heals", "healed", "healing" ],
-      "Definition": "Restores HP, never above the unit's maximum. A heal's strength scales with the healer's Special Attack."
+      "Forms": [ "glossary.heal.forms.0", "glossary.heal.forms.1", "glossary.heal.forms.2", "glossary.heal.forms.3" ],
+      "Definition": "glossary.heal.definition"
     },
     {
       "TermId": "aura",
-      "Term": "Aura",
+      "Term": "glossary.aura.term",
       "Category": "Passive",
-      "Forms": [ "Aura" ],
-      "Definition": "A passive that is always on: its effect holds for the whole battle."
+      "Forms": [ "glossary.aura.forms.0" ],
+      "Definition": "glossary.aura.definition"
     },
     {
       "TermId": "vanguard",
-      "Term": "Vanguard",
+      "Term": "glossary.vanguard.term",
       "Category": "Stance",
-      "Forms": [ "Vanguard", "Vanguards" ],
-      "Definition": "The front-line stance: walks straight in, stands between the enemy and its more fragile allies, and never retreats."
+      "Forms": [ "glossary.vanguard.forms.0", "glossary.vanguard.forms.1" ],
+      "Definition": "glossary.vanguard.definition"
     },
     {
       "TermId": "ranged",
-      "Term": "Ranged",
+      "Term": "glossary.ranged.term",
       "Category": "Stance",
-      "Forms": [ "Ranged" ],
-      "Definition": "Keeps its distance: approaches only as far as its skills need, never walks into melee, and backs away from nearby enemies."
+      "Forms": [ "glossary.ranged.forms.0" ],
+      "Definition": "glossary.ranged.definition"
     },
     {
       "TermId": "skirmisher",
-      "Term": "Skirmisher",
+      "Term": "glossary.skirmisher.term",
       "Category": "Stance",
-      "Forms": [ "Skirmisher", "Skirmishers" ],
-      "Definition": "Hit and run: closes in and strikes like a Vanguard, then spends any movement left retreating."
+      "Forms": [ "glossary.skirmisher.forms.0", "glossary.skirmisher.forms.1" ],
+      "Definition": "glossary.skirmisher.definition"
     },
     {
       "TermId": "atb",
-      "Term": "ATB",
+      "Term": "glossary.atb.term",
       "Category": "Combat",
-      "Forms": [ "ATB" ],
-      "Definition": "Active Time Battle: there are no rounds. Every unit fills its own gauge each tick, faster the higher its Speed, and whoever fills it first acts next. Turns grow with the square root of Speed, so double the Speed is about 1.41 times the turns."
+      "Forms": [ "glossary.atb.forms.0" ],
+      "Definition": "glossary.atb.definition"
     },
     {
       "TermId": "gauge",
-      "Term": "Gauge",
+      "Term": "glossary.gauge.term",
       "Category": "Combat",
-      "Forms": [ "gauge", "gauges" ],
-      "Definition": "The turn meter behind the ATB order. It fills by 100 x the square root of Speed each tick, and a turn costs 100,000 points: a Speed 100 unit acts once every 100 ticks. The turn-order bar shows the predicted order and, under each portrait, the ticks until that turn (+0: acting now, or queued at the same instant)."
+      "Forms": [ "glossary.gauge.forms.0", "glossary.gauge.forms.1" ],
+      "Definition": "glossary.gauge.definition"
     },
     {
       "TermId": "level_gap",
-      "Term": "Level gap",
+      "Term": "glossary.level_gap.term",
       "Category": "Combat",
-      "Forms": [ "level gap", "level gaps" ],
-      "Definition": "Hits between units of different levels are scaled by 1 + 0.05 x d + 0.045 x d x the size of d, where d is the attacker's level minus the target's, kept between x0.125 and x1.875. It works both ways: a team under its foes' level deals less and takes more, and a team 4 or more levels over its foes overwhelms them outright."
+      "Forms": [ "glossary.level_gap.forms.0", "glossary.level_gap.forms.1" ],
+      "Definition": "glossary.level_gap.definition"
     },
     {
       "TermId": "execute",
-      "Term": "Execute",
+      "Term": "glossary.execute.term",
       "Category": "Combat",
-      "Forms": [ "execute", "executes" ],
-      "Definition": "Extra damage against a worn-down target: the hit grows with the target's missing HP, up to the skill's full bonus at 0 HP. A +100% execute hits one and a half times as hard at half HP."
+      "Forms": [ "glossary.execute.forms.0", "glossary.execute.forms.1" ],
+      "Definition": "glossary.execute.definition"
     },
     {
       "TermId": "variance",
-      "Term": "Variance",
+      "Term": "glossary.variance.term",
       "Category": "Combat",
-      "Forms": [ "variance" ],
-      "Definition": "Every hit rolls a whole percent from 90% to 110% and is scaled by it, after the element and any crit, so the same hit lands a little differently each time."
+      "Forms": [ "glossary.variance.forms.0" ],
+      "Definition": "glossary.variance.definition"
     },
     {
       "TermId": "element_chart",
-      "Term": "Element chart",
+      "Term": "glossary.element_chart.term",
       "Category": "Combat",
-      "Forms": [ "element chart" ],
-      "Definition": "How a skill's element fares against a target's: Strong x2, Mild x1.25, Weak x0.5, anything else x1. A target with two elements takes both multipliers. Open the full chart from the glossary."
+      "Forms": [ "glossary.element_chart.forms.0" ],
+      "Definition": "glossary.element_chart.definition"
     },
     {
       "TermId": "adaptive_assist",
-      "Term": "Adaptive assist",
+      "Term": "glossary.adaptive_assist.term",
       "Category": "Combat",
-      "Forms": [ "assist", "adaptive assist", "the wilds ease" ],
-      "Definition": "Lose a fight and it eases a little; lose it again and it eases a little more, down to a floor; win it and the ease resets. Rewards and XP never change. It never applies on Hard difficulty in the post-game, or in Hearthglen."
+      "Forms": [ "glossary.adaptive_assist.forms.0", "glossary.adaptive_assist.forms.1", "glossary.adaptive_assist.forms.2" ],
+      "Definition": "glossary.adaptive_assist.definition"
     },
     {
       "TermId": "matchup_warnings",
-      "Term": "Matchup warnings",
+      "Term": "glossary.matchup_warnings.term",
       "Category": "Combat",
-      "Forms": [ "matchup warning", "warnings" ],
-      "Definition": "Shown before every fight: no Vanguard or no Skirmisher in your picked team, an element disadvantage against this lineup, or being under-levelled. They are a heads-up, not a lock: you can still fight."
+      "Forms": [ "glossary.matchup_warnings.forms.0", "glossary.matchup_warnings.forms.1" ],
+      "Definition": "glossary.matchup_warnings.definition"
     }
   ]
 }

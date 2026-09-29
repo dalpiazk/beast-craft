@@ -227,8 +227,8 @@ namespace BeastCraft.Tooling.BalanceSim
             try
             {
                 JsonSerializerOptions json = new JsonSerializerOptions { IncludeFields = true };
-                library = JsonSerializer.Deserialize<SkillLibraryData>(File.ReadAllText(libraryPath), json);
-                tables = JsonSerializer.Deserialize<DropTableData>(File.ReadAllText(tablesPath), json);
+                library = JsonSerializer.Deserialize<SkillLibraryData>(BeastCraft.Localization.ContentText.ReadFile(libraryPath), json);
+                tables = JsonSerializer.Deserialize<DropTableData>(BeastCraft.Localization.ContentText.ReadFile(tablesPath), json);
             }
             catch (Exception exception)
             {

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using BeastCraft.Game.Screens.Components;
+using BeastCraft.Presentation.Board;
 using BeastCraft.Presentation.Cards;
 using BeastCraft.Presentation.Layout;
 using BeastCraft.Presentation.Screens;
@@ -19,7 +20,7 @@ namespace BeastCraft.Game.Screens
     {
         private static readonly float ContentTop = TabStrip.ContentTop(HeaderMetrics.Standard);
 
-        private static readonly string[] TabNames = { "Overview", "Skills", "Gear", "Wardrobe" };
+        private static readonly string[] TabKeys = { "ui.avatar.tab_overview", "ui.avatar.tab_skills", "ui.avatar.tab_gear", "ui.avatar.tab_wardrobe" };
         private static readonly string[] TabGlyphs = { "avatar", "star", "gear", "roster" };
 
         private readonly AvatarHubViewModel _hub;
@@ -40,7 +41,7 @@ namespace BeastCraft.Game.Screens
             _wardrobe = new CardList(Ui.Add(new ScrollView { Id = "wardrobe-page", Bounds = page, Visible = false }));
 
             _header = new ScreenHeader(Ui, HeaderMetrics.Standard, () => Ctx.Stack.Pop());
-            _tabs = TabStrip.Build(Ui, "avatar-tabs", HeaderMetrics.Standard, TabNames, TabGlyphs, index => SelectTab((AvatarTab)index));
+            _tabs = TabStrip.Build(Ui, "avatar-tabs", HeaderMetrics.Standard, Array.ConvertAll(TabKeys, key => Loc(key)), TabGlyphs, index => SelectTab((AvatarTab)index));
 
             BuildAll();
         }
@@ -56,8 +57,15 @@ namespace BeastCraft.Game.Screens
             BuildAll();
         }
 
+        public override void Exit()
+        {
+            _hub.Wardrobe.SaveSeen();
+            base.Exit();
+        }
+
         public void SelectTab(AvatarTab tab)
         {
+            _hub.Wardrobe.SaveSeen();
             _hub.Select(tab);
             ShowTab();
         }
@@ -96,14 +104,14 @@ namespace BeastCraft.Game.Screens
             float y = 10f;
             y = _overview.Card(y, 130f, "card", box => DrawLevelCard(box, model));
             float statsHeight = 100f + model.Stats.Count * StatTable.RowHeight;
-            y = _overview.Card(y, statsHeight, "panel", box => StatTable.Draw(Ctx, box, "Base", "Total", ToStatRows(model.Stats)));
+            y = _overview.Card(y, statsHeight, "panel", box => StatTable.Draw(Ctx, box, Loc("ui.beast.col_base"), Loc("ui.beast.col_total"), ToStatRows(model.Stats)));
             float actionsTop = y;
             const float moreHeight = 310f;
-            y = _overview.Card(y, moreHeight, "card", box => SectionHeader.Draw(Ctx, box, "More"));
+            y = _overview.Card(y, moreHeight, "card", box => SectionHeader.Draw(Ctx, box, Loc("ui.avatar.more")));
             float bw = _overview.Width - 40f;
-            _overview.Add(new Button { Id = "avatar-achievements", Bounds = new Rect(HeaderMetrics.Pad + 20f, actionsTop + 80f, bw, 90f), Text = "Achievements & titles", StyleKey = "primary", Glyph = "seal" })
+            _overview.Add(new Button { Id = "avatar-achievements", Bounds = new Rect(HeaderMetrics.Pad + 20f, actionsTop + 80f, bw, 90f), Text = Loc("ui.avatar.achievements"), StyleKey = "primary", Glyph = "seal" })
                      .Clicked += () => Ctx.Stack.Push(new AchievementsScreen(Ctx));
-            _overview.Add(new Button { Id = "avatar-look-shop", Bounds = new Rect(HeaderMetrics.Pad + 20f, actionsTop + 184f, bw, 90f), Text = "Look-token shop", StyleKey = "secondary", Glyph = "coin" })
+            _overview.Add(new Button { Id = "avatar-look-shop", Bounds = new Rect(HeaderMetrics.Pad + 20f, actionsTop + 184f, bw, 90f), Text = Loc("ui.avatar.look_token_shop"), StyleKey = "secondary", Glyph = "coin" })
                      .Clicked += () => Ctx.Stack.Push(new LookTokenShopScreen(Ctx));
             _overview.End(y);
         }
@@ -114,7 +122,7 @@ namespace BeastCraft.Game.Screens
             float x = box.X + 40f;
             float w = box.Width - 80f;
             Painter.Progress(new Rect(x, box.Y + 44f, w, 44f), model.XpFraction, -1f, "leaf", "moss", "track",
-                             "Lv " + model.Level + "   " + model.Xp + " / " + model.XpToNext + " XP");
+                             Loc("ui.avatar.level_xp", model.Level, model.Xp, model.XpToNext));
         }
 
         private static List<StatTableRow> ToStatRows(List<AvatarStatRow> stats)
@@ -136,7 +144,7 @@ namespace BeastCraft.Game.Screens
         {
             _skills.Begin();
             float y = 10f;
-            y = SectionHeader.Add(Ctx, _skills.Scroll, HeaderMetrics.Pad, y, _skills.Width, "Actives");
+            y = SectionHeader.Add(Ctx, _skills.Scroll, HeaderMetrics.Pad, y, _skills.Width, Loc("ui.avatar.actives"));
             for (int i = 0; i < _hub.Skills.ActiveSlots.Count; i++)
             {
                 int slot = i;
@@ -152,7 +160,7 @@ namespace BeastCraft.Game.Screens
                 });
             }
 
-            y = SectionHeader.Add(Ctx, _skills.Scroll, HeaderMetrics.Pad, y, _skills.Width, "Passives");
+            y = SectionHeader.Add(Ctx, _skills.Scroll, HeaderMetrics.Pad, y, _skills.Width, Loc("ui.avatar.passives"));
             for (int i = 0; i < _hub.Skills.PassiveSlots.Count; i++)
             {
                 int slot = i;
@@ -174,10 +182,10 @@ namespace BeastCraft.Game.Screens
         private void BuildSlotActions(CardList list, float top, float height, bool filled, Action change, Action unequip)
         {
             float right = HeaderMetrics.Pad + list.Width;
-            List<ActionButtonData> buttons = new List<ActionButtonData> { new ActionButtonData { Id = "change-" + list.Scroll.Id + "-" + (int)top, Text = "Change", OnClick = change } };
+            List<ActionButtonData> buttons = new List<ActionButtonData> { new ActionButtonData { Id = "change-" + list.Scroll.Id + "-" + (int)top, Text = Loc("ui.beast.change"), OnClick = change } };
             if (filled)
             {
-                buttons.Add(new ActionButtonData { Id = "unequip-" + list.Scroll.Id + "-" + (int)top, Text = "Take off", Style = "secondary", OnClick = unequip });
+                buttons.Add(new ActionButtonData { Id = "unequip-" + list.Scroll.Id + "-" + (int)top, Text = Loc("ui.beast.take_off"), Style = "secondary", OnClick = unequip });
             }
 
             ActionRow.Build(list.Scroll, new Rect(right - 220f, top + 20f, 220f, height - 40f), 200f, 80f, buttons);
@@ -187,7 +195,7 @@ namespace BeastCraft.Game.Screens
         {
             if (slot.Card == null)
             {
-                SectionHeader.Draw(Ctx, box, "Slot " + (slot.Slot + 1) + ": empty");
+                SectionHeader.Draw(Ctx, box, Loc("ui.avatar.slot_empty", slot.Slot + 1));
                 return;
             }
 
@@ -213,7 +221,7 @@ namespace BeastCraft.Game.Screens
         {
             if (slot.PassiveName == null)
             {
-                SectionHeader.Draw(Ctx, box, "Slot " + (slot.Slot + 1) + ": empty");
+                SectionHeader.Draw(Ctx, box, Loc("ui.avatar.slot_empty", slot.Slot + 1));
                 return;
             }
 
@@ -243,7 +251,7 @@ namespace BeastCraft.Game.Screens
                     continue;
                 }
 
-                string label = known.Name + (known.EquippedSlot >= 0 ? "  (swap with slot " + (known.EquippedSlot + 1) + ")" : string.Empty);
+                string label = known.EquippedSlot >= 0 ? Loc("ui.beast.swap_with", known.Name, known.EquippedSlot + 1) : known.Name;
                 string id = known.Id;
                 options.Add(new ChoiceOption(label, true, null, () =>
                 {
@@ -253,7 +261,7 @@ namespace BeastCraft.Game.Screens
                 }));
             }
 
-            Ctx.Stack.PushModal(new ChoiceModal(Ctx, "Slot " + (slot + 1), options.Count == 0 ? "No other active known yet: the Trader teaches more." : "Pick an active for this slot.", options));
+            Ctx.Stack.PushModal(new ChoiceModal(Ctx, Loc("ui.beast.slot", slot + 1), Loc(options.Count == 0 ? "ui.avatar.no_other_active" : "ui.avatar.pick_active"), options));
         }
 
         private void ChoosePassive(int slot)
@@ -266,7 +274,7 @@ namespace BeastCraft.Game.Screens
                     continue;
                 }
 
-                string label = known.Name + (known.EquippedSlot >= 0 ? "  (swap with slot " + (known.EquippedSlot + 1) + ")" : string.Empty);
+                string label = known.EquippedSlot >= 0 ? Loc("ui.beast.swap_with", known.Name, known.EquippedSlot + 1) : known.Name;
                 string id = known.Id;
                 options.Add(new ChoiceOption(label, true, null, () =>
                 {
@@ -276,7 +284,7 @@ namespace BeastCraft.Game.Screens
                 }));
             }
 
-            Ctx.Stack.PushModal(new ChoiceModal(Ctx, "Slot " + (slot + 1), options.Count == 0 ? "No other passive known yet: the Trader teaches more." : "Pick a passive for this slot.", options));
+            Ctx.Stack.PushModal(new ChoiceModal(Ctx, Loc("ui.beast.slot", slot + 1), Loc(options.Count == 0 ? "ui.avatar.no_other_passive" : "ui.avatar.pick_passive"), options));
         }
 
         // ------------------------------------------------------------------------------------------
@@ -295,7 +303,7 @@ namespace BeastCraft.Game.Screens
                 y = _gear.Card(y, height, "panel", box => DrawGearSlot(box, captured));
                 if (slot.Worn != null)
                 {
-                    _gear.Add(new Button { Id = "unequip-" + slot.Slot, Bounds = new Rect(HeaderMetrics.Pad + _gear.Width - 260f, top + 22f, 230f, 76f), Text = "Take off", StyleKey = "secondary" })
+                    _gear.Add(new Button { Id = "unequip-" + slot.Slot, Bounds = new Rect(HeaderMetrics.Pad + _gear.Width - 260f, top + 22f, 230f, 76f), Text = Loc("ui.beast.take_off"), StyleKey = "secondary" })
                          .Clicked += () =>
                     {
                         _hub.Gear.UnequipGear(captured.Slot, out string message);
@@ -316,7 +324,7 @@ namespace BeastCraft.Game.Screens
                     {
                         Id = "equip-" + option.InstanceId,
                         Bounds = new Rect(HeaderMetrics.Pad + _gear.Width - 220f, top + 128f + i * 96f, 190f, 76f),
-                        Text = "Equip",
+                        Text = Loc("ui.beast.equip"),
                         StyleKey = "chip"
                     });
                     equip.Enabled = option.Equippable;
@@ -339,11 +347,13 @@ namespace BeastCraft.Game.Screens
             float w = box.Width - 300f;
             float body = Ctx.Style.TextSizes.Body;
             float small = Ctx.Style.TextSizes.Small + 1f;
-            string worn = slot.Worn == null ? "Nothing worn" : "Wearing " + slot.Worn.Name + ": " + string.Join(", ", slot.Worn.Bonuses) + (slot.Worn.Inactive ? " (inactive)" : string.Empty);
+            string worn = slot.Worn == null
+                               ? Loc("ui.beast.nothing_worn")
+                               : Loc(slot.Worn.Inactive ? "ui.beast.wearing_inactive" : "ui.beast.wearing", slot.Worn.Name, string.Join(Loc("ui.common.list_sep"), slot.Worn.Bonuses));
             Painter.TextIn(worn, new Rect(x, box.Y + 80f, w, body), body - 1f, Painter.C(slot.Worn == null ? "inkSoft" : "leafDeep"), TextAlign.Left);
             if (slot.Options.Count == 0)
             {
-                Painter.TextIn("No gear for this slot yet: battles and the Trader give it.", new Rect(x, box.Y + 138f, w, body), body - 1f, Painter.C("inkSoft"), TextAlign.Left);
+                Painter.TextIn(Loc("ui.avatar.no_gear_for_slot"), new Rect(x, box.Y + 138f, w, body), body - 1f, Painter.C("inkSoft"), TextAlign.Left);
                 return;
             }
 
@@ -351,7 +361,7 @@ namespace BeastCraft.Game.Screens
             {
                 AvatarGearOptionRow option = slot.Options[i];
                 float y = box.Y + 128f + i * 96f;
-                Painter.TextIn(option.Name + (option.MinimumLevel > 1 ? "  (Lv " + option.MinimumLevel + ")" : string.Empty), new Rect(x, y + 4f, w, body), body, Painter.C("ink"), TextAlign.Left);
+                Painter.TextIn(option.MinimumLevel > 1 ? Loc("ui.beast.gear_min_level", option.Name, option.MinimumLevel) : option.Name, new Rect(x, y + 4f, w, body), body, Painter.C("ink"), TextAlign.Left);
                 string note = string.Join(", ", option.Bonuses) + (option.Reason != null ? "  -  " + option.Reason : string.Empty);
                 Painter.TextIn(note, new Rect(x, y + 44f, w, small), small, Painter.C("inkSoft"), TextAlign.Left);
             }
@@ -383,6 +393,17 @@ namespace BeastCraft.Game.Screens
                             Build();
                         };
                     }
+
+                    string pickId = category.CategoryId;
+                    Button custom = _wardrobe.Add(new Button
+                    {
+                        Id = "custom-colour-" + category.CategoryId,
+                        Bounds = new Rect(HeaderMetrics.Pad + 40f + AvatarWardrobeViewModel.Swatches.Length * 100f + 10f, top + 110f, 220f, 64f),
+                        Text = Loc("ui.avatar.custom_colour"),
+                        StyleKey = "chip"
+                    });
+                    int pickIndex = _hub.Wardrobe.Categories.FindAll(c => c.IsColor).FindIndex(c => c.CategoryId == pickId);
+                    custom.Clicked += () => OpenColourPicker(pickIndex);
                 }
                 else
                 {
@@ -403,7 +424,7 @@ namespace BeastCraft.Game.Screens
                         Rect rowBounds = new Rect(HeaderMetrics.Pad + _wardrobe.Width - 220f, top + 90f + i * 96f, 190f, 76f);
                         if (option.Owned)
                         {
-                            _wardrobe.Add(new Button { Id = "wear-" + option.Key, Bounds = rowBounds, Text = "Wear", StyleKey = "chip" }).Clicked += () =>
+                            _wardrobe.Add(new Button { Id = "wear-" + option.Key, Bounds = rowBounds, Text = Loc("ui.beast.wear"), StyleKey = "chip" }).Clicked += () =>
                             {
                                 _hub.Wardrobe.Wear(categoryId, optionId);
                                 Build();
@@ -411,7 +432,7 @@ namespace BeastCraft.Game.Screens
                         }
                         else if (option.TokenPurchasable)
                         {
-                            _wardrobe.Add(new Button { Id = "shop-" + option.Key, Bounds = rowBounds, Text = "Look shop", StyleKey = "secondary" }).Clicked += () => Ctx.Stack.Push(new LookTokenShopScreen(Ctx));
+                            _wardrobe.Add(new Button { Id = "shop-" + option.Key, Bounds = rowBounds, Text = Loc("ui.beast.look_shop"), StyleKey = "secondary" }).Clicked += () => Ctx.Stack.Push(new LookTokenShopScreen(Ctx));
                         }
                     }
                 }
@@ -420,10 +441,22 @@ namespace BeastCraft.Game.Screens
             _wardrobe.End(y);
         }
 
+        /// <summary>Opens the custom colour picker for the <paramref name="index"/>th colour category (the Custom chip; scripted screenshots).</summary>
+        public void OpenColourPicker(int index)
+        {
+            WardrobeCategoryRow category = _hub.Wardrobe.Categories.FindAll(c => c.IsColor)[index];
+            string categoryId = category.CategoryId;
+            Ctx.Stack.PushModal(new ColourPickerModal(Ctx, category.DisplayName, _hub.Wardrobe.CurrentHsv(categoryId), colour =>
+            {
+                _hub.Wardrobe.SetColorHsv(categoryId, colour);
+                Build();
+            }));
+        }
+
         private void DrawColorCategory(Rect box, WardrobeCategoryRow category)
         {
             SectionHeader.Draw(Ctx, box, category.DisplayName);
-            Painter.TextIn("Current: " + category.WornColorHex, new Rect(box.X + 40f, box.Y + 74f, box.Width - 80f, Ctx.Style.TextSizes.Small + 1f), Ctx.Style.TextSizes.Small + 1f,
+            Painter.TextIn(Loc("ui.avatar.current_colour", category.WornColorHex), new Rect(box.X + 40f, box.Y + 74f, box.Width - 80f, Ctx.Style.TextSizes.Small + 1f), Ctx.Style.TextSizes.Small + 1f,
                            Painter.C("inkSoft"), TextAlign.Left);
             for (int i = 0; i < AvatarWardrobeViewModel.Swatches.Length; i++)
             {
@@ -439,13 +472,18 @@ namespace BeastCraft.Game.Screens
         private void DrawOptionCategory(Rect box, WardrobeCategoryRow category)
         {
             SectionHeader.Draw(Ctx, box, category.DisplayName);
+            if (category.HasNew)
+            {
+                Painter.NewDot(new Vec2(box.Right - 30f, box.Y + 30f));
+            }
+
             float x = box.X + 40f;
             float w = box.Width - 300f;
             float body = Ctx.Style.TextSizes.Body;
             float small = Ctx.Style.TextSizes.Small + 1f;
             if (category.Options.Count == 0)
             {
-                Painter.TextIn("No looks yet.", new Rect(x, box.Y + 80f, w, body), body, Painter.C("inkSoft"), TextAlign.Left);
+                Painter.TextIn(Loc("ui.avatar.no_looks"), new Rect(x, box.Y + 80f, w, body), body, Painter.C("inkSoft"), TextAlign.Left);
                 return;
             }
 
@@ -453,8 +491,17 @@ namespace BeastCraft.Game.Screens
             {
                 WardrobeOptionRow option = category.Options[i];
                 float y = box.Y + 90f + i * 96f;
+                if (option.IsNew)
+                {
+                    Painter.NewDot(new Vec2(box.X + 20f, y + 18f));
+                    if (_wardrobe.OnScreen(new Rect(box.X, y, box.Width, 96f)))
+                    {
+                        _hub.Wardrobe.MarkSeen(option.Key);
+                    }
+                }
+
                 Painter.TextIn(option.Name, new Rect(x, y, w, body), body, Painter.C(option.Worn ? "leafDeep" : "ink"), TextAlign.Left);
-                string status = option.Worn ? "Worn" : option.Owned ? "Owned" : option.TokenPurchasable ? option.TokenPrice + " look tokens" : "Locked";
+                string status = option.Worn ? Loc("ui.beast.worn") : option.Owned ? Loc("ui.beast.owned") : option.TokenPurchasable ? Loc("ui.avatar.token_price", option.TokenPrice) : Loc("ui.grove.locked");
                 Painter.TextIn(status, new Rect(x, y + 40f, w, small), small, Painter.C(option.Worn ? "leafDeep" : option.Owned ? "goldDeep" : "inkSoft"), TextAlign.Left);
             }
         }
@@ -468,7 +515,12 @@ namespace BeastCraft.Game.Screens
             Gradient("cream", "creamDeep", new Rect(0, 0, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight));
             base.Draw();
             AvatarOverviewViewModel overview = _hub.Overview;
-            _header.Paint(Ctx, Ui, "Avatar", overview.DisplayName + "   Lv " + overview.Level);
+            _header.Paint(Ctx, Ui, Loc("ui.avatar.title"), Loc("ui.tutorial.beast_level", overview.DisplayName, overview.Level));
+            if (_hub.Wardrobe.AnyNew || _hub.Wardrobe.Categories.Exists(category => category.HasNew))
+            {
+                Rect wardrobeTab = _tabs.ItemBounds((int)AvatarTab.Wardrobe);
+                Painter.NewDot(new Vec2(wardrobeTab.Right - 30f, wardrobeTab.Y + 26f));
+            }
         }
 
         protected override void DrawCustom(Widget widget)

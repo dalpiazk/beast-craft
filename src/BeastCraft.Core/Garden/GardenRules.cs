@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using BeastCraft.Common;
 using BeastCraft.Economy;
+using BeastCraft.Localization;
 using BeastCraft.Save;
 
 namespace BeastCraft.Garden
@@ -36,18 +37,18 @@ namespace BeastCraft.Garden
             save.EnsureInitialized();
             if (plotId < 0 || plotId >= library.Data.PlotCount)
             {
-                return GardenActionResult.Refused("That is not one of the Wildgarden's plots.");
+                return GardenActionResult.Refused(RulesText.Get("ui.rules.garden.not_a_plot"));
             }
 
             if (save.Garden.FindPlot(plotId) != null)
             {
-                return GardenActionResult.Refused("That plot is already planted.");
+                return GardenActionResult.Refused(RulesText.Get("ui.rules.garden.already_planted"));
             }
 
             SeedSpeciesData seed = library.Seed(seedId);
             if (seed == null || !IsSeedUnlocked(save, seed))
             {
-                return GardenActionResult.Refused("That seed is not unlocked.");
+                return GardenActionResult.Refused(RulesText.Get("ui.rules.garden.seed_locked"));
             }
 
             save.Garden.Plots.Add(new PlotState
@@ -108,12 +109,12 @@ namespace BeastCraft.Garden
             PlotState plot = save.Garden.FindPlot(plotId);
             if (plot == null)
             {
-                return GardenHarvestResult.Refused("That plot is empty.");
+                return GardenHarvestResult.Refused(RulesText.Get("ui.rules.garden.plot_empty"));
             }
 
             if (!IsReady(library, plot, nowUtc, nowMonotonic))
             {
-                return GardenHarvestResult.Refused("That plot is not ready yet.");
+                return GardenHarvestResult.Refused(RulesText.Get("ui.rules.garden.not_ready"));
             }
 
             CrossPollinationData self = library.Cross(plot.SeedId, plot.SeedId);
@@ -139,25 +140,25 @@ namespace BeastCraft.Garden
 
             if (plotIdA == plotIdB)
             {
-                return GardenHarvestResult.Refused("Cross-pollination needs two different plots.");
+                return GardenHarvestResult.Refused(RulesText.Get("ui.rules.garden.two_plots"));
             }
 
             PlotState plotA = save.Garden.FindPlot(plotIdA);
             PlotState plotB = save.Garden.FindPlot(plotIdB);
             if (plotA == null || plotB == null)
             {
-                return GardenHarvestResult.Refused("Both plots must be planted.");
+                return GardenHarvestResult.Refused(RulesText.Get("ui.rules.garden.both_planted"));
             }
 
             if (!IsReady(library, plotA, nowUtc, nowMonotonic) || !IsReady(library, plotB, nowUtc, nowMonotonic))
             {
-                return GardenHarvestResult.Refused("Both plots must be ready.");
+                return GardenHarvestResult.Refused(RulesText.Get("ui.rules.garden.both_ready"));
             }
 
             CrossPollinationData cross = library.Cross(plotA.SeedId, plotB.SeedId);
             if (cross == null)
             {
-                return GardenHarvestResult.Refused("These two do not cross-pollinate.");
+                return GardenHarvestResult.Refused(RulesText.Get("ui.rules.garden.no_cross"));
             }
 
             save.Garden.Plots.Remove(plotA);
@@ -188,7 +189,7 @@ namespace BeastCraft.Garden
             RecipeData recipe = library.Recipe(recipeId);
             if (recipe == null)
             {
-                return GardenActionResult.Refused("Unknown recipe.");
+                return GardenActionResult.Refused(RulesText.Get("ui.rules.garden.unknown_recipe"));
             }
 
             save.Grove.EnsureInitialized();
@@ -201,7 +202,7 @@ namespace BeastCraft.Garden
             {
                 if (input == null || string.IsNullOrEmpty(input.VarietyId) || input.Count <= 0)
                 {
-                    return GardenActionResult.Refused("Not enough " + (input == null ? "?" : input.VarietyId) + ".");
+                    return GardenActionResult.Refused(RulesText.Format("ui.rules.not_enough", input == null ? "?" : input.VarietyId));
                 }
 
                 required.TryGetValue(input.VarietyId, out int soFar);
@@ -212,7 +213,7 @@ namespace BeastCraft.Garden
             {
                 if (save.Grove.Items.GetCount(entry.Key) < entry.Value)
                 {
-                    return GardenActionResult.Refused("Not enough " + entry.Key + ".");
+                    return GardenActionResult.Refused(RulesText.Format("ui.rules.not_enough", entry.Key));
                 }
             }
 
@@ -220,7 +221,7 @@ namespace BeastCraft.Garden
             {
                 if (!save.Grove.Items.TryConsume(entry.Key, entry.Value))
                 {
-                    return GardenActionResult.Refused("Not enough " + entry.Key + ".");
+                    return GardenActionResult.Refused(RulesText.Format("ui.rules.not_enough", entry.Key));
                 }
             }
 

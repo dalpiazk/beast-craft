@@ -43,9 +43,9 @@ namespace BeastCraft.Tests.EditMode
 
             Assert.AreEqual(Content.Species.Count, model.Beasts.Count);
             Assert.AreEqual(3, model.Beasts.Count(b => b.State == CompendiumBeastState.Owned));
-            Assert.IsTrue(model.Beasts.Where(b => b.State == CompendiumBeastState.Unknown).All(b => b.Name == "???" && b.Hint == RosterViewModel.SilhouetteHint));
+            Assert.IsTrue(model.Beasts.Where(b => b.State == CompendiumBeastState.Unknown).All(b => b.Name == "???" && b.Hint == Content.Text.Get(RosterViewModel.SilhouetteHintKey)));
             Assert.AreEqual(Content.Discovery.Library.Data.Lore.Length, model.Lore.Count);
-            Assert.IsTrue(model.Lore.All(l => !l.Found && l.Title == CompendiumViewModel.LockedTitle && l.Text == CompendiumViewModel.LockedText));
+            Assert.IsTrue(model.Lore.All(l => !l.Found && l.Title == CompendiumViewModel.LockedTitle && l.Text == Content.Text.Get(CompendiumViewModel.LockedTextKey)));
 
             CompendiumCompletion expected = CompendiumRules.Completion(session.Save, session.Content.Discovery);
             Assert.AreEqual(expected.Percent, model.Completion.Percent);
@@ -179,14 +179,14 @@ namespace BeastCraft.Tests.EditMode
         [Test]
         public void ExtraRewardText_FormatsTitlesAndTokens_EmptyWhenNothing()
         {
-            Assert.AreEqual(string.Empty, GameSession.ExtraRewardText(null, 0));
-            Assert.AreEqual(string.Empty, GameSession.ExtraRewardText(new List<AchievementData>(), 0));
+            Assert.AreEqual(string.Empty, GameSession.ExtraRewardText(Content.Text, null, 0));
+            Assert.AreEqual(string.Empty, GameSession.ExtraRewardText(Content.Text, new List<AchievementData>(), 0));
 
             AchievementData title = new AchievementData { AchievementId = "a", TitleId = "t", TitleText = "Trio" };
-            Assert.AreEqual(" You earned the title \"Trio\".", GameSession.ExtraRewardText(new List<AchievementData> { title }, 0));
-            Assert.AreEqual(" You earned 3 look tokens.", GameSession.ExtraRewardText(null, 3));
-            Assert.AreEqual(" You earned 1 look token.", GameSession.ExtraRewardText(null, 1));
-            Assert.AreEqual(" You earned the title \"Trio\" and 3 look tokens.", GameSession.ExtraRewardText(new List<AchievementData> { title }, 3));
+            Assert.AreEqual(" You earned the title \"Trio\".", GameSession.ExtraRewardText(Content.Text, new List<AchievementData> { title }, 0));
+            Assert.AreEqual(" You earned 3 look tokens.", GameSession.ExtraRewardText(Content.Text, null, 3));
+            Assert.AreEqual(" You earned 1 look token.", GameSession.ExtraRewardText(Content.Text, null, 1));
+            Assert.AreEqual(" You earned the title \"Trio\" and 3 look tokens.", GameSession.ExtraRewardText(Content.Text, new List<AchievementData> { title }, 3));
         }
 
         [Test]

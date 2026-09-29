@@ -1,9 +1,9 @@
 using System.Collections.Generic;
-using System.Globalization;
 using BeastCraft.Avatar;
 using BeastCraft.Battle;
 using BeastCraft.Campaign;
 using BeastCraft.Economy;
+using BeastCraft.Localization;
 using BeastCraft.Presentation.Content;
 using BeastCraft.Progression;
 using BeastCraft.Save;
@@ -58,6 +58,12 @@ namespace BeastCraft.Presentation.Screens
             _isCamp = isCamp;
             _gearSource = new InventoryGearViewModel(session);
             EnsureOpened();
+        }
+
+        /// <summary>The text table (<c>ui.shop.*</c>).</summary>
+        private StringTable Text
+        {
+            get { return _session.Content.Text; }
         }
 
         public ShopTab Tab { get; private set; } = ShopTab.Stock;
@@ -140,7 +146,7 @@ namespace BeastCraft.Presentation.Screens
             ShopService shop = _session.Content.Shop;
             if (shop == null)
             {
-                message = "The Trader is unavailable.";
+                message = Text.Get("ui.shop.unavailable");
                 return ShopOutcome.UnknownItem;
             }
 
@@ -181,33 +187,33 @@ namespace BeastCraft.Presentation.Screens
                 case ShopCategory.Material:
                     SkillMaterialSO material = BeastDetailViewModel.MaterialDefinitions(content).Find(m => m.MaterialId == listing.ItemId);
                     name = material?.DisplayName ?? listing.ItemId;
-                    detail = material == null ? null : "Tier " + material.Tier;
+                    detail = material == null ? null : Text.Format("ui.inventory.tier", material.Tier);
                     break;
                 case ShopCategory.BeastGear:
                     GearSO gear = content.Battle.GetGear(listing.ItemId);
                     name = gear?.DisplayName ?? listing.ItemId;
-                    detail = gear == null ? null : string.Join(", ", BonusLines(gear.Modifiers));
+                    detail = gear == null ? null : string.Join(Text.Get("ui.common.list_sep"), BonusLines(gear.Modifiers));
                     break;
                 case ShopCategory.AvatarGear:
                     AvatarGearSO avatarGear = content.Battle.GetAvatarGear(listing.ItemId);
                     name = avatarGear?.DisplayName ?? listing.ItemId;
-                    detail = avatarGear == null ? null : string.Join(", ", BonusLines(avatarGear.Modifiers));
+                    detail = avatarGear == null ? null : string.Join(Text.Get("ui.common.list_sep"), BonusLines(avatarGear.Modifiers));
                     break;
                 case ShopCategory.BeastSkill:
                     SkillSO tome = content.Battle.GetSkill(listing.ItemId);
-                    name = "Tome: " + (tome?.DisplayName ?? listing.ItemId);
-                    detail = "Teaches an owned beast of its species.";
+                    name = Text.Format("ui.shop.tome", tome?.DisplayName ?? listing.ItemId);
+                    detail = Text.Get("ui.shop.tome_detail");
                     needsTarget = true;
                     break;
                 case ShopCategory.AvatarSkill:
                     SkillSO active = content.Battle.GetSkill(listing.ItemId);
                     name = active?.DisplayName ?? listing.ItemId;
-                    detail = "Avatar active skill.";
+                    detail = Text.Get("ui.shop.avatar_active");
                     break;
                 case ShopCategory.AvatarPassive:
                     PassiveSkillSO passive = content.Battle.GetPassive(listing.ItemId);
                     name = passive?.DisplayName ?? listing.ItemId;
-                    detail = "Avatar passive.";
+                    detail = Text.Get("ui.shop.avatar_passive");
                     break;
                 case ShopCategory.Consumable:
                     ConsumableSO consumable = content.Economy?.Consumables?.Get(listing.ItemId);
@@ -228,7 +234,7 @@ namespace BeastCraft.Presentation.Screens
                 // Eligibility is per target (which owned beast can learn it): the generic row only
                 // checks stock and gold, the same as ever; the BeastPickerModal's own pick surfaces
                 // ShopOutcome.IneligibleTarget for a specific beast (see ShopService.CanBuy's doc).
-                reason = listing.Remaining <= 0 ? "Sold out" : !afford ? "Not enough gold" : null;
+                reason = listing.Remaining <= 0 ? Text.Get("ui.shop.reason_sold_out") : !afford ? Text.Get("ui.shop.reason_no_gold") : null;
             }
             else
             {
@@ -252,7 +258,7 @@ namespace BeastCraft.Presentation.Screens
             };
         }
 
-        private static List<string> BonusLines(List<StatModifier> modifiers)
+        private List<string> BonusLines(List<StatModifier> modifiers)
         {
             List<string> lines = new List<string>();
             foreach (StatModifier modifier in modifiers ?? new List<StatModifier>())
@@ -262,67 +268,58 @@ namespace BeastCraft.Presentation.Screens
                     continue;
                 }
 
-                if (modifier.FlatBonus != 0)
-                {
-                    lines.Add((modifier.FlatBonus > 0 ? "+" : string.Empty) + modifier.FlatBonus.ToString(CultureInfo.InvariantCulture) + " " + DerivedStats.ShortName(modifier.Stat));
-                }
-
-                if (modifier.PercentBonus != 0f)
-                {
-                    lines.Add((modifier.PercentBonus > 0f ? "+" : string.Empty) + (modifier.PercentBonus * 100f).ToString("0.##", CultureInfo.InvariantCulture) + "% " +
-                              DerivedStats.ShortName(modifier.Stat));
-                }
+                lines.AddRange(DerivedStats.BonusLines(modifier, Text));
             }
 
             return lines;
         }
 
-        private static string MessageFor(ShopOutcome outcome)
+        private string MessageFor(ShopOutcome outcome)
         {
             switch (outcome)
             {
                 case ShopOutcome.Bought:
-                    return "Bought.";
+                    return Text.Get("ui.shop.bought");
                 case ShopOutcome.SoldOut:
-                    return "Sold out.";
+                    return Text.Get("ui.shop.sold_out");
                 case ShopOutcome.NotEnoughGold:
-                    return "Not enough gold.";
+                    return Text.Get("ui.shop.no_gold");
                 case ShopOutcome.StackFull:
-                    return "You already hold the most of that.";
+                    return Text.Get("ui.shop.stack_full");
                 case ShopOutcome.IneligibleTarget:
-                    return "That beast cannot learn it.";
+                    return Text.Get("ui.shop.ineligible");
                 case ShopOutcome.AlreadyKnown:
-                    return "Already known.";
+                    return Text.Get("ui.shop.already_known");
                 case ShopOutcome.LevelTooLow:
-                    return "The avatar's level is too low.";
+                    return Text.Get("ui.avatar.level_low");
                 case ShopOutcome.AlreadyUnlocked:
-                    return "Already unlocked.";
+                    return Text.Get("ui.shop.already_unlocked");
                 default:
-                    return "Cannot buy that.";
+                    return Text.Get("ui.shop.cannot_buy");
             }
         }
 
         /// <summary>The Buy button's disabled reason for a non-<see cref="ShopCategory.BeastSkill"/> listing's <see cref="ShopService.CanBuy"/> result; null (enabled) for <see cref="ShopOutcome.Bought"/>.</summary>
-        private static string DisabledReasonFor(ShopOutcome outcome)
+        private string DisabledReasonFor(ShopOutcome outcome)
         {
             switch (outcome)
             {
                 case ShopOutcome.Bought:
                     return null;
                 case ShopOutcome.SoldOut:
-                    return "Sold out";
+                    return Text.Get("ui.shop.reason_sold_out");
                 case ShopOutcome.NotEnoughGold:
-                    return "Not enough gold";
+                    return Text.Get("ui.shop.reason_no_gold");
                 case ShopOutcome.AlreadyUnlocked:
-                    return "Already unlocked";
+                    return Text.Get("ui.shop.reason_unlocked");
                 case ShopOutcome.AlreadyKnown:
-                    return "Already known";
+                    return Text.Get("ui.shop.reason_known");
                 case ShopOutcome.StackFull:
-                    return "Can't carry more";
+                    return Text.Get("ui.shop.reason_full");
                 case ShopOutcome.LevelTooLow:
-                    return "The avatar's level is too low";
+                    return Text.Get("ui.shop.reason_level");
                 default:
-                    return "Unavailable";
+                    return Text.Get("ui.shop.reason_unavailable");
             }
         }
     }

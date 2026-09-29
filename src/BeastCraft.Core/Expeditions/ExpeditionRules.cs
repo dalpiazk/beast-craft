@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using BeastCraft.Common;
 using BeastCraft.Economy;
 using BeastCraft.Grove;
+using BeastCraft.Localization;
 using BeastCraft.Progression;
 using BeastCraft.Save;
 
@@ -60,12 +61,12 @@ namespace BeastCraft.Expeditions
             DestinationData destination = library.Destination(destinationId);
             if (destination == null || !IsDestinationUnlocked(save, destination))
             {
-                return ExpeditionActionResult.Refused("That destination is not unlocked.");
+                return ExpeditionActionResult.Refused(RulesText.Get("ui.rules.board.destination_locked"));
             }
 
             if (save.Expeditions.FindActive(destinationId) != null)
             {
-                return ExpeditionActionResult.Refused("An expedition is already away there.");
+                return ExpeditionActionResult.Refused(RulesText.Get("ui.rules.board.already_away"));
             }
 
             List<string> party = new List<string>();
@@ -80,7 +81,7 @@ namespace BeastCraft.Expeditions
 
             if (party.Count == 0 || party.Count > destination.PartySize)
             {
-                return ExpeditionActionResult.Refused("Send 1 to " + destination.PartySize + " beasts.");
+                return ExpeditionActionResult.Refused(RulesText.Format("ui.rules.board.send_count", destination.PartySize));
             }
 
             int sendIndex = save.Expeditions.SendCount;
@@ -133,12 +134,12 @@ namespace BeastCraft.Expeditions
             ActiveExpedition active = save.Expeditions.FindActive(destinationId);
             if (active == null)
             {
-                return ExpeditionCollectResult.Refused("No expedition is away there.");
+                return ExpeditionCollectResult.Refused(RulesText.Get("ui.rules.board.none_away"));
             }
 
             if (!IsReturned(library, active, nowUtc, nowMonotonic))
             {
-                return ExpeditionCollectResult.Refused("That expedition is not back yet.");
+                return ExpeditionCollectResult.Refused(RulesText.Get("ui.rules.board.not_back"));
             }
 
             ExpeditionOutcomeTableData table = library.OutcomeTable(destinationId);

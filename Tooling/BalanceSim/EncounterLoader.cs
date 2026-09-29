@@ -455,7 +455,7 @@ namespace BeastCraft.Tooling.BalanceSim
 
             try
             {
-                T data = JsonSerializer.Deserialize<T>(File.ReadAllText(path), new JsonSerializerOptions { IncludeFields = true });
+                T data = JsonSerializer.Deserialize<T>(BeastCraft.Localization.ContentText.ReadFile(path), new JsonSerializerOptions { IncludeFields = true });
                 if (data == null)
                 {
                     errors.Add("'" + path + "' is empty.");

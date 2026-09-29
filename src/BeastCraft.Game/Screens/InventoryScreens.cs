@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using BeastCraft.Game.Screens.Components;
+using BeastCraft.Presentation.Board;
 using BeastCraft.Presentation.Layout;
 using BeastCraft.Presentation.Screens;
 using BeastCraft.Presentation.Ui;
@@ -17,9 +18,9 @@ namespace BeastCraft.Game.Screens
     {
         private static readonly float ContentTop = TabStrip.ContentTop(HeaderMetrics.Standard);
 
-        private static readonly string[] TabNames = { "Gear", "Materials", "Looks" };
+        private static readonly string[] TabKeys = { "ui.inventory.tab_gear", "ui.inventory.tab_materials", "ui.inventory.tab_looks" };
         private static readonly string[] TabGlyphs = { "gear", "cache", "coin" };
-        private static readonly string[] FilterLabels = { "All", "Beast", "Avatar" };
+        private static readonly string[] FilterKeys = { "ui.inventory.filter_all", "ui.inventory.filter_beast", "ui.inventory.filter_avatar" };
 
         private readonly InventoryHubViewModel _hub;
         private readonly ScreenHeader _header;
@@ -37,7 +38,7 @@ namespace BeastCraft.Game.Screens
             _looksList = new CardList(Ui.Add(new ScrollView { Id = "looks-page", Bounds = page, Visible = false }));
 
             _header = new ScreenHeader(Ui, HeaderMetrics.Standard, () => Ctx.Stack.Pop());
-            _tabs = TabStrip.Build(Ui, "inventory-tabs", HeaderMetrics.Standard, TabNames, TabGlyphs, index => SelectTab((InventoryTab)index));
+            _tabs = TabStrip.Build(Ui, "inventory-tabs", HeaderMetrics.Standard, Array.ConvertAll(TabKeys, key => Loc(key)), TabGlyphs, index => SelectTab((InventoryTab)index));
 
             BuildAll();
         }
@@ -53,8 +54,15 @@ namespace BeastCraft.Game.Screens
             BuildAll();
         }
 
+        public override void Exit()
+        {
+            _hub.Gear.SaveSeen();
+            base.Exit();
+        }
+
         public void SelectTab(InventoryTab tab)
         {
+            _hub.Gear.SaveSeen();
             _hub.Select(tab);
             ShowTab();
         }
@@ -88,13 +96,13 @@ namespace BeastCraft.Game.Screens
         {
             _gearList.Begin();
             float y = 10f;
-            y = ChipRow.Build(Ctx, _gearList.Scroll, HeaderMetrics.Pad, y, _gearList.Width, FilterLabels, (int)_hub.Gear.Filter, "gear-filter-", i =>
+            y = ChipRow.Build(Ctx, _gearList.Scroll, HeaderMetrics.Pad, y, _gearList.Width, Array.ConvertAll(FilterKeys, key => Loc(key)), (int)_hub.Gear.Filter, "gear-filter-", i =>
             {
                 _hub.Gear.SetFilter((GearOwnerFilter)i);
                 Build();
             });
             y += 6f;
-            y = ChipRow.Build(Ctx, _gearList.Scroll, HeaderMetrics.Pad, y, _gearList.Width, new[] { "Sort: " + _hub.Gear.Sort }, -1, "gear-sort-", i =>
+            y = ChipRow.Build(Ctx, _gearList.Scroll, HeaderMetrics.Pad, y, _gearList.Width, new[] { Loc("ui.roster.sort", _hub.Gear.Sort) }, -1, "gear-sort-", i =>
             {
                 _hub.Gear.CycleSort();
                 Build();
@@ -103,7 +111,7 @@ namespace BeastCraft.Game.Screens
 
             if (_hub.Gear.Gear.Count == 0)
             {
-                y = _gearList.Card(y, 110f, "card", box => Painter.TextIn("No gear yet: battles, first clears and the Trader give it.",
+                y = _gearList.Card(y, 110f, "card", box => Painter.TextIn(Loc("ui.inventory.no_gear"),
                                                                            new Rect(box.X + 40f, box.Y + 34f, box.Width - 80f, Ctx.Style.TextSizes.Body), Ctx.Style.TextSizes.Body,
                                                                            Painter.C("inkSoft"), TextAlign.Left));
             }
@@ -112,12 +120,23 @@ namespace BeastCraft.Game.Screens
             {
                 InventoryGearRow captured = row;
                 float top = y;
-                y = _gearList.Card(y, ItemRow.Height, "card", box => ItemRow.Draw(Ctx, box, RowData(captured), 240f));
+                y = _gearList.Card(y, ItemRow.Height, "card", box =>
+                {
+                    ItemRow.Draw(Ctx, box, RowData(captured), 240f);
+                    if (captured.IsNew)
+                    {
+                        Painter.NewDot(new Vec2(box.X + 20f, box.Y + 20f));
+                        if (_gearList.OnScreen(box))
+                        {
+                            _hub.Gear.MarkSeen(captured.InstanceId);
+                        }
+                    }
+                });
                 List<ActionButtonData> actions = new List<ActionButtonData>();
                 if (row.WornBy == null)
                 {
-                    actions.Add(new ActionButtonData { Id = "equip-" + row.InstanceId, Text = "Equip", OnClick = () => Equip(captured) });
-                    actions.Add(new ActionButtonData { Id = "sell-" + row.InstanceId, Text = "Sell", Style = "secondary", OnClick = () => SellGear(captured) });
+                    actions.Add(new ActionButtonData { Id = "equip-" + row.InstanceId, Text = Loc("ui.beast.equip"), OnClick = () => Equip(captured) });
+                    actions.Add(new ActionButtonData { Id = "sell-" + row.InstanceId, Text = Loc("ui.shop.sell"), Style = "secondary", OnClick = () => SellGear(captured) });
                 }
 
                 ActionRow.Build(_gearList.Scroll, new Rect(HeaderMetrics.Pad + _gearList.Width - 220f, top + 20f, 220f, ItemRow.Height - 40f), 190f, 70f, actions);
@@ -126,13 +145,13 @@ namespace BeastCraft.Game.Screens
             _gearList.End(y);
         }
 
-        private static ItemRowData RowData(InventoryGearRow row)
+        private ItemRowData RowData(InventoryGearRow row)
         {
             return new ItemRowData
             {
-                Title = row.Name + "  (" + row.SlotName + (row.MinimumLevel > 1 ? ", Lv " + row.MinimumLevel : string.Empty) + ")",
-                Subtitle = row.Bonuses.Count == 0 ? null : string.Join(", ", row.Bonuses),
-                Detail = row.WornBy != null ? "Worn by " + row.WornBy : "Unworn",
+                Title = row.MinimumLevel > 1 ? Loc("ui.inventory.gear_title_level", row.Name, row.SlotName, row.MinimumLevel) : Loc("ui.inventory.gear_title", row.Name, row.SlotName),
+                Subtitle = row.Bonuses.Count == 0 ? null : string.Join(Loc("ui.common.list_sep"), row.Bonuses),
+                Detail = row.WornBy != null ? Loc("ui.inventory.worn_by", row.WornBy) : Loc("ui.shop.unworn"),
                 DetailColor = row.WornBy != null ? "leafDeep" : "inkSoft"
             };
         }
@@ -154,7 +173,7 @@ namespace BeastCraft.Game.Screens
             }
 
             string instanceId = row.InstanceId;
-            Ctx.Stack.PushModal(new BeastPickerModal(Ctx, "Equip " + row.Name, "No beasts owned yet.", options, beastId =>
+            Ctx.Stack.PushModal(new BeastPickerModal(Ctx, Loc("ui.inventory.equip_name", row.Name), Loc("ui.shop.no_beasts"), options, beastId =>
             {
                 _hub.Gear.EquipToBeast(instanceId, beastId, out string message);
                 Ctx.Game.Toast(message);
@@ -177,9 +196,9 @@ namespace BeastCraft.Game.Screens
         {
             _materialsList.Begin();
             float y = 10f;
-            y = SectionCard(_materialsList, y, "Materials", _hub.Materials.Materials);
-            y = SectionCard(_materialsList, y, "Grove items", _hub.Materials.GroveItems);
-            y = SectionCard(_materialsList, y, "Consumables", _hub.Materials.Consumables);
+            y = SectionCard(_materialsList, y, Loc("ui.inventory.materials"), _hub.Materials.Materials);
+            y = SectionCard(_materialsList, y, Loc("ui.grove.items"), _hub.Materials.GroveItems);
+            y = SectionCard(_materialsList, y, Loc("ui.shop.cat_consumables"), _hub.Materials.Consumables);
             _materialsList.End(y);
         }
 
@@ -188,7 +207,7 @@ namespace BeastCraft.Game.Screens
             y = SectionHeader.Add(Ctx, list.Scroll, HeaderMetrics.Pad, y, list.Width, title);
             if (rows.Count == 0)
             {
-                return list.Card(y, 90f, "panel", box => Painter.TextIn("None held.", new Rect(box.X + 40f, box.Y + 30f, box.Width - 80f, Ctx.Style.TextSizes.Body), Ctx.Style.TextSizes.Body,
+                return list.Card(y, 90f, "panel", box => Painter.TextIn(Loc("ui.inventory.none_held"), new Rect(box.X + 40f, box.Y + 30f, box.Width - 80f, Ctx.Style.TextSizes.Body), Ctx.Style.TextSizes.Body,
                                                                          Painter.C("inkSoft"), TextAlign.Left));
             }
 
@@ -204,9 +223,9 @@ namespace BeastCraft.Game.Screens
             return y;
         }
 
-        private static ItemRowData CountRowData(InventoryCountRow row)
+        private ItemRowData CountRowData(InventoryCountRow row)
         {
-            return new ItemRowData { Title = row.Name + "  x" + row.Quantity, Subtitle = row.Detail };
+            return new ItemRowData { Title = Loc("ui.grove.item_count", row.Name, row.Quantity), Subtitle = row.Detail };
         }
 
         // ------------------------------------------------------------------------------------------
@@ -219,8 +238,8 @@ namespace BeastCraft.Game.Screens
             InventoryLooksViewModel model = _hub.Looks;
             float y = 10f;
             float top = y;
-            y = _looksList.Card(y, 140f, "card", box => SectionHeader.Draw(Ctx, box, "Look tokens: " + model.LookTokens));
-            _looksList.Add(new Button { Id = "open-look-shop", Bounds = new Rect(HeaderMetrics.Pad + _looksList.Width - 260f, top + 34f, 220f, 76f), Text = "Look shop", StyleKey = "primary", Glyph = "coin" })
+            y = _looksList.Card(y, 140f, "card", box => SectionHeader.Draw(Ctx, box, Loc("ui.inventory.look_tokens", model.LookTokens)));
+            _looksList.Add(new Button { Id = "open-look-shop", Bounds = new Rect(HeaderMetrics.Pad + _looksList.Width - 260f, top + 34f, 220f, 76f), Text = Loc("ui.beast.look_shop"), StyleKey = "primary", Glyph = "coin" })
                       .Clicked += () => Ctx.Stack.Push(new LookTokenShopScreen(Ctx));
             float height = 60f + Math.Max(1, model.Categories.Count) * 56f;
             y = _looksList.Card(y, height, "panel", box => DrawCollection(box, model.Categories));
@@ -229,7 +248,7 @@ namespace BeastCraft.Game.Screens
 
         private void DrawCollection(Rect box, List<WardrobeCollectionRow> categories)
         {
-            SectionHeader.Draw(Ctx, box, "Collection");
+            SectionHeader.Draw(Ctx, box, Loc("ui.inventory.collection"));
             float x = box.X + 40f;
             float w = box.Width - 80f;
             float y = box.Y + 80f;
@@ -249,7 +268,12 @@ namespace BeastCraft.Game.Screens
         {
             Gradient("cream", "creamDeep", new Rect(0, 0, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight));
             base.Draw();
-            _header.Paint(Ctx, Ui, "Inventory", Ctx.Session.Save.Gold + " gold");
+            _header.Paint(Ctx, Ui, Loc("ui.inventory.title"), Loc("ui.encounter.reward_gold", Ctx.Session.Save.Gold));
+            if (_hub.Gear.AnyNew || _hub.Gear.Gear.Exists(row => row.IsNew))
+            {
+                Rect gearTab = _tabs.ItemBounds((int)InventoryTab.Gear);
+                Painter.NewDot(new Vec2(gearTab.Right - 30f, gearTab.Y + 26f));
+            }
         }
 
         protected override void DrawCustom(Widget widget)

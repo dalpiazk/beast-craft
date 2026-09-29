@@ -1,5 +1,6 @@
 using BeastCraft.Avatar;
 using BeastCraft.Creatures;
+using BeastCraft.Localization;
 using BeastCraft.Presentation.Content;
 
 namespace BeastCraft.Presentation.Screens
@@ -22,7 +23,14 @@ namespace BeastCraft.Presentation.Screens
         /// <summary>The unit id the avatar fights under (<c>BattleAvatar.DefaultId</c>).</summary>
         public const string UnitId = Battle.BattleAvatar.DefaultId;
 
-        public const string DisplayName = "Beastbinder";
+        /// <summary>The avatar's name, as a text key.</summary>
+        public const string DisplayNameKey = "ui.avatar.name";
+
+        /// <summary>The avatar's name (<see cref="DisplayNameKey"/>).</summary>
+        public static string DisplayName(StringTable text)
+        {
+            return text.Get(DisplayNameKey);
+        }
 
         /// <summary>The avatar's stat profile: the simulator's fixture on the roster's curve (its first species', as the simulator reads it).</summary>
         public static AvatarStatsSO Profile(GameContent content)

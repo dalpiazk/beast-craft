@@ -6,8 +6,9 @@ using BeastCraft.Presentation.Ui;
 namespace BeastCraft.Game.Screens
 {
     /// <summary>
-    /// The title (<see cref="TitleViewModel"/>): Continue when a save exists, New Game (asking
-    /// first when it would replace the save) and Settings over a warm painted-style backdrop with
+    /// The title (<see cref="TitleViewModel"/>): Continue (the most recently played slot) and Save slots
+    /// (<see cref="SaveSlotsScreen"/>) when a save exists, New Game (in the first empty slot; the slot
+    /// list when all three are full) and Settings over a warm painted-style backdrop with
     /// the starter beasts. A save that could only be restored from its backup says so; one that
     /// cannot be loaded at all says why. Back asks before quitting.
     /// </summary>
@@ -18,15 +19,17 @@ namespace BeastCraft.Game.Screens
         private readonly TitleViewModel _model;
         private readonly Button _continue;
         private readonly Button _newGame;
+        private readonly Button _slots;
 
         public TitleScreen(ScreenContext ctx) : base(ctx)
         {
             _model = new TitleViewModel(ctx.Session);
             float width = 680f;
             float x = (PortraitLayout.CanvasWidth - width) / 2f;
-            _continue = AddButton(null, "continue", new Rect(x, 1180f, width, 130f), "Continue", "primary", () => EnterGame(true));
-            _newGame = AddButton(null, "new-game", new Rect(x, 1350f, width, 130f), "New Game", "secondary", NewGame);
-            _settings = AddButton(null, "settings", new Rect(x, 1520f, width, 130f), "Settings", "secondary", OpenSettings, "gear");
+            _continue = AddButton(null, "continue", new Rect(x, 1180f, width, 130f), Loc("ui.title.continue"), "primary", () => EnterGame(true));
+            _slots = AddButton(null, "slots", new Rect(x, 1330f, width, 130f), Loc("ui.title.save_slots"), "secondary", OpenSlots);
+            _newGame = AddButton(null, "new-game", new Rect(x, 1350f, width, 130f), Loc("ui.title.new_game"), "secondary", NewGame);
+            _settings = AddButton(null, "settings", new Rect(x, 1520f, width, 130f), Loc("ui.title.settings"), "secondary", OpenSettings, "gear");
         }
 
         private readonly Button _settings;
@@ -38,18 +41,20 @@ namespace BeastCraft.Game.Screens
 
         public override void Enter()
         {
-            // Continue first when there is a save; the buttons close up without it.
+            // Continue and the slot list first when there is a save; the buttons close up without it.
             bool save = _model.CanContinue;
             _continue.Visible = save;
+            _slots.Visible = _model.CanManageSlots;
+            _continue.Bounds = new Rect(_continue.Bounds.X, save ? 1130f : 1180f, _continue.Bounds.Width, 130f);
             _newGame.StyleKey = save ? "secondary" : "primary";
-            float y = save ? 1350f : 1180f;
+            float y = save ? 1430f : 1180f;
             _newGame.Bounds = new Rect(_newGame.Bounds.X, y, _newGame.Bounds.Width, 130f);
-            _settings.Bounds = new Rect(_settings.Bounds.X, y + 170f, _settings.Bounds.Width, 130f);
+            _settings.Bounds = new Rect(_settings.Bounds.X, y + (save ? 150f : 170f), _settings.Bounds.Width, 130f);
         }
 
         public override bool HandleBack()
         {
-            Ctx.Stack.PushModal(new ConfirmModal(Ctx, "Leave Beast Craft?", "Your progress is saved.", "Stay", "Quit", Ctx.Game.Exit, "danger"));
+            Ctx.Stack.PushModal(new ConfirmModal(Ctx, Loc("ui.title.leave_title"), Loc("ui.title.leave_body"), Loc("ui.title.stay"), Loc("ui.title.quit"), Ctx.Game.Exit, "danger"));
             return true;
         }
 
@@ -61,14 +66,14 @@ namespace BeastCraft.Game.Screens
                 LoadOutcome outcome = _model.Continue();
                 if (!outcome.Success)
                 {
-                    Ctx.Stack.PushModal(new ConfirmModal(Ctx, "Save not loaded", outcome.Message + " You can start a new game.", null, "OK", null));
+                    Ctx.Stack.PushModal(new ConfirmModal(Ctx, Loc("ui.title.not_loaded_title"), Loc("ui.title.not_loaded_body", outcome.Message), null, Loc("ui.common.ok"), null));
                     return;
                 }
 
                 Ctx.Stack.Push(new HomeScreen(Ctx));
                 if (outcome.Message != null)
                 {
-                    Ctx.Stack.PushModal(new ConfirmModal(Ctx, "Save restored", outcome.Message, null, "OK", null));
+                    Ctx.Stack.PushModal(new ConfirmModal(Ctx, Loc("ui.title.restored_title"), outcome.Message, null, Loc("ui.common.ok"), null));
                 }
 
                 // Continue claimed the idle rewards: say what they paid (nothing is silent).
@@ -77,16 +82,33 @@ namespace BeastCraft.Game.Screens
                     Ctx.Game.Toast(Ctx.Session.LastContinueClaim.Message);
                 }
 
+                // The last battle never finished (the app closed mid-battle): its consumables came back.
+                if (outcome.RefundMessage != null)
+                {
+                    Ctx.Game.Toast(outcome.RefundMessage);
+                }
+
                 return;
             }
 
             StartNewGame();
         }
 
-        /// <summary>A new game straight away (no question): the first beast's pick, then Hearthglen's map (or the skip's three picks).</summary>
+        /// <summary>
+        /// A new game straight away (no question), in the first empty slot (or the current one when every
+        /// slot is full, as a scripted run may be): the first beast's pick, then Hearthglen's map (or the
+        /// skip's three picks).
+        /// </summary>
         public void StartNewGame()
         {
+            _model.PrepareNewGame();
             Ctx.Stack.Push(new StarterPickScreen(Ctx));
+        }
+
+        /// <summary>The save slot list.</summary>
+        public void OpenSlots()
+        {
+            Ctx.Stack.Push(new SaveSlotsScreen(Ctx));
         }
 
         public void OpenSettings()
@@ -98,7 +120,9 @@ namespace BeastCraft.Game.Screens
         {
             if (_model.NewGameNeedsConfirm)
             {
-                Ctx.Stack.PushModal(new ConfirmModal(Ctx, "Start a new game?", "This replaces your saved game.", "Cancel", "Start", StartNewGame, "danger"));
+                // Every slot holds a game: the slot list asks which one to replace (or delete).
+                OpenSlots();
+                Ctx.Game.Toast(Loc("ui.title.slots_full"));
                 return;
             }
 
@@ -114,8 +138,8 @@ namespace BeastCraft.Game.Screens
             Painter.Soft(new Vec2(540f, 330f), 360f, Painter.C("cream", 0.55f), 0.5f);
 
             float titleSize = Ctx.Style.TextSizes.Title * 1.5f;
-            Painter.TextIn("Beast Craft", new Rect(0, 240f, PortraitLayout.CanvasWidth, titleSize), titleSize, Painter.C("cream"), TextAlign.Center, true, Painter.C("plum"));
-            Painter.TextIn("Bind beasts. Brave the Gloam.", new Rect(0, 380f, PortraitLayout.CanvasWidth, 40f), Ctx.Style.TextSizes.Body + 4f, Painter.C("plum"), TextAlign.Center);
+            Painter.TextIn(Loc("ui.title.name"), new Rect(0, 240f, PortraitLayout.CanvasWidth, titleSize), titleSize, Painter.C("cream"), TextAlign.Center, true, Painter.C("plum"));
+            Painter.TextIn(Loc("ui.title.tagline"), new Rect(0, 380f, PortraitLayout.CanvasWidth, 40f), Ctx.Style.TextSizes.Body + 4f, Painter.C("plum"), TextAlign.Center);
 
             for (int i = 0; i < Beasts.Length; i++)
             {
@@ -125,7 +149,7 @@ namespace BeastCraft.Game.Screens
             }
 
             base.Draw();
-            Painter.TextIn("Pre-alpha - local play", new Rect(0, 1840f, PortraitLayout.CanvasWidth, 30f), Ctx.Style.TextSizes.Small, Painter.C("plum", 0.7f), TextAlign.Center);
+            Painter.TextIn(Loc("ui.title.footer"), new Rect(0, 1840f, PortraitLayout.CanvasWidth, 30f), Ctx.Style.TextSizes.Small, Painter.C("plum", 0.7f), TextAlign.Center);
         }
     }
 }

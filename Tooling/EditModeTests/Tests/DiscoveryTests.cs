@@ -372,7 +372,7 @@ namespace BeastCraft.Tests.EditMode
         /// <summary>A shipped content file, read fresh (the tests may break it).</summary>
         internal static T ReadJson<T>(string projectRelativePath) where T : class
         {
-            return FieldJson.FromJson<T>(System.IO.File.ReadAllText(GameContent.PathOf(GameContent.FindRoot(), projectRelativePath)));
+            return FieldJson.FromJson<T>(BeastCraft.Localization.ContentText.ReadFile(GameContent.PathOf(GameContent.FindRoot(), projectRelativePath)));
         }
 
         private static int LootRollerSeed(int runSeed)

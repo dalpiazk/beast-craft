@@ -77,9 +77,9 @@ inline. Four inner tabs (`AvatarTab`), driven by `AvatarHubViewModel` over four 
   meaning throughout `CosmeticRules`); colour categories (hair/skin/eye colour) as a small fixed swatch
   row (six curated hex presets per category, held in the view-model, not new content) calling
   `CosmeticRules.TrySetColor(save, null, categoryId, color, library)` — colours are always free.
-  **No colour-picker widget exists in the toolkit** (`Widgets.cs` has no such control), so a full RGB
-  picker is out of scope; the swatch row is the minimal UI the existing free-colour rule needs and is
-  flagged below for a producer call on whether a real picker is wanted later. Locked looks read the
+  The six swatches stay as quick picks; a **Custom** chip beside them opens `ColourPickerModal` (#46): hue,
+  saturation and brightness bars (`SliderBar`, tapped or dragged; alpha fixed at 1, `Hsv` does the
+  arithmetic), a preview, and Use colour, stored through the same `TrySetColor` (no save change). Locked looks read the
   same "Owned/locked" language the look-token shop and colour-forms UI already use, with a link to the
   Look-token shop for `TokenPurchasable` ones. Collector lens: wardrobe as its own tab, mirroring the
   Compendium's "owned vs. locked" framing.
@@ -112,14 +112,14 @@ inline. Four inner tabs (`AvatarTab`), driven by `AvatarHubViewModel` over four 
   every species) — a small Collector "collection" summary in the same spirit as the Compendium's
   completion bar, reading `CosmeticCollection.Has`/`CosmeticLibrary.Categories` only (no new state).
 
-**"New" markers.** Flagged, not built: a true "new since you last looked" marker needs a persisted
-"seen" set (there is no such save field or convention anywhere in the codebase today — confirmed by
-survey), which is new save state the brief's "no new mechanics unless a screen truly needs a missing
-Core rule, then keep it minimal and flag it" clause is exactly about. Cheaply derivable from existing
-data alone would only be "unworn", which already has its own clear label on the Gear tab (a piece kept
-unworn on purpose is not "new") — so rather than mislabel it, this PR ships without a "new" badge and
-leaves it as a producer decision (a `HashSet<string>` of seen gear instance ids, mirroring
-`CosmeticCollection.Unlocked`'s shape, would be the minimal schema addition if wanted).
+**"New" markers** (#46, schema 12). `PlayerSave.Seen` (`SeenItems`: gear instance ids and unlocked look keys,
+`"categoryId/optionId"`) records what the player has already seen; `SeenRules` says what is new (owned or
+unlocked, not in the list). A new Gear-tab row (`InventoryGearRow.IsNew`) and a new wardrobe option
+(`WardrobeOptionRow.IsNew`) show a small berry dot, and so do their parents while any child is new (the
+Inventory's Gear tab, the Avatar's Wardrobe tab, the wardrobe category). A key is marked seen once its row
+has been on screen, and saved when the player leaves the screen or switches tab; the row keeps its dot for
+that visit. Free default and starter looks are never "new". The 11-to-12 migration marks everything a save
+already owns as seen, so an updated save shows nothing as new.
 
 ## 3. Shop/Trader screen
 
@@ -175,8 +175,7 @@ reachable, then opens it), mirroring `BeastCraftGame.GoTo`'s existing `grove-*` 
 ## 6. Decisions for the producer to review
 
 - The Wardrobe tab's six-swatch colour presets are UI-only curation over the existing free
-  `TrySetColor` rule, not authored content; a producer may prefer a full colour picker later (needs a
-  new toolkit widget) or a curated per-category palette in content instead of a fixed six.
-- No "new" marker for Inventory (above) — flagged as a minimal save addition if wanted, not built.
+  `TrySetColor` rule, not authored content, now beside a custom HSV picker (#46); a producer may still
+  prefer a curated per-category palette in content instead of a fixed six.
 - The camp trader's "Trade" button opens the same `ShopScreen`; a producer may prefer the camp modal to
   show a compact inline preview instead of a full screen hop.

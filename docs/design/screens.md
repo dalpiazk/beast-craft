@@ -26,9 +26,17 @@ Title ──Continue / New Game──▶ Home (Map tab) ──tap a location / N
   (`StoryModal`), the camp (`CampModal`, every region), the tutorial hints (`HintModal`, anchored to a
   widget, pausing a battle) and the way on (`RegionCardModal`) — are in [area-zero.md](area-zero.md).
 - **Title** (`TitleScreen`, `TitleViewModel`): Continue (primary when a save exists; it claims the
-  idle rewards and toasts them), New Game (asks before replacing a save; then the starter pick), Settings. A save that
+  idle rewards and toasts them; the most recently played slot), Save slots (when a save exists), New Game (in the first free slot, then the starter pick; the slot list when all three are full), Settings. A save that
   could only be restored from its `.bak` says so; one that cannot be loaded says why. Back asks
   before quitting.
+- **Consent** (`ConsentModal`, `ConsentViewModel`; #62): once, the first time the map shows with no pick
+  waiting (after the first starter pick, before play), until answered: anonymous gameplay events and
+  crash reports in plain words, a row for each (both off until turned on), and Continue; Back does not
+  skip it. Both are rows in Settings too. Never offered in a scripted run; `--screen consent` shows it.
+- **Save slots** (`SaveSlotsScreen`, `SaveSlotsViewModel`): one card per slot (three) with the save's
+  summary and Continue or New game, Delete (asks first), and Export and Import where the host has an
+  `ISaveTransfer` (desktop only for now). See `progression-and-saves.md`, "Save slots, backup and
+  export".
 - **Home** (`HomeScreen`, `HomeViewModel`, `MapViewModel`): the bottom nav — **Map, Roster, Grove,
   Avatar, Inventory** — over the region map. Map and Roster show inline (see "Roster and visibility"
   below); Grove, Avatar and Inventory each push their own full screen (`GroveScreen`, `AvatarScreen`,
@@ -160,6 +168,11 @@ Rules and data: [kinship-discovery.md](kinship-discovery.md). Everything here re
   `RegionProgressModal` (`RegionProgressViewModel`: the 100% reward, per stage rows walked and places
   found, **Revisit** a stage already reached: `GameSession.ReplayStage`). The 100% reward's toast
   (`GameSession.CheckCompletion` → `PendingToasts`, drained when the map shows).
+- **Normal or Hard** (post-game regions only, `RegionHeaderView.HardAvailable`; #60): a chip under the header
+  showing the difficulty now; its tap asks, then plays the stage on the map again on the other difficulty
+  (`MapViewModel.SwitchDifficulty` → `GameSession.ReplayStage(stage, difficulty)`). On Hard a berry **Hard**
+  badge leads the header's level line and ends the encounter preview's subtitle (`EncounterViewModel.IsHard`).
+  Replays and the next stage keep the difficulty, even after a restart (saved, schema 12). Screenshots: `--screen map-hard | encounter-hard`.
 - Screenshots: `--screen kinship-map | kinship-poi | kinship-trial | kinship-choice | region-progress`
   (a scripted walk up to the first stage's Kinship site, every fight on the way counted won).
 
@@ -218,9 +231,9 @@ is unaffected.
   children in `src/BeastCraft.Presentation/Screens/GroveViewModels.cs`): one screen, an inner `Tabs`
   strip (Glade / Garden / Board / Npc), reached by pushing from the Home tab bar's Grove slot
   (`HomeScreen.SelectTab`) rather than showing inline.
-- **Glade**: habitat chips (locked ones dimmed) select which habitat's decor grid shows — a simple
-  4-column slot grid, not free drag (a producer-reviewable simplification, see grove.md §5 and §10:
-  no drag primitive exists to reuse, and the Core cap is a count per habitat, not a layout). Every
+- **Glade**: habitat chips (locked ones dimmed) select which habitat's decor grid shows: a
+  4-column slot grid to place and remove, and below it a habitat canvas where each piece is dragged to
+  move it (#46; grove.md §5). Every
   owned beast is a card: portrait (its worn colour form's tint applied, see below), affinity tier and
   XP bar, Feed/Play (disabled on cooldown) and, once any gift is pending, Collect/Collect all.
 - **Garden**: plots as a 2-column grid (empty → a seed-picker `ChoiceModal`; growing → a progress bar;
@@ -263,8 +276,8 @@ Continue falls back to the `.bak` with a message when the main file is torn.
 **Idle.** `GameSession.ClaimIdle` runs `IdleRewardCalculator.Claim` with the device's clocks
 (`IGameClock`: the wall clock plus a monotonic one, Android's `elapsedRealtime`), on Continue, when
 the app comes back (the map claims it when it next shows) and from the idle chip; a claim of
-nothing is silent. The optional "idle full" notification is a host seam (`IIdleNotifier`), off by
-default, implemented on Android only.
+nothing is silent. The optional "idle full" and "Grove ready" notifications go through a host seam
+(`ILocalNotifier`, one channel and alarm each), both off by default, implemented on Android only.
 
 ## Avatar, Inventory and the Trader
 
@@ -294,8 +307,8 @@ byte-identical. Built on the shared component layer below ("Shared components").
     with Wear (`CosmeticRules.TrySetOption(save, null, categoryId, optionId, library)` — `beastId:
     null` is the established meaning "the avatar" throughout `CosmeticRules`), plus a curated
     six-swatch colour row per colour category (`AvatarWardrobeViewModel.Swatches`, UI-only presets
-    over the always-free `TrySetColor`; no colour-picker widget exists in the toolkit yet, flagged in
-    the design doc).
+    over the always-free `TrySetColor`) and a Custom chip that opens the HSV picker (`ColourPickerModal`).
+    New looks carry a dot until seen (schema 12).
 - **Inventory tab** (`InventoryScreen`, `InventoryHubViewModel` and its three children in
   `src/BeastCraft.Presentation/Screens/InventoryViewModels.cs`): Gear / Materials / Looks.
   - *Gear*: every owned gear instance (beast and avatar), a filter chip row (All/Beast/Avatar) and a
@@ -506,11 +519,6 @@ notification is an opt-in Android hook.
 - Grove is built (D4 — see "The Grove" above); Avatar, Inventory and the Trader are built (see
   "Avatar, Inventory and the Trader" above). The roster's own looks are still shown, not edited
   beyond the look-token shop's direct purchases and the avatar's own wardrobe (editing a *beast's*
-  worn looks beyond its colour forms is a later PR). No "new since you last looked" marker on
-  Inventory (flagged in avatar-inventory-shop.md — needs a small save addition). No colour-picker
-  widget in the toolkit yet: the avatar wardrobe's colour categories use a curated six-swatch preset
-  row over the always-free `TrySetColor` rather than a full picker.
-- One save slot; no region list (the next region starts automatically after a boss).
-- The Grove has no Android local-notification hook (only the in-app toast on entering Home): the
-  idle-full notification's `IIdleNotifier` seam exists, a Grove-readiness one does not yet — a
-  natural, separable follow-up.
+  worn looks beyond its colour forms is a later PR). New gear and looks carry a "new" dot until
+  seen (schema 12), and the wardrobe's colour categories have an HSV picker beside the six swatches (#46).
+- No region list (the next region starts automatically after a boss).

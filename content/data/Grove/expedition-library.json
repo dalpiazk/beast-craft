@@ -4,7 +4,7 @@
   "Destinations": [
     {
       "DestinationId": "whispering_hollow",
-      "DisplayName": "Whispering Hollow",
+      "DisplayName": "expedition.whispering_hollow.name",
       "UnlockSource": "habitat",
       "UnlockId": "mossy_glade",
       "DurationHours": 2,
@@ -13,7 +13,7 @@
     },
     {
       "DestinationId": "sunken_shoal",
-      "DisplayName": "Sunken Shoal",
+      "DisplayName": "expedition.sunken_shoal.name",
       "UnlockSource": "habitat",
       "UnlockId": "tide_pool",
       "DurationHours": 3,
@@ -22,7 +22,7 @@
     },
     {
       "DestinationId": "frostglass_ridge",
-      "DisplayName": "Frostglass Ridge",
+      "DisplayName": "expedition.frostglass_ridge.name",
       "UnlockSource": "habitat",
       "UnlockId": "snow_hollow",
       "DurationHours": 4,
@@ -31,7 +31,7 @@
     },
     {
       "DestinationId": "nearby_meadow",
-      "DisplayName": "Nearby Meadow",
+      "DisplayName": "expedition.nearby_meadow.name",
       "UnlockSource": "start",
       "UnlockId": "",
       "DurationHours": 1,
@@ -40,7 +40,7 @@
     },
     {
       "DestinationId": "old_orchard",
-      "DisplayName": "Old Orchard",
+      "DisplayName": "expedition.old_orchard.name",
       "UnlockSource": "start",
       "UnlockId": "",
       "DurationHours": 3,
@@ -49,7 +49,7 @@
     },
     {
       "DestinationId": "river_bend",
-      "DisplayName": "River Bend",
+      "DisplayName": "expedition.river_bend.name",
       "UnlockSource": "start",
       "UnlockId": "",
       "DurationHours": 5,
@@ -58,7 +58,7 @@
     },
     {
       "DestinationId": "quiet_ruins",
-      "DisplayName": "Quiet Ruins",
+      "DisplayName": "expedition.quiet_ruins.name",
       "UnlockSource": "start",
       "UnlockId": "",
       "DurationHours": 8,
@@ -67,7 +67,7 @@
     },
     {
       "DestinationId": "far_ridge_trail",
-      "DisplayName": "Far Ridge Trail",
+      "DisplayName": "expedition.far_ridge_trail.name",
       "UnlockSource": "start",
       "UnlockId": "",
       "DurationHours": 12,
@@ -272,43 +272,43 @@
   "Stories": [
     {
       "StoryId": "story_whispering_hollow",
-      "Text": "The scouts found a hollow tree that hums faintly when the wind turns. They left it exactly as they found it.",
-      "CodexCategory": "Wilds"
+      "Text": "expedition_story.story_whispering_hollow.text",
+      "CodexCategory": "expedition_story.story_whispering_hollow.codex_category"
     },
     {
       "StoryId": "story_sunken_shoal",
-      "Text": "At low tide a shoal appears, ringed in shells no one has named yet. The scouts sketched a few before the water returned.",
-      "CodexCategory": "Wilds"
+      "Text": "expedition_story.story_sunken_shoal.text",
+      "CodexCategory": "expedition_story.story_sunken_shoal.codex_category"
     },
     {
       "StoryId": "story_frostglass_ridge",
-      "Text": "Ice on the ridge has grown so clear you can see frozen leaves inside it, perfectly preserved from some older autumn.",
-      "CodexCategory": "Wilds"
+      "Text": "expedition_story.story_frostglass_ridge.text",
+      "CodexCategory": "expedition_story.story_frostglass_ridge.codex_category"
     },
     {
       "StoryId": "story_nearby_meadow",
-      "Text": "A meadow just past the treeline is thick with wildflowers that close up tight whenever a shadow passes over.",
-      "CodexCategory": "Old Roads"
+      "Text": "expedition_story.story_nearby_meadow.text",
+      "CodexCategory": "expedition_story.story_nearby_meadow.codex_category"
     },
     {
       "StoryId": "story_old_orchard",
-      "Text": "The old orchard's trees are gnarled and half-wild now, but they still fruit every year, right on schedule.",
-      "CodexCategory": "Old Roads"
+      "Text": "expedition_story.story_old_orchard.text",
+      "CodexCategory": "expedition_story.story_old_orchard.codex_category"
     },
     {
       "StoryId": "story_river_bend",
-      "Text": "Where the river bends there is a quiet pool the current never seems to disturb, however hard it rains upstream.",
-      "CodexCategory": "Old Roads"
+      "Text": "expedition_story.story_river_bend.text",
+      "CodexCategory": "expedition_story.story_river_bend.codex_category"
     },
     {
       "StoryId": "story_quiet_ruins",
-      "Text": "Something was built here once, long enough ago that moss has claimed most of the walls. It still feels cared for.",
-      "CodexCategory": "Old Roads"
+      "Text": "expedition_story.story_quiet_ruins.text",
+      "CodexCategory": "expedition_story.story_quiet_ruins.codex_category"
     },
     {
       "StoryId": "story_far_ridge_trail",
-      "Text": "The trail crests a ridge with a view of country none of the maps quite agree on. The scouts added their own notes.",
-      "CodexCategory": "Old Roads"
+      "Text": "expedition_story.story_far_ridge_trail.text",
+      "CodexCategory": "expedition_story.story_far_ridge_trail.codex_category"
     }
   ]
 }

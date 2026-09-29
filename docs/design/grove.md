@@ -203,7 +203,7 @@ The `Tabs` widget and the `HomeTab.Grove` slot already existed (see "What alread
 page, the same way the Roster tab's "Compendium" chip pushes a screen without changing the Roster
 tab's own selection — `HomeViewModel.Tab` never actually becomes `Grove`.
 
-**Producer-reviewable simplification: decor placement is a slot grid, not free drag.** The draft's
+**Decor placement: first a slot grid (D4), since joined by free drag (#46, below).** The draft's
 "drag-to-place decor via the existing `Hotspot`/drag primitives" doesn't fit a portrait phone well
 (a placed piece's exact `X`/`Y` has no gameplay meaning — `GroveRules.PlaceDecor`'s cap is a *count*
 per habitat, not a layout), and no drag-and-drop primitive actually exists in the toolkit to reuse (a
@@ -211,8 +211,12 @@ per habitat, not a layout), and no drag-and-drop primitive actually exists in th
 simple 4-column grid of slots (`GladeViewModel.Slots`, filled left-to-right in `PlacedDecor`'s own
 order): tap an empty slot for a picker over owned-but-unplaced decor (a `ChoiceModal`, scoped to the
 habitat like `GroveRules.PlaceDecor` already checks); tap a filled slot to put it away (still owned).
-`X`/`Y`/`Rotation` are written as `0`/`0`/`0` — the fields stay in the save shape for whenever a later
-pass adds real placement art and free arrangement matters.
+**Free arrangement (#46).** The slot grid stays the place and remove path, and a habitat canvas below it
+(a placeholder panel until habitat art lands) shows each placed piece at its `X`/`Y`: fractions 0-1 of
+the canvas, from the top left. Dragging a piece moves it (the toolkit's `Draggable`, which wins over the
+page's scroll) and commits through `GroveRules.MoveDecor`, which clamps to 0-1; loading clamps too
+(`GroveProgress.EnsureInitialized`). A new piece starts halfway down, in the next column along.
+`Rotation` stays 0. No save change: `PlacedDecorEntry` always had `X`/`Y`.
 
 **Glade**: habitat chips (locked ones dimmed, matching `GroveRules.IsHabitatUnlocked`) selecting which
 habitat's decor grid shows; every owned beast as a card (portrait — with its worn colour form's tint,
@@ -483,10 +487,9 @@ constrained the choice — flagged for review, not hidden:
    refuses a *second send to the same destination* while one is already away there, never a repeat
    beast across different destinations. Flagged in case the producer wants a "one destination at a
    time per beast" rule for flavour reasons even though nothing mechanical requires it.
-8. **Decor placement is a slot grid, not free drag** (D4). See §5's own callout: no drag primitive
-   exists to reuse, and `PlaceDecor`'s cap is a count, not a layout, so a grid loses nothing mechanical
-   — but it is a real visual simplification from the draft's ask, flagged for review before real
-   habitat art (which might want to suggest specific spots) is authored.
+8. **Decor placement: a slot grid plus free drag** (D4, then #46). The grid places and removes; a
+   habitat canvas lets the player drag each piece where they like (see §5). `PlaceDecor`'s cap is still a
+   count, not a layout. Real habitat art (which might suggest specific spots) is still to come.
 9. **NPCs are a fourth Grove-hub tab, not their own screen** (D4). The draft didn't say; "the Grove
    Keeper... now also tends the Grove hub" (§6) reads as NPCs belonging inside it, and the content is
    small (4 NPCs, at most one request and one side story each) — light enough that a fifth top-level
@@ -522,9 +525,9 @@ constrained the choice — flagged for review, not hidden:
    §5), the Grove tab's real content (replacing the placeholder), the soothing option on the ordinary
    encounter preview, colour forms in the beast detail's looks area, the whole-sprite tint fallback
    (§7) applied everywhere an owned beast's own sprite draws, `GameSession.RefreshGrove` and its
-   in-app toast on Home. Not built in this pass: the Android local-notification hook (the idle-full
-   notification's `IIdleNotifier` seam exists; a Grove-readiness one does not yet — nothing in D4
-   depended on it, and it is a natural, separable follow-up) and real art (every visual here is the
+   in-app toast on Home. Since built (#46): the Android "Grove ready" notification (`PlayerSettings.GroveNotifications`, off by
+   default; `GameSession.GroveReadyUtc`, the soonest plot or expedition still on its way; the host's
+   `ILocalNotifier` with its own channel). Not built: real art (every visual here is the
    existing toolkit's cards/lists/grid, matching how every other D4-adjacent screen — Compendium,
    Achievements, the discovery layer — shipped before its own art).
 

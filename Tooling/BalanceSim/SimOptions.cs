@@ -440,7 +440,7 @@ namespace BeastCraft.Tooling.BalanceSim
                 {
                     if (!LayoutCache.TryGetValue(path, out BattleLayoutData data))
                     {
-                        data = System.Text.Json.JsonSerializer.Deserialize<BattleLayoutData>(System.IO.File.ReadAllText(path),
+                        data = System.Text.Json.JsonSerializer.Deserialize<BattleLayoutData>(BeastCraft.Localization.ContentText.ReadFile(path),
                                                                                             new System.Text.Json.JsonSerializerOptions { IncludeFields = true });
                         List<string> errors = ObstacleLayoutValidator.Validate(data, null, null, null);
                         if (errors.Count > 0)
@@ -758,7 +758,7 @@ namespace BeastCraft.Tooling.BalanceSim
             if (_pinned == null)
             {
                 string path = PinnedDifficultyFile;
-                EncounterDifficultyData data = System.Text.Json.JsonSerializer.Deserialize<EncounterDifficultyData>(System.IO.File.ReadAllText(path),
+                EncounterDifficultyData data = System.Text.Json.JsonSerializer.Deserialize<EncounterDifficultyData>(BeastCraft.Localization.ContentText.ReadFile(path),
                                                                                                                   new System.Text.Json.JsonSerializerOptions { IncludeFields = true });
                 Dictionary<string, double> pinned = new Dictionary<string, double>(StringComparer.Ordinal);
                 foreach (DifficultyCellData cell in data.Cells)
@@ -932,8 +932,9 @@ namespace BeastCraft.Tooling.BalanceSim
             "  --out <path>               Also write the Markdown report to this file.\n" +
             "  --write-difficulty <path>  PvE, generated set, one seed: also write the calibrated multipliers as the game's\n" +
             "                             encounter-difficulty.json (content/data/Encounters/). Report unchanged.\n" +
-            "  --pin-difficulty <path>    PvE, generated set: no calibration search; every cell fights at the multiplier this\n" +
-            "                             encounter-difficulty.json gives it ({seed} in the path = the run's seed). Measures a\n" +
+            "  --pin-difficulty <path>    PvE (generated or fixed set): no calibration search; every cell fights at\n" +
+            "                             the multiplier this encounter-difficulty.json gives it ({seed} in the path = the\n" +
+            "                             run's seed; on the fixed set a cell's Shape is the encounter id). Measures a\n" +
             "                             change at a stale calibration. Default: off (calibrate).\n" +
             "  --obstacles <region|none>  PvE: every battle stands on one of this region's battle layouts for its arena\n" +
             "                             (content/data/Encounters/battle-layouts.json), picked from the battle's seed as the\n" +
@@ -1589,9 +1590,9 @@ namespace BeastCraft.Tooling.BalanceSim
                 return null;
             }
 
-            if (options.PinDifficultyPath != null && (!options.RunPve || options.EncounterSet != EncounterSet.Generated))
+            if (options.PinDifficultyPath != null && !options.RunPve)
             {
-                error = "--pin-difficulty needs PvE and the generated encounter set.";
+                error = "--pin-difficulty needs PvE.";
                 return null;
             }
 

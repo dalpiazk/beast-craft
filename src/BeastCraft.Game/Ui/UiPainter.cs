@@ -453,6 +453,20 @@ namespace BeastCraft.Game.Ui
             RoundedRect(box, 0f, color);
         }
 
+        /// <summary>The "new" marker: a small berry dot ringed in white, centred on <paramref name="center"/>.</summary>
+        public void NewDot(Vec2 center)
+        {
+            Disc(center, 13f, C("white"));
+            Disc(center, 9f, C("berry"));
+        }
+
+        /// <summary>A small berry pill with <paramref name="text"/> in white (the Hard badge).</summary>
+        public void Badge(Rect box, string text, float size)
+        {
+            RoundedRect(box, box.Height / 2f, C("berry"));
+            TextIn(text, box, size, C("white"), TextAlign.Center);
+        }
+
         public void Disc(Vec2 center, float radius, Color color)
         {
             if (radius <= 0f)

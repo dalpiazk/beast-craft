@@ -297,7 +297,7 @@ namespace BeastCraft.Tests.EditMode
             string path = FindFile(DropTableData.ProjectRelativePath);
             Assert.IsNotNull(path, "Could not find " + DropTableData.ProjectRelativePath);
 
-            DropTableData tables = FieldJson.FromJson<DropTableData>(File.ReadAllText(path));
+            DropTableData tables = FieldJson.FromJson<DropTableData>(BeastCraft.Localization.ContentText.ReadFile(path));
             Assert.IsNotNull(tables);
             return tables;
         }

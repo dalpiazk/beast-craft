@@ -2706,7 +2706,11 @@ of the design pass are recorded here.
   (mainline 70 / 15 / 8 / 7), 2-6 Elites per map (mainline 1-3), so "harder" also means more dens.
   Battle nodes draw squad 45 / horde 40 (no solo).
 - **Difficulty, chosen per run.** The player picks **Normal** (the default) or **Hard** when an r11
-  expedition starts: `CampaignRules.StartRun(save, regions, regionId, [stage,] seed, difficulty)`,
+  expedition starts (in the game: the map header's Normal or Hard chip, which plays the stage on the
+  map again on the other difficulty, on a new map; a replayed stage and the next stage keep the difficulty,
+  `GameSession.ReplayStage`, `PreferredDifficulty`; a Hard badge sits on the map header and the encounter
+  preview; when r11 opens, a toast on the results says it can be played on Hard; the choice is kept in the
+  save, `CampaignProgress.PreferredDifficulty` (schema 12), so it survives a restart; #60): `CampaignRules.StartRun(save, regions, regionId, [stage,] seed, difficulty)`,
   stored on the run as `MapRun.Difficulty` (save schema 6; see progression-and-saves.md). Hard is
   refused outside a post-game region, and the save validator rejects a stored Hard there. On Hard the
   map is generated from the region's `HardMode` (Hard shapes, Hard elite shape, Hard boss template);
@@ -2735,7 +2739,10 @@ of the design pass are recorded here.
   Calibrated with the tuning log's boss recipe, both on the Normal template's battles (the lineups are
   identical). The pair's clear rate falls off a cliff around x0.711-0.713 (41% to 29% at 256 samples a
   step), so Normal sits at 36-41% and Hard at about 18-25% depending on the sample count; see the
-  tuning log.
+  tuning log. **Superseded:** these first-pass figures predate the typical-team re-calibration.
+  The shipped overrides are x0.437 (Normal) and x0.454 (Hard), calibrated to 35% and 20% on the typical
+  team (docs/balance/typical-team-report.md, "Region bosses"); the x0.711 and x0.723 above are history,
+  not retuned here.
 - **Rewards.** Loot is Normal's on both difficulties: each post-game shape pays out as the mainline
   shape its `DropShapeId` names (`EncounterLibrary.DropShapeOf`, `EncounterPlan.DropShapeId`), so
   `drop-tables.json` is unchanged and r11 draws the 81-100 band (D7); no new gear tier (D6: the boss
@@ -2744,8 +2751,8 @@ of the design pass are recorded here.
   100 at r10's boss). **Hard's only extra reward is looks**: a new cosmetic source, `boss_hard`,
   unlocked by any Hard boss clear of its post-game region (the first included; never sold, never
   dropped). DRAFT looks: Normal lair Dawnshade Horn (Kirin, Light) and Dawnshade Crown (Basilisk,
-  Dark); Hard Radiant Dawnshade Horn and Eclipse Dawnshade Crown. No badge: the cosmetic system has no
-  badge or title slot (deferred).
+  Dark); Hard Radiant Dawnshade Horn and Eclipse Dawnshade Crown. No badge or title for Hard: titles exist now
+  (achievements; compendium-achievements.md) but none is tied to Hard, and adding one is a producer call.
 - **Pacing.** `--mode campaign` keeps post-game regions out of every mainline table and gate and adds
   a separately seeded "Post-game" section (docs/balance/campaign-pacing-report.md): r11 on Normal
   clears 56% of its battles (squad / horde 65%, elites and gates 45%, boss 34%) and takes 66 battles

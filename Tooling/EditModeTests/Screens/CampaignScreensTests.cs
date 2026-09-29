@@ -167,7 +167,7 @@ namespace BeastCraft.Tests.EditMode
         {
             MemorySaveStorage storage = new MemorySaveStorage();
             GameSession session = new GameSession(Content, storage, () => 1);
-            SettingsViewModel settings = new SettingsViewModel(session.Settings, session.SaveSettings);
+            SettingsViewModel settings = new SettingsViewModel(session.Settings, session.Content.Text, session.SaveSettings);
             settings.Change(SettingsViewModel.TeamSuggestions);
             settings.Change(SettingsViewModel.Effects);
 
@@ -179,15 +179,18 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
-        public void Title_OffersContinueOnlyWithASave_AndAsksBeforeReplacingIt()
+        public void Title_OffersContinueOnlyWithASave_AndNewGameUsesAFreeSlot()
         {
             MemorySaveStorage storage = new MemorySaveStorage();
             TitleViewModel fresh = new TitleViewModel(new GameSession(Content, storage, () => MapSeed));
             Assert.IsFalse(fresh.CanContinue);
+            Assert.IsFalse(fresh.CanManageSlots);
             Assert.IsFalse(fresh.NewGameNeedsConfirm);
+            Assert.IsTrue(fresh.PrepareNewGame());
             fresh.NewGame("griffin");
             Assert.IsTrue(fresh.CanContinue);
-            Assert.IsTrue(new TitleViewModel(new GameSession(Content, storage, () => 1)).NewGameNeedsConfirm);
+            Assert.IsTrue(fresh.CanManageSlots);
+            Assert.IsFalse(new TitleViewModel(new GameSession(Content, storage, () => 1)).NewGameNeedsConfirm, "two slots are still free");
         }
 
         // ------------------------------------------------------------------ region map

@@ -3,13 +3,17 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using BeastCraft.Campaign;
+using BeastCraft.Common;
 using BeastCraft.Creatures;
 using BeastCraft.Discovery;
+using BeastCraft.Economy;
 using BeastCraft.Expeditions;
 using BeastCraft.Garden;
 using BeastCraft.Grove;
 using BeastCraft.Idle;
+using BeastCraft.Localization;
 using BeastCraft.Presentation.Content;
+using BeastCraft.Presentation.Telemetry;
 using BeastCraft.Progression;
 using BeastCraft.Save;
 using BeastCraft.Skills;
@@ -136,6 +140,41 @@ namespace BeastCraft.Presentation.Screens
 
         /// <summary>A message for the player (the backup notice, or why nothing could be loaded); null when all was well.</summary>
         public string Message;
+
+        /// <summary>
+        /// The consumables handed back because the last battle never finished (the app closed or
+        /// crashed mid-battle; <see cref="Economy.BattleConsumableRefund"/>), for a toast; null when none.
+        /// </summary>
+        public string RefundMessage;
+    }
+
+    /// <summary>One save slot as the slot list shows it (<see cref="GameSession.DescribeSlot"/>).</summary>
+    public sealed class SaveSlotSummary
+    {
+        /// <summary>The slot id (<see cref="GameSession.SlotIds"/>).</summary>
+        public string Slot;
+
+        /// <summary>1-based, for "Slot 1".</summary>
+        public int Number;
+
+        /// <summary>Whether the slot holds a save (readable or not).</summary>
+        public bool HasSave;
+
+        /// <summary>Whether the save loads (<see cref="Problem"/> says why not).</summary>
+        public bool Readable;
+
+        /// <summary>When the save was last written (UTC); <see cref="DateTime.MinValue"/> when the storage does not say.</summary>
+        public DateTime SavedUtc;
+
+        public int AvatarLevel;
+
+        public int BeastCount;
+
+        /// <summary>The region being played, or null.</summary>
+        public string RegionName;
+
+        /// <summary>Why the save does not load; null when it does.</summary>
+        public string Problem;
     }
 
     /// <summary>
@@ -150,8 +189,14 @@ namespace BeastCraft.Presentation.Screens
     /// </summary>
     public sealed class GameSession
     {
-        /// <summary>The one save slot (a slot list comes later).</summary>
+        /// <summary>The first save slot: the one a session starts on.</summary>
         public const string SlotName = "slot1";
+
+        /// <summary>How many save slots the game offers (<see cref="SlotIds"/>).</summary>
+        public const int SlotCount = 3;
+
+        /// <summary>The save slots, in order: <c>slot1</c> to <c>slot3</c> (<see cref="SlotName"/> first).</summary>
+        public static readonly IReadOnlyList<string> SlotIds = new[] { SlotName, "slot2", "slot3" };
 
         /// <summary>
         /// How many beasts a campaign battle fields beside the Beastbinder
@@ -178,7 +223,14 @@ namespace BeastCraft.Presentation.Screens
             _settingsStore = new PlayerSettingsStore(storage, json);
             _seeds = seeds ?? (() => Environment.TickCount);
             Settings = _settingsStore.Load();
+            Telemetry = new TelemetryGate(() => Settings);
         }
+
+        /// <summary>
+        /// The analytics and crash reports (#62), behind the player's consent settings: nothing starts and nothing is sent
+        /// while they are off (the default). Hosts plug a provider in with <see cref="TelemetryGate.Use"/>.
+        /// </summary>
+        public TelemetryGate Telemetry { get; }
 
         public GameContent Content { get; }
 
@@ -196,10 +248,233 @@ namespace BeastCraft.Presentation.Screens
 
         public PlayerSettings Settings { get; private set; }
 
-        /// <summary>Whether the slot holds a save (the title screen's Continue).</summary>
+        /// <summary>The slot New Game, Continue and every autosave use (<see cref="UseSlot"/>).</summary>
+        public string Slot { get; private set; } = SlotName;
+
+        /// <summary>Whether the current <see cref="Slot"/> holds a save.</summary>
         public bool HasSave
         {
-            get { return _store.Exists(SlotName); }
+            get { return _store.Exists(Slot); }
+        }
+
+        /// <summary>Whether any slot holds a save (the title screen's Continue).</summary>
+        public bool AnySave
+        {
+            get
+            {
+                foreach (string slot in SlotIds)
+                {
+                    if (_store.Exists(slot))
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Switches to <paramref name="slot"/> (one of <see cref="SlotIds"/>). The game in play, if any,
+        /// is put down first (it was autosaved as it went), so nothing of it is written into the new
+        /// slot. False (nothing changes) for a slot that is not one of the game's.
+        /// </summary>
+        public bool UseSlot(string slot)
+        {
+            if (!IsSlot(slot))
+            {
+                return false;
+            }
+
+            if (!string.Equals(slot, Slot, StringComparison.Ordinal))
+            {
+                Save = null;
+                Slot = slot;
+            }
+
+            return true;
+        }
+
+        /// <summary>Whether <paramref name="slot"/> is one of <see cref="SlotIds"/>.</summary>
+        public static bool IsSlot(string slot)
+        {
+            foreach (string id in SlotIds)
+            {
+                if (string.Equals(id, slot, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>The first slot with no save, or null when every slot holds one.</summary>
+        public string FirstEmptySlot()
+        {
+            foreach (string slot in SlotIds)
+            {
+                if (!_store.Exists(slot))
+                {
+                    return slot;
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// The slot Continue loads: the most recently written save (when the storage knows write times),
+        /// else the first slot that holds one; null when there is none.
+        /// </summary>
+        public string MostRecentSlot()
+        {
+            string best = null;
+            DateTime bestTime = DateTime.MinValue;
+            foreach (string slot in SlotIds)
+            {
+                if (!_store.Exists(slot))
+                {
+                    continue;
+                }
+
+                DateTime written = _storage is IBackupSaveStorage files ? files.Read(slot).LastWriteUtc : DateTime.MinValue;
+                if (best == null || written > bestTime)
+                {
+                    best = slot;
+                    bestTime = written;
+                }
+            }
+
+            return best;
+        }
+
+        /// <summary>
+        /// What <paramref name="slot"/> holds, for the slot list: loaded (and migrated in memory, never
+        /// written) to read its summary. Never throws.
+        /// </summary>
+        public SaveSlotSummary DescribeSlot(string slot)
+        {
+            SaveSlotSummary summary = new SaveSlotSummary { Slot = slot, Number = IndexOfSlot(slot) + 1 };
+            if (!_store.Exists(slot))
+            {
+                return summary;
+            }
+
+            summary.HasSave = true;
+            if (_storage is IBackupSaveStorage files)
+            {
+                summary.SavedUtc = files.Read(slot).LastWriteUtc;
+            }
+
+            SaveLoadResult loaded = _store.Load(slot);
+            if (!loaded.Success)
+            {
+                summary.Problem = loaded.Error;
+                return summary;
+            }
+
+            PlayerSave save = loaded.Save;
+            summary.Readable = true;
+            summary.AvatarLevel = save.Avatar?.Level ?? 1;
+            summary.BeastCount = save.Beasts?.Count ?? 0;
+            string regionId = save.Campaign?.ActiveRun != null && save.Campaign.HasActiveRun ? save.Campaign.ActiveRun.RegionId : save.Campaign?.CurrentRegionId;
+            summary.RegionName = string.IsNullOrEmpty(regionId) ? null : Content.Campaign.GetRegion(regionId)?.DisplayName;
+            return summary;
+        }
+
+        /// <summary>
+        /// Deletes <paramref name="slot"/>'s save and its backup. When it is the slot in play, the game
+        /// is put down (nothing autosaves into the emptied slot). False when there was nothing to delete.
+        /// </summary>
+        public bool DeleteSlot(string slot)
+        {
+            if (!IsSlot(slot) || !_store.Exists(slot))
+            {
+                return false;
+            }
+
+            if (string.Equals(slot, Slot, StringComparison.Ordinal))
+            {
+                Save = null;
+            }
+
+            return _storage.Delete(slot);
+        }
+
+        /// <summary>
+        /// <paramref name="slot"/>'s save as current-schema JSON, for an export file: loaded, migrated and
+        /// validated like Continue, so a file written from a backup or an older schema is still a clean,
+        /// current save. Null with <paramref name="error"/> when the slot has nothing loadable.
+        /// </summary>
+        public string ExportSlot(string slot, out string error)
+        {
+            error = null;
+            if (!IsSlot(slot) || !_store.Exists(slot))
+            {
+                error = Content.Text.Get("ui.session.no_save_in_slot");
+                return null;
+            }
+
+            SaveLoadResult loaded = _store.Load(slot);
+            if (!loaded.Success)
+            {
+                error = loaded.Error;
+                return null;
+            }
+
+            return new SaveSerializer(new JsonSaveSerializer(true)).Serialize(loaded.Save);
+        }
+
+        /// <summary>
+        /// Imports <paramref name="json"/> (an exported save) into <paramref name="slot"/>. The text is
+        /// read, migrated and validated first; only a save that loads cleanly is written, so a bad file
+        /// never touches the slot (its old save, if any, stays as the slot's backup). When it is the slot
+        /// in play, the game is put down so the next Continue reads the import. False with
+        /// <paramref name="error"/> (nothing written) otherwise.
+        /// </summary>
+        public bool ImportSlot(string slot, string json, out string error)
+        {
+            error = null;
+            if (!IsSlot(slot))
+            {
+                error = Content.Text.Get("ui.save_slots.not_a_slot");
+                return false;
+            }
+
+            SaveLoadResult loaded = new SaveSerializer(new JsonSaveSerializer(true)).Deserialize(json);
+            if (!loaded.Success)
+            {
+                error = loaded.Error;
+                return false;
+            }
+
+            if (!_store.Save(slot, loaded.Save))
+            {
+                error = Content.Text.Get("ui.session.write_failed");
+                return false;
+            }
+
+            if (string.Equals(slot, Slot, StringComparison.Ordinal))
+            {
+                Save = null;
+            }
+
+            return true;
+        }
+
+        /// <summary>0-based position of <paramref name="slot"/> in <see cref="SlotIds"/>, or -1.</summary>
+        public static int IndexOfSlot(string slot)
+        {
+            for (int i = 0; i < SlotIds.Count; i++)
+            {
+                if (string.Equals(SlotIds[i], slot, StringComparison.Ordinal))
+                {
+                    return i;
+                }
+            }
+
+            return -1;
         }
 
         public int AutosaveCount { get; private set; }
@@ -274,6 +549,7 @@ namespace BeastCraft.Presentation.Screens
             Save.EnsureInitialized();
             LastTeam.Clear();
             DismissedSuggestions.Clear();
+            Telemetry.Track("new_game");
             EnsureExpedition();
             IdleRewardCalculator.Claim(Save, Content.Idle, Clock.UtcNow, Clock.Monotonic, Party());
             EvaluateAchievementsOnSessionStart();
@@ -330,17 +606,24 @@ namespace BeastCraft.Presentation.Screens
         /// </summary>
         public LoadOutcome Continue()
         {
-            SaveLoadResult loaded = _store.Load(SlotName);
+            SaveLoadResult loaded = _store.Load(Slot);
             if (!loaded.Success)
             {
-                return new LoadOutcome { Success = false, Message = "Your save could not be loaded (" + loaded.Error + ")." };
+                return new LoadOutcome { Success = false, Message = Content.Text.Format("ui.session.not_loaded", loaded.Error) };
             }
 
             Save = loaded.Save;
             LastTeam.Clear();
             DismissedSuggestions.Clear();
+            Telemetry.Track("session_start");
             bool fromBackup = loaded.StorageSource == SaveFileSource.Backup;
             bool started = !Save.Campaign.HasActiveRun;
+
+            // A battle the app died in (never resolved) hands back what it spent; the refund takes it off the
+            // record, and the autosave below writes that. If that save fails the refund is undone in memory
+            // (the file still holds the record), so it is paid exactly once, by a load that can save it.
+            BattleConsumableRefund.Snapshot beforeRefund = BattleConsumableRefund.Take(Save);
+            List<string> refunded = BattleConsumableRefund.RefundPending(Save, id => Content.Battle.GetConsumable(id)?.MaxStack);
             EnsureExpedition();
 
             // Welcome back: the idle rewards are claimed straight away, before achievements are
@@ -350,12 +633,17 @@ namespace BeastCraft.Presentation.Screens
             LastContinueClaim = ClaimIdle();
             bool achievementsChanged = EvaluateAchievementsOnSessionStart();
             bool groveReady = RefreshGrove();
-            if (started || fromBackup || achievementsChanged || groveReady)
+            if (started || fromBackup || achievementsChanged || groveReady || refunded.Count > 0)
             {
                 // Keep the main file current: a started expedition, a retroactively earned achievement,
                 // a Grove unlock/gift the offline clock just rolled forward, or the restored backup
-                // made main again.
-                Autosave(AutosaveReason.Results);
+                // made main again. A refund is written straight away too.
+                bool saved = Autosave(AutosaveReason.Results);
+                if (!saved && refunded.Count > 0)
+                {
+                    BattleConsumableRefund.Restore(Save, beforeRefund, refunded);
+                    refunded.Clear();
+                }
             }
 
             return new LoadOutcome
@@ -363,9 +651,22 @@ namespace BeastCraft.Presentation.Screens
                 Success = true,
                 FromBackup = fromBackup,
                 Message = fromBackup
-                              ? "Your latest save could not be read (" + (loaded.MainFileProblem ?? "corrupt") + "), so the backup was loaded. A little progress may be lost."
-                              : null
+                              ? Content.Text.Format("ui.session.from_backup", loaded.MainFileProblem ?? Content.Text.Get("ui.session.corrupt"))
+                              : null,
+                RefundMessage = RefundText(refunded)
             };
+        }
+
+        /// <summary>The refund toast: "Your last battle did not finish, so your Fury Draught was returned." Null for none.</summary>
+        private string RefundText(List<string> refunded)
+        {
+            if (refunded == null || refunded.Count == 0)
+            {
+                return null;
+            }
+
+            List<string> names = refunded.ConvertAll(id => Content.Battle.GetConsumable(id)?.DisplayName ?? id);
+            return Content.Text.Format(names.Count == 1 ? "ui.session.refund_one" : "ui.session.refund_many", string.Join(Content.Text.Get("ui.session.and"), names));
         }
 
         /// <summary>Writes the save to the slot (nothing to do before a game is loaded). Returns whether it was written.</summary>
@@ -376,7 +677,7 @@ namespace BeastCraft.Presentation.Screens
                 return false;
             }
 
-            LastAutosaveOk = _store.Save(SlotName, Save);
+            LastAutosaveOk = _store.Save(Slot, Save);
             LastAutosaveReason = reason;
             if (LastAutosaveOk)
             {
@@ -441,28 +742,28 @@ namespace BeastCraft.Presentation.Screens
             List<string> parts = new List<string>();
             if (view.Gold > 0)
             {
-                parts.Add("+" + view.Gold + " gold");
+                parts.Add(Content.Text.Format("ui.idle.gold", view.Gold));
             }
 
             if (view.Xp > 0)
             {
-                parts.Add("+" + view.Xp + " XP" + (view.Levels > 0 ? " (" + view.Levels + (view.Levels == 1 ? " level up)" : " level ups)") : string.Empty));
+                parts.Add(Content.Text.Format("ui.beast.xp_gained_short", view.Xp) + (view.Levels > 0 ? Content.Text.Format(view.Levels == 1 ? "ui.idle.level_up" : "ui.idle.level_ups", view.Levels) : string.Empty));
             }
 
             if (view.Materials > 0)
             {
-                parts.Add(view.Materials + (view.Materials == 1 ? " material" : " materials"));
+                parts.Add(Content.Text.Format(view.Materials == 1 ? "ui.encounter.reward_material" : "ui.encounter.reward_materials", view.Materials));
             }
 
             if (view.Look != null)
             {
-                parts.Add("a new look");
+                parts.Add(Content.Text.Get("ui.idle.new_look"));
             }
 
-            string extra = ExtraRewardText(result.TitlesEarned, 0);
+            string extra = ExtraRewardText(Content.Text, result.TitlesEarned, 0);
             if (parts.Count > 0)
             {
-                view.Message = "While you were away: " + string.Join(", ", parts) + (result.Capped ? " (idle was full)" : string.Empty) + "." + extra;
+                view.Message = Content.Text.Format(result.Capped ? "ui.idle.while_away_full" : "ui.idle.while_away", string.Join(Content.Text.Get("ui.common.list_sep"), parts)) + extra;
                 Autosave(AutosaveReason.IdleClaim);
             }
             else if (extra.Length > 0)
@@ -478,7 +779,7 @@ namespace BeastCraft.Presentation.Screens
         /// <summary>The map's idle chip: see <see cref="IdleStatusView"/>. Changes nothing.</summary>
         public IdleStatusView IdleStatus()
         {
-            IdleStatusView status = new IdleStatusView { Text = "Idle" };
+            IdleStatusView status = new IdleStatusView { Text = Content.Text.Get("ui.home.idle") };
             if (Save == null || Content.Idle?.Rewards == null)
             {
                 return status;
@@ -493,15 +794,17 @@ namespace BeastCraft.Presentation.Screens
             int minutes = (int)Math.Floor(preview.Hours * 60.0);
             if (preview.ProgressLevel <= 0)
             {
-                status.Text = "Idle: win a battle to start";
+                status.Text = Content.Text.Get("ui.idle.win_to_start");
             }
             else if (status.Capped)
             {
-                status.Text = "Idle full (" + preview.CapHours + "h)";
+                status.Text = Content.Text.Format("ui.idle.full", preview.CapHours);
             }
             else
             {
-                status.Text = "Idle " + (minutes >= 60 ? minutes / 60 + "h " + (minutes % 60).ToString("00", CultureInfo.InvariantCulture) + "m" : minutes + "m");
+                status.Text = minutes >= 60
+                                  ? Content.Text.Format("ui.idle.hours_minutes", minutes / 60, (minutes % 60).ToString("00", CultureInfo.InvariantCulture))
+                                  : Content.Text.Format("ui.idle.minutes", minutes);
             }
 
             return status;
@@ -518,15 +821,81 @@ namespace BeastCraft.Presentation.Screens
             return new DateTime(Save.Idle.LastClaimUtcTicks, DateTimeKind.Utc).AddHours(Content.Idle.Rewards.CapHours);
         }
 
+        /// <summary>
+        /// When the Grove next has something ready (for the "Grove" local notification, <c>PlayerSettings.GroveNotifications</c>):
+        /// the earliest moment a planted plot finishes growing or an expedition comes back, of those not ready yet. Each
+        /// time left is measured the way the Grove measures it (<see cref="OfflineClock.ElapsedMs"/>: the monotonic clock
+        /// where it is trusted), then counted from now. Gifts are left out. Null when nothing is on its way.
+        /// </summary>
+        public DateTime? GroveReadyUtc()
+        {
+            if (Save == null)
+            {
+                return null;
+            }
+
+            DateTime now = Clock.UtcNow;
+            long nowTicks = OfflineClock.UtcTicks(now);
+            long nowMono = OfflineClock.MonotonicMs(Clock.Monotonic);
+            double soonest = double.MaxValue;
+            foreach (PlotState plot in Save.Garden?.Plots ?? new List<PlotState>())
+            {
+                SeedSpeciesData seed = plot == null ? null : Content.GardenLibrary?.Seed(plot.SeedId);
+                if (seed != null)
+                {
+                    long elapsed = OfflineClock.ElapsedMs(plot.StartUtcTicks, plot.StartMonotonicMs, nowTicks, nowMono, out bool _);
+                    soonest = Soonest(soonest, Math.Max(1, seed.GrowthHours) * MsPerHour - elapsed);
+                }
+            }
+
+            foreach (ActiveExpedition active in Save.Expeditions?.Active ?? new List<ActiveExpedition>())
+            {
+                DestinationData destination = active == null ? null : Content.ExpeditionLibrary?.Destination(active.DestinationId);
+                if (destination != null)
+                {
+                    long elapsed = OfflineClock.ElapsedMs(active.StartUtcTicks, active.StartMonotonicMs, nowTicks, nowMono, out bool _);
+                    soonest = Soonest(soonest, destination.DurationHours * MsPerHour - elapsed);
+                }
+            }
+
+            return soonest == double.MaxValue ? (DateTime?)null : now.AddMilliseconds(soonest);
+        }
+
+        private const double MsPerHour = 3600000.0;
+
+        /// <summary>The sooner of <paramref name="soonest"/> and <paramref name="remainingMs"/>, counting only time still to go.</summary>
+        private static double Soonest(double soonest, double remainingMs)
+        {
+            return remainingMs > 0.0 && remainingMs < soonest ? remainingMs : soonest;
+        }
+
         public bool SaveSettings()
         {
             return _settingsStore.Save(Settings);
         }
 
         /// <summary>
+        /// The difficulty the player last chose for a post-game region (<see cref="ReplayStage(int, RunDifficulty)"/>), kept in
+        /// the save (<see cref="CampaignProgress.PreferredDifficulty"/>, schema 12) so it survives a restart. The next stage
+        /// starts on it, so a Hard run stays Hard from stage to stage. Normal before a game is loaded.
+        /// </summary>
+        public RunDifficulty PreferredDifficulty
+        {
+            get { return Save?.Campaign?.PreferredDifficulty ?? RunDifficulty.Normal; }
+            private set
+            {
+                if (Save?.Campaign != null)
+                {
+                    Save.Campaign.PreferredDifficulty = value;
+                }
+            }
+        }
+
+        /// <summary>
         /// Makes sure an expedition is in progress: when none is, starts one (a new map seed) into
         /// Hearthglen while it is not behind the player, else the first unlocked region whose boss
-        /// still stands, else the region last played.
+        /// still stands, else the region last played. It starts on <see cref="PreferredDifficulty"/>
+        /// where the region allows it (<see cref="RegionLibrary.Allows"/>), else on Normal.
         /// </summary>
         public CampaignResult EnsureExpedition()
         {
@@ -535,7 +904,19 @@ namespace BeastCraft.Presentation.Screens
                 return null;
             }
 
-            return CampaignRules.StartRun(Save, Content.Campaign, NextRegionId(), _seeds());
+            string regionId = NextRegionId();
+            RunDifficulty difficulty = RegionLibrary.Allows(Content.Campaign.GetRegion(regionId), PreferredDifficulty) ? PreferredDifficulty : RunDifficulty.Normal;
+            return CampaignRules.StartRun(Save, Content.Campaign, regionId, _seeds(), difficulty);
+        }
+
+        /// <summary>Whether the region of the expedition in progress can be played on Hard (a post-game region).</summary>
+        public bool HardAvailable
+        {
+            get
+            {
+                MapRun run = Save?.Campaign?.ActiveRun;
+                return run != null && Save.Campaign.HasActiveRun && RegionLibrary.Allows(Content.Campaign.GetRegion(run.RegionId), RunDifficulty.Hard);
+            }
         }
 
         /// <summary>The region an expedition starts into: see <see cref="EnsureExpedition"/>.</summary>
@@ -618,7 +999,7 @@ namespace BeastCraft.Presentation.Screens
             _groveReadyToasted.IntersectWith(stillReady);
             if (somethingNew)
             {
-                PendingToasts.Add("Something is ready in the Grove.");
+                PendingToasts.Add(Content.Text.Get("ui.grove.ready_toast"));
             }
 
             return somethingNew;
@@ -658,16 +1039,16 @@ namespace BeastCraft.Presentation.Screens
                 List<string> parts = new List<string>();
                 if (reward.Look != null)
                 {
-                    parts.Add("the " + LookName(reward.Look));
+                    parts.Add(Content.Text.Format("ui.discovery.reward_look", LookName(reward.Look)));
                 }
 
                 if (reward.Gold > 0)
                 {
-                    parts.Add(reward.Gold + " gold");
+                    parts.Add(Content.Text.Format("ui.encounter.reward_gold", reward.Gold));
                 }
 
-                string earned = parts.Count > 0 ? "You earned " + string.Join(" and ", parts) + "." : string.Empty;
-                PendingToasts.Add(region + " fully explored! " + earned + ExtraRewardText(reward.TitlesEarned, reward.LookTokens));
+                string earned = parts.Count > 0 ? Content.Text.Format("ui.discovery.you_earned", string.Join(Content.Text.Get("ui.session.and"), parts)) : string.Empty;
+                PendingToasts.Add(Content.Text.Format("ui.discovery.fully_explored_toast", region) + earned + ExtraRewardText(Content.Text, reward.TitlesEarned, reward.LookTokens));
             }
 
             return reward;
@@ -702,7 +1083,7 @@ namespace BeastCraft.Presentation.Screens
             }
 
             List<string> titles = earned.ConvertAll(a => a.TitleText);
-            PendingToasts.Add((titles.Count == 1 ? "New title earned: " : "New titles earned: ") + string.Join(", ", titles) + ".");
+            PendingToasts.Add(Content.Text.Format(titles.Count == 1 ? "ui.achievements.new_title" : "ui.achievements.new_titles", string.Join(Content.Text.Get("ui.common.list_sep"), titles)));
             return true;
         }
 
@@ -711,23 +1092,23 @@ namespace BeastCraft.Presentation.Screens
         /// message (<see cref="DiscoveryResult"/>, <see cref="CompletionReward"/>, <see cref="KinshipResult"/>,
         /// <see cref="Campaign.CampaignResult"/> each carry these); "" when there is nothing to add.
         /// </summary>
-        public static string ExtraRewardText(List<AchievementData> titlesEarned, int lookTokensGranted)
+        public static string ExtraRewardText(StringTable text, List<AchievementData> titlesEarned, int lookTokensGranted)
         {
             List<string> parts = new List<string>();
             foreach (AchievementData title in titlesEarned ?? new List<AchievementData>())
             {
                 if (title != null)
                 {
-                    parts.Add("the title \"" + title.TitleText + "\"");
+                    parts.Add(text.Format("ui.achievements.the_title", title.TitleText));
                 }
             }
 
             if (lookTokensGranted > 0)
             {
-                parts.Add(lookTokensGranted + " look token" + (lookTokensGranted == 1 ? string.Empty : "s"));
+                parts.Add(text.Format(lookTokensGranted == 1 ? "ui.achievements.look_token" : "ui.achievements.look_tokens", lookTokensGranted));
             }
 
-            return parts.Count == 0 ? string.Empty : " You earned " + string.Join(" and ", parts) + ".";
+            return parts.Count == 0 ? string.Empty : " " + text.Format("ui.discovery.you_earned", string.Join(text.Get("ui.session.and"), parts));
         }
 
         /// <summary>
@@ -764,8 +1145,7 @@ namespace BeastCraft.Presentation.Screens
 
         /// <summary>
         /// Replays stage <paramref name="stage"/> of the region in progress (to explore what the fog still
-        /// hides): the expedition in progress is abandoned (its stage progress stays; the fog never comes
-        /// back) and a new one starts on a new map. Refused beyond the first uncleared stage.
+        /// hides) on the expedition's own difficulty: see <see cref="ReplayStage(int, RunDifficulty)"/>.
         /// </summary>
         public CampaignResult ReplayStage(int stage)
         {
@@ -774,19 +1154,43 @@ namespace BeastCraft.Presentation.Screens
                 return null;
             }
 
+            return ReplayStage(stage, Save.Campaign.ActiveRun.Difficulty);
+        }
+
+        /// <summary>
+        /// Replays stage <paramref name="stage"/> of the region in progress on <paramref name="difficulty"/>
+        /// (Hard only in a post-game region): the expedition in progress is abandoned (its stage progress
+        /// stays; the fog never comes back) and a new one starts on a new map. Refused beyond the first
+        /// uncleared stage or on a difficulty the region does not allow; a start the rules refuse puts the
+        /// player back on the stage and difficulty they left. The chosen difficulty becomes
+        /// <see cref="PreferredDifficulty"/>.
+        /// </summary>
+        public CampaignResult ReplayStage(int stage, RunDifficulty difficulty)
+        {
+            if (Save == null || !Save.Campaign.HasActiveRun)
+            {
+                return null;
+            }
+
             string regionId = Save.Campaign.ActiveRun.RegionId;
-            if (stage < 0 || stage > CampaignRules.NextStage(Save, Content.Campaign, regionId))
+            if (stage < 0 || stage > CampaignRules.NextStage(Save, Content.Campaign, regionId) ||
+                !RegionLibrary.Allows(Content.Campaign.GetRegion(regionId), difficulty))
             {
                 return null;
             }
 
             MapRun previous = Save.Campaign.ActiveRun;
             int oldStage = previous.Stage;
+            RunDifficulty oldDifficulty = previous.Difficulty;
             CampaignRules.Retreat(Save);
-            CampaignResult started = CampaignRules.StartRun(Save, Content.Campaign, regionId, stage, _seeds());
-            if (!started.Success)
+            CampaignResult started = CampaignRules.StartRun(Save, Content.Campaign, regionId, stage, _seeds(), difficulty);
+            if (started.Success)
             {
-                CampaignRules.StartRun(Save, Content.Campaign, regionId, oldStage, _seeds());
+                PreferredDifficulty = difficulty;
+            }
+            else
+            {
+                CampaignRules.StartRun(Save, Content.Campaign, regionId, oldStage, _seeds(), oldDifficulty);
             }
 
             Autosave(AutosaveReason.Results);

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using BeastCraft.Presentation.Audio;
 using BeastCraft.Presentation.Board;
 using BeastCraft.Presentation.Layout;
 using BeastCraft.Presentation.Screens;
@@ -27,12 +28,13 @@ namespace BeastCraft.Game.Screens
         private Panel _rewards;
         private Panel _notes;
         private float _elapsedMs;
+        private bool _announced;
 
         public ResultsScreen(ScreenContext ctx, ResultsViewModel model) : base(ctx)
         {
             _model = model;
             _scroll = Ui.Add(new ScrollView { Id = "page", Bounds = new Rect(0, 330f, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight - 330f - 220f) });
-            AddButton(null, "continue", new Rect(Pad + 60f, PortraitLayout.CanvasHeight - 180f, PortraitLayout.CanvasWidth - 2f * Pad - 120f, 140f), "Continue", "primary", Continue);
+            AddButton(null, "continue", new Rect(Pad + 60f, PortraitLayout.CanvasHeight - 180f, PortraitLayout.CanvasWidth - 2f * Pad - 120f, 140f), Loc("ui.results.continue"), "primary", Continue);
             Build();
 
             // Scripted screenshots show the bars filled.
@@ -47,6 +49,26 @@ namespace BeastCraft.Game.Screens
         public override void Enter()
         {
             base.Enter();
+            if (!_announced)
+            {
+                // Once, as the results first show: the win's reward sting, and a level-up when anyone levelled.
+                _announced = true;
+                if (_model.Victory)
+                {
+                    Ctx.Audio?.Cue(AudioDirector.Rewards);
+                }
+
+                if (!string.IsNullOrEmpty(_model.HardUnlockedToast))
+                {
+                    Ctx.Game.Toast(_model.HardUnlockedToast);
+                }
+
+                if (_model.AvatarLevelsGained > 0 || _model.Team.Exists(row => row.LevelsGained > 0))
+                {
+                    Ctx.Audio?.Cue(AudioDirector.LevelUp);
+                }
+            }
+
             ShowHints(BeastCraft.Tutorial.HintTriggers.ResultsOpen, _model.NodeId);
         }
 
@@ -104,14 +126,14 @@ namespace BeastCraft.Game.Screens
             y = _notes.Bounds.Bottom + 30f;
 
             // The whole battle's log: every hit with its damage breakdown, filterable by unit.
-            AddButton(_scroll, "battle-log", new Rect(Pad + 120f, y, width - 240f, 110f), "Battle log", "secondary", () => OpenLog());
+            AddButton(_scroll, "battle-log", new Rect(Pad + 120f, y, width - 240f, 110f), Loc("ui.insight.battle_log"), "secondary", () => OpenLog());
             _scroll.ContentHeight = y + 140f;
         }
 
         /// <summary>The post-battle log (every hit's damage breakdown, filterable by unit).</summary>
         public BattleLogModal OpenLog()
         {
-            BattleLogModal modal = new BattleLogModal(Ctx, _model.Log, "Battle log: " + _model.Subtitle);
+            BattleLogModal modal = new BattleLogModal(Ctx, _model.Log, Loc("ui.results.log_title", _model.Subtitle));
             Ctx.Stack.PushModal(modal);
             return modal;
         }
@@ -146,19 +168,19 @@ namespace BeastCraft.Game.Screens
                 Rect portrait = new Rect(box.X + 16f, box.Y + 14f, 152f, 152f);
                 Painter.Soft(new Vec2(portrait.Center.X, portrait.Bottom - 8f), 64f, Painter.C("plum", 0.25f), 0.3f);
                 Painter.Art(Painter.Sprite(Ctx.Content.Battle.GetSpecies(row.SpeciesId)?.ArtKey), portrait, false, row.KnockedOut ? new Microsoft.Xna.Framework.Color(170, 160, 170) : (Microsoft.Xna.Framework.Color?)null);
-                string level = row.LevelsGained > 0 ? "Lv " + row.LevelBefore + " > " + row.LevelAfter : "Lv " + row.LevelAfter;
+                string level = row.LevelsGained > 0 ? Loc("ui.results.level_change", row.LevelBefore, row.LevelAfter) : Loc("ui.common.level", row.LevelAfter);
                 Painter.TextIn(row.Name, new Rect(box.X + 190f, box.Y + 26f, 330f, 34f), style.TextSizes.Body + 4f, Painter.C("ink"), TextAlign.Left);
                 Painter.TextIn(level, new Rect(box.X + 190f, box.Y + 70f, 330f, 30f), style.TextSizes.Body, Painter.C("plum"), TextAlign.Left);
                 if (row.LevelsGained > 0)
                 {
                     Rect badge = new Rect(box.X + 470f, box.Y + 24f, 230f, 56f);
                     Painter.Framed(badge, 28f, 4f, Painter.C("plum"), Painter.C("gold"));
-                    Painter.TextIn("LEVEL UP!", badge, style.TextSizes.Body, Painter.C("plum"), TextAlign.Center);
+                    Painter.TextIn(Loc("ui.results.level_up"), badge, style.TextSizes.Body, Painter.C("plum"), TextAlign.Center);
                 }
 
-                string xp = _model.IsKinshipTrial ? "Trial" : "+" + row.XpGained.ToString(CultureInfo.InvariantCulture) + " XP";
+                string xp = _model.IsKinshipTrial ? Loc("ui.results.trial") : Loc("ui.beast.xp_gained_short", row.XpGained);
                 Painter.TextIn(xp, new Rect(box.Right - 220f, box.Y + 112f, 196f, 40f), style.TextSizes.Body, Painter.C("leafDeep"), TextAlign.Right);
-                string note = row.KnockedOut ? "Knocked out (share only)" : row.Banked > 0 ? "+" + row.Banked + " banked at the limit" : row.FalloffPercent < 100 ? row.FalloffPercent + "% (out-levelled)" : null;
+                string note = row.KnockedOut ? Loc("ui.results.knocked_out") : row.Banked > 0 ? Loc("ui.results.banked", row.Banked) : row.FalloffPercent < 100 ? Loc("ui.results.falloff", row.FalloffPercent) : null;
                 if (note != null)
                 {
                     Painter.TextIn(note, new Rect(box.Right - 400f, box.Y + 70f, 376f, 30f), style.TextSizes.Small + 1f, Painter.C("inkSoft"), TextAlign.Right);
@@ -176,7 +198,7 @@ namespace BeastCraft.Game.Screens
             if (widget == _notes)
             {
                 Rect box = widget.Bounds;
-                Painter.TextIn(_model.Victory ? "On the map" : "What now", new Rect(box.X + 40f, box.Y + 26f, box.Width - 80f, 36f), style.TextSizes.Heading - 6f, Painter.C("plum"),
+                Painter.TextIn(Loc(_model.Victory ? "ui.results.on_the_map" : "ui.results.what_now"), new Rect(box.X + 40f, box.Y + 26f, box.Width - 80f, 36f), style.TextSizes.Heading - 6f, Painter.C("plum"),
                                TextAlign.Left);
                 float y = box.Y + 84f;
                 foreach (string note in _model.Notes)
@@ -195,7 +217,7 @@ namespace BeastCraft.Game.Screens
         private void DrawRewards(Rect box)
         {
             UiStyle style = Ctx.Style;
-            Painter.TextIn("Rewards", new Rect(box.X + 40f, box.Y + 26f, box.Width - 80f, 36f), style.TextSizes.Heading - 6f, Painter.C("plum"), TextAlign.Left);
+            Painter.TextIn(Loc("ui.results.rewards"), new Rect(box.X + 40f, box.Y + 26f, box.Width - 80f, 36f), style.TextSizes.Heading - 6f, Painter.C("plum"), TextAlign.Left);
             float y = box.Y + 90f;
             float size = style.TextSizes.Body;
 
@@ -209,45 +231,45 @@ namespace BeastCraft.Game.Screens
             if (_model.IsKinshipTrial)
             {
                 // A Kinship trial pays no XP or loot: its reward is the beast that joins.
-                Line("kinship", _model.Victory ? "A beast will join you" : "The stone waits for you", _model.Victory ? "leafDeep" : "inkSoft");
-                Line("seal", "Trials pay no XP or loot", "inkSoft");
+                Line("kinship", Loc(_model.Victory ? "ui.results.beast_will_join" : "ui.results.stone_waits"), _model.Victory ? "leafDeep" : "inkSoft");
+                Line("seal", Loc("ui.results.trials_pay_nothing"), "inkSoft");
                 return;
             }
 
-            Line("coin", "+" + _model.Gold + " gold  (" + _model.GoldTotal + " held)");
+            Line("coin", Loc("ui.results.gold", _model.Gold, _model.GoldTotal));
             if (_model.FirstClear)
             {
-                Line("star", "First clear bonus!", "leafDeep");
+                Line("star", Loc("ui.results.first_clear"), "leafDeep");
             }
 
             if (_model.FirstClearGear != null)
             {
-                Line("star", "First clear gear: " + _model.FirstClearGear, "leafDeep");
+                Line("star", Loc("ui.results.first_clear_gear", _model.FirstClearGear), "leafDeep");
             }
 
             foreach (RewardLine drop in _model.Drops)
             {
-                Line(drop.Kind == "gear" ? "inventory" : drop.Kind == "look" ? "star" : "seal", drop.Name + (drop.Quantity > 1 ? " x" + drop.Quantity : string.Empty));
+                Line(drop.Kind == "gear" ? "inventory" : drop.Kind == "look" ? "star" : "seal", drop.Quantity > 1 ? Loc("ui.encounter.consumable_count", drop.Name, drop.Quantity) : drop.Name);
             }
 
             if (_model.Drops.Count == 0)
             {
-                Line("seal", _model.Victory ? "No drops this time" : "No drops (no clear)", "inkSoft");
+                Line("seal", Loc(_model.Victory ? "ui.results.no_drops" : "ui.results.no_drops_no_clear"), "inkSoft");
             }
 
             if (_model.AvatarXp > 0)
             {
-                Line("avatar", _model.AvatarDisplayName + " +" + _model.AvatarXp + " XP" + (_model.AvatarLevelsGained > 0 ? " (level up!)" : string.Empty), "inkSoft");
+                Line("avatar", Loc("ui.results.avatar_xp", _model.AvatarDisplayName, _model.AvatarXp) + (_model.AvatarLevelsGained > 0 ? Loc("ui.results.avatar_level_up") : string.Empty), "inkSoft");
             }
 
             if (_model.BenchXp > 0)
             {
-                Line("roster", "Bench beasts shared " + _model.BenchXp + " XP" + (_model.BenchLevelsGained > 0 ? " (+" + _model.BenchLevelsGained + " levels)" : string.Empty), "inkSoft");
+                Line("roster", Loc("ui.results.bench_xp", _model.BenchXp) + (_model.BenchLevelsGained > 0 ? Loc("ui.results.bench_levels", _model.BenchLevelsGained) : string.Empty), "inkSoft");
             }
 
             if (_model.XpBanked > 0)
             {
-                Line("lock", _model.XpBanked + " XP banked at the binding limit (Lv " + _model.BindingLimit + ")", "inkSoft");
+                Line("lock", Loc("ui.results.xp_banked", _model.XpBanked, _model.BindingLimit), "inkSoft");
             }
         }
     }

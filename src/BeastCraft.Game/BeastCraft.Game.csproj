@@ -33,6 +33,15 @@
     <AssemblyName>BeastCraft.Game</AssemblyName>
   </PropertyGroup>
 
+  <!--
+    The frame-time overlay (#64, Diagnostics/PerfOverlay.cs) is compiled into Debug builds. A Release build
+    gets it only with -p:PerfOverlay=true, to measure optimised code (docs/design/performance.md); a
+    shipping build never has it.
+  -->
+  <PropertyGroup Condition="'$(PerfOverlay)' == 'true'">
+    <DefineConstants>$(DefineConstants);PERF_OVERLAY</DefineConstants>
+  </PropertyGroup>
+
   <ItemGroup>
     <!--
       The UI font's rasteriser (TtfText): FontStashSharp, Zlib licence (with StbTrueTypeSharp and
@@ -41,6 +50,11 @@
       unlike the MonoGame reference it must flow to the hosts (they load it at run time).
     -->
     <PackageReference Include="FontStashSharp.MonoGame" Version="1.6.1" />
+    <!--
+      The music stream's OGG Vorbis decoder (MonoGameMusicPlayer): NVorbis, MIT (see THIRD-PARTY-NOTICES.md).
+      The version MonoGame's own packages resolve, referenced here so it flows to every host.
+    -->
+    <PackageReference Include="NVorbis" Version="0.10.4" />
     <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.5.1">
       <PrivateAssets>All</PrivateAssets>
     </PackageReference>

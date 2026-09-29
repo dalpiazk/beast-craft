@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using BeastCraft.Avatar;
 using BeastCraft.Battle;
 using BeastCraft.Creatures;
 using BeastCraft.Economy;
+using BeastCraft.Localization;
 using BeastCraft.Presentation.Content;
 using BeastCraft.Progression;
 using BeastCraft.Save;
@@ -33,7 +35,9 @@ namespace BeastCraft.Presentation.Screens
                 {
                     BeastId = beast.BeastId,
                     Name = session.BeastName(beast),
-                    Subtitle = "Lv " + (beast.Progress?.Level ?? 1) + (species != null ? "  " + species.DisplayName : string.Empty),
+                    Subtitle = species != null
+                                   ? session.Content.Text.Format("ui.inventory.beast_subtitle", beast.Progress?.Level ?? 1, species.DisplayName)
+                                   : session.Content.Text.Format("ui.common.level", beast.Progress?.Level ?? 1),
                     ArtKey = species?.ArtKey,
                     TintHex = species == null ? null : ColourFormPresentation.WornTint(session.Save, beast.BeastId, species.SpeciesId, session.Content.GroveLibrary, session.Content.Economy?.Cosmetics)
                 });
@@ -81,6 +85,9 @@ namespace BeastCraft.Presentation.Screens
         public string WornBy;
 
         public bool CanSell => WornBy == null;
+
+        /// <summary>Owned and not seen yet (<see cref="SeenRules.IsNewGear"/>), as the list was built: the row shows a dot.</summary>
+        public bool IsNew;
     }
 
     /// <summary>
@@ -92,11 +99,18 @@ namespace BeastCraft.Presentation.Screens
     public sealed class InventoryGearViewModel
     {
         private readonly GameSession _session;
+        private bool _seenChanged;
 
         public InventoryGearViewModel(GameSession session)
         {
             _session = session ?? throw new ArgumentNullException(nameof(session));
             Refresh();
+        }
+
+        /// <summary>The text table (<c>ui.*</c>).</summary>
+        private StringTable Text
+        {
+            get { return _session.Content.Text; }
         }
 
         public GearOwnerFilter Filter { get; private set; } = GearOwnerFilter.All;
@@ -137,7 +151,7 @@ namespace BeastCraft.Presentation.Screens
                     }
 
                     string holder = GearRules.FindBeastGearHolder(save, owned.InstanceId);
-                    Gear.Add(Row(owned.InstanceId, gear.GearId, false, gear.DisplayName ?? gear.GearId, BeastDetailViewModel.SlotName(gear.Slot), gear.Rarity, gear.MinimumLevel, gear.Modifiers,
+                    Gear.Add(Row(owned.InstanceId, gear.GearId, false, gear.DisplayName ?? gear.GearId, BeastDetailViewModel.SlotName(gear.Slot, Text), gear.Rarity, gear.MinimumLevel, gear.Modifiers,
                                  holder == null ? null : _session.BeastName(save.FindBeast(holder))));
                 }
             }
@@ -153,8 +167,8 @@ namespace BeastCraft.Presentation.Screens
                     }
 
                     bool worn = Array.IndexOf(save.AvatarEquippedGear ?? new string[0], owned.InstanceId) >= 0;
-                    Gear.Add(Row(owned.InstanceId, gear.AvatarGearId, true, gear.DisplayName ?? gear.AvatarGearId, AvatarGearViewModel.SlotName(gear.Slot), gear.Rarity, gear.MinimumLevel,
-                                 gear.Modifiers, worn ? "Avatar" : null));
+                    Gear.Add(Row(owned.InstanceId, gear.AvatarGearId, true, gear.DisplayName ?? gear.AvatarGearId, AvatarGearViewModel.SlotName(gear.Slot, Text), gear.Rarity, gear.MinimumLevel,
+                                 gear.Modifiers, worn ? Text.Get("ui.inventory.avatar") : null));
                 }
             }
 
@@ -172,7 +186,46 @@ namespace BeastCraft.Presentation.Screens
             }
         }
 
-        private static InventoryGearRow Row(string instanceId, string gearId, bool avatar, string name, string slotName, int rarity, int minimumLevel, List<StatModifier> modifiers, string wornBy)
+        /// <summary>Whether any owned gear (beast or avatar, whatever the filter) is not seen yet: the Gear tab shows a dot.</summary>
+        public bool AnyNew
+        {
+            get
+            {
+                PlayerSave save = _session.Save;
+                if (save?.Gear == null)
+                {
+                    return false;
+                }
+
+                foreach (OwnedGear gear in save.Gear.BeastGear.Concat(save.Gear.AvatarGear))
+                {
+                    if (gear != null && SeenRules.IsNewGear(save, gear.InstanceId))
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+        }
+
+        /// <summary>Records <paramref name="instanceId"/> as seen (its row has been on screen); <see cref="SaveSeen"/> writes it.</summary>
+        public void MarkSeen(string instanceId)
+        {
+            _seenChanged |= SeenRules.MarkGearSeen(_session.Save, instanceId);
+        }
+
+        /// <summary>Autosaves when rows were seen since the last call (the screen calls it as it leaves or switches tab).</summary>
+        public void SaveSeen()
+        {
+            if (_seenChanged)
+            {
+                _seenChanged = false;
+                _session.Autosave(AutosaveReason.PlayerEdit);
+            }
+        }
+
+        private InventoryGearRow Row(string instanceId, string gearId, bool avatar, string name, string slotName, int rarity, int minimumLevel, List<StatModifier> modifiers, string wornBy)
         {
             InventoryGearRow row = new InventoryGearRow
             {
@@ -183,7 +236,8 @@ namespace BeastCraft.Presentation.Screens
                 SlotName = slotName,
                 Rarity = rarity,
                 MinimumLevel = minimumLevel,
-                WornBy = wornBy
+                WornBy = wornBy,
+                IsNew = SeenRules.IsNewGear(_session.Save, instanceId)
             };
             foreach (StatModifier modifier in modifiers ?? new List<StatModifier>())
             {
@@ -192,17 +246,7 @@ namespace BeastCraft.Presentation.Screens
                     continue;
                 }
 
-                if (modifier.FlatBonus != 0)
-                {
-                    row.Bonuses.Add((modifier.FlatBonus > 0 ? "+" : string.Empty) + modifier.FlatBonus.ToString(System.Globalization.CultureInfo.InvariantCulture) + " " +
-                                    DerivedStats.ShortName(modifier.Stat));
-                }
-
-                if (modifier.PercentBonus != 0f)
-                {
-                    row.Bonuses.Add((modifier.PercentBonus > 0f ? "+" : string.Empty) + (modifier.PercentBonus * 100f).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + "% " +
-                                    DerivedStats.ShortName(modifier.Stat));
-                }
+                row.Bonuses.AddRange(DerivedStats.BonusLines(modifier, Text));
             }
 
             return row;
@@ -222,14 +266,14 @@ namespace BeastCraft.Presentation.Screens
             GearSO gear = owned == null ? null : _session.Content.Battle.GetGear(owned.GearId);
             if (gear == null)
             {
-                message = "Unknown gear.";
+                message = Text.Get("ui.gear.unknown");
                 return false;
             }
 
             GearEquipResult result = GearRules.EquipBeastGear(save, beastId, gear.Slot, instanceId, _session.Content.Battle);
             if (result == GearEquipResult.Equipped)
             {
-                return Changed(out message, "Equipped.");
+                return Changed(out message, Text.Get("ui.beast.equipped_done"));
             }
 
             message = EquipReason(result);
@@ -244,14 +288,14 @@ namespace BeastCraft.Presentation.Screens
             AvatarGearSO gear = owned == null ? null : _session.Content.Battle.GetAvatarGear(owned.GearId);
             if (gear == null)
             {
-                message = "Unknown gear.";
+                message = Text.Get("ui.gear.unknown");
                 return false;
             }
 
             GearEquipResult result = GearRules.EquipAvatarGear(save, gear.Slot, instanceId, _session.Content.Battle);
             if (result == GearEquipResult.Equipped)
             {
-                return Changed(out message, "Equipped.");
+                return Changed(out message, Text.Get("ui.beast.equipped_done"));
             }
 
             message = EquipReason(result);
@@ -265,19 +309,19 @@ namespace BeastCraft.Presentation.Screens
             ShopService shop = _session.Content.Shop;
             if (shop == null)
             {
-                message = "The Trader is unavailable.";
+                message = Text.Get("ui.shop.unavailable");
                 return false;
             }
 
             ShopSaleResult result = shop.TrySellGear(_session.Save, instanceId);
             if (!result.Success)
             {
-                message = result.Outcome == ShopOutcome.Equipped ? "Take it off first." : "Cannot sell that.";
+                message = Text.Get(result.Outcome == ShopOutcome.Equipped ? "ui.inventory.take_off_first" : "ui.inventory.cannot_sell");
                 return false;
             }
 
             gold = result.Gold;
-            return Changed(out message, "Sold for " + gold + " gold.");
+            return Changed(out message, Text.Format("ui.inventory.sold_for", gold));
         }
 
         private bool Changed(out string message, string text)
@@ -288,22 +332,22 @@ namespace BeastCraft.Presentation.Screens
             return true;
         }
 
-        private static string EquipReason(GearEquipResult result)
+        private string EquipReason(GearEquipResult result)
         {
             switch (result)
             {
                 case GearEquipResult.LevelTooLow:
-                    return "Its level is too low.";
+                    return Text.Get("ui.gear.level_low");
                 case GearEquipResult.EquippedElsewhere:
-                    return "Worn by another beast.";
+                    return Text.Get("ui.gear.worn_by_another");
                 case GearEquipResult.SlotMismatch:
-                    return "It does not go in that slot.";
+                    return Text.Get("ui.gear.slot_mismatch");
                 case GearEquipResult.UnknownInstance:
-                    return "You do not have it.";
+                    return Text.Get("ui.gear.not_owned");
                 case GearEquipResult.UnknownGear:
-                    return "Unknown gear.";
+                    return Text.Get("ui.gear.unknown");
                 default:
-                    return "No such owner.";
+                    return Text.Get("ui.gear.no_owner");
             }
         }
     }
@@ -327,6 +371,12 @@ namespace BeastCraft.Presentation.Screens
             Refresh();
         }
 
+        /// <summary>The text table (<c>ui.*</c>).</summary>
+        private StringTable Text
+        {
+            get { return _session.Content.Text; }
+        }
+
         public List<InventoryCountRow> Materials { get; } = new List<InventoryCountRow>();
         public List<InventoryCountRow> GroveItems { get; } = new List<InventoryCountRow>();
         public List<InventoryCountRow> Consumables { get; } = new List<InventoryCountRow>();
@@ -348,7 +398,7 @@ namespace BeastCraft.Presentation.Screens
                 int owned = save.Materials.GetCount(material.MaterialId);
                 if (owned > 0)
                 {
-                    Materials.Add(new InventoryCountRow { Id = material.MaterialId, Name = material.DisplayName ?? material.MaterialId, Quantity = owned, Detail = "Tier " + material.Tier });
+                    Materials.Add(new InventoryCountRow { Id = material.MaterialId, Name = material.DisplayName ?? material.MaterialId, Quantity = owned, Detail = Text.Format("ui.inventory.tier", material.Tier) });
                 }
             }
 

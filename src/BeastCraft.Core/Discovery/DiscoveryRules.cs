@@ -4,6 +4,7 @@ using BeastCraft.Campaign;
 using BeastCraft.Creatures;
 using BeastCraft.Economy;
 using BeastCraft.Encounters;
+using BeastCraft.Localization;
 using BeastCraft.Save;
 using BeastCraft.Skills;
 
@@ -268,20 +269,20 @@ namespace BeastCraft.Discovery
             PointOfInterest poi = PointOfInterest.Find(PointsOnMap(save, content), poiId);
             if (poi == null)
             {
-                error = "That place is not on this map.";
+                error = RulesText.Get("ui.rules.discovery.not_on_map");
                 return null;
             }
 
             PoiState state = StateOf(save, content, poi);
             if (state == PoiState.Found)
             {
-                error = "You have already been there.";
+                error = RulesText.Get("ui.rules.discovery.already_visited");
                 return null;
             }
 
             if (state == PoiState.Hidden)
             {
-                error = "The Gloam still hides that place: explore nearby first.";
+                error = RulesText.Get("ui.rules.discovery.hidden");
                 return null;
             }
 
@@ -330,7 +331,7 @@ namespace BeastCraft.Discovery
                     KinshipSiteData site = content.Library.Site(poi.RefId);
                     if (site == null || KinshipRules.Offer(save, site, content.Roster).Count > 0)
                     {
-                        return DiscoveryResult.Refused("A beast waits here: face its trial.");
+                        return DiscoveryResult.Refused(RulesText.Get("ui.rules.discovery.face_trial"));
                     }
 
                     result.KinshipFallback = true;

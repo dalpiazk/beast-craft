@@ -60,9 +60,48 @@ namespace BeastCraft.Save
         public bool IdleNotifications;
 
         /// <summary>
+        /// A local notification when something in the Grove is ready: a plot grown or an expedition back (the Android host
+        /// only; other hosts ignore it). Off by default.
+        /// </summary>
+        public bool GroveNotifications;
+
+        /// <summary>
+        /// Whether anonymous gameplay events may be sent (#62). Off by default: nothing is set up or sent
+        /// until the player turns it on (the one-time consent screen or the settings).
+        /// </summary>
+        public bool AnalyticsConsent;
+
+        /// <summary>Whether crash reports may be sent (#62). Off by default, like <see cref="AnalyticsConsent"/>.</summary>
+        public bool CrashReportConsent;
+
+        /// <summary>Whether the player has answered the one-time consent screen (it shows until they do).</summary>
+        public bool ConsentAsked;
+
+        /// <summary>
         /// Whether the tutorial hints show (each at most once; <c>PlayerSave.Tutorial.SeenHintIds</c>).
         /// On by default; a hint's own "Turn hints off" and the settings row switch it.
         /// </summary>
         public bool TutorialHints = true;
+
+        /// <summary>
+        /// The overall volume, 0-100 (percent; anything outside reads as the nearest end). 100 by
+        /// default. Music and sound effects play at this times their own volume (docs/design/audio.md).
+        /// </summary>
+        public int MasterVolume = 100;
+
+        /// <summary>The music and ambience volume, 0-100, under <see cref="MasterVolume"/>. 100 by default.</summary>
+        public int MusicVolume = 100;
+
+        /// <summary>The sound effects' volume, 0-100, under <see cref="MasterVolume"/>. 100 by default.</summary>
+        public int SfxVolume = 100;
+
+        /// <summary>Silences all sound without losing the volumes. Off by default.</summary>
+        public bool Muted;
+
+        /// <summary>
+        /// Light vibration on hits, knockouts and key confirms, where the device has it (docs/design/decisions.md:
+        /// on by default, with this toggle). Hosts without haptics ignore it and hide the setting.
+        /// </summary>
+        public bool Haptics = true;
     }
 }

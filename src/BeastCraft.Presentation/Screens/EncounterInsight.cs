@@ -122,13 +122,13 @@ namespace BeastCraft.Presentation.Screens
                     Gap = gap,
                     TeamDealt = DamageFormula.GetLevelMultiplier(view.TeamLevel, group.Level),
                     EnemyDealt = DamageFormula.GetLevelMultiplier(group.Level, view.TeamLevel),
-                    GapText = gap == 0 ? "Level with your team" : Math.Abs(gap) + (Math.Abs(gap) == 1 ? " level " : " levels ") + (gap > 0 ? "above" : "below") + " your team"
+                    GapText = gap == 0 ? content.Text.Get("ui.encounter.gap_level") : content.Text.Format(gap > 0 ? (Math.Abs(gap) == 1 ? "ui.encounter.gap_above_one" : "ui.encounter.gap_above") : (Math.Abs(gap) == 1 ? "ui.encounter.gap_below_one" : "ui.encounter.gap_below"), Math.Abs(gap))
                 };
                 foreach (SkillSO skill in content.Enemies.Kit(group.EnemyId, group.Element) ?? new SkillSO[0])
                 {
                     if (skill != null)
                     {
-                        enemy.Skills.Add(SkillCard.Of(skill, content.Glossary));
+                        enemy.Skills.Add(SkillCard.Of(skill, content.Glossary, content.Text));
                     }
                 }
 

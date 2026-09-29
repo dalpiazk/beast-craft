@@ -71,7 +71,7 @@ namespace BeastCraft.Tests.EditMode
             HintService.TurnOff(again);
             Assert.IsNull(HintService.Next(again, HintTriggers.EncounterOpen, 2), "hints off: none");
             Assert.IsFalse(new GameSession(Content, storage, () => 1).Settings.TutorialHints, "the switch is saved in the settings");
-            SettingsViewModel settings = new SettingsViewModel(again.Settings, again.SaveSettings);
+            SettingsViewModel settings = new SettingsViewModel(again.Settings, again.Content.Text, again.SaveSettings);
             Assert.AreEqual("Off", settings.Rows()[SettingsViewModel.TutorialHints].Value);
             settings.Change(SettingsViewModel.TutorialHints);
             Assert.IsNotNull(HintService.Next(again, HintTriggers.EncounterOpen, 2));
@@ -195,7 +195,7 @@ namespace BeastCraft.Tests.EditMode
         {
             string root = GameContent.FindRoot();
             string path = GameContent.PathOf(root, projectRelativePath);
-            return BeastCraft.FieldJson.FromJson<T>(System.IO.File.ReadAllText(path));
+            return BeastCraft.FieldJson.FromJson<T>(BeastCraft.Localization.ContentText.ReadFile(path));
         }
     }
 }

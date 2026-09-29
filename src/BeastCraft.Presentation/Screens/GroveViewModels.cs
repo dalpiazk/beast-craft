@@ -6,6 +6,7 @@ using BeastCraft.Economy;
 using BeastCraft.Expeditions;
 using BeastCraft.Garden;
 using BeastCraft.Grove;
+using BeastCraft.Localization;
 using BeastCraft.Npc;
 using BeastCraft.Progression;
 using BeastCraft.Save;
@@ -143,6 +144,11 @@ namespace BeastCraft.Presentation.Screens
         public string DecorId;
 
         public string DisplayName;
+
+        /// <summary>Where a placed piece sits on the habitat canvas, fractions 0-1 from the top left (<see cref="GroveRules.MoveDecor"/>).</summary>
+        public float X;
+
+        public float Y;
     }
 
     /// <summary>An owned decor piece not currently placed anywhere, offered for the selected habitat.</summary>
@@ -202,6 +208,12 @@ namespace BeastCraft.Presentation.Screens
         {
             _session = session ?? throw new ArgumentNullException(nameof(session));
             Refresh();
+        }
+
+        /// <summary>The text table (<c>ui.grove.*</c>).</summary>
+        private StringTable Text
+        {
+            get { return _session.Content.Text; }
         }
 
         public List<HabitatRow> Habitats { get; } = new List<HabitatRow>();
@@ -266,7 +278,7 @@ namespace BeastCraft.Presentation.Screens
                     }
 
                     DecorData data = library.Decor(entry.DecorId);
-                    Slots.Add(new DecorSlotRow { Index = index++, DecorId = entry.DecorId, DisplayName = data?.DisplayName ?? entry.DecorId });
+                    Slots.Add(new DecorSlotRow { Index = index++, DecorId = entry.DecorId, DisplayName = data?.DisplayName ?? entry.DecorId, X = entry.X, Y = entry.Y });
                 }
 
                 for (; index < selected.SlotCount; index++)
@@ -329,44 +341,61 @@ namespace BeastCraft.Presentation.Screens
         {
             GroveActionResult result = GroveRules.Feed(_session.Save, _session.Content.GroveLibrary, beastId, _session.Clock.UtcNow, _session.Clock.Monotonic,
                                                        _session.Content.Economy?.Cosmetics);
-            return Apply(result.Success, result.Success ? "Fed! +" + result.XpGained + " affinity XP." + (result.TierUp ? " Tier " + result.Tier + "!" : string.Empty) : result.Error);
+            return Apply(result.Success, result.Success ? Text.Format("ui.grove.fed", result.XpGained) + (result.TierUp ? Text.Format("ui.grove.tier_up", result.Tier) : string.Empty) : result.Error);
         }
 
         public GladeActionOutcome Play(string beastId)
         {
             GroveActionResult result = GroveRules.Play(_session.Save, _session.Content.GroveLibrary, beastId, _session.Clock.UtcNow, _session.Clock.Monotonic,
                                                        _session.Content.Economy?.Cosmetics);
-            return Apply(result.Success, result.Success ? "Played! +" + result.XpGained + " affinity XP." + (result.TierUp ? " Tier " + result.Tier + "!" : string.Empty) : result.Error);
+            return Apply(result.Success, result.Success ? Text.Format("ui.grove.played", result.XpGained) + (result.TierUp ? Text.Format("ui.grove.tier_up", result.Tier) : string.Empty) : result.Error);
         }
 
         public GladeActionOutcome CollectGift(string beastId)
         {
             GiftInstance gift = GroveRules.CollectGift(_session.Save, beastId, _session.Content.Economy?.Cosmetics);
-            return Apply(gift != null, gift != null ? "Gift collected: " + gift.ItemId + "." : "No gift waiting.");
+            return Apply(gift != null, gift != null ? Text.Format("ui.grove.gift_collected", gift.ItemId) : Text.Get("ui.grove.no_gift"));
         }
 
         public GladeActionOutcome CollectAllGifts(string beastId)
         {
             List<GiftInstance> collected = new List<GiftInstance>();
             int count = GroveRules.CollectAllGifts(_session.Save, beastId, collected, _session.Content.Economy?.Cosmetics);
-            return Apply(count > 0, count > 0 ? "Collected " + count + " gift" + (count == 1 ? string.Empty : "s") + "." : "No gifts waiting.");
+            return Apply(count > 0, count > 0 ? Text.Format(count == 1 ? "ui.grove.gifts_collected_one" : "ui.grove.gifts_collected", count) : Text.Get("ui.grove.no_gifts"));
+        }
+
+        /// <summary>Moves placed decor <paramref name="decorId"/> on the habitat canvas (<see cref="GroveRules.MoveDecor"/>; 0-1 fractions). Autosaves on success; no toast.</summary>
+        public bool MoveDecor(string decorId, float x, float y)
+        {
+            GroveActionResult result = GroveRules.MoveDecor(_session.Save, _session.Content.GroveLibrary, decorId, x, y);
+            if (result.Success)
+            {
+                _session.Autosave(AutosaveReason.PlayerEdit);
+                Refresh();
+            }
+
+            return result.Success;
         }
 
         public GladeActionOutcome PlaceDecor(string decorId)
         {
             if (string.IsNullOrEmpty(SelectedHabitatId))
             {
-                return GladeActionOutcome.Of(false, "No habitat unlocked yet.");
+                return GladeActionOutcome.Of(false, Text.Get("ui.grove.no_habitat"));
             }
 
-            GroveActionResult result = GroveRules.PlaceDecor(_session.Save, _session.Content.GroveLibrary, SelectedHabitatId, decorId, 0f, 0f, 0);
-            return Apply(result.Success, result.Success ? "Placed." : result.Error);
+            // A new piece goes on the canvas beside the others (the next free column, halfway down); the player drags it from there.
+            HabitatData habitat = _session.Content.GroveLibrary.Habitat(SelectedHabitatId);
+            int slots = Math.Max(1, habitat?.SlotCount ?? 1);
+            float x = (_session.Save.Grove.PlacedCountIn(SelectedHabitatId) + 0.5f) / slots;
+            GroveActionResult result = GroveRules.PlaceDecor(_session.Save, _session.Content.GroveLibrary, SelectedHabitatId, decorId, x, 0.5f, 0);
+            return Apply(result.Success, result.Success ? Text.Get("ui.grove.placed") : result.Error);
         }
 
         public GladeActionOutcome RemoveDecor(string decorId)
         {
             bool removed = GroveRules.RemoveDecor(_session.Save, decorId);
-            return Apply(removed, removed ? "Put away (still owned)." : "That is not placed.");
+            return Apply(removed, removed ? Text.Get("ui.grove.put_away") : Text.Get("ui.grove.not_placed"));
         }
 
         private GladeActionOutcome Apply(bool success, string message)
@@ -468,6 +497,12 @@ namespace BeastCraft.Presentation.Screens
             Refresh();
         }
 
+        /// <summary>The text table (<c>ui.grove.*</c>).</summary>
+        private StringTable Text
+        {
+            get { return _session.Content.Text; }
+        }
+
         public List<PlotRow> Plots { get; } = new List<PlotRow>();
 
         public List<SeedOptionRow> AvailableSeeds { get; } = new List<SeedOptionRow>();
@@ -542,7 +577,7 @@ namespace BeastCraft.Presentation.Screens
                 {
                     VarietyId = variety.VarietyId,
                     DisplayName = found ? variety.DisplayName ?? variety.VarietyId : "???",
-                    Entry = found ? variety.HerbariumEntry : "Not yet grown.",
+                    Entry = found ? variety.HerbariumEntry : Text.Get("ui.grove.not_grown"),
                     Discovered = found
                 });
             }
@@ -583,14 +618,14 @@ namespace BeastCraft.Presentation.Screens
             }
         }
 
-        private static string OutputDisplay(GardenLibrary library, RecipeData recipe)
+        private string OutputDisplay(GardenLibrary library, RecipeData recipe)
         {
             switch (recipe.Output)
             {
                 case "decor":
-                    return "Decor: " + recipe.OutputId;
+                    return Text.Format("ui.grove.output_decor", recipe.OutputId);
                 case "dye":
-                    return "Dye: " + Humanize(recipe.OutputId);
+                    return Text.Format("ui.grove.output_dye", Humanize(recipe.OutputId));
                 default:
                     return recipe.OutputId;
             }
@@ -618,7 +653,7 @@ namespace BeastCraft.Presentation.Screens
         public GardenActionOutcome Plant(int plotId, string seedId)
         {
             GardenActionResult result = GardenRules.Plant(_session.Save, _session.Content.GardenLibrary, plotId, seedId, _session.Clock.UtcNow, _session.Clock.Monotonic);
-            return Apply(result.Success, result.Success ? "Planted." : result.Error);
+            return Apply(result.Success, result.Success ? Text.Get("ui.grove.planted") : result.Error);
         }
 
         public GardenActionOutcome Harvest(int plotId)
@@ -629,7 +664,7 @@ namespace BeastCraft.Presentation.Screens
                 _crossFirstPlotId = -1;
             }
 
-            return Apply(result.Success, result.Success ? "Harvested: " + Grown(result) + "." : result.Error);
+            return Apply(result.Success, result.Success ? Text.Format("ui.grove.harvested", Grown(result)) : result.Error);
         }
 
         /// <summary>Picks or completes a cross-pollination pair: the first tap remembers the plot, the second (a different, ready plot) harvests both.</summary>
@@ -638,31 +673,31 @@ namespace BeastCraft.Presentation.Screens
             if (_crossFirstPlotId < 0)
             {
                 _crossFirstPlotId = plotId;
-                return GardenActionOutcome.Of(true, "Pick a second ready plot to cross-pollinate.");
+                return GardenActionOutcome.Of(true, Text.Get("ui.grove.pick_second"));
             }
 
             if (_crossFirstPlotId == plotId)
             {
                 _crossFirstPlotId = -1;
-                return GardenActionOutcome.Of(true, "Unpicked.");
+                return GardenActionOutcome.Of(true, Text.Get("ui.grove.unpicked"));
             }
 
             int first = _crossFirstPlotId;
             _crossFirstPlotId = -1;
             GardenHarvestResult result = GardenRules.HarvestPair(_session.Save, _session.Content.GardenLibrary, first, plotId, _session.Clock.UtcNow, _session.Clock.Monotonic);
-            return Apply(result.Success, result.Success ? "Cross-pollinated: " + Grown(result) + "." : result.Error);
+            return Apply(result.Success, result.Success ? Text.Format("ui.grove.cross_pollinated", Grown(result)) : result.Error);
         }
 
         private string Grown(GardenHarvestResult result)
         {
             string name = _session.Content.GardenLibrary.Variety(result.VarietyId)?.DisplayName ?? result.VarietyId;
-            return name + (result.Discovered ? " (new!)" : string.Empty);
+            return result.Discovered ? Text.Format("ui.grove.new_variety", name) : name;
         }
 
         public GardenActionOutcome Craft(string recipeId)
         {
             GardenActionResult result = GardenRules.Craft(_session.Save, _session.Content.GardenLibrary, recipeId, _session.Content.Economy?.Cosmetics);
-            return Apply(result.Success, result.Success ? "Crafted." : result.Error);
+            return Apply(result.Success, result.Success ? Text.Get("ui.grove.crafted") : result.Error);
         }
 
         private GardenActionOutcome Apply(bool success, string message)
@@ -741,6 +776,12 @@ namespace BeastCraft.Presentation.Screens
             Refresh();
         }
 
+        /// <summary>The text table (<c>ui.grove.*</c>).</summary>
+        private StringTable Text
+        {
+            get { return _session.Content.Text; }
+        }
+
         public List<DestinationRow> Destinations { get; } = new List<DestinationRow>();
 
         public List<BoardBeastOptionRow> Beasts { get; } = new List<BoardBeastOptionRow>();
@@ -808,7 +849,7 @@ namespace BeastCraft.Presentation.Screens
         {
             ExpeditionActionResult result = ExpeditionRules.Send(_session.Save, _session.Content.ExpeditionLibrary, destinationId, beastIds, _session.Clock.UtcNow,
                                                                  _session.Clock.Monotonic);
-            return Apply(result.Success, result.Success ? "Sent." : result.Error);
+            return Apply(result.Success, result.Success ? Text.Get("ui.grove.sent") : result.Error);
         }
 
         public BoardActionOutcome Collect(string destinationId)
@@ -824,17 +865,17 @@ namespace BeastCraft.Presentation.Screens
             switch (result.Kind)
             {
                 case "story":
-                    what = result.NewStory ? "a new story" : "a story you already know";
+                    what = Text.Get(result.NewStory ? "ui.grove.new_story" : "ui.grove.known_story");
                     break;
                 case "trinket":
                     what = _session.Content.GardenLibrary.Variety(result.Id)?.DisplayName ?? GardenViewModel.Humanize(result.Id);
                     break;
                 default:
-                    what = "a look";
+                    what = Text.Get("ui.grove.a_look");
                     break;
             }
 
-            return Apply(true, "Expedition back: " + what + ".");
+            return Apply(true, Text.Format("ui.grove.expedition_back", what));
         }
 
         private BoardActionOutcome Apply(bool success, string message)
@@ -916,6 +957,12 @@ namespace BeastCraft.Presentation.Screens
         {
             _session = session ?? throw new ArgumentNullException(nameof(session));
             Refresh();
+        }
+
+        /// <summary>The text table (<c>ui.grove.*</c>).</summary>
+        private StringTable Text
+        {
+            get { return _session.Content.Text; }
         }
 
         public List<NpcSummaryRow> Npcs { get; } = new List<NpcSummaryRow>();
@@ -1030,7 +1077,7 @@ namespace BeastCraft.Presentation.Screens
             RequestData request = book.Request(requestId);
             HashSet<string> facts = NpcRules.BuildFacts(_session.Save, _session.Content.GroveLibrary, _session.Content.GardenLibrary, _session.Content.ExpeditionLibrary);
             NpcActionResult result = NpcRules.FulfillRequest(_session.Save, request, facts, _session.Content.Economy?.Cosmetics);
-            return Apply(result.Success, result.Success ? "Given. Thank you." : result.Error);
+            return Apply(result.Success, result.Success ? Text.Get("ui.grove.given") : result.Error);
         }
 
         public NpcActionOutcome AdvanceSideStory(string storyId)
@@ -1039,7 +1086,7 @@ namespace BeastCraft.Presentation.Screens
             SideStoryData story = book.SideStory(storyId);
             HashSet<string> facts = NpcRules.BuildFacts(_session.Save, _session.Content.GroveLibrary, _session.Content.GardenLibrary, _session.Content.ExpeditionLibrary);
             NpcActionResult result = NpcRules.FulfillChapter(_session.Save, story, facts, _session.Content.Economy?.Cosmetics);
-            return Apply(result.Success, result.Success ? "The story continues." : result.Error);
+            return Apply(result.Success, result.Success ? Text.Get("ui.grove.story_continues") : result.Error);
         }
 
         private NpcActionOutcome Apply(bool success, string message)

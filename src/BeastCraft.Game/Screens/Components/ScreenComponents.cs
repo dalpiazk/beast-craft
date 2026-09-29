@@ -207,6 +207,12 @@ namespace BeastCraft.Game.Screens.Components
             return y + height + 26f;
         }
 
+        /// <summary>Whether <paramref name="content"/> (in the scroll's content space, as a card's draw gets it) is at least partly on screen now.</summary>
+        public bool OnScreen(Rect content)
+        {
+            return _scroll.Visible && content.Bottom > _scroll.ScrollY && content.Y < _scroll.ScrollY + _scroll.Bounds.Height;
+        }
+
         /// <summary>Adds any other widget (a button, a hotspot) straight to the scroll's content.</summary>
         public T Add<T>(T widget) where T : Widget
         {
@@ -472,7 +478,7 @@ namespace BeastCraft.Game.Screens.Components
             ScrollView scroll = Ui.Add(new ScrollView { Bounds = new Rect(card.X + 60f, rowsTop, width - 120f, Math.Max(0f, rowsBottom - rowsTop)) });
             if (options.Count == 0)
             {
-                scroll.Add(new Label { Bounds = new Rect(0, 0, width - 120f, 60f), Text = emptyMessage ?? "None available.", Size = ctx.Style.TextSizes.Body, ColorKey = "inkSoft", Align = TextAlign.Center });
+                scroll.Add(new Label { Bounds = new Rect(0, 0, width - 120f, 60f), Text = emptyMessage ?? ctx.Loc("ui.common.none_available"), Size = ctx.Style.TextSizes.Body, ColorKey = "inkSoft", Align = TextAlign.Center });
             }
 
             float y = 0f;
@@ -496,7 +502,7 @@ namespace BeastCraft.Game.Screens.Components
 
             scroll.ContentHeight = Math.Max(scroll.Bounds.Height, y);
 
-            Button close = panel.Add(new Button { Id = "close", Bounds = new Rect(card.Center.X - 200f, card.Bottom - 140f, 400f, 100f), Text = "Close", StyleKey = "secondary" });
+            Button close = panel.Add(new Button { Id = "close", Bounds = new Rect(card.Center.X - 200f, card.Bottom - 140f, 400f, 100f), Text = ctx.Loc("ui.common.close"), StyleKey = "secondary" });
             close.Clicked += Close;
             Name = "beast-picker:" + title;
         }
