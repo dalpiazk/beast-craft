@@ -13,7 +13,8 @@ Title ──Continue / New Game──▶ Home (Map tab) ──tap a location / N
   ▲  Back: "Leave?"             │  idle chip, header, bottom nav                   │ Start Battle
   │                             │  (Roster ─▶ beast detail, compendium;            ▼
   └──────── Back ───────────────┘   Avatar ─▶ achievements, look tokens;        Battle ──decided──▶ Results
-                                     Grove, Inventory: "coming soon")                                 │
+                                     Grove ─▶ Glade/Garden/Board/Npc;                                 │
+                                     Inventory: "coming soon")                                        │
                                 ▲                                                                     │
                                 └───────────────────── Continue (or auto-advance) ────────────────────┘
 ```
@@ -29,7 +30,10 @@ Title ──Continue / New Game──▶ Home (Map tab) ──tap a location / N
   could only be restored from its `.bak` says so; one that cannot be loaded says why. Back asks
   before quitting.
 - **Home** (`HomeScreen`, `HomeViewModel`, `MapViewModel`): the bottom nav — **Map, Roster, Grove,
-  Avatar, Inventory** (Map and Roster work; see "Roster and visibility" below) — over the region map. The map is *spatial*: the stage's
+  Avatar, Inventory** (Map, Roster, Grove and Avatar work; see "Roster and visibility" below and "The
+  Grove" further down) — over the region map. Grove pushes `GroveScreen` instead of showing inline
+  (`HomeScreen.SelectTab`), the same way the Roster tab's "Compendium" chip pushes a screen without
+  changing the Roster tab's own selection. The map is *spatial*: the stage's
   node map (rows and lanes, the internal pacing model) is laid out by `MapLayout` as places on a
   painted-style meadow (placeholder: a soft gradient and blobs), joined by winding trails; it is
   never drawn as a graph. Locations show their type (Battle, Den, Pass, Lair, Trader, Camp) and
@@ -200,6 +204,51 @@ power).
   compendium-achievements.md, "Evaluating") evaluates achievements in real play.
 - Screenshots: `--screen compendium | achievements | look-tokens`.
 
+## The Grove (D4)
+
+Rules, content and save: [grove.md](grove.md). Everything here reads Core (`Grove.GroveRules`,
+`Garden.GardenRules`, `Expeditions.ExpeditionRules`, `Npc.NpcRules`) and, for soothing, the campaign's
+own `CampaignRules.Soothe`; no combat power anywhere in this feature, the balance sim's default report
+is unaffected.
+
+- **`GroveScreen`** (`src/BeastCraft.Game/Screens/GroveScreens.cs`, `GroveHubViewModel` and its four
+  children in `src/BeastCraft.Presentation/Screens/GroveViewModels.cs`): one screen, an inner `Tabs`
+  strip (Glade / Garden / Board / Npc), reached by pushing from the Home tab bar's Grove slot
+  (`HomeScreen.SelectTab`) rather than showing inline.
+- **Glade**: habitat chips (locked ones dimmed) select which habitat's decor grid shows — a simple
+  4-column slot grid, not free drag (a producer-reviewable simplification, see grove.md §5 and §10:
+  no drag primitive exists to reuse, and the Core cap is a count per habitat, not a layout). Every
+  owned beast is a card: portrait (its worn colour form's tint applied, see below), affinity tier and
+  XP bar, Feed/Play (disabled on cooldown) and, once any gift is pending, Collect/Collect all.
+- **Garden**: plots as a 2-column grid (empty → a seed-picker `ChoiceModal`; growing → a progress bar;
+  ready → Harvest alone, or pick it and then another ready plot to cross-pollinate), the herbarium,
+  the crafting recipes (Craft enabled only once every input is held) and the Grove item inventory.
+- **Board**: destination cards (Locked / Available / Away, with the party's names and hours left /
+  Ready); Send opens `SendPartyModal` (a multi-select party picker, up to the destination's
+  `PartySize` — sending never locks a beast, so every owned beast is offered); Collect pays out and
+  toasts the result.
+- **Npc**: NPC chips, the selected NPC's resolved line (`Npc.NpcRules.ResolveAndMark`, marking it
+  seen), its open requests (Fulfil enabled only once the item is held) and its side story's current
+  chapter with a Continue button once it can advance.
+- **Colour forms** live in the beast detail's looks area (`BeastDetailScreen`'s Gear & bonds tab,
+  `BeastDetailViewModel.ColourForms`), not a Grove tab: locked (with the item's held/needed count),
+  owned, or worn, with Unlock (`GroveRules.TryUnlockColourForm`) and Wear/Wear natural
+  (`Economy.CosmeticRules.TrySetOption`) buttons.
+- **The whole-sprite tint fallback** (`Presentation.Screens.ColourFormPresentation.WornTint`, a
+  deterministic HSV hash of the colour form's id — no tint is authored anywhere, see grove.md §10):
+  applied everywhere a specific owned beast's own sprite draws — the roster card, the beast detail
+  portrait, the encounter screen's party portraits, the Glade's beast cards.
+- **Soothing** shows on the ordinary encounter preview (`EncounterViewModel.CanSoothe`/
+  `SoothingOptions`/`Soothe`, `EncounterScreen`'s "This place can be soothed" banner): a `ChoiceModal`
+  over the region's soothing items held, a `ConfirmModal`, then `CampaignRules.Soothe` with the
+  current team; success pops back to the map with a toast. Never shown for an Elite den, a Gate, a
+  Boss, a Kinship trial or Hearthglen.
+- **Session wiring**: `GameSession.RefreshGrove()` (unlocks, gift clocks, plot/expedition readiness)
+  runs on `StartWith`, `Continue` and every `HomeScreen.Enter`, queuing one `PendingToasts` entry the
+  first time something new is ready.
+- Screenshots: `--screen grove | grove-glade | grove-garden | grove-board | grove-npc | soothe |
+  colour-forms`.
+
 **Saves.** `GameSession` owns the loaded `PlayerSave` and writes it to one slot through
 `SaveStore` over an `ISaveStorage`: `FileSaveStorage` under `SaveLocations` in the game (the
 per-user folder on desktop, the app's files directory on Android, or `--save-dir`),
@@ -304,7 +353,8 @@ them.
   screens `beast-detail`, `beast-derived`, `beast-skills`, `beast-gear`, `encounter-insight`,
   `element-chart`, `glossary`, `battle-log`, `results-log`; the discovery layer's
   `kinship-map`, `kinship-poi`, `kinship-trial`, `kinship-choice`, `region-progress`; the Collector
-  persona's `compendium`, `achievements`, `look-tokens`); with `--screenshot PATH` it renders it and
+  persona's `compendium`, `achievements`, `look-tokens`; the Grove's `grove-glade`, `grove-garden`,
+  `grove-board`, `grove-npc`, `soothe`, `colour-forms`); with `--screenshot PATH` it renders it and
   exits, on a throwaway in-memory save (`--starter-level 6` shows a level gap).
 - `--walkthrough DIR` captures a new player's first session (the starter pick, Hearthglen with its
   hints, the trials, the camp, the finale, the way on to Verdant Hollow) as numbered PNGs on a fresh
@@ -317,8 +367,8 @@ them.
 
 ## Decisions this follows
 
-Bottom nav Map, Roster, Grove (the team base: the party and idle rewards now; the beasts' habitat,
-a garden and expeditions later; the map's Camp locations keep their name), Avatar, Inventory, with
+Bottom nav Map, Roster, Grove (the team base: the party and idle rewards, and — since D4 — the
+beasts' habitat, a garden and expeditions; the map's Camp locations keep their name), Avatar, Inventory, with
 Map as home and Shop and Idle contextual; a painted spatial region map, never a graph; the full
 scouting preview always, for free; one consolidated results screen; the team suggestion as a
 dismissible banner after 3 losses, respecting its setting; a small custom toolkit; the r11
@@ -340,11 +390,14 @@ notification is an opt-in Android hook.
   never recorded: on the next Continue the location is simply still there to fight. Nothing is
   duplicated. A refund would need a pending-battle marker in the save (a schema change), so it is
   left for a later PR.
-- Grove and Inventory are placeholders; Avatar is a minimal identity card (level, equipped title,
-  the way to achievements/titles and the look-token shop) — its skills and gear are a later PR (the
-  full Beastbinder screen). Trader locations are "coming soon" (Camp locations open the minimal
+- Inventory is a placeholder; Grove is built (D4 — see "The Grove" above). Avatar is a minimal
+  identity card (level, equipped title, the way to achievements/titles and the look-token shop) — its
+  skills and gear are a later PR (the full Beastbinder screen). Trader locations are "coming soon" (Camp locations open the minimal
   camp: train a beast, the idle chip). The roster's looks are shown, not edited beyond the
   look-token shop's direct purchases (the full wardrobe — editing a beast's or the avatar's worn
   looks — is a later PR). Skill tomes are only sold by the trader (coming soon), so a beast's kit
   beyond its default loadout stays locked for now; gear comes from drops and first clears.
 - One save slot; no region list (the next region starts automatically after a boss).
+- The Grove has no Android local-notification hook (only the in-app toast on entering Home): the
+  idle-full notification's `IIdleNotifier` seam exists, a Grove-readiness one does not yet — a
+  natural, separable follow-up.

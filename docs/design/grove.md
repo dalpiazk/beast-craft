@@ -1,6 +1,6 @@
 # Grove: Beast Grove, Wildgarden, Expeditions
 
-**Status: D1, D2 and D3 BUILT (Core, content, save, sim, tests); D4 not started — see §11.**
+**Status: D1, D2, D3 and D4 BUILT (Core, content, save, sim, screens, tests) — see §5 and §11.**
 **DRAFT — every DisplayName, Title and Text pending producer review.** This is the design pass
 reconciled against `main` at commit `8829dbf` (the draft this replaces was written against an older
 `main`, schema 7, before the Kinship/discovery layer, the compendium and look tokens existed). It
@@ -191,19 +191,102 @@ determinism, `OfflineClock`-clamp behaviour (shared `OfflineClockTests` plus per
 growth/timer tests), cooldowns, the gift cap's "never loses banked time" behaviour, migration/golden
 round-trips, every validator's authoring-mistake catches.
 
-## 5. Screens (D4 — not built in this PR)
+## 5. Screens (D4 — status: BUILT)
 
-Unchanged from the draft's plan: Grove hub (`GroveScreen : GameScreen`, inner `Tabs` for Glade/
-Garden/Board — the `Tabs` widget and the `HomeTab.Grove` slot already exist, see "What already
-existed" above), a painted glade background per habitat, beasts as wander sprites, drag-to-place
-decor via the existing `Hotspot`/drag primitives. Glade: tap a beast → Feed/Play/affinity-bar panel.
-Garden: plots as tappable slots (empty → plant picker; growing → progress ring; ready → one-tap
-harvest, or select two ready plots to cross-pollinate), plus **Collect All** for the idle-first
-player. Board: destination cards (locked/available/away/ready); tap ready to collect, tap available
-to open the bench-*and-party* picker (beasts are never locked away, so the picker is not bench-only —
-see the producer decision) sized to `PartySize`. Notifications: the existing Android local-
-notification hook from the screens PR, off by default, plus an in-app toast on entering Home when
-something is ready.
+Built close to the draft's plan, with one deliberate simplification called out below. `GroveScreen`
+(`src/BeastCraft.Game/Screens/GroveScreens.cs`) is the hub: one `GameScreen`, an inner `Tabs` strip
+(Glade / Garden / Board / **Npc** — the draft named three; NPC access needed a fourth slot of its own
+rather than being squeezed into one of the others, see below) over four `ScrollView` pages, each built
+from its own view-model (`GroveHubViewModel` and its four children, `src/BeastCraft.Presentation/Screens/GroveViewModels.cs`).
+The `Tabs` widget and the `HomeTab.Grove` slot already existed (see "What already existed" above);
+`HomeScreen.SelectTab` now pushes `GroveScreen` for that tab instead of showing the old coming-soon
+page, the same way the Roster tab's "Compendium" chip pushes a screen without changing the Roster
+tab's own selection — `HomeViewModel.Tab` never actually becomes `Grove`.
+
+**Producer-reviewable simplification: decor placement is a slot grid, not free drag.** The draft's
+"drag-to-place decor via the existing `Hotspot`/drag primitives" doesn't fit a portrait phone well
+(a placed piece's exact `X`/`Y` has no gameplay meaning — `GroveRules.PlaceDecor`'s cap is a *count*
+per habitat, not a layout), and no drag-and-drop primitive actually exists in the toolkit to reuse (a
+`ScrollView` drag is for scrolling, not moving a child). D4 instead lists a habitat's decor as a
+simple 4-column grid of slots (`GladeViewModel.Slots`, filled left-to-right in `PlacedDecor`'s own
+order): tap an empty slot for a picker over owned-but-unplaced decor (a `ChoiceModal`, scoped to the
+habitat like `GroveRules.PlaceDecor` already checks); tap a filled slot to put it away (still owned).
+`X`/`Y`/`Rotation` are written as `0`/`0`/`0` — the fields stay in the save shape for whenever a later
+pass adds real placement art and free arrangement matters.
+
+**Glade**: habitat chips (locked ones dimmed, matching `GroveRules.IsHabitatUnlocked`) selecting which
+habitat's decor grid shows; every owned beast as a card (portrait — with its worn colour form's tint,
+see below — name, element, affinity tier and XP bar) with Feed/Play buttons (disabled on cooldown,
+`OfflineClock`-checked the same way `GroveRules.Feed`/`Play` check it) and, once any gift is pending,
+Collect/Collect all buttons.
+
+**Garden**: the plots as a 2-column grid (empty → tap for a seed-picker `ChoiceModal`; growing → a
+progress bar; ready → tap for Harvest-alone-or-pick-for-cross, then tap another ready plot to
+complete the cross-pollination — `GardenViewModel.PickForCross`'s own small pending-pick state, armed
+by the first tap, completed or cancelled by the second), the herbarium (found: name and entry; not
+found: "???"), the recipes (each input's held/needed count, colour-coded, Craft enabled only once
+every input is held) and the Grove item inventory as a plain list. No separate "Collect All" button —
+Garden has nothing that queues up the way gifts do (a lone plot's `Harvest` is already one tap).
+
+**Board**: destination cards (Locked / Available / Away — with its party's names and hours left /
+Ready); Send opens `SendPartyModal` (a dedicated multi-select modal — the draft's "bench-and-party
+picker" language predates the Roster/Grove split, so this is simply every owned beast, up to the
+destination's `PartySize`; sending never locks one, exactly the producer decision `ExpeditionRules`
+already enforces, and the modal says so); Collect pays out and toasts the result (a story, a trinket,
+or a look).
+
+**Npc** (folded into the Grove hub rather than a separate screen, since it is small and Grove-adjacent
+by design): NPC chips: the Grove Keeper, the Trader, the Wandering Scholar, Forest Folk; the selected
+NPC's resolved line (`Npc.NpcRules.ResolveAndMark`, marking it seen); its open requests (shown once
+available, not only once fulfillable — a request whose item isn't held yet still explains what's
+wanted; Fulfil enabled only once enough is held); its side story's current chapter and a Continue
+button once it can be completed.
+
+**Colour forms** are not a Grove tab — the design always scoped them to "the beast detail's looks
+area" (§7), so `BeastDetailViewModel` gained a `ColourForms` list (locked, with the item's held/needed
+count; owned but not worn; worn) beside the existing read-only "Looks worn" card, with Unlock
+(`GroveRules.TryUnlockColourForm`) and Wear/Wear natural (`Economy.CosmeticRules.TrySetOption`, "natural"
+being the free default option every colour-form category ships, see §7) buttons.
+
+**The whole-sprite tint fallback** (§7's documented seam) is `Presentation.Screens.ColourFormPresentation`:
+`WornTint` checks whether the beast's worn option in its species' colour-form category matches an
+authored `ColourFormData`, and if so returns a `#RRGGBB` multiply tint — deterministically hashed from
+the form's own id (HSV, fixed low saturation and high value, so it reads as a soft recolour rather
+than a wash), since no colour data is authored anywhere for a "tint" (the design left this an open
+presentation seam, not a data field). Applied wherever a specific owned beast's sprite is drawn from
+its instance (not a species silhouette): the roster card, the beast detail portrait, the encounter
+screen's party-member portraits, and the Glade's own beast cards — everywhere else (the compendium's
+species cards, enemies, the title screen) draws a species, not an owned instance, so there is nothing
+to tint.
+
+**Soothing** is not a Grove tab either — it lives where a fight is decided, the ordinary encounter
+preview (§7 already specified this). `EncounterViewModel` gained `CanSoothe` (an ordinary
+`MapNodeType.Battle` location whose region has a soothing set authored — which already excludes every
+Elite den, Gate, Boss, Kinship trial and Hearthglen fight, the last two because a Kinship trial has no
+map node at all and Hearthglen's region authors no soothing set) and `SoothingOptions` (the region's
+soothing items actually held); `EncounterScreen` shows a banner with a Soothe button when `CanSoothe`,
+opening a `ChoiceModal` over the held items, then a `ConfirmModal`, then `EncounterViewModel.Soothe`
+calls `CampaignRules.Soothe` with the current team and pops back to the map with a toast summarising
+what was paid.
+
+**Session wiring**: `GameSession.RefreshGrove()` runs `GroveRules.RefreshUnlocks`, rolls every owned
+beast's gift clock forward (`GroveRules.RefreshGifts`) and checks the Wildgarden's plots and the
+Board's expeditions for readiness (`GardenRules.IsReady`, `ExpeditionRules.IsReturned`), queuing one
+`PendingToasts` entry the first time something new is ready since the last check (a small dedupe set
+so it never repeats while the player just hasn't collected it yet — the same "banked, never lost"
+stance every Grove timer already has). Called on `StartWith` and `Continue` (folded into the
+achievements-retroactive-earn autosave-if-changed decision) and every time `HomeScreen.Enter` runs
+(cheap and idempotent, so calling it after every battle result is fine).
+
+**Screenshots**: `--screen grove-glade | grove-garden | grove-board | grove-npc | soothe |
+colour-forms` (plus the existing `--screen grove`, now the real hub's Glade tab instead of a
+coming-soon page).
+
+**Tests**: `Tooling/EditModeTests/Screens/GroveScreensTests.cs` — the four sub view-models (rows built
+correctly, actions call the Core rules and autosave, disabled-state flags), the encounter screen's
+soothing (`CanSoothe` excludes every non-ordinary-Battle node, `Soothe` pays and clears), the beast
+detail's colour forms (locked → owned → worn, and back to natural) and `ColourFormPresentation`
+(deterministic, null for natural/unknown).
 
 ## 6. NPCs (D2 — status: BUILT)
 
@@ -400,6 +483,22 @@ constrained the choice — flagged for review, not hidden:
    refuses a *second send to the same destination* while one is already away there, never a repeat
    beast across different destinations. Flagged in case the producer wants a "one destination at a
    time per beast" rule for flavour reasons even though nothing mechanical requires it.
+8. **Decor placement is a slot grid, not free drag** (D4). See §5's own callout: no drag primitive
+   exists to reuse, and `PlaceDecor`'s cap is a count, not a layout, so a grid loses nothing mechanical
+   — but it is a real visual simplification from the draft's ask, flagged for review before real
+   habitat art (which might want to suggest specific spots) is authored.
+9. **NPCs are a fourth Grove-hub tab, not their own screen** (D4). The draft didn't say; "the Grove
+   Keeper... now also tends the Grove hub" (§6) reads as NPCs belonging inside it, and the content is
+   small (4 NPCs, at most one request and one side story each) — light enough that a fifth top-level
+   screen felt like more navigation than the content earns. Easy to split out later if the roster of
+   NPCs or their content grows.
+10. **The colour-form tint is a deterministic hash, not authored per form.** §7 documented the
+    mechanism (multiply the sprite by a per-form colour) but not where the colour comes from — no field
+    for it exists anywhere in the content (`ColourFormData` has no colour, and the cosmetic option it
+    points at is a `DiscreteOption`, not a `ColorPicker`). Hashing the form's own id into a fixed-range
+    HSV tint (`ColourFormPresentation.TintHex`) needed no content change and is stable forever; the
+    trade-off is the tint is not art-directed — whichever hue a given id happens to hash to. Revisit
+    once real accent-mask art (or even just an authored hex per form) exists.
 
 ## 11. Sequencing
 
@@ -419,9 +518,15 @@ constrained the choice — flagged for review, not hidden:
    --soothe-fraction` pacing probe (default report unchanged). No screens — see §5. The whole-sprite
    tint fallback for colour forms (no accent-mask art exists for roster beasts yet) is a documented,
    not-yet-taken seam for D4.
-4. **D4 — Grove screens.** Hub, Glade, Garden, Board, the Grove tab's real content (replacing the
-   placeholder), toasts, the Android local-notification hook, the colour-form tint hook (§7). Art
-   integration once assets exist.
+4. **D4 — Grove screens. Status: BUILT.** `GroveScreen` (hub, inner tabs Glade/Garden/Board/Npc — see
+   §5), the Grove tab's real content (replacing the placeholder), the soothing option on the ordinary
+   encounter preview, colour forms in the beast detail's looks area, the whole-sprite tint fallback
+   (§7) applied everywhere an owned beast's own sprite draws, `GameSession.RefreshGrove` and its
+   in-app toast on Home. Not built in this pass: the Android local-notification hook (the idle-full
+   notification's `IIdleNotifier` seam exists; a Grove-readiness one does not yet — nothing in D4
+   depended on it, and it is a natural, separable follow-up) and real art (every visual here is the
+   existing toolkit's cards/lists/grid, matching how every other D4-adjacent screen — Compendium,
+   Achievements, the discovery layer — shipped before its own art).
 
 Risks carried forward: JsonUtility's list-only constraint on nested data (mitigated throughout by the
 existing flat-list idiom, including the flat `(SpeciesId, Tier)` affinity table); the "two
