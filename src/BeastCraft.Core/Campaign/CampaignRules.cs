@@ -506,9 +506,14 @@ namespace BeastCraft.Campaign
         /// drawn on <c>DeriveSeed(node.EncounterSeed, </c><see cref="NodeRewardStream"/><c>)</c>
         /// (<see cref="CampaignResult.GearGranted"/>); a lair's first clear also unlocks its
         /// boss-exclusive looks and then any milestone looks reached (<see cref="CampaignResult.CosmeticsUnlocked"/>).
-        /// A replay grants nothing new.
+        /// A replay grants nothing new. When <paramref name="achievements"/> is given, every resolved
+        /// battle (a plain clear, a stage's pass, a region's lair or Hearthglen's trials, not only a
+        /// boss) also evaluates it (<see cref="CampaignResult.TitlesEarned"/>; idempotent — an
+        /// already-earned achievement fires nothing again). Null — the default, unchanged from before
+        /// this parameter existed — means achievements are not wired up.
         /// </summary>
-        public static CampaignResult ResolveBattle(PlayerSave save, RegionLibrary library, int nodeId, BattleOutcome outcome, EconomyContent economy)
+        public static CampaignResult ResolveBattle(PlayerSave save, RegionLibrary library, int nodeId, BattleOutcome outcome, EconomyContent economy,
+                                                    AchievementContent achievements = null)
         {
             CampaignResult refused = CheckNode(save, library, nodeId, out MapRun run, out MapNode node, out RegionData region);
             if (refused != null)
@@ -535,6 +540,18 @@ namespace BeastCraft.Campaign
                 return CampaignResult.Done(CampaignOutcome.Lost, node);
             }
 
+            // Every victory below returns through here, so achievements see every resolved battle
+            // (not only a boss clear); Evaluate is idempotent, so calling it this often is safe.
+            CampaignResult Finish(CampaignResult result)
+            {
+                if (achievements != null)
+                {
+                    result.TitlesEarned.AddRange(AchievementRules.Evaluate(save, achievements));
+                }
+
+                return result;
+            }
+
             Clear(run, node);
             RevealAround(save, library, run, node);
             if (region.IsTutorial)
@@ -542,7 +559,7 @@ namespace BeastCraft.Campaign
                 CampaignResult cleared = CampaignResult.Done(CampaignOutcome.Cleared, node);
                 FixedNodeData authored = library.FixedNode(run.RegionId, node.NodeId);
                 cleared.PickStep = node.Type == MapNodeType.Trial && authored != null ? authored.PickStep : 0;
-                return FinishIfLast(save, library, run, node, cleared);
+                return Finish(FinishIfLast(save, library, run, node, cleared));
             }
 
             RegionProgress progress = save.Campaign.FindRegion(run.RegionId);
@@ -557,7 +574,7 @@ namespace BeastCraft.Campaign
                     GrantNodeGear(save, economy, node, 0, gate);
                 }
 
-                return gate;
+                return Finish(gate);
             }
 
             if (node.Type == MapNodeType.Boss)
@@ -604,10 +621,10 @@ namespace BeastCraft.Campaign
                     result.CosmeticsUnlocked.AddRange(CosmeticRules.UnlockMilestones(save, economy.Cosmetics));
                 }
 
-                return result;
+                return Finish(result);
             }
 
-            return CampaignResult.Done(CampaignOutcome.Cleared, node);
+            return Finish(CampaignResult.Done(CampaignOutcome.Cleared, node));
         }
 
         /// <summary>
@@ -616,8 +633,12 @@ namespace BeastCraft.Campaign
         /// (<c>BeastProgression.AwardBattle</c>: falloff on its level, under the cap). The node is
         /// cleared and becomes current. Refused for an unknown beast. In a tutorial region the camp
         /// also catches every beast up to the leader's level (<see cref="CampaignResult.CaughtUp"/>).
+        /// When <paramref name="achievements"/> is given, the training also evaluates it
+        /// (<see cref="CampaignResult.TitlesEarned"/>; idempotent), so a beast level camp training
+        /// crosses (e.g. <c>BeastLevel</c>) earns its title straight away. Null — the default — means
+        /// achievements are not wired up.
         /// </summary>
-        public static CampaignResult Camp(PlayerSave save, RegionLibrary library, int nodeId, string beastId)
+        public static CampaignResult Camp(PlayerSave save, RegionLibrary library, int nodeId, string beastId, AchievementContent achievements = null)
         {
             CampaignResult refused = CheckNode(save, library, nodeId, out MapRun run, out MapNode node, out RegionData _);
             if (refused != null)
@@ -647,7 +668,13 @@ namespace BeastCraft.Campaign
 
             Clear(run, node);
             RevealAround(save, library, run, node);
-            return FinishIfLast(save, library, run, node, result);
+            CampaignResult finished = FinishIfLast(save, library, run, node, result);
+            if (achievements != null)
+            {
+                finished.TitlesEarned.AddRange(AchievementRules.Evaluate(save, achievements));
+            }
+
+            return finished;
         }
 
         /// <summary>
@@ -1173,6 +1200,12 @@ namespace BeastCraft.Campaign
 
         /// <summary>A won Trial's beast pick (2 or 3; <see cref="StarterPicks"/>), now pending; 0 otherwise.</summary>
         public int PickStep { get; internal set; }
+
+        /// <summary>
+        /// Achievements newly earned by this call; empty unless <c>ResolveBattle</c> or <c>Camp</c> was
+        /// passed <c>achievements</c>. Each awards a text title, never a stat.
+        /// </summary>
+        public List<AchievementData> TitlesEarned { get; } = new List<AchievementData>();
 
         internal static CampaignResult Refused(string error)
         {

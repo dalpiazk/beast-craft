@@ -60,9 +60,11 @@ namespace BeastCraft.Presentation.Screens
     }
 
     /// <summary>
-    /// The home screen's bottom nav: Map, Roster, Grove, Avatar, Inventory. Map and Roster work in
-    /// this build; the others show a "coming soon" page. Back on another tab returns to the Map; on the
-    /// Map it is not handled here (the stack pops back to the title).
+    /// The home screen's bottom nav: Map, Roster, Grove, Avatar, Inventory. Map, Roster and Avatar work
+    /// in this build (Avatar is a minimal identity card for now: level, equipped title, and the way to
+    /// the achievements/title screen and the look-token shop; its skills and gear are a later PR); Grove
+    /// and Inventory show a "coming soon" page. Back on another tab returns to the Map; on the Map it is
+    /// not handled here (the stack pops back to the title).
     /// </summary>
     public sealed class HomeViewModel
     {
@@ -74,16 +76,16 @@ namespace BeastCraft.Presentation.Screens
             null,
             null,
             "Your team base: organise the party and claim idle rewards; later your beasts' habitat, a garden and expeditions.",
-            "Your Beastbinder: level, skills, gear and looks.",
+            null,
             "Materials, consumables and spare gear."
         };
 
         public HomeTab Tab { get; private set; } = HomeTab.Map;
 
-        /// <summary>Whether the current tab is built (the Map and the Roster, for now).</summary>
+        /// <summary>Whether the current tab is built (the Map, the Roster and the Avatar identity card).</summary>
         public bool TabAvailable
         {
-            get { return Tab == HomeTab.Map || Tab == HomeTab.Roster; }
+            get { return Tab == HomeTab.Map || Tab == HomeTab.Roster || Tab == HomeTab.Avatar; }
         }
 
         public string TabName

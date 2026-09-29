@@ -22,6 +22,12 @@ namespace BeastCraft.Economy
 
         public int SchemaVersion;
 
+        /// <summary>
+        /// Look tokens granted instead of a duplicate (a cache's or a region's 100% look that was
+        /// already owned, <see cref="CosmeticRules.UnlockOrRefund"/>): a small fixed amount, never RNG.
+        /// </summary>
+        public int DuplicateLookTokens = 5;
+
         public CosmeticCategoryData[] Categories = new CosmeticCategoryData[0];
 
         public MilestoneData[] Milestones = new MilestoneData[0];
@@ -86,6 +92,17 @@ namespace BeastCraft.Economy
 
         /// <summary>The art the look will use (a placeholder key until the art exists).</summary>
         public string ArtKey;
+
+        /// <summary>
+        /// Whether look tokens can buy this look directly (an explicit pool: today the <c>drop</c>
+        /// looks, so a token gives a deterministic path to what a battle would otherwise roll). Needs
+        /// <see cref="TokenPrice"/> &gt; 0; never a <c>default</c>, <c>starter</c>, <c>boss</c>,
+        /// <c>boss_hard</c>, <c>milestone</c> or <c>premium</c> look.
+        /// </summary>
+        public bool TokenPurchasable;
+
+        /// <summary>The look tokens <see cref="TokenPurchasable"/> costs; 0 when it is not token-purchasable.</summary>
+        public int TokenPrice;
     }
 
     /// <summary>

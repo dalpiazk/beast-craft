@@ -159,6 +159,7 @@ namespace BeastCraft.Tests.EditMode
             KinshipResult won = KinshipRules.ResolveTrial(save, Discovery, site.PoiId, BattleOutcome.PlayerVictory, new[] { "b1", "b2", "b3" }, false);
             Assert.AreEqual(KinshipOutcome.Won, won.Outcome);
             CollectionAssert.AreEqual(new[] { "treant", "kirin" }, won.Offer);
+            Assert.IsFalse(won.SoloOffer, "two offered: not the last beast");
             Assert.AreEqual(3, won.JoinLevel, "team level 6, minus 3");
             Assert.IsTrue(won.BondMet, "a Vanguard (the golem) held the line");
             Assert.IsNull(KinshipRules.Challengeable(save, Discovery, site.PoiId, out _, out _), "a choice is pending");
@@ -175,6 +176,17 @@ namespace BeastCraft.Tests.EditMode
             Assert.IsTrue(save.Campaign.FindRegion("r01").HasFound(site.PoiId));
             Assert.IsFalse(save.Discovery.HasPendingKinship);
             Assert.IsNull(KinshipRules.Challengeable(save, Discovery, site.PoiId, out _, out _), "claimed");
+
+            Assert.AreEqual("kin_r01", save.Discovery.FindKinshipJoin("kirin").SiteId, "the compendium's 'found through Kinship, at this site'");
+            Assert.IsNull(save.Discovery.FindKinshipJoin("golem"), "a Hearthglen pick never joined through Kinship");
+        }
+
+        [Test]
+        public void SoloOffer_IsTrueOnlyForAOneBeastOffer()
+        {
+            Assert.IsFalse(new KinshipResult { Offer = new List<string> { "golem", "kirin" } }.SoloOffer);
+            Assert.IsTrue(new KinshipResult { Offer = new List<string> { "kirin" } }.SoloOffer, "the last beast chooses you (no eighth species)");
+            Assert.IsFalse(new KinshipResult { Offer = new List<string>() }.SoloOffer);
         }
 
         [Test]

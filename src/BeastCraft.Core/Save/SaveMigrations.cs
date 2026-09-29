@@ -23,6 +23,8 @@ namespace BeastCraft.Save
     /// <item>6 to 7: the onboarding state (<see cref="PlayerSave.Tutorial"/>): <see cref="AddTutorial"/>.</item>
     /// <item>7 to 8: the discovery layer (<see cref="PlayerSave.Discovery"/>, each region's fog, points of
     /// interest found and discovery seed): <see cref="AddDiscovery"/>.</item>
+    /// <item>8 to 9: the compendium's achievements and titles (<see cref="PlayerSave.Achievements"/>)
+    /// and look tokens (<see cref="PlayerSave.LookTokens"/>): <see cref="AddCompendium"/>.</item>
     /// </list>
     /// </summary>
     public static class SaveMigrations
@@ -30,7 +32,10 @@ namespace BeastCraft.Save
         /// <summary>A fresh list of every step (callers may append to it).</summary>
         public static List<ISaveMigration> All()
         {
-            return new List<ISaveMigration> { new AddGear(), new AddCampaign(), new AddEconomy(), new AddIdle(), new AddRunDifficulty(), new AddTutorial(), new AddDiscovery() };
+            return new List<ISaveMigration>
+            {
+                new AddGear(), new AddCampaign(), new AddEconomy(), new AddIdle(), new AddRunDifficulty(), new AddTutorial(), new AddDiscovery(), new AddCompendium()
+            };
         }
 
         /// <summary>
@@ -278,5 +283,26 @@ namespace BeastCraft.Save
             }
         }
 
+        /// <summary>
+        /// Schema 8 to 9: a v8 save has no compendium. The upgrade reads it into the current type (no
+        /// achievement earned, no title owned or equipped, no look tokens), fills in anything missing
+        /// and writes it back. Nothing else moves: an achievement is only ever earned by
+        /// <c>Progression.AchievementRules.Evaluate</c>, never by the migration itself.
+        /// </summary>
+        public sealed class AddCompendium : ISaveMigration
+        {
+            public int FromVersion
+            {
+                get { return 8; }
+            }
+
+            public string Upgrade(string json, ISaveJsonSerializer serializer)
+            {
+                PlayerSave save = serializer.FromJson<PlayerSave>(json);
+                save.EnsureInitialized();
+                save.SchemaVersion = 9;
+                return serializer.ToJson(save);
+            }
+        }
     }
 }

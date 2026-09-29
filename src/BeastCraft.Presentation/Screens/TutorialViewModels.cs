@@ -355,7 +355,7 @@ namespace BeastCraft.Presentation.Screens
         /// <summary>Trains <paramref name="beastId"/> and saves; false with <paramref name="error"/> when refused.</summary>
         public bool Train(string beastId, out string error)
         {
-            CampaignResult result = CampaignRules.Camp(_session.Save, _session.Content.Campaign, NodeId, beastId);
+            CampaignResult result = CampaignRules.Camp(_session.Save, _session.Content.Campaign, NodeId, beastId, _session.Content.Achievements);
             error = result.Error;
             if (!result.Success)
             {
@@ -365,7 +365,8 @@ namespace BeastCraft.Presentation.Screens
             Done = true;
             OwnedBeast beast = _session.Save.FindBeast(beastId);
             Summary.Clear();
-            Summary.Add(_session.BeastName(beast) + " trained: +" + result.XpTrained + " XP" + (result.LevelsGained > 0 ? ", up to Lv " + beast.Progress.Level : string.Empty) + ".");
+            string extra = GameSession.ExtraRewardText(result.TitlesEarned, 0);
+            Summary.Add(_session.BeastName(beast) + " trained: +" + result.XpTrained + " XP" + (result.LevelsGained > 0 ? ", up to Lv " + beast.Progress.Level : string.Empty) + "." + extra);
             foreach (string id in result.CaughtUp)
             {
                 OwnedBeast caught = _session.Save.FindBeast(id);

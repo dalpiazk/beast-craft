@@ -1,0 +1,186 @@
+{
+  "_readme": "GAME CONTENT, DRAFT PENDING PRODUCER REVIEW (every name and title). The Collector persona (PR B, docs/design/compendium-achievements.md): deterministic achievements only, no RNG anywhere, and no combat power ever from any of this — each one is met by checking existing save state (a region's boss beaten, its discovery layer or lore complete, Kinship sites claimed, distinct species owned, the compendium's own completion, an avatar or beast level) and awards a text TITLE the player can own and equip (display only; never a stat). Kind is one of BossCleared, AllBossesCleared, RegionExplored, AllRegionsExplored, KinshipSitesClaimed, AllKinshipClaimed, BeastsOwned, RegionLoreComplete, AllLoreFound, CompendiumPercent, AvatarLevel, BeastLevel (BeastCraft.Progression.AchievementKinds). RegionId is used by the region-scoped kinds only; Threshold by the threshold kinds only (the validator checks which). Evaluated idempotently (BeastCraft.Progression.AchievementRules.Evaluate) after a Kinship join, a discovery visit or completion, and a region boss clear. Validated by AchievementLibraryValidator; see docs/design/compendium-achievements.md.",
+  "SchemaVersion": 1,
+  "Achievements": [
+    {
+      "AchievementId": "kinship_first",
+      "DisplayName": "First Bond",
+      "Kind": "KinshipSitesClaimed",
+      "RegionId": "",
+      "Threshold": 1,
+      "TitleId": "title_beastbinder",
+      "TitleText": "Beastbinder"
+    },
+    {
+      "AchievementId": "kinship_all",
+      "DisplayName": "Every Stone Answered",
+      "Kind": "AllKinshipClaimed",
+      "RegionId": "",
+      "Threshold": 0,
+      "TitleId": "title_kinship_bound",
+      "TitleText": "Kinship Bound"
+    },
+    {
+      "AchievementId": "beasts_5",
+      "DisplayName": "Growing Company",
+      "Kind": "BeastsOwned",
+      "RegionId": "",
+      "Threshold": 5,
+      "TitleId": "title_beast_keeper",
+      "TitleText": "Beast Keeper"
+    },
+    {
+      "AchievementId": "beasts_10",
+      "DisplayName": "The Whole Roster",
+      "Kind": "BeastsOwned",
+      "RegionId": "",
+      "Threshold": 10,
+      "TitleId": "title_beast_collector",
+      "TitleText": "Beast Collector"
+    },
+    {
+      "AchievementId": "explored_r01",
+      "DisplayName": "Every Corner of the Hollow",
+      "Kind": "RegionExplored",
+      "RegionId": "r01",
+      "Threshold": 0,
+      "TitleId": "title_hollow_pathfinder",
+      "TitleText": "Hollow Pathfinder"
+    },
+    {
+      "AchievementId": "explored_r02",
+      "DisplayName": "Every Corner of Emberreach",
+      "Kind": "RegionExplored",
+      "RegionId": "r02",
+      "Threshold": 0,
+      "TitleId": "title_emberreach_pathfinder",
+      "TitleText": "Emberreach Pathfinder"
+    },
+    {
+      "AchievementId": "explored_r03",
+      "DisplayName": "Every Corner of Tidefall",
+      "Kind": "RegionExplored",
+      "RegionId": "r03",
+      "Threshold": 0,
+      "TitleId": "title_tidefall_pathfinder",
+      "TitleText": "Tidefall Pathfinder"
+    },
+    {
+      "AchievementId": "explored_r04",
+      "DisplayName": "Every Corner of Stormcrag",
+      "Kind": "RegionExplored",
+      "RegionId": "r04",
+      "Threshold": 0,
+      "TitleId": "title_stormcrag_pathfinder",
+      "TitleText": "Stormcrag Pathfinder"
+    },
+    {
+      "AchievementId": "explored_r05",
+      "DisplayName": "Every Corner of Rustwood",
+      "Kind": "RegionExplored",
+      "RegionId": "r05",
+      "Threshold": 0,
+      "TitleId": "title_rustwood_pathfinder",
+      "TitleText": "Rustwood Pathfinder"
+    },
+    {
+      "AchievementId": "explored_r06",
+      "DisplayName": "Every Corner of Frostmere",
+      "Kind": "RegionExplored",
+      "RegionId": "r06",
+      "Threshold": 0,
+      "TitleId": "title_frostmere_pathfinder",
+      "TitleText": "Frostmere Pathfinder"
+    },
+    {
+      "AchievementId": "explored_all",
+      "DisplayName": "Nothing Left Unseen",
+      "Kind": "AllRegionsExplored",
+      "RegionId": "",
+      "Threshold": 0,
+      "TitleId": "title_full_cartographer",
+      "TitleText": "Full Cartographer"
+    },
+    {
+      "AchievementId": "boss_first",
+      "DisplayName": "First Warden Fallen",
+      "Kind": "BossCleared",
+      "RegionId": "r01",
+      "Threshold": 0,
+      "TitleId": "title_warden_slayer",
+      "TitleText": "Warden Slayer"
+    },
+    {
+      "AchievementId": "boss_all",
+      "DisplayName": "Every Throne Emptied",
+      "Kind": "AllBossesCleared",
+      "RegionId": "",
+      "Threshold": 0,
+      "TitleId": "title_apex_hunter",
+      "TitleText": "Apex Hunter"
+    },
+    {
+      "AchievementId": "lore_r01",
+      "DisplayName": "Every Tale of the Hollow",
+      "Kind": "RegionLoreComplete",
+      "RegionId": "r01",
+      "Threshold": 0,
+      "TitleId": "title_hollow_loremaster",
+      "TitleText": "Hollow Loremaster"
+    },
+    {
+      "AchievementId": "lore_r06",
+      "DisplayName": "Every Tale of Frostmere",
+      "Kind": "RegionLoreComplete",
+      "RegionId": "r06",
+      "Threshold": 0,
+      "TitleId": "title_frostmere_loremaster",
+      "TitleText": "Frostmere Loremaster"
+    },
+    {
+      "AchievementId": "lore_all",
+      "DisplayName": "Every Stone Read",
+      "Kind": "AllLoreFound",
+      "RegionId": "",
+      "Threshold": 0,
+      "TitleId": "title_keeper_of_tales",
+      "TitleText": "Keeper of Tales"
+    },
+    {
+      "AchievementId": "compendium_50",
+      "DisplayName": "Halfway Catalogued",
+      "Kind": "CompendiumPercent",
+      "RegionId": "",
+      "Threshold": 50,
+      "TitleId": "title_rising_naturalist",
+      "TitleText": "Rising Naturalist"
+    },
+    {
+      "AchievementId": "compendium_100",
+      "DisplayName": "The Compendium Complete",
+      "Kind": "CompendiumPercent",
+      "RegionId": "",
+      "Threshold": 100,
+      "TitleId": "title_master_naturalist",
+      "TitleText": "Master Naturalist"
+    },
+    {
+      "AchievementId": "avatar_level_25",
+      "DisplayName": "Seasoned on the Road",
+      "Kind": "AvatarLevel",
+      "RegionId": "",
+      "Threshold": 25,
+      "TitleId": "title_seasoned_handler",
+      "TitleText": "Seasoned Handler"
+    },
+    {
+      "AchievementId": "avatar_level_100",
+      "DisplayName": "Nothing Left to Learn",
+      "Kind": "AvatarLevel",
+      "RegionId": "",
+      "Threshold": 100,
+      "TitleId": "title_legend_of_beastlands",
+      "TitleText": "Legend of the Beastlands"
+    }
+  ]
+}

@@ -312,7 +312,7 @@ namespace BeastCraft.Presentation.Screens
             int cap = CampaignRules.BeastCap(save, content.Campaign);
             RewardModifiers modifiers = CampaignRules.RewardModifiersFor(save.Campaign.ActiveRun, Node, content.Campaign).With(content.Economy);
             BattleRewardSummary summary = BattleSession.ApplyRewards(save, result, content.Battle, content.Drops, cap, modifiers);
-            CampaignResult campaign = CampaignRules.ResolveBattle(save, content.Campaign, Node.NodeId, result.Outcome, content.Economy);
+            CampaignResult campaign = CampaignRules.ResolveBattle(save, content.Campaign, Node.NodeId, result.Outcome, content.Economy, content.Achievements);
             _session.CheckCompletion();
             _session.Autosave(AutosaveReason.Results);
             return ResultsViewModel.Build(_session, this, result, summary, campaign, before);

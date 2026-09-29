@@ -328,6 +328,25 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
+        public void Validate_ReportsCompendiumProblems()
+        {
+            PlayerSave save = BuildSave();
+            save.LookTokens = -3;
+            save.Achievements.EarnedIds.Add("beasts_5");
+            save.Achievements.EarnedIds.Add("beasts_5");
+            save.Achievements.OwnedTitleIds.Add("title_beast_keeper");
+            save.Achievements.OwnedTitleIds.Add("title_beast_keeper");
+            save.Achievements.EquippedTitleId = "title_not_owned";
+
+            List<SaveIssue> issues = SaveValidator.Validate(save, Catalog);
+
+            AssertIssue(issues, SaveIssueKind.InvalidValue, null, "LookTokens");
+            AssertIssue(issues, SaveIssueKind.InvalidValue, "beasts_5", "Achievements.EarnedIds[1]");
+            AssertIssue(issues, SaveIssueKind.InvalidValue, "title_beast_keeper", "Achievements.OwnedTitleIds[1]");
+            AssertIssue(issues, SaveIssueKind.InvalidValue, "title_not_owned", "Achievements.EquippedTitleId");
+        }
+
+        [Test]
         public void Validate_AStarterSaveBuiltFromTheAuthoredData_IsClean()
         {
             BeastRosterData roster = BeastRosterTests.LoadRoster();

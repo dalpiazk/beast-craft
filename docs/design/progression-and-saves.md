@@ -346,6 +346,42 @@ Save schema **8** adds the fog, the points of interest and Kinship ([kinship-dis
   `"SchemaVersion":8`, the region fields after `"BossCleared"` and the appended `,"Discovery":{…}`
   (verified field by field when captured).
 
+### Schema 9: the compendium, achievements and look tokens
+
+Save schema **9** adds the Collector persona ([compendium-achievements.md](compendium-achievements.md)):
+a compendium (a pure derived view, no storage of its own), deterministic achievements that award text
+titles, and look tokens. `CurrentSchemaVersion` is **9**.
+
+- `DiscoveryProgress` gains `KinshipJoins` (`List<KinshipJoinRecord> {SpeciesId, SiteId}`, after
+  `LoreIds`): a species that joined through a Kinship site, and which one, appended once by
+  `KinshipRules.Choose` (never on a fallback claim, which adds no beast) — the smallest fact the
+  compendium needs to tell "found through Kinship, at this site" apart from a Hearthglen pick or an
+  older save's starting six.
+- `PlayerSave.Achievements` (`Progression.AchievementProgress`, written after `Discovery`):
+  `EarnedIds` (achievements earned, deterministic — no RNG anywhere), `OwnedTitleIds` (the titles they
+  unlocked) and `EquippedTitleId` ("" = none). Titles are display only: never a stat.
+- `PlayerSave.LookTokens` (`int`, after `Achievements`): spent on an explicit, data-driven pool of
+  looks (`CosmeticRules.SpendLookToken`); earned when a cache's or a region's 100% look was already
+  owned (`CosmeticRules.UnlockOrRefund`) instead of wasting the reward. Never negative.
+- *Rules.* `Progression.AchievementRules.Evaluate` is pure and idempotent (an already-earned
+  achievement is skipped); hooked into `DiscoveryRules.Visit`, `DiscoveryRules.TryComplete` and
+  `KinshipRules.Choose` (via `DiscoveryContent.Achievements`, always wired up by
+  `GameContent.Discovery`) and `CampaignRules.ResolveBattle`'s first boss clear (a new optional
+  `achievements` parameter, `null` by default — every existing call site is unchanged).
+- *Migration.* `SaveMigrations.AddCompendium` (8 to 9): a v8 save has none of the above; the upgrade
+  reads it into the current type (no Kinship join recorded, no achievement earned, no title owned or
+  equipped, no look tokens), fills in anything missing and writes it back. Nothing else moves, and no
+  achievement is ever earned by the migration itself — only `AchievementRules.Evaluate` earns one.
+- *Validation.* `SaveValidator` reports `InvalidValue` for negative `LookTokens`, an achievement or
+  title id earned/owned twice, and an `EquippedTitleId` that is not owned (never silently cleared:
+  `EnsureInitialized` fills missing collections only, exactly as it does for every other section —
+  reporting a bad cross-reference is `SaveValidator`'s job, not `EnsureInitialized`'s).
+- *Golden saves.* `rich-v8.input.json` is frozen; the new `rich-v9.input.json` (reflection-filled) must
+  round-trip byte-identical; new `min-v9`. No input changed; every older expected output changed only by
+  `"SchemaVersion":9`, `,"KinshipJoins":[]` inside `"Discovery"` (after `"LoreIds"`), and the appended
+  `,"Achievements":{"EarnedIds":[],"OwnedTitleIds":[],"EquippedTitleId":""},"LookTokens":0` after
+  `"Discovery"`.
+
 ### Hearthglen's rules (`StarterPicks`, `CampaignRules`)
 
 - **Picks.** The 1st any of the ten; the 2nd any beast of the next stance in the cycle

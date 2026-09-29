@@ -231,6 +231,106 @@ namespace BeastCraft.Tests.EditMode
             Assert.IsTrue(save.Cosmetics.Has("kirin_mane/lair"));
         }
 
+        [Test]
+        public void AuthoredLibrary_HasATokenPool_AndAPositiveDuplicateReward()
+        {
+            Assert.Greater(_library.DuplicateLookTokens, 0);
+            List<CosmeticOption> pool = _library.TokenPool();
+            Assert.IsNotEmpty(pool, "an explicit token-purchasable pool");
+            Assert.IsTrue(pool.TrueForAll(o => o.TokenPrice > 0 && (o.Source == CosmeticLibrary.SourceShop || o.Source == CosmeticLibrary.SourceDrop)));
+        }
+
+        [Test]
+        public void Validator_CatchesTokenAuthoringMistakes()
+        {
+            CosmeticLibraryData data = LoadCosmetics();
+            data.DuplicateLookTokens = -1;
+
+            CosmeticOptionData priceless = null;
+            CosmeticOptionData bossLook = null;
+            CosmeticOptionData untagged = null;
+            foreach (CosmeticOptionData option in AllOptions(data))
+            {
+                if (priceless == null && option.Source == CosmeticLibrary.SourceDrop)
+                {
+                    priceless = option;
+                }
+                else if (bossLook == null && option.Source == CosmeticLibrary.SourceBoss)
+                {
+                    bossLook = option;
+                }
+                else if (untagged == null && !option.TokenPurchasable)
+                {
+                    untagged = option;
+                }
+            }
+
+            priceless.TokenPurchasable = true;
+            priceless.TokenPrice = 0;
+            bossLook.TokenPurchasable = true;
+            bossLook.TokenPrice = 50;
+            untagged.TokenPrice = 30;
+
+            List<string> errors = CosmeticLibraryValidator.Validate(data, new[] { "phoenix" }, new[] { "r01" });
+            string all = string.Join("\n", errors);
+            StringAssert.Contains("DuplicateLookTokens is negative", all);
+            StringAssert.Contains("a positive TokenPrice and a shop or drop Source", all);
+            StringAssert.Contains("TokenPrice is set but TokenPurchasable is false", all);
+        }
+
+        [Test]
+        public void UnlockOrRefund_UnlocksANewLook_OrGrantsTokensInsteadOfADuplicate()
+        {
+            PlayerSave save = PlayerSave.CreateNew();
+            Assert.AreEqual(0, save.LookTokens);
+
+            Assert.IsFalse(CosmeticRules.UnlockOrRefund(save, _library, "griffin_crest/swept", out int freeTokens), "a free look grants nothing");
+            Assert.AreEqual(0, freeTokens);
+            Assert.AreEqual(0, save.LookTokens);
+
+            Assert.IsTrue(CosmeticRules.UnlockOrRefund(save, _library, "griffin_crest/sunlit", out int newTokens), "not owned yet: unlocked");
+            Assert.AreEqual(0, newTokens);
+            Assert.IsTrue(save.Cosmetics.Has("griffin_crest/sunlit"));
+
+            Assert.IsFalse(CosmeticRules.UnlockOrRefund(save, _library, "griffin_crest/sunlit", out int duplicateTokens), "already owned: refunded as tokens, not wasted");
+            Assert.AreEqual(_library.DuplicateLookTokens, duplicateTokens);
+            Assert.AreEqual(_library.DuplicateLookTokens, save.LookTokens);
+        }
+
+        [Test]
+        public void SpendLookToken_BuysFromTheExplicitPool_Deterministically()
+        {
+            PlayerSave save = PlayerSave.CreateNew();
+            CosmeticOption look = _library.TokenPool()[0];
+
+            Assert.AreEqual(LookTokenResult.UnknownLook, CosmeticRules.SpendLookToken(save, _library, "nope/nope"));
+            Assert.AreEqual(LookTokenResult.NotTokenPurchasable, CosmeticRules.SpendLookToken(save, _library, "griffin_crest/sunlit"));
+            Assert.AreEqual(LookTokenResult.InsufficientTokens, CosmeticRules.SpendLookToken(save, _library, look.Key));
+
+            save.LookTokens = look.TokenPrice - 1;
+            Assert.AreEqual(LookTokenResult.InsufficientTokens, CosmeticRules.SpendLookToken(save, _library, look.Key));
+
+            save.LookTokens = look.TokenPrice;
+            Assert.AreEqual(LookTokenResult.Unlocked, CosmeticRules.SpendLookToken(save, _library, look.Key));
+            Assert.AreEqual(0, save.LookTokens);
+            Assert.IsTrue(save.Cosmetics.Has(look.Key));
+
+            save.LookTokens = 500;
+            Assert.AreEqual(LookTokenResult.AlreadyUsable, CosmeticRules.SpendLookToken(save, _library, look.Key));
+            Assert.AreEqual(500, save.LookTokens, "spending never happens on an already-usable look");
+        }
+
+        private static IEnumerable<CosmeticOptionData> AllOptions(CosmeticLibraryData data)
+        {
+            foreach (CosmeticCategoryData category in data.Categories)
+            {
+                foreach (CosmeticOptionData option in category.Options ?? new CosmeticOptionData[0])
+                {
+                    yield return option;
+                }
+            }
+        }
+
         private IEnumerable<CosmeticOption> AllOptions()
         {
             foreach (CosmeticCategory category in _library.Categories)

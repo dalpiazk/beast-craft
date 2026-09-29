@@ -237,7 +237,7 @@ namespace BeastCraft.Game.Screens
 
             if (_model.AvatarXp > 0)
             {
-                Line("avatar", CampaignAvatar.DisplayName + " +" + _model.AvatarXp + " XP" + (_model.AvatarLevelsGained > 0 ? " (level up!)" : string.Empty), "inkSoft");
+                Line("avatar", _model.AvatarDisplayName + " +" + _model.AvatarXp + " XP" + (_model.AvatarLevelsGained > 0 ? " (level up!)" : string.Empty), "inkSoft");
             }
 
             if (_model.BenchXp > 0)

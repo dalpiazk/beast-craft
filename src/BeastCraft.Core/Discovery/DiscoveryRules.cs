@@ -30,6 +30,14 @@ namespace BeastCraft.Discovery
 
         public EnemyCatalog Enemies;
 
+        /// <summary>
+        /// The achievements content (<c>achievements.json</c>): null = achievements are not wired up
+        /// (no title is ever evaluated or awarded). When set, <see cref="DiscoveryRules.Visit"/>,
+        /// <see cref="DiscoveryRules.TryComplete"/> and <see cref="KinshipRules.Choose"/> evaluate it
+        /// after their own reward, idempotently (a repeat call earns nothing twice).
+        /// </summary>
+        public Progression.AchievementContent Achievements;
+
         private readonly Dictionary<string, List<PointOfInterest>> _layouts = new Dictionary<string, List<PointOfInterest>>(StringComparer.Ordinal);
 
         /// <summary>
@@ -117,11 +125,20 @@ namespace BeastCraft.Discovery
         /// <summary>Looks unlocked (cosmetic keys).</summary>
         public List<string> Looks = new List<string>();
 
+        /// <summary>
+        /// Look tokens granted instead of a cache's look that was already owned
+        /// (<see cref="Economy.CosmeticRules.UnlockOrRefund"/>): a duplicate is never wasted.
+        /// </summary>
+        public int LookTokens;
+
         /// <summary>A Vista's fog cells lifted.</summary>
         public int CellsRevealed;
 
         /// <summary>A Kinship site with no beast left to offer was visited as a lore and cache stop instead.</summary>
         public bool KinshipFallback;
+
+        /// <summary>Achievements newly earned by this visit (empty when <see cref="DiscoveryContent.Achievements"/> is not wired up).</summary>
+        public List<Progression.AchievementData> TitlesEarned = new List<Progression.AchievementData>();
 
         internal static DiscoveryResult Refused(string error)
         {
@@ -145,6 +162,12 @@ namespace BeastCraft.Discovery
         public string Look;
 
         public int Gold;
+
+        /// <summary>Look tokens granted instead when the reward's look was already owned (<see cref="Economy.CosmeticRules.UnlockOrRefund"/>).</summary>
+        public int LookTokens;
+
+        /// <summary>Achievements newly earned by this completion (empty when <see cref="DiscoveryContent.Achievements"/> is not wired up).</summary>
+        public List<Progression.AchievementData> TitlesEarned = new List<Progression.AchievementData>();
     }
 
     /// <summary>
@@ -322,6 +345,11 @@ namespace BeastCraft.Discovery
             }
 
             progress.MarkFound(poi.PoiId);
+            if (content.Achievements != null)
+            {
+                result.TitlesEarned.AddRange(Progression.AchievementRules.Evaluate(save, content.Achievements));
+            }
+
             return result;
         }
 
@@ -348,9 +376,16 @@ namespace BeastCraft.Discovery
                 }
             }
 
-            if (!string.IsNullOrEmpty(cache.Look) && CosmeticRules.Unlock(save, content.Cosmetics, cache.Look))
+            if (!string.IsNullOrEmpty(cache.Look))
             {
-                result.Looks.Add(cache.Look);
+                if (CosmeticRules.UnlockOrRefund(save, content.Cosmetics, cache.Look, out int tokens))
+                {
+                    result.Looks.Add(cache.Look);
+                }
+                else
+                {
+                    result.LookTokens += tokens;
+                }
             }
         }
 
@@ -407,14 +442,26 @@ namespace BeastCraft.Discovery
             RegionDiscoveryData data = content.Library.Region(regionId);
             progress.Completed = true;
             CompletionReward reward = new CompletionReward { RegionId = regionId };
-            if (!string.IsNullOrEmpty(data.CompletionLook) && CosmeticRules.Unlock(save, content.Cosmetics, data.CompletionLook))
+            if (!string.IsNullOrEmpty(data.CompletionLook))
             {
-                reward.Look = data.CompletionLook;
+                if (CosmeticRules.UnlockOrRefund(save, content.Cosmetics, data.CompletionLook, out int tokens))
+                {
+                    reward.Look = data.CompletionLook;
+                }
+                else
+                {
+                    reward.LookTokens = tokens;
+                }
             }
 
             if (data.CompletionGold > 0)
             {
                 reward.Gold = Wallet.Add(save, data.CompletionGold);
+            }
+
+            if (content.Achievements != null)
+            {
+                reward.TitlesEarned.AddRange(Progression.AchievementRules.Evaluate(save, content.Achievements));
             }
 
             return reward;

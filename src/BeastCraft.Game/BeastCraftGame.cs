@@ -972,6 +972,33 @@ namespace BeastCraft.Game
                 steps.Add(() => Home().SelectTab(tab));
             }
 
+            if (screen == "compendium")
+            {
+                steps.Add(() =>
+                {
+                    Home().SelectTab(HomeTab.Roster);
+                    Home().Roster.OpenCompendium();
+                });
+            }
+
+            if (screen == "achievements")
+            {
+                steps.Add(() =>
+                {
+                    Home().SelectTab(HomeTab.Avatar);
+                    Home().OpenAchievements();
+                });
+            }
+
+            if (screen == "look-tokens")
+            {
+                steps.Add(() =>
+                {
+                    Home().SelectTab(HomeTab.Avatar);
+                    Home().OpenLookTokenShop();
+                });
+            }
+
             if (screen == "beast-detail" || screen == "beast-derived" || screen == "beast-skills" || screen == "beast-gear")
             {
                 int detailTab = screen == "beast-skills" ? 1 : screen == "beast-gear" ? 2 : 0;

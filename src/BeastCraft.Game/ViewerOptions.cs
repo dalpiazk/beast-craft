@@ -102,7 +102,7 @@ namespace BeastCraft.Game
         /// <summary>The screens <c>--screen</c> accepts.</summary>
         public static readonly string[] ScreenNames = { "title", "starter-pick", "hearthglen", "map", "encounter", "battle", "results", "roster", "grove", "avatar", "inventory", "settings", "demo",
                                                           "beast-detail", "beast-derived", "beast-skills", "beast-gear", "encounter-insight", "element-chart", "glossary", "battle-log", "results-log",
-                                                          "kinship-map", "kinship-poi", "kinship-trial", "kinship-choice", "region-progress" };
+                                                          "kinship-map", "kinship-poi", "kinship-trial", "kinship-choice", "region-progress", "compendium", "achievements", "look-tokens" };
 
         /// <summary>
         /// Where the app starts: <c>--screen</c>'s screen, else the battle demo when a demo flag

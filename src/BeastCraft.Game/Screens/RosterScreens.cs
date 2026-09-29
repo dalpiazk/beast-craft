@@ -18,7 +18,7 @@ namespace BeastCraft.Game.Screens
     /// The Roster tab's page (<see cref="RosterViewModel"/>), inside the home screen: every owned
     /// beast as an illustrated card (level, stance, element; a leaf badge when in the party), a sort
     /// button that cycles Joined, Level, Name, Element and Stance, then a silhouette for each species
-    /// not found yet ("Found through Kinship"). Tapping a beast opens its detail screen.
+    /// not found yet ("Meet it at a Kinship site"). Tapping a beast opens its detail screen.
     /// </summary>
     public sealed class RosterPage
     {
@@ -37,7 +37,7 @@ namespace BeastCraft.Game.Screens
             _ctx = ctx;
             _model = new RosterViewModel(ctx.Session);
             Root = parent.Add(new Group { Id = "roster-page", Bounds = area });
-            Root.Add(new Panel { Bounds = new Rect(area.X + 24f, area.Y + 24f, area.Width - 48f, 170f), StyleKey = "header" });
+            Root.Add(new Panel { Bounds = new Rect(area.X + 24f, area.Y + 24f, area.Width - 48f, 250f), StyleKey = "header" });
             _sort = Root.Add(new Button { Id = "roster-sort", Bounds = new Rect(area.Right - 400f, area.Y + 70f, 340f, 84f), StyleKey = "chip" });
             _sort.Clicked += () =>
             {
@@ -46,7 +46,9 @@ namespace BeastCraft.Game.Screens
             };
             Button glossary = Root.Add(new Button { Id = "roster-glossary", Bounds = new Rect(area.Right - 520f, area.Y + 70f, 100f, 84f), Text = "?", StyleKey = "chip" });
             glossary.Clicked += () => ctx.Stack.Push(new GlossaryScreen(ctx, null));
-            _scroll = Root.Add(new ScrollView { Id = "roster", Bounds = new Rect(area.X, area.Y + 214f, area.Width, area.Height - 214f) });
+            Button compendium = Root.Add(new Button { Id = "roster-compendium", Bounds = new Rect(area.X + 48f, area.Y + 168f, area.Width - 96f, 70f), Text = "Compendium", StyleKey = "chip" });
+            compendium.Clicked += OpenCompendium;
+            _scroll = Root.Add(new ScrollView { Id = "roster", Bounds = new Rect(area.X, area.Y + 294f, area.Width, area.Height - 294f) });
         }
 
         public Group Root { get; }
@@ -67,6 +69,12 @@ namespace BeastCraft.Game.Screens
         public void Open(string beastId)
         {
             _ctx.Stack.Push(new BeastDetailScreen(_ctx, beastId));
+        }
+
+        /// <summary>Opens the compendium screen (the header's "Compendium" chip).</summary>
+        public void OpenCompendium()
+        {
+            _ctx.Stack.Push(new CompendiumScreen(_ctx));
         }
 
         private void Build()
@@ -754,7 +762,9 @@ namespace BeastCraft.Game.Screens
             }
 
             y = Card(y, _model.Bonds.Count == 0 ? 170f : bondsHeight, "panel", DrawBonds);
+            float looksTop = y;
             y = Card(y, 150f + Math.Max(1, _model.Looks.Count) * 48f, "card", DrawLooks);
+            AddButton(_scroll, "look-token-shop", new Rect(Pad + Width - 260f, looksTop + 24f, 220f, 76f), "Look shop", "chip", () => Ctx.Stack.Push(new LookTokenShopScreen(Ctx)));
             return y;
         }
 

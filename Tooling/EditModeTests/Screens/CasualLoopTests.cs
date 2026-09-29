@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using BeastCraft.Campaign;
 using BeastCraft.Presentation.Content;
 using BeastCraft.Presentation.Screens;
+using BeastCraft.Progression;
 using BeastCraft.Save;
 using NUnit.Framework;
 
@@ -103,6 +104,49 @@ namespace BeastCraft.Tests.EditMode
             Assert.IsTrue(outcome.Success);
             Assert.IsNotNull(second.LastContinueClaim?.Message, "Continue claims straight away");
             Assert.Greater(second.Save.Gold, 0);
+        }
+
+        [Test]
+        public void Continue_IdleClaimThatCrossesAnAvatarLevelThreshold_EarnsTheTitle_InTheSameContinue_WithOneToast_AndPersists()
+        {
+            ManualGameClock clock = new ManualGameClock(T0, TimeSpan.FromHours(100));
+            MemorySaveStorage storage = new MemorySaveStorage();
+            GameSession first = NewSession(clock, storage);
+            ClearFirst(first);
+
+            // Push the progress level well past the avatar's target level, so idle's avatar XP pays at
+            // the full rate no matter the avatar's own level (LevelGapXp: a gap this far below pays 0%,
+            // so without this the claim below would earn nothing at all).
+            first.Save.Campaign.FindRegion("r01").BossCleared = true;
+            first.Save.Campaign.AddSeal("seal_r01");
+            first.Save.Campaign.Unlock("r02");
+            first.Save.Campaign.FindRegion("r02").BossCleared = true;
+            first.Save.Campaign.Unlock("r03");
+            first.Save.Campaign.FindRegion("r03").BossCleared = true;
+
+            // One XP short of the avatar's 25th level (the authored "avatar_level_25" / "Seasoned
+            // Handler"): any idle XP at all crosses it.
+            first.Save.Avatar.Level = 24;
+            first.Save.Avatar.Xp = AvatarProgression.XpToNextLevel(24) - 1;
+            first.Autosave(AutosaveReason.Background);
+
+            clock.Advance(TimeSpan.FromMinutes(10));
+            GameSession second = new GameSession(Content, storage, () => 1, clock);
+            LoadOutcome outcome = second.Continue();
+
+            Assert.IsTrue(outcome.Success, outcome.Message);
+            Assert.GreaterOrEqual(second.Save.Avatar.Level, 25, "the idle claim leveled the avatar past the threshold");
+            Assert.IsTrue(second.Save.Achievements.HasEarned("avatar_level_25"));
+            StringAssert.Contains("Seasoned Handler", second.LastContinueClaim?.Message, "the idle claim's own toast carries the new title");
+            Assert.IsEmpty(second.PendingToasts, "one toast total: folded into the idle claim's message, not a second one from the session-start check");
+
+            // Persisted: reloading the slot keeps the title without earning (or toasting) it again.
+            GameSession third = new GameSession(Content, storage, () => 1, clock);
+            LoadOutcome reloaded = third.Continue();
+            Assert.IsTrue(reloaded.Success, reloaded.Message);
+            Assert.IsTrue(third.Save.Achievements.HasEarned("avatar_level_25"));
+            Assert.IsFalse((third.LastContinueClaim?.Message ?? string.Empty).Contains("Seasoned Handler"), "not earned again on a later Continue");
+            Assert.IsTrue(third.PendingToasts.TrueForAll(t => !t.Contains("Seasoned Handler")));
         }
 
         [Test]

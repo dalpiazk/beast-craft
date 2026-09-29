@@ -31,6 +31,25 @@ namespace BeastCraft.Economy
         WrongValueType
     }
 
+    /// <summary>What <see cref="CosmeticRules.SpendLookToken"/> did.</summary>
+    public enum LookTokenResult
+    {
+        /// <summary>The look is now unlocked account-wide.</summary>
+        Unlocked,
+
+        /// <summary>No such look in the library.</summary>
+        UnknownLook,
+
+        /// <summary>The look is not in the token pool (<see cref="CosmeticOption.TokenPurchasable"/>).</summary>
+        NotTokenPurchasable,
+
+        /// <summary>Free or already unlocked: nothing to spend on.</summary>
+        AlreadyUsable,
+
+        /// <summary>Not enough look tokens (<see cref="PlayerSave.LookTokens"/>).</summary>
+        InsufficientTokens
+    }
+
     /// <summary>
     /// The cosmetic rules over a <see cref="PlayerSave"/> (schema 4): which looks are usable (free —
     /// the default and starter looks — or unlocked account-wide in <see cref="PlayerSave.Cosmetics"/>),
@@ -138,6 +157,71 @@ namespace BeastCraft.Economy
             }
 
             return save.Cosmetics.Unlock(option.Key);
+        }
+
+        /// <summary>
+        /// Unlocks <paramref name="key"/> (<see cref="Unlock"/>); when it is unknown or free this does
+        /// nothing, and when it is already owned this grants <see cref="CosmeticLibrary.DuplicateLookTokens"/>
+        /// look tokens instead (<paramref name="tokensGranted"/>) rather than wasting the reward. The
+        /// seam a cache's or a region's 100% reward's look uses (<c>DiscoveryRules</c>); deterministic,
+        /// no RNG. Returns whether the look was newly unlocked.
+        /// </summary>
+        public static bool UnlockOrRefund(PlayerSave save, CosmeticLibrary library, string key, out int tokensGranted)
+        {
+            tokensGranted = 0;
+            CosmeticOption option = library == null ? null : library.GetOption(key);
+            if (save == null || option == null || option.IsFree)
+            {
+                return false;
+            }
+
+            if (Unlock(save, library, key))
+            {
+                return true;
+            }
+
+            int amount = library.DuplicateLookTokens;
+            if (amount > 0)
+            {
+                save.LookTokens += amount;
+                tokensGranted = amount;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Spends <see cref="CosmeticOption.TokenPrice"/> look tokens to unlock <paramref name="key"/>
+        /// directly from the token pool (<see cref="CosmeticOption.TokenPurchasable"/>): a deterministic
+        /// alternative to a battle-drop roll or the Trader, never RNG. Non-throwing; a refused call
+        /// changes nothing.
+        /// </summary>
+        public static LookTokenResult SpendLookToken(PlayerSave save, CosmeticLibrary library, string key)
+        {
+            CosmeticOption option = library == null ? null : library.GetOption(key);
+            if (save == null || option == null)
+            {
+                return LookTokenResult.UnknownLook;
+            }
+
+            if (!option.TokenPurchasable)
+            {
+                return LookTokenResult.NotTokenPurchasable;
+            }
+
+            if (IsUsable(save, option))
+            {
+                return LookTokenResult.AlreadyUsable;
+            }
+
+            if (save.LookTokens < option.TokenPrice)
+            {
+                return LookTokenResult.InsufficientTokens;
+            }
+
+            save.LookTokens -= option.TokenPrice;
+            Unlock(save, library, key);
+            return LookTokenResult.Unlocked;
         }
 
         /// <summary>Unlocks every boss-exclusive look <paramref name="regionId"/>'s lair grants. Returns the keys newly unlocked.</summary>
