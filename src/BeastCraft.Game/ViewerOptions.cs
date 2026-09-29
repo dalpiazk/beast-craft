@@ -27,6 +27,11 @@ namespace BeastCraft.Game
     ///                       scripted runs use a fixed one)
     ///   --starter-level L   a new game's starter beasts start at level L (debug; default 1)
     ///
+    /// Measuring (either mode; the overlay is compiled into Debug builds, and into Release only with
+    /// -p:PerfOverlay=true; docs/design/performance.md):
+    ///   --perf-overlay      show the frame-time overlay (F3 toggles it too)
+    ///   --perf-seconds S    print the run's frame-time summary to the console after S seconds and exit
+    ///
     /// The battle demo (any of the flags below except the effects ones starts it instead of the
     /// title, as the viewer always has; so does --screen demo):
     ///   --screenshot PATH   render one frame to PATH (PNG) and exit, after:
@@ -95,6 +100,12 @@ namespace BeastCraft.Game
         public string SaveDir;
         public int? MapSeed;
         public int? StarterLevel;
+
+        /// <summary>Show the frame-time overlay from the start (Debug builds, or Release with -p:PerfOverlay=true; else ignored with a note).</summary>
+        public bool PerfOverlay;
+
+        /// <summary>With the overlay compiled in: print the frame-time summary and exit after this many seconds (a measurement run).</summary>
+        public double? PerfSeconds;
 
         /// <summary>A flag of the battle demo was given (not counting the effects settings): start in the demo battle.</summary>
         public bool DemoFlags;
@@ -284,6 +295,21 @@ namespace BeastCraft.Game
                     case "--show-settings":
                         options.ShowSettings = true;
                         break;
+                    case "--perf-overlay":
+                        options.PerfOverlay = true;
+                        break;
+                    case "--perf-seconds":
+                        if (double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out double seconds) && seconds > 0.0)
+                        {
+                            options.PerfSeconds = seconds;
+                        }
+                        else
+                        {
+                            error = "--perf-seconds needs a number of seconds above 0.";
+                        }
+
+                        i++;
+                        break;
                     case "--glossary":
                         options.Glossary = value;
                         i++;
@@ -312,7 +338,7 @@ namespace BeastCraft.Game
         private static readonly string[] GameFlags = { "--screen", "--walkthrough", "--save-dir", "--map-seed", "--starter-level" };
 
         /// <summary>Flags that serve the game and the demo alike (they do not start the demo).</summary>
-        private static readonly string[] NeutralFlags = { "--screenshot", "--scale", "--safe-inset", "--content", "--effects", "--no-shake", "--no-flashes" };
+        private static readonly string[] NeutralFlags = { "--screenshot", "--scale", "--safe-inset", "--content", "--effects", "--no-shake", "--no-flashes", "--perf-overlay", "--perf-seconds" };
 
         /// <summary>Applies the effects flags to <paramref name="settings"/> (unset flags leave it as it is).</summary>
         public void ApplyTo(PlayerSettings settings)

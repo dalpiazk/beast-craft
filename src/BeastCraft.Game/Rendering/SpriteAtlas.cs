@@ -149,6 +149,25 @@ namespace BeastCraft.Game.Rendering
         /// <summary>A 1x1 white texture for rectangles and bars.</summary>
         public Texture2D Pixel { get; }
 
+        /// <summary>
+        /// The loaded art files' texture memory in bytes, as uploaded (4 bytes a pixel, a third more with
+        /// mipmaps): the perf overlay's texture number (#64). Deferred backdrops count once loaded.
+        /// </summary>
+        public long TextureBytes
+        {
+            get
+            {
+                long bytes = 0;
+                foreach (Texture2D texture in _files)
+                {
+                    long level0 = 4L * texture.Width * texture.Height;
+                    bytes += texture.LevelCount > 1 ? level0 * 4 / 3 : level0;
+                }
+
+                return bytes;
+            }
+        }
+
         /// <summary>The sprite named <paramref name="name"/> (a deferred one is loaded now), or null.</summary>
         public ArtSprite Sprite(string name)
         {

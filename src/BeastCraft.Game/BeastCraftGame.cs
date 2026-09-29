@@ -58,6 +58,12 @@ namespace BeastCraft.Game
         private SpriteBatch _batch;
         private SpriteRenderer _draw;
         private SpriteAtlas _atlas;
+#if DEBUG || PERF_OVERLAY
+        private Diagnostics.PerfOverlay _perf;
+        private double _perfElapsedMs;
+        private long _perfFrames;
+        private bool _perfF3;
+#endif
         private ITextRenderer _text;
         private Texture2D _pixel;
         private UiPainter _painter;
@@ -274,6 +280,20 @@ namespace BeastCraft.Game
             };
             _audio = CreateAudio(scripted);
             _ctx.Audio = _audio;
+#if DEBUG || PERF_OVERLAY
+            // The frame-time overlay (#64): off unless asked for, so scripted screenshots stay as they are.
+            _perf = new Diagnostics.PerfOverlay { Visible = _options.PerfOverlay };
+            if (_options.PerfSeconds.HasValue)
+            {
+                // A measurement run keeps full speed when its window is not focused (MonoGame sleeps 20 ms a frame then).
+                InactiveSleepTime = TimeSpan.Zero;
+            }
+#else
+            if (_options.PerfOverlay || _options.PerfSeconds.HasValue)
+            {
+                Console.WriteLine("The frame-time overlay is not in this build (build Debug, or Release with -p:PerfOverlay=true).");
+            }
+#endif
             _stack.TopChanged += top => _audio.ScreenChanged(top?.Name, RegionOf(top));
 
             if (_options.IsDemo)
@@ -318,10 +338,16 @@ namespace BeastCraft.Game
 
         protected override void Update(GameTime gameTime)
         {
+#if DEBUG || PERF_OVERLAY
+            _perf?.OnUpdate();
+#endif
             lock (_saveGate)
             {
                 UpdateFrame(gameTime);
             }
+#if DEBUG || PERF_OVERLAY
+            PerfTick(gameTime);
+#endif
         }
 
         private void UpdateFrame(GameTime gameTime)
@@ -374,6 +400,34 @@ namespace BeastCraft.Game
             base.Update(gameTime);
         }
 
+#if DEBUG || PERF_OVERLAY
+        /// <summary>F3 toggles the frame-time overlay; with --perf-seconds, the summary is printed and the app exits once the time is up.</summary>
+        private void PerfTick(GameTime gameTime)
+        {
+            if (_perf == null)
+            {
+                return;
+            }
+
+            KeyboardState keys = Keyboard.GetState();
+            if (keys.IsKeyDown(Keys.F3) && !_perfF3)
+            {
+                _perf.Visible = !_perf.Visible;
+            }
+
+            _perfF3 = keys.IsKeyDown(Keys.F3);
+            _perfElapsedMs += gameTime.ElapsedGameTime.TotalMilliseconds;
+            if (_options.PerfSeconds.HasValue && _perfElapsedMs >= _options.PerfSeconds.Value * 1000.0)
+            {
+                _perf.TextureBytes = _atlas?.TextureBytes ?? 0;
+                Console.WriteLine(_perf.Summary());
+                _options.PerfSeconds = null;
+                Exit();
+            }
+        }
+
+#endif
+
         protected override void Draw(GameTime gameTime)
         {
             lock (_saveGate)
@@ -401,6 +455,17 @@ namespace BeastCraft.Game
             PresentationParameters back = GraphicsDevice.PresentationParameters;
             RenderScene(back.BackBufferWidth, back.BackBufferHeight, _host.SafeArea != null ? _host.SafeArea() : _options.SafeInsets);
             base.Draw(gameTime);
+#if DEBUG || PERF_OVERLAY
+            if (_perf != null)
+            {
+                if (_perfFrames++ % 60 == 0)
+                {
+                    _perf.TextureBytes = _atlas?.TextureBytes ?? 0;
+                }
+
+                _perf.OnDrawEnd(GraphicsDevice.Metrics);
+            }
+#endif
         }
 
         /// <summary>The back button: the stack's rule; at the root it quits.</summary>
@@ -457,6 +522,9 @@ namespace BeastCraft.Game
                 _painter.Fill(new Rect(0, 0, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight), _painter.C("cream", veil * 0.85f));
             }
 
+#if DEBUG || PERF_OVERLAY
+            _perf?.Draw(_draw, _text, _pixel);
+#endif
             _draw.Flush();
         }
 

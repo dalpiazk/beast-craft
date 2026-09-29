@@ -22,7 +22,8 @@ old one.
 - **Tablets.** Portrait stays locked on every device. Tablets get the portrait canvas letterboxed with
   painted side art (the side art is still to be made).
 - **Minimum-spec device.** **Samsung Galaxy A35 class** (Exynos 1380, 6-8 GB RAM). Performance and
-  memory are budgeted and tested against it (#64).
+  memory are budgeted and tested against it (#64; the budgets, worst cases, profiling and a desktop baseline are in
+  performance.md).
 - **Playtesting.** The producer plays the builds for now. External testers come later, closer to
   release.
 

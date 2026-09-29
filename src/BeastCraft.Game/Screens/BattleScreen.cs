@@ -211,6 +211,9 @@ namespace BeastCraft.Game.Screens
                 screen.PrepareScreenshot();
             }
 
+            // A measurement run (--perf-seconds, docs/design/performance.md) plays by itself, like a map battle.
+            screen._auto |= options.PerfSeconds.HasValue;
+
             return screen;
         }
 

@@ -33,6 +33,15 @@
     <AssemblyName>BeastCraft.Game</AssemblyName>
   </PropertyGroup>
 
+  <!--
+    The frame-time overlay (#64, Diagnostics/PerfOverlay.cs) is compiled into Debug builds. A Release build
+    gets it only with -p:PerfOverlay=true, to measure optimised code (docs/design/performance.md); a
+    shipping build never has it.
+  -->
+  <PropertyGroup Condition="'$(PerfOverlay)' == 'true'">
+    <DefineConstants>$(DefineConstants);PERF_OVERLAY</DefineConstants>
+  </PropertyGroup>
+
   <ItemGroup>
     <!--
       The UI font's rasteriser (TtfText): FontStashSharp, Zlib licence (with StbTrueTypeSharp and
