@@ -25,6 +25,8 @@ namespace BeastCraft.Save
     /// interest found and discovery seed): <see cref="AddDiscovery"/>.</item>
     /// <item>8 to 9: the compendium's achievements and titles (<see cref="PlayerSave.Achievements"/>)
     /// and look tokens (<see cref="PlayerSave.LookTokens"/>): <see cref="AddCompendium"/>.</item>
+    /// <item>9 to 10: the Grove, the Wildgarden and the Board (<see cref="PlayerSave.Grove"/>,
+    /// <see cref="PlayerSave.Garden"/>, <see cref="PlayerSave.Expeditions"/>): <see cref="AddGrove"/>.</item>
     /// </list>
     /// </summary>
     public static class SaveMigrations
@@ -34,7 +36,8 @@ namespace BeastCraft.Save
         {
             return new List<ISaveMigration>
             {
-                new AddGear(), new AddCampaign(), new AddEconomy(), new AddIdle(), new AddRunDifficulty(), new AddTutorial(), new AddDiscovery(), new AddCompendium()
+                new AddGear(), new AddCampaign(), new AddEconomy(), new AddIdle(), new AddRunDifficulty(), new AddTutorial(), new AddDiscovery(), new AddCompendium(),
+                new AddGrove()
             };
         }
 
@@ -301,6 +304,33 @@ namespace BeastCraft.Save
                 PlayerSave save = serializer.FromJson<PlayerSave>(json);
                 save.EnsureInitialized();
                 save.SchemaVersion = 9;
+                return serializer.ToJson(save);
+            }
+        }
+
+        /// <summary>
+        /// Schema 9 to 10: a v9 save has no Grove, Wildgarden or Board. The upgrade reads it into the
+        /// current type (no habitat or decor unlocked, no beast's affinity, no Grove item held, no
+        /// plot planted, no variety in the herbarium, no expedition away, no story or pity), fills in
+        /// anything missing and writes it back. Nothing else moves: every unlock, plant and send is
+        /// only ever granted by <c>Grove.GroveRules</c>, <c>Garden.GardenRules</c> or
+        /// <c>Expeditions.ExpeditionRules</c>, never by the migration itself. A save's existing
+        /// <c>Discovery.GroveUnlockIds</c> (shrines visited before the Grove existed) is untouched here —
+        /// the Grove reads it live (<c>GroveRules.RefreshUnlocks</c>) the first time it opens, so
+        /// nothing already earned is lost.
+        /// </summary>
+        public sealed class AddGrove : ISaveMigration
+        {
+            public int FromVersion
+            {
+                get { return 9; }
+            }
+
+            public string Upgrade(string json, ISaveJsonSerializer serializer)
+            {
+                PlayerSave save = serializer.FromJson<PlayerSave>(json);
+                save.EnsureInitialized();
+                save.SchemaVersion = 10;
                 return serializer.ToJson(save);
             }
         }

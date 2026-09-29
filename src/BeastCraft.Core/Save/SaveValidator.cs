@@ -1,7 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using BeastCraft.Battle;
 using BeastCraft.Campaign;
+using BeastCraft.Expeditions;
+using BeastCraft.Garden;
+using BeastCraft.Grove;
 using BeastCraft.Idle;
 using BeastCraft.Progression;
 
@@ -88,7 +92,103 @@ namespace BeastCraft.Save
             ValidateCampaign(save.Campaign, catalog, issues);
             ValidateIdle(save.Idle, issues);
             ValidateCompendium(save, issues);
+            ValidateGrove(save, issues);
             return issues;
+        }
+
+        /// <summary>
+        /// The Grove, the Wildgarden and the Board (schema 10): no negative counts, tiers, seeds or
+        /// misses; a beast's tier 0-5 and its pending gifts never past
+        /// <see cref="Grove.GroveRules.MaxPendingGifts"/>; every held Grove item and plot count
+        /// positive. No content cross-references here (mirrors <see cref="ValidateCompendium"/>: the
+        /// content catalog does not carry Grove/Garden/Expedition ids).
+        /// </summary>
+        private static void ValidateGrove(PlayerSave save, List<SaveIssue> issues)
+        {
+            Grove.GroveProgress grove = save.Grove;
+            if (grove != null)
+            {
+                HashSet<string> beasts = new HashSet<string>(StringComparer.Ordinal);
+                for (int i = 0; i < (grove.Affinity == null ? 0 : grove.Affinity.Count); i++)
+                {
+                    Grove.BeastAffinityState state = grove.Affinity[i];
+                    string path = "Grove.Affinity[" + i + "]";
+                    if (state == null || string.IsNullOrEmpty(state.BeastId) || !beasts.Add(state.BeastId))
+                    {
+                        issues.Add(new SaveIssue(SaveIssueKind.InvalidValue, path + ".BeastId", state?.BeastId, "beast id is empty or listed twice"));
+                        continue;
+                    }
+
+                    CheckRange(issues, path + ".Xp", state.Xp, 0, int.MaxValue);
+                    CheckRange(issues, path + ".Tier", state.Tier, 0, 5);
+                    CheckRange(issues, path + ".GiftPityMisses", state.GiftPityMisses, 0, int.MaxValue);
+                    if (state.PendingGifts != null && state.PendingGifts.Count > Grove.GroveRules.MaxPendingGifts)
+                    {
+                        issues.Add(new SaveIssue(SaveIssueKind.InvalidValue, path + ".PendingGifts", state.PendingGifts.Count.ToString(CultureInfo.InvariantCulture),
+                                                  "more pending gifts than the cap of " + Grove.GroveRules.MaxPendingGifts));
+                    }
+                }
+
+                CheckItemInventory(grove.Items, "Grove.Items", issues);
+            }
+
+            Garden.GardenProgress garden = save.Garden;
+            if (garden?.Plots != null)
+            {
+                HashSet<int> plotIds = new HashSet<int>();
+                for (int i = 0; i < garden.Plots.Count; i++)
+                {
+                    Garden.PlotState plot = garden.Plots[i];
+                    string path = "Garden.Plots[" + i + "]";
+                    if (plot == null || string.IsNullOrEmpty(plot.SeedId) || !plotIds.Add(plot.PlotId))
+                    {
+                        issues.Add(new SaveIssue(SaveIssueKind.InvalidValue, path, plot?.SeedId, "plot has no seed or its PlotId is listed twice"));
+                    }
+                }
+            }
+
+            Expeditions.ExpeditionProgress expeditions = save.Expeditions;
+            if (expeditions?.Active != null)
+            {
+                HashSet<string> destinations = new HashSet<string>(StringComparer.Ordinal);
+                for (int i = 0; i < expeditions.Active.Count; i++)
+                {
+                    Expeditions.ActiveExpedition active = expeditions.Active[i];
+                    string path = "Expeditions.Active[" + i + "]";
+                    if (active == null || string.IsNullOrEmpty(active.DestinationId) || !destinations.Add(active.DestinationId))
+                    {
+                        issues.Add(new SaveIssue(SaveIssueKind.InvalidValue, path + ".DestinationId", active?.DestinationId, "destination is empty or has two expeditions away"));
+                        continue;
+                    }
+
+                    if (active.BeastIds == null || active.BeastIds.Count == 0)
+                    {
+                        issues.Add(new SaveIssue(SaveIssueKind.InvalidValue, path + ".BeastIds", null, "an expedition away with no beasts sent"));
+                    }
+                }
+            }
+        }
+
+        private static void CheckItemInventory(Grove.GroveItemInventory inventory, string path, List<SaveIssue> issues)
+        {
+            if (inventory?.Items == null)
+            {
+                return;
+            }
+
+            HashSet<string> ids = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < inventory.Items.Count; i++)
+            {
+                Grove.GroveItemStack stack = inventory.Items[i];
+                string entryPath = path + "[" + i + "]";
+                if (stack == null || string.IsNullOrEmpty(stack.ItemId) || !ids.Add(stack.ItemId))
+                {
+                    issues.Add(new SaveIssue(SaveIssueKind.InvalidValue, entryPath + ".ItemId", stack?.ItemId, "item id is empty or listed twice"));
+                    continue;
+                }
+
+                CheckRange(issues, entryPath + ".Quantity", stack.Quantity, 1, int.MaxValue);
+            }
         }
 
         /// <summary>The compendium (schema 9): look tokens never negative, no achievement or title id used twice, an equipped title owned.</summary>
