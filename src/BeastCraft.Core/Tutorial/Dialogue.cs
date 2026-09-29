@@ -288,6 +288,7 @@ namespace BeastCraft.Tutorial
         private readonly Dictionary<string, DialogueLineData> _lines = new Dictionary<string, DialogueLineData>(StringComparer.Ordinal);
         private readonly Dictionary<string, DialogueSceneData> _scenes = new Dictionary<string, DialogueSceneData>(StringComparer.Ordinal);
         private readonly Dictionary<string, NpcData> _npcs = new Dictionary<string, NpcData>(StringComparer.Ordinal);
+        private readonly List<NpcData> _npcOrder = new List<NpcData>();
         private readonly Dictionary<string, RequestData> _requests = new Dictionary<string, RequestData>(StringComparer.Ordinal);
         private readonly Dictionary<string, SideStoryData> _sideStories = new Dictionary<string, SideStoryData>(StringComparer.Ordinal);
         private readonly Dictionary<string, NpcLoreEntryData> _lore = new Dictionary<string, NpcLoreEntryData>(StringComparer.Ordinal);
@@ -308,6 +309,7 @@ namespace BeastCraft.Tutorial
                 if (npc != null && !string.IsNullOrEmpty(npc.NpcId) && !book._npcs.ContainsKey(npc.NpcId))
                 {
                     book._npcs.Add(npc.NpcId, npc);
+                    book._npcOrder.Add(npc);
                 }
             }
 
@@ -361,6 +363,12 @@ namespace BeastCraft.Tutorial
         public NpcData Npc(string npcId)
         {
             return !string.IsNullOrEmpty(npcId) && _npcs.TryGetValue(npcId, out NpcData npc) ? npc : null;
+        }
+
+        /// <summary>Every NPC, in file order (the Grove hub's Npc tab lists them this way).</summary>
+        public IReadOnlyList<NpcData> AllNpcs
+        {
+            get { return _npcOrder; }
         }
 
         public DialogueSceneData Scene(string sceneId)
