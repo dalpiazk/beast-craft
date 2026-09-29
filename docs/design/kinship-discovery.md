@@ -177,7 +177,7 @@ tuning log's "Kinship: roster growth, trials and the r02 fall-off".
 **Built (Core/content/save/tests); see [compendium-achievements.md](compendium-achievements.md) for the full design:**
 
 - **Compendium**: `DiscoveryProgress.LoreIds` (lore found), `ClaimedKinshipIds` (sites claimed), the
-  roster page's silhouettes ("Found through Kinship"); `LoreEntryData` carries a title and text.
+  roster page's silhouettes ("Meet it at a Kinship site"); `LoreEntryData` carries a title and text.
   `CompendiumRules` is the pure derived view; `DiscoveryProgress.KinshipJoins` (schema 9) added the one
   fact needed beyond PR A's save shape (which site a beast joined through).
 - **Achievements**: `RegionProgress.Completed` and `DiscoveryRules.Completion` per region (now also

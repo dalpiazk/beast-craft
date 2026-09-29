@@ -19,7 +19,7 @@ namespace BeastCraft.Game.Screens
     public sealed class CompendiumScreen : GameScreen
     {
         private const float Pad = 36f;
-        private const float TopBar = 190f;
+        private const float TopBar = 210f;
         private const float CardHeight = 320f;
 
         private readonly CompendiumViewModel _model;
@@ -105,7 +105,9 @@ namespace BeastCraft.Game.Screens
             Painter.Progress(new Rect(180f, 118f, PortraitLayout.CanvasWidth - 260f, 34f), completion.Percent / 100f, -1f, "gold", "gold", "track", completion.Percent + "% complete");
             string sub = completion.BeastsOwned + "/" + completion.BeastsTotal + " beasts  -  " + completion.LoreFound + "/" + completion.LoreTotal + " lore  -  " +
                          completion.KinshipClaimed + "/" + completion.KinshipTotal + " kinship";
-            Painter.TextIn(sub, new Rect(180f, 158f, PortraitLayout.CanvasWidth - 260f, 28f), style.TextSizes.Small + 2f, Painter.C("inkSoft"), TextAlign.Left);
+            // A gap of clear air above the header divider (TopBar - 5): the line used to sit right
+            // against it.
+            Painter.TextIn(sub, new Rect(180f, 166f, PortraitLayout.CanvasWidth - 260f, 28f), style.TextSizes.Small + 2f, Painter.C("inkSoft"), TextAlign.Left);
         }
 
         protected override void DrawCustom(Widget widget)

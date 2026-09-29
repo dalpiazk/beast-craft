@@ -100,9 +100,15 @@ namespace BeastCraft.Idle
         /// device booted — e.g. Android's <c>elapsedRealtime</c>, iOS's continuous time; negative = not
         /// available, the wall clock alone is used). The first claim of a save only starts the clock.
         /// <paramref name="partyBeastIds"/> is the current party (unknown or repeated ids are ignored);
-        /// every other beast is on the bench. See the class remarks.
+        /// every other beast is on the bench. See the class remarks. When <paramref name="achievements"/>
+        /// is given, a claim that actually paid something also evaluates it (<see cref="IdleClaimResult.TitlesEarned"/>;
+        /// idempotent — an already-earned achievement fires nothing again), so a beast or avatar level
+        /// idle crosses (e.g. <c>AvatarLevel</c>, <c>BeastLevel</c>) earns its title the moment it is
+        /// claimed rather than only on the next session start. Null — the default, unchanged from before
+        /// this parameter existed — means achievements are not wired up.
         /// </summary>
-        public static IdleClaimResult Claim(PlayerSave save, IdleContent content, DateTime nowUtc, TimeSpan nowMonotonic, IEnumerable<string> partyBeastIds)
+        public static IdleClaimResult Claim(PlayerSave save, IdleContent content, DateTime nowUtc, TimeSpan nowMonotonic, IEnumerable<string> partyBeastIds,
+                                             AchievementContent achievements = null)
         {
             if (save == null || content == null || content.Rewards == null)
             {
@@ -140,6 +146,10 @@ namespace BeastCraft.Idle
             if (band != null && result.Hours > 0.0)
             {
                 Pay(save, content, band, result, claimSeed, partyBeastIds);
+                if (achievements != null)
+                {
+                    result.TitlesEarned.AddRange(AchievementRules.Evaluate(save, achievements));
+                }
             }
 
             Anchor(state, nowTicks, nowMonoMs);
@@ -433,6 +443,13 @@ namespace BeastCraft.Idle
 
         /// <summary>Every look unlocked by the claim: the idle drop, then milestones.</summary>
         public List<string> CosmeticsUnlocked { get; } = new List<string>();
+
+        /// <summary>
+        /// Achievements newly earned by this claim (a beast or avatar level idle crossed); empty unless
+        /// <c>Claim</c> was passed <c>achievements</c>, and only on a claim that paid something. Each
+        /// awards a text title, never a stat.
+        /// </summary>
+        public List<AchievementData> TitlesEarned { get; } = new List<AchievementData>();
 
         internal static IdleClaimResult Refused(string error)
         {

@@ -359,6 +359,77 @@ namespace BeastCraft.Tests.EditMode
             Assert.IsEmpty(result.TitlesEarned);
         }
 
+        [Test]
+        public void Camp_EvaluatesAchievements_OnABeastLevelThresholdCrossed()
+        {
+            PlayerSave save = FreshSave();
+            AchievementData def = new AchievementData { AchievementId = "a", Kind = AchievementKinds.BeastLevel, Threshold = 5, TitleId = "t1", TitleText = "Trained Hand" };
+            AchievementContent achievements = Synthetic(def);
+            Assert.IsTrue(CampaignRules.StartRun(save, Content.Campaign, "r01", 3).Success);
+            MapRun run = save.Campaign.ActiveRun;
+
+            // Walk the lowest-id reachable location row by row (as KinshipTests.WalkTo does) until a
+            // Rest node is the frontier, without wiring achievements into the battles along the way.
+            MapNode restNode = null;
+            for (int steps = 0; restNode == null; steps++)
+            {
+                Assert.Less(steps, 20, "no Rest node reached: the map shape changed");
+                MapNode next = CampaignRules.Choices(run)[0];
+                if (next.Type == MapNodeType.Rest)
+                {
+                    restNode = next;
+                    break;
+                }
+
+                CampaignResult step = next.Type == MapNodeType.Shop
+                                           ? CampaignRules.Trade(save, Content.Campaign, next.NodeId, null)
+                                           : CampaignRules.ResolveBattle(save, Content.Campaign, next.NodeId, Battle.BattleOutcome.PlayerVictory);
+                Assert.IsTrue(step.Success, step.Error);
+            }
+
+            // One XP short of level 5: the camp's XP (any amount) crosses "a".
+            string beastId = save.Beasts[0].BeastId;
+            save.Beasts[0].Progress.Level = 4;
+            save.Beasts[0].Progress.Xp = BeastProgression.XpToNextLevel(4) - 1;
+
+            CampaignResult result = CampaignRules.Camp(save, Content.Campaign, restNode.NodeId, beastId, achievements);
+
+            Assert.IsTrue(result.Success, result.Error);
+            Assert.AreEqual(5, save.FindBeast(beastId).Progress.Level);
+            CollectionAssert.AreEquivalent(new[] { "a" }, ExtractIdList(result.TitlesEarned));
+            Assert.IsTrue(save.Achievements.HasEarned("a"));
+        }
+
+        [Test]
+        public void Camp_WithoutAchievements_LeavesTitlesEarnedEmpty_UnchangedFromBeforeTheParameterExisted()
+        {
+            PlayerSave save = FreshSave();
+            Assert.IsTrue(CampaignRules.StartRun(save, Content.Campaign, "r01", 3).Success);
+            MapRun run = save.Campaign.ActiveRun;
+
+            MapNode restNode = null;
+            for (int steps = 0; restNode == null; steps++)
+            {
+                Assert.Less(steps, 20, "no Rest node reached: the map shape changed");
+                MapNode next = CampaignRules.Choices(run)[0];
+                if (next.Type == MapNodeType.Rest)
+                {
+                    restNode = next;
+                    break;
+                }
+
+                CampaignResult step = next.Type == MapNodeType.Shop
+                                           ? CampaignRules.Trade(save, Content.Campaign, next.NodeId, null)
+                                           : CampaignRules.ResolveBattle(save, Content.Campaign, next.NodeId, Battle.BattleOutcome.PlayerVictory);
+                Assert.IsTrue(step.Success, step.Error);
+            }
+
+            CampaignResult result = CampaignRules.Camp(save, Content.Campaign, restNode.NodeId, save.Beasts[0].BeastId);
+
+            Assert.IsTrue(result.Success, result.Error);
+            Assert.IsEmpty(result.TitlesEarned);
+        }
+
         private static List<string> ExtractIdList(List<AchievementData> list)
         {
             List<string> ids = new List<string>();

@@ -47,12 +47,12 @@ namespace BeastCraft.Presentation.Screens
 
     /// <summary>
     /// The Roster tab: every owned beast as an illustrated card (level, stance, element), sortable,
-    /// then a silhouette for each species not yet found ("found through Kinship"), which will feed
+    /// then a silhouette for each species not yet found ("meet it at a Kinship site"), which will feed
     /// the compendium. Tapping an owned beast opens its detail screen.
     /// </summary>
     public sealed class RosterViewModel
     {
-        public const string SilhouetteHint = "Found through Kinship";
+        public const string SilhouetteHint = "Meet it at a Kinship site";
 
         public static readonly string[] SortNames = { "Joined", "Level", "Name", "Element", "Stance" };
 

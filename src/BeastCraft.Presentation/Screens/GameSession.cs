@@ -330,6 +330,12 @@ namespace BeastCraft.Presentation.Screens
             bool fromBackup = loaded.StorageSource == SaveFileSource.Backup;
             bool started = !Save.Campaign.HasActiveRun;
             EnsureExpedition();
+
+            // Welcome back: the idle rewards are claimed straight away, before achievements are
+            // evaluated, so a level the claim itself crosses (ClaimIdle evaluates it too, its own
+            // toast folded into LastContinueClaim.Message) is already reflected when the catch-all,
+            // once-per-session-start check below runs (idempotent, so it never toasts it twice).
+            LastContinueClaim = ClaimIdle();
             bool achievementsChanged = EvaluateAchievementsOnSessionStart();
             if (started || fromBackup || achievementsChanged)
             {
@@ -337,9 +343,6 @@ namespace BeastCraft.Presentation.Screens
                 // or the restored backup made main again.
                 Autosave(AutosaveReason.Results);
             }
-
-            // Welcome back: the idle rewards are claimed straight away.
-            LastContinueClaim = ClaimIdle();
 
             return new LoadOutcome
             {
@@ -389,9 +392,11 @@ namespace BeastCraft.Presentation.Screens
 
         /// <summary>
         /// Claims the idle rewards now (<see cref="IdleRewardCalculator.Claim"/> with <see cref="Clock"/>
-        /// and <see cref="Party"/>) and autosaves when it paid anything. The view's message is null
-        /// when nothing was paid (the first claim only starts the clock; before the first clear there
-        /// is no rate). Null before a game is loaded.
+        /// and <see cref="Party"/>, and <see cref="GameContent.Achievements"/> so a beast or avatar level
+        /// the claim crosses earns its title straight away — <see cref="ExtraRewardText"/> in the same
+        /// message) and autosaves when it paid anything, including a title alone. The view's message is
+        /// null when nothing was paid (the first claim only starts the clock; before the first clear
+        /// there is no rate). Null before a game is loaded.
         /// </summary>
         public IdleClaimView ClaimIdle()
         {
@@ -401,7 +406,7 @@ namespace BeastCraft.Presentation.Screens
             }
 
             ResumeClaimPending = false;
-            IdleClaimResult result = IdleRewardCalculator.Claim(Save, Content.Idle, Clock.UtcNow, Clock.Monotonic, Party());
+            IdleClaimResult result = IdleRewardCalculator.Claim(Save, Content.Idle, Clock.UtcNow, Clock.Monotonic, Party(), Content.Achievements);
             IdleClaimView view = new IdleClaimView { Result = result, Gold = result.GoldGained, Look = result.CosmeticDropped };
             foreach (KeyValuePair<string, int> offered in result.XpOffered)
             {
@@ -440,9 +445,16 @@ namespace BeastCraft.Presentation.Screens
                 parts.Add("a new look");
             }
 
+            string extra = ExtraRewardText(result.TitlesEarned, 0);
             if (parts.Count > 0)
             {
-                view.Message = "While you were away: " + string.Join(", ", parts) + (result.Capped ? " (idle was full)" : string.Empty) + ".";
+                view.Message = "While you were away: " + string.Join(", ", parts) + (result.Capped ? " (idle was full)" : string.Empty) + "." + extra;
+                Autosave(AutosaveReason.IdleClaim);
+            }
+            else if (extra.Length > 0)
+            {
+                // Nothing else to report (a beast at its level cap, say) but a title was still earned.
+                view.Message = extra.Trim();
                 Autosave(AutosaveReason.IdleClaim);
             }
 

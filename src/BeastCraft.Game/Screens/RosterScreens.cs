@@ -18,7 +18,7 @@ namespace BeastCraft.Game.Screens
     /// The Roster tab's page (<see cref="RosterViewModel"/>), inside the home screen: every owned
     /// beast as an illustrated card (level, stance, element; a leaf badge when in the party), a sort
     /// button that cycles Joined, Level, Name, Element and Stance, then a silhouette for each species
-    /// not found yet ("Found through Kinship"). Tapping a beast opens its detail screen.
+    /// not found yet ("Meet it at a Kinship site"). Tapping a beast opens its detail screen.
     /// </summary>
     public sealed class RosterPage
     {

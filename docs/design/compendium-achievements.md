@@ -135,11 +135,14 @@ reward is silently lost. Two additive pieces close that, both deterministic (no 
 - **Spending** (`CosmeticRules.SpendLookToken`, `LookTokenResult`): unlocks a look directly from an
   **explicit, data-driven pool** — `CosmeticOptionData.TokenPurchasable` + `TokenPrice`, validated to
   need a positive price and a `shop` or `drop` `Source` (never a `boss`, `milestone` or `premium`
-  look). The shipped pool is every `drop` look (24 of them, priced 80 common / 160 rare by
-  `Rarity`): a deterministic way to buy a look the game would otherwise only ever hand out on a
-  battle-drop roll, without touching the roll itself. `CosmeticLibrary.TokenPool()` lists it
-  (sorted by key, stable). Refuses on an unknown or non-pool look, an already-usable one, or
-  insufficient tokens; never partially spends.
+  look). The shipped pool is every `drop` look (24 of them, all `Rarity` 0/common today, so every one
+  is priced 80): a deterministic way to buy a look the game would otherwise only ever hand out on a
+  battle-drop roll, without touching the roll itself. `TokenPrice` is authored per option, not derived
+  from `Rarity` by any rule — `CosmeticLibraryValidator` only requires it positive on a
+  `TokenPurchasable` look, so a rare drop look added later could ship at 160 (or any other price)
+  without a code change; nothing ships at that price yet because no `drop` look is rare yet.
+  `CosmeticLibrary.TokenPool()` lists it (sorted by key, stable). Refuses on an unknown or non-pool
+  look, an already-usable one, or insufficient tokens; never partially spends.
 
 Both are pure `PlayerSave` state (`LookTokens`, an `int`, never negative) and pure library data —
 no new content file.
@@ -169,8 +172,9 @@ nothing earned by the migration itself); see progression-and-saves.md, "Schema 9
   cosmetics only); the producer may prefer a different explicit pool (e.g. `shop` looks too, or a
   curated subset) — the data model (`TokenPurchasable` + `TokenPrice`) supports either without a code
   change.
-- `DuplicateLookTokens` = 5 and the token prices (80 / 160 by rarity) are placeholder economy numbers,
-  not calibrated against anything (there is no existing "look token" economy to anchor them to).
+- `DuplicateLookTokens` = 5 and the 80-token price on every shipped look are placeholder economy
+  numbers, not calibrated against anything (there is no existing "look token" economy to anchor them
+  to); 160 was the intended price for a rare drop look, but none is rare today, so it does not ship.
 - Enemies encountered are explicitly **not** in the compendium (see "Compendium", above) — flagged,
   not decided against; a producer call for a later pass.
 - The 20 achievements, their DisplayName/TitleText and thresholds are a first DRAFT pass (mirroring
@@ -199,7 +203,7 @@ Full detail: [screens.md](screens.md#compendium-achievements-and-look-tokens-the
 
 - **Compendium screen** (`CompendiumScreen`, reached from the Roster tab): `CompendiumRules.BeastEntries`
   / `LoreEntries` / `Completion`, read against `GameSession.Content.Discovery`. The roster's existing
-  silhouette hint (`RosterViewModel.SilhouetteHint`, "Found through Kinship") is made precise per owned
+  silhouette hint (`RosterViewModel.SilhouetteHint`, "Meet it at a Kinship site") is made precise per owned
   beast via `DiscoveryProgress.FindKinshipJoin` ("Found through Kinship at &lt;site&gt;").
 - **Achievement list and title picker** (`AchievementsScreen`, reached from the Avatar tab):
   `PlayerSave.Achievements.EarnedIds` / `OwnedTitleIds` / `EquippedTitleId`; `AchievementLibrary.All` /

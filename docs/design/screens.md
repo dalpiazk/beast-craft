@@ -66,7 +66,7 @@ report and the difficulty table regenerate byte-identical).
 - **Roster tab** (`RosterPage`, `RosterViewModel`): every owned beast as an illustrated card (level,
   stance, element; a leaf check when it is in the last party), sortable (Joined, Level, Name,
   Element, Stance: the Sort chip cycles), then a dark silhouette for every species not yet found,
-  "Found through Kinship" (the compendium's seed). A card opens the beast's detail screen.
+  "Meet it at a Kinship site" (the compendium's seed). A card opens the beast's detail screen.
 - **Beast detail** (`BeastDetailScreen`, `BeastDetailViewModel`), three tabs:
   - *Stats*: HP, Atk, Def, SpA, SpD, Speed and Crit as base (the species at its level,
     `StatCalculator.GetBaseStatsAtLevel`), gear and total (`StatCalculator.ComputeStats`), each

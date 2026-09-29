@@ -633,8 +633,12 @@ namespace BeastCraft.Campaign
         /// (<c>BeastProgression.AwardBattle</c>: falloff on its level, under the cap). The node is
         /// cleared and becomes current. Refused for an unknown beast. In a tutorial region the camp
         /// also catches every beast up to the leader's level (<see cref="CampaignResult.CaughtUp"/>).
+        /// When <paramref name="achievements"/> is given, the training also evaluates it
+        /// (<see cref="CampaignResult.TitlesEarned"/>; idempotent), so a beast level camp training
+        /// crosses (e.g. <c>BeastLevel</c>) earns its title straight away. Null — the default — means
+        /// achievements are not wired up.
         /// </summary>
-        public static CampaignResult Camp(PlayerSave save, RegionLibrary library, int nodeId, string beastId)
+        public static CampaignResult Camp(PlayerSave save, RegionLibrary library, int nodeId, string beastId, AchievementContent achievements = null)
         {
             CampaignResult refused = CheckNode(save, library, nodeId, out MapRun run, out MapNode node, out RegionData _);
             if (refused != null)
@@ -664,7 +668,13 @@ namespace BeastCraft.Campaign
 
             Clear(run, node);
             RevealAround(save, library, run, node);
-            return FinishIfLast(save, library, run, node, result);
+            CampaignResult finished = FinishIfLast(save, library, run, node, result);
+            if (achievements != null)
+            {
+                finished.TitlesEarned.AddRange(AchievementRules.Evaluate(save, achievements));
+            }
+
+            return finished;
         }
 
         /// <summary>
@@ -1192,9 +1202,8 @@ namespace BeastCraft.Campaign
         public int PickStep { get; internal set; }
 
         /// <summary>
-        /// Achievements newly earned by this call (a region's boss cleared; empty unless
-        /// <c>ResolveBattle</c> was passed <c>achievements</c>, and on any call but a first boss
-        /// clear). Each awards a text title, never a stat.
+        /// Achievements newly earned by this call; empty unless <c>ResolveBattle</c> or <c>Camp</c> was
+        /// passed <c>achievements</c>. Each awards a text title, never a stat.
         /// </summary>
         public List<AchievementData> TitlesEarned { get; } = new List<AchievementData>();
 
