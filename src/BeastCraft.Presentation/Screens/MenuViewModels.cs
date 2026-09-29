@@ -60,14 +60,14 @@ namespace BeastCraft.Presentation.Screens
     }
 
     /// <summary>
-    /// The home screen's bottom nav: Map, Roster, Grove, Avatar, Inventory. Map, Roster, Grove and
-    /// Avatar work in this build (Avatar is a minimal identity card for now: level, equipped title, and
-    /// the way to the achievements/title screen and the look-token shop; its skills and gear are a
-    /// later PR; Grove opens the full Grove hub screen — <c>Game.Screens.GroveScreen</c> — rather than
-    /// showing inline, so this view-model's own <see cref="Tab"/> never actually becomes
-    /// <see cref="HomeTab.Grove"/>, see <c>HomeScreen.SelectTab</c>); Inventory shows a "coming soon"
-    /// page. Back on another tab returns to the Map; on the Map it is not handled here (the stack pops
-    /// back to the title).
+    /// The home screen's bottom nav: Map, Roster, Grove, Avatar, Inventory. Map and Roster show inline;
+    /// Grove, Avatar and Inventory each open their own full screen (<c>Game.Screens.GroveScreen</c>,
+    /// <c>AvatarScreen</c>, <c>InventoryScreen</c>) rather than showing inline, so this view-model's
+    /// own <see cref="Tab"/> never actually becomes <see cref="HomeTab.Grove"/>,
+    /// <see cref="HomeTab.Avatar"/> or <see cref="HomeTab.Inventory"/> (see
+    /// <c>HomeScreen.SelectTab</c>) — the nav bar keeps showing whichever of Map/Roster was selected
+    /// underneath. Back on another tab returns to the Map; on the Map it is not handled here (the
+    /// stack pops back to the title).
     /// </summary>
     public sealed class HomeViewModel
     {

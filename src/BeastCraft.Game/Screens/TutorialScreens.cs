@@ -477,7 +477,7 @@ namespace BeastCraft.Game.Screens
             _model = model;
             _done = done;
             float rowHeight = 150f;
-            float height = 330f + model.Beasts.Count * (rowHeight + 14f) + 420f;
+            float height = 330f + model.Beasts.Count * (rowHeight + 14f) + 540f;
             _card = new Rect(60f, Math.Max(60f, (PortraitLayout.CanvasHeight - height) / 2f), PortraitLayout.CanvasWidth - 120f, height);
             Ui.Add(new Panel { Bounds = _card, StyleKey = "modal" });
             for (int i = 0; i < model.Beasts.Count; i++)
@@ -492,6 +492,8 @@ namespace BeastCraft.Game.Screens
             float y = _card.Y + 300f + model.Beasts.Count * (rowHeight + 14f) + 20f;
             _idle = Ui.Add(new Button { Id = "idle", Bounds = new Rect(_card.X + 40f, y + 130f, _card.Width - 80f, 90f), StyleKey = "chip", Glyph = "hourglass" });
             _idle.Clicked += ClaimIdle;
+            Button trade = Ui.Add(new Button { Id = "trade", Bounds = new Rect(_card.X + 40f, y + 240f, _card.Width - 80f, 90f), StyleKey = "chip", Glyph = "shop", Text = "Trade with the travelling trader" });
+            trade.Clicked += OpenTrade;
             _train = Ui.Add(new Button { Id = "train", Bounds = new Rect(_card.X + 120f, _card.Bottom - 160f, _card.Width - 240f, 120f), StyleKey = "primary" });
             _train.Clicked += Train;
             Select(model.Suggested);
@@ -556,6 +558,12 @@ namespace BeastCraft.Game.Screens
             IdleClaimView claim = Ctx.Session.ClaimIdle();
             Ctx.Game.Toast(claim?.Message ?? (Ctx.Session.IdleStatus().Started ? "Nothing to collect yet." : "The idle clock has started."));
             RefreshIdle();
+        }
+
+        /// <summary>Every camp has a travelling trader too (economy-and-shop.md, "The Trader"): opens the same <see cref="ShopScreen"/> a Shop map node does, over this camp's own node.</summary>
+        private void OpenTrade()
+        {
+            Ctx.Stack.Push(new ShopScreen(Ctx, _model.NodeId, true));
         }
 
         private void RefreshIdle()
