@@ -299,6 +299,7 @@ namespace BeastCraft.Tests.EditMode
             // A prior loss at this node: soothing must reset the streak exactly as a win does.
             CampaignRules.ResolveBattle(save, Content.Campaign, node.NodeId, BattleOutcome.EnemyVictory);
             Assert.AreEqual(1, save.Campaign.ActiveRun.NodeAttempts);
+            int avatarLevelBefore = save.Avatar.Level;
 
             CampaignResult result = CampaignRules.Soothe(save, Content.Campaign, Content.GroveLibrary, Content.Encounters, Content.Enemies, node.NodeId, item, new[] { "b1" },
                                                           Content.Drops, Content.Economy, out BattleRewardSummary rewards);
@@ -319,6 +320,10 @@ namespace BeastCraft.Tests.EditMode
             Assert.Greater(rewards.BeastXpGained["b1"], 0, "full beast XP, not participation-only");
             Assert.AreEqual(BeastProgression.BattleXp(BattleOutcome.PlayerVictory, node.Level, false, 2), rewards.BeastXpGained["b1"],
                             "exactly the clear bonus a still-standing fielded beast earns for a real win");
+
+            Assert.Greater(rewards.AvatarXpGained, 0, "full rewards: the avatar is part of the team and earns its battle XP too");
+            Assert.AreEqual(AvatarProgression.BattleXp(BattleOutcome.PlayerVictory, node.Level, avatarLevelBefore), rewards.AvatarXpGained,
+                            "exactly the avatar XP a real win at this node's level would grant");
         }
 
         [Test]

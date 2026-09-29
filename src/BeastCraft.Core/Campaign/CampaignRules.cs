@@ -641,15 +641,19 @@ namespace BeastCraft.Campaign
         /// On success: consumes one <paramref name="itemId"/> from <see cref="GroveItemInventory.TryConsume"/>,
         /// then pays out exactly what a combat win at this node would — <paramref name="teamBeastIds"/>'
         /// full beast XP (the clear bonus, as if none were knocked out), every other owned beast's
-        /// bench XP, gold, material and (with <paramref name="economy"/>) gear and cosmetic drops,
-        /// first-clear bonuses included — through the very same <see cref="Session.BattleSession.ApplyRewards"/>
-        /// a fought battle pays through, on this node's current-attempt seed
-        /// (<see cref="BattleSeed"/> of <see cref="LossesAt"/>): the same seed a real attempt right
-        /// now would use, so a soothe can never reroll or improve on what fighting would have paid
-        /// (RNG stream parity — the design's own ask). No battle is simulated (no skill practice XP;
-        /// the avatar does not take part, so it earns no XP from a soothe — a deliberate scope
-        /// decision, since the design's ask was "full beast XP", not avatar XP), so <paramref name="rewards"/>
-        /// carries the payout the same shape <c>NodeBattle.Complete</c> reports for a real battle.
+        /// bench XP, the avatar's own battle XP (the avatar is part of the team; see below), gold,
+        /// material and (with <paramref name="economy"/>) gear and cosmetic drops, first-clear bonuses
+        /// included — through the very same <see cref="Session.BattleSession.ApplyRewards"/> a fought
+        /// battle pays through, on this node's current-attempt seed (<see cref="BattleSeed"/> of
+        /// <see cref="LossesAt"/>): the same seed a real attempt right now would use, so a soothe can
+        /// never reroll or improve on what fighting would have paid (RNG stream parity — the design's
+        /// own ask). No battle is simulated, so no <em>skill</em> practice XP is credited (that is only
+        /// ever earned per skill use inside a real battle's turns, and a soothe has none) — but the
+        /// producer decision is that a soothe is a full-reward clear, so the synthetic result still
+        /// names a (non-fighting, non-casting) avatar unit, and <see cref="Session.BattleSession.ApplyRewards"/>
+        /// awards it the same <c>AvatarProgression.BattleXp</c> a real win at this node's level would.
+        /// <paramref name="rewards"/> carries the payout the same shape <c>NodeBattle.Complete</c>
+        /// reports for a real battle.
         /// </para>
         /// <para>
         /// Then clears the node the same way a win does (<see cref="Clear"/>, <see cref="RevealAround"/>:
@@ -728,7 +732,8 @@ namespace BeastCraft.Campaign
                 RegionId = run.RegionId,
                 Battle = new BattleResult(BattleOutcome.PlayerVictory, 0, new List<BattleTurnResult>()),
                 TeamUnitIds = teamUnitIds,
-                Units = units
+                Units = units,
+                Avatar = new BattleUnit(BattleAvatar.DefaultId, BattleTeam.Player, default, default)
             };
 
             int cap = BeastCap(save, library);

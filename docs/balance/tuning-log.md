@@ -4443,3 +4443,18 @@ sim does not model it.
 Reproduce: `-- --mode campaign --soothe-fraction 0.5 --runs 1000 --out docs/balance/soothing-probe.md`
 (not committed; a documentation-only probe, not a gate) for the full-sample version of the numbers
 above.
+
+**Re-verified after the D4 fix (avatar XP).** The producer decision on `CampaignRules.Soothe` was
+"full rewards including full XP", and this sim's `Fight` already modelled a soothed clear as paying
+the avatar its battle XP the same as a won one (it always calls `AvatarProgression.BattleXp`/
+`AwardBattle` regardless of `soothed`, ever since this probe was written) — but the real
+`CampaignRules.Soothe` did not: its synthetic `BattleSessionResult` left `Avatar` null, so
+`BattleSession.ApplyRewards` skipped the avatar-XP branch and a real soothe paid every reward except
+the avatar's own XP. Fixed by naming a (non-fighting, non-casting) avatar unit on the synthetic
+result, same as a real battle names one, so `ApplyRewards` awards it — no skill practice XP either
+way (that is only ever earned per skill use inside a real battle's turns, and a soothe simulates
+none). This was a Core/save bug, not a pacing-model one: this sim's numbers above were already
+computed as if the avatar earned its XP, so a `--soothe-fraction 0.5 --runs 200` re-run after the fix
+reproduces the exact same figures byte-for-byte (63710 ordinary Battle nodes, 31851 soothed, 50.0%;
+every gate/boss row still "ok") — nothing here needed to change, only `CampaignRules.Soothe` (and its
+unit test) did.

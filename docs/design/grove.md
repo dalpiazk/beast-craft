@@ -274,18 +274,23 @@ already excludes them) — or for a region with no soothing item set, an item no
 naming no owned beast. On success it consumes one item from `Grove.GroveItemInventory.TryConsume` (the
 same seam D2's NPC requests read) and pays out **exactly** what a combat win at that node grants — the
 named team's full beast XP (the clear bonus, as if none were knocked out; every other owned beast's
-bench XP), gold, material and gear/cosmetic drops, first-clear bonuses — by building a synthetic,
-already-won `Session.BattleSessionResult` (a `BattleResult(PlayerVictory, …)`, one not-defeated
-`Battle.BattleUnit` per named beast) and handing it to the very same `Session.BattleSession
-.ApplyRewards` a fought battle pays through, seeded with `CampaignRules.BattleSeed(node,
-LossesAt(run, node))` — this node's *current-attempt* seed, the same one a real attempt right now
-would use — so a soothe can never reroll or improve on what fighting would have paid (RNG stream
-parity, the producer's own ask). No battle is simulated, so no skill practice XP is credited and the
-avatar does not take part (a deliberate D3 scope decision: the ask was "full beast XP", not avatar
-XP). The node then clears exactly as a win does (`Clear`, `RevealAround`: reveal, and a loss streak at
-that node resets), `Campaign.CampaignProgress.LocationsSoothed` counts it (never decreases, account-
-wide, replays included — the `location_soothed` NPC fact, cascading like `decor_placed_count`), and
-`achievements` (when given) evaluates as usual.
+bench XP), the avatar's own battle XP (the avatar is part of the team — see below), gold, material and
+gear/cosmetic drops, first-clear bonuses — by building a synthetic, already-won
+`Session.BattleSessionResult` (a `BattleResult(PlayerVictory, …)`, one not-defeated `Battle.BattleUnit`
+per named beast, plus a placeholder avatar `BattleUnit` the same shape a real battle names) and handing
+it to the very same `Session.BattleSession.ApplyRewards` a fought battle pays through, seeded with
+`CampaignRules.BattleSeed(node, LossesAt(run, node))` — this node's *current-attempt* seed, the same
+one a real attempt right now would use — so a soothe can never reroll or improve on what fighting would
+have paid (RNG stream parity, the producer's own ask). **Producer decision (D4): a soothed location
+pays full rewards, avatar XP included** — the avatar does not fight or cast (no skills fire, so no
+skill practice XP: that is only ever earned per skill use inside a real battle's turns, and a soothe
+simulates none), but it is still credited as part of the team, exactly `AvatarProgression.BattleXp`/
+`AwardBattle` at the node's level, the same as a real win. (D3 had shipped this scoped to beast XP only,
+deliberately excluding the avatar; D4's producer review corrected that — "full rewards" means full
+rewards.) The node then clears exactly as a win does (`Clear`, `RevealAround`: reveal, and a loss streak
+at that node resets), `Campaign.CampaignProgress.LocationsSoothed` counts it (never decreases,
+account-wide, replays included — the `location_soothed` NPC fact, cascading like `decor_placed_count`),
+and `achievements` (when given) evaluates as usual.
 
 Data-driven, per region (`Grove.GroveLibraryData.Soothing`, `SoothingRegionData {RegionId, ItemIds[]}`
 — a few Wildgarden varieties per region, so the player has a choice; cross-validated by
