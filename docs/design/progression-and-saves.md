@@ -382,6 +382,157 @@ titles, and look tokens. `CurrentSchemaVersion` is **9**.
   `,"Achievements":{"EarnedIds":[],"OwnedTitleIds":[],"EquippedTitleId":""},"LookTokens":0` after
   `"Discovery"`.
 
+### Schema 10: the Grove, the Wildgarden and the Board
+
+Save schema **10** adds the Grove hub ([grove.md](grove.md)): the Grove (habitats, decor, affinity
+and gifts, and a generic Grove item inventory), the Wildgarden (plots and the herbarium) and the
+Board (expeditions away, stories and pity). No combat power anywhere in any of the three — nothing
+here is read by battle, stats or campaign difficulty; `docs/balance/tuned-report.md` and
+`campaign-pacing-report.md` are unchanged by this PR. `CurrentSchemaVersion` is **10**.
+
+- `PlayerSave.Grove` (`Grove.GroveProgress`, written after `LookTokens`): `HabitatsUnlocked`,
+  `UnlockedDecorIds` (owned, whether placed or not), `PlacedDecor` (`{HabitatId, DecorId, X, Y,
+  Rotation}`, a decor id placed at most once), `Affinity` (`List<BeastAffinityState>` — per beast:
+  XP and tier, the Feed/Play cooldown anchors, the gift clock's anchor, seed and pity, and
+  `PendingGifts`, capped at `GroveRules.MaxPendingGifts` (3)), `LoreIds` (the Grove's own small lore
+  codex — affinity and gift flavour, kept separate from `DiscoveryProgress.LoreIds`) and `Items`
+  (`Grove.GroveItemInventory`: a generic counted pool, keyed by id — what the Wildgarden grows and
+  crafts and the Board's expeditions find; the seam D3 reads for peaceful clears and colour
+  evolutions, see `grove.md`, §7).
+- `PlayerSave.Garden` (`Garden.GardenProgress`, written after `Grove`): `Plots` (`{PlotId, SeedId,
+  StartUtcTicks, StartMonotonicMs}`; no entry for a plot id means it is empty) and
+  `VarietiesDiscovered` (the herbarium).
+- `PlayerSave.Expeditions` (`Expeditions.ExpeditionProgress`, written after `Garden`): `Active`
+  (`{DestinationId, BeastIds, StartUtcTicks, StartMonotonicMs, Seed}` — a timer on the destination,
+  never a lock on the beasts: producer decision, they stay fully available for battle and idle XP
+  the whole time away), `StoriesUnlocked` and `Pity` (`{DestinationId, Misses}`). Distinct from the
+  region campaign's own "expedition" (`CampaignProgress.ActiveRun`, a `MapRun`) — the two names
+  never interact; see `grove.md`, "Naming: two different 'expeditions'".
+- *Offline clock.* `Common.OfflineClock.ElapsedMs` is `IdleRewardCalculator.Elapsed`'s wall-plus-
+  monotonic reconciliation, extracted unchanged (`IdleRewardTests` proves idle's own behaviour is
+  byte-for-byte identical after the extraction) and now shared by every Grove/Garden/Expedition
+  timer: Feed/Play's daily cooldown, the gift clock, plot growth and an expedition's remaining time
+  all use the same anti-tamper stance (a clock moved back or forward is silently clamped to the
+  provable elapsed time — no message, no penalty, no bonus).
+- *Rules.* `Grove.GroveRules`, `Garden.GardenRules`, `Expeditions.ExpeditionRules`: deterministic,
+  non-throwing, refuse-and-no-op on bad input (the `CosmeticRules`/`IdleRewardCalculator` idiom).
+  Gifts and expedition outcomes reuse the idle-claim's seeded-roll-plus-pity idiom
+  (`LootRoller.DeriveSeed`, a per-beast or per-destination pity counter). Cross-pollination
+  (`GardenRules.Harvest`/`HarvestPair`) is a curated, deterministic matrix, never rolled: a lone
+  plot always yields its seed's self-pair variety; two different ready plots harvested together
+  always yield the matrix's fixed hybrid for that pair.
+- *Migration.* `SaveMigrations.AddGrove` (9 to 10): a v9 save has none of the above; the upgrade
+  reads it into the current type (no habitat or decor unlocked, no beast's affinity, no Grove item
+  held, no plot planted, no variety in the herbarium, no expedition away, no story or pity), fills
+  in anything missing and writes it back. Nothing else moves: a save's existing
+  `Discovery.GroveUnlockIds` (shrines visited before the Grove existed) is untouched — the Grove
+  reads it live (`GroveRules.RefreshUnlocks`) the first time it opens, so nothing already earned is
+  lost.
+- *Validation.* `SaveValidator` reports `InvalidValue` for a beast's affinity out of range (Xp,
+  Tier 0-5, pity misses), more pending gifts than the cap, a negative or duplicate-id Grove item
+  count, a plot with no seed or a repeated plot id, and an expedition away with an empty destination
+  or no beasts sent. No content cross-references here (mirrors schema 9's compendium check: the
+  content catalog does not carry Grove/Garden/Expedition ids).
+- *Golden saves.* `rich-v9.input.json` is frozen; the new `rich-v10.input.json` (reflection-filled)
+  must round-trip byte-identical; new `min-v10`. No input changed; every older expected output
+  changed only by `"SchemaVersion":10` and the appended `,"Grove":{"HabitatsUnlocked":[],
+  "UnlockedDecorIds":[],"PlacedDecor":[],"Affinity":[],"LoreIds":[],"Items":{"Items":[]}},
+  "Garden":{"Plots":[],"VarietiesDiscovered":[]},"Expeditions":{"Active":[],"StoriesUnlocked":[],
+  "Pity":[]}` after `"LookTokens"`.
+
+#### Schema 10, extended in place: the NPC dialogue layer (D2)
+
+`grove.md`'s D2 (NPC dialogue, requests and side stories) landed before schema 10 shipped on any
+other branch, so it was folded into the **same** schema-10 shape rather than bumping to 11 — see
+`SaveMigrations.AddGrove`'s remarks. `PlayerSave.Npc` (`Npc.NpcProgress`, written after
+`Expeditions`, the schema's last field): `Dialogue` (`Npc.DialogueState { LinesSeen }` — every
+dialogue line ever resolved and shown, via `Npc.NpcRules.ResolveAndMark`), `RequestsFulfilled` (a
+`Tutorial.RequestData.RequestId` once each, forever), `LoreIds` (the dialogue layer's own small lore
+codex — a request's or a side-story chapter's reward, kept separate from `Grove.GroveProgress.LoreIds`
+and `DiscoveryProgress.LoreIds`, the same "each domain owns its own small lore list" shape) and
+`SideStories` (`List<Npc.SideStoryState> { StoryId, ChaptersCompleted }` — one entry per side story
+touched, `ChaptersCompleted` in the order completed).
+
+- *Content.* `content/data/Npc/dialogue.json` (`Tutorial.DialogueLibraryData`, unchanged path — the
+  Grove design's original `npc-dialogue.json` proposal turned out to already have a home: Hearthglen's
+  tutorial dialogue layer, built before D2, already used exactly the Grove's `{NpcId, Conditions, Text,
+  Priority}` shape and said so in its own readme). D2 adds three arrays: `Requests`
+  (`Tutorial.RequestData`), `SideStories` (`Tutorial.SideStoryData` → `SideStoryChapterData`, chained
+  by `NextChapterId`) and `Lore` (`Tutorial.NpcLoreEntryData`). Cast v1: the Grove Keeper (already
+  existed), the Trader, the Wandering Scholar, Forest Folk.
+- *Conditions.* A condition is `"kind:params"` (e.g. `habitat_unlocked:mossy_glade`); the known kinds
+  are `Tutorial.NpcConditionKinds.All`, built live from account state by `Npc.NpcRules.BuildFacts`
+  (affinity tier — any beast and per species, cascading up to the current tier —, herbarium variety
+  found/count, decor placed count, habitat unlocked, an expedition story unlocked, a region's boss
+  cleared, Grove/dialogue lore found, a Grove item held, a side-story chapter or story complete).
+  Deliberately one small, growable list: D3 added `colour_form_owned` and `location_soothed` the same
+  way (a new kind constant plus a new fact emitted from `BuildFacts`), without touching
+  `DialogueBook.Resolve` or this shape.
+- *Rules.* `Npc.NpcRules`: deterministic, non-throwing, refuse-and-no-op on bad input (the same
+  idiom). `ResolveAndMark` wraps `DialogueBook.Resolve` and records the line seen.
+  `IsRequestAvailable`/`CanFulfillRequest`/`FulfillRequest` consume a request's Grove item
+  (`GroveItemInventory.TryConsume`) and grant its reward once, forever.
+  `CurrentChapter`/`IsChapterAvailable`/`CanFulfillChapter`/`FulfillChapter` walk a side story's
+  chapter chain, optionally consuming an item per chapter, granting a mechanical reward and the
+  chapter's own lore. No combat power ever, no gold that buys power; a title is earned only through
+  an achievement (`AchievementKinds.SideStoryComplete`, `AchievementData.StoryId`), never a request or
+  side-story reward directly.
+- *Validation.* `Tutorial.DialogueValidator.ValidateRequestsAndSideStories`: unique snake_case ids,
+  every `NpcId` known, every request's/chapter's item id a real `GroveItemInventory` id (a Wildgarden
+  variety, a crafted dye or an expedition trinket), every reward id resolving for its kind, every
+  condition's kind known, and every side story's chapter chain acyclic with exactly one entry chapter
+  and every chapter reachable from it. `SaveValidator.ValidateNpc` (structural only, no content
+  cross-references, the same shape as `ValidateGrove`/`ValidateCompendium`): no line, request, lore or
+  story id listed twice, no chapter listed twice within one story.
+- *Golden saves.* `rich-v10.input.json` was regenerated by reflection
+  (`BEASTCRAFT_UPDATE_GOLDENS=1`) to fill the new fields; every expected output (v1-v10, rich and min)
+  changed in exactly one additional place: `,"Npc":{"Dialogue":{"LinesSeen":[]},
+  "RequestsFulfilled":[],"LoreIds":[],"SideStories":[]}` after `"Expeditions"`'s closing brace. No
+  other input or migration changed.
+
+#### Schema 10, extended in place: peaceful clears (D3)
+
+`grove.md`'s D3 (peaceful clears / "soothing"; colour evolutions) landed before schema 11, so it too
+was folded into schema 10 in place. Only peaceful clears need a save field — colour evolutions add
+none at all (see below).
+
+- `Campaign.CampaignProgress.LocationsSoothed` (an `int`, written directly after `ActiveRun`'s closing
+  brace inside `"Campaign"`): how many ordinary battle locations have ever been soothed with a Grove
+  item instead of fought (`CampaignRules.Soothe`); never decreases, account-wide, replays included.
+  Read by `Npc.NpcRules.BuildFacts` for the `location_soothed` NPC condition (a cascading count fact,
+  like `decor_placed_count`) and by the `LocationsSoothed` achievement kind.
+- *Rules.* `Campaign.CampaignRules.Soothe(save, regions, grove, encounters, enemyCatalog, nodeId,
+  itemId, teamBeastIds, dropTable, economy, out rewards, achievements)`: refuses anything but a plain
+  `MapNodeType.Battle` node, a region with no `Grove.GroveLibraryData.Soothing` entry, an item not in
+  it, or an empty team. On success it consumes the item (`GroveItemInventory.TryConsume`) and pays the
+  reward through `Session.BattleSession.ApplyRewards` itself — a synthetic, already-won
+  `BattleSessionResult` (one not-defeated `BattleUnit` per named beast, `BattleSeed(node,
+  LossesAt(run, node))` as its seed) rather than a re-implementation — so a soothe's gold/loot/XP is
+  byte-for-byte what a real win at that node, right now, would pay (RNG stream parity). The node
+  clears exactly as a win does (`Clear`, `RevealAround`, the loss streak resets) and
+  `LocationsSoothed` increments once.
+- *Validation.* `Grove.GroveLibraryValidator.ValidateSoothingAndColourForms` (a second pass over
+  `grove-library.json`, after `garden-library.json`/`expedition-library.json` are themselves valid —
+  the same two-pass shape as D2's `DialogueValidator.ValidateRequestsAndSideStories`): every mainline
+  and post-game region has exactly one `Soothing` entry naming at least one real Grove item; every
+  `Grove.ColourFormData` has a unique id, a known species, a positive item count, an item that
+  resolves, and a `CosmeticCategoryId`/`CosmeticOptionId` that resolve to a `"grove"`-sourced look
+  scoped to that species whose `UnlockId` is the row's own id (`CheckLook`, the same idiom D1/D2 used).
+  `SaveValidator` reports `Campaign.LocationsSoothed` out of range (non-negative) alongside the rest of
+  `ValidateCampaign`.
+- *Golden saves.* `rich-v10.input.json` was regenerated again; every expected output changed in
+  exactly one additional place: `,"LocationsSoothed":0` after `ActiveRun`'s closing brace, inside
+  `"Campaign"`. No other input or migration changed.
+- **Colour evolutions add no save field.** A colour form's account-wide ownership and which one a
+  beast currently wears reuse the *existing* per-species cosmetic shape end to end:
+  `PlayerSave.Cosmetics` (`Economy.CosmeticCollection`, schema 4) and `OwnedBeast.Appearance`
+  (`Customization.CustomizationSelection`, schema 4) already model "owned once per species, worn per
+  beast instance, switchable freely" — exactly what "owned colour forms per beast species/instance"
+  needed. `Grove.GroveRules.TryUnlockColourForm` spends a Grove item to unlock a form's cosmetic
+  option through the existing `Economy.CosmeticRules.UnlockOrRefund`; wearing/switching it on a
+  specific beast is the existing `CosmeticRules.TrySetOption` — no new Core method for that half
+  either. See `grove.md`, "Colour evolutions" for the full reasoning.
+
 ### Hearthglen's rules (`StarterPicks`, `CampaignRules`)
 
 - **Picks.** The 1st any of the ten; the 2nd any beast of the next stance in the cycle

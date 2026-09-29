@@ -180,8 +180,7 @@ namespace BeastCraft.Tests.EditMode
             Assert.AreEqual(HomeTab.Map, home.Tab);
 
             home.Select(HomeTab.Grove);
-            Assert.IsFalse(home.TabAvailable, "coming soon");
-            StringAssert.Contains("idle rewards", home.ComingSoon);
+            Assert.IsTrue(home.TabAvailable, "the Grove hub is built (D4); HomeScreen pushes it rather than showing it inline");
             Assert.IsTrue(home.HandleBack());
             Assert.AreEqual(HomeTab.Map, home.Tab);
             CollectionAssert.AreEqual(new[] { "Map", "Roster", "Grove", "Avatar", "Inventory" }, HomeViewModel.TabNames, "the Camp tab is the Grove (producer rename)");

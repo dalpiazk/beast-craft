@@ -23,6 +23,17 @@ namespace BeastCraft.Progression
 
         public static List<string> Validate(AchievementLibraryData data, RegionLibraryData regions, DiscoveryLibraryData discovery, ICollection<string> speciesIds)
         {
+            return Validate(data, regions, discovery, speciesIds, null);
+        }
+
+        /// <summary>
+        /// <see cref="Validate(AchievementLibraryData, RegionLibraryData, DiscoveryLibraryData, ICollection{string})"/>
+        /// plus <see cref="AchievementKinds.SideStoryComplete"/>'s <see cref="AchievementData.StoryId"/> check against
+        /// <paramref name="dialogue"/>'s side stories (D2). Without a dialogue library only the structural checks run.
+        /// </summary>
+        public static List<string> Validate(AchievementLibraryData data, RegionLibraryData regions, DiscoveryLibraryData discovery, ICollection<string> speciesIds,
+                                             Tutorial.DialogueLibraryData dialogue)
+        {
             List<string> errors = new List<string>();
             if (data == null)
             {
@@ -57,6 +68,15 @@ namespace BeastCraft.Progression
             int kinshipSites = discovery == null ? 0 : (discovery.KinshipSites ?? new KinshipSiteData[0]).Length;
             int rosterSize = speciesIds == null ? int.MaxValue : Math.Max(1, speciesIds.Count);
 
+            HashSet<string> storyIds = new HashSet<string>(StringComparer.Ordinal);
+            foreach (Tutorial.SideStoryData story in dialogue == null ? new Tutorial.SideStoryData[0] : dialogue.SideStories ?? new Tutorial.SideStoryData[0])
+            {
+                if (story != null && !string.IsNullOrEmpty(story.StoryId))
+                {
+                    storyIds.Add(story.StoryId);
+                }
+            }
+
             HashSet<string> ids = new HashSet<string>(StringComparer.Ordinal);
             HashSet<string> titleIds = new HashSet<string>(StringComparer.Ordinal);
             foreach (AchievementData achievement in data.Achievements ?? new AchievementData[0])
@@ -77,6 +97,7 @@ namespace BeastCraft.Progression
 
                 ValidateRegion(errors, at, achievement, library, discoveryRegions, regionsWithLore);
                 ValidateThreshold(errors, at, achievement, kinshipSites, rosterSize);
+                ValidateStory(errors, at, achievement, dialogue, storyIds);
 
                 if (!IsSnakeCase(achievement.TitleId) || !titleIds.Add(achievement.TitleId))
                 {
@@ -128,6 +149,29 @@ namespace BeastCraft.Progression
             if (achievement.Kind == AchievementKinds.RegionLoreComplete && library != null && !regionsWithLore.Contains(achievement.RegionId))
             {
                 errors.Add(at + ": RegionId '" + achievement.RegionId + "' has no lore entries (discovery.json Lore).");
+            }
+        }
+
+        private static void ValidateStory(List<string> errors, string at, AchievementData achievement, Tutorial.DialogueLibraryData dialogue, HashSet<string> storyIds)
+        {
+            bool storyScoped = AchievementKinds.IsStoryScoped(achievement.Kind);
+            if (!storyScoped)
+            {
+                if (!string.IsNullOrEmpty(achievement.StoryId))
+                {
+                    errors.Add(at + ": Kind " + achievement.Kind + " does not use StoryId.");
+                }
+
+                return;
+            }
+
+            if (string.IsNullOrEmpty(achievement.StoryId))
+            {
+                errors.Add(at + ": Kind " + achievement.Kind + " needs a StoryId.");
+            }
+            else if (dialogue != null && !storyIds.Contains(achievement.StoryId))
+            {
+                errors.Add(at + ": StoryId '" + achievement.StoryId + "' is not a known side story (dialogue.json SideStories).");
             }
         }
 

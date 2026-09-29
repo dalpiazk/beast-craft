@@ -10,6 +10,9 @@ using BeastCraft.Creatures.Roster;
 using BeastCraft.Discovery;
 using BeastCraft.Economy;
 using BeastCraft.Encounters;
+using BeastCraft.Expeditions;
+using BeastCraft.Garden;
+using BeastCraft.Grove;
 using BeastCraft.Idle;
 using BeastCraft.Presentation.Art;
 using BeastCraft.Presentation.Text;
@@ -129,6 +132,15 @@ namespace BeastCraft.Presentation.Content
         /// <summary><c>achievements.json</c>: the Collector persona's deterministic, title-awarding achievements (see <see cref="Achievements"/>).</summary>
         public AchievementLibrary AchievementLibrary { get; private set; }
 
+        /// <summary><c>grove-library.json</c>: habitats, decor, affinity tiers and gift tables (see <see cref="Grove.GroveRules"/>).</summary>
+        public GroveLibrary GroveLibrary { get; private set; }
+
+        /// <summary><c>garden-library.json</c>: seeds, the cross-pollination matrix, varieties and recipes (see <see cref="Garden.GardenRules"/>).</summary>
+        public GardenLibrary GardenLibrary { get; private set; }
+
+        /// <summary><c>expedition-library.json</c>: the Board's destinations and outcome tables (see <see cref="Expeditions.ExpeditionRules"/>).</summary>
+        public ExpeditionLibrary ExpeditionLibrary { get; private set; }
+
         /// <summary>A file of the content root by its ProjectRelativePath (<c>content/...</c>).</summary>
         public static string PathOf(string root, string projectRelativePath)
         {
@@ -219,6 +231,9 @@ namespace BeastCraft.Presentation.Content
             DialogueLibraryData dialogue = Read<DialogueLibraryData>(root, DialogueLibraryData.ProjectRelativePath, errors);
             DiscoveryLibraryData discovery = Read<DiscoveryLibraryData>(root, DiscoveryLibraryData.ProjectRelativePath, errors);
             AchievementLibraryData achievementData = Read<AchievementLibraryData>(root, AchievementLibraryData.ProjectRelativePath, errors);
+            GroveLibraryData groveData = Read<GroveLibraryData>(root, GroveLibraryData.ProjectRelativePath, errors);
+            GardenLibraryData gardenData = Read<GardenLibraryData>(root, GardenLibraryData.ProjectRelativePath, errors);
+            ExpeditionLibraryData expeditionData = Read<ExpeditionLibraryData>(root, ExpeditionLibraryData.ProjectRelativePath, errors);
             if (errors.Count > 0)
             {
                 return null;
@@ -244,7 +259,13 @@ namespace BeastCraft.Presentation.Content
             Prefix(errors, "dialogue.json", DialogueValidator.Validate(dialogue));
             Prefix(errors, "dialogue.json", DialogueValidator.ValidateScenes(dialogue, regions));
             Prefix(errors, "discovery.json", DiscoveryLibraryValidator.Validate(discovery, regions, encounterLibrary, SpeciesIds(roster), MaterialIds(skills), cosmeticData));
-            Prefix(errors, "achievements.json", AchievementLibraryValidator.Validate(achievementData, regions, discovery, SpeciesIds(roster)));
+            Prefix(errors, "grove-library.json", GroveLibraryValidator.Validate(groveData, discovery, SpeciesIds(roster), cosmeticData));
+            Prefix(errors, "garden-library.json", GardenLibraryValidator.Validate(gardenData, discovery, groveData, cosmeticData));
+            Prefix(errors, "expedition-library.json", ExpeditionLibraryValidator.Validate(expeditionData, groveData, cosmeticData));
+            Prefix(errors, "grove-library.json",
+                   GroveLibraryValidator.ValidateSoothingAndColourForms(groveData, regions, gardenData, expeditionData, cosmeticData));
+            Prefix(errors, "dialogue.json", DialogueValidator.ValidateRequestsAndSideStories(dialogue, groveData, gardenData, expeditionData, cosmeticData));
+            Prefix(errors, "achievements.json", AchievementLibraryValidator.Validate(achievementData, regions, discovery, SpeciesIds(roster), dialogue));
 
             HashSet<string> known = KnownSkills(skills, enemyLibrary);
             Prefix(errors, "vfx-library.json", VfxLibraryValidator.Validate(vfx, known, art));
@@ -335,7 +356,10 @@ namespace BeastCraft.Presentation.Content
                 Hints = HintBook.Build(hints),
                 Dialogue = DialogueBook.Build(dialogue),
                 DiscoveryLibrary = DiscoveryLibrary.Build(discovery),
-                AchievementLibrary = AchievementLibrary.Build(achievementData)
+                AchievementLibrary = AchievementLibrary.Build(achievementData),
+                GroveLibrary = GroveLibrary.Build(groveData),
+                GardenLibrary = GardenLibrary.Build(gardenData),
+                ExpeditionLibrary = ExpeditionLibrary.Build(expeditionData)
             };
         }
 
@@ -390,7 +414,7 @@ namespace BeastCraft.Presentation.Content
                         Encounters = Encounters,
                         Enemies = Enemies
                     };
-                    _discovery.Achievements = new AchievementContent { Library = AchievementLibrary, Discovery = _discovery };
+                    _discovery.Achievements = new AchievementContent { Library = AchievementLibrary, Discovery = _discovery, Dialogue = Dialogue };
                 }
 
                 return _discovery;

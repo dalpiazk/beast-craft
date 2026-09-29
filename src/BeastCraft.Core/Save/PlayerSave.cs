@@ -4,7 +4,11 @@ using BeastCraft.Campaign;
 using BeastCraft.Customization;
 using BeastCraft.Discovery;
 using BeastCraft.Economy;
+using BeastCraft.Expeditions;
+using BeastCraft.Garden;
+using BeastCraft.Grove;
 using BeastCraft.Idle;
+using BeastCraft.Npc;
 using BeastCraft.Progression;
 using BeastCraft.Tutorial;
 
@@ -23,7 +27,13 @@ namespace BeastCraft.Save
     /// fog, points of interest found and discovery seed (<c>RegionProgress</c>), the Kinship sites
     /// claimed, the shrines' Grove unlocks and the lore found (<see cref="Discovery"/>, schema 8), and
     /// the compendium's achievements and titles (<see cref="Achievements"/>) and look tokens
-    /// (<see cref="LookTokens"/>, schema 9).
+    /// (<see cref="LookTokens"/>, schema 9), and the Grove: habitats, decor, affinity and gifts, and the
+    /// generic Grove item inventory (<see cref="Grove"/>), the Wildgarden: plots and the herbarium
+    /// (<see cref="Garden"/>), and the Board: expeditions away, stories and pity (<see cref="Expeditions"/>,
+    /// schema 10), and the NPC dialogue layer: lines seen, requests fulfilled, the dialogue layer's own
+    /// lore and every side story's chapter progress (<see cref="Npc"/>; the Grove design's D2, folded
+    /// into schema 10 in place — see <c>Save.SaveMigrations.AddGrove</c> — because schema 10 had not
+    /// shipped yet).
     /// <para>
     /// <strong>JsonUtility-compatible by construction.</strong> Every type reachable from here is
     /// <c>[Serializable]</c> with public fields, and every map is a list (<c>JsonUtility</c> drops
@@ -43,7 +53,7 @@ namespace BeastCraft.Save
     public class PlayerSave
     {
         /// <summary>The schema this code writes, and the newest it reads.</summary>
-        public const int CurrentSchemaVersion = 9;
+        public const int CurrentSchemaVersion = 10;
 
         /// <summary>The schema the data is in. 0 (or missing) is never valid.</summary>
         public int SchemaVersion = CurrentSchemaVersion;
@@ -135,6 +145,36 @@ namespace BeastCraft.Save
         /// wasting it. Never negative. Added in schema 9.
         /// </summary>
         public int LookTokens;
+
+        /// <summary>
+        /// The Grove: unlocked habitats and decor, placed decor, every beast's affinity and pending
+        /// gifts, the Grove's own lore codex and the generic Grove item inventory (grown, crafted and
+        /// found items, one counted pool). Change it through <c>Grove.GroveRules</c>. No combat power.
+        /// Added in schema 10.
+        /// </summary>
+        public GroveProgress Grove = new GroveProgress();
+
+        /// <summary>
+        /// The Wildgarden: every planted plot and the herbarium (varieties discovered). Change it
+        /// through <c>Garden.GardenRules</c>. No combat power. Added in schema 10.
+        /// </summary>
+        public GardenProgress Garden = new GardenProgress();
+
+        /// <summary>
+        /// The Board: expeditions away, stories unlocked and each destination's outcome pity. Distinct
+        /// from the region campaign's own "expedition" (<c>Campaign.ActiveRun</c>, a <c>MapRun</c>) —
+        /// see <see cref="ExpeditionProgress"/>. Change it through <c>Expeditions.ExpeditionRules</c>.
+        /// No combat power; sending a beast never locks it. Added in schema 10.
+        /// </summary>
+        public ExpeditionProgress Expeditions = new ExpeditionProgress();
+
+        /// <summary>
+        /// The NPC dialogue layer: every line seen, every request fulfilled, the dialogue layer's own
+        /// small lore codex and every side story's chapter progress (<see cref="NpcProgress"/>). Change
+        /// it through <c>Npc.NpcRules</c>. No combat power, no title (a title is earned only through an
+        /// achievement). Added in schema 10.
+        /// </summary>
+        public NpcProgress Npc = new NpcProgress();
 
         /// <summary>
         /// A blank save: no beasts, avatar level 1, nothing learned or held, the first campaign region
@@ -375,6 +415,38 @@ namespace BeastCraft.Save
                 LookTokens = 0;
                 repaired++;
             }
+
+            if (Grove == null)
+            {
+                Grove = new GroveProgress();
+                repaired++;
+            }
+
+            repaired += Grove.EnsureInitialized();
+
+            if (Garden == null)
+            {
+                Garden = new GardenProgress();
+                repaired++;
+            }
+
+            repaired += Garden.EnsureInitialized();
+
+            if (Expeditions == null)
+            {
+                Expeditions = new ExpeditionProgress();
+                repaired++;
+            }
+
+            repaired += Expeditions.EnsureInitialized();
+
+            if (Npc == null)
+            {
+                Npc = new NpcProgress();
+                repaired++;
+            }
+
+            repaired += Npc.EnsureInitialized();
 
             return repaired;
         }

@@ -1,0 +1,689 @@
+{
+  "_readme": "GAME CONTENT, DRAFT PENDING PRODUCER REVIEW (every DisplayName and HerbariumEntry; no art yet: ArtKey is a placeholder key). The Wildgarden (docs/design/grove.md): PlotCount plots, each planted with one seed (Source shrine, gated by a discovery.json shrine's GroveUnlockId, or starter, unlocked from the first save); growth (GrowthHours, 3-24) is checked through OfflineClock. Cross-pollination is a curated, deterministic matrix, never rolled: CrossPollinations lists every (ParentA, ParentB) pair this content defines, order-independent, each naming its fixed ResultVarietyId; a self-pair (ParentA == ParentB) is what a lone plot of that seed harvests (GardenRules.Harvest), every other pair is what harvesting two different, ready plots together yields (GardenRules.HarvestPair) \u2014 every seed has exactly one self-pair, and every Varieties entry is reachable by some pair. A harvest deposits one of the resulting variety into the generic Grove item inventory (PlayerSave.Grove.Items) and records the herbarium find. Recipes (GardenRules.Craft) are deterministic (no rolls): they consume Grove item varieties and produce a decor unlock, a dye (a Grove item id \u2014 the seam a later PR spends for colour evolutions), or (not authored here yet) a cosmetic look. Validated by BeastCraft.Garden.GardenLibraryValidator (content load and the EditMode tests).",
+  "SchemaVersion": 1,
+  "PlotCount": 6,
+  "Seeds": [
+    {
+      "SeedId": "sunpetal",
+      "DisplayName": "Sunpetal",
+      "GrowthHours": 3,
+      "Source": "starter",
+      "UnlockId": "",
+      "ArtKey": "grove/seeds/sunpetal"
+    },
+    {
+      "SeedId": "moonbell",
+      "DisplayName": "Moonbell",
+      "GrowthHours": 4,
+      "Source": "starter",
+      "UnlockId": "",
+      "ArtKey": "grove/seeds/moonbell"
+    },
+    {
+      "SeedId": "dewgrass",
+      "DisplayName": "Dewgrass",
+      "GrowthHours": 3,
+      "Source": "starter",
+      "UnlockId": "",
+      "ArtKey": "grove/seeds/dewgrass"
+    },
+    {
+      "SeedId": "ashbloom",
+      "DisplayName": "Ashbloom",
+      "GrowthHours": 6,
+      "Source": "shrine",
+      "UnlockId": "grove_seed_ashbloom",
+      "ArtKey": "grove/seeds/ashbloom"
+    },
+    {
+      "SeedId": "thornberry",
+      "DisplayName": "Thornberry",
+      "GrowthHours": 12,
+      "Source": "starter",
+      "UnlockId": "",
+      "ArtKey": "grove/seeds/thornberry"
+    },
+    {
+      "SeedId": "honeyvine",
+      "DisplayName": "Honeyvine",
+      "GrowthHours": 9,
+      "Source": "starter",
+      "UnlockId": "",
+      "ArtKey": "grove/seeds/honeyvine"
+    },
+    {
+      "SeedId": "cloudthistle",
+      "DisplayName": "Cloudthistle",
+      "GrowthHours": 8,
+      "Source": "shrine",
+      "UnlockId": "grove_seed_cloudthistle",
+      "ArtKey": "grove/seeds/cloudthistle"
+    },
+    {
+      "SeedId": "frostfern",
+      "DisplayName": "Frostfern",
+      "GrowthHours": 14,
+      "Source": "starter",
+      "UnlockId": "",
+      "ArtKey": "grove/seeds/frostfern"
+    },
+    {
+      "SeedId": "emberroot",
+      "DisplayName": "Emberroot",
+      "GrowthHours": 16,
+      "Source": "starter",
+      "UnlockId": "",
+      "ArtKey": "grove/seeds/emberroot"
+    },
+    {
+      "SeedId": "copperleaf",
+      "DisplayName": "Copperleaf",
+      "GrowthHours": 10,
+      "Source": "shrine",
+      "UnlockId": "grove_seed_copperleaf",
+      "ArtKey": "grove/seeds/copperleaf"
+    },
+    {
+      "SeedId": "stargrass",
+      "DisplayName": "Stargrass",
+      "GrowthHours": 18,
+      "Source": "starter",
+      "UnlockId": "",
+      "ArtKey": "grove/seeds/stargrass"
+    },
+    {
+      "SeedId": "willowseed",
+      "DisplayName": "Willowseed",
+      "GrowthHours": 24,
+      "Source": "starter",
+      "UnlockId": "",
+      "ArtKey": "grove/seeds/willowseed"
+    }
+  ],
+  "CrossPollinations": [
+    {
+      "ParentA": "ashbloom",
+      "ParentB": "ashbloom",
+      "ResultVarietyId": "ashbloom_pure"
+    },
+    {
+      "ParentA": "dewgrass",
+      "ParentB": "ashbloom",
+      "ResultVarietyId": "ashbloom_dewgrass_hybrid"
+    },
+    {
+      "ParentA": "ashbloom",
+      "ParentB": "honeyvine",
+      "ResultVarietyId": "ashbloom_honeyvine_hybrid"
+    },
+    {
+      "ParentA": "moonbell",
+      "ParentB": "ashbloom",
+      "ResultVarietyId": "ashbloom_moonbell_hybrid"
+    },
+    {
+      "ParentA": "ashbloom",
+      "ParentB": "thornberry",
+      "ResultVarietyId": "ashbloom_thornberry_hybrid"
+    },
+    {
+      "ParentA": "cloudthistle",
+      "ParentB": "cloudthistle",
+      "ResultVarietyId": "cloudthistle_pure"
+    },
+    {
+      "ParentA": "cloudthistle",
+      "ParentB": "emberroot",
+      "ResultVarietyId": "cloudthistle_emberroot_hybrid"
+    },
+    {
+      "ParentA": "cloudthistle",
+      "ParentB": "frostfern",
+      "ResultVarietyId": "cloudthistle_frostfern_hybrid"
+    },
+    {
+      "ParentA": "honeyvine",
+      "ParentB": "cloudthistle",
+      "ResultVarietyId": "cloudthistle_honeyvine_hybrid"
+    },
+    {
+      "ParentA": "thornberry",
+      "ParentB": "cloudthistle",
+      "ResultVarietyId": "cloudthistle_thornberry_hybrid"
+    },
+    {
+      "ParentA": "copperleaf",
+      "ParentB": "copperleaf",
+      "ResultVarietyId": "copperleaf_pure"
+    },
+    {
+      "ParentA": "emberroot",
+      "ParentB": "copperleaf",
+      "ResultVarietyId": "copperleaf_emberroot_hybrid"
+    },
+    {
+      "ParentA": "frostfern",
+      "ParentB": "copperleaf",
+      "ResultVarietyId": "copperleaf_frostfern_hybrid"
+    },
+    {
+      "ParentA": "copperleaf",
+      "ParentB": "stargrass",
+      "ResultVarietyId": "copperleaf_stargrass_hybrid"
+    },
+    {
+      "ParentA": "copperleaf",
+      "ParentB": "willowseed",
+      "ResultVarietyId": "copperleaf_willowseed_hybrid"
+    },
+    {
+      "ParentA": "dewgrass",
+      "ParentB": "dewgrass",
+      "ResultVarietyId": "dewgrass_pure"
+    },
+    {
+      "ParentA": "moonbell",
+      "ParentB": "dewgrass",
+      "ResultVarietyId": "dewgrass_moonbell_hybrid"
+    },
+    {
+      "ParentA": "sunpetal",
+      "ParentB": "dewgrass",
+      "ResultVarietyId": "dewgrass_sunpetal_hybrid"
+    },
+    {
+      "ParentA": "dewgrass",
+      "ParentB": "thornberry",
+      "ResultVarietyId": "dewgrass_thornberry_hybrid"
+    },
+    {
+      "ParentA": "emberroot",
+      "ParentB": "emberroot",
+      "ResultVarietyId": "emberroot_pure"
+    },
+    {
+      "ParentA": "frostfern",
+      "ParentB": "emberroot",
+      "ResultVarietyId": "emberroot_frostfern_hybrid"
+    },
+    {
+      "ParentA": "emberroot",
+      "ParentB": "stargrass",
+      "ResultVarietyId": "emberroot_stargrass_hybrid"
+    },
+    {
+      "ParentA": "frostfern",
+      "ParentB": "frostfern",
+      "ResultVarietyId": "frostfern_pure"
+    },
+    {
+      "ParentA": "honeyvine",
+      "ParentB": "frostfern",
+      "ResultVarietyId": "frostfern_honeyvine_hybrid"
+    },
+    {
+      "ParentA": "honeyvine",
+      "ParentB": "honeyvine",
+      "ResultVarietyId": "honeyvine_pure"
+    },
+    {
+      "ParentA": "thornberry",
+      "ParentB": "honeyvine",
+      "ResultVarietyId": "honeyvine_thornberry_hybrid"
+    },
+    {
+      "ParentA": "moonbell",
+      "ParentB": "moonbell",
+      "ResultVarietyId": "moonbell_pure"
+    },
+    {
+      "ParentA": "sunpetal",
+      "ParentB": "moonbell",
+      "ResultVarietyId": "moonbell_sunpetal_hybrid"
+    },
+    {
+      "ParentA": "willowseed",
+      "ParentB": "moonbell",
+      "ResultVarietyId": "moonbell_willowseed_hybrid"
+    },
+    {
+      "ParentA": "stargrass",
+      "ParentB": "stargrass",
+      "ResultVarietyId": "stargrass_pure"
+    },
+    {
+      "ParentA": "stargrass",
+      "ParentB": "sunpetal",
+      "ResultVarietyId": "stargrass_sunpetal_hybrid"
+    },
+    {
+      "ParentA": "stargrass",
+      "ParentB": "willowseed",
+      "ResultVarietyId": "stargrass_willowseed_hybrid"
+    },
+    {
+      "ParentA": "sunpetal",
+      "ParentB": "sunpetal",
+      "ResultVarietyId": "sunpetal_pure"
+    },
+    {
+      "ParentA": "willowseed",
+      "ParentB": "sunpetal",
+      "ResultVarietyId": "sunpetal_willowseed_hybrid"
+    },
+    {
+      "ParentA": "thornberry",
+      "ParentB": "thornberry",
+      "ResultVarietyId": "thornberry_pure"
+    },
+    {
+      "ParentA": "willowseed",
+      "ParentB": "willowseed",
+      "ResultVarietyId": "willowseed_pure"
+    }
+  ],
+  "Varieties": [
+    {
+      "VarietyId": "ashbloom_pure",
+      "DisplayName": "Ashbloom Bloom",
+      "ArtKey": "grove/varieties/ashbloom_pure",
+      "HerbariumEntry": "A true ashbloom, grown alone and true to its seed."
+    },
+    {
+      "VarietyId": "ashbloom_dewgrass_hybrid",
+      "DisplayName": "Ashbloom-Dewgrass",
+      "ArtKey": "grove/varieties/ashbloom_dewgrass_hybrid",
+      "HerbariumEntry": "A cross of ashbloom and dewgrass, something neither seed alone would grow."
+    },
+    {
+      "VarietyId": "ashbloom_honeyvine_hybrid",
+      "DisplayName": "Ashbloom-Honeyvine",
+      "ArtKey": "grove/varieties/ashbloom_honeyvine_hybrid",
+      "HerbariumEntry": "A cross of ashbloom and honeyvine, something neither seed alone would grow."
+    },
+    {
+      "VarietyId": "ashbloom_moonbell_hybrid",
+      "DisplayName": "Ashbloom-Moonbell",
+      "ArtKey": "grove/varieties/ashbloom_moonbell_hybrid",
+      "HerbariumEntry": "A cross of ashbloom and moonbell, something neither seed alone would grow."
+    },
+    {
+      "VarietyId": "ashbloom_thornberry_hybrid",
+      "DisplayName": "Ashbloom-Thornberry",
+      "ArtKey": "grove/varieties/ashbloom_thornberry_hybrid",
+      "HerbariumEntry": "A cross of ashbloom and thornberry, something neither seed alone would grow."
+    },
+    {
+      "VarietyId": "cloudthistle_pure",
+      "DisplayName": "Cloudthistle Bloom",
+      "ArtKey": "grove/varieties/cloudthistle_pure",
+      "HerbariumEntry": "A true cloudthistle, grown alone and true to its seed."
+    },
+    {
+      "VarietyId": "cloudthistle_emberroot_hybrid",
+      "DisplayName": "Cloudthistle-Emberroot",
+      "ArtKey": "grove/varieties/cloudthistle_emberroot_hybrid",
+      "HerbariumEntry": "A cross of cloudthistle and emberroot, something neither seed alone would grow."
+    },
+    {
+      "VarietyId": "cloudthistle_frostfern_hybrid",
+      "DisplayName": "Cloudthistle-Frostfern",
+      "ArtKey": "grove/varieties/cloudthistle_frostfern_hybrid",
+      "HerbariumEntry": "A cross of cloudthistle and frostfern, something neither seed alone would grow."
+    },
+    {
+      "VarietyId": "cloudthistle_honeyvine_hybrid",
+      "DisplayName": "Cloudthistle-Honeyvine",
+      "ArtKey": "grove/varieties/cloudthistle_honeyvine_hybrid",
+      "HerbariumEntry": "A cross of cloudthistle and honeyvine, something neither seed alone would grow."
+    },
+    {
+      "VarietyId": "cloudthistle_thornberry_hybrid",
+      "DisplayName": "Cloudthistle-Thornberry",
+      "ArtKey": "grove/varieties/cloudthistle_thornberry_hybrid",
+      "HerbariumEntry": "A cross of cloudthistle and thornberry, something neither seed alone would grow."
+    },
+    {
+      "VarietyId": "copperleaf_pure",
+      "DisplayName": "Copperleaf Bloom",
+      "ArtKey": "grove/varieties/copperleaf_pure",
+      "HerbariumEntry": "A true copperleaf, grown alone and true to its seed."
+    },
+    {
+      "VarietyId": "copperleaf_emberroot_hybrid",
+      "DisplayName": "Copperleaf-Emberroot",
+      "ArtKey": "grove/varieties/copperleaf_emberroot_hybrid",
+      "HerbariumEntry": "A cross of copperleaf and emberroot, something neither seed alone would grow."
+    },
+    {
+      "VarietyId": "copperleaf_frostfern_hybrid",
+      "DisplayName": "Copperleaf-Frostfern",
+      "ArtKey": "grove/varieties/copperleaf_frostfern_hybrid",
+      "HerbariumEntry": "A cross of copperleaf and frostfern, something neither seed alone would grow."
+    },
+    {
+      "VarietyId": "copperleaf_stargrass_hybrid",
+      "DisplayName": "Copperleaf-Stargrass",
+      "ArtKey": "grove/varieties/copperleaf_stargrass_hybrid",
+      "HerbariumEntry": "A cross of copperleaf and stargrass, something neither seed alone would grow."
+    },
+    {
+      "VarietyId": "copperleaf_willowseed_hybrid",
+      "DisplayName": "Copperleaf-Willowseed",
+      "ArtKey": "grove/varieties/copperleaf_willowseed_hybrid",
+      "HerbariumEntry": "A cross of copperleaf and willowseed, something neither seed alone would grow."
+    },
+    {
+      "VarietyId": "dewgrass_pure",
+      "DisplayName": "Dewgrass Bloom",
+      "ArtKey": "grove/varieties/dewgrass_pure",
+      "HerbariumEntry": "A true dewgrass, grown alone and true to its seed."
+    },
+    {
+      "VarietyId": "dewgrass_moonbell_hybrid",
+      "DisplayName": "Dewgrass-Moonbell",
+      "ArtKey": "grove/varieties/dewgrass_moonbell_hybrid",
+      "HerbariumEntry": "A cross of dewgrass and moonbell, something neither seed alone would grow."
+    },
+    {
+      "VarietyId": "dewgrass_sunpetal_hybrid",
+      "DisplayName": "Dewgrass-Sunpetal",
+      "ArtKey": "grove/varieties/dewgrass_sunpetal_hybrid",
+      "HerbariumEntry": "A cross of dewgrass and sunpetal, something neither seed alone would grow."
+    },
+    {
+      "VarietyId": "dewgrass_thornberry_hybrid",
+      "DisplayName": "Dewgrass-Thornberry",
+      "ArtKey": "grove/varieties/dewgrass_thornberry_hybrid",
+      "HerbariumEntry": "A cross of dewgrass and thornberry, something neither seed alone would grow."
+    },
+    {
+      "VarietyId": "emberroot_pure",
+      "DisplayName": "Emberroot Bloom",
+      "ArtKey": "grove/varieties/emberroot_pure",
+      "HerbariumEntry": "A true emberroot, grown alone and true to its seed."
+    },
+    {
+      "VarietyId": "emberroot_frostfern_hybrid",
+      "DisplayName": "Emberroot-Frostfern",
+      "ArtKey": "grove/varieties/emberroot_frostfern_hybrid",
+      "HerbariumEntry": "A cross of emberroot and frostfern, something neither seed alone would grow."
+    },
+    {
+      "VarietyId": "emberroot_stargrass_hybrid",
+      "DisplayName": "Emberroot-Stargrass",
+      "ArtKey": "grove/varieties/emberroot_stargrass_hybrid",
+      "HerbariumEntry": "A cross of emberroot and stargrass, something neither seed alone would grow."
+    },
+    {
+      "VarietyId": "frostfern_pure",
+      "DisplayName": "Frostfern Bloom",
+      "ArtKey": "grove/varieties/frostfern_pure",
+      "HerbariumEntry": "A true frostfern, grown alone and true to its seed."
+    },
+    {
+      "VarietyId": "frostfern_honeyvine_hybrid",
+      "DisplayName": "Frostfern-Honeyvine",
+      "ArtKey": "grove/varieties/frostfern_honeyvine_hybrid",
+      "HerbariumEntry": "A cross of frostfern and honeyvine, something neither seed alone would grow."
+    },
+    {
+      "VarietyId": "honeyvine_pure",
+      "DisplayName": "Honeyvine Bloom",
+      "ArtKey": "grove/varieties/honeyvine_pure",
+      "HerbariumEntry": "A true honeyvine, grown alone and true to its seed."
+    },
+    {
+      "VarietyId": "honeyvine_thornberry_hybrid",
+      "DisplayName": "Honeyvine-Thornberry",
+      "ArtKey": "grove/varieties/honeyvine_thornberry_hybrid",
+      "HerbariumEntry": "A cross of honeyvine and thornberry, something neither seed alone would grow."
+    },
+    {
+      "VarietyId": "moonbell_pure",
+      "DisplayName": "Moonbell Bloom",
+      "ArtKey": "grove/varieties/moonbell_pure",
+      "HerbariumEntry": "A true moonbell, grown alone and true to its seed."
+    },
+    {
+      "VarietyId": "moonbell_sunpetal_hybrid",
+      "DisplayName": "Moonbell-Sunpetal",
+      "ArtKey": "grove/varieties/moonbell_sunpetal_hybrid",
+      "HerbariumEntry": "A cross of moonbell and sunpetal, something neither seed alone would grow."
+    },
+    {
+      "VarietyId": "moonbell_willowseed_hybrid",
+      "DisplayName": "Moonbell-Willowseed",
+      "ArtKey": "grove/varieties/moonbell_willowseed_hybrid",
+      "HerbariumEntry": "A cross of moonbell and willowseed, something neither seed alone would grow."
+    },
+    {
+      "VarietyId": "stargrass_pure",
+      "DisplayName": "Stargrass Bloom",
+      "ArtKey": "grove/varieties/stargrass_pure",
+      "HerbariumEntry": "A true stargrass, grown alone and true to its seed."
+    },
+    {
+      "VarietyId": "stargrass_sunpetal_hybrid",
+      "DisplayName": "Stargrass-Sunpetal",
+      "ArtKey": "grove/varieties/stargrass_sunpetal_hybrid",
+      "HerbariumEntry": "A cross of stargrass and sunpetal, something neither seed alone would grow."
+    },
+    {
+      "VarietyId": "stargrass_willowseed_hybrid",
+      "DisplayName": "Stargrass-Willowseed",
+      "ArtKey": "grove/varieties/stargrass_willowseed_hybrid",
+      "HerbariumEntry": "A cross of stargrass and willowseed, something neither seed alone would grow."
+    },
+    {
+      "VarietyId": "sunpetal_pure",
+      "DisplayName": "Sunpetal Bloom",
+      "ArtKey": "grove/varieties/sunpetal_pure",
+      "HerbariumEntry": "A true sunpetal, grown alone and true to its seed."
+    },
+    {
+      "VarietyId": "sunpetal_willowseed_hybrid",
+      "DisplayName": "Sunpetal-Willowseed",
+      "ArtKey": "grove/varieties/sunpetal_willowseed_hybrid",
+      "HerbariumEntry": "A cross of sunpetal and willowseed, something neither seed alone would grow."
+    },
+    {
+      "VarietyId": "thornberry_pure",
+      "DisplayName": "Thornberry Bloom",
+      "ArtKey": "grove/varieties/thornberry_pure",
+      "HerbariumEntry": "A true thornberry, grown alone and true to its seed."
+    },
+    {
+      "VarietyId": "willowseed_pure",
+      "DisplayName": "Willowseed Bloom",
+      "ArtKey": "grove/varieties/willowseed_pure",
+      "HerbariumEntry": "A true willowseed, grown alone and true to its seed."
+    }
+  ],
+  "Recipes": [
+    {
+      "RecipeId": "recipe_dye_sunwash",
+      "Inputs": [
+        {
+          "VarietyId": "ashbloom_pure",
+          "Count": 2
+        },
+        {
+          "VarietyId": "cloudthistle_pure",
+          "Count": 1
+        }
+      ],
+      "Output": "dye",
+      "OutputId": "dye_sunwash"
+    },
+    {
+      "RecipeId": "recipe_dye_duskrose",
+      "Inputs": [
+        {
+          "VarietyId": "ashbloom_moonbell_hybrid",
+          "Count": 2
+        },
+        {
+          "VarietyId": "cloudthistle_honeyvine_hybrid",
+          "Count": 1
+        }
+      ],
+      "Output": "dye",
+      "OutputId": "dye_duskrose"
+    },
+    {
+      "RecipeId": "recipe_dye_mossgreen",
+      "Inputs": [
+        {
+          "VarietyId": "cloudthistle_emberroot_hybrid",
+          "Count": 2
+        },
+        {
+          "VarietyId": "copperleaf_emberroot_hybrid",
+          "Count": 1
+        }
+      ],
+      "Output": "dye",
+      "OutputId": "dye_mossgreen"
+    },
+    {
+      "RecipeId": "recipe_dye_coralblush",
+      "Inputs": [
+        {
+          "VarietyId": "cloudthistle_thornberry_hybrid",
+          "Count": 2
+        },
+        {
+          "VarietyId": "copperleaf_willowseed_hybrid",
+          "Count": 1
+        }
+      ],
+      "Output": "dye",
+      "OutputId": "dye_coralblush"
+    },
+    {
+      "RecipeId": "recipe_dye_frostsilver",
+      "Inputs": [
+        {
+          "VarietyId": "copperleaf_frostfern_hybrid",
+          "Count": 2
+        },
+        {
+          "VarietyId": "dewgrass_sunpetal_hybrid",
+          "Count": 1
+        }
+      ],
+      "Output": "dye",
+      "OutputId": "dye_frostsilver"
+    },
+    {
+      "RecipeId": "recipe_dye_embergold",
+      "Inputs": [
+        {
+          "VarietyId": "dewgrass_pure",
+          "Count": 2
+        },
+        {
+          "VarietyId": "emberroot_frostfern_hybrid",
+          "Count": 1
+        }
+      ],
+      "Output": "dye",
+      "OutputId": "dye_embergold"
+    },
+    {
+      "RecipeId": "recipe_dye_willowsage",
+      "Inputs": [
+        {
+          "VarietyId": "dewgrass_thornberry_hybrid",
+          "Count": 2
+        },
+        {
+          "VarietyId": "frostfern_honeyvine_hybrid",
+          "Count": 1
+        }
+      ],
+      "Output": "dye",
+      "OutputId": "dye_willowsage"
+    },
+    {
+      "RecipeId": "recipe_dye_starlilac",
+      "Inputs": [
+        {
+          "VarietyId": "emberroot_stargrass_hybrid",
+          "Count": 2
+        },
+        {
+          "VarietyId": "moonbell_pure",
+          "Count": 1
+        }
+      ],
+      "Output": "dye",
+      "OutputId": "dye_starlilac"
+    },
+    {
+      "RecipeId": "recipe_dye_honeyamber",
+      "Inputs": [
+        {
+          "VarietyId": "honeyvine_pure",
+          "Count": 2
+        },
+        {
+          "VarietyId": "stargrass_pure",
+          "Count": 1
+        }
+      ],
+      "Output": "dye",
+      "OutputId": "dye_honeyamber"
+    },
+    {
+      "RecipeId": "recipe_dye_cloudpearl",
+      "Inputs": [
+        {
+          "VarietyId": "moonbell_sunpetal_hybrid",
+          "Count": 2
+        },
+        {
+          "VarietyId": "sunpetal_pure",
+          "Count": 1
+        }
+      ],
+      "Output": "dye",
+      "OutputId": "dye_cloudpearl"
+    },
+    {
+      "RecipeId": "recipe_petal_frame",
+      "Inputs": [
+        {
+          "VarietyId": "ashbloom_pure",
+          "Count": 3
+        },
+        {
+          "VarietyId": "ashbloom_dewgrass_hybrid",
+          "Count": 2
+        }
+      ],
+      "Output": "decor",
+      "OutputId": "pressed_petal_frame"
+    },
+    {
+      "RecipeId": "recipe_herbarium_shelf",
+      "Inputs": [
+        {
+          "VarietyId": "copperleaf_pure",
+          "Count": 2
+        },
+        {
+          "VarietyId": "emberroot_frostfern_hybrid",
+          "Count": 2
+        },
+        {
+          "VarietyId": "stargrass_sunpetal_hybrid",
+          "Count": 1
+        }
+      ],
+      "Output": "decor",
+      "OutputId": "herbarium_shelf"
+    }
+  ]
+}

@@ -1,0 +1,314 @@
+{
+  "_readme": "GAME CONTENT, DRAFT PENDING PRODUCER REVIEW (every DisplayName and story Text; no art yet: ArtKey is a placeholder key). The Board (docs/design/grove.md): destinations unlock from the first save (\"start\") or from a Grove habitat being unlocked (\"habitat\", UnlockId names it) \u2014 not from a discovery.json shrine in v1, since no shrine ids were reserved for destinations and reserving new ones would touch discovery.json's own points-of-interest capacity math, out of this PR's scope; a producer-reviewable trim, see docs/design/grove.md. Sending a party (ExpeditionRules.Send) is a timer on the destination only: the beasts sent stay fully available for battle and idle XP the whole time away (producer decision). Waiting is checked through OfflineClock; collecting (ExpeditionRules.Collect) rolls the destination's OutcomeTables entry with the same seeded-roll-plus-pity idiom as the Grove's gifts: a \"story\" entry unlocks a Stories entry (the codex's future seed), a \"trinket\" entry adds a Grove item, and a \"look\" entry (not authored here yet) would unlock a cosmetic look. Validated by BeastCraft.Expeditions.ExpeditionLibraryValidator (content load and the EditMode tests).",
+  "SchemaVersion": 1,
+  "Destinations": [
+    {
+      "DestinationId": "whispering_hollow",
+      "DisplayName": "Whispering Hollow",
+      "UnlockSource": "habitat",
+      "UnlockId": "mossy_glade",
+      "DurationHours": 2,
+      "PartySize": 1,
+      "ArtKey": "grove/expeditions/whispering_hollow"
+    },
+    {
+      "DestinationId": "sunken_shoal",
+      "DisplayName": "Sunken Shoal",
+      "UnlockSource": "habitat",
+      "UnlockId": "tide_pool",
+      "DurationHours": 3,
+      "PartySize": 2,
+      "ArtKey": "grove/expeditions/sunken_shoal"
+    },
+    {
+      "DestinationId": "frostglass_ridge",
+      "DisplayName": "Frostglass Ridge",
+      "UnlockSource": "habitat",
+      "UnlockId": "snow_hollow",
+      "DurationHours": 4,
+      "PartySize": 2,
+      "ArtKey": "grove/expeditions/frostglass_ridge"
+    },
+    {
+      "DestinationId": "nearby_meadow",
+      "DisplayName": "Nearby Meadow",
+      "UnlockSource": "start",
+      "UnlockId": "",
+      "DurationHours": 1,
+      "PartySize": 1,
+      "ArtKey": "grove/expeditions/nearby_meadow"
+    },
+    {
+      "DestinationId": "old_orchard",
+      "DisplayName": "Old Orchard",
+      "UnlockSource": "start",
+      "UnlockId": "",
+      "DurationHours": 3,
+      "PartySize": 1,
+      "ArtKey": "grove/expeditions/old_orchard"
+    },
+    {
+      "DestinationId": "river_bend",
+      "DisplayName": "River Bend",
+      "UnlockSource": "start",
+      "UnlockId": "",
+      "DurationHours": 5,
+      "PartySize": 2,
+      "ArtKey": "grove/expeditions/river_bend"
+    },
+    {
+      "DestinationId": "quiet_ruins",
+      "DisplayName": "Quiet Ruins",
+      "UnlockSource": "start",
+      "UnlockId": "",
+      "DurationHours": 8,
+      "PartySize": 2,
+      "ArtKey": "grove/expeditions/quiet_ruins"
+    },
+    {
+      "DestinationId": "far_ridge_trail",
+      "DisplayName": "Far Ridge Trail",
+      "UnlockSource": "start",
+      "UnlockId": "",
+      "DurationHours": 12,
+      "PartySize": 3,
+      "ArtKey": "grove/expeditions/far_ridge_trail"
+    }
+  ],
+  "OutcomeTables": [
+    {
+      "DestinationId": "whispering_hollow",
+      "Entries": [
+        {
+          "Kind": "trinket",
+          "Id": "trinket_hollow_bark",
+          "Weight": 55,
+          "IsCommon": true
+        },
+        {
+          "Kind": "story",
+          "Id": "story_whispering_hollow",
+          "Weight": 30,
+          "IsCommon": true
+        },
+        {
+          "Kind": "trinket",
+          "Id": "trinket_hollow_echo_charm",
+          "Weight": 15,
+          "IsCommon": false
+        }
+      ],
+      "PityAt": 4
+    },
+    {
+      "DestinationId": "sunken_shoal",
+      "Entries": [
+        {
+          "Kind": "trinket",
+          "Id": "trinket_banded_shell",
+          "Weight": 55,
+          "IsCommon": true
+        },
+        {
+          "Kind": "story",
+          "Id": "story_sunken_shoal",
+          "Weight": 30,
+          "IsCommon": true
+        },
+        {
+          "Kind": "trinket",
+          "Id": "trinket_tideglass_bead",
+          "Weight": 15,
+          "IsCommon": false
+        }
+      ],
+      "PityAt": 4
+    },
+    {
+      "DestinationId": "frostglass_ridge",
+      "Entries": [
+        {
+          "Kind": "trinket",
+          "Id": "trinket_clear_ice_shard",
+          "Weight": 55,
+          "IsCommon": true
+        },
+        {
+          "Kind": "story",
+          "Id": "story_frostglass_ridge",
+          "Weight": 30,
+          "IsCommon": true
+        },
+        {
+          "Kind": "trinket",
+          "Id": "trinket_frost_rose",
+          "Weight": 15,
+          "IsCommon": false
+        }
+      ],
+      "PityAt": 4
+    },
+    {
+      "DestinationId": "nearby_meadow",
+      "Entries": [
+        {
+          "Kind": "trinket",
+          "Id": "trinket_pressed_wildflower",
+          "Weight": 55,
+          "IsCommon": true
+        },
+        {
+          "Kind": "story",
+          "Id": "story_nearby_meadow",
+          "Weight": 30,
+          "IsCommon": true
+        },
+        {
+          "Kind": "trinket",
+          "Id": "trinket_meadow_honeycomb",
+          "Weight": 15,
+          "IsCommon": false
+        }
+      ],
+      "PityAt": 4
+    },
+    {
+      "DestinationId": "old_orchard",
+      "Entries": [
+        {
+          "Kind": "trinket",
+          "Id": "trinket_old_orchard_apple",
+          "Weight": 55,
+          "IsCommon": true
+        },
+        {
+          "Kind": "story",
+          "Id": "story_old_orchard",
+          "Weight": 30,
+          "IsCommon": true
+        },
+        {
+          "Kind": "trinket",
+          "Id": "trinket_candied_orchard_seed",
+          "Weight": 15,
+          "IsCommon": false
+        }
+      ],
+      "PityAt": 4
+    },
+    {
+      "DestinationId": "river_bend",
+      "Entries": [
+        {
+          "Kind": "trinket",
+          "Id": "trinket_smooth_river_stone",
+          "Weight": 55,
+          "IsCommon": true
+        },
+        {
+          "Kind": "story",
+          "Id": "story_river_bend",
+          "Weight": 30,
+          "IsCommon": true
+        },
+        {
+          "Kind": "trinket",
+          "Id": "trinket_river_pearl",
+          "Weight": 15,
+          "IsCommon": false
+        }
+      ],
+      "PityAt": 4
+    },
+    {
+      "DestinationId": "quiet_ruins",
+      "Entries": [
+        {
+          "Kind": "trinket",
+          "Id": "trinket_worn_ruin_tile",
+          "Weight": 55,
+          "IsCommon": true
+        },
+        {
+          "Kind": "story",
+          "Id": "story_quiet_ruins",
+          "Weight": 30,
+          "IsCommon": true
+        },
+        {
+          "Kind": "trinket",
+          "Id": "trinket_ruin_coin",
+          "Weight": 15,
+          "IsCommon": false
+        }
+      ],
+      "PityAt": 4
+    },
+    {
+      "DestinationId": "far_ridge_trail",
+      "Entries": [
+        {
+          "Kind": "trinket",
+          "Id": "trinket_ridge_wind_feather",
+          "Weight": 55,
+          "IsCommon": true
+        },
+        {
+          "Kind": "story",
+          "Id": "story_far_ridge_trail",
+          "Weight": 30,
+          "IsCommon": true
+        },
+        {
+          "Kind": "trinket",
+          "Id": "trinket_summit_crystal",
+          "Weight": 15,
+          "IsCommon": false
+        }
+      ],
+      "PityAt": 4
+    }
+  ],
+  "Stories": [
+    {
+      "StoryId": "story_whispering_hollow",
+      "Text": "The scouts found a hollow tree that hums faintly when the wind turns. They left it exactly as they found it.",
+      "CodexCategory": "Wilds"
+    },
+    {
+      "StoryId": "story_sunken_shoal",
+      "Text": "At low tide a shoal appears, ringed in shells no one has named yet. The scouts sketched a few before the water returned.",
+      "CodexCategory": "Wilds"
+    },
+    {
+      "StoryId": "story_frostglass_ridge",
+      "Text": "Ice on the ridge has grown so clear you can see frozen leaves inside it, perfectly preserved from some older autumn.",
+      "CodexCategory": "Wilds"
+    },
+    {
+      "StoryId": "story_nearby_meadow",
+      "Text": "A meadow just past the treeline is thick with wildflowers that close up tight whenever a shadow passes over.",
+      "CodexCategory": "Old Roads"
+    },
+    {
+      "StoryId": "story_old_orchard",
+      "Text": "The old orchard's trees are gnarled and half-wild now, but they still fruit every year, right on schedule.",
+      "CodexCategory": "Old Roads"
+    },
+    {
+      "StoryId": "story_river_bend",
+      "Text": "Where the river bends there is a quiet pool the current never seems to disturb, however hard it rains upstream.",
+      "CodexCategory": "Old Roads"
+    },
+    {
+      "StoryId": "story_quiet_ruins",
+      "Text": "Something was built here once, long enough ago that moss has claimed most of the walls. It still feels cared for.",
+      "CodexCategory": "Old Roads"
+    },
+    {
+      "StoryId": "story_far_ridge_trail",
+      "Text": "The trail crests a ridge with a view of country none of the maps quite agree on. The scouts added their own notes.",
+      "CodexCategory": "Old Roads"
+    }
+  ]
+}

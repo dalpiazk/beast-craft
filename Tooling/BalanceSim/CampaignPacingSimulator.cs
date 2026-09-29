@@ -240,6 +240,7 @@ namespace BeastCraft.Tooling.BalanceSim
             // region: it plays the regions.json it would play without them.
             World world = new World(new PacingSimulator.Model(library.Materials, DropTableBuilder.Build(tables, DropTableBuilder.TierLookup(library.Materials))),
                                     RegionLibrary.Build(MainlineOnly(regions)), EncounterLibrary.Build(encounters));
+            world.SootheFraction = options.SootheFraction;
             world.Economy = CampaignEconomyModel.World.Load(library, errors);
             if (world.Economy == null)
             {
@@ -424,6 +425,12 @@ namespace BeastCraft.Tooling.BalanceSim
             /// <summary>The idle rewards' content and cadence (<see cref="CampaignIdleModel"/>).</summary>
             public CampaignIdleModel.Settings Idle { get; set; }
 
+            /// <summary>
+            /// The D3 peaceful-clears probe (<c>--soothe-fraction</c>): 0 (the default) never soothes
+            /// a node, so it draws no extra randomness and the default report is untouched.
+            /// </summary>
+            public double SootheFraction { get; set; }
+
             /// <summary>The discovery layer (fog, points of interest, Kinship sites) the campaign walks.</summary>
             public DiscoveryContent Discovery { get; set; }
 
@@ -541,6 +548,10 @@ namespace BeastCraft.Tooling.BalanceSim
 
             public int[] FocusReached = new int[SkillProgressionDefinition.DefaultMaxLevel + 1];
             public int Stuck;
+
+            /// <summary>D3 peaceful-clears probe (<c>--soothe-fraction</c>): ordinary Battle-node fights offered, and how many were soothed instead.</summary>
+            public int OrdinaryBattles;
+            public int Soothed;
 
             /// <summary>The economy's measurements (<see cref="CampaignEconomyModel"/>).</summary>
             public CampaignEconomyModel.Result Econ;
@@ -900,9 +911,27 @@ namespace BeastCraft.Tooling.BalanceSim
         {
             PlayerSave save = player.Save;
             int cap = CampaignRules.BeastCap(save, world.Regions);
-            double chance = ClearChance(world.TierClear(node), node.Level - player.FieldedMean());
-            chance = AssistedChance(world.Regions, world.Regions.Regions[regionIndex].RegionId, World.AssistShapeKey(node), chance, losses);
-            bool cleared = rng.NextDouble() < chance;
+            result.OrdinaryBattles += node.Type == MapNodeType.Battle ? 1 : 0;
+
+            bool cleared;
+            bool soothed = false;
+            // D3 peaceful-clears probe (docs/design/grove.md, "Peaceful clears"): ordinary Battle nodes
+            // only, never Elites/Gates/Bosses (those always fight below); SootheFraction 0 (the
+            // default) short-circuits before the extra rng.NextDouble() draw, so the default report's
+            // RNG stream — and its byte-identical output — is untouched.
+            if (world.SootheFraction > 0.0 && node.Type == MapNodeType.Battle && rng.NextDouble() < world.SootheFraction)
+            {
+                cleared = true;
+                soothed = true;
+                result.Soothed++;
+            }
+            else
+            {
+                double chance = ClearChance(world.TierClear(node), node.Level - player.FieldedMean());
+                chance = AssistedChance(world.Regions, world.Regions.Regions[regionIndex].RegionId, World.AssistShapeKey(node), chance, losses);
+                cleared = rng.NextDouble() < chance;
+            }
+
             BattleOutcome outcome = cleared ? BattleOutcome.PlayerVictory : BattleOutcome.EnemyVictory;
             int focusUses = PacingSimulator.FocusUsesMin + rng.Next(PacingSimulator.FocusUsesMax - PacingSimulator.FocusUsesMin + 1);
             int secondaryUses = PacingSimulator.FocusUsesMin + rng.Next(PacingSimulator.FocusUsesMax - PacingSimulator.FocusUsesMin + 1);
@@ -933,7 +962,9 @@ namespace BeastCraft.Tooling.BalanceSim
 
             foreach (OwnedBeast beast in player.Fielded)
             {
-                bool knockedOut = rng.NextDouble() < KnockoutChance;
+                // A soothed clear risks nobody: never knocked out, so it pays the full clear bonus,
+                // exactly CampaignRules.Soothe's parity guarantee (every team BattleUnit not defeated).
+                bool knockedOut = !soothed && rng.NextDouble() < KnockoutChance;
                 result.FieldedRawXp += BeastProgression.BattleXp(outcome, node.Level, knockedOut);
                 result.FieldedCreditedXp += BeastProgression.BattleXp(outcome, node.Level, knockedOut, beast.Progress.Level);
                 Award(result, beast, BeastProgression.BattleXp(outcome, node.Level, knockedOut, beast.Progress.Level), cap);
@@ -1477,6 +1508,28 @@ namespace BeastCraft.Tooling.BalanceSim
 
                 sb.Append("| ").Append(gate.Level).Append(" | ").Append(gate.Label).Append(" | ").Append(Battles(PacingSimulator.Percentile(reached, 10))).Append(" | ")
                   .Append(Battles(p50)).Append(" | ").Append(Battles(PacingSimulator.Percentile(reached, 90))).Append(" | ").Append(ok ? "ok" : "**MISS**").Append(" |\n");
+            }
+
+            if (options.SootheFraction > 0.0)
+            {
+                sb.Append("\n## Soothing probe (D3)\n\n");
+                sb.Append("Peaceful clears (docs/design/grove.md, \"Peaceful clears\"): `--soothe-fraction ").Append(SimOptions.Format(options.SootheFraction))
+                  .Append("` of ordinary Battle nodes are soothed with a Grove item instead of fought, paying the exact same full clear (XP, gold, loot) a win\n");
+                sb.Append("would; Elites, Gates and Bosses are never soothed (still always fought — see \"Levels at every gate and boss\" above, unaffected by\n");
+                sb.Append("this probe). Not part of the default report (0 = off, the default byte-identical output).\n\n");
+                long ordinary = 0;
+                long soothed = 0;
+                foreach (CampaignPacingSimulator.Result run in runs)
+                {
+                    ordinary += run.OrdinaryBattles;
+                    soothed += run.Soothed;
+                }
+
+                double actual = ordinary == 0 ? 0.0 : (double)soothed / ordinary;
+                sb.Append("- Ordinary Battle nodes offered: ").Append(ordinary).Append(" across ").Append(runs.Count).Append(" campaigns; ").Append(soothed)
+                  .Append(" soothed (").Append(Pct(actual * 100.0)).Append(" of them, requested ").Append(Pct(options.SootheFraction * 100.0)).Append(")\n");
+                sb.Append("- Levels at every gate and boss are unchanged by this probe (see the table above): a soothed ordinary fight pays the same XP a won\n");
+                sb.Append("  one would, so the team is never behind reaching the next Gate or Boss, which is always fought.\n");
             }
 
             sb.Append("\n## Verdict\n\n");

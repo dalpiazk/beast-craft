@@ -60,32 +60,35 @@ namespace BeastCraft.Presentation.Screens
     }
 
     /// <summary>
-    /// The home screen's bottom nav: Map, Roster, Grove, Avatar, Inventory. Map, Roster and Avatar work
-    /// in this build (Avatar is a minimal identity card for now: level, equipped title, and the way to
-    /// the achievements/title screen and the look-token shop; its skills and gear are a later PR); Grove
-    /// and Inventory show a "coming soon" page. Back on another tab returns to the Map; on the Map it is
-    /// not handled here (the stack pops back to the title).
+    /// The home screen's bottom nav: Map, Roster, Grove, Avatar, Inventory. Map, Roster, Grove and
+    /// Avatar work in this build (Avatar is a minimal identity card for now: level, equipped title, and
+    /// the way to the achievements/title screen and the look-token shop; its skills and gear are a
+    /// later PR; Grove opens the full Grove hub screen — <c>Game.Screens.GroveScreen</c> — rather than
+    /// showing inline, so this view-model's own <see cref="Tab"/> never actually becomes
+    /// <see cref="HomeTab.Grove"/>, see <c>HomeScreen.SelectTab</c>); Inventory shows a "coming soon"
+    /// page. Back on another tab returns to the Map; on the Map it is not handled here (the stack pops
+    /// back to the title).
     /// </summary>
     public sealed class HomeViewModel
     {
         public static readonly string[] TabNames = { "Map", "Roster", "Grove", "Avatar", "Inventory" };
 
-        /// <summary>What each coming-soon tab will hold (shown on its placeholder page).</summary>
+        /// <summary>What each coming-soon tab will hold (shown on its placeholder page). Grove's is unused — see the class remarks.</summary>
         public static readonly string[] ComingSoonText =
         {
             null,
             null,
-            "Your team base: organise the party and claim idle rewards; later your beasts' habitat, a garden and expeditions.",
+            "Your team base: organise the party and claim idle rewards; your beasts' habitat, a garden and expeditions.",
             null,
             "Materials, consumables and spare gear."
         };
 
         public HomeTab Tab { get; private set; } = HomeTab.Map;
 
-        /// <summary>Whether the current tab is built (the Map, the Roster and the Avatar identity card).</summary>
+        /// <summary>Whether the current tab is built (the Map, the Roster, Grove and the Avatar identity card).</summary>
         public bool TabAvailable
         {
-            get { return Tab == HomeTab.Map || Tab == HomeTab.Roster || Tab == HomeTab.Avatar; }
+            get { return Tab == HomeTab.Map || Tab == HomeTab.Roster || Tab == HomeTab.Grove || Tab == HomeTab.Avatar; }
         }
 
         public string TabName

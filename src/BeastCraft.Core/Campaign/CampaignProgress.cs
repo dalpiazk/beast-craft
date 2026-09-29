@@ -44,6 +44,17 @@ namespace BeastCraft.Campaign
         /// <summary>The expedition in progress; its <see cref="MapRun.RegionId"/> is "" when there is none.</summary>
         public MapRun ActiveRun = new MapRun();
 
+        /// <summary>
+        /// How many ordinary battle locations have ever been soothed with a Grove item instead of
+        /// fought (<see cref="CampaignRules.Soothe"/>, the Grove design's "peaceful clears" — D3):
+        /// never decreases, account-wide, replays included. Read by <c>Npc.NpcRules.BuildFacts</c>
+        /// for the <c>location_soothed</c> NPC condition (a cascading count fact, like
+        /// <c>decor_placed_count</c>). Added in schema 10 (extended in place; see
+        /// <c>Save.SaveMigrations.AddGrove</c>'s remarks — schema 10 had not shipped on any other
+        /// branch when this was added).
+        /// </summary>
+        public int LocationsSoothed;
+
         /// <summary>Whether an expedition is in progress.</summary>
         public bool HasActiveRun
         {
@@ -157,6 +168,12 @@ namespace BeastCraft.Campaign
             }
 
             repaired += ActiveRun.EnsureInitialized();
+
+            if (LocationsSoothed < 0)
+            {
+                LocationsSoothed = 0;
+                repaired++;
+            }
             foreach (RegionProgress region in Regions)
             {
                 repaired += region.EnsureInitialized();

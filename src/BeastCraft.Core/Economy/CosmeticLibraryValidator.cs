@@ -218,6 +218,7 @@ namespace BeastCraft.Economy
                 bool bossHard = o.Source == CosmeticLibrary.SourceBossHard;
                 bool milestone = o.Source == CosmeticLibrary.SourceMilestone;
                 bool discovery = o.Source == CosmeticLibrary.SourceDiscovery;
+                bool grove = o.Source == CosmeticLibrary.SourceGrove;
                 if (boss && (string.IsNullOrEmpty(o.UnlockId) || (regionIds != null && !regionIds.Contains(o.UnlockId))))
                 {
                     errors.Add(where + ": a boss look names the region whose lair grants it (UnlockId).");
@@ -235,9 +236,13 @@ namespace BeastCraft.Economy
                 {
                     errors.Add(where + ": a discovery look names the region or cache that grants it (UnlockId; discovery.json checks which).");
                 }
-                else if (!boss && !bossHard && !milestone && !discovery && !string.IsNullOrEmpty(o.UnlockId))
+                else if (grove && string.IsNullOrEmpty(o.UnlockId))
                 {
-                    errors.Add(where + ": only boss, milestone and discovery looks have an UnlockId.");
+                    errors.Add(where + ": a grove look names the affinity tier, gift entry or destination that grants it (UnlockId; the Grove content checks which).");
+                }
+                else if (!boss && !bossHard && !milestone && !discovery && !grove && !string.IsNullOrEmpty(o.UnlockId))
+                {
+                    errors.Add(where + ": only boss, milestone, discovery and grove looks have an UnlockId.");
                 }
 
                 bool tokenEligible = o.Source == CosmeticLibrary.SourceShop || o.Source == CosmeticLibrary.SourceDrop;

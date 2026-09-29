@@ -4402,3 +4402,59 @@ docs/balance/assist-floor-report.md` (about 45 minutes); `-- --mode newplayer --
 --samples 2 --map-seeds 60 --out docs/balance/new-player-report.md` (about 15 minutes); `-- --mode
 campaign --self-check --out docs/balance/campaign-pacing-report.md` (about 2 s); `-- --mode pve
 --seeds 12345,777,4242,2024,99 --target-clear 50` for the per-beast guard.
+
+## Grove D3: peaceful clears (soothing) — pacing probe
+
+`docs/design/grove.md`, "Peaceful clears": an ordinary Battle location (never an Elite den, a Gate, a
+Boss or a Kinship trial) can be cleared by giving the right Grove item instead of fighting it, paying
+the exact same full clear — beast XP, gold, loot, first-clear bonuses — a combat win there would
+(`Campaign.CampaignRules.Soothe`, reusing `Session.BattleSession.ApplyRewards` itself through a
+synthetic, not-knocked-out result on the node's own current-attempt seed, so a soothe can never reroll
+or improve on what fighting would have paid). The producer's ask: the pacing model must account for
+peaceful clears — a player who soothes ordinary fights still gets full XP, so level pacing stays
+roughly unchanged — but gates and bosses must still always be won by combat.
+
+**`--mode campaign`'s new probe, off by default.** `--soothe-fraction <f>` (0-1, default 0): that
+fraction of ordinary Battle-node fights is resolved as a soothe instead of a clear-chance roll —
+still the same full reward payout (XP, gold, loot) the sim's `Fight` already pays a win, and never a
+knockout roll (a soothe risks nobody). Elites, Gates and Bosses are untouched — always the existing
+clear-chance roll. At `f` = 0 the extra `rng.NextDouble()` draw never happens (short-circuited before
+it), so the default `campaign-pacing-report.md` is unaffected: confirmed byte-identical
+(`diff --strip-trailing-cr`) against a fresh `-- --mode campaign` run after this change.
+
+**Probe run** (`-- --mode campaign --soothe-fraction 0.5 --runs 200`, a fifth of the standard 1000 runs
+for a quick check — not the committed report):
+
+- 63710 ordinary Battle nodes offered across 200 campaigns; 31851 soothed (50.0%, matching the
+  requested fraction — the roll is unbiased).
+- **"Levels at every gate and boss": every one of the 40 rows still "ok"**, fielded/avatar medians
+  identical to the `f` = 0 report (soothing an ordinary fight pays the same XP a win would, so the
+  team is never behind reaching the next Gate or Boss, which is always fought) — the producer's ask
+  confirmed.
+- The Focus skill gates (L10/L15/L20) read a few battles short of their target band in this run; this
+  is the smaller `--runs 200` sample's noise, not a soothing effect — skill practice fires once per
+  `Fight` call regardless of how it resolved (soothed or rolled), so `--soothe-fraction` cannot move
+  it, and the committed 1000-run, `f` = 0 report already meets every gate.
+
+No change to `docs/balance/campaign-pacing-report.md` (still `f` = 0, byte-identical). Colour
+evolutions (D3's other half) has no pacing surface at all — purely cosmetic, no stats, so the balance
+sim does not model it.
+
+Reproduce: `-- --mode campaign --soothe-fraction 0.5 --runs 1000 --out docs/balance/soothing-probe.md`
+(not committed; a documentation-only probe, not a gate) for the full-sample version of the numbers
+above.
+
+**Re-verified after the D4 fix (avatar XP).** The producer decision on `CampaignRules.Soothe` was
+"full rewards including full XP", and this sim's `Fight` already modelled a soothed clear as paying
+the avatar its battle XP the same as a won one (it always calls `AvatarProgression.BattleXp`/
+`AwardBattle` regardless of `soothed`, ever since this probe was written) — but the real
+`CampaignRules.Soothe` did not: its synthetic `BattleSessionResult` left `Avatar` null, so
+`BattleSession.ApplyRewards` skipped the avatar-XP branch and a real soothe paid every reward except
+the avatar's own XP. Fixed by naming a (non-fighting, non-casting) avatar unit on the synthetic
+result, same as a real battle names one, so `ApplyRewards` awards it — no skill practice XP either
+way (that is only ever earned per skill use inside a real battle's turns, and a soothe simulates
+none). This was a Core/save bug, not a pacing-model one: this sim's numbers above were already
+computed as if the avatar earned its XP, so a `--soothe-fraction 0.5 --runs 200` re-run after the fix
+reproduces the exact same figures byte-for-byte (63710 ordinary Battle nodes, 31851 soothed, 50.0%;
+every gate/boss row still "ok") — nothing here needed to change, only `CampaignRules.Soothe` (and its
+unit test) did.

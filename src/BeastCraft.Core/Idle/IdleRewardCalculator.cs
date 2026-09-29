@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using BeastCraft.Campaign;
+using BeastCraft.Common;
 using BeastCraft.Economy;
 using BeastCraft.Progression;
 using BeastCraft.Save;
@@ -89,8 +90,8 @@ namespace BeastCraft.Idle
         /// <summary>The stream an unset <see cref="IdleState.IdleSeed"/> is drawn on, from the first claim's clock.</summary>
         public const int SeedStream = 0x49444C45;
 
-        /// <summary>A wall clock ahead of the monotonic clock by more than this (ms) counts as a clamp (NTP corrections stay under it).</summary>
-        public const long ClockSlackMs = 120000;
+        /// <summary>A wall clock ahead of the monotonic clock by more than this (ms) counts as a clamp (NTP corrections stay under it). See <see cref="OfflineClock.ClockSlackMs"/>.</summary>
+        public const long ClockSlackMs = OfflineClock.ClockSlackMs;
 
         private const double MsPerHour = 3600000.0;
 
@@ -195,20 +196,10 @@ namespace BeastCraft.Idle
         /// <summary>
         /// The real idle time since the last claim, in milliseconds, from the wall clock
         /// (<paramref name="nowTicks"/>, UTC ticks) and the monotonic clock (<paramref name="nowMonoMs"/>,
-        /// −1 = not available):
-        /// <list type="bullet">
-        /// <item>Both clocks from the same boot (the monotonic reading has not gone back): the wall-clock
-        /// time, but never more than the monotonic time and, when the wall clock went back, the
-        /// monotonic time. <paramref name="clamped"/> when the wall clock was replaced (went back, or
-        /// ran ahead by more than <see cref="ClockSlackMs"/>).</item>
-        /// <item>The device rebooted in between (the monotonic reading went back): at least the time
-        /// since boot really passed, so the wall-clock time, or the time since boot when that is more
-        /// (<paramref name="clamped"/>). A clock set forward across a reboot cannot be told apart
-        /// offline; the cap bounds it.</item>
-        /// <item>No monotonic reading (now or at the last claim): the wall-clock time, or 0 when it went
-        /// back (<paramref name="clamped"/>).</item>
-        /// </list>
-        /// Never negative.
+        /// −1 = not available): 0 (unclamped) when the clock never started; otherwise
+        /// <see cref="OfflineClock.ElapsedMs"/> since the last claim (the anti-tamper reconciliation
+        /// every offline timer in the game now shares — see its remarks for the exact rules).
+        /// <paramref name="clamped"/> is whether the wall clock could not be trusted. Never negative.
         /// </summary>
         public static long Elapsed(IdleState state, long nowTicks, long nowMonoMs, out bool clamped)
         {
@@ -218,33 +209,7 @@ namespace BeastCraft.Idle
                 return 0;
             }
 
-            long deltaUtcMs = (nowTicks - state.LastClaimUtcTicks) / TimeSpan.TicksPerMillisecond;
-            if (nowMonoMs < 0 || state.LastClaimMonotonicMs < 0)
-            {
-                clamped = deltaUtcMs < 0;
-                return Math.Max(0, deltaUtcMs);
-            }
-
-            long deltaMonoMs = nowMonoMs - state.LastClaimMonotonicMs;
-            if (deltaMonoMs >= 0)
-            {
-                if (deltaUtcMs < 0)
-                {
-                    clamped = true;
-                    return deltaMonoMs;
-                }
-
-                clamped = deltaUtcMs > deltaMonoMs + ClockSlackMs;
-                return Math.Min(deltaUtcMs, deltaMonoMs);
-            }
-
-            if (deltaUtcMs < nowMonoMs)
-            {
-                clamped = true;
-                return nowMonoMs;
-            }
-
-            return deltaUtcMs;
+            return OfflineClock.ElapsedMs(state.LastClaimUtcTicks, state.LastClaimMonotonicMs, nowTicks, nowMonoMs, out clamped);
         }
 
         private static void Pay(PlayerSave save, IdleContent content, IdleBand band, IdleClaimResult result, int claimSeed, IEnumerable<string> partyBeastIds)
@@ -354,8 +319,7 @@ namespace BeastCraft.Idle
 
         private static long UtcTicks(DateTime now)
         {
-            DateTime utc = now.Kind == DateTimeKind.Local ? now.ToUniversalTime() : now;
-            return Math.Max(1, utc.Ticks);
+            return OfflineClock.UtcTicks(now);
         }
 
         private static int SeedFrom(long ticks)

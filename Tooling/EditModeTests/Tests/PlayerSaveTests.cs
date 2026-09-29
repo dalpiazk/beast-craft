@@ -347,6 +347,33 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
+        public void Validate_ReportsGroveGardenAndExpeditionProblems()
+        {
+            PlayerSave save = BuildSave();
+            save.Grove.Affinity.Add(new Grove.BeastAffinityState { BeastId = "b1", Xp = -1, Tier = 6, GiftPityMisses = -1 });
+            save.Grove.Affinity.Add(new Grove.BeastAffinityState
+            {
+                BeastId = "b1", // duplicate beast id
+                PendingGifts = { new Grove.GiftInstance { ItemKind = "decor", ItemId = "x" } }
+            });
+            save.Grove.Items.Items.Add(new Grove.GroveItemStack("seed_a", -2));
+            save.Garden.Plots.Add(new Garden.PlotState { PlotId = 0, SeedId = "" });
+            save.Expeditions.Active.Add(new Expeditions.ActiveExpedition { DestinationId = "", BeastIds = { "b1" } });
+            save.Expeditions.Active.Add(new Expeditions.ActiveExpedition { DestinationId = "meadow" });
+
+            List<SaveIssue> issues = SaveValidator.Validate(save, Catalog);
+
+            AssertIssue(issues, SaveIssueKind.InvalidValue, null, "Grove.Affinity[0].Xp");
+            AssertIssue(issues, SaveIssueKind.InvalidValue, null, "Grove.Affinity[0].Tier");
+            AssertIssue(issues, SaveIssueKind.InvalidValue, null, "Grove.Affinity[0].GiftPityMisses");
+            AssertIssue(issues, SaveIssueKind.InvalidValue, "b1", "Grove.Affinity[1].BeastId");
+            AssertIssue(issues, SaveIssueKind.InvalidValue, null, "Grove.Items[0].Quantity");
+            AssertIssue(issues, SaveIssueKind.InvalidValue, "", "Garden.Plots[0]");
+            AssertIssue(issues, SaveIssueKind.InvalidValue, "", "Expeditions.Active[0].DestinationId");
+            AssertIssue(issues, SaveIssueKind.InvalidValue, null, "Expeditions.Active[1].BeastIds");
+        }
+
+        [Test]
         public void Validate_AStarterSaveBuiltFromTheAuthoredData_IsClean()
         {
             BeastRosterData roster = BeastRosterTests.LoadRoster();

@@ -36,11 +36,20 @@ namespace BeastCraft.Economy
         /// </summary>
         public const string SourceDiscovery = "discovery";
 
+        /// <summary>
+        /// A Grove reward (affinity, a gift, or an expedition outcome; <c>grove-library.json</c> /
+        /// <c>expedition-library.json</c>): UnlockId names the affinity tier row, gift table entry or
+        /// destination that grants it. Not authored in v1 (see <c>docs/design/grove.md</c>) — the
+        /// mechanism is wired up for a later content-only follow-up.
+        /// </summary>
+        public const string SourceGrove = "grove";
+
         /// <summary>A category's <see cref="CosmeticCategory.Scope"/> for the avatar.</summary>
         public const string AvatarScope = "avatar";
 
         /// <summary>Every source name, in the validator's order.</summary>
-        public static readonly string[] Sources = { SourceDefault, SourceStarter, SourceShop, SourceBoss, SourceMilestone, SourceDrop, SourcePremium, SourceBossHard, SourceDiscovery };
+        public static readonly string[] Sources =
+            { SourceDefault, SourceStarter, SourceShop, SourceBoss, SourceMilestone, SourceDrop, SourcePremium, SourceBossHard, SourceDiscovery, SourceGrove };
 
         private readonly List<CosmeticCategory> _categories = new List<CosmeticCategory>();
         private readonly Dictionary<string, CosmeticCategory> _byId = new Dictionary<string, CosmeticCategory>(StringComparer.Ordinal);

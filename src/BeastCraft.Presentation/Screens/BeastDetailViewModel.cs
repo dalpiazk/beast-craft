@@ -5,6 +5,8 @@ using BeastCraft.Battle;
 using BeastCraft.Bonds;
 using BeastCraft.Creatures;
 using BeastCraft.Economy;
+using BeastCraft.Garden;
+using BeastCraft.Grove;
 using BeastCraft.Presentation.Cards;
 using BeastCraft.Presentation.Content;
 using BeastCraft.Progression;
@@ -149,6 +151,24 @@ namespace BeastCraft.Presentation.Screens
     }
 
     /// <summary>
+    /// One colour form of the beast's species (docs/design/grove.md, "Colour evolutions" — D3/D4):
+    /// locked (needs <see cref="ItemHeld"/> of <see cref="ItemCount"/> <see cref="ItemDisplay"/>),
+    /// owned but not worn by this beast, or worn.
+    /// </summary>
+    public sealed class ColourFormRow
+    {
+        public string ColourFormId;
+        public string DisplayName;
+        public string CosmeticCategoryId;
+        public string CosmeticOptionId;
+        public string ItemDisplay;
+        public int ItemCount;
+        public int ItemHeld;
+        public bool Owned;
+        public bool Worn;
+    }
+
+    /// <summary>
     /// The beast detail screen: one owned beast's raw stats with the gear's share broken out, the
     /// derived numbers (turns per 100 gauge ticks against the team and a level-matched average
     /// enemy, the element chart as attacker and defender, crits, the level-gap curve), its skills
@@ -238,6 +258,9 @@ namespace BeastCraft.Presentation.Screens
 
         public List<LookView> Looks { get; } = new List<LookView>();
 
+        /// <summary>The species' collectible colour forms (docs/design/grove.md, D3/D4), locked/owned/worn.</summary>
+        public List<ColourFormRow> ColourForms { get; } = new List<ColourFormRow>();
+
         /// <summary>Re-reads the save and recomputes everything.</summary>
         public void Refresh()
         {
@@ -251,6 +274,7 @@ namespace BeastCraft.Presentation.Screens
             Gear.Clear();
             Bonds.Clear();
             Looks.Clear();
+            ColourForms.Clear();
 
             GameContent content = _session.Content;
             Beast = _session.Save?.FindBeast(BeastId);
@@ -279,6 +303,7 @@ namespace BeastCraft.Presentation.Screens
             BuildGear();
             BuildBonds();
             BuildLooks();
+            BuildColourForms();
         }
 
         // ------------------------------------------------------------------------------------------
@@ -830,6 +855,90 @@ namespace BeastCraft.Presentation.Screens
                 CosmeticOption worn = CosmeticRules.Worn(_session.Save, BeastId, category.CategoryId, library);
                 Looks.Add(new LookView { Category = category.DisplayName, Option = worn?.DisplayName ?? "Default" });
             }
+        }
+
+        private void BuildColourForms()
+        {
+            GroveLibrary grove = _session.Content.GroveLibrary;
+            GardenLibrary garden = _session.Content.GardenLibrary;
+            CosmeticLibrary cosmetics = _session.Content.Economy?.Cosmetics;
+            if (grove == null || cosmetics == null)
+            {
+                return;
+            }
+
+            foreach (ColourFormData form in grove.ColourFormsFor(Species.SpeciesId))
+            {
+                if (form == null)
+                {
+                    continue;
+                }
+
+                string key = CosmeticCollection.Key(form.CosmeticCategoryId, form.CosmeticOptionId);
+                bool owned = _session.Save.Cosmetics != null && _session.Save.Cosmetics.Has(key);
+                CosmeticOption worn = CosmeticRules.Worn(_session.Save, BeastId, form.CosmeticCategoryId, cosmetics);
+                ColourForms.Add(new ColourFormRow
+                {
+                    ColourFormId = form.ColourFormId,
+                    DisplayName = form.DisplayName ?? form.ColourFormId,
+                    CosmeticCategoryId = form.CosmeticCategoryId,
+                    CosmeticOptionId = form.CosmeticOptionId,
+                    ItemDisplay = garden.Variety(form.ItemId)?.DisplayName ?? GardenViewModel.Humanize(form.ItemId),
+                    ItemCount = form.ItemCount,
+                    ItemHeld = _session.Save.Grove?.Items.GetCount(form.ItemId) ?? 0,
+                    Owned = owned,
+                    Worn = owned && worn != null && worn.OptionId == form.CosmeticOptionId
+                });
+            }
+        }
+
+        /// <summary>
+        /// Spends the colour form's Grove item to unlock it account-wide
+        /// (<see cref="GroveRules.TryUnlockColourForm"/>) — already owned still spends the item but
+        /// grants look tokens instead of wasting it. Autosaves and refreshes on success.
+        /// </summary>
+        public ColourFormResult UnlockColourForm(string colourFormId)
+        {
+            ColourFormResult result = GroveRules.TryUnlockColourForm(_session.Save, _session.Content.GroveLibrary, _session.Content.Economy?.Cosmetics, colourFormId);
+            if (result.Success)
+            {
+                _session.Autosave(AutosaveReason.BeastEdit);
+            }
+
+            Refresh();
+            return result;
+        }
+
+        /// <summary>Wears an already-owned colour form on this beast (<see cref="CosmeticRules.TrySetOption"/>). Autosaves and refreshes on success.</summary>
+        public CosmeticResult WearColourForm(string colourFormId)
+        {
+            ColourFormRow row = ColourForms.Find(c => c.ColourFormId == colourFormId);
+            if (row == null)
+            {
+                return CosmeticResult.UnknownOption;
+            }
+
+            CosmeticResult result = CosmeticRules.TrySetOption(_session.Save, BeastId, row.CosmeticCategoryId, row.CosmeticOptionId, _session.Content.Economy?.Cosmetics);
+            if (result == CosmeticResult.Set)
+            {
+                _session.Autosave(AutosaveReason.BeastEdit);
+            }
+
+            Refresh();
+            return result;
+        }
+
+        /// <summary>Switches this beast back to its species' free natural colour (the category's <c>"natural"</c> default option).</summary>
+        public CosmeticResult WearNaturalColour(string categoryId)
+        {
+            CosmeticResult result = CosmeticRules.TrySetOption(_session.Save, BeastId, categoryId, "natural", _session.Content.Economy?.Cosmetics);
+            if (result == CosmeticResult.Set)
+            {
+                _session.Autosave(AutosaveReason.BeastEdit);
+            }
+
+            Refresh();
+            return result;
         }
 
         private List<GearSO> WornGear(out List<GearView> contributions)

@@ -662,6 +662,16 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <summary><c>--idle-claims-per-day</c>: campaign: idle claims a day, evenly spaced (each covers the day's idle hours / claims).</summary>
         public int IdleClaimsPerDay = CampaignIdleModel.DefaultClaimsPerDay;
 
+        /// <summary>
+        /// <c>--soothe-fraction</c>: campaign: the Grove design's D3 peaceful-clears probe — the
+        /// fraction (0-1) of ordinary Battle nodes (never Elites, Gates or Bosses: those are always
+        /// fought) soothed with a Grove item instead of fought, given the item, paying the same full
+        /// XP/gold/loot a win would. 0 (the default) never rolls it, so the default report's RNG
+        /// draws — and its byte-identical output — are unaffected; a positive value also appends a
+        /// "Soothing probe" report section. See docs/balance/tuning-log.md, "Peaceful clears (D3)".
+        /// </summary>
+        public double SootheFraction;
+
         /// <summary><c>--battles-per-day</c>: campaign: battles fought a day, which sets how many battles lie between two idle claims.</summary>
         public double BattlesPerDay = CampaignIdleModel.DefaultBattlesPerDay;
 
@@ -852,6 +862,10 @@ namespace BeastCraft.Tooling.BalanceSim
             "                             0 = no idle rewards). Each claim covers h / claims hours, paid up to the 8-hour cap.\n" +
             "  --idle-claims-per-day <n>  campaign: idle claims a day, evenly spaced (default 2).\n" +
             "  --battles-per-day <n>      campaign: battles fought a day (default 25); sets the battles between two claims.\n" +
+            "  --soothe-fraction <f>      campaign: D3 peaceful-clears probe, 0-1 (default 0 = off, the default report is\n" +
+            "                             unaffected). That fraction of ordinary Battle nodes is soothed (full reward parity with\n" +
+            "                             a win) instead of fought; Elites, Gates and Bosses are always fought. > 0 appends a\n" +
+            "                             \"Soothing probe\" section (docs/balance/tuning-log.md, \"Peaceful clears (D3)\").\n" +
             "  --drop-tables <path>       drop-tables.json (default: found by walking up from the working directory). Pacing\n" +
             "                             rolls it; PvE checks the encounter library's shape ids against it.\n" +
             "  --kit <k>                  elemental | neutral | both (default both): the element axis. neutral forces every\n" +
@@ -1208,6 +1222,19 @@ namespace BeastCraft.Tooling.BalanceSim
                     case "--idle-claims-per-day":
                         if (!TryNextInt(args, ref i, arg, 1, out options.IdleClaimsPerDay, out error))
                         {
+                            return null;
+                        }
+
+                        break;
+                    case "--soothe-fraction":
+                        if (!TryNextDouble(args, ref i, arg, out options.SootheFraction, out error))
+                        {
+                            return null;
+                        }
+
+                        if (options.SootheFraction < 0.0 || options.SootheFraction > 1.0)
+                        {
+                            error = "--soothe-fraction must be between 0 and 1.";
                             return null;
                         }
 

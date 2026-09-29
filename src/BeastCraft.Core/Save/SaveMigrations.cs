@@ -25,6 +25,10 @@ namespace BeastCraft.Save
     /// interest found and discovery seed): <see cref="AddDiscovery"/>.</item>
     /// <item>8 to 9: the compendium's achievements and titles (<see cref="PlayerSave.Achievements"/>)
     /// and look tokens (<see cref="PlayerSave.LookTokens"/>): <see cref="AddCompendium"/>.</item>
+    /// <item>9 to 10: the Grove, the Wildgarden, the Board and the NPC dialogue layer (<see cref="PlayerSave.Grove"/>,
+    /// <see cref="PlayerSave.Garden"/>, <see cref="PlayerSave.Expeditions"/>, <see cref="PlayerSave.Npc"/>):
+    /// <see cref="AddGrove"/>. The NPC dialogue layer (D2) was folded into this same migration in place,
+    /// before schema 10 shipped — see <see cref="AddGrove"/>'s own remarks.</item>
     /// </list>
     /// </summary>
     public static class SaveMigrations
@@ -34,7 +38,8 @@ namespace BeastCraft.Save
         {
             return new List<ISaveMigration>
             {
-                new AddGear(), new AddCampaign(), new AddEconomy(), new AddIdle(), new AddRunDifficulty(), new AddTutorial(), new AddDiscovery(), new AddCompendium()
+                new AddGear(), new AddCampaign(), new AddEconomy(), new AddIdle(), new AddRunDifficulty(), new AddTutorial(), new AddDiscovery(), new AddCompendium(),
+                new AddGrove()
             };
         }
 
@@ -301,6 +306,41 @@ namespace BeastCraft.Save
                 PlayerSave save = serializer.FromJson<PlayerSave>(json);
                 save.EnsureInitialized();
                 save.SchemaVersion = 9;
+                return serializer.ToJson(save);
+            }
+        }
+
+        /// <summary>
+        /// Schema 9 to 10: a v9 save has no Grove, Wildgarden, Board or NPC dialogue layer. The upgrade
+        /// reads it into the current type (no habitat or decor unlocked, no beast's affinity, no Grove
+        /// item held, no plot planted, no variety in the herbarium, no expedition away, no story or
+        /// pity, no dialogue line seen, no request fulfilled, no side-story chapter reached), fills in
+        /// anything missing and writes it back. Nothing else moves: every unlock, plant, send, dialogue
+        /// line and request is only ever granted by <c>Grove.GroveRules</c>, <c>Garden.GardenRules</c>,
+        /// <c>Expeditions.ExpeditionRules</c> or <c>Npc.NpcRules</c>, never by the migration itself. A
+        /// save's existing <c>Discovery.GroveUnlockIds</c> (shrines visited before the Grove existed) is
+        /// untouched here — the Grove reads it live (<c>GroveRules.RefreshUnlocks</c>) the first time it
+        /// opens, so nothing already earned is lost.
+        /// <para>
+        /// The NPC dialogue layer (<see cref="PlayerSave.Npc"/>, the Grove design's D2) was added to
+        /// this same schema-10 shape in place, after D1 shipped but before schema 10 itself was
+        /// released on any branch other than this one — see <c>docs/design/grove.md</c>, "D2": no new
+        /// migration step or schema bump was needed, only this class's and the goldens' doc comments
+        /// and fixtures being regenerated.
+        /// </para>
+        /// </summary>
+        public sealed class AddGrove : ISaveMigration
+        {
+            public int FromVersion
+            {
+                get { return 9; }
+            }
+
+            public string Upgrade(string json, ISaveJsonSerializer serializer)
+            {
+                PlayerSave save = serializer.FromJson<PlayerSave>(json);
+                save.EnsureInitialized();
+                save.SchemaVersion = 10;
                 return serializer.ToJson(save);
             }
         }

@@ -150,6 +150,7 @@ namespace BeastCraft.Game.Screens
 
             _explored.Text = _map.Header.CompletionText;
             _explored.Selected = _map.Header.CompletionRewarded;
+            Ctx.Session.RefreshGrove();
             foreach (string toast in Ctx.Session.PendingToasts)
             {
                 Ctx.Game.Toast(toast);
@@ -283,8 +284,21 @@ namespace BeastCraft.Game.Screens
             return false;
         }
 
+        /// <summary>
+        /// Selects bottom-nav tab <paramref name="tab"/>. Grove is not shown inline: it pushes the full
+        /// Grove hub screen (<see cref="GroveScreen"/>, its own inner tabs Glade/Garden/Board/Npc), so
+        /// <see cref="HomeViewModel.Tab"/> is left on whatever it already was — the nav bar keeps
+        /// showing that tab selected underneath, exactly as the Roster tab's "Compendium" chip pushes a
+        /// screen without changing the Roster tab's own selection.
+        /// </summary>
         public void SelectTab(HomeTab tab)
         {
+            if (tab == HomeTab.Grove)
+            {
+                Ctx.Stack.Push(new GroveScreen(Ctx));
+                return;
+            }
+
             _home.Select(tab);
             ShowTab();
         }

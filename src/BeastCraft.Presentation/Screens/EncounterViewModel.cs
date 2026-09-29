@@ -5,6 +5,8 @@ using BeastCraft.Campaign;
 using BeastCraft.Creatures;
 using BeastCraft.Economy;
 using BeastCraft.Encounters;
+using BeastCraft.Garden;
+using BeastCraft.Grove;
 using BeastCraft.Presentation.Content;
 using BeastCraft.Save;
 using BeastCraft.Session;
@@ -68,6 +70,32 @@ namespace BeastCraft.Presentation.Screens
     {
         public bool Ok;
         public string Message;
+    }
+
+    /// <summary>One soothing item the player holds for this region (docs/design/grove.md, "Peaceful clears").</summary>
+    public sealed class SoothingOptionView
+    {
+        public string ItemId;
+        public string DisplayName;
+        public int Held;
+    }
+
+    /// <summary>What <see cref="EncounterViewModel.Soothe"/> did.</summary>
+    public sealed class SootheOutcome
+    {
+        public bool Success { get; private set; }
+
+        public string Message { get; private set; }
+
+        internal static SootheOutcome Succeeded(string message)
+        {
+            return new SootheOutcome { Success = true, Message = message };
+        }
+
+        internal static SootheOutcome Refused(string message)
+        {
+            return new SootheOutcome { Success = false, Message = message };
+        }
     }
 
     /// <summary>
@@ -280,6 +308,106 @@ namespace BeastCraft.Presentation.Screens
         public int Obstacles { get; }
 
         public Element? DominantElement { get; }
+
+        /// <summary>
+        /// Whether this location can be soothed instead of fought (docs/design/grove.md, "Peaceful
+        /// clears" — D3/D4): an ordinary <see cref="MapNodeType.Battle"/> location whose region has a
+        /// soothing item set authored (<see cref="Grove.GroveLibrary.Soothing"/>) — never an Elite den,
+        /// a Gate, a Boss, a Kinship trial or a Hearthglen fight (a Kinship trial has no
+        /// <see cref="Node"/> at all; Hearthglen's region authors no soothing set, so it is excluded the
+        /// same way <see cref="Campaign.CampaignRules.Soothe"/> itself refuses it).
+        /// </summary>
+        public bool CanSoothe
+        {
+            get
+            {
+                return Battle != null && !Battle.IsKinshipTrial && Battle.Node.Type == MapNodeType.Battle &&
+                       _session.Content.GroveLibrary.Soothing(Battle.RegionId) != null;
+            }
+        }
+
+        /// <summary>The region's soothing items the player holds (empty when <see cref="CanSoothe"/> is false, or none are held).</summary>
+        public List<SoothingOptionView> SoothingOptions
+        {
+            get
+            {
+                List<SoothingOptionView> options = new List<SoothingOptionView>();
+                if (!CanSoothe)
+                {
+                    return options;
+                }
+
+                GardenLibrary garden = _session.Content.GardenLibrary;
+                SoothingRegionData set = _session.Content.GroveLibrary.Soothing(Battle.RegionId);
+                foreach (string itemId in set.ItemIds ?? new string[0])
+                {
+                    int held = _session.Save.Grove.Items.GetCount(itemId);
+                    if (held > 0)
+                    {
+                        options.Add(new SoothingOptionView { ItemId = itemId, DisplayName = garden.Variety(itemId)?.DisplayName ?? itemId, Held = held });
+                    }
+                }
+
+                return options;
+            }
+        }
+
+        /// <summary>
+        /// Soothes this location with <paramref name="itemId"/> instead of fighting it
+        /// (<see cref="Campaign.CampaignRules.Soothe"/>, with the current <see cref="Team"/>): full
+        /// rewards, the node clears, autosaved. Refused (no state changed) when <see cref="CanSoothe"/>
+        /// is false, the item is not held, or the team is empty.
+        /// </summary>
+        public SootheOutcome Soothe(string itemId)
+        {
+            if (!CanSoothe)
+            {
+                return SootheOutcome.Refused("This location cannot be soothed.");
+            }
+
+            GameContent content = _session.Content;
+            CampaignResult result = CampaignRules.Soothe(_session.Save, content.Campaign, content.GroveLibrary, content.Encounters, content.Enemies, NodeId, itemId, Team,
+                                                          content.Drops, content.Economy, out Session.BattleRewardSummary rewards, content.Achievements);
+            if (!result.Success)
+            {
+                return SootheOutcome.Refused(result.Error);
+            }
+
+            _session.Autosave(AutosaveReason.Results);
+            return SootheOutcome.Succeeded(SootheSummary(rewards, result));
+        }
+
+        private string SootheSummary(Session.BattleRewardSummary rewards, CampaignResult result)
+        {
+            List<string> parts = new List<string>();
+            if (rewards.GoldGained > 0)
+            {
+                parts.Add(rewards.GoldGained + " gold");
+            }
+
+            if (rewards.BeastLevelsGained > 0)
+            {
+                parts.Add(rewards.BeastLevelsGained + " beast level" + (rewards.BeastLevelsGained == 1 ? string.Empty : "s"));
+            }
+
+            if (rewards.AvatarLevelsGained > 0)
+            {
+                parts.Add("avatar level " + (rewards.AvatarLevelsGained == 1 ? "up" : "up x" + rewards.AvatarLevelsGained));
+            }
+
+            if (rewards.Loot.Drops.Count > 0)
+            {
+                parts.Add(rewards.Loot.Drops.Count + " material" + (rewards.Loot.Drops.Count == 1 ? string.Empty : "s"));
+            }
+
+            if (rewards.GearGained.Count > 0)
+            {
+                parts.Add(rewards.GearGained.Count + " gear");
+            }
+
+            string extra = GameSession.ExtraRewardText(result.TitlesEarned, 0);
+            return "Soothed! " + (parts.Count > 0 ? string.Join(", ", parts) + "." : "Full rewards claimed.") + extra;
+        }
 
         public List<EnemyGroupView> Enemies { get; } = new List<EnemyGroupView>();
 
