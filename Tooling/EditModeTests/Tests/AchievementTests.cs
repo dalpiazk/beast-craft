@@ -321,6 +321,44 @@ namespace BeastCraft.Tests.EditMode
             Assert.IsTrue(save.Achievements.HasEarned("a"));
         }
 
+        [Test]
+        public void ResolveBattle_EvaluatesAchievements_OnEveryResolvedBattle_NotOnlyABossClear()
+        {
+            PlayerSave save = FreshSave();
+            AchievementData def = new AchievementData { AchievementId = "a", Kind = AchievementKinds.BeastsOwned, Threshold = 3, TitleId = "t1", TitleText = "Trio" };
+            AchievementContent achievements = Synthetic(def);
+            Assert.IsTrue(CampaignRules.StartRun(save, Content.Campaign, "r01", 3).Success);
+            MapRun run = save.Campaign.ActiveRun;
+            MapNode first = CampaignRules.Choices(run)[0];
+            Assert.IsTrue(first.IsBattle, "a plain battle, not the boss or a gate");
+
+            CampaignResult result = CampaignRules.ResolveBattle(save, Content.Campaign, first.NodeId, Battle.BattleOutcome.PlayerVictory, null, achievements);
+
+            Assert.IsTrue(result.Success, result.Error);
+            Assert.AreEqual(CampaignOutcome.Cleared, result.Outcome, "an ordinary node clear, not a stage or region milestone");
+            CollectionAssert.AreEquivalent(new[] { "a" }, ExtractIdList(result.TitlesEarned));
+            Assert.IsTrue(save.Achievements.HasEarned("a"));
+
+            // Idempotent: clearing the next node does not earn it again.
+            MapNode second = CampaignRules.Choices(run)[0];
+            CampaignResult again = CampaignRules.ResolveBattle(save, Content.Campaign, second.NodeId, Battle.BattleOutcome.PlayerVictory, null, achievements);
+            Assert.IsEmpty(again.TitlesEarned);
+        }
+
+        [Test]
+        public void ResolveBattle_WithoutAchievements_LeavesTitlesEarnedEmpty_UnchangedFromBeforeTheParameterExisted()
+        {
+            PlayerSave save = FreshSave();
+            Assert.IsTrue(CampaignRules.StartRun(save, Content.Campaign, "r01", 3).Success);
+            MapRun run = save.Campaign.ActiveRun;
+            MapNode first = CampaignRules.Choices(run)[0];
+
+            CampaignResult result = CampaignRules.ResolveBattle(save, Content.Campaign, first.NodeId, Battle.BattleOutcome.PlayerVictory);
+
+            Assert.IsTrue(result.Success, result.Error);
+            Assert.IsEmpty(result.TitlesEarned);
+        }
+
         private static List<string> ExtractIdList(List<AchievementData> list)
         {
             List<string> ids = new List<string>();

@@ -132,6 +132,9 @@ namespace BeastCraft.Presentation.Screens
 
         public int AvatarLevelsGained { get; private set; }
 
+        /// <summary>"&lt;title&gt; Beastbinder" with a title equipped, else plain "Beastbinder" (<see cref="AchievementsViewModel.TitledName"/>).</summary>
+        public string AvatarDisplayName { get; private set; } = CampaignAvatar.DisplayName;
+
         /// <summary>A won trial's pick (2 or 3), now waiting on the map; 0 otherwise.</summary>
         public int PickStep { get; private set; }
 
@@ -173,7 +176,8 @@ namespace BeastCraft.Presentation.Screens
                 LevelsReleased = campaign.LevelsReleased,
                 ConsumablesSpent = summary.ConsumablesSpent.Count,
                 AvatarXp = summary.AvatarXpGained,
-                AvatarLevelsGained = summary.AvatarLevelsGained
+                AvatarLevelsGained = summary.AvatarLevelsGained,
+                AvatarDisplayName = AchievementsViewModel.TitledName(save, session.Content.Achievements?.Library, CampaignAvatar.DisplayName)
             };
             view.Title = result.Outcome == BattleOutcome.PlayerVictory ? "Victory!" : result.Outcome == BattleOutcome.EnemyVictory ? "Defeat" : "Stalemate";
             BattleRun run = battle.Run?.Battle;
@@ -273,6 +277,12 @@ namespace BeastCraft.Presentation.Screens
                 view.Notes.Add("A beast stirs by the kinship stone. It wants to join you.");
             }
             view.BuildNotes(session);
+            string extra = GameSession.ExtraRewardText(campaign.TitlesEarned, 0);
+            if (extra.Length > 0)
+            {
+                view.Notes.Add(extra.Trim());
+            }
+
             return view;
         }
 

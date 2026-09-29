@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using BeastCraft.Campaign;
 using BeastCraft.Creatures;
 using BeastCraft.Discovery;
+using BeastCraft.Progression;
 
 namespace BeastCraft.Presentation.Screens
 {
@@ -37,6 +38,7 @@ namespace BeastCraft.Presentation.Screens
     public sealed class KinshipPickViewModel : IBeastPicker
     {
         private readonly GameSession _session;
+        private List<AchievementData> _titlesEarned = new List<AchievementData>();
 
         public KinshipPickViewModel(GameSession session)
         {
@@ -44,6 +46,7 @@ namespace BeastCraft.Presentation.Screens
             KinshipResult pending = KinshipRules.Pending(session.Save, session.Content.Discovery);
             Site = pending.Site;
             JoinLevel = pending.JoinLevel;
+            SoloOffer = pending.SoloOffer;
             foreach (string id in pending.Offer)
             {
                 CreatureSpeciesSO species = session.Content.Battle.GetSpecies(id);
@@ -58,6 +61,9 @@ namespace BeastCraft.Presentation.Screens
 
         public int JoinLevel { get; }
 
+        /// <summary>The seventh site's one-choice offer ("the last beast chooses you"; <see cref="KinshipResult.SoloOffer"/>): no eighth species left to pick between.</summary>
+        public bool SoloOffer { get; }
+
         public List<PickOptionView> Options { get; } = new List<PickOptionView>();
 
         public CombatStance? RequiredStance
@@ -67,14 +73,16 @@ namespace BeastCraft.Presentation.Screens
 
         public string Title
         {
-            get { return Options.Count > 1 ? "Two beasts answer" : "A beast answers"; }
+            get { return SoloOffer ? "The last beast chooses you" : "Two beasts answer"; }
         }
 
         public string Subtitle
         {
             get
             {
-                return (Options.Count > 1 ? "At the " + (Site?.Name ?? "kinship stone") + ", choose who joins you." : "At the " + (Site?.Name ?? "kinship stone") + ", the last beast joins you.") +
+                return (SoloOffer
+                           ? "At the " + (Site?.Name ?? "kinship stone") + ", the last beast joins you: no choice needed."
+                           : "At the " + (Site?.Name ?? "kinship stone") + ", choose who joins you.") +
                        " They join at level " + JoinLevel + ", a little behind your team; camp and the bench help them catch up.";
             }
         }
@@ -83,12 +91,13 @@ namespace BeastCraft.Presentation.Screens
         {
             KinshipResult result = _session.ChooseKinship(speciesId);
             error = result.Error;
+            _titlesEarned = result.TitlesEarned;
             return result.Success;
         }
 
         public string JoinedMessage(PickOptionView option)
         {
-            return (option?.Name ?? "A beast") + " joins your team at level " + JoinLevel + "!";
+            return (option?.Name ?? "A beast") + " joins your team at level " + JoinLevel + "!" + GameSession.ExtraRewardText(_titlesEarned, 0);
         }
     }
 
@@ -226,19 +235,20 @@ namespace BeastCraft.Presentation.Screens
                 return result.Error;
             }
 
+            string extra = GameSession.ExtraRewardText(result.TitlesEarned, result.LookTokens);
             switch (Poi.Kind)
             {
                 case PoiKind.Shrine:
-                    return Title + " found. It will remember you when your Grove grows.";
+                    return Title + " found. It will remember you when your Grove grows." + extra;
                 case PoiKind.LoreStone:
-                    return "Lore found: " + Title + ".";
+                    return "Lore found: " + Title + "." + extra;
                 case PoiKind.Cache:
-                    return "You found " + CacheText(_session, _session.Content.Discovery.Library.Cache(result.CacheId)) + ".";
+                    return "You found " + CacheText(_session, _session.Content.Discovery.Library.Cache(result.CacheId)) + "." + extra;
                 case PoiKind.Vista:
-                    return "From up here you can see the land around: the map is clearer.";
+                    return "From up here you can see the land around: the map is clearer." + extra;
                 default:
                     return "Every beast here already walks with you. The stone gives you an offering instead: " +
-                           CacheText(_session, _session.Content.Discovery.Library.Cache(result.CacheId)) + ".";
+                           CacheText(_session, _session.Content.Discovery.Library.Cache(result.CacheId)) + "." + extra;
             }
         }
     }

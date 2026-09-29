@@ -506,9 +506,11 @@ namespace BeastCraft.Campaign
         /// drawn on <c>DeriveSeed(node.EncounterSeed, </c><see cref="NodeRewardStream"/><c>)</c>
         /// (<see cref="CampaignResult.GearGranted"/>); a lair's first clear also unlocks its
         /// boss-exclusive looks and then any milestone looks reached (<see cref="CampaignResult.CosmeticsUnlocked"/>).
-        /// A replay grants nothing new. When <paramref name="achievements"/> is given, a first boss
-        /// clear also evaluates it (<see cref="CampaignResult.TitlesEarned"/>; null — the default,
-        /// unchanged from before this parameter existed — means achievements are not wired up).
+        /// A replay grants nothing new. When <paramref name="achievements"/> is given, every resolved
+        /// battle (a plain clear, a stage's pass, a region's lair or Hearthglen's trials, not only a
+        /// boss) also evaluates it (<see cref="CampaignResult.TitlesEarned"/>; idempotent — an
+        /// already-earned achievement fires nothing again). Null — the default, unchanged from before
+        /// this parameter existed — means achievements are not wired up.
         /// </summary>
         public static CampaignResult ResolveBattle(PlayerSave save, RegionLibrary library, int nodeId, BattleOutcome outcome, EconomyContent economy,
                                                     AchievementContent achievements = null)
@@ -538,6 +540,18 @@ namespace BeastCraft.Campaign
                 return CampaignResult.Done(CampaignOutcome.Lost, node);
             }
 
+            // Every victory below returns through here, so achievements see every resolved battle
+            // (not only a boss clear); Evaluate is idempotent, so calling it this often is safe.
+            CampaignResult Finish(CampaignResult result)
+            {
+                if (achievements != null)
+                {
+                    result.TitlesEarned.AddRange(AchievementRules.Evaluate(save, achievements));
+                }
+
+                return result;
+            }
+
             Clear(run, node);
             RevealAround(save, library, run, node);
             if (region.IsTutorial)
@@ -545,7 +559,7 @@ namespace BeastCraft.Campaign
                 CampaignResult cleared = CampaignResult.Done(CampaignOutcome.Cleared, node);
                 FixedNodeData authored = library.FixedNode(run.RegionId, node.NodeId);
                 cleared.PickStep = node.Type == MapNodeType.Trial && authored != null ? authored.PickStep : 0;
-                return FinishIfLast(save, library, run, node, cleared);
+                return Finish(FinishIfLast(save, library, run, node, cleared));
             }
 
             RegionProgress progress = save.Campaign.FindRegion(run.RegionId);
@@ -560,7 +574,7 @@ namespace BeastCraft.Campaign
                     GrantNodeGear(save, economy, node, 0, gate);
                 }
 
-                return gate;
+                return Finish(gate);
             }
 
             if (node.Type == MapNodeType.Boss)
@@ -607,15 +621,10 @@ namespace BeastCraft.Campaign
                     result.CosmeticsUnlocked.AddRange(CosmeticRules.UnlockMilestones(save, economy.Cosmetics));
                 }
 
-                if (achievements != null)
-                {
-                    result.TitlesEarned.AddRange(AchievementRules.Evaluate(save, achievements));
-                }
-
-                return result;
+                return Finish(result);
             }
 
-            return CampaignResult.Done(CampaignOutcome.Cleared, node);
+            return Finish(CampaignResult.Done(CampaignOutcome.Cleared, node));
         }
 
         /// <summary>

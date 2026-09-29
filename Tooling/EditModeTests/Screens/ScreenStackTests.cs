@@ -162,7 +162,7 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
-        public void HomeNav_BackFromAnotherTab_ReturnsToTheMap_AndOnlyTheMapAndRosterWork()
+        public void HomeNav_BackFromAnotherTab_ReturnsToTheMap_AndTheMapRosterAndAvatarWork()
         {
             HomeViewModel home = new HomeViewModel();
             Assert.AreEqual(HomeTab.Map, home.Tab);
@@ -171,6 +171,11 @@ namespace BeastCraft.Tests.EditMode
 
             home.Select(HomeTab.Roster);
             Assert.IsTrue(home.TabAvailable, "the roster is built");
+            Assert.IsTrue(home.HandleBack());
+            Assert.AreEqual(HomeTab.Map, home.Tab);
+
+            home.Select(HomeTab.Avatar);
+            Assert.IsTrue(home.TabAvailable, "the avatar identity card, achievements and look-token shop are built");
             Assert.IsTrue(home.HandleBack());
             Assert.AreEqual(HomeTab.Map, home.Tab);
 

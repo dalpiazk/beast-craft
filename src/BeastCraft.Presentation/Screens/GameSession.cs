@@ -32,7 +32,10 @@ namespace BeastCraft.Presentation.Screens
         IdleClaim,
 
         /// <summary>A beast's skills or gear were changed on its detail screen (a swap, an upgrade, gear on or off).</summary>
-        BeastEdit
+        BeastEdit,
+
+        /// <summary>A player-facing change outside a battle: an equipped title, a look bought with tokens.</summary>
+        PlayerEdit
     }
 
     /// <summary>
@@ -262,6 +265,7 @@ namespace BeastCraft.Presentation.Screens
             DismissedSuggestions.Clear();
             EnsureExpedition();
             IdleRewardCalculator.Claim(Save, Content.Idle, Clock.UtcNow, Clock.Monotonic, Party());
+            EvaluateAchievementsOnSessionStart();
             Autosave(AutosaveReason.NewGame);
         }
 
@@ -326,9 +330,11 @@ namespace BeastCraft.Presentation.Screens
             bool fromBackup = loaded.StorageSource == SaveFileSource.Backup;
             bool started = !Save.Campaign.HasActiveRun;
             EnsureExpedition();
-            if (started || fromBackup)
+            bool achievementsChanged = EvaluateAchievementsOnSessionStart();
+            if (started || fromBackup || achievementsChanged)
             {
-                // Keep the main file current: a started expedition, or the restored backup made main again.
+                // Keep the main file current: a started expedition, a retroactively earned achievement,
+                // or the restored backup made main again.
                 Autosave(AutosaveReason.Results);
             }
 
@@ -569,7 +575,8 @@ namespace BeastCraft.Presentation.Screens
                     parts.Add(reward.Gold + " gold");
                 }
 
-                PendingToasts.Add(region + " fully explored! " + (parts.Count > 0 ? "You earned " + string.Join(" and ", parts) + "." : string.Empty));
+                string earned = parts.Count > 0 ? "You earned " + string.Join(" and ", parts) + "." : string.Empty;
+                PendingToasts.Add(region + " fully explored! " + earned + ExtraRewardText(reward.TitlesEarned, reward.LookTokens));
             }
 
             return reward;
@@ -579,6 +586,57 @@ namespace BeastCraft.Presentation.Screens
         public string LookName(string key)
         {
             return Content.Economy?.Cosmetics?.GetOption(key)?.DisplayName ?? key;
+        }
+
+        /// <summary>
+        /// Evaluates achievements once against the save's current state (New Game and Continue), so a
+        /// save retroactively earns whatever it already meets — e.g. an older save migrated to schema 9,
+        /// or a level or Kinship count reached between sessions — rather than only from a discovery
+        /// visit, a Kinship join or a resolved battle. Idempotent (<see cref="AchievementRules.Evaluate"/>);
+        /// newly earned titles queue one consolidated toast (<see cref="PendingToasts"/>, shown when the
+        /// map next appears) instead of nothing, so the player is told even though nothing they just did
+        /// triggered it. Returns whether anything was newly earned (the caller autosaves when it did).
+        /// </summary>
+        private bool EvaluateAchievementsOnSessionStart()
+        {
+            if (Save == null)
+            {
+                return false;
+            }
+
+            List<AchievementData> earned = AchievementRules.Evaluate(Save, Content.Achievements);
+            if (earned.Count == 0)
+            {
+                return false;
+            }
+
+            List<string> titles = earned.ConvertAll(a => a.TitleText);
+            PendingToasts.Add((titles.Count == 1 ? "New title earned: " : "New titles earned: ") + string.Join(", ", titles) + ".");
+            return true;
+        }
+
+        /// <summary>
+        /// Toast text for titles newly earned and look tokens newly granted, appended to a reward's own
+        /// message (<see cref="DiscoveryResult"/>, <see cref="CompletionReward"/>, <see cref="KinshipResult"/>,
+        /// <see cref="Campaign.CampaignResult"/> each carry these); "" when there is nothing to add.
+        /// </summary>
+        public static string ExtraRewardText(List<AchievementData> titlesEarned, int lookTokensGranted)
+        {
+            List<string> parts = new List<string>();
+            foreach (AchievementData title in titlesEarned ?? new List<AchievementData>())
+            {
+                if (title != null)
+                {
+                    parts.Add("the title \"" + title.TitleText + "\"");
+                }
+            }
+
+            if (lookTokensGranted > 0)
+            {
+                parts.Add(lookTokensGranted + " look token" + (lookTokensGranted == 1 ? string.Empty : "s"));
+            }
+
+            return parts.Count == 0 ? string.Empty : " You earned " + string.Join(" and ", parts) + ".";
         }
 
         /// <summary>

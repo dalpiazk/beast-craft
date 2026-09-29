@@ -11,10 +11,11 @@ design pass; the decisions are summarised at the end.
 ```
 Title ──Continue / New Game──▶ Home (Map tab) ──tap a location / Next battle──▶ Encounter
   ▲  Back: "Leave?"             │  idle chip, header, bottom nav                   │ Start Battle
-  │                             │  (Roster ─▶ beast detail; Grove, Avatar,         ▼
-  └──────── Back ───────────────┘   Inventory: "coming soon")                    Battle ──decided──▶ Results
-                                ▲                                                                   │
-                                └─────────────────────── Continue (or auto-advance) ────────────────┘
+  │                             │  (Roster ─▶ beast detail, compendium;            ▼
+  └──────── Back ───────────────┘   Avatar ─▶ achievements, look tokens;        Battle ──decided──▶ Results
+                                     Grove, Inventory: "coming soon")                                 │
+                                ▲                                                                     │
+                                └───────────────────── Continue (or auto-advance) ────────────────────┘
 ```
 
 - **Starter pick** (`StarterPickScreen`, `StarterPickViewModel`): New Game's first beast, any of the
@@ -155,6 +156,50 @@ Rules and data: [kinship-discovery.md](kinship-discovery.md). Everything here re
 - Screenshots: `--screen kinship-map | kinship-poi | kinship-trial | kinship-choice | region-progress`
   (a scripted walk up to the first stage's Kinship site, every fight on the way counted won).
 
+## Compendium, achievements and look tokens (the Collector persona)
+
+Rules and content: [compendium-achievements.md](compendium-achievements.md). Everything here reads
+Core (`CompendiumRules`, `AchievementRules`, `CosmeticLibrary.TokenPool`); the battle rules and the
+calibration are untouched (achievements award a text title only, never a stat or a look with combat
+power).
+
+- **Compendium screen** (`CompendiumScreen`, `CompendiumViewModel`): reached from the Roster tab's
+  "Compendium" chip. Every roster species as a card — an unknown silhouette (dimmed art, "???", the
+  roster's silhouette hint), a live Kinship offer (highlighted, its real name and art: a preview, never
+  stored), or owned (and, through Kinship, "Found through Kinship at &lt;site&gt;") — then every lore
+  entry (found: its title and text; not found: a locked "???" placeholder), and the combined
+  completion percent as a header progress bar (`CompendiumRules.Completion`).
+- **Achievements screen** (`AchievementsScreen`, `AchievementsViewModel`): reached from the Avatar tab.
+  The Beastbinder's level and equipped title at the top (`AchievementsViewModel.TitledName`), the title
+  picker (every owned title plus "No title", one equipped at a time — set directly, autosaved), and
+  every achievement, earned or not, with its condition in words and the title it awards. The equipped
+  title also shows beside "Beastbinder" on the Results screen's avatar XP line (wherever the avatar's
+  name is already shown, the same way a beast's name is never re-derived).
+- **Look-token shop** (`LookTokenShopScreen`, `LookTokenShopViewModel`): the token balance
+  (`PlayerSave.LookTokens`) and every token-purchasable look (`CosmeticLibrary.TokenPool`), owned,
+  affordable or not, bought directly with `CosmeticRules.SpendLookToken` — disabled when it is already
+  owned or the balance falls short. Reached from the Avatar tab and from a beast's Gear & bonds tab
+  ("Look shop", beside its worn looks — the existing, display-only cosmetics UI).
+- **Avatar tab**: no longer a bare "coming soon" page. A minimal identity card (level, equipped title)
+  and the way to the achievements/title screen and the look-token shop; its skills and gear are a later
+  PR (the full Beastbinder screen).
+- **Toasts**: `DiscoveryResult.TitlesEarned` / `LookTokens` (a point of interest's visit toast),
+  `CompletionReward.TitlesEarned` / `LookTokens` (the region 100% toast), `KinshipResult.TitlesEarned`
+  (a Kinship join's toast) and `CampaignResult.TitlesEarned` (a Results screen note) each add
+  `GameSession.ExtraRewardText`'s " You earned the title \"...\" and N look tokens." to the reward's own
+  message — the same toast mechanism every discovery and campaign reward already used, never a new one.
+  Achievements are also evaluated once at session start (New Game and Continue), so a save
+  retroactively earns whatever it already meets (an older save, or a level or Kinship count reached
+  between sessions) rather than only from a fresh trigger; newly earned titles queue one consolidated
+  toast (`GameSession.PendingToasts`, shown when the map next appears) instead of nothing.
+- **The Kinship "last beast chooses you" framing** (`KinshipPickViewModel`, over
+  `KinshipResult.SoloOffer`): the seventh site's one-beast offer is titled "The last beast chooses you"
+  and its subtitle says "the last beast joins you: no choice needed" instead of "choose who joins you".
+- **Wiring**: `NodeBattle.cs` passes `content.Achievements` into `CampaignRules.ResolveBattle`, so a
+  region's first boss clear (and, since this PR, every resolved campaign battle — see
+  compendium-achievements.md, "Evaluating") evaluates achievements in real play.
+- Screenshots: `--screen compendium | achievements | look-tokens`.
+
 **Saves.** `GameSession` owns the loaded `PlayerSave` and writes it to one slot through
 `SaveStore` over an `ISaveStorage`: `FileSaveStorage` under `SaveLocations` in the game (the
 per-user folder on desktop, the app's files directory on Android, or `--save-dir`),
@@ -257,8 +302,10 @@ them.
 - `--screen NAME` starts at a screen (`title`, `map`, `encounter`, `battle`, `results`, `roster`,
   `grove`, `avatar`, `inventory`, `settings`; `demo` is the battle demo; the roster-visibility
   screens `beast-detail`, `beast-derived`, `beast-skills`, `beast-gear`, `encounter-insight`,
-  `element-chart`, `glossary`, `battle-log`, `results-log`); with `--screenshot PATH` it renders
-  it and exits, on a throwaway in-memory save (`--starter-level 6` shows a level gap).
+  `element-chart`, `glossary`, `battle-log`, `results-log`; the discovery layer's
+  `kinship-map`, `kinship-poi`, `kinship-trial`, `kinship-choice`, `region-progress`; the Collector
+  persona's `compendium`, `achievements`, `look-tokens`); with `--screenshot PATH` it renders it and
+  exits, on a throwaway in-memory save (`--starter-level 6` shows a level gap).
 - `--walkthrough DIR` captures a new player's first session (the starter pick, Hearthglen with its
   hints, the trials, the camp, the finale, the way on to Verdant Hollow) as numbered PNGs on a fresh
   save in a temporary folder; `--screen starter-pick` and `--screen hearthglen` start there, and the
@@ -293,9 +340,11 @@ notification is an opt-in Android hook.
   never recorded: on the next Continue the location is simply still there to fight. Nothing is
   duplicated. A refund would need a pending-battle marker in the save (a schema change), so it is
   left for a later PR.
-- Grove, Avatar and Inventory are placeholders; Trader locations are "coming soon" (Camp
-  locations open the minimal camp: train a beast, the idle chip). The roster's looks are shown,
-  not edited (the wardrobe is a later PR). Skill tomes are only sold by the trader (coming soon),
-  so a beast's kit beyond its default loadout stays locked for now; gear comes from drops and
-  first clears.
+- Grove and Inventory are placeholders; Avatar is a minimal identity card (level, equipped title,
+  the way to achievements/titles and the look-token shop) — its skills and gear are a later PR (the
+  full Beastbinder screen). Trader locations are "coming soon" (Camp locations open the minimal
+  camp: train a beast, the idle chip). The roster's looks are shown, not edited beyond the
+  look-token shop's direct purchases (the full wardrobe — editing a beast's or the avatar's worn
+  looks — is a later PR). Skill tomes are only sold by the trader (coming soon), so a beast's kit
+  beyond its default loadout stays locked for now; gear comes from drops and first clears.
 - One save slot; no region list (the next region starts automatically after a boss).

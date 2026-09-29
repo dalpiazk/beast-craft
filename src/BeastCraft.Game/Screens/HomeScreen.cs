@@ -44,6 +44,7 @@ namespace BeastCraft.Game.Screens
         private readonly Tabs _tabs;
         private readonly Group _page;
         private readonly RosterPage _roster;
+        private readonly Group _avatarPage;
         private readonly Button _gear;
         private readonly Button _idle;
         private readonly Button _next;
@@ -64,6 +65,25 @@ namespace BeastCraft.Game.Screens
             _explored = AddButton(null, "explored", new Rect(HeaderBox.X, HeaderBox.Bottom + 18f, 400f, 84f), "Explored", "chip", OpenRegionProgress, "map");
             _next = AddButton(null, "next-battle", new Rect(NavBox.X + 90f, NavBox.Y - 150f, NavBox.Width - 180f, 124f), "Next battle", "primary", OpenRecommended,
                               "battle");
+            _avatarPage = Ui.Add(new Group { Id = "avatar-page", Bounds = new Rect(0, HeaderBox.Bottom, PortraitLayout.CanvasWidth, NavBox.Y - HeaderBox.Bottom - 20f), Visible = false });
+            Button achievements = _avatarPage.Add(new Button
+            {
+                Id = "avatar-achievements",
+                Bounds = new Rect(HeaderBox.X, HeaderBox.Bottom + 40f, HeaderBox.Width, 130f),
+                Text = "Achievements & titles",
+                StyleKey = "primary",
+                Glyph = "seal"
+            });
+            achievements.Clicked += OpenAchievements;
+            Button lookShop = _avatarPage.Add(new Button
+            {
+                Id = "avatar-look-shop",
+                Bounds = new Rect(HeaderBox.X, HeaderBox.Bottom + 190f, HeaderBox.Width, 130f),
+                Text = "Look-token shop",
+                StyleKey = "secondary",
+                Glyph = "coin"
+            });
+            lookShop.Clicked += OpenLookTokenShop;
             Ui.Add(new Panel { Id = "nav-panel", Bounds = NavBox, StyleKey = "nav" });
             _tabs = Ui.Add(new Tabs { Id = "nav", Bounds = NavBox.Inset(10f) });
             _tabs.Items.AddRange(HomeViewModel.TabNames);
@@ -343,6 +363,18 @@ namespace BeastCraft.Game.Screens
             Ctx.Stack.PushModal(new RegionProgressModal(Ctx, new RegionProgressViewModel(Ctx.Session), Enter));
         }
 
+        /// <summary>The Avatar tab's "Achievements &amp; titles" button.</summary>
+        public void OpenAchievements()
+        {
+            Ctx.Stack.Push(new AchievementsScreen(Ctx));
+        }
+
+        /// <summary>The Avatar tab's "Look-token shop" button.</summary>
+        public void OpenLookTokenShop()
+        {
+            Ctx.Stack.Push(new LookTokenShopScreen(Ctx));
+        }
+
         /// <summary>A story location: the mentor's scene, then the visit (gifts; at Hearthglen's end, the way on).</summary>
         public void OpenStory(int nodeId)
         {
@@ -419,6 +451,7 @@ namespace BeastCraft.Game.Screens
             _tabs.Selected = (int)_home.Tab;
             bool map = _home.Tab == HomeTab.Map;
             bool roster = _home.Tab == HomeTab.Roster;
+            bool avatar = _home.Tab == HomeTab.Avatar;
             _scroll.Visible = map;
             _page.Visible = !_home.TabAvailable;
             _roster.Root.Visible = roster;
@@ -427,11 +460,12 @@ namespace BeastCraft.Game.Screens
                 _roster.Refresh();
             }
 
-            Ui.Find("header").Visible = map;
+            Ui.Find("header").Visible = map || avatar;
             _gear.Visible = map;
             _idle.Visible = map;
             _explored.Visible = map && _map.Header.CompletionPercent >= 0;
             _next.Visible = map && _next.Tag != null;
+            _avatarPage.Visible = avatar;
         }
 
         // ------------------------------------------------------------------------------------------
@@ -453,6 +487,10 @@ namespace BeastCraft.Game.Screens
             else if (_home.Tab == HomeTab.Roster)
             {
                 _roster.DrawHeader();
+            }
+            else if (_home.Tab == HomeTab.Avatar)
+            {
+                DrawAvatar();
             }
             else
             {
@@ -767,6 +805,22 @@ namespace BeastCraft.Game.Screens
             Rect coin = new Rect(box.Right - 330f, box.Y + 44f, 48f, 48f);
             Painter.Glyph("coin", coin, Painter.C("goldDeep"));
             Painter.TextIn(gold, new Rect(coin.Right + 10f, coin.Y, 150f, coin.Height), Ctx.Style.TextSizes.Body + 2f, Painter.C("ink"), TextAlign.Left);
+        }
+
+        /// <summary>
+        /// The Avatar tab's minimal identity card (the full avatar screen — skills, gear — is a later
+        /// PR): the Beastbinder's level and equipped title (<see cref="AchievementsViewModel.TitledName"/>),
+        /// and the way to the achievements/title screen and the look-token shop.
+        /// </summary>
+        private void DrawAvatar()
+        {
+            Rect box = HeaderBox;
+            string name = AchievementsViewModel.TitledName(Ctx.Session.Save, Ctx.Content.Achievements?.Library, CampaignAvatar.DisplayName);
+            int level = Ctx.Session.Save?.Avatar?.Level ?? 1;
+            Painter.TextIn("Avatar", new Rect(box.X + 36f, box.Y + 30f, box.Width - 200f, Ctx.Style.TextSizes.Heading), Ctx.Style.TextSizes.Heading, Painter.C("plum"), TextAlign.Left);
+            Painter.TextIn(name, new Rect(box.X + 36f, box.Y + 96f, box.Width - 72f, 44f), Ctx.Style.TextSizes.Body + 6f, Painter.C("ink"), TextAlign.Left);
+            Painter.TextIn("Level " + level.ToString(CultureInfo.InvariantCulture), new Rect(box.X + 36f, box.Y + 146f, box.Width - 72f, 34f), Ctx.Style.TextSizes.Body, Painter.C("inkSoft"),
+                           TextAlign.Left);
         }
 
         private void DrawComingSoon()

@@ -1,8 +1,9 @@
 # Compendium, achievements and look tokens (PR B)
 
-**Status: BUILT — Core, content, save and tests (this deliverable). Screens are next**: a Compendium
-tab/panel, an achievement list and title picker, and a look-token shop are not built yet; see "Seams
-for the screens step". The producer decisions this build follows are at the end.
+**Status: BUILT — Core, content, save (deliverable 1) and the screens (deliverable 2)**: the
+compendium screen, the achievements list and title picker, and the look-token shop are all built; see
+"The screens" below (what "Seams for the screens step" became). The producer decisions this build
+follows are at the end.
 
 Builds on [kinship-discovery.md](kinship-discovery.md) ("Seams for PR B") and
 [progression-and-saves.md](progression-and-saves.md) ("Schema 9"). The Collector persona: a
@@ -84,16 +85,26 @@ already do (no new call sites needed in the screens layer for these three):
 - `DiscoveryRules.TryComplete` (a region's 100%) — same field, `CompletionReward.TitlesEarned`.
 - `KinshipRules.Choose` (a beast joins) — same field (it takes the same `DiscoveryContent`),
   `KinshipResult.TitlesEarned`.
-- `CampaignRules.ResolveBattle`'s first boss clear — a new **optional** `AchievementContent
-  achievements = null` parameter (mirroring how it already takes `EconomyContent economy` for gear
-  and cosmetic rewards), evaluated into `CampaignResult.TitlesEarned`. Optional and defaulted to keep
-  every existing call site source-compatible; `null` (unset) means "achievements are not wired up
-  here" exactly as before this parameter existed.
+- `CampaignRules.ResolveBattle` — a new **optional** `AchievementContent achievements = null`
+  parameter (mirroring how it already takes `EconomyContent economy` for gear and cosmetic rewards),
+  evaluated into `CampaignResult.TitlesEarned`. Optional and defaulted to keep every existing call site
+  source-compatible; `null` (unset) means "achievements are not wired up here" exactly as before this
+  parameter existed. **Evaluated after every resolved battle** (a plain node clear, a stage's pass, a
+  region's lair, a Hearthglen trial — not only a boss clear, screens deliverable): every victory branch
+  of `ResolveBattle` now returns through one `Finish` step that evaluates achievements when
+  `achievements` is given, so `AvatarLevel` / `BeastLevel` / `BeastsOwned` (and any other
+  save-state-only kind) fire the moment they are met rather than waiting for a boss. Idempotent either
+  way (`AchievementRules.Evaluate` skips an already-earned achievement), so calling it this often costs
+  nothing beyond the check itself.
 - `GameContent.Discovery` (content loading, `BeastCraft.Presentation.Content`) always wires
-  `DiscoveryContent.Achievements` up from the loaded `achievements.json`, so the first three hooks are
-  **live in the real game and in every test that uses the shared test content** without any
-  screens-layer change. Only the fourth (`CampaignRules.ResolveBattle`'s `achievements` argument) is
-  left for the screens step to pass through (see "Seams for the screens step").
+  `DiscoveryContent.Achievements` up from the loaded `achievements.json`, so all four hooks are live in
+  the real game and in every test that uses the shared test content; `NodeBattle.cs` passes
+  `content.Achievements` as `ResolveBattle`'s 6th argument (the screens deliverable's one-line wire-up).
+- **Session start** (`GameSession.StartWith` / `Continue`): achievements are also evaluated once when a
+  session begins, so a save retroactively earns whatever it already meets — an older save, or a level
+  or Kinship count reached between sessions — rather than only from a fresh trigger. Newly earned
+  titles queue **one consolidated toast** (`GameSession.PendingToasts`, shown when the map next appears)
+  instead of firing silently or one toast per achievement; a producer call, see "Decisions" below.
 
 ### "The last beast chooses you" (open question, resolved)
 
@@ -103,6 +114,9 @@ beast (7 sites, 7 unowned after Hearthglen) — is resolved as flavour, not a ne
 choice as "the last beast chooses you" instead of "choose one of two". `KinshipRules.Offer` already
 returns fewer than two beasts when fewer are left (unchanged, tested exhaustively in
 `KinshipTests.EveryTrio_...`); nothing about the offer or the choice call itself changes.
+`KinshipPickViewModel` (the screens deliverable) reads `SoloOffer` directly: its `Title` becomes "The
+last beast chooses you" and its `Subtitle` "...the last beast joins you: no choice needed" instead of
+"choose who joins you".
 
 ## Look tokens
 
@@ -166,24 +180,41 @@ nothing earned by the migration itself); see progression-and-saves.md, "Schema 9
   see `GlossaryValidator.ValidateText`); "Title", "Look token" and "Compendium" never appear in skill
   text, so adding them would misuse the file (and likely fail its own validator). No other
   player-facing term glossary exists in the codebase today.
+- **Session-start retroactive earning toasts silently into one consolidated line**, not one toast per
+  achievement and not fully silent: `GameSession.PendingToasts` gets "New title(s) earned: ..." once,
+  shown when the map next appears (the same drain the region-100% toast already uses). A producer may
+  prefer fully silent (no toast at all for something the player did not just do) or per-achievement
+  toasts; the one-line choice here was to acknowledge it without a barrage on an old save's first load
+  after this PR ships.
+- **The Avatar tab is a minimal identity card for this deliverable** (level, equipped title, the way to
+  the achievements/title screen and the look-token shop), not the full Beastbinder screen (skills,
+  gear, wardrobe editing) screens.md's "Known gaps" already called out as a later PR; a producer call
+  on how much of that to fold into this tab versus a dedicated one.
 
-## Seams for the screens step
+## The screens
 
-- **Compendium screen**: `CompendiumRules.BeastEntries` / `LoreEntries` / `Completion`, read against
-  `GameSession.Content.Discovery`. The roster's existing silhouette hint
-  (`RosterViewModel.SilhouetteHint`, "Found through Kinship") can now be made precise per owned beast
-  via `DiscoveryProgress.FindKinshipJoin`.
-- **Achievement list and title picker**: `PlayerSave.Achievements.EarnedIds` / `OwnedTitleIds` /
-  `EquippedTitleId`; `AchievementLibrary.All` / `Get` for each entry's `DisplayName` and `TitleText`;
-  set `EquippedTitleId` directly (any owned id, or "" to clear — there is no dedicated rule call, the
-  same way `AvatarAppearance` fields are set directly through `CosmeticRules.TrySetOption` for
-  cosmetics, but a title has no unlock/lock state to check, only ownership).
+Built this deliverable (`src/BeastCraft.Presentation/Screens/CompendiumViewModel.cs`,
+`AchievementsViewModel.cs`, `LookTokenShopViewModel.cs`; `src/BeastCraft.Game/Screens/CompendiumScreens.cs`).
+Full detail: [screens.md](screens.md#compendium-achievements-and-look-tokens-the-collector-persona).
+
+- **Compendium screen** (`CompendiumScreen`, reached from the Roster tab): `CompendiumRules.BeastEntries`
+  / `LoreEntries` / `Completion`, read against `GameSession.Content.Discovery`. The roster's existing
+  silhouette hint (`RosterViewModel.SilhouetteHint`, "Found through Kinship") is made precise per owned
+  beast via `DiscoveryProgress.FindKinshipJoin` ("Found through Kinship at &lt;site&gt;").
+- **Achievement list and title picker** (`AchievementsScreen`, reached from the Avatar tab):
+  `PlayerSave.Achievements.EarnedIds` / `OwnedTitleIds` / `EquippedTitleId`; `AchievementLibrary.All` /
+  `Get` for each entry's `DisplayName` and `TitleText`; `EquippedTitleId` is set directly (any owned id,
+  or "" to clear — there is no dedicated rule call, the same way `AvatarAppearance` fields are set
+  directly through `CosmeticRules.TrySetOption` for cosmetics, but a title has no unlock/lock state to
+  check, only ownership). The equipped title also shows beside "Beastbinder" on the Results screen's
+  avatar XP line.
 - **Toasts**: `DiscoveryResult.TitlesEarned` / `LookTokens`, `CompletionReward.TitlesEarned` /
-  `LookTokens`, `KinshipResult.TitlesEarned`, `CampaignResult.TitlesEarned` (once wired, below) — each
-  a `List<AchievementData>` (or an `int`) ready to show.
-- **One remaining wire-up**: `NodeBattle.cs`'s call to `CampaignRules.ResolveBattle` (currently 5
-  arguments) should pass `content.Achievements` as the 6th argument so a first region-boss clear also
-  evaluates achievements in real play (today only the Kinship/discovery hooks are live end-to-end; see
-  "Evaluating" above). A one-line, additive change.
-- **Look-token shop**: `CosmeticLibrary.TokenPool()` for the list, `CosmeticRules.SpendLookToken` to
-  buy, `PlayerSave.LookTokens` to show the balance.
+  `LookTokens`, `KinshipResult.TitlesEarned`, `CampaignResult.TitlesEarned` each feed
+  `GameSession.ExtraRewardText` (" You earned the title \"...\" and N look tokens."), appended to the
+  reward's own toast or Results note — the existing toast mechanism, no new one.
+- **The wire-up**: `NodeBattle.cs` passes `content.Achievements` as `ResolveBattle`'s 6th argument, and
+  `ResolveBattle` itself now evaluates achievements after every resolved battle (see "Evaluating",
+  above), not only a boss clear.
+- **Look-token shop** (`LookTokenShopScreen`, reached from the Avatar tab and from a beast's Gear &amp;
+  bonds tab): `CosmeticLibrary.TokenPool()` for the list, `CosmeticRules.SpendLookToken` to buy,
+  `PlayerSave.LookTokens` for the balance.
