@@ -81,6 +81,54 @@ namespace BeastCraft.Game.Screens.Components
     }
 
     /// <summary>
+    /// The inner tab strip a full-page screen with more than one tab shows under its
+    /// <see cref="ScreenHeader"/> (Avatar's Overview/Skills/Gear/Wardrobe, Inventory's Gear/
+    /// Materials/Looks, the Trader's Stock/Sell, Grove's Glade/Garden/Board/Npc, the beast detail
+    /// screen's Stats/Skills/Gear &amp; bonds) — one height for all of them, so a strip never has to
+    /// guess how much room its icon-above-label layout needs (Grove's own strip used to sit at
+    /// 170px, almost twice this, worked around from an old layout bug; the bug was in
+    /// <c>UiPainter.Tabs</c>'s label placement, fixed since, so every strip can share this height).
+    /// </summary>
+    public static class TabStrip
+    {
+        public const float Height = 96f;
+        public const float Gap = 12f;
+
+        /// <summary>The strip's own y, right under a header of <paramref name="headerHeight"/>.</summary>
+        public static float Top(float headerHeight)
+        {
+            return headerHeight + Gap;
+        }
+
+        /// <summary>Where the page content below the strip starts.</summary>
+        public static float ContentTop(float headerHeight, float contentGap = 16f)
+        {
+            return Top(headerHeight) + Height + contentGap;
+        }
+
+        /// <summary>Builds the strip's backing panel and the <see cref="Tabs"/> widget itself, wired to <paramref name="onChanged"/>.</summary>
+        public static Tabs Build(UiRoot ui, string id, float headerHeight, IReadOnlyList<string> labels, IReadOnlyList<string> glyphs, Action<int> onChanged)
+        {
+            float width = PortraitLayout.CanvasWidth - 2f * HeaderMetrics.Pad;
+            Rect bounds = new Rect(HeaderMetrics.Pad, Top(headerHeight), width, Height);
+            ui.Add(new Panel { Id = id + "-panel", Bounds = bounds, StyleKey = "nav" });
+            Tabs tabs = ui.Add(new Tabs { Id = id, Bounds = bounds.Inset(6f) });
+            tabs.Items.AddRange(labels);
+            if (glyphs != null)
+            {
+                tabs.Glyphs.AddRange(glyphs);
+            }
+
+            if (onChanged != null)
+            {
+                tabs.Changed += onChanged;
+            }
+
+            return tabs;
+        }
+    }
+
+    /// <summary>
     /// A section's heading text: either drawn inside a card that also holds more content below it
     /// (<see cref="Draw"/> — the card must be tall enough for the heading plus whatever else it
     /// draws), or, for a plain divider between groups of cards with nothing else in its own row, a
@@ -153,6 +201,16 @@ namespace BeastCraft.Game.Screens.Components
         public T Add<T>(T widget) where T : Widget
         {
             return _scroll.Add(widget);
+        }
+
+        /// <summary>
+        /// Registers <paramref name="draw"/> for a widget the screen built and added itself (a grid
+        /// cell with a custom style per entry, a panel plus its own <see cref="Hotspot"/>) rather
+        /// than through <see cref="Card"/> — the Grove Garden's plot grid is the shape this is for.
+        /// </summary>
+        public void TrackDraw(Widget widget, Action<Rect> draw)
+        {
+            _drawers[widget] = draw;
         }
 
         /// <summary>Sets the scroll view's content height from the last <paramref name="y"/> and restores its scroll position.</summary>
