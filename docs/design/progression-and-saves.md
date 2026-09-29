@@ -226,7 +226,9 @@ untouched, and one device's settings apply to every save slot.
   haptics settings (see `docs/design/audio.md`, "Settings"): `MasterVolume`, `MusicVolume` and
   `SfxVolume` (0-100, default **100**), `Muted` (default off) and `Haptics` (default **on**; hidden where
   the host cannot vibrate), and `GroveNotifications` (default off; the Android "something is ready in
-  the Grove" notification, hidden where the host has no notifications). New settings
+  the Grove" notification, hidden where the host has no notifications). `AnalyticsConsent` and
+  `CrashReportConsent` (default off; #62, nothing is set up or sent until turned on) and `ConsentAsked`
+  (whether the one-time consent screen has been answered). New settings
   are added as fields with defaults: a key an older file lacks keeps its default, so a purely
   additive setting needs no version bump (a file from before the effects settings loads as Full,
   shake on, flashes on).

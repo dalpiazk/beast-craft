@@ -185,7 +185,9 @@ namespace BeastCraft.Presentation.Screens
         public const int Mute = 11;
         public const int Haptics = 12;
         public const int GroveNotifications = 13;
-        public const int RowCount = 14;
+        public const int Analytics = 14;
+        public const int CrashReports = 15;
+        public const int RowCount = 16;
 
         /// <summary>A volume row's step: each tap takes it down a quarter, and from 0 back to 100.</summary>
         public const int VolumeStep = 25;
@@ -220,6 +222,9 @@ namespace BeastCraft.Presentation.Screens
         /// <summary>Raised after the Grove-notification setting changes (the host asks for the permission, or cancels).</summary>
         public event Action<bool> GroveNotificationsChanged;
 
+        /// <summary>Raised after a consent setting (analytics, crash reports) changes: the session's telemetry starts or stops to match.</summary>
+        public event Action ConsentChanged;
+
         /// <summary>The rows in display order (the alert rows and the haptics row only where the host has them); <see cref="Row"/> finds one by id.</summary>
         public List<SettingRow> Rows()
         {
@@ -248,6 +253,9 @@ namespace BeastCraft.Presentation.Screens
             {
                 rows.Add(new SettingRow { Id = Haptics, Label = _text.Get("ui.settings.haptics"), Value = OnOff(_settings.Haptics), On = _settings.Haptics });
             }
+
+            rows.Add(new SettingRow { Id = Analytics, Label = _text.Get("ui.settings.analytics"), Value = OnOff(_settings.AnalyticsConsent), On = _settings.AnalyticsConsent });
+            rows.Add(new SettingRow { Id = CrashReports, Label = _text.Get("ui.settings.crash_reports"), Value = OnOff(_settings.CrashReportConsent), On = _settings.CrashReportConsent });
 
             return rows;
         }
@@ -351,6 +359,12 @@ namespace BeastCraft.Presentation.Screens
 
                     _settings.Haptics = !_settings.Haptics;
                     break;
+                case Analytics:
+                    _settings.AnalyticsConsent = !_settings.AnalyticsConsent;
+                    break;
+                case CrashReports:
+                    _settings.CrashReportConsent = !_settings.CrashReportConsent;
+                    break;
                 default:
                     return;
             }
@@ -369,6 +383,51 @@ namespace BeastCraft.Presentation.Screens
             {
                 GroveNotificationsChanged?.Invoke(_settings.GroveNotifications);
             }
+
+            if (row == Analytics || row == CrashReports)
+            {
+                ConsentChanged?.Invoke();
+            }
+        }
+    }
+
+    /// <summary>
+    /// The one-time consent screen (#62): shown once, after the first starter pick and before play, until the
+    /// player answers it. Both choices start off; the player turns on what they agree to and continues, and
+    /// can change either later in the settings. Nothing is set up or sent before that (<see cref="GameSession.Telemetry"/>).
+    /// </summary>
+    public sealed class ConsentViewModel
+    {
+        private readonly GameSession _session;
+
+        public ConsentViewModel(GameSession session)
+        {
+            _session = session ?? throw new ArgumentNullException(nameof(session));
+            Analytics = session.Settings.AnalyticsConsent;
+            CrashReports = session.Settings.CrashReportConsent;
+        }
+
+        /// <summary>Whether the screen still has to be shown (never answered).</summary>
+        public static bool ShouldAsk(PlayerSettings settings)
+        {
+            return settings != null && !settings.ConsentAsked;
+        }
+
+        /// <summary>The analytics choice on the screen (off until the player turns it on).</summary>
+        public bool Analytics { get; set; }
+
+        /// <summary>The crash-report choice on the screen (off until the player turns it on).</summary>
+        public bool CrashReports { get; set; }
+
+        /// <summary>Stores both choices, marks the screen answered, saves the settings and starts only what was agreed to.</summary>
+        public void Confirm()
+        {
+            PlayerSettings settings = _session.Settings;
+            settings.AnalyticsConsent = Analytics;
+            settings.CrashReportConsent = CrashReports;
+            settings.ConsentAsked = true;
+            _session.SaveSettings();
+            _session.Telemetry.Apply();
         }
     }
 }

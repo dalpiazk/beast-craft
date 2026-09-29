@@ -16,6 +16,15 @@ old one.
 - **Telemetry.** **Opt-in anonymous analytics plus crash reports**, both behind a consent screen. Nothing
   is sent before the player agrees. The privacy policy and the Play data-safety form must declare both
   (#62).
+  - **Built (#62 slice):** `PlayerSettings.AnalyticsConsent` and `CrashReportConsent`, both off by
+    default; a one-time consent screen (`ConsentModal`) after the first starter pick and before play,
+    shown until answered, with both choices starting off; a settings row for each. The code talks to
+    engine-neutral `IAnalytics` and `ICrashReporter` (do-nothing `NullAnalytics` and
+    `NullCrashReporter` for now) only through `TelemetryGate`, which initialises a provider only while
+    its consent is on and drops everything otherwise; tests enforce it (`ConsentTests`).
+  - **Provider: to be decided.** No analytics or crash-reporting SDK is chosen or included, so nothing
+    leaves the device yet. Whichever is chosen, the privacy policy and the Play data-safety form must
+    declare both kinds of data before it ships.
 - **Haptics.** On by default, with a settings toggle. Light haptics on hits, KOs and key UI confirms
   (#56).
 - **Gamepad.** Not supported. The game is touch-first; desktop uses mouse and keyboard.

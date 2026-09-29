@@ -66,6 +66,18 @@ namespace BeastCraft.Save
         public bool GroveNotifications;
 
         /// <summary>
+        /// Whether anonymous gameplay events may be sent (#62). Off by default: nothing is set up or sent
+        /// until the player turns it on (the one-time consent screen or the settings).
+        /// </summary>
+        public bool AnalyticsConsent;
+
+        /// <summary>Whether crash reports may be sent (#62). Off by default, like <see cref="AnalyticsConsent"/>.</summary>
+        public bool CrashReportConsent;
+
+        /// <summary>Whether the player has answered the one-time consent screen (it shows until they do).</summary>
+        public bool ConsentAsked;
+
+        /// <summary>
         /// Whether the tutorial hints show (each at most once; <c>PlayerSave.Tutorial.SeenHintIds</c>).
         /// On by default; a hint's own "Turn hints off" and the settings row switch it.
         /// </summary>

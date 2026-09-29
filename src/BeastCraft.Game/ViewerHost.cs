@@ -71,6 +71,15 @@ namespace BeastCraft.Game
         public IHaptics Haptics;
 
         /// <summary>
+        /// The analytics provider (#62; none chosen yet, docs/design/decisions.md). Null: <see cref="BeastCraft.Presentation.Telemetry.NullAnalytics"/>.
+        /// Whatever it is, the session's <see cref="BeastCraft.Presentation.Telemetry.TelemetryGate"/> starts it only with the player's consent.
+        /// </summary>
+        public BeastCraft.Presentation.Telemetry.IAnalytics Analytics;
+
+        /// <summary>The crash reporter (#62; none chosen yet), gated the same way. Null: <see cref="BeastCraft.Presentation.Telemetry.NullCrashReporter"/>.</summary>
+        public BeastCraft.Presentation.Telemetry.ICrashReporter CrashReporter;
+
+        /// <summary>
         /// Exports a save slot to a file and imports one back (the slot list's Export and Import). The desktop
         /// host uses a folder (<see cref="FolderSaveTransfer"/>, <c>Documents/BeastCraft</c>). Null: the host has
         /// none, and the buttons are hidden (Android, for now: see its MainActivity).

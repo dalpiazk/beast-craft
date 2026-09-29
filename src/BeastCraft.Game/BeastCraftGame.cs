@@ -211,6 +211,7 @@ namespace BeastCraft.Game
             SettingsViewModel model = new SettingsViewModel(session.Settings, session.Content.Text, session.SaveSettings, _host.Notifier != null, _host.Haptics != null);
             model.IdleNotificationsChanged += on => NotificationSettingChanged(LocalNotification.IdleFull, on);
             model.GroveNotificationsChanged += on => NotificationSettingChanged(LocalNotification.GroveReady, on);
+            model.ConsentChanged += () => session.Telemetry.Apply();
             return model;
         }
 
@@ -303,6 +304,7 @@ namespace BeastCraft.Game
             }
 
             _ctx.Session = new GameSession(_content, Storage(scripted), SeedSource(scripted), new SystemGameClock(_host.MonotonicClock));
+            _ctx.Session.Telemetry.Use(_host.Analytics, _host.CrashReporter);
             if (_options.StarterLevel.HasValue)
             {
                 _ctx.Session.StarterLevel = _options.StarterLevel.Value;
@@ -1386,6 +1388,12 @@ namespace BeastCraft.Game
                     CampaignRules.StartRun(save, _ctx.Content.Campaign, "r11", 0, 7, RunDifficulty.Hard);
                     Home().Enter();
                 });
+            }
+
+            // A verification aid for #62: the one-time consent screen over the map (scripted runs never offer it by themselves).
+            if (screen == "consent")
+            {
+                steps.Add(() => _stack.PushModal(new ConsentModal(_ctx, new ConsentViewModel(_ctx.Session), null)));
             }
 
             if (screen == "encounter-hard")

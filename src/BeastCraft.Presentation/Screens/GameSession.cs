@@ -13,6 +13,7 @@ using BeastCraft.Grove;
 using BeastCraft.Idle;
 using BeastCraft.Localization;
 using BeastCraft.Presentation.Content;
+using BeastCraft.Presentation.Telemetry;
 using BeastCraft.Progression;
 using BeastCraft.Save;
 using BeastCraft.Skills;
@@ -222,7 +223,14 @@ namespace BeastCraft.Presentation.Screens
             _settingsStore = new PlayerSettingsStore(storage, json);
             _seeds = seeds ?? (() => Environment.TickCount);
             Settings = _settingsStore.Load();
+            Telemetry = new TelemetryGate(() => Settings);
         }
+
+        /// <summary>
+        /// The analytics and crash reports (#62), behind the player's consent settings: nothing starts and nothing is sent
+        /// while they are off (the default). Hosts plug a provider in with <see cref="TelemetryGate.Use"/>.
+        /// </summary>
+        public TelemetryGate Telemetry { get; }
 
         public GameContent Content { get; }
 
@@ -541,6 +549,7 @@ namespace BeastCraft.Presentation.Screens
             Save.EnsureInitialized();
             LastTeam.Clear();
             DismissedSuggestions.Clear();
+            Telemetry.Track("new_game");
             PreferredDifficulty = Save.Campaign.HasActiveRun ? Save.Campaign.ActiveRun.Difficulty : RunDifficulty.Normal;
             EnsureExpedition();
             IdleRewardCalculator.Claim(Save, Content.Idle, Clock.UtcNow, Clock.Monotonic, Party());
@@ -608,6 +617,7 @@ namespace BeastCraft.Presentation.Screens
             LastTeam.Clear();
             DismissedSuggestions.Clear();
             PreferredDifficulty = Save.Campaign.HasActiveRun ? Save.Campaign.ActiveRun.Difficulty : RunDifficulty.Normal;
+            Telemetry.Track("session_start");
             bool fromBackup = loaded.StorageSource == SaveFileSource.Backup;
             bool started = !Save.Campaign.HasActiveRun;
 

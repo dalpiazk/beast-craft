@@ -29,6 +29,10 @@ Title ──Continue / New Game──▶ Home (Map tab) ──tap a location / N
   idle rewards and toasts them; the most recently played slot), Save slots (when a save exists), New Game (in the first free slot, then the starter pick; the slot list when all three are full), Settings. A save that
   could only be restored from its `.bak` says so; one that cannot be loaded says why. Back asks
   before quitting.
+- **Consent** (`ConsentModal`, `ConsentViewModel`; #62): once, the first time the map shows with no pick
+  waiting (after the first starter pick, before play), until answered: anonymous gameplay events and
+  crash reports in plain words, a row for each (both off until turned on), and Continue; Back does not
+  skip it. Both are rows in Settings too. Never offered in a scripted run; `--screen consent` shows it.
 - **Save slots** (`SaveSlotsScreen`, `SaveSlotsViewModel`): one card per slot (three) with the save's
   summary and Continue or New game, Delete (asks first), and Export and Import where the host has an
   `ISaveTransfer` (desktop only for now). See `progression-and-saves.md`, "Save slots, backup and

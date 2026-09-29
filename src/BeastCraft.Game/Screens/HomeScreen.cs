@@ -187,7 +187,28 @@ namespace BeastCraft.Game.Screens
                 return;
             }
 
+            if (OfferConsent())
+            {
+                return;
+            }
+
             ShowHints(BeastCraft.Tutorial.HintTriggers.MapOpen);
+        }
+
+        /// <summary>
+        /// The one-time consent screen (#62), once the first-run picks are done and before play: until the player
+        /// answers it. Not in scripted screenshots or the walkthrough (their own <c>--screen consent</c> shows it).
+        /// </summary>
+        private bool OfferConsent()
+        {
+            bool scripted = Ctx.Options.Screenshot || !string.IsNullOrEmpty(Ctx.Options.WalkthroughDir);
+            if (scripted || !ConsentViewModel.ShouldAsk(Ctx.Session.Settings) || Ctx.Stack.IsOpen("consent"))
+            {
+                return false;
+            }
+
+            Ctx.Stack.PushModal(new ConsentModal(Ctx, new ConsentViewModel(Ctx.Session), () => ShowHints(BeastCraft.Tutorial.HintTriggers.MapOpen)));
+            return true;
         }
 
         public override void Update(float elapsedMs, FrameInput input)
