@@ -88,7 +88,9 @@ namespace BeastCraft.Tests.EditMode
     /// added <c>rich-v12</c>, which is now the one that must round-trip unchanged. Every older expected output
     /// changed in exactly these places: <c>"SchemaVersion":11</c> became <c>12</c>, and
     /// <c>,"Seen":{"Gear":[...],"Looks":[...]}</c> follows <c>"PendingBattleConsumables"</c>, listing the gear instance
-    /// ids and unlocked look keys that save already owned (the migration marks them seen). And the placed decor's
+    /// ids and unlocked look keys that save already owned (the migration marks them seen). <c>,"PreferredDifficulty":N</c>
+    /// follows <c>"LocationsSoothed"</c> (the post-game difficulty preference, folded into schema 12 before it shipped:
+    /// 1 where the save's expedition was on Hard, <c>rich-v6</c> to <c>rich-v11</c>, else 0). And the placed decor's
     /// <c>X</c>/<c>Y</c> (now fractions of the habitat canvas, clamped to 0-1 on load) read 1 in <c>rich-v10</c> and
     /// <c>rich-v11</c>, whose reflection-filled 64-65 were out of range. <c>rich-v12</c>'s capture fills them in range.
     /// No input changed.
@@ -220,6 +222,7 @@ namespace BeastCraft.Tests.EditMode
             StringAssert.Contains("\"LocationsSoothed\":", input, "the rich save fills the schema-10 peaceful-clears field (D3)");
             StringAssert.Contains("\"PendingBattleConsumables\":[\"", input, "the rich save fills the schema-11 crash-refund field");
             StringAssert.Contains("\"Seen\":{\"Gear\":[\"", input, "the rich save fills the schema-12 seen list");
+            StringAssert.Contains("\"PreferredDifficulty\":1", input, "the rich save fills the schema-12 difficulty preference");
         }
 
         [TestCase(1)]

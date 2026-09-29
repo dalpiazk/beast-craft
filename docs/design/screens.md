@@ -172,7 +172,7 @@ Rules and data: [kinship-discovery.md](kinship-discovery.md). Everything here re
   showing the difficulty now; its tap asks, then plays the stage on the map again on the other difficulty
   (`MapViewModel.SwitchDifficulty` → `GameSession.ReplayStage(stage, difficulty)`). On Hard a berry **Hard**
   badge leads the header's level line and ends the encounter preview's subtitle (`EncounterViewModel.IsHard`).
-  Replays and the next stage keep the difficulty. Screenshots: `--screen map-hard | encounter-hard`.
+  Replays and the next stage keep the difficulty, even after a restart (saved, schema 12). Screenshots: `--screen map-hard | encounter-hard`.
 - Screenshots: `--screen kinship-map | kinship-poi | kinship-trial | kinship-choice | region-progress`
   (a scripted walk up to the first stage's Kinship site, every fight on the way counted won).
 
@@ -231,7 +231,7 @@ is unaffected.
   children in `src/BeastCraft.Presentation/Screens/GroveViewModels.cs`): one screen, an inner `Tabs`
   strip (Glade / Garden / Board / Npc), reached by pushing from the Home tab bar's Grove slot
   (`HomeScreen.SelectTab`) rather than showing inline.
-- **Glade**: habitat chips (locked ones dimmed) select which habitat's decor grid shows — a
+- **Glade**: habitat chips (locked ones dimmed) select which habitat's decor grid shows: a
   4-column slot grid to place and remove, and below it a habitat canvas where each piece is dragged to
   move it (#46; grove.md §5). Every
   owned beast is a card: portrait (its worn colour form's tint applied, see below), affinity tier and

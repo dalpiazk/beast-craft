@@ -32,7 +32,8 @@ namespace BeastCraft.Save
     /// <item>10 to 11: the consumables spent on a battle in progress (<see cref="PlayerSave.PendingBattleConsumables"/>),
     /// so a battle the process died in hands them back: <see cref="AddPendingBattle"/>.</item>
     /// <item>11 to 12: the gear and looks already seen (<see cref="PlayerSave.Seen"/>), for the "new" dots; everything
-    /// owned then counts as seen: <see cref="AddSeen"/>.</item>
+    /// owned then counts as seen; and the post-game difficulty preference (<see cref="CampaignProgress.PreferredDifficulty"/>),
+    /// taken from the expedition in progress: <see cref="AddSeen"/>.</item>
     /// </list>
     /// </summary>
     public static class SaveMigrations
@@ -374,8 +375,9 @@ namespace BeastCraft.Save
         /// <summary>
         /// Schema 11 to 12: a v11 save has no seen list. The upgrade reads it into the current type and
         /// marks every gear instance and unlocked look it owns as seen (<see cref="SeenRules.MarkAllOwnedSeen"/>),
-        /// so an updated save shows nothing as new; only what is earned after the update gets a dot.
-        /// Nothing else moves.
+        /// so an updated save shows nothing as new; only what is earned after the update gets a dot. It also sets
+        /// <see cref="CampaignProgress.PreferredDifficulty"/> (folded into this step before schema 12 shipped) to the
+        /// difficulty of the expedition in progress, else Normal. Nothing else moves.
         /// </summary>
         public sealed class AddSeen : ISaveMigration
         {
@@ -389,6 +391,7 @@ namespace BeastCraft.Save
                 PlayerSave save = serializer.FromJson<PlayerSave>(json);
                 save.EnsureInitialized();
                 SeenRules.MarkAllOwnedSeen(save);
+                save.Campaign.PreferredDifficulty = save.Campaign.HasActiveRun ? save.Campaign.ActiveRun.Difficulty : RunDifficulty.Normal;
                 save.SchemaVersion = 12;
                 return serializer.ToJson(save);
             }

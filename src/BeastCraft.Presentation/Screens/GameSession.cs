@@ -550,7 +550,6 @@ namespace BeastCraft.Presentation.Screens
             LastTeam.Clear();
             DismissedSuggestions.Clear();
             Telemetry.Track("new_game");
-            PreferredDifficulty = Save.Campaign.HasActiveRun ? Save.Campaign.ActiveRun.Difficulty : RunDifficulty.Normal;
             EnsureExpedition();
             IdleRewardCalculator.Claim(Save, Content.Idle, Clock.UtcNow, Clock.Monotonic, Party());
             EvaluateAchievementsOnSessionStart();
@@ -616,7 +615,6 @@ namespace BeastCraft.Presentation.Screens
             Save = loaded.Save;
             LastTeam.Clear();
             DismissedSuggestions.Clear();
-            PreferredDifficulty = Save.Campaign.HasActiveRun ? Save.Campaign.ActiveRun.Difficulty : RunDifficulty.Normal;
             Telemetry.Track("session_start");
             bool fromBackup = loaded.StorageSource == SaveFileSource.Backup;
             bool started = !Save.Campaign.HasActiveRun;
@@ -870,11 +868,21 @@ namespace BeastCraft.Presentation.Screens
         }
 
         /// <summary>
-        /// The difficulty the player last chose for a post-game region (<see cref="ReplayStage(int, RunDifficulty)"/>),
-        /// or the one of the expedition a loaded save was on. The next stage starts on it, so a Hard run
-        /// stays Hard from stage to stage. Session only: a save closed between stages starts Normal.
+        /// The difficulty the player last chose for a post-game region (<see cref="ReplayStage(int, RunDifficulty)"/>), kept in
+        /// the save (<see cref="CampaignProgress.PreferredDifficulty"/>, schema 12) so it survives a restart. The next stage
+        /// starts on it, so a Hard run stays Hard from stage to stage. Normal before a game is loaded.
         /// </summary>
-        public RunDifficulty PreferredDifficulty { get; private set; }
+        public RunDifficulty PreferredDifficulty
+        {
+            get { return Save?.Campaign?.PreferredDifficulty ?? RunDifficulty.Normal; }
+            private set
+            {
+                if (Save?.Campaign != null)
+                {
+                    Save.Campaign.PreferredDifficulty = value;
+                }
+            }
+        }
 
         /// <summary>
         /// Makes sure an expedition is in progress: when none is, starts one (a new map seed) into

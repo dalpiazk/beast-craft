@@ -25,6 +25,13 @@ namespace BeastCraft.Tests.EditMode
         private static GameSession AtR11()
         {
             GameSession session = TestSaves.Started(new GameSession(Content, new MemorySaveStorage(), () => 424242, new ManualGameClock(T0, TimeSpan.FromHours(1000))));
+            OpenR11(session);
+            return session;
+        }
+
+        /// <summary>Every region's boss down and r11 open, on a Normal r11 expedition.</summary>
+        private static void OpenR11(GameSession session)
+        {
             PlayerSave save = session.Save;
             save.Tutorial.HearthglenCleared = true;
             foreach (RegionData region in Content.Campaign.Regions)
@@ -40,7 +47,6 @@ namespace BeastCraft.Tests.EditMode
             CampaignRules.Retreat(save);
             CampaignResult started = CampaignRules.StartRun(save, Content.Campaign, "r11", 0, 7, RunDifficulty.Normal);
             Assert.IsTrue(started.Success, started.Error);
-            return session;
         }
 
         [Test]
@@ -71,6 +77,25 @@ namespace BeastCraft.Tests.EditMode
             Assert.IsTrue(next.Success, next.Error);
             Assert.AreEqual(1, session.Save.Campaign.ActiveRun.Stage);
             Assert.AreEqual(RunDifficulty.Hard, session.Save.Campaign.ActiveRun.Difficulty);
+        }
+
+        [Test]
+        public void TheChoice_SurvivesARestart()
+        {
+            MemorySaveStorage storage = new MemorySaveStorage();
+            GameSession first = TestSaves.Started(new GameSession(Content, storage, () => 424242, new ManualGameClock(T0, TimeSpan.FromHours(1000))));
+            OpenR11(first);
+            Assert.IsTrue(first.ReplayStage(0, RunDifficulty.Hard).Success);
+            first.Save.Campaign.FindRegion("r11").StagesCleared = 1;
+            CampaignRules.Retreat(first.Save);
+            first.Autosave(AutosaveReason.Results);
+
+            GameSession second = new GameSession(Content, storage, () => 424242, new ManualGameClock(T0, TimeSpan.FromHours(1000)));
+            Assert.IsTrue(second.Continue().Success);
+
+            Assert.AreEqual(RunDifficulty.Hard, second.PreferredDifficulty, "kept in the save");
+            Assert.AreEqual(RunDifficulty.Hard, second.Save.Campaign.ActiveRun.Difficulty, "the next stage starts on it");
+            Assert.AreEqual(1, second.Save.Campaign.ActiveRun.Stage);
         }
 
         [Test]

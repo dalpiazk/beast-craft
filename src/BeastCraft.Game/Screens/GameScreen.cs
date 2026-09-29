@@ -340,14 +340,27 @@ namespace BeastCraft.Game.Screens
         public override string Name { get; }
     }
 
-    /// <summary>The settings (<see cref="SettingsViewModel"/>): each row cycles or toggles its setting and saves it.</summary>
+    /// <summary>
+    /// The settings (<see cref="SettingsViewModel"/>): each row cycles or toggles its setting and saves it. The rows sit in a
+    /// scrolling list inside the card, so every row keeps a comfortable touch height however many the host shows (16 on
+    /// Android): the card grows to fit and, past the screen, the list scrolls.
+    /// </summary>
     public sealed class SettingsModal : GameModal
     {
-        /// <summary>A row's height plus its gap, while the rows fit; more rows than fit share the height (the Android host shows two more).</summary>
-        private const float RowPitch = 128f;
+        /// <summary>
+        /// A row's height: at least 48dp on a phone (the 1080-px canvas spans about 411dp across, so 48dp is about 126 px).
+        /// </summary>
+        private const float RowHeight = 128f;
+
+        /// <summary>The gap between rows.</summary>
+        private const float RowGap = 18f;
 
         /// <summary>The least margin above and below the card.</summary>
         private const float MinMargin = 40f;
+
+        /// <summary>The card above the list (the title) and below it (Close).</summary>
+        private const float Top = 150f;
+        private const float Bottom = 180f;
 
         private readonly SettingsViewModel _model;
         private readonly List<Button> _rows = new List<Button>();
@@ -356,17 +369,19 @@ namespace BeastCraft.Game.Screens
         {
             _model = model;
             UiStyle style = ctx.Style;
-            List<SettingRow> rows = model.Rows();
-            int count = rows.Count;
-            float pitch = Math.Min(RowPitch, (PortraitLayout.CanvasHeight - 2f * MinMargin - 330f) / Math.Max(1, count));
-            float height = 160f + count * pitch + 170f;
+            List<SettingRow> shown = model.Rows();
+            int count = shown.Count;
+            float listHeight = count * (RowHeight + RowGap);
+            float visible = Math.Min(listHeight, PortraitLayout.CanvasHeight - 2f * MinMargin - Top - Bottom);
+            float height = Top + visible + Bottom;
             Rect card = new Rect(90f, (PortraitLayout.CanvasHeight - height) / 2f, 900f, height);
             Panel panel = Ui.Add(new Panel { Bounds = card, StyleKey = "modal" });
             panel.Add(new Label { Bounds = new Rect(card.X, card.Y + 50f, card.Width, 60f), Text = Loc("ui.settings.title"), Size = style.TextSizes.Heading, ColorKey = "plum", Align = TextAlign.Center });
+            ScrollView list = panel.Add(new ScrollView { Id = "rows", Bounds = new Rect(card.X + 40f, card.Y + Top, card.Width - 80f, visible), ContentHeight = listHeight });
             for (int i = 0; i < count; i++)
             {
-                int id = rows[i].Id;
-                Button button = panel.Add(new Button { Id = "row" + i, Bounds = new Rect(card.X + 60f, card.Y + 150f + i * pitch, card.Width - 120f, pitch - 22f), StyleKey = "secondary" });
+                int id = shown[i].Id;
+                Button button = list.Add(new Button { Id = "row" + i, Bounds = new Rect(20f, i * (RowHeight + RowGap), card.Width - 120f, RowHeight), StyleKey = "secondary" });
                 button.Clicked += () => _model.Change(id);
                 _rows.Add(button);
             }
@@ -382,16 +397,23 @@ namespace BeastCraft.Game.Screens
 
         public override void Draw()
         {
-            base.Draw();
+            Ctx.Painter.Fill(new Rect(0, 0, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight), Ctx.Painter.C("scrim"));
             List<SettingRow> rows = _model.Rows();
-            for (int i = 0; i < _rows.Count && i < rows.Count; i++)
+            Ctx.Painter.Paint(Ui, Ui, widget =>
             {
-                Rect box = _rows[i].Bounds;
+                // Each row's words, drawn in the list's own (scrolled, clipped) space.
+                int i = widget is Button button ? _rows.IndexOf(button) : -1;
+                if (i < 0 || i >= rows.Count)
+                {
+                    return;
+                }
+
+                Rect box = widget.Bounds;
                 float size = Ctx.Style.TextSizes.Body + 4f;
                 Ctx.Painter.TextIn(rows[i].Label, new Rect(box.X + 40f, box.Y, box.Width / 2f, box.Height), size, Ctx.Painter.C("ink"), TextAlign.Left);
                 Ctx.Painter.TextIn(rows[i].Value, new Rect(box.Center.X, box.Y, box.Width / 2f - 40f, box.Height), size, Ctx.Painter.C(rows[i].On ? "leafDeep" : "berry"),
                                    TextAlign.Right);
-            }
+            });
         }
     }
 }

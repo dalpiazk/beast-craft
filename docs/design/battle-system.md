@@ -2709,8 +2709,8 @@ of the design pass are recorded here.
   expedition starts (in the game: the map header's Normal or Hard chip, which plays the stage on the
   map again on the other difficulty, on a new map; a replayed stage and the next stage keep the difficulty,
   `GameSession.ReplayStage`, `PreferredDifficulty`; a Hard badge sits on the map header and the encounter
-  preview; when r11 opens, a toast on the results says it can be played on Hard; the choice is held for the
-  session only, so a game closed between stages starts the next one on Normal; #60): `CampaignRules.StartRun(save, regions, regionId, [stage,] seed, difficulty)`,
+  preview; when r11 opens, a toast on the results says it can be played on Hard; the choice is kept in the
+  save, `CampaignProgress.PreferredDifficulty` (schema 12), so it survives a restart; #60): `CampaignRules.StartRun(save, regions, regionId, [stage,] seed, difficulty)`,
   stored on the run as `MapRun.Difficulty` (save schema 6; see progression-and-saves.md). Hard is
   refused outside a post-game region, and the save validator rejects a stored Hard there. On Hard the
   map is generated from the region's `HardMode` (Hard shapes, Hard elite shape, Hard boss template);

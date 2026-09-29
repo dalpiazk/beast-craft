@@ -594,12 +594,17 @@ The Inventory's Gear tab and the Avatar's wardrobe mark gear and looks the playe
 - *Decor positions* ride on the same step (no field change): a placed piece's `X`/`Y` are now fractions
   0-1 of the habitat canvas (`GroveRules.MoveDecor`), and `GroveProgress.EnsureInitialized` clamps them
   on load.
+- `CampaignProgress.PreferredDifficulty` (`RunDifficulty`, written as its number after `"LocationsSoothed"`;
+  folded into this step before schema 12 shipped): the post-game Normal or Hard choice (#60), so the next r11
+  stage starts on it after a restart (`GameSession.PreferredDifficulty` reads and writes it). Normal by default;
+  an undefined value repairs to Normal. The migration takes it from the expedition in progress (Normal without one).
 - *Golden saves.* `rich-v11.input.json` is frozen as an input and `rich-v12.input.json` (captured by
   reflection with `BEASTCRAFT_UPDATE_GOLDENS=1`, its decor positions filled in range) is the one that must
   round-trip. Every older expected output changed in exactly these places: `"SchemaVersion":11` became
   `12`, `,"Seen":{"Gear":[...],"Looks":[...]}` follows `"PendingBattleConsumables"` (listing what that
-  save already owned), and in `rich-v10` and `rich-v11` the placed decor's out-of-range `X`/`Y` read `1`.
-  No input changed.
+  save already owned), `,"PreferredDifficulty":N` follows `"LocationsSoothed"` (1 where the save's expedition
+  was on Hard, `rich-v6` to `rich-v11`; else 0), and in `rich-v10` and `rich-v11` the placed decor's
+  out-of-range `X`/`Y` read `1`. No input changed.
 
 ### Save slots, backup and export (#59)
 
