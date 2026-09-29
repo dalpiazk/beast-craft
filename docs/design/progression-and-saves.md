@@ -126,6 +126,22 @@ saves in `Tooling/EditModeTests/Goldens/Saves` must load, migrate and write back
 (One known difference from real Unity `JsonUtility`, unchanged by the port: a null string or array
 field is written as `null` rather than `""`/`[]`.)
 
+*Trim-safe contracts* (#51). `FieldJson` takes its type contracts only from System.Text.Json
+source-generated contexts, never from runtime reflection over the types, so a trimmed build (Android
+release, a trimmed desktop publish) reads and writes the same JSON. Core's `CoreJsonContext` lists the
+save roots (`PlayerSave`, `SaveSerializer.SaveHeader`, `PlayerSettings`) and every Core data file;
+Presentation's `PresentationJsonContext` lists its own data files and hands them to `FieldJson` from its
+module initializer. The generator follows each root's fields, so only roots are listed. A type no
+context lists throws `NotSupportedException` rather than falling back to reflection, and
+`FieldJsonContractTests` fails for any save root or type with a `ProjectRelativePath` that is missing
+from its own assembly's context: **a new data file or save root needs a `[JsonSerializable]` line**.
+The public-field rules are applied to the generated contracts by the same field filter as before (it
+reads the `FieldInfo` the generated code references), and the output is unchanged: the golden saves
+and a round trip of every data file are byte-identical to the reflection-based version. A trimmed
+self-contained desktop publish reports no trim warnings (the reflection version reported three, all in
+`FieldJson`). The balance simulator (`Tooling/BalanceSim`) still reads some files with reflection-based
+System.Text.Json; it is a local tool and never trimmed.
+
 - **Writing** stamps `SchemaVersion` to the current version, then serializes.
 - **Loading** never throws. It reads only the version first; refuses empty or unreadable text, a
   missing / 0 version, and a version newer than the build; runs the migration steps from the save's
