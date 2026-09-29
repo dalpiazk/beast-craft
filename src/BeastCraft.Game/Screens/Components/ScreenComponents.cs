@@ -27,6 +27,9 @@ namespace BeastCraft.Game.Screens.Components
         /// <summary>Back button + title (+ optional one-line subtitle): most screens.</summary>
         public const float Standard = 210f;
 
+        /// <summary>The same shape as <see cref="Standard"/>, a touch shorter — the encounter and glossary screens' own header, which never needed the extra room.</summary>
+        public const float Compact = 190f;
+
         /// <summary>+ a stat/identity line under the title (the beast detail screen's shape).</summary>
         public const float Tall = 330f;
 

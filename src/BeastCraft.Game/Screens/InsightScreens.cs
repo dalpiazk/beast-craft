@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using BeastCraft.Creatures;
+using BeastCraft.Game.Screens.Components;
 using BeastCraft.Game.Ui;
 using BeastCraft.Presentation.Board;
 using BeastCraft.Presentation.Layout;
@@ -168,9 +169,10 @@ namespace BeastCraft.Game.Screens
     /// </summary>
     public sealed class GlossaryScreen : GameScreen
     {
-        private const float Pad = 36f;
-        private const float TopBar = 190f;
+        private const float Pad = HeaderMetrics.Pad;
+        private const float TopBar = HeaderMetrics.Compact;
 
+        private readonly ScreenHeader _header;
         private readonly ScrollView _scroll;
         private readonly Dictionary<Widget, GlossaryTerm> _cards = new Dictionary<Widget, GlossaryTerm>();
         private readonly string _focus;
@@ -179,7 +181,7 @@ namespace BeastCraft.Game.Screens
         {
             _focus = focusTermId;
             _scroll = Ui.Add(new ScrollView { Id = "page", Bounds = new Rect(0, TopBar, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight - TopBar) });
-            AddButton(null, "back", new Rect(Pad, 40f, 110f, 110f), null, "secondary", () => Ctx.Stack.Pop(), "back");
+            _header = new ScreenHeader(Ui, TopBar, () => Ctx.Stack.Pop());
             AddButton(null, "element-chart", new Rect(PortraitLayout.CanvasWidth - Pad - 320f, 50f, 320f, 90f), "Element chart", "chip",
                       () => Ctx.Stack.Push(new ElementChartScreen(Ctx, TeamElements(Ctx))));
             Build();
@@ -244,9 +246,10 @@ namespace BeastCraft.Game.Screens
         {
             Gradient("cream", "parchment", new Rect(0, 0, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight));
             base.Draw();
-            Painter.Fill(new Rect(0, 0, PortraitLayout.CanvasWidth, TopBar), Painter.C("cream"));
-            Painter.Fill(new Rect(0, TopBar - 5f, PortraitLayout.CanvasWidth, 5f), Painter.C("plumSoft", 0.5f));
-            Painter.Paint(Ui.Find("back"), Ui);
+            // No subtitle here: the title sits lower (60, not the header's usual 44) to stay centred
+            // in the bar on its own, so it is drawn after the (title-less) header wash rather than
+            // through ScreenHeader.Paint's own fixed title position.
+            _header.Paint(Ctx, Ui, string.Empty);
             Painter.Paint(Ui.Find("element-chart"), Ui);
             Painter.TextIn("Glossary", new Rect(180f, 60f, 500f, Ctx.Style.TextSizes.Heading + 6f), Ctx.Style.TextSizes.Heading + 6f, Painter.C("plum"), TextAlign.Left);
         }

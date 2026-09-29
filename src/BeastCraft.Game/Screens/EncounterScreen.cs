@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using BeastCraft.Creatures;
 using BeastCraft.Game.Rendering;
+using BeastCraft.Game.Screens.Components;
 using BeastCraft.Presentation.Board;
 using BeastCraft.Presentation.Layout;
 using BeastCraft.Presentation.Screens;
@@ -22,11 +23,12 @@ namespace BeastCraft.Game.Screens
     /// </summary>
     public sealed class EncounterScreen : GameScreen
     {
-        private const float Pad = 36f;
-        private const float TopBar = 190f;
+        private const float Pad = HeaderMetrics.Pad;
+        private const float TopBar = HeaderMetrics.Compact;
         private const float BottomBar = 230f;
 
         private readonly EncounterViewModel _model;
+        private readonly ScreenHeader _header;
         private readonly ScrollView _scroll;
         private readonly Button _start;
         private readonly Dictionary<Widget, PartyMemberView> _cards = new Dictionary<Widget, PartyMemberView>();
@@ -48,7 +50,7 @@ namespace BeastCraft.Game.Screens
         {
             _model = model;
             _scroll = Ui.Add(new ScrollView { Id = "page", Bounds = new Rect(0, TopBar, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight - TopBar - BottomBar) });
-            AddButton(null, "back", new Rect(Pad, 40f, 110f, 110f), null, "secondary", () => Ctx.Stack.Pop(), "back");
+            _header = new ScreenHeader(Ui, TopBar, () => Ctx.Stack.Pop());
             _start = AddButton(null, "start", new Rect(Pad + 60f, PortraitLayout.CanvasHeight - BottomBar + 70f, PortraitLayout.CanvasWidth - 2f * Pad - 120f, 140f), "Start Battle",
                                "primary", StartBattle, "battle");
             Build();
@@ -324,17 +326,11 @@ namespace BeastCraft.Game.Screens
             base.Draw();
 
             // The title bar over the page.
-            Painter.Fill(new Rect(0, 0, PortraitLayout.CanvasWidth, TopBar), Painter.C("cream"));
-            Painter.Fill(new Rect(0, TopBar - 5f, PortraitLayout.CanvasWidth, 5f), Painter.C("plumSoft", 0.5f));
-            Painter.Paint(Ui.Find("back"), Ui);
             UiStyle style = Ctx.Style;
-            Painter.TextIn(_model.Title ?? "Encounter", new Rect(180f, 44f, PortraitLayout.CanvasWidth - 220f, style.TextSizes.Heading + 6f), style.TextSizes.Heading + 6f, Painter.C("plum"),
-                           TextAlign.Left);
-            if (_model.Battle != null)
-            {
-                string sub = _model.KindLabel + "  -  Lv " + _model.Level + "  -  " + _model.Arena + " arena" + (_model.Attempt > 0 ? "  -  losses here: " + _model.Attempt : string.Empty);
-                Painter.TextIn(sub, new Rect(180f, 112f, PortraitLayout.CanvasWidth - 220f, 30f), style.TextSizes.Body, Painter.C("inkSoft"), TextAlign.Left);
-            }
+            string sub = _model.Battle == null
+                             ? null
+                             : _model.KindLabel + "  -  Lv " + _model.Level + "  -  " + _model.Arena + " arena" + (_model.Attempt > 0 ? "  -  losses here: " + _model.Attempt : string.Empty);
+            _header.Paint(Ctx, Ui, _model.Title ?? "Encounter", sub);
 
             // The start bar.
             Rect bar = new Rect(0, PortraitLayout.CanvasHeight - BottomBar, PortraitLayout.CanvasWidth, BottomBar);
