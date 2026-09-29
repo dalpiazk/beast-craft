@@ -338,7 +338,7 @@ namespace BeastCraft.Tests.EditMode
             KinshipTests.WalkTo(v7, 3);
             List<int> cleared = new List<int>(v7.Campaign.ActiveRun.Cleared);
             SaveSerializer serializer = new SaveSerializer(new JsonSaveSerializer());
-            string json = serializer.Serialize(v7).Replace("\"SchemaVersion\":8", "\"SchemaVersion\":7");
+            string json = serializer.Serialize(v7).Replace("\"SchemaVersion\":" + PlayerSave.CurrentSchemaVersion, "\"SchemaVersion\":7");
             json = System.Text.RegularExpressions.Regex.Replace(json, ",\"DiscoverySeed\":-?\\d+,\"Fog\":\\[.*?\\],\"FoundPoiIds\":\\[\\],\"Completed\":false", string.Empty);
             json = json.Substring(0, json.IndexOf(",\"Discovery\":", StringComparison.Ordinal)) + "}";
             StringAssert.DoesNotContain("DiscoverySeed", json);
@@ -364,7 +364,7 @@ namespace BeastCraft.Tests.EditMode
 
             // A region with no expedition takes a seed from its id alone.
             PlayerSave idle = TestSaves.SixStarters(Content, 12);
-            string idleJson = serializer.Serialize(idle).Replace("\"SchemaVersion\":8", "\"SchemaVersion\":7");
+            string idleJson = serializer.Serialize(idle).Replace("\"SchemaVersion\":" + PlayerSave.CurrentSchemaVersion, "\"SchemaVersion\":7");
             PlayerSave idleSave = serializer.Deserialize(idleJson.Substring(0, idleJson.IndexOf(",\"Discovery\":", StringComparison.Ordinal)) + "}").Save;
             Assert.AreEqual(SaveMigrations.AddDiscovery.MigratedDiscoverySeed("r01"), idleSave.Campaign.FindRegion("r01").DiscoverySeed);
         }
