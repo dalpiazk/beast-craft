@@ -239,6 +239,8 @@ namespace BeastCraft.Presentation.Screens
 
             _session.LastTeam.Clear();
             _session.LastTeam.AddRange(setup.TeamBeastIds);
+            // The pack was charged as the battle began: note it, so a crash before the results hands it back.
+            BattleConsumableRefund.Record(_session.Save, run.Result.ConsumablesUsed);
             _session.Autosave(AutosaveReason.NodeEntry);
             return run;
         }
@@ -285,6 +287,7 @@ namespace BeastCraft.Presentation.Screens
 
             _completed = true;
             BattleSessionResult result = _run.Finish();
+            BattleConsumableRefund.Clear(_session.Save);
             PlayerSave save = _session.Save;
             GameContent content = _session.Content;
             if (Trial != null)

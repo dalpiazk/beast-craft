@@ -4,5 +4,7 @@
   <uses-feature android:glEsVersion="0x00020000" android:required="true" />
   <!-- The idle-full notification (off by default; asked for at run time on Android 13+ when the player turns it on). -->
   <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-  <application android:hardwareAccelerated="true" android:isGame="true" android:label="Beast Craft" />
+  <!-- Auto Backup of the saves folder only (save slots and settings): Resources/xml/backup_rules.xml (Android 6-11) and data_extraction_rules.xml (12+). -->
+  <application android:hardwareAccelerated="true" android:isGame="true" android:label="Beast Craft" android:allowBackup="true"
+               android:fullBackupContent="@xml/backup_rules" android:dataExtractionRules="@xml/data_extraction_rules" />
 </manifest>

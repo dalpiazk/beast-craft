@@ -49,6 +49,15 @@ namespace BeastCraft.Android
             // Idle time counts deep sleep (elapsedRealtime), and the idle-full notification is Android's.
             host.MonotonicClock = () => TimeSpan.FromMilliseconds(SystemClock.ElapsedRealtime());
             host.IdleNotifier = new AndroidIdleNotifier(this);
+
+            // TODO(#59): save export/import on Android. host.SaveTransfer is left null, so the slot list
+            // hides Export and Import here (Auto Backup still covers the saves: Resources/xml). The plan is
+            // an ISaveTransfer over the Storage Access Framework: Export starts ACTION_CREATE_DOCUMENT
+            // (type application/json, the suggested name as EXTRA_TITLE) and Import ACTION_OPEN_DOCUMENT;
+            // OnActivityResult writes or reads the returned Uri through ContentResolver streams and calls
+            // the pending callback (Cancelled when the result is not OK), marshalled back to the game
+            // thread before it touches the session. Not written yet because the Android host could not be
+            // built or run where this was done (no Android workload); add it with a device test.
             _game = new BeastCraftGame(new ViewerOptions(), host);
             // MonoGame's Exit() on Android only moves the task to the back; finish the activity so
             // Back really quits.

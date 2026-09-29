@@ -944,6 +944,13 @@ namespace BeastCraft.Game
                 case "starter-pick":
                     steps.Add(() => Title().StartNewGame());
                     break;
+                case "save-slots":
+                    steps.Add(() =>
+                    {
+                        StartScriptedGame();
+                        _stack.Push(new SaveSlotsScreen(_ctx));
+                    });
+                    break;
                 case "hearthglen":
                     steps.Add(() =>
                     {
@@ -955,7 +962,7 @@ namespace BeastCraft.Game
                 default:
                     steps.Add(() =>
                     {
-                        if (_ctx.Session.HasSave && capture == null)
+                        if (_ctx.Session.AnySave && capture == null)
                         {
                             Title().EnterGame(true);
                         }

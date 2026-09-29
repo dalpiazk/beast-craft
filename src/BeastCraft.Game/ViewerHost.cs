@@ -1,6 +1,7 @@
 using System;
 using BeastCraft.Presentation.Content;
 using BeastCraft.Presentation.Layout;
+using BeastCraft.Presentation.Screens;
 
 namespace BeastCraft.Game
 {
@@ -62,13 +63,21 @@ namespace BeastCraft.Game
         /// </summary>
         public IIdleNotifier IdleNotifier;
 
+        /// <summary>
+        /// Exports a save slot to a file and imports one back (the slot list's Export and Import). The desktop
+        /// host uses a folder (<see cref="FolderSaveTransfer"/>, <c>Documents/BeastCraft</c>). Null: the host has
+        /// none, and the buttons are hidden (Android, for now: see its MainActivity).
+        /// </summary>
+        public ISaveTransfer SaveTransfer;
+
         /// <summary>The desktop spike: a tall window, the keyboard and mouse, and the content as files.</summary>
         public static ViewerHost Desktop()
         {
             return new ViewerHost
             {
                 HudTitle = "BEAST CRAFT",
-                WindowTitle = "Beast Craft (Esc: back; in battle Space: step  A: auto  1-3: speed  S: skip  Tab: skill)"
+                WindowTitle = "Beast Craft (Esc: back; in battle Space: step  A: auto  1-3: speed  S: skip  Tab: skill)",
+                SaveTransfer = new FolderSaveTransfer(FolderSaveTransfer.DefaultFolder())
             };
         }
 

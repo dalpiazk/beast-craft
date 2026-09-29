@@ -29,6 +29,8 @@ namespace BeastCraft.Save
     /// <see cref="PlayerSave.Garden"/>, <see cref="PlayerSave.Expeditions"/>, <see cref="PlayerSave.Npc"/>):
     /// <see cref="AddGrove"/>. The NPC dialogue layer (D2) was folded into this same migration in place,
     /// before schema 10 shipped — see <see cref="AddGrove"/>'s own remarks.</item>
+    /// <item>10 to 11: the consumables spent on a battle in progress (<see cref="PlayerSave.PendingBattleConsumables"/>),
+    /// so a battle the process died in hands them back: <see cref="AddPendingBattle"/>.</item>
     /// </list>
     /// </summary>
     public static class SaveMigrations
@@ -39,7 +41,7 @@ namespace BeastCraft.Save
             return new List<ISaveMigration>
             {
                 new AddGear(), new AddCampaign(), new AddEconomy(), new AddIdle(), new AddRunDifficulty(), new AddTutorial(), new AddDiscovery(), new AddCompendium(),
-                new AddGrove()
+                new AddGrove(), new AddPendingBattle()
             };
         }
 
@@ -341,6 +343,28 @@ namespace BeastCraft.Save
                 PlayerSave save = serializer.FromJson<PlayerSave>(json);
                 save.EnsureInitialized();
                 save.SchemaVersion = 10;
+                return serializer.ToJson(save);
+            }
+        }
+
+        /// <summary>
+        /// Schema 10 to 11: a v10 save records no battle in progress. The upgrade reads it into the
+        /// current type (<see cref="PlayerSave.PendingBattleConsumables"/> empty: nothing to hand back,
+        /// since a v10 save never recorded what a battle spent), fills in anything missing and writes it
+        /// back. Nothing else moves.
+        /// </summary>
+        public sealed class AddPendingBattle : ISaveMigration
+        {
+            public int FromVersion
+            {
+                get { return 10; }
+            }
+
+            public string Upgrade(string json, ISaveJsonSerializer serializer)
+            {
+                PlayerSave save = serializer.FromJson<PlayerSave>(json);
+                save.EnsureInitialized();
+                save.SchemaVersion = 11;
                 return serializer.ToJson(save);
             }
         }

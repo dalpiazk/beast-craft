@@ -215,18 +215,19 @@ dotnet run --project src/BeastCraft.Desktop -c Release
 ```
 
 **New Game** gives you the starter beasts and an expedition into the Verdant
-Hollow; **Continue** (the primary button once there is a save) loads it and
-claims the idle rewards. On the **map**, drag to scroll, tap a glowing location
+Hollow in the first free save slot (there are three); **Continue** (the primary button once there is a save) loads
+the most recently played slot and claims the idle rewards. **Save slots** lists the three slots to
+continue, start, delete, export or import one (exports go to `Documents/BeastCraft`). On the **map**, drag to scroll, tap a glowing location
 (or **Next battle**) to see its encounter for free, pick up to three beasts and
 one consumable, and **Start Battle**; the battle plays by itself, then the
 results pay out and the map moves on. **Esc** is Back (the title asks before
 quitting); the mouse clicks and drags like a finger. The game autosaves when a
 battle starts, after its results and when the window loses focus or closes, to
-`%LOCALAPPDATA%\BeastCraft\saves\slot1.save` (with a `.bak` of the previous
+`%LOCALAPPDATA%\BeastCraft\saves\slotN.save` (with a `.bak` of the previous
 write, which Continue falls back to with a message if the main file is torn).
 
 Debug flags: `--screen NAME` starts at a screen (`title`, `map`, `encounter`,
-`battle`, `results`, `roster`, `grove`, `avatar`, `inventory`, `settings`),
+`battle`, `results`, `roster`, `grove`, `avatar`, `inventory`, `settings`, `save-slots`),
 setting up a game as needed; with `--screenshot PATH` it renders that screen and
 exits (on a throwaway in-memory save). `--walkthrough DIR` takes numbered
 screenshots of the whole loop on a fresh save in a temporary folder (title, map,

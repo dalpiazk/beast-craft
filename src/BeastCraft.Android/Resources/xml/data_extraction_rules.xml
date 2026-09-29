@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 12+ backup and device-to-device transfer (android:dataExtractionRules in
+  AndroidManifest.xml): the same rule as backup_rules.xml. Only the saves folder (save slots, their
+  backups and the settings) goes; caches and every other file stay on the device.
+-->
+<data-extraction-rules>
+  <cloud-backup>
+    <include domain="file" path="saves/" />
+  </cloud-backup>
+  <device-transfer>
+    <include domain="file" path="saves/" />
+  </device-transfer>
+</data-extraction-rules>

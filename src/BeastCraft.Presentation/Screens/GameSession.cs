@@ -5,6 +5,7 @@ using System.Globalization;
 using BeastCraft.Campaign;
 using BeastCraft.Creatures;
 using BeastCraft.Discovery;
+using BeastCraft.Economy;
 using BeastCraft.Expeditions;
 using BeastCraft.Garden;
 using BeastCraft.Grove;
@@ -136,6 +137,41 @@ namespace BeastCraft.Presentation.Screens
 
         /// <summary>A message for the player (the backup notice, or why nothing could be loaded); null when all was well.</summary>
         public string Message;
+
+        /// <summary>
+        /// The consumables handed back because the last battle never finished (the app closed or
+        /// crashed mid-battle; <see cref="Economy.BattleConsumableRefund"/>), for a toast; null when none.
+        /// </summary>
+        public string RefundMessage;
+    }
+
+    /// <summary>One save slot as the slot list shows it (<see cref="GameSession.DescribeSlot"/>).</summary>
+    public sealed class SaveSlotSummary
+    {
+        /// <summary>The slot id (<see cref="GameSession.SlotIds"/>).</summary>
+        public string Slot;
+
+        /// <summary>1-based, for "Slot 1".</summary>
+        public int Number;
+
+        /// <summary>Whether the slot holds a save (readable or not).</summary>
+        public bool HasSave;
+
+        /// <summary>Whether the save loads (<see cref="Problem"/> says why not).</summary>
+        public bool Readable;
+
+        /// <summary>When the save was last written (UTC); <see cref="DateTime.MinValue"/> when the storage does not say.</summary>
+        public DateTime SavedUtc;
+
+        public int AvatarLevel;
+
+        public int BeastCount;
+
+        /// <summary>The region being played, or null.</summary>
+        public string RegionName;
+
+        /// <summary>Why the save does not load; null when it does.</summary>
+        public string Problem;
     }
 
     /// <summary>
@@ -150,8 +186,14 @@ namespace BeastCraft.Presentation.Screens
     /// </summary>
     public sealed class GameSession
     {
-        /// <summary>The one save slot (a slot list comes later).</summary>
+        /// <summary>The first save slot: the one a session starts on.</summary>
         public const string SlotName = "slot1";
+
+        /// <summary>How many save slots the game offers (<see cref="SlotIds"/>).</summary>
+        public const int SlotCount = 3;
+
+        /// <summary>The save slots, in order: <c>slot1</c> to <c>slot3</c> (<see cref="SlotName"/> first).</summary>
+        public static readonly IReadOnlyList<string> SlotIds = new[] { SlotName, "slot2", "slot3" };
 
         /// <summary>
         /// How many beasts a campaign battle fields beside the Beastbinder
@@ -196,10 +238,233 @@ namespace BeastCraft.Presentation.Screens
 
         public PlayerSettings Settings { get; private set; }
 
-        /// <summary>Whether the slot holds a save (the title screen's Continue).</summary>
+        /// <summary>The slot New Game, Continue and every autosave use (<see cref="UseSlot"/>).</summary>
+        public string Slot { get; private set; } = SlotName;
+
+        /// <summary>Whether the current <see cref="Slot"/> holds a save.</summary>
         public bool HasSave
         {
-            get { return _store.Exists(SlotName); }
+            get { return _store.Exists(Slot); }
+        }
+
+        /// <summary>Whether any slot holds a save (the title screen's Continue).</summary>
+        public bool AnySave
+        {
+            get
+            {
+                foreach (string slot in SlotIds)
+                {
+                    if (_store.Exists(slot))
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Switches to <paramref name="slot"/> (one of <see cref="SlotIds"/>). The game in play, if any,
+        /// is put down first (it was autosaved as it went), so nothing of it is written into the new
+        /// slot. False (nothing changes) for a slot that is not one of the game's.
+        /// </summary>
+        public bool UseSlot(string slot)
+        {
+            if (!IsSlot(slot))
+            {
+                return false;
+            }
+
+            if (!string.Equals(slot, Slot, StringComparison.Ordinal))
+            {
+                Save = null;
+                Slot = slot;
+            }
+
+            return true;
+        }
+
+        /// <summary>Whether <paramref name="slot"/> is one of <see cref="SlotIds"/>.</summary>
+        public static bool IsSlot(string slot)
+        {
+            foreach (string id in SlotIds)
+            {
+                if (string.Equals(id, slot, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>The first slot with no save, or null when every slot holds one.</summary>
+        public string FirstEmptySlot()
+        {
+            foreach (string slot in SlotIds)
+            {
+                if (!_store.Exists(slot))
+                {
+                    return slot;
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// The slot Continue loads: the most recently written save (when the storage knows write times),
+        /// else the first slot that holds one; null when there is none.
+        /// </summary>
+        public string MostRecentSlot()
+        {
+            string best = null;
+            DateTime bestTime = DateTime.MinValue;
+            foreach (string slot in SlotIds)
+            {
+                if (!_store.Exists(slot))
+                {
+                    continue;
+                }
+
+                DateTime written = _storage is IBackupSaveStorage files ? files.Read(slot).LastWriteUtc : DateTime.MinValue;
+                if (best == null || written > bestTime)
+                {
+                    best = slot;
+                    bestTime = written;
+                }
+            }
+
+            return best;
+        }
+
+        /// <summary>
+        /// What <paramref name="slot"/> holds, for the slot list: loaded (and migrated in memory, never
+        /// written) to read its summary. Never throws.
+        /// </summary>
+        public SaveSlotSummary DescribeSlot(string slot)
+        {
+            SaveSlotSummary summary = new SaveSlotSummary { Slot = slot, Number = IndexOfSlot(slot) + 1 };
+            if (!_store.Exists(slot))
+            {
+                return summary;
+            }
+
+            summary.HasSave = true;
+            if (_storage is IBackupSaveStorage files)
+            {
+                summary.SavedUtc = files.Read(slot).LastWriteUtc;
+            }
+
+            SaveLoadResult loaded = _store.Load(slot);
+            if (!loaded.Success)
+            {
+                summary.Problem = loaded.Error;
+                return summary;
+            }
+
+            PlayerSave save = loaded.Save;
+            summary.Readable = true;
+            summary.AvatarLevel = save.Avatar?.Level ?? 1;
+            summary.BeastCount = save.Beasts?.Count ?? 0;
+            string regionId = save.Campaign?.ActiveRun != null && save.Campaign.HasActiveRun ? save.Campaign.ActiveRun.RegionId : save.Campaign?.CurrentRegionId;
+            summary.RegionName = string.IsNullOrEmpty(regionId) ? null : Content.Campaign.GetRegion(regionId)?.DisplayName;
+            return summary;
+        }
+
+        /// <summary>
+        /// Deletes <paramref name="slot"/>'s save and its backup. When it is the slot in play, the game
+        /// is put down (nothing autosaves into the emptied slot). False when there was nothing to delete.
+        /// </summary>
+        public bool DeleteSlot(string slot)
+        {
+            if (!IsSlot(slot) || !_store.Exists(slot))
+            {
+                return false;
+            }
+
+            if (string.Equals(slot, Slot, StringComparison.Ordinal))
+            {
+                Save = null;
+            }
+
+            return _storage.Delete(slot);
+        }
+
+        /// <summary>
+        /// <paramref name="slot"/>'s save as current-schema JSON, for an export file: loaded, migrated and
+        /// validated like Continue, so a file written from a backup or an older schema is still a clean,
+        /// current save. Null with <paramref name="error"/> when the slot has nothing loadable.
+        /// </summary>
+        public string ExportSlot(string slot, out string error)
+        {
+            error = null;
+            if (!IsSlot(slot) || !_store.Exists(slot))
+            {
+                error = "There is no save in that slot.";
+                return null;
+            }
+
+            SaveLoadResult loaded = _store.Load(slot);
+            if (!loaded.Success)
+            {
+                error = loaded.Error;
+                return null;
+            }
+
+            return new SaveSerializer(new JsonSaveSerializer(true)).Serialize(loaded.Save);
+        }
+
+        /// <summary>
+        /// Imports <paramref name="json"/> (an exported save) into <paramref name="slot"/>. The text is
+        /// read, migrated and validated first; only a save that loads cleanly is written, so a bad file
+        /// never touches the slot (its old save, if any, stays as the slot's backup). When it is the slot
+        /// in play, the game is put down so the next Continue reads the import. False with
+        /// <paramref name="error"/> (nothing written) otherwise.
+        /// </summary>
+        public bool ImportSlot(string slot, string json, out string error)
+        {
+            error = null;
+            if (!IsSlot(slot))
+            {
+                error = "That is not a save slot.";
+                return false;
+            }
+
+            SaveLoadResult loaded = new SaveSerializer(new JsonSaveSerializer(true)).Deserialize(json);
+            if (!loaded.Success)
+            {
+                error = loaded.Error;
+                return false;
+            }
+
+            if (!_store.Save(slot, loaded.Save))
+            {
+                error = "The save could not be written.";
+                return false;
+            }
+
+            if (string.Equals(slot, Slot, StringComparison.Ordinal))
+            {
+                Save = null;
+            }
+
+            return true;
+        }
+
+        /// <summary>0-based position of <paramref name="slot"/> in <see cref="SlotIds"/>, or -1.</summary>
+        public static int IndexOfSlot(string slot)
+        {
+            for (int i = 0; i < SlotIds.Count; i++)
+            {
+                if (string.Equals(SlotIds[i], slot, StringComparison.Ordinal))
+                {
+                    return i;
+                }
+            }
+
+            return -1;
         }
 
         public int AutosaveCount { get; private set; }
@@ -330,7 +595,7 @@ namespace BeastCraft.Presentation.Screens
         /// </summary>
         public LoadOutcome Continue()
         {
-            SaveLoadResult loaded = _store.Load(SlotName);
+            SaveLoadResult loaded = _store.Load(Slot);
             if (!loaded.Success)
             {
                 return new LoadOutcome { Success = false, Message = "Your save could not be loaded (" + loaded.Error + ")." };
@@ -341,6 +606,10 @@ namespace BeastCraft.Presentation.Screens
             DismissedSuggestions.Clear();
             bool fromBackup = loaded.StorageSource == SaveFileSource.Backup;
             bool started = !Save.Campaign.HasActiveRun;
+
+            // A battle the app died in (never resolved) hands back what it spent; the refund clears the
+            // record, and the autosave below writes that, so it can never pay twice.
+            List<string> refunded = BattleConsumableRefund.RefundPending(Save, id => Content.Battle.GetConsumable(id)?.MaxStack);
             EnsureExpedition();
 
             // Welcome back: the idle rewards are claimed straight away, before achievements are
@@ -350,11 +619,11 @@ namespace BeastCraft.Presentation.Screens
             LastContinueClaim = ClaimIdle();
             bool achievementsChanged = EvaluateAchievementsOnSessionStart();
             bool groveReady = RefreshGrove();
-            if (started || fromBackup || achievementsChanged || groveReady)
+            if (started || fromBackup || achievementsChanged || groveReady || refunded.Count > 0)
             {
                 // Keep the main file current: a started expedition, a retroactively earned achievement,
                 // a Grove unlock/gift the offline clock just rolled forward, or the restored backup
-                // made main again.
+                // made main again. A refund is written straight away too.
                 Autosave(AutosaveReason.Results);
             }
 
@@ -364,8 +633,21 @@ namespace BeastCraft.Presentation.Screens
                 FromBackup = fromBackup,
                 Message = fromBackup
                               ? "Your latest save could not be read (" + (loaded.MainFileProblem ?? "corrupt") + "), so the backup was loaded. A little progress may be lost."
-                              : null
+                              : null,
+                RefundMessage = RefundText(refunded)
             };
+        }
+
+        /// <summary>The refund toast: "Your last battle did not finish, so your Fury Draught was returned." Null for none.</summary>
+        private string RefundText(List<string> refunded)
+        {
+            if (refunded == null || refunded.Count == 0)
+            {
+                return null;
+            }
+
+            List<string> names = refunded.ConvertAll(id => Content.Battle.GetConsumable(id)?.DisplayName ?? id);
+            return "Your last battle did not finish, so your " + string.Join(" and ", names) + (names.Count == 1 ? " was" : " were") + " returned.";
         }
 
         /// <summary>Writes the save to the slot (nothing to do before a game is loaded). Returns whether it was written.</summary>
@@ -376,7 +658,7 @@ namespace BeastCraft.Presentation.Screens
                 return false;
             }
 
-            LastAutosaveOk = _store.Save(SlotName, Save);
+            LastAutosaveOk = _store.Save(Slot, Save);
             LastAutosaveReason = reason;
             if (LastAutosaveOk)
             {

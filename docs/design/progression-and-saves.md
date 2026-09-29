@@ -236,7 +236,7 @@ untouched, and one device's settings apply to every save slot.
 - **The reserved slot.** Settings and saves share one directory, so `settings` is reserved in any
   letter case (`PlayerSettingsStore.IsReservedSlot`; file names are case-insensitive on Windows and
   macOS): `SaveStore.Save` / `Load` refuse it and `Exists` reports false, and `SaveSlotIndex` skips
-  it. Whatever names game-save slots (today only `main`) must not use it.
+  it. The game-save slots (`slot1` to `slot3`, see "Save slots, backup and export") never use it.
 
 ### Validation
 
@@ -548,6 +548,79 @@ none at all (see below).
   option through the existing `Economy.CosmeticRules.UnlockOrRefund`; wearing/switching it on a
   specific beast is the existing `CosmeticRules.TrySetOption` — no new Core method for that half
   either. See `grove.md`, "Colour evolutions" for the full reasoning.
+
+### Schema 11: the mid-battle crash refund (`PlayerSave.PendingBattleConsumables`)
+
+A campaign battle charges its consumables as it begins (`BattleSession.Begin`) and the game
+autosaves then (`AutosaveReason.NodeEntry`), so an item can never be used for free. Until schema 11
+that also meant a process killed mid-battle (a crash, the OS reclaiming a backgrounded app) lost
+the item. Schema 11 records what the battle in progress spent, so it can be handed back.
+
+- `PlayerSave.PendingBattleConsumables` (a `List<string>` of consumable ids, written last, after
+  `"Npc"`): empty between battles.
+- *Rules* (`Economy.BattleConsumableRefund`). `NodeBattle.Begin` records the spent items
+  (`Record`) before the battle-start autosave; `NodeBattle.Complete` clears the record (`Clear`)
+  before the results autosave, on both the ordinary and the Kinship-trial path. `GameSession.Continue`
+  calls `RefundPending`: each recorded item goes back into the pack (never past its stack cap; an id
+  the content no longer has is skipped), the record is cleared, and the save is written straight
+  away. The player gets a toast (`LoadOutcome.RefundMessage`: "Your last battle did not finish, so
+  your Fury Draught was returned."). Because the refund clears the record and is saved at once, it
+  is paid at most once, and a battle that resolved normally is never refunded.
+- *Migration.* `SaveMigrations.AddPendingBattle` (10 to 11): the record starts empty. A v10 save
+  never recorded a battle, so there is nothing to refund.
+- *Golden saves.* `rich-v10.input.json` is frozen as an input and `rich-v11.input.json` (captured by
+  reflection with `BEASTCRAFT_UPDATE_GOLDENS=1`) is the one that must round-trip. Every older
+  expected output changed in exactly two places: `"SchemaVersion":10` became `11`, and
+  `,"PendingBattleConsumables":[]` follows `"Npc"`'s closing brace. No input changed.
+
+### Save slots, backup and export (#59)
+
+- **Three slots.** `GameSession.SlotIds` is `slot1`, `slot2`, `slot3` (`SlotCount` = 3). The session
+  plays one slot at a time (`GameSession.Slot`, `UseSlot`); switching slots puts the game in play
+  down first, so nothing of it is written into the new slot. New Game starts in the first empty slot
+  (`FirstEmptySlot`); when all three hold a game, the title opens the slot list instead of replacing
+  one silently. The title's Continue loads the most recently written slot (`MostRecentSlot`, by the
+  file's write time).
+- **The slot list** (`SaveSlotsViewModel`, the `SaveSlotsScreen`, reached from the title's "Save
+  slots"): one card per slot with the Beastbinder's level, the number of beasts, the region and when
+  it was saved (`GameSession.DescribeSlot`, which loads and migrates in memory and never writes).
+  Continue, New game (asks first when it replaces a save), Delete (asks first; removes the save and
+  its backup), and Export and Import where the host supports them.
+- **Export and import** go through the engine-neutral `ISaveTransfer` seam
+  (`ViewerHost.SaveTransfer`). Export writes the slot as current-schema JSON (`ExportSlot`: loaded,
+  migrated and validated, so a slot read from its backup or an older schema still exports clean).
+  Import (`ImportSlot`) reads, migrates and validates the file first and writes only a save that
+  loads; a bad file, a newer build's save or an empty file never touches the slot, and the slot's
+  previous save stays as its `.bak`. The desktop host uses `FolderSaveTransfer` over
+  `Documents/BeastCraft`: Export writes `beastcraft-<slot>-<yyyyMMdd-HHmmss>.json` there and Import
+  reads the newest `.json` in it. **Android has no transfer yet**: the buttons are hidden, and
+  `MainActivity` carries a TODO for a Storage Access Framework implementation (create and open
+  document intents), which needs a device to build and test on.
+- **Android Auto Backup.** The manifest sets `allowBackup` with `Resources/xml/backup_rules.xml`
+  (Android 6 to 11) and `data_extraction_rules.xml` (12 and up, cloud backup and device transfer).
+  Both include only the `saves/` folder under the app's files directory: every slot, its backup and
+  the settings. Nothing else in the files directory is backed up, and caches never are.
+
+### 1.0 save policy
+
+- **Pre-1.0 saves migrate forward and are never wiped.** A save from any earlier build, including
+  the pre-alpha schemas 1 to 11, loads in 1.0 through the migration chain. This is the engineering
+  default: the chain and its golden fixtures already cover every schema since 1, so keeping it costs
+  little, and a wipe would throw away the producer's and early testers' progress. Wiping would be a
+  deliberate producer decision, announced in the release notes, never a side effect.
+- **Version numbers.** `PlayerSave.CurrentSchemaVersion` is a plain integer that only goes up, one
+  step per change to the save's shape, and is independent of the app's version name. A build refuses
+  a save with a higher number (it was written by a newer build) and never overwrites it.
+  `PlayerSettings` keeps its own schema number on the same rules.
+- **One migration entry per content patch.** Every patch that changes the save's shape, or changes
+  content in a way an existing save must be adjusted for (a renamed or removed id, a moved region),
+  bumps the schema once and adds one `ISaveMigration` step for it, with a golden fixture, even when
+  the step only stamps the version. Changes that ship together in one patch share one step. Once a
+  schema has shipped to players, it is never extended in place again (the schema-10 extensions above
+  were only allowed because schema 10 had not shipped).
+- **Ids never change meaning.** Species, skill, item and region ids stay under the never-rename rule;
+  a removal is handled in that patch's migration, not left for validation to trip over.
+
 
 ### Hearthglen's rules (`StarterPicks`, `CampaignRules`)
 

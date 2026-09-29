@@ -26,9 +26,13 @@ Title ──Continue / New Game──▶ Home (Map tab) ──tap a location / N
   (`StoryModal`), the camp (`CampModal`, every region), the tutorial hints (`HintModal`, anchored to a
   widget, pausing a battle) and the way on (`RegionCardModal`) — are in [area-zero.md](area-zero.md).
 - **Title** (`TitleScreen`, `TitleViewModel`): Continue (primary when a save exists; it claims the
-  idle rewards and toasts them), New Game (asks before replacing a save; then the starter pick), Settings. A save that
+  idle rewards and toasts them; the most recently played slot), Save slots (when a save exists), New Game (in the first free slot, then the starter pick; the slot list when all three are full), Settings. A save that
   could only be restored from its `.bak` says so; one that cannot be loaded says why. Back asks
   before quitting.
+- **Save slots** (`SaveSlotsScreen`, `SaveSlotsViewModel`): one card per slot (three) with the save's
+  summary and Continue or New game, Delete (asks first), and Export and Import where the host has an
+  `ISaveTransfer` (desktop only for now). See `progression-and-saves.md`, "Save slots, backup and
+  export".
 - **Home** (`HomeScreen`, `HomeViewModel`, `MapViewModel`): the bottom nav — **Map, Roster, Grove,
   Avatar, Inventory** — over the region map. Map and Roster show inline (see "Roster and visibility"
   below); Grove, Avatar and Inventory each push their own full screen (`GroveScreen`, `AvatarScreen`,
@@ -510,7 +514,7 @@ notification is an opt-in Android hook.
   Inventory (flagged in avatar-inventory-shop.md — needs a small save addition). No colour-picker
   widget in the toolkit yet: the avatar wardrobe's colour categories use a curated six-swatch preset
   row over the always-free `TrySetColor` rather than a full picker.
-- One save slot; no region list (the next region starts automatically after a boss).
+- No region list (the next region starts automatically after a boss).
 - The Grove has no Android local-notification hook (only the in-app toast on entering Home): the
   idle-full notification's `IIdleNotifier` seam exists, a Grove-readiness one does not yet — a
   natural, separable follow-up.

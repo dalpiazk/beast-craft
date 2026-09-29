@@ -5,8 +5,9 @@ using BeastCraft.Save;
 namespace BeastCraft.Presentation.Screens
 {
     /// <summary>
-    /// The title screen: Continue (only when a save exists), New Game (asking first when it would
-    /// replace a save) and Settings; Back asks before quitting.
+    /// The title screen: Continue (only when a save exists: the most recently played slot), Save
+    /// slots (the slot list, when any slot holds a save), New Game (in the first empty slot; when all
+    /// three hold a game the slot list asks which to replace) and Settings; Back asks before quitting.
     /// </summary>
     public sealed class TitleViewModel
     {
@@ -19,18 +20,38 @@ namespace BeastCraft.Presentation.Screens
 
         public bool CanContinue
         {
-            get { return _session.HasSave; }
+            get { return _session.AnySave; }
         }
 
-        /// <summary>Whether New Game should ask first (it would replace the save in the slot).</summary>
+        /// <summary>Whether the slot list is offered (some slot holds a save).</summary>
+        public bool CanManageSlots
+        {
+            get { return _session.AnySave; }
+        }
+
+        /// <summary>Whether New Game must replace a save (every slot holds one): the slot list asks which.</summary>
         public bool NewGameNeedsConfirm
         {
-            get { return _session.HasSave; }
+            get { return _session.FirstEmptySlot() == null; }
         }
 
+        /// <summary>Continues the most recently played slot.</summary>
         public LoadOutcome Continue()
         {
+            string slot = _session.MostRecentSlot();
+            if (slot != null)
+            {
+                _session.UseSlot(slot);
+            }
+
             return _session.Continue();
+        }
+
+        /// <summary>Moves to the first empty slot for a new game. False when every slot holds a save (the current slot stays).</summary>
+        public bool PrepareNewGame()
+        {
+            string slot = _session.FirstEmptySlot();
+            return slot != null && _session.UseSlot(slot);
         }
 
         /// <summary>A new game in Hearthglen with <paramref name="firstSpeciesId"/> as the New Game pick.</summary>

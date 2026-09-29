@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android Auto Backup (Android 6 to 11; android:fullBackupContent in AndroidManifest.xml). Only the
+  saves folder is backed up: the save slots (slotN.save and their .bak) and the settings
+  (settings.save), under the app's files directory (the host's SaveRoot, SaveLocations adds saves/).
+  Listing an include means nothing else is: runtime files, caches and anything else in files/ stay
+  out, and the cache directories are never backed up anyway.
+-->
+<full-backup-content>
+  <include domain="file" path="saves/" />
+</full-backup-content>
