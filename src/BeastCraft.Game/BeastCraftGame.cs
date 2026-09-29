@@ -173,7 +173,7 @@ namespace BeastCraft.Game
         public SettingsViewModel NewSettingsModel()
         {
             GameSession session = _ctx.Session;
-            SettingsViewModel model = new SettingsViewModel(session.Settings, session.SaveSettings, _host.IdleNotifier != null);
+            SettingsViewModel model = new SettingsViewModel(session.Settings, session.Content.Text, session.SaveSettings, _host.IdleNotifier != null);
             model.IdleNotificationsChanged += on =>
             {
                 if (on)

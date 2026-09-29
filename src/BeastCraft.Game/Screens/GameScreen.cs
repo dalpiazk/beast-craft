@@ -81,6 +81,18 @@ namespace BeastCraft.Game.Screens
 
         protected ScreenContext Ctx { get; }
 
+        /// <summary>The screens' own text by key (<c>ui.*</c> in <c>content/data/Localization/en.json</c>, <see cref="GameContent.Text"/>).</summary>
+        protected string Loc(string key)
+        {
+            return Ctx.Content.Text.Get(key);
+        }
+
+        /// <summary><see cref="Loc(string)"/> with <c>{0}</c>-style arguments.</summary>
+        protected string Loc(string key, params object[] args)
+        {
+            return Ctx.Content.Text.Format(key, args);
+        }
+
         public UiRoot Ui { get; } = new UiRoot();
 
         public abstract string Name { get; }
@@ -216,6 +228,18 @@ namespace BeastCraft.Game.Screens
 
         protected ScreenContext Ctx { get; }
 
+        /// <summary>The screens' own text by key (<c>ui.*</c> in <c>content/data/Localization/en.json</c>, <see cref="GameContent.Text"/>).</summary>
+        protected string Loc(string key)
+        {
+            return Ctx.Content.Text.Get(key);
+        }
+
+        /// <summary><see cref="Loc(string)"/> with <c>{0}</c>-style arguments.</summary>
+        protected string Loc(string key, params object[] args)
+        {
+            return Ctx.Content.Text.Format(key, args);
+        }
+
         public UiRoot Ui { get; } = new UiRoot();
 
         public abstract string Name { get; }
@@ -314,7 +338,7 @@ namespace BeastCraft.Game.Screens
             float height = 160f + count * 128f + 170f;
             Rect card = new Rect(90f, (PortraitLayout.CanvasHeight - height) / 2f, 900f, height);
             Panel panel = Ui.Add(new Panel { Bounds = card, StyleKey = "modal" });
-            panel.Add(new Label { Bounds = new Rect(card.X, card.Y + 50f, card.Width, 60f), Text = "Settings", Size = style.TextSizes.Heading, ColorKey = "plum", Align = TextAlign.Center });
+            panel.Add(new Label { Bounds = new Rect(card.X, card.Y + 50f, card.Width, 60f), Text = Loc("ui.settings.title"), Size = style.TextSizes.Heading, ColorKey = "plum", Align = TextAlign.Center });
             for (int i = 0; i < count; i++)
             {
                 int row = i;
@@ -323,7 +347,7 @@ namespace BeastCraft.Game.Screens
                 _rows.Add(button);
             }
 
-            Button close = panel.Add(new Button { Id = "close", Bounds = new Rect(card.Center.X - 200f, card.Bottom - 150f, 400f, 110f), Text = "Close", StyleKey = "primary" });
+            Button close = panel.Add(new Button { Id = "close", Bounds = new Rect(card.Center.X - 200f, card.Bottom - 150f, 400f, 110f), Text = Loc("ui.settings.close"), StyleKey = "primary" });
             close.Clicked += Close;
         }
 

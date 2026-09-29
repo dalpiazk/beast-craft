@@ -402,7 +402,7 @@ namespace BeastCraft.Presentation.Screens
             error = null;
             if (!IsSlot(slot) || !_store.Exists(slot))
             {
-                error = "There is no save in that slot.";
+                error = Content.Text.Get("ui.session.no_save_in_slot");
                 return null;
             }
 
@@ -428,7 +428,7 @@ namespace BeastCraft.Presentation.Screens
             error = null;
             if (!IsSlot(slot))
             {
-                error = "That is not a save slot.";
+                error = Content.Text.Get("ui.save_slots.not_a_slot");
                 return false;
             }
 
@@ -441,7 +441,7 @@ namespace BeastCraft.Presentation.Screens
 
             if (!_store.Save(slot, loaded.Save))
             {
-                error = "The save could not be written.";
+                error = Content.Text.Get("ui.session.write_failed");
                 return false;
             }
 
@@ -598,7 +598,7 @@ namespace BeastCraft.Presentation.Screens
             SaveLoadResult loaded = _store.Load(Slot);
             if (!loaded.Success)
             {
-                return new LoadOutcome { Success = false, Message = "Your save could not be loaded (" + loaded.Error + ")." };
+                return new LoadOutcome { Success = false, Message = Content.Text.Format("ui.session.not_loaded", loaded.Error) };
             }
 
             Save = loaded.Save;
@@ -632,7 +632,7 @@ namespace BeastCraft.Presentation.Screens
                 Success = true,
                 FromBackup = fromBackup,
                 Message = fromBackup
-                              ? "Your latest save could not be read (" + (loaded.MainFileProblem ?? "corrupt") + "), so the backup was loaded. A little progress may be lost."
+                              ? Content.Text.Format("ui.session.from_backup", loaded.MainFileProblem ?? Content.Text.Get("ui.session.corrupt"))
                               : null,
                 RefundMessage = RefundText(refunded)
             };
@@ -647,7 +647,7 @@ namespace BeastCraft.Presentation.Screens
             }
 
             List<string> names = refunded.ConvertAll(id => Content.Battle.GetConsumable(id)?.DisplayName ?? id);
-            return "Your last battle did not finish, so your " + string.Join(" and ", names) + (names.Count == 1 ? " was" : " were") + " returned.";
+            return Content.Text.Format(names.Count == 1 ? "ui.session.refund_one" : "ui.session.refund_many", string.Join(Content.Text.Get("ui.session.and"), names));
         }
 
         /// <summary>Writes the save to the slot (nothing to do before a game is loaded). Returns whether it was written.</summary>

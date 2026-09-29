@@ -190,7 +190,7 @@ namespace BeastCraft.Tests.EditMode
             MapViewModel map = new MapViewModel(session);
             Assert.AreEqual(-1, map.AutoAdvanceTarget(session.Settings, true), "off by default");
 
-            SettingsViewModel settings = new SettingsViewModel(session.Settings, session.SaveSettings);
+            SettingsViewModel settings = new SettingsViewModel(session.Settings, session.Content.Text, session.SaveSettings);
             settings.Change(SettingsViewModel.AutoAdvance);
             Assert.AreEqual(map.Recommended().NodeId, map.AutoAdvanceTarget(session.Settings, true));
             Assert.AreEqual(-1, map.AutoAdvanceTarget(session.Settings, false), "a defeat stops at the map");
@@ -201,7 +201,7 @@ namespace BeastCraft.Tests.EditMode
         {
             MemorySaveStorage storage = new MemorySaveStorage();
             GameSession session = new GameSession(Content, storage, () => 1);
-            SettingsViewModel desktop = new SettingsViewModel(session.Settings, session.SaveSettings);
+            SettingsViewModel desktop = new SettingsViewModel(session.Settings, session.Content.Text, session.SaveSettings);
 
             Assert.AreEqual(1, session.Settings.BattleSpeed);
             Assert.AreEqual("x1", desktop.Rows()[SettingsViewModel.BattleSpeed].Value);
@@ -217,7 +217,7 @@ namespace BeastCraft.Tests.EditMode
             Assert.IsFalse(session.Settings.IdleNotifications);
 
             List<bool> asked = new List<bool>();
-            SettingsViewModel android = new SettingsViewModel(session.Settings, session.SaveSettings, true);
+            SettingsViewModel android = new SettingsViewModel(session.Settings, session.Content.Text, session.SaveSettings, true);
             android.IdleNotificationsChanged += asked.Add;
             Assert.AreEqual(SettingsViewModel.RowCount, android.Rows().Count);
             Assert.AreEqual("Off", android.Rows()[SettingsViewModel.IdleNotifications].Value, "off by default");

@@ -57,7 +57,7 @@ namespace BeastCraft.Game.Screens
                 LoadOutcome outcome = _model.Continue(row.Slot);
                 if (!outcome.Success)
                 {
-                    Ctx.Stack.PushModal(new ConfirmModal(Ctx, "Save not loaded", outcome.Message, null, "OK", null));
+                    Ctx.Stack.PushModal(new ConfirmModal(Ctx, Loc("ui.title.not_loaded_title"), outcome.Message, null, Loc("ui.common.ok"), null));
                     return;
                 }
 
@@ -65,7 +65,7 @@ namespace BeastCraft.Game.Screens
                 Ctx.Stack.Push(new HomeScreen(Ctx));
                 if (outcome.Message != null)
                 {
-                    Ctx.Stack.PushModal(new ConfirmModal(Ctx, "Save restored", outcome.Message, null, "OK", null));
+                    Ctx.Stack.PushModal(new ConfirmModal(Ctx, Loc("ui.title.restored_title"), outcome.Message, null, Loc("ui.common.ok"), null));
                 }
 
                 if (Ctx.Session.LastContinueClaim?.Message != null)
@@ -89,7 +89,8 @@ namespace BeastCraft.Game.Screens
             };
             if (_model.NewGameReplaces(row.Slot))
             {
-                Ctx.Stack.PushModal(new ConfirmModal(Ctx, "Start a new game?", "This replaces the save in " + row.Title + ".", "Cancel", "Start", start, "danger"));
+                Ctx.Stack.PushModal(new ConfirmModal(Ctx, Loc("ui.save_slots.replace_title"), Loc("ui.save_slots.replace_body", row.Title), Loc("ui.common.cancel"), Loc("ui.save_slots.start"), start,
+                                                     "danger"));
                 return;
             }
 
@@ -99,7 +100,7 @@ namespace BeastCraft.Game.Screens
         /// <summary>Deletes <paramref name="row"/>'s save after asking.</summary>
         public void Delete(SaveSlotRow row)
         {
-            Ctx.Stack.PushModal(new ConfirmModal(Ctx, "Delete " + row.Title + "?", "This save and its backup are deleted for good.", "Cancel", "Delete", () =>
+            Ctx.Stack.PushModal(new ConfirmModal(Ctx, Loc("ui.save_slots.delete_title", row.Title), Loc("ui.save_slots.delete_body"), Loc("ui.common.cancel"), Loc("ui.save_slots.delete"), () =>
             {
                 Ctx.Game.Toast(_model.Delete(row.Slot));
                 Build();
@@ -121,7 +122,7 @@ namespace BeastCraft.Game.Screens
             });
             if (row.HasSave)
             {
-                Ctx.Stack.PushModal(new ConfirmModal(Ctx, "Import into " + row.Title + "?", "The imported save replaces this one. The file is checked first.", "Cancel", "Import",
+                Ctx.Stack.PushModal(new ConfirmModal(Ctx, Loc("ui.save_slots.import_title", row.Title), Loc("ui.save_slots.import_body"), Loc("ui.common.cancel"), Loc("ui.save_slots.import"),
                                                      import, "danger"));
                 return;
             }
@@ -144,17 +145,17 @@ namespace BeastCraft.Game.Screens
                 };
                 if (row.HasSave)
                 {
-                    buttons.Add(("delete-" + row.Slot, "Delete", "chip", () => Delete(row)));
+                    buttons.Add(("delete-" + row.Slot, Loc("ui.save_slots.delete"), "chip", () => Delete(row)));
                 }
 
                 if (_model.CanTransfer && row.Readable)
                 {
-                    buttons.Add(("export-" + row.Slot, "Export", "chip", () => Export(row)));
+                    buttons.Add(("export-" + row.Slot, Loc("ui.save_slots.export"), "chip", () => Export(row)));
                 }
 
                 if (_model.CanTransfer)
                 {
-                    buttons.Add(("import-" + row.Slot, "Import", "chip", () => Import(row)));
+                    buttons.Add(("import-" + row.Slot, Loc("ui.save_slots.import"), "chip", () => Import(row)));
                 }
 
                 float gap = 16f;
@@ -174,14 +175,14 @@ namespace BeastCraft.Game.Screens
         {
             Gradient("cream", "parchment", new Rect(0, 0, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight));
             base.Draw();
-            _header.Paint(Ctx, Ui, "Save slots", "Three slots, each its own game");
+            _header.Paint(Ctx, Ui, Loc("ui.save_slots.title"), Loc("ui.save_slots.subtitle"));
         }
 
         private void DrawSlot(Rect box, SaveSlotRow row)
         {
             UiPainter painter = Ctx.Painter;
             UiStyle style = Ctx.Style;
-            painter.TextIn(row.Title + (row.Current ? "  (last played)" : string.Empty), new Rect(box.X + 36f, box.Y + 26f, box.Width - 72f, style.TextSizes.Heading),
+            painter.TextIn(row.Current ? Loc("ui.save_slots.last_played", row.Title) : row.Title, new Rect(box.X + 36f, box.Y + 26f, box.Width - 72f, style.TextSizes.Heading),
                            style.TextSizes.Heading, painter.C("plum"), TextAlign.Left);
             painter.TextIn(row.Detail, new Rect(box.X + 36f, box.Y + 96f, box.Width - 72f, style.TextSizes.Body + 2f), style.TextSizes.Body + 2f,
                            painter.C(row.HasSave && !row.Readable ? "berry" : "ink"), TextAlign.Left);

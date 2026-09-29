@@ -50,6 +50,12 @@ namespace BeastCraft.Presentation.Screens
             _utcNow = utcNow ?? (() => DateTime.UtcNow);
         }
 
+        /// <summary>The text table (<c>ui.save_slots.*</c>).</summary>
+        private BeastCraft.Localization.StringTable Text
+        {
+            get { return _session.Content.Text; }
+        }
+
         /// <summary>Whether Export and Import are offered.</summary>
         public bool CanTransfer
         {
@@ -65,26 +71,27 @@ namespace BeastCraft.Presentation.Screens
                 SaveSlotRow row = new SaveSlotRow
                 {
                     Slot = slot,
-                    Title = "Slot " + summary.Number.ToString(CultureInfo.InvariantCulture),
+                    Title = Text.Format("ui.save_slots.slot", summary.Number),
                     HasSave = summary.HasSave,
                     Readable = summary.Readable,
                     Current = string.Equals(slot, _session.Slot, StringComparison.Ordinal) && summary.HasSave,
-                    PlayText = summary.Readable ? "Continue" : "New game"
+                    PlayText = Text.Get(summary.Readable ? "ui.save_slots.continue" : "ui.save_slots.new_game")
                 };
                 if (!summary.HasSave)
                 {
-                    row.Detail = "Empty";
+                    row.Detail = Text.Get("ui.save_slots.empty");
                 }
                 else if (!summary.Readable)
                 {
-                    row.Detail = "This save cannot be loaded (" + summary.Problem + ").";
+                    row.Detail = Text.Format("ui.save_slots.unloadable", summary.Problem);
                 }
                 else
                 {
-                    row.Detail = "Beastbinder level " + summary.AvatarLevel.ToString(CultureInfo.InvariantCulture) + ", " +
-                                 summary.BeastCount.ToString(CultureInfo.InvariantCulture) + (summary.BeastCount == 1 ? " beast" : " beasts");
-                    string saved = summary.SavedUtc == DateTime.MinValue ? null : "saved " + summary.SavedUtc.ToLocalTime().ToString("d MMM yyyy HH:mm", CultureInfo.InvariantCulture);
-                    row.Where = summary.RegionName == null ? saved : saved == null ? summary.RegionName : summary.RegionName + ", " + saved;
+                    row.Detail = Text.Format(summary.BeastCount == 1 ? "ui.save_slots.summary_one" : "ui.save_slots.summary_many", summary.AvatarLevel, summary.BeastCount);
+                    string saved = summary.SavedUtc == DateTime.MinValue
+                                       ? null
+                                       : Text.Format("ui.save_slots.saved", summary.SavedUtc.ToLocalTime().ToString("d MMM yyyy HH:mm", CultureInfo.InvariantCulture));
+                    row.Where = summary.RegionName == null ? saved : saved == null ? summary.RegionName : Text.Format("ui.save_slots.where_saved", summary.RegionName, saved);
                 }
 
                 rows.Add(row);
@@ -104,7 +111,7 @@ namespace BeastCraft.Presentation.Screens
         {
             if (!_session.UseSlot(slot))
             {
-                return new LoadOutcome { Success = false, Message = "That is not a save slot." };
+                return new LoadOutcome { Success = false, Message = Text.Get("ui.save_slots.not_a_slot") };
             }
 
             return _session.Continue();
@@ -121,8 +128,8 @@ namespace BeastCraft.Presentation.Screens
         {
             int number = GameSession.IndexOfSlot(slot) + 1;
             return _session.DeleteSlot(slot)
-                       ? "Slot " + number.ToString(CultureInfo.InvariantCulture) + " deleted."
-                       : "Slot " + number.ToString(CultureInfo.InvariantCulture) + " could not be deleted.";
+                       ? Text.Format("ui.save_slots.deleted", number)
+                       : Text.Format("ui.save_slots.not_deleted", number);
         }
 
         /// <summary>Exports <paramref name="slot"/> to a file; <paramref name="message"/> gets the player message (once, maybe later).</summary>
@@ -130,14 +137,14 @@ namespace BeastCraft.Presentation.Screens
         {
             if (_transfer == null)
             {
-                message?.Invoke("Export is not available here.");
+                message?.Invoke(Text.Get("ui.save_slots.export_unavailable"));
                 return;
             }
 
             string json = _session.ExportSlot(slot, out string error);
             if (json == null)
             {
-                message?.Invoke("Nothing to export: " + error);
+                message?.Invoke(Text.Format("ui.save_slots.nothing_to_export", error));
                 return;
             }
 
@@ -148,7 +155,7 @@ namespace BeastCraft.Presentation.Screens
                     return;
                 }
 
-                message?.Invoke(result.Success ? "Saved a copy to " + result.Location + "." : "Export failed. " + result.Error);
+                message?.Invoke(result.Success ? Text.Format("ui.save_slots.exported", result.Location) : Text.Format("ui.save_slots.export_failed", result.Error));
             });
         }
 
@@ -160,7 +167,7 @@ namespace BeastCraft.Presentation.Screens
         {
             if (_transfer == null)
             {
-                message?.Invoke("Import is not available here.");
+                message?.Invoke(Text.Get("ui.save_slots.import_unavailable"));
                 return;
             }
 
@@ -174,14 +181,13 @@ namespace BeastCraft.Presentation.Screens
 
                 if (!result.Success)
                 {
-                    message?.Invoke("Import failed. " + result.Error);
+                    message?.Invoke(Text.Format("ui.save_slots.import_failed", result.Error));
                     return;
                 }
 
                 message?.Invoke(_session.ImportSlot(slot, result.Contents, out string error)
-                                    ? "Imported into slot " + number.ToString(CultureInfo.InvariantCulture) + "."
-                                    : "That file is not a save this game can load (" + error + "). Slot " + number.ToString(CultureInfo.InvariantCulture) +
-                                      " is unchanged.");
+                                    ? Text.Format("ui.save_slots.imported", number)
+                                    : Text.Format("ui.save_slots.import_rejected", error, number));
             });
         }
     }

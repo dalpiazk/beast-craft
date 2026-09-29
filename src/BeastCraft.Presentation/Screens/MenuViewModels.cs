@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using BeastCraft.Localization;
 using BeastCraft.Save;
 
 namespace BeastCraft.Presentation.Screens
@@ -171,11 +172,16 @@ namespace BeastCraft.Presentation.Screens
 
         private readonly PlayerSettings _settings;
         private readonly Func<bool> _save;
+        private readonly StringTable _text;
 
+        /// <param name="settings">The settings the rows change.</param>
+        /// <param name="text">The text table the labels come from (<c>ui.settings.*</c>; <c>GameContent.Text</c>).</param>
+        /// <param name="save">Saves the settings after each change.</param>
         /// <param name="notificationsAvailable">Whether the host can post notifications (Android): otherwise that row is hidden.</param>
-        public SettingsViewModel(PlayerSettings settings, Func<bool> save, bool notificationsAvailable = false)
+        public SettingsViewModel(PlayerSettings settings, StringTable text, Func<bool> save, bool notificationsAvailable = false)
         {
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+            _text = text ?? throw new ArgumentNullException(nameof(text));
             _save = save;
             NotificationsAvailable = notificationsAvailable;
         }
@@ -190,23 +196,28 @@ namespace BeastCraft.Presentation.Screens
         /// <summary>The rows, by the row constants (the notification row only where the host has notifications).</summary>
         public List<SettingRow> Rows()
         {
-            string intensity = _settings.EffectsIntensity == EffectsIntensity.Minimal ? "Minimal" : _settings.EffectsIntensity == EffectsIntensity.Reduced ? "Reduced" : "Full";
+            string intensity = _text.Get(_settings.EffectsIntensity == EffectsIntensity.Minimal ? "ui.settings.effects_minimal" : _settings.EffectsIntensity == EffectsIntensity.Reduced ? "ui.settings.effects_reduced" : "ui.settings.effects_full");
             List<SettingRow> rows = new List<SettingRow>
             {
-                new SettingRow { Label = "Effects", Value = intensity, On = true },
-                new SettingRow { Label = "Screen shake", Value = _settings.ScreenShake ? "On" : "Off", On = _settings.ScreenShake },
-                new SettingRow { Label = "Flashes", Value = _settings.Flashes ? "On" : "Off", On = _settings.Flashes },
-                new SettingRow { Label = "Team suggestions", Value = _settings.TeamSuggestionsEnabled ? "On" : "Off", On = _settings.TeamSuggestionsEnabled },
-                new SettingRow { Label = "Battle speed", Value = "x" + Speed(_settings), On = true },
-                new SettingRow { Label = "Auto next battle", Value = _settings.AutoAdvance ? "On" : "Off", On = _settings.AutoAdvance },
-                new SettingRow { Label = "Tutorial hints", Value = _settings.TutorialHints ? "On" : "Off", On = _settings.TutorialHints }
+                new SettingRow { Label = _text.Get("ui.settings.effects"), Value = intensity, On = true },
+                new SettingRow { Label = _text.Get("ui.settings.screen_shake"), Value = OnOff(_settings.ScreenShake), On = _settings.ScreenShake },
+                new SettingRow { Label = _text.Get("ui.settings.flashes"), Value = OnOff(_settings.Flashes), On = _settings.Flashes },
+                new SettingRow { Label = _text.Get("ui.settings.team_suggestions"), Value = OnOff(_settings.TeamSuggestionsEnabled), On = _settings.TeamSuggestionsEnabled },
+                new SettingRow { Label = _text.Get("ui.settings.battle_speed"), Value = _text.Format("ui.settings.speed_value", Speed(_settings)), On = true },
+                new SettingRow { Label = _text.Get("ui.settings.auto_advance"), Value = OnOff(_settings.AutoAdvance), On = _settings.AutoAdvance },
+                new SettingRow { Label = _text.Get("ui.settings.tutorial_hints"), Value = OnOff(_settings.TutorialHints), On = _settings.TutorialHints }
             };
             if (NotificationsAvailable)
             {
-                rows.Add(new SettingRow { Label = "Idle full alert", Value = _settings.IdleNotifications ? "On" : "Off", On = _settings.IdleNotifications });
+                rows.Add(new SettingRow { Label = _text.Get("ui.settings.idle_alert"), Value = OnOff(_settings.IdleNotifications), On = _settings.IdleNotifications });
             }
 
             return rows;
+        }
+
+        private string OnOff(bool on)
+        {
+            return _text.Get(on ? "ui.settings.on" : "ui.settings.off");
         }
 
         /// <summary>The battle speed a setting holds, 1-3 (anything else reads as 1).</summary>

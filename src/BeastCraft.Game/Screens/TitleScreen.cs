@@ -26,10 +26,10 @@ namespace BeastCraft.Game.Screens
             _model = new TitleViewModel(ctx.Session);
             float width = 680f;
             float x = (PortraitLayout.CanvasWidth - width) / 2f;
-            _continue = AddButton(null, "continue", new Rect(x, 1180f, width, 130f), "Continue", "primary", () => EnterGame(true));
-            _slots = AddButton(null, "slots", new Rect(x, 1330f, width, 130f), "Save slots", "secondary", OpenSlots);
-            _newGame = AddButton(null, "new-game", new Rect(x, 1350f, width, 130f), "New Game", "secondary", NewGame);
-            _settings = AddButton(null, "settings", new Rect(x, 1520f, width, 130f), "Settings", "secondary", OpenSettings, "gear");
+            _continue = AddButton(null, "continue", new Rect(x, 1180f, width, 130f), Loc("ui.title.continue"), "primary", () => EnterGame(true));
+            _slots = AddButton(null, "slots", new Rect(x, 1330f, width, 130f), Loc("ui.title.save_slots"), "secondary", OpenSlots);
+            _newGame = AddButton(null, "new-game", new Rect(x, 1350f, width, 130f), Loc("ui.title.new_game"), "secondary", NewGame);
+            _settings = AddButton(null, "settings", new Rect(x, 1520f, width, 130f), Loc("ui.title.settings"), "secondary", OpenSettings, "gear");
         }
 
         private readonly Button _settings;
@@ -54,7 +54,7 @@ namespace BeastCraft.Game.Screens
 
         public override bool HandleBack()
         {
-            Ctx.Stack.PushModal(new ConfirmModal(Ctx, "Leave Beast Craft?", "Your progress is saved.", "Stay", "Quit", Ctx.Game.Exit, "danger"));
+            Ctx.Stack.PushModal(new ConfirmModal(Ctx, Loc("ui.title.leave_title"), Loc("ui.title.leave_body"), Loc("ui.title.stay"), Loc("ui.title.quit"), Ctx.Game.Exit, "danger"));
             return true;
         }
 
@@ -66,14 +66,14 @@ namespace BeastCraft.Game.Screens
                 LoadOutcome outcome = _model.Continue();
                 if (!outcome.Success)
                 {
-                    Ctx.Stack.PushModal(new ConfirmModal(Ctx, "Save not loaded", outcome.Message + " You can start a new game.", null, "OK", null));
+                    Ctx.Stack.PushModal(new ConfirmModal(Ctx, Loc("ui.title.not_loaded_title"), Loc("ui.title.not_loaded_body", outcome.Message), null, Loc("ui.common.ok"), null));
                     return;
                 }
 
                 Ctx.Stack.Push(new HomeScreen(Ctx));
                 if (outcome.Message != null)
                 {
-                    Ctx.Stack.PushModal(new ConfirmModal(Ctx, "Save restored", outcome.Message, null, "OK", null));
+                    Ctx.Stack.PushModal(new ConfirmModal(Ctx, Loc("ui.title.restored_title"), outcome.Message, null, Loc("ui.common.ok"), null));
                 }
 
                 // Continue claimed the idle rewards: say what they paid (nothing is silent).
@@ -122,7 +122,7 @@ namespace BeastCraft.Game.Screens
             {
                 // Every slot holds a game: the slot list asks which one to replace (or delete).
                 OpenSlots();
-                Ctx.Game.Toast("All three save slots are in use. Pick one to replace, or delete one.");
+                Ctx.Game.Toast(Loc("ui.title.slots_full"));
                 return;
             }
 
@@ -138,8 +138,8 @@ namespace BeastCraft.Game.Screens
             Painter.Soft(new Vec2(540f, 330f), 360f, Painter.C("cream", 0.55f), 0.5f);
 
             float titleSize = Ctx.Style.TextSizes.Title * 1.5f;
-            Painter.TextIn("Beast Craft", new Rect(0, 240f, PortraitLayout.CanvasWidth, titleSize), titleSize, Painter.C("cream"), TextAlign.Center, true, Painter.C("plum"));
-            Painter.TextIn("Bind beasts. Brave the Gloam.", new Rect(0, 380f, PortraitLayout.CanvasWidth, 40f), Ctx.Style.TextSizes.Body + 4f, Painter.C("plum"), TextAlign.Center);
+            Painter.TextIn(Loc("ui.title.name"), new Rect(0, 240f, PortraitLayout.CanvasWidth, titleSize), titleSize, Painter.C("cream"), TextAlign.Center, true, Painter.C("plum"));
+            Painter.TextIn(Loc("ui.title.tagline"), new Rect(0, 380f, PortraitLayout.CanvasWidth, 40f), Ctx.Style.TextSizes.Body + 4f, Painter.C("plum"), TextAlign.Center);
 
             for (int i = 0; i < Beasts.Length; i++)
             {
@@ -149,7 +149,7 @@ namespace BeastCraft.Game.Screens
             }
 
             base.Draw();
-            Painter.TextIn("Pre-alpha - local play", new Rect(0, 1840f, PortraitLayout.CanvasWidth, 30f), Ctx.Style.TextSizes.Small, Painter.C("plum", 0.7f), TextAlign.Center);
+            Painter.TextIn(Loc("ui.title.footer"), new Rect(0, 1840f, PortraitLayout.CanvasWidth, 30f), Ctx.Style.TextSizes.Small, Painter.C("plum", 0.7f), TextAlign.Center);
         }
     }
 }

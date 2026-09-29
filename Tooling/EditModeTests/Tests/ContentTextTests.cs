@@ -122,6 +122,30 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
+        public void EveryUiKeyTheScreensUse_IsInTheEnglishTable()
+        {
+            StringTable english = English;
+            string src = Path.Combine(Path.GetDirectoryName(Root), "src");
+            Regex uiKey = new Regex("\"(ui\\.[a-z0-9_.]+)\"");
+            List<string> missing = new List<string>();
+            int found = 0;
+            foreach (string source in Directory.GetFiles(src, "*.cs", SearchOption.AllDirectories))
+            {
+                foreach (Match match in uiKey.Matches(File.ReadAllText(source)))
+                {
+                    found++;
+                    if (!english.Contains(match.Groups[1].Value))
+                    {
+                        missing.Add(Path.GetFileName(source) + ": " + match.Groups[1].Value);
+                    }
+                }
+            }
+
+            Assert.Greater(found, 0, "the screens look their own text up by key");
+            Assert.IsEmpty(missing, string.Join("\n", missing));
+        }
+
+        [Test]
         public void EveryLocaleTable_CoversEveryEnglishKey()
         {
             StringTable english = English;

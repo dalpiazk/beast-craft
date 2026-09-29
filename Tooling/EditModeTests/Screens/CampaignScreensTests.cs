@@ -167,7 +167,7 @@ namespace BeastCraft.Tests.EditMode
         {
             MemorySaveStorage storage = new MemorySaveStorage();
             GameSession session = new GameSession(Content, storage, () => 1);
-            SettingsViewModel settings = new SettingsViewModel(session.Settings, session.SaveSettings);
+            SettingsViewModel settings = new SettingsViewModel(session.Settings, session.Content.Text, session.SaveSettings);
             settings.Change(SettingsViewModel.TeamSuggestions);
             settings.Change(SettingsViewModel.Effects);
 
