@@ -46,14 +46,17 @@ namespace BeastCraft.Tooling.BalanceSim
     /// game's <c>IdleRewardCalculator</c> at a claim cadence) are <see cref="CampaignIdleModel"/>'s.
     /// </para>
     /// <para>
-    /// <strong>Clear chance</strong> by tier (the user's tiered targets, the difficulty the
-    /// encounter table is calibrated to for a scouting player at equal level): a generated node (gates
-    /// included) clears at its shape's <c>TargetClear</c> in <c>encounter-library.json</c> (squad and
-    /// horde 80%, elite 60%, solo 50%), the boss templates at <see cref="BossClear"/> (the target their
-    /// <c>DifficultyOverride</c>s are calibrated to). Across a level gap (node level − fielded mean) the
-    /// chance moves along <see cref="GapTable"/> (the design's table, whose 0 is 80%) in log-odds,
-    /// shifted so gap 0 is the tier's target, interpolated for fractional gaps and clamped at its
-    /// ends. A modelling assumption, not measured from the PvE simulation.
+    /// <strong>Clear chance</strong> by tier (the producer's never-blocked targets, the difficulty the
+    /// encounter table is calibrated to for a TYPICAL owned-roster pick at equal level, docs/balance/
+    /// tuning-log.md, "Never-blocked targets"): a generated node (gates included) clears at its shape's
+    /// <c>TargetClear</c> in <c>encounter-library.json</c> (squad and horde 85%, elite and solo 75%,
+    /// read live so a content change here tracks it automatically), the boss templates at
+    /// <see cref="BossClear"/> (75%, the target their <c>DifficultyOverride</c>s are calibrated to).
+    /// Across a level gap (node level − fielded mean) the chance moves along <see cref="GapTable"/> in
+    /// log-odds (only its shape matters; the anchor cancels out of the shift), interpolated for
+    /// fractional gaps and clamped at its ends; a losing streak at the same node also eases it further
+    /// (<see cref="AssistedChance"/>, adaptive assist). A modelling assumption, not measured from the
+    /// PvE simulation (<see cref="GapTable"/>'s own doc comment says where its shape comes from).
     /// </para>
     /// <para>
     /// <strong>Post-game regions</strong> (<see cref="RegionData.IsPostGame"/>) are never played by
@@ -99,13 +102,35 @@ namespace BeastCraft.Tooling.BalanceSim
 
         /// <summary>
         /// Boss-template clear chance at equal level: the target the templates' <c>DifficultyOverride</c>s
-        /// are calibrated to (docs/balance/tuning-log.md). Generated nodes read their shape's
-        /// <c>TargetClear</c> (<see cref="World.ShapeClear"/>).
+        /// are calibrated to (the producer's never-blocked targets, docs/balance/tuning-log.md,
+        /// "Never-blocked targets": bosses share the elite/solo tier, 75%). Generated nodes read their
+        /// shape's <c>TargetClear</c> (<see cref="World.ShapeClear"/>), already 85%/75% in
+        /// <c>encounter-library.json</c>.
         /// </summary>
-        public const double BossClear = 0.50;
+        public const double BossClear = 0.75;
 
-        /// <summary>The design's clear chance by gap (node level − team level) from −2 to +4, for an 80% encounter.</summary>
-        public static readonly double[] GapTable = { 0.95, 0.90, 0.80, 0.60, 0.40, 0.20, 0.05 };
+        /// <summary>
+        /// The clear chance by gap (node level − team level) from −2 to +4, for an 85%-tier encounter
+        /// (the anchor cancels out of <see cref="ClearChance"/>'s shift; only the log-odds shape between
+        /// entries matters). Re-derived for the producer's never-blocked retune (steeper
+        /// <c>DamageFormula.GetLevelMultiplier</c>; docs/balance/tuning-log.md, "Never-blocked targets")
+        /// from <c>docs/balance/level-gap-report.md</c>'s measured `elemental` `squad` scouted-pick curve
+        /// (the closest real data: the typical-team calibration does not sweep a level gap), mean over
+        /// levels 10-90: -2 98.7%, 0 85.0%, +2 33.6%, +3 7.5% measured directly; -1, +1 and +4 are a
+        /// logit-linear interpolation between their neighbours (the report does not sample every
+        /// integer gap). A modelling assumption for the Monte Carlo shape only, not a fresh measurement
+        /// of every entry.
+        /// </summary>
+        public static readonly double[] GapTable = { 0.987, 0.955, 0.850, 0.629, 0.336, 0.075, 0.023 };
+
+        /// <summary>
+        /// Adaptive assist's ceiling clear chance (the logit ramp's far end, <see cref="AssistedChance"/>):
+        /// not measured directly (the assist floor is calibrated on the WEAK pick reaching 70%/60%, docs/
+        /// balance/tuning-log.md, "Never-blocked targets"; this model's player is closer to a typical
+        /// pick, already above that floor before any assist), so a near-certain ceiling stands in for
+        /// "a struggling player eventually all but always clears", consistent with the mechanism's intent.
+        /// </summary>
+        public const double AssistCeiling = 0.99;
 
         /// <summary>The <see cref="GapTable"/> gap of its first entry.</summary>
         public const int GapTableFirst = -2;
@@ -425,6 +450,12 @@ namespace BeastCraft.Tooling.BalanceSim
                 return !string.IsNullOrEmpty(node.TemplateId) || node.Type == MapNodeType.Boss ? BossClear : ShapeClear(node.ShapeId);
             }
 
+            /// <summary>The <see cref="RegionLibrary.AssistFloorScale"/> key of <paramref name="node"/>: <see cref="RegionLibraryData.EasingBossId"/> for a template (the bosses), else its shape's id.</summary>
+            public static string AssistShapeKey(MapNode node)
+            {
+                return !string.IsNullOrEmpty(node.TemplateId) || node.Type == MapNodeType.Boss ? RegionLibraryData.EasingBossId : node.ShapeId;
+            }
+
             /// <summary>The drop-table shape a node pays out from: its shape, or its template's.</summary>
             public string DropShape(MapNode node)
             {
@@ -596,6 +627,45 @@ namespace BeastCraft.Tooling.BalanceSim
             return Math.Log(p / (1.0 - p));
         }
 
+        /// <summary>
+        /// <paramref name="baseChance"/> (<see cref="ClearChance"/>) eased by adaptive assist after
+        /// <paramref name="losses"/> consecutive losses at this node (<c>RegionLibrary.AssistScaleFor</c>'s
+        /// mechanism, read from the real library so it tracks <c>regions.json</c>): a logit-linear ramp
+        /// from <paramref name="baseChance"/> toward <see cref="AssistCeiling"/>, reaching it at the same
+        /// number of losses the real per-fight stat-multiplier assist takes to reach its own floor
+        /// (<c>AssistStep</c> compounding to <c>AssistFloorScales</c> / a region's own
+        /// <c>AssistBossFloorScale</c>), then held there. 0 losses, no <c>AssistStep</c>, or no floor for
+        /// this kind of fight all return <paramref name="baseChance"/> unchanged (never assisted).
+        /// </summary>
+        public static double AssistedChance(RegionLibrary regions, string regionId, string shapeKey, double baseChance, int losses)
+        {
+            if (losses <= 0)
+            {
+                return baseChance;
+            }
+
+            double step = Math.Max(0.0, Math.Min(1.0, regions.Data.AssistStep));
+            if (step <= 0.0)
+            {
+                return baseChance;
+            }
+
+            RegionData region = regions.GetRegion(regionId);
+            double floor = region != null && string.Equals(shapeKey, RegionLibraryData.EasingBossId, StringComparison.Ordinal) && region.AssistBossFloorScale > 0.0 &&
+                           region.AssistBossFloorScale <= 1.0
+                ? region.AssistBossFloorScale
+                : regions.AssistFloorScale(shapeKey);
+            if (floor >= 1.0)
+            {
+                return baseChance;
+            }
+
+            int lossesToFloor = Math.Max(1, (int)Math.Ceiling(Math.Log(floor, 1.0 - step)));
+            double t = Math.Min(1.0, (double)losses / lossesToFloor);
+            double logit = Logit(baseChance) + (t * (Logit(AssistCeiling) - Logit(baseChance)));
+            return 1.0 / (1.0 + Math.Exp(-logit));
+        }
+
         /// <summary>Plays one campaign.</summary>
         public static Result Play(World world, int campaignSeed)
         {
@@ -694,7 +764,7 @@ namespace BeastCraft.Tooling.BalanceSim
                 result.ElitesByRegion[regionIndex] += node.Type == MapNodeType.Elite ? 1 : 0;
                 for (int attempt = 0; ; attempt++)
                 {
-                    bool cleared = Fight(world, player, result, regionIndex, node, rng);
+                    bool cleared = Fight(world, player, result, regionIndex, node, rng, attempt);
                     if (!cleared && attempt + 1 >= StuckAttempts)
                     {
                         result.Stuck++;
@@ -822,11 +892,12 @@ namespace BeastCraft.Tooling.BalanceSim
         }
 
         /// <summary>Fights (draws) one battle at <paramref name="node"/> and pays it out. Returns whether it was cleared.</summary>
-        private static bool Fight(World world, Player player, Result result, int regionIndex, MapNode node, Random rng)
+        private static bool Fight(World world, Player player, Result result, int regionIndex, MapNode node, Random rng, int losses)
         {
             PlayerSave save = player.Save;
             int cap = CampaignRules.BeastCap(save, world.Regions);
             double chance = ClearChance(world.TierClear(node), node.Level - player.FieldedMean());
+            chance = AssistedChance(world.Regions, world.Regions.Regions[regionIndex].RegionId, World.AssistShapeKey(node), chance, losses);
             bool cleared = rng.NextDouble() < chance;
             BattleOutcome outcome = cleared ? BattleOutcome.PlayerVictory : BattleOutcome.EnemyVictory;
             int focusUses = PacingSimulator.FocusUsesMin + rng.Next(PacingSimulator.FocusUsesMax - PacingSimulator.FocusUsesMin + 1);

@@ -4348,11 +4348,35 @@ is a closed-form estimate (the shipping and floor weak rates linearly interpolat
 takes to reach the floor, then a geometric tail at the floor rate), not a fresh simulation of every
 intermediate loss — cheap enough to check against the bar, not exact.
 
-Campaign-pacing gates (`--mode campaign --self-check`, including the grind probe) were re-run and are
-untouched: the Monte Carlo pacing model draws each battle's clear from its own tiered clear-chance
-table (independent of `encounter-difficulty.json` and `DamageFormula`), so `campaign-pacing-report.md`
-regenerates byte-identical. Every gate still reads `ok`; grind probe p50 0.00 levels at both check
-points (target < 0.05 / < 0.50).
+**Campaign-pacing model updated to match** (follow-up, after this section first shipped claiming it
+was untouched — a mistaken conclusion from a report generated during a file-lock race with a
+concurrent run, not a real invariant). `CampaignPacingSimulator`'s clear-chance model is its own
+Monte Carlo assumption, not fought battles: `World.ShapeClear` already reads the shape's real
+`TargetClear` (85/85/75/75, automatically current once the content changed), but `BossClear` (0.50)
+and `GapTable` (the design's old, mild gap curve) were still hardcoded to the pre-retune numbers, and
+adaptive assist was not modelled on a retry at all. Fixed:
+
+- `BossClear` 0.50 -> **0.75** (bosses share the elite/solo tier).
+- `GapTable` re-derived from `docs/balance/level-gap-report.md`'s measured `elemental` `squad`
+  scouted-pick curve (the closest real data — the typical-team calibration does not sweep a level
+  gap), mean over levels 10-90: gap -2 98.7%, 0 85.0%, +2 33.6%, +3 7.5% measured directly; -1, +1 and
+  +4 are a logit-linear interpolation between neighbours (the report does not sample every integer
+  gap). Old (mild, pre-retune): 95/90/80/60/40/20/5%; new: 98.7/95.5/85.0/62.9/33.6/7.5/2.3%.
+- **Adaptive assist**, new: `CampaignPacingSimulator.AssistedChance`, a logit ramp from the base
+  chance toward a near-certain ceiling (99%) over the same number of losses the real per-fight assist
+  takes to reach its own floor (`RegionLibrary.AssistScaleFor`'s data, read live from `regions.json`,
+  not a copy). Not measured directly (the assist floor is calibrated on the WEAK pick reaching
+  70%/60%; this model's player is closer to typical, already above that floor before any assist), so
+  the ceiling is a documented modelling choice, not a fresh simulation.
+
+Re-run (`--mode campaign --self-check`): total battles p50 450 (target 400-600: **ok**); every gate/
+boss level parity still within +/-3 of the node (**ok** at all 40); bench gap 3.0-5.7 from region 1,
+5.0-5.7 from region 3 against its 5-8 target (**ok**); grind probe p50 0.00 levels at both check
+points, target < 0.05 / < 0.50 (**ok**). **Two skill-pacing gates now miss**: focus skill to L15,
+p50 155 battles (target 162-198) and to L20, p50 268 (target 270+) — the team now clears faster
+(higher targets, assist on retries), so it reaches a battle-count skill milestone a little ahead of
+the design's old pacing. Reported, not retuned: XP and skill-practice constants are a producer call,
+not remeasured here.
 
 ### Guidance
 

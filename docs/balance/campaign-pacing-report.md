@@ -20,15 +20,15 @@ everything else is the game's code — `regions.json`, `NodeMapGenerator`, `Camp
   empty), then its travelling trader is
   visited, as is any trading post taken (the game's `ShopService`; see "Economy")
 - Team: the trio griffin, phoenix, golem (species only matter for skill tomes and the Kinship offers); recruits as offered (see "Kinship")
-- Clear chance at equal level: squad / horde 80.0%, elite and generated gates 60.0%, solo and bosses 50.0%; across a gap (node level - fielded mean) it follows the table below in log-odds, interpolated, clamped at its ends
+- Clear chance at equal level: squad / horde 85.0%, elite and generated gates 75.0%, solo and bosses 75.0%; across a gap (node level - fielded mean) it follows the table below in log-odds, interpolated, clamped at its ends
 - Focus skill fires 3-9 times per battle, secondary the same; materials spent with `--mode pacing`'s policy
 - Idle rewards: 25.0 battles a day, 16.0 hours away, 2 claims a day (see "Idle rewards")
 
 | Gap | -2 | -1 | 0 | +1 | +2 | +3 | +4 |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| squad / horde | 95.0% | 90.0% | 80.0% | 60.0% | 40.0% | 20.0% | 5.0% |
-| elite / gate | 87.7% | 77.1% | 60.0% | 36.0% | 20.0% | 8.6% | 1.9% |
-| solo / boss | 82.6% | 69.2% | 50.0% | 27.3% | 14.3% | 5.9% | 1.3% |
+| squad / horde | 98.7% | 95.5% | 85.0% | 62.9% | 33.6% | 7.5% | 2.3% |
+| elite / gate | 97.6% | 91.8% | 75.0% | 47.3% | 21.1% | 4.1% | 1.2% |
+| solo / boss | 97.6% | 91.8% | 75.0% | 47.3% | 21.1% | 4.1% | 1.2% |
 
 ## Battles per region
 
@@ -36,17 +36,17 @@ Every battle fought, losses (retries) and Kinship trials included.
 
 | Region | Levels | p10 | p50 | p90 | Lost (mean) | Elites taken (mean) |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
-| r01 Verdant Hollow | 1-10 | 46 | 51 | 58 | 12.7 | 2.9 |
-| r02 Emberreach | 11-20 | 46 | 52 | 59 | 13.3 | 2.8 |
-| r03 Tidefall | 21-30 | 46 | 51 | 59 | 12.9 | 2.9 |
-| r04 Stormcrag | 31-40 | 46 | 52 | 58 | 13.0 | 3.0 |
-| r05 Rustwood | 41-50 | 46 | 51 | 58 | 12.6 | 3.0 |
-| r06 Frostmere | 51-60 | 47 | 53 | 59 | 13.1 | 2.9 |
-| r07 Thunderspire | 61-70 | 45 | 50 | 57 | 13.1 | 3.0 |
-| r08 Deepwild | 71-80 | 45 | 50 | 57 | 13.0 | 3.0 |
-| r09 Cinder Throne | 81-90 | 45 | 50 | 57 | 12.7 | 3.0 |
-| r10 Worldcrown | 91-100 | 45 | 50 | 57 | 12.8 | 3.0 |
-| **Total** | 1-100 | 496 | 515 | 534 | 129.1 | 29.4 |
+| r01 Verdant Hollow | 1-10 | 41 | 45 | 49 | 6.3 | 2.8 |
+| r02 Emberreach | 11-20 | 42 | 46 | 50 | 6.9 | 2.8 |
+| r03 Tidefall | 21-30 | 42 | 45 | 50 | 6.5 | 2.8 |
+| r04 Stormcrag | 31-40 | 42 | 45 | 50 | 6.5 | 2.9 |
+| r05 Rustwood | 41-50 | 41 | 45 | 50 | 6.5 | 2.9 |
+| r06 Frostmere | 51-60 | 42 | 46 | 50 | 6.4 | 2.8 |
+| r07 Thunderspire | 61-70 | 40 | 44 | 49 | 6.4 | 2.9 |
+| r08 Deepwild | 71-80 | 40 | 44 | 48 | 6.3 | 2.9 |
+| r09 Cinder Throne | 81-90 | 40 | 44 | 48 | 6.2 | 2.8 |
+| r10 Worldcrown | 91-100 | 40 | 44 | 48 | 6.3 | 2.9 |
+| **Total** | 1-100 | 437 | 450 | 463 | 64.2 | 28.4 |
 
 Target: total p50 400-600: ok.
 
@@ -58,45 +58,45 @@ fielded beasts. Target: the fielded and avatar medians within 3 levels of the no
 | Region | Stage | Node | Level | Fielded p10 | Fielded p50 | Fielded p90 | Avatar p50 | Verdict |
 | --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | --- |
 | r01 | 1 | Gate | 3 | 2.7 | 3.0 | 3.0 | 3 | ok |
-| r01 | 2 | Gate | 5 | 5.0 | 5.7 | 6.0 | 5 | ok |
-| r01 | 3 | Gate | 7 | 7.3 | 8.0 | 8.0 | 8 | ok |
+| r01 | 2 | Gate | 5 | 5.0 | 5.3 | 6.0 | 5 | ok |
+| r01 | 3 | Gate | 7 | 7.3 | 7.7 | 8.0 | 8 | ok |
 | r01 | 4 | Boss | 10 | 9.7 | 10.0 | 10.0 | 10 | ok |
-| r02 | 1 | Gate | 13 | 12.7 | 13.0 | 13.3 | 13 | ok |
-| r02 | 2 | Gate | 15 | 15.0 | 15.7 | 16.0 | 16 | ok |
-| r02 | 3 | Gate | 17 | 17.7 | 18.0 | 18.0 | 18 | ok |
+| r02 | 1 | Gate | 13 | 12.7 | 13.0 | 13.0 | 13 | ok |
+| r02 | 2 | Gate | 15 | 15.0 | 15.7 | 16.0 | 15 | ok |
+| r02 | 3 | Gate | 17 | 17.3 | 18.0 | 18.0 | 18 | ok |
 | r02 | 4 | Boss | 20 | 19.7 | 20.0 | 20.0 | 20 | ok |
-| r03 | 1 | Gate | 23 | 22.7 | 23.0 | 23.3 | 23 | ok |
-| r03 | 2 | Gate | 25 | 25.0 | 25.7 | 26.0 | 26 | ok |
+| r03 | 1 | Gate | 23 | 22.7 | 23.0 | 23.0 | 23 | ok |
+| r03 | 2 | Gate | 25 | 25.0 | 25.7 | 26.0 | 25 | ok |
 | r03 | 3 | Gate | 27 | 27.7 | 28.0 | 28.0 | 28 | ok |
 | r03 | 4 | Boss | 30 | 29.7 | 30.0 | 30.0 | 30 | ok |
-| r04 | 1 | Gate | 33 | 32.7 | 33.0 | 33.3 | 33 | ok |
+| r04 | 1 | Gate | 33 | 32.7 | 33.0 | 33.0 | 33 | ok |
 | r04 | 2 | Gate | 35 | 35.0 | 35.7 | 36.0 | 36 | ok |
 | r04 | 3 | Gate | 37 | 37.7 | 38.0 | 38.0 | 38 | ok |
-| r04 | 4 | Boss | 40 | 39.7 | 40.0 | 40.3 | 40 | ok |
-| r05 | 1 | Gate | 43 | 42.7 | 43.0 | 43.3 | 43 | ok |
+| r04 | 4 | Boss | 40 | 39.7 | 40.0 | 40.0 | 40 | ok |
+| r05 | 1 | Gate | 43 | 42.7 | 43.0 | 43.0 | 43 | ok |
 | r05 | 2 | Gate | 45 | 45.0 | 45.7 | 46.0 | 46 | ok |
 | r05 | 3 | Gate | 47 | 47.7 | 48.0 | 48.0 | 48 | ok |
-| r05 | 4 | Boss | 50 | 50.0 | 50.0 | 50.3 | 50 | ok |
-| r06 | 1 | Gate | 53 | 52.7 | 53.0 | 53.3 | 53 | ok |
+| r05 | 4 | Boss | 50 | 49.7 | 50.0 | 50.3 | 50 | ok |
+| r06 | 1 | Gate | 53 | 52.7 | 53.0 | 53.0 | 53 | ok |
 | r06 | 2 | Gate | 55 | 55.0 | 55.7 | 56.0 | 56 | ok |
 | r06 | 3 | Gate | 57 | 57.7 | 58.0 | 58.0 | 58 | ok |
-| r06 | 4 | Boss | 60 | 60.0 | 60.0 | 60.3 | 60 | ok |
-| r07 | 1 | Gate | 63 | 62.7 | 63.0 | 63.3 | 63 | ok |
+| r06 | 4 | Boss | 60 | 59.7 | 60.0 | 60.0 | 60 | ok |
+| r07 | 1 | Gate | 63 | 62.7 | 63.0 | 63.0 | 63 | ok |
 | r07 | 2 | Gate | 65 | 65.0 | 65.7 | 66.0 | 66 | ok |
 | r07 | 3 | Gate | 67 | 67.7 | 68.0 | 68.0 | 68 | ok |
-| r07 | 4 | Boss | 70 | 70.0 | 70.0 | 70.3 | 70 | ok |
-| r08 | 1 | Gate | 73 | 72.7 | 73.0 | 73.3 | 73 | ok |
+| r07 | 4 | Boss | 70 | 69.7 | 70.0 | 70.0 | 70 | ok |
+| r08 | 1 | Gate | 73 | 72.7 | 73.0 | 73.0 | 73 | ok |
 | r08 | 2 | Gate | 75 | 75.0 | 75.7 | 76.0 | 76 | ok |
 | r08 | 3 | Gate | 77 | 77.7 | 78.0 | 78.0 | 78 | ok |
-| r08 | 4 | Boss | 80 | 79.7 | 80.0 | 80.3 | 80 | ok |
+| r08 | 4 | Boss | 80 | 79.7 | 80.0 | 80.0 | 80 | ok |
 | r09 | 1 | Gate | 83 | 82.7 | 83.0 | 83.3 | 83 | ok |
 | r09 | 2 | Gate | 85 | 85.0 | 85.7 | 86.0 | 86 | ok |
 | r09 | 3 | Gate | 87 | 87.7 | 88.0 | 88.0 | 88 | ok |
-| r09 | 4 | Boss | 90 | 90.0 | 90.0 | 90.3 | 90 | ok |
+| r09 | 4 | Boss | 90 | 89.7 | 90.0 | 90.3 | 90 | ok |
 | r10 | 1 | Gate | 93 | 92.7 | 93.0 | 93.3 | 93 | ok |
 | r10 | 2 | Gate | 95 | 95.0 | 95.7 | 96.0 | 96 | ok |
 | r10 | 3 | Gate | 97 | 97.7 | 98.0 | 98.0 | 98 | ok |
-| r10 | 4 | Boss | 100 | 100.0 | 100.0 | 100.0 | 100 | ok |
+| r10 | 4 | Boss | 100 | 99.7 | 100.0 | 100.0 | 100 | ok |
 
 ## Kinship and the bench
 
@@ -106,35 +106,35 @@ Recruits joining (every campaign): the region and stage, the join level (the fie
 | --- | ---: | ---: | ---: | ---: | ---: | --- |
 | r01 | 1.0 | 1 | 1 | 2.0 | 1.1 | treant |
 | r02 | 1.0 | 1 | 9 | 12.0 | 1.1 | kirin |
-| r03 | 1.0 | 1 | 19 | 22.0 | 1.1 | leviathan |
-| r04 | 1.0 | 2 | 31 | 34.7 | 1.1 | thunderbird |
+| r03 | 1.0 | 1 | 18 | 21.7 | 1.1 | leviathan |
+| r04 | 1.0 | 2 | 31 | 34.3 | 1.1 | thunderbird |
 | r05 | 1.0 | 2 | 41 | 44.3 | 1.1 | tarasque |
-| r06 | 2.0 | 1 | 50 | 53.0 | 2.1 | basilisk, frost_wyrm |
+| r06 | 2.0 | 1 | 50 | 53.0 | 2.2 | basilisk, frost_wyrm |
 
-Caches found on the way (one walk per stage, as above): gold p50 940, materials p50 9 (essence shards) per campaign.
+Caches found on the way (one walk per stage, as above): gold p50 935, materials p50 8 (essence shards) per campaign.
 
 At each boss, before its seal's release. The bench (the Kinship recruits) earns 10% of a standing fielded beast's XP, +9.0% per level below the enemy (up to 100%), then the falloff; Camp trains the lowest bench beast. Targets: the beasts owned at
 r01-r06's bosses 4, 5, 6, 7, 8, 10 (median); the bench median 5-8 levels below the fielded team from region 3; its lowest beast within 8 at every boss (median).
 
 | Region | Boss level | Owned p50 | Fielded p50 | Bench p50 | Bench gap p50 | Lowest bench p50 | Lowest gap p50 | Verdict |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| r01 | 10 | 4 | 10.3 | 7.0 | 3.0 | 7.0 | 3.0 | owned ok, lowest ok |
-| r02 | 20 | 5 | 20.3 | 16.0 | 4.3 | 16.0 | 4.3 | owned ok, lowest ok |
+| r01 | 10 | 4 | 10.0 | 7.0 | 3.0 | 7.0 | 3.0 | owned ok, lowest ok |
+| r02 | 20 | 5 | 20.0 | 16.0 | 4.3 | 16.0 | 4.3 | owned ok, lowest ok |
 | r03 | 30 | 6 | 30.3 | 25.3 | 5.0 | 25.0 | 5.3 | owned ok, lowest ok, bench ok |
 | r04 | 40 | 7 | 40.3 | 35.3 | 5.1 | 35.0 | 5.3 | owned ok, lowest ok, bench ok |
-| r05 | 50 | 8 | 50.3 | 45.2 | 5.3 | 45.0 | 5.3 | owned ok, lowest ok, bench ok |
-| r06 | 60 | 10 | 60.3 | 55.1 | 5.3 | 55.0 | 5.7 | owned ok, lowest ok, bench ok |
-| r07 | 70 | 10 | 70.3 | 65.0 | 5.5 | 65.0 | 5.7 | lowest ok, bench ok |
-| r08 | 80 | 10 | 80.3 | 75.0 | 5.7 | 75.0 | 6.0 | lowest ok, bench ok |
-| r09 | 90 | 10 | 90.3 | 84.7 | 5.7 | 84.0 | 6.0 | lowest ok, bench ok |
-| r10 | 100 | 10 | 100.0 | 94.6 | 5.4 | 94.0 | 6.0 | lowest ok, bench ok |
+| r05 | 50 | 8 | 50.3 | 45.0 | 5.3 | 45.0 | 5.3 | owned ok, lowest ok, bench ok |
+| r06 | 60 | 10 | 60.3 | 55.1 | 5.2 | 55.0 | 5.7 | owned ok, lowest ok, bench ok |
+| r07 | 70 | 10 | 70.3 | 64.9 | 5.6 | 64.0 | 6.0 | lowest ok, bench ok |
+| r08 | 80 | 10 | 80.3 | 74.6 | 5.7 | 74.0 | 6.0 | lowest ok, bench ok |
+| r09 | 90 | 10 | 90.3 | 84.4 | 5.7 | 84.0 | 6.0 | lowest ok, bench ok |
+| r10 | 100 | 10 | 100.0 | 94.4 | 5.6 | 94.0 | 6.0 | lowest ok, bench ok |
 
 ## Level cap, bank and falloff
 
 - Cap exceeded: 0 beast-levels over all campaigns (target 0): ok
 - Banked levels per beast at a seal (before its release): p50 0.0, p90 0.0, max 0.0 (target p50 <= 3): ok
 - XP lost past the bank limit: 0.0 per campaign (all beasts)
-- XP lost to the level-gap falloff: fielded 22.5% of their battle XP, avatar 21.9%
+- XP lost to the level-gap falloff: fielded 21.1% of their battle XP, avatar 20.6%
 
 ## Grind probe
 
@@ -157,27 +157,27 @@ consumable at every den, pass and lair battle. Purchases do not change the clear
 
 | Region | Gold earned p50 | Visits (mean) | Battles per visit | Gold held at the boss p50 | Held / visit income p50 | Gear at typical (mean) | Consumables used (mean) | Verdict |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| r01 | 993 | 6.2 | 8.3 | 164 | 1.0 | 64% | 7.4 | ok |
-| r02 | 1860 | 6.2 | 8.4 | 359 | 1.2 | 98% | 7.6 | ok |
-| r03 | 2800 | 6.2 | 8.4 | 560 | 1.2 | 50% | 7.7 | ok |
-| r04 | 3696 | 6.2 | 8.3 | 921 | 1.6 | 74% | 7.8 | ok |
-| r05 | 4639 | 6.2 | 8.3 | 1090 | 1.5 | 38% | 7.7 | ok |
-| r06 | 5533 | 6.2 | 8.6 | 1554 | 1.7 | 61% | 7.7 | ok |
-| r07 | 6458 | 6.2 | 8.2 | 1585 | 1.5 | 19% | 7.7 | ok |
-| r08 | 7376 | 6.2 | 8.2 | 1966 | 1.6 | 37% | 7.7 | ok |
-| r09 | 8317 | 6.1 | 8.3 | 2213 | 1.6 | 15% | 7.7 | ok |
-| r10 | 9193 | 6.2 | 8.2 | 2530 | 1.6 | 29% | 7.7 | ok |
-| **Campaign** | 50791 | 61.8 | | | | | | |
+| r01 | 992 | 6.2 | 7.3 | 164 | 1.0 | 64% | 6.8 | ok |
+| r02 | 1862 | 6.2 | 7.4 | 353 | 1.2 | 98% | 7.1 | ok |
+| r03 | 2792 | 6.2 | 7.3 | 570 | 1.2 | 50% | 7.2 | ok |
+| r04 | 3695 | 6.1 | 7.4 | 936 | 1.5 | 75% | 7.3 | ok |
+| r05 | 4618 | 6.2 | 7.3 | 1084 | 1.5 | 39% | 7.2 | ok |
+| r06 | 5499 | 6.2 | 7.4 | 1548 | 1.7 | 62% | 7.2 | ok |
+| r07 | 6442 | 6.1 | 7.2 | 1570 | 1.5 | 19% | 7.2 | ok |
+| r08 | 7328 | 6.2 | 7.0 | 1943 | 1.6 | 37% | 7.2 | ok |
+| r09 | 8254 | 6.2 | 7.1 | 2109 | 1.5 | 15% | 7.2 | ok |
+| r10 | 9172 | 6.2 | 7.2 | 2575 | 1.7 | 30% | 7.2 | ok |
+| **Campaign** | 50606 | 61.9 | | | | | | |
 
 Design reference (not a gate): about 900 gold in region 1, 4400 in region 5, 8800 in region 10, 55000 over the campaign. Gold held target: under 2.0 visits' income at every boss (p50). "Gear at typical" = the share of the fielded beasts' slots at or
 above the typical profile (`--gear typical`) for the boss's band.
 
 | Gate | Target | Result | Verdict |
 | --- | --- | --- | --- |
-| Want-list affordability (gold spent / wanted, per visit) | p50 55%-80% | p10 9%, p50 73%, p90 100% | ok |
-| Visits where nothing meaningful in stock (material, gear, consumable, skill) is affordable on arrival | under 5% | 0% of 61750 | ok |
+| Want-list affordability (gold spent / wanted, per visit) | p50 55%-80% | p10 7%, p50 73%, p90 100% | ok |
+| Visits where nothing meaningful in stock (material, gear, consumable, skill) is affordable on arrival | under 5% | 0% of 61913 | ok |
 
-Per campaign (means): bought AvatarGear 10.2, AvatarPassive 5.4, AvatarSkill 5.4, BeastGear 28.0, BeastSkill 1.9, Consumable 77.3, Cosmetic 30.9 (materials by tier: 0.0 / 0.0 / 0.0); gear dropped 10.7, from passes and lairs 40.0, sold back 76.9 for 8414 gold (14% of all gold; target about 10-15%); looks unlocked by source boss 14.0, drop 3.2, milestone 18.0, shop 30.9.
+Per campaign (means): bought AvatarGear 10.2, AvatarPassive 5.4, AvatarSkill 5.3, BeastGear 28.1, BeastSkill 1.9, Consumable 72.2, Cosmetic 30.9 (materials by tier: 0.0 / 0.0 / 0.0); gear dropped 10.7, from passes and lairs 40.0, sold back 77.0 for 8441 gold (14% of all gold; target about 10-15%); looks unlocked by source boss 14.0, drop 3.1, milestone 18.0, shop 30.9.
 
 ## Idle rewards
 
@@ -205,24 +205,24 @@ beast XP credited (battles, camps and idle).
 
 | Region | Claims (mean) | Idle gold p50 | Gold share | Material share | XP share |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| r01 | 3.5 | 48 | 5.2% | 7.1% | 8.6% |
-| r02 | 4.2 | 128 | 6.5% | 14.3% | 8.6% |
-| r03 | 4.1 | 192 | 6.5% | 9.8% | 8.0% |
-| r04 | 4.1 | 256 | 6.5% | 13.9% | 7.3% |
-| r05 | 4.1 | 320 | 6.5% | 4.1% | 6.9% |
-| r06 | 4.2 | 384 | 6.6% | 12.5% | 5.6% |
-| r07 | 4.1 | 448 | 6.5% | 9.5% | 9.0% |
-| r08 | 4.1 | 512 | 6.5% | 15.8% | 9.1% |
-| r09 | 4.0 | 576 | 6.5% | 13.6% | 9.1% |
-| r10 | 4.0 | 640 | 6.5% | 17.1% | 9.1% |
+| r01 | 3.0 | 48 | 4.6% | 5.9% | 7.6% |
+| r02 | 3.7 | 128 | 6.1% | 13.0% | 8.0% |
+| r03 | 3.6 | 176 | 6.0% | 8.7% | 7.2% |
+| r04 | 3.6 | 256 | 6.1% | 12.0% | 6.8% |
+| r05 | 3.7 | 320 | 6.2% | 3.4% | 6.5% |
+| r06 | 3.7 | 384 | 6.3% | 11.1% | 5.3% |
+| r07 | 3.5 | 432 | 6.0% | 8.3% | 8.2% |
+| r08 | 3.5 | 496 | 5.8% | 13.6% | 8.0% |
+| r09 | 3.5 | 560 | 6.0% | 12.1% | 8.4% |
+| r10 | 3.5 | 624 | 6.0% | 15.4% | 8.2% |
 
 | Over the campaign | Ceiling | p10 | p50 | p90 | Verdict |
 | --- | --- | ---: | ---: | ---: | --- |
-| Idle gold / all gold (clears, gear sales, idle) | at most 15.0% | 5.4% | 5.7% | 6.0% | ok |
-| Idle materials / all materials (by XP value) | at most 15.0% | 10.6% | 13.5% | 16.8% | ok |
-| Idle beast XP / all beast XP | at most 10.0% | 7.8% | 8.3% | 8.7% | ok |
+| Idle gold / all gold (clears, gear sales, idle) | at most 15.0% | 4.8% | 5.0% | 5.2% | ok |
+| Idle materials / all materials (by XP value) | at most 15.0% | 9.1% | 12.0% | 15.2% | ok |
+| Idle beast XP / all beast XP | at most 10.0% | 7.0% | 7.3% | 7.6% | ok |
 
-Per campaign (means): 40.6 claims (40.6 reached the cap), 324.5 idle hours paid, 3568 gold (p50), materials by tier 19.1 / 23.2 / 2.5 (clears: 96.9 / 113.2 / 25.7), 0.04 idle look drops; idle avatar XP 8.8% of the avatar's XP (p50; not gated).
+Per campaign (means): 35.4 claims (35.4 reached the cap), 283.4 idle hours paid, 3120 gold (p50), materials by tier 16.6 / 20.2 / 2.2 (clears: 97.3 / 113.3 / 25.7), 0.04 idle look drops; idle avatar XP 7.8% of the avatar's XP (p50; not gated).
 
 ## Focus skill
 
@@ -231,14 +231,17 @@ economy design): L5 15-20, L10 ~80 +/-10%, L15 ~180 +/-10%, L20 at least 270.
 
 | Level | Target (p50) | p10 | p50 | p90 | Verdict |
 | ---: | --- | ---: | ---: | ---: | --- |
-| 5 | 15-20 | 16 | 17 | 20 | ok |
-| 10 | ~80 (72-88) | 70 | 77 | 86 | ok |
-| 15 | ~180 (162-198) | 156 | 173 | 188 | ok |
-| 20 | 270+ | 281 | 301 | 318 | ok |
+| 5 | 15-20 | 15 | 17 | 19 | ok |
+| 10 | ~80 (72-88) | 65 | 72 | 80 | ok |
+| 15 | ~180 (162-198) | 142 | 155 | 168 | **MISS** |
+| 20 | 270+ | 253 | 268 | 281 | **MISS** |
 
 ## Verdict
 
-Every gate is met.
+Gates missed:
+
+- Focus skill L15: p50 155 is outside 162-198.
+- Focus skill L20: p50 268 is outside 270-2147483647.
 
 ## Post-game
 
