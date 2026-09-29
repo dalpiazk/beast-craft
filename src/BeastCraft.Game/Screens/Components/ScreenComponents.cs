@@ -29,6 +29,9 @@ namespace BeastCraft.Game.Screens.Components
 
         /// <summary>+ a stat/identity line under the title (the beast detail screen's shape).</summary>
         public const float Tall = 330f;
+
+        /// <summary>+ two extra lines under the title (a name/level line, then a small counter), with more breathing room before the divider — the Achievements screen's shape.</summary>
+        public const float Roomy = 250f;
     }
 
     /// <summary>
