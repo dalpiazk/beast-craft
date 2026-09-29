@@ -21,7 +21,9 @@ namespace BeastCraft.Save
     /// (<c>MapRun.Difficulty</c>, schema 6), the onboarding state: Hearthglen cleared and the
     /// tutorial hints seen (<see cref="Tutorial"/>, schema 7), and the discovery layer: each region's
     /// fog, points of interest found and discovery seed (<c>RegionProgress</c>), the Kinship sites
-    /// claimed, the shrines' Grove unlocks and the lore found (<see cref="Discovery"/>, schema 8).
+    /// claimed, the shrines' Grove unlocks and the lore found (<see cref="Discovery"/>, schema 8), and
+    /// the compendium's achievements and titles (<see cref="Achievements"/>) and look tokens
+    /// (<see cref="LookTokens"/>, schema 9).
     /// <para>
     /// <strong>JsonUtility-compatible by construction.</strong> Every type reachable from here is
     /// <c>[Serializable]</c> with public fields, and every map is a list (<c>JsonUtility</c> drops
@@ -41,7 +43,7 @@ namespace BeastCraft.Save
     public class PlayerSave
     {
         /// <summary>The schema this code writes, and the newest it reads.</summary>
-        public const int CurrentSchemaVersion = 8;
+        public const int CurrentSchemaVersion = 9;
 
         /// <summary>The schema the data is in. 0 (or missing) is never valid.</summary>
         public int SchemaVersion = CurrentSchemaVersion;
@@ -117,6 +119,22 @@ namespace BeastCraft.Save
         /// (<see cref="DiscoveryProgress"/>). Added in schema 8.
         /// </summary>
         public DiscoveryProgress Discovery = new DiscoveryProgress();
+
+        /// <summary>
+        /// The compendium's achievements and titles: every achievement earned, the titles it unlocked
+        /// and the one equipped (<see cref="Progression.AchievementProgress"/>). Change it through
+        /// <c>Progression.AchievementRules</c>. Deterministic — no RNG — and display only: a title
+        /// never changes a stat. Added in schema 9.
+        /// </summary>
+        public Progression.AchievementProgress Achievements = new Progression.AchievementProgress();
+
+        /// <summary>
+        /// Look tokens held: spent to unlock a look from the token pool
+        /// (<c>Economy.CosmeticRules.SpendLookToken</c>), earned when a cache's or a region's 100%
+        /// reward's look was already owned (<c>Economy.CosmeticRules.UnlockOrRefund</c>) instead of
+        /// wasting it. Never negative. Added in schema 9.
+        /// </summary>
+        public int LookTokens;
 
         /// <summary>
         /// A blank save: no beasts, avatar level 1, nothing learned or held, the first campaign region
@@ -344,6 +362,20 @@ namespace BeastCraft.Save
             }
 
             repaired += Discovery.EnsureInitialized();
+
+            if (Achievements == null)
+            {
+                Achievements = new Progression.AchievementProgress();
+                repaired++;
+            }
+
+            repaired += Achievements.EnsureInitialized();
+            if (LookTokens < 0)
+            {
+                LookTokens = 0;
+                repaired++;
+            }
+
             return repaired;
         }
 

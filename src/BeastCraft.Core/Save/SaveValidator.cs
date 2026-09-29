@@ -87,7 +87,45 @@ namespace BeastCraft.Save
             ValidateMaterials(save.Materials, catalog, issues);
             ValidateCampaign(save.Campaign, catalog, issues);
             ValidateIdle(save.Idle, issues);
+            ValidateCompendium(save, issues);
             return issues;
+        }
+
+        /// <summary>The compendium (schema 9): look tokens never negative, no achievement or title id used twice, an equipped title owned.</summary>
+        private static void ValidateCompendium(PlayerSave save, List<SaveIssue> issues)
+        {
+            CheckRange(issues, "LookTokens", save.LookTokens, 0, int.MaxValue);
+
+            Progression.AchievementProgress achievements = save.Achievements;
+            if (achievements == null)
+            {
+                return;
+            }
+
+            HashSet<string> earned = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < (achievements.EarnedIds == null ? 0 : achievements.EarnedIds.Count); i++)
+            {
+                string id = achievements.EarnedIds[i];
+                if (string.IsNullOrEmpty(id) || !earned.Add(id))
+                {
+                    issues.Add(new SaveIssue(SaveIssueKind.InvalidValue, "Achievements.EarnedIds[" + i + "]", id, "achievement id is empty or earned twice"));
+                }
+            }
+
+            HashSet<string> owned = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < (achievements.OwnedTitleIds == null ? 0 : achievements.OwnedTitleIds.Count); i++)
+            {
+                string id = achievements.OwnedTitleIds[i];
+                if (string.IsNullOrEmpty(id) || !owned.Add(id))
+                {
+                    issues.Add(new SaveIssue(SaveIssueKind.InvalidValue, "Achievements.OwnedTitleIds[" + i + "]", id, "title id is empty or owned twice"));
+                }
+            }
+
+            if (!string.IsNullOrEmpty(achievements.EquippedTitleId) && !owned.Contains(achievements.EquippedTitleId))
+            {
+                issues.Add(new SaveIssue(SaveIssueKind.InvalidValue, "Achievements.EquippedTitleId", achievements.EquippedTitleId, "equipped title is not owned"));
+            }
         }
 
         /// <summary>The idle clock (schema 5): no negative time, count or seed-less started clock; a monotonic reading of −1 means "not available".</summary>

@@ -63,6 +63,9 @@ namespace BeastCraft.Economy
             get { return _milestones; }
         }
 
+        /// <summary><see cref="CosmeticLibraryData.DuplicateLookTokens"/> (0 or more).</summary>
+        public int DuplicateLookTokens { get; private set; }
+
         /// <summary>Indexes <paramref name="data"/> (null gives an empty library).</summary>
         public static CosmeticLibrary Build(CosmeticLibraryData data)
         {
@@ -72,6 +75,7 @@ namespace BeastCraft.Economy
                 return library;
             }
 
+            library.DuplicateLookTokens = Math.Max(0, data.DuplicateLookTokens);
             foreach (CosmeticCategoryData c in data.Categories ?? new CosmeticCategoryData[0])
             {
                 if (c == null || string.IsNullOrEmpty(c.CategoryId) || library._byId.ContainsKey(c.CategoryId))
@@ -150,6 +154,25 @@ namespace BeastCraft.Economy
         public static int RegionOfLevel(int level)
         {
             return Math.Max(1, Math.Min(10, ((Math.Max(1, level) - 1) / 10) + 1));
+        }
+
+        /// <summary>Every token-purchasable look (<see cref="CosmeticOption.TokenPurchasable"/>), sorted by key (a stable, deterministic list).</summary>
+        public List<CosmeticOption> TokenPool()
+        {
+            List<CosmeticOption> pool = new List<CosmeticOption>();
+            foreach (CosmeticCategory category in _categories)
+            {
+                foreach (CosmeticOption option in category.Options)
+                {
+                    if (option.TokenPurchasable)
+                    {
+                        pool.Add(option);
+                    }
+                }
+            }
+
+            pool.Sort((a, b) => string.CompareOrdinal(a.Key, b.Key));
+            return pool;
         }
     }
 
@@ -233,6 +256,8 @@ namespace BeastCraft.Economy
             MinRegion = Math.Max(1, data.MinRegion);
             UnlockId = data.UnlockId ?? string.Empty;
             ArtKey = data.ArtKey ?? string.Empty;
+            TokenPurchasable = data.TokenPurchasable;
+            TokenPrice = data.TokenPrice;
         }
 
         public CosmeticCategory Category { get; }
@@ -259,6 +284,12 @@ namespace BeastCraft.Economy
         public string UnlockId { get; }
 
         public string ArtKey { get; }
+
+        /// <summary>Whether look tokens can buy this look directly (an explicit, data-driven pool).</summary>
+        public bool TokenPurchasable { get; }
+
+        /// <summary>The look tokens <see cref="TokenPurchasable"/> costs; 0 when it is not token-purchasable.</summary>
+        public int TokenPrice { get; }
 
         /// <summary>Free to wear without an unlock: the default or a starter look.</summary>
         public bool IsFree

@@ -33,6 +33,13 @@ namespace BeastCraft.Discovery
         /// <summary>Lore entry ids (<c>discovery.json</c> <c>Lore</c>) found at lore stones, in order, each once. The compendium's seed.</summary>
         public List<string> LoreIds = new List<string>();
 
+        /// <summary>
+        /// A species joined through a Kinship site (<see cref="KinshipRules.Choose"/>), in join order,
+        /// each species once (a site never offers a species already owned, so a species joins through
+        /// Kinship at most once). The compendium's "found through Kinship" state (schema 9).
+        /// </summary>
+        public List<KinshipJoinRecord> KinshipJoins = new List<KinshipJoinRecord>();
+
         /// <summary>Whether a won trial's choice is waiting.</summary>
         public bool HasPendingKinship
         {
@@ -43,6 +50,25 @@ namespace BeastCraft.Discovery
         public bool HasClaimed(string siteId)
         {
             return Contains(ClaimedKinshipIds, siteId);
+        }
+
+        /// <summary>The Kinship join record of <paramref name="speciesId"/> (the site it joined at), or null when it did not join through Kinship.</summary>
+        public KinshipJoinRecord FindKinshipJoin(string speciesId)
+        {
+            if (string.IsNullOrEmpty(speciesId) || KinshipJoins == null)
+            {
+                return null;
+            }
+
+            foreach (KinshipJoinRecord join in KinshipJoins)
+            {
+                if (join != null && join.SpeciesId == speciesId)
+                {
+                    return join;
+                }
+            }
+
+            return null;
         }
 
         /// <summary>Adds <paramref name="id"/> to <paramref name="list"/> unless empty or already there; returns whether it was added.</summary>
@@ -70,6 +96,15 @@ namespace BeastCraft.Discovery
                 repaired++;
             }
 
+            if (KinshipJoins == null)
+            {
+                KinshipJoins = new List<KinshipJoinRecord>();
+                repaired++;
+            }
+
+            repaired += KinshipJoins.RemoveAll(join => join == null || string.IsNullOrEmpty(join.SpeciesId));
+            HashSet<string> joined = new HashSet<string>(StringComparer.Ordinal);
+            repaired += KinshipJoins.RemoveAll(join => !joined.Add(join.SpeciesId));
             return repaired;
         }
 
@@ -91,5 +126,14 @@ namespace BeastCraft.Discovery
             repaired += list.RemoveAll(id => string.IsNullOrEmpty(id) || !seen.Add(id));
             return repaired;
         }
+    }
+
+    /// <summary>A species that joined through a Kinship site: which site (<see cref="DiscoveryProgress.KinshipJoins"/>).</summary>
+    [Serializable]
+    public class KinshipJoinRecord
+    {
+        public string SpeciesId;
+
+        public string SiteId;
     }
 }

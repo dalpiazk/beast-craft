@@ -506,9 +506,12 @@ namespace BeastCraft.Campaign
         /// drawn on <c>DeriveSeed(node.EncounterSeed, </c><see cref="NodeRewardStream"/><c>)</c>
         /// (<see cref="CampaignResult.GearGranted"/>); a lair's first clear also unlocks its
         /// boss-exclusive looks and then any milestone looks reached (<see cref="CampaignResult.CosmeticsUnlocked"/>).
-        /// A replay grants nothing new.
+        /// A replay grants nothing new. When <paramref name="achievements"/> is given, a first boss
+        /// clear also evaluates it (<see cref="CampaignResult.TitlesEarned"/>; null — the default,
+        /// unchanged from before this parameter existed — means achievements are not wired up).
         /// </summary>
-        public static CampaignResult ResolveBattle(PlayerSave save, RegionLibrary library, int nodeId, BattleOutcome outcome, EconomyContent economy)
+        public static CampaignResult ResolveBattle(PlayerSave save, RegionLibrary library, int nodeId, BattleOutcome outcome, EconomyContent economy,
+                                                    AchievementContent achievements = null)
         {
             CampaignResult refused = CheckNode(save, library, nodeId, out MapRun run, out MapNode node, out RegionData region);
             if (refused != null)
@@ -602,6 +605,11 @@ namespace BeastCraft.Campaign
                 if (economy != null && economy.Cosmetics != null)
                 {
                     result.CosmeticsUnlocked.AddRange(CosmeticRules.UnlockMilestones(save, economy.Cosmetics));
+                }
+
+                if (achievements != null)
+                {
+                    result.TitlesEarned.AddRange(AchievementRules.Evaluate(save, achievements));
                 }
 
                 return result;
@@ -1173,6 +1181,13 @@ namespace BeastCraft.Campaign
 
         /// <summary>A won Trial's beast pick (2 or 3; <see cref="StarterPicks"/>), now pending; 0 otherwise.</summary>
         public int PickStep { get; internal set; }
+
+        /// <summary>
+        /// Achievements newly earned by this call (a region's boss cleared; empty unless
+        /// <c>ResolveBattle</c> was passed <c>achievements</c>, and on any call but a first boss
+        /// clear). Each awards a text title, never a stat.
+        /// </summary>
+        public List<AchievementData> TitlesEarned { get; } = new List<AchievementData>();
 
         internal static CampaignResult Refused(string error)
         {

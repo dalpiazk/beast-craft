@@ -2,7 +2,8 @@
 
 **Status: BUILT (PR A).** Every name, lore entry, shrine and cache text, trial and look is **DRAFT
 pending producer review** (the text lives in the data files below; the content bible holds the
-flavour). PR B (the compendium, achievements and look tokens) builds on the seams listed at the end.
+flavour). PR B (the compendium, achievements and look tokens; Core/content/save/tests done, screens
+next) builds on the seams listed at the end — see [compendium-achievements.md](compendium-achievements.md).
 The producer decisions this build follows are at the end; Hearthglen (area-zero.md) supersedes the
 original "pick 3 starters at New Game".
 
@@ -173,11 +174,19 @@ tuning log's "Kinship: roster growth, trials and the r02 fall-off".
 
 ## Seams for PR B
 
+**Built (Core/content/save/tests); see [compendium-achievements.md](compendium-achievements.md) for the full design:**
+
 - **Compendium**: `DiscoveryProgress.LoreIds` (lore found), `ClaimedKinshipIds` (sites claimed), the
   roster page's silhouettes ("Found through Kinship"); `LoreEntryData` carries a title and text.
-- **Achievements**: `RegionProgress.Completed` and `DiscoveryRules.Completion` per region.
+  `CompendiumRules` is the pure derived view; `DiscoveryProgress.KinshipJoins` (schema 9) added the one
+  fact needed beyond PR A's save shape (which site a beast joined through).
+- **Achievements**: `RegionProgress.Completed` and `DiscoveryRules.Completion` per region (now also
+  `AchievementRules.Evaluate`, `content/data/Progression/achievements.json`).
 - **Look tokens**: caches and 100% looks unlock through `CosmeticRules.Unlock` (a look already owned
-  unlocks nothing today: the place to convert it into tokens).
+  unlocks nothing today: the place to convert it into tokens) — now `CosmeticRules.UnlockOrRefund`.
+
+**Still open (a later feature):**
+
 - **The Grove**: `DiscoveryProgress.GroveUnlockIds` holds the shrines' unlocks until it consumes them.
 
 ## Content
@@ -211,8 +220,10 @@ This build's calls (for review):
 
 ## Open questions
 
-- The seventh site can only offer the last beast (7 sites, 7 unowned): a choice of one. Add an eighth
-  species, or accept it as "the last beast chooses you"?
+- ~~The seventh site can only offer the last beast (7 sites, 7 unowned): a choice of one. Add an
+  eighth species, or accept it as "the last beast chooses you"?~~ **Resolved (PR B)**: "the last beast
+  chooses you" — flavour only (`KinshipResult.SoloOffer`), no eighth species; see
+  compendium-achievements.md, "'The last beast chooses you'".
 - ~~The new player still sits below the calibrated tiers from r03 on without the easing... Calibrate
   for the owned roster, or ease longer?~~ **Resolved**: calibrate for the owned roster
   (`--mode typical`, a producer decision), plus adaptive assist for what is still left after a loss;

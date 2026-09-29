@@ -48,9 +48,25 @@ namespace BeastCraft.Discovery
         /// <summary>The beast that joined.</summary>
         public OwnedBeast Beast;
 
+        /// <summary>
+        /// Achievements newly earned by this call (<see cref="DiscoveryContent.Achievements"/>; empty
+        /// when it is not wired up). Each awards a text title, never a stat.
+        /// </summary>
+        public List<Progression.AchievementData> TitlesEarned = new List<Progression.AchievementData>();
+
         public bool Success
         {
             get { return Outcome != KinshipOutcome.Refused; }
+        }
+
+        /// <summary>
+        /// Whether the offer is a solo one (one beast, not two): the seventh site, which can only offer
+        /// the last unowned species (producer decision, "the last beast chooses you" — no eighth
+        /// species). Flavour only; the choice call is unchanged (<see cref="KinshipRules.Choose"/>).
+        /// </summary>
+        public bool SoloOffer
+        {
+            get { return Offer != null && Offer.Count == 1; }
         }
 
         internal static KinshipResult Refused(string error)
@@ -304,6 +320,7 @@ namespace BeastCraft.Discovery
             OwnedBeast beast = StarterPicks.AddBeast(save, content.Skills, speciesId, pending.JoinLevel);
             DiscoveryProgress.AddOnce(save.Discovery.ClaimedKinshipIds, pending.Site.SiteId);
             DiscoveryProgress.AddOnce(save.Discovery.LoreIds, pending.Site.LoreId);
+            save.Discovery.KinshipJoins.Add(new KinshipJoinRecord { SpeciesId = speciesId, SiteId = pending.Site.SiteId });
             if (pending.Poi != null)
             {
                 save.Campaign.FindRegion(pending.Poi.RegionId)?.MarkFound(pending.Poi.PoiId);
@@ -313,6 +330,11 @@ namespace BeastCraft.Discovery
             save.Discovery.PendingKinshipLevel = 0;
             pending.Outcome = KinshipOutcome.Joined;
             pending.Beast = beast;
+            if (content.Achievements != null)
+            {
+                pending.TitlesEarned.AddRange(Progression.AchievementRules.Evaluate(save, content.Achievements));
+            }
+
             return pending;
         }
 

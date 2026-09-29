@@ -126,6 +126,9 @@ namespace BeastCraft.Presentation.Content
         /// <summary><c>discovery.json</c>: the fog and points of interest, the Kinship sites (see <see cref="Discovery"/>).</summary>
         public DiscoveryLibrary DiscoveryLibrary { get; private set; }
 
+        /// <summary><c>achievements.json</c>: the Collector persona's deterministic, title-awarding achievements (see <see cref="Achievements"/>).</summary>
+        public AchievementLibrary AchievementLibrary { get; private set; }
+
         /// <summary>A file of the content root by its ProjectRelativePath (<c>content/...</c>).</summary>
         public static string PathOf(string root, string projectRelativePath)
         {
@@ -215,6 +218,7 @@ namespace BeastCraft.Presentation.Content
             HintLibraryData hints = Read<HintLibraryData>(root, HintLibraryData.ProjectRelativePath, errors);
             DialogueLibraryData dialogue = Read<DialogueLibraryData>(root, DialogueLibraryData.ProjectRelativePath, errors);
             DiscoveryLibraryData discovery = Read<DiscoveryLibraryData>(root, DiscoveryLibraryData.ProjectRelativePath, errors);
+            AchievementLibraryData achievementData = Read<AchievementLibraryData>(root, AchievementLibraryData.ProjectRelativePath, errors);
             if (errors.Count > 0)
             {
                 return null;
@@ -240,6 +244,7 @@ namespace BeastCraft.Presentation.Content
             Prefix(errors, "dialogue.json", DialogueValidator.Validate(dialogue));
             Prefix(errors, "dialogue.json", DialogueValidator.ValidateScenes(dialogue, regions));
             Prefix(errors, "discovery.json", DiscoveryLibraryValidator.Validate(discovery, regions, encounterLibrary, SpeciesIds(roster), MaterialIds(skills), cosmeticData));
+            Prefix(errors, "achievements.json", AchievementLibraryValidator.Validate(achievementData, regions, discovery, SpeciesIds(roster)));
 
             HashSet<string> known = KnownSkills(skills, enemyLibrary);
             Prefix(errors, "vfx-library.json", VfxLibraryValidator.Validate(vfx, known, art));
@@ -329,7 +334,8 @@ namespace BeastCraft.Presentation.Content
                 Style = UiStyle.Build(style),
                 Hints = HintBook.Build(hints),
                 Dialogue = DialogueBook.Build(dialogue),
-                DiscoveryLibrary = DiscoveryLibrary.Build(discovery)
+                DiscoveryLibrary = DiscoveryLibrary.Build(discovery),
+                AchievementLibrary = AchievementLibrary.Build(achievementData)
             };
         }
 
@@ -364,7 +370,9 @@ namespace BeastCraft.Presentation.Content
         /// <summary>
         /// The discovery layer's content and everything its rules read (<see cref="DiscoveryRules"/>,
         /// <see cref="KinshipRules"/>): the library, the regions, the looks, the roster, the skill library,
-        /// the encounters and enemies (a Kinship trial). Built once.
+        /// the encounters and enemies (a Kinship trial), and the achievements
+        /// (<see cref="DiscoveryContent.Achievements"/>, always wired up here: a visit, a completion
+        /// and a Kinship join all evaluate it). Built once.
         /// </summary>
         public DiscoveryContent Discovery
         {
@@ -382,6 +390,7 @@ namespace BeastCraft.Presentation.Content
                         Encounters = Encounters,
                         Enemies = Enemies
                     };
+                    _discovery.Achievements = new AchievementContent { Library = AchievementLibrary, Discovery = _discovery };
                 }
 
                 return _discovery;
@@ -389,6 +398,12 @@ namespace BeastCraft.Presentation.Content
         }
 
         private DiscoveryContent _discovery;
+
+        /// <summary>The achievements content (<see cref="AchievementRules.Evaluate"/> reads it): the library plus <see cref="Discovery"/>. Same instance as <c>Discovery.Achievements</c>.</summary>
+        public AchievementContent Achievements
+        {
+            get { return Discovery.Achievements; }
+        }
 
         /// <summary>Every skill id: beast skills, avatar actives and the enemy library's skills.</summary>
         public static HashSet<string> KnownSkills(SkillLibraryData skills, EnemyLibraryData enemies)

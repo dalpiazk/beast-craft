@@ -18,7 +18,9 @@ namespace BeastCraft.Economy
     /// option no unlock id. Boss, Hard boss and milestone looks are never sold: the Trader stocks
     /// <c>shop</c> looks only. Milestones: ids unique, kind <c>BeastLevel</c> / <c>AvatarLevel</c> (1-100)
     /// or <c>BossesCleared</c> (1-10). With the roster, every species has at least one category;
-    /// the avatar always must. No stats anywhere — looks never change a battle.
+    /// the avatar always must. A <c>TokenPurchasable</c> option (the look-token pool) needs a positive
+    /// <c>TokenPrice</c> and a <c>shop</c> or <c>drop</c> Source. No stats anywhere — looks never
+    /// change a battle.
     /// </summary>
     public static class CosmeticLibraryValidator
     {
@@ -53,6 +55,11 @@ namespace BeastCraft.Economy
             if (data.SchemaVersion != CosmeticLibraryData.CurrentSchemaVersion)
             {
                 errors.Add("SchemaVersion is " + data.SchemaVersion + "; this code reads version " + CosmeticLibraryData.CurrentSchemaVersion + ".");
+            }
+
+            if (data.DuplicateLookTokens < 0)
+            {
+                errors.Add("DuplicateLookTokens is negative.");
             }
 
             HashSet<string> milestones = new HashSet<string>(StringComparer.Ordinal);
@@ -231,6 +238,16 @@ namespace BeastCraft.Economy
                 else if (!boss && !bossHard && !milestone && !discovery && !string.IsNullOrEmpty(o.UnlockId))
                 {
                     errors.Add(where + ": only boss, milestone and discovery looks have an UnlockId.");
+                }
+
+                bool tokenEligible = o.Source == CosmeticLibrary.SourceShop || o.Source == CosmeticLibrary.SourceDrop;
+                if (o.TokenPurchasable && (o.TokenPrice <= 0 || !tokenEligible))
+                {
+                    errors.Add(where + ": a token-purchasable look needs a positive TokenPrice and a shop or drop Source.");
+                }
+                else if (!o.TokenPurchasable && o.TokenPrice != 0)
+                {
+                    errors.Add(where + ": TokenPrice is set but TokenPurchasable is false.");
                 }
             }
 
