@@ -865,9 +865,10 @@ namespace BeastCraft.Game
                 Modal<RegionCardModal>().Onward();
                 DismissHints();
             });
-            Step("26-coming-soon", () => Home().SelectTab(HomeTab.Grove));
+            Step("26-grove", () => Home().SelectTab(HomeTab.Grove));
             Step("27-settings", () =>
             {
+                _stack.Pop();
                 Home().SelectTab(HomeTab.Map);
                 Home().OpenSettings();
             });
@@ -970,6 +971,32 @@ namespace BeastCraft.Game
             {
                 HomeTab tab = (HomeTab)Array.IndexOf(HomeViewModel.TabNames, char.ToUpperInvariant(screen[0]) + screen.Substring(1));
                 steps.Add(() => Home().SelectTab(tab));
+            }
+
+            if (screen == "grove-glade" || screen == "grove-garden" || screen == "grove-board" || screen == "grove-npc")
+            {
+                GroveTab tab = screen == "grove-garden" ? GroveTab.Garden : screen == "grove-board" ? GroveTab.Board : screen == "grove-npc" ? GroveTab.Npc : GroveTab.Glade;
+                steps.Add(() =>
+                {
+                    Home().SelectTab(HomeTab.Grove);
+                    Top<GroveScreen>().SelectTab(tab);
+                });
+            }
+
+            if (screen == "soothe")
+            {
+                steps.Add(() => SetupSoothe());
+            }
+
+            if (screen == "colour-forms")
+            {
+                steps.Add(() =>
+                {
+                    Home().SelectTab(HomeTab.Roster);
+                    Home().Roster.Open(Home().Roster.Model.Owned[0].BeastId);
+                    Top<BeastDetailScreen>().SelectTab(2);
+                    Top<BeastDetailScreen>().ScrollPage(1f);
+                });
             }
 
             if (screen == "compendium")
@@ -1154,6 +1181,52 @@ namespace BeastCraft.Game
 
             session.Autosave(AutosaveReason.Results);
             Home().Enter();
+        }
+
+        /// <summary>
+        /// Walks the current expedition (camping/trading through Rest/Shop, winning any Elite in the
+        /// way) until an ordinary Battle-node location is reachable, grants a few of that region's
+        /// soothing items, then opens that location's encounter (its "Soothe" section is what
+        /// <c>--screen soothe</c> is for).
+        /// </summary>
+        private void SetupSoothe()
+        {
+            GameSession session = _ctx.Session;
+            Home().Enter();
+            MapNodeView target = Home().Map.Reachable().Find(n => n.Type == MapNodeType.Battle);
+            for (int guard = 0; guard < 40 && target == null; guard++)
+            {
+                MapNodeView next = Home().Map.Reachable()[0];
+                if (next.Type == MapNodeType.Rest)
+                {
+                    CampaignRules.Camp(session.Save, session.Content.Campaign, next.NodeId, session.Save.Beasts[0].BeastId);
+                }
+                else if (next.Type == MapNodeType.Shop)
+                {
+                    CampaignRules.Trade(session.Save, session.Content.Campaign, next.NodeId, null);
+                }
+                else
+                {
+                    CampaignRules.ResolveBattle(session.Save, session.Content.Campaign, next.NodeId, BeastCraft.Battle.BattleOutcome.PlayerVictory);
+                }
+
+                Home().Enter();
+                target = Home().Map.Reachable().Find(n => n.Type == MapNodeType.Battle);
+            }
+
+            if (target == null)
+            {
+                throw new InvalidOperationException("No ordinary Battle location found for --screen soothe.");
+            }
+
+            string regionId = session.Save.Campaign.ActiveRun.RegionId;
+            BeastCraft.Grove.SoothingRegionData soothing = session.Content.GroveLibrary.Soothing(regionId);
+            if (soothing != null && soothing.ItemIds != null && soothing.ItemIds.Length > 0)
+            {
+                session.Save.Grove.Items.Add(soothing.ItemIds[0], 5);
+            }
+
+            Home().TapNode(target.NodeId);
         }
 
         private T Top<T>() where T : class

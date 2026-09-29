@@ -95,6 +95,36 @@ namespace BeastCraft.Game.Screens
             Ctx.Stack.Replace(new ResultsScreen(Ctx, results));
         }
 
+        /// <summary>The Soothe button: a picker over the region's soothing items the player holds, then a confirm.</summary>
+        private void OpenSoothe()
+        {
+            List<ChoiceOption> options = new List<ChoiceOption>();
+            foreach (SoothingOptionView item in _model.SoothingOptions)
+            {
+                string itemId = item.ItemId;
+                options.Add(new ChoiceOption(item.DisplayName + " (" + item.Held + " held)", true, null,
+                                             () => Ctx.Stack.PushModal(new ConfirmModal(Ctx, "Soothe this location?",
+                                                                                        "Spend one " + item.DisplayName + " for the same full rewards a win here would pay. No fight, no risk.",
+                                                                                        "Cancel", "Soothe", () => ConfirmSoothe(itemId)))));
+            }
+
+            Ctx.Stack.PushModal(new ChoiceModal(Ctx, "Soothe with", "Pick an item to give.", options));
+        }
+
+        private void ConfirmSoothe(string itemId)
+        {
+            SootheOutcome outcome = _model.Soothe(itemId);
+            Ctx.Game.Toast(outcome.Message);
+            if (outcome.Success)
+            {
+                Ctx.Stack.Pop();
+            }
+            else
+            {
+                Build();
+            }
+        }
+
         /// <summary>Lays the page out (again, after a pick changes what shows).</summary>
         private void Build()
         {
@@ -128,6 +158,26 @@ namespace BeastCraft.Game.Screens
                     AddLabel(_scroll, new Rect(Pad + 30f, y + 30f + lines.Count * Ctx.Text.LineHeight(size), width - 60f, 40f), _model.BondText, size, "plum");
                 }
 
+                y += height + 30f;
+            }
+
+            // Soothing (docs/design/grove.md, "Peaceful clears" — D3/D4): an ordinary Battle location
+            // whose region has a soothing item set, offered here instead of fighting. Never shown for
+            // an Elite den, a Gate, a Boss, a Kinship trial or Hearthglen (CanSoothe already excludes
+            // all of these).
+            if (_model.CanSoothe)
+            {
+                List<SoothingOptionView> options = _model.SoothingOptions;
+                float height = 130f;
+                Rect box = new Rect(Pad, y, width, height);
+                _scroll.Add(new Panel { Bounds = box, StyleKey = "banner" });
+                AddLabel(_scroll, new Rect(Pad + 30f, y + 20f, width - 260f, 36f), "This place can be soothed", style.TextSizes.Body + 2f, "plum");
+                string sub = options.Count == 0
+                                 ? "You hold none of this region's soothing items."
+                                 : "Give a calming gift for the same full rewards a win pays -- no fight needed.";
+                AddLabel(_scroll, new Rect(Pad + 30f, y + 64f, width - 260f, 60f), sub, style.TextSizes.Small + 2f, "inkSoft", TextAlign.Left, true);
+                Button soothe = AddButton(_scroll, "soothe", new Rect(Pad + width - 230f, y + 30f, 190f, 76f), "Soothe", "primary", OpenSoothe);
+                soothe.Enabled = options.Count > 0;
                 y += height + 30f;
             }
 
@@ -352,7 +402,8 @@ namespace BeastCraft.Game.Screens
                 Rect card = widget.Bounds;
                 Rect portrait = new Rect(card.X + 20f, card.Y + 16f, card.Width - 40f, 150f);
                 Painter.Soft(new Vec2(portrait.Center.X, portrait.Bottom - 6f), 70f, Painter.C("plum", 0.25f), 0.3f);
-                Painter.Art(Painter.Sprite(member.ArtKey), portrait, false);
+                string tintHex = ColourFormPresentation.WornTint(Ctx.Session.Save, member.BeastId, member.SpeciesId, Ctx.Content.GroveLibrary, Ctx.Content.Economy?.Cosmetics);
+                Painter.Art(Painter.Sprite(member.ArtKey), portrait, false, string.IsNullOrEmpty(tintHex) ? (Microsoft.Xna.Framework.Color?)null : Painter.C(tintHex));
                 Painter.TextIn(member.Name, new Rect(card.X + 12f, card.Y + 176f, card.Width - 24f, 30f), style.TextSizes.Body, Painter.C("ink"), TextAlign.Center);
                 Painter.ElementBadge(member.Element, new Rect(card.X + 18f, card.Y + 222f, 40f, 40f));
                 Painter.TextIn("Lv " + member.Level + "  " + member.Stance, new Rect(card.X + 64f, card.Y + 226f, card.Width - 76f, 30f), style.TextSizes.Small + 1f,

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using BeastCraft.Creatures;
 using BeastCraft.Game.Ui;
+using BeastCraft.Grove;
 using BeastCraft.Presentation.Board;
 using BeastCraft.Presentation.Cards;
 using BeastCraft.Presentation.Layout;
@@ -153,7 +154,8 @@ namespace BeastCraft.Game.Screens
                 return true;
             }
 
-            painter.Art(painter.Sprite(entry.ArtKey), portrait, false);
+            string tintHex = ColourFormPresentation.WornTint(_ctx.Session.Save, entry.BeastId, entry.SpeciesId, _ctx.Content.GroveLibrary, _ctx.Content.Economy?.Cosmetics);
+            painter.Art(painter.Sprite(entry.ArtKey), portrait, false, string.IsNullOrEmpty(tintHex) ? (Color?)null : painter.C(tintHex));
             painter.TextIn(entry.Name, new Rect(card.X + 12f, card.Y + 232f, card.Width - 24f, 34f), style.TextSizes.Body + 2f, painter.C("ink"), TextAlign.Center);
             painter.ElementBadge(entry.Element, new Rect(card.X + 18f, card.Y + 284f, 48f, 48f));
             painter.TextIn("Lv " + entry.Level.ToString(CultureInfo.InvariantCulture), new Rect(card.X + 76f, card.Y + 280f, card.Width - 90f, 26f), style.TextSizes.Body,
@@ -372,7 +374,8 @@ namespace BeastCraft.Game.Screens
             UiStyle style = Ctx.Style;
             Rect portrait = new Rect(box.X + 20f, box.Y + 20f, 340f, 300f);
             Painter.Soft(new Vec2(portrait.Center.X, portrait.Bottom - 10f), 120f, Painter.C("plum", 0.25f), 0.3f);
-            Painter.Art(Painter.Sprite(_model.ArtKey), portrait, false);
+            string tintHex = ColourFormPresentation.WornTint(Ctx.Session.Save, _model.BeastId, _model.Species?.SpeciesId, Ctx.Content.GroveLibrary, Ctx.Content.Economy?.Cosmetics);
+            Painter.Art(Painter.Sprite(_model.ArtKey), portrait, false, string.IsNullOrEmpty(tintHex) ? (Color?)null : Painter.C(tintHex));
             float x = box.X + 400f;
             float w = box.Right - x - 30f;
             float y = box.Y + 30f;
@@ -765,6 +768,47 @@ namespace BeastCraft.Game.Screens
             float looksTop = y;
             y = Card(y, 150f + Math.Max(1, _model.Looks.Count) * 48f, "card", DrawLooks);
             AddButton(_scroll, "look-token-shop", new Rect(Pad + Width - 260f, looksTop + 24f, 220f, 76f), "Look shop", "chip", () => Ctx.Stack.Push(new LookTokenShopScreen(Ctx)));
+
+            if (_model.ColourForms.Count > 0)
+            {
+                const float rowHeight = 96f;
+                float colourTop = y;
+                y = Card(y, 100f + _model.ColourForms.Count * rowHeight, "card", DrawColourForms);
+                for (int i = 0; i < _model.ColourForms.Count; i++)
+                {
+                    ColourFormRow form = _model.ColourForms[i];
+                    string id = form.ColourFormId;
+                    float rowY = colourTop + 88f + i * rowHeight;
+                    if (!form.Owned)
+                    {
+                        Button unlock = AddButton(_scroll, "unlock-colour-" + id, new Rect(Pad + Width - 230f, rowY, 190f, 76f), "Unlock", "chip", () =>
+                        {
+                            ColourFormResult result = _model.UnlockColourForm(id);
+                            Ctx.Game.Toast(result.Success ? "Unlocked! Wear it below." : result.Error);
+                            Build();
+                        });
+                        unlock.Enabled = form.ItemHeld >= form.ItemCount;
+                    }
+                    else if (!form.Worn)
+                    {
+                        AddButton(_scroll, "wear-colour-" + id, new Rect(Pad + Width - 230f, rowY, 190f, 76f), "Wear", "chip", () =>
+                        {
+                            _model.WearColourForm(id);
+                            Build();
+                        });
+                    }
+                    else
+                    {
+                        string categoryId = form.CosmeticCategoryId;
+                        AddButton(_scroll, "unwear-colour-" + id, new Rect(Pad + Width - 260f, rowY, 220f, 76f), "Wear natural", "secondary", () =>
+                        {
+                            _model.WearNaturalColour(categoryId);
+                            Build();
+                        });
+                    }
+                }
+            }
+
             return y;
         }
 
@@ -835,6 +879,24 @@ namespace BeastCraft.Game.Screens
 
             Painter.TextIn("Changing looks comes with the wardrobe.", new Rect(box.X + 40f, box.Bottom - 50f, box.Width - 80f, 24f), Ctx.Style.TextSizes.Small + 1f,
                            Painter.C("inkSoft"), TextAlign.Left);
+        }
+
+        /// <summary>The species' colour forms (docs/design/grove.md, "Colour evolutions" — D3/D4): locked, owned, or worn.</summary>
+        private void DrawColourForms(Rect box)
+        {
+            Heading(box, "Colour forms");
+            float y = box.Y + 90f;
+            const float rowHeight = 96f;
+            foreach (ColourFormRow form in _model.ColourForms)
+            {
+                Painter.TextIn(form.DisplayName, new Rect(box.X + 40f, y, box.Width - 300f, Body), Body, Painter.C(form.Worn ? "leafDeep" : "ink"), TextAlign.Left);
+                string status = form.Worn ? "Worn"
+                               : form.Owned ? "Owned"
+                               : form.ItemDisplay + "  " + form.ItemHeld + " / " + form.ItemCount;
+                Painter.TextIn(status, new Rect(box.X + 40f, y + 42f, box.Width - 300f, Ctx.Style.TextSizes.Small + 1f), Ctx.Style.TextSizes.Small + 1f,
+                               Painter.C(form.Worn ? "leafDeep" : form.Owned ? "goldDeep" : form.ItemHeld >= form.ItemCount ? "goldDeep" : "berry"), TextAlign.Left);
+                y += rowHeight;
+            }
         }
 
         // ------------------------------------------------------------------------------------------
