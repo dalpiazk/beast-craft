@@ -382,6 +382,64 @@ titles, and look tokens. `CurrentSchemaVersion` is **9**.
   `,"Achievements":{"EarnedIds":[],"OwnedTitleIds":[],"EquippedTitleId":""},"LookTokens":0` after
   `"Discovery"`.
 
+### Schema 10: the Grove, the Wildgarden and the Board
+
+Save schema **10** adds the Grove hub ([grove.md](grove.md)): the Grove (habitats, decor, affinity
+and gifts, and a generic Grove item inventory), the Wildgarden (plots and the herbarium) and the
+Board (expeditions away, stories and pity). No combat power anywhere in any of the three — nothing
+here is read by battle, stats or campaign difficulty; `docs/balance/tuned-report.md` and
+`campaign-pacing-report.md` are unchanged by this PR. `CurrentSchemaVersion` is **10**.
+
+- `PlayerSave.Grove` (`Grove.GroveProgress`, written after `LookTokens`): `HabitatsUnlocked`,
+  `UnlockedDecorIds` (owned, whether placed or not), `PlacedDecor` (`{HabitatId, DecorId, X, Y,
+  Rotation}`, a decor id placed at most once), `Affinity` (`List<BeastAffinityState>` — per beast:
+  XP and tier, the Feed/Play cooldown anchors, the gift clock's anchor, seed and pity, and
+  `PendingGifts`, capped at `GroveRules.MaxPendingGifts` (3)), `LoreIds` (the Grove's own small lore
+  codex — affinity and gift flavour, kept separate from `DiscoveryProgress.LoreIds`) and `Items`
+  (`Grove.GroveItemInventory`: a generic counted pool, keyed by id — what the Wildgarden grows and
+  crafts and the Board's expeditions find; the seam a later PR reads for peaceful clears and colour
+  evolutions, see `grove.md`, "Producer additions").
+- `PlayerSave.Garden` (`Garden.GardenProgress`, written after `Grove`): `Plots` (`{PlotId, SeedId,
+  StartUtcTicks, StartMonotonicMs}`; no entry for a plot id means it is empty) and
+  `VarietiesDiscovered` (the herbarium).
+- `PlayerSave.Expeditions` (`Expeditions.ExpeditionProgress`, written after `Garden`): `Active`
+  (`{DestinationId, BeastIds, StartUtcTicks, StartMonotonicMs, Seed}` — a timer on the destination,
+  never a lock on the beasts: producer decision, they stay fully available for battle and idle XP
+  the whole time away), `StoriesUnlocked` and `Pity` (`{DestinationId, Misses}`). Distinct from the
+  region campaign's own "expedition" (`CampaignProgress.ActiveRun`, a `MapRun`) — the two names
+  never interact; see `grove.md`, "Naming: two different 'expeditions'".
+- *Offline clock.* `Common.OfflineClock.ElapsedMs` is `IdleRewardCalculator.Elapsed`'s wall-plus-
+  monotonic reconciliation, extracted unchanged (`IdleRewardTests` proves idle's own behaviour is
+  byte-for-byte identical after the extraction) and now shared by every Grove/Garden/Expedition
+  timer: Feed/Play's daily cooldown, the gift clock, plot growth and an expedition's remaining time
+  all use the same anti-tamper stance (a clock moved back or forward is silently clamped to the
+  provable elapsed time — no message, no penalty, no bonus).
+- *Rules.* `Grove.GroveRules`, `Garden.GardenRules`, `Expeditions.ExpeditionRules`: deterministic,
+  non-throwing, refuse-and-no-op on bad input (the `CosmeticRules`/`IdleRewardCalculator` idiom).
+  Gifts and expedition outcomes reuse the idle-claim's seeded-roll-plus-pity idiom
+  (`LootRoller.DeriveSeed`, a per-beast or per-destination pity counter). Cross-pollination
+  (`GardenRules.Harvest`/`HarvestPair`) is a curated, deterministic matrix, never rolled: a lone
+  plot always yields its seed's self-pair variety; two different ready plots harvested together
+  always yield the matrix's fixed hybrid for that pair.
+- *Migration.* `SaveMigrations.AddGrove` (9 to 10): a v9 save has none of the above; the upgrade
+  reads it into the current type (no habitat or decor unlocked, no beast's affinity, no Grove item
+  held, no plot planted, no variety in the herbarium, no expedition away, no story or pity), fills
+  in anything missing and writes it back. Nothing else moves: a save's existing
+  `Discovery.GroveUnlockIds` (shrines visited before the Grove existed) is untouched — the Grove
+  reads it live (`GroveRules.RefreshUnlocks`) the first time it opens, so nothing already earned is
+  lost.
+- *Validation.* `SaveValidator` reports `InvalidValue` for a beast's affinity out of range (Xp,
+  Tier 0-5, pity misses), more pending gifts than the cap, a negative or duplicate-id Grove item
+  count, a plot with no seed or a repeated plot id, and an expedition away with an empty destination
+  or no beasts sent. No content cross-references here (mirrors schema 9's compendium check: the
+  content catalog does not carry Grove/Garden/Expedition ids).
+- *Golden saves.* `rich-v9.input.json` is frozen; the new `rich-v10.input.json` (reflection-filled)
+  must round-trip byte-identical; new `min-v10`. No input changed; every older expected output
+  changed only by `"SchemaVersion":10` and the appended `,"Grove":{"HabitatsUnlocked":[],
+  "UnlockedDecorIds":[],"PlacedDecor":[],"Affinity":[],"LoreIds":[],"Items":{"Items":[]}},
+  "Garden":{"Plots":[],"VarietiesDiscovered":[]},"Expeditions":{"Active":[],"StoriesUnlocked":[],
+  "Pity":[]}` after `"LookTokens"`.
+
 ### Hearthglen's rules (`StarterPicks`, `CampaignRules`)
 
 - **Picks.** The 1st any of the ten; the 2nd any beast of the next stance in the cycle
