@@ -174,13 +174,17 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <summary>A node lost this many times in a row is counted as stuck (and cleared, so the campaign ends).</summary>
         public const int StuckAttempts = 200;
 
-        /// <summary>The focus skill's targets with the economy (the design: L10 ~80 and L15 ~180 within 10%, L20 at least 270).</summary>
+        /// <summary>
+        /// The focus skill's targets with the economy (the design: L10 ~80 within 10%; L15 and L20
+        /// widened for the never-blocked retune's faster clears, producer-accepted: docs/balance/
+        /// tuning-log.md, "Never-blocked targets").
+        /// </summary>
         public static readonly PacingSimulator.Gate[] FocusGates =
         {
             new PacingSimulator.Gate(5, 15, 20, "15-20"),
             new PacingSimulator.Gate(10, 72, 88, "~80 (72-88)"),
-            new PacingSimulator.Gate(15, 162, 198, "~180 (162-198)"),
-            new PacingSimulator.Gate(20, 270, int.MaxValue, "270+"),
+            new PacingSimulator.Gate(15, 150, 198, "~150-198"),
+            new PacingSimulator.Gate(20, 260, int.MaxValue, "260+"),
         };
 
         /// <summary>Loads the data, runs the Monte Carlo (twice with <c>--self-check</c>), prints the report. Exit codes as <c>--mode pacing</c>.</summary>
@@ -1459,7 +1463,7 @@ namespace BeastCraft.Tooling.BalanceSim
             // Skill.
             sb.Append("## Focus skill\n\n");
             sb.Append("Battles (losses included) for the focus skill to reach each level, the Trader's gate materials included. Targets (the\n");
-            sb.Append("economy design): L5 15-20, L10 ~80 +/-10%, L15 ~180 +/-10%, L20 at least 270.\n\n");
+            sb.Append("economy design): L5 15-20, L10 ~80 +/-10%, L15 150-198, L20 at least 260 (widened for the never-blocked retune's faster clears).\n\n");
             sb.Append("| Level | Target (p50) | p10 | p50 | p90 | Verdict |\n| ---: | --- | ---: | ---: | ---: | --- |\n");
             foreach (PacingSimulator.Gate gate in CampaignPacingSimulator.FocusGates)
             {

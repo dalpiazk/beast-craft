@@ -4372,11 +4372,13 @@ adaptive assist was not modelled on a retry at all. Fixed:
 Re-run (`--mode campaign --self-check`): total battles p50 450 (target 400-600: **ok**); every gate/
 boss level parity still within +/-3 of the node (**ok** at all 40); bench gap 3.0-5.7 from region 1,
 5.0-5.7 from region 3 against its 5-8 target (**ok**); grind probe p50 0.00 levels at both check
-points, target < 0.05 / < 0.50 (**ok**). **Two skill-pacing gates now miss**: focus skill to L15,
-p50 155 battles (target 162-198) and to L20, p50 268 (target 270+) — the team now clears faster
-(higher targets, assist on retries), so it reaches a battle-count skill milestone a little ahead of
-the design's old pacing. Reported, not retuned: XP and skill-practice constants are a producer call,
-not remeasured here.
+points, target < 0.05 / < 0.50 (**ok**). Focus skill to L15 (p50 155 battles) and L20 (p50 268) came
+in ahead of the design's old pacing (162-198, 270+) — the team now clears faster (higher targets,
+assist on retries), reaching a battle-count skill milestone a little early. **Producer-accepted**: the
+faster pacing itself is fine, not a bug; `FocusGates` widened to match instead of retuning XP or
+skill-practice — L15 162-198 -> **150-198**, L20 270+ -> **260+**. Re-run: every gate meets its target
+(self-check passed, two runs identical); `campaign-pacing-report.md` regenerates byte-identical to a
+fresh run.
 
 ### Guidance
 

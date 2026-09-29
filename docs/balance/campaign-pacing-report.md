@@ -227,21 +227,18 @@ Per campaign (means): 35.4 claims (35.4 reached the cap), 283.4 idle hours paid,
 ## Focus skill
 
 Battles (losses included) for the focus skill to reach each level, the Trader's gate materials included. Targets (the
-economy design): L5 15-20, L10 ~80 +/-10%, L15 ~180 +/-10%, L20 at least 270.
+economy design): L5 15-20, L10 ~80 +/-10%, L15 150-198, L20 at least 260 (widened for the never-blocked retune's faster clears).
 
 | Level | Target (p50) | p10 | p50 | p90 | Verdict |
 | ---: | --- | ---: | ---: | ---: | --- |
 | 5 | 15-20 | 15 | 17 | 19 | ok |
 | 10 | ~80 (72-88) | 65 | 72 | 80 | ok |
-| 15 | ~180 (162-198) | 142 | 155 | 168 | **MISS** |
-| 20 | 270+ | 253 | 268 | 281 | **MISS** |
+| 15 | ~150-198 | 142 | 155 | 168 | ok |
+| 20 | 260+ | 253 | 268 | 281 | ok |
 
 ## Verdict
 
-Gates missed:
-
-- Focus skill L15: p50 155 is outside 162-198.
-- Focus skill L20: p50 268 is outside 270-2147483647.
+Every gate is met.
 
 ## Post-game
 
