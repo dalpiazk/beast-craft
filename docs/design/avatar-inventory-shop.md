@@ -92,8 +92,8 @@ inline. Four inner tabs (`AvatarTab`), driven by `AvatarHubViewModel` over four 
 - **Gear**: every owned gear instance (beast and avatar), filter (All / Beast / Avatar / by slot) and
   sort (Rarity, Level, Name — mirroring the Roster tab's own Sort chip cycle) chips; each row shows
   name, slot, rarity, bonuses, and "Worn by `<beast name>`" / "Worn (avatar)" / "Unworn". **Equip**
-  opens a `ChoiceModal`: for beast gear, one option per owned beast (`GearRules.EquipBeastGear`, the
-  rule already validates level/slot and reports why not); for avatar gear, it equips directly
+  opens a `BeastPickerModal`: for beast gear, one option per owned beast (`GearRules.EquipBeastGear`,
+  the rule already validates level/slot and reports why not); for avatar gear, it equips directly
   (`GearRules.EquipAvatarGear`, one target, no picker needed). **Sell** (unworn gear only —
   `ShopService.TrySellGear` refuses worn gear itself, `Equipped`) uses the newly-wired
   `GameSession.Content.Shop`, gold from `ShopSaleResult.Gold`, at the existing 25% sell-back rule —
@@ -131,13 +131,17 @@ economy-and-shop.md: "every camp has a travelling trader too"). Two inner tabs:
 
 - **Stock**: every category the Trader currently offers (`ShopService.GetStock`, which freezes/reads
   the node's stock the first time it is opened, unchanged), grouped by category header, each listing
-  showing name, price, remaining (or "Sold out"), and a disabled reason (can't afford, sold out,
-  already known/unlocked, too low level) read straight off the `ShopOutcome` `TryBuy` would return — a
-  dry-run read via the listing's own state, never a second mutating call. **Buy** calls
-  `ShopService.TryBuy(save, context, listingIndex, targetBeastId)`; a `BeastSkill` (tome) listing opens
-  a `ChoiceModal` of owned beasts first (the rule itself reports `IneligibleTarget` for a beast that
-  cannot learn it, rather than the screen pre-filtering, matching how gear equip errors are surfaced
-  elsewhere); every other category buys directly. Results toast a short message per `ShopOutcome`.
+  showing name, price, remaining (or "Sold out"), and a disabled reason (not enough gold, sold out,
+  already known/unlocked, can't carry more, too low level) read from `ShopService.CanBuy(save,
+  context, listingIndex)` — a genuine non-mutating dry run over the same `Check` helper `TryBuy`
+  itself calls (added this round: one source of truth, so the disabled reason can never drift from
+  what a real purchase attempt would say), never a second mutating call. A `BeastSkill` (tome)
+  listing's row skips this (its eligibility is per beast, not generic — only stock/gold show) and
+  **Buy** opens a `BeastPickerModal` of owned beasts first (`ShopService.TryBuy` itself reports
+  `IneligibleTarget` for a beast that cannot learn it, rather than the screen pre-filtering, matching
+  how gear equip errors are surfaced elsewhere); every other category calls
+  `ShopService.TryBuy(save, context, listingIndex, targetBeastId)` directly. Results toast a short
+  message per `ShopOutcome`.
 - **Sell**: unworn owned gear, reusing the same rows/rule as the Inventory Gear tab's Sell action
   (`ShopService.TrySellGear`) — kept as its own tab here since a Trader visit is the moment a player
   is naturally clearing out spares, matching the existing UI pattern of a screen offering the same Core

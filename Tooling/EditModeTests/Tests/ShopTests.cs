@@ -160,6 +160,14 @@ namespace BeastCraft.Tests.EditMode
                 Listing(ShopCategory.AvatarSkill, "hex_of_frailty", 1, 200)
             });
 
+            string before = FieldJson.ToJson(save);
+            for (int i = 0; i < 8; i++)
+            {
+                Assert.AreEqual(ShopOutcome.Bought, _shop.CanBuy(save, here, i, "g"), "CanBuy, listing " + i);
+            }
+
+            Assert.AreEqual(before, FieldJson.ToJson(save), "CanBuy is a dry run: it changes nothing even when it would succeed");
+
             for (int i = 0; i < 8; i++)
             {
                 ShopPurchaseResult bought = _shop.TryBuy(save, here, i, "g");
@@ -284,6 +292,8 @@ namespace BeastCraft.Tests.EditMode
         private void AssertRefused(PlayerSave save, ShopContext here, int index, string target, ShopOutcome expected, string because = null)
         {
             string before = FieldJson.ToJson(save);
+            Assert.AreEqual(expected, _shop.CanBuy(save, here, index, target), because);
+            Assert.AreEqual(before, FieldJson.ToJson(save), "CanBuy is a dry run: it changes nothing even when it refuses (" + expected + ")");
             ShopPurchaseResult result = _shop.TryBuy(save, here, index, target);
             Assert.AreEqual(expected, result.Outcome, because);
             Assert.AreEqual(0, result.Price);

@@ -485,5 +485,44 @@ namespace BeastCraft.Tests.EditMode
             Assert.IsFalse(run.IsCleared(camp.NodeId), "visiting the camp's trader never clears the camp itself");
             Assert.IsTrue(session.Save.Shops.Exists(v => v.NodeKey == CampaignRules.ShopContextFor(run, camp).NodeKey));
         }
+
+        /// <summary>
+        /// Every disabled-reason case a stock row can show (not just "sold out"/"not enough gold"):
+        /// ShopListingRow.DisabledReason reads BeastCraft.Economy.ShopService.CanBuy, the same
+        /// non-mutating check TryBuy itself runs -- one source of truth, see ShopService.CheckGrant's
+        /// branches for Cosmetic/AvatarPassive/Consumable.
+        /// </summary>
+        [Test]
+        public void ShopViewModel_DisabledReason_CoversAlreadyUnlocked_AlreadyKnown_AndStackFull()
+        {
+            GameSession session = NewSession();
+            MapRun run = session.Save.Campaign.ActiveRun;
+            MapNode node = run.Nodes[0];
+            ShopContext context = CampaignRules.ShopContextFor(run, node);
+            int maxStack = Content.Economy.Consumables.Get("fury_draught").MaxStack;
+
+            // Freezing the stock directly (the same trick ShopTests.cs uses) makes the scenario
+            // deterministic, unlike relying on what a real roll happens to stock.
+            session.Save.Shops.Add(new ShopVisit
+            {
+                NodeKey = context.NodeKey,
+                Listings = new List<ShopListing>
+                {
+                    new ShopListing { Category = ShopCategory.Cosmetic, ItemId = "griffin_crest/sunlit", Quantity = 1, Remaining = 1, Price = 100 },
+                    new ShopListing { Category = ShopCategory.AvatarPassive, ItemId = "iron_will", Quantity = 1, Remaining = 1, Price = 100 },
+                    new ShopListing { Category = ShopCategory.Consumable, ItemId = "fury_draught", Quantity = 1, Remaining = 1, Price = 100 }
+                }
+            });
+            session.Save.Gold = 100000;
+            session.Save.Cosmetics.Unlock("griffin_crest/sunlit");
+            session.Save.AvatarSkills.Passives.Learn("iron_will");
+            ConsumableInventory.TryAdd(session.Save, "fury_draught", maxStack, maxStack);
+
+            ShopViewModel model = new ShopViewModel(session, node.NodeId);
+
+            Assert.AreEqual("Already unlocked", model.Listings.Find(l => l.ItemId == "griffin_crest/sunlit").DisabledReason);
+            Assert.AreEqual("Already known", model.Listings.Find(l => l.ItemId == "iron_will").DisabledReason);
+            Assert.AreEqual("Can't carry more", model.Listings.Find(l => l.ItemId == "fury_draught").DisabledReason);
+        }
     }
 }

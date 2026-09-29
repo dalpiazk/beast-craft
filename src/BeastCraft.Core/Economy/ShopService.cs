@@ -265,31 +265,53 @@ namespace BeastCraft.Economy
         {
             ShopVisit visit = save == null || context == null ? null : Find(save, context.NodeKey);
             ShopListing listing = visit == null || listingIndex < 0 || listingIndex >= visit.Listings.Count ? null : visit.Listings[listingIndex];
-            if (listing == null)
-            {
-                return Fail(ShopOutcome.UnknownListing, null);
-            }
-
-            if (listing.Remaining <= 0)
-            {
-                return Fail(ShopOutcome.SoldOut, listing);
-            }
-
-            ShopOutcome check = CheckGrant(save, listing, targetBeastId);
+            ShopOutcome check = Check(save, listing, targetBeastId);
             if (check != ShopOutcome.Bought)
             {
                 return Fail(check, listing);
-            }
-
-            if (!Wallet.CanAfford(save, listing.Price))
-            {
-                return Fail(ShopOutcome.NotEnoughGold, listing);
             }
 
             Wallet.TrySpend(save, listing.Price);
             string instance = Grant(save, listing, targetBeastId);
             listing.Remaining--;
             return new ShopPurchaseResult(ShopOutcome.Bought, listing, listing.Price, instance);
+        }
+
+        /// <summary>
+        /// What buying <paramref name="listingIndex"/> would do right now, without spending or
+        /// granting anything: <see cref="ShopOutcome.Bought"/> means it could be bought; any other
+        /// outcome is why not (the same checks <see cref="TryBuy"/> itself runs — one source of
+        /// truth, so a screen's disabled reason never drifts from what a real purchase attempt would
+        /// say). A <see cref="ShopCategory.BeastSkill"/> tome's eligibility is per
+        /// <paramref name="targetBeastId"/> (which beast could learn it); pass <c>null</c> to check
+        /// only stock and gold, deferring eligibility to a specific pick.
+        /// </summary>
+        public ShopOutcome CanBuy(PlayerSave save, ShopContext context, int listingIndex, string targetBeastId = null)
+        {
+            ShopVisit visit = save == null || context == null ? null : Find(save, context.NodeKey);
+            ShopListing listing = visit == null || listingIndex < 0 || listingIndex >= visit.Listings.Count ? null : visit.Listings[listingIndex];
+            return Check(save, listing, targetBeastId);
+        }
+
+        private ShopOutcome Check(PlayerSave save, ShopListing listing, string targetBeastId)
+        {
+            if (listing == null)
+            {
+                return ShopOutcome.UnknownListing;
+            }
+
+            if (listing.Remaining <= 0)
+            {
+                return ShopOutcome.SoldOut;
+            }
+
+            ShopOutcome check = CheckGrant(save, listing, targetBeastId);
+            if (check != ShopOutcome.Bought)
+            {
+                return check;
+            }
+
+            return Wallet.CanAfford(save, listing.Price) ? ShopOutcome.Bought : ShopOutcome.NotEnoughGold;
         }
 
         /// <summary>Sells an unworn gear instance for <see cref="SellPrice"/>. Changes the save only when sold.</summary>

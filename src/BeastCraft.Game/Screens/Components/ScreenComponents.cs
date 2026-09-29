@@ -374,7 +374,13 @@ namespace BeastCraft.Game.Screens.Components
         public string Reason;
     }
 
-    /// <summary>A titled list of beasts to pick one of (equip gear to a beast, buy a tome for one), each row a <see cref="BeastCard"/>.</summary>
+    /// <summary>
+    /// A titled list of beasts to pick one of (equip gear to a beast, buy a tome for one), each row a
+    /// <see cref="BeastCard"/>. The rows live in their own <see cref="ScrollView"/> between the title
+    /// and a Close button pinned to the card's bottom, so the card's own height stays clamped to the
+    /// canvas (<see cref="PortraitLayout.CanvasHeight"/>) for any roster size — a large roster scrolls
+    /// inside the card instead of pushing Close off it.
+    /// </summary>
     public sealed class BeastPickerModal : GameModal
     {
         private readonly Dictionary<Widget, BeastPickerOption> _rows = new Dictionary<Widget, BeastPickerOption>();
@@ -383,25 +389,33 @@ namespace BeastCraft.Game.Screens.Components
         {
             float width = 960f;
             float rowHeight = BeastCard.Height + 14f;
-            float rowsHeight = options.Count == 0 ? 90f : options.Count * rowHeight;
-            float height = Math.Min(PortraitLayout.CanvasHeight - 120f, 170f + rowsHeight + 160f);
+            float maxCardHeight = PortraitLayout.CanvasHeight - 120f;
+            // Title + top padding (140) + the gap above Close (20) + the Close button (100) + the
+            // margin below it to the card's own bottom edge (40): what the rows' ScrollView never gets.
+            const float chromeHeight = 300f;
+            float rowsAreaHeight = options.Count == 0 ? 90f : Math.Min(maxCardHeight - chromeHeight, options.Count * rowHeight);
+            float height = Math.Min(maxCardHeight, chromeHeight + rowsAreaHeight);
             Rect card = new Rect((PortraitLayout.CanvasWidth - width) / 2f, (PortraitLayout.CanvasHeight - height) / 2f, width, height);
             Panel panel = Ui.Add(new Panel { Bounds = card, StyleKey = "modal" });
             panel.Add(new Label { Bounds = new Rect(card.X + 60f, card.Y + 46f, width - 120f, 60f), Text = title, Size = ctx.Style.TextSizes.Heading, ColorKey = "plum", Align = TextAlign.Center });
-            float y = card.Y + 140f;
+
+            float rowsTop = card.Y + 140f;
+            float rowsBottom = card.Bottom - 160f;
+            ScrollView scroll = Ui.Add(new ScrollView { Bounds = new Rect(card.X + 60f, rowsTop, width - 120f, Math.Max(0f, rowsBottom - rowsTop)) });
             if (options.Count == 0)
             {
-                panel.Add(new Label { Bounds = new Rect(card.X + 60f, y, width - 120f, 60f), Text = emptyMessage ?? "None available.", Size = ctx.Style.TextSizes.Body, ColorKey = "inkSoft", Align = TextAlign.Center });
+                scroll.Add(new Label { Bounds = new Rect(0, 0, width - 120f, 60f), Text = emptyMessage ?? "None available.", Size = ctx.Style.TextSizes.Body, ColorKey = "inkSoft", Align = TextAlign.Center });
             }
 
+            float y = 0f;
             foreach (BeastPickerOption option in options)
             {
-                Rect rowBounds = new Rect(card.X + 60f, y, width - 120f, BeastCard.Height);
-                Panel row = panel.Add(new Panel { Bounds = rowBounds, StyleKey = option.Enabled ? "card" : "slot" });
+                Rect rowBounds = new Rect(0, y, width - 120f, BeastCard.Height);
+                Panel row = scroll.Add(new Panel { Bounds = rowBounds, StyleKey = option.Enabled ? "card" : "slot" });
                 _rows[row] = option;
                 if (option.Enabled)
                 {
-                    Hotspot tap = panel.Add(new Hotspot { Id = "pick-" + option.Id, Bounds = rowBounds });
+                    Hotspot tap = scroll.Add(new Hotspot { Id = "pick-" + option.Id, Bounds = rowBounds });
                     tap.Clicked += _ =>
                     {
                         Close();
@@ -412,6 +426,8 @@ namespace BeastCraft.Game.Screens.Components
                 y += rowHeight;
             }
 
+            scroll.ContentHeight = Math.Max(scroll.Bounds.Height, y);
+
             Button close = panel.Add(new Button { Id = "close", Bounds = new Rect(card.Center.X - 200f, card.Bottom - 140f, 400f, 100f), Text = "Close", StyleKey = "secondary" });
             close.Clicked += Close;
             Name = "beast-picker:" + title;
@@ -421,11 +437,15 @@ namespace BeastCraft.Game.Screens.Components
 
         public override void Draw()
         {
-            base.Draw();
-            foreach (KeyValuePair<Widget, BeastPickerOption> entry in _rows)
+            Ctx.Painter.Fill(new Rect(0, 0, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight), Ctx.Painter.C("scrim"));
+            Ctx.Painter.Paint(Ui, Ui, DrawCustom);
+        }
+
+        private void DrawCustom(Widget widget)
+        {
+            if (_rows.TryGetValue(widget, out BeastPickerOption option))
             {
-                BeastPickerOption option = entry.Value;
-                BeastCard.Draw(Ctx, entry.Key.Bounds, option.ArtKey, option.TintHex, option.Name, option.Enabled ? option.Subtitle : (option.Reason ?? option.Subtitle));
+                BeastCard.Draw(Ctx, widget.Bounds, option.ArtKey, option.TintHex, option.Name, option.Enabled ? option.Subtitle : (option.Reason ?? option.Subtitle));
             }
         }
     }

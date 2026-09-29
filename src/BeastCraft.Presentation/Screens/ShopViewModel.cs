@@ -222,7 +222,20 @@ namespace BeastCraft.Presentation.Screens
             }
 
             bool afford = Wallet.CanAfford(_session.Save, listing.Price);
-            string reason = listing.Remaining <= 0 ? "Sold out" : !afford ? "Not enough gold" : null;
+            string reason;
+            if (listing.Category == ShopCategory.BeastSkill)
+            {
+                // Eligibility is per target (which owned beast can learn it): the generic row only
+                // checks stock and gold, the same as ever; the BeastPickerModal's own pick surfaces
+                // ShopOutcome.IneligibleTarget for a specific beast (see ShopService.CanBuy's doc).
+                reason = listing.Remaining <= 0 ? "Sold out" : !afford ? "Not enough gold" : null;
+            }
+            else
+            {
+                ShopOutcome outcome = _session.Content.Shop == null ? ShopOutcome.UnknownItem : _session.Content.Shop.CanBuy(_session.Save, Context(), index);
+                reason = DisabledReasonFor(outcome);
+            }
+
             return new ShopListingRow
             {
                 Index = index,
@@ -286,6 +299,30 @@ namespace BeastCraft.Presentation.Screens
                     return "Already unlocked.";
                 default:
                     return "Cannot buy that.";
+            }
+        }
+
+        /// <summary>The Buy button's disabled reason for a non-<see cref="ShopCategory.BeastSkill"/> listing's <see cref="ShopService.CanBuy"/> result; null (enabled) for <see cref="ShopOutcome.Bought"/>.</summary>
+        private static string DisabledReasonFor(ShopOutcome outcome)
+        {
+            switch (outcome)
+            {
+                case ShopOutcome.Bought:
+                    return null;
+                case ShopOutcome.SoldOut:
+                    return "Sold out";
+                case ShopOutcome.NotEnoughGold:
+                    return "Not enough gold";
+                case ShopOutcome.AlreadyUnlocked:
+                    return "Already unlocked";
+                case ShopOutcome.AlreadyKnown:
+                    return "Already known";
+                case ShopOutcome.StackFull:
+                    return "Can't carry more";
+                case ShopOutcome.LevelTooLow:
+                    return "The avatar's level is too low";
+                default:
+                    return "Unavailable";
             }
         }
     }

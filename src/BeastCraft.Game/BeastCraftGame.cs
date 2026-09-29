@@ -1012,6 +1012,36 @@ namespace BeastCraft.Game
                 });
             }
 
+            // A verification aid, not a player-facing screen: the BeastPickerModal (equip gear to a
+            // beast, buy a tome for one) at the full ten-species roster, to check it scrolls its rows
+            // instead of overflowing past Close at a large roster size.
+            if (screen == "picker10")
+            {
+                steps.Add(() =>
+                {
+                    GameSession session = _ctx.Session;
+                    foreach (BeastCraft.Creatures.CreatureSpeciesSO species in session.Content.Species)
+                    {
+                        BeastCraft.Tutorial.StarterPicks.AddBeast(session.Save, session.Content.SkillLibrary, species.SpeciesId, 1);
+                    }
+
+                    BeastCraft.Battle.GearSO piece = null;
+                    foreach (BeastCraft.Battle.GearSO candidate in session.Content.Economy.Gear.BeastGearAssets)
+                    {
+                        if (candidate.MinimumLevel <= 1)
+                        {
+                            piece = candidate;
+                            break;
+                        }
+                    }
+
+                    string instanceId = session.Save.Gear.AddBeastGear(piece.GearId);
+                    session.Autosave(AutosaveReason.PlayerEdit);
+                    Home().SelectTab(HomeTab.Inventory);
+                    Top<InventoryScreen>().TapWidget("equip-" + instanceId);
+                });
+            }
+
             if (screen == "soothe")
             {
                 steps.Add(() => SetupSoothe());
