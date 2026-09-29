@@ -259,10 +259,11 @@ namespace BeastCraft.Presentation.Content
             Prefix(errors, "dialogue.json", DialogueValidator.Validate(dialogue));
             Prefix(errors, "dialogue.json", DialogueValidator.ValidateScenes(dialogue, regions));
             Prefix(errors, "discovery.json", DiscoveryLibraryValidator.Validate(discovery, regions, encounterLibrary, SpeciesIds(roster), MaterialIds(skills), cosmeticData));
-            Prefix(errors, "achievements.json", AchievementLibraryValidator.Validate(achievementData, regions, discovery, SpeciesIds(roster)));
             Prefix(errors, "grove-library.json", GroveLibraryValidator.Validate(groveData, discovery, SpeciesIds(roster), cosmeticData));
             Prefix(errors, "garden-library.json", GardenLibraryValidator.Validate(gardenData, discovery, groveData, cosmeticData));
             Prefix(errors, "expedition-library.json", ExpeditionLibraryValidator.Validate(expeditionData, groveData, cosmeticData));
+            Prefix(errors, "dialogue.json", DialogueValidator.ValidateRequestsAndSideStories(dialogue, groveData, gardenData, expeditionData, cosmeticData));
+            Prefix(errors, "achievements.json", AchievementLibraryValidator.Validate(achievementData, regions, discovery, SpeciesIds(roster), dialogue));
 
             HashSet<string> known = KnownSkills(skills, enemyLibrary);
             Prefix(errors, "vfx-library.json", VfxLibraryValidator.Validate(vfx, known, art));
@@ -411,7 +412,7 @@ namespace BeastCraft.Presentation.Content
                         Encounters = Encounters,
                         Enemies = Enemies
                     };
-                    _discovery.Achievements = new AchievementContent { Library = AchievementLibrary, Discovery = _discovery };
+                    _discovery.Achievements = new AchievementContent { Library = AchievementLibrary, Discovery = _discovery, Dialogue = Dialogue };
                 }
 
                 return _discovery;

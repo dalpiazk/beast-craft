@@ -13,6 +13,9 @@ namespace BeastCraft.Progression
 
         /// <summary>The discovery content (its <c>Regions</c>, <c>Library</c> and <c>Roster</c> — the compendium and Kinship conditions read these too).</summary>
         public DiscoveryContent Discovery;
+
+        /// <summary>The dialogue library (<see cref="AchievementKinds.SideStoryComplete"/> reads its side stories). Added for the Grove design's D2.</summary>
+        public Tutorial.DialogueBook Dialogue;
     }
 
     /// <summary>
@@ -112,6 +115,9 @@ namespace BeastCraft.Progression
 
                 case AchievementKinds.BeastLevel:
                     return AnyBeastAtLevel(save, def.Threshold);
+
+                case AchievementKinds.SideStoryComplete:
+                    return Npc.NpcRules.IsSideStoryComplete(save, content.Dialogue, def.StoryId);
 
                 default:
                     return false;

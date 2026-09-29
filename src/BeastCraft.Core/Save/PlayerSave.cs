@@ -8,6 +8,7 @@ using BeastCraft.Expeditions;
 using BeastCraft.Garden;
 using BeastCraft.Grove;
 using BeastCraft.Idle;
+using BeastCraft.Npc;
 using BeastCraft.Progression;
 using BeastCraft.Tutorial;
 
@@ -29,7 +30,10 @@ namespace BeastCraft.Save
     /// (<see cref="LookTokens"/>, schema 9), and the Grove: habitats, decor, affinity and gifts, and the
     /// generic Grove item inventory (<see cref="Grove"/>), the Wildgarden: plots and the herbarium
     /// (<see cref="Garden"/>), and the Board: expeditions away, stories and pity (<see cref="Expeditions"/>,
-    /// schema 10).
+    /// schema 10), and the NPC dialogue layer: lines seen, requests fulfilled, the dialogue layer's own
+    /// lore and every side story's chapter progress (<see cref="Npc"/>; the Grove design's D2, folded
+    /// into schema 10 in place — see <c>Save.SaveMigrations.AddGrove</c> — because schema 10 had not
+    /// shipped yet).
     /// <para>
     /// <strong>JsonUtility-compatible by construction.</strong> Every type reachable from here is
     /// <c>[Serializable]</c> with public fields, and every map is a list (<c>JsonUtility</c> drops
@@ -163,6 +167,14 @@ namespace BeastCraft.Save
         /// No combat power; sending a beast never locks it. Added in schema 10.
         /// </summary>
         public ExpeditionProgress Expeditions = new ExpeditionProgress();
+
+        /// <summary>
+        /// The NPC dialogue layer: every line seen, every request fulfilled, the dialogue layer's own
+        /// small lore codex and every side story's chapter progress (<see cref="NpcProgress"/>). Change
+        /// it through <c>Npc.NpcRules</c>. No combat power, no title (a title is earned only through an
+        /// achievement). Added in schema 10.
+        /// </summary>
+        public NpcProgress Npc = new NpcProgress();
 
         /// <summary>
         /// A blank save: no beasts, avatar level 1, nothing learned or held, the first campaign region
@@ -427,6 +439,14 @@ namespace BeastCraft.Save
             }
 
             repaired += Expeditions.EnsureInitialized();
+
+            if (Npc == null)
+            {
+                Npc = new NpcProgress();
+                repaired++;
+            }
+
+            repaired += Npc.EnsureInitialized();
 
             return repaired;
         }

@@ -151,6 +151,43 @@ namespace BeastCraft.Discovery
             return entries;
         }
 
+        /// <summary>
+        /// Every dialogue-layer lore entry (an NPC request's or side-story chapter's reward — see
+        /// <c>docs/design/grove.md</c>, "NPCs"), in file order, each with whether it has been found
+        /// (<c>PlayerSave.Npc.LoreIds</c>). Kept separate from <see cref="LoreEntries"/> (the discovery
+        /// layer's own lore) and deliberately **not** folded into <see cref="Completion"/>/its
+        /// <c>Percent</c> — that stays scoped to what it already covers (beasts, discovery lore, Kinship
+        /// sites), the same "each domain owns its own small lore list" shape used throughout.
+        /// </summary>
+        public static List<CompendiumLoreEntry> NpcLoreEntries(PlayerSave save, Tutorial.DialogueBook dialogue)
+        {
+            List<CompendiumLoreEntry> entries = new List<CompendiumLoreEntry>();
+            if (save == null || dialogue == null)
+            {
+                return entries;
+            }
+
+            save.EnsureInitialized();
+            foreach (Tutorial.NpcLoreEntryData lore in dialogue.AllLore)
+            {
+                if (lore == null || string.IsNullOrEmpty(lore.LoreId))
+                {
+                    continue;
+                }
+
+                entries.Add(new CompendiumLoreEntry
+                {
+                    LoreId = lore.LoreId,
+                    RegionId = string.Empty,
+                    Title = lore.Title,
+                    Text = lore.Text,
+                    Found = save.Npc.LoreIds != null && save.Npc.LoreIds.Contains(lore.LoreId)
+                });
+            }
+
+            return entries;
+        }
+
         /// <summary>The compendium's completion: beasts owned, lore found and Kinship sites claimed, and their combined percent. Null without discovery content.</summary>
         public static CompendiumCompletion Completion(PlayerSave save, DiscoveryContent content)
         {

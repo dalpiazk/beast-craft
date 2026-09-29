@@ -93,6 +93,7 @@ namespace BeastCraft.Save
             ValidateIdle(save.Idle, issues);
             ValidateCompendium(save, issues);
             ValidateGrove(save, issues);
+            ValidateNpc(save, issues);
             return issues;
         }
 
@@ -165,6 +166,61 @@ namespace BeastCraft.Save
                     {
                         issues.Add(new SaveIssue(SaveIssueKind.InvalidValue, path + ".BeastIds", null, "an expedition away with no beasts sent"));
                     }
+                }
+            }
+        }
+
+        /// <summary>
+        /// The NPC dialogue layer (schema 10, D2): no line, request, lore or story id listed twice, and
+        /// no chapter listed twice within one side story. No content cross-references here (mirrors
+        /// <see cref="ValidateGrove"/>: the content catalog does not carry dialogue/request/story ids).
+        /// </summary>
+        private static void ValidateNpc(PlayerSave save, List<SaveIssue> issues)
+        {
+            Npc.NpcProgress npc = save.Npc;
+            if (npc == null)
+            {
+                return;
+            }
+
+            CheckUniqueIds(npc.Dialogue?.LinesSeen, "Npc.Dialogue.LinesSeen", issues);
+            CheckUniqueIds(npc.RequestsFulfilled, "Npc.RequestsFulfilled", issues);
+            CheckUniqueIds(npc.LoreIds, "Npc.LoreIds", issues);
+
+            if (npc.SideStories == null)
+            {
+                return;
+            }
+
+            HashSet<string> storyIds = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < npc.SideStories.Count; i++)
+            {
+                Npc.SideStoryState state = npc.SideStories[i];
+                string path = "Npc.SideStories[" + i + "]";
+                if (state == null || string.IsNullOrEmpty(state.StoryId) || !storyIds.Add(state.StoryId))
+                {
+                    issues.Add(new SaveIssue(SaveIssueKind.InvalidValue, path + ".StoryId", state?.StoryId, "story id is empty or listed twice"));
+                    continue;
+                }
+
+                CheckUniqueIds(state.ChaptersCompleted, path + ".ChaptersCompleted", issues);
+            }
+        }
+
+        private static void CheckUniqueIds(List<string> ids, string path, List<SaveIssue> issues)
+        {
+            if (ids == null)
+            {
+                return;
+            }
+
+            HashSet<string> seen = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < ids.Count; i++)
+            {
+                string id = ids[i];
+                if (string.IsNullOrEmpty(id) || !seen.Add(id))
+                {
+                    issues.Add(new SaveIssue(SaveIssueKind.InvalidValue, path + "[" + i + "]", id, "id is empty or listed twice"));
                 }
             }
         }

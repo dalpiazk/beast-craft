@@ -194,9 +194,16 @@ namespace BeastCraft.Presentation.Screens
                     return "Reach Beastbinder level " + def.Threshold + ".";
                 case AchievementKinds.BeastLevel:
                     return "Reach level " + def.Threshold + " with any beast.";
+                case AchievementKinds.SideStoryComplete:
+                    return "Complete " + SideStoryName(session, def.StoryId) + ".";
                 default:
                     return string.Empty;
             }
+        }
+
+        private static string SideStoryName(GameSession session, string storyId)
+        {
+            return session.Content.Dialogue.SideStory(storyId)?.DisplayName ?? storyId;
         }
 
         private static string RegionName(GameSession session, string regionId)
