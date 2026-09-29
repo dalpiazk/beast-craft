@@ -4,22 +4,22 @@
   "Npcs": [
     {
       "NpcId": "grove_keeper",
-      "DisplayName": "The Grove Keeper",
+      "DisplayName": "npc.grove_keeper.name",
       "PortraitKey": ""
     },
     {
       "NpcId": "trader",
-      "DisplayName": "The Trader",
+      "DisplayName": "npc.trader.name",
       "PortraitKey": ""
     },
     {
       "NpcId": "wandering_scholar",
-      "DisplayName": "The Wandering Scholar",
+      "DisplayName": "npc.wandering_scholar.name",
       "PortraitKey": ""
     },
     {
       "NpcId": "forest_folk",
-      "DisplayName": "Forest Folk",
+      "DisplayName": "npc.forest_folk.name",
       "PortraitKey": ""
     }
   ],
@@ -30,7 +30,7 @@
       "Conditions": [
         "scene:hg_shrine"
       ],
-      "Text": "There you are. I am the Grove Keeper; I have tended this shrine since before the old oak by the mill was an acorn.",
+      "Text": "line.hg_shrine_1.text",
       "Priority": 0
     },
     {
@@ -39,7 +39,7 @@
       "Conditions": [
         "scene:hg_shrine"
       ],
-      "Text": "Your beast chose you. That is how every Beastbinder begins: not with a leash, but with a promise.",
+      "Text": "line.hg_shrine_2.text",
       "Priority": 0
     },
     {
@@ -48,7 +48,7 @@
       "Conditions": [
         "scene:hg_shrine"
       ],
-      "Text": "Hold out your hand. There: a small mending light, your first binder art. You will never strike in a fight; you will keep your friends standing.",
+      "Text": "line.hg_shrine_3.text",
       "Priority": 0
     },
     {
@@ -57,7 +57,7 @@
       "Conditions": [
         "scene:hg_shrine"
       ],
-      "Text": "Take these Fury Draughts, for when a fight turns against you. And go gently: the hedgerows are restless, and the Gloam's shimmer has reached the far hedge.",
+      "Text": "line.hg_shrine_4.text",
       "Priority": 0
     },
     {
@@ -66,7 +66,7 @@
       "Conditions": [
         "scene:hg_camp"
       ],
-      "Text": "Rest here a while. The lanterns keep the haze at bay.",
+      "Text": "line.hg_camp_1.text",
       "Priority": 0
     },
     {
@@ -75,7 +75,7 @@
       "Conditions": [
         "scene:hg_camp"
       ],
-      "Text": "The miller says the Seals are only an old story. They are not. One sleeps in Verdant Hollow, just past the ridge.",
+      "Text": "line.hg_camp_2.text",
       "Priority": 0
     },
     {
@@ -84,7 +84,7 @@
       "Conditions": [
         "scene:hg_camp"
       ],
-      "Text": "Your newest friends are keen to keep up. Sit with them a while, and they will stand as tall as your first.",
+      "Text": "line.hg_camp_3.text",
       "Priority": 0
     },
     {
@@ -93,7 +93,7 @@
       "Conditions": [
         "scene:hg_farewell"
       ],
-      "Text": "You calmed it. See how the haze slipped off, and the creature wandered home, dazed but whole? That is your work now.",
+      "Text": "line.hg_farewell_1.text",
       "Priority": 0
     },
     {
@@ -102,7 +102,7 @@
       "Conditions": [
         "scene:hg_farewell"
       ],
-      "Text": "Verdant Hollow starts past this ridge, and the Gloam is thicker there. Some places lie off the path: explore, and the map will fill in.",
+      "Text": "line.hg_farewell_2.text",
       "Priority": 0
     },
     {
@@ -111,14 +111,14 @@
       "Conditions": [
         "scene:hg_farewell"
       ],
-      "Text": "When you need a quiet place, find me at the Grove. And listen for kinship stones in the wild: more beasts are waiting to meet you.",
+      "Text": "line.hg_farewell_3.text",
       "Priority": 0
     },
     {
       "LineId": "keeper_default",
       "NpcId": "grove_keeper",
       "Conditions": [],
-      "Text": "The wild remembers kindness. So do I.",
+      "Text": "line.keeper_default.text",
       "Priority": -1
     },
     {
@@ -127,7 +127,7 @@
       "Conditions": [
         "habitat_unlocked:mossy_glade"
       ],
-      "Text": "The mossy glade is yours now. Sit a while; the moss keeps the warmth of every beast that has rested here.",
+      "Text": "line.gk_habitat_glade.text",
       "Priority": 0
     },
     {
@@ -136,7 +136,7 @@
       "Conditions": [
         "habitat_unlocked:tide_pool"
       ],
-      "Text": "The tide pool breathes with the sea, even this far inland. Watch how the light moves across it at dusk.",
+      "Text": "line.gk_habitat_pool.text",
       "Priority": 0
     },
     {
@@ -145,7 +145,7 @@
       "Conditions": [
         "habitat_unlocked:snow_hollow"
       ],
-      "Text": "The snow hollow never quite melts, and never quite freezes either. A patient sort of place.",
+      "Text": "line.gk_habitat_snow.text",
       "Priority": 0
     },
     {
@@ -154,7 +154,7 @@
       "Conditions": [
         "decor_placed_count:3"
       ],
-      "Text": "You have started to make this place your own. A lantern here, a bench there, and it shows.",
+      "Text": "line.gk_decor_3.text",
       "Priority": 1
     },
     {
@@ -163,7 +163,7 @@
       "Conditions": [
         "decor_placed_count:6"
       ],
-      "Text": "Six pieces placed with care, and the Grove already feels lived in. Beasts notice that more than you would think.",
+      "Text": "line.gk_decor_6.text",
       "Priority": 2
     },
     {
@@ -172,7 +172,7 @@
       "Conditions": [
         "affinity_tier_any:2"
       ],
-      "Text": "Whichever of your beasts has been keeping you company, it trusts you a little more than it did.",
+      "Text": "line.gk_affinity_any_2.text",
       "Priority": 1
     },
     {
@@ -181,7 +181,7 @@
       "Conditions": [
         "affinity_tier_any:4"
       ],
-      "Text": "That bond has grown deep. Some beasts start humming old tunes at that stage. Have you noticed?",
+      "Text": "line.gk_affinity_any_4.text",
       "Priority": 2
     },
     {
@@ -190,7 +190,7 @@
       "Conditions": [
         "variety_count:5"
       ],
-      "Text": "Five varieties in the herbarium already. The Wildgarden rewards patience more than skill.",
+      "Text": "line.gk_variety_5.text",
       "Priority": 1
     },
     {
@@ -199,7 +199,7 @@
       "Conditions": [
         "variety_count:15"
       ],
-      "Text": "Fifteen varieties pressed and catalogued. You could open a stall of your own at this rate.",
+      "Text": "line.gk_variety_15.text",
       "Priority": 2
     },
     {
@@ -208,7 +208,7 @@
       "Conditions": [
         "grove_lore_found:gift_lore_wander"
       ],
-      "Text": "That little tale a gift carried, I remember hearing it myself, long before you arrived.",
+      "Text": "line.gk_lore_found.text",
       "Priority": 1
     },
     {
@@ -217,14 +217,14 @@
       "Conditions": [
         "region_cleared:r01"
       ],
-      "Text": "Word travels fast from the wilds. I hear the first stretch of the road is calm behind you now.",
+      "Text": "line.gk_region_r01.text",
       "Priority": 1
     },
     {
       "LineId": "trader_default",
       "NpcId": "trader",
       "Conditions": [],
-      "Text": "Wares from every corner I have walked. Have a look, if coin or curiosity moves you.",
+      "Text": "line.trader_default.text",
       "Priority": -1
     },
     {
@@ -233,7 +233,7 @@
       "Conditions": [
         "habitat_unlocked:mossy_glade"
       ],
-      "Text": "A mossy glade for a home base, sensible. Easy to find, easy to defend, easy to sell to.",
+      "Text": "line.trader_habitat_glade.text",
       "Priority": 0
     },
     {
@@ -242,7 +242,7 @@
       "Conditions": [
         "habitat_unlocked:tide_pool"
       ],
-      "Text": "A tide pool habitat. I have seen beasts fetch salt glass from those on their own, given time.",
+      "Text": "line.trader_habitat_pool.text",
       "Priority": 0
     },
     {
@@ -251,7 +251,7 @@
       "Conditions": [
         "habitat_unlocked:snow_hollow"
       ],
-      "Text": "A snow hollow keeps preserves fresher than any cellar I have paid for. Handy, that.",
+      "Text": "line.trader_habitat_snow.text",
       "Priority": 0
     },
     {
@@ -260,7 +260,7 @@
       "Conditions": [
         "item_held:dye_sunwash:1"
       ],
-      "Text": "That sunwash dye in your pack, mixed well. Whoever crafted it has a good eye for warmth.",
+      "Text": "line.trader_item_dye.text",
       "Priority": 1
     },
     {
@@ -269,7 +269,7 @@
       "Conditions": [
         "variety_count:10"
       ],
-      "Text": "Ten varieties pressed already. I could move those at three markets before midday.",
+      "Text": "line.trader_variety_10.text",
       "Priority": 1
     },
     {
@@ -278,7 +278,7 @@
       "Conditions": [
         "variety_count:20"
       ],
-      "Text": "Twenty varieties now. You are outpacing half the growers I deal with on the road.",
+      "Text": "line.trader_variety_20.text",
       "Priority": 2
     },
     {
@@ -287,7 +287,7 @@
       "Conditions": [
         "expedition_story:story_whispering_hollow"
       ],
-      "Text": "Whispering Hollow, was it. I have heard that story told three different ways by three different travellers.",
+      "Text": "line.trader_expedition_story.text",
       "Priority": 1
     },
     {
@@ -296,7 +296,7 @@
       "Conditions": [
         "region_cleared:r01"
       ],
-      "Text": "The road past the first stretch is quieter now, they tell me. Good for business, good for you.",
+      "Text": "line.trader_region_r01.text",
       "Priority": 1
     },
     {
@@ -305,7 +305,7 @@
       "Conditions": [
         "region_cleared:r02"
       ],
-      "Text": "Two stretches of road cleared. I might finally take the long route again myself.",
+      "Text": "line.trader_region_r02.text",
       "Priority": 2
     },
     {
@@ -314,7 +314,7 @@
       "Conditions": [
         "affinity_tier_any:3"
       ],
-      "Text": "That beast of yours watches you the way a good pack mule watches its favourite handler. Rare, that.",
+      "Text": "line.trader_affinity_any_3.text",
       "Priority": 1
     },
     {
@@ -323,7 +323,7 @@
       "Conditions": [
         "npc_lore_found:trader_lore_roads_1"
       ],
-      "Text": "You heard the start of my old road story, then. There is more to it, when you have the time.",
+      "Text": "line.trader_lore_found.text",
       "Priority": 1
     },
     {
@@ -332,14 +332,14 @@
       "Conditions": [
         "side_story_complete:trader_roads"
       ],
-      "Text": "You have heard the whole of my roads now, start to finish. Not many sit still long enough for that.",
+      "Text": "line.trader_side_story_complete.text",
       "Priority": 3
     },
     {
       "LineId": "scholar_default",
       "NpcId": "wandering_scholar",
       "Conditions": [],
-      "Text": "Every corner of this Grove is worth a footnote, if you look closely enough.",
+      "Text": "line.scholar_default.text",
       "Priority": -1
     },
     {
@@ -348,7 +348,7 @@
       "Conditions": [
         "habitat_unlocked:mossy_glade"
       ],
-      "Text": "A mossy glade. The moss itself is worth studying, it only grows where a beast has slept undisturbed.",
+      "Text": "line.scholar_habitat_glade.text",
       "Priority": 0
     },
     {
@@ -357,7 +357,7 @@
       "Conditions": [
         "habitat_unlocked:tide_pool"
       ],
-      "Text": "A tide pool this far from open water. I have three theories and no proof for any of them yet.",
+      "Text": "line.scholar_habitat_pool.text",
       "Priority": 0
     },
     {
@@ -366,7 +366,7 @@
       "Conditions": [
         "habitat_unlocked:snow_hollow"
       ],
-      "Text": "A snow hollow that never fully thaws. My notes on it already run to four pages.",
+      "Text": "line.scholar_habitat_snow.text",
       "Priority": 0
     },
     {
@@ -375,7 +375,7 @@
       "Conditions": [
         "variety_count:5"
       ],
-      "Text": "Five varieties catalogued. The cross pollination patterns alone could fill a chapter.",
+      "Text": "line.scholar_variety_5.text",
       "Priority": 1
     },
     {
@@ -384,7 +384,7 @@
       "Conditions": [
         "variety_count:15"
       ],
-      "Text": "Fifteen varieties now. Your herbarium is becoming more thorough than my own field notes.",
+      "Text": "line.scholar_variety_15.text",
       "Priority": 2
     },
     {
@@ -393,7 +393,7 @@
       "Conditions": [
         "variety_count:30"
       ],
-      "Text": "Thirty varieties. I may need to ask you to review my next manuscript before I publish it.",
+      "Text": "line.scholar_variety_30.text",
       "Priority": 3
     },
     {
@@ -402,7 +402,7 @@
       "Conditions": [
         "grove_lore_found:affinity_lore_phoenix"
       ],
-      "Text": "That story about the phoenix bond, I have heard three tellings, and yours matches the oldest one.",
+      "Text": "line.scholar_lore_grove.text",
       "Priority": 1
     },
     {
@@ -411,7 +411,7 @@
       "Conditions": [
         "expedition_story:story_frostglass_ridge"
       ],
-      "Text": "Frostglass Ridge again. Every party that returns from there brings back a slightly different account.",
+      "Text": "line.scholar_expedition_story.text",
       "Priority": 1
     },
     {
@@ -420,7 +420,7 @@
       "Conditions": [
         "region_cleared:r01"
       ],
-      "Text": "The first stretch of road, quiet at last. I might finally survey it properly.",
+      "Text": "line.scholar_region_r01.text",
       "Priority": 1
     },
     {
@@ -429,7 +429,7 @@
       "Conditions": [
         "affinity_tier_species:phoenix:3"
       ],
-      "Text": "Your phoenix trusts you deeply now. Its plumage shifts a little at that stage, did you notice?",
+      "Text": "line.scholar_affinity_species_phoenix.text",
       "Priority": 1
     },
     {
@@ -438,14 +438,14 @@
       "Conditions": [
         "side_story_complete:scholar_atlas"
       ],
-      "Text": "My atlas of this Grove is complete, thanks to you. I could not have mapped it half so well alone.",
+      "Text": "line.scholar_side_story_complete.text",
       "Priority": 3
     },
     {
       "LineId": "forest_default",
       "NpcId": "forest_folk",
       "Conditions": [],
-      "Text": "The wild has its own quiet ways. Stay a while and you will learn to hear them.",
+      "Text": "line.forest_default.text",
       "Priority": -1
     },
     {
@@ -454,7 +454,7 @@
       "Conditions": [
         "habitat_unlocked:mossy_glade"
       ],
-      "Text": "The glade hums when it is happy. Can you hear it yet? Most cannot, at first.",
+      "Text": "line.forest_habitat_glade.text",
       "Priority": 0
     },
     {
@@ -463,7 +463,7 @@
       "Conditions": [
         "habitat_unlocked:tide_pool"
       ],
-      "Text": "The tide pool remembers every beast that has ever drunk from it. Odd, but true.",
+      "Text": "line.forest_habitat_pool.text",
       "Priority": 0
     },
     {
@@ -472,7 +472,7 @@
       "Conditions": [
         "habitat_unlocked:snow_hollow"
       ],
-      "Text": "The snow hollow keeps its own kind of warmth, underneath. Dig a little and you will feel it.",
+      "Text": "line.forest_habitat_snow.text",
       "Priority": 0
     },
     {
@@ -481,7 +481,7 @@
       "Conditions": [
         "decor_placed_count:1"
       ],
-      "Text": "One little piece placed, and already the clearing feels less empty. Small things matter here.",
+      "Text": "line.forest_decor_1.text",
       "Priority": 1
     },
     {
@@ -490,7 +490,7 @@
       "Conditions": [
         "decor_placed_count:5"
       ],
-      "Text": "Five pieces now. The wild things have started treating this place as part of the forest proper.",
+      "Text": "line.forest_decor_5.text",
       "Priority": 2
     },
     {
@@ -499,7 +499,7 @@
       "Conditions": [
         "affinity_tier_any:1"
       ],
-      "Text": "Your beast leans toward you now, just a little, when you are near. That is how it always starts.",
+      "Text": "line.forest_affinity_any_1.text",
       "Priority": 1
     },
     {
@@ -508,7 +508,7 @@
       "Conditions": [
         "affinity_tier_any:5"
       ],
-      "Text": "That bond is about as deep as they come. Whatever you did, keep doing it.",
+      "Text": "line.forest_affinity_any_5.text",
       "Priority": 2
     },
     {
@@ -517,7 +517,7 @@
       "Conditions": [
         "item_held:trinket_hollow_bark:1"
       ],
-      "Text": "That bark from the hollow, press it flat and dry, and it keeps its shape for years.",
+      "Text": "line.forest_item_trinket.text",
       "Priority": 1
     },
     {
@@ -526,7 +526,7 @@
       "Conditions": [
         "region_cleared:r01"
       ],
-      "Text": "The road behind you is calmer now. The wild things feel it too, in their own way.",
+      "Text": "line.forest_region_r01.text",
       "Priority": 1
     },
     {
@@ -535,7 +535,7 @@
       "Conditions": [
         "npc_lore_found:forest_lore_bloom"
       ],
-      "Text": "That bloom you brought me carried more of a story than you knew. Glad it found its way to me.",
+      "Text": "line.forest_lore_found.text",
       "Priority": 1
     },
     {
@@ -544,14 +544,14 @@
       "Conditions": [
         "location_soothed:1"
       ],
-      "Text": "You calmed one of them with a gift instead of a fight. The Gloam lifts just as well for kindness as for courage.",
+      "Text": "line.gk_location_soothed.text",
       "Priority": 1
     }
   ],
   "Scenes": [
     {
       "SceneId": "hg_shrine",
-      "Title": "The Keeper's Shrine",
+      "Title": "scene.hg_shrine.title",
       "LineIds": [
         "hg_shrine_1",
         "hg_shrine_2",
@@ -561,7 +561,7 @@
     },
     {
       "SceneId": "hg_camp",
-      "Title": "Lantern Camp",
+      "Title": "scene.hg_camp.title",
       "LineIds": [
         "hg_camp_1",
         "hg_camp_2",
@@ -570,7 +570,7 @@
     },
     {
       "SceneId": "hg_farewell",
-      "Title": "Hollow's Edge",
+      "Title": "scene.hg_farewell.title",
       "LineIds": [
         "hg_farewell_1",
         "hg_farewell_2",
@@ -589,7 +589,7 @@
       "Count": 1,
       "RewardKind": "lore",
       "RewardId": "trader_lore_market",
-      "Text": "Bring me a vial of sunwash dye and I will tell you where I learned to spot a fair market from a rigged one."
+      "Text": "request.request_trader_dye.text"
     },
     {
       "RequestId": "request_keeper_variety",
@@ -601,7 +601,7 @@
       "Count": 2,
       "RewardKind": "lore",
       "RewardId": "keeper_lore_soil",
-      "Text": "Two ashbloom blossoms, if the Wildgarden has spared them. I want to check something about this soil."
+      "Text": "request.request_keeper_variety.text"
     },
     {
       "RequestId": "request_scholar_trinket",
@@ -613,7 +613,7 @@
       "Count": 1,
       "RewardKind": "lore",
       "RewardId": "scholar_lore_ice",
-      "Text": "A clear ice shard from Frostglass Ridge would settle an argument I have been having with myself for years."
+      "Text": "request.request_scholar_trinket.text"
     },
     {
       "RequestId": "request_forest_bloom",
@@ -625,7 +625,7 @@
       "Count": 1,
       "RewardKind": "lore",
       "RewardId": "forest_lore_bloom",
-      "Text": "A dewgrass bloom, freshly grown. The wild things ask for one every season, and I never say no."
+      "Text": "request.request_forest_bloom.text"
     },
     {
       "RequestId": "request_scholar_colour_form",
@@ -637,21 +637,21 @@
       "Count": 1,
       "RewardKind": "lore",
       "RewardId": "scholar_lore_colour_forms",
-      "Text": "Is that a duskrose phoenix I see? I would love an amber vial too, if you can spare one, to compare the dyes."
+      "Text": "request.request_scholar_colour_form.text"
     }
   ],
   "SideStories": [
     {
       "StoryId": "keeper_roots",
       "NpcId": "grove_keeper",
-      "DisplayName": "Roots of the Grove",
+      "DisplayName": "story.keeper_roots.name",
       "Chapters": [
         {
           "ChapterId": "keeper_roots_1",
           "Conditions": [
             "habitat_unlocked:mossy_glade"
           ],
-          "Text": "Sit with me a while. I want to tell you how this glade came to be the Grove's first root.",
+          "Text": "story.keeper_roots.chapter.keeper_roots_1.text",
           "RequestItemId": "",
           "RequestCount": 0,
           "RewardKind": "none",
@@ -664,7 +664,7 @@
           "Conditions": [
             "affinity_tier_any:2"
           ],
-          "Text": "Bring me two sunpetal blooms, grown here and not bought elsewhere. I want to show you something about trust.",
+          "Text": "story.keeper_roots.chapter.keeper_roots_2.text",
           "RequestItemId": "sunpetal_pure",
           "RequestCount": 2,
           "RewardKind": "none",
@@ -677,7 +677,7 @@
           "Conditions": [
             "decor_placed_count:3"
           ],
-          "Text": "A vial of sunwash dye, if you have crafted one. The colour matters less to me than the making of it.",
+          "Text": "story.keeper_roots.chapter.keeper_roots_3.text",
           "RequestItemId": "dye_sunwash",
           "RequestCount": 1,
           "RewardKind": "none",
@@ -690,7 +690,7 @@
           "Conditions": [
             "variety_count:10"
           ],
-          "Text": "You have grown, gathered and given more than most who pass through here. That is the whole of the story, really.",
+          "Text": "story.keeper_roots.chapter.keeper_roots_4.text",
           "RequestItemId": "",
           "RequestCount": 0,
           "RewardKind": "none",
@@ -703,14 +703,14 @@
     {
       "StoryId": "scholar_atlas",
       "NpcId": "wandering_scholar",
-      "DisplayName": "The Wandering Atlas",
+      "DisplayName": "story.scholar_atlas.name",
       "Chapters": [
         {
           "ChapterId": "scholar_atlas_1",
           "Conditions": [
             "habitat_unlocked:snow_hollow"
           ],
-          "Text": "I am mapping every habitat in this Grove, in my own slow way. Would you help me start with the snow hollow?",
+          "Text": "story.scholar_atlas.chapter.scholar_atlas_1.text",
           "RequestItemId": "",
           "RequestCount": 0,
           "RewardKind": "none",
@@ -723,7 +723,7 @@
           "Conditions": [
             "variety_discovered:frostfern_pure"
           ],
-          "Text": "A frostfern bloom for my notes, if the Wildgarden has one ready. I suspect it only grows where the hollow's chill reaches.",
+          "Text": "story.scholar_atlas.chapter.scholar_atlas_2.text",
           "RequestItemId": "frostfern_pure",
           "RequestCount": 1,
           "RewardKind": "none",
@@ -736,7 +736,7 @@
           "Conditions": [
             "expedition_story:story_frostglass_ridge"
           ],
-          "Text": "A frost rose from the ridge would confirm a theory I have been chasing for three seasons now.",
+          "Text": "story.scholar_atlas.chapter.scholar_atlas_3.text",
           "RequestItemId": "trinket_frost_rose",
           "RequestCount": 1,
           "RewardKind": "none",
@@ -749,7 +749,7 @@
           "Conditions": [
             "region_cleared:r01"
           ],
-          "Text": "With the road behind you quiet, I can finally cross reference my notes against what you have seen out there. Thank you for your patience.",
+          "Text": "story.scholar_atlas.chapter.scholar_atlas_4.text",
           "RequestItemId": "",
           "RequestCount": 0,
           "RewardKind": "none",
@@ -762,14 +762,14 @@
     {
       "StoryId": "trader_roads",
       "NpcId": "trader",
-      "DisplayName": "The Long Roads",
+      "DisplayName": "story.trader_roads.name",
       "Chapters": [
         {
           "ChapterId": "trader_roads_1",
           "Conditions": [
             "habitat_unlocked:mossy_glade"
           ],
-          "Text": "Settle in, and I will tell you how I ended up walking these roads instead of settling on one of them.",
+          "Text": "story.trader_roads.chapter.trader_roads_1.text",
           "RequestItemId": "",
           "RequestCount": 0,
           "RewardKind": "none",
@@ -782,7 +782,7 @@
           "Conditions": [
             "variety_count:8"
           ],
-          "Text": "A vial of duskrose dye, if your Wildgarden has one to spare. It fetches a fair price where I am headed next.",
+          "Text": "story.trader_roads.chapter.trader_roads_2.text",
           "RequestItemId": "dye_duskrose",
           "RequestCount": 1,
           "RewardKind": "none",
@@ -795,7 +795,7 @@
           "Conditions": [
             "region_cleared:r02"
           ],
-          "Text": "Two stretches of road behind you now, same as me all those years ago. That is where this story ends, and a new one starts.",
+          "Text": "story.trader_roads.chapter.trader_roads_3.text",
           "RequestItemId": "",
           "RequestCount": 0,
           "RewardKind": "none",
@@ -809,83 +809,83 @@
   "Lore": [
     {
       "LoreId": "keeper_lore_roots_1",
-      "Title": "The First Root",
-      "Text": "Long before the habitats had names, the Grove Keeper planted a single seed here and waited three winters to see what it would become."
+      "Title": "npc_lore.keeper_lore_roots_1.title",
+      "Text": "npc_lore.keeper_lore_roots_1.text"
     },
     {
       "LoreId": "keeper_lore_roots_2",
-      "Title": "A Question of Trust",
-      "Text": "The Keeper says a beast's trust is grown the same way a garden is, slowly, and never by pulling on it to make it faster."
+      "Title": "npc_lore.keeper_lore_roots_2.title",
+      "Text": "npc_lore.keeper_lore_roots_2.text"
     },
     {
       "LoreId": "keeper_lore_roots_3",
-      "Title": "Colour and Care",
-      "Text": "Every dye the Wildgarden yields carries a little of the hand that mixed it, the Keeper claims to recognise a crafter by their sunwash alone."
+      "Title": "npc_lore.keeper_lore_roots_3.title",
+      "Text": "npc_lore.keeper_lore_roots_3.text"
     },
     {
       "LoreId": "keeper_lore_roots_4",
-      "Title": "What the Grove Remembers",
-      "Text": "The Keeper believes a Grove remembers every visitor who ever tended it, long after the visitor has forgotten the visit."
+      "Title": "npc_lore.keeper_lore_roots_4.title",
+      "Text": "npc_lore.keeper_lore_roots_4.text"
     },
     {
       "LoreId": "scholar_lore_atlas_1",
-      "Title": "Mapping the Cold",
-      "Text": "The Scholar's notes on the snow hollow fill four pages and still end with the words more study needed."
+      "Title": "npc_lore.scholar_lore_atlas_1.title",
+      "Text": "npc_lore.scholar_lore_atlas_1.text"
     },
     {
       "LoreId": "scholar_lore_atlas_2",
-      "Title": "A Bloom Out of Season",
-      "Text": "Frostfern only opens where a chill lingers past its season, the Scholar suspects the snow hollow keeps its own private winter."
+      "Title": "npc_lore.scholar_lore_atlas_2.title",
+      "Text": "npc_lore.scholar_lore_atlas_2.text"
     },
     {
       "LoreId": "scholar_lore_atlas_3",
-      "Title": "The Ridge Secret",
-      "Text": "A frost rose, the Scholar explains, only forms where the ridge's wind crosses itself exactly right, proof, finally, of a theory chased for years."
+      "Title": "npc_lore.scholar_lore_atlas_3.title",
+      "Text": "npc_lore.scholar_lore_atlas_3.text"
     },
     {
       "LoreId": "scholar_lore_atlas_4",
-      "Title": "The Completed Page",
-      "Text": "With the first stretch of road surveyed, the Scholar's atlas gains its first fully finished page, dedicated, in small handwriting, to a patient companion."
+      "Title": "npc_lore.scholar_lore_atlas_4.title",
+      "Text": "npc_lore.scholar_lore_atlas_4.text"
     },
     {
       "LoreId": "trader_lore_roads_1",
-      "Title": "Why I Walk",
-      "Text": "The Trader once tried to settle in a single town and lasted one season before the road called again, some people are built for moving."
+      "Title": "npc_lore.trader_lore_roads_1.title",
+      "Text": "npc_lore.trader_lore_roads_1.text"
     },
     {
       "LoreId": "trader_lore_roads_2",
-      "Title": "The Duskrose Trade",
-      "Text": "Duskrose dye fetches its best price three towns over, the Trader says, where the evenings run long and everyone wants a warmer colour to wear."
+      "Title": "npc_lore.trader_lore_roads_2.title",
+      "Text": "npc_lore.trader_lore_roads_2.text"
     },
     {
       "LoreId": "trader_lore_roads_3",
-      "Title": "Two Stretches Down",
-      "Text": "The Trader admits that clearing two stretches of road, the same as their own first journey, feels less like an ending and more like finally being caught up to."
+      "Title": "npc_lore.trader_lore_roads_3.title",
+      "Text": "npc_lore.trader_lore_roads_3.text"
     },
     {
       "LoreId": "trader_lore_market",
-      "Title": "Reading a Market",
-      "Text": "The Trader learned to spot a fair market from a rigged one by watching which stalls the local children lingered near."
+      "Title": "npc_lore.trader_lore_market.title",
+      "Text": "npc_lore.trader_lore_market.text"
     },
     {
       "LoreId": "keeper_lore_soil",
-      "Title": "What the Soil Holds",
-      "Text": "The Grove Keeper tests ashbloom soil by scent alone, and claims to have never once been wrong about what grew there before the Grove did."
+      "Title": "npc_lore.keeper_lore_soil.title",
+      "Text": "npc_lore.keeper_lore_soil.text"
     },
     {
       "LoreId": "scholar_lore_ice",
-      "Title": "A Clear Answer",
-      "Text": "The clear ice shard confirms it, Frostglass Ridge's ice forms in perfect layers, one season at a time, like the slowest journal in the world."
+      "Title": "npc_lore.scholar_lore_ice.title",
+      "Text": "npc_lore.scholar_lore_ice.text"
     },
     {
       "LoreId": "forest_lore_bloom",
-      "Title": "A Seasonal Gift",
-      "Text": "The wild things bring dewgrass blooms to Forest Folk every season, and every season Forest Folk passes a few along to whoever seems to need one most."
+      "Title": "npc_lore.forest_lore_bloom.title",
+      "Text": "npc_lore.forest_lore_bloom.text"
     },
     {
       "LoreId": "scholar_lore_colour_forms",
-      "Title": "A Study in Dye",
-      "Text": "The Wandering Scholar keeps a small book of pressed petals beside every dye vial, matching colour to colour until the pages run out."
+      "Title": "npc_lore.scholar_lore_colour_forms.title",
+      "Text": "npc_lore.scholar_lore_colour_forms.text"
     }
   ]
 }

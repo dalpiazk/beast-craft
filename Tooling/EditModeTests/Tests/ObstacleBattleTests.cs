@@ -282,7 +282,7 @@ namespace BeastCraft.Tests.EditMode
 
         private static EncounterLibraryData EncounterLibraryDataOf()
         {
-            return FieldJson.FromJson<EncounterLibraryData>(System.IO.File.ReadAllText(GameContent.PathOf(GameContent.FindRoot(), EncounterLibraryData.ProjectRelativePath)));
+            return FieldJson.FromJson<EncounterLibraryData>(BeastCraft.Localization.ContentText.ReadFile(GameContent.PathOf(GameContent.FindRoot(), EncounterLibraryData.ProjectRelativePath)));
         }
 
         private static void AssertNobodyOnAnObstacle(BattleSessionRun run, string when)

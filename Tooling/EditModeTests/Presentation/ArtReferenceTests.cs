@@ -39,7 +39,7 @@ namespace BeastCraft.Tests.EditMode
         [Test]
         public void EveryVfxSheet_IsInTheManifest_AndEveryManifestFileExists()
         {
-            VfxLibraryData data = FieldJson.FromJson<VfxLibraryData>(File.ReadAllText(GameContent.PathOf(GameContent.FindRoot(), VfxLibraryData.ProjectRelativePath)));
+            VfxLibraryData data = FieldJson.FromJson<VfxLibraryData>(BeastCraft.Localization.ContentText.ReadFile(GameContent.PathOf(GameContent.FindRoot(), VfxLibraryData.ProjectRelativePath)));
             List<string> errors = VfxLibraryValidator.Validate(data, Content.KnownSkillIds, Content.Art);
             Assert.IsEmpty(errors, string.Join("\n", errors));
 
@@ -106,7 +106,7 @@ namespace BeastCraft.Tests.EditMode
         [Test]
         public void RegionArt_RegionIds_MustBeRegionsInRegionsJson()
         {
-            EnemyLibraryData library = FieldJson.FromJson<EnemyLibraryData>(File.ReadAllText(GameContent.PathOf(GameContent.FindRoot(), EnemyLibraryData.ProjectRelativePath)));
+            EnemyLibraryData library = FieldJson.FromJson<EnemyLibraryData>(BeastCraft.Localization.ContentText.ReadFile(GameContent.PathOf(GameContent.FindRoot(), EnemyLibraryData.ProjectRelativePath)));
             Assert.IsEmpty(EnemyLibraryValidator.Validate(library, null, Content.Regions), "the shipped library names only real regions");
 
             library.Enemies[0].RegionArt = new[] { new EnemyRegionArtData { RegionId = "r1", ArtKey = library.Enemies[0].ArtKey } };
@@ -222,7 +222,7 @@ namespace BeastCraft.Tests.EditMode
         [Test]
         public void EnemyLibraryValidator_RefusesAMalformedSkillIconKey()
         {
-            EnemyLibraryData enemies = FieldJson.FromJson<EnemyLibraryData>(File.ReadAllText(GameContent.PathOf(GameContent.FindRoot(), EnemyLibraryData.ProjectRelativePath)));
+            EnemyLibraryData enemies = FieldJson.FromJson<EnemyLibraryData>(BeastCraft.Localization.ContentText.ReadFile(GameContent.PathOf(GameContent.FindRoot(), EnemyLibraryData.ProjectRelativePath)));
             Assert.IsEmpty(EnemyLibraryValidator.Validate(enemies, Content.Roster, Content.Regions));
 
             enemies.Enemies[0].Skills[0].ArtKey = "Skill/Enemy/Crush";
@@ -297,7 +297,7 @@ namespace BeastCraft.Tests.EditMode
         [Test]
         public void SkillLibraryValidator_RefusesAMalformedIconKey()
         {
-            SkillLibraryData skills = FieldJson.FromJson<SkillLibraryData>(File.ReadAllText(GameContent.PathOf(GameContent.FindRoot(), SkillLibraryData.ProjectRelativePath)));
+            SkillLibraryData skills = FieldJson.FromJson<SkillLibraryData>(BeastCraft.Localization.ContentText.ReadFile(GameContent.PathOf(GameContent.FindRoot(), SkillLibraryData.ProjectRelativePath)));
             Assert.IsEmpty(SkillLibraryValidator.Validate(skills, Content.Roster));
 
             skills.BeastSkills[0].ArtKey = "Skill/Boulder";
@@ -325,11 +325,11 @@ namespace BeastCraft.Tests.EditMode
         [Test]
         public void RosterAndEnemyValidators_RefuseAMalformedArtKey()
         {
-            BeastRosterData roster = FieldJson.FromJson<BeastRosterData>(File.ReadAllText(GameContent.PathOf(GameContent.FindRoot(), BeastRosterData.ProjectRelativePath)));
+            BeastRosterData roster = FieldJson.FromJson<BeastRosterData>(BeastCraft.Localization.ContentText.ReadFile(GameContent.PathOf(GameContent.FindRoot(), BeastRosterData.ProjectRelativePath)));
             roster.Species[0].ArtKey = "Beast/Phoenix";
             Assert.IsTrue(BeastRosterValidator.Validate(roster).Exists(e => e.Contains("ArtKey")));
 
-            EnemyLibraryData enemies = FieldJson.FromJson<EnemyLibraryData>(File.ReadAllText(GameContent.PathOf(GameContent.FindRoot(), EnemyLibraryData.ProjectRelativePath)));
+            EnemyLibraryData enemies = FieldJson.FromJson<EnemyLibraryData>(BeastCraft.Localization.ContentText.ReadFile(GameContent.PathOf(GameContent.FindRoot(), EnemyLibraryData.ProjectRelativePath)));
             enemies.Enemies[0].ArtKey = "enemy giant";
             Assert.IsTrue(EnemyLibraryValidator.Validate(enemies, roster).Exists(e => e.Contains("ArtKey")));
         }

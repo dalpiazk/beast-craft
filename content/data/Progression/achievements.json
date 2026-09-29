@@ -4,223 +4,223 @@
   "Achievements": [
     {
       "AchievementId": "kinship_first",
-      "DisplayName": "First Bond",
+      "DisplayName": "achievement.kinship_first.name",
       "Kind": "KinshipSitesClaimed",
       "RegionId": "",
       "Threshold": 1,
       "TitleId": "title_beastbinder",
-      "TitleText": "Beastbinder"
+      "TitleText": "achievement.kinship_first.title"
     },
     {
       "AchievementId": "kinship_all",
-      "DisplayName": "Every Stone Answered",
+      "DisplayName": "achievement.kinship_all.name",
       "Kind": "AllKinshipClaimed",
       "RegionId": "",
       "Threshold": 0,
       "TitleId": "title_kinship_bound",
-      "TitleText": "Kinship Bound"
+      "TitleText": "achievement.kinship_all.title"
     },
     {
       "AchievementId": "beasts_5",
-      "DisplayName": "Growing Company",
+      "DisplayName": "achievement.beasts_5.name",
       "Kind": "BeastsOwned",
       "RegionId": "",
       "Threshold": 5,
       "TitleId": "title_beast_keeper",
-      "TitleText": "Beast Keeper"
+      "TitleText": "achievement.beasts_5.title"
     },
     {
       "AchievementId": "beasts_10",
-      "DisplayName": "The Whole Roster",
+      "DisplayName": "achievement.beasts_10.name",
       "Kind": "BeastsOwned",
       "RegionId": "",
       "Threshold": 10,
       "TitleId": "title_beast_collector",
-      "TitleText": "Beast Collector"
+      "TitleText": "achievement.beasts_10.title"
     },
     {
       "AchievementId": "explored_r01",
-      "DisplayName": "Every Corner of the Hollow",
+      "DisplayName": "achievement.explored_r01.name",
       "Kind": "RegionExplored",
       "RegionId": "r01",
       "Threshold": 0,
       "TitleId": "title_hollow_pathfinder",
-      "TitleText": "Hollow Pathfinder"
+      "TitleText": "achievement.explored_r01.title"
     },
     {
       "AchievementId": "explored_r02",
-      "DisplayName": "Every Corner of Emberreach",
+      "DisplayName": "achievement.explored_r02.name",
       "Kind": "RegionExplored",
       "RegionId": "r02",
       "Threshold": 0,
       "TitleId": "title_emberreach_pathfinder",
-      "TitleText": "Emberreach Pathfinder"
+      "TitleText": "achievement.explored_r02.title"
     },
     {
       "AchievementId": "explored_r03",
-      "DisplayName": "Every Corner of Tidefall",
+      "DisplayName": "achievement.explored_r03.name",
       "Kind": "RegionExplored",
       "RegionId": "r03",
       "Threshold": 0,
       "TitleId": "title_tidefall_pathfinder",
-      "TitleText": "Tidefall Pathfinder"
+      "TitleText": "achievement.explored_r03.title"
     },
     {
       "AchievementId": "explored_r04",
-      "DisplayName": "Every Corner of Stormcrag",
+      "DisplayName": "achievement.explored_r04.name",
       "Kind": "RegionExplored",
       "RegionId": "r04",
       "Threshold": 0,
       "TitleId": "title_stormcrag_pathfinder",
-      "TitleText": "Stormcrag Pathfinder"
+      "TitleText": "achievement.explored_r04.title"
     },
     {
       "AchievementId": "explored_r05",
-      "DisplayName": "Every Corner of Rustwood",
+      "DisplayName": "achievement.explored_r05.name",
       "Kind": "RegionExplored",
       "RegionId": "r05",
       "Threshold": 0,
       "TitleId": "title_rustwood_pathfinder",
-      "TitleText": "Rustwood Pathfinder"
+      "TitleText": "achievement.explored_r05.title"
     },
     {
       "AchievementId": "explored_r06",
-      "DisplayName": "Every Corner of Frostmere",
+      "DisplayName": "achievement.explored_r06.name",
       "Kind": "RegionExplored",
       "RegionId": "r06",
       "Threshold": 0,
       "TitleId": "title_frostmere_pathfinder",
-      "TitleText": "Frostmere Pathfinder"
+      "TitleText": "achievement.explored_r06.title"
     },
     {
       "AchievementId": "explored_all",
-      "DisplayName": "Nothing Left Unseen",
+      "DisplayName": "achievement.explored_all.name",
       "Kind": "AllRegionsExplored",
       "RegionId": "",
       "Threshold": 0,
       "TitleId": "title_full_cartographer",
-      "TitleText": "Full Cartographer"
+      "TitleText": "achievement.explored_all.title"
     },
     {
       "AchievementId": "boss_first",
-      "DisplayName": "First Warden Fallen",
+      "DisplayName": "achievement.boss_first.name",
       "Kind": "BossCleared",
       "RegionId": "r01",
       "Threshold": 0,
       "TitleId": "title_warden_slayer",
-      "TitleText": "Warden Slayer"
+      "TitleText": "achievement.boss_first.title"
     },
     {
       "AchievementId": "boss_all",
-      "DisplayName": "Every Throne Emptied",
+      "DisplayName": "achievement.boss_all.name",
       "Kind": "AllBossesCleared",
       "RegionId": "",
       "Threshold": 0,
       "TitleId": "title_apex_hunter",
-      "TitleText": "Apex Hunter"
+      "TitleText": "achievement.boss_all.title"
     },
     {
       "AchievementId": "lore_r01",
-      "DisplayName": "Every Tale of the Hollow",
+      "DisplayName": "achievement.lore_r01.name",
       "Kind": "RegionLoreComplete",
       "RegionId": "r01",
       "Threshold": 0,
       "TitleId": "title_hollow_loremaster",
-      "TitleText": "Hollow Loremaster"
+      "TitleText": "achievement.lore_r01.title"
     },
     {
       "AchievementId": "lore_r06",
-      "DisplayName": "Every Tale of Frostmere",
+      "DisplayName": "achievement.lore_r06.name",
       "Kind": "RegionLoreComplete",
       "RegionId": "r06",
       "Threshold": 0,
       "TitleId": "title_frostmere_loremaster",
-      "TitleText": "Frostmere Loremaster"
+      "TitleText": "achievement.lore_r06.title"
     },
     {
       "AchievementId": "lore_all",
-      "DisplayName": "Every Stone Read",
+      "DisplayName": "achievement.lore_all.name",
       "Kind": "AllLoreFound",
       "RegionId": "",
       "Threshold": 0,
       "TitleId": "title_keeper_of_tales",
-      "TitleText": "Keeper of Tales"
+      "TitleText": "achievement.lore_all.title"
     },
     {
       "AchievementId": "compendium_50",
-      "DisplayName": "Halfway Catalogued",
+      "DisplayName": "achievement.compendium_50.name",
       "Kind": "CompendiumPercent",
       "RegionId": "",
       "Threshold": 50,
       "TitleId": "title_rising_naturalist",
-      "TitleText": "Rising Naturalist"
+      "TitleText": "achievement.compendium_50.title"
     },
     {
       "AchievementId": "compendium_100",
-      "DisplayName": "The Compendium Complete",
+      "DisplayName": "achievement.compendium_100.name",
       "Kind": "CompendiumPercent",
       "RegionId": "",
       "Threshold": 100,
       "TitleId": "title_master_naturalist",
-      "TitleText": "Master Naturalist"
+      "TitleText": "achievement.compendium_100.title"
     },
     {
       "AchievementId": "avatar_level_25",
-      "DisplayName": "Seasoned on the Road",
+      "DisplayName": "achievement.avatar_level_25.name",
       "Kind": "AvatarLevel",
       "RegionId": "",
       "Threshold": 25,
       "TitleId": "title_seasoned_handler",
-      "TitleText": "Seasoned Handler"
+      "TitleText": "achievement.avatar_level_25.title"
     },
     {
       "AchievementId": "avatar_level_100",
-      "DisplayName": "Nothing Left to Learn",
+      "DisplayName": "achievement.avatar_level_100.name",
       "Kind": "AvatarLevel",
       "RegionId": "",
       "Threshold": 100,
       "TitleId": "title_legend_of_beastlands",
-      "TitleText": "Legend of the Beastlands"
+      "TitleText": "achievement.avatar_level_100.title"
     },
     {
       "AchievementId": "side_story_keeper_roots",
-      "DisplayName": "Roots of the Grove",
+      "DisplayName": "achievement.side_story_keeper_roots.name",
       "Kind": "SideStoryComplete",
       "RegionId": "",
       "Threshold": 0,
       "StoryId": "keeper_roots",
       "TitleId": "title_friend_of_the_grove",
-      "TitleText": "Friend of the Grove"
+      "TitleText": "achievement.side_story_keeper_roots.title"
     },
     {
       "AchievementId": "side_story_scholar_atlas",
-      "DisplayName": "The Wandering Atlas",
+      "DisplayName": "achievement.side_story_scholar_atlas.name",
       "Kind": "SideStoryComplete",
       "RegionId": "",
       "Threshold": 0,
       "StoryId": "scholar_atlas",
       "TitleId": "title_field_correspondent",
-      "TitleText": "Field Correspondent"
+      "TitleText": "achievement.side_story_scholar_atlas.title"
     },
     {
       "AchievementId": "side_story_trader_roads",
-      "DisplayName": "The Long Roads",
+      "DisplayName": "achievement.side_story_trader_roads.name",
       "Kind": "SideStoryComplete",
       "RegionId": "",
       "Threshold": 0,
       "StoryId": "trader_roads",
       "TitleId": "title_fellow_traveller",
-      "TitleText": "Fellow Traveller"
+      "TitleText": "achievement.side_story_trader_roads.title"
     },
     {
       "AchievementId": "peacekeeper",
-      "DisplayName": "Peacekeeper",
+      "DisplayName": "achievement.peacekeeper.name",
       "Kind": "LocationsSoothed",
       "RegionId": "",
       "Threshold": 3,
       "StoryId": "",
       "TitleId": "title_peacekeeper",
-      "TitleText": "Peacekeeper"
+      "TitleText": "achievement.peacekeeper.title"
     }
   ]
 }

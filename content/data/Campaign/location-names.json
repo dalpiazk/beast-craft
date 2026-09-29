@@ -4,102 +4,102 @@
   "Regions": [
     {
       "RegionId": "r01",
-      "Wilds": [ "Mossy Glade", "Fernshade Trail", "Dappled Clearing", "Bramble Run", "Old Stone Ring", "Brookside Meadow", "Toadstool Dell", "Whispering Thicket" ],
-      "Den": [ "Hollow Log Den", "Bramble Burrow", "Tangleroot Den", "Stump Hollow", "Fern Grotto", "Mossback Knoll", "Briar Warren", "Shadowed Dell" ],
-      "Camp": [ "Firefly Camp", "Mossbed Rest", "Old Oak Camp", "Brookside Camp", "Lantern Glade", "Stone Circle Camp", "Acorn Hearth", "Willow Rest" ],
-      "TradingPost": [ "Wandering Wagon", "Acorn Exchange", "Mossy Market Cart", "Hollow Stump Stall", "Peddler Post", "Berry Barter", "Tinker Tent", "Crossroads Stall" ],
-      "Pass": [ "Mossgate Pass", "Old Root Bridge", "Stone Arch Trail", "Fernwall Gap", "Hollow Gate", "Bramble Gap", "Twin Oak Pass", "Brook Ford" ],
-      "Lair": [ "Warden Grove", "Heartwood Clearing", "The Moss Throne", "Old Seal Glade", "Greenheart Hollow", "Ancient Oak Ring", "Sealstone Grove", "Wardenwood" ]
+      "Wilds": [ "location.r01.wilds.0", "location.r01.wilds.1", "location.r01.wilds.2", "location.r01.wilds.3", "location.r01.wilds.4", "location.r01.wilds.5", "location.r01.wilds.6", "location.r01.wilds.7" ],
+      "Den": [ "location.r01.den.0", "location.r01.den.1", "location.r01.den.2", "location.r01.den.3", "location.r01.den.4", "location.r01.den.5", "location.r01.den.6", "location.r01.den.7" ],
+      "Camp": [ "location.r01.camp.0", "location.r01.camp.1", "location.r01.camp.2", "location.r01.camp.3", "location.r01.camp.4", "location.r01.camp.5", "location.r01.camp.6", "location.r01.camp.7" ],
+      "TradingPost": [ "location.r01.trading_post.0", "location.r01.trading_post.1", "location.r01.trading_post.2", "location.r01.trading_post.3", "location.r01.trading_post.4", "location.r01.trading_post.5", "location.r01.trading_post.6", "location.r01.trading_post.7" ],
+      "Pass": [ "location.r01.pass.0", "location.r01.pass.1", "location.r01.pass.2", "location.r01.pass.3", "location.r01.pass.4", "location.r01.pass.5", "location.r01.pass.6", "location.r01.pass.7" ],
+      "Lair": [ "location.r01.lair.0", "location.r01.lair.1", "location.r01.lair.2", "location.r01.lair.3", "location.r01.lair.4", "location.r01.lair.5", "location.r01.lair.6", "location.r01.lair.7" ]
     },
     {
       "RegionId": "r02",
-      "Wilds": [ "Ashen Slope", "Cinder Trail", "Scorched Ridge", "Smoke Hollow", "Glowrock Flats", "Emberfield", "Charred Gulch", "Hot Spring Terrace" ],
-      "Den": [ "Magma Burrow", "Sootcave Den", "Flameback Hollow", "Ember Grotto", "Kiln Cave", "Smoulder Pit", "Obsidian Nook", "Blackrock Den" ],
-      "Camp": [ "Warm Rock Camp", "Hot Spring Rest", "Ashfall Camp", "Ridge Hearth", "Glowstone Camp", "Cool Cave Rest", "Pumice Camp", "Sunset Ledge" ],
-      "TradingPost": [ "Ember Market", "Coalcart Stall", "Ridge Trader", "Ashwind Bazaar", "Kiln Exchange", "Hot Rock Stall", "Tinder Tent", "Smithy Wagon" ],
-      "Pass": [ "Cinder Pass", "Ashgate", "Scorch Gap", "Ember Bridge", "Smokewall Pass", "Lava Ford", "Red Rock Pass", "Blackglass Gap" ],
-      "Lair": [ "Twin Flame Ridge", "Emberheart Crater", "Kindling Throne", "Scorched Summit", "Ember Seal Rise", "Firewell Basin", "Ashcrown Peak", "The Hearthstone" ]
+      "Wilds": [ "location.r02.wilds.0", "location.r02.wilds.1", "location.r02.wilds.2", "location.r02.wilds.3", "location.r02.wilds.4", "location.r02.wilds.5", "location.r02.wilds.6", "location.r02.wilds.7" ],
+      "Den": [ "location.r02.den.0", "location.r02.den.1", "location.r02.den.2", "location.r02.den.3", "location.r02.den.4", "location.r02.den.5", "location.r02.den.6", "location.r02.den.7" ],
+      "Camp": [ "location.r02.camp.0", "location.r02.camp.1", "location.r02.camp.2", "location.r02.camp.3", "location.r02.camp.4", "location.r02.camp.5", "location.r02.camp.6", "location.r02.camp.7" ],
+      "TradingPost": [ "location.r02.trading_post.0", "location.r02.trading_post.1", "location.r02.trading_post.2", "location.r02.trading_post.3", "location.r02.trading_post.4", "location.r02.trading_post.5", "location.r02.trading_post.6", "location.r02.trading_post.7" ],
+      "Pass": [ "location.r02.pass.0", "location.r02.pass.1", "location.r02.pass.2", "location.r02.pass.3", "location.r02.pass.4", "location.r02.pass.5", "location.r02.pass.6", "location.r02.pass.7" ],
+      "Lair": [ "location.r02.lair.0", "location.r02.lair.1", "location.r02.lair.2", "location.r02.lair.3", "location.r02.lair.4", "location.r02.lair.5", "location.r02.lair.6", "location.r02.lair.7" ]
     },
     {
       "RegionId": "r03",
-      "Wilds": [ "Tidepool Shelf", "Kelp Shallows", "Barnacle Beach", "Drowned Steps", "Foamspray Cove", "Shell Strand", "Low Tide Flats", "Coral Causeway" ],
-      "Den": [ "Sea Cave Den", "Wreck Hollow", "Brine Grotto", "Clamshell Den", "Undertow Cave", "Sunken Cellar", "Eelback Burrow", "Driftwood Nook" ],
-      "Camp": [ "Lighthouse Camp", "Dry Ledge Rest", "Driftwood Fire", "Gull Rock Camp", "High Tide Rest", "Shellfire Camp", "Cove Hearth", "Lantern Buoy Camp" ],
-      "TradingPost": [ "Tidal Market", "Barnacle Barter", "Driftwood Stall", "Pearl Exchange", "Fisher Wagon", "Salt Trader", "Shellhouse Stall", "Harbor Cart" ],
-      "Pass": [ "Tidefall Gate", "Drowned Arch", "Kelp Bridge", "Surf Gap", "Causeway Pass", "Low Tide Crossing", "Breakwater Pass", "Sunken Stair" ],
-      "Lair": [ "Drowned Hall", "Colossus Cove", "Sunken Seal Vault", "Tidewell Chamber", "Abyssal Basin", "Deepwater Ruin", "Moonpool Grotto", "Floodgate Hall" ]
+      "Wilds": [ "location.r03.wilds.0", "location.r03.wilds.1", "location.r03.wilds.2", "location.r03.wilds.3", "location.r03.wilds.4", "location.r03.wilds.5", "location.r03.wilds.6", "location.r03.wilds.7" ],
+      "Den": [ "location.r03.den.0", "location.r03.den.1", "location.r03.den.2", "location.r03.den.3", "location.r03.den.4", "location.r03.den.5", "location.r03.den.6", "location.r03.den.7" ],
+      "Camp": [ "location.r03.camp.0", "location.r03.camp.1", "location.r03.camp.2", "location.r03.camp.3", "location.r03.camp.4", "location.r03.camp.5", "location.r03.camp.6", "location.r03.camp.7" ],
+      "TradingPost": [ "location.r03.trading_post.0", "location.r03.trading_post.1", "location.r03.trading_post.2", "location.r03.trading_post.3", "location.r03.trading_post.4", "location.r03.trading_post.5", "location.r03.trading_post.6", "location.r03.trading_post.7" ],
+      "Pass": [ "location.r03.pass.0", "location.r03.pass.1", "location.r03.pass.2", "location.r03.pass.3", "location.r03.pass.4", "location.r03.pass.5", "location.r03.pass.6", "location.r03.pass.7" ],
+      "Lair": [ "location.r03.lair.0", "location.r03.lair.1", "location.r03.lair.2", "location.r03.lair.3", "location.r03.lair.4", "location.r03.lair.5", "location.r03.lair.6", "location.r03.lair.7" ]
     },
     {
       "RegionId": "r04",
-      "Wilds": [ "Cloudline Trail", "Windswept Ledge", "Gale Meadow", "Kite Cliffs", "Featherfall Slope", "Skyrock Shelf", "Mistveil Path", "Rope Bridge Run" ],
-      "Den": [ "Eyrie Nest", "Crag Hollow", "Gust Cave", "Talon Roost", "Windhowl Den", "Cliffside Nook", "Stormnest Grotto", "Updraft Burrow" ],
-      "Camp": [ "Cloudrest Camp", "Windbreak Camp", "Eyrie Hearth", "Sheltered Crag", "Sunrise Ledge", "Lee Side Rest", "Pinecrag Camp", "Bellrock Camp" ],
-      "TradingPost": [ "Sky Market", "Pulley Post", "Kite Trader", "Cliff Stall", "Windmill Exchange", "Feather Barter", "Crag Wagon", "Cloud Bazaar" ],
-      "Pass": [ "Gale Pass", "Windgate", "Sky Bridge", "Cloudstep Gap", "Howling Notch", "Rope Bridge Pass", "High Saddle", "Crag Stair" ],
-      "Lair": [ "Titan Summit", "Galecrown Peak", "Windeye", "Skyseal Spire", "Cloudbreak Summit", "Whirlwind Crag", "Highwind Throne", "Stormcrag Crown" ]
+      "Wilds": [ "location.r04.wilds.0", "location.r04.wilds.1", "location.r04.wilds.2", "location.r04.wilds.3", "location.r04.wilds.4", "location.r04.wilds.5", "location.r04.wilds.6", "location.r04.wilds.7" ],
+      "Den": [ "location.r04.den.0", "location.r04.den.1", "location.r04.den.2", "location.r04.den.3", "location.r04.den.4", "location.r04.den.5", "location.r04.den.6", "location.r04.den.7" ],
+      "Camp": [ "location.r04.camp.0", "location.r04.camp.1", "location.r04.camp.2", "location.r04.camp.3", "location.r04.camp.4", "location.r04.camp.5", "location.r04.camp.6", "location.r04.camp.7" ],
+      "TradingPost": [ "location.r04.trading_post.0", "location.r04.trading_post.1", "location.r04.trading_post.2", "location.r04.trading_post.3", "location.r04.trading_post.4", "location.r04.trading_post.5", "location.r04.trading_post.6", "location.r04.trading_post.7" ],
+      "Pass": [ "location.r04.pass.0", "location.r04.pass.1", "location.r04.pass.2", "location.r04.pass.3", "location.r04.pass.4", "location.r04.pass.5", "location.r04.pass.6", "location.r04.pass.7" ],
+      "Lair": [ "location.r04.lair.0", "location.r04.lair.1", "location.r04.lair.2", "location.r04.lair.3", "location.r04.lair.4", "location.r04.lair.5", "location.r04.lair.6", "location.r04.lair.7" ]
     },
     {
       "RegionId": "r05",
-      "Wilds": [ "Iron Grove", "Rustleaf Path", "Copper Clearing", "Bellbark Wood", "Filings Field", "Redrain Hollow", "Tin Thicket", "Clanking Glade" ],
-      "Den": [ "Scrapheap Den", "Rusted Burrow", "Ironroot Hollow", "Oreseam Cave", "Bolt Nest", "Slag Grotto", "Chainvine Nook", "Anvil Knoll" ],
-      "Camp": [ "Tinker Camp", "Copper Kettle Rest", "Bellbark Camp", "Forge Ember Camp", "Iron Canopy Rest", "Oilcloth Camp", "Lodestone Hearth", "Rain Shelter" ],
-      "TradingPost": [ "Scrap Market", "Tinker Wagon", "Ore Exchange", "Rustwood Trader", "Gearwheel Stall", "Copper Barter", "Salvage Cart", "Bellwood Bazaar" ],
-      "Pass": [ "Iron Gate", "Rust Bridge", "Chainlink Pass", "Ironbark Gap", "Copperstep", "Ore Road Pass", "Ringing Arch", "Stag Trail" ],
-      "Lair": [ "Stag Clearing", "Antler Grove", "Iron Heart Glade", "Rustseal Hollow", "Lodestone Ring", "Bell Tree Court", "Ironwood Crown", "Rustfall Glade" ]
+      "Wilds": [ "location.r05.wilds.0", "location.r05.wilds.1", "location.r05.wilds.2", "location.r05.wilds.3", "location.r05.wilds.4", "location.r05.wilds.5", "location.r05.wilds.6", "location.r05.wilds.7" ],
+      "Den": [ "location.r05.den.0", "location.r05.den.1", "location.r05.den.2", "location.r05.den.3", "location.r05.den.4", "location.r05.den.5", "location.r05.den.6", "location.r05.den.7" ],
+      "Camp": [ "location.r05.camp.0", "location.r05.camp.1", "location.r05.camp.2", "location.r05.camp.3", "location.r05.camp.4", "location.r05.camp.5", "location.r05.camp.6", "location.r05.camp.7" ],
+      "TradingPost": [ "location.r05.trading_post.0", "location.r05.trading_post.1", "location.r05.trading_post.2", "location.r05.trading_post.3", "location.r05.trading_post.4", "location.r05.trading_post.5", "location.r05.trading_post.6", "location.r05.trading_post.7" ],
+      "Pass": [ "location.r05.pass.0", "location.r05.pass.1", "location.r05.pass.2", "location.r05.pass.3", "location.r05.pass.4", "location.r05.pass.5", "location.r05.pass.6", "location.r05.pass.7" ],
+      "Lair": [ "location.r05.lair.0", "location.r05.lair.1", "location.r05.lair.2", "location.r05.lair.3", "location.r05.lair.4", "location.r05.lair.5", "location.r05.lair.6", "location.r05.lair.7" ]
     },
     {
       "RegionId": "r06",
-      "Wilds": [ "Frozen Shore", "Snowdrift Flats", "Icefloe Field", "Rime Reeds", "Glittering Ice", "Pinefrost Edge", "Whiteout Plain", "Crystal Shallows" ],
-      "Den": [ "Ice Cave Den", "Snowbank Burrow", "Frostfang Hollow", "Glacier Grotto", "Icicle Nook", "Snowcap Warren", "Frozen Hulk", "Blue Ice Den" ],
-      "Camp": [ "Ice Fishing Camp", "Warm Mitten Camp", "Pine Shelter", "Snow Lodge", "Aurora Camp", "Hearthstone Igloo", "Lakeside Rest", "Snug Tent Camp" ],
-      "TradingPost": [ "Frost Market", "Sled Trader", "Ice Fisher Stall", "Mitten Trader", "Snowshoe Barter", "Lantern Sled", "Icehouse Exchange", "Frostmere Cart" ],
-      "Pass": [ "Frozen Crossing", "Iceshelf Pass", "Snowgate", "Rime Bridge", "Glacier Gap", "Frostwind Pass", "Crackling Ice", "Pinefrost Ford" ],
-      "Lair": [ "Matriarch Hollow", "Mereheart", "Frozen Nest", "Rimeseal Chamber", "Glacier Throne", "Brood Cavern", "Midlake Isle", "Icebloom Hollow" ]
+      "Wilds": [ "location.r06.wilds.0", "location.r06.wilds.1", "location.r06.wilds.2", "location.r06.wilds.3", "location.r06.wilds.4", "location.r06.wilds.5", "location.r06.wilds.6", "location.r06.wilds.7" ],
+      "Den": [ "location.r06.den.0", "location.r06.den.1", "location.r06.den.2", "location.r06.den.3", "location.r06.den.4", "location.r06.den.5", "location.r06.den.6", "location.r06.den.7" ],
+      "Camp": [ "location.r06.camp.0", "location.r06.camp.1", "location.r06.camp.2", "location.r06.camp.3", "location.r06.camp.4", "location.r06.camp.5", "location.r06.camp.6", "location.r06.camp.7" ],
+      "TradingPost": [ "location.r06.trading_post.0", "location.r06.trading_post.1", "location.r06.trading_post.2", "location.r06.trading_post.3", "location.r06.trading_post.4", "location.r06.trading_post.5", "location.r06.trading_post.6", "location.r06.trading_post.7" ],
+      "Pass": [ "location.r06.pass.0", "location.r06.pass.1", "location.r06.pass.2", "location.r06.pass.3", "location.r06.pass.4", "location.r06.pass.5", "location.r06.pass.6", "location.r06.pass.7" ],
+      "Lair": [ "location.r06.lair.0", "location.r06.lair.1", "location.r06.lair.2", "location.r06.lair.3", "location.r06.lair.4", "location.r06.lair.5", "location.r06.lair.6", "location.r06.lair.7" ]
     },
     {
       "RegionId": "r07",
-      "Wilds": [ "Crackling Heath", "Spire Fields", "Stormglass Flats", "Static Meadow", "Charged Ridge", "Rumblestone Path", "Sparkfern Slope", "Thunderhead Trail" ],
-      "Den": [ "Spark Burrow", "Stormcave Den", "Bolt Hollow", "Charged Grotto", "Lightning Nest", "Crackle Nook", "Thunder Roost", "Voltstone Den" ],
-      "Camp": [ "Lightning Rod Camp", "Storm Shelter", "Lee Spire Camp", "Thunderlull Camp", "Rumble Hearth", "Stillair Rest", "Glasslight Camp", "Cloudbreak Rest" ],
-      "TradingPost": [ "Spark Market", "Stormglass Trader", "Coil Cart", "Thunder Exchange", "Bottled Bolt Stall", "Static Stall", "Spire Bazaar", "Bolt Barter" ],
-      "Pass": [ "Thunder Gate", "Spire Bridge", "Stormgap", "Bolt Stair", "Crackling Pass", "Charged Arch", "Skyrend Notch", "Rumbling Ford" ],
-      "Lair": [ "Court of Thunder", "High Spire", "Stormseal Throne", "Crown of Bolts", "Stormeye", "Tempest Peak", "Thunderhall", "Lightning Throne" ]
+      "Wilds": [ "location.r07.wilds.0", "location.r07.wilds.1", "location.r07.wilds.2", "location.r07.wilds.3", "location.r07.wilds.4", "location.r07.wilds.5", "location.r07.wilds.6", "location.r07.wilds.7" ],
+      "Den": [ "location.r07.den.0", "location.r07.den.1", "location.r07.den.2", "location.r07.den.3", "location.r07.den.4", "location.r07.den.5", "location.r07.den.6", "location.r07.den.7" ],
+      "Camp": [ "location.r07.camp.0", "location.r07.camp.1", "location.r07.camp.2", "location.r07.camp.3", "location.r07.camp.4", "location.r07.camp.5", "location.r07.camp.6", "location.r07.camp.7" ],
+      "TradingPost": [ "location.r07.trading_post.0", "location.r07.trading_post.1", "location.r07.trading_post.2", "location.r07.trading_post.3", "location.r07.trading_post.4", "location.r07.trading_post.5", "location.r07.trading_post.6", "location.r07.trading_post.7" ],
+      "Pass": [ "location.r07.pass.0", "location.r07.pass.1", "location.r07.pass.2", "location.r07.pass.3", "location.r07.pass.4", "location.r07.pass.5", "location.r07.pass.6", "location.r07.pass.7" ],
+      "Lair": [ "location.r07.lair.0", "location.r07.lair.1", "location.r07.lair.2", "location.r07.lair.3", "location.r07.lair.4", "location.r07.lair.5", "location.r07.lair.6", "location.r07.lair.7" ]
     },
     {
       "RegionId": "r08",
-      "Wilds": [ "Elderwood Trail", "Giant Fern Vale", "Mossgrown Ruins", "Glowcap Hollow", "Canopy Walk", "Tangled Deep", "Humming Thicket", "Firefly Mire" ],
-      "Den": [ "Titanroot Hollow", "Sporecave Den", "Hive Hollow", "Deeproot Burrow", "Thornheart Den", "Vinewrap Grotto", "Broodbloom Nook", "Old Growth Den" ],
-      "Camp": [ "Glowcap Camp", "Canopy Rest", "Treehouse Camp", "Root Hearth", "Moonflower Rest", "Hidden Glade", "Lantern Tree Camp", "Elder Stump Rest" ],
-      "TradingPost": [ "Canopy Market", "Seed Trader", "Glowcap Stall", "Root Cellar Exchange", "Treetop Bazaar", "Honey Barter", "Herbal Cart", "Rope Ladder Stall" ],
-      "Pass": [ "Deeproot Gate", "Vine Bridge", "Elder Arch", "Thornwall Gap", "Hollow Log Pass", "Canopy Crossing", "Mistfall Ford", "Great Root Stair" ],
-      "Lair": [ "Heartwood Deep", "Elder Heart", "Bloomseal Grove", "The Great Tree", "Hive Heart", "First Root Hollow", "Elderheart Glade", "Deepwild Heart" ]
+      "Wilds": [ "location.r08.wilds.0", "location.r08.wilds.1", "location.r08.wilds.2", "location.r08.wilds.3", "location.r08.wilds.4", "location.r08.wilds.5", "location.r08.wilds.6", "location.r08.wilds.7" ],
+      "Den": [ "location.r08.den.0", "location.r08.den.1", "location.r08.den.2", "location.r08.den.3", "location.r08.den.4", "location.r08.den.5", "location.r08.den.6", "location.r08.den.7" ],
+      "Camp": [ "location.r08.camp.0", "location.r08.camp.1", "location.r08.camp.2", "location.r08.camp.3", "location.r08.camp.4", "location.r08.camp.5", "location.r08.camp.6", "location.r08.camp.7" ],
+      "TradingPost": [ "location.r08.trading_post.0", "location.r08.trading_post.1", "location.r08.trading_post.2", "location.r08.trading_post.3", "location.r08.trading_post.4", "location.r08.trading_post.5", "location.r08.trading_post.6", "location.r08.trading_post.7" ],
+      "Pass": [ "location.r08.pass.0", "location.r08.pass.1", "location.r08.pass.2", "location.r08.pass.3", "location.r08.pass.4", "location.r08.pass.5", "location.r08.pass.6", "location.r08.pass.7" ],
+      "Lair": [ "location.r08.lair.0", "location.r08.lair.1", "location.r08.lair.2", "location.r08.lair.3", "location.r08.lair.4", "location.r08.lair.5", "location.r08.lair.6", "location.r08.lair.7" ]
     },
     {
       "RegionId": "r09",
-      "Wilds": [ "Lava Fields", "Basalt Steps", "Obsidian Flats", "Sulphur Springs", "Magma Run", "Cinderfall Plain", "Ember Rain Gulch", "Pumice Slope" ],
-      "Den": [ "Molten Den", "Basalt Burrow", "Firevent Cave", "Slagheap Hollow", "Lava Tube Den", "Brimstone Nook", "Scorchmaw Grotto", "Clinker Cave" ],
-      "Camp": [ "Cooled Lava Camp", "Hot Spring Hearth", "Basalt Shelter", "Ash Screen Camp", "Steamvent Rest", "Obsidian Camp", "Blackrock Rest", "Ridge Watch Camp" ],
-      "TradingPost": [ "Cinder Market", "Forgefire Trader", "Obsidian Exchange", "Lava Glass Stall", "Ember Bazaar", "Slag Barter", "Firebrick Stall", "Ashcart Trader" ],
-      "Pass": [ "Throne Road", "Lava Bridge", "Basalt Gate", "Magma Ford", "Cinder Stair", "Obsidian Arch", "Fumarole Pass", "Ashen Gap" ],
-      "Lair": [ "Throne Hall", "Caldera Court", "Molten Crown", "Kingfire Crater", "Cinderseal Forge", "Throne of Ash", "Volcano Heart", "Magma Dais" ]
+      "Wilds": [ "location.r09.wilds.0", "location.r09.wilds.1", "location.r09.wilds.2", "location.r09.wilds.3", "location.r09.wilds.4", "location.r09.wilds.5", "location.r09.wilds.6", "location.r09.wilds.7" ],
+      "Den": [ "location.r09.den.0", "location.r09.den.1", "location.r09.den.2", "location.r09.den.3", "location.r09.den.4", "location.r09.den.5", "location.r09.den.6", "location.r09.den.7" ],
+      "Camp": [ "location.r09.camp.0", "location.r09.camp.1", "location.r09.camp.2", "location.r09.camp.3", "location.r09.camp.4", "location.r09.camp.5", "location.r09.camp.6", "location.r09.camp.7" ],
+      "TradingPost": [ "location.r09.trading_post.0", "location.r09.trading_post.1", "location.r09.trading_post.2", "location.r09.trading_post.3", "location.r09.trading_post.4", "location.r09.trading_post.5", "location.r09.trading_post.6", "location.r09.trading_post.7" ],
+      "Pass": [ "location.r09.pass.0", "location.r09.pass.1", "location.r09.pass.2", "location.r09.pass.3", "location.r09.pass.4", "location.r09.pass.5", "location.r09.pass.6", "location.r09.pass.7" ],
+      "Lair": [ "location.r09.lair.0", "location.r09.lair.1", "location.r09.lair.2", "location.r09.lair.3", "location.r09.lair.4", "location.r09.lair.5", "location.r09.lair.6", "location.r09.lair.7" ]
     },
     {
       "RegionId": "r10",
-      "Wilds": [ "Summit Road", "Gloamveil Slope", "Twin Spring Terrace", "Steamcloud Heights", "Skyward Steps", "Crownward Ridge", "Starlit Scree", "Last Meadow" ],
-      "Den": [ "Summit Cave", "Steamvent Den", "Crownrock Hollow", "Highnest Den", "Mistfire Grotto", "Stormbreak Nook", "Eaglecrest Den", "Old Titan Den" ],
-      "Camp": [ "Last Camp", "Starwatch Camp", "Summit Hearth", "Twin Fire Rest", "Cloudsea Camp", "Wayfarer Rest", "Highcrag Shelter", "Dawnwatch Camp" ],
-      "TradingPost": [ "Summit Market", "Last Trader", "Cloudtop Bazaar", "Highroad Stall", "Crown Exchange", "Wayfarer Cart", "Star Barter", "Skyline Stall" ],
-      "Pass": [ "Crown Gate", "Sky Stair", "Final Bridge", "Summit Pass", "Cloudsea Crossing", "Twin Spring Gap", "Gloamgate", "Highest Arch" ],
-      "Lair": [ "The Worldcrown", "Summit Crown", "Twin Springs", "Crownseal Dais", "Steam Throne", "Gloam Wellspring", "Tidefire Basin", "Everpeak" ]
+      "Wilds": [ "location.r10.wilds.0", "location.r10.wilds.1", "location.r10.wilds.2", "location.r10.wilds.3", "location.r10.wilds.4", "location.r10.wilds.5", "location.r10.wilds.6", "location.r10.wilds.7" ],
+      "Den": [ "location.r10.den.0", "location.r10.den.1", "location.r10.den.2", "location.r10.den.3", "location.r10.den.4", "location.r10.den.5", "location.r10.den.6", "location.r10.den.7" ],
+      "Camp": [ "location.r10.camp.0", "location.r10.camp.1", "location.r10.camp.2", "location.r10.camp.3", "location.r10.camp.4", "location.r10.camp.5", "location.r10.camp.6", "location.r10.camp.7" ],
+      "TradingPost": [ "location.r10.trading_post.0", "location.r10.trading_post.1", "location.r10.trading_post.2", "location.r10.trading_post.3", "location.r10.trading_post.4", "location.r10.trading_post.5", "location.r10.trading_post.6", "location.r10.trading_post.7" ],
+      "Pass": [ "location.r10.pass.0", "location.r10.pass.1", "location.r10.pass.2", "location.r10.pass.3", "location.r10.pass.4", "location.r10.pass.5", "location.r10.pass.6", "location.r10.pass.7" ],
+      "Lair": [ "location.r10.lair.0", "location.r10.lair.1", "location.r10.lair.2", "location.r10.lair.3", "location.r10.lair.4", "location.r10.lair.5", "location.r10.lair.6", "location.r10.lair.7" ]
     },
     {
       "RegionId": "r11",
-      "Wilds": [ "Dawnfield Road", "Duskgrass Vale", "Halo Meadow", "Shadefern Slope", "Meridian Plain", "Radiant Heath", "Shadow Orchard", "Evenlight Steppe" ],
-      "Den": [ "Dawnlit Den", "Duskhollow Den", "Halo Grotto", "Shade Warren", "Radiant Burrow", "Shadow Nook", "Eclipse Den", "Sunshade Cave" ],
-      "Camp": [ "Meridian Camp", "Dawnrise Rest", "Duskfire Camp", "Halo Hearth", "Shadetree Camp", "Lantern Rest", "Evenlight Camp", "Starshade Shelter" ],
-      "TradingPost": [ "Meridian Market", "Dawn Bazaar", "Dusk Stall", "Halo Exchange", "Shadecart Trader", "Lantern Stall", "Evening Barter", "Evenglow Wagon" ],
-      "Pass": [ "Dawn Gate", "Dusk Stair", "Halo Arch", "Shadow Ford", "Meridian Bridge", "Radiant Pass", "Shade Gap", "Evenfall Crossing" ],
-      "Lair": [ "Meridian Dais", "Dawndusk Court", "Halo Throne", "Shadow Crown", "Radiant Basin", "Eclipse Ring", "Twin Light Hall", "Evenfall Altar" ]
+      "Wilds": [ "location.r11.wilds.0", "location.r11.wilds.1", "location.r11.wilds.2", "location.r11.wilds.3", "location.r11.wilds.4", "location.r11.wilds.5", "location.r11.wilds.6", "location.r11.wilds.7" ],
+      "Den": [ "location.r11.den.0", "location.r11.den.1", "location.r11.den.2", "location.r11.den.3", "location.r11.den.4", "location.r11.den.5", "location.r11.den.6", "location.r11.den.7" ],
+      "Camp": [ "location.r11.camp.0", "location.r11.camp.1", "location.r11.camp.2", "location.r11.camp.3", "location.r11.camp.4", "location.r11.camp.5", "location.r11.camp.6", "location.r11.camp.7" ],
+      "TradingPost": [ "location.r11.trading_post.0", "location.r11.trading_post.1", "location.r11.trading_post.2", "location.r11.trading_post.3", "location.r11.trading_post.4", "location.r11.trading_post.5", "location.r11.trading_post.6", "location.r11.trading_post.7" ],
+      "Pass": [ "location.r11.pass.0", "location.r11.pass.1", "location.r11.pass.2", "location.r11.pass.3", "location.r11.pass.4", "location.r11.pass.5", "location.r11.pass.6", "location.r11.pass.7" ],
+      "Lair": [ "location.r11.lair.0", "location.r11.lair.1", "location.r11.lair.2", "location.r11.lair.3", "location.r11.lair.4", "location.r11.lair.5", "location.r11.lair.6", "location.r11.lair.7" ]
     }
   ]
 }

@@ -195,7 +195,10 @@ namespace BeastCraft.Campaign
         /// The display-label hook: a stable localization key a map UI resolves to the location's
         /// name, <c>"{regionId}/{kind}/{variant}"</c> (e.g. <c>r01/wilds/3</c>; the kind is
         /// <see cref="LocationKinds.Key"/>), the variant drawn from the map seed, 0 to
-        /// <see cref="NodeMapGenerator.LabelVariants"/> − 1. "" until placed.
+        /// <see cref="NodeMapGenerator.LabelVariants"/> − 1. "" until placed. Its text is the string
+        /// table's <c>location.{regionId}.{kind}.{variant}</c> (this key with dots, e.g.
+        /// <c>location.r01.wilds.3</c>; <c>Localization.ContentTextRules</c>), resolved into the
+        /// location-name table as the content loads (<see cref="LocationNameTable.Resolve(string)"/>).
         /// </summary>
         public string LabelKey = string.Empty;
 

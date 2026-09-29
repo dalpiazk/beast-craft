@@ -440,7 +440,7 @@ namespace BeastCraft.Tooling.BalanceSim
                 {
                     if (!LayoutCache.TryGetValue(path, out BattleLayoutData data))
                     {
-                        data = System.Text.Json.JsonSerializer.Deserialize<BattleLayoutData>(System.IO.File.ReadAllText(path),
+                        data = System.Text.Json.JsonSerializer.Deserialize<BattleLayoutData>(BeastCraft.Localization.ContentText.ReadFile(path),
                                                                                             new System.Text.Json.JsonSerializerOptions { IncludeFields = true });
                         List<string> errors = ObstacleLayoutValidator.Validate(data, null, null, null);
                         if (errors.Count > 0)
@@ -758,7 +758,7 @@ namespace BeastCraft.Tooling.BalanceSim
             if (_pinned == null)
             {
                 string path = PinnedDifficultyFile;
-                EncounterDifficultyData data = System.Text.Json.JsonSerializer.Deserialize<EncounterDifficultyData>(System.IO.File.ReadAllText(path),
+                EncounterDifficultyData data = System.Text.Json.JsonSerializer.Deserialize<EncounterDifficultyData>(BeastCraft.Localization.ContentText.ReadFile(path),
                                                                                                                   new System.Text.Json.JsonSerializerOptions { IncludeFields = true });
                 Dictionary<string, double> pinned = new Dictionary<string, double>(StringComparer.Ordinal);
                 foreach (DifficultyCellData cell in data.Cells)

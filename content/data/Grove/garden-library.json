@@ -5,7 +5,7 @@
   "Seeds": [
     {
       "SeedId": "sunpetal",
-      "DisplayName": "Sunpetal",
+      "DisplayName": "seed.sunpetal.name",
       "GrowthHours": 3,
       "Source": "starter",
       "UnlockId": "",
@@ -13,7 +13,7 @@
     },
     {
       "SeedId": "moonbell",
-      "DisplayName": "Moonbell",
+      "DisplayName": "seed.moonbell.name",
       "GrowthHours": 4,
       "Source": "starter",
       "UnlockId": "",
@@ -21,7 +21,7 @@
     },
     {
       "SeedId": "dewgrass",
-      "DisplayName": "Dewgrass",
+      "DisplayName": "seed.dewgrass.name",
       "GrowthHours": 3,
       "Source": "starter",
       "UnlockId": "",
@@ -29,7 +29,7 @@
     },
     {
       "SeedId": "ashbloom",
-      "DisplayName": "Ashbloom",
+      "DisplayName": "seed.ashbloom.name",
       "GrowthHours": 6,
       "Source": "shrine",
       "UnlockId": "grove_seed_ashbloom",
@@ -37,7 +37,7 @@
     },
     {
       "SeedId": "thornberry",
-      "DisplayName": "Thornberry",
+      "DisplayName": "seed.thornberry.name",
       "GrowthHours": 12,
       "Source": "starter",
       "UnlockId": "",
@@ -45,7 +45,7 @@
     },
     {
       "SeedId": "honeyvine",
-      "DisplayName": "Honeyvine",
+      "DisplayName": "seed.honeyvine.name",
       "GrowthHours": 9,
       "Source": "starter",
       "UnlockId": "",
@@ -53,7 +53,7 @@
     },
     {
       "SeedId": "cloudthistle",
-      "DisplayName": "Cloudthistle",
+      "DisplayName": "seed.cloudthistle.name",
       "GrowthHours": 8,
       "Source": "shrine",
       "UnlockId": "grove_seed_cloudthistle",
@@ -61,7 +61,7 @@
     },
     {
       "SeedId": "frostfern",
-      "DisplayName": "Frostfern",
+      "DisplayName": "seed.frostfern.name",
       "GrowthHours": 14,
       "Source": "starter",
       "UnlockId": "",
@@ -69,7 +69,7 @@
     },
     {
       "SeedId": "emberroot",
-      "DisplayName": "Emberroot",
+      "DisplayName": "seed.emberroot.name",
       "GrowthHours": 16,
       "Source": "starter",
       "UnlockId": "",
@@ -77,7 +77,7 @@
     },
     {
       "SeedId": "copperleaf",
-      "DisplayName": "Copperleaf",
+      "DisplayName": "seed.copperleaf.name",
       "GrowthHours": 10,
       "Source": "shrine",
       "UnlockId": "grove_seed_copperleaf",
@@ -85,7 +85,7 @@
     },
     {
       "SeedId": "stargrass",
-      "DisplayName": "Stargrass",
+      "DisplayName": "seed.stargrass.name",
       "GrowthHours": 18,
       "Source": "starter",
       "UnlockId": "",
@@ -93,7 +93,7 @@
     },
     {
       "SeedId": "willowseed",
-      "DisplayName": "Willowseed",
+      "DisplayName": "seed.willowseed.name",
       "GrowthHours": 24,
       "Source": "starter",
       "UnlockId": "",
@@ -285,219 +285,219 @@
   "Varieties": [
     {
       "VarietyId": "ashbloom_pure",
-      "DisplayName": "Ashbloom Bloom",
+      "DisplayName": "variety.ashbloom_pure.name",
       "ArtKey": "grove/varieties/ashbloom_pure",
-      "HerbariumEntry": "A true ashbloom, grown alone and true to its seed."
+      "HerbariumEntry": "variety.ashbloom_pure.herbarium"
     },
     {
       "VarietyId": "ashbloom_dewgrass_hybrid",
-      "DisplayName": "Ashbloom-Dewgrass",
+      "DisplayName": "variety.ashbloom_dewgrass_hybrid.name",
       "ArtKey": "grove/varieties/ashbloom_dewgrass_hybrid",
-      "HerbariumEntry": "A cross of ashbloom and dewgrass, something neither seed alone would grow."
+      "HerbariumEntry": "variety.ashbloom_dewgrass_hybrid.herbarium"
     },
     {
       "VarietyId": "ashbloom_honeyvine_hybrid",
-      "DisplayName": "Ashbloom-Honeyvine",
+      "DisplayName": "variety.ashbloom_honeyvine_hybrid.name",
       "ArtKey": "grove/varieties/ashbloom_honeyvine_hybrid",
-      "HerbariumEntry": "A cross of ashbloom and honeyvine, something neither seed alone would grow."
+      "HerbariumEntry": "variety.ashbloom_honeyvine_hybrid.herbarium"
     },
     {
       "VarietyId": "ashbloom_moonbell_hybrid",
-      "DisplayName": "Ashbloom-Moonbell",
+      "DisplayName": "variety.ashbloom_moonbell_hybrid.name",
       "ArtKey": "grove/varieties/ashbloom_moonbell_hybrid",
-      "HerbariumEntry": "A cross of ashbloom and moonbell, something neither seed alone would grow."
+      "HerbariumEntry": "variety.ashbloom_moonbell_hybrid.herbarium"
     },
     {
       "VarietyId": "ashbloom_thornberry_hybrid",
-      "DisplayName": "Ashbloom-Thornberry",
+      "DisplayName": "variety.ashbloom_thornberry_hybrid.name",
       "ArtKey": "grove/varieties/ashbloom_thornberry_hybrid",
-      "HerbariumEntry": "A cross of ashbloom and thornberry, something neither seed alone would grow."
+      "HerbariumEntry": "variety.ashbloom_thornberry_hybrid.herbarium"
     },
     {
       "VarietyId": "cloudthistle_pure",
-      "DisplayName": "Cloudthistle Bloom",
+      "DisplayName": "variety.cloudthistle_pure.name",
       "ArtKey": "grove/varieties/cloudthistle_pure",
-      "HerbariumEntry": "A true cloudthistle, grown alone and true to its seed."
+      "HerbariumEntry": "variety.cloudthistle_pure.herbarium"
     },
     {
       "VarietyId": "cloudthistle_emberroot_hybrid",
-      "DisplayName": "Cloudthistle-Emberroot",
+      "DisplayName": "variety.cloudthistle_emberroot_hybrid.name",
       "ArtKey": "grove/varieties/cloudthistle_emberroot_hybrid",
-      "HerbariumEntry": "A cross of cloudthistle and emberroot, something neither seed alone would grow."
+      "HerbariumEntry": "variety.cloudthistle_emberroot_hybrid.herbarium"
     },
     {
       "VarietyId": "cloudthistle_frostfern_hybrid",
-      "DisplayName": "Cloudthistle-Frostfern",
+      "DisplayName": "variety.cloudthistle_frostfern_hybrid.name",
       "ArtKey": "grove/varieties/cloudthistle_frostfern_hybrid",
-      "HerbariumEntry": "A cross of cloudthistle and frostfern, something neither seed alone would grow."
+      "HerbariumEntry": "variety.cloudthistle_frostfern_hybrid.herbarium"
     },
     {
       "VarietyId": "cloudthistle_honeyvine_hybrid",
-      "DisplayName": "Cloudthistle-Honeyvine",
+      "DisplayName": "variety.cloudthistle_honeyvine_hybrid.name",
       "ArtKey": "grove/varieties/cloudthistle_honeyvine_hybrid",
-      "HerbariumEntry": "A cross of cloudthistle and honeyvine, something neither seed alone would grow."
+      "HerbariumEntry": "variety.cloudthistle_honeyvine_hybrid.herbarium"
     },
     {
       "VarietyId": "cloudthistle_thornberry_hybrid",
-      "DisplayName": "Cloudthistle-Thornberry",
+      "DisplayName": "variety.cloudthistle_thornberry_hybrid.name",
       "ArtKey": "grove/varieties/cloudthistle_thornberry_hybrid",
-      "HerbariumEntry": "A cross of cloudthistle and thornberry, something neither seed alone would grow."
+      "HerbariumEntry": "variety.cloudthistle_thornberry_hybrid.herbarium"
     },
     {
       "VarietyId": "copperleaf_pure",
-      "DisplayName": "Copperleaf Bloom",
+      "DisplayName": "variety.copperleaf_pure.name",
       "ArtKey": "grove/varieties/copperleaf_pure",
-      "HerbariumEntry": "A true copperleaf, grown alone and true to its seed."
+      "HerbariumEntry": "variety.copperleaf_pure.herbarium"
     },
     {
       "VarietyId": "copperleaf_emberroot_hybrid",
-      "DisplayName": "Copperleaf-Emberroot",
+      "DisplayName": "variety.copperleaf_emberroot_hybrid.name",
       "ArtKey": "grove/varieties/copperleaf_emberroot_hybrid",
-      "HerbariumEntry": "A cross of copperleaf and emberroot, something neither seed alone would grow."
+      "HerbariumEntry": "variety.copperleaf_emberroot_hybrid.herbarium"
     },
     {
       "VarietyId": "copperleaf_frostfern_hybrid",
-      "DisplayName": "Copperleaf-Frostfern",
+      "DisplayName": "variety.copperleaf_frostfern_hybrid.name",
       "ArtKey": "grove/varieties/copperleaf_frostfern_hybrid",
-      "HerbariumEntry": "A cross of copperleaf and frostfern, something neither seed alone would grow."
+      "HerbariumEntry": "variety.copperleaf_frostfern_hybrid.herbarium"
     },
     {
       "VarietyId": "copperleaf_stargrass_hybrid",
-      "DisplayName": "Copperleaf-Stargrass",
+      "DisplayName": "variety.copperleaf_stargrass_hybrid.name",
       "ArtKey": "grove/varieties/copperleaf_stargrass_hybrid",
-      "HerbariumEntry": "A cross of copperleaf and stargrass, something neither seed alone would grow."
+      "HerbariumEntry": "variety.copperleaf_stargrass_hybrid.herbarium"
     },
     {
       "VarietyId": "copperleaf_willowseed_hybrid",
-      "DisplayName": "Copperleaf-Willowseed",
+      "DisplayName": "variety.copperleaf_willowseed_hybrid.name",
       "ArtKey": "grove/varieties/copperleaf_willowseed_hybrid",
-      "HerbariumEntry": "A cross of copperleaf and willowseed, something neither seed alone would grow."
+      "HerbariumEntry": "variety.copperleaf_willowseed_hybrid.herbarium"
     },
     {
       "VarietyId": "dewgrass_pure",
-      "DisplayName": "Dewgrass Bloom",
+      "DisplayName": "variety.dewgrass_pure.name",
       "ArtKey": "grove/varieties/dewgrass_pure",
-      "HerbariumEntry": "A true dewgrass, grown alone and true to its seed."
+      "HerbariumEntry": "variety.dewgrass_pure.herbarium"
     },
     {
       "VarietyId": "dewgrass_moonbell_hybrid",
-      "DisplayName": "Dewgrass-Moonbell",
+      "DisplayName": "variety.dewgrass_moonbell_hybrid.name",
       "ArtKey": "grove/varieties/dewgrass_moonbell_hybrid",
-      "HerbariumEntry": "A cross of dewgrass and moonbell, something neither seed alone would grow."
+      "HerbariumEntry": "variety.dewgrass_moonbell_hybrid.herbarium"
     },
     {
       "VarietyId": "dewgrass_sunpetal_hybrid",
-      "DisplayName": "Dewgrass-Sunpetal",
+      "DisplayName": "variety.dewgrass_sunpetal_hybrid.name",
       "ArtKey": "grove/varieties/dewgrass_sunpetal_hybrid",
-      "HerbariumEntry": "A cross of dewgrass and sunpetal, something neither seed alone would grow."
+      "HerbariumEntry": "variety.dewgrass_sunpetal_hybrid.herbarium"
     },
     {
       "VarietyId": "dewgrass_thornberry_hybrid",
-      "DisplayName": "Dewgrass-Thornberry",
+      "DisplayName": "variety.dewgrass_thornberry_hybrid.name",
       "ArtKey": "grove/varieties/dewgrass_thornberry_hybrid",
-      "HerbariumEntry": "A cross of dewgrass and thornberry, something neither seed alone would grow."
+      "HerbariumEntry": "variety.dewgrass_thornberry_hybrid.herbarium"
     },
     {
       "VarietyId": "emberroot_pure",
-      "DisplayName": "Emberroot Bloom",
+      "DisplayName": "variety.emberroot_pure.name",
       "ArtKey": "grove/varieties/emberroot_pure",
-      "HerbariumEntry": "A true emberroot, grown alone and true to its seed."
+      "HerbariumEntry": "variety.emberroot_pure.herbarium"
     },
     {
       "VarietyId": "emberroot_frostfern_hybrid",
-      "DisplayName": "Emberroot-Frostfern",
+      "DisplayName": "variety.emberroot_frostfern_hybrid.name",
       "ArtKey": "grove/varieties/emberroot_frostfern_hybrid",
-      "HerbariumEntry": "A cross of emberroot and frostfern, something neither seed alone would grow."
+      "HerbariumEntry": "variety.emberroot_frostfern_hybrid.herbarium"
     },
     {
       "VarietyId": "emberroot_stargrass_hybrid",
-      "DisplayName": "Emberroot-Stargrass",
+      "DisplayName": "variety.emberroot_stargrass_hybrid.name",
       "ArtKey": "grove/varieties/emberroot_stargrass_hybrid",
-      "HerbariumEntry": "A cross of emberroot and stargrass, something neither seed alone would grow."
+      "HerbariumEntry": "variety.emberroot_stargrass_hybrid.herbarium"
     },
     {
       "VarietyId": "frostfern_pure",
-      "DisplayName": "Frostfern Bloom",
+      "DisplayName": "variety.frostfern_pure.name",
       "ArtKey": "grove/varieties/frostfern_pure",
-      "HerbariumEntry": "A true frostfern, grown alone and true to its seed."
+      "HerbariumEntry": "variety.frostfern_pure.herbarium"
     },
     {
       "VarietyId": "frostfern_honeyvine_hybrid",
-      "DisplayName": "Frostfern-Honeyvine",
+      "DisplayName": "variety.frostfern_honeyvine_hybrid.name",
       "ArtKey": "grove/varieties/frostfern_honeyvine_hybrid",
-      "HerbariumEntry": "A cross of frostfern and honeyvine, something neither seed alone would grow."
+      "HerbariumEntry": "variety.frostfern_honeyvine_hybrid.herbarium"
     },
     {
       "VarietyId": "honeyvine_pure",
-      "DisplayName": "Honeyvine Bloom",
+      "DisplayName": "variety.honeyvine_pure.name",
       "ArtKey": "grove/varieties/honeyvine_pure",
-      "HerbariumEntry": "A true honeyvine, grown alone and true to its seed."
+      "HerbariumEntry": "variety.honeyvine_pure.herbarium"
     },
     {
       "VarietyId": "honeyvine_thornberry_hybrid",
-      "DisplayName": "Honeyvine-Thornberry",
+      "DisplayName": "variety.honeyvine_thornberry_hybrid.name",
       "ArtKey": "grove/varieties/honeyvine_thornberry_hybrid",
-      "HerbariumEntry": "A cross of honeyvine and thornberry, something neither seed alone would grow."
+      "HerbariumEntry": "variety.honeyvine_thornberry_hybrid.herbarium"
     },
     {
       "VarietyId": "moonbell_pure",
-      "DisplayName": "Moonbell Bloom",
+      "DisplayName": "variety.moonbell_pure.name",
       "ArtKey": "grove/varieties/moonbell_pure",
-      "HerbariumEntry": "A true moonbell, grown alone and true to its seed."
+      "HerbariumEntry": "variety.moonbell_pure.herbarium"
     },
     {
       "VarietyId": "moonbell_sunpetal_hybrid",
-      "DisplayName": "Moonbell-Sunpetal",
+      "DisplayName": "variety.moonbell_sunpetal_hybrid.name",
       "ArtKey": "grove/varieties/moonbell_sunpetal_hybrid",
-      "HerbariumEntry": "A cross of moonbell and sunpetal, something neither seed alone would grow."
+      "HerbariumEntry": "variety.moonbell_sunpetal_hybrid.herbarium"
     },
     {
       "VarietyId": "moonbell_willowseed_hybrid",
-      "DisplayName": "Moonbell-Willowseed",
+      "DisplayName": "variety.moonbell_willowseed_hybrid.name",
       "ArtKey": "grove/varieties/moonbell_willowseed_hybrid",
-      "HerbariumEntry": "A cross of moonbell and willowseed, something neither seed alone would grow."
+      "HerbariumEntry": "variety.moonbell_willowseed_hybrid.herbarium"
     },
     {
       "VarietyId": "stargrass_pure",
-      "DisplayName": "Stargrass Bloom",
+      "DisplayName": "variety.stargrass_pure.name",
       "ArtKey": "grove/varieties/stargrass_pure",
-      "HerbariumEntry": "A true stargrass, grown alone and true to its seed."
+      "HerbariumEntry": "variety.stargrass_pure.herbarium"
     },
     {
       "VarietyId": "stargrass_sunpetal_hybrid",
-      "DisplayName": "Stargrass-Sunpetal",
+      "DisplayName": "variety.stargrass_sunpetal_hybrid.name",
       "ArtKey": "grove/varieties/stargrass_sunpetal_hybrid",
-      "HerbariumEntry": "A cross of stargrass and sunpetal, something neither seed alone would grow."
+      "HerbariumEntry": "variety.stargrass_sunpetal_hybrid.herbarium"
     },
     {
       "VarietyId": "stargrass_willowseed_hybrid",
-      "DisplayName": "Stargrass-Willowseed",
+      "DisplayName": "variety.stargrass_willowseed_hybrid.name",
       "ArtKey": "grove/varieties/stargrass_willowseed_hybrid",
-      "HerbariumEntry": "A cross of stargrass and willowseed, something neither seed alone would grow."
+      "HerbariumEntry": "variety.stargrass_willowseed_hybrid.herbarium"
     },
     {
       "VarietyId": "sunpetal_pure",
-      "DisplayName": "Sunpetal Bloom",
+      "DisplayName": "variety.sunpetal_pure.name",
       "ArtKey": "grove/varieties/sunpetal_pure",
-      "HerbariumEntry": "A true sunpetal, grown alone and true to its seed."
+      "HerbariumEntry": "variety.sunpetal_pure.herbarium"
     },
     {
       "VarietyId": "sunpetal_willowseed_hybrid",
-      "DisplayName": "Sunpetal-Willowseed",
+      "DisplayName": "variety.sunpetal_willowseed_hybrid.name",
       "ArtKey": "grove/varieties/sunpetal_willowseed_hybrid",
-      "HerbariumEntry": "A cross of sunpetal and willowseed, something neither seed alone would grow."
+      "HerbariumEntry": "variety.sunpetal_willowseed_hybrid.herbarium"
     },
     {
       "VarietyId": "thornberry_pure",
-      "DisplayName": "Thornberry Bloom",
+      "DisplayName": "variety.thornberry_pure.name",
       "ArtKey": "grove/varieties/thornberry_pure",
-      "HerbariumEntry": "A true thornberry, grown alone and true to its seed."
+      "HerbariumEntry": "variety.thornberry_pure.herbarium"
     },
     {
       "VarietyId": "willowseed_pure",
-      "DisplayName": "Willowseed Bloom",
+      "DisplayName": "variety.willowseed_pure.name",
       "ArtKey": "grove/varieties/willowseed_pure",
-      "HerbariumEntry": "A true willowseed, grown alone and true to its seed."
+      "HerbariumEntry": "variety.willowseed_pure.herbarium"
     }
   ],
   "Recipes": [

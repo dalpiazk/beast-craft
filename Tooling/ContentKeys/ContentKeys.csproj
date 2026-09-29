@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    ContentKeys: the string-key tool. LOCAL-ONLY TOOLING: not a CI job, never shipped. It walks the
+    content data files by the rule in src/BeastCraft.Core/Localization/ContentTextRules.cs, turns
+    every English literal in a player-facing field into its stable key and writes the text to
+    content/data/Localization/en.json (the single source of English). Re-runnable: a field that
+    already holds its key is left alone. See docs/design/content-bible.md, "Text keys and en.json".
+
+        dotnet run (project Tooling/ContentKeys)            convert and write
+        dotnet run (project Tooling/ContentKeys) with check  report only; see README.md
+  -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <EnableNETAnalyzers>false</EnableNETAnalyzers>
+    <RootNamespace>BeastCraft.Tooling.ContentKeys</RootNamespace>
+    <AssemblyName>ContentKeys</AssemblyName>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\BeastCraft.Core\BeastCraft.Core.csproj" />
+  </ItemGroup>
+
+</Project>

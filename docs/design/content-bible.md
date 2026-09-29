@@ -290,3 +290,46 @@ no draft marker goes in a `DisplayName` or `Description` (the encounter validato
 
 Items, consumables, materials and looks have their own appendix: [content-items.md](content-items.md)
 (gear prefixes, boss-look signature words per region, milestone titles).
+
+## Text keys and en.json (#50)
+
+Every player-facing text field in `content/data/` holds a **stable key**, not the English itself:
+`"DisplayName": "creature.phoenix.name"`. The English lives in one place,
+`content/data/Localization/en.json` (`"creature.phoenix.name": "Phoenix"`), and the game resolves the
+keys as it loads the content, so every screen shows the same text it always did. English is the only
+locale; which languages come next is decided after launch (docs/design/decisions.md). A later locale is
+a `<locale>.json` beside `en.json` with the same keys.
+
+**Which fields are player-facing.** A field is keyed when the player reads its text: names
+(`DisplayName`, `Name`, `TitleText`, `Term`, the map location names), descriptions and definitions,
+dialogue, lore, story and hint text and titles, bond and intro lines, herbarium entries, codex
+categories, and the glossary's matching word forms (a translation needs its own). Everything else stays
+a literal: ids and references (`...Id`, `Look`, `Conditions`), art and asset keys (`ArtKey`, `Sheet`,
+`Icon`), enum names (`Kind`, `Stance`, `Element`, `Type`), colours and style keys, designer-only labels
+no screen shows (an encounter shape variant's `Label`, an enemy's `Role`) and every `_readme`. The list
+of files, arrays and fields is `src/BeastCraft.Core/Localization/ContentTextRules.cs`.
+
+**Keys** are built from ids the data already has: `<kind>.<id>.<field>`, for example
+`creature.phoenix.name`, `skill.ember_shot.desc`, `enemy.giant.skill.crush.name`, `hint.h_preview.text`.
+Field short names: `DisplayName` and `Name` are `name`, `Description` is `desc`, `TitleText` is `title`,
+`BondText` is `bond`, `HerbariumEntry` is `herbarium`, anything else in snake case. A list of strings adds
+the index: `location.r01.wilds.3`, which is `location.` plus the map node's `LabelKey` (`r01/wilds/3`)
+with dots, and `glossary.stun.forms.0`. A Hearthglen fixed location has no id, so it is keyed by its
+place in the list (`region.r00.node.4`). Keys never change once shipped, like ids.
+
+**Writing and editing text.**
+- To change existing text, edit `en.json`.
+- To add content, write the English straight into the data file as always, then run
+  `dotnet run --project Tooling/ContentKeys`. The tool moves each new literal into `en.json`, puts its
+  key in the data file (editing only that value, so the file's layout is untouched) and leaves fields
+  that already hold their key alone. `-- --check` reports without writing.
+- The EditMode tests fail on a raw literal in a player-facing field, a key `en.json` lacks, an `en.json`
+  key nothing uses, a text-looking field no rule covers, and (once there are other locales) a locale
+  missing an English key.
+
+**Screens.** The screens' own text (button labels, messages) is keyed `ui.<screen>.<name>` in the same
+table and looked up through `GameContent.Text`. Only some screens have moved so far; the rest are
+tracked on #50.
+
+**Missing keys.** A key the table lacks is logged once and shows as `[missing: key]` in a Debug build,
+so it stands out on screen; a Release build shows the key itself.

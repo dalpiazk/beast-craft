@@ -119,7 +119,7 @@ namespace BeastCraft.Tooling.BalanceSim
                 IdleRewardsData data;
                 try
                 {
-                    data = JsonSerializer.Deserialize<IdleRewardsData>(File.ReadAllText(path), new JsonSerializerOptions { IncludeFields = true });
+                    data = JsonSerializer.Deserialize<IdleRewardsData>(BeastCraft.Localization.ContentText.ReadFile(path), new JsonSerializerOptions { IncludeFields = true });
                 }
                 catch (Exception exception)
                 {

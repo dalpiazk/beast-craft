@@ -195,7 +195,7 @@ namespace BeastCraft.Tests.EditMode
         {
             string root = GameContent.FindRoot();
             string path = GameContent.PathOf(root, projectRelativePath);
-            return BeastCraft.FieldJson.FromJson<T>(System.IO.File.ReadAllText(path));
+            return BeastCraft.FieldJson.FromJson<T>(BeastCraft.Localization.ContentText.ReadFile(path));
         }
     }
 }

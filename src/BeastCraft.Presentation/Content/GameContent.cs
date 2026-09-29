@@ -14,6 +14,7 @@ using BeastCraft.Expeditions;
 using BeastCraft.Garden;
 using BeastCraft.Grove;
 using BeastCraft.Idle;
+using BeastCraft.Localization;
 using BeastCraft.Presentation.Art;
 using BeastCraft.Presentation.Text;
 using BeastCraft.Presentation.Ui;
@@ -64,6 +65,12 @@ namespace BeastCraft.Presentation.Content
 
         /// <summary>Where the content was read from; the sprite atlas opens the PNGs through it.</summary>
         public IContentSource Source { get; private set; }
+
+        /// <summary>
+        /// The English text by key (<c>content/data/Localization/en.json</c>): the data files' text keys were
+        /// resolved through it as they loaded, and the screens look their own <c>ui.*</c> text up in it.
+        /// </summary>
+        public StringTable Text { get; private set; }
 
         public BeastRosterData Roster { get; private set; }
 
@@ -212,32 +219,34 @@ namespace BeastCraft.Presentation.Content
         /// </summary>
         public static GameContent Load(IContentSource root, List<string> errors)
         {
-            BeastRosterData roster = Read<BeastRosterData>(root, BeastRosterData.ProjectRelativePath, errors);
-            SkillLibraryData skills = Read<SkillLibraryData>(root, SkillLibraryData.ProjectRelativePath, errors);
-            EnemyLibraryData enemyLibrary = Read<EnemyLibraryData>(root, EnemyLibraryData.ProjectRelativePath, errors);
-            EncounterLibraryData encounterLibrary = Read<EncounterLibraryData>(root, EncounterLibraryData.ProjectRelativePath, errors);
-            EncounterDifficultyData difficulty = Read<EncounterDifficultyData>(root, EncounterDifficultyData.ProjectRelativePath, errors);
-            DropTableData dropTables = Read<DropTableData>(root, DropTableData.ProjectRelativePath, errors);
-            VfxLibraryData vfx = Read<VfxLibraryData>(root, VfxLibraryData.ProjectRelativePath, errors);
-            ArtManifestData art = ArtManifestData.Normalize(Read<ArtManifestData>(root, ArtManifestData.ProjectRelativePath, errors));
-            GlossaryData glossaryData = Read<GlossaryData>(root, GlossaryData.ProjectRelativePath, errors);
-            RegionLibraryData regions = Read<RegionLibraryData>(root, RegionLibraryData.ProjectRelativePath, errors);
-            BattleArtData battleArt = Read<BattleArtData>(root, BattleArtData.ProjectRelativePath, errors);
-            BattleLayoutData layouts = Read<BattleLayoutData>(root, BattleLayoutData.ProjectRelativePath, errors);
-            LocationNameTableData locationNames = Read<LocationNameTableData>(root, LocationNameTableData.ProjectRelativePath, errors);
-            GearLibraryData gearData = Read<GearLibraryData>(root, GearLibraryData.ProjectRelativePath, errors);
-            ConsumableLibraryData consumableData = Read<ConsumableLibraryData>(root, ConsumableLibraryData.ProjectRelativePath, errors);
-            CosmeticLibraryData cosmeticData = Read<CosmeticLibraryData>(root, CosmeticLibraryData.ProjectRelativePath, errors);
-            ShopTableData shopTableData = Read<ShopTableData>(root, ShopTableData.ProjectRelativePath, errors);
-            UiStyleData style = Read<UiStyleData>(root, UiStyleData.ProjectRelativePath, errors);
-            IdleRewardsData idleData = Read<IdleRewardsData>(root, IdleRewardsData.ProjectRelativePath, errors);
-            HintLibraryData hints = Read<HintLibraryData>(root, HintLibraryData.ProjectRelativePath, errors);
-            DialogueLibraryData dialogue = Read<DialogueLibraryData>(root, DialogueLibraryData.ProjectRelativePath, errors);
-            DiscoveryLibraryData discovery = Read<DiscoveryLibraryData>(root, DiscoveryLibraryData.ProjectRelativePath, errors);
-            AchievementLibraryData achievementData = Read<AchievementLibraryData>(root, AchievementLibraryData.ProjectRelativePath, errors);
-            GroveLibraryData groveData = Read<GroveLibraryData>(root, GroveLibraryData.ProjectRelativePath, errors);
-            GardenLibraryData gardenData = Read<GardenLibraryData>(root, GardenLibraryData.ProjectRelativePath, errors);
-            ExpeditionLibraryData expeditionData = Read<ExpeditionLibraryData>(root, ExpeditionLibraryData.ProjectRelativePath, errors);
+            // The English text first: every data file's text keys resolve through it as the file is read.
+            StringTable text = ReadStrings(root, errors);
+            BeastRosterData roster = Read<BeastRosterData>(root, text, BeastRosterData.ProjectRelativePath, errors);
+            SkillLibraryData skills = Read<SkillLibraryData>(root, text, SkillLibraryData.ProjectRelativePath, errors);
+            EnemyLibraryData enemyLibrary = Read<EnemyLibraryData>(root, text, EnemyLibraryData.ProjectRelativePath, errors);
+            EncounterLibraryData encounterLibrary = Read<EncounterLibraryData>(root, text, EncounterLibraryData.ProjectRelativePath, errors);
+            EncounterDifficultyData difficulty = Read<EncounterDifficultyData>(root, text, EncounterDifficultyData.ProjectRelativePath, errors);
+            DropTableData dropTables = Read<DropTableData>(root, text, DropTableData.ProjectRelativePath, errors);
+            VfxLibraryData vfx = Read<VfxLibraryData>(root, text, VfxLibraryData.ProjectRelativePath, errors);
+            ArtManifestData art = ArtManifestData.Normalize(Read<ArtManifestData>(root, text, ArtManifestData.ProjectRelativePath, errors));
+            GlossaryData glossaryData = Read<GlossaryData>(root, text, GlossaryData.ProjectRelativePath, errors);
+            RegionLibraryData regions = Read<RegionLibraryData>(root, text, RegionLibraryData.ProjectRelativePath, errors);
+            BattleArtData battleArt = Read<BattleArtData>(root, text, BattleArtData.ProjectRelativePath, errors);
+            BattleLayoutData layouts = Read<BattleLayoutData>(root, text, BattleLayoutData.ProjectRelativePath, errors);
+            LocationNameTableData locationNames = Read<LocationNameTableData>(root, text, LocationNameTableData.ProjectRelativePath, errors);
+            GearLibraryData gearData = Read<GearLibraryData>(root, text, GearLibraryData.ProjectRelativePath, errors);
+            ConsumableLibraryData consumableData = Read<ConsumableLibraryData>(root, text, ConsumableLibraryData.ProjectRelativePath, errors);
+            CosmeticLibraryData cosmeticData = Read<CosmeticLibraryData>(root, text, CosmeticLibraryData.ProjectRelativePath, errors);
+            ShopTableData shopTableData = Read<ShopTableData>(root, text, ShopTableData.ProjectRelativePath, errors);
+            UiStyleData style = Read<UiStyleData>(root, text, UiStyleData.ProjectRelativePath, errors);
+            IdleRewardsData idleData = Read<IdleRewardsData>(root, text, IdleRewardsData.ProjectRelativePath, errors);
+            HintLibraryData hints = Read<HintLibraryData>(root, text, HintLibraryData.ProjectRelativePath, errors);
+            DialogueLibraryData dialogue = Read<DialogueLibraryData>(root, text, DialogueLibraryData.ProjectRelativePath, errors);
+            DiscoveryLibraryData discovery = Read<DiscoveryLibraryData>(root, text, DiscoveryLibraryData.ProjectRelativePath, errors);
+            AchievementLibraryData achievementData = Read<AchievementLibraryData>(root, text, AchievementLibraryData.ProjectRelativePath, errors);
+            GroveLibraryData groveData = Read<GroveLibraryData>(root, text, GroveLibraryData.ProjectRelativePath, errors);
+            GardenLibraryData gardenData = Read<GardenLibraryData>(root, text, GardenLibraryData.ProjectRelativePath, errors);
+            ExpeditionLibraryData expeditionData = Read<ExpeditionLibraryData>(root, text, ExpeditionLibraryData.ProjectRelativePath, errors);
             if (errors.Count > 0)
             {
                 return null;
@@ -336,6 +345,7 @@ namespace BeastCraft.Presentation.Content
             return new GameContent
             {
                 Root = root.Location,
+                Text = text,
                 Source = root,
                 Roster = roster,
                 Species = species,
@@ -469,7 +479,31 @@ namespace BeastCraft.Presentation.Content
             return skill;
         }
 
-        private static T Read<T>(IContentSource root, string projectRelativePath, List<string> errors) where T : class
+        /// <summary>The string table (<see cref="StringTable.SourceProjectRelativePath"/>); null with an error when it is missing or unreadable.</summary>
+        private static StringTable ReadStrings(IContentSource root, List<string> errors)
+        {
+            string relative = RelativeOf(StringTable.SourceProjectRelativePath);
+            if (!root.Exists(relative))
+            {
+                errors.Add("Missing " + root.Describe(relative) + ".");
+                return null;
+            }
+
+            try
+            {
+                using (StreamReader reader = new StreamReader(root.Open(relative)))
+                {
+                    return StringTable.Parse(reader.ReadToEnd());
+                }
+            }
+            catch (Exception exception)
+            {
+                errors.Add("Could not read " + root.Describe(relative) + ": " + exception.Message);
+                return null;
+            }
+        }
+
+        private static T Read<T>(IContentSource root, StringTable text, string projectRelativePath, List<string> errors) where T : class
         {
             string relative = RelativeOf(projectRelativePath);
             string path = root.Describe(relative);
@@ -486,6 +520,8 @@ namespace BeastCraft.Presentation.Content
                 {
                     json = reader.ReadToEnd();
                 }
+
+                json = ContentText.Resolve(json, projectRelativePath, text);
 
                 T data = FieldJson.FromJson<T>(json);
                 if (data == null)

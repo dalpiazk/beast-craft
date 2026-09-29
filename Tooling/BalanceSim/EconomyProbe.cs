@@ -163,7 +163,7 @@ namespace BeastCraft.Tooling.BalanceSim
             ConsumableLibraryData data;
             try
             {
-                data = JsonSerializer.Deserialize<ConsumableLibraryData>(File.ReadAllText(resolved), new JsonSerializerOptions { IncludeFields = true });
+                data = JsonSerializer.Deserialize<ConsumableLibraryData>(BeastCraft.Localization.ContentText.ReadFile(resolved), new JsonSerializerOptions { IncludeFields = true });
             }
             catch (Exception exception)
             {

@@ -29,7 +29,7 @@ namespace BeastCraft.Tests.EditMode
 
         private static GlossaryData ShippedData()
         {
-            return FieldJson.FromJson<GlossaryData>(File.ReadAllText(GameContent.PathOf(GameContent.FindRoot(), GlossaryData.ProjectRelativePath)));
+            return FieldJson.FromJson<GlossaryData>(BeastCraft.Localization.ContentText.ReadFile(GameContent.PathOf(GameContent.FindRoot(), GlossaryData.ProjectRelativePath)));
         }
 
         private static Glossary Small()

@@ -36,7 +36,7 @@ namespace BeastCraft.Tests.EditMode
         public void ShippedBattleArt_IsValid_AndDressesEveryHollowArena()
         {
             string root = GameContent.FindRoot();
-            BattleArtData data = FieldJson.FromJson<BattleArtData>(File.ReadAllText(GameContent.PathOf(root, BattleArtData.ProjectRelativePath)));
+            BattleArtData data = FieldJson.FromJson<BattleArtData>(BeastCraft.Localization.ContentText.ReadFile(GameContent.PathOf(root, BattleArtData.ProjectRelativePath)));
             List<string> errors = BattleArtValidator.Validate(data, Content.Regions, Content.Art);
 
             Assert.IsEmpty(errors, string.Join("\n", errors));

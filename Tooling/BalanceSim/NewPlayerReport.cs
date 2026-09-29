@@ -899,7 +899,7 @@ namespace BeastCraft.Tooling.BalanceSim
 
             try
             {
-                return JsonSerializer.Deserialize<T>(File.ReadAllText(path), json);
+                return JsonSerializer.Deserialize<T>(BeastCraft.Localization.ContentText.ReadFile(path), json);
             }
             catch (Exception exception)
             {

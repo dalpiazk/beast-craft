@@ -79,8 +79,8 @@ namespace BeastCraft.Tooling.BalanceSim
             try
             {
                 JsonSerializerOptions options = new JsonSerializerOptions { IncludeFields = true };
-                library = JsonSerializer.Deserialize<SkillLibraryData>(File.ReadAllText(path), options);
-                roster = JsonSerializer.Deserialize<BeastRosterData>(File.ReadAllText(rosterPath), options);
+                library = JsonSerializer.Deserialize<SkillLibraryData>(BeastCraft.Localization.ContentText.ReadFile(path), options);
+                roster = JsonSerializer.Deserialize<BeastRosterData>(BeastCraft.Localization.ContentText.ReadFile(rosterPath), options);
             }
             catch (Exception exception)
             {

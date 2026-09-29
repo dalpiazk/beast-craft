@@ -38,8 +38,8 @@ namespace BeastCraft.Tests.EditMode
         public void ShippedLibrary_IsValid_AgainstTheRealSkillsAndArt()
         {
             string root = GameContent.FindRoot();
-            VfxLibraryData data = FieldJson.FromJson<VfxLibraryData>(File.ReadAllText(GameContent.PathOf(root, VfxLibraryData.ProjectRelativePath)));
-            ArtManifestData art = FieldJson.FromJson<ArtManifestData>(File.ReadAllText(GameContent.PathOf(root, ArtManifestData.ProjectRelativePath)));
+            VfxLibraryData data = FieldJson.FromJson<VfxLibraryData>(BeastCraft.Localization.ContentText.ReadFile(GameContent.PathOf(root, VfxLibraryData.ProjectRelativePath)));
+            ArtManifestData art = FieldJson.FromJson<ArtManifestData>(BeastCraft.Localization.ContentText.ReadFile(GameContent.PathOf(root, ArtManifestData.ProjectRelativePath)));
 
             List<string> errors = VfxLibraryValidator.Validate(data, Content.KnownSkillIds, art);
 

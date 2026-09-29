@@ -211,10 +211,10 @@ namespace BeastCraft.Tooling.BalanceSim
             try
             {
                 JsonSerializerOptions json = new JsonSerializerOptions { IncludeFields = true };
-                library = JsonSerializer.Deserialize<SkillLibraryData>(File.ReadAllText(libraryPath), json);
-                tables = JsonSerializer.Deserialize<DropTableData>(File.ReadAllText(tablesPath), json);
-                regions = JsonSerializer.Deserialize<RegionLibraryData>(File.ReadAllText(regionsPath), json);
-                encounters = JsonSerializer.Deserialize<EncounterLibraryData>(File.ReadAllText(encountersPath), json);
+                library = JsonSerializer.Deserialize<SkillLibraryData>(BeastCraft.Localization.ContentText.ReadFile(libraryPath), json);
+                tables = JsonSerializer.Deserialize<DropTableData>(BeastCraft.Localization.ContentText.ReadFile(tablesPath), json);
+                regions = JsonSerializer.Deserialize<RegionLibraryData>(BeastCraft.Localization.ContentText.ReadFile(regionsPath), json);
+                encounters = JsonSerializer.Deserialize<EncounterLibraryData>(BeastCraft.Localization.ContentText.ReadFile(encountersPath), json);
             }
             catch (Exception exception)
             {
@@ -356,7 +356,7 @@ namespace BeastCraft.Tooling.BalanceSim
             DiscoveryLibraryData data;
             try
             {
-                data = JsonSerializer.Deserialize<DiscoveryLibraryData>(File.ReadAllText(discoveryPath), new JsonSerializerOptions { IncludeFields = true });
+                data = JsonSerializer.Deserialize<DiscoveryLibraryData>(BeastCraft.Localization.ContentText.ReadFile(discoveryPath), new JsonSerializerOptions { IncludeFields = true });
             }
             catch (Exception exception)
             {

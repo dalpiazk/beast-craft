@@ -5,14 +5,14 @@
   "Categories": [
     {
       "CategoryId": "avatar_hair",
-      "DisplayName": "Hair",
+      "DisplayName": "cosmetic.avatar_hair.name",
       "Scope": "avatar",
       "ValueType": "DiscreteOption",
       "DefaultColor": "#FFFFFF",
       "Options": [
         {
           "OptionId": "short",
-          "DisplayName": "Short Crop",
+          "DisplayName": "cosmetic.avatar_hair.short.name",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": true,
@@ -24,7 +24,7 @@
         },
         {
           "OptionId": "braids",
-          "DisplayName": "Trail Braids",
+          "DisplayName": "cosmetic.avatar_hair.braids.name",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": true,
@@ -36,7 +36,7 @@
         },
         {
           "OptionId": "ponytail",
-          "DisplayName": "High Ponytail",
+          "DisplayName": "cosmetic.avatar_hair.ponytail.name",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": true,
@@ -48,7 +48,7 @@
         },
         {
           "OptionId": "curls",
-          "DisplayName": "Wild Curls",
+          "DisplayName": "cosmetic.avatar_hair.curls.name",
           "IsDefault": false,
           "SortOrder": 3,
           "SupportsPaletteShader": true,
@@ -60,7 +60,7 @@
         },
         {
           "OptionId": "mohawk",
-          "DisplayName": "Crest Cut",
+          "DisplayName": "cosmetic.avatar_hair.mohawk.name",
           "IsDefault": false,
           "SortOrder": 4,
           "SupportsPaletteShader": true,
@@ -72,7 +72,7 @@
         },
         {
           "OptionId": "topknot",
-          "DisplayName": "Wanderer's Topknot",
+          "DisplayName": "cosmetic.avatar_hair.topknot.name",
           "IsDefault": false,
           "SortOrder": 5,
           "SupportsPaletteShader": true,
@@ -84,7 +84,7 @@
         },
         {
           "OptionId": "silver_mane",
-          "DisplayName": "Silverstream Mane",
+          "DisplayName": "cosmetic.avatar_hair.silver_mane.name",
           "IsDefault": false,
           "SortOrder": 6,
           "SupportsPaletteShader": true,
@@ -96,7 +96,7 @@
         },
         {
           "OptionId": "windswept",
-          "DisplayName": "Windswept Locks",
+          "DisplayName": "cosmetic.avatar_hair.windswept.name",
           "IsDefault": false,
           "SortOrder": 7,
           "SupportsPaletteShader": true,
@@ -110,7 +110,7 @@
         },
         {
           "OptionId": "starlight",
-          "DisplayName": "Starlight Locks",
+          "DisplayName": "cosmetic.avatar_hair.starlight.name",
           "IsDefault": false,
           "SortOrder": 8,
           "SupportsPaletteShader": true,
@@ -124,7 +124,7 @@
     },
     {
       "CategoryId": "avatar_hair_color",
-      "DisplayName": "Hair Colour",
+      "DisplayName": "cosmetic.avatar_hair_color.name",
       "Scope": "avatar",
       "ValueType": "ColorPicker",
       "DefaultColor": "#3B2A20",
@@ -132,14 +132,14 @@
     },
     {
       "CategoryId": "avatar_outfit",
-      "DisplayName": "Outfit",
+      "DisplayName": "cosmetic.avatar_outfit.name",
       "Scope": "avatar",
       "ValueType": "DiscreteOption",
       "DefaultColor": "#FFFFFF",
       "Options": [
         {
           "OptionId": "traveler",
-          "DisplayName": "Traveler's Garb",
+          "DisplayName": "cosmetic.avatar_outfit.traveler.name",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": true,
@@ -151,7 +151,7 @@
         },
         {
           "OptionId": "ranger",
-          "DisplayName": "Ranger Leathers",
+          "DisplayName": "cosmetic.avatar_outfit.ranger.name",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": true,
@@ -163,7 +163,7 @@
         },
         {
           "OptionId": "scholar",
-          "DisplayName": "Bestiary Scholar",
+          "DisplayName": "cosmetic.avatar_outfit.scholar.name",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": true,
@@ -175,7 +175,7 @@
         },
         {
           "OptionId": "explorer",
-          "DisplayName": "Explorer's Kit",
+          "DisplayName": "cosmetic.avatar_outfit.explorer.name",
           "IsDefault": false,
           "SortOrder": 3,
           "SupportsPaletteShader": true,
@@ -187,7 +187,7 @@
         },
         {
           "OptionId": "noble",
-          "DisplayName": "Noble Finery",
+          "DisplayName": "cosmetic.avatar_outfit.noble.name",
           "IsDefault": false,
           "SortOrder": 4,
           "SupportsPaletteShader": true,
@@ -199,7 +199,7 @@
         },
         {
           "OptionId": "warden",
-          "DisplayName": "Forester Greens",
+          "DisplayName": "cosmetic.avatar_outfit.warden.name",
           "IsDefault": false,
           "SortOrder": 5,
           "SupportsPaletteShader": true,
@@ -211,7 +211,7 @@
         },
         {
           "OptionId": "stormcoat",
-          "DisplayName": "Stormrider Coat",
+          "DisplayName": "cosmetic.avatar_outfit.stormcoat.name",
           "IsDefault": false,
           "SortOrder": 6,
           "SupportsPaletteShader": true,
@@ -223,7 +223,7 @@
         },
         {
           "OptionId": "veteran_garb",
-          "DisplayName": "Veteran Binder Garb",
+          "DisplayName": "cosmetic.avatar_outfit.veteran_garb.name",
           "IsDefault": false,
           "SortOrder": 7,
           "SupportsPaletteShader": true,
@@ -235,7 +235,7 @@
         },
         {
           "OptionId": "apex_regalia",
-          "DisplayName": "Summit Regalia",
+          "DisplayName": "cosmetic.avatar_outfit.apex_regalia.name",
           "IsDefault": false,
           "SortOrder": 8,
           "SupportsPaletteShader": true,
@@ -247,7 +247,7 @@
         },
         {
           "OptionId": "festival_garb",
-          "DisplayName": "Firefly Festival Garb",
+          "DisplayName": "cosmetic.avatar_outfit.festival_garb.name",
           "IsDefault": false,
           "SortOrder": 9,
           "SupportsPaletteShader": true,
@@ -259,7 +259,7 @@
         },
         {
           "OptionId": "tidewalker_coat",
-          "DisplayName": "Tidewalker Coat",
+          "DisplayName": "cosmetic.avatar_outfit.tidewalker_coat.name",
           "IsDefault": false,
           "SortOrder": 10,
           "SupportsPaletteShader": true,
@@ -271,7 +271,7 @@
         },
         {
           "OptionId": "cloudrunner_vest",
-          "DisplayName": "Cloudrunner Vest",
+          "DisplayName": "cosmetic.avatar_outfit.cloudrunner_vest.name",
           "IsDefault": false,
           "SortOrder": 11,
           "SupportsPaletteShader": true,
@@ -283,7 +283,7 @@
         },
         {
           "OptionId": "rimeweave_garb",
-          "DisplayName": "Rimeweave Garb",
+          "DisplayName": "cosmetic.avatar_outfit.rimeweave_garb.name",
           "IsDefault": false,
           "SortOrder": 12,
           "SupportsPaletteShader": true,
@@ -297,14 +297,14 @@
     },
     {
       "CategoryId": "avatar_headwear",
-      "DisplayName": "Headwear",
+      "DisplayName": "cosmetic.avatar_headwear.name",
       "Scope": "avatar",
       "ValueType": "DiscreteOption",
       "DefaultColor": "#FFFFFF",
       "Options": [
         {
           "OptionId": "none",
-          "DisplayName": "None",
+          "DisplayName": "cosmetic.avatar_headwear.none.name",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": true,
@@ -316,7 +316,7 @@
         },
         {
           "OptionId": "bandana",
-          "DisplayName": "Trail Bandana",
+          "DisplayName": "cosmetic.avatar_headwear.bandana.name",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": true,
@@ -328,7 +328,7 @@
         },
         {
           "OptionId": "explorer_hat",
-          "DisplayName": "Wide-Brim Hat",
+          "DisplayName": "cosmetic.avatar_headwear.explorer_hat.name",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": true,
@@ -340,7 +340,7 @@
         },
         {
           "OptionId": "circlet",
-          "DisplayName": "Silver Circlet",
+          "DisplayName": "cosmetic.avatar_headwear.circlet.name",
           "IsDefault": false,
           "SortOrder": 3,
           "SupportsPaletteShader": true,
@@ -352,7 +352,7 @@
         },
         {
           "OptionId": "rustwood_helm",
-          "DisplayName": "Rustleaf Helm",
+          "DisplayName": "cosmetic.avatar_headwear.rustwood_helm.name",
           "IsDefault": false,
           "SortOrder": 4,
           "SupportsPaletteShader": true,
@@ -364,7 +364,7 @@
         },
         {
           "OptionId": "champions_laurel",
-          "DisplayName": "First Seal Laurel",
+          "DisplayName": "cosmetic.avatar_headwear.champions_laurel.name",
           "IsDefault": false,
           "SortOrder": 5,
           "SupportsPaletteShader": true,
@@ -376,7 +376,7 @@
         },
         {
           "OptionId": "crown_of_seals",
-          "DisplayName": "Crown of Seals",
+          "DisplayName": "cosmetic.avatar_headwear.crown_of_seals.name",
           "IsDefault": false,
           "SortOrder": 6,
           "SupportsPaletteShader": true,
@@ -388,7 +388,7 @@
         },
         {
           "OptionId": "feathered_cap",
-          "DisplayName": "Plumed Cap",
+          "DisplayName": "cosmetic.avatar_headwear.feathered_cap.name",
           "IsDefault": false,
           "SortOrder": 7,
           "SupportsPaletteShader": true,
@@ -402,7 +402,7 @@
         },
         {
           "OptionId": "star_crown",
-          "DisplayName": "Constellation Crown",
+          "DisplayName": "cosmetic.avatar_headwear.star_crown.name",
           "IsDefault": false,
           "SortOrder": 8,
           "SupportsPaletteShader": true,
@@ -414,7 +414,7 @@
         },
         {
           "OptionId": "fern_sprig",
-          "DisplayName": "Fern Sprig",
+          "DisplayName": "cosmetic.avatar_headwear.fern_sprig.name",
           "IsDefault": false,
           "SortOrder": 9,
           "SupportsPaletteShader": true,
@@ -426,7 +426,7 @@
         },
         {
           "OptionId": "emberlight_cap",
-          "DisplayName": "Emberlight Cap",
+          "DisplayName": "cosmetic.avatar_headwear.emberlight_cap.name",
           "IsDefault": false,
           "SortOrder": 10,
           "SupportsPaletteShader": true,
@@ -438,7 +438,7 @@
         },
         {
           "OptionId": "shell_circlet",
-          "DisplayName": "Shell Circlet",
+          "DisplayName": "cosmetic.avatar_headwear.shell_circlet.name",
           "IsDefault": false,
           "SortOrder": 11,
           "SupportsPaletteShader": true,
@@ -450,7 +450,7 @@
         },
         {
           "OptionId": "copperleaf_crown",
-          "DisplayName": "Copperleaf Crown",
+          "DisplayName": "cosmetic.avatar_headwear.copperleaf_crown.name",
           "IsDefault": false,
           "SortOrder": 12,
           "SupportsPaletteShader": true,
@@ -462,7 +462,7 @@
         },
         {
           "OptionId": "snowdrift_hood",
-          "DisplayName": "Snowdrift Hood",
+          "DisplayName": "cosmetic.avatar_headwear.snowdrift_hood.name",
           "IsDefault": false,
           "SortOrder": 13,
           "SupportsPaletteShader": true,
@@ -476,14 +476,14 @@
     },
     {
       "CategoryId": "avatar_cape",
-      "DisplayName": "Cape",
+      "DisplayName": "cosmetic.avatar_cape.name",
       "Scope": "avatar",
       "ValueType": "DiscreteOption",
       "DefaultColor": "#FFFFFF",
       "Options": [
         {
           "OptionId": "none",
-          "DisplayName": "None",
+          "DisplayName": "cosmetic.avatar_cape.none.name",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": true,
@@ -495,7 +495,7 @@
         },
         {
           "OptionId": "short_cape",
-          "DisplayName": "Shoulder Cape",
+          "DisplayName": "cosmetic.avatar_cape.short_cape.name",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": true,
@@ -507,7 +507,7 @@
         },
         {
           "OptionId": "travel_cloak",
-          "DisplayName": "Hooded Travel Cloak",
+          "DisplayName": "cosmetic.avatar_cape.travel_cloak.name",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": true,
@@ -519,7 +519,7 @@
         },
         {
           "OptionId": "silk_mantle",
-          "DisplayName": "Moonsilk Mantle",
+          "DisplayName": "cosmetic.avatar_cape.silk_mantle.name",
           "IsDefault": false,
           "SortOrder": 3,
           "SupportsPaletteShader": true,
@@ -531,7 +531,7 @@
         },
         {
           "OptionId": "tidefall_cape",
-          "DisplayName": "Undertow Cape",
+          "DisplayName": "cosmetic.avatar_cape.tidefall_cape.name",
           "IsDefault": false,
           "SortOrder": 4,
           "SupportsPaletteShader": true,
@@ -543,7 +543,7 @@
         },
         {
           "OptionId": "deepwild_cloak",
-          "DisplayName": "Elderroot Cloak",
+          "DisplayName": "cosmetic.avatar_cape.deepwild_cloak.name",
           "IsDefault": false,
           "SortOrder": 5,
           "SupportsPaletteShader": true,
@@ -555,7 +555,7 @@
         },
         {
           "OptionId": "tattered_banner",
-          "DisplayName": "Tattered Banner",
+          "DisplayName": "cosmetic.avatar_cape.tattered_banner.name",
           "IsDefault": false,
           "SortOrder": 6,
           "SupportsPaletteShader": true,
@@ -569,7 +569,7 @@
         },
         {
           "OptionId": "veteran_mantle",
-          "DisplayName": "Elder Mantle",
+          "DisplayName": "cosmetic.avatar_cape.veteran_mantle.name",
           "IsDefault": false,
           "SortOrder": 7,
           "SupportsPaletteShader": true,
@@ -581,7 +581,7 @@
         },
         {
           "OptionId": "mosstrail_cape",
-          "DisplayName": "Mosstrail Cape",
+          "DisplayName": "cosmetic.avatar_cape.mosstrail_cape.name",
           "IsDefault": false,
           "SortOrder": 8,
           "SupportsPaletteShader": true,
@@ -593,7 +593,7 @@
         },
         {
           "OptionId": "cinder_scarf",
-          "DisplayName": "Cinder Scarf",
+          "DisplayName": "cosmetic.avatar_cape.cinder_scarf.name",
           "IsDefault": false,
           "SortOrder": 9,
           "SupportsPaletteShader": true,
@@ -605,7 +605,7 @@
         },
         {
           "OptionId": "galewander_cloak",
-          "DisplayName": "Galewander Cloak",
+          "DisplayName": "cosmetic.avatar_cape.galewander_cloak.name",
           "IsDefault": false,
           "SortOrder": 10,
           "SupportsPaletteShader": true,
@@ -617,7 +617,7 @@
         },
         {
           "OptionId": "rustleaf_mantle",
-          "DisplayName": "Rustleaf Mantle",
+          "DisplayName": "cosmetic.avatar_cape.rustleaf_mantle.name",
           "IsDefault": false,
           "SortOrder": 11,
           "SupportsPaletteShader": true,
@@ -631,7 +631,7 @@
     },
     {
       "CategoryId": "avatar_skin_tone",
-      "DisplayName": "Skin Tone",
+      "DisplayName": "cosmetic.avatar_skin_tone.name",
       "Scope": "avatar",
       "ValueType": "ColorPicker",
       "DefaultColor": "#C68642",
@@ -639,7 +639,7 @@
     },
     {
       "CategoryId": "avatar_eye_color",
-      "DisplayName": "Eye Colour",
+      "DisplayName": "cosmetic.avatar_eye_color.name",
       "Scope": "avatar",
       "ValueType": "ColorPicker",
       "DefaultColor": "#4A6B8A",
@@ -647,14 +647,14 @@
     },
     {
       "CategoryId": "kirin_horn",
-      "DisplayName": "Kirin Horn",
+      "DisplayName": "cosmetic.kirin_horn.name",
       "Scope": "kirin",
       "ValueType": "DiscreteOption",
       "DefaultColor": "#FFFFFF",
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Ivory Horn",
+          "DisplayName": "cosmetic.kirin_horn.natural.name",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": true,
@@ -666,7 +666,7 @@
         },
         {
           "OptionId": "swept",
-          "DisplayName": "Windswept Horn",
+          "DisplayName": "cosmetic.kirin_horn.swept.name",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": true,
@@ -678,7 +678,7 @@
         },
         {
           "OptionId": "banded",
-          "DisplayName": "Ringed Horn",
+          "DisplayName": "cosmetic.kirin_horn.banded.name",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": true,
@@ -690,7 +690,7 @@
         },
         {
           "OptionId": "sunlit",
-          "DisplayName": "Dawnbeam Horn",
+          "DisplayName": "cosmetic.kirin_horn.sunlit.name",
           "IsDefault": false,
           "SortOrder": 3,
           "SupportsPaletteShader": true,
@@ -702,7 +702,7 @@
         },
         {
           "OptionId": "moonlit",
-          "DisplayName": "Moonpearl Horn",
+          "DisplayName": "cosmetic.kirin_horn.moonlit.name",
           "IsDefault": false,
           "SortOrder": 4,
           "SupportsPaletteShader": true,
@@ -714,7 +714,7 @@
         },
         {
           "OptionId": "regal",
-          "DisplayName": "Halo Horn",
+          "DisplayName": "cosmetic.kirin_horn.regal.name",
           "IsDefault": false,
           "SortOrder": 5,
           "SupportsPaletteShader": true,
@@ -726,7 +726,7 @@
         },
         {
           "OptionId": "wildborn",
-          "DisplayName": "Wildbranch Horn",
+          "DisplayName": "cosmetic.kirin_horn.wildborn.name",
           "IsDefault": false,
           "SortOrder": 6,
           "SupportsPaletteShader": true,
@@ -740,7 +740,7 @@
         },
         {
           "OptionId": "veteran",
-          "DisplayName": "Veteran Brighthorn",
+          "DisplayName": "cosmetic.kirin_horn.veteran.name",
           "IsDefault": false,
           "SortOrder": 7,
           "SupportsPaletteShader": true,
@@ -752,7 +752,7 @@
         },
         {
           "OptionId": "starlit",
-          "DisplayName": "Aurora Horn",
+          "DisplayName": "cosmetic.kirin_horn.starlit.name",
           "IsDefault": false,
           "SortOrder": 8,
           "SupportsPaletteShader": true,
@@ -764,7 +764,7 @@
         },
         {
           "OptionId": "dawnshade",
-          "DisplayName": "Dawnshade Horn",
+          "DisplayName": "cosmetic.kirin_horn.dawnshade.name",
           "IsDefault": false,
           "SortOrder": 9,
           "SupportsPaletteShader": true,
@@ -776,7 +776,7 @@
         },
         {
           "OptionId": "radiant_dawnshade",
-          "DisplayName": "Radiant Dawnshade Horn",
+          "DisplayName": "cosmetic.kirin_horn.radiant_dawnshade.name",
           "IsDefault": false,
           "SortOrder": 10,
           "SupportsPaletteShader": true,
@@ -790,14 +790,14 @@
     },
     {
       "CategoryId": "kirin_mane",
-      "DisplayName": "Kirin Mane",
+      "DisplayName": "cosmetic.kirin_mane.name",
       "Scope": "kirin",
       "ValueType": "DiscreteOption",
       "DefaultColor": "#FFFFFF",
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Cloud Mane",
+          "DisplayName": "cosmetic.kirin_mane.natural.name",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": true,
@@ -809,7 +809,7 @@
         },
         {
           "OptionId": "striped",
-          "DisplayName": "Ribboned Mane",
+          "DisplayName": "cosmetic.kirin_mane.striped.name",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": true,
@@ -821,7 +821,7 @@
         },
         {
           "OptionId": "mottled",
-          "DisplayName": "Dappled Mane",
+          "DisplayName": "cosmetic.kirin_mane.mottled.name",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": true,
@@ -833,7 +833,7 @@
         },
         {
           "OptionId": "gilded",
-          "DisplayName": "Gilded Mane",
+          "DisplayName": "cosmetic.kirin_mane.gilded.name",
           "IsDefault": false,
           "SortOrder": 3,
           "SupportsPaletteShader": true,
@@ -845,7 +845,7 @@
         },
         {
           "OptionId": "runed",
-          "DisplayName": "Sunrune Mane",
+          "DisplayName": "cosmetic.kirin_mane.runed.name",
           "IsDefault": false,
           "SortOrder": 4,
           "SupportsPaletteShader": true,
@@ -857,7 +857,7 @@
         },
         {
           "OptionId": "lair",
-          "DisplayName": "Mossgrove Mane",
+          "DisplayName": "cosmetic.kirin_mane.lair.name",
           "IsDefault": false,
           "SortOrder": 5,
           "SupportsPaletteShader": true,
@@ -869,7 +869,7 @@
         },
         {
           "OptionId": "ghostly",
-          "DisplayName": "Wisp Mane",
+          "DisplayName": "cosmetic.kirin_mane.ghostly.name",
           "IsDefault": false,
           "SortOrder": 6,
           "SupportsPaletteShader": true,
@@ -883,7 +883,7 @@
         },
         {
           "OptionId": "ascendant",
-          "DisplayName": "Ascendant Sunmane",
+          "DisplayName": "cosmetic.kirin_mane.ascendant.name",
           "IsDefault": false,
           "SortOrder": 7,
           "SupportsPaletteShader": true,
@@ -897,7 +897,7 @@
     },
     {
       "CategoryId": "kirin_tint",
-      "DisplayName": "Kirin Tint",
+      "DisplayName": "cosmetic.kirin_tint.name",
       "Scope": "kirin",
       "ValueType": "ColorPicker",
       "DefaultColor": "#F4E7B0",
@@ -905,14 +905,14 @@
     },
     {
       "CategoryId": "phoenix_plumage",
-      "DisplayName": "Phoenix Plumage",
+      "DisplayName": "cosmetic.phoenix_plumage.name",
       "Scope": "phoenix",
       "ValueType": "DiscreteOption",
       "DefaultColor": "#FFFFFF",
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Ember Plumage",
+          "DisplayName": "cosmetic.phoenix_plumage.natural.name",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": true,
@@ -924,7 +924,7 @@
         },
         {
           "OptionId": "swept",
-          "DisplayName": "Sweeping Plumage",
+          "DisplayName": "cosmetic.phoenix_plumage.swept.name",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": true,
@@ -936,7 +936,7 @@
         },
         {
           "OptionId": "banded",
-          "DisplayName": "Barred Plumage",
+          "DisplayName": "cosmetic.phoenix_plumage.banded.name",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": true,
@@ -948,7 +948,7 @@
         },
         {
           "OptionId": "sunlit",
-          "DisplayName": "Sunflare Plumage",
+          "DisplayName": "cosmetic.phoenix_plumage.sunlit.name",
           "IsDefault": false,
           "SortOrder": 3,
           "SupportsPaletteShader": true,
@@ -960,7 +960,7 @@
         },
         {
           "OptionId": "moonlit",
-          "DisplayName": "Moonfire Plumage",
+          "DisplayName": "cosmetic.phoenix_plumage.moonlit.name",
           "IsDefault": false,
           "SortOrder": 4,
           "SupportsPaletteShader": true,
@@ -972,7 +972,7 @@
         },
         {
           "OptionId": "regal",
-          "DisplayName": "Crownfire Plumage",
+          "DisplayName": "cosmetic.phoenix_plumage.regal.name",
           "IsDefault": false,
           "SortOrder": 5,
           "SupportsPaletteShader": true,
@@ -984,7 +984,7 @@
         },
         {
           "OptionId": "wildborn",
-          "DisplayName": "Wildfire Plumage",
+          "DisplayName": "cosmetic.phoenix_plumage.wildborn.name",
           "IsDefault": false,
           "SortOrder": 6,
           "SupportsPaletteShader": true,
@@ -998,7 +998,7 @@
         },
         {
           "OptionId": "veteran",
-          "DisplayName": "Veteran Blazeplume",
+          "DisplayName": "cosmetic.phoenix_plumage.veteran.name",
           "IsDefault": false,
           "SortOrder": 7,
           "SupportsPaletteShader": true,
@@ -1010,7 +1010,7 @@
         },
         {
           "OptionId": "starlit",
-          "DisplayName": "Starfire Plumage",
+          "DisplayName": "cosmetic.phoenix_plumage.starlit.name",
           "IsDefault": false,
           "SortOrder": 8,
           "SupportsPaletteShader": true,
@@ -1024,14 +1024,14 @@
     },
     {
       "CategoryId": "phoenix_wings",
-      "DisplayName": "Phoenix Wings",
+      "DisplayName": "cosmetic.phoenix_wings.name",
       "Scope": "phoenix",
       "ValueType": "DiscreteOption",
       "DefaultColor": "#FFFFFF",
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Flame Wings",
+          "DisplayName": "cosmetic.phoenix_wings.natural.name",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": true,
@@ -1043,7 +1043,7 @@
         },
         {
           "OptionId": "striped",
-          "DisplayName": "Streaked Wings",
+          "DisplayName": "cosmetic.phoenix_wings.striped.name",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": true,
@@ -1055,7 +1055,7 @@
         },
         {
           "OptionId": "mottled",
-          "DisplayName": "Ashfleck Wings",
+          "DisplayName": "cosmetic.phoenix_wings.mottled.name",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": true,
@@ -1067,7 +1067,7 @@
         },
         {
           "OptionId": "gilded",
-          "DisplayName": "Gilded Pinions",
+          "DisplayName": "cosmetic.phoenix_wings.gilded.name",
           "IsDefault": false,
           "SortOrder": 3,
           "SupportsPaletteShader": true,
@@ -1079,7 +1079,7 @@
         },
         {
           "OptionId": "runed",
-          "DisplayName": "Glyphflame Wings",
+          "DisplayName": "cosmetic.phoenix_wings.runed.name",
           "IsDefault": false,
           "SortOrder": 4,
           "SupportsPaletteShader": true,
@@ -1091,7 +1091,7 @@
         },
         {
           "OptionId": "lair",
-          "DisplayName": "Emberflare Wings",
+          "DisplayName": "cosmetic.phoenix_wings.lair.name",
           "IsDefault": false,
           "SortOrder": 5,
           "SupportsPaletteShader": true,
@@ -1103,7 +1103,7 @@
         },
         {
           "OptionId": "ghostly",
-          "DisplayName": "Ghostflame Wings",
+          "DisplayName": "cosmetic.phoenix_wings.ghostly.name",
           "IsDefault": false,
           "SortOrder": 6,
           "SupportsPaletteShader": true,
@@ -1117,7 +1117,7 @@
         },
         {
           "OptionId": "ascendant",
-          "DisplayName": "Ascendant Rebirth Wings",
+          "DisplayName": "cosmetic.phoenix_wings.ascendant.name",
           "IsDefault": false,
           "SortOrder": 7,
           "SupportsPaletteShader": true,
@@ -1131,7 +1131,7 @@
     },
     {
       "CategoryId": "phoenix_tint",
-      "DisplayName": "Phoenix Tint",
+      "DisplayName": "cosmetic.phoenix_tint.name",
       "Scope": "phoenix",
       "ValueType": "ColorPicker",
       "DefaultColor": "#E4572E",
@@ -1139,14 +1139,14 @@
     },
     {
       "CategoryId": "leviathan_fins",
-      "DisplayName": "Leviathan Fins",
+      "DisplayName": "cosmetic.leviathan_fins.name",
       "Scope": "leviathan",
       "ValueType": "DiscreteOption",
       "DefaultColor": "#FFFFFF",
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Tide Fins",
+          "DisplayName": "cosmetic.leviathan_fins.natural.name",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": true,
@@ -1158,7 +1158,7 @@
         },
         {
           "OptionId": "swept",
-          "DisplayName": "Streamline Fins",
+          "DisplayName": "cosmetic.leviathan_fins.swept.name",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": true,
@@ -1170,7 +1170,7 @@
         },
         {
           "OptionId": "banded",
-          "DisplayName": "Wavebanded Fins",
+          "DisplayName": "cosmetic.leviathan_fins.banded.name",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": true,
@@ -1182,7 +1182,7 @@
         },
         {
           "OptionId": "sunlit",
-          "DisplayName": "Sunshallow Fins",
+          "DisplayName": "cosmetic.leviathan_fins.sunlit.name",
           "IsDefault": false,
           "SortOrder": 3,
           "SupportsPaletteShader": true,
@@ -1194,7 +1194,7 @@
         },
         {
           "OptionId": "moonlit",
-          "DisplayName": "Moontide Fins",
+          "DisplayName": "cosmetic.leviathan_fins.moonlit.name",
           "IsDefault": false,
           "SortOrder": 4,
           "SupportsPaletteShader": true,
@@ -1206,7 +1206,7 @@
         },
         {
           "OptionId": "regal",
-          "DisplayName": "Coral Crown Fins",
+          "DisplayName": "cosmetic.leviathan_fins.regal.name",
           "IsDefault": false,
           "SortOrder": 5,
           "SupportsPaletteShader": true,
@@ -1218,7 +1218,7 @@
         },
         {
           "OptionId": "wildborn",
-          "DisplayName": "Kelp-Frilled Fins",
+          "DisplayName": "cosmetic.leviathan_fins.wildborn.name",
           "IsDefault": false,
           "SortOrder": 6,
           "SupportsPaletteShader": true,
@@ -1232,7 +1232,7 @@
         },
         {
           "OptionId": "veteran",
-          "DisplayName": "Veteran Deepfins",
+          "DisplayName": "cosmetic.leviathan_fins.veteran.name",
           "IsDefault": false,
           "SortOrder": 7,
           "SupportsPaletteShader": true,
@@ -1244,7 +1244,7 @@
         },
         {
           "OptionId": "starlit",
-          "DisplayName": "Starsea Fins",
+          "DisplayName": "cosmetic.leviathan_fins.starlit.name",
           "IsDefault": false,
           "SortOrder": 8,
           "SupportsPaletteShader": true,
@@ -1258,14 +1258,14 @@
     },
     {
       "CategoryId": "leviathan_scales",
-      "DisplayName": "Leviathan Scales",
+      "DisplayName": "cosmetic.leviathan_scales.name",
       "Scope": "leviathan",
       "ValueType": "DiscreteOption",
       "DefaultColor": "#FFFFFF",
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Sea Scales",
+          "DisplayName": "cosmetic.leviathan_scales.natural.name",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": true,
@@ -1277,7 +1277,7 @@
         },
         {
           "OptionId": "striped",
-          "DisplayName": "Currentline Scales",
+          "DisplayName": "cosmetic.leviathan_scales.striped.name",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": true,
@@ -1289,7 +1289,7 @@
         },
         {
           "OptionId": "mottled",
-          "DisplayName": "Foamfleck Scales",
+          "DisplayName": "cosmetic.leviathan_scales.mottled.name",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": true,
@@ -1301,7 +1301,7 @@
         },
         {
           "OptionId": "gilded",
-          "DisplayName": "Pearl-Gilt Scales",
+          "DisplayName": "cosmetic.leviathan_scales.gilded.name",
           "IsDefault": false,
           "SortOrder": 3,
           "SupportsPaletteShader": true,
@@ -1313,7 +1313,7 @@
         },
         {
           "OptionId": "runed",
-          "DisplayName": "Tiderune Scales",
+          "DisplayName": "cosmetic.leviathan_scales.runed.name",
           "IsDefault": false,
           "SortOrder": 4,
           "SupportsPaletteShader": true,
@@ -1325,7 +1325,7 @@
         },
         {
           "OptionId": "lair",
-          "DisplayName": "Undertow Scales",
+          "DisplayName": "cosmetic.leviathan_scales.lair.name",
           "IsDefault": false,
           "SortOrder": 5,
           "SupportsPaletteShader": true,
@@ -1337,7 +1337,7 @@
         },
         {
           "OptionId": "ghostly",
-          "DisplayName": "Abyssglow Scales",
+          "DisplayName": "cosmetic.leviathan_scales.ghostly.name",
           "IsDefault": false,
           "SortOrder": 6,
           "SupportsPaletteShader": true,
@@ -1351,7 +1351,7 @@
         },
         {
           "OptionId": "ascendant",
-          "DisplayName": "Ascendant Tidescale",
+          "DisplayName": "cosmetic.leviathan_scales.ascendant.name",
           "IsDefault": false,
           "SortOrder": 7,
           "SupportsPaletteShader": true,
@@ -1365,7 +1365,7 @@
     },
     {
       "CategoryId": "leviathan_tint",
-      "DisplayName": "Leviathan Tint",
+      "DisplayName": "cosmetic.leviathan_tint.name",
       "Scope": "leviathan",
       "ValueType": "ColorPicker",
       "DefaultColor": "#2E86AB",
@@ -1373,14 +1373,14 @@
     },
     {
       "CategoryId": "griffin_crest",
-      "DisplayName": "Griffin Crest",
+      "DisplayName": "cosmetic.griffin_crest.name",
       "Scope": "griffin",
       "ValueType": "DiscreteOption",
       "DefaultColor": "#FFFFFF",
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Eagle Crest",
+          "DisplayName": "cosmetic.griffin_crest.natural.name",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": true,
@@ -1392,7 +1392,7 @@
         },
         {
           "OptionId": "swept",
-          "DisplayName": "Windswept Crest",
+          "DisplayName": "cosmetic.griffin_crest.swept.name",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": true,
@@ -1404,7 +1404,7 @@
         },
         {
           "OptionId": "banded",
-          "DisplayName": "Barred Crest",
+          "DisplayName": "cosmetic.griffin_crest.banded.name",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": true,
@@ -1416,7 +1416,7 @@
         },
         {
           "OptionId": "sunlit",
-          "DisplayName": "Sunfeather Crest",
+          "DisplayName": "cosmetic.griffin_crest.sunlit.name",
           "IsDefault": false,
           "SortOrder": 3,
           "SupportsPaletteShader": true,
@@ -1428,7 +1428,7 @@
         },
         {
           "OptionId": "moonlit",
-          "DisplayName": "Owlmoon Crest",
+          "DisplayName": "cosmetic.griffin_crest.moonlit.name",
           "IsDefault": false,
           "SortOrder": 4,
           "SupportsPaletteShader": true,
@@ -1440,7 +1440,7 @@
         },
         {
           "OptionId": "regal",
-          "DisplayName": "Royal Plume Crest",
+          "DisplayName": "cosmetic.griffin_crest.regal.name",
           "IsDefault": false,
           "SortOrder": 5,
           "SupportsPaletteShader": true,
@@ -1452,7 +1452,7 @@
         },
         {
           "OptionId": "wildborn",
-          "DisplayName": "Cliffwild Crest",
+          "DisplayName": "cosmetic.griffin_crest.wildborn.name",
           "IsDefault": false,
           "SortOrder": 6,
           "SupportsPaletteShader": true,
@@ -1466,7 +1466,7 @@
         },
         {
           "OptionId": "veteran",
-          "DisplayName": "Veteran Skycrest",
+          "DisplayName": "cosmetic.griffin_crest.veteran.name",
           "IsDefault": false,
           "SortOrder": 7,
           "SupportsPaletteShader": true,
@@ -1478,7 +1478,7 @@
         },
         {
           "OptionId": "starlit",
-          "DisplayName": "Starwind Crest",
+          "DisplayName": "cosmetic.griffin_crest.starlit.name",
           "IsDefault": false,
           "SortOrder": 8,
           "SupportsPaletteShader": true,
@@ -1492,14 +1492,14 @@
     },
     {
       "CategoryId": "griffin_wings",
-      "DisplayName": "Griffin Wings",
+      "DisplayName": "cosmetic.griffin_wings.name",
       "Scope": "griffin",
       "ValueType": "DiscreteOption",
       "DefaultColor": "#FFFFFF",
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Sky Wings",
+          "DisplayName": "cosmetic.griffin_wings.natural.name",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": true,
@@ -1511,7 +1511,7 @@
         },
         {
           "OptionId": "striped",
-          "DisplayName": "Pinstripe Wings",
+          "DisplayName": "cosmetic.griffin_wings.striped.name",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": true,
@@ -1523,7 +1523,7 @@
         },
         {
           "OptionId": "mottled",
-          "DisplayName": "Speckled Wings",
+          "DisplayName": "cosmetic.griffin_wings.mottled.name",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": true,
@@ -1535,7 +1535,7 @@
         },
         {
           "OptionId": "gilded",
-          "DisplayName": "Goldpinion Wings",
+          "DisplayName": "cosmetic.griffin_wings.gilded.name",
           "IsDefault": false,
           "SortOrder": 3,
           "SupportsPaletteShader": true,
@@ -1547,7 +1547,7 @@
         },
         {
           "OptionId": "runed",
-          "DisplayName": "Galerune Wings",
+          "DisplayName": "cosmetic.griffin_wings.runed.name",
           "IsDefault": false,
           "SortOrder": 4,
           "SupportsPaletteShader": true,
@@ -1559,7 +1559,7 @@
         },
         {
           "OptionId": "lair",
-          "DisplayName": "Galeborn Wings",
+          "DisplayName": "cosmetic.griffin_wings.lair.name",
           "IsDefault": false,
           "SortOrder": 5,
           "SupportsPaletteShader": true,
@@ -1571,7 +1571,7 @@
         },
         {
           "OptionId": "ghostly",
-          "DisplayName": "Mistfeather Wings",
+          "DisplayName": "cosmetic.griffin_wings.ghostly.name",
           "IsDefault": false,
           "SortOrder": 6,
           "SupportsPaletteShader": true,
@@ -1585,7 +1585,7 @@
         },
         {
           "OptionId": "ascendant",
-          "DisplayName": "Ascendant Skywings",
+          "DisplayName": "cosmetic.griffin_wings.ascendant.name",
           "IsDefault": false,
           "SortOrder": 7,
           "SupportsPaletteShader": true,
@@ -1599,7 +1599,7 @@
     },
     {
       "CategoryId": "griffin_tint",
-      "DisplayName": "Griffin Tint",
+      "DisplayName": "cosmetic.griffin_tint.name",
       "Scope": "griffin",
       "ValueType": "ColorPicker",
       "DefaultColor": "#C9A66B",
@@ -1607,14 +1607,14 @@
     },
     {
       "CategoryId": "tarasque_shell",
-      "DisplayName": "Tarasque Shell",
+      "DisplayName": "cosmetic.tarasque_shell.name",
       "Scope": "tarasque",
       "ValueType": "DiscreteOption",
       "DefaultColor": "#FFFFFF",
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Iron Shell",
+          "DisplayName": "cosmetic.tarasque_shell.natural.name",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": true,
@@ -1626,7 +1626,7 @@
         },
         {
           "OptionId": "swept",
-          "DisplayName": "Sloped Shell",
+          "DisplayName": "cosmetic.tarasque_shell.swept.name",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": true,
@@ -1638,7 +1638,7 @@
         },
         {
           "OptionId": "banded",
-          "DisplayName": "Riveted Shell",
+          "DisplayName": "cosmetic.tarasque_shell.banded.name",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": true,
@@ -1650,7 +1650,7 @@
         },
         {
           "OptionId": "sunlit",
-          "DisplayName": "Brass Shell",
+          "DisplayName": "cosmetic.tarasque_shell.sunlit.name",
           "IsDefault": false,
           "SortOrder": 3,
           "SupportsPaletteShader": true,
@@ -1662,7 +1662,7 @@
         },
         {
           "OptionId": "moonlit",
-          "DisplayName": "Moonsilver Shell",
+          "DisplayName": "cosmetic.tarasque_shell.moonlit.name",
           "IsDefault": false,
           "SortOrder": 4,
           "SupportsPaletteShader": true,
@@ -1674,7 +1674,7 @@
         },
         {
           "OptionId": "regal",
-          "DisplayName": "Bastion Shell",
+          "DisplayName": "cosmetic.tarasque_shell.regal.name",
           "IsDefault": false,
           "SortOrder": 5,
           "SupportsPaletteShader": true,
@@ -1686,7 +1686,7 @@
         },
         {
           "OptionId": "wildborn",
-          "DisplayName": "Mossback Shell",
+          "DisplayName": "cosmetic.tarasque_shell.wildborn.name",
           "IsDefault": false,
           "SortOrder": 6,
           "SupportsPaletteShader": true,
@@ -1700,7 +1700,7 @@
         },
         {
           "OptionId": "veteran",
-          "DisplayName": "Veteran Carapace",
+          "DisplayName": "cosmetic.tarasque_shell.veteran.name",
           "IsDefault": false,
           "SortOrder": 7,
           "SupportsPaletteShader": true,
@@ -1712,7 +1712,7 @@
         },
         {
           "OptionId": "starlit",
-          "DisplayName": "Star-Iron Shell",
+          "DisplayName": "cosmetic.tarasque_shell.starlit.name",
           "IsDefault": false,
           "SortOrder": 8,
           "SupportsPaletteShader": true,
@@ -1726,14 +1726,14 @@
     },
     {
       "CategoryId": "tarasque_spikes",
-      "DisplayName": "Tarasque Spikes",
+      "DisplayName": "cosmetic.tarasque_spikes.name",
       "Scope": "tarasque",
       "ValueType": "DiscreteOption",
       "DefaultColor": "#FFFFFF",
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Iron Spikes",
+          "DisplayName": "cosmetic.tarasque_spikes.natural.name",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": true,
@@ -1745,7 +1745,7 @@
         },
         {
           "OptionId": "striped",
-          "DisplayName": "Forge-Striped Spikes",
+          "DisplayName": "cosmetic.tarasque_spikes.striped.name",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": true,
@@ -1757,7 +1757,7 @@
         },
         {
           "OptionId": "mottled",
-          "DisplayName": "Rustfleck Spikes",
+          "DisplayName": "cosmetic.tarasque_spikes.mottled.name",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": true,
@@ -1769,7 +1769,7 @@
         },
         {
           "OptionId": "gilded",
-          "DisplayName": "Gilded Spikes",
+          "DisplayName": "cosmetic.tarasque_spikes.gilded.name",
           "IsDefault": false,
           "SortOrder": 3,
           "SupportsPaletteShader": true,
@@ -1781,7 +1781,7 @@
         },
         {
           "OptionId": "runed",
-          "DisplayName": "Forgerune Spikes",
+          "DisplayName": "cosmetic.tarasque_spikes.runed.name",
           "IsDefault": false,
           "SortOrder": 4,
           "SupportsPaletteShader": true,
@@ -1793,7 +1793,7 @@
         },
         {
           "OptionId": "lair",
-          "DisplayName": "Rustleaf Spikes",
+          "DisplayName": "cosmetic.tarasque_spikes.lair.name",
           "IsDefault": false,
           "SortOrder": 5,
           "SupportsPaletteShader": true,
@@ -1805,7 +1805,7 @@
         },
         {
           "OptionId": "ghostly",
-          "DisplayName": "Phantom Steel Spikes",
+          "DisplayName": "cosmetic.tarasque_spikes.ghostly.name",
           "IsDefault": false,
           "SortOrder": 6,
           "SupportsPaletteShader": true,
@@ -1819,7 +1819,7 @@
         },
         {
           "OptionId": "ascendant",
-          "DisplayName": "Ascendant Crownspikes",
+          "DisplayName": "cosmetic.tarasque_spikes.ascendant.name",
           "IsDefault": false,
           "SortOrder": 7,
           "SupportsPaletteShader": true,
@@ -1833,7 +1833,7 @@
     },
     {
       "CategoryId": "tarasque_tint",
-      "DisplayName": "Tarasque Tint",
+      "DisplayName": "cosmetic.tarasque_tint.name",
       "Scope": "tarasque",
       "ValueType": "ColorPicker",
       "DefaultColor": "#8D8D8D",
@@ -1841,14 +1841,14 @@
     },
     {
       "CategoryId": "frost_wyrm_horns",
-      "DisplayName": "Frost Wyrm Horns",
+      "DisplayName": "cosmetic.frost_wyrm_horns.name",
       "Scope": "frost_wyrm",
       "ValueType": "DiscreteOption",
       "DefaultColor": "#FFFFFF",
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Rime Horns",
+          "DisplayName": "cosmetic.frost_wyrm_horns.natural.name",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": true,
@@ -1860,7 +1860,7 @@
         },
         {
           "OptionId": "swept",
-          "DisplayName": "Glacier-Swept Horns",
+          "DisplayName": "cosmetic.frost_wyrm_horns.swept.name",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": true,
@@ -1872,7 +1872,7 @@
         },
         {
           "OptionId": "banded",
-          "DisplayName": "Frostbanded Horns",
+          "DisplayName": "cosmetic.frost_wyrm_horns.banded.name",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": true,
@@ -1884,7 +1884,7 @@
         },
         {
           "OptionId": "sunlit",
-          "DisplayName": "Sundog Horns",
+          "DisplayName": "cosmetic.frost_wyrm_horns.sunlit.name",
           "IsDefault": false,
           "SortOrder": 3,
           "SupportsPaletteShader": true,
@@ -1896,7 +1896,7 @@
         },
         {
           "OptionId": "moonlit",
-          "DisplayName": "Moonfrost Horns",
+          "DisplayName": "cosmetic.frost_wyrm_horns.moonlit.name",
           "IsDefault": false,
           "SortOrder": 4,
           "SupportsPaletteShader": true,
@@ -1908,7 +1908,7 @@
         },
         {
           "OptionId": "regal",
-          "DisplayName": "Icecrown Horns",
+          "DisplayName": "cosmetic.frost_wyrm_horns.regal.name",
           "IsDefault": false,
           "SortOrder": 5,
           "SupportsPaletteShader": true,
@@ -1920,7 +1920,7 @@
         },
         {
           "OptionId": "wildborn",
-          "DisplayName": "Snowdrift Horns",
+          "DisplayName": "cosmetic.frost_wyrm_horns.wildborn.name",
           "IsDefault": false,
           "SortOrder": 6,
           "SupportsPaletteShader": true,
@@ -1934,7 +1934,7 @@
         },
         {
           "OptionId": "veteran",
-          "DisplayName": "Veteran Frosthorns",
+          "DisplayName": "cosmetic.frost_wyrm_horns.veteran.name",
           "IsDefault": false,
           "SortOrder": 7,
           "SupportsPaletteShader": true,
@@ -1946,7 +1946,7 @@
         },
         {
           "OptionId": "starlit",
-          "DisplayName": "Starfrost Horns",
+          "DisplayName": "cosmetic.frost_wyrm_horns.starlit.name",
           "IsDefault": false,
           "SortOrder": 8,
           "SupportsPaletteShader": true,
@@ -1960,14 +1960,14 @@
     },
     {
       "CategoryId": "frost_wyrm_wings",
-      "DisplayName": "Frost Wyrm Wings",
+      "DisplayName": "cosmetic.frost_wyrm_wings.name",
       "Scope": "frost_wyrm",
       "ValueType": "DiscreteOption",
       "DefaultColor": "#FFFFFF",
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Frost Wings",
+          "DisplayName": "cosmetic.frost_wyrm_wings.natural.name",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": true,
@@ -1979,7 +1979,7 @@
         },
         {
           "OptionId": "striped",
-          "DisplayName": "Icevein Wings",
+          "DisplayName": "cosmetic.frost_wyrm_wings.striped.name",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": true,
@@ -1991,7 +1991,7 @@
         },
         {
           "OptionId": "mottled",
-          "DisplayName": "Snowfleck Wings",
+          "DisplayName": "cosmetic.frost_wyrm_wings.mottled.name",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": true,
@@ -2003,7 +2003,7 @@
         },
         {
           "OptionId": "gilded",
-          "DisplayName": "Gilt-Frost Wings",
+          "DisplayName": "cosmetic.frost_wyrm_wings.gilded.name",
           "IsDefault": false,
           "SortOrder": 3,
           "SupportsPaletteShader": true,
@@ -2015,7 +2015,7 @@
         },
         {
           "OptionId": "runed",
-          "DisplayName": "Rimerune Wings",
+          "DisplayName": "cosmetic.frost_wyrm_wings.runed.name",
           "IsDefault": false,
           "SortOrder": 4,
           "SupportsPaletteShader": true,
@@ -2027,7 +2027,7 @@
         },
         {
           "OptionId": "lair",
-          "DisplayName": "Rimeglass Wings",
+          "DisplayName": "cosmetic.frost_wyrm_wings.lair.name",
           "IsDefault": false,
           "SortOrder": 5,
           "SupportsPaletteShader": true,
@@ -2039,7 +2039,7 @@
         },
         {
           "OptionId": "ghostly",
-          "DisplayName": "Whiteout Wings",
+          "DisplayName": "cosmetic.frost_wyrm_wings.ghostly.name",
           "IsDefault": false,
           "SortOrder": 6,
           "SupportsPaletteShader": true,
@@ -2053,7 +2053,7 @@
         },
         {
           "OptionId": "ascendant",
-          "DisplayName": "Ascendant Glacier Wings",
+          "DisplayName": "cosmetic.frost_wyrm_wings.ascendant.name",
           "IsDefault": false,
           "SortOrder": 7,
           "SupportsPaletteShader": true,
@@ -2067,14 +2067,14 @@
     },
     {
       "CategoryId": "frost_wyrm_tail",
-      "DisplayName": "Frost Wyrm Tail",
+      "DisplayName": "cosmetic.frost_wyrm_tail.name",
       "Scope": "frost_wyrm",
       "ValueType": "DiscreteOption",
       "DefaultColor": "#FFFFFF",
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Frost Tail",
+          "DisplayName": "cosmetic.frost_wyrm_tail.natural.name",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": true,
@@ -2086,7 +2086,7 @@
         },
         {
           "OptionId": "ridged",
-          "DisplayName": "Iceridge Tail",
+          "DisplayName": "cosmetic.frost_wyrm_tail.ridged.name",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": true,
@@ -2098,7 +2098,7 @@
         },
         {
           "OptionId": "forked",
-          "DisplayName": "Twin-Fork Tail",
+          "DisplayName": "cosmetic.frost_wyrm_tail.forked.name",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": true,
@@ -2110,7 +2110,7 @@
         },
         {
           "OptionId": "icicle",
-          "DisplayName": "Icicle Tail",
+          "DisplayName": "cosmetic.frost_wyrm_tail.icicle.name",
           "IsDefault": false,
           "SortOrder": 3,
           "SupportsPaletteShader": true,
@@ -2122,7 +2122,7 @@
         },
         {
           "OptionId": "shardborn",
-          "DisplayName": "Shardborn Tail",
+          "DisplayName": "cosmetic.frost_wyrm_tail.shardborn.name",
           "IsDefault": false,
           "SortOrder": 4,
           "SupportsPaletteShader": true,
@@ -2136,7 +2136,7 @@
         },
         {
           "OptionId": "seasoned",
-          "DisplayName": "Seasoned Frosttail",
+          "DisplayName": "cosmetic.frost_wyrm_tail.seasoned.name",
           "IsDefault": false,
           "SortOrder": 5,
           "SupportsPaletteShader": true,
@@ -2150,7 +2150,7 @@
     },
     {
       "CategoryId": "frost_wyrm_tint",
-      "DisplayName": "Frost Wyrm Tint",
+      "DisplayName": "cosmetic.frost_wyrm_tint.name",
       "Scope": "frost_wyrm",
       "ValueType": "ColorPicker",
       "DefaultColor": "#A8DADC",
@@ -2158,14 +2158,14 @@
     },
     {
       "CategoryId": "thunderbird_crest",
-      "DisplayName": "Thunderbird Crest",
+      "DisplayName": "cosmetic.thunderbird_crest.name",
       "Scope": "thunderbird",
       "ValueType": "DiscreteOption",
       "DefaultColor": "#FFFFFF",
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Storm Crest",
+          "DisplayName": "cosmetic.thunderbird_crest.natural.name",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": true,
@@ -2177,7 +2177,7 @@
         },
         {
           "OptionId": "swept",
-          "DisplayName": "Tailwind Crest",
+          "DisplayName": "cosmetic.thunderbird_crest.swept.name",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": true,
@@ -2189,7 +2189,7 @@
         },
         {
           "OptionId": "banded",
-          "DisplayName": "Zigzag Crest",
+          "DisplayName": "cosmetic.thunderbird_crest.banded.name",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": true,
@@ -2201,7 +2201,7 @@
         },
         {
           "OptionId": "sunlit",
-          "DisplayName": "Sunbolt Crest",
+          "DisplayName": "cosmetic.thunderbird_crest.sunlit.name",
           "IsDefault": false,
           "SortOrder": 3,
           "SupportsPaletteShader": true,
@@ -2213,7 +2213,7 @@
         },
         {
           "OptionId": "moonlit",
-          "DisplayName": "Moonstorm Crest",
+          "DisplayName": "cosmetic.thunderbird_crest.moonlit.name",
           "IsDefault": false,
           "SortOrder": 4,
           "SupportsPaletteShader": true,
@@ -2225,7 +2225,7 @@
         },
         {
           "OptionId": "regal",
-          "DisplayName": "Thunderhead Crest",
+          "DisplayName": "cosmetic.thunderbird_crest.regal.name",
           "IsDefault": false,
           "SortOrder": 5,
           "SupportsPaletteShader": true,
@@ -2237,7 +2237,7 @@
         },
         {
           "OptionId": "wildborn",
-          "DisplayName": "Squall Crest",
+          "DisplayName": "cosmetic.thunderbird_crest.wildborn.name",
           "IsDefault": false,
           "SortOrder": 6,
           "SupportsPaletteShader": true,
@@ -2251,7 +2251,7 @@
         },
         {
           "OptionId": "veteran",
-          "DisplayName": "Veteran Stormcrest",
+          "DisplayName": "cosmetic.thunderbird_crest.veteran.name",
           "IsDefault": false,
           "SortOrder": 7,
           "SupportsPaletteShader": true,
@@ -2263,7 +2263,7 @@
         },
         {
           "OptionId": "starlit",
-          "DisplayName": "Starbolt Crest",
+          "DisplayName": "cosmetic.thunderbird_crest.starlit.name",
           "IsDefault": false,
           "SortOrder": 8,
           "SupportsPaletteShader": true,
@@ -2277,14 +2277,14 @@
     },
     {
       "CategoryId": "thunderbird_wings",
-      "DisplayName": "Thunderbird Wings",
+      "DisplayName": "cosmetic.thunderbird_wings.name",
       "Scope": "thunderbird",
       "ValueType": "DiscreteOption",
       "DefaultColor": "#FFFFFF",
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Thunder Wings",
+          "DisplayName": "cosmetic.thunderbird_wings.natural.name",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": true,
@@ -2296,7 +2296,7 @@
         },
         {
           "OptionId": "striped",
-          "DisplayName": "Bolt-Striped Wings",
+          "DisplayName": "cosmetic.thunderbird_wings.striped.name",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": true,
@@ -2308,7 +2308,7 @@
         },
         {
           "OptionId": "mottled",
-          "DisplayName": "Cloudfleck Wings",
+          "DisplayName": "cosmetic.thunderbird_wings.mottled.name",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": true,
@@ -2320,7 +2320,7 @@
         },
         {
           "OptionId": "gilded",
-          "DisplayName": "Goldbolt Wings",
+          "DisplayName": "cosmetic.thunderbird_wings.gilded.name",
           "IsDefault": false,
           "SortOrder": 3,
           "SupportsPaletteShader": true,
@@ -2332,7 +2332,7 @@
         },
         {
           "OptionId": "runed",
-          "DisplayName": "Sparkrune Wings",
+          "DisplayName": "cosmetic.thunderbird_wings.runed.name",
           "IsDefault": false,
           "SortOrder": 4,
           "SupportsPaletteShader": true,
@@ -2344,7 +2344,7 @@
         },
         {
           "OptionId": "lair",
-          "DisplayName": "Stormcrown Wings",
+          "DisplayName": "cosmetic.thunderbird_wings.lair.name",
           "IsDefault": false,
           "SortOrder": 5,
           "SupportsPaletteShader": true,
@@ -2356,7 +2356,7 @@
         },
         {
           "OptionId": "ghostly",
-          "DisplayName": "Static Wings",
+          "DisplayName": "cosmetic.thunderbird_wings.ghostly.name",
           "IsDefault": false,
           "SortOrder": 6,
           "SupportsPaletteShader": true,
@@ -2370,7 +2370,7 @@
         },
         {
           "OptionId": "ascendant",
-          "DisplayName": "Ascendant Tempest Wings",
+          "DisplayName": "cosmetic.thunderbird_wings.ascendant.name",
           "IsDefault": false,
           "SortOrder": 7,
           "SupportsPaletteShader": true,
@@ -2384,7 +2384,7 @@
     },
     {
       "CategoryId": "thunderbird_tint",
-      "DisplayName": "Thunderbird Tint",
+      "DisplayName": "cosmetic.thunderbird_tint.name",
       "Scope": "thunderbird",
       "ValueType": "ColorPicker",
       "DefaultColor": "#F6D743",
@@ -2392,14 +2392,14 @@
     },
     {
       "CategoryId": "treant_canopy",
-      "DisplayName": "Treant Canopy",
+      "DisplayName": "cosmetic.treant_canopy.name",
       "Scope": "treant",
       "ValueType": "DiscreteOption",
       "DefaultColor": "#FFFFFF",
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Oak Canopy",
+          "DisplayName": "cosmetic.treant_canopy.natural.name",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": true,
@@ -2411,7 +2411,7 @@
         },
         {
           "OptionId": "swept",
-          "DisplayName": "Willow Canopy",
+          "DisplayName": "cosmetic.treant_canopy.swept.name",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": true,
@@ -2423,7 +2423,7 @@
         },
         {
           "OptionId": "banded",
-          "DisplayName": "Birchband Canopy",
+          "DisplayName": "cosmetic.treant_canopy.banded.name",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": true,
@@ -2435,7 +2435,7 @@
         },
         {
           "OptionId": "sunlit",
-          "DisplayName": "Summerleaf Canopy",
+          "DisplayName": "cosmetic.treant_canopy.sunlit.name",
           "IsDefault": false,
           "SortOrder": 3,
           "SupportsPaletteShader": true,
@@ -2447,7 +2447,7 @@
         },
         {
           "OptionId": "moonlit",
-          "DisplayName": "Moonmoss Canopy",
+          "DisplayName": "cosmetic.treant_canopy.moonlit.name",
           "IsDefault": false,
           "SortOrder": 4,
           "SupportsPaletteShader": true,
@@ -2459,7 +2459,7 @@
         },
         {
           "OptionId": "regal",
-          "DisplayName": "Grandcrown Canopy",
+          "DisplayName": "cosmetic.treant_canopy.regal.name",
           "IsDefault": false,
           "SortOrder": 5,
           "SupportsPaletteShader": true,
@@ -2471,7 +2471,7 @@
         },
         {
           "OptionId": "wildborn",
-          "DisplayName": "Brambletop Canopy",
+          "DisplayName": "cosmetic.treant_canopy.wildborn.name",
           "IsDefault": false,
           "SortOrder": 6,
           "SupportsPaletteShader": true,
@@ -2485,7 +2485,7 @@
         },
         {
           "OptionId": "veteran",
-          "DisplayName": "Veteran Oakcrown",
+          "DisplayName": "cosmetic.treant_canopy.veteran.name",
           "IsDefault": false,
           "SortOrder": 7,
           "SupportsPaletteShader": true,
@@ -2497,7 +2497,7 @@
         },
         {
           "OptionId": "starlit",
-          "DisplayName": "Starleaf Canopy",
+          "DisplayName": "cosmetic.treant_canopy.starlit.name",
           "IsDefault": false,
           "SortOrder": 8,
           "SupportsPaletteShader": true,
@@ -2511,14 +2511,14 @@
     },
     {
       "CategoryId": "treant_blossoms",
-      "DisplayName": "Treant Blossoms",
+      "DisplayName": "cosmetic.treant_blossoms.name",
       "Scope": "treant",
       "ValueType": "DiscreteOption",
       "DefaultColor": "#FFFFFF",
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Meadow Blossoms",
+          "DisplayName": "cosmetic.treant_blossoms.natural.name",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": true,
@@ -2530,7 +2530,7 @@
         },
         {
           "OptionId": "striped",
-          "DisplayName": "Ribbon Blossoms",
+          "DisplayName": "cosmetic.treant_blossoms.striped.name",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": true,
@@ -2542,7 +2542,7 @@
         },
         {
           "OptionId": "mottled",
-          "DisplayName": "Speckled Blossoms",
+          "DisplayName": "cosmetic.treant_blossoms.mottled.name",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": true,
@@ -2554,7 +2554,7 @@
         },
         {
           "OptionId": "gilded",
-          "DisplayName": "Goldenrod Blossoms",
+          "DisplayName": "cosmetic.treant_blossoms.gilded.name",
           "IsDefault": false,
           "SortOrder": 3,
           "SupportsPaletteShader": true,
@@ -2566,7 +2566,7 @@
         },
         {
           "OptionId": "runed",
-          "DisplayName": "Runebloom Blossoms",
+          "DisplayName": "cosmetic.treant_blossoms.runed.name",
           "IsDefault": false,
           "SortOrder": 4,
           "SupportsPaletteShader": true,
@@ -2578,7 +2578,7 @@
         },
         {
           "OptionId": "lair",
-          "DisplayName": "Elderroot Blossoms",
+          "DisplayName": "cosmetic.treant_blossoms.lair.name",
           "IsDefault": false,
           "SortOrder": 5,
           "SupportsPaletteShader": true,
@@ -2590,7 +2590,7 @@
         },
         {
           "OptionId": "ghostly",
-          "DisplayName": "Ghostbloom Blossoms",
+          "DisplayName": "cosmetic.treant_blossoms.ghostly.name",
           "IsDefault": false,
           "SortOrder": 6,
           "SupportsPaletteShader": true,
@@ -2604,7 +2604,7 @@
         },
         {
           "OptionId": "ascendant",
-          "DisplayName": "Ascendant Worldbloom",
+          "DisplayName": "cosmetic.treant_blossoms.ascendant.name",
           "IsDefault": false,
           "SortOrder": 7,
           "SupportsPaletteShader": true,
@@ -2618,7 +2618,7 @@
     },
     {
       "CategoryId": "treant_tint",
-      "DisplayName": "Treant Tint",
+      "DisplayName": "cosmetic.treant_tint.name",
       "Scope": "treant",
       "ValueType": "ColorPicker",
       "DefaultColor": "#6A994E",
@@ -2626,14 +2626,14 @@
     },
     {
       "CategoryId": "golem_core",
-      "DisplayName": "Golem Core",
+      "DisplayName": "cosmetic.golem_core.name",
       "Scope": "golem",
       "ValueType": "DiscreteOption",
       "DefaultColor": "#FFFFFF",
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Stone Core",
+          "DisplayName": "cosmetic.golem_core.natural.name",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": true,
@@ -2645,7 +2645,7 @@
         },
         {
           "OptionId": "swept",
-          "DisplayName": "Faceted Core",
+          "DisplayName": "cosmetic.golem_core.swept.name",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": true,
@@ -2657,7 +2657,7 @@
         },
         {
           "OptionId": "banded",
-          "DisplayName": "Strata Core",
+          "DisplayName": "cosmetic.golem_core.banded.name",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": true,
@@ -2669,7 +2669,7 @@
         },
         {
           "OptionId": "sunlit",
-          "DisplayName": "Amber Core",
+          "DisplayName": "cosmetic.golem_core.sunlit.name",
           "IsDefault": false,
           "SortOrder": 3,
           "SupportsPaletteShader": true,
@@ -2681,7 +2681,7 @@
         },
         {
           "OptionId": "moonlit",
-          "DisplayName": "Moonstone Core",
+          "DisplayName": "cosmetic.golem_core.moonlit.name",
           "IsDefault": false,
           "SortOrder": 4,
           "SupportsPaletteShader": true,
@@ -2693,7 +2693,7 @@
         },
         {
           "OptionId": "regal",
-          "DisplayName": "Crown Jewel Core",
+          "DisplayName": "cosmetic.golem_core.regal.name",
           "IsDefault": false,
           "SortOrder": 5,
           "SupportsPaletteShader": true,
@@ -2705,7 +2705,7 @@
         },
         {
           "OptionId": "wildborn",
-          "DisplayName": "Fossil Core",
+          "DisplayName": "cosmetic.golem_core.wildborn.name",
           "IsDefault": false,
           "SortOrder": 6,
           "SupportsPaletteShader": true,
@@ -2719,7 +2719,7 @@
         },
         {
           "OptionId": "veteran",
-          "DisplayName": "Veteran Heartstone",
+          "DisplayName": "cosmetic.golem_core.veteran.name",
           "IsDefault": false,
           "SortOrder": 7,
           "SupportsPaletteShader": true,
@@ -2731,7 +2731,7 @@
         },
         {
           "OptionId": "starlit",
-          "DisplayName": "Star Geode Core",
+          "DisplayName": "cosmetic.golem_core.starlit.name",
           "IsDefault": false,
           "SortOrder": 8,
           "SupportsPaletteShader": true,
@@ -2745,14 +2745,14 @@
     },
     {
       "CategoryId": "golem_runes",
-      "DisplayName": "Golem Runes",
+      "DisplayName": "cosmetic.golem_runes.name",
       "Scope": "golem",
       "ValueType": "DiscreteOption",
       "DefaultColor": "#FFFFFF",
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Earth Runes",
+          "DisplayName": "cosmetic.golem_runes.natural.name",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": true,
@@ -2764,7 +2764,7 @@
         },
         {
           "OptionId": "striped",
-          "DisplayName": "Etched Runes",
+          "DisplayName": "cosmetic.golem_runes.striped.name",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": true,
@@ -2776,7 +2776,7 @@
         },
         {
           "OptionId": "mottled",
-          "DisplayName": "Pebbled Runes",
+          "DisplayName": "cosmetic.golem_runes.mottled.name",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": true,
@@ -2788,7 +2788,7 @@
         },
         {
           "OptionId": "gilded",
-          "DisplayName": "Gilded Runes",
+          "DisplayName": "cosmetic.golem_runes.gilded.name",
           "IsDefault": false,
           "SortOrder": 3,
           "SupportsPaletteShader": true,
@@ -2800,7 +2800,7 @@
         },
         {
           "OptionId": "runed",
-          "DisplayName": "Deep-Cut Runes",
+          "DisplayName": "cosmetic.golem_runes.runed.name",
           "IsDefault": false,
           "SortOrder": 4,
           "SupportsPaletteShader": true,
@@ -2812,7 +2812,7 @@
         },
         {
           "OptionId": "lair",
-          "DisplayName": "Magmavein Runes",
+          "DisplayName": "cosmetic.golem_runes.lair.name",
           "IsDefault": false,
           "SortOrder": 5,
           "SupportsPaletteShader": true,
@@ -2824,7 +2824,7 @@
         },
         {
           "OptionId": "ghostly",
-          "DisplayName": "Ghostlight Runes",
+          "DisplayName": "cosmetic.golem_runes.ghostly.name",
           "IsDefault": false,
           "SortOrder": 6,
           "SupportsPaletteShader": true,
@@ -2838,7 +2838,7 @@
         },
         {
           "OptionId": "ascendant",
-          "DisplayName": "Ascendant Mountain Runes",
+          "DisplayName": "cosmetic.golem_runes.ascendant.name",
           "IsDefault": false,
           "SortOrder": 7,
           "SupportsPaletteShader": true,
@@ -2852,7 +2852,7 @@
     },
     {
       "CategoryId": "golem_tint",
-      "DisplayName": "Golem Tint",
+      "DisplayName": "cosmetic.golem_tint.name",
       "Scope": "golem",
       "ValueType": "ColorPicker",
       "DefaultColor": "#9C6644",
@@ -2860,14 +2860,14 @@
     },
     {
       "CategoryId": "basilisk_crown",
-      "DisplayName": "Basilisk Crown",
+      "DisplayName": "cosmetic.basilisk_crown.name",
       "Scope": "basilisk",
       "ValueType": "DiscreteOption",
       "DefaultColor": "#FFFFFF",
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Shadow Crown",
+          "DisplayName": "cosmetic.basilisk_crown.natural.name",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": true,
@@ -2879,7 +2879,7 @@
         },
         {
           "OptionId": "swept",
-          "DisplayName": "Hooded Crown",
+          "DisplayName": "cosmetic.basilisk_crown.swept.name",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": true,
@@ -2891,7 +2891,7 @@
         },
         {
           "OptionId": "banded",
-          "DisplayName": "Coiled Crown",
+          "DisplayName": "cosmetic.basilisk_crown.banded.name",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": true,
@@ -2903,7 +2903,7 @@
         },
         {
           "OptionId": "sunlit",
-          "DisplayName": "Eclipse Crown",
+          "DisplayName": "cosmetic.basilisk_crown.sunlit.name",
           "IsDefault": false,
           "SortOrder": 3,
           "SupportsPaletteShader": true,
@@ -2915,7 +2915,7 @@
         },
         {
           "OptionId": "moonlit",
-          "DisplayName": "New Moon Crown",
+          "DisplayName": "cosmetic.basilisk_crown.moonlit.name",
           "IsDefault": false,
           "SortOrder": 4,
           "SupportsPaletteShader": true,
@@ -2927,7 +2927,7 @@
         },
         {
           "OptionId": "regal",
-          "DisplayName": "Midnight Diadem",
+          "DisplayName": "cosmetic.basilisk_crown.regal.name",
           "IsDefault": false,
           "SortOrder": 5,
           "SupportsPaletteShader": true,
@@ -2939,7 +2939,7 @@
         },
         {
           "OptionId": "wildborn",
-          "DisplayName": "Thornwild Crown",
+          "DisplayName": "cosmetic.basilisk_crown.wildborn.name",
           "IsDefault": false,
           "SortOrder": 6,
           "SupportsPaletteShader": true,
@@ -2953,7 +2953,7 @@
         },
         {
           "OptionId": "veteran",
-          "DisplayName": "Veteran Shadowcrown",
+          "DisplayName": "cosmetic.basilisk_crown.veteran.name",
           "IsDefault": false,
           "SortOrder": 7,
           "SupportsPaletteShader": true,
@@ -2965,7 +2965,7 @@
         },
         {
           "OptionId": "starlit",
-          "DisplayName": "Nightstar Crown",
+          "DisplayName": "cosmetic.basilisk_crown.starlit.name",
           "IsDefault": false,
           "SortOrder": 8,
           "SupportsPaletteShader": true,
@@ -2977,7 +2977,7 @@
         },
         {
           "OptionId": "dawnshade",
-          "DisplayName": "Dawnshade Crown",
+          "DisplayName": "cosmetic.basilisk_crown.dawnshade.name",
           "IsDefault": false,
           "SortOrder": 9,
           "SupportsPaletteShader": true,
@@ -2989,7 +2989,7 @@
         },
         {
           "OptionId": "eclipse_dawnshade",
-          "DisplayName": "Eclipse Dawnshade Crown",
+          "DisplayName": "cosmetic.basilisk_crown.eclipse_dawnshade.name",
           "IsDefault": false,
           "SortOrder": 10,
           "SupportsPaletteShader": true,
@@ -3003,14 +3003,14 @@
     },
     {
       "CategoryId": "basilisk_scales",
-      "DisplayName": "Basilisk Scales",
+      "DisplayName": "cosmetic.basilisk_scales.name",
       "Scope": "basilisk",
       "ValueType": "DiscreteOption",
       "DefaultColor": "#FFFFFF",
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Dusk Scales",
+          "DisplayName": "cosmetic.basilisk_scales.natural.name",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": true,
@@ -3022,7 +3022,7 @@
         },
         {
           "OptionId": "striped",
-          "DisplayName": "Viper-Stripe Scales",
+          "DisplayName": "cosmetic.basilisk_scales.striped.name",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": true,
@@ -3034,7 +3034,7 @@
         },
         {
           "OptionId": "mottled",
-          "DisplayName": "Smokefleck Scales",
+          "DisplayName": "cosmetic.basilisk_scales.mottled.name",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": true,
@@ -3046,7 +3046,7 @@
         },
         {
           "OptionId": "gilded",
-          "DisplayName": "Gilt-Edge Scales",
+          "DisplayName": "cosmetic.basilisk_scales.gilded.name",
           "IsDefault": false,
           "SortOrder": 3,
           "SupportsPaletteShader": true,
@@ -3058,7 +3058,7 @@
         },
         {
           "OptionId": "runed",
-          "DisplayName": "Shadowrune Scales",
+          "DisplayName": "cosmetic.basilisk_scales.runed.name",
           "IsDefault": false,
           "SortOrder": 4,
           "SupportsPaletteShader": true,
@@ -3070,7 +3070,7 @@
         },
         {
           "OptionId": "lair",
-          "DisplayName": "Summit Scales",
+          "DisplayName": "cosmetic.basilisk_scales.lair.name",
           "IsDefault": false,
           "SortOrder": 5,
           "SupportsPaletteShader": true,
@@ -3082,7 +3082,7 @@
         },
         {
           "OptionId": "ghostly",
-          "DisplayName": "Gloam Scales",
+          "DisplayName": "cosmetic.basilisk_scales.ghostly.name",
           "IsDefault": false,
           "SortOrder": 6,
           "SupportsPaletteShader": true,
@@ -3096,7 +3096,7 @@
         },
         {
           "OptionId": "ascendant",
-          "DisplayName": "Ascendant Umbra Scales",
+          "DisplayName": "cosmetic.basilisk_scales.ascendant.name",
           "IsDefault": false,
           "SortOrder": 7,
           "SupportsPaletteShader": true,
@@ -3110,7 +3110,7 @@
     },
     {
       "CategoryId": "basilisk_tint",
-      "DisplayName": "Basilisk Tint",
+      "DisplayName": "cosmetic.basilisk_tint.name",
       "Scope": "basilisk",
       "ValueType": "ColorPicker",
       "DefaultColor": "#5E548E",
@@ -3118,14 +3118,14 @@
     },
     {
       "CategoryId": "kirin_colour_form",
-      "DisplayName": "Kirin Colour Form",
+      "DisplayName": "cosmetic.kirin_colour_form.name",
       "Scope": "kirin",
       "ValueType": "DiscreteOption",
       "DefaultColor": "#FFFFFF",
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Kirin's Own Colours",
+          "DisplayName": "cosmetic.kirin_colour_form.natural.name",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": false,
@@ -3137,7 +3137,7 @@
         },
         {
           "OptionId": "dusk",
-          "DisplayName": "Duskbound Kirin",
+          "DisplayName": "cosmetic.kirin_colour_form.dusk.name",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": false,
@@ -3149,7 +3149,7 @@
         },
         {
           "OptionId": "sunwash",
-          "DisplayName": "Sunwash Kirin",
+          "DisplayName": "cosmetic.kirin_colour_form.sunwash.name",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": false,
@@ -3163,14 +3163,14 @@
     },
     {
       "CategoryId": "phoenix_colour_form",
-      "DisplayName": "Phoenix Colour Form",
+      "DisplayName": "cosmetic.phoenix_colour_form.name",
       "Scope": "phoenix",
       "ValueType": "DiscreteOption",
       "DefaultColor": "#FFFFFF",
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Phoenix's Own Colours",
+          "DisplayName": "cosmetic.phoenix_colour_form.natural.name",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": false,
@@ -3182,7 +3182,7 @@
         },
         {
           "OptionId": "dusk",
-          "DisplayName": "Duskbound Phoenix",
+          "DisplayName": "cosmetic.phoenix_colour_form.dusk.name",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": false,
@@ -3194,7 +3194,7 @@
         },
         {
           "OptionId": "duskrose",
-          "DisplayName": "Duskrose Phoenix",
+          "DisplayName": "cosmetic.phoenix_colour_form.duskrose.name",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": false,
@@ -3208,14 +3208,14 @@
     },
     {
       "CategoryId": "leviathan_colour_form",
-      "DisplayName": "Leviathan Colour Form",
+      "DisplayName": "cosmetic.leviathan_colour_form.name",
       "Scope": "leviathan",
       "ValueType": "DiscreteOption",
       "DefaultColor": "#FFFFFF",
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Leviathan's Own Colours",
+          "DisplayName": "cosmetic.leviathan_colour_form.natural.name",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": false,
@@ -3227,7 +3227,7 @@
         },
         {
           "OptionId": "dusk",
-          "DisplayName": "Duskbound Leviathan",
+          "DisplayName": "cosmetic.leviathan_colour_form.dusk.name",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": false,
@@ -3239,7 +3239,7 @@
         },
         {
           "OptionId": "mossgreen",
-          "DisplayName": "Mossgreen Leviathan",
+          "DisplayName": "cosmetic.leviathan_colour_form.mossgreen.name",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": false,
@@ -3253,14 +3253,14 @@
     },
     {
       "CategoryId": "griffin_colour_form",
-      "DisplayName": "Griffin Colour Form",
+      "DisplayName": "cosmetic.griffin_colour_form.name",
       "Scope": "griffin",
       "ValueType": "DiscreteOption",
       "DefaultColor": "#FFFFFF",
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Griffin's Own Colours",
+          "DisplayName": "cosmetic.griffin_colour_form.natural.name",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": false,
@@ -3272,7 +3272,7 @@
         },
         {
           "OptionId": "dusk",
-          "DisplayName": "Duskbound Griffin",
+          "DisplayName": "cosmetic.griffin_colour_form.dusk.name",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": false,
@@ -3284,7 +3284,7 @@
         },
         {
           "OptionId": "coralblush",
-          "DisplayName": "Coralblush Griffin",
+          "DisplayName": "cosmetic.griffin_colour_form.coralblush.name",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": false,
@@ -3298,14 +3298,14 @@
     },
     {
       "CategoryId": "tarasque_colour_form",
-      "DisplayName": "Tarasque Colour Form",
+      "DisplayName": "cosmetic.tarasque_colour_form.name",
       "Scope": "tarasque",
       "ValueType": "DiscreteOption",
       "DefaultColor": "#FFFFFF",
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Tarasque's Own Colours",
+          "DisplayName": "cosmetic.tarasque_colour_form.natural.name",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": false,
@@ -3317,7 +3317,7 @@
         },
         {
           "OptionId": "dusk",
-          "DisplayName": "Duskbound Tarasque",
+          "DisplayName": "cosmetic.tarasque_colour_form.dusk.name",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": false,
@@ -3329,7 +3329,7 @@
         },
         {
           "OptionId": "frostsilver",
-          "DisplayName": "Frostsilver Tarasque",
+          "DisplayName": "cosmetic.tarasque_colour_form.frostsilver.name",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": false,
@@ -3343,14 +3343,14 @@
     },
     {
       "CategoryId": "frost_wyrm_colour_form",
-      "DisplayName": "Frost Wyrm Colour Form",
+      "DisplayName": "cosmetic.frost_wyrm_colour_form.name",
       "Scope": "frost_wyrm",
       "ValueType": "DiscreteOption",
       "DefaultColor": "#FFFFFF",
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Frost Wyrm's Own Colours",
+          "DisplayName": "cosmetic.frost_wyrm_colour_form.natural.name",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": false,
@@ -3362,7 +3362,7 @@
         },
         {
           "OptionId": "dusk",
-          "DisplayName": "Duskbound Frost Wyrm",
+          "DisplayName": "cosmetic.frost_wyrm_colour_form.dusk.name",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": false,
@@ -3374,7 +3374,7 @@
         },
         {
           "OptionId": "embergold",
-          "DisplayName": "Embergold Frost Wyrm",
+          "DisplayName": "cosmetic.frost_wyrm_colour_form.embergold.name",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": false,
@@ -3388,14 +3388,14 @@
     },
     {
       "CategoryId": "thunderbird_colour_form",
-      "DisplayName": "Thunderbird Colour Form",
+      "DisplayName": "cosmetic.thunderbird_colour_form.name",
       "Scope": "thunderbird",
       "ValueType": "DiscreteOption",
       "DefaultColor": "#FFFFFF",
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Thunderbird's Own Colours",
+          "DisplayName": "cosmetic.thunderbird_colour_form.natural.name",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": false,
@@ -3407,7 +3407,7 @@
         },
         {
           "OptionId": "dusk",
-          "DisplayName": "Duskbound Thunderbird",
+          "DisplayName": "cosmetic.thunderbird_colour_form.dusk.name",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": false,
@@ -3419,7 +3419,7 @@
         },
         {
           "OptionId": "willowsage",
-          "DisplayName": "Willowsage Thunderbird",
+          "DisplayName": "cosmetic.thunderbird_colour_form.willowsage.name",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": false,
@@ -3433,14 +3433,14 @@
     },
     {
       "CategoryId": "treant_colour_form",
-      "DisplayName": "Treant Colour Form",
+      "DisplayName": "cosmetic.treant_colour_form.name",
       "Scope": "treant",
       "ValueType": "DiscreteOption",
       "DefaultColor": "#FFFFFF",
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Treant's Own Colours",
+          "DisplayName": "cosmetic.treant_colour_form.natural.name",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": false,
@@ -3452,7 +3452,7 @@
         },
         {
           "OptionId": "dusk",
-          "DisplayName": "Duskbound Treant",
+          "DisplayName": "cosmetic.treant_colour_form.dusk.name",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": false,
@@ -3464,7 +3464,7 @@
         },
         {
           "OptionId": "starlilac",
-          "DisplayName": "Starlilac Treant",
+          "DisplayName": "cosmetic.treant_colour_form.starlilac.name",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": false,
@@ -3478,14 +3478,14 @@
     },
     {
       "CategoryId": "golem_colour_form",
-      "DisplayName": "Golem Colour Form",
+      "DisplayName": "cosmetic.golem_colour_form.name",
       "Scope": "golem",
       "ValueType": "DiscreteOption",
       "DefaultColor": "#FFFFFF",
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Golem's Own Colours",
+          "DisplayName": "cosmetic.golem_colour_form.natural.name",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": false,
@@ -3497,7 +3497,7 @@
         },
         {
           "OptionId": "dusk",
-          "DisplayName": "Duskbound Golem",
+          "DisplayName": "cosmetic.golem_colour_form.dusk.name",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": false,
@@ -3509,7 +3509,7 @@
         },
         {
           "OptionId": "honeyamber",
-          "DisplayName": "Honeyamber Golem",
+          "DisplayName": "cosmetic.golem_colour_form.honeyamber.name",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": false,
@@ -3523,14 +3523,14 @@
     },
     {
       "CategoryId": "basilisk_colour_form",
-      "DisplayName": "Basilisk Colour Form",
+      "DisplayName": "cosmetic.basilisk_colour_form.name",
       "Scope": "basilisk",
       "ValueType": "DiscreteOption",
       "DefaultColor": "#FFFFFF",
       "Options": [
         {
           "OptionId": "natural",
-          "DisplayName": "Basilisk's Own Colours",
+          "DisplayName": "cosmetic.basilisk_colour_form.natural.name",
           "IsDefault": true,
           "SortOrder": 0,
           "SupportsPaletteShader": false,
@@ -3542,7 +3542,7 @@
         },
         {
           "OptionId": "dusk",
-          "DisplayName": "Duskbound Basilisk",
+          "DisplayName": "cosmetic.basilisk_colour_form.dusk.name",
           "IsDefault": false,
           "SortOrder": 1,
           "SupportsPaletteShader": false,
@@ -3554,7 +3554,7 @@
         },
         {
           "OptionId": "cloudpearl",
-          "DisplayName": "Cloudpearl Basilisk",
+          "DisplayName": "cosmetic.basilisk_colour_form.cloudpearl.name",
           "IsDefault": false,
           "SortOrder": 2,
           "SupportsPaletteShader": false,
@@ -3570,43 +3570,43 @@
   "Milestones": [
     {
       "MilestoneId": "beast_level_25",
-      "DisplayName": "Seasoned (beast level 25)",
+      "DisplayName": "milestone.beast_level_25.name",
       "Kind": "BeastLevel",
       "Threshold": 25
     },
     {
       "MilestoneId": "beast_level_50",
-      "DisplayName": "Veteran (beast level 50)",
+      "DisplayName": "milestone.beast_level_50.name",
       "Kind": "BeastLevel",
       "Threshold": 50
     },
     {
       "MilestoneId": "beast_level_75",
-      "DisplayName": "Elder (beast level 75)",
+      "DisplayName": "milestone.beast_level_75.name",
       "Kind": "BeastLevel",
       "Threshold": 75
     },
     {
       "MilestoneId": "beast_level_100",
-      "DisplayName": "Ascendant (beast level 100)",
+      "DisplayName": "milestone.beast_level_100.name",
       "Kind": "BeastLevel",
       "Threshold": 100
     },
     {
       "MilestoneId": "avatar_level_50",
-      "DisplayName": "Veteran Binder (avatar level 50)",
+      "DisplayName": "milestone.avatar_level_50.name",
       "Kind": "AvatarLevel",
       "Threshold": 50
     },
     {
       "MilestoneId": "first_boss",
-      "DisplayName": "Sealbearer (first region boss beaten)",
+      "DisplayName": "milestone.first_boss.name",
       "Kind": "BossesCleared",
       "Threshold": 1
     },
     {
       "MilestoneId": "all_bosses",
-      "DisplayName": "Keeper of Seals (all ten region bosses beaten)",
+      "DisplayName": "milestone.all_bosses.name",
       "Kind": "BossesCleared",
       "Threshold": 10
     }

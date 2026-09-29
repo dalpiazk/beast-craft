@@ -31,7 +31,8 @@ beast-craft/
 │   │                       Skills/skill-library.json + drop-tables.json, Encounters/ (enemy and
 │   │                       encounter libraries, the generated difficulty table), Campaign/,
 │   │                       Items/, Economy/, Cosmetics/, Idle/, Vfx/vfx-library.json (skill VFX,
-│   │                       presentation only)
+│   │                       presentation only), Localization/en.json (every player-facing
+│   │                       English string; the data files hold its keys)
 │   ├── art/pixel/          the generated placeholder pixel art (PNGs in Git LFS) + manifest
 │   │                       (written by Tooling/PixelArt)
 │   └── fonts/              the UI typeface, Fredoka SemiBold (Git LFS), and its OFL.txt
@@ -39,7 +40,8 @@ beast-craft/
 ├── Tooling/        BalanceSim/: local-only headless balance simulator over the real
 │                   battle code. EditModeTests/: the `dotnet test` runner and the test
 │                   suite (Tests/, Goldens/, Presentation/; CI runs it). PixelArt/: text-grid
-│                   sprites -> placeholder PNGs (Python + Pillow). Never shipped.
+│                   sprites -> placeholder PNGs (Python + Pillow). ContentKeys/: the
+│                   string-key tool (content text -> content/data/Localization/en.json). Never shipped.
 ├── docs/           design/ and balance/ (simulator reports, tuning log, research) notes;
 │                   design/decisions.md is the producer decision log; architecture/ is
 │                   an empty placeholder
