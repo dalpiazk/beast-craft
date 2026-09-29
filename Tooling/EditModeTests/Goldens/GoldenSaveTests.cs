@@ -66,6 +66,16 @@ namespace BeastCraft.Tests.EditMode
     /// closing brace (nothing seen, fulfilled, found or reached for the min saves). No other input or
     /// migration changed.
     /// </para>
+    /// <para>
+    /// Peaceful clears (<c>Campaign.CampaignProgress.LocationsSoothed</c>, the Grove design's D3) was
+    /// also added to this same schema-10 shape in place, for the same "schema 10 had not shipped yet"
+    /// reason: <c>rich-v10.input.json</c> was regenerated again (<c>BEASTCRAFT_UPDATE_GOLDENS=1</c>),
+    /// and every expected output changed in exactly one additional place: <c>,"LocationsSoothed":0</c>
+    /// follows <c>ActiveRun</c>'s closing brace, inside <c>"Campaign"</c> (0 for the min saves).
+    /// Colour evolutions (D3's other half) added no save field at all: a colour form's ownership and a
+    /// beast's applied form reuse the existing <c>PlayerSave.Cosmetics</c>/<c>OwnedBeast.Appearance</c>
+    /// shape (<c>Economy.CosmeticRules</c>), so no golden changed for it.
+    /// </para>
     /// </summary>
     public class GoldenSaveTests
     {
@@ -176,6 +186,7 @@ namespace BeastCraft.Tests.EditMode
             StringAssert.Contains("\"LinesSeen\":[", input, "the rich save fills the schema-10 NPC dialogue layer's fields (D2)");
             StringAssert.Contains("\"RequestsFulfilled\":[", input, "the rich save fills the schema-10 NPC dialogue layer's fields (D2)");
             StringAssert.Contains("\"ChaptersCompleted\":[", input, "the rich save fills the schema-10 NPC dialogue layer's fields (D2)");
+            StringAssert.Contains("\"LocationsSoothed\":", input, "the rich save fills the schema-10 peaceful-clears field (D3)");
         }
 
         [TestCase(1)]
