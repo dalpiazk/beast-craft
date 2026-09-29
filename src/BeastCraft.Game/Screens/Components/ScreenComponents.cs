@@ -27,8 +27,14 @@ namespace BeastCraft.Game.Screens.Components
         /// <summary>Back button + title (+ optional one-line subtitle): most screens.</summary>
         public const float Standard = 210f;
 
+        /// <summary>The same shape as <see cref="Standard"/>, a touch shorter — the encounter and glossary screens' own header, which never needed the extra room.</summary>
+        public const float Compact = 190f;
+
         /// <summary>+ a stat/identity line under the title (the beast detail screen's shape).</summary>
         public const float Tall = 330f;
+
+        /// <summary>+ two extra lines under the title (a name/level line, then a small counter), with more breathing room before the divider — the Achievements screen's shape.</summary>
+        public const float Roomy = 250f;
     }
 
     /// <summary>
@@ -77,6 +83,58 @@ namespace BeastCraft.Game.Screens.Components
             {
                 ctx.Painter.Paint(widget, ui);
             }
+        }
+    }
+
+    /// <summary>
+    /// The inner tab strip a full-page screen with more than one tab shows under its
+    /// <see cref="ScreenHeader"/> (Avatar's Overview/Skills/Gear/Wardrobe, Inventory's Gear/
+    /// Materials/Looks, the Trader's Stock/Sell, Grove's Glade/Garden/Board/Npc) — one height for
+    /// all of them, sized so <see cref="UiPainter.Tabs"/>'s icon-above-label layout reads clearly:
+    /// a readable icon and the label sitting with even air above and below it inside the selected
+    /// pill, the same proportions the home bottom nav (<c>HomeScreen.NavHeight</c>, 170px, the same
+    /// painter) reads at. <see cref="Height"/> is shorter than that (a full-page screen's strip sits
+    /// under a header rather than at the canvas edge, so it can afford to be tighter), but well past
+    /// the old 96px, which cramped the icon down to a sliver and pushed the label to sit right on the
+    /// selected pill's bottom edge — Grove's own strip had briefly been widened to 170px to work
+    /// around exactly that, before this shared height replaced the workaround everywhere.
+    /// </summary>
+    public static class TabStrip
+    {
+        public const float Height = 136f;
+        public const float Gap = 12f;
+
+        /// <summary>The strip's own y, right under a header of <paramref name="headerHeight"/>.</summary>
+        public static float Top(float headerHeight)
+        {
+            return headerHeight + Gap;
+        }
+
+        /// <summary>Where the page content below the strip starts.</summary>
+        public static float ContentTop(float headerHeight, float contentGap = 16f)
+        {
+            return Top(headerHeight) + Height + contentGap;
+        }
+
+        /// <summary>Builds the strip's backing panel and the <see cref="Tabs"/> widget itself, wired to <paramref name="onChanged"/>.</summary>
+        public static Tabs Build(UiRoot ui, string id, float headerHeight, IReadOnlyList<string> labels, IReadOnlyList<string> glyphs, Action<int> onChanged)
+        {
+            float width = PortraitLayout.CanvasWidth - 2f * HeaderMetrics.Pad;
+            Rect bounds = new Rect(HeaderMetrics.Pad, Top(headerHeight), width, Height);
+            ui.Add(new Panel { Id = id + "-panel", Bounds = bounds, StyleKey = "nav" });
+            Tabs tabs = ui.Add(new Tabs { Id = id, Bounds = bounds.Inset(6f) });
+            tabs.Items.AddRange(labels);
+            if (glyphs != null)
+            {
+                tabs.Glyphs.AddRange(glyphs);
+            }
+
+            if (onChanged != null)
+            {
+                tabs.Changed += onChanged;
+            }
+
+            return tabs;
         }
     }
 
@@ -153,6 +211,16 @@ namespace BeastCraft.Game.Screens.Components
         public T Add<T>(T widget) where T : Widget
         {
             return _scroll.Add(widget);
+        }
+
+        /// <summary>
+        /// Registers <paramref name="draw"/> for a widget the screen built and added itself (a grid
+        /// cell with a custom style per entry, a panel plus its own <see cref="Hotspot"/>) rather
+        /// than through <see cref="Card"/> — the Grove Garden's plot grid is the shape this is for.
+        /// </summary>
+        public void TrackDraw(Widget widget, Action<Rect> draw)
+        {
+            _drawers[widget] = draw;
         }
 
         /// <summary>Sets the scroll view's content height from the last <paramref name="y"/> and restores its scroll position.</summary>

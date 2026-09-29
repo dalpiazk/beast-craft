@@ -259,7 +259,7 @@ namespace BeastCraft.Game
                 Walkthrough();
                 _exitAfterScript = true;
             }
-            else if (_options.StartScreen != "title")
+            else if (_options.StartScreen != "title" || _options.Screenshot)
             {
                 GoTo(_options.StartScreen, _options.Screenshot ? _options.ScreenshotPath : null);
                 _exitAfterScript = _options.Screenshot;

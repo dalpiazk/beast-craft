@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using BeastCraft.Creatures;
+using BeastCraft.Game.Screens.Components;
 using BeastCraft.Game.Ui;
 using BeastCraft.Grove;
 using BeastCraft.Presentation.Board;
@@ -185,15 +186,16 @@ namespace BeastCraft.Game.Screens
     /// </summary>
     public sealed class BeastDetailScreen : GameScreen
     {
-        private const float Pad = 36f;
-        private const float TopBar = 330f;
+        private const float Pad = HeaderMetrics.Pad;
+        private const float TopBar = HeaderMetrics.Tall;
 
         private static readonly string[] TabNames = { "Stats", "Skills", "Gear & bonds" };
 
         private readonly BeastDetailViewModel _model;
+        private readonly ScreenHeader _header;
         private readonly ScrollView _scroll;
+        private readonly CardList _cards;
         private readonly List<Button> _tabs = new List<Button>();
-        private readonly Dictionary<Widget, Action<Rect>> _drawers = new Dictionary<Widget, Action<Rect>>();
         private int _tab;
 
         public BeastDetailScreen(ScreenContext ctx, string beastId, int tab = 0) : base(ctx)
@@ -201,7 +203,8 @@ namespace BeastCraft.Game.Screens
             _model = new BeastDetailViewModel(ctx.Session, beastId);
             _tab = tab;
             _scroll = Ui.Add(new ScrollView { Id = "page", Bounds = new Rect(0, TopBar, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight - TopBar) });
-            AddButton(null, "back", new Rect(Pad, 40f, 110f, 110f), null, "secondary", () => Ctx.Stack.Pop(), "back");
+            _cards = new CardList(_scroll);
+            _header = new ScreenHeader(Ui, TopBar, () => Ctx.Stack.Pop());
             AddButton(null, "element-chart", new Rect(PortraitLayout.CanvasWidth - Pad - 300f, 40f, 180f, 90f), "Chart", "chip", OpenChart);
             AddButton(null, "glossary", new Rect(PortraitLayout.CanvasWidth - Pad - 100f, 40f, 100f, 90f), "?", "chip", () => Ctx.Stack.Push(new GlossaryScreen(Ctx, null)));
             float tabWidth = (PortraitLayout.CanvasWidth - 2f * Pad - 2f * 16f) / 3f;
@@ -264,9 +267,7 @@ namespace BeastCraft.Game.Screens
 
         private void Build()
         {
-            float scrollY = _scroll.ScrollY;
-            _scroll.ClearChildren();
-            _drawers.Clear();
+            _cards.Begin();
             for (int i = 0; i < _tabs.Count; i++)
             {
                 _tabs[i].Selected = i == _tab;
@@ -274,6 +275,7 @@ namespace BeastCraft.Game.Screens
 
             if (!_model.Exists)
             {
+                _cards.End(0f);
                 return;
             }
 
@@ -291,8 +293,7 @@ namespace BeastCraft.Game.Screens
                     break;
             }
 
-            _scroll.ContentHeight = y + 40f;
-            _scroll.ScrollTo(scrollY);
+            _cards.End(y);
         }
 
         private float Width
@@ -308,14 +309,6 @@ namespace BeastCraft.Game.Screens
         private float Line
         {
             get { return Ctx.Text.LineHeight(Body); }
-        }
-
-        /// <summary>A panel drawn by <paramref name="draw"/> (in its bounds), added to the page.</summary>
-        private float Card(float y, float height, string style, Action<Rect> draw)
-        {
-            Panel panel = _scroll.Add(new Panel { Bounds = new Rect(Pad, y, Width, height), StyleKey = style });
-            _drawers[panel] = draw;
-            return y + height + 26f;
         }
 
         private int Lines(string text, float size, float width)
@@ -335,26 +328,20 @@ namespace BeastCraft.Game.Screens
             return y;
         }
 
-        private void Heading(Rect box, string text)
-        {
-            Painter.TextIn(text, new Rect(box.X + 36f, box.Y + 28f, box.Width - 72f, Ctx.Style.TextSizes.Heading - 6f), Ctx.Style.TextSizes.Heading - 6f, Painter.C("plum"),
-                           TextAlign.Left);
-        }
-
         // ---- Stats ---------------------------------------------------------------------------------
 
         private float BuildStats(float y)
         {
             float descLines = Lines(_model.Description, Body, Width - 440f);
-            y = Card(y, Math.Max(340f, 200f + descLines * Line), "card", DrawIdentity);
-            y = Card(y, 150f + _model.Stats.Count * 56f + Math.Max(1, _model.GearContributions.Count) * 44f + 30f, "panel", DrawStatTable);
+            y = _cards.Card(y, Math.Max(340f, 200f + descLines * Line), "card", DrawIdentity);
+            y = _cards.Card(y, 150f + _model.Stats.Count * 56f + Math.Max(1, _model.GearContributions.Count) * 44f + 30f, "panel", DrawStatTable);
             float turnsTop = y;
-            y = Card(y, 230f + _model.TurnRates.Count * 56f, "panel", DrawTurnRates);
+            y = _cards.Card(y, 230f + _model.TurnRates.Count * 56f, "panel", DrawTurnRates);
             AddButton(_scroll, "glossary-atb", new Rect(PortraitLayout.CanvasWidth - Pad - 150f, turnsTop + 22f, 120f, 70f), "ATB?", "chip", OpenTurnsHelp);
-            y = Card(y, 330f, "panel", DrawElements);
+            y = _cards.Card(y, 330f, "panel", DrawElements);
             AddButton(_scroll, "element-chart-2", new Rect(PortraitLayout.CanvasWidth - Pad - 250f, y - 26f - 330f + 22f, 220f, 70f), "Full chart", "chip", OpenChart);
-            y = Card(y, 190f, "panel", DrawCrits);
-            y = Card(y, 290f, "panel", DrawLevelGap);
+            y = _cards.Card(y, 190f, "panel", DrawCrits);
+            y = _cards.Card(y, 290f, "panel", DrawLevelGap);
             AddButton(_scroll, "glossary-gap", new Rect(PortraitLayout.CanvasWidth - Pad - 150f, y - 26f - 290f + 22f, 120f, 70f), "Gap?", "chip",
                       () => Ctx.Stack.Push(new GlossaryScreen(Ctx, "level_gap")));
             return y;
@@ -408,7 +395,7 @@ namespace BeastCraft.Game.Screens
 
         private void DrawStatTable(Rect box)
         {
-            Heading(box, "Stats");
+            SectionHeader.Draw(Ctx, box, "Stats");
             float[] cols = { box.X + 40f, box.X + 330f, box.X + 560f, box.X + 790f };
             float y = box.Y + 90f;
             string[] head = { "Stat", "Base", "Gear", "Total" };
@@ -446,7 +433,7 @@ namespace BeastCraft.Game.Screens
 
         private void DrawTurnRates(Rect box)
         {
-            Heading(box, "Turns (ATB)");
+            SectionHeader.Draw(Ctx, box, "Turns (ATB)");
             Wrapped("Turns per 100 gauge ticks. Each tick the gauge fills 100 x the square root of Speed (Fill); a turn costs 100,000.", box.X + 40f, box.Y + 100f,
                     box.Width - 80f, Ctx.Style.TextSizes.Small + 1f, "inkSoft");
             float[] cols = { box.X + 40f, box.X + 520f, box.X + 680f, box.X + 850f, box.X + 980f };
@@ -473,7 +460,7 @@ namespace BeastCraft.Game.Screens
 
         private void DrawElements(Rect box)
         {
-            Heading(box, "Elements");
+            SectionHeader.Draw(Ctx, box, "Elements");
             float cell = (box.Width - 250f) / 10f;
             float x0 = box.X + 210f;
             float y = box.Y + 96f;
@@ -500,7 +487,7 @@ namespace BeastCraft.Game.Screens
 
         private void DrawCrits(Rect box)
         {
-            Heading(box, "Critical hits");
+            SectionHeader.Draw(Ctx, box, "Critical hits");
             float y = box.Y + 96f;
             string text = "Chance " + _model.CritChance + "%   -   a crit hits " + DerivedStats.Times(_model.CritMultiplier) + "   -   on average " +
                           DerivedStats.Times(Math.Round(_model.ExpectedCritFactor, 3));
@@ -511,7 +498,7 @@ namespace BeastCraft.Game.Screens
 
         private void DrawLevelGap(Rect box)
         {
-            Heading(box, "Level gap (enemy level - " + _model.Level + ")");
+            SectionHeader.Draw(Ctx, box, "Level gap (enemy level - " + _model.Level + ")");
             int count = _model.LevelGap.Count;
             float cell = (box.Width - 250f) / Math.Max(1, count);
             float x0 = box.X + 210f;
@@ -542,7 +529,7 @@ namespace BeastCraft.Game.Screens
                 int index = slot;
                 float height = entry.Skill == null ? 170f : SkillCardHeight(entry.Card) + 280f;
                 float top = y;
-                y = Card(y, height, "panel", box => DrawSkillEntry(box, entry, index));
+                y = _cards.Card(y, height, "panel", box => DrawSkillEntry(box, entry, index));
                 AddButton(_scroll, "change-" + slot, new Rect(Pad + Width - 460f, top + 24f, 200f, 76f), entry.Skill == null ? "Fill" : "Change", "chip", () => ChooseSkill(index));
                 if (entry.Skill != null)
                 {
@@ -562,7 +549,7 @@ namespace BeastCraft.Game.Screens
                 float rule = Lines(entry.Card?.TargetingRule, Body, Width - 80f) * Line;
                 SkillEntryView captured = entry;
                 float top = y;
-                y = Card(y, 150f + rule, entry.Known ? "card" : "slot", box => DrawKitEntry(box, captured));
+                y = _cards.Card(y, 150f + rule, entry.Known ? "card" : "slot", box => DrawKitEntry(box, captured));
                 if (entry.Known)
                 {
                     AddButton(_scroll, "equip-" + entry.SkillId, new Rect(Pad + Width - 240f, top + 20f, 210f, 70f), "Equip", "chip", () => ChooseSlot(captured.SkillId));
@@ -726,7 +713,7 @@ namespace BeastCraft.Game.Screens
                 GearSlotView captured = slot;
                 float height = 150f + Math.Max(1, slot.Options.Count) * 96f;
                 float top = y;
-                y = Card(y, height, "panel", box => DrawGearSlot(box, captured));
+                y = _cards.Card(y, height, "panel", box => DrawGearSlot(box, captured));
                 if (slot.Worn != null)
                 {
                     AddButton(_scroll, "unequip-" + slot.Slot, new Rect(Pad + Width - 260f, top + 22f, 230f, 76f), "Take off", "secondary", () =>
@@ -752,9 +739,9 @@ namespace BeastCraft.Game.Screens
             }
 
             string stance = _model.StanceBehaviour ?? string.Empty;
-            y = Card(y, 130f + Lines(stance, Body, Width - 80f) * Line, "card", box =>
+            y = _cards.Card(y, 130f + Lines(stance, Body, Width - 80f) * Line, "card", box =>
             {
-                Heading(box, "Stance: " + _model.Stance);
+                SectionHeader.Draw(Ctx, box, "Stance: " + _model.Stance);
                 Wrapped(stance, box.X + 40f, box.Y + 90f, box.Width - 80f, Body, "ink");
             });
 
@@ -764,16 +751,16 @@ namespace BeastCraft.Game.Screens
                 bondsHeight += 120f + Lines(bond.Description, Ctx.Style.TextSizes.Small + 1f, Width - 80f) * Ctx.Text.LineHeight(Ctx.Style.TextSizes.Small + 1f);
             }
 
-            y = Card(y, _model.Bonds.Count == 0 ? 170f : bondsHeight, "panel", DrawBonds);
+            y = _cards.Card(y, _model.Bonds.Count == 0 ? 170f : bondsHeight, "panel", DrawBonds);
             float looksTop = y;
-            y = Card(y, 150f + Math.Max(1, _model.Looks.Count) * 48f, "card", DrawLooks);
+            y = _cards.Card(y, 150f + Math.Max(1, _model.Looks.Count) * 48f, "card", DrawLooks);
             AddButton(_scroll, "look-token-shop", new Rect(Pad + Width - 260f, looksTop + 24f, 220f, 76f), "Look shop", "chip", () => Ctx.Stack.Push(new LookTokenShopScreen(Ctx)));
 
             if (_model.ColourForms.Count > 0)
             {
                 const float rowHeight = 96f;
                 float colourTop = y;
-                y = Card(y, 100f + _model.ColourForms.Count * rowHeight, "card", DrawColourForms);
+                y = _cards.Card(y, 100f + _model.ColourForms.Count * rowHeight, "card", DrawColourForms);
                 for (int i = 0; i < _model.ColourForms.Count; i++)
                 {
                     ColourFormRow form = _model.ColourForms[i];
@@ -814,7 +801,7 @@ namespace BeastCraft.Game.Screens
 
         private void DrawGearSlot(Rect box, GearSlotView slot)
         {
-            Heading(box, slot.SlotName);
+            SectionHeader.Draw(Ctx, box, slot.SlotName);
             float x = box.X + 40f;
             float w = box.Width - 80f;
             string worn = slot.Worn == null ? "Nothing worn" : "Wearing " + slot.Worn.Name + ": " + string.Join(", ", slot.Worn.Bonuses) + (slot.Worn.Inactive ? " (inactive)" : string.Empty);
@@ -838,7 +825,7 @@ namespace BeastCraft.Game.Screens
 
         private void DrawBonds(Rect box)
         {
-            Heading(box, "Bonds it takes part in");
+            SectionHeader.Draw(Ctx, box, "Bonds it takes part in");
             float x = box.X + 40f;
             float w = box.Width - 80f;
             float y = box.Y + 90f;
@@ -864,7 +851,7 @@ namespace BeastCraft.Game.Screens
 
         private void DrawLooks(Rect box)
         {
-            Heading(box, "Looks worn");
+            SectionHeader.Draw(Ctx, box, "Looks worn");
             float y = box.Y + 90f;
             if (_model.Looks.Count == 0)
             {
@@ -884,7 +871,7 @@ namespace BeastCraft.Game.Screens
         /// <summary>The species' colour forms (docs/design/grove.md, "Colour evolutions" — D3/D4): locked, owned, or worn.</summary>
         private void DrawColourForms(Rect box)
         {
-            Heading(box, "Colour forms");
+            SectionHeader.Draw(Ctx, box, "Colour forms");
             float y = box.Y + 90f;
             const float rowHeight = 96f;
             foreach (ColourFormRow form in _model.ColourForms)
@@ -907,30 +894,33 @@ namespace BeastCraft.Game.Screens
         {
             Gradient("cream", "parchment", new Rect(0, 0, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight));
             base.Draw();
-            Painter.Fill(new Rect(0, 0, PortraitLayout.CanvasWidth, TopBar), Painter.C("cream"));
-            Painter.Fill(new Rect(0, TopBar - 5f, PortraitLayout.CanvasWidth, 5f), Painter.C("plumSoft", 0.5f));
+            if (!_model.Exists)
+            {
+                _header.Paint(Ctx, Ui, string.Empty);
+                RepaintExtras();
+                Painter.TextIn("No such beast.", new Rect(180f, 60f, 600f, Ctx.Style.TextSizes.Heading), Ctx.Style.TextSizes.Heading, Painter.C("berry"), TextAlign.Left);
+                return;
+            }
+
+            _header.Paint(Ctx, Ui, _model.Name, "Lv " + _model.Level + "  -  " + _model.Stance + "  -  " + _model.Element);
+            RepaintExtras();
+        }
+
+        /// <summary>Repaints the screen's own fixed widgets above the header wash: Chart/? and the tab row (<see cref="ScreenHeader.Paint"/> only repaints Back and the title/subtitle).</summary>
+        private void RepaintExtras()
+        {
             foreach (Widget widget in Ui.Children)
             {
-                if (widget != _scroll)
+                if (widget != _scroll && widget != _header.Back)
                 {
                     Painter.Paint(widget, Ui);
                 }
             }
-
-            UiStyle style = Ctx.Style;
-            if (!_model.Exists)
-            {
-                Painter.TextIn("No such beast.", new Rect(180f, 60f, 600f, style.TextSizes.Heading), style.TextSizes.Heading, Painter.C("berry"), TextAlign.Left);
-                return;
-            }
-
-            Painter.TextIn(_model.Name, new Rect(180f, 44f, 520f, style.TextSizes.Heading + 6f), style.TextSizes.Heading + 6f, Painter.C("plum"), TextAlign.Left);
-            Painter.TextIn("Lv " + _model.Level + "  -  " + _model.Stance + "  -  " + _model.Element, new Rect(180f, 112f, 520f, 30f), Body, Painter.C("inkSoft"), TextAlign.Left);
         }
 
         protected override void DrawCustom(Widget widget)
         {
-            if (_drawers.TryGetValue(widget, out Action<Rect> draw))
+            if (_cards.TryDraw(widget, out Action<Rect> draw))
             {
                 draw(widget.Bounds);
             }
