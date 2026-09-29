@@ -23,7 +23,11 @@ namespace BeastCraft.Game.Screens
         private const float Pad = 36f;
         private const float HeaderWash = 160f;
         private const float TabsY = 170f;
-        private const float TabsHeight = 84f;
+
+        // Same height as the home bottom nav (HomeScreen.NavHeight) so the icon-above-label layout
+        // that UiPainter.Tabs draws has room to breathe -- at the old 84f the icon and label
+        // overlapped (see docs/design/grove.md D4 review).
+        private const float TabsHeight = 170f;
         private const float ContentTop = TabsY + TabsHeight + 20f;
         private const float ChipHeight = 78f;
 
