@@ -619,8 +619,10 @@ namespace BeastCraft.Presentation.Screens
             bool fromBackup = loaded.StorageSource == SaveFileSource.Backup;
             bool started = !Save.Campaign.HasActiveRun;
 
-            // A battle the app died in (never resolved) hands back what it spent; the refund clears the
-            // record, and the autosave below writes that, so it can never pay twice.
+            // A battle the app died in (never resolved) hands back what it spent; the refund takes it off the
+            // record, and the autosave below writes that. If that save fails the refund is undone in memory
+            // (the file still holds the record), so it is paid exactly once, by a load that can save it.
+            BattleConsumableRefund.Snapshot beforeRefund = BattleConsumableRefund.Take(Save);
             List<string> refunded = BattleConsumableRefund.RefundPending(Save, id => Content.Battle.GetConsumable(id)?.MaxStack);
             EnsureExpedition();
 
@@ -636,7 +638,12 @@ namespace BeastCraft.Presentation.Screens
                 // Keep the main file current: a started expedition, a retroactively earned achievement,
                 // a Grove unlock/gift the offline clock just rolled forward, or the restored backup
                 // made main again. A refund is written straight away too.
-                Autosave(AutosaveReason.Results);
+                bool saved = Autosave(AutosaveReason.Results);
+                if (!saved && refunded.Count > 0)
+                {
+                    BattleConsumableRefund.Restore(Save, beforeRefund, refunded);
+                    refunded.Clear();
+                }
             }
 
             return new LoadOutcome

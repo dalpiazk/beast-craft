@@ -94,7 +94,40 @@ namespace BeastCraft.Save
             ValidateCompendium(save, issues);
             ValidateGrove(save, issues);
             ValidateNpc(save, issues);
+            ValidateSeen(save.Seen, issues);
             return issues;
+        }
+
+        /// <summary>
+        /// The "new" markers' seen list (schema 12): no empty entries and each key once, in <c>Seen.Gear</c> (gear instance ids)
+        /// and <c>Seen.Looks</c> (look keys). No content lookups: a seen key the save no longer owns is harmless.
+        /// </summary>
+        private static void ValidateSeen(SeenItems seen, List<SaveIssue> issues)
+        {
+            if (seen == null)
+            {
+                return;
+            }
+
+            CheckSeenList(seen.Gear, "Seen.Gear", issues);
+            CheckSeenList(seen.Looks, "Seen.Looks", issues);
+        }
+
+        private static void CheckSeenList(List<string> keys, string path, List<SaveIssue> issues)
+        {
+            HashSet<string> once = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < (keys == null ? 0 : keys.Count); i++)
+            {
+                string key = keys[i];
+                if (string.IsNullOrEmpty(key))
+                {
+                    issues.Add(new SaveIssue(SaveIssueKind.InvalidValue, path + "[" + i + "]", key, "empty entry"));
+                }
+                else if (!once.Add(key))
+                {
+                    issues.Add(new SaveIssue(SaveIssueKind.InvalidValue, path + "[" + i + "]", key, "'" + key + "' is listed twice"));
+                }
+            }
         }
 
         /// <summary>
@@ -470,6 +503,11 @@ namespace BeastCraft.Save
             if (campaign == null)
             {
                 return;
+            }
+
+            if (!Enum.IsDefined(typeof(RunDifficulty), campaign.PreferredDifficulty))
+            {
+                issues.Add(new SaveIssue(SaveIssueKind.InvalidValue, "Campaign.PreferredDifficulty", null, "unknown difficulty " + (int)campaign.PreferredDifficulty));
             }
 
             if (campaign.Seals != null)

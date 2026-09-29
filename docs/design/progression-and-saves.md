@@ -567,11 +567,14 @@ the item. Schema 11 records what the battle in progress spent, so it can be hand
 - *Rules* (`Economy.BattleConsumableRefund`). `NodeBattle.Begin` records the spent items
   (`Record`) before the battle-start autosave; `NodeBattle.Complete` clears the record (`Clear`)
   before the results autosave, on both the ordinary and the Kinship-trial path. `GameSession.Continue`
-  calls `RefundPending`: each recorded item goes back into the pack (never past its stack cap; an id
-  the content no longer has is skipped), the record is cleared, and the save is written straight
-  away. The player gets a toast (`LoadOutcome.RefundMessage`: "Your last battle did not finish, so
-  your Fury Draught was returned."). Because the refund clears the record and is saved at once, it
-  is paid at most once, and a battle that resolved normally is never refunded.
+  calls `RefundPending`: each recorded item goes back into the pack and off the record (an id the content no
+  longer has is dropped; an item whose stack is full stays on the record, still owed, and comes back
+  on a later load once there is room, since a stack never passes its cap), and the save is written
+  straight away. If that write fails, the refund is undone in memory (`Restore`: the refunded units
+  are taken back and the record put back, as the file still has it), so a later save cannot write the
+  items and the record together. The player gets a toast (`LoadOutcome.RefundMessage`: "Your last battle did not finish, so
+  your Fury Draught was returned."). Because the refund takes the items off the record and only stands once saved,
+  it is paid exactly once, and a battle that resolved normally is never refunded.
 - *Migration.* `SaveMigrations.AddPendingBattle` (10 to 11): the record starts empty. A v10 save
   never recorded a battle, so there is nothing to refund.
 - *Golden saves.* `rich-v10.input.json` is frozen as an input and `rich-v11.input.json` (captured by
@@ -598,6 +601,10 @@ The Inventory's Gear tab and the Avatar's wardrobe mark gear and looks the playe
   folded into this step before schema 12 shipped): the post-game Normal or Hard choice (#60), so the next r11
   stage starts on it after a restart (`GameSession.PreferredDifficulty` reads and writes it). Normal by default;
   an undefined value repairs to Normal. The migration takes it from the expedition in progress (Normal without one).
+- *Validation* (`SaveValidator`): `Seen.Gear` and `Seen.Looks` entries non-empty and each once;
+  `Campaign.PreferredDifficulty` a defined value. The schema 11 record (`PendingBattleConsumables`) is
+  checked too: no empty entries and, with an economy catalog, known consumable ids (a repeated id is two
+  units owed).
 - *Golden saves.* `rich-v11.input.json` is frozen as an input and `rich-v12.input.json` (captured by
   reflection with `BEASTCRAFT_UPDATE_GOLDENS=1`, its decor positions filled in range) is the one that must
   round-trip. Every older expected output changed in exactly these places: `"SchemaVersion":11` became

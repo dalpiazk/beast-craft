@@ -327,7 +327,7 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
-        public void Refund_SkipsAnItemTheContentNoLongerHas_AndNeverPassesTheCap()
+        public void Refund_DropsAnItemTheContentNoLongerHas_AndKeepsAFullStacksItemOwed()
         {
             PlayerSave save = PlayerSave.CreateNew();
             ConsumableInventory.TryAdd(save, "fury_draught", 5, 5);
@@ -337,8 +337,59 @@ namespace BeastCraft.Tests.EditMode
             List<string> refunded = BattleConsumableRefund.RefundPending(save, id => id == "fury_draught" ? 5 : (int?)null);
 
             Assert.IsEmpty(refunded);
+            Assert.AreEqual(5, ConsumableInventory.Quantity(save, "fury_draught"), "never past the cap");
+            CollectionAssert.AreEqual(new[] { "fury_draught" }, save.PendingBattleConsumables, "still owed, not lost; the gone item is dropped");
+
+            // Room again (one used): the next refund pays it and the record empties.
+            ConsumableStack stack = save.Consumables.Find(s => s.ConsumableId == "fury_draught");
+            stack.Quantity = 4;
+            CollectionAssert.AreEqual(new[] { "fury_draught" }, BattleConsumableRefund.RefundPending(save, id => 5));
             Assert.AreEqual(5, ConsumableInventory.Quantity(save, "fury_draught"));
-            Assert.IsEmpty(save.PendingBattleConsumables, "the record is cleared either way");
+            Assert.IsEmpty(save.PendingBattleConsumables);
+        }
+
+        [Test]
+        public void ARefundWhoseSaveFails_IsUndone_AndPaidOnceLater()
+        {
+            MemorySaveStorage storage = new MemorySaveStorage();
+            BeginBattleAndCrash(storage);
+
+            storage.FailWrites = true;
+            GameSession failing = NewSession(storage);
+            LoadOutcome outcome = failing.Continue();
+
+            Assert.IsTrue(outcome.Success, outcome.Message);
+            Assert.IsNull(outcome.RefundMessage, "nothing is announced when it could not be kept");
+            Assert.AreEqual(1, ConsumableInventory.Quantity(failing.Save, "fury_draught"), "the refund is undone in memory");
+            CollectionAssert.AreEqual(new[] { "fury_draught" }, failing.Save.PendingBattleConsumables, "the record stays, as on disk");
+
+            // The disk recovers and this session saves: still owed once, not paid.
+            storage.FailWrites = false;
+            Assert.IsTrue(failing.Autosave(AutosaveReason.Results));
+
+            GameSession next = NewSession(storage);
+            Assert.IsNotNull(next.Continue().RefundMessage);
+            Assert.AreEqual(2, ConsumableInventory.Quantity(next.Save, "fury_draught"), "paid once");
+            GameSession again = NewSession(storage);
+            Assert.IsNull(again.Continue().RefundMessage);
+            Assert.AreEqual(2, ConsumableInventory.Quantity(again.Save, "fury_draught"), "and never twice");
+        }
+
+        [Test]
+        public void Restore_TakesBackOnlyTheRefundedUnits()
+        {
+            PlayerSave save = PlayerSave.CreateNew();
+            ConsumableInventory.TryAdd(save, "fury_draught", 1, 5);
+            BattleConsumableRefund.Record(save, new[] { "fury_draught", "mend_tonic" });
+            BattleConsumableRefund.Snapshot before = BattleConsumableRefund.Take(save);
+            List<string> refunded = BattleConsumableRefund.RefundPending(save, id => 5);
+            ConsumableInventory.TryAdd(save, "fury_draught", 1, 5);
+
+            BattleConsumableRefund.Restore(save, before, refunded);
+
+            Assert.AreEqual(2, ConsumableInventory.Quantity(save, "fury_draught"), "what came in after the refund stays");
+            Assert.AreEqual(0, ConsumableInventory.Quantity(save, "mend_tonic"));
+            CollectionAssert.AreEqual(new[] { "fury_draught", "mend_tonic" }, save.PendingBattleConsumables);
         }
     }
 }
