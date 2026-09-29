@@ -64,5 +64,26 @@ namespace BeastCraft.Save
         /// On by default; a hint's own "Turn hints off" and the settings row switch it.
         /// </summary>
         public bool TutorialHints = true;
+
+        /// <summary>
+        /// The overall volume, 0-100 (percent; anything outside reads as the nearest end). 100 by
+        /// default. Music and sound effects play at this times their own volume (docs/design/audio.md).
+        /// </summary>
+        public int MasterVolume = 100;
+
+        /// <summary>The music and ambience volume, 0-100, under <see cref="MasterVolume"/>. 100 by default.</summary>
+        public int MusicVolume = 100;
+
+        /// <summary>The sound effects' volume, 0-100, under <see cref="MasterVolume"/>. 100 by default.</summary>
+        public int SfxVolume = 100;
+
+        /// <summary>Silences all sound without losing the volumes. Off by default.</summary>
+        public bool Muted;
+
+        /// <summary>
+        /// Light vibration on hits, knockouts and key confirms, where the device has it (docs/design/decisions.md:
+        /// on by default, with this toggle). Hosts without haptics ignore it and hide the setting.
+        /// </summary>
+        public bool Haptics = true;
     }
 }

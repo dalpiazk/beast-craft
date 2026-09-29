@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using BeastCraft.Presentation.Audio;
 using BeastCraft.Presentation.Board;
 using BeastCraft.Presentation.Layout;
 using BeastCraft.Presentation.Screens;
@@ -27,6 +28,7 @@ namespace BeastCraft.Game.Screens
         private Panel _rewards;
         private Panel _notes;
         private float _elapsedMs;
+        private bool _announced;
 
         public ResultsScreen(ScreenContext ctx, ResultsViewModel model) : base(ctx)
         {
@@ -47,6 +49,21 @@ namespace BeastCraft.Game.Screens
         public override void Enter()
         {
             base.Enter();
+            if (!_announced)
+            {
+                // Once, as the results first show: the win's reward sting, and a level-up when anyone levelled.
+                _announced = true;
+                if (_model.Victory)
+                {
+                    Ctx.Audio?.Cue(AudioDirector.Rewards);
+                }
+
+                if (_model.AvatarLevelsGained > 0 || _model.Team.Exists(row => row.LevelsGained > 0))
+                {
+                    Ctx.Audio?.Cue(AudioDirector.LevelUp);
+                }
+            }
+
             ShowHints(BeastCraft.Tutorial.HintTriggers.ResultsOpen, _model.NodeId);
         }
 

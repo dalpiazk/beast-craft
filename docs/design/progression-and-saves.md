@@ -222,7 +222,10 @@ untouched, and one device's settings apply to every save slot.
   preview", `TeamSuggestionPolicy`), and the battle effects settings: `EffectsIntensity` (`Full`
   (default), `Reduced` or `Minimal`, stored as its number), `ScreenShake` (default **true**) and
   `Flashes` (default **true**; accessibility: the hit flash and bright additive bursts), all
-  presentation only (see `docs/design/presentation-and-vfx.md`, "Effects settings"). New settings
+  presentation only (see `docs/design/presentation-and-vfx.md`, "Effects settings"), and the sound and
+  haptics settings (see `docs/design/audio.md`, "Settings"): `MasterVolume`, `MusicVolume` and
+  `SfxVolume` (0-100, default **100**), `Muted` (default off) and `Haptics` (default **on**; hidden where
+  the host cannot vibrate). New settings
   are added as fields with defaults: a key an older file lacks keeps its default, so a purely
   additive setting needs no version bump (a file from before the effects settings loads as Full,
   shake on, flashes on).

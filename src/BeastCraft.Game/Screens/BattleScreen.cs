@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using BeastCraft.Battle;
 using BeastCraft.Game.Rendering;
+using BeastCraft.Presentation.Audio;
 using BeastCraft.Presentation.Board;
 using BeastCraft.Presentation.Camera;
 using BeastCraft.Presentation.Cards;
@@ -109,6 +110,11 @@ namespace BeastCraft.Game.Screens
         private Vector2 _gestureEnd;
         private readonly List<string> _log = new List<string>();
 
+        /// <summary>The playing turn's sounds (<see cref="BattleAudioCues"/>) and how far into the turn they have played.</summary>
+        private List<TimedCue> _cues = new List<TimedCue>();
+
+        private int _cuesPlayedMs = -1;
+
         private BattleScreen(ScreenContext ctx, BattleSessionRun run, Dictionary<string, string> speciesByUnit, string regionId, int seed, string hudTitle,
                              NodeBattle campaign, Action<NodeBattle> finished, string artRegionId = null) : base(ctx)
         {
@@ -143,6 +149,12 @@ namespace BeastCraft.Game.Screens
         public override string Name
         {
             get { return "battle"; }
+        }
+
+        /// <summary>The region the battle is fought in (its music).</summary>
+        public string RegionId
+        {
+            get { return _regionId; }
         }
 
         /// <summary>The battle input comes raw (keys, mouse, touch gestures) rather than through the widget toolkit.</summary>
@@ -316,8 +328,10 @@ namespace BeastCraft.Game.Screens
                 {
                     _clockMs = _animation.DurationMs;
                     step = false;
+                    _cuesPlayedMs = _clockMs;
                 }
 
+                PlayCues();
                 if (_clockMs >= _animation.DurationMs)
                 {
                     _cameraRest = CameraNow();
@@ -338,6 +352,34 @@ namespace BeastCraft.Game.Screens
             }
         }
 
+        /// <summary>The playing turn's sounds due since the last frame (a skipped turn plays none).</summary>
+        private void PlayCues()
+        {
+            foreach (string cue in BattleAudioCues.Between(_cues, _cuesPlayedMs, _clockMs))
+            {
+                Ctx.Audio?.Cue(cue);
+            }
+
+            _cuesPlayedMs = Math.Max(_cuesPlayedMs, _clockMs);
+        }
+
+        /// <summary>The enemy side's HP left in <paramref name="units"/>, and their whole HP (<paramref name="total"/>).</summary>
+        private static int EnemyHp(IReadOnlyDictionary<string, UnitSnapshot> units, out int total)
+        {
+            int left = 0;
+            total = 0;
+            foreach (UnitSnapshot unit in units.Values)
+            {
+                if (unit.Team == BattleTeam.Enemy)
+                {
+                    left += Math.Max(0, unit.Hp);
+                    total += Math.Max(0, unit.MaxHp);
+                }
+            }
+
+            return left;
+        }
+
         // ------------------------------------------------------------------------------------------
         // Battle flow
         // ------------------------------------------------------------------------------------------
@@ -355,6 +397,9 @@ namespace BeastCraft.Game.Screens
             _animation = new TurnAnimation(turn, _layout, _content.Vfx, _seed, _vfxSettings, _playback.Grid);
             _turnCamera = new TurnCamera(_animation, _layout, _camera, from);
             _clockMs = 0;
+            _cues = BattleAudioCues.For(_animation);
+            _cuesPlayedMs = -1;
+            Ctx.Audio?.SetIntensity(AudioDirector.BattleIntensity(EnemyHp(turn.After, out int total), total));
             Log(turn);
             if (_campaign != null)
             {

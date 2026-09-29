@@ -16,6 +16,7 @@ using BeastCraft.Grove;
 using BeastCraft.Idle;
 using BeastCraft.Localization;
 using BeastCraft.Presentation.Art;
+using BeastCraft.Presentation.Audio;
 using BeastCraft.Presentation.Text;
 using BeastCraft.Presentation.Ui;
 using BeastCraft.Progression;
@@ -102,6 +103,9 @@ namespace BeastCraft.Presentation.Content
 
         /// <summary>How the board is dressed (<see cref="BattleArtData.ProjectRelativePath"/>): painted backdrops per region and arena, and their overlays.</summary>
         public BattleArtData BattleArt { get; private set; }
+
+        /// <summary>The sounds by cue id (<see cref="AudioCueLibraryData.ProjectRelativePath"/>): files and gains; docs/design/audio.md.</summary>
+        public AudioCueLibrary AudioCues { get; private set; }
 
         /// <summary>The battle glossary (<see cref="GlossaryData.ProjectRelativePath"/>): the terms the skill card highlights.</summary>
         public Glossary Glossary { get; private set; }
@@ -238,6 +242,7 @@ namespace BeastCraft.Presentation.Content
             ConsumableLibraryData consumableData = Read<ConsumableLibraryData>(root, text, ConsumableLibraryData.ProjectRelativePath, errors);
             CosmeticLibraryData cosmeticData = Read<CosmeticLibraryData>(root, text, CosmeticLibraryData.ProjectRelativePath, errors);
             ShopTableData shopTableData = Read<ShopTableData>(root, text, ShopTableData.ProjectRelativePath, errors);
+            AudioCueLibraryData audioCues = Read<AudioCueLibraryData>(root, text, AudioCueLibraryData.ProjectRelativePath, errors);
             UiStyleData style = Read<UiStyleData>(root, text, UiStyleData.ProjectRelativePath, errors);
             IdleRewardsData idleData = Read<IdleRewardsData>(root, text, IdleRewardsData.ProjectRelativePath, errors);
             HintLibraryData hints = Read<HintLibraryData>(root, text, HintLibraryData.ProjectRelativePath, errors);
@@ -287,6 +292,7 @@ namespace BeastCraft.Presentation.Content
             Prefix(errors, "battle-art.json", BattleArtValidator.Validate(battleArt, regions, art));
             Prefix(errors, "battle-art.json", BattleArtValidator.ValidateLayouts(battleArt, layouts));
             Prefix(errors, "glossary.json", GlossaryValidator.Validate(glossaryData));
+            Prefix(errors, "audio-cues.json", AudioCueLibrary.Validate(audioCues));
             Glossary glossary = Glossary.Build(glossaryData);
             Prefix(errors, "skill text", GlossaryValidator.ValidateText(glossary, skills, enemyLibrary));
             if (errors.Count > 0)
@@ -364,6 +370,7 @@ namespace BeastCraft.Presentation.Content
                 Vfx = VfxLibrary.Build(vfx),
                 Art = art,
                 BattleArt = battleArt,
+                AudioCues = AudioCueLibrary.Build(audioCues),
                 Glossary = glossary,
                 KnownSkillIds = known,
                 Campaign = campaign,

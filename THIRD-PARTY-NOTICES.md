@@ -25,6 +25,7 @@ licence texts are at the links (and, for the font, beside the file).
 | FontStashSharp.MonoGame 1.6.1, FontStashSharp.Base, FontStashSharp.Rasterizers.StbTrueTypeSharp 1.2.9 | runtime TTF rasterising for the UI text (`TtfText`) | Zlib (https://github.com/FontStashSharp/FontStashSharp/blob/main/LICENSE) |
 | StbTrueTypeSharp 1.26.13, StbImageSharp 2.30.16 | FontStashSharp's rasteriser and image loader | MIT or Unlicense, used under MIT (https://github.com/StbSharp) |
 | Cyotek.Drawing.BitmapFont 2.0.4 | FontStashSharp dependency (bitmap-font reader, unused by the game) | MIT (https://github.com/cyotek/Cyotek.Drawing.BitmapFont) |
+| NVorbis 0.10.4 | decoding the OGG Vorbis music and ambience as it streams (`MonoGameMusicPlayer`) | MIT (https://github.com/NVorbis/NVorbis/blob/master/LICENSE) |
 
 The .NET runtime and base libraries (including System.Text.Json) are MIT-licensed by the .NET
 Foundation. Build-time and test-only packages (the test SDK, NUnit) are not shipped.

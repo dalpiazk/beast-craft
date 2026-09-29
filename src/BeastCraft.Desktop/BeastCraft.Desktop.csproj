@@ -55,6 +55,8 @@
     <None Include="..\..\content\art\icons\**\*.png" Link="Content\art\icons\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <!-- The UI font and its licence (SIL OFL 1.1: the licence travels with the font). -->
     <None Include="..\..\content\fonts\*.ttf;..\..\content\fonts\OFL.txt" Link="Content\fonts\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The sounds (docs/design/audio.md): SFX as WAV, music and ambience as OGG Vorbis. None ship yet; a missing file plays nothing. -->
+    <None Include="..\..\content\audio\**\*.wav;..\..\content\audio\**\*.ogg" Link="Content\audio\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

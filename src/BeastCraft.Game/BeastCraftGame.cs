@@ -3,9 +3,11 @@ using System.Collections.Generic;
 using System.IO;
 using BeastCraft.Campaign;
 using BeastCraft.Discovery;
+using BeastCraft.Game.Audio;
 using BeastCraft.Game.Rendering;
 using BeastCraft.Game.Screens;
 using BeastCraft.Game.Ui;
+using BeastCraft.Presentation.Audio;
 using BeastCraft.Presentation.Board;
 using BeastCraft.Presentation.Content;
 using BeastCraft.Presentation.Layout;
@@ -61,6 +63,8 @@ namespace BeastCraft.Game
         private UiPainter _painter;
         private GameContent _content;
         private ScreenContext _ctx;
+        private AudioDirector _audio;
+        private readonly List<IDisposable> _audioPlayers = new List<IDisposable>();
         private KeyboardState _previousKeys;
         private MouseState _previousMouse;
         private bool _previousBack;
@@ -173,7 +177,7 @@ namespace BeastCraft.Game
         public SettingsViewModel NewSettingsModel()
         {
             GameSession session = _ctx.Session;
-            SettingsViewModel model = new SettingsViewModel(session.Settings, session.Content.Text, session.SaveSettings, _host.IdleNotifier != null);
+            SettingsViewModel model = new SettingsViewModel(session.Settings, session.Content.Text, session.SaveSettings, _host.IdleNotifier != null, _host.Haptics != null);
             model.IdleNotificationsChanged += on =>
             {
                 if (on)
@@ -239,6 +243,9 @@ namespace BeastCraft.Game
                 Stack = _stack,
                 Toast = _toast
             };
+            _audio = CreateAudio(scripted);
+            _ctx.Audio = _audio;
+            _stack.TopChanged += top => _audio.ScreenChanged(top?.Name, RegionOf(top));
 
             if (_options.IsDemo)
             {
@@ -268,6 +275,11 @@ namespace BeastCraft.Game
 
         protected override void UnloadContent()
         {
+            foreach (IDisposable player in _audioPlayers)
+            {
+                player.Dispose();
+            }
+
             _painter?.Dispose();
             _atlas?.Dispose();
             _text?.Dispose();
@@ -292,6 +304,7 @@ namespace BeastCraft.Game
             }
 
             float elapsed = (float)gameTime.ElapsedGameTime.TotalMilliseconds;
+            _audio?.Update(elapsed);
             if (_script.Count > 0 || _exitAfterScript)
             {
                 // Scripted: one step a frame, each drawn (and captured) before the next.
@@ -571,7 +584,7 @@ namespace BeastCraft.Game
                     else if (touch.State == TouchLocationState.Released && _touchId == touch.Id)
                     {
                         _touchId = -1;
-                        ui.OnPointerUp(at);
+                        _audio?.Clicked(ui.OnPointerUp(at));
                     }
                 }
 
@@ -595,7 +608,7 @@ namespace BeastCraft.Game
             }
             else if (_pointerDown)
             {
-                ui.OnPointerUp(point);
+                _audio?.Clicked(ui.OnPointerUp(point));
             }
 
             _pointerDown = down;
@@ -655,6 +668,50 @@ namespace BeastCraft.Game
             }
 
             return () => Environment.TickCount;
+        }
+
+        /// <summary>
+        /// The sound: MonoGame's effects and music players over the content's cues, and the host's haptics
+        /// (none on desktop). Scripted runs (screenshots, the walkthrough) are silent and still, so they
+        /// stay deterministic and need no audio device; a device that cannot play falls back to silence.
+        /// </summary>
+        private AudioDirector CreateAudio(bool scripted)
+        {
+            Func<PlayerSettings> settings = () => _ctx?.Session?.Settings;
+            if (scripted)
+            {
+                return new AudioDirector(_content.AudioCues, null, null, null, settings);
+            }
+
+            IAudio effects = null;
+            IMusicPlayer music = null;
+            try
+            {
+                MonoGameAudio sfx = new MonoGameAudio(_content.AudioCues, _content.Source);
+                _audioPlayers.Add(sfx);
+                effects = sfx;
+                MonoGameMusicPlayer player = new MonoGameMusicPlayer(_content.AudioCues, _content.Source);
+                _audioPlayers.Add(player);
+                music = player;
+            }
+            catch (Exception e)
+            {
+                Console.Error.WriteLine("[Audio] No sound on this device: " + e.Message);
+            }
+
+            return new AudioDirector(_content.AudioCues, effects, music, _host.Haptics, settings);
+        }
+
+        /// <summary>The region whose music a screen plays: a battle's own, else the expedition's (or the last region played).</summary>
+        private string RegionOf(IScreen screen)
+        {
+            if (screen is BattleScreen battle)
+            {
+                return battle.RegionId;
+            }
+
+            CampaignProgress campaign = _ctx?.Session?.Save?.Campaign;
+            return campaign == null ? null : campaign.HasActiveRun ? campaign.ActiveRun.RegionId : campaign.CurrentRegionId;
         }
 
         /// <summary>The battle demo: the command line's battle as the only screen (Back quits), with the saved effects settings (the defaults in a screenshot).</summary>

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using BeastCraft.Localization;
+using BeastCraft.Presentation.Audio;
 using BeastCraft.Save;
 
 namespace BeastCraft.Presentation.Screens
@@ -153,6 +154,9 @@ namespace BeastCraft.Presentation.Screens
     /// <summary>One row of the settings modal.</summary>
     public sealed class SettingRow
     {
+        /// <summary>Which setting (the <see cref="SettingsViewModel"/> row constants); <see cref="SettingsViewModel.Change"/> takes it.</summary>
+        public int Id;
+
         public string Label;
         public string Value;
 
@@ -161,8 +165,9 @@ namespace BeastCraft.Presentation.Screens
     }
 
     /// <summary>
-    /// The settings modal (the battle's effects settings, plus the team-suggestion toggle): each
-    /// row cycles or toggles its setting, which is saved at once.
+    /// The settings modal (the battle's effects settings, the team-suggestion toggle, sound and
+    /// haptics): each row cycles or toggles its setting, which is saved at once. The rows that need
+    /// the host (the idle alert, haptics) show only where it has them.
     /// </summary>
     public sealed class SettingsViewModel
     {
@@ -174,7 +179,15 @@ namespace BeastCraft.Presentation.Screens
         public const int AutoAdvance = 5;
         public const int TutorialHints = 6;
         public const int IdleNotifications = 7;
-        public const int RowCount = 8;
+        public const int MasterVolume = 8;
+        public const int MusicVolume = 9;
+        public const int SfxVolume = 10;
+        public const int Mute = 11;
+        public const int Haptics = 12;
+        public const int RowCount = 13;
+
+        /// <summary>A volume row's step: each tap takes it down a quarter, and from 0 back to 100.</summary>
+        public const int VolumeStep = 25;
 
         private readonly PlayerSettings _settings;
         private readonly Func<bool> _save;
@@ -184,41 +197,66 @@ namespace BeastCraft.Presentation.Screens
         /// <param name="text">The text table the labels come from (<c>ui.settings.*</c>; <c>GameContent.Text</c>).</param>
         /// <param name="save">Saves the settings after each change.</param>
         /// <param name="notificationsAvailable">Whether the host can post notifications (Android): otherwise that row is hidden.</param>
-        public SettingsViewModel(PlayerSettings settings, StringTable text, Func<bool> save, bool notificationsAvailable = false)
+        /// <param name="hapticsAvailable">Whether the host can vibrate (Android): otherwise that row is hidden.</param>
+        public SettingsViewModel(PlayerSettings settings, StringTable text, Func<bool> save, bool notificationsAvailable = false, bool hapticsAvailable = false)
         {
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
             _text = text ?? throw new ArgumentNullException(nameof(text));
             _save = save;
             NotificationsAvailable = notificationsAvailable;
+            HapticsAvailable = hapticsAvailable;
         }
 
         public int Saves { get; private set; }
 
         public bool NotificationsAvailable { get; }
 
+        public bool HapticsAvailable { get; }
+
         /// <summary>Raised after the idle-notification setting changes (the host asks for the permission, or cancels).</summary>
         public event Action<bool> IdleNotificationsChanged;
 
-        /// <summary>The rows, by the row constants (the notification row only where the host has notifications).</summary>
+        /// <summary>The rows in display order (the idle alert and haptics rows only where the host has them); <see cref="Row"/> finds one by id.</summary>
         public List<SettingRow> Rows()
         {
             string intensity = _text.Get(_settings.EffectsIntensity == EffectsIntensity.Minimal ? "ui.settings.effects_minimal" : _settings.EffectsIntensity == EffectsIntensity.Reduced ? "ui.settings.effects_reduced" : "ui.settings.effects_full");
             List<SettingRow> rows = new List<SettingRow>
             {
-                new SettingRow { Label = _text.Get("ui.settings.effects"), Value = intensity, On = true },
-                new SettingRow { Label = _text.Get("ui.settings.screen_shake"), Value = OnOff(_settings.ScreenShake), On = _settings.ScreenShake },
-                new SettingRow { Label = _text.Get("ui.settings.flashes"), Value = OnOff(_settings.Flashes), On = _settings.Flashes },
-                new SettingRow { Label = _text.Get("ui.settings.team_suggestions"), Value = OnOff(_settings.TeamSuggestionsEnabled), On = _settings.TeamSuggestionsEnabled },
-                new SettingRow { Label = _text.Get("ui.settings.battle_speed"), Value = _text.Format("ui.settings.speed_value", Speed(_settings)), On = true },
-                new SettingRow { Label = _text.Get("ui.settings.auto_advance"), Value = OnOff(_settings.AutoAdvance), On = _settings.AutoAdvance },
-                new SettingRow { Label = _text.Get("ui.settings.tutorial_hints"), Value = OnOff(_settings.TutorialHints), On = _settings.TutorialHints }
+                new SettingRow { Id = Effects, Label = _text.Get("ui.settings.effects"), Value = intensity, On = true },
+                new SettingRow { Id = ScreenShake, Label = _text.Get("ui.settings.screen_shake"), Value = OnOff(_settings.ScreenShake), On = _settings.ScreenShake },
+                new SettingRow { Id = Flashes, Label = _text.Get("ui.settings.flashes"), Value = OnOff(_settings.Flashes), On = _settings.Flashes },
+                new SettingRow { Id = TeamSuggestions, Label = _text.Get("ui.settings.team_suggestions"), Value = OnOff(_settings.TeamSuggestionsEnabled), On = _settings.TeamSuggestionsEnabled },
+                new SettingRow { Id = BattleSpeed, Label = _text.Get("ui.settings.battle_speed"), Value = _text.Format("ui.settings.speed_value", Speed(_settings)), On = true },
+                new SettingRow { Id = AutoAdvance, Label = _text.Get("ui.settings.auto_advance"), Value = OnOff(_settings.AutoAdvance), On = _settings.AutoAdvance },
+                new SettingRow { Id = TutorialHints, Label = _text.Get("ui.settings.tutorial_hints"), Value = OnOff(_settings.TutorialHints), On = _settings.TutorialHints }
             };
             if (NotificationsAvailable)
             {
-                rows.Add(new SettingRow { Label = _text.Get("ui.settings.idle_alert"), Value = OnOff(_settings.IdleNotifications), On = _settings.IdleNotifications });
+                rows.Add(new SettingRow { Id = IdleNotifications, Label = _text.Get("ui.settings.idle_alert"), Value = OnOff(_settings.IdleNotifications), On = _settings.IdleNotifications });
+            }
+
+            rows.Add(VolumeRow(MasterVolume, "ui.settings.master_volume", _settings.MasterVolume));
+            rows.Add(VolumeRow(MusicVolume, "ui.settings.music_volume", _settings.MusicVolume));
+            rows.Add(VolumeRow(SfxVolume, "ui.settings.sfx_volume", _settings.SfxVolume));
+            rows.Add(new SettingRow { Id = Mute, Label = _text.Get("ui.settings.mute"), Value = OnOff(_settings.Muted), On = !_settings.Muted });
+            if (HapticsAvailable)
+            {
+                rows.Add(new SettingRow { Id = Haptics, Label = _text.Get("ui.settings.haptics"), Value = OnOff(_settings.Haptics), On = _settings.Haptics });
             }
 
             return rows;
+        }
+
+        /// <summary>The row for setting <paramref name="id"/>, or null when it is not shown here.</summary>
+        public SettingRow Row(int id)
+        {
+            return Rows().Find(row => row.Id == id);
+        }
+
+        private SettingRow VolumeRow(int id, string labelKey, int volume)
+        {
+            int percent = (int)Math.Round(MusicMix.Percent(volume) * 100f);
+            return new SettingRow { Id = id, Label = _text.Get(labelKey), Value = _text.Format("ui.settings.volume_value", percent), On = percent > 0 && !_settings.Muted };
         }
 
         private string OnOff(bool on)
@@ -233,7 +271,18 @@ namespace BeastCraft.Presentation.Screens
             return speed >= 1 && speed <= 3 ? speed : 1;
         }
 
-        /// <summary>Changes row <paramref name="row"/>'s setting (effects cycle Full, Reduced, Minimal; speed x1, x2, x3; the rest toggle) and saves.</summary>
+        /// <summary>The next volume down in <see cref="VolumeStep"/>s, wrapping from 0 to 100 (an off-step value rounds down first).</summary>
+        public static int NextVolume(int volume)
+        {
+            int clamped = Math.Max(0, Math.Min(100, volume));
+            return clamped == 0 ? 100 : (clamped - 1) / VolumeStep * VolumeStep;
+        }
+
+        /// <summary>
+        /// Changes setting <paramref name="row"/> (a row constant): effects cycle Full, Reduced, Minimal;
+        /// speed x1, x2, x3; a volume steps down a quarter at a time (<see cref="NextVolume"/>); the rest
+        /// toggle. Saves.
+        /// </summary>
         public void Change(int row)
         {
             switch (row)
@@ -268,6 +317,26 @@ namespace BeastCraft.Presentation.Screens
                     }
 
                     _settings.IdleNotifications = !_settings.IdleNotifications;
+                    break;
+                case MasterVolume:
+                    _settings.MasterVolume = NextVolume(_settings.MasterVolume);
+                    break;
+                case MusicVolume:
+                    _settings.MusicVolume = NextVolume(_settings.MusicVolume);
+                    break;
+                case SfxVolume:
+                    _settings.SfxVolume = NextVolume(_settings.SfxVolume);
+                    break;
+                case Mute:
+                    _settings.Muted = !_settings.Muted;
+                    break;
+                case Haptics:
+                    if (!HapticsAvailable)
+                    {
+                        return;
+                    }
+
+                    _settings.Haptics = !_settings.Haptics;
                     break;
                 default:
                     return;

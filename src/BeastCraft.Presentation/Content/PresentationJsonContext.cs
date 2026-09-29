@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using System.Text.Json.Serialization;
 using BeastCraft.Presentation.Art;
+using BeastCraft.Presentation.Audio;
 using BeastCraft.Presentation.Text;
 using BeastCraft.Presentation.Ui;
 
@@ -13,6 +14,7 @@ namespace BeastCraft.Presentation.Content
     /// <c>[JsonSerializable]</c> line here.
     /// </summary>
     [JsonSourceGenerationOptions(IncludeFields = true, GenerationMode = JsonSourceGenerationMode.Metadata)]
+    [JsonSerializable(typeof(AudioCueLibraryData))]
     [JsonSerializable(typeof(BattleArtData))]
     [JsonSerializable(typeof(GlossaryData))]
     [JsonSerializable(typeof(UiStyleData))]

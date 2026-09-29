@@ -49,6 +49,8 @@ namespace BeastCraft.Android
             // Idle time counts deep sleep (elapsedRealtime), and the idle-full notification is Android's.
             host.MonotonicClock = () => TimeSpan.FromMilliseconds(SystemClock.ElapsedRealtime());
             host.IdleNotifier = new AndroidIdleNotifier(this);
+            // Light haptics on hits, knockouts and key confirms (on by default, a settings toggle). UNVERIFIED: see AndroidHaptics.
+            host.Haptics = new AndroidHaptics(this);
 
             // TODO(#59): save export/import on Android. host.SaveTransfer is left null, so the slot list
             // hides Export and Import here (Auto Backup still covers the saves: Resources/xml). The plan is

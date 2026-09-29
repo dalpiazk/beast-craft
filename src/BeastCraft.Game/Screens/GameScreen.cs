@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using BeastCraft.Game.Rendering;
 using BeastCraft.Game.Ui;
+using BeastCraft.Presentation.Audio;
 using BeastCraft.Presentation.Board;
 using BeastCraft.Presentation.Content;
 using BeastCraft.Presentation.Layout;
@@ -35,6 +36,9 @@ namespace BeastCraft.Game.Screens
 
         public ScreenStack Stack;
         public ToastQueue Toast;
+
+        /// <summary>Sound, music and haptics (<see cref="AudioDirector"/>; silent in scripted runs).</summary>
+        public AudioDirector Audio;
 
         /// <summary>This frame's fit of the canvas into the target (set by the host before drawing).</summary>
         public CanvasFit CanvasFit;
@@ -339,6 +343,12 @@ namespace BeastCraft.Game.Screens
     /// <summary>The settings (<see cref="SettingsViewModel"/>): each row cycles or toggles its setting and saves it.</summary>
     public sealed class SettingsModal : GameModal
     {
+        /// <summary>A row's height plus its gap, while the rows fit; more rows than fit share the height (the Android host shows two more).</summary>
+        private const float RowPitch = 128f;
+
+        /// <summary>The least margin above and below the card.</summary>
+        private const float MinMargin = 40f;
+
         private readonly SettingsViewModel _model;
         private readonly List<Button> _rows = new List<Button>();
 
@@ -346,16 +356,18 @@ namespace BeastCraft.Game.Screens
         {
             _model = model;
             UiStyle style = ctx.Style;
-            int count = model.Rows().Count;
-            float height = 160f + count * 128f + 170f;
+            List<SettingRow> rows = model.Rows();
+            int count = rows.Count;
+            float pitch = Math.Min(RowPitch, (PortraitLayout.CanvasHeight - 2f * MinMargin - 330f) / Math.Max(1, count));
+            float height = 160f + count * pitch + 170f;
             Rect card = new Rect(90f, (PortraitLayout.CanvasHeight - height) / 2f, 900f, height);
             Panel panel = Ui.Add(new Panel { Bounds = card, StyleKey = "modal" });
             panel.Add(new Label { Bounds = new Rect(card.X, card.Y + 50f, card.Width, 60f), Text = Loc("ui.settings.title"), Size = style.TextSizes.Heading, ColorKey = "plum", Align = TextAlign.Center });
             for (int i = 0; i < count; i++)
             {
-                int row = i;
-                Button button = panel.Add(new Button { Id = "row" + i, Bounds = new Rect(card.X + 60f, card.Y + 150f + i * 128f, card.Width - 120f, 106f), StyleKey = "secondary" });
-                button.Clicked += () => _model.Change(row);
+                int id = rows[i].Id;
+                Button button = panel.Add(new Button { Id = "row" + i, Bounds = new Rect(card.X + 60f, card.Y + 150f + i * pitch, card.Width - 120f, pitch - 22f), StyleKey = "secondary" });
+                button.Clicked += () => _model.Change(id);
                 _rows.Add(button);
             }
 

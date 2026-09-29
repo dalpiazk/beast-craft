@@ -1,4 +1,5 @@
 using System;
+using BeastCraft.Presentation.Audio;
 using BeastCraft.Presentation.Content;
 using BeastCraft.Presentation.Layout;
 using BeastCraft.Presentation.Screens;
@@ -62,6 +63,12 @@ namespace BeastCraft.Game
         /// (desktop), and the setting is hidden.
         /// </summary>
         public IIdleNotifier IdleNotifier;
+
+        /// <summary>
+        /// Vibrates the device (Android). Null: the host has none (desktop): the game uses
+        /// <see cref="NullHaptics"/> and the setting is hidden.
+        /// </summary>
+        public IHaptics Haptics;
 
         /// <summary>
         /// Exports a save slot to a file and imports one back (the slot list's Export and Import). The desktop
