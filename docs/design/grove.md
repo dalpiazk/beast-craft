@@ -1,5 +1,6 @@
 # Grove: Beast Grove, Wildgarden, Expeditions
 
+**Status: D1 and D2 BUILT (Core, content, save, tests); D3 and D4 not started — see §11.**
 **DRAFT — every DisplayName, Title and Text pending producer review.** This is the design pass
 reconciled against `main` at commit `8829dbf` (the draft this replaces was written against an older
 `main`, schema 7, before the Kinship/discovery layer, the compendium and look tokens existed). It
@@ -204,20 +205,64 @@ see the producer decision) sized to `PartySize`. Notifications: the existing And
 notification hook from the screens PR, off by default, plus an in-app toast on entering Home when
 something is ready.
 
-## 6. NPCs (D2 — not built in this PR)
+## 6. NPCs (D2 — status: BUILT)
 
-Unchanged in shape from the draft, now explicitly scoped as **D2**: a light, data-driven dialogue
-layer (`npc-dialogue.json`, `DialogueLineData {NpcId, Conditions[], Text, Priority}`, highest-priority-
-line-whose-conditions-hold resolution, a `DialogueState {LinesSeen[]}` save section), cast v1 = 4
-(Trader, a Grove Keeper, a Wandering Scholar, generic Forest Folk). **Producer addition, carried
-forward**: Grove items drive NPC and map interactions — NPCs make requests for grown/crafted/found
-Grove items; fulfilling them advances their story and gives rewards. This PR's `GroveItemInventory`
-(`PlayerSave.Grove.Items`) is exactly the seam D2 reads and spends from: a request is "hold N of item
-X", checked with `GetCount`, granted with `TryConsume`, no new inventory concept needed.
-**Producer addition, carried forward**: NPC side stories — optional multi-step chapter chains
-(condition → request → reward/lore → next chapter) per NPC, tracked in the save and the compendium,
-never required for the main campaign. D2 should model a chapter chain as its own small save list
-(`ChapterId` reached per NPC) rather than overloading `DialogueState.LinesSeen`.
+Built as planned, with one reconciliation against real code found while implementing it: the file is
+**not** a new `npc-dialogue.json` — `content/data/Npc/dialogue.json` already existed (Hearthglen's
+tutorial dialogue layer) and already used exactly this shape
+(`Tutorial.DialogueLineData {NpcId, Conditions[], Text, Priority}`, `DialogueBook.Resolve` = highest-
+priority line whose conditions hold, ties by specificity), because it was built anticipating this PR
+(its own readme said so). D2 extends that one file and its `DialogueBook`/`DialogueValidator` rather
+than creating a second dialogue system. Cast v1 = 4: the Grove Keeper (already existed, now also
+tends the Grove hub), the Trader, the Wandering Scholar, Forest Folk — ~10-15 condition-resolved lines
+each, plus each NPC's existing/added no-condition default line.
+
+**Conditions are `"kind:params"` strings** (`Tutorial.NpcConditionKinds`), built live from account
+state every time by `Npc.NpcRules.BuildFacts` — affinity tier (any beast, and per species, cascading:
+a beast at tier 3 also emits its tier-1 and tier-2 facts so a "tier 2+" line still matches), herbarium
+variety found/count, decor placed count, habitat unlocked, an expedition story unlocked, a region's
+boss cleared, Grove or dialogue-layer lore found, a Grove item held, and a side-story chapter/story
+complete. Deliberately one small, growable list, exactly per the design's extensibility ask: D3 adds
+`colour_form_owned`/`location_soothed` the same way, a new kind constant plus a new fact emitted from
+`BuildFacts`, with `DialogueBook.Resolve` itself untouched.
+
+**Producer addition, delivered**: Grove items drive NPC interactions — `Tutorial.RequestData
+{RequestId, NpcId, Conditions[], ItemId, Count, RewardKind, RewardId, Text}`, checked with
+`GroveItemInventory.GetCount` and consumed with `TryConsume` through `Npc.NpcRules
+.IsRequestAvailable`/`CanFulfillRequest`/`FulfillRequest`, exactly the seam D1 built. 4 requests
+shipped (one per NPC), each granting the dialogue layer's own lore.
+
+**Producer addition, delivered**: NPC side stories — `Tutorial.SideStoryData {StoryId, NpcId,
+DisplayName, Chapters[]}`, each chapter (`SideStoryChapterData {ChapterId, Conditions[], Text,
+RequestItemId, RequestCount, RewardKind, RewardId, LoreId, NextChapterId}`) chained by
+`NextChapterId` (validated acyclic, exactly one entry chapter, every chapter reachable) rather than
+by array order, so the validator can catch a broken chain. Progress is its own small save list, per
+the design's own steer: `PlayerSave.Npc.SideStories` (`List<Npc.SideStoryState> {StoryId,
+ChaptersCompleted}`), not folded into `DialogueState.LinesSeen`. 3 arcs shipped, one each for the
+Grove Keeper, the Wandering Scholar and the Trader (3-4 chapters each), never required for the main
+campaign. Completing an arc is surfaced as an achievement (`AchievementKinds.SideStoryComplete`,
+`AchievementData.StoryId` naming the arc); found dialogue-layer lore is surfaced through
+`Discovery.CompendiumRules.NpcLoreEntries(save, dialogue)` (cheap — a pure listing over
+`DialogueBook.AllLore` and `PlayerSave.Npc.LoreIds`, deliberately **not** folded into
+`CompendiumRules.Completion`/its `Percent`, which stays scoped to what it already covered). No
+compendium *screen* change is in this PR (no screens); D4 wires the method up. **No title, decor or look
+reward is ever granted directly by a request or a chapter's `RewardKind`** — v1 content authors only
+`"lore"` (requests) and `"none"` (chapters, which instead always carry their own `LoreId`), the same
+"wire it, don't author it yet" stance D1 took for `"look"` rewards; `RewardKind` still mechanically
+supports `"decor"`/`"look"` (validated, `Npc.NpcRules.ApplyReward` grants them) for a later pass once
+there is a reason to spend new decor/look content on an NPC reward specifically rather than the
+existing Grove/Garden/Board unlock paths.
+
+**Save.** `PlayerSave.Npc` (`Npc.NpcProgress`) was added to the **same** schema-10 shape in place
+(schema 10 had not shipped on any other branch — see `progression-and-saves.md`, "Schema 10, extended
+in place"), not a new schema 11.
+
+**Validator.** `Tutorial.DialogueValidator.ValidateRequestsAndSideStories`, hooked into
+`GameContent.Load` beside the existing dialogue/scene checks: every request's/chapter's item id
+resolves to a real `GroveItemInventory` id (a Wildgarden variety, a crafted dye or an expedition
+trinket — cross-checked against `garden-library.json`/`expedition-library.json`), every reward id
+resolves for its kind, every condition's kind is known, ids are unique, ids are snake_case, text
+follows the content bible's length and tone rules, and every side story's chapter chain is acyclic.
 
 ## 7. Peaceful clears ("soothing") and colour evolutions (D3 — not built in this PR)
 
@@ -290,10 +335,13 @@ constrained the choice — flagged for review, not hidden:
 
 ## 11. Sequencing
 
-1. **D1 — Data + Rules + Save 10 (this PR).** `*LibraryData`/`*Validator`/`*Rules`/save sections,
+1. **D1 — Data + Rules + Save 10. Status: BUILT.** `*LibraryData`/`*Validator`/`*Rules`/save sections,
    `OfflineClock` extraction, migration + goldens, full unit coverage. No screens.
-2. **D2 — NPC dialogue, requests and side stories.** Data, validator, resolution, save flags, chapter
-   chains reading `GroveItemInventory`.
+2. **D2 — NPC dialogue, requests and side stories. Status: BUILT.** Data (extending
+   `content/data/Npc/dialogue.json`), validator, resolution (`Npc.NpcRules.BuildFacts`/
+   `ResolveAndMark`), save (`PlayerSave.Npc`, folded into schema 10 in place), request fulfilment and
+   chapter chains reading `GroveItemInventory`, `AchievementKinds.SideStoryComplete`. No screens — see
+   §6.
 3. **D3 — Soothing and colour evolutions.** Peaceful-clear rule (ordinary locations, full rewards),
    colour-variant save flags and accent masks, the `Tooling/BalanceSim` pacing check for soothed
    clears.
