@@ -5,6 +5,9 @@ using System.Globalization;
 using BeastCraft.Campaign;
 using BeastCraft.Creatures;
 using BeastCraft.Discovery;
+using BeastCraft.Expeditions;
+using BeastCraft.Garden;
+using BeastCraft.Grove;
 using BeastCraft.Idle;
 using BeastCraft.Presentation.Content;
 using BeastCraft.Progression;
@@ -216,6 +219,14 @@ namespace BeastCraft.Presentation.Screens
         public HashSet<string> DismissedSuggestions { get; } = new HashSet<string>(StringComparer.Ordinal);
 
         /// <summary>
+        /// Grove/Garden/Board readiness already toasted this "ready" spell (a plot id or destination
+        /// id), so <see cref="RefreshGrove"/> does not repeat the toast on every Home visit while the
+        /// player has simply not collected it yet; pruned back to what is still ready each call, so a
+        /// harvest or collect re-arms it for next time.
+        /// </summary>
+        private readonly HashSet<string> _groveReadyToasted = new HashSet<string>(StringComparer.Ordinal);
+
+        /// <summary>
         /// A brand-new game in Hearthglen (<see cref="StarterPicks.NewGame"/>): the avatar's starting
         /// kit and the New Game pick <paramref name="firstSpeciesId"/>, the Hearthglen expedition
         /// started, saved. False (nothing changes) for a species that is not a legal first pick.
@@ -266,6 +277,7 @@ namespace BeastCraft.Presentation.Screens
             EnsureExpedition();
             IdleRewardCalculator.Claim(Save, Content.Idle, Clock.UtcNow, Clock.Monotonic, Party());
             EvaluateAchievementsOnSessionStart();
+            RefreshGrove();
             Autosave(AutosaveReason.NewGame);
         }
 
@@ -337,10 +349,12 @@ namespace BeastCraft.Presentation.Screens
             // once-per-session-start check below runs (idempotent, so it never toasts it twice).
             LastContinueClaim = ClaimIdle();
             bool achievementsChanged = EvaluateAchievementsOnSessionStart();
-            if (started || fromBackup || achievementsChanged)
+            bool groveReady = RefreshGrove();
+            if (started || fromBackup || achievementsChanged || groveReady)
             {
                 // Keep the main file current: a started expedition, a retroactively earned achievement,
-                // or the restored backup made main again.
+                // a Grove unlock/gift the offline clock just rolled forward, or the restored backup
+                // made main again.
                 Autosave(AutosaveReason.Results);
             }
 
@@ -543,6 +557,71 @@ namespace BeastCraft.Presentation.Screens
 
             string current = Save?.Campaign?.CurrentRegionId;
             return string.IsNullOrEmpty(current) ? CampaignProgress.StartingRegionId : current;
+        }
+
+        // ------------------------------------------------------------------ The Grove (docs/design/grove.md, D4)
+
+        /// <summary>
+        /// Refreshes the Grove's live-condition unlocks (<see cref="GroveRules.RefreshUnlocks"/>) and
+        /// rolls every owned beast's gift clock forward (<see cref="GroveRules.RefreshGifts"/>), then
+        /// checks the Wildgarden's plots and the Board's expeditions for readiness, queuing one
+        /// consolidated <see cref="PendingToasts"/> entry the first time something new is ready since
+        /// the last check (never repeated while it just sits there uncollected — see
+        /// <see cref="_groveReadyToasted"/>). Idempotent and safe to call often (session start, every
+        /// time Home shows): nothing here is ever lost by checking late, the same "banked, not spent"
+        /// stance every Grove timer already has. Does nothing before a game is loaded. Returns whether
+        /// anything new became ready.
+        /// </summary>
+        public bool RefreshGrove()
+        {
+            if (Save == null)
+            {
+                return false;
+            }
+
+            Save.EnsureInitialized();
+            GroveRules.RefreshUnlocks(Save, Content.GroveLibrary);
+            bool somethingNew = false;
+            foreach (OwnedBeast beast in Save.Beasts)
+            {
+                if (beast != null && GroveRules.RefreshGifts(Save, Content.GroveLibrary, beast.BeastId, Clock.UtcNow, Clock.Monotonic) > 0)
+                {
+                    somethingNew = true;
+                }
+            }
+
+            HashSet<string> stillReady = new HashSet<string>(StringComparer.Ordinal);
+            foreach (PlotState plot in Save.Garden.Plots)
+            {
+                if (plot == null || !GardenRules.IsReady(Content.GardenLibrary, plot, Clock.UtcNow, Clock.Monotonic))
+                {
+                    continue;
+                }
+
+                string key = "plot:" + plot.PlotId.ToString(CultureInfo.InvariantCulture);
+                stillReady.Add(key);
+                somethingNew |= _groveReadyToasted.Add(key);
+            }
+
+            foreach (ActiveExpedition active in Save.Expeditions.Active)
+            {
+                if (active == null || string.IsNullOrEmpty(active.DestinationId) || !ExpeditionRules.IsReturned(Content.ExpeditionLibrary, active, Clock.UtcNow, Clock.Monotonic))
+                {
+                    continue;
+                }
+
+                string key = "expedition:" + active.DestinationId;
+                stillReady.Add(key);
+                somethingNew |= _groveReadyToasted.Add(key);
+            }
+
+            _groveReadyToasted.IntersectWith(stillReady);
+            if (somethingNew)
+            {
+                PendingToasts.Add("Something is ready in the Grove.");
+            }
+
+            return somethingNew;
         }
 
         // ------------------------------------------------------------------ The discovery layer
