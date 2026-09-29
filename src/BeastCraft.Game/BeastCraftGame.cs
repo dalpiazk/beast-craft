@@ -1296,6 +1296,35 @@ namespace BeastCraft.Game
                 steps.Add(() => Home().OpenRegionProgress());
             }
 
+            // Verification aids for #60, not player-facing screens: r11 on Hard, on the map (the header badge and the
+            // Normal or Hard chip) and in the encounter preview (the badge), every earlier boss down.
+            if (screen == "map-hard" || screen == "encounter-hard")
+            {
+                steps.Add(() =>
+                {
+                    PlayerSave save = _ctx.Session.Save;
+                    save.Tutorial.HearthglenCleared = true;
+                    foreach (RegionData region in _ctx.Content.Campaign.Regions)
+                    {
+                        if (!region.IsPostGame && !region.IsTutorial)
+                        {
+                            save.Campaign.Unlock(region.RegionId);
+                            save.Campaign.FindRegion(region.RegionId).BossCleared = true;
+                        }
+                    }
+
+                    save.Campaign.Unlock("r11");
+                    CampaignRules.Retreat(save);
+                    CampaignRules.StartRun(save, _ctx.Content.Campaign, "r11", 0, 7, RunDifficulty.Hard);
+                    Home().Enter();
+                });
+            }
+
+            if (screen == "encounter-hard")
+            {
+                steps.Add(() => Home().OpenFirstEncounter());
+            }
+
             if (screen == "encounter" || screen == "encounter-insight" || screen == "battle" || screen == "results" || screen == "battle-log" || screen == "results-log")
             {
                 steps.Add(() => Home().OpenFirstEncounter());

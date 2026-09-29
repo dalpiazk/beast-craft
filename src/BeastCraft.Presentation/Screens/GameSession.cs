@@ -541,6 +541,7 @@ namespace BeastCraft.Presentation.Screens
             Save.EnsureInitialized();
             LastTeam.Clear();
             DismissedSuggestions.Clear();
+            PreferredDifficulty = Save.Campaign.HasActiveRun ? Save.Campaign.ActiveRun.Difficulty : RunDifficulty.Normal;
             EnsureExpedition();
             IdleRewardCalculator.Claim(Save, Content.Idle, Clock.UtcNow, Clock.Monotonic, Party());
             EvaluateAchievementsOnSessionStart();
@@ -606,6 +607,7 @@ namespace BeastCraft.Presentation.Screens
             Save = loaded.Save;
             LastTeam.Clear();
             DismissedSuggestions.Clear();
+            PreferredDifficulty = Save.Campaign.HasActiveRun ? Save.Campaign.ActiveRun.Difficulty : RunDifficulty.Normal;
             bool fromBackup = loaded.StorageSource == SaveFileSource.Backup;
             bool started = !Save.Campaign.HasActiveRun;
 
@@ -858,9 +860,17 @@ namespace BeastCraft.Presentation.Screens
         }
 
         /// <summary>
+        /// The difficulty the player last chose for a post-game region (<see cref="ReplayStage(int, RunDifficulty)"/>),
+        /// or the one of the expedition a loaded save was on. The next stage starts on it, so a Hard run
+        /// stays Hard from stage to stage. Session only: a save closed between stages starts Normal.
+        /// </summary>
+        public RunDifficulty PreferredDifficulty { get; private set; }
+
+        /// <summary>
         /// Makes sure an expedition is in progress: when none is, starts one (a new map seed) into
         /// Hearthglen while it is not behind the player, else the first unlocked region whose boss
-        /// still stands, else the region last played.
+        /// still stands, else the region last played. It starts on <see cref="PreferredDifficulty"/>
+        /// where the region allows it (<see cref="RegionLibrary.Allows"/>), else on Normal.
         /// </summary>
         public CampaignResult EnsureExpedition()
         {
@@ -869,7 +879,19 @@ namespace BeastCraft.Presentation.Screens
                 return null;
             }
 
-            return CampaignRules.StartRun(Save, Content.Campaign, NextRegionId(), _seeds());
+            string regionId = NextRegionId();
+            RunDifficulty difficulty = RegionLibrary.Allows(Content.Campaign.GetRegion(regionId), PreferredDifficulty) ? PreferredDifficulty : RunDifficulty.Normal;
+            return CampaignRules.StartRun(Save, Content.Campaign, regionId, _seeds(), difficulty);
+        }
+
+        /// <summary>Whether the region of the expedition in progress can be played on Hard (a post-game region).</summary>
+        public bool HardAvailable
+        {
+            get
+            {
+                MapRun run = Save?.Campaign?.ActiveRun;
+                return run != null && Save.Campaign.HasActiveRun && RegionLibrary.Allows(Content.Campaign.GetRegion(run.RegionId), RunDifficulty.Hard);
+            }
         }
 
         /// <summary>The region an expedition starts into: see <see cref="EnsureExpedition"/>.</summary>
@@ -1098,8 +1120,7 @@ namespace BeastCraft.Presentation.Screens
 
         /// <summary>
         /// Replays stage <paramref name="stage"/> of the region in progress (to explore what the fog still
-        /// hides): the expedition in progress is abandoned (its stage progress stays; the fog never comes
-        /// back) and a new one starts on a new map. Refused beyond the first uncleared stage.
+        /// hides) on the expedition's own difficulty: see <see cref="ReplayStage(int, RunDifficulty)"/>.
         /// </summary>
         public CampaignResult ReplayStage(int stage)
         {
@@ -1108,19 +1129,43 @@ namespace BeastCraft.Presentation.Screens
                 return null;
             }
 
+            return ReplayStage(stage, Save.Campaign.ActiveRun.Difficulty);
+        }
+
+        /// <summary>
+        /// Replays stage <paramref name="stage"/> of the region in progress on <paramref name="difficulty"/>
+        /// (Hard only in a post-game region): the expedition in progress is abandoned (its stage progress
+        /// stays; the fog never comes back) and a new one starts on a new map. Refused beyond the first
+        /// uncleared stage or on a difficulty the region does not allow; a start the rules refuse puts the
+        /// player back on the stage and difficulty they left. The chosen difficulty becomes
+        /// <see cref="PreferredDifficulty"/>.
+        /// </summary>
+        public CampaignResult ReplayStage(int stage, RunDifficulty difficulty)
+        {
+            if (Save == null || !Save.Campaign.HasActiveRun)
+            {
+                return null;
+            }
+
             string regionId = Save.Campaign.ActiveRun.RegionId;
-            if (stage < 0 || stage > CampaignRules.NextStage(Save, Content.Campaign, regionId))
+            if (stage < 0 || stage > CampaignRules.NextStage(Save, Content.Campaign, regionId) ||
+                !RegionLibrary.Allows(Content.Campaign.GetRegion(regionId), difficulty))
             {
                 return null;
             }
 
             MapRun previous = Save.Campaign.ActiveRun;
             int oldStage = previous.Stage;
+            RunDifficulty oldDifficulty = previous.Difficulty;
             CampaignRules.Retreat(Save);
-            CampaignResult started = CampaignRules.StartRun(Save, Content.Campaign, regionId, stage, _seeds());
-            if (!started.Success)
+            CampaignResult started = CampaignRules.StartRun(Save, Content.Campaign, regionId, stage, _seeds(), difficulty);
+            if (started.Success)
             {
-                CampaignRules.StartRun(Save, Content.Campaign, regionId, oldStage, _seeds());
+                PreferredDifficulty = difficulty;
+            }
+            else
+            {
+                CampaignRules.StartRun(Save, Content.Campaign, regionId, oldStage, _seeds(), oldDifficulty);
             }
 
             Autosave(AutosaveReason.Results);

@@ -149,6 +149,7 @@ namespace BeastCraft.Presentation.Screens
             MapNode node = Battle.Node;
             Title = session.LocationName(node);
             KindLabel = MapViewModel.KindLabel(node.Type, content.Text);
+            IsHard = !Battle.IsKinshipTrial && session.Save.Campaign.HasActiveRun && session.Save.Campaign.ActiveRun.Difficulty == RunDifficulty.Hard;
             if (Battle.IsKinshipTrial)
             {
                 Discovery.KinshipSiteData site = Discovery.KinshipRules.SiteOf(content.Discovery, Battle.Trial);
@@ -272,6 +273,9 @@ namespace BeastCraft.Presentation.Screens
         public string Title { get; }
 
         public string KindLabel { get; }
+
+        /// <summary>Whether this fight is on a Hard expedition (a post-game region played on Hard): the preview shows the Hard badge.</summary>
+        public bool IsHard { get; }
 
         /// <summary>A Kinship trial's words (the site's intro), shown as a banner; null for a map location.</summary>
         public string Banner { get; }

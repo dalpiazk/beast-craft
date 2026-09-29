@@ -58,6 +58,11 @@ namespace BeastCraft.Game.Screens
                     Ctx.Audio?.Cue(AudioDirector.Rewards);
                 }
 
+                if (!string.IsNullOrEmpty(_model.HardUnlockedToast))
+                {
+                    Ctx.Game.Toast(_model.HardUnlockedToast);
+                }
+
                 if (_model.AvatarLevelsGained > 0 || _model.Team.Exists(row => row.LevelsGained > 0))
                 {
                     Ctx.Audio?.Cue(AudioDirector.LevelUp);

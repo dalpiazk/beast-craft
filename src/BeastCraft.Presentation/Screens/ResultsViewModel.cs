@@ -108,6 +108,9 @@ namespace BeastCraft.Presentation.Screens
 
         public List<string> UnlockedRegions { get; } = new List<string>();
 
+        /// <summary>When a region this win opened can be played on Hard (a post-game region), a toast saying so; else null.</summary>
+        public string HardUnlockedToast { get; private set; }
+
         public CampaignOutcome MapOutcome { get; private set; }
 
         /// <summary>After a loss: losses at this location, and what happens next.</summary>
@@ -271,6 +274,11 @@ namespace BeastCraft.Presentation.Screens
             foreach (string region in campaign.UnlockedRegionIds)
             {
                 view.UnlockedRegions.Add(session.Content.Campaign.GetRegion(region)?.DisplayName ?? region);
+                RegionData opened = session.Content.Campaign.GetRegion(region);
+                if (view.HardUnlockedToast == null && RegionLibrary.Allows(opened, RunDifficulty.Hard))
+                {
+                    view.HardUnlockedToast = session.Content.Text.Format("ui.results.hard_open", opened.DisplayName);
+                }
             }
 
             view.Losses = campaign.Outcome == CampaignOutcome.Lost ? CampaignRules.LossesAt(save.Campaign.ActiveRun, battle.Node.NodeId) : 0;

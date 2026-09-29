@@ -368,6 +368,12 @@ namespace BeastCraft.Presentation.Screens
 
         /// <summary>Whether the region's 100% reward has been granted.</summary>
         public bool CompletionRewarded;
+
+        /// <summary>Whether the region can be played on Hard (a post-game region): the header offers the Normal or Hard choice.</summary>
+        public bool HardAvailable;
+
+        /// <summary>Whether this expedition is on Hard: the header shows the Hard badge.</summary>
+        public bool IsHard;
     }
 
     /// <summary>What a tap on a location does.</summary>
@@ -863,8 +869,33 @@ namespace BeastCraft.Presentation.Screens
                 SealName = seal?.DisplayName,
                 SealOwned = seal != null && _session.Save.Campaign.HasSeal(seal.SealId),
                 SealProgress = cleared / (float)stages,
-                BindingLimit = CampaignRules.BeastCap(_session.Save, _session.Content.Campaign)
+                BindingLimit = CampaignRules.BeastCap(_session.Save, _session.Content.Campaign),
+                HardAvailable = RegionLibrary.Allows(region, RunDifficulty.Hard),
+                IsHard = run.Difficulty == RunDifficulty.Hard
             };
+        }
+
+        /// <summary>
+        /// Plays the stage on the map now again on <paramref name="difficulty"/> (the header's Normal or Hard
+        /// choice, post-game regions only; <see cref="GameSession.ReplayStage(int, RunDifficulty)"/>), on a new
+        /// map. False when refused.
+        /// </summary>
+        public bool SwitchDifficulty(RunDifficulty difficulty)
+        {
+            MapRun run = _session.Save?.Campaign?.ActiveRun;
+            if (run == null || !_session.Save.Campaign.HasActiveRun || run.Difficulty == difficulty)
+            {
+                return false;
+            }
+
+            CampaignResult result = _session.ReplayStage(run.Stage, difficulty);
+            if (result == null || !result.Success)
+            {
+                return false;
+            }
+
+            Refresh();
+            return true;
         }
     }
 }

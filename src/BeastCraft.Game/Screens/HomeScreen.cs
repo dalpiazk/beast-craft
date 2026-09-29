@@ -49,6 +49,7 @@ namespace BeastCraft.Game.Screens
         private readonly Button _idle;
         private readonly Button _next;
         private readonly Button _explored;
+        private readonly Button _difficulty;
         private readonly List<Hotspot> _spots = new List<Hotspot>();
         private float _idleRefreshMs;
 
@@ -63,6 +64,8 @@ namespace BeastCraft.Game.Screens
             _gear = AddButton(null, "gear", new Rect(HeaderBox.Right - 120f, HeaderBox.Y + 24f, 96f, 96f), null, "ghost", OpenSettings, "gear");
             _idle = AddButton(null, "idle", new Rect(HeaderBox.Right - 420f, HeaderBox.Bottom + 18f, 420f, 84f), Loc("ui.home.idle"), "chip", ClaimIdle, "hourglass");
             _explored = AddButton(null, "explored", new Rect(HeaderBox.X, HeaderBox.Bottom + 18f, 400f, 84f), Loc("ui.home.explored"), "chip", OpenRegionProgress, "map");
+            _difficulty = AddButton(null, "difficulty", new Rect(HeaderBox.X, HeaderBox.Bottom + 18f, 400f, 84f), Loc("ui.home.normal"), "chip", AskDifficulty, "battle");
+            _difficulty.Visible = false;
             _next = AddButton(null, "next-battle", new Rect(NavBox.X + 90f, NavBox.Y - 150f, NavBox.Width - 180f, 124f), Loc("ui.home.next_battle"), "primary", OpenRecommended,
                               "battle");
             Ui.Add(new Panel { Id = "nav-panel", Bounds = NavBox, StyleKey = "nav" });
@@ -131,6 +134,9 @@ namespace BeastCraft.Game.Screens
 
             _explored.Text = _map.Header.CompletionText;
             _explored.Selected = _map.Header.CompletionRewarded;
+            _difficulty.Text = Loc(_map.Header.IsHard ? "ui.home.hard" : "ui.home.normal");
+            _difficulty.Selected = _map.Header.IsHard;
+            _difficulty.Bounds = new Rect(HeaderBox.X, HeaderBox.Bottom + (_map.Header.CompletionPercent >= 0 ? 120f : 18f), 400f, 84f);
             Ctx.Session.RefreshGrove();
             foreach (string toast in Ctx.Session.PendingToasts)
             {
@@ -373,6 +379,34 @@ namespace BeastCraft.Game.Screens
             Ctx.Stack.PushModal(new RegionProgressModal(Ctx, new RegionProgressViewModel(Ctx.Session), Enter));
         }
 
+        /// <summary>
+        /// The header's Normal or Hard chip (post-game regions only): asks, then plays the stage on the map
+        /// again on the other difficulty, on a new map.
+        /// </summary>
+        public void AskDifficulty()
+        {
+            if (!_map.Header.HardAvailable)
+            {
+                return;
+            }
+
+            RunDifficulty target = _map.Header.IsHard ? RunDifficulty.Normal : RunDifficulty.Hard;
+            bool hard = target == RunDifficulty.Hard;
+            string title = hard ? Loc("ui.home.to_hard_title") : Loc("ui.home.to_normal_title");
+            string body = hard ? Loc("ui.home.to_hard_body", _map.Header.Stage + 1) : Loc("ui.home.to_normal_body", _map.Header.Stage + 1);
+            string confirm = hard ? Loc("ui.home.to_hard") : Loc("ui.home.to_normal");
+            Ctx.Stack.PushModal(new ConfirmModal(Ctx, title, body, Loc("ui.home.stay"), confirm, () =>
+            {
+                if (!_map.SwitchDifficulty(target))
+                {
+                    Ctx.Game.Toast(Loc("ui.home.difficulty_refused"));
+                    return;
+                }
+
+                Enter();
+            }));
+        }
+
         /// <summary>A story location: the mentor's scene, then the visit (gifts; at Hearthglen's end, the way on).</summary>
         public void OpenStory(int nodeId)
         {
@@ -461,6 +495,7 @@ namespace BeastCraft.Game.Screens
             _gear.Visible = map;
             _idle.Visible = map;
             _explored.Visible = map && _map.Header.CompletionPercent >= 0;
+            _difficulty.Visible = map && _map.Header.HardAvailable;
             _next.Visible = map && _next.Tag != null;
         }
 
@@ -773,7 +808,15 @@ namespace BeastCraft.Game.Screens
             float x = box.X + 36f;
             Painter.TextIn(header.Name, new Rect(x, box.Y + 30f, box.Width - 200f, Ctx.Style.TextSizes.Heading), Ctx.Style.TextSizes.Heading, Painter.C("plum"), TextAlign.Left);
             string line = header.LevelBand + "   " + header.StageText;
-            Painter.TextIn(line, new Rect(x, box.Y + 88f, box.Width - 200f, 30f), Ctx.Style.TextSizes.Body, Painter.C("inkSoft"), TextAlign.Left);
+            float lineX = x;
+            if (header.IsHard)
+            {
+                // The Hard badge, ahead of the level and stage.
+                Painter.Badge(new Rect(x, box.Y + 84f, 110f, 38f), Loc("ui.home.hard"), Ctx.Style.TextSizes.Small + 2f);
+                lineX = x + 126f;
+            }
+
+            Painter.TextIn(line, new Rect(lineX, box.Y + 88f, box.Width - 200f - (lineX - x), 30f), Ctx.Style.TextSizes.Body, Painter.C("inkSoft"), TextAlign.Left);
 
             // The seal: its stone, its name, the stages toward it.
             Rect seal = new Rect(x, box.Y + 140f, 76f, 76f);

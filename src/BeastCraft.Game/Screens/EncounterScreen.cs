@@ -331,6 +331,11 @@ namespace BeastCraft.Game.Screens
                              ? null
                              : Loc("ui.encounter.subtitle", _model.KindLabel, _model.Level, _model.Arena) + (_model.Attempt > 0 ? Loc("ui.encounter.losses_here", _model.Attempt) : string.Empty);
             _header.Paint(Ctx, Ui, _model.Title ?? Loc("ui.encounter.title"), sub);
+            if (_model.IsHard)
+            {
+                // The Hard badge, at the end of the subtitle line.
+                Painter.Badge(new Rect(PortraitLayout.CanvasWidth - HeaderMetrics.Pad - 110f, 108f, 110f, 38f), Loc("ui.home.hard"), style.TextSizes.Small + 2f);
+            }
 
             // The start bar.
             Rect bar = new Rect(0, PortraitLayout.CanvasHeight - BottomBar, PortraitLayout.CanvasWidth, BottomBar);

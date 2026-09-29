@@ -105,7 +105,7 @@ namespace BeastCraft.Game
                                                           "kinship-map", "kinship-poi", "kinship-trial", "kinship-choice", "region-progress", "compendium", "achievements", "look-tokens",
                                                           "grove-glade", "grove-garden", "grove-board", "grove-npc", "soothe", "colour-forms", "shop", "avatar-skills", "avatar-gear",
                                                           "avatar-wardrobe", "inventory-materials", "inventory-looks", "shop-sell", "picker10", "save-slots",
-                                                          "grove-canvas", "colour-picker", "inventory-new" };
+                                                          "grove-canvas", "colour-picker", "inventory-new", "map-hard", "encounter-hard" };
 
         /// <summary>
         /// Where the app starts: <c>--screen</c>'s screen, else the battle demo when a demo flag

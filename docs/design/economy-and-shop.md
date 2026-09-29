@@ -227,8 +227,8 @@ Crown) and a seventh source, **`boss_hard`**: a look unlocked by clearing a post
 (any Hard clear, the first included; `CosmeticRules.UnlockHardBossLooks`), never sold and never
 dropped (the Trader stocks `shop` looks only; the validator requires a `boss_hard` look to name a
 post-game region). r11's: Radiant Dawnshade Horn (Kirin) and Eclipse Dawnshade Crown (Basilisk).
-Hard pays Normal's loot; these looks are its only extra reward. No badge (the system has no badge or
-title slot). See battle-system.md, "Post-game region".
+Hard pays Normal's loot; these looks are its only extra reward. No badge or title for Hard: titles
+exist now (achievements; compendium-achievements.md), but none is tied to Hard (a producer call). See battle-system.md, "Post-game region".
 
 ## Pacing (`--mode campaign`)
 

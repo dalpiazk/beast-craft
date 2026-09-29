@@ -460,6 +460,13 @@ namespace BeastCraft.Game.Ui
             Disc(center, 9f, C("berry"));
         }
 
+        /// <summary>A small berry pill with <paramref name="text"/> in white (the Hard badge).</summary>
+        public void Badge(Rect box, string text, float size)
+        {
+            RoundedRect(box, box.Height / 2f, C("berry"));
+            TextIn(text, box, size, C("white"), TextAlign.Center);
+        }
+
         public void Disc(Vec2 center, float radius, Color color)
         {
             if (radius <= 0f)

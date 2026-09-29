@@ -164,6 +164,11 @@ Rules and data: [kinship-discovery.md](kinship-discovery.md). Everything here re
   `RegionProgressModal` (`RegionProgressViewModel`: the 100% reward, per stage rows walked and places
   found, **Revisit** a stage already reached: `GameSession.ReplayStage`). The 100% reward's toast
   (`GameSession.CheckCompletion` → `PendingToasts`, drained when the map shows).
+- **Normal or Hard** (post-game regions only, `RegionHeaderView.HardAvailable`; #60): a chip under the header
+  showing the difficulty now; its tap asks, then plays the stage on the map again on the other difficulty
+  (`MapViewModel.SwitchDifficulty` → `GameSession.ReplayStage(stage, difficulty)`). On Hard a berry **Hard**
+  badge leads the header's level line and ends the encounter preview's subtitle (`EncounterViewModel.IsHard`).
+  Replays and the next stage keep the difficulty. Screenshots: `--screen map-hard | encounter-hard`.
 - Screenshots: `--screen kinship-map | kinship-poi | kinship-trial | kinship-choice | region-progress`
   (a scripted walk up to the first stage's Kinship site, every fight on the way counted won).
 
