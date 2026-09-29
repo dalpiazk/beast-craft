@@ -319,6 +319,33 @@ tutorial hint shown and dismissed, in order, each once; see [area-zero.md](area-
   Hearthglen unlocked instead of Verdant Hollow.
 - *Settings.* `PlayerSettings.TutorialHints` (default **true**; additive, no settings version bump).
 
+### Schema 8: the discovery layer (`PlayerSave.Discovery`, region fog)
+
+Save schema **8** adds the fog, the points of interest and Kinship ([kinship-discovery.md](kinship-discovery.md)).
+`CurrentSchemaVersion` is **8**.
+
+- `PlayerSave.Discovery` (`DiscoveryProgress`, namespace `BeastCraft.Discovery`, written after
+  `Tutorial`): `ClaimedKinshipIds` (sites whose beast joined, or that had none left), `PendingKinshipId`
+  and `PendingKinshipLevel` (a won trial's choice still to make, and the level it joins at),
+  `KinshipLosses` (the trials' retry seed), `GroveUnlockIds` (the shrines' unlocks, held for the
+  Grove), `LoreIds` (lore found, the compendium's seed). Id lists are each-once, in order.
+- `RegionProgress` gains, after `BossCleared`: `DiscoverySeed` (the region's points-of-interest seed,
+  assigned once by its first expedition; 0 = not yet), `Fog` (one `StageFog` per stage visited:
+  `Stage`, `DeepestLayer`, `Cells` — the seen fog cells as a hexadecimal bit set), `FoundPoiIds`,
+  `Completed` (the 100% reward granted).
+- *Rules.* `CampaignRules.StartRun` assigns the seed and lifts the trailhead's fog; every clear, camp
+  and trade lifts the fog around the location (`MapFog.OnCleared`). No random draw: the pacing is
+  unchanged by the fog itself.
+- *Migration.* `SaveMigrations.AddDiscovery` (7 to 8): every unlocked campaign region gets its seed
+  (the expedition in progress's map seed for its region, else one derived from the region id), every
+  stage cleared before fog existed is revealed whole, the expedition in progress has its trailhead and
+  cleared ground revealed; nothing is claimed and no beast is touched (a site never offers an owned
+  beast; one with nothing left is a lore and cache stop). Tutorial regions have no fog.
+- *Golden saves.* `rich-v7.input.json` is frozen; the new `rich-v8.input.json` (reflection-filled) must
+  round-trip byte-identical; new `min-v8`. No input changed; every older expected output changed only by
+  `"SchemaVersion":8`, the region fields after `"BossCleared"` and the appended `,"Discovery":{…}`
+  (verified field by field when captured).
+
 ### Hearthglen's rules (`StarterPicks`, `CampaignRules`)
 
 - **Picks.** The 1st any of the ten; the 2nd any beast of the next stance in the cycle
@@ -541,8 +568,10 @@ merged combat rules (behaviour bonds, enemy statuses); see the tuning log, "Boss
 `dotnet run --project Tooling/BalanceSim -c Release -- --mode campaign [--runs n] [--seed(s)] [--out
 path] [--self-check] [--regions path] [--battles-per-day n] [--idle-hours-per-day h]
 [--idle-claims-per-day n]`: 1,000 Monte Carlo campaigns through the real save, maps and rules, idle
-rewards included (25 battles and two 8-hour claims a day; see "Idle rewards"). The player fields 3 beasts (knocked out in 20% of battles each), benches 3, recruits a level-1
-beast when region 5 starts, takes an Elite when the team's mean level is at least its level (else a
+rewards included (25 battles and two 8-hour claims a day; see "Idle rewards"). The player fields the Hearthglen trio (3 beasts, level 1, knocked out in 20% of battles each) and grows the bench
+through the Kinship sites (the game's discovery rules walked as each stage is cleared: every point the fog reveals visited,
+each revealed site's trial fought until won, its first offer joining at the fielded mean − 3; see
+[kinship-discovery.md](kinship-discovery.md)), takes an Elite when the team's mean level is at least its level (else a
 Battle, else Rest, Shop), camps the lowest bench beast, and retries every loss. Clear chance at equal
 level: squad / horde 80%, elite and gates 60%, solo and bosses 50% (the user's tiers: a generated
 node reads its shape's `TargetClear` from `encounter-library.json`, the boss templates the 50% their
@@ -551,16 +580,17 @@ level gap along the design's table in log-odds (+1 level: 60% / 36% / 27%). Resu
 
 | Gate | Target | Result |
 | --- | --- | --- |
-| Battles, whole campaign | 400-600 (p50) | 507 (p10-p90 489-527); 50-51 per region, ~13 of them lost retries (without idle: 541, 52-54, ~17) |
+| Battles, whole campaign | 400-600 (p50) | 515 (p10-p90 496-534); 50-53 per region, ~13 of them lost retries, Kinship trials included |
 | Fielded level at every gate and boss | p50 within 3 | within 1 of the node level everywhere (up to 1 above: idle XP) |
 | Avatar level at every gate and boss | p50 within 3 | within 1 of the node level |
-| Bench | 5-8 behind, from region 3 | 5.0-5.7 |
-| Recruit | within 8 by the end of region 6 | 6.3 |
+| Beasts owned at r01-r06's bosses | 4, 5, 6, 7, 8, 10 | met |
+| Bench (the Kinship recruits) | 5-8 behind, from region 3 | 5.0-5.7 |
+| Lowest bench beast | within 8 at every boss | 3.0-6.0 |
 | Level cap | never exceeded | 0 |
 | Banked levels at a seal | p50 ≤ 3 | 0 (the cap never binds for this player) |
 | Grind probe after r05's boss | < 0.05 levels (r01), < 0.5 (r05 stage 2) | 0.00, 0.00 |
-| Focus skill (the economy design's gates) | L5 15-20, L10 72-88, L15 162-198, L20 270+ | 17, 77, 171, 297 |
-| Idle shares of the campaign (p50) | gold ≤ 15%, materials ≤ 15%, beast XP ≤ 10% | 5.6%, 13.4%, 9.3% |
+| Focus skill (the economy design's gates) | L5 15-20, L10 72-88, L15 162-198, L20 270+ | 17, 77, 173, 301 (caches' shards included) |
+| Idle shares of the campaign (p50) | gold ≤ 15%, materials ≤ 15%, beast XP ≤ 10% | 5.7%, 13.5%, 8.3% |
 
 The clear-chance model is an assumption, not measured from fought battles; the tiered targets are
 what the encounter table is calibrated to for a scouting player at equal level.
@@ -724,9 +754,9 @@ day, two claims a day (a claim every 12.5 battles, 8 hours each; `--battles-per-
 
 | Over the campaign (p50) | Ceiling | Result |
 | --- | --- | --- |
-| Idle gold / all gold (clears, gear sales, idle) | ≤ 15% | 5.6% (about 3,500 gold) |
-| Idle materials / all materials (by XP value) | ≤ 15% | 13.4% (p90 16.8%) |
-| Idle beast XP / all beast XP (battles, camps, idle) | ≤ 10% | 9.3% (p90 9.8%) |
+| Idle gold / all gold (clears, gear sales, idle) | ≤ 15% | 5.7% (about 3,600 gold; Kinship roster flow) |
+| Idle materials / all materials (by XP value) | ≤ 15% | 13.5% (p90 16.8%) |
+| Idle beast XP / all beast XP (battles, camps, idle) | ≤ 10% | 8.3% (p90 8.7%; the bench is smaller early) |
 | Every earlier campaign gate | met | met (507 battles p50; want-list affordability 74%) |
 
 **Gold is held well under its ceiling by the Trader.** More idle gold pushes the economy's want-list

@@ -39,9 +39,14 @@ namespace BeastCraft.Game.Screens
         private Rect _enemySkills;
         private EncounterInsightView _insight = new EncounterInsightView();
 
-        public EncounterScreen(ScreenContext ctx, int nodeId) : base(ctx)
+        public EncounterScreen(ScreenContext ctx, int nodeId) : this(ctx, new EncounterViewModel(ctx.Session, nodeId))
         {
-            _model = new EncounterViewModel(ctx.Session, nodeId);
+        }
+
+        /// <summary>The page over <paramref name="model"/> (a Kinship trial's, <see cref="EncounterViewModel.ForKinship"/>).</summary>
+        public EncounterScreen(ScreenContext ctx, EncounterViewModel model) : base(ctx)
+        {
+            _model = model;
             _scroll = Ui.Add(new ScrollView { Id = "page", Bounds = new Rect(0, TopBar, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight - TopBar - BottomBar) });
             AddButton(null, "back", new Rect(Pad, 40f, 110f, 110f), null, "secondary", () => Ctx.Stack.Pop(), "back");
             _start = AddButton(null, "start", new Rect(Pad + 60f, PortraitLayout.CanvasHeight - BottomBar + 70f, PortraitLayout.CanvasWidth - 2f * Pad - 120f, 140f), "Start Battle",
@@ -108,6 +113,22 @@ namespace BeastCraft.Game.Screens
                 AddLabel(_scroll, new Rect(Pad, y, width, 200f), _model.Error, style.TextSizes.Body, "berry", TextAlign.Center, true);
                 _start.Enabled = false;
                 return;
+            }
+
+            // A Kinship trial's words and its bond condition.
+            if (!string.IsNullOrEmpty(_model.Banner))
+            {
+                float size = style.TextSizes.Body;
+                List<string> lines = Painter.Wrap(_model.Banner, size, width - 60f);
+                float height = 70f + lines.Count * Ctx.Text.LineHeight(size) + (string.IsNullOrEmpty(_model.BondText) ? 0f : 56f);
+                _scroll.Add(new Panel { Bounds = new Rect(Pad, y, width, height), StyleKey = "banner" });
+                AddLabel(_scroll, new Rect(Pad + 30f, y + 20f, width - 60f, lines.Count * Ctx.Text.LineHeight(size)), _model.Banner, size, "ink", TextAlign.Left, true);
+                if (!string.IsNullOrEmpty(_model.BondText))
+                {
+                    AddLabel(_scroll, new Rect(Pad + 30f, y + 30f + lines.Count * Ctx.Text.LineHeight(size), width - 60f, 40f), _model.BondText, size, "plum");
+                }
+
+                y += height + 30f;
             }
 
             // The battlefield.

@@ -85,10 +85,24 @@ namespace BeastCraft.Presentation.Screens
         private readonly List<string> _team = new List<string>();
         private string _consumable;
 
-        public EncounterViewModel(GameSession session, int nodeId)
+        public EncounterViewModel(GameSession session, int nodeId) : this(session, NodeBattle.For(session, nodeId, out string error), error, nodeId)
+        {
+        }
+
+        /// <summary>
+        /// The preview of the Kinship trial at point of interest <paramref name="poiId"/>
+        /// (<see cref="NodeBattle.ForKinship"/>): the same page, titled by the site, with the site's
+        /// words and its optional bond condition as a banner, no team suggestion.
+        /// </summary>
+        public static EncounterViewModel ForKinship(GameSession session, string poiId)
+        {
+            return new EncounterViewModel(session, NodeBattle.ForKinship(session, poiId, out string error), error, -1);
+        }
+
+        private EncounterViewModel(GameSession session, NodeBattle battle, string error, int nodeId)
         {
             _session = session ?? throw new ArgumentNullException(nameof(session));
-            Battle = NodeBattle.For(session, nodeId, out string error);
+            Battle = battle;
             Error = error;
             NodeId = nodeId;
             if (Battle == null)
@@ -100,6 +114,14 @@ namespace BeastCraft.Presentation.Screens
             MapNode node = Battle.Node;
             Title = session.LocationName(node);
             KindLabel = MapViewModel.KindLabel(node.Type);
+            if (Battle.IsKinshipTrial)
+            {
+                Discovery.KinshipSiteData site = Discovery.KinshipRules.SiteOf(content.Discovery, Battle.Trial);
+                Title = site?.Name ?? "Kinship trial";
+                KindLabel = "Kinship trial";
+                Banner = site?.Intro;
+                BondText = site?.BondText;
+            }
             Level = Battle.Plan.Level;
             Arena = Battle.Plan.Arena.ToString();
             Attempt = Battle.Attempt;
@@ -185,7 +207,8 @@ namespace BeastCraft.Presentation.Screens
                 }
             }
 
-            CampaignTeamSuggestion suggestion = CampaignRules.SuggestionFor(session.Save, nodeId, session.Settings, content.Encounters, content.Battle, content.Campaign, PartySize);
+            CampaignTeamSuggestion suggestion = Battle.IsKinshipTrial ? null
+                                                : CampaignRules.SuggestionFor(session.Save, nodeId, session.Settings, content.Encounters, content.Battle, content.Campaign, PartySize);
             if (suggestion != null && !session.DismissedSuggestions.Contains(SuggestionKey()))
             {
                 Suggestion = new SuggestionView { Losses = suggestion.Losses };
@@ -214,6 +237,33 @@ namespace BeastCraft.Presentation.Screens
         public string Title { get; }
 
         public string KindLabel { get; }
+
+        /// <summary>A Kinship trial's words (the site's intro), shown as a banner; null for a map location.</summary>
+        public string Banner { get; }
+
+        /// <summary>A Kinship trial's optional bond condition in words (flavour), or null.</summary>
+        public string BondText { get; }
+
+        /// <summary>
+        /// "The wilds ease a little (-x%)" while adaptive assist is active at this location
+        /// (<see cref="Encounters.EncounterPlan.AssistScale"/> below 1, producer decision "assist +
+        /// guidance"; a consecutive-loss discount, <see cref="Campaign.RegionLibrary.AssistScaleFor"/>);
+        /// null when it is not (a fresh location, post-game Hard, or Hearthglen, none of which are
+        /// ever assisted — Hearthglen has its own catch-up instead).
+        /// </summary>
+        public string AssistNote
+        {
+            get
+            {
+                if (Battle == null || !(Battle.Plan.AssistScale < 1.0))
+                {
+                    return null;
+                }
+
+                int percent = (int)Math.Round((1.0 - Battle.Plan.AssistScale) * 100.0);
+                return "The wilds ease a little (-" + percent.ToString(System.Globalization.CultureInfo.InvariantCulture) + "%).";
+            }
+        }
 
         public int Level { get; }
 
@@ -250,6 +300,40 @@ namespace BeastCraft.Presentation.Screens
 
         /// <summary>The suggestion banner, or null (none offered, the setting is off, or it was dismissed).</summary>
         public SuggestionView Suggestion { get; private set; }
+
+        /// <summary>
+        /// The ALWAYS-shown matchup warnings for the picked <see cref="Team"/> against this encounter
+        /// (<see cref="MatchupWarnings.For"/>, producer decision "assist + guidance"): no Vanguard, no
+        /// Skirmisher, an element disadvantage, under-levelled by N. Recomputed from the current pick
+        /// every read (cheap: at most <see cref="PartySize"/> beasts), so it always reflects
+        /// <see cref="ToggleMember"/>. Empty with no team or on an error (<see cref="Battle"/> null).
+        /// </summary>
+        public List<string> Warnings
+        {
+            get
+            {
+                if (Battle == null)
+                {
+                    return new List<string>();
+                }
+
+                List<CreatureSpeciesSO> team = new List<CreatureSpeciesSO>();
+                int levelSum = 0;
+                foreach (string beastId in _team)
+                {
+                    OwnedBeast beast = _session.Save.FindBeast(beastId);
+                    CreatureSpeciesSO species = beast == null ? null : _session.Content.Battle.GetSpecies(beast.Progress.SpeciesId);
+                    if (species != null)
+                    {
+                        team.Add(species);
+                        levelSum += beast.Progress.Level;
+                    }
+                }
+
+                int teamLevel = team.Count > 0 ? levelSum / team.Count : 0;
+                return MatchupWarnings.For(Battle.Plan.Preview(ScoutingDetail.Full), team, teamLevel, Battle.Plan.Level);
+            }
+        }
 
         /// <summary>
         /// Adds a beast to the party (at the end) or takes it out. Refused (false, with

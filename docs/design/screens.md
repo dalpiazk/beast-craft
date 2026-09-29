@@ -127,6 +127,34 @@ report and the difficulty table regenerate byte-identical).
 - **Help**: the Turns panel's "?" explains its columns and that the average enemy is the plain,
   unweighted mean over every enemy type at the beast's level.
 
+## Fog, points of interest and Kinship (the discovery layer)
+
+Rules and data: [kinship-discovery.md](kinship-discovery.md). Everything here reads Core
+(`MapFog`, `DiscoveryRules`, `KinshipRules`); the battle rules and the calibration are untouched.
+
+- **Map fog** (`MapViewModel.HasFog`, `FogCells`; `HomeScreen.DrawFog`): in a discovery region
+  (r01-r06) soft painted mist (placeholder: layered soft discs, a shaded underlayer, a pale body and a
+  light top, overlapping into a bank) over every fog cell not yet seen; a locked or bypassed location
+  on unseen ground is not drawn (`MapNodeView.Hidden`). The trailhead row and the pass or lair are
+  always in sight. Hearthglen and r07 on are shown fully revealed.
+- **Points of interest** (`MapViewModel.Pois`, `PoiView`): rounded badges (never a location's round
+  disc) in their kind's colour and glyph (`shrine`, `lore`, `cache`, `vista`, `kinship`), glowing while
+  unvisited, a check once found, with a name tag. A tap opens `PoiModal` (`PoiViewModel`: name, kind,
+  words, one action — rest a while, read the stone, open it, look out — or what it held); a Kinship
+  site with a beast to offer opens its trial instead.
+- **Kinship trial**: the encounter screen (`EncounterViewModel.ForKinship`, `NodeBattle.ForKinship`)
+  with the site's words and its bond condition as a banner and no team suggestion; results
+  (`ResultsViewModel.BuildTrial`) pay nothing and name the beasts offered. A won trial's choice of two
+  is the Hearthglen trial's popup (`TrialPickModal.Kinship` over `KinshipPickViewModel`; the popup now
+  takes an `IBeastPicker`), offered before anything else on the map, like Hearthglen's pending pick.
+  Taking the pass or lair with an unclaimed site on the map asks first (`MapTapKind.ConfirmLeave`).
+- **Explored N%** (`RegionHeaderView.CompletionText`): a chip under the header; its tap opens
+  `RegionProgressModal` (`RegionProgressViewModel`: the 100% reward, per stage rows walked and places
+  found, **Revisit** a stage already reached: `GameSession.ReplayStage`). The 100% reward's toast
+  (`GameSession.CheckCompletion` → `PendingToasts`, drained when the map shows).
+- Screenshots: `--screen kinship-map | kinship-poi | kinship-trial | kinship-choice | region-progress`
+  (a scripted walk up to the first stage's Kinship site, every fight on the way counted won).
+
 **Saves.** `GameSession` owns the loaded `PlayerSave` and writes it to one slot through
 `SaveStore` over an `ISaveStorage`: `FileSaveStorage` under `SaveLocations` in the game (the
 per-user folder on desktop, the app's files directory on Android, or `--save-dir`),

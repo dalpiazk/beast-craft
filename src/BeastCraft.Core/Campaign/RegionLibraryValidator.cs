@@ -100,6 +100,11 @@ namespace BeastCraft.Campaign
             ValidateRules(data.MapRules, "MapRules", shapes, errors);
             Dictionary<string, SealData> seals = ValidateSeals(data.Seals, errors);
             ValidateEasingScales(data.EasingShapeScales, shapes, errors);
+            ValidateEasingScales(data.AssistFloorScales, shapes, errors, "AssistFloorScales");
+            if (data.AssistStep < 0.0 || data.AssistStep >= 1.0)
+            {
+                errors.Add("AssistStep " + data.AssistStep.ToString(System.Globalization.CultureInfo.InvariantCulture) + " must be in [0, 1) (0 disables assist).");
+            }
 
             if (data.StartingLevelCap < 1 || data.StartingLevelCap > MaxLevel)
             {
@@ -573,6 +578,21 @@ namespace BeastCraft.Campaign
         private static void ValidateEasing(RegionData region, string where, ref double previousWeight, List<string> errors)
         {
             double[] weights = region.StageEasing ?? new double[0];
+            if (region.BossScale != 0.0 && (double.IsNaN(region.BossScale) || region.BossScale < 0.0 || region.BossScale > 1.0 || weights.Length == 0 ||
+                                            weights[weights.Length - 1] <= 0.0))
+            {
+                errors.Add(where + ": BossScale " + region.BossScale.ToString(System.Globalization.CultureInfo.InvariantCulture) +
+                           " must be 0 (none), or in (0, 1] on a region whose last stage is eased.");
+            }
+
+            // Independent of the early-region easing (StageEasing): adaptive assist applies everywhere,
+            // mainline or post-game Normal, so this override is not gated on the last stage being eased.
+            if (region.AssistBossFloorScale != 0.0 && (double.IsNaN(region.AssistBossFloorScale) || region.AssistBossFloorScale <= 0.0 || region.AssistBossFloorScale > 1.0))
+            {
+                errors.Add(where + ": AssistBossFloorScale " + region.AssistBossFloorScale.ToString(System.Globalization.CultureInfo.InvariantCulture) +
+                           " must be 0 (none) or in (0, 1].");
+            }
+
             if (weights.Length == 0)
             {
                 if (previousWeight > 0.0)
@@ -611,11 +631,12 @@ namespace BeastCraft.Campaign
         }
 
         /// <summary>
-        /// <see cref="RegionLibraryData.EasingShapeScales"/>: each id a known shape (when the encounter
-        /// library is given) or <see cref="RegionLibraryData.EasingBossId"/>, listed once, with a scale
-        /// above 0 and at most 1.
+        /// <see cref="RegionLibraryData.EasingShapeScales"/> or <see cref="RegionLibraryData.AssistFloorScales"/>
+        /// (<paramref name="label"/> names which for the errors): each id a known shape (when the
+        /// encounter library is given) or <see cref="RegionLibraryData.EasingBossId"/>, listed once,
+        /// with a scale above 0 and at most 1.
         /// </summary>
-        private static void ValidateEasingScales(ShapeScaleData[] scales, HashSet<string> shapes, List<string> errors)
+        private static void ValidateEasingScales(ShapeScaleData[] scales, HashSet<string> shapes, List<string> errors, string label = "EasingShapeScales")
         {
             HashSet<string> seen = new HashSet<string>(StringComparer.Ordinal);
             for (int i = 0; i < (scales ?? new ShapeScaleData[0]).Length; i++)
@@ -623,11 +644,11 @@ namespace BeastCraft.Campaign
                 ShapeScaleData entry = scales[i];
                 if (entry == null)
                 {
-                    errors.Add("EasingShapeScales #" + i + " is null.");
+                    errors.Add(label + " #" + i + " is null.");
                     continue;
                 }
 
-                string where = "EasingShapeScales '" + entry.ShapeId + "'";
+                string where = label + " '" + entry.ShapeId + "'";
                 if (string.IsNullOrEmpty(entry.ShapeId) || !seen.Add(entry.ShapeId))
                 {
                     errors.Add(where + ": missing or repeated ShapeId.");
@@ -747,6 +768,20 @@ namespace BeastCraft.Campaign
                 if (region.StageEasing != null && region.StageEasing.Length > 0)
                 {
                     errors.Add(where + ": StageEasing must be empty (the early-region easing is for mainline regions).");
+                }
+
+                if (region.BossScale != 0.0)
+                {
+                    errors.Add(where + ": BossScale must be 0 (the early-region easing is for mainline regions).");
+                }
+
+                // Unlike BossScale, AssistBossFloorScale is allowed here: adaptive assist applies to a
+                // post-game region on Normal too (never on Hard), and a post-game boss's own need can
+                // differ from the shared floor (its typical target is already lower).
+                if (region.AssistBossFloorScale != 0.0 && (double.IsNaN(region.AssistBossFloorScale) || region.AssistBossFloorScale <= 0.0 || region.AssistBossFloorScale > 1.0))
+                {
+                    errors.Add(where + ": AssistBossFloorScale " + region.AssistBossFloorScale.ToString(System.Globalization.CultureInfo.InvariantCulture) +
+                               " must be 0 (none) or in (0, 1].");
                 }
 
                 MapRulesData ownRules = region.MapRules != null && region.MapRules.Layers > 0 ? region.MapRules : data.MapRules;

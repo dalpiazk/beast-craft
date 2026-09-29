@@ -50,7 +50,14 @@
     { "Key": "trail", "Hex": "#EBD6B0" },
     { "Key": "trail_edge", "Hex": "#B79B73" },
     { "Key": "title_top", "Hex": "#F7D9B0" },
-    { "Key": "title_bottom", "Hex": "#9CCB8A" }
+    { "Key": "title_bottom", "Hex": "#9CCB8A" },
+    { "Key": "map_fog", "Hex": "#F3F0E8F2" },
+    { "Key": "map_fog_shade", "Hex": "#C4C0D2B3" },
+    { "Key": "poi_shrine", "Hex": "#9C7BC4" },
+    { "Key": "poi_lore", "Hex": "#A18B78" },
+    { "Key": "poi_cache", "Hex": "#D99A2B" },
+    { "Key": "poi_vista", "Hex": "#5E9FC4" },
+    { "Key": "poi_kinship", "Hex": "#D9668E" }
   ],
   "Panels": [
     { "Key": "panel", "Fill": "cream", "Outline": "plum", "OutlineWidth": 5, "Radius": 28, "Shadow": "shadow" },

@@ -119,7 +119,7 @@
       "Term": "Level gap",
       "Category": "Combat",
       "Forms": [ "level gap", "level gaps" ],
-      "Definition": "Hits between units of different levels are scaled by 1 + 0.012 x d + 0.009 x d x the size of d, where d is the attacker's level minus the target's, kept between x0.6 and x1.4. It works both ways: a team under its foes' level deals less and takes more."
+      "Definition": "Hits between units of different levels are scaled by 1 + 0.05 x d + 0.045 x d x the size of d, where d is the attacker's level minus the target's, kept between x0.125 and x1.875. It works both ways: a team under its foes' level deals less and takes more, and a team 4 or more levels over its foes overwhelms them outright."
     },
     {
       "TermId": "execute",
@@ -141,6 +141,20 @@
       "Category": "Combat",
       "Forms": [ "element chart" ],
       "Definition": "How a skill's element fares against a target's: Strong x2, Mild x1.25, Weak x0.5, anything else x1. A target with two elements takes both multipliers. Open the full chart from the glossary."
+    },
+    {
+      "TermId": "adaptive_assist",
+      "Term": "Adaptive assist",
+      "Category": "Combat",
+      "Forms": [ "assist", "adaptive assist", "the wilds ease" ],
+      "Definition": "Lose a fight and it eases a little; lose it again and it eases a little more, down to a floor; win it and the ease resets. Rewards and XP never change. It never applies on Hard difficulty in the post-game, or in Hearthglen."
+    },
+    {
+      "TermId": "matchup_warnings",
+      "Term": "Matchup warnings",
+      "Category": "Combat",
+      "Forms": [ "matchup warning", "warnings" ],
+      "Definition": "Shown before every fight: no Vanguard or no Skirmisher in your picked team, an element disadvantage against this lineup, or being under-levelled. They are a heads-up, not a lock: you can still fight."
     }
   ]
 }

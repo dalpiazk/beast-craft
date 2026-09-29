@@ -65,6 +65,13 @@ namespace BeastCraft.Encounters
         public double DifficultyScale { get; private set; } = 1.0;
 
         /// <summary>
+        /// The adaptive-assist portion of <see cref="DifficultyScale"/> (<see cref="WithAssist"/>,
+        /// <c>RegionLibrary.AssistScaleFor</c>): 1 for none. Tracked separately from the early-region
+        /// easing so the preview can report just the assist discount ("The wilds ease a little").
+        /// </summary>
+        public double AssistScale { get; private set; } = 1.0;
+
+        /// <summary>
         /// This plan with its enemies fielded at <see cref="Multiplier"/> x <paramref name="scale"/>
         /// (a copy; this plan is unchanged): the campaign's early-region easing. A scale that is not
         /// above 0, or is exactly 1, returns this plan itself.
@@ -78,7 +85,29 @@ namespace BeastCraft.Encounters
 
             return new EncounterPlan(ShapeId, DropShapeId, EncounterId, Level, Multiplier * scale, Arena, ElementScheme, Enemies, Catalog)
             {
-                DifficultyScale = DifficultyScale * scale
+                DifficultyScale = DifficultyScale * scale,
+                AssistScale = AssistScale
+            };
+        }
+
+        /// <summary>
+        /// This plan with its enemies fielded at <see cref="Multiplier"/> x <paramref name="scale"/>
+        /// (a copy; this plan is unchanged), <paramref name="scale"/> also recorded on
+        /// <see cref="AssistScale"/>: adaptive assist (<c>CampaignRules.PlanFor</c> with consecutive
+        /// losses at a location, <c>RegionLibrary.AssistScaleFor</c>). A scale that is not above 0, or
+        /// is exactly 1, returns this plan itself.
+        /// </summary>
+        public EncounterPlan WithAssist(double scale)
+        {
+            if (!(scale > 0.0) || scale == 1.0)
+            {
+                return this;
+            }
+
+            return new EncounterPlan(ShapeId, DropShapeId, EncounterId, Level, Multiplier * scale, Arena, ElementScheme, Enemies, Catalog)
+            {
+                DifficultyScale = DifficultyScale * scale,
+                AssistScale = AssistScale * scale
             };
         }
 
@@ -95,7 +124,11 @@ namespace BeastCraft.Encounters
                 enemies.Add(new EncounterLineupEnemy(enemy.EnemyId, enemy.DisplayName, element, enemy.Stance));
             }
 
-            return new EncounterPlan(ShapeId, DropShapeId, EncounterId, Level, Multiplier, Arena, ElementScheme, enemies, Catalog) { DifficultyScale = DifficultyScale };
+            return new EncounterPlan(ShapeId, DropShapeId, EncounterId, Level, Multiplier, Arena, ElementScheme, enemies, Catalog)
+            {
+                DifficultyScale = DifficultyScale,
+                AssistScale = AssistScale
+            };
         }
 
         public ArenaSize Arena { get; }

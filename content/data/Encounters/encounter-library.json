@@ -1,5 +1,5 @@
 {
-  "_readme": "GAME CONTENT: how PvE encounters are put together from enemy-library.json. Shapes are generated encounters: the runtime EncounterGenerator picks a variant (by Weight), draws each slot's count in [Min, Max] and each unit's type uniformly from Types, and keeps the draw only if its summed enemy Threat is inside [ThreatMin, ThreatMax], it has at least MinDistinctTypes types and it seats on the arena; units are placed front to back (Vanguard, Skirmisher, Ranged; library order within a stance). Each lineup then draws an element scheme by SchemeWeights (Uniform: one element for the whole team; PerType: one per type; PerUnit: one per unit; None), with elements dealt from a shuffled deck of the ten so every element is dealt before any repeats. Shape ids are drop-tables.json's shape ids (the validator requires the two sets to match): a cleared encounter pays out from its shape's drop cell. POST-GAME shapes (PostGame: true; the six *_postgame and *_postgame_hard shapes, drawn only by the post-game region r11, regions.json IsPostGame) are the exception: each pays out as the mainline shape its DropShapeId names (the same loot as that shape, on Normal and Hard alike), is calibrated by the balance simulator at level 100 only (TargetClear: squad and horde 65, elite 45 on Normal; 50, 50 and 30 on Hard), and stays out of the mainline report; its cells are appended to encounter-difficulty.json after the mainline ones. Any mainline rebalance must re-run --write-difficulty so they follow. Templates are authored fixed encounters ({ EncounterId, DisplayName, Description, ShapeId, Arena, Groups: [{ EnemyId, Count, Elements }], DifficultyOverride, Draft }; Elements are cycled over the group, empty = no element; DifficultyOverride 0 = use the shape's calibrated difficulty; Draft true = placeholder text/design pending producer review, never shown to the player). Hearthglen's fixed fights (hg_*, regions.json TutorialRegions FixedNodes; docs/design/area-zero.md) are templates too, each with its own DifficultyOverride tuned by the balance simulator's --mode hearthglen (docs/balance/hearthglen-report.md). The region bosses (regions.json's BossTemplateId, and the post-game region's HardMode.BossTemplateId) are the only templates, DRAFT placeholders pending producer review; each mainline DifficultyOverride is calibrated so a scouting team of three beasts (beside the Beastbinder) at the boss's level wearing typical gear clears about 50%, the post-game twins (boss_r11_dusk_and_dawn, boss_r11_dusk_and_dawn_hard) about 35% on Normal and about 20% on Hard (docs/balance/tuning-log.md). Difficulty: every enemy's HP, Attack, Defense, SpecialAttack and SpecialDefense are multiplied by the shape's calibrated multiplier at the encounter's level (encounter-difficulty.json, written by the balance simulator's --write-difficulty, interpolated between the calibrated levels) times DifficultyScale. PENDING PRODUCER REVIEW: DifficultyScale is 1.0 and the table is calibrated so a player who scouts and counter-picks (the simulator's bond-aware heuristic pick) wearing typical gear (the balance simulator's --gear typical, a user decision) clears each shape's TargetClear (the tiered targets, a user decision: squad and horde 80%, elite 60%, solo 50%; encounter-difficulty.json records the target of every cell); whether the campaign should be that hard, and how a map node picks a shape and a level, are producer decisions not made here. Validated by EncounterLibraryValidator (the Editor importer Beast Craft/Data/Import Encounters, the EditMode tests, Tooling/BalanceSim): every shape's worst case (each slot at Max, each unit its slot's largest type) and every template must fit its arena's enemy deployment zone. The shapes and weights came over unchanged from the balance simulator's former fixtures; see docs/design/battle-system.md, 'Encounter direction'. Boss names and descriptions follow docs/design/content-bible.md; each boss carries Draft: true until the producer signs it off (the validator rejects a [DRAFT] marker in DisplayName/Description, which are player-facing); the calibration note that used to sit in each Description is this readme's (each mainline DifficultyOverride clears about 50% for a scouting team at the boss's level in typical gear; the post-game twins about 35% on Normal and 20% on Hard).",
+  "_readme": "GAME CONTENT: how PvE encounters are put together from enemy-library.json. Shapes are generated encounters: the runtime EncounterGenerator picks a variant (by Weight), draws each slot's count in [Min, Max] and each unit's type uniformly from Types, and keeps the draw only if its summed enemy Threat is inside [ThreatMin, ThreatMax], it has at least MinDistinctTypes types and it seats on the arena; units are placed front to back (Vanguard, Skirmisher, Ranged; library order within a stance). Each lineup then draws an element scheme by SchemeWeights (Uniform: one element for the whole team; PerType: one per type; PerUnit: one per unit; None), with elements dealt from a shuffled deck of the ten so every element is dealt before any repeats. Shape ids are drop-tables.json's shape ids (the validator requires the two sets to match): a cleared encounter pays out from its shape's drop cell. POST-GAME shapes (PostGame: true; the six *_postgame and *_postgame_hard shapes, drawn only by the post-game region r11, regions.json IsPostGame) are the exception: each pays out as the mainline shape its DropShapeId names (the same loot as that shape, on Normal and Hard alike), is calibrated by the balance simulator at level 100 only (TargetClear: squad and horde 65, elite 45 on Normal; 50, 50 and 30 on Hard), and stays out of the mainline report; its cells are appended to encounter-difficulty.json after the mainline ones. Any mainline rebalance must re-run --write-difficulty so they follow. Templates are authored fixed encounters ({ EncounterId, DisplayName, Description, ShapeId, Arena, Groups: [{ EnemyId, Count, Elements }], DifficultyOverride, Draft }; Elements are cycled over the group, empty = no element; DifficultyOverride 0 = use the shape's calibrated difficulty; Draft true = placeholder text/design pending producer review, never shown to the player). Hearthglen's fixed fights (hg_*, regions.json TutorialRegions FixedNodes; docs/design/area-zero.md) are templates too, each with its own DifficultyOverride tuned by the balance simulator's --mode hearthglen (docs/balance/hearthglen-report.md). The region bosses (regions.json's BossTemplateId, and the post-game region's HardMode.BossTemplateId) are the only templates, DRAFT placeholders pending producer review; each mainline DifficultyOverride is calibrated so the typical team from the owned roster (Tooling/BalanceSim --mode typical) at the boss's level wearing typical gear clears about 75%, the post-game twins (boss_r11_dusk_and_dawn, boss_r11_dusk_and_dawn_hard) about 35% on Normal and about 20% on Hard (docs/balance/tuning-log.md). Difficulty: every enemy's HP, Attack, Defense, SpecialAttack and SpecialDefense are multiplied by the shape's calibrated multiplier at the encounter's level (encounter-difficulty.json, written by the balance simulator's --write-difficulty, interpolated between the calibrated levels) times DifficultyScale. PENDING PRODUCER REVIEW: DifficultyScale is 1.0 and the table is calibrated so the typical team from the owned roster (Tooling/BalanceSim --mode typical; a sensible, not optimal pick, a producer decision) wearing typical gear (the balance simulator's --gear typical, a user decision) clears each shape's TargetClear (the tiered targets, a user decision: squad and horde 85%, elite and solo 75% (the producer's never-blocked targets: docs/balance/tuning-log.md, \"Never-blocked targets\"); encounter-difficulty.json records the target of every cell); whether the campaign should be that hard, and how a map node picks a shape and a level, are producer decisions not made here. Validated by EncounterLibraryValidator (the Editor importer Beast Craft/Data/Import Encounters, the EditMode tests, Tooling/BalanceSim): every shape's worst case (each slot at Max, each unit its slot's largest type) and every template must fit its arena's enemy deployment zone. The shapes and weights came over unchanged from the balance simulator's former fixtures; see docs/design/battle-system.md, 'Encounter direction'. Boss names and descriptions follow docs/design/content-bible.md; each boss carries Draft: true until the producer signs it off (the validator rejects a [DRAFT] marker in DisplayName/Description, which are player-facing); the calibration note that used to sit in each Description is this readme's (each mainline DifficultyOverride clears about 75% for the typical team at the boss's level in typical gear; the post-game twins about 35% on Normal and 20% on Hard).",
   "SchemaVersion": 1,
   "DifficultyScale": 1.0,
   "SchemeWeights": [
@@ -17,7 +17,7 @@
       "ThreatMin": 12,
       "ThreatMax": 12,
       "MinDistinctTypes": 1,
-      "TargetClear": 50,
+      "TargetClear": 75,
       "Variants": [
         { "Label": "giant", "Weight": 1, "Slots": [ { "Types": [ "giant" ], "Min": 1, "Max": 1 } ] }
       ]
@@ -30,7 +30,7 @@
       "ThreatMin": 14,
       "ThreatMax": 17,
       "MinDistinctTypes": 2,
-      "TargetClear": 60,
+      "TargetClear": 75,
       "Variants": [
         { "Label": "giant + escort", "Weight": 2, "Slots": [ { "Types": [ "giant" ], "Min": 1, "Max": 1 }, { "Types": [ "brute", "stalker", "archer", "caster", "shaman" ], "Min": 2, "Max": 2 } ] },
         { "Label": "two champions + escort", "Weight": 1, "Slots": [ { "Types": [ "champion" ], "Min": 2, "Max": 2 }, { "Types": [ "brute", "stalker", "archer", "caster", "shaman" ], "Min": 1, "Max": 2 } ] }
@@ -44,7 +44,7 @@
       "ThreatMin": 10,
       "ThreatMax": 12,
       "MinDistinctTypes": 3,
-      "TargetClear": 80,
+      "TargetClear": 85,
       "Variants": [
         { "Label": "mixed", "Weight": 1, "Slots": [ { "Types": [ "brute", "stalker", "archer", "caster", "shaman" ], "Min": 4, "Max": 6 } ] }
       ]
@@ -57,7 +57,7 @@
       "ThreatMin": 12.5,
       "ThreatMax": 14,
       "MinDistinctTypes": 3,
-      "TargetClear": 80,
+      "TargetClear": 85,
       "Variants": [
         { "Label": "swarm + ranged support", "Weight": 1, "Slots": [ { "Types": [ "swarmling", "stingling" ], "Min": 14, "Max": 20 }, { "Types": [ "archer", "caster" ], "Min": 2, "Max": 4 } ] }
       ]
@@ -247,13 +247,83 @@
       "Draft": true
     },
     {
+      "EncounterId": "kin_trial_r01",
+      "DisplayName": "Mossbound Trial",
+      "Description": "A mossy champion keeps the kinship stone, a horned brute and a lean stalker at its side. Stand firm and a beast of the Hollow may choose you.",
+      "ShapeId": "elite",
+      "Arena": "Medium",
+      "Groups": [ { "EnemyId": "champion", "Count": 1, "Elements": [ "Nature" ] }, { "EnemyId": "brute", "Count": 1, "Elements": [ ] }, { "EnemyId": "stalker", "Count": 1, "Elements": [ ] } ],
+      "DifficultyOverride": 0.851,
+      "Draft": true
+    },
+    {
+      "EncounterId": "kin_trial_r02",
+      "DisplayName": "Cinderglow Trial",
+      "Description": "A smouldering champion stands guard at the glowing stone with an archer and a caster behind it. Win and a beast of the ridges may answer.",
+      "ShapeId": "elite",
+      "Arena": "Medium",
+      "Groups": [ { "EnemyId": "champion", "Count": 1, "Elements": [ "Fire" ] }, { "EnemyId": "archer", "Count": 1, "Elements": [ ] }, { "EnemyId": "caster", "Count": 1, "Elements": [ ] } ],
+      "DifficultyOverride": 0.867,
+      "Draft": true
+    },
+    {
+      "EncounterId": "kin_trial_r03",
+      "DisplayName": "Tidewrack Trial",
+      "Description": "A brine-soaked champion rises from the pool by the stone, a shaman and a brute wading after it. Win and a beast of the tides may choose you.",
+      "ShapeId": "elite",
+      "Arena": "Medium",
+      "Groups": [ { "EnemyId": "champion", "Count": 1, "Elements": [ "Water" ] }, { "EnemyId": "shaman", "Count": 1, "Elements": [ ] }, { "EnemyId": "brute", "Count": 1, "Elements": [ ] } ],
+      "DifficultyOverride": 0.927,
+      "Draft": true
+    },
+    {
+      "EncounterId": "kin_trial_r04",
+      "DisplayName": "Galecrest Trial",
+      "Description": "A gale-wrapped champion swoops down on the still stone with two stalkers circling. Win and a beast of the crags may answer.",
+      "ShapeId": "elite",
+      "Arena": "Medium",
+      "Groups": [ { "EnemyId": "champion", "Count": 1, "Elements": [ "Air" ] }, { "EnemyId": "stalker", "Count": 2, "Elements": [ ] } ],
+      "DifficultyOverride": 0.933,
+      "Draft": true
+    },
+    {
+      "EncounterId": "kin_trial_r05",
+      "DisplayName": "Ironroot Trial",
+      "Description": "A rust-plated champion guards the rooted stone, a brute and an archer beside it. Win and a beast of the iron wood may choose you.",
+      "ShapeId": "elite",
+      "Arena": "Medium",
+      "Groups": [ { "EnemyId": "champion", "Count": 1, "Elements": [ "Metal" ] }, { "EnemyId": "brute", "Count": 1, "Elements": [ ] }, { "EnemyId": "archer", "Count": 1, "Elements": [ ] } ],
+      "DifficultyOverride": 0.791,
+      "Draft": true
+    },
+    {
+      "EncounterId": "kin_trial_r06_rime",
+      "DisplayName": "Rimeglass Trial",
+      "Description": "A frost-bright champion keeps the glassy stone with a caster and a stalker. Win and a beast of the frozen lake may answer.",
+      "ShapeId": "elite",
+      "Arena": "Medium",
+      "Groups": [ { "EnemyId": "champion", "Count": 1, "Elements": [ "Ice" ] }, { "EnemyId": "caster", "Count": 1, "Elements": [ ] }, { "EnemyId": "stalker", "Count": 1, "Elements": [ ] } ],
+      "DifficultyOverride": 0.895,
+      "Draft": true
+    },
+    {
+      "EncounterId": "kin_trial_r06_shade",
+      "DisplayName": "Deepshade Trial",
+      "Description": "A dusk-cloaked champion rises from the shadow of the dark stone, a shaman and an archer behind it. Win and the last beast may choose you.",
+      "ShapeId": "elite",
+      "Arena": "Medium",
+      "Groups": [ { "EnemyId": "champion", "Count": 1, "Elements": [ "Dark" ] }, { "EnemyId": "shaman", "Count": 1, "Elements": [ ] }, { "EnemyId": "archer", "Count": 1, "Elements": [ ] } ],
+      "DifficultyOverride": 0.878,
+      "Draft": true
+    },
+    {
       "EncounterId": "boss_r01_hollow_warden",
       "DisplayName": "Mossjaw the Warden",
       "Description": "A moss-backed champion that once guarded the Hollow's Seal for the first Beastbinders and now guards it from everyone. Two horned brutes stamp at its side.",
       "ShapeId": "elite",
       "Arena": "Medium",
       "Groups": [ { "EnemyId": "champion", "Count": 1, "Elements": [ "Nature" ] }, { "EnemyId": "brute", "Count": 2, "Elements": [ ] } ],
-      "DifficultyOverride": 1.188,
+      "DifficultyOverride": 0.906,
       "Draft": true
     },
     {
@@ -263,7 +333,7 @@
       "ShapeId": "elite",
       "Arena": "Medium",
       "Groups": [ { "EnemyId": "champion", "Count": 2, "Elements": [ "Fire" ] }, { "EnemyId": "archer", "Count": 2, "Elements": [ ] } ],
-      "DifficultyOverride": 0.84,
+      "DifficultyOverride": 0.662,
       "Draft": true
     },
     {
@@ -273,7 +343,7 @@
       "ShapeId": "elite",
       "Arena": "Medium",
       "Groups": [ { "EnemyId": "giant", "Count": 1, "Elements": [ "Water" ] }, { "EnemyId": "caster", "Count": 2, "Elements": [ "Water", "Ice" ] } ],
-      "DifficultyOverride": 1.125,
+      "DifficultyOverride": 0.617,
       "Draft": true
     },
     {
@@ -283,7 +353,7 @@
       "ShapeId": "elite",
       "Arena": "Large",
       "Groups": [ { "EnemyId": "giant", "Count": 1, "Elements": [ "Air" ] }, { "EnemyId": "stalker", "Count": 3, "Elements": [ ] } ],
-      "DifficultyOverride": 0.984,
+      "DifficultyOverride": 0.596,
       "Draft": true
     },
     {
@@ -293,7 +363,7 @@
       "ShapeId": "elite",
       "Arena": "Large",
       "Groups": [ { "EnemyId": "champion", "Count": 2, "Elements": [ "Metal", "Earth" ] }, { "EnemyId": "shaman", "Count": 1, "Elements": [ ] }, { "EnemyId": "brute", "Count": 2, "Elements": [ ] } ],
-      "DifficultyOverride": 0.875,
+      "DifficultyOverride": 0.547,
       "Draft": true
     },
     {
@@ -303,7 +373,7 @@
       "ShapeId": "elite",
       "Arena": "Large",
       "Groups": [ { "EnemyId": "giant", "Count": 1, "Elements": [ "Ice" ] }, { "EnemyId": "swarmling", "Count": 10, "Elements": [ ] }, { "EnemyId": "archer", "Count": 2, "Elements": [ ] } ],
-      "DifficultyOverride": 0.906,
+      "DifficultyOverride": 0.488,
       "Draft": true
     },
     {
@@ -313,7 +383,7 @@
       "ShapeId": "elite",
       "Arena": "Large",
       "Groups": [ { "EnemyId": "giant", "Count": 1, "Elements": [ "Lightning" ] }, { "EnemyId": "champion", "Count": 1, "Elements": [ "Air" ] }, { "EnemyId": "caster", "Count": 2, "Elements": [ ] } ],
-      "DifficultyOverride": 0.68,
+      "DifficultyOverride": 0.481,
       "Draft": true
     },
     {
@@ -323,7 +393,7 @@
       "ShapeId": "elite",
       "Arena": "Large",
       "Groups": [ { "EnemyId": "giant", "Count": 1, "Elements": [ "Nature" ] }, { "EnemyId": "stingling", "Count": 12, "Elements": [ ] }, { "EnemyId": "shaman", "Count": 2, "Elements": [ ] } ],
-      "DifficultyOverride": 0.809,
+      "DifficultyOverride": 0.492,
       "Draft": true
     },
     {
@@ -333,7 +403,7 @@
       "ShapeId": "elite",
       "Arena": "Large",
       "Groups": [ { "EnemyId": "giant", "Count": 1, "Elements": [ "Fire" ] }, { "EnemyId": "champion", "Count": 2, "Elements": [ "Earth", "Metal" ] } ],
-      "DifficultyOverride": 0.801,
+      "DifficultyOverride": 0.432,
       "Draft": true
     },
     {
@@ -343,7 +413,7 @@
       "ShapeId": "elite",
       "Arena": "Large",
       "Groups": [ { "EnemyId": "giant", "Count": 2, "Elements": [ "Fire", "Water" ] } ],
-      "DifficultyOverride": 0.748,
+      "DifficultyOverride": 0.436,
       "Draft": true
     },
     {
@@ -353,7 +423,7 @@
       "ShapeId": "elite",
       "Arena": "Large",
       "Groups": [ { "EnemyId": "giant", "Count": 2, "Elements": [ "Light", "Dark" ] } ],
-      "DifficultyOverride": 0.563,
+      "DifficultyOverride": 0.437,
       "Draft": true
     },
     {
@@ -363,7 +433,7 @@
       "ShapeId": "elite",
       "Arena": "Large",
       "Groups": [ { "EnemyId": "giant", "Count": 2, "Elements": [ "Light", "Dark" ] } ],
-      "DifficultyOverride": 0.574,
+      "DifficultyOverride": 0.454,
       "Draft": true
     }
   ]

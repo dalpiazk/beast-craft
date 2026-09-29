@@ -18,6 +18,7 @@ Where the text lives:
 | Regions and Seals | `content/data/Campaign/regions.json` |
 | Map location names | `content/data/Campaign/location-names.json` |
 | Gear, consumables, materials, looks, shop text | `content/data/Items`, `content/data/Cosmetics`, `content/data/Economy`, the skill library's `Materials` (naming rules: [content-items.md](content-items.md)) |
+| Kinship stones, lore stones, shrines, caches | `content/data/Campaign/discovery.json` (see "Kinship sites and the discovery layer") |
 
 ---
 
@@ -170,6 +171,46 @@ Played once, in about 20-25 minutes (docs/design/area-zero.md).
   proves their bond (the trials); the later regions' Kinship sites reuse the idea.
 - **Hints** (`content/data/Tutorial/hints.json`): second person, one or two short sentences, plain
   words, a light touch of wonder; they explain one thing each and point at it.
+
+## Kinship sites and the discovery layer (DRAFT)
+
+Every text here is DRAFT pending producer review; it lives in `content/data/Campaign/discovery.json`
+(sites, lore, shrines, caches), `encounter-library.json` (the `kin_trial_*` trials) and
+`cosmetic-library.json` (the `discovery` looks). Rules: [kinship-discovery.md](kinship-discovery.md).
+
+- **Kinship stones** (Hearthglen's Bramble and Grove stones, grown up): one or two old standing stones
+  a region where wild beasts choose a Beastbinder who proves their bond. Each has a name that says what
+  it is (…Stone), an **intro** (what the player sees arriving: a beast watching, curious, never
+  captured), a **bond** line in the same voice as a hint ("Bond: win with a Vanguard holding the
+  line."), and its own lore entry (what the stone is and what bonding there means). The trial is a
+  gloamed champion of the region's flavour and two escorts; the beast is never the enemy.
+
+  | Stone | Region | Its feeling |
+  | --- | --- | --- |
+  | Mossbound Stone | r01 | soft with moss, warm at night |
+  | Cinderglow Stone | r02 | warm as bread from the oven, the mountain's blessing |
+  | Tidewrack Stone | r03 | covered and freed by the tide twice a day: patient beasts |
+  | Galecrest Stone | r04 | the one calm spot in the endless wind |
+  | Ironroot Stone | r05 | held by iron roots like a hand: bonds hard to break |
+  | Rimeglass Stone | r06 | clear as ice: you see the beast who will choose you |
+  | Deepshade Stone | r06 | a dark stone that drinks the snowlight: shadow beasts, quiet evenings |
+
+- **Lore stones**: one short entry per stone (a title of 1-3 words, 1-2 sentences, at most 280
+  characters), about the region's small wonders and its history with the first Beastbinders: a
+  carving of a person and a beast side by side, firefly roads, drowned bells, rope bridges, bell
+  trees, the singing ice. Present tense for what is there, past for what was; no villains (the Gloam
+  makes guardians forget, it never makes them wicked). Kept by the save for the future compendium.
+- **Shrines**: little wayside shrines (stacked stones, a brazier, a ring of shells, chimes, an iron
+  bell, a snow hollow) whose one line promises that something of the place will grow in the Grove.
+  Each grants a Grove unlock (a habitat, a decor piece or a seed, by id only until the Grove exists).
+- **Caches**: a found stash named like an item (Mossy Satchel, Kiln Stash, Driftwood Chest): what it
+  holds is shown plainly ("45 gold and 1 Essence Shard"). A Kinship stone with no beast left gives a
+  **Kinship Offering** instead.
+- **Vistas**: high places with a long view; no name beyond "Vista".
+- **Looks** (the `discovery` source; placeholder art keys): each region's 100% reward — Mosstrail
+  Cape, Emberlight Cap, Tidewalker Coat, Galewander Cloak, Copperleaf Crown, Rimeweave Garb ("For those
+  who walked every trail of…") — and one cache look a region — Fern Sprig, Cinder Scarf, Shell
+  Circlet, Cloudrunner Vest, Rustleaf Mantle, Snowdrift Hood. Element words follow the region's flavour.
 
 ## Post-game region (DRAFT)
 

@@ -21,6 +21,22 @@ namespace BeastCraft.Tests.EditMode
     /// avatar's arts, the passives' and bonds' hits, the final HP of every unit, the outcome and the
     /// elapsed ticks — across map seeds and team levels (so level gaps apply both ways). Any change
     /// to a draw or a number moves the hash.
+    /// <para>
+    /// Widened (the Roster review's note) to every <see cref="AppliedEffect"/> too — its target, effect
+    /// type, stat, status and recorded <see cref="AppliedEffect.Amount"/> — and re-captured on
+    /// <c>main</c> (797ed05) before the Kinship and discovery work touched anything.
+    /// </para>
+    /// <para>
+    /// Re-captured twice more for the producer's never-blocked retune (docs/balance/tuning-log.md,
+    /// "Never-blocked targets"): first for <see cref="DamageFormula.LevelDifferenceCap"/> and its k/q
+    /// steepened (every case here fields a team level away from the node's own level, so the level-gap
+    /// term moves every hash) and the shipping difficulty table recalibrated on the new targets (85%
+    /// squad/horde, 75% elite/solo/boss); then again for the trimmed early-region easing (r01 only,
+    /// fading to nothing by its own last stage; r02 and r03 need none, adaptive assist covers what is
+    /// left) and adaptive assist itself, both of which move a campaign battle's stat multiplier for
+    /// any of these that land in r01-r03. All legitimate outcome changes; the recording invariant
+    /// itself is untouched.
+    /// </para>
     /// </summary>
     public class BattleRecordInvarianceTests
     {
@@ -29,16 +45,16 @@ namespace BeastCraft.Tests.EditMode
             get { return VfxLibraryTests.Content; }
         }
 
-        [TestCase(11, 1, "BADC552C12274E6F")]
-        [TestCase(12, 3, "9A99CF8C3D183998")]
-        [TestCase(13, 6, "6DB98AB971216E32")]
-        [TestCase(14, 2, "849E84CE8CE3BD02")]
-        [TestCase(15, 9, "16AD76B8B27919F8")]
+        [TestCase(11, 1, "A26CCB2D494EDB3C")]
+        [TestCase(12, 3, "BCE0BB77DD8DD464")]
+        [TestCase(13, 6, "4C5AB52AD8241523")]
+        [TestCase(14, 2, "7A34C70929E43DDA")]
+        [TestCase(15, 9, "4B2AA0ECD29B149C")]
         public void CampaignBattle_Fingerprint_IsUnchangedByTheLogRecording(int mapSeed, int teamLevel, string expected)
         {
             string text = Fingerprint(mapSeed, teamLevel);
             string hash = Fnv(text);
-            TestContext.WriteLine(mapSeed + "/" + teamLevel + ": " + hash + " (" + text.Length + " chars)");
+            TestContext.WriteLine(mapSeed + "/" + teamLevel + ": " + hash + " (" + text.Length + " chars, " + (text.Split(" e ").Length - 1) + " applied effects)");
             Assert.AreEqual(expected, hash);
         }
 
@@ -129,6 +145,12 @@ namespace BeastCraft.Tests.EditMode
             {
                 text.Append(tag).Append(" h ").Append(hit.Target.Id).Append(' ').Append(hit.Roll.Amount).Append(hit.Roll.IsCrit ? "c" : string.Empty).Append(' ')
                     .Append(hit.Roll.VariancePercent).Append(' ').Append(hit.Absorbed).Append('\n');
+            }
+
+            foreach (AppliedEffect applied in activation.Applied)
+            {
+                text.Append(tag).Append(" e ").Append(applied.Target?.Id).Append(' ').Append(applied.Effect?.EffectType).Append(' ').Append(applied.Effect?.AffectedStat)
+                    .Append(' ').Append(applied.Effect?.Status).Append(' ').Append(applied.Amount).Append('\n');
             }
         }
 

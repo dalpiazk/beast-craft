@@ -72,15 +72,16 @@ namespace BeastCraft.Economy
         /// Where it comes from: <c>default</c>, <c>starter</c> (free from the start), <c>shop</c> (the
         /// Trader sells it), <c>boss</c> (a lair's first clear; never sold), <c>boss_hard</c> (a
         /// post-game lair cleared on Hard; never sold), <c>milestone</c>
-        /// (<see cref="UnlockId"/> names the milestone), <c>drop</c> (a low chance per battle), or
-        /// <c>premium</c> (reserved for future purchases: never obtainable with gold or play in v1).
+        /// (<see cref="UnlockId"/> names the milestone), <c>drop</c> (a low chance per battle),
+        /// <c>premium</c> (reserved for future purchases: never obtainable with gold or play in v1), or
+        /// <c>discovery</c> (an exploration reward: a region's 100% or a cache; <see cref="UnlockId"/> names it).
         /// </summary>
         public string Source;
 
         /// <summary>For <c>shop</c> and <c>drop</c>: the first region (1-based) it can appear in.</summary>
         public int MinRegion = 1;
 
-        /// <summary>For <c>boss</c> and <c>boss_hard</c>: the region whose lair grants it; for <c>milestone</c>: the milestone id. Otherwise "".</summary>
+        /// <summary>For <c>boss</c> and <c>boss_hard</c>: the region whose lair grants it; for <c>milestone</c>: the milestone id; for <c>discovery</c>: the region or cache. Otherwise "".</summary>
         public string UnlockId = string.Empty;
 
         /// <summary>The art the look will use (a placeholder key until the art exists).</summary>

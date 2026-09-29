@@ -537,7 +537,8 @@ namespace BeastCraft.Game.Ui
         /// <summary>
         /// A code-drawn icon in <paramref name="box"/>: battle, elite, gate, boss, shop, camp (the
         /// map's locations), map, roster, avatar, inventory (the nav), lock, check, back, close,
-        /// star, seal, coin, flag, gear, element; an art key from the manifest also works.
+        /// star, seal, coin, flag, gear, element, and the points of interest's shrine, lore, cache, vista
+        /// and kinship; an art key from the manifest also works.
         /// </summary>
         public void Glyph(string name, Rect box, Color ink)
         {
@@ -669,6 +670,40 @@ namespace BeastCraft.Game.Ui
                 case "flag":
                     Line(P(0.3f, 0.86f), P(0.3f, 0.14f), t, ink);
                     Polyline(new[] { P(0.3f, 0.16f), P(0.78f, 0.3f), P(0.3f, 0.46f) }, t, ink);
+                    break;
+                case "shrine":
+                    // A little roofed shrine with a flame inside.
+                    Polyline(new[] { P(0.14f, 0.36f), P(0.5f, 0.14f), P(0.86f, 0.36f) }, t, ink);
+                    Line(P(0.26f, 0.38f), P(0.26f, 0.84f), t, ink);
+                    Line(P(0.74f, 0.38f), P(0.74f, 0.84f), t, ink);
+                    Line(P(0.16f, 0.86f), P(0.84f, 0.86f), t, ink);
+                    Disc(P(0.5f, 0.62f), s * 0.1f, ink);
+                    break;
+                case "lore":
+                    // A standing stone with carved lines.
+                    RoundedRect(new Rect(ox + 0.28f * s, oy + 0.14f * s, 0.44f * s, 0.72f * s), s * 0.16f, ink);
+                    Line(P(0.38f, 0.36f), P(0.62f, 0.36f), t * 0.6f, C("plum", 0.55f));
+                    Line(P(0.38f, 0.5f), P(0.62f, 0.5f), t * 0.6f, C("plum", 0.55f));
+                    Line(P(0.38f, 0.64f), P(0.56f, 0.64f), t * 0.6f, C("plum", 0.55f));
+                    break;
+                case "cache":
+                    // A chest.
+                    RoundedRect(new Rect(ox + 0.16f * s, oy + 0.42f * s, 0.68f * s, 0.4f * s), s * 0.06f, ink);
+                    Arc(P(0.5f, 0.44f), s * 0.34f, t, ink, 180f, 360f);
+                    Line(P(0.16f, 0.46f), P(0.84f, 0.46f), t * 0.7f, C("plum", 0.55f));
+                    Disc(P(0.5f, 0.56f), s * 0.06f, C("plum", 0.55f));
+                    break;
+                case "vista":
+                    // Two peaks and a rising sun.
+                    Arc(P(0.62f, 0.44f), s * 0.14f, t * 0.8f, ink, 180f, 360f);
+                    Polyline(new[] { P(0.1f, 0.82f), P(0.38f, 0.36f), P(0.56f, 0.64f), P(0.7f, 0.46f), P(0.9f, 0.82f) }, t, ink);
+                    Line(P(0.1f, 0.84f), P(0.9f, 0.84f), t, ink);
+                    break;
+                case "kinship":
+                    // Two paws' worth of bond: two linked rings.
+                    Arc(P(0.38f, 0.52f), s * 0.2f, t, ink);
+                    Arc(P(0.62f, 0.52f), s * 0.2f, t, ink);
+                    Disc(P(0.5f, 0.52f), s * 0.07f, ink);
                     break;
                 case "gear":
                     Arc(P(0.5f, 0.5f), s * 0.24f, t * 1.4f, ink);

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using BeastCraft.Campaign;
+using BeastCraft.Discovery;
 using BeastCraft.Presentation.Board;
 using BeastCraft.Presentation.Layout;
 using BeastCraft.Presentation.Screens;
@@ -24,6 +25,14 @@ namespace BeastCraft.Game.Screens
     /// piled up; tap to claim) and Next battle (the recommended location's encounter, the last team
     /// already picked). Coming back to the app claims the idle rewards here. The Roster tab is the
     /// roster page (<see cref="RosterPage"/>); the other tabs show a coming-soon page.
+    /// <para>
+    /// <strong>The discovery layer</strong> (a discovery region's map): soft painted fog over the ground
+    /// not yet seen (locations under it are not drawn), the points of interest seen as badges (tap one
+    /// for its popup, <see cref="PoiModal"/>; a Kinship site opens its trial's preview), the region's
+    /// "Explored" percentage in the header (tap it for the region progress panel,
+    /// <see cref="RegionProgressModal"/>), a won trial's choice offered before anything else
+    /// (<see cref="TrialPickModal.Kinship"/>), and the 100% reward's toast.
+    /// </para>
     /// </summary>
     public sealed class HomeScreen : GameScreen
     {
@@ -38,6 +47,7 @@ namespace BeastCraft.Game.Screens
         private readonly Button _gear;
         private readonly Button _idle;
         private readonly Button _next;
+        private readonly Button _explored;
         private readonly List<Hotspot> _spots = new List<Hotspot>();
         private float _idleRefreshMs;
 
@@ -51,6 +61,7 @@ namespace BeastCraft.Game.Screens
             Ui.Add(new Panel { Id = "header", Bounds = HeaderBox, StyleKey = "header" });
             _gear = AddButton(null, "gear", new Rect(HeaderBox.Right - 120f, HeaderBox.Y + 24f, 96f, 96f), null, "ghost", OpenSettings, "gear");
             _idle = AddButton(null, "idle", new Rect(HeaderBox.Right - 420f, HeaderBox.Bottom + 18f, 420f, 84f), "Idle", "chip", ClaimIdle, "hourglass");
+            _explored = AddButton(null, "explored", new Rect(HeaderBox.X, HeaderBox.Bottom + 18f, 400f, 84f), "Explored", "chip", OpenRegionProgress, "map");
             _next = AddButton(null, "next-battle", new Rect(NavBox.X + 90f, NavBox.Y - 150f, NavBox.Width - 180f, 124f), "Next battle", "primary", OpenRecommended,
                               "battle");
             Ui.Add(new Panel { Id = "nav-panel", Bounds = NavBox, StyleKey = "nav" });
@@ -98,11 +109,33 @@ namespace BeastCraft.Game.Screens
             _spots.Clear();
             foreach (MapNodeView node in _map.Nodes)
             {
+                if (node.Hidden)
+                {
+                    continue;
+                }
+
                 float r = node.Radius + 16f;
                 Hotspot spot = _scroll.Add(new Hotspot { Id = "node" + node.NodeId, Tag = node.NodeId, Bounds = new Rect(node.Position.X - r, node.Position.Y - r, 2f * r, 2f * r) });
                 spot.Clicked += s => TapNode((int)s.Tag);
                 _spots.Add(spot);
             }
+
+            foreach (PoiView poi in _map.Pois)
+            {
+                float r = poi.Radius + 18f;
+                Hotspot spot = _scroll.Add(new Hotspot { Id = "poi-" + poi.PoiId, Tag = poi.PoiId, Bounds = new Rect(poi.Position.X - r, poi.Position.Y - r, 2f * r, 2f * r) });
+                spot.Clicked += s => TapPoi((string)s.Tag);
+                _spots.Add(spot);
+            }
+
+            _explored.Text = _map.Header.CompletionText;
+            _explored.Selected = _map.Header.CompletionRewarded;
+            foreach (string toast in Ctx.Session.PendingToasts)
+            {
+                Ctx.Game.Toast(toast);
+            }
+
+            Ctx.Session.PendingToasts.Clear();
 
             MapNodeView next = _map.Recommended();
             _next.Tag = next?.NodeId;
@@ -131,6 +164,16 @@ namespace BeastCraft.Game.Screens
                 {
                     Ctx.Stack.PushModal(new TrialPickModal(Ctx, Enter));
                     ShowHints(BeastCraft.Tutorial.HintTriggers.PickOpen, -1, pending);
+                }
+
+                return;
+            }
+
+            if (Ctx.Session.PendingKinship)
+            {
+                if (!Ctx.Stack.IsOpen("kinship-pick"))
+                {
+                    Ctx.Stack.PushModal(TrialPickModal.Kinship(Ctx, Enter));
                 }
 
                 return;
@@ -234,9 +277,21 @@ namespace BeastCraft.Game.Screens
         /// <summary>A tap on location <paramref name="nodeId"/>: its encounter, or a toast.</summary>
         public void TapNode(int nodeId)
         {
-            MapTapResult tap = _map.Tap(nodeId);
+            TapNode(nodeId, false);
+        }
+
+        private void TapNode(int nodeId, bool leaveConfirmed)
+        {
+            MapTapResult tap = _map.Tap(nodeId, leaveConfirmed);
             switch (tap.Kind)
             {
+                case MapTapKind.ConfirmLeave:
+                    Ctx.Stack.PushModal(new ConfirmModal(Ctx, "Leave the kinship stone?", tap.Message, "Stay", "Go on", () => TapNode(nodeId, true)));
+                    break;
+                case MapTapKind.KinshipChoice:
+                    Ctx.Game.Toast(tap.Message);
+                    OfferPendingPick();
+                    break;
                 case MapTapKind.Preview:
                     Ctx.Stack.Push(new EncounterScreen(Ctx, nodeId));
                     break;
@@ -255,6 +310,37 @@ namespace BeastCraft.Game.Screens
                     Ctx.Game.Toast(tap.Message);
                     break;
             }
+        }
+
+        /// <summary>A tap on point of interest <paramref name="poiId"/>: its popup, or (a Kinship site) its trial's preview.</summary>
+        public void TapPoi(string poiId)
+        {
+            MapTapResult tap = _map.TapPoi(poiId);
+            switch (tap.Kind)
+            {
+                case MapTapKind.Poi:
+                    Ctx.Stack.PushModal(new PoiModal(Ctx, new PoiViewModel(Ctx.Session, poiId), Enter));
+                    break;
+                case MapTapKind.KinshipTrial:
+                    Ctx.Stack.Push(new EncounterScreen(Ctx, EncounterViewModel.ForKinship(Ctx.Session, poiId)));
+                    break;
+                case MapTapKind.Pick:
+                case MapTapKind.KinshipChoice:
+                    Ctx.Game.Toast(tap.Message);
+                    OfferPendingPick();
+                    break;
+            }
+        }
+
+        /// <summary>The region progress panel (the header's "Explored" chip).</summary>
+        public void OpenRegionProgress()
+        {
+            if (_map.Header.CompletionPercent < 0)
+            {
+                return;
+            }
+
+            Ctx.Stack.PushModal(new RegionProgressModal(Ctx, new RegionProgressViewModel(Ctx.Session), Enter));
         }
 
         /// <summary>A story location: the mentor's scene, then the visit (gifts; at Hearthglen's end, the way on).</summary>
@@ -344,6 +430,7 @@ namespace BeastCraft.Game.Screens
             Ui.Find("header").Visible = map;
             _gear.Visible = map;
             _idle.Visible = map;
+            _explored.Visible = map && _map.Header.CompletionPercent >= 0;
             _next.Visible = map && _next.Tag != null;
         }
 
@@ -427,15 +514,17 @@ namespace BeastCraft.Game.Screens
                 DrawTrail(path);
             }
 
+            float pulse = 0.5f + 0.5f * (float)Math.Sin(Painter.TimeMs / 260f);
+            DrawFog(top, bottom);
+
             // The trailhead: a little flag where every expedition starts.
             Vec2 head = layout.Trailhead;
             Painter.Soft(head, 70f, Painter.C("trail", 0.9f), 0.45f);
             Painter.Glyph("flag", new Rect(head.X - 36f, head.Y - 70f, 72f, 72f), Painter.C("plum"));
 
-            float pulse = 0.5f + 0.5f * (float)Math.Sin(Painter.TimeMs / 260f);
             foreach (MapNodeView node in _map.Nodes)
             {
-                if (node.Position.Y + node.Radius < top || node.Position.Y - node.Radius > bottom)
+                if (node.Hidden || node.Position.Y + node.Radius < top || node.Position.Y - node.Radius > bottom)
                 {
                     continue;
                 }
@@ -443,7 +532,53 @@ namespace BeastCraft.Game.Screens
                 DrawNode(node, pulse);
             }
 
+            foreach (PoiView poi in _map.Pois)
+            {
+                if (poi.Position.Y + poi.Radius * 2f < top || poi.Position.Y - poi.Radius * 2f > bottom)
+                {
+                    continue;
+                }
+
+                DiscoveryArt.Marker(Ctx, poi.Kind, poi.Position, poi.Radius, poi.State == PoiState.Found, pulse);
+            }
+
             DrawLabels(top, bottom);
+        }
+
+        /// <summary>
+        /// The fog (placeholder painting until the art lands): over every cell not yet seen, a soft
+        /// cloud — a shaded underlayer, a pale body and a light top — sized to overlap its neighbours
+        /// so the edge of the seen ground reads as a soft, painted bank of mist.
+        /// </summary>
+        private void DrawFog(float top, float bottom)
+        {
+            if (!_map.HasFog)
+            {
+                return;
+            }
+
+            float r = Math.Max(_map.FogCellSize.X, _map.FogCellSize.Y) * 1.25f;
+            foreach (Vec2 cell in _map.FogCells)
+            {
+                if (cell.Y + r < top || cell.Y - r > bottom)
+                {
+                    continue;
+                }
+
+                Painter.Soft(new Vec2(cell.X, cell.Y + r * 0.18f), r * 1.1f, Painter.C("map_fog_shade"), 0.45f);
+            }
+
+            foreach (Vec2 cell in _map.FogCells)
+            {
+                if (cell.Y + r < top || cell.Y - r > bottom)
+                {
+                    continue;
+                }
+
+                Painter.Soft(cell, r, Painter.C("map_fog"), 0.55f);
+                float wobble = (float)Math.Sin((cell.X * 0.013f) + (cell.Y * 0.021f));
+                Painter.Soft(new Vec2(cell.X - r * 0.22f * wobble, cell.Y - r * 0.25f), r * 0.55f, Painter.C("white", 0.35f), 0.4f);
+            }
         }
 
         private void DrawTrail(MapPathView path)
@@ -533,8 +668,8 @@ namespace BeastCraft.Game.Screens
         {
             float size = Ctx.Style.TextSizes.Small + 2f;
             List<Rect> placed = new List<Rect>();
-            List<MapNodeView> labelled = _map.Nodes.FindAll(n => n.State == MapNodeState.Reachable || n.State == MapNodeState.Current || n.Type == MapNodeType.Boss ||
-                                                                 n.Type == MapNodeType.Gate);
+            List<MapNodeView> labelled = _map.Nodes.FindAll(n => !n.Hidden && (n.State == MapNodeState.Reachable || n.State == MapNodeState.Current || n.Type == MapNodeType.Boss ||
+                                                                                n.Type == MapNodeType.Gate));
             labelled.Sort((a, b) => a.Position.X.CompareTo(b.Position.X));
             foreach (MapNodeView node in labelled)
             {
@@ -558,6 +693,28 @@ namespace BeastCraft.Game.Screens
                 placed.Add(tag.Value);
                 Painter.Framed(tag.Value, 22f, 3f, Painter.C("plum"), Painter.C("cream", 0.95f));
                 Painter.TextIn(text, tag.Value.Inset(12f), size, Painter.C("ink"), TextAlign.Center);
+            }
+
+            // Points of interest waiting to be visited: their names, where they fit.
+            foreach (PoiView poi in _map.Pois)
+            {
+                Vec2 c = poi.Position;
+                if (poi.State != PoiState.Revealed || c.Y + poi.Radius + 80f < top || c.Y - poi.Radius - 80f > bottom)
+                {
+                    continue;
+                }
+
+                string text = poi.Name + (poi.Kind == PoiKind.KinshipSite ? "  Lv " + poi.Level.ToString(CultureInfo.InvariantCulture) : string.Empty);
+                float width = Math.Min(460f, Ctx.Text.Measure(text, size) + 40f);
+                Rect below = Clamp(new Rect(c.X - width / 2f, c.Y + poi.Radius + 12f, width, 44f));
+                if (Overlaps(placed, below))
+                {
+                    continue;
+                }
+
+                placed.Add(below);
+                Painter.Framed(below, 22f, 3f, Painter.C(DiscoveryArt.ColorKey(poi.Kind)), Painter.C("cream", 0.95f));
+                Painter.TextIn(text, below.Inset(12f), size, Painter.C("ink"), TextAlign.Center);
             }
         }
 

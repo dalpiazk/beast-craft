@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Linq;
 using BeastCraft.Campaign;
 using BeastCraft.Encounters;
 using BeastCraft.Save;
@@ -10,8 +9,11 @@ namespace BeastCraft.Tests.EditMode
     /// <summary>
     /// The early-region easing (<see cref="RegionData.StageEasing"/> of <see cref="RegionLibraryData.EasingShapeScales"/>): the authored curve,
     /// the validator's rules, and that <see cref="CampaignRules.PlanFor(MapRun, MapNode, EncounterLibrary, EnemyCatalog, RegionLibrary)"/>
-    /// applies it to campaign battles in r01-r02 only. The curve itself is measured by the balance
-    /// simulator's <c>--mode newplayer</c> (docs/balance/tuning-log.md, "Early-region easing").
+    /// applies it to campaign battles in r01 only (r02 and r03 need none; adaptive assist covers the
+    /// rest). The curve itself is measured by the balance simulator's <c>--mode newplayer</c>
+    /// (docs/balance/tuning-log.md, "Never-blocked targets", which trimmed the r02 extension and
+    /// BossScale from "Kinship: roster growth and the r02 fall-off" once the typical-team calibration
+    /// and adaptive assist made them unnecessary).
     /// </summary>
     public class EarlyRegionEasingTests
     {
@@ -31,30 +33,36 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
-        public void AuthoredCurve_EasesEachShapeInR01_AndFadesToNothingByTheEndOfR02()
+        public void AuthoredCurve_EasesR01Only_FadingToNothingByItsLastStage_NeverTheBoss()
         {
-            foreach (string key in new[] { "squad", "horde", "solo", "elite", RegionLibraryData.EasingBossId })
+            foreach (string key in new[] { "squad", "horde", "solo", "elite" })
             {
                 Assert.Less(_regions.FullEasingScale(key), 1.0, key + " has its own discount");
-                Assert.Greater(_regions.FullEasingScale(key), 0.5, key);
+                Assert.Greater(_regions.FullEasingScale(key), 0.75, key + ": mild now (the typical-team calibration and adaptive assist do the rest)");
             }
 
+            Assert.AreEqual(1.0, _regions.FullEasingScale(RegionLibraryData.EasingBossId), "the boss needs no early-region discount at all (adaptive assist covers a struggling player)");
             Assert.AreEqual(1.0, _regions.FullEasingScale("squad_postgame"), "a kind not listed is never eased");
-            Assert.Less(_regions.FullEasingScale("elite"), _regions.FullEasingScale("squad"), "the shapes need different discounts");
+            Assert.Less(_regions.FullEasingScale("horde"), _regions.FullEasingScale("squad"), "the shapes need different discounts");
 
             RegionData r01 = _regions.GetRegion("r01");
             RegionData r02 = _regions.GetRegion("r02");
+            RegionData r03 = _regions.GetRegion("r03");
             Assert.AreEqual(r01.Stages, r01.StageEasing.Length);
-            Assert.AreEqual(r02.Stages, r02.StageEasing.Length);
+            Assert.IsEmpty(r02.StageEasing, "r02 needs no easing (the no-gear typical-team need is mild by then)");
+            Assert.IsEmpty(r03.StageEasing, "r03 needs no easing either");
             Assert.AreEqual(1.0, _regions.EasingWeight("r01", 0), "r01's first stage gets the full discount");
-            Assert.AreEqual(0.0, _regions.EasingWeight("r02", r02.Stages - 1), "the easing is gone by the end of r02");
-            Assert.AreEqual(1.0, _regions.DifficultyScaleFor("r02", r02.Stages - 1, "elite"));
+            Assert.AreEqual(0.0, _regions.EasingWeight("r01", r01.Stages - 1), "the easing is gone by r01's own last stage");
+            Assert.AreEqual(1.0, _regions.DifficultyScaleFor("r01", r01.Stages - 1, "elite"), "unscaled at r01's last stage");
+            Assert.AreEqual(1.0, _regions.DifficultyScaleFor("r02", 0, "squad"), "r02 is never eased, however early");
+            Assert.AreEqual(1.0, _regions.DifficultyScaleFor("r03", 0, "squad"), "neither is r03");
             Assert.AreEqual(_regions.FullEasingScale("elite"), _regions.DifficultyScaleFor("r01", 0, "elite"), 1e-12);
-            double half = _regions.EasingWeight("r02", 1);
-            Assert.AreEqual(1.0 - (half * (1.0 - _regions.FullEasingScale("horde"))), _regions.DifficultyScaleFor("r02", 1, "horde"), 1e-12, "a partial weight scales the discount");
+            Assert.AreEqual(0.0, r01.BossScale, "no region sets its own BossScale (the shared boss discount is 1: none)");
+            Assert.AreEqual(1.0, _regions.DifficultyScaleFor("r01", r01.Stages - 1, RegionLibraryData.EasingBossId), 1e-12, "r01's boss is never eased");
+            Assert.AreEqual(1.0, _regions.DifficultyScaleFor("r02", 0, RegionLibraryData.EasingBossId), 1e-12, "nor r02's");
 
             double previous = 1.0;
-            foreach (double weight in new List<double>(r01.StageEasing).Concat(r02.StageEasing))
+            foreach (double weight in r01.StageEasing)
             {
                 Assert.LessOrEqual(weight, previous, "the easing only fades out");
                 previous = weight;
@@ -62,9 +70,9 @@ namespace BeastCraft.Tests.EditMode
 
             foreach (RegionData region in _regions.Regions)
             {
-                if (region.RegionId != "r01" && region.RegionId != "r02")
+                if (region.RegionId != "r01")
                 {
-                    Assert.IsEmpty(region.StageEasing, region.RegionId + ": no easing after r02");
+                    Assert.IsEmpty(region.StageEasing, region.RegionId + ": no easing outside r01");
                     for (int stage = 0; stage < region.Stages; stage++)
                     {
                         Assert.AreEqual(1.0, _regions.DifficultyScaleFor(region.RegionId, stage, "squad"), region.RegionId);
@@ -74,6 +82,17 @@ namespace BeastCraft.Tests.EditMode
 
             Assert.AreEqual(1.0, _regions.DifficultyScaleFor("nowhere", 0, "squad"));
             Assert.AreEqual(1.0, _regions.DifficultyScaleFor("r01", 9, "squad"), "a stage past the entries");
+        }
+
+        [Test]
+        public void AssistFloorScales_CoverTheBoss_UnlikeTheEarlyRegionEasing()
+        {
+            Assert.Greater(_data.AssistStep, 0.0, "adaptive assist is on");
+            Assert.Less(_regions.AssistFloorScale(RegionLibraryData.EasingBossId), 1.0, "unlike EasingShapeScales, the assist floor does cover the boss");
+            foreach (string key in new[] { "squad", "horde", "solo", "elite" })
+            {
+                Assert.Less(_regions.AssistFloorScale(key), 1.0, key + " has an assist floor");
+            }
         }
 
         [Test]
@@ -90,6 +109,8 @@ namespace BeastCraft.Tests.EditMode
             data.Regions[0].StageEasing = new[] { 1.0, 1.0 };
             data.Regions[1].StageEasing = new[] { 0.5, 0.75, 1.2, -0.1 };
             data.Regions[10].StageEasing = new[] { 1.0, 1.0, 1.0, 1.0 };
+            data.Regions[3].BossScale = 0.9;
+            data.Regions[10].BossScale = 0.9;
 
             List<string> errors = RegionLibraryValidator.Validate(data, EncounterContentTests.LoadEncounterLibrary());
 
@@ -101,10 +122,12 @@ namespace BeastCraft.Tests.EditMode
             Assert.That(errors, Has.Some.Contains("StageEasing[2] 1.2 must be between 0 and 1"));
             Assert.That(errors, Has.Some.Contains("StageEasing[3] -0.1 must be between 0 and 1"));
             Assert.That(errors, Has.Some.Contains("Post-game region 'r11': StageEasing must be empty"));
+            Assert.That(errors, Has.Some.Contains("Region 'r04': BossScale 0.9 must be 0 (none), or in (0, 1] on a region whose last stage is eased"));
+            Assert.That(errors, Has.Some.Contains("Post-game region 'r11': BossScale must be 0"));
 
             RegionLibraryData unfinished = CampaignMapTests.LoadRegions();
-            unfinished.Regions[1].StageEasing = new[] { 1.0, 0.5, 0.25, 0.25 };
-            Assert.That(RegionLibraryValidator.Validate(unfinished), Has.Some.Contains("Region 'r03': no StageEasing after an easing that ended at 0.25"));
+            unfinished.Regions[2].StageEasing = new[] { 1.0, 0.5, 0.25, 0.25 };
+            Assert.That(RegionLibraryValidator.Validate(unfinished), Has.Some.Contains("Region 'r04': no StageEasing after an easing that ended at 0.25"));
         }
 
         [Test]

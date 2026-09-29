@@ -13,8 +13,9 @@ namespace BeastCraft.Economy
     /// <c>default</c>, <c>IsDefault</c>), at least one starter look, every other option from a known
     /// source, rarity 0-1, MinRegion 1-10 and an art key; a <c>boss</c> option naming (given the
     /// regions) a known region, a <c>boss_hard</c> option (a post-game lair's Hard-only look) a known
-    /// post-game region, a <c>milestone</c> option a milestone of the file, every other option no
-    /// unlock id. Boss, Hard boss and milestone looks are never sold: the Trader stocks
+    /// post-game region, a <c>milestone</c> option a milestone of the file, a <c>discovery</c> option
+    /// (an exploration reward) the region or cache granting it (discovery.json checks it), every other
+    /// option no unlock id. Boss, Hard boss and milestone looks are never sold: the Trader stocks
     /// <c>shop</c> looks only. Milestones: ids unique, kind <c>BeastLevel</c> / <c>AvatarLevel</c> (1-100)
     /// or <c>BossesCleared</c> (1-10). With the roster, every species has at least one category;
     /// the avatar always must. No stats anywhere — looks never change a battle.
@@ -209,6 +210,7 @@ namespace BeastCraft.Economy
                 bool boss = o.Source == CosmeticLibrary.SourceBoss;
                 bool bossHard = o.Source == CosmeticLibrary.SourceBossHard;
                 bool milestone = o.Source == CosmeticLibrary.SourceMilestone;
+                bool discovery = o.Source == CosmeticLibrary.SourceDiscovery;
                 if (boss && (string.IsNullOrEmpty(o.UnlockId) || (regionIds != null && !regionIds.Contains(o.UnlockId))))
                 {
                     errors.Add(where + ": a boss look names the region whose lair grants it (UnlockId).");
@@ -222,9 +224,13 @@ namespace BeastCraft.Economy
                 {
                     errors.Add(where + ": a milestone look names a milestone of the file (UnlockId).");
                 }
-                else if (!boss && !bossHard && !milestone && !string.IsNullOrEmpty(o.UnlockId))
+                else if (discovery && string.IsNullOrEmpty(o.UnlockId))
                 {
-                    errors.Add(where + ": only boss and milestone looks have an UnlockId.");
+                    errors.Add(where + ": a discovery look names the region or cache that grants it (UnlockId; discovery.json checks which).");
+                }
+                else if (!boss && !bossHard && !milestone && !discovery && !string.IsNullOrEmpty(o.UnlockId))
+                {
+                    errors.Add(where + ": only boss, milestone and discovery looks have an UnlockId.");
                 }
             }
 

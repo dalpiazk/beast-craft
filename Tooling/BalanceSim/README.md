@@ -30,7 +30,8 @@ dotnet run --project Tooling/BalanceSim -c Release -- [options]
 
 | Option | Default | Meaning |
 | --- | --- | --- |
-| `--mode <m>` | `both` | `pve`, `pvp` or `both`; `pacing` and `campaign` (the Monte Carlo models, below); `newplayer` (the new-player report, see "New-player easing"). |
+| `--mode <m>` | `both` | `pve`, `pvp` or `both`; `pacing` and `campaign` (the Monte Carlo models, below); `newplayer` (the new-player report, see "New-player easing"); `hearthglen`; `typical` (the shipping difficulty calibration on the typical team, see "Typical team"). |
+| `--typical-samples <n>` | `2` | `--mode typical`: battles per team and composition at every search step. |
 | `--kit <k>` | `both` | The element axis: `elemental`, `neutral` or `both` (see below). |
 | `--skill-kit <k>` | `library` | The skill axis: `library` (each beast's authored `DefaultLoadout` from `skill-library.json`, the real game setup and the committed report's setting; see "Library kits") or `standard` (the same standard kit for every beast, so the stat lines are what is measured; see "The standard kit"). Before the authored-kits retune this was `--kit standard|library`; `--kit` now takes only the element axis. |
 | `--skill-level <n>` | `1` | Skill level (1-20) for library skills and library avatar skills; the tier is the gates below that level (16+ = all three passed). |
@@ -46,7 +47,8 @@ dotnet run --project Tooling/BalanceSim -c Release -- [options]
 | `--team-size <n>` | `3` | Beasts per PvE team, 1-6. Every combination of the roster is fielded (C(10,3) = 120). The default is the game's party size (three beasts beside the Beastbinder, `TeamSuggester.DefaultTeamSize`; four, 210 teams, until "Team size 3" in the tuning log). |
 | `--map-seeds <n>` | `60` | `--mode newplayer`: the first-node section's map seeds, 1..n. |
 | `--difficulty <path>` | the game's | `--mode newplayer`: the difficulty table the new player fights (`encounter-difficulty.json` format). |
-| `--target-clear <t>` | library | Clear rate the difficulty calibration aims for (the scouted pick's by default; see `--calibrate-on`). By default each shape's own `TargetClear` in `encounter-library.json` (the game's tiered targets: `squad` and `horde` 80, `elite` 60, `solo` 50; 50 for a fixed-set encounter). A single percentage (e.g. `50`) is the legacy uniform target for every shape (the balance guard is judged at `--target-clear 50`); `shape=pct` pairs (e.g. `squad=70,solo=45`) override single shapes. |
+| `--kinship-only` | off | `--mode newplayer`: only the Kinship sections (roster growth, the trials); with `--tune`, each trial's multiplier for its floor. For tuning; the committed report is the full run. |
+| `--target-clear <t>` | library | Clear rate the difficulty calibration aims for (the scouted pick's by default; see `--calibrate-on`). By default each shape's own `TargetClear` in `encounter-library.json` (the game's tiered targets: `squad` and `horde` 85, `elite` and `solo` 75; 50 for a fixed-set encounter). A single percentage (e.g. `50`) is the legacy uniform target for every shape (the balance guard is judged at `--target-clear 50`); `shape=pct` pairs (e.g. `squad=70,solo=45`) override single shapes. |
 | `--calibrate-on <t>` | `bonds` | Whose clear rate the PvE difficulty is calibrated to `--target-clear`. `bonds`: the team the bond-aware scouted picker (heuristic + bonds) fields against each composition, i.e. the player scouts and counter-picks; falls back to `heuristic` when bonds are not active (`--bonds off`, `--skill-kit standard`). `heuristic`: the plain element counter-pick. `mean`: the mean of every team (the unscouted player), the calibration before scouting; it reproduces the pre-scouting report byte for byte. See "Difficulty calibration". |
 | `--calibrate-samples <n>` | `16` | Scouted-pick calibration only: battles per composition the picked team fights at each search step (8 compositions x 16 = 128 battles per step, a binomial SE of about 4.4 points at 50%). Raise it if a cell's search is non-monotone. |
 | `--level-gap <list>` | off | PvE only. Also replay every cell with the enemies `g` levels above the team (negative = below) at the cell's calibrated multiplier, and add the "PvE level gap" section (and "PvE level gap over seeds" with `--seeds`). Comma-separated gaps and inclusive ranges, e.g. `-5..10` or `0,2,3,5`. The team and the avatar (unless `--avatar-level`) stay at the row's level; the enemies' stats follow their curve to their level, and the damage formula's level-difference term applies. Each battle's seed ignores the gap, so gap 0 is the calibration itself (no extra battles). A gap that puts the enemies outside 1-100 is not run (`—`). Suggested with `--levels 10,30,50,70,90`. See "Level gap". |
@@ -103,16 +105,21 @@ Two reports are committed, both the default arguments:
   "Behaviour bonds and tiered difficulty" it runs the behaviour bonds, the composition panel
   (`--panel 16x4`), the avatar-value replay (`--avatar-value`, for the no-avatar column of
   "Difficulty by shape") and the tiered targets. Since "Level-gap mix" (see below) its balance
-  sections are judged over the default gap mix. Since the campaign merge the report and the game's
-  difficulty table come from two commands: the report stays **gearless** (the per-beast balance
-  guard's setting), and the shipping table is calibrated with **typical gear** (`--gear typical`, a
-  user decision; "Difficulty table for the game"):
+  sections are judged over the default gap mix. The report and the game's difficulty table come
+  from two commands and measure **two different things**:
+  - **The per-beast balance measure** (this report, the balance guard): the whole roster, the
+    scouted bond-aware pick, **gearless**, skill level 1; the guard at a uniform 50% (`--mode pve
+    --seeds 12345,777,4242,2024,99 --target-clear 50`). "Is each beast pulling its weight?"
+  - **The shipping difficulty** (`encounter-difficulty.json` and the boss overrides): the **typical
+    team from the owned roster**, in **typical gear**, at the pacing model's typical skill level
+    (`--mode typical`, a producer decision; see "Typical team"). "Does an ordinary player meet the
+    targets?"
 
 ```sh
-# the committed report (gearless)
+# the committed report (gearless, full roster: the per-beast measure)
 dotnet run --project Tooling/BalanceSim -c Release -- --panel 16x4 --avatar-value --out docs/balance/tuned-report.md
-# the shipping difficulty table (the same run plus --gear typical; its report is not committed)
-dotnet run --project Tooling/BalanceSim -c Release -- --panel 16x4 --avatar-value --gear typical --write-difficulty content/data/Encounters/encounter-difficulty.json
+# the shipping table, the boss overrides to author and the typical-team report (about an hour)
+dotnet run --project Tooling/BalanceSim -c Release -- --mode typical --gear typical --write-difficulty content/data/Encounters/encounter-difficulty.json --out docs/balance/typical-team-report.md
 ```
 
 The new-player report (`docs/balance/new-player-report.md`, "New-player easing" below) reads that
@@ -314,8 +321,8 @@ cooldown 2 weighted `Attack` about twice as heavily.
   compositions (per fixed encounter with `--encounter-set fixed`), scales every enemy's
   HP, Atk, Def, SpA and SpD. Speed and Move stay unscaled: Speed is how many turns a unit gets, so
   scaling it would change the enemies' action economy, not just their toughness. **The target** is
-  the shape's `TargetClear` in `encounter-library.json` (tiered: `squad` and `horde` 80%, `elite` 60%,
-  `solo` 50%; 50% for a fixed-set encounter) unless `--target-clear` sets one for every shape (the
+  the shape's `TargetClear` in `encounter-library.json` (tiered: `squad` and `horde` 85%, `elite` and
+  `solo` 75%; 50% for a fixed-set encounter) unless `--target-clear` sets one for every shape (the
   guard's `--target-clear 50`) or per shape. The multiplier starts at 1 and doubles or halves until the target clear rate is
   bracketed (between 1/64 and 64), then bisects 8 times. The evaluated multiplier closest to the
   target wins (first evaluated on a tie), and its battles are the ones reported (they are kept, not
@@ -540,8 +547,8 @@ is the documented table command's (`--panel 16x4 --avatar-value --gear typical -
 ...`, above; the panel and avatar-value replay do not touch the calibration: `--mode pve --gear
 typical --write-difficulty` writes the same bytes): seed 12345, 8 compositions, levels 1 / 50 / 100,
 the player team in **typical gear** (the shipping assumption, a user decision; its `_readme` names
-the gear), calibrated on the bond-aware scouted pick at each shape's **tiered target**: `squad` and `horde` 80%, `elite` 60%,
-`solo` 50%, the shapes' `TargetClear`, a user decision). The game reads its `elemental` cells through
+the gear), calibrated on the bond-aware scouted pick at each shape's **tiered target**: `squad` and `horde` 85%, `elite` and
+`solo` 75%, the shapes' `TargetClear`, a user decision). The game reads its `elemental` cells through
 `EncounterDifficultyTable` (linear between calibrated levels, clamped outside them) and multiplies by
 `encounter-library.json`'s `DifficultyScale` (1.0, a global producer factor). The table is
 calibrated for a player who scouts and counter-picks: an unscouted team clears far less (the
@@ -569,8 +576,8 @@ column per gap, cells `scouted (no-scouting)`. Bands for the scouted rate are re
 calibration target T, its shape's `TargetClear` (`SimOptions.LevelGap*`, `LevelGapReport.Band`):
 gap 0 T +/- 5; +2 and +3 (a couple of levels under) 0.4 T to 0.7 T; +5 and beyond under 0.2 T; -2 and
 -3 (a couple of levels over) at least T + 0.4 (100 - T); -5 and beyond at least T + 0.8 (100 - T), so
-over-levelling must make every fight easier. At T = 50 that is 45-55, 20-35, under 10, at least 70 and at
-least 90; at T = 80, 75-85, 32-56, under 16, at least 88 and at least 96. **All shapes** rows are held to
+over-levelling must make every fight easier. At T = 75 that is 70-80, 30-52.5, under 15, at least 85 and at
+least 95; at T = 85, 80-90, 34-59.5, under 17, at least 91 and at least 97. **All shapes** rows are held to
 the bands of the mean target. `!` marks a miss, and a line per mode counts the targets met. With
 `--self-check`, the loop-parity replay also runs each level at its widest in-range gap.
 
@@ -1057,6 +1064,53 @@ on the seed stream `0x504F5354` (so the mainline campaigns never move), at gap 0
 targets and the boss at 35% (Normal) / 20% (Hard), reporting clear rates by tier and battles and boss
 attempts to clear.
 
+## Typical team (`--mode typical`)
+
+Producer decision: it is not fun to expect the optimal team every time, so the tiered targets
+(`squad` / `horde` 85%, `elite` / `solo` / bosses 75%; the producer's "never-blocked" targets, see
+"Adaptive assist floor" below and docs/balance/tuning-log.md, "Never-blocked targets") are hit by a **typical** team: a sensible,
+not optimal pick from the beasts the player **owns** at that point, with the gear, level and skills
+of an ordinary player there. `--mode typical` (`TypicalCalibration.cs`, `TypicalTeam.cs`,
+`SkillCurve.cs`) calibrates the shipping table and the boss overrides on it and writes
+`docs/balance/typical-team-report.md`:
+
+- **Owned roster** (`TypicalTeamModel`): the Kinship flow the campaign model walks. Every
+  one-per-stance trio of the roster (30, the Hearthglen trio) plus one beast of every Kinship site
+  whose trial level is at most the band's level (a site offers two: trio k takes offer (k + site)
+  mod 2, so both choices are represented). Owned at the bands 1 / 10 / 20 / 30 / 40 / 50 / 60+:
+  3 / 4 / 5 / 6 / 7 / 8 / 10. The trio at the band's level (the campaign model's fielded median),
+  recruits the bench gap below it (3 in r01, 4 in r02, 5 after: `NewPlayerReport.RecruitLag`).
+- **Reasonable teams**: three owned beasts covering at least two stances, at least one a Vanguard
+  (no screen for the Ranged without one; the game's suggester never proposes a Vanguard-less team;
+  a single-stance team gives up the stance system).
+- **Typical team**: per roster, the median-performing reasonable team (each team's clear rate over
+  the shape's compositions at its members' own levels, default placement, no scouting); the
+  calibrated rate is the mean over the rosters of that median. Why the median of performance and
+  not the suggester's top-k: the suggester's pick is the scouted, counter-picked team the producer
+  asked not to assume; the median of every sensible pick is the ordinary player by construction
+  (half the sensible picks do better, half worse), and it needs no guess about how players rank
+  teams.
+- **Skills** (`SkillCurve`, from `--mode pacing`'s campaigns; the pacing report's "Team skill
+  level"): the fielded team's nine skills, the focus and the secondary skill at their p50 and the
+  other seven by practice alone (they wait at their first gate, level 5); typical = the mean,
+  rounded: 2 / 5 / 6 / 6 / 7 / 7 / 7 / 8 at levels 1 / 10 / 20 / 30 / 40 / 50 / 60 / 70+ (was a
+  flat 1). Every beast and avatar skill is fielded at it. **Upgraded** = the focus skill's level on
+  every skill (3 / 8 / 10 / 13 / 15 / 18 / 19 / 20).
+- **Gear** `--gear typical` at the band's level; the library avatar at the band's level.
+- **Bands and cells**: every mainline shape at levels 1, 10, 20, ..., 100 (each region boss's
+  level; the game interpolates between them), the post-game shapes at 100 (everything owned), and
+  every region boss template at its region's max level on its own region's battlefields (50%; the
+  r11 twins 35% Normal / 20% Hard), 16 seeded copies of the lineup. Elemental cells only (the kit
+  mode the game reads); `CalibratedOn` is `typical`. The search is the PvE one (bracket from x1,
+  eight bisections, the closest evaluated multiplier). The boss multipliers are printed (report
+  and stderr) for authoring into `encounter-library.json` by hand, three decimals.
+- **Spread check** beside every cell: **Weak** = the roster's lower-quartile reasonable team;
+  **Best** = its best team (noise-inflated); **Scouted** = the game's `TeamSuggester` over what the
+  roster owns, per composition (a lagging recruit weighed as the game weighs it); **Strong** = the
+  scouted pick with upgraded skills. Placement is the simulator's default everywhere.
+- 8 compositions (seed 12345), `--typical-samples` 2 battles per team and composition. About an
+  hour on 8 cores (a band at level 50+ fields 500-650 distinct (team, levels) entries).
+
 ## Hearthglen (`--mode hearthglen`)
 
 Hearthglen (r00, the tutorial region; `docs/design/area-zero.md`) fight by fight
@@ -1076,27 +1130,59 @@ multiplier to the edge where its weakest combination meets its target. About 30 
 
 ## New-player easing (`--mode newplayer`)
 
-The shipping table assumes typical gear and a scouted pick of three from the whole roster. A new
-player has three starters and no gear, so the campaign eases the first regions
-(`regions.json` `EasingShapeScales`, each kind of fight's full discount, times each stage's
-`StageEasing` weight, applied by `CampaignRules.PlanFor` with the run; see
-`docs/design/battle-system.md`, "Early-region easing"). The calibration never sees it. `--mode newplayer` (`NewPlayerReport.cs`)
-measures the curve and writes `docs/balance/new-player-report.md`:
+The shipping table is calibrated on the typical team from the owned roster in typical gear (see
+"Typical team"); the campaign can still ease the first regions (`regions.json` `EasingShapeScales`,
+each kind of fight's full discount, times each stage's `StageEasing` weight, and a region's
+`BossScale`, applied by `CampaignRules.PlanFor` with the run; see `docs/design/battle-system.md`,
+"Early-region easing"). The calibration never sees it. Since the typical-team calibration and
+adaptive assist (see "Adaptive assist floor" below) the measured need is now small enough that only
+r01 carries any easing (fading out by its own last stage) and no region boss gets any; this mode is
+what fits it, and stays the source of truth even though the curve it measures is thin.
+`--mode newplayer` (`NewPlayerReport.cs`) measures what the player meets and writes
+`docs/balance/new-player-report.md`:
 
-- **Profile.** Every one-per-stance trio of the roster (30), all three fielded, no scouting, the
-  library avatar, team and avatar at the node's level (the campaign pacing model's fielded median),
-  no gear in r01-r02 and typical gear from r03 (`NewPlayerReport.GearFor`). Min, mean and max over
-  the trios. Needs `--team-size 3` (the default).
-- **Per stage** of r01-r03: each shape the stage draws (its battle shapes and the elite shape, one
-  level up) at the level of the stage's middle row, at the table's multiplier (interpolated as the
-  game does), on the region's own battlefields (`--obstacles` per region, as `BattleSession` picks
-  them): the clear rate with the stage's scale off and on, and the scale the trio mean needs to reach
-  the shape's target (a bisection), which is how the full per-shape discounts are fitted; the last
-  stage adds the region's boss at its own override (the `boss` discount).
+- **By region** (r01-r10): each region's second stage at its middle row (the elite shape a level
+  up) and its boss, at the shipping table, no easing, typical gear, typical skills, on the region's
+  own battlefields: the typical team (out of sample: 16 other compositions, a level between two
+  calibrated bands), the weak, the scouted and the strong pick, as `--mode typical` defines them.
+- **r01-r03 per stage** (the easing): the typical team from the roster owned there, in typical gear
+  and with no gear (a player arriving from Hearthglen has none), unscaled and at the authored
+  easing, and the scale the no-gear team needs for the target (a bisection). This is what fits the
+  easing.
 - **First node.** Map seeds 1..`--map-seeds` (default 60): a fresh save's first r01 expedition, its
   Next battle node (`MapViewModel.Recommended`'s rule), planned by `CampaignRules.PlanFor` with the
-  run, fought by every trio with and without the easing.
-- `--compositions` and `--samples` set the battles (the committed report: 16 x 2 per trio and cell);
-  `--difficulty <path>` fights another table; `--start-level N` fields the trio and avatar never below
-  level N (a player arriving from Hearthglen around level 3; the committed report is level 1). About 5
-  minutes; deterministic like every other mode.
+  run, fought by every trio (the roster there) with no gear, with and without the easing.
+- **Kinship trials**: each site's `kin_trial_*` template at its middle row's level plus its offset,
+  16 seeded copies, fought by every trio with the recruits of the sites before it (the scouted
+  heuristic's three, recruits lagging), skill level 1, the trio's old gear profile (none before
+  r03), the weakest trio targeted at `NewPlayerReport.TrialFloor` (50%); `--tune` bisects each
+  template's multiplier for it (unchanged by the typical-team calibration: templates carry their
+  own override).
+- `--compositions` and `--samples` set the battles (the committed report: 16 x 2); `--difficulty
+  <path>` fights another table; `--start-level N` fields the trio and avatar never below level N.
+  Needs `--team-size 3`. Deterministic like every other mode.
+
+## Adaptive assist floor (`--mode assistfloor`)
+
+Producer decision ("assist + guidance"): a losing streak at one campaign location eases that specific
+fight further, on top of any early-region easing (`regions.json` `AssistStep` per loss, compounding,
+down to `AssistFloorScales`; see `docs/design/battle-system.md`, "Adaptive assist and guidance").
+`--mode assistfloor` (`AssistFloorCalibration.cs`) finds the floor and writes
+`docs/balance/assist-floor-report.md`:
+
+- **The floor**: per ordinary shape, the multiplier at which the typical-team model's WEAK pick
+  (`TypicalTeamModel.Evaluate(...).Weak`, the same population `--mode typical` calibrates on) reaches
+  `AssistFloorCalibration.MainTarget` (70%), and per region boss `BossTarget` (60%, scaled down for a
+  lower-target boss such as a post-game Normal twin). Checked at `AssistFloorCalibration.Levels`
+  (10/30/50/70/90) for the shapes and at every region's own boss's own level, since the weak pick's
+  shortfall is not flat across levels (it is worst once the whole roster is owned, late game); the
+  shipped scale is the *minimum* (strongest discount) needed across them, reported alongside which
+  level or boss was binding.
+- **Expected attempts to clear**: `AssistFloorCalibration.ExpectedAttempts`, a closed-form estimate
+  (not a fresh simulation of every intermediate loss) from the shipping (no-assist) weak rate and the
+  rate actually reached at the floor, linearly interpolated over the losses `AssumedStep` (0.10, -10%
+  a loss) takes to reach it, then a geometric tail at the floor rate. Checked against the producer's
+  bar (<= 3 an ordinary fight, <= 5 a boss).
+- `--gear typical` (the shipping assumption); reuses `TypicalCalibration.BuildContext` (the same
+  content loading and owned-roster model as `--mode typical`) so it needs no recalibration to run.
+  About 45 minutes (a weak-target search at every level and every boss, each a full bisection).

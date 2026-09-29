@@ -6,6 +6,8 @@ using System.Text;
 using System.Text.Json;
 using BeastCraft.Battle;
 using BeastCraft.Campaign;
+using BeastCraft.Creatures;
+using BeastCraft.Discovery;
 using BeastCraft.Encounters;
 using BeastCraft.Idle;
 using BeastCraft.Progression;
@@ -26,11 +28,16 @@ namespace BeastCraft.Tooling.BalanceSim
     /// practice (<see cref="SkillProgression"/>) and drops (<see cref="LootRoller"/> against
     /// <c>drop-tables.json</c>).
     /// <para>
-    /// <strong>The player</strong> fields <see cref="FieldedCount"/> beasts (each knocked out in
-    /// <see cref="KnockoutChance"/> of battles), keeps <see cref="BenchCount"/> on the bench, and
-    /// recruits one more at level 1 when region <see cref="RecruitRegion"/> starts (it joins the
-    /// bench). The avatar fights every battle. Regions are played in order, each stage once
-    /// (a loss retries the node). Route: an Elite when the fielded team's mean level is at least
+    /// <strong>The player</strong> (the Kinship roster flow, producer decisions 2026-09-27/28) starts
+    /// with the Hearthglen trio (<see cref="FieldedCount"/> beasts, one per stance, at
+    /// <see cref="TrioLevel"/>), fields it in every battle (each beast knocked out in
+    /// <see cref="KnockoutChance"/> of battles), and grows the bench through the Kinship sites: the
+    /// game's own discovery layer (<see cref="DiscoveryRules"/>, <see cref="KinshipRules"/>) is walked as
+    /// the stage is cleared — every point of interest the fog reveals is visited (caches pay their
+    /// gold and materials), and a revealed Kinship site's trial is fought (a battle drawn at
+    /// <see cref="TrialClear"/> across its level gap, retried until won, paying no XP), the first
+    /// beast offered (the region's theme) joining the bench at the fielded mean level − 3. The avatar
+    /// fights every battle. Regions are played in order, each stage once (a loss retries the node). Route: an Elite when the fielded team's mean level is at least
     /// the Elite's level, otherwise a Battle, otherwise a Rest, a Shop, an Elite (ties drawn at
     /// random). Camp trains the lowest-level bench beast. The focus skill and its materials follow
     /// <c>--mode pacing</c>'s feeding policy. The economy (gold, gear and look drops, pass and lair
@@ -39,14 +46,17 @@ namespace BeastCraft.Tooling.BalanceSim
     /// game's <c>IdleRewardCalculator</c> at a claim cadence) are <see cref="CampaignIdleModel"/>'s.
     /// </para>
     /// <para>
-    /// <strong>Clear chance</strong> by tier (the user's tiered targets, the difficulty the
-    /// encounter table is calibrated to for a scouting player at equal level): a generated node (gates
-    /// included) clears at its shape's <c>TargetClear</c> in <c>encounter-library.json</c> (squad and
-    /// horde 80%, elite 60%, solo 50%), the boss templates at <see cref="BossClear"/> (the target their
-    /// <c>DifficultyOverride</c>s are calibrated to). Across a level gap (node level − fielded mean) the
-    /// chance moves along <see cref="GapTable"/> (the design's table, whose 0 is 80%) in log-odds,
-    /// shifted so gap 0 is the tier's target, interpolated for fractional gaps and clamped at its
-    /// ends. A modelling assumption, not measured from the PvE simulation.
+    /// <strong>Clear chance</strong> by tier (the producer's never-blocked targets, the difficulty the
+    /// encounter table is calibrated to for a TYPICAL owned-roster pick at equal level, docs/balance/
+    /// tuning-log.md, "Never-blocked targets"): a generated node (gates included) clears at its shape's
+    /// <c>TargetClear</c> in <c>encounter-library.json</c> (squad and horde 85%, elite and solo 75%,
+    /// read live so a content change here tracks it automatically), the boss templates at
+    /// <see cref="BossClear"/> (75%, the target their <c>DifficultyOverride</c>s are calibrated to).
+    /// Across a level gap (node level − fielded mean) the chance moves along <see cref="GapTable"/> in
+    /// log-odds (only its shape matters; the anchor cancels out of the shift), interpolated for
+    /// fractional gaps and clamped at its ends; a losing streak at the same node also eases it further
+    /// (<see cref="AssistedChance"/>, adaptive assist). A modelling assumption, not measured from the
+    /// PvE simulation (<see cref="GapTable"/>'s own doc comment says where its shape comes from).
     /// </para>
     /// <para>
     /// <strong>Post-game regions</strong> (<see cref="RegionData.IsPostGame"/>) are never played by
@@ -69,24 +79,58 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <summary>Beasts fielded in every battle.</summary>
         public const int FieldedCount = 3;
 
-        /// <summary>Beasts kept on the bench from the start.</summary>
-        public const int BenchCount = 3;
+        /// <summary>
+        /// The Hearthglen trio's level on arriving in the first campaign region: the skip's (a played
+        /// Hearthglen lands around level 3, a little ahead: see docs/design/area-zero.md).
+        /// </summary>
+        public const int TrioLevel = 1;
 
-        /// <summary>The recruit (level 1) joins the bench when this region (1-based) starts.</summary>
-        public const int RecruitRegion = 5;
+        /// <summary>
+        /// A Kinship trial's clear chance at equal level: the trio mean its template's <c>DifficultyOverride</c>
+        /// gives (<c>--mode newplayer</c>'s "Kinship trials" section: 93-97%, tuned for the weakest trio at 50%+).
+        /// </summary>
+        public const double TrialClear = 0.95;
+
+        /// <summary>The Hearthglen trio species (any one-per-stance trio; the kits only matter for skill tomes and the Kinship offers).</summary>
+        public static string[] TrioSpecies
+        {
+            get { return CampaignEconomyModel.FieldedSpecies; }
+        }
 
         /// <summary>Share of battles each fielded beast is knocked out in (as <c>--mode pacing</c>).</summary>
         public const double KnockoutChance = 0.2;
 
         /// <summary>
         /// Boss-template clear chance at equal level: the target the templates' <c>DifficultyOverride</c>s
-        /// are calibrated to (docs/balance/tuning-log.md). Generated nodes read their shape's
-        /// <c>TargetClear</c> (<see cref="World.ShapeClear"/>).
+        /// are calibrated to (the producer's never-blocked targets, docs/balance/tuning-log.md,
+        /// "Never-blocked targets": bosses share the elite/solo tier, 75%). Generated nodes read their
+        /// shape's <c>TargetClear</c> (<see cref="World.ShapeClear"/>), already 85%/75% in
+        /// <c>encounter-library.json</c>.
         /// </summary>
-        public const double BossClear = 0.50;
+        public const double BossClear = 0.75;
 
-        /// <summary>The design's clear chance by gap (node level − team level) from −2 to +4, for an 80% encounter.</summary>
-        public static readonly double[] GapTable = { 0.95, 0.90, 0.80, 0.60, 0.40, 0.20, 0.05 };
+        /// <summary>
+        /// The clear chance by gap (node level − team level) from −2 to +4, for an 85%-tier encounter
+        /// (the anchor cancels out of <see cref="ClearChance"/>'s shift; only the log-odds shape between
+        /// entries matters). Re-derived for the producer's never-blocked retune (steeper
+        /// <c>DamageFormula.GetLevelMultiplier</c>; docs/balance/tuning-log.md, "Never-blocked targets")
+        /// from <c>docs/balance/level-gap-report.md</c>'s measured `elemental` `squad` scouted-pick curve
+        /// (the closest real data: the typical-team calibration does not sweep a level gap), mean over
+        /// levels 10-90: -2 98.7%, 0 85.0%, +2 33.6%, +3 7.5% measured directly; -1, +1 and +4 are a
+        /// logit-linear interpolation between their neighbours (the report does not sample every
+        /// integer gap). A modelling assumption for the Monte Carlo shape only, not a fresh measurement
+        /// of every entry.
+        /// </summary>
+        public static readonly double[] GapTable = { 0.987, 0.955, 0.850, 0.629, 0.336, 0.075, 0.023 };
+
+        /// <summary>
+        /// Adaptive assist's ceiling clear chance (the logit ramp's far end, <see cref="AssistedChance"/>):
+        /// not measured directly (the assist floor is calibrated on the WEAK pick reaching 70%/60%, docs/
+        /// balance/tuning-log.md, "Never-blocked targets"; this model's player is closer to a typical
+        /// pick, already above that floor before any assist), so a near-certain ceiling stands in for
+        /// "a struggling player eventually all but always clears", consistent with the mechanism's intent.
+        /// </summary>
+        public const double AssistCeiling = 0.99;
 
         /// <summary>The <see cref="GapTable"/> gap of its first entry.</summary>
         public const int GapTableFirst = -2;
@@ -94,7 +138,7 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <summary>Fielded (and avatar) median within this many levels of the node at every gate and boss.</summary>
         public const int LevelTolerance = 3;
 
-        /// <summary>Bench median this many levels (inclusive) below the fielded team at every boss from <see cref="BenchGateFromRegion"/>.</summary>
+        /// <summary>Bench (the Kinship recruits) median this many levels (inclusive) below the fielded team at every boss from <see cref="BenchGateFromRegion"/>.</summary>
         public const int BenchGapMin = 5;
 
         /// <summary>See <see cref="BenchGapMin"/>.</summary>
@@ -103,8 +147,11 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <summary>The first region (1-based) the bench gap gate applies at.</summary>
         public const int BenchGateFromRegion = 3;
 
-        /// <summary>Recruit median within this many levels of the fielded team by the end of <see cref="RecruitRegion"/> + 1.</summary>
+        /// <summary>The bench's lowest beast (the newest recruit, usually) within this many levels of the fielded team at every boss (median).</summary>
         public const int RecruitGapMax = 8;
+
+        /// <summary>Beasts owned (median) at each of the first six regions' bosses: the trio plus the Kinship recruits (1-2 a region; r06 closes the roster).</summary>
+        public static readonly int[] OwnedAtBoss = { 4, 5, 6, 7, 8, 10 };
 
         /// <summary>Total battles (p50) must fall in this band.</summary>
         public const int TotalBattlesMin = 400;
@@ -127,13 +174,17 @@ namespace BeastCraft.Tooling.BalanceSim
         /// <summary>A node lost this many times in a row is counted as stuck (and cleared, so the campaign ends).</summary>
         public const int StuckAttempts = 200;
 
-        /// <summary>The focus skill's targets with the economy (the design: L10 ~80 and L15 ~180 within 10%, L20 at least 270).</summary>
+        /// <summary>
+        /// The focus skill's targets with the economy (the design: L10 ~80 within 10%; L15 and L20
+        /// widened for the never-blocked retune's faster clears, producer-accepted: docs/balance/
+        /// tuning-log.md, "Never-blocked targets").
+        /// </summary>
         public static readonly PacingSimulator.Gate[] FocusGates =
         {
             new PacingSimulator.Gate(5, 15, 20, "15-20"),
             new PacingSimulator.Gate(10, 72, 88, "~80 (72-88)"),
-            new PacingSimulator.Gate(15, 162, 198, "~180 (162-198)"),
-            new PacingSimulator.Gate(20, 270, int.MaxValue, "270+"),
+            new PacingSimulator.Gate(15, 150, 198, "~150-198"),
+            new PacingSimulator.Gate(20, 260, int.MaxValue, "260+"),
         };
 
         /// <summary>Loads the data, runs the Monte Carlo (twice with <c>--self-check</c>), prints the report. Exit codes as <c>--mode pacing</c>.</summary>
@@ -193,6 +244,18 @@ namespace BeastCraft.Tooling.BalanceSim
             if (world.Economy == null)
             {
                 Console.Error.WriteLine("The economy data is invalid:");
+                foreach (string error in errors)
+                {
+                    Console.Error.WriteLine("  " + error);
+                }
+
+                return 2;
+            }
+
+            world.Discovery = LoadDiscovery(options, library, regions, encounters, world, errors);
+            if (world.Discovery == null)
+            {
+                Console.Error.WriteLine("The discovery data (discovery.json, the roster) is invalid:");
                 foreach (string error in errors)
                 {
                     Console.Error.WriteLine("  " + error);
@@ -273,6 +336,58 @@ namespace BeastCraft.Tooling.BalanceSim
             return 0;
         }
 
+        /// <summary>
+        /// The discovery layer the campaign walks: <c>discovery.json</c> (validated against the content)
+        /// and the roster (the Kinship offers' order), with the world's regions and looks.
+        /// </summary>
+        private static DiscoveryContent LoadDiscovery(SimOptions options, SkillLibraryData library, RegionLibraryData regions, EncounterLibraryData encounters, World world,
+                                                      List<string> errors)
+        {
+            string rosterPath = RosterLoader.ResolvePath(options.RosterPath);
+            string discoveryPath = RosterLoader.ResolveFile(null, DiscoveryLibraryData.ProjectRelativePath);
+            if (rosterPath == null || discoveryPath == null)
+            {
+                errors.Add("Could not find the roster or discovery.json; run from inside the repo.");
+                return null;
+            }
+
+            List<CreatureSpeciesSO> roster = RosterLoader.Load(rosterPath, errors, out Dictionary<string, GrowthRateCurve> _);
+            DiscoveryLibraryData data;
+            try
+            {
+                data = JsonSerializer.Deserialize<DiscoveryLibraryData>(File.ReadAllText(discoveryPath), new JsonSerializerOptions { IncludeFields = true });
+            }
+            catch (Exception exception)
+            {
+                errors.Add("Could not read discovery.json: " + exception.Message);
+                return null;
+            }
+
+            if (roster == null)
+            {
+                return null;
+            }
+
+            HashSet<string> species = new HashSet<string>(KinshipRules.RosterOrder(roster), StringComparer.Ordinal);
+            HashSet<string> materials = new HashSet<string>(StringComparer.Ordinal);
+            foreach (SkillMaterialData material in library.Materials ?? new SkillMaterialData[0])
+            {
+                materials.Add(material.MaterialId);
+            }
+
+            errors.AddRange(DiscoveryLibraryValidator.Validate(data, regions, encounters, species, materials, null));
+            return errors.Count > 0
+                       ? null
+                       : new DiscoveryContent
+                       {
+                           Library = DiscoveryLibrary.Build(data),
+                           Regions = world.Regions,
+                           Cosmetics = world.Economy.Content.Cosmetics,
+                           Roster = roster,
+                           Skills = library
+                       };
+        }
+
         /// <summary>A copy of <paramref name="data"/> with only its mainline regions (post-game ones, <see cref="RegionData.IsPostGame"/>, dropped).</summary>
         public static RegionLibraryData MainlineOnly(RegionLibraryData data)
         {
@@ -309,6 +424,9 @@ namespace BeastCraft.Tooling.BalanceSim
             /// <summary>The idle rewards' content and cadence (<see cref="CampaignIdleModel"/>).</summary>
             public CampaignIdleModel.Settings Idle { get; set; }
 
+            /// <summary>The discovery layer (fog, points of interest, Kinship sites) the campaign walks.</summary>
+            public DiscoveryContent Discovery { get; set; }
+
             /// <summary>A material's tier (0 when unknown).</summary>
             public int TierOf(string materialId)
             {
@@ -334,6 +452,12 @@ namespace BeastCraft.Tooling.BalanceSim
             public double TierClear(MapNode node)
             {
                 return !string.IsNullOrEmpty(node.TemplateId) || node.Type == MapNodeType.Boss ? BossClear : ShapeClear(node.ShapeId);
+            }
+
+            /// <summary>The <see cref="RegionLibrary.AssistFloorScale"/> key of <paramref name="node"/>: <see cref="RegionLibraryData.EasingBossId"/> for a template (the bosses), else its shape's id.</summary>
+            public static string AssistShapeKey(MapNode node)
+            {
+                return !string.IsNullOrEmpty(node.TemplateId) || node.Type == MapNodeType.Boss ? RegionLibraryData.EasingBossId : node.ShapeId;
             }
 
             /// <summary>The drop-table shape a node pays out from: its shape, or its template's.</summary>
@@ -363,6 +487,9 @@ namespace BeastCraft.Tooling.BalanceSim
                 EndFielded = new double[regions];
                 EndBench = new double[regions];
                 EndRecruit = new double[regions];
+                EndOwned = new int[regions];
+                TrialsByRegion = new int[regions];
+                RecruitsByRegion = new int[regions];
             }
 
             public int Battles;
@@ -375,10 +502,25 @@ namespace BeastCraft.Tooling.BalanceSim
             public int[,] TopAvatar;
             public int[,] TopLevel;
 
-            /// <summary>At each boss clear (before the seal's release): fielded, bench and recruit mean levels (recruit −1 before it joins).</summary>
+            /// <summary>
+            /// At each boss clear (before the seal's release): fielded and bench (the Kinship recruits) mean
+            /// levels and the bench's lowest level (−1 while the bench is empty), and the beasts owned.
+            /// </summary>
             public double[] EndFielded;
             public double[] EndBench;
             public double[] EndRecruit;
+            public int[] EndOwned;
+
+            /// <summary>Kinship trial battles fought (losses included; counted in <see cref="Battles"/>) and beasts recruited, per region.</summary>
+            public int[] TrialsByRegion;
+            public int[] RecruitsByRegion;
+
+            /// <summary>Every recruit: the region (0-based) and stage it joined in, its join level and the fielded mean then.</summary>
+            public List<RecruitEvent> Recruits = new List<RecruitEvent>();
+
+            /// <summary>Gold and materials (XP value) the caches paid.</summary>
+            public long CacheGold;
+            public int CacheMaterials;
 
             /// <summary>Levels any beast stood above the cap after an award (must stay 0).</summary>
             public int CapViolations;
@@ -407,12 +549,21 @@ namespace BeastCraft.Tooling.BalanceSim
             public CampaignIdleModel.Result Idle;
         }
 
+        /// <summary>One Kinship recruit joining (see <see cref="Result.Recruits"/>).</summary>
+        public sealed class RecruitEvent
+        {
+            public int Region;
+            public int Stage;
+            public string SpeciesId;
+            public int JoinLevel;
+            public double FieldedMean;
+        }
+
         private sealed class Player
         {
             public PlayerSave Save;
             public List<OwnedBeast> Fielded = new List<OwnedBeast>();
             public List<OwnedBeast> Bench = new List<OwnedBeast>();
-            public OwnedBeast Recruit;
             public SkillProgress Focus = new SkillProgress("focus");
             public SkillProgress Secondary = new SkillProgress("secondary");
             public SkillProgressionDefinition Definition = new SkillProgressionDefinition();
@@ -433,21 +584,33 @@ namespace BeastCraft.Tooling.BalanceSim
                 return sum / Fielded.Count;
             }
 
-            /// <summary>The mean level of the original bench (the recruit is reported on its own).</summary>
+            /// <summary>The mean level of the bench (the Kinship recruits); −1 while it is empty.</summary>
             public double BenchMean()
             {
                 double sum = 0.0;
-                int count = 0;
                 foreach (OwnedBeast beast in Bench)
                 {
-                    if (beast != Recruit)
-                    {
-                        sum += beast.Progress.Level;
-                        count++;
-                    }
+                    sum += beast.Progress.Level;
                 }
 
-                return sum / count;
+                return Bench.Count == 0 ? -1.0 : sum / Bench.Count;
+            }
+
+            /// <summary>The bench's lowest level; −1 while it is empty.</summary>
+            public double BenchLowest()
+            {
+                double lowest = double.MaxValue;
+                foreach (OwnedBeast beast in Bench)
+                {
+                    lowest = Math.Min(lowest, beast.Progress.Level);
+                }
+
+                return Bench.Count == 0 ? -1.0 : lowest;
+            }
+
+            public List<string> FieldedIds()
+            {
+                return Fielded.ConvertAll(beast => beast.BeastId);
             }
         }
 
@@ -468,6 +631,45 @@ namespace BeastCraft.Tooling.BalanceSim
             return Math.Log(p / (1.0 - p));
         }
 
+        /// <summary>
+        /// <paramref name="baseChance"/> (<see cref="ClearChance"/>) eased by adaptive assist after
+        /// <paramref name="losses"/> consecutive losses at this node (<c>RegionLibrary.AssistScaleFor</c>'s
+        /// mechanism, read from the real library so it tracks <c>regions.json</c>): a logit-linear ramp
+        /// from <paramref name="baseChance"/> toward <see cref="AssistCeiling"/>, reaching it at the same
+        /// number of losses the real per-fight stat-multiplier assist takes to reach its own floor
+        /// (<c>AssistStep</c> compounding to <c>AssistFloorScales</c> / a region's own
+        /// <c>AssistBossFloorScale</c>), then held there. 0 losses, no <c>AssistStep</c>, or no floor for
+        /// this kind of fight all return <paramref name="baseChance"/> unchanged (never assisted).
+        /// </summary>
+        public static double AssistedChance(RegionLibrary regions, string regionId, string shapeKey, double baseChance, int losses)
+        {
+            if (losses <= 0)
+            {
+                return baseChance;
+            }
+
+            double step = Math.Max(0.0, Math.Min(1.0, regions.Data.AssistStep));
+            if (step <= 0.0)
+            {
+                return baseChance;
+            }
+
+            RegionData region = regions.GetRegion(regionId);
+            double floor = region != null && string.Equals(shapeKey, RegionLibraryData.EasingBossId, StringComparison.Ordinal) && region.AssistBossFloorScale > 0.0 &&
+                           region.AssistBossFloorScale <= 1.0
+                ? region.AssistBossFloorScale
+                : regions.AssistFloorScale(shapeKey);
+            if (floor >= 1.0)
+            {
+                return baseChance;
+            }
+
+            int lossesToFloor = Math.Max(1, (int)Math.Ceiling(Math.Log(floor, 1.0 - step)));
+            double t = Math.Min(1.0, (double)losses / lossesToFloor);
+            double logit = Logit(baseChance) + (t * (Logit(AssistCeiling) - Logit(baseChance)));
+            return 1.0 / (1.0 + Math.Exp(-logit));
+        }
+
         /// <summary>Plays one campaign.</summary>
         public static Result Play(World world, int campaignSeed)
         {
@@ -482,12 +684,11 @@ namespace BeastCraft.Tooling.BalanceSim
             Random rng = new Random(campaignSeed);
             Player player = new Player { Save = PlayerSave.CreateNew(), Economy = new CampaignEconomyModel(world.Economy, campaignSeed, regions.Regions.Count) };
             result.Econ = player.Economy.Stats;
-            for (int i = 0; i < FieldedCount + BenchCount; i++)
+            for (int i = 0; i < FieldedCount; i++)
             {
-                string species = i < FieldedCount ? CampaignEconomyModel.FieldedSpecies[i] : CampaignEconomyModel.BenchSpecies[i - FieldedCount];
-                OwnedBeast beast = OwnedBeast.Create("b" + (i + 1), species, 1);
+                OwnedBeast beast = OwnedBeast.Create("b" + (i + 1), TrioSpecies[i], TrioLevel);
                 player.Save.Beasts.Add(beast);
-                (i < FieldedCount ? player.Fielded : player.Bench).Add(beast);
+                player.Fielded.Add(beast);
             }
 
             player.Idle = new CampaignIdleModel(world.Idle, player.Save, campaignSeed, regions.Regions.Count, world.Model.Materials);
@@ -497,13 +698,6 @@ namespace BeastCraft.Tooling.BalanceSim
             for (int r = 0; r < regions.Regions.Count; r++)
             {
                 RegionData region = regions.Regions[r];
-                if (r + 1 == RecruitRegion)
-                {
-                    player.Recruit = OwnedBeast.Create("recruit", CampaignEconomyModel.RecruitSpecies, 1);
-                    player.Save.Beasts.Add(player.Recruit);
-                    player.Bench.Add(player.Recruit);
-                }
-
                 for (int stage = 0; stage < region.Stages; stage++, stageIndex++)
                 {
                     CampaignResult started = CampaignRules.StartRun(player.Save, regions, region.RegionId, stage, LootRoller.DeriveSeed(campaignSeed, 1000 + stageIndex));
@@ -540,8 +734,9 @@ namespace BeastCraft.Tooling.BalanceSim
                 MapNode node = Choose(CampaignRules.Choices(save.Campaign.ActiveRun), player.FieldedMean(), rng);
                 if (node.Type == MapNodeType.Rest)
                 {
-                    OwnedBeast lowest = player.Bench[0];
-                    foreach (OwnedBeast beast in player.Bench)
+                    List<OwnedBeast> trainees = player.Bench.Count > 0 ? player.Bench : player.Fielded;
+                    OwnedBeast lowest = trainees[0];
+                    foreach (OwnedBeast beast in trainees)
                     {
                         lowest = beast.Progress.Level < lowest.Progress.Level ? beast : lowest;
                     }
@@ -550,6 +745,7 @@ namespace BeastCraft.Tooling.BalanceSim
                     Expect(CampaignRules.Camp(save, regions, node.NodeId, lowest.BeastId));
                     CheckCap(player, result, regions);
                     Shop(world, player, camp, regionIndex);
+                    Explore(world, player, result, regionIndex, stage, rng);
                     continue;
                 }
 
@@ -558,6 +754,7 @@ namespace BeastCraft.Tooling.BalanceSim
                     ShopContext post = CampaignRules.ShopContextFor(save.Campaign.ActiveRun, node);
                     Expect(CampaignRules.Trade(save, regions, node.NodeId, world.Economy.Shop));
                     Shop(world, player, post, regionIndex);
+                    Explore(world, player, result, regionIndex, stage, rng);
                     continue;
                 }
 
@@ -571,7 +768,7 @@ namespace BeastCraft.Tooling.BalanceSim
                 result.ElitesByRegion[regionIndex] += node.Type == MapNodeType.Elite ? 1 : 0;
                 for (int attempt = 0; ; attempt++)
                 {
-                    bool cleared = Fight(world, player, result, regionIndex, node, rng);
+                    bool cleared = Fight(world, player, result, regionIndex, node, rng, attempt);
                     if (!cleared && attempt + 1 >= StuckAttempts)
                     {
                         result.Stuck++;
@@ -582,7 +779,8 @@ namespace BeastCraft.Tooling.BalanceSim
                     {
                         result.EndFielded[regionIndex] = player.FieldedMean();
                         result.EndBench[regionIndex] = player.BenchMean();
-                        result.EndRecruit[regionIndex] = player.Recruit == null ? -1.0 : player.Recruit.Progress.Level;
+                        result.EndRecruit[regionIndex] = player.BenchLowest();
+                        result.EndOwned[regionIndex] = save.Beasts.Count;
                         double banked = 0.0;
                         foreach (OwnedBeast beast in save.Beasts)
                         {
@@ -605,10 +803,87 @@ namespace BeastCraft.Tooling.BalanceSim
                     CheckCap(player, result, regions);
                     if (cleared)
                     {
+                        if (save.Campaign.HasActiveRun)
+                        {
+                            Explore(world, player, result, regionIndex, stage, rng);
+                        }
+                        else
+                        {
+                            DiscoveryRules.TryComplete(save, world.Discovery, regions.Regions[regionIndex].RegionId);
+                        }
+
                         break;
                     }
                 }
             }
+        }
+
+        /// <summary>
+        /// The discovery layer as the stage is walked: every point of interest the fog has revealed and
+        /// not yet found is visited (<see cref="DiscoveryRules.Visit"/>; caches pay gold and materials,
+        /// which the focus and secondary skills then take), and a revealed Kinship site's trial is fought
+        /// until won (<see cref="TrialClear"/> across its level gap; each attempt a battle that pays no XP),
+        /// its first offered beast (the region's theme) joining the bench (<see cref="KinshipRules.Choose"/>).
+        /// </summary>
+        private static void Explore(World world, Player player, Result result, int regionIndex, int stage, Random rng)
+        {
+            PlayerSave save = player.Save;
+            DiscoveryContent discovery = world.Discovery;
+            foreach (PointOfInterest poi in DiscoveryRules.PointsOnMap(save, discovery))
+            {
+                if (DiscoveryRules.StateOf(save, discovery, poi) != PoiState.Revealed)
+                {
+                    continue;
+                }
+
+                if (poi.Kind == PoiKind.KinshipSite && KinshipRules.Challengeable(save, discovery, poi.PoiId, out KinshipSiteData _, out string _) != null)
+                {
+                    for (int attempt = 0; ; attempt++)
+                    {
+                        bool won = attempt + 1 >= StuckAttempts || rng.NextDouble() < ClearChance(TrialClear, poi.Level - player.FieldedMean());
+                        result.Battles++;
+                        result.BattlesByRegion[regionIndex]++;
+                        result.TrialsByRegion[regionIndex]++;
+                        KinshipResult trial = KinshipRules.ResolveTrial(save, discovery, poi.PoiId, won ? BattleOutcome.PlayerVictory : BattleOutcome.EnemyVictory,
+                                                                        player.FieldedIds(), false);
+                        if (!trial.Success)
+                        {
+                            throw new InvalidOperationException("Campaign model: " + trial.Error);
+                        }
+
+                        if (won)
+                        {
+                            KinshipResult joined = KinshipRules.Choose(save, discovery, trial.Offer[0]);
+                            player.Bench.Add(joined.Beast);
+                            result.RecruitsByRegion[regionIndex]++;
+                            result.Recruits.Add(new RecruitEvent
+                            {
+                                Region = regionIndex,
+                                Stage = stage,
+                                SpeciesId = joined.Beast.Progress.SpeciesId,
+                                JoinLevel = joined.Beast.Progress.Level,
+                                FieldedMean = player.FieldedMean()
+                            });
+                            break;
+                        }
+                    }
+
+                    continue;
+                }
+
+                DiscoveryResult visit = DiscoveryRules.Visit(save, discovery, poi.PoiId);
+                if (visit.Success)
+                {
+                    result.CacheGold += visit.Gold;
+                    foreach (MaterialGrant grant in visit.Materials)
+                    {
+                        result.CacheMaterials += grant.Quantity;
+                    }
+                }
+            }
+
+            MaterialSpending.Spend(world.Model, player.Focus, player.Definition, save.Materials, null);
+            MaterialSpending.Spend(world.Model, player.Secondary, player.Definition, save.Materials, MaterialSpending.Reserve(world.Model, player.Focus, player.Definition));
         }
 
         /// <summary>A Trader visit (a trading post, or the camp's travelling trader), then the focus and secondary skills take any material bought.</summary>
@@ -621,11 +896,12 @@ namespace BeastCraft.Tooling.BalanceSim
         }
 
         /// <summary>Fights (draws) one battle at <paramref name="node"/> and pays it out. Returns whether it was cleared.</summary>
-        private static bool Fight(World world, Player player, Result result, int regionIndex, MapNode node, Random rng)
+        private static bool Fight(World world, Player player, Result result, int regionIndex, MapNode node, Random rng, int losses)
         {
             PlayerSave save = player.Save;
             int cap = CampaignRules.BeastCap(save, world.Regions);
             double chance = ClearChance(world.TierClear(node), node.Level - player.FieldedMean());
+            chance = AssistedChance(world.Regions, world.Regions.Regions[regionIndex].RegionId, World.AssistShapeKey(node), chance, losses);
             bool cleared = rng.NextDouble() < chance;
             BattleOutcome outcome = cleared ? BattleOutcome.PlayerVictory : BattleOutcome.EnemyVictory;
             int focusUses = PacingSimulator.FocusUsesMin + rng.Next(PacingSimulator.FocusUsesMax - PacingSimulator.FocusUsesMin + 1);
@@ -920,15 +1196,19 @@ namespace BeastCraft.Tooling.BalanceSim
             }
 
             sb.Append("); bank limit ").Append(LevelCap.BankLevelLimit).Append(" levels\n");
-            sb.Append("- Player: ").Append(CampaignPacingSimulator.FieldedCount).Append(" fielded beasts (each knocked out in ")
-              .Append(Pct(CampaignPacingSimulator.KnockoutChance * 100.0)).Append(" of battles), ").Append(CampaignPacingSimulator.BenchCount)
-              .Append(" on the bench, a level-1 recruit joins the bench when region ").Append(CampaignPacingSimulator.RecruitRegion)
-              .Append(" starts; the avatar fights every battle\n");
+            sb.Append("- Player: the Hearthglen trio (").Append(CampaignPacingSimulator.FieldedCount).Append(" beasts, one per stance, level ")
+              .Append(CampaignPacingSimulator.TrioLevel).Append(": the skip's arrival) fielded in every battle (each knocked out in ")
+              .Append(Pct(CampaignPacingSimulator.KnockoutChance * 100.0)).Append(" of battles); the bench grows through the Kinship sites (the game's\n");
+            sb.Append("  discovery layer, `DiscoveryRules` / `KinshipRules`, walked as each stage is cleared: every point the fog reveals is visited, caches\n");
+            sb.Append("  paying their gold and materials; a revealed site's trial is fought at ").Append(Pct(CampaignPacingSimulator.TrialClear * 100.0))
+              .Append(" across its level gap until won, paying no XP, and its first\n");
+            sb.Append("  offered beast joins the bench at the fielded mean level - ").Append(KinshipRules.JoinLevelsBelow).Append("); the avatar fights every battle\n");
             sb.Append("- Route: an Elite when the fielded mean level is at least its level, else a Battle, else Rest, Shop, Elite (ties at random);\n");
-            sb.Append("  a lost battle is retried at the same node (new battle seed); Camp trains the lowest bench beast, then its travelling trader is\n");
+            sb.Append("  a lost battle is retried at the same node (new battle seed); Camp trains the lowest bench beast (a fielded one while the bench is\n");
+            sb.Append("  empty), then its travelling trader is\n");
             sb.Append("  visited, as is any trading post taken (the game's `ShopService`; see \"Economy\")\n");
-            sb.Append("- Team: fielded ").Append(string.Join(", ", CampaignEconomyModel.FieldedSpecies)).Append("; bench ").Append(string.Join(", ", CampaignEconomyModel.BenchSpecies))
-              .Append("; recruit ").Append(CampaignEconomyModel.RecruitSpecies).Append(" (species only matter for skill tomes)\n");
+            sb.Append("- Team: the trio ").Append(string.Join(", ", CampaignPacingSimulator.TrioSpecies))
+              .Append(" (species only matter for skill tomes and the Kinship offers); recruits as offered (see \"Kinship\")\n");
             List<KeyValuePair<string, double>> tiers = ClearTiers(world);
             sb.Append("- Clear chance at equal level: ");
             for (int t = 0; t < tiers.Count; t++)
@@ -959,7 +1239,7 @@ namespace BeastCraft.Tooling.BalanceSim
 
             // Battles.
             sb.Append("\n## Battles per region\n\n");
-            sb.Append("Every battle fought, losses (retries) included.\n\n");
+            sb.Append("Every battle fought, losses (retries) and Kinship trials included.\n\n");
             sb.Append("| Region | Levels | p10 | p50 | p90 | Lost (mean) | Elites taken (mean) |\n| --- | --- | ---: | ---: | ---: | ---: | ---: |\n");
             for (int r = 0; r < regions.Regions.Count; r++)
             {
@@ -1019,26 +1299,88 @@ namespace BeastCraft.Tooling.BalanceSim
                 }
             }
 
-            // Bench and recruit.
-            sb.Append("\n## Bench and recruit\n\n");
-            sb.Append("At each boss, before its seal's release. The bench earns ").Append(BeastProgression.BenchShareBasePermille / 10)
+            // Kinship and the bench.
+            sb.Append("\n## Kinship and the bench\n\n");
+            sb.Append("Recruits joining (every campaign): the region and stage, the join level (the fielded mean then, minus ").Append(KinshipRules.JoinLevelsBelow)
+              .Append("), and the trial battles fought.\n\n");
+            sb.Append("| Region | Recruits (mean) | Joined at stage (median) | Join level p50 | Fielded mean then p50 | Trial battles (mean) | Species (most often) |\n")
+              .Append("| --- | ---: | ---: | ---: | ---: | ---: | --- |\n");
+            for (int r = 0; r < regions.Regions.Count; r++)
+            {
+                List<CampaignPacingSimulator.RecruitEvent> joined = new List<CampaignPacingSimulator.RecruitEvent>();
+                foreach (CampaignPacingSimulator.Result run in runs)
+                {
+                    joined.AddRange(run.Recruits.FindAll(e => e.Region == r));
+                }
+
+                if (joined.Count == 0)
+                {
+                    continue;
+                }
+
+                Dictionary<string, int> bySpecies = new Dictionary<string, int>(StringComparer.Ordinal);
+                foreach (CampaignPacingSimulator.RecruitEvent e in joined)
+                {
+                    bySpecies[e.SpeciesId] = (bySpecies.TryGetValue(e.SpeciesId, out int n) ? n : 0) + 1;
+                }
+
+                List<string> species = new List<string>(bySpecies.Keys);
+                species.Sort((a, b) => bySpecies[b] != bySpecies[a] ? bySpecies[b].CompareTo(bySpecies[a]) : string.CompareOrdinal(a, b));
+                sb.Append("| ").Append(regions.Regions[r].RegionId).Append(" | ").Append(SimOptions.Format(Mean(runs.ConvertAll(run => (double)run.RecruitsByRegion[r]))))
+                  .Append(" | ").Append(Int(P(joined.ConvertAll(e => (double)e.Stage + 1), 50))).Append(" | ").Append(Int(P(joined.ConvertAll(e => (double)e.JoinLevel), 50)))
+                  .Append(" | ").Append(Lv(P(joined.ConvertAll(e => e.FieldedMean), 50))).Append(" | ")
+                  .Append(SimOptions.Format(Mean(runs.ConvertAll(run => (double)run.TrialsByRegion[r])))).Append(" | ").Append(string.Join(", ", species)).Append(" |\n");
+            }
+
+            List<double> cacheGold = runs.ConvertAll(run => (double)run.CacheGold);
+            List<double> cacheMaterials = runs.ConvertAll(run => (double)run.CacheMaterials);
+            sb.Append("\nCaches found on the way (one walk per stage, as above): gold p50 ").Append(Int(P(cacheGold, 50))).Append(", materials p50 ")
+              .Append(Int(P(cacheMaterials, 50))).Append(" (essence shards) per campaign.\n\n");
+
+            sb.Append("At each boss, before its seal's release. The bench (the Kinship recruits) earns ").Append(BeastProgression.BenchShareBasePermille / 10)
               .Append("% of a standing fielded beast's XP, +").Append(SimOptions.Format(BeastProgression.BenchSharePerLevelPermille / 10.0))
-              .Append("% per level below the enemy (up to 100%), then the falloff; Camp trains the lowest bench beast. Targets: the bench median ")
+              .Append("% per level below the enemy (up to 100%), then the falloff; Camp trains the lowest bench beast. Targets: the beasts owned at\n");
+            sb.Append("r01-r06's bosses ").Append(string.Join(", ", CampaignPacingSimulator.OwnedAtBoss)).Append(" (median); the bench median ")
               .Append(CampaignPacingSimulator.BenchGapMin).Append('-').Append(CampaignPacingSimulator.BenchGapMax).Append(" levels below the fielded team from region ")
-              .Append(CampaignPacingSimulator.BenchGateFromRegion).Append("; the recruit (joins at level 1 in region ").Append(CampaignPacingSimulator.RecruitRegion)
-              .Append(") within ").Append(CampaignPacingSimulator.RecruitGapMax).Append(" by the end of region ").Append(CampaignPacingSimulator.RecruitRegion + 1).Append(".\n\n");
-            sb.Append("| Region | Boss level | Fielded p50 | Bench p50 | Bench gap p50 | Recruit p50 | Recruit gap p50 | Verdict |\n| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |\n");
+              .Append(CampaignPacingSimulator.BenchGateFromRegion).Append("; its lowest beast within ").Append(CampaignPacingSimulator.RecruitGapMax)
+              .Append(" at every boss (median).\n\n");
+            sb.Append("| Region | Boss level | Owned p50 | Fielded p50 | Bench p50 | Bench gap p50 | Lowest bench p50 | Lowest gap p50 | Verdict |\n")
+              .Append("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |\n");
             for (int r = 0; r < regions.Regions.Count; r++)
             {
                 RegionData region = regions.Regions[r];
+                List<double> owned = runs.ConvertAll(run => (double)run.EndOwned[r]);
                 List<double> fielded = runs.ConvertAll(run => run.EndFielded[r]);
                 List<double> bench = runs.ConvertAll(run => run.EndBench[r]);
                 List<double> benchGap = runs.ConvertAll(run => run.EndFielded[r] - run.EndBench[r]);
                 bool hasRecruit = runs[0].EndRecruit[r] >= 0.0;
                 List<double> recruit = runs.ConvertAll(run => run.EndRecruit[r]);
                 List<double> recruitGap = runs.ConvertAll(run => run.EndFielded[r] - run.EndRecruit[r]);
-                string verdict = "-";
-                if (r + 1 >= CampaignPacingSimulator.BenchGateFromRegion)
+                List<string> verdicts = new List<string>();
+                if (r < CampaignPacingSimulator.OwnedAtBoss.Length)
+                {
+                    bool ok = Math.Abs(P(owned, 50) - CampaignPacingSimulator.OwnedAtBoss[r]) < 0.5;
+                    if (!ok)
+                    {
+                        misses.Add(region.RegionId + ": beasts owned p50 " + Int(P(owned, 50)) + " at the boss, not " + CampaignPacingSimulator.OwnedAtBoss[r] + ".");
+                    }
+
+                    verdicts.Add(ok ? "owned ok" : "owned **MISS**");
+                }
+
+                if (hasRecruit)
+                {
+                    double gap = P(recruitGap, 50);
+                    bool ok = gap <= CampaignPacingSimulator.RecruitGapMax;
+                    if (!ok)
+                    {
+                        misses.Add(region.RegionId + ": the lowest bench beast's gap p50 " + Lv(gap) + " is above " + CampaignPacingSimulator.RecruitGapMax + ".");
+                    }
+
+                    verdicts.Add(ok ? "lowest ok" : "lowest **MISS**");
+                }
+
+                if (r + 1 >= CampaignPacingSimulator.BenchGateFromRegion && hasRecruit)
                 {
                     double gap = P(benchGap, 50);
                     bool ok = gap >= CampaignPacingSimulator.BenchGapMin && gap <= CampaignPacingSimulator.BenchGapMax;
@@ -1047,24 +1389,13 @@ namespace BeastCraft.Tooling.BalanceSim
                         misses.Add(region.RegionId + ": bench gap p50 " + Lv(gap) + " is outside " + CampaignPacingSimulator.BenchGapMin + "-" + CampaignPacingSimulator.BenchGapMax + ".");
                     }
 
-                    verdict = ok ? "ok" : "**MISS**";
+                    verdicts.Add(ok ? "bench ok" : "bench **MISS**");
                 }
 
-                if (r + 1 == CampaignPacingSimulator.RecruitRegion + 1)
-                {
-                    double gap = P(recruitGap, 50);
-                    bool ok = gap <= CampaignPacingSimulator.RecruitGapMax;
-                    if (!ok)
-                    {
-                        misses.Add(region.RegionId + ": recruit gap p50 " + Lv(gap) + " is above " + CampaignPacingSimulator.RecruitGapMax + ".");
-                    }
-
-                    verdict += ok ? " (recruit ok)" : " (recruit **MISS**)";
-                }
-
-                sb.Append("| ").Append(region.RegionId).Append(" | ").Append(region.MaxLevel).Append(" | ").Append(Lv(P(fielded, 50))).Append(" | ").Append(Lv(P(bench, 50)))
-                  .Append(" | ").Append(Lv(P(benchGap, 50))).Append(" | ").Append(hasRecruit ? Lv(P(recruit, 50)) : "-").Append(" | ")
-                  .Append(hasRecruit ? Lv(P(recruitGap, 50)) : "-").Append(" | ").Append(verdict).Append(" |\n");
+                sb.Append("| ").Append(region.RegionId).Append(" | ").Append(region.MaxLevel).Append(" | ").Append(Int(P(owned, 50))).Append(" | ").Append(Lv(P(fielded, 50)))
+                  .Append(" | ").Append(hasRecruit ? Lv(P(bench, 50)) : "-").Append(" | ").Append(hasRecruit ? Lv(P(benchGap, 50)) : "-").Append(" | ")
+                  .Append(hasRecruit ? Lv(P(recruit, 50)) : "-").Append(" | ").Append(hasRecruit ? Lv(P(recruitGap, 50)) : "-").Append(" | ")
+                  .Append(verdicts.Count == 0 ? "-" : string.Join(", ", verdicts)).Append(" |\n");
             }
 
             // Cap and XP.
@@ -1132,7 +1463,7 @@ namespace BeastCraft.Tooling.BalanceSim
             // Skill.
             sb.Append("## Focus skill\n\n");
             sb.Append("Battles (losses included) for the focus skill to reach each level, the Trader's gate materials included. Targets (the\n");
-            sb.Append("economy design): L5 15-20, L10 ~80 +/-10%, L15 ~180 +/-10%, L20 at least 270.\n\n");
+            sb.Append("economy design): L5 15-20, L10 ~80 +/-10%, L15 150-198, L20 at least 260 (widened for the never-blocked retune's faster clears).\n\n");
             sb.Append("| Level | Target (p50) | p10 | p50 | p90 | Verdict |\n| ---: | --- | ---: | ---: | ---: | --- |\n");
             foreach (PacingSimulator.Gate gate in CampaignPacingSimulator.FocusGates)
             {

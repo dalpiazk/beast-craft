@@ -7,6 +7,7 @@ using BeastCraft.Bonds;
 using BeastCraft.Campaign;
 using BeastCraft.Creatures;
 using BeastCraft.Creatures.Roster;
+using BeastCraft.Discovery;
 using BeastCraft.Economy;
 using BeastCraft.Encounters;
 using BeastCraft.Idle;
@@ -122,6 +123,9 @@ namespace BeastCraft.Presentation.Content
         /// <summary>The NPC dialogue: the mentor's scenes (<c>content/data/Npc/dialogue.json</c>).</summary>
         public DialogueBook Dialogue { get; private set; }
 
+        /// <summary><c>discovery.json</c>: the fog and points of interest, the Kinship sites (see <see cref="Discovery"/>).</summary>
+        public DiscoveryLibrary DiscoveryLibrary { get; private set; }
+
         /// <summary>A file of the content root by its ProjectRelativePath (<c>content/...</c>).</summary>
         public static string PathOf(string root, string projectRelativePath)
         {
@@ -210,6 +214,7 @@ namespace BeastCraft.Presentation.Content
             IdleRewardsData idleData = Read<IdleRewardsData>(root, IdleRewardsData.ProjectRelativePath, errors);
             HintLibraryData hints = Read<HintLibraryData>(root, HintLibraryData.ProjectRelativePath, errors);
             DialogueLibraryData dialogue = Read<DialogueLibraryData>(root, DialogueLibraryData.ProjectRelativePath, errors);
+            DiscoveryLibraryData discovery = Read<DiscoveryLibraryData>(root, DiscoveryLibraryData.ProjectRelativePath, errors);
             if (errors.Count > 0)
             {
                 return null;
@@ -234,6 +239,7 @@ namespace BeastCraft.Presentation.Content
             Prefix(errors, "hints.json", HintValidator.Validate(hints));
             Prefix(errors, "dialogue.json", DialogueValidator.Validate(dialogue));
             Prefix(errors, "dialogue.json", DialogueValidator.ValidateScenes(dialogue, regions));
+            Prefix(errors, "discovery.json", DiscoveryLibraryValidator.Validate(discovery, regions, encounterLibrary, SpeciesIds(roster), MaterialIds(skills), cosmeticData));
 
             HashSet<string> known = KnownSkills(skills, enemyLibrary);
             Prefix(errors, "vfx-library.json", VfxLibraryValidator.Validate(vfx, known, art));
@@ -322,9 +328,67 @@ namespace BeastCraft.Presentation.Content
                 Economy = economy,
                 Style = UiStyle.Build(style),
                 Hints = HintBook.Build(hints),
-                Dialogue = DialogueBook.Build(dialogue)
+                Dialogue = DialogueBook.Build(dialogue),
+                DiscoveryLibrary = DiscoveryLibrary.Build(discovery)
             };
         }
+
+        private static HashSet<string> SpeciesIds(BeastRosterData roster)
+        {
+            HashSet<string> ids = new HashSet<string>(StringComparer.Ordinal);
+            foreach (SpeciesData beast in roster == null ? new SpeciesData[0] : roster.Species ?? new SpeciesData[0])
+            {
+                if (beast != null && !string.IsNullOrEmpty(beast.SpeciesId))
+                {
+                    ids.Add(beast.SpeciesId);
+                }
+            }
+
+            return ids;
+        }
+
+        private static HashSet<string> MaterialIds(SkillLibraryData skills)
+        {
+            HashSet<string> ids = new HashSet<string>(StringComparer.Ordinal);
+            foreach (SkillMaterialData material in skills == null ? new SkillMaterialData[0] : skills.Materials ?? new SkillMaterialData[0])
+            {
+                if (material != null && !string.IsNullOrEmpty(material.MaterialId))
+                {
+                    ids.Add(material.MaterialId);
+                }
+            }
+
+            return ids;
+        }
+
+        /// <summary>
+        /// The discovery layer's content and everything its rules read (<see cref="DiscoveryRules"/>,
+        /// <see cref="KinshipRules"/>): the library, the regions, the looks, the roster, the skill library,
+        /// the encounters and enemies (a Kinship trial). Built once.
+        /// </summary>
+        public DiscoveryContent Discovery
+        {
+            get
+            {
+                if (_discovery == null)
+                {
+                    _discovery = new DiscoveryContent
+                    {
+                        Library = DiscoveryLibrary,
+                        Regions = Campaign,
+                        Cosmetics = Economy?.Cosmetics,
+                        Roster = Species,
+                        Skills = SkillLibrary,
+                        Encounters = Encounters,
+                        Enemies = Enemies
+                    };
+                }
+
+                return _discovery;
+            }
+        }
+
+        private DiscoveryContent _discovery;
 
         /// <summary>Every skill id: beast skills, avatar actives and the enemy library's skills.</summary>
         public static HashSet<string> KnownSkills(SkillLibraryData skills, EnemyLibraryData enemies)

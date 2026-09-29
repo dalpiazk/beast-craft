@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using BeastCraft.Campaign;
+using BeastCraft.Discovery;
 using BeastCraft.Game.Rendering;
 using BeastCraft.Game.Screens;
 using BeastCraft.Game.Ui;
@@ -997,6 +998,52 @@ namespace BeastCraft.Game
                 steps.Add(() => _stack.Push(new GlossaryScreen(_ctx, "level_gap")));
             }
 
+            if (screen.StartsWith("kinship-", StringComparison.Ordinal) || screen == "region-progress")
+            {
+                // The discovery layer: walk (headless, every fight counted won: a screenshot script) up to
+                // the first stage's Kinship site's row, so the fog has lifted around the trail and the site calls.
+                steps.Add(() => WalkToKinship());
+            }
+
+            if (screen == "kinship-poi")
+            {
+                steps.Add(() =>
+                {
+                    // Walk on until the fog reveals another point of interest (the map's own layout decides where).
+                    for (int layer = 1; layer < 10 && Home().Map.Pois.Find(p => p.Kind != PoiKind.KinshipSite && p.State == PoiState.Revealed) == null; layer++)
+                    {
+                        WalkToKinship(layer);
+                    }
+
+                    Home().TapPoi(Home().Map.Pois.Find(p => p.Kind != PoiKind.KinshipSite && p.State == PoiState.Revealed)?.PoiId ??
+                                  throw new InvalidOperationException("No point of interest revealed on the map."));
+                });
+            }
+
+            if (screen == "kinship-trial")
+            {
+                steps.Add(() => Home().TapPoi(Home().Map.Pois.Find(p => p.Kind == PoiKind.KinshipSite).PoiId));
+            }
+
+            if (screen == "kinship-choice")
+            {
+                steps.Add(() =>
+                {
+                    GameSession session = _ctx.Session;
+                    PointOfInterest site = DiscoveryRules.PointsOnMap(session.Save, session.Content.Discovery).Find(p => p.Kind == PoiKind.KinshipSite);
+                    KinshipRules.ResolveTrial(session.Save, session.Content.Discovery, site.PoiId, BeastCraft.Battle.BattleOutcome.PlayerVictory,
+                                              session.Save.Beasts.ConvertAll(b => b.BeastId), false);
+                    Home().Enter();
+                    TrialPickModal pick = Modal<TrialPickModal>();
+                    pick.Select(pick.Model.Options[0].SpeciesId);
+                });
+            }
+
+            if (screen == "region-progress")
+            {
+                steps.Add(() => Home().OpenRegionProgress());
+            }
+
             if (screen == "encounter" || screen == "encounter-insight" || screen == "battle" || screen == "results" || screen == "battle-log" || screen == "results-log")
             {
                 steps.Add(() => Home().OpenFirstEncounter());
@@ -1047,6 +1094,39 @@ namespace BeastCraft.Game
             {
                 Step(name, () => { });
             }
+        }
+
+        /// <summary>
+        /// Walks the expedition in progress up to the row of its map's Kinship site (a screenshot script:
+        /// every fight on the way is counted won, camps train the first beast, traders are passed), then
+        /// shows the map again.
+        /// </summary>
+        private void WalkToKinship(int toLayer = -1)
+        {
+            GameSession session = _ctx.Session;
+            PointOfInterest site = DiscoveryRules.PointsOnMap(session.Save, session.Content.Discovery).Find(p => p.Kind == PoiKind.KinshipSite);
+            int layer = toLayer >= 0 ? toLayer : site == null ? 3 : site.Layer;
+            MapRun run = session.Save.Campaign.ActiveRun;
+            for (int guard = 0; guard < 20 && (run.CurrentNodeId < 0 || run.Find(run.CurrentNodeId).Layer < layer); guard++)
+            {
+                List<MapNode> choices = CampaignRules.Choices(run);
+                MapNode next = choices.Find(n => n.Type == MapNodeType.Battle) ?? choices[0];
+                if (next.Type == MapNodeType.Rest)
+                {
+                    CampaignRules.Camp(session.Save, session.Content.Campaign, next.NodeId, session.Save.Beasts[0].BeastId);
+                }
+                else if (next.Type == MapNodeType.Shop)
+                {
+                    CampaignRules.Trade(session.Save, session.Content.Campaign, next.NodeId, null);
+                }
+                else
+                {
+                    CampaignRules.ResolveBattle(session.Save, session.Content.Campaign, next.NodeId, BeastCraft.Battle.BattleOutcome.PlayerVictory);
+                }
+            }
+
+            session.Autosave(AutosaveReason.Results);
+            Home().Enter();
         }
 
         private T Top<T>() where T : class

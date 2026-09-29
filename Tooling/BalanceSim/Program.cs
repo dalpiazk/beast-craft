@@ -104,6 +104,16 @@ namespace BeastCraft.Tooling.BalanceSim
                 return 1;
             }
 
+            if (options.RunTypical)
+            {
+                return TypicalCalibration.Run(options, species, curves);
+            }
+
+            if (options.RunAssistFloor)
+            {
+                return AssistFloorCalibration.Run(options, species, curves);
+            }
+
             if (options.RunNewPlayer)
             {
                 return NewPlayerReport.Run(options, species, curves);

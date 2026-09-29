@@ -533,7 +533,13 @@ namespace BeastCraft.Tests.EditMode
         private static List<TurnAnimation> DemoTurns()
         {
             GameContent content = VfxLibraryTests.Content;
-            BattleSetup setup = DemoBattle.Create(content, DemoBattle.DefaultSeed, out _, out string error);
+            // encounterLevel 19 and seed 2 (not the defaults 10 / DemoBattle.DefaultSeed): the
+            // producer's never-blocked retune (steeper DamageFormula.LevelDifferenceCap) and the
+            // boss's own DifficultyOverride recalibration (docs/balance/tuning-log.md, "Never-blocked
+            // targets") together end the default matchup before every status VFX (stun, shield, burn,
+            // heal, taunt) has a chance to show; a smaller, seed-picked gap gives a long enough fight
+            // again, the same way DemoBattle.DefaultSeed itself was originally picked.
+            BattleSetup setup = DemoBattle.Create(content, 2, out _, out string error, encounterLevel: 19);
             Assert.IsNotNull(setup, error);
             BattlePlayback playback = new BattlePlayback(BattleSession.Begin(setup));
             List<TurnAnimation> turns = new List<TurnAnimation>();

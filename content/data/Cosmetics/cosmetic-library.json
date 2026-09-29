@@ -253,6 +253,42 @@
           "MinRegion": 1,
           "UnlockId": "",
           "ArtKey": "cosmetic/avatar_outfit/festival_garb"
+        },
+        {
+          "OptionId": "tidewalker_coat",
+          "DisplayName": "Tidewalker Coat",
+          "IsDefault": false,
+          "SortOrder": 10,
+          "SupportsPaletteShader": true,
+          "Rarity": 1,
+          "Source": "discovery",
+          "MinRegion": 3,
+          "UnlockId": "r03",
+          "ArtKey": "cosmetic/avatar_outfit/tidewalker_coat"
+        },
+        {
+          "OptionId": "cloudrunner_vest",
+          "DisplayName": "Cloudrunner Vest",
+          "IsDefault": false,
+          "SortOrder": 11,
+          "SupportsPaletteShader": true,
+          "Rarity": 0,
+          "Source": "discovery",
+          "MinRegion": 4,
+          "UnlockId": "cache_r04_3",
+          "ArtKey": "cosmetic/avatar_outfit/cloudrunner_vest"
+        },
+        {
+          "OptionId": "rimeweave_garb",
+          "DisplayName": "Rimeweave Garb",
+          "IsDefault": false,
+          "SortOrder": 12,
+          "SupportsPaletteShader": true,
+          "Rarity": 1,
+          "Source": "discovery",
+          "MinRegion": 6,
+          "UnlockId": "r06",
+          "ArtKey": "cosmetic/avatar_outfit/rimeweave_garb"
         }
       ]
     },
@@ -370,6 +406,66 @@
           "MinRegion": 1,
           "UnlockId": "",
           "ArtKey": "cosmetic/avatar_headwear/star_crown"
+        },
+        {
+          "OptionId": "fern_sprig",
+          "DisplayName": "Fern Sprig",
+          "IsDefault": false,
+          "SortOrder": 9,
+          "SupportsPaletteShader": true,
+          "Rarity": 0,
+          "Source": "discovery",
+          "MinRegion": 1,
+          "UnlockId": "cache_r01_3",
+          "ArtKey": "cosmetic/avatar_headwear/fern_sprig"
+        },
+        {
+          "OptionId": "emberlight_cap",
+          "DisplayName": "Emberlight Cap",
+          "IsDefault": false,
+          "SortOrder": 10,
+          "SupportsPaletteShader": true,
+          "Rarity": 1,
+          "Source": "discovery",
+          "MinRegion": 2,
+          "UnlockId": "r02",
+          "ArtKey": "cosmetic/avatar_headwear/emberlight_cap"
+        },
+        {
+          "OptionId": "shell_circlet",
+          "DisplayName": "Shell Circlet",
+          "IsDefault": false,
+          "SortOrder": 11,
+          "SupportsPaletteShader": true,
+          "Rarity": 0,
+          "Source": "discovery",
+          "MinRegion": 3,
+          "UnlockId": "cache_r03_3",
+          "ArtKey": "cosmetic/avatar_headwear/shell_circlet"
+        },
+        {
+          "OptionId": "copperleaf_crown",
+          "DisplayName": "Copperleaf Crown",
+          "IsDefault": false,
+          "SortOrder": 12,
+          "SupportsPaletteShader": true,
+          "Rarity": 1,
+          "Source": "discovery",
+          "MinRegion": 5,
+          "UnlockId": "r05",
+          "ArtKey": "cosmetic/avatar_headwear/copperleaf_crown"
+        },
+        {
+          "OptionId": "snowdrift_hood",
+          "DisplayName": "Snowdrift Hood",
+          "IsDefault": false,
+          "SortOrder": 13,
+          "SupportsPaletteShader": true,
+          "Rarity": 0,
+          "Source": "discovery",
+          "MinRegion": 6,
+          "UnlockId": "cache_r06_3",
+          "ArtKey": "cosmetic/avatar_headwear/snowdrift_hood"
         }
       ]
     },
@@ -475,6 +571,54 @@
           "MinRegion": 1,
           "UnlockId": "beast_level_75",
           "ArtKey": "cosmetic/avatar_cape/veteran_mantle"
+        },
+        {
+          "OptionId": "mosstrail_cape",
+          "DisplayName": "Mosstrail Cape",
+          "IsDefault": false,
+          "SortOrder": 8,
+          "SupportsPaletteShader": true,
+          "Rarity": 1,
+          "Source": "discovery",
+          "MinRegion": 1,
+          "UnlockId": "r01",
+          "ArtKey": "cosmetic/avatar_cape/mosstrail_cape"
+        },
+        {
+          "OptionId": "cinder_scarf",
+          "DisplayName": "Cinder Scarf",
+          "IsDefault": false,
+          "SortOrder": 9,
+          "SupportsPaletteShader": true,
+          "Rarity": 0,
+          "Source": "discovery",
+          "MinRegion": 2,
+          "UnlockId": "cache_r02_3",
+          "ArtKey": "cosmetic/avatar_cape/cinder_scarf"
+        },
+        {
+          "OptionId": "galewander_cloak",
+          "DisplayName": "Galewander Cloak",
+          "IsDefault": false,
+          "SortOrder": 10,
+          "SupportsPaletteShader": true,
+          "Rarity": 1,
+          "Source": "discovery",
+          "MinRegion": 4,
+          "UnlockId": "r04",
+          "ArtKey": "cosmetic/avatar_cape/galewander_cloak"
+        },
+        {
+          "OptionId": "rustleaf_mantle",
+          "DisplayName": "Rustleaf Mantle",
+          "IsDefault": false,
+          "SortOrder": 11,
+          "SupportsPaletteShader": true,
+          "Rarity": 0,
+          "Source": "discovery",
+          "MinRegion": 5,
+          "UnlockId": "cache_r05_3",
+          "ArtKey": "cosmetic/avatar_cape/rustleaf_mantle"
         }
       ]
     },

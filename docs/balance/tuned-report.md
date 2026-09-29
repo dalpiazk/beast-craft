@@ -11,7 +11,7 @@ and arguments produce a byte-identical report. Battles per PvE team and composit
 - Skill kit: `library` (`--skill-kit library`, the default): each beast's authored default loadout from `content/data/Skills/skill-library.json` at skill level 1 (`--skill-level`)
 - Team bonds: on (`--bonds on`, the default): the library's 9 `TeamBonds` apply at battle start to every player team that meets their condition (never to enemies); see "PvE team bonds"
 - Scouted picking (PvE, `--scouted`): random, heuristic, heuristic + bonds, oracle at preview detail `full`; post-processing of the same battles, see "PvE scouted picking"
-- Difficulty (PvE, `--calibrate-on bonds`): calibrated so the team the bond-aware scouted picker (heuristic + bonds) fields per composition clears `solo` 50.0%, `elite` 60.0%, `squad` 80.0%, `horde` 80.0% (the shapes' `TargetClear`) (the player scouts and counter-picks); the average team's no-scouting rate is reported beside it, see "Calibrated difficulty"
+- Difficulty (PvE, `--calibrate-on bonds`): calibrated so the team the bond-aware scouted picker (heuristic + bonds) fields per composition clears `solo` 75.0%, `elite` 75.0%, `squad` 85.0%, `horde` 85.0% (the shapes' `TargetClear`) (the player scouts and counter-picks); the average team's no-scouting rate is reported beside it, see "Calibrated difficulty". This is the per-beast balance measure (the whole roster, scouted); the shipping difficulty table is calibrated on the typical team from the owned roster instead (`--mode typical`, docs/balance/typical-team-report.md)
 - Obstacles (PvE, `--obstacles r01`): every battle stands on one of r01's battle layouts for its arena (`battle-layouts.json`), picked from its seed as the game picks it; region-agnostic calibration
 - Level-gap mix (PvE, `--gap-mix`): the balance sections (marginals, niches, flags, element matchups, team composition,
   bonds) are judged over battles at a mix of level gaps (-3: 5.0%, -2: 10.0%, -1: 15.0%, 0: 40.0%, +1: 15.0%, +2: 10.0%, +3: 5.0%); calibration and scouting stay at gap 0;
@@ -65,7 +65,7 @@ The expected shape of the game: the player fields a team of beasts against enemi
 from one huge creature to a couple of dozen small ones. Encounters are generated: for each shape (solo giant, elite, squad, horde) the
 simulator draws 8 random compositions of mixed enemy types with varied elements; every team fights every
 composition. The player is assumed to scout: each shape's difficulty is calibrated so the team the bond-aware scouted picker (heuristic + bonds)
-fields against each composition clears it about `solo` 50.0%, `elite` 60.0%, `squad` 80.0%, `horde` 80.0% of the time (`--calibrate-on bonds`), and each beast
+fields against each composition clears it about `solo` 75.0%, `elite` 75.0%, `squad` 85.0%, `horde` 85.0% of the time (`--calibrate-on bonds`), and each beast
 is judged by how much it moves the clear rate of every team it is in. The average team clears less than that (the
 no-scouting rate, see "Calibrated difficulty"), where marginals shrink, so they are also given normalized to a 50% cell.
 
@@ -94,7 +94,7 @@ no-scouting rate, see "Calibrated difficulty"), where marginals shrink, so they 
   mode and level, exactly half the teams win them (a seeded shuffle of the team indices). The prefix is side-wide,
   so ties within a side are unchanged.
 - Difficulty: HP, Atk, Def, SpA and SpD of every enemy are scaled by one multiplier per (kit mode, shape, level), shared by all
-  of the shape's compositions; Speed and Move are not. Calibration starts at x1, doubles or halves until the target (`solo` 50.0%, `elite` 60.0%, `squad` 80.0%, `horde` 80.0%) is bracketed
+  of the shape's compositions; Speed and Move are not. Calibration starts at x1, doubles or halves until the target (`solo` 75.0%, `elite` 75.0%, `squad` 85.0%, `horde` 85.0%) is bracketed
   (x0.016 to x64.000), then bisects 8 times; the evaluated multiplier whose picked-team clear rate is closest to the
   target wins (first evaluated on a tie). Every metric below is measured at that multiplier, over every team.
 - Movement rules are the Runtime's own (`BattleTurnExecutor`), with no simulator-side emulation: a defeated unit
@@ -154,38 +154,38 @@ levels averaged, per kit mode.
 
 | Composition | Enemies | Scheme | Elements | Dominant | Threat | Clear `elemental` | Clear `neutral` |
 | --- | --- | --- | --- | --- | ---: | ---: | ---: |
-| `solo-01` | Giant x1 | per unit | Giant: Ice | Ice | 12 | 7.8% | 61.9% |
-| `solo-02` | Giant x1 | one element | Giant: Earth | Earth | 12 | 27.2% | 55.3% |
-| `solo-03` | Giant x1 | one element | Giant: Fire | Fire | 12 | 18.1% | 60.6% |
-| `solo-04` | Giant x1 | per type | Giant: Water | Water | 12 | 11.9% | 58.3% |
-| `solo-05` | Giant x1 | per type | Giant: Air | Air | 12 | 11.7% | 58.9% |
-| `solo-06` | Giant x1 | one element | Giant: Metal | Metal | 12 | 13.9% | 59.7% |
-| `solo-07` | Giant x1 | one element | Giant: Dark | Dark | 12 | 0.0% | 56.1% |
-| `solo-08` | Giant x1 | none | Giant: None | - | 12 | 0.0% | 57.2% |
-| `elite-01` | Giant x1, Archer x2 | one element | Giant: Nature; Archer: Nature x2 | Nature | 16 | 10.0% | 53.9% |
-| `elite-02` | Giant x1, Brute x1, Caster x1 | one element | Giant: Lightning; Brute: Lightning; Caster: Lightning | Lightning | 16.75 | 31.1% | 58.9% |
-| `elite-03` | Giant x1, Archer x1, Caster x1 | none | Giant: None; Archer: None; Caster: None | - | 16 | 0.6% | 58.1% |
-| `elite-04` | Giant x1, Shaman x1, Archer x1 | per type | Giant: Light; Shaman: Lightning; Archer: Nature | Light | 16 | 1.7% | 61.4% |
-| `elite-05` | Giant x1, Brute x1, Stalker x1 | per type | Giant: Water; Brute: Air; Stalker: Dark | Water | 16.75 | 18.9% | 64.2% |
-| `elite-06` | Giant x1, Brute x1, Shaman x1 | per unit | Giant: Fire; Brute: Ice; Shaman: Metal | Fire | 16.75 | 26.7% | 64.4% |
-| `elite-07` | Giant x1, Caster x2 | per unit | Giant: Earth; Caster: Light, Earth | Earth | 16 | 19.2% | 68.3% |
-| `elite-08` | Giant x1, Brute x1, Archer x1 | one element | Giant: Fire; Brute: Fire; Archer: Fire | Fire | 16.75 | 23.6% | 58.6% |
-| `squad-01` | Brute x2, Shaman x2, Archer x1 | one element | Brute: Lightning x2; Shaman: Lightning x2; Archer: Lightning | Lightning | 11.5 | 67.5% | 80.0% |
-| `squad-02` | Brute x1, Shaman x1, Archer x1, Caster x2 | none | Brute: None; Shaman: None; Archer: None; Caster: None x2 | - | 10.75 | 36.9% | 77.2% |
-| `squad-03` | Brute x1, Stalker x2, Archer x1, Caster x1 | per type | Brute: Nature; Stalker: Air x2; Archer: Ice; Caster: Metal | - | 10.75 | 22.5% | 71.1% |
-| `squad-04` | Brute x1, Stalker x1, Archer x1, Caster x2 | per unit | Brute: Dark; Stalker: Water; Archer: Light; Caster: Air, Water | - | 10.75 | 50.0% | 76.1% |
-| `squad-05` | Brute x2, Shaman x1, Stalker x1, Archer x1 | per type | Brute: Light x2; Shaman: Metal; Stalker: Fire; Archer: Lightning | - | 11.5 | 34.7% | 80.0% |
-| `squad-06` | Shaman x2, Archer x2, Caster x2 | per type | Shaman: Dark x2; Archer: Ice x2; Caster: Earth x2 | - | 12 | 8.9% | 37.2% |
-| `squad-07` | Brute x1, Shaman x2, Stalker x1, Caster x1 | per type | Brute: Nature; Shaman: Lightning x2; Stalker: Earth; Caster: Air | - | 10.75 | 55.3% | 88.3% |
-| `squad-08` | Brute x1, Shaman x1, Stalker x2, Caster x1 | one element | Brute: Metal; Shaman: Metal; Stalker: Metal x2; Caster: Metal | Metal | 10.75 | 65.0% | 76.7% |
-| `horde-01` | Swarmling x10, Stingling x10, Archer x2 | per unit | Swarmling: Ice x2, Dark, Fire, Nature x2, Water, Light x2, Lightning; Stingling: Metal x2, Fire, Dark, Air x2, Water, Earth, Ice, Light; Archer: Lightning, Water | - | 13 | 37.8% | 69.4% |
-| `horde-02` | Swarmling x10, Stingling x9, Archer x1, Caster x1 | per type | Swarmling: Dark x10; Stingling: Earth x9; Archer: Nature; Caster: Fire | - | 12.55 | 40.3% | 67.5% |
-| `horde-03` | Swarmling x8, Stingling x11, Archer x2 | one element | Swarmling: Dark x8; Stingling: Dark x11; Archer: Dark x2 | Dark | 12.55 | 50.6% | 71.9% |
-| `horde-04` | Swarmling x5, Stingling x11, Archer x3 | one element | Swarmling: Water x5; Stingling: Water x11; Archer: Water x3 | Water | 13.2 | 49.2% | 31.9% |
-| `horde-05` | Swarmling x12, Stingling x7, Caster x2 | none | Swarmling: None x12; Stingling: None x7; Caster: None x2 | - | 12.55 | 71.1% | 70.6% |
-| `horde-06` | Swarmling x8, Stingling x7, Archer x2, Caster x1 | none | Swarmling: None x8; Stingling: None x7; Archer: None x2; Caster: None | - | 12.75 | 30.6% | 33.1% |
-| `horde-07` | Swarmling x9, Stingling x11, Archer x1, Caster x1 | one element | Swarmling: Air x9; Stingling: Air x11; Archer: Air; Caster: Air | Air | 13 | 63.9% | 55.6% |
-| `horde-08` | Swarmling x7, Stingling x13, Caster x2 | per unit | Swarmling: Fire, Metal, Lightning, Ice, Nature, Light, Earth; Stingling: Dark, Light x2, Lightning x2, Water, Fire, Air, Ice, Nature x2, Earth, Metal; Caster: Earth, Fire | - | 13 | 35.8% | 64.4% |
+| `solo-01` | Giant x1 | per unit | Giant: Ice | Ice | 12 | 26.1% | 78.9% |
+| `solo-02` | Giant x1 | one element | Giant: Earth | Earth | 12 | 40.6% | 72.5% |
+| `solo-03` | Giant x1 | one element | Giant: Fire | Fire | 12 | 43.3% | 78.9% |
+| `solo-04` | Giant x1 | per type | Giant: Water | Water | 12 | 34.7% | 77.8% |
+| `solo-05` | Giant x1 | per type | Giant: Air | Air | 12 | 35.0% | 75.8% |
+| `solo-06` | Giant x1 | one element | Giant: Metal | Metal | 12 | 26.1% | 77.8% |
+| `solo-07` | Giant x1 | one element | Giant: Dark | Dark | 12 | 0.3% | 74.7% |
+| `solo-08` | Giant x1 | none | Giant: None | - | 12 | 1.4% | 75.3% |
+| `elite-01` | Giant x1, Archer x2 | one element | Giant: Nature; Archer: Nature x2 | Nature | 16 | 27.5% | 69.2% |
+| `elite-02` | Giant x1, Brute x1, Caster x1 | one element | Giant: Lightning; Brute: Lightning; Caster: Lightning | Lightning | 16.75 | 54.7% | 75.3% |
+| `elite-03` | Giant x1, Archer x1, Caster x1 | none | Giant: None; Archer: None; Caster: None | - | 16 | 3.9% | 73.1% |
+| `elite-04` | Giant x1, Shaman x1, Archer x1 | per type | Giant: Light; Shaman: Lightning; Archer: Nature | Light | 16 | 6.4% | 75.6% |
+| `elite-05` | Giant x1, Brute x1, Stalker x1 | per type | Giant: Water; Brute: Air; Stalker: Dark | Water | 16.75 | 38.6% | 74.2% |
+| `elite-06` | Giant x1, Brute x1, Shaman x1 | per unit | Giant: Fire; Brute: Ice; Shaman: Metal | Fire | 16.75 | 47.5% | 75.3% |
+| `elite-07` | Giant x1, Caster x2 | per unit | Giant: Earth; Caster: Light, Earth | Earth | 16 | 41.4% | 78.1% |
+| `elite-08` | Giant x1, Brute x1, Archer x1 | one element | Giant: Fire; Brute: Fire; Archer: Fire | Fire | 16.75 | 44.2% | 72.8% |
+| `squad-01` | Brute x2, Shaman x2, Archer x1 | one element | Brute: Lightning x2; Shaman: Lightning x2; Archer: Lightning | Lightning | 11.5 | 71.9% | 87.2% |
+| `squad-02` | Brute x1, Shaman x1, Archer x1, Caster x2 | none | Brute: None; Shaman: None; Archer: None; Caster: None x2 | - | 10.75 | 46.9% | 83.3% |
+| `squad-03` | Brute x1, Stalker x2, Archer x1, Caster x1 | per type | Brute: Nature; Stalker: Air x2; Archer: Ice; Caster: Metal | - | 10.75 | 30.0% | 79.2% |
+| `squad-04` | Brute x1, Stalker x1, Archer x1, Caster x2 | per unit | Brute: Dark; Stalker: Water; Archer: Light; Caster: Air, Water | - | 10.75 | 53.9% | 81.4% |
+| `squad-05` | Brute x2, Shaman x1, Stalker x1, Archer x1 | per type | Brute: Light x2; Shaman: Metal; Stalker: Fire; Archer: Lightning | - | 11.5 | 43.6% | 85.8% |
+| `squad-06` | Shaman x2, Archer x2, Caster x2 | per type | Shaman: Dark x2; Archer: Ice x2; Caster: Earth x2 | - | 12 | 11.4% | 47.8% |
+| `squad-07` | Brute x1, Shaman x2, Stalker x1, Caster x1 | per type | Brute: Nature; Shaman: Lightning x2; Stalker: Earth; Caster: Air | - | 10.75 | 61.9% | 92.5% |
+| `squad-08` | Brute x1, Shaman x1, Stalker x2, Caster x1 | one element | Brute: Metal; Shaman: Metal; Stalker: Metal x2; Caster: Metal | Metal | 10.75 | 68.6% | 83.9% |
+| `horde-01` | Swarmling x10, Stingling x10, Archer x2 | per unit | Swarmling: Ice x2, Dark, Fire, Nature x2, Water, Light x2, Lightning; Stingling: Metal x2, Fire, Dark, Air x2, Water, Earth, Ice, Light; Archer: Lightning, Water | - | 13 | 55.8% | 71.9% |
+| `horde-02` | Swarmling x10, Stingling x9, Archer x1, Caster x1 | per type | Swarmling: Dark x10; Stingling: Earth x9; Archer: Nature; Caster: Fire | - | 12.55 | 53.9% | 76.9% |
+| `horde-03` | Swarmling x8, Stingling x11, Archer x2 | one element | Swarmling: Dark x8; Stingling: Dark x11; Archer: Dark x2 | Dark | 12.55 | 67.2% | 78.9% |
+| `horde-04` | Swarmling x5, Stingling x11, Archer x3 | one element | Swarmling: Water x5; Stingling: Water x11; Archer: Water x3 | Water | 13.2 | 57.5% | 37.2% |
+| `horde-05` | Swarmling x12, Stingling x7, Caster x2 | none | Swarmling: None x12; Stingling: None x7; Caster: None x2 | - | 12.55 | 83.3% | 75.6% |
+| `horde-06` | Swarmling x8, Stingling x7, Archer x2, Caster x1 | none | Swarmling: None x8; Stingling: None x7; Archer: None x2; Caster: None | - | 12.75 | 48.1% | 36.9% |
+| `horde-07` | Swarmling x9, Stingling x11, Archer x1, Caster x1 | one element | Swarmling: Air x9; Stingling: Air x11; Archer: Air; Caster: Air | Air | 13 | 72.5% | 64.7% |
+| `horde-08` | Swarmling x7, Stingling x13, Caster x2 | per unit | Swarmling: Fire, Metal, Lightning, Ice, Nature, Light, Earth; Stingling: Dark, Light x2, Lightning x2, Water, Fire, Air, Ice, Nature x2, Earth, Metal; Caster: Earth, Fire | - | 13 | 50.8% | 70.8% |
 
 ### Enemy element distribution (all compositions)
 
@@ -209,30 +209,30 @@ Element schemes over 32 compositions: per unit 6, one element 12, per type 9, no
 
 | Kit mode | Shape | Level | Multiplier | Calibrated on | Target | Scouted clear | No-scouting clear | Gap | Composition clear range | Evaluations | Battles | Avg time | Stalemates |
 | --- | --- | ---: | ---: | --- | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: |
-| `elemental` | `solo` | 1 | x1.047 | bonds | 50.0% | 50.0% | 11.6% | +38.4 | 0.0-23.3% | 9 | 960 | 15.1 | 0 |
-| `elemental` | `solo` | 50 | x1.078 | bonds | 50.0% | 51.6% | 10.0% | +41.6 | 0.0-26.7% | 11 | 960 | 7.2 | 0 |
-| `elemental` | `solo` | 100 | x1.039 | bonds | 50.0% | 50.0% | 12.4% | +37.6 | 0.0-31.7% | 10 | 960 | 5.5 | 0 |
-| `elemental` | `elite` | 1 | x0.961 | bonds | 60.0% | 60.9% | 20.4% | +40.5 | 0.8-37.5% | 11 | 960 | 17.3 | 0 |
-| `elemental` | `elite` | 50 | x0.963 | bonds | 60.0% | 60.9% | 15.6% | +45.3 | 0.0-31.7% | 11 | 960 | 8.0 | 0 |
-| `elemental` | `elite` | 100 | x0.971 | bonds | 60.0% | 60.9% | 13.3% | +47.6 | 0.0-24.2% | 11 | 960 | 6.0 | 0 |
-| `elemental` | `squad` | 1 | x1.094 | bonds | 80.0% | 78.1% | 40.2% | +37.9 | 10.0-66.7% | 11 | 960 | 11.1 | 0 |
-| `elemental` | `squad` | 50 | x1.066 | bonds | 80.0% | 79.7% | 44.8% | +34.9 | 5.0-67.5% | 11 | 960 | 5.7 | 0 |
-| `elemental` | `squad` | 100 | x1.082 | bonds | 80.0% | 79.7% | 42.8% | +36.9 | 11.7-68.3% | 11 | 960 | 4.3 | 0 |
-| `elemental` | `horde` | 1 | x1.086 | bonds | 80.0% | 79.7% | 51.3% | +28.4 | 38.3-70.0% | 11 | 960 | 16.9 | 0 |
-| `elemental` | `horde` | 50 | x1.023 | bonds | 80.0% | 79.7% | 49.9% | +29.8 | 26.7-75.0% | 11 | 960 | 8.7 | 0 |
-| `elemental` | `horde` | 100 | x1.070 | bonds | 80.0% | 78.9% | 41.0% | +37.9 | 20.0-68.3% | 11 | 960 | 6.4 | 0 |
-| `neutral` | `solo` | 1 | x0.805 | bonds | 50.0% | 50.0% | 56.5% | -6.5 | 51.7-63.3% | 9 | 960 | 20.1 | 0 |
-| `neutral` | `solo` | 50 | x0.797 | bonds | 50.0% | 51.6% | 59.6% | -8.0 | 55.0-64.2% | 11 | 960 | 9.5 | 0 |
-| `neutral` | `solo` | 100 | x0.795 | bonds | 50.0% | 50.8% | 59.5% | -8.7 | 56.7-65.0% | 11 | 960 | 7.0 | 0 |
-| `neutral` | `elite` | 1 | x0.719 | bonds | 60.0% | 60.2% | 65.8% | -5.7 | 60.8-72.5% | 11 | 960 | 20.5 | 0 |
-| `neutral` | `elite` | 50 | x0.744 | bonds | 60.0% | 53.9% | 54.5% | -0.6 | 45.8-65.8% | 11 | 960 | 10.0 | 0 |
-| `neutral` | `elite` | 100 | x0.736 | bonds | 60.0% | 61.7% | 62.6% | -0.9 | 55.0-73.3% | 11 | 960 | 7.6 | 0 |
-| `neutral` | `squad` | 1 | x1.023 | bonds | 80.0% | 81.3% | 75.0% | +6.3 | 41.7-92.5% | 11 | 960 | 13.1 | 0 |
-| `neutral` | `squad` | 50 | x1.000 | bonds | 80.0% | 78.9% | 73.3% | +5.6 | 36.7-87.5% | 11 | 960 | 6.4 | 0 |
-| `neutral` | `squad` | 100 | x1.008 | bonds | 80.0% | 82.0% | 71.7% | +10.4 | 33.3-85.0% | 11 | 960 | 4.8 | 0 |
-| `neutral` | `horde` | 1 | x1.086 | bonds | 80.0% | 81.3% | 59.9% | +21.4 | 37.5-79.2% | 11 | 960 | 17.4 | 0 |
-| `neutral` | `horde` | 50 | x1.016 | bonds | 80.0% | 80.5% | 61.3% | +19.2 | 31.7-74.2% | 11 | 960 | 8.9 | 0 |
-| `neutral` | `horde` | 100 | x1.055 | bonds | 80.0% | 81.3% | 53.0% | +28.2 | 26.7-65.8% | 11 | 960 | 6.7 | 0 |
+| `elemental` | `solo` | 1 | x0.938 | bonds | 75.0% | 75.0% | 27.2% | +47.8 | 0.0-42.5% | 6 | 960 | 17.1 | 0 |
+| `elemental` | `solo` | 50 | x0.938 | bonds | 75.0% | 75.0% | 26.0% | +49.0 | 0.0-45.8% | 6 | 960 | 8.3 | 0 |
+| `elemental` | `solo` | 100 | x0.953 | bonds | 75.0% | 75.0% | 24.6% | +50.4 | 0.8-41.7% | 8 | 960 | 6.1 | 0 |
+| `elemental` | `elite` | 1 | x0.867 | bonds | 75.0% | 73.4% | 29.0% | +44.5 | 0.8-50.0% | 11 | 960 | 17.9 | 0 |
+| `elemental` | `elite` | 50 | x0.844 | bonds | 75.0% | 75.0% | 37.0% | +38.0 | 5.8-56.7% | 7 | 960 | 9.2 | 0 |
+| `elemental` | `elite` | 100 | x0.840 | bonds | 75.0% | 75.0% | 33.1% | +41.9 | 5.0-57.5% | 10 | 960 | 6.9 | 0 |
+| `elemental` | `squad` | 1 | x1.082 | bonds | 85.0% | 85.9% | 49.4% | +36.6 | 17.5-71.7% | 11 | 960 | 11.8 | 0 |
+| `elemental` | `squad` | 50 | x1.055 | bonds | 85.0% | 85.2% | 47.4% | +37.8 | 6.7-70.8% | 11 | 960 | 5.8 | 0 |
+| `elemental` | `squad` | 100 | x1.055 | bonds | 85.0% | 85.2% | 48.9% | +36.3 | 10.0-73.3% | 11 | 960 | 4.4 | 0 |
+| `elemental` | `horde` | 1 | x1.047 | bonds | 85.0% | 85.2% | 62.5% | +22.7 | 53.3-83.3% | 11 | 960 | 17.4 | 0 |
+| `elemental` | `horde` | 50 | x0.984 | bonds | 85.0% | 86.7% | 63.1% | +23.6 | 46.7-85.8% | 11 | 960 | 9.0 | 0 |
+| `elemental` | `horde` | 100 | x1.000 | bonds | 85.0% | 84.4% | 57.8% | +26.6 | 40.8-80.8% | 11 | 960 | 6.7 | 0 |
+| `neutral` | `solo` | 1 | x0.750 | bonds | 75.0% | 66.4% | 72.3% | -5.9 | 67.5-78.3% | 11 | 960 | 18.5 | 0 |
+| `neutral` | `solo` | 50 | x0.766 | bonds | 75.0% | 72.7% | 76.6% | -3.9 | 70.0-82.5% | 11 | 960 | 9.1 | 0 |
+| `neutral` | `solo` | 100 | x0.762 | bonds | 75.0% | 75.8% | 80.5% | -4.7 | 73.3-86.7% | 11 | 960 | 6.8 | 0 |
+| `neutral` | `elite` | 1 | x0.695 | bonds | 75.0% | 71.1% | 73.4% | -2.3 | 68.3-78.3% | 11 | 960 | 19.5 | 0 |
+| `neutral` | `elite` | 50 | x0.730 | bonds | 75.0% | 69.5% | 66.8% | +2.8 | 60.0-76.7% | 11 | 960 | 9.9 | 0 |
+| `neutral` | `elite` | 100 | x0.711 | bonds | 75.0% | 76.6% | 82.3% | -5.7 | 78.3-86.7% | 11 | 960 | 7.2 | 0 |
+| `neutral` | `squad` | 1 | x0.971 | bonds | 85.0% | 86.7% | 84.6% | +2.1 | 55.0-97.5% | 11 | 960 | 12.9 | 0 |
+| `neutral` | `squad` | 50 | x0.977 | bonds | 85.0% | 85.2% | 82.0% | +3.2 | 52.5-92.5% | 11 | 960 | 6.3 | 0 |
+| `neutral` | `squad` | 100 | x1.000 | bonds | 85.0% | 85.9% | 73.9% | +12.1 | 35.8-87.5% | 11 | 960 | 4.8 | 0 |
+| `neutral` | `horde` | 1 | x1.063 | bonds | 85.0% | 85.9% | 63.0% | +22.9 | 36.7-79.2% | 11 | 960 | 17.5 | 0 |
+| `neutral` | `horde` | 50 | x1.000 | bonds | 85.0% | 85.2% | 69.0% | +16.2 | 39.2-82.5% | 11 | 960 | 8.9 | 0 |
+| `neutral` | `horde` | 100 | x1.023 | bonds | 85.0% | 85.9% | 60.4% | +25.5 | 30.8-76.7% | 11 | 960 | 6.7 | 0 |
 
 **Scouted clear** = the clear rate of the team the bond-aware scouted picker (heuristic + bonds) fields against each composition, over 16 battles per composition
 (`--calibrate-samples`): the number the calibration aims at the target. **No-scouting clear** = the mean over every
@@ -252,14 +252,14 @@ per composition in the every-team run, so noisier); **no avatar** = the scouted 
 
 | Kit mode | Shape | Target | Multiplier | Scouted clear | No-scouting clear | Heuristic (no bonds) | No avatar | Gap |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `elemental` | `solo` | 50.0% | x1.055 | 50.5% | 11.3% | 66.7% | 3.4% | +39.2 |
-| `elemental` | `elite` | 60.0% | x0.965 | 60.9% | 16.5% | 75.0% | 11.5% | +44.5 |
-| `elemental` | `squad` | 80.0% | x1.081 | 79.2% | 42.6% | 50.0% | 41.7% | +36.6 |
-| `elemental` | `horde` | 80.0% | x1.060 | 79.4% | 47.4% | 50.0% | 41.7% | +32.0 |
-| `neutral` | `solo` | 50.0% | x0.799 | 50.8% | 58.5% | 54.2% | 1.6% | -7.7 |
-| `neutral` | `elite` | 60.0% | x0.733 | 58.6% | 61.0% | 62.5% | 1.3% | -2.4 |
-| `neutral` | `squad` | 80.0% | x1.010 | 80.7% | 73.3% | 79.2% | 12.5% | +7.4 |
-| `neutral` | `horde` | 80.0% | x1.052 | 81.0% | 58.1% | 58.3% | 28.1% | +22.9 |
+| `elemental` | `solo` | 75.0% | x0.943 | 75.0% | 25.9% | 75.0% | 28.1% | +49.1 |
+| `elemental` | `elite` | 75.0% | x0.850 | 74.5% | 33.0% | 75.0% | 30.7% | +41.5 |
+| `elemental` | `squad` | 85.0% | x1.064 | 85.4% | 48.5% | 54.2% | 44.8% | +36.9 |
+| `elemental` | `horde` | 85.0% | x1.010 | 85.4% | 61.1% | 70.8% | 52.1% | +24.3 |
+| `neutral` | `solo` | 75.0% | x0.759 | 71.6% | 76.5% | 70.8% | 3.1% | -4.8 |
+| `neutral` | `elite` | 75.0% | x0.712 | 72.4% | 74.2% | 75.0% | 4.2% | -1.8 |
+| `neutral` | `squad` | 85.0% | x0.982 | 85.9% | 80.1% | 83.3% | 19.5% | +5.8 |
+| `neutral` | `horde` | 85.0% | x1.029 | 85.7% | 64.1% | 62.5% | 33.1% | +21.5 |
 
 ### Level-gap mix
 
@@ -273,14 +273,14 @@ overall beside the mix. No-scouting clear rate (every team), levels averaged:
 
 | Kit mode | Shape | Gap 0 | Mix | -3 | -2 | -1 | 0 | +1 | +2 | +3 |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `elemental` | `solo` | 11.3% | 13.1% | 35.4% | 27.8% | 18.1% | 10.3% | 7.6% | 4.9% | 0.7% |
-| `elemental` | `elite` | 16.5% | 17.9% | 45.1% | 32.6% | 20.8% | 16.7% | 11.6% | 6.6% | 4.2% |
-| `elemental` | `squad` | 42.6% | 42.7% | 81.3% | 62.2% | 50.2% | 43.0% | 31.3% | 23.3% | 13.2% |
-| `elemental` | `horde` | 47.4% | 47.2% | 81.9% | 66.0% | 55.8% | 47.3% | 37.3% | 26.4% | 18.8% |
-| `neutral` | `solo` | 58.5% | 55.7% | 98.6% | 89.6% | 79.4% | 59.2% | 29.2% | 17.0% | 2.8% |
-| `neutral` | `elite` | 61.0% | 59.3% | 97.2% | 94.1% | 79.6% | 61.2% | 38.9% | 25.0% | 5.6% |
-| `neutral` | `squad` | 73.3% | 69.9% | 96.5% | 90.6% | 83.8% | 74.6% | 60.4% | 36.8% | 16.7% |
-| `neutral` | `horde` | 58.1% | 56.3% | 90.3% | 79.5% | 66.2% | 58.8% | 43.3% | 30.2% | 18.1% |
+| `elemental` | `solo` | 25.9% | 32.3% | 99.3% | 83.7% | 45.4% | 24.2% | 14.4% | 3.1% | 0.0% |
+| `elemental` | `elite` | 33.0% | 37.3% | 100.0% | 88.9% | 46.1% | 32.2% | 21.3% | 4.2% | 0.0% |
+| `elemental` | `squad` | 48.5% | 50.1% | 100.0% | 96.2% | 73.8% | 48.7% | 27.8% | 7.6% | 0.7% |
+| `elemental` | `horde` | 61.1% | 58.4% | 100.0% | 96.9% | 81.5% | 60.2% | 39.8% | 13.5% | 1.4% |
+| `neutral` | `solo` | 76.5% | 65.1% | 100.0% | 100.0% | 98.6% | 76.2% | 31.5% | 1.0% | 0.0% |
+| `neutral` | `elite` | 74.2% | 64.2% | 100.0% | 100.0% | 96.8% | 73.7% | 31.3% | 4.9% | 0.7% |
+| `neutral` | `squad` | 80.1% | 69.6% | 100.0% | 100.0% | 95.8% | 80.6% | 50.0% | 4.9% | 0.0% |
+| `neutral` | `horde` | 64.1% | 58.9% | 100.0% | 99.7% | 85.4% | 64.1% | 33.8% | 3.8% | 0.0% |
 
 Per-gap columns pool the battles the mix dealt that gap over the shape's levels (5.0% of each cell for the rarest gap), so they
 are noisy; `--level-gap` measures single gaps properly.
@@ -299,51 +299,51 @@ Auras and buffs count only through what the beasts then do, so the share is the 
 
 | Shape | Level | With avatar % | Without % | Value (pts) | Avatar turns / battle | Direct share % | damage % | heal % | shield % | from passives % |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `solo` | 1 | 50.0 | 3.1 | +46.9 | 6.28 | 12.7 | 0.0 | 2.0 | 10.7 | 9.9 |
-| `solo` | 50 | 51.6 | 3.1 | +48.4 | 6.02 | 13.7 | 0.0 | 1.9 | 11.8 | 10.3 |
-| `solo` | 100 | 50.0 | 3.9 | +46.1 | 5.84 | 13.9 | 0.0 | 2.0 | 11.9 | 10.5 |
-| `elite` | 1 | 60.9 | 13.3 | +47.7 | 6.66 | 12.6 | 0.0 | 2.6 | 10.0 | 9.2 |
-| `elite` | 50 | 60.9 | 11.7 | +49.2 | 6.38 | 12.9 | 0.0 | 2.2 | 10.6 | 9.3 |
-| `elite` | 100 | 60.9 | 9.4 | +51.6 | 6.47 | 13.3 | 0.0 | 2.4 | 11.0 | 9.9 |
-| `squad` | 1 | 78.1 | 35.2 | +43.0 | 4.10 | 19.2 | 0.0 | 2.8 | 16.4 | 15.8 |
-| `squad` | 50 | 79.7 | 45.3 | +34.4 | 3.87 | 20.0 | 0.0 | 2.8 | 17.2 | 16.4 |
-| `squad` | 100 | 79.7 | 44.5 | +35.2 | 3.68 | 21.3 | 0.0 | 2.7 | 18.5 | 17.7 |
-| `horde` | 1 | 79.7 | 46.1 | +33.6 | 5.90 | 20.4 | 0.0 | 3.7 | 16.6 | 14.3 |
-| `horde` | 50 | 79.7 | 45.3 | +34.4 | 5.93 | 21.3 | 0.0 | 3.8 | 17.5 | 14.7 |
-| `horde` | 100 | 78.9 | 33.6 | +45.3 | 6.14 | 22.7 | 0.0 | 3.9 | 18.9 | 15.5 |
-| `solo` | all | 50.5 | 3.4 | +47.1 | 6.05 | 13.4 | 0.0 | 2.0 | 11.5 | 10.3 |
-| `elite` | all | 60.9 | 11.5 | +49.5 | 6.50 | 12.9 | 0.0 | 2.4 | 10.5 | 9.5 |
-| `squad` | all | 79.2 | 41.7 | +37.5 | 3.88 | 20.2 | 0.0 | 2.8 | 17.4 | 16.6 |
-| `horde` | all | 79.4 | 41.7 | +37.8 | 5.99 | 21.5 | 0.0 | 3.8 | 17.7 | 14.8 |
-| **All shapes** | 1 | 67.2 | 24.4 | +42.8 | 5.73 | 16.2 | 0.0 | 2.8 | 13.4 | 12.3 |
-| **All shapes** | 50 | 68.0 | 26.4 | +41.6 | 5.55 | 17.0 | 0.0 | 2.7 | 14.3 | 12.7 |
-| **All shapes** | 100 | 67.4 | 22.9 | +44.5 | 5.53 | 17.8 | 0.0 | 2.7 | 15.1 | 13.4 |
-| **All shapes** | **all** | 67.5 | 24.5 | +43.0 | 5.61 | 17.0 | 0.0 | 2.7 | 14.3 | 12.8 |
+| `solo` | 1 | 75.0 | 36.7 | +38.3 | 5.54 | 11.8 | 0.0 | 1.9 | 9.9 | 9.2 |
+| `solo` | 50 | 75.0 | 28.1 | +46.9 | 5.09 | 11.5 | 0.0 | 1.7 | 9.8 | 8.3 |
+| `solo` | 100 | 75.0 | 19.5 | +55.5 | 5.25 | 12.9 | 0.0 | 1.9 | 11.0 | 9.5 |
+| `elite` | 1 | 73.4 | 28.1 | +45.3 | 6.38 | 12.0 | 0.0 | 2.5 | 9.4 | 8.7 |
+| `elite` | 50 | 75.0 | 31.3 | +43.8 | 5.80 | 11.3 | 0.0 | 2.1 | 9.2 | 7.8 |
+| `elite` | 100 | 75.0 | 32.8 | +42.2 | 5.80 | 11.2 | 0.0 | 2.2 | 9.0 | 8.2 |
+| `squad` | 1 | 85.9 | 37.5 | +48.4 | 4.23 | 17.8 | 0.0 | 2.7 | 15.1 | 14.4 |
+| `squad` | 50 | 85.2 | 48.4 | +36.7 | 3.80 | 19.7 | 0.0 | 2.9 | 16.9 | 16.1 |
+| `squad` | 100 | 85.2 | 48.4 | +36.7 | 3.83 | 20.6 | 0.0 | 2.8 | 17.8 | 16.9 |
+| `horde` | 1 | 85.2 | 46.9 | +38.3 | 5.95 | 18.9 | 0.0 | 3.9 | 15.0 | 12.6 |
+| `horde` | 50 | 86.7 | 54.7 | +32.0 | 6.02 | 20.5 | 0.0 | 3.8 | 16.7 | 13.9 |
+| `horde` | 100 | 84.4 | 54.7 | +29.7 | 5.88 | 21.5 | 0.0 | 3.9 | 17.6 | 14.5 |
+| `solo` | all | 75.0 | 28.1 | +46.9 | 5.29 | 12.1 | 0.0 | 1.9 | 10.2 | 9.0 |
+| `elite` | all | 74.5 | 30.7 | +43.8 | 5.99 | 11.5 | 0.0 | 2.3 | 9.2 | 8.2 |
+| `squad` | all | 85.4 | 44.8 | +40.6 | 3.96 | 19.4 | 0.0 | 2.8 | 16.6 | 15.8 |
+| `horde` | all | 85.4 | 52.1 | +33.3 | 5.95 | 20.3 | 0.0 | 3.9 | 16.4 | 13.7 |
+| **All shapes** | 1 | 79.9 | 37.3 | +42.6 | 5.52 | 15.1 | 0.0 | 2.8 | 12.3 | 11.2 |
+| **All shapes** | 50 | 80.5 | 40.6 | +39.8 | 5.18 | 15.8 | 0.0 | 2.6 | 13.1 | 11.6 |
+| **All shapes** | 100 | 79.9 | 38.9 | +41.0 | 5.19 | 16.6 | 0.0 | 2.7 | 13.8 | 12.3 |
+| **All shapes** | **all** | 80.1 | 38.9 | +41.1 | 5.30 | 15.8 | 0.0 | 2.7 | 13.1 | 11.7 |
 
 #### Avatar value: `neutral`
 
 | Shape | Level | With avatar % | Without % | Value (pts) | Avatar turns / battle | Direct share % | damage % | heal % | shield % | from passives % |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `solo` | 1 | 50.0 | 3.9 | +46.1 | 7.88 | 17.8 | 0.0 | 3.1 | 14.8 | 12.8 |
-| `solo` | 50 | 51.6 | 0.8 | +50.8 | 7.34 | 17.6 | 0.0 | 2.8 | 14.8 | 12.5 |
-| `solo` | 100 | 50.8 | 0.0 | +50.8 | 7.16 | 17.5 | 0.0 | 2.8 | 14.7 | 12.3 |
-| `elite` | 1 | 60.2 | 3.1 | +57.0 | 7.75 | 17.0 | 0.0 | 3.2 | 13.8 | 12.2 |
-| `elite` | 50 | 53.9 | 0.0 | +53.9 | 7.54 | 16.3 | 0.0 | 3.0 | 13.4 | 11.5 |
-| `elite` | 100 | 61.7 | 0.8 | +60.9 | 7.27 | 17.8 | 0.0 | 3.2 | 14.6 | 13.1 |
-| `squad` | 1 | 81.3 | 21.9 | +59.4 | 4.75 | 22.5 | 0.0 | 4.1 | 18.3 | 17.3 |
-| `squad` | 50 | 78.9 | 7.0 | +71.9 | 4.69 | 23.4 | 0.0 | 3.7 | 19.7 | 18.5 |
-| `squad` | 100 | 82.0 | 8.6 | +73.4 | 4.81 | 24.0 | 0.0 | 3.7 | 20.3 | 18.8 |
-| `horde` | 1 | 81.3 | 31.3 | +50.0 | 5.87 | 22.5 | 0.0 | 4.3 | 18.2 | 16.2 |
-| `horde` | 50 | 80.5 | 37.5 | +43.0 | 6.14 | 23.7 | 0.0 | 3.6 | 20.1 | 17.2 |
-| `horde` | 100 | 81.3 | 15.6 | +65.6 | 6.22 | 23.4 | 0.0 | 3.6 | 19.8 | 17.3 |
-| `solo` | all | 50.8 | 1.6 | +49.2 | 7.46 | 17.6 | 0.0 | 2.9 | 14.7 | 12.5 |
-| `elite` | all | 58.6 | 1.3 | +57.3 | 7.52 | 17.1 | 0.0 | 3.1 | 13.9 | 12.3 |
-| `squad` | all | 80.7 | 12.5 | +68.2 | 4.75 | 23.3 | 0.0 | 3.8 | 19.4 | 18.2 |
-| `horde` | all | 81.0 | 28.1 | +52.9 | 6.08 | 23.2 | 0.0 | 3.8 | 19.4 | 16.9 |
-| **All shapes** | 1 | 68.2 | 15.0 | +53.1 | 6.56 | 20.0 | 0.0 | 3.7 | 16.3 | 14.6 |
-| **All shapes** | 50 | 66.2 | 11.3 | +54.9 | 6.43 | 20.3 | 0.0 | 3.3 | 17.0 | 14.9 |
-| **All shapes** | 100 | 68.9 | 6.3 | +62.7 | 6.37 | 20.7 | 0.0 | 3.3 | 17.4 | 15.4 |
-| **All shapes** | **all** | 67.8 | 10.9 | +56.9 | 6.45 | 20.3 | 0.0 | 3.4 | 16.9 | 15.0 |
+| `solo` | 1 | 66.4 | 6.3 | +60.2 | 7.38 | 17.4 | 0.0 | 3.0 | 14.4 | 12.6 |
+| `solo` | 50 | 72.7 | 3.1 | +69.5 | 7.00 | 16.5 | 0.0 | 2.7 | 13.9 | 11.7 |
+| `solo` | 100 | 75.8 | 0.0 | +75.8 | 6.92 | 16.1 | 0.0 | 2.7 | 13.4 | 11.7 |
+| `elite` | 1 | 71.1 | 2.3 | +68.8 | 7.37 | 16.3 | 0.0 | 3.1 | 13.3 | 11.8 |
+| `elite` | 50 | 69.5 | 3.1 | +66.4 | 7.38 | 15.9 | 0.0 | 2.9 | 13.0 | 11.3 |
+| `elite` | 100 | 76.6 | 7.0 | +69.5 | 7.17 | 16.6 | 0.0 | 3.0 | 13.6 | 12.3 |
+| `squad` | 1 | 86.7 | 33.6 | +53.1 | 4.69 | 22.0 | 0.0 | 4.1 | 17.9 | 16.9 |
+| `squad` | 50 | 85.2 | 15.6 | +69.5 | 4.45 | 22.8 | 0.0 | 3.8 | 19.0 | 18.0 |
+| `squad` | 100 | 85.9 | 9.4 | +76.6 | 4.60 | 23.3 | 0.0 | 3.6 | 19.6 | 18.3 |
+| `horde` | 1 | 85.9 | 30.5 | +55.5 | 5.98 | 22.0 | 0.0 | 4.4 | 17.6 | 15.6 |
+| `horde` | 50 | 85.2 | 37.5 | +47.7 | 6.20 | 22.9 | 0.0 | 3.7 | 19.2 | 16.4 |
+| `horde` | 100 | 85.9 | 31.3 | +54.7 | 6.06 | 22.4 | 0.0 | 3.8 | 18.6 | 16.0 |
+| `solo` | all | 71.6 | 3.1 | +68.5 | 7.10 | 16.7 | 0.0 | 2.8 | 13.9 | 12.0 |
+| `elite` | all | 72.4 | 4.2 | +68.2 | 7.30 | 16.3 | 0.0 | 3.0 | 13.3 | 11.8 |
+| `squad` | all | 85.9 | 19.5 | +66.4 | 4.58 | 22.7 | 0.0 | 3.8 | 18.8 | 17.7 |
+| `horde` | all | 85.7 | 33.1 | +52.6 | 6.08 | 22.4 | 0.0 | 3.9 | 18.5 | 16.0 |
+| **All shapes** | 1 | 77.5 | 18.2 | +59.4 | 6.35 | 19.4 | 0.0 | 3.6 | 15.8 | 14.2 |
+| **All shapes** | 50 | 78.1 | 14.8 | +63.3 | 6.25 | 19.5 | 0.0 | 3.3 | 16.3 | 14.4 |
+| **All shapes** | 100 | 81.1 | 11.9 | +69.1 | 6.19 | 19.6 | 0.0 | 3.3 | 16.3 | 14.6 |
+| **All shapes** | **all** | 78.9 | 15.0 | +63.9 | 6.27 | 19.5 | 0.0 | 3.4 | 16.1 | 14.4 |
 
 ### Critical hits and damage rolls (beast kit, calibrated difficulty, all modes, levels and samples)
 
@@ -352,24 +352,21 @@ of `(crit ? 1.5 : 1) x variance` over the beast's hits; expected = `1 + 0.5 x ch
 
 | Beast | Crit chance | Hits | Crits | Observed crit rate | Avg roll | Expected avg roll |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Phoenix | 10% | 50954 | 7500 | 14.7% | 1.073 | 1.050 |
-| Leviathan | 3% | 26717 | 2191 | 8.2% | 1.041 | 1.015 |
-| Golem | 2% | 24251 | 1664 | 6.9% | 1.034 | 1.010 |
-| Griffin | 8% | 38834 | 5324 | 13.7% | 1.069 | 1.040 |
-| Thunderbird | 15% | 134034 | 27572 | 20.6% | 1.103 | 1.075 |
-| Frost Wyrm | 5% | 46229 | 4489 | 9.7% | 1.048 | 1.025 |
-| Treant | 3% | 33264 | 2676 | 8.0% | 1.041 | 1.015 |
-| Tarasque | 6% | 25344 | 2768 | 10.9% | 1.055 | 1.030 |
-| Kirin | 5% | 37625 | 3844 | 10.2% | 1.051 | 1.025 |
-| Basilisk | 12% | 50313 | 8652 | 17.2% | 1.086 | 1.060 |
+| Phoenix | 10% | 51973 | 7625 | 14.7% | 1.073 | 1.050 |
+| Leviathan | 3% | 28510 | 2318 | 8.1% | 1.041 | 1.015 |
+| Golem | 2% | 26092 | 1756 | 6.7% | 1.034 | 1.010 |
+| Griffin | 8% | 42671 | 5867 | 13.7% | 1.069 | 1.040 |
+| Thunderbird | 15% | 140897 | 29002 | 20.6% | 1.103 | 1.075 |
+| Frost Wyrm | 5% | 48262 | 4696 | 9.7% | 1.049 | 1.025 |
+| Treant | 3% | 34954 | 2844 | 8.1% | 1.041 | 1.015 |
+| Tarasque | 6% | 26753 | 2922 | 10.9% | 1.055 | 1.030 |
+| Kirin | 5% | 38605 | 3899 | 10.1% | 1.051 | 1.025 |
+| Basilisk | 12% | 51977 | 8972 | 17.3% | 1.086 | 1.060 |
 
 ### PvE flagged outliers
 
-- `elemental` Treant: overall normalized marginal +8.8 points (HIGH, outside +/-5.0)
-- `elemental` Phoenix: overall normalized marginal -6.3 points (LOW, outside +/-5.0)
-- `elemental` Tarasque: overall normalized marginal -6.8 points (LOW, outside +/-5.0)
-- `neutral` Kirin: overall normalized marginal +7.3 points (HIGH, outside +/-5.0)
-- `neutral` Phoenix: overall normalized marginal -5.1 points (LOW, outside +/-5.0)
+- `elemental` Tarasque: overall normalized marginal -5.1 points (LOW, outside +/-5.0)
+- `neutral` Kirin: overall normalized marginal +6.1 points (HIGH, outside +/-5.0)
 
 ### PvE mode: `elemental`
 
@@ -377,16 +374,16 @@ of `(crit ? 1.5 : 1) x variance` over the beast's hits; expected = `1 + 0.5 x ch
 
 | Beast | Element | Stance | `solo` | `elite` | `squad` | `horde` | Overall | Overall normalized | Gap 0 overall | Gap 0 normalized |
 | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Treant | Nature | Vanguard | **+6.2** (3) | **+6.3** (2) | _-6.1_ (8) | **+15.6** (2) | **+5.5** | **+8.8** | **+6.1** | **+10.2** |
-| Kirin | Light | Ranged | +0.2 (4) | +4.5 (4) | **+7.3** (3) | -1.6 (7) | +2.6 | +3.6 | +2.9 | +3.6 |
-| Thunderbird | Lightning | Skirmisher | -2.6 (7) | -3.4 (6) | **+13.6** (1) | -0.4 (6) | +1.8 | +0.7 | +0.9 | -1.2 |
-| Golem | Earth | Vanguard | -2.3 (6) | **+8.1** (1) | -1.8 (6) | +0.4 (5) | +1.1 | +1.7 | +1.2 | +1.7 |
-| Frost Wyrm | Ice | Vanguard | _-5.3_ (10) | _-5.3_ (9) | _-6.1_ (7) | **+19.9** (1) | +0.8 | -1.7 | +2.3 | -0.6 |
-| Leviathan | Water | Vanguard | **+7.3** (1) | +4.5 (3) | _-13.2_ (10) | +0.4 (4) | -0.2 | +2.6 | -0.3 | +3.3 |
-| Basilisk | Dark | Ranged | -0.3 (5) | -1.6 (5) | +1.9 (5) | -4.4 (8) | -1.1 | -1.6 | -1.1 | -1.5 |
-| Griffin | Air | Skirmisher | **+6.2** (2) | _-5.3_ (10) | _-8.2_ (9) | +0.8 (3) | -1.6 | -0.9 | -1.8 | -0.6 |
-| Phoenix | Fire | Ranged | -4.9 (9) | -4.4 (8) | +4.8 (4) | _-12.5_ (9) | -4.2 | _-6.3_ | -4.5 | _-6.6_ |
-| Tarasque | Metal | Vanguard | -4.4 (8) | -3.4 (7) | **+7.7** (2) | _-18.4_ (10) | -4.7 | _-6.8_ | _-5.8_ | _-8.3_ |
+| Treant | Nature | Vanguard | +4.3 (3) | +2.4 (4) | -3.8 (7) | **+13.6** (1) | +4.1 | +4.5 | **+5.6** | **+6.7** |
+| Kirin | Light | Ranged | +0.3 (5) | +2.6 (3) | **+9.6** (1) | -0.9 (7) | +2.9 | +3.0 | +3.7 | +3.6 |
+| Golem | Earth | Vanguard | -2.0 (6) | **+9.7** (1) | +1.3 (6) | +0.2 (5) | +2.3 | +2.4 | +2.2 | +2.5 |
+| Leviathan | Water | Vanguard | **+8.8** (1) | **+6.9** (2) | _-10.8_ (10) | +1.4 (3) | +1.6 | +2.0 | +0.6 | +1.5 |
+| Basilisk | Dark | Ranged | +1.7 (4) | -1.2 (5) | +3.4 (5) | -2.2 (8) | +0.4 | +0.4 | -1.2 | -1.4 |
+| Frost Wyrm | Ice | Vanguard | -4.5 (8) | -4.2 (8) | _-6.0_ (8) | **+12.1** (2) | -0.6 | -0.8 | +0.1 | -0.5 |
+| Thunderbird | Lightning | Skirmisher | _-6.8_ (10) | -3.2 (7) | **+6.7** (2) | -0.6 (6) | -1.0 | -1.3 | +1.5 | +1.1 |
+| Griffin | Air | Skirmisher | **+6.9** (2) | -2.3 (6) | _-9.6_ (9) | +0.2 (4) | -1.2 | -1.0 | -0.2 | +0.4 |
+| Phoenix | Fire | Ranged | _-5.3_ (9) | _-5.8_ (10) | **+5.6** (3) | _-9.7_ (9) | -3.8 | -4.2 | _-5.7_ | _-6.6_ |
+| Tarasque | Metal | Vanguard | -3.5 (7) | -5.0 (9) | +3.6 (4) | _-14.2_ (10) | -4.8 | _-5.1_ | _-6.7_ | _-7.4_ |
 
 Points of clear rate; (n) = rank within that shape. Sorted by overall. **Bold** = above +5.0, _italic_ = below -5.0. Overall normalized = the per-cell normalized marginals (see "PvE configuration"), averaged. Every column but the gap-0 ones is over the level-gap mix (see "Level-gap mix"); gap 0 = the equal-level battles alone.
 
@@ -394,91 +391,91 @@ Points of clear rate; (n) = rank within that shape. Sorted by overall. **Bold** 
 
 | Beast | `solo` L1 | `solo` L50 | `solo` L100 | `elite` L1 | `elite` L50 | `elite` L100 | `squad` L1 | `squad` L50 | `squad` L100 | `horde` L1 | `horde` L50 | `horde` L100 |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Treant | **+5.6** | **+6.8** | **+6.0** | **+7.3** | +4.5 | **+7.2** | -2.9 | _-6.2_ | _-9.1_ | **+12.5** | **+14.6** | **+19.8** |
-| Kirin | -0.3 | -0.6 | +1.5 | +4.8 | +4.0 | +4.7 | **+6.0** | +4.2 | **+11.8** | -2.9 | -1.2 | -0.5 |
-| Thunderbird | _-5.8_ | +0.4 | -2.4 | _-5.6_ | -1.0 | -3.7 | **+8.0** | **+17.1** | **+15.7** | **+8.5** | _-6.2_ | -3.5 |
-| Golem | +2.1 | -3.6 | _-5.4_ | **+7.8** | **+8.9** | **+7.7** | -0.4 | -0.7 | -4.1 | -1.9 | +3.2 | 0.0 |
-| Frost Wyrm | _-7.8_ | -3.6 | -4.4 | _-5.1_ | _-6.9_ | -3.7 | _-9.9_ | -4.2 | -4.1 | **+13.9** | **+21.1** | **+24.8** |
-| Leviathan | **+11.1** | **+5.4** | **+5.5** | **+7.3** | +2.0 | +4.2 | _-8.9_ | _-16.1_ | _-14.5_ | +1.0 | +2.2 | -2.0 |
-| Basilisk | +3.1 | -2.1 | -1.9 | -3.6 | +0.5 | -1.7 | +2.0 | +2.2 | +1.3 | _-7.9_ | -2.2 | -3.0 |
-| Griffin | **+5.6** | +4.9 | **+8.0** | -1.6 | _-7.4_ | _-6.7_ | _-5.4_ | _-8.7_ | _-10.6_ | +2.5 | -0.2 | 0.0 |
-| Phoenix | _-10.8_ | -2.6 | -1.4 | _-6.6_ | -3.0 | -3.7 | +2.0 | **+6.7** | **+5.8** | _-7.9_ | _-13.1_ | _-16.4_ |
-| Tarasque | -2.8 | _-5.1_ | _-5.4_ | -4.6 | -1.5 | -4.2 | **+9.5** | **+5.7** | **+7.8** | _-17.8_ | _-18.1_ | _-19.3_ |
+| Treant | +1.7 | **+7.3** | +3.9 | +2.9 | +2.0 | +2.5 | -3.5 | _-6.7_ | -1.3 | **+9.5** | **+17.2** | **+14.2** |
+| Kirin | _-5.7_ | +3.3 | +3.4 | +1.4 | +4.0 | +2.5 | **+7.9** | +4.2 | **+16.5** | _-5.4_ | -0.2 | +2.8 |
+| Golem | +0.7 | -2.6 | -4.1 | **+10.8** | **+10.9** | **+7.4** | +1.0 | +3.7 | -0.8 | -0.9 | **+5.3** | -3.7 |
+| Leviathan | **+7.7** | **+10.8** | **+7.8** | **+5.9** | **+8.4** | **+6.4** | _-7.4_ | _-10.2_ | _-14.7_ | -0.4 | -0.2 | +4.8 |
+| Basilisk | **+9.2** | -3.1 | -1.1 | +0.9 | +1.0 | _-5.5_ | +0.5 | +2.2 | **+7.6** | -1.9 | +1.3 | _-6.2_ |
+| Frost Wyrm | -4.7 | -3.6 | _-5.1_ | -2.6 | _-8.4_ | -1.5 | _-10.4_ | -2.7 | -4.8 | **+10.0** | **+11.7** | **+14.7** |
+| Thunderbird | _-9.2_ | _-7.1_ | -4.1 | _-5.1_ | _-6.0_ | +1.5 | +4.0 | **+8.7** | **+7.6** | **+6.1** | _-8.1_ | +0.3 |
+| Griffin | **+10.7** | +3.3 | **+6.8** | -1.1 | -2.5 | -3.5 | _-5.5_ | _-10.2_ | _-13.2_ | +2.6 | +0.8 | -2.7 |
+| Phoenix | _-8.7_ | -4.6 | -2.6 | _-7.5_ | -5.0 | -5.0 | +4.5 | **+8.7** | +3.6 | _-5.4_ | _-13.1_ | _-10.6_ |
+| Tarasque | -1.7 | -3.6 | _-5.1_ | _-5.6_ | -4.5 | -5.0 | **+8.9** | +2.2 | -0.3 | _-14.3_ | _-14.6_ | _-13.6_ |
 
 #### Ranking per shape (niches)
 
 | Rank | `solo` | `elite` | `squad` | `horde` | Overall |
 | ---: | --- | --- | --- | --- | --- |
-| 1 | Leviathan +7.3 | Golem +8.1 | Thunderbird +13.6 | Frost Wyrm +19.9 | Treant +5.5 |
-| 2 | Griffin +6.2 | Treant +6.3 | Tarasque +7.7 | Treant +15.6 | Kirin +2.6 |
-| 3 | Treant +6.2 | Leviathan +4.5 | Kirin +7.3 | Griffin +0.8 | Thunderbird +1.8 |
-| 4 | Kirin +0.2 | Kirin +4.5 | Phoenix +4.8 | Leviathan +0.4 | Golem +1.1 |
-| 5 | Basilisk -0.3 | Basilisk -1.6 | Basilisk +1.9 | Golem +0.4 | Frost Wyrm +0.8 |
-| 6 | Golem -2.3 | Thunderbird -3.4 | Golem -1.8 | Thunderbird -0.4 | Leviathan -0.2 |
-| 7 | Thunderbird -2.6 | Tarasque -3.4 | Frost Wyrm -6.1 | Kirin -1.6 | Basilisk -1.1 |
-| 8 | Tarasque -4.4 | Phoenix -4.4 | Treant -6.1 | Basilisk -4.4 | Griffin -1.6 |
-| 9 | Phoenix -4.9 | Frost Wyrm -5.3 | Griffin -8.2 | Phoenix -12.5 | Phoenix -4.2 |
-| 10 | Frost Wyrm -5.3 | Griffin -5.3 | Leviathan -13.2 | Tarasque -18.4 | Tarasque -4.7 |
+| 1 | Leviathan +8.8 | Golem +9.7 | Kirin +9.6 | Treant +13.6 | Treant +4.1 |
+| 2 | Griffin +6.9 | Leviathan +6.9 | Thunderbird +6.7 | Frost Wyrm +12.1 | Kirin +2.9 |
+| 3 | Treant +4.3 | Kirin +2.6 | Phoenix +5.6 | Leviathan +1.4 | Golem +2.3 |
+| 4 | Basilisk +1.7 | Treant +2.4 | Tarasque +3.6 | Griffin +0.2 | Leviathan +1.6 |
+| 5 | Kirin +0.3 | Basilisk -1.2 | Basilisk +3.4 | Golem +0.2 | Basilisk +0.4 |
+| 6 | Golem -2.0 | Griffin -2.3 | Golem +1.3 | Thunderbird -0.6 | Frost Wyrm -0.6 |
+| 7 | Tarasque -3.5 | Thunderbird -3.2 | Treant -3.8 | Kirin -0.9 | Thunderbird -1.0 |
+| 8 | Frost Wyrm -4.5 | Frost Wyrm -4.2 | Frost Wyrm -6.0 | Basilisk -2.2 | Griffin -1.2 |
+| 9 | Phoenix -5.3 | Tarasque -5.0 | Griffin -9.6 | Phoenix -9.7 | Phoenix -3.8 |
+| 10 | Thunderbird -6.8 | Phoenix -5.8 | Leviathan -10.8 | Tarasque -14.2 | Tarasque -4.8 |
 
 #### Role metrics: `solo` (levels averaged)
 
 | Beast | Marginal | Clear with | Clear without | Dmg share | Taken share | Survival | Time to clear | Turns / time |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Leviathan | **+7.3** | 18.2% | 10.9% | 22.2% | 43.2% | 11.3% | 14.6 | 0.43 |
-| Griffin | **+6.2** | 17.4% | 11.2% | 40.3% | 33.2% | 14.8% | 10.2 | 0.42 |
-| Treant | **+6.2** | 17.4% | 11.2% | 20.0% | 38.3% | 12.5% | 15.8 | 0.47 |
-| Kirin | +0.2 | 13.2% | 13.0% | 44.5% | 31.0% | 10.2% | 13.5 | 0.53 |
-| Basilisk | -0.3 | 12.8% | 13.1% | 43.5% | 28.3% | 9.3% | 12.0 | 0.54 |
-| Golem | -2.3 | 11.5% | 13.7% | 23.8% | 39.1% | 5.3% | 14.6 | 0.39 |
-| Thunderbird | -2.6 | 11.2% | 13.8% | 40.3% | 31.5% | 9.0% | 12.3 | 0.44 |
-| Tarasque | -4.4 | 10.0% | 14.4% | 29.6% | 32.5% | 3.5% | 11.9 | 0.33 |
-| Phoenix | -4.9 | 9.6% | 14.5% | 51.9% | 26.5% | 9.4% | 11.6 | 0.67 |
-| Frost Wyrm | _-5.3_ | 9.4% | 14.6% | 17.2% | 29.6% | 3.6% | 14.4 | 0.36 |
+| Leviathan | **+8.8** | 38.4% | 29.7% | 22.0% | 46.2% | 26.5% | 11.9 | 0.45 |
+| Griffin | **+6.9** | 37.2% | 30.2% | 48.8% | 33.9% | 32.9% | 8.8 | 0.52 |
+| Treant | +4.3 | 35.3% | 31.0% | 18.6% | 38.1% | 27.7% | 13.3 | 0.49 |
+| Basilisk | +1.7 | 33.4% | 31.8% | 42.3% | 25.1% | 29.3% | 10.0 | 0.56 |
+| Kirin | +0.3 | 32.5% | 32.2% | 42.1% | 27.6% | 26.6% | 10.5 | 0.55 |
+| Golem | -2.0 | 30.9% | 32.9% | 23.7% | 40.8% | 19.3% | 12.7 | 0.43 |
+| Tarasque | -3.5 | 29.9% | 33.3% | 29.4% | 36.7% | 15.9% | 10.5 | 0.35 |
+| Frost Wyrm | -4.5 | 29.2% | 33.6% | 17.8% | 32.8% | 13.7% | 11.1 | 0.38 |
+| Phoenix | _-5.3_ | 28.6% | 33.9% | 47.2% | 21.4% | 28.4% | 10.2 | 0.67 |
+| Thunderbird | _-6.8_ | 27.5% | 34.3% | 41.5% | 30.7% | 23.1% | 9.7 | 0.50 |
 
 #### Role metrics: `elite` (levels averaged)
 
 | Beast | Marginal | Clear with | Clear without | Dmg share | Taken share | Survival | Time to clear | Turns / time |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Golem | **+8.1** | 23.6% | 15.5% | 26.7% | 40.5% | 17.7% | 17.0 | 0.46 |
-| Treant | **+6.3** | 22.3% | 16.0% | 16.0% | 36.3% | 15.7% | 18.2 | 0.48 |
-| Leviathan | +4.5 | 21.1% | 16.6% | 19.7% | 42.5% | 14.4% | 16.4 | 0.43 |
-| Kirin | +4.5 | 21.1% | 16.6% | 44.0% | 31.5% | 19.2% | 15.8 | 0.61 |
-| Basilisk | -1.6 | 16.8% | 18.4% | 41.5% | 28.3% | 14.6% | 13.6 | 0.53 |
-| Thunderbird | -3.4 | 15.5% | 18.9% | 42.7% | 32.5% | 11.1% | 14.7 | 0.52 |
-| Tarasque | -3.4 | 15.5% | 18.9% | 33.0% | 32.3% | 5.2% | 14.3 | 0.30 |
-| Phoenix | -4.4 | 14.8% | 19.2% | 47.7% | 27.7% | 13.5% | 13.9 | 0.66 |
-| Frost Wyrm | _-5.3_ | 14.2% | 19.5% | 24.3% | 29.7% | 8.2% | 15.5 | 0.42 |
-| Griffin | _-5.3_ | 14.2% | 19.5% | 37.8% | 31.9% | 10.4% | 11.5 | 0.34 |
+| Golem | **+9.7** | 44.1% | 34.4% | 26.4% | 40.4% | 34.5% | 14.0 | 0.49 |
+| Leviathan | **+6.9** | 42.1% | 35.2% | 19.9% | 45.9% | 30.1% | 13.5 | 0.46 |
+| Kirin | +2.6 | 39.1% | 36.5% | 42.6% | 29.1% | 34.8% | 12.2 | 0.63 |
+| Treant | +2.4 | 39.0% | 36.6% | 15.5% | 35.6% | 31.0% | 14.1 | 0.49 |
+| Basilisk | -1.2 | 36.5% | 37.6% | 41.7% | 26.9% | 30.4% | 10.6 | 0.55 |
+| Griffin | -2.3 | 35.6% | 38.0% | 43.1% | 33.1% | 27.4% | 9.4 | 0.42 |
+| Thunderbird | -3.2 | 35.1% | 38.2% | 41.4% | 29.9% | 30.0% | 11.4 | 0.56 |
+| Frost Wyrm | -4.2 | 34.4% | 38.5% | 23.9% | 31.4% | 23.0% | 12.3 | 0.44 |
+| Tarasque | -5.0 | 33.8% | 38.8% | 33.4% | 38.0% | 15.4% | 11.1 | 0.32 |
+| Phoenix | _-5.8_ | 33.2% | 39.0% | 45.3% | 23.0% | 31.6% | 11.4 | 0.66 |
 
 #### Role metrics: `squad` (levels averaged)
 
 | Beast | Marginal | Clear with | Clear without | Dmg share | Taken share | Survival | Time to clear | Turns / time |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Thunderbird | **+13.6** | 52.2% | 38.6% | 43.7% | 33.8% | 33.1% | 7.4 | 0.47 |
-| Tarasque | **+7.7** | 48.0% | 40.4% | 37.0% | 34.5% | 38.0% | 7.2 | 0.45 |
-| Kirin | **+7.3** | 47.8% | 40.5% | 43.8% | 29.1% | 40.6% | 8.2 | 0.58 |
-| Phoenix | +4.8 | 46.1% | 41.2% | 39.6% | 27.1% | 38.3% | 7.6 | 0.55 |
-| Basilisk | +1.9 | 44.0% | 42.1% | 33.9% | 31.5% | 31.9% | 7.5 | 0.49 |
-| Golem | -1.8 | 41.4% | 43.2% | 35.0% | 36.4% | 35.9% | 8.6 | 0.49 |
-| Frost Wyrm | _-6.1_ | 38.4% | 44.5% | 22.9% | 31.8% | 18.4% | 8.3 | 0.38 |
-| Treant | _-6.1_ | 38.4% | 44.5% | 20.8% | 35.9% | 31.5% | 9.3 | 0.49 |
-| Griffin | _-8.2_ | 36.9% | 45.1% | 32.8% | 34.5% | 16.2% | 7.9 | 0.34 |
-| Leviathan | _-13.2_ | 33.4% | 46.6% | 23.9% | 38.7% | 19.2% | 8.7 | 0.40 |
+| Kirin | **+9.6** | 56.8% | 47.3% | 43.1% | 27.8% | 50.0% | 7.8 | 0.59 |
+| Thunderbird | **+6.7** | 54.9% | 48.1% | 44.7% | 33.6% | 38.4% | 6.8 | 0.49 |
+| Phoenix | **+5.6** | 54.1% | 48.5% | 38.8% | 28.2% | 45.0% | 7.2 | 0.56 |
+| Tarasque | +3.6 | 52.7% | 49.1% | 36.5% | 35.0% | 44.2% | 6.7 | 0.47 |
+| Basilisk | +3.4 | 52.5% | 49.1% | 34.9% | 32.8% | 39.1% | 7.2 | 0.51 |
+| Golem | +1.3 | 51.0% | 49.8% | 33.5% | 33.3% | 45.7% | 8.1 | 0.51 |
+| Treant | -3.8 | 47.5% | 51.3% | 20.2% | 32.7% | 41.4% | 8.7 | 0.51 |
+| Frost Wyrm | _-6.0_ | 45.9% | 51.9% | 23.0% | 33.9% | 25.3% | 7.9 | 0.39 |
+| Griffin | _-9.6_ | 43.4% | 53.0% | 34.7% | 37.0% | 22.1% | 7.4 | 0.38 |
+| Leviathan | _-10.8_ | 42.6% | 53.4% | 24.0% | 38.9% | 28.7% | 8.4 | 0.42 |
 
 #### Role metrics: `horde` (levels averaged)
 
 | Beast | Marginal | Clear with | Clear without | Dmg share | Taken share | Survival | Time to clear | Turns / time |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Frost Wyrm | **+19.9** | 61.1% | 41.2% | 42.6% | 32.3% | 42.9% | 10.5 | 0.51 |
-| Treant | **+15.6** | 58.1% | 42.5% | 25.4% | 35.5% | 48.8% | 12.8 | 0.54 |
-| Griffin | +0.8 | 47.7% | 46.9% | 38.1% | 33.9% | 33.7% | 10.7 | 0.52 |
-| Leviathan | +0.4 | 47.5% | 47.0% | 21.8% | 43.4% | 27.1% | 12.3 | 0.45 |
-| Golem | +0.4 | 47.5% | 47.0% | 20.4% | 40.0% | 32.5% | 12.9 | 0.48 |
-| Thunderbird | -0.4 | 46.9% | 47.3% | 45.3% | 33.4% | 33.6% | 10.2 | 0.48 |
-| Kirin | -1.6 | 46.1% | 47.6% | 35.9% | 27.2% | 42.1% | 11.4 | 0.64 |
-| Basilisk | -4.4 | 44.1% | 48.5% | 39.9% | 29.8% | 30.8% | 10.7 | 0.54 |
-| Phoenix | _-12.5_ | 38.4% | 50.9% | 42.0% | 24.2% | 33.0% | 11.0 | 0.64 |
-| Tarasque | _-18.4_ | 34.3% | 52.7% | 21.8% | 33.7% | 11.1% | 12.0 | 0.32 |
+| Treant | **+13.6** | 67.9% | 54.3% | 24.1% | 33.6% | 60.2% | 12.1 | 0.56 |
+| Frost Wyrm | **+12.1** | 66.9% | 54.8% | 41.9% | 33.8% | 51.9% | 9.9 | 0.52 |
+| Leviathan | +1.4 | 59.4% | 58.0% | 22.2% | 43.2% | 42.5% | 11.7 | 0.49 |
+| Griffin | +0.2 | 58.6% | 58.3% | 40.2% | 34.6% | 46.3% | 10.2 | 0.56 |
+| Golem | +0.2 | 58.6% | 58.3% | 20.6% | 39.3% | 45.8% | 12.2 | 0.51 |
+| Thunderbird | -0.6 | 58.0% | 58.6% | 45.9% | 34.3% | 44.6% | 9.7 | 0.51 |
+| Kirin | -0.9 | 57.8% | 58.7% | 34.1% | 23.7% | 54.6% | 11.1 | 0.65 |
+| Basilisk | -2.2 | 56.8% | 59.1% | 40.7% | 31.3% | 44.6% | 10.3 | 0.59 |
+| Phoenix | _-9.7_ | 51.6% | 61.3% | 40.9% | 22.7% | 47.6% | 10.4 | 0.66 |
+| Tarasque | _-14.2_ | 48.5% | 62.6% | 22.7% | 37.0% | 22.3% | 11.2 | 0.36 |
 
 An even split is 33.3% for both shares.
 
@@ -490,16 +487,16 @@ element or a `None` one (mixed). (n) = compositions in the bucket per level and 
 
 | Beast | Element | Strong | Neutral | Weak | Mixed / none |
 | --- | --- | ---: | ---: | ---: | ---: |
-| Phoenix | Fire | +31.7 (3) | -10.7 (11) | -15.5 (5) | -2.8 (13) |
-| Leviathan | Water | +22.3 (5) | +2.5 (11) | -24.8 (3) | -5.5 (13) |
-| Golem | Earth | +24.3 (3) | +4.3 (11) | -12.2 (5) | -1.8 (13) |
-| Griffin | Air | +12.4 (5) | -4.0 (12) | -12.2 (2) | -3.2 (13) |
-| Thunderbird | Lightning | +15.6 (5) | -5.1 (9) | -16.4 (5) | +8.3 (13) |
-| Frost Wyrm | Ice | +25.6 (3) | -3.4 (11) | -15.0 (5) | +4.8 (13) |
-| Treant | Nature | +16.8 (7) | +5.4 (9) | -3.0 (3) | +1.5 (13) |
-| Tarasque | Metal | +22.1 (4) | -12.0 (8) | -12.7 (7) | -4.0 (13) |
-| Kirin | Light | +0.3 (10) | +2.4 (9) | - (0) | +4.5 (13) |
-| Basilisk | Dark | +2.7 (9) | -3.6 (10) | - (0) | -1.9 (13) |
+| Phoenix | Fire | +30.9 (3) | -10.3 (11) | -18.4 (5) | -0.7 (13) |
+| Leviathan | Water | +23.1 (5) | +4.0 (11) | -21.3 (3) | -3.5 (13) |
+| Golem | Earth | +18.7 (3) | +6.3 (11) | -10.3 (5) | 0.0 (13) |
+| Griffin | Air | +19.0 (5) | -3.3 (12) | -18.6 (2) | -4.4 (13) |
+| Thunderbird | Lightning | +16.6 (5) | -5.3 (9) | -20.0 (5) | +2.6 (13) |
+| Frost Wyrm | Ice | +26.1 (3) | -4.9 (11) | -16.0 (5) | +2.7 (13) |
+| Treant | Nature | +15.7 (7) | +2.8 (9) | -8.2 (3) | +1.6 (13) |
+| Tarasque | Metal | +28.8 (4) | -12.5 (8) | -15.8 (7) | -4.4 (13) |
+| Kirin | Light | -0.4 (10) | +1.7 (9) | - (0) | +6.2 (13) |
+| Basilisk | Dark | +3.4 (9) | -1.3 (10) | - (0) | -0.3 (13) |
 
 ### PvE mode: `neutral`
 
@@ -507,16 +504,16 @@ element or a `None` one (mixed). (n) = compositions in the bucket per level and 
 
 | Beast | Element | Stance | `solo` | `elite` | `squad` | `horde` | Overall | Overall normalized | Gap 0 overall | Gap 0 normalized |
 | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Kirin | Light | Ranged | **+7.6** (3) | **+12.3** (1) | **+6.7** (2) | +0.7 (5) | **+6.8** | **+7.3** | **+8.3** | **+8.9** |
-| Griffin | Air | Skirmisher | **+17.8** (1) | +1.1 (6) | -0.6 (5) | -2.4 (6) | +4.0 | +4.0 | +3.8 | +3.9 |
-| Golem | Earth | Vanguard | +2.4 (4) | **+5.9** (3) | -2.1 (7) | +3.7 (3) | +2.5 | +2.4 | +3.5 | +3.4 |
-| Basilisk | Dark | Ranged | **+7.9** (2) | **+9.7** (2) | -3.4 (8) | -4.4 (7) | +2.4 | +2.4 | +3.0 | +2.7 |
-| Leviathan | Water | Vanguard | +0.6 (5) | +3.9 (4) | _-8.0_ (9) | +2.5 (4) | -0.2 | -0.6 | -1.9 | -2.7 |
-| Treant | Nature | Vanguard | _-5.8_ (8) | +2.9 (5) | _-10.7_ (10) | **+9.8** (2) | -0.9 | -1.4 | +0.9 | +0.2 |
-| Frost Wyrm | Ice | Vanguard | _-14.6_ (10) | _-9.5_ (9) | -1.9 (6) | **+18.3** (1) | -1.9 | -2.0 | -1.8 | -1.9 |
-| Thunderbird | Lightning | Skirmisher | _-9.0_ (9) | _-7.2_ (7) | **+11.5** (1) | _-7.0_ (8) | -2.9 | -2.6 | -4.2 | -3.5 |
-| Tarasque | Metal | Vanguard | -1.9 (6) | _-8.2_ (8) | +2.4 (4) | _-10.4_ (9) | -4.5 | -4.6 | _-7.7_ | _-7.6_ |
-| Phoenix | Fire | Ranged | _-5.2_ (7) | _-11.0_ (10) | **+6.2** (3) | _-10.8_ (10) | _-5.2_ | _-5.1_ | -3.9 | -3.5 |
+| Kirin | Light | Ranged | **+6.2** (2) | **+10.8** (1) | +3.6 (3) | +1.7 (5) | **+5.6** | **+6.1** | **+7.9** | **+11.1** |
+| Golem | Earth | Vanguard | +3.7 (4) | +4.5 (3) | -1.2 (7) | +4.2 (3) | +2.8 | +3.0 | +3.2 | +3.7 |
+| Griffin | Air | Skirmisher | **+10.2** (1) | -0.1 (6) | -0.6 (5) | -2.1 (6) | +1.8 | +2.1 | +2.7 | +4.1 |
+| Basilisk | Dark | Ranged | **+5.9** (3) | **+7.0** (2) | -2.7 (8) | _-5.9_ (8) | +1.1 | +1.2 | +1.8 | +2.4 |
+| Leviathan | Water | Vanguard | +1.7 (5) | +1.9 (4) | _-5.9_ (9) | +3.7 (4) | +0.4 | +0.2 | -2.5 | -4.3 |
+| Thunderbird | Lightning | Skirmisher | -4.9 (8) | -4.2 (7) | **+8.5** (1) | -3.8 (7) | -1.1 | -1.0 | -2.1 | -1.4 |
+| Frost Wyrm | Ice | Vanguard | _-11.8_ (10) | _-6.7_ (9) | -0.9 (6) | **+11.8** (1) | -1.9 | -2.3 | -0.9 | -2.7 |
+| Treant | Nature | Vanguard | _-6.7_ (9) | +0.7 (5) | _-8.0_ (10) | **+5.8** (2) | -2.0 | -2.5 | +0.6 | -0.7 |
+| Phoenix | Fire | Ranged | -4.7 (7) | _-5.7_ (8) | **+6.0** (2) | _-8.1_ (10) | -3.1 | -3.2 | -4.0 | -4.3 |
+| Tarasque | Metal | Vanguard | +0.4 (6) | _-8.1_ (10) | +1.2 (4) | _-7.2_ (9) | -3.4 | -3.7 | _-6.7_ | _-8.0_ |
 
 Points of clear rate; (n) = rank within that shape. Sorted by overall. **Bold** = above +5.0, _italic_ = below -5.0. Overall normalized = the per-cell normalized marginals (see "PvE configuration"), averaged. Every column but the gap-0 ones is over the level-gap mix (see "Level-gap mix"); gap 0 = the equal-level battles alone.
 
@@ -524,98 +521,98 @@ Points of clear rate; (n) = rank within that shape. Sorted by overall. **Bold** 
 
 | Beast | `solo` L1 | `solo` L50 | `solo` L100 | `elite` L1 | `elite` L50 | `elite` L100 | `squad` L1 | `squad` L50 | `squad` L100 | `horde` L1 | `horde` L50 | `horde` L100 |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Kirin | **+8.3** | **+5.6** | **+8.8** | **+10.3** | **+15.2** | **+11.5** | +4.2 | **+9.1** | **+6.7** | **+5.2** | -2.6 | -0.3 |
-| Griffin | **+16.3** | **+14.0** | **+23.2** | **+10.3** | _-5.7_ | -1.4 | **+7.2** | -1.8 | _-7.1_ | +1.2 | -3.1 | _-5.3_ |
-| Golem | **+7.3** | +2.1 | -2.1 | +3.4 | **+8.2** | **+6.1** | -0.7 | -1.3 | -4.2 | +1.7 | +1.8 | **+7.6** |
-| Basilisk | -1.6 | **+12.1** | **+13.2** | +1.4 | **+16.2** | **+11.5** | _-6.2_ | -3.3 | -0.7 | _-9.2_ | +0.3 | -4.3 |
-| Leviathan | **+7.3** | -2.3 | -3.1 | **+6.8** | +4.3 | +0.6 | -0.7 | _-12.3_ | _-11.1_ | +0.2 | **+5.8** | +1.6 |
-| Treant | _-10.5_ | -3.3 | -3.6 | **+5.9** | +0.8 | +2.1 | _-5.7_ | _-9.8_ | _-16.6_ | **+7.1** | **+8.8** | **+13.5** |
-| Frost Wyrm | _-6.5_ | _-21.2_ | _-16.0_ | _-8.5_ | _-17.1_ | -2.9 | _-6.7_ | -1.3 | +2.3 | **+11.1** | **+20.7** | **+23.0** |
-| Thunderbird | _-10.5_ | -3.8 | _-12.5_ | _-7.0_ | _-7.6_ | _-6.8_ | **+11.7** | **+11.1** | **+11.7** | +4.7 | _-14.0_ | _-11.8_ |
-| Tarasque | +1.4 | +1.1 | _-8.1_ | _-9.5_ | -3.7 | _-11.3_ | -0.2 | +2.1 | **+5.3** | _-9.2_ | _-6.6_ | _-15.2_ |
-| Phoenix | _-11.5_ | -4.3 | +0.3 | _-13.0_ | _-10.6_ | _-9.3_ | -2.7 | **+7.6** | **+13.7** | _-12.7_ | _-11.1_ | _-8.8_ |
+| Kirin | **+7.1** | +4.7 | **+6.7** | **+9.8** | **+12.7** | **+9.9** | +2.6 | -0.6 | **+8.7** | **+7.3** | _-5.2_ | +3.0 |
+| Golem | **+6.2** | +0.2 | +4.8 | +0.8 | +4.8 | **+7.9** | -1.4 | +2.9 | _-5.2_ | +1.3 | +4.7 | **+6.4** |
+| Griffin | **+12.6** | **+9.2** | **+8.7** | **+5.8** | -2.7 | -3.5 | **+7.0** | -4.1 | -4.7 | -2.1 | -4.2 | 0.0 |
+| Basilisk | -0.3 | **+9.7** | **+8.2** | +1.8 | **+12.7** | **+6.4** | -4.4 | -1.6 | -2.2 | _-8.6_ | -4.2 | -5.0 |
+| Leviathan | **+5.7** | +1.7 | -2.2 | **+5.8** | +1.8 | -2.0 | +0.6 | _-8.5_ | _-9.7_ | +1.8 | **+6.2** | +3.0 |
+| Thunderbird | _-11.2_ | +0.7 | -4.2 | _-6.1_ | -4.2 | -2.5 | **+8.0** | **+9.3** | **+8.2** | +4.3 | _-5.7_ | _-9.9_ |
+| Frost Wyrm | _-6.7_ | _-15.6_ | _-13.1_ | _-8.6_ | _-11.6_ | 0.0 | _-5.4_ | -0.1 | +2.7 | **+9.3** | **+10.7** | **+15.4** |
+| Treant | _-8.2_ | _-6.2_ | _-5.7_ | +4.8 | -1.2 | -1.5 | -4.9 | _-8.0_ | _-11.2_ | **+6.3** | **+6.2** | +5.0 |
+| Phoenix | _-7.7_ | -4.7 | -1.7 | _-6.6_ | _-7.6_ | -3.0 | -1.9 | **+9.3** | **+10.7** | _-12.1_ | -4.7 | _-7.4_ |
+| Tarasque | +2.7 | +0.2 | -1.7 | _-7.6_ | -4.7 | _-11.9_ | -0.4 | +1.4 | +2.7 | _-7.6_ | -3.7 | _-10.4_ |
 
 #### Ranking per shape (niches)
 
 | Rank | `solo` | `elite` | `squad` | `horde` | Overall |
 | ---: | --- | --- | --- | --- | --- |
-| 1 | Griffin +17.8 | Kirin +12.3 | Thunderbird +11.5 | Frost Wyrm +18.3 | Kirin +6.8 |
-| 2 | Basilisk +7.9 | Basilisk +9.7 | Kirin +6.7 | Treant +9.8 | Griffin +4.0 |
-| 3 | Kirin +7.6 | Golem +5.9 | Phoenix +6.2 | Golem +3.7 | Golem +2.5 |
-| 4 | Golem +2.4 | Leviathan +3.9 | Tarasque +2.4 | Leviathan +2.5 | Basilisk +2.4 |
-| 5 | Leviathan +0.6 | Treant +2.9 | Griffin -0.6 | Kirin +0.7 | Leviathan -0.2 |
-| 6 | Tarasque -1.9 | Griffin +1.1 | Frost Wyrm -1.9 | Griffin -2.4 | Treant -0.9 |
-| 7 | Phoenix -5.2 | Thunderbird -7.2 | Golem -2.1 | Basilisk -4.4 | Frost Wyrm -1.9 |
-| 8 | Treant -5.8 | Tarasque -8.2 | Basilisk -3.4 | Thunderbird -7.0 | Thunderbird -2.9 |
-| 9 | Thunderbird -9.0 | Frost Wyrm -9.5 | Leviathan -8.0 | Tarasque -10.4 | Tarasque -4.5 |
-| 10 | Frost Wyrm -14.6 | Phoenix -11.0 | Treant -10.7 | Phoenix -10.8 | Phoenix -5.2 |
+| 1 | Griffin +10.2 | Kirin +10.8 | Thunderbird +8.5 | Frost Wyrm +11.8 | Kirin +5.6 |
+| 2 | Kirin +6.2 | Basilisk +7.0 | Phoenix +6.0 | Treant +5.8 | Golem +2.8 |
+| 3 | Basilisk +5.9 | Golem +4.5 | Kirin +3.6 | Golem +4.2 | Griffin +1.8 |
+| 4 | Golem +3.7 | Leviathan +1.9 | Tarasque +1.2 | Leviathan +3.7 | Basilisk +1.1 |
+| 5 | Leviathan +1.7 | Treant +0.7 | Griffin -0.6 | Kirin +1.7 | Leviathan +0.4 |
+| 6 | Tarasque +0.4 | Griffin -0.1 | Frost Wyrm -0.9 | Griffin -2.1 | Thunderbird -1.1 |
+| 7 | Phoenix -4.7 | Thunderbird -4.2 | Golem -1.2 | Thunderbird -3.8 | Frost Wyrm -1.9 |
+| 8 | Thunderbird -4.9 | Phoenix -5.7 | Basilisk -2.7 | Basilisk -5.9 | Treant -2.0 |
+| 9 | Treant -6.7 | Frost Wyrm -6.7 | Leviathan -5.9 | Tarasque -7.2 | Phoenix -3.1 |
+| 10 | Frost Wyrm -11.8 | Tarasque -8.1 | Treant -8.0 | Phoenix -8.1 | Tarasque -3.4 |
 
 #### Role metrics: `solo` (levels averaged)
 
 | Beast | Marginal | Clear with | Clear without | Dmg share | Taken share | Survival | Time to clear | Turns / time |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Griffin | **+17.8** | 68.2% | 50.3% | 53.4% | 34.5% | 56.0% | 9.3 | 0.62 |
-| Basilisk | **+7.9** | 61.2% | 53.3% | 41.6% | 20.7% | 55.2% | 10.0 | 0.61 |
-| Kirin | **+7.6** | 61.0% | 53.4% | 39.4% | 28.1% | 48.4% | 11.2 | 0.63 |
-| Golem | +2.4 | 57.4% | 55.0% | 24.7% | 44.4% | 33.7% | 11.7 | 0.48 |
-| Leviathan | +0.6 | 56.1% | 55.5% | 17.5% | 50.8% | 24.4% | 11.9 | 0.46 |
-| Tarasque | -1.9 | 54.4% | 56.3% | 33.4% | 39.1% | 16.7% | 9.9 | 0.37 |
-| Phoenix | _-5.2_ | 52.1% | 57.2% | 46.1% | 15.4% | 52.1% | 10.5 | 0.70 |
-| Treant | _-5.8_ | 51.6% | 57.4% | 13.1% | 36.4% | 27.8% | 12.8 | 0.49 |
-| Thunderbird | _-9.0_ | 49.4% | 58.4% | 44.7% | 30.2% | 41.0% | 10.4 | 0.64 |
-| Frost Wyrm | _-14.6_ | 45.5% | 60.1% | 19.5% | 33.7% | 16.1% | 11.4 | 0.42 |
+| Griffin | **+10.2** | 72.2% | 62.1% | 52.3% | 33.2% | 62.5% | 8.3 | 0.62 |
+| Kirin | **+6.2** | 69.4% | 63.2% | 38.7% | 24.6% | 60.0% | 10.0 | 0.64 |
+| Basilisk | **+5.9** | 69.2% | 63.3% | 40.8% | 19.3% | 63.8% | 9.0 | 0.63 |
+| Golem | +3.7 | 67.7% | 64.0% | 25.0% | 44.4% | 49.7% | 10.6 | 0.51 |
+| Leviathan | +1.7 | 66.3% | 64.6% | 18.4% | 54.3% | 40.2% | 10.7 | 0.50 |
+| Tarasque | +0.4 | 65.4% | 65.0% | 35.1% | 44.8% | 30.8% | 9.0 | 0.41 |
+| Phoenix | -4.7 | 61.8% | 66.5% | 44.7% | 12.4% | 61.8% | 9.6 | 0.69 |
+| Thunderbird | -4.9 | 61.7% | 66.6% | 44.9% | 26.9% | 55.1% | 9.1 | 0.66 |
+| Treant | _-6.7_ | 60.4% | 67.1% | 13.3% | 36.0% | 40.9% | 11.6 | 0.51 |
+| Frost Wyrm | _-11.8_ | 56.8% | 68.7% | 20.3% | 37.4% | 30.3% | 10.2 | 0.45 |
 
 #### Role metrics: `elite` (levels averaged)
 
 | Beast | Marginal | Clear with | Clear without | Dmg share | Taken share | Survival | Time to clear | Turns / time |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Kirin | **+12.3** | 67.9% | 55.6% | 38.9% | 25.1% | 58.2% | 12.0 | 0.64 |
-| Basilisk | **+9.7** | 66.1% | 56.4% | 41.4% | 23.7% | 57.9% | 11.0 | 0.63 |
-| Golem | **+5.9** | 63.4% | 57.5% | 24.9% | 45.1% | 40.0% | 12.5 | 0.49 |
-| Leviathan | +3.9 | 62.0% | 58.1% | 18.9% | 50.5% | 31.4% | 13.0 | 0.49 |
-| Treant | +2.9 | 61.3% | 58.4% | 14.2% | 36.4% | 38.7% | 13.7 | 0.52 |
-| Griffin | +1.1 | 60.1% | 59.0% | 50.9% | 34.5% | 50.6% | 10.2 | 0.57 |
-| Thunderbird | _-7.2_ | 54.3% | 61.5% | 42.4% | 29.4% | 44.1% | 11.3 | 0.62 |
-| Tarasque | _-8.2_ | 53.6% | 61.8% | 30.8% | 37.6% | 17.8% | 11.5 | 0.35 |
-| Frost Wyrm | _-9.5_ | 52.7% | 62.2% | 24.3% | 32.8% | 24.7% | 12.5 | 0.47 |
-| Phoenix | _-11.0_ | 51.6% | 62.6% | 46.5% | 18.1% | 50.9% | 11.2 | 0.69 |
+| Kirin | **+10.8** | 71.8% | 61.0% | 38.2% | 23.1% | 64.4% | 10.9 | 0.64 |
+| Basilisk | **+7.0** | 69.1% | 62.1% | 41.5% | 23.5% | 62.6% | 10.1 | 0.64 |
+| Golem | +4.5 | 67.4% | 62.8% | 24.9% | 43.9% | 50.2% | 11.4 | 0.51 |
+| Leviathan | +1.9 | 65.5% | 63.6% | 19.2% | 51.8% | 43.6% | 11.7 | 0.51 |
+| Treant | +0.7 | 64.7% | 64.0% | 14.0% | 35.9% | 48.1% | 12.4 | 0.54 |
+| Griffin | -0.1 | 64.1% | 64.2% | 50.0% | 34.8% | 55.6% | 9.1 | 0.58 |
+| Thunderbird | -4.2 | 61.2% | 65.5% | 42.6% | 26.4% | 53.7% | 10.1 | 0.62 |
+| Phoenix | _-5.7_ | 60.2% | 65.9% | 44.6% | 16.0% | 59.5% | 10.3 | 0.69 |
+| Frost Wyrm | _-6.7_ | 59.5% | 66.2% | 25.1% | 34.4% | 36.7% | 11.3 | 0.49 |
+| Tarasque | _-8.1_ | 58.6% | 66.6% | 33.3% | 43.7% | 27.4% | 10.1 | 0.39 |
 
 #### Role metrics: `squad` (levels averaged)
 
 | Beast | Marginal | Clear with | Clear without | Dmg share | Taken share | Survival | Time to clear | Turns / time |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Thunderbird | **+11.5** | 77.9% | 66.4% | 45.1% | 35.0% | 54.9% | 7.1 | 0.53 |
-| Kirin | **+6.7** | 74.5% | 67.9% | 39.4% | 25.7% | 67.0% | 7.9 | 0.61 |
-| Phoenix | **+6.2** | 74.2% | 68.0% | 37.4% | 25.5% | 58.6% | 7.5 | 0.58 |
-| Tarasque | +2.4 | 71.5% | 69.1% | 36.4% | 37.1% | 49.4% | 7.5 | 0.46 |
-| Griffin | -0.6 | 69.4% | 70.0% | 41.4% | 40.3% | 35.5% | 7.3 | 0.42 |
-| Frost Wyrm | -1.9 | 68.5% | 70.4% | 25.5% | 34.7% | 40.2% | 8.2 | 0.43 |
-| Golem | -2.1 | 68.4% | 70.5% | 32.4% | 34.7% | 58.2% | 8.6 | 0.53 |
-| Basilisk | -3.4 | 67.5% | 70.9% | 31.2% | 29.9% | 47.0% | 7.7 | 0.50 |
-| Leviathan | _-8.0_ | 64.2% | 72.3% | 25.3% | 39.1% | 51.7% | 8.9 | 0.51 |
-| Treant | _-10.7_ | 62.4% | 73.1% | 19.3% | 31.4% | 53.5% | 9.4 | 0.54 |
+| Thunderbird | **+8.5** | 75.6% | 67.1% | 46.2% | 34.4% | 56.4% | 6.7 | 0.54 |
+| Phoenix | **+6.0** | 73.8% | 67.8% | 37.8% | 29.1% | 63.0% | 7.0 | 0.60 |
+| Kirin | +3.6 | 72.1% | 68.6% | 39.0% | 24.9% | 68.1% | 7.3 | 0.61 |
+| Tarasque | +1.2 | 70.5% | 69.2% | 36.0% | 37.2% | 54.7% | 6.9 | 0.48 |
+| Griffin | -0.6 | 69.2% | 69.8% | 42.6% | 41.8% | 42.0% | 6.8 | 0.45 |
+| Frost Wyrm | -0.9 | 69.0% | 69.9% | 25.7% | 36.6% | 48.6% | 7.5 | 0.46 |
+| Golem | -1.2 | 68.8% | 70.0% | 30.2% | 31.3% | 62.2% | 7.9 | 0.53 |
+| Basilisk | -2.7 | 67.7% | 70.4% | 33.0% | 31.9% | 51.3% | 7.0 | 0.53 |
+| Leviathan | _-5.9_ | 65.5% | 71.4% | 24.5% | 37.7% | 56.5% | 8.1 | 0.51 |
+| Treant | _-8.0_ | 64.0% | 72.0% | 18.2% | 28.4% | 59.3% | 8.4 | 0.54 |
 
 #### Role metrics: `horde` (levels averaged)
 
 | Beast | Marginal | Clear with | Clear without | Dmg share | Taken share | Survival | Time to clear | Turns / time |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Frost Wyrm | **+18.3** | 69.1% | 50.8% | 40.4% | 33.2% | 45.0% | 10.4 | 0.51 |
-| Treant | **+9.8** | 63.2% | 53.4% | 23.4% | 35.8% | 48.1% | 12.4 | 0.53 |
-| Golem | +3.7 | 58.9% | 55.2% | 21.0% | 39.3% | 43.3% | 12.3 | 0.51 |
-| Leviathan | +2.5 | 58.1% | 55.6% | 23.0% | 44.2% | 38.1% | 12.3 | 0.48 |
-| Kirin | +0.7 | 56.8% | 56.1% | 34.2% | 25.6% | 52.3% | 11.4 | 0.65 |
-| Griffin | -2.4 | 54.6% | 57.0% | 38.7% | 33.2% | 38.5% | 10.5 | 0.53 |
-| Basilisk | -4.4 | 53.2% | 57.6% | 39.2% | 29.8% | 36.3% | 10.7 | 0.55 |
-| Thunderbird | _-7.0_ | 51.4% | 58.4% | 43.9% | 33.4% | 33.3% | 10.1 | 0.46 |
-| Tarasque | _-10.4_ | 49.1% | 59.4% | 25.7% | 35.5% | 22.7% | 11.5 | 0.39 |
-| Phoenix | _-10.8_ | 48.7% | 59.6% | 43.9% | 23.4% | 45.1% | 11.0 | 0.68 |
+| Frost Wyrm | **+11.8** | 67.1% | 55.4% | 41.4% | 34.1% | 50.9% | 9.9 | 0.52 |
+| Treant | **+5.8** | 63.0% | 57.1% | 22.2% | 33.9% | 54.1% | 11.8 | 0.55 |
+| Golem | +4.2 | 61.8% | 57.6% | 20.7% | 38.2% | 50.9% | 12.0 | 0.53 |
+| Leviathan | +3.7 | 61.5% | 57.8% | 23.0% | 44.0% | 44.9% | 11.7 | 0.50 |
+| Kirin | +1.7 | 60.1% | 58.4% | 32.9% | 23.2% | 56.7% | 11.0 | 0.65 |
+| Griffin | -2.1 | 57.4% | 59.5% | 39.6% | 33.3% | 44.3% | 10.0 | 0.56 |
+| Thunderbird | -3.8 | 56.3% | 60.0% | 44.6% | 34.4% | 40.5% | 9.7 | 0.50 |
+| Basilisk | _-5.9_ | 54.7% | 60.7% | 39.3% | 31.5% | 41.7% | 10.0 | 0.58 |
+| Tarasque | _-7.2_ | 53.8% | 61.1% | 26.6% | 38.5% | 33.1% | 10.8 | 0.43 |
+| Phoenix | _-8.1_ | 53.2% | 61.3% | 43.0% | 22.3% | 50.9% | 10.5 | 0.68 |
 
 An even split is 33.3% for both shares.
 
 ### PvE team composition: does the lineup matter?
 
 The marginals above judge beasts one at a time; this judges whole teams. Each of the 120 teams' clear rate at the calibrated
-difficulty (the scouted pick clears about `solo` 50.0%, `elite` 60.0%, `squad` 80.0%, `horde` 80.0%, the average team the no-scouting rate): per shape it is 24 battles (compositions x levels x samples), levels
+difficulty (the scouted pick clears about `solo` 75.0%, `elite` 75.0%, `squad` 85.0%, `horde` 85.0%, the average team the no-scouting rate): per shape it is 24 battles (compositions x levels x samples), levels
 pooled; overall averages the shapes. **Noise SD** is the spread the teams would show from damage rolls alone
 (binomial, sqrt(p(1 - p) / (N - 1)) per cell, an upper bound since a team's chance differs between compositions), and
 **beyond noise** = sqrt(SD² - noise SD²) is a lower bound on the spread that is the lineup's own. A single seed also
@@ -623,55 +620,55 @@ carries its own composition draw; `--seeds` separates what persists across seeds
 
 #### Does composition matter?
 
-- `elemental` `solo`: best-to-worst team spread 37.5 points (0.0% … 37.5%); p10–p90 20.8 points (4.2% … 25.0%); team SD 8.7 against 6.9 from damage rolls alone, so at least 5.3 points of real spread.
-- `elemental` `elite`: best-to-worst team spread 41.7 points (0.0% … 41.7%); p10–p90 25.4 points (7.9% … 33.3%); team SD 9.5 against 7.9 from damage rolls alone, so at least 5.3 points of real spread.
-- `elemental` `squad`: best-to-worst team spread 62.5 points (12.5% … 75.0%); p10–p90 41.7 points (20.8% … 62.5%); team SD 14.4 against 10.0 from damage rolls alone, so at least 10.4 points of real spread.
-- `elemental` `horde`: best-to-worst team spread 87.5 points (4.2% … 91.7%); p10–p90 54.2 points (20.8% … 75.0%); team SD 20.1 against 9.5 from damage rolls alone, so at least 17.7 points of real spread.
-- `elemental` overall: best-to-worst team spread 27.1 points (18.8% … 45.8%); p10–p90 15.7 points (21.9% … 37.6%); team SD 6.1 against 4.3 from damage rolls alone, so at least 4.2 points of real spread.
-- `neutral` `solo`: best-to-worst team spread 91.7 points (8.3% … 100.0%); p10–p90 50.0 points (29.2% … 79.2%); team SD 19.5 against 9.4 from damage rolls alone, so at least 17.0 points of real spread.
-- `neutral` `elite`: best-to-worst team spread 79.2 points (20.8% … 100.0%); p10–p90 37.9 points (37.5% … 75.4%); team SD 15.8 against 9.6 from damage rolls alone, so at least 12.6 points of real spread.
-- `neutral` `squad`: best-to-worst team spread 62.5 points (33.3% … 95.8%); p10–p90 33.3 points (50.0% … 83.3%); team SD 13.8 against 9.1 from damage rolls alone, so at least 10.4 points of real spread.
-- `neutral` `horde`: best-to-worst team spread 83.3 points (12.5% … 95.8%); p10–p90 50.0 points (29.2% … 79.2%); team SD 18.6 against 9.5 from damage rolls alone, so at least 16.0 points of real spread.
-- `neutral` overall: best-to-worst team spread 45.8 points (37.5% … 83.3%); p10–p90 22.0 points (49.0% … 70.9%); team SD 9.3 against 4.7 from damage rolls alone, so at least 8.0 points of real spread.
+- `elemental` `solo`: best-to-worst team spread 50.0 points (8.3% … 58.3%); p10–p90 29.2 points (16.7% … 45.8%); team SD 11.0 against 9.6 from damage rolls alone, so at least 5.2 points of real spread.
+- `elemental` `elite`: best-to-worst team spread 58.3 points (12.5% … 70.8%); p10–p90 29.2 points (20.8% … 50.0%); team SD 11.6 against 9.9 from damage rolls alone, so at least 6.0 points of real spread.
+- `elemental` `squad`: best-to-worst team spread 66.7 points (16.7% … 83.3%); p10–p90 33.3 points (33.3% … 66.7%); team SD 13.6 against 10.1 from damage rolls alone, so at least 9.1 points of real spread.
+- `elemental` `horde`: best-to-worst team spread 83.3 points (12.5% … 95.8%); p10–p90 41.7 points (37.5% … 79.2%); team SD 16.5 against 9.7 from damage rolls alone, so at least 13.4 points of real spread.
+- `elemental` overall: best-to-worst team spread 33.3 points (32.3% … 65.6%); p10–p90 16.7 points (36.5% … 53.1%); team SD 6.5 against 4.9 from damage rolls alone, so at least 4.3 points of real spread.
+- `neutral` `solo`: best-to-worst team spread 70.8 points (25.0% … 95.8%); p10–p90 37.5 points (45.8% … 83.3%); team SD 14.7 against 9.4 from damage rolls alone, so at least 11.3 points of real spread.
+- `neutral` `elite`: best-to-worst team spread 79.2 points (20.8% … 100.0%); p10–p90 29.2 points (50.0% … 79.2%); team SD 12.9 against 9.6 from damage rolls alone, so at least 8.7 points of real spread.
+- `neutral` `squad`: best-to-worst team spread 54.2 points (37.5% … 91.7%); p10–p90 29.2 points (54.2% … 83.3%); team SD 12.4 against 9.2 from damage rolls alone, so at least 8.4 points of real spread.
+- `neutral` `horde`: best-to-worst team spread 66.7 points (20.8% … 87.5%); p10–p90 41.7 points (37.5% … 79.2%); team SD 14.6 against 9.8 from damage rolls alone, so at least 10.8 points of real spread.
+- `neutral` overall: best-to-worst team spread 39.6 points (45.8% … 85.4%); p10–p90 18.9 points (54.2% … 73.0%); team SD 7.5 against 4.7 from damage rolls alone, so at least 5.8 points of real spread.
 
 #### Team clear-rate spread
 
 | Kit mode | Shape | Level | Battles / team | Min | p10 | Median | p90 | Max | Max - min | p10–p90 | SD | Noise SD | Beyond noise |
 | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `elemental` | `solo` | L1 | 8 | 0.0% | 0.0% | 12.5% | 37.5% | 62.5% | 62.5 | 37.5 | 13.7 | 13.1 | 4.2 |
-| `elemental` | `solo` | L50 | 8 | 0.0% | 0.0% | 12.5% | 25.0% | 37.5% | 37.5 | 25.0 | 9.7 | 10.6 | 0.0 |
-| `elemental` | `solo` | L100 | 8 | 0.0% | 0.0% | 12.5% | 25.0% | 37.5% | 37.5 | 25.0 | 10.6 | 12.0 | 0.0 |
-| `elemental` | `solo` | pooled | 24 | 0.0% | 4.2% | 12.5% | 25.0% | 37.5% | 37.5 | 20.8 | 8.7 | 6.9 | 5.3 |
-| `elemental` | `elite` | L1 | 8 | 0.0% | 12.5% | 25.0% | 37.5% | 62.5% | 62.5 | 25.0 | 12.7 | 15.4 | 0.0 |
-| `elemental` | `elite` | L50 | 8 | 0.0% | 0.0% | 12.5% | 37.5% | 50.0% | 50.0 | 37.5 | 12.8 | 12.8 | 0.0 |
-| `elemental` | `elite` | L100 | 8 | 0.0% | 0.0% | 12.5% | 25.0% | 50.0% | 50.0 | 25.0 | 11.8 | 12.4 | 0.0 |
-| `elemental` | `elite` | pooled | 24 | 0.0% | 7.9% | 16.7% | 33.3% | 41.7% | 41.7 | 25.4 | 9.5 | 7.9 | 5.3 |
-| `elemental` | `squad` | L1 | 8 | 0.0% | 12.5% | 37.5% | 62.5% | 75.0% | 75.0 | 50.0 | 17.7 | 17.3 | 3.4 |
-| `elemental` | `squad` | L50 | 8 | 0.0% | 25.0% | 37.5% | 75.0% | 87.5% | 87.5 | 50.0 | 18.6 | 17.4 | 6.5 |
-| `elemental` | `squad` | L100 | 8 | 12.5% | 23.8% | 37.5% | 62.5% | 100.0% | 87.5 | 38.8 | 18.9 | 17.2 | 7.7 |
-| `elemental` | `squad` | pooled | 24 | 12.5% | 20.8% | 41.7% | 62.5% | 75.0% | 62.5 | 41.7 | 14.4 | 10.0 | 10.4 |
-| `elemental` | `horde` | L1 | 8 | 0.0% | 25.0% | 50.0% | 87.5% | 100.0% | 100.0 | 62.5 | 23.2 | 16.7 | 16.0 |
-| `elemental` | `horde` | L50 | 8 | 0.0% | 25.0% | 50.0% | 87.5% | 100.0% | 100.0 | 62.5 | 24.1 | 16.6 | 17.5 |
-| `elemental` | `horde` | L100 | 8 | 0.0% | 12.5% | 37.5% | 75.0% | 87.5% | 87.5 | 62.5 | 23.8 | 16.3 | 17.4 |
-| `elemental` | `horde` | pooled | 24 | 4.2% | 20.8% | 45.8% | 75.0% | 91.7% | 87.5 | 54.2 | 20.1 | 9.5 | 17.7 |
-| `elemental` | overall | pooled | 96 | 18.8% | 21.9% | 30.2% | 37.6% | 45.8% | 27.1 | 15.7 | 6.1 | 4.3 | 4.2 |
-| `neutral` | `solo` | L1 | 8 | 12.5% | 25.0% | 50.0% | 87.5% | 100.0% | 87.5 | 62.5 | 22.4 | 16.8 | 14.7 |
-| `neutral` | `solo` | L50 | 8 | 0.0% | 25.0% | 50.0% | 87.5% | 100.0% | 100.0 | 62.5 | 24.2 | 16.5 | 17.8 |
-| `neutral` | `solo` | L100 | 8 | 0.0% | 23.8% | 50.0% | 87.5% | 100.0% | 100.0 | 63.8 | 26.8 | 15.6 | 21.7 |
-| `neutral` | `solo` | pooled | 24 | 8.3% | 29.2% | 58.3% | 79.2% | 100.0% | 91.7 | 50.0 | 19.5 | 9.4 | 17.0 |
-| `neutral` | `elite` | L1 | 8 | 12.5% | 37.5% | 62.5% | 87.5% | 100.0% | 87.5 | 50.0 | 19.8 | 16.5 | 11.0 |
-| `neutral` | `elite` | L50 | 8 | 0.0% | 25.0% | 50.0% | 87.5% | 100.0% | 100.0 | 62.5 | 23.0 | 16.7 | 15.8 |
-| `neutral` | `elite` | L100 | 8 | 12.5% | 37.5% | 62.5% | 87.5% | 100.0% | 87.5 | 50.0 | 21.1 | 16.6 | 12.9 |
-| `neutral` | `elite` | pooled | 24 | 20.8% | 37.5% | 60.4% | 75.4% | 100.0% | 79.2 | 37.9 | 15.8 | 9.6 | 12.6 |
-| `neutral` | `squad` | L1 | 8 | 37.5% | 37.5% | 75.0% | 87.5% | 100.0% | 62.5 | 50.0 | 17.0 | 16.4 | 4.5 |
-| `neutral` | `squad` | L50 | 8 | 12.5% | 50.0% | 75.0% | 100.0% | 100.0% | 87.5 | 50.0 | 19.3 | 15.6 | 11.5 |
-| `neutral` | `squad` | L100 | 8 | 0.0% | 48.8% | 75.0% | 88.8% | 100.0% | 100.0 | 40.0 | 21.0 | 15.3 | 14.4 |
-| `neutral` | `squad` | pooled | 24 | 33.3% | 50.0% | 75.0% | 83.3% | 95.8% | 62.5 | 33.3 | 13.8 | 9.1 | 10.4 |
-| `neutral` | `horde` | L1 | 8 | 0.0% | 25.0% | 50.0% | 87.5% | 100.0% | 100.0 | 62.5 | 21.0 | 17.0 | 12.3 |
-| `neutral` | `horde` | L50 | 8 | 0.0% | 37.5% | 62.5% | 87.5% | 100.0% | 100.0 | 50.0 | 22.9 | 16.2 | 16.1 |
-| `neutral` | `horde` | L100 | 8 | 0.0% | 12.5% | 50.0% | 87.5% | 100.0% | 100.0 | 75.0 | 25.6 | 16.2 | 19.8 |
-| `neutral` | `horde` | pooled | 24 | 12.5% | 29.2% | 56.3% | 79.2% | 95.8% | 83.3 | 50.0 | 18.6 | 9.5 | 16.0 |
-| `neutral` | overall | pooled | 96 | 37.5% | 49.0% | 60.4% | 70.9% | 83.3% | 45.8 | 22.0 | 9.3 | 4.7 | 8.0 |
+| `elemental` | `solo` | L1 | 8 | 0.0% | 12.5% | 37.5% | 62.5% | 75.0% | 75.0 | 50.0 | 16.6 | 16.9 | 0.0 |
+| `elemental` | `solo` | L50 | 8 | 0.0% | 12.5% | 37.5% | 50.0% | 75.0% | 75.0 | 37.5 | 15.2 | 16.7 | 0.0 |
+| `elemental` | `solo` | L100 | 8 | 0.0% | 12.5% | 25.0% | 50.0% | 62.5% | 62.5 | 37.5 | 14.0 | 16.4 | 0.0 |
+| `elemental` | `solo` | pooled | 24 | 8.3% | 16.7% | 33.3% | 45.8% | 58.3% | 50.0 | 29.2 | 11.0 | 9.6 | 5.2 |
+| `elemental` | `elite` | L1 | 8 | 0.0% | 12.5% | 37.5% | 50.0% | 75.0% | 75.0 | 37.5 | 15.6 | 17.1 | 0.0 |
+| `elemental` | `elite` | L50 | 8 | 0.0% | 12.5% | 37.5% | 62.5% | 87.5% | 87.5 | 50.0 | 17.6 | 17.2 | 3.8 |
+| `elemental` | `elite` | L100 | 8 | 12.5% | 12.5% | 37.5% | 50.0% | 87.5% | 75.0 | 37.5 | 15.2 | 17.4 | 0.0 |
+| `elemental` | `elite` | pooled | 24 | 12.5% | 20.8% | 37.5% | 50.0% | 70.8% | 58.3 | 29.2 | 11.6 | 9.9 | 6.0 |
+| `elemental` | `squad` | L1 | 8 | 12.5% | 25.0% | 50.0% | 75.0% | 100.0% | 87.5 | 50.0 | 18.0 | 17.6 | 3.5 |
+| `elemental` | `squad` | L50 | 8 | 12.5% | 25.0% | 50.0% | 75.0% | 100.0% | 87.5 | 50.0 | 18.2 | 17.6 | 4.7 |
+| `elemental` | `squad` | L100 | 8 | 12.5% | 25.0% | 50.0% | 75.0% | 100.0% | 87.5 | 50.0 | 19.8 | 17.4 | 9.5 |
+| `elemental` | `squad` | pooled | 24 | 16.7% | 33.3% | 50.0% | 66.7% | 83.3% | 66.7 | 33.3 | 13.6 | 10.1 | 9.1 |
+| `elemental` | `horde` | L1 | 8 | 12.5% | 25.0% | 56.3% | 87.5% | 100.0% | 87.5 | 62.5 | 21.5 | 16.9 | 13.3 |
+| `elemental` | `horde` | L50 | 8 | 12.5% | 37.5% | 62.5% | 87.5% | 100.0% | 87.5 | 50.0 | 21.7 | 16.5 | 14.2 |
+| `elemental` | `horde` | L100 | 8 | 0.0% | 36.3% | 62.5% | 87.5% | 100.0% | 100.0 | 51.3 | 20.6 | 17.0 | 11.6 |
+| `elemental` | `horde` | pooled | 24 | 12.5% | 37.5% | 58.3% | 79.2% | 95.8% | 83.3 | 41.7 | 16.5 | 9.7 | 13.4 |
+| `elemental` | overall | pooled | 96 | 32.3% | 36.5% | 44.8% | 53.1% | 65.6% | 33.3 | 16.7 | 6.5 | 4.9 | 4.3 |
+| `neutral` | `solo` | L1 | 8 | 25.0% | 37.5% | 62.5% | 87.5% | 100.0% | 75.0 | 50.0 | 20.0 | 16.5 | 11.2 |
+| `neutral` | `solo` | L50 | 8 | 12.5% | 37.5% | 62.5% | 87.5% | 100.0% | 87.5 | 50.0 | 20.8 | 16.5 | 12.6 |
+| `neutral` | `solo` | L100 | 8 | 12.5% | 37.5% | 75.0% | 87.5% | 100.0% | 87.5 | 50.0 | 20.1 | 15.8 | 12.4 |
+| `neutral` | `solo` | pooled | 24 | 25.0% | 45.8% | 66.7% | 83.3% | 95.8% | 70.8 | 37.5 | 14.7 | 9.4 | 11.3 |
+| `neutral` | `elite` | L1 | 8 | 25.0% | 37.5% | 62.5% | 87.5% | 100.0% | 75.0 | 50.0 | 18.8 | 16.5 | 9.0 |
+| `neutral` | `elite` | L50 | 8 | 0.0% | 36.3% | 62.5% | 87.5% | 100.0% | 100.0 | 51.3 | 19.7 | 17.2 | 9.8 |
+| `neutral` | `elite` | L100 | 8 | 25.0% | 50.0% | 75.0% | 87.5% | 100.0% | 75.0 | 37.5 | 16.3 | 16.2 | 2.0 |
+| `neutral` | `elite` | pooled | 24 | 20.8% | 50.0% | 66.7% | 79.2% | 100.0% | 79.2 | 29.2 | 12.9 | 9.6 | 8.7 |
+| `neutral` | `squad` | L1 | 8 | 25.0% | 50.0% | 75.0% | 87.5% | 100.0% | 75.0 | 37.5 | 16.5 | 15.9 | 4.3 |
+| `neutral` | `squad` | L50 | 8 | 12.5% | 48.8% | 75.0% | 87.5% | 100.0% | 87.5 | 38.8 | 18.4 | 15.8 | 9.4 |
+| `neutral` | `squad` | L100 | 8 | 0.0% | 37.5% | 75.0% | 87.5% | 100.0% | 100.0 | 50.0 | 20.7 | 15.9 | 13.2 |
+| `neutral` | `squad` | pooled | 24 | 37.5% | 54.2% | 70.8% | 83.3% | 91.7% | 54.2 | 29.2 | 12.4 | 9.2 | 8.4 |
+| `neutral` | `horde` | L1 | 8 | 0.0% | 37.5% | 62.5% | 75.0% | 100.0% | 100.0 | 37.5 | 19.4 | 17.2 | 9.0 |
+| `neutral` | `horde` | L50 | 8 | 25.0% | 37.5% | 62.5% | 87.5% | 100.0% | 75.0 | 50.0 | 18.6 | 17.0 | 7.6 |
+| `neutral` | `horde` | L100 | 8 | 0.0% | 25.0% | 62.5% | 87.5% | 100.0% | 100.0 | 62.5 | 21.8 | 16.8 | 13.9 |
+| `neutral` | `horde` | pooled | 24 | 20.8% | 37.5% | 60.4% | 79.2% | 87.5% | 66.7 | 41.7 | 14.6 | 9.8 | 10.8 |
+| `neutral` | overall | pooled | 96 | 45.8% | 54.2% | 64.6% | 73.0% | 85.4% | 39.6 | 18.9 | 7.5 | 4.7 | 5.8 |
 
 A single level is only 8 battles per team, so its spread is mostly roll noise; read the pooled rows.
 
@@ -679,16 +676,16 @@ A single level is only 8 battles per team, so its spread is mostly roll noise; r
 
 | Kit mode | Shape | 0-9 | 10-19 | 20-29 | 30-39 | 40-49 | 50-59 | 60-69 | 70-79 | 80-89 | 90-100 |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `elemental` | `solo` | 56 | 30 | 30 | 4 | 0 | 0 | 0 | 0 | 0 | 0 |
-| `elemental` | `elite` | 24 | 46 | 35 | 14 | 1 | 0 | 0 | 0 | 0 | 0 |
-| `elemental` | `squad` | 0 | 4 | 22 | 26 | 23 | 30 | 10 | 5 | 0 | 0 |
-| `elemental` | `horde` | 2 | 9 | 18 | 16 | 20 | 24 | 10 | 15 | 5 | 1 |
-| `elemental` | overall | 0 | 8 | 45 | 61 | 6 | 0 | 0 | 0 | 0 | 0 |
-| `neutral` | `solo` | 1 | 2 | 10 | 12 | 23 | 21 | 15 | 25 | 8 | 3 |
-| `neutral` | `elite` | 0 | 0 | 5 | 11 | 12 | 32 | 28 | 25 | 3 | 4 |
-| `neutral` | `squad` | 0 | 0 | 0 | 3 | 7 | 21 | 18 | 42 | 23 | 6 |
-| `neutral` | `horde` | 0 | 1 | 14 | 8 | 14 | 32 | 23 | 18 | 6 | 4 |
-| `neutral` | overall | 0 | 0 | 0 | 1 | 15 | 43 | 44 | 14 | 3 | 0 |
+| `elemental` | `solo` | 2 | 11 | 43 | 38 | 16 | 10 | 0 | 0 | 0 | 0 |
+| `elemental` | `elite` | 0 | 4 | 35 | 28 | 35 | 14 | 3 | 1 | 0 | 0 |
+| `elemental` | `squad` | 0 | 1 | 10 | 17 | 25 | 38 | 19 | 9 | 1 | 0 |
+| `elemental` | `horde` | 0 | 1 | 7 | 5 | 20 | 33 | 20 | 23 | 8 | 3 |
+| `elemental` | overall | 0 | 0 | 0 | 34 | 62 | 22 | 2 | 0 | 0 | 0 |
+| `neutral` | `solo` | 0 | 0 | 2 | 6 | 10 | 23 | 27 | 35 | 13 | 4 |
+| `neutral` | `elite` | 0 | 0 | 1 | 2 | 6 | 36 | 32 | 34 | 6 | 3 |
+| `neutral` | `squad` | 0 | 0 | 0 | 2 | 7 | 18 | 20 | 53 | 17 | 3 |
+| `neutral` | `horde` | 0 | 0 | 5 | 9 | 15 | 31 | 30 | 22 | 8 | 0 |
+| `neutral` | overall | 0 | 0 | 0 | 0 | 3 | 28 | 64 | 23 | 2 | 0 |
 
 Teams per 10-point bucket of clear rate (120 per row).
 
@@ -696,31 +693,31 @@ Teams per 10-point bucket of clear rate (120 per row).
 
 | Shape | Rank | Best team | Clear | Worst team | Clear |
 | --- | ---: | --- | ---: | --- | ---: |
-| `solo` | 1 | Leviathan + Griffin + Basilisk | 37.5% | Thunderbird + Tarasque + Basilisk | 0.0% |
-| `solo` | 2 | Leviathan + Thunderbird + Kirin | 37.5% | Golem + Thunderbird + Frost Wyrm | 0.0% |
-| `solo` | 3 | Leviathan + Treant + Basilisk | 33.3% | Leviathan + Golem + Tarasque | 0.0% |
-| `solo` | 4 | Griffin + Treant + Basilisk | 33.3% | Phoenix + Frost Wyrm + Kirin | 0.0% |
-| `solo` | 5 | Phoenix + Leviathan + Griffin | 29.2% | Phoenix + Thunderbird + Tarasque | 0.0% |
-| `elite` | 1 | Leviathan + Kirin + Basilisk | 41.7% | Griffin + Thunderbird + Tarasque | 0.0% |
-| `elite` | 2 | Phoenix + Leviathan + Treant | 37.5% | Griffin + Thunderbird + Frost Wyrm | 0.0% |
-| `elite` | 3 | Leviathan + Treant + Kirin | 37.5% | Phoenix + Kirin + Basilisk | 0.0% |
-| `elite` | 4 | Golem + Thunderbird + Kirin | 37.5% | Phoenix + Thunderbird + Basilisk | 0.0% |
-| `elite` | 5 | Golem + Frost Wyrm + Treant | 37.5% | Frost Wyrm + Tarasque + Basilisk | 4.2% |
-| `squad` | 1 | Phoenix + Thunderbird + Tarasque | 75.0% | Leviathan + Treant + Kirin | 12.5% |
-| `squad` | 2 | Phoenix + Thunderbird + Kirin | 75.0% | Leviathan + Frost Wyrm + Treant | 12.5% |
-| `squad` | 3 | Phoenix + Treant + Tarasque | 70.8% | Leviathan + Thunderbird + Treant | 16.7% |
-| `squad` | 4 | Phoenix + Treant + Kirin | 70.8% | Phoenix + Leviathan + Basilisk | 16.7% |
-| `squad` | 5 | Griffin + Kirin + Basilisk | 70.8% | Griffin + Treant + Tarasque | 20.8% |
-| `horde` | 1 | Leviathan + Frost Wyrm + Treant | 91.7% | Golem + Tarasque + Kirin | 4.2% |
-| `horde` | 2 | Griffin + Frost Wyrm + Treant | 87.5% | Phoenix + Golem + Tarasque | 4.2% |
-| `horde` | 3 | Golem + Thunderbird + Frost Wyrm | 83.3% | Griffin + Tarasque + Kirin | 12.5% |
-| `horde` | 4 | Golem + Frost Wyrm + Treant | 83.3% | Phoenix + Leviathan + Tarasque | 12.5% |
-| `horde` | 5 | Golem + Frost Wyrm + Kirin | 83.3% | Thunderbird + Tarasque + Kirin | 16.7% |
-| overall | 1 | Leviathan + Kirin + Basilisk | 45.8% | Griffin + Frost Wyrm + Basilisk | 18.8% |
-| overall | 2 | Leviathan + Thunderbird + Basilisk | 43.8% | Leviathan + Treant + Tarasque | 18.8% |
-| overall | 3 | Treant + Kirin + Basilisk | 42.7% | Phoenix + Leviathan + Basilisk | 19.8% |
-| overall | 4 | Phoenix + Treant + Kirin | 40.6% | Thunderbird + Tarasque + Basilisk | 19.8% |
-| overall | 5 | Golem + Thunderbird + Treant | 40.6% | Griffin + Tarasque + Kirin | 19.8% |
+| `solo` | 1 | Phoenix + Leviathan + Griffin | 58.3% | Phoenix + Thunderbird + Kirin | 8.3% |
+| `solo` | 2 | Leviathan + Thunderbird + Kirin | 58.3% | Phoenix + Thunderbird + Tarasque | 8.3% |
+| `solo` | 3 | Leviathan + Thunderbird + Basilisk | 58.3% | Golem + Frost Wyrm + Tarasque | 12.5% |
+| `solo` | 4 | Griffin + Treant + Basilisk | 58.3% | Golem + Thunderbird + Basilisk | 12.5% |
+| `solo` | 5 | Leviathan + Griffin + Treant | 54.2% | Phoenix + Thunderbird + Basilisk | 12.5% |
+| `elite` | 1 | Leviathan + Kirin + Basilisk | 70.8% | Griffin + Frost Wyrm + Kirin | 12.5% |
+| `elite` | 2 | Leviathan + Golem + Kirin | 66.7% | Phoenix + Tarasque + Basilisk | 12.5% |
+| `elite` | 3 | Griffin + Treant + Kirin | 66.7% | Phoenix + Thunderbird + Frost Wyrm | 12.5% |
+| `elite` | 4 | Phoenix + Golem + Treant | 62.5% | Phoenix + Thunderbird + Treant | 16.7% |
+| `elite` | 5 | Leviathan + Griffin + Thunderbird | 58.3% | Treant + Tarasque + Kirin | 20.8% |
+| `squad` | 1 | Griffin + Kirin + Basilisk | 83.3% | Leviathan + Thunderbird + Treant | 16.7% |
+| `squad` | 2 | Phoenix + Thunderbird + Kirin | 79.2% | Leviathan + Thunderbird + Tarasque | 20.8% |
+| `squad` | 3 | Phoenix + Thunderbird + Tarasque | 75.0% | Griffin + Treant + Tarasque | 25.0% |
+| `squad` | 4 | Golem + Thunderbird + Tarasque | 75.0% | Leviathan + Frost Wyrm + Basilisk | 25.0% |
+| `squad` | 5 | Leviathan + Kirin + Basilisk | 70.8% | Leviathan + Frost Wyrm + Treant | 25.0% |
+| `horde` | 1 | Golem + Thunderbird + Frost Wyrm | 95.8% | Phoenix + Golem + Tarasque | 12.5% |
+| `horde` | 2 | Frost Wyrm + Treant + Kirin | 95.8% | Golem + Thunderbird + Kirin | 20.8% |
+| `horde` | 3 | Golem + Frost Wyrm + Kirin | 91.7% | Phoenix + Thunderbird + Tarasque | 25.0% |
+| `horde` | 4 | Phoenix + Golem + Treant | 87.5% | Phoenix + Leviathan + Tarasque | 25.0% |
+| `horde` | 5 | Leviathan + Thunderbird + Frost Wyrm | 87.5% | Griffin + Tarasque + Basilisk | 29.2% |
+| overall | 1 | Leviathan + Kirin + Basilisk | 65.6% | Griffin + Tarasque + Kirin | 32.3% |
+| overall | 2 | Leviathan + Thunderbird + Basilisk | 62.5% | Thunderbird + Tarasque + Basilisk | 32.3% |
+| overall | 3 | Golem + Kirin + Basilisk | 58.3% | Phoenix + Frost Wyrm + Basilisk | 32.3% |
+| overall | 4 | Griffin + Treant + Kirin | 58.3% | Golem + Griffin + Basilisk | 33.3% |
+| overall | 5 | Phoenix + Golem + Treant | 57.3% | Phoenix + Frost Wyrm + Tarasque | 33.3% |
 
 Rank 1 worst is the lowest clear rate. A team's binomial SE is about 10.4 points per shape at 50% (24 battles), so neighbouring ranks are not separated.
 
@@ -734,56 +731,56 @@ Top 5 each way per shape. With 45 pairs, |synergy / SE| up to about 2.5 is expec
 
 | Shape | Kind | Pair | Teams | Observed | Additive | Synergy | SE |
 | --- | --- | --- | ---: | ---: | ---: | ---: | ---: |
-| `solo` | synergy | Frost Wyrm + Tarasque | 8 | 9.4% | 5.4% | +3.9 | 2.2 |
-| `solo` | synergy | Griffin + Basilisk | 8 | 20.8% | 17.7% | +3.2 | 2.9 |
-| `solo` | synergy | Thunderbird + Treant | 8 | 18.2% | 15.8% | +2.4 | 2.9 |
-| `solo` | synergy | Leviathan + Basilisk | 8 | 20.8% | 18.6% | +2.3 | 2.8 |
-| `solo` | synergy | Phoenix + Griffin | 8 | 16.1% | 14.0% | +2.1 | 2.7 |
-| `solo` | anti-synergy | Leviathan + Tarasque | 8 | 9.4% | 15.3% | -5.9 | 2.0 |
-| `solo` | anti-synergy | Griffin + Thunderbird | 8 | 12.0% | 15.8% | -3.9 | 2.4 |
-| `solo` | anti-synergy | Treant + Tarasque | 8 | 10.9% | 14.4% | -3.5 | 2.3 |
-| `solo` | anti-synergy | Griffin + Frost Wyrm | 8 | 10.9% | 13.8% | -2.8 | 2.3 |
-| `solo` | anti-synergy | Kirin + Basilisk | 8 | 10.4% | 13.0% | -2.6 | 2.2 |
-| `elite` | synergy | Leviathan + Basilisk | 8 | 24.0% | 20.2% | +3.8 | 3.0 |
-| `elite` | synergy | Leviathan + Griffin | 8 | 20.8% | 17.3% | +3.5 | 3.0 |
-| `elite` | synergy | Frost Wyrm + Basilisk | 8 | 15.6% | 12.5% | +3.1 | 2.6 |
-| `elite` | synergy | Golem + Kirin | 8 | 30.7% | 27.9% | +2.9 | 3.4 |
-| `elite` | synergy | Leviathan + Thunderbird | 8 | 20.8% | 18.8% | +2.1 | 2.9 |
-| `elite` | anti-synergy | Leviathan + Frost Wyrm | 8 | 12.5% | 17.3% | -4.8 | 2.4 |
-| `elite` | anti-synergy | Leviathan + Tarasque | 8 | 15.1% | 18.8% | -3.6 | 2.5 |
-| `elite` | anti-synergy | Golem + Griffin | 8 | 16.7% | 20.2% | -3.5 | 2.7 |
-| `elite` | anti-synergy | Griffin + Kirin | 8 | 14.1% | 17.3% | -3.3 | 2.6 |
-| `elite` | anti-synergy | Phoenix + Basilisk | 8 | 10.4% | 13.2% | -2.7 | 2.2 |
-| `squad` | synergy | Kirin + Basilisk | 8 | 56.8% | 49.9% | +6.9 | 3.6 |
-| `squad` | synergy | Phoenix + Thunderbird | 8 | 63.0% | 57.2% | +5.8 | 3.5 |
-| `squad` | synergy | Frost Wyrm + Treant | 8 | 38.0% | 33.1% | +4.9 | 3.5 |
-| `squad` | synergy | Phoenix + Treant | 8 | 46.4% | 41.7% | +4.6 | 3.5 |
-| `squad` | synergy | Leviathan + Griffin | 8 | 29.7% | 25.8% | +3.9 | 3.4 |
-| `squad` | anti-synergy | Phoenix + Basilisk | 8 | 37.0% | 48.0% | -11.0 * | 3.4 |
-| `squad` | anti-synergy | Leviathan + Treant | 8 | 21.4% | 27.5% | -6.2 | 3.0 |
-| `squad` | anti-synergy | Thunderbird + Treant | 8 | 43.8% | 48.6% | -4.9 | 3.6 |
-| `squad` | anti-synergy | Tarasque + Kirin | 8 | 51.6% | 54.5% | -2.9 | 3.7 |
-| `squad` | anti-synergy | Frost Wyrm + Kirin | 8 | 41.1% | 43.7% | -2.5 | 3.6 |
-| `horde` | synergy | Kirin + Basilisk | 8 | 53.6% | 42.5% | +11.2 * | 3.5 |
-| `horde` | synergy | Phoenix + Kirin | 8 | 45.8% | 36.1% | +9.7 | 3.5 |
-| `horde` | synergy | Golem + Frost Wyrm | 8 | 71.9% | 63.2% | +8.7 | 3.1 |
-| `horde` | synergy | Frost Wyrm + Tarasque | 8 | 56.8% | 48.4% | +8.4 | 3.5 |
-| `horde` | synergy | Griffin + Thunderbird | 8 | 55.2% | 47.4% | +7.8 | 3.5 |
-| `horde` | anti-synergy | Tarasque + Kirin | 8 | 22.4% | 31.4% | -9.0 * | 2.9 |
-| `horde` | anti-synergy | Frost Wyrm + Basilisk | 8 | 50.5% | 59.4% | -8.9 | 3.5 |
-| `horde` | anti-synergy | Griffin + Frost Wyrm | 8 | 54.7% | 63.5% | -8.8 | 3.5 |
-| `horde` | anti-synergy | Griffin + Basilisk | 8 | 36.5% | 44.3% | -7.9 | 3.5 |
-| `horde` | anti-synergy | Thunderbird + Frost Wyrm | 8 | 55.7% | 62.5% | -6.8 | 3.3 |
-| overall | synergy | Kirin + Basilisk | 8 | 35.3% | 31.4% | +3.9 | 1.6 |
-| overall | synergy | Leviathan + Basilisk | 8 | 32.6% | 29.1% | +3.4 | 1.6 |
-| overall | synergy | Frost Wyrm + Treant | 8 | 38.3% | 35.2% | +3.1 | 1.5 |
-| overall | synergy | Frost Wyrm + Tarasque | 8 | 30.2% | 27.2% | +3.0 | 1.5 |
-| overall | synergy | Phoenix + Kirin | 8 | 31.1% | 28.9% | +2.2 | 1.5 |
-| overall | anti-synergy | Griffin + Frost Wyrm | 8 | 26.7% | 29.6% | -2.9 | 1.5 |
-| overall | anti-synergy | Leviathan + Treant | 8 | 31.6% | 34.4% | -2.7 | 1.6 |
-| overall | anti-synergy | Tarasque + Kirin | 8 | 26.2% | 28.6% | -2.4 | 1.5 |
-| overall | anti-synergy | Thunderbird + Treant | 8 | 33.9% | 35.9% | -2.1 | 1.6 |
-| overall | anti-synergy | Phoenix + Basilisk | 8 | 24.0% | 26.0% | -2.0 | 1.4 |
+| `solo` | synergy | Leviathan + Basilisk | 8 | 45.8% | 40.5% | +5.3 | 3.7 |
+| `solo` | synergy | Leviathan + Thunderbird | 8 | 39.1% | 33.9% | +5.2 | 3.6 |
+| `solo` | synergy | Griffin + Tarasque | 8 | 39.6% | 35.0% | +4.6 | 3.6 |
+| `solo` | synergy | Golem + Kirin | 8 | 35.4% | 31.0% | +4.4 | 3.5 |
+| `solo` | synergy | Thunderbird + Frost Wyrm | 8 | 27.6% | 23.4% | +4.2 | 3.3 |
+| `solo` | anti-synergy | Leviathan + Golem | 8 | 31.8% | 37.6% | -5.9 | 3.4 |
+| `solo` | anti-synergy | Griffin + Kirin | 8 | 33.9% | 38.0% | -4.2 | 3.5 |
+| `solo` | anti-synergy | Phoenix + Thunderbird | 8 | 18.8% | 22.8% | -4.0 | 2.9 |
+| `solo` | anti-synergy | Golem + Griffin | 8 | 32.8% | 36.2% | -3.4 | 3.5 |
+| `solo` | anti-synergy | Frost Wyrm + Treant | 8 | 29.7% | 32.2% | -2.5 | 3.4 |
+| `elite` | synergy | Phoenix + Golem | 8 | 46.9% | 40.4% | +6.5 | 3.7 |
+| `elite` | synergy | Frost Wyrm + Tarasque | 8 | 35.9% | 30.1% | +5.9 | 3.5 |
+| `elite` | synergy | Kirin + Basilisk | 8 | 44.3% | 38.4% | +5.9 | 3.6 |
+| `elite` | synergy | Leviathan + Basilisk | 8 | 47.4% | 41.8% | +5.6 | 3.7 |
+| `elite` | synergy | Frost Wyrm + Treant | 8 | 40.1% | 35.9% | +4.2 | 3.6 |
+| `elite` | anti-synergy | Leviathan + Golem | 8 | 45.3% | 50.4% | -5.1 | 3.7 |
+| `elite` | anti-synergy | Frost Wyrm + Kirin | 8 | 32.3% | 36.1% | -3.8 | 3.4 |
+| `elite` | anti-synergy | Phoenix + Basilisk | 8 | 28.1% | 31.8% | -3.6 | 3.3 |
+| `elite` | anti-synergy | Griffin + Kirin | 8 | 33.9% | 37.5% | -3.6 | 3.3 |
+| `elite` | anti-synergy | Thunderbird + Frost Wyrm | 8 | 28.1% | 31.5% | -3.4 | 3.3 |
+| `squad` | synergy | Frost Wyrm + Treant | 8 | 49.5% | 42.4% | +7.1 | 3.6 |
+| `squad` | synergy | Kirin + Basilisk | 8 | 66.1% | 60.4% | +5.8 | 3.3 |
+| `squad` | synergy | Phoenix + Tarasque | 8 | 63.0% | 57.4% | +5.6 | 3.4 |
+| `squad` | synergy | Leviathan + Griffin | 8 | 39.6% | 34.1% | +5.5 | 3.6 |
+| `squad` | synergy | Phoenix + Thunderbird | 8 | 64.6% | 59.9% | +4.7 | 3.5 |
+| `squad` | anti-synergy | Phoenix + Basilisk | 8 | 50.0% | 57.2% | -7.2 | 3.6 |
+| `squad` | anti-synergy | Golem + Griffin | 8 | 38.5% | 43.6% | -5.0 | 3.6 |
+| `squad` | anti-synergy | Leviathan + Treant | 8 | 34.4% | 38.6% | -4.3 | 3.5 |
+| `squad` | anti-synergy | Thunderbird + Treant | 8 | 48.4% | 52.4% | -4.0 | 3.5 |
+| `squad` | anti-synergy | Leviathan + Thunderbird | 8 | 43.2% | 47.0% | -3.7 | 3.5 |
+| `horde` | synergy | Kirin + Basilisk | 8 | 63.5% | 55.9% | +7.6 | 3.4 |
+| `horde` | synergy | Golem + Frost Wyrm | 8 | 74.5% | 68.1% | +6.3 | 3.0 |
+| `horde` | synergy | Phoenix + Kirin | 8 | 56.3% | 50.0% | +6.2 | 3.6 |
+| `horde` | synergy | Griffin + Treant | 8 | 75.0% | 69.3% | +5.7 | 3.2 |
+| `horde` | synergy | Griffin + Thunderbird | 8 | 63.5% | 58.1% | +5.4 | 3.5 |
+| `horde` | anti-synergy | Frost Wyrm + Basilisk | 8 | 57.3% | 66.2% | -8.9 | 3.5 |
+| `horde` | anti-synergy | Tarasque + Kirin | 8 | 38.5% | 46.5% | -8.0 | 3.6 |
+| `horde` | anti-synergy | Phoenix + Tarasque | 8 | 33.3% | 39.6% | -6.3 | 3.4 |
+| `horde` | anti-synergy | Griffin + Basilisk | 8 | 50.5% | 56.8% | -6.3 | 3.5 |
+| `horde` | anti-synergy | Thunderbird + Kirin | 8 | 51.0% | 57.2% | -6.2 | 3.4 |
+| overall | synergy | Kirin + Basilisk | 8 | 52.0% | 47.1% | +4.8 | 1.7 |
+| overall | synergy | Leviathan + Basilisk | 8 | 50.4% | 46.1% | +4.3 | 1.8 |
+| overall | synergy | Leviathan + Thunderbird | 8 | 47.5% | 45.0% | +2.5 | 1.8 |
+| overall | synergy | Griffin + Thunderbird | 8 | 45.2% | 42.8% | +2.3 | 1.8 |
+| overall | synergy | Griffin + Treant | 8 | 49.1% | 46.8% | +2.2 | 1.7 |
+| overall | anti-synergy | Thunderbird + Treant | 8 | 43.9% | 47.0% | -3.2 | 1.7 |
+| overall | anti-synergy | Golem + Griffin | 8 | 42.3% | 45.4% | -3.1 | 1.8 |
+| overall | anti-synergy | Tarasque + Kirin | 8 | 40.0% | 43.1% | -3.1 | 1.7 |
+| overall | anti-synergy | Leviathan + Golem | 8 | 44.9% | 47.6% | -2.7 | 1.8 |
+| overall | anti-synergy | Leviathan + Treant | 8 | 46.4% | 49.0% | -2.7 | 1.8 |
 
 ### PvE composition panel
 
@@ -798,39 +795,39 @@ own spread. **Pooled** is the root mean square over the shapes.
 
 | Kit mode | Shape | Multiplier | Battles | Mean clear | Team main-effect SD | Interaction SD | Noise SD (team mean) |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| `elemental` | `solo` | 1.078 | 7680 | 9.5% | 5.9 | 21.2 | 2.4 |
-| `elemental` | `elite` | 0.963 | 7680 | 9.9% | 4.7 | 19.7 | 2.6 |
-| `elemental` | `squad` | 1.066 | 7680 | 50.0% | 11.5 | 33.7 | 3.8 |
-| `elemental` | `horde` | 1.023 | 7680 | 32.9% | 13.7 | 26.8 | 4.0 |
-| `elemental` | pooled |  |  | 25.6% | **9.7** | **25.9** |  |
-| `neutral` | `solo` | 0.797 | 7680 | 59.1% | 26.6 | 2.5 | 5.2 |
-| `neutral` | `elite` | 0.744 | 7680 | 65.6% | 14.5 | 15.1 | 5.1 |
-| `neutral` | `squad` | 1.000 | 7680 | 75.1% | 16.5 | 18.6 | 4.0 |
-| `neutral` | `horde` | 1.016 | 7680 | 43.0% | 22.4 | 15.9 | 4.7 |
-| `neutral` | pooled |  |  | 60.7% | **20.6** | **14.4** |  |
+| `elemental` | `solo` | 0.938 | 7680 | 28.9% | 8.0 | 36.7 | 2.9 |
+| `elemental` | `elite` | 0.844 | 7680 | 29.2% | 7.0 | 31.4 | 3.6 |
+| `elemental` | `squad` | 1.055 | 7680 | 53.0% | 12.3 | 33.1 | 3.8 |
+| `elemental` | `horde` | 0.984 | 7680 | 43.2% | 15.4 | 28.8 | 4.0 |
+| `elemental` | pooled |  |  | 38.6% | **11.2** | **32.6** |  |
+| `neutral` | `solo` | 0.766 | 7680 | 78.3% | 20.1 | 3.2 | 4.5 |
+| `neutral` | `elite` | 0.730 | 7680 | 75.4% | 11.5 | 15.2 | 4.7 |
+| `neutral` | `squad` | 0.977 | 7680 | 82.7% | 13.6 | 16.5 | 3.6 |
+| `neutral` | `horde` | 1.000 | 7680 | 48.7% | 22.3 | 16.3 | 4.7 |
+| `neutral` | pooled |  |  | 71.3% | **17.4** | **13.9** |  |
 
 #### Clear rate by stance mix (panel)
 
 | Kit mode | Vanguard / Ranged / Skirmisher | Teams | `solo` | `elite` | `squad` | `horde` | Mean |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| `elemental` | 3 / 0 / 0 | 10 | 11.1% | 7.8% | 40.5% | 56.6% | 29.0% |
-| `elemental` | 2 / 1 / 0 | 30 | 8.6% | 11.0% | 47.6% | 33.0% | 25.1% |
-| `elemental` | 2 / 0 / 1 | 20 | 11.4% | 8.8% | 43.0% | 34.1% | 24.3% |
-| `elemental` | 1 / 2 / 0 | 15 | 7.7% | 11.5% | 45.2% | 35.8% | 25.1% |
-| `elemental` | 1 / 1 / 1 | 30 | 10.4% | 10.4% | 56.5% | 23.1% | 25.1% |
-| `elemental` | 1 / 0 / 2 | 5 | 6.6% | 7.8% | 60.0% | 30.0% | 26.1% |
-| `elemental` | 0 / 3 / 0 | 1 | 12.5% | 9.4% | 54.7% | 54.7% | 32.8% |
-| `elemental` | 0 / 2 / 1 | 6 | 8.3% | 8.1% | 61.2% | 30.7% | 27.1% |
-| `elemental` | 0 / 1 / 2 | 3 | 6.3% | 7.8% | 69.3% | 31.3% | 28.6% |
-| `neutral` | 3 / 0 / 0 | 10 | 31.1% | 60.0% | 63.9% | 76.4% | 57.9% |
-| `neutral` | 2 / 1 / 0 | 30 | 49.5% | 62.5% | 71.1% | 44.0% | 56.8% |
-| `neutral` | 2 / 0 / 1 | 20 | 58.4% | 64.8% | 63.8% | 48.9% | 59.0% |
-| `neutral` | 1 / 2 / 0 | 15 | 77.6% | 75.3% | 75.1% | 46.4% | 68.6% |
-| `neutral` | 1 / 1 / 1 | 30 | 67.0% | 66.6% | 82.8% | 22.7% | 59.8% |
-| `neutral` | 1 / 0 / 2 | 5 | 65.0% | 65.0% | 86.3% | 48.8% | 66.3% |
-| `neutral` | 0 / 3 / 0 | 1 | 60.9% | 65.6% | 84.4% | 68.8% | 69.9% |
-| `neutral` | 0 / 2 / 1 | 6 | 52.1% | 62.2% | 92.2% | 43.0% | 62.4% |
-| `neutral` | 0 / 1 / 2 | 3 | 85.9% | 68.8% | 92.7% | 49.5% | 74.2% |
+| `elemental` | 3 / 0 / 0 | 10 | 27.5% | 27.5% | 42.8% | 70.3% | 42.0% |
+| `elemental` | 2 / 1 / 0 | 30 | 30.2% | 27.3% | 50.9% | 44.4% | 38.2% |
+| `elemental` | 2 / 0 / 1 | 20 | 30.9% | 26.5% | 45.6% | 44.1% | 36.8% |
+| `elemental` | 1 / 2 / 0 | 15 | 26.5% | 32.6% | 48.3% | 45.1% | 38.1% |
+| `elemental` | 1 / 1 / 1 | 30 | 29.8% | 29.8% | 59.6% | 31.2% | 37.6% |
+| `elemental` | 1 / 0 / 2 | 5 | 30.3% | 31.9% | 64.7% | 39.1% | 41.5% |
+| `elemental` | 0 / 3 / 0 | 1 | 15.6% | 31.3% | 57.8% | 60.9% | 41.4% |
+| `elemental` | 0 / 2 / 1 | 6 | 20.8% | 32.0% | 64.1% | 43.5% | 40.1% |
+| `elemental` | 0 / 1 / 2 | 3 | 30.2% | 35.9% | 72.9% | 43.2% | 45.6% |
+| `neutral` | 3 / 0 / 0 | 10 | 53.4% | 69.2% | 76.9% | 80.5% | 70.0% |
+| `neutral` | 2 / 1 / 0 | 30 | 73.4% | 73.0% | 80.2% | 48.8% | 68.9% |
+| `neutral` | 2 / 0 / 1 | 20 | 77.8% | 75.8% | 73.5% | 56.5% | 70.9% |
+| `neutral` | 1 / 2 / 0 | 15 | 88.0% | 82.9% | 80.7% | 50.5% | 75.5% |
+| `neutral` | 1 / 1 / 1 | 30 | 85.7% | 75.7% | 89.2% | 28.6% | 69.8% |
+| `neutral` | 1 / 0 / 2 | 5 | 83.1% | 77.2% | 90.0% | 55.0% | 76.3% |
+| `neutral` | 0 / 3 / 0 | 1 | 82.8% | 82.8% | 92.2% | 71.9% | 82.4% |
+| `neutral` | 0 / 2 / 1 | 6 | 71.6% | 72.9% | 94.3% | 52.3% | 72.8% |
+| `neutral` | 0 / 1 / 2 | 3 | 95.8% | 78.1% | 95.3% | 56.8% | 81.5% |
 
 #### Team bonds on the panel
 
@@ -841,24 +838,24 @@ effect is absorbed into its members' marginals, so excess is a lower bound. **Re
 
 | Kit mode | Bond | Teams | `solo` | `elite` | `squad` | `horde` | Pooled excess | Reactions / battle |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `elemental` | guardian | 60 | -0.1 | 0.0 | 0.0 | -0.3 | **-0.1** | 0.41 |
-| `elemental` | pack_hunters | 8 | -3.4 | -0.5 | +2.8 | +7.6 | **+1.7** | 0.95 |
-| `elemental` | crossfire | 22 | -0.1 | -0.7 | -3.7 | +5.7 | **+0.3** | 1.05 |
-| `elemental` | wildfire | 8 | +2.6 | +2.5 | +1.5 | -1.4 | **+1.3** | 4.47 |
-| `elemental` | storm_front | 8 | -0.6 | +0.2 | -0.5 | -1.4 | **-0.6** | 1.21 |
-| `elemental` | bedrock | 8 | +1.5 | +2.0 | -3.7 | +3.4 | **+0.8** | 2.11 |
-| `elemental` | winter_grove | 8 | +3.8 | +2.5 | +3.8 | +13.7 | **+5.9** | 1.66 |
-| `elemental` | twilight | 8 | -0.7 | -0.7 | -5.4 | +11.3 | **+1.1** | 0.67 |
-| `elemental` | combined_arms | 30 | +1.1 | +0.8 | +2.0 | -5.5 | **-0.4** | 1.74 |
-| `neutral` | guardian | 60 | -1.1 | -0.7 | -0.6 | +0.7 | **-0.4** | 0.52 |
-| `neutral` | pack_hunters | 8 | +1.2 | +0.6 | +3.4 | +18.3 | **+5.9** | 1.71 |
-| `neutral` | crossfire | 22 | +0.9 | +1.8 | -2.7 | +10.9 | **+2.7** | 1.30 |
-| `neutral` | wildfire | 8 | -5.9 | -2.8 | +2.5 | -1.8 | **-2.0** | 5.94 |
-| `neutral` | storm_front | 8 | +6.8 | +9.0 | +4.3 | +5.8 | **+6.5** | 1.88 |
-| `neutral` | bedrock | 8 | +1.5 | +0.4 | +4.5 | +6.0 | **+3.1** | 2.26 |
-| `neutral` | winter_grove | 8 | +7.7 | +9.8 | +6.2 | +15.2 | **+9.7** | 1.92 |
-| `neutral` | twilight | 8 | +4.9 | +1.2 | -2.3 | +21.4 | **+6.3** | 0.77 |
-| `neutral` | combined_arms | 30 | +1.2 | -0.1 | +2.3 | -14.3 | **-2.7** | 1.44 |
+| `elemental` | guardian | 60 | 0.0 | -0.4 | 0.0 | 0.0 | **-0.1** | 0.44 |
+| `elemental` | pack_hunters | 8 | +0.1 | +2.7 | +3.8 | +9.3 | **+4.0** | 1.22 |
+| `elemental` | crossfire | 22 | -1.7 | +0.7 | -3.8 | +6.2 | **+0.3** | 1.12 |
+| `elemental` | wildfire | 8 | +2.3 | -1.1 | +0.5 | +0.9 | **+0.7** | 5.01 |
+| `elemental` | storm_front | 8 | +3.2 | +2.1 | -1.0 | -1.5 | **+0.7** | 1.49 |
+| `elemental` | bedrock | 8 | -0.9 | 0.0 | -3.5 | +4.5 | **0.0** | 2.18 |
+| `elemental` | winter_grove | 8 | +2.3 | +5.0 | +5.3 | +12.0 | **+6.2** | 1.74 |
+| `elemental` | twilight | 8 | -2.2 | +1.4 | -5.5 | +12.8 | **+1.6** | 0.74 |
+| `elemental` | combined_arms | 30 | +1.2 | -0.5 | +1.9 | -6.9 | **-1.1** | 1.60 |
+| `neutral` | guardian | 60 | -0.4 | -0.3 | -0.6 | +1.0 | **-0.1** | 0.53 |
+| `neutral` | pack_hunters | 8 | -0.6 | +1.1 | +2.2 | +16.7 | **+4.9** | 1.77 |
+| `neutral` | crossfire | 22 | -1.8 | +1.7 | -2.9 | +11.2 | **+2.0** | 1.27 |
+| `neutral` | wildfire | 8 | -2.8 | -1.8 | +2.6 | -1.4 | **-0.9** | 5.86 |
+| `neutral` | storm_front | 8 | +5.8 | +5.7 | +3.0 | +4.0 | **+4.6** | 1.84 |
+| `neutral` | bedrock | 8 | +2.2 | +2.8 | +5.0 | +4.9 | **+3.7** | 2.22 |
+| `neutral` | winter_grove | 8 | +3.1 | +7.3 | +6.1 | +12.5 | **+7.2** | 1.79 |
+| `neutral` | twilight | 8 | -0.1 | +1.0 | -2.9 | +20.7 | **+4.7** | 0.77 |
+| `neutral` | combined_arms | 30 | +2.3 | -0.9 | +2.8 | -14.8 | **-2.7** | 1.28 |
 
 ### PvE team bonds
 
@@ -908,15 +905,15 @@ prediction from the members' marginals (see the class notes in `BondReport.cs`).
 
 | Bond | Teams | `solo` | `elite` | `squad` | `horde` | Overall |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| `guardian` | 60 | +1.0 / +0.1 | +5.0 / 0.0 | -9.9 / -0.3 | +10.7 / +1.0 | +1.7 / +0.2 |
-| `pack_hunters` | 8 | -1.2 / -3.9 | -5.2 / +2.0 | +3.4 / -1.1 | +8.6 / +7.8 | +1.4 / +1.2 |
-| `crossfire` | 22 | -4.6 / -1.3 | -0.6 / +0.3 | +8.7 / +0.2 | -4.4 / +5.4 | -0.2 / +1.2 |
-| `wildfire` | 8 | +3.3 / +2.1 | -6.9 / +1.2 | -5.5 / -2.5 | -5.9 / +3.7 | -3.8 / +1.1 |
-| `storm_front` | 8 | +5.5 / +1.5 | +3.1 / +2.1 | 0.0 / -0.3 | +4.2 / +3.9 | +3.2 / +1.8 |
-| `bedrock` | 8 | -3.9 / +1.6 | +4.8 / +0.8 | +5.1 / +0.1 | -13.1 / +1.9 | -1.8 / +1.1 |
-| `winter_grove` | 8 | +2.2 / +1.3 | +2.6 / +1.6 | -5.0 / +4.9 | +34.9 / +4.5 | +8.7 / +3.1 |
-| `twilight` | 8 | -2.8 / -2.6 | +2.6 / +0.1 | +15.1 / +6.9 | +7.0 / +11.2 | +5.5 / +3.9 |
-| `combined_arms` | 30 | +2.8 / +1.7 | -4.4 / -0.8 | +5.1 / +0.7 | -13.6 / -8.1 | -2.5 / -1.6 |
+| `guardian` | 60 | +1.3 / -0.1 | +5.6 / +0.4 | -8.2 / -0.3 | +7.8 / +0.7 | +1.6 / +0.2 |
+| `pack_hunters` | 8 | -1.1 / -1.2 | -0.9 / +3.5 | -0.7 / +1.6 | +5.5 / +5.4 | +0.7 / +2.3 |
+| `crossfire` | 22 | -3.1 / -0.9 | -2.1 / +0.5 | +10.7 / -0.4 | -2.4 / +4.4 | +0.8 / +0.9 |
+| `wildfire` | 8 | +5.6 / +3.9 | -5.9 / +0.9 | -7.4 / -3.7 | -6.8 / +1.1 | -3.6 / +0.6 |
+| `storm_front` | 8 | +7.3 / +5.2 | +7.5 / +4.0 | -7.4 / -3.7 | +5.5 / +4.5 | +3.2 / +2.5 |
+| `bedrock` | 8 | -5.0 / -0.4 | +3.6 / -0.4 | +8.8 / +4.3 | -9.0 / +2.6 | -0.4 / +1.5 |
+| `winter_grove` | 8 | -2.8 / -2.5 | +3.0 / +4.2 | -0.7 / +7.1 | +20.0 / -1.6 | +4.9 / +1.8 |
+| `twilight` | 8 | +1.7 / 0.0 | +7.5 / +5.9 | +17.2 / +5.8 | +5.5 / +7.6 | +8.0 / +4.8 |
+| `combined_arms` | 30 | +1.2 / +1.3 | -5.5 / -2.1 | +2.6 / +0.5 | -10.3 / -6.1 | -3.0 / -1.6 |
 
 #### Bond marginal (`neutral`, levels pooled)
 
@@ -925,15 +922,15 @@ prediction from the members' marginals (see the class notes in `BondReport.cs`).
 
 | Bond | Teams | `solo` | `elite` | `squad` | `horde` | Overall |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| `guardian` | 60 | -9.9 / -0.3 | -1.4 / +0.5 | -10.1 / -0.2 | +13.6 / +1.1 | -1.9 / +0.3 |
-| `pack_hunters` | 8 | +7.8 / +0.3 | -4.4 / +0.7 | +14.4 / +4.9 | +8.3 / +15.2 | +6.5 / +5.3 |
-| `crossfire` | 22 | +6.5 / +0.2 | +8.1 / +1.2 | +6.1 / +0.3 | +1.1 / +8.0 | +5.4 / +2.4 |
-| `wildfire` | 8 | +5.6 / -4.7 | -11.1 / -2.6 | +8.3 / +3.3 | -11.8 / -0.6 | -2.2 / -1.1 |
-| `storm_front` | 8 | +3.4 / +9.7 | +5.1 / +7.3 | +4.9 / +1.9 | -1.2 / +2.4 | +3.1 / +5.3 |
-| `bedrock` | 8 | -0.5 / -1.0 | +4.5 / +6.0 | +6.6 / +5.9 | +2.7 / +7.8 | +3.3 / +4.7 |
-| `winter_grove` | 8 | -15.0 / +2.0 | -0.5 / +4.7 | -4.5 / +5.7 | +32.3 / +8.0 | +3.1 / +5.1 |
-| `twilight` | 8 | +15.1 / +1.9 | +20.7 / +2.0 | +4.4 / +1.5 | +10.5 / +12.7 | +12.7 / +4.5 |
-| `combined_arms` | 30 | +5.4 / +0.4 | -3.1 / -2.0 | +3.9 / -1.2 | -21.8 / -12.0 | -3.9 / -3.7 |
+| `guardian` | 60 | -6.3 / -0.1 | -2.4 / +0.6 | -7.7 / -0.3 | +9.3 / +0.3 | -1.8 / +0.1 |
+| `pack_hunters` | 8 | +8.9 / +4.2 | -4.1 / -0.3 | +8.6 / +1.7 | +6.7 / +10.9 | +5.0 / +4.1 |
+| `crossfire` | 22 | +3.8 / -0.5 | +8.8 / +1.3 | +4.7 / +0.5 | -0.9 / +5.3 | +4.1 / +1.6 |
+| `wildfire` | 8 | +3.3 / -1.2 | -7.4 / -2.3 | +5.8 / +1.1 | -9.5 / -0.9 | -2.0 / -0.8 |
+| `storm_front` | 8 | +4.5 / +6.6 | -0.1 / +1.7 | +5.2 / +2.8 | +1.1 / +1.1 | +2.7 / +3.1 |
+| `bedrock` | 8 | +6.1 / +2.5 | -0.7 / +2.1 | +9.1 / +8.5 | +5.0 / +7.1 | +4.9 / +5.0 |
+| `winter_grove` | 8 | -14.0 / +1.6 | -7.4 / -2.2 | -2.6 / +4.6 | +20.1 / +4.9 | -1.0 / +2.2 |
+| `twilight` | 8 | +12.8 / +2.5 | +17.7 / +2.5 | +4.7 / +3.7 | +6.7 / +9.5 | +10.5 / +4.6 |
+| `combined_arms` | 30 | +2.5 / -0.5 | -2.5 / -2.1 | +3.7 / -0.2 | -13.9 / -7.4 | -2.6 / -2.5 |
 
 #### Bond reactions per battle (levels pooled)
 
@@ -941,31 +938,31 @@ Reactions fired per battle of a team the bond is active for, every battle at the
 
 | Kit mode | Bond | `solo` | `elite` | `squad` | `horde` | Overall |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
-| `elemental` | `guardian` | 0.33 | 0.57 | 0.46 | 0.81 | 0.54 |
-| `elemental` | `pack_hunters` | 1.44 | 1.32 | 0.79 | 0.26 | 0.95 |
-| `elemental` | `crossfire` | 0.81 | 1.17 | 0.88 | 2.00 | 1.22 |
-| `elemental` | `wildfire` | 6.80 | 5.90 | 4.16 | 1.15 | 4.50 |
-| `elemental` | `storm_front` | 1.76 | 2.36 | 1.07 | 0.35 | 1.39 |
-| `elemental` | `bedrock` | 1.96 | 2.11 | 1.97 | 2.16 | 2.05 |
-| `elemental` | `winter_grove` | 1.34 | 1.77 | 1.74 | 1.31 | 1.54 |
-| `elemental` | `twilight` | 0.05 | 0.41 | 0.43 | 2.11 | 0.75 |
-| `elemental` | `combined_arms` | 1.87 | 1.86 | 1.51 | 1.63 | 1.72 |
-| `neutral` | `guardian` | 0.35 | 0.63 | 0.56 | 0.83 | 0.59 |
-| `neutral` | `pack_hunters` | 2.95 | 2.76 | 1.11 | 0.07 | 1.72 |
-| `neutral` | `crossfire` | 1.10 | 1.29 | 0.93 | 2.15 | 1.37 |
-| `neutral` | `wildfire` | 8.89 | 8.77 | 4.87 | 0.88 | 5.85 |
-| `neutral` | `storm_front` | 3.04 | 3.08 | 1.28 | 0.21 | 1.90 |
-| `neutral` | `bedrock` | 2.17 | 2.21 | 2.18 | 2.17 | 2.18 |
-| `neutral` | `winter_grove` | 1.96 | 1.92 | 1.92 | 1.48 | 1.82 |
-| `neutral` | `twilight` | 0.08 | 0.51 | 0.53 | 2.18 | 0.83 |
-| `neutral` | `combined_arms` | 1.43 | 1.41 | 1.18 | 1.59 | 1.40 |
+| `elemental` | `guardian` | 0.34 | 0.57 | 0.47 | 0.82 | 0.55 |
+| `elemental` | `pack_hunters` | 1.88 | 1.82 | 0.78 | 0.29 | 1.19 |
+| `elemental` | `crossfire` | 0.83 | 1.25 | 0.88 | 2.10 | 1.26 |
+| `elemental` | `wildfire` | 7.27 | 6.31 | 4.13 | 1.16 | 4.72 |
+| `elemental` | `storm_front` | 1.95 | 2.52 | 0.98 | 0.40 | 1.46 |
+| `elemental` | `bedrock` | 2.11 | 2.07 | 1.82 | 1.98 | 2.00 |
+| `elemental` | `winter_grove` | 1.45 | 1.57 | 1.71 | 1.27 | 1.50 |
+| `elemental` | `twilight` | 0.08 | 0.42 | 0.48 | 2.15 | 0.78 |
+| `elemental` | `combined_arms` | 1.58 | 1.58 | 1.39 | 1.36 | 1.48 |
+| `neutral` | `guardian` | 0.35 | 0.61 | 0.56 | 0.81 | 0.58 |
+| `neutral` | `pack_hunters` | 2.68 | 2.68 | 1.00 | 0.15 | 1.63 |
+| `neutral` | `crossfire` | 0.95 | 1.24 | 0.92 | 2.13 | 1.31 |
+| `neutral` | `wildfire` | 7.99 | 8.09 | 4.67 | 1.00 | 5.44 |
+| `neutral` | `storm_front` | 2.63 | 2.69 | 1.14 | 0.29 | 1.69 |
+| `neutral` | `bedrock` | 1.93 | 2.06 | 1.96 | 1.98 | 1.98 |
+| `neutral` | `winter_grove` | 1.78 | 1.73 | 1.62 | 1.39 | 1.63 |
+| `neutral` | `twilight` | 0.07 | 0.50 | 0.54 | 2.20 | 0.83 |
+| `neutral` | `combined_arms` | 1.18 | 1.16 | 1.05 | 1.37 | 1.19 |
 
 #### Clear rate by number of active bonds (`elemental`, levels pooled)
 
 | Active bonds | Teams | `solo` | `elite` | `squad` | `horde` | Overall |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1 | 80 | 12.7% | 17.3% | 41.8% | 44.6% | 29.1% |
-| 2 | 40 | 13.9% | 19.1% | 44.5% | 52.2% | 32.4% |
+| 1 | 80 | 31.7% | 35.8% | 49.2% | 57.0% | 43.4% |
+| 2 | 40 | 33.5% | 40.2% | 52.1% | 61.3% | 46.8% |
 
 ### PvE scouted picking
 
@@ -995,11 +992,11 @@ figures as indicative and the `--seeds` aggregate as the finding.
 
 | Shape | No scouting | Random | Heuristic | Heuristic + bonds | Best team | Oracle |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| `solo` | 11.3% | 12.5% (+1.2) | 66.7% (+55.3) | 58.3% (+47.0) | 25.0% (+13.7) | 75.0% (+63.7) |
-| `elite` | 16.5% | 12.5% (-4.0) | 75.0% (+58.5) | 62.5% (+46.0) | 33.3% (+16.9) | 91.7% (+75.2) |
-| `squad` | 42.6% | 29.2% (-13.4) | 50.0% (+7.4) | 66.7% (+24.1) | 75.0% (+32.4) | 100.0% (+57.4) |
-| `horde` | 47.4% | 54.2% (+6.8) | 50.0% (+2.6) | 79.2% (+31.8) | 83.3% (+35.9) | 100.0% (+52.6) |
-| Overall | 29.4% | 27.1% (-2.4) | 60.4% (+31.0) | 66.7% (+37.2) | 54.2% (+24.7) | 91.7% (+62.2) |
+| `solo` | 25.9% | 29.2% (+3.2) | 75.0% (+49.1) | 75.0% (+49.1) | 41.7% (+15.7) | 91.7% (+65.7) |
+| `elite` | 33.0% | 20.8% (-12.2) | 75.0% (+42.0) | 75.0% (+42.0) | 54.2% (+21.1) | 100.0% (+67.0) |
+| `squad` | 48.5% | 41.7% (-6.9) | 54.2% (+5.6) | 83.3% (+34.8) | 66.7% (+18.1) | 100.0% (+51.5) |
+| `horde` | 61.1% | 58.3% (-2.8) | 70.8% (+9.7) | 87.5% (+26.4) | 79.2% (+18.0) | 100.0% (+38.9) |
+| Overall | 42.2% | 37.5% (-4.7) | 68.8% (+26.6) | 80.2% (+38.0) | 60.4% (+18.3) | 97.9% (+55.8) |
 
 #### Pick rates (`elemental`, levels pooled)
 
@@ -1009,30 +1006,30 @@ never / always fielded.
 
 | Beast | Element | Stance | `solo` H / B / O | `elite` H / B / O | `squad` H / B / O | `horde` H / B / O |
 | --- | --- | --- | ---: | ---: | ---: | ---: |
-| Phoenix | Fire | Ranged | 38 / 38 / 17 | 50 / 50 / 33 | 50 / 38 / 96 | 25 / 25 / **0** |
-| Leviathan | Water | Vanguard | 63 / 25 / 88 | 38 / 25 / 17 | 25 / 13 / 4 | 38 / **0** / 67 |
-| Golem | Earth | Vanguard | 38 / 13 / 13 | 50 / 25 / 71 | 50 / 38 / 4 | 38 / 13 / 67 |
-| Griffin | Air | Skirmisher | 25 / 25 / 29 | 25 / 25 / 8 | **0** / **0** / **0** | 13 / 13 / **0** |
-| Thunderbird | Lightning | Skirmisher | 25 / 25 / 33 | 25 / 13 / 13 | 25 / 25 / 92 | 25 / 25 / 33 |
-| Frost Wyrm | Ice | Vanguard | 13 / 50 / 4 | 38 / 50 / 29 | 25 / 50 / 4 | 13 / 75 / **100** |
-| Treant | Nature | Vanguard | 50 / 63 / 58 | 25 / 50 / 67 | 25 / 38 / 4 | 50 / 88 / 33 |
-| Tarasque | Metal | Vanguard | 13 / 13 / 8 | 38 / 38 / **0** | 38 / 50 / 58 | 25 / 25 / **0** |
-| Kirin | Light | Ranged | 25 / 25 / 29 | 13 / 13 / 21 | 38 / 25 / 38 | 50 / 25 / **0** |
-| Basilisk | Dark | Ranged | 13 / 25 / 21 | **0** / 13 / 42 | 25 / 25 / **0** | 25 / 13 / **0** |
+| Phoenix | Fire | Ranged | 38 / 38 / 21 | 50 / 50 / 46 | 50 / 38 / 96 | 25 / 25 / 33 |
+| Leviathan | Water | Vanguard | 63 / 25 / 79 | 38 / 25 / 42 | 25 / 13 / 4 | 38 / **0** / 67 |
+| Golem | Earth | Vanguard | 38 / 13 / 29 | 50 / 25 / 54 | 50 / 38 / 33 | 38 / 13 / 67 |
+| Griffin | Air | Skirmisher | 25 / 25 / 33 | 25 / 25 / 58 | **0** / **0** / **0** | 13 / 13 / **0** |
+| Thunderbird | Lightning | Skirmisher | 25 / 25 / 29 | 25 / 13 / **0** | 25 / 25 / 96 | 25 / 25 / **0** |
+| Frost Wyrm | Ice | Vanguard | 13 / 50 / 4 | 38 / 50 / 4 | 25 / 50 / **0** | 13 / 75 / 33 |
+| Treant | Nature | Vanguard | 50 / 63 / 50 | 25 / 50 / 33 | 25 / 38 / **0** | 50 / 88 / **100** |
+| Tarasque | Metal | Vanguard | 13 / 13 / 17 | 38 / 38 / 4 | 38 / 50 / 33 | 25 / 25 / **0** |
+| Kirin | Light | Ranged | 25 / 25 / **0** | 13 / 13 / 46 | 38 / 25 / 38 | 50 / 25 / **0** |
+| Basilisk | Dark | Ranged | 13 / 25 / 38 | **0** / 13 / 13 | 25 / 25 / **0** | 25 / 13 / **0** |
 
 - Heuristic (H): never fielded: `elite` Basilisk; `squad` Griffin. Always fielded: none.
 - Heuristic + bonds (B): never fielded: `squad` Griffin; `horde` Leviathan. Always fielded: none.
-- Oracle (O): never fielded: `elite` Tarasque; `squad` Griffin, Basilisk; `horde` Phoenix, Griffin, Tarasque, Kirin, Basilisk. Always fielded: `horde` Frost Wyrm.
+- Oracle (O): never fielded: `solo` Kirin; `elite` Thunderbird; `squad` Griffin, Frost Wyrm, Treant, Basilisk; `horde` Griffin, Thunderbird, Tarasque, Kirin, Basilisk. Always fielded: `horde` Treant.
 
 #### Clear rate with scouting (`neutral`, levels averaged)
 
 | Shape | No scouting | Random | Heuristic | Heuristic + bonds | Best team | Oracle |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| `solo` | 58.5% | 41.7% (-16.8) | 54.2% (-4.3) | 33.3% (-25.2) | 95.8% (+37.3) | 100.0% (+41.5) |
-| `elite` | 61.0% | 45.8% (-15.1) | 62.5% (+1.5) | 54.2% (-6.8) | 95.8% (+34.9) | 100.0% (+39.0) |
-| `squad` | 73.3% | 75.0% (+1.7) | 79.2% (+5.8) | 87.5% (+14.2) | 95.8% (+22.5) | 100.0% (+26.7) |
-| `horde` | 58.1% | 62.5% (+4.4) | 58.3% (+0.3) | 79.2% (+21.1) | 91.7% (+33.6) | 100.0% (+41.9) |
-| Overall | 62.7% | 56.3% (-6.5) | 63.5% (+0.8) | 63.5% (+0.8) | 94.8% (+32.1) | 100.0% (+37.3) |
+| `solo` | 76.5% | 66.7% (-9.8) | 70.8% (-5.6) | 58.3% (-18.1) | 100.0% (+23.5) | 100.0% (+23.5) |
+| `elite` | 74.2% | 66.7% (-7.5) | 75.0% (+0.8) | 83.3% (+9.2) | 95.8% (+21.7) | 100.0% (+25.8) |
+| `squad` | 80.1% | 79.2% (-1.0) | 83.3% (+3.2) | 91.7% (+11.5) | 95.8% (+15.7) | 100.0% (+19.9) |
+| `horde` | 64.1% | 70.8% (+6.7) | 62.5% (-1.6) | 83.3% (+19.2) | 100.0% (+35.9) | 100.0% (+35.9) |
+| Overall | 73.7% | 70.8% (-2.9) | 72.9% (-0.8) | 79.2% (+5.4) | 97.9% (+24.2) | 100.0% (+26.3) |
 
 In `neutral` mode every skill is `None`, so the chart the heuristic reads does not apply: its uplift here is what its
 picks are worth as lineups alone, the control for the `elemental` figure.
@@ -1045,20 +1042,20 @@ never / always fielded.
 
 | Beast | Element | Stance | `solo` H / B / O | `elite` H / B / O | `squad` H / B / O | `horde` H / B / O |
 | --- | --- | --- | ---: | ---: | ---: | ---: |
-| Phoenix | Fire | Ranged | 38 / 38 / **100** | 50 / 50 / 67 | 50 / 38 / **100** | 25 / 25 / 67 |
-| Leviathan | Water | Vanguard | 63 / 25 / 67 | 38 / 25 / 33 | 25 / 13 / 67 | 38 / **0** / 33 |
-| Golem | Earth | Vanguard | 38 / 13 / 33 | 50 / 25 / **0** | 50 / 38 / 33 | 38 / 13 / 33 |
-| Griffin | Air | Skirmisher | 25 / 25 / **0** | 25 / 25 / 33 | **0** / **0** / **0** | 13 / 13 / **0** |
-| Thunderbird | Lightning | Skirmisher | 25 / 25 / **0** | 25 / 13 / **0** | 25 / 25 / 33 | 25 / 25 / **0** |
+| Phoenix | Fire | Ranged | 38 / 38 / **100** | 50 / 50 / **100** | 50 / 38 / **100** | 25 / 25 / **100** |
+| Leviathan | Water | Vanguard | 63 / 25 / **100** | 38 / 25 / 33 | 25 / 13 / **100** | 38 / **0** / 33 |
+| Golem | Earth | Vanguard | 38 / 13 / **0** | 50 / 25 / 67 | 50 / 38 / 33 | 38 / 13 / 33 |
+| Griffin | Air | Skirmisher | 25 / 25 / **100** | 25 / 25 / **0** | **0** / **0** / **0** | 13 / 13 / **0** |
+| Thunderbird | Lightning | Skirmisher | 25 / 25 / **0** | 25 / 13 / 33 | 25 / 25 / 67 | 25 / 25 / **0** |
 | Frost Wyrm | Ice | Vanguard | 13 / 50 / **0** | 38 / 50 / **0** | 25 / 50 / **0** | 13 / 75 / **100** |
-| Treant | Nature | Vanguard | 50 / 63 / **0** | 25 / 50 / 33 | 25 / 38 / 33 | 50 / 88 / 67 |
-| Tarasque | Metal | Vanguard | 13 / 13 / **0** | 38 / 38 / 33 | 38 / 50 / 33 | 25 / 25 / **0** |
-| Kirin | Light | Ranged | 25 / 25 / **100** | 13 / 13 / 67 | 38 / 25 / **0** | 50 / 25 / **0** |
-| Basilisk | Dark | Ranged | 13 / 25 / **0** | **0** / 13 / 33 | 25 / 25 / **0** | 25 / 13 / **0** |
+| Treant | Nature | Vanguard | 50 / 63 / **0** | 25 / 50 / 33 | 25 / 38 / **0** | 50 / 88 / 33 |
+| Tarasque | Metal | Vanguard | 13 / 13 / **0** | 38 / 38 / **0** | 38 / 50 / **0** | 25 / 25 / **0** |
+| Kirin | Light | Ranged | 25 / 25 / **0** | 13 / 13 / 33 | 38 / 25 / **0** | 50 / 25 / **0** |
+| Basilisk | Dark | Ranged | 13 / 25 / **0** | **0** / 13 / **0** | 25 / 25 / **0** | 25 / 13 / **0** |
 
 - Heuristic (H): never fielded: `elite` Basilisk; `squad` Griffin. Always fielded: none.
 - Heuristic + bonds (B): never fielded: `squad` Griffin; `horde` Leviathan. Always fielded: none.
-- Oracle (O): never fielded: `solo` Griffin, Thunderbird, Frost Wyrm, Treant, Tarasque, Basilisk; `elite` Golem, Thunderbird, Frost Wyrm; `squad` Griffin, Frost Wyrm, Kirin, Basilisk; `horde` Griffin, Thunderbird, Tarasque, Kirin, Basilisk. Always fielded: `solo` Phoenix, Kirin; `squad` Phoenix; `horde` Frost Wyrm.
+- Oracle (O): never fielded: `solo` Golem, Thunderbird, Frost Wyrm, Treant, Tarasque, Kirin, Basilisk; `elite` Griffin, Frost Wyrm, Tarasque, Basilisk; `squad` Griffin, Frost Wyrm, Treant, Tarasque, Kirin, Basilisk; `horde` Griffin, Thunderbird, Tarasque, Kirin, Basilisk. Always fielded: `solo` Phoenix, Leviathan, Griffin; `elite` Phoenix; `squad` Phoenix, Leviathan; `horde` Phoenix, Frost Wyrm.
 
 ## Avatar passives
 
@@ -1066,7 +1063,7 @@ The `library` preset is the skill library's default avatar loadout (actives: Ral
 Firings per battle are averaged over every PvE battle at its cell's calibrated difficulty (23040 battles).
 
 - Avatar level: each battle's encounter level (`--avatar-level` unset); its stats follow the medium curve (every combat stat 100 and Speed 100 at level 100).
-- Avatar turns (its own ATB gauge) per battle: 5.71 (0.56 per unit of normalized time); active casts per battle: 6.19.
+- Avatar turns (its own ATB gauge) per battle: 5.80 (0.56 per unit of normalized time); active casts per battle: 6.30.
 
 | Passive | Trigger | Scope | Proc % | Max / battle | Cooldown | Firings per battle |
 | --- | --- | --- | ---: | ---: | ---: | ---: |

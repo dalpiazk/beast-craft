@@ -39,7 +39,13 @@ namespace BeastCraft.Tooling.BalanceSim
         Heuristic = 1,
 
         /// <summary>The team the bond-aware picker fields per composition (<see cref="ScoutedPicker.PickWithBonds"/>); the default.</summary>
-        Bonds = 2
+        Bonds = 2,
+
+        /// <summary>
+        /// The typical team from the owned roster at each level band (<see cref="TypicalTeamModel"/>): the shipping
+        /// table's calibration, <c>--mode typical</c> only (never <c>--calibrate-on</c>).
+        /// </summary>
+        Typical = 3
     }
 
     /// <summary>
@@ -606,6 +612,26 @@ namespace BeastCraft.Tooling.BalanceSim
         /// </summary>
         public bool RunHearthglen;
 
+        /// <summary>
+        /// <c>--mode typical</c>: the typical-team calibration (<see cref="TypicalCalibration"/>): the shipping
+        /// difficulty table, the boss overrides and the typical-team report, calibrated on the typical team from
+        /// the owned roster at each level band.
+        /// </summary>
+        public bool RunTypical;
+
+        /// <summary>
+        /// <c>--mode assistfloor</c>: the adaptive-assist floor per kind of fight
+        /// (<see cref="AssistFloorCalibration"/>), what <c>regions.json</c> <c>AssistFloorScales</c>
+        /// should author.
+        /// </summary>
+        public bool RunAssistFloor;
+
+        /// <summary><c>--typical-samples</c>: typical (and assistfloor): battles per team and composition at each search step.</summary>
+        public int TypicalSamples = TypicalCalibration.DefaultSamples;
+
+        /// <summary>Whether <c>--levels</c> was given (<c>--mode typical</c> otherwise calibrates its own level bands).</summary>
+        public bool LevelsGiven;
+
         /// <summary><c>--tune</c>: hearthglen: also search each fight's DifficultyOverride for its target and print the suggestions.</summary>
         public bool HearthglenTune;
 
@@ -614,6 +640,12 @@ namespace BeastCraft.Tooling.BalanceSim
         /// below it (0, the default = at the node's level, the report as committed).
         /// </summary>
         public int NewPlayerStartLevel;
+
+        /// <summary>
+        /// <c>--kinship-only</c>: newplayer: only the Kinship sections (roster growth and the trials),
+        /// for tuning; the committed report is the full run.
+        /// </summary>
+        public bool NewPlayerKinshipOnly;
 
         /// <summary><c>--map-seeds</c>: newplayer: the first-node section's map seeds, 1..n.</summary>
         public int NewPlayerMapSeeds = NewPlayerReport.DefaultMapSeeds;
@@ -770,6 +802,8 @@ namespace BeastCraft.Tooling.BalanceSim
                     return "mean";
                 case CalibrationTarget.Heuristic:
                     return "heuristic";
+                case CalibrationTarget.Typical:
+                    return "typical";
                 default:
                     return "bonds";
             }
@@ -792,18 +826,24 @@ namespace BeastCraft.Tooling.BalanceSim
             "\n" +
             "Usage: dotnet run --project Tooling/BalanceSim -c Release -- [options]\n" +
             "\n" +
-            "  --mode <m>                 pve | pvp | both | pacing | campaign | newplayer | hearthglen (default both). pve = team vs encounter\n" +
+            "  --mode <m>                 pve | pvp | both | pacing | campaign | newplayer | hearthglen | typical (default both). pve = team vs encounter\n" +
             "                             (primary); pvp = the 1v1 round-robin (secondary); pacing = the skill-progression /\n" +
             "                             material economy model (Monte Carlo campaigns; see README.md, \"Pacing\"); campaign = the\n" +
             "                             region campaign model (node maps, level cap, bench; docs/design/progression-and-saves.md);\n" +
             "                             newplayer = one-per-stance trios through r01-r03 with and without the early-region\n" +
             "                             easing, and the first node (README.md, \"New-player easing\").\n" +
             "  --map-seeds <n>            newplayer: map seeds 1..n for the first-node section (default 60).\n" +
+            "                             typical = the shipping calibration: every mainline shape at each level band (default\n" +
+            "                             1,10,...,100), post-game shapes at 100 and every boss template, calibrated on the typical\n" +
+            "                             team from the owned roster (the Kinship flow), with the pacing model's skill levels;\n" +
+            "                             --write-difficulty writes the table, --out the typical-team report (README, \"Typical team\").\n" +
+            "  --typical-samples <n>      typical: battles per team and composition at each search step (default 2).\n" +
             "                             hearthglen = every fixed Hearthglen (r00, tutorial) fight against every legal pick:\n" +
             "                             the 10 solo picks, every (1st, 2nd) pair and every trio in pick order, at the levels\n" +
             "                             the picks have reached there (docs/balance/hearthglen-report.md).\n" +
             "  --tune                     hearthglen: also search each fight's DifficultyOverride for its target.\n" +
             "  --start-level <n>          newplayer: the trio and avatar never fight below level n (a player arriving from Hearthglen).\n" +
+            "  --kinship-only             newplayer: only the Kinship sections (roster growth, trials); with --tune, each trial's multiplier for its target.\n" +
             "  --difficulty <path>        newplayer: the difficulty table fought at (default: the game's encounter-difficulty.json).\n" +
             "  --battles <n>              pacing: battles per campaign (default 500).\n" +
             "  --runs <n>                 pacing / campaign: campaigns per base seed (default 1000; --seeds pools every seed's).\n" +
@@ -964,6 +1004,9 @@ namespace BeastCraft.Tooling.BalanceSim
                     case "--tune":
                         options.HearthglenTune = true;
                         break;
+                    case "--kinship-only":
+                        options.NewPlayerKinshipOnly = true;
+                        break;
                     case "--start-level":
                         if (!TryNextInt(args, ref i, arg, 1, out options.NewPlayerStartLevel, out error))
                         {
@@ -1046,6 +1089,14 @@ namespace BeastCraft.Tooling.BalanceSim
                         break;
                     case "--levels":
                         if (!TryNext(args, ref i, arg, out text, out error) || !TryParseLevels(text, options.Levels, out error))
+                        {
+                            return null;
+                        }
+
+                        options.LevelsGiven = true;
+                        break;
+                    case "--typical-samples":
+                        if (!TryNextInt(args, ref i, arg, 1, out options.TypicalSamples, out error))
                         {
                             return null;
                         }
@@ -1499,6 +1550,12 @@ namespace BeastCraft.Tooling.BalanceSim
                 return null;
             }
 
+            if (options.RunTypical && (options.Seeds != null || options.EncounterSet != EncounterSet.Generated || options.TeamSize != 3 || options.PinDifficultyPath != null))
+            {
+                error = "--mode typical needs the generated encounter set, a single seed, --team-size 3 and no --pin-difficulty.";
+                return null;
+            }
+
             if (options.WriteDifficultyPath != null && (!options.RunPve || options.EncounterSet != EncounterSet.Generated || options.Seeds != null))
             {
                 error = "--write-difficulty needs PvE, the generated encounter set and a single seed (not --seeds).";
@@ -1830,8 +1887,20 @@ namespace BeastCraft.Tooling.BalanceSim
                     options.RunPvp = false;
                     options.RunHearthglen = true;
                     return true;
+                case "typical":
+                    // PvE's loading, then the typical-team calibration instead of the PvE report.
+                    options.RunPve = true;
+                    options.RunPvp = false;
+                    options.RunTypical = true;
+                    return true;
+                case "assistfloor":
+                    // PvE's loading, then the adaptive-assist floor calibration instead of the PvE report.
+                    options.RunPve = true;
+                    options.RunPvp = false;
+                    options.RunAssistFloor = true;
+                    return true;
                 default:
-                    error = "--mode expects pve, pvp, both, pacing, campaign, newplayer or hearthglen, got '" + text + "'.";
+                    error = "--mode expects pve, pvp, both, pacing, campaign, newplayer, hearthglen, typical or assistfloor, got '" + text + "'.";
                     return false;
             }
         }
