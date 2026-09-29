@@ -41,7 +41,8 @@ beast-craft/
 │                   suite (Tests/, Goldens/, Presentation/; CI runs it). PixelArt/: text-grid
 │                   sprites -> placeholder PNGs (Python + Pillow). Never shipped.
 ├── docs/           design/ and balance/ (simulator reports, tuning log, research) notes;
-│                   architecture/ is an empty placeholder
+│                   design/decisions.md is the producer decision log; architecture/ is
+│                   an empty placeholder
 └── .github/        CI workflows
 ```
 
