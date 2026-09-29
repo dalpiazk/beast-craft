@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using BeastCraft.Game.Rendering;
 using BeastCraft.Game.Ui;
 using BeastCraft.Presentation.Layout;
 using BeastCraft.Presentation.Ui;
@@ -79,13 +80,33 @@ namespace BeastCraft.Game.Screens.Components
         }
     }
 
-    /// <summary>A card's heading line (the same look every card heading used, once).</summary>
+    /// <summary>
+    /// A section's heading text: either drawn inside a card that also holds more content below it
+    /// (<see cref="Draw"/> — the card must be tall enough for the heading plus whatever else it
+    /// draws), or, for a plain divider between groups of cards with nothing else in its own row, a
+    /// bare label with no card at all (<see cref="Add"/> — the Grove Glade's "Habitats"/"Beasts"
+    /// heading shape), which cannot clip since it has no fixed-height box to overflow.
+    /// </summary>
     public static class SectionHeader
     {
+        /// <summary>The heading's own line height at <paramref name="ctx"/>'s style, for sizing a card that holds one plus other content.</summary>
+        public static float LineHeight(ScreenContext ctx)
+        {
+            return ctx.Text.LineHeight(ctx.Style.TextSizes.Heading - 6f);
+        }
+
         public static void Draw(ScreenContext ctx, Rect box, string text)
         {
             ctx.Painter.TextIn(text, new Rect(box.X + 36f, box.Y + 28f, box.Width - 72f, ctx.Style.TextSizes.Heading - 6f), ctx.Style.TextSizes.Heading - 6f, ctx.Painter.C("plum"),
                                TextAlign.Left);
+        }
+
+        /// <summary>Adds a bare heading label (no card) at (<paramref name="x"/>, <paramref name="y"/>); returns the y below it.</summary>
+        public static float Add(ScreenContext ctx, Widget parent, float x, float y, float width, string text)
+        {
+            float size = ctx.Style.TextSizes.Heading - 4f;
+            parent.Add(new Label { Bounds = new Rect(x, y, width, size), Text = text, Size = size, ColorKey = "plum" });
+            return y + ctx.Text.LineHeight(size) + 16f;
         }
     }
 
@@ -227,10 +248,13 @@ namespace BeastCraft.Game.Screens.Components
         public string DetailColor = "inkSoft";
     }
 
-    /// <summary>A list row: title, subtitle, detail line — the shape Inventory's and the Trader's listings share.</summary>
+    /// <summary>A list row: title, a subtitle up to two lines (wrapped, the second cut with an ellipsis rather than mid-word), detail line — the shape Inventory's and the Trader's listings share.</summary>
     public static class ItemRow
     {
-        public const float Height = 150f;
+        /// <summary>Tall enough for the title, a two-line subtitle and the detail line.</summary>
+        public const float Height = 190f;
+
+        private const int SubtitleMaxLines = 2;
 
         /// <summary><paramref name="rightInset"/> leaves room for an <see cref="ActionRow"/> beside the text.</summary>
         public static void Draw(ScreenContext ctx, Rect box, ItemRowData row, float rightInset = 0f)
@@ -240,15 +264,33 @@ namespace BeastCraft.Game.Screens.Components
             float w = box.Width - 72f - rightInset;
             float body = ctx.Style.TextSizes.Body;
             float small = ctx.Style.TextSizes.Small + 1f;
+            float lineHeight = ctx.Text.LineHeight(small);
             painter.TextIn(row.Title ?? string.Empty, new Rect(x, box.Y + 18f, w, body), body, painter.C(row.TitleColor), TextAlign.Left);
+            float y = box.Y + 62f;
             if (!string.IsNullOrEmpty(row.Subtitle))
             {
-                painter.TextIn(row.Subtitle, new Rect(x, box.Y + 62f, w, small), small, painter.C("inkSoft"), TextAlign.Left);
+                List<string> full = painter.Wrap(row.Subtitle, small, w);
+                List<string> shown = painter.Wrap(row.Subtitle, small, w, SubtitleMaxLines);
+                for (int i = 0; i < shown.Count; i++)
+                {
+                    string line = shown[i];
+                    bool truncated = i == shown.Count - 1 && full.Count > shown.Count;
+                    if (truncated)
+                    {
+                        float ellipsisWidth = ctx.Text.Measure("...", small);
+                        line = ctx.Text.Fit(line, small, Math.Max(0f, w - ellipsisWidth)) + "...";
+                    }
+
+                    painter.TextIn(line, new Rect(x, y, w, small), small, painter.C("inkSoft"), TextAlign.Left);
+                    y += lineHeight;
+                }
+
+                y += 8f;
             }
 
             if (!string.IsNullOrEmpty(row.Detail))
             {
-                painter.TextIn(row.Detail, new Rect(x, box.Y + 102f, w, small), small, painter.C(row.DetailColor), TextAlign.Left);
+                painter.TextIn(row.Detail, new Rect(x, y, w, small), small, painter.C(row.DetailColor), TextAlign.Left);
             }
         }
     }
@@ -266,9 +308,13 @@ namespace BeastCraft.Game.Screens.Components
     /// <summary>One or more buttons stacked top-to-bottom, right-aligned within an area (an item row's Equip/Sell, a slot's Take off).</summary>
     public static class ActionRow
     {
+        /// <summary>The gap kept between a trailing button and the card's own edge (<paramref name="area"/> is expected to reach the card's outer bounds).</summary>
+        public const float EdgeInset = 20f;
+
         public static void Build(Widget parent, Rect area, float buttonWidth, float buttonHeight, IReadOnlyList<ActionButtonData> buttons)
         {
             float y = area.Y;
+            float right = area.Right - EdgeInset;
             foreach (ActionButtonData data in buttons)
             {
                 if (data == null)
@@ -276,7 +322,7 @@ namespace BeastCraft.Game.Screens.Components
                     continue;
                 }
 
-                Button button = parent.Add(new Button { Id = data.Id, Bounds = new Rect(area.Right - buttonWidth, y, buttonWidth, buttonHeight), Text = data.Text, StyleKey = data.Style, Enabled = data.Enabled });
+                Button button = parent.Add(new Button { Id = data.Id, Bounds = new Rect(right - buttonWidth, y, buttonWidth, buttonHeight), Text = data.Text, StyleKey = data.Style, Enabled = data.Enabled });
                 if (data.OnClick != null)
                 {
                     button.Clicked += data.OnClick;

@@ -45,15 +45,11 @@ namespace BeastCraft.Tests.EditMode
             Assert.AreEqual(1, model.Level);
             Assert.AreEqual(0, model.Xp);
             Assert.AreEqual(AvatarProgression.XpToNextLevel(1), model.XpToNext);
-            Assert.AreEqual(6, model.Stats.Count, "HP, Attack, Defense, SpA, SpD, Speed");
+            Assert.AreEqual(0f, model.XpFraction);
+            Assert.AreEqual(5, model.Stats.Count, "Attack, Defense, SpA, SpD, Speed -- HP is excluded, a fixture always 1");
+            Assert.IsFalse(model.Stats.Exists(s => s.Name == "HP"));
             foreach (AvatarStatRow row in model.Stats)
             {
-                if (row.Name == "HP")
-                {
-                    Assert.AreEqual(1, row.Total, "StatCalculator floors HP at 1 even with a zero base");
-                    continue;
-                }
-
                 Assert.AreEqual(row.Base, row.Total, row.Name + " has no gear worn yet");
             }
         }

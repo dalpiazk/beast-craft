@@ -47,6 +47,9 @@ namespace BeastCraft.Presentation.Screens
 
         public int XpToNext { get; private set; }
 
+        /// <summary>0-1 of the way to the next level (0 when <see cref="XpToNext"/> is 0).</summary>
+        public float XpFraction { get; private set; }
+
         public List<AvatarStatRow> Stats { get; } = new List<AvatarStatRow>();
 
         public void Refresh()
@@ -57,12 +60,14 @@ namespace BeastCraft.Presentation.Screens
             Level = progress?.Level ?? 1;
             Xp = progress?.Xp ?? 0;
             XpToNext = AvatarProgression.XpToNextLevel(Level);
+            XpFraction = XpToNext <= 0 ? 0f : Math.Max(0f, Math.Min(1f, (float)Xp / XpToNext));
             DisplayName = AchievementsViewModel.TitledName(save, _session.Content.Achievements?.Library, CampaignAvatar.DisplayName);
             Stats.Clear();
             AvatarStatsSO profile = CampaignAvatar.Profile(_session.Content);
             StatBlock baseStats = profile.GetStatsAtLevel(Level);
             StatBlock total = StatCalculator.ComputeStats(baseStats, StatCalculator.CollectModifiers(AvatarGear.Worn(_session)));
-            AddRow("HP", baseStats.Hp, total.Hp);
+            // HP is excluded: the avatar's HP is a fixture (CampaignAvatar.Profile), always 1 and
+            // never targeted in battle, so a "0 -> 1" row would read as a bug rather than a stat.
             AddRow("Attack", baseStats.Attack, total.Attack);
             AddRow("Defense", baseStats.Defense, total.Defense);
             AddRow("Special Attack", baseStats.SpecialAttack, total.SpecialAttack);

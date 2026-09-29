@@ -88,6 +88,13 @@ namespace BeastCraft.Game.Screens
         // Stock
         // ------------------------------------------------------------------------------------------
 
+        /// <summary>A stable display order: one section per category, regardless of the roll order the Trader's own "Gear"/"Skill" draws interleave beast and avatar items in.</summary>
+        private static readonly ShopCategory[] CategoryOrder =
+        {
+            ShopCategory.Material, ShopCategory.BeastGear, ShopCategory.AvatarGear, ShopCategory.BeastSkill, ShopCategory.AvatarSkill, ShopCategory.AvatarPassive, ShopCategory.Consumable,
+            ShopCategory.Cosmetic
+        };
+
         private void BuildStock()
         {
             _stock.Begin();
@@ -98,22 +105,24 @@ namespace BeastCraft.Game.Screens
                                                                         Painter.C("inkSoft"), TextAlign.Left));
             }
 
-            string lastCategory = null;
-            foreach (ShopListingRow row in _model.Listings)
+            foreach (ShopCategory category in CategoryOrder)
             {
-                string categoryLabel = CategoryLabel(row.Category);
-                if (categoryLabel != lastCategory)
+                List<ShopListingRow> rows = _model.Listings.FindAll(l => l.Category == category);
+                if (rows.Count == 0)
                 {
-                    y = _stock.Card(y, 60f, "card", box => SectionHeader.Draw(Ctx, box, categoryLabel));
-                    lastCategory = categoryLabel;
+                    continue;
                 }
 
-                ShopListingRow captured = row;
-                float top = y;
-                y = _stock.Card(y, ItemRow.Height, "panel", box => ItemRow.Draw(Ctx, box, StockRowData(captured), 240f));
-                bool enabled = captured.DisabledReason == null;
-                ActionRow.Build(_stock.Scroll, new Rect(HeaderMetrics.Pad + _stock.Width - 220f, top + 40f, 220f, ItemRow.Height - 60f), 190f, 70f,
-                                new List<ActionButtonData> { new ActionButtonData { Id = "buy-" + captured.Index, Text = "Buy " + captured.Price, Enabled = enabled, OnClick = () => Buy(captured) } });
+                y = SectionHeader.Add(Ctx, _stock.Scroll, HeaderMetrics.Pad, y, _stock.Width, CategoryLabel(category));
+                foreach (ShopListingRow row in rows)
+                {
+                    ShopListingRow captured = row;
+                    float top = y;
+                    y = _stock.Card(y, ItemRow.Height, "panel", box => ItemRow.Draw(Ctx, box, StockRowData(captured), 240f));
+                    bool enabled = captured.DisabledReason == null;
+                    ActionRow.Build(_stock.Scroll, new Rect(HeaderMetrics.Pad + _stock.Width - 220f, top + 40f, 220f, ItemRow.Height - 60f), 190f, 70f,
+                                    new List<ActionButtonData> { new ActionButtonData { Id = "buy-" + captured.Index, Text = "Buy " + captured.Price, Enabled = enabled, OnClick = () => Buy(captured) } });
+                }
             }
 
             _stock.End(y);

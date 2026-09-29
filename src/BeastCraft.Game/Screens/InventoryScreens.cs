@@ -192,28 +192,28 @@ namespace BeastCraft.Game.Screens
 
         private float SectionCard(CardList list, float y, string title, List<InventoryCountRow> rows)
         {
-            y = list.Card(y, 60f, "card", box => SectionHeader.Draw(Ctx, box, title));
+            y = SectionHeader.Add(Ctx, list.Scroll, HeaderMetrics.Pad, y, list.Width, title);
             if (rows.Count == 0)
             {
                 return list.Card(y, 90f, "panel", box => Painter.TextIn("None held.", new Rect(box.X + 40f, box.Y + 30f, box.Width - 80f, Ctx.Style.TextSizes.Body), Ctx.Style.TextSizes.Body,
                                                                          Painter.C("inkSoft"), TextAlign.Left));
             }
 
-            float height = 40f + rows.Count * 60f;
-            return list.Card(y, height, "panel", box => DrawCounts(box, rows));
-        }
-
-        private void DrawCounts(Rect box, List<InventoryCountRow> rows)
-        {
-            float x = box.X + 40f;
-            float w = box.Width - 80f;
-            float y = box.Y + 24f;
+            // One ItemRow per held item (its Subtitle wraps to two lines with an ellipsis rather than
+            // clipping mid-word — a consumable's description is the reason this needs the shared row,
+            // not a flat multi-line panel).
             foreach (InventoryCountRow row in rows)
             {
-                string line = row.Name + "  x" + row.Quantity + (string.IsNullOrEmpty(row.Detail) ? string.Empty : "   " + row.Detail);
-                Painter.TextIn(line, new Rect(x, y, w, Ctx.Style.TextSizes.Body), Ctx.Style.TextSizes.Body, Painter.C("ink"), TextAlign.Left);
-                y += 60f;
+                InventoryCountRow captured = row;
+                y = list.Card(y, ItemRow.Height, "panel", box => ItemRow.Draw(Ctx, box, CountRowData(captured)));
             }
+
+            return y;
+        }
+
+        private static ItemRowData CountRowData(InventoryCountRow row)
+        {
+            return new ItemRowData { Title = row.Name + "  x" + row.Quantity, Subtitle = row.Detail };
         }
 
         // ------------------------------------------------------------------------------------------

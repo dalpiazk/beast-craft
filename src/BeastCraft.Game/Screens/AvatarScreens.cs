@@ -101,17 +101,27 @@ namespace BeastCraft.Game.Screens
             _overview.Begin();
             AvatarOverviewViewModel model = _hub.Overview;
             float y = 10f;
-            y = _overview.Card(y, 90f, "card", box => SectionHeader.Draw(Ctx, box, "Level " + model.Level + "   " + model.Xp + " / " + model.XpToNext + " XP"));
+            y = _overview.Card(y, 130f, "card", box => DrawLevelCard(box, model));
             float statsHeight = 100f + model.Stats.Count * StatTable.RowHeight;
             y = _overview.Card(y, statsHeight, "panel", box => StatTable.Draw(Ctx, box, "Base", "Total", ToStatRows(model.Stats)));
             float actionsTop = y;
-            y = _overview.Card(y, 240f, "card", box => SectionHeader.Draw(Ctx, box, "More"));
+            const float moreHeight = 310f;
+            y = _overview.Card(y, moreHeight, "card", box => SectionHeader.Draw(Ctx, box, "More"));
             float bw = _overview.Width - 40f;
-            _overview.Add(new Button { Id = "avatar-achievements", Bounds = new Rect(HeaderMetrics.Pad + 20f, actionsTop + 90f, bw, 90f), Text = "Achievements & titles", StyleKey = "primary", Glyph = "seal" })
+            _overview.Add(new Button { Id = "avatar-achievements", Bounds = new Rect(HeaderMetrics.Pad + 20f, actionsTop + 80f, bw, 90f), Text = "Achievements & titles", StyleKey = "primary", Glyph = "seal" })
                      .Clicked += () => Ctx.Stack.Push(new AchievementsScreen(Ctx));
-            _overview.Add(new Button { Id = "avatar-look-shop", Bounds = new Rect(HeaderMetrics.Pad + 20f, actionsTop + 194f, bw, 90f), Text = "Look-token shop", StyleKey = "secondary", Glyph = "coin" })
+            _overview.Add(new Button { Id = "avatar-look-shop", Bounds = new Rect(HeaderMetrics.Pad + 20f, actionsTop + 184f, bw, 90f), Text = "Look-token shop", StyleKey = "secondary", Glyph = "coin" })
                      .Clicked += () => Ctx.Stack.Push(new LookTokenShopScreen(Ctx));
             _overview.End(y);
+        }
+
+        /// <summary>The level/XP bar, the same shape as the beast detail screen's own (<see cref="Painter.Progress"/> with the label baked in).</summary>
+        private void DrawLevelCard(Rect box, AvatarOverviewViewModel model)
+        {
+            float x = box.X + 40f;
+            float w = box.Width - 80f;
+            Painter.Progress(new Rect(x, box.Y + 44f, w, 44f), model.XpFraction, -1f, "leaf", "moss", "track",
+                             "Lv " + model.Level + "   " + model.Xp + " / " + model.XpToNext + " XP");
         }
 
         private static List<StatTableRow> ToStatRows(List<AvatarStatRow> stats)
@@ -133,7 +143,7 @@ namespace BeastCraft.Game.Screens
         {
             _skills.Begin();
             float y = 10f;
-            y = _skills.Card(y, 60f, "card", box => SectionHeader.Draw(Ctx, box, "Actives"));
+            y = SectionHeader.Add(Ctx, _skills.Scroll, HeaderMetrics.Pad, y, _skills.Width, "Actives");
             for (int i = 0; i < _hub.Skills.ActiveSlots.Count; i++)
             {
                 int slot = i;
@@ -149,7 +159,7 @@ namespace BeastCraft.Game.Screens
                 });
             }
 
-            y = _skills.Card(y, 60f, "card", box => SectionHeader.Draw(Ctx, box, "Passives"));
+            y = SectionHeader.Add(Ctx, _skills.Scroll, HeaderMetrics.Pad, y, _skills.Width, "Passives");
             for (int i = 0; i < _hub.Skills.PassiveSlots.Count; i++)
             {
                 int slot = i;
