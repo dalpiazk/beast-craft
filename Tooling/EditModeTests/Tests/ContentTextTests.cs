@@ -145,6 +145,110 @@ namespace BeastCraft.Tests.EditMode
             Assert.IsEmpty(missing, string.Join("\n", missing));
         }
 
+        /// <summary>
+        /// Every <c>ui.*</c> string is a valid <see cref="StringTable.Format"/> pattern: its placeholders
+        /// are <c>{0}</c>, <c>{1}</c>... with no gaps (a translation may reorder them, never invent one), no
+        /// stray brace, and no em or en dash (the copy rules, content-bible.md).
+        /// </summary>
+        [Test]
+        public void EveryUiString_IsAWellFormedPattern()
+        {
+            StringTable english = English;
+            Regex placeholder = new Regex("\\{(\\d+)(?:[,:][^}]*)?\\}");
+            object[] args = Enumerable.Range(0, 10).Select(i => (object)("#" + i)).ToArray();
+            List<string> bad = new List<string>();
+            int count = 0;
+            foreach (string key in english.Keys.Where(k => k.StartsWith("ui.", StringComparison.Ordinal)))
+            {
+                count++;
+                english.TryGet(key, out string text);
+                List<int> indices = placeholder.Matches(text).Cast<Match>().Select(m => int.Parse(m.Groups[1].Value)).Distinct().OrderBy(i => i).ToList();
+                if (indices.Count > 0 && indices.Last() != indices.Count - 1)
+                {
+                    bad.Add(key + ": placeholders skip a number (" + string.Join(", ", indices) + ")");
+                }
+
+                if (placeholder.Replace(text, string.Empty).IndexOfAny(new[] { '{', '}' }) >= 0)
+                {
+                    bad.Add(key + ": a stray brace");
+                }
+                else
+                {
+                    try
+                    {
+                        string.Format(System.Globalization.CultureInfo.InvariantCulture, text, args);
+                    }
+                    catch (FormatException e)
+                    {
+                        bad.Add(key + ": " + e.Message);
+                    }
+                }
+
+                if (text.IndexOf('—') >= 0 || text.IndexOf('–') >= 0)
+                {
+                    bad.Add(key + ": an em or en dash");
+                }
+            }
+
+            Assert.Greater(count, 500, "the screens' text is in the table");
+            Assert.IsEmpty(bad, string.Join("\n", bad));
+        }
+
+        /// <summary>
+        /// The screens, their view-models and the skill card draw no English of their own: a literal that
+        /// reads as words (a capital, then letters) passed where the player sees it (drawn, toasted, a
+        /// button or label, a modal's title or body, a message, reason or error) fails. Their text is
+        /// <c>ui.*</c> keys (#50). Logs, exceptions and the command-line tools' output are not covered.
+        /// </summary>
+        [Test]
+        public void TheScreens_HaveNoHardCodedPlayerText()
+        {
+            string src = Path.Combine(Path.GetDirectoryName(Root), "src");
+            string[] folders =
+            {
+                Path.Combine(src, "BeastCraft.Game", "Screens"),
+                Path.Combine(src, "BeastCraft.Presentation", "Screens"),
+                Path.Combine(src, "BeastCraft.Presentation", "Cards")
+            };
+            const string Words = "\"(?:[A-Z][a-z]{2,}[^\"]*|[A-Z][^\" ]* [^\"]*)\"";
+            Regex[] player =
+            {
+                new Regex("\\b(?:TextIn|Toast|DrawCentered|DrawRight|Paragraph|Wrap|Button|Progress)\\([^;]*?" + Words),
+                new Regex("\\b(?:Text|Title|Subtitle|Detail|Message|Reason|Caption|Hint|Label|StageText|SealName|LevelBand|GapText|Body|Action|Found|RetryNote|XpText|Summary)\\s*=\\s*[^;]*?" + Words),
+                new Regex("\\b(?:message|error|reason|status|state|text|label|sub|note|detail|what|stateText|tierText|worn|tags|banner|intensity)\\s*=\\s*[^;]*?" + Words),
+                new Regex("new (?:ChoiceOption|ConfirmModal|ChoiceModal|BeastPickerModal|SendPartyModal|BattleLogModal)\\([^;]*?" + Words),
+                new Regex("\\b(?:AddButton|AddLabel|SectionHeader\\.Draw|SectionHeader\\.Add|Line|Paint|Notes\\.Add|parts\\.Add|Add|Refused|Of)\\([^;]*?" + Words),
+                new Regex("\\breturn\\s+[^;]*?" + Words)
+            };
+            // Not player text: the command-line battle demo's own errors (printed, then the viewer exits),
+            // the in-memory test store's error, and a content prefix the Kinship bond line strips.
+            string[] notPlayerText = { "\"Unknown region '\"", "\"Could not begin the battle: \"", "\"No slot.\"", "StartsWith(\"Bond: \"" };
+            List<string> found = new List<string>();
+            foreach (string folder in folders)
+            {
+                foreach (string source in Directory.GetFiles(folder, "*.cs", SearchOption.AllDirectories))
+                {
+                    string[] lines = File.ReadAllLines(source);
+                    for (int i = 0; i < lines.Length; i++)
+                    {
+                        string line = lines[i].Trim();
+                        if (line.StartsWith("//", StringComparison.Ordinal) || line.Contains("Console.") || line.Contains("throw new") || line.Contains("Fail(") ||
+                            notPlayerText.Any(line.Contains))
+                        {
+                            continue;
+                        }
+
+                        if (player.Any(pattern => pattern.IsMatch(line)))
+                        {
+                            found.Add(Path.GetFileName(source) + ":" + (i + 1) + ": " + line);
+                        }
+                    }
+                }
+            }
+
+            Assert.IsEmpty(found, "Player-facing literals (move them to ui.* keys in en.json):\n" + string.Join("\n", found));
+        }
+
         [Test]
         public void EveryLocaleTable_CoversEveryEnglishKey()
         {

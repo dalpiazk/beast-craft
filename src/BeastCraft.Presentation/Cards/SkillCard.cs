@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using BeastCraft.Battle;
 using BeastCraft.Creatures;
+using BeastCraft.Localization;
 using BeastCraft.Presentation.Text;
 
 namespace BeastCraft.Presentation.Cards
@@ -58,13 +59,20 @@ namespace BeastCraft.Presentation.Cards
 
         /// <summary>How a taunt changes that pick (<see cref="TauntRuleText"/>).</summary>
         public string TauntRule { get; private set; }
-
-        /// <summary>The card for <paramref name="skill"/>, its text parsed with <paramref name="glossary"/> (null: plain text).</summary>
-        public static SkillCard Of(SkillSO skill, Glossary glossary)
+        /// <summary>
+        /// The card for <paramref name="skill"/>, its text parsed with <paramref name="glossary"/> (null: plain text) and its
+        /// own words from <paramref name="text"/> (<c>ui.skill_card.*</c>; <c>GameContent.Text</c>).
+        /// </summary>
+        public static SkillCard Of(SkillSO skill, Glossary glossary, StringTable text)
         {
             if (skill == null)
             {
                 throw new ArgumentNullException(nameof(skill));
+            }
+
+            if (text == null)
+            {
+                throw new ArgumentNullException(nameof(text));
             }
 
             glossary = glossary ?? Glossary.Empty;
@@ -78,7 +86,7 @@ namespace BeastCraft.Presentation.Cards
                 }
 
                 damage |= effect.EffectType == SkillEffectType.Damage;
-                power.Add(PowerLine(effect, skill.Element, skill.Category));
+                power.Add(PowerLine(effect, skill.Element, skill.Category, text));
             }
 
             return new SkillCard
@@ -86,16 +94,16 @@ namespace BeastCraft.Presentation.Cards
                 Name = string.IsNullOrEmpty(skill.DisplayName) ? skill.SkillId : skill.DisplayName,
                 ArtKey = skill.ArtKey,
                 Element = skill.Element == Creatures.Element.None ? null : skill.Element.ToString(),
-                Category = damage ? (skill.Category == DamageCategory.Special ? "Special" : "Physical") : null,
-                Targets = TargetTags(skill.TargetShape, skill.TargetSide),
-                Cooldown = skill.Cooldown <= 1 ? "Every turn" : "Cooldown " + Int(skill.Cooldown),
-                Range = RangeText(skill.TargetShape, skill.Range),
-                Uses = UsesText(skill.MaxUsesPerBattle, skill.InitialCooldown, skill.Cooldown),
+                Category = damage ? text.Get(skill.Category == DamageCategory.Special ? "ui.skill_card.special" : "ui.skill_card.physical") : null,
+                Targets = TargetTags(skill.TargetShape, skill.TargetSide, text),
+                Cooldown = skill.Cooldown <= 1 ? text.Get("ui.skill_card.every_turn") : text.Format("ui.skill_card.cooldown", Int(skill.Cooldown)),
+                Range = RangeText(skill.TargetShape, skill.Range, text),
+                Uses = UsesText(skill.MaxUsesPerBattle, skill.InitialCooldown, skill.Cooldown, text),
                 Power = power,
-                Scaling = ScalingText(skill.Progression),
+                Scaling = ScalingText(skill.Progression, text),
                 Description = glossary.Parse(skill.Description),
-                TargetingRule = TargetingRuleText(skill),
-                TauntRule = TauntRuleText(skill)
+                TargetingRule = TargetingRuleText(skill, text),
+                TauntRule = TauntRuleText(skill, text)
             };
         }
 
@@ -107,7 +115,7 @@ namespace BeastCraft.Presentation.Cards
         /// with the lowest HP% within 3 hexes." Range is measured from the caster's nearest tile to
         /// the target's; area and whole-field shapes hit everyone eligible and pick no one.
         /// </summary>
-        public static string TargetingRuleText(SkillSO skill)
+        public static string TargetingRuleText(SkillSO skill, StringTable text)
         {
             if (skill == null)
             {
@@ -115,25 +123,24 @@ namespace BeastCraft.Presentation.Cards
             }
 
             bool ally = skill.TargetSide == SkillTargetSide.Ally;
-            string side = ally ? "ally" : "enemy";
-            string sides = ally ? "allies" : "enemies";
+            string side = text.Get(ally ? "ui.skill_card.side_ally" : "ui.skill_card.side_enemy");
+            string sides = text.Get(ally ? "ui.skill_card.sides_ally" : "ui.skill_card.sides_enemy");
             switch (skill.TargetShape)
             {
                 case SkillTargetShape.Self:
-                    return "Affects only itself.";
+                    return text.Get("ui.skill_card.rule_self");
                 case SkillTargetShape.AllEnemies:
-                    return "Hits every enemy on the field, at any range.";
+                    return text.Get("ui.skill_card.rule_all_enemies");
                 case SkillTargetShape.AllAllies:
-                    return "Affects every ally on the field, itself included, at any range.";
+                    return text.Get("ui.skill_card.rule_all_allies");
                 case SkillTargetShape.AreaBurst:
-                    return (ally ? "Affects" : "Hits") + " every " + side + (ally ? ", itself included," : string.Empty) + " within " + Hexes(skill.Range) + " of itself.";
+                    return text.Format(ally ? "ui.skill_card.rule_burst_ally" : "ui.skill_card.rule_burst_enemy", side, Hexes(skill.Range, text));
                 case SkillTargetShape.Cross:
-                    return (ally ? "Affects" : "Hits") + " every " + side + " on the six straight lines running " + Hexes(skill.Range) + " out from itself.";
+                    return text.Format(ally ? "ui.skill_card.rule_cross_ally" : "ui.skill_card.rule_cross_enemy", side, Hexes(skill.Range, text));
                 case SkillTargetShape.Line:
-                    return "Picks " + Pick(skill, side, sides) + " within " + Hexes(skill.Range) + ", then strikes a straight line " + Hexes(skill.Range) +
-                           " long toward it, hitting every " + side + " on the line.";
+                    return text.Format("ui.skill_card.rule_line", Pick(skill, side, sides, text), Hexes(skill.Range, text), side);
                 default:
-                    return "Targets " + Pick(skill, side, sides) + " within " + Hexes(skill.Range) + ".";
+                    return text.Format("ui.skill_card.rule_target", Pick(skill, side, sides, text), Hexes(skill.Range, text));
             }
         }
 
@@ -143,7 +150,7 @@ namespace BeastCraft.Presentation.Cards
         /// caster walks toward it when it is not); area, whole-field, self and ally skills are not
         /// redirected.
         /// </summary>
-        public static string TauntRuleText(SkillSO skill)
+        public static string TauntRuleText(SkillSO skill, StringTable text)
         {
             if (skill == null)
             {
@@ -153,43 +160,43 @@ namespace BeastCraft.Presentation.Cards
             bool picks = skill.TargetShape == SkillTargetShape.SingleTarget || skill.TargetShape == SkillTargetShape.Line;
             if (picks && skill.TargetSide == SkillTargetSide.Enemy)
             {
-                return "Taunt overrides the pick: while taunted, it must pick the taunter whenever the taunter is in range, and walks toward it when it is not.";
+                return text.Get("ui.skill_card.taunt_overrides");
             }
 
             if (skill.TargetShape == SkillTargetShape.Self || skill.TargetSide == SkillTargetSide.Ally || skill.TargetShape == SkillTargetShape.AllAllies)
             {
-                return "Taunt has no effect: it never aims at an enemy.";
+                return text.Get("ui.skill_card.taunt_never_aims");
             }
 
-            return "Taunt has no effect: it hits every enemy in its area and picks no one.";
+            return text.Get("ui.skill_card.taunt_area");
         }
 
         /// <summary>The pick among the candidates, e.g. "the enemy with the lowest HP%", "a random ally (itself included)".</summary>
-        private static string Pick(SkillSO skill, string side, string sides)
+        private static string Pick(SkillSO skill, string side, string sides, StringTable text)
         {
-            string who = skill.TargetSide == SkillTargetSide.Ally ? side + " (itself included)" : side;
+            string who = skill.TargetSide == SkillTargetSide.Ally ? text.Format("ui.skill_card.itself_included", side) : side;
             bool lowest = skill.TargetingOrder == SkillTargetingOrder.Lowest;
             switch (skill.TargetingCriterion)
             {
                 case SkillTargetingCriterion.Random:
-                    return "a random " + who;
+                    return text.Format("ui.skill_card.pick_random", who);
                 case SkillTargetingCriterion.Distance:
-                    return "the " + (lowest ? "nearest " : "farthest ") + who;
+                    return text.Format(lowest ? "ui.skill_card.pick_nearest" : "ui.skill_card.pick_farthest", who);
                 case SkillTargetingCriterion.CurrentHp:
-                    return "the " + who + " with the " + (lowest ? "least" : "most") + " HP left";
+                    return text.Format(lowest ? "ui.skill_card.pick_least_hp" : "ui.skill_card.pick_most_hp", who);
                 case SkillTargetingCriterion.HpFraction:
-                    return "the " + who + " with the " + (lowest ? "lowest" : "highest") + " HP%";
+                    return text.Format(lowest ? "ui.skill_card.pick_lowest_hp_pct" : "ui.skill_card.pick_highest_hp_pct", who);
                 case SkillTargetingCriterion.Stat:
-                    string stat = skill.TargetingStat == StatType.HP ? "max HP" : StatName(skill.TargetingStat);
-                    return "the " + who + " with the " + (lowest ? "lowest " : "highest ") + stat;
+                    string stat = skill.TargetingStat == StatType.HP ? text.Get("ui.skill_card.max_hp") : StatName(skill.TargetingStat, text);
+                    return text.Format(lowest ? "ui.skill_card.pick_lowest_stat" : "ui.skill_card.pick_highest_stat", who, stat);
                 default:
-                    return "one of the " + sides;
+                    return text.Format("ui.skill_card.pick_any", sides);
             }
         }
 
-        private static string Hexes(int range)
+        private static string Hexes(int range, StringTable text)
         {
-            return range == 1 ? "1 hex" : Int(range) + " hexes";
+            return range == 1 ? text.Get("ui.skill_card.hex_one") : text.Format("ui.skill_card.hexes", Int(range));
         }
 
         /// <summary>
@@ -197,44 +204,47 @@ namespace BeastCraft.Presentation.Cards
         /// the caster) for all allies; Enemy for all enemies; else its side, plus Self for an
         /// ally burst (a burst is centred on the caster and covers it).
         /// </summary>
-        public static List<string> TargetTags(SkillTargetShape shape, SkillTargetSide side)
+        public static List<string> TargetTags(SkillTargetShape shape, SkillTargetSide side, StringTable text)
         {
+            string self = text.Get("ui.skill_card.tag_self");
+            string ally = text.Get("ui.skill_card.tag_ally");
+            string enemy = text.Get("ui.skill_card.tag_enemy");
             switch (shape)
             {
                 case SkillTargetShape.Self:
-                    return new List<string> { "Self" };
+                    return new List<string> { self };
                 case SkillTargetShape.AllAllies:
-                    return new List<string> { "Ally", "Self" };
+                    return new List<string> { ally, self };
                 case SkillTargetShape.AllEnemies:
-                    return new List<string> { "Enemy" };
+                    return new List<string> { enemy };
                 default:
                     if (side == SkillTargetSide.Ally)
                     {
-                        return shape == SkillTargetShape.AreaBurst ? new List<string> { "Ally", "Self" } : new List<string> { "Ally" };
+                        return shape == SkillTargetShape.AreaBurst ? new List<string> { ally, self } : new List<string> { ally };
                     }
 
-                    return new List<string> { "Enemy" };
+                    return new List<string> { enemy };
             }
         }
 
         /// <summary>The range text for a shape (see <see cref="Range"/>).</summary>
-        public static string RangeText(SkillTargetShape shape, int range)
+        public static string RangeText(SkillTargetShape shape, int range, StringTable text)
         {
             switch (shape)
             {
                 case SkillTargetShape.Self:
-                    return "Self";
+                    return text.Get("ui.skill_card.range_self");
                 case SkillTargetShape.AllAllies:
                 case SkillTargetShape.AllEnemies:
-                    return "Whole field";
+                    return text.Get("ui.skill_card.range_whole_field");
                 case SkillTargetShape.AreaBurst:
-                    return "Burst " + Int(range) + " around self";
+                    return text.Format("ui.skill_card.range_burst", Int(range));
                 case SkillTargetShape.Cross:
-                    return "Cross " + Int(range);
+                    return text.Format("ui.skill_card.range_cross", Int(range));
                 case SkillTargetShape.Line:
-                    return "Line " + Int(range);
+                    return text.Format("ui.skill_card.range_line", Int(range));
                 default:
-                    return range <= 1 ? "Melee" : "Range " + Int(range);
+                    return range <= 1 ? text.Get("ui.skill_card.range_melee") : text.Format("ui.skill_card.range", Int(range));
             }
         }
 
@@ -244,54 +254,54 @@ namespace BeastCraft.Presentation.Cards
         /// over time a fixed power each turn, a knockback whole hexes, a buff or debuff a percent
         /// or flat change; then its duration, stacks and chance.
         /// </summary>
-        public static string PowerLine(SkillEffect effect, Element element, DamageCategory category)
+        public static string PowerLine(SkillEffect effect, Element element, DamageCategory category, StringTable text)
         {
             string magnitude = Number(effect.Magnitude);
             string line;
             switch (effect.EffectType)
             {
                 case SkillEffectType.Damage:
-                    line = "Damage " + magnitude + "% of " + (category == DamageCategory.Special ? "Special Attack" : "Attack");
+                    line = text.Format(category == DamageCategory.Special ? "ui.skill_card.power_damage_special" : "ui.skill_card.power_damage", magnitude);
                     if (effect.HitCount > 1)
                     {
-                        line += ", " + Int(effect.HitCount) + " hits";
+                        line += text.Format("ui.skill_card.power_hits", Int(effect.HitCount));
                     }
 
                     if (effect.ExecuteBonusPercent > 0)
                     {
-                        line += ", up to +" + Int(effect.ExecuteBonusPercent) + "% on a worn-down target";
+                        line += text.Format("ui.skill_card.power_execute", Int(effect.ExecuteBonusPercent));
                     }
 
                     return line;
                 case SkillEffectType.Heal:
-                    line = "Heal " + magnitude + "% of Special Attack";
+                    line = text.Format("ui.skill_card.power_heal", magnitude);
                     break;
                 case SkillEffectType.BuffStat:
-                    line = "+" + magnitude + (effect.IsPercent ? "% " : " ") + StatName(effect.AffectedStat);
+                    line = text.Format(effect.IsPercent ? "ui.skill_card.power_buff_percent" : "ui.skill_card.power_buff", magnitude, StatName(effect.AffectedStat, text));
                     break;
                 case SkillEffectType.DebuffStat:
-                    line = "-" + magnitude + (effect.IsPercent ? "% " : " ") + StatName(effect.AffectedStat);
+                    line = text.Format(effect.IsPercent ? "ui.skill_card.power_debuff_percent" : "ui.skill_card.power_debuff", magnitude, StatName(effect.AffectedStat, text));
                     break;
                 case SkillEffectType.Cleanse:
-                    line = "Cleanse";
+                    line = text.Get("ui.skill_card.power_cleanse");
                     break;
                 case SkillEffectType.ApplyStatus:
                     switch (effect.Status)
                     {
                         case StatusType.Shield:
-                            line = "Shield " + magnitude + "% of Defense";
+                            line = text.Format("ui.skill_card.power_shield", magnitude);
                             break;
                         case StatusType.DamageOverTime:
-                            line = (element == Creatures.Element.Fire ? "Burn " : "Poison ") + magnitude + " power a turn";
+                            line = text.Format(element == Creatures.Element.Fire ? "ui.skill_card.power_burn" : "ui.skill_card.power_poison", magnitude);
                             break;
                         case StatusType.Knockback:
-                            line = "Knockback " + magnitude + (effect.Magnitude == 1f ? " hex" : " hexes");
+                            line = text.Format(effect.Magnitude == 1f ? "ui.skill_card.power_knockback_one" : "ui.skill_card.power_knockback", magnitude);
                             break;
                         case StatusType.Stun:
-                            line = "Stun";
+                            line = text.Get("ui.skill_card.power_stun");
                             break;
                         case StatusType.Taunt:
-                            line = "Taunt";
+                            line = text.Get("ui.skill_card.power_taunt");
                             break;
                         default:
                             line = effect.Status.ToString();
@@ -307,34 +317,34 @@ namespace BeastCraft.Presentation.Cards
             if (effect.DurationTurns > 0 && effect.EffectType != SkillEffectType.Heal && effect.EffectType != SkillEffectType.Cleanse &&
                 !(effect.EffectType == SkillEffectType.ApplyStatus && effect.Status == StatusType.Knockback))
             {
-                line += ", " + Int(effect.DurationTurns) + (effect.DurationTurns == 1 ? " turn" : " turns");
+                line += text.Format(effect.DurationTurns == 1 ? "ui.skill_card.power_turn" : "ui.skill_card.power_turns", Int(effect.DurationTurns));
             }
 
             if (effect.MaxStacks > 1)
             {
-                line += ", stacks x" + Int(effect.MaxStacks);
+                line += text.Format("ui.skill_card.power_stacks", Int(effect.MaxStacks));
             }
 
             if (effect.Chance > 0 && effect.Chance < SkillEffect.AlwaysChance)
             {
-                line += " (" + Int(effect.Chance) + "% chance)";
+                line += text.Format("ui.skill_card.power_chance", Int(effect.Chance));
             }
 
             return line;
         }
 
-        private static string UsesText(int maxUses, int initialCooldown, int cooldown)
+        private static string UsesText(int maxUses, int initialCooldown, int cooldown, StringTable text)
         {
-            string uses = maxUses == 1 ? "Once per battle" : maxUses > 1 ? Int(maxUses) + " times per battle" : null;
+            string uses = maxUses == 1 ? text.Get("ui.skill_card.once_per_battle") : maxUses > 1 ? text.Format("ui.skill_card.times_per_battle", Int(maxUses)) : null;
             if (initialCooldown == 0 && cooldown > 1)
             {
-                uses = uses == null ? "Ready at once" : uses + ", ready at once";
+                uses = uses == null ? text.Get("ui.skill_card.ready_at_once") : text.Format("ui.skill_card.uses_ready_at_once", uses);
             }
 
             return uses;
         }
 
-        private static string ScalingText(Progression.SkillProgressionDefinition progression)
+        private static string ScalingText(Progression.SkillProgressionDefinition progression, StringTable text)
         {
             if (progression == null)
             {
@@ -342,21 +352,21 @@ namespace BeastCraft.Presentation.Cards
             }
 
             float growth = Math.Max(0f, progression.MagnitudeGrowthPerLevel);
-            return "+" + Number(growth) + "% power per level, to Lv " + Int(progression.MaxLevel);
+            return text.Format("ui.skill_card.scaling", Number(growth), Int(progression.MaxLevel));
         }
 
-        private static string StatName(StatType stat)
+        private static string StatName(StatType stat, StringTable text)
         {
             switch (stat)
             {
                 case StatType.SpecialAttack:
-                    return "Special Attack";
+                    return text.Get("ui.skill_card.stat_special_attack");
                 case StatType.SpecialDefense:
-                    return "Special Defense";
+                    return text.Get("ui.skill_card.stat_special_defense");
                 case StatType.MoveRange:
-                    return "movement";
+                    return text.Get("ui.skill_card.stat_movement");
                 case StatType.CritChance:
-                    return "crit chance";
+                    return text.Get("ui.skill_card.stat_crit_chance");
                 default:
                     return stat.ToString();
             }

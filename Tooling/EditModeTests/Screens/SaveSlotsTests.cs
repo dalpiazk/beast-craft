@@ -239,14 +239,14 @@ namespace BeastCraft.Tests.EditMode
             SaveTransferResult result = null;
             folder.Import(r => result = r);
             Assert.IsFalse(result.Success);
-            StringAssert.StartsWith("No save file found", result.Error);
+            StringAssert.StartsWith("No save file found", result.Describe(Content.Text));
 
             Directory.CreateDirectory(_folder);
             File.WriteAllText(Path.Combine(_folder, "old.json"), "old");
             File.WriteAllText(Path.Combine(_folder, "new.json"), "new");
             File.SetLastWriteTimeUtc(Path.Combine(_folder, "old.json"), DateTime.UtcNow.AddDays(-1));
             folder.Import(r => result = r);
-            Assert.IsTrue(result.Success, result.Error);
+            Assert.IsTrue(result.Success, result.ErrorKey);
             Assert.AreEqual("new", result.Contents);
         }
 

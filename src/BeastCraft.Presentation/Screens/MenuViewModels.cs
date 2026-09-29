@@ -93,16 +93,20 @@ namespace BeastCraft.Presentation.Screens
     /// </summary>
     public sealed class HomeViewModel
     {
+        /// <summary>The tabs' ids, in <see cref="HomeTab"/> order (also the <c>--screen</c> names); their labels are <see cref="TabKeys"/>.</summary>
         public static readonly string[] TabNames = { "Map", "Roster", "Grove", "Avatar", "Inventory" };
 
-        /// <summary>What each coming-soon tab will hold (shown on its placeholder page). Grove's is unused — see the class remarks.</summary>
-        public static readonly string[] ComingSoonText =
+        /// <summary>The tabs' labels as text keys (<c>ui.home.tab_*</c>), in <see cref="HomeTab"/> order.</summary>
+        public static readonly string[] TabKeys = { "ui.home.tab_map", "ui.home.tab_roster", "ui.home.tab_grove", "ui.home.tab_avatar", "ui.home.tab_inventory" };
+
+        /// <summary>What each coming-soon tab will hold (shown on its placeholder page), as text keys. Grove's is unused — see the class remarks.</summary>
+        public static readonly string[] ComingSoonKeys =
         {
             null,
             null,
-            "Your team base: organise the party and claim idle rewards; your beasts' habitat, a garden and expeditions.",
+            "ui.home.coming_soon_grove",
             null,
-            "Materials, consumables and spare gear."
+            "ui.home.coming_soon_inventory"
         };
 
         public HomeTab Tab { get; private set; } = HomeTab.Map;
@@ -113,14 +117,16 @@ namespace BeastCraft.Presentation.Screens
             get { return Tab == HomeTab.Map || Tab == HomeTab.Roster || Tab == HomeTab.Grove || Tab == HomeTab.Avatar; }
         }
 
-        public string TabName
+        /// <summary>The current tab's label key (<see cref="TabKeys"/>).</summary>
+        public string TabNameKey
         {
-            get { return TabNames[(int)Tab]; }
+            get { return TabKeys[(int)Tab]; }
         }
 
-        public string ComingSoon
+        /// <summary>The current tab's placeholder text key (<see cref="ComingSoonKeys"/>; null for none).</summary>
+        public string ComingSoonKey
         {
-            get { return ComingSoonText[(int)Tab]; }
+            get { return ComingSoonKeys[(int)Tab]; }
         }
 
         public void Select(HomeTab tab)

@@ -4,6 +4,7 @@ using System.Globalization;
 using BeastCraft.Battle;
 using BeastCraft.Bonds;
 using BeastCraft.Creatures;
+using BeastCraft.Localization;
 using BeastCraft.Presentation.Content;
 
 namespace BeastCraft.Presentation.Screens
@@ -104,27 +105,28 @@ namespace BeastCraft.Presentation.Screens
             get { return DamageFormula.Compute(Power, Attack, Defense, ElementMultiplier, VariancePercent, Crit, ExecuteMultiplier, LevelMultiplier); }
         }
 
-        /// <summary>The breakdown as label/value lines, for the log panel.</summary>
-        public List<KeyValuePair<string, string>> Lines()
+        /// <summary>The breakdown as label/value lines, for the log panel (the labels from <paramref name="text"/>, <c>ui.battle_log.*</c>).</summary>
+        public List<KeyValuePair<string, string>> Lines(StringTable text)
         {
-            string a = Category == DamageCategory.Special ? "SpA" : "Atk";
-            string d = Category == DamageCategory.Special ? "SpD" : "Def";
+            string a = DerivedStats.ShortName(Category == DamageCategory.Special ? StatType.SpecialAttack : StatType.Attack, text);
+            string d = DerivedStats.ShortName(Category == DamageCategory.Special ? StatType.SpecialDefense : StatType.Defense, text);
             List<KeyValuePair<string, string>> lines = new List<KeyValuePair<string, string>>
             {
-                Line("Skill power", Number(Power) + "%"),
-                Line(a + " vs " + d, Attack.ToString(CultureInfo.InvariantCulture) + " vs " + Defense.ToString(CultureInfo.InvariantCulture)),
-                Line("Base: power x A²/(A+D)", Base.ToString("0.##", CultureInfo.InvariantCulture)),
-                Line("Element", DerivedStats.Times(ElementMultiplier)),
-                Line("Crit", Crit ? DerivedStats.Times(CritMultiplier) : "no"),
-                Line("Variance roll", VariancePercent.ToString(CultureInfo.InvariantCulture) + "%"),
-                Line("Level gap", DerivedStats.Times(LevelMultiplier))
+                Line(text.Get("ui.battle_log.skill_power"), text.Format("ui.battle_log.percent", Number(Power))),
+                Line(text.Format("ui.battle_log.versus", a, d), text.Format("ui.battle_log.versus", Attack.ToString(CultureInfo.InvariantCulture), Defense.ToString(CultureInfo.InvariantCulture))),
+                Line(text.Get("ui.battle_log.base"), Base.ToString("0.##", CultureInfo.InvariantCulture)),
+                Line(text.Get("ui.battle_log.element"), DerivedStats.Times(ElementMultiplier)),
+                Line(text.Get("ui.battle_log.crit"), Crit ? DerivedStats.Times(CritMultiplier) : text.Get("ui.battle_log.no")),
+                Line(text.Get("ui.battle_log.variance"), text.Format("ui.battle_log.percent", VariancePercent.ToString(CultureInfo.InvariantCulture))),
+                Line(text.Get("ui.battle_log.level_gap"), DerivedStats.Times(LevelMultiplier))
             };
             if (ExecuteMultiplier != 1.0)
             {
-                lines.Add(Line("Execute", DerivedStats.Times(ExecuteMultiplier)));
+                lines.Add(Line(text.Get("ui.battle_log.execute"), DerivedStats.Times(ExecuteMultiplier)));
             }
 
-            lines.Add(Line("Final", Amount.ToString(CultureInfo.InvariantCulture) + (Absorbed > 0 ? " (" + Absorbed.ToString(CultureInfo.InvariantCulture) + " to the shield)" : string.Empty)));
+            string final = Amount.ToString(CultureInfo.InvariantCulture);
+            lines.Add(Line(text.Get("ui.battle_log.final"), Absorbed > 0 ? text.Format("ui.battle_log.final_shielded", final, Absorbed.ToString(CultureInfo.InvariantCulture)) : final));
             return lines;
         }
 
@@ -217,13 +219,20 @@ namespace BeastCraft.Presentation.Screens
     /// </summary>
     public sealed class BattleLogViewModel
     {
+        /// <summary>The <c>via</c> an avatar art's lines carry (they read "Skill (art)").</summary>
+        private const string ArtVia = "art";
+
         private readonly Func<string, string> _names;
+        private readonly StringTable _text;
         private readonly List<BattleLogEntry> _entries = new List<BattleLogEntry>();
         private BattleUnit _avatar;
 
-        public BattleLogViewModel(Func<string, string> names)
+        /// <param name="names">Unit ids to display names (null: the ids).</param>
+        /// <param name="text">The text table the lines are written from (<c>ui.battle_log.*</c>; <c>GameContent.Text</c>).</param>
+        public BattleLogViewModel(Func<string, string> names, StringTable text)
         {
             _names = names ?? (id => id);
+            _text = text ?? throw new ArgumentNullException(nameof(text));
         }
 
         /// <summary>Every entry, oldest first.</summary>
@@ -245,9 +254,9 @@ namespace BeastCraft.Presentation.Screens
         }
 
         /// <summary>The log of a whole (or partly played) battle.</summary>
-        public static BattleLogViewModel Build(BattleRun battle, IEnumerable<BattleUnit> units, Func<string, string> names)
+        public static BattleLogViewModel Build(BattleRun battle, IEnumerable<BattleUnit> units, Func<string, string> names, StringTable text)
         {
-            BattleLogViewModel log = new BattleLogViewModel(names);
+            BattleLogViewModel log = new BattleLogViewModel(names, text);
             if (battle == null)
             {
                 return log;
@@ -272,7 +281,7 @@ namespace BeastCraft.Presentation.Screens
             {
                 if (id != null && id == avatarId)
                 {
-                    return CampaignAvatar.DisplayName;
+                    return CampaignAvatar.DisplayName(content.Text);
                 }
 
                 return id != null && names.TryGetValue(id, out string name) ? name : id;
@@ -299,7 +308,7 @@ namespace BeastCraft.Presentation.Screens
                 display = display ?? entry.Key;
                 counts.TryGetValue(display, out int seen);
                 counts[display] = seen + 1;
-                names[entry.Key] = seen == 0 ? display : display + " " + (seen + 1).ToString(CultureInfo.InvariantCulture);
+                names[entry.Key] = seen == 0 ? display : content?.Text != null ? content.Text.Format("ui.battle_log.numbered", display, seen + 1) : display + " " + (seen + 1).ToString(CultureInfo.InvariantCulture);
             }
 
             return names;
@@ -343,7 +352,7 @@ namespace BeastCraft.Presentation.Screens
         {
             foreach (TeamBondActivation bond in bonds ?? new TeamBondActivation[0])
             {
-                string name = bond.Bond?.DisplayName ?? bond.Bond?.BondId ?? "Bond";
+                string name = bond.Bond?.DisplayName ?? bond.Bond?.BondId ?? _text.Get("ui.battle_log.bond");
                 List<string> who = new List<string>();
                 foreach (BattleUnit unit in bond.Recipients)
                 {
@@ -356,7 +365,7 @@ namespace BeastCraft.Presentation.Screens
                     Kind = BattleLogKind.Bond,
                     Source = name,
                     ActorId = bond.Recipients.Count > 0 ? bond.Recipients[0].Id : null,
-                    Text = "Bond " + name + " (tier " + bond.Tier + ") on " + (who.Count == 0 ? "no one" : string.Join(", ", who))
+                    Text = _text.Format("ui.battle_log.bond_line", name, bond.Tier, who.Count == 0 ? _text.Get("ui.battle_log.no_one") : string.Join(_text.Get("ui.common.list_sep"), who))
                 });
             }
 
@@ -375,8 +384,12 @@ namespace BeastCraft.Presentation.Screens
             }
 
             string actor = Name(turn.Unit);
-            string what = turn.Stunned ? "is stunned" : turn.MovementSpent > 0 ? "moves " + turn.MovementSpent + (turn.MovementSpent == 1 ? " hex" : " hexes") : "acts";
-            _entries.Add(new BattleLogEntry { Turn = turnNumber, Kind = BattleLogKind.Turn, ActorId = turn.Unit.Id, Text = "Turn " + turnNumber + ": " + actor + " " + what });
+            string text = turn.Stunned
+                              ? _text.Format("ui.battle_log.turn_stunned", turnNumber, actor)
+                              : turn.MovementSpent > 0
+                                  ? _text.Format(turn.MovementSpent == 1 ? "ui.battle_log.turn_moves_one" : "ui.battle_log.turn_moves", turnNumber, actor, turn.MovementSpent)
+                                  : _text.Format("ui.battle_log.turn_acts", turnNumber, actor);
+            _entries.Add(new BattleLogEntry { Turn = turnNumber, Kind = BattleLogKind.Turn, ActorId = turn.Unit.Id, Text = text });
             if (turn.StatusDamage > 0)
             {
                 _entries.Add(new BattleLogEntry
@@ -386,7 +399,7 @@ namespace BeastCraft.Presentation.Screens
                     ActorId = turn.Unit.Id,
                     TargetId = turn.Unit.Id,
                     Amount = turn.StatusDamage,
-                    Text = actor + " takes " + turn.StatusDamage + " from burn/poison"
+                    Text = _text.Format("ui.battle_log.dot_damage", actor, turn.StatusDamage)
                 });
             }
 
@@ -400,7 +413,7 @@ namespace BeastCraft.Presentation.Screens
 
             foreach (SkillActivation art in turn.AvatarActivations)
             {
-                AddActivation(turnNumber, turn.Unit, art, "art");
+                AddActivation(turnNumber, turn.Unit, art, ArtVia);
             }
 
             foreach (PassiveActivation passive in turn.PassiveActivations)
@@ -410,7 +423,7 @@ namespace BeastCraft.Presentation.Screens
 
             foreach (BondReactionRecord reaction in turn.BondReactions)
             {
-                string bond = reaction.Bond?.DisplayName ?? reaction.Bond?.BondId ?? "Bond";
+                string bond = reaction.Bond?.DisplayName ?? reaction.Bond?.BondId ?? _text.Get("ui.battle_log.bond");
                 _entries.Add(new BattleLogEntry
                 {
                     Turn = turnNumber,
@@ -418,7 +431,9 @@ namespace BeastCraft.Presentation.Screens
                     ActorId = reaction.Reactor?.Id,
                     TargetId = reaction.InterceptedFrom?.Id,
                     Source = bond,
-                    Text = bond + ": " + Name(reaction.Reactor) + " reacts" + (reaction.InterceptedFrom != null ? ", covering " + Name(reaction.InterceptedFrom) : string.Empty)
+                    Text = reaction.InterceptedFrom != null
+                               ? _text.Format("ui.battle_log.reacts_covering", bond, Name(reaction.Reactor), Name(reaction.InterceptedFrom))
+                               : _text.Format("ui.battle_log.reacts", bond, Name(reaction.Reactor))
                 });
                 if (reaction.Activation != null)
                 {
@@ -434,7 +449,7 @@ namespace BeastCraft.Presentation.Screens
                 return;
             }
 
-            string name = passive.Passive?.DisplayName ?? passive.Passive?.PassiveId ?? "Passive";
+            string name = passive.Passive?.DisplayName ?? passive.Passive?.PassiveId ?? _text.Get("ui.battle_log.passive");
             _entries.Add(new BattleLogEntry
             {
                 Turn = turnNumber,
@@ -442,7 +457,7 @@ namespace BeastCraft.Presentation.Screens
                 ActorId = _avatar?.Id,
                 TargetId = passive.TriggeringUnit?.Id,
                 Source = name,
-                Text = "Passive " + name + " (" + passive.Trigger + ")"
+                Text = _text.Format("ui.battle_log.passive_line", name, passive.Trigger)
             });
             if (passive.Activation != null)
             {
@@ -454,11 +469,11 @@ namespace BeastCraft.Presentation.Screens
         private void AddActivation(int turnNumber, BattleUnit caster, SkillActivation activation, string via)
         {
             string skill = activation.Skill?.DisplayName ?? activation.Skill?.SkillId ?? "?";
-            string source = via == null || via == skill ? skill : via == "art" ? skill + " (art)" : via + ": " + skill;
+            string source = via == null || via == skill ? skill : via == ArtVia ? _text.Format("ui.battle_log.art", skill) : _text.Format("ui.common.label_value", via, skill);
             string casterName = caster == null ? via ?? "?" : Name(caster);
             if (activation.Targets.Count == 0)
             {
-                _entries.Add(new BattleLogEntry { Turn = turnNumber, Kind = BattleLogKind.Status, ActorId = caster?.Id, Source = source, Text = casterName + ": " + source + " finds no target" });
+                _entries.Add(new BattleLogEntry { Turn = turnNumber, Kind = BattleLogKind.Status, ActorId = caster?.Id, Source = source, Text = _text.Format("ui.battle_log.no_target", casterName, source) });
                 return;
             }
 
@@ -475,8 +490,8 @@ namespace BeastCraft.Presentation.Screens
                     Amount = hit.Roll.Amount,
                     Crit = hit.Roll.IsCrit,
                     Breakdown = breakdown,
-                    Text = casterName + " > " + Name(hit.Target) + ": " + source + " " + hit.Roll.Amount + (hit.Roll.IsCrit ? " CRIT" : string.Empty) +
-                           (hit.Absorbed > 0 ? " (" + hit.Absorbed + " shielded)" : string.Empty)
+                    Text = _text.Format("ui.battle_log.hit", casterName, Name(hit.Target), source, hit.Roll.Amount) + (hit.Roll.IsCrit ? _text.Get("ui.battle_log.crit_tag") : string.Empty) +
+                           (hit.Absorbed > 0 ? _text.Format("ui.battle_log.shielded", hit.Absorbed) : string.Empty)
                 });
             }
 
@@ -504,41 +519,43 @@ namespace BeastCraft.Presentation.Screens
             {
                 case SkillEffectType.Heal:
                     entry.Kind = BattleLogKind.Heal;
-                    entry.Text = casterName + " heals " + target + " +" + applied.Amount + " HP (" + source + ")";
+                    entry.Text = _text.Format("ui.battle_log.heal", casterName, target, applied.Amount, source);
                     break;
                 case SkillEffectType.BuffStat:
                 case SkillEffectType.DebuffStat:
                     entry.Kind = BattleLogKind.StatChange;
-                    entry.Text = target + " " + (applied.Amount >= 0 ? "+" : string.Empty) + applied.Amount + " " + DerivedStats.ShortName(effect.AffectedStat) +
-                                 (effect.DurationTurns > 0 ? " for " + effect.DurationTurns + (effect.DurationTurns == 1 ? " turn" : " turns") : string.Empty) + " (" + source + ")";
+                    string delta = (applied.Amount >= 0 ? "+" : string.Empty) + applied.Amount;
+                    string duration = effect.DurationTurns > 0 ? _text.Format(effect.DurationTurns == 1 ? "ui.battle_log.for_turn" : "ui.battle_log.for_turns", effect.DurationTurns) : string.Empty;
+                    entry.Text = _text.Format("ui.battle_log.stat_change", target, delta, DerivedStats.ShortName(effect.AffectedStat, _text), duration, source);
                     break;
                 case SkillEffectType.Cleanse:
                     entry.Kind = BattleLogKind.Status;
-                    entry.Text = target + " is cleansed (" + source + ")";
+                    entry.Text = _text.Format("ui.battle_log.cleansed", target, source);
                     break;
                 default:
                     switch (effect.Status)
                     {
                         case StatusType.Shield:
                             entry.Kind = BattleLogKind.Shield;
-                            entry.Text = applied.Amount > 0 ? target + " gains a " + applied.Amount + " shield (" + source + ")" : target + " keeps its larger shield (" + source + ")";
+                            entry.Text = applied.Amount > 0 ? _text.Format("ui.battle_log.shield", target, applied.Amount, source) : _text.Format("ui.battle_log.shield_kept", target, source);
                             break;
                         case StatusType.DamageOverTime:
                             entry.Kind = BattleLogKind.Status;
-                            entry.Text = target + " is " + (effect.Status == StatusType.DamageOverTime && SourceElement(applied) == Element.Fire ? "burned" : "poisoned") +
-                                         (applied.Amount > 0 ? ": " + applied.Amount + " a turn" : string.Empty) + " (" + source + ")";
+                            bool burn = effect.Status == StatusType.DamageOverTime && SourceElement(applied) == Element.Fire;
+                            string perTurn = applied.Amount > 0 ? _text.Format("ui.battle_log.per_turn", applied.Amount) : string.Empty;
+                            entry.Text = _text.Format(burn ? "ui.battle_log.burned" : "ui.battle_log.poisoned", target, perTurn, source);
                             break;
                         case StatusType.Stun:
                             entry.Kind = BattleLogKind.Status;
-                            entry.Text = target + " is stunned (" + source + ")";
+                            entry.Text = _text.Format("ui.battle_log.stunned", target, source);
                             break;
                         case StatusType.Taunt:
                             entry.Kind = BattleLogKind.Status;
-                            entry.Text = target + " is taunted by " + casterName + " (" + source + ")";
+                            entry.Text = _text.Format("ui.battle_log.taunted", target, casterName, source);
                             break;
                         case StatusType.Knockback:
                             entry.Kind = BattleLogKind.Status;
-                            entry.Text = target + " is knocked back " + applied.Amount + (applied.Amount == 1 ? " hex" : " hexes") + " (" + source + ")";
+                            entry.Text = _text.Format(applied.Amount == 1 ? "ui.battle_log.knocked_back_one" : "ui.battle_log.knocked_back", target, applied.Amount, source);
                             break;
                         default:
                             return null;
@@ -586,7 +603,7 @@ namespace BeastCraft.Presentation.Screens
                     Kind = BattleLogKind.Defeat,
                     ActorId = blow.ActorId,
                     TargetId = unit.Id,
-                    Text = Name(unit) + " falls"
+                    Text = _text.Format("ui.battle_log.falls", Name(unit))
                 });
             }
         }

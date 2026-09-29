@@ -1,12 +1,12 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using BeastCraft.Battle;
 using BeastCraft.Bonds;
 using BeastCraft.Creatures;
 using BeastCraft.Economy;
 using BeastCraft.Garden;
 using BeastCraft.Grove;
+using BeastCraft.Localization;
 using BeastCraft.Presentation.Cards;
 using BeastCraft.Presentation.Content;
 using BeastCraft.Progression;
@@ -194,6 +194,12 @@ namespace BeastCraft.Presentation.Screens
             Refresh();
         }
 
+        /// <summary>The text table (<c>ui.beast.*</c>).</summary>
+        private StringTable Text
+        {
+            get { return _session.Content.Text; }
+        }
+
         public string BeastId { get; }
 
         /// <summary>False when the beast is not in the save (the screen shows nothing).</summary>
@@ -289,7 +295,7 @@ namespace BeastCraft.Presentation.Screens
             Level = Beast.Progress.Level;
             int toNext = BeastProgression.XpToNextLevel(Level);
             XpFraction = Level >= BeastProgression.MaxLevel || toNext <= 0 ? 1f : Math.Min(1f, Math.Max(0f, (float)Beast.Progress.Xp / toNext));
-            XpText = Level >= BeastProgression.MaxLevel ? "Max level" : Beast.Progress.Xp.ToString(CultureInfo.InvariantCulture) + " / " + toNext.ToString(CultureInfo.InvariantCulture) + " XP";
+            XpText = Level >= BeastProgression.MaxLevel ? Text.Get("ui.beast.max_level_cap") : Text.Format("ui.beast.xp_of", Beast.Progress.Xp, toNext);
             Stance = Species.Stance;
             Elements = Species.Elements ?? new Element[0];
             Element = RosterViewModel.PrimaryElement(Species);
@@ -320,7 +326,7 @@ namespace BeastCraft.Presentation.Screens
             message = null;
             if (!Exists)
             {
-                message = "No such beast.";
+                message = Text.Get("ui.beast.no_such_beast");
                 return false;
             }
 
@@ -328,29 +334,29 @@ namespace BeastCraft.Presentation.Screens
             int current = book.IndexOfEquipped(skillId);
             if (current == slot)
             {
-                message = "Already in that slot.";
+                message = Text.Get("ui.beast.already_in_slot");
                 return false;
             }
 
             if (current >= 0)
             {
                 book.SwapSlots(current, slot);
-                return Changed(out message, "Swapped.");
+                return Changed(out message, Text.Get("ui.beast.swapped"));
             }
 
             SkillEquipResult result = book.Equip(slot, skillId);
             switch (result)
             {
                 case SkillEquipResult.Equipped:
-                    return Changed(out message, "Equipped.");
+                    return Changed(out message, Text.Get("ui.beast.equipped_done"));
                 case SkillEquipResult.UnknownSkill:
-                    message = "Not learned yet.";
+                    message = Text.Get("ui.beast.not_learned");
                     return false;
                 case SkillEquipResult.SlotOutOfRange:
-                    message = "No such slot.";
+                    message = Text.Get("ui.beast.no_such_slot");
                     return false;
                 default:
-                    message = "Already equipped.";
+                    message = Text.Get("ui.beast.already_equipped");
                     return false;
             }
         }
@@ -361,7 +367,7 @@ namespace BeastCraft.Presentation.Screens
             message = null;
             if (!Exists || Beast.Skills.GetEquipped(slot) == null)
             {
-                message = "That slot is empty.";
+                message = Text.Get("ui.beast.slot_empty");
                 return false;
             }
 
@@ -373,12 +379,12 @@ namespace BeastCraft.Presentation.Screens
 
             if (equipped <= 1)
             {
-                message = "A beast needs at least one skill.";
+                message = Text.Get("ui.beast.needs_one_skill");
                 return false;
             }
 
             Beast.Skills.Unequip(slot);
-            return Changed(out message, "Unequipped.");
+            return Changed(out message, Text.Get("ui.beast.unequipped"));
         }
 
         /// <summary>
@@ -391,24 +397,24 @@ namespace BeastCraft.Presentation.Screens
             MaterialOptionView option = MaterialFor(skillId, materialId, out SkillProgress progress, out SkillSO skill, out SkillMaterialSO material);
             if (option == null)
             {
-                message = "Nothing to train.";
+                message = Text.Get("ui.beast.nothing_to_train");
                 return false;
             }
 
             if (!option.CanTrain)
             {
-                message = option.Reason ?? "It cannot be trained with that.";
+                message = option.Reason ?? Text.Get("ui.beast.cannot_train");
                 return false;
             }
 
             if (!_session.Save.Materials.TryConsume(materialId, 1))
             {
-                message = "None left.";
+                message = Text.Get("ui.beast.none_left");
                 return false;
             }
 
             int levels = SkillProgression.ApplyMaterial(progress, skill.Progression, material);
-            return Changed(out message, levels > 0 ? "Up " + levels + (levels == 1 ? " level" : " levels") + ": Lv " + progress.Level + "." : "+" + material.XpValue + " XP.");
+            return Changed(out message, levels > 0 ? Text.Format(levels == 1 ? "ui.beast.up_level" : "ui.beast.up_levels", levels, progress.Level) : Text.Format("ui.beast.xp_gained", material.XpValue));
         }
 
         /// <summary>
@@ -421,13 +427,13 @@ namespace BeastCraft.Presentation.Screens
             MaterialOptionView option = MaterialFor(skillId, materialId, out SkillProgress progress, out SkillSO skill, out SkillMaterialSO material);
             if (option == null)
             {
-                message = "Nothing to break through.";
+                message = Text.Get("ui.beast.nothing_to_break");
                 return false;
             }
 
             if (!option.CanBreakthrough)
             {
-                message = option.Reason ?? "Not now.";
+                message = option.Reason ?? Text.Get("ui.beast.not_now");
                 return false;
             }
 
@@ -439,7 +445,7 @@ namespace BeastCraft.Presentation.Screens
             }
 
             _session.Save.Materials.TryConsume(materialId, 1);
-            return Changed(out message, "Breakthrough! Tier " + progress.Tier + ": it can grow to Lv " + SkillProgression.LevelCap(skill.Progression, progress.Tier) + ".");
+            return Changed(out message, Text.Format("ui.beast.breakthrough_done", progress.Tier, SkillProgression.LevelCap(skill.Progression, progress.Tier)));
         }
 
         /// <summary>Wears gear <paramref name="instanceId"/> in <paramref name="slot"/> (<see cref="GearRules.EquipBeastGear"/>). Autosaves.</summary>
@@ -448,10 +454,10 @@ namespace BeastCraft.Presentation.Screens
             GearEquipResult result = GearRules.EquipBeastGear(_session.Save, BeastId, slot, instanceId, _session.Content.Battle);
             if (result == GearEquipResult.Equipped)
             {
-                return Changed(out message, "Equipped.");
+                return Changed(out message, Text.Get("ui.beast.equipped_done"));
             }
 
-            message = EquipReason(result, 0);
+            message = EquipReason(result, 0, Text);
             return false;
         }
 
@@ -460,11 +466,11 @@ namespace BeastCraft.Presentation.Screens
         {
             if (!GearRules.UnequipBeastGear(_session.Save, BeastId, slot))
             {
-                message = "Nothing worn there.";
+                message = Text.Get("ui.beast.nothing_worn_there");
                 return false;
             }
 
-            return Changed(out message, "Taken off.");
+            return Changed(out message, Text.Get("ui.beast.taken_off"));
         }
 
         /// <summary>The materials the player holds (every tier), and what each can do for <paramref name="skillId"/> now.</summary>
@@ -501,7 +507,7 @@ namespace BeastCraft.Presentation.Screens
         }
 
         /// <summary>A skill's progress under <paramref name="definition"/>, as the screen shows it.</summary>
-        public static SkillProgressView ProgressOf(SkillProgress progress, SkillProgressionDefinition definition)
+        public static SkillProgressView ProgressOf(SkillProgress progress, SkillProgressionDefinition definition, StringTable text)
         {
             if (progress == null)
             {
@@ -529,8 +535,8 @@ namespace BeastCraft.Presentation.Screens
                 NextPowerMultiplier = def.GetMagnitudeMultiplier(Math.Min(max, level + 1))
             };
             view.GateText = gate == null
-                ? "Fully broken through: grows to Lv " + max
-                : (view.AwaitingBreakthrough ? "Breakthrough due" : "Next breakthrough at Lv " + view.NextGateLevel) + ": a tier " + view.NextGateMaterialTier + " material or better";
+                ? text.Format("ui.beast.gate_done", max)
+                : text.Format("ui.beast.gate", view.AwaitingBreakthrough ? text.Get("ui.beast.breakthrough_due") : text.Format("ui.beast.next_breakthrough", view.NextGateLevel), view.NextGateMaterialTier);
             return view;
         }
 
@@ -549,7 +555,7 @@ namespace BeastCraft.Presentation.Screens
                 Stats.Add(new StatLine
                 {
                     Stat = stat,
-                    Label = DerivedStats.ShortName(stat),
+                    Label = DerivedStats.ShortName(stat, Text),
                     Base = baseStats.GetStat(stat),
                     Gear = total.GetStat(stat) - baseStats.GetStat(stat),
                     Total = total.GetStat(stat)
@@ -583,7 +589,7 @@ namespace BeastCraft.Presentation.Screens
             double enemyTurns = DerivedStats.AverageEnemyTurns(content.Enemies, Level, out int enemySpeed);
             if (enemyTurns > 0.0)
             {
-                TurnRateView enemy = Rate("Average enemy, Lv " + Level, enemySpeed, false, true);
+                TurnRateView enemy = Rate(Text.Format("ui.beast.average_enemy", Level), enemySpeed, false, true);
                 enemy.TurnsPer100Ticks = enemyTurns;
                 enemy.Relative = TurnsPer100Ticks > 0.0 ? enemyTurns / TurnsPer100Ticks : 0.0;
                 TurnRates.Add(enemy);
@@ -662,10 +668,10 @@ namespace BeastCraft.Presentation.Screens
             {
                 SkillId = skillId,
                 Skill = skill,
-                Card = skill == null ? null : SkillCard.Of(skill, _session.Content.Glossary),
+                Card = skill == null ? null : SkillCard.Of(skill, _session.Content.Glossary, _session.Content.Text),
                 EquippedSlot = slot,
                 Known = progress != null,
-                Progress = ProgressOf(progress, skill?.Progression)
+                Progress = ProgressOf(progress, skill?.Progression, Text)
             };
         }
 
@@ -695,23 +701,23 @@ namespace BeastCraft.Presentation.Screens
             };
             if (progress == null || skill == null)
             {
-                option.Reason = "Not learned yet.";
+                option.Reason = Text.Get("ui.beast.not_learned");
                 return option;
             }
 
-            SkillProgressView view = ProgressOf(progress, skill.Progression);
+            SkillProgressView view = ProgressOf(progress, skill.Progression, Text);
             if (owned <= 0)
             {
-                option.Reason = "None held.";
+                option.Reason = Text.Get("ui.beast.none_held");
             }
             else if (view.AwaitingBreakthrough)
             {
                 option.CanBreakthrough = material.Tier >= view.NextGateMaterialTier;
-                option.Reason = option.CanBreakthrough ? null : "The breakthrough needs a tier " + view.NextGateMaterialTier + " material or better.";
+                option.Reason = option.CanBreakthrough ? null : Text.Format("ui.beast.breakthrough_needs", view.NextGateMaterialTier);
             }
             else if (view.Level >= view.MaxLevel)
             {
-                option.Reason = "Already at the maximum level.";
+                option.Reason = Text.Get("ui.beast.at_max_level");
             }
             else
             {
@@ -727,7 +733,7 @@ namespace BeastCraft.Presentation.Screens
             PlayerSave save = _session.Save;
             foreach (GearSlot slot in (GearSlot[])Enum.GetValues(typeof(GearSlot)))
             {
-                GearSlotView view = new GearSlotView { Slot = slot, SlotName = SlotName(slot) };
+                GearSlotView view = new GearSlotView { Slot = slot, SlotName = SlotName(slot, Text) };
                 string wornId = GearRules.GetSlot(Beast.EquippedGear, (int)slot);
                 foreach (OwnedGear owned in save.Gear.BeastGear)
                 {
@@ -737,21 +743,21 @@ namespace BeastCraft.Presentation.Screens
                         continue;
                     }
 
-                    GearView option = View(owned, gear);
+                    GearView option = View(owned, gear, Text);
                     string holder = GearRules.FindBeastGearHolder(save, owned.InstanceId);
                     if (holder == BeastId)
                     {
                         option.WornBy = Name;
-                        option.Reason = "Worn.";
+                        option.Reason = Text.Get("ui.beast.worn_here");
                     }
                     else if (holder != null)
                     {
                         option.WornBy = _session.BeastName(save.FindBeast(holder));
-                        option.Reason = EquipReason(GearEquipResult.EquippedElsewhere, 0, option.WornBy);
+                        option.Reason = EquipReason(GearEquipResult.EquippedElsewhere, 0, Text, option.WornBy);
                     }
                     else if (Level < gear.MinimumLevel)
                     {
-                        option.Reason = EquipReason(GearEquipResult.LevelTooLow, gear.MinimumLevel);
+                        option.Reason = EquipReason(GearEquipResult.LevelTooLow, gear.MinimumLevel, Text);
                     }
                     else
                     {
@@ -800,7 +806,7 @@ namespace BeastCraft.Presentation.Screens
                     BondId = bond.BondId,
                     Name = bond.DisplayName ?? bond.BondId,
                     Description = bond.Description,
-                    Condition = ConditionText(bond)
+                    Condition = ConditionText(bond, Text)
                 };
                 foreach (TeamBondTier tier in bond.Tiers ?? new List<TeamBondTier>())
                 {
@@ -853,7 +859,7 @@ namespace BeastCraft.Presentation.Screens
                 }
 
                 CosmeticOption worn = CosmeticRules.Worn(_session.Save, BeastId, category.CategoryId, library);
-                Looks.Add(new LookView { Category = category.DisplayName, Option = worn?.DisplayName ?? "Default" });
+                Looks.Add(new LookView { Category = category.DisplayName, Option = worn?.DisplayName ?? Text.Get("ui.beast.default") });
             }
         }
 
@@ -956,7 +962,7 @@ namespace BeastCraft.Presentation.Screens
                 }
 
                 worn.Add(gear);
-                GearView view = View(owned, gear);
+                GearView view = View(owned, gear, Text);
                 view.Inactive = Level < gear.MinimumLevel;
                 contributions.Add(view);
             }
@@ -982,7 +988,7 @@ namespace BeastCraft.Presentation.Screens
             return worn;
         }
 
-        private static GearView View(OwnedGear owned, GearSO gear)
+        private static GearView View(OwnedGear owned, GearSO gear, StringTable text)
         {
             GearView view = new GearView { InstanceId = owned.InstanceId, GearId = gear.GearId, Name = gear.DisplayName ?? gear.GearId, MinimumLevel = gear.MinimumLevel };
             foreach (StatModifier modifier in gear.Modifiers ?? new List<StatModifier>())
@@ -992,16 +998,7 @@ namespace BeastCraft.Presentation.Screens
                     continue;
                 }
 
-                if (modifier.FlatBonus != 0)
-                {
-                    view.Bonuses.Add((modifier.FlatBonus > 0 ? "+" : string.Empty) + modifier.FlatBonus.ToString(CultureInfo.InvariantCulture) + " " + DerivedStats.ShortName(modifier.Stat));
-                }
-
-                if (modifier.PercentBonus != 0f)
-                {
-                    view.Bonuses.Add((modifier.PercentBonus > 0f ? "+" : string.Empty) + (modifier.PercentBonus * 100f).ToString("0.##", CultureInfo.InvariantCulture) + "% " +
-                                     DerivedStats.ShortName(modifier.Stat));
-                }
+                view.Bonuses.AddRange(DerivedStats.BonusLines(modifier, text));
             }
 
             return view;
@@ -1016,53 +1013,55 @@ namespace BeastCraft.Presentation.Screens
         }
 
         /// <summary>A gear slot's name.</summary>
-        public static string SlotName(GearSlot slot)
+        public static string SlotName(GearSlot slot, StringTable text)
         {
             switch (slot)
             {
                 case GearSlot.WeaponOrCore:
-                    return "Weapon / core";
+                    return text.Get("ui.gear.slot_weapon");
                 case GearSlot.ArmorOrShell:
-                    return "Armour / shell";
+                    return text.Get("ui.gear.slot_armour");
                 default:
-                    return "Accessory";
+                    return text.Get("ui.gear.slot_accessory");
             }
         }
 
-        private static string EquipReason(GearEquipResult result, int minimumLevel, string holder = null)
+        private static string EquipReason(GearEquipResult result, int minimumLevel, StringTable text, string holder = null)
         {
             switch (result)
             {
                 case GearEquipResult.LevelTooLow:
-                    return minimumLevel > 0 ? "Needs Lv " + minimumLevel + "." : "The beast's level is too low.";
+                    return minimumLevel > 0 ? text.Format("ui.gear.needs_level", minimumLevel) : text.Get("ui.gear.beast_level_low");
                 case GearEquipResult.EquippedElsewhere:
-                    return holder != null ? "Worn by " + holder + "." : "Another beast wears it.";
+                    return holder != null ? text.Format("ui.gear.worn_by", holder) : text.Get("ui.gear.worn_by_other");
                 case GearEquipResult.SlotMismatch:
-                    return "It does not go in that slot.";
+                    return text.Get("ui.gear.slot_mismatch");
                 case GearEquipResult.UnknownInstance:
-                    return "You do not have it.";
+                    return text.Get("ui.gear.not_owned");
                 case GearEquipResult.UnknownGear:
-                    return "Unknown gear.";
+                    return text.Get("ui.gear.unknown");
                 default:
-                    return "No such beast.";
+                    return text.Get("ui.beast.no_such_beast");
             }
         }
 
         /// <summary>A bond's membership rule in words.</summary>
-        public static string ConditionText(TeamBondSO bond)
+        public static string ConditionText(TeamBondSO bond, StringTable text)
         {
             switch (bond.Condition)
             {
                 case TeamBondCondition.Stance:
-                    return bond.Stance + " beasts";
+                    return text.Format("ui.bond.stance_beasts", bond.Stance);
                 case TeamBondCondition.Elements:
                     List<string> elements = (bond.Elements ?? new List<Element>()).ConvertAll(e => e.ToString());
-                    return (elements.Count <= 1 ? string.Join(string.Empty, elements) : string.Join(", ", elements.GetRange(0, elements.Count - 1)) + " or " + elements[elements.Count - 1]) +
-                           " beasts (one per element)";
+                    string list = elements.Count <= 1
+                                      ? string.Join(string.Empty, elements)
+                                      : text.Format("ui.common.or_list", string.Join(text.Get("ui.common.list_sep"), elements.GetRange(0, elements.Count - 1)), elements[elements.Count - 1]);
+                    return text.Format("ui.bond.element_beasts", list);
                 case TeamBondCondition.Species:
-                    return "Particular beasts";
+                    return text.Get("ui.bond.species_beasts");
                 default:
-                    return "Beasts of different stances";
+                    return text.Get("ui.bond.mixed_stances");
             }
         }
     }

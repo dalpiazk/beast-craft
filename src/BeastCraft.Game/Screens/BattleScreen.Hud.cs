@@ -48,7 +48,7 @@ namespace BeastCraft.Game.Screens
 
             if (_playback.IsOver && (_animation == null || _clockMs >= _animation.DurationMs))
             {
-                string banner = _playback.Outcome == BattleOutcome.PlayerVictory ? "VICTORY" : _playback.Outcome == BattleOutcome.EnemyVictory ? "DEFEAT" : "STALEMATE";
+                string banner = Loc(_playback.Outcome == BattleOutcome.PlayerVictory ? "ui.battle_hud.victory" : _playback.Outcome == BattleOutcome.EnemyVictory ? "ui.battle_hud.defeat" : "ui.battle_hud.stalemate");
                 Rect board = _screen.Board;
                 _draw.Fill(Pixel, new Vector2(board.X, board.Center.Y - 70f), new Vector2(board.Width, 140f), shadow * 0.75f);
                 _text.DrawCentered(_draw, banner, board.Center.X, board.Center.Y - 30f, 60f, Ink("y", Color.Gold), shadow);
@@ -66,7 +66,7 @@ namespace BeastCraft.Game.Screens
                 return;
             }
 
-            Ctx.Painter.Button(ContinueButton, "Continue", Ctx.Style.Button("primary"), false, true, false);
+            Ctx.Painter.Button(ContinueButton, Loc("ui.battle_hud.continue"), Ctx.Style.Button("primary"), false, true, false);
         }
 
         /// <summary>
@@ -84,11 +84,13 @@ namespace BeastCraft.Game.Screens
             Rect panel = _screen.SettingsPanel;
             _draw.Fill(Pixel, new Vector2(panel.X, panel.Y), new Vector2(panel.Width, panel.Height), Ink("y", Color.Gold));
             _draw.Fill(Pixel, new Vector2(panel.X + 5f, panel.Y + 5f), new Vector2(panel.Width - 10f, panel.Height - 10f), Ink("p", Color.Purple));
-            _text.DrawCentered(_draw, "EFFECTS SETTINGS", panel.Center.X, panel.Y + 36f, Large, Ink("y", Color.Gold), shadow);
+            _text.DrawCentered(_draw, Loc("ui.battle_hud.effects_settings"), panel.Center.X, panel.Y + 36f, Large, Ink("y", Color.Gold), shadow);
 
-            string intensity = _settings.EffectsIntensity == EffectsIntensity.Minimal ? "MINIMAL" : _settings.EffectsIntensity == EffectsIntensity.Reduced ? "REDUCED" : "FULL";
-            string[] labels = { "EFFECTS", "SCREEN SHAKE", "FLASHES", null };
-            string[] values = { intensity, _settings.ScreenShake ? "ON" : "OFF", _settings.Flashes ? "ON" : "OFF", null };
+            string intensity = Loc(_settings.EffectsIntensity == EffectsIntensity.Minimal ? "ui.battle_hud.minimal" : _settings.EffectsIntensity == EffectsIntensity.Reduced ? "ui.battle_hud.reduced" : "ui.battle_hud.full");
+            string[] labels = { Loc("ui.battle_hud.effects"), Loc("ui.battle_hud.screen_shake"), Loc("ui.battle_hud.flashes"), null };
+            string onText = Loc("ui.battle_hud.on");
+            string offText = Loc("ui.battle_hud.off");
+            string[] values = { intensity, _settings.ScreenShake ? onText : offText, _settings.Flashes ? onText : offText, null };
             for (int i = 0; i < PortraitLayout.SettingsRowCount; i++)
             {
                 Rect row = _screen.SettingsRow(i);
@@ -96,12 +98,12 @@ namespace BeastCraft.Game.Screens
                 _draw.Fill(Pixel, new Vector2(row.X, row.Y), new Vector2(row.Width, row.Height), close ? Ink("2", Color.Gray) : Ink("1", Color.DarkGray));
                 if (close)
                 {
-                    _text.DrawCentered(_draw, "CLOSE", row.Center.X, row.Center.Y - 12f, Large, Ink("4", Color.White), shadow);
+                    _text.DrawCentered(_draw, Loc("ui.battle_hud.close"), row.Center.X, row.Center.Y - 12f, Large, Ink("4", Color.White), shadow);
                     continue;
                 }
 
                 _text.Draw(_draw, labels[i], new Vector2(row.X + 24f, row.Center.Y - 12f), Large, Ink("4", Color.White), shadow);
-                bool on = values[i] != "OFF";
+                bool on = values[i] != offText;
                 _text.DrawRight(_draw, values[i], row.Right - 24f, row.Center.Y - 12f, Large, on ? Ink("l", Color.LightGreen) : Ink("o", Color.OrangeRed), shadow);
             }
         }
@@ -110,8 +112,7 @@ namespace BeastCraft.Game.Screens
         {
             Rect header = _screen.Header;
             _text.Draw(_draw, _text.Fit(_hudTitle, Large, 520f), new Vector2(header.X, header.Y + 12f), Large, Ink("y", Color.Gold), shadow);
-            string turn = "TURN " + _playback.Played.Count.ToString(CultureInfo.InvariantCulture) + "  SEED " +
-                          _seed.ToString(CultureInfo.InvariantCulture);
+            string turn = Loc("ui.battle_hud.turn_seed", _playback.Played.Count.ToString(CultureInfo.InvariantCulture), _seed.ToString(CultureInfo.InvariantCulture));
             Rect gear = _screen.SettingsButton;
             _text.DrawRight(_draw, turn, gear.X - 20f, header.Y + 16f, Medium, Ink("3", Color.Gray), shadow);
 
@@ -133,7 +134,7 @@ namespace BeastCraft.Game.Screens
         private void DrawTurnOrder(ScheduledBeat beat, Color shadow)
         {
             Rect band = _screen.TurnOrder;
-            _text.DrawRight(_draw, "TURN ORDER", band.Right, band.Y + 8f, Small, Ink("3", Color.Gray), shadow);
+            _text.DrawRight(_draw, Loc("ui.battle_hud.turn_order"), band.Right, band.Y + 8f, Small, Ink("3", Color.Gray), shadow);
 
             // The order, with the gauge ticks until each turn (the animating turn is now: 0).
             List<KeyValuePair<BattleUnit, long>> order = new List<KeyValuePair<BattleUnit, long>>();
@@ -195,7 +196,7 @@ namespace BeastCraft.Game.Screens
                 }
                 if (current)
                 {
-                    _text.DrawCentered(_draw, _animation != null ? "NOW" : "NEXT", slot.Center.X, band.Y + 8f, Small, Ink("Y", Color.Yellow), shadow);
+                    _text.DrawCentered(_draw, Loc(_animation != null ? "ui.battle_hud.now" : "ui.battle_hud.next"), slot.Center.X, band.Y + 8f, Small, Ink("Y", Color.Yellow), shadow);
                     SkillSO firing = beat == null ? null : FindSkill(unit, beat.Beat.SkillId);
                     if (firing != null)
                     {
@@ -275,7 +276,7 @@ namespace BeastCraft.Game.Screens
 
             Rect toast = _screen.Toast;
             _draw.Fill(Pixel, new Vector2(toast.X, toast.Y), new Vector2(toast.Width, toast.Height), Ink("p", Color.Purple) * 0.8f);
-            string count = "LOG #" + _log.Count.ToString(CultureInfo.InvariantCulture);
+            string count = Loc("ui.battle_hud.log_count", _log.Count.ToString(CultureInfo.InvariantCulture));
             float countWidth = _text.Measure(count, Small);
             _text.Draw(_draw, _text.Fit(_log[_log.Count - 1], Medium, toast.Width - countWidth - 48f), new Vector2(toast.X + 16f, toast.Y + 22f), Medium,
                        Ink("4", Color.White), shadow);
@@ -294,7 +295,7 @@ namespace BeastCraft.Game.Screens
             }
 
             _text.Draw(_draw, UnitName(unit.Id), new Vector2(strip.X, strip.Y + 8f), Medium, Ink("y", Color.Gold), shadow);
-            _text.Draw(_draw, "SKILLS", new Vector2(strip.X + _text.Measure(UnitName(unit.Id), Medium) + 20f, strip.Y + 12f), Small, Ink("3", Color.Gray), shadow);
+            _text.Draw(_draw, Loc("ui.battle_hud.skills"), new Vector2(strip.X + _text.Measure(UnitName(unit.Id), Medium) + 20f, strip.Y + 12f), Small, Ink("3", Color.Gray), shadow);
 
             int shown = SelectedSkill();
             for (int i = 0; i < skills.Count; i++)
@@ -312,7 +313,7 @@ namespace BeastCraft.Game.Screens
                 DrawSkillIcon(skill, icon, shadow, SourceOf(unit, skill));
 
                 int cooldown = unit.Skills == null ? 0 : unit.Skills.RemainingCooldown(i);
-                string state = firing ? "CAST" : cooldown <= 0 ? "READY" : "CD " + cooldown.ToString(CultureInfo.InvariantCulture);
+                string state = firing ? Loc("ui.battle_hud.cast") : cooldown <= 0 ? Loc("ui.battle_hud.ready") : Loc("ui.battle_hud.cooldown", cooldown.ToString(CultureInfo.InvariantCulture));
                 _text.Draw(_draw, state, new Vector2(icon.Right + 12f, icon.Y + 6f), Small, cooldown <= 0 || firing ? Ink("l", Color.LightGreen) : Ink("3", Color.Gray),
                            shadow);
                 _text.Draw(_draw, _text.Fit(ShapeLabel(skill), Small, card.Right - icon.Right - 20f), new Vector2(icon.Right + 12f, icon.Y + 40f), Small,
@@ -344,7 +345,7 @@ namespace BeastCraft.Game.Screens
             }
 
             SkillSO skill = ActingSkills()[selected];
-            SkillCard card = SkillCard.Of(skill, _content.Glossary);
+            SkillCard card = SkillCard.Of(skill, _content.Glossary, _content.Text);
             SkillCardLayout layout = CardLayout(card);
             Rect panel = layout.Card;
             _draw.Fill(Pixel, new Vector2(panel.X, panel.Y), new Vector2(panel.Width, panel.Height), Ink("Y", Color.Yellow));
@@ -369,7 +370,7 @@ namespace BeastCraft.Game.Screens
 
             foreach (string target in card.Targets)
             {
-                Color tint = target == "Enemy" ? Ink("r", Color.DarkRed) : target == "Ally" ? Ink("g", Color.DarkGreen) : Ink("q", Color.Chocolate);
+                Color tint = target == Loc("ui.skill_card.tag_enemy") ? Ink("r", Color.DarkRed) : target == Loc("ui.skill_card.tag_ally") ? Ink("g", Color.DarkGreen) : Ink("q", Color.Chocolate);
                 x = DrawChip(target, x, layout.ChipsY, tint);
             }
 
@@ -435,7 +436,7 @@ namespace BeastCraft.Game.Screens
 
             if (layout.HintY.HasValue)
             {
-                _text.Draw(_draw, "Tap a highlighted word to learn it", new Vector2(area.X, layout.HintY.Value), SkillCardLayout.HintSize, Ink("3", Color.Gray), shadow);
+                _text.Draw(_draw, Loc("ui.battle_hud.tap_word"), new Vector2(area.X, layout.HintY.Value), SkillCardLayout.HintSize, Ink("3", Color.Gray), shadow);
             }
         }
 
@@ -553,7 +554,7 @@ namespace BeastCraft.Game.Screens
         /// <summary>Pause/play, the three speeds and skip.</summary>
         private void DrawControls(Color shadow)
         {
-            string[] labels = { _auto ? "PAUSE" : "PLAY", "X1", "X2", "X3", "SKIP" };
+            string[] labels = { Loc(_auto ? "ui.battle_hud.pause" : "ui.battle_hud.play"), Loc("ui.battle_hud.speed", 1), Loc("ui.battle_hud.speed", 2), Loc("ui.battle_hud.speed", 3), Loc("ui.battle_hud.skip") };
             for (int i = 0; i < labels.Length; i++)
             {
                 Rect button = _screen.Control(i);
@@ -717,24 +718,24 @@ namespace BeastCraft.Game.Screens
             return shown >= 0 && shown < count ? shown : -1;
         }
 
-        private static string ShapeLabel(SkillSO skill)
+        private string ShapeLabel(SkillSO skill)
         {
             switch (skill.TargetShape)
             {
                 case SkillTargetShape.Self:
-                    return "SELF";
+                    return Loc("ui.battle_hud.shape_self");
                 case SkillTargetShape.AllAllies:
-                    return "ALL ALLIES";
+                    return Loc("ui.battle_hud.shape_all_allies");
                 case SkillTargetShape.AllEnemies:
-                    return "ALL FOES";
+                    return Loc("ui.battle_hud.shape_all_foes");
                 case SkillTargetShape.AreaBurst:
-                    return "BURST R" + skill.Range.ToString(CultureInfo.InvariantCulture);
+                    return Loc("ui.battle_hud.shape_burst", skill.Range.ToString(CultureInfo.InvariantCulture));
                 case SkillTargetShape.Line:
-                    return "LINE R" + skill.Range.ToString(CultureInfo.InvariantCulture);
+                    return Loc("ui.battle_hud.shape_line", skill.Range.ToString(CultureInfo.InvariantCulture));
                 case SkillTargetShape.Cross:
-                    return "CROSS R" + skill.Range.ToString(CultureInfo.InvariantCulture);
+                    return Loc("ui.battle_hud.shape_cross", skill.Range.ToString(CultureInfo.InvariantCulture));
                 default:
-                    return "SINGLE R" + skill.Range.ToString(CultureInfo.InvariantCulture);
+                    return Loc("ui.battle_hud.shape_single", skill.Range.ToString(CultureInfo.InvariantCulture));
             }
         }
 

@@ -472,7 +472,7 @@ namespace BeastCraft.Game.Screens.Components
             ScrollView scroll = Ui.Add(new ScrollView { Bounds = new Rect(card.X + 60f, rowsTop, width - 120f, Math.Max(0f, rowsBottom - rowsTop)) });
             if (options.Count == 0)
             {
-                scroll.Add(new Label { Bounds = new Rect(0, 0, width - 120f, 60f), Text = emptyMessage ?? "None available.", Size = ctx.Style.TextSizes.Body, ColorKey = "inkSoft", Align = TextAlign.Center });
+                scroll.Add(new Label { Bounds = new Rect(0, 0, width - 120f, 60f), Text = emptyMessage ?? ctx.Loc("ui.common.none_available"), Size = ctx.Style.TextSizes.Body, ColorKey = "inkSoft", Align = TextAlign.Center });
             }
 
             float y = 0f;
@@ -496,7 +496,7 @@ namespace BeastCraft.Game.Screens.Components
 
             scroll.ContentHeight = Math.Max(scroll.Bounds.Height, y);
 
-            Button close = panel.Add(new Button { Id = "close", Bounds = new Rect(card.Center.X - 200f, card.Bottom - 140f, 400f, 100f), Text = "Close", StyleKey = "secondary" });
+            Button close = panel.Add(new Button { Id = "close", Bounds = new Rect(card.Center.X - 200f, card.Bottom - 140f, 400f, 100f), Text = ctx.Loc("ui.common.close"), StyleKey = "secondary" });
             close.Clicked += Close;
             Name = "beast-picker:" + title;
         }

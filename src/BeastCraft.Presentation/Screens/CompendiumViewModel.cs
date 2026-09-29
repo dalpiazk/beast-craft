@@ -47,8 +47,8 @@ namespace BeastCraft.Presentation.Screens
         /// <summary>An unfound lore entry's title placeholder.</summary>
         public const string LockedTitle = "???";
 
-        /// <summary>An unfound lore entry's text placeholder.</summary>
-        public const string LockedText = "Old words, still unread. Find this stone to read them.";
+        /// <summary>An unfound lore entry's text placeholder, as a text key.</summary>
+        public const string LockedTextKey = "ui.compendium.locked_lore";
 
         private readonly GameSession _session;
 
@@ -98,7 +98,7 @@ namespace BeastCraft.Presentation.Screens
                     LoreId = entry.LoreId,
                     RegionId = entry.RegionId,
                     Title = entry.Found ? entry.Title : LockedTitle,
-                    Text = entry.Found ? entry.Text : LockedText,
+                    Text = entry.Found ? entry.Text : _session.Content.Text.Get(LockedTextKey),
                     Found = entry.Found
                 });
             }
@@ -111,7 +111,7 @@ namespace BeastCraft.Presentation.Screens
             switch (entry.State)
             {
                 case CompendiumBeastState.Offered:
-                    return "Offered now: a Kinship choice waits on the map.";
+                    return session.Content.Text.Get("ui.compendium.offered");
                 case CompendiumBeastState.Owned:
                     if (!entry.JoinedThroughKinship)
                     {
@@ -119,9 +119,9 @@ namespace BeastCraft.Presentation.Screens
                     }
 
                     KinshipSiteData site = session.Content.Discovery.Library.Site(entry.KinshipSiteId);
-                    return "Found through Kinship at " + (site?.Name ?? "a kinship stone") + ".";
+                    return session.Content.Text.Format("ui.compendium.found_through", site?.Name ?? session.Content.Text.Get("ui.compendium.a_kinship_stone"));
                 default:
-                    return RosterViewModel.SilhouetteHint;
+                    return session.Content.Text.Get(RosterViewModel.SilhouetteHintKey);
             }
         }
     }

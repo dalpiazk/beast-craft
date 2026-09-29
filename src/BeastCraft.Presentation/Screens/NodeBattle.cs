@@ -90,6 +90,12 @@ namespace BeastCraft.Presentation.Screens
             get { return _run; }
         }
 
+        /// <summary>The player message <paramref name="key"/> (<c>ui.map.*</c>) from the session's text table; the key itself without a session.</summary>
+        private static string Say(GameSession session, string key, params object[] args)
+        {
+            return session?.Content?.Text == null ? key : session.Content.Text.Format(key, args);
+        }
+
         /// <summary>The battle at <paramref name="nodeId"/> of the expedition in progress; null with <paramref name="error"/> when it cannot be fought now.</summary>
         public static NodeBattle For(GameSession session, int nodeId, out string error)
         {
@@ -98,25 +104,25 @@ namespace BeastCraft.Presentation.Screens
             MapNode node = run?.Find(nodeId);
             if (node == null || !session.Save.Campaign.HasActiveRun)
             {
-                error = "No such location on the map.";
+                error = Say(session, "ui.map.no_such_location");
                 return null;
             }
 
             if (!node.IsBattle)
             {
-                error = "Nothing to fight at a " + MapViewModel.KindLabel(node.Type) + ".";
+                error = Say(session, "ui.map.nothing_to_fight", MapViewModel.KindLabel(node.Type, session.Content.Text));
                 return null;
             }
 
             if (!CampaignRules.CanEnter(run, nodeId))
             {
-                error = "That location cannot be reached from here.";
+                error = Say(session, "ui.map.unreachable");
                 return null;
             }
 
             if (session.PendingPick > 0)
             {
-                error = "A beast is waiting to join you: choose it first.";
+                error = Say(session, "ui.map.pick_first");
                 return null;
             }
 
@@ -125,7 +131,7 @@ namespace BeastCraft.Presentation.Screens
                                                        session.Content.Battle.GetSpecies);
             if (plan == null)
             {
-                error = "The encounter could not be built.";
+                error = Say(session, "ui.map.encounter_not_built");
                 return null;
             }
 
@@ -147,7 +153,7 @@ namespace BeastCraft.Presentation.Screens
             error = null;
             if (session?.Save == null)
             {
-                error = "No game.";
+                error = Say(session, "ui.map.no_game");
                 return null;
             }
 
@@ -159,14 +165,14 @@ namespace BeastCraft.Presentation.Screens
 
             if (session.PendingPick > 0)
             {
-                error = "A beast is waiting to join you: choose it first.";
+                error = Say(session, "ui.map.pick_first");
                 return null;
             }
 
             EncounterPlan plan = KinshipRules.PlanFor(session.Content.Discovery, poi);
             if (plan == null)
             {
-                error = "The trial could not be built.";
+                error = Say(session, "ui.map.trial_not_built");
                 return null;
             }
 

@@ -327,9 +327,19 @@ place in the list (`region.r00.node.4`). Keys never change once shipped, like id
   key nothing uses, a text-looking field no rule covers, and (once there are other locales) a locale
   missing an English key.
 
-**Screens.** The screens' own text (button labels, messages) is keyed `ui.<screen>.<name>` in the same
-table and looked up through `GameContent.Text`. Only some screens have moved so far; the rest are
-tracked on #50.
+**Screens.** The screens' own text (button labels, messages, the view-models' lines, the skill card's
+generated rules, the battle log) is keyed `ui.<screen>.<name>` in the same table and looked up through
+`GameContent.Text` (a screen's `Loc`, a view-model's `Text`, `StringTable.Format` for values). Values use
+numbered placeholders, `{0}`, `{1}`, in any order a translation needs (`"ui.beast.slot": "Slot {0}"`); a
+count that changes the wording gets one key per form (`ui.grove.gifts_collected_one`,
+`ui.grove.gifts_collected`). Words shared across screens live under `ui.common.*` (Close, Cancel, `Lv {0}`,
+the list separator). The EditMode tests fail on a `ui.*` key `en.json` lacks, on a malformed pattern (a
+skipped placeholder number, a stray brace, an em dash), and on a literal that reads as words passed to a
+screen's drawing, toast, button, label or message in the screens, view-models or skill card.
+
+What is still English in code, on purpose: logs, exceptions, validator messages and the debug viewer's
+command line; enum names shown as-is (elements, stances, a passive's trigger); the element badges'
+two-letter codes (placeholders until the icons land); the desktop window title.
 
 **Missing keys.** A key the table lacks is logged once and shows as `[missing: key]` in a Debug build,
 so it stands out on screen; a Release build shows the key itself.

@@ -52,8 +52,8 @@ namespace BeastCraft.Game.Screens
         {
             Gradient("cream", "parchment", new Rect(0, 0, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight));
             UiStyle style = Ctx.Style;
-            Painter.TextIn("Element chart", new Rect(180f, 44f, 600f, style.TextSizes.Heading + 6f), style.TextSizes.Heading + 6f, Painter.C("plum"), TextAlign.Left);
-            Painter.TextIn("Rows attack, columns defend", new Rect(180f, 112f, 700f, 30f), style.TextSizes.Body, Painter.C("inkSoft"), TextAlign.Left);
+            Painter.TextIn(Loc("ui.insight.element_chart"), new Rect(180f, 44f, 600f, style.TextSizes.Heading + 6f), style.TextSizes.Heading + 6f, Painter.C("plum"), TextAlign.Left);
+            Painter.TextIn(Loc("ui.insight.rows_columns"), new Rect(180f, 112f, 700f, 30f), style.TextSizes.Body, Painter.C("inkSoft"), TextAlign.Left);
 
             float cell = Cell;
             float x0 = Pad + Head;
@@ -101,13 +101,13 @@ namespace BeastCraft.Game.Screens
             {
                 Rect swatch = new Rect(x, y, 56f, 56f);
                 Painter.Framed(swatch, 12f, 3f, Painter.C("plumSoft"), Painter.C(KindColor(kind)));
-                Painter.TextIn(ElementChartViewModel.Label(kind), new Rect(swatch.Right + 14f, y + 14f, 170f, 30f), style.TextSizes.Body - 2f, Painter.C("ink"), TextAlign.Left);
+                Painter.TextIn(ElementChartViewModel.Label(kind, Ctx.Content.Text), new Rect(swatch.Right + 14f, y + 14f, 170f, 30f), style.TextSizes.Body - 2f, Painter.C("ink"), TextAlign.Left);
                 x += 252f;
             }
 
             y += 100f;
-            string team = _model.TeamElements.Count == 0 ? "No team elements to highlight." : "Highlighted: your team's elements (" + string.Join(", ", Sorted(_model.TeamElements)) + ").";
-            foreach (string line in Painter.Wrap(team + " A target with two elements takes both multipliers. The element is the skill's, against the target's own.", style.TextSizes.Body,
+            string team = _model.TeamElements.Count == 0 ? Loc("ui.insight.no_team_elements") : Loc("ui.insight.team_elements", string.Join(Loc("ui.common.list_sep"), Sorted(_model.TeamElements)));
+            foreach (string line in Painter.Wrap(Loc("ui.insight.chart_note", team), style.TextSizes.Body,
                                                  PortraitLayout.CanvasWidth - 2f * Pad))
             {
                 Painter.TextIn(line, new Rect(Pad, y, PortraitLayout.CanvasWidth - 2f * Pad, style.TextSizes.Body), style.TextSizes.Body, Painter.C("inkSoft"), TextAlign.Left, false);
@@ -132,14 +132,14 @@ namespace BeastCraft.Game.Screens
         }
 
         /// <summary>A name short enough for a column (Lightning and Light share a badge letter, so the names tell them apart).</summary>
-        private static string Short(Element element)
+        private string Short(Element element)
         {
             switch (element)
             {
                 case Element.Lightning:
-                    return "Lightn.";
+                    return Loc("ui.insight.lightning_short");
                 case Element.Nature:
-                    return "Nature";
+                    return Loc("ui.insight.nature_short");
                 default:
                     return element.ToString();
             }
@@ -182,7 +182,7 @@ namespace BeastCraft.Game.Screens
             _focus = focusTermId;
             _scroll = Ui.Add(new ScrollView { Id = "page", Bounds = new Rect(0, TopBar, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight - TopBar) });
             _header = new ScreenHeader(Ui, TopBar, () => Ctx.Stack.Pop());
-            AddButton(null, "element-chart", new Rect(PortraitLayout.CanvasWidth - Pad - 320f, 50f, 320f, 90f), "Element chart", "chip",
+            AddButton(null, "element-chart", new Rect(PortraitLayout.CanvasWidth - Pad - 320f, 50f, 320f, 90f), Loc("ui.insight.element_chart"), "chip",
                       () => Ctx.Stack.Push(new ElementChartScreen(Ctx, TeamElements(Ctx))));
             Build();
         }
@@ -251,7 +251,7 @@ namespace BeastCraft.Game.Screens
             // through ScreenHeader.Paint's own fixed title position.
             _header.Paint(Ctx, Ui, string.Empty);
             Painter.Paint(Ui.Find("element-chart"), Ui);
-            Painter.TextIn("Glossary", new Rect(180f, 60f, 500f, Ctx.Style.TextSizes.Heading + 6f), Ctx.Style.TextSizes.Heading + 6f, Painter.C("plum"), TextAlign.Left);
+            Painter.TextIn(Loc("ui.insight.glossary"), new Rect(180f, 60f, 500f, Ctx.Style.TextSizes.Heading + 6f), Ctx.Style.TextSizes.Heading + 6f, Painter.C("plum"), TextAlign.Left);
         }
 
         protected override void DrawCustom(Widget widget)
@@ -296,10 +296,10 @@ namespace BeastCraft.Game.Screens
 
         public BattleLogModal(ScreenContext ctx, BattleLogViewModel model, string title) : base(ctx)
         {
-            _model = model ?? new BattleLogViewModel(null);
+            _model = model ?? new BattleLogViewModel(null, ctx.Content.Text);
             _card = new Rect(30f, 90f, PortraitLayout.CanvasWidth - 60f, PortraitLayout.CanvasHeight - 180f);
             Ui.Add(new Panel { Bounds = _card, StyleKey = "modal" });
-            Ui.Add(new Label { Bounds = new Rect(_card.X + 50f, _card.Y + 40f, _card.Width - 260f, 50f), Text = title ?? "Battle log", Size = ctx.Style.TextSizes.Heading, ColorKey = "plum" });
+            Ui.Add(new Label { Bounds = new Rect(_card.X + 50f, _card.Y + 40f, _card.Width - 260f, 50f), Text = title ?? Loc("ui.insight.battle_log"), Size = ctx.Style.TextSizes.Heading, ColorKey = "plum" });
             Button close = Ui.Add(new Button { Id = "close", Bounds = new Rect(_card.Right - 150f, _card.Y + 30f, 110f, 90f), StyleKey = "secondary", Glyph = "close" });
             close.Clicked += Close;
             _chips = Ui.Add(new Group { Bounds = new Rect(_card.X + 30f, _card.Y + 130f, _card.Width - 60f, 200f) });
@@ -356,7 +356,7 @@ namespace BeastCraft.Game.Screens
 
             // One chip each for everyone and the player's side; the enemies (up to two dozen) share one
             // chip that steps through them, so the filters stay on two rows.
-            List<BattleLogUnit> units = new List<BattleLogUnit> { new BattleLogUnit { UnitId = null, Name = "All" } };
+            List<BattleLogUnit> units = new List<BattleLogUnit> { new BattleLogUnit { UnitId = null, Name = Loc("ui.insight.filter_all") } };
             List<BattleLogUnit> enemies = _model.Units.FindAll(u => u.Team != BeastCraft.Battle.BattleTeam.Player);
             units.AddRange(_model.Units.FindAll(u => u.Team == BeastCraft.Battle.BattleTeam.Player));
             int at = enemies.FindIndex(u => u.UnitId == _model.Filter);
@@ -383,7 +383,7 @@ namespace BeastCraft.Game.Screens
             if (enemies.Count > 0)
             {
                 // Tapping steps to the next enemy (the last one back to the first).
-                Chip("filter-enemies", (at >= 0 ? enemies[at].Name : "Enemies") + "  >", at >= 0, enemies[(at + 1) % enemies.Count].UnitId);
+                Chip("filter-enemies", Loc("ui.insight.filter_next", at >= 0 ? enemies[at].Name : Loc("ui.insight.filter_enemies")), at >= 0, enemies[(at + 1) % enemies.Count].UnitId);
             }
 
             return y + 64f;
@@ -401,7 +401,7 @@ namespace BeastCraft.Game.Screens
                 float height = entry.Kind == BattleLogKind.Turn ? RowHeight + 8f : RowHeight;
                 if (open)
                 {
-                    height += entry.Breakdown.Lines().Count * BreakdownLine + 30f;
+                    height += entry.Breakdown.Lines(Ctx.Content.Text).Count * BreakdownLine + 30f;
                 }
 
                 Hotspot row = _scroll.Add(new Hotspot { Bounds = new Rect(0, y, width, height), Tag = entry });
@@ -440,11 +440,11 @@ namespace BeastCraft.Game.Screens
             Ctx.Painter.Fill(new Rect(0, 0, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight), Ctx.Painter.C("scrim"));
             Ctx.Painter.Paint(Ui, Ui, DrawCustom);
             UiPainter painter = Ctx.Painter;
-            painter.TextIn("Tap a hit for its damage breakdown", new Rect(_card.X + 50f, _card.Y + 98f, _card.Width - 260f, 26f), Ctx.Style.TextSizes.Small + 1f, painter.C("inkSoft"),
+            painter.TextIn(Loc("ui.insight.tap_hit"), new Rect(_card.X + 50f, _card.Y + 98f, _card.Width - 260f, 26f), Ctx.Style.TextSizes.Small + 1f, painter.C("inkSoft"),
                            TextAlign.Left);
             if (_model.Filtered().Count == 0)
             {
-                painter.TextIn("Nothing yet.", new Rect(_scroll.Bounds.X + 30f, _scroll.Bounds.Y + 20f, 600f, 30f), Ctx.Style.TextSizes.Body, painter.C("inkSoft"), TextAlign.Left);
+                painter.TextIn(Loc("ui.insight.nothing_yet"), new Rect(_scroll.Bounds.X + 30f, _scroll.Bounds.Y + 20f, 600f, 30f), Ctx.Style.TextSizes.Body, painter.C("inkSoft"), TextAlign.Left);
             }
         }
 
@@ -482,9 +482,9 @@ namespace BeastCraft.Game.Screens
             }
 
             float y = box.Y + RowHeight + 6f;
-            foreach (KeyValuePair<string, string> line in entry.Breakdown.Lines())
+            foreach (KeyValuePair<string, string> line in entry.Breakdown.Lines(Ctx.Content.Text))
             {
-                bool final = line.Key == "Final";
+                bool final = line.Key == Loc("ui.battle_log.final");
                 painter.TextIn(line.Key, new Rect(box.X + 80f, y, 420f, BreakdownLine), size - 1f, painter.C(final ? "plum" : "inkSoft"), TextAlign.Left);
                 painter.TextIn(line.Value, new Rect(box.X + 480f, y, box.Width - 540f, BreakdownLine), size - 1f, painter.C(final ? "plum" : "ink"), TextAlign.Right);
                 y += BreakdownLine;

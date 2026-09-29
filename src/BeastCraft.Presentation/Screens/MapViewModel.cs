@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using BeastCraft.Campaign;
 using BeastCraft.Discovery;
+using BeastCraft.Localization;
 using BeastCraft.Presentation.Board;
 using BeastCraft.Presentation.Layout;
 using BeastCraft.Presentation.Vfx;
@@ -473,7 +474,7 @@ namespace BeastCraft.Presentation.Screens
             if (run == null || string.IsNullOrEmpty(run.RegionId))
             {
                 Layout = MapLayout.Of(new MapNode[0], 0);
-                Header = new RegionHeaderView { Name = "No expedition" };
+                Header = new RegionHeaderView { Name = _session.Content.Text.Get("ui.map.no_expedition") };
                 return;
             }
 
@@ -500,7 +501,7 @@ namespace BeastCraft.Presentation.Screens
                     Name = _session.LocationName(node),
                     Level = node.Level,
                     Layer = node.Layer,
-                    KindLabel = KindLabel(node.Type),
+                    KindLabel = KindLabel(node.Type, _session.Content.Text),
                     Hidden = HasFog && (state == MapNodeState.Locked || state == MapNodeState.Bypassed) && !MapFog.IsRevealed(fog, grid, node)
                 };
                 Nodes.Add(view);
@@ -554,7 +555,7 @@ namespace BeastCraft.Presentation.Screens
                     State = poiState,
                     Position = Layout.CellCenter(poi.HalfRow, poi.Col),
                     Name = PoiViewModel.NameOf(_session, poi),
-                    KindLabel = PoiKindLabel(poi.Kind),
+                    KindLabel = PoiKindLabel(poi.Kind, _session.Content.Text),
                     Level = poi.Level
                 });
             }
@@ -566,20 +567,20 @@ namespace BeastCraft.Presentation.Screens
         }
 
         /// <summary>A point of interest kind's short label.</summary>
-        public static string PoiKindLabel(PoiKind kind)
+        public static string PoiKindLabel(PoiKind kind, StringTable text)
         {
             switch (kind)
             {
                 case PoiKind.Shrine:
-                    return "Shrine";
+                    return text.Get("ui.map.poi_shrine");
                 case PoiKind.LoreStone:
-                    return "Lore stone";
+                    return text.Get("ui.map.poi_lore");
                 case PoiKind.Cache:
-                    return "Cache";
+                    return text.Get("ui.map.poi_cache");
                 case PoiKind.KinshipSite:
-                    return "Kinship";
+                    return text.Get("ui.map.poi_kinship");
                 default:
-                    return "Vista";
+                    return text.Get("ui.map.poi_vista");
             }
         }
 
@@ -599,12 +600,12 @@ namespace BeastCraft.Presentation.Screens
 
             if (_session.PendingPick > 0)
             {
-                return new MapTapResult { Kind = MapTapKind.Pick, PoiId = poiId, Message = "A beast is waiting to join you: choose it first." };
+                return new MapTapResult { Kind = MapTapKind.Pick, PoiId = poiId, Message = _session.Content.Text.Get("ui.map.pick_first") };
             }
 
             if (_session.PendingKinship)
             {
-                return new MapTapResult { Kind = MapTapKind.KinshipChoice, PoiId = poiId, Message = "A beast is waiting to join you: choose it first." };
+                return new MapTapResult { Kind = MapTapKind.KinshipChoice, PoiId = poiId, Message = _session.Content.Text.Get("ui.map.pick_first") };
             }
 
             if (poi.Kind == PoiKind.KinshipSite)
@@ -709,21 +710,21 @@ namespace BeastCraft.Presentation.Screens
             {
                 case MapNodeState.Cleared:
                 case MapNodeState.Current:
-                    return new MapTapResult { Kind = MapTapKind.Refused, NodeId = nodeId, Message = node.Name + " is already cleared." };
+                    return new MapTapResult { Kind = MapTapKind.Refused, NodeId = nodeId, Message = _session.Content.Text.Format("ui.map.already_cleared", node.Name) };
                 case MapNodeState.Bypassed:
-                    return new MapTapResult { Kind = MapTapKind.Refused, NodeId = nodeId, Message = "That trail is behind you now." };
+                    return new MapTapResult { Kind = MapTapKind.Refused, NodeId = nodeId, Message = _session.Content.Text.Get("ui.map.trail_behind") };
                 case MapNodeState.Locked:
-                    return new MapTapResult { Kind = MapTapKind.Refused, NodeId = nodeId, Message = "Clear the way to " + node.Name + " first." };
+                    return new MapTapResult { Kind = MapTapKind.Refused, NodeId = nodeId, Message = _session.Content.Text.Format("ui.map.clear_the_way", node.Name) };
             }
 
             if (_session.PendingPick > 0)
             {
-                return new MapTapResult { Kind = MapTapKind.Pick, NodeId = nodeId, Message = "A beast is waiting to join you: choose it first." };
+                return new MapTapResult { Kind = MapTapKind.Pick, NodeId = nodeId, Message = _session.Content.Text.Get("ui.map.pick_first") };
             }
 
             if (_session.PendingKinship)
             {
-                return new MapTapResult { Kind = MapTapKind.KinshipChoice, NodeId = nodeId, Message = "A beast is waiting to join you: choose it first." };
+                return new MapTapResult { Kind = MapTapKind.KinshipChoice, NodeId = nodeId, Message = _session.Content.Text.Get("ui.map.pick_first") };
             }
 
             if (!leaveConfirmed && (node.Type == MapNodeType.Gate || node.Type == MapNodeType.Boss))
@@ -736,8 +737,7 @@ namespace BeastCraft.Presentation.Screens
                         Kind = MapTapKind.ConfirmLeave,
                         NodeId = nodeId,
                         PoiId = kinship.PoiId,
-                        Message = "The " + kinship.Name + " is still waiting on this map. Clearing the " + node.KindLabel.ToLowerInvariant() +
-                                  " ends this expedition: you can come back to it by revisiting the stage."
+                        Message = _session.Content.Text.Format("ui.map.kinship_waiting", kinship.Name, node.KindLabel.ToLowerInvariant())
                     };
                 }
             }
@@ -761,26 +761,26 @@ namespace BeastCraft.Presentation.Screens
         }
 
         /// <summary>A location type's short label.</summary>
-        public static string KindLabel(MapNodeType type)
+        public static string KindLabel(MapNodeType type, StringTable text)
         {
             switch (type)
             {
                 case MapNodeType.Elite:
-                    return "Den";
+                    return text.Get("ui.map.kind_den");
                 case MapNodeType.Rest:
-                    return "Camp";
+                    return text.Get("ui.map.kind_camp");
                 case MapNodeType.Shop:
-                    return "Trader";
+                    return text.Get("ui.map.kind_trader");
                 case MapNodeType.Gate:
-                    return "Pass";
+                    return text.Get("ui.map.kind_pass");
                 case MapNodeType.Boss:
-                    return "Lair";
+                    return text.Get("ui.map.kind_lair");
                 case MapNodeType.Story:
-                    return "Shrine";
+                    return text.Get("ui.map.kind_shrine");
                 case MapNodeType.Trial:
-                    return "Trial";
+                    return text.Get("ui.map.kind_trial");
                 default:
-                    return "Wilds";
+                    return text.Get("ui.map.kind_wilds");
             }
         }
 
@@ -834,13 +834,13 @@ namespace BeastCraft.Presentation.Screens
                 {
                     RegionId = run.RegionId,
                     Name = region.DisplayName,
-                    LevelBand = "Lv " + region.MinLevel + "-" + region.MaxLevel,
+                    LevelBand = _session.Content.Text.Format("ui.map.level_band", region.MinLevel, region.MaxLevel),
                     Stage = 0,
                     Stages = StarterPicks.PickCount,
-                    StageText = "Your first steps",
+                    StageText = _session.Content.Text.Get("ui.map.first_steps"),
                     StagesCleared = Math.Min(owned, StarterPicks.PickCount),
                     IsTutorial = true,
-                    SealName = "Beasts bonded",
+                    SealName = _session.Content.Text.Get("ui.map.beasts_bonded"),
                     SealProgress = Math.Min(owned, StarterPicks.PickCount) / (float)StarterPicks.PickCount,
                     BindingLimit = CampaignRules.BeastCap(_session.Save, _session.Content.Campaign)
                 };
@@ -850,14 +850,14 @@ namespace BeastCraft.Presentation.Screens
             return new RegionHeaderView
             {
                 CompletionPercent = completion?.Percent ?? -1,
-                CompletionText = completion == null ? string.Empty : "Explored " + completion.Percent + "%",
+                CompletionText = completion == null ? string.Empty : _session.Content.Text.Format("ui.discovery.explored_percent", completion.Percent),
                 CompletionRewarded = completion != null && completion.Rewarded,
                 RegionId = run.RegionId,
                 Name = region?.DisplayName ?? run.RegionId,
-                LevelBand = region == null ? string.Empty : "Lv " + region.MinLevel + "-" + region.MaxLevel,
+                LevelBand = region == null ? string.Empty : _session.Content.Text.Format("ui.map.level_band", region.MinLevel, region.MaxLevel),
                 Stage = run.Stage,
                 Stages = stages,
-                StageText = "Stage " + (run.Stage + 1) + " of " + stages,
+                StageText = _session.Content.Text.Format("ui.map.stage_of", run.Stage + 1, stages),
                 StagesCleared = cleared,
                 BossCleared = progress != null && progress.BossCleared,
                 SealName = seal?.DisplayName,

@@ -107,7 +107,7 @@ namespace BeastCraft.Game.Screens
             {
                 Id = "visit",
                 Bounds = new Rect(_card.X + 120f, _card.Bottom - 160f, _card.Width - 240f, 120f),
-                Text = model.CanVisit ? model.Action : "Close",
+                Text = model.CanVisit ? model.Action : Loc("ui.common.close"),
                 StyleKey = model.CanVisit ? "primary" : "secondary"
             });
             _action.Clicked += Act;
@@ -150,7 +150,7 @@ namespace BeastCraft.Game.Screens
 
             Ctx.Painter.TextIn(_model.Title, new Rect(_card.X, _card.Y + 220f, _card.Width, style.TextSizes.Heading + 6f), style.TextSizes.Heading + 6f, Ctx.Painter.C("plum"),
                                TextAlign.Center);
-            string sub = _model.KindLabel + (_model.State == PoiState.Found ? "  -  found" : string.Empty);
+            string sub = _model.State == PoiState.Found ? Loc("ui.discovery.found", _model.KindLabel) : _model.KindLabel;
             Ctx.Painter.TextIn(sub ?? string.Empty, new Rect(_card.X, _card.Y + 290f, _card.Width, 32f), style.TextSizes.Body, Ctx.Painter.C("inkSoft"), TextAlign.Center);
             TutorialArt.Paragraph(Ctx, _model.Body, _card.X + 60f, _card.Y + 350f, _card.Width - 120f, style.TextSizes.Body + 2f, Ctx.Painter.C("ink"));
         }
@@ -189,13 +189,13 @@ namespace BeastCraft.Game.Screens
                 {
                     Id = "revisit-" + index.ToString(CultureInfo.InvariantCulture),
                     Bounds = new Rect(_card.Right - 300f, RowY(i) + 36f, 240f, 80f),
-                    Text = "Revisit",
+                    Text = Loc("ui.discovery.revisit"),
                     StyleKey = "chip"
                 });
                 revisit.Clicked += () => AskRevisit(index);
             }
 
-            Button close = Ui.Add(new Button { Id = "close", Bounds = new Rect(_card.X + 120f, _card.Bottom - 150f, _card.Width - 240f, 110f), Text = "Close", StyleKey = "secondary" });
+            Button close = Ui.Add(new Button { Id = "close", Bounds = new Rect(_card.X + 120f, _card.Bottom - 150f, _card.Width - 240f, 110f), Text = Loc("ui.common.close"), StyleKey = "secondary" });
             close.Clicked += () =>
             {
                 Close();
@@ -220,13 +220,12 @@ namespace BeastCraft.Game.Screens
 
         private void AskRevisit(int stage)
         {
-            Ctx.Stack.PushModal(new ConfirmModal(Ctx, "Revisit stage " + (stage + 1) + "?",
-                                                 "You leave this expedition (its stage progress stays) and set out on a new map of stage " + (stage + 1) +
-                                                 ". Ground you have seen stays mapped.", "Stay", "Revisit", () =>
+            Ctx.Stack.PushModal(new ConfirmModal(Ctx, Loc("ui.discovery.revisit_title", stage + 1),
+                                                 Loc("ui.discovery.revisit_body", stage + 1), Loc("ui.home.stay"), Loc("ui.discovery.revisit"), () =>
                                                  {
                                                      if (!_model.Revisit(stage))
                                                      {
-                                                         Ctx.Game.Toast("That stage cannot be revisited now.");
+                                                         Ctx.Game.Toast(Loc("ui.discovery.cannot_revisit"));
                                                          return;
                                                      }
 
@@ -248,19 +247,18 @@ namespace BeastCraft.Game.Screens
             }
 
             Rect bar = new Rect(_card.X + 80f, _card.Y + 140f, _card.Width - 160f, 44f);
-            Ctx.Painter.Progress(bar, completion.Percent / 100f, -1f, "gold", "gold", "track", "Explored " + completion.Percent + "%");
-            string reward = completion.Rewarded ? "Fully explored: you earned " + _model.Reward + "." : "At 100%: " + _model.Reward + ".";
+            Ctx.Painter.Progress(bar, completion.Percent / 100f, -1f, "gold", "gold", "track", Loc("ui.discovery.explored_percent", completion.Percent));
+            string reward = Loc(completion.Rewarded ? "ui.discovery.fully_explored" : "ui.discovery.at_100", _model.Reward);
             TutorialArt.Paragraph(Ctx, reward, _card.X + 80f, _card.Y + 210f, _card.Width - 160f, style.TextSizes.Body, Ctx.Painter.C("ink"));
-            TutorialArt.Paragraph(Ctx, completion.LocationsExplored + " of " + completion.LocationsTotal + " map rows walked, " + completion.PoisFound + " of " + completion.PoisTotal +
-                                       " places found.", _card.X + 80f, _card.Y + 290f, _card.Width - 160f, style.TextSizes.Small + 2f, Ctx.Painter.C("inkSoft"));
+            TutorialArt.Paragraph(Ctx, Loc("ui.discovery.region_counts", completion.LocationsExplored, completion.LocationsTotal, completion.PoisFound, completion.PoisTotal), _card.X + 80f, _card.Y + 290f, _card.Width - 160f, style.TextSizes.Small + 2f, Ctx.Painter.C("inkSoft"));
             for (int i = 0; i < _model.Stages.Count; i++)
             {
                 StageProgressView stage = _model.Stages[i];
                 Rect row = new Rect(_card.X + 40f, RowY(i), _card.Width - 80f, RowHeight);
                 Ctx.Painter.Framed(row, 28f, 3f, Ctx.Painter.C("plum", stage.IsCurrent ? 1f : 0.5f), Ctx.Painter.C(stage.IsCurrent ? "creamDeep" : "cream"));
-                Ctx.Painter.TextIn(stage.Label + (stage.IsCurrent ? "  (here now)" : stage.Cleared ? "  (cleared)" : string.Empty), new Rect(row.X + 30f, row.Y + 20f, row.Width - 360f, 40f),
+                Ctx.Painter.TextIn(stage.IsCurrent ? Loc("ui.discovery.here_now", stage.Label) : stage.Cleared ? Loc("ui.discovery.cleared", stage.Label) : stage.Label, new Rect(row.X + 30f, row.Y + 20f, row.Width - 360f, 40f),
                                    style.TextSizes.Body + 4f, Ctx.Painter.C("plum"), TextAlign.Left);
-                string detail = stage.RowsWalked + "/" + stage.Rows + " rows walked, " + stage.PoisFound + "/" + stage.PoisTotal + " places found";
+                string detail = Loc("ui.discovery.stage_counts", stage.RowsWalked, stage.Rows, stage.PoisFound, stage.PoisTotal);
                 Ctx.Painter.TextIn(detail, new Rect(row.X + 30f, row.Y + 80f, row.Width - 360f, 36f), style.TextSizes.Small + 2f, Ctx.Painter.C("inkSoft"), TextAlign.Left);
             }
         }

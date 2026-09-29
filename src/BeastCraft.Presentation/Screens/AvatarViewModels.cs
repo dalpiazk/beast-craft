@@ -4,6 +4,7 @@ using BeastCraft.Avatar;
 using BeastCraft.Battle;
 using BeastCraft.Creatures;
 using BeastCraft.Economy;
+using BeastCraft.Localization;
 using BeastCraft.Presentation.Cards;
 using BeastCraft.Presentation.Content;
 using BeastCraft.Progression;
@@ -39,6 +40,12 @@ namespace BeastCraft.Presentation.Screens
             Refresh();
         }
 
+        /// <summary>The text table (<c>ui.*</c>).</summary>
+        private StringTable Text
+        {
+            get { return _session.Content.Text; }
+        }
+
         public string DisplayName { get; private set; }
 
         public int Level { get; private set; }
@@ -61,18 +68,18 @@ namespace BeastCraft.Presentation.Screens
             Xp = progress?.Xp ?? 0;
             XpToNext = AvatarProgression.XpToNextLevel(Level);
             XpFraction = XpToNext <= 0 ? 0f : Math.Max(0f, Math.Min(1f, (float)Xp / XpToNext));
-            DisplayName = AchievementsViewModel.TitledName(save, _session.Content.Achievements?.Library, CampaignAvatar.DisplayName);
+            DisplayName = AchievementsViewModel.TitledName(save, _session.Content.Achievements?.Library, CampaignAvatar.DisplayName(_session.Content.Text));
             Stats.Clear();
             AvatarStatsSO profile = CampaignAvatar.Profile(_session.Content);
             StatBlock baseStats = profile.GetStatsAtLevel(Level);
             StatBlock total = StatCalculator.ComputeStats(baseStats, StatCalculator.CollectModifiers(AvatarGear.Worn(_session)));
             // HP is excluded: the avatar's HP is a fixture (CampaignAvatar.Profile), always 1 and
             // never targeted in battle, so a "0 -> 1" row would read as a bug rather than a stat.
-            AddRow("Attack", baseStats.Attack, total.Attack);
-            AddRow("Defense", baseStats.Defense, total.Defense);
-            AddRow("Special Attack", baseStats.SpecialAttack, total.SpecialAttack);
-            AddRow("Special Defense", baseStats.SpecialDefense, total.SpecialDefense);
-            AddRow("Speed", baseStats.Speed, total.Speed);
+            AddRow(Text.Get("ui.stat.attack"), baseStats.Attack, total.Attack);
+            AddRow(Text.Get("ui.stat.defense"), baseStats.Defense, total.Defense);
+            AddRow(Text.Get("ui.stat.special_attack"), baseStats.SpecialAttack, total.SpecialAttack);
+            AddRow(Text.Get("ui.stat.special_defense"), baseStats.SpecialDefense, total.SpecialDefense);
+            AddRow(Text.Get("ui.stat.speed"), baseStats.Speed, total.Speed);
         }
 
         private void AddRow(string name, int baseValue, int totalValue)
@@ -146,6 +153,12 @@ namespace BeastCraft.Presentation.Screens
             Refresh();
         }
 
+        /// <summary>The text table (<c>ui.*</c>).</summary>
+        private StringTable Text
+        {
+            get { return _session.Content.Text; }
+        }
+
         public List<AvatarSkillSlotRow> ActiveSlots { get; } = new List<AvatarSkillSlotRow>();
         public List<AvatarSkillSlotRow> PassiveSlots { get; } = new List<AvatarSkillSlotRow>();
         public List<AvatarKnownRow> KnownActives { get; } = new List<AvatarKnownRow>();
@@ -169,7 +182,7 @@ namespace BeastCraft.Presentation.Screens
                 SkillSO skill = string.IsNullOrEmpty(id) ? null : content.Battle.GetSkill(id);
                 if (skill != null)
                 {
-                    row.Card = SkillCard.Of(skill, content.Glossary);
+                    row.Card = SkillCard.Of(skill, content.Glossary, content.Text);
                 }
 
                 ActiveSlots.Add(row);
@@ -190,7 +203,7 @@ namespace BeastCraft.Presentation.Screens
                     {
                         if (effect != null)
                         {
-                            row.PassivePower.Add(SkillCard.PowerLine(effect, passive.Element, passive.Category));
+                            row.PassivePower.Add(SkillCard.PowerLine(effect, passive.Element, passive.Category, content.Text));
                         }
                     }
                 }
@@ -231,7 +244,7 @@ namespace BeastCraft.Presentation.Screens
         /// <summary>Empties active slot <paramref name="slot"/> (never the last one: the avatar always fights with one active). Autosaves.</summary>
         public bool UnequipActive(int slot, out string message)
         {
-            return Unequip(_session.Save?.AvatarSkills?.Actives, slot, "The avatar needs at least one active skill.", out message);
+            return Unequip(_session.Save?.AvatarSkills?.Actives, slot, Text.Get("ui.avatar.needs_active"), out message);
         }
 
         /// <summary>Puts <paramref name="passiveId"/> into passive slot <paramref name="slot"/> (swapping if it is already equipped elsewhere). Autosaves.</summary>
@@ -243,7 +256,7 @@ namespace BeastCraft.Presentation.Screens
         /// <summary>Empties passive slot <paramref name="slot"/> (never the last one). Autosaves.</summary>
         public bool UnequipPassive(int slot, out string message)
         {
-            return Unequip(_session.Save?.AvatarSkills?.Passives, slot, "The avatar needs at least one passive.", out message);
+            return Unequip(_session.Save?.AvatarSkills?.Passives, slot, Text.Get("ui.avatar.needs_passive"), out message);
         }
 
         private bool Equip(SkillBook book, int slot, string id, out string message)
@@ -251,36 +264,36 @@ namespace BeastCraft.Presentation.Screens
             message = null;
             if (book == null)
             {
-                message = "No avatar.";
+                message = Text.Get("ui.avatar.no_avatar");
                 return false;
             }
 
             int current = book.IndexOfEquipped(id);
             if (current == slot)
             {
-                message = "Already in that slot.";
+                message = Text.Get("ui.beast.already_in_slot");
                 return false;
             }
 
             if (current >= 0)
             {
                 book.SwapSlots(current, slot);
-                return Changed(out message, "Swapped.");
+                return Changed(out message, Text.Get("ui.beast.swapped"));
             }
 
             SkillEquipResult result = book.Equip(slot, id);
             switch (result)
             {
                 case SkillEquipResult.Equipped:
-                    return Changed(out message, "Equipped.");
+                    return Changed(out message, Text.Get("ui.beast.equipped_done"));
                 case SkillEquipResult.UnknownSkill:
-                    message = "Not learned yet.";
+                    message = Text.Get("ui.beast.not_learned");
                     return false;
                 case SkillEquipResult.SlotOutOfRange:
-                    message = "No such slot.";
+                    message = Text.Get("ui.beast.no_such_slot");
                     return false;
                 default:
-                    message = "Already equipped.";
+                    message = Text.Get("ui.beast.already_equipped");
                     return false;
             }
         }
@@ -290,7 +303,7 @@ namespace BeastCraft.Presentation.Screens
             message = null;
             if (book == null || book.GetEquipped(slot) == null)
             {
-                message = "That slot is empty.";
+                message = Text.Get("ui.beast.slot_empty");
                 return false;
             }
 
@@ -307,7 +320,7 @@ namespace BeastCraft.Presentation.Screens
             }
 
             book.Unequip(slot);
-            return Changed(out message, "Unequipped.");
+            return Changed(out message, Text.Get("ui.beast.unequipped"));
         }
 
         private bool Changed(out string message, string text)
@@ -318,39 +331,39 @@ namespace BeastCraft.Presentation.Screens
             return true;
         }
 
-        private static string TriggerText(PassiveTrigger trigger)
+        private string TriggerText(PassiveTrigger trigger)
         {
             switch (trigger)
             {
                 case PassiveTrigger.BattleStart:
-                    return "At battle start";
+                    return Text.Get("ui.avatar.trigger_battle_start");
                 case PassiveTrigger.EnemyDefeated:
-                    return "When an enemy falls";
+                    return Text.Get("ui.avatar.trigger_enemy_falls");
                 case PassiveTrigger.AllyDefeated:
-                    return "When an ally falls";
+                    return Text.Get("ui.avatar.trigger_ally_falls");
                 case PassiveTrigger.AllyCrit:
-                    return "When an ally crits";
+                    return Text.Get("ui.avatar.trigger_ally_crits");
                 case PassiveTrigger.AllyTurnStart:
-                    return "At the start of an ally's turn";
+                    return Text.Get("ui.avatar.trigger_ally_turn");
                 case PassiveTrigger.AllyBelowHpPercent:
-                    return "While an ally is low on HP";
+                    return Text.Get("ui.avatar.trigger_ally_low");
                 default:
-                    return "Always active";
+                    return Text.Get("ui.avatar.trigger_always");
             }
         }
 
-        private static string TargetText(PassiveTarget target)
+        private string TargetText(PassiveTarget target)
         {
             switch (target)
             {
                 case PassiveTarget.TriggeringUnit:
-                    return "Whoever triggers it";
+                    return Text.Get("ui.avatar.target_trigger");
                 case PassiveTarget.AllEnemies:
-                    return "Every enemy";
+                    return Text.Get("ui.avatar.target_all_enemies");
                 case PassiveTarget.LowestHpFractionAlly:
-                    return "The ally lowest on HP%";
+                    return Text.Get("ui.avatar.target_lowest_ally");
                 default:
-                    return "Every ally";
+                    return Text.Get("ui.avatar.target_all_allies");
             }
         }
     }
@@ -386,6 +399,12 @@ namespace BeastCraft.Presentation.Screens
             Refresh();
         }
 
+        /// <summary>The text table (<c>ui.*</c>).</summary>
+        private StringTable Text
+        {
+            get { return _session.Content.Text; }
+        }
+
         public List<AvatarGearSlotRow> Slots { get; } = new List<AvatarGearSlotRow>();
 
         public void Refresh()
@@ -397,7 +416,7 @@ namespace BeastCraft.Presentation.Screens
             int level = save?.Avatar?.Level ?? 1;
             foreach (AvatarGearSlot slot in (AvatarGearSlot[])Enum.GetValues(typeof(AvatarGearSlot)))
             {
-                AvatarGearSlotRow row = new AvatarGearSlotRow { Slot = slot, SlotName = SlotName(slot) };
+                AvatarGearSlotRow row = new AvatarGearSlotRow { Slot = slot, SlotName = SlotName(slot, Text) };
                 string wornId = GearRules.GetSlot(save?.AvatarEquippedGear, (int)slot);
                 foreach (OwnedGear owned in save?.Gear?.AvatarGear ?? new List<OwnedGear>())
                 {
@@ -407,7 +426,7 @@ namespace BeastCraft.Presentation.Screens
                         continue;
                     }
 
-                    AvatarGearOptionRow option = View(owned, gear);
+                    AvatarGearOptionRow option = View(owned, gear, Text);
                     if (owned.InstanceId == wornId)
                     {
                         option.Inactive = level < gear.MinimumLevel;
@@ -415,7 +434,7 @@ namespace BeastCraft.Presentation.Screens
                     }
                     else if (level < gear.MinimumLevel)
                     {
-                        option.Reason = "Needs Lv " + gear.MinimumLevel + ".";
+                        option.Reason = Text.Format("ui.gear.needs_level", gear.MinimumLevel);
                     }
                     else
                     {
@@ -435,7 +454,7 @@ namespace BeastCraft.Presentation.Screens
             GearEquipResult result = GearRules.EquipAvatarGear(_session.Save, slot, instanceId, _session.Content.Battle);
             if (result == GearEquipResult.Equipped)
             {
-                return Changed(out message, "Equipped.");
+                return Changed(out message, Text.Get("ui.beast.equipped_done"));
             }
 
             message = EquipReason(result);
@@ -447,11 +466,11 @@ namespace BeastCraft.Presentation.Screens
         {
             if (!GearRules.UnequipAvatarGear(_session.Save, slot))
             {
-                message = "Nothing worn there.";
+                message = Text.Get("ui.beast.nothing_worn_there");
                 return false;
             }
 
-            return Changed(out message, "Taken off.");
+            return Changed(out message, Text.Get("ui.beast.taken_off"));
         }
 
         private bool Changed(out string message, string text)
@@ -462,7 +481,7 @@ namespace BeastCraft.Presentation.Screens
             return true;
         }
 
-        private static AvatarGearOptionRow View(OwnedGear owned, AvatarGearSO gear)
+        private static AvatarGearOptionRow View(OwnedGear owned, AvatarGearSO gear, StringTable text)
         {
             AvatarGearOptionRow view = new AvatarGearOptionRow { InstanceId = owned.InstanceId, Name = gear.DisplayName ?? gear.AvatarGearId, MinimumLevel = gear.MinimumLevel };
             foreach (StatModifier modifier in gear.Modifiers ?? new List<StatModifier>())
@@ -472,49 +491,39 @@ namespace BeastCraft.Presentation.Screens
                     continue;
                 }
 
-                if (modifier.FlatBonus != 0)
-                {
-                    view.Bonuses.Add((modifier.FlatBonus > 0 ? "+" : string.Empty) + modifier.FlatBonus.ToString(System.Globalization.CultureInfo.InvariantCulture) + " " +
-                                     DerivedStats.ShortName(modifier.Stat));
-                }
-
-                if (modifier.PercentBonus != 0f)
-                {
-                    view.Bonuses.Add((modifier.PercentBonus > 0f ? "+" : string.Empty) + (modifier.PercentBonus * 100f).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) +
-                                     "% " + DerivedStats.ShortName(modifier.Stat));
-                }
+                view.Bonuses.AddRange(DerivedStats.BonusLines(modifier, text));
             }
 
             return view;
         }
 
-        private static string EquipReason(GearEquipResult result)
+        private string EquipReason(GearEquipResult result)
         {
             switch (result)
             {
                 case GearEquipResult.LevelTooLow:
-                    return "The avatar's level is too low.";
+                    return Text.Get("ui.avatar.level_low");
                 case GearEquipResult.SlotMismatch:
-                    return "It does not go in that slot.";
+                    return Text.Get("ui.gear.slot_mismatch");
                 case GearEquipResult.UnknownInstance:
-                    return "You do not have it.";
+                    return Text.Get("ui.gear.not_owned");
                 case GearEquipResult.UnknownGear:
-                    return "Unknown gear.";
+                    return Text.Get("ui.gear.unknown");
                 default:
-                    return "No avatar.";
+                    return Text.Get("ui.avatar.no_avatar");
             }
         }
 
-        public static string SlotName(AvatarGearSlot slot)
+        public static string SlotName(AvatarGearSlot slot, StringTable text)
         {
             switch (slot)
             {
                 case AvatarGearSlot.Weapon:
-                    return "Staff";
+                    return text.Get("ui.avatar.slot_staff");
                 case AvatarGearSlot.Armor:
-                    return "Coat";
+                    return text.Get("ui.avatar.slot_coat");
                 default:
-                    return "Ring";
+                    return text.Get("ui.avatar.slot_ring");
             }
         }
     }

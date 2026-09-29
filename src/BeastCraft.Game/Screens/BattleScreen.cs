@@ -229,7 +229,7 @@ namespace BeastCraft.Game.Screens
                 return true;
             }
 
-            Ctx.Stack.PushModal(new ConfirmModal(Ctx, "Skip to the result?", "The battle plays out in an instant; the outcome is the same.", "Keep watching", "Skip",
+            Ctx.Stack.PushModal(new ConfirmModal(Ctx, Loc("ui.battle.skip_title"), Loc("ui.battle.skip_body"), Loc("ui.battle.keep_watching"), Loc("ui.battle.skip"),
                                                  SkipToEnd));
             return true;
         }
@@ -430,8 +430,8 @@ namespace BeastCraft.Game.Screens
         /// </summary>
         public BattleLogModal OpenLog()
         {
-            BattleLogViewModel log = BattleLogViewModel.Build(_playback.Battle, _playback.Units, BattleLogViewModel.NamesFor(_content, _speciesByUnit, _playback.Avatar?.Id));
-            BattleLogModal modal = new BattleLogModal(Ctx, log, "Battle log: turn " + _playback.Played.Count.ToString(CultureInfo.InvariantCulture));
+            BattleLogViewModel log = BattleLogViewModel.Build(_playback.Battle, _playback.Units, BattleLogViewModel.NamesFor(_content, _speciesByUnit, _playback.Avatar?.Id), _content.Text);
+            BattleLogModal modal = new BattleLogModal(Ctx, log, Loc("ui.battle.log_title_turn", _playback.Played.Count.ToString(CultureInfo.InvariantCulture)));
             Ctx.Stack.PushModal(modal);
             return modal;
         }
@@ -659,7 +659,7 @@ namespace BeastCraft.Game.Screens
 
             if (pinned && _screen.SkillDetail.Contains(at.X, at.Y))
             {
-                _popupTerm = CardLayout(SkillCard.Of(skills[_selectedSkill], _content.Glossary)).TermAt(at.X, at.Y);
+                _popupTerm = CardLayout(SkillCard.Of(skills[_selectedSkill], _content.Glossary, _content.Text)).TermAt(at.X, at.Y);
                 return;
             }
 
@@ -799,7 +799,7 @@ namespace BeastCraft.Game.Screens
         {
             if (_playback.Avatar != null && unitId == _playback.Avatar.Id)
             {
-                return CampaignAvatar.DisplayName;
+                return CampaignAvatar.DisplayName(_content.Text);
             }
 
             return unitId != null && _names.TryGetValue(unitId, out string name) ? name : unitId;
@@ -810,7 +810,7 @@ namespace BeastCraft.Game.Screens
             string actor = UnitName(turn.Turn.Unit.Id);
             if (turn.Beats.Count == 0)
             {
-                _log.Add(actor + (turn.Turn.Stunned ? ": STUNNED" : turn.Turn.MovementSpent > 0 ? ": MOVES" : ": WAITS"));
+                _log.Add(Loc(turn.Turn.Stunned ? "ui.battle_hud.log_stunned" : turn.Turn.MovementSpent > 0 ? "ui.battle_hud.log_moves" : "ui.battle_hud.log_waits", actor));
                 return;
             }
 
@@ -823,7 +823,7 @@ namespace BeastCraft.Game.Screens
                 }
 
                 string what = beat.SkillName ?? beat.SkillId;
-                _log.Add(actor + ": " + what + (damage > 0 ? " " + damage.ToString(CultureInfo.InvariantCulture) : string.Empty));
+                _log.Add(damage > 0 ? Loc("ui.battle_hud.log_damage", actor, what, damage.ToString(CultureInfo.InvariantCulture)) : Loc("ui.common.label_value", actor, what));
             }
         }
 
@@ -845,7 +845,7 @@ namespace BeastCraft.Game.Screens
 
                 counts.TryGetValue(display, out int seen);
                 counts[display] = seen + 1;
-                names[entry.Key] = seen == 0 ? display : display + " " + (seen + 1).ToString(CultureInfo.InvariantCulture);
+                names[entry.Key] = seen == 0 ? display : content.Text.Format("ui.battle_log.numbered", display, seen + 1);
             }
 
             return names;

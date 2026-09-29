@@ -155,7 +155,7 @@ namespace BeastCraft.Presentation.Screens
                     return;
                 }
 
-                message?.Invoke(result.Success ? Text.Format("ui.save_slots.exported", result.Location) : Text.Format("ui.save_slots.export_failed", result.Error));
+                message?.Invoke(result.Success ? Text.Format("ui.save_slots.exported", result.Location) : Text.Format("ui.save_slots.export_failed", result.Describe(Text)));
             });
         }
 
@@ -181,7 +181,7 @@ namespace BeastCraft.Presentation.Screens
 
                 if (!result.Success)
                 {
-                    message?.Invoke(Text.Format("ui.save_slots.import_failed", result.Error));
+                    message?.Invoke(Text.Format("ui.save_slots.import_failed", result.Describe(Text)));
                     return;
                 }
 

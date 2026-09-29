@@ -61,13 +61,13 @@ namespace BeastCraft.Game.Screens
             _roster.Root.Visible = false;
             Ui.Add(new Panel { Id = "header", Bounds = HeaderBox, StyleKey = "header" });
             _gear = AddButton(null, "gear", new Rect(HeaderBox.Right - 120f, HeaderBox.Y + 24f, 96f, 96f), null, "ghost", OpenSettings, "gear");
-            _idle = AddButton(null, "idle", new Rect(HeaderBox.Right - 420f, HeaderBox.Bottom + 18f, 420f, 84f), "Idle", "chip", ClaimIdle, "hourglass");
-            _explored = AddButton(null, "explored", new Rect(HeaderBox.X, HeaderBox.Bottom + 18f, 400f, 84f), "Explored", "chip", OpenRegionProgress, "map");
-            _next = AddButton(null, "next-battle", new Rect(NavBox.X + 90f, NavBox.Y - 150f, NavBox.Width - 180f, 124f), "Next battle", "primary", OpenRecommended,
+            _idle = AddButton(null, "idle", new Rect(HeaderBox.Right - 420f, HeaderBox.Bottom + 18f, 420f, 84f), Loc("ui.home.idle"), "chip", ClaimIdle, "hourglass");
+            _explored = AddButton(null, "explored", new Rect(HeaderBox.X, HeaderBox.Bottom + 18f, 400f, 84f), Loc("ui.home.explored"), "chip", OpenRegionProgress, "map");
+            _next = AddButton(null, "next-battle", new Rect(NavBox.X + 90f, NavBox.Y - 150f, NavBox.Width - 180f, 124f), Loc("ui.home.next_battle"), "primary", OpenRecommended,
                               "battle");
             Ui.Add(new Panel { Id = "nav-panel", Bounds = NavBox, StyleKey = "nav" });
             _tabs = Ui.Add(new Tabs { Id = "nav", Bounds = NavBox.Inset(10f) });
-            _tabs.Items.AddRange(HomeViewModel.TabNames);
+            _tabs.Items.AddRange(Array.ConvertAll(HomeViewModel.TabKeys, key => Loc(key)));
             _tabs.Glyphs.AddRange(new[] { "map", "roster", "grove", "avatar", "inventory" });
             _tabs.Changed += index => SelectTab((HomeTab)index);
         }
@@ -141,7 +141,7 @@ namespace BeastCraft.Game.Screens
 
             MapNodeView next = _map.Recommended();
             _next.Tag = next?.NodeId;
-            _next.Text = next == null ? "Next battle" : "Next: " + next.Name;
+            _next.Text = next == null ? Loc("ui.home.next_battle") : Loc("ui.home.next_named", next.Name);
             RefreshIdle();
             ShowTab();
             OfferPendingPick();
@@ -214,7 +214,7 @@ namespace BeastCraft.Game.Screens
             }
             else if (!quiet)
             {
-                Ctx.Game.Toast(Ctx.Session.IdleStatus().Started ? "Nothing to collect yet." : "The idle clock has started.");
+                Ctx.Game.Toast(Loc(Ctx.Session.IdleStatus().Started ? "ui.idle.nothing_yet" : "ui.idle.clock_started"));
             }
 
             RefreshIdle();
@@ -226,7 +226,7 @@ namespace BeastCraft.Game.Screens
             MapNodeView next = _map.Recommended();
             if (next == null)
             {
-                Ctx.Game.Toast("No battle is reachable: rest or trade first.");
+                Ctx.Game.Toast(Loc("ui.home.no_battle"));
                 return;
             }
 
@@ -313,7 +313,7 @@ namespace BeastCraft.Game.Screens
             switch (tap.Kind)
             {
                 case MapTapKind.ConfirmLeave:
-                    Ctx.Stack.PushModal(new ConfirmModal(Ctx, "Leave the kinship stone?", tap.Message, "Stay", "Go on", () => TapNode(nodeId, true)));
+                    Ctx.Stack.PushModal(new ConfirmModal(Ctx, Loc("ui.home.leave_kinship"), tap.Message, Loc("ui.home.stay"), Loc("ui.home.go_on"), () => TapNode(nodeId, true)));
                     break;
                 case MapTapKind.KinshipChoice:
                     Ctx.Game.Toast(tap.Message);
@@ -386,14 +386,14 @@ namespace BeastCraft.Game.Screens
         {
             if (result == null || !result.Success)
             {
-                Ctx.Game.Toast(result?.Error ?? "Nothing happens.");
+                Ctx.Game.Toast(result?.Error ?? Loc("ui.home.nothing_happens"));
                 return;
             }
 
             string gifts = StoryViewModel.GiftText(Ctx.Session, result);
             if (gifts.Length > 0)
             {
-                Ctx.Game.Toast("The Keeper gave you " + gifts + ".");
+                Ctx.Game.Toast(Loc("ui.home.keeper_gave", gifts));
             }
 
             if (result.Outcome == CampaignOutcome.TutorialCleared)
@@ -709,8 +709,7 @@ namespace BeastCraft.Game.Screens
                     continue;
                 }
 
-                string text = node.Name + (node.Type == MapNodeType.Rest || node.Type == MapNodeType.Shop || node.Type == MapNodeType.Story ? string.Empty
-                                               : "  Lv " + node.Level.ToString(CultureInfo.InvariantCulture));
+                string text = node.Type == MapNodeType.Rest || node.Type == MapNodeType.Shop || node.Type == MapNodeType.Story ? node.Name : Loc("ui.home.node_level", node.Name, node.Level);
                 float width = Math.Min(460f, Ctx.Text.Measure(text, size) + 40f);
                 Rect below = Clamp(new Rect(c.X - width / 2f, c.Y + node.Radius + 14f, width, 44f));
                 Rect above = Clamp(new Rect(c.X - width / 2f, c.Y - node.Radius - 58f, width, 44f));
@@ -734,7 +733,7 @@ namespace BeastCraft.Game.Screens
                     continue;
                 }
 
-                string text = poi.Name + (poi.Kind == PoiKind.KinshipSite ? "  Lv " + poi.Level.ToString(CultureInfo.InvariantCulture) : string.Empty);
+                string text = poi.Kind == PoiKind.KinshipSite ? Loc("ui.home.node_level", poi.Name, poi.Level) : poi.Name;
                 float width = Math.Min(460f, Ctx.Text.Measure(text, size) + 40f);
                 Rect below = Clamp(new Rect(c.X - width / 2f, c.Y + poi.Radius + 12f, width, 44f));
                 if (Overlaps(placed, below))
@@ -780,16 +779,16 @@ namespace BeastCraft.Game.Screens
             Rect seal = new Rect(x, box.Y + 140f, 76f, 76f);
             Painter.Disc(seal.Center, 38f, Painter.C("plum"));
             Painter.Glyph("seal", seal.Inset(6f), header.SealOwned ? Painter.C("gold") : Painter.C("moss"));
-            string sealName = header.SealName ?? "No seal";
+            string sealName = header.SealName ?? Loc("ui.home.no_seal");
             Painter.TextIn(sealName, new Rect(seal.Right + 18f, box.Y + 144f, 380f, 28f), Ctx.Style.TextSizes.Small + 3f, Painter.C("ink"), TextAlign.Left);
-            string progress = header.IsTutorial ? header.StagesCleared + " / " + header.Stages + " beasts" : header.SealOwned ? "Claimed" : header.StagesCleared + " / " + header.Stages + " stages";
+            string progress = header.IsTutorial ? Loc("ui.home.tutorial_progress", header.StagesCleared, header.Stages) : header.SealOwned ? Loc("ui.home.claimed") : Loc("ui.home.stage_progress", header.StagesCleared, header.Stages);
             Painter.Progress(new Rect(seal.Right + 18f, box.Y + 184f, 380f, 30f), header.SealProgress, -1f, "gold", "gold", "track", progress);
 
             // The binding limit (the beast level cap the seals give).
             Rect limit = new Rect(box.Right - 330f, box.Y + 146f, 300f, 76f);
             Painter.Framed(limit, 30f, 4f, Painter.C("plumSoft"), Painter.C("creamDeep"));
-            Painter.TextIn("Binding limit", new Rect(limit.X, limit.Y + 8f, limit.Width, 22f), Ctx.Style.TextSizes.Small, Painter.C("inkSoft"), TextAlign.Center, false);
-            Painter.TextIn("Lv " + header.BindingLimit.ToString(CultureInfo.InvariantCulture), new Rect(limit.X, limit.Y + 38f, limit.Width, 30f), Ctx.Style.TextSizes.Body + 4f,
+            Painter.TextIn(Loc("ui.home.binding_limit"), new Rect(limit.X, limit.Y + 8f, limit.Width, 22f), Ctx.Style.TextSizes.Small, Painter.C("inkSoft"), TextAlign.Center, false);
+            Painter.TextIn(Loc("ui.common.level", header.BindingLimit), new Rect(limit.X, limit.Y + 38f, limit.Width, 30f), Ctx.Style.TextSizes.Body + 4f,
                            Painter.C("plum"), TextAlign.Center, false);
 
             // Gold, beside the gear.
@@ -808,12 +807,12 @@ namespace BeastCraft.Game.Screens
             Painter.Disc(c, 140f, Painter.C("gold"));
             string[] glyphs = { "map", "roster", "grove", "avatar", "inventory" };
             Painter.Glyph(glyphs[(int)_home.Tab], new Rect(c.X - 100f, c.Y - 100f, 200f, 200f), Painter.C("plum"));
-            Painter.TextIn(_home.TabName, new Rect(card.X, card.Y + 450f, card.Width, 60f), Ctx.Style.TextSizes.Heading + 8f, Painter.C("plum"), TextAlign.Center);
+            Painter.TextIn(Loc(_home.TabNameKey), new Rect(card.X, card.Y + 450f, card.Width, 60f), Ctx.Style.TextSizes.Heading + 8f, Painter.C("plum"), TextAlign.Center);
             Rect badge = new Rect(card.Center.X - 160f, card.Y + 540f, 320f, 64f);
             Painter.Framed(badge, 32f, 4f, Painter.C("plum"), Painter.C("peach"));
-            Painter.TextIn("Coming soon", badge, Ctx.Style.TextSizes.Body, Painter.C("white"), TextAlign.Center);
+            Painter.TextIn(Loc("ui.home.coming_soon"), badge, Ctx.Style.TextSizes.Body, Painter.C("white"), TextAlign.Center);
             float y = card.Y + 660f;
-            foreach (string line in Painter.Wrap(_home.ComingSoon, Ctx.Style.TextSizes.Body, card.Width - 160f))
+            foreach (string line in Painter.Wrap(Loc(_home.ComingSoonKey), Ctx.Style.TextSizes.Body, card.Width - 160f))
             {
                 Painter.TextIn(line, new Rect(card.X + 80f, y, card.Width - 160f, Ctx.Style.TextSizes.Body), Ctx.Style.TextSizes.Body, Painter.C("inkSoft"), TextAlign.Center);
                 y += Ctx.Text.LineHeight(Ctx.Style.TextSizes.Body);

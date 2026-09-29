@@ -52,9 +52,11 @@ namespace BeastCraft.Presentation.Screens
     /// </summary>
     public sealed class RosterViewModel
     {
-        public const string SilhouetteHint = "Meet it at a Kinship site";
+        /// <summary>A silhouette's hint, as a text key.</summary>
+        public const string SilhouetteHintKey = "ui.roster.silhouette_hint";
 
-        public static readonly string[] SortNames = { "Joined", "Level", "Name", "Element", "Stance" };
+        /// <summary>The sorts' labels as text keys, in <see cref="RosterSort"/> order.</summary>
+        public static readonly string[] SortKeys = { "ui.roster.sort_joined", "ui.roster.sort_level", "ui.roster.sort_name", "ui.roster.sort_element", "ui.roster.sort_stance" };
 
         private readonly GameSession _session;
 
@@ -74,7 +76,7 @@ namespace BeastCraft.Presentation.Screens
 
         public string SortName
         {
-            get { return SortNames[(int)Sort]; }
+            get { return _session.Content.Text.Get(SortKeys[(int)Sort]); }
         }
 
         /// <summary>Orders the grid by <paramref name="sort"/>.</summary>
@@ -87,10 +89,10 @@ namespace BeastCraft.Presentation.Screens
             }
         }
 
-        /// <summary>The next sort in <see cref="SortNames"/> order (the sort button cycles).</summary>
+        /// <summary>The next sort in <see cref="SortKeys"/> order (the sort button cycles).</summary>
         public void NextSort()
         {
-            SortBy((RosterSort)(((int)Sort + 1) % SortNames.Length));
+            SortBy((RosterSort)(((int)Sort + 1) % SortKeys.Length));
         }
 
         /// <summary>Re-reads the save (after a detail screen changed something).</summary>
@@ -140,7 +142,7 @@ namespace BeastCraft.Presentation.Screens
                     Element = PrimaryElement(species),
                     Stance = species.Stance,
                     Silhouette = true,
-                    Hint = SilhouetteHint,
+                    Hint = _session.Content.Text.Get(SilhouetteHintKey),
                     Order = Silhouettes.Count
                 });
             }

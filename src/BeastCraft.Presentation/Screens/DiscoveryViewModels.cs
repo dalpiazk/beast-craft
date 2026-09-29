@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using BeastCraft.Campaign;
 using BeastCraft.Creatures;
 using BeastCraft.Discovery;
+using BeastCraft.Localization;
 using BeastCraft.Progression;
 
 namespace BeastCraft.Presentation.Screens
@@ -73,17 +74,16 @@ namespace BeastCraft.Presentation.Screens
 
         public string Title
         {
-            get { return SoloOffer ? "The last beast chooses you" : "Two beasts answer"; }
+            get { return _session.Content.Text.Get(SoloOffer ? "ui.discovery.last_beast" : "ui.discovery.two_beasts"); }
         }
 
         public string Subtitle
         {
             get
             {
-                return (SoloOffer
-                           ? "At the " + (Site?.Name ?? "kinship stone") + ", the last beast joins you: no choice needed."
-                           : "At the " + (Site?.Name ?? "kinship stone") + ", choose who joins you.") +
-                       " They join at level " + JoinLevel + ", a little behind your team; camp and the bench help them catch up.";
+                StringTable text = _session.Content.Text;
+                string site = Site?.Name ?? text.Get("ui.discovery.kinship_stone_lower");
+                return text.Format(SoloOffer ? "ui.discovery.solo_subtitle" : "ui.discovery.pick_subtitle", site) + text.Format("ui.discovery.join_level", JoinLevel);
             }
         }
 
@@ -97,7 +97,7 @@ namespace BeastCraft.Presentation.Screens
 
         public string JoinedMessage(PickOptionView option)
         {
-            return (option?.Name ?? "A beast") + " joins your team at level " + JoinLevel + "!" + GameSession.ExtraRewardText(_titlesEarned, 0);
+            return _session.Content.Text.Format("ui.discovery.joined", option?.Name ?? _session.Content.Text.Get("ui.discovery.a_beast"), JoinLevel) + GameSession.ExtraRewardText(_session.Content.Text, _titlesEarned, 0);
         }
     }
 
@@ -116,39 +116,40 @@ namespace BeastCraft.Presentation.Screens
             Poi = PointOfInterest.Find(DiscoveryRules.PointsOnMap(session.Save, session.Content.Discovery), poiId);
             if (Poi == null)
             {
-                Title = "Nothing here";
+                Title = session.Content.Text.Get("ui.discovery.nothing_here");
                 return;
             }
 
             State = DiscoveryRules.StateOf(session.Save, session.Content.Discovery, Poi);
             Title = NameOf(session, Poi);
-            KindLabel = MapViewModel.PoiKindLabel(Poi.Kind);
+            KindLabel = MapViewModel.PoiKindLabel(Poi.Kind, session.Content.Text);
             DiscoveryLibrary library = session.Content.Discovery.Library;
+            StringTable text = session.Content.Text;
             switch (Poi.Kind)
             {
                 case PoiKind.Shrine:
                     Body = library.Shrine(Poi.RefId)?.Text;
-                    Action = "Rest a while";
-                    Found = "You rested here. Something of this place will grow in your Grove.";
+                    Action = text.Get("ui.discovery.rest");
+                    Found = text.Get("ui.discovery.rested");
                     break;
                 case PoiKind.LoreStone:
-                    Body = State == PoiState.Found ? library.Lore(Poi.RefId)?.Text : "Old carvings cover the stone, worn soft by weather.";
-                    Action = "Read the stone";
+                    Body = State == PoiState.Found ? library.Lore(Poi.RefId)?.Text : text.Get("ui.discovery.lore_unread");
+                    Action = text.Get("ui.discovery.read_stone");
                     break;
                 case PoiKind.Cache:
-                    Body = State == PoiState.Found ? "Empty now: you took what it held." : "Something is tucked away here: " + CacheText(session, library.Cache(Poi.RefId)) + ".";
-                    Action = "Open it";
+                    Body = State == PoiState.Found ? text.Get("ui.discovery.cache_empty") : text.Format("ui.discovery.cache_full", CacheText(session, library.Cache(Poi.RefId)));
+                    Action = text.Get("ui.discovery.open_it");
                     break;
                 case PoiKind.Vista:
-                    Body = State == PoiState.Found ? "You have looked out from here: the land around is mapped." : "A high place with a long view. From the top you could map the land around.";
-                    Action = "Look out";
+                    Body = text.Get(State == PoiState.Found ? "ui.discovery.vista_done" : "ui.discovery.vista");
+                    Action = text.Get("ui.discovery.look_out");
                     break;
                 default:
                     KinshipSiteData site = library.Site(Poi.RefId);
                     bool claimed = site != null && session.Save.Discovery.HasClaimed(site.SiteId);
                     Body = claimed ? library.Lore(site.LoreId)?.Text : site?.Intro;
-                    Action = claimed ? null : "Visit the stone";
-                    Found = claimed ? "Your bond was made here." : null;
+                    Action = claimed ? null : text.Get("ui.discovery.visit_stone");
+                    Found = claimed ? text.Get("ui.discovery.bond_made") : null;
                     break;
             }
 
@@ -185,45 +186,46 @@ namespace BeastCraft.Presentation.Screens
             switch (poi.Kind)
             {
                 case PoiKind.Shrine:
-                    return library.Shrine(poi.RefId)?.Name ?? "Shrine";
+                    return library.Shrine(poi.RefId)?.Name ?? session.Content.Text.Get("ui.map.poi_shrine");
                 case PoiKind.LoreStone:
-                    return library.Lore(poi.RefId)?.Title ?? "Lore stone";
+                    return library.Lore(poi.RefId)?.Title ?? session.Content.Text.Get("ui.map.poi_lore");
                 case PoiKind.Cache:
-                    return library.Cache(poi.RefId)?.Name ?? "Cache";
+                    return library.Cache(poi.RefId)?.Name ?? session.Content.Text.Get("ui.map.poi_cache");
                 case PoiKind.KinshipSite:
-                    return library.Site(poi.RefId)?.Name ?? "Kinship stone";
+                    return library.Site(poi.RefId)?.Name ?? session.Content.Text.Get("ui.discovery.kinship_stone");
                 default:
-                    return "Vista";
+                    return session.Content.Text.Get("ui.map.poi_vista");
             }
         }
 
         /// <summary>A cache's contents in words ("45 gold and 1 Essence Shard").</summary>
         public static string CacheText(GameSession session, CacheData cache)
         {
+            StringTable text = session.Content.Text;
             List<string> parts = new List<string>();
             if (cache == null)
             {
-                return "nothing";
+                return text.Get("ui.discovery.nothing");
             }
 
             if (cache.Gold > 0)
             {
-                parts.Add(cache.Gold + " gold");
+                parts.Add(text.Format("ui.encounter.reward_gold", cache.Gold));
             }
 
             foreach (CacheMaterialData material in cache.Materials ?? new CacheMaterialData[0])
             {
                 string name = Array.Find(session.Content.SkillLibrary.Materials ?? new Skills.SkillMaterialData[0], m => m.MaterialId == material.MaterialId)?.DisplayName ??
                               material.MaterialId;
-                parts.Add(material.Quantity + " " + name + (material.Quantity == 1 ? string.Empty : "s"));
+                parts.Add(text.Format(material.Quantity == 1 ? "ui.discovery.material_one" : "ui.discovery.material_many", material.Quantity, name));
             }
 
             if (!string.IsNullOrEmpty(cache.Look))
             {
-                parts.Add("a new look, the " + session.LookName(cache.Look));
+                parts.Add(text.Format("ui.discovery.new_look", session.LookName(cache.Look)));
             }
 
-            return parts.Count == 0 ? "nothing" : string.Join(" and ", parts);
+            return parts.Count == 0 ? text.Get("ui.discovery.nothing") : string.Join(text.Get("ui.session.and"), parts);
         }
 
         /// <summary>Visits the point (<see cref="GameSession.VisitPoi"/>); returns the toast to show (why, when refused).</summary>
@@ -235,20 +237,20 @@ namespace BeastCraft.Presentation.Screens
                 return result.Error;
             }
 
-            string extra = GameSession.ExtraRewardText(result.TitlesEarned, result.LookTokens);
+            string extra = GameSession.ExtraRewardText(_session.Content.Text, result.TitlesEarned, result.LookTokens);
+            StringTable text = _session.Content.Text;
             switch (Poi.Kind)
             {
                 case PoiKind.Shrine:
-                    return Title + " found. It will remember you when your Grove grows." + extra;
+                    return text.Format("ui.discovery.shrine_found", Title) + extra;
                 case PoiKind.LoreStone:
-                    return "Lore found: " + Title + "." + extra;
+                    return text.Format("ui.discovery.lore_found", Title) + extra;
                 case PoiKind.Cache:
-                    return "You found " + CacheText(_session, _session.Content.Discovery.Library.Cache(result.CacheId)) + "." + extra;
+                    return text.Format("ui.discovery.you_found", CacheText(_session, _session.Content.Discovery.Library.Cache(result.CacheId))) + extra;
                 case PoiKind.Vista:
-                    return "From up here you can see the land around: the map is clearer." + extra;
+                    return text.Get("ui.discovery.vista_found") + extra;
                 default:
-                    return "Every beast here already walks with you. The stone gives you an offering instead: " +
-                           CacheText(_session, _session.Content.Discovery.Library.Cache(result.CacheId)) + "." + extra;
+                    return text.Format("ui.discovery.offering", CacheText(_session, _session.Content.Discovery.Library.Cache(result.CacheId))) + extra;
             }
         }
     }
@@ -295,8 +297,8 @@ namespace BeastCraft.Presentation.Screens
                 return;
             }
 
-            Reward = (data == null || string.IsNullOrEmpty(data.CompletionLook) ? string.Empty : "the " + session.LookName(data.CompletionLook)) +
-                     (data != null && data.CompletionGold > 0 ? " and " + data.CompletionGold + " gold" : string.Empty);
+            Reward = (data == null || string.IsNullOrEmpty(data.CompletionLook) ? string.Empty : session.Content.Text.Format("ui.discovery.reward_look", session.LookName(data.CompletionLook))) +
+                     (data != null && data.CompletionGold > 0 ? session.Content.Text.Format("ui.discovery.reward_and_gold", data.CompletionGold) : string.Empty);
             int layers = session.Content.Campaign.RulesFor(region).Layers;
             int next = CampaignRules.NextStage(session.Save, session.Content.Campaign, run.RegionId);
             List<PointOfInterest> points = DiscoveryRules.PointsOf(session.Save, session.Content.Discovery, run.RegionId);
@@ -308,7 +310,7 @@ namespace BeastCraft.Presentation.Screens
                 Stages.Add(new StageProgressView
                 {
                     Stage = stage,
-                    Label = "Stage " + (stage + 1),
+                    Label = session.Content.Text.Format("ui.discovery.stage", stage + 1),
                     Rows = layers,
                     RowsWalked = cleared ? layers : Math.Min(layers, (fog == null ? -1 : fog.DeepestLayer) + 1),
                     PoisTotal = mine.Count,

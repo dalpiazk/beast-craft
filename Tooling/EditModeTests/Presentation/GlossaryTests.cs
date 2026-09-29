@@ -296,7 +296,7 @@ namespace BeastCraft.Tests.EditMode
         public void SkillCard_ReadsTheSkillsData()
         {
             SkillSO ember = Content.Battle.GetSkill("ember_shot");
-            SkillCard card = SkillCard.Of(ember, Content.Glossary);
+            SkillCard card = SkillCard.Of(ember, Content.Glossary, Content.Text);
 
             Assert.AreEqual("Ember Shot", card.Name);
             Assert.AreEqual("skill/ember_shot", card.ArtKey);
@@ -311,17 +311,17 @@ namespace BeastCraft.Tests.EditMode
             StringAssert.Contains("per level", card.Scaling);
             Assert.IsTrue(((List<RichSpan>)card.Description).Exists(s => s.Term != null && s.Term.TermId == "burn"));
 
-            SkillCard pounce = SkillCard.Of(Content.Battle.GetSkill("coup_de_grace"), Content.Glossary);
+            SkillCard pounce = SkillCard.Of(Content.Battle.GetSkill("coup_de_grace"), Content.Glossary, Content.Text);
             Assert.AreEqual("Shadow Pounce", pounce.Name);
             StringAssert.Contains("worn-down", pounce.Power[0]);
 
-            SkillCard bulwark = SkillCard.Of(Content.Battle.GetSkill("granite_bulwark"), Content.Glossary);
+            SkillCard bulwark = SkillCard.Of(Content.Battle.GetSkill("granite_bulwark"), Content.Glossary, Content.Text);
             CollectionAssert.AreEqual(new[] { "Ally", "Self" }, bulwark.Targets);
             Assert.IsNull(bulwark.Category, "no damage, no category");
             StringAssert.StartsWith("Shield ", bulwark.Power[0]);
             StringAssert.Contains("% of Defense", bulwark.Power[0]);
 
-            SkillCard dive = SkillCard.Of(Content.Battle.GetSkill("storm_dive"), Content.Glossary);
+            SkillCard dive = SkillCard.Of(Content.Battle.GetSkill("storm_dive"), Content.Glossary, Content.Text);
             StringAssert.Contains("Once per battle", dive.Uses);
         }
 
@@ -333,30 +333,30 @@ namespace BeastCraft.Tests.EditMode
         [TestCase(SkillTargetShape.Line, SkillTargetSide.Enemy, "Enemy")]
         public void TargetTags(SkillTargetShape shape, SkillTargetSide side, string expected)
         {
-            Assert.AreEqual(expected, string.Join(",", SkillCard.TargetTags(shape, side)));
+            Assert.AreEqual(expected, string.Join(",", SkillCard.TargetTags(shape, side, Content.Text)));
         }
 
         [Test]
         public void PowerLines_SayWhatEachEffectDoes()
         {
             Assert.AreEqual("Damage 32% of Special Attack, 4 hits",
-                            SkillCard.PowerLine(new SkillEffect { Magnitude = 32f, HitCount = 4 }, Element.Dark, DamageCategory.Special));
+                            SkillCard.PowerLine(new SkillEffect { Magnitude = 32f, HitCount = 4 }, Element.Dark, DamageCategory.Special, Content.Text));
             Assert.AreEqual("Poison 15 power a turn, 3 turns, stacks x3",
                             SkillCard.PowerLine(new SkillEffect { EffectType = SkillEffectType.ApplyStatus, Status = StatusType.DamageOverTime, Magnitude = 15f, DurationTurns = 3, MaxStacks = 3 },
-                                                Element.Nature, DamageCategory.Special));
+                                                Element.Nature, DamageCategory.Special, Content.Text));
             Assert.AreEqual("Stun, 1 turn (45% chance)",
                             SkillCard.PowerLine(new SkillEffect { EffectType = SkillEffectType.ApplyStatus, Status = StatusType.Stun, DurationTurns = 1, Chance = 45 },
-                                                Element.Dark, DamageCategory.Special));
+                                                Element.Dark, DamageCategory.Special, Content.Text));
             Assert.AreEqual("Knockback 2 hexes",
                             SkillCard.PowerLine(new SkillEffect { EffectType = SkillEffectType.ApplyStatus, Status = StatusType.Knockback, Magnitude = 2f, DurationTurns = 1 },
-                                                Element.Earth, DamageCategory.Physical));
+                                                Element.Earth, DamageCategory.Physical, Content.Text));
             Assert.AreEqual("-12% Speed, 3 turns",
                             SkillCard.PowerLine(new SkillEffect { EffectType = SkillEffectType.DebuffStat, AffectedStat = StatType.Speed, Magnitude = 12f, IsPercent = true, DurationTurns = 3 },
-                                                Element.None, DamageCategory.Physical));
+                                                Element.None, DamageCategory.Physical, Content.Text));
             Assert.AreEqual("+25 crit chance, 3 turns",
                             SkillCard.PowerLine(new SkillEffect { EffectType = SkillEffectType.BuffStat, AffectedStat = StatType.CritChance, Magnitude = 25f, DurationTurns = 3 },
-                                                Element.Lightning, DamageCategory.Physical));
-            Assert.AreEqual("Heal 20% of Special Attack", SkillCard.PowerLine(new SkillEffect { EffectType = SkillEffectType.Heal, Magnitude = 20f }, Element.Light, DamageCategory.Physical));
+                                                Element.Lightning, DamageCategory.Physical, Content.Text));
+            Assert.AreEqual("Heal 20% of Special Attack", SkillCard.PowerLine(new SkillEffect { EffectType = SkillEffectType.Heal, Magnitude = 20f }, Element.Light, DamageCategory.Physical, Content.Text));
         }
 
         [Test]
@@ -446,7 +446,7 @@ namespace BeastCraft.Tests.EditMode
         [Test]
         public void CardLayout_WrapsLongPowerLines_WithinTheCard()
         {
-            SkillCard card = SkillCard.Of(Content.Battle.GetSkill("ember_shot"), Content.Glossary);
+            SkillCard card = SkillCard.Of(Content.Battle.GetSkill("ember_shot"), Content.Glossary, Content.Text);
             PortraitLayout screen = new PortraitLayout();
             // A wide face, so the power lines must wrap.
             SkillCardLayout layout = SkillCardLayout.Of(card, screen.SkillDetail, (s, size) => s.Length * size * 1.3f, size => size * 1.5f);
@@ -478,7 +478,7 @@ namespace BeastCraft.Tests.EditMode
             PortraitLayout screen = new PortraitLayout();
             foreach (SkillData data in Content.SkillLibrary.BeastSkills)
             {
-                SkillCard card = SkillCard.Of(Content.Battle.GetSkill(data.SkillId), Content.Glossary);
+                SkillCard card = SkillCard.Of(Content.Battle.GetSkill(data.SkillId), Content.Glossary, Content.Text);
                 SkillCardLayout layout = SkillCardLayout.Of(card, screen.SkillDetail, (s, size) => s.Length * size * 0.55f, size => size * 1.3f);
 
                 Assert.AreEqual(screen.SkillDetail.Bottom, layout.Card.Bottom, 1e-3f, data.SkillId);
@@ -497,7 +497,7 @@ namespace BeastCraft.Tests.EditMode
             int above = 0;
             foreach (SkillData data in Content.SkillLibrary.BeastSkills)
             {
-                SkillCard card = SkillCard.Of(Content.Battle.GetSkill(data.SkillId), Content.Glossary);
+                SkillCard card = SkillCard.Of(Content.Battle.GetSkill(data.SkillId), Content.Glossary, Content.Text);
                 SkillCardLayout layout = SkillCardLayout.Of(card, screen.SkillDetail, (s, size) => s.Length * size * 0.55f, size => size * 1.3f);
                 foreach (GlossaryTerm term in Content.Glossary.TermsIn(data.Description))
                 {
@@ -535,7 +535,7 @@ namespace BeastCraft.Tests.EditMode
         public void CardLayout_HitTestsTermsInCanvasPixels()
         {
             PortraitLayout screen = new PortraitLayout();
-            SkillCard card = SkillCard.Of(Content.Battle.GetSkill("ember_shot"), Content.Glossary);
+            SkillCard card = SkillCard.Of(Content.Battle.GetSkill("ember_shot"), Content.Glossary, Content.Text);
             SkillCardLayout layout = SkillCardLayout.Of(card, screen.SkillDetail, (s, size) => s.Length * size * 0.55f, size => size * 1.3f);
             GlossaryTerm burn = Content.Glossary.Find("burn");
             Rect rect = layout.TermRect(burn).Value;

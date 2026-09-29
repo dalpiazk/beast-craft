@@ -51,7 +51,7 @@ namespace BeastCraft.Game.Screens
             _model = model;
             _scroll = Ui.Add(new ScrollView { Id = "page", Bounds = new Rect(0, TopBar, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight - TopBar - BottomBar) });
             _header = new ScreenHeader(Ui, TopBar, () => Ctx.Stack.Pop());
-            _start = AddButton(null, "start", new Rect(Pad + 60f, PortraitLayout.CanvasHeight - BottomBar + 70f, PortraitLayout.CanvasWidth - 2f * Pad - 120f, 140f), "Start Battle",
+            _start = AddButton(null, "start", new Rect(Pad + 60f, PortraitLayout.CanvasHeight - BottomBar + 70f, PortraitLayout.CanvasWidth - 2f * Pad - 120f, 140f), Loc("ui.encounter.start"),
                                "primary", StartBattle, "battle");
             Build();
         }
@@ -78,7 +78,7 @@ namespace BeastCraft.Game.Screens
             NodeBattle battle = _model.Start(out string error);
             if (battle == null)
             {
-                Ctx.Game.Toast(error ?? "The battle could not begin.");
+                Ctx.Game.Toast(error ?? Loc("ui.encounter.could_not_begin"));
                 if (Ctx.Options.Screenshot || !string.IsNullOrEmpty(Ctx.Options.WalkthroughDir))
                 {
                     throw new InvalidOperationException(error);
@@ -104,13 +104,13 @@ namespace BeastCraft.Game.Screens
             foreach (SoothingOptionView item in _model.SoothingOptions)
             {
                 string itemId = item.ItemId;
-                options.Add(new ChoiceOption(item.DisplayName + " (" + item.Held + " held)", true, null,
-                                             () => Ctx.Stack.PushModal(new ConfirmModal(Ctx, "Soothe this location?",
-                                                                                        "Spend one " + item.DisplayName + " for the same full rewards a win here would pay. No fight, no risk.",
-                                                                                        "Cancel", "Soothe", () => ConfirmSoothe(itemId)))));
+                options.Add(new ChoiceOption(Loc("ui.encounter.item_held", item.DisplayName, item.Held), true, null,
+                                             () => Ctx.Stack.PushModal(new ConfirmModal(Ctx, Loc("ui.encounter.soothe_title"),
+                                                                                        Loc("ui.encounter.soothe_body", item.DisplayName),
+                                                                                        Loc("ui.common.cancel"), Loc("ui.encounter.soothe"), () => ConfirmSoothe(itemId)))));
             }
 
-            Ctx.Stack.PushModal(new ChoiceModal(Ctx, "Soothe with", "Pick an item to give.", options));
+            Ctx.Stack.PushModal(new ChoiceModal(Ctx, Loc("ui.encounter.soothe_with"), Loc("ui.encounter.soothe_with_body"), options));
         }
 
         private void ConfirmSoothe(string itemId)
@@ -173,12 +173,12 @@ namespace BeastCraft.Game.Screens
                 float height = 130f;
                 Rect box = new Rect(Pad, y, width, height);
                 _scroll.Add(new Panel { Bounds = box, StyleKey = "banner" });
-                AddLabel(_scroll, new Rect(Pad + 30f, y + 20f, width - 260f, 36f), "This place can be soothed", style.TextSizes.Body + 2f, "plum");
+                AddLabel(_scroll, new Rect(Pad + 30f, y + 20f, width - 260f, 36f), Loc("ui.encounter.can_soothe"), style.TextSizes.Body + 2f, "plum");
                 string sub = options.Count == 0
-                                 ? "You hold none of this region's soothing items."
-                                 : "Give a calming gift for the same full rewards a win pays -- no fight needed.";
+                                 ? Loc("ui.encounter.no_soothe_items")
+                                 : Loc("ui.encounter.soothe_hint");
                 AddLabel(_scroll, new Rect(Pad + 30f, y + 64f, width - 260f, 60f), sub, style.TextSizes.Small + 2f, "inkSoft", TextAlign.Left, true);
-                Button soothe = AddButton(_scroll, "soothe", new Rect(Pad + width - 230f, y + 30f, 190f, 76f), "Soothe", "primary", OpenSoothe);
+                Button soothe = AddButton(_scroll, "soothe", new Rect(Pad + width - 230f, y + 30f, 190f, 76f), Loc("ui.encounter.soothe"), "primary", OpenSoothe);
                 soothe.Enabled = options.Count > 0;
                 y += height + 30f;
             }
@@ -196,8 +196,8 @@ namespace BeastCraft.Game.Screens
             }
 
             _insight = EncounterInsightView.For(Ctx.Session, _model);
-            AddLabel(_scroll, new Rect(Pad, y, width, 40f), "Enemies (" + total + ")", style.TextSizes.Heading - 4f, "plum");
-            AddButton(_scroll, "element-chart", new Rect(Pad + width - 360f, y - 10f, 240f, 64f), "Element chart", "chip",
+            AddLabel(_scroll, new Rect(Pad, y, width, 40f), Loc("ui.encounter.enemies", total), style.TextSizes.Heading - 4f, "plum");
+            AddButton(_scroll, "element-chart", new Rect(Pad + width - 360f, y - 10f, 240f, 64f), Loc("ui.encounter.element_chart"), "chip",
                       () => Ctx.Stack.Push(new ElementChartScreen(Ctx, _insight.TeamElements)));
             AddButton(_scroll, "glossary", new Rect(Pad + width - 104f, y - 10f, 104f, 64f), "?", "chip", () => Ctx.Stack.Push(new GlossaryScreen(Ctx, "level_gap")));
             y += 70f;
@@ -239,9 +239,9 @@ namespace BeastCraft.Game.Screens
             {
                 _suggestionBox = new Rect(Pad, y, width, 200f);
                 _scroll.Add(new Panel { Bounds = _suggestionBox, StyleKey = "banner" });
-                AddLabel(_scroll, new Rect(Pad + 30f, y + 22f, width - 140f, 36f), "Stuck here? Try this team", style.TextSizes.Body + 4f, "plum");
+                AddLabel(_scroll, new Rect(Pad + 30f, y + 22f, width - 140f, 36f), Loc("ui.encounter.suggestion"), style.TextSizes.Body + 4f, "plum");
                 AddLabel(_scroll, new Rect(Pad + 30f, y + 70f, width - 60f, 30f), string.Join(", ", _model.Suggestion.Names), style.TextSizes.Body, "ink");
-                AddButton(_scroll, "use-suggestion", new Rect(Pad + 30f, y + 118f, 260f, 64f), "Use team", "primary", () =>
+                AddButton(_scroll, "use-suggestion", new Rect(Pad + 30f, y + 118f, 260f, 64f), Loc("ui.encounter.use_team"), "primary", () =>
                 {
                     _model.ApplySuggestion();
                     Build();
@@ -255,8 +255,8 @@ namespace BeastCraft.Game.Screens
             }
 
             // The party.
-            AddLabel(_scroll, new Rect(Pad, y, width, 40f), "Your party (" + _model.Team.Count + "/" + _model.PartySize + ")", style.TextSizes.Heading - 4f, "plum");
-            AddLabel(_scroll, new Rect(Pad, y + 4f, width, 36f), "Tap to add or remove", style.TextSizes.Small + 2f, "inkSoft", TextAlign.Right);
+            AddLabel(_scroll, new Rect(Pad, y, width, 40f), Loc("ui.encounter.party", _model.Team.Count, _model.PartySize), style.TextSizes.Heading - 4f, "plum");
+            AddLabel(_scroll, new Rect(Pad, y + 4f, width, 36f), Loc("ui.encounter.tap_add_remove"), style.TextSizes.Small + 2f, "inkSoft", TextAlign.Right);
             y += 60f;
             float cardWidth = (width - 2f * 20f) / 3f;
             for (int i = 0; i < _model.Owned.Count; i++)
@@ -271,11 +271,11 @@ namespace BeastCraft.Game.Screens
             y += ((_model.Owned.Count + 2) / 3) * 300f + 20f;
 
             // The consumable.
-            AddLabel(_scroll, new Rect(Pad, y, width, 40f), "Consumable (one per battle)", style.TextSizes.Heading - 4f, "plum");
+            AddLabel(_scroll, new Rect(Pad, y, width, 40f), Loc("ui.encounter.consumable"), style.TextSizes.Heading - 4f, "plum");
             y += 60f;
             if (_model.Consumables.Count == 0)
             {
-                AddLabel(_scroll, new Rect(Pad, y, width, 40f), "None held yet: traders sell them.", style.TextSizes.Body, "inkSoft");
+                AddLabel(_scroll, new Rect(Pad, y, width, 40f), Loc("ui.encounter.no_consumables"), style.TextSizes.Body, "inkSoft");
                 y += 60f;
             }
             else
@@ -283,7 +283,7 @@ namespace BeastCraft.Game.Screens
                 float x = Pad;
                 foreach (ConsumableView consumable in _model.Consumables)
                 {
-                    string text = consumable.Name + " x" + consumable.Quantity.ToString(CultureInfo.InvariantCulture);
+                    string text = Loc("ui.encounter.consumable_count", consumable.Name, consumable.Quantity);
                     float w = Math.Min(width, Ctx.Text.Measure(text, style.Button("chip").TextSize) + 60f);
                     if (x + w > Pad + width)
                     {
@@ -329,15 +329,15 @@ namespace BeastCraft.Game.Screens
             UiStyle style = Ctx.Style;
             string sub = _model.Battle == null
                              ? null
-                             : _model.KindLabel + "  -  Lv " + _model.Level + "  -  " + _model.Arena + " arena" + (_model.Attempt > 0 ? "  -  losses here: " + _model.Attempt : string.Empty);
-            _header.Paint(Ctx, Ui, _model.Title ?? "Encounter", sub);
+                             : Loc("ui.encounter.subtitle", _model.KindLabel, _model.Level, _model.Arena) + (_model.Attempt > 0 ? Loc("ui.encounter.losses_here", _model.Attempt) : string.Empty);
+            _header.Paint(Ctx, Ui, _model.Title ?? Loc("ui.encounter.title"), sub);
 
             // The start bar.
             Rect bar = new Rect(0, PortraitLayout.CanvasHeight - BottomBar, PortraitLayout.CanvasWidth, BottomBar);
             Painter.Fill(bar, Painter.C("cream"));
             Painter.Fill(new Rect(0, bar.Y, PortraitLayout.CanvasWidth, 5f), Painter.C("plumSoft", 0.5f));
             TeamValidation validation = _model.Validate();
-            Painter.TextIn(validation.Ok ? _model.Team.Count + " beast" + (_model.Team.Count == 1 ? string.Empty : "s") + (_model.SelectedConsumable != null ? " + 1 consumable" : string.Empty)
+            Painter.TextIn(validation.Ok ? Loc(_model.Team.Count == 1 ? "ui.encounter.team_one" : "ui.encounter.team_many", _model.Team.Count) + (_model.SelectedConsumable != null ? Loc("ui.encounter.plus_consumable") : string.Empty)
                                          : validation.Message,
                            new Rect(0, bar.Y + 18f, PortraitLayout.CanvasWidth, 30f), style.TextSizes.Body, Painter.C(validation.Ok ? "inkSoft" : "berry"), TextAlign.Center);
             Painter.Paint(_start, Ui);
@@ -365,13 +365,13 @@ namespace BeastCraft.Game.Screens
                 Painter.Art(Painter.Sprite(enemy.ArtKey), portrait, true);
                 float x = portrait.Right + 14f;
                 float w = card.Right - x - 14f;
-                Painter.TextIn(enemy.Name + (enemy.Count > 1 ? "  x" + enemy.Count : string.Empty), new Rect(x, card.Y + 22f, w, 30f), style.TextSizes.Body, Painter.C("ink"),
+                Painter.TextIn(enemy.Count > 1 ? Loc("ui.encounter.enemy_count", enemy.Name, enemy.Count) : enemy.Name, new Rect(x, card.Y + 22f, w, 30f), style.TextSizes.Body, Painter.C("ink"),
                                TextAlign.Left);
                 Painter.ElementBadge(enemy.Element, new Rect(x, card.Y + 66f, 44f, 44f));
-                Painter.TextIn(enemy.Element == Element.None ? "No element" : enemy.Element.ToString(), new Rect(x + 54f, card.Y + 72f, w - 54f, 30f), style.TextSizes.Small + 2f,
+                Painter.TextIn(enemy.Element == Element.None ? Loc("ui.beast.no_element") : enemy.Element.ToString(), new Rect(x + 54f, card.Y + 72f, w - 54f, 30f), style.TextSizes.Small + 2f,
                                Painter.C("inkSoft"), TextAlign.Left);
                 string stance = enemy.Stance.HasValue ? enemy.Stance.Value.ToString() : "?";
-                Painter.TextIn("Lv " + enemy.Level + "  -  " + stance, new Rect(x, card.Y + 118f, w, 30f), style.TextSizes.Small + 2f, Painter.C("plum"), TextAlign.Left);
+                Painter.TextIn(Loc("ui.common.pair", Loc("ui.common.level", enemy.Level), stance), new Rect(x, card.Y + 118f, w, 30f), style.TextSizes.Small + 2f, Painter.C("plum"), TextAlign.Left);
                 int index = _model.Enemies.IndexOf(enemy);
                 if (index >= 0 && index < _insight.Enemies.Count)
                 {
@@ -402,7 +402,7 @@ namespace BeastCraft.Game.Screens
                 Painter.Art(Painter.Sprite(member.ArtKey), portrait, false, string.IsNullOrEmpty(tintHex) ? (Microsoft.Xna.Framework.Color?)null : Painter.C(tintHex));
                 Painter.TextIn(member.Name, new Rect(card.X + 12f, card.Y + 176f, card.Width - 24f, 30f), style.TextSizes.Body, Painter.C("ink"), TextAlign.Center);
                 Painter.ElementBadge(member.Element, new Rect(card.X + 18f, card.Y + 222f, 40f, 40f));
-                Painter.TextIn("Lv " + member.Level + "  " + member.Stance, new Rect(card.X + 64f, card.Y + 226f, card.Width - 76f, 30f), style.TextSizes.Small + 1f,
+                Painter.TextIn(Loc("ui.encounter.member_level", member.Level, member.Stance), new Rect(card.X + 64f, card.Y + 226f, card.Width - 76f, 30f), style.TextSizes.Small + 1f,
                                Painter.C("inkSoft"), TextAlign.Left);
                 if (member.Selected)
                 {
@@ -427,7 +427,7 @@ namespace BeastCraft.Game.Screens
             Painter.Framed(badge, box.Height / 2f, 3f, Painter.C("plum"), Painter.C(color));
             string gap = enemy.Gap == 0 ? "= 0" : (enemy.Gap > 0 ? "+" : "-") + Math.Abs(enemy.Gap);
             Painter.TextIn(gap, badge, style.TextSizes.Body, Painter.C("white"), TextAlign.Center);
-            string text = "You " + DerivedStats.Times(enemy.TeamDealt) + "  -  It " + DerivedStats.Times(enemy.EnemyDealt);
+            string text = Loc("ui.encounter.matchup", DerivedStats.Times(enemy.TeamDealt), DerivedStats.Times(enemy.EnemyDealt));
             Painter.TextIn(text, new Rect(badge.Right + 14f, box.Y, box.Right - badge.Right - 14f, box.Height), style.TextSizes.Small + 2f, Painter.C("ink"), TextAlign.Left);
         }
 
@@ -435,8 +435,8 @@ namespace BeastCraft.Game.Screens
         private void DrawMatchups(Rect box)
         {
             UiStyle style = Ctx.Style;
-            Painter.TextIn("Element matchups", new Rect(box.X + 36f, box.Y + 26f, box.Width - 72f, style.TextSizes.Heading - 6f), style.TextSizes.Heading - 6f, Painter.C("plum"), TextAlign.Left);
-            Painter.TextIn("each cell: you deal (top), you take (below)", new Rect(box.X + 36f, box.Y + 32f, box.Width - 72f, 24f), style.TextSizes.Small + 1f, Painter.C("inkSoft"),
+            Painter.TextIn(Loc("ui.encounter.element_matchups"), new Rect(box.X + 36f, box.Y + 26f, box.Width - 72f, style.TextSizes.Heading - 6f), style.TextSizes.Heading - 6f, Painter.C("plum"), TextAlign.Left);
+            Painter.TextIn(Loc("ui.encounter.matchups_note"), new Rect(box.X + 36f, box.Y + 32f, box.Width - 72f, 24f), style.TextSizes.Small + 1f, Painter.C("inkSoft"),
                            TextAlign.Right);
             float label = 220f;
             int columns = _insight.ColumnElements.Count;
@@ -447,7 +447,7 @@ namespace BeastCraft.Game.Screens
             {
                 float badge = Math.Min(44f, cell - 20f);
                 Painter.ElementBadge(_insight.ColumnElements[c], new Rect(x0 + c * cell + (cell - badge) / 2f, y, badge, badge));
-                Painter.TextIn("x" + _insight.ColumnCounts[c], new Rect(x0 + c * cell, y + badge + 2f, cell, 20f), style.TextSizes.Small - 2f, Painter.C("inkSoft"), TextAlign.Center);
+                Painter.TextIn(Loc("ui.encounter.column_count", _insight.ColumnCounts[c]), new Rect(x0 + c * cell, y + badge + 2f, cell, 20f), style.TextSizes.Small - 2f, Painter.C("inkSoft"), TextAlign.Center);
             }
 
             y += 70f;
@@ -496,7 +496,7 @@ namespace BeastCraft.Game.Screens
         private void DrawEnemySkills(Rect box)
         {
             UiStyle style = Ctx.Style;
-            Painter.TextIn("Enemy skills", new Rect(box.X + 36f, box.Y + 26f, box.Width - 72f, style.TextSizes.Heading - 6f), style.TextSizes.Heading - 6f, Painter.C("plum"), TextAlign.Left);
+            Painter.TextIn(Loc("ui.encounter.enemy_skills"), new Rect(box.X + 36f, box.Y + 26f, box.Width - 72f, style.TextSizes.Heading - 6f), style.TextSizes.Heading - 6f, Painter.C("plum"), TextAlign.Left);
             float y = box.Y + 90f;
             float rule = style.TextSizes.Small + 2f;
             foreach (EnemyInsightView enemy in EnemyTypes())
@@ -538,15 +538,15 @@ namespace BeastCraft.Game.Screens
 
             float x = image.Right + 30f;
             float w = card.Right - x - 24f;
-            Painter.TextIn("Battlefield", new Rect(x, card.Y + 36f, w, 36f), style.TextSizes.Heading - 6f, Painter.C("plum"), TextAlign.Left);
-            Painter.TextIn(_model.LayoutName ?? "Open ground", new Rect(x, card.Y + 92f, w, 30f), style.TextSizes.Body, Painter.C("ink"), TextAlign.Left);
-            Painter.TextIn(_model.Arena + " arena", new Rect(x, card.Y + 140f, w, 30f), style.TextSizes.Body, Painter.C("inkSoft"), TextAlign.Left);
-            Painter.TextIn(_model.Obstacles > 0 ? _model.Obstacles + " obstacles" : "No obstacles", new Rect(x, card.Y + 184f, w, 30f), style.TextSizes.Body, Painter.C("inkSoft"),
+            Painter.TextIn(Loc("ui.encounter.battlefield"), new Rect(x, card.Y + 36f, w, 36f), style.TextSizes.Heading - 6f, Painter.C("plum"), TextAlign.Left);
+            Painter.TextIn(_model.LayoutName ?? Loc("ui.encounter.open_ground"), new Rect(x, card.Y + 92f, w, 30f), style.TextSizes.Body, Painter.C("ink"), TextAlign.Left);
+            Painter.TextIn(Loc("ui.encounter.arena", _model.Arena), new Rect(x, card.Y + 140f, w, 30f), style.TextSizes.Body, Painter.C("inkSoft"), TextAlign.Left);
+            Painter.TextIn(_model.Obstacles > 0 ? Loc("ui.encounter.obstacles", _model.Obstacles) : Loc("ui.encounter.no_obstacles"), new Rect(x, card.Y + 184f, w, 30f), style.TextSizes.Body, Painter.C("inkSoft"),
                            TextAlign.Left);
             if (_model.DominantElement.HasValue)
             {
                 Painter.ElementBadge(_model.DominantElement.Value, new Rect(x, card.Y + 236f, 50f, 50f));
-                Painter.TextIn("Mostly " + _model.DominantElement.Value, new Rect(x + 62f, card.Y + 244f, w - 62f, 30f), style.TextSizes.Body, Painter.C("ink"), TextAlign.Left);
+                Painter.TextIn(Loc("ui.encounter.mostly", _model.DominantElement.Value), new Rect(x + 62f, card.Y + 244f, w - 62f, 30f), style.TextSizes.Body, Painter.C("ink"), TextAlign.Left);
             }
         }
     }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using BeastCraft.Localization;
 using BeastCraft.Progression;
 using BeastCraft.Save;
 
@@ -73,7 +74,7 @@ namespace BeastCraft.Presentation.Screens
             AchievementLibrary library = _session.Content.Achievements?.Library;
             AvatarLevel = save?.Avatar?.Level ?? 1;
             EquippedTitleText = TitleTextOf(library, save?.Achievements?.EquippedTitleId);
-            AvatarDisplayName = TitledName(save, library, CampaignAvatar.DisplayName);
+            AvatarDisplayName = TitledName(save, library, CampaignAvatar.DisplayName(_session.Content.Text));
             if (library == null)
             {
                 return;
@@ -100,7 +101,7 @@ namespace BeastCraft.Presentation.Screens
             }
 
             string equipped = save?.Achievements?.EquippedTitleId ?? string.Empty;
-            Titles.Add(new TitleRow { TitleId = string.Empty, Text = "No title", Equipped = equipped.Length == 0 });
+            Titles.Add(new TitleRow { TitleId = string.Empty, Text = _session.Content.Text.Get("ui.achievements.no_title"), Equipped = equipped.Length == 0 });
             foreach (string titleId in save?.Achievements?.OwnedTitleIds ?? new List<string>())
             {
                 Titles.Add(new TitleRow { TitleId = titleId, Text = TitleTextOf(library, titleId), Equipped = equipped == titleId });
@@ -168,36 +169,37 @@ namespace BeastCraft.Presentation.Screens
         /// <summary>An achievement's condition, in words (mirrors <c>AchievementRules.IsMet</c>'s switch).</summary>
         private static string ConditionTextFor(GameSession session, AchievementData def)
         {
+            StringTable text = session.Content.Text;
             switch (def.Kind)
             {
                 case AchievementKinds.BossCleared:
-                    return "Beat " + RegionName(session, def.RegionId) + "'s boss.";
+                    return text.Format("ui.achievements.cond_boss", RegionName(session, def.RegionId));
                 case AchievementKinds.AllBossesCleared:
-                    return "Beat every mainline region's boss.";
+                    return text.Get("ui.achievements.cond_all_bosses");
                 case AchievementKinds.RegionExplored:
-                    return "Explore " + RegionName(session, def.RegionId) + " to 100%.";
+                    return text.Format("ui.achievements.cond_explore", RegionName(session, def.RegionId));
                 case AchievementKinds.AllRegionsExplored:
-                    return "Explore every region to 100%.";
+                    return text.Get("ui.achievements.cond_explore_all");
                 case AchievementKinds.KinshipSitesClaimed:
-                    return "Claim " + def.Threshold + " Kinship site" + (def.Threshold == 1 ? string.Empty : "s") + ".";
+                    return text.Format(def.Threshold == 1 ? "ui.achievements.cond_kinship_one" : "ui.achievements.cond_kinship", def.Threshold);
                 case AchievementKinds.AllKinshipClaimed:
-                    return "Claim every Kinship site.";
+                    return text.Get("ui.achievements.cond_kinship_all");
                 case AchievementKinds.BeastsOwned:
-                    return "Own " + def.Threshold + " distinct beasts.";
+                    return text.Format("ui.achievements.cond_beasts", def.Threshold);
                 case AchievementKinds.RegionLoreComplete:
-                    return "Find every lore entry of " + RegionName(session, def.RegionId) + ".";
+                    return text.Format("ui.achievements.cond_lore_region", RegionName(session, def.RegionId));
                 case AchievementKinds.AllLoreFound:
-                    return "Find every lore entry in the game.";
+                    return text.Get("ui.achievements.cond_lore_all");
                 case AchievementKinds.CompendiumPercent:
-                    return "Reach " + def.Threshold + "% compendium completion.";
+                    return text.Format("ui.achievements.cond_compendium", def.Threshold);
                 case AchievementKinds.AvatarLevel:
-                    return "Reach Beastbinder level " + def.Threshold + ".";
+                    return text.Format("ui.achievements.cond_avatar_level", def.Threshold);
                 case AchievementKinds.BeastLevel:
-                    return "Reach level " + def.Threshold + " with any beast.";
+                    return text.Format("ui.achievements.cond_beast_level", def.Threshold);
                 case AchievementKinds.SideStoryComplete:
-                    return "Complete " + SideStoryName(session, def.StoryId) + ".";
+                    return text.Format("ui.achievements.cond_side_story", SideStoryName(session, def.StoryId));
                 case AchievementKinds.LocationsSoothed:
-                    return "Soothe " + def.Threshold + " location" + (def.Threshold == 1 ? string.Empty : "s") + " with a Grove gift.";
+                    return text.Format(def.Threshold == 1 ? "ui.achievements.cond_soothe_one" : "ui.achievements.cond_soothe", def.Threshold);
                 default:
                     return string.Empty;
             }

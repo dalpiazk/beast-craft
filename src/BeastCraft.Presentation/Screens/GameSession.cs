@@ -10,6 +10,7 @@ using BeastCraft.Expeditions;
 using BeastCraft.Garden;
 using BeastCraft.Grove;
 using BeastCraft.Idle;
+using BeastCraft.Localization;
 using BeastCraft.Presentation.Content;
 using BeastCraft.Progression;
 using BeastCraft.Save;
@@ -723,28 +724,28 @@ namespace BeastCraft.Presentation.Screens
             List<string> parts = new List<string>();
             if (view.Gold > 0)
             {
-                parts.Add("+" + view.Gold + " gold");
+                parts.Add(Content.Text.Format("ui.idle.gold", view.Gold));
             }
 
             if (view.Xp > 0)
             {
-                parts.Add("+" + view.Xp + " XP" + (view.Levels > 0 ? " (" + view.Levels + (view.Levels == 1 ? " level up)" : " level ups)") : string.Empty));
+                parts.Add(Content.Text.Format("ui.beast.xp_gained_short", view.Xp) + (view.Levels > 0 ? Content.Text.Format(view.Levels == 1 ? "ui.idle.level_up" : "ui.idle.level_ups", view.Levels) : string.Empty));
             }
 
             if (view.Materials > 0)
             {
-                parts.Add(view.Materials + (view.Materials == 1 ? " material" : " materials"));
+                parts.Add(Content.Text.Format(view.Materials == 1 ? "ui.encounter.reward_material" : "ui.encounter.reward_materials", view.Materials));
             }
 
             if (view.Look != null)
             {
-                parts.Add("a new look");
+                parts.Add(Content.Text.Get("ui.idle.new_look"));
             }
 
-            string extra = ExtraRewardText(result.TitlesEarned, 0);
+            string extra = ExtraRewardText(Content.Text, result.TitlesEarned, 0);
             if (parts.Count > 0)
             {
-                view.Message = "While you were away: " + string.Join(", ", parts) + (result.Capped ? " (idle was full)" : string.Empty) + "." + extra;
+                view.Message = Content.Text.Format(result.Capped ? "ui.idle.while_away_full" : "ui.idle.while_away", string.Join(Content.Text.Get("ui.common.list_sep"), parts)) + extra;
                 Autosave(AutosaveReason.IdleClaim);
             }
             else if (extra.Length > 0)
@@ -760,7 +761,7 @@ namespace BeastCraft.Presentation.Screens
         /// <summary>The map's idle chip: see <see cref="IdleStatusView"/>. Changes nothing.</summary>
         public IdleStatusView IdleStatus()
         {
-            IdleStatusView status = new IdleStatusView { Text = "Idle" };
+            IdleStatusView status = new IdleStatusView { Text = Content.Text.Get("ui.home.idle") };
             if (Save == null || Content.Idle?.Rewards == null)
             {
                 return status;
@@ -775,15 +776,17 @@ namespace BeastCraft.Presentation.Screens
             int minutes = (int)Math.Floor(preview.Hours * 60.0);
             if (preview.ProgressLevel <= 0)
             {
-                status.Text = "Idle: win a battle to start";
+                status.Text = Content.Text.Get("ui.idle.win_to_start");
             }
             else if (status.Capped)
             {
-                status.Text = "Idle full (" + preview.CapHours + "h)";
+                status.Text = Content.Text.Format("ui.idle.full", preview.CapHours);
             }
             else
             {
-                status.Text = "Idle " + (minutes >= 60 ? minutes / 60 + "h " + (minutes % 60).ToString("00", CultureInfo.InvariantCulture) + "m" : minutes + "m");
+                status.Text = minutes >= 60
+                                  ? Content.Text.Format("ui.idle.hours_minutes", minutes / 60, (minutes % 60).ToString("00", CultureInfo.InvariantCulture))
+                                  : Content.Text.Format("ui.idle.minutes", minutes);
             }
 
             return status;
@@ -900,7 +903,7 @@ namespace BeastCraft.Presentation.Screens
             _groveReadyToasted.IntersectWith(stillReady);
             if (somethingNew)
             {
-                PendingToasts.Add("Something is ready in the Grove.");
+                PendingToasts.Add(Content.Text.Get("ui.grove.ready_toast"));
             }
 
             return somethingNew;
@@ -940,16 +943,16 @@ namespace BeastCraft.Presentation.Screens
                 List<string> parts = new List<string>();
                 if (reward.Look != null)
                 {
-                    parts.Add("the " + LookName(reward.Look));
+                    parts.Add(Content.Text.Format("ui.discovery.reward_look", LookName(reward.Look)));
                 }
 
                 if (reward.Gold > 0)
                 {
-                    parts.Add(reward.Gold + " gold");
+                    parts.Add(Content.Text.Format("ui.encounter.reward_gold", reward.Gold));
                 }
 
-                string earned = parts.Count > 0 ? "You earned " + string.Join(" and ", parts) + "." : string.Empty;
-                PendingToasts.Add(region + " fully explored! " + earned + ExtraRewardText(reward.TitlesEarned, reward.LookTokens));
+                string earned = parts.Count > 0 ? Content.Text.Format("ui.discovery.you_earned", string.Join(Content.Text.Get("ui.session.and"), parts)) : string.Empty;
+                PendingToasts.Add(Content.Text.Format("ui.discovery.fully_explored_toast", region) + earned + ExtraRewardText(Content.Text, reward.TitlesEarned, reward.LookTokens));
             }
 
             return reward;
@@ -984,7 +987,7 @@ namespace BeastCraft.Presentation.Screens
             }
 
             List<string> titles = earned.ConvertAll(a => a.TitleText);
-            PendingToasts.Add((titles.Count == 1 ? "New title earned: " : "New titles earned: ") + string.Join(", ", titles) + ".");
+            PendingToasts.Add(Content.Text.Format(titles.Count == 1 ? "ui.achievements.new_title" : "ui.achievements.new_titles", string.Join(Content.Text.Get("ui.common.list_sep"), titles)));
             return true;
         }
 
@@ -993,23 +996,23 @@ namespace BeastCraft.Presentation.Screens
         /// message (<see cref="DiscoveryResult"/>, <see cref="CompletionReward"/>, <see cref="KinshipResult"/>,
         /// <see cref="Campaign.CampaignResult"/> each carry these); "" when there is nothing to add.
         /// </summary>
-        public static string ExtraRewardText(List<AchievementData> titlesEarned, int lookTokensGranted)
+        public static string ExtraRewardText(StringTable text, List<AchievementData> titlesEarned, int lookTokensGranted)
         {
             List<string> parts = new List<string>();
             foreach (AchievementData title in titlesEarned ?? new List<AchievementData>())
             {
                 if (title != null)
                 {
-                    parts.Add("the title \"" + title.TitleText + "\"");
+                    parts.Add(text.Format("ui.achievements.the_title", title.TitleText));
                 }
             }
 
             if (lookTokensGranted > 0)
             {
-                parts.Add(lookTokensGranted + " look token" + (lookTokensGranted == 1 ? string.Empty : "s"));
+                parts.Add(text.Format(lookTokensGranted == 1 ? "ui.achievements.look_token" : "ui.achievements.look_tokens", lookTokensGranted));
             }
 
-            return parts.Count == 0 ? string.Empty : " You earned " + string.Join(" and ", parts) + ".";
+            return parts.Count == 0 ? string.Empty : " " + text.Format("ui.discovery.you_earned", string.Join(text.Get("ui.session.and"), parts));
         }
 
         /// <summary>

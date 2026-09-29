@@ -7,6 +7,7 @@ using BeastCraft.Economy;
 using BeastCraft.Encounters;
 using BeastCraft.Garden;
 using BeastCraft.Grove;
+using BeastCraft.Localization;
 using BeastCraft.Presentation.Content;
 using BeastCraft.Save;
 using BeastCraft.Session;
@@ -113,6 +114,12 @@ namespace BeastCraft.Presentation.Screens
         private readonly List<string> _team = new List<string>();
         private string _consumable;
 
+        /// <summary>The text table (<c>ui.encounter.*</c>).</summary>
+        private StringTable Text
+        {
+            get { return _session.Content.Text; }
+        }
+
         public EncounterViewModel(GameSession session, int nodeId) : this(session, NodeBattle.For(session, nodeId, out string error), error, nodeId)
         {
         }
@@ -141,12 +148,12 @@ namespace BeastCraft.Presentation.Screens
             GameContent content = session.Content;
             MapNode node = Battle.Node;
             Title = session.LocationName(node);
-            KindLabel = MapViewModel.KindLabel(node.Type);
+            KindLabel = MapViewModel.KindLabel(node.Type, content.Text);
             if (Battle.IsKinshipTrial)
             {
                 Discovery.KinshipSiteData site = Discovery.KinshipRules.SiteOf(content.Discovery, Battle.Trial);
-                Title = site?.Name ?? "Kinship trial";
-                KindLabel = "Kinship trial";
+                Title = site?.Name ?? content.Text.Get("ui.results.kinship_trial");
+                KindLabel = content.Text.Get("ui.results.kinship_trial");
                 Banner = site?.Intro;
                 BondText = site?.BondText;
             }
@@ -289,7 +296,7 @@ namespace BeastCraft.Presentation.Screens
                 }
 
                 int percent = (int)Math.Round((1.0 - Battle.Plan.AssistScale) * 100.0);
-                return "The wilds ease a little (-" + percent.ToString(System.Globalization.CultureInfo.InvariantCulture) + "%).";
+                return Text.Format("ui.encounter.assist", percent);
             }
         }
 
@@ -362,7 +369,7 @@ namespace BeastCraft.Presentation.Screens
         {
             if (!CanSoothe)
             {
-                return SootheOutcome.Refused("This location cannot be soothed.");
+                return SootheOutcome.Refused(Text.Get("ui.encounter.cannot_soothe"));
             }
 
             GameContent content = _session.Content;
@@ -382,31 +389,31 @@ namespace BeastCraft.Presentation.Screens
             List<string> parts = new List<string>();
             if (rewards.GoldGained > 0)
             {
-                parts.Add(rewards.GoldGained + " gold");
+                parts.Add(Text.Format("ui.encounter.reward_gold", rewards.GoldGained));
             }
 
             if (rewards.BeastLevelsGained > 0)
             {
-                parts.Add(rewards.BeastLevelsGained + " beast level" + (rewards.BeastLevelsGained == 1 ? string.Empty : "s"));
+                parts.Add(Text.Format(rewards.BeastLevelsGained == 1 ? "ui.encounter.reward_beast_level" : "ui.encounter.reward_beast_levels", rewards.BeastLevelsGained));
             }
 
             if (rewards.AvatarLevelsGained > 0)
             {
-                parts.Add("avatar level " + (rewards.AvatarLevelsGained == 1 ? "up" : "up x" + rewards.AvatarLevelsGained));
+                parts.Add(rewards.AvatarLevelsGained == 1 ? Text.Get("ui.encounter.reward_avatar_level") : Text.Format("ui.encounter.reward_avatar_levels", rewards.AvatarLevelsGained));
             }
 
             if (rewards.Loot.Drops.Count > 0)
             {
-                parts.Add(rewards.Loot.Drops.Count + " material" + (rewards.Loot.Drops.Count == 1 ? string.Empty : "s"));
+                parts.Add(Text.Format(rewards.Loot.Drops.Count == 1 ? "ui.encounter.reward_material" : "ui.encounter.reward_materials", rewards.Loot.Drops.Count));
             }
 
             if (rewards.GearGained.Count > 0)
             {
-                parts.Add(rewards.GearGained.Count + " gear");
+                parts.Add(Text.Format("ui.encounter.reward_gear", rewards.GearGained.Count));
             }
 
-            string extra = GameSession.ExtraRewardText(result.TitlesEarned, 0);
-            return "Soothed! " + (parts.Count > 0 ? string.Join(", ", parts) + "." : "Full rewards claimed.") + extra;
+            string extra = GameSession.ExtraRewardText(Text, result.TitlesEarned, 0);
+            return Text.Format("ui.encounter.soothed", parts.Count > 0 ? Text.Format("ui.encounter.soothed_parts", string.Join(Text.Get("ui.common.list_sep"), parts)) : Text.Get("ui.encounter.soothed_full")) + extra;
         }
 
         public List<EnemyGroupView> Enemies { get; } = new List<EnemyGroupView>();
@@ -472,7 +479,7 @@ namespace BeastCraft.Presentation.Screens
             message = null;
             if (!Owned.Exists(m => m.BeastId == beastId))
             {
-                message = "That beast is not in your collection.";
+                message = Text.Get("ui.encounter.not_in_collection");
                 return false;
             }
 
@@ -484,7 +491,7 @@ namespace BeastCraft.Presentation.Screens
 
             if (_team.Count >= PartySize)
             {
-                message = "Your party is full (" + PartySize + "). Tap a member to take them out first.";
+                message = Text.Format("ui.encounter.party_full", PartySize);
                 return false;
             }
 
@@ -542,12 +549,12 @@ namespace BeastCraft.Presentation.Screens
 
             if (_team.Count == 0)
             {
-                return new TeamValidation { Ok = false, Message = "Pick at least one beast." };
+                return new TeamValidation { Ok = false, Message = Text.Get("ui.encounter.pick_one") };
             }
 
             if (_team.Count > PartySize)
             {
-                return new TeamValidation { Ok = false, Message = "At most " + PartySize + " beasts can fight." };
+                return new TeamValidation { Ok = false, Message = Text.Format("ui.encounter.at_most", PartySize) };
             }
 
             return new TeamValidation { Ok = true };

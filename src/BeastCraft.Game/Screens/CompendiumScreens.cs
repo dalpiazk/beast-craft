@@ -58,7 +58,7 @@ namespace BeastCraft.Game.Screens
             float width = _cards.Width;
             float cardWidth = (width - 2f * 20f) / 3f;
             float y = 10f;
-            AddLabel(_cards.Scroll, new Rect(Pad, y, 400f, style.TextSizes.Heading - 4f), "Beasts", style.TextSizes.Heading - 4f, "plum");
+            AddLabel(_cards.Scroll, new Rect(Pad, y, 400f, style.TextSizes.Heading - 4f), Loc("ui.compendium.beasts"), style.TextSizes.Heading - 4f, "plum");
             y += Ctx.Text.LineHeight(style.TextSizes.Heading - 4f) + 20f;
             for (int i = 0; i < _model.Beasts.Count; i++)
             {
@@ -70,7 +70,7 @@ namespace BeastCraft.Game.Screens
             }
 
             y += ((_model.Beasts.Count + 2) / 3) * (CardHeight + 20f) + 30f;
-            AddLabel(_cards.Scroll, new Rect(Pad, y, 400f, style.TextSizes.Heading - 4f), "Lore", style.TextSizes.Heading - 4f, "plum");
+            AddLabel(_cards.Scroll, new Rect(Pad, y, 400f, style.TextSizes.Heading - 4f), Loc("ui.compendium.lore"), style.TextSizes.Heading - 4f, "plum");
             y += Ctx.Text.LineHeight(style.TextSizes.Heading - 4f) + 20f;
             foreach (CompendiumLoreRow lore in _model.Lore)
             {
@@ -86,7 +86,7 @@ namespace BeastCraft.Game.Screens
         {
             Gradient("cream", "parchment", new Rect(0, 0, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight));
             base.Draw();
-            _header.Paint(Ctx, Ui, "Compendium");
+            _header.Paint(Ctx, Ui, Loc("ui.compendium.title"));
             CompendiumCompletion completion = _model.Completion;
             if (completion == null)
             {
@@ -94,9 +94,8 @@ namespace BeastCraft.Game.Screens
             }
 
             UiStyle style = Ctx.Style;
-            Painter.Progress(new Rect(180f, 118f, PortraitLayout.CanvasWidth - 260f, 34f), completion.Percent / 100f, -1f, "gold", "gold", "track", completion.Percent + "% complete");
-            string sub = completion.BeastsOwned + "/" + completion.BeastsTotal + " beasts  -  " + completion.LoreFound + "/" + completion.LoreTotal + " lore  -  " +
-                         completion.KinshipClaimed + "/" + completion.KinshipTotal + " kinship";
+            Painter.Progress(new Rect(180f, 118f, PortraitLayout.CanvasWidth - 260f, 34f), completion.Percent / 100f, -1f, "gold", "gold", "track", Loc("ui.compendium.percent", completion.Percent));
+            string sub = Loc("ui.compendium.counts", completion.BeastsOwned, completion.BeastsTotal, completion.LoreFound, completion.LoreTotal, completion.KinshipClaimed, completion.KinshipTotal);
             // A gap of clear air above the header divider (TopBar - 5): the line used to sit right
             // against it.
             Painter.TextIn(sub, new Rect(180f, 166f, PortraitLayout.CanvasWidth - 260f, 28f), style.TextSizes.Small + 2f, Painter.C("inkSoft"), TextAlign.Left);
@@ -214,7 +213,7 @@ namespace BeastCraft.Game.Screens
             UiStyle style = Ctx.Style;
             float width = _cards.Width;
             float y = 10f;
-            AddLabel(_cards.Scroll, new Rect(Pad, y, 400f, style.TextSizes.Heading - 4f), "Titles", style.TextSizes.Heading - 4f, "plum");
+            AddLabel(_cards.Scroll, new Rect(Pad, y, 400f, style.TextSizes.Heading - 4f), Loc("ui.achievements.titles"), style.TextSizes.Heading - 4f, "plum");
             y += Ctx.Text.LineHeight(style.TextSizes.Heading - 4f) + 16f;
             float x = Pad;
             float chipSize = Ctx.Style.Button("chip").TextSize;
@@ -234,7 +233,7 @@ namespace BeastCraft.Game.Screens
             }
 
             y += ChipHeight + 30f;
-            AddLabel(_cards.Scroll, new Rect(Pad, y, 500f, style.TextSizes.Heading - 4f), "Achievements", style.TextSizes.Heading - 4f, "plum");
+            AddLabel(_cards.Scroll, new Rect(Pad, y, 500f, style.TextSizes.Heading - 4f), Loc("ui.achievements.title"), style.TextSizes.Heading - 4f, "plum");
             y += Ctx.Text.LineHeight(style.TextSizes.Heading - 4f) + 16f;
             foreach (AchievementRow row in _model.Achievements)
             {
@@ -250,11 +249,11 @@ namespace BeastCraft.Game.Screens
         {
             Gradient("cream", "parchment", new Rect(0, 0, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight));
             base.Draw();
-            _header.Paint(Ctx, Ui, "Achievements");
+            _header.Paint(Ctx, Ui, Loc("ui.achievements.title"));
             UiStyle style = Ctx.Style;
-            Painter.TextIn(_model.AvatarDisplayName + "  -  Level " + _model.AvatarLevel, new Rect(180f, 116f, PortraitLayout.CanvasWidth - 260f, 34f), style.TextSizes.Body + 2f,
+            Painter.TextIn(Loc("ui.achievements.avatar_level", _model.AvatarDisplayName, _model.AvatarLevel), new Rect(180f, 116f, PortraitLayout.CanvasWidth - 260f, 34f), style.TextSizes.Body + 2f,
                            Painter.C("ink"), TextAlign.Left);
-            Painter.TextIn(_model.EarnedCount + " / " + _model.Achievements.Count + " earned", new Rect(180f, 160f, PortraitLayout.CanvasWidth - 260f, 28f), style.TextSizes.Small + 2f,
+            Painter.TextIn(Loc("ui.achievements.earned", _model.EarnedCount, _model.Achievements.Count), new Rect(180f, 160f, PortraitLayout.CanvasWidth - 260f, 28f), style.TextSizes.Small + 2f,
                            Painter.C("inkSoft"), TextAlign.Left);
         }
 
@@ -265,7 +264,7 @@ namespace BeastCraft.Game.Screens
             painter.Glyph(row.Earned ? "check" : "lock", new Rect(box.X + 24f, box.Y + 26f, 52f, 52f), painter.C(row.Earned ? "leafDeep" : "inkSoft"));
             painter.TextIn(row.DisplayName, new Rect(box.X + 96f, box.Y + 22f, box.Width - 132f, style.TextSizes.Body + 2f), style.TextSizes.Body + 2f,
                            painter.C(row.Earned ? "plum" : "ink"), TextAlign.Left);
-            painter.TextIn("Awards: " + row.TitleText, new Rect(box.X + 96f, box.Y + 64f, box.Width - 132f, style.TextSizes.Small + 2f), style.TextSizes.Small + 2f,
+            painter.TextIn(Loc("ui.achievements.awards", row.TitleText), new Rect(box.X + 96f, box.Y + 64f, box.Width - 132f, style.TextSizes.Small + 2f), style.TextSizes.Small + 2f,
                            painter.C("goldDeep"), TextAlign.Left);
             float y = box.Y + 112f;
             foreach (string line in painter.Wrap(row.ConditionText, style.TextSizes.Body - 1f, box.Width - 132f))
@@ -333,18 +332,18 @@ namespace BeastCraft.Game.Screens
             Build();
         }
 
-        private static string MessageFor(LookTokenResult result)
+        private string MessageFor(LookTokenResult result)
         {
             switch (result)
             {
                 case LookTokenResult.Unlocked:
-                    return "Look unlocked! Wear it from the wardrobe.";
+                    return Loc("ui.look_tokens.unlocked");
                 case LookTokenResult.InsufficientTokens:
-                    return "Not enough look tokens.";
+                    return Loc("ui.look_tokens.not_enough");
                 case LookTokenResult.AlreadyUsable:
-                    return "You can already wear that look.";
+                    return Loc("ui.look_tokens.already_usable");
                 default:
-                    return "That look cannot be bought with tokens.";
+                    return Loc("ui.look_tokens.not_for_tokens");
             }
         }
 
@@ -360,14 +359,14 @@ namespace BeastCraft.Game.Screens
                 if (!row.Owned)
                 {
                     string key = row.Key;
-                    Button buy = AddButton(_cards.Scroll, "buy-" + key, new Rect(Pad + width - 230f, top + 40f, 190f, 76f), "Buy", "primary", () => Buy(key));
+                    Button buy = AddButton(_cards.Scroll, "buy-" + key, new Rect(Pad + width - 230f, top + 40f, 190f, 76f), Loc("ui.look_tokens.buy"), "primary", () => Buy(key));
                     buy.Enabled = row.CanAfford;
                 }
             }
 
             if (_model.Looks.Count == 0)
             {
-                AddLabel(_cards.Scroll, new Rect(Pad, y, width, 40f), "No looks in the token pool yet.", Ctx.Style.TextSizes.Body, "inkSoft");
+                AddLabel(_cards.Scroll, new Rect(Pad, y, width, 40f), Loc("ui.look_tokens.none"), Ctx.Style.TextSizes.Body, "inkSoft");
                 y += 60f;
             }
 
@@ -378,11 +377,11 @@ namespace BeastCraft.Game.Screens
         {
             Gradient("cream", "parchment", new Rect(0, 0, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight));
             base.Draw();
-            _header.Paint(Ctx, Ui, "Look tokens");
+            _header.Paint(Ctx, Ui, Loc("ui.look_tokens.title"));
             UiStyle style = Ctx.Style;
             Rect coin = new Rect(180f, 118f, 48f, 48f);
             Painter.Glyph("coin", coin, Painter.C("goldDeep"));
-            Painter.TextIn(_model.Balance + " look tokens", new Rect(coin.Right + 14f, coin.Y + 4f, PortraitLayout.CanvasWidth - 260f, 40f), style.TextSizes.Body + 2f, Painter.C("ink"),
+            Painter.TextIn(Loc("ui.avatar.token_price", _model.Balance), new Rect(coin.Right + 14f, coin.Y + 4f, PortraitLayout.CanvasWidth - 260f, 40f), style.TextSizes.Body + 2f, Painter.C("ink"),
                            TextAlign.Left);
         }
 
@@ -391,9 +390,9 @@ namespace BeastCraft.Game.Screens
             UiPainter painter = Ctx.Painter;
             UiStyle style = Ctx.Style;
             painter.TextIn(row.DisplayName, new Rect(box.X + 36f, box.Y + 24f, box.Width - 280f, style.TextSizes.Body + 2f), style.TextSizes.Body + 2f, painter.C("ink"), TextAlign.Left);
-            painter.TextIn(row.CategoryName + "  -  " + (row.Rarity <= 0 ? "Common" : "Rare"), new Rect(box.X + 36f, box.Y + 68f, box.Width - 280f, style.TextSizes.Small + 2f),
+            painter.TextIn(Loc("ui.common.pair", row.CategoryName, Loc(row.Rarity <= 0 ? "ui.look_tokens.common" : "ui.look_tokens.rare")), new Rect(box.X + 36f, box.Y + 68f, box.Width - 280f, style.TextSizes.Small + 2f),
                            style.TextSizes.Small + 2f, painter.C("inkSoft"), TextAlign.Left);
-            string status = row.Owned ? "Owned" : row.Price + " tokens" + (row.CanAfford ? string.Empty : " (not enough)");
+            string status = row.Owned ? Loc("ui.beast.owned") : Loc(row.CanAfford ? "ui.look_tokens.price" : "ui.look_tokens.price_short", row.Price);
             painter.TextIn(status, new Rect(box.X + 36f, box.Y + 108f, box.Width - 280f, style.TextSizes.Small + 2f), style.TextSizes.Small + 2f,
                            painter.C(row.Owned ? "leafDeep" : row.CanAfford ? "goldDeep" : "berry"), TextAlign.Left);
         }

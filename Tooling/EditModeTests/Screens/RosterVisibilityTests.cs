@@ -51,7 +51,7 @@ namespace BeastCraft.Tests.EditMode
 
             Assert.AreEqual(TestSaves.SixSpecies.Length, roster.Owned.Count);
             Assert.AreEqual(Content.Species.Count, roster.Owned.Count + roster.Silhouettes.Count, "every species is either owned or a silhouette");
-            Assert.IsTrue(roster.Silhouettes.TrueForAll(s => s.Silhouette && s.BeastId == null && s.Hint == RosterViewModel.SilhouetteHint && s.Name == "???"));
+            Assert.IsTrue(roster.Silhouettes.TrueForAll(s => s.Silhouette && s.BeastId == null && s.Hint == Content.Text.Get(RosterViewModel.SilhouetteHintKey) && s.Name == "???"));
             Assert.IsFalse(roster.Silhouettes.Exists(s => Array.IndexOf(TestSaves.SixSpecies, s.SpeciesId) >= 0));
             CollectionAssert.AreEqual(TestSaves.SixSpecies, roster.Owned.ConvertAll(e => e.SpeciesId), "joined order by default");
             Assert.IsTrue(roster.Owned.TrueForAll(e => e.ArtKey != null && e.Element != Element.None));
@@ -370,13 +370,13 @@ namespace BeastCraft.Tests.EditMode
             foreach (KeyValuePair<string, SkillSO> pair in skills)
             {
                 SkillSO skill = pair.Value;
-                string rule = SkillCard.TargetingRuleText(skill);
-                string taunt = SkillCard.TauntRuleText(skill);
+                string rule = SkillCard.TargetingRuleText(skill, Content.Text);
+                string taunt = SkillCard.TauntRuleText(skill, Content.Text);
                 Assert.IsNotEmpty(rule, skill.SkillId);
                 Assert.IsTrue(rule.EndsWith(".", StringComparison.Ordinal), skill.SkillId + ": " + rule);
                 Assert.IsNotEmpty(taunt, skill.SkillId);
                 AssertAccurate(skill, rule, taunt);
-                Assert.AreEqual(rule, SkillCard.Of(skill, Content.Glossary).TargetingRule, "the card carries it");
+                Assert.AreEqual(rule, SkillCard.Of(skill, Content.Glossary, Content.Text).TargetingRule, "the card carries it");
                 snapshot.Append(pair.Key).Append(": ").Append(rule).Append(" | ").Append(taunt).Append('\n');
             }
 
@@ -446,20 +446,20 @@ namespace BeastCraft.Tests.EditMode
                 TargetingOrder = SkillTargetingOrder.Lowest,
                 Range = 3
             };
-            Assert.AreEqual("Targets the enemy with the lowest HP% within 3 hexes.", SkillCard.TargetingRuleText(skill));
+            Assert.AreEqual("Targets the enemy with the lowest HP% within 3 hexes.", SkillCard.TargetingRuleText(skill, Content.Text));
             skill.TargetSide = SkillTargetSide.Ally;
             skill.TargetingCriterion = SkillTargetingCriterion.Stat;
             skill.TargetingStat = StatType.HP;
             skill.Range = 1;
-            Assert.AreEqual("Targets the ally (itself included) with the lowest max HP within 1 hex.", SkillCard.TargetingRuleText(skill));
+            Assert.AreEqual("Targets the ally (itself included) with the lowest max HP within 1 hex.", SkillCard.TargetingRuleText(skill, Content.Text));
             skill.TargetSide = SkillTargetSide.Enemy;
             skill.TargetShape = SkillTargetShape.Line;
             skill.TargetingCriterion = SkillTargetingCriterion.Distance;
             skill.TargetingOrder = SkillTargetingOrder.Highest;
             skill.Range = 4;
             Assert.AreEqual("Picks the farthest enemy within 4 hexes, then strikes a straight line 4 hexes long toward it, hitting every enemy on the line.",
-                            SkillCard.TargetingRuleText(skill));
-            StringAssert.StartsWith("Taunt overrides", SkillCard.TauntRuleText(skill));
+                            SkillCard.TargetingRuleText(skill, Content.Text));
+            StringAssert.StartsWith("Taunt overrides", SkillCard.TauntRuleText(skill, Content.Text));
         }
 
         /// <summary>Every beast skill, avatar active and enemy kit skill, labelled (an enemy's by "enemy/skill").</summary>
@@ -625,7 +625,7 @@ namespace BeastCraft.Tests.EditMode
                 Assert.AreEqual(DamageFormula.CritMultiplier, b.CritMultiplier);
                 Assert.AreEqual(hit.Crit, b.Crit);
                 levelGap |= b.LevelMultiplier != 1.0;
-                Assert.IsNotEmpty(b.Lines());
+                Assert.IsNotEmpty(b.Lines(Content.Text));
             }
 
             Assert.IsTrue(levelGap || teamLevel == 1, "a team over the location's level fights across a gap");

@@ -39,6 +39,18 @@ namespace BeastCraft.Game.Screens
         /// <summary>This frame's fit of the canvas into the target (set by the host before drawing).</summary>
         public CanvasFit CanvasFit;
 
+        /// <summary>The screens' own text by key (<c>ui.*</c> in <c>content/data/Localization/en.json</c>, <see cref="GameContent.Text"/>).</summary>
+        public string Loc(string key)
+        {
+            return Content.Text.Get(key);
+        }
+
+        /// <summary><see cref="Loc(string)"/> with <c>{0}</c>-style arguments.</summary>
+        public string Loc(string key, params object[] args)
+        {
+            return Content.Text.Format(key, args);
+        }
+
         public Texture2D Pixel
         {
             get { return Atlas.Pixel; }

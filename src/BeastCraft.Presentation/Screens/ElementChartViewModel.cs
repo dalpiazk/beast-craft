@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using BeastCraft.Battle;
 using BeastCraft.Creatures;
+using BeastCraft.Localization;
 
 namespace BeastCraft.Presentation.Screens
 {
@@ -149,18 +150,18 @@ namespace BeastCraft.Presentation.Screens
         }
 
         /// <summary>The legend: each kind's label and multiplier.</summary>
-        public static string Label(MatchupKind kind)
+        public static string Label(MatchupKind kind, StringTable text)
         {
             switch (kind)
             {
                 case MatchupKind.Strong:
-                    return "Strong x2";
+                    return text.Get("ui.element_chart.strong");
                 case MatchupKind.Mild:
-                    return "Mild x1.25";
+                    return text.Get("ui.element_chart.mild");
                 case MatchupKind.Weak:
-                    return "Weak x0.5";
+                    return text.Get("ui.element_chart.weak");
                 default:
-                    return "Neutral x1";
+                    return text.Get("ui.element_chart.neutral");
             }
         }
     }

@@ -5,6 +5,7 @@ using BeastCraft.Battle.Scouting;
 using BeastCraft.Campaign;
 using BeastCraft.Discovery;
 using BeastCraft.Economy;
+using BeastCraft.Localization;
 using BeastCraft.Progression;
 using BeastCraft.Save;
 using BeastCraft.Session;
@@ -133,12 +134,13 @@ namespace BeastCraft.Presentation.Screens
         public int AvatarLevelsGained { get; private set; }
 
         /// <summary>"&lt;title&gt; Beastbinder" with a title equipped, else plain "Beastbinder" (<see cref="AchievementsViewModel.TitledName"/>).</summary>
-        public string AvatarDisplayName { get; private set; } = CampaignAvatar.DisplayName;
+        public string AvatarDisplayName { get; private set; }
 
         /// <summary>A won trial's pick (2 or 3), now waiting on the map; 0 otherwise.</summary>
         public int PickStep { get; private set; }
 
         private BattleLogViewModel _log;
+        private StringTable _text;
         private Func<BattleLogViewModel> _buildLog;
 
         /// <summary>
@@ -152,7 +154,7 @@ namespace BeastCraft.Presentation.Screens
             {
                 if (_log == null)
                 {
-                    _log = _buildLog?.Invoke() ?? new BattleLogViewModel(null);
+                    _log = _buildLog?.Invoke() ?? new BattleLogViewModel(null, _text);
                 }
 
                 return _log;
@@ -177,13 +179,14 @@ namespace BeastCraft.Presentation.Screens
                 ConsumablesSpent = summary.ConsumablesSpent.Count,
                 AvatarXp = summary.AvatarXpGained,
                 AvatarLevelsGained = summary.AvatarLevelsGained,
-                AvatarDisplayName = AchievementsViewModel.TitledName(save, session.Content.Achievements?.Library, CampaignAvatar.DisplayName)
+                AvatarDisplayName = AchievementsViewModel.TitledName(save, session.Content.Achievements?.Library, CampaignAvatar.DisplayName(session.Content.Text))
             };
-            view.Title = result.Outcome == BattleOutcome.PlayerVictory ? "Victory!" : result.Outcome == BattleOutcome.EnemyVictory ? "Defeat" : "Stalemate";
+            view._text = session.Content.Text;
+            view.Title = view._text.Get(result.Outcome == BattleOutcome.PlayerVictory ? "ui.results.victory" : result.Outcome == BattleOutcome.EnemyVictory ? "ui.results.defeat" : "ui.results.stalemate");
             BattleRun run = battle.Run?.Battle;
             if (run != null)
             {
-                view._buildLog = () => BattleLogViewModel.Build(run, run.Units, BattleLogViewModel.NamesFor(session.Content, battle.SpeciesByUnit, run.Avatar?.Id));
+                view._buildLog = () => BattleLogViewModel.Build(run, run.Units, BattleLogViewModel.NamesFor(session.Content, battle.SpeciesByUnit, run.Avatar?.Id), session.Content.Text);
             }
 
             HashSet<string> knockedOut = new HashSet<string>(StringComparer.Ordinal);
@@ -274,10 +277,10 @@ namespace BeastCraft.Presentation.Screens
             view.PickStep = campaign.PickStep;
             if (campaign.PickStep > 0)
             {
-                view.Notes.Add("A beast stirs by the kinship stone. It wants to join you.");
+                view.Notes.Add(view._text.Get("ui.results.beast_stirs"));
             }
             view.BuildNotes(session);
-            string extra = GameSession.ExtraRewardText(campaign.TitlesEarned, 0);
+            string extra = GameSession.ExtraRewardText(view._text, campaign.TitlesEarned, 0);
             if (extra.Length > 0)
             {
                 view.Notes.Add(extra.Trim());
@@ -298,19 +301,21 @@ namespace BeastCraft.Presentation.Screens
             {
                 Outcome = result.Outcome,
                 NodeId = -1,
-                Subtitle = trial?.Site?.Name ?? "Kinship trial",
+                Subtitle = trial?.Site?.Name ?? session.Content.Text.Get("ui.results.kinship_trial"),
                 GoldTotal = save.Gold,
                 BindingLimit = CampaignRules.BeastCap(save, session.Content.Campaign),
                 MapOutcome = result.Outcome == BattleOutcome.PlayerVictory ? CampaignOutcome.Cleared : CampaignOutcome.Lost,
                 ConsumablesSpent = result.ConsumablesUsed?.Count ?? 0,
                 IsKinshipTrial = true,
+                AvatarDisplayName = CampaignAvatar.DisplayName(session.Content.Text),
                 BondMet = trial != null && trial.BondMet
             };
-            view.Title = result.Outcome == BattleOutcome.PlayerVictory ? "Trial won!" : "Not this time";
+            view._text = session.Content.Text;
+            view.Title = view._text.Get(result.Outcome == BattleOutcome.PlayerVictory ? "ui.results.trial_won" : "ui.results.trial_lost");
             BattleRun run = battle.Run?.Battle;
             if (run != null)
             {
-                view._buildLog = () => BattleLogViewModel.Build(run, run.Units, BattleLogViewModel.NamesFor(session.Content, battle.SpeciesByUnit, run.Avatar?.Id));
+                view._buildLog = () => BattleLogViewModel.Build(run, run.Units, BattleLogViewModel.NamesFor(session.Content, battle.SpeciesByUnit, run.Avatar?.Id), session.Content.Text);
             }
 
             foreach (KeyValuePair<string, string> pair in result.TeamUnitIds)
@@ -341,16 +346,16 @@ namespace BeastCraft.Presentation.Screens
                 }
 
                 view.Notes.Add(view.KinshipOffer.Count > 1
-                                   ? string.Join(" and ", view.KinshipOffer) + " step out to meet you. Choose who joins your team."
-                                   : view.KinshipOffer[0] + " steps out to meet you and joins your team.");
+                                   ? view._text.Format("ui.results.offer_many", string.Join(view._text.Get("ui.session.and"), view.KinshipOffer))
+                                   : view._text.Format("ui.results.offer_one", view.KinshipOffer[0]));
                 if (!string.IsNullOrEmpty(trial.Site?.BondCondition))
                 {
-                    view.Notes.Add(view.BondMet ? "The bond rings true: " + BondFlavour(trial.Site) : "The trial is won, if not quite as the stone hoped. " + BondFlavour(trial.Site));
+                    view.Notes.Add(view._text.Format(view.BondMet ? "ui.results.bond_true" : "ui.results.bond_missed", BondFlavour(trial.Site)));
                 }
             }
             else
             {
-                view.RetryNote = "The trial waits for you: try again whenever you like (a fresh battle each time). A trial pays no XP.";
+                view.RetryNote = view._text.Get("ui.results.trial_retry");
                 view.Notes.Add(view.RetryNote);
             }
 
@@ -368,26 +373,26 @@ namespace BeastCraft.Presentation.Screens
             switch (MapOutcome)
             {
                 case CampaignOutcome.Cleared:
-                    Notes.Add(Subtitle + " is cleared. The trail ahead is open.");
+                    Notes.Add(_text.Format("ui.results.cleared", Subtitle));
                     break;
                 case CampaignOutcome.StageCleared:
-                    Notes.Add("The pass is yours: stage cleared! The next stage's map awaits.");
+                    Notes.Add(_text.Get("ui.results.stage_cleared"));
                     break;
                 case CampaignOutcome.RegionCleared:
-                    Notes.Add("The lair is cleared: the region is yours!");
+                    Notes.Add(_text.Get("ui.results.region_cleared"));
                     break;
                 case CampaignOutcome.TutorialCleared:
-                    Notes.Add("Hearthglen is behind you. Verdant Hollow is open.");
+                    Notes.Add(_text.Get("ui.results.tutorial_cleared"));
                     break;
                 case CampaignOutcome.Lost:
-                    RetryNote = "You can try " + Subtitle + " again (a fresh battle each time) or take another trail.";
+                    RetryNote = _text.Format("ui.results.retry", Subtitle);
                     if (TeamSuggestionPolicy.ShouldSuggest(Losses, session.Settings))
                     {
-                        RetryNote += " A suggested team will be offered before the next attempt.";
+                        RetryNote += _text.Get("ui.results.suggestion_next");
                     }
                     else if (Losses < TeamSuggestionPolicy.MinLossesBeforeSuggestion && session.Settings.TeamSuggestionsEnabled)
                     {
-                        RetryNote += " Losses here: " + Losses + ".";
+                        RetryNote += _text.Format("ui.results.losses_here", Losses);
                     }
 
                     Notes.Add(RetryNote);
@@ -396,17 +401,17 @@ namespace BeastCraft.Presentation.Screens
 
             if (SealGranted != null)
             {
-                Notes.Add("You claimed the " + SealGranted + ": your binding limit is now " + BindingLimit + ".");
+                Notes.Add(_text.Format("ui.results.seal", SealGranted, BindingLimit));
             }
 
             if (LevelsReleased > 0)
             {
-                Notes.Add("Banked XP paid out " + LevelsReleased + (LevelsReleased == 1 ? " level." : " levels."));
+                Notes.Add(_text.Format(LevelsReleased == 1 ? "ui.results.banked_level" : "ui.results.banked_levels", LevelsReleased));
             }
 
             foreach (string region in UnlockedRegions)
             {
-                Notes.Add(region + " is now open.");
+                Notes.Add(_text.Format("ui.results.region_open", region));
             }
         }
 

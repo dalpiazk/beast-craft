@@ -1,6 +1,7 @@
 using System;
 using System.Globalization;
 using System.IO;
+using BeastCraft.Localization;
 
 namespace BeastCraft.Presentation.Screens
 {
@@ -19,12 +20,30 @@ namespace BeastCraft.Presentation.Screens
         /// <summary>Where the file is, for the player ("Documents/BeastCraft/beastcraft-slot1-....json").</summary>
         public string Location;
 
-        /// <summary>Why it failed; null on success.</summary>
+        /// <summary>Why it failed, as plain text (a host's own message); null on success or when <see cref="ErrorKey"/> says it.</summary>
         public string Error;
+
+        /// <summary>Why it failed, as a text key (<c>ui.save_transfer.*</c>) with <see cref="ErrorArg"/>; null otherwise.</summary>
+        public string ErrorKey;
+
+        /// <summary>The value <see cref="ErrorKey"/>'s text shows (a path, a file name, a system message).</summary>
+        public string ErrorArg;
 
         public static SaveTransferResult Failed(string error)
         {
             return new SaveTransferResult { Error = error };
+        }
+
+        /// <summary>A failure the player reads as <paramref name="errorKey"/>'s text with <paramref name="arg"/>.</summary>
+        public static SaveTransferResult FailedWith(string errorKey, string arg)
+        {
+            return new SaveTransferResult { ErrorKey = errorKey, ErrorArg = arg };
+        }
+
+        /// <summary>Why it failed, for the player: <see cref="ErrorKey"/>'s text from <paramref name="text"/>, else <see cref="Error"/>.</summary>
+        public string Describe(StringTable text)
+        {
+            return ErrorKey != null && text != null ? text.Format(ErrorKey, ErrorArg) : Error;
         }
 
         public static SaveTransferResult Cancel()
@@ -97,7 +116,7 @@ namespace BeastCraft.Presentation.Screens
             }
             catch (Exception e)
             {
-                result = SaveTransferResult.Failed("Could not write the file: " + e.Message);
+                result = SaveTransferResult.FailedWith("ui.save_transfer.write_failed", e.Message);
             }
 
             done?.Invoke(result);
@@ -122,11 +141,11 @@ namespace BeastCraft.Presentation.Screens
 
                 if (newest == null)
                 {
-                    result = SaveTransferResult.Failed("No save file found in " + Folder + ".");
+                    result = SaveTransferResult.FailedWith("ui.save_transfer.none_found", Folder);
                 }
                 else if (newest.Length > MaxImportBytes)
                 {
-                    result = SaveTransferResult.Failed(newest.Name + " is too large to be a save.");
+                    result = SaveTransferResult.FailedWith("ui.save_transfer.too_large", newest.Name);
                 }
                 else
                 {
@@ -135,7 +154,7 @@ namespace BeastCraft.Presentation.Screens
             }
             catch (Exception e)
             {
-                result = SaveTransferResult.Failed("Could not read the file: " + e.Message);
+                result = SaveTransferResult.FailedWith("ui.save_transfer.read_failed", e.Message);
             }
 
             done?.Invoke(result);
