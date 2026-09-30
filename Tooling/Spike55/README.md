@@ -9,12 +9,17 @@ Scripts behind `docs/spikes/055-3d-mini-spike.md`, the mini-spike gate report co
   (`content/art/source/griffin/parts/*.png` + `parts.json`), no Spine licence, driven by
   sinusoidal oscillators -- what Spine Essential does (bones, no mesh deform); see `rig2d.py`.
 
-No GLB and no Blender install are committed here. The Meshy GLB used for Path A is a private,
-producer-supplied input (see `Tooling/ArtLab/provenance/spike55-griffin-meshy.md`); rerunning
-Path A needs your own copy of it (or a fresh Meshy export) and a Blender install. To generate a fresh
-export (or re-download an existing task's outputs) from the command line instead of the web app, see
+No GLB and no Blender install are committed here. Path A has been run twice (see
+`docs/spikes/055-3d-mini-spike.md` sections 2 and 2.6): an untextured GLB, producer-supplied
+(`Tooling/ArtLab/provenance/spike55-griffin-meshy.md`), and a textured `meshy-7.1` + 2K-texture GLB,
+generated via the CLI below under a specific spend authorisation
+(`Tooling/ArtLab/provenance/meshy-01a0f351-869e-7319-9820-e4b6e8b6b226.md`). Neither GLB is committed;
+rerunning Path A needs your own copy of one (or a fresh Meshy export) and a Blender install. To generate a
+fresh export (or re-download an existing task's outputs) from the command line instead of the web app, see
 `Tooling/ArtLab/README.md`'s "Meshy (3D)" section for `Tooling/ArtLab/scripts/meshy.py` -- a local-only,
-spend-guarded CLI for Meshy's paid API.
+spend-guarded CLI for Meshy's paid API. `blender_toon_render.py` auto-detects whether the GLB it's given
+has a texture (an untextured GLB gets the flat-swatch toon material described below; a textured one gets
+a banded multiplier over the real base-colour texture) -- no separate flag needed.
 
 ## Scripts
 
@@ -22,7 +27,7 @@ spend-guarded CLI for Meshy's paid API.
 | --- | --- |
 | `gltf_inspect.py` | Pure-stdlib GLB inspector (tri count, vertex count, embedded image sizes, node/skin/animation counts) -- no 3D library needed. |
 | `inspect_orientation.py` | Blender headless: imports a GLB and renders quick orthographic front/side/top probes so you can read off which local axis the mesh faces, before writing any camera/rig code against it. |
-| `blender_toon_render.py` | Blender headless: imports the GLB, normalises it (feet on ground, scaled to a fixed height), builds a 2-3 band toon material (Diffuse -> Shader to RGB -> ColorRamp -> Emission) plus an inverted-hull ink-plum outline (Solidify), places an orthographic hex-board camera, builds a simple armature, attempts automatic (heat-map) weights with a voxel-remesh fallback if that fails, and renders idle (12 frame) and move (8 frame) loops as transparent PNGs. |
+| `blender_toon_render.py` | Blender headless: imports the GLB, normalises it (feet on ground, scaled to a fixed height), builds a 2-3 band toon material (Diffuse -> Shader to RGB -> ColorRamp -> Emission, multiplied onto the GLB's base-colour texture if it has one) plus a thin inverted-hull ink-plum outline (Solidify), places an orthographic hex-board camera, builds a simple armature, and tries several weighting strategies in order (heat weights on the raw mesh; heat weights on a disposable voxel-remeshed duplicate, data-transferred back onto the original UV-intact mesh; envelope weights) before falling back to a rigid whole-object animation. Three small repair passes clean up strays from the data-transfer path (unweighted vertices, vertices that disagree with their mesh-connected neighbours, and small disconnected mesh islands mapped to the wrong bone). Renders idle (12 frame) and move (8 frame) loops as transparent PNGs. |
 | `rig2d.py` | Pure Pillow: loads `parts.json` + the six part PNGs, rotates each part about its own pivot (padding the image so rotation doesn't clip, per-part), composites back-to-front per `order_back_to_front`, and renders the same idle/move loops at the game's sprite size, plus sprite-strip PNGs and preview GIFs. |
 
 ## Rerunning
@@ -65,14 +70,19 @@ inside a nested temp directory).
 
 ## Known issues found while building this (see the gate report for the full write-up)
 
-- The Meshy "generate" GLB download has geometry + UVs but **no material or embedded texture**.
-  Path A's toon shading uses a flat colour sampled from the approved Griffin palette
-  (`Tooling/ArtLab/provenance/griffin.md`), not the source image.
+**Pass 1 (untextured GLB):**
+
+- The Meshy "generate" GLB download (as produced for pass 1) had geometry + UVs but **no material
+  or embedded texture**. Path A's toon shading used a flat colour sampled from the approved
+  Griffin palette (`Tooling/ArtLab/provenance/griffin.md`), not the source image. Closed in pass
+  2 -- `--texture` on the CLI produces a GLB with a real baked base-colour texture, which
+  `blender_toon_render.py` now detects and uses automatically.
 - Blender's automatic (heat-map) bone weighting **did not converge** on this mesh, even after a
-  voxel remesh (`blender_toon_render.py` tries the remesh fallback automatically and logs both
-  attempts). `blender_toon_render.py` falls back to animating the whole Griffin object rigidly
-  (bob/sway/lean) rather than true per-part skeletal deformation -- the armature and bone
-  hierarchy are still built and left in the scene as documentation of the intended rig.
+  voxel remesh applied directly to the render mesh. Fell back to animating the whole Griffin
+  object rigidly (bob/sway/lean) rather than true per-part skeletal deformation. Closed in pass 2
+  for that generation (a real per-part rig converged -- see below) -- but the underlying cause
+  (this class of AI mesh not always being heat-weightable) is mesh-dependent and could recur on a
+  different beast/generation.
 - In Blender 5.2's headless/background EEVEE, moving/rotating the *mesh* object between renders
   in the same session was silently ignored by the render operator (reproduced with a pixel
   diff: identical output despite different `object.rotation_euler`), even after forcing a
@@ -80,3 +90,24 @@ inside a nested temp directory).
   object directly (the mesh has an Armature modifier + armature-parenting from the automatic
   weights attempts, which is suspected but not confirmed to be related) -- see the comments in
   `blender_toon_render.py` around `anim_root`.
+
+**Pass 2 (textured `meshy-7.1` GLB, 2026-09-30):**
+
+- Heat weighting on the *raw* mesh still didn't converge (same failure class as pass 1). This
+  time, remeshing directly would have destroyed the new texture's UV mapping, so the remesh runs
+  on a disposable duplicate and the resulting weights are data-transferred back onto the
+  original, UV-intact mesh -- see `blender_toon_render.py`'s comments around
+  `Griffin_weight_donor_temp` and the `DATA_TRANSFER` modifier. That data-transfer path
+  introduced its own strays (unweighted vertices, vertices disagreeing with their mesh-connected
+  neighbours, small disconnected mesh islands mapped to the wrong bone) -- each has a targeted
+  repair function in the script; see their docstrings.
+- This Meshy mesh is fragmented into **703 disconnected edge-connected components** (separate
+  feather/fur shells, not "one body plus a few floaters"). Any repair that treats "not the single
+  largest component" as "a floater" is wrong here -- it touched 489,925 of 496,815 vertices in an
+  early version of `reweight_floating_mesh_islands` and was confirmed overcorrecting. The shipped
+  version only touches components at or below 300 vertices.
+- One thin spike artefact survived every weight repair on certain move-loop frames (large leg
+  rotation angles); disabling the outline modifier and re-rendering showed the same spike in the
+  base mesh colour, confirming it's **real geometry from the Meshy reconstruction** (a thin spur
+  near a claw), not a rig/weight bug. Left as a known, cosmetic issue -- see the gate report's
+  section 2.6.

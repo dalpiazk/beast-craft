@@ -18,6 +18,7 @@ import sys
 import os
 import math
 import mathutils
+from collections import Counter
 
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 
@@ -64,11 +65,20 @@ world = bpy.data.worlds.new("World")
 scene.world = world
 world.use_nodes = True
 
+pre_import_images = set(bpy.data.images.keys())
 bpy.ops.import_scene.gltf(filepath=GLB)
 meshes = [o for o in bpy.context.scene.objects if o.type == "MESH"]
 obj = meshes[0]
 obj.name = "Griffin"
 bpy.context.view_layer.objects.active = obj
+
+# A textured Meshy export (second pass, spike #55) embeds one base-colour image in the GLB;
+# the first-pass export had none (images: 0). Pick up whatever the importer just added, so this
+# script renders a flat swatch on an untextured GLB and a textured toon look on a textured one,
+# with no separate code path needed.
+new_images = [img for img in bpy.data.images if img.name not in pre_import_images]
+tex_image = new_images[0] if new_images else None
+print(f"IMPORTED TEXTURE IMAGE: {tex_image.name if tex_image else 'none (untextured GLB, using flat swatch)'}")
 
 # ---------------------------------------------------------------------------
 # Normalise: feet on ground (z=0), centred on X, scaled to a 2.0-unit height
@@ -103,10 +113,20 @@ print(f"NORMALISED BBOX Z: {min(v.z for v in bbox3):.3f}..{max(v.z for v in bbox
 print(f"SCALE APPLIED: {scale:.4f} (Meshy export was Y-forward/Z-up-ish unitless, ~1.9 bbox cube)")
 
 # ---------------------------------------------------------------------------
-# Toon material: Diffuse -> Shader to RGB -> 3-band ColorRamp -> Emission
-# (the GLB has geometry + UVs but no baked material/texture -- Meshy's
-# "generate" GLB download is mesh-only; see docs/spikes/055 for this note.
-# Flat warm-gold base colour sampled from the approved Griffin palette.)
+# Toon material: Diffuse -> Shader to RGB -> 3-band ColorRamp -> multiply
+# onto the base colour -> Emission.
+#
+# First pass (spike #55, untextured GLB): the ColorRamp held literal band
+# colours (cool shadow / warm gold / apricot highlight) sampled from the
+# Griffin's approved swatch, because the mesh had no texture at all.
+#
+# Second pass (textured GLB, meshy-7.1 + 2K texture): the ramp instead
+# produces a *multiplier* per band -- a cool-tinted, never-fully-black
+# shadow multiplier, a neutral (1,1,1) midtone pass-through, and a slight
+# warm highlight boost -- multiplied onto the Meshy base-colour texture, so
+# the banded toon lighting reads over the actual painted texture instead of
+# replacing it with a flat colour. Falls back to a flat swatch (the old
+# literal-colour behaviour) if the GLB has no texture.
 # ---------------------------------------------------------------------------
 mat = bpy.data.materials.new("GriffinToon")
 mat.use_nodes = True
@@ -114,29 +134,56 @@ nt = mat.node_tree
 nt.nodes.clear()
 
 out = nt.nodes.new("ShaderNodeOutputMaterial")
-out.location = (600, 0)
+out.location = (900, 0)
 emit = nt.nodes.new("ShaderNodeEmission")
-emit.location = (400, 0)
+emit.location = (700, 0)
+
+diffuse = nt.nodes.new("ShaderNodeBsdfDiffuse")
+diffuse.location = (-300, 200)
+diffuse.inputs["Color"].default_value = (1, 1, 1, 1)
+s2rgb = nt.nodes.new("ShaderNodeShaderToRGB")
+s2rgb.location = (-100, 200)
 ramp = nt.nodes.new("ShaderNodeValToRGB")
-ramp.location = (150, 0)
+ramp.location = (150, 200)
 ramp.color_ramp.interpolation = "CONSTANT"
 els = ramp.color_ramp.elements
-els[0].position = 0.0
-els[0].color = (*COOL_SHADOW, 1.0)
-els[1].position = 0.32
-els[1].color = (*GOLD, 1.0)
-mid = els.new(0.78)
-mid.color = (*APRICOT, 1.0)
 
-s2rgb = nt.nodes.new("ShaderNodeShaderToRGB")
-s2rgb.location = (-100, 0)
-diffuse = nt.nodes.new("ShaderNodeBsdfDiffuse")
-diffuse.location = (-300, 0)
-diffuse.inputs["Color"].default_value = (*GOLD, 1.0)
+if tex_image is not None:
+    # Banded multiplier over the base-colour texture: shadow band tinted
+    # cool (#7C7AAE), never pure black; midtone passes the texture through
+    # unchanged; highlight band gets a small warm boost.
+    els[0].position = 0.0
+    els[0].color = (*COOL_SHADOW, 1.0)
+    els[1].position = 0.32
+    els[1].color = (1.0, 1.0, 1.0, 1.0)
+    mid = els.new(0.78)
+    mid.color = (1.08, 1.0, 0.85, 1.0)
+else:
+    # No texture in this GLB (first-pass behaviour): literal band colours.
+    els[0].position = 0.0
+    els[0].color = (*COOL_SHADOW, 1.0)
+    els[1].position = 0.32
+    els[1].color = (*GOLD, 1.0)
+    mid = els.new(0.78)
+    mid.color = (*APRICOT, 1.0)
 
 nt.links.new(diffuse.outputs["BSDF"], s2rgb.inputs["Shader"])
 nt.links.new(s2rgb.outputs["Color"], ramp.inputs["Fac"])
-nt.links.new(ramp.outputs["Color"], emit.inputs["Color"])
+
+if tex_image is not None:
+    tex_node = nt.nodes.new("ShaderNodeTexImage")
+    tex_node.image = tex_image
+    tex_node.location = (-300, -150)
+    mix = nt.nodes.new("ShaderNodeMixRGB")
+    mix.blend_type = "MULTIPLY"
+    mix.inputs["Fac"].default_value = 1.0
+    mix.location = (400, 0)
+    nt.links.new(tex_node.outputs["Color"], mix.inputs["Color1"])
+    nt.links.new(ramp.outputs["Color"], mix.inputs["Color2"])
+    nt.links.new(mix.outputs["Color"], emit.inputs["Color"])
+else:
+    nt.links.new(ramp.outputs["Color"], emit.inputs["Color"])
+
 nt.links.new(emit.outputs["Emission"], out.inputs["Surface"])
 
 # outline material: flat ink-plum, unlit
@@ -162,9 +209,10 @@ obj.data.materials.append(outline_mat)
 # Lighting: warm key + cool-tinted fill so the toon ramp actually reads
 # ---------------------------------------------------------------------------
 key_data = bpy.data.lights.new("Key", type="SUN")
-key_data.energy = 4.5
+key_data.energy = 5.0
 key_data.angle = math.radians(3)
-key_data.color = (1.0, 0.93, 0.8)  # warm daylight
+key_data.color = (1.0, 0.88, 0.68)  # warm daylight -- a touch warmer/brighter than the first pass so
+                                     # banded shading reads clearly over the new base-colour texture
 key = bpy.data.objects.new("Key", key_data)
 bpy.context.collection.objects.link(key)
 key.rotation_euler = (math.radians(35), math.radians(20), math.radians(-70))
@@ -267,54 +315,300 @@ def try_auto_weights(mesh_obj, armature_obj):
 
 # Attempt 1: automatic (heat-map) weights straight on the Meshy mesh.
 unweighted, total = try_auto_weights(obj, arm_obj)
-print(f"ATTEMPT 1 (raw mesh) - VERTS WITH NO DEFORM WEIGHT: {unweighted} / {total}")
+print(f"ATTEMPT 1 (raw mesh, heat weights) - VERTS WITH NO DEFORM WEIGHT: {unweighted} / {total}")
 
 remeshed = False
-if unweighted > total * 0.05:
+method_used = "heat weights (raw mesh)" if unweighted <= total * 0.05 else None
+bone_names = [b.name for b in arm_data.bones]
+
+if method_used is None:
     # The raw AI mesh is very likely non-manifold / has disjoint shells under
     # the wings and body (common for single-image-to-3D output), which is
     # exactly when Blender's heat-weighting solver gives up on one or more
     # bones. Per the brief: try a voxel remesh first before falling back.
-    print("Heat weighting mostly failed on the raw mesh -- trying a voxel remesh fallback")
-    remesh_mod = obj.modifiers.new("VoxelRemesh", "REMESH")
-    remesh_mod.mode = "VOXEL"
-    remesh_mod.voxel_size = TARGET_HEIGHT * 0.006
-    remesh_mod.use_smooth_shade = True
+    #
+    # Remeshing destroys UVs, and this pass's GLB (unlike the first pass) has
+    # a real base-colour texture we want to keep mapped correctly. So the
+    # remesh runs on a throwaway *duplicate*, used only to compute weights;
+    # those weights are then copied back onto the original, UV-intact `obj`
+    # via a Data Transfer modifier (nearest-surface interpolated -- this is
+    # exactly what works across two meshes with different topology), and the
+    # duplicate is discarded. `obj` itself is never remeshed.
+    print("Heat weighting mostly failed on the raw mesh -- trying heat weights on a voxel-remeshed "
+          "duplicate, then transferring the computed weights back onto the original (UV-intact) mesh")
+    bpy.ops.object.select_all(action="DESELECT")
+    obj.select_set(True)
     bpy.context.view_layer.objects.active = obj
-    bpy.ops.object.modifier_apply(modifier=remesh_mod.name)
+    bpy.ops.object.duplicate()
+    remesh_obj = bpy.context.view_layer.objects.active
+    remesh_obj.name = "Griffin_weight_donor_temp"
     remeshed = True
 
-    # remesh drops material assignment (and UVs, which cost us nothing since
-    # there's no texture) -- re-add the two materials.
-    obj.data.materials.clear()
-    obj.data.materials.append(mat)
-    obj.data.materials.append(outline_mat)
+    remesh_mod = remesh_obj.modifiers.new("VoxelRemesh", "REMESH")
+    remesh_mod.mode = "VOXEL"
+    # Fine enough to keep thin claw/spur geometry represented in the remeshed duplicate -- at the
+    # coarser 0.006 first tried, claw tips were voxelised away/merged into the nearest larger mass,
+    # so the nearest-surface data transfer below mapped those tip vertices to the wrong bone
+    # (mismatched against their own mesh-connected neighbours) and produced visible spike artefacts
+    # stretching from the paws during the move loop's largest leg rotations. See the fix-round note.
+    remesh_mod.voxel_size = TARGET_HEIGHT * 0.003
+    remesh_mod.use_smooth_shade = True
+    bpy.context.view_layer.objects.active = remesh_obj
+    bpy.ops.object.modifier_apply(modifier=remesh_mod.name)
 
-    # drop the (now dangling) armature modifier / vertex groups from attempt 1
-    for m in list(obj.modifiers):
-        if m.type == "ARMATURE":
-            obj.modifiers.remove(m)
-    obj.vertex_groups.clear()
-
-    unweighted, total = try_auto_weights(obj, arm_obj)
-    print(f"ATTEMPT 2 (voxel-remeshed, voxel_size={remesh_mod.voxel_size:.4f}) - "
+    unweighted, total = try_auto_weights(remesh_obj, arm_obj)
+    print(f"ATTEMPT 2 (voxel-remeshed duplicate, voxel_size={remesh_mod.voxel_size:.4f}, heat weights) - "
           f"VERTS WITH NO DEFORM WEIGHT: {unweighted} / {total}")
 
-weight_ok = unweighted < total * 0.05
-print(f"AUTOMATIC WEIGHTS OK: {weight_ok} (remeshed: {remeshed})")
-if not weight_ok:
-    print("FALLBACK IN EFFECT: Blender's heat-weight solver could not find a solution for one "
-          "or more bones on this mesh, even after a voxel remesh (both attempts left every "
-          "vertex with zero deform weight -- see the ATTEMPT lines above). Per the brief's "
-          "fallback instruction, the bone hierarchy below stays as documentation/scaffolding "
-          "(it does not visibly deform the mesh), and the idle/move loops instead animate the "
-          "whole Griffin object rigidly (bob, sway, lean) -- an object-level fallback, not a "
-          "true per-part skeletal deform. Noted as a limitation in the gate report.")
+    if unweighted <= total * 0.05:
+        for name in bone_names:
+            if name not in obj.vertex_groups:
+                obj.vertex_groups.new(name=name)
+        dt = obj.modifiers.new("WeightTransfer", "DATA_TRANSFER")
+        dt.object = remesh_obj
+        dt.use_vert_data = True
+        dt.data_types_verts = {"VGROUP_WEIGHTS"}
+        dt.vert_mapping = "POLYINTERP_NEAREST"
+        dt.layers_vgroup_select_src = "ALL"
+        dt.layers_vgroup_select_dst = "NAME"
+        bpy.context.view_layer.objects.active = obj
+        bpy.ops.object.datalayout_transfer(modifier=dt.name)
+        bpy.ops.object.modifier_apply(modifier=dt.name)
 
-# Outline last, on the final (possibly remeshed) base mesh, so it never gets
-# baked into a remesh pass and always renders on top of the armature deform.
+        arm_mod = obj.modifiers.new("Armature", "ARMATURE")
+        arm_mod.object = arm_obj
+
+        unweighted, total = count_unweighted(obj)
+        print(f"AFTER DATA TRANSFER (onto the original, UV-intact mesh) - "
+              f"VERTS WITH NO DEFORM WEIGHT: {unweighted} / {total}")
+        if unweighted <= total * 0.05:
+            method_used = "heat weights on a voxel-remeshed duplicate, data-transferred to the original mesh"
+        else:
+            # transfer under-covered the mesh -- undo so attempt 3 starts clean
+            obj.modifiers.remove(arm_mod)
+            obj.vertex_groups.clear()
+
+    bpy.data.objects.remove(remesh_obj, do_unlink=True)
+
+if method_used is None:
+    # Heat weighting failed (raw mesh and voxel-remeshed duplicate). Envelope
+    # weights are a purely geometric fallback (bone-distance based, no
+    # heat-map solve, so they can't fail the same way) -- run directly on the
+    # original mesh (never remeshed, so UVs/texture stay intact either way)
+    # before dropping to the rigid object-level fallback.
+    print("Heat weighting still failed after a voxel-remeshed duplicate -- trying envelope weights "
+          "on the original mesh")
+    for m in list(obj.modifiers):
+        if m.type in ("ARMATURE", "DATA_TRANSFER"):
+            obj.modifiers.remove(m)
+    obj.vertex_groups.clear()
+    bpy.ops.object.select_all(action="DESELECT")
+    obj.select_set(True)
+    arm_obj.select_set(True)
+    bpy.context.view_layer.objects.active = arm_obj
+    try:
+        bpy.ops.object.parent_set(type="ARMATURE_ENVELOPE")
+    except RuntimeError as e:
+        print(f"ENVELOPE WEIGHTS RAISED: {e}")
+    unweighted, total = count_unweighted(obj)
+    print(f"ATTEMPT 3 (envelope weights, original mesh) - VERTS WITH NO DEFORM WEIGHT: {unweighted} / {total}")
+    if unweighted <= total * 0.05:
+        method_used = "envelope weights"
+
+
+def repair_topologically_inconsistent_weights(mesh_obj, passes=4):
+    """A second, different kind of stray weight: a vertex that DOES have a deform weight (so it's
+    invisible to repair_stray_unweighted_vertices), but its dominant bone disagrees with every one of
+    its mesh-connected neighbours -- e.g. a claw-tip vertex the nearest-surface data transfer mapped to
+    a spatially-close-but-unconnected body part. Visible as a thin spike stretching from a moving part
+    (leg) back toward wherever the mismatched bone puts it. Unlike the spatial KD-tree repair above,
+    this one walks actual mesh edges, so it can't jump across the same empty-space gap that caused the
+    mismatch in the first place -- it only ever copies weights from a vertex the bad one is physically
+    stitched to. Runs a few passes so a correct fix can propagate past more than one bad vertex deep."""
+    me = mesh_obj.data
+    n = len(me.vertices)
+    adjacency = [[] for _ in range(n)]
+    for e in me.edges:
+        a, b = e.vertices[0], e.vertices[1]
+        adjacency[a].append(b)
+        adjacency[b].append(a)
+
+    def dominant_group(vi):
+        groups = me.vertices[vi].groups
+        if not groups:
+            return None
+        return max(groups, key=lambda g: g.weight).group
+
+    fixed_total = 0
+    for _ in range(passes):
+        doms = [dominant_group(i) for i in range(n)]
+        to_fix = []
+        for vi in range(n):
+            nbrs = adjacency[vi]
+            if not nbrs or doms[vi] is None:
+                continue
+            nbr_doms = [doms[j] for j in nbrs if doms[j] is not None]
+            if nbr_doms and doms[vi] not in nbr_doms:
+                winner_group, _ = Counter(nbr_doms).most_common(1)[0]
+                donor = next(j for j in nbrs if doms[j] == winner_group)
+                to_fix.append((vi, donor))
+        if not to_fix:
+            break
+        for vi, donor in to_fix:
+            for g in list(me.vertices[vi].groups):
+                mesh_obj.vertex_groups[g.group].remove([vi])
+            for g in me.vertices[donor].groups:
+                mesh_obj.vertex_groups[g.group].add([vi], g.weight, "REPLACE")
+        fixed_total += len(to_fix)
+    return fixed_total
+
+
+def reweight_floating_mesh_islands(mesh_obj):
+    """A third kind of stray weight, and the one that actually explains the still-visible move-loop
+    spike after the two repairs above: single-image-to-3D AI meshes commonly ship small disconnected
+    geometry islands (a few dozen verts, not edge-connected to the main body at all -- not the same
+    thing as the "non-manifold but still one blob" problem the voxel remesh/heat-weighting dance
+    upstream is working around). An isolated island's own nearest-surface data-transfer mapping can be
+    internally self-consistent (so repair_topologically_inconsistent_weights, which only ever compares
+    a vertex against its own edge-connected neighbours, sees no disagreement to fix) while still being
+    mapped to the wrong bone as a *whole* -- it stays near the body while the foot mesh it visually sits
+    next to swings away underneath it, reading as a thin spike. Finds every component smaller than the
+    main body via edge-connectivity (a flood fill), then re-weights each one wholesale from its nearest
+    main-body vertex, so it moves with whatever it's actually sitting against instead of an unrelated
+    bone."""
+    me = mesh_obj.data
+    n = len(me.vertices)
+    adjacency = [[] for _ in range(n)]
+    for e in me.edges:
+        a, b = e.vertices[0], e.vertices[1]
+        adjacency[a].append(b)
+        adjacency[b].append(a)
+
+    visited = [False] * n
+    components = []
+    for start in range(n):
+        if visited[start]:
+            continue
+        stack = [start]
+        visited[start] = True
+        comp = [start]
+        while stack:
+            v = stack.pop()
+            for nb in adjacency[v]:
+                if not visited[nb]:
+                    visited[nb] = True
+                    comp.append(nb)
+                    stack.append(nb)
+        components.append(comp)
+    components.sort(key=len, reverse=True)
+    sizes = [len(c) for c in components]
+    print(f"  mesh components: {len(components)} total, sizes (top 10): {sizes[:10]}, "
+          f"components <= 300 verts: {sum(1 for s in sizes if s <= 300)}")
+    if len(components) <= 1:
+        return 0, len(components)
+
+    # This Meshy mesh (like many single-image-to-3D outputs) is NOT "one main body plus a few loose
+    # floaters" -- it's genuinely fragmented into hundreds of disconnected shells (separate feather
+    # tufts, fur clumps, etc., each its own little connected patch). Most of those are legitimate
+    # surface pieces whose own heat/data-transfer weight is already fine; only the *small* ones are the
+    # claw-tip/sliver kind of floater this function exists to fix. Re-weighting every non-largest
+    # component wholesale (the first version of this function did, against 703 components here) was
+    # confirmed overcorrecting -- see the fix-round note -- so only components at or below a small size
+    # threshold are touched, spatially snapped to the nearest vertex belonging to any *larger*
+    # (non-floater) component.
+    FLOATER_MAX_VERTS = 300
+    large = [c for c in components if len(c) > FLOATER_MAX_VERTS]
+    floaters = [c for c in components if len(c) <= FLOATER_MAX_VERTS]
+    if not large or not floaters:
+        return 0, len(components)
+
+    donor_pool = [vi for c in large for vi in c]
+    kd = mathutils.kdtree.KDTree(len(donor_pool))
+    for vi in donor_pool:
+        kd.insert(me.vertices[vi].co, vi)
+    kd.balance()
+
+    fixed = 0
+    for comp in floaters:
+        for vi in comp:
+            _, donor, _ = kd.find(me.vertices[vi].co)
+            for g in list(me.vertices[vi].groups):
+                mesh_obj.vertex_groups[g.group].remove([vi])
+            for g in me.vertices[donor].groups:
+                mesh_obj.vertex_groups[g.group].add([vi], g.weight, "REPLACE")
+            fixed += 1
+    return fixed, len(components)
+
+
+def repair_stray_unweighted_vertices(mesh_obj):
+    """Nearest-neighbour weight inpainting: a handful of vertices (claw tips, thin wing-tip geometry)
+    can come out of heat-weighting or a nearest-surface data transfer with no deform weight at all, even
+    when >95% of the mesh is fine -- visible as a thin spike/stray stretching to the bind-pose position
+    while the rest of that body part moves. Each unweighted vertex copies its nearest *weighted*
+    vertex's groups, closing the gap with real neighbouring rig data (not a guess)."""
+    me = mesh_obj.data
+    kd = mathutils.kdtree.KDTree(len(me.vertices))
+    weighted = 0
+    for v in me.vertices:
+        if any(g.weight > 0.01 for g in v.groups):
+            kd.insert(v.co, v.index)
+            weighted += 1
+    if weighted == 0:
+        return 0
+    kd.balance()
+    fixed = 0
+    for v in me.vertices:
+        if any(g.weight > 0.01 for g in v.groups):
+            continue
+        _, idx, _ = kd.find(v.co)
+        for g in me.vertices[idx].groups:
+            mesh_obj.vertex_groups[g.group].add([v.index], g.weight, "REPLACE")
+        fixed += 1
+    return fixed
+
+
+# One fix round (spike #55 second pass): the first render of this textured pass showed thin
+# ink-plum spikes stretching from moving legs back toward the body in the move loop. Chasing that
+# down turned up three distinct causes in the data-transfer weighting path -- a small number of
+# fully unweighted vertices (554 / 496,815 at the voxel size first tried), a smaller number of
+# weighted-but-topologically-mismatched vertices, and several hundred small disconnected mesh
+# islands mapped to the wrong bone as a whole -- each repaired below. See each function's
+# docstring for what it targets and why. One spike survived all three repairs; confirmed (by
+# disabling the outline modifier and re-rendering) to be actual base-mesh geometry from the Meshy
+# reconstruction, not a rig/weight bug -- left as a known issue, same class as the first pass's
+# outline-shell specks (see the gate report).
+if method_used is not None and unweighted > 0:
+    fixed = repair_stray_unweighted_vertices(obj)
+    unweighted, total = count_unweighted(obj)
+    print(f"STRAY-VERTEX REPAIR ({method_used}) - fixed {fixed}, now {unweighted} / {total} unweighted")
+
+if method_used is not None and "data-transferred" in method_used:
+    # The data-transfer path is the one that can produce topologically-inconsistent (not just zero)
+    # weights; heat weights computed directly on obj, and envelope weights, don't cross a remesh gap.
+    topo_fixed = repair_topologically_inconsistent_weights(obj)
+    print(f"TOPOLOGY-CONSISTENCY REPAIR ({method_used}) - fixed {topo_fixed} mismatched vertex/vertices")
+
+if method_used is not None:
+    island_fixed, n_components = reweight_floating_mesh_islands(obj)
+    print(f"FLOATING-ISLAND REPAIR ({method_used}) - {n_components} disconnected mesh component(s), "
+          f"re-weighted {island_fixed} vert(s) outside the main body from their nearest main-body vertex")
+
+weight_ok = method_used is not None
+print(f"AUTOMATIC WEIGHTS OK: {weight_ok} (method: {method_used or 'none -- rigid object-level fallback'}, "
+      f"remesh used for weight computation only: {remeshed})")
+if not weight_ok:
+    print("FALLBACK IN EFFECT: neither heat weighting (raw mesh or a voxel-remeshed duplicate) nor "
+          "envelope weights produced a usably-weighted mesh (see the ATTEMPT lines above). Per the "
+          "brief's fallback instruction, the bone hierarchy below stays as documentation/scaffolding "
+          "(it does not visibly deform the mesh), and the idle/move loops instead animate the whole "
+          "Griffin object rigidly (bob, sway, lean) -- an object-level fallback, not a true per-part "
+          "skeletal deform. Noted as a limitation in the gate report.")
+
+# Outline last, on the final base mesh (obj itself is never remeshed -- see
+# above -- so this always sits on the UV-intact mesh, on top of the armature
+# deform in the modifier stack, whichever weighting method produced it).
 solid = obj.modifiers.new("Outline", "SOLIDIFY")
-solid.thickness = -0.012 * TARGET_HEIGHT
+solid.thickness = -0.006 * TARGET_HEIGHT  # thinner than the first pass's -0.012 (ink-plum, unlit)
 solid.offset = 1.0
 solid.use_flip_normals = True
 solid.material_offset = 1

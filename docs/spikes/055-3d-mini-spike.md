@@ -1,7 +1,9 @@
 # Spike #55 (mini): pre-rendered 3D toon vs 2D code bone rig -- gate report
 
 **Status:** mini-spike only, per the producer's 2026-09-29 decision on issue #55 (1-2 days, one beast, two
-paths, not the full 2-3 week engine evaluation). This report is the gate.
+paths, not the full 2-3 week engine evaluation). This report is the gate. **Updated 2026-09-30** with a
+second pass (section 2.6) that re-runs Path A against a *textured* Meshy generation; see that section for
+what changed and what didn't.
 
 ## 0. Goal
 
@@ -43,14 +45,20 @@ needed to make the call.
 
 ![Comparison sheet](055/comparison_sheet.png)
 
-*Left to right: the approved 2D illustration, Path A's Blender toon render, Path B's 2D code bone rig.*
+*Left to right: the approved 2D illustration, Path A pass 1 (untextured Meshy GLB), Path A pass 2
+(textured meshy-7.1 GLB, section 2.6), Path B's 2D code bone rig. Updated 2026-09-30 from a 3-column sheet
+to this 4-column one; the pass-1-only renders this report originally shipped with are superseded here but
+described unchanged below (2.1-2.5) since that evidence still stands for pass 1.*
 
 ![Board mock](055/board_mock.png)
 
-*Both placed on a Verdant Hollow backdrop at the same scale (a simplified placement, not the full
-hex/obstacle overlay tooling -- out of scope for a two-day spike).*
+*All three (2D reference, Path A pass 1, Path A pass 2) placed on a Verdant Hollow backdrop at the same
+scale (a simplified placement, not the full hex/obstacle overlay tooling -- out of scope for a two-day
+spike).*
 
-Idle loops: `055/idle_2d.gif`, `055/idle_3d.gif`. Move loops: `055/move_2d.gif`, `055/move_3d.gif`.
+Idle loops: `055/idle_2d.gif` (Path B), `055/idle_3d.gif` (Path A pass 1, untextured),
+`055/idle_3d_textured.gif` (Path A pass 2, textured, section 2.6). Move loops: `055/move_2d.gif`,
+`055/move_3d.gif`, `055/move_3d_textured.gif`, same pattern.
 
 ### 2.1 Likeness and fit with the art v2 pillars
 
@@ -122,6 +130,97 @@ result than Path B, which does bend each part independently at its own pivot.
 | A | Design drifts from the approved illustration (see 2.1) | Real gap for reuse of existing approved art |
 | B | Small seam at the head/neck joint at extreme rotation | Minor, cosmetic |
 | B | `legs_front`/`legs_back` are pair-combined parts, not per-leg, so the move cycle is a stylised 2-group lope, not a true 4-leg alternating gait | Known limitation of the *existing* rig-parts cut, not something this spike introduced |
+
+### 2.6 Second pass: textured model (2026-09-30)
+
+The producer authorised exactly one more paid Meshy call to test whether a **textured** generation closes
+2.2 (no texture) and improves 2.3 (rigging) enough to change the recommendation. One call was made and is
+fully accounted for below; nothing else spent credits.
+
+**Generation.** `python Tooling/ArtLab/scripts/meshy.py image-to-3d --image scratchpad/spike55/griffin_meshy_input.png
+--model meshy-7.1 --texture --texture-resolution 2k --yes` (the same source illustration as pass 1,
+re-submitted through the new local CLI rather than the producer's manual first-pass generation). Balance
+before: **1700 credits**; after: **1670 credits** -- **30 credits spent**, exactly matching the CLI's printed
+cost for `meshy-7.1` mesh + 2K texture, confirmed with a `--dry-run` before the real call. Task
+`01a0f351-869e-7319-9820-e4b6e8b6b226`, `SUCCEEDED` in ~104s. Full record:
+`Tooling/ArtLab/provenance/meshy-01a0f351-869e-7319-9820-e4b6e8b6b226.md`.
+
+**Mesh/texture stats** (`Tooling/Spike55/gltf_inspect.py` on the downloaded GLB, not committed -- see
+"Committed?" in the provenance file): **929,638 tris, 496,815 verts, 1 material, 1 image** (`base_color`,
+JPEG, 2048x2048). Unlike pass 1 (51,488 tris, 39,446 verts, `images: 0`, `materials: 0`), this generation
+carries a real baked base-colour texture -- 2.2's finding is closed for this generation/tier/settings
+combination. File size ~29 MB (not committed; large binary working file, same policy as pass 1's GLB).
+
+**Rig result: a real per-part rig, after three targeted repairs.** `blender_toon_render.py` was extended to
+(a) build the toon material as a banded multiplier over the Meshy base-colour texture instead of a flat
+swatch (cool `#7C7AAE`-tinted shadow band, never pure black, neutral midtone, slight warm highlight boost,
+warmed key light, thinner ink-plum outline), and (b) retry rigging per the task brief. What actually
+converged, in order:
+
+1. **Attempt 1** (heat weights, raw mesh): failed, same as pass 1 (`Bone Heat Weighting: failed to find
+   solution for one or more bones`; 496,815 / 496,815 vertices unweighted).
+2. **Attempt 2** (heat weights on a voxel-remeshed duplicate): **succeeded** (16 / 51,398 unweighted at the
+   first voxel size tried). Pass 1 stopped here and applied the remesh directly to the render mesh, which
+   would have destroyed this pass's UVs/texture mapping. Instead, the remesh ran on a disposable
+   *duplicate*; the computed weights were copied back onto the original, UV-intact mesh with a Data
+   Transfer modifier (`POLYINTERP_NEAREST`, nearest-surface), and the duplicate was discarded. This is the
+   "voxel remesh + data-transfer of weights" option the task brief named, chosen over envelope weights
+   because it produces real heat-map-quality weights rather than a coarser geometric approximation, and it
+   worked on the first try.
+3. **Method that shipped:** heat weights computed on a voxel-remeshed duplicate (finished at
+   `voxel_size = 0.003 x TARGET_HEIGHT`, finer than the `0.006` first tried -- see below), data-transferred
+   onto the original mesh. Envelope weights (the brief's other named fallback) were never needed.
+
+**One fix round, three causes found.** The first textured render showed thin ink-plum spikes stretching
+from the legs during the move loop's largest rotations. Investigating turned up three distinct failure
+modes in the data-transfer path, each with a targeted repair (all in `blender_toon_render.py`, run
+automatically, not manual cleanup):
+
+- **554 fully unweighted vertices** (at the voxel size first tried) -- nearest-*weighted*-vertex copy
+  (`repair_stray_unweighted_vertices`). Finer remeshing (`0.006` -> `0.003`) independently brought this to
+  0 before the repair even ran.
+- **70 vertices weighted, but disagreeing with every mesh-connected neighbour's dominant bone** -- a
+  topology-walking repair (`repair_topologically_inconsistent_weights`) that only ever copies from a
+  vertex the bad one is actually edge-connected to, so it can't jump the same empty-space gap that caused
+  the original mismatch.
+- **Small disconnected mesh islands** (this Meshy mesh is fragmented into 703 edge-connected components,
+  not one blob with a few floaters -- typical of single-image-to-3D output): islands at or below 300
+  vertices (276 of the 703) were snapped wholesale to their nearest larger-component vertex
+  (`reweight_floating_mesh_islands`). An earlier, untargeted version of this repair (touching every
+  non-largest component) was tried and rejected after it altered 489,925 of 496,815 vertices -- confirmed
+  overcorrecting -- before landing on the 300-vertex threshold.
+
+After all three, **0 / 496,815 vertices are unweighted**, all previously-mismatched vertices agree with
+their neighbours, and idle/move show genuine per-part skeletal deformation, not the whole-object rigid
+fallback pass 1 shipped. One thin spike remained visible on certain move frames after all three repairs;
+disabling the outline (Solidify) modifier and re-rendering showed the exact same spike in the base mesh
+colour, confirming it is **real geometry from the Meshy reconstruction** (a thin spur near a claw, not a
+rig/weight bug) -- left as a known issue, the same class as pass 1's outline-shell specks (2.5), not chased
+further under the one-fix-round budget.
+
+**Renders.** Idle (12) and move (8) frames at 512x512, same camera/framing/board-mock placement as pass 1
+for a fair comparison: `055/idle_3d_textured.gif`, `055/move_3d_textured.gif`, and the fourth column of
+`055/comparison_sheet.png` / third figure of `055/board_mock.png`.
+
+**Likeness assessment vs. the approved illustration and the art v2 pillars.** Closer, but the verdict from
+2.1 is **unchanged**: this is still a plausible *new* griffin, not a 3D version of the *approved* one. The
+texture is real (unlike pass 1) and reads as warm gold/cream fur and white feathering with visible
+strokework -- tonally in the art v2 family (warm daylight, cool saturated shadow band, no pure black,
+painted rather than plastic) -- but it's Meshy's own fabricated texture, not a projection of the actual
+approved artwork, and the underlying mesh still reinterprets proportions, crest shape and feather
+silhouette the same way pass 1's did (2.1). A producer comparing `055/comparison_sheet.png` column 3
+against column 1 would still recognise "a griffin, by the same tool, now with fur and feather detail," not
+"our griffin, in 3D."
+
+**Does this change the recommendation?** **No.** The cosmetics combinatorics argument (section 4) that
+drives the recommendation is untouched by texturing -- if anything it gets slightly worse, since a
+different crest/wings/colour-form combination now means a different *textured* generation and re-render
+(same 30-credit, ~2-minute cost each, at minimum, for a single-fused mesh with no separable cosmetic
+sub-meshes), not just a different untextured one. The rigging picture genuinely improved (a real per-part
+rig now works, given the extra weight-transfer engineering above), which **does** partially address 2.3 and
+would matter if a free-orbiting camera became a real requirement (section 6, point 4) -- but it doesn't
+touch the cosmetic-swap failure that is the recommendation's primary driver. **Recommendation unchanged:
+continue the 2.5D + Spine path (or the code bone rig this spike demonstrates).**
 
 ## 3. Measurements
 
@@ -218,7 +317,9 @@ multiplier).
 
 **Continue the 2.5D + Spine path** (or, short of taking on the Spine licence, the code bone rig this spike
 demonstrates over the existing parts). Do not pursue pre-rendered 3D for the beast roster on the evidence
-here.
+here. **Unchanged after the second, textured pass (section 2.6, 2026-09-30):** a real texture and a real
+per-part rig both improved Path A's *engineering* quality, but neither touches the cosmetic-swap
+combinatorics that drive this call (point 1 below, and section 4).
 
 Reasoning:
 
@@ -260,9 +361,15 @@ Reasoning:
 
 ## AI provenance
 
-The Griffin 3D model used for Path A was generated by **Meshy (paid tier)**, by the producer, from the
-already-approved 2D Griffin illustration; output ownership is retained (paid tier, not the CC BY free
-tier). Disclosed per `docs/art/art-brief.md`'s AI-disclosure rule. Full record:
-`Tooling/ArtLab/provenance/spike55-griffin-meshy.md`. The model is a spike input only and is not committed
-to the repository or shipped with the game (`Tooling/Spike55/README.md` explains how to get your own copy
-to rerun Path A).
+The Griffin 3D models used for Path A were generated by **Meshy (paid tier)**, from the already-approved 2D
+Griffin illustration; output ownership is retained in both cases (paid tier, not the CC BY free tier).
+Disclosed per `docs/art/art-brief.md`'s AI-disclosure rule.
+
+- **Pass 1** (untextured, section 2.2): generated by the producer directly. Full record:
+  `Tooling/ArtLab/provenance/spike55-griffin-meshy.md`.
+- **Pass 2** (textured, `meshy-7.1`, section 2.6): generated 2026-09-30 via `Tooling/ArtLab/scripts/meshy.py`
+  under a specific one-call, 30-credit spend authorisation. Full record:
+  `Tooling/ArtLab/provenance/meshy-01a0f351-869e-7319-9820-e4b6e8b6b226.md`.
+
+Both models are spike inputs only; neither is committed to the repository or shipped with the game
+(`Tooling/Spike55/README.md` explains how to get your own copy to rerun Path A).
