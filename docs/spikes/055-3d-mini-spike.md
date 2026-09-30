@@ -392,6 +392,169 @@ new for Path B, which stays inside the same budget the game already ships. A rea
 needed to confirm either way; not done here (out of scope for a mini-spike, and no device was available in
 this environment).
 
+### 2.8 Fourth pass: real-time 3D in MonoGame (2026-09-30)
+
+Per the producer's 2026-09-30 decision, this pass tests the question the first three passes explicitly
+did **not**: does **real-time** 3D rendering (not pre-rendered frames) change the cosmetic-combinatorics
+verdict that has driven every recommendation so far? Built as a standalone app,
+`Tooling/Spike55/Live3D` (not added to `BeastCraft.slnx`, does not touch `src/`), full tooling reference
+in `Tooling/Spike55/README.md`'s "Fourth pass" section.
+
+**Method.** The pass-3 low-poly `remesh` GLB (8,372 tris, section 2.7 -- no new Meshy call this pass,
+per this pass's spend authorisation) was re-run through the same weld/texture-downsize/armature/
+auto-weight pipeline as `blender_lowpoly_render.py`, but instead of baking PNG frames,
+`Tooling/Spike55/blender_export_live.py` authors real keyframed `Idle` (2s loop) and `Move` (1s loop)
+Actions and exports a single skinned, animated GLB (`griffin_live.glb`, 0.88 MiB, base-colour texture
+only, JPEG-encoded, well under the 2 MB budget) plus one small procedural cosmetic attachment mesh
+(`crest_alt.glb`, ~224 tris, 13 KiB, no Meshy call -- a from-scratch fanned-quad "plume", not an AI
+generation) meant to be parented to the head bone at runtime. Both are small enough to commit directly.
+
+The runtime (`Tooling/Spike55/Live3D`, MonoGame DesktopGL, `net10.0`, mirroring
+`BeastCraft.Desktop`'s `MonoGame.Framework.DesktopGL` version) loads both GLBs with **SharpGLTF.Core
+1.0.7** (MIT), CPU-skins each beast instance per frame (`Skinner.cs`, linear blend skinning against
+`Node.GetWorldMatrix(animation, time)`-evaluated joint matrices), and draws with a custom toon +
+inverted-hull-outline effect (`Content/Effects/Toon.fx`, compiled by the MonoGame content pipeline: a
+2-3 band diffuse ramp, cool `#7C7AAE` shadow tint that's never pure black, a warm key light, plus an
+ink-plum `#2E2A45` outline pass) over the Verdant Hollow backdrop
+(`content/art/backdrops/r01/sun0/medium.png`) and a simple hex grid, orthographic camera, portrait
+window (540x960 -- a 50% scale-down of the 1080x1920 target, so the window fits a normal desktop
+monitor; see the README).
+
+**Two real bugs found and fixed** (both are non-obvious MonoGame/glTF integration gotchas worth
+recording, not spike-specific one-offs):
+
+1. **MGFX (MonoGame's effect compiler) does not honour a `.fx` file's HLSL default-value
+   initialisers.** A first render came out **solid black** -- `LightDirection`'s HLSL default
+   (`normalize(float3(0.45, 0.65, 0.60))`) was silently discarded at compile time, came back as
+   `(0,0,0)` at runtime, `normalize` of a zero vector is undefined/NaN, and every toon-band comparison
+   fell through to `HighlightBoost` -- itself also unset/zero -- multiplying the correctly bound,
+   correctly textured beast by black. Fixed by explicitly setting every constant shader parameter from
+   C# in `LoadContent` instead of relying on the shader's own defaults.
+2. **glTF's winding convention is the opposite of MonoGame/XNA's default `RasterizerState`.**
+   `griffin_live.glb`'s index data was loaded as-is (no re-winding); MonoGame's default
+   `CullCounterClockwise` treats *clockwise* as front-facing, backwards for a right-handed, CCW-front
+   glTF mesh. Symptom: the toon pass lit the mesh's inside-out backfaces and the outline pass (also
+   reversed) fully overdrew the model instead of just its fringe -- both explained by, and fixed by,
+   swapping which `RasterizerState` each pass uses.
+
+**One fix round, cosmetic placement.** The crest attachment first rendered draped in front of the
+face like a bib (parented directly at the head bone's world matrix, no adjustment) -- the head bone's
+bind-pose orientation doesn't line up with "up" in world space. Fixed with one small fixed local
+re-orientation (scale down, tip the blades up and back) in `Game1.SkinInstance`; this is a stand-in
+procedural mesh for the toggle proof, not hand-placed art, so a single fixed correction (not a full
+per-bone rig) is deliberately as far as cosmetic placement went.
+
+**Cosmetics and colour form: proven, no re-render or re-animation needed.** Pressing `C` toggles the
+crest attachment on/off and `T` cycles 3 colour-form tints (a shader multiply on the sampled base-colour
+texture) -- both change instantly, every frame, on the live skinned mesh, with **zero new art
+generation and zero new Blender work**. This is the thing passes 1-3 could not test (section 4's
+combinatorics finding was specifically about *pre-rendered* frames): a live 3D mesh really does sidestep
+the per-combination re-bake cost that ruled out pre-rendered 3D. It does **not** by itself prove
+segmented-submesh cosmetics (crest/wings as swappable parts of the *same* mesh) -- this pass only
+demonstrates one *additional* small mesh parented to a bone, which is enough for an attachment-style
+cosmetic (a crest, a saddle, a weapon) but not yet a body-colour-form-only proof for a part that's
+baked into the base mesh's own geometry (handled here instead by the tint shader parameter, which is a
+real and simpler mechanism for that case).
+
+**Measured numbers (this machine: Intel Arc 140V laptop, DesktopGL, Release build, vsync disabled for
+true uncapped throughput via `--bench`):**
+
+| Beasts | fps avg | fps 1% low | Draw calls | Triangles | CPU skin time | Managed mem | GPU mem (est.) |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 | 1,006 | 154 | 6 | 17,192 | 0.37 ms | 12.8 MB | 6.4 MB |
+| 3 | 644 | 69 | 14 | 51,576 | 1.24 ms | 8.4 MB | 7.6 MB |
+| 12 | 183 | 20 | 50 | 206,304 | 4.11 ms | 9.9 MB | 11.5 MB |
+| 24 | 92 | 9 | 98 | 412,608 | 9.43 ms | 16.9 MB | 16.6 MB |
+
+(10-second `--bench` runs; "draw calls"/"triangles" are per-frame totals -- each beast is 2 draw calls
+x 2 passes (toon + outline) for body and crest.) Even at 24 beasts, uncapped average throughput (92
+fps) stays comfortably above the 60 fps pass bar on this desktop GPU, with wide margin. The 1%-low
+numbers are notably worse relative to average, especially at 12/24 beasts (20 fps, 9 fps) -- this looks
+like GC/driver-pressure jitter from `DynamicVertexBuffer.SetData` discard-writing large buffers for
+every instance every frame (CPU skinning re-uploads the full vertex buffer per beast per frame; an
+earlier version that allocated fresh `Matrix4x4[]` arrays per instance per frame made this materially
+worse, fixed by reusing per-instance scratch arrays -- see `AnimatedPose.cs`'s comments), not something
+chased further here. A production implementation would very likely move skinning to the GPU (a bone
+matrix palette in the vertex shader, no per-frame CPU vertex buffer rewrite) specifically to remove this
+class of stall; this spike deliberately used CPU skinning (explicitly acceptable per the task brief) so
+"skinning time" would be a directly measurable, honest number rather than hidden GPU cost.
+
+**Galaxy A35 (Exynos 1380 / Mali-G68 MP5) estimate -- unmeasured, reasoned from these numbers:**
+
+- 8,372 tris and one 1024x1024 texture per beast is a trivial vertex/fill-rate budget for a mobile
+  GPU in the A35's tier (Mali-G68 MP5 comfortably handles several times this in current mobile titles);
+  the real mobile-specific risk is **not** raw triangle/fill throughput.
+- The real risks are (a) **CPU skinning cost on a much slower mobile CPU core** -- this laptop's CPU
+  skinned 24 beasts in 9.4 ms; a phone-class Cortex-A55/A78-tier core (Exynos 1380's CPU) could plausibly
+  run this 3-6x slower with no other optimisation, which would meaningfully eat into a 16.6 ms (60 fps)
+  frame budget at high beast counts -- this is the single biggest unmeasured unknown; (b) **driver
+  overhead per draw call on a mobile OpenGL ES driver**, typically worse than desktop drivers -- at 98
+  draw calls/frame for 24 beasts, this is a real (if standard) mobile-optimisation target (instancing or
+  batching would cut it); (c) **shader compile/portability for GLSL ES** (`Toon.fx` was only compiled
+  and tested for the OpenGL/DesktopGL profile via MGFX here -- Android's MonoGame target uses a
+  different GLSL ES profile, untested); (d) **content pipeline and SharpGLTF behaviour on Android**,
+  entirely untested in this pass (MonoGame's Android host uses a different asset-loading path than
+  `File.ReadAllBytes`/`Texture2D.FromStream` off the raw filesystem, which is what this spike relies
+  on). **The exact test needed:** build the Android variant of this same app (out of scope for this
+  pass per the task brief) and run the same `--bench` harness on a physical Galaxy A35 at the beast
+  counts the PvE design actually needs (per the user's PvE-direction note: small teams vs. up to ~24
+  small enemies) -- no number in this section should be treated as a substitute for that.
+
+**Per-beast asset cost, honestly estimated from what was actually done this pass:**
+
+- Meshy generate (pass 2, reused): 30 credits -- **not spent again this pass**.
+- Meshy remesh (pass 3, reused): 5 credits -- **not spent again this pass**. This pass made **zero**
+  Meshy API calls (none were authorised for it); it consumed the pass-3 GLB already on disk.
+- Blender rig/anim authoring (`blender_export_live.py`), *given the pass-3 rig/weighting code already
+  existed to build on*: roughly 25-35 minutes of active work this session, including two Blender-API
+  debugging detours (the layered-Action `fcurves` API change in Blender 5.x, and the glTF exporter's
+  Principled-BSDF-only base-colour extraction, both documented in the README). This is the "tooling
+  exists" case -- a first attempt on a species with no prior rig work would likely cost closer to pass
+  1/2's 60-110 minute range (section 2.7's time table).
+- **Not a per-beast cost, but a real one-time cost this pass paid for the whole game:** the runtime
+  engineering (SharpGLTF integration, CPU skinner, custom toon+outline shader, camera/hex board,
+  stress/bench/screenshot harness) took the bulk of this session's time. It does not recur per beast,
+  but it is real engineering investment a production real-time-3D path would need to have already paid
+  before any beast benefits from it -- unlike Path B (section 4), which reuses the game's existing
+  `SpriteBatch` draw path with no new engine code at all.
+
+**Risks, specific to this pass:**
+
+- **Quadruped animation authoring without Mixamo.** This pass's idle/move clips are hand-authored
+  sinusoidal pose keyframes (ported directly from `blender_lowpoly_render.py`'s per-frame posing code),
+  not motion-captured or hand-animated by a rigger -- a crude, proof-of-concept gait, not
+  production-quality animation. Mixamo (a common free source of pre-made animation clips) targets
+  bipedal humanoid rigs and does not support an arbitrary quadruped-plus-wings skeleton like this
+  Griffin's; a production pipeline would need either a real animator hand-keying every clip per beast
+  (expensive, does not scale to 10 beasts x 7 clips) or a from-scratch procedural/physics-assisted gait
+  system (unbuilt, unproven here).
+- **Meshy inventing designs, still applies.** This pass's mesh is the same pass-3 remesh as before
+  (section 2.7); its likeness caveats (2.1, 2.7 -- a plausible griffin, not a reconstruction of the
+  *specific* approved illustration) are unchanged and unre-tested here.
+- **SharpGLTF/skinning on Android, entirely unverified.** See the A35 estimate above -- this pass only
+  built and ran the DesktopGL host.
+- **Shader compile for Android.** `Toon.fx` compiled cleanly for the OpenGL/DesktopGL MGFX profile; an
+  Android build would need it to also compile for MonoGame's Android GLSL ES target, untested here.
+
+**Screenshots** (one fix round applied to the crest-placement and rendering bugs above before these
+were taken; all still at the 540x960 desktop window size, not device-tested):
+
+![Single Griffin, crest on](055/live3d_close_crest_on.png)
+![Single Griffin, crest off](055/live3d_close_crest_off.png)
+
+*Left: crest attachment on (teal plume, head bone-parented). Right: crest off -- same live mesh, same
+frame, toggled with no re-render or re-animation.*
+
+![Azure colour-form tint](055/live3d_tint_azure.png)
+
+*The same beast with the `T`-key colour-form tint cycled to the cool azure variant -- a shader
+multiply on the sampled texture, no new art, no accent mask.*
+
+![24-beast stress test](055/live3d_board_24.png)
+
+*The stress test's top step: 24 Griffins, each with its own randomised (desynced) animation-clock
+offset, toon-shaded with outlines, on the hex board over the Verdant Hollow backdrop.*
+
 ## 4. Cosmetics (`docs/art/art-brief.md`, `cosmetic-library.json`, issue #38)
 
 The Griffin has two discrete cosmetic categories plus a colour-form set (from
@@ -423,26 +586,51 @@ multiplier).
 
 ## 5. Pass criteria (from issue #55)
 
-| Criterion | Path A | Path B |
-| --- | --- | --- |
-| Steady 60 fps on a Galaxy A35-class phone | Unmeasured; expected non-issue as baked 2D sprites (same cost class as shipping content) -- see section 3 | Unmeasured; expected non-issue, same reasoning, and it's strictly less new content than Path A |
-| An approvable beast within a set number of hours per asset | Real risk on pass 1's mesh (rigging did not converge); **pass 3's low-poly remesh rigged cleanly on the first attempt with no repairs (2.7)**, but that's one beast, one mesh -- generality across the other 9 is unconfirmed | Looks solid: ~3-5 min per beast once the tooling exists, reusing the existing `rigparts.py` convention |
-| Cosmetic swaps without per-beast rework | **Fails as built, all three passes**: needs full re-generation (+ re-render, for pre-rendered output) per combination (section 4) | **Passes**: parts/attachment swap, no rework |
-| A trimmed device build that loads content | Out of scope for this mini-spike | Out of scope for this mini-spike |
+| Criterion | Path A (pre-rendered, passes 1-3) | Path A' (real-time, pass 4) | Path B |
+| --- | --- | --- | --- |
+| Steady 60 fps on a Galaxy A35-class phone | Unmeasured; expected non-issue as baked 2D sprites (same cost class as shipping content) -- see section 3 | **Measured on desktop only** (2.8): 92 fps avg at 24 beasts, uncapped, wide margin above 60 fps on this laptop's GPU; A35 unmeasured, reasoned estimate says CPU skinning cost is the real unknown, not fill rate -- see 2.8 | Unmeasured; expected non-issue, same reasoning, and it's strictly less new content than Path A |
+| An approvable beast within a set number of hours per asset | Real risk on pass 1's mesh (rigging did not converge); **pass 3's low-poly remesh rigged cleanly on the first attempt with no repairs (2.7)**, but that's one beast, one mesh -- generality across the other 9 is unconfirmed | Same mesh/rig as pass 3, plus ~25-35 min this pass to author Idle/Move clips and export -- but animation is hand-keyed sinusoidal posing, not production quality, and has no Mixamo-equivalent shortcut for a quadruped (2.8) | Looks solid: ~3-5 min per beast once the tooling exists, reusing the existing `rigparts.py` convention |
+| Cosmetic swaps without per-beast rework | **Fails as built, all three passes**: needs full re-generation (+ re-render, for pre-rendered output) per combination (section 4) | **Passes, for attachment-style cosmetics and colour form** (2.8): crest toggle and tint cycle both proven live, zero re-render/re-animation -- does *not* yet prove segmented-submesh swaps for a cosmetic baked into the base mesh's own geometry | **Passes**: parts/attachment swap, no rework |
+| A trimmed device build that loads content | Out of scope for this mini-spike | Out of scope for this mini-spike (DesktopGL only; Android untested, see 2.8's A35 estimate) | Out of scope for this mini-spike |
 
 *Low-poly (pass 3, section 2.7) row values above are folded into "Path A"; it's the same path, a third
-generation. Likeness (not itself a pass-criteria row, but see 2.1/2.7) reassessed as passing the
-producer's current "close, with appropriate physiology" bar for the low-poly and textured passes.*
+generation. Path A' (pass 4, section 2.8) is real-time rendering of that same low-poly mesh, not a
+fourth generation -- a different rendering strategy over the same asset. Likeness (not itself a
+pass-criteria row, but see 2.1/2.7) reassessed as passing the producer's current "close, with
+appropriate physiology" bar for the low-poly and textured passes, and unchanged (same mesh) for pass 4.*
 
-## 6. Recommendation
+## 6. Recommendation (revised 2026-09-30 after the fourth, real-time pass)
 
-**Continue the 2.5D + Spine path** (or, short of taking on the Spine licence, the code bone rig this spike
-demonstrates over the existing parts). Do not pursue pre-rendered 3D for the beast roster on the evidence
-here. **Unchanged after the second, textured pass (section 2.6) and the third, low-poly pass (section 2.7,
-both 2026-09-30):** a real texture, a real per-part rig, and now a clean, well-behaved low-poly mesh all
-improved Path A's *engineering* quality -- the low-poly pass in particular is the first of the three 3D
-passes to come out clean with no fix round needed -- but none of that touches the cosmetic-swap
-combinatorics that drive this call (point 1 below, and section 4).
+**Still continue the 2.5D + Spine path (or the code bone rig this spike demonstrates) as the default for
+the beast roster.** That part of the call is unchanged by the fourth pass. **What the fourth pass does
+change:** the single objection that has driven every version of this recommendation -- pre-rendered 3D
+fails the cosmetic-swap criterion outright (section 4) -- is **no longer true of real-time 3D**. Section
+2.8 built and measured a real-time MonoGame renderer and it passes the cosmetic-swap and colour-form
+criteria live, with no re-render or re-animation step. That means real-time 3D is no longer a
+theoretical "wrinkle" (as it was described after pass 3) -- it is now an evidence-backed, *credible*
+alternative architecture, not just a rejected one. It is not being recommended as the default today
+because it loses on cost and risk, not because it's structurally blocked the way pre-rendered 3D is:
+
+- **New engineering cost pre-rendered 3D never had.** Path B reuses the game's existing `SpriteBatch`
+  draw path with zero new engine code. Real-time 3D needed a new glTF loader/skinner, a new custom
+  shader, and a new render path (section 2.8) -- real, one-time engineering investment a production
+  adoption would have to pay up front, on top of per-beast asset cost.
+- **Animation authoring has no Mixamo-equivalent shortcut for this game's quadruped/winged beasts**
+  (2.8's risks) -- every clip, for every beast, would need either expensive hand-keying or an unbuilt
+  procedural gait system. Path B's per-beast animation cost (a few minutes, section 2.7's time table)
+  stays dramatically cheaper.
+- **The A35 number that matters most (CPU skinning cost on mobile) is still unmeasured** (2.8) -- this
+  pass used CPU skinning deliberately so the cost would be visible and honest, but that same choice
+  means the one most mobile-relevant number in this whole spike is a reasoned estimate, not a
+  measurement, pending an actual device test.
+- **Likeness is unchanged** (same pass-3 mesh): still a plausible griffin, not a reconstruction of the
+  specific approved illustration (2.1, 2.7).
+
+**Unchanged after the second, textured pass (section 2.6) and the third, low-poly pass (section 2.7):**
+a real texture, a real per-part rig, and a clean, well-behaved low-poly mesh all improved Path A's
+*engineering* quality without touching the pre-rendering-specific cosmetic-swap combinatorics that drove
+the original call (point 1 below, and section 4) -- that combinatorics objection specifically, not
+real-time 3D in general, is what those two passes left standing.
 
 **Likeness, reassessed (2026-09-30):** the producer's own bar for this criterion has moved to "close, with
 appropriate physiology," not an exact match to the approved illustration. Re-read against that relaxed
@@ -452,21 +640,25 @@ legs, tail), just not reconstructions of the *specific* approved illustration. T
 of the three original objections. It does not reach the cosmetic-swap combinatorics (section 4), which is
 the objection that actually decides this call, and which likeness has no bearing on.
 
-**One wrinkle surfaced by the low-poly pass, explicitly not tested here:** the combinatorics problem is a
-*pre-rendering* problem specifically -- baking fixed 2D frames means every cosmetic combination needs its
-own render. A real-time 3D renderer would not inherit that constraint the same way (cosmetics could be
-swapped as textures or toggled submeshes on a live mesh at runtime, closer to how Path B already swaps 2D
-parts, with no re-render step). This spike did not build or measure real-time MonoGame 3D rendering, so
-this is noted as a reason a future, wider spike on real-time 3D (issue #55's full scope) could reach a
-different conclusion than this pre-rendered-3D-specific mini-spike -- not a reason to revise today's call.
+**The wrinkle the low-poly pass surfaced but couldn't test is now tested, and confirmed (2.8):** the
+combinatorics problem is a *pre-rendering* problem specifically -- baking fixed 2D frames means every
+cosmetic combination needs its own render. Section 2.8 built a real-time MonoGame renderer and proved
+cosmetics (a head-bone-attached mesh toggle) and colour form (a shader tint) both work live, with zero
+re-render or re-animation, the same "no rework" property Path B already has. That is real, measured
+evidence, not a hypothesis -- but see the reasoning below (point 1) for why it still doesn't change
+*today's* default recommendation: the combinatorics fix comes bundled with new costs (engineering,
+animation authoring, unmeasured mobile CPU-skinning risk) that pre-rendered 3D never had to pay.
 
 Reasoning:
 
-1. The cosmetic-swap criterion is the one this whole spike (and issue #38) cares most about, and Path A
-   fails it outright with the tooling available in a two-day window: a single-fused AI mesh -- textured or
-   not, low-poly or not -- cannot cheaply take 20 discrete cosmetic options without a full re-render per
-   combination. Neither the textured pass (2.6) nor the low-poly pass (2.7) changes this; see the wrinkle
-   above for the one case (real-time 3D) that might.
+1. The cosmetic-swap criterion is the one this whole spike (and issue #38) cares most about. **Pre-rendered**
+   3D fails it outright, all three passes (1-3): a single-fused AI mesh -- textured or not, low-poly or
+   not -- cannot cheaply take 20 discrete cosmetic options without a full re-render per combination.
+   **Real-time** 3D (pass 4, section 2.8) passes it for attachment-style cosmetics and colour form, measured
+   not hypothesised -- but adopting it means paying for a new render path, a new animation-authoring
+   problem with no Mixamo shortcut, and an unmeasured mobile CPU-skinning risk (2.8), costs Path B simply
+   doesn't have. That package of new costs, not the combinatorics objection itself, is why real-time 3D is
+   not today's default even though it clears the one bar that mattered most.
 2. Path B costs almost nothing beyond what's already built: it reuses the *already-approved* Griffin art,
    the *already-cut* rig parts, and produces a visibly correct, independently-articulated idle/move loop
    with about 20 minutes of new tooling. It is the lower-risk, lower-cost path by a wide margin.
@@ -482,12 +674,12 @@ Reasoning:
    AI-generated meshes reliably -- which, per 2.7, may now be a materially smaller problem than 2.3 first
    found, at least for a remeshed low-poly mesh -- not a reason to adopt 3D for the whole roster today.
 
-**Real-time 3D on a Galaxy A35-class phone, an unmeasured estimate (2.7):** 8,372 tris, one material, a
-1024x1024 texture is a trivial GPU budget on any mobile-class GPU in the A35's tier -- comparable to a
-single simple mobile-game character, well inside a 60 fps budget for the handful of beasts likely on
-screen at once. This is markedly better than pass 2's 929,638-tri mesh would be for the same purpose. This
-estimate is unmeasured (no device was available in this environment, and no real-time MonoGame 3D renderer
-was built here) and should not be treated as a substitute for an actual on-device test.
+**Real-time 3D on a Galaxy A35-class phone:** see section 2.8's full estimate and reasoning. Short
+version: 8,372 tris and a 1024x1024 texture per beast is a trivial fill-rate/vertex budget for the
+A35's Mali-G68 MP5; the real unmeasured risk is CPU skinning cost on a much slower mobile CPU core and
+per-draw-call driver overhead, not raw triangle throughput. Desktop numbers (2.8) show wide 60 fps
+margin at up to 24 beasts on this laptop's GPU, but that is not a substitute for an on-device A35 test,
+which remains not done.
 
 ### Risks if this recommendation is wrong
 
@@ -497,22 +689,30 @@ was built here) and should not be treated as a substitute for an actual on-devic
 - If a future AI-to-3D tool or tier reliably outputs clean, riggable, textured, segmented meshes, most of
   Path A's problems here (2.2, 2.3, section 4) could disappear; this spike used one paid-tier Meshy
   generation (plus one paid `remesh` follow-up, 2.7) and does not rule that out for other tools/settings.
-- If real-time 3D rendering (not pre-rendered frames) is ever built and measured for this game, the
-  cosmetic-combinatorics objection that drives this recommendation may not apply the same way (see the
-  "wrinkle" above) -- that would need its own spike, not an extrapolation from this one.
+- **Now confirmed rather than hypothetical (2.8):** real-time 3D rendering does dodge the
+  cosmetic-combinatorics objection, for attachment-style cosmetics and colour form. If the animation-
+  authoring problem (no Mixamo-equivalent for this game's beasts) or the unmeasured A35 CPU-skinning
+  risk turn out to be smaller than feared, this recommendation is the one most likely to flip on new
+  evidence -- see "Next steps".
 
 ### Next steps
 
-- No further 3D work recommended off this spike. If 2D cosmetic authoring later proves unsustainable at
-  full scale (10 beasts x ~2-3 categories x several options each), re-open with a wider spike per issue
-  #55's original scope (real-time MonoGame 3D, Unity, Godot), not another pre-rendered-3D attempt.
+- No further 3D work recommended as the *default* roster path off this spike -- Path B remains it. But
+  unlike after pass 3, this is no longer "no further 3D work, full stop": if 2D cosmetic authoring later
+  proves unsustainable at full scale (10 beasts x ~2-3 categories x several options each), or a
+  free-orbiting camera becomes a real requirement, real-time 3D (not another pre-rendered-3D attempt) is
+  now a credible re-open path, with a working starting point (`Tooling/Spike55/Live3D`) and a specific,
+  named list of what to close first: an Android build and an actual Galaxy A35 `--bench` run (2.8's
+  single biggest open unknown), and a real animation-authoring plan for a quadruped/winged skeleton with
+  no Mixamo shortcut.
 - Carry the code-bone-rig approach (Path B) forward as a live option if the Spine licence is ever judged
   not worth it: `Tooling/Spike55/rig2d.py` is a working starting point, though production use would want it
   ported to run inside the game (not as an offline PNG baker) so it gets the "no rework" benefit at
   runtime rather than needing pre-baked frames.
-- If a free-orbiting camera or real-time 3D is ever prioritised, start from the low-poly `remesh` pipeline
-  (2.7, `Tooling/Spike55/blender_lowpoly_render.py`), not a fresh hi-poly generation -- it rigs cleanly on
-  the first attempt and is a far more reasonable real-time asset budget than pass 1/2's meshes.
+- If a free-orbiting camera or real-time 3D is ever prioritised, start from `Tooling/Spike55/Live3D`
+  (2.8) and the low-poly `remesh` pipeline (2.7, `Tooling/Spike55/blender_lowpoly_render.py` /
+  `blender_export_live.py`), not a fresh hi-poly generation or a from-scratch renderer -- both already
+  exist and are known to work end-to-end on desktop.
 
 ## AI provenance
 
@@ -530,6 +730,15 @@ Disclosed per `docs/art/art-brief.md`'s AI-disclosure rule.
   record: `Tooling/ArtLab/provenance/meshy-remesh-01a0f38d-c409-702e-b976-62bff441b88f.md`. (A free local
   Blender Decimate attempt preceded this and failed -- shattered mesh, no texture -- see 2.7; it spent no
   credits and is not part of this AI-provenance list since it produced no usable output.)
+- **Pass 4** (real-time 3D, section 2.8): **made zero Meshy API calls** (none were authorised for this
+  pass). It re-used the pass-3 GLB already generated above, re-exporting it as a skinned, animated GLB
+  (`griffin_live.glb`, committed at `Tooling/Spike55/Live3D/Content/model/`, 0.88 MiB -- small enough to
+  commit directly per this pass's size budget, unlike passes 1-3's uncommitted GLBs). The cosmetic
+  attachment mesh built for this pass (`crest_alt.glb`, also committed) is **not** AI-generated -- it's a
+  small procedural mesh built directly in `blender_export_live.py` (a fanned quad-strip "plume"), with no
+  Meshy involvement and no AI-disclosure implication.
 
-None of these models are committed to the repository or shipped with the game (`Tooling/Spike55/README.md`
-explains how to get your own copy to rerun Path A).
+None of passes 1-3's models are committed to the repository or shipped with the game
+(`Tooling/Spike55/README.md` explains how to get your own copy to rerun Path A). Pass 4's two small GLBs
+(`griffin_live.glb`, `crest_alt.glb`) are the one exception, committed under `Tooling/Spike55/Live3D/`
+because they're both well under the spike's size budget.

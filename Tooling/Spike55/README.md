@@ -144,3 +144,110 @@ inside a nested temp directory).
 - No fix round was needed for the low-poly render -- the first pass at idle/move frames was
   already clean (no holes, shards, floating debris, texture seams, or broken silhouette), a first
   among this spike's three 3D passes.
+
+## Fourth pass: real-time 3D in MonoGame (`Tooling/Spike55/Live3D`)
+
+Per the producer's 2026-09-30 decision, the fourth pass tests **real-time** 3D rendering in MonoGame
+(not pre-rendered frames) -- a standalone spike app, not added to `BeastCraft.slnx` and not touching
+`src/`, so CI is unaffected. Full write-up (method, measured numbers, screenshots, cost estimate,
+risks, revised recommendation): `docs/spikes/055-3d-mini-spike.md`'s "Fourth pass" section. This
+section is the tooling reference -- how to rebuild the asset and how to run the app.
+
+### Asset: `blender_export_live.py`
+
+Blender headless, reuses `blender_lowpoly_render.py`'s import/weld/texture-downsize/armature/
+auto-weight pipeline verbatim (same weld threshold, bone hierarchy, heat-weights -> voxel-remesh-donor
+-> envelope-weights fallback chain, same three weight-repair passes -- see that script's docstring),
+but instead of rendering PNG frames it authors real keyframed `Idle` (2s loop) and `Move` (1s loop)
+Actions on the armature and exports a single skinned, animated GLB, plus one small separate procedural
+cosmetic attachment mesh (no Meshy call -- none authorised for this pass):
+
+```
+blender -b --python Tooling/Spike55/blender_export_live.py -- \
+    --glb <griffin_remesh.glb> --out <output dir> [--texture-size 1024] [--fps 24]
+```
+
+Writes `griffin_live.glb` (skinned mesh + armature + both animation clips, base-colour texture only --
+no normal/metallic-roughness, JPEG-encoded to stay well under the 2 MB budget) and `crest_alt.glb` (a
+procedural low-poly plume, ~224 tris, no skin, parented at runtime to the head bone's world matrix).
+Both are small enough to commit directly (`Tooling/Spike55/Live3D/Content/model/`) rather than needing
+a path argument: `griffin_live.glb` is 0.88 MiB, `crest_alt.glb` is 13 KiB.
+
+One Blender API gotcha hit while writing this script: Blender 5.x's layered-Action data model (the
+4.4+ "Animation 2.0" redesign) removed the top-level `Action.fcurves` -- fcurves now live under
+`action.layers[].strips[].channelbag(slot).fcurves`; see `set_linear_interpolation()`'s docstring for
+the walk. A second, more consequential one: the glTF exporter's base-colour-texture extraction only
+recognises a **Principled** BSDF's Base Color input -- a first export using a plain Diffuse BSDF
+produced a GLB with a material but zero images/textures, silently untextured (caught by inspecting the
+exported JSON chunk, not by eye). A third: `Image.scale()` only touches the in-memory pixel buffer: the
+glTF exporter reads from the image's packed/on-disk source, so a first downsize-and-export shipped the
+original 2048x2048 texture despite the resize; fixed by saving the scaled image to a real file and
+reloading it as a fresh image datablock before export.
+
+### Runtime: `Tooling/Spike55/Live3D`
+
+A standalone MonoGame DesktopGL project, `net10.0`, mirroring `src/BeastCraft.Desktop`'s target
+framework and `MonoGame.Framework.DesktopGL` package version (`3.8.5.1`) for an apples-to-apples
+comparison. Loads the GLBs at runtime with **SharpGLTF.Core 1.0.7** (MIT licence,
+https://github.com/vpenades/SharpGLTF -- see `THIRD-PARTY-NOTICES.md`-style attribution below; only
+`SharpGLTF.Core` is referenced, not `SharpGLTF.Runtime`, because this project hand-rolls CPU skinning
+and animation sampling directly against the glTF schema via `Node.GetWorldMatrix(animation, time)`
+rather than using Runtime's scene-graph helper). CPU linear-blend skinning (`Skinner.cs`) feeds a
+custom toon + inverted-hull-outline effect (`Content/Effects/Toon.fx`, compiled by the MonoGame content
+pipeline via `MonoGame.Content.Builder.Task` -- the only MGCB-built content; the GLBs and backdrop PNG
+are read as plain files at runtime, same convention as `BeastCraft.Desktop`).
+
+Build/run (first time, restore the local `dotnet-mgcb` tool the content pipeline needs):
+
+```
+dotnet tool restore --manifest Tooling/Spike55/Live3D/dotnet-tools.json   # or just: cd Tooling/Spike55/Live3D && dotnet tool restore
+dotnet build Tooling/Spike55/Live3D -c Release
+dotnet Tooling/Spike55/Live3D/bin/Release/net10.0/Live3D.dll             # interactive window
+```
+
+Controls (interactive mode only): `Tab` cycles the stress test 1 -> 3 -> 12 -> 24 beasts (each with
+its own randomised animation-clock offset -- desynced on purpose, to prove instances don't need to
+share a phase); `C` toggles the crest attachment on/off; `T` cycles 3 colour-form tints (a shader
+multiply on the sampled texture); `M` toggles the Idle/Move clip; `Esc` quits. On-screen stats: average
+fps, 1%-low fps (over a rolling 3-second window), draw calls, triangles, CPU skinning time, managed +
+estimated GPU memory.
+
+Headless modes for reproducible numbers/images:
+
+```
+dotnet Tooling/Spike55/Live3D/bin/Release/net10.0/Live3D.dll --bench 24 --seconds 10 --out result.json
+dotnet Tooling/Spike55/Live3D/bin/Release/net10.0/Live3D.dll --screenshot shot.png --beasts 12 --crest on --tint 1
+```
+
+`--bench N --seconds S --out path.json` disables vsync (uncapped throughput, not monitor-capped),
+spawns N beasts, runs for S seconds of real wall-clock time, and writes `{beasts, seconds, frameCount,
+fpsAvg, fps1PercentLow, frameMsAvg, drawCalls, triangles, skinningMsAvg, managedMemoryBytes,
+gpuMemoryEstimateBytes}`. `--screenshot path.png [--beasts N] [--crest on|off] [--tint 0|1|2]` opens
+the window, waits 30 frames for the scene to settle, writes one PNG, then exits.
+
+### Two real bugs this uncovered (worth knowing before touching the shader)
+
+- **MGFX does not honour a `.fx` file's HLSL default-value initialisers.** `Toon.fx` declares e.g.
+  `float3 LightDirection = normalize(float3(0.45, 0.65, 0.60));`, but MonoGame's effect compiler
+  strips that default and the parameter comes back zero at runtime unless explicitly set from C#. A
+  first render (only `ViewProjection`/`BaseTexture`/`TintMultiply` set from `Game1`) came out
+  **solid black**: `LightDirection` was `(0,0,0)`, `normalize` of a zero vector is undefined/NaN, every
+  band comparison fell through to `HighlightBoost` -- itself also unset/zero -- multiplying the
+  (correctly bound, correctly textured) beast by black. Fixed by explicitly setting every constant
+  parameter once in `LoadContent` (see `Game1.cs`'s comment at that call site).
+- **glTF's winding convention is the opposite of MonoGame/XNA's default `RasterizerState`.**
+  `griffin_live.glb`'s index data was loaded as-is (no re-winding); MonoGame's default
+  `CullCounterClockwise` treats *clockwise* as front-facing, which is backwards for a right-handed,
+  CCW-front glTF mesh. Fixed by using `RasterizerState.CullClockwise` for the main toon pass and
+  `CullCounterClockwise` for the inverted-hull outline pass (the two are swapped from what an
+  XNA-only codebase would default to).
+
+### Licences
+
+- **SharpGLTF** (`SharpGLTF.Core`, v1.0.7) -- MIT licence. https://github.com/vpenades/SharpGLTF
+- **MonoGame.Framework.DesktopGL** / **MonoGame.Content.Builder.Task** (v3.8.5.1) -- same licence
+  already covered for the rest of the game (see the repo's `THIRD-PARTY-NOTICES.md`).
+- The Verdant Hollow backdrop (`content/art/backdrops/r01/sun0/medium.png`) and the griffin's approved
+  illustration/palette are existing, already-approved game assets -- no new licence implications.
+- `crest_alt.glb`'s geometry is procedurally generated in `blender_export_live.py` (a simple fanned
+  quad-strip "plume"), not AI-generated and not derived from Meshy output.
