@@ -38,6 +38,13 @@ namespace BeastCraft.Spike55.Live3D
         // alongside the uncapped throughput number, not instead of it.
         public int FpsCap = 0;
 
+        // Producer-feedback fix round: "a --kill N option for screenshots" -- marks N random Swarmlings
+        // dead right after the battle scene (and its initial facing) is built, so a screenshot can show
+        // the survivors' facing after some of their nearest enemies are gone (see Game1.KillRandomSwarmling
+        // and the interactive K key, the same mechanism). Clamped to the actual swarm count by
+        // KillRandomSwarmling itself (no-ops once every Swarmling is dead).
+        public int Kill = 0;
+
         public static LaunchOptions Parse(string[] args)
         {
             var o = new LaunchOptions();
@@ -85,6 +92,9 @@ namespace BeastCraft.Spike55.Live3D
                         break;
                     case "--zoom":
                         o.CameraZoom = args[++i];
+                        break;
+                    case "--kill":
+                        o.Kill = int.Parse(args[++i], CultureInfo.InvariantCulture);
                         break;
                     default:
                         Console.Error.WriteLine("Unrecognised argument: " + args[i]);

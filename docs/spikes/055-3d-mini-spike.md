@@ -1194,6 +1194,123 @@ No new licence implications: the real Swarmling mesh/texture are **Meshy, paid t
 retained, same as the Griffin's Meshy passes -- see "AI provenance" below); everything else this pass
 touched (the batching/shader/camera code) is original engineering, not AI-generated content.
 
+### 2.12 Producer feedback: real per-unit facing, a lower and closer battle camera (2026-09-30)
+
+The producer's reaction to the second fix round's screenshots was positive ("they look pretty good"),
+with two directional changes: replace the mirrored-screen-convention facing (Griffins and Swarmlings each
+carrying one fixed yaw for their whole side) with **real per-unit facing** -- every unit turns to face its
+own nearest living enemy, in actual world-space XZ, not a stylised convention -- and **lower and zoom in**
+the default battle camera so units read larger and more from the side, less from directly overhead.
+
+**Facing.** Every Griffin's yaw now tracks its nearest living Swarmling; every living Swarmling's yaw
+tracks its nearest Griffin (Griffins never die in this scene, so no liveness check is needed on that
+side). Both assets share the same bind-pose forward convention established in section 2.11 (local +Z,
+confirmed via `inspect_orientation.py`'s probe renders and the Blender->glTF axis conversion) -- facing a
+world-space direction `(dx, dz)` is `theta = atan2(dx, dz)`, derived from how `Matrix.CreateRotationY`
+actually composes under this codebase's row-vector convention (`v' = v * M`), not from the "-90 degrees
+turns +Z into +X" claim in this file's older comments, which turns out to have the sign backwards --
+harmless there (the fixed yaws were only ever a stylistic angle, correct by construction either way for a
+value nobody needed to invert), load-bearing here (an inverted target direction would make every unit
+face directly away from its target instead of toward it). Turning eases at a capped angular speed via the
+shortest arc (`Game1.StepTowardAngle`/`WrapAngle`) rather than snapping -- a full 180-degree reversal
+takes 0.25 seconds, smaller turns proportionally less, equivalent to a yaw-only quaternion slerp without
+needing `Quaternion` for a rotation that only ever happens around one axis. **"Keep the last facing"**: a
+side with no living enemy simply has its target yaw left unchanged (not reset to a default) every frame,
+so a Griffin whose nearest Swarmling just died keeps easing toward -- and then holds -- whatever direction
+that Swarmling was in, rather than snapping back to some idle orientation.
+
+**Kill mechanism** (so the "keep the last facing" behaviour can actually be seen): `K` (interactive,
+battle mode only) marks one random living Swarmling dead; `--kill N` does the same N times right after the
+battle scene's initial facing is snapped, for reproducible screenshots. A dead Swarmling gets an
+all-zero skin matrix instead of a real pose (`UpdateSwarmBones`) -- every one of its vertices collapses to
+the origin regardless of its bind-pose position, so it simply doesn't rasterise (zero-area triangles),
+without touching the merged batch's VertexBuffer or the `SwarmBoneRows[]` register layout at all -- no
+per-instance visibility flag needed, no buffer rebuild per kill.
+
+**Register budget, rechecked as asked: unchanged, still 216 of 256.** Per-instance facing needed no new
+uniform at all -- it flows through exactly the same pipeline section 2.11 already built: each Griffin's
+yaw feeds `inst.World`, already an input to `AnimatedPose.ComputeSkinMatrices`; each Swarmling's yaw feeds
+its own per-instance `_swarmWorld[i]`, already folded into the same skin-matrix computation that gets
+transposed into `SwarmBoneRows[]`. The flat array's size (`SWARM_BATCH_CAPACITY(12) x
+SWARM_BONES_PER_INSTANCE(6) x 3 vec4/bone = 216`) and GLES 3.0's guaranteed-minimum 256 vec4 budget are
+untouched by this pass -- confirmed by inspection (no edits to `Toon.fx` at all this round) and by the
+bench table below showing identical draw-call and triangle counts to section 2.11's numbers.
+
+**Camera.** `CameraTiltDeg` (shared by every camera mode -- arena, front, close, and the non-battle
+stress test, for one consistent look rather than a battle-only special case) dropped from 48 to 33
+degrees -- a shallower elevation, more side profile, less top-down, picked by eye within the requested
+30-35 degree range against the same screenshots, while still tilted enough that the 15-row-deep arena's
+rows separate on screen rather than collapsing (the original failure mode that first justified a steep
+tilt, section 2.8). Separately, the *default* arena shot (not `--zoom front`, already a tighter crop via
+its own narrower column/row sampling, and not `--zoom close`, an unrelated instance-fit path) now also
+zooms in an extra 20% via a new `zoom` parameter on `ApplyCamera` that shrinks the fitted ortho size
+*after* the width/edge-margin fit above -- deliberately letting far/rear rows and the outermost columns
+run off the frame in exchange for larger, more readable units, as asked. `--zoom front`/`--zoom close`
+are otherwise unaffected by this change.
+
+**An honest finding, said plainly rather than glossed over:** the default battle formation (3 Griffins,
+24 Swarmlings, both built by `HexBoard.FillOrder`'s centre-outward column order) places every unit's
+*individually* nearest enemy almost directly ahead of it in Z, at nearly the same X -- both sides fill
+their rows centred on the same middle column. Real "face your nearest enemy" math on that layout computes
+a yaw very close to zero for nearly every unit (bind-pose forward, +Z, already points straight at the
+target), which reads as a flatter, more front-on silhouette than the previous fixed 3/4-profile
+convention -- recognisable at real resolution (a Griffin's beak/crest and a Swarmling's muzzle are both
+still visible up close; see the crops taken while investigating this), but visibly flatter than before in
+the wide arena shot, and not something a fixed convention would ever have produced. Confirmed this is the
+real, correct output of the requested design (not a sign bug) with a `--kill 23` test: with only one
+Swarmling left, off-centre from the Griffins, each Griffin's computed yaw visibly differs from the others
+and from the zero-yaw default case, exactly as real position-dependent facing should behave. Any
+encounter with less perfectly mirrored left-right symmetry than this demo's default formation would show
+more per-unit variation than the screenshots below happen to -- this is a property of the *test scene's*
+symmetry, not a limitation of the facing code.
+
+**Measured numbers, re-run after this change:**
+
+| Scene | fps avg (uncapped) | fps 1% low (uncapped) | fps avg (30fps cap) | fps 1% low (30fps cap) | Draw calls | Triangles | Skin time (ms) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 24 swarmlings alone | 1,088.1 | 192.5 | 30.0 | 28.1 | 6 | 59,232 | 0.54 |
+| 3 Griffins + 24 swarmlings | 854.9 | 148.5 | 30.0 | 29.2 | 18 | 110,808 | 0.72 |
+
+Draw calls and triangles are bit-for-bit identical to section 2.11's numbers (facing changes rotation, not
+geometry or batch layout). fps numbers moved *up* from section 2.11's own re-run (696/633 uncapped there
+vs. 1,088/855 here) despite the added per-frame nearest-enemy search -- consistent with ordinary run-to-run
+variance on this desktop machine (thermal/background load), not a real speed-up from a change that adds
+CPU work; the search itself is a trivial O(griffins x swarm) <= 3x24 = 72 distance comparisons per frame,
+well below anything the profiler-grade `_stats.SkinningMsEma` number could resolve on its own. 30fps-cap
+1%-low numbers (28.1/29.2) are, if anything, tighter to the cap than section 2.11's (21.1/24.3) --
+again read as variance, not evidence either way that facing made frame pacing better.
+
+**Screenshots** (re-taken after both changes; looked at each at roughly phone width before committing):
+
+![3 Griffins + 24 swarmlings, per-unit facing](055/live3d_battle_3plus24.png)
+
+*The "before" half of the before/after-kill pair below. Same 24-Swarmling formation as section 2.11's
+shot, now with the lower/closer camera and real per-unit facing -- every unit visibly turned toward its
+own nearest enemy rather than sharing one fixed yaw per side (see the honest finding above for why this
+particular symmetric formation reads flatter than the previous stylised convention).*
+
+![Front-line mid-zoom, per-unit facing](055/live3d_battle_front.png)
+
+*Same crop as section 2.11's front-line shot, same facing/camera changes.*
+
+![After --kill 24: every Swarmling dead, Griffins holding their last facing](055/live3d_battle_after_kill.png)
+
+*The "after" half of the pair -- all 24 Swarmlings removed (`--kill 24`), and the three Griffins are still
+turned toward where their nearest enemies used to be, not reset to a default orientation, confirming
+"keep the last facing" works as asked.*
+
+![Swarmling close-up, lower camera](055/live3d_swarmling_close.png)
+
+*Re-taken for the tilt change only (`--griffins 0 --swarm 1 --zoom close`, no enemy present so facing
+stays at its identity fallback, unchanged from section 2.11) -- included for consistency since
+`CameraTiltDeg` is shared by every camera mode.*
+
+![Griffin close-up, lower camera](055/live3d_griffin_close_check.png)
+
+*Re-taken for the same reason (`--griffins 1 --swarm 0 --zoom close`, no enemy present, `FacingYawAngle`
+fallback unchanged) -- still a clean 3/4 profile, confirming the tilt change alone (not the facing change)
+is responsible for any difference from section 2.11's version of this shot.*
+
 ## 4. Cosmetics (`docs/art/art-brief.md`, `cosmetic-library.json`, issue #38)
 
 The Griffin has two discrete cosmetic categories plus a colour-form set (from

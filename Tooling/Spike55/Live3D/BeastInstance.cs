@@ -16,6 +16,14 @@ namespace BeastCraft.Spike55.Live3D
         public float ClockOffset; // seconds, randomised per instance so 24 beasts don't move in lockstep
         public bool CrestOn = true;
 
+        // Producer-feedback fix round: dynamic facing (--battle only -- see Game1.UpdateFacing). Position
+        // is fixed at spawn (this spike has no movement); CurrentYaw is what World is actually built from
+        // each frame, eased toward TargetYaw at a capped angular speed (shortest arc) rather than snapping,
+        // so a Griffin's yaw visibly turns rather than popping when its nearest living Swarmling changes.
+        public Vector3 Position;
+        public float CurrentYaw;
+        public float TargetYaw;
+
         // Reused every frame by AnimatedPose so per-instance pose evaluation doesn't allocate (see
         // AnimatedPose.ComputeWorldMatrices/ComputeSkinMatrices's doc comments for why that mattered).
         public Matrix4x4[] NodeWorldScratch;

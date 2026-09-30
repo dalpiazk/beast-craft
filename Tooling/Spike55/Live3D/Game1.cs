@@ -75,7 +75,11 @@ namespace BeastCraft.Spike55.Live3D
         private EffectParameter _paramSwarmBoneRows;
         private int _swarmInstanceCount;
         private int _swarmBonesPerInstance; // loaded from swarmling_live.glb's skin joint count; must equal Toon.fx's SWARM_BONES_PER_INSTANCE (6)
-        private NumMatrix[] _swarmWorld = Array.Empty<NumMatrix>(); // per-instance world placement (hex cell + SwarmFacingYaw), like BeastInstance.World
+        private NumMatrix[] _swarmWorld = Array.Empty<NumMatrix>(); // per-instance world placement, rebuilt every frame from _swarmPosition + _swarmCurrentYaw (see UpdateFacing)
+        private NumVector3[] _swarmPosition = Array.Empty<NumVector3>(); // fixed hex-cell position, set once at spawn (this spike has no movement)
+        private float[] _swarmCurrentYaw = Array.Empty<float>(); // producer-feedback fix round: dynamic facing, same easing scheme as BeastInstance's
+        private float[] _swarmTargetYaw = Array.Empty<float>();
+        private bool[] _swarmAlive = Array.Empty<bool>(); // producer-feedback fix round: K / --kill N marks a swarmling dead (see KillRandomSwarmling)
         private float[] _swarmClockOffsets = Array.Empty<float>(); // per-instance desync, like BeastInstance.ClockOffset
         private Matrix4x4[][] _swarmNodeWorldScratch = Array.Empty<Matrix4x4[]>(); // per-instance, reused every frame (see AnimatedPose's doc comment)
         private Matrix4x4[][] _swarmSkinScratch = Array.Empty<Matrix4x4[]>();
@@ -93,6 +97,7 @@ namespace BeastCraft.Spike55.Live3D
         // confirmed by screenshot, fixed by this extra RotationY term.
         private static readonly NumMatrix CrestLocal = NumMatrix.CreateRotationY(MathF.PI / 2f) * NumMatrix.CreateScale(0.55f) * NumMatrix.CreateRotationX(-1.65f) * NumMatrix.CreateTranslation(0f, 0.05f, 0.05f);
         private static readonly NumMatrix FacingYaw = NumMatrix.CreateRotationY(-MathF.PI / 2f);
+        private const float FacingYawAngle = -MathF.PI / 2f; // same angle as FacingYaw, as a float for the dynamic-facing fallback below
         // Battle-scene fix round (task 3, camera/facing): the Swarmling's bind pose shares the same
         // front convention as the Griffin's (both exported by the same blender_export_live*.py family --
         // confirmed by inspect_orientation.py's probe render, which shows the Swarmling's face/horns
@@ -105,6 +110,57 @@ namespace BeastCraft.Spike55.Live3D
         // symmetric shape made an unrotated bind pose hard to fault by eye, but the real rigged mesh's
         // directional head/legs make facing actually visible, so this is a real fix, not cosmetic-only).
         private static readonly NumMatrix SwarmFacingYaw = NumMatrix.CreateRotationY(MathF.PI / 2f);
+        private const float SwarmFacingYawAngle = MathF.PI / 2f; // same angle as SwarmFacingYaw, as a float for the dynamic-facing fallback below
+
+        // Producer-feedback fix round: "each unit faces its nearest enemy" replaces both fixed yaws above
+        // for the battle scene (SetStressLevel's single-species stress test is unaffected -- FacingYaw
+        // stays a fixed constant there, no enemies exist to face). FacingYaw/SwarmFacingYaw's angles are
+        // kept as the FALLBACK/initial yaw for a side with no living enemy (a Griffin with --swarm 0, or
+        // the swarmling close-up's --griffins 0 -- "keep the last facing" needs *some* facing before any
+        // enemy has ever existed) -- everything else below computes a real target-facing every frame once
+        // an opposing unit exists, and eases toward it rather than snapping.
+        //
+        // Both assets share the same bind-pose forward convention (local +Z after the Blender->glTF axis
+        // conversion -- see the fix-round doc's derivation from inspect_orientation.py's probe renders).
+        // For this codebase's row-vector convention, Matrix.CreateRotationY(theta) maps a local-forward
+        // vector (0,0,1) to world (sin(theta), 0, cos(theta)) (worked out from CreateRotationY's actual
+        // matrix and v' = v * M -- NOT the "-90 turns +Z into +X" claim in this file's older comments,
+        // which was never rechecked against the real formula and turns out to be backwards; harmless
+        // there because FacingYaw/SwarmFacingYaw were only ever used as fixed decorative angles, but
+        // load-bearing here since a wrong sign would make every unit face directly away from its target).
+        // So facing world direction (dx, dz) needs theta = atan2(dx, dz) -- see YawTowards below.
+        private const float TurnDurationSeconds = 0.25f; // a full 180-degree reversal takes this long; smaller turns are proportionally faster (a shortest-arc ease, not a fixed-time slerp)
+
+        private static float WrapAngle(float radians)
+        {
+            radians %= MathF.PI * 2f;
+            if (radians < -MathF.PI)
+                radians += MathF.PI * 2f;
+            else if (radians > MathF.PI)
+                radians -= MathF.PI * 2f;
+            return radians;
+        }
+
+        /// <summary>Eases `current` toward `target` by at most `maxDelta` radians this frame, always via
+        /// the shortest arc (wrapping the difference to (-pi, pi] first) -- equivalent to a yaw-only
+        /// quaternion slerp at a capped angular speed, without needing System.Numerics.Quaternion for a
+        /// rotation that only ever happens around one axis.</summary>
+        private static float StepTowardAngle(float current, float target, float maxDelta)
+        {
+            float delta = WrapAngle(target - current);
+            if (MathF.Abs(delta) <= maxDelta)
+                return WrapAngle(target);
+            return WrapAngle(current + MathF.Sign(delta) * maxDelta);
+        }
+
+        /// <summary>The yaw (radians) that turns this asset's bind-pose forward (+Z) to point from `from`
+        /// toward `to`, XZ-plane only (ground-plane facing, no pitch). See this section's header comment
+        /// for the CreateRotationY(theta) -> world (sin theta, cos theta) derivation this inverts.</summary>
+        private static float YawTowards(NumVector3 from, NumVector3 to)
+        {
+            float dx = to.X - from.X, dz = to.Z - from.Z;
+            return MathF.Atan2(dx, dz);
+        }
 
         // Lead-review fix round: the Swarmling's own exported bind pose (TARGET_HEIGHT=0.55 in
         // blender_export_live_swarmling.py) reads far smaller than its hex even after HexBoard's own
@@ -299,6 +355,16 @@ namespace BeastCraft.Spike55.Live3D
                 _hexGridVertexCount = battleGridVerts.Length;
 
                 SetupBattleScene(_options.BattleGriffins, _options.BattleSwarm);
+
+                // Producer feedback: "a --kill N option for screenshots" -- applied once, right after the
+                // initial formation is built and its facing snapped, so a --kill screenshot shows the
+                // Griffins already holding whatever facing they settled on once those Swarmlings were
+                // removed (RecomputeFacingTargets below re-targets survivors' nearest enemies too, same as
+                // the interactive K key does frame-by-frame).
+                for (int i = 0; i < _options.Kill; i++)
+                    KillRandomSwarmling();
+                if (_options.Kill > 0)
+                    SnapInitialFacing();
             }
             else
             {
@@ -360,6 +426,8 @@ namespace BeastCraft.Spike55.Live3D
         /// placement/phase.</summary>
         private void SetupBattleScene(int griffinCount, int swarmCount)
         {
+            bool closeUp = string.Equals(_options.CameraZoom, "close", StringComparison.OrdinalIgnoreCase);
+
             _instances.Clear();
             var griffinCells = HexBoard.FillOrder(11, 15, griffinCount, startRow: 2);
             for (int i = 0; i < griffinCount; i++)
@@ -367,7 +435,12 @@ namespace BeastCraft.Spike55.Live3D
                 var inst = new BeastInstance(_bodyModel);
                 var (col, row) = griffinCells[i % Math.Max(1, griffinCells.Count)];
                 var center = HexBoard.CellCenter(col, row);
-                inst.World = FacingYaw * NumMatrix.CreateTranslation(center.X, 0f, center.Z);
+                inst.Position = new NumVector3(center.X, 0f, center.Z);
+                // Fallback yaw for a side with no living enemy yet (see this file's facing-header comment
+                // above FacingYaw/SwarmFacingYaw) -- SnapInitialFacing below overrides it immediately if a
+                // Swarmling exists.
+                inst.CurrentYaw = inst.TargetYaw = FacingYawAngle;
+                inst.World = NumMatrix.CreateRotationY(inst.CurrentYaw) * NumMatrix.CreateTranslation(center.X, 0f, center.Z);
                 inst.ClockOffset = (float)(_rng.NextDouble() * 4.0);
                 _instances.Add(inst);
             }
@@ -402,38 +475,179 @@ namespace BeastCraft.Spike55.Live3D
             }
 
             _swarmWorld = swarmCount > 0 ? new NumMatrix[swarmCount] : Array.Empty<NumMatrix>();
+            _swarmPosition = swarmCount > 0 ? new NumVector3[swarmCount] : Array.Empty<NumVector3>();
+            _swarmCurrentYaw = swarmCount > 0 ? new float[swarmCount] : Array.Empty<float>();
+            _swarmTargetYaw = swarmCount > 0 ? new float[swarmCount] : Array.Empty<float>();
+            _swarmAlive = swarmCount > 0 ? new bool[swarmCount] : Array.Empty<bool>();
             _swarmClockOffsets = swarmCount > 0 ? new float[swarmCount] : Array.Empty<float>();
             _swarmNodeWorldScratch = swarmCount > 0 ? new Matrix4x4[swarmCount][] : Array.Empty<Matrix4x4[]>();
             _swarmSkinScratch = swarmCount > 0 ? new Matrix4x4[swarmCount][] : Array.Empty<Matrix4x4[]>();
             if (swarmCount > 0)
             {
                 // Lead-review fix round: `--zoom close` is the dedicated single-unit beauty-shot mode
-                // (the swarmling close-up) -- using the battle formation's SwarmFacingYaw there pointed
+                // (the swarmling close-up) -- using the battle-formation SwarmFacingYawAngle there pointed
                 // the one swarmling's face away from the same camera angle that shows a Griffin's front
-                // (confirmed by screenshot: the close-up read as "from behind/above"). SwarmFacingYaw is
-                // specifically a *battle-formation* choice (face the opposite way from the Griffins, who
-                // sit in the rows ahead) and has no reason to apply to an isolated close-up with no
-                // Griffins in the shot at all -- use the Griffins' own FacingYaw there instead, same
-                // camera-facing convention as the Griffin close-up.
-                bool closeUp = string.Equals(_options.CameraZoom, "close", StringComparison.OrdinalIgnoreCase);
-                var swarmFacing = closeUp ? NumMatrix.Identity : SwarmFacingYaw;
+                // (confirmed by screenshot: the close-up read as "from behind/above"). It has no reason to
+                // apply to an isolated close-up with no Griffins in the shot at all (no enemy ever exists
+                // there to override this fallback) -- identity (0 yaw) instead, same camera-facing
+                // convention that already reads correctly for the Griffin close-up.
+                float fallbackYaw = closeUp ? 0f : SwarmFacingYawAngle;
                 var swarmCells = HexBoard.FillOrder(11, 15, swarmCount, startRow: 6);
                 for (int i = 0; i < swarmCount; i++)
                 {
                     var (col, row) = swarmCells[i % Math.Max(1, swarmCells.Count)];
                     var center = HexBoard.CellCenter(col, row);
-                    // SwarmScale first (local-space, before any rotation/translation), then swarmFacing
-                    // (turn the bind-pose swarmling to face back across the gap toward the Griffins in
-                    // battle, or toward the camera for a close-up -- see its comment above), then place
-                    // on its cell.
-                    _swarmWorld[i] = NumMatrix.CreateScale(SwarmScale) * swarmFacing * NumMatrix.CreateTranslation(center.X, 0f, center.Z);
+                    _swarmPosition[i] = new NumVector3(center.X, 0f, center.Z);
+                    _swarmCurrentYaw[i] = _swarmTargetYaw[i] = fallbackYaw;
+                    // SwarmScale first (local-space, before any rotation/translation), then the fallback
+                    // yaw (SnapInitialFacing below overrides it immediately if a Griffin exists), then
+                    // place on its cell.
+                    _swarmWorld[i] = NumMatrix.CreateScale(SwarmScale) * NumMatrix.CreateRotationY(fallbackYaw) * NumMatrix.CreateTranslation(center.X, 0f, center.Z);
+                    _swarmAlive[i] = true;
                     _swarmClockOffsets[i] = (float)(_rng.NextDouble() * 4.0);
                     _swarmNodeWorldScratch[i] = new Matrix4x4[_swarmModel.Nodes.Length];
                     _swarmSkinScratch[i] = new Matrix4x4[_swarmModel.Joints.Length];
                 }
             }
 
+            // Producer-feedback fix round ("keep the last facing"): every unit's fallback yaw above is
+            // overridden immediately, once, so nothing visibly snaps on the very first frame if an
+            // opposing unit already exists (UpdateFacing's own per-frame easing is what animates any
+            // *later* change, e.g. a kill removing the current nearest target).
+            SnapInitialFacing();
+
             RebuildCamera();
+        }
+
+        /// <summary>Recomputes every unit's TargetYaw from the current nearest-living-enemy search (see
+        /// UpdateFacing's own doc comment for the search itself), then immediately sets CurrentYaw to
+        /// match -- used once, right after SetupBattleScene builds the initial formation, so the very
+        /// first frame already shows units facing their nearest enemy instead of animating from the
+        /// fallback FacingYawAngle/SwarmFacingYawAngle every time the scene is (re)built.</summary>
+        private void SnapInitialFacing()
+        {
+            RecomputeFacingTargets();
+            foreach (var inst in _instances)
+                inst.CurrentYaw = inst.TargetYaw;
+            for (int i = 0; i < _swarmInstanceCount; i++)
+                _swarmCurrentYaw[i] = _swarmTargetYaw[i];
+            ApplyFacingToWorldMatrices();
+        }
+
+        /// <summary>Producer-feedback fix round: "each unit faces its nearest enemy" -- updates every
+        /// Griffin's TargetYaw to face its nearest living Swarmling, and every living Swarmling's
+        /// TargetYaw to face its nearest Griffin (Griffins never die in this scene, so "nearest Griffin"
+        /// never needs a liveness check). A side with no living enemy is left alone -- its TargetYaw stays
+        /// whatever it last was, which is exactly "keep the last facing": UpdateFacing's caller still eases
+        /// CurrentYaw toward that unchanged target every frame, so a facing already in flight when the
+        /// last enemy dies finishes its turn and then genuinely stops, rather than snapping back to a
+        /// default. Cheap at this scale (<=3 Griffins x <=24 Swarmlings, no spatial index needed) and run
+        /// unconditionally every frame rather than only "when units move or an enemy is removed" -- this
+        /// spike has no movement, so the only thing that can actually change target is a kill, and
+        /// checking every frame is simpler and just as correct as trying to detect that event.</summary>
+        private void RecomputeFacingTargets()
+        {
+            foreach (var inst in _instances)
+            {
+                NumVector3 pos = inst.Position;
+                bool found = false;
+                float bestDistSq = float.MaxValue;
+                NumVector3 best = default;
+                for (int i = 0; i < _swarmInstanceCount; i++)
+                {
+                    if (!_swarmAlive[i])
+                        continue;
+                    float dx = _swarmPosition[i].X - pos.X, dz = _swarmPosition[i].Z - pos.Z;
+                    float d2 = dx * dx + dz * dz;
+                    if (d2 < bestDistSq)
+                    {
+                        bestDistSq = d2;
+                        best = _swarmPosition[i];
+                        found = true;
+                    }
+                }
+                if (found)
+                    inst.TargetYaw = YawTowards(pos, best);
+            }
+
+            for (int i = 0; i < _swarmInstanceCount; i++)
+            {
+                if (!_swarmAlive[i])
+                    continue;
+                NumVector3 pos = _swarmPosition[i];
+                bool found = false;
+                float bestDistSq = float.MaxValue;
+                NumVector3 best = default;
+                foreach (var inst in _instances)
+                {
+                    float dx = inst.Position.X - pos.X, dz = inst.Position.Z - pos.Z;
+                    float d2 = dx * dx + dz * dz;
+                    if (d2 < bestDistSq)
+                    {
+                        bestDistSq = d2;
+                        best = inst.Position;
+                        found = true;
+                    }
+                }
+                if (found)
+                    _swarmTargetYaw[i] = YawTowards(pos, best);
+            }
+        }
+
+        /// <summary>Eases every unit's CurrentYaw toward its TargetYaw (see RecomputeFacingTargets) at a
+        /// capped angular speed, shortest arc, then rebuilds World from the result -- called every battle
+        /// frame from Update, before the pose/skin work that reads World.</summary>
+        private void UpdateFacing(float dtSeconds)
+        {
+            RecomputeFacingTargets();
+            float maxDelta = (MathF.PI / TurnDurationSeconds) * dtSeconds;
+
+            foreach (var inst in _instances)
+                inst.CurrentYaw = StepTowardAngle(inst.CurrentYaw, inst.TargetYaw, maxDelta);
+            for (int i = 0; i < _swarmInstanceCount; i++)
+                _swarmCurrentYaw[i] = StepTowardAngle(_swarmCurrentYaw[i], _swarmTargetYaw[i], maxDelta);
+
+            ApplyFacingToWorldMatrices();
+        }
+
+        /// <summary>Rebuilds every unit's World matrix from its fixed Position and current (eased) yaw --
+        /// shared by SnapInitialFacing (no easing, first frame) and UpdateFacing (eased, every later
+        /// frame) so both end up with a World matrix in the exact same shape.</summary>
+        private void ApplyFacingToWorldMatrices()
+        {
+            foreach (var inst in _instances)
+                inst.World = NumMatrix.CreateRotationY(inst.CurrentYaw) * NumMatrix.CreateTranslation(inst.Position.X, 0f, inst.Position.Z);
+            for (int i = 0; i < _swarmInstanceCount; i++)
+                _swarmWorld[i] = NumMatrix.CreateScale(SwarmScale) * NumMatrix.CreateRotationY(_swarmCurrentYaw[i]) * NumMatrix.CreateTranslation(_swarmPosition[i].X, 0f, _swarmPosition[i].Z);
+        }
+
+        /// <summary>Producer feedback: "add a key ... that removes a random swarmling so this can be seen
+        /// interactively" (K, see Update) "and a --kill N option for screenshots" (see LoadContent). Marks
+        /// one living Swarmling dead -- UpdateSwarmBones writes an all-zero (degenerate) skin for a dead
+        /// instance instead of a real pose (see its own comment), collapsing every one of its vertices to
+        /// the origin so it simply doesn't rasterise, without touching the merged batch's VertexBuffer or
+        /// the SwarmBoneRows[] register layout at all. No-op if every Swarmling is already dead.</summary>
+        private void KillRandomSwarmling()
+        {
+            int aliveCount = 0;
+            for (int i = 0; i < _swarmInstanceCount; i++)
+                if (_swarmAlive[i])
+                    aliveCount++;
+            if (aliveCount == 0)
+                return;
+            int target = _rng.Next(aliveCount);
+            int seen = 0;
+            for (int i = 0; i < _swarmInstanceCount; i++)
+            {
+                if (!_swarmAlive[i])
+                    continue;
+                if (seen == target)
+                {
+                    _swarmAlive[i] = false;
+                    return;
+                }
+                seen++;
+            }
         }
 
         // Lead-review fix (fourth pass): the first camera sat on the Z axis looking straight at the
@@ -448,9 +662,16 @@ namespace BeastCraft.Spike55.Live3D
         // many world units apart they are -- confirmed: the first tilt value (24 degrees, chosen for a
         // single beast's close-up 3/4 read) made a 3-row, 24-beast formation collapse into one
         // overlapping clump on screen even though the fit math below correctly measured the beasts as
-        // spread across ~20 world units. 48 degrees gives the rows real screen-Y separation while still
+        // spread across ~20 world units. 48 degrees gave the rows real screen-Y separation while still
         // reading as a 3/4, not top-down, view for the close-up single-beast case.
-        private const float CameraTiltDeg = 48f;
+        //
+        // Producer feedback (second round): 48 degrees read as too steep -- mostly tops of units, not
+        // their sides. Lowered to 33 (within the requested ~30-35 range, picked by eye against the same
+        // screenshots) -- shallower elevation, more side profile, still tilted enough that a 15-row-deep
+        // arena's rows separate on screen rather than collapsing (the same failure the original 24-degree
+        // attempt hit). Shared by every camera mode (arena/front/close and the non-battle stress test) for
+        // one consistent look rather than a battle-only special case.
+        private const float CameraTiltDeg = 33f;
         private const float CameraDistance = 8f;
 
         private static XnaVector3 CameraDir()
@@ -467,7 +688,7 @@ namespace BeastCraft.Spike55.Live3D
         /// on screen, with `edgeMargin` world units of breathing room beyond that on every side. Used by
         /// both RebuildCameraFitInstances (fits to wherever instances actually are, for the single-
         /// species stress test) and RebuildCameraArena (fits to the fixed board, fix-round task 3).</summary>
-        private void ApplyCamera(XnaVector3 target, IReadOnlyList<(XnaVector3 basePt, float heightMargin)> samples, float edgeMargin, bool preferWidth = false)
+        private void ApplyCamera(XnaVector3 target, IReadOnlyList<(XnaVector3 basePt, float heightMargin)> samples, float edgeMargin, bool preferWidth = false, float zoom = 1f)
         {
             var camDir = CameraDir();
             var camPos = target + camDir * CameraDistance;
@@ -504,6 +725,11 @@ namespace BeastCraft.Spike55.Live3D
             // far rows may run off the top of the portrait screen instead of shrinking everything to
             // keep them all visible.
             float orthoWidth = preferWidth ? viewSpanX : Math.Max(viewSpanX, viewSpanY / aspect);
+            // Producer feedback (third round): `zoom` (>1 = closer) shrinks the fitted ortho size after
+            // the fit above, on purpose letting content run off the edges rather than changing what
+            // counts as "fitted" -- used only by the default arena shot (see RebuildCameraArena) so units
+            // read larger even though that means the far/rear rows and side columns now crop.
+            orthoWidth /= zoom;
             float orthoHeight = orthoWidth * aspect;
             _projection = XnaMatrix.CreateOrthographic(orthoWidth, orthoHeight, 0.05f, 50f);
         }
@@ -605,7 +831,14 @@ namespace BeastCraft.Spike55.Live3D
             // `BeastCraft.Desktop --screenshot` battle shot), not comfortably inset from them.
             // `preferWidth: true` makes the arena's width the sole binding constraint (see ApplyCamera's
             // comment) so a tall row range crops top/bottom instead of shrinking the whole board to fit.
-            ApplyCamera(target, samples, HexBoard.HexSize * 0.1f, preferWidth: true);
+            //
+            // Producer feedback (third round): the default "arena" shot -- not "front", already a tighter
+            // crop via the narrower column/row range above -- zooms in an extra 20% (units read larger,
+            // trading away showing literally all 11x15 cells; far/rear rows and the outermost columns may
+            // now run off the frame, judged acceptable by eye as long as the front line and most units
+            // stay in view).
+            float zoom = front ? 1f : 1.2f;
+            ApplyCamera(target, samples, HexBoard.HexSize * 0.1f, preferWidth: true, zoom: zoom);
         }
 
         protected override void Update(GameTime gameTime)
@@ -639,10 +872,22 @@ namespace BeastCraft.Spike55.Live3D
                     _tintIndex = (_tintIndex + 1) % Tints.Length;
                 if (WasPressed(kb, Keys.M))
                     _clip = _clip == AnimatedPose.Clip.Idle ? AnimatedPose.Clip.Move : AnimatedPose.Clip.Idle;
+                // Producer feedback: "add a key ... that removes a random swarmling so this can be seen
+                // interactively" -- battle mode only (KillRandomSwarmling no-ops harmlessly otherwise,
+                // since _swarmInstanceCount is 0 in the single-species stress test, but gating it here
+                // keeps the key's effect obviously scoped to the battle scene it was asked for).
+                if (_options.Battle && WasPressed(kb, Keys.K))
+                    KillRandomSwarmling();
             }
             _prevKeyboard = kb;
 
             _elapsedSeconds += (float)gameTime.ElapsedGameTime.TotalSeconds;
+
+            // Producer feedback: dynamic per-unit facing (battle only -- the single-species stress test
+            // keeps its fixed FacingYaw, there being no "enemy" to face there). Must run before the pose/
+            // skin work below, which reads each unit's just-updated World matrix.
+            if (_options.Battle)
+                UpdateFacing((float)gameTime.ElapsedGameTime.TotalSeconds);
 
             _skinStopwatch.Restart();
             foreach (var inst in _instances)
@@ -714,14 +959,29 @@ namespace BeastCraft.Spike55.Live3D
             int boneCount = _swarmBonesPerInstance;
             for (int i = 0; i < _swarmInstanceCount; i++)
             {
-                float t = _elapsedSeconds + _swarmClockOffsets[i];
-                AnimatedPose.ComputeWorldMatrices(_swarmModel, _clip, t, _swarmNodeWorldScratch[i]);
-                AnimatedPose.ComputeSkinMatrices(_swarmModel, _swarmNodeWorldScratch[i], _swarmWorld[i], _swarmSkinScratch[i]);
-
                 int batchIndex = i / SwarmBatchCapacity;
                 int localId = i % SwarmBatchCapacity;
                 var rows = _swarmBoneRowsPalette[batchIndex];
                 int baseRow = localId * boneCount * 3;
+
+                if (!_swarmAlive[i])
+                {
+                    // Producer feedback (K / --kill N): a dead Swarmling gets an all-zero skin instead of
+                    // a real pose -- every vertex referencing these rows (with any blend weight) maps to
+                    // (0,0,0) regardless of its bind-pose position, collapsing the whole instance to a
+                    // single point (zero-area triangles, nothing rasterises). Cheaper than skipping it in
+                    // the draw call too: the merged batch has no per-instance visibility flag, and adding
+                    // one would cost a CPU-side vertex/index buffer rebuild per kill instead of just not
+                    // calling AnimatedPose for this slot.
+                    for (int r = baseRow; r < baseRow + boneCount * 3; r++)
+                        rows[r] = XnaVector4.Zero;
+                    continue;
+                }
+
+                float t = _elapsedSeconds + _swarmClockOffsets[i];
+                AnimatedPose.ComputeWorldMatrices(_swarmModel, _clip, t, _swarmNodeWorldScratch[i]);
+                AnimatedPose.ComputeSkinMatrices(_swarmModel, _swarmNodeWorldScratch[i], _swarmWorld[i], _swarmSkinScratch[i]);
+
                 for (int b = 0; b < boneCount; b++)
                 {
                     var skinT = Matrix4x4.Transpose(_swarmSkinScratch[i][b]);
@@ -905,12 +1165,18 @@ namespace BeastCraft.Spike55.Live3D
             _spriteBatch.Begin();
             long managedBytes = StatsTracker.EstimateManagedBytes();
             long gpuEstimateBytes = EstimateGpuBytes();
+            int swarmAliveCount = 0;
+            for (int i = 0; i < _swarmInstanceCount; i++)
+                if (_swarmAlive[i])
+                    swarmAliveCount++;
             string text =
-                $"beasts: {_instances.Count}  swarm: {_swarmInstanceCount}  clip: {_clip}  crest: {(_instances.Count > 0 && _instances[0].CrestOn ? "on" : "off")}  tint: {_tintIndex}\n" +
+                $"beasts: {_instances.Count}  swarm: {swarmAliveCount}/{_swarmInstanceCount}  clip: {_clip}  crest: {(_instances.Count > 0 && _instances[0].CrestOn ? "on" : "off")}  tint: {_tintIndex}\n" +
                 $"fps avg: {_stats.AverageFps():0.0}  fps 1% low: {_stats.OnePercentLowFps():0.0}\n" +
                 $"draw calls: {_stats.DrawCallsThisFrame}  tris: {_stats.TrianglesThisFrame:N0}\n" +
                 $"skin: {_stats.SkinningMsEma:0.00} ms  managed: {managedBytes / (1024.0 * 1024.0):0.0} MB  gpu(est): {gpuEstimateBytes / (1024.0 * 1024.0):0.0} MB\n" +
-                "Tab: stress 1/3/12/24   C: crest   T: tint   M: idle/move   Esc: quit";
+                (_options.Battle
+                    ? "Tab: stress 1/3/12/24   C: crest   T: tint   M: idle/move   K: kill swarmling   Esc: quit"
+                    : "Tab: stress 1/3/12/24   C: crest   T: tint   M: idle/move   Esc: quit");
             _spriteBatch.DrawString(_font, text, new XnaVector2(12, 12), XnaColor.White);
             _spriteBatch.End();
         }

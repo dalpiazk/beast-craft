@@ -310,7 +310,11 @@ dotnet Tooling/Spike55/Live3D/bin/Release/net10.0/Live3D.dll --bench 1 --battle 
 dotnet Tooling/Spike55/Live3D/bin/Release/net10.0/Live3D.dll --screenshot shot.png --battle --griffins 3 --swarm 24 --zoom arena
 dotnet Tooling/Spike55/Live3D/bin/Release/net10.0/Live3D.dll --screenshot shot.png --battle --griffins 3 --swarm 24 --zoom front
 dotnet Tooling/Spike55/Live3D/bin/Release/net10.0/Live3D.dll --screenshot shot.png --battle --griffins 0 --swarm 1 --zoom close
+dotnet Tooling/Spike55/Live3D/bin/Release/net10.0/Live3D.dll --screenshot shot.png --battle --griffins 3 --swarm 24 --kill 24 --zoom arena
 ```
+
+In interactive `--battle` mode, `K` kills one random living Swarmling (see "Producer-feedback round"
+below); `--kill N` does the same N times before the first frame renders, for a reproducible screenshot.
 
 `--zoom arena|front|close` (fix round, task item 3): `arena` (the default) frames the whole fixed 11x15
 board; `front` crops tighter around the Griffins' front line and the first couple of swarm rows; `close`
@@ -385,6 +389,23 @@ fitting to the actual occupied cells, which read as "too far out" in the previou
 at the existing 540x960 for comparability across passes). New CLI flag: `--zoom arena|front|close`
 (`arena` = full board, the default; `front` = a tighter crop around the front line; `close` = a
 tight instance-fit close-up, for the swarmling/beast close-up shots).
+
+### Producer-feedback round: real per-unit facing, camera pitch/zoom
+
+Full account (facing math and its sign derivation, the register-budget recheck, camera changes, an
+honest finding about the default formation's facing, bench numbers): `docs/spikes/055-3d-mini-spike.md`
+section 2.12. Summary:
+
+- Every Griffin/Swarmling now turns (eased, shortest arc, ~0.25s for a full reversal) to face its own
+  nearest living enemy in real world-space XZ, replacing the previous fixed per-side yaw. A side with no
+  living enemy keeps its last facing rather than resetting.
+- `K` (interactive, battle mode only) kills one random Swarmling; `--kill N` does the same N times before
+  the first frame, for reproducible screenshots (e.g. `--battle --griffins 3 --swarm 24 --kill 24` shows
+  every Griffin holding its final facing with no Swarmlings left).
+- `CameraTiltDeg` dropped from 48 to 33 degrees (shared by every camera mode); the default `--zoom arena`
+  shot also zooms in an extra 20% (`--zoom front`/`--zoom close` unaffected).
+- No shader changes -- the register budget is still 216 of 256 vec4 (facing flows through the same
+  per-instance skin-matrix pipeline already in place).
 
 ### Licences
 
