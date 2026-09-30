@@ -11,7 +11,10 @@ Scripts behind `docs/spikes/055-3d-mini-spike.md`, the mini-spike gate report co
 
 No GLB and no Blender install are committed here. The Meshy GLB used for Path A is a private,
 producer-supplied input (see `Tooling/ArtLab/provenance/spike55-griffin-meshy.md`); rerunning
-Path A needs your own copy of it (or a fresh Meshy export) and a Blender install.
+Path A needs your own copy of it (or a fresh Meshy export) and a Blender install. To generate a fresh
+export (or re-download an existing task's outputs) from the command line instead of the web app, see
+`Tooling/ArtLab/README.md`'s "Meshy (3D)" section for `Tooling/ArtLab/scripts/meshy.py` -- a local-only,
+spend-guarded CLI for Meshy's paid API.
 
 ## Scripts
 
