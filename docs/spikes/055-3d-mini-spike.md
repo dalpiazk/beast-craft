@@ -2,8 +2,9 @@
 
 **Status:** mini-spike only, per the producer's 2026-09-29 decision on issue #55 (1-2 days, one beast, two
 paths, not the full 2-3 week engine evaluation). This report is the gate. **Updated 2026-09-30** with a
-second pass (section 2.6) that re-runs Path A against a *textured* Meshy generation; see that section for
-what changed and what didn't.
+second pass (section 2.6) that re-runs Path A against a *textured* Meshy generation, and a third pass
+(section 2.7) that re-topologises that textured generation down to a low-poly (~8k tri) mesh via Meshy's
+paid `remesh` endpoint; see those sections for what changed and what didn't.
 
 ## 0. Goal
 
@@ -59,6 +60,22 @@ spike).*
 Idle loops: `055/idle_2d.gif` (Path B), `055/idle_3d.gif` (Path A pass 1, untextured),
 `055/idle_3d_textured.gif` (Path A pass 2, textured, section 2.6). Move loops: `055/move_2d.gif`,
 `055/move_3d.gif`, `055/move_3d_textured.gif`, same pattern.
+
+**Low-poly (pass 3, section 2.7) is kept on a separate sheet, not folded into the 4-column one above**, to
+avoid re-touching the already-committed comparison sheet for a pass added after the gate's main call:
+
+![Low-poly sheet](055/lowpoly_sheet.png)
+
+*2D reference, Path A pass 2 (textured, 929,638 tris), Path A pass 3 (low-poly `remesh`, 8,372 tris,
+section 2.7).*
+
+![Board mock with low-poly](055/board_mock_lowpoly.png)
+
+*The pass-3 low-poly figure added to a copy of the existing board mock, same backdrop/scale as the other
+three.*
+
+Low-poly loops: `055/idle_3d_lowpoly.gif`, `055/move_3d_lowpoly.gif` (Path A pass 3, same 12/8-frame,
+512x512 pattern as the other two 3D passes).
 
 ### 2.1 Likeness and fit with the art v2 pillars
 
@@ -222,7 +239,101 @@ would matter if a free-orbiting camera became a real requirement (section 6, poi
 touch the cosmetic-swap failure that is the recommendation's primary driver. **Recommendation unchanged:
 continue the 2.5D + Spine path (or the code bone rig this spike demonstrates).**
 
-## 3. Measurements
+### 2.7 Third pass: low-poly (remesh) (2026-09-30)
+
+The producer authorised exactly **one** more paid call -- Meshy's `remesh` endpoint, 5 credits flat,
+`input_task_id=01a0f351-869e-7319-9820-e4b6e8b6b226` (the pass-2 textured task), `target_polycount=8000`,
+`topology=triangle` -- to test whether a paid, purpose-built retopology closes the gap a **free** local
+attempt had just failed to close. One call was made and is fully accounted for below; nothing else spent
+credits.
+
+**The free attempt that came before this, and why it doesn't count.** Before this authorisation, a free
+local pass ran Blender's Decimate (Collapse) modifier directly on the pass-2 mesh (929,638 tris -> ~8,000,
+no Meshy call, no credits). It failed visually: the result (`lowpoly_render/hero.png`,
+`lowpoly_render/move/move_02.png` in the work dir, not committed) shattered into disconnected shards with
+visible holes and floating debris, and the texture did not carry over (a flat grey-lilac surface, not the
+Griffin's gold/cream palette). Root cause: the pass-2 mesh is itself fragmented into 703 disconnected
+components (2.6), and Collapse decimation has no awareness of component or UV-seam boundaries -- it merges
+edges within each shard independently, tearing the silhouette apart at the seams between shards. **That
+result is not reused anywhere in this section** and should not be described as clean; it's superseded by
+the paid remesh below, which explicitly avoids this failure mode.
+
+**The remesh call.** `python Tooling/ArtLab/scripts/meshy.py remesh --task 01a0f351-869e-7319-9820-e4b6e8b6b226
+--target-polycount 8000 --topology triangle --formats glb --yes`, confirmed against a `--dry-run` printing
+the same 5-credit cost first. Balance before: **1670 credits**; after: **1665 credits** -- exactly 5 spent.
+Task `01a0f38d-c409-702e-b976-62bff441b88f`, `SUCCEEDED` in ~89s. Full record:
+`Tooling/ArtLab/provenance/meshy-remesh-01a0f38d-c409-702e-b976-62bff441b88f.md`.
+
+**Mesh stats, and a finding that looked worse than it was.** `gltf_inspect.py` on the downloaded GLB:
+**8,372 tris**, 12,987 verts as exported (includes glTF's per-loop UV/normal-seam vertex duplication -- see
+below), 1 material, **3 images** (`texture_0` base colour 2048x2048, `normal` 2048x2048,
+`texture_0_metallic_roughness` 4096x4096; a full PBR export, not just base colour -- texture handling on
+`remesh` isn't documented either way as of this writing, and this call confirms it's carried through, at
+least for this task/settings combination). A first raw connected-component check (same method as 2.6's
+703-component finding on the pass-2 mesh) read as **2,452 components, largest only 38 verts** -- at first
+glance indistinguishable from a shattered mesh, and alarming given the free attempt's failure right before
+it. Checked rather than accepted: the glTF exporter (`Khronos glTF Blender I/O`) splits a vertex into
+several coincident, unwelded position duplicates wherever its UV or normal differs per face corner --
+normal glTF/Blender-import behaviour, not fragmentation. Running Blender's "Merge by Distance" at a 1e-4
+threshold (small relative to this mesh's ~1.2-unit bounding-box range) collapses those 12,987 verts to
+**4,192 true verts and a single connected component**, with only 28 non-manifold edges and 18 boundary
+edges out of 12,562 -- a genuinely coherent, near-watertight low-poly mesh. This weld is now the first
+step `Tooling/Spike55/blender_lowpoly_render.py` runs after import, before weighting or materials.
+
+**Texture route: Meshy-kept, downsized.** The remesh output already carried a real base-colour texture
+(unlike pass 1, and matching pass 2), so no UV-unwrap-and-bake pass was needed (the task brief's fallback
+for an untextured result). The base-colour image (2048x2048) was downsized to **1024x1024** in Blender
+(`Image.scale`) before rendering, per the task's 1K cap for a low-poly asset; the normal and
+metallic/roughness maps were not used (this spike's toon shader, both here and in pass 2, only consumes
+base colour -- see `blender_toon_render.py`'s banded-multiplier material).
+
+**Rig result: converged on the first attempt, no repairs needed.** Automatic (heat-map) bone weighting ran
+directly on the welded 4,192-vert mesh and converged immediately: **0 / 4,192 vertices unweighted**, single
+mesh component. None of pass 2's three weight repairs (stray-unweighted, topologically-inconsistent,
+floating-island) were needed, and the voxel-remesh-donor workaround both earlier passes required never
+triggered. This mesh is the first of the three passes where Blender's own automatic weighting worked
+cleanly on the mesh as delivered -- consistent with the low-poly mesh being genuinely more coherent
+(single shell, few non-manifold edges) than either the 39,446-vert pass-1 mesh or the 496,815-vert,
+703-component pass-2 mesh.
+
+**Render and honest visual verdict.** Idle (12) and move (8) frames at 512x512, plus a hero frame and a
+board-mock placement, same camera/lighting/palette/outline settings as `blender_toon_render.py`'s second
+pass (`Tooling/Spike55/blender_lowpoly_render.py`, which is that script plus the weld and texture-downsize
+steps above). Every idle and move frame was looked at individually, specifically for holes, shards,
+floating pieces, texture seams/smears, and broken silhouette (wings, four legs, tail, beak). **The result
+is clean**: no holes, no shards, no floating debris, no visible texture seams or smears, and the silhouette
+reads correctly (both wings, all four legs, the tail, and the beak are intact and legible) across every
+frame checked, including the move loop's largest leg-rotation frames where pass 2 had shown a residual
+geometry spike. **No fix round was needed** -- the first render was already usable, a first for this
+spike's three 3D passes. This is a materially different outcome from the failed free Decimate attempt
+above; the two should not be conflated.
+
+**Renders:** `055/idle_3d_lowpoly.gif`, `055/move_3d_lowpoly.gif`, and `055/lowpoly_sheet.png` (2D
+reference / pass-2 textured hi-poly / pass-3 low-poly remesh, three columns) / `055/board_mock_lowpoly.png`
+(the low-poly figure added to a copy of the existing board mock, same backdrop and scale as the earlier
+three).
+
+**Likeness, reassessed against the producer's relaxed bar.** The producer's criterion as of this pass is
+"close, with appropriate physiology," not an exact match to the approved illustration (a change from how
+2.1/2.6 read the bar). Under that relaxed standard, the low-poly remesh **passes**: it is unambiguously a
+griffin with the right physiology -- eagle head and beak, feathered wings, lion hindquarters, four legs, a
+tail -- proportioned plausibly, and carrying real fur/feather texture in the approved warm-gold/cream
+family. It is still not a 3D reconstruction of the *specific* approved illustration (the underlying mesh
+still reinterprets crest shape, proportions and feather silhouette, same as 2.1/2.6 found), so it would not
+pass a strict same-design test -- but that stricter test is no longer the bar the producer is applying.
+
+**Does this change the recommendation?** Partially reassessed, not reversed. Closing the likeness gap
+under the relaxed bar removes one objection to Path A, but it doesn't touch the cosmetics-combinatorics
+finding (section 4), which is about **pre-rendering a fused, non-segmented mesh** -- crest/wings/colour-form
+swaps still mean a different generation and a full re-render per combination, regardless of whether the
+per-combination render is a hi-poly or a low-poly pass. **One relevant, untested wrinkle the low-poly
+result surfaces:** the combinatorics problem is specifically a *pre-rendering* problem -- baking fixed 2D
+frames means every cosmetic combination needs its own bake. A real-time 3D renderer (not pre-rendered
+frames) would not have this constraint in the same way: cosmetics could in principle be swapped as
+textures or toggled submeshes on a live mesh at runtime, the same way Path B swaps 2D parts today, without
+a re-render step. **This spike does not test that** -- no real-time MonoGame 3D rendering was built or
+measured here, and issue #55's full-scope real-time-3D evaluation remains the place to test it, not this
+mini-spike. See section 6 for the updated recommendation text.
 
 **Time** (this session, one person, one beast, building the tooling from scratch -- see the breakdown for
 what's one-time vs repeatable):
@@ -303,42 +414,80 @@ multiplier).
   single-fused-mesh Meshy output doesn't support it without extra retopology/segmentation work per asset.
   Labelled as an estimate (frame count is exact arithmetic; the "how much of this could be engineered away"
   part is not).
+- **Low-poly (pass 3, section 2.7) changes none of this arithmetic.** The `remesh` task re-topologises one
+  already-generated, already-fused mesh; it doesn't segment it into swappable crest/wing sub-meshes, so a
+  different crest or wing still means a different upstream generation (and, if a low-poly version is
+  wanted, a second paid `remesh` call) per combination. If it were built, real-time 3D rendering is the one
+  path that could avoid this by swapping textures/submeshes on a live mesh instead of pre-rendering frames
+  (see section 6) -- not tested in this spike.
 
 ## 5. Pass criteria (from issue #55)
 
 | Criterion | Path A | Path B |
 | --- | --- | --- |
 | Steady 60 fps on a Galaxy A35-class phone | Unmeasured; expected non-issue as baked 2D sprites (same cost class as shipping content) -- see section 3 | Unmeasured; expected non-issue, same reasoning, and it's strictly less new content than Path A |
-| An approvable beast within a set number of hours per asset | Real risk: rigging did not converge this attempt; per-asset time is uncertain/mesh-dependent | Looks solid: ~3-5 min per beast once the tooling exists, reusing the existing `rigparts.py` convention |
-| Cosmetic swaps without per-beast rework | **Fails as built**: needs full re-generation + re-render per combination (section 4) | **Passes**: parts/attachment swap, no rework |
+| An approvable beast within a set number of hours per asset | Real risk on pass 1's mesh (rigging did not converge); **pass 3's low-poly remesh rigged cleanly on the first attempt with no repairs (2.7)**, but that's one beast, one mesh -- generality across the other 9 is unconfirmed | Looks solid: ~3-5 min per beast once the tooling exists, reusing the existing `rigparts.py` convention |
+| Cosmetic swaps without per-beast rework | **Fails as built, all three passes**: needs full re-generation (+ re-render, for pre-rendered output) per combination (section 4) | **Passes**: parts/attachment swap, no rework |
 | A trimmed device build that loads content | Out of scope for this mini-spike | Out of scope for this mini-spike |
+
+*Low-poly (pass 3, section 2.7) row values above are folded into "Path A"; it's the same path, a third
+generation. Likeness (not itself a pass-criteria row, but see 2.1/2.7) reassessed as passing the
+producer's current "close, with appropriate physiology" bar for the low-poly and textured passes.*
 
 ## 6. Recommendation
 
 **Continue the 2.5D + Spine path** (or, short of taking on the Spine licence, the code bone rig this spike
 demonstrates over the existing parts). Do not pursue pre-rendered 3D for the beast roster on the evidence
-here. **Unchanged after the second, textured pass (section 2.6, 2026-09-30):** a real texture and a real
-per-part rig both improved Path A's *engineering* quality, but neither touches the cosmetic-swap
+here. **Unchanged after the second, textured pass (section 2.6) and the third, low-poly pass (section 2.7,
+both 2026-09-30):** a real texture, a real per-part rig, and now a clean, well-behaved low-poly mesh all
+improved Path A's *engineering* quality -- the low-poly pass in particular is the first of the three 3D
+passes to come out clean with no fix round needed -- but none of that touches the cosmetic-swap
 combinatorics that drive this call (point 1 below, and section 4).
+
+**Likeness, reassessed (2026-09-30):** the producer's own bar for this criterion has moved to "close, with
+appropriate physiology," not an exact match to the approved illustration. Re-read against that relaxed
+bar (2.7), Path A's likeness gap -- point 3 below in its original, stricter form -- **softens**: the
+low-poly (and textured) results are unambiguously griffins with correct physiology (beak, wings, four
+legs, tail), just not reconstructions of the *specific* approved illustration. That's real progress on one
+of the three original objections. It does not reach the cosmetic-swap combinatorics (section 4), which is
+the objection that actually decides this call, and which likeness has no bearing on.
+
+**One wrinkle surfaced by the low-poly pass, explicitly not tested here:** the combinatorics problem is a
+*pre-rendering* problem specifically -- baking fixed 2D frames means every cosmetic combination needs its
+own render. A real-time 3D renderer would not inherit that constraint the same way (cosmetics could be
+swapped as textures or toggled submeshes on a live mesh at runtime, closer to how Path B already swaps 2D
+parts, with no re-render step). This spike did not build or measure real-time MonoGame 3D rendering, so
+this is noted as a reason a future, wider spike on real-time 3D (issue #55's full scope) could reach a
+different conclusion than this pre-rendered-3D-specific mini-spike -- not a reason to revise today's call.
 
 Reasoning:
 
 1. The cosmetic-swap criterion is the one this whole spike (and issue #38) cares most about, and Path A
-   fails it outright with the tooling available in a two-day window: a single-fused, textureless,
-   non-riggable-by-default AI mesh cannot cheaply take 20 discrete cosmetic options without a full
-   re-render per combination.
+   fails it outright with the tooling available in a two-day window: a single-fused AI mesh -- textured or
+   not, low-poly or not -- cannot cheaply take 20 discrete cosmetic options without a full re-render per
+   combination. Neither the textured pass (2.6) nor the low-poly pass (2.7) changes this; see the wrinkle
+   above for the one case (real-time 3D) that might.
 2. Path B costs almost nothing beyond what's already built: it reuses the *already-approved* Griffin art,
    the *already-cut* rig parts, and produces a visibly correct, independently-articulated idle/move loop
    with about 20 minutes of new tooling. It is the lower-risk, lower-cost path by a wide margin.
-3. Path A's likeness gap (2.1) and missing texture (2.2) mean even a "best case" render isn't a 3D version
-   of the approved Griffin -- it's a new, different-looking griffin, which the producer would need to
-   re-review and potentially re-approve per beast, on top of the rigging and cosmetic problems above.
-4. The one thing Path A visibly wins on: it's a real skeleton in principle (once rigging works), giving a
-   camera more freedom (e.g., a free-orbiting Grove camera, noted as one of the two reasons to reconsider
-   3D in issue #55's notes). If a free Grove camera becomes a real requirement, that's worth a fresh,
-   narrower spike specifically on rigging AI-generated meshes reliably (voxel remesh already tried and
-   failed here; manual retopology or a different generation tool might do better) -- not a reason to adopt
-   3D for the whole roster today.
+3. Path A's likeness gap (2.1, reassessed 2.7) means a "best case" render still isn't a 3D reconstruction
+   of the *specific* approved Griffin illustration -- it's a new, different-looking griffin that happens to
+   read as the right species under the producer's current, relaxed bar. Depending on how strictly future
+   art review reads "close, with appropriate physiology," the producer may still want to re-review and
+   potentially re-approve per beast, on top of the cosmetic problem above.
+4. The one thing Path A visibly wins on: it's a real skeleton in principle (rigging now works cleanly, on
+   the first attempt, for the low-poly mesh -- 2.7), giving a camera more freedom (e.g., a free-orbiting
+   Grove camera, noted as one of the two reasons to reconsider 3D in issue #55's notes). If a free Grove
+   camera becomes a real requirement, that's worth a fresh, narrower spike specifically on rigging
+   AI-generated meshes reliably -- which, per 2.7, may now be a materially smaller problem than 2.3 first
+   found, at least for a remeshed low-poly mesh -- not a reason to adopt 3D for the whole roster today.
+
+**Real-time 3D on a Galaxy A35-class phone, an unmeasured estimate (2.7):** 8,372 tris, one material, a
+1024x1024 texture is a trivial GPU budget on any mobile-class GPU in the A35's tier -- comparable to a
+single simple mobile-game character, well inside a 60 fps budget for the handful of beasts likely on
+screen at once. This is markedly better than pass 2's 929,638-tri mesh would be for the same purpose. This
+estimate is unmeasured (no device was available in this environment, and no real-time MonoGame 3D renderer
+was built here) and should not be treated as a substitute for an actual on-device test.
 
 ### Risks if this recommendation is wrong
 
@@ -347,7 +496,10 @@ Reasoning:
   significantly.
 - If a future AI-to-3D tool or tier reliably outputs clean, riggable, textured, segmented meshes, most of
   Path A's problems here (2.2, 2.3, section 4) could disappear; this spike used one paid-tier Meshy
-  generation and does not rule that out for other tools/settings.
+  generation (plus one paid `remesh` follow-up, 2.7) and does not rule that out for other tools/settings.
+- If real-time 3D rendering (not pre-rendered frames) is ever built and measured for this game, the
+  cosmetic-combinatorics objection that drives this recommendation may not apply the same way (see the
+  "wrinkle" above) -- that would need its own spike, not an extrapolation from this one.
 
 ### Next steps
 
@@ -358,11 +510,14 @@ Reasoning:
   not worth it: `Tooling/Spike55/rig2d.py` is a working starting point, though production use would want it
   ported to run inside the game (not as an offline PNG baker) so it gets the "no rework" benefit at
   runtime rather than needing pre-baked frames.
+- If a free-orbiting camera or real-time 3D is ever prioritised, start from the low-poly `remesh` pipeline
+  (2.7, `Tooling/Spike55/blender_lowpoly_render.py`), not a fresh hi-poly generation -- it rigs cleanly on
+  the first attempt and is a far more reasonable real-time asset budget than pass 1/2's meshes.
 
 ## AI provenance
 
 The Griffin 3D models used for Path A were generated by **Meshy (paid tier)**, from the already-approved 2D
-Griffin illustration; output ownership is retained in both cases (paid tier, not the CC BY free tier).
+Griffin illustration; output ownership is retained in all cases (paid tier, not the CC BY free tier).
 Disclosed per `docs/art/art-brief.md`'s AI-disclosure rule.
 
 - **Pass 1** (untextured, section 2.2): generated by the producer directly. Full record:
@@ -370,6 +525,11 @@ Disclosed per `docs/art/art-brief.md`'s AI-disclosure rule.
 - **Pass 2** (textured, `meshy-7.1`, section 2.6): generated 2026-09-30 via `Tooling/ArtLab/scripts/meshy.py`
   under a specific one-call, 30-credit spend authorisation. Full record:
   `Tooling/ArtLab/provenance/meshy-01a0f351-869e-7319-9820-e4b6e8b6b226.md`.
+- **Pass 3** (low-poly `remesh` of pass 2, section 2.7): generated 2026-09-30 via
+  `Tooling/ArtLab/scripts/meshy.py remesh`, under a specific one-call, 5-credit spend authorisation. Full
+  record: `Tooling/ArtLab/provenance/meshy-remesh-01a0f38d-c409-702e-b976-62bff441b88f.md`. (A free local
+  Blender Decimate attempt preceded this and failed -- shattered mesh, no texture -- see 2.7; it spent no
+  credits and is not part of this AI-provenance list since it produced no usable output.)
 
-Both models are spike inputs only; neither is committed to the repository or shipped with the game
-(`Tooling/Spike55/README.md` explains how to get your own copy to rerun Path A).
+None of these models are committed to the repository or shipped with the game (`Tooling/Spike55/README.md`
+explains how to get your own copy to rerun Path A).

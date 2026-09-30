@@ -9,17 +9,21 @@ Scripts behind `docs/spikes/055-3d-mini-spike.md`, the mini-spike gate report co
   (`content/art/source/griffin/parts/*.png` + `parts.json`), no Spine licence, driven by
   sinusoidal oscillators -- what Spine Essential does (bones, no mesh deform); see `rig2d.py`.
 
-No GLB and no Blender install are committed here. Path A has been run twice (see
-`docs/spikes/055-3d-mini-spike.md` sections 2 and 2.6): an untextured GLB, producer-supplied
-(`Tooling/ArtLab/provenance/spike55-griffin-meshy.md`), and a textured `meshy-7.1` + 2K-texture GLB,
-generated via the CLI below under a specific spend authorisation
-(`Tooling/ArtLab/provenance/meshy-01a0f351-869e-7319-9820-e4b6e8b6b226.md`). Neither GLB is committed;
-rerunning Path A needs your own copy of one (or a fresh Meshy export) and a Blender install. To generate a
-fresh export (or re-download an existing task's outputs) from the command line instead of the web app, see
-`Tooling/ArtLab/README.md`'s "Meshy (3D)" section for `Tooling/ArtLab/scripts/meshy.py` -- a local-only,
-spend-guarded CLI for Meshy's paid API. `blender_toon_render.py` auto-detects whether the GLB it's given
-has a texture (an untextured GLB gets the flat-swatch toon material described below; a textured one gets
-a banded multiplier over the real base-colour texture) -- no separate flag needed.
+No GLB and no Blender install are committed here. Path A has been run three times (see
+`docs/spikes/055-3d-mini-spike.md` sections 2, 2.6 and 2.7): an untextured GLB, producer-supplied
+(`Tooling/ArtLab/provenance/spike55-griffin-meshy.md`); a textured `meshy-7.1` + 2K-texture GLB, generated
+via the CLI below under a specific spend authorisation
+(`Tooling/ArtLab/provenance/meshy-01a0f351-869e-7319-9820-e4b6e8b6b226.md`); and a low-poly (~8k tri)
+`remesh` of that textured GLB via Meshy's paid `remesh` endpoint, also under a specific spend authorisation
+(`Tooling/ArtLab/provenance/meshy-remesh-01a0f38d-c409-702e-b976-62bff441b88f.md`). No GLB is committed;
+rerunning Path A needs your own copy of one (or a fresh Meshy export/remesh) and a Blender install. To
+generate a fresh export (or re-download an existing task's outputs) from the command line instead of the
+web app, see `Tooling/ArtLab/README.md`'s "Meshy (3D)" section for `Tooling/ArtLab/scripts/meshy.py` -- a
+local-only, spend-guarded CLI for Meshy's paid API (`image-to-3d` and `remesh` subcommands).
+`blender_toon_render.py` auto-detects whether the GLB it's given has a texture (an untextured GLB gets the
+flat-swatch toon material described below; a textured one gets a banded multiplier over the real
+base-colour texture) -- no separate flag needed. `blender_lowpoly_render.py` is the same pipeline plus a
+vertex-weld step for a `remesh`-task GLB's duplicate-position verts (see below) and a texture downsize.
 
 ## Scripts
 
@@ -28,6 +32,7 @@ a banded multiplier over the real base-colour texture) -- no separate flag neede
 | `gltf_inspect.py` | Pure-stdlib GLB inspector (tri count, vertex count, embedded image sizes, node/skin/animation counts) -- no 3D library needed. |
 | `inspect_orientation.py` | Blender headless: imports a GLB and renders quick orthographic front/side/top probes so you can read off which local axis the mesh faces, before writing any camera/rig code against it. |
 | `blender_toon_render.py` | Blender headless: imports the GLB, normalises it (feet on ground, scaled to a fixed height), builds a 2-3 band toon material (Diffuse -> Shader to RGB -> ColorRamp -> Emission, multiplied onto the GLB's base-colour texture if it has one) plus a thin inverted-hull ink-plum outline (Solidify), places an orthographic hex-board camera, builds a simple armature, and tries several weighting strategies in order (heat weights on the raw mesh; heat weights on a disposable voxel-remeshed duplicate, data-transferred back onto the original UV-intact mesh; envelope weights) before falling back to a rigid whole-object animation. Three small repair passes clean up strays from the data-transfer path (unweighted vertices, vertices that disagree with their mesh-connected neighbours, and small disconnected mesh islands mapped to the wrong bone). Renders idle (12 frame) and move (8 frame) loops as transparent PNGs. |
+| `blender_lowpoly_render.py` | Same pipeline as `blender_toon_render.py`, for a Meshy `remesh`-task GLB. Adds two steps right after import: (1) "Merge by Distance" at a 1e-4 threshold to weld the duplicate-position vertices the glTF exporter leaves behind at every UV/normal seam (without this, a `remesh` GLB's raw vertex-edge connectivity reads as thousands of tiny disconnected "components" that look shattered but aren't -- see the gate report section 2.7 for the full story); (2) picks the base-colour image by walking the imported material's node graph to whatever feeds the Principled BSDF's Base Color (a `remesh` GLB can carry base_color + normal + metallic_roughness, so "the first image" is not a safe guess), then downsizes it to 1024x1024 (`--texture-size`, default 1024). On the one low-poly Griffin mesh tested here, automatic weighting converged on the *first* attempt (no voxel-remesh-donor fallback needed) with 0 unweighted vertices. |
 | `rig2d.py` | Pure Pillow: loads `parts.json` + the six part PNGs, rotates each part about its own pivot (padding the image so rotation doesn't clip, per-part), composites back-to-front per `order_back_to_front`, and renders the same idle/move loops at the game's sprite size, plus sprite-strip PNGs and preview GIFs. |
 
 ## Rerunning
@@ -55,11 +60,16 @@ blender -b --python Tooling/Spike55/inspect_orientation.py -- --glb <griffin.glb
 # Full render
 blender -b --python Tooling/Spike55/blender_toon_render.py -- \
     --glb <griffin.glb> --out <output dir> --frame-size 512
+
+# Low-poly variant (a Meshy `remesh`-task GLB)
+blender -b --python Tooling/Spike55/blender_lowpoly_render.py -- \
+    --glb <griffin_remesh.glb> --out <output dir> --frame-size 512 --texture-size 1024
 ```
 
-`blender_toon_render.py` writes `idle/idle_NN.png`, `move/move_NN.png`, `hero.png` (neutral
-pose) and, for reference only, `griffin_rig.blend` (not meant to be committed -- it's a large
-binary scratch file).
+Both scripts write `idle/idle_NN.png`, `move/move_NN.png`, `hero.png` (neutral pose) and, for
+reference only, `griffin_rig.blend` (not meant to be committed -- it's a large binary scratch
+file). `blender_lowpoly_render.py` also writes `texture_1k.png`, the downsized base-colour
+texture actually used for the render.
 
 Blender itself was installed as a portable zip (not the winget/MSI package -- that download was
 blocked by a Cloudflare bot challenge in this environment) from
@@ -111,3 +121,26 @@ inside a nested temp directory).
   base mesh colour, confirming it's **real geometry from the Meshy reconstruction** (a thin spur
   near a claw), not a rig/weight bug. Left as a known, cosmetic issue -- see the gate report's
   section 2.6.
+
+**Pass 3 (low-poly `remesh`, 2026-09-30):**
+
+- A **free**, local-only attempt preceded this: Blender's Decimate (Collapse) modifier run
+  directly on pass 2's 929,638-tri mesh. It failed visually -- shattered into disconnected shards
+  with holes and floating debris, texture not carried over (flat grey-lilac). Root cause: pass 2's
+  mesh is fragmented into 703 disconnected components (see above), and Collapse decimation has no
+  awareness of component/UV-seam boundaries. That attempt's output (`decimate_lowpoly.py` in the
+  work dir, not committed here) is superseded and was not reused for anything below.
+- The **paid** `remesh` endpoint (5 credits flat) avoided that failure mode entirely: a single,
+  near-watertight low-poly mesh (once its glTF-export vertex-splitting is welded -- see
+  `blender_lowpoly_render.py`'s docstring) that rigs cleanly with automatic weights on the first
+  attempt, no voxel-remesh-donor fallback or repair passes needed.
+- A first raw connected-component reading on the un-welded import (2,452 components, largest 38
+  verts) looked like the same shattering the free Decimate attempt produced. It wasn't: the glTF
+  exporter splits a vertex into coincident, unwelded duplicates wherever UV/normal differs per
+  face corner (normal behaviour, not fragmentation) -- confirmed, and fixed, by a "Merge by
+  Distance" weld step (1e-4 threshold) that collapses this to 4,192 true verts and a single
+  connected component. See the gate report section 2.7 for the full account; don't conflate this
+  finding with the free attempt's genuine shattering above.
+- No fix round was needed for the low-poly render -- the first pass at idle/move frames was
+  already clean (no holes, shards, floating debris, texture seams, or broken silhouette), a first
+  among this spike's three 3D passes.
