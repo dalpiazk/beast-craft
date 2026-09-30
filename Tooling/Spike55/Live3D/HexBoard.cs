@@ -34,12 +34,19 @@ namespace BeastCraft.Spike55.Live3D
         /// <summary>Hex corner radius (centre to corner), for drawing the grid lines only.</summary>
         public static float HexSize => ColumnStep / (float)Math.Sqrt(3.0);
 
-        /// <summary>Sizes the hex grid from the beast's own bind-pose width, with clearance so a
-        /// standing beast reads as roughly one hex wide (docs/spikes/055/board_mock_lowpoly.png's own
-        /// proportions), not overlapping its neighbours the way the first version of this file did.</summary>
+        /// <summary>Sizes the hex grid from the beast's own bind-pose width. Lead-review fix round
+        /// (2026-09-30, second pass): the original 1.4x clearance factor undersized every unit relative
+        /// to its hex -- a direct pixel comparison against the real 2D battle screen
+        /// (`BeastCraft.Desktop --screenshot ... --turns 0`, a player beast's sprite noticeably wider
+        /// than its own hex, an enemy sprite filling roughly two-thirds of its hex) showed beasts should
+        /// read as *larger* than one hex, not comfortably inside one with margin. 0.8x makes a beast
+        /// about 1.25 hexes wide (`beastFootprint / 0.8`) -- "a bit larger than a hex", matching the 2D
+        /// Griffin's wingspan overflowing its own hex in that reference shot -- while every other unit's
+        /// own absolute size (e.g. the Swarmling, sized independently in `blender_export_live_swarmling
+        /// .py`) reads proportionally larger on the same, now-smaller hex too.</summary>
         public static void SetScale(float beastFootprint)
         {
-            ColumnStep = Math.Max(1.0f, beastFootprint * 1.4f);
+            ColumnStep = Math.Max(0.6f, beastFootprint * 0.8f);
         }
 
         /// <summary>Pointy-top hex centre for offset coordinates (col, row), matching

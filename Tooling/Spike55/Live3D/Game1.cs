@@ -106,6 +106,15 @@ namespace BeastCraft.Spike55.Live3D
         // directional head/legs make facing actually visible, so this is a real fix, not cosmetic-only).
         private static readonly NumMatrix SwarmFacingYaw = NumMatrix.CreateRotationY(MathF.PI / 2f);
 
+        // Lead-review fix round: the Swarmling's own exported bind pose (TARGET_HEIGHT=0.55 in
+        // blender_export_live_swarmling.py) reads far smaller than its hex even after HexBoard's own
+        // scale fix (a direct pixel comparison against the real 2D battle screen showed an enemy sprite
+        // filling roughly two-thirds of its hex; this mesh's round body core -- not counting its
+        // horn-tip-to-horn-tip bounding box, which is wider than the body actually looks -- was under
+        // half that). A runtime scale multiplier (not a re-export) so this can be tuned without
+        // rebuilding the asset; folded into each swarm instance's World matrix, same place FacingYaw is.
+        private const float SwarmScale = 1.4f;
+
         private readonly List<BeastInstance> _instances = new List<BeastInstance>();
         private readonly Random _rng = new Random(12345); // fixed seed: reproducible desync, reproducible bench runs
         private static readonly int[] StressLevels = { 1, 3, 12, 24 };
@@ -272,6 +281,17 @@ namespace BeastCraft.Spike55.Live3D
                         "re-export with the 6-bone rig or update both the shader and this check together.");
                 _swarmTexture = LoadTextureFromBytes(_swarmModel.BaseColorImageBytes);
                 _paramSwarmBoneRows = _toonEffect.Parameters["SwarmBoneRows"];
+                // Lead-review fix round: a separate, proportionally smaller outline push-out distance for
+                // the swarm pass -- see Toon.fx's SwarmOutlineThickness comment for why the Griffin's
+                // fixed 0.012 world-unit thickness reads as an oversized ring on the much smaller
+                // Swarmling. Scaled by the ratio of the two assets' own effective on-screen heights:
+                // Griffin's 2.0 TARGET_HEIGHT (blender_export_live.py) vs the Swarmling's 0.55 TARGET_
+                // HEIGHT (blender_export_live_swarmling.py) x the runtime SwarmScale multiplier above
+                // (both hardcoded, not stored in either GLB) -- so the outline stays proportionally
+                // consistent with SwarmScale if that constant is ever re-tuned.
+                const float griffinTargetHeight = 2.0f;
+                const float swarmlingTargetHeight = 0.55f;
+                _toonEffect.Parameters["SwarmOutlineThickness"].SetValue(0.012f * (swarmlingTargetHeight * SwarmScale / griffinTargetHeight));
 
                 var battleGridVerts = HexBoard.BuildGridLines(11, 15, new XnaColor(46, 42, 69, 140));
                 _hexGridVertexBuffer = new VertexBuffer(GraphicsDevice, VertexPositionColor.VertexDeclaration, battleGridVerts.Length, BufferUsage.WriteOnly);
@@ -387,14 +407,26 @@ namespace BeastCraft.Spike55.Live3D
             _swarmSkinScratch = swarmCount > 0 ? new Matrix4x4[swarmCount][] : Array.Empty<Matrix4x4[]>();
             if (swarmCount > 0)
             {
+                // Lead-review fix round: `--zoom close` is the dedicated single-unit beauty-shot mode
+                // (the swarmling close-up) -- using the battle formation's SwarmFacingYaw there pointed
+                // the one swarmling's face away from the same camera angle that shows a Griffin's front
+                // (confirmed by screenshot: the close-up read as "from behind/above"). SwarmFacingYaw is
+                // specifically a *battle-formation* choice (face the opposite way from the Griffins, who
+                // sit in the rows ahead) and has no reason to apply to an isolated close-up with no
+                // Griffins in the shot at all -- use the Griffins' own FacingYaw there instead, same
+                // camera-facing convention as the Griffin close-up.
+                bool closeUp = string.Equals(_options.CameraZoom, "close", StringComparison.OrdinalIgnoreCase);
+                var swarmFacing = closeUp ? NumMatrix.Identity : SwarmFacingYaw;
                 var swarmCells = HexBoard.FillOrder(11, 15, swarmCount, startRow: 6);
                 for (int i = 0; i < swarmCount; i++)
                 {
                     var (col, row) = swarmCells[i % Math.Max(1, swarmCells.Count)];
                     var center = HexBoard.CellCenter(col, row);
-                    // SwarmFacingYaw first (turn the bind-pose swarmling to face back across the gap
-                    // toward the Griffins -- see SwarmFacingYaw's own comment), then place on its cell.
-                    _swarmWorld[i] = SwarmFacingYaw * NumMatrix.CreateTranslation(center.X, 0f, center.Z);
+                    // SwarmScale first (local-space, before any rotation/translation), then swarmFacing
+                    // (turn the bind-pose swarmling to face back across the gap toward the Griffins in
+                    // battle, or toward the camera for a close-up -- see its comment above), then place
+                    // on its cell.
+                    _swarmWorld[i] = NumMatrix.CreateScale(SwarmScale) * swarmFacing * NumMatrix.CreateTranslation(center.X, 0f, center.Z);
                     _swarmClockOffsets[i] = (float)(_rng.NextDouble() * 4.0);
                     _swarmNodeWorldScratch[i] = new Matrix4x4[_swarmModel.Nodes.Length];
                     _swarmSkinScratch[i] = new Matrix4x4[_swarmModel.Joints.Length];
@@ -435,7 +467,7 @@ namespace BeastCraft.Spike55.Live3D
         /// on screen, with `edgeMargin` world units of breathing room beyond that on every side. Used by
         /// both RebuildCameraFitInstances (fits to wherever instances actually are, for the single-
         /// species stress test) and RebuildCameraArena (fits to the fixed board, fix-round task 3).</summary>
-        private void ApplyCamera(XnaVector3 target, IReadOnlyList<(XnaVector3 basePt, float heightMargin)> samples, float edgeMargin)
+        private void ApplyCamera(XnaVector3 target, IReadOnlyList<(XnaVector3 basePt, float heightMargin)> samples, float edgeMargin, bool preferWidth = false)
         {
             var camDir = CameraDir();
             var camPos = target + camDir * CameraDistance;
@@ -460,7 +492,18 @@ namespace BeastCraft.Spike55.Live3D
             float viewSpanY = Math.Max(1.6f, (maxVY - minVY) + edgeMargin * 2f);
 
             float aspect = (float)_graphics.PreferredBackBufferHeight / _graphics.PreferredBackBufferWidth;
-            float orthoWidth = Math.Max(viewSpanX, viewSpanY / aspect);
+            // Lead-review fix round: `preferWidth` (arena framing only) makes viewSpanX the binding
+            // constraint outright, instead of Math.Max(viewSpanX, viewSpanY / aspect) -- the original
+            // "fit both axes, whichever needs more room wins" rule widened orthoWidth whenever the
+            // sampled row range's vertical extent (up to 15 rows deep, under the board tilt) exceeded
+            // what the portrait aspect would otherwise show, which is exactly what made the arena read
+            // as "too far out": the board's own *width* was never actually the limiting factor, its
+            // *depth* was. The real 2D battle screen crops rows top/bottom rather than shrinking to fit
+            // them all (confirmed against a real `BeastCraft.Desktop --screenshot` battle-opening shot),
+            // so arena framing does the same here: width always fills the frame, and a tall arena's
+            // far rows may run off the top of the portrait screen instead of shrinking everything to
+            // keep them all visible.
+            float orthoWidth = preferWidth ? viewSpanX : Math.Max(viewSpanX, viewSpanY / aspect);
             float orthoHeight = orthoWidth * aspect;
             _projection = XnaMatrix.CreateOrthographic(orthoWidth, orthoHeight, 0.05f, 50f);
         }
@@ -556,9 +599,13 @@ namespace BeastCraft.Spike55.Live3D
             centerSum /= Math.Max(1, samples.Count);
             var target = new XnaVector3(centerSum.X, 0.85f, centerSum.Z);
 
-            // A more generous edge margin than the instance-fit path's 1.4 (a hex's own corner radius,
-            // HexSize) so the arena's own boundary hexes aren't cropped flush against the screen edge.
-            ApplyCamera(target, samples, HexBoard.HexSize);
+            // Lead-review fix round: a near-zero edge margin (a sliver of the hex's own corner radius),
+            // not the previous full-HexSize margin -- the real 2D battle screen runs its hex grid to, and
+            // slightly past, the screen edges (edge hexes visibly cropped, confirmed against a real
+            // `BeastCraft.Desktop --screenshot` battle shot), not comfortably inset from them.
+            // `preferWidth: true` makes the arena's width the sole binding constraint (see ApplyCamera's
+            // comment) so a tall row range crops top/bottom instead of shrinking the whole board to fit.
+            ApplyCamera(target, samples, HexBoard.HexSize * 0.1f, preferWidth: true);
         }
 
         protected override void Update(GameTime gameTime)
@@ -698,7 +745,12 @@ namespace BeastCraft.Spike55.Live3D
             DrawBeasts();
             DrawSwarm();
 
-            bool showStats = !_options.BenchMode && !(_options.ScreenshotMode && _options.ScreenshotHideStats);
+            // Lead-review fix round: screenshots hide the debug stats overlay unconditionally now (so
+            // they read like the actual game, not a debug HUD) -- previously only `--hide-stats` did
+            // that, so every screenshot in the spike doc up to and including the last pass carried the
+            // fps/draw-call/memory text baked into the image. `--hide-stats` still parses (now a no-op
+            // for screenshots specifically) rather than erroring on old invocations.
+            bool showStats = !_options.BenchMode && !_options.ScreenshotMode;
             if (showStats)
                 DrawStatsOverlay();
 

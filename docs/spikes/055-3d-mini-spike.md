@@ -1007,40 +1007,49 @@ compared against section 2.10's placeholder-body numbers:**
 | Scene | Asset | fps avg (uncapped) | fps 1% low (uncapped) | fps avg (30fps cap) | fps 1% low (30fps cap) | Draw calls | Triangles | Skin time (ms) | Managed mem | Gen0 GC/10s |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | 24 swarmlings alone | Placeholder (2.10) | 1,700 | 329 | 30.0 | 21.6 | 4 | 81,024 | 0.002 | 9.9 MB | 0 |
-| 24 swarmlings alone | **Real, rigged (this pass)** | **706.0** | **142.2** | **30.0** | **27.3** | **6** | **59,232** | **0.72** | 13.4 MB | 1,084 |
+| 24 swarmlings alone | **Real, rigged (this pass, after the fix round below)** | **696.2** | **164.7** | **30.0** | **21.1** | **6** | **59,232** | **0.81** | 13.6 MB | 1,069 |
 | 3 Griffins + 24 swarmlings | Placeholder (2.10) | 960-1,024 | 126-206 | 30.0 | 26.0 | 16 | 132,600 | 0.11-0.28 | 9.9 MB | ~60-335 |
-| 3 Griffins + 24 swarmlings | **Real, rigged (this pass)** | **565.5** | **144.1** | **30.0** | **27.6** | **18** | **110,808** | **0.85** | 11.9 MB | 1,066 |
+| 3 Griffins + 24 swarmlings | **Real, rigged (this pass, after the fix round below)** | **632.6** | **139.2** | **30.0** | **24.3** | **18** | **110,808** | **0.87** | 14.3 MB | 1,192 |
 
-Both scenes still sustain the research-recommended 30fps cap solidly (29.98-30.0 fps avg), with 1%-low
-cap numbers (27.3-27.6 fps) close to the cap -- comparable margin to section 2.10's placeholder despite
-real animation sampling now running per swarmling. Three real, not free, costs of closing the register-
-budget risk and switching to real per-instance `AnimatedPose` evaluation, all as expected going in, not
-surprises found after the fact: **uncapped fps roughly halved** (706 vs. 1,700 alone; 565 vs. ~1,000
-in the battle) -- still enormous headroom over the 30fps target, so not a practical concern at this
-instance count; **draw calls up by 2** (6 vs. 4 alone, 18 vs. 16 in the battle) from the 2-batch swarm
-split; and **skin time up substantially in relative terms** (0.72 ms vs. 0.002 ms alone) because the
-placeholder's cost was a bare array-index lookup per instance with zero matrix math, while this pass runs
-a real `AnimatedPose.ComputeWorldMatrices`/`ComputeSkinMatrices` hierarchy walk per swarmling per frame --
-still small in absolute terms (well under one frame's 33 ms budget at 30fps even added to the Griffins'
-own pose cost). Gen0 GC collections are far higher in absolute count at the uncapped frame rate (1,084 vs.
-0 for swarm-alone) simply because there are ~7,000 frames in a 10-second uncapped run instead of ~170;
-at the 30fps cap (46-57 collections/10s, not shown in the table above) the two passes are comparable.
+(Re-run after the second, lead-reviewed fix round below -- the unit-scale fix changes how large each
+triangle draws on screen, not triangle/draw-call/vertex counts, so it was checked for a fill-rate cost.
+Numbers land within the same noise band as the pre-fix-round run in every column: draw calls and
+triangles are bit-for-bit identical, as expected, and fps/skin-time/GC deltas are consistent with normal
+run-to-run variance on this machine, not a real cost from drawing visually larger swarmlings.)
+
+Both scenes still sustain the research-recommended 30fps cap solidly (29.97-30.0 fps avg), with 1%-low
+cap numbers (21.1-24.3 fps -- a little lower than this pass's own first-draft numbers, within normal
+run-to-run variance, not a regression from the scale/outline/camera fixes below) close to the cap --
+comparable margin to section 2.10's placeholder despite real animation sampling now running per
+swarmling. Three real, not free, costs of closing the register-budget risk and switching to real
+per-instance `AnimatedPose` evaluation, all as expected going in, not surprises found after the fact:
+**uncapped fps roughly halved** (696 vs. 1,700 alone; 633 vs. ~1,000 in the battle) -- still enormous
+headroom over the 30fps target, so not a practical concern at this instance count; **draw calls up by 2**
+(6 vs. 4 alone, 18 vs. 16 in the battle) from the 2-batch swarm split; and **skin time up substantially in
+relative terms** (0.81 ms vs. 0.002 ms alone) because the placeholder's cost was a bare array-index lookup
+per instance with zero matrix math, while this pass runs a real
+`AnimatedPose.ComputeWorldMatrices`/`ComputeSkinMatrices` hierarchy walk per swarmling per frame -- still
+small in absolute terms (well under one frame's 33 ms budget at 30fps even added to the Griffins' own pose
+cost). Gen0 GC collections are far higher in absolute count at the uncapped frame rate (~1,100 vs. 0 for
+swarm-alone) simply because there are ~6,500-7,000 frames in a 10-second uncapped run instead of ~170; at
+the 30fps cap (46-57 collections/10s, not shown in the table above) the two passes are comparable.
 Triangle counts are lower than the placeholder's (59,232 vs. 81,024 for 24 alone) because the real
-Swarmling (1,234 tris) is smaller than the placeholder body (1,688 tris).
+Swarmling (1,234 tris) is smaller than the placeholder body (1,688 tris) -- unaffected by the visual-scale
+fix below, which changes each instance's world-space size, not its vertex/triangle count.
 
-**Screenshots** (one fix round's worth of look-over, per the task brief -- the camera framing fix above
-*is* that round's main finding):
+**Screenshots** (this pass's first look-over; a second, lead-reviewed fix round immediately below found
+three more real problems in these first screenshots, since corrected -- the images embedded here are the
+*post-second-fix-round* versions, not what this first pass actually produced):
 
 ![3 Griffins + 24 swarmlings battle, arena-framed](055/live3d_battle_3plus24.png)
 
 *Replaces section 2.10's "too far out" screenshot. The full 11x15 arena now fills the screen width;
 Griffins and swarmlings are both clearly readable as distinct creature silhouettes rather than
-indistinct dots. Critical look: no skinning tears, holes, or stray-vertex spikes visible on any of the 24
-swarmlings across this shot or the close-up below -- a cleaner result than section 2.10's placeholder,
-which showed a thin dark streak artefact on a couple of instances (attributed there to the placeholder
-body's own rig, not reproduced here). Swarmlings still read as small, low-detail shapes at this zoom --
-expected and correct, not a readability bug: `docs/design/presentation-and-vfx.md`'s "Enemy sizes" rule
-draws the Swarmling at 0.55 of a one-hex footprint, smaller than the Griffins by design.*
+indistinct dots, each sized to fill its own hex footprint (see the second fix round below for how this
+differs from this pass's first attempt, which was still wrong). Critical look: no skinning tears, holes,
+or stray-vertex spikes visible on any of the 24 swarmlings across this shot or the close-up below -- a
+cleaner result than section 2.10's placeholder, which showed a thin dark streak artefact on a couple of
+instances (attributed there to the placeholder body's own rig, not reproduced here).*
 
 ![Front-line mid-zoom](055/live3d_battle_front.png)
 
@@ -1052,10 +1061,79 @@ this distance; the swarm's facing (toward the Griffins, away from the far back r
 
 *A single swarmling at close range (`--zoom close`): mossy olive-gold fur texture (sampled from the real
 approved illustration by Meshy's own generation, not a flat swatch colour this time, unlike the
-placeholder), visible curled horns, ink-plum outline, legs mostly foreshortened under the round body at
-this board-tilt camera angle -- consistent with the 2D approved art's own "2 stubby front legs, hind
-hidden" silhouette (`Tooling/ArtLab/provenance/enemies/swarmling.md`). Reads clearly as the same creature
-concept as the 2D illustration, not just a generic round critter.*
+placeholder), visible curled horns and a cream muzzle, ink-plum outline (re-scaled to the mesh's own
+size in the second fix round below -- this pass's first version had a large, disconnected ring around the
+body instead), viewed front-on so the face actually reads -- consistent with the 2D approved art's own
+Skittery "cute creepy, glowing eyes" read (`Tooling/ArtLab/provenance/enemies/swarmling.md`). Legs are
+still mostly foreshortened/hidden under the round body, matching that same source art's own "2 stubby
+front legs, hind hidden" silhouette -- a shared design trait, not a rendering gap.*
+
+**Lead-review fix round (2026-09-30, second pass).** A lead review of this pass's first screenshots
+(commit `abba70f`) sent back four real findings, all fixed; the screenshots and bench table above are
+already the *post-fix* versions, this is the account of what was wrong and why.
+
+1. **Unit scale was still wrong, despite the first fix round's camera-framing work**: Griffins read at
+   roughly half a hex wide, Swarmlings at roughly a fifth of a hex -- both far smaller than the real 2D
+   battle screen's own proportions. Checked directly rather than guessed: `BeastCraft.Desktop
+   --screenshot shot.png --turns 0 --team griffin --lineup swarmling:Nature,swarmling:Nature,... --arena
+   Large` renders the actual 2D battle-opening board (fit-all camera, no turn played) -- the same game,
+   the same screen, ground truth rather than a doc's stated ratio. A direct pixel measurement against
+   that render: the 2D Griffin's wingspan visibly overflows its own hex (roughly 1.2-1.3x hex width), and
+   a 2D enemy sprite fills roughly two-thirds of its hex (~0.65-0.75x). Two separate bugs, both real:
+   - `HexBoard.SetScale`'s clearance factor (`beastFootprint * 1.4`) sized the hex *wider* than the
+     Griffin by 40% -- backwards from the 2D reference, where the beast is wider than its hex, not the
+     other way round. Changed to `beastFootprint * 0.8` (the Griffin now ~1.25 hexes wide, matching the
+     2D reference's overflow).
+   - Even after that, the Swarmling's own absolute world size (`TARGET_HEIGHT = 0.55` in
+     `blender_export_live_swarmling.py`) was still too small relative to the now-smaller hex: a bind-pose
+     bounding-box estimate suggested ~0.59x hex, but the *observed* on-screen ratio was ~0.35x --
+     the horn-tip-to-horn-tip bounding box is wider than the visually solid round body actually reads, so
+     the bbox math over-estimated the apparent size. Fixed with a runtime `SwarmScale = 1.4` multiplier
+     (Game1.cs, folded into each swarm instance's World matrix, not a Blender re-export -- quick to
+     re-tune without rebuilding the asset), landing the Swarmling at roughly 0.7x hex by the same pixel-
+     measurement method -- matching the 2D reference's own enemy-sprite ratio. **Re-ran both benches after
+     this change** (a visually larger swarm instance could plausibly cost more fill rate): draw calls and
+     triangle counts are bit-for-bit identical (scale doesn't touch vertex/index data), and fps/skin-time/
+     GC numbers land within normal run-to-run variance -- see the bench table above, now showing the
+     post-fix numbers directly.
+   - **Stated plainly, as asked:** this was tuned by eye against a handful of screenshots and one 2D
+     reference render, not derived from the 2D renderer's own sprite-to-hex sizing formula (which lives in
+     `BeastCraft.Presentation`, not reverse-engineered here) -- close enough by direct pixel comparison to
+     call this fixed, but a future pass should re-check if either asset's proportions change.
+2. **The arena still didn't fill the screen width**, even with the first fix round's arena-grid camera
+   sampling. Root cause: `ApplyCamera`'s ortho-fit rule, `Math.Max(viewSpanX, viewSpanY / aspect)`, widens
+   the frame whenever the sampled content's *vertical* extent needs more room than the portrait aspect
+   would otherwise show -- and a 15-row-deep arena's vertical extent (under the board tilt) does, every
+   time, which is exactly what was quietly shrinking the *width* below what it could have been. The real
+   2D battle screen doesn't do this: it crops rows top/bottom rather than shrinking everything to keep a
+   tall board fully visible (confirmed against the same `battle2d.png` reference -- the hex pattern runs
+   flush to, and slightly past, the left/right edges). Added `ApplyCamera(..., preferWidth: true)`, used
+   only by `RebuildCameraArena`, which makes `orthoWidth = viewSpanX` outright -- width always fills the
+   frame, tall row ranges may run off the top of the portrait screen instead. Edge margin also cut from a
+   full hex corner radius (`HexBoard.HexSize`) to a tenth of one, matching the 2D board's own edge hexes
+   reading as visibly, slightly cropped rather than comfortably inset.
+3. **The swarmling close-up had a large, disconnected elliptical ring around the body.** Cause: the
+   inverted-hull outline pass pushes every vertex out along its normal by a fixed *world-space* distance
+   (`OutlineThickness = 0.012`, tuned for the Griffin's ~2.0-unit scale) -- that absolute distance doesn't
+   shrink with a smaller mesh, so on the Swarmling's ~0.55-0.77-unit body it reads as a shell floating well
+   outside the silhouette rather than a thin contour hugging it. Fixed with a second, separate
+   `SwarmOutlineThickness` uniform in `Toon.fx` (used only by `VS_OutlineSwarm`), set from Game1 in
+   proportion to the two assets' own normalisation heights times `SwarmScale` above -- small enough now to
+   read as a contour, not a ring.
+4. **The swarmling close-up was framed from behind, not the front.** `SwarmFacingYaw` is specifically a
+   *battle-formation* choice (turn the Swarmling to face the Griffins across the front line) with no
+   reason to apply to an isolated, no-Griffins-in-frame close-up shot -- applying it there pointed the
+   Swarmling's face away from the same camera angle that shows a Griffin's front. `--zoom close`'s swarm
+   facing is now the identity rotation (no yaw) instead -- confirmed by a side-by-side render check (not
+   re-derived from the Blender axis-convention reasoning that got the *battle* facing right, because a
+   round, mostly bilaterally-symmetric creature's face doesn't reliably read from the 3/4 *side* profile
+   that works for the Griffin's beak/wings silhouette; a front-ish view was empirically the one that
+   actually shows the muzzle and horns). A same-settings Griffin close-up (`live3d_griffin_close_check
+   .png`, not otherwise referenced in this doc, kept here as the regression check) confirms the Griffin's
+   own close-up framing is unchanged.
+5. **Screenshots carried the debug stats overlay** (fps/draw-calls/memory text) baked into the image,
+   previously hidden only with an explicit `--hide-stats`. `--screenshot` now always hides it (interactive
+   play and `--bench` keep it) -- every screenshot in this section was re-taken after this change.
 
 **Honest per-enemy cost estimate, given the Griffin pipeline already existed to adapt from:**
 
@@ -1071,10 +1149,15 @@ concept as the 2D illustration, not just a generic round critter.*
   through the same pipeline would skip almost all of it (only the Blender authoring step repeats).
   Camera-framing work (task item 3) is a similar one-time, not-per-enemy cost.
 - Testing (screenshots, bench runs, one fix round) and this write-up: roughly 45-60 minutes.
-- **Total for this one enemy, this pass: roughly 3-3.5 hours**, dominated by the one-time swarm-tier
-  runtime architecture work, not by the Blender asset authoring itself -- consistent with section 2.10's
-  own observation that the merged-batch engineering, not the per-asset rig, was the larger cost that
-  pass too.
+- **Second, lead-reviewed fix round** (unit-scale investigation against a real 2D reference render,
+  camera `preferWidth` fix, per-asset outline thickness, close-up facing, stats-overlay hiding, re-running
+  both benches, re-taking four screenshots, this write-up's own update): roughly 60-75 minutes -- a real
+  cost, not folded into the estimate above, because it was a genuine correctness pass on top of the first
+  round's work, not part of authoring the asset itself.
+- **Total for this one enemy, this pass: roughly 4-4.5 hours** across both fix rounds, dominated by the
+  one-time swarm-tier runtime architecture work and camera/scale correctness, not by the Blender asset
+  authoring itself -- consistent with section 2.10's own observation that the merged-batch engineering,
+  not the per-asset rig, was the larger cost that pass too.
 
 **Caveats, honestly stated:**
 
@@ -1093,6 +1176,17 @@ concept as the 2D illustration, not just a generic round critter.*
   the Griffins, matching genre convention for side-view battle scenes), not a literal vector pointing at
   the Griffins' world position -- named here since "up/right toward enemies, enemies facing the players"
   in the task brief could be read more literally than what was built.
+- **Unit scale (`HexBoard`'s 0.8x factor, `SwarmScale = 1.4`) was tuned by eye against pixel measurements
+  of one 2D reference render**, not derived from the 2D renderer's own hex/sprite sizing formula -- close
+  enough by direct comparison to call fixed (see the fix round above for the actual before/after ratios),
+  but not a guaranteed-exact match, and the reference render itself
+  (`BeastCraft.Desktop --screenshot ... --turns 0 --team griffin --lineup swarmling:Nature,...`) is a
+  scratch artefact, not committed to the repository -- rerun that exact command against `content/data/Vfx
+  /battle-art.json`'s `Large` arena entry to reproduce it.
+- **The swarmling close-up's front-facing choice (`--zoom close` -> identity rotation) was found
+  empirically** (render, look, compare), not derived from the same Blender-axis reasoning that fixed the
+  battle-formation facing -- correct by inspection for this mesh, but if the Swarmling is ever re-rigged
+  from a different remesh, re-check by eye rather than assuming the axis math still lines up the same way.
 
 ### Licences (this pass)
 

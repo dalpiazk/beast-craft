@@ -345,7 +345,9 @@ credits, plus a remesh to ~1,200 tris, 5 credits -- run directly, not through `m
 `Tooling/ArtLab/provenance/meshy-01a0f424-1644-75af-8cdb-e25ef6452845.md` and
 `Tooling/ArtLab/provenance/meshy-remesh-01a0f426-b36a-7051-8603-3b77b80b9616.md`), this pass replaces the
 procedural placeholder above with a real, rigged, animated Swarmling. Full account (asset stats, register
-budget, camera-framing fix, bench numbers, caveats): `docs/spikes/055-3d-mini-spike.md` section 2.11.
+budget, camera-framing fix, bench numbers, caveats, and a lead-reviewed second fix round for unit scale,
+board-width fill, the swarm outline, close-up facing, and hiding the debug overlay in `--screenshot`
+mode): `docs/spikes/055-3d-mini-spike.md` section 2.11.
 
 ### Asset: `blender_export_live_swarmling.py`
 

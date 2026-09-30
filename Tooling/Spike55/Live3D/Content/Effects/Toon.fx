@@ -60,6 +60,14 @@ float3 TintMultiply = float3(1.0, 1.0, 1.0);                    // colour-form c
 
 float OutlineThickness = 0.012;
 float3 OutlineColor = float3(0.1804, 0.1647, 0.2706);           // #2E2A45, ink-plum
+// Lead-review fix round: a SEPARATE, smaller outline thickness for the swarm pass. OutlineThickness
+// above was tuned for the Griffin's ~2.0-unit scale; the Swarmling is ~0.55-0.65 world units tall
+// (roughly a third), so the same *absolute* push-out distance reads as a large, disconnected ring
+// around its much smaller body at close range (confirmed by screenshot -- an inverted-hull outline
+// pass expands along the normal by a fixed world-space distance, not a fraction of the mesh's own
+// size, so it does not scale down with the mesh automatically). Set from Game1 in proportion to the
+// Swarmling's own TargetHeight vs the Griffin's (see Game1.LoadContent's comment at this parameter).
+float SwarmOutlineThickness = 0.004;
 
 texture BaseTexture;
 sampler BaseSampler = sampler_state
@@ -321,7 +329,7 @@ VSOutput VS_OutlineSwarm(VSInputSwarm input)
     VSOutput output;
     float3 worldPos, worldNormal;
     SkinSwarmPositionNormal(input, worldPos, worldNormal);
-    float3 expanded = worldPos + normalize(worldNormal) * OutlineThickness;
+    float3 expanded = worldPos + normalize(worldNormal) * SwarmOutlineThickness;
     output.Position = mul(float4(expanded, 1.0), ViewProjection);
     output.NormalWS = worldNormal;
     output.TexCoord = input.TexCoord;
