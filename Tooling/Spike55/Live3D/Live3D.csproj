@@ -47,6 +47,13 @@
     <None Include="Content\model\griffin_live.glb" Link="Content\model\griffin_live.glb" CopyToOutputDirectory="PreserveNewest" />
     <None Include="Content\model\crest_alt.glb" Link="Content\model\crest_alt.glb" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\..\content\art\backdrops\r01\sun0\medium.png" Link="Content\backdrop.png" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Fifth pass (swarm via GPU skinning, battle mode only): the Swarmling's custom binary mesh/bone
+         data and shared swatch texture, see SwarmlingSkinnedModel.cs and Tooling/Spike55/
+         blender_export_vat_swarmling.py. -->
+    <None Include="Content\swarm\swarmling_mesh.bin" Link="Content\swarm\swarmling_mesh.bin" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Content\swarm\swarmling_bones.bin" Link="Content\swarm\swarmling_bones.bin" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Content\swarm\swarmling_meta.json" Link="Content\swarm\swarmling_meta.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Content\swarm\swarmling_texture.png" Link="Content\swarm\swarmling_texture.png" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

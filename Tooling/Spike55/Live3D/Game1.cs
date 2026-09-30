@@ -51,6 +51,24 @@ namespace BeastCraft.Spike55.Live3D
         private EffectParameter _paramBaseTexture;
         private EffectParameter _paramBones;
 
+        // Fifth pass: swarm rendering via GPU skinning with a per-instance bone-array offset -- see
+        // Toon.fx's "Fifth pass" section (this replaced an original Vertex-Animation-Texture design,
+        // which MonoGame's effect compiler cannot build for the OpenGL profile at all) and
+        // GpuMesh.BuildSwarmMerged. Only populated when --battle is passed. Each swarmling's per-frame
+        // bone skin matrices are pre-baked in Blender (SwarmlingSkinnedModel.BoneFrames), not computed
+        // via AnimatedPose at runtime -- see SwarmlingSkinnedModel.cs's doc comment for why (no glTF
+        // involved for this asset at all).
+        private const int MaxSwarmInstances = 24; // must match Toon.fx's MAX_SWARM_INSTANCES
+        private SwarmlingSkinnedModel _swarmModel;
+        private GpuMesh _swarmMesh; // one merged static buffer, N copies baked in at scene-setup time
+        private Texture2D _swarmTexture;
+        private EffectParameter _paramSwarmBones;
+        private int _swarmInstanceCount;
+        private int _swarmBonesPerInstance;
+        private XnaVector3[] _swarmWorldOffsets = Array.Empty<XnaVector3>();
+        private float[] _swarmClockOffsets = Array.Empty<float>(); // per-instance desync, like BeastInstance.ClockOffset
+        private XnaMatrix[] _swarmBonesPalette = Array.Empty<XnaMatrix>(); // uploaded to Toon.fx's SwarmBones[] once per frame
+
         // The crest's fixed local re-orientation (see SkinInstance's comment) plus, new this fix round,
         // a fixed facing rotation applied to every beast so the camera reads a 3/4 side profile with
         // the head on-screen-right -- matching content/art/beasts/griffin/griffin.png's orientation --
@@ -126,7 +144,19 @@ namespace BeastCraft.Spike55.Live3D
             _graphics.PreferredBackBufferWidth = 540;
             _graphics.PreferredBackBufferHeight = 960;
             _graphics.SynchronizeWithVerticalRetrace = !_options.BenchMode; // uncapped in --bench, for a true throughput number
-            IsFixedTimeStep = false;
+            if (_options.BenchMode && _options.FpsCap > 0)
+            {
+                // A bench-mode frame-rate cap: MonoGame's own fixed-time-step throttle (not vsync, which
+                // stays off above so this is a deliberate, measured cap rather than a monitor-refresh
+                // accident) -- measures whether the scene can sustain the research-backed 30fps battle
+                // target (docs/spikes/055-3d-mini-spike.md section 2.9), not just uncapped throughput.
+                IsFixedTimeStep = true;
+                TargetElapsedTime = TimeSpan.FromSeconds(1.0 / _options.FpsCap);
+            }
+            else
+            {
+                IsFixedTimeStep = false;
+            }
             _graphics.ApplyChanges();
             base.Initialize();
         }
@@ -194,16 +224,38 @@ namespace BeastCraft.Spike55.Live3D
             _lineEffect = new BasicEffect(GraphicsDevice) { VertexColorEnabled = true };
             _backdropEffect = new BasicEffect(GraphicsDevice) { TextureEnabled = true, VertexColorEnabled = false, World = XnaMatrix.Identity, View = XnaMatrix.Identity, Projection = XnaMatrix.Identity };
 
-            var gridVerts = HexBoard.BuildGridLines(HexBoard.ArenaWidth, HexBoard.ArenaHeight, new XnaColor(46, 42, 69, 140));
-            _hexGridVertexBuffer = new VertexBuffer(GraphicsDevice, VertexPositionColor.VertexDeclaration, gridVerts.Length, BufferUsage.WriteOnly);
-            _hexGridVertexBuffer.SetData(gridVerts);
-            _hexGridVertexCount = gridVerts.Length;
+            if (_options.Battle)
+            {
+                string swarmDir = Path.Combine(contentRoot, "swarm");
+                _swarmModel = SwarmlingSkinnedModel.Load(swarmDir);
+                using (var fs = File.OpenRead(Path.Combine(swarmDir, "swarmling_texture.png")))
+                    _swarmTexture = Texture2D.FromStream(GraphicsDevice, fs);
+                _paramSwarmBones = _toonEffect.Parameters["SwarmBones"];
+                _swarmBonesPerInstance = _swarmModel.BoneCount;
+                _swarmBonesPalette = new XnaMatrix[MaxSwarmInstances * _swarmBonesPerInstance];
+                for (int i = 0; i < _swarmBonesPalette.Length; i++)
+                    _swarmBonesPalette[i] = XnaMatrix.Identity;
 
-            SetStressLevel(_options.BenchMode ? _options.BenchBeasts : (_options.ScreenshotMode ? _options.ScreenshotBeasts : 1));
-            if (!_options.ScreenshotCrestOn)
-                foreach (var inst in _instances)
-                    inst.CrestOn = false;
-            _tintIndex = Math.Clamp(_options.ScreenshotTint, 0, Tints.Length - 1);
+                var battleGridVerts = HexBoard.BuildGridLines(11, 15, new XnaColor(46, 42, 69, 140));
+                _hexGridVertexBuffer = new VertexBuffer(GraphicsDevice, VertexPositionColor.VertexDeclaration, battleGridVerts.Length, BufferUsage.WriteOnly);
+                _hexGridVertexBuffer.SetData(battleGridVerts);
+                _hexGridVertexCount = battleGridVerts.Length;
+
+                SetupBattleScene(_options.BattleGriffins, _options.BattleSwarm);
+            }
+            else
+            {
+                var gridVerts = HexBoard.BuildGridLines(HexBoard.ArenaWidth, HexBoard.ArenaHeight, new XnaColor(46, 42, 69, 140));
+                _hexGridVertexBuffer = new VertexBuffer(GraphicsDevice, VertexPositionColor.VertexDeclaration, gridVerts.Length, BufferUsage.WriteOnly);
+                _hexGridVertexBuffer.SetData(gridVerts);
+                _hexGridVertexCount = gridVerts.Length;
+
+                SetStressLevel(_options.BenchMode ? _options.BenchBeasts : (_options.ScreenshotMode ? _options.ScreenshotBeasts : 1));
+                if (!_options.ScreenshotCrestOn)
+                    foreach (var inst in _instances)
+                        inst.CrestOn = false;
+                _tintIndex = Math.Clamp(_options.ScreenshotTint, 0, Tints.Length - 1);
+            }
 
             if (_options.BenchMode)
             {
@@ -242,6 +294,49 @@ namespace BeastCraft.Spike55.Live3D
             RebuildCamera();
         }
 
+        /// <summary>The fifth-pass battle scene: `griffinCount` GPU-skinned beasts in a front row plus
+        /// `swarmCount` VAT-driven swarmlings filling the rows behind them, on an 11x15 arena ("game
+        /// scale" per the task brief -- a Large arena per docs/art/hollow-art-slots.md's sizing). Unlike
+        /// SetStressLevel's beasts, the swarm's per-instance placement/phase are uploaded to the shader
+        /// ONCE here, not every frame -- see Toon.fx's "Fifth pass" section for why that's the point of
+        /// VAT (CPU cost doesn't scale with swarm size).</summary>
+        private void SetupBattleScene(int griffinCount, int swarmCount)
+        {
+            _instances.Clear();
+            var griffinCells = HexBoard.FillOrder(11, 15, griffinCount, startRow: 2);
+            for (int i = 0; i < griffinCount; i++)
+            {
+                var inst = new BeastInstance(_bodyModel);
+                var (col, row) = griffinCells[i % Math.Max(1, griffinCells.Count)];
+                var center = HexBoard.CellCenter(col, row);
+                inst.World = FacingYaw * NumMatrix.CreateTranslation(center.X, 0f, center.Z);
+                inst.ClockOffset = (float)(_rng.NextDouble() * 4.0);
+                _instances.Add(inst);
+            }
+
+            swarmCount = Math.Min(swarmCount, MaxSwarmInstances);
+            _swarmInstanceCount = swarmCount;
+            _swarmMesh = swarmCount > 0 ? GpuMesh.BuildSwarmMerged(GraphicsDevice, _swarmModel, swarmCount) : null;
+            _swarmWorldOffsets = swarmCount > 0 ? new XnaVector3[swarmCount] : Array.Empty<XnaVector3>();
+            _swarmClockOffsets = swarmCount > 0 ? new float[swarmCount] : Array.Empty<float>();
+            if (swarmCount > 0)
+            {
+                // The swarmling's bind pose already faces +X (baked into the mesh at export time by
+                // blender_export_vat_swarmling.py -- see its module docstring), unlike the Griffin's
+                // GLB, so instance placement here is a pure translation, no FacingYaw needed.
+                var swarmCells = HexBoard.FillOrder(11, 15, swarmCount, startRow: 6);
+                for (int i = 0; i < swarmCount; i++)
+                {
+                    var (col, row) = swarmCells[i % Math.Max(1, swarmCells.Count)];
+                    var center = HexBoard.CellCenter(col, row);
+                    _swarmWorldOffsets[i] = center;
+                    _swarmClockOffsets[i] = (float)(_rng.NextDouble() * 4.0);
+                }
+            }
+
+            RebuildCamera();
+        }
+
         private void RebuildCamera()
         {
             // Lead-review fix: the first camera sat on the Z axis looking straight at the beast's
@@ -253,10 +348,19 @@ namespace BeastCraft.Spike55.Live3D
             // slight 3/4 turn rather than a flat profile), elevated and tilted down for the hex-board
             // angle the earlier Blender passes also used.
             NumVector3 boardCenterNum = NumVector3.Zero;
+            int centerCount = 0;
             foreach (var inst in _instances)
+            {
                 boardCenterNum += new NumVector3(inst.World.M41, inst.World.M42, inst.World.M43);
-            if (_instances.Count > 0)
-                boardCenterNum /= _instances.Count;
+                centerCount++;
+            }
+            foreach (var off in _swarmWorldOffsets)
+            {
+                boardCenterNum += new NumVector3(off.X, off.Y, off.Z);
+                centerCount++;
+            }
+            if (centerCount > 0)
+                boardCenterNum /= centerCount;
             var target = new XnaVector3(boardCenterNum.X, 0.85f, boardCenterNum.Z);
 
             // A hex board's rows are separated along world Z; an orthographic camera looking *straight*
@@ -282,7 +386,7 @@ namespace BeastCraft.Spike55.Live3D
             // each beast's ground point and a point near its head height/wingtip so the vertical extent
             // (and wing spread) are both accounted for.
             float minVX = float.MaxValue, maxVX = float.MinValue, minVY = float.MaxValue, maxVY = float.MinValue;
-            if (_instances.Count == 0)
+            if (_instances.Count == 0 && _swarmWorldOffsets.Length == 0)
             {
                 minVX = maxVX = minVY = maxVY = 0f;
             }
@@ -290,6 +394,16 @@ namespace BeastCraft.Spike55.Live3D
             {
                 var basePt = new XnaVector3(inst.World.M41, inst.World.M42, inst.World.M43);
                 var topPt = basePt + new XnaVector3(0f, 2.2f, 0f);
+                var vpBase = XnaVector3.Transform(basePt, _view);
+                var vpTop = XnaVector3.Transform(topPt, _view);
+                minVX = Math.Min(minVX, Math.Min(vpBase.X, vpTop.X));
+                maxVX = Math.Max(maxVX, Math.Max(vpBase.X, vpTop.X));
+                minVY = Math.Min(minVY, Math.Min(vpBase.Y, vpTop.Y));
+                maxVY = Math.Max(maxVY, Math.Max(vpBase.Y, vpTop.Y));
+            }
+            foreach (var basePt in _swarmWorldOffsets)
+            {
+                var topPt = basePt + new XnaVector3(0f, 0.6f, 0f); // swarmlings are much shorter than beasts
                 var vpBase = XnaVector3.Transform(basePt, _view);
                 var vpTop = XnaVector3.Transform(topPt, _view);
                 minVX = Math.Min(minVX, Math.Min(vpBase.X, vpTop.X));
@@ -346,6 +460,7 @@ namespace BeastCraft.Spike55.Live3D
             _skinStopwatch.Restart();
             foreach (var inst in _instances)
                 UpdateInstancePose(inst);
+            UpdateSwarmBones();
             _skinStopwatch.Stop();
             _stats.SkinningMsThisFrame = _skinStopwatch.Elapsed.TotalMilliseconds;
 
@@ -393,6 +508,35 @@ namespace BeastCraft.Spike55.Live3D
             }
         }
 
+        /// <summary>The whole swarm's per-frame CPU cost: for each instance, pick its nearest baked
+        /// animation frame (a plain array index -- no interpolation, no vertex work, see
+        /// SwarmlingSkinnedModel's doc comment for why frames are pre-baked in Blender rather than
+        /// evaluated here) and combine that frame's 3 object-local bone skin matrices with the
+        /// instance's fixed hex-cell world offset, writing the result into this instance's slice of the
+        /// shared SwarmBones[] palette DrawSwarm uploads once before the single merged draw call. Real,
+        /// measured cost (unlike the original VAT design's "one float"), but small -- see the gate
+        /// report for the measured skinningMsAvg delta this added.</summary>
+        private void UpdateSwarmBones()
+        {
+            if (_swarmInstanceCount == 0)
+                return;
+            int frameCount = _swarmModel.FrameCount;
+            int boneCount = _swarmBonesPerInstance;
+            for (int i = 0; i < _swarmInstanceCount; i++)
+            {
+                float t = _elapsedSeconds + _swarmClockOffsets[i];
+                int frame = ((int)(t * _swarmModel.Fps)) % frameCount;
+                if (frame < 0)
+                    frame += frameCount;
+                var offset = _swarmWorldOffsets[i];
+                var worldTranslation = NumMatrix.CreateTranslation(offset.X, offset.Y, offset.Z);
+                var frameBones = _swarmModel.BoneFrames[frame];
+                int baseIndex = i * boneCount;
+                for (int b = 0; b < boneCount; b++)
+                    _swarmBonesPalette[baseIndex + b] = ToXna(frameBones[b] * worldTranslation);
+            }
+        }
+
         protected override void Draw(GameTime gameTime)
         {
             _stats.DrawCallsThisFrame = 0;
@@ -403,6 +547,7 @@ namespace BeastCraft.Spike55.Live3D
             DrawBackdrop();
             DrawHexGrid();
             DrawBeasts();
+            DrawSwarm();
 
             bool showStats = !_options.BenchMode && !(_options.ScreenshotMode && _options.ScreenshotHideStats);
             if (showStats)
@@ -512,13 +657,49 @@ namespace BeastCraft.Spike55.Live3D
             }
         }
 
+        /// <summary>Draws the whole swarm (up to 32 merged instances) in exactly 2 draw calls total
+        /// (toon fill + outline), regardless of swarm size -- the merged-batch VAT approach's actual
+        /// payoff (see Toon.fx's "Fifth pass" section and GpuMesh.BuildSwarmMerged). ViewProjection/
+        /// TintMultiply are already set by DrawBeasts, called just before this every frame.</summary>
+        private void DrawSwarm()
+        {
+            if (_swarmInstanceCount == 0 || _swarmMesh == null)
+                return;
+
+            _paramBaseTexture.SetValue(_swarmTexture);
+            _paramSwarmBones.SetValue(_swarmBonesPalette);
+
+            GraphicsDevice.BlendState = BlendState.Opaque;
+            GraphicsDevice.DepthStencilState = DepthStencilState.Default;
+            GraphicsDevice.SetVertexBuffer(_swarmMesh.Vertices);
+            GraphicsDevice.Indices = _swarmMesh.Indices;
+
+            GraphicsDevice.RasterizerState = RasterizerState.CullClockwise;
+            foreach (var pass in _toonEffect.Techniques["ToonSwarm"].Passes)
+            {
+                pass.Apply();
+                GraphicsDevice.DrawIndexedPrimitives(PrimitiveType.TriangleList, 0, 0, _swarmMesh.TriangleCount);
+            }
+            _stats.DrawCallsThisFrame++;
+            _stats.TrianglesThisFrame += _swarmMesh.TriangleCount;
+
+            GraphicsDevice.RasterizerState = RasterizerState.CullCounterClockwise;
+            foreach (var pass in _toonEffect.Techniques["OutlineSwarm"].Passes)
+            {
+                pass.Apply();
+                GraphicsDevice.DrawIndexedPrimitives(PrimitiveType.TriangleList, 0, 0, _swarmMesh.TriangleCount);
+            }
+            _stats.DrawCallsThisFrame++;
+            _stats.TrianglesThisFrame += _swarmMesh.TriangleCount;
+        }
+
         private void DrawStatsOverlay()
         {
             _spriteBatch.Begin();
             long managedBytes = StatsTracker.EstimateManagedBytes();
             long gpuEstimateBytes = EstimateGpuBytes();
             string text =
-                $"beasts: {_instances.Count}  clip: {_clip}  crest: {(_instances.Count > 0 && _instances[0].CrestOn ? "on" : "off")}  tint: {_tintIndex}\n" +
+                $"beasts: {_instances.Count}  swarm: {_swarmInstanceCount}  clip: {_clip}  crest: {(_instances.Count > 0 && _instances[0].CrestOn ? "on" : "off")}  tint: {_tintIndex}\n" +
                 $"fps avg: {_stats.AverageFps():0.0}  fps 1% low: {_stats.OnePercentLowFps():0.0}\n" +
                 $"draw calls: {_stats.DrawCallsThisFrame}  tris: {_stats.TrianglesThisFrame:N0}\n" +
                 $"skin: {_stats.SkinningMsEma:0.00} ms  managed: {managedBytes / (1024.0 * 1024.0):0.0} MB  gpu(est): {gpuEstimateBytes / (1024.0 * 1024.0):0.0} MB\n" +
@@ -539,7 +720,16 @@ namespace BeastCraft.Spike55.Live3D
             long ib = (long)(_bodyModel.Indices.Length + _crestModel.Indices.Length) * sizeof(short);
             long tex = _baseColorTexture != null ? (long)_baseColorTexture.Width * _baseColorTexture.Height * 4 : 0;
             long backdrop = _backdropTexture != null ? (long)_backdropTexture.Width * _backdropTexture.Height * 4 : 0;
-            return vb + ib + tex + backdrop;
+
+            // Swarm (fifth pass): the merged VB scales with instance count (each copy repeats the same
+            // ~860-vertex swarmling), but the shared swatch texture and the tiny pre-baked bone-frame
+            // data (a managed array, not a GPU resource -- not counted here) are each built/loaded ONCE
+            // regardless of swarm size.
+            long swarmVb = _swarmMesh != null ? (long)_swarmMesh.Vertices.VertexCount * SwarmVertex.VertexDeclaration.VertexStride : 0;
+            long swarmIb = _swarmMesh != null ? (long)_swarmMesh.Indices.IndexCount * sizeof(short) : 0;
+            long swarmTex = _swarmTexture != null ? (long)_swarmTexture.Width * _swarmTexture.Height * 4 : 0;
+
+            return vb + ib + tex + backdrop + swarmVb + swarmIb + swarmTex;
         }
 
         private void SaveScreenshot(string path)
@@ -581,6 +771,8 @@ namespace BeastCraft.Spike55.Live3D
 
             string json = "{\n" +
                 $"  \"beasts\": {_instances.Count},\n" +
+                $"  \"swarm\": {_swarmInstanceCount},\n" +
+                $"  \"fpsCap\": {_options.FpsCap},\n" +
                 $"  \"seconds\": {_benchElapsedSeconds:0.###},\n" +
                 $"  \"frameCount\": {_benchFrameMs.Count},\n" +
                 $"  \"fpsAvg\": {(meanMs > 0 ? 1000.0 / meanMs : 0):0.###},\n" +

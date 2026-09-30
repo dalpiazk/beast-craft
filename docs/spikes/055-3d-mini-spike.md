@@ -667,6 +667,226 @@ Hollow backdrop. Some wingtip overlap between neighbours remains (beasts are dra
 own hex footprint, same as the 2D sprites in `docs/spikes/055/board_mock_lowpoly.png`), but beasts now
 read as individually placed on the board rather than one overlapping clump.*
 
+### 2.9 Mobile budgets (research)
+
+A separate research pass gathered sourced evidence on real-time 3D budgets for mid-range Android
+(target: Galaxy A35-class, Exynos 1380 / Mali-G68 MP5), specifically to turn section 2.8's "A35
+unmeasured" caveats into numbers with citations rather than guesses. Full research with every source
+link, confidence flags (**evidence** vs **[secondary]**/**[speculative]**), and reasoning is not
+reproduced here -- this is the load-bearing summary; go to the research itself for the primary-source
+detail behind any number below.
+
+**Per-unit tier budget (A35-class target):**
+
+| Unit tier | Triangles | Texture | Bones | Draw calls |
+| --- | --- | --- | --- | --- |
+| Player beast (<=4 on screen) | 6,000-8,000 | 1K ASTC (ETC2 fallback) | 10-20 (<=30 ceiling) | 2 (toon fill + outline) |
+| Giant boss (1 on screen) | 12,000-16,000 | 1-2K ASTC | 20-30 | 2 (fill + outline) |
+| Small/swarm enemy (up to 24 on screen) | 800-1,500 | Shared atlas, <=512 each | <=15, or VAT (no bones) | Target <=2-4 **total** for the whole swarm, not per-unit |
+
+Other headline numbers: **1K ASTC primary / ETC2 fallback** texture compression (ASTC on ~75%+ of
+active Android devices, ETC2 ~90%+); **30 fps hard cap in battle** (turn-based has no gameplay need for
+60, and mid-range Android sustains only 50-65% of peak GPU clock under continuous load -- a 60fps start
+can fall to 33-40fps within 5 minutes); **draw calls ~100-150** as a 2026 mid-range ceiling, explicitly
+framed across sources as the *bigger* lever than raw triangle count once many small skinned meshes are
+on screen -- directly relevant here, since 24 individually-drawn, individually-outlined swarmlings
+alone would already be ~96-100+ draw calls before board/UI.
+
+**Evidence, separated from recommendation** (per topic; sources inline):
+
+- **Triangle counts**: no single authoritative number exists. Unity's own official guidance is
+  conservative (~300-1,500 tris/mesh "for good results" on mobile,
+  https://docs.unity3d.com/560/Documentation/Manual/ModelingOptimizedCharacters.html); mobile-art blog
+  consensus runs higher (hero 3,000-8,000+ tris, crowd 800-1,500 -- MessyPoly
+  https://www.messypoly.com/learn/polygon-budgets-mobile-games, Creatuneagency
+  https://www.creatuneagency.com/en/blog/low-poly-3d-models-for-mobile-games/). The tier table above
+  uses the blog consensus as the working target (Unity's figure treated as a conservative floor).
+- **Total per-frame triangle budget**: no official Google/Arm/Qualcomm fixed number; Arm frames it as a
+  *cycle budget* derived from device clock/target fps/resolution, not a poll count (Arm, "GPU Processing
+  Budget Approach to Game Development",
+  https://developer.arm.com/community/arm-community-blogs/b/mobile-graphics-and-gaming-blog/posts/gpu-processing-budget-approach-to-game-development).
+  100-300K visible tris/frame is a recurring secondary-sourced ceiling (Creatuneagency, as above); our
+  worst-case battle geometry (3 beasts/avatar + 24 swarmlings, both passes) stays comfortably under it
+  even unoptimised.
+- **Texture format/size**: ASTC ~75%+ device support, ETC2 ~90%+ (Android Developers, "Textures",
+  https://developer.android.com/games/optimize/textures); the existing Griffin's 1K base-colour texture
+  matches that page's own example of a "right-sized" (not oversized) mobile character texture.
+- **Bone counts**: Unity community consensus keeps mobile skinning under ~30 bones
+  (https://discussions.unity.com/t/skinned-mesh-max-number-of-bones-in-total/936356); Unreal caps
+  mobile skeletal-mesh sections at 75 bones
+  (https://dev.epicgames.com/documentation/en-us/unreal-engine/skeletal-mesh-rendering-paths-in-unreal-engine);
+  the GLES 3.0 spec's guaranteed-minimum 1024 vertex-uniform components is the underlying hard
+  constraint a naive 4x4-per-bone uniform array runs into around 64 bones. The Griffin's 11 joints (and
+  `Tooling/Spike55/Live3D`'s `MAX_BONES = 16`, chosen for exactly this reason -- see
+  `Toon.fx`'s header comment) is comfortably inside every cited ceiling.
+- **GPU instancing for skinned meshes**: not supported by Unity's `SkinnedMeshRenderer` at all, a
+  platform-level limitation, not Unity-specific
+  (https://docs.unity3d.com/Manual/GPUInstancing.html); MonoGame's own GLES/Android backend has an open,
+  long-standing gap for instanced geometry drawing generally (not just skinned), tracked since 2018
+  (https://github.com/MonoGame/MonoGame/issues/6292) -- directly relevant to how the fifth pass (below)
+  approaches swarm rendering.
+- **Vertex Animation Textures (VAT)**: the standard industry technique for many animated crowd
+  characters, foundational reference NVIDIA GPU Gems 3 Ch.2
+  (https://developer.nvidia.com/gpugems/gpugems3/part-i-geometry/chapter-2-animated-crowd-rendering);
+  bakes animation into a texture sampled in the vertex shader, compatible with ordinary (non-skeletal)
+  instancing/batched drawing -- which is exactly what sidesteps MonoGame's skinned-instancing gap above.
+- **Thermal/battery**: mid-range Android sustains only 50-65% of peak GPU clock under continuous load
+  (Kryozon, secondary but widely converged,
+  https://www.kryozon.com/blogs/cooling-hub/how-to-cool-down-phone-throttling-on-android); Android's own
+  Game Mode FPS-throttling docs confirm the platform expects and rewards fps capping (~50% GPU power
+  reduction at a battery-mode cap;
+  https://developer.android.com/games/optimize/adpf/gamemode/fps-throttling) and call 30fps "a
+  recommended starting target frame rate."
+
+**Recommendation carried forward into the fifth pass (below):** hero-tier GPU skinning (already built,
+section 2.8) for player beasts, a much lower-poly VAT path for swarm-tier enemies (no per-unit skinning
+or instancing at all), a shared atlas/material across the whole swarm, and a 30fps battle cap as the
+default target for on-device numbers -- tested below against an uncapped-throughput bench for
+comparison, same as section 2.8's methodology.
+
+### 2.10 Fifth pass: swarm via VAT (2026-09-30)
+
+Per the producer's continued interest in the 3D route, this pass tests the hero-plus-swarm scene
+section 2.9's research called for: hero-tier GPU skinning (already built, section 2.8) for the player
+beasts, plus a much cheaper, much-lower-draw-call path for many small swarm-tier enemies. Scene: 3
+GPU-skinned Griffins + 24 swarm-tier "Swarmling" units on hexes, 11x15 arena (matching the research
+pass's "game scale" -- a Large arena per `docs/art/hollow-art-slots.md`), both an uncapped bench and the
+research-recommended 30fps battle cap.
+
+**Blocked spend, and what this pass built instead of a Meshy Swarmling.** The producer authorised
+exactly two paid Meshy calls (image-to-3d of the approved Swarmling art at
+`content/art/enemies/swarmling/swarmling_hollow.png`, 30 credits; a remesh to ~1,200 tris, 5 credits).
+A `--dry-run` confirmed the exact 30-credit image-to-3d request. The real `--yes` call was **refused by
+this environment's own safety classifier** ("Real-World Transactions"), independent of the task-level
+authorisation -- a tool-level restriction this session could not get past, and did not attempt to work
+around. **Zero Meshy credits were spent this pass.** Rather than skip the swarm-rendering engineering
+entirely, `Tooling/Spike55/blender_export_vat_swarmling.py` builds a small procedural low-poly
+"swarmling" body (1,688 tris, 860 verts -- in the authorised ~1,200-tri target's range) textured with
+the real approved Swarmling illustration's own sampled palette, so the *technique* is actually built and
+measured, honestly labelled as a stand-in body, not a Meshy output. If Meshy spend authorisation reaches
+this session by a channel the classifier accepts, this is the one clearly-scoped follow-up: swap the
+procedural body for a real Swarmling generation/remesh through the same pipeline -- everything else
+(rig, bake, merged-batch rendering) carries over unchanged.
+
+**What "VAT" means in this section's title, and why it isn't literally what got built.** The task brief
+asked for Vertex Animation Textures: bake animated position/normal per frame into a texture, sample it
+in the vertex shader, so many instances can share one draw call with no per-instance skinning cost. This
+was attempted first and **does not compile**: MonoGame 3.8.5's DesktopGL effect compiler has no support
+for sampling a texture in the vertex shader stage at all -- isolated to a 6-line minimal repro (a bare
+`tex2Dlod` call, nothing else) that fails identically to the full implementation: `"invalid DCL register
+type for this shader model"` / `"TEXLD using undeclared sampler"`, inside MonoGame's MojoShader-based
+DX9-bytecode-to-GLSL translation step. This is a **harder, more definitive constraint than section 2.9's
+own "unverified on some Android GPUs" VTF caveat**: it doesn't build for *desktop* GL at all, so it would
+never have reached an Android device to test in the first place, and no shader-side workaround was found
+in this pass. Pivoted instead to GPU skinning via a **per-instance-sliced bone-array offset**: the same
+`Bones[]`-uniform-array technique already proven working for the Griffin (section 2.8's `SkinPosition
+Normal`), just with a bigger shared array (`SwarmBones[72]` = 24 swarmlings x 3 bones each) and a
+per-vertex `InstanceId` selecting which instance's slice of that array a given copy reads. Each
+swarmling's animation is still pre-baked per frame in Blender (3 bone skin matrices x 20 frames -- tiny,
+`swarmling_bones.bin`), matching the task brief's "bake once, sample cheaply at runtime" spirit even
+though the runtime-sampling mechanism changed from a texture fetch to a uniform-array index. See
+`Content/Effects/Toon.fx`'s "Fifth pass" section and `Tooling/Spike55/blender_export_vat_swarmling.py`'s
+module docstring for the full account.
+
+**The merged-batch property survives the pivot, which is the part that actually matters for Android.**
+Whichever way each vertex gets its final position, the whole swarm still draws from **one shared static
+vertex buffer** (`GpuMesh.BuildSwarmMerged`: N copies of the swarmling's bind-pose vertices, index
+buffer offset per copy) in **exactly 2 draw calls total** (toon fill + outline), regardless of swarm
+size -- confirmed at 24 instances below. This is the property the research pass (2.9,
+`MonoGame/MonoGame#6292`) flagged as load-bearing for Android specifically because MonoGame's GLES
+backend has no reliable instancing support; a merged static buffer sidesteps that gap entirely, and nothing
+about the VAT-to-bone-array pivot changes that.
+
+**A genuinely new, separately-flagged Android risk the pivot introduces: uniform-array budget.**
+`SwarmBones[72]` (24 instances x 3 bones, 4x4 matrices) is 72 x 16 = 1,152 floats = **288 vec4
+registers**. GLES 2.0's spec-guaranteed minimum vertex-uniform budget is 128 vec4; **GLES 3.0's is 256
+vec4 -- this array does not safely fit inside even the GLES 3.0 guaranteed minimum**, though it compiles
+and runs without issue on this desktop GPU (desktop uniform budgets are far larger in practice). This is
+exactly the class of problem section 2.9's research flagged in the abstract (Qualcomm's recommendation
+to use 3x4 instead of 4x4 bone matrices, or a texture-buffer/UBO-based approach, for higher bone counts)
+-- now concretely hit by this pass's own design, not a hypothetical. A production implementation would
+need one of: 3x4 matrices (cuts this to 216 vec4, still tight), fewer bones per swarmling (2 instead of
+3 -- root+combined-body-head -- cuts to 192 vec4), a smaller simultaneous-swarm cap, or genuinely
+texture-based instance data via a mechanism that isn't vertex-stage texture sampling (this pass's other
+finding says that path is closed for MonoGame/DesktopGL specifically, but a UBO/uniform-buffer approach
+is a different mechanism, untested here).
+
+**Measured numbers (this machine: Intel Arc 140V laptop, DesktopGL, Release build):**
+
+| Scene | fps avg (uncapped) | fps 1% low (uncapped) | fps avg (30fps cap) | fps 1% low (30fps cap) | Draw calls | Triangles | Skin time | GPU mem (est.) | Gen0 GC |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 24 swarmlings alone | 1,700 | 329 | 30.0 | 21.6 | 4 | 81,024 | 0.002 ms | 9.9 MB | 0 |
+| 3 Griffins + 24 swarmlings | 960-1,024 | 126-206 | 30.0 | 26.0 | 16 | 132,600 | 0.11-0.28 ms | 9.9 MB | ~60-335/10s |
+
+(10-second `--bench` runs, or 2s for the smallest smoke-test row shown in the range above; GPU memory
+estimate is flat across swarm-alone vs. full-battle because the swarm's shared swatch texture and merged
+buffer are sized for the fixed 24-instance cap either way.) The swarm's own CPU cost is close to
+immeasurable (0.002 ms for 24 instances -- a plain per-instance array-index lookup, no per-vertex work,
+no matrix hierarchy walk) and produces **zero Gen0 GC** on its own (confirmed with `--battle --griffins
+0`); all Gen0 pressure in the full-battle row comes from the Griffins' own pose evaluation (section
+2.8's residual SharpGLTF allocation, unchanged here). Both scenes sustain the research-recommended 30fps
+cap solidly (29.99 fps avg in both), with 1%-low cap numbers (21.6-26.0 fps) close enough to the 30fps
+target that this desktop GPU is nowhere near the bottleneck -- the uncapped throughput (nearly 1,000-
+1,700 fps) shows the actual margin. Draw calls stay at exactly 16 for the full battle regardless of
+swarm size changes (griffins: 3 x 4 = 12 [body+crest x toon+outline] + swarm: 2 x [toon+outline] = 2 +
+backdrop + hex grid = 2; the swarm's own 2 draw calls would stay 2 even at the 32-instance array cap).
+
+**Galaxy A35 estimate, building on section 2.9's budgets:**
+
+- Triangle/fill-rate cost is trivial either way (81,024-132,600 tris/frame total, well under the
+  100-300K/frame secondary-sourced ceiling from section 2.9, and the swarm-tier per-unit budget --
+  1,688 tris -- is close to, if a bit over, the 800-1,500 tri-per-swarmling target that section
+  recommended).
+- **Draw calls are now genuinely small** (16 for the full battle, 4 for the swarm alone) -- comfortably
+  under section 2.9's ~100-150 mid-range ceiling, and this is the number the merged-batch design was
+  built specifically to keep small.
+- **CPU cost for the swarm itself is a non-issue** (0.002 ms measured for 24 instances) -- the
+  GPU-skinned Griffins' own per-instance cost (section 2.8, already measured and small) remains the
+  larger of the two CPU-side costs, and that's already accounted for in section 2.8's own A35 estimate.
+- **The uniform-array budget risk above is the one new, swarm-specific Android unknown** this pass
+  surfaces -- not fill rate, not draw calls, not CPU cost, but whether a 288-vec4 `SwarmBones[]` array
+  actually compiles and runs correctly on a real Mali-G68 MP5 GLES driver, given it exceeds the GLES
+  3.0 spec's own guaranteed minimum. **The exact test needed:** the same Android-build-plus-on-device
+  `--bench` test section 2.8 already named, specifically checking whether this shader compiles at all
+  on-device (not just whether it runs fast) before trusting any of this pass's other numbers for mobile.
+
+**Per-enemy asset cost, honestly estimated from what was actually done this pass:**
+
+- Meshy generate + remesh: **0 credits spent** (blocked, see above) -- the 30+5 = 35-credit
+  authorisation is unused and still available for a follow-up pass with a real Swarmling generation.
+- Blender rig/anim/bake authoring (`blender_export_vat_swarmling.py`), *given the Griffin pipeline's
+  weighting/repair code already existed to adapt*: roughly 20-30 minutes of active work this session,
+  most of it spent on the procedural body construction (new) rather than the rig/weighting/animation
+  parts (adapted almost directly from `blender_export_live.py`).
+- **Not a per-enemy cost, but a real one-time cost this pass paid for the whole swarm tier:** the
+  merged-batch runtime engineering (`GpuMesh.BuildSwarmMerged`, `SwarmVertex`, `SwarmlingSkinnedModel`,
+  `Toon.fx`'s `SwarmBones[]` techniques) plus the VAT-to-bone-array pivot (diagnosing the vertex-texture-
+  fetch compile failure, redesigning around it) took the bulk of this session's time -- a materially
+  larger one-time engineering cost than section 2.8's GPU-skinning work alone, because it included a
+  full architecture change mid-pass. It does not recur per swarmling once built.
+
+**Screenshots** (one look-over pass per the task brief; both still at the 540x960 desktop window size,
+not device-tested):
+
+![3 Griffins + 24 swarmlings battle](055/live3d_battle_3plus24.png)
+
+*The full battle scene: 3 GPU-skinned Griffins in front, 24 swarm-tier units filling the rows behind
+them, on the 11x15 arena. Critical look: the swarm reads as small, numerous, and clearly separate from
+the hero-tier beasts in both scale and shading weight (no outline-heavy silhouette competing with the
+Griffins') -- matching section 1.7's research recommendation to reserve full outline treatment for
+hero/boss-tier units, though this pass gave swarmlings the same outline pass as everyone else rather
+than implementing that cheaper-swarm-shading recommendation (a real, not-yet-taken next step, not a
+finding). A couple of swarmlings show a thin dark streak artefact (a stray vertex-weight mismatch, the
+same general class of issue the Griffin passes hit and documented in section 2.3/2.6 -- not chased
+further here, left as a known cosmetic issue on this stand-in placeholder body).*
+
+![Swarmling close-up](055/live3d_swarmling_close.png)
+
+*A single swarmling at close range: toon-shaded olive-gold body (sampled from the real Swarmling
+illustration's palette), visible ink-plum outline, legs/antennae mostly foreshortened under the body at
+this camera's elevated board-tilt angle. Reads clearly as a small, distinct creature type at this
+distance, not just a coloured blob -- reasonable for a stand-in swarm-tier placeholder.*
+
 ## 4. Cosmetics (`docs/art/art-brief.md`, `cosmetic-library.json`, issue #38)
 
 The Griffin has two discrete cosmetic categories plus a colour-form set (from
@@ -711,15 +931,27 @@ fourth generation -- a different rendering strategy over the same asset. Likenes
 pass-criteria row, but see 2.1/2.7) reassessed as passing the producer's current "close, with
 appropriate physiology" bar for the low-poly and textured passes, and unchanged (same mesh) for pass 4.*
 
-## 6. Recommendation (revised 2026-09-30 after the fourth, real-time pass)
+## 6. Recommendation (revised 2026-09-30 after the fourth and fifth, real-time passes)
+
+**Fifth-pass update.** Section 2.10 closes the last big open technical unknown from the fourth pass's
+own recommendation text below: whether a hero-plus-swarm battle scene (the actual shape of combat per
+the PvE design direction -- a few player beasts vs. up to ~24 small enemies) can be rendered cheaply.
+It can: hero-tier GPU skinning (section 2.8, unchanged) plus a merged-batch swarm path (section 2.10,
+pivoted from VAT to a shared bone-array technique after confirming VAT itself doesn't compile under
+MonoGame's DesktopGL effect profile) drew a 3-Griffin-plus-24-swarmling battle in 16 total draw calls
+and sustained the research-recommended 30fps battle cap with wide margin on this desktop GPU. **This is
+now enough evidence to write a concrete production plan** (below), not just "real-time 3D is credible in
+the abstract" -- but the plan still has real, named open risks (an actual Android device test chief
+among them) that keep it a plan to execute, not a decision already proven safe.
 
 **Still continue the 2.5D + Spine path (or the code bone rig this spike demonstrates) as the default for
-the beast roster.** That part of the call is unchanged by the fourth pass. **What the fourth pass does
-change:** the single objection that has driven every version of this recommendation -- pre-rendered 3D
-fails the cosmetic-swap criterion outright (section 4) -- is **no longer true of real-time 3D**. Section
-2.8 built and measured a real-time MonoGame renderer and it passes the cosmetic-swap and colour-form
-criteria live, with no re-render or re-animation step. That means real-time 3D is no longer a
-theoretical "wrinkle" (as it was described after pass 3) -- it is now an evidence-backed, *credible*
+the beast roster today.** That part of the call is unchanged by either real-time pass. **What the
+real-time passes do change:** the single objection that has driven every version of this recommendation
+-- pre-rendered 3D fails the cosmetic-swap criterion outright (section 4) -- is **no longer true of
+real-time 3D**. Section 2.8 built and measured a real-time MonoGame renderer and it passes the
+cosmetic-swap and colour-form criteria live, with no re-render or re-animation step. That means real-time
+3D is no longer a theoretical "wrinkle" (as it was described after pass 3) -- it is now an evidence-backed,
+*credible*
 alternative architecture, not just a rejected one. It is not being recommended as the default today
 because it loses on cost and risk, not because it's structurally blocked the way pre-rendered 3D is:
 
@@ -818,6 +1050,48 @@ which remains not done.
   A35 risks (driver overhead, GLSL ES shader compile) turn out to be smaller than feared, this
   recommendation is the one most likely to flip on new evidence -- see "Next steps".
 
+### A concrete production plan, if real-time 3D is ever greenlit (not a recommendation to greenlit it today)
+
+Sections 2.8-2.10 are now enough evidence to write this down concretely rather than leave it as "real-time
+3D is credible" -- this is the plan this spike would hand to an engineer starting that work, with its
+risks named, not a claim that those risks are already closed:
+
+1. **Hero tier (player beasts, ~≤4 on screen): GPU skinning**, the Griffin's proven `Bones[]`-array
+   technique (section 2.8), 6-8K tris/1K texture/10-20 bones per section 2.9's budget.
+2. **Swarm tier (up to ~24-32 on screen): merged-batch GPU skinning via a shared, per-instance-sliced
+   bone array** (section 2.10) -- not literal VAT (confirmed not to compile under MonoGame/DesktopGL),
+   but the same "one merged draw call for the whole swarm" outcome the task brief wanted. Needs the
+   uniform-array-budget fix named in 2.10 before scaling past this spike's 24-instance/3-bone/72-slot
+   design (3x4 matrices, fewer bones/swarmling, or a smaller simultaneous cap).
+3. **30fps hard cap in battle** (section 2.9's research, confirmed compatible with both scene shapes in
+   2.10's numbers) -- register with Android's Game Mode/frame-pacing APIs per 2.9, not just a MonoGame
+   frame-rate throttle.
+4. **Selective outline-pass cost-cutting** (section 1.7/2.9's own recommendation, not yet implemented in
+   this spike's own swarm rendering -- section 2.10's battle screenshot still gives every swarmling a
+   full outline pass): drop or cheapen the inverted-hull outline for swarm-tier units specifically, since
+   it currently doubles their already-multiplied draw-call/fill cost for a readability benefit that
+   matters most for player-targeted units, not background swarm.
+
+**Named risks that keep this a plan, not a proven-safe decision** -- every one of these is an actual
+open unknown after five passes, not a formality:
+
+- **An Android device test is still not done.** Every fps/draw-call/triangle number in this spike is
+  desktop-only (Intel Arc 140V laptop). The single most important next step before trusting any of this
+  for production is building the Android variant and running the same `--bench` harness on a physical
+  Galaxy A35.
+- **Quadruped/winged animation authoring has no Mixamo-equivalent shortcut.** Every clip in this spike
+  (Griffin and swarmling both) is hand-authored sinusoidal posing, not production-quality animation, and
+  not a workflow that scales cheaply to 10 beasts x several clips each.
+- **GLES shader compile is unverified beyond "the vertex-texture-fetch path is confirmed closed."**
+  Section 2.10 found one hard MonoGame/MGFX limitation (no VTF on the OpenGL profile at all) by testing
+  it; the uniform-array-budget question above is a second, different shader-compile risk that is
+  reasoned from the GLES spec, not yet tested against a real driver. Both need resolving on-device
+  before the swarm path above can be trusted for Android.
+- **Likeness and cosmetic-segmentation caveats from earlier passes are unchanged**: the Griffin mesh is
+  still a plausible griffin, not a reconstruction of the specific approved illustration (2.1, 2.7), and
+  this spike still only proves attachment-style cosmetics (a crest parented to a bone), not
+  segmented-submesh swaps for a cosmetic baked into a beast's own base geometry (section 4).
+
 ### Next steps
 
 - No further 3D work recommended as the *default* roster path off this spike -- Path B remains it. But
@@ -825,9 +1099,14 @@ which remains not done.
   proves unsustainable at full scale (10 beasts x ~2-3 categories x several options each), or a
   free-orbiting camera becomes a real requirement, real-time 3D (not another pre-rendered-3D attempt) is
   now a credible re-open path, with a working starting point (`Tooling/Spike55/Live3D`) and a specific,
-  named list of what to close first: an Android build and an actual Galaxy A35 `--bench` run (2.8's
-  single biggest open unknown), and a real animation-authoring plan for a quadruped/winged skeleton with
-  no Mixamo shortcut.
+  named list of what to close first: an Android build and an actual Galaxy A35 `--bench` run (the single
+  biggest open unknown across sections 2.8-2.10), the `SwarmBones[]` uniform-budget fix (2.10), and a
+  real animation-authoring plan for a quadruped/winged skeleton with no Mixamo shortcut.
+- The 35-credit Meshy spend authorisation for a real Swarmling generation (section 2.10) is still
+  unused (the real API call was blocked by this environment's own safety classifier, not spent or
+  declined) -- a real Swarmling asset through the same pipeline is the clearly-scoped very next step if
+  this spike is picked back up, swapping out section 2.10's procedural placeholder body with no other
+  pipeline changes needed.
 - Carry the code-bone-rig approach (Path B) forward as a live option if the Spine licence is ever judged
   not worth it: `Tooling/Spike55/rig2d.py` is a working starting point, though production use would want it
   ported to run inside the game (not as an offline PNG baker) so it gets the "no rework" benefit at

@@ -176,3 +176,106 @@ technique Outline
         PixelShader = compile PS_SHADERMODEL PS_Outline();
     }
 }
+
+// ===========================================================================
+// Fifth pass: swarm rendering. ORIGINALLY built as Vertex Animation Textures
+// (VAT: bake animated position/normal per frame into a texture, sample it in
+// the vertex shader) -- **confirmed not buildable**: isolated to a 6-line
+// minimal repro (a bare `tex2Dlod` in a vertex shader, no dynamic array
+// indexing, no other complexity) and MonoGame 3.8.5's effect compiler fails
+// it identically -- "invalid DCL register type for this shader model" /
+// "TEXLD using undeclared sampler" inside MonoGame.Effect.ShaderData.
+// CreateGLSL (the MojoShader-based DX9-bytecode-to-GLSL translation step the
+// OpenGL profile goes through). This is a **hard MonoGame/MGFX toolchain
+// limitation for the OpenGL profile, not a runtime GPU-support question** --
+// stronger and more definitive than the mobile-budgets research's own
+// "unverified on some Android GPUs" caveat (section 2.9): it doesn't build
+// for DesktopGL at all, so it was never going to reach an Android GLES
+// device to test in the first place. Real, confirmed, documented in
+// docs/spikes/055-3d-mini-spike.md's fifth-pass section.
+//
+// Replaced with GPU skinning via a per-instance bone-ARRAY OFFSET instead --
+// the same Bones[]-uniform-array + BLENDINDICES/BLENDWEIGHT pattern already
+// proven working for the Griffin above (SkinPositionNormal), just with a
+// bigger array (MAX_SWARM_INSTANCES swarmlings x SWARM_BONES_PER_INSTANCE
+// bones each) and a per-vertex InstanceId selecting which instance's slice
+// of that array to read. No texture sampling in the vertex shader at all --
+// only dynamic uniform-array indexing, which Toon.fx's existing Bones[]
+// technique already confirms this toolchain *does* support. The whole
+// swarm still draws from one merged static vertex buffer in one draw call
+// per pass (GpuMesh.BuildSwarmMerged); the per-frame CPU cost is now
+// SWARM_BONES_PER_INSTANCE x instance-count small matrix computations
+// (cheap, same order of cost as the Griffins' own per-instance bone work),
+// not the "one float" VAT's CPU cost would have been -- a real, measured
+// cost difference from the VAT design, not zero, but still small; see the
+// gate report for the measured number.
+// ===========================================================================
+#define MAX_SWARM_INSTANCES 24
+#define SWARM_BONES_PER_INSTANCE 3
+#define SWARM_BONES_TOTAL (MAX_SWARM_INSTANCES * SWARM_BONES_PER_INSTANCE)
+
+float4x4 SwarmBones[SWARM_BONES_TOTAL];
+
+struct VSInputSwarm
+{
+    float3 Position : POSITION0;
+    float3 Normal : NORMAL0;
+    float2 TexCoord : TEXCOORD0;
+    float4 BlendIndicesLocal : BLENDINDICES0; // 0..SWARM_BONES_PER_INSTANCE-1, local to one swarmling
+    float4 BlendWeight : BLENDWEIGHT0;
+    float InstanceId : TEXCOORD1;             // which swarmling copy this vertex belongs to
+};
+
+void SkinSwarmPositionNormal(VSInputSwarm input, out float3 worldPos, out float3 worldNormal)
+{
+    float base = input.InstanceId * SWARM_BONES_PER_INSTANCE;
+    float4x4 skin =
+        SwarmBones[(int)(base + input.BlendIndicesLocal.x)] * input.BlendWeight.x +
+        SwarmBones[(int)(base + input.BlendIndicesLocal.y)] * input.BlendWeight.y +
+        SwarmBones[(int)(base + input.BlendIndicesLocal.z)] * input.BlendWeight.z +
+        SwarmBones[(int)(base + input.BlendIndicesLocal.w)] * input.BlendWeight.w;
+
+    worldPos = mul(float4(input.Position, 1.0), skin).xyz;
+    worldNormal = mul(input.Normal, (float3x3)skin);
+}
+
+VSOutput VS_ToonSwarm(VSInputSwarm input)
+{
+    VSOutput output;
+    float3 worldPos, worldNormal;
+    SkinSwarmPositionNormal(input, worldPos, worldNormal);
+    output.Position = mul(float4(worldPos, 1.0), ViewProjection);
+    output.NormalWS = worldNormal;
+    output.TexCoord = input.TexCoord;
+    return output;
+}
+
+technique ToonSwarm
+{
+    pass P0
+    {
+        VertexShader = compile VS_SHADERMODEL VS_ToonSwarm();
+        PixelShader = compile PS_SHADERMODEL PS_Toon();
+    }
+}
+
+VSOutput VS_OutlineSwarm(VSInputSwarm input)
+{
+    VSOutput output;
+    float3 worldPos, worldNormal;
+    SkinSwarmPositionNormal(input, worldPos, worldNormal);
+    float3 expanded = worldPos + normalize(worldNormal) * OutlineThickness;
+    output.Position = mul(float4(expanded, 1.0), ViewProjection);
+    output.NormalWS = worldNormal;
+    output.TexCoord = input.TexCoord;
+    return output;
+}
+
+technique OutlineSwarm
+{
+    pass P0
+    {
+        VertexShader = compile VS_SHADERMODEL VS_OutlineSwarm();
+        PixelShader = compile PS_SHADERMODEL PS_Outline();
+    }
+}

@@ -80,11 +80,11 @@ namespace BeastCraft.Spike55.Live3D
         /// left to right, centred on the arena's middle column -- reads like an encounter lineup
         /// (docs/spikes/055-3d-mini-spike.md's fourth-pass screenshots) rather than a
         /// nearest-to-centre spiral.</summary>
-        public static List<(int col, int row)> FillOrder(int cols, int rows, int count)
+        public static List<(int col, int row)> FillOrder(int cols, int rows, int count, int startRow = 0)
         {
             var ordered = new List<(int col, int row)>();
             int centerCol = cols / 2;
-            for (int row = 0; row < rows && ordered.Count < count; row++)
+            for (int row = startRow; row < rows && ordered.Count < count; row++)
             {
                 // Walk columns outward from the centre so a partially-filled row stays centred.
                 var rowCols = new List<int> { centerCol };

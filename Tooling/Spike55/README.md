@@ -283,12 +283,60 @@ full detail (and the before/after numbers/screenshots) is in
    outside the window) -- `--bench`'s own numbers were never affected (computed independently), only
    the on-screen overlay and every screenshot taken before this fix.
 
+## Fifth pass: swarm via merged-batch GPU skinning (`--battle`)
+
+`docs/spikes/055-3d-mini-spike.md`'s section 2.10 has the full account; this is the tooling-facing
+summary. **No Meshy credits spent this pass** -- the real-money `image-to-3d` call was refused by this
+environment's own safety classifier independent of the task's spend authorisation (a `--dry-run`
+confirmed the exact 30-credit request first); `Tooling/Spike55/blender_export_vat_swarmling.py` builds a
+procedural placeholder "swarmling" body instead (1,688 tris), textured with the real approved
+Swarmling illustration's own sampled palette.
+
+**VAT (vertex animation textures, sampled in the vertex shader) does not compile** under MonoGame
+3.8.5's DesktopGL effect profile at all (`"invalid DCL register type for this shader model"` /
+`"TEXLD using undeclared sampler"`, isolated to a 6-line minimal repro). Pivoted to GPU skinning via a
+per-instance-sliced bone-array offset instead -- `SwarmBones[]` in `Content/Effects/Toon.fx`'s "Fifth
+pass" section, the same `Bones[]`-array technique already proven for the Griffin, just bigger (24
+swarmlings x 3 bones = 72 slots). The merged-batch property survives the pivot either way: the whole
+swarm draws from one shared static vertex buffer (`GpuMesh.BuildSwarmMerged`) in exactly 2 draw calls,
+regardless of swarm size -- confirmed at 24 instances: 4 draw calls total for "swarm alone" (backdrop +
+hex grid + 2 swarm passes), 16 for a full 3-Griffin + 24-swarmling battle.
+
+Run the battle scene:
+
+```
+dotnet Tooling/Spike55/Live3D/bin/Release/net10.0/Live3D.dll --battle --griffins 3 --swarm 24
+dotnet Tooling/Spike55/Live3D/bin/Release/net10.0/Live3D.dll --bench 1 --battle --griffins 3 --swarm 24 --seconds 10 --fps-cap 30 --out result.json
+dotnet Tooling/Spike55/Live3D/bin/Release/net10.0/Live3D.dll --screenshot shot.png --battle --griffins 0 --swarm 1
+```
+
+`--battle` switches the scene to `BattleGriffins` GPU-skinned beasts + `BattleSwarm` swarmlings on an
+11x15 arena instead of the fourth pass's single-species Tab-cycling stress test; `--griffins 0` gives
+"swarm alone". `--fps-cap N` (bench only) throttles via MonoGame's own fixed-time-step, measuring
+whether the scene sustains the 30fps battle cap section 2.9's research recommends, alongside (not
+instead of) the uncapped throughput number -- both are always reported in `--bench`'s JSON.
+
+To rebuild the swarmling asset: `blender -b --python Tooling/Spike55/blender_export_vat_swarmling.py --
+--out OUTDIR`, then copy `swarmling_mesh.bin`, `swarmling_bones.bin`, `swarmling_meta.json` into
+`Tooling/Spike55/Live3D/Content/swarm/` (`swarmling_texture.png` is built separately with a plain PIL
+script sampling `content/art/enemies/swarmling/swarmling_hollow.png`'s palette, not committed as a
+script since it's a few lines run once).
+
+A genuinely new Android risk this pivot introduces: `SwarmBones[72]` is 288 vec4 registers, which
+**does not fit inside GLES 3.0's own spec-guaranteed minimum (256 vec4)** even though it runs fine on
+this desktop GPU's much larger uniform budget -- see the gate report for what a production fix looks
+like (3x4 matrices, fewer bones/swarmling, or a smaller simultaneous-swarm cap).
+
 ### Licences
 
 - **SharpGLTF** (`SharpGLTF.Core`, v1.0.7) -- MIT licence. https://github.com/vpenades/SharpGLTF
 - **MonoGame.Framework.DesktopGL** / **MonoGame.Content.Builder.Task** (v3.8.5.1) -- same licence
   already covered for the rest of the game (see the repo's `THIRD-PARTY-NOTICES.md`).
-- The Verdant Hollow backdrop (`content/art/backdrops/r01/sun0/medium.png`) and the griffin's approved
-  illustration/palette are existing, already-approved game assets -- no new licence implications.
+- The Verdant Hollow backdrop (`content/art/backdrops/r01/sun0/medium.png`), the griffin's approved
+  illustration/palette, and the Swarmling's approved illustration/palette
+  (`content/art/enemies/swarmling/swarmling_hollow.png`, sampled only for a flat swatch colour, not
+  used as a texture) are existing, already-approved game assets -- no new licence implications.
 - `crest_alt.glb`'s geometry is procedurally generated in `blender_export_live.py` (a simple fanned
-  quad-strip "plume"), not AI-generated and not derived from Meshy output.
+  quad-strip "plume"), and the fifth pass's swarmling body is procedurally generated in
+  `blender_export_vat_swarmling.py` (icospheres + cones) -- neither is AI-generated or derived from
+  Meshy output.

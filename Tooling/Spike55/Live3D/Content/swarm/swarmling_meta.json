@@ -1,0 +1,11 @@
+{
+  "vertexCount": 860,
+  "indexCount": 5064,
+  "boneCount": 3,
+  "triangleCount": 1688,
+  "frameCount": 20,
+  "idleFrames": 12,
+  "moveFrames": 8,
+  "fps": 24,
+  "targetHeight": 0.55
+}

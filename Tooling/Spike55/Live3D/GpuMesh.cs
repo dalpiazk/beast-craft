@@ -56,5 +56,60 @@ namespace BeastCraft.Spike55.Live3D
 
             return new GpuMesh { Vertices = vb, Indices = ib, TriangleCount = model.TriangleCount };
         }
+
+        /// <summary>Builds ONE merged static VertexBuffer/IndexBuffer containing `instanceCount` copies
+        /// of a SwarmlingSkinnedModel's bind-pose, skinned mesh -- the "merged-batch" swarm path
+        /// (Tooling/Spike55's fifth-pass task brief: MonoGame's GLES/Android backend has no supported
+        /// path for instanced geometry drawing, so this bakes N copies into one buffer instead). Every
+        /// copy carries the SAME local BlendIndices (0..boneCount-1, this model's own 3 bones) plus
+        /// which copy it is (InstanceId); the vertex shader (Toon.fx's VS_ToonSwarm/VS_OutlineSwarm)
+        /// offsets BlendIndicesLocal by InstanceId*boneCount into one big shared SwarmBones[] uniform
+        /// array Game1 uploads once per frame (see Game1.UpdateSwarmBones). Cheap to build:
+        /// `instanceCount` array copies, done once at scene setup, not per frame.</summary>
+        public static GpuMesh BuildSwarmMerged(GraphicsDevice device, SwarmlingSkinnedModel model, int instanceCount)
+        {
+            int baseVerts = model.VertexCount;
+            int baseIndices = model.IndexCount;
+            var verts = new SwarmVertex[baseVerts * instanceCount];
+            for (int inst = 0; inst < instanceCount; inst++)
+            {
+                int offset = inst * baseVerts;
+                for (int v = 0; v < baseVerts; v++)
+                {
+                    var p = model.BindPosition[v];
+                    var nrm = model.BindNormal[v];
+                    var uv = model.BindUv[v];
+                    var bi = model.BlendIndices[v];
+                    var bw = model.BlendWeight[v];
+                    verts[offset + v] = new SwarmVertex
+                    {
+                        Position = new XnaVector3(p.X, p.Y, p.Z),
+                        Normal = new XnaVector3(nrm.X, nrm.Y, nrm.Z),
+                        TexCoord = new XnaVector2(uv.X, uv.Y),
+                        BlendIndicesLocal = new XnaVector4(bi.X, bi.Y, bi.Z, bi.W),
+                        BlendWeight = new XnaVector4(bw.X, bw.Y, bw.Z, bw.W),
+                        InstanceId = inst,
+                    };
+                }
+            }
+            var vb = new VertexBuffer(device, SwarmVertex.VertexDeclaration, verts.Length, BufferUsage.WriteOnly);
+            vb.SetData(verts);
+
+            var indices = new int[baseIndices * instanceCount];
+            for (int inst = 0; inst < instanceCount; inst++)
+            {
+                int vOffset = inst * baseVerts;
+                int iOffset = inst * baseIndices;
+                for (int i = 0; i < baseIndices; i++)
+                    indices[iOffset + i] = model.Indices[i] + vOffset;
+            }
+            var ib = new IndexBuffer(device, IndexElementSize.SixteenBits, indices.Length, BufferUsage.WriteOnly);
+            var shorts = new short[indices.Length];
+            for (int i = 0; i < indices.Length; i++)
+                shorts[i] = (short)indices[i];
+            ib.SetData(shorts);
+
+            return new GpuMesh { Vertices = vb, Indices = ib, TriangleCount = (baseIndices / 3) * instanceCount };
+        }
     }
 }
