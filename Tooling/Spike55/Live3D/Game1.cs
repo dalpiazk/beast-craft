@@ -7,6 +7,7 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using NumMatrix = System.Numerics.Matrix4x4;
+using NumVector3 = System.Numerics.Vector3;
 using XnaColor = Microsoft.Xna.Framework.Color;
 using XnaMatrix = Microsoft.Xna.Framework.Matrix;
 using XnaVector2 = Microsoft.Xna.Framework.Vector2;
@@ -15,10 +16,12 @@ using XnaVector3 = Microsoft.Xna.Framework.Vector3;
 namespace BeastCraft.Spike55.Live3D
 {
     /// <summary>Spike #55, fourth pass: real-time 3D in MonoGame. Loads the Blender-authored, skinned
-    /// griffin_live.glb (see Tooling/Spike55/blender_export_live.py), CPU-skins it per instance per
-    /// frame, and draws it with a custom toon + inverted-hull-outline effect over a Verdant Hollow
-    /// backdrop and a hex-grid board. See Tooling/Spike55/README.md for controls and the bench/screenshot
-    /// CLI, and docs/spikes/055-3d-mini-spike.md's fourth-pass section for what this was built to answer.</summary>
+    /// griffin_live.glb (see Tooling/Spike55/blender_export_live.py), GPU-skins it per instance per
+    /// frame (a bone-palette vertex shader -- see Toon.fx and GpuMesh.cs), and draws it with a custom
+    /// toon + inverted-hull-outline effect over a Verdant Hollow backdrop and a hex-grid board. See
+    /// Tooling/Spike55/README.md for controls and the bench/screenshot CLI, and
+    /// docs/spikes/055-3d-mini-spike.md's fourth-pass section for what this was built to answer and the
+    /// lead-review fix round's before/after numbers.</summary>
     public sealed class Game1 : Game
     {
         private readonly GraphicsDeviceManager _graphics;
@@ -28,6 +31,8 @@ namespace BeastCraft.Spike55.Live3D
 
         private GltfSkinnedModel _bodyModel;
         private GltfSkinnedModel _crestModel;
+        private GpuMesh _bodyMesh;
+        private GpuMesh _crestMesh;
         private Effect _toonEffect;
         private Texture2D _baseColorTexture;
         private Texture2D _crestTexture; // crest_alt.glb ships no base-colour image (a flat Principled
@@ -37,9 +42,27 @@ namespace BeastCraft.Spike55.Live3D
                                          // first render with no texture bound at all showed the crest as
                                          // near-black, indistinguishable from its own outline pass).
         private Texture2D _backdropTexture;
-        private IndexBuffer _bodyIndices;
-        private IndexBuffer _crestIndices;
         private int _headNodeIndex;
+
+        // Cached effect parameters (avoid a string-keyed lookup in EffectParameterCollection every draw
+        // call -- looked up once here instead of via Parameters["..."] in the hot path).
+        private EffectParameter _paramViewProjection;
+        private EffectParameter _paramTintMultiply;
+        private EffectParameter _paramBaseTexture;
+        private EffectParameter _paramBones;
+
+        // The crest's fixed local re-orientation (see SkinInstance's comment) plus, new this fix round,
+        // a fixed facing rotation applied to every beast so the camera reads a 3/4 side profile with
+        // the head on-screen-right -- matching content/art/beasts/griffin/griffin.png's orientation --
+        // instead of the first version's straight head-on front view. See RebuildCamera's comment for
+        // the other half of this fix (the camera itself moved from a frontal to a side position).
+        // The crest's own fan-spread axis (blender_export_live.py's blade loop spreads blades along its
+        // local X) used to face the old frontal camera directly. Now that every beast carries a fixed
+        // FacingYaw, the crest (parented in head-local space, so it inherits that same yaw) needs a
+        // compensating Y rotation or its fan reads edge-on (a thin sliver) from the new side camera --
+        // confirmed by screenshot, fixed by this extra RotationY term.
+        private static readonly NumMatrix CrestLocal = NumMatrix.CreateRotationY(MathF.PI / 2f) * NumMatrix.CreateScale(0.55f) * NumMatrix.CreateRotationX(-1.65f) * NumMatrix.CreateTranslation(0f, 0.05f, 0.05f);
+        private static readonly NumMatrix FacingYaw = NumMatrix.CreateRotationY(-MathF.PI / 2f);
 
         private readonly List<BeastInstance> _instances = new List<BeastInstance>();
         private readonly Random _rng = new Random(12345); // fixed seed: reproducible desync, reproducible bench runs
@@ -76,9 +99,14 @@ namespace BeastCraft.Spike55.Live3D
         // --bench state
         private double _benchElapsedSeconds;
         private readonly List<double> _benchFrameMs = new List<double>();
+        private int _gc0Start, _gc1Start, _gc2Start;
 
-        // --screenshot state
-        private int _screenshotFramesRemaining;
+        // --screenshot state: warm up by elapsed wall-clock time (not a fixed frame count) so the
+        // on-screen fps stats are real by the time the shot is taken -- a lead-review fix: the first
+        // version waited a fixed 30 frames, which at a few hundred fps is well under StatsTracker's
+        // 3-second rolling window, so the overlay's fps read 0.0 in every screenshot.
+        private const double ScreenshotWarmupSeconds = 3.5;
+        private double _screenshotElapsedSeconds;
 
         private XnaMatrix _view;
         private XnaMatrix _projection;
@@ -114,6 +142,25 @@ namespace BeastCraft.Spike55.Live3D
             _crestModel = GltfSkinnedModel.Load(Path.Combine(contentRoot, "model", "crest_alt.glb"));
             _headNodeIndex = AnimatedPose.FindNodeIndexByName(_bodyModel, "bone_head");
 
+            _bodyMesh = GpuMesh.Build(GraphicsDevice, _bodyModel);
+            _crestMesh = GpuMesh.Build(GraphicsDevice, _crestModel);
+
+            // Every beast is yawed 90 degrees (FacingYaw, see RebuildCamera's comment) to face the
+            // camera side-on, which swaps which bind-pose axis maps to world X (columns) vs world Z
+            // (rows): local X (wingspan) ends up along world Z, local Z (chest-to-tail depth) ends up
+            // along world X. A first version sized hex spacing from local X alone and got it wrong for
+            // the now-relevant column axis -- fixed by taking the larger of the two bind-pose extents,
+            // so hex spacing comfortably covers whichever axis ends up where post-yaw.
+            float minX = float.MaxValue, maxX = float.MinValue, minZ = float.MaxValue, maxZ = float.MinValue;
+            foreach (var p in _bodyModel.Positions)
+            {
+                minX = Math.Min(minX, p.X);
+                maxX = Math.Max(maxX, p.X);
+                minZ = Math.Min(minZ, p.Z);
+                maxZ = Math.Max(maxZ, p.Z);
+            }
+            HexBoard.SetScale(Math.Max(maxX - minX, maxZ - minZ));
+
             _baseColorTexture = LoadTextureFromBytes(_bodyModel.BaseColorImageBytes);
 
             // MGFX (MonoGame's effect compiler) does not honour a .fx file's HLSL default-value
@@ -123,46 +170,47 @@ namespace BeastCraft.Spike55.Live3D
             // normalize(0,0,0) is undefined/NaN, every ndotl comparison then fell through to the
             // HighlightBoost band -- which was *also* unset/zero -- multiplying the sampled texture by
             // black regardless of what it actually was). Set the toon material's fixed constants once
-            // here, not per frame (only ViewProjection/BaseTexture/TintMultiply change per frame/instance).
+            // here, not per frame (only ViewProjection/Bones/BaseTexture/TintMultiply change per
+            // frame/instance). Lead-review fix round: LightColor/HighlightBoost pulled back toward
+            // neutral -- the first tuning rendered noticeably more saturated/orange than both the
+            // Meshy source texture and the approved illustration (sampled and compared, see Toon.fx's
+            // header comment).
             _toonEffect.Parameters["LightDirection"].SetValue(XnaVector3.Normalize(new XnaVector3(0.45f, 0.65f, 0.60f)));
-            _toonEffect.Parameters["LightColor"].SetValue(new XnaVector3(1.0f, 0.88f, 0.68f));
+            _toonEffect.Parameters["LightColor"].SetValue(new XnaVector3(1.0f, 0.97f, 0.92f));
             _toonEffect.Parameters["ShadowTint"].SetValue(new XnaVector3(0x7C / 255f, 0x7A / 255f, 0xAE / 255f));
-            _toonEffect.Parameters["HighlightBoost"].SetValue(new XnaVector3(1.08f, 1.0f, 0.85f));
+            _toonEffect.Parameters["HighlightBoost"].SetValue(new XnaVector3(1.03f, 1.0f, 0.96f));
             _toonEffect.Parameters["OutlineThickness"].SetValue(0.012f);
             _toonEffect.Parameters["OutlineColor"].SetValue(new XnaVector3(0x2E / 255f, 0x2A / 255f, 0x45 / 255f));
+            _paramViewProjection = _toonEffect.Parameters["ViewProjection"];
+            _paramTintMultiply = _toonEffect.Parameters["TintMultiply"];
+            _paramBaseTexture = _toonEffect.Parameters["BaseTexture"];
+            _paramBones = _toonEffect.Parameters["Bones"];
             using (var fs = File.OpenRead(Path.Combine(contentRoot, "backdrop.png")))
                 _backdropTexture = Texture2D.FromStream(GraphicsDevice, fs);
 
             _crestTexture = new Texture2D(GraphicsDevice, 1, 1);
             _crestTexture.SetData(new[] { new XnaColor(64, 191, 179) }); // matches CrestAlt's Blender material (0.25, 0.75, 0.70)
 
-            _bodyIndices = BuildIndexBuffer(_bodyModel.Indices);
-            _crestIndices = BuildIndexBuffer(_crestModel.Indices);
-
             _lineEffect = new BasicEffect(GraphicsDevice) { VertexColorEnabled = true };
             _backdropEffect = new BasicEffect(GraphicsDevice) { TextureEnabled = true, VertexColorEnabled = false, World = XnaMatrix.Identity, View = XnaMatrix.Identity, Projection = XnaMatrix.Identity };
 
-            var gridVerts = HexBoard.BuildGridLines(8, 6, new XnaColor(46, 42, 69, 140));
+            var gridVerts = HexBoard.BuildGridLines(HexBoard.ArenaWidth, HexBoard.ArenaHeight, new XnaColor(46, 42, 69, 140));
             _hexGridVertexBuffer = new VertexBuffer(GraphicsDevice, VertexPositionColor.VertexDeclaration, gridVerts.Length, BufferUsage.WriteOnly);
             _hexGridVertexBuffer.SetData(gridVerts);
             _hexGridVertexCount = gridVerts.Length;
 
-            SetStressLevel(_options.BenchMode ? ClampStress(_options.BenchBeasts) : (_options.ScreenshotMode ? ClampStress(_options.ScreenshotBeasts) : 1));
+            SetStressLevel(_options.BenchMode ? _options.BenchBeasts : (_options.ScreenshotMode ? _options.ScreenshotBeasts : 1));
             if (!_options.ScreenshotCrestOn)
                 foreach (var inst in _instances)
                     inst.CrestOn = false;
             _tintIndex = Math.Clamp(_options.ScreenshotTint, 0, Tints.Length - 1);
 
-            if (_options.ScreenshotMode)
-                _screenshotFramesRemaining = 30; // let one full idle cycle's worth of frames settle first
-        }
-
-        private static int ClampStress(int requested)
-        {
-            foreach (var lvl in StressLevels)
-                if (lvl >= requested)
-                    return requested; // bench/screenshot honour the exact requested count, not just the UI's steps
-            return requested;
+            if (_options.BenchMode)
+            {
+                _gc0Start = GC.CollectionCount(0);
+                _gc1Start = GC.CollectionCount(1);
+                _gc2Start = GC.CollectionCount(2);
+            }
         }
 
         private Texture2D LoadTextureFromBytes(byte[] bytes)
@@ -173,29 +221,21 @@ namespace BeastCraft.Spike55.Live3D
                 return Texture2D.FromStream(GraphicsDevice, ms);
         }
 
-        private IndexBuffer BuildIndexBuffer(int[] indices)
-        {
-            var ib = new IndexBuffer(GraphicsDevice, IndexElementSize.SixteenBits, indices.Length, BufferUsage.WriteOnly);
-            var shorts = new short[indices.Length];
-            for (int i = 0; i < indices.Length; i++)
-                shorts[i] = (short)indices[i];
-            ib.SetData(shorts);
-            return ib;
-        }
-
         private void SetStressLevel(int count)
         {
             while (_instances.Count < count)
-                _instances.Add(new BeastInstance(GraphicsDevice, _bodyModel, _crestModel));
+                _instances.Add(new BeastInstance(_bodyModel));
             while (_instances.Count > count)
                 _instances.RemoveAt(_instances.Count - 1);
 
-            var cells = HexBoard.FillOrder(8, 6, count);
+            var cells = HexBoard.FillOrder(HexBoard.ArenaWidth, HexBoard.ArenaHeight, count);
             for (int i = 0; i < _instances.Count; i++)
             {
-                var (col, row) = cells[i % cells.Count];
+                var (col, row) = cells[i % Math.Max(1, cells.Count)];
                 var center = HexBoard.CellCenter(col, row);
-                var world = NumMatrix.CreateTranslation(center.X, 0f, center.Z);
+                // FacingYaw first (rotate the bind-pose beast to face +X, screen-right, under the new
+                // side-on camera -- see RebuildCamera), then place on its hex cell.
+                var world = FacingYaw * NumMatrix.CreateTranslation(center.X, 0f, center.Z);
                 _instances[i].World = world;
                 _instances[i].ClockOffset = (float)(_rng.NextDouble() * 4.0);
             }
@@ -204,36 +244,65 @@ namespace BeastCraft.Spike55.Live3D
 
         private void RebuildCamera()
         {
-            // Fit an orthographic camera to whatever's currently on the board -- a close-up single
-            // beast, or all 24 spread across the grid -- same hex-board 3/4 tilt the earlier pre-rendered
-            // passes used (blender_lowpoly_render.py's BoardCam), adapted to MonoGame's Y-up glTF space.
-            float minX = float.MaxValue, maxX = float.MinValue, minZ = float.MaxValue, maxZ = float.MinValue;
+            // Lead-review fix: the first camera sat on the Z axis looking straight at the beast's
+            // front (its glTF-space forward, +Z, points directly at a camera offset in +Z), reading as
+            // a flat head-on view with wings straight up. Beasts in the game are seen in a 3/4 side
+            // view (content/art/beasts/griffin/griffin.png) -- fixed by rotating every beast
+            // FacingYaw=-90 degrees (see SetStressLevel) so its forward axis points world +X instead of
+            // +Z, and moving the camera to the *side* (offset mostly along Z, a little along X for a
+            // slight 3/4 turn rather than a flat profile), elevated and tilted down for the hex-board
+            // angle the earlier Blender passes also used.
+            NumVector3 boardCenterNum = NumVector3.Zero;
             foreach (var inst in _instances)
-            {
-                float x = inst.World.M41, z = inst.World.M43;
-                minX = Math.Min(minX, x);
-                maxX = Math.Max(maxX, x);
-                minZ = Math.Min(minZ, z);
-                maxZ = Math.Max(maxZ, z);
-            }
-            if (_instances.Count == 0)
-            { minX = maxX = minZ = maxZ = 0; }
+                boardCenterNum += new NumVector3(inst.World.M41, inst.World.M42, inst.World.M43);
+            if (_instances.Count > 0)
+                boardCenterNum /= _instances.Count;
+            var target = new XnaVector3(boardCenterNum.X, 0.85f, boardCenterNum.Z);
 
-            var target = new XnaVector3((minX + maxX) * 0.5f, 0.9f, (minZ + maxZ) * 0.5f);
-            float spanX = Math.Max(1.6f, maxX - minX + HexBoard.HexSize * 2.5f);
-            float spanZ = Math.Max(1.6f, maxZ - minZ + HexBoard.HexSize * 2.5f);
-
-            const float tiltDeg = 32f;
+            // A hex board's rows are separated along world Z; an orthographic camera looking *straight*
+            // down Z would collapse all rows onto the same screen position no matter how many world
+            // units apart they are (that axis is exactly what gets projected away) -- confirmed: the
+            // first value here (24 degrees, chosen for a single beast's close-up 3/4 read) made a
+            // 3-row, 24-beast formation collapse into one overlapping clump on screen even though
+            // RebuildCamera's own view-space bounding math (below) correctly measured the beasts as
+            // spread across ~20 world units. 48 degrees gives the rows real screen-Y separation while
+            // still reading as a 3/4, not top-down, view for the close-up single-beast case.
+            const float tiltDeg = 48f;
             float tilt = MathHelper.ToRadians(tiltDeg);
-            var camDir = XnaVector3.Normalize(new XnaVector3(0f, (float)Math.Sin(tilt), (float)Math.Cos(tilt)));
-            float camDistance = 6f;
+            // Side axis (+Z, since beasts now face +X) dominates; a small +X component gives the 3/4
+            // turn instead of a flat 90-degree profile; +Y from the tilt for the elevated board look.
+            var camDir = XnaVector3.Normalize(new XnaVector3(0.22f, (float)Math.Sin(tilt), (float)Math.Cos(tilt)));
+            float camDistance = 8f;
             var camPos = target + camDir * camDistance;
             _view = XnaMatrix.CreateLookAt(camPos, target, XnaVector3.Up);
 
-            // Portrait viewport (9:16): fit width to the widest span, derive height from the aspect ratio
-            // so beasts don't stretch; orthoHeight tracks whichever of spanX/spanZ*aspect is larger.
+            // Fit the ortho projection to the actual on-screen (view-space) extent of every instance,
+            // not a world-axis-aligned guess -- robust to the camera direction above, and what actually
+            // fixes "oversized/clumped" framing rather than just widening a fixed-axis span. Samples
+            // each beast's ground point and a point near its head height/wingtip so the vertical extent
+            // (and wing spread) are both accounted for.
+            float minVX = float.MaxValue, maxVX = float.MinValue, minVY = float.MaxValue, maxVY = float.MinValue;
+            if (_instances.Count == 0)
+            {
+                minVX = maxVX = minVY = maxVY = 0f;
+            }
+            foreach (var inst in _instances)
+            {
+                var basePt = new XnaVector3(inst.World.M41, inst.World.M42, inst.World.M43);
+                var topPt = basePt + new XnaVector3(0f, 2.2f, 0f);
+                var vpBase = XnaVector3.Transform(basePt, _view);
+                var vpTop = XnaVector3.Transform(topPt, _view);
+                minVX = Math.Min(minVX, Math.Min(vpBase.X, vpTop.X));
+                maxVX = Math.Max(maxVX, Math.Max(vpBase.X, vpTop.X));
+                minVY = Math.Min(minVY, Math.Min(vpBase.Y, vpTop.Y));
+                maxVY = Math.Max(maxVY, Math.Max(vpBase.Y, vpTop.Y));
+            }
+            const float margin = 1.4f; // wing spread + outline thickness clearance around each beast
+            float viewSpanX = Math.Max(1.6f, (maxVX - minVX) + margin * 2f);
+            float viewSpanY = Math.Max(1.6f, (maxVY - minVY) + margin * 2f);
+
             float aspect = (float)_graphics.PreferredBackBufferHeight / _graphics.PreferredBackBufferWidth;
-            float orthoWidth = Math.Max(spanX, spanZ / aspect) * 1.15f;
+            float orthoWidth = Math.Max(viewSpanX, viewSpanY / aspect);
             float orthoHeight = orthoWidth * aspect;
             _projection = XnaMatrix.CreateOrthographic(orthoWidth, orthoHeight, 0.05f, 50f);
         }
@@ -276,9 +345,12 @@ namespace BeastCraft.Spike55.Live3D
 
             _skinStopwatch.Restart();
             foreach (var inst in _instances)
-                SkinInstance(inst);
+                UpdateInstancePose(inst);
             _skinStopwatch.Stop();
             _stats.SkinningMsThisFrame = _skinStopwatch.Elapsed.TotalMilliseconds;
+
+            if (_options.ScreenshotMode)
+                _screenshotElapsedSeconds += gameTime.ElapsedGameTime.TotalSeconds;
 
             if (_options.BenchMode)
             {
@@ -295,29 +367,29 @@ namespace BeastCraft.Spike55.Live3D
 
         private bool WasPressed(KeyboardState kb, Keys key) => kb.IsKeyDown(key) && !_prevKeyboard.IsKeyDown(key);
 
-        private void SkinInstance(BeastInstance inst)
+        private static XnaMatrix ToXna(in NumMatrix m) => new XnaMatrix(
+            m.M11, m.M12, m.M13, m.M14,
+            m.M21, m.M22, m.M23, m.M24,
+            m.M31, m.M32, m.M33, m.M34,
+            m.M41, m.M42, m.M43, m.M44);
+
+        /// <summary>Per-instance-per-frame CPU work: evaluate the pose (11 joint world matrices, cheap
+        /// -- no vertex work happens here any more) and write the resulting bone palette into the
+        /// instance's reused XNA Matrix[] arrays, ready to upload to Toon.fx's `Bones` parameter in
+        /// DrawInstance. No vertex buffer is touched here -- see GpuMesh/Toon.fx's header comments for
+        /// why this replaced the first version's CPU-skin-into-a-DynamicVertexBuffer approach.</summary>
+        private void UpdateInstancePose(BeastInstance inst)
         {
             float t = _elapsedSeconds + inst.ClockOffset;
             AnimatedPose.ComputeWorldMatrices(_bodyModel, _clip, t, inst.NodeWorldScratch);
             AnimatedPose.ComputeSkinMatrices(_bodyModel, inst.NodeWorldScratch, inst.World, inst.SkinScratch);
-            Skinner.SkinToBuffer(_bodyModel, inst.SkinScratch, inst.BodyScratch);
-            inst.BodyVertexBuffer.SetData(inst.BodyScratch);
+            for (int j = 0; j < inst.SkinScratch.Length && j < BeastInstance.MaxBones; j++)
+                inst.BonePalette[j] = ToXna(inst.SkinScratch[j]);
 
             if (inst.CrestOn)
             {
-                // The crest's local mesh grows from its own origin along -Y/+Z (see
-                // blender_export_live.py's procedural blade loop); parented directly at the head
-                // bone's world matrix with no adjustment, it first rendered draped in front of the
-                // face like a bib instead of sticking up like a crest -- the head bone's own bind-pose
-                // orientation (tilted forward/down to follow the beak) doesn't line up with "up" in
-                // world space. A small fixed local re-orientation (tip the blades up and back, scale
-                // down a little) fixes that -- this is a stand-in cosmetic mesh for the toggle proof,
-                // not a hand-placed art asset, so this one fixed correction (not a full per-bone rig)
-                // is deliberately as far as this spike takes cosmetic placement.
-                var crestLocal = NumMatrix.CreateScale(0.55f) * NumMatrix.CreateRotationX(-1.65f) * NumMatrix.CreateTranslation(0f, 0.05f, 0.05f);
-                var crestTransform = crestLocal * inst.NodeWorldScratch[_headNodeIndex] * inst.World;
-                Skinner.TransformToBuffer(_crestModel, crestTransform, inst.CrestScratch);
-                inst.CrestVertexBuffer.SetData(inst.CrestScratch);
+                var crestTransform = CrestLocal * inst.NodeWorldScratch[_headNodeIndex] * inst.World;
+                inst.CrestPalette[0] = ToXna(crestTransform);
             }
         }
 
@@ -332,19 +404,16 @@ namespace BeastCraft.Spike55.Live3D
             DrawHexGrid();
             DrawBeasts();
 
-            if (!_options.BenchMode)
+            bool showStats = !_options.BenchMode && !(_options.ScreenshotMode && _options.ScreenshotHideStats);
+            if (showStats)
                 DrawStatsOverlay();
 
             base.Draw(gameTime);
 
-            if (_options.ScreenshotMode)
+            if (_options.ScreenshotMode && _screenshotElapsedSeconds >= ScreenshotWarmupSeconds)
             {
-                _screenshotFramesRemaining--;
-                if (_screenshotFramesRemaining <= 0)
-                {
-                    SaveScreenshot(_options.ScreenshotPath);
-                    Exit();
-                }
+                SaveScreenshot(_options.ScreenshotPath);
+                Exit();
             }
         }
 
@@ -391,8 +460,8 @@ namespace BeastCraft.Spike55.Live3D
         private void DrawBeasts()
         {
             var viewProjection = _view * _projection;
-            _toonEffect.Parameters["ViewProjection"]?.SetValue(viewProjection);
-            _toonEffect.Parameters["TintMultiply"]?.SetValue(Tints[_tintIndex]);
+            _paramViewProjection.SetValue(viewProjection);
+            _paramTintMultiply.SetValue(Tints[_tintIndex]);
 
             GraphicsDevice.BlendState = BlendState.Opaque;
             GraphicsDevice.DepthStencilState = DepthStencilState.Default;
@@ -400,11 +469,7 @@ namespace BeastCraft.Spike55.Live3D
             // glTF/OpenGL's winding convention is the opposite of MonoGame/XNA's default
             // (RasterizerState.CullCounterClockwise, which treats *clockwise* as front-facing) -- the
             // griffin_live.glb index data was loaded as-is (no re-winding), so the front-facing set
-            // under glTF's right-handed CCW convention is CullClockwise's kept set here. Using the
-            // (wrong) default first showed a flat, uniformly dark silhouette with no banding at all: the
-            // main pass was lighting/culling the mesh's inside-out backfaces, and the outline pass (also
-            // reversed) then fully overdrew it instead of just its fringe -- both symptoms explained by
-            // this one winding mismatch, confirmed by swapping the two RasterizerStates below.
+            // under glTF's right-handed CCW convention is CullClockwise's kept set here.
             GraphicsDevice.RasterizerState = RasterizerState.CullClockwise;
             var toonTechnique = _toonEffect.Techniques["Toon"];
             foreach (var inst in _instances)
@@ -419,29 +484,31 @@ namespace BeastCraft.Spike55.Live3D
 
         private void DrawInstance(BeastInstance inst, EffectTechnique technique)
         {
-            _toonEffect.Parameters["BaseTexture"].SetValue(_baseColorTexture);
-            GraphicsDevice.SetVertexBuffer(inst.BodyVertexBuffer);
-            GraphicsDevice.Indices = _bodyIndices;
+            _paramBaseTexture.SetValue(_baseColorTexture);
+            _paramBones.SetValue(inst.BonePalette);
+            GraphicsDevice.SetVertexBuffer(_bodyMesh.Vertices);
+            GraphicsDevice.Indices = _bodyMesh.Indices;
             foreach (var pass in technique.Passes)
             {
                 pass.Apply();
-                GraphicsDevice.DrawIndexedPrimitives(PrimitiveType.TriangleList, 0, 0, _bodyModel.TriangleCount);
+                GraphicsDevice.DrawIndexedPrimitives(PrimitiveType.TriangleList, 0, 0, _bodyMesh.TriangleCount);
             }
             _stats.DrawCallsThisFrame++;
-            _stats.TrianglesThisFrame += _bodyModel.TriangleCount;
+            _stats.TrianglesThisFrame += _bodyMesh.TriangleCount;
 
             if (inst.CrestOn)
             {
-                _toonEffect.Parameters["BaseTexture"].SetValue(_crestTexture);
-                GraphicsDevice.SetVertexBuffer(inst.CrestVertexBuffer);
-                GraphicsDevice.Indices = _crestIndices;
+                _paramBaseTexture.SetValue(_crestTexture);
+                _paramBones.SetValue(inst.CrestPalette);
+                GraphicsDevice.SetVertexBuffer(_crestMesh.Vertices);
+                GraphicsDevice.Indices = _crestMesh.Indices;
                 foreach (var pass in technique.Passes)
                 {
                     pass.Apply();
-                    GraphicsDevice.DrawIndexedPrimitives(PrimitiveType.TriangleList, 0, 0, _crestModel.TriangleCount);
+                    GraphicsDevice.DrawIndexedPrimitives(PrimitiveType.TriangleList, 0, 0, _crestMesh.TriangleCount);
                 }
                 _stats.DrawCallsThisFrame++;
-                _stats.TrianglesThisFrame += _crestModel.TriangleCount;
+                _stats.TrianglesThisFrame += _crestMesh.TriangleCount;
             }
         }
 
@@ -462,8 +529,13 @@ namespace BeastCraft.Spike55.Live3D
 
         private long EstimateGpuBytes()
         {
-            long perInstanceVb = (long)(_bodyModel.Positions.Length + _crestModel.Positions.Length) * VertexPositionNormalTexture.VertexDeclaration.VertexStride;
-            long vb = perInstanceVb * _instances.Count;
+            // GPU skinning (lead-review fix round) means the vertex buffers are shared/static now, not
+            // per-instance -- one body + one crest buffer total, regardless of beast count. Per-instance
+            // GPU cost is now just the small Bones[] uniform upload (16 float4x4 = 1 KiB), not counted
+            // here (it's uniform/constant memory, not buffer memory, and is reused/overwritten per draw
+            // rather than resident per instance).
+            long vb = (long)_bodyModel.Positions.Length * SkinnedVertex.VertexDeclaration.VertexStride
+                    + (long)_crestModel.Positions.Length * SkinnedVertex.VertexDeclaration.VertexStride;
             long ib = (long)(_bodyModel.Indices.Length + _crestModel.Indices.Length) * sizeof(short);
             long tex = _baseColorTexture != null ? (long)_baseColorTexture.Width * _baseColorTexture.Height * 4 : 0;
             long backdrop = _backdropTexture != null ? (long)_backdropTexture.Width * _backdropTexture.Height * 4 : 0;
@@ -503,6 +575,9 @@ namespace BeastCraft.Spike55.Live3D
 
             long managedBytes = StatsTracker.EstimateManagedBytes();
             long gpuBytes = EstimateGpuBytes();
+            int gc0 = GC.CollectionCount(0) - _gc0Start;
+            int gc1 = GC.CollectionCount(1) - _gc1Start;
+            int gc2 = GC.CollectionCount(2) - _gc2Start;
 
             string json = "{\n" +
                 $"  \"beasts\": {_instances.Count},\n" +
@@ -515,7 +590,10 @@ namespace BeastCraft.Spike55.Live3D
                 $"  \"triangles\": {_stats.TrianglesThisFrame},\n" +
                 $"  \"skinningMsAvg\": {_stats.SkinningMsEma:0.###},\n" +
                 $"  \"managedMemoryBytes\": {managedBytes},\n" +
-                $"  \"gpuMemoryEstimateBytes\": {gpuBytes}\n" +
+                $"  \"gpuMemoryEstimateBytes\": {gpuBytes},\n" +
+                $"  \"gcGen0Collections\": {gc0},\n" +
+                $"  \"gcGen1Collections\": {gc1},\n" +
+                $"  \"gcGen2Collections\": {gc2}\n" +
                 "}\n";
             File.WriteAllText(_options.BenchOutPath, json);
             Console.WriteLine($"Bench result written: {_options.BenchOutPath}");

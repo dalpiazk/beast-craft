@@ -13,15 +13,14 @@ namespace BeastCraft.Spike55.Live3D
         public Matrix4x4 InverseBind;
     }
 
-    /// <summary>A loaded, CPU-skinnable glTF mesh: static per-vertex data (position/normal/uv/joint
-    /// indices/weights), plus the live SharpGLTF node graph and named animations needed to evaluate a
-    /// pose. Deliberately keeps the SharpGLTF Schema2 objects (Node, Animation) alive and queries them
-    /// directly every frame via Node.GetWorldMatrix(animation, time) -- SharpGLTF already walks the
-    /// parent chain and falls back to each ancestor's bind pose where an animation has no channel for
-    /// it, which is exactly the hierarchical pose evaluation this spike needs, so there was no reason to
-    /// hand-roll it (an earlier version of this file did exactly that, manually decomposing bind
-    /// matrices and sampling rotation/translation keyframes node-by-node -- SharpGLTF's own node.
-    /// GetWorldMatrix(animation, time) does the same job in one call and is what this file uses). No
+    /// <summary>A loaded, GPU-skinnable glTF mesh (see GpuMesh/Toon.fx for the GPU skin itself): static
+    /// per-vertex data (position/normal/uv/joint indices/weights), plus the live SharpGLTF node graph
+    /// and named animations AnimatedPose needs to evaluate a pose every frame. Deliberately keeps the
+    /// SharpGLTF Schema2 objects (Node, Animation) alive and queries them directly (Node.
+    /// GetLocalTransform(animation, time) -- AnimatedPose walks the parent hierarchy itself using this
+    /// class's precomputed ParentIndex array, rather than calling SharpGLTF's own Node.GetWorldMatrix,
+    /// which turned out to allocate measurably when called once per node per instance per frame -- see
+    /// AnimatedPose.ComputeWorldMatrices's doc comment for the before/after GC numbers). No
     /// SharpGLTF.Runtime dependency either -- this is a small, purpose-built reader for exactly what
     /// griffin_live.glb and crest_alt.glb carry (one mesh primitive, <= 4 joint influences per vertex, at
     /// most two named animations), not a general-purpose glTF scene loader.</summary>
@@ -36,6 +35,11 @@ namespace BeastCraft.Spike55.Live3D
         public byte[] BaseColorImageBytes; // PNG/JPEG bytes as embedded in the GLB, or null if untextured
 
         public Node[] Nodes;    // every logical node, indexed by LogicalIndex
+        public int[] ParentIndex; // ParentIndex[i] = Nodes[i].VisualParent's LogicalIndex, or -1 for a root.
+                                  // Precomputed once here so AnimatedPose can walk the hierarchy itself
+                                  // with Node.GetLocalTransform(animation, time) (one node, no ancestor
+                                  // walk) instead of Node.GetWorldMatrix(animation, time) -- see
+                                  // AnimatedPose's doc comment for why that swap mattered.
         public GltfJoint[] Joints; // empty if this model has no skin (e.g. crest_alt.glb)
         public Animation IdleAnimation;
         public Animation MoveAnimation;
@@ -47,6 +51,9 @@ namespace BeastCraft.Spike55.Live3D
 
             var logicalNodes = root.LogicalNodes;
             model.Nodes = logicalNodes.OrderBy(n => n.LogicalIndex).ToArray();
+            model.ParentIndex = new int[model.Nodes.Length];
+            for (int i = 0; i < model.Nodes.Length; i++)
+                model.ParentIndex[i] = model.Nodes[i].VisualParent?.LogicalIndex ?? -1;
 
             Node meshNode = logicalNodes.FirstOrDefault(n => n.Mesh != null);
             if (meshNode == null)

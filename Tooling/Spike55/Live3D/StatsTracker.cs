@@ -26,8 +26,15 @@ namespace BeastCraft.Spike55.Live3D
         public void RecordFrame(double frameMs)
         {
             _frameMs.Add(frameMs);
+            // Keep roughly the last _windowSeconds of history: walk backward from the newest sample
+            // accumulating elapsed time, and drop everything older than where that crosses the window.
+            // Lead-review fix: this used to default `cut` to `_frameMs.Count` (not 0), so whenever the
+            // *whole* list's total duration was still under the window -- true on every single call,
+            // since the list is wiped to near-empty by the end of each one -- the entire list, including
+            // the sample just added, was deleted immediately. Net effect: SampleCount was permanently 0
+            // and every fps stat (on-screen and in every screenshot taken before this fix) read 0.0.
             double total = 0;
-            int cut = _frameMs.Count;
+            int cut = 0;
             for (int i = _frameMs.Count - 1; i >= 0; i--)
             {
                 total += _frameMs[i];

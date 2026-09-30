@@ -190,12 +190,21 @@ A standalone MonoGame DesktopGL project, `net10.0`, mirroring `src/BeastCraft.De
 framework and `MonoGame.Framework.DesktopGL` package version (`3.8.5.1`) for an apples-to-apples
 comparison. Loads the GLBs at runtime with **SharpGLTF.Core 1.0.7** (MIT licence,
 https://github.com/vpenades/SharpGLTF -- see `THIRD-PARTY-NOTICES.md`-style attribution below; only
-`SharpGLTF.Core` is referenced, not `SharpGLTF.Runtime`, because this project hand-rolls CPU skinning
-and animation sampling directly against the glTF schema via `Node.GetWorldMatrix(animation, time)`
-rather than using Runtime's scene-graph helper). CPU linear-blend skinning (`Skinner.cs`) feeds a
-custom toon + inverted-hull-outline effect (`Content/Effects/Toon.fx`, compiled by the MonoGame content
-pipeline via `MonoGame.Content.Builder.Task` -- the only MGCB-built content; the GLBs and backdrop PNG
-are read as plain files at runtime, same convention as `BeastCraft.Desktop`).
+`SharpGLTF.Core` is referenced, not `SharpGLTF.Runtime`, because this project hand-rolls animation
+sampling directly against the glTF schema (`Node.GetLocalTransform(animation, time)`, walked through
+the hierarchy by `AnimatedPose.cs` itself -- see its doc comment for why not `Node.GetWorldMatrix`)
+rather than using Runtime's scene-graph helper.
+
+**GPU skinning** (`Content/Effects/Toon.fx`'s `Bones[16]` bone-palette vertex shader, fed by one shared
+*static* `VertexBuffer` per model, built once -- see `SkinnedVertex.cs`/`GpuMesh.cs`): each beast
+instance's CPU-side work per frame is just computing 11 joint matrices and uploading them as that one
+small array, not touching a vertex. This replaced an initial CPU-skinning implementation (blend the
+mesh on the CPU every instance every frame into a per-instance `DynamicVertexBuffer`) after a
+lead-review pass found it was the direct cause of the worst frame-time spikes at 12+ beasts -- see
+"Lead-review fix round" below and `docs/spikes/055-3d-mini-spike.md`'s fourth-pass section for the full
+before/after numbers. The custom toon + inverted-hull-outline effect itself is compiled by the
+MonoGame content pipeline via `MonoGame.Content.Builder.Task` -- the only MGCB-built content; the GLBs
+and backdrop PNG are read as plain files at runtime, same convention as `BeastCraft.Desktop`.
 
 Build/run (first time, restore the local `dotnet-mgcb` tool the content pipeline needs):
 
@@ -209,8 +218,8 @@ Controls (interactive mode only): `Tab` cycles the stress test 1 -> 3 -> 12 -> 2
 its own randomised animation-clock offset -- desynced on purpose, to prove instances don't need to
 share a phase); `C` toggles the crest attachment on/off; `T` cycles 3 colour-form tints (a shader
 multiply on the sampled texture); `M` toggles the Idle/Move clip; `Esc` quits. On-screen stats: average
-fps, 1%-low fps (over a rolling 3-second window), draw calls, triangles, CPU skinning time, managed +
-estimated GPU memory.
+fps, 1%-low fps (over a rolling 3-second window), draw calls, triangles, CPU-side pose/skin-upload
+time, managed + estimated GPU memory.
 
 Headless modes for reproducible numbers/images:
 
@@ -222,8 +231,12 @@ dotnet Tooling/Spike55/Live3D/bin/Release/net10.0/Live3D.dll --screenshot shot.p
 `--bench N --seconds S --out path.json` disables vsync (uncapped throughput, not monitor-capped),
 spawns N beasts, runs for S seconds of real wall-clock time, and writes `{beasts, seconds, frameCount,
 fpsAvg, fps1PercentLow, frameMsAvg, drawCalls, triangles, skinningMsAvg, managedMemoryBytes,
-gpuMemoryEstimateBytes}`. `--screenshot path.png [--beasts N] [--crest on|off] [--tint 0|1|2]` opens
-the window, waits 30 frames for the scene to settle, writes one PNG, then exits.
+gpuMemoryEstimateBytes, gcGen0Collections, gcGen1Collections, gcGen2Collections}` (the three GC counts
+are `GC.CollectionCount(0/1/2)` deltas over the bench window -- added in the lead-review fix round to
+make GC-driven frame-time jitter directly measurable rather than inferred). `--screenshot path.png
+[--beasts N] [--crest on|off] [--tint 0|1|2] [--hide-stats]` opens the window, waits until the
+on-screen stats have real data (elapsed wall-clock time, not a fixed frame count -- see "Lead-review
+fix round" below), writes one PNG, then exits.
 
 ### Two real bugs this uncovered (worth knowing before touching the shader)
 
@@ -241,6 +254,34 @@ the window, waits 30 frames for the scene to settle, writes one PNG, then exits.
   CCW-front glTF mesh. Fixed by using `RasterizerState.CullClockwise` for the main toon pass and
   `CullCounterClockwise` for the inverted-hull outline pass (the two are swapped from what an
   XNA-only codebase would default to).
+
+### Lead-review fix round (2026-09-30, same day)
+
+A first commit's screenshots and numbers were reviewed and sent back with five findings, all fixed;
+full detail (and the before/after numbers/screenshots) is in
+`docs/spikes/055-3d-mini-spike.md`'s fourth-pass section -- this is the short tooling-facing version:
+
+1. **GPU skinning**, replacing CPU skinning into a per-instance `DynamicVertexBuffer` -- the direct
+   cause of the worst 1%-low framerate (9 fps at 24 beasts) and dominant CPU cost (9.4 ms). Also found
+   along the way: `Node.GetWorldMatrix(animation, time)`, called once per node per instance per frame,
+   walks the full ancestor chain from scratch every call and measurably allocates doing it; replaced
+   with `AnimatedPose` walking the hierarchy itself via a precomputed `ParentIndex` array and
+   `Node.GetLocalTransform(animation, time)` (one node, no ancestor walk).
+2. **Facing and camera**: beasts now carry a fixed 90-degree yaw so they read as a 3/4 side profile
+   (matching `content/art/beasts/griffin/griffin.png`) instead of head-on with wings straight up.
+3. **Colour**: `LightColor`/`HighlightBoost` pulled back toward neutral -- the original tuning rendered
+   noticeably more saturated/orange than both the Meshy source texture and the approved illustration
+   (confirmed by sampling actual pixels from both, not a texture colour-space bug).
+4. **Board layout and hex scale**: the hex grid now mirrors the real game's own
+   `src/BeastCraft.Presentation/Board/HexLayout.cs` convention and ratio, sized from the beast's own
+   bind-pose bounding box; the board camera's tilt was increased (24 -> 48 degrees) once a 24-beast test
+   showed *why* the original tilt collapsed multiple hex rows onto the same screen position (an
+   orthographic camera looking straight down an axis projects that axis away entirely -- rows are
+   separated along world Z, so a shallow tilt gave them almost no screen-space separation).
+5. **Screenshot fps stats reading `0.0`**: a real, standalone bug in `StatsTracker.RecordFrame`'s
+   rolling-window trim (it defaulted to wiping the *entire* history every call, not just the part
+   outside the window) -- `--bench`'s own numbers were never affected (computed independently), only
+   the on-screen overlay and every screenshot taken before this fix.
 
 ### Licences
 

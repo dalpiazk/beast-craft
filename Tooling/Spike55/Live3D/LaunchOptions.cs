@@ -16,6 +16,7 @@ namespace BeastCraft.Spike55.Live3D
         public int ScreenshotBeasts = 1;
         public bool ScreenshotCrestOn = true;
         public int ScreenshotTint = 0;
+        public bool ScreenshotHideStats = false;
 
         public static LaunchOptions Parse(string[] args)
         {
@@ -46,6 +47,9 @@ namespace BeastCraft.Spike55.Live3D
                         break;
                     case "--tint":
                         o.ScreenshotTint = int.Parse(args[++i], CultureInfo.InvariantCulture);
+                        break;
+                    case "--hide-stats":
+                        o.ScreenshotHideStats = true;
                         break;
                     default:
                         Console.Error.WriteLine("Unrecognised argument: " + args[i]);

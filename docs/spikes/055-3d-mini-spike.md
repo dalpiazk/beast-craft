@@ -411,14 +411,25 @@ generation) meant to be parented to the head bone at runtime. Both are small eno
 
 The runtime (`Tooling/Spike55/Live3D`, MonoGame DesktopGL, `net10.0`, mirroring
 `BeastCraft.Desktop`'s `MonoGame.Framework.DesktopGL` version) loads both GLBs with **SharpGLTF.Core
-1.0.7** (MIT), CPU-skins each beast instance per frame (`Skinner.cs`, linear blend skinning against
-`Node.GetWorldMatrix(animation, time)`-evaluated joint matrices), and draws with a custom toon +
-inverted-hull-outline effect (`Content/Effects/Toon.fx`, compiled by the MonoGame content pipeline: a
-2-3 band diffuse ramp, cool `#7C7AAE` shadow tint that's never pure black, a warm key light, plus an
-ink-plum `#2E2A45` outline pass) over the Verdant Hollow backdrop
-(`content/art/backdrops/r01/sun0/medium.png`) and a simple hex grid, orthographic camera, portrait
-window (540x960 -- a 50% scale-down of the 1080x1920 target, so the window fits a normal desktop
-monitor; see the README).
+1.0.7** (MIT), **GPU-skins** each beast instance (a bone-palette vertex shader -- see "Lead-review fix
+round" below for why this replaced an initial CPU-skinning implementation), and draws with a custom
+toon + inverted-hull-outline effect (`Content/Effects/Toon.fx`, compiled by the MonoGame content
+pipeline: a 2-3 band diffuse ramp, cool `#7C7AAE` shadow tint that's never pure black, a warm key
+light, plus an ink-plum `#2E2A45` outline pass) over the Verdant Hollow backdrop
+(`content/art/backdrops/r01/sun0/medium.png`) and a hex grid sized and laid out to match the real
+game's own hex convention (`src/BeastCraft.Presentation/Board/HexLayout.cs`), orthographic camera,
+portrait window (540x960 -- a 50% scale-down of the 1080x1920 target, so the window fits a normal
+desktop monitor; see the README).
+
+**Lead-review fix round (2026-09-30, same day).** A first pass through this section's numbers and
+screenshots was reviewed and sent back with five findings: the 24-beast 1%-low framerate (9 fps) and
+CPU skin time (9.4 ms) were the biggest unmeasured-A35 risk and avoidable; the beast faced the camera
+head-on with wings straight up instead of the game's 3/4 side view; the natural tint rendered
+noticeably more saturated/orange than the source texture and the approved illustration; the 24-beast
+board was an oversized, overlapping clump, not beasts on hexes; and every screenshot's on-screen fps
+read 0.0. All five are fixed; each is detailed in its own subsection below, and the numbers/screenshots
+throughout this section are the **post-fix** ones (the original commit's numbers are quoted inline
+where the delta itself is the finding).
 
 **Two real bugs found and fixed** (both are non-obvious MonoGame/glTF integration gotchas worth
 recording, not spike-specific one-offs):
@@ -437,12 +448,98 @@ recording, not spike-specific one-offs):
    reversed) fully overdrew the model instead of just its fringe -- both explained by, and fixed by,
    swapping which `RasterizerState` each pass uses.
 
-**One fix round, cosmetic placement.** The crest attachment first rendered draped in front of the
-face like a bib (parented directly at the head bone's world matrix, no adjustment) -- the head bone's
+**Cosmetic placement, two rounds.** The crest attachment first rendered draped in front of the face
+like a bib (parented directly at the head bone's world matrix, no adjustment) -- the head bone's
 bind-pose orientation doesn't line up with "up" in world space. Fixed with one small fixed local
-re-orientation (scale down, tip the blades up and back) in `Game1.SkinInstance`; this is a stand-in
-procedural mesh for the toggle proof, not hand-placed art, so a single fixed correction (not a full
-per-bone rig) is deliberately as far as cosmetic placement went.
+re-orientation (scale down, tip the blades up and back) in `Game1`'s per-instance pose update. The
+lead-review facing fix (below) then rotated every beast 90 degrees, which also rotated the crest's own
+fan-spread axis edge-on to the new camera (a thin sliver instead of a plume); fixed with one more fixed
+`RotationY` term compensating for the new facing. Both are one fixed correction each, not a full
+per-bone rig -- this is a stand-in procedural mesh for the toggle proof, not hand-placed art, so that's
+deliberately as far as cosmetic placement went.
+
+**Lead-review fix 1: GPU skinning.** The original CPU-skinning implementation (blend the mesh on the
+CPU every instance every frame, rewrite a per-instance `DynamicVertexBuffer`) was the direct cause of
+the worst 1%-low numbers (9 fps at 24 beasts) and the dominant CPU cost (9.4 ms skin time at 24
+beasts). Moved to GPU skinning: one **static, shared** `VertexBuffer` per model (built once in
+`LoadContent`, carrying `BLENDINDICES0`/`BLENDWEIGHT0` per vertex -- see `SkinnedVertex.cs`/
+`GpuMesh.cs`), a `Bones[16]` bone-palette array parameter in `Toon.fx`, and per-instance-per-frame CPU
+work reduced to computing 11 joint matrices and uploading them as that one small array (no vertex
+buffer touched at all). `MAX_BONES = 16` was chosen deliberately small for this 11-joint rig rather
+than copying `SkinnedEffect`'s 72-bone budget -- 16 float4x4 is 64 vec4 vertex-uniform registers, safely
+inside GLSL ES 2.0's spec-minimum guaranteed 128 vec4, where 72 bones would not fit (see Toon.fx's
+header comment). Skin time dropped from 9.4 ms to 1.4 ms at 24 beasts; 1%-low fps rose from 9 to ~86
+(see the updated numbers table below).
+
+A second, smaller allocation source turned up while chasing the remaining Gen0 GC count: SharpGLTF's
+own `Node.GetWorldMatrix(animation, time)` -- used once per node per instance per frame to evaluate the
+pose -- walks the *full* ancestor chain from that node up to the scene root on every call and
+measurably allocates doing it (confirmed: disabling the `Bones` effect-parameter upload entirely barely
+moved the Gen0 count, ruling that call out). Fixed by having `AnimatedPose` walk the hierarchy itself
+(a precomputed `ParentIndex` array, a small stack-allocated `Span<bool>` fixed-point sweep -- glTF node
+order is not guaranteed parent-before-child, confirmed on this exact rig, so a naive single forward
+pass isn't safe) using each node's own `Node.GetLocalTransform(animation, time)` instead, which doesn't
+re-walk ancestors. Gen0 collections at 24 beasts over a 10-second bench: ~2,000 with `GetWorldMatrix`,
+~1,230 after this change, ~1,300 in the final build (noise-level difference from the `Bones`-upload
+isolation test). This residual is inside SharpGLTF's own per-node keyframe-sampler evaluation -- not
+chased further (closing it fully would mean hand-rolling keyframe interpolation directly off the glTF
+accessor data, bypassing SharpGLTF's animation API entirely, a bigger change than this fix round's
+scope). Gen1 collections stayed at 0-1 and Gen2 at 0 across every beast count tested -- the residual
+Gen0 pressure is real but never escalates to the more expensive collection generations.
+
+**Lead-review fix 2: facing and camera.** The beast faced the camera head-on with wings straight up;
+the game shows beasts in a 3/4 side view facing right
+(`content/art/beasts/griffin/griffin.png`). Fixed two ways together: every beast instance now carries a
+fixed 90-degree `FacingYaw` (its glTF-space forward axis, +Z, now points world +X instead), and the
+camera -- initially moved, incorrectly, to view mostly along X -- was corrected back to viewing mostly
+along Z (elevated, tilted down, the same axis the original frontal camera used) once a 24-beast test
+revealed *why* that mattered: a hex board's rows are separated along world Z, and an orthographic
+camera looking straight down an axis projects that axis away entirely, so a Z-axis camera is required
+for rows to have any screen-space separation at all (see "Lead-review fix 4" below -- the facing and
+board-layout fixes are coupled through this same camera axis choice). The net effect: beasts face right
+under a camera that still reads the hex board correctly, both fixed by a 90-degree rotation on the
+*beast* rather than moving the camera off the board-reading axis.
+
+**Lead-review fix 3: colour.** The natural tint rendered noticeably more saturated/orange than both the
+Meshy source texture and the approved illustration -- confirmed by sampling actual pixels from both
+(the source texture's own gold, e.g. `(226,163,89)`, is already close to the illustration's
+`(218,164,75)`; multiplying by the shader's original `LightColor` of `(1.0, 0.88, 0.68)` alone
+reproduces the rendered colour almost exactly, i.e. the shader's lighting -- not a texture
+colour-space bug -- was the cause). Checked and ruled out: MonoGame's default `Texture2D.FromStream`
+load (`SurfaceFormat.Color`) applies no gamma/sRGB conversion, so this shader's straight multiply is
+gamma-space compositing throughout, consistent with the rest of the game (`SpriteBatch`, also
+gamma-space) -- not a colour-space mismatch to fix. Fixed by pulling `LightColor` (`(1.0, 0.97,
+0.92)`) and `HighlightBoost` (`(1.03, 1.0, 0.96)`) back toward neutral so the texture's own colour
+carries through; `ShadowTint` (the brief's required cool `#7C7AAE`, never-pure-black shadow) is
+unchanged.
+
+**Lead-review fix 4: board layout and hex scale.** The 24-beast screenshot was an oversized, overlapping
+clump, not beasts on hexes -- two compounding bugs. First, hex spacing was picked with no reference to
+either the game's own hex convention or the beast's actual size; replaced with a hex grid that mirrors
+`HexLayout.cs`'s own pointy-top, "each row shifts half a column per row down" layout and ratio, sized
+from the beast's own bind-pose bounding box (`HexBoard.SetScale`) so a standing beast roughly fills,
+rather than bursts out of, its own cell. That alone didn't fix it: the 90-degree `FacingYaw` (fix 2)
+swaps which bind-pose axis maps to which world axis, and the first version measured the wrong one for
+hex-column spacing; fixed by sizing hex spacing from the larger of the beast's two horizontal bind-pose
+extents, covering whichever axis ends up where after the yaw. Second, and the one that actually
+explained the "clump" look even with correct spacing: the camera was viewing almost straight down the
+Z axis (the axis hex rows are separated along), which an orthographic projection collapses entirely --
+tilt alone (24 degrees) wasn't enough to give rows real screen separation. Fixed by increasing the
+board-camera tilt to 48 degrees. The camera's projection-fitting math was also rewritten to measure the
+actual **view-space** extent of every instance (not a world-axis-aligned guess), so it's robust to
+camera direction generally, not just retuned for this one fix.
+
+**Lead-review fix 5: screenshot fps stats.** Every screenshot's on-screen `fps avg`/`fps 1% low` read
+`0.0`. Not a warm-up timing issue (a warm-up was added regardless, see the README's `--screenshot`
+docs) -- a real, standalone bug in `StatsTracker.RecordFrame`'s rolling-window trim: it defaulted to
+trimming the *entire* list (`cut = _frameMs.Count`, not `0`) whenever the list's total duration was
+still under the 3-second window, which was true on *every single call* (the list was wiped to near-empty
+by the end of the previous one), so `SampleCount` was permanently 0 and every fps stat -- on-screen and
+in every screenshot taken before this fix, including all four in the original commit -- read 0.0. Fixed
+by correcting the default. The bench JSON numbers were never affected (`WriteBenchResult` computes its
+own stats directly from the full `_benchFrameMs` list, independent of `StatsTracker`), so the numbers
+reported from the original commit's `--bench` runs were accurate; only the on-screen overlay and
+screenshots were wrong.
 
 **Cosmetics and colour form: proven, no re-render or re-animation needed.** Pressing `C` toggles the
 crest attachment on/off and `T` cycles 3 colour-form tints (a shader multiply on the sampled base-colour
@@ -456,44 +553,52 @@ cosmetic (a crest, a saddle, a weapon) but not yet a body-colour-form-only proof
 baked into the base mesh's own geometry (handled here instead by the tint shader parameter, which is a
 real and simpler mechanism for that case).
 
-**Measured numbers (this machine: Intel Arc 140V laptop, DesktopGL, Release build, vsync disabled for
-true uncapped throughput via `--bench`):**
+**Measured numbers, post-lead-review-fix (this machine: Intel Arc 140V laptop, DesktopGL, Release
+build, vsync disabled for true uncapped throughput via `--bench`, GPU skinning):**
 
-| Beasts | fps avg | fps 1% low | Draw calls | Triangles | CPU skin time | Managed mem | GPU mem (est.) |
-| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1 | 1,006 | 154 | 6 | 17,192 | 0.37 ms | 12.8 MB | 6.4 MB |
-| 3 | 644 | 69 | 14 | 51,576 | 1.24 ms | 8.4 MB | 7.6 MB |
-| 12 | 183 | 20 | 50 | 206,304 | 4.11 ms | 9.9 MB | 11.5 MB |
-| 24 | 92 | 9 | 98 | 412,608 | 9.43 ms | 16.9 MB | 16.6 MB |
+| Beasts | fps avg | fps 1% low | Draw calls | Triangles | Skin time (CPU-side) | Managed mem | GPU mem (est.) | Gen0 GC | Gen1 GC | Gen2 GC |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 | 991 | 182 | 6 | 17,192 | 0.05 ms | 11.1 MB | 7.2 MB | 115 | 1 | 0 |
+| 3 | 1,011 | 236 | 14 | 51,576 | 0.20 ms | 7.4 MB | 7.2 MB | 354 | 1 | 1 |
+| 12 | 742 | 179 | 50 | 206,304 | 0.74 ms | 11.2 MB | 7.2 MB | 1,036 | 1 | 0 |
+| 24 | 471 | 86 | 98 | 412,608 | 1.39 ms | 12.6 MB | 7.2 MB | 1,315 | 1 | 0 |
 
 (10-second `--bench` runs; "draw calls"/"triangles" are per-frame totals -- each beast is 2 draw calls
-x 2 passes (toon + outline) for body and crest.) Even at 24 beasts, uncapped average throughput (92
-fps) stays comfortably above the 60 fps pass bar on this desktop GPU, with wide margin. The 1%-low
-numbers are notably worse relative to average, especially at 12/24 beasts (20 fps, 9 fps) -- this looks
-like GC/driver-pressure jitter from `DynamicVertexBuffer.SetData` discard-writing large buffers for
-every instance every frame (CPU skinning re-uploads the full vertex buffer per beast per frame; an
-earlier version that allocated fresh `Matrix4x4[]` arrays per instance per frame made this materially
-worse, fixed by reusing per-instance scratch arrays -- see `AnimatedPose.cs`'s comments), not something
-chased further here. A production implementation would very likely move skinning to the GPU (a bone
-matrix palette in the vertex shader, no per-frame CPU vertex buffer rewrite) specifically to remove this
-class of stall; this spike deliberately used CPU skinning (explicitly acceptable per the task brief) so
-"skinning time" would be a directly measurable, honest number rather than hidden GPU cost.
+x 2 passes (toon + outline) for body and crest; Gen0/1/2 GC counts are collections observed *during*
+the 10-second bench window, via `GC.CollectionCount`.) For comparison, the **original CPU-skinning**
+numbers this fix round replaced: at 24 beasts, 92 fps avg / **9 fps 1% low** / 9.43 ms skin time (see
+"Lead-review fix 1" above for the two changes -- GPU skinning, then a SharpGLTF allocation fix -- that
+produced this improvement). 1%-low fps at 24 beasts improved **~9.5x** (9 -> 86); skin time dropped
+**~6.8x** (9.43 ms -> 1.39 ms); GPU memory is now flat with beast count (a shared static vertex buffer
+per model, not one per instance -- see `EstimateGpuBytes`'s comment) instead of scaling linearly.
+Every beast count tested stays at or above 60 fps on *both* the average and the 1%-low number on this
+desktop GPU, with wide margin even at 24 beasts uncapped. GPU skinning was always an option the task
+brief explicitly allowed ("MonoGame's built-in `SkinnedEffect` is acceptable for a first pass, or a
+custom toon effect... GPU or CPU skinning"); CPU skinning was chosen for the original commit
+specifically so "skinning time" would be a directly measurable, honest CPU-side number -- GPU skinning
+keeps that same measurability (the CPU side is now just 11 joint-matrix computations and one small
+array upload, still timed and reported) while removing the per-frame vertex-buffer rewrite that caused
+the 1%-low regression.
 
 **Galaxy A35 (Exynos 1380 / Mali-G68 MP5) estimate -- unmeasured, reasoned from these numbers:**
 
 - 8,372 tris and one 1024x1024 texture per beast is a trivial vertex/fill-rate budget for a mobile
   GPU in the A35's tier (Mali-G68 MP5 comfortably handles several times this in current mobile titles);
   the real mobile-specific risk is **not** raw triangle/fill throughput.
-- The real risks are (a) **CPU skinning cost on a much slower mobile CPU core** -- this laptop's CPU
-  skinned 24 beasts in 9.4 ms; a phone-class Cortex-A55/A78-tier core (Exynos 1380's CPU) could plausibly
-  run this 3-6x slower with no other optimisation, which would meaningfully eat into a 16.6 ms (60 fps)
-  frame budget at high beast counts -- this is the single biggest unmeasured unknown; (b) **driver
-  overhead per draw call on a mobile OpenGL ES driver**, typically worse than desktop drivers -- at 98
-  draw calls/frame for 24 beasts, this is a real (if standard) mobile-optimisation target (instancing or
-  batching would cut it); (c) **shader compile/portability for GLSL ES** (`Toon.fx` was only compiled
-  and tested for the OpenGL/DesktopGL profile via MGFX here -- Android's MonoGame target uses a
-  different GLSL ES profile, untested); (d) **content pipeline and SharpGLTF behaviour on Android**,
-  entirely untested in this pass (MonoGame's Android host uses a different asset-loading path than
+- **CPU skinning cost is no longer the standout risk it was.** With GPU skinning (the lead-review fix),
+  the CPU side per beast per frame is now just 11 joint-matrix computations and one small array upload
+  (1.39 ms for 24 beasts on this laptop, down from 9.43 ms with the original CPU-skin implementation --
+  see the numbers table above), a much smaller, much more mobile-CPU-tolerant number even after a
+  pessimistic 3-6x mobile-CPU slowdown factor.
+- The remaining real risks are (a) **per-draw-call driver overhead on a mobile OpenGL ES driver**,
+  typically worse than desktop drivers -- at 98 draw calls/frame for 24 beasts, this is now the more
+  relevant mobile-optimisation target (instancing or batching would cut it) than CPU skinning was;
+  (b) **shader compile/portability for GLSL ES**, now with the added complexity of the `Bones[16]`
+  array parameter (`Toon.fx` was only compiled and tested for the OpenGL/DesktopGL profile via MGFX
+  here -- chosen deliberately small, 16 bones vs. `SkinnedEffect`'s 72, specifically to stay inside
+  GLSL ES 2.0's spec-minimum vertex-uniform guarantee, but the *actual* Android GLSL ES compile is
+  still untested); (c) **content pipeline and SharpGLTF behaviour on Android**, entirely untested in
+  this pass (MonoGame's Android host uses a different asset-loading path than
   `File.ReadAllBytes`/`Texture2D.FromStream` off the raw filesystem, which is what this spike relies
   on). **The exact test needed:** build the Android variant of this same app (out of scope for this
   pass per the task brief) and run the same `--bench` harness on a physical Galaxy A35 at the beast
@@ -512,10 +617,12 @@ class of stall; this spike deliberately used CPU skinning (explicitly acceptable
   exists" case -- a first attempt on a species with no prior rig work would likely cost closer to pass
   1/2's 60-110 minute range (section 2.7's time table).
 - **Not a per-beast cost, but a real one-time cost this pass paid for the whole game:** the runtime
-  engineering (SharpGLTF integration, CPU skinner, custom toon+outline shader, camera/hex board,
-  stress/bench/screenshot harness) took the bulk of this session's time. It does not recur per beast,
-  but it is real engineering investment a production real-time-3D path would need to have already paid
-  before any beast benefits from it -- unlike Path B (section 4), which reuses the game's existing
+  engineering (SharpGLTF integration, GPU skinner, custom toon+outline shader, camera/hex board,
+  stress/bench/screenshot harness) took the bulk of this session's time -- and a same-day lead-review
+  fix round (GPU skinning, facing/camera, colour tuning, hex-board layout, an on-screen-stats bug) added
+  a comparable second block of engineering time on top, all still one-time and still not recurring per
+  beast. It is real engineering investment a production real-time-3D path would need to have already
+  paid before any beast benefits from it -- unlike Path B (section 4), which reuses the game's existing
   `SpriteBatch` draw path with no new engine code at all.
 
 **Risks, specific to this pass:**
@@ -536,8 +643,9 @@ class of stall; this spike deliberately used CPU skinning (explicitly acceptable
 - **Shader compile for Android.** `Toon.fx` compiled cleanly for the OpenGL/DesktopGL MGFX profile; an
   Android build would need it to also compile for MonoGame's Android GLSL ES target, untested here.
 
-**Screenshots** (one fix round applied to the crest-placement and rendering bugs above before these
-were taken; all still at the 540x960 desktop window size, not device-tested):
+**Screenshots** (retaken after the lead-review fix round above -- facing/camera, colour, board layout
+and the on-screen-stats bug all affect what these show; all still at the 540x960 desktop window size,
+not device-tested; on-screen stats are real numbers now, not the earlier `0.0`):
 
 ![Single Griffin, crest on](055/live3d_close_crest_on.png)
 ![Single Griffin, crest off](055/live3d_close_crest_off.png)
@@ -553,7 +661,11 @@ multiply on the sampled texture, no new art, no accent mask.*
 ![24-beast stress test](055/live3d_board_24.png)
 
 *The stress test's top step: 24 Griffins, each with its own randomised (desynced) animation-clock
-offset, toon-shaded with outlines, on the hex board over the Verdant Hollow backdrop.*
+offset, toon-shaded with outlines, spread across three rows of the hex board (8x11 arena, matching the
+game's own `HexLayout.cs` convention and the Verdant Hollow backdrop's painted size) over the Verdant
+Hollow backdrop. Some wingtip overlap between neighbours remains (beasts are drawn larger than their
+own hex footprint, same as the 2D sprites in `docs/spikes/055/board_mock_lowpoly.png`), but beasts now
+read as individually placed on the board rather than one overlapping clump.*
 
 ## 4. Cosmetics (`docs/art/art-brief.md`, `cosmetic-library.json`, issue #38)
 
@@ -588,7 +700,7 @@ multiplier).
 
 | Criterion | Path A (pre-rendered, passes 1-3) | Path A' (real-time, pass 4) | Path B |
 | --- | --- | --- | --- |
-| Steady 60 fps on a Galaxy A35-class phone | Unmeasured; expected non-issue as baked 2D sprites (same cost class as shipping content) -- see section 3 | **Measured on desktop only** (2.8): 92 fps avg at 24 beasts, uncapped, wide margin above 60 fps on this laptop's GPU; A35 unmeasured, reasoned estimate says CPU skinning cost is the real unknown, not fill rate -- see 2.8 | Unmeasured; expected non-issue, same reasoning, and it's strictly less new content than Path A |
+| Steady 60 fps on a Galaxy A35-class phone | Unmeasured; expected non-issue as baked 2D sprites (same cost class as shipping content) -- see section 3 | **Measured on desktop only** (2.8): 471 fps avg / 86 fps 1% low at 24 beasts, uncapped, wide margin above 60 fps on this laptop's GPU (GPU skinning, after a lead-review fix round); A35 unmeasured, reasoned estimate says per-draw-call driver overhead and GLSL ES shader compile are the real unknowns now, not CPU skinning or fill rate -- see 2.8 | Unmeasured; expected non-issue, same reasoning, and it's strictly less new content than Path A |
 | An approvable beast within a set number of hours per asset | Real risk on pass 1's mesh (rigging did not converge); **pass 3's low-poly remesh rigged cleanly on the first attempt with no repairs (2.7)**, but that's one beast, one mesh -- generality across the other 9 is unconfirmed | Same mesh/rig as pass 3, plus ~25-35 min this pass to author Idle/Move clips and export -- but animation is hand-keyed sinusoidal posing, not production quality, and has no Mixamo-equivalent shortcut for a quadruped (2.8) | Looks solid: ~3-5 min per beast once the tooling exists, reusing the existing `rigparts.py` convention |
 | Cosmetic swaps without per-beast rework | **Fails as built, all three passes**: needs full re-generation (+ re-render, for pre-rendered output) per combination (section 4) | **Passes, for attachment-style cosmetics and colour form** (2.8): crest toggle and tint cycle both proven live, zero re-render/re-animation -- does *not* yet prove segmented-submesh swaps for a cosmetic baked into the base mesh's own geometry | **Passes**: parts/attachment swap, no rework |
 | A trimmed device build that loads content | Out of scope for this mini-spike | Out of scope for this mini-spike (DesktopGL only; Android untested, see 2.8's A35 estimate) | Out of scope for this mini-spike |
@@ -619,10 +731,14 @@ because it loses on cost and risk, not because it's structurally blocked the way
   (2.8's risks) -- every clip, for every beast, would need either expensive hand-keying or an unbuilt
   procedural gait system. Path B's per-beast animation cost (a few minutes, section 2.7's time table)
   stays dramatically cheaper.
-- **The A35 number that matters most (CPU skinning cost on mobile) is still unmeasured** (2.8) -- this
-  pass used CPU skinning deliberately so the cost would be visible and honest, but that same choice
-  means the one most mobile-relevant number in this whole spike is a reasoned estimate, not a
-  measurement, pending an actual device test.
+- **The A35 numbers that matter most -- per-draw-call driver overhead and GLSL ES shader compile on
+  mobile -- are still unmeasured** (2.8). A lead-review fix round moved skinning from CPU to GPU
+  specifically because the CPU-skinning cost *was* the standout unmeasured risk and turned out, once
+  measured, to also be the dominant cause of a real desktop performance problem (a 9 fps 1%-low at 24
+  beasts); with that fixed, the CPU side is now small even under a pessimistic mobile-CPU slowdown
+  factor, but every other A35 unknown (98 draw calls/frame, a `Bones[16]`-array GLSL ES compile,
+  SharpGLTF/content-loading on Android) is still a reasoned estimate, not a measurement, pending an
+  actual device test.
 - **Likeness is unchanged** (same pass-3 mesh): still a plausible griffin, not a reconstruction of the
   specific approved illustration (2.1, 2.7).
 
@@ -647,7 +763,9 @@ cosmetics (a head-bone-attached mesh toggle) and colour form (a shader tint) bot
 re-render or re-animation, the same "no rework" property Path B already has. That is real, measured
 evidence, not a hypothesis -- but see the reasoning below (point 1) for why it still doesn't change
 *today's* default recommendation: the combinatorics fix comes bundled with new costs (engineering,
-animation authoring, unmeasured mobile CPU-skinning risk) that pre-rendered 3D never had to pay.
+animation authoring, and -- even after a lead-review fix round found and fixed the worst of it, moving
+skinning to the GPU -- still-unmeasured mobile driver/shader-compile risk) that pre-rendered 3D never
+had to pay.
 
 Reasoning:
 
@@ -656,9 +774,11 @@ Reasoning:
    not -- cannot cheaply take 20 discrete cosmetic options without a full re-render per combination.
    **Real-time** 3D (pass 4, section 2.8) passes it for attachment-style cosmetics and colour form, measured
    not hypothesised -- but adopting it means paying for a new render path, a new animation-authoring
-   problem with no Mixamo shortcut, and an unmeasured mobile CPU-skinning risk (2.8), costs Path B simply
-   doesn't have. That package of new costs, not the combinatorics objection itself, is why real-time 3D is
-   not today's default even though it clears the one bar that mattered most.
+   problem with no Mixamo shortcut, and still-unmeasured mobile driver/shader-compile risk (2.8's CPU
+   skinning cost was the worst of the mobile unknowns and is now fixed and measured small, but the
+   others -- draw-call overhead, GLSL ES compile, Android content loading -- remain open), costs Path B
+   simply doesn't have. That package of new costs, not the combinatorics objection itself, is why
+   real-time 3D is not today's default even though it clears the one bar that mattered most.
 2. Path B costs almost nothing beyond what's already built: it reuses the *already-approved* Griffin art,
    the *already-cut* rig parts, and produces a visibly correct, independently-articulated idle/move loop
    with about 20 minutes of new tooling. It is the lower-risk, lower-cost path by a wide margin.
@@ -676,9 +796,11 @@ Reasoning:
 
 **Real-time 3D on a Galaxy A35-class phone:** see section 2.8's full estimate and reasoning. Short
 version: 8,372 tris and a 1024x1024 texture per beast is a trivial fill-rate/vertex budget for the
-A35's Mali-G68 MP5; the real unmeasured risk is CPU skinning cost on a much slower mobile CPU core and
-per-draw-call driver overhead, not raw triangle throughput. Desktop numbers (2.8) show wide 60 fps
-margin at up to 24 beasts on this laptop's GPU, but that is not a substitute for an on-device A35 test,
+A35's Mali-G68 MP5; GPU skinning (the lead-review fix) means CPU skinning cost is no longer the
+standout mobile risk it originally was; the real unmeasured risks now are per-draw-call driver
+overhead, `Bones[16]`-array GLSL ES shader compile, and SharpGLTF/content loading on Android, not raw
+triangle throughput or CPU skinning. Desktop numbers (2.8) show wide 60 fps margin (both average and
+1% low) at up to 24 beasts on this laptop's GPU, but that is not a substitute for an on-device A35 test,
 which remains not done.
 
 ### Risks if this recommendation is wrong
@@ -690,10 +812,11 @@ which remains not done.
   Path A's problems here (2.2, 2.3, section 4) could disappear; this spike used one paid-tier Meshy
   generation (plus one paid `remesh` follow-up, 2.7) and does not rule that out for other tools/settings.
 - **Now confirmed rather than hypothetical (2.8):** real-time 3D rendering does dodge the
-  cosmetic-combinatorics objection, for attachment-style cosmetics and colour form. If the animation-
-  authoring problem (no Mixamo-equivalent for this game's beasts) or the unmeasured A35 CPU-skinning
-  risk turn out to be smaller than feared, this recommendation is the one most likely to flip on new
-  evidence -- see "Next steps".
+  cosmetic-combinatorics objection, for attachment-style cosmetics and colour form. A lead-review fix
+  round already closed the CPU-skinning risk (moved to the GPU, measured small); if the remaining
+  animation-authoring problem (no Mixamo-equivalent for this game's beasts) or the remaining unmeasured
+  A35 risks (driver overhead, GLSL ES shader compile) turn out to be smaller than feared, this
+  recommendation is the one most likely to flip on new evidence -- see "Next steps".
 
 ### Next steps
 
