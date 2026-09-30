@@ -195,26 +195,63 @@ technique Outline
 // docs/spikes/055-3d-mini-spike.md's fifth-pass section.
 //
 // Replaced with GPU skinning via a per-instance bone-ARRAY OFFSET instead --
-// the same Bones[]-uniform-array + BLENDINDICES/BLENDWEIGHT pattern already
-// proven working for the Griffin above (SkinPositionNormal), just with a
-// bigger array (MAX_SWARM_INSTANCES swarmlings x SWARM_BONES_PER_INSTANCE
-// bones each) and a per-vertex InstanceId selecting which instance's slice
-// of that array to read. No texture sampling in the vertex shader at all --
-// only dynamic uniform-array indexing, which Toon.fx's existing Bones[]
-// technique already confirms this toolchain *does* support. The whole
-// swarm still draws from one merged static vertex buffer in one draw call
-// per pass (GpuMesh.BuildSwarmMerged); the per-frame CPU cost is now
-// SWARM_BONES_PER_INSTANCE x instance-count small matrix computations
-// (cheap, same order of cost as the Griffins' own per-instance bone work),
-// not the "one float" VAT's CPU cost would have been -- a real, measured
-// cost difference from the VAT design, not zero, but still small; see the
-// gate report for the measured number.
+// the same uniform-array + BLENDINDICES/BLENDWEIGHT pattern already proven
+// working for the Griffin above (SkinPositionNormal). No texture sampling in
+// the vertex shader at all -- only dynamic uniform-array indexing, which
+// Toon.fx's existing Bones[] technique already confirms this toolchain
+// *does* support. The per-frame CPU cost is SWARM_BONES_PER_INSTANCE x
+// instance-count small matrix computations (cheap, same order of cost as
+// the Griffins' own per-instance bone work), not the "one float" VAT's CPU
+// cost would have been -- a real, measured cost difference from the VAT
+// design, not zero, but still small; see the gate report for the measured
+// number.
+//
+// Fix-round register-budget redesign: the real, rigged Swarmling
+// (Tooling/Spike55/blender_export_live_swarmling.py) has SWARM_BONES_PER_INSTANCE = 6
+// bones (bone_body, bone_head, 4 legs -- no separate horn bones, weighted
+// rigidly to bone_head instead; see that script's module docstring), not
+// the procedural placeholder's 3. At MAX_SWARM_INSTANCES = 24 swarmlings x 6
+// bones, a flat float4x4 array (4 vec4/bone, the original design above) would
+// need 24*6*4 = 576 vec4 registers -- far over GLES 3.0's own
+// spec-guaranteed minimum of 256 vec4 vertex uniform vectors (worse than the
+// 3-bone placeholder's 288, which was already over budget). Two changes claw
+// this back under budget:
+//   1. 3x4 affine matrices (3 vec4 registers/bone, dropping the [0,0,0,1]
+//      projective row every bind-pose skin matrix has anyway) instead of a
+//      full float4x4 (4 vec4/bone) -- a 25% cut on its own.
+//   2. The swarm draws in fixed-size BATCHES of SWARM_BATCH_CAPACITY = 12
+//      swarmlings (GpuMesh.BuildSwarmMerged is called once per batch, each
+//      with its own merged VertexBuffer and local InstanceId 0..11; see
+//      Game1.cs's _swarmBatches) instead of one flat 24-instance array, so
+//      only one batch's bone data needs to be resident at a time.
+// Together: SWARM_BATCH_CAPACITY(12) * SWARM_BONES_PER_INSTANCE(6) * 3 vec4/bone
+// = 216 vec4 registers -- 216 of GLES 3.0's guaranteed-minimum 256 (84%),
+// leaving ~40 vec4 of headroom for ViewProjection (4) and the handful of
+// lighting/outline uniforms above (well under 40 even in the worst case
+// where each scalar/float3 uniform is packed into its own register). A
+// 24-swarmling battle now draws in 2 batches instead of 1 merged draw --
+// 4 swarm draw calls (2 batches x Toon+Outline) instead of 2 -- see the gate
+// report's bench table for the measured draw-call/fps delta this cost.
+//
+// The 3x4 matrix is stored as 3 plain float4 "rows" per bone (not an HLSL
+// float3x4[] array) to sidestep any ambiguity in how a host API packs a
+// non-4x4 matrix array parameter: Game1.cs uploads a flat Vector4[] via
+// EffectParameter.SetValue(Vector4[]), one Vector4 per register, so the
+// C#-side register count and this shader's register count are
+// unambiguously the same number by construction. Each "row" r (0, 1, 2) of
+// bone b's matrix dotted with [position, 1] (or [normal, 0] for the normal)
+// gives that bone's contribution to world X/Y/Z respectively -- the standard
+// compact affine-skin-matrix layout, with the CPU side responsible for
+// transposing the row-vector skin matrix into this column-dot-friendly row
+// layout before upload (see Game1.UpdateSwarmBones's comment for the exact
+// transpose).
 // ===========================================================================
 #define MAX_SWARM_INSTANCES 24
-#define SWARM_BONES_PER_INSTANCE 3
-#define SWARM_BONES_TOTAL (MAX_SWARM_INSTANCES * SWARM_BONES_PER_INSTANCE)
+#define SWARM_BATCH_CAPACITY 12
+#define SWARM_BONES_PER_INSTANCE 6
+#define SWARM_ROWS_TOTAL (SWARM_BATCH_CAPACITY * SWARM_BONES_PER_INSTANCE * 3)
 
-float4x4 SwarmBones[SWARM_BONES_TOTAL];
+float4 SwarmBoneRows[SWARM_ROWS_TOTAL]; // 216 of GLES 3.0's guaranteed 256 vec4 vertex uniforms
 
 struct VSInputSwarm
 {
@@ -223,20 +260,40 @@ struct VSInputSwarm
     float2 TexCoord : TEXCOORD0;
     float4 BlendIndicesLocal : BLENDINDICES0; // 0..SWARM_BONES_PER_INSTANCE-1, local to one swarmling
     float4 BlendWeight : BLENDWEIGHT0;
-    float InstanceId : TEXCOORD1;             // which swarmling copy this vertex belongs to
+    float InstanceId : TEXCOORD1;             // which swarmling copy WITHIN THIS BATCH (0..11)
 };
 
+// Blends up to 4 bones' 3x4 (3-row) skin matrices, weighted, then applies the blended matrix to
+// position/normal via a row-dot (equivalent to, and cheaper to express here than, blending full
+// matrices and then multiplying once -- linear in both operations, so the two orders agree).
 void SkinSwarmPositionNormal(VSInputSwarm input, out float3 worldPos, out float3 worldNormal)
 {
-    float base = input.InstanceId * SWARM_BONES_PER_INSTANCE;
-    float4x4 skin =
-        SwarmBones[(int)(base + input.BlendIndicesLocal.x)] * input.BlendWeight.x +
-        SwarmBones[(int)(base + input.BlendIndicesLocal.y)] * input.BlendWeight.y +
-        SwarmBones[(int)(base + input.BlendIndicesLocal.z)] * input.BlendWeight.z +
-        SwarmBones[(int)(base + input.BlendIndicesLocal.w)] * input.BlendWeight.w;
+    int instBase = (int)input.InstanceId * SWARM_BONES_PER_INSTANCE;
+    int i0 = (instBase + (int)input.BlendIndicesLocal.x) * 3;
+    int i1 = (instBase + (int)input.BlendIndicesLocal.y) * 3;
+    int i2 = (instBase + (int)input.BlendIndicesLocal.z) * 3;
+    int i3 = (instBase + (int)input.BlendIndicesLocal.w) * 3;
 
-    worldPos = mul(float4(input.Position, 1.0), skin).xyz;
-    worldNormal = mul(input.Normal, (float3x3)skin);
+    float4 row0 =
+        SwarmBoneRows[i0 + 0] * input.BlendWeight.x +
+        SwarmBoneRows[i1 + 0] * input.BlendWeight.y +
+        SwarmBoneRows[i2 + 0] * input.BlendWeight.z +
+        SwarmBoneRows[i3 + 0] * input.BlendWeight.w;
+    float4 row1 =
+        SwarmBoneRows[i0 + 1] * input.BlendWeight.x +
+        SwarmBoneRows[i1 + 1] * input.BlendWeight.y +
+        SwarmBoneRows[i2 + 1] * input.BlendWeight.z +
+        SwarmBoneRows[i3 + 1] * input.BlendWeight.w;
+    float4 row2 =
+        SwarmBoneRows[i0 + 2] * input.BlendWeight.x +
+        SwarmBoneRows[i1 + 2] * input.BlendWeight.y +
+        SwarmBoneRows[i2 + 2] * input.BlendWeight.z +
+        SwarmBoneRows[i3 + 2] * input.BlendWeight.w;
+
+    float4 pos4 = float4(input.Position, 1.0);
+    worldPos = float3(dot(row0, pos4), dot(row1, pos4), dot(row2, pos4));
+    float4 nrm4 = float4(input.Normal, 0.0); // w=0: direction only, no translation contribution
+    worldNormal = float3(dot(row0, nrm4), dot(row1, nrm4), dot(row2, nrm4));
 }
 
 VSOutput VS_ToonSwarm(VSInputSwarm input)

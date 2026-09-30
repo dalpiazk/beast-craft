@@ -887,6 +887,219 @@ illustration's palette), visible ink-plum outline, legs/antennae mostly foreshor
 this camera's elevated board-tilt angle. Reads clearly as a small, distinct creature type at this
 distance, not just a coloured blob -- reasonable for a stand-in swarm-tier placeholder.*
 
+### 2.11 Fifth-pass fix round: the real Swarmling, register budget, camera framing (2026-09-30)
+
+Section 2.10's swarm-rendering engineering was measured against a procedural placeholder body because
+the real Meshy call was blocked by this environment's own safety classifier. This fix round closes that
+gap: the producer ran the two authorised Meshy calls directly (outside this session's own tool-level
+restriction) and this pass rigs, animates, and integrates the result, fixes the battle camera's framing,
+and re-measures.
+
+**Provenance (35 credits total, run by the producer directly, not through the spend-guarded CLI):**
+
+| Call | Task id | Credits | Output |
+| --- | --- | ---: | --- |
+| `image-to-3d` (approved Swarmling illustration) | `01a0f424-1644-75af-8cdb-e25ef6452845` | 30 | Untextured-shape + 2K base-colour texture mesh |
+| `remesh` (target ~1,200 tris) | `01a0f426-b36a-7051-8603-3b77b80b9616` | 5 | 1,234 tris, 2,454 verts as exported (UV-seam-duplicated), base_color + normal + metallic_roughness textures |
+
+Full records: `Tooling/ArtLab/provenance/meshy-01a0f424-1644-75af-8cdb-e25ef6452845.md` and
+`Tooling/ArtLab/provenance/meshy-remesh-01a0f426-b36a-7051-8603-3b77b80b9616.md` (the second was written
+this pass -- the CLI only writes a provenance record for calls it makes itself, and this remesh was run
+directly by the producer).
+
+**Asset pipeline (`Tooling/Spike55/blender_export_live_swarmling.py`, new -- reuses
+`blender_export_live.py`'s import/weld/texture-pick/downsize/normalise pipeline verbatim in shape, same
+as every prior pass's script did):**
+
+1,234 raw tris weld to **620 true verts, 1 connected component** (same "glTF UV-seam vertex splitting,
+not real fragmentation" story as the Griffin's own remesh, section 2.7) -- confirming this remesh task
+produces a coherent, non-shattered low-poly mesh for the Swarmling too, not just the one Griffin data
+point.
+
+- **Rig: 6 bones** -- `bone_body` (the armature's own root; no separate identity root bone, unlike the
+  Griffin's 11-bone rig), `bone_head`, and 4 leg bones (`bone_leg_front_l/r`, `bone_leg_back_l/r`). Bone
+  placement was chosen from `inspect_orientation.py`'s probe renders of the raw remesh GLB (front faces
+  local -Y, same convention as the Griffin's own remesh, horns splay along +-X near the head), not
+  guessed blind, though exact placement is still an approximation (fractions of the mesh's own bounding
+  height) rather than derived from a skeletal analysis of the mesh.
+- **No horn bones**, by deliberate choice, not an oversight: two more bones would have meant either a
+  smaller per-batch swarm cap or a smaller bone budget elsewhere (see the register-budget arithmetic
+  below), for motion (horns wagging independently of the head) that would not read at swarm scale/camera
+  distance anyway. The horns are weighted rigidly to `bone_head` instead -- they move with the head, just
+  not independently.
+- **Automatic (heat-map) weighting converged on the first attempt**: 0 / 620 vertices unweighted, no
+  voxel-remesh-donor fallback needed (unlike the Griffin's first two Meshy passes, section 2.3/2.6, which
+  both needed it) -- consistent with the Griffin's own low-poly `remesh` mesh also converging cleanly
+  (section 2.7), suggesting the `remesh` endpoint's output topology, not mesh size or creature type, is
+  what makes heat weighting reliable here.
+- **Texture**: downsized 2048x2048 -> 512x512 (within the task's 512-or-1K budget; 512 chosen since a
+  swarm unit is small and far from camera even at the close-up shot's own zoom level), JPEG-encoded in
+  the export (quality 88, same as the Griffin) to keep the GLB small.
+- **Idle (48 frames, 2s @24fps) and Move (24 frames, 1s @24fps)** actions, named "Idle"/"Move" exactly
+  like the Griffin's clips. Idle is a gentle bob/sway/head-tilt; Move is a four-legged diagonal trot
+  (front-left+back-right swing together, opposite front-right+back-left) plus a faster bob.
+- **Export: `swarmling_live.glb`, 191,900 bytes (0.183 MiB)** -- well under the <1 MB target, committed at
+  `Tooling/Spike55/Live3D/Content/model/swarmling_live.glb`.
+
+**A genuine architecture change, not just a new asset: the runtime now loads the Swarmling exactly like
+the Griffin.** The procedural placeholder's custom `swarmling_mesh.bin`/`swarmling_bones.bin`/
+`swarmling_meta.json` format (pre-baked bone matrices per frame, nearest-frame-snapped at runtime, no
+glTF involved) is retired. `SwarmlingSkinnedModel.cs` is deleted; the runtime loads `swarmling_live.glb`
+with `GltfSkinnedModel.Load` (the same class the Griffin uses) and evaluates its pose every frame via
+`AnimatedPose` (real interpolated animation sampling at arbitrary time, not a snap to one of a handful of
+baked frames) -- what stays swarm-specific is purely the *batching* (see below), not the asset format or
+the pose-evaluation method.
+
+**Register-budget recompute, as the task brief asked.** Section 2.10 flagged `SwarmBones[72]` (24
+instances x 3 bones, full 4x4 matrices = 288 vec4) as already over GLES 3.0's guaranteed-minimum 256 vec4
+vertex-uniform budget, before this pass even doubled the bone count per swarmling. Two changes claw this
+back under budget:
+
+1. **3x4 affine matrices** (3 vec4 registers/bone, dropping the `[0,0,0,1]` row every bind-pose skin
+   matrix has anyway) instead of a full 4x4 (4 vec4/bone) -- a 25% cut on its own. Implemented as a flat
+   `float4 SwarmBoneRows[]` array (3 plain rows per bone) rather than an HLSL `float3x4[]` array, so the
+   register count is unambiguous by construction (Game1.cs uploads it via
+   `EffectParameter.SetValue(Vector4[])`, one `Vector4` = one register, no reliance on how a host API
+   might pack a non-4x4 matrix array).
+2. **Fixed-size batches of `SWARM_BATCH_CAPACITY = 12` swarmlings** instead of one flat 24-instance array
+   -- `GpuMesh.BuildSwarmMerged` is called once per batch, each with its own merged `VertexBuffer` and its
+   own slice of bone data uploaded before that batch's 2 draw calls (toon + outline).
+
+**Final count: `SWARM_BATCH_CAPACITY(12) x SWARM_BONES_PER_INSTANCE(6) x 3 vec4/bone = 216 vec4` --
+216 of GLES 3.0's guaranteed-minimum 256 (84%)**, leaving ~40 vec4 of headroom for `ViewProjection` (4)
+and the handful of lighting/outline uniforms (`LightDirection`, `LightColor`, `ShadowTint`,
+`HighlightBoost`, `TintMultiply`, `OutlineThickness`, `OutlineColor` -- 7 small uniforms, comfortably
+under 40 vec4 even if each is packed into its own register). A 24-swarmling battle now draws the swarm in
+**2 batches (4 draw calls: 2 batches x toon+outline)** instead of section 2.10's single merged buffer (2
+draw calls) -- a real, measured cost of closing the register-budget risk, not a free fix; see the bench
+table below.
+
+**Camera framing (task brief item 3): the battle camera now frames the fixed arena, not wherever units
+happen to be.** Section 2.10's screenshot (reproduced below for comparison) read as "too far out" --
+Griffins tiny, swarm unreadable -- because the camera fit itself to the *actual occupied cells'*
+view-space bounding box (`RebuildCamera`'s original design, still used by the single-species stress
+test), and a sparse, off-centre placement (3 Griffins in rows 2-5, 24 swarmlings starting row 6) doesn't
+by itself tell the camera how wide the *board* is. `Game1.RebuildCameraArena` (new) instead samples every
+cell centre across the real 11-column arena (up to 15 rows for the "arena" shot, a narrower column+row
+crop for a "front" close-up of the front line -- `--zoom arena|front|close`) and fits to that fixed grid,
+independent of how many units are actually on the board. `--screenshot` also now renders at the task
+brief's full portrait **1080x1920** (previously the same half-scale 540x960 window used for interactive
+play and `--bench`, which this pass keeps at 540x960 for comparability across passes).
+
+*One fix round, as the task brief allows:* the first version of `RebuildCameraArena` only narrowed the
+**row** range for `--zoom front`, leaving all 11 columns sampled -- since the ortho fit is column/width-
+bound (11 columns alone already decides the frame's width in the "arena" shot), narrowing rows barely
+changed anything (confirmed by comparing the two renders side by side). Fixed by narrowing both the
+column and row range together for `front`.
+
+**Facing.** The Swarmling and Griffin share an identical bind-pose front convention -- confirmed via
+`inspect_orientation.py`'s probe renders of both raw remesh GLBs, both facing local -Y in Blender before
+export -- so a Y-axis yaw exactly 180 degrees apart from the Griffins' own `FacingYaw` (`RotationY(-90°)`)
+is guaranteed, by construction, to face the swarm the exact opposite screen direction, not just
+approximately: `SwarmFacingYaw = RotationY(+90°)`. Griffins keep their existing, already-reviewed facing;
+swarmlings now visibly face back across the front line toward them, instead of the placeholder's
+un-rotated bind pose (its squat, roughly radially-symmetric shape made that omission hard to notice by
+eye -- the real rigged mesh's directional head/legs make facing actually visible, so this is a real fix).
+
+**Measured numbers (same machine as every other pass: Intel Arc 140V laptop, DesktopGL, Release build),
+compared against section 2.10's placeholder-body numbers:**
+
+| Scene | Asset | fps avg (uncapped) | fps 1% low (uncapped) | fps avg (30fps cap) | fps 1% low (30fps cap) | Draw calls | Triangles | Skin time (ms) | Managed mem | Gen0 GC/10s |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 24 swarmlings alone | Placeholder (2.10) | 1,700 | 329 | 30.0 | 21.6 | 4 | 81,024 | 0.002 | 9.9 MB | 0 |
+| 24 swarmlings alone | **Real, rigged (this pass)** | **706.0** | **142.2** | **30.0** | **27.3** | **6** | **59,232** | **0.72** | 13.4 MB | 1,084 |
+| 3 Griffins + 24 swarmlings | Placeholder (2.10) | 960-1,024 | 126-206 | 30.0 | 26.0 | 16 | 132,600 | 0.11-0.28 | 9.9 MB | ~60-335 |
+| 3 Griffins + 24 swarmlings | **Real, rigged (this pass)** | **565.5** | **144.1** | **30.0** | **27.6** | **18** | **110,808** | **0.85** | 11.9 MB | 1,066 |
+
+Both scenes still sustain the research-recommended 30fps cap solidly (29.98-30.0 fps avg), with 1%-low
+cap numbers (27.3-27.6 fps) close to the cap -- comparable margin to section 2.10's placeholder despite
+real animation sampling now running per swarmling. Three real, not free, costs of closing the register-
+budget risk and switching to real per-instance `AnimatedPose` evaluation, all as expected going in, not
+surprises found after the fact: **uncapped fps roughly halved** (706 vs. 1,700 alone; 565 vs. ~1,000
+in the battle) -- still enormous headroom over the 30fps target, so not a practical concern at this
+instance count; **draw calls up by 2** (6 vs. 4 alone, 18 vs. 16 in the battle) from the 2-batch swarm
+split; and **skin time up substantially in relative terms** (0.72 ms vs. 0.002 ms alone) because the
+placeholder's cost was a bare array-index lookup per instance with zero matrix math, while this pass runs
+a real `AnimatedPose.ComputeWorldMatrices`/`ComputeSkinMatrices` hierarchy walk per swarmling per frame --
+still small in absolute terms (well under one frame's 33 ms budget at 30fps even added to the Griffins'
+own pose cost). Gen0 GC collections are far higher in absolute count at the uncapped frame rate (1,084 vs.
+0 for swarm-alone) simply because there are ~7,000 frames in a 10-second uncapped run instead of ~170;
+at the 30fps cap (46-57 collections/10s, not shown in the table above) the two passes are comparable.
+Triangle counts are lower than the placeholder's (59,232 vs. 81,024 for 24 alone) because the real
+Swarmling (1,234 tris) is smaller than the placeholder body (1,688 tris).
+
+**Screenshots** (one fix round's worth of look-over, per the task brief -- the camera framing fix above
+*is* that round's main finding):
+
+![3 Griffins + 24 swarmlings battle, arena-framed](055/live3d_battle_3plus24.png)
+
+*Replaces section 2.10's "too far out" screenshot. The full 11x15 arena now fills the screen width;
+Griffins and swarmlings are both clearly readable as distinct creature silhouettes rather than
+indistinct dots. Critical look: no skinning tears, holes, or stray-vertex spikes visible on any of the 24
+swarmlings across this shot or the close-up below -- a cleaner result than section 2.10's placeholder,
+which showed a thin dark streak artefact on a couple of instances (attributed there to the placeholder
+body's own rig, not reproduced here). Swarmlings still read as small, low-detail shapes at this zoom --
+expected and correct, not a readability bug: `docs/design/presentation-and-vfx.md`'s "Enemy sizes" rule
+draws the Swarmling at 0.55 of a one-hex footprint, smaller than the Griffins by design.*
+
+![Front-line mid-zoom](055/live3d_battle_front.png)
+
+*A tighter crop around the Griffins' front line and the first couple of swarm rows behind them
+(`--zoom front`). Griffin wing/leg/tail detail and swarmling horn/leg silhouettes are both legible at
+this distance; the swarm's facing (toward the Griffins, away from the far back rows) reads correctly.*
+
+![Swarmling close-up](055/live3d_swarmling_close.png)
+
+*A single swarmling at close range (`--zoom close`): mossy olive-gold fur texture (sampled from the real
+approved illustration by Meshy's own generation, not a flat swatch colour this time, unlike the
+placeholder), visible curled horns, ink-plum outline, legs mostly foreshortened under the round body at
+this board-tilt camera angle -- consistent with the 2D approved art's own "2 stubby front legs, hind
+hidden" silhouette (`Tooling/ArtLab/provenance/enemies/swarmling.md`). Reads clearly as the same creature
+concept as the 2D illustration, not just a generic round critter.*
+
+**Honest per-enemy cost estimate, given the Griffin pipeline already existed to adapt from:**
+
+- Meshy generate + remesh: **35 credits** (30 + 5, run by the producer directly).
+- Blender script authoring/debugging (`blender_export_live_swarmling.py`, adapting
+  `blender_export_live.py`'s weld/weight/repair pipeline to a smaller 6-bone rig and new idle/move
+  poses): roughly 45-60 minutes, most of it spent on bone placement/pose tuning and confirming facing via
+  `inspect_orientation.py`, not the weighting pipeline itself (reused near-verbatim).
+- C# runtime integration (retiring `SwarmlingSkinnedModel`, adapting `GpuMesh.BuildSwarmMerged` to a
+  generic `GltfSkinnedModel`, the batched-draw redesign, the 3x4-row shader rewrite, per-instance
+  `AnimatedPose` scratch arrays, facing, the arena camera): roughly 90-120 minutes -- this is a one-time
+  architecture cost for the *swarm tier as a whole*, not a per-enemy cost; a second real swarm-tier enemy
+  through the same pipeline would skip almost all of it (only the Blender authoring step repeats).
+  Camera-framing work (task item 3) is a similar one-time, not-per-enemy cost.
+- Testing (screenshots, bench runs, one fix round) and this write-up: roughly 45-60 minutes.
+- **Total for this one enemy, this pass: roughly 3-3.5 hours**, dominated by the one-time swarm-tier
+  runtime architecture work, not by the Blender asset authoring itself -- consistent with section 2.10's
+  own observation that the merged-batch engineering, not the per-asset rig, was the larger cost that
+  pass too.
+
+**Caveats, honestly stated:**
+
+- **No on-device Android test still.** Every number above remains desktop-only; the register-budget fix
+  narrows a *reasoned-from-spec* risk (closing distance to GLES 3.0's guaranteed minimum) but does not
+  replace an actual GLES driver compile test, named as the standing next step since section 2.8.
+- **Bone placement is an approximation**, not derived from a skeletal/medial-axis analysis of the mesh --
+  heat weighting converged cleanly regardless, but a different remesh of the same source could place
+  geometry differently enough that these fractional bone coordinates need re-tuning by eye.
+- **No horn bones**, a deliberate register-budget trade-off (above), not a limitation discovered after
+  the fact -- flagged here so it isn't mistaken for an oversight if a future pass revisits bone count.
+  `SWARM_BONES_PER_INSTANCE` is hardcoded to 6 on both the Blender and shader sides; a differently-rigged
+  swarm enemy would need both changed together (`Game1.LoadContent` throws if the loaded GLB's joint
+  count doesn't match, rather than silently misrendering).
+- **The 3/4-turn "facing the players" choice is a screen-reading convention** (mirrored left/right from
+  the Griffins, matching genre convention for side-view battle scenes), not a literal vector pointing at
+  the Griffins' world position -- named here since "up/right toward enemies, enemies facing the players"
+  in the task brief could be read more literally than what was built.
+
+### Licences (this pass)
+
+No new licence implications: the real Swarmling mesh/texture are **Meshy, paid tier** (output ownership
+retained, same as the Griffin's Meshy passes -- see "AI provenance" below); everything else this pass
+touched (the batching/shader/camera code) is original engineering, not AI-generated content.
+
 ## 4. Cosmetics (`docs/art/art-brief.md`, `cosmetic-library.json`, issue #38)
 
 The Griffin has two discrete cosmetic categories plus a colour-form set (from
@@ -936,13 +1149,18 @@ appropriate physiology" bar for the low-poly and textured passes, and unchanged 
 **Fifth-pass update.** Section 2.10 closes the last big open technical unknown from the fourth pass's
 own recommendation text below: whether a hero-plus-swarm battle scene (the actual shape of combat per
 the PvE design direction -- a few player beasts vs. up to ~24 small enemies) can be rendered cheaply.
-It can: hero-tier GPU skinning (section 2.8, unchanged) plus a merged-batch swarm path (section 2.10,
+It can: hero-tier GPU skinning (section 2.8, unchanged) plus a batched swarm path (section 2.10,
 pivoted from VAT to a shared bone-array technique after confirming VAT itself doesn't compile under
-MonoGame's DesktopGL effect profile) drew a 3-Griffin-plus-24-swarmling battle in 16 total draw calls
-and sustained the research-recommended 30fps battle cap with wide margin on this desktop GPU. **This is
-now enough evidence to write a concrete production plan** (below), not just "real-time 3D is credible in
-the abstract" -- but the plan still has real, named open risks (an actual Android device test chief
-among them) that keep it a plan to execute, not a decision already proven safe.
+MonoGame's DesktopGL effect profile) drew a 3-Griffin-plus-24-swarmling battle in 18 total draw calls
+(16 with section 2.10's placeholder body's smaller bone count; 2.11's real 6-bone rig needed 2 swarm
+batches instead of 1 merged buffer to stay under the GLES register budget) and sustained the
+research-recommended 30fps battle cap with wide margin on this desktop GPU. **Fifth-pass fix round
+(2.11)** replaced the procedural placeholder with a real, rigged, animated Swarmling (the producer's
+own 35-credit Meshy generation) and fixed the battle camera's framing, which read as "too far out" in
+2.10's own screenshot. **This is now enough evidence to write a concrete production plan** (below), not
+just "real-time 3D is credible in the abstract" -- but the plan still has real, named open risks (an
+actual Android device test chief among them) that keep it a plan to execute, not a decision already
+proven safe.
 
 **Still continue the 2.5D + Spine path (or the code bone rig this spike demonstrates) as the default for
 the beast roster today.** That part of the call is unchanged by either real-time pass. **What the
@@ -1058,11 +1276,13 @@ risks named, not a claim that those risks are already closed:
 
 1. **Hero tier (player beasts, ~≤4 on screen): GPU skinning**, the Griffin's proven `Bones[]`-array
    technique (section 2.8), 6-8K tris/1K texture/10-20 bones per section 2.9's budget.
-2. **Swarm tier (up to ~24-32 on screen): merged-batch GPU skinning via a shared, per-instance-sliced
-   bone array** (section 2.10) -- not literal VAT (confirmed not to compile under MonoGame/DesktopGL),
-   but the same "one merged draw call for the whole swarm" outcome the task brief wanted. Needs the
-   uniform-array-budget fix named in 2.10 before scaling past this spike's 24-instance/3-bone/72-slot
-   design (3x4 matrices, fewer bones/swarmling, or a smaller simultaneous cap).
+2. **Swarm tier (up to ~24-32 on screen): batched GPU skinning via a shared, per-instance-sliced bone
+   array** (sections 2.10-2.11) -- not literal VAT (confirmed not to compile under MonoGame/DesktopGL),
+   but the same "very few draw calls for the whole swarm" outcome the task brief wanted (4 draw calls at
+   24 instances, not literally 2 any more once a real 6-bone rig made the uniform-array-budget risk real
+   rather than hypothetical). The register-budget fix named in 2.10 is now closed (2.11: 3x4 matrices +
+   fixed 12-instance batches, 216 of GLES 3.0's guaranteed 256 vec4) for *this* rig's bone count; a
+   different swarm enemy with more bones would need the same arithmetic re-run, not a new technique.
 3. **30fps hard cap in battle** (section 2.9's research, confirmed compatible with both scene shapes in
    2.10's numbers) -- register with Android's Game Mode/frame-pacing APIs per 2.9, not just a MonoGame
    frame-rate throttle.
@@ -1084,9 +1304,10 @@ open unknown after five passes, not a formality:
   not a workflow that scales cheaply to 10 beasts x several clips each.
 - **GLES shader compile is unverified beyond "the vertex-texture-fetch path is confirmed closed."**
   Section 2.10 found one hard MonoGame/MGFX limitation (no VTF on the OpenGL profile at all) by testing
-  it; the uniform-array-budget question above is a second, different shader-compile risk that is
-  reasoned from the GLES spec, not yet tested against a real driver. Both need resolving on-device
-  before the swarm path above can be trusted for Android.
+  it; the uniform-array-budget question is a second, different shader-compile risk -- 2.11 closes the
+  *arithmetic* (216 of 256 guaranteed vec4) but that is still reasoned from the GLES spec, not tested
+  against a real driver. Both need resolving on-device before the swarm path above can be trusted for
+  Android.
 - **Likeness and cosmetic-segmentation caveats from earlier passes are unchanged**: the Griffin mesh is
   still a plausible griffin, not a reconstruction of the specific approved illustration (2.1, 2.7), and
   this spike still only proves attachment-style cosmetics (a crest parented to a bone), not
@@ -1099,14 +1320,17 @@ open unknown after five passes, not a formality:
   proves unsustainable at full scale (10 beasts x ~2-3 categories x several options each), or a
   free-orbiting camera becomes a real requirement, real-time 3D (not another pre-rendered-3D attempt) is
   now a credible re-open path, with a working starting point (`Tooling/Spike55/Live3D`) and a specific,
-  named list of what to close first: an Android build and an actual Galaxy A35 `--bench` run (the single
-  biggest open unknown across sections 2.8-2.10), the `SwarmBones[]` uniform-budget fix (2.10), and a
-  real animation-authoring plan for a quadruped/winged skeleton with no Mixamo shortcut.
-- The 35-credit Meshy spend authorisation for a real Swarmling generation (section 2.10) is still
-  unused (the real API call was blocked by this environment's own safety classifier, not spent or
-  declined) -- a real Swarmling asset through the same pipeline is the clearly-scoped very next step if
-  this spike is picked back up, swapping out section 2.10's procedural placeholder body with no other
-  pipeline changes needed.
+  named list of what to close first: an Android build and an actual Galaxy A35 `--bench` run (still the
+  single biggest open unknown across sections 2.8-2.11), and a real animation-authoring plan for a
+  quadruped/winged skeleton with no Mixamo shortcut. The `SwarmBones[]` uniform-budget fix (2.10) is now
+  closed for this rig's bone count (2.11) -- re-run the same arithmetic for any differently-rigged swarm
+  enemy, rather than treating it as solved once for all future swarm assets.
+- **Closed this pass:** the 35-credit Meshy spend authorisation for a real Swarmling generation (section
+  2.10) is now used (2.11) -- a real, rigged, animated Swarmling (`swarmling_live.glb`) replaced the
+  procedural placeholder body, with the merged-batch/register-budget engineering carrying over largely
+  unchanged in shape (batched rather than single-merged, per the register-budget fix). The next enemy
+  through this pipeline (if any) would be a much smaller marginal cost -- see 2.11's honest per-enemy
+  estimate.
 - Carry the code-bone-rig approach (Path B) forward as a live option if the Spine licence is ever judged
   not worth it: `Tooling/Spike55/rig2d.py` is a working starting point, though production use would want it
   ported to run inside the game (not as an offline PNG baker) so it gets the "no rework" benefit at
@@ -1144,3 +1368,21 @@ None of passes 1-3's models are committed to the repository or shipped with the 
 (`Tooling/Spike55/README.md` explains how to get your own copy to rerun Path A). Pass 4's two small GLBs
 (`griffin_live.glb`, `crest_alt.glb`) are the one exception, committed under `Tooling/Spike55/Live3D/`
 because they're both well under the spike's size budget.
+
+**The Swarmling 3D model (section 2.10's procedural placeholder, replaced in section 2.11's fix round)**
+was generated by **Meshy (paid tier)**, from the already-approved 2D Swarmling illustration
+(`content/art/enemies/swarmling/swarmling_hollow.png`, itself a separately AI-disclosed asset --
+`Tooling/ArtLab/provenance/enemies/swarmling.md`, unrelated Meshy involvement); output ownership retained
+(paid tier).
+
+- **Pass 5 fix round** (2.11): `image-to-3d` (30 credits) + `remesh` to ~1,200 tris (5 credits), **run by
+  the producer directly**, not via `Tooling/ArtLab/scripts/meshy.py`. Full records:
+  `Tooling/ArtLab/provenance/meshy-01a0f424-1644-75af-8cdb-e25ef6452845.md` and
+  `Tooling/ArtLab/provenance/meshy-remesh-01a0f426-b36a-7051-8603-3b77b80b9616.md`. Re-exported as a
+  skinned, animated GLB (`swarmling_live.glb`, committed at `Tooling/Spike55/Live3D/Content/model/`, 0.18
+  MiB -- small enough to commit directly per the spike's size budget, same convention as
+  `griffin_live.glb`), same as pass 4 did for the Griffin.
+- **Section 2.10's procedural placeholder body** (superseded, no longer used at runtime, but its script
+  and a description remain in the repo for reference) was **not** AI-generated -- a small procedural
+  mesh (icospheres + cones) built directly in `blender_export_vat_swarmling.py`, textured with a sampled
+  swatch from the approved 2D illustration's own palette, not the illustration itself.

@@ -6,14 +6,16 @@ using XnaVector4 = Microsoft.Xna.Framework.Vector4;
 
 namespace BeastCraft.Spike55.Live3D
 {
-    /// <summary>One vertex of the swarm's merged static VertexBuffer (see GpuMesh.BuildSwarmMerged and
-    /// Toon.fx's "Fifth pass" section). GPU-skinned via a per-instance-sliced bone array
-    /// (Toon.fx's SwarmBones[]), the same technique as the Griffin's Bones[] -- NOT Vertex Animation
-    /// Textures: an earlier version of this pass sampled a texture in the vertex shader instead, which
-    /// MonoGame 3.8.5's effect compiler cannot compile at all for the OpenGL profile (confirmed with a
-    /// minimal repro -- see Toon.fx's header comment). BlendIndicesLocal is 0..2 (local to one
-    /// swarmling's 3-bone rig); InstanceId selects which swarmling's slice of SwarmBones[] those local
-    /// indices are offset into.</summary>
+    /// <summary>One vertex of one swarm BATCH's merged static VertexBuffer (see GpuMesh.BuildSwarmMerged
+    /// and Toon.fx's "Fifth pass" section). GPU-skinned via a per-instance-sliced bone array
+    /// (Toon.fx's SwarmBoneRows[]), the same underlying technique as the Griffin's Bones[] -- NOT Vertex
+    /// Animation Textures: an earlier version of this pass sampled a texture in the vertex shader
+    /// instead, which MonoGame 3.8.5's effect compiler cannot compile at all for the OpenGL profile
+    /// (confirmed with a minimal repro -- see Toon.fx's header comment). BlendIndicesLocal is
+    /// 0..SWARM_BONES_PER_INSTANCE-1 (local to one swarmling's 6-bone rig); InstanceId is 0..batch
+    /// size-1, local to the batch this vertex's buffer belongs to (not a global 0..23 swarm index --
+    /// see Game1.cs's _swarmBatches), selecting which swarmling's slice of that batch's SwarmBoneRows[]
+    /// upload those local bone indices are offset into.</summary>
     [StructLayout(LayoutKind.Sequential)]
     public struct SwarmVertex : IVertexType
     {

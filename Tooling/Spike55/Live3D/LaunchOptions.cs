@@ -18,6 +18,13 @@ namespace BeastCraft.Spike55.Live3D
         public int ScreenshotTint = 0;
         public bool ScreenshotHideStats = false;
 
+        // Fifth-pass fix round (task 3, camera framing): in --battle mode the camera frames the fixed
+        // arena, not a dynamic fit to wherever instances happen to be (see Game1.RebuildCamera) --
+        // "arena" (default) fits the whole 11x15 board, "front" fits a tighter row range around the
+        // Griffins' front line for a readable close-up (docs/spikes/055-3d-mini-spike.md's fifth-pass
+        // fix-round section explains why a dynamic instance-fit camera read as "too far out").
+        public string CameraZoom = "arena";
+
         // Fifth pass (swarm via VAT): --battle sets up a fixed-composition scene (BattleGriffins
         // GPU-skinned beasts + BattleSwarm VAT swarmlings on an 11x15 arena, "game scale" per the task
         // brief) instead of the fourth pass's single-species Tab-cycling stress test. BattleGriffins=0
@@ -75,6 +82,9 @@ namespace BeastCraft.Spike55.Live3D
                         break;
                     case "--fps-cap":
                         o.FpsCap = int.Parse(args[++i], CultureInfo.InvariantCulture);
+                        break;
+                    case "--zoom":
+                        o.CameraZoom = args[++i];
                         break;
                     default:
                         Console.Error.WriteLine("Unrecognised argument: " + args[i]);

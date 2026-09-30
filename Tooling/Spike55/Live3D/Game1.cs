@@ -12,6 +12,7 @@ using XnaColor = Microsoft.Xna.Framework.Color;
 using XnaMatrix = Microsoft.Xna.Framework.Matrix;
 using XnaVector2 = Microsoft.Xna.Framework.Vector2;
 using XnaVector3 = Microsoft.Xna.Framework.Vector3;
+using XnaVector4 = Microsoft.Xna.Framework.Vector4;
 
 namespace BeastCraft.Spike55.Live3D
 {
@@ -54,20 +55,31 @@ namespace BeastCraft.Spike55.Live3D
         // Fifth pass: swarm rendering via GPU skinning with a per-instance bone-array offset -- see
         // Toon.fx's "Fifth pass" section (this replaced an original Vertex-Animation-Texture design,
         // which MonoGame's effect compiler cannot build for the OpenGL profile at all) and
-        // GpuMesh.BuildSwarmMerged. Only populated when --battle is passed. Each swarmling's per-frame
-        // bone skin matrices are pre-baked in Blender (SwarmlingSkinnedModel.BoneFrames), not computed
-        // via AnimatedPose at runtime -- see SwarmlingSkinnedModel.cs's doc comment for why (no glTF
-        // involved for this asset at all).
+        // GpuMesh.BuildSwarmMerged. Only populated when --battle is passed.
+        //
+        // Fix-round redesign: the real, rigged Swarmling (blender_export_live_swarmling.py) is a real
+        // skinned+animated GLB, loaded and posed exactly like the Griffin (GltfSkinnedModel +
+        // AnimatedPose, evaluated at arbitrary time -- not the procedural placeholder's pre-baked,
+        // nearest-frame-snapped bone matrices). What stays swarm-specific is BATCHING: the whole swarm
+        // no longer fits in one merged draw call's worth of bone-palette registers at this rig's 6
+        // bones/swarmling (see Toon.fx's header comment for the register arithmetic), so it draws in
+        // fixed-size batches of SwarmBatchCapacity swarmlings, each with its own merged VertexBuffer
+        // (GpuMesh.BuildSwarmMerged) and its own slice of bone data uploaded to Toon.fx's
+        // SwarmBoneRows[] before that batch's 2 draw calls (Toon + Outline).
         private const int MaxSwarmInstances = 24; // must match Toon.fx's MAX_SWARM_INSTANCES
-        private SwarmlingSkinnedModel _swarmModel;
-        private GpuMesh _swarmMesh; // one merged static buffer, N copies baked in at scene-setup time
+        private const int SwarmBatchCapacity = 12; // must match Toon.fx's SWARM_BATCH_CAPACITY
+        private GltfSkinnedModel _swarmModel;
+        private readonly List<GpuMesh> _swarmBatches = new List<GpuMesh>(); // one merged buffer per batch of <= SwarmBatchCapacity swarmlings
+        private readonly List<int> _swarmBatchCounts = new List<int>(); // actual instance count in each batch (last one may be partial)
         private Texture2D _swarmTexture;
-        private EffectParameter _paramSwarmBones;
+        private EffectParameter _paramSwarmBoneRows;
         private int _swarmInstanceCount;
-        private int _swarmBonesPerInstance;
-        private XnaVector3[] _swarmWorldOffsets = Array.Empty<XnaVector3>();
+        private int _swarmBonesPerInstance; // loaded from swarmling_live.glb's skin joint count; must equal Toon.fx's SWARM_BONES_PER_INSTANCE (6)
+        private NumMatrix[] _swarmWorld = Array.Empty<NumMatrix>(); // per-instance world placement (hex cell + SwarmFacingYaw), like BeastInstance.World
         private float[] _swarmClockOffsets = Array.Empty<float>(); // per-instance desync, like BeastInstance.ClockOffset
-        private XnaMatrix[] _swarmBonesPalette = Array.Empty<XnaMatrix>(); // uploaded to Toon.fx's SwarmBones[] once per frame
+        private Matrix4x4[][] _swarmNodeWorldScratch = Array.Empty<Matrix4x4[]>(); // per-instance, reused every frame (see AnimatedPose's doc comment)
+        private Matrix4x4[][] _swarmSkinScratch = Array.Empty<Matrix4x4[]>();
+        private XnaVector4[][] _swarmBoneRowsPalette = Array.Empty<XnaVector4[]>(); // one flat array per batch, uploaded to Toon.fx's SwarmBoneRows[] before that batch's draws
 
         // The crest's fixed local re-orientation (see SkinInstance's comment) plus, new this fix round,
         // a fixed facing rotation applied to every beast so the camera reads a 3/4 side profile with
@@ -81,6 +93,18 @@ namespace BeastCraft.Spike55.Live3D
         // confirmed by screenshot, fixed by this extra RotationY term.
         private static readonly NumMatrix CrestLocal = NumMatrix.CreateRotationY(MathF.PI / 2f) * NumMatrix.CreateScale(0.55f) * NumMatrix.CreateRotationX(-1.65f) * NumMatrix.CreateTranslation(0f, 0.05f, 0.05f);
         private static readonly NumMatrix FacingYaw = NumMatrix.CreateRotationY(-MathF.PI / 2f);
+        // Battle-scene fix round (task 3, camera/facing): the Swarmling's bind pose shares the same
+        // front convention as the Griffin's (both exported by the same blender_export_live*.py family --
+        // confirmed by inspect_orientation.py's probe render, which shows the Swarmling's face/horns
+        // when viewed from local -Y, same as the Griffin's head/beak). Griffins sit in the front rows
+        // (lower row index, closer to the camera/player side) and swarmlings fill the rows behind them
+        // (SetupBattleScene's startRow split) -- a mirrored yaw (+90 degrees instead of Griffins' -90)
+        // turns the swarm to face back across the gap toward the Griffins, instead of either matching
+        // the Griffins' own screen-right-facing orientation (would read as "ignoring" the front line) or
+        // carrying no rotation at all (the placeholder's behaviour -- its squat, mostly-radially-
+        // symmetric shape made an unrotated bind pose hard to fault by eye, but the real rigged mesh's
+        // directional head/legs make facing actually visible, so this is a real fix, not cosmetic-only).
+        private static readonly NumMatrix SwarmFacingYaw = NumMatrix.CreateRotationY(MathF.PI / 2f);
 
         private readonly List<BeastInstance> _instances = new List<BeastInstance>();
         private readonly Random _rng = new Random(12345); // fixed seed: reproducible desync, reproducible bench runs
@@ -139,10 +163,23 @@ namespace BeastCraft.Spike55.Live3D
 
         protected override void Initialize()
         {
-            // Portrait 1080x1920 is the task brief's target; scaled down 50% here so the window fits a
-            // normal desktop monitor without the person having to move it (see README "Window size").
-            _graphics.PreferredBackBufferWidth = 540;
-            _graphics.PreferredBackBufferHeight = 960;
+            // Portrait 1080x1920 is the task brief's target. Interactive play and --bench stay at a 50%-
+            // scaled 540x960 so the window fits a normal desktop monitor without the person having to
+            // move it (see README "Window size") and so bench numbers stay comparable across passes at a
+            // fixed resolution; --screenshot renders at the real, full 1080x1920 -- fix-round change
+            // (task 3): the task brief asks for portrait 1080x1920 framing specifically for the battle
+            // screenshots, and half-scale screenshots made the swarm's already-small units harder to
+            // judge for on-screen readability than the shipped game would be.
+            if (_options.ScreenshotMode)
+            {
+                _graphics.PreferredBackBufferWidth = 1080;
+                _graphics.PreferredBackBufferHeight = 1920;
+            }
+            else
+            {
+                _graphics.PreferredBackBufferWidth = 540;
+                _graphics.PreferredBackBufferHeight = 960;
+            }
             _graphics.SynchronizeWithVerticalRetrace = !_options.BenchMode; // uncapped in --bench, for a true throughput number
             if (_options.BenchMode && _options.FpsCap > 0)
             {
@@ -226,15 +263,15 @@ namespace BeastCraft.Spike55.Live3D
 
             if (_options.Battle)
             {
-                string swarmDir = Path.Combine(contentRoot, "swarm");
-                _swarmModel = SwarmlingSkinnedModel.Load(swarmDir);
-                using (var fs = File.OpenRead(Path.Combine(swarmDir, "swarmling_texture.png")))
-                    _swarmTexture = Texture2D.FromStream(GraphicsDevice, fs);
-                _paramSwarmBones = _toonEffect.Parameters["SwarmBones"];
-                _swarmBonesPerInstance = _swarmModel.BoneCount;
-                _swarmBonesPalette = new XnaMatrix[MaxSwarmInstances * _swarmBonesPerInstance];
-                for (int i = 0; i < _swarmBonesPalette.Length; i++)
-                    _swarmBonesPalette[i] = XnaMatrix.Identity;
+                _swarmModel = GltfSkinnedModel.Load(Path.Combine(contentRoot, "model", "swarmling_live.glb"));
+                _swarmBonesPerInstance = _swarmModel.Joints.Length;
+                if (_swarmBonesPerInstance != 6)
+                    throw new InvalidOperationException(
+                        $"swarmling_live.glb has {_swarmBonesPerInstance} joints; Toon.fx's SwarmBoneRows[] " +
+                        "layout is hardcoded to SWARM_BONES_PER_INSTANCE=6 (see its header comment) -- " +
+                        "re-export with the 6-bone rig or update both the shader and this check together.");
+                _swarmTexture = LoadTextureFromBytes(_swarmModel.BaseColorImageBytes);
+                _paramSwarmBoneRows = _toonEffect.Parameters["SwarmBoneRows"];
 
                 var battleGridVerts = HexBoard.BuildGridLines(11, 15, new XnaColor(46, 42, 69, 140));
                 _hexGridVertexBuffer = new VertexBuffer(GraphicsDevice, VertexPositionColor.VertexDeclaration, battleGridVerts.Length, BufferUsage.WriteOnly);
@@ -295,11 +332,12 @@ namespace BeastCraft.Spike55.Live3D
         }
 
         /// <summary>The fifth-pass battle scene: `griffinCount` GPU-skinned beasts in a front row plus
-        /// `swarmCount` VAT-driven swarmlings filling the rows behind them, on an 11x15 arena ("game
+        /// `swarmCount` GPU-skinned swarmlings filling the rows behind them, on an 11x15 arena ("game
         /// scale" per the task brief -- a Large arena per docs/art/hollow-art-slots.md's sizing). Unlike
-        /// SetStressLevel's beasts, the swarm's per-instance placement/phase are uploaded to the shader
-        /// ONCE here, not every frame -- see Toon.fx's "Fifth pass" section for why that's the point of
-        /// VAT (CPU cost doesn't scale with swarm size).</summary>
+        /// the placeholder's pre-baked design, the swarm's per-instance pose is evaluated every frame via
+        /// AnimatedPose just like the Griffins' (see UpdateSwarmBones) -- what's still set up ONCE here
+        /// is the batching (GpuMesh.BuildSwarmMerged per batch) and each instance's fixed hex-cell world
+        /// placement/phase.</summary>
         private void SetupBattleScene(int griffinCount, int swarmCount)
         {
             _instances.Clear();
@@ -316,37 +354,134 @@ namespace BeastCraft.Spike55.Live3D
 
             swarmCount = Math.Min(swarmCount, MaxSwarmInstances);
             _swarmInstanceCount = swarmCount;
-            _swarmMesh = swarmCount > 0 ? GpuMesh.BuildSwarmMerged(GraphicsDevice, _swarmModel, swarmCount) : null;
-            _swarmWorldOffsets = swarmCount > 0 ? new XnaVector3[swarmCount] : Array.Empty<XnaVector3>();
+
+            _swarmBatches.Clear();
+            _swarmBatchCounts.Clear();
+            int batchCount = swarmCount > 0 ? (swarmCount + SwarmBatchCapacity - 1) / SwarmBatchCapacity : 0;
+            for (int b = 0; b < batchCount; b++)
+            {
+                int thisBatch = Math.Min(SwarmBatchCapacity, swarmCount - b * SwarmBatchCapacity);
+                _swarmBatches.Add(GpuMesh.BuildSwarmMerged(GraphicsDevice, _swarmModel, thisBatch));
+                _swarmBatchCounts.Add(thisBatch);
+            }
+            _swarmBoneRowsPalette = new XnaVector4[batchCount][];
+            for (int b = 0; b < batchCount; b++)
+            {
+                var rows = new XnaVector4[SwarmBatchCapacity * _swarmBonesPerInstance * 3];
+                for (int r = 0; r < rows.Length; r += 3)
+                {
+                    // Identity 3x4 rows for unused slots (a partial last batch): row0=(1,0,0,0),
+                    // row1=(0,1,0,0), row2=(0,0,1,0) -- no vertex references these unless a batch is
+                    // short, but keeping them identity rather than zero avoids a degenerate (all-zero)
+                    // skin matrix if anything ever does.
+                    rows[r + 0] = new XnaVector4(1f, 0f, 0f, 0f);
+                    rows[r + 1] = new XnaVector4(0f, 1f, 0f, 0f);
+                    rows[r + 2] = new XnaVector4(0f, 0f, 1f, 0f);
+                }
+                _swarmBoneRowsPalette[b] = rows;
+            }
+
+            _swarmWorld = swarmCount > 0 ? new NumMatrix[swarmCount] : Array.Empty<NumMatrix>();
             _swarmClockOffsets = swarmCount > 0 ? new float[swarmCount] : Array.Empty<float>();
+            _swarmNodeWorldScratch = swarmCount > 0 ? new Matrix4x4[swarmCount][] : Array.Empty<Matrix4x4[]>();
+            _swarmSkinScratch = swarmCount > 0 ? new Matrix4x4[swarmCount][] : Array.Empty<Matrix4x4[]>();
             if (swarmCount > 0)
             {
-                // The swarmling's bind pose already faces +X (baked into the mesh at export time by
-                // blender_export_vat_swarmling.py -- see its module docstring), unlike the Griffin's
-                // GLB, so instance placement here is a pure translation, no FacingYaw needed.
                 var swarmCells = HexBoard.FillOrder(11, 15, swarmCount, startRow: 6);
                 for (int i = 0; i < swarmCount; i++)
                 {
                     var (col, row) = swarmCells[i % Math.Max(1, swarmCells.Count)];
                     var center = HexBoard.CellCenter(col, row);
-                    _swarmWorldOffsets[i] = center;
+                    // SwarmFacingYaw first (turn the bind-pose swarmling to face back across the gap
+                    // toward the Griffins -- see SwarmFacingYaw's own comment), then place on its cell.
+                    _swarmWorld[i] = SwarmFacingYaw * NumMatrix.CreateTranslation(center.X, 0f, center.Z);
                     _swarmClockOffsets[i] = (float)(_rng.NextDouble() * 4.0);
+                    _swarmNodeWorldScratch[i] = new Matrix4x4[_swarmModel.Nodes.Length];
+                    _swarmSkinScratch[i] = new Matrix4x4[_swarmModel.Joints.Length];
                 }
             }
 
             RebuildCamera();
         }
 
+        // Lead-review fix (fourth pass): the first camera sat on the Z axis looking straight at the
+        // beast's front (its glTF-space forward, +Z, points directly at a camera offset in +Z), reading
+        // as a flat head-on view with wings straight up. Beasts in the game are seen in a 3/4 side view
+        // (content/art/beasts/griffin/griffin.png) -- fixed by rotating every beast FacingYaw=-90
+        // degrees (see SetStressLevel) so its forward axis points world +X instead of +Z, and moving the
+        // camera to the *side* (offset mostly along Z, a little along X for a slight 3/4 turn rather
+        // than a flat profile), elevated and tilted down for the hex-board angle the earlier Blender
+        // passes also used. A hex board's rows are separated along world Z; an orthographic camera
+        // looking *straight* down Z would collapse all rows onto the same screen position no matter how
+        // many world units apart they are -- confirmed: the first tilt value (24 degrees, chosen for a
+        // single beast's close-up 3/4 read) made a 3-row, 24-beast formation collapse into one
+        // overlapping clump on screen even though the fit math below correctly measured the beasts as
+        // spread across ~20 world units. 48 degrees gives the rows real screen-Y separation while still
+        // reading as a 3/4, not top-down, view for the close-up single-beast case.
+        private const float CameraTiltDeg = 48f;
+        private const float CameraDistance = 8f;
+
+        private static XnaVector3 CameraDir()
+        {
+            float tilt = MathHelper.ToRadians(CameraTiltDeg);
+            // Side axis (+Z, since beasts now face +X) dominates; a small +X component gives the 3/4
+            // turn instead of a flat 90-degree profile; +Y from the tilt for the elevated board look.
+            return XnaVector3.Normalize(new XnaVector3(0.22f, (float)Math.Sin(tilt), (float)Math.Cos(tilt)));
+        }
+
+        /// <summary>Shared ortho-camera fit: given a look-at target and a set of (ground point, height
+        /// margin above it) samples, points the camera at the fixed tilt/direction above and sizes the
+        /// orthographic projection so every sample's ground point AND its height-margin point both land
+        /// on screen, with `edgeMargin` world units of breathing room beyond that on every side. Used by
+        /// both RebuildCameraFitInstances (fits to wherever instances actually are, for the single-
+        /// species stress test) and RebuildCameraArena (fits to the fixed board, fix-round task 3).</summary>
+        private void ApplyCamera(XnaVector3 target, IReadOnlyList<(XnaVector3 basePt, float heightMargin)> samples, float edgeMargin)
+        {
+            var camDir = CameraDir();
+            var camPos = target + camDir * CameraDistance;
+            _view = XnaMatrix.CreateLookAt(camPos, target, XnaVector3.Up);
+
+            float minVX = float.MaxValue, maxVX = float.MinValue, minVY = float.MaxValue, maxVY = float.MinValue;
+            if (samples.Count == 0)
+            {
+                minVX = maxVX = minVY = maxVY = 0f;
+            }
+            foreach (var (basePt, heightMargin) in samples)
+            {
+                var topPt = basePt + new XnaVector3(0f, heightMargin, 0f);
+                var vpBase = XnaVector3.Transform(basePt, _view);
+                var vpTop = XnaVector3.Transform(topPt, _view);
+                minVX = Math.Min(minVX, Math.Min(vpBase.X, vpTop.X));
+                maxVX = Math.Max(maxVX, Math.Max(vpBase.X, vpTop.X));
+                minVY = Math.Min(minVY, Math.Min(vpBase.Y, vpTop.Y));
+                maxVY = Math.Max(maxVY, Math.Max(vpBase.Y, vpTop.Y));
+            }
+            float viewSpanX = Math.Max(1.6f, (maxVX - minVX) + edgeMargin * 2f);
+            float viewSpanY = Math.Max(1.6f, (maxVY - minVY) + edgeMargin * 2f);
+
+            float aspect = (float)_graphics.PreferredBackBufferHeight / _graphics.PreferredBackBufferWidth;
+            float orthoWidth = Math.Max(viewSpanX, viewSpanY / aspect);
+            float orthoHeight = orthoWidth * aspect;
+            _projection = XnaMatrix.CreateOrthographic(orthoWidth, orthoHeight, 0.05f, 50f);
+        }
+
         private void RebuildCamera()
         {
-            // Lead-review fix: the first camera sat on the Z axis looking straight at the beast's
-            // front (its glTF-space forward, +Z, points directly at a camera offset in +Z), reading as
-            // a flat head-on view with wings straight up. Beasts in the game are seen in a 3/4 side
-            // view (content/art/beasts/griffin/griffin.png) -- fixed by rotating every beast
-            // FacingYaw=-90 degrees (see SetStressLevel) so its forward axis points world +X instead of
-            // +Z, and moving the camera to the *side* (offset mostly along Z, a little along X for a
-            // slight 3/4 turn rather than a flat profile), elevated and tilted down for the hex-board
-            // angle the earlier Blender passes also used.
+            // "close" (battle mode only): a tight instance-fit close-up, same framing style as the
+            // non-battle stress test -- used for the fix round's swarmling close-up shot
+            // (--battle --griffins 0 --swarm 1 --zoom close), where the arena-fit framing below would
+            // correctly, but unhelpfully, show one tiny swarmling in a full board's worth of empty space.
+            if (_options.Battle && !string.Equals(_options.CameraZoom, "close", StringComparison.OrdinalIgnoreCase))
+                RebuildCameraArena();
+            else
+                RebuildCameraFitInstances();
+        }
+
+        /// <summary>Single-species stress test (Tab 1/3/12/24): fits the camera to wherever the current
+        /// instances actually are, exactly as before the fix round -- unchanged behaviour, just factored
+        /// through the shared ApplyCamera helper above.</summary>
+        private void RebuildCameraFitInstances()
+        {
             NumVector3 boardCenterNum = NumVector3.Zero;
             int centerCount = 0;
             foreach (var inst in _instances)
@@ -354,71 +489,76 @@ namespace BeastCraft.Spike55.Live3D
                 boardCenterNum += new NumVector3(inst.World.M41, inst.World.M42, inst.World.M43);
                 centerCount++;
             }
-            foreach (var off in _swarmWorldOffsets)
+            foreach (var w in _swarmWorld)
             {
-                boardCenterNum += new NumVector3(off.X, off.Y, off.Z);
+                boardCenterNum += new NumVector3(w.M41, w.M42, w.M43);
                 centerCount++;
             }
             if (centerCount > 0)
                 boardCenterNum /= centerCount;
             var target = new XnaVector3(boardCenterNum.X, 0.85f, boardCenterNum.Z);
 
-            // A hex board's rows are separated along world Z; an orthographic camera looking *straight*
-            // down Z would collapse all rows onto the same screen position no matter how many world
-            // units apart they are (that axis is exactly what gets projected away) -- confirmed: the
-            // first value here (24 degrees, chosen for a single beast's close-up 3/4 read) made a
-            // 3-row, 24-beast formation collapse into one overlapping clump on screen even though
-            // RebuildCamera's own view-space bounding math (below) correctly measured the beasts as
-            // spread across ~20 world units. 48 degrees gives the rows real screen-Y separation while
-            // still reading as a 3/4, not top-down, view for the close-up single-beast case.
-            const float tiltDeg = 48f;
-            float tilt = MathHelper.ToRadians(tiltDeg);
-            // Side axis (+Z, since beasts now face +X) dominates; a small +X component gives the 3/4
-            // turn instead of a flat 90-degree profile; +Y from the tilt for the elevated board look.
-            var camDir = XnaVector3.Normalize(new XnaVector3(0.22f, (float)Math.Sin(tilt), (float)Math.Cos(tilt)));
-            float camDistance = 8f;
-            var camPos = target + camDir * camDistance;
-            _view = XnaMatrix.CreateLookAt(camPos, target, XnaVector3.Up);
-
-            // Fit the ortho projection to the actual on-screen (view-space) extent of every instance,
-            // not a world-axis-aligned guess -- robust to the camera direction above, and what actually
-            // fixes "oversized/clumped" framing rather than just widening a fixed-axis span. Samples
-            // each beast's ground point and a point near its head height/wingtip so the vertical extent
-            // (and wing spread) are both accounted for.
-            float minVX = float.MaxValue, maxVX = float.MinValue, minVY = float.MaxValue, maxVY = float.MinValue;
-            if (_instances.Count == 0 && _swarmWorldOffsets.Length == 0)
-            {
-                minVX = maxVX = minVY = maxVY = 0f;
-            }
+            var samples = new List<(XnaVector3, float)>();
             foreach (var inst in _instances)
-            {
-                var basePt = new XnaVector3(inst.World.M41, inst.World.M42, inst.World.M43);
-                var topPt = basePt + new XnaVector3(0f, 2.2f, 0f);
-                var vpBase = XnaVector3.Transform(basePt, _view);
-                var vpTop = XnaVector3.Transform(topPt, _view);
-                minVX = Math.Min(minVX, Math.Min(vpBase.X, vpTop.X));
-                maxVX = Math.Max(maxVX, Math.Max(vpBase.X, vpTop.X));
-                minVY = Math.Min(minVY, Math.Min(vpBase.Y, vpTop.Y));
-                maxVY = Math.Max(maxVY, Math.Max(vpBase.Y, vpTop.Y));
-            }
-            foreach (var basePt in _swarmWorldOffsets)
-            {
-                var topPt = basePt + new XnaVector3(0f, 0.6f, 0f); // swarmlings are much shorter than beasts
-                var vpBase = XnaVector3.Transform(basePt, _view);
-                var vpTop = XnaVector3.Transform(topPt, _view);
-                minVX = Math.Min(minVX, Math.Min(vpBase.X, vpTop.X));
-                maxVX = Math.Max(maxVX, Math.Max(vpBase.X, vpTop.X));
-                minVY = Math.Min(minVY, Math.Min(vpBase.Y, vpTop.Y));
-                maxVY = Math.Max(maxVY, Math.Max(vpBase.Y, vpTop.Y));
-            }
-            const float margin = 1.4f; // wing spread + outline thickness clearance around each beast
-            float viewSpanX = Math.Max(1.6f, (maxVX - minVX) + margin * 2f);
-            float viewSpanY = Math.Max(1.6f, (maxVY - minVY) + margin * 2f);
+                samples.Add((new XnaVector3(inst.World.M41, inst.World.M42, inst.World.M43), 2.2f));
+            foreach (var w in _swarmWorld)
+                samples.Add((new XnaVector3(w.M41, w.M42, w.M43), 0.6f)); // swarmlings are much shorter than beasts
 
-            float aspect = (float)_graphics.PreferredBackBufferHeight / _graphics.PreferredBackBufferWidth;
-            float orthoWidth = Math.Max(viewSpanX, viewSpanY / aspect);
-            float orthoHeight = orthoWidth * aspect;
-            _projection = XnaMatrix.CreateOrthographic(orthoWidth, orthoHeight, 0.05f, 50f);
+            const float margin = 1.4f; // wing spread + outline thickness clearance around each beast
+            ApplyCamera(target, samples, margin);
+        }
+
+        /// <summary>Fix round, task 3: frames the fixed 11-wide arena (not wherever the current griffins/
+        /// swarm happen to be placed) so the battle board fills the screen width the way the task brief
+        /// asks -- "portrait 1080x1920, the 11x15 arena filling the width at the board tilt, units sized
+        /// to their hex footprint like the 2D sprites". The previous instance-fit camera (still used by
+        /// the single-species stress test above) read as "too far out" for the battle scene specifically
+        /// because a sparse, off-centre placement (e.g. 3 griffins in rows 2-5, 24 swarmlings starting
+        /// row 6) doesn't, by itself, tell the camera how wide the *board* actually is -- fitting to a
+        /// fixed grid of sample points across the real arena width/row-range fixes that by construction,
+        /// independent of how many units are actually on it. `_options.CameraZoom` ("arena", the default,
+        /// vs "front") switches between the full-board shot and a tighter close-up of the front few rows
+        /// for a readable mid-zoom shot of the front line (both requested by the task brief).</summary>
+        private void RebuildCameraArena()
+        {
+            bool front = string.Equals(_options.CameraZoom, "front", StringComparison.OrdinalIgnoreCase);
+            // "front": a genuinely tighter crop around the Griffins' front line and the first couple of
+            // swarm rows behind them, not just a shorter row range at the full 11-column width (which,
+            // since the ortho fit is column/width-bound in both cases -- see ApplyCamera -- barely
+            // changed the framing in a first version of this method: cutting rows alone left orthoWidth
+            // unchanged because 11 columns was still the binding constraint). Narrowing the column range
+            // too is what actually zooms in.
+            int colStart = front ? 2 : 0;
+            int colEnd = front ? 9 : 11;
+            int rowStart = 0;
+            int rowEnd = front ? 9 : 15; // "front": Griffin rows (2-5ish) plus the first swarm rows (6-8)
+
+            // Sample every cell centre across the chosen range, not just the four corners: the hex
+            // offset-coordinate stagger (HexBoard.CellCenter shifts X by row/2) means the true left/right
+            // extent is reached at different rows depending on the stagger direction, which corner-only
+            // sampling could under-estimate. At most 11*15 = 165 points -- cheap, done once per scene
+            // rebuild, not per frame.
+            var samples = new List<(XnaVector3, float)>();
+            NumVector3 centerSum = NumVector3.Zero;
+            for (int row = rowStart; row < rowEnd; row++)
+            {
+                for (int col = colStart; col < colEnd; col++)
+                {
+                    var c = HexBoard.CellCenter(col, row);
+                    var pt = new XnaVector3(c.X, c.Y, c.Z);
+                    // 2.2: tall enough to cover a standing Griffin's wingtip height (the instance-fit
+                    // path's own Griffin margin) -- applied at every cell, not just occupied ones, so
+                    // framing is stable regardless of which cells actually hold a beast this run.
+                    samples.Add((pt, 2.2f));
+                    centerSum += new NumVector3(c.X, c.Y, c.Z);
+                }
+            }
+            centerSum /= Math.Max(1, samples.Count);
+            var target = new XnaVector3(centerSum.X, 0.85f, centerSum.Z);
+
+            // A more generous edge margin than the instance-fit path's 1.4 (a hex's own corner radius,
+            // HexSize) so the arena's own boundary hexes aren't cropped flush against the screen edge.
+            ApplyCamera(target, samples, HexBoard.HexSize);
         }
 
         protected override void Update(GameTime gameTime)
@@ -508,32 +648,41 @@ namespace BeastCraft.Spike55.Live3D
             }
         }
 
-        /// <summary>The whole swarm's per-frame CPU cost: for each instance, pick its nearest baked
-        /// animation frame (a plain array index -- no interpolation, no vertex work, see
-        /// SwarmlingSkinnedModel's doc comment for why frames are pre-baked in Blender rather than
-        /// evaluated here) and combine that frame's 3 object-local bone skin matrices with the
-        /// instance's fixed hex-cell world offset, writing the result into this instance's slice of the
-        /// shared SwarmBones[] palette DrawSwarm uploads once before the single merged draw call. Real,
-        /// measured cost (unlike the original VAT design's "one float"), but small -- see the gate
-        /// report for the measured skinningMsAvg delta this added.</summary>
+        /// <summary>The whole swarm's per-frame CPU cost: for each instance, evaluate its pose via
+        /// AnimatedPose (exactly like UpdateInstancePose does for a Griffin -- real interpolated
+        /// animation sampling, not the placeholder's nearest-baked-frame snap) and write the resulting
+        /// skin matrices into that instance's slice of its batch's flat SwarmBoneRows palette. Each
+        /// row-vector skin matrix (inverseBind * jointWorld * instanceWorld, translation in row 4) is
+        /// transposed before upload: Toon.fx's SkinSwarmPositionNormal reconstructs a compact 3x4 affine
+        /// transform from 3 plain float4 "rows" via a row-dot against [position,1] -- after transposing,
+        /// the transposed matrix's first 3 ROWS are exactly (Xaxis.x, Yaxis.x, Zaxis.x, Tx),
+        /// (Xaxis.y, ..., Ty), (Xaxis.z, ..., Tz) -- i.e. row i dotted with [pos,1] gives world axis i
+        /// directly, which is what the shader needs (see Toon.fx's header comment for the full
+        /// derivation). The transposed matrix's 4th row is always (0,0,0,1) for an affine transform and
+        /// is simply not uploaded (the shader never reads a "row 3").</summary>
         private void UpdateSwarmBones()
         {
             if (_swarmInstanceCount == 0)
                 return;
-            int frameCount = _swarmModel.FrameCount;
             int boneCount = _swarmBonesPerInstance;
             for (int i = 0; i < _swarmInstanceCount; i++)
             {
                 float t = _elapsedSeconds + _swarmClockOffsets[i];
-                int frame = ((int)(t * _swarmModel.Fps)) % frameCount;
-                if (frame < 0)
-                    frame += frameCount;
-                var offset = _swarmWorldOffsets[i];
-                var worldTranslation = NumMatrix.CreateTranslation(offset.X, offset.Y, offset.Z);
-                var frameBones = _swarmModel.BoneFrames[frame];
-                int baseIndex = i * boneCount;
+                AnimatedPose.ComputeWorldMatrices(_swarmModel, _clip, t, _swarmNodeWorldScratch[i]);
+                AnimatedPose.ComputeSkinMatrices(_swarmModel, _swarmNodeWorldScratch[i], _swarmWorld[i], _swarmSkinScratch[i]);
+
+                int batchIndex = i / SwarmBatchCapacity;
+                int localId = i % SwarmBatchCapacity;
+                var rows = _swarmBoneRowsPalette[batchIndex];
+                int baseRow = localId * boneCount * 3;
                 for (int b = 0; b < boneCount; b++)
-                    _swarmBonesPalette[baseIndex + b] = ToXna(frameBones[b] * worldTranslation);
+                {
+                    var skinT = Matrix4x4.Transpose(_swarmSkinScratch[i][b]);
+                    int r = baseRow + b * 3;
+                    rows[r + 0] = new XnaVector4(skinT.M11, skinT.M12, skinT.M13, skinT.M14);
+                    rows[r + 1] = new XnaVector4(skinT.M21, skinT.M22, skinT.M23, skinT.M24);
+                    rows[r + 2] = new XnaVector4(skinT.M31, skinT.M32, skinT.M33, skinT.M34);
+                }
             }
         }
 
@@ -657,40 +806,46 @@ namespace BeastCraft.Spike55.Live3D
             }
         }
 
-        /// <summary>Draws the whole swarm (up to 32 merged instances) in exactly 2 draw calls total
-        /// (toon fill + outline), regardless of swarm size -- the merged-batch VAT approach's actual
-        /// payoff (see Toon.fx's "Fifth pass" section and GpuMesh.BuildSwarmMerged). ViewProjection/
-        /// TintMultiply are already set by DrawBeasts, called just before this every frame.</summary>
+        /// <summary>Draws the whole swarm across its batches (SwarmBatchCapacity swarmlings each) -- 2
+        /// draw calls per batch (toon fill + outline), so a 24-swarmling battle draws 4 total instead of
+        /// the single-merged-buffer design's 2 (see Toon.fx's header comment for why the register budget
+        /// forced this at the real rig's 6 bones/swarmling). ViewProjection/TintMultiply are already set
+        /// by DrawBeasts, called just before this every frame.</summary>
         private void DrawSwarm()
         {
-            if (_swarmInstanceCount == 0 || _swarmMesh == null)
+            if (_swarmInstanceCount == 0)
                 return;
 
             _paramBaseTexture.SetValue(_swarmTexture);
-            _paramSwarmBones.SetValue(_swarmBonesPalette);
 
             GraphicsDevice.BlendState = BlendState.Opaque;
             GraphicsDevice.DepthStencilState = DepthStencilState.Default;
-            GraphicsDevice.SetVertexBuffer(_swarmMesh.Vertices);
-            GraphicsDevice.Indices = _swarmMesh.Indices;
 
-            GraphicsDevice.RasterizerState = RasterizerState.CullClockwise;
-            foreach (var pass in _toonEffect.Techniques["ToonSwarm"].Passes)
+            for (int b = 0; b < _swarmBatches.Count; b++)
             {
-                pass.Apply();
-                GraphicsDevice.DrawIndexedPrimitives(PrimitiveType.TriangleList, 0, 0, _swarmMesh.TriangleCount);
-            }
-            _stats.DrawCallsThisFrame++;
-            _stats.TrianglesThisFrame += _swarmMesh.TriangleCount;
+                var batch = _swarmBatches[b];
+                _paramSwarmBoneRows.SetValue(_swarmBoneRowsPalette[b]);
+                GraphicsDevice.SetVertexBuffer(batch.Vertices);
+                GraphicsDevice.Indices = batch.Indices;
 
-            GraphicsDevice.RasterizerState = RasterizerState.CullCounterClockwise;
-            foreach (var pass in _toonEffect.Techniques["OutlineSwarm"].Passes)
-            {
-                pass.Apply();
-                GraphicsDevice.DrawIndexedPrimitives(PrimitiveType.TriangleList, 0, 0, _swarmMesh.TriangleCount);
+                GraphicsDevice.RasterizerState = RasterizerState.CullClockwise;
+                foreach (var pass in _toonEffect.Techniques["ToonSwarm"].Passes)
+                {
+                    pass.Apply();
+                    GraphicsDevice.DrawIndexedPrimitives(PrimitiveType.TriangleList, 0, 0, batch.TriangleCount);
+                }
+                _stats.DrawCallsThisFrame++;
+                _stats.TrianglesThisFrame += batch.TriangleCount;
+
+                GraphicsDevice.RasterizerState = RasterizerState.CullCounterClockwise;
+                foreach (var pass in _toonEffect.Techniques["OutlineSwarm"].Passes)
+                {
+                    pass.Apply();
+                    GraphicsDevice.DrawIndexedPrimitives(PrimitiveType.TriangleList, 0, 0, batch.TriangleCount);
+                }
+                _stats.DrawCallsThisFrame++;
+                _stats.TrianglesThisFrame += batch.TriangleCount;
             }
-            _stats.DrawCallsThisFrame++;
-            _stats.TrianglesThisFrame += _swarmMesh.TriangleCount;
         }
 
         private void DrawStatsOverlay()
@@ -721,12 +876,16 @@ namespace BeastCraft.Spike55.Live3D
             long tex = _baseColorTexture != null ? (long)_baseColorTexture.Width * _baseColorTexture.Height * 4 : 0;
             long backdrop = _backdropTexture != null ? (long)_backdropTexture.Width * _backdropTexture.Height * 4 : 0;
 
-            // Swarm (fifth pass): the merged VB scales with instance count (each copy repeats the same
-            // ~860-vertex swarmling), but the shared swatch texture and the tiny pre-baked bone-frame
-            // data (a managed array, not a GPU resource -- not counted here) are each built/loaded ONCE
-            // regardless of swarm size.
-            long swarmVb = _swarmMesh != null ? (long)_swarmMesh.Vertices.VertexCount * SwarmVertex.VertexDeclaration.VertexStride : 0;
-            long swarmIb = _swarmMesh != null ? (long)_swarmMesh.Indices.IndexCount * sizeof(short) : 0;
+            // Swarm (fifth pass): each batch's merged VB scales with that batch's instance count (every
+            // copy repeats the same ~620-vertex swarmling), but the shared swatch texture is built/
+            // loaded ONCE regardless of swarm size; the per-batch bone-row palettes are managed arrays,
+            // not GPU resources, so not counted here.
+            long swarmVb = 0, swarmIb = 0;
+            foreach (var batch in _swarmBatches)
+            {
+                swarmVb += (long)batch.Vertices.VertexCount * SwarmVertex.VertexDeclaration.VertexStride;
+                swarmIb += (long)batch.Indices.IndexCount * sizeof(short);
+            }
             long swarmTex = _swarmTexture != null ? (long)_swarmTexture.Width * _swarmTexture.Height * 4 : 0;
 
             return vb + ib + tex + backdrop + swarmVb + swarmIb + swarmTex;

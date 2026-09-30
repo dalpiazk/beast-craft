@@ -307,8 +307,17 @@ Run the battle scene:
 ```
 dotnet Tooling/Spike55/Live3D/bin/Release/net10.0/Live3D.dll --battle --griffins 3 --swarm 24
 dotnet Tooling/Spike55/Live3D/bin/Release/net10.0/Live3D.dll --bench 1 --battle --griffins 3 --swarm 24 --seconds 10 --fps-cap 30 --out result.json
-dotnet Tooling/Spike55/Live3D/bin/Release/net10.0/Live3D.dll --screenshot shot.png --battle --griffins 0 --swarm 1
+dotnet Tooling/Spike55/Live3D/bin/Release/net10.0/Live3D.dll --screenshot shot.png --battle --griffins 3 --swarm 24 --zoom arena
+dotnet Tooling/Spike55/Live3D/bin/Release/net10.0/Live3D.dll --screenshot shot.png --battle --griffins 3 --swarm 24 --zoom front
+dotnet Tooling/Spike55/Live3D/bin/Release/net10.0/Live3D.dll --screenshot shot.png --battle --griffins 0 --swarm 1 --zoom close
 ```
+
+`--zoom arena|front|close` (fix round, task item 3): `arena` (the default) frames the whole fixed 11x15
+board; `front` crops tighter around the Griffins' front line and the first couple of swarm rows; `close`
+is a tight instance-fit close-up (for a single-unit shot, e.g. the swarmling close-up above) -- see
+`Game1.RebuildCameraArena`/`RebuildCameraFitInstances`. `--screenshot` renders at the task brief's full
+portrait 1080x1920 regardless of zoom level; interactive play and `--bench` stay at the existing
+540x960 half-scale window.
 
 `--battle` switches the scene to `BattleGriffins` GPU-skinned beasts + `BattleSwarm` swarmlings on an
 11x15 arena instead of the fourth pass's single-species Tab-cycling stress test; `--griffins 0` gives
@@ -316,16 +325,64 @@ dotnet Tooling/Spike55/Live3D/bin/Release/net10.0/Live3D.dll --screenshot shot.p
 whether the scene sustains the 30fps battle cap section 2.9's research recommends, alongside (not
 instead of) the uncapped throughput number -- both are always reported in `--bench`'s JSON.
 
-To rebuild the swarmling asset: `blender -b --python Tooling/Spike55/blender_export_vat_swarmling.py --
---out OUTDIR`, then copy `swarmling_mesh.bin`, `swarmling_bones.bin`, `swarmling_meta.json` into
-`Tooling/Spike55/Live3D/Content/swarm/` (`swarmling_texture.png` is built separately with a plain PIL
-script sampling `content/art/enemies/swarmling/swarmling_hollow.png`'s palette, not committed as a
-script since it's a few lines run once).
+**Superseded (kept for reference only, not used by the runtime any more):** the original procedural
+placeholder body was rebuilt with
+`blender -b --python Tooling/Spike55/blender_export_vat_swarmling.py -- --out OUTDIR`, writing
+`swarmling_mesh.bin`/`swarmling_bones.bin`/`swarmling_meta.json` plus a separately PIL-built
+`swarmling_texture.png`. The fix round below replaces all of that with a single real GLB -- see its own
+section for the current rebuild command.
 
 A genuinely new Android risk this pivot introduces: `SwarmBones[72]` is 288 vec4 registers, which
 **does not fit inside GLES 3.0's own spec-guaranteed minimum (256 vec4)** even though it runs fine on
 this desktop GPU's much larger uniform budget -- see the gate report for what a production fix looks
-like (3x4 matrices, fewer bones/swarmling, or a smaller simultaneous-swarm cap).
+like (3x4 matrices, fewer bones/swarmling, or a smaller simultaneous-swarm cap). **Closed in the fix
+round below** for the real Swarmling's actual bone count.
+
+## Fifth-pass fix round: the real Swarmling (`swarmling_live.glb`)
+
+Per the producer's own 35-credit Meshy spend (image-to-3D of the approved Swarmling illustration, 30
+credits, plus a remesh to ~1,200 tris, 5 credits -- run directly, not through `meshy.py`; see
+`Tooling/ArtLab/provenance/meshy-01a0f424-1644-75af-8cdb-e25ef6452845.md` and
+`Tooling/ArtLab/provenance/meshy-remesh-01a0f426-b36a-7051-8603-3b77b80b9616.md`), this pass replaces the
+procedural placeholder above with a real, rigged, animated Swarmling. Full account (asset stats, register
+budget, camera-framing fix, bench numbers, caveats): `docs/spikes/055-3d-mini-spike.md` section 2.11.
+
+### Asset: `blender_export_live_swarmling.py`
+
+Reuses `blender_export_live.py`'s (Griffin) import/weld/texture-pick/downsize/normalise/auto-weight
+pipeline in shape, for a much smaller **6-bone** rig (`bone_body` as the armature root, `bone_head`, 4 leg
+bones -- no separate horn bones, weighted rigidly to `bone_head` instead; see the script's module
+docstring for the register-budget reasoning) and exports a real skinned, animated GLB exactly like the
+Griffin's, not the old custom binary format below:
+
+```
+blender -b --python Tooling/Spike55/blender_export_live_swarmling.py -- \
+    --glb <swarmling_remesh.glb> --out <output dir> [--texture-size 512] [--fps 24]
+```
+
+Writes `swarmling_live.glb` (skinned mesh + armature + Idle/Move clips, JPEG base-colour texture --
+0.18 MiB for the committed asset at `Tooling/Spike55/Live3D/Content/model/swarmling_live.glb`, well
+under the 1 MB target).
+
+### Runtime changes this pass
+
+`SwarmlingSkinnedModel.cs` (the custom `swarmling_mesh.bin`/`swarmling_bones.bin`/`swarmling_meta.json`
+loader below) is retired: the runtime now loads `swarmling_live.glb` with `GltfSkinnedModel.Load` --
+the same class the Griffin uses -- and evaluates its pose every frame via `AnimatedPose`, exactly like a
+Griffin. What stays swarm-specific is purely the *batching*: `Content/Effects/Toon.fx`'s `SwarmBoneRows[]`
+(a flat `float4[]`, 3 rows/bone, not a `float4x4[]`) and `Game1.cs`'s `_swarmBatches` draw the swarm in
+fixed-size batches of `SwarmBatchCapacity = 12` swarmlings (24 total = 2 batches, 4 draw calls) instead of
+one merged buffer -- **216 of GLES 3.0's guaranteed-minimum 256 vec4 vertex uniform registers** at this
+rig's 6-bones/swarmling x 12-per-batch x 3-vec4-per-bone layout; see the shader's header comment for the
+full arithmetic.
+
+The battle camera also changed this pass (`Game1.RebuildCameraArena`, task item 3): it now frames the
+fixed 11-wide arena (sampling every cell centre, not wherever units happen to be placed) instead of
+fitting to the actual occupied cells, which read as "too far out" in the previous pass's own screenshot.
+`--screenshot` renders at the task brief's full portrait 1080x1920 (interactive play and `--bench` stay
+at the existing 540x960 for comparability across passes). New CLI flag: `--zoom arena|front|close`
+(`arena` = full board, the default; `front` = a tighter crop around the front line; `close` = a
+tight instance-fit close-up, for the swarmling/beast close-up shots).
 
 ### Licences
 

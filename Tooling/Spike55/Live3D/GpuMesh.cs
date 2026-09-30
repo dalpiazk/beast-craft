@@ -58,29 +58,32 @@ namespace BeastCraft.Spike55.Live3D
         }
 
         /// <summary>Builds ONE merged static VertexBuffer/IndexBuffer containing `instanceCount` copies
-        /// of a SwarmlingSkinnedModel's bind-pose, skinned mesh -- the "merged-batch" swarm path
+        /// of a GltfSkinnedModel's bind-pose, skinned mesh -- the "merged-batch" swarm path
         /// (Tooling/Spike55's fifth-pass task brief: MonoGame's GLES/Android backend has no supported
         /// path for instanced geometry drawing, so this bakes N copies into one buffer instead). Every
-        /// copy carries the SAME local BlendIndices (0..boneCount-1, this model's own 3 bones) plus
-        /// which copy it is (InstanceId); the vertex shader (Toon.fx's VS_ToonSwarm/VS_OutlineSwarm)
-        /// offsets BlendIndicesLocal by InstanceId*boneCount into one big shared SwarmBones[] uniform
-        /// array Game1 uploads once per frame (see Game1.UpdateSwarmBones). Cheap to build:
-        /// `instanceCount` array copies, done once at scene setup, not per frame.</summary>
-        public static GpuMesh BuildSwarmMerged(GraphicsDevice device, SwarmlingSkinnedModel model, int instanceCount)
+        /// copy carries the SAME local BlendIndices (0..model.Joints.Length-1) plus which copy it is
+        /// within THIS BATCH (InstanceId, 0..instanceCount-1 -- not a global swarm index: the fix-round
+        /// register-budget redesign draws the swarm in fixed-size batches, each with its own merged
+        /// buffer and its own slice of Toon.fx's SwarmBoneRows[] uploaded before that batch's draw calls
+        /// -- see Game1.cs's _swarmBatches/UpdateSwarmBones and Toon.fx's "Fifth pass" section for why a
+        /// single flat 24-swarmling bone array no longer fits GLES 3.0's guaranteed-minimum 256 vec4
+        /// vertex uniform register budget at this rig's bone count). Cheap to build: `instanceCount`
+        /// array copies, done once at scene setup, not per frame.</summary>
+        public static GpuMesh BuildSwarmMerged(GraphicsDevice device, GltfSkinnedModel model, int instanceCount)
         {
-            int baseVerts = model.VertexCount;
-            int baseIndices = model.IndexCount;
+            int baseVerts = model.Positions.Length;
+            int baseIndices = model.Indices.Length;
             var verts = new SwarmVertex[baseVerts * instanceCount];
             for (int inst = 0; inst < instanceCount; inst++)
             {
                 int offset = inst * baseVerts;
                 for (int v = 0; v < baseVerts; v++)
                 {
-                    var p = model.BindPosition[v];
-                    var nrm = model.BindNormal[v];
-                    var uv = model.BindUv[v];
-                    var bi = model.BlendIndices[v];
-                    var bw = model.BlendWeight[v];
+                    var p = model.Positions[v];
+                    var nrm = model.Normals[v];
+                    var uv = model.TexCoords[v];
+                    var bi = model.JointIndices[v];
+                    var bw = model.JointWeights[v];
                     verts[offset + v] = new SwarmVertex
                     {
                         Position = new XnaVector3(p.X, p.Y, p.Z),
