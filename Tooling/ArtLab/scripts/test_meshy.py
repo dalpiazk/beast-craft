@@ -120,6 +120,42 @@ class BuildBodyTests(unittest.TestCase):
         self.assertEqual(body["symmetry_mode"], "on")
 
 
+class RemeshBodyTests(unittest.TestCase):
+    def test_minimal_body_only_input_task_id(self):
+        body = meshy.build_remesh_body("0193bfc5-ee4f-73f8-8525-44b398884ce9", None, None, [])
+        self.assertEqual(body, {"input_task_id": "0193bfc5-ee4f-73f8-8525-44b398884ce9"})
+
+    def test_target_polycount_included_when_set(self):
+        body = meshy.build_remesh_body("task-1", 8000, None, [])
+        self.assertEqual(body["target_polycount"], 8000)
+
+    def test_topology_included_when_set(self):
+        body = meshy.build_remesh_body("task-1", None, "triangle", [])
+        self.assertEqual(body["topology"], "triangle")
+
+    def test_formats_included_when_set(self):
+        body = meshy.build_remesh_body("task-1", None, None, ["glb", "fbx"])
+        self.assertEqual(body["target_formats"], ["glb", "fbx"])
+
+    def test_formats_omitted_when_empty(self):
+        body = meshy.build_remesh_body("task-1", None, None, [])
+        self.assertNotIn("target_formats", body)
+
+    def test_full_body(self):
+        body = meshy.build_remesh_body("task-1", 8000, "triangle", ["glb"])
+        self.assertEqual(body, {
+            "input_task_id": "task-1",
+            "target_polycount": 8000,
+            "topology": "triangle",
+            "target_formats": ["glb"],
+        })
+
+
+class RemeshCostTests(unittest.TestCase):
+    def test_flat_five_credits(self):
+        self.assertEqual(meshy.REMESH_COST, 5)
+
+
 class ApiKeyTests(unittest.TestCase):
     def test_process_env_wins_over_registry(self, monkeypatch=None):
         import os

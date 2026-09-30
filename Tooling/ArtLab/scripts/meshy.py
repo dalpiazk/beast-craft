@@ -9,23 +9,44 @@ Usage:
                                [--texture/--no-texture] [--texture-resolution 2k|4k|8k] [--pbr]
                                [--model AI_MODEL] [--dry-run] [--yes] [--timeout SECONDS]
   python meshy.py get --task TASK_ID --out DIR
+  python meshy.py remesh --task INPUT_TASK_ID --out DIR [--target-polycount N] [--topology quad|triangle]
+                          [--formats glb,fbx,obj,usdz,blend,stl,3mf] [--dry-run] [--yes] [--timeout SECONDS]
 
 Docs consulted (fetched 2026-09-30 -- cite exact fields/paths from these pages, not from memory):
   https://docs.meshy.ai/en/api/authentication  Authorization: Bearer <key>; 401 on a bad/missing key
   https://docs.meshy.ai/en/api/image-to-3d     POST .../image-to-3d (create), GET .../image-to-3d/:id (retrieve)
+  https://docs.meshy.ai/en/api/remesh          POST .../remesh (create), GET .../remesh/:id (retrieve)
   https://docs.meshy.ai/en/api/balance         GET .../balance -> {"balance": N}
-  https://docs.meshy.ai/en/api/pricing         credit cost table (image-to-3d block)
+  https://docs.meshy.ai/en/api/pricing         credit cost table (image-to-3d block, remesh: 5 credits flat)
   https://docs.meshy.ai/en/api/errors          {"message": ...} / task_error shape, HTTP status codes
 
 Endpoints (https://api.meshy.ai):
   GET  /openapi/v1/balance                 free, any number of times
   POST /openapi/v1/image-to-3d             creates a task; costs credits -- spend-guarded below
   GET  /openapi/v1/image-to-3d/{id}        free, any number of times (task status, then the download URLs)
+  POST /openapi/v1/remesh                  creates a remesh task from an existing task_id or model_url;
+                                            5 credits flat (docs.meshy.ai/en/api/pricing) -- spend-guarded below
+  GET  /openapi/v1/remesh/{id}             free, any number of times (task status, then the download URLs)
 
-SPEND GUARD: `image-to-3d` always builds the request, encodes the image, and prints the exact body (key
-redacted, image data truncated) plus the documented credit cost, then stops. Nothing reaches Meshy unless
-you also pass --yes. --dry-run never sends a request even together with --yes, for eyeballing the request
-shape with zero network risk.
+SPEND GUARD: `image-to-3d` and `remesh` always build the request and print the exact body (key redacted,
+image data truncated for image-to-3d) plus the documented credit cost, then stop. Nothing reaches Meshy
+unless you also pass --yes. --dry-run never sends a request even together with --yes, for eyeballing the
+request shape with zero network risk.
+
+remesh notes (docs.meshy.ai/en/api/remesh, read 2026-09-30):
+  - input_task_id (the completed Image to 3D / Text to 3D task to remesh) and model_url (a public URL or
+    data URI to an existing model) are alternatives -- this CLI's `remesh` subcommand only exposes
+    input_task_id (--task), the case this repo actually needs (re-topologising an existing Meshy task's
+    output), not a from-scratch model_url upload.
+  - target_polycount: integer, default 30000, documented range 100-300,000 (may be tier-limited).
+  - topology: "quad" (quad-dominant) or "triangle" (decimated triangle mesh, the default).
+  - target_formats: list, default ["glb"] if omitted; available values glb/fbx/obj/usdz/blend/stl/3mf.
+  - Texture handling on remesh is NOT documented either way: the remesh request body has no
+    should_texture/texture_resolution/texture_prompt fields, and the retrieve-task response documents
+    model_urls + thumbnail_url but no texture_urls (unlike image-to-3d's retrieve response, which has
+    both). Whether the output GLB/FBX/etc. embeds a re-mapped copy of the original texture, or comes back
+    untextured, is not stated on the page as of 2026-09-30 -- verify by inspecting a real remeshed output
+    (e.g. with gltf_inspect.py) before relying on it, or ask Meshy support.
 
 Key handling: MESHY_API_KEY is read from the process environment first; if unset, falls back to the
 Windows **user**-level environment variable at HKCU\\Environment\\MESHY_API_KEY via winreg (read-only,
@@ -96,6 +117,12 @@ IMAGE_TO_3D_COSTS = {
 }
 DEPRECATED_FIELDS = ("symmetry_mode", "ultra_mode", "hd_texture", "is_a_t_pose")
 IMAGE_MIME = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg"}
+
+# https://docs.meshy.ai/en/api/pricing ("Remesh" row), read 2026-09-30: flat 5 credits per request,
+# regardless of target_polycount or topology (the pricing table shows no conditional pricing for either).
+REMESH_COST = 5
+REMESH_TOPOLOGIES = ("quad", "triangle")
+REMESH_FORMATS = ("glb", "fbx", "obj", "usdz", "blend", "stl", "3mf")
 
 
 class MeshyError(Exception):
@@ -186,6 +213,22 @@ def build_image_to_3d_body(image_uri, model, polycount, symmetry, texture, textu
     return body
 
 
+def build_remesh_body(input_task_id, target_polycount, topology, target_formats):
+    """https://docs.meshy.ai/en/api/remesh -- input_task_id is the completed Image to 3D / Text to 3D task
+    to remesh (this CLI's `remesh` subcommand doesn't expose the model_url alternative). target_polycount
+    and topology are omitted when None/unset so Meshy's own documented defaults (30000, "triangle") apply;
+    target_formats is only included when the caller asked for something other than the default (["glb"]
+    when omitted, per the docs)."""
+    body = {"input_task_id": input_task_id}
+    if target_polycount is not None:
+        body["target_polycount"] = target_polycount
+    if topology is not None:
+        body["topology"] = topology
+    if target_formats:
+        body["target_formats"] = list(target_formats)
+    return body
+
+
 # ---------------------------------------------------------------------------------------------------------
 # Key handling
 # ---------------------------------------------------------------------------------------------------------
@@ -264,13 +307,14 @@ def download_file(url, dest, timeout=120):
 TERMINAL_STATUSES = ("SUCCEEDED", "FAILED", "CANCELED")
 
 
-def poll_task(task_id, key, timeout_s):
-    """GET /openapi/v1/image-to-3d/:id on a capped exponential backoff until a terminal status or timeout.
-    Free per the docs (no credit cost for retrieval), so polling aggressively is not a spend risk."""
+def poll_task(task_id, key, timeout_s, endpoint="/openapi/v1/image-to-3d"):
+    """GET {endpoint}/:id on a capped exponential backoff until a terminal status or timeout. Free per the
+    docs (no credit cost for retrieval), so polling aggressively is not a spend risk. endpoint defaults to
+    image-to-3d; `remesh` passes /openapi/v1/remesh (https://docs.meshy.ai/en/api/remesh)."""
     start = time.monotonic()
     delay = 2.0
     while True:
-        _, task = api_request("GET", f"/openapi/v1/image-to-3d/{task_id}", key)
+        _, task = api_request("GET", f"{endpoint}/{task_id}", key)
         status = task.get("status", "?")
         progress = task.get("progress", "?")
         elapsed = time.monotonic() - start
@@ -534,6 +578,78 @@ def cmd_get(args):
     return 0
 
 
+def cmd_remesh(args):
+    if args.target_polycount is not None and not (100 <= args.target_polycount <= 300000):
+        print(f"--target-polycount must be 100-300000 (docs.meshy.ai/en/api/remesh), got {args.target_polycount}",
+              file=sys.stderr)
+        return 2
+    formats = [f.strip().lower() for f in args.formats.split(",")] if args.formats else []
+    bad_formats = [f for f in formats if f not in REMESH_FORMATS]
+    if bad_formats:
+        print(f"--formats has unrecognised value(s) {bad_formats}; available: {', '.join(REMESH_FORMATS)}",
+              file=sys.stderr)
+        return 2
+
+    out_dir = pathlib.Path(args.out) if args.out else None
+    if not args.dry_run and out_dir is None:
+        print("--out DIR is required (or set ARTLAB_MESHY_OUT) unless --dry-run", file=sys.stderr)
+        return 2
+
+    key, source = (None, None)
+    if not args.dry_run:
+        key, source = get_api_key()
+        if not key:
+            print("MESHY_API_KEY not found in the process environment or the Windows user environment.",
+                  file=sys.stderr)
+            return 2
+
+    body = build_remesh_body(args.task, args.target_polycount, args.topology, formats)
+
+    print("POST https://api.meshy.ai/openapi/v1/remesh")
+    print("Authorization: Bearer " + REDACTED)
+    print(json.dumps(body, indent=2))
+    print()
+    print(f"credit cost: {REMESH_COST} credits (flat rate, https://docs.meshy.ai/en/api/pricing "
+          f"-- does not vary with target_polycount or topology per the docs)")
+    print("note: whether the remeshed output keeps/re-bakes the input task's texture is not documented "
+          "(see this script's docstring) -- inspect the downloaded GLB (e.g. with gltf_inspect.py) once "
+          "you have real output before relying on it.")
+
+    if args.dry_run:
+        print("\n--dry-run: nothing sent.")
+        return 0
+    if not args.yes:
+        print("\nSpend guard: pass --yes to actually submit this request and spend credits.")
+        return 0
+
+    try:
+        _, created = api_request("POST", "/openapi/v1/remesh", key, body=body)
+        task_id = created.get("result")
+        if not task_id:
+            print(f"unexpected response (no 'result' task id): {json.dumps(created)}", file=sys.stderr)
+            return 1
+        print(f"\nsubmitted: task {task_id}")
+        task = poll_task(task_id, key, args.timeout, endpoint="/openapi/v1/remesh")
+    except MeshyError as e:
+        print(f"\nremesh failed: {e}", file=sys.stderr)
+        return 1
+
+    if task.get("status") != "SUCCEEDED":
+        err = task.get("task_error") or {}
+        print(f"\ntask did not succeed: status={task.get('status')} "
+              f"{redact(err.get('message', ''), key)}", file=sys.stderr)
+        (out_dir / "task.json").parent.mkdir(parents=True, exist_ok=True)
+        (out_dir / "task.json").write_text(json.dumps(task, indent=2), encoding="utf-8")
+        return 1
+
+    saved = save_task_outputs(task, out_dir)
+    print(f"\nsaved {len(saved)} file(s) to {out_dir}:")
+    for label, path, size in saved:
+        print(f"  {label:28s} {path}  ({size:,} bytes)")
+    print(f"  {'task.json':28s} {out_dir / 'task.json'}")
+    return 0
+
+
 # ---------------------------------------------------------------------------------------------------------
 
 def main(argv=None):
@@ -562,6 +678,20 @@ def main(argv=None):
     p.add_argument("--task", required=True, help="task id")
     p.add_argument("--out", default=os.environ.get("ARTLAB_MESHY_OUT"), help="output dir (or set ARTLAB_MESHY_OUT)")
     p.set_defaults(func=cmd_get)
+
+    p = sub.add_parser("remesh", help="POST /openapi/v1/remesh then poll and download (spend-guarded, 5 credits)")
+    p.add_argument("--task", required=True, help="input_task_id: a completed Image to 3D / Text to 3D task id")
+    p.add_argument("--out", default=os.environ.get("ARTLAB_MESHY_OUT"), help="output dir (or set ARTLAB_MESHY_OUT)")
+    p.add_argument("--target-polycount", type=int, default=None,
+                    help="target_polycount, 100-300000 (Meshy default 30000 if omitted)")
+    p.add_argument("--topology", choices=REMESH_TOPOLOGIES, default=None,
+                    help="quad or triangle (Meshy default: triangle if omitted)")
+    p.add_argument("--formats", default=None,
+                    help=f"comma-separated target_formats, from {{{','.join(REMESH_FORMATS)}}} (default: glb only)")
+    p.add_argument("--dry-run", action="store_true", help="print the request and cost; never sends anything")
+    p.add_argument("--yes", action="store_true", help="actually submit the request (spends 5 credits)")
+    p.add_argument("--timeout", type=float, default=900.0, help="seconds to poll before giving up (default 900)")
+    p.set_defaults(func=cmd_remesh)
 
     args = ap.parse_args(argv)
     if args.cmd == "balance":
