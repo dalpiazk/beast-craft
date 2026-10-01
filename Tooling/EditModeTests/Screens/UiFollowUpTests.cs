@@ -51,7 +51,7 @@ namespace BeastCraft.Tests.EditMode
 
             Assert.IsTrue(loaded.Success, loaded.Error);
             Assert.IsTrue(loaded.Migrated);
-            Assert.AreEqual(12, loaded.Save.SchemaVersion);
+            Assert.AreEqual(13, loaded.Save.SchemaVersion);
             Assert.IsFalse(SeenRules.IsNewGear(loaded.Save, gear));
             Assert.IsFalse(SeenRules.IsNewGear(loaded.Save, avatarGear));
             Assert.IsFalse(SeenRules.IsNewLook(loaded.Save, CosmeticCollection.Key("hat", "crown")), "an updated save shows nothing as new");
@@ -255,13 +255,15 @@ namespace BeastCraft.Tests.EditMode
         {
             GameSession session = NewSession();
             Assert.IsFalse(session.Settings.GroveNotifications);
-            Assert.IsNull(new SettingsViewModel(session.Settings, session.Content.Text, session.SaveSettings).Row(SettingsViewModel.GroveNotifications));
+            SettingsViewModel desktop = new SettingsViewModel(session.Settings, session.Content.Text, session.SaveSettings);
+            Assert.IsFalse(desktop.NotificationsAvailable, "no Grove alert control without notifications");
 
             SettingsViewModel phone = new SettingsViewModel(session.Settings, session.Content.Text, session.SaveSettings, true);
             List<bool> changed = new List<bool>();
             phone.GroveNotificationsChanged += changed.Add;
-            Assert.AreEqual("Off", phone.Row(SettingsViewModel.GroveNotifications).Value);
-            phone.Change(SettingsViewModel.GroveNotifications);
+            Assert.IsTrue(phone.NotificationsAvailable);
+            Assert.IsFalse(phone.GroveNotifications);
+            phone.SetGroveNotifications(true);
             Assert.IsTrue(session.Settings.GroveNotifications);
             Assert.IsFalse(session.Settings.IdleNotifications, "separate from the idle alert");
             CollectionAssert.AreEqual(new[] { true }, changed);

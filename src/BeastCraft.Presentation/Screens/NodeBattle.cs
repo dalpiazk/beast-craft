@@ -326,5 +326,50 @@ namespace BeastCraft.Presentation.Screens
             _session.Autosave(AutosaveReason.Results);
             return ResultsViewModel.Build(_session, this, result, summary, campaign, before);
         }
+
+        /// <summary>
+        /// Retreats from this battle (the in-battle pause menu's Retreat, before it is decided):
+        /// forfeits it outright through <see cref="CampaignRules.RetreatBattle"/> — producer decision,
+        /// 2026-09-30, "same as losing the battle" (docs/design/battle-system.md, "Adaptive assist and
+        /// guidance"). Unlike <see cref="Complete"/>, the battle's predetermined result is never played
+        /// out or paid out: no rewards at all, not even a real loss's reduced XP (there is nothing to
+        /// pay out from). The spent consumable is not refunded, exactly as a real loss keeps it spent
+        /// (<see cref="Economy.BattleConsumableRefund"/>'s rule: a battle begun cannot hand items back
+        /// by being abandoned). Autosaves. Once only (<see cref="IsCompleted"/>), like <see cref="Complete"/>.
+        /// Refuses loudly (an <see cref="InvalidOperationException"/>, like the guards above — the UI
+        /// is expected to have already checked <see cref="IsKinshipTrial"/>/<see cref="IsCompleted"/>
+        /// before offering it) for a Kinship trial — it has no campaign node, and no retry count, to
+        /// forfeit — or for any other refusal <see cref="CampaignRules.RetreatBattle"/> reports (the
+        /// node no longer current, no expedition, …): nothing is marked completed, nothing autosaves,
+        /// and no "Retreated" result is built for a retreat that was never actually recorded.
+        /// </summary>
+        public ResultsViewModel Retreat()
+        {
+            if (_run == null)
+            {
+                throw new InvalidOperationException("The battle was never begun.");
+            }
+
+            if (_completed)
+            {
+                throw new InvalidOperationException("The battle was already completed.");
+            }
+
+            if (IsKinshipTrial)
+            {
+                throw new InvalidOperationException("A Kinship trial (" + Trial.PoiId + ") has no campaign node to retreat from.");
+            }
+
+            CampaignResult campaign = CampaignRules.RetreatBattle(_session.Save, _session.Content.Campaign, Node.NodeId);
+            if (!campaign.Success)
+            {
+                throw new InvalidOperationException("Retreat refused: " + campaign.Error);
+            }
+
+            _completed = true;
+            BattleConsumableRefund.Clear(_session.Save);
+            _session.Autosave(AutosaveReason.Results);
+            return ResultsViewModel.BuildRetreat(_session, this, campaign);
+        }
     }
 }

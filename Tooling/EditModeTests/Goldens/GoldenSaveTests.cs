@@ -95,6 +95,14 @@ namespace BeastCraft.Tests.EditMode
     /// <c>rich-v11</c>, whose reflection-filled 64-65 were out of range. <c>rich-v12</c>'s capture fills them in range.
     /// No input changed.
     /// </para>
+    /// <para>
+    /// Schema 13 (the in-battle pause menu's Retreat, <c>MapRun.NodeRetreats</c>/<c>NodeRetreatsNodeId</c> —
+    /// see <c>docs/design/progression-and-saves.md</c>, "Schema 13: Retreat") froze <c>rich-v12</c> as an
+    /// input and added <c>rich-v13</c>, which is now the one that must round-trip unchanged. Every older
+    /// expected output changed in exactly two places: <c>"SchemaVersion":12</c> became <c>13</c>, and
+    /// <c>,"NodeRetreats":N,"NodeRetreatsNodeId":N</c> follows <c>"Difficulty"</c> inside every
+    /// <c>ActiveRun</c>. No input changed.
+    /// </para>
     /// </summary>
     public class GoldenSaveTests
     {
@@ -133,7 +141,8 @@ namespace BeastCraft.Tests.EditMode
             "{\"SchemaVersion\":9}",
             "{\"SchemaVersion\":10}",
             "{\"SchemaVersion\":11}",
-            "{\"SchemaVersion\":12}"
+            "{\"SchemaVersion\":12}",
+            "{\"SchemaVersion\":13}"
         };
 
         private static SaveSerializer NewSerializer()
@@ -183,24 +192,30 @@ namespace BeastCraft.Tests.EditMode
             return GoldenFiles.Read("Saves/rich-v11.input.json");
         }
 
-        /// <summary>The frozen schema-12 rich save (captured by reflection in update mode).</summary>
+        /// <summary>The frozen schema-12 rich save (captured by reflection before schema 13; never rewritten).</summary>
         private static string RichV12()
+        {
+            return GoldenFiles.Read("Saves/rich-v12.input.json");
+        }
+
+        /// <summary>The frozen schema-13 rich save (captured by reflection in update mode).</summary>
+        private static string RichV13()
         {
             if (GoldenFiles.Updating)
             {
                 PlayerSave save = new PlayerSave();
                 int seed = 1;
                 Populate(save, ref seed, 0);
-                GoldenFiles.Write("Saves/rich-v12.input.json", NewSerializer().Serialize(save));
+                GoldenFiles.Write("Saves/rich-v13.input.json", NewSerializer().Serialize(save));
             }
 
-            return GoldenFiles.Read("Saves/rich-v12.input.json");
+            return GoldenFiles.Read("Saves/rich-v13.input.json");
         }
 
         [Test]
-        public void RichV12_RoundTripsByteIdentical()
+        public void RichV13_RoundTripsByteIdentical()
         {
-            string input = RichV12();
+            string input = RichV13();
             SaveLoadResult result = NewSerializer().Deserialize(input);
 
             Assert.IsTrue(result.Success, result.Error);
@@ -223,6 +238,8 @@ namespace BeastCraft.Tests.EditMode
             StringAssert.Contains("\"PendingBattleConsumables\":[\"", input, "the rich save fills the schema-11 crash-refund field");
             StringAssert.Contains("\"Seen\":{\"Gear\":[\"", input, "the rich save fills the schema-12 seen list");
             StringAssert.Contains("\"PreferredDifficulty\":1", input, "the rich save fills the schema-12 difficulty preference");
+            StringAssert.Contains("\"NodeRetreats\":", input, "the rich save fills the schema-13 retreat-tracking field");
+            StringAssert.Contains("\"NodeRetreatsNodeId\":", input, "the rich save fills the schema-13 retreat-tracking field");
         }
 
         [TestCase(1)]
@@ -237,9 +254,11 @@ namespace BeastCraft.Tests.EditMode
         [TestCase(10)]
         [TestCase(11)]
         [TestCase(12)]
+        [TestCase(13)]
         public void RichSave_LoadsAndMigrates_ToTheGoldenText(int version)
         {
-            string input = version == 12 ? RichV12()
+            string input = version == 13 ? RichV13()
+                            : version == 12 ? RichV12()
                             : version == 11 ? RichV11()
                             : version == 10 ? RichV10()
                             : version == 9 ? RichV9()
@@ -262,6 +281,7 @@ namespace BeastCraft.Tests.EditMode
         [TestCase(10)]
         [TestCase(11)]
         [TestCase(12)]
+        [TestCase(13)]
         public void MinimalSave_LoadsAndMigrates_ToTheGoldenText(int version)
         {
             AssertGolden("min-v" + version, MinimalInputs[version - 1], version);

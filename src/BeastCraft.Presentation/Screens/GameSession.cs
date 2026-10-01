@@ -173,6 +173,19 @@ namespace BeastCraft.Presentation.Screens
         /// <summary>The region being played, or null.</summary>
         public string RegionName;
 
+        /// <summary>
+        /// The stage within <see cref="RegionName"/> (1-based, the expedition in progress's
+        /// <c>MapRun.Stage</c> + 1), or 0 when there is no expedition in progress to read one from.
+        /// </summary>
+        public int Stage;
+
+        /// <summary>
+        /// Up to <see cref="GameSession.SlotCardPortraitCount"/> owned beasts' species art keys, in
+        /// roster order, for the slot card's small team portrait row (the same art
+        /// <see cref="RosterViewModel"/>'s cards use). Empty for an empty or unreadable slot.
+        /// </summary>
+        public List<string> TeamArtKeys = new List<string>();
+
         /// <summary>Why the save does not load; null when it does.</summary>
         public string Problem;
     }
@@ -194,6 +207,9 @@ namespace BeastCraft.Presentation.Screens
 
         /// <summary>How many save slots the game offers (<see cref="SlotIds"/>).</summary>
         public const int SlotCount = 3;
+
+        /// <summary>How many beasts a slot card's small team portrait row shows (<see cref="SaveSlotSummary.TeamArtKeys"/>).</summary>
+        public const int SlotCardPortraitCount = 4;
 
         /// <summary>The save slots, in order: <c>slot1</c> to <c>slot3</c> (<see cref="SlotName"/> first).</summary>
         public static readonly IReadOnlyList<string> SlotIds = new[] { SlotName, "slot2", "slot3" };
@@ -378,8 +394,24 @@ namespace BeastCraft.Presentation.Screens
             summary.Readable = true;
             summary.AvatarLevel = save.Avatar?.Level ?? 1;
             summary.BeastCount = save.Beasts?.Count ?? 0;
-            string regionId = save.Campaign?.ActiveRun != null && save.Campaign.HasActiveRun ? save.Campaign.ActiveRun.RegionId : save.Campaign?.CurrentRegionId;
+            bool hasRun = save.Campaign?.ActiveRun != null && save.Campaign.HasActiveRun;
+            string regionId = hasRun ? save.Campaign.ActiveRun.RegionId : save.Campaign?.CurrentRegionId;
             summary.RegionName = string.IsNullOrEmpty(regionId) ? null : Content.Campaign.GetRegion(regionId)?.DisplayName;
+            summary.Stage = hasRun ? save.Campaign.ActiveRun.Stage + 1 : 0;
+            foreach (OwnedBeast beast in save.Beasts ?? new List<OwnedBeast>())
+            {
+                if (summary.TeamArtKeys.Count >= SlotCardPortraitCount)
+                {
+                    break;
+                }
+
+                string artKey = beast?.Progress == null ? null : Content.Battle.GetSpecies(beast.Progress.SpeciesId)?.ArtKey;
+                if (!string.IsNullOrEmpty(artKey))
+                {
+                    summary.TeamArtKeys.Add(artKey);
+                }
+            }
+
             return summary;
         }
 

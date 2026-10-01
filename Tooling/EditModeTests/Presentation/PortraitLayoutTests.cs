@@ -136,6 +136,8 @@ namespace BeastCraft.Tests.EditMode
         [Test]
         public void SettingsGear_SitsInTheHeader_AndItsRowsStackInsideThePanel()
         {
+            // The same button is the campaign's pause button (producer review, menu-screens pass #67);
+            // only its position and the demo's effects-settings overlay are PortraitLayout's concern.
             PortraitLayout layout = new PortraitLayout();
             Rect gear = layout.SettingsButton;
 

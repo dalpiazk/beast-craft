@@ -1094,8 +1094,22 @@ namespace BeastCraft.Game
             {
                 case "title":
                     break;
+                case "title-continue":
+                    steps.Add(() =>
+                    {
+                        StartScriptedGame();
+                        _stack.PopTo("title");
+                    });
+                    break;
                 case "settings":
+                case "settings-gameplay":
+                case "settings-visuals":
+                case "settings-audio":
+                case "settings-privacy":
                     steps.Add(() => Title().OpenSettings());
+                    break;
+                case "credits":
+                    steps.Add(() => _stack.Push(new CreditsScreen(_ctx)));
                     break;
                 case "starter-pick":
                     steps.Add(() => Title().StartNewGame());
@@ -1104,6 +1118,23 @@ namespace BeastCraft.Game
                     steps.Add(() =>
                     {
                         StartScriptedGame();
+                        _stack.Push(new SaveSlotsScreen(_ctx));
+                    });
+                    break;
+                case "save-slots-empty":
+                    // No save anywhere: all three cards read "Empty" (producer review #2).
+                    steps.Add(() => _stack.Push(new SaveSlotsScreen(_ctx)));
+                    break;
+                case "save-slots-full":
+                    // Every slot holds a save: New Game's "pick one to overwrite" flow (producer review #2).
+                    steps.Add(() =>
+                    {
+                        foreach (string slot in GameSession.SlotIds)
+                        {
+                            _ctx.Session.UseSlot(slot);
+                            _ctx.Session.NewGame("golem");
+                        }
+
                         _stack.Push(new SaveSlotsScreen(_ctx));
                     });
                     break;
@@ -1134,6 +1165,14 @@ namespace BeastCraft.Game
             {
                 HomeTab tab = (HomeTab)Array.IndexOf(HomeViewModel.TabNames, char.ToUpperInvariant(screen[0]) + screen.Substring(1));
                 steps.Add(() => Home().SelectTab(tab));
+            }
+
+            if (screen == "settings-gameplay" || screen == "settings-visuals" || screen == "settings-audio" || screen == "settings-privacy")
+            {
+                SettingsTab tab = screen == "settings-visuals" ? SettingsTab.Visuals
+                                      : screen == "settings-audio" ? SettingsTab.Audio
+                                      : screen == "settings-privacy" ? SettingsTab.Privacy : SettingsTab.Gameplay;
+                steps.Add(() => Top<SettingsScreen>().SelectTab(tab));
             }
 
             if (screen == "grove-glade" || screen == "grove-garden" || screen == "grove-board" || screen == "grove-npc")
@@ -1401,7 +1440,8 @@ namespace BeastCraft.Game
                 steps.Add(() => Home().OpenFirstEncounter());
             }
 
-            if (screen == "encounter" || screen == "encounter-insight" || screen == "battle" || screen == "results" || screen == "battle-log" || screen == "results-log")
+            if (screen == "encounter" || screen == "encounter-insight" || screen == "battle" || screen == "results" || screen == "battle-log" || screen == "results-log" ||
+                screen == "pause" || screen == "retreat-confirm")
             {
                 steps.Add(() => Home().OpenFirstEncounter());
             }
@@ -1411,7 +1451,7 @@ namespace BeastCraft.Game
                 steps.Add(() => Encounter().ScrollToInsight());
             }
 
-            if (screen == "battle" || screen == "results" || screen == "battle-log" || screen == "results-log")
+            if (screen == "battle" || screen == "results" || screen == "battle-log" || screen == "results-log" || screen == "pause" || screen == "retreat-confirm")
             {
                 steps.Add(() => Encounter().StartBattle());
             }
@@ -1419,6 +1459,16 @@ namespace BeastCraft.Game
             if (screen == "battle" && capture != null)
             {
                 steps.Add(() => Battle().ShowTurn(3));
+            }
+
+            if (screen == "pause" || screen == "retreat-confirm")
+            {
+                steps.Add(() => Battle().OpenPauseMenu());
+            }
+
+            if (screen == "retreat-confirm")
+            {
+                steps.Add(() => Modal<PauseMenuModal>().TapWidget("retreat"));
             }
 
             if (screen == "battle-log")

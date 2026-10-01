@@ -141,18 +141,16 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
-        public void TheSettingsRows_TurnAnalyticsOnAndOff()
+        public void TheSettingsScreen_TurnsAnalyticsOnAndOff()
         {
             SpyAnalytics analytics = new SpyAnalytics();
             SpyCrashes crashes = new SpyCrashes();
             GameSession session = NewSession(analytics, crashes);
             SettingsViewModel settings = new SettingsViewModel(session.Settings, Content.Text, null);
             settings.ConsentChanged += () => session.Telemetry.Apply();
-            Assert.IsNotNull(settings.Row(SettingsViewModel.Analytics), "on every host");
-            Assert.IsNotNull(settings.Row(SettingsViewModel.CrashReports));
-            Assert.IsFalse(settings.Row(SettingsViewModel.Analytics).On);
+            Assert.IsFalse(settings.AnalyticsConsent);
 
-            settings.Change(SettingsViewModel.Analytics);
+            settings.SetAnalyticsConsent(true);
             session.Telemetry.Track("on");
 
             Assert.IsTrue(session.Settings.AnalyticsConsent);
@@ -160,7 +158,7 @@ namespace BeastCraft.Tests.EditMode
             CollectionAssert.AreEqual(new[] { "on" }, analytics.Events);
             Assert.AreEqual(0, crashes.Initialized, "crash reports keep their own consent");
 
-            settings.Change(SettingsViewModel.Analytics);
+            settings.SetAnalyticsConsent(false);
             session.Telemetry.Track("off");
 
             Assert.IsFalse(session.Settings.AnalyticsConsent);

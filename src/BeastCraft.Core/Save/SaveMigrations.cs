@@ -34,6 +34,9 @@ namespace BeastCraft.Save
     /// <item>11 to 12: the gear and looks already seen (<see cref="PlayerSave.Seen"/>), for the "new" dots; everything
     /// owned then counts as seen; and the post-game difficulty preference (<see cref="CampaignProgress.PreferredDifficulty"/>),
     /// taken from the expedition in progress: <see cref="AddSeen"/>.</item>
+    /// <item>12 to 13: the in-battle pause menu's Retreat, counted apart from an ordinary loss
+    /// (<see cref="MapRun.NodeRetreats"/>/<see cref="MapRun.NodeRetreatsNodeId"/>) so it never eases
+    /// adaptive assist (<c>CampaignRules.AssistLossesAt</c>) the way a real loss does: <see cref="AddRetreats"/>.</item>
     /// </list>
     /// </summary>
     public static class SaveMigrations
@@ -44,7 +47,7 @@ namespace BeastCraft.Save
             return new List<ISaveMigration>
             {
                 new AddGear(), new AddCampaign(), new AddEconomy(), new AddIdle(), new AddRunDifficulty(), new AddTutorial(), new AddDiscovery(), new AddCompendium(),
-                new AddGrove(), new AddPendingBattle(), new AddSeen()
+                new AddGrove(), new AddPendingBattle(), new AddSeen(), new AddRetreats()
             };
         }
 
@@ -393,6 +396,28 @@ namespace BeastCraft.Save
                 SeenRules.MarkAllOwnedSeen(save);
                 save.Campaign.PreferredDifficulty = save.Campaign.HasActiveRun ? save.Campaign.ActiveRun.Difficulty : RunDifficulty.Normal;
                 save.SchemaVersion = 12;
+                return serializer.ToJson(save);
+            }
+        }
+
+        /// <summary>
+        /// Schema 12 to 13: a v12 expedition has no retreat count. The upgrade reads it into the
+        /// current type (<see cref="MapRun.NodeRetreats"/> and <see cref="MapRun.NodeRetreatsNodeId"/>
+        /// take their empty defaults: no retreat recorded, since a v12 save never counted one apart
+        /// from an ordinary loss), fills in anything missing and writes it back. Nothing else moves.
+        /// </summary>
+        public sealed class AddRetreats : ISaveMigration
+        {
+            public int FromVersion
+            {
+                get { return 12; }
+            }
+
+            public string Upgrade(string json, ISaveJsonSerializer serializer)
+            {
+                PlayerSave save = serializer.FromJson<PlayerSave>(json);
+                save.EnsureInitialized();
+                save.SchemaVersion = 13;
                 return serializer.ToJson(save);
             }
         }

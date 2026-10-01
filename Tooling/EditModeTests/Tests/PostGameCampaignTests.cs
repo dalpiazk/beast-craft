@@ -228,14 +228,15 @@ namespace BeastCraft.Tests.EditMode
             Assert.IsTrue(CampaignRules.StartRun(save, _regions, "r11", 0, 5, RunDifficulty.Hard).Success);
             string v6 = serializer.Serialize(save);
             StringAssert.Contains("\"SchemaVersion\":" + PlayerSave.CurrentSchemaVersion, v6);
-            StringAssert.Contains(",\"Difficulty\":1}", v6);
+            StringAssert.Contains(",\"Difficulty\":1,\"NodeRetreats\":0,\"NodeRetreatsNodeId\":-1}", v6);
             SaveLoadResult loaded = serializer.Deserialize(v6);
             Assert.IsTrue(loaded.Success, loaded.Error);
             Assert.AreEqual(RunDifficulty.Hard, loaded.Save.Campaign.ActiveRun.Difficulty);
             Assert.IsFalse(loaded.Save.Campaign.ActiveRun.Nodes.Count == 0);
             Assert.IsEmpty(SaveValidator.Validate(loaded.Save, catalog), "a Hard run in r11 is valid");
 
-            string v5 = v6.Replace("\"SchemaVersion\":" + PlayerSave.CurrentSchemaVersion, "\"SchemaVersion\":5").Replace(",\"Difficulty\":1}", "}");
+            string v5 = v6.Replace("\"SchemaVersion\":" + PlayerSave.CurrentSchemaVersion, "\"SchemaVersion\":5")
+                          .Replace(",\"Difficulty\":1,\"NodeRetreats\":0,\"NodeRetreatsNodeId\":-1}", "}");
             SaveLoadResult migrated = serializer.Deserialize(v5);
             Assert.IsTrue(migrated.Success, migrated.Error);
             Assert.IsTrue(migrated.Migrated);

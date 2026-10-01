@@ -420,7 +420,8 @@ namespace BeastCraft.Campaign
         /// <see cref="EncounterPlan.Scaled"/>; the early regions' <see cref="RegionData.StageEasing"/>
         /// of <see cref="RegionLibraryData.EasingShapeScales"/>, 1 elsewhere), then adaptive assist on
         /// top (<see cref="EncounterPlan.WithAssist"/>, <see cref="RegionLibrary.AssistScaleFor"/> of
-        /// the consecutive losses at this node, <see cref="LossesAt"/>; off on
+        /// the consecutive losses at this node that were not retreats (<see cref="AssistLossesAt"/>,
+        /// which <see cref="LossesAt"/> feeds); off on
         /// <see cref="RunDifficulty.Hard"/> and off in Hearthglen, <see cref="RegionLibrary.IsTutorial"/>
         /// — the tutorial already has its own catch-up, a 60% finale floor and adaptive finale elements,
         /// see docs/balance/hearthglen-report.md). What a campaign battle fights; both are campaign-only
@@ -444,7 +445,7 @@ namespace BeastCraft.Campaign
             // (docs/balance/hearthglen-report.md) — a second, unrelated ease would double up on it.
             if (run.Difficulty != RunDifficulty.Hard && !regions.IsTutorial(run.RegionId))
             {
-                int losses = LossesAt(run, node.NodeId);
+                int losses = AssistLossesAt(run, node.NodeId);
                 plan = plan.WithAssist(regions.AssistScaleFor(run.RegionId, shapeKey, losses));
             }
 
@@ -628,6 +629,60 @@ namespace BeastCraft.Campaign
             }
 
             return Finish(CampaignResult.Done(CampaignOutcome.Cleared, node));
+        }
+
+        /// <summary>
+        /// Retreats from the battle at <paramref name="nodeId"/> (the in-battle pause menu's Retreat,
+        /// before the fight is decided): forfeits it outright. Named apart from the unrelated
+        /// <see cref="Retreat(PlayerSave)"/> (which abandons the whole expedition): this forfeits one
+        /// battle, not the run. Producer decision, 2026-09-30 (docs/design/battle-system.md, "Adaptive
+        /// assist and guidance") — "same as losing the battle": scored exactly like the loss branch of
+        /// <see cref="ResolveBattle(PlayerSave, RegionLibrary, int, BattleOutcome)"/> (the node stays
+        /// uncleared; <see cref="MapRun.Attempts"/>, <see cref="MapRun.NodeAttempts"/> and
+        /// <see cref="MapRun.NodeAttemptsNodeId"/> advance exactly as a loss would, so
+        /// <see cref="LossesAt"/> and the team-suggestion rule see it like any other loss), except it
+        /// also marks the loss a retreat (<see cref="MapRun.NodeRetreats"/>/<see cref="MapRun.NodeRetreatsNodeId"/>),
+        /// which <see cref="AssistLossesAt"/> discounts so the adaptive assist is never eased by a fight
+        /// the player chose to leave rather than lose. Grants nothing: unlike a real loss (which still
+        /// pays reduced XP through <c>BattleSession.ApplyRewards</c>), the caller never applies rewards
+        /// for a retreat — there is no battle result to pay out from. Refused exactly as
+        /// <see cref="ResolveBattle(PlayerSave, RegionLibrary, int, BattleOutcome)"/> would be (no
+        /// expedition, an unreachable or non-battle node). Returns <see cref="CampaignOutcome.Lost"/>
+        /// (not <see cref="CampaignOutcome.Retreated"/>, which is <see cref="Retreat(PlayerSave)"/>'s own
+        /// unrelated outcome for abandoning the run) — the producer's "same as losing" wording.
+        /// </summary>
+        public static CampaignResult RetreatBattle(PlayerSave save, RegionLibrary library, int nodeId)
+        {
+            CampaignResult refused = CheckNode(save, library, nodeId, out MapRun run, out MapNode node, out RegionData _);
+            if (refused != null)
+            {
+                return refused;
+            }
+
+            if (!node.IsBattle)
+            {
+                return CampaignResult.Refused("Node " + nodeId + " is a " + node.Type + " node, not a battle.");
+            }
+
+            run.Attempts++;
+            if (run.NodeAttemptsNodeId != nodeId)
+            {
+                // A loss (or a retreat) at another location starts that location's count afresh.
+                run.NodeAttemptsNodeId = nodeId;
+                run.NodeAttempts = 0;
+            }
+
+            run.NodeAttempts++;
+
+            if (run.NodeRetreatsNodeId != nodeId)
+            {
+                run.NodeRetreatsNodeId = nodeId;
+                run.NodeRetreats = 0;
+            }
+
+            run.NodeRetreats++;
+
+            return CampaignResult.Done(CampaignOutcome.Lost, node);
         }
 
         /// <summary>
@@ -1085,6 +1140,28 @@ namespace BeastCraft.Campaign
         }
 
         /// <summary>
+        /// How many of the losses <see cref="LossesAt"/> counts at <paramref name="nodeId"/> were
+        /// retreats (<see cref="RetreatBattle"/>) rather than a battle actually lost. 0 for a null run.
+        /// </summary>
+        public static int RetreatsAt(MapRun run, int nodeId)
+        {
+            return run != null && nodeId >= 0 && run.NodeRetreatsNodeId == nodeId ? run.NodeRetreats : 0;
+        }
+
+        /// <summary>
+        /// The losses adaptive assist eases for at <paramref name="nodeId"/>: <see cref="LossesAt"/>
+        /// minus its retreats (<see cref="RetreatsAt"/>), never negative. A retreat still counts toward
+        /// <see cref="LossesAt"/> (the team-suggestion rule, <see cref="TeamSuggestionPolicy"/>, treats
+        /// it like any other loss), but never eases the next attempt here: producer decision,
+        /// docs/design/battle-system.md "Adaptive assist and guidance" (2026-09-30), since retreating is
+        /// the player's own choice, not a fight they actually lost.
+        /// </summary>
+        public static int AssistLossesAt(MapRun run, int nodeId)
+        {
+            return Math.Max(0, LossesAt(run, nodeId) - RetreatsAt(run, nodeId));
+        }
+
+        /// <summary>
         /// The pre-fight team suggestion for location <paramref name="nodeId"/> of the expedition in
         /// progress, or null when none is offered. The one call site of the suggestion rule (user
         /// decision): <see cref="TeamSuggestionPolicy.ShouldSuggest"/> of <see cref="LossesAt"/> and
@@ -1233,6 +1310,8 @@ namespace BeastCraft.Campaign
             run.CurrentNodeId = node.NodeId;
             run.NodeAttempts = 0;
             run.NodeAttemptsNodeId = -1;
+            run.NodeRetreats = 0;
+            run.NodeRetreatsNodeId = -1;
         }
     }
 

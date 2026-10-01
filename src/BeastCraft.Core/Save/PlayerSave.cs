@@ -33,7 +33,10 @@ namespace BeastCraft.Save
     /// schema 10), and the NPC dialogue layer: lines seen, requests fulfilled, the dialogue layer's own
     /// lore and every side story's chapter progress (<see cref="Npc"/>; the Grove design's D2, folded
     /// into schema 10 in place — see <c>Save.SaveMigrations.AddGrove</c> — because schema 10 had not
-    /// shipped yet).
+    /// shipped yet), the consumables spent on a battle in progress (schema 11), the gear and looks
+    /// already seen for the "new" dots and the post-game difficulty preference (schema 12), and the
+    /// in-battle pause menu's Retreat, counted apart from an ordinary loss so it never eases adaptive
+    /// assist (<c>Campaign.MapRun.NodeRetreats</c>/<c>NodeRetreatsNodeId</c>, schema 13).
     /// <para>
     /// <strong>JsonUtility-compatible by construction.</strong> Every type reachable from here is
     /// <c>[Serializable]</c> with public fields, and every map is a list (<c>JsonUtility</c> drops
@@ -53,7 +56,7 @@ namespace BeastCraft.Save
     public class PlayerSave
     {
         /// <summary>The schema this code writes, and the newest it reads.</summary>
-        public const int CurrentSchemaVersion = 12;
+        public const int CurrentSchemaVersion = 13;
 
         /// <summary>The schema the data is in. 0 (or missing) is never valid.</summary>
         public int SchemaVersion = CurrentSchemaVersion;

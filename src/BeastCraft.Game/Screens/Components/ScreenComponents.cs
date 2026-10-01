@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using BeastCraft.Game.Rendering;
 using BeastCraft.Game.Ui;
+using BeastCraft.Presentation.Board;
 using BeastCraft.Presentation.Layout;
 using BeastCraft.Presentation.Ui;
 
@@ -404,6 +405,95 @@ namespace BeastCraft.Game.Screens.Components
 
                 y += buttonHeight + 14f;
             }
+        }
+    }
+
+    /// <summary>
+    /// A reusable on/off switch (the settings screen's Gameplay/Visuals/Audio/Privacy toggles): a
+    /// pill track with a sliding knob, an "On"/"Off" value label, and the whole row tappable (a
+    /// comfortable 48dp+ target, not just the small track) — <see cref="Build"/> adds a
+    /// <see cref="Hotspot"/> the full row's width, <see cref="Draw"/> paints the label, the value and
+    /// the track/knob in the view-model's own words (so "On"/"Off" is never hard-coded here).
+    /// </summary>
+    public static class Toggle
+    {
+        /// <summary>A row's height: at least 48dp (about 126px on this canvas; see <see cref="HeaderMetrics"/>'s sibling comment in <c>GameScreen.SettingsModal</c>'s old row).</summary>
+        public const float Height = 112f;
+
+        private const float TrackWidth = 108f;
+        private const float TrackHeight = 56f;
+
+        /// <summary>Adds the row's tap target (the whole row, not just the track) at (<paramref name="x"/>, <paramref name="y"/>, <paramref name="width"/>); toggles <paramref name="on"/> on tap.</summary>
+        public static Hotspot Build(Widget parent, string id, float x, float y, float width, bool on, Action<bool> onChanged)
+        {
+            Hotspot hotspot = parent.Add(new Hotspot { Id = id, Bounds = new Rect(x, y, width, Height) });
+            bool current = on;
+            hotspot.Clicked += _ => onChanged?.Invoke(!current);
+            return hotspot;
+        }
+
+        /// <summary>Paints <paramref name="box"/> (a <see cref="Build"/> hotspot's bounds): the label, "On"/"Off" and the track/knob.</summary>
+        public static void Draw(ScreenContext ctx, Rect box, string label, bool on, string onText, string offText)
+        {
+            UiPainter painter = ctx.Painter;
+            float size = ctx.Style.TextSizes.Body;
+            Rect track = new Rect(box.Right - TrackWidth, box.Center.Y - TrackHeight / 2f, TrackWidth, TrackHeight);
+            float valueWidth = 150f;
+            painter.TextIn(label ?? string.Empty, new Rect(box.X, box.Y, box.Width - TrackWidth - valueWidth - 48f, box.Height), size, painter.C("ink"), TextAlign.Left);
+            painter.TextIn(on ? onText : offText, new Rect(track.X - valueWidth - 20f, box.Y, valueWidth, box.Height), size, painter.C(on ? "leafDeep" : "berry"), TextAlign.Right);
+
+            painter.Framed(track, TrackHeight / 2f, 4f, painter.C("plumSoft"), painter.C(on ? "leaf" : "track"));
+            float knobRadius = TrackHeight / 2f - 6f;
+            float knobX = on ? track.Right - TrackHeight / 2f : track.X + TrackHeight / 2f;
+            painter.Disc(new Vec2(knobX, track.Center.Y), knobRadius, painter.C("cream"));
+        }
+    }
+
+    /// <summary>
+    /// A reusable labelled slider (the settings screen's volume controls): drag or tap the bar to set
+    /// the value (<see cref="SliderBar"/>, so it already wins over a <see cref="ScrollView"/> it sits
+    /// in), a value label above it, 48dp+ touch height even though the drawn track is thin. Built once
+    /// per screen rebuild; <see cref="Draw"/> paints the label, track, fill and knob from the live
+    /// <see cref="SliderBar.Value"/> (so a drag in progress always reads correctly, not just the value
+    /// it started at).
+    /// </summary>
+    public static class Slider
+    {
+        /// <summary>The whole row's height (the label above the bar plus a 48dp+ touch band around it).</summary>
+        public const float Height = 112f;
+
+        private const float BarHeight = 16f;
+        private const float KnobRadius = 28f;
+
+        /// <summary>Adds the draggable bar at (<paramref name="x"/>, <paramref name="y"/> + the label's room, <paramref name="width"/>); <paramref name="value01"/> is 0-1.</summary>
+        public static SliderBar Build(Widget parent, string id, float x, float y, float width, float value01, Action<float> onChanged)
+        {
+            SliderBar bar = parent.Add(new SliderBar { Id = id, Bounds = new Rect(x, y + 48f, width, Height - 48f), Value = value01 });
+            if (onChanged != null)
+            {
+                bar.Changed += onChanged;
+            }
+
+            return bar;
+        }
+
+        /// <summary>Paints a <see cref="Build"/> bar: the label and value text above it, then the track, fill and knob at its live value.</summary>
+        public static void Draw(ScreenContext ctx, SliderBar bar, string label, string valueText)
+        {
+            UiPainter painter = ctx.Painter;
+            Rect box = bar.Bounds;
+            float size = ctx.Style.TextSizes.Body;
+            painter.TextIn(label ?? string.Empty, new Rect(box.X, box.Y - 44f, box.Width * 0.6f, size), size, painter.C("ink"), TextAlign.Left);
+            painter.TextIn(valueText ?? string.Empty, new Rect(box.X + box.Width * 0.6f, box.Y - 44f, box.Width * 0.4f, size), size, painter.C("inkSoft"), TextAlign.Right);
+
+            Rect track = new Rect(box.X, box.Center.Y - BarHeight / 2f, box.Width, BarHeight);
+            painter.RoundedRect(track, BarHeight / 2f, painter.C("track"));
+            float t = Math.Max(0f, Math.Min(1f, bar.Value));
+            float fillWidth = Math.Max(BarHeight, box.Width * t);
+            painter.RoundedRect(new Rect(box.X, track.Y, fillWidth, BarHeight), BarHeight / 2f, painter.C("leaf"));
+            float knobX = box.X + t * box.Width;
+            painter.Disc(new Vec2(knobX, track.Center.Y), KnobRadius, painter.C("plum"));
+            painter.Disc(new Vec2(knobX, track.Center.Y), KnobRadius - 7f, painter.C("cream"));
         }
     }
 

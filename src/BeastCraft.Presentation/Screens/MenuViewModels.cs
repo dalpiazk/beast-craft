@@ -7,9 +7,11 @@ using BeastCraft.Save;
 namespace BeastCraft.Presentation.Screens
 {
     /// <summary>
-    /// The title screen: Continue (only when a save exists: the most recently played slot), Save
-    /// slots (the slot list, when any slot holds a save), New Game (in the first empty slot; when all
-    /// three hold a game the slot list asks which to replace) and Settings; Back asks before quitting.
+    /// The title screen: Continue (only when a save exists: the most recently played slot), Load game
+    /// (the slot list, when any slot holds a save), New Game and Settings; Back asks before quitting.
+    /// New Game always opens the slot list too (menu-screens pass #67: `Game.Screens.TitleScreen.NewGame`
+    /// no longer asks this view-model first) — picking an empty slot there, or a used one, which asks to
+    /// replace it (`SaveSlotsViewModel.NewGameReplaces`), is the one way a game starts.
     /// </summary>
     public sealed class TitleViewModel
     {
@@ -29,12 +31,6 @@ namespace BeastCraft.Presentation.Screens
         public bool CanManageSlots
         {
             get { return _session.AnySave; }
-        }
-
-        /// <summary>Whether New Game must replace a save (every slot holds one): the slot list asks which.</summary>
-        public bool NewGameNeedsConfirm
-        {
-            get { return _session.FirstEmptySlot() == null; }
         }
 
         /// <summary>Continues the most recently played slot.</summary>
@@ -151,56 +147,27 @@ namespace BeastCraft.Presentation.Screens
         }
     }
 
-    /// <summary>One row of the settings modal.</summary>
-    public sealed class SettingRow
-    {
-        /// <summary>Which setting (the <see cref="SettingsViewModel"/> row constants); <see cref="SettingsViewModel.Change"/> takes it.</summary>
-        public int Id;
-
-        public string Label;
-        public string Value;
-
-        /// <summary>Whether the value reads as "on" (drawn green) rather than "off".</summary>
-        public bool On;
-    }
-
     /// <summary>
-    /// The settings modal (the battle's effects settings, the team-suggestion toggle, sound and
-    /// haptics): each row cycles or toggles its setting, which is saved at once. The rows that need
-    /// the host (the idle and Grove alerts, haptics) show only where it has them.
+    /// The settings screen (menu-screens pass, #67): a full screen, grouped into four sections —
+    /// Gameplay, Visuals &amp; accessibility, Audio, Privacy — each a plain set of fields the screen
+    /// binds directly to its widgets (toggles, sliders, a chip row for the two cycling choices,
+    /// Effects intensity and Battle speed), replacing the single long cycling list of rows a
+    /// <c>SettingsModal</c> used to show. Every setter saves at once (<see cref="Saves"/> counts how
+    /// many times). The alert settings (idle, Grove) and haptics are only meaningful where the host
+    /// has them (<see cref="NotificationsAvailable"/>, <see cref="HapticsAvailable"/>); their setters
+    /// do nothing where the host does not, so a screen built without checking first is still safe.
     /// </summary>
     public sealed class SettingsViewModel
     {
-        public const int Effects = 0;
-        public const int ScreenShake = 1;
-        public const int Flashes = 2;
-        public const int TeamSuggestions = 3;
-        public const int BattleSpeed = 4;
-        public const int AutoAdvance = 5;
-        public const int TutorialHints = 6;
-        public const int IdleNotifications = 7;
-        public const int MasterVolume = 8;
-        public const int MusicVolume = 9;
-        public const int SfxVolume = 10;
-        public const int Mute = 11;
-        public const int Haptics = 12;
-        public const int GroveNotifications = 13;
-        public const int Analytics = 14;
-        public const int CrashReports = 15;
-        public const int RowCount = 16;
-
-        /// <summary>A volume row's step: each tap takes it down a quarter, and from 0 back to 100.</summary>
-        public const int VolumeStep = 25;
-
         private readonly PlayerSettings _settings;
         private readonly Func<bool> _save;
         private readonly StringTable _text;
 
-        /// <param name="settings">The settings the rows change.</param>
+        /// <param name="settings">The settings this changes.</param>
         /// <param name="text">The text table the labels come from (<c>ui.settings.*</c>; <c>GameContent.Text</c>).</param>
         /// <param name="save">Saves the settings after each change.</param>
-        /// <param name="notificationsAvailable">Whether the host can post notifications (Android): otherwise that row is hidden.</param>
-        /// <param name="hapticsAvailable">Whether the host can vibrate (Android): otherwise that row is hidden.</param>
+        /// <param name="notificationsAvailable">Whether the host can post notifications (Android): otherwise the idle/Grove alert setters do nothing.</param>
+        /// <param name="hapticsAvailable">Whether the host can vibrate (Android): otherwise the haptics setter does nothing.</param>
         public SettingsViewModel(PlayerSettings settings, StringTable text, Func<bool> save, bool notificationsAvailable = false, bool hapticsAvailable = false)
         {
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
@@ -210,6 +177,7 @@ namespace BeastCraft.Presentation.Screens
             HapticsAvailable = hapticsAvailable;
         }
 
+        /// <summary>How many changes have been saved so far (tests only; the screen does not read this).</summary>
         public int Saves { get; private set; }
 
         public bool NotificationsAvailable { get; }
@@ -225,56 +193,278 @@ namespace BeastCraft.Presentation.Screens
         /// <summary>Raised after a consent setting (analytics, crash reports) changes: the session's telemetry starts or stops to match.</summary>
         public event Action ConsentChanged;
 
-        /// <summary>The rows in display order (the alert rows and the haptics row only where the host has them); <see cref="Row"/> finds one by id.</summary>
-        public List<SettingRow> Rows()
+        // ------------------------------------------------------------------------------------------
+        // Gameplay
+        // ------------------------------------------------------------------------------------------
+
+        /// <summary>The battle speed, 1-3 (<see cref="Speed"/>).</summary>
+        public int BattleSpeed
         {
-            string intensity = _text.Get(_settings.EffectsIntensity == EffectsIntensity.Minimal ? "ui.settings.effects_minimal" : _settings.EffectsIntensity == EffectsIntensity.Reduced ? "ui.settings.effects_reduced" : "ui.settings.effects_full");
-            List<SettingRow> rows = new List<SettingRow>
+            get { return Speed(_settings); }
+        }
+
+        /// <summary>Sets the battle speed directly (clamped to 1-3). Saves.</summary>
+        public void SetBattleSpeed(int speed)
+        {
+            _settings.BattleSpeed = speed < 1 ? 1 : speed > 3 ? 3 : speed;
+            Persist();
+        }
+
+        public bool AutoAdvance
+        {
+            get { return _settings.AutoAdvance; }
+        }
+
+        public void SetAutoAdvance(bool on)
+        {
+            _settings.AutoAdvance = on;
+            Persist();
+        }
+
+        public bool TeamSuggestionsEnabled
+        {
+            get { return _settings.TeamSuggestionsEnabled; }
+        }
+
+        public void SetTeamSuggestions(bool on)
+        {
+            _settings.TeamSuggestionsEnabled = on;
+            Persist();
+        }
+
+        public bool TutorialHints
+        {
+            get { return _settings.TutorialHints; }
+        }
+
+        public void SetTutorialHints(bool on)
+        {
+            _settings.TutorialHints = on;
+            Persist();
+        }
+
+        /// <summary>A local notification when idle rewards reach their cap. Only where <see cref="NotificationsAvailable"/>.</summary>
+        public bool IdleNotifications
+        {
+            get { return _settings.IdleNotifications; }
+        }
+
+        /// <summary>Does nothing where <see cref="NotificationsAvailable"/> is false.</summary>
+        public void SetIdleNotifications(bool on)
+        {
+            if (!NotificationsAvailable)
             {
-                new SettingRow { Id = Effects, Label = _text.Get("ui.settings.effects"), Value = intensity, On = true },
-                new SettingRow { Id = ScreenShake, Label = _text.Get("ui.settings.screen_shake"), Value = OnOff(_settings.ScreenShake), On = _settings.ScreenShake },
-                new SettingRow { Id = Flashes, Label = _text.Get("ui.settings.flashes"), Value = OnOff(_settings.Flashes), On = _settings.Flashes },
-                new SettingRow { Id = TeamSuggestions, Label = _text.Get("ui.settings.team_suggestions"), Value = OnOff(_settings.TeamSuggestionsEnabled), On = _settings.TeamSuggestionsEnabled },
-                new SettingRow { Id = BattleSpeed, Label = _text.Get("ui.settings.battle_speed"), Value = _text.Format("ui.settings.speed_value", Speed(_settings)), On = true },
-                new SettingRow { Id = AutoAdvance, Label = _text.Get("ui.settings.auto_advance"), Value = OnOff(_settings.AutoAdvance), On = _settings.AutoAdvance },
-                new SettingRow { Id = TutorialHints, Label = _text.Get("ui.settings.tutorial_hints"), Value = OnOff(_settings.TutorialHints), On = _settings.TutorialHints }
-            };
-            if (NotificationsAvailable)
-            {
-                rows.Add(new SettingRow { Id = IdleNotifications, Label = _text.Get("ui.settings.idle_alert"), Value = OnOff(_settings.IdleNotifications), On = _settings.IdleNotifications });
-                rows.Add(new SettingRow { Id = GroveNotifications, Label = _text.Get("ui.settings.grove_alert"), Value = OnOff(_settings.GroveNotifications), On = _settings.GroveNotifications });
+                return;
             }
 
-            rows.Add(VolumeRow(MasterVolume, "ui.settings.master_volume", _settings.MasterVolume));
-            rows.Add(VolumeRow(MusicVolume, "ui.settings.music_volume", _settings.MusicVolume));
-            rows.Add(VolumeRow(SfxVolume, "ui.settings.sfx_volume", _settings.SfxVolume));
-            rows.Add(new SettingRow { Id = Mute, Label = _text.Get("ui.settings.mute"), Value = OnOff(_settings.Muted), On = !_settings.Muted });
-            if (HapticsAvailable)
+            _settings.IdleNotifications = on;
+            Persist();
+            IdleNotificationsChanged?.Invoke(on);
+        }
+
+        /// <summary>A local notification when something in the Grove is ready. Only where <see cref="NotificationsAvailable"/>.</summary>
+        public bool GroveNotifications
+        {
+            get { return _settings.GroveNotifications; }
+        }
+
+        /// <summary>Does nothing where <see cref="NotificationsAvailable"/> is false.</summary>
+        public void SetGroveNotifications(bool on)
+        {
+            if (!NotificationsAvailable)
             {
-                rows.Add(new SettingRow { Id = Haptics, Label = _text.Get("ui.settings.haptics"), Value = OnOff(_settings.Haptics), On = _settings.Haptics });
+                return;
             }
 
-            rows.Add(new SettingRow { Id = Analytics, Label = _text.Get("ui.settings.analytics"), Value = OnOff(_settings.AnalyticsConsent), On = _settings.AnalyticsConsent });
-            rows.Add(new SettingRow { Id = CrashReports, Label = _text.Get("ui.settings.crash_reports"), Value = OnOff(_settings.CrashReportConsent), On = _settings.CrashReportConsent });
-
-            return rows;
+            _settings.GroveNotifications = on;
+            Persist();
+            GroveNotificationsChanged?.Invoke(on);
         }
 
-        /// <summary>The row for setting <paramref name="id"/>, or null when it is not shown here.</summary>
-        public SettingRow Row(int id)
+        // ------------------------------------------------------------------------------------------
+        // Visuals & accessibility
+        // ------------------------------------------------------------------------------------------
+
+        public EffectsIntensity EffectsIntensity
         {
-            return Rows().Find(row => row.Id == id);
+            get { return _settings.EffectsIntensity; }
         }
 
-        private SettingRow VolumeRow(int id, string labelKey, int volume)
+        /// <summary>The current intensity's label (<c>ui.settings.effects_*</c>), for the chip row.</summary>
+        public string EffectsIntensityLabel
         {
-            int percent = (int)Math.Round(MusicMix.Percent(volume) * 100f);
-            return new SettingRow { Id = id, Label = _text.Get(labelKey), Value = _text.Format("ui.settings.volume_value", percent), On = percent > 0 && !_settings.Muted };
+            get
+            {
+                return _text.Get(EffectsIntensity == EffectsIntensity.Minimal ? "ui.settings.effects_minimal"
+                                      : EffectsIntensity == EffectsIntensity.Reduced ? "ui.settings.effects_reduced" : "ui.settings.effects_full");
+            }
         }
 
-        private string OnOff(bool on)
+        public void SetEffectsIntensity(EffectsIntensity intensity)
         {
-            return _text.Get(on ? "ui.settings.on" : "ui.settings.off");
+            _settings.EffectsIntensity = intensity;
+            Persist();
+        }
+
+        public bool ScreenShake
+        {
+            get { return _settings.ScreenShake; }
+        }
+
+        public void SetScreenShake(bool on)
+        {
+            _settings.ScreenShake = on;
+            Persist();
+        }
+
+        public bool Flashes
+        {
+            get { return _settings.Flashes; }
+        }
+
+        public void SetFlashes(bool on)
+        {
+            _settings.Flashes = on;
+            Persist();
+        }
+
+        // ------------------------------------------------------------------------------------------
+        // Audio
+        // ------------------------------------------------------------------------------------------
+
+        public int MasterVolume
+        {
+            get { return Clamp(_settings.MasterVolume); }
+        }
+
+        /// <summary>Sets the master volume (0-100, clamped) directly — a slider's exact value, no stepping. Saves.</summary>
+        public void SetMasterVolume(int percent)
+        {
+            _settings.MasterVolume = Clamp(percent);
+            Persist();
+        }
+
+        /// <summary>
+        /// The master volume's live value during a drag, applied at once (so the player hears it move)
+        /// but never saved — code review: writing to disk on every drag frame is needless I/O; the
+        /// screen calls <see cref="SetMasterVolume"/> once the drag ends (or on a plain tap) to persist
+        /// the exact value the drag settled on.
+        /// </summary>
+        public void SetMasterVolumeLive(int percent)
+        {
+            _settings.MasterVolume = Clamp(percent);
+        }
+
+        public int MusicVolume
+        {
+            get { return Clamp(_settings.MusicVolume); }
+        }
+
+        public void SetMusicVolume(int percent)
+        {
+            _settings.MusicVolume = Clamp(percent);
+            Persist();
+        }
+
+        /// <summary>The music volume's live value during a drag, never saved — see <see cref="SetMasterVolumeLive"/>.</summary>
+        public void SetMusicVolumeLive(int percent)
+        {
+            _settings.MusicVolume = Clamp(percent);
+        }
+
+        public int SfxVolume
+        {
+            get { return Clamp(_settings.SfxVolume); }
+        }
+
+        public void SetSfxVolume(int percent)
+        {
+            _settings.SfxVolume = Clamp(percent);
+            Persist();
+        }
+
+        /// <summary>The sound effects volume's live value during a drag, never saved — see <see cref="SetMasterVolumeLive"/>.</summary>
+        public void SetSfxVolumeLive(int percent)
+        {
+            _settings.SfxVolume = Clamp(percent);
+        }
+
+        /// <summary>A volume's slider position, 0-1 (<see cref="MusicMix.Percent"/>).</summary>
+        public static float Fraction(int percent)
+        {
+            return MusicMix.Percent(percent);
+        }
+
+        public bool Muted
+        {
+            get { return _settings.Muted; }
+        }
+
+        public void SetMuted(bool on)
+        {
+            _settings.Muted = on;
+            Persist();
+        }
+
+        /// <summary>Light vibration on hits, knockouts and key confirms. Only where <see cref="HapticsAvailable"/>.</summary>
+        public bool Haptics
+        {
+            get { return _settings.Haptics; }
+        }
+
+        /// <summary>Does nothing where <see cref="HapticsAvailable"/> is false.</summary>
+        public void SetHaptics(bool on)
+        {
+            if (!HapticsAvailable)
+            {
+                return;
+            }
+
+            _settings.Haptics = on;
+            Persist();
+        }
+
+        // ------------------------------------------------------------------------------------------
+        // Privacy (#62)
+        // ------------------------------------------------------------------------------------------
+
+        public bool AnalyticsConsent
+        {
+            get { return _settings.AnalyticsConsent; }
+        }
+
+        public void SetAnalyticsConsent(bool on)
+        {
+            _settings.AnalyticsConsent = on;
+            Persist();
+            ConsentChanged?.Invoke();
+        }
+
+        public bool CrashReportConsent
+        {
+            get { return _settings.CrashReportConsent; }
+        }
+
+        public void SetCrashReportConsent(bool on)
+        {
+            _settings.CrashReportConsent = on;
+            Persist();
+            ConsentChanged?.Invoke();
+        }
+
+        // ------------------------------------------------------------------------------------------
+
+        private void Persist()
+        {
+            if (_save == null || _save())
+            {
+                Saves++;
+            }
+        }
+
+        private static int Clamp(int percent)
+        {
+            return percent < 0 ? 0 : percent > 100 ? 100 : percent;
         }
 
         /// <summary>The battle speed a setting holds, 1-3 (anything else reads as 1).</summary>
@@ -282,112 +472,6 @@ namespace BeastCraft.Presentation.Screens
         {
             int speed = settings == null ? 1 : settings.BattleSpeed;
             return speed >= 1 && speed <= 3 ? speed : 1;
-        }
-
-        /// <summary>The next volume down in <see cref="VolumeStep"/>s, wrapping from 0 to 100 (an off-step value rounds down first).</summary>
-        public static int NextVolume(int volume)
-        {
-            int clamped = Math.Max(0, Math.Min(100, volume));
-            return clamped == 0 ? 100 : (clamped - 1) / VolumeStep * VolumeStep;
-        }
-
-        /// <summary>
-        /// Changes setting <paramref name="row"/> (a row constant): effects cycle Full, Reduced, Minimal;
-        /// speed x1, x2, x3; a volume steps down a quarter at a time (<see cref="NextVolume"/>); the rest
-        /// toggle. Saves.
-        /// </summary>
-        public void Change(int row)
-        {
-            switch (row)
-            {
-                case Effects:
-                    _settings.EffectsIntensity = _settings.EffectsIntensity == EffectsIntensity.Full
-                                                     ? EffectsIntensity.Reduced
-                                                     : _settings.EffectsIntensity == EffectsIntensity.Reduced ? EffectsIntensity.Minimal : EffectsIntensity.Full;
-                    break;
-                case ScreenShake:
-                    _settings.ScreenShake = !_settings.ScreenShake;
-                    break;
-                case Flashes:
-                    _settings.Flashes = !_settings.Flashes;
-                    break;
-                case TeamSuggestions:
-                    _settings.TeamSuggestionsEnabled = !_settings.TeamSuggestionsEnabled;
-                    break;
-                case BattleSpeed:
-                    _settings.BattleSpeed = Speed(_settings) % 3 + 1;
-                    break;
-                case AutoAdvance:
-                    _settings.AutoAdvance = !_settings.AutoAdvance;
-                    break;
-                case TutorialHints:
-                    _settings.TutorialHints = !_settings.TutorialHints;
-                    break;
-                case IdleNotifications:
-                    if (!NotificationsAvailable)
-                    {
-                        return;
-                    }
-
-                    _settings.IdleNotifications = !_settings.IdleNotifications;
-                    break;
-                case GroveNotifications:
-                    if (!NotificationsAvailable)
-                    {
-                        return;
-                    }
-
-                    _settings.GroveNotifications = !_settings.GroveNotifications;
-                    break;
-                case MasterVolume:
-                    _settings.MasterVolume = NextVolume(_settings.MasterVolume);
-                    break;
-                case MusicVolume:
-                    _settings.MusicVolume = NextVolume(_settings.MusicVolume);
-                    break;
-                case SfxVolume:
-                    _settings.SfxVolume = NextVolume(_settings.SfxVolume);
-                    break;
-                case Mute:
-                    _settings.Muted = !_settings.Muted;
-                    break;
-                case Haptics:
-                    if (!HapticsAvailable)
-                    {
-                        return;
-                    }
-
-                    _settings.Haptics = !_settings.Haptics;
-                    break;
-                case Analytics:
-                    _settings.AnalyticsConsent = !_settings.AnalyticsConsent;
-                    break;
-                case CrashReports:
-                    _settings.CrashReportConsent = !_settings.CrashReportConsent;
-                    break;
-                default:
-                    return;
-            }
-
-            if (_save == null || _save())
-            {
-                Saves++;
-            }
-
-            if (row == IdleNotifications)
-            {
-                IdleNotificationsChanged?.Invoke(_settings.IdleNotifications);
-            }
-
-            if (row == GroveNotifications)
-            {
-                GroveNotificationsChanged?.Invoke(_settings.GroveNotifications);
-            }
-
-            if (row == Analytics || row == CrashReports)
-            {
-                ConsentChanged?.Invoke();
-            }
         }
     }
 

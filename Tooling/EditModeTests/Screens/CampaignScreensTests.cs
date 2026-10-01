@@ -168,14 +168,14 @@ namespace BeastCraft.Tests.EditMode
             MemorySaveStorage storage = new MemorySaveStorage();
             GameSession session = new GameSession(Content, storage, () => 1);
             SettingsViewModel settings = new SettingsViewModel(session.Settings, session.Content.Text, session.SaveSettings);
-            settings.Change(SettingsViewModel.TeamSuggestions);
-            settings.Change(SettingsViewModel.Effects);
+            settings.SetTeamSuggestions(false);
+            settings.SetEffectsIntensity(EffectsIntensity.Reduced);
 
             Assert.AreEqual(2, settings.Saves);
             PlayerSettings read = new GameSession(Content, storage, () => 1).Settings;
             Assert.IsFalse(read.TeamSuggestionsEnabled);
             Assert.AreEqual(EffectsIntensity.Reduced, read.EffectsIntensity);
-            Assert.AreEqual("Off", settings.Rows()[SettingsViewModel.TeamSuggestions].Value);
+            Assert.IsFalse(settings.TeamSuggestionsEnabled);
         }
 
         [Test]
@@ -185,12 +185,10 @@ namespace BeastCraft.Tests.EditMode
             TitleViewModel fresh = new TitleViewModel(new GameSession(Content, storage, () => MapSeed));
             Assert.IsFalse(fresh.CanContinue);
             Assert.IsFalse(fresh.CanManageSlots);
-            Assert.IsFalse(fresh.NewGameNeedsConfirm);
             Assert.IsTrue(fresh.PrepareNewGame());
             fresh.NewGame("griffin");
             Assert.IsTrue(fresh.CanContinue);
             Assert.IsTrue(fresh.CanManageSlots);
-            Assert.IsFalse(new TitleViewModel(new GameSession(Content, storage, () => 1)).NewGameNeedsConfirm, "two slots are still free");
         }
 
         // ------------------------------------------------------------------ region map
@@ -546,6 +544,48 @@ namespace BeastCraft.Tests.EditMode
             Assert.AreEqual(1, retry.Attempt);
             Assert.AreEqual(CampaignRules.BattleSeed(node, 1), retry.Battle.Seed, "a new battle seed for the retry");
             CollectionAssert.AreEqual(new[] { "b3" }, retry.Team, "the last team is remembered");
+        }
+
+        [Test]
+        public void NodeBattle_Retreat_ForfeitsItAsALoss_GrantsNothing_AndOffersTheRetry()
+        {
+            GameSession session = NewSession();
+            MapRun run = session.Save.Campaign.ActiveRun;
+            MapNode node = CampaignRules.Choices(run)[0];
+            EncounterViewModel encounter = new EncounterViewModel(session, node.NodeId);
+
+            NodeBattle battle = encounter.Start(out string error);
+            Assert.IsNotNull(battle, error);
+            int goldBefore = session.Save.Gold;
+            int saves = session.AutosaveCount;
+
+            ResultsViewModel results = battle.Retreat();
+
+            Assert.AreEqual(BattleOutcome.EnemyVictory, results.Outcome);
+            Assert.IsFalse(results.Victory);
+            Assert.AreEqual("Retreated", results.Title);
+            Assert.AreEqual(CampaignOutcome.Lost, results.MapOutcome);
+            Assert.AreEqual(1, results.Losses, "the team-suggestion rule sees it like any other loss");
+            Assert.AreEqual(1, run.NodeRetreats, "but it is marked a retreat apart from an ordinary loss");
+            Assert.AreEqual(0, CampaignRules.AssistLossesAt(run, node.NodeId), "and never eases the adaptive assist");
+            Assert.AreEqual(0, results.Gold, "grants nothing");
+            Assert.IsEmpty(results.Drops);
+            Assert.AreEqual(goldBefore, session.Save.Gold);
+            foreach (BeastResultRow row in results.Team)
+            {
+                Assert.AreEqual(0, row.XpGained, "no XP either, unlike a real loss's reduced XP");
+            }
+
+            StringAssert.Contains("try", results.RetryNote);
+            Assert.IsFalse(run.IsCleared(node.NodeId), "the location stays open");
+            Assert.AreEqual(AutosaveReason.Results, session.LastAutosaveReason);
+            Assert.AreEqual(saves + 1, session.AutosaveCount);
+            Assert.IsTrue(battle.IsCompleted);
+            Assert.Throws<InvalidOperationException>(() => battle.Retreat(), "once only");
+            Assert.Throws<InvalidOperationException>(() => battle.Complete(), "paid out (forfeited) once only, the same guard Complete uses");
+
+            MapViewModel map = new MapViewModel(session);
+            Assert.AreEqual(MapNodeState.Reachable, map.Find(node.NodeId).State, "retry from the node");
         }
 
         [Test]

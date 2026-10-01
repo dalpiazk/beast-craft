@@ -15,8 +15,11 @@ namespace BeastCraft.Presentation.Screens
         /// <summary>"Beastbinder level 12, 5 beasts", "Empty", or why the save cannot be loaded.</summary>
         public string Detail;
 
-        /// <summary>"Verdant Hollow, saved 29 Sep 2026 14:05" (either half may be missing); null for an empty slot.</summary>
+        /// <summary>"Verdant Hollow, Stage 2, saved 29 Sep 2026 14:05" (any part may be missing); null for an empty slot.</summary>
         public string Where;
+
+        /// <summary>Up to <see cref="GameSession.SlotCardPortraitCount"/> owned beasts' art keys, for the card's small team portrait row; empty for an empty or unreadable slot.</summary>
+        public List<string> TeamArtKeys = new List<string>();
 
         public bool HasSave;
 
@@ -91,7 +94,13 @@ namespace BeastCraft.Presentation.Screens
                     string saved = summary.SavedUtc == DateTime.MinValue
                                        ? null
                                        : Text.Format("ui.save_slots.saved", summary.SavedUtc.ToLocalTime().ToString("d MMM yyyy HH:mm", CultureInfo.InvariantCulture));
-                    row.Where = summary.RegionName == null ? saved : saved == null ? summary.RegionName : Text.Format("ui.save_slots.where_saved", summary.RegionName, saved);
+                    string region = summary.RegionName == null
+                                        ? null
+                                        : summary.Stage > 0
+                                            ? Text.Format("ui.save_slots.region_stage", summary.RegionName, summary.Stage)
+                                            : summary.RegionName;
+                    row.Where = region == null ? saved : saved == null ? region : Text.Format("ui.save_slots.where_saved", region, saved);
+                    row.TeamArtKeys = summary.TeamArtKeys;
                 }
 
                 rows.Add(row);

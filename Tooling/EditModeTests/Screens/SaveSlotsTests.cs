@@ -65,8 +65,6 @@ namespace BeastCraft.Tests.EditMode
 
             foreach (string expected in GameSession.SlotIds)
             {
-                TitleViewModel title = new TitleViewModel(NewSession(storage));
-                Assert.IsFalse(title.NewGameNeedsConfirm);
                 GameSession session = NewSession(storage);
                 Assert.AreEqual(expected, session.FirstEmptySlot());
                 StartIn(storage, expected);
@@ -74,7 +72,10 @@ namespace BeastCraft.Tests.EditMode
 
             GameSession full = NewSession(storage);
             Assert.IsNull(full.FirstEmptySlot());
-            Assert.IsTrue(new TitleViewModel(full).NewGameNeedsConfirm, "every slot holds a game: the slot list asks which to replace");
+            // Every slot holds a game: the title's New Game always opens the slot list now (it no
+            // longer asks the view-model first), and every row there offers the overwrite-with-confirm
+            // flow (SaveSlotsViewModel.NewGameReplaces) — that is "every slot needs a pick" today.
+            Assert.IsTrue(new SaveSlotsViewModel(full).Rows().TrueForAll(row => row.HasSave));
             Assert.IsFalse(new TitleViewModel(full).PrepareNewGame());
             Assert.IsFalse(full.UseSlot("slot4"));
             Assert.IsFalse(full.UseSlot("settings"));
@@ -140,7 +141,8 @@ namespace BeastCraft.Tests.EditMode
 
             Assert.IsTrue(rows[1].HasSave && rows[1].Readable && rows[1].Current);
             Assert.AreEqual("Beastbinder level 1, 6 beasts", rows[1].Detail);
-            Assert.AreEqual(Content.Campaign.GetRegion(CampaignProgress.StartingRegionId).DisplayName, rows[1].Where, "the memory storage has no write times: the region alone");
+            Assert.AreEqual(Content.Text.Format("ui.save_slots.region_stage", Content.Campaign.GetRegion(CampaignProgress.StartingRegionId).DisplayName, 1), rows[1].Where,
+                            "the memory storage has no write times: the region and stage alone");
             Assert.AreEqual("Continue", rows[1].PlayText);
 
             Assert.IsTrue(rows[2].HasSave);

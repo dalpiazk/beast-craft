@@ -211,7 +211,8 @@ namespace BeastCraft.Presentation.Layout
         /// </summary>
         public const float DiscHeadroom = 48f;
 
-        public const int ControlCount = 5;
+        /// <summary>x1/x2/x3 and skip (producer review, menu-screens pass #67: pause/play moved to the header's gear, so the bar has one fewer control, filling evenly).</summary>
+        public const int ControlCount = 4;
 
         /// <summary>The rows of the settings overlay: effects intensity, screen shake, flashes, close.</summary>
         public const int SettingsRowCount = 4;
@@ -253,7 +254,13 @@ namespace BeastCraft.Presentation.Layout
         /// </summary>
         public Rect SkillDetail { get; }
 
-        /// <summary>The gear button at the header's right end: opens and closes the settings overlay.</summary>
+        /// <summary>
+        /// The one button at the header's right end (producer review, menu-screens pass #67): in a
+        /// campaign battle it is the pause button, opening the pause menu
+        /// (<c>Game.Screens.PauseMenuModal</c>: Resume, Settings, Retreat) and freezing the battle clock
+        /// while it — or anything pushed from it — is open; in the demo it keeps its original meaning,
+        /// opening and closing the effects settings overlay (<see cref="SettingsPanel"/>).
+        /// </summary>
         public Rect SettingsButton { get; }
 
         /// <summary>The settings overlay's panel, over the board.</summary>
