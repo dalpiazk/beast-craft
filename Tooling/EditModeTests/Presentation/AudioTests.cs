@@ -160,38 +160,37 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
-        public void TheSettingsRows_StepTheVolumes_ToggleMuteAndHaptics_AndSave()
+        public void TheSettingsScreen_SetsVolumesDirectly_TogglesMuteAndHaptics_AndSaves()
         {
             MemorySaveStorage storage = new MemorySaveStorage();
             GameSession session = new GameSession(Content, storage, () => 1);
             SettingsViewModel phone = new SettingsViewModel(session.Settings, session.Content.Text, session.SaveSettings, true, true);
 
-            Assert.AreEqual("100%", phone.Row(SettingsViewModel.MasterVolume).Value);
-            Assert.AreEqual("On", phone.Row(SettingsViewModel.Haptics).Value, "haptics on by default");
-            List<int> steps = new List<int>();
-            for (int i = 0; i < 5; i++)
-            {
-                phone.Change(SettingsViewModel.MusicVolume);
-                steps.Add(session.Settings.MusicVolume);
-            }
+            Assert.AreEqual(100, phone.MasterVolume);
+            Assert.IsTrue(phone.Haptics, "haptics on by default");
 
-            CollectionAssert.AreEqual(new[] { 75, 50, 25, 0, 100 }, steps);
-            Assert.AreEqual(50, SettingsViewModel.NextVolume(60), "an off-step value steps down to the quarter below");
-            phone.Change(SettingsViewModel.Mute);
-            phone.Change(SettingsViewModel.Haptics);
-            phone.Change(SettingsViewModel.SfxVolume);
+            phone.SetMusicVolume(42);
+            Assert.AreEqual(42, session.Settings.MusicVolume, "a slider sets the exact value, no stepping");
+            phone.SetMusicVolume(-5);
+            Assert.AreEqual(0, session.Settings.MusicVolume, "clamped to 0-100");
+            phone.SetMusicVolume(150);
+            Assert.AreEqual(100, session.Settings.MusicVolume);
+
+            phone.SetMuted(true);
+            phone.SetHaptics(false);
+            phone.SetSfxVolume(75);
 
             PlayerSettings saved = new GameSession(Content, storage, () => 1).Settings;
             Assert.IsTrue(saved.Muted);
             Assert.IsFalse(saved.Haptics);
             Assert.AreEqual(75, saved.SfxVolume);
-            Assert.AreEqual("Off", phone.Row(SettingsViewModel.Haptics).Value);
+            Assert.IsFalse(phone.Haptics);
 
             SettingsViewModel desktop = new SettingsViewModel(session.Settings, session.Content.Text, session.SaveSettings);
-            Assert.IsNull(desktop.Row(SettingsViewModel.Haptics), "no vibration row without haptics");
-            desktop.Change(SettingsViewModel.Haptics);
-            Assert.IsFalse(session.Settings.Haptics, "and the row does nothing there");
-            Assert.IsNotNull(desktop.Row(SettingsViewModel.Mute), "the sound rows are everywhere");
+            Assert.IsFalse(desktop.HapticsAvailable, "no vibration control without haptics");
+            desktop.SetHaptics(true);
+            Assert.IsFalse(session.Settings.Haptics, "and the setter does nothing there");
+            Assert.IsTrue(desktop.Muted, "the Mute control is available on every host");
         }
 
         [Test]

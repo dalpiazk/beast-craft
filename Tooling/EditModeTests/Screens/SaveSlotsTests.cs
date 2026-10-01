@@ -140,7 +140,8 @@ namespace BeastCraft.Tests.EditMode
 
             Assert.IsTrue(rows[1].HasSave && rows[1].Readable && rows[1].Current);
             Assert.AreEqual("Beastbinder level 1, 6 beasts", rows[1].Detail);
-            Assert.AreEqual(Content.Campaign.GetRegion(CampaignProgress.StartingRegionId).DisplayName, rows[1].Where, "the memory storage has no write times: the region alone");
+            Assert.AreEqual(Content.Text.Format("ui.save_slots.region_stage", Content.Campaign.GetRegion(CampaignProgress.StartingRegionId).DisplayName, 1), rows[1].Where,
+                            "the memory storage has no write times: the region and stage alone");
             Assert.AreEqual("Continue", rows[1].PlayText);
 
             Assert.IsTrue(rows[2].HasSave);

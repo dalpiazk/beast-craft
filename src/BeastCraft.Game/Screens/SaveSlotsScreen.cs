@@ -18,7 +18,9 @@ namespace BeastCraft.Game.Screens
     {
         private const float Pad = HeaderMetrics.Pad;
         private const float TopBar = HeaderMetrics.Standard;
-        private const float CardHeight = 330f;
+        private const float CardHeight = 420f;
+        private const float EmptyCardHeight = 320f;
+        private const float PortraitSize = 86f;
         private const float ButtonHeight = 96f;
 
         private readonly SaveSlotsViewModel _model;
@@ -138,7 +140,8 @@ namespace BeastCraft.Game.Screens
             foreach (SaveSlotRow row in _model.Rows())
             {
                 float top = y;
-                y = _cards.Card(y, CardHeight, row.Current ? "card" : "panel", box => DrawSlot(box, row));
+                float cardHeight = row.HasSave ? CardHeight : EmptyCardHeight;
+                y = _cards.Card(y, cardHeight, row.Current ? "card" : row.HasSave ? "panel" : "slot", box => DrawSlot(box, row));
                 List<(string Id, string Text, string Style, Action Click)> buttons = new List<(string, string, string, Action)>
                 {
                     ("play-" + row.Slot, row.PlayText, row.Readable ? "primary" : "secondary", () => Play(row))
@@ -163,7 +166,7 @@ namespace BeastCraft.Game.Screens
                 float x = Pad + 36f;
                 foreach ((string id, string text, string style, Action click) in buttons)
                 {
-                    AddButton(_cards.Scroll, id, new Rect(x, top + CardHeight - ButtonHeight - 30f, buttonWidth, ButtonHeight), text, style, click);
+                    AddButton(_cards.Scroll, id, new Rect(x, top + cardHeight - ButtonHeight - 30f, buttonWidth, ButtonHeight), text, style, click);
                     x += buttonWidth + gap;
                 }
             }
@@ -186,10 +189,40 @@ namespace BeastCraft.Game.Screens
                            style.TextSizes.Heading, painter.C("plum"), TextAlign.Left);
             painter.TextIn(row.Detail, new Rect(box.X + 36f, box.Y + 96f, box.Width - 72f, style.TextSizes.Body + 2f), style.TextSizes.Body + 2f,
                            painter.C(row.HasSave && !row.Readable ? "berry" : "ink"), TextAlign.Left);
+            if (!row.HasSave)
+            {
+                // A clearer empty-slot state: what Detail ("Empty") alone used to leave unsaid.
+                painter.TextIn(Loc("ui.save_slots.empty_hint"), new Rect(box.X + 36f, box.Y + 146f, box.Width - 72f, style.TextSizes.Small + 2f), style.TextSizes.Small + 2f,
+                               painter.C("inkSoft"), TextAlign.Left);
+                return;
+            }
+
             if (!string.IsNullOrEmpty(row.Where))
             {
                 painter.TextIn(row.Where, new Rect(box.X + 36f, box.Y + 146f, box.Width - 72f, style.TextSizes.Small + 2f), style.TextSizes.Small + 2f, painter.C("inkSoft"),
                                TextAlign.Left);
+            }
+
+            DrawTeamPortraits(box, row);
+        }
+
+        /// <summary>The slot's small team portrait row (the first few owned beasts' art, the same the roster cards use), under the "where saved" line.</summary>
+        private void DrawTeamPortraits(Rect box, SaveSlotRow row)
+        {
+            if (row.TeamArtKeys == null || row.TeamArtKeys.Count == 0)
+            {
+                return;
+            }
+
+            UiPainter painter = Ctx.Painter;
+            float x = box.X + 36f;
+            float y = box.Y + 190f;
+            foreach (string artKey in row.TeamArtKeys)
+            {
+                Rect portrait = new Rect(x, y, PortraitSize, PortraitSize);
+                painter.Framed(portrait, 14f, 3f, painter.C("plumSoft"), painter.C("parchment"));
+                painter.Art(painter.Sprite(artKey), portrait.Inset(6f), false);
+                x += PortraitSize + 14f;
             }
         }
 

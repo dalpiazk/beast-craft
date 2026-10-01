@@ -325,7 +325,7 @@ namespace BeastCraft.Game.Screens
 
         public void OpenSettings()
         {
-            Ctx.Stack.PushModal(new SettingsModal(Ctx, Ctx.Game.NewSettingsModel()));
+            Ctx.Stack.Push(new SettingsScreen(Ctx));
         }
 
         /// <summary>A tap on location <paramref name="nodeId"/>: its encounter, or a toast.</summary>

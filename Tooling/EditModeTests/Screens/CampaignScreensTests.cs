@@ -168,14 +168,14 @@ namespace BeastCraft.Tests.EditMode
             MemorySaveStorage storage = new MemorySaveStorage();
             GameSession session = new GameSession(Content, storage, () => 1);
             SettingsViewModel settings = new SettingsViewModel(session.Settings, session.Content.Text, session.SaveSettings);
-            settings.Change(SettingsViewModel.TeamSuggestions);
-            settings.Change(SettingsViewModel.Effects);
+            settings.SetTeamSuggestions(false);
+            settings.SetEffectsIntensity(EffectsIntensity.Reduced);
 
             Assert.AreEqual(2, settings.Saves);
             PlayerSettings read = new GameSession(Content, storage, () => 1).Settings;
             Assert.IsFalse(read.TeamSuggestionsEnabled);
             Assert.AreEqual(EffectsIntensity.Reduced, read.EffectsIntensity);
-            Assert.AreEqual("Off", settings.Rows()[SettingsViewModel.TeamSuggestions].Value);
+            Assert.IsFalse(settings.TeamSuggestionsEnabled);
         }
 
         [Test]

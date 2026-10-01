@@ -191,38 +191,36 @@ namespace BeastCraft.Tests.EditMode
             Assert.AreEqual(-1, map.AutoAdvanceTarget(session.Settings, true), "off by default");
 
             SettingsViewModel settings = new SettingsViewModel(session.Settings, session.Content.Text, session.SaveSettings);
-            settings.Change(SettingsViewModel.AutoAdvance);
+            settings.SetAutoAdvance(true);
             Assert.AreEqual(map.Recommended().NodeId, map.AutoAdvanceTarget(session.Settings, true));
             Assert.AreEqual(-1, map.AutoAdvanceTarget(session.Settings, false), "a defeat stops at the map");
         }
 
         [Test]
-        public void Settings_BattleSpeedCycles_AndIsSaved_AndTheAlertRowIsOnlyWhereNotificationsExist()
+        public void Settings_BattleSpeedIsSetDirectly_AndSaved_AndTheAlertSettingIsOnlyAvailableWhereNotificationsExist()
         {
             MemorySaveStorage storage = new MemorySaveStorage();
             GameSession session = new GameSession(Content, storage, () => 1);
             SettingsViewModel desktop = new SettingsViewModel(session.Settings, session.Content.Text, session.SaveSettings);
 
             Assert.AreEqual(1, session.Settings.BattleSpeed);
-            Assert.AreEqual("x1", desktop.Rows()[SettingsViewModel.BattleSpeed].Value);
-            desktop.Change(SettingsViewModel.BattleSpeed);
-            desktop.Change(SettingsViewModel.BattleSpeed);
+            Assert.AreEqual(1, desktop.BattleSpeed);
+            desktop.SetBattleSpeed(3);
             Assert.AreEqual(3, new GameSession(Content, storage, () => 1).Settings.BattleSpeed, "saved at once");
-            desktop.Change(SettingsViewModel.BattleSpeed);
-            Assert.AreEqual(1, session.Settings.BattleSpeed, "x3 wraps to x1");
+            desktop.SetBattleSpeed(1);
+            Assert.AreEqual(1, session.Settings.BattleSpeed);
             Assert.AreEqual(1, SettingsViewModel.Speed(new PlayerSettings { BattleSpeed = 9 }), "out of range reads as x1");
 
-            Assert.AreEqual(SettingsViewModel.RowCount - 3, desktop.Rows().Count, "no notification (idle, Grove) or vibration row on desktop");
-            Assert.IsNull(desktop.Row(SettingsViewModel.IdleNotifications));
-            desktop.Change(SettingsViewModel.IdleNotifications);
-            Assert.IsFalse(session.Settings.IdleNotifications);
+            Assert.IsFalse(desktop.NotificationsAvailable, "no notification (idle, Grove) or vibration control on desktop");
+            desktop.SetIdleNotifications(true);
+            Assert.IsFalse(session.Settings.IdleNotifications, "unavailable: the setter does nothing");
 
             List<bool> asked = new List<bool>();
             SettingsViewModel android = new SettingsViewModel(session.Settings, session.Content.Text, session.SaveSettings, true, true);
             android.IdleNotificationsChanged += asked.Add;
-            Assert.AreEqual(SettingsViewModel.RowCount, android.Rows().Count);
-            Assert.AreEqual("Off", android.Row(SettingsViewModel.IdleNotifications).Value, "off by default");
-            android.Change(SettingsViewModel.IdleNotifications);
+            Assert.IsTrue(android.NotificationsAvailable);
+            Assert.IsFalse(android.IdleNotifications, "off by default");
+            android.SetIdleNotifications(true);
             Assert.IsTrue(session.Settings.IdleNotifications);
             CollectionAssert.AreEqual(new[] { true }, asked, "turning it on asks the host for the permission");
         }

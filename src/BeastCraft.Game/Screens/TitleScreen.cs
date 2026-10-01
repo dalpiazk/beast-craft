@@ -6,33 +6,51 @@ using BeastCraft.Presentation.Ui;
 namespace BeastCraft.Game.Screens
 {
     /// <summary>
-    /// The title (<see cref="TitleViewModel"/>): Continue (the most recently played slot) and Save slots
-    /// (<see cref="SaveSlotsScreen"/>) when a save exists, New Game (in the first empty slot; the slot
-    /// list when all three are full) and Settings over a warm painted-style backdrop with
-    /// the starter beasts. A save that could only be restored from its backup says so; one that
+    /// The title (<see cref="TitleViewModel"/>): Continue (the most recently played slot, when one
+    /// exists) and Load game (<see cref="SaveSlotsScreen"/>, when any slot holds a save), New Game
+    /// (always opens the slot list too, so the player picks an empty slot or confirms replacing one —
+    /// the one way a game starts), Settings and Credits (<see cref="CreditsScreen"/>), over a warm
+    /// painted-style backdrop with the starter beasts. Every button is a 48dp+ target anchored toward
+    /// the bottom of the canvas. A save that could only be restored from its backup says so; one that
     /// cannot be loaded at all says why. Back asks before quitting.
     /// </summary>
     public sealed class TitleScreen : GameScreen
     {
         private static readonly string[] Beasts = { "beast/griffin/illustrated", "beast/phoenix/illustrated", "beast/golem/illustrated" };
 
+        private const float ButtonWidth = 680f;
+        private const float ButtonHeight = 130f;
+
         private readonly TitleViewModel _model;
         private readonly Button _continue;
+        private readonly Button _loadGame;
         private readonly Button _newGame;
-        private readonly Button _slots;
+        private readonly Button _settings;
+        private readonly Button _credits;
 
         public TitleScreen(ScreenContext ctx) : base(ctx)
         {
             _model = new TitleViewModel(ctx.Session);
-            float width = 680f;
-            float x = (PortraitLayout.CanvasWidth - width) / 2f;
-            _continue = AddButton(null, "continue", new Rect(x, 1180f, width, 130f), Loc("ui.title.continue"), "primary", () => EnterGame(true));
-            _slots = AddButton(null, "slots", new Rect(x, 1330f, width, 130f), Loc("ui.title.save_slots"), "secondary", OpenSlots);
-            _newGame = AddButton(null, "new-game", new Rect(x, 1350f, width, 130f), Loc("ui.title.new_game"), "secondary", NewGame);
-            _settings = AddButton(null, "settings", new Rect(x, 1520f, width, 130f), Loc("ui.title.settings"), "secondary", OpenSettings, "gear");
+            float x = (PortraitLayout.CanvasWidth - ButtonWidth) / 2f;
+            _continue = AddButton(null, "continue", Row(x, 0), Loc("ui.title.continue"), "primary", () => EnterGame(true));
+            _loadGame = AddButton(null, "load-game", Row(x, 1), Loc("ui.title.load_game"), "secondary", OpenSlots);
+            _newGame = AddButton(null, "new-game", Row(x, 2), Loc("ui.title.new_game"), "secondary", NewGame);
+            _settings = AddButton(null, "settings", Row(x, 3), Loc("ui.title.settings"), "secondary", OpenSettings, "gear");
+            float creditsWidth = 360f;
+            _credits = AddButton(null, "credits", new Rect((PortraitLayout.CanvasWidth - creditsWidth) / 2f, 1690f, creditsWidth, 80f), Loc("ui.title.credits"), "chip",
+                                  () => Ctx.Stack.Push(new CreditsScreen(Ctx)));
         }
 
-        private readonly Button _settings;
+        /// <summary>
+        /// Row <paramref name="index"/> (0 = Continue's slot) of the fixed bottom-anchored stack: each
+        /// a comfortable 130px (far past the 48dp/~126px minimum touch target).
+        /// </summary>
+        private static Rect Row(float x, int index)
+        {
+            const float top = 1080f;
+            const float gap = 20f;
+            return new Rect(x, top + index * (ButtonHeight + gap), ButtonWidth, ButtonHeight);
+        }
 
         public override string Name
         {
@@ -41,15 +59,11 @@ namespace BeastCraft.Game.Screens
 
         public override void Enter()
         {
-            // Continue and the slot list first when there is a save; the buttons close up without it.
+            // Continue and Load game only where a save exists; New Game, Settings and Credits always.
             bool save = _model.CanContinue;
             _continue.Visible = save;
-            _slots.Visible = _model.CanManageSlots;
-            _continue.Bounds = new Rect(_continue.Bounds.X, save ? 1130f : 1180f, _continue.Bounds.Width, 130f);
+            _loadGame.Visible = _model.CanManageSlots;
             _newGame.StyleKey = save ? "secondary" : "primary";
-            float y = save ? 1430f : 1180f;
-            _newGame.Bounds = new Rect(_newGame.Bounds.X, y, _newGame.Bounds.Width, 130f);
-            _settings.Bounds = new Rect(_settings.Bounds.X, y + (save ? 150f : 170f), _settings.Bounds.Width, 130f);
         }
 
         public override bool HandleBack()
@@ -113,20 +127,18 @@ namespace BeastCraft.Game.Screens
 
         public void OpenSettings()
         {
-            Ctx.Stack.PushModal(new SettingsModal(Ctx, Ctx.Game.NewSettingsModel()));
+            Ctx.Stack.Push(new SettingsScreen(Ctx));
         }
 
+        /// <summary>
+        /// New Game always opens the slot list (producer decision, menu-screens pass #67): pick an
+        /// empty slot there, or a used one, which asks to replace it first
+        /// (<see cref="SaveSlotsScreen.Play"/>) — the one way a game starts, whether or not any slot
+        /// already holds one.
+        /// </summary>
         private void NewGame()
         {
-            if (_model.NewGameNeedsConfirm)
-            {
-                // Every slot holds a game: the slot list asks which one to replace (or delete).
-                OpenSlots();
-                Ctx.Game.Toast(Loc("ui.title.slots_full"));
-                return;
-            }
-
-            StartNewGame();
+            OpenSlots();
         }
 
         public override void Draw()
