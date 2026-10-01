@@ -407,6 +407,23 @@ section 2.12. Summary:
 - No shader changes -- the register budget is still 216 of 256 vec4 (facing flows through the same
   per-instance skin-matrix pipeline already in place).
 
+### Producer decision: camera yaw, near/far formation swap
+
+Full account: `docs/spikes/055-3d-mini-spike.md` section 2.13. Summary:
+
+- `CameraDir()` now applies a real, tunable yaw (`CameraYawDeg = 35`) around the board on top of the
+  existing tilt, replacing the old fixed `0.22`-unit lateral nudge -- "angle the camera around the board so
+  both sides read in three-quarter view", the standard portrait-tactics look.
+- The battle formation itself swapped near/far: Griffins now start near the arena's high-row end (closer
+  to the camera, bottom of screen), Swarmlings start at the low-row end (far side, top of screen) --
+  reversed from every earlier pass. `HexBoard.FillOrder` gained an optional `centerColOverride` so the
+  Swarm's fill centres two columns off from the Griffins' (`SwarmCenterColOffset`), a "realistic, not
+  perfectly mirrored" formation with genuine lateral facing variation.
+- `--zoom front`'s row/column sample range moved to match the new layout (rows 0-9, columns 1-9).
+- Depth sorting and outlines checked and confirmed unaffected -- the existing hardware depth test handles
+  overlap correctly regardless of camera direction.
+- No shader changes -- register budget still 216 of 256 vec4.
+
 ### Licences
 
 - **SharpGLTF** (`SharpGLTF.Core`, v1.0.7) -- MIT licence. https://github.com/vpenades/SharpGLTF

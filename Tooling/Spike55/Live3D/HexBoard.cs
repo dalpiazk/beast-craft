@@ -84,13 +84,18 @@ namespace BeastCraft.Spike55.Live3D
         }
 
         /// <summary>A horde-formation fill order for placing up to `count` beasts: back rows first,
-        /// left to right, centred on the arena's middle column -- reads like an encounter lineup
-        /// (docs/spikes/055-3d-mini-spike.md's fourth-pass screenshots) rather than a
-        /// nearest-to-centre spiral.</summary>
-        public static List<(int col, int row)> FillOrder(int cols, int rows, int count, int startRow = 0)
+        /// left to right, centred on the arena's middle column by default -- reads like an encounter
+        /// lineup (docs/spikes/055-3d-mini-spike.md's fourth-pass screenshots) rather than a
+        /// nearest-to-centre spiral. `centerColOverride` (producer-feedback fix round: "offset the swarm
+        /// a little so facing varies naturally") shifts which column the fill centres on, so two sides
+        /// built with different overrides don't end up perfectly column-aligned -- real nearest-enemy
+        /// facing (Game1.UpdateFacing) on a perfectly mirrored formation computes a near-zero yaw for
+        /// almost everyone (see docs/spikes/055-3d-mini-spike.md section 2.12's "honest finding"); a
+        /// believable, not-perfectly-mirrored encounter avoids that by construction.</summary>
+        public static List<(int col, int row)> FillOrder(int cols, int rows, int count, int startRow = 0, int? centerColOverride = null)
         {
             var ordered = new List<(int col, int row)>();
-            int centerCol = cols / 2;
+            int centerCol = centerColOverride ?? cols / 2;
             for (int row = startRow; row < rows && ordered.Count < count; row++)
             {
                 // Walk columns outward from the centre so a partially-filled row stays centred.

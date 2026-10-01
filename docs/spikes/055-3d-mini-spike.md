@@ -1311,6 +1311,93 @@ stays at its identity fallback, unchanged from section 2.11) -- included for con
 fallback unchanged) -- still a clean 3/4 profile, confirming the tilt change alone (not the facing change)
 is responsible for any difference from section 2.11's version of this shot.*
 
+### 2.13 Producer decision: camera yaw, near/far formation swap (2026-09-30)
+
+Section 2.12's own honest finding -- the demo's left-right-symmetric default formation makes real
+nearest-enemy facing compute a near-zero yaw for almost every unit, reading flatter than the previous
+stylised convention -- prompted a direct producer decision rather than leaving it as a known caveat:
+**angle the camera around the board (yaw), with player units nearest the camera and enemies at the far
+side**, the standard portrait-tactics look (e.g. AFK Journey) where both sides read in three-quarter view
+by construction, regardless of how close to axis-aligned any individual unit's real facing happens to be.
+
+**Camera yaw.** `CameraDir()`'s old fixed `(0.22, _, cos(tilt))` approximation (a small, non-adjustable
+lateral nudge "for a slight 3/4 turn") is replaced with a real, tunable yaw: the tilt direction's
+horizontal (XZ-plane) component is rotated by `CameraYawDeg` around world Y before combining with the
+tilt's vertical component. **35 degrees** (the midpoint of the requested ~30-40 range) is the chosen
+value, judged by eye against the actual screenshots below, same as `CameraTiltDeg`'s own 33 degrees was.
+Shared by every camera mode (arena/front/close and the non-battle stress test), same reasoning as the
+tilt change. This is a camera-side fix, not a facing-math change -- `Game1.UpdateFacing`'s nearest-enemy
+computation (section 2.12) is completely unchanged; the yaw simply means a unit whose real-world yaw is
+near zero (pointing straight down the board's own Z axis) no longer points straight down *this camera's*
+view axis too, so it reads at a genuine three-quarter angle regardless.
+
+**Formation swap.** `CameraDir()`'s dominant +Z component means larger-row (larger world Z) cells render
+nearer the camera and lower on screen (see the comment at `CameraDir`). The battle scene's Griffins now
+start near the arena's high-row end (row 9 of 0..14) and the Swarm starts at the low end (row 0), the
+reverse of every earlier pass's layout (Griffins were always "first", near row 2; Swarm filled in behind
+them) -- "player units at the bottom (nearest the camera), enemies at the top" needed that reversed, not
+just a camera change on top of the old placement. `HexBoard.FillOrder` gained an optional
+`centerColOverride` parameter so the Swarm's fill can be centred two columns off from the Griffins'
+(`SwarmCenterColOffset` in `SetupBattleScene`) -- "a realistic, not perfectly mirrored formation" -- so the
+two sides' nearest-enemy pairs have real lateral (X) variation too, not just a camera trick papering over
+a geometrically flat formation. `--zoom front`'s own row/column sample range moved to match (0..9 rows,
+covering both the Swarm's rows 0-2 and the Griffins' row 9; columns widened slightly to comfortably cover
+both the Griffins' column-5 centre and the Swarm's offset column-7 centre).
+
+**Depth sorting and outlines**, checked as asked: unaffected by either change. Overlap between units (more
+likely now that the yaw and lower tilt show more of each unit's side, and rows read closer together on
+screen) is resolved by the existing hardware depth test (`DepthStencilState.Default`, depth write and test
+both already enabled) exactly as it was for the previous camera angle -- an orthographic camera's z-buffer
+sorts correctly regardless of view direction, and nothing about this change touches draw order, blend
+state, or the outline pass's own vertex-normal push-out. No tearing, seams, or incorrectly-ordered
+silhouettes observed in any of the screenshots below.
+
+**Register budget**: unchanged, still 216 of 256 vec4 -- this round touched only `Game1.CameraDir`/
+`SetupBattleScene`/`HexBoard.FillOrder`, no shader edits.
+
+**Measured numbers, re-run after this change:**
+
+| Scene | fps avg (uncapped) | fps 1% low (uncapped) | fps avg (30fps cap) | fps 1% low (30fps cap) | Draw calls | Triangles | Skin time (ms) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 24 swarmlings alone | 671.0 | 142.2 | 30.0 | 21.6 | 6 | 59,232 | 0.73 |
+| 3 Griffins + 24 swarmlings | 637.9 | 122.2 | 30.0 | 20.3 | 18 | 110,808 | 0.91 |
+
+Draw calls and triangles are bit-for-bit identical to sections 2.11/2.12's numbers, as expected (yaw and
+formation placement change rotation/position, not geometry, batch layout, or register usage). fps numbers
+sit within the same noise band this spike has seen across every re-run of this bench on this desktop
+machine (637-1,088 uncapped across the last three passes' re-runs, with no code change between them that
+would plausibly explain that spread) -- both scenes still sustain the 30fps cap solidly.
+
+**Screenshots** (re-taken after this change; looked at each at roughly phone width -- one fix round, not
+needed this time: the yaw read correctly on the first render):
+
+![3 Griffins + 24 swarmlings, camera yaw + near/far swap](055/live3d_battle_3plus24.png)
+
+*Replaces section 2.12's flatter-reading shot. The board now reads as a rotated, diagonal band (the
+"portrait-tactics" look) with Griffins near the bottom/camera and Swarmlings near the top/far side; both
+sides show genuine three-quarter views -- heads, crests and wing silhouettes are legible on the Griffins,
+and individual Swarmlings show more shape variation now that they aren't all facing the same near-zero
+yaw.*
+
+![Front-line mid-zoom, camera yaw + near/far swap](055/live3d_battle_front.png)
+
+*Updated row/column crop (see above) framing both active bands together.*
+
+![After --kill 24, camera yaw + near/far swap](055/live3d_battle_after_kill.png)
+
+*The Griffins still hold their last facing (toward where the Swarm used to be, upper-right of frame) after
+every Swarmling is removed -- the yaw doesn't change the "keep the last facing" behaviour, just how it
+reads on screen.*
+
+![Swarmling close-up, camera yaw](055/live3d_swarmling_close.png)
+
+*Re-taken for the yaw/tilt consistency (no enemy present, so facing is still the identity fallback from
+section 2.11; shared `CameraDir` means the close-up angle moved along with the battle shots').*
+
+![Griffin close-up, camera yaw](055/live3d_griffin_close_check.png)
+
+*Re-taken for the same reason (`FacingYawAngle` fallback unchanged) -- still a clean 3/4 profile.*
+
 ## 4. Cosmetics (`docs/art/art-brief.md`, `cosmetic-library.json`, issue #38)
 
 The Griffin has two discrete cosmetic categories plus a colour-form set (from

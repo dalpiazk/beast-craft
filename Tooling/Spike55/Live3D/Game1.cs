@@ -428,8 +428,22 @@ namespace BeastCraft.Spike55.Live3D
         {
             bool closeUp = string.Equals(_options.CameraZoom, "close", StringComparison.OrdinalIgnoreCase);
 
+            // Producer feedback (camera-yaw round): "player units at the bottom (nearest the camera),
+            // enemies at the top" -- CameraDir's dominant +Z component means larger-row (larger world Z)
+            // cells render nearer the camera/lower on screen (see CameraDir's own comment), so the
+            // Griffins now start near the arena's HIGH row end (row 11 of 0..14) and the Swarm starts at
+            // the LOW end (row 0), the opposite of this scene's original layout. `SwarmCenterColOffset`
+            // ("offset the swarm a little so facing varies naturally") shifts the Swarm's fill centre two
+            // columns right of the Griffins' so the two sides aren't perfectly column-aligned -- a
+            // perfectly mirrored formation makes real nearest-enemy facing compute a near-zero yaw for
+            // almost every unit (section 2.12's "honest finding"); this keeps that from being the only
+            // thing a screenshot ever shows.
+            const int griffinStartRow = 9;
+            const int swarmStartRow = 0;
+            const int swarmCenterColOffset = 2;
+
             _instances.Clear();
-            var griffinCells = HexBoard.FillOrder(11, 15, griffinCount, startRow: 2);
+            var griffinCells = HexBoard.FillOrder(11, 15, griffinCount, startRow: griffinStartRow);
             for (int i = 0; i < griffinCount; i++)
             {
                 var inst = new BeastInstance(_bodyModel);
@@ -492,7 +506,7 @@ namespace BeastCraft.Spike55.Live3D
                 // there to override this fallback) -- identity (0 yaw) instead, same camera-facing
                 // convention that already reads correctly for the Griffin close-up.
                 float fallbackYaw = closeUp ? 0f : SwarmFacingYawAngle;
-                var swarmCells = HexBoard.FillOrder(11, 15, swarmCount, startRow: 6);
+                var swarmCells = HexBoard.FillOrder(11, 15, swarmCount, startRow: swarmStartRow, centerColOverride: 11 / 2 + swarmCenterColOffset);
                 for (int i = 0; i < swarmCount; i++)
                 {
                     var (col, row) = swarmCells[i % Math.Max(1, swarmCells.Count)];
@@ -672,14 +686,31 @@ namespace BeastCraft.Spike55.Live3D
         // attempt hit). Shared by every camera mode (arena/front/close and the non-battle stress test) for
         // one consistent look rather than a battle-only special case.
         private const float CameraTiltDeg = 33f;
+        // Producer feedback (camera-yaw round): a real yaw around the board (not the old fixed 0.22
+        // lateral nudge this replaces) -- "angle the camera ~35 degrees around the board so both sides
+        // read in three-quarter view (flanks and faces) instead of fronts and backs, the standard
+        // portrait-tactics look". Combined with real nearest-enemy facing (section 2.12), a unit whose
+        // bind-pose forward (+Z) points roughly down the board's own Z axis now reads at a genuine 3/4
+        // angle to THIS camera even when its yaw relative to its target is itself near zero -- the yaw
+        // this round adds is a camera-side fix for the "flat front/back" finding section 2.12 called out
+        // honestly, not a change to the facing math itself (still real, unchanged, world-space). 35
+        // degrees is the midpoint of the requested ~30-40 range; judged by eye against the actual
+        // screenshots, not re-derived analytically.
+        private const float CameraYawDeg = 35f;
         private const float CameraDistance = 8f;
 
         private static XnaVector3 CameraDir()
         {
             float tilt = MathHelper.ToRadians(CameraTiltDeg);
-            // Side axis (+Z, since beasts now face +X) dominates; a small +X component gives the 3/4
-            // turn instead of a flat 90-degree profile; +Y from the tilt for the elevated board look.
-            return XnaVector3.Normalize(new XnaVector3(0.22f, (float)Math.Sin(tilt), (float)Math.Cos(tilt)));
+            float yaw = MathHelper.ToRadians(CameraYawDeg);
+            // Horizontal (XZ-plane) magnitude of the tilt direction, then rotated by `yaw` around world Y
+            // -- replaces the old fixed (0.22, _, cos(tilt)) approximation (a small, non-adjustable lateral
+            // nudge) with a real, tunable rotation around the board. +Y from the tilt is unaffected by yaw
+            // (still the same elevated look).
+            float horiz = (float)Math.Cos(tilt);
+            float hx = horiz * (float)Math.Sin(yaw);
+            float hz = horiz * (float)Math.Cos(yaw);
+            return XnaVector3.Normalize(new XnaVector3(hx, (float)Math.Sin(tilt), hz));
         }
 
         /// <summary>Shared ortho-camera fit: given a look-at target and a set of (ground point, height
@@ -782,25 +813,31 @@ namespace BeastCraft.Spike55.Live3D
         /// asks -- "portrait 1080x1920, the 11x15 arena filling the width at the board tilt, units sized
         /// to their hex footprint like the 2D sprites". The previous instance-fit camera (still used by
         /// the single-species stress test above) read as "too far out" for the battle scene specifically
-        /// because a sparse, off-centre placement (e.g. 3 griffins in rows 2-5, 24 swarmlings starting
-        /// row 6) doesn't, by itself, tell the camera how wide the *board* actually is -- fitting to a
-        /// fixed grid of sample points across the real arena width/row-range fixes that by construction,
-        /// independent of how many units are actually on it. `_options.CameraZoom` ("arena", the default,
-        /// vs "front") switches between the full-board shot and a tighter close-up of the front few rows
-        /// for a readable mid-zoom shot of the front line (both requested by the task brief).</summary>
+        /// because a sparse, off-centre placement (Griffins near row 9, Swarmlings starting row 0 -- see
+        /// SetupBattleScene's producer-feedback comment for why that's the near/far split, not the
+        /// original's reverse) doesn't, by itself, tell the camera how wide the *board* actually is --
+        /// fitting to a fixed grid of sample points across the real arena width/row-range fixes that by
+        /// construction, independent of how many units are actually on it. `_options.CameraZoom` ("arena",
+        /// the default, vs "front") switches between the full-board shot and a tighter close-up of the
+        /// active rows for a readable mid-zoom shot of the front line (both requested by the task
+        /// brief).</summary>
         private void RebuildCameraArena()
         {
             bool front = string.Equals(_options.CameraZoom, "front", StringComparison.OrdinalIgnoreCase);
-            // "front": a genuinely tighter crop around the Griffins' front line and the first couple of
-            // swarm rows behind them, not just a shorter row range at the full 11-column width (which,
-            // since the ortho fit is column/width-bound in both cases -- see ApplyCamera -- barely
-            // changed the framing in a first version of this method: cutting rows alone left orthoWidth
-            // unchanged because 11 columns was still the binding constraint). Narrowing the column range
-            // too is what actually zooms in.
-            int colStart = front ? 2 : 0;
-            int colEnd = front ? 9 : 11;
+            // "front": a genuinely tighter crop around both active bands (the Griffins' row near the
+            // bottom and the Swarmlings' rows near the top -- see SetupBattleScene), not just a shorter
+            // row range at the full 11-column width (which, since the ortho fit is column/width-bound in
+            // both cases -- see ApplyCamera -- barely changed the framing in a first version of this
+            // method: cutting rows alone left orthoWidth unchanged because 11 columns was still the
+            // binding constraint). Narrowing the column range too is what actually zooms in. The row range
+            // covers 0..9 (Swarmling rows 0-2 through the Griffins' row 9), skipping the empty rows 10-14
+            // past the Griffins; the column range is widened slightly from the arena shot's own crop to
+            // comfortably cover both the Griffins' column-5 centre and the Swarm's offset column-7 centre
+            // (SwarmCenterColOffset).
+            int colStart = front ? 1 : 0;
+            int colEnd = front ? 10 : 11;
             int rowStart = 0;
-            int rowEnd = front ? 9 : 15; // "front": Griffin rows (2-5ish) plus the first swarm rows (6-8)
+            int rowEnd = front ? 10 : 15;
 
             // Sample every cell centre across the chosen range, not just the four corners: the hex
             // offset-coordinate stagger (HexBoard.CellCenter shifts X by row/2) means the true left/right
