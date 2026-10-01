@@ -350,6 +350,17 @@ preview should tell them plainly why a fight might be hard.
   from the current pick on every read. The one-tap recommended team is unchanged (its own 3-loss rule
   and settings toggle, `TeamSuggestionPolicy` / `CampaignRules.SuggestionFor`): a separate mechanism
   that happens to read the same `LossesAt` counter as adaptive assist.
+- **Retreat (producer decision, 2026-09-30).** The in-battle pause menu's Retreat (menu-screens pass,
+  #67) forfeits the battle outright: "same as losing the battle" — no rewards, the location stays
+  uncleared, and it counts as a loss everywhere else, including the team-suggestion rule above
+  (`TeamSuggestionPolicy`/`LossesAt`) — **except** it must not ease adaptive assist, since the player
+  chose to leave rather than fight and lose. `MapRun.NodeRetreats`/`NodeRetreatsNodeId` (save schema
+  13, additive) track a retreat apart from an ordinary loss at the same location;
+  `CampaignRules.AssistLossesAt` (`LossesAt` minus its retreats) is what the assist step above reads
+  instead of `LossesAt` directly. `CampaignRules.RetreatBattle` is the one call site (`Game.Screens.PauseMenuModal`
+  via `NodeBattle.Retreat`); `BalanceSim` never calls it, so the tuned and campaign-pacing reports stay
+  byte-identical. See `docs/design/progression-and-saves.md`, "Schema 13: Retreat", for the save
+  record and migration.
 
 ## Data-driven foundation already in place
 

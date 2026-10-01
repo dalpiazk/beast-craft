@@ -613,6 +613,42 @@ The Inventory's Gear tab and the Avatar's wardrobe mark gear and looks the playe
   was on Hard, `rich-v6` to `rich-v11`; else 0), and in `rich-v10` and `rich-v11` the placed decor's
   out-of-range `X`/`Y` read `1`. No input changed.
 
+### Schema 13: Retreat (the in-battle pause menu)
+
+The pause menu (menu-screens pass, #67) adds a Retreat option: leaving a campaign battle before it is
+decided. Producer decision, 2026-09-30 (battle-system.md, "Adaptive assist and guidance"): a retreat
+**counts as a loss everywhere the game already counts one** — the location stays uncleared, it grants
+nothing (no XP, no drops, no gold: the caller never applies rewards for it), and it advances the
+team-suggestion rule's loss count (`TeamSuggestionPolicy`, `CampaignRules.LossesAt`) exactly like a
+battle actually lost — **except** it must not ease the adaptive assist the way a real loss does: the
+player chose to leave, not fight and lose, so the next attempt should not get easier for it. Schema 13
+records the split. `CurrentSchemaVersion` is **13**.
+
+- `MapRun.NodeRetreats` / `NodeRetreatsNodeId` (`int`, written after `Difficulty`): a retreat count at
+  one location, reset exactly like `NodeAttempts`/`NodeAttemptsNodeId` (a retreat or loss elsewhere, or
+  a win here, starts it over). A subset of `NodeAttempts`: every retreat also bumps `NodeAttempts`, so
+  `LossesAt` (and the team-suggestion rule) sees it like any other loss.
+- *Rules* (`CampaignRules.RetreatBattle`): refused exactly as `ResolveBattle`'s loss branch would be (no
+  expedition, an unreachable or non-battle node); otherwise it runs that same loss bookkeeping
+  (`Attempts`, `NodeAttempts`/`NodeAttemptsNodeId`) and also bumps `NodeRetreats`/`NodeRetreatsNodeId`,
+  returning `CampaignOutcome.Lost` like a real loss. `CampaignRules.RetreatsAt` reads the count back;
+  `CampaignRules.AssistLossesAt` (`LossesAt` minus `RetreatsAt`, never negative) is what
+  `PlanFor`'s adaptive-assist step reads instead of `LossesAt` directly, so a retreat is invisible to
+  the assist floor while remaining visible to the team suggestion. `BalanceSim` never calls `Retreat`,
+  so its reports are unaffected (byte-identical).
+- *Presentation* (`NodeBattle.Retreat`, `Game.Screens.PauseMenuModal`): the pause menu's Retreat, after
+  a confirm, calls `CampaignRules.RetreatBattle` directly rather than finishing the battle's predetermined
+  result — a retreat forfeits the fight regardless of what the simulated outcome would have been. The
+  spent consumable is not refunded (the existing rule: a battle begun cannot hand items back by being
+  abandoned). `ResultsViewModel.BuildRetreat` shows the same retry note a loss would.
+- *Migration.* `SaveMigrations.AddRetreats` (12 to 13): the counts start empty (0 / −1). A v12 save
+  never recorded a retreat apart from an ordinary loss, so there is nothing to split out.
+- *Golden saves.* `rich-v12.input.json` is frozen as an input and `rich-v13.input.json` (captured by
+  reflection with `BEASTCRAFT_UPDATE_GOLDENS=1`) is the one that must round-trip. Every older expected
+  output changed in exactly two places: `"SchemaVersion":12` became `13`, and
+  `,"NodeRetreats":N,"NodeRetreatsNodeId":N` follows `"Difficulty"` inside every `ActiveRun`. No input
+  changed.
+
 ### Save slots, backup and export (#59)
 
 - **Three slots.** `GameSession.SlotIds` is `slot1`, `slot2`, `slot3` (`SlotCount` = 3). The session

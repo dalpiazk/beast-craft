@@ -60,6 +60,23 @@ namespace BeastCraft.Campaign
         /// </summary>
         public RunDifficulty Difficulty = RunDifficulty.Normal;
 
+        /// <summary>
+        /// Retreats at <see cref="NodeRetreatsNodeId"/>, the node currently being retried: a subset of
+        /// <see cref="NodeAttempts"/> (a retreat also counts as a loss there, so the team-suggestion
+        /// rule, <see cref="CampaignRules.LossesAt"/>, sees it like any other loss), counted separately
+        /// so adaptive assist (<see cref="CampaignRules.AssistLossesAt"/>) can leave it out: retreating
+        /// mid-battle is the player's own choice, not a fight actually lost, so it should not ease the
+        /// next attempt. Producer decision, docs/design/battle-system.md "Adaptive assist and
+        /// guidance" (2026-09-30). Added in schema 13.
+        /// </summary>
+        public int NodeRetreats;
+
+        /// <summary>
+        /// The node <see cref="NodeRetreats"/> counts at, or −1 when none (reset exactly like
+        /// <see cref="NodeAttemptsNodeId"/>, including by a win at either location). Added in schema 13.
+        /// </summary>
+        public int NodeRetreatsNodeId = -1;
+
         /// <summary>The node with <paramref name="nodeId"/>, or null.</summary>
         public MapNode Find(int nodeId)
         {
@@ -85,6 +102,8 @@ namespace BeastCraft.Campaign
             NodeAttempts = 0;
             NodeAttemptsNodeId = -1;
             Difficulty = RunDifficulty.Normal;
+            NodeRetreats = 0;
+            NodeRetreatsNodeId = -1;
         }
 
         /// <summary>Replaces null lists and strings with empty ones and drops null nodes. Returns how many things were repaired.</summary>

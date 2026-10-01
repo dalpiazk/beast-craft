@@ -248,6 +248,81 @@ namespace BeastCraft.Tests.EditMode
         }
 
         // ---------------------------------------------------------------------------------------
+        // CampaignRules.RetreatBattle: a loss for the team-suggestion rule, never for assist
+        // (the in-battle pause menu's Retreat; producer decision, 2026-09-30).
+        // ---------------------------------------------------------------------------------------
+
+        [Test]
+        public void RetreatBattle_CountsAsALoss_ButNeverEasesAssist_WhileARealLossStillDoes()
+        {
+            RegionLibrary regions = RegionLibrary.Build(CampaignMapTests.LoadRegions());
+            EncounterLibrary encounters = EncounterLibrary.Build(EncounterContentTests.LoadEncounterLibrary(), EncounterDifficultyTable.Build(EncounterContentTests.Load<EncounterDifficultyData>(EncounterDifficultyData.ProjectRelativePath)));
+            EnemyCatalog enemies = EnemyCatalog.Build(EncounterContentTests.LoadEnemyLibrary(), null);
+
+            PlayerSave save = PlayerSave.CreateNew();
+            Assert.IsTrue(CampaignRules.StartRun(save, regions, "r01", 3).Success);
+            MapRun run = save.Campaign.ActiveRun;
+            MapNode node = CampaignRules.Choices(run)[0];
+            EncounterPlan before = CampaignRules.PlanFor(run, node, encounters, enemies, regions);
+
+            CampaignResult retreated = CampaignRules.RetreatBattle(save, regions, node.NodeId);
+
+            Assert.AreEqual(CampaignOutcome.Lost, retreated.Outcome, "producer decision: scored the same as a loss");
+            Assert.AreEqual(-1, run.CurrentNodeId, "the location stays uncleared");
+            Assert.AreEqual(1, CampaignRules.LossesAt(run, node.NodeId), "the team-suggestion rule sees a retreat like any other loss");
+            Assert.AreEqual(1, run.NodeRetreats);
+            Assert.AreEqual(0, CampaignRules.AssistLossesAt(run, node.NodeId), "but the assist is never eased by a retreat");
+
+            EncounterPlan afterRetreat = CampaignRules.PlanFor(run, node, encounters, enemies, regions);
+            Assert.AreEqual(before.Multiplier, afterRetreat.Multiplier, 1e-9, "the retreat left the fight's difficulty exactly as it was");
+
+            // A real loss at the same node still advances the assist, stacked onto the same per-node count.
+            CampaignResult lost = CampaignRules.ResolveBattle(save, regions, node.NodeId, BattleOutcome.EnemyVictory);
+            Assert.AreEqual(CampaignOutcome.Lost, lost.Outcome);
+            Assert.AreEqual(2, CampaignRules.LossesAt(run, node.NodeId), "the real loss stacks onto the retreat's count");
+            Assert.AreEqual(1, CampaignRules.AssistLossesAt(run, node.NodeId), "only the real loss, not the retreat, is what the assist eases for");
+            EncounterPlan afterLoss = CampaignRules.PlanFor(run, node, encounters, enemies, regions);
+            Assert.Less(afterLoss.Multiplier, before.Multiplier, "a real loss still eases the fight");
+        }
+
+        [Test]
+        public void RetreatBattle_GrantsNothing_AndAWinAfterwardsStillClearsTheNode()
+        {
+            RegionLibrary regions = RegionLibrary.Build(CampaignMapTests.LoadRegions());
+            PlayerSave save = PlayerSave.CreateNew();
+            Assert.IsTrue(CampaignRules.StartRun(save, regions, "r01", 3).Success);
+            MapRun run = save.Campaign.ActiveRun;
+            MapNode node = CampaignRules.Choices(run)[0];
+            int goldBefore = save.Gold;
+
+            CampaignRules.RetreatBattle(save, regions, node.NodeId);
+
+            Assert.AreEqual(goldBefore, save.Gold, "a retreat grants nothing");
+            Assert.IsTrue(CampaignRules.CanEnter(run, node.NodeId), "the same node can be retried, exactly as after a loss");
+
+            CampaignResult won = CampaignRules.ResolveBattle(save, regions, node.NodeId, BattleOutcome.PlayerVictory);
+            Assert.AreEqual(CampaignOutcome.Cleared, won.Outcome);
+            Assert.AreEqual(node.NodeId, run.CurrentNodeId);
+            Assert.AreEqual(0, run.NodeRetreats, "clearing the node resets the retreat count, exactly like the loss count");
+            Assert.AreEqual(0, CampaignRules.LossesAt(run, node.NodeId));
+        }
+
+        [Test]
+        public void RetreatBattle_Refuses_WithNoExpedition_OrAnUnreachableNode()
+        {
+            RegionLibrary regions = RegionLibrary.Build(CampaignMapTests.LoadRegions());
+            PlayerSave save = PlayerSave.CreateNew();
+
+            Assert.IsFalse(CampaignRules.RetreatBattle(save, regions, 0).Success, "no expedition in progress");
+
+            Assert.IsTrue(CampaignRules.StartRun(save, regions, "r01", 3).Success);
+            MapRun run = save.Campaign.ActiveRun;
+            MapNode unreachable = run.Nodes.Find(n => n.Layer == 5);
+            Assert.IsNotNull(unreachable, "the generated map has a node at layer 5");
+            Assert.IsFalse(CampaignRules.RetreatBattle(save, regions, unreachable.NodeId).Success, "not reachable from where the player stands");
+        }
+
+        // ---------------------------------------------------------------------------------------
         // MatchupWarnings
         // ---------------------------------------------------------------------------------------
 
