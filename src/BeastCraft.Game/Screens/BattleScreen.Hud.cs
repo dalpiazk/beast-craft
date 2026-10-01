@@ -112,9 +112,13 @@ namespace BeastCraft.Game.Screens
         {
             Rect header = _screen.Header;
             _text.Draw(_draw, _text.Fit(_hudTitle, Large, 520f), new Vector2(header.X, header.Y + 12f), Large, Ink("y", Color.Gold), shadow);
-            string turn = Loc("ui.battle_hud.turn_seed", _playback.Played.Count.ToString(CultureInfo.InvariantCulture), _seed.ToString(CultureInfo.InvariantCulture));
             Rect gear = _screen.SettingsButton;
-            _text.DrawRight(_draw, turn, gear.X - 20f, header.Y + 16f, Medium, Ink("3", Color.Gray), shadow);
+            Rect pause = _screen.PauseButton;
+            // The turn/seed text ends clear of whichever button sits leftmost (the pause button, a
+            // campaign battle not yet decided; else the gear).
+            bool showPause = _campaign != null && !IsDone;
+            string turn = Loc("ui.battle_hud.turn_seed", _playback.Played.Count.ToString(CultureInfo.InvariantCulture), _seed.ToString(CultureInfo.InvariantCulture));
+            _text.DrawRight(_draw, turn, (showPause ? pause.X : gear.X) - 20f, header.Y + 16f, Medium, Ink("3", Color.Gray), shadow);
 
             // The settings gear (opens the effects settings overlay).
             _draw.Fill(Pixel, new Vector2(gear.X, gear.Y), new Vector2(gear.Width, gear.Height), _settingsOpen ? Ink("y", Color.Gold) : Ink("2", Color.Gray));
@@ -123,6 +127,14 @@ namespace BeastCraft.Game.Screens
             if (icon != null)
             {
                 DrawIcon(icon, gear.Inset(10f));
+            }
+
+            if (showPause)
+            {
+                // The pause button (the pause menu: Resume, Settings, Retreat), beside the gear.
+                _draw.Fill(Pixel, new Vector2(pause.X, pause.Y), new Vector2(pause.Width, pause.Height), Ink("2", Color.Gray));
+                _draw.Fill(Pixel, new Vector2(pause.X + 3f, pause.Y + 3f), new Vector2(pause.Width - 6f, pause.Height - 6f), Ink("p", Color.Purple));
+                Ctx.Painter.Glyph("pause", pause.Inset(16f), Ctx.Painter.C("cream"));
             }
         }
 

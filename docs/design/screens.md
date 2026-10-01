@@ -25,18 +25,45 @@ Title ──Continue / New Game──▶ Home (Map tab) ──tap a location / N
   Hollow. Hearthglen's own screens — the trial pick (`TrialPickModal`), the Keeper's dialogue box
   (`StoryModal`), the camp (`CampModal`, every region), the tutorial hints (`HintModal`, anchored to a
   widget, pausing a battle) and the way on (`RegionCardModal`) — are in [area-zero.md](area-zero.md).
-- **Title** (`TitleScreen`, `TitleViewModel`): Continue (primary when a save exists; it claims the
-  idle rewards and toasts them; the most recently played slot), Save slots (when a save exists), New Game (in the first free slot, then the starter pick; the slot list when all three are full), Settings. A save that
-  could only be restored from its `.bak` says so; one that cannot be loaded says why. Back asks
-  before quitting.
+- **Title** (`TitleScreen`, `TitleViewModel`; menu-screens pass, #67): a fixed, bottom-anchored stack
+  of 48dp+ buttons — Continue (primary when a save exists; it claims the idle rewards and toasts
+  them; the most recently played slot), Load game (`SaveSlotsScreen`, when any slot holds a save),
+  New Game (always opens the slot list too — the one way a game starts, whether picking an empty slot
+  or confirming a replace, `SaveSlotsScreen.Play`), Settings (`SettingsScreen`) and a smaller Credits
+  link (`CreditsScreen`) — over the warm painted backdrop with the starter beasts and the tagline. A
+  save that could only be restored from its `.bak` says so; one that cannot be loaded says why. Back
+  asks before quitting.
 - **Consent** (`ConsentModal`, `ConsentViewModel`; #62): once, the first time the map shows with no pick
   waiting (after the first starter pick, before play), until answered: anonymous gameplay events and
   crash reports in plain words, a row for each (both off until turned on), and Continue; Back does not
-  skip it. Both are rows in Settings too. Never offered in a scripted run; `--screen consent` shows it.
+  skip it. Both are toggles in Settings' Privacy section too. Never offered in a scripted run;
+  `--screen consent` shows it.
 - **Save slots** (`SaveSlotsScreen`, `SaveSlotsViewModel`): one card per slot (three) with the save's
-  summary and Continue or New game, Delete (asks first), and Export and Import where the host has an
-  `ISaveTransfer` (desktop only for now). See `progression-and-saves.md`, "Save slots, backup and
-  export".
+  summary — Beastbinder level, beast count, region and stage, last played date — and a small team
+  portrait row (the first few owned beasts' art, `GameSession.SlotCardPortraitCount`), then Continue
+  or New game, Delete (asks first), and Export and Import where the host has an `ISaveTransfer`
+  (desktop only for now); an empty slot is its own shorter card ("Tap New game to begin."). New game
+  over an existing save, Delete and Import over an existing save all ask first (`ConfirmModal`). See
+  `progression-and-saves.md`, "Save slots, backup and export".
+- **Settings** (`SettingsScreen`, `SettingsViewModel`; menu-screens pass, #67): a full screen
+  (`ScreenHeader` + `TabStrip`), not a modal — four sections, each its own tab: **Gameplay** (battle
+  speed as a chip row, auto next battle, team suggestions, tutorial hints, and the idle/Grove alert
+  toggles where the host has notifications), **Visuals & accessibility** (effects intensity as a chip
+  row, screen shake, flashes — no text-scale setting exists yet to add here), **Audio** (master,
+  music and SFX volume as real sliders, mute, haptics where the host has them) and **Privacy** (the
+  analytics and crash-report consent toggles from #62, with the same plain-words explanation the
+  consent screen uses). A pinned "About & Credits" link under every tab opens `CreditsScreen`. Every
+  change saves at once through the same `PlayerSettings`/`GameSession.SaveSettings` path as before;
+  reachable from the title, the home header's gear and the battle pause menu (`PauseMenuModal`), which
+  reopens over it when Settings is backed out of. Replaces the old `SettingsModal`'s single long
+  cycling list of rows.
+- **Credits** (`CreditsScreen`; menu-screens pass, #67): the game's name, tagline, footer note and
+  build version (`Assembly.GetExecutingAssembly().GetName().Version`), a DRAFT producer-credit
+  placeholder (`ui.credits.producer_draft` — no personal name; the producer fills it in later), a
+  short third-party notices summary pointing at `THIRD-PARTY-NOTICES.md`, and the AI-assistance
+  disclosure (`docs/art/art-brief.md`, decision 10: some beast and enemy art was made with an
+  AI-assisted pipeline, each asset producer-approved). Scrollable; reached from the title and every
+  Settings screen's footer link.
 - **Home** (`HomeScreen`, `HomeViewModel`, `MapViewModel`): the bottom nav — **Map, Roster, Grove,
   Avatar, Inventory** — over the region map. Map and Roster show inline (see "Roster and visibility"
   below); Grove, Avatar and Inventory each push their own full screen (`GroveScreen`, `AvatarScreen`,
@@ -63,8 +90,18 @@ Title ──Continue / New Game──▶ Home (Map tab) ──tap a location / N
   the difficulty was calibrated: `CampaignAvatar` mirrors the balance simulator's avatar — its
   default arts and passives, its stat fixture — off the board, in the turn order, its arts playing
   on their targets, shown as a portrait badge with its art cooldowns at the board's foot). It plays
-  by itself at the saved speed; Back offers to skip to the
-  result; once decided, Continue hands it back.
+  by itself at the saved speed; once decided, Continue hands it back.
+  - **Pause menu** (`PauseMenuModal`; menu-screens pass, #67): the header's pause button (beside the
+    settings gear, a campaign battle not yet decided only), or Android Back / desktop Esc (replacing
+    the old "skip to the result?" confirm — the explicit Skip control still skips immediately, with no
+    confirm), opens it over the battle, freezing the clock (`BattleScreen.Update`'s top check, the same
+    guard the tutorial hints and the battle log already use) while it — or anything pushed from it — is
+    open. **Resume** closes it. **Settings** opens `SettingsScreen` over the paused battle and reopens
+    this menu on the way back (`BattleScreen.OpenSettingsFromPause`/`Enter`). **Retreat** (hidden for a
+    Kinship trial) asks first, then forfeits the battle outright (`BattleScreen.ConfirmRetreat` →
+    `NodeBattle.Retreat` → `CampaignRules.RetreatBattle`) — producer decision, 2026-09-30: "same as
+    losing the battle", see `battle-system.md`, "Adaptive assist and guidance", and
+    `progression-and-saves.md`, "Schema 13: Retreat".
 - **Results** (`ResultsScreen`, `ResultsViewModel`): one consolidated summary — XP bars (before →
   after, level-ups), the bench's share, gold, drops, the first-clear bonus, XP banked at the
   limit, and what the map made of it (cleared, a stage or region won with its seal, or the retry
@@ -356,7 +393,7 @@ Ui/Widgets.cs   Widget tree, UiRoot input routing,         BeastCraftGame   the 
                 ProgressBar, Hotspot, ToastQueue           Screens/         Title, Home, Encounter,
 Ui/UiStyle.cs   the house style (data)                                      Battle, Results;
 Screens/        ScreenStack (+ modals, Back rule),                          GameModal, Confirm,
-                GameSession, the view-models,                               Settings
+                GameSession, the view-models,                               PauseMenuModal
                 NodeBattle, MapLayout                      Ui/UiPainter.cs  draws the widgets
 ```
 
@@ -430,20 +467,22 @@ list):
 |---|---|
 | `HeaderMetrics` | The standard header heights (`Compact` — back + title, no room to spare, the encounter/glossary shape; `Standard` — back + title + subtitle, most screens; `Roomy` — + two extra lines with more breathing room, Achievements' shape; `Tall` — + a stat/identity line, the beast detail screen's shape) and the page padding, as one source of truth. |
 | `ScreenHeader` | Builds the back button; `Paint` draws the fixed wash + divider + title/subtitle over whatever a scroll view painted underneath, and repaints the back button (both live above the header line). A screen whose title sits somewhere other than the fixed position (Glossary's lower, centred title) calls `Paint` with an empty title for the wash alone and draws its own title over it, the same way the beast detail screen's "no such beast" case does. |
-| `TabStrip` | The inner tab strip (Avatar's Overview/Skills/Gear/Wardrobe, Inventory's Gear/Materials/Looks, the Trader's Stock/Sell, Grove's Glade/Garden/Board/Npc) at one shared height (136px), sized so the icon reads clearly and the label sits with even air above and below it inside the selected pill — the same proportions the home bottom nav reads at (`HomeScreen.NavHeight`, 170px, the same `UiPainter.Tabs` painter). A first version of this height (96px) shipped too short: the icon shrank to a sliver and the label sat on the selected pill's bottom edge, the exact bug Grove's own strip had once been widened to 170px to work around, before `TabStrip` replaced that workaround with (at the time) too-short a shared height; 136px is the corrected value every strip above now shares. |
+| `TabStrip` | The inner tab strip (Avatar's Overview/Skills/Gear/Wardrobe, Inventory's Gear/Materials/Looks, the Trader's Stock/Sell, Grove's Glade/Garden/Board/Npc, Settings' Gameplay/Visuals/Audio/Privacy) at one shared height (136px), sized so the icon reads clearly and the label sits with even air above and below it inside the selected pill — the same proportions the home bottom nav reads at (`HomeScreen.NavHeight`, 170px, the same `UiPainter.Tabs` painter). A first version of this height (96px) shipped too short: the icon shrank to a sliver and the label sat on the selected pill's bottom edge, the exact bug Grove's own strip had once been widened to 170px to work around, before `TabStrip` replaced that workaround with (at the time) too-short a shared height; 136px is the corrected value every strip above now shares. |
 | `SectionHeader` | A card's heading line. |
-| `CardList` | The `Card`/drawer-dictionary pair every page rebuilt for itself, now written once: wraps one `ScrollView`, `Begin()`/`Card(...)`/`End(y)` to rebuild it (keeping the scroll position), `TryDraw` for the screen's `DrawCustom`; `TrackDraw` registers a drawer for a widget the screen added itself (an irregular grid cell, e.g. the Grove Garden's plots) rather than through `Card`. Every screen on `CardList` now advances by its one fixed card gap (26px) rather than each screen's own hand-picked value (16-30px before) — wider than most, so it only ever adds air, never removes it. |
-| `ChipRow` | A wrapping row of chip buttons (a filter, a sort cycle) from a label list. |
+| `CardList` | The `Card`/drawer-dictionary pair every page rebuilt for itself, now written once: wraps one `ScrollView`, `Begin()`/`Card(...)`/`End(y)` to rebuild it (keeping the scroll position), `TryDraw` for the screen's `DrawCustom`; `TrackDraw` registers a drawer for a widget the screen added itself (an irregular grid cell, e.g. the Grove Garden's plots, or Settings' toggles and sliders) rather than through `Card`. Every screen on `CardList` now advances by its one fixed card gap (26px) rather than each screen's own hand-picked value (16-30px before) — wider than most, so it only ever adds air, never removes it. |
+| `ChipRow` | A wrapping row of chip buttons (a filter, a sort cycle, Settings' battle-speed and effects-intensity choices) from a label list. |
 | `StatTable` | A name column plus up to two right-aligned numeric columns with headers (the Avatar Overview's base/total stats). |
 | `ItemRow` | A list row's text (title, subtitle, a detail/disabled-reason line) — Inventory's and the Trader's listings. |
 | `ActionRow` | One or more buttons stacked and right-aligned in an area, each bound to `Enabled`. |
 | `BeastCard` / `BeastPickerModal` | A small portrait-or-placeholder beside a name and subtitle, and a titled modal list of them — equip gear to a beast, buy a tome for one. |
+| `Toggle` | An on/off switch (menu-screens pass, #67; Settings' Gameplay/Visuals/Audio/Privacy toggles): a pill track with a sliding knob and an "On"/"Off" value label, the whole row tappable (not just the small track) for a comfortable 48dp+ target. `Build` adds the row's `Hotspot`; `Draw` paints it, registered through `CardList.TrackDraw`. |
+| `Slider` | A labelled slider (menu-screens pass, #67; Settings' Audio volumes): drag or tap the bar to set the value exactly (built on the existing `SliderBar` widget, which already wins over a `ScrollView` it sits in), a value label above it, a 48dp+ touch band around a visually thin track. Sets the setting directly on every change (no debounce) rather than stepping by a fixed amount, replacing the old `SettingsModal` row's quarter-steps. |
 
 Left off this layer, deliberately: `ElementChartScreen` (no wash/divider at all — title text drawn
 straight over the background, a genuinely different shape, not a duplicate of `ScreenHeader`'s);
 `ResultsScreen` and `StarterPickScreen` (a full-bleed banner/gradient with a centred title, no back
 button, no wash — their own shape, not `ScreenHeader`'s); the Discovery layer's `PoiModal` /
-`RegionProgressModal`, `ChoiceModal`, `SettingsModal` and the other `GameModal` subclasses (each
+`RegionProgressModal`, `ChoiceModal`, `PauseMenuModal` and the other `GameModal` subclasses (each
 already a small, self-contained centred card with its own one-off sizing, not a second copy of a
 `CardList` or `ScreenHeader` shape); `HomeScreen`'s own map/nav chrome (already its own thing, not a
 hand-rolled copy of these components); `BattleLogModal` (shared with the battle screen, which is out
@@ -472,16 +511,19 @@ full-page screens should build on this layer rather than hand-rolling their own
 
 ## Debugging
 
-- `--screen NAME` starts at a screen (`title`, `map`, `encounter`, `battle`, `results`, `roster`,
-  `grove`, `avatar`, `inventory`, `settings`; `demo` is the battle demo; the roster-visibility
-  screens `beast-detail`, `beast-derived`, `beast-skills`, `beast-gear`, `encounter-insight`,
-  `element-chart`, `glossary`, `battle-log`, `results-log`; the discovery layer's
-  `kinship-map`, `kinship-poi`, `kinship-trial`, `kinship-choice`, `region-progress`; the Collector
-  persona's `compendium`, `achievements`, `look-tokens`; the Grove's `grove-glade`, `grove-garden`,
-  `grove-board`, `grove-npc`, `soothe`, `colour-forms`; the Avatar/Inventory/Trader screens'
-  `avatar-skills`, `avatar-gear`, `avatar-wardrobe`, `inventory-materials`, `inventory-looks`,
-  `shop`, `shop-sell`); with `--screenshot PATH` it renders it and exits, on a throwaway in-memory
-  save (`--starter-level 6` shows a level gap).
+- `--screen NAME` starts at a screen (`title`, `title-continue` (a save present, so Continue/Load
+  game show), `map`, `encounter`, `battle`, `results`, `roster`, `grove`, `avatar`, `inventory`,
+  `settings` (and its sections `settings-gameplay`, `settings-visuals`, `settings-audio`,
+  `settings-privacy`), `credits`, `pause` (the battle pause menu) and `retreat-confirm` (its Retreat
+  confirm); `demo` is the battle demo; the roster-visibility screens `beast-detail`, `beast-derived`,
+  `beast-skills`, `beast-gear`, `encounter-insight`, `element-chart`, `glossary`, `battle-log`,
+  `results-log`; the discovery layer's `kinship-map`, `kinship-poi`, `kinship-trial`,
+  `kinship-choice`, `region-progress`; the Collector persona's `compendium`, `achievements`,
+  `look-tokens`; the Grove's `grove-glade`, `grove-garden`, `grove-board`, `grove-npc`, `soothe`,
+  `colour-forms`; the Avatar/Inventory/Trader screens' `avatar-skills`, `avatar-gear`,
+  `avatar-wardrobe`, `inventory-materials`, `inventory-looks`, `shop`, `shop-sell`); with
+  `--screenshot PATH` it renders it and exits, on a throwaway in-memory save (`--starter-level 6`
+  shows a level gap).
 - `--walkthrough DIR` captures a new player's first session (the starter pick, Hearthglen with its
   hints, the trials, the camp, the finale, the way on to Verdant Hollow) as numbered PNGs on a fresh
   save in a temporary folder; `--screen starter-pick` and `--screen hearthglen` start there, and the
@@ -522,3 +564,7 @@ notification is an opt-in Android hook.
   worn looks beyond its colour forms is a later PR). New gear and looks carry a "new" dot until
   seen (schema 12), and the wardrobe's colour categories have an HSV picker beside the six swatches (#46).
 - No region list (the next region starts automatically after a boss).
+- **Settings' Visuals & accessibility section** (menu-screens pass, #67) has only the settings that
+  already existed (effects intensity, screen shake, flashes): no text-scale or other accessibility
+  setting exists in `PlayerSettings` yet to surface there. A save-slot card shows playtime only if it
+  is ever tracked — no such save field exists yet, so it is left off for now.

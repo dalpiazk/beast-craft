@@ -161,6 +161,21 @@ namespace BeastCraft.Tests.EditMode
             }
         }
 
+        [Test]
+        public void PauseButton_SitsLeftOfTheGear_ClearOfTheTurnOrderBand_AndDoesNotOverlapIt()
+        {
+            PortraitLayout layout = new PortraitLayout();
+            Rect pause = layout.PauseButton;
+            Rect gear = layout.SettingsButton;
+
+            Assert.GreaterOrEqual(pause.Y, 0f);
+            Assert.LessOrEqual(pause.Bottom, layout.TurnOrder.Y, "clear of the turn-order band");
+            Assert.LessOrEqual(pause.Right, gear.X, "left of the gear, not overlapping it");
+            Assert.GreaterOrEqual(pause.X, PortraitLayout.Margin, "inside the canvas");
+            Assert.GreaterOrEqual(pause.Width, 56f, "a comfortable touch target");
+            Assert.AreEqual(gear.Height, pause.Height, "the same size as the gear it sits beside");
+        }
+
         [TestCase(ArenaSize.Small)]
         [TestCase(ArenaSize.Medium)]
         [TestCase(ArenaSize.Large)]

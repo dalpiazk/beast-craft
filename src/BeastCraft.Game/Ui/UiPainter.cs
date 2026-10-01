@@ -738,6 +738,17 @@ namespace BeastCraft.Game.Ui
                     }
 
                     break;
+                case "pause":
+                    // Two bars (the battle HUD's pause button).
+                    Line(P(0.34f, 0.2f), P(0.34f, 0.8f), t * 1.6f, ink);
+                    Line(P(0.66f, 0.2f), P(0.66f, 0.8f), t * 1.6f, ink);
+                    break;
+                case "speaker":
+                    // A speaker cone (the settings' Audio tab) with two sound-wave arcs.
+                    Polyline(new[] { P(0.16f, 0.62f), P(0.16f, 0.38f), P(0.34f, 0.38f), P(0.56f, 0.18f), P(0.56f, 0.82f), P(0.34f, 0.62f) }, t, ink, true);
+                    Arc(P(0.58f, 0.5f), s * 0.2f, t * 0.8f, ink, -45f, 45f);
+                    Arc(P(0.58f, 0.5f), s * 0.32f, t * 0.7f, ink, -55f, 55f);
+                    break;
                 default:
                     Disc(P(0.5f, 0.5f), s * 0.3f, ink);
                     break;

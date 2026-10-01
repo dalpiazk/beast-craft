@@ -81,6 +81,9 @@ namespace BeastCraft.Game.Screens
         /// <summary>Whether the battle-start hints were offered.</summary>
         private bool _hintedStart;
 
+        /// <summary>The pause menu's Settings pushed a screen (which clears the modal stack): reopen it on the way back (<see cref="Enter"/>).</summary>
+        private bool _resumePauseOnEnter;
+
         /// <summary>The region the units are drawn in (its enemy art): the battlefield, or on an open board the region it stands in for.</summary>
         private readonly string _artRegionId;
 
@@ -175,6 +178,15 @@ namespace BeastCraft.Game.Screens
             get { return _playback.IsOver && (_animation == null || _clockMs >= _animation.DurationMs); }
         }
 
+        /// <summary>
+        /// Whether the pause menu offers Retreat: a campaign battle, not a Kinship trial (no campaign
+        /// retry count to forfeit there) and not yet decided.
+        /// </summary>
+        public bool OffersRetreat
+        {
+            get { return _campaign != null && !_campaign.IsKinshipTrial && !IsDone; }
+        }
+
         public BattlePlayback Playback
         {
             get { return _playback; }
@@ -244,16 +256,69 @@ namespace BeastCraft.Game.Screens
                 return true;
             }
 
-            Ctx.Stack.PushModal(new ConfirmModal(Ctx, Loc("ui.battle.skip_title"), Loc("ui.battle.skip_body"), Loc("ui.battle.keep_watching"), Loc("ui.battle.skip"),
-                                                 SkipToEnd));
+            // Android Back (desktop Esc) opens the pause menu, same as the header's pause button.
+            OpenPauseMenu();
             return true;
+        }
+
+        /// <summary>
+        /// Opens the pause menu (<see cref="PauseMenuModal"/>: Resume, Settings, Retreat) over a
+        /// campaign battle not yet decided, freezing the clock (<see cref="Update"/>'s top check) while
+        /// it, or anything pushed from it, is open. Not offered in the demo, once decided, or for a
+        /// Kinship trial's own stand-in node (the modal hides Retreat there; see its remarks).
+        /// </summary>
+        public void OpenPauseMenu()
+        {
+            if (_campaign == null || IsDone)
+            {
+                return;
+            }
+
+            Ctx.Stack.PushModal(new PauseMenuModal(Ctx, this));
+        }
+
+        /// <summary>
+        /// The pause menu's Settings, over the paused battle: pushes the settings screen and remembers
+        /// to reopen the pause menu when it is popped back to (<see cref="Enter"/>) — pushing a screen
+        /// clears the modal stack, so the pause menu itself cannot simply stay open underneath it.
+        /// </summary>
+        public void OpenSettingsFromPause()
+        {
+            _resumePauseOnEnter = true;
+            Ctx.Stack.Push(new SettingsScreen(Ctx));
+        }
+
+        /// <summary>
+        /// The pause menu's Retreat, after its confirm: forfeits the battle outright
+        /// (<see cref="NodeBattle.Retreat"/>, never its predetermined real result) and hands it
+        /// straight to the results, the same one-shot guard <see cref="HandBack"/> uses
+        /// (<see cref="NodeBattle.TryHandBack"/>).
+        /// </summary>
+        public void ConfirmRetreat()
+        {
+            if (_campaign == null || !_campaign.TryHandBack())
+            {
+                return;
+            }
+
+            ResultsViewModel results = _campaign.Retreat();
+            Ctx.Stack.Replace(new ResultsScreen(Ctx, results));
+        }
+
+        public override void Enter()
+        {
+            if (_resumePauseOnEnter)
+            {
+                _resumePauseOnEnter = false;
+                OpenPauseMenu();
+            }
         }
 
         public override void Update(float elapsedMs, FrameInput input)
         {
-            if (Ctx.Stack.TopModal is HintModal || Ctx.Stack.TopModal is BattleLogModal)
+            if (Ctx.Stack.TopModal is HintModal || Ctx.Stack.TopModal is BattleLogModal || Ctx.Stack.TopModal is PauseMenuModal)
             {
-                // A tutorial hint, or the battle log, pauses the battle until it is closed.
+                // A tutorial hint, the battle log, or the pause menu, pauses the battle until it is closed.
                 return;
             }
 
@@ -658,13 +723,19 @@ namespace BeastCraft.Game.Screens
         }
 
         /// <summary>
-        /// A tap or click at canvas point <paramref name="at"/>: the settings gear, the settings
-        /// overlay while it is open (a row changes that setting; anywhere else closes it), a
-        /// campaign battle's Continue once it is decided, a control, a skill card, else the board
-        /// (step).
+        /// A tap or click at canvas point <paramref name="at"/>: the pause button (a campaign battle
+        /// not yet decided), the settings gear, the settings overlay while it is open (a row changes
+        /// that setting; anywhere else closes it), a campaign battle's Continue once it is decided, a
+        /// control, a skill card, else the board (step).
         /// </summary>
         private void Tap(Vec2 at, ref bool step)
         {
+            if (_campaign != null && !IsDone && _screen.PauseButton.Contains(at.X, at.Y))
+            {
+                OpenPauseMenu();
+                return;
+            }
+
             if (_screen.SettingsButton.Contains(at.X, at.Y))
             {
                 _settingsOpen = !_settingsOpen;

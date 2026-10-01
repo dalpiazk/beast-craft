@@ -298,6 +298,56 @@ namespace BeastCraft.Presentation.Screens
         }
 
         /// <summary>
+        /// A retreat's results (<see cref="NodeBattle.Retreat"/>): no XP, no loot, no gold, scored
+        /// exactly like a loss (producer decision, 2026-09-30, "same as losing the battle") — the same
+        /// retry note and team-suggestion bookkeeping <see cref="BuildNotes"/> gives any other loss,
+        /// since <see cref="CampaignRules.RetreatBattle"/> advances the same per-node loss count
+        /// <see cref="CampaignRules.LossesAt"/> reads.
+        /// </summary>
+        internal static ResultsViewModel BuildRetreat(GameSession session, NodeBattle battle, CampaignResult campaign)
+        {
+            PlayerSave save = session.Save;
+            ResultsViewModel view = new ResultsViewModel
+            {
+                Outcome = BattleOutcome.EnemyVictory,
+                NodeId = battle.Node.NodeId,
+                Subtitle = session.LocationName(battle.Node),
+                GoldTotal = save.Gold,
+                BindingLimit = CampaignRules.BeastCap(save, session.Content.Campaign),
+                MapOutcome = campaign.Outcome,
+                ConsumablesSpent = battle.Setup?.Consumables?.Count ?? 0,
+                AvatarDisplayName = AchievementsViewModel.TitledName(save, session.Content.Achievements?.Library, CampaignAvatar.DisplayName(session.Content.Text))
+            };
+            view._text = session.Content.Text;
+            view.Title = view._text.Get("ui.results.retreated");
+
+            foreach (string beastId in battle.Setup?.TeamBeastIds ?? new List<string>())
+            {
+                OwnedBeast beast = save.FindBeast(beastId);
+                if (beast == null)
+                {
+                    continue;
+                }
+
+                float fraction = Fraction(beast.Progress.Level, beast.Progress.Xp);
+                view.Team.Add(new BeastResultRow
+                {
+                    BeastId = beast.BeastId,
+                    SpeciesId = beast.Progress.SpeciesId,
+                    Name = session.BeastName(beast),
+                    LevelBefore = beast.Progress.Level,
+                    LevelAfter = beast.Progress.Level,
+                    FractionBefore = fraction,
+                    FractionAfter = fraction
+                });
+            }
+
+            view.Losses = campaign.Outcome == CampaignOutcome.Lost ? CampaignRules.LossesAt(save.Campaign.ActiveRun, battle.Node.NodeId) : 0;
+            view.BuildNotes(session);
+            return view;
+        }
+
+        /// <summary>
         /// A Kinship trial's results (<see cref="NodeBattle.ForKinship"/>): the team's rows without XP (a
         /// trial pays nothing), and what the site made of it — on a win the beasts offered and the bond
         /// condition's flavour line, on a loss the retry note.
