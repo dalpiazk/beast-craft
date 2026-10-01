@@ -7,9 +7,11 @@ using BeastCraft.Save;
 namespace BeastCraft.Presentation.Screens
 {
     /// <summary>
-    /// The title screen: Continue (only when a save exists: the most recently played slot), Save
-    /// slots (the slot list, when any slot holds a save), New Game (in the first empty slot; when all
-    /// three hold a game the slot list asks which to replace) and Settings; Back asks before quitting.
+    /// The title screen: Continue (only when a save exists: the most recently played slot), Load game
+    /// (the slot list, when any slot holds a save), New Game and Settings; Back asks before quitting.
+    /// New Game always opens the slot list too (menu-screens pass #67: `Game.Screens.TitleScreen.NewGame`
+    /// no longer asks this view-model first) — picking an empty slot there, or a used one, which asks to
+    /// replace it (`SaveSlotsViewModel.NewGameReplaces`), is the one way a game starts.
     /// </summary>
     public sealed class TitleViewModel
     {
@@ -29,12 +31,6 @@ namespace BeastCraft.Presentation.Screens
         public bool CanManageSlots
         {
             get { return _session.AnySave; }
-        }
-
-        /// <summary>Whether New Game must replace a save (every slot holds one): the slot list asks which.</summary>
-        public bool NewGameNeedsConfirm
-        {
-            get { return _session.FirstEmptySlot() == null; }
         }
 
         /// <summary>Continues the most recently played slot.</summary>
@@ -348,6 +344,17 @@ namespace BeastCraft.Presentation.Screens
             Persist();
         }
 
+        /// <summary>
+        /// The master volume's live value during a drag, applied at once (so the player hears it move)
+        /// but never saved — code review: writing to disk on every drag frame is needless I/O; the
+        /// screen calls <see cref="SetMasterVolume"/> once the drag ends (or on a plain tap) to persist
+        /// the exact value the drag settled on.
+        /// </summary>
+        public void SetMasterVolumeLive(int percent)
+        {
+            _settings.MasterVolume = Clamp(percent);
+        }
+
         public int MusicVolume
         {
             get { return Clamp(_settings.MusicVolume); }
@@ -359,6 +366,12 @@ namespace BeastCraft.Presentation.Screens
             Persist();
         }
 
+        /// <summary>The music volume's live value during a drag, never saved — see <see cref="SetMasterVolumeLive"/>.</summary>
+        public void SetMusicVolumeLive(int percent)
+        {
+            _settings.MusicVolume = Clamp(percent);
+        }
+
         public int SfxVolume
         {
             get { return Clamp(_settings.SfxVolume); }
@@ -368,6 +381,12 @@ namespace BeastCraft.Presentation.Screens
         {
             _settings.SfxVolume = Clamp(percent);
             Persist();
+        }
+
+        /// <summary>The sound effects volume's live value during a drag, never saved — see <see cref="SetMasterVolumeLive"/>.</summary>
+        public void SetSfxVolumeLive(int percent)
+        {
+            _settings.SfxVolume = Clamp(percent);
         }
 
         /// <summary>A volume's slider position, 0-1 (<see cref="MusicMix.Percent"/>).</summary>

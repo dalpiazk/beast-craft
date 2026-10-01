@@ -619,6 +619,7 @@ namespace BeastCraft.Save
             CheckRange(issues, "Campaign.ActiveRun.Stage", run.Stage, 0, int.MaxValue);
             CheckRange(issues, "Campaign.ActiveRun.Attempts", run.Attempts, 0, int.MaxValue);
             CheckRange(issues, "Campaign.ActiveRun.NodeAttempts", run.NodeAttempts, 0, int.MaxValue);
+            CheckRange(issues, "Campaign.ActiveRun.NodeRetreats", run.NodeRetreats, 0, int.MaxValue);
 
             if (nodeCount == 0)
             {
@@ -681,6 +682,11 @@ namespace BeastCraft.Save
             if (run.NodeAttemptsNodeId != -1 && run.Find(run.NodeAttemptsNodeId) == null)
             {
                 issues.Add(new SaveIssue(SaveIssueKind.InvalidMapRun, "Campaign.ActiveRun.NodeAttemptsNodeId", null, "retried node " + run.NodeAttemptsNodeId + " is not on the map"));
+            }
+
+            if (run.NodeRetreatsNodeId != -1 && run.Find(run.NodeRetreatsNodeId) == null)
+            {
+                issues.Add(new SaveIssue(SaveIssueKind.InvalidMapRun, "Campaign.ActiveRun.NodeRetreatsNodeId", null, "retreated-from node " + run.NodeRetreatsNodeId + " is not on the map"));
             }
 
             if (run.Cleared != null)

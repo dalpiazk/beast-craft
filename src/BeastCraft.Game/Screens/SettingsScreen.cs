@@ -179,9 +179,9 @@ namespace BeastCraft.Game.Screens
             y = _audio.Card(top, height, "card", box => SectionHeader.Draw(Ctx, box, Loc("ui.settings.section_audio")));
 
             float rowY = top + CardTopPad;
-            rowY = AddSlider(_audio, x, rowY, width, "master-volume", Loc("ui.settings.master_volume"), _model.MasterVolume, _model.SetMasterVolume);
-            rowY = AddSlider(_audio, x, rowY, width, "music-volume", Loc("ui.settings.music_volume"), _model.MusicVolume, _model.SetMusicVolume);
-            rowY = AddSlider(_audio, x, rowY, width, "sfx-volume", Loc("ui.settings.sfx_volume"), _model.SfxVolume, _model.SetSfxVolume);
+            rowY = AddSlider(_audio, x, rowY, width, "master-volume", Loc("ui.settings.master_volume"), _model.MasterVolume, _model.SetMasterVolumeLive, _model.SetMasterVolume);
+            rowY = AddSlider(_audio, x, rowY, width, "music-volume", Loc("ui.settings.music_volume"), _model.MusicVolume, _model.SetMusicVolumeLive, _model.SetMusicVolume);
+            rowY = AddSlider(_audio, x, rowY, width, "sfx-volume", Loc("ui.settings.sfx_volume"), _model.SfxVolume, _model.SetSfxVolumeLive, _model.SetSfxVolume);
             rowY = AddToggle(_audio, x, rowY, width, "mute", Loc("ui.settings.mute"), _model.Muted, _model.SetMuted);
             if (_model.HapticsAvailable)
             {
@@ -232,13 +232,24 @@ namespace BeastCraft.Game.Screens
         }
 
         /// <summary>
-        /// A <see cref="Components.Slider"/> row: sets the exact value live as it drags (saved on every
-        /// change, like a volume the player hears move); never rebuilds the tab mid-drag — the bar reads
+        /// A <see cref="Components.Slider"/> row: <paramref name="setLive"/> applies the exact value as
+        /// it drags (so the player hears the volume move at once) but never saves;
+        /// <paramref name="setFinal"/> commits — and saves — the value the drag settled on, once, on
+        /// release (<see cref="SliderBar.Dropped"/>, inherited from <see cref="Draggable"/>) or on a
+        /// plain tap (<see cref="SliderBar.Clicked"/>, which never raises <c>Dropped</c>) — code review:
+        /// saving on every drag frame was needless I/O. Never rebuilds the tab mid-drag — the bar reads
         /// its own live <see cref="SliderBar.Value"/> at <see cref="Components.Slider.Draw"/> time.
         /// </summary>
-        private float AddSlider(CardList list, float x, float y, float width, string id, string label, int percent, Action<int> set)
+        private float AddSlider(CardList list, float x, float y, float width, string id, string label, int percent, Action<int> setLive, Action<int> setFinal)
         {
-            SliderBar bar = Slider.Build(list.Scroll, id, x, y, width, SettingsViewModel.Fraction(percent), v => set((int)Math.Round(v * 100f)));
+            SliderBar bar = Slider.Build(list.Scroll, id, x, y, width, SettingsViewModel.Fraction(percent), v => setLive((int)Math.Round(v * 100f)));
+            void Commit()
+            {
+                setFinal((int)Math.Round(bar.Value * 100f));
+            }
+
+            bar.Dropped += _ => Commit();
+            bar.Clicked += Commit;
             list.TrackDraw(bar, _ => Slider.Draw(Ctx, bar, label, Loc("ui.settings.volume_value", (int)Math.Round(bar.Value * 100f))));
             return y + Slider.Height + RowGap;
         }

@@ -194,6 +194,34 @@ namespace BeastCraft.Tests.EditMode
         }
 
         [Test]
+        public void TheVolumeLiveSetters_ApplyAtOnce_ButNeverSave_UntilTheNonLiveSetterCommits()
+        {
+            MemorySaveStorage storage = new MemorySaveStorage();
+            GameSession session = new GameSession(Content, storage, () => 1);
+            SettingsViewModel settings = new SettingsViewModel(session.Settings, session.Content.Text, session.SaveSettings);
+            int savesBefore = settings.Saves;
+
+            // A slider drag: several live frames, applied at once, none of them saved to disk.
+            settings.SetMasterVolumeLive(80);
+            settings.SetMasterVolumeLive(65);
+            settings.SetMasterVolumeLive(42);
+            Assert.AreEqual(42, session.Settings.MasterVolume, "the live value applies at once, so the player hears it move");
+            Assert.AreEqual(savesBefore, settings.Saves, "but none of that was saved");
+            Assert.AreEqual(100, new GameSession(Content, storage, () => 1).Settings.MasterVolume, "disk still holds the old value");
+
+            settings.SetMusicVolumeLive(-10);
+            Assert.AreEqual(0, session.Settings.MusicVolume, "clamped live too");
+            settings.SetSfxVolumeLive(150);
+            Assert.AreEqual(100, session.Settings.SfxVolume, "clamped live too");
+            Assert.AreEqual(savesBefore, settings.Saves, "still nothing saved");
+
+            // The drag ends (or it was a plain tap): the screen commits the exact value once.
+            settings.SetMasterVolume(42);
+            Assert.AreEqual(savesBefore + 1, settings.Saves);
+            Assert.AreEqual(42, new GameSession(Content, storage, () => 1).Settings.MasterVolume, "the exact value the drag settled on, saved");
+        }
+
+        [Test]
         public void TheVolumes_FollowMasterTimesChannel_AndMuteSilencesBoth()
         {
             PlayerSettings settings = new PlayerSettings { MasterVolume = 50, MusicVolume = 50, SfxVolume = 100 };

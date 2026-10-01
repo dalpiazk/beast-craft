@@ -319,9 +319,13 @@ namespace BeastCraft.Game.Screens
 
         public override void Update(float elapsedMs, FrameInput input)
         {
-            if (Ctx.Stack.TopModal is HintModal || Ctx.Stack.TopModal is BattleLogModal || Ctx.Stack.TopModal is PauseMenuModal)
+            if (Ctx.Stack.TopModal != null)
             {
-                // A tutorial hint, the battle log, or the pause menu, pauses the battle until it is closed.
+                // Any modal over the battle pauses it until it is closed: the pause menu, a tutorial
+                // hint, the battle log, a confirm pushed from any of those (e.g. the pause menu's
+                // Retreat, which stacks a ConfirmModal over itself rather than closing first, exactly
+                // so this still catches it) — named by "any modal", not an enumerated list, so a future
+                // modal can never be forgotten here the way Retreat's confirm once was (code review).
                 return;
             }
 

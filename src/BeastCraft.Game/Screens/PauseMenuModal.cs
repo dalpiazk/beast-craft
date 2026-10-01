@@ -17,9 +17,11 @@ namespace BeastCraft.Game.Screens
     /// pushing a screen clears the modal stack.</item>
     /// <item><b>Retreat</b> (hidden for a Kinship trial, <see cref="BattleScreen.OffersRetreat"/>: a
     /// trial has no campaign retry count to forfeit, and the producer's ruling was scoped to the
-    /// campaign map) asks first, then forfeits the battle outright through
-    /// <see cref="BattleScreen.ConfirmRetreat"/> — producer decision, 2026-09-30: "same as losing the
-    /// battle" (no rewards, the location stays open; see
+    /// campaign map) asks first — a <see cref="ConfirmModal"/> stacked over this menu rather than
+    /// replacing it (code review: so Cancel returns here, not to a battle that kept running behind the
+    /// confirm — <see cref="BattleScreen.Update"/> freezes on any open modal, this one included), then
+    /// forfeits the battle outright through <see cref="BattleScreen.ConfirmRetreat"/> — producer
+    /// decision, 2026-09-30: "same as losing the battle" (no rewards, the location stays open; see
     /// <see cref="BeastCraft.Campaign.CampaignRules.RetreatBattle"/> and
     /// docs/design/battle-system.md, "Adaptive assist and guidance").
     /// </list>
@@ -73,7 +75,12 @@ namespace BeastCraft.Game.Screens
                 Button retreat = panel.Add(new Button { Id = "retreat", Bounds = new Rect(card.X + 60f, y, width - 120f, RowHeight), Text = Loc("ui.battle.retreat"), StyleKey = "danger" });
                 retreat.Clicked += () =>
                 {
-                    Close();
+                    // Stacks the confirm over this menu rather than closing it first (code review):
+                    // Cancel then falls back to the pause menu, not to a battle already running again,
+                    // and the battle stays frozen throughout — BattleScreen.Update freezes on any open
+                    // modal, and this one never stops being open while the confirm is up. Confirming
+                    // replaces the whole screen (BattleScreen.ConfirmRetreat), which clears every modal
+                    // anyway.
                     Ctx.Stack.PushModal(new ConfirmModal(Ctx, Loc("ui.battle.retreat_title"), Loc("ui.battle.retreat_body"), Loc("ui.common.cancel"), Loc("ui.battle.retreat"),
                                                          battle.ConfirmRetreat, "danger"));
                 };

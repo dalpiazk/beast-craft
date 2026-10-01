@@ -185,12 +185,10 @@ namespace BeastCraft.Tests.EditMode
             TitleViewModel fresh = new TitleViewModel(new GameSession(Content, storage, () => MapSeed));
             Assert.IsFalse(fresh.CanContinue);
             Assert.IsFalse(fresh.CanManageSlots);
-            Assert.IsFalse(fresh.NewGameNeedsConfirm);
             Assert.IsTrue(fresh.PrepareNewGame());
             fresh.NewGame("griffin");
             Assert.IsTrue(fresh.CanContinue);
             Assert.IsTrue(fresh.CanManageSlots);
-            Assert.IsFalse(new TitleViewModel(new GameSession(Content, storage, () => 1)).NewGameNeedsConfirm, "two slots are still free");
         }
 
         // ------------------------------------------------------------------ region map

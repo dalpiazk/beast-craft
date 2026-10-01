@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using BeastCraft.Battle;
@@ -150,6 +151,31 @@ namespace BeastCraft.Tests.EditMode
             Assert.IsFalse(session.PendingKinship);
             Assert.AreEqual(4, session.Save.Beasts.Count);
             Assert.AreEqual(PoiState.Found, new MapViewModel(session).FindPoi(site.PoiId).State);
+        }
+
+        [Test]
+        public void KinshipTrial_Retreat_RefusesLoudly_AndNeverCompletesOrAutosaves()
+        {
+            // Code review: NodeBattle.Retreat had no Kinship-trial guard (only the pause menu's UI hid
+            // it); a trial has no campaign node and no retry count to forfeit.
+            GameSession session = Trio(8);
+            PointOfInterest site = Site(session);
+            KinshipTests.WalkTo(session.Save, site.Layer);
+            NodeBattle battle = EncounterViewModel.ForKinship(session, site.PoiId).Start(out string error);
+            Assert.IsNotNull(battle, error);
+            Assert.IsTrue(battle.IsKinshipTrial);
+            int saves = session.AutosaveCount;
+
+            Assert.Throws<InvalidOperationException>(() => battle.Retreat());
+
+            Assert.IsFalse(battle.IsCompleted, "refused: never marked completed");
+            Assert.AreEqual(saves, session.AutosaveCount, "refused: never autosaved");
+            Assert.AreEqual(0, session.Save.Discovery.KinshipLosses, "refused: no loss (or retreat) was ever recorded");
+
+            // The one-shot is still live: the trial can still be played out normally afterwards.
+            ResultsViewModel results = battle.Complete();
+            Assert.IsTrue(results.IsKinshipTrial);
+            Assert.IsTrue(battle.IsCompleted);
         }
 
         [Test]

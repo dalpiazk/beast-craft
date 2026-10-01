@@ -283,5 +283,32 @@ namespace BeastCraft.Tests.EditMode
             Assert.IsFalse(save.Campaign.HasActiveRun);
             Assert.IsEmpty(SaveValidator.Validate(save, Catalog));
         }
+
+        [Test]
+        public void Validate_ChecksNodeRetreats_AndNodeRetreatsNodeId_LikeNodeAttempts()
+        {
+            PlayerSave save = SaveWithRun();
+            Assert.IsEmpty(SaveValidator.Validate(save, Catalog), "the defaults (0, -1) are valid");
+
+            save.Campaign.ActiveRun.NodeRetreats = -1;
+            List<SaveIssue> negative = SaveValidator.Validate(save, Catalog);
+            Assert.AreEqual(1, negative.Count, string.Join("\n", negative));
+            Assert.AreEqual(SaveIssueKind.InvalidValue, negative[0].Kind);
+            StringAssert.Contains("NodeRetreats", negative[0].Path);
+
+            save.Campaign.ActiveRun.NodeRetreats = 1;
+            save.Campaign.ActiveRun.NodeRetreatsNodeId = 40;
+            List<SaveIssue> offMap = SaveValidator.Validate(save, Catalog);
+            Assert.AreEqual(1, offMap.Count, string.Join("\n", offMap));
+            Assert.AreEqual(SaveIssueKind.InvalidMapRun, offMap[0].Kind);
+            Assert.AreEqual("Campaign.ActiveRun.NodeRetreatsNodeId", offMap[0].Path);
+            StringAssert.Contains("not on the map", offMap[0].Message);
+
+            save.Campaign.ActiveRun.NodeRetreatsNodeId = save.Campaign.ActiveRun.Nodes[1].NodeId;
+            Assert.IsEmpty(SaveValidator.Validate(save, Catalog), "a node actually on the map is valid");
+
+            save.Campaign.ActiveRun.NodeRetreatsNodeId = -1;
+            Assert.IsEmpty(SaveValidator.Validate(save, Catalog), "-1 (none) is always valid, whatever NodeRetreats holds");
+        }
     }
 }
