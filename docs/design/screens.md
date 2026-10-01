@@ -38,12 +38,18 @@ Title ──Continue / New Game──▶ Home (Map tab) ──tap a location / N
   crash reports in plain words, a row for each (both off until turned on), and Continue; Back does not
   skip it. Both are toggles in Settings' Privacy section too. Never offered in a scripted run;
   `--screen consent` shows it.
-- **Save slots** (`SaveSlotsScreen`, `SaveSlotsViewModel`): one card per slot (three) with the save's
-  summary — Beastbinder level, beast count, region and stage, last played date — and a small team
-  portrait row (the first few owned beasts' art, `GameSession.SlotCardPortraitCount`), then Continue
-  or New game, Delete (asks first), and Export and Import where the host has an `ISaveTransfer`
-  (desktop only for now); an empty slot is its own shorter card ("Tap New game to begin."). New game
-  over an existing save, Delete and Import over an existing save all ask first (`ConfirmModal`). See
+- **Save slots** (`SaveSlotsScreen`, `SaveSlotsViewModel`; a maximum of three — producer review #2,
+  2026-10-01): one card per slot with the save's summary — Beastbinder level, beast count, region and
+  stage, last played date — and a small team portrait row (the first few owned beasts' art,
+  `GameSession.SlotCardPortraitCount`), then a primary button (Continue for a save that loads, else
+  New game) and a second row for an occupied slot: **New game** (only where the primary is Continue —
+  starts fresh in that very slot, asking first, `SaveSlotsScreen.NewGame`/`SaveSlotsViewModel.NewGameReplaces`;
+  this is also what three full slots use, so New Game at the title can always start a game by picking
+  one to overwrite rather than deleting one first), **Delete** (asks first — the save menu is where
+  saves are deleted) and Export/Import where the host has an `ISaveTransfer` (desktop only for now).
+  An empty slot is its own shorter card, one primary button only ("Tap New game to begin."). Import
+  over an existing save also asks first (`ConfirmModal`). `--screen save-slots-empty` /
+  `save-slots-full` show the 0- and 3-full states; `save-slots` the everyday 1-full one. See
   `progression-and-saves.md`, "Save slots, backup and export".
 - **Settings** (`SettingsScreen`, `SettingsViewModel`; menu-screens pass, #67): a full screen
   (`ScreenHeader` + `TabStrip`), not a modal — four sections, each its own tab: **Gameplay** (battle
@@ -91,13 +97,21 @@ Title ──Continue / New Game──▶ Home (Map tab) ──tap a location / N
   default arts and passives, its stat fixture — off the board, in the turn order, its arts playing
   on their targets, shown as a portrait badge with its art cooldowns at the board's foot). It plays
   by itself at the saved speed; once decided, Continue hands it back.
-  - **Pause menu** (`PauseMenuModal`; menu-screens pass, #67): the header's pause button (beside the
-    settings gear, a campaign battle not yet decided only), or Android Back / desktop Esc (replacing
-    the old "skip to the result?" confirm — the explicit Skip control still skips immediately, with no
-    confirm), opens it over the battle, freezing the clock (`BattleScreen.Update`'s top check, the same
-    guard the tutorial hints and the battle log already use) while it — or anything pushed from it — is
-    open. **Resume** closes it. **Settings** opens `SettingsScreen` over the paused battle and reopens
-    this menu on the way back (`BattleScreen.OpenSettingsFromPause`/`Enter`). **Retreat** (hidden for a
+  - **Pause menu** (`PauseMenuModal`; menu-screens pass, #67; producer review, 2026-10-01): the
+    header's one gear button is the pause button in a campaign battle — tapping it pauses and opens
+    the menu, rather than a separate icon beside the gear (that icon is gone; the demo, with no
+    campaign to pause, keeps the gear's original meaning, the effects settings overlay — see
+    `BattleScreen.cs`'s class remarks and `PortraitLayout.SettingsButton`). Android Back / desktop Esc
+    open the same menu (replacing the old "skip to the result?" confirm — the explicit Skip control
+    still skips immediately, with no confirm). Opening it freezes the clock
+    (`BattleScreen.Update`'s top check, the same guard the tutorial hints and the battle log already
+    use — neither depended on the old playback pause/play control, so nothing needed rerouting) while
+    it — or anything pushed from it — is open. The bottom playback bar now holds only x1/x2/x3/Skip
+    (one fewer control, filling the bar evenly; pause/play's keyboard shortcut, A, and the two-finger
+    touch gesture still toggle auto-play directly, unrelated to this menu). The gear carries an
+    accessible label (`ui.battle_hud.pause_menu`, "Pause / menu") for a future screen-reader bridge.
+    **Resume** closes it. **Settings** opens `SettingsScreen` over the paused battle and reopens this
+    menu on the way back (`BattleScreen.OpenSettingsFromPause`/`Enter`). **Retreat** (hidden for a
     Kinship trial) asks first, then forfeits the battle outright (`BattleScreen.ConfirmRetreat` →
     `NodeBattle.Retreat` → `CampaignRules.RetreatBattle`) — producer decision, 2026-09-30: "same as
     losing the battle", see `battle-system.md`, "Adaptive assist and guidance", and
@@ -521,9 +535,10 @@ full-page screens should build on this layer rather than hand-rolling their own
   `kinship-choice`, `region-progress`; the Collector persona's `compendium`, `achievements`,
   `look-tokens`; the Grove's `grove-glade`, `grove-garden`, `grove-board`, `grove-npc`, `soothe`,
   `colour-forms`; the Avatar/Inventory/Trader screens' `avatar-skills`, `avatar-gear`,
-  `avatar-wardrobe`, `inventory-materials`, `inventory-looks`, `shop`, `shop-sell`); with
-  `--screenshot PATH` it renders it and exits, on a throwaway in-memory save (`--starter-level 6`
-  shows a level gap).
+  `avatar-wardrobe`, `inventory-materials`, `inventory-looks`, `shop`, `shop-sell`; the save slots'
+  other states, `save-slots-empty` (no save anywhere) and `save-slots-full` (all three slots full, for
+  New Game's overwrite flow)); with `--screenshot PATH` it renders it and exits, on a throwaway
+  in-memory save (`--starter-level 6` shows a level gap).
 - `--walkthrough DIR` captures a new player's first session (the starter pick, Hearthglen with its
   hints, the trials, the camp, the finale, the way on to Verdant Hollow) as numbered PNGs on a fresh
   save in a temporary folder; `--screen starter-pick` and `--screen hearthglen` start there, and the

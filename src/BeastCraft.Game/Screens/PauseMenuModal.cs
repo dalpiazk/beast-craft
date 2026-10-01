@@ -5,9 +5,11 @@ using BeastCraft.Presentation.Ui;
 namespace BeastCraft.Game.Screens
 {
     /// <summary>
-    /// The in-battle pause menu (menu-screens pass, #67): opened by the battle HUD's pause button, or
-    /// Android Back / desktop Esc, over a campaign battle not yet decided (<see cref="BattleScreen.OpenPauseMenu"/>),
-    /// freezing the battle clock while it — or anything pushed from it — is open.
+    /// The in-battle pause menu (menu-screens pass, #67): opened by tapping the battle HUD's gear
+    /// (producer review — the gear button itself is the pause button in a campaign battle, rather than
+    /// a separate icon), or Android Back / desktop Esc, over a campaign battle not yet decided
+    /// (<see cref="BattleScreen.OpenPauseMenu"/>), freezing the battle clock while it — or anything
+    /// pushed from it — is open.
     /// <list type="bullet">
     /// <item><b>Resume</b> closes it; the battle picks up exactly where it paused.</item>
     /// <item><b>Settings</b> opens the full settings screen over the paused battle

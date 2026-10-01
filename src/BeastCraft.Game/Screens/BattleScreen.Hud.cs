@@ -113,28 +113,34 @@ namespace BeastCraft.Game.Screens
             Rect header = _screen.Header;
             _text.Draw(_draw, _text.Fit(_hudTitle, Large, 520f), new Vector2(header.X, header.Y + 12f), Large, Ink("y", Color.Gold), shadow);
             Rect gear = _screen.SettingsButton;
-            Rect pause = _screen.PauseButton;
-            // The turn/seed text ends clear of whichever button sits leftmost (the pause button, a
-            // campaign battle not yet decided; else the gear).
-            bool showPause = _campaign != null && !IsDone;
             string turn = Loc("ui.battle_hud.turn_seed", _playback.Played.Count.ToString(CultureInfo.InvariantCulture), _seed.ToString(CultureInfo.InvariantCulture));
-            _text.DrawRight(_draw, turn, (showPause ? pause.X : gear.X) - 20f, header.Y + 16f, Medium, Ink("3", Color.Gray), shadow);
+            _text.DrawRight(_draw, turn, gear.X - 20f, header.Y + 16f, Medium, Ink("3", Color.Gray), shadow);
 
-            // The settings gear (opens the effects settings overlay).
-            _draw.Fill(Pixel, new Vector2(gear.X, gear.Y), new Vector2(gear.Width, gear.Height), _settingsOpen ? Ink("y", Color.Gold) : Ink("2", Color.Gray));
+            // The one gear/pause button (producer review, menu-screens pass #67): a campaign battle not
+            // yet decided draws it as the pause button (opens the pause menu: Resume, Settings, Retreat,
+            // PauseMenuModal), highlighted while that menu is open; the demo (no campaign) keeps its old
+            // meaning, the effects settings overlay, highlighted while that is open.
+            bool isPauseButton = _campaign != null;
+            bool highlighted = isPauseButton ? Ctx.Stack.TopModal is PauseMenuModal : _settingsOpen;
+            _draw.Fill(Pixel, new Vector2(gear.X, gear.Y), new Vector2(gear.Width, gear.Height), highlighted ? Ink("y", Color.Gold) : Ink("2", Color.Gray));
             _draw.Fill(Pixel, new Vector2(gear.X + 3f, gear.Y + 3f), new Vector2(gear.Width - 6f, gear.Height - 6f), Ink("p", Color.Purple));
-            ArtSprite icon = _atlas.ByArtKey("ui/gear");
-            if (icon != null)
+            if (isPauseButton)
             {
-                DrawIcon(icon, gear.Inset(10f));
+                Ctx.Painter.Glyph("pause", gear.Inset(16f), Ctx.Painter.C("cream"));
+                if (_options.Screenshot)
+                {
+                    // The accessible label (producer review): no screen-reader bridge yet, but the
+                    // string exists and is wired to this button, ready for one.
+                    Console.WriteLine("Battle HUD gear/pause button: " + Loc("ui.battle_hud.pause_menu") + ".");
+                }
             }
-
-            if (showPause)
+            else
             {
-                // The pause button (the pause menu: Resume, Settings, Retreat), beside the gear.
-                _draw.Fill(Pixel, new Vector2(pause.X, pause.Y), new Vector2(pause.Width, pause.Height), Ink("2", Color.Gray));
-                _draw.Fill(Pixel, new Vector2(pause.X + 3f, pause.Y + 3f), new Vector2(pause.Width - 6f, pause.Height - 6f), Ink("p", Color.Purple));
-                Ctx.Painter.Glyph("pause", pause.Inset(16f), Ctx.Painter.C("cream"));
+                ArtSprite icon = _atlas.ByArtKey("ui/gear");
+                if (icon != null)
+                {
+                    DrawIcon(icon, gear.Inset(10f));
+                }
             }
         }
 
@@ -563,14 +569,14 @@ namespace BeastCraft.Game.Screens
             _draw.SetTransform(canvas);
         }
 
-        /// <summary>Pause/play, the three speeds and skip.</summary>
+        /// <summary>The three speeds and skip (producer review, menu-screens pass #67: pause/play moved to the header's gear — see <see cref="DrawHeader"/>), filling the bar evenly.</summary>
         private void DrawControls(Color shadow)
         {
-            string[] labels = { Loc(_auto ? "ui.battle_hud.pause" : "ui.battle_hud.play"), Loc("ui.battle_hud.speed", 1), Loc("ui.battle_hud.speed", 2), Loc("ui.battle_hud.speed", 3), Loc("ui.battle_hud.skip") };
+            string[] labels = { Loc("ui.battle_hud.speed", 1), Loc("ui.battle_hud.speed", 2), Loc("ui.battle_hud.speed", 3), Loc("ui.battle_hud.skip") };
             for (int i = 0; i < labels.Length; i++)
             {
                 Rect button = _screen.Control(i);
-                bool on = (i == ControlPause && _auto) || (i >= 1 && i <= 3 && _speed == i);
+                bool on = i < 3 && _speed == i + 1;
                 _draw.Fill(Pixel, new Vector2(button.X, button.Y), new Vector2(button.Width, button.Height), on ? Ink("y", Color.Gold) : Ink("2", Color.Gray));
                 _draw.Fill(Pixel, new Vector2(button.X + 4f, button.Y + 4f), new Vector2(button.Width - 8f, button.Height - 8f),
                            on ? Ink("q", Color.Orange) * 0.9f : Ink("p", Color.Purple));

@@ -136,6 +136,8 @@ namespace BeastCraft.Tests.EditMode
         [Test]
         public void SettingsGear_SitsInTheHeader_AndItsRowsStackInsideThePanel()
         {
+            // The same button is the campaign's pause button (producer review, menu-screens pass #67);
+            // only its position and the demo's effects-settings overlay are PortraitLayout's concern.
             PortraitLayout layout = new PortraitLayout();
             Rect gear = layout.SettingsButton;
 
@@ -159,21 +161,6 @@ namespace BeastCraft.Tests.EditMode
                     Assert.Greater(row.Y, layout.SettingsRow(i - 1).Bottom, "rows do not overlap");
                 }
             }
-        }
-
-        [Test]
-        public void PauseButton_SitsLeftOfTheGear_ClearOfTheTurnOrderBand_AndDoesNotOverlapIt()
-        {
-            PortraitLayout layout = new PortraitLayout();
-            Rect pause = layout.PauseButton;
-            Rect gear = layout.SettingsButton;
-
-            Assert.GreaterOrEqual(pause.Y, 0f);
-            Assert.LessOrEqual(pause.Bottom, layout.TurnOrder.Y, "clear of the turn-order band");
-            Assert.LessOrEqual(pause.Right, gear.X, "left of the gear, not overlapping it");
-            Assert.GreaterOrEqual(pause.X, PortraitLayout.Margin, "inside the canvas");
-            Assert.GreaterOrEqual(pause.Width, 56f, "a comfortable touch target");
-            Assert.AreEqual(gear.Height, pause.Height, "the same size as the gear it sits beside");
         }
 
         [TestCase(ArenaSize.Small)]

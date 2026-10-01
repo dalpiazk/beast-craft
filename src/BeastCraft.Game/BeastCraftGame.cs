@@ -1121,6 +1121,23 @@ namespace BeastCraft.Game
                         _stack.Push(new SaveSlotsScreen(_ctx));
                     });
                     break;
+                case "save-slots-empty":
+                    // No save anywhere: all three cards read "Empty" (producer review #2).
+                    steps.Add(() => _stack.Push(new SaveSlotsScreen(_ctx)));
+                    break;
+                case "save-slots-full":
+                    // Every slot holds a save: New Game's "pick one to overwrite" flow (producer review #2).
+                    steps.Add(() =>
+                    {
+                        foreach (string slot in GameSession.SlotIds)
+                        {
+                            _ctx.Session.UseSlot(slot);
+                            _ctx.Session.NewGame("golem");
+                        }
+
+                        _stack.Push(new SaveSlotsScreen(_ctx));
+                    });
+                    break;
                 case "hearthglen":
                     steps.Add(() =>
                     {

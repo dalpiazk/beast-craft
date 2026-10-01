@@ -26,22 +26,26 @@ namespace BeastCraft.Game.Screens
     /// stepped a turn at a time through <see cref="BattlePlayback"/> and drawn in portrait on the
     /// fixed 1080x1920 logical canvas (<see cref="PortraitLayout"/>), which the host scales and
     /// letterboxes into the window or screen inside its safe area. The screen, top to bottom:
-    /// header, turn-order portraits (the acting unit highlighted), the board fitted to the arena, a
-    /// one-line log toast, the acting unit's skills, and the playback controls (pause/play,
-    /// x1/x2/x3, skip).
+    /// header (title, turn/seed, the gear/pause button), turn-order portraits (the acting unit
+    /// highlighted), the board fitted to the arena, a one-line log toast, the acting unit's skills,
+    /// and the playback controls (x1/x2/x3, skip — producer review, menu-screens pass #67: pause/play
+    /// moved to the header's gear, so the bar now fills evenly with four).
     /// <para>
     /// Two modes. <b>Demo</b> (<see cref="Demo"/>): the command line's battle
-    /// (<see cref="DemoBattle"/>), exactly the old viewer — the <c>--screenshot</c> flags, and Back
-    /// (Esc) quits. <b>Campaign</b> (<see cref="Campaign"/>): a map location's battle begun by
-    /// <see cref="NodeBattle"/>, playing by itself; once it is decided a Continue button (or Back)
-    /// hands it back for the results, and Back before that offers to skip to the result.
+    /// (<see cref="DemoBattle"/>), exactly the old viewer — the <c>--screenshot</c> flags, Back (Esc)
+    /// quits, and the gear keeps its old meaning, the effects settings overlay (<see cref="PauseMenuModal"/>
+    /// needs a campaign to retreat from or a session to open <see cref="SettingsScreen"/> over, neither
+    /// of which the demo has). <b>Campaign</b> (<see cref="Campaign"/>): a map location's battle begun
+    /// by <see cref="NodeBattle"/>, playing by itself; the gear (or Android Back / desktop Esc) opens
+    /// the pause menu (<see cref="OpenPauseMenu"/>: Resume, Settings, Retreat); once decided, a
+    /// Continue button (or Back) hands it back for the results.
     /// </para>
     /// <para>
     /// Desktop: Space steps (or finishes the turn playing), A toggles auto-play, 1-3 set the speed,
     /// S skips to the end, Tab cycles the selected skill; the mouse clicks the buttons and hovers or
     /// clicks the skills. Touch: tap a button or a skill to open its detail card (tap a highlighted
-    /// word for its definition; tap off the card to close it), tap the gear for the effects
-    /// settings, tap the board to step, two fingers toggle auto-play.
+    /// word for its definition; tap off the card to close it), tap the gear to pause (campaign) or
+    /// for the effects settings (demo), tap the board to step, two fingers toggle auto-play.
     /// </para>
     /// <para>
     /// The screen only reads the battle: turns are the session's own
@@ -52,8 +56,7 @@ namespace BeastCraft.Game.Screens
     public sealed partial class BattleScreen : GameScreen
     {
         private const int AutoPauseMs = 260;
-        private const int ControlPause = 0;
-        private const int ControlSkip = 4;
+        private const int ControlSkip = 3;
 
         private readonly ViewerOptions _options;
         private readonly PortraitLayout _screen = new PortraitLayout();
@@ -256,7 +259,7 @@ namespace BeastCraft.Game.Screens
                 return true;
             }
 
-            // Android Back (desktop Esc) opens the pause menu, same as the header's pause button.
+            // Android Back (desktop Esc) opens the pause menu, same as tapping the header's gear.
             OpenPauseMenu();
             return true;
         }
@@ -723,22 +726,26 @@ namespace BeastCraft.Game.Screens
         }
 
         /// <summary>
-        /// A tap or click at canvas point <paramref name="at"/>: the pause button (a campaign battle
-        /// not yet decided), the settings gear, the settings overlay while it is open (a row changes
-        /// that setting; anywhere else closes it), a campaign battle's Continue once it is decided, a
-        /// control, a skill card, else the board (step).
+        /// A tap or click at canvas point <paramref name="at"/>: the gear/pause button (a campaign
+        /// battle opens the pause menu; the demo opens the effects settings overlay — the same split
+        /// <c>DrawHeader</c> draws), the settings overlay while it is open (a row changes that setting;
+        /// anywhere else closes it), a campaign battle's Continue once it is decided, a control, a
+        /// skill card, else the board (step).
         /// </summary>
         private void Tap(Vec2 at, ref bool step)
         {
-            if (_campaign != null && !IsDone && _screen.PauseButton.Contains(at.X, at.Y))
-            {
-                OpenPauseMenu();
-                return;
-            }
-
             if (_screen.SettingsButton.Contains(at.X, at.Y))
             {
-                _settingsOpen = !_settingsOpen;
+                if (_campaign != null)
+                {
+                    // OpenPauseMenu is a no-op once the battle is decided: nothing to pause.
+                    OpenPauseMenu();
+                }
+                else
+                {
+                    _settingsOpen = !_settingsOpen;
+                }
+
                 return;
             }
 
@@ -789,17 +796,13 @@ namespace BeastCraft.Game.Screens
                     continue;
                 }
 
-                if (i == ControlPause)
-                {
-                    _auto = !_auto;
-                }
-                else if (i == ControlSkip)
+                if (i == ControlSkip)
                 {
                     SkipToEnd();
                 }
                 else
                 {
-                    SetSpeed(i);
+                    SetSpeed(i + 1);
                 }
 
                 return;

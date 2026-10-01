@@ -9,19 +9,24 @@ using BeastCraft.Presentation.Ui;
 namespace BeastCraft.Game.Screens
 {
     /// <summary>
-    /// The save slot list (<see cref="SaveSlotsViewModel"/>), reached from the title: one card per slot
-    /// with Continue (or New game for an empty slot), Delete, and Export/Import when the host can move
-    /// files (<see cref="ViewerHost.SaveTransfer"/>). Replacing a save (a new game or an import over it)
-    /// and deleting one each ask first.
+    /// The save slot list (<see cref="SaveSlotsViewModel"/>), reached from the title (Load game, or
+    /// New Game — always, producer decision, menu-screens pass #67, so picking a slot or confirming an
+    /// overwrite is the one way a game starts): one card per slot. A save's primary button is Continue;
+    /// a second row offers New game (over this very save, asking first — the overwrite producer review
+    /// #2 asked for, so three full slots can still start a new game without deleting one first), Delete
+    /// (asks first) and Export/Import where the host can move files (<see cref="ViewerHost.SaveTransfer"/>).
+    /// An empty slot is a shorter card with New game as its one primary button. Importing over an
+    /// existing save asks first too.
     /// </summary>
     public sealed class SaveSlotsScreen : GameScreen
     {
         private const float Pad = HeaderMetrics.Pad;
         private const float TopBar = HeaderMetrics.Standard;
-        private const float CardHeight = 420f;
+        private const float CardHeight = 540f;
         private const float EmptyCardHeight = 320f;
         private const float PortraitSize = 86f;
         private const float ButtonHeight = 96f;
+        private const float ButtonGap = 16f;
 
         private readonly SaveSlotsViewModel _model;
         private readonly ScreenHeader _header;
@@ -51,7 +56,7 @@ namespace BeastCraft.Game.Screens
             Build();
         }
 
-        /// <summary>Continue <paramref name="row"/>'s save, or start a new game in it (asking first when it replaces one).</summary>
+        /// <summary>The primary button: Continue when the slot's save loads, else New game (an empty slot, or one that cannot be loaded).</summary>
         public void Play(SaveSlotRow row)
         {
             if (row.Readable)
@@ -83,6 +88,17 @@ namespace BeastCraft.Game.Screens
                 return;
             }
 
+            NewGame(row);
+        }
+
+        /// <summary>
+        /// Starts a new game in <paramref name="row"/>'s slot, asking first when it replaces a save
+        /// (<see cref="SaveSlotsViewModel.NewGameReplaces"/>) — an empty slot's primary button, or the
+        /// "New game" row a readable save also offers (producer review #2: three full slots can still
+        /// start a new game by picking one to overwrite, with a confirm, rather than deleting one first).
+        /// </summary>
+        public void NewGame(SaveSlotRow row)
+        {
             Action start = () =>
             {
                 _model.StartNew(row.Slot);
@@ -137,37 +153,50 @@ namespace BeastCraft.Game.Screens
             _cards.Begin();
             float width = _cards.Width;
             float y = 10f;
+            float fullWidth = width - 72f;
+            float x0 = Pad + 36f;
             foreach (SaveSlotRow row in _model.Rows())
             {
                 float top = y;
                 float cardHeight = row.HasSave ? CardHeight : EmptyCardHeight;
                 y = _cards.Card(y, cardHeight, row.Current ? "card" : row.HasSave ? "panel" : "slot", box => DrawSlot(box, row));
-                List<(string Id, string Text, string Style, Action Click)> buttons = new List<(string, string, string, Action)>
+
+                if (!row.HasSave)
                 {
-                    ("play-" + row.Slot, row.PlayText, row.Readable ? "primary" : "secondary", () => Play(row))
-                };
-                if (row.HasSave)
-                {
-                    buttons.Add(("delete-" + row.Slot, Loc("ui.save_slots.delete"), "chip", () => Delete(row)));
+                    // An empty slot: New game is the one primary button, no second row.
+                    AddButton(_cards.Scroll, "play-" + row.Slot, new Rect(x0, top + cardHeight - ButtonHeight - 30f, fullWidth, ButtonHeight), row.PlayText, "primary", () => Play(row));
+                    continue;
                 }
 
+                float primaryY = top + cardHeight - 2f * ButtonHeight - ButtonGap - 30f;
+                AddButton(_cards.Scroll, "play-" + row.Slot, new Rect(x0, primaryY, fullWidth, ButtonHeight), row.PlayText, row.Readable ? "primary" : "secondary", () => Play(row));
+
+                // The second row: New game (only a readable save, whose primary is Continue, needs a
+                // separate overwrite action here — producer review #2), Delete, Export/Import.
+                List<(string Id, string Text, Action Click)> chips = new List<(string, string, Action)>();
+                if (row.Readable)
+                {
+                    chips.Add(("newgame-" + row.Slot, Loc("ui.save_slots.new_game"), () => NewGame(row)));
+                }
+
+                chips.Add(("delete-" + row.Slot, Loc("ui.save_slots.delete"), () => Delete(row)));
                 if (_model.CanTransfer && row.Readable)
                 {
-                    buttons.Add(("export-" + row.Slot, Loc("ui.save_slots.export"), "chip", () => Export(row)));
+                    chips.Add(("export-" + row.Slot, Loc("ui.save_slots.export"), () => Export(row)));
                 }
 
                 if (_model.CanTransfer)
                 {
-                    buttons.Add(("import-" + row.Slot, Loc("ui.save_slots.import"), "chip", () => Import(row)));
+                    chips.Add(("import-" + row.Slot, Loc("ui.save_slots.import"), () => Import(row)));
                 }
 
-                float gap = 16f;
-                float buttonWidth = (width - 72f - gap * 3f) / 4f;
-                float x = Pad + 36f;
-                foreach ((string id, string text, string style, Action click) in buttons)
+                float chipY = primaryY + ButtonHeight + ButtonGap;
+                float chipWidth = (fullWidth - ButtonGap * (chips.Count - 1)) / chips.Count;
+                float x = x0;
+                foreach ((string id, string text, Action click) in chips)
                 {
-                    AddButton(_cards.Scroll, id, new Rect(x, top + cardHeight - ButtonHeight - 30f, buttonWidth, ButtonHeight), text, style, click);
-                    x += buttonWidth + gap;
+                    AddButton(_cards.Scroll, id, new Rect(x, chipY, chipWidth, ButtonHeight), text, "chip", click);
+                    x += chipWidth + ButtonGap;
                 }
             }
 

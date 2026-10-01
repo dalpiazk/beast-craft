@@ -116,7 +116,7 @@ namespace BeastCraft.Game
                                                           "beast-detail", "beast-derived", "beast-skills", "beast-gear", "encounter-insight", "element-chart", "glossary", "battle-log", "results-log",
                                                           "kinship-map", "kinship-poi", "kinship-trial", "kinship-choice", "region-progress", "compendium", "achievements", "look-tokens",
                                                           "grove-glade", "grove-garden", "grove-board", "grove-npc", "soothe", "colour-forms", "shop", "avatar-skills", "avatar-gear",
-                                                          "avatar-wardrobe", "inventory-materials", "inventory-looks", "shop-sell", "picker10", "save-slots",
+                                                          "avatar-wardrobe", "inventory-materials", "inventory-looks", "shop-sell", "picker10", "save-slots", "save-slots-empty", "save-slots-full",
                                                           "grove-canvas", "colour-picker", "inventory-new", "map-hard", "encounter-hard", "consent" };
 
         /// <summary>

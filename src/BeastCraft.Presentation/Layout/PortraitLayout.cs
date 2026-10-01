@@ -211,7 +211,8 @@ namespace BeastCraft.Presentation.Layout
         /// </summary>
         public const float DiscHeadroom = 48f;
 
-        public const int ControlCount = 5;
+        /// <summary>x1/x2/x3 and skip (producer review, menu-screens pass #67: pause/play moved to the header's gear, so the bar has one fewer control, filling evenly).</summary>
+        public const int ControlCount = 4;
 
         /// <summary>The rows of the settings overlay: effects intensity, screen shake, flashes, close.</summary>
         public const int SettingsRowCount = 4;
@@ -225,7 +226,6 @@ namespace BeastCraft.Presentation.Layout
             SkillStrip = new Rect(Margin, 1514f, CanvasWidth - 2f * Margin, 244f);
             Controls = new Rect(Margin, 1774f, CanvasWidth - 2f * Margin, 120f);
             SettingsButton = new Rect(CanvasWidth - Margin - 64f, 12f, 64f, 64f);
-            PauseButton = new Rect(SettingsButton.X - 76f, SettingsButton.Y, 64f, 64f);
             SkillDetail = new Rect(Margin, 560f, CanvasWidth - 2f * Margin, 856f);
             SettingsPanel = new Rect(Margin + 96f, 520f, CanvasWidth - 2f * Margin - 192f, 520f);
         }
@@ -254,15 +254,14 @@ namespace BeastCraft.Presentation.Layout
         /// </summary>
         public Rect SkillDetail { get; }
 
-        /// <summary>The gear button at the header's right end: opens and closes the settings overlay.</summary>
-        public Rect SettingsButton { get; }
-
         /// <summary>
-        /// The pause button, just left of <see cref="SettingsButton"/> (a campaign battle only): opens
-        /// the pause menu (<c>Game.Screens.PauseMenuModal</c>: Resume, Settings, Retreat), freezing the
-        /// battle clock while it (or anything pushed from it) is open.
+        /// The one button at the header's right end (producer review, menu-screens pass #67): in a
+        /// campaign battle it is the pause button, opening the pause menu
+        /// (<c>Game.Screens.PauseMenuModal</c>: Resume, Settings, Retreat) and freezing the battle clock
+        /// while it — or anything pushed from it — is open; in the demo it keeps its original meaning,
+        /// opening and closing the effects settings overlay (<see cref="SettingsPanel"/>).
         /// </summary>
-        public Rect PauseButton { get; }
+        public Rect SettingsButton { get; }
 
         /// <summary>The settings overlay's panel, over the board.</summary>
         public Rect SettingsPanel { get; }
