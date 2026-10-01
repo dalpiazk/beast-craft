@@ -1,0 +1,57 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Spike #55, fourth pass: real-time 3D in MonoGame (DesktopGL), standalone from the game — NOT
+    added to BeastCraft.slnx and does NOT touch src/, so CI is unaffected by this spike. Mirrors
+    src/BeastCraft.Desktop's TargetFramework and MonoGame.Framework.DesktopGL package version so the
+    comparison is apples-to-apples.
+
+    Loads Content/model/griffin_live.glb (a Blender-authored, skinned + idle/move-animated
+    low-poly Griffin, exported from the spike's pass-3 Meshy remesh — see
+    Tooling/Spike55/blender_export_live.py) at runtime with SharpGLTF (MIT licence; SharpGLTF.Core
+    only — this project hand-rolls CPU skinning and animation sampling directly against the glTF
+    schema rather than using SharpGLTF.Runtime's scene-graph helper, so Runtime is not referenced).
+    The only MGCB-built content is the custom toon/outline effect (Content/Effects/Toon.fx); the GLBs
+    and backdrop PNG are read as plain files at runtime (Texture2D.FromStream / File.ReadAllBytes),
+    same convention as BeastCraft.Desktop's own content loading.
+
+    See Tooling/Spike55/README.md for build/run/bench commands, licence notes and how the assets were built.
+  -->
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <EnableNETAnalyzers>false</EnableNETAnalyzers>
+    <RootNamespace>BeastCraft.Spike55.Live3D</RootNamespace>
+    <AssemblyName>Live3D</AssemblyName>
+    <RollForward>Major</RollForward>
+    <TieredPGO>true</TieredPGO>
+    <!-- Standalone spike: not part of BeastCraft.slnx, no ProjectReference to src/ or Tooling/. -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.5.1" />
+    <PackageReference Include="MonoGame.Content.Builder.Task" Version="3.8.5.1" />
+    <!-- MIT licence (https://github.com/vpenades/SharpGLTF) — see Tooling/Spike55/README.md's
+         "Licences" section for the full notice this project ships. -->
+    <PackageReference Include="SharpGLTF.Core" Version="1.0.7" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Content pipeline: only the toon/outline effect is MGCB-built; everything else (GLBs, backdrop
+         PNG) is read as a plain file at runtime, same convention as BeastCraft.Desktop. -->
+    <MonoGameContentReference Include="Content\Content.mgcb" />
+    <None Include="Content\model\griffin_live.glb" Link="Content\model\griffin_live.glb" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Content\model\crest_alt.glb" Link="Content\model\crest_alt.glb" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\..\content\art\backdrops\r01\sun0\medium.png" Link="Content\backdrop.png" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Fifth pass fix round (swarm via GPU skinning, battle mode only): the real, rigged Swarmling,
+         a skinned + idle/move-animated GLB, loaded with SharpGLTF exactly like the Griffin (see
+         Tooling/Spike55/blender_export_live_swarmling.py). Replaces the earlier procedural
+         placeholder's custom Content/swarm/*.bin format. -->
+    <None Include="Content\model\swarmling_live.glb" Link="Content\model\swarmling_live.glb" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

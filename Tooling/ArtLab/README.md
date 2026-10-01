@@ -33,6 +33,7 @@ Nothing here needs the network once the models are downloaded; `common.py` sets 
 | `scripts/export_ingame.py` | The in-game sprite for `content/art/beasts/<beast>/`; with `--accent-mask`, an enemy's base and element-accent overlay for `content/art/enemies/<type>/` (and the Nature-tint fidelity check) |
 | `scripts/layout_overlay.py` | Battle backdrop review: the hex grid, the deployment zones and a layout's obstacle hexes (`content/data/Encounters/battle-layouts.json`) drawn over any backdrop image, placed by its `battle-art.json` board rect (or an approximate fit for a candidate painting); `--all` renders every layout. Standard library plus Pillow, no GPU. See `docs/art/hollow-art-slots.md` |
 | `scripts/accent_mask_master.py` | An enemy's saved accent mask (1x working canvas) aligned to its archived `character.png` |
+| `scripts/meshy.py`, `scripts/test_meshy.py` | A separate, optional tool: a local-only CLI for Meshy's paid image-to-3D API (standard library only, no GPU, no models to download) -- see "Meshy (3D)" below. Unrelated to the SDXL pipeline above |
 | `scripts/enemies/` | The scripts **as run** for the nine Verdant Hollow enemy finals (2026-09-27): `common.py` (as `seven/common.py`, plus `ARTLAB_ENEMIES`, the folder of all nine), `beasts.py` + `enemy_defs.json` (the enemy prompts and swatches), `fixlib.py`, `fixguide.py`, the fixes (Giant `giantfix2.py`, `nocrystal.py`, `pawfix.py`; Shaman `staffix.py`; Archer `bowfix.py`; Stalker `legfix.py`, `leg4.py`; Caster `orbfix.py`; Champion `scalefix.py`; Stingling `stingfix.py`, `barb2x.py`), the rig specs `<type>_parts.json`, `deliver.py` + `deliver_specs.json` (review sheets and the masks no fix saved) and `lineup.py` (the relative sizes). The rest of the chain (`gen4.py`, `lock2.py`, `chain.sh`, `finish.py`, `rigparts.py`...) is `seven/`'s, unchanged. Each file's first line names what it produced |
 | `scripts/seven/` | The scripts **as run** for the other seven finals (Leviathan, Thunderbird, Griffin, Frost Wyrm, Treant, Tarasque, Basilisk), kept apart because they differ from the trio's cleaned-up set above (the trio finals as style refs, XPU math SDPA and no VAE tiling, `rigparts.py`'s inpaint validator and pivot overrides). Paths from `BEASTCRAFT_ARTLAB`, `ARTLAB_OUT` (one beast's folder), `ARTLAB_WORK` and `ARTLAB_FINALS` (see its `common.py`). Each file's first line names what it produced |
 | `scripts/seven/` shared | `common.py`, `beasts.py`, `gen4.py` (prep, lock), `lock2.py` (pick-init lock), `colour.py`, `masks.py`, `sketches_soft.py`, `detail_pass.py`, `line_pass.py`, `finish.py`, `golem_face.py`, `facemask.py`, `chain.sh` (the finish chain), `offpal.py`, `despeck.py`, `rigparts.py` + `<beast>_parts.json`, `parts_sheet.py` |
@@ -178,6 +179,32 @@ Run from `Tooling/ArtLab/scripts`; `$W` is `ARTLAB_WORK`, `$O` is `ARTLAB_OUT`.
   The feet pivot is (256, 508).
 - **Size in game** is `WorldHeight` in `Tooling/PixelArt/illustrated.json` (world units from the feet to the top of
   the art); see `Tooling/PixelArt/README.md`.
+
+## Meshy (3D)
+`scripts/meshy.py` is a separate, optional local-only CLI for [Meshy](https://www.meshy.ai)'s **paid**
+image-to-3D API, used e.g. to turn an approved 2D beast illustration into a mesh for a 3D spike (see
+`Tooling/Spike55/README.md` and `provenance/spike55-griffin-meshy.md`). It has nothing to do with the SDXL
+pipeline above: standard library only (urllib, json, base64, argparse), no GPU, no models. CI never runs it
+either. Full endpoint/field/pricing citations and doc links are in the script's own docstring.
+
+**Setting the key.** Set `MESHY_API_KEY` (a Windows user environment variable works even if the current
+shell was opened before you set it -- the CLI falls back to reading it from the registry). The key is never
+printed, logged or written to any output file.
+
+**Spend guard.** `image-to-3d` always prints the exact request (key redacted) and its documented credit
+cost, then stops. Nothing is sent to Meshy unless you also pass `--yes`; `--dry-run` never sends a request
+at all, even with `--yes`. `balance` and `get` (re-downloading a finished task's outputs) are free per
+Meshy's docs and can be run as often as you like.
+
+**Examples** (run from `Tooling/ArtLab/scripts`):
+```
+python meshy.py balance
+python meshy.py image-to-3d --image path/to/source.png --out OUT_DIR --dry-run       # see the request + cost, send nothing
+python meshy.py image-to-3d --image path/to/source.png --out OUT_DIR --yes           # actually spend credits
+python meshy.py get --task TASK_ID --out OUT_DIR                                     # re-download later (free)
+```
+Outputs (GLBs, textures, thumbnails) are never committed; point `--out` outside the repo (or set
+`ARTLAB_MESHY_OUT`). A successful download writes a provenance record to `provenance/meshy-<task-id>.md`.
 
 ## Known issues
 - **XPU NaN/black images.** About 20-30% of calls on the Arc iGPU come back NaN, which decodes black. Every generator
