@@ -512,7 +512,7 @@ namespace BeastCraft.Game.Screens
 
         public override void Draw()
         {
-            Gradient("cream", "creamDeep", new Rect(0, 0, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight));
+            PageBackground("cream", "creamDeep");
             base.Draw();
             AvatarOverviewViewModel overview = _hub.Overview;
             _header.Paint(Ctx, Ui, Loc("ui.avatar.title"), Loc("ui.tutorial.beast_level", overview.DisplayName, overview.Level));

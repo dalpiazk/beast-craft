@@ -1111,10 +1111,27 @@ namespace BeastCraft.Game
                 case "settings-visuals":
                 case "settings-audio":
                 case "settings-privacy":
-                    steps.Add(() => Title().OpenSettings());
+                    // --backdrop needs a save to mark a region reached on (Settings is otherwise reachable
+                    // straight from the title, with none): start one first, same as every other screen
+                    // does. Opening Settings itself is deferred below, after the save exists and
+                    // --backdrop's own mark-and-select step has run — SettingsScreen's backdrop picker
+                    // reads CampaignProgress once, in its constructor, so it must not be built before
+                    // that mark-and-select step has run (and StartScriptedGame leaves Title, so
+                    // Title().OpenSettings() — which expects the title on top — no longer applies).
+                    if (!string.IsNullOrEmpty(_options.Backdrop))
+                    {
+                        steps.Add(StartScriptedGame);
+                    }
+
                     break;
                 case "credits":
-                    steps.Add(() => _stack.Push(new CreditsScreen(_ctx)));
+                    // CreditsScreen pushes onto whatever is on top; with --backdrop that needs to be Home,
+                    // not Title (see the "settings" case above) — deferred below for the same reason.
+                    if (!string.IsNullOrEmpty(_options.Backdrop))
+                    {
+                        steps.Add(StartScriptedGame);
+                    }
+
                     break;
                 case "starter-pick":
                     steps.Add(() => Title().StartNewGame());
@@ -1164,6 +1181,33 @@ namespace BeastCraft.Game
                         }
                     });
                     break;
+            }
+
+            if (!string.IsNullOrEmpty(_options.Backdrop))
+            {
+                string backdropId = _options.Backdrop;
+                steps.Add(() =>
+                {
+                    PlayerSave save = _ctx.Session?.Save;
+                    if (save != null)
+                    {
+                        save.Campaign.MarkBackdropReached(backdropId);
+                        save.Campaign.SelectBackdrop(backdropId);
+                    }
+                });
+            }
+
+            // Settings and Credits open here, not in the switch above, when --backdrop started a game for
+            // them: the mark-and-select step just above must run first, since SettingsScreen's backdrop
+            // picker reads CampaignProgress once, in its own constructor.
+            bool backdropGame = !string.IsNullOrEmpty(_options.Backdrop);
+            if (screen == "settings" || screen == "settings-gameplay" || screen == "settings-visuals" || screen == "settings-audio" || screen == "settings-privacy")
+            {
+                steps.Add(backdropGame ? () => Home().OpenSettings() : () => Title().OpenSettings());
+            }
+            else if (screen == "credits")
+            {
+                steps.Add(() => _stack.Push(new CreditsScreen(_ctx)));
             }
 
             if (screen == "roster" || screen == "grove" || screen == "avatar" || screen == "inventory")

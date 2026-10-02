@@ -50,7 +50,7 @@ namespace BeastCraft.Game.Screens
 
         public override void Draw()
         {
-            Gradient("cream", "parchment", new Rect(0, 0, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight));
+            PageBackground("cream", "parchment");
             UiStyle style = Ctx.Style;
             Painter.TextIn(Loc("ui.insight.element_chart"), new Rect(180f, 44f, 600f, style.TextSizes.Heading + 6f), style.TextSizes.Heading + 6f, Painter.C("plum"), TextAlign.Left);
             Painter.TextIn(Loc("ui.insight.rows_columns"), new Rect(180f, 112f, 700f, 30f), style.TextSizes.Body, Painter.C("inkSoft"), TextAlign.Left);
@@ -244,7 +244,7 @@ namespace BeastCraft.Game.Screens
 
         public override void Draw()
         {
-            Gradient("cream", "parchment", new Rect(0, 0, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight));
+            PageBackground("cream", "parchment");
             base.Draw();
             // No subtitle here: the title sits lower (60, not the header's usual 44) to stay centred
             // in the bar on its own, so it is drawn after the (title-less) header wash rather than

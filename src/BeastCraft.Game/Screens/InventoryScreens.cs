@@ -266,7 +266,7 @@ namespace BeastCraft.Game.Screens
 
         public override void Draw()
         {
-            Gradient("cream", "creamDeep", new Rect(0, 0, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight));
+            PageBackground("cream", "creamDeep");
             base.Draw();
             _header.Paint(Ctx, Ui, Loc("ui.inventory.title"), Loc("ui.encounter.reward_gold", Ctx.Session.Save.Gold));
             if (_hub.Gear.AnyNew || _hub.Gear.Gear.Exists(row => row.IsNew))

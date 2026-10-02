@@ -84,7 +84,7 @@ namespace BeastCraft.Game.Screens
 
         public override void Draw()
         {
-            Gradient("cream", "parchment", new Rect(0, 0, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight));
+            PageBackground("cream", "parchment");
             base.Draw();
             _header.Paint(Ctx, Ui, Loc("ui.compendium.title"));
             CompendiumCompletion completion = _model.Completion;
@@ -247,7 +247,7 @@ namespace BeastCraft.Game.Screens
 
         public override void Draw()
         {
-            Gradient("cream", "parchment", new Rect(0, 0, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight));
+            PageBackground("cream", "parchment");
             base.Draw();
             _header.Paint(Ctx, Ui, Loc("ui.achievements.title"));
             UiStyle style = Ctx.Style;
@@ -375,7 +375,7 @@ namespace BeastCraft.Game.Screens
 
         public override void Draw()
         {
-            Gradient("cream", "parchment", new Rect(0, 0, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight));
+            PageBackground("cream", "parchment");
             base.Draw();
             _header.Paint(Ctx, Ui, Loc("ui.look_tokens.title"));
             UiStyle style = Ctx.Style;

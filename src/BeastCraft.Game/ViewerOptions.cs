@@ -26,6 +26,10 @@ namespace BeastCraft.Game
     ///   --map-seed N        the seed new expedition maps are drawn with (default: the clock;
     ///                       scripted runs use a fixed one)
     ///   --starter-level L   a new game's starter beasts start at level L (debug; default 1)
+    ///   --backdrop ID       marks region ID's menu backdrop reached and selects it before the screen
+    ///                       loads (debug, journal UI kit #52 step 3: e.g. --screen settings-visuals
+    ///                       --backdrop r05 to look at a screen over a backdrop other than
+    ///                       Hearthglen's default)
     ///
     /// Measuring (either mode; the overlay is compiled into Debug builds, and into Release only with
     /// -p:PerfOverlay=true; docs/design/performance.md):
@@ -100,6 +104,7 @@ namespace BeastCraft.Game
         public string SaveDir;
         public int? MapSeed;
         public int? StarterLevel;
+        public string Backdrop;
 
         /// <summary>Show the frame-time overlay from the start (Debug builds, or Release with -p:PerfOverlay=true; else ignored with a note).</summary>
         public bool PerfOverlay;
@@ -195,6 +200,15 @@ namespace BeastCraft.Game
                         break;
                     case "--starter-level":
                         options.StarterLevel = Math.Min(100, Int(value, flag, 1, ref error));
+                        i++;
+                        break;
+                    case "--backdrop":
+                        options.Backdrop = value;
+                        if (string.IsNullOrEmpty(value))
+                        {
+                            error = "--backdrop needs a region id (e.g. r05).";
+                        }
+
                         i++;
                         break;
                     case "--screenshot":
@@ -336,7 +350,7 @@ namespace BeastCraft.Game
         }
 
         /// <summary>The game's own flags (never the demo's).</summary>
-        private static readonly string[] GameFlags = { "--screen", "--walkthrough", "--save-dir", "--map-seed", "--starter-level" };
+        private static readonly string[] GameFlags = { "--screen", "--walkthrough", "--save-dir", "--map-seed", "--starter-level", "--backdrop" };
 
         /// <summary>Flags that serve the game and the demo alike (they do not start the demo).</summary>
         private static readonly string[] NeutralFlags = { "--screenshot", "--scale", "--safe-inset", "--content", "--effects", "--no-shake", "--no-flashes", "--perf-overlay", "--perf-seconds" };

@@ -168,6 +168,44 @@ namespace BeastCraft.Game.Screens
             }
         }
 
+        /// <summary>
+        /// A menu screen's full-canvas background (journal UI kit, #52 step 3): the player's selected
+        /// region backdrop (<c>ui/backdrop/&lt;id&gt;</c>, <see cref="Campaign.CampaignProgress.SelectedBackdropId"/>),
+        /// stretched over the canvas with a soft cream wash on top so the parchment UI kit's contrast
+        /// ratios hold against a painted scene instead of a flat colour. Falls back to the plain
+        /// <paramref name="top"/>/<paramref name="bottom"/> <see cref="Gradient"/> when the kit is off,
+        /// there is no session yet (the title, before a save loads) or the backdrop art is missing —
+        /// so every screen keeps working exactly as before whenever a backdrop is not available.
+        /// </summary>
+        protected void PageBackground(string top, string bottom)
+        {
+            Rect canvas = new Rect(0, 0, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight);
+            ArtSprite backdrop = ResolveBackdrop();
+            if (backdrop == null)
+            {
+                Gradient(top, bottom, canvas);
+                return;
+            }
+
+            Painter.NineSlice(backdrop, canvas);
+            Painter.Fill(canvas, Painter.C("cream", BackdropWashAlpha));
+        }
+
+        /// <summary>How much of the cream wash <see cref="PageBackground"/> lays over the backdrop (0 = none, 1 = opaque cream).</summary>
+        private const float BackdropWashAlpha = 0.55f;
+
+        /// <summary>The selected region's backdrop art, or null when the kit is off, there is no session, or it has none.</summary>
+        private ArtSprite ResolveBackdrop()
+        {
+            if (!UiKit.Enabled || Ctx.Session?.Save?.Campaign == null)
+            {
+                return null;
+            }
+
+            string id = Ctx.Session.Save.Campaign.SelectedBackdropId;
+            return string.IsNullOrEmpty(id) ? null : Painter.Sprite("ui/backdrop/" + id);
+        }
+
         /// <summary>A button added to <see cref="Ui"/> (or <paramref name="parent"/>) that runs <paramref name="onClick"/>.</summary>
         protected Button AddButton(Widget parent, string id, Rect bounds, string text, string style, Action onClick, string glyph = null)
         {

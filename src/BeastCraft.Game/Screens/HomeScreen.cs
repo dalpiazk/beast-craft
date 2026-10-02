@@ -528,7 +528,7 @@ namespace BeastCraft.Game.Screens
         {
             if (_home.Tab != HomeTab.Map)
             {
-                Gradient("cream", "creamDeep", new Rect(0, 0, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight));
+                PageBackground("cream", "creamDeep");
             }
 
             base.Draw();
