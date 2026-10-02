@@ -14,7 +14,7 @@ namespace BeastCraft.Tests.EditMode
     public class CampaignSaveTests
     {
         private static readonly SaveContentCatalog Catalog = new SaveContentCatalog(
-            new[] { "emberfox" }, new string[0], new string[0], new string[0], new[] { "r01", "r02" }, new[] { "seal_r01" });
+            new[] { "emberfox" }, new string[0], new string[0], new string[0], new[] { "r00", "r01", "r02" }, new[] { "seal_r01" });
 
         private static SaveSerializer NewSerializer(ISaveContentCatalog catalog = null)
         {
@@ -51,7 +51,7 @@ namespace BeastCraft.Tests.EditMode
         {
             PlayerSave save = PlayerSave.CreateNew();
 
-            Assert.AreEqual(13, PlayerSave.CurrentSchemaVersion);
+            Assert.AreEqual(14, PlayerSave.CurrentSchemaVersion);
             Assert.AreEqual(RunDifficulty.Normal, save.Campaign.ActiveRun.Difficulty);
             Assert.IsTrue(save.Campaign.IsUnlocked(CampaignProgress.StartingRegionId));
             Assert.AreEqual(1, save.Campaign.Regions.Count);

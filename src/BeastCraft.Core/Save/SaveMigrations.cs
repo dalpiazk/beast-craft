@@ -37,6 +37,10 @@ namespace BeastCraft.Save
     /// <item>12 to 13: the in-battle pause menu's Retreat, counted apart from an ordinary loss
     /// (<see cref="MapRun.NodeRetreats"/>/<see cref="MapRun.NodeRetreatsNodeId"/>) so it never eases
     /// adaptive assist (<c>CampaignRules.AssistLossesAt</c>) the way a real loss does: <see cref="AddRetreats"/>.</item>
+    /// <item>13 to 14: the menu backdrop picker (<see cref="CampaignProgress.ReachedBackdropIds"/>,
+    /// <see cref="CampaignProgress.SelectedBackdropId"/>) — Hearthglen starts reached and selected,
+    /// every other region already unlocked on the save is also marked reached (its backdrop was
+    /// already earned): <see cref="AddBackdrops"/>.</item>
     /// </list>
     /// </summary>
     public static class SaveMigrations
@@ -47,7 +51,7 @@ namespace BeastCraft.Save
             return new List<ISaveMigration>
             {
                 new AddGear(), new AddCampaign(), new AddEconomy(), new AddIdle(), new AddRunDifficulty(), new AddTutorial(), new AddDiscovery(), new AddCompendium(),
-                new AddGrove(), new AddPendingBattle(), new AddSeen(), new AddRetreats()
+                new AddGrove(), new AddPendingBattle(), new AddSeen(), new AddRetreats(), new AddBackdrops()
             };
         }
 
@@ -418,6 +422,43 @@ namespace BeastCraft.Save
                 PlayerSave save = serializer.FromJson<PlayerSave>(json);
                 save.EnsureInitialized();
                 save.SchemaVersion = 13;
+                return serializer.ToJson(save);
+            }
+        }
+
+        /// <summary>
+        /// Schema 13 to 14: a v13 save has no backdrop picker state. The upgrade reads it into the
+        /// current type (<see cref="CampaignProgress.ReachedBackdropIds"/> takes its default of just
+        /// Hearthglen, <see cref="CampaignProgress.SelectedBackdropId"/> defaults to Hearthglen too,
+        /// both via <see cref="PlayerSave.EnsureInitialized"/>), then also marks every region already
+        /// unlocked on the save (<see cref="CampaignProgress.Regions"/>) as a reached backdrop: an
+        /// existing player has already earned those, even if the new, stricter "entered" bookkeeping
+        /// (<see cref="CampaignRules.StartRun(BeastCraft.Save.PlayerSave, RegionLibrary, string, int, int, RunDifficulty)"/>)
+        /// never ran for them. Nothing else moves.
+        /// </summary>
+        public sealed class AddBackdrops : ISaveMigration
+        {
+            public int FromVersion
+            {
+                get { return 13; }
+            }
+
+            public string Upgrade(string json, ISaveJsonSerializer serializer)
+            {
+                PlayerSave save = serializer.FromJson<PlayerSave>(json);
+                save.EnsureInitialized();
+                if (save.Campaign.Regions != null)
+                {
+                    foreach (RegionProgress region in save.Campaign.Regions)
+                    {
+                        if (region != null)
+                        {
+                            save.Campaign.MarkBackdropReached(region.RegionId);
+                        }
+                    }
+                }
+
+                save.SchemaVersion = 14;
                 return serializer.ToJson(save);
             }
         }

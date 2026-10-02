@@ -649,6 +649,49 @@ records the split. `CurrentSchemaVersion` is **13**.
   `,"NodeRetreats":N,"NodeRetreatsNodeId":N` follows `"Difficulty"` inside every `ActiveRun`. No input
   changed.
 
+### Schema 14: the menu backdrop picker (`CampaignProgress.ReachedBackdropIds`/`SelectedBackdropId`)
+
+The journal UI kit (#52, step 3) draws a graded region backdrop behind out-of-combat menu screens.
+Producer decision, 2026-10-01: a region's backdrop becomes selectable once the player reaches that
+region (first entry); Hearthglen's (`r00`) is unlocked from the start and is the default.
+`CurrentSchemaVersion` is **14**.
+
+- **Explicit field, not derived from `CampaignProgress.Regions`.** `Regions` records *unlocked*
+  regions, not *ever-reached* ones, and it is not monotonic: `CampaignRules` (via `StarterPicks`)
+  calls `CampaignProgress.Lock(TutorialRegionId)` once Hearthglen is cleared or skipped, dropping its
+  `RegionProgress` entry so Hearthglen reads as locked again even though the player's first hours were
+  spent there. Deriving "reached" from `Regions` would un-earn Hearthglen's backdrop the moment the
+  tutorial ends. A separate, append-only list sidesteps that: `ReachedBackdropIds` only ever grows.
+- `CampaignProgress.ReachedBackdropIds` (`List<string>`, region ids, defaults to `["r00"]`) and
+  `SelectedBackdropId` (`string`, defaults to `"r00"`): added right after `PreferredDifficulty`.
+  `HasReachedBackdrop`/`MarkBackdropReached`/`SelectBackdrop` are the only ways code touches them;
+  `MarkBackdropReached` is a no-op once a region is already reached, so it is safe to call on every
+  expedition start, not only the first.
+- *Rules* (`CampaignRules.StartRun`): marks `regionId` reached right after setting `CurrentRegionId`,
+  for every expedition (tutorial included, though Hearthglen is reached from a fresh save regardless).
+  "First entry" is exactly the first successful `StartRun` into a region — the same gate
+  (`IsUnlocked`, an existing expedition, a reachable stage) already guards starting one at all.
+- `PlayerSave.EnsureInitialized` only repairs structure (a null list becomes `["r00"]`, empty/duplicate
+  ids drop, an empty `SelectedBackdropId` becomes `"r00"`); it does not force `"r00"` into an
+  already-non-null list or force `SelectedBackdropId` to be among the reached ids — consistent with
+  this type's existing rule that reporting bad data is `SaveValidator`'s job, not silent repair.
+  `SaveValidator.ValidateBackdrops` reports an unknown or duplicated reached id, or a selected id that
+  has not been reached, as `SaveIssueKind.InvalidBackdrop`.
+- *Presentation.* Settings > Visuals gets a "Backdrop" picker: one thumbnail per reached id (from
+  `ui/backdrop/<id>`), tap to `SelectBackdrop`; locked regions show as a silhouette with their
+  `RegionData.DisplayName` (or "Hearthglen" for `r00`, which has no `regions.json` entry) and no tap
+  target. The backdrop itself is drawn behind the out-of-combat menu screens with a soft dim so the
+  parchment UI kit's contrast ratios still hold (`docs/art/` kit contrast notes).
+- *Migration.* `SaveMigrations.AddBackdrops` (13 to 14): `EnsureInitialized` gives a fresh save
+  `["r00"]`/`"r00"`, then every region already in `Campaign.Regions` is also marked reached — an
+  existing player has already earned that backdrop even though the stricter "entered" bookkeeping
+  (`StartRun`'s own call) never ran for them.
+- *Golden saves.* `rich-v13.input.json` is frozen as an input and `rich-v14.input.json` (captured by
+  reflection with `BEASTCRAFT_UPDATE_GOLDENS=1`) is the one that must round-trip. Every older expected
+  output changed in exactly these places: `"SchemaVersion":13` became `14`, and
+  `,"ReachedBackdropIds":[...],"SelectedBackdropId":"r00"` follows `"PreferredDifficulty"` inside
+  `"Campaign"` (Hearthglen plus any region the save already had unlocked). No input changed.
+
 ### Save slots, backup and export (#59)
 
 - **Three slots.** `GameSession.SlotIds` is `slot1`, `slot2`, `slot3` (`SlotCount` = 3). The session
