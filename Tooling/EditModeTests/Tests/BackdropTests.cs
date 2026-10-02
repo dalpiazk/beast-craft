@@ -1,5 +1,7 @@
 using System.Collections.Generic;
 using BeastCraft.Campaign;
+using BeastCraft.Presentation.Content;
+using BeastCraft.Presentation.Screens;
 using BeastCraft.Save;
 using NUnit.Framework;
 
@@ -10,7 +12,8 @@ namespace BeastCraft.Tests.EditMode
     /// <see cref="CampaignProgress.ReachedBackdropIds"/>/<see cref="CampaignProgress.SelectedBackdropId"/>,
     /// <see cref="CampaignRules.StartRun(BeastCraft.Save.PlayerSave, RegionLibrary, string, int, int, RunDifficulty)"/>
     /// marking a region's backdrop reached on first entry, the 13 to 14 migration
-    /// (<see cref="SaveMigrations.AddBackdrops"/>) and <see cref="SaveValidator"/>'s checks.
+    /// (<see cref="SaveMigrations.AddBackdrops"/>), <see cref="SaveValidator"/>'s checks, and
+    /// <see cref="BackdropPickerViewModel"/>, Settings &gt; Visuals' own view-model.
     /// </summary>
     public class BackdropTests
     {
@@ -18,6 +21,11 @@ namespace BeastCraft.Tests.EditMode
 
         private static readonly SaveContentCatalog Catalog = new SaveContentCatalog(
             new string[0], new string[0], new string[0], new string[0], new[] { "r00", "r01", "r02" }, new string[0]);
+
+        private static GameContent Content
+        {
+            get { return VfxLibraryTests.Content; }
+        }
 
         [SetUp]
         public void SetUp()
@@ -142,6 +150,46 @@ namespace BeastCraft.Tests.EditMode
             save.Campaign.ReachedBackdropIds.Add("whatever-id");
 
             Assert.IsEmpty(SaveValidator.Validate(save, null));
+        }
+
+        [Test]
+        public void BackdropPickerViewModel_ListsRowsInCampaignOrder_LockedUntilReached()
+        {
+            GameSession session = new GameSession(Content, new MemorySaveStorage(), () => 1);
+            session.StartWith(PlayerSave.CreateNew());
+            CampaignRules.StartRun(session.Save, Content.Campaign, "r01", 7);
+
+            BackdropPickerViewModel model = new BackdropPickerViewModel(session);
+
+            Assert.AreEqual(12, model.Rows.Count);
+            Assert.AreEqual("r00", model.Rows[0].RegionId);
+            Assert.IsTrue(model.Rows[0].Reached);
+            Assert.IsTrue(model.Rows[0].Selected, "Hearthglen is the default selection");
+            Assert.AreEqual("r01", model.Rows[1].RegionId);
+            Assert.IsTrue(model.Rows[1].Reached, "StartRun reached it");
+            Assert.IsFalse(model.Rows[1].Selected);
+            Assert.AreEqual("r02", model.Rows[2].RegionId);
+            Assert.IsFalse(model.Rows[2].Reached);
+            Assert.AreEqual(Content.Text.Get("region.r02.name"), model.Rows[2].DisplayName, "already-resolved region text, not a loc key");
+        }
+
+        [Test]
+        public void BackdropPickerViewModel_Select_RefusesALockedRegion_AndPersistsAReachedOne()
+        {
+            GameSession session = new GameSession(Content, new MemorySaveStorage(), () => 1);
+            session.StartWith(PlayerSave.CreateNew());
+            CampaignRules.StartRun(session.Save, Content.Campaign, "r01", 7);
+            BackdropPickerViewModel model = new BackdropPickerViewModel(session);
+
+            Assert.IsFalse(model.Select("r02"), "r02 has not been reached");
+            Assert.IsTrue(model.Rows[0].Selected, "unchanged by a refused pick");
+
+            int savesBefore = session.AutosaveCount;
+            Assert.IsTrue(model.Select("r01"));
+            Assert.Greater(session.AutosaveCount, savesBefore, "Select persists through GameSession.Autosave");
+            Assert.IsTrue(model.Rows[1].Selected);
+            Assert.IsFalse(model.Rows[0].Selected);
+            Assert.AreEqual("r01", session.Save.Campaign.SelectedBackdropId);
         }
     }
 }
