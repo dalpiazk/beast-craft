@@ -45,7 +45,7 @@ namespace BeastCraft.Tests.EditMode
                         { "beasts", new[] { "beast" } },
                         { "enemies", new[] { "enemy", "accent" } },
                         { "backdrops", new[] { "backdrop" } },
-                        { "ui", new[] { "ui", "ui_kit", "ui_glyph" } },
+                        { "ui", new[] { "ui", "ui_kit", "ui_glyph", "ui_backdrop" } },
                         { "icons", new[] { "skill" } },
                         { "vfx", new[] { "fx" } }
                     };

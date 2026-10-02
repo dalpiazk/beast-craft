@@ -252,6 +252,13 @@ that (foreground, small batches, ~15 GB free memory headroom).
 | `Tooling/ArtLab/scripts/menu_backdrops/tokcheck.py` | 77-token budget check for every region's prompts |
 | `Tooling/ArtLab/scripts/menu_backdrops/README.md` | how to regenerate and grade a region's backdrop |
 
-The graded PNGs themselves (`content/art/ui/menu_backdrops/r00.png` ... `r11.png` or similar, path
-TBD by the UI kit commit) are **not** part of this commit -- they ship with the Journal/Settings UI
-kit commit on this same branch, per the producer's picks in section 3.
+The graded images themselves are **not** part of this commit -- they ship with the Journal/Settings UI
+kit commit on this same branch, per the producer's picks in section 3, as
+`content/art/ui/backdrops/r00.jpg` ... `r11.jpg` (ArtKey `ui/backdrop/<regionId>`, registered in
+`Tooling/PixelArt/illustrated.json`'s Painted list). Each graded 832x1216 PNG is centre-cropped to the
+game's 9:16 portrait canvas, resized to 1080x1920 and saved as a quality-88 JPEG (`*.jpg` is already
+Git LFS-tracked): 218-374 KB per file, well under the ~700 KB/file budget, with no visible banding or
+block artefacts behind the UI kit's dim overlay at that quality. PNG was not used for the shipped
+asset: these are continuous-tone painted/grained images (not the flat-fill UI kit pieces), so lossless
+PNG at 1080x1920 ran 1-1.5 MB per file against JPEG's 220-370 KB for no visible difference once dimmed
+under the parchment UI.

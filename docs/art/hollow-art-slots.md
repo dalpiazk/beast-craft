@@ -21,8 +21,10 @@ Tick a box when the painted file has landed.
 
 **Status (2026-10-02).** Landed: the 91 skill icons and the frame and the five rarity rings (sections 2 and 3;
 Treatment B, Frame 1; `Tooling/ArtLab/provenance/icons.md`), the 14 journal UI kit pieces (section 5;
-procedural, `Tooling/UiKit/README.md`) and 11 journal UI kit painted glyphs (section 6; AI-assisted,
-`Tooling/ArtLab/provenance/ui-glyphs.md`). Borderline but accepted ("not aiming for perfect"):
+procedural, `Tooling/UiKit/README.md`), 11 journal UI kit painted glyphs (section 6; AI-assisted,
+`Tooling/ArtLab/provenance/ui-glyphs.md`) and the 12 journal UI kit menu backdrops (section 7;
+AI-assisted plus a deterministic colour grade, `Tooling/ArtLab/provenance/menu-backdrops.md`).
+Borderline but accepted ("not aiming for perfect"):
 **Thorn Lash**, **Sunder** and **Great Cleave** (see `docs/art/touch-ups.md`). Still placeholders: the 24
 backdrops (section 1) and the 59 VFX hero frames (section 4). Pending outside this list: the region map art and the
 Archer's accent mask re-cut (`docs/art/touch-ups.md`).
@@ -364,6 +366,36 @@ code-drawn vector glyph otherwise. 256x256, linear filtering, straight alpha, ce
 | [x] | `content/art/ui/glyphs/star.png` | `ui/glyph/star` | a Settings tab (Visuals), an Avatar tab (Skills) |
 | [x] | `content/art/ui/glyphs/speaker.png` | `ui/glyph/speaker` | a Settings tab (Audio) |
 | [x] | `content/art/ui/glyphs/lock.png` | `ui/glyph/lock` | a Settings tab (Privacy) |
+
+## 7. Journal UI kit menu backdrops (12)
+
+One painted scene per campaign region (`regions.json`'s `r01`-`r11` plus Hearthglen, `r00`), drawn
+behind every out-of-combat menu screen (issue #52, step 3): a region's backdrop becomes selectable
+once the player first reaches it (`CampaignRules.StartRun`, `CampaignProgress.ReachedBackdropIds`),
+Hearthglen unlocked and selected by default; see `docs/design/progression-and-saves.md`, "Schema 14."
+Picked in Settings &gt; Visuals (`BackdropPicker`). AI-assisted (Animagine XL 4.0, local, txt2img, one
+prompt per region) plus a deterministic Pillow/numpy colour grade unifying all 12 under direction D's
+look — see `Tooling/ArtLab/provenance/menu-backdrops.md` for the method, prompts, seeds and grade
+parameters; disclose per `docs/art/art-brief.md`, decision 10. Unlike every other section here, these
+are shipped as **JPEG, not PNG** (quality 88, Git LFS-tracked `*.jpg`): continuous-tone painted scenes
+compress 4-6x smaller than lossless PNG at the same 1080x1920 resolution with no visible loss once
+dimmed behind the parchment UI, keeping the total well under the ~700 KB/file budget. Linear filtering,
+mipmapped, centre pivot, no nine-slice (drawn stretched to the full canvas, then dimmed).
+
+| Done | File | ArtKey | Region |
+| --- | --- | --- | --- |
+| [x] | `content/art/ui/backdrops/r00.jpg` | `ui/backdrop/r00` | Hearthglen (tutorial; unlocked from the start) |
+| [x] | `content/art/ui/backdrops/r01.jpg` | `ui/backdrop/r01` | Verdant Hollow |
+| [x] | `content/art/ui/backdrops/r02.jpg` | `ui/backdrop/r02` | Emberreach |
+| [x] | `content/art/ui/backdrops/r03.jpg` | `ui/backdrop/r03` | Tidefall |
+| [x] | `content/art/ui/backdrops/r04.jpg` | `ui/backdrop/r04` | Stormcrag |
+| [x] | `content/art/ui/backdrops/r05.jpg` | `ui/backdrop/r05` | Rustwood |
+| [x] | `content/art/ui/backdrops/r06.jpg` | `ui/backdrop/r06` | Frostmere |
+| [x] | `content/art/ui/backdrops/r07.jpg` | `ui/backdrop/r07` | Thunderspire |
+| [x] | `content/art/ui/backdrops/r08.jpg` | `ui/backdrop/r08` | Deepwild |
+| [x] | `content/art/ui/backdrops/r09.jpg` | `ui/backdrop/r09` | Cinder Throne |
+| [x] | `content/art/ui/backdrops/r10.jpg` | `ui/backdrop/r10` | Worldcrown |
+| [x] | `content/art/ui/backdrops/r11.jpg` | `ui/backdrop/r11` | Duskmeridian |
 
 ## Checks after dropping art in
 
