@@ -720,6 +720,21 @@ namespace BeastCraft.Game.Ui
                 return;
             }
 
+            // A painted replacement for this glyph (the journal UI kit, issue #52 direction D;
+            // Tooling/ArtLab/provenance/ui-glyphs.md): drawn at its own painted colour (no ink tint
+            // — it is already ink-plum on the kit's parchment), only when the kit is on and this
+            // name has one; every other name keeps the code-drawn glyph below either way, so turning
+            // the kit off always compares cleanly against the original.
+            if (UiKit.Enabled)
+            {
+                ArtSprite painted = _atlas.ByArtKey("ui/glyph/" + name);
+                if (painted != null)
+                {
+                    Art(painted, box, false);
+                    return;
+                }
+            }
+
             float s = Math.Min(box.Width, box.Height);
             float ox = box.Center.X - s / 2f;
             float oy = box.Center.Y - s / 2f;

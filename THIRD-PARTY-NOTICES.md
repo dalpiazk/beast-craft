@@ -47,10 +47,12 @@ Foundation. Build-time and test-only packages (the test SDK, NUnit) are not ship
 
 ## Tools used to make game art (not shipped)
 
-The starter trio's beast art (`content/art/beasts/`, with masters in `content/art/source/`) was made
-with the local AI-assisted pipeline in `Tooling/ArtLab/`, with the producer as art director. These
-models were used as **tools**: none of their weights or code ships with the game or is in this
-repository. How each asset was made is recorded in `Tooling/ArtLab/provenance/`.
+The starter trio's beast art (`content/art/beasts/`, with masters in `content/art/source/`), the
+other seven beasts and nine Verdant Hollow enemies, the 91 skill icons, and 11 of the journal UI
+kit's painted glyphs (`content/art/ui/glyphs/`, issue #52) were made with the local AI-assisted
+pipeline in `Tooling/ArtLab/`, with the producer as art director. These models were used as
+**tools**: none of their weights or code ships with the game or is in this repository. How each
+asset was made is recorded in `Tooling/ArtLab/provenance/`.
 
 | Model (Hugging Face) | Used for | Licence |
 | --- | --- | --- |

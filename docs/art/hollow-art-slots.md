@@ -20,8 +20,9 @@ colours** (the data does not tint them).
 Tick a box when the painted file has landed.
 
 **Status (2026-10-02).** Landed: the 91 skill icons and the frame and the five rarity rings (sections 2 and 3;
-Treatment B, Frame 1; `Tooling/ArtLab/provenance/icons.md`), and the 14 journal UI kit pieces (section 5;
-procedural, `Tooling/UiKit/README.md`). Borderline but accepted ("not aiming for perfect"):
+Treatment B, Frame 1; `Tooling/ArtLab/provenance/icons.md`), the 14 journal UI kit pieces (section 5;
+procedural, `Tooling/UiKit/README.md`) and 11 journal UI kit painted glyphs (section 6; AI-assisted,
+`Tooling/ArtLab/provenance/ui-glyphs.md`). Borderline but accepted ("not aiming for perfect"):
 **Thorn Lash**, **Sunder** and **Great Cleave** (see `docs/art/touch-ups.md`). Still placeholders: the 24
 backdrops (section 1) and the 59 VFX hero frames (section 4). Pending outside this list: the region map art and the
 Archer's accent mask re-cut (`docs/art/touch-ups.md`).
@@ -339,6 +340,30 @@ back to the original code-drawn style; `src/BeastCraft.Presentation/Ui/UiKit.cs`
 | [x] | `content/art/ui/kit/toggle_track.png` | `ui/kit/toggle_track` | a toggle's track, on or off alike |
 | [x] | `content/art/ui/kit/toggle_knob.png` | `ui/kit/toggle_knob` | a toggle's knob (fixed sprite) |
 | [x] | `content/art/ui/kit/chip.png` | `ui/kit/chip` | a filter chip's face |
+
+## 6. Journal UI kit painted glyphs (11)
+
+Painted replacements for 11 of `UiPainter.Glyph`'s code-drawn names — the ones the tab strips
+(`SettingsScreen`, `AvatarScreens`, `InventoryScreens`, `ShopScreens`, `GroveScreens`), the bottom
+nav (`HomeScreen`) and the header back button actually use — drawn when `UiKit.Enabled`, the
+code-drawn vector glyph otherwise. 256x256, linear filtering, straight alpha, centre pivot. AI-assisted
+(Animagine XL 4.0, local, img2img over each glyph's own vector geometry as the init — see
+`Tooling/ArtLab/provenance/ui-glyphs.md` for the method, prompts and seeds; disclose per
+`docs/art/art-brief.md`, decision 10).
+
+| Done | File | ArtKey | What |
+| --- | --- | --- | --- |
+| [x] | `content/art/ui/glyphs/back.png` | `ui/glyph/back` | the header back button |
+| [x] | `content/art/ui/glyphs/gear.png` | `ui/glyph/gear` | settings (a tab, the pause menu) |
+| [x] | `content/art/ui/glyphs/map.png` | `ui/glyph/map` | bottom nav, a Grove tab |
+| [x] | `content/art/ui/glyphs/roster.png` | `ui/glyph/roster` | bottom nav, an Avatar tab |
+| [x] | `content/art/ui/glyphs/grove.png` | `ui/glyph/grove` | bottom nav, a Grove tab |
+| [x] | `content/art/ui/glyphs/avatar.png` | `ui/glyph/avatar` | bottom nav, an Avatar tab |
+| [x] | `content/art/ui/glyphs/inventory.png` | `ui/glyph/inventory` | bottom nav |
+| [x] | `content/art/ui/glyphs/battle.png` | `ui/glyph/battle` | a Settings tab (Gameplay) |
+| [x] | `content/art/ui/glyphs/star.png` | `ui/glyph/star` | a Settings tab (Visuals), an Avatar tab (Skills) |
+| [x] | `content/art/ui/glyphs/speaker.png` | `ui/glyph/speaker` | a Settings tab (Audio) |
+| [x] | `content/art/ui/glyphs/lock.png` | `ui/glyph/lock` | a Settings tab (Privacy) |
 
 ## Checks after dropping art in
 
