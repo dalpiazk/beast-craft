@@ -76,12 +76,12 @@
     { "Key": "slot", "Fill": "parchment", "Outline": "plumSoft", "OutlineWidth": 4, "Radius": 20, "Shadow": "" }
   ],
   "Buttons": [
-    { "Key": "primary", "Fill": "leaf", "PressedFill": "leafDeep", "DisabledFill": "stone", "SelectedFill": "leafDeep", "Outline": "plum", "Text": "white", "DisabledText": "cream", "OutlineWidth": 5, "Radius": 34, "TextSize": 30, "Texture": "ui/kit/button_primary" },
-    { "Key": "secondary", "Fill": "cream", "PressedFill": "creamDeep", "DisabledFill": "stone", "SelectedFill": "gold", "Outline": "plum", "Text": "ink", "DisabledText": "inkSoft", "OutlineWidth": 5, "Radius": 34, "TextSize": 28, "Texture": "ui/kit/button_secondary" },
+    { "Key": "primary", "Fill": "leaf", "PressedFill": "leafDeep", "DisabledFill": "stone", "SelectedFill": "leafDeep", "Outline": "plum", "Text": "white", "DisabledText": "cream", "OutlineWidth": 5, "Radius": 34, "TextSize": 30, "Texture": "ui/kit/button_primary", "TextureText": "inkPlum2", "TextureDisabledText": "inkPlum2" },
+    { "Key": "secondary", "Fill": "cream", "PressedFill": "creamDeep", "DisabledFill": "stone", "SelectedFill": "gold", "Outline": "plum", "Text": "ink", "DisabledText": "inkSoft", "OutlineWidth": 5, "Radius": 34, "TextSize": 28, "Texture": "ui/kit/button_secondary", "TextureText": "inkPlum2", "TextureDisabledText": "inkPlum2" },
     { "Key": "ghost", "Fill": "#FFF4DF00", "PressedFill": "#5B3A5E26", "DisabledFill": "#FFF4DF00", "SelectedFill": "#5B3A5E26", "Outline": "plumSoft", "Text": "ink", "DisabledText": "inkSoft", "OutlineWidth": 3, "Radius": 26, "TextSize": 22 },
     { "Key": "nav", "Fill": "#5B3A5E00", "PressedFill": "plumDeep", "DisabledFill": "#5B3A5E00", "SelectedFill": "gold", "Outline": "#5B3A5E00", "Text": "cream", "DisabledText": "plumSoft", "OutlineWidth": 0, "Radius": 26, "TextSize": 17, "Texture": "ui/kit/tab_selected", "UnselectedTexture": "ui/kit/tab_unselected" },
-    { "Key": "chip", "Fill": "cream", "PressedFill": "creamDeep", "DisabledFill": "stone", "SelectedFill": "gold", "Outline": "plumSoft", "Text": "ink", "DisabledText": "inkSoft", "OutlineWidth": 4, "Radius": 22, "TextSize": 20, "Texture": "ui/kit/chip" },
-    { "Key": "danger", "Fill": "berry", "PressedFill": "plum", "DisabledFill": "stone", "SelectedFill": "plum", "Outline": "plum", "Text": "white", "DisabledText": "cream", "OutlineWidth": 5, "Radius": 34, "TextSize": 28, "Texture": "ui/kit/button_danger" }
+    { "Key": "chip", "Fill": "cream", "PressedFill": "creamDeep", "DisabledFill": "stone", "SelectedFill": "gold", "Outline": "plumSoft", "Text": "ink", "DisabledText": "inkSoft", "OutlineWidth": 4, "Radius": 22, "TextSize": 20, "Texture": "ui/kit/chip", "TextureText": "inkPlum2", "TextureDisabledText": "inkPlum2" },
+    { "Key": "danger", "Fill": "berry", "PressedFill": "plum", "DisabledFill": "stone", "SelectedFill": "plum", "Outline": "plum", "Text": "white", "DisabledText": "cream", "OutlineWidth": 5, "Radius": 34, "TextSize": 28, "Texture": "ui/kit/button_danger", "TextureText": "inkPlum2", "TextureDisabledText": "inkPlum2" }
   ],
   "TextSizes": { "Small": 17, "Body": 22, "Heading": 32, "Title": 64 }
 }

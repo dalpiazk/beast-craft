@@ -166,6 +166,18 @@ namespace BeastCraft.Presentation.Ui
 
         public string DisabledText;
 
+        /// <summary>
+        /// <see cref="Text"/>, but for when this look draws its <see cref="Texture"/> (kit-textured
+        /// faces are light parchment regardless of the look's vector <see cref="Fill"/>, so the
+        /// classic look's own <see cref="Text"/> — white, for <c>primary</c>/<c>danger</c>, legible
+        /// on their vector fills' leaf-green/berry — reads at well under 4.5:1 on parchment; empty
+        /// falls back to <see cref="Text"/>). See <see cref="UiPanelStyleData.Texture"/>.
+        /// </summary>
+        public string TextureText = string.Empty;
+
+        /// <summary>See <see cref="TextureText"/>; the disabled-state equivalent of <see cref="DisabledText"/>.</summary>
+        public string TextureDisabledText = string.Empty;
+
         public float OutlineWidth;
 
         public float Radius;
@@ -219,6 +231,13 @@ namespace BeastCraft.Presentation.Ui
         public UiColor Outline;
         public UiColor Text;
         public UiColor DisabledText;
+
+        /// <summary>See <see cref="UiButtonStyleData.TextureText"/>; always resolved (falls back to <see cref="Text"/> when unset).</summary>
+        public UiColor TextureText;
+
+        /// <summary>See <see cref="UiButtonStyleData.TextureDisabledText"/>; always resolved (falls back to <see cref="DisabledText"/> when unset).</summary>
+        public UiColor TextureDisabledText;
+
         public float OutlineWidth;
         public float Radius;
         public float TextSize;
@@ -304,6 +323,8 @@ namespace BeastCraft.Presentation.Ui
                     Outline = style.Color(button.Outline),
                     Text = style.Color(button.Text),
                     DisabledText = style.Color(button.DisabledText),
+                    TextureText = style.Color(string.IsNullOrEmpty(button.TextureText) ? button.Text : button.TextureText),
+                    TextureDisabledText = style.Color(string.IsNullOrEmpty(button.TextureDisabledText) ? button.DisabledText : button.TextureDisabledText),
                     OutlineWidth = button.OutlineWidth,
                     Radius = button.Radius,
                     TextSize = button.TextSize > 0f ? button.TextSize : style.TextSizes.Body,
@@ -467,6 +488,16 @@ namespace BeastCraft.Presentation.Ui
                 if (!string.IsNullOrEmpty(button.SelectedFill))
                 {
                     CheckRef(errors, colors, name + "selected fill", button.SelectedFill);
+                }
+
+                if (!string.IsNullOrEmpty(button.TextureText))
+                {
+                    CheckRef(errors, colors, name + "texture text", button.TextureText);
+                }
+
+                if (!string.IsNullOrEmpty(button.TextureDisabledText))
+                {
+                    CheckRef(errors, colors, name + "texture disabled text", button.TextureDisabledText);
                 }
             }
 

@@ -4409,10 +4409,10 @@
       "Filter": "linear",
       "Premultiplied": false,
       "NineSlice": {
-        "Left": 60,
-        "Top": 54,
-        "Right": 60,
-        "Bottom": 54
+        "Left": 46,
+        "Top": 46,
+        "Right": 46,
+        "Bottom": 46
       }
     },
     {
@@ -4432,10 +4432,10 @@
       "Filter": "linear",
       "Premultiplied": false,
       "NineSlice": {
-        "Left": 60,
-        "Top": 54,
-        "Right": 60,
-        "Bottom": 54
+        "Left": 46,
+        "Top": 46,
+        "Right": 46,
+        "Bottom": 46
       }
     },
     {
@@ -4455,10 +4455,10 @@
       "Filter": "linear",
       "Premultiplied": false,
       "NineSlice": {
-        "Left": 60,
-        "Top": 54,
-        "Right": 60,
-        "Bottom": 54
+        "Left": 46,
+        "Top": 46,
+        "Right": 46,
+        "Bottom": 46
       }
     },
     {
@@ -4478,10 +4478,10 @@
       "Filter": "linear",
       "Premultiplied": false,
       "NineSlice": {
-        "Left": 84,
-        "Top": 84,
-        "Right": 84,
-        "Bottom": 84
+        "Left": 34,
+        "Top": 34,
+        "Right": 34,
+        "Bottom": 34
       }
     },
     {
@@ -4501,10 +4501,10 @@
       "Filter": "linear",
       "Premultiplied": false,
       "NineSlice": {
-        "Left": 40,
-        "Top": 32,
-        "Right": 40,
-        "Bottom": 32
+        "Left": 30,
+        "Top": 26,
+        "Right": 30,
+        "Bottom": 26
       }
     },
     {
@@ -4524,10 +4524,10 @@
       "Filter": "linear",
       "Premultiplied": false,
       "NineSlice": {
-        "Left": 72,
-        "Top": 72,
-        "Right": 72,
-        "Bottom": 72
+        "Left": 40,
+        "Top": 40,
+        "Right": 40,
+        "Bottom": 40
       }
     },
     {
@@ -4604,10 +4604,10 @@
       "Filter": "linear",
       "Premultiplied": false,
       "NineSlice": {
-        "Left": 64,
-        "Top": 58,
-        "Right": 64,
-        "Bottom": 58
+        "Left": 38,
+        "Top": 38,
+        "Right": 38,
+        "Bottom": 38
       }
     },
     {
@@ -4627,10 +4627,10 @@
       "Filter": "linear",
       "Premultiplied": false,
       "NineSlice": {
-        "Left": 64,
-        "Top": 58,
-        "Right": 64,
-        "Bottom": 58
+        "Left": 38,
+        "Top": 38,
+        "Right": 38,
+        "Bottom": 38
       }
     },
     {
@@ -4641,19 +4641,19 @@
       "Label": "Journal UI kit: title plaque",
       "ArtKey": "ui/kit/title_plaque",
       "FrameWidth": 260,
-      "FrameHeight": 104,
+      "FrameHeight": 112,
       "Frames": 1,
       "FrameMs": 0,
       "PivotX": 130.0,
-      "PivotY": 52.0,
+      "PivotY": 56.0,
       "PixelsPerUnit": 260.0,
       "Filter": "linear",
       "Premultiplied": false,
       "NineSlice": {
-        "Left": 76,
-        "Top": 38,
-        "Right": 76,
-        "Bottom": 38
+        "Left": 44,
+        "Top": 36,
+        "Right": 44,
+        "Bottom": 36
       }
     },
     {

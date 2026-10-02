@@ -148,7 +148,21 @@ def save(img, name):
 # ---------------------------------------------------------------------------- the kit pieces
 
 def build_panel():
-    """9-slice parchment panel: grain, a soft deckled (torn) edge, a faint warm inner shadow.
+    """9-slice parchment panel: grain, a clean softly-rounded edge (radius matches the classic
+    look's own Panel Radius, 28 -- content-data/Ui/ui-style.json -- so the kit and the vector shape
+    it replaces read as the same silhouette), a faint warm inner shadow.
+
+    NOT deckled. A first pass gave this piece a torn/deckled edge (the brief's "panel" bullet asks
+    for one), but "panel" is this toolkit's single most-reused generic container -- ItemRow,
+    StatTable, dozens of screens' own cards -- rendered at every size from a 110px-tall row to a
+    full-page panel, and a deckled mask looks like fine torn paper only at the size it was tuned
+    for; shrunk into a 110-190px-tall box its jittered points (14px apart) read as a few blunt
+    notches, not a deckle (lead review, kit-shots/step1). Lead review also found corner flourishes
+    sitting on top of real text almost everywhere panel is used (see corner_flourish()'s note below)
+    -- for the same reason (panel's huge range of render sizes), a deckled edge cannot be safely
+    reserved here either. Kept clean rounded instead, matching card and matching the approved mock
+    (r04_settings_mock.png), whose own Audio card has a plain rounded rect edge, not a torn one.
+
     NOTE on corner flourishes: the task brief asks for them on this piece, and corner_flourish()
     (above) draws exactly the mock's ink-line hook; a first pass baked one into each corner, but at
     any size that reads as a flourish (radius 50+) it reaches past where a great many existing
@@ -159,24 +173,25 @@ def build_panel():
     screens that butt content against the very corner, or add a flourish as a separate, optional
     overlay a screen opts into only where it has room."""
     w = h = 320
-    radius = 56
-    img, _mask = parchment_fill(w, h, radius, seed=911, grain=3, mottle=9, alpha=252, deckled=True, jitter=6)
+    radius = 28
+    img, _mask = parchment_fill(w, h, radius, seed=911, grain=3, mottle=9, alpha=252, deckled=False)
     faint_inner_shadow(img, radius, strength=20)
     save(img, "panel.png")
-    return dict(name="panel", size=(w, h), nine_slice=(72, 72, 72, 72))
+    return dict(name="panel", size=(w, h), nine_slice=(40, 40, 40, 40))
 
 
 def build_card():
-    """A larger parchment card (the mock's Audio card): clean rounded edge (not deckled), an ink
-    outline, a sky-teal wash. See build_panel()'s note: no baked corner flourish, same reason."""
+    """A larger parchment card (the mock's Audio card): clean rounded edge, radius matching the
+    classic look's own Card Radius (22), an ink outline, a sky-teal wash. See build_panel()'s note:
+    no baked corner flourish, same reason."""
     w = h = 360
-    radius = 72
+    radius = 22
     img, _mask = parchment_fill(w, h, radius, seed=970, wash=SKY_TEAL, grain=2, mottle=7, alpha=252)
     faint_inner_shadow(img, radius, strength=16)
     d = ImageDraw.Draw(img)
     d.rounded_rectangle([1, 1, w - 2, h - 2], radius=radius, outline=INK_PLUM, width=3)
     save(img, "card.png")
-    return dict(name="card", size=(w, h), nine_slice=(84, 84, 84, 84))
+    return dict(name="card", size=(w, h), nine_slice=(34, 34, 34, 34))
 
 
 def _unused_card_flourish_reference(d, w, h, tone):
@@ -189,24 +204,33 @@ def _unused_card_flourish_reference(d, w, h, tone):
 
 
 def build_title_plaque():
-    """The title plaque (settings_mock.py fix 1): a small parchment pill, brass trim, apricot wash."""
-    w, h = 260, 104
-    radius = h // 2
+    """The title plaque (settings_mock.py fix 1): a small parchment chip, brass trim, apricot wash,
+    radius matching a button's own corner (28) -- a softly rounded rect, not the full-pill (radius =
+    half height) a first pass used, which (lead review, kit-shots/step1) read as pointed lens ends
+    once nine-sliced and did not match the approved mock's modest corner."""
+    w, h = 260, 112
+    radius = 28
     img, _mask = parchment_fill(w, h, radius, seed=500, wash=APRICOT, grain=2, mottle=6, alpha=250)
     d = ImageDraw.Draw(img)
     brass_trim(d, (2, 2, w - 3, h - 3), radius, color=BRASS, w=2, inset=4)
     save(img, "title_plaque.png")
-    return dict(name="title_plaque", size=(w, h), nine_slice=(76, 38, 76, 38))
+    return dict(name="title_plaque", size=(w, h), nine_slice=(44, 36, 44, 36))
 
 
 def _button(name, wash, trim_color, seed):
+    """radius=34 matches the classic look's own Button Radius (content/data/Ui/ui-style.json);
+    insets=46 (vs. a first pass's 60/54, half the texture's own height -- a full pill) so the softer
+    corner stretches correctly and so a small square control reusing this texture (the header's
+    back button, 110x110) has enough room left for a real centre strip instead of squashing it to a
+    sliver a couple of pixels tall, which (lead review) read as a stray seam line straight through
+    the button."""
     w, h = 240, 160
-    radius = 56
+    radius = 34
     img, _mask = parchment_fill(w, h, radius, seed=seed, wash=wash, grain=2, mottle=6, alpha=250)
     d = ImageDraw.Draw(img)
     brass_trim(d, (2, 2, w - 3, h - 3), radius, color=trim_color, w=3, inset=5)
     save(img, f"{name}.png")
-    return dict(name=name, size=(w, h), nine_slice=(60, 54, 60, 54))
+    return dict(name=name, size=(w, h), nine_slice=(46, 46, 46, 46))
 
 
 def build_buttons():
@@ -218,13 +242,17 @@ def build_buttons():
 
 
 def _tab(name, wash, trim_color, alpha, trim_width, seed):
+    """radius=26 matches the classic look's own nav-button Radius; a first pass used the full pill
+    (radius = half height, 75) which, once nine-sliced into the tab strip's own 236x120-ish item
+    box, left almost no centre row and read as pointed lens ends, not the approved mock's soft
+    rounded-rect tabs (lead review, kit-shots/step1)."""
     w, h = 220, 150
-    radius = h // 2
+    radius = 26
     img, _mask = parchment_fill(w, h, radius, seed=seed, wash=wash, grain=2, mottle=6, alpha=alpha)
     d = ImageDraw.Draw(img)
     brass_trim(d, (2, 2, w - 3, h - 3), radius, color=trim_color, w=trim_width, inset=4)
     save(img, f"{name}.png")
-    return dict(name=name, size=(w, h), nine_slice=(64, 58, 64, 58))
+    return dict(name=name, size=(w, h), nine_slice=(38, 38, 38, 38))
 
 
 def build_tabs():
@@ -289,13 +317,15 @@ def build_toggle_knob():
 
 
 def build_chip():
+    """radius=20 (a first pass used the full pill, radius = half height; see _tab()'s note, same
+    issue, same fix)."""
     w, h = 160, 96
-    radius = h // 2
+    radius = 20
     img, _mask = parchment_fill(w, h, radius, seed=741, grain=2, mottle=6, alpha=248)
     d = ImageDraw.Draw(img)
     brass_trim(d, (2, 2, w - 3, h - 3), radius, color=WOOD, w=2, inset=4)
     save(img, "chip.png")
-    return dict(name="chip", size=(w, h), nine_slice=(40, 32, 40, 32))
+    return dict(name="chip", size=(w, h), nine_slice=(30, 26, 30, 26))
 
 
 def main():

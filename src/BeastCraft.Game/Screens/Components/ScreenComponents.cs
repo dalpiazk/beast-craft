@@ -74,20 +74,31 @@ namespace BeastCraft.Game.Screens.Components
             float titleSize = style.TextSizes.Heading + 6f;
             string titleText = title ?? string.Empty;
 
-            // The mock's title plaque (fix 1 of settings_mock.py): a small parchment pill behind the
+            // The mock's title plaque (fix 1 of settings_mock.py): a small parchment chip behind the
             // title instead of plain text on the header wash, sized to the title so it reads as a
-            // tag rather than another full-width bar.
+            // tag rather than another full-width bar. Even padding on every side (a first pass's 28px
+            // read tight against the glyphs on the right in the approved mock comparison — lead
+            // review, kit-shots/step1 — so this is noticeably roomier), its top within a couple of
+            // pixels of the back button's own top so the two read as sitting on one baseline, and its
+            // own height (70, not the back button's full 110) kept short enough to clear a subtitle
+            // line at y=112 (HeaderMetrics.Tall screens) with no overlap.
             ArtSprite plaque = UiKit.Enabled && titleText.Length > 0 ? painter.Sprite(UiKitArt.TitlePlaque) : null;
             if (plaque != null)
             {
-                float padX = 28f;
-                float padY = 14f;
+                float padX = 40f;
+                float plaqueY = Back.Bounds.Y + 2f;
+                float plaqueHeight = 70f;
                 float textWidth = ctx.Text.Measure(titleText, titleSize);
-                painter.NineSlice(plaque, new Rect(titleX - padX, titleY - padY, textWidth + 2f * padX, titleSize + 2f * padY));
+                Rect plaqueBox = new Rect(titleX - padX, plaqueY, textWidth + 2f * padX, plaqueHeight);
+                painter.NineSlice(plaque, plaqueBox);
+                painter.TextIn(titleText, new Rect(titleX, plaqueY, PortraitLayout.CanvasWidth - titleX - HeaderMetrics.Pad, plaqueHeight), titleSize,
+                               painter.C("plum"), TextAlign.Left);
             }
-
-            painter.TextIn(titleText, new Rect(titleX, titleY, PortraitLayout.CanvasWidth - titleX - HeaderMetrics.Pad, titleSize), titleSize,
-                           painter.C("plum"), TextAlign.Left);
+            else
+            {
+                painter.TextIn(titleText, new Rect(titleX, titleY, PortraitLayout.CanvasWidth - titleX - HeaderMetrics.Pad, titleSize), titleSize,
+                               painter.C("plum"), TextAlign.Left);
+            }
             if (!string.IsNullOrEmpty(subtitle))
             {
                 painter.TextIn(subtitle, new Rect(180f, 112f, PortraitLayout.CanvasWidth - 180f - HeaderMetrics.Pad, 30f), style.TextSizes.Body, painter.C("inkSoft"), TextAlign.Left);
@@ -134,12 +145,22 @@ namespace BeastCraft.Game.Screens.Components
             return Top(headerHeight) + Height + contentGap;
         }
 
-        /// <summary>Builds the strip's backing panel and the <see cref="Tabs"/> widget itself, wired to <paramref name="onChanged"/>.</summary>
+        /// <summary>
+        /// Builds the strip's backing panel (classic look only — the kit's painted pills float
+        /// directly over the page, as the approved mock shows, with no bar behind them; the dark
+        /// plum nav bar is the code-drawn look's own device for giving unselected tabs' cream text
+        /// contrast, which the kit's parchment pills do not need) and the <see cref="Tabs"/> widget
+        /// itself, wired to <paramref name="onChanged"/>.
+        /// </summary>
         public static Tabs Build(UiRoot ui, string id, float headerHeight, IReadOnlyList<string> labels, IReadOnlyList<string> glyphs, Action<int> onChanged)
         {
             float width = PortraitLayout.CanvasWidth - 2f * HeaderMetrics.Pad;
             Rect bounds = new Rect(HeaderMetrics.Pad, Top(headerHeight), width, Height);
-            ui.Add(new Panel { Id = id + "-panel", Bounds = bounds, StyleKey = "nav" });
+            if (!UiKit.Enabled)
+            {
+                ui.Add(new Panel { Id = id + "-panel", Bounds = bounds, StyleKey = "nav" });
+            }
+
             Tabs tabs = ui.Add(new Tabs { Id = id, Bounds = bounds.Inset(6f) });
             tabs.Items.AddRange(labels);
             if (glyphs != null)

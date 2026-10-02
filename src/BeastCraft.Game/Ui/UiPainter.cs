@@ -229,14 +229,30 @@ namespace BeastCraft.Game.Ui
         public void Button(Rect box, string text, UiButtonStyle style, bool pressed, bool enabled, bool selected, string glyph = null, string caption = null)
         {
             Color fill = C(!enabled ? style.DisabledFill : pressed ? style.PressedFill : selected ? style.SelectedFill : style.Fill);
-            Color ink = C(enabled ? style.Text : style.DisabledText);
+            bool hasText = !string.IsNullOrEmpty(text);
+            // The kit's button faces are authored wide (240x160, a pill/rounded-rect meant for text
+            // CTAs): nine-sliced into a small, roughly square, icon-only control (the header's back
+            // button, 110x110; a lone "?" help button) its centre strip compresses so hard (8:1+)
+            // that the brass/ink trim ring visibly breaks at the slice seam (lead review,
+            // kit-shots/step1 — the "stray line through the back button"). Rather than reusing a
+            // texture authored for a different aspect ratio, an icon-only, roughly square, small
+            // button stays on the vector path, which draws a clean uniform ring at any size —
+            // matching the approved mock's own back button, whose trim reads differently from the
+            // wide pill buttons beside it anyway.
+            bool iconOnlySquare = !hasText && caption == null && !string.IsNullOrEmpty(glyph) &&
+                                   Math.Abs(box.Width - box.Height) < box.Height * 0.3f && box.Height < 140f;
+            bool kitTextured = UiKit.Enabled && !string.IsNullOrEmpty(style.Texture) && !iconOnlySquare;
+            // A kit face is light parchment regardless of the look's vector Fill (leaf-green,
+            // berry, ...), so its own TextureText/TextureDisabledText apply instead of Text/
+            // DisabledText (ink plum on parchment, not white — white there read under 4.5:1).
+            Color ink = C(enabled ? (kitTextured ? style.TextureText : style.Text) : (kitTextured ? style.TextureDisabledText : style.DisabledText));
             Rect face = pressed ? new Rect(box.X, box.Y + 4f, box.Width, box.Height - 4f) : box;
             if (!pressed && enabled && style.OutlineWidth > 0f)
             {
                 RoundedRect(new Rect(box.X, box.Y + 6f, box.Width, box.Height), style.Radius, C(style.Outline, 0.35f));
             }
 
-            if (UiKit.Enabled && !string.IsNullOrEmpty(style.Texture))
+            if (kitTextured)
             {
                 Color tint = !enabled ? C(new UiColor(185, 185, 185), 0.68f) : pressed ? C(new UiColor(214, 199, 178)) :
                              selected ? C(new UiColor(255, 240, 214)) : C(new UiColor(255, 255, 255));
@@ -248,7 +264,6 @@ namespace BeastCraft.Game.Ui
             }
 
             float size = style.TextSize;
-            bool hasText = !string.IsNullOrEmpty(text);
             if (!string.IsNullOrEmpty(glyph))
             {
                 float g = hasText && caption == null ? Math.Min(face.Height * 0.6f, 64f) : Math.Min(face.Height * (caption != null ? 0.5f : 0.7f), face.Width * 0.7f);
@@ -416,7 +431,7 @@ namespace BeastCraft.Game.Ui
                     RoundedRect(item, style.Radius, C(style.SelectedFill));
                 }
 
-                Color ink = C(kit ? "plumDeep" : selected ? "plumDeep" : "cream");
+                Color ink = C(kit ? "inkPlum2" : selected ? "plumDeep" : "cream");
                 float g = Math.Min(item.Width, item.Height) * 0.46f;
                 float iconTop = item.Y + item.Height * 0.12f;
                 Glyph(i < tabs.Glyphs.Count ? tabs.Glyphs[i] : null, new Rect(item.Center.X - g / 2f, iconTop, g, g), ink);
@@ -432,7 +447,14 @@ namespace BeastCraft.Game.Ui
             }
         }
 
-        /// <summary>The selected tab's small cloth-ribbon accent (<see cref="UiKitArt.TabRibbon"/>), centred under its pill's bottom edge, its own aspect kept.</summary>
+        /// <summary>
+        /// The selected tab's small cloth-ribbon accent (<see cref="UiKitArt.TabRibbon"/>): a tiny
+        /// tag hanging almost entirely below the pill's own bottom edge (the mock's shape — a sliver
+        /// of cloth poking out, not a banner), never reaching up into the icon/label band. A first
+        /// pass sized it to a third of the tab's width and hung it 55% above the bottom edge, which
+        /// at the tab strip's actual height put it squarely on top of the label text (lead review,
+        /// kit-shots/step1); this is deliberately small and low instead.
+        /// </summary>
         private void DrawTabRibbon(Rect item)
         {
             ArtSprite ribbon = Sprite(UiKitArt.TabRibbon);
@@ -441,9 +463,9 @@ namespace BeastCraft.Game.Ui
                 return;
             }
 
-            float width = Math.Min(item.Width * 0.34f, ribbon.Data.FrameWidth);
+            float width = Math.Min(item.Width * 0.14f, ribbon.Data.FrameWidth * 0.5f);
             float height = width * ribbon.Data.FrameHeight / ribbon.Data.FrameWidth;
-            Rect box = new Rect(item.Center.X - width / 2f, item.Bottom - height * 0.55f, width, height);
+            Rect box = new Rect(item.Center.X - width / 2f, item.Bottom - 3f, width, height);
             Art(ribbon, box, false);
         }
 
