@@ -4400,19 +4400,19 @@
       "Label": "Journal UI kit: danger button face",
       "ArtKey": "ui/kit/button_danger",
       "FrameWidth": 240,
-      "FrameHeight": 160,
+      "FrameHeight": 100,
       "Frames": 1,
       "FrameMs": 0,
       "PivotX": 120.0,
-      "PivotY": 80.0,
+      "PivotY": 50.0,
       "PixelsPerUnit": 240.0,
       "Filter": "linear",
       "Premultiplied": false,
       "NineSlice": {
-        "Left": 46,
-        "Top": 46,
-        "Right": 46,
-        "Bottom": 46
+        "Left": 40,
+        "Top": 40,
+        "Right": 40,
+        "Bottom": 40
       }
     },
     {
@@ -4423,19 +4423,19 @@
       "Label": "Journal UI kit: primary button face",
       "ArtKey": "ui/kit/button_primary",
       "FrameWidth": 240,
-      "FrameHeight": 160,
+      "FrameHeight": 100,
       "Frames": 1,
       "FrameMs": 0,
       "PivotX": 120.0,
-      "PivotY": 80.0,
+      "PivotY": 50.0,
       "PixelsPerUnit": 240.0,
       "Filter": "linear",
       "Premultiplied": false,
       "NineSlice": {
-        "Left": 46,
-        "Top": 46,
-        "Right": 46,
-        "Bottom": 46
+        "Left": 40,
+        "Top": 40,
+        "Right": 40,
+        "Bottom": 40
       }
     },
     {
@@ -4446,19 +4446,19 @@
       "Label": "Journal UI kit: secondary button face",
       "ArtKey": "ui/kit/button_secondary",
       "FrameWidth": 240,
-      "FrameHeight": 160,
+      "FrameHeight": 100,
       "Frames": 1,
       "FrameMs": 0,
       "PivotX": 120.0,
-      "PivotY": 80.0,
+      "PivotY": 50.0,
       "PixelsPerUnit": 240.0,
       "Filter": "linear",
       "Premultiplied": false,
       "NineSlice": {
-        "Left": 46,
-        "Top": 46,
-        "Right": 46,
-        "Bottom": 46
+        "Left": 40,
+        "Top": 40,
+        "Right": 40,
+        "Bottom": 40
       }
     },
     {
@@ -4492,19 +4492,19 @@
       "Label": "Journal UI kit: chip",
       "ArtKey": "ui/kit/chip",
       "FrameWidth": 160,
-      "FrameHeight": 96,
+      "FrameHeight": 76,
       "Frames": 1,
       "FrameMs": 0,
       "PivotX": 80.0,
-      "PivotY": 48.0,
+      "PivotY": 38.0,
       "PixelsPerUnit": 160.0,
       "Filter": "linear",
       "Premultiplied": false,
       "NineSlice": {
         "Left": 30,
-        "Top": 26,
+        "Top": 24,
         "Right": 30,
-        "Bottom": 26
+        "Bottom": 24
       }
     },
     {
@@ -4595,19 +4595,19 @@
       "Label": "Journal UI kit: selected tab pill",
       "ArtKey": "ui/kit/tab_selected",
       "FrameWidth": 220,
-      "FrameHeight": 150,
+      "FrameHeight": 120,
       "Frames": 1,
       "FrameMs": 0,
       "PivotX": 110.0,
-      "PivotY": 75.0,
+      "PivotY": 60.0,
       "PixelsPerUnit": 220.0,
       "Filter": "linear",
       "Premultiplied": false,
       "NineSlice": {
         "Left": 38,
-        "Top": 38,
+        "Top": 30,
         "Right": 38,
-        "Bottom": 38
+        "Bottom": 30
       }
     },
     {
@@ -4618,19 +4618,19 @@
       "Label": "Journal UI kit: unselected tab pill",
       "ArtKey": "ui/kit/tab_unselected",
       "FrameWidth": 220,
-      "FrameHeight": 150,
+      "FrameHeight": 120,
       "Frames": 1,
       "FrameMs": 0,
       "PivotX": 110.0,
-      "PivotY": 75.0,
+      "PivotY": 60.0,
       "PixelsPerUnit": 220.0,
       "Filter": "linear",
       "Premultiplied": false,
       "NineSlice": {
         "Left": 38,
-        "Top": 38,
+        "Top": 30,
         "Right": 38,
-        "Bottom": 38
+        "Bottom": 30
       }
     },
     {
@@ -4641,19 +4641,19 @@
       "Label": "Journal UI kit: title plaque",
       "ArtKey": "ui/kit/title_plaque",
       "FrameWidth": 260,
-      "FrameHeight": 112,
+      "FrameHeight": 90,
       "Frames": 1,
       "FrameMs": 0,
       "PivotX": 130.0,
-      "PivotY": 56.0,
+      "PivotY": 45.0,
       "PixelsPerUnit": 260.0,
       "Filter": "linear",
       "Premultiplied": false,
       "NineSlice": {
         "Left": 44,
-        "Top": 36,
+        "Top": 28,
         "Right": 44,
-        "Bottom": 36
+        "Bottom": 28
       }
     },
     {

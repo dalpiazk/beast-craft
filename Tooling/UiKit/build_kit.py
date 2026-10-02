@@ -207,14 +207,19 @@ def build_title_plaque():
     """The title plaque (settings_mock.py fix 1): a small parchment chip, brass trim, apricot wash,
     radius matching a button's own corner (28) -- a softly rounded rect, not the full-pill (radius =
     half height) a first pass used, which (lead review, kit-shots/step1) read as pointed lens ends
-    once nine-sliced and did not match the approved mock's modest corner."""
-    w, h = 260, 112
+    once nine-sliced and did not match the approved mock's modest corner.
+
+    Height 90, not a first pass's 112, and Top/Bottom insets 28 not 36: see _button()'s note (the
+    compression-thins-the-trim-ring seam) -- ScreenHeader draws this at 70px tall, and a first pass's
+    insets (36+36=72) left no centre row at all there (clamped to a sliver), the worst case of that
+    seam of any kit piece. 90/28 keeps a real, barely-compressed centre row at 70px."""
+    w, h = 260, 90
     radius = 28
     img, _mask = parchment_fill(w, h, radius, seed=500, wash=APRICOT, grain=2, mottle=6, alpha=250)
     d = ImageDraw.Draw(img)
-    brass_trim(d, (2, 2, w - 3, h - 3), radius, color=BRASS, w=2, inset=4)
+    brass_trim(d, (2, 2, w - 3, h - 3), radius, color=BRASS, w=3, inset=4)
     save(img, "title_plaque.png")
-    return dict(name="title_plaque", size=(w, h), nine_slice=(44, 36, 44, 36))
+    return dict(name="title_plaque", size=(w, h), nine_slice=(44, 28, 44, 28))
 
 
 def _button(name, wash, trim_color, seed):
@@ -223,14 +228,25 @@ def _button(name, wash, trim_color, seed):
     corner stretches correctly and so a small square control reusing this texture (the header's
     back button, 110x110) has enough room left for a real centre strip instead of squashing it to a
     sliver a couple of pixels tall, which (lead review) read as a stray seam line straight through
-    the button."""
-    w, h = 240, 160
+    the button.
+
+    Height 100 (insets 40), not a first pass's 160/46: the edge cells (the centre row/column,
+    between the two unstretched corners) are the texture's own leftover height/width above the
+    insets, and compressing that down to whatever a real button's own centre row is thins and
+    anti-aliases the brass/ink trim ring's straight run into a visibly duller, greyer segment than
+    the same ring's un-stretched run in the neighbouring corner cell -- a second lead-review seam,
+    distinct from the squash this piece's insets already fixed. The shortest button in this UI
+    (SettingsScreen's footer "About & Credits", 96px tall) still compresses the old 130/46 pairing's
+    4px centre row enough to show it; 100/40 leaves a 20px centre row against that same 96px box
+    (compression 0.8, not 0.3), close enough to 1:1 that the ring reads continuous. trim_width
+    bumped from 3 so the ring reads solid rather than hairline even where some compression remains."""
+    w, h = 240, 100
     radius = 34
     img, _mask = parchment_fill(w, h, radius, seed=seed, wash=wash, grain=2, mottle=6, alpha=250)
     d = ImageDraw.Draw(img)
-    brass_trim(d, (2, 2, w - 3, h - 3), radius, color=trim_color, w=3, inset=5)
+    brass_trim(d, (2, 2, w - 3, h - 3), radius, color=trim_color, w=4, inset=5)
     save(img, f"{name}.png")
-    return dict(name=name, size=(w, h), nine_slice=(46, 46, 46, 46))
+    return dict(name=name, size=(w, h), nine_slice=(40, 40, 40, 40))
 
 
 def build_buttons():
@@ -245,20 +261,25 @@ def _tab(name, wash, trim_color, alpha, trim_width, seed):
     """radius=26 matches the classic look's own nav-button Radius; a first pass used the full pill
     (radius = half height, 75) which, once nine-sliced into the tab strip's own 236x120-ish item
     box, left almost no centre row and read as pointed lens ends, not the approved mock's soft
-    rounded-rect tabs (lead review, kit-shots/step1)."""
-    w, h = 220, 150
+    rounded-rect tabs (lead review, kit-shots/step1).
+
+    Height 120, not a first pass's 150: see _button()'s note (same compression-thins-the-trim-ring
+    seam, same fix -- a texture height close to this UI's actual tab height so the centre
+    row/column barely compresses); trim_width is bumped a touch at each call site below for the
+    same reason."""
+    w, h = 220, 120
     radius = 26
     img, _mask = parchment_fill(w, h, radius, seed=seed, wash=wash, grain=2, mottle=6, alpha=alpha)
     d = ImageDraw.Draw(img)
     brass_trim(d, (2, 2, w - 3, h - 3), radius, color=trim_color, w=trim_width, inset=4)
     save(img, f"{name}.png")
-    return dict(name=name, size=(w, h), nine_slice=(38, 38, 38, 38))
+    return dict(name=name, size=(w, h), nine_slice=(38, 30, 38, 30))
 
 
 def build_tabs():
     entries = [
-        _tab("tab_unselected", None, WOOD, alpha=205, trim_width=2, seed=701),
-        _tab("tab_selected", APRICOT, BRASS, alpha=255, trim_width=3, seed=702),
+        _tab("tab_unselected", None, WOOD, alpha=205, trim_width=3, seed=701),
+        _tab("tab_selected", APRICOT, BRASS, alpha=255, trim_width=4, seed=702),
     ]
     # tab_ribbon.png: the small cloth-ribbon accent under a selected tab (settings_mock.py's
     # ribbon_tab -- a flat polygon, no paper texture: it reads as cloth, not parchment).
@@ -318,14 +339,15 @@ def build_toggle_knob():
 
 def build_chip():
     """radius=20 (a first pass used the full pill, radius = half height; see _tab()'s note, same
-    issue, same fix)."""
-    w, h = 160, 96
+    issue, same fix). Height 76 (ChipRow.Height, this piece's actual render height, exactly) and
+    Top/Bottom insets 24: see _button()'s note (the compression-thins-the-trim-ring seam)."""
+    w, h = 160, 76
     radius = 20
     img, _mask = parchment_fill(w, h, radius, seed=741, grain=2, mottle=6, alpha=248)
     d = ImageDraw.Draw(img)
-    brass_trim(d, (2, 2, w - 3, h - 3), radius, color=WOOD, w=2, inset=4)
+    brass_trim(d, (2, 2, w - 3, h - 3), radius, color=WOOD, w=3, inset=4)
     save(img, "chip.png")
-    return dict(name="chip", size=(w, h), nine_slice=(30, 26, 30, 26))
+    return dict(name="chip", size=(w, h), nine_slice=(30, 24, 30, 24))
 
 
 def main():

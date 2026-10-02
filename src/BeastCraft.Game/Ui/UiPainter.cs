@@ -643,18 +643,53 @@ namespace BeastCraft.Game.Ui
                 return;
             }
 
-            foreach (NineSliceCell cell in NineSlicePatch.Build(art.Data.FrameWidth, art.Data.FrameHeight, slice.Left, slice.Top, slice.Right, slice.Bottom, box))
+            IReadOnlyList<NineSliceCell> cells = NineSlicePatch.Build(art.Data.FrameWidth, art.Data.FrameHeight, slice.Left, slice.Top, slice.Right, slice.Bottom, box);
+            for (int i = 0; i < cells.Count; i++)
             {
+                NineSliceCell cell = cells[i];
                 if (cell.Dest.Width <= 0f || cell.Dest.Height <= 0f || cell.Source.Width <= 0f || cell.Source.Height <= 0f)
                 {
                     continue;
                 }
 
-                Rectangle source = new Rectangle((int)Math.Round(cell.Source.X), (int)Math.Round(cell.Source.Y), (int)Math.Round(cell.Source.Width),
-                                                  (int)Math.Round(cell.Source.Height));
-                _draw.DrawRegion(art.Texture, source, new Vector2(cell.Dest.X, cell.Dest.Y), new Vector2(cell.Dest.Width, cell.Dest.Height), color);
+                // A one-source-pixel inset on every side this cell shares with its neighbour (not on
+                // a side that is the frame's own true edge): without it, LinearClamp's bilinear
+                // sampling reads a sliver of the next cell across that shared boundary (it only
+                // clamps at the texture's own edge, not a sub-rect's), which shows as a thin seam
+                // line at every internal nine-slice join. Column/row from i, cells built left-to-
+                // right then top-to-bottom (NineSlicePatch.Build's own order).
+                int col = i % 3;
+                int row = i / 3;
+                int x = (int)Math.Round(cell.Source.X) + (col > 0 ? 1 : 0);
+                int y = (int)Math.Round(cell.Source.Y) + (row > 0 ? 1 : 0);
+                int right = (int)Math.Round(cell.Source.X + cell.Source.Width) - (col < 2 ? 1 : 0);
+                int bottom = (int)Math.Round(cell.Source.Y + cell.Source.Height) - (row < 2 ? 1 : 0);
+                int width = Math.Max(1, right - x);
+                int height = Math.Max(1, bottom - y);
+                Rectangle source = new Rectangle(x, y, width, height);
+
+                // Cells are drawn in this same index order (0..8), so a cell with col/row > 0 was
+                // drawn after, and sits beside, the neighbour at its left/top; growing its dest rect
+                // one screen pixel into that neighbour's own area (its content there is the same
+                // continuous paint, so the extra pixel is never a visible stretch) means this cell's
+                // own fresh sample paints over whatever that shared boundary pixel rendered as in the
+                // earlier draw, covering a seam there outright rather than trying to prevent one.
+                float destX = cell.Dest.X - (col > 0 ? 1f : 0f);
+                float destY = cell.Dest.Y - (row > 0 ? 1f : 0f);
+                float destWidth = cell.Dest.Width + (col > 0 ? 1f : 0f);
+                float destHeight = cell.Dest.Height + (row > 0 ? 1f : 0f);
+                _draw.DrawRegion(art.Texture, source, new Vector2(destX, destY), new Vector2(destWidth, destHeight), color, NineSliceSampler);
             }
         }
+
+        /// <summary>Mip level 0 only — see <see cref="SpriteRenderer.DrawRegion(Texture2D,Rectangle,Vector2,Vector2,Color,SamplerState)"/>'s doc for why a nine-slice patch's cells need this instead of the mipmapped default.</summary>
+        private static readonly SamplerState NineSliceSampler = new SamplerState
+        {
+            Filter = TextureFilter.Point,
+            AddressU = TextureAddressMode.Clamp,
+            AddressV = TextureAddressMode.Clamp,
+            MaxMipLevel = 0
+        };
 
         private static Color MultiplyTint(Color a, Color b)
         {
