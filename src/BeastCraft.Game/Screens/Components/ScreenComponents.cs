@@ -69,7 +69,24 @@ namespace BeastCraft.Game.Screens.Components
             painter.Fill(new Rect(0, Height - 5f, PortraitLayout.CanvasWidth, 5f), painter.C("plumSoft", 0.5f));
             painter.Paint(Back, ui);
             UiStyle style = ctx.Style;
-            painter.TextIn(title ?? string.Empty, new Rect(180f, 44f, PortraitLayout.CanvasWidth - 180f - HeaderMetrics.Pad, style.TextSizes.Heading + 6f), style.TextSizes.Heading + 6f,
+            const float titleX = 180f;
+            const float titleY = 44f;
+            float titleSize = style.TextSizes.Heading + 6f;
+            string titleText = title ?? string.Empty;
+
+            // The mock's title plaque (fix 1 of settings_mock.py): a small parchment pill behind the
+            // title instead of plain text on the header wash, sized to the title so it reads as a
+            // tag rather than another full-width bar.
+            ArtSprite plaque = UiKit.Enabled && titleText.Length > 0 ? painter.Sprite(UiKitArt.TitlePlaque) : null;
+            if (plaque != null)
+            {
+                float padX = 28f;
+                float padY = 14f;
+                float textWidth = ctx.Text.Measure(titleText, titleSize);
+                painter.NineSlice(plaque, new Rect(titleX - padX, titleY - padY, textWidth + 2f * padX, titleSize + 2f * padY));
+            }
+
+            painter.TextIn(titleText, new Rect(titleX, titleY, PortraitLayout.CanvasWidth - titleX - HeaderMetrics.Pad, titleSize), titleSize,
                            painter.C("plum"), TextAlign.Left);
             if (!string.IsNullOrEmpty(subtitle))
             {
@@ -156,8 +173,15 @@ namespace BeastCraft.Game.Screens.Components
 
         public static void Draw(ScreenContext ctx, Rect box, string text)
         {
-            ctx.Painter.TextIn(text, new Rect(box.X + 36f, box.Y + 28f, box.Width - 72f, ctx.Style.TextSizes.Heading - 6f), ctx.Style.TextSizes.Heading - 6f, ctx.Painter.C("plum"),
-                               TextAlign.Left);
+            float size = ctx.Style.TextSizes.Heading - 6f;
+            float y = box.Y + 28f;
+            ctx.Painter.TextIn(text, new Rect(box.X + 36f, y, box.Width - 72f, size), size, ctx.Painter.C("plum"), TextAlign.Left);
+            if (UiKit.Enabled)
+            {
+                // The mock's card title rule: a thin ink line under the heading, fading toward paper.
+                float ruleY = y + size + 10f;
+                ctx.Painter.Line(new Vec2(box.X + 36f, ruleY), new Vec2(box.Right - 36f, ruleY), 2f, ctx.Painter.C("coolShadow", 0.55f));
+            }
         }
 
         /// <summary>Adds a bare heading label (no card) at (<paramref name="x"/>, <paramref name="y"/>); returns the y below it.</summary>
@@ -442,9 +466,19 @@ namespace BeastCraft.Game.Screens.Components
             painter.TextIn(label ?? string.Empty, new Rect(box.X, box.Y, box.Width - TrackWidth - valueWidth - 48f, box.Height), size, painter.C("ink"), TextAlign.Left);
             painter.TextIn(on ? onText : offText, new Rect(track.X - valueWidth - 20f, box.Y, valueWidth, box.Height), size, painter.C(on ? "leafDeep" : "berry"), TextAlign.Right);
 
-            painter.Framed(track, TrackHeight / 2f, 4f, painter.C("plumSoft"), painter.C(on ? "leaf" : "track"));
             float knobRadius = TrackHeight / 2f - 6f;
             float knobX = on ? track.Right - TrackHeight / 2f : track.X + TrackHeight / 2f;
+            ArtSprite trackArt = UiKit.Enabled ? painter.Sprite(UiKitArt.ToggleTrack) : null;
+            ArtSprite knobArt = UiKit.Enabled ? painter.Sprite(UiKitArt.ToggleKnob) : null;
+            if (trackArt != null && knobArt != null)
+            {
+                // The mock's wood_switch: one track texture either way (only the knob moves).
+                painter.NineSlice(trackArt, track);
+                painter.NineSlice(knobArt, new Rect(knobX - knobRadius, track.Center.Y - knobRadius, knobRadius * 2f, knobRadius * 2f));
+                return;
+            }
+
+            painter.Framed(track, TrackHeight / 2f, 4f, painter.C("plumSoft"), painter.C(on ? "leaf" : "track"));
             painter.Disc(new Vec2(knobX, track.Center.Y), knobRadius, painter.C("cream"));
         }
     }
@@ -464,6 +498,9 @@ namespace BeastCraft.Game.Screens.Components
 
         private const float BarHeight = 16f;
         private const float KnobRadius = 28f;
+
+        /// <summary>The painted rail's own inner line thickness (<c>rail_h</c> in Tooling/UiKit/build_kit.py's slider_rail.png): the live-value fill is drawn this thin, not <see cref="BarHeight"/>, so it reads as the rail's own colour up to the value (the mock's ink_rail_slider) instead of a bar sitting over the art and hiding it at a high value.</summary>
+        private const float KitRailFillHeight = 10f;
 
         /// <summary>Adds the draggable bar at (<paramref name="x"/>, <paramref name="y"/> + the label's room, <paramref name="width"/>); <paramref name="value01"/> is 0-1.</summary>
         public static SliderBar Build(Widget parent, string id, float x, float y, float width, float value01, Action<float> onChanged)
@@ -487,11 +524,26 @@ namespace BeastCraft.Game.Screens.Components
             painter.TextIn(valueText ?? string.Empty, new Rect(box.X + box.Width * 0.6f, box.Y - 44f, box.Width * 0.4f, size), size, painter.C("inkSoft"), TextAlign.Right);
 
             Rect track = new Rect(box.X, box.Center.Y - BarHeight / 2f, box.Width, BarHeight);
-            painter.RoundedRect(track, BarHeight / 2f, painter.C("track"));
             float t = Math.Max(0f, Math.Min(1f, bar.Value));
             float fillWidth = Math.Max(BarHeight, box.Width * t);
-            painter.RoundedRect(new Rect(box.X, track.Y, fillWidth, BarHeight), BarHeight / 2f, painter.C("leaf"));
             float knobX = box.X + t * box.Width;
+            ArtSprite railArt = UiKit.Enabled ? painter.Sprite(UiKitArt.SliderRail) : null;
+            ArtSprite knobArt = UiKit.Enabled ? painter.Sprite(UiKitArt.SliderKnob) : null;
+            if (railArt != null && knobArt != null)
+            {
+                // The mock's ink_rail_slider: the painted rail, a sage fill at the rail's own
+                // thickness up to the live value (so it reads as the rail's own colour, not a bar
+                // sitting over the art and hiding it at a high value — KitRailFillHeight, not the
+                // classic look's thicker BarHeight), then the painted knob.
+                painter.NineSlice(railArt, track);
+                Rect fill = new Rect(box.X, track.Center.Y - KitRailFillHeight / 2f, fillWidth, KitRailFillHeight);
+                painter.RoundedRect(fill, KitRailFillHeight / 2f, painter.C("sage2"));
+                painter.NineSlice(knobArt, new Rect(knobX - KnobRadius, track.Center.Y - KnobRadius, KnobRadius * 2f, KnobRadius * 2f));
+                return;
+            }
+
+            painter.RoundedRect(track, BarHeight / 2f, painter.C("track"));
+            painter.RoundedRect(new Rect(box.X, track.Y, fillWidth, BarHeight), BarHeight / 2f, painter.C("leaf"));
             painter.Disc(new Vec2(knobX, track.Center.Y), KnobRadius, painter.C("plum"));
             painter.Disc(new Vec2(knobX, track.Center.Y), KnobRadius - 7f, painter.C("cream"));
         }

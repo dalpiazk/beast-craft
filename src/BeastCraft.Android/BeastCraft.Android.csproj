@@ -62,7 +62,7 @@
     <AndroidAsset Include="..\..\content\art\ui\**\*.png" Link="Assets\Content\art\ui\%(RecursiveDir)%(Filename)%(Extension)" />
     <AndroidAsset Include="..\..\content\art\icons\**\*.png" Link="Assets\Content\art\icons\%(RecursiveDir)%(Filename)%(Extension)" />
     <!-- The UI font and its licence (SIL OFL 1.1: the licence travels with the font). -->
-    <AndroidAsset Include="..\..\content\fonts\*.ttf;..\..\content\fonts\OFL.txt" Link="Assets\Content\fonts\%(Filename)%(Extension)" />
+    <AndroidAsset Include="..\..\content\fonts\*.ttf;..\..\content\fonts\OFL.txt;..\..\content\fonts\AtkinsonHyperlegible-OFL.txt" Link="Assets\Content\fonts\%(Filename)%(Extension)" />
     <!-- The sounds (docs/design/audio.md). None ship yet; a missing file plays nothing. -->
     <AndroidAsset Include="..\..\content\audio\**\*.wav;..\..\content\audio\**\*.ogg" Link="Assets\Content\audio\%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>

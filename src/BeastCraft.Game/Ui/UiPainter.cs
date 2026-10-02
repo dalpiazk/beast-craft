@@ -4,7 +4,9 @@ using BeastCraft.Creatures;
 using BeastCraft.Game.Rendering;
 using BeastCraft.Presentation.Board;
 using BeastCraft.Presentation.Layout;
+using BeastCraft.Presentation.Text;
 using BeastCraft.Presentation.Ui;
+using BeastCraft.Vfx;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
@@ -195,6 +197,12 @@ namespace BeastCraft.Game.Ui
                 RoundedRect(new Rect(box.X, box.Y + 8f, box.Width, box.Height), style.Radius, C(style.Shadow.Value, alpha));
             }
 
+            if (UiKit.Enabled && !string.IsNullOrEmpty(style.Texture))
+            {
+                NineSlice(Sprite(style.Texture), box, C(new UiColor(255, 255, 255), alpha));
+                return;
+            }
+
             Framed(box, style.Radius, style.OutlineWidth, C(style.Outline, alpha), C(style.Fill, alpha));
         }
 
@@ -228,7 +236,17 @@ namespace BeastCraft.Game.Ui
                 RoundedRect(new Rect(box.X, box.Y + 6f, box.Width, box.Height), style.Radius, C(style.Outline, 0.35f));
             }
 
-            Framed(face, style.Radius, style.OutlineWidth, C(style.Outline, enabled ? 1f : 0.6f), fill);
+            if (UiKit.Enabled && !string.IsNullOrEmpty(style.Texture))
+            {
+                Color tint = !enabled ? C(new UiColor(185, 185, 185), 0.68f) : pressed ? C(new UiColor(214, 199, 178)) :
+                             selected ? C(new UiColor(255, 240, 214)) : C(new UiColor(255, 255, 255));
+                NineSlice(Sprite(style.Texture), face, tint);
+            }
+            else
+            {
+                Framed(face, style.Radius, style.OutlineWidth, C(style.Outline, enabled ? 1f : 0.6f), fill);
+            }
+
             float size = style.TextSize;
             bool hasText = !string.IsNullOrEmpty(text);
             if (!string.IsNullOrEmpty(glyph))
@@ -264,46 +282,46 @@ namespace BeastCraft.Game.Ui
             Color ink = C(label.ColorKey);
             if (!label.Wrap)
             {
-                TextIn(label.Text, label.Bounds, size, ink, label.Align, label.CenterVertically);
+                TextIn(label.Text, label.Bounds, size, ink, label.Align, label.CenterVertically, null, label.Face);
                 return;
             }
 
-            List<string> lines = Wrap(label.Text, size, label.Bounds.Width, label.MaxLines);
-            float lineHeight = _text.LineHeight(size);
+            List<string> lines = Wrap(label.Text, size, label.Bounds.Width, label.MaxLines, label.Face);
+            float lineHeight = _text.LineHeight(size, label.Face);
             float y = label.CenterVertically ? label.Bounds.Center.Y - (lines.Count * lineHeight - (lineHeight - size)) / 2f : label.Bounds.Y;
             foreach (string line in lines)
             {
-                TextIn(line, new Rect(label.Bounds.X, y, label.Bounds.Width, size), size, ink, label.Align, false);
+                TextIn(line, new Rect(label.Bounds.X, y, label.Bounds.Width, size), size, ink, label.Align, false, null, label.Face);
                 y += lineHeight;
             }
         }
 
-        /// <summary>One line in <paramref name="box"/>, cut to fit, aligned; centred vertically on its cap height (or top-aligned).</summary>
-        public void TextIn(string text, Rect box, float size, Color ink, TextAlign align, bool center = true, Color? shadow = null)
+        /// <summary>One line in <paramref name="box"/>, cut to fit, aligned; centred vertically on its cap height (or top-aligned); <paramref name="face"/> is <see cref="UiFontFace.Heading"/> unless given.</summary>
+        public void TextIn(string text, Rect box, float size, Color ink, TextAlign align, bool center = true, Color? shadow = null, UiFontFace face = UiFontFace.Heading)
         {
             if (string.IsNullOrEmpty(text))
             {
                 return;
             }
 
-            string fitted = _text.Fit(text, size, box.Width);
+            string fitted = _text.Fit(text, size, box.Width, face);
             float y = center ? box.Center.Y - size / 2f : box.Y;
             switch (align)
             {
                 case TextAlign.Center:
-                    _text.DrawCentered(_draw, fitted, box.Center.X, y, size, ink, shadow);
+                    _text.DrawCentered(_draw, fitted, box.Center.X, y, size, ink, face, shadow);
                     break;
                 case TextAlign.Right:
-                    _text.DrawRight(_draw, fitted, box.Right, y, size, ink, shadow);
+                    _text.DrawRight(_draw, fitted, box.Right, y, size, ink, face, shadow);
                     break;
                 default:
-                    _text.Draw(_draw, fitted, new Vector2(box.X, y), size, ink, shadow);
+                    _text.Draw(_draw, fitted, new Vector2(box.X, y), size, ink, face, shadow);
                     break;
             }
         }
 
-        /// <summary>Words of <paramref name="text"/> packed into lines of <paramref name="width"/> (at most <paramref name="maxLines"/>; 0 = any).</summary>
-        public List<string> Wrap(string text, float size, float width, int maxLines = 0)
+        /// <summary>Words of <paramref name="text"/> packed into lines of <paramref name="width"/> (at most <paramref name="maxLines"/>; 0 = any), measured in <paramref name="face"/>.</summary>
+        public List<string> Wrap(string text, float size, float width, int maxLines = 0, UiFontFace face = UiFontFace.Heading)
         {
             List<string> lines = new List<string>();
             foreach (string paragraph in (text ?? string.Empty).Split('\n'))
@@ -312,7 +330,7 @@ namespace BeastCraft.Game.Ui
                 foreach (string word in paragraph.Split(' '))
                 {
                     string next = line.Length == 0 ? word : line + " " + word;
-                    if (_text.Measure(next, size) <= width || line.Length == 0)
+                    if (_text.Measure(next, size, face) <= width || line.Length == 0)
                     {
                         line = next;
                         continue;
@@ -378,16 +396,27 @@ namespace BeastCraft.Game.Ui
         private void Tabs(Tabs tabs)
         {
             UiButtonStyle style = Style.Button(tabs.StyleKey);
+            bool kit = UiKit.Enabled && !string.IsNullOrEmpty(style.Texture) && !string.IsNullOrEmpty(style.UnselectedTexture);
             for (int i = 0; i < tabs.Items.Count; i++)
             {
                 Rect item = tabs.ItemBounds(i).Inset(8f);
                 bool selected = i == tabs.Selected;
-                if (selected)
+                if (kit)
+                {
+                    // Both states are a painted parchment pill here (the mock's shape): only the
+                    // wash/trim differ, baked into the two kit textures themselves.
+                    NineSlice(Sprite(selected ? style.Texture : style.UnselectedTexture), item);
+                    if (selected)
+                    {
+                        DrawTabRibbon(item);
+                    }
+                }
+                else if (selected)
                 {
                     RoundedRect(item, style.Radius, C(style.SelectedFill));
                 }
 
-                Color ink = C(selected ? "plumDeep" : "cream");
+                Color ink = C(kit ? "plumDeep" : selected ? "plumDeep" : "cream");
                 float g = Math.Min(item.Width, item.Height) * 0.46f;
                 float iconTop = item.Y + item.Height * 0.12f;
                 Glyph(i < tabs.Glyphs.Count ? tabs.Glyphs[i] : null, new Rect(item.Center.X - g / 2f, iconTop, g, g), ink);
@@ -401,6 +430,21 @@ namespace BeastCraft.Game.Ui
                 labelTop = Math.Min(labelTop, item.Bottom - labelHeight);
                 _text.DrawCentered(_draw, _text.Fit(tabs.Items[i], style.TextSize, item.Width - 8f), item.Center.X, labelTop, style.TextSize, ink);
             }
+        }
+
+        /// <summary>The selected tab's small cloth-ribbon accent (<see cref="UiKitArt.TabRibbon"/>), centred under its pill's bottom edge, its own aspect kept.</summary>
+        private void DrawTabRibbon(Rect item)
+        {
+            ArtSprite ribbon = Sprite(UiKitArt.TabRibbon);
+            if (ribbon == null || ribbon.Data.FrameWidth <= 0 || ribbon.Data.FrameHeight <= 0)
+            {
+                return;
+            }
+
+            float width = Math.Min(item.Width * 0.34f, ribbon.Data.FrameWidth);
+            float height = width * ribbon.Data.FrameHeight / ribbon.Data.FrameWidth;
+            Rect box = new Rect(item.Center.X - width / 2f, item.Bottom - height * 0.55f, width, height);
+            Art(ribbon, box, false);
         }
 
         // ------------------------------------------------------------------------------------------
@@ -551,6 +595,48 @@ namespace BeastCraft.Game.Ui
         public ArtSprite Sprite(string artKey)
         {
             return string.IsNullOrEmpty(artKey) ? null : _atlas.ByArtKey(artKey);
+        }
+
+        /// <summary>
+        /// Draws <paramref name="art"/>'s frame 0 over <paramref name="box"/>: nine-sliced by its
+        /// manifest insets (<see cref="ArtSpriteData.NineSlice"/>; the math is
+        /// <see cref="NineSlicePatch"/>, shared with its unit tests) when it has any, else stretched
+        /// over the whole box like <see cref="SpriteRenderer.DrawStretched"/>. The journal UI kit's
+        /// painted panels, plaques, buttons, tabs, rails, tracks, chips and cards all draw this way;
+        /// <paramref name="tint"/> multiplies the art's own colours (its manifest Tint, then this),
+        /// white for none.
+        /// </summary>
+        public void NineSlice(ArtSprite art, Rect box, Color? tint = null)
+        {
+            if (art == null || art.Data.FrameWidth <= 0 || art.Data.FrameHeight <= 0 || box.Width <= 0f || box.Height <= 0f)
+            {
+                return;
+            }
+
+            Color color = MultiplyTint(art.Tint, tint ?? Color.White);
+            ArtNineSliceData slice = art.Data.NineSlice;
+            if (slice == null)
+            {
+                _draw.DrawRegion(art.Texture, art.Frame(0), new Vector2(box.X, box.Y), new Vector2(box.Width, box.Height), color);
+                return;
+            }
+
+            foreach (NineSliceCell cell in NineSlicePatch.Build(art.Data.FrameWidth, art.Data.FrameHeight, slice.Left, slice.Top, slice.Right, slice.Bottom, box))
+            {
+                if (cell.Dest.Width <= 0f || cell.Dest.Height <= 0f || cell.Source.Width <= 0f || cell.Source.Height <= 0f)
+                {
+                    continue;
+                }
+
+                Rectangle source = new Rectangle((int)Math.Round(cell.Source.X), (int)Math.Round(cell.Source.Y), (int)Math.Round(cell.Source.Width),
+                                                  (int)Math.Round(cell.Source.Height));
+                _draw.DrawRegion(art.Texture, source, new Vector2(cell.Dest.X, cell.Dest.Y), new Vector2(cell.Dest.Width, cell.Dest.Height), color);
+            }
+        }
+
+        private static Color MultiplyTint(Color a, Color b)
+        {
+            return new Color(a.R * b.R / 255, a.G * b.G / 255, a.B * b.B / 255, a.A * b.A / 255);
         }
 
         // ------------------------------------------------------------------------------------------

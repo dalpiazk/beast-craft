@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using BeastCraft.Presentation.Board;
 using BeastCraft.Presentation.Layout;
+using BeastCraft.Presentation.Text;
 
 namespace BeastCraft.Presentation.Ui
 {
@@ -248,6 +249,13 @@ namespace BeastCraft.Presentation.Ui
         public TextAlign Align = TextAlign.Left;
 
         public bool Wrap;
+
+        /// <summary>
+        /// Which typeface this label draws in (<see cref="Text.UiFontFace"/>): <c>Heading</c>
+        /// (Fredoka, the default — every label before the body typeface landed) or <c>Body</c>
+        /// (Atkinson Hyperlegible: long-form reading text — a paragraph, a description, the credits).
+        /// </summary>
+        public UiFontFace Face = UiFontFace.Heading;
 
         /// <summary>Wrapped lines beyond this are dropped (0 = no limit).</summary>
         public int MaxLines;

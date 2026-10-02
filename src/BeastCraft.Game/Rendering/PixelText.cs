@@ -17,14 +17,23 @@ namespace BeastCraft.Game.Rendering
     /// </summary>
     public interface ITextRenderer : IDisposable
     {
-        /// <summary>The width of <paramref name="text"/> at cap height <paramref name="size"/>.</summary>
+        /// <summary>The width of <paramref name="text"/> at cap height <paramref name="size"/>, in <see cref="UiFontFace.Heading"/>.</summary>
         float Measure(string text, float size);
 
-        /// <summary>The distance from one line's top to the next's at <paramref name="size"/>.</summary>
+        /// <summary>The distance from one line's top to the next's at <paramref name="size"/>, in <see cref="UiFontFace.Heading"/>.</summary>
         float LineHeight(float size);
 
-        /// <summary>Draws <paramref name="text"/> with its top-left at <paramref name="topLeft"/>, with a drop shadow when <paramref name="shadow"/> is set.</summary>
+        /// <summary>Draws <paramref name="text"/> in <see cref="UiFontFace.Heading"/>, with its top-left at <paramref name="topLeft"/>, with a drop shadow when <paramref name="shadow"/> is set.</summary>
         void Draw(SpriteRenderer renderer, string text, Vector2 topLeft, float size, Color color, Color? shadow = null);
+
+        /// <summary>The same as <see cref="Measure(string,float)"/>, in <paramref name="face"/> (<see cref="PixelText"/>, the placeholder with only the one face, ignores it).</summary>
+        float Measure(string text, float size, UiFontFace face);
+
+        /// <summary>The same as <see cref="LineHeight(float)"/>, in <paramref name="face"/>.</summary>
+        float LineHeight(float size, UiFontFace face);
+
+        /// <summary>The same as <see cref="Draw(SpriteRenderer,string,Vector2,float,Color,Color?)"/>, in <paramref name="face"/>.</summary>
+        void Draw(SpriteRenderer renderer, string text, Vector2 topLeft, float size, Color color, UiFontFace face, Color? shadow = null);
     }
 
     /// <summary>Alignment helpers over any <see cref="ITextRenderer"/>.</summary>
@@ -36,10 +45,22 @@ namespace BeastCraft.Game.Rendering
             text.Draw(renderer, value, new Vector2(centerX - text.Measure(value, size) / 2f, y), size, color, shadow);
         }
 
+        public static void DrawCentered(this ITextRenderer text, SpriteRenderer renderer, string value, float centerX, float y, float size, Color color,
+                                        UiFontFace face, Color? shadow = null)
+        {
+            text.Draw(renderer, value, new Vector2(centerX - text.Measure(value, size, face) / 2f, y), size, color, face, shadow);
+        }
+
         public static void DrawRight(this ITextRenderer text, SpriteRenderer renderer, string value, float right, float y, float size, Color color,
                                      Color? shadow = null)
         {
             text.Draw(renderer, value, new Vector2(right - text.Measure(value, size), y), size, color, shadow);
+        }
+
+        public static void DrawRight(this ITextRenderer text, SpriteRenderer renderer, string value, float right, float y, float size, Color color,
+                                     UiFontFace face, Color? shadow = null)
+        {
+            text.Draw(renderer, value, new Vector2(right - text.Measure(value, size, face), y), size, color, face, shadow);
         }
 
         /// <summary><paramref name="value"/> cut (with no ellipsis) to fit <paramref name="width"/>.</summary>
@@ -52,6 +73,23 @@ namespace BeastCraft.Game.Rendering
 
             int length = value.Length;
             while (length > 0 && text.Measure(value.Substring(0, length), size) > width)
+            {
+                length--;
+            }
+
+            return value.Substring(0, length);
+        }
+
+        /// <summary>The same as <see cref="Fit(ITextRenderer,string,float,float)"/>, in <paramref name="face"/>.</summary>
+        public static string Fit(this ITextRenderer text, string value, float size, float width, UiFontFace face)
+        {
+            if (string.IsNullOrEmpty(value) || text.Measure(value, size, face) <= width)
+            {
+                return value;
+            }
+
+            int length = value.Length;
+            while (length > 0 && text.Measure(value.Substring(0, length), size, face) > width)
             {
                 length--;
             }
@@ -115,6 +153,23 @@ namespace BeastCraft.Game.Rendering
             }
 
             DrawRun(batch, text, topLeft.X, topLeft.Y, color, scale);
+        }
+
+        // PixelText is the built-in placeholder font only (one face, no TTF needed): the face-aware
+        // overloads ignore UiFontFace and draw exactly as the originals above.
+        public float Measure(string text, float size, UiFontFace face)
+        {
+            return Measure(text, size);
+        }
+
+        public float LineHeight(float size, UiFontFace face)
+        {
+            return LineHeight(size);
+        }
+
+        public void Draw(SpriteRenderer renderer, string text, Vector2 topLeft, float size, Color color, UiFontFace face, Color? shadow = null)
+        {
+            Draw(renderer, text, topLeft, size, color, shadow);
         }
 
         public void Dispose()

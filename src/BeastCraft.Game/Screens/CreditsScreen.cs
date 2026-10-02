@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using BeastCraft.Game.Screens.Components;
 using BeastCraft.Presentation.Layout;
+using BeastCraft.Presentation.Text;
 using BeastCraft.Presentation.Ui;
 
 namespace BeastCraft.Game.Screens
@@ -68,27 +69,32 @@ namespace BeastCraft.Game.Screens
             });
         }
 
-        /// <summary>A card with a heading and one wrapped paragraph; returns the next y.</summary>
+        /// <summary>A card with a heading and one wrapped paragraph (the body typeface: long-form reading text); returns the next y.</summary>
         private float AddTextCard(float y, float size, string headingKey, string bodyKey)
         {
             string body = Loc(bodyKey);
             float textWidth = _cards.Width - 72f;
-            List<string> lines = Ctx.Painter.Wrap(body, size, textWidth);
-            float bodyHeight = lines.Count * Ctx.Text.LineHeight(size);
+            List<string> lines = Ctx.Painter.Wrap(body, size, textWidth, 0, UiFontFace.Body);
+            float bodyHeight = lines.Count * Ctx.Text.LineHeight(size, UiFontFace.Body);
             return AddCard(y, 96f + bodyHeight + 30f, headingKey, box => AddLine(box, 90f, body, size, "ink", bodyHeight, true));
         }
 
-        /// <summary>One line (or, with <paramref name="wrap"/>, a wrapped block of <paramref name="height"/>) under the heading, inset to match <see cref="SectionHeader"/>.</summary>
+        /// <summary>
+        /// One line (or, with <paramref name="wrap"/>, a wrapped block of <paramref name="height"/>)
+        /// under the heading, inset to match <see cref="SectionHeader"/>. A wrapped block is
+        /// long-form reading text, so it draws in the body typeface (Atkinson Hyperlegible); a single
+        /// line (the name, tagline, version, draft producer credit) stays the heading face (Fredoka).
+        /// </summary>
         private void AddLine(Rect box, float yOffset, string text, float size, string colorKey, float height = 36f, bool wrap = false)
         {
             Rect line = new Rect(box.X + 36f, box.Y + yOffset, box.Width - 72f, height);
             if (wrap)
             {
-                float lineHeight = Ctx.Text.LineHeight(size);
+                float lineHeight = Ctx.Text.LineHeight(size, UiFontFace.Body);
                 float lineY = line.Y;
-                foreach (string part in Ctx.Painter.Wrap(text, size, line.Width))
+                foreach (string part in Ctx.Painter.Wrap(text, size, line.Width, 0, UiFontFace.Body))
                 {
-                    Ctx.Painter.TextIn(part, new Rect(line.X, lineY, line.Width, size), size, Ctx.Painter.C(colorKey), TextAlign.Left, false);
+                    Ctx.Painter.TextIn(part, new Rect(line.X, lineY, line.Width, size), size, Ctx.Painter.C(colorKey), TextAlign.Left, false, null, UiFontFace.Body);
                     lineY += lineHeight;
                 }
 

@@ -590,11 +590,16 @@ namespace BeastCraft.Game
         /// </summary>
         private void LoadFont()
         {
-            TtfText font = TtfText.TryLoad(_content.Source, GameContent.UiFontPath, out string error);
+            TtfText font = TtfText.TryLoad(_content.Source, GameContent.UiFontPath, GameContent.UiBodyFontPath, out string error);
             if (font == null)
             {
                 Console.WriteLine("UI font not loaded (" + error + "); using the pixel font.");
                 return;
+            }
+
+            if (font.BodyError != null)
+            {
+                Console.WriteLine("UI body font not loaded (" + font.BodyError + "); using the heading font for body text too.");
             }
 
             _text.Dispose();

@@ -17,6 +17,21 @@ licence texts are at the links (and, for the font, beside the file).
   under the OFL.
 - Source: https://fonts.google.com/specimen/Fredoka
 
+### Atkinson Hyperlegible (UI body typeface)
+
+- File: `content/fonts/AtkinsonHyperlegible-Regular.ttf` (the Regular static instance, as served by
+  the Google Fonts GitHub repository), copied by the hosts to `Content/fonts/` (desktop, beside the
+  executable; Android, APK assets). Long-form reading text (a paragraph, a description, the
+  credits) draws in it; Fredoka stays the face for headings, buttons, tabs and chips.
+- Copyright 2020 Braille Institute of America, Inc.
+- Licence: **SIL Open Font License, Version 1.1** — full text in
+  `content/fonts/AtkinsonHyperlegible-OFL.txt`, which ships with the font. No Reserved Font Name is
+  declared. The font may be bundled, embedded and redistributed with the game; it may not be sold
+  on its own, and any modified version must stay under the OFL.
+- Source: https://github.com/google/fonts/tree/main/ofl/atkinsonhyperlegible (mirrored from the
+  Braille Institute of America's original release); also at
+  https://fonts.google.com/specimen/Atkinson+Hyperlegible
+
 ## Libraries (NuGet)
 
 | Package | Used for | Licence |
