@@ -643,42 +643,28 @@ namespace BeastCraft.Game.Ui
                 return;
             }
 
+            // No per-cell source inset or dest overlap here — an earlier pass tried both (to guard
+            // against bilinear bleed and to paint over a boundary pixel), but with point sampling
+            // (below) there is no interpolation left to bleed, and the two adjustments together
+            // were themselves distorting each cell's own scale right at the boundary, which (lead
+            // review, kit-shots/step2 — a disabled-tinted chip, flat grey with no grain left to hide
+            // it in) is exactly where a visible grid line showed. The real fix is the art itself:
+            // every kit texture's stretched regions (everything but the four corners, which always
+            // render at native 1:1 scale) are now flat, grain only in the corners
+            // (Tooling/UiKit/build_kit.py's flatten_outside_corners) — a flat region has no pattern
+            // to misalign at any stretch factor, so the cells can simply tile edge-to-edge as
+            // NineSlicePatch computes them.
             IReadOnlyList<NineSliceCell> cells = NineSlicePatch.Build(art.Data.FrameWidth, art.Data.FrameHeight, slice.Left, slice.Top, slice.Right, slice.Bottom, box);
-            for (int i = 0; i < cells.Count; i++)
+            foreach (NineSliceCell cell in cells)
             {
-                NineSliceCell cell = cells[i];
                 if (cell.Dest.Width <= 0f || cell.Dest.Height <= 0f || cell.Source.Width <= 0f || cell.Source.Height <= 0f)
                 {
                     continue;
                 }
 
-                // A one-source-pixel inset on every side this cell shares with its neighbour (not on
-                // a side that is the frame's own true edge): without it, LinearClamp's bilinear
-                // sampling reads a sliver of the next cell across that shared boundary (it only
-                // clamps at the texture's own edge, not a sub-rect's), which shows as a thin seam
-                // line at every internal nine-slice join. Column/row from i, cells built left-to-
-                // right then top-to-bottom (NineSlicePatch.Build's own order).
-                int col = i % 3;
-                int row = i / 3;
-                int x = (int)Math.Round(cell.Source.X) + (col > 0 ? 1 : 0);
-                int y = (int)Math.Round(cell.Source.Y) + (row > 0 ? 1 : 0);
-                int right = (int)Math.Round(cell.Source.X + cell.Source.Width) - (col < 2 ? 1 : 0);
-                int bottom = (int)Math.Round(cell.Source.Y + cell.Source.Height) - (row < 2 ? 1 : 0);
-                int width = Math.Max(1, right - x);
-                int height = Math.Max(1, bottom - y);
-                Rectangle source = new Rectangle(x, y, width, height);
-
-                // Cells are drawn in this same index order (0..8), so a cell with col/row > 0 was
-                // drawn after, and sits beside, the neighbour at its left/top; growing its dest rect
-                // one screen pixel into that neighbour's own area (its content there is the same
-                // continuous paint, so the extra pixel is never a visible stretch) means this cell's
-                // own fresh sample paints over whatever that shared boundary pixel rendered as in the
-                // earlier draw, covering a seam there outright rather than trying to prevent one.
-                float destX = cell.Dest.X - (col > 0 ? 1f : 0f);
-                float destY = cell.Dest.Y - (row > 0 ? 1f : 0f);
-                float destWidth = cell.Dest.Width + (col > 0 ? 1f : 0f);
-                float destHeight = cell.Dest.Height + (row > 0 ? 1f : 0f);
-                _draw.DrawRegion(art.Texture, source, new Vector2(destX, destY), new Vector2(destWidth, destHeight), color, NineSliceSampler);
+                Rectangle source = new Rectangle((int)Math.Round(cell.Source.X), (int)Math.Round(cell.Source.Y), (int)Math.Round(cell.Source.Width),
+                                                  (int)Math.Round(cell.Source.Height));
+                _draw.DrawRegion(art.Texture, source, new Vector2(cell.Dest.X, cell.Dest.Y), new Vector2(cell.Dest.Width, cell.Dest.Height), color, NineSliceSampler);
             }
         }
 

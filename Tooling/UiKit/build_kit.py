@@ -32,7 +32,7 @@ from texlib import (  # noqa: E402 -- path set up above
     mix, rng, paper_texture, watercolor_wash, rounded_mask, deckled_rect_mask,
 )
 
-from PIL import Image, ImageDraw, ImageFilter  # noqa: E402
+from PIL import Image, ImageDraw, ImageFilter, ImageStat  # noqa: E402
 
 OUT_DIR = ROOT / "content" / "art" / "ui" / "kit"
 
@@ -46,13 +46,52 @@ MUTED_ROSE = mix((196, 92, 102), PAPER, 0.22)  # a desaturated berry-rose wash f
 # (mirrors settings_mock.py's parchment_panel/brass_trim/corner_flourish, generalised for a
 # standalone texture rather than one composited over a backdrop.)
 
-def parchment_fill(w, h, radius, seed, wash=None, grain=2, mottle=7, alpha=250, deckled=False, jitter=5):
+def flatten_outside_corners(img, w, h, insets):
+    """Replaces every pixel OUTSIDE the four corners (insets = (left, top, right, bottom), the exact
+    nine-slice cut this piece will be sliced on) with one flat colour -- the image's own area
+    average, so the flat fill reads as the same tone as the textured corners right next to it, just
+    without their grain -- leaving grain/mottle only where a nine-slice patch actually leaves it
+    (the four corners, which always render at native, unstretched 1:1 scale; everything else is some
+    cell this piece's own edges or centre, stretched by whatever amount the box it is drawn into
+    needs). A first pass instead tried to make the *source* texture's own height closer to each
+    piece's typical render height, so the stretch factor stayed closer to 1:1 and the compression
+    less visible -- that only ever worked for the ONE render size it was tuned against (lead review,
+    kit-shots/step2: a chip and a bottom-nav button, both reusing the same texture at two more sizes
+    neither tuned for, still showed a visible grid of seams). A stretched region with literally no
+    grain pattern to misalign cannot show a seam at any size, which this is instead.
+
+    A piece with Top=Bottom=0 (or Left=Right=0, unused here) is a 3-slice pill (the slider rail, the
+    toggle track): its "corner" is the full height (or width) end cap, not a small square -- insets
+    of 0 on an axis mean this flattens nothing along that axis, which is exactly what a 3-slice pill
+    needs (only the two end caps keep grain; the whole stretched middle does not, same as every
+    other piece)."""
+    left, top, right, bottom = insets
+    top_h = top if top > 0 else h
+    bottom_h = bottom if bottom > 0 else h
+    flat = tuple(int(round(v)) for v in ImageStat.Stat(img.convert("RGB")).mean)
+    solid = Image.new("RGBA", (w, h), flat + (255,))
+    mask = Image.new("L", (w, h), 0)
+    d = ImageDraw.Draw(mask)
+    if left > 0:
+        d.rectangle([0, 0, left, top_h], fill=255)
+        d.rectangle([0, h - bottom_h, left, h], fill=255)
+    if right > 0:
+        d.rectangle([w - right, 0, w, top_h], fill=255)
+        d.rectangle([w - right, h - bottom_h, w, h], fill=255)
+    return Image.composite(img, solid, mask)
+
+
+def parchment_fill(w, h, radius, seed, wash=None, grain=2, mottle=7, alpha=250, deckled=False, jitter=5, nine_slice=None):
     """A parchment RGBA fill (paper grain + optional watercolour wash), masked to a rounded rect or
-    (deckled=True) a soft torn/deckled edge."""
+    (deckled=True) a soft torn/deckled edge. nine_slice, when given, flattens the grain/wash outside
+    the four corners those insets mark off (flatten_outside_corners) -- applied before the shape
+    mask, so the flattened base still gets the same soft rounded/deckled edge as the textured one."""
     base = paper_texture(w, h, PAPER, seed=seed, mottle_strength=mottle, grain_strength=grain).convert("RGBA")
     if wash:
         ws = watercolor_wash(w, h, wash, seed=seed + 5, blobs=3, alpha=20, spread=0.8)
         base.alpha_composite(ws)
+    if nine_slice:
+        base = flatten_outside_corners(base, w, h, nine_slice)
     mask = deckled_rect_mask(w, h, jitter=jitter, seed=seed + 1, margin=3) if deckled else rounded_mask(w, h, radius)
     a = mask.point(lambda v: int(v * alpha / 255))
     out = Image.new("RGBA", (w, h), (0, 0, 0, 0))
@@ -174,7 +213,7 @@ def build_panel():
     overlay a screen opts into only where it has room."""
     w = h = 320
     radius = 28
-    img, _mask = parchment_fill(w, h, radius, seed=911, grain=3, mottle=9, alpha=252, deckled=False)
+    img, _mask = parchment_fill(w, h, radius, seed=911, grain=3, mottle=9, alpha=252, deckled=False, nine_slice=(40, 40, 40, 40))
     faint_inner_shadow(img, radius, strength=20)
     save(img, "panel.png")
     return dict(name="panel", size=(w, h), nine_slice=(40, 40, 40, 40))
@@ -186,7 +225,7 @@ def build_card():
     no baked corner flourish, same reason."""
     w = h = 360
     radius = 22
-    img, _mask = parchment_fill(w, h, radius, seed=970, wash=SKY_TEAL, grain=2, mottle=7, alpha=252)
+    img, _mask = parchment_fill(w, h, radius, seed=970, wash=SKY_TEAL, grain=2, mottle=7, alpha=252, nine_slice=(34, 34, 34, 34))
     faint_inner_shadow(img, radius, strength=16)
     d = ImageDraw.Draw(img)
     d.rounded_rectangle([1, 1, w - 2, h - 2], radius=radius, outline=INK_PLUM, width=3)
@@ -215,7 +254,7 @@ def build_title_plaque():
     seam of any kit piece. 90/28 keeps a real, barely-compressed centre row at 70px."""
     w, h = 260, 90
     radius = 28
-    img, _mask = parchment_fill(w, h, radius, seed=500, wash=APRICOT, grain=2, mottle=6, alpha=250)
+    img, _mask = parchment_fill(w, h, radius, seed=500, wash=APRICOT, grain=2, mottle=6, alpha=250, nine_slice=(44, 28, 44, 28))
     d = ImageDraw.Draw(img)
     brass_trim(d, (2, 2, w - 3, h - 3), radius, color=BRASS, w=3, inset=4)
     save(img, "title_plaque.png")
@@ -242,7 +281,7 @@ def _button(name, wash, trim_color, seed):
     bumped from 3 so the ring reads solid rather than hairline even where some compression remains."""
     w, h = 240, 100
     radius = 34
-    img, _mask = parchment_fill(w, h, radius, seed=seed, wash=wash, grain=2, mottle=6, alpha=250)
+    img, _mask = parchment_fill(w, h, radius, seed=seed, wash=wash, grain=2, mottle=6, alpha=250, nine_slice=(40, 40, 40, 40))
     d = ImageDraw.Draw(img)
     brass_trim(d, (2, 2, w - 3, h - 3), radius, color=trim_color, w=4, inset=5)
     save(img, f"{name}.png")
@@ -269,7 +308,7 @@ def _tab(name, wash, trim_color, alpha, trim_width, seed):
     same reason."""
     w, h = 220, 120
     radius = 26
-    img, _mask = parchment_fill(w, h, radius, seed=seed, wash=wash, grain=2, mottle=6, alpha=alpha)
+    img, _mask = parchment_fill(w, h, radius, seed=seed, wash=wash, grain=2, mottle=6, alpha=alpha, nine_slice=(38, 30, 38, 30))
     d = ImageDraw.Draw(img)
     brass_trim(d, (2, 2, w - 3, h - 3), radius, color=trim_color, w=trim_width, inset=4)
     save(img, f"{name}.png")
@@ -319,9 +358,12 @@ def build_slider_knob():
 
 
 def build_toggle_track():
-    """The wood switch track (settings_mock.py's wood_switch): one texture either way, only the knob moves."""
+    """The wood switch track (settings_mock.py's wood_switch): one texture either way, only the knob
+    moves. Grain flattened outside its own two end caps (flatten_outside_corners), same as every
+    other piece -- a 3-slice pill's "corner" is the full-height end cap (Top=Bottom=0 here)."""
     w, h = 160, 64
     base = paper_texture(w, h, WOOD, seed=61, mottle_strength=7, grain_strength=2).convert("RGBA")
+    base = flatten_outside_corners(base, w, h, (32, 0, 32, 0))
     mask = rounded_mask(w, h, h // 2)
     out = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     out.paste(base, (0, 0), mask)
@@ -343,7 +385,7 @@ def build_chip():
     Top/Bottom insets 24: see _button()'s note (the compression-thins-the-trim-ring seam)."""
     w, h = 160, 76
     radius = 20
-    img, _mask = parchment_fill(w, h, radius, seed=741, grain=2, mottle=6, alpha=248)
+    img, _mask = parchment_fill(w, h, radius, seed=741, grain=2, mottle=6, alpha=248, nine_slice=(30, 24, 30, 24))
     d = ImageDraw.Draw(img)
     brass_trim(d, (2, 2, w - 3, h - 3), radius, color=WOOD, w=3, inset=4)
     save(img, "chip.png")
