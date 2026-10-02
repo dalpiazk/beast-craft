@@ -399,7 +399,7 @@ namespace BeastCraft.Tests.EditMode
                 }
             }
 
-            Assert.AreEqual(24 + 6 + 59, painted, "backdrops, icon frame and rings, VFX hero frames");
+            Assert.AreEqual(24 + 6 + 59 + 14, painted, "backdrops, icon frame and rings, VFX hero frames, journal UI kit pieces");
             int icons = 0;
             foreach (string file in listed)
             {

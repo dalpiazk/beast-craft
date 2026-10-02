@@ -19,8 +19,9 @@ colours** (the data does not tint them).
 
 Tick a box when the painted file has landed.
 
-**Status (2026-09-27).** Landed: the 91 skill icons and the frame and the five rarity rings (sections 2 and 3;
-Treatment B, Frame 1; `Tooling/ArtLab/provenance/icons.md`). Borderline but accepted ("not aiming for perfect"):
+**Status (2026-10-02).** Landed: the 91 skill icons and the frame and the five rarity rings (sections 2 and 3;
+Treatment B, Frame 1; `Tooling/ArtLab/provenance/icons.md`), and the 14 journal UI kit pieces (section 5;
+procedural, `Tooling/UiKit/README.md`). Borderline but accepted ("not aiming for perfect"):
 **Thorn Lash**, **Sunder** and **Great Cleave** (see `docs/art/touch-ups.md`). Still placeholders: the 24
 backdrops (section 1) and the 59 VFX hero frames (section 4). Pending outside this list: the region map art and the
 Archer's accent mask re-cut (`docs/art/touch-ups.md`).
@@ -308,6 +309,36 @@ HP bar stays). Read at a glance at unit size; a symbol plus a soft glow.
 | [ ] | `content/art/vfx/status/heal.png` | `fx_painted_status_heal` | Heal | on apply only |
 | [ ] | `content/art/vfx/status/buff.png` | `fx_painted_status_buff` | Stat buff | over the unit, faint |
 | [ ] | `content/art/vfx/status/debuff.png` | `fx_painted_status_debuff` | Stat debuff | over the unit, faint |
+
+## 5. Journal UI kit (14)
+
+The shared UI toolkit's painted-parchment look (issue #52, direction D: "painted world + storybook
+page"): a 9-slice panel, a title plaque, three button faces, two tab pills plus a ribbon accent, a
+slider rail, a slider knob, a toggle track, a toggle knob, a chip and a card. Unlike every other
+section here, these are not placeholders waiting on the art lane: **procedural, no AI**, built
+(and re-buildable) by `Tooling/UiKit/build_kit.py` from `Tooling/ArtLab/scripts/texlib.py`'s
+generators (paper grain, a watercolour wash, rounded/deckled masks, ink-line flourishes) — see
+`Tooling/UiKit/README.md`. Linear filtering, mipmapped, straight alpha, like every other slot here.
+Nine-sliced (`Tooling/PixelArt/illustrated.json`'s `NineSlice`) except the three fixed sprites
+(ribbon, slider knob, toggle knob). Drawn by `UiPainter.NineSlice` when `UiKit.Enabled` (the switch
+back to the original code-drawn style; `src/BeastCraft.Presentation/Ui/UiKit.cs`).
+
+| Done | File | ArtKey | What |
+| --- | --- | --- | --- |
+| [x] | `content/art/ui/kit/panel.png` | `ui/kit/panel` | the generic panel look's face (`UiStyle` Panel `panel`) |
+| [x] | `content/art/ui/kit/card.png` | `ui/kit/card` | the card look's face (`UiStyle` Panel `card`) |
+| [x] | `content/art/ui/kit/title_plaque.png` | `ui/kit/title_plaque` | a screen header's title plaque |
+| [x] | `content/art/ui/kit/button_primary.png` | `ui/kit/button_primary` | the primary button face |
+| [x] | `content/art/ui/kit/button_secondary.png` | `ui/kit/button_secondary` | the secondary button face |
+| [x] | `content/art/ui/kit/button_danger.png` | `ui/kit/button_danger` | the danger button face |
+| [x] | `content/art/ui/kit/tab_unselected.png` | `ui/kit/tab_unselected` | an unselected tab's pill |
+| [x] | `content/art/ui/kit/tab_selected.png` | `ui/kit/tab_selected` | the selected tab's pill |
+| [x] | `content/art/ui/kit/tab_ribbon.png` | `ui/kit/tab_ribbon` | the selected tab's ribbon accent (fixed sprite) |
+| [x] | `content/art/ui/kit/slider_rail.png` | `ui/kit/slider_rail` | a slider's background rail |
+| [x] | `content/art/ui/kit/slider_knob.png` | `ui/kit/slider_knob` | a slider's knob (fixed sprite) |
+| [x] | `content/art/ui/kit/toggle_track.png` | `ui/kit/toggle_track` | a toggle's track, on or off alike |
+| [x] | `content/art/ui/kit/toggle_knob.png` | `ui/kit/toggle_knob` | a toggle's knob (fixed sprite) |
+| [x] | `content/art/ui/kit/chip.png` | `ui/kit/chip` | a filter chip's face |
 
 ## Checks after dropping art in
 

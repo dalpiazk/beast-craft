@@ -742,7 +742,7 @@ def painted_entries():
         u, v = s.get("PivotU", 0.5), s.get("PivotV", 0.5)
         if not (0 <= u <= 1 and 0 <= v <= 1):
             sys.exit(f"painted {s['Name']}: PivotU/PivotV must be fractions of the frame (0-1)")
-        entries.append({
+        entry = {
             "Name": s["Name"],
             "File": s["File"],
             "Kind": "sprite",
@@ -758,8 +758,16 @@ def painted_entries():
             "PixelsPerUnit": round(w / s["WorldWidth"], 3),
             "Filter": "linear",
             "Premultiplied": bool(s.get("Premultiplied", False)),
-        })
-        print(f"painted {s['Name']:22s} {w}x{h} across {s['WorldWidth']} -> {entries[-1]['PixelsPerUnit']} px/unit")
+        }
+        if "NineSlice" in s:
+            ns = s["NineSlice"]
+            left, top, right, bottom = ns.get("Left", 0), ns.get("Top", 0), ns.get("Right", 0), ns.get("Bottom", 0)
+            if left + right > w or top + bottom > h:
+                sys.exit(f"painted {s['Name']}: NineSlice insets ({left},{top},{right},{bottom}) exceed its {w}x{h} frame")
+            entry["NineSlice"] = {"Left": left, "Top": top, "Right": right, "Bottom": bottom}
+        entries.append(entry)
+        print(f"painted {s['Name']:22s} {w}x{h} across {s['WorldWidth']} -> {entries[-1]['PixelsPerUnit']} px/unit" +
+              (f" nine-slice {entry['NineSlice']}" if "NineSlice" in entry else ""))
     return entries
 
 
@@ -827,7 +835,10 @@ def write_manifest(data, sprites):
                    "element-accent overlay sprite (same frame, pivot and PixelsPerUnit), drawn over it multiplied by "
                    "the unit's element colour, with AccentElement (the element the art is drawn in) and AccentNative "
                    "(that colour, #rrggbb); painted art (illustrated.json's Painted list: battle backdrops and the other "
-                   "painted slots of docs/art/hollow-art-slots.md) is listed the same way, Filter linear; plus the palette (char -> colour) that VFX colours are named from, and "
+                   "painted slots of docs/art/hollow-art-slots.md) is listed the same way, Filter linear, plus an optional NineSlice "
+                   "({Left,Top,Right,Bottom}, source px): the corner size that never stretches on each side, drawn nine-sliced "
+                   "instead of a single stretched quad (the journal UI kit's panels, buttons, tabs, slider rail and toggle track); "
+                   "plus the palette (char -> colour) that VFX colours are named from, and "
                    "ElementAccents (element -> palette char: the accent colour of every other element).",
         "SchemaVersion": 2,
         "Palette": palette,
