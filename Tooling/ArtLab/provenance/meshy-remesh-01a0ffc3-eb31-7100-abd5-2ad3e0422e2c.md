@@ -1,0 +1,24 @@
+# Provenance: Meshy `remesh` task `01a0ffc3-eb31-7100-abd5-2ad3e0422e2c` (quad remesh, anim pilot)
+
+**Status:** local-tooling input to the 3D animation pilot (GitHub issue #68), not shipped in the game unless a producer later approves the resulting rig/animation as in-game art (see `docs/art/art-brief.md`'s AI-disclosure rule).
+
+| | |
+| --- | --- |
+| Tool | Meshy, **paid tier**, `remesh` (`POST /openapi/v1/remesh`) |
+| Input | `input_task_id=01a0f351-869e-7319-9820-e4b6e8b6b226` -- the same pass-2 textured `meshy-7.1` image-to-3D task used by the earlier triangle remesh (`meshy-remesh-01a0f38d-c409-702e-b976-62bff441b88f.md`, 929,638 tris, 2K base-colour texture); this pass re-remeshes it with **quad** topology and a lower (~7k) target instead, since quad topology deforms more predictably under skinning than triangles (see the animation methodology research, section 1) |
+| Settings | `target_polycount=7000` (approximate -- target_faces for quad output is a face, not a tri, count), `topology=quad`, `formats=["glb"]` (exact request parameters as delivered in the task's working directory `task.json`, not independently re-verified against a fresh `--dry-run` by this session) |
+| Task id | `01a0ffc3-eb31-7100-abd5-2ad3e0422e2c` |
+| Status | `SUCCEEDED` (~94s, per `task.json`'s `started_at`/`finished_at`) |
+| Credits spent | `5` (flat `remesh` rate, per `task.json`'s `consumed_credits`) |
+| Generated | 2026-10-02, producer-approved for the animation pilot the same day |
+| Output ownership | Meshy's paid tier grants the generating account ownership of outputs; no attribution requirement (unlike the free CC BY tier) |
+
+## Notes
+
+- Delivered to this session already downloaded, at `model.glb` + `textures/` (`0_base_color.png` 2048x2048, `0_normal.png` 2048x2048, `0_metallic_roughness.png` 4096x4096, `0_metallic.png`, `0_roughness.png`) plus `task.json` and `thumbnail.png` -- not re-requested from the Meshy API by this session (no Meshy calls were authorised for the animation-pilot task; this asset was prepared and handed off beforehand).
+- `Tooling/Spike55/gltf_inspect.py` on the delivered `model.glb`: **14,761 tris, 13,587 verts, 1 material, 3 images** (base-colour, normal, metallic/roughness). The triangle count is consistent with a ~7,380-quad mesh exported as glTF triangles (every quad splits into 2 tris on glTF export, which only supports triangle primitives) -- i.e. this reads as a genuine quad remesh at roughly the requested ~7k target, not a raw triangle remesh.
+- `Tooling/Animation/prep_mesh.py` (this pilot's mesh-prep stage) found the raw mesh fragmented into **1,018 connected components** (largest only 1,680 verts) and **10,475 non-manifold edges** -- at first glance alarming, but this is the same glTF export/import vertex-splitting artefact documented for the earlier triangle remesh (`meshy-remesh-01a0f38d...md`'s notes): a "Merge by Distance" weld (1e-4 threshold) collapses this to **7,418 verts, 4 components** (largest 7,376, i.e. 99.4% of verts), **107 non-manifold edges** -- a coherent mesh, not a shattered one. This weld is the first step `prep_mesh.py` runs after import, before any decimation or weighting, matching the precedent set by `blender_lowpoly_render.py` for the earlier (triangle) remesh.
+- `prep_mesh.py` then decimated (Collapse) the welded mesh from 14,755 to **7,998 tris** (the task's ≤8k-tri hero budget), confirmed single-component-dominant (3,998 / 4,031 verts in the largest of 4 residual components) before decimating, per Spike #55's finding that Collapse decimation shatters a mesh that's still genuinely fragmented into many similarly-sized components.
+- Base-colour texture downsized from 2048x2048 to 1024x1024 (`Image.scale` + reload-from-file, the Spike #55 "downsize must be saved and reloaded to actually take effect on export" gotcha), per the task's 1K base-colour cap.
+- **Committed?** No. `model.glb`, its texture set, and every intermediate Blender working file from the rig/animation pipeline are large binary working files, kept out of git per this repo's established convention (see the earlier remesh's provenance note); only the final `griffin_anim.glb` (skinned, animated, < 2 MB -- see `Tooling/Spike55/Live3D/Content/model/griffin_anim.glb`) is committed, and only because it is small enough and is the actual runtime asset.
+- Landmark/rig finding worth recording here since it affects how this specific generation reads: this delivered mesh is a **winged biped** (lion hindquarters with two legs, eagle head, wings in place of forelimbs), not a four-legged chimera -- confirmed by `Tooling/Animation/rig_creature.py`'s ground-contact landmark detection (two foot clusters, not four) and a visual close-up render. See `Tooling/Animation/rig_templates/winged_quadruped.py`'s module docstring for the full account; the rig template adapted to 2 legs for this creature rather than forcing an unused 4-leg structure onto it.
