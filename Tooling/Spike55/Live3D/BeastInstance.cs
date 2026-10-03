@@ -10,7 +10,23 @@ namespace BeastCraft.Spike55.Live3D
     /// bone palette uploaded to the shader before each draw is.</summary>
     public sealed class BeastInstance
     {
-        public const int MaxBones = 16; // must match Toon.fx's MAX_BONES
+        // Anim-pilot griffin (griffin_anim.glb, Tooling/Animation): 25 deform bones -- bumped from the
+        // fourth pass's 16 (griffin_live.glb's 11-joint rig). Safe for every existing model too: unused
+        // palette slots beyond a model's real joint count are just inert identity padding (see
+        // NewIdentityPalette below), and 25 * 4 = 100 vec4 vertex-uniform registers is still comfortably
+        // inside GLSL ES 2.0's guaranteed 128 vec4 minimum alongside Toon.fx's other vertex-stage
+        // parameters (see Toon.fx's header comment for the full register-budget note).
+        public const int MaxBones = 25; // must match Toon.fx's MAX_BONES
+
+        // Anim-pilot griffin: runtime spring bones for tail tip / wing feathers (SpringBone.cs), layered
+        // on top of the baked clip pose after AnimatedPose runs -- see SpringBone.cs's header comment.
+        // Harmless, always-present fields: a model with no matching spring-joint names (e.g.
+        // griffin_live.glb) just never gets its SpringJointConfig.NodeIndex resolved, and
+        // SpringJointConfig.IsValid guards every use site, so these states simply never update for
+        // anything but the pilot model.
+        public SpringJointState TailSpring;
+        public SpringJointState WingLSpring;
+        public SpringJointState WingRSpring;
 
         public Matrix4x4 World; // world placement (hex cell position + facing), row-vector convention
         public float ClockOffset; // seconds, randomised per instance so 24 beasts don't move in lockstep

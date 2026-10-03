@@ -13,11 +13,15 @@
 // frame-time spikes at 12+ instances (see docs/spikes/055-3d-mini-spike.md's fourth-pass section for
 // the before/after numbers) and is why this version moved the blend into the vertex shader instead.
 //
-// MAX_BONES = 16 comfortably covers this rig's 11 joints (root/body/neck/head/2 wings/4 legs/tail)
-// with headroom, and 16 float4x4 = 64 vec4 vertex-uniform registers -- well inside GLSL ES 2.0's
-// spec-minimum guaranteed 128 vec4 vertex uniform vectors (MonoGame's own SkinnedEffect budgets 72
-// bones = 288 vec4, which would NOT fit that same minimum guarantee; this rig needs nowhere near that,
-// so 16 was chosen deliberately small rather than copying SkinnedEffect's budget). The cosmetic crest
+// MAX_BONES = 25 (bumped from the fourth pass's 16 for the anim-pilot griffin, griffin_anim.glb --
+// Tooling/Animation -- whose deform rig is 25 bones: root/pelvis/2 spine/2 neck/head/4 tail/3+3 wing/
+// 4+4 leg). 25 float4x4 = 100 vec4 vertex-uniform registers -- still comfortably inside GLSL ES 2.0's
+// spec-minimum guaranteed 128 vec4 vertex uniform vectors alongside this shader's handful of other
+// vertex-stage parameters (ViewProjection etc, a few more vec4) -- MonoGame's own SkinnedEffect budgets
+// 72 bones = 288 vec4, which would NOT fit that same minimum guarantee; this rig needs nowhere near
+// that. The fourth pass's griffin_live.glb (11 joints) and crest_alt.glb (1) both still fit easily in
+// this larger array -- unused slots are inert identity padding, see Game1's NewIdentityPalette. The
+// cosmetic crest
 // attachment (no real skin) reuses the same vertex format and shader: every one of its vertices is
 // authored with BlendIndices=(0,0,0,0) and BlendWeight=(1,0,0,0) (see Game1.LoadContent), so setting
 // Bones[0] to its rigid head-bone-relative transform skins it as a single "bone" with no separate code
@@ -38,7 +42,7 @@
     #define PS_SHADERMODEL ps_4_0_level_9_1
 #endif
 
-#define MAX_BONES 16
+#define MAX_BONES 25
 
 float4x4 ViewProjection;
 float4x4 Bones[MAX_BONES];

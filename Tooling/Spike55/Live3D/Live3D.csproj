@@ -45,6 +45,10 @@
          PNG) is read as a plain file at runtime, same convention as BeastCraft.Desktop. -->
     <MonoGameContentReference Include="Content\Content.mgcb" />
     <None Include="Content\model\griffin_live.glb" Link="Content\model\griffin_live.glb" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Anim-pilot griffin (issue #68, Tooling/Animation): the 25-bone, three-clip (Idle/Move/Attack)
+         skinned + animated GLB, loaded instead of griffin_live.glb when the pilot sequence mode is
+         requested (see Game1.LoadContent). -->
+    <None Include="Content\model\griffin_anim.glb" Link="Content\model\griffin_anim.glb" CopyToOutputDirectory="PreserveNewest" />
     <None Include="Content\model\crest_alt.glb" Link="Content\model\crest_alt.glb" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\..\content\art\backdrops\r01\sun0\medium.png" Link="Content\backdrop.png" CopyToOutputDirectory="PreserveNewest" />
     <!-- Fifth pass fix round (swarm via GPU skinning, battle mode only): the real, rigged Swarmling,

@@ -45,6 +45,17 @@ namespace BeastCraft.Spike55.Live3D
         private Texture2D _backdropTexture;
         private int _headNodeIndex;
 
+        // Anim-pilot griffin (issue #68, Tooling/Animation): when --pilot-sequence is given, _bodyModel
+        // is griffin_anim.glb instead of griffin_live.glb (see LoadContent) -- a 25-bone rig with three
+        // named clips (Idle/Move/Attack) and real spring-joint bones, vs. the fourth pass's 11-bone,
+        // two-clip rig. These fields are only ever populated in that mode; SpringJointConfig.IsValid
+        // guards every use site so a non-pilot run (every other mode) is completely unaffected.
+        private SpringJointConfig _springTail;
+        private SpringJointConfig _springWingL;
+        private SpringJointConfig _springWingR;
+        private int _pilotFrameIndex;
+        private int _pilotWarmupFramesLeft = 6; // let the window/GPU settle before the first capture
+
         // Cached effect parameters (avoid a string-keyed lookup in EffectParameterCollection every draw
         // call -- looked up once here instead of via Parameters["..."] in the hot path).
         private EffectParameter _paramViewProjection;
@@ -235,7 +246,7 @@ namespace BeastCraft.Spike55.Live3D
             // (task 3): the task brief asks for portrait 1080x1920 framing specifically for the battle
             // screenshots, and half-scale screenshots made the swarm's already-small units harder to
             // judge for on-screen readability than the shipped game would be.
-            if (_options.ScreenshotMode)
+            if (_options.ScreenshotMode || _options.PilotSequenceMode)
             {
                 _graphics.PreferredBackBufferWidth = 1080;
                 _graphics.PreferredBackBufferHeight = 1920;
@@ -270,9 +281,27 @@ namespace BeastCraft.Spike55.Live3D
             _toonEffect = Content.Load<Effect>("Effects/Toon");
 
             string contentRoot = Path.Combine(AppContext.BaseDirectory, "Content");
-            _bodyModel = GltfSkinnedModel.Load(Path.Combine(contentRoot, "model", "griffin_live.glb"));
+            // Anim-pilot griffin: --pilot-sequence swaps in griffin_anim.glb (Tooling/Animation's 25-bone,
+            // three-clip rig) in place of the fourth pass's griffin_live.glb -- same loader, same GPU mesh
+            // builder, same toon/outline draw path; only the bone/joint-name conventions differ (this
+            // rig's bones are named head/tail_04/wing_L_03/wing_R_03 etc, not bone_head -- see
+            // rig_templates/winged_quadruped.py), so the node-name lookups below branch on which file was
+            // loaded rather than needing a second code path.
+            bool pilotMode = _options.PilotSequenceMode;
+            string bodyGlbName = pilotMode ? "griffin_anim.glb" : "griffin_live.glb";
+            _bodyModel = GltfSkinnedModel.Load(Path.Combine(contentRoot, "model", bodyGlbName));
             _crestModel = GltfSkinnedModel.Load(Path.Combine(contentRoot, "model", "crest_alt.glb"));
-            _headNodeIndex = AnimatedPose.FindNodeIndexByName(_bodyModel, "bone_head");
+            _headNodeIndex = AnimatedPose.FindNodeIndexByName(_bodyModel, pilotMode ? "head" : "bone_head");
+
+            if (pilotMode)
+            {
+                // Tuning by eye against the review GIF, not derived from any physical measurement (see
+                // SpringBone.cs's header comment): the tail is heavier/longer and settles slower (lower
+                // stiffness, more damping) than a light wing feather tip.
+                _springTail = new SpringJointConfig(AnimatedPose.FindNodeIndexByName(_bodyModel, "tail_04"), 90f, 6f);
+                _springWingL = new SpringJointConfig(AnimatedPose.FindNodeIndexByName(_bodyModel, "wing_L_03"), 140f, 8f);
+                _springWingR = new SpringJointConfig(AnimatedPose.FindNodeIndexByName(_bodyModel, "wing_R_03"), 140f, 8f);
+            }
 
             _bodyMesh = GpuMesh.Build(GraphicsDevice, _bodyModel);
             _crestMesh = GpuMesh.Build(GraphicsDevice, _crestModel);
@@ -374,7 +403,13 @@ namespace BeastCraft.Spike55.Live3D
                 _hexGridVertexCount = gridVerts.Length;
 
                 SetStressLevel(_options.BenchMode ? _options.BenchBeasts : (_options.ScreenshotMode ? _options.ScreenshotBeasts : 1));
-                if (!_options.ScreenshotCrestOn)
+                if (!_options.ScreenshotCrestOn || _options.PilotSequenceMode)
+                    // The crest attachment's fixed local re-orientation (CrestLocal) is tuned for
+                    // griffin_live.glb's "bone_head" bind pose -- on the pilot rig's differently-oriented
+                    // "head" bone it renders as a stray floating plume, not a head decoration. The crest
+                    // toggle is a separate fourth-pass feature from the anim-pilot deliverable, so it's
+                    // simply off for every pilot-sequence capture rather than re-tuned for a rig it was
+                    // never meant to drive.
                     foreach (var inst in _instances)
                         inst.CrestOn = false;
                 _tintIndex = Math.Clamp(_options.ScreenshotTint, 0, Tints.Length - 1);
@@ -895,7 +930,7 @@ namespace BeastCraft.Spike55.Live3D
             if (kb.IsKeyDown(Keys.Escape))
                 Exit();
 
-            if (!_options.BenchMode && !_options.ScreenshotMode)
+            if (!_options.BenchMode && !_options.ScreenshotMode && !_options.PilotSequenceMode)
             {
                 if (WasPressed(kb, Keys.Tab))
                 {
@@ -927,8 +962,19 @@ namespace BeastCraft.Spike55.Live3D
                 UpdateFacing((float)gameTime.ElapsedGameTime.TotalSeconds);
 
             _skinStopwatch.Restart();
-            foreach (var inst in _instances)
-                UpdateInstancePose(inst);
+            if (_options.PilotSequenceMode)
+            {
+                // Deterministic, frame-indexed pose (see UpdateInstancePosePilot's doc comment) -- not
+                // driven by _elapsedSeconds/real gameTime, so output is reproducible regardless of how
+                // fast the real engine loop happens to run.
+                foreach (var inst in _instances)
+                    UpdateInstancePosePilot(inst);
+            }
+            else
+            {
+                foreach (var inst in _instances)
+                    UpdateInstancePose(inst);
+            }
             UpdateSwarmBones();
             _skinStopwatch.Stop();
             _stats.SkinningMsThisFrame = _skinStopwatch.Elapsed.TotalMilliseconds;
@@ -975,6 +1021,139 @@ namespace BeastCraft.Spike55.Live3D
                 var crestTransform = CrestLocal * inst.NodeWorldScratch[_headNodeIndex] * inst.World;
                 inst.CrestPalette[0] = ToXna(crestTransform);
             }
+        }
+
+        // Anim-pilot griffin (issue #68): the crossfaded Idle->Move->Attack->Idle reel's segment timing
+        // (seconds). Tuned by eye against the review GIF, not derived from the clips' own authored
+        // lengths (Idle=3s/Move=1s/Attack=1s, Tooling/Animation/anim/{keyed,gait}.py) -- the reel plays a
+        // shorter slice of Idle/Move than their own full loop length so the reel itself stays a readable
+        // few seconds, not a literal concatenation of every clip's full duration.
+        private const float PilotIdleInLen = 1.5f;
+        private const float PilotMoveLen = 1.2f;
+        private const float PilotAttackLen = 1.0f;
+        private const float PilotIdleOutLen = 0.6f;
+        private const float PilotCrossfade = 0.2f;
+
+        private static float PilotReelDuration() =>
+            PilotIdleInLen + PilotCrossfade + PilotMoveLen + PilotCrossfade + PilotAttackLen + PilotCrossfade + PilotIdleOutLen;
+
+        private float ClipDuration(AnimatedPose.Clip clip)
+        {
+            var anim = clip switch
+            {
+                AnimatedPose.Clip.Idle => _bodyModel.IdleAnimation,
+                AnimatedPose.Clip.Move => _bodyModel.MoveAnimation,
+                AnimatedPose.Clip.Attack => _bodyModel.AttackAnimation,
+                _ => null,
+            };
+            return anim?.Duration ?? 1f;
+        }
+
+        /// <summary>How many frames --pilot-sequence should render in total: one pass over the crossfaded
+        /// reel's own duration at --pilot-fps for "reel" (the GIF deliverable), or --frames evenly spaced
+        /// across exactly one loop of the named clip's own duration for "idle"/"move"/"attack" (the
+        /// contact-sheet deliverable -- Tooling/Animation/README.md's gate).</summary>
+        private int TotalPilotFrames()
+        {
+            if (string.Equals(_options.PilotClip, "reel", StringComparison.OrdinalIgnoreCase))
+                return Math.Max(1, (int)MathF.Ceiling(PilotReelDuration() * _options.PilotFps));
+            return Math.Max(1, _options.PilotFrames);
+        }
+
+        /// <summary>Maps a captured frame index to the (fromClip, fromTime, toClip, toTime, blend) that
+        /// AnimatedPose.ComputeWorldMatricesBlended needs. blend=0 means "fully fromClip" (toClip/toTime
+        /// are unused in that case but still well-defined, same clip/time as from).</summary>
+        private void GetPilotPoseParams(int frameIndex, out AnimatedPose.Clip clipFrom, out float tFrom,
+            out AnimatedPose.Clip clipTo, out float tTo, out float blend)
+        {
+            if (!string.Equals(_options.PilotClip, "reel", StringComparison.OrdinalIgnoreCase))
+            {
+                var clip = _options.PilotClip.ToLowerInvariant() switch
+                {
+                    "move" => AnimatedPose.Clip.Move,
+                    "attack" => AnimatedPose.Clip.Attack,
+                    _ => AnimatedPose.Clip.Idle,
+                };
+                float duration = ClipDuration(clip);
+                int frames = Math.Max(1, _options.PilotFrames);
+                float t = frames > 1 ? frameIndex / (float)(frames - 1) * duration : 0f;
+                clipFrom = clipTo = clip;
+                tFrom = tTo = t;
+                blend = 0f;
+                return;
+            }
+
+            float s1 = PilotIdleInLen;
+            float s2 = s1 + PilotCrossfade;
+            float s3 = s2 + PilotMoveLen;
+            float s4 = s3 + PilotCrossfade;
+            float s5 = s4 + PilotAttackLen;
+            float s6 = s5 + PilotCrossfade;
+            float s7 = s6 + PilotIdleOutLen;
+
+            float simTime = frameIndex / (float)Math.Max(1, _options.PilotFps);
+            float t2 = simTime % s7;
+
+            if (t2 < s1)
+            { clipFrom = clipTo = AnimatedPose.Clip.Idle; tFrom = tTo = t2; blend = 0f; }
+            else if (t2 < s2)
+            { clipFrom = AnimatedPose.Clip.Idle; clipTo = AnimatedPose.Clip.Move; tFrom = t2; tTo = t2 - s1; blend = (t2 - s1) / PilotCrossfade; }
+            else if (t2 < s3)
+            { clipFrom = clipTo = AnimatedPose.Clip.Move; tFrom = tTo = t2 - s2; blend = 0f; }
+            else if (t2 < s4)
+            { clipFrom = AnimatedPose.Clip.Move; clipTo = AnimatedPose.Clip.Attack; tFrom = t2 - s2; tTo = t2 - s3; blend = (t2 - s3) / PilotCrossfade; }
+            else if (t2 < s5)
+            { clipFrom = clipTo = AnimatedPose.Clip.Attack; tFrom = tTo = t2 - s4; blend = 0f; }
+            else if (t2 < s6)
+            { clipFrom = AnimatedPose.Clip.Attack; clipTo = AnimatedPose.Clip.Idle; tFrom = t2 - s4; tTo = t2 - s5; blend = (t2 - s5) / PilotCrossfade; }
+            else
+            { clipFrom = clipTo = AnimatedPose.Clip.Idle; tFrom = tTo = t2 - s6; blend = 0f; }
+        }
+
+        /// <summary>Pilot-mode equivalent of UpdateInstancePose: evaluates a crossfaded pose (see
+        /// GetPilotPoseParams) instead of a single clip, then layers runtime spring bones (SpringBone.cs)
+        /// on the tracked tail/wing joints before computing skin matrices. Uses a fixed per-captured-frame
+        /// dt (1/--pilot-fps), not real elapsed time -- --pilot-sequence advances exactly one output frame
+        /// per Update() call regardless of the engine's real frame rate (see Draw()'s capture block), so
+        /// the spring simulation needs a matching fixed step to stay deterministic/reproducible.</summary>
+        private void UpdateInstancePosePilot(BeastInstance inst)
+        {
+            float dt = 1f / Math.Max(1, _options.PilotFps);
+            GetPilotPoseParams(_pilotFrameIndex, out var clipFrom, out var tFrom, out var clipTo, out var tTo, out var blend);
+            AnimatedPose.ComputeWorldMatricesBlended(_bodyModel, clipFrom, tFrom, clipTo, tTo, blend, inst.NodeWorldScratch);
+
+            ApplySpringJoint(ref inst.TailSpring, _springTail, inst.NodeWorldScratch, inst.World, dt);
+            ApplySpringJoint(ref inst.WingLSpring, _springWingL, inst.NodeWorldScratch, inst.World, dt);
+            ApplySpringJoint(ref inst.WingRSpring, _springWingR, inst.NodeWorldScratch, inst.World, dt);
+
+            AnimatedPose.ComputeSkinMatrices(_bodyModel, inst.NodeWorldScratch, inst.World, inst.SkinScratch);
+            for (int j = 0; j < inst.SkinScratch.Length && j < BeastInstance.MaxBones; j++)
+                inst.BonePalette[j] = ToXna(inst.SkinScratch[j]);
+
+            if (inst.CrestOn)
+            {
+                var crestTransform = CrestLocal * inst.NodeWorldScratch[_headNodeIndex] * inst.World;
+                inst.CrestPalette[0] = ToXna(crestTransform);
+            }
+        }
+
+        /// <summary>Nudges `nodeWorld[config.NodeIndex]` (in-place) so the joint's effective WORLD
+        /// position lags toward a damped-spring-simulated point instead of snapping straight to the baked
+        /// clip pose -- see SpringBone.cs's header comment for why this is a single point-mass spring per
+        /// joint, not a real chain solver. No-ops if `config` has no resolved node (a model with no
+        /// matching bone name, e.g. griffin_live.glb).</summary>
+        private static void ApplySpringJoint(ref SpringJointState state, SpringJointConfig config,
+            NumMatrix[] nodeWorld, NumMatrix instanceWorld, float dt)
+        {
+            if (!config.IsValid)
+                return;
+            var baked = nodeWorld[config.NodeIndex];
+            var bakedWorldPos = NumVector3.Transform(NumVector3.Zero, baked * instanceWorld);
+            state.Update(bakedWorldPos, config.Stiffness, config.Damping, dt);
+            var worldOffset = state.Offset(bakedWorldPos);
+            var invWorld = NumMatrix.Invert(instanceWorld, out var inv) ? inv : NumMatrix.Identity;
+            var localOffset = NumVector3.TransformNormal(worldOffset, invWorld);
+            nodeWorld[config.NodeIndex] = baked * NumMatrix.CreateTranslation(localOffset);
         }
 
         /// <summary>The whole swarm's per-frame CPU cost: for each instance, evaluate its pose via
@@ -1047,7 +1226,7 @@ namespace BeastCraft.Spike55.Live3D
             // that, so every screenshot in the spike doc up to and including the last pass carried the
             // fps/draw-call/memory text baked into the image. `--hide-stats` still parses (now a no-op
             // for screenshots specifically) rather than erroring on old invocations.
-            bool showStats = !_options.BenchMode && !_options.ScreenshotMode;
+            bool showStats = !_options.BenchMode && !_options.ScreenshotMode && !_options.PilotSequenceMode;
             if (showStats)
                 DrawStatsOverlay();
 
@@ -1057,6 +1236,28 @@ namespace BeastCraft.Spike55.Live3D
             {
                 SaveScreenshot(_options.ScreenshotPath);
                 Exit();
+            }
+
+            // Anim-pilot griffin (issue #68): capture one numbered PNG per Update()/Draw() pair once the
+            // window has had a few frames to settle (same reasoning as --screenshot's warmup, just frame-
+            // counted instead of time-counted since pilot time itself is frame-indexed -- see
+            // UpdateInstancePosePilot). Advances _pilotFrameIndex (consumed by GetPilotPoseParams next
+            // Update()) and exits once TotalPilotFrames() frames have been written.
+            if (_options.PilotSequenceMode)
+            {
+                if (_pilotWarmupFramesLeft > 0)
+                {
+                    _pilotWarmupFramesLeft--;
+                }
+                else
+                {
+                    // SaveScreenshot itself creates the output directory if needed.
+                    string path = Path.Combine(_options.PilotSequenceDir, $"frame_{_pilotFrameIndex:D4}.png");
+                    SaveScreenshot(path);
+                    _pilotFrameIndex++;
+                    if (_pilotFrameIndex >= TotalPilotFrames())
+                        Exit();
+                }
             }
         }
 

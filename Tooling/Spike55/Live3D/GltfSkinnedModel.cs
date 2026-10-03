@@ -43,6 +43,9 @@ namespace BeastCraft.Spike55.Live3D
         public GltfJoint[] Joints; // empty if this model has no skin (e.g. crest_alt.glb)
         public Animation IdleAnimation;
         public Animation MoveAnimation;
+        public Animation AttackAnimation; // anim-pilot griffin: griffin_anim.glb carries a third named
+                                          // clip (Tooling/Animation/anim/keyed.py); null for any model
+                                          // that doesn't export one (e.g. griffin_live.glb).
 
         public static GltfSkinnedModel Load(string path)
         {
@@ -107,6 +110,7 @@ namespace BeastCraft.Spike55.Live3D
 
             model.IdleAnimation = root.LogicalAnimations.FirstOrDefault(a => string.Equals(a.Name, "Idle", StringComparison.OrdinalIgnoreCase));
             model.MoveAnimation = root.LogicalAnimations.FirstOrDefault(a => string.Equals(a.Name, "Move", StringComparison.OrdinalIgnoreCase));
+            model.AttackAnimation = root.LogicalAnimations.FirstOrDefault(a => string.Equals(a.Name, "Attack", StringComparison.OrdinalIgnoreCase));
 
             return model;
         }

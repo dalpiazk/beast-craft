@@ -45,6 +45,19 @@ namespace BeastCraft.Spike55.Live3D
         // KillRandomSwarmling itself (no-ops once every Swarmling is dead).
         public int Kill = 0;
 
+        // Anim-pilot griffin (issue #68): a dedicated headless mode that loads griffin_anim.glb (not
+        // griffin_live.glb -- see Game1.LoadContent) and renders a numbered PNG sequence for the
+        // producer-review deliverables (Tooling/Animation/README.md's gate): either one clip's own loop
+        // (--pilot-clip idle|move|attack, for a contact sheet -- evenly spaced frames across exactly one
+        // clip cycle) or the full crossfaded reel (--pilot-clip reel, the default -- Idle -> Move ->
+        // Attack -> Idle with real crossfades, for the GIF). Mutually exclusive with --battle/--bench/
+        // --screenshot in practice (not enforced here; Game1 just checks PilotSequenceMode first).
+        public bool PilotSequenceMode;
+        public string PilotSequenceDir;
+        public string PilotClip = "reel";
+        public int PilotFrames = 10; // contact-sheet frame count per clip; ignored for "reel"
+        public int PilotFps = 24; // reel playback rate
+
         public static LaunchOptions Parse(string[] args)
         {
             var o = new LaunchOptions();
@@ -95,6 +108,19 @@ namespace BeastCraft.Spike55.Live3D
                         break;
                     case "--kill":
                         o.Kill = int.Parse(args[++i], CultureInfo.InvariantCulture);
+                        break;
+                    case "--pilot-sequence":
+                        o.PilotSequenceMode = true;
+                        o.PilotSequenceDir = args[++i];
+                        break;
+                    case "--pilot-clip":
+                        o.PilotClip = args[++i];
+                        break;
+                    case "--pilot-fps":
+                        o.PilotFps = int.Parse(args[++i], CultureInfo.InvariantCulture);
+                        break;
+                    case "--frames":
+                        o.PilotFrames = int.Parse(args[++i], CultureInfo.InvariantCulture);
                         break;
                     default:
                         Console.Error.WriteLine("Unrecognised argument: " + args[i]);

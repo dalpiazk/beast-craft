@@ -15,7 +15,15 @@ namespace BeastCraft.Spike55.Live3D
     /// computes matrices, it never touches a vertex).</summary>
     public static class AnimatedPose
     {
-        public enum Clip { Idle, Move }
+        public enum Clip { Idle, Move, Attack }
+
+        private static Animation AnimationFor(GltfSkinnedModel model, Clip clip) => clip switch
+        {
+            Clip.Idle => model.IdleAnimation,
+            Clip.Move => model.MoveAnimation,
+            Clip.Attack => model.AttackAnimation,
+            _ => null,
+        };
 
         /// <summary>World matrix for every node, at the given clip/time (seconds, looped over the
         /// clip's own duration), written into a caller-owned `destination` array (sized model.Nodes.Length
@@ -41,7 +49,7 @@ namespace BeastCraft.Spike55.Live3D
         /// with no matching animation (e.g. crest_alt.glb, which has none at all).</summary>
         public static void ComputeWorldMatrices(GltfSkinnedModel model, Clip clip, float timeSeconds, Matrix4x4[] destination)
         {
-            var animation = clip == Clip.Idle ? model.IdleAnimation : model.MoveAnimation;
+            var animation = AnimationFor(model, clip);
             var nodes = model.Nodes;
             var parentIndex = model.ParentIndex;
 
@@ -86,6 +94,58 @@ namespace BeastCraft.Spike55.Live3D
         {
             float m = t % duration;
             return m < 0f ? m + duration : m;
+        }
+
+        /// <summary>Anim-pilot griffin (Tooling/Animation): crossfades between two clips by blending
+        /// per-node LOCAL transforms (translation lerp, rotation slerp, scale lerp) BEFORE composing the
+        /// hierarchy -- blending already-composed WORLD matrices instead would not interpolate rotation
+        /// correctly (a linear blend of two rotation matrices is not itself a rotation in general). `blend`
+        /// is 0 = fully `clipFrom`, 1 = fully `clipTo`. Same non-allocating, parent-before-child fixed-point
+        /// sweep as ComputeWorldMatrices (see its doc comment) -- this is that method's sibling, not a
+        /// wrapper around it, since the blend has to happen per-node before any parent composition.</summary>
+        public static void ComputeWorldMatricesBlended(GltfSkinnedModel model, Clip clipFrom, float timeFrom,
+            Clip clipTo, float timeTo, float blend, Matrix4x4[] destination)
+        {
+            var animFrom = AnimationFor(model, clipFrom);
+            var animTo = AnimationFor(model, clipTo);
+            var nodes = model.Nodes;
+            var parentIndex = model.ParentIndex;
+            blend = Math.Clamp(blend, 0f, 1f);
+
+            float tFrom = animFrom != null && animFrom.Duration > 0f ? Wrap(timeFrom, animFrom.Duration) : 0f;
+            float tTo = animTo != null && animTo.Duration > 0f ? Wrap(timeTo, animTo.Duration) : 0f;
+
+            Span<bool> done = stackalloc bool[nodes.Length];
+            int remaining = nodes.Length;
+            while (remaining > 0)
+            {
+                for (int i = 0; i < nodes.Length; i++)
+                {
+                    if (done[i])
+                        continue;
+                    int p = parentIndex[i];
+                    if (p >= 0 && !done[p])
+                        continue;
+
+                    Matrix4x4 local;
+                    if (animFrom == null && animTo == null)
+                    {
+                        local = nodes[i].LocalMatrix;
+                    }
+                    else
+                    {
+                        var fromT = animFrom != null ? nodes[i].GetLocalTransform(animFrom, tFrom) : nodes[i].LocalTransform;
+                        var toT = animTo != null ? nodes[i].GetLocalTransform(animTo, tTo) : nodes[i].LocalTransform;
+                        var translation = Vector3.Lerp(fromT.Translation, toT.Translation, blend);
+                        var rotation = Quaternion.Slerp(fromT.Rotation, toT.Rotation, blend);
+                        var scale = Vector3.Lerp(fromT.Scale, toT.Scale, blend);
+                        local = Matrix4x4.CreateScale(scale) * Matrix4x4.CreateFromQuaternion(rotation) * Matrix4x4.CreateTranslation(translation);
+                    }
+                    destination[i] = p >= 0 ? local * destination[p] : local; // row-vector: child-local first, then parent
+                    done[i] = true;
+                    remaining--;
+                }
+            }
         }
 
         /// <summary>Per-joint skin matrix (inverseBind * jointWorld * instanceWorld), ready to upload as
