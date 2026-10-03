@@ -66,52 +66,61 @@ search initially produced and how it was caught/fixed). Final skeleton: **25 def
 pelvis, 2 spine, 2 neck, head, 4-bone tail chain, 3-bone wing chain x2, 4-bone leg chain x2) -- at
 the low end of the 25-45 bone budget, which is appropriate for a 2-leg creature.
 
-**Weighting:** native automatic (heat) weights failed on the raw mesh (`Bone Heat Weighting: failed
-to find solution for one or more bones` -- the same class of failure Spike #55 hit on earlier Meshy
-generations); the voxel-remesh-donor fallback converged (0 unweighted vertices), followed by the
+**Weighting (second round, 4-leg rig):** native automatic (heat) weights failed on the raw mesh
+again; the voxel-remesh-donor fallback converged (0 unweighted vertices), followed by the
 topology-consistency and floating-island repair passes. After the scripted weight-paint cleanup
-(limit 3, normalise, clean, smooth, **re-limit to 3 again**, clean, re-normalise -- the lead-review
-fix round added the second limit pass): **max 3 / avg 2.92 influences per vertex**,
-**0 / 6,740 vertices unweighted**, comfortably inside the <=3-4 mobile target.
+(limit 4, normalise, clean, smooth, re-limit to 4, clean, re-normalise): **max 4 / avg 3.64
+influences per vertex**, **0 / 6,740 vertices unweighted** -- at the top of the <=3-4 mobile
+target (the earlier 2-leg rig hit max 3; the extra foreleg bones near the shoulder/hip cost one
+more influence slot on nearby vertices).
 
-**Animation:**
-- `Move`: 30-frame (1.2s @ 24fps) in-place walk/trot. Per-leg stride is **solved per leg from its
-  own IK reach**, not a fixed constant (see `anim/gait.py`'s `solve_2bone_ik` docstring). The
-  lead-review fix round rebuilt the hip/knee landmark placement (`winged_quadruped.py`'s
-  `build_bones`) to pull the hip inward/up and bow the knee forward hard, giving a genuine bent-knee
-  rest stance with real IK slack instead of a near-fully-extended rest leg -- solved stride is now
-  **L: 0.460 (peak-to-peak 46% of body height), R: 0.250 (peak-to-peak 25%)**, both within/above the
-  requested ~25-40% range, up from both legs being stuck at 0.040 (4% peak-to-peak) before the fix.
-  The L/R asymmetry reflects this mesh's own asymmetric bind pose (see the fix-round section above),
-  not a bug. The swing-phase lift height scales with each leg's own solved stride (`0.9x`).
+**Animation (second round, 4-leg):**
+- `Move`: 30-frame (1.2s @ 24fps). **Hind legs (BL/BR)** execute a real lateral-sequence walk
+  (`anim/gait.py`'s `LATERAL_SEQUENCE`: BL->FL->BR->FR phase order, each a quarter-cycle apart) with
+  per-leg IK-solved stride -- **BL: 0.460 (peak-to-peak 46% of body height), BR: 0.250 (25%)**, both
+  within/above the requested ~25-40% range. **Forelegs (FL/FR) are kept static** (braced at their
+  bind pose) through the whole clip -- every attempt to animate them, including a tiny 0.08H stride
+  and even a fully *static IK target*, visibly tore the mesh (see the lead-review section above for
+  the full diagnosis: the bind-pose knee fold needed for IK reach is more extreme than the weighting
+  holds up across, for the forelegs specifically). This is a real, documented limitation, not the
+  full "all four legs walk" result asked for.
 - `Idle`: 73-frame (3.0s @ 24fps) loop, 5 sparse key poses, Bezier ease-in-out. Subtle breathing
-  (spine rotation), slow head-look, wing settle, tail sway, alternating weight shift.
+  (spine rotation), slow head-look, wing settle, tail sway, alternating weight shift. All four legs
+  stay at their bind/rest pose throughout (never touched by `anim/keyed.py`) -- "all four planted".
 - `Attack`: 25-frame (1.0s @ 24fps), 5 key poses (neutral/anticipation/strike/follow-through/
   recover). Anticipation counter-rotates opposite the strike; the strike's in-edge is set to
   `EASE_IN` only (not `EASE_IN_OUT`) so the anticipation-to-strike transition reads as fast/abrupt
   per the methodology doc's timing guidance; bounded squash/stretch (1.08/1.08/0.90) on the chest at
-  the strike frame. **One fix round**: a first pass summed spine+neck+head forward pitch to ~98
-  degrees at the strike frame, curling the head entirely behind the wing/body silhouette in a render
-  check -- reduced to a ~54-degree cumulative pitch, which keeps the beak visible through the strike.
+  the strike frame. **Foreleg rake:** FR's thigh/shin get explicit keyframed rotations (anticipation:
+  wind up/lift; strike: swing forward/down; follow-through: settle) -- small, modest angles (not
+  routed through the fragile Move-clip IK path at all, so this doesn't hit the same tearing issue --
+  confirmed clean in a render check). Hind legs (BL/BR) and the other foreleg (FL) stay braced at
+  rest throughout. **One fix round** (carried over from the 2-leg pilot): a first pass summed
+  spine+neck+head forward pitch to ~98 degrees at the strike frame, curling the head entirely behind
+  the wing/body silhouette -- reduced to a ~54-degree cumulative pitch, which keeps the beak visible.
 
-**Verification gates** (`verify_report.json`, numbers from the actual pilot run):
+**Verification gates** (`verify_report.json`, numbers from the actual 4-leg pilot run):
 
 | Gate | Result | Pass |
 | --- | --- | --- |
-| Move foot-slide (stance-velocity CV, threshold < 0.35) | L: 0.049, R: 0.031 (stddev 2.28 / 0.82 mm/frame) | yes |
-| Move knee-angle range (15-179.5 deg) | L: 42.0-117.7, R: 69.2-124.1 | yes |
+| Move foot-slide, hind legs (stance CV, threshold < 0.35) | BL: 0.031, BR: 0.031 (stddev <1mm/frame) | yes |
+| Move foot-slide, forelegs (near-static, judged on abs stddev < 2mm/frame) | FL/FR: 1.4-1.5mm/frame | yes |
+| Move knee-angle range, hind legs (15-179.5 deg) | BL: 42.0-117.7, BR: 69.2-124.1 | yes |
+| Move knee-angle, forelegs (static) | 16.5 deg (constant) | yes |
 | Move loop-seam (max bone delta < 0.5 deg) | 0.000 deg | yes |
-| Move ground interpenetration (toe min z > -0.01) | L: -3.7e-8, R: -1.9e-7 | yes |
+| Move ground interpenetration (toe min z > -0.01) | hind: ~0; fore: 0.548 (never reaches ground, by design) | yes |
 | Idle loop-seam | 0.000 deg | yes |
 | Idle jitter (max 2nd-deriv < 0.15) | 0.00057 | yes |
-| Attack jitter (max 2nd-deriv < 0.15) | 0.0351 | yes |
+| Attack jitter (max 2nd-deriv < 0.15) | 0.0357 | yes |
 | Attack cumulative head pitch (< 120 deg, post-fix) | 64.0 deg | yes |
 
 The foot-slide gate's threshold (constancy of stance-phase velocity, not literal zero) is specific
 to this pipeline's **in-place clip** convention -- see `anim/gait.py`'s and `verify.py`'s module
 docstrings for why that's the correct metric when root translation is left to the engine, not baked.
+The foreleg gate judges on absolute stddev, not the velocity-ratio CV, once a leg is near-static --
+see `verify.py`'s comment for why CV is a poor metric at near-zero mean velocity.
 
-**Export:** `griffin_anim.glb`, **0.575 MiB** (well under the 2 MB budget), 25 bones, 7,998 tris,
+**Export:** `griffin_anim.glb`, **0.594 MiB** (well under the 2 MB budget), **33 bones**, 7,998 tris,
 6,740 verts, 3 named glTF animations (Idle/Move/Attack), 1024x1024 JPEG base-colour texture. Copied
 to `Tooling/Spike55/Live3D/Content/model/griffin_anim.glb` for the runtime.
 
@@ -167,23 +176,51 @@ GPU skinning, and crossfade/spring-bone code produce, not a pre-rendered stand-i
 A first pass through this pilot was sent back with five findings. Four are fixed; one (leg count)
 was re-investigated and the original finding stands, with the evidence recorded here.
 
-1. **Leg count -- re-investigated, 2-leg finding confirmed.** The lead cited the Meshy thumbnail
-   (`scratchpad/anim-pilot/griffin_quad/thumbnail.png`) and earlier Spike #55 passes as showing a
-   4-legged quadruped. This was re-checked thoroughly, not just reasserted: (a) a dedicated raycast
-   grid scan across the entire plausible front-leg region (chest/shoulder, both signs of the
-   forward axis, a wide Z range) found no second leg pair -- every high-"protrusion-score" candidate
-   traced back to the wing, the tail, or the already-confirmed hind legs, never to independent
-   front-leg geometry; (b) a render matched to the thumbnail's exact camera framing (front
-   perspective, same pose, same crop) was compared side-by-side with the official thumbnail and
-   shows the same silhouette -- **two legs, no visible front limbs, in both**. The earlier Spike #55
-   passes this task's instructions cite used a hand-authored 4-leg bone layout on a *different*
-   Meshy generation (an older task, not today's quad remesh), built from fractional heuristics
-   rather than verified against the mesh's own geometry -- it was never confirmed to match real
-   4-leg mesh data either. Given this mesh (task `01a0ffc3-eb31-7100-abd5-2ad3e0422e2c`) is a
-   winged biped by every check run against it, the rig stays 2-leg; fabricating a second leg pair
-   with invented geometry (and no real mesh to weight it to) would be worse than the honest
-   alternative. If the producer re-confirms a 4-leg design is required, the right fix is a different
-   or re-generated mesh, not synthetic bones on a biped mesh.
+1. **Leg count -- CORRECTED to 4-leg after a second review round (this agent's "2-leg" conclusion
+   below was wrong).** On the first lead-review pass, this section argued (in good faith, with real
+   evidence -- a thumbnail-matched render, exhaustive clustering/protrusion/raycast searches) that
+   the mesh was a 2-legged winged biped. The producer then supplied an independent multi-angle
+   orthographic render of the exact same input mesh (`views_quad.png`), whose Left/Right/Bottom/
+   3-4-low-back views clearly show **four separate legs** -- two eagle forelegs tucked up under the
+   chest (never touching the ground in this reared bind pose, which is exactly why every ground-
+   contact and silhouette-based check this agent ran missed them) and two lion hind legs planted on
+   the ground. Re-rendering this agent's own prepped mesh with the same turnaround confirmed it's
+   the same asset, and the forelegs ARE there -- this agent's front-view and straight-down bottom-
+   view probes put them directly in front of (visually overlapping) the hind legs from those
+   specific angles, which is exactly the failure mode the producer's reference diagnosed. The
+   earlier "2-leg, confirmed via thumbnail match" write-up is left below, struck through in spirit
+   but not deleted, because the mistake and why it happened are worth keeping on record: silhouette/
+   ground-contact checks from a narrow set of angles are not sufficient to rule out a tucked, never-
+   grounded limb, and this agent should have tried more independent view combinations (side + bottom
+   together, specifically) before concluding a limb didn't exist.
+
+   **What changed in the rig:** `winged_quadruped.py` now always builds 4 legs. Hind legs (BL/BR)
+   keep the original, reliable ground-contact clustering. Foreleg (FL/FR) landmarks could not be
+   isolated by any further vertex-level search either (clustering, protrusion scoring, and several
+   raycast strategies all mis-traced onto the tail or wing, which sweep through most of the
+   plausible foreleg region in this mesh's dramatically curled pose) -- they're placed via a
+   documented proportional estimate (torso centreline height at the target Z, offset forward by a
+   conservative margin) rather than precise detection, acknowledged as a real limitation, not a
+   silent guess. Forelegs attach at the shoulder (parented to `spine_02`, like the wings), not the
+   pelvis -- a true quadruped detail the earlier 2-leg rig didn't need. Final skeleton: **33 deform
+   bones** (was 25), weighting converges cleanly (0/6,740 unweighted, max 4 influences/vertex).
+
+   **Known limitation, honestly reported:** the forelegs' bind-pose knee had to be folded far more
+   sharply than the hind legs' (needed purely for IK reach -- the shoulder sits much higher above
+   the ground than the hind hips do) and the mesh weighting does not hold up across *any* animated
+   range at that fold, tearing visibly in every attempt tried (full ground reach, a reduced-depth
+   ground target, even a tiny 0.08H stride) -- confirmed it wasn't a stride-amplitude problem by
+   testing a fully STATIC foreleg target too, which still tore until the IK solve itself was bypassed
+   in favour of directly reproducing the bind-pose transforms. **Forelegs are kept static (braced) through
+   the Move clip** as a result -- only the hind legs execute the walk cycle -- and get a small, explicit
+   rake rotation in the Attack clip's keyframes (not routed through the fragile IK path at all). This
+   is a real, time-boxed limitation: a genuinely animated foreleg walk would need either re-weighting
+   (not attempted -- the automatic weighting pipeline doesn't have a lever for "be more robust across
+   large pose changes" beyond what's already tried) or a less extreme bind-pose fold (which would
+   cost IK reach instead). The toon-shaded runtime render (the actual producer-review deliverable)
+   reads acceptably despite this -- the outline/toon shading hides most of the underlying seam that's
+   plainly visible in flat Blender MatCap renders -- but it is not the full "all four legs walk" result
+   the task asked for.
 2. **Move's stride fixed at the root cause.** The hip/knee landmark placement (`winged_quadruped.py`
    `build_bones`) now pulls the hip inward toward the spine and raises it, with a pronounced forward
    knee bow -- a genuine bent-knee rest stance instead of a near-fully-extended leg -- which is what
@@ -234,12 +271,17 @@ was re-investigated and the original finding stands, with the evidence recorded 
   record repeatedly (e.g. docs/spikes/055-3d-mini-spike.md section 2.4's outline-shell specks).
 - **Move's L/R stride is asymmetric** (0.460 vs 0.250, see the lead-review fix round above) -- a
   direct, honest reflection of this specific mesh's asymmetric bind pose (leg R's own rest geometry
-  has less IK reach margin than leg L's), not a bug in the gait math (the verification gates confirm
-  zero measurable foot slide on both legs regardless of stride length). Narrowing the asymmetry
+  has less IK reach margin than leg BL's), not a bug in the gait math (the verification gates confirm
+  zero measurable foot slide on both hind legs regardless of stride length). Narrowing the asymmetry
   further would need a hip-landmark heuristic that compensates per-leg for the source mesh's own
   pose asymmetry, rather than placing both hips with the same formula.
-- **This is a pilot on one creature.** The template's leg-count auto-detection, landmark heuristics,
-  and the overall stage pipeline are written to generalise, but they have only been exercised against
-  this one winged-biped mesh. A true 4-legged creature, a creature with separate front talons, or a
-  serpentine/no-leg creature would each exercise code paths (the 4-leg branch in
-  `winged_quadruped.py`'s clustering, for instance) that this pilot's own mesh never triggered.
+- **Forelegs don't walk** (see the lead-review section above) -- kept static through Move, with only
+  a small keyframed rake in Attack. The single biggest open item if this pipeline continues past the
+  pilot: either a less extreme bind-pose knee fold (costs IK reach) or a dedicated re-weighting pass
+  for the foreleg region specifically.
+- **This is a pilot on one creature.** The template's landmark heuristics and overall stage pipeline
+  are written to generalise, but they have only been exercised against this one mesh. Hind-leg
+  ground-contact detection is reliable and reusable as-is; foreleg placement (proportional, not
+  detected -- see above) is the weakest, least-generalisable part of the template and would need
+  re-tuning per creature, possibly per-pose, until a more robust detection method is found. A
+  serpentine/no-leg creature would exercise the 2-leg/0-leg code paths this pilot's mesh never did.

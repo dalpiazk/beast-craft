@@ -158,7 +158,9 @@ def attack_pose(label):
         pass
     elif label == "anticipation":
         # Counter-rotation opposite the strike direction: pull head/neck BACK and UP, compress
-        # chest, wings pulled in tight, tail coils back -- the codeable anticipation rule.
+        # chest, wings pulled in tight, tail coils back -- the codeable anticipation rule. The
+        # raking foreleg (FR) lifts and draws back, winding up for the rake -- hind legs (BL/BR)
+        # and the other foreleg (FL) stay at rest (0,0,0, i.e. braced) throughout the whole clip.
         p["spine_02"] = (-6, 0, 0)
         p["neck_01"] = (-8, 0, 0)
         p["neck_02"] = (-10, 0, 0)
@@ -169,11 +171,16 @@ def attack_pose(label):
         p["wing_R_02"] = (0, 0, 8)
         p["tail_01"] = (10, 0, 0)
         p["tail_02"] = (14, 0, 0)
+        p["leg_FR_thigh"] = (-16, 0, 6)
+        p["leg_FR_shin"] = (10, 0, 0)
     elif label == "strike":
         # Fast snap forward/down -- the beak strike extreme. Wings flare for balance. Tuned down
         # from a first pass (spine+neck+head summed to ~98 degrees of forward pitch, which curled
         # the head entirely behind the wing/body silhouette in the render -- a first-fix-round
         # correction per the task's silhouette-readability check, not just a numbers tweak.)
+        # Foreleg rake: FR swings forward and down past the wind-up, as if raking a talon across --
+        # kept to a modest angle (this leg's weighting is fragile at larger articulation, see
+        # anim/gait.py's docstring on why Move keeps forelegs static) rather than a dramatic swipe.
         p["spine_02"] = (8, 0, 0)
         p["neck_01"] = (12, 0, 0)
         p["neck_02"] = (16, 0, 0)
@@ -184,6 +191,8 @@ def attack_pose(label):
         p["wing_R_02"] = (0, 0, -14)
         p["tail_01"] = (-14, 0, 0)
         p["tail_02"] = (-18, 0, 0)
+        p["leg_FR_thigh"] = (22, 0, -8)
+        p["leg_FR_shin"] = (-14, 0, 0)
     elif label == "follow_through":
         # Slight overshoot past the strike extreme, wings pushing back for balance recovery.
         p["spine_02"] = (10, 0, 0)
@@ -194,8 +203,10 @@ def attack_pose(label):
         p["wing_R_01"] = (6, 0, -10)
         p["tail_01"] = (-8, 0, 0)
         p["tail_02"] = (-10, 0, 0)
+        p["leg_FR_thigh"] = (14, 0, -4)
+        p["leg_FR_shin"] = (-8, 0, 0)
     elif label == "recover":
-        pass  # back to neutral, ready to loop into Idle
+        pass  # back to neutral (foreleg lowered back to braced rest), ready to loop into Idle
     return p
 
 

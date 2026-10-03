@@ -102,7 +102,7 @@ if method_used is None:
     raise SystemExit("rig_creature.py: auto-weighting failed on all three methods -- refusing to "
                       "proceed with an unrigged mesh.")
 
-common.cleanup_weights(obj, limit=3)
+common.cleanup_weights(obj, limit=4)
 worst, avg = common.max_influences_per_vertex(obj)
 report["weighting"]["max_influences_after_cleanup"] = worst
 report["weighting"]["avg_influences_after_cleanup"] = avg

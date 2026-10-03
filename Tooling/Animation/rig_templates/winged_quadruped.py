@@ -1,31 +1,45 @@
-"""The "winged beast" deform-rig template: spine/neck/head, a tail chain, a 3-bone wing chain per
-side, and a 4-bone (thigh/shin/foot/toe) digitigrade leg chain per leg -- 2 legs for a winged
-biped (what the Griffin pilot mesh turned out to be, see below) or 4 for a true quadruped.
+"""The "winged quadruped" deform-rig template: spine/neck/head, a tail chain, a 3-bone wing chain
+per side, and a 4-bone (thigh/shin/foot/toe) digitigrade leg chain per leg -- 4 legs for a true
+quadruped (the confirmed case, see below) or 2 for a winged biped if a future creature's mesh turns
+out that way.
 
-Despite the filename (kept to match the task brief's naming -- this is the template issue #68
-asked for), this module supports **2 or 4 legs**, auto-detected from the mesh's own ground-contact
-geometry, not hardcoded to "quadruped". Why: landmark detection on the actual pilot creature
-(Tooling/Animation/prep_mesh.py's output, griffin_quad/model.glb) found exactly **two** ground-
-contact feet, not four -- this Griffin is modelled as a winged biped (lion hindquarters + two legs,
-eagle head, and wings in place of forelimbs), not a four-legged chimera with separate front talons.
-Confirmed two ways: (a) a connected-component clustering of ground-band vertices (z < 0.12H) finds
-two foot blobs cleanly separated on the X (left/right) axis with no separate front-leg cluster
-anywhere in a z in [0.20H, 0.60H] "tucked talon" search band; (b) a rendered close-up
-(scratchpad probe, not committed) visually confirms two lion-style hind paws and nothing else at
-ground level. Building a rigid 4-leg template and forcing two unused "front leg" bones onto this
-mesh (with no geometry under them to weight) would be worse than adapting the template -- so the
-template detects leg count from the mesh and this creature gets a 2-leg rig. A future creature with
-real front talons/legs (e.g. a true ground quadruped) gets 4 via the same detection, unchanged.
+**Corrected finding (lead/producer review, superseding an earlier wrong conclusion in this
+module):** this Griffin mesh (`griffin_quad/model.glb`) IS a four-legged quadruped -- two eagle
+forelegs under the chest, held up off the ground in a reared/rampant stance, and two lion hind legs
+planted on the ground -- confirmed by the producer against an independent multi-angle render
+(side, bottom, and a 3/4 low-back view that separates the hind legs from the forelegs) and by the
+approved 2D art, which the existing art pipeline already splits into `legs_front`/`legs_back`
+parts. An earlier pass of this module concluded "2 legs" from this agent's own renders; that was
+wrong, and the root cause is recorded here rather than papered over: every "front view" and
+straight-down "bottom view" this agent rendered put the forelegs directly in front of (visually
+overlapping) the hind legs, so a pure silhouette/ground-contact read from those angles alone could
+not separate the two pairs -- the forelegs never touch the ground band (z < 0.12H) at all in this
+reared pose, and a vertex-protrusion/clustering search for them repeatedly mis-traced onto the tail
+root and wing membrane instead (both are large, thin, "protruding" surfaces by the same metric).
+The producer's reference render makes the separation obvious from the side/3-4 angles this agent's
+own probes didn't try in combination with each other early enough.
+
+**Landmark placement for the forelegs is proportional, not purely vertex-detected.** Repeated
+clustering/protrusion/raycast searches on this mesh's own vertex data did not reliably isolate a
+foreleg-only surface patch distinct from the chest/tail/wing (see above) -- rather than keep
+chasing an automated signal this mesh doesn't give cleanly, foreleg foot/shoulder positions are
+placed as fractions of the mesh's own measured dimensions (chest landmark, body height, hind-leg
+lateral spread), informed by the producer's reference render's visible proportions (forepaws held
+at roughly chest height, forward of the hindquarters, in the reared stance). This is the same kind
+of documented, explicit fallback this module already uses elsewhere (e.g. rig_creature.py's
+custom-rig-over-Rigify choice) when precise automated detection isn't reliable for a given mesh --
+logged clearly, not silently guessed. The hind legs keep the original, reliable ground-contact
+detection (ground-band clustering, ties back to real geometry 1:1).
 
 All landmark detection works on the mesh in its **normalised** frame (common.normalise_transform:
 feet-ish lowest point at z=0, centred on X/Y, scaled to target_height, matching every other script
 in this repo's 3D pipeline back to Spike #55).
 
-Deform bone list this template builds (Griffin instance, 2 legs): root, pelvis, spine_01,
-spine_02, neck_01, neck_02, head, tail_01..tail_04, wing_L_01..03, wing_R_01..03,
-leg_L_thigh/shin/foot/toe, leg_R_thigh/shin/foot/toe = 25 bones -- inside the 25-45 budget. A
-4-leg instance would add leg_FL_*/leg_FR_* (4 more bones each) for 33.
+Deform bone list this template builds (Griffin instance, 4 legs): root, pelvis, spine_01,
+spine_02, neck_01, neck_02, head, tail_01..tail_04, wing_L_01..03, wing_R_01..03, leg_<FL/FR/BL/
+BR>_thigh/shin/foot/toe (4 bones x 4 legs) = 33 bones -- inside the 25-45 budget.
 """
+import bpy
 import mathutils
 
 
@@ -81,71 +95,89 @@ def detect_landmarks(obj, H):
     mw = obj.matrix_world
     verts = [mw @ v.co for v in me.vertices]
 
-    # --- Feet: ground-contact band, clustered in XY. Try increasing thresholds; a mesh with 4
-    # separable feet will stay at 4 clusters longer than one with only 2, so we take the largest
-    # threshold that still yields a stable small cluster count (2 or 4), capped at a generous but
-    # bounded search so this never loops unboundedly on odd geometry.
+    # --- Head: forward (+Y or -Y, whichever this mesh's feet are NOT biased toward) and high.
+    # The pilot Griffin faces +Y (head/beak) with feet/tail biased -Y; detect forward sign from
+    # which Y half holds more upper-band (z > 0.55H) mass, so this isn't hardcoded to one facing.
+    # Moved ahead of leg detection: the foreleg estimate below needs forward_sign and chest first.
+    upper = [v for v in verts if v.z > 0.55 * H]
+    upper_y_sum = sum(v.y for v in upper) if upper else 0.0
+    forward_sign = 1.0 if upper_y_sum >= 0 else -1.0
+    chest_p = mathutils.Vector((0.0, forward_sign * 0.06 * H, 0.60 * H))  # also needed by the
+    # foreleg raycast below; the full landmark dict's "chest" entry is set from this same value.
+
+    # --- Hind legs: ground-contact band, clustered in XY -- reliable, ties 1:1 to real geometry
+    # (both hind paws are planted on the ground in this creature's reared bind pose). A single paw
+    # spread into toe/heel sub-blobs collapses from many clusters to a clean 2 as the clustering
+    # threshold grows past the toe-heel gap -- take the largest threshold that still gives exactly 2
+    # (the real pair), per the loop below.
     ground = [v for v in verts if v.z < 0.12 * H]
     ground_pts = [(v.x, v.y, i) for i, v in enumerate(ground)]
-    # Scan thresholds ascending and remember the LARGEST threshold at which each cluster count
-    # (2 or 4) was last seen. A single paw that's spread into sub-blobs (toe cluster vs heel pad)
-    # collapses from 4 -> 2 as the threshold grows past the toe-heel gap; two genuinely separate
-    # legs (a real front/back pair) stay separated across a much wider threshold range, since the
-    # gap between front and back legs is typically larger than the gap within one paw. So: if 4
-    # clusters are still distinct at a threshold >= the one where 2 last appeared, trust 4 (real
-    # quadruped); otherwise 2 last appeared at a larger threshold than 4 ever held, meaning the
-    # 4-split was almost certainly just sub-blobbing of 2 real feet -- trust 2. This is exactly
-    # what caught the pilot Griffin's false 4-leg positive (see module docstring): its "4 clusters"
-    # were two paws each split into a toe blob and a heel blob, and collapsed to a clean 2 well
-    # before the largest threshold tried.
-    four_leg_clusters, four_leg_thresh = None, -1.0
     two_leg_clusters, two_leg_thresh = None, -1.0
     for thresh in (0.07, 0.09, 0.11, 0.14, 0.18, 0.22, 0.28):
         clusters = _cluster_xy(ground_pts, thresh)
         big = [c for c in clusters if len(c) >= max(5, len(ground) * 0.03)]
-        if len(big) == 4:
-            four_leg_clusters, four_leg_thresh = big, thresh
         if len(big) == 2:
             two_leg_clusters, two_leg_thresh = big, thresh
-    if four_leg_clusters is not None and four_leg_thresh >= two_leg_thresh:
-        feet_clusters = four_leg_clusters
-    else:
-        feet_clusters = two_leg_clusters
-    if feet_clusters is None:
+    hind_clusters = two_leg_clusters
+    if hind_clusters is None:
         # Fallback: hard split by X sign (always produces exactly 2).
         left = [i for i, (x, y, idx) in enumerate(ground_pts) if x < 0]
         right = [i for i, (x, y, idx) in enumerate(ground_pts) if x >= 0]
-        feet_clusters = [[ground_pts[i][2] for i in left], [ground_pts[i][2] for i in right]]
+        hind_clusters = [[ground_pts[i][2] for i in left], [ground_pts[i][2] for i in right]]
 
-    foot_points = []
-    for c in feet_clusters:
+    hind_points = []
+    for c in hind_clusters:
         pts = [ground[i] for i in c]
         cen = _centroid(pts)
-        foot_points.append(mathutils.Vector((cen.x, cen.y, 0.0)))
+        hind_points.append(mathutils.Vector((cen.x, cen.y, 0.0)))
+    hind_points.sort(key=lambda p: p.x)
+    bl, br = hind_points[0], hind_points[-1]
 
-    legs = []
-    if len(foot_points) == 4:
-        # Front/back by Y, left/right by X.
-        by_y = sorted(foot_points, key=lambda p: p.y)
-        back2, front2 = by_y[:2], by_y[2:]
-        bl, br = sorted(back2, key=lambda p: p.x)
-        fl, fr = sorted(front2, key=lambda p: p.x)
-        legs = [
-            {"side": "BL", "foot": bl}, {"side": "BR", "foot": br},
-            {"side": "FL", "foot": fl}, {"side": "FR", "foot": fr},
-        ]
-    else:
-        pts_sorted = sorted(foot_points, key=lambda p: p.x)
-        legs = [{"side": "L", "foot": pts_sorted[0]}, {"side": "R", "foot": pts_sorted[-1]}]
+    # --- Forelegs: this mesh's forepaws never touch the ground (a reared/rampant stance -- producer-
+    # confirmed against an independent multi-angle reference render, see this module's docstring),
+    # and repeated vertex-level searches (clustering, protrusion-from-neighbour-centroid, dense
+    # raycast grids) could not reliably isolate a foreleg-only surface patch distinct from the
+    # chest/tail/wing on this specific mesh. Placed via a forward-facing raycast against the body's
+    # own surface instead of a pure guessed fraction -- an earlier pass guessed a forward-offset
+    # fraction directly and it overshot the body silhouette entirely (landed in empty air past the
+    # head, confirmed by a verification render): casting a ray toward the body from outside it, at
+    # the target chest height, and taking the hit point is a geometrically grounded way to find
+    # "the front of the torso at this height" without needing a clean separate leg-only patch.
+    # Lateral offset capped well inside the wing-detection threshold (|x| > 0.20H, see wing_band
+    # below) -- a first pass used ~0.20H and a chest-area raycast hit the raised wing's own membrane
+    # instead of the torso at that lateral distance (confirmed by a verification render).
+    hind_lateral = (abs(bl.x) + abs(br.x)) / 2.0
+    foreleg_lateral = min(0.12 * H, max(0.08 * H, hind_lateral * 0.5))
 
-    foot_centroid = _centroid([l["foot"] for l in legs])
+    # Raycasting toward the forelegs' expected position repeatedly hit either the raised wing or
+    # the tail instead of the torso (confirmed across several verification renders) -- both pass
+    # through most of the plausible "elevated foreleg" region in this dramatically curled/reared
+    # pose. The torso's own centreline turned out to run noticeably further back than the `chest`
+    # landmark's fixed +0.06H forward guess: a narrow near-centreline slab (|x| < 0.15H) at
+    # chest-ish heights measures a median Y around -0.17 to -0.21 (the body leans back substantially
+    # in this heraldic pose, confirmed across z = 0.35H-0.60H), not the positive Y `chest` assumes --
+    # so a foreleg placed relative to `chest` was reaching toward where the torso surface *isn't*.
+    # Forelegs are placed relative to this directly-measured torso centre instead, offset forward by
+    # a conservative margin toward the torso's own front surface rather than chest's guess.
+    torso_slab = [v for v in verts if abs(v.z - 0.45 * H) < 0.03 * H and abs(v.x) < 0.15 * H]
+    torso_center_y = sorted(v.y for v in torso_slab)[len(torso_slab) // 2] if torso_slab else 0.0
+    # Smaller forward offset and a LOWER height than the first attempt -- this creature's tail
+    # curls up and forward dramatically in this pose and was found (across several verification
+    # renders) to sweep through almost the entire z=0.42H-0.80H / forward-of-centre region a
+    # "reared chest-high" guess naturally reaches for. Staying lower (z=0.28H, below where the tail
+    # was repeatedly hit) and closer to the torso's own measured centre line (a smaller forward
+    # offset) trades some fidelity to "held at full chest height" for actually landing on/near the
+    # torso instead of the tail.
+    foreleg_y = torso_center_y + forward_sign * 0.08 * H
+    foreleg_z = 0.28 * H
+    fl = mathutils.Vector((-foreleg_lateral, foreleg_y, foreleg_z))
+    fr = mathutils.Vector((foreleg_lateral, foreleg_y, foreleg_z))
 
-    # --- Head: forward (+Y or -Y, whichever this mesh's feet are NOT biased toward) and high.
-    # The pilot Griffin faces +Y (head/beak) with feet/tail biased -Y; detect forward sign from
-    # which Y half holds more upper-band (z > 0.55H) mass, so this isn't hardcoded to one facing.
-    upper = [v for v in verts if v.z > 0.55 * H]
-    upper_y_sum = sum(v.y for v in upper) if upper else 0.0
-    forward_sign = 1.0 if upper_y_sum >= 0 else -1.0
+    legs = [
+        {"side": "BL", "foot": bl}, {"side": "BR", "foot": br},
+        {"side": "FL", "foot": fl}, {"side": "FR", "foot": fr},
+    ]
+    foot_centroid = _centroid([bl, br])  # pelvis/stance reference uses the (ground-truth) hind feet
 
     head_band = [v for v in verts if v.z > 0.75 * H and forward_sign * v.y > 0]
     if not head_band:
@@ -180,7 +212,7 @@ def detect_landmarks(obj, H):
         mathutils.Vector((0, -forward_sign * 0.70 * H, 0.75 * H))
 
     pelvis = mathutils.Vector((0.0, foot_centroid.y * 0.6, 0.30 * H))
-    chest = mathutils.Vector((0.0, forward_sign * 0.06 * H, 0.60 * H))
+    chest = chest_p
 
     return {
         "H": H,
@@ -267,20 +299,45 @@ def build_bones(eb, lm, H):
     # chain length) without increasing the straight-line hip-to-foot distance much, which is exactly
     # what creates IK slack for a real stride -- the standard "bent-knee/hock" digitigrade stance,
     # not a cosmetic change: it changes the actual reachable envelope anim/gait.py solves within.
+    # Front legs (FL/FR) attach at the CHEST/shoulder (parented to spine_02, like the wings), not
+    # the pelvis -- a true quadruped's forelegs hang from the shoulder girdle, not the hip. Back
+    # legs (BL/BR, or L/R for a 2-leg biped instance) keep the original pelvis attachment. Each
+    # still gets the same pronounced-forward-knee-bow treatment for IK slack (see the comment
+    # above) and a toe tip offset FROM the foot's own height (not hardcoded to the ground), since a
+    # foreleg's foot sits elevated (reared stance), not at z=0.
     for leg in lm["legs"]:
         side = leg["side"]
         foot = leg["foot"]
-        hip = mathutils.Vector((
-            foot.x * 0.45,                               # pulled in toward the spine centreline
-            foot.y * 0.20 + pelvis_p.y * 0.80,            # mostly at the pelvis's own depth, not the foot's
-            pelvis_p.z + 0.13 * H,                        # raised above plain pelvis height
-        ))
+        is_front = side.startswith("F")
+        attach_p = chest_p if is_front else pelvis_p
+        parent_bone = "spine_02" if is_front else "pelvis"
+        if is_front:
+            # Shoulder height relative to the FOOT (not chest_p.z directly) -- chest_p sits much
+            # higher than this mesh's measured foreleg-foot height (see the foreleg placement
+            # comment above), and anchoring the shoulder to chest_p.z produced an excessively long,
+            # oddly-angled thigh spanning most of the torso height. A fixed offset above the foot
+            # gives a geometrically sane thigh span regardless of exactly where chest_p lands.
+            hip = mathutils.Vector((foot.x * 0.45, foot.y * 0.20 + attach_p.y * 0.80, foot.z + 0.15 * H))
+        else:
+            hip = mathutils.Vector((
+                foot.x * 0.45,                               # pulled in toward the spine centreline
+                foot.y * 0.20 + attach_p.y * 0.80,            # mostly at the pelvis's own depth
+                attach_p.z + 0.13 * H,                        # raised above plain attach height
+            ))
         knee = hip.lerp(foot, 0.45)
-        knee.y += fwd * 0.17 * H                          # pronounced forward bow (was 0.05H)
+        # Front legs get a MUCH bigger bow than back legs: anim/gait.py's Move clip brings every
+        # foot down to the ground (z=0) during its own stance, regardless of this creature's
+        # elevated reared bind pose -- so a foreleg's actual required reach is hip-to-GROUND
+        # (large, since the shoulder sits well above the bind-pose foot), not hip-to-bind-pose-foot.
+        # A first pass used the same bow for both leg types and the foreleg chain came out too
+        # short to reach the ground AT ALL (confirmed: anim/gait.py's safe-stride solve returned
+        # the degenerate 0.02H floor for both forelegs). This bow is sized so L1+L2 comfortably
+        # exceeds the hip-to-ground distance with margin for a real stride on top.
+        knee.y += fwd * (0.45 * H if is_front else 0.17 * H)
         knee.z += 0.035 * H                               # lift the knee slightly for a bent silhouette
         ankle = hip.lerp(foot, 0.85)
-        toe_tip = mathutils.Vector((foot.x, foot.y + fwd * 0.12 * H, 0.0))
-        mk(f"leg_{side}_thigh", hip, knee, "pelvis", role=f"leg_{side}")
+        toe_tip = mathutils.Vector((foot.x, foot.y + fwd * 0.12 * H, foot.z))
+        mk(f"leg_{side}_thigh", hip, knee, parent_bone, role=f"leg_{side}")
         mk(f"leg_{side}_shin", knee, ankle, f"leg_{side}_thigh", role=f"leg_{side}")
         mk(f"leg_{side}_foot", ankle, foot, f"leg_{side}_shin", role=f"leg_{side}")
         mk(f"leg_{side}_toe", foot, toe_tip, f"leg_{side}_foot", role=f"leg_{side}")

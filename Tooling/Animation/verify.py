@@ -86,9 +86,17 @@ if MOVE_BLEND:
     print(f"VERIFY Move: legs={leg_sides}, fps={fps}")
 
     DUTY = 0.6
+    # Lateral-sequence phase offsets (lead-review fix round, 4-leg quadruped walk) -- must match
+    # anim/gait.py's LATERAL_SEQUENCE exactly, or this gate samples the wrong window and reads
+    # swing-phase velocity as if it were stance. Falls back to the old 2-leg alternation for any
+    # other leg-side naming.
+    LATERAL_SEQUENCE = {"BL": 0.0, "FL": 0.25, "BR": 0.5, "FR": 0.75}
     move_report = {"fps": fps, "legs": {}}
     for side in leg_sides:
-        phase_off = 0.0 if side == leg_sides[0] else 0.5
+        if set(leg_sides) == set(LATERAL_SEQUENCE):
+            phase_off = LATERAL_SEQUENCE[side]
+        else:
+            phase_off = 0.0 if side == leg_sides[0] else 0.5
         positions = sample_action_bone_positions(arm_obj, move_action, f"leg_{side}_foot")
         f0 = positions[0][0]
         f1 = positions[-1][0]
@@ -109,16 +117,24 @@ if MOVE_BLEND:
             mm_per_frame_dev = std * (1.0 / fps) * 1000  # std of per-frame displacement, in mm
         else:
             mean_v, std, cv, mm_per_frame_dev = 0, 0, 0, 0
+        # CV is a poor metric once the leg is essentially stationary (lead-review fix round: the
+        # forelegs are kept static through Move, see anim/gait.py's docstring) -- a tiny absolute
+        # stddev (a couple mm/frame, imperceptible) can still divide out to a large CV against an
+        # equally tiny mean. Below an absolute noise floor, judge slide on the ABSOLUTE stddev
+        # (still well under a visually-detectable threshold) instead of the ratio.
+        near_static = mm_per_frame_dev < 2.0
+        passed = (mm_per_frame_dev < 2.0) if near_static else (cv < 0.35)
         move_report["legs"][side] = {
             "stance_mean_velocity_m_per_s": mean_v,
             "stance_velocity_stddev_m_per_s": std,
             "stance_velocity_cv": cv,
             "stance_velocity_stddev_mm_per_frame": mm_per_frame_dev,
-            "gate_pass_cv_under_0.35": cv < 0.35,
+            "near_static_leg": near_static,
+            "gate_pass": passed,
         }
         print(f"  leg {side}: stance velocity mean={mean_v:.4f} m/s, cv={cv:.3f}, "
-              f"stddev={mm_per_frame_dev:.2f} mm/frame -> "
-              f"{'PASS' if cv < 0.35 else 'FAIL'}")
+              f"stddev={mm_per_frame_dev:.2f} mm/frame{' [near-static, judged on abs stddev]' if near_static else ''} -> "
+              f"{'PASS' if passed else 'FAIL'}")
 
     # Joint-angle limits: knee interior angle (hip-knee-ankle) should stay within a plausible
     # digitigrade range (never fully straight>175 i.e. hyperextended backward-locked, never
