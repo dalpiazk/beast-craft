@@ -131,9 +131,20 @@ namespace BeastCraft.Game.Screens
             {
                 if (_model.Silhouettes.Count > 0)
                 {
-                    painter.TextIn(_ctx.Loc("ui.roster.not_found"), new Rect(Pad, _silhouettesY, 600f, style.TextSizes.Heading - 4f), style.TextSizes.Heading - 4f, painter.C("plum"), TextAlign.Left);
-                    painter.TextIn(_ctx.Loc("ui.roster.for_compendium"), new Rect(PortraitLayout.CanvasWidth - Pad - 400f, _silhouettesY + 6f, 400f, 26f), style.TextSizes.Small + 2f,
-                                   painter.C("inkSoft"), TextAlign.Right);
+                    // Bare headings over the scroll's own content (no card behind them): haloed when the
+                    // kit's backdrop painting might sit right behind them (GameScreen.PageBackground).
+                    Rect notFound = new Rect(Pad, _silhouettesY, 600f, style.TextSizes.Heading - 4f);
+                    Rect forCompendium = new Rect(PortraitLayout.CanvasWidth - Pad - 400f, _silhouettesY + 6f, 400f, 26f);
+                    if (UiKit.Enabled)
+                    {
+                        painter.TextInHalo(_ctx.Loc("ui.roster.not_found"), notFound, style.TextSizes.Heading - 4f, painter.C("plum"), painter.C("cream", 0.92f), TextAlign.Left);
+                        painter.TextInHalo(_ctx.Loc("ui.roster.for_compendium"), forCompendium, style.TextSizes.Small + 2f, painter.C("inkSoft"), painter.C("cream", 0.92f), TextAlign.Right);
+                    }
+                    else
+                    {
+                        painter.TextIn(_ctx.Loc("ui.roster.not_found"), notFound, style.TextSizes.Heading - 4f, painter.C("plum"), TextAlign.Left);
+                        painter.TextIn(_ctx.Loc("ui.roster.for_compendium"), forCompendium, style.TextSizes.Small + 2f, painter.C("inkSoft"), TextAlign.Right);
+                    }
                 }
 
                 return true;
@@ -911,7 +922,7 @@ namespace BeastCraft.Game.Screens
             {
                 _header.Paint(Ctx, Ui, string.Empty);
                 RepaintExtras();
-                Painter.TextIn(Loc("ui.beast.no_such_beast"), new Rect(180f, 60f, 600f, Ctx.Style.TextSizes.Heading), Ctx.Style.TextSizes.Heading, Painter.C("berry"), TextAlign.Left);
+                HeaderText(Loc("ui.beast.no_such_beast"), new Rect(180f, 60f, 600f, Ctx.Style.TextSizes.Heading), Ctx.Style.TextSizes.Heading, "berry");
                 return;
             }
 

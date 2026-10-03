@@ -297,7 +297,15 @@ namespace BeastCraft.Game.Ui
             Color ink = C(label.ColorKey);
             if (!label.Wrap)
             {
-                TextIn(label.Text, label.Bounds, size, ink, label.Align, label.CenterVertically, null, label.Face);
+                if (label.Halo && UiKit.Enabled)
+                {
+                    TextInHalo(label.Text, label.Bounds, size, ink, C("cream", 0.92f), label.Align, label.CenterVertically, label.Face);
+                }
+                else
+                {
+                    TextIn(label.Text, label.Bounds, size, ink, label.Align, label.CenterVertically, null, label.Face);
+                }
+
                 return;
             }
 
@@ -333,6 +341,34 @@ namespace BeastCraft.Game.Ui
                     _text.Draw(_draw, fitted, new Vector2(box.X, y), size, ink, face, shadow);
                     break;
             }
+        }
+
+        /// <summary>Offsets <see cref="TextInHalo"/> draws its 8 halo copies at (a ring around the glyphs).</summary>
+        private static readonly Vector2[] HaloOffsets =
+        {
+            new Vector2(-2f, 0f), new Vector2(2f, 0f), new Vector2(0f, -2f), new Vector2(0f, 2f),
+            new Vector2(-1.5f, -1.5f), new Vector2(1.5f, -1.5f), new Vector2(-1.5f, 1.5f), new Vector2(1.5f, 1.5f)
+        };
+
+        /// <summary>
+        /// Like <see cref="TextIn"/>, but with a soft parchment halo behind the glyphs (<paramref name="halo"/>,
+        /// 8 offset copies) instead of a single drop shadow — for a heading that sits directly on the
+        /// journal UI kit's backdrop painting rather than on an opaque panel, where a flat colour would
+        /// not always clear WCAG contrast against the art underneath.
+        /// </summary>
+        public void TextInHalo(string text, Rect box, float size, Color ink, Color halo, TextAlign align, bool center = true, UiFontFace face = UiFontFace.Heading)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return;
+            }
+
+            foreach (Vector2 offset in HaloOffsets)
+            {
+                TextIn(text, new Rect(box.X + offset.X, box.Y + offset.Y, box.Width, box.Height), size, halo, align, center, null, face);
+            }
+
+            TextIn(text, box, size, ink, align, center, null, face);
         }
 
         /// <summary>Words of <paramref name="text"/> packed into lines of <paramref name="width"/> (at most <paramref name="maxLines"/>; 0 = any), measured in <paramref name="face"/>.</summary>

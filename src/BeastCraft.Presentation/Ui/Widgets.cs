@@ -262,6 +262,14 @@ namespace BeastCraft.Presentation.Ui
 
         /// <summary>Centre the text block vertically in the box (else top-aligned).</summary>
         public bool CenterVertically;
+
+        /// <summary>
+        /// A soft parchment halo behind the glyphs instead of a flat colour (<c>UiPainter.TextInHalo</c>),
+        /// for a bare heading that sits directly on the journal UI kit's backdrop painting rather than
+        /// an opaque panel. Ignored (drawn plain) when the kit is off. Wrapped text is never haloed —
+        /// no screen currently needs both.
+        /// </summary>
+        public bool Halo;
     }
 
     /// <summary>

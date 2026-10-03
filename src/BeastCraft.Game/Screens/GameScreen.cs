@@ -8,6 +8,7 @@ using BeastCraft.Presentation.Content;
 using BeastCraft.Presentation.Layout;
 using BeastCraft.Presentation.Screens;
 using BeastCraft.Presentation.Ui;
+using BeastCraft.Save;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
@@ -124,6 +125,18 @@ namespace BeastCraft.Game.Screens
             get { return Ctx.Painter; }
         }
 
+        /// <summary>
+        /// Whether anything should animate right now (#52 step 4): false in screenshot/scripted mode
+        /// (<see cref="ScreenStack.Animate"/>) or under Settings &gt; Visuals' Minimal effects
+        /// (<see cref="ScreenStack.Effects"/>) — the same reduced-motion rule <see cref="ScreenStack"/>
+        /// itself applies to a screen push/pop, reused here for a screen's own internal tab fade
+        /// (<see cref="Components.TabFade"/>) so both follow one setting.
+        /// </summary>
+        protected bool AnimationsEnabled
+        {
+            get { return Ctx.Stack != null && Ctx.Stack.Animate && Ctx.Stack.Effects != EffectsIntensity.Minimal; }
+        }
+
         public virtual void Enter()
         {
         }
@@ -192,7 +205,7 @@ namespace BeastCraft.Game.Screens
         }
 
         /// <summary>How much of the cream wash <see cref="PageBackground"/> lays over the backdrop (0 = none, 1 = opaque cream).</summary>
-        private const float BackdropWashAlpha = 0.55f;
+        private const float BackdropWashAlpha = 0.3f;
 
         /// <summary>The selected region's backdrop art, or null when the kit is off, there is no session, or it has none.</summary>
         private ArtSprite ResolveBackdrop()
@@ -204,6 +217,24 @@ namespace BeastCraft.Game.Screens
 
             string id = Ctx.Session.Save.Campaign.SelectedBackdropId;
             return string.IsNullOrEmpty(id) ? null : Painter.Sprite("ui/backdrop/" + id);
+        }
+
+        /// <summary>
+        /// A bare header decoration (an avatar level, a progress count, a manually-drawn title) that a
+        /// screen paints straight onto the canvas right under <see cref="ScreenHeader.Paint"/>, over
+        /// where the header's own flat bar used to sit: haloed when the kit's backdrop is behind it
+        /// (<see cref="UiPainter.TextInHalo"/>), plain otherwise.
+        /// </summary>
+        protected void HeaderText(string text, Rect box, float size, string colorKey, TextAlign align = TextAlign.Left, bool center = true)
+        {
+            if (UiKit.Enabled)
+            {
+                Painter.TextInHalo(text, box, size, Painter.C(colorKey), Painter.C("cream", 0.92f), align, center);
+            }
+            else
+            {
+                Painter.TextIn(text, box, size, Painter.C(colorKey), align, center);
+            }
         }
 
         /// <summary>A button added to <see cref="Ui"/> (or <paramref name="parent"/>) that runs <paramref name="onClick"/>.</summary>
@@ -218,9 +249,9 @@ namespace BeastCraft.Game.Screens
             return button;
         }
 
-        protected Label AddLabel(Widget parent, Rect bounds, string text, float size, string color = "ink", TextAlign align = TextAlign.Left, bool wrap = false)
+        protected Label AddLabel(Widget parent, Rect bounds, string text, float size, string color = "ink", TextAlign align = TextAlign.Left, bool wrap = false, bool halo = false)
         {
-            return (parent ?? Ui).Add(new Label { Bounds = bounds, Text = text ?? string.Empty, Size = size, ColorKey = color, Align = align, Wrap = wrap });
+            return (parent ?? Ui).Add(new Label { Bounds = bounds, Text = text ?? string.Empty, Size = size, ColorKey = color, Align = align, Wrap = wrap, Halo = halo });
         }
 
         /// <summary>

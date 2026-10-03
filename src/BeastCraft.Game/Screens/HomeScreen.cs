@@ -51,6 +51,7 @@ namespace BeastCraft.Game.Screens
         private readonly Button _explored;
         private readonly Button _difficulty;
         private readonly List<Hotspot> _spots = new List<Hotspot>();
+        private readonly TabFade _tabFade = new TabFade();
         private float _idleRefreshMs;
 
         public HomeScreen(ScreenContext ctx) : base(ctx)
@@ -68,7 +69,14 @@ namespace BeastCraft.Game.Screens
             _difficulty.Visible = false;
             _next = AddButton(null, "next-battle", new Rect(NavBox.X + 90f, NavBox.Y - 150f, NavBox.Width - 180f, 124f), Loc("ui.home.next_battle"), "primary", OpenRecommended,
                               "battle");
-            Ui.Add(new Panel { Id = "nav-panel", Bounds = NavBox, StyleKey = "nav" });
+            if (!UiKit.Enabled)
+            {
+                // The kit's painted pills float directly over the page, as the tab strips already do
+                // (TabStrip.Build) -- the dark plum bar is the code-drawn look's own device for
+                // unselected cream text contrast, which the kit's parchment pills do not need.
+                Ui.Add(new Panel { Id = "nav-panel", Bounds = NavBox, StyleKey = "nav" });
+            }
+
             _tabs = Ui.Add(new Tabs { Id = "nav", Bounds = NavBox.Inset(10f) });
             _tabs.Items.AddRange(Array.ConvertAll(HomeViewModel.TabKeys, key => Loc(key)));
             _tabs.Glyphs.AddRange(new[] { "map", "roster", "grove", "avatar", "inventory" });
@@ -214,6 +222,7 @@ namespace BeastCraft.Game.Screens
         public override void Update(float elapsedMs, FrameInput input)
         {
             base.Update(elapsedMs, input);
+            _tabFade.Update(elapsedMs);
             if (Ctx.Session.ResumeClaimPending)
             {
                 ClaimIdle(true);
@@ -501,6 +510,7 @@ namespace BeastCraft.Game.Screens
 
         private void ShowTab()
         {
+            _tabFade.Reset();
             _tabs.Selected = (int)_home.Tab;
             bool map = _home.Tab == HomeTab.Map;
             bool roster = _home.Tab == HomeTab.Roster;
@@ -543,6 +553,15 @@ namespace BeastCraft.Game.Screens
             else
             {
                 DrawComingSoon();
+            }
+
+            if (_home.Tab != HomeTab.Map)
+            {
+                float fade = _tabFade.Alpha(AnimationsEnabled);
+                if (fade > 0f)
+                {
+                    Painter.Fill(new Rect(0, 0, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight), Painter.C("cream", fade));
+                }
             }
         }
 

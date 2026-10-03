@@ -28,6 +28,7 @@ namespace BeastCraft.Game.Screens
         private readonly CardList _gearList;
         private readonly CardList _materialsList;
         private readonly CardList _looksList;
+        private readonly TabFade _tabFade = new TabFade();
 
         public InventoryScreen(ScreenContext ctx) : base(ctx)
         {
@@ -65,6 +66,13 @@ namespace BeastCraft.Game.Screens
             _hub.Gear.SaveSeen();
             _hub.Select(tab);
             ShowTab();
+            _tabFade.Reset();
+        }
+
+        public override void Update(float elapsedMs, FrameInput input)
+        {
+            base.Update(elapsedMs, input);
+            _tabFade.Update(elapsedMs);
         }
 
         private void ShowTab()
@@ -273,6 +281,12 @@ namespace BeastCraft.Game.Screens
             {
                 Rect gearTab = _tabs.ItemBounds((int)InventoryTab.Gear);
                 Painter.NewDot(new Vec2(gearTab.Right - 30f, gearTab.Y + 26f));
+            }
+
+            float fade = _tabFade.Alpha(AnimationsEnabled);
+            if (fade > 0f)
+            {
+                Painter.Fill(new Rect(0, ContentTop, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight - ContentTop), Painter.C("cream", fade));
             }
         }
 

@@ -50,6 +50,8 @@ namespace BeastCraft.Game.Screens
         private readonly CardList _visuals;
         private readonly CardList _audio;
         private readonly CardList _privacy;
+        private readonly TabFade _tabFade = new TabFade();
+        private readonly Rect _page;
 
         public SettingsScreen(ScreenContext ctx) : base(ctx)
         {
@@ -57,6 +59,7 @@ namespace BeastCraft.Game.Screens
             _backdrops = Ctx.Session == null ? null : new BackdropPickerViewModel(Ctx.Session);
             float top = TabStrip.ContentTop(HeaderMetrics.Standard);
             Rect page = new Rect(0, top, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight - top - FooterHeight);
+            _page = page;
             _gameplay = new CardList(Ui.Add(new ScrollView { Id = "settings-gameplay", Bounds = page }));
             _visuals = new CardList(Ui.Add(new ScrollView { Id = "settings-visuals", Bounds = page, Visible = false }));
             _audio = new CardList(Ui.Add(new ScrollView { Id = "settings-audio", Bounds = page, Visible = false }));
@@ -90,6 +93,13 @@ namespace BeastCraft.Game.Screens
             _visuals.Scroll.Visible = tab == SettingsTab.Visuals;
             _audio.Scroll.Visible = tab == SettingsTab.Audio;
             _privacy.Scroll.Visible = tab == SettingsTab.Privacy;
+            _tabFade.Reset();
+        }
+
+        public override void Update(float elapsedMs, FrameInput input)
+        {
+            base.Update(elapsedMs, input);
+            _tabFade.Update(elapsedMs);
         }
 
         private void Build()
@@ -361,6 +371,11 @@ namespace BeastCraft.Game.Screens
             PageBackground("cream", "parchment");
             base.Draw();
             _header.Paint(Ctx, Ui, Loc("ui.settings.title"));
+            float fade = _tabFade.Alpha(AnimationsEnabled);
+            if (fade > 0f)
+            {
+                Painter.Fill(_page, Painter.C("cream", fade));
+            }
         }
 
         protected override void DrawCustom(Widget widget)

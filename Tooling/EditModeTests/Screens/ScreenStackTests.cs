@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using BeastCraft.Presentation.Screens;
+using BeastCraft.Save;
 using NUnit.Framework;
 
 namespace BeastCraft.Tests.EditMode
@@ -112,6 +113,68 @@ namespace BeastCraft.Tests.EditMode
             ScreenStack still = new ScreenStack { Animate = false };
             still.Push(new FakeScreen("title", new List<string>()));
             Assert.AreEqual(TransitionKind.None, still.Transition);
+        }
+
+        [Test]
+        public void TransitionFrom_IsTheScreenJustLeft_AndClearsOnceTheTransitionEnds()
+        {
+            ScreenStack stack = new ScreenStack();
+            FakeScreen title = new FakeScreen("title", new List<string>());
+            stack.Push(title);
+            Assert.IsNull(stack.TransitionFrom, "the very first push has nothing to animate from");
+
+            FakeScreen map = new FakeScreen("map", new List<string>());
+            stack.Push(map);
+            Assert.AreSame(title, stack.TransitionFrom);
+            stack.Update(ScreenStack.TransitionMs);
+            Assert.IsNull(stack.TransitionFrom, "cleared once the transition finishes, same frame Transition itself clears");
+
+            stack.Push(new FakeScreen("encounter", new List<string>()));
+            Assert.AreSame(map, stack.TransitionFrom, "a pop's TransitionFrom is the popped screen, not the one before it");
+            stack.Pop();
+            Assert.AreEqual("encounter", ((FakeScreen)stack.TransitionFrom).Name);
+        }
+
+        [Test]
+        public void Effects_ReducedAlwaysFades_MinimalSkipsTheTransitionEntirely()
+        {
+            ScreenStack reduced = new ScreenStack { Effects = EffectsIntensity.Reduced };
+            reduced.Push(new FakeScreen("title", new List<string>()));
+            reduced.Push(new FakeScreen("map", new List<string>()));
+            Assert.AreEqual(TransitionKind.Fade, reduced.Transition, "Reduced never slides, even for a push (normally Forward)");
+            Assert.IsNotNull(reduced.TransitionFrom, "still animates, just as a fade");
+
+            ScreenStack minimal = new ScreenStack { Effects = EffectsIntensity.Minimal };
+            minimal.Push(new FakeScreen("title", new List<string>()));
+            minimal.Push(new FakeScreen("map", new List<string>()));
+            Assert.AreEqual(TransitionKind.None, minimal.Transition, "Minimal skips the transition outright, like Animate = false");
+            Assert.IsNull(minimal.TransitionFrom);
+            Assert.AreEqual(1f, minimal.TransitionProgress);
+        }
+
+        [Test]
+        public void ModalProgress_PlaysOnceOnOpen_AndSkipsUnderAnimateOffOrMinimal()
+        {
+            ScreenStack stack = new ScreenStack();
+            Assert.AreEqual(1f, stack.ModalProgress, "nothing open");
+
+            stack.PushModal(new FakeModal("settings"));
+            Assert.AreEqual(0f, stack.ModalProgress);
+            stack.Update(ScreenStack.ModalPopMs / 2f);
+            Assert.AreEqual(0.5f, stack.ModalProgress, 0.001f);
+            stack.Update(ScreenStack.ModalPopMs);
+            Assert.AreEqual(1f, stack.ModalProgress, "settled, and stays there");
+
+            stack.PushModal(new FakeModal("confirm"));
+            Assert.AreEqual(0f, stack.ModalProgress, "a newly pushed modal replays the pop");
+
+            ScreenStack still = new ScreenStack { Animate = false };
+            still.PushModal(new FakeModal("settings"));
+            Assert.AreEqual(1f, still.ModalProgress, "Animate off: no pop to play");
+
+            ScreenStack minimal = new ScreenStack { Effects = EffectsIntensity.Minimal };
+            minimal.PushModal(new FakeModal("settings"));
+            Assert.AreEqual(1f, minimal.ModalProgress, "Minimal: no pop to play");
         }
 
         [Test]

@@ -213,10 +213,18 @@ def build_panel():
     overlay a screen opts into only where it has room."""
     w = h = 320
     radius = 28
-    img, _mask = parchment_fill(w, h, radius, seed=911, grain=3, mottle=9, alpha=252, deckled=False, nine_slice=(40, 40, 40, 40))
+    nine_slice = (40, 40, 40, 40)
+    img, _mask = parchment_fill(w, h, radius, seed=911, grain=3, mottle=9, alpha=252, deckled=False, nine_slice=nine_slice)
     faint_inner_shadow(img, radius, strength=20)
+    # Re-flatten: faint_inner_shadow draws its blurred ring across the WHOLE image, after
+    # parchment_fill's own flatten already ran -- so without this, the ring's gradient (however
+    # faint) is still baked into the stretched regions, unflattened, the exact class of seam the
+    # original flatten was written to prevent (lead review, step 3 polish: "faint corner notches on
+    # panels/cards"). Safe to flatten the WHOLE shadow this way (not just re-run the base flatten)
+    # since nothing else is drawn on this piece after it.
+    img = flatten_outside_corners(img, w, h, nine_slice)
     save(img, "panel.png")
-    return dict(name="panel", size=(w, h), nine_slice=(40, 40, 40, 40))
+    return dict(name="panel", size=(w, h), nine_slice=nine_slice)
 
 
 def build_card():
@@ -225,12 +233,17 @@ def build_card():
     no baked corner flourish, same reason."""
     w = h = 360
     radius = 22
-    img, _mask = parchment_fill(w, h, radius, seed=970, wash=SKY_TEAL, grain=2, mottle=7, alpha=252, nine_slice=(34, 34, 34, 34))
+    nine_slice = (34, 34, 34, 34)
+    img, _mask = parchment_fill(w, h, radius, seed=970, wash=SKY_TEAL, grain=2, mottle=7, alpha=252, nine_slice=nine_slice)
     faint_inner_shadow(img, radius, strength=16)
+    # Re-flatten the shadow out of the stretched regions (see build_panel()'s note) before the ink
+    # outline, which -- unlike the shadow -- must stay: it runs the piece's whole perimeter, not just
+    # its corners, so it is drawn after, never flattened.
+    img = flatten_outside_corners(img, w, h, nine_slice)
     d = ImageDraw.Draw(img)
     d.rounded_rectangle([1, 1, w - 2, h - 2], radius=radius, outline=INK_PLUM, width=3)
     save(img, "card.png")
-    return dict(name="card", size=(w, h), nine_slice=(34, 34, 34, 34))
+    return dict(name="card", size=(w, h), nine_slice=nine_slice)
 
 
 def _unused_card_flourish_reference(d, w, h, tone):

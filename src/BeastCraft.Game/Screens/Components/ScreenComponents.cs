@@ -65,8 +65,15 @@ namespace BeastCraft.Game.Screens.Components
         public void Paint(ScreenContext ctx, UiRoot ui, string title, string subtitle = null)
         {
             UiPainter painter = ctx.Painter;
-            painter.Fill(new Rect(0, 0, PortraitLayout.CanvasWidth, Height), painter.C("cream"));
-            painter.Fill(new Rect(0, Height - 5f, PortraitLayout.CanvasWidth, 5f), painter.C("plumSoft", 0.5f));
+            if (!UiKit.Enabled)
+            {
+                painter.Fill(new Rect(0, 0, PortraitLayout.CanvasWidth, Height), painter.C("cream"));
+                painter.Fill(new Rect(0, Height - 5f, PortraitLayout.CanvasWidth, 5f), painter.C("plumSoft", 0.5f));
+            }
+
+            // The kit's header has no bar of its own (lead review, step 3 polish): the backdrop painting
+            // shows straight through, with the back button and title plaque (both already opaque, painted
+            // chips) floating on it, the way the approved mock draws it.
             painter.Paint(Back, ui);
             UiStyle style = ctx.Style;
             const float titleX = 180f;
@@ -101,7 +108,17 @@ namespace BeastCraft.Game.Screens.Components
             }
             if (!string.IsNullOrEmpty(subtitle))
             {
-                painter.TextIn(subtitle, new Rect(180f, 112f, PortraitLayout.CanvasWidth - 180f - HeaderMetrics.Pad, 30f), style.TextSizes.Body, painter.C("inkSoft"), TextAlign.Left);
+                Rect subtitleBox = new Rect(180f, 112f, PortraitLayout.CanvasWidth - 180f - HeaderMetrics.Pad, 30f);
+                if (UiKit.Enabled)
+                {
+                    // Not on the plaque (sized to the title only) or any other opaque chip: haloed,
+                    // like every other bare heading over the backdrop.
+                    painter.TextInHalo(subtitle, subtitleBox, style.TextSizes.Body, painter.C("inkSoft"), painter.C("cream", 0.92f), TextAlign.Left);
+                }
+                else
+                {
+                    painter.TextIn(subtitle, subtitleBox, style.TextSizes.Body, painter.C("inkSoft"), TextAlign.Left);
+                }
             }
         }
 
@@ -209,7 +226,7 @@ namespace BeastCraft.Game.Screens.Components
         public static float Add(ScreenContext ctx, Widget parent, float x, float y, float width, string text)
         {
             float size = ctx.Style.TextSizes.Heading - 4f;
-            parent.Add(new Label { Bounds = new Rect(x, y, width, size), Text = text, Size = size, ColorKey = "plum" });
+            parent.Add(new Label { Bounds = new Rect(x, y, width, size), Text = text, Size = size, ColorKey = "plum", Halo = true });
             return y + ctx.Text.LineHeight(size) + 16f;
         }
     }

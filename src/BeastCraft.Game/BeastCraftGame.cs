@@ -384,6 +384,11 @@ namespace BeastCraft.Game
             }
 
             _painter.TimeMs += elapsed;
+            // The reduced-motion fallback (#52 step 4) reads straight from the saved setting each
+            // frame, same as every other screen that checks it (e.g. BattleScreen's own
+            // _settings.EffectsIntensity reads) -- cheap, and it picks up a change the moment Settings
+            // saves it, with nothing to invalidate.
+            _stack.Effects = _ctx?.Session?.Settings?.EffectsIntensity ?? EffectsIntensity.Full;
             _stack.Update(elapsed);
             _toast.Tick(elapsed);
             FrameInput input = ReadInput();
@@ -506,19 +511,62 @@ namespace BeastCraft.Game
             }
 
             _ctx.CanvasFit = fit;
-            _painter.Begin(fit, canvas);
-            (_stack.Top as GameScreen)?.Draw();
+            GameScreen top = _stack.Top as GameScreen;
+            GameScreen from = _stack.TransitionFrom as GameScreen;
+            bool sliding = from != null && (_stack.Transition == TransitionKind.Forward || _stack.Transition == TransitionKind.Backward);
+            if (sliding)
+            {
+                // A push/pop slide (#52 step 4): the incoming screen (the new Top on a push, the
+                // revealed one on a pop) travels the full canvas width from its leading edge to rest;
+                // the outgoing one travels a shorter distance the same direction (a parallax "push"),
+                // so the pair reads as one strip sliding past rather than two screens swapping in
+                // place. Shifting CanvasFit itself (not just the sprite transform) rather than only
+                // Matrix.CreateTranslation on canvas, so a screen's own scroll-view clip rects (which
+                // go through CanvasFit.ToScreen, not the sprite matrix) shift with it too -- otherwise
+                // a ScrollView's content would slide while its clip window stayed put.
+                float t = EaseOutCubic(_stack.TransitionProgress);
+                float w = PortraitLayout.CanvasWidth;
+                float sign = _stack.Transition == TransitionKind.Forward ? 1f : -1f;
+                DrawScreenShifted(from, fit, -sign * w * 0.3f * t);
+                DrawScreenShifted(top, fit, sign * w * (1f - t));
+            }
+            else
+            {
+                _painter.Begin(fit, canvas);
+                top?.Draw();
+            }
+
             _draw.SetBlend(BlendState.AlphaBlend);
             _draw.UnitSize = HexLayout.ColumnStep;
             foreach (IModal modal in _stack.Modals)
             {
-                _painter.Begin(fit, canvas);
+                // A spring pop (#52 step 4) on the top modal only: a settled modal underneath (a rare
+                // nested case) draws at its resting scale throughout, never replaying. Lerped from
+                // 85%, not 0 -- EaseOutBack alone (0 -> overshoot past 1 -> 1) reads as the modal
+                // springing out of a single point, dramatic for what is usually a settings sheet or a
+                // confirm; growing the last 15% keeps the same gentle overshoot-and-settle feel.
+                bool popping = modal == _stack.TopModal && _stack.ModalProgress < 1f;
+                if (!popping)
+                {
+                    _painter.Begin(fit, canvas);
+                }
+                else
+                {
+                    float scale = 0.85f + 0.15f * EaseOutBack(_stack.ModalProgress);
+                    // Scaled about the canvas centre, not the origin -- a plain Matrix.CreateScale
+                    // would pop the modal from its top-left corner instead of growing in place.
+                    float cx = PortraitLayout.CanvasWidth / 2f;
+                    float cy = PortraitLayout.CanvasHeight / 2f;
+                    Matrix popped = Matrix.CreateTranslation(-cx, -cy, 0f) * Matrix.CreateScale(scale) * Matrix.CreateTranslation(cx, cy, 0f) * canvas;
+                    _painter.Begin(fit, popped);
+                }
+
                 (modal as GameModal)?.Draw();
             }
 
             _painter.Begin(fit, canvas);
             DrawToast();
-            if (_stack.Transition != TransitionKind.None)
+            if (_stack.Transition == TransitionKind.Fade)
             {
                 float veil = 1f - _stack.TransitionProgress;
                 _painter.Fill(new Rect(0, 0, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight), _painter.C("cream", veil * 0.85f));
@@ -528,6 +576,43 @@ namespace BeastCraft.Game
             _perf?.Draw(_draw, _text, _pixel);
 #endif
             _draw.Flush();
+        }
+
+        /// <summary>
+        /// Draws <paramref name="screen"/> shifted <paramref name="canvasOffsetX"/> canvas pixels off
+        /// its resting place (a push/pop slide's outgoing or incoming frame): a fresh <see cref="CanvasFit"/>
+        /// with its own <c>OffsetX</c> bumped by the shift (scaled to screen pixels), so the shift
+        /// reaches everywhere the fit does -- the sprite transform and a <c>ScrollView</c>'s own clip
+        /// rects (<c>CanvasFit.ToScreen</c>) alike -- not just <see cref="Matrix.CreateTranslation(float, float, float)"/>
+        /// on the sprite transform alone, which clip rects do not go through.
+        /// </summary>
+        private void DrawScreenShifted(GameScreen screen, CanvasFit fit, float canvasOffsetX)
+        {
+            if (screen == null)
+            {
+                return;
+            }
+
+            CanvasFit shifted = canvasOffsetX == 0f ? fit : new CanvasFit(fit.Scale, fit.OffsetX + canvasOffsetX * fit.Scale, fit.OffsetY);
+            Matrix shiftedCanvas = Matrix.CreateScale(shifted.Scale) * Matrix.CreateTranslation(shifted.OffsetX, shifted.OffsetY, 0f);
+            _painter.Begin(shifted, shiftedCanvas);
+            screen.Draw();
+        }
+
+        /// <summary>An ease-out cubic (fast start, gentle settle): every push/pop slide in this file eases with it.</summary>
+        private static float EaseOutCubic(float t)
+        {
+            float f = 1f - Math.Clamp(t, 0f, 1f);
+            return 1f - f * f * f;
+        }
+
+        /// <summary>An ease-out back (a small overshoot past 1 before settling): a modal's spring pop eases with it.</summary>
+        private static float EaseOutBack(float t)
+        {
+            const float c1 = 1.70158f;
+            const float c3 = c1 + 1f;
+            float f = Math.Clamp(t, 0f, 1f) - 1f;
+            return 1f + c3 * f * f * f + c1 * f * f;
         }
 
         private void DrawToast()
