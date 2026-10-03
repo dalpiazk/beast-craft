@@ -734,10 +734,20 @@ namespace BeastCraft.Spike55.Live3D
         private const float CameraYawDeg = 35f;
         private const float CameraDistance = 8f;
 
-        private static XnaVector3 CameraDir()
+        private XnaVector3 CameraDir()
         {
-            float tilt = MathHelper.ToRadians(CameraTiltDeg);
-            float yaw = MathHelper.ToRadians(CameraYawDeg);
+            // Lead-review fix round: --pilot-side-camera swaps in a camera perpendicular to the
+            // walk direction. Every beast is yawed by FacingYaw to face world +X (see
+            // SetStressLevel's comment), and the DEFAULT battle camera's yaw=35 is a small offset
+            // from yaw=0 specifically because yaw=0 (a pure world-Z offset) is already "a genuine
+            // 3/4 angle" to an X-facing unit -- i.e. yaw=0 is itself close to a true side view. So
+            // the side camera is yaw=0 (not the battle camera's 35), with a shallower tilt so the
+            // gait's fore-aft leg swing reads clearly instead of being foreshortened by elevation.
+            // Every other mode is completely unaffected.
+            float tiltDeg = _options.PilotSideCamera ? 10f : CameraTiltDeg;
+            float yawDeg = _options.PilotSideCamera ? 0f : CameraYawDeg;
+            float tilt = MathHelper.ToRadians(tiltDeg);
+            float yaw = MathHelper.ToRadians(yawDeg);
             // Horizontal (XZ-plane) magnitude of the tilt direction, then rotated by `yaw` around world Y
             // -- replaces the old fixed (0.22, _, cos(tilt)) approximation (a small, non-adjustable lateral
             // nudge) with a real, tunable rotation around the board. +Y from the tilt is unaffected by yaw

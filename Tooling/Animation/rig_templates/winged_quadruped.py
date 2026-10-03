@@ -254,15 +254,30 @@ def build_bones(eb, lm, H):
             mk(name, prev, pt, prev_name, role=f"wing_{side}")
             prev, prev_name = pt, name
 
-    # Legs: 4-bone chain (thigh/shin/foot/toe) per leg, hip-attached at pelvis height, ending at
-    # the detected ground foot point. A small forward bow at the knee (0.5 fraction) gives the
-    # chain a bend direction for IK/weighting instead of a dead-straight line.
+    # Legs: 4-bone chain (thigh/shin/foot/toe) per leg, hip-attached INSIDE the body (pulled toward
+    # the spine centerline and raised above pelvis height, not placed directly above the foot) with
+    # a pronounced forward knee bow -- a genuinely bent-knee rest stance, not a near-straight leg.
+    #
+    # Lead-review fix round: a first version placed the hip directly above the foot at plain pelvis
+    # height with only a small (0.05H) knee bow, which put the rest-pose leg at ~92-95% of its own
+    # L1+L2 reach -- almost fully extended -- leaving only ~2% of body height of IK slack before the
+    # 2-bone solve clamped (anim/gait.py's per-leg safe-stride computation measured this directly:
+    # solved stride came out to 0.040 units, ~2% of H, visibly a "barely moves" walk in the review
+    # render). Pulling the hip inward/up and bowing the knee forward hard increases L1+L2 (more bent
+    # chain length) without increasing the straight-line hip-to-foot distance much, which is exactly
+    # what creates IK slack for a real stride -- the standard "bent-knee/hock" digitigrade stance,
+    # not a cosmetic change: it changes the actual reachable envelope anim/gait.py solves within.
     for leg in lm["legs"]:
         side = leg["side"]
         foot = leg["foot"]
-        hip = mathutils.Vector((foot.x, foot.y * 0.5 + pelvis_p.y * 0.5, pelvis_p.z))
-        knee = hip.lerp(foot, 0.48)
-        knee.y += fwd * 0.05 * H  # bow the knee slightly forward, digitigrade-ish
+        hip = mathutils.Vector((
+            foot.x * 0.45,                               # pulled in toward the spine centreline
+            foot.y * 0.20 + pelvis_p.y * 0.80,            # mostly at the pelvis's own depth, not the foot's
+            pelvis_p.z + 0.13 * H,                        # raised above plain pelvis height
+        ))
+        knee = hip.lerp(foot, 0.45)
+        knee.y += fwd * 0.17 * H                          # pronounced forward bow (was 0.05H)
+        knee.z += 0.035 * H                               # lift the knee slightly for a bent silhouette
         ankle = hip.lerp(foot, 0.85)
         toe_tip = mathutils.Vector((foot.x, foot.y + fwd * 0.12 * H, 0.0))
         mk(f"leg_{side}_thigh", hip, knee, "pelvis", role=f"leg_{side}")

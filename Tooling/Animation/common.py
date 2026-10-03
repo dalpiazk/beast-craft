@@ -396,7 +396,16 @@ def auto_weight_with_fallbacks(obj, arm_obj, bone_names, target_height):
 
 def cleanup_weights(obj, limit=3):
     """Scripted weight-paint cleanup, per the methodology doc section 2: limit influences,
-    normalise, clean near-zero, smooth. All plain bpy.ops, fully headless."""
+    normalise, clean near-zero, smooth. All plain bpy.ops, fully headless.
+
+    Lead-review fix round: `vertex_group_smooth` (run to remove hard weight-paint boundaries) can
+    spread a vertex's weight back onto neighbouring groups it didn't previously belong to, silently
+    pushing some vertices back over the influence cap `limit_total` had just enforced -- confirmed
+    on the pilot (max influences crept to 7 after smoothing, against a <=3-4 target). Re-running
+    `vertex_group_limit_total` a second time, *after* smooth, catches that spill-over; the first
+    call (before smooth/clean) still matters too, since starting from a tighter set makes the
+    smoothed result cleaner than skipping straight to one post-smooth limit pass.
+    """
     bpy.ops.object.select_all(action="DESELECT")
     obj.select_set(True)
     bpy.context.view_layer.objects.active = obj
@@ -405,6 +414,8 @@ def cleanup_weights(obj, limit=3):
     bpy.ops.object.vertex_group_normalize_all(lock_active=False)
     bpy.ops.object.vertex_group_clean(group_select_mode="ALL", limit=0.01)
     bpy.ops.object.vertex_group_smooth(group_select_mode="ALL", factor=0.5, repeat=2)
+    bpy.ops.object.vertex_group_limit_total(limit=limit)  # re-cap: smooth can reintroduce influences
+    bpy.ops.object.vertex_group_clean(group_select_mode="ALL", limit=0.01)
     bpy.ops.object.vertex_group_normalize_all(lock_active=False)
     bpy.ops.object.mode_set(mode="OBJECT")
 

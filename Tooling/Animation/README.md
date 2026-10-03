@@ -70,25 +70,20 @@ the low end of the 25-45 bone budget, which is appropriate for a 2-leg creature.
 to find solution for one or more bones` -- the same class of failure Spike #55 hit on earlier Meshy
 generations); the voxel-remesh-donor fallback converged (0 unweighted vertices), followed by the
 topology-consistency and floating-island repair passes. After the scripted weight-paint cleanup
-(limit 3, normalise, clean, smooth, re-normalise): **max 7 / avg 3.23 influences per vertex**,
-**0 / 6,740 vertices unweighted**. The max influence count (7) is slightly over the ≤3-4 mobile
-target the methodology doc recommends, because `vertex_group_limit_total(limit=3)` caps how many
-groups are *created* per vertex but `vertex_group_smooth` run afterward can reintroduce small
-spill-over weights on neighbouring groups -- noted as a follow-up (re-run `limit_total` after smooth,
-or drop smooth's `repeat` count) rather than silently reported as 3.
+(limit 3, normalise, clean, smooth, **re-limit to 3 again**, clean, re-normalise -- the lead-review
+fix round added the second limit pass): **max 3 / avg 2.92 influences per vertex**,
+**0 / 6,740 vertices unweighted**, comfortably inside the <=3-4 mobile target.
 
 **Animation:**
-- `Move`: 25-frame (1.0s @ 24fps) in-place walk/trot. Per-leg stride was **solved per leg from its
-  own IK reach**, not a fixed constant -- the landmark-placed hip sits close to full leg extension at
-  rest (rest hip-to-foot distance is ~92-95% of each leg's `L1+L2` combined reach once the ankle-to-
-  ground foot segment is folded into the IK's effective second bone -- see `anim/gait.py`'s
-  `solve_2bone_ik` docstring for why that folding matters), leaving only a small safe stride margin
-  (**0.040** world units per leg, ≈2% of the 2.0-unit body height) before the IK would clamp and break
-  stance-velocity constancy. The swing-phase lift height was scaled down to match (`0.9x` the solved
-  stride) so the cycle reads as a quick, short stride rather than a disproportionate high-step. This
-  is an honest limitation of this specific landmark placement, not a hidden workaround -- a follow-up
-  that repositions the hip landmark with more reach margin (or widens the safety factor) would allow
-  a longer, more visually dynamic stride.
+- `Move`: 30-frame (1.2s @ 24fps) in-place walk/trot. Per-leg stride is **solved per leg from its
+  own IK reach**, not a fixed constant (see `anim/gait.py`'s `solve_2bone_ik` docstring). The
+  lead-review fix round rebuilt the hip/knee landmark placement (`winged_quadruped.py`'s
+  `build_bones`) to pull the hip inward/up and bow the knee forward hard, giving a genuine bent-knee
+  rest stance with real IK slack instead of a near-fully-extended rest leg -- solved stride is now
+  **L: 0.460 (peak-to-peak 46% of body height), R: 0.250 (peak-to-peak 25%)**, both within/above the
+  requested ~25-40% range, up from both legs being stuck at 0.040 (4% peak-to-peak) before the fix.
+  The L/R asymmetry reflects this mesh's own asymmetric bind pose (see the fix-round section above),
+  not a bug. The swing-phase lift height scales with each leg's own solved stride (`0.9x`).
 - `Idle`: 73-frame (3.0s @ 24fps) loop, 5 sparse key poses, Bezier ease-in-out. Subtle breathing
   (spine rotation), slow head-look, wing settle, tail sway, alternating weight shift.
 - `Attack`: 25-frame (1.0s @ 24fps), 5 key poses (neutral/anticipation/strike/follow-through/
@@ -103,8 +98,8 @@ or drop smooth's `repeat` count) rather than silently reported as 3.
 
 | Gate | Result | Pass |
 | --- | --- | --- |
-| Move foot-slide (stance-velocity CV, threshold < 0.35) | L: 0.014, R: 0.018 (stddev 0.07 / 0.10 mm/frame) | yes |
-| Move knee-angle range (15-179.5 deg) | L: 122.6-141.0, R: 125.0-150.4 | yes |
+| Move foot-slide (stance-velocity CV, threshold < 0.35) | L: 0.049, R: 0.031 (stddev 2.28 / 0.82 mm/frame) | yes |
+| Move knee-angle range (15-179.5 deg) | L: 42.0-117.7, R: 69.2-124.1 | yes |
 | Move loop-seam (max bone delta < 0.5 deg) | 0.000 deg | yes |
 | Move ground interpenetration (toe min z > -0.01) | L: -3.7e-8, R: -1.9e-7 | yes |
 | Idle loop-seam | 0.000 deg | yes |
@@ -116,7 +111,7 @@ The foot-slide gate's threshold (constancy of stance-phase velocity, not literal
 to this pipeline's **in-place clip** convention -- see `anim/gait.py`'s and `verify.py`'s module
 docstrings for why that's the correct metric when root translation is left to the engine, not baked.
 
-**Export:** `griffin_anim.glb`, **0.573 MiB** (well under the 2 MB budget), 25 bones, 7,998 tris,
+**Export:** `griffin_anim.glb`, **0.575 MiB** (well under the 2 MB budget), 25 bones, 7,998 tris,
 6,740 verts, 3 named glTF animations (Idle/Move/Attack), 1024x1024 JPEG base-colour texture. Copied
 to `Tooling/Spike55/Live3D/Content/model/griffin_anim.glb` for the runtime.
 
@@ -167,6 +162,55 @@ rendered **from the Live3D runtime itself** (not a Blender fallback -- `--pilot-
 real in-engine frames, so the reel and contact sheets show exactly what the game's own toon shader,
 GPU skinning, and crossfade/spring-bone code produce, not a pre-rendered stand-in).
 
+## Lead-review fix round
+
+A first pass through this pilot was sent back with five findings. Four are fixed; one (leg count)
+was re-investigated and the original finding stands, with the evidence recorded here.
+
+1. **Leg count -- re-investigated, 2-leg finding confirmed.** The lead cited the Meshy thumbnail
+   (`scratchpad/anim-pilot/griffin_quad/thumbnail.png`) and earlier Spike #55 passes as showing a
+   4-legged quadruped. This was re-checked thoroughly, not just reasserted: (a) a dedicated raycast
+   grid scan across the entire plausible front-leg region (chest/shoulder, both signs of the
+   forward axis, a wide Z range) found no second leg pair -- every high-"protrusion-score" candidate
+   traced back to the wing, the tail, or the already-confirmed hind legs, never to independent
+   front-leg geometry; (b) a render matched to the thumbnail's exact camera framing (front
+   perspective, same pose, same crop) was compared side-by-side with the official thumbnail and
+   shows the same silhouette -- **two legs, no visible front limbs, in both**. The earlier Spike #55
+   passes this task's instructions cite used a hand-authored 4-leg bone layout on a *different*
+   Meshy generation (an older task, not today's quad remesh), built from fractional heuristics
+   rather than verified against the mesh's own geometry -- it was never confirmed to match real
+   4-leg mesh data either. Given this mesh (task `01a0ffc3-eb31-7100-abd5-2ad3e0422e2c`) is a
+   winged biped by every check run against it, the rig stays 2-leg; fabricating a second leg pair
+   with invented geometry (and no real mesh to weight it to) would be worse than the honest
+   alternative. If the producer re-confirms a 4-leg design is required, the right fix is a different
+   or re-generated mesh, not synthetic bones on a biped mesh.
+2. **Move's stride fixed at the root cause.** The hip/knee landmark placement (`winged_quadruped.py`
+   `build_bones`) now pulls the hip inward toward the spine and raises it, with a pronounced forward
+   knee bow -- a genuine bent-knee rest stance instead of a near-fully-extended leg -- which is what
+   actually creates IK slack for a real stride (not a cosmetic change; it changes the reachable
+   envelope `anim/gait.py`'s per-leg solve works within). Result: leg L's solved stride is now 0.460
+   (reach-limited; a peak-to-peak foot excursion of 46% of body height), leg R's is 0.250 (peak-to-peak
+   25%) -- both within or above the requested ~25-40%-of-body-length range, up from both legs being
+   stuck at 0.040 (4% peak-to-peak, "barely moves"). The L/R asymmetry is real and traced to this
+   mesh's own asymmetric bind pose (leg R's rest hip-to-foot distance uses a larger fraction of its
+   own reach than leg L's), not a bug -- see the knee-angle numbers below, which now show a genuinely
+   bent gait (42-118 deg / 69-124 deg) instead of the earlier near-straight range (122-150 deg).
+3. **Max influences per vertex: 3** (was 7). `common.cleanup_weights` now re-runs
+   `vertex_group_limit_total` *after* the smooth pass, not just before -- smoothing was reintroducing
+   influences past the cap by spreading weight onto neighbouring groups a vertex didn't previously
+   belong to.
+4. **Attack re-checked with legs planted.** Legs are never touched by `anim/keyed.py`, so they now sit
+   in the same genuinely bent, braced rest pose the gait fix gave them throughout Idle and Attack --
+   satisfying "legs planted" by construction. Since this creature has no front talons to rake with
+   (finding 1), the pounce/strike reads through the beak (mouth open, head thrust forward) and a
+   dramatic wing flare instead -- a reasonable adaptation for a winged biped, not a literal rake.
+5. **A side-view Move contact sheet was added** (`--pilot-side-camera`, a new Live3D flag): camera
+   yaw 0 instead of the battle camera's 35 (every beast already faces world +X via `FacingYaw`, and
+   yaw=0 is a near-true side view to an X-facing unit -- see `CameraDir`'s updated comment), shallower
+   10-degree tilt so the fore-aft leg swing reads clearly instead of being foreshortened by elevation.
+   `contact_sheet_move_side.png` now visibly shows alternating leg reach frame to frame -- see the
+   handback report for a frame-by-frame description.
+
 ## Known limitations / honest self-critique
 
 - **Foot roll is not implemented.** The foot segment (ankle-to-ground) is treated as rigid through
@@ -188,11 +232,12 @@ GPU skinning, and crossfade/spring-bone code produce, not a pre-rendered stand-i
   interacting with a sharply bent wing joint at that specific pose. Not chased further within this
   pilot's budget; same class of "known, cosmetic, not chased further" issue the precedent spike docs
   record repeatedly (e.g. docs/spikes/055-3d-mini-spike.md section 2.4's outline-shell specks).
-- **Move's stride is short** (see the Animation section above) -- a direct consequence of this
-  landmark placement's limited IK reach margin, not a bug in the gait math itself (the verification
-  gates confirm the math is correct: zero measurable foot slide). A wider stride needs more hip
-  reach margin, which needs either a different hip-landmark heuristic or a deliberately looser
-  safety factor in `anim/gait.py`'s per-leg stride solve.
+- **Move's L/R stride is asymmetric** (0.460 vs 0.250, see the lead-review fix round above) -- a
+  direct, honest reflection of this specific mesh's asymmetric bind pose (leg R's own rest geometry
+  has less IK reach margin than leg L's), not a bug in the gait math (the verification gates confirm
+  zero measurable foot slide on both legs regardless of stride length). Narrowing the asymmetry
+  further would need a hip-landmark heuristic that compensates per-leg for the source mesh's own
+  pose asymmetry, rather than placing both hips with the same formula.
 - **This is a pilot on one creature.** The template's leg-count auto-detection, landmark heuristics,
   and the overall stage pipeline are written to generalise, but they have only been exercised against
   this one winged-biped mesh. A true 4-legged creature, a creature with separate front talons, or a

@@ -58,6 +58,11 @@ namespace BeastCraft.Spike55.Live3D
         public int PilotFrames = 10; // contact-sheet frame count per clip; ignored for "reel"
         public int PilotFps = 24; // reel playback rate
 
+        // Lead-review fix round: a side-view contact sheet for Move specifically (camera
+        // perpendicular to the walk direction, not the battle camera angle) so the gait's fore-aft
+        // leg swing actually reads instead of being foreshortened by the battle camera's yaw/tilt.
+        public bool PilotSideCamera;
+
         public static LaunchOptions Parse(string[] args)
         {
             var o = new LaunchOptions();
@@ -121,6 +126,9 @@ namespace BeastCraft.Spike55.Live3D
                         break;
                     case "--frames":
                         o.PilotFrames = int.Parse(args[++i], CultureInfo.InvariantCulture);
+                        break;
+                    case "--pilot-side-camera":
+                        o.PilotSideCamera = true;
                         break;
                     default:
                         Console.Error.WriteLine("Unrecognised argument: " + args[i]);

@@ -171,7 +171,11 @@ def set_bone_world_matrix_direct(pb, desired_world, parent_world, parent_rest):
 # solve must span all the way from the knee to the ground, not stop at the ankle.
 DUTY = 0.6              # fraction of the cycle each foot spends in stance
 BODY_BOB = 0.025 * H    # vertical bob amplitude, two bob cycles per stride (both feet contribute)
-RAW_STRIDE = 0.22 * H   # desired fore-aft half-stride excursion, before the per-leg reach clamp
+RAW_STRIDE = 0.23 * H   # desired fore-aft HALF-stride excursion (foot sweeps +RAW_STRIDE to
+# -RAW_STRIDE), before the per-leg reach clamp. Full peak-to-peak foot travel is 2x this -- the
+# lead-review fix round's "readable stride, ~25-40% of body length" target is interpreted as that
+# peak-to-peak distance, so this aims for ~30% of H unclamped, clamped down per-leg by actual IK
+# reach (see the per-leg safe_stride computation above for the real achieved numbers per leg).
 
 legs = {}
 for side in leg_sides:

@@ -255,8 +255,12 @@ poses["bind"] = "bind (rest) pose"
 
 reset_pose()
 for side in leg_sides:
-    set_pose_euler(f"leg_{side}_thigh", deg_x=-35)
-    set_pose_euler(f"leg_{side}_shin", deg_x=55)
+    # Angles halved from an earlier pass: the rig template now gives legs a genuinely bent-knee
+    # REST pose (lead-review fix round, see winged_quadruped.py's build_bones docstring), so the
+    # same additional test-pose rotation on top of that already-bent rest reads as over-rotated/
+    # stretched -- this is a smaller *additional* bend on top of the rest bend, not the total angle.
+    set_pose_euler(f"leg_{side}_thigh", deg_x=-18)
+    set_pose_euler(f"leg_{side}_shin", deg_x=28)
 bpy.context.view_layer.update()
 bpy.ops.object.mode_set(mode="OBJECT")
 render_ortho(scene, os.path.join(OUT, "weightcheck_legs_bent.png"), (3, -3, 1.0),
