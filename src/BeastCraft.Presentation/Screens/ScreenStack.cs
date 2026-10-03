@@ -134,6 +134,29 @@ namespace BeastCraft.Presentation.Screens
             get { return Transition == TransitionKind.None ? 1f : Math.Min(1f, TransitionElapsedMs / TransitionMs); }
         }
 
+        /// <summary>
+        /// True while a screen transition or a modal's spring pop is still running (independent review,
+        /// #52 step 4 follow-up): a Forward/Backward slide draws the top screen offset from its resting
+        /// canvas position (<c>BeastCraftGame.DrawScreenShifted</c>, a shifted <c>CanvasFit</c>), but
+        /// hit-testing always uses the resting one (<c>RoutePointer</c>'s <c>_ctx.CanvasFit</c>) — a tap
+        /// during the slide would land on whatever is at that canvas position at rest, not what is
+        /// actually drawn there. The host swallows pointer input and the Back button entirely while this
+        /// is true (simplest and safest: no ambiguity over which screen — the one sliding out or the one
+        /// sliding in — a stray tap belongs to) rather than routing hit-tests through the shifted fit,
+        /// and does the same for a Fade transition and a modal's pop for the same "don't interact with
+        /// something still animating in or out" reason, and so the Back button cannot start a second
+        /// transition over the first one. Each screen's own <c>UiRoot</c> tracks its own pointer-down
+        /// state independently, so a press that began before this and is released after it is safe either
+        /// way — the screen it started on already saw a matching <c>OnPointerDown</c>, and whichever
+        /// screen is on top once this clears was never sent one, so its own <c>OnPointerUp</c>/
+        /// <c>OnPointerMove</c> no-op; swallowing input here is about not hit-testing the wrong widget
+        /// against the wrong screen while this is true, not about that per-root safety net alone.
+        /// </summary>
+        public bool InputBlocked
+        {
+            get { return Transition != TransitionKind.None || ModalProgress < 1f; }
+        }
+
         /// <summary>Raised after every change of the top screen.</summary>
         public event Action<IScreen> TopChanged;
 

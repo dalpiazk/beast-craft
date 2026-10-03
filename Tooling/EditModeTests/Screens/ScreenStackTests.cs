@@ -177,6 +177,47 @@ namespace BeastCraft.Tests.EditMode
             Assert.AreEqual(1f, minimal.ModalProgress, "Minimal: no pop to play");
         }
 
+        /// <summary>
+        /// Independent review, #52 step 4 follow-up: a Forward/Backward slide draws the top screen
+        /// offset from its resting canvas position, but the host's pointer hit-test always uses the
+        /// resting one — so the host swallows input entirely while <see cref="ScreenStack.InputBlocked"/>
+        /// is true, covering a screen transition of any kind and a modal's spring pop alike.
+        /// </summary>
+        [Test]
+        public void InputBlocked_DuringATransitionOrAModalPop_ClearsOnceBothSettle()
+        {
+            ScreenStack stack = new ScreenStack();
+            Assert.IsFalse(stack.InputBlocked, "nothing has happened yet");
+
+            stack.Push(new FakeScreen("title", new List<string>()));
+            Assert.IsTrue(stack.InputBlocked, "even the very first push fades in and blocks until it settles");
+            stack.Update(ScreenStack.TransitionMs);
+            Assert.IsFalse(stack.InputBlocked);
+
+            stack.Push(new FakeScreen("map", new List<string>()));
+            Assert.AreEqual(TransitionKind.Forward, stack.Transition);
+            Assert.IsTrue(stack.InputBlocked);
+            stack.Update(ScreenStack.TransitionMs / 2f);
+            Assert.IsTrue(stack.InputBlocked, "still mid-slide");
+            stack.Update(ScreenStack.TransitionMs);
+            Assert.IsFalse(stack.InputBlocked, "the slide settled");
+
+            stack.PushModal(new FakeModal("settings"));
+            Assert.IsTrue(stack.InputBlocked, "the spring pop just started");
+            stack.Update(ScreenStack.ModalPopMs);
+            Assert.IsFalse(stack.InputBlocked, "the pop settled");
+
+            ScreenStack still = new ScreenStack { Animate = false };
+            still.Push(new FakeScreen("title", new List<string>()));
+            still.Push(new FakeScreen("map", new List<string>()));
+            Assert.IsFalse(still.InputBlocked, "Animate off: no transition ever starts, so nothing blocks");
+
+            ScreenStack minimal = new ScreenStack { Effects = EffectsIntensity.Minimal };
+            minimal.Push(new FakeScreen("title", new List<string>()));
+            minimal.PushModal(new FakeModal("settings"));
+            Assert.IsFalse(minimal.InputBlocked, "Minimal: no pop plays either, so nothing blocks");
+        }
+
         [Test]
         public void Back_ClosesModalsFirst_ThenAsksTheScreen_ThenPops_ThenQuits()
         {

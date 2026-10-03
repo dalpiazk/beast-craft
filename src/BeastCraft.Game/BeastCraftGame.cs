@@ -392,16 +392,25 @@ namespace BeastCraft.Game
             _stack.Update(elapsed);
             _toast.Tick(elapsed);
             FrameInput input = ReadInput();
-            if (BackPressed(input))
+            // Pointer input and Back are swallowed entirely while a transition or a modal's spring pop
+            // is running (ScreenStack.InputBlocked's own remarks explain why: a mid-slide hit-test
+            // would use the resting CanvasFit against a screen drawn shifted from it). Still read every
+            // frame (ReadInput above) so _previousKeys/_previousMouse below never desyncs.
+            bool inputBlocked = _stack.InputBlocked;
+            if (!inputBlocked && BackPressed(input))
             {
                 Back();
             }
 
             GameModal modal = _stack.TopModal as GameModal;
             GameScreen screen = _stack.Top as GameScreen;
-            RoutePointer(input, modal != null ? modal.Ui : screen != null && !screen.UsesRawInput ? screen.Ui : null);
+            if (!inputBlocked)
+            {
+                RoutePointer(input, modal != null ? modal.Ui : screen != null && !screen.UsesRawInput ? screen.Ui : null);
+            }
+
             modal?.Update(elapsed);
-            screen?.Update(elapsed, modal == null ? input : null);
+            screen?.Update(elapsed, modal == null && !inputBlocked ? input : null);
             _previousKeys = input.Keys;
             _previousMouse = input.Mouse;
             base.Update(gameTime);
