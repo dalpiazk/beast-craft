@@ -181,7 +181,9 @@ namespace BeastCraft.Campaign
         /// <see cref="RegionData.HardMode"/> shapes and boss). Refused when an expedition is already in
         /// progress (retreat first), the region is unknown or locked, the stage is past the first
         /// uncleared one, or the difficulty is not allowed there (Hard outside a post-game region, or
-        /// an undefined value).
+        /// an undefined value). Also marks <paramref name="regionId"/>'s backdrop reached
+        /// (<see cref="CampaignProgress.MarkBackdropReached"/>), so entering a region for the first
+        /// time unlocks its menu backdrop in Settings &gt; Visuals.
         /// </summary>
         public static CampaignResult StartRun(PlayerSave save, RegionLibrary library, string regionId, int stage, int seed, RunDifficulty difficulty)
         {
@@ -233,6 +235,7 @@ namespace BeastCraft.Campaign
                             ? FixedMap(region, seed)
                             : NodeMapGenerator.Generate(library.RegionFor(region, difficulty), library.RulesFor(region, difficulty), stage, seed);
             save.Campaign.CurrentRegionId = regionId;
+            save.Campaign.MarkBackdropReached(regionId);
             if (!region.IsTutorial)
             {
                 // The discovery layer: the region's own seed, assigned once (never the map's, which a

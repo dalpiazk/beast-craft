@@ -1,12 +1,17 @@
 using System;
+using BeastCraft.Game.Rendering;
 using BeastCraft.Game.Screens.Components;
 using BeastCraft.Presentation.Layout;
 using BeastCraft.Presentation.Screens;
 using BeastCraft.Presentation.Ui;
 using BeastCraft.Save;
+using Microsoft.Xna.Framework;
 
 namespace BeastCraft.Game.Screens
 {
+    // BeastCraft.Color (Core's engine-neutral colour) would win over a file-level using here.
+    using Color = Microsoft.Xna.Framework.Color;
+
     /// <summary>The settings screen's inner tabs.</summary>
     public enum SettingsTab
     {
@@ -38,18 +43,23 @@ namespace BeastCraft.Game.Screens
         private static readonly string[] TabGlyphs = { "battle", "star", "speaker", "lock" };
 
         private readonly SettingsViewModel _model;
+        private readonly BackdropPickerViewModel _backdrops;
         private readonly ScreenHeader _header;
         private readonly Tabs _tabs;
         private readonly CardList _gameplay;
         private readonly CardList _visuals;
         private readonly CardList _audio;
         private readonly CardList _privacy;
+        private readonly TabFade _tabFade = new TabFade();
+        private readonly Rect _page;
 
         public SettingsScreen(ScreenContext ctx) : base(ctx)
         {
             _model = Ctx.Game.NewSettingsModel();
+            _backdrops = Ctx.Session == null ? null : new BackdropPickerViewModel(Ctx.Session);
             float top = TabStrip.ContentTop(HeaderMetrics.Standard);
             Rect page = new Rect(0, top, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight - top - FooterHeight);
+            _page = page;
             _gameplay = new CardList(Ui.Add(new ScrollView { Id = "settings-gameplay", Bounds = page }));
             _visuals = new CardList(Ui.Add(new ScrollView { Id = "settings-visuals", Bounds = page, Visible = false }));
             _audio = new CardList(Ui.Add(new ScrollView { Id = "settings-audio", Bounds = page, Visible = false }));
@@ -72,6 +82,7 @@ namespace BeastCraft.Game.Screens
         public override void Enter()
         {
             base.Enter();
+            _backdrops?.Refresh();
             BuildAll();
         }
 
@@ -82,6 +93,13 @@ namespace BeastCraft.Game.Screens
             _visuals.Scroll.Visible = tab == SettingsTab.Visuals;
             _audio.Scroll.Visible = tab == SettingsTab.Audio;
             _privacy.Scroll.Visible = tab == SettingsTab.Privacy;
+            _tabFade.Reset();
+        }
+
+        public override void Update(float elapsedMs, FrameInput input)
+        {
+            base.Update(elapsedMs, input);
+            _tabFade.Update(elapsedMs);
         }
 
         private void Build()
@@ -160,7 +178,101 @@ namespace BeastCraft.Game.Screens
             rowY = AddToggle(_visuals, x, rowY, width, "screen-shake", Loc("ui.settings.screen_shake"), _model.ScreenShake, _model.SetScreenShake);
             AddToggle(_visuals, x, rowY, width, "flashes", Loc("ui.settings.flashes"), _model.Flashes, _model.SetFlashes);
 
+            if (_backdrops != null && _backdrops.Rows.Count > 0)
+            {
+                y = BuildBackdropPicker(y);
+            }
+
             _visuals.End(y);
+        }
+
+        // ------------------------------------------------------------------------------------------
+        // Backdrop (#52 step 3, journal UI kit): a tap-to-select thumbnail per region's menu backdrop
+        // (ui/backdrop/<id>, drawn behind every out-of-combat screen, GameScreen.PageBackground).
+        // Reached regions (CampaignProgress.ReachedBackdropIds, unlocked on first entry,
+        // CampaignRules.StartRun) are tappable; a still-locked region shows as a silhouette with its
+        // name and no tap target.
+        // ------------------------------------------------------------------------------------------
+
+        private const int BackdropColumns = 3;
+        private const float BackdropGap = 16f;
+
+        private float BuildBackdropPicker(float top)
+        {
+            float width = _visuals.Width - 72f;
+            float x = HeaderMetrics.Pad + 36f;
+            float cellWidth = (width - (BackdropColumns - 1) * BackdropGap) / BackdropColumns;
+            float cellHeight = cellWidth * 1.3f;
+            int rows = (_backdrops.Rows.Count + BackdropColumns - 1) / BackdropColumns;
+            float gridHeight = rows * cellHeight + Math.Max(0, rows - 1) * BackdropGap;
+            float height = CardTopPad + gridHeight + CardBottomPad;
+            float cardTop = top;
+            float y = _visuals.Card(cardTop, height, "card", box => SectionHeader.Draw(Ctx, box, Loc("ui.settings.section_backdrop")));
+
+            float gridTop = cardTop + CardTopPad;
+            for (int i = 0; i < _backdrops.Rows.Count; i++)
+            {
+                BackdropRow row = _backdrops.Rows[i];
+                int col = i % BackdropColumns;
+                int line = i / BackdropColumns;
+                Rect cell = new Rect(x + col * (cellWidth + BackdropGap), gridTop + line * (cellHeight + BackdropGap), cellWidth, cellHeight);
+                Button button = _visuals.Add(new Button { Id = "backdrop-" + row.RegionId, Bounds = cell, StyleKey = "chip", Selected = row.Selected, Enabled = row.Reached });
+                string regionId = row.RegionId;
+                button.Clicked += () =>
+                {
+                    _backdrops.Select(regionId);
+                    Build();
+                };
+                _visuals.TrackDraw(button, box => DrawBackdropThumb(box, row));
+            }
+
+            return y;
+        }
+
+        /// <summary>
+        /// A backdrop thumbnail: the painted scene (dimmed to a silhouette when locked), its region name
+        /// on a plaque strip, a lock glyph over a locked one, and — since the chip button's own selected
+        /// border sits under the art and would otherwise be hidden — an explicit gold ring and check
+        /// badge over a selected one.
+        /// </summary>
+        private void DrawBackdropThumb(Rect box, BackdropRow row)
+        {
+            Rect inset = box.Inset(6f);
+            ArtSprite art = Painter.Sprite("ui/backdrop/" + row.RegionId);
+            if (art != null)
+            {
+                Color tint = row.Reached ? Color.White : new Color(96, 88, 108, 255);
+                Painter.NineSlice(art, inset, tint);
+            }
+
+            Rect nameStrip = new Rect(inset.X, inset.Bottom - 40f, inset.Width, 40f);
+            Painter.Fill(nameStrip, Painter.C("inkPlum2", 0.6f));
+            Painter.TextIn(row.DisplayName, nameStrip.Inset(6f), Ctx.Style.TextSizes.Small, Painter.C("cream"), TextAlign.Center);
+
+            if (!row.Reached)
+            {
+                float size = Math.Min(inset.Width, inset.Height) * 0.3f;
+                Painter.Glyph("lock", new Rect(inset.Center.X - size / 2f, inset.Center.Y - size / 2f - 20f, size, size), Painter.C("cream"));
+                return;
+            }
+
+            if (row.Selected)
+            {
+                DrawBorder(inset, 6f, Painter.C("gold"));
+                float badge = 56f;
+                Rect badgeBox = new Rect(inset.Right - badge - 10f, inset.Y + 10f, badge, badge);
+                Painter.Fill(badgeBox, Painter.C("gold"));
+                Painter.Glyph("check", badgeBox.Inset(8f), Painter.C("inkPlum2"));
+            }
+        }
+
+        /// <summary>A rectangular outline (four fills — the kit has no stroked-rect primitive) of <paramref name="thickness"/>, just inside <paramref name="box"/>.</summary>
+        private void DrawBorder(Rect box, float thickness, Color color)
+        {
+            Painter.Fill(new Rect(box.X, box.Y, box.Width, thickness), color);
+            Painter.Fill(new Rect(box.X, box.Bottom - thickness, box.Width, thickness), color);
+            Painter.Fill(new Rect(box.X, box.Y, thickness, box.Height), color);
+            Painter.Fill(new Rect(box.Right - thickness, box.Y, thickness, box.Height), color);
         }
 
         // ------------------------------------------------------------------------------------------
@@ -256,9 +368,14 @@ namespace BeastCraft.Game.Screens
 
         public override void Draw()
         {
-            Gradient("cream", "parchment", new Rect(0, 0, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight));
+            PageBackground("cream", "parchment");
             base.Draw();
             _header.Paint(Ctx, Ui, Loc("ui.settings.title"));
+            float fade = _tabFade.Alpha(AnimationsEnabled);
+            if (fade > 0f)
+            {
+                Painter.Fill(_page, Painter.C("cream", fade));
+            }
         }
 
         protected override void DrawCustom(Widget widget)

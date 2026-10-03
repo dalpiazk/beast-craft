@@ -8,7 +8,7 @@ using NUnit.Framework;
 namespace BeastCraft.Tests.EditMode
 {
     /// <summary>
-    /// Golden save fixtures for every schema version (1-12): each committed input is loaded (and
+    /// Golden save fixtures for every schema version (1-14): each committed input is loaded (and
     /// migrated) by <see cref="SaveSerializer"/> and written back, and the text must equal the
     /// committed expected output byte for byte. The fixtures and outputs were captured on the
     /// Unity-era JsonUtility serializer; the engine-neutral serializer must reproduce them exactly.
@@ -103,6 +103,16 @@ namespace BeastCraft.Tests.EditMode
     /// <c>,"NodeRetreats":N,"NodeRetreatsNodeId":N</c> follows <c>"Difficulty"</c> inside every
     /// <c>ActiveRun</c>. No input changed.
     /// </para>
+    /// <para>
+    /// Schema 14 (the journal UI kit's menu backdrop picker, <c>CampaignProgress.ReachedBackdropIds</c>/
+    /// <c>SelectedBackdropId</c>) froze <c>rich-v13</c> as an input and added <c>rich-v14</c>, which is now
+    /// the one that must round-trip unchanged. Every older expected output changed in exactly these
+    /// places: <c>"SchemaVersion":13</c> became <c>14</c>, and <c>,"ReachedBackdropIds":[...],
+    /// "SelectedBackdropId":"r00"</c> follows <c>"PreferredDifficulty"</c> inside <c>"Campaign"</c>:
+    /// Hearthglen (<c>r00</c>) reached by default plus every region already listed in
+    /// <c>Campaign.Regions</c> (<see cref="Save.SaveMigrations.AddBackdrops"/> treats an already-unlocked
+    /// region as already reached), Hearthglen selected. No input changed.
+    /// </para>
     /// </summary>
     public class GoldenSaveTests
     {
@@ -142,7 +152,8 @@ namespace BeastCraft.Tests.EditMode
             "{\"SchemaVersion\":10}",
             "{\"SchemaVersion\":11}",
             "{\"SchemaVersion\":12}",
-            "{\"SchemaVersion\":13}"
+            "{\"SchemaVersion\":13}",
+            "{\"SchemaVersion\":14}"
         };
 
         private static SaveSerializer NewSerializer()
@@ -198,24 +209,30 @@ namespace BeastCraft.Tests.EditMode
             return GoldenFiles.Read("Saves/rich-v12.input.json");
         }
 
-        /// <summary>The frozen schema-13 rich save (captured by reflection in update mode).</summary>
+        /// <summary>The frozen schema-13 rich save (captured by reflection before schema 14; never rewritten).</summary>
         private static string RichV13()
+        {
+            return GoldenFiles.Read("Saves/rich-v13.input.json");
+        }
+
+        /// <summary>The frozen schema-14 rich save (captured by reflection in update mode).</summary>
+        private static string RichV14()
         {
             if (GoldenFiles.Updating)
             {
                 PlayerSave save = new PlayerSave();
                 int seed = 1;
                 Populate(save, ref seed, 0);
-                GoldenFiles.Write("Saves/rich-v13.input.json", NewSerializer().Serialize(save));
+                GoldenFiles.Write("Saves/rich-v14.input.json", NewSerializer().Serialize(save));
             }
 
-            return GoldenFiles.Read("Saves/rich-v13.input.json");
+            return GoldenFiles.Read("Saves/rich-v14.input.json");
         }
 
         [Test]
-        public void RichV13_RoundTripsByteIdentical()
+        public void RichV14_RoundTripsByteIdentical()
         {
-            string input = RichV13();
+            string input = RichV14();
             SaveLoadResult result = NewSerializer().Deserialize(input);
 
             Assert.IsTrue(result.Success, result.Error);
@@ -240,6 +257,8 @@ namespace BeastCraft.Tests.EditMode
             StringAssert.Contains("\"PreferredDifficulty\":1", input, "the rich save fills the schema-12 difficulty preference");
             StringAssert.Contains("\"NodeRetreats\":", input, "the rich save fills the schema-13 retreat-tracking field");
             StringAssert.Contains("\"NodeRetreatsNodeId\":", input, "the rich save fills the schema-13 retreat-tracking field");
+            StringAssert.Contains("\"ReachedBackdropIds\":[\"", input, "the rich save fills the schema-14 backdrop picker field");
+            StringAssert.Contains("\"SelectedBackdropId\":\"", input, "the rich save fills the schema-14 backdrop picker field");
         }
 
         [TestCase(1)]
@@ -255,9 +274,11 @@ namespace BeastCraft.Tests.EditMode
         [TestCase(11)]
         [TestCase(12)]
         [TestCase(13)]
+        [TestCase(14)]
         public void RichSave_LoadsAndMigrates_ToTheGoldenText(int version)
         {
-            string input = version == 13 ? RichV13()
+            string input = version == 14 ? RichV14()
+                            : version == 13 ? RichV13()
                             : version == 12 ? RichV12()
                             : version == 11 ? RichV11()
                             : version == 10 ? RichV10()
@@ -282,6 +303,7 @@ namespace BeastCraft.Tests.EditMode
         [TestCase(11)]
         [TestCase(12)]
         [TestCase(13)]
+        [TestCase(14)]
         public void MinimalSave_LoadsAndMigrates_ToTheGoldenText(int version)
         {
             AssertGolden("min-v" + version, MinimalInputs[version - 1], version);

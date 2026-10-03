@@ -384,19 +384,33 @@ namespace BeastCraft.Game
             }
 
             _painter.TimeMs += elapsed;
+            // The reduced-motion fallback (#52 step 4) reads straight from the saved setting each
+            // frame, same as every other screen that checks it (e.g. BattleScreen's own
+            // _settings.EffectsIntensity reads) -- cheap, and it picks up a change the moment Settings
+            // saves it, with nothing to invalidate.
+            _stack.Effects = _ctx?.Session?.Settings?.EffectsIntensity ?? EffectsIntensity.Full;
             _stack.Update(elapsed);
             _toast.Tick(elapsed);
             FrameInput input = ReadInput();
-            if (BackPressed(input))
+            // Pointer input and Back are swallowed entirely while a transition or a modal's spring pop
+            // is running (ScreenStack.InputBlocked's own remarks explain why: a mid-slide hit-test
+            // would use the resting CanvasFit against a screen drawn shifted from it). Still read every
+            // frame (ReadInput above) so _previousKeys/_previousMouse below never desyncs.
+            bool inputBlocked = _stack.InputBlocked;
+            if (!inputBlocked && BackPressed(input))
             {
                 Back();
             }
 
             GameModal modal = _stack.TopModal as GameModal;
             GameScreen screen = _stack.Top as GameScreen;
-            RoutePointer(input, modal != null ? modal.Ui : screen != null && !screen.UsesRawInput ? screen.Ui : null);
+            if (!inputBlocked)
+            {
+                RoutePointer(input, modal != null ? modal.Ui : screen != null && !screen.UsesRawInput ? screen.Ui : null);
+            }
+
             modal?.Update(elapsed);
-            screen?.Update(elapsed, modal == null ? input : null);
+            screen?.Update(elapsed, modal == null && !inputBlocked ? input : null);
             _previousKeys = input.Keys;
             _previousMouse = input.Mouse;
             base.Update(gameTime);
@@ -506,19 +520,62 @@ namespace BeastCraft.Game
             }
 
             _ctx.CanvasFit = fit;
-            _painter.Begin(fit, canvas);
-            (_stack.Top as GameScreen)?.Draw();
+            GameScreen top = _stack.Top as GameScreen;
+            GameScreen from = _stack.TransitionFrom as GameScreen;
+            bool sliding = from != null && (_stack.Transition == TransitionKind.Forward || _stack.Transition == TransitionKind.Backward);
+            if (sliding)
+            {
+                // A push/pop slide (#52 step 4): the incoming screen (the new Top on a push, the
+                // revealed one on a pop) travels the full canvas width from its leading edge to rest;
+                // the outgoing one travels a shorter distance the same direction (a parallax "push"),
+                // so the pair reads as one strip sliding past rather than two screens swapping in
+                // place. Shifting CanvasFit itself (not just the sprite transform) rather than only
+                // Matrix.CreateTranslation on canvas, so a screen's own scroll-view clip rects (which
+                // go through CanvasFit.ToScreen, not the sprite matrix) shift with it too -- otherwise
+                // a ScrollView's content would slide while its clip window stayed put.
+                float t = EaseOutCubic(_stack.TransitionProgress);
+                float w = PortraitLayout.CanvasWidth;
+                float sign = _stack.Transition == TransitionKind.Forward ? 1f : -1f;
+                DrawScreenShifted(from, fit, -sign * w * 0.3f * t);
+                DrawScreenShifted(top, fit, sign * w * (1f - t));
+            }
+            else
+            {
+                _painter.Begin(fit, canvas);
+                top?.Draw();
+            }
+
             _draw.SetBlend(BlendState.AlphaBlend);
             _draw.UnitSize = HexLayout.ColumnStep;
             foreach (IModal modal in _stack.Modals)
             {
-                _painter.Begin(fit, canvas);
+                // A spring pop (#52 step 4) on the top modal only: a settled modal underneath (a rare
+                // nested case) draws at its resting scale throughout, never replaying. Lerped from
+                // 85%, not 0 -- EaseOutBack alone (0 -> overshoot past 1 -> 1) reads as the modal
+                // springing out of a single point, dramatic for what is usually a settings sheet or a
+                // confirm; growing the last 15% keeps the same gentle overshoot-and-settle feel.
+                bool popping = modal == _stack.TopModal && _stack.ModalProgress < 1f;
+                if (!popping)
+                {
+                    _painter.Begin(fit, canvas);
+                }
+                else
+                {
+                    float scale = 0.85f + 0.15f * EaseOutBack(_stack.ModalProgress);
+                    // Scaled about the canvas centre, not the origin -- a plain Matrix.CreateScale
+                    // would pop the modal from its top-left corner instead of growing in place.
+                    float cx = PortraitLayout.CanvasWidth / 2f;
+                    float cy = PortraitLayout.CanvasHeight / 2f;
+                    Matrix popped = Matrix.CreateTranslation(-cx, -cy, 0f) * Matrix.CreateScale(scale) * Matrix.CreateTranslation(cx, cy, 0f) * canvas;
+                    _painter.Begin(fit, popped);
+                }
+
                 (modal as GameModal)?.Draw();
             }
 
             _painter.Begin(fit, canvas);
             DrawToast();
-            if (_stack.Transition != TransitionKind.None)
+            if (_stack.Transition == TransitionKind.Fade)
             {
                 float veil = 1f - _stack.TransitionProgress;
                 _painter.Fill(new Rect(0, 0, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight), _painter.C("cream", veil * 0.85f));
@@ -528,6 +585,43 @@ namespace BeastCraft.Game
             _perf?.Draw(_draw, _text, _pixel);
 #endif
             _draw.Flush();
+        }
+
+        /// <summary>
+        /// Draws <paramref name="screen"/> shifted <paramref name="canvasOffsetX"/> canvas pixels off
+        /// its resting place (a push/pop slide's outgoing or incoming frame): a fresh <see cref="CanvasFit"/>
+        /// with its own <c>OffsetX</c> bumped by the shift (scaled to screen pixels), so the shift
+        /// reaches everywhere the fit does -- the sprite transform and a <c>ScrollView</c>'s own clip
+        /// rects (<c>CanvasFit.ToScreen</c>) alike -- not just <see cref="Matrix.CreateTranslation(float, float, float)"/>
+        /// on the sprite transform alone, which clip rects do not go through.
+        /// </summary>
+        private void DrawScreenShifted(GameScreen screen, CanvasFit fit, float canvasOffsetX)
+        {
+            if (screen == null)
+            {
+                return;
+            }
+
+            CanvasFit shifted = canvasOffsetX == 0f ? fit : new CanvasFit(fit.Scale, fit.OffsetX + canvasOffsetX * fit.Scale, fit.OffsetY);
+            Matrix shiftedCanvas = Matrix.CreateScale(shifted.Scale) * Matrix.CreateTranslation(shifted.OffsetX, shifted.OffsetY, 0f);
+            _painter.Begin(shifted, shiftedCanvas);
+            screen.Draw();
+        }
+
+        /// <summary>An ease-out cubic (fast start, gentle settle): every push/pop slide in this file eases with it.</summary>
+        private static float EaseOutCubic(float t)
+        {
+            float f = 1f - Math.Clamp(t, 0f, 1f);
+            return 1f - f * f * f;
+        }
+
+        /// <summary>An ease-out back (a small overshoot past 1 before settling): a modal's spring pop eases with it.</summary>
+        private static float EaseOutBack(float t)
+        {
+            const float c1 = 1.70158f;
+            const float c3 = c1 + 1f;
+            float f = Math.Clamp(t, 0f, 1f) - 1f;
+            return 1f + c3 * f * f * f + c1 * f * f;
         }
 
         private void DrawToast()
@@ -590,11 +684,16 @@ namespace BeastCraft.Game
         /// </summary>
         private void LoadFont()
         {
-            TtfText font = TtfText.TryLoad(_content.Source, GameContent.UiFontPath, out string error);
+            TtfText font = TtfText.TryLoad(_content.Source, GameContent.UiFontPath, GameContent.UiBodyFontPath, out string error);
             if (font == null)
             {
                 Console.WriteLine("UI font not loaded (" + error + "); using the pixel font.");
                 return;
+            }
+
+            if (font.BodyError != null)
+            {
+                Console.WriteLine("UI body font not loaded (" + font.BodyError + "); using the heading font for body text too.");
             }
 
             _text.Dispose();
@@ -1106,10 +1205,27 @@ namespace BeastCraft.Game
                 case "settings-visuals":
                 case "settings-audio":
                 case "settings-privacy":
-                    steps.Add(() => Title().OpenSettings());
+                    // --backdrop needs a save to mark a region reached on (Settings is otherwise reachable
+                    // straight from the title, with none): start one first, same as every other screen
+                    // does. Opening Settings itself is deferred below, after the save exists and
+                    // --backdrop's own mark-and-select step has run — SettingsScreen's backdrop picker
+                    // reads CampaignProgress once, in its constructor, so it must not be built before
+                    // that mark-and-select step has run (and StartScriptedGame leaves Title, so
+                    // Title().OpenSettings() — which expects the title on top — no longer applies).
+                    if (!string.IsNullOrEmpty(_options.Backdrop))
+                    {
+                        steps.Add(StartScriptedGame);
+                    }
+
                     break;
                 case "credits":
-                    steps.Add(() => _stack.Push(new CreditsScreen(_ctx)));
+                    // CreditsScreen pushes onto whatever is on top; with --backdrop that needs to be Home,
+                    // not Title (see the "settings" case above) — deferred below for the same reason.
+                    if (!string.IsNullOrEmpty(_options.Backdrop))
+                    {
+                        steps.Add(StartScriptedGame);
+                    }
+
                     break;
                 case "starter-pick":
                     steps.Add(() => Title().StartNewGame());
@@ -1159,6 +1275,33 @@ namespace BeastCraft.Game
                         }
                     });
                     break;
+            }
+
+            if (!string.IsNullOrEmpty(_options.Backdrop))
+            {
+                string backdropId = _options.Backdrop;
+                steps.Add(() =>
+                {
+                    PlayerSave save = _ctx.Session?.Save;
+                    if (save != null)
+                    {
+                        save.Campaign.MarkBackdropReached(backdropId);
+                        save.Campaign.SelectBackdrop(backdropId);
+                    }
+                });
+            }
+
+            // Settings and Credits open here, not in the switch above, when --backdrop started a game for
+            // them: the mark-and-select step just above must run first, since SettingsScreen's backdrop
+            // picker reads CampaignProgress once, in its own constructor.
+            bool backdropGame = !string.IsNullOrEmpty(_options.Backdrop);
+            if (screen == "settings" || screen == "settings-gameplay" || screen == "settings-visuals" || screen == "settings-audio" || screen == "settings-privacy")
+            {
+                steps.Add(backdropGame ? () => Home().OpenSettings() : () => Title().OpenSettings());
+            }
+            else if (screen == "credits")
+            {
+                steps.Add(() => _stack.Push(new CreditsScreen(_ctx)));
             }
 
             if (screen == "roster" || screen == "grove" || screen == "avatar" || screen == "inventory")

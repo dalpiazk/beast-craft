@@ -27,6 +27,7 @@ namespace BeastCraft.Game.Screens
         private readonly Tabs _tabs;
         private readonly CardList _stock;
         private readonly CardList _sell;
+        private readonly TabFade _tabFade = new TabFade();
 
         public ShopScreen(ScreenContext ctx, int nodeId, bool isCamp = false) : base(ctx)
         {
@@ -56,6 +57,13 @@ namespace BeastCraft.Game.Screens
         {
             _model.Select(tab);
             ShowTab();
+            _tabFade.Reset();
+        }
+
+        public override void Update(float elapsedMs, FrameInput input)
+        {
+            base.Update(elapsedMs, input);
+            _tabFade.Update(elapsedMs);
         }
 
         private void ShowTab()
@@ -225,9 +233,14 @@ namespace BeastCraft.Game.Screens
 
         public override void Draw()
         {
-            Gradient("cream", "creamDeep", new Rect(0, 0, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight));
+            PageBackground("cream", "creamDeep");
             base.Draw();
             _header.Paint(Ctx, Ui, Loc("ui.shop.title"), Loc("ui.encounter.reward_gold", _model.Gold));
+            float fade = _tabFade.Alpha(AnimationsEnabled);
+            if (fade > 0f)
+            {
+                Painter.Fill(new Rect(0, ContentTop, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight - ContentTop), Painter.C("cream", fade));
+            }
         }
 
         protected override void DrawCustom(Widget widget)

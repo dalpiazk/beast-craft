@@ -1,9 +1,15 @@
 {
-  "_readme": "PRESENTATION ONLY: the UI toolkit's house style (src/BeastCraft.Presentation/Ui/UiStyle.cs, validated by UiStyleValidator on content load). Rounded, friendly shapes: warm plum outlines on cream panels. Colors: named #RRGGBB or #RRGGBBAA; Panels and Buttons name a colour key (or give #hex). Radius and OutlineWidth are canvas pixels on the 1080x1920 portrait canvas; TextSizes are cap heights in canvas pixels. Placeholder values until the UI art lands (docs/design/screens.md).",
+  "_readme": "PRESENTATION ONLY: the UI toolkit's house style (src/BeastCraft.Presentation/Ui/UiStyle.cs, validated by UiStyleValidator on content load). Rounded, friendly shapes: warm plum outlines on cream panels. Colors: named #RRGGBB or #RRGGBBAA; Panels and Buttons name a colour key (or give #hex) and, for the journal UI kit (issue #52 direction D, UiKit.Enabled), a nine-sliced Texture art key drawn instead of the flat shape -- the original plum/cream/gold colours stay the vector look's own, so clearing UiKit.Enabled compares the two without touching this file. Radius and OutlineWidth are canvas pixels on the 1080x1920 portrait canvas; TextSizes are cap heights in canvas pixels. The six keys below suffixed by nothing extra (inkPlum2 ... coolShadow) are the kit's own v2 palette (docs art direction, issue #49): the colours the kit's PNGs (content/art/ui/kit/, Tooling/UiKit/build_kit.py) are painted in, named here only for the vector accents drawn on top of them (ink lines, rules) -- not a re-skin of the classic look's own plum/cream, which stay as they were.",
   "SchemaVersion": 1,
   "Colors": [
     { "Key": "plum", "Hex": "#5B3A5E" },
     { "Key": "plumDeep", "Hex": "#3F2842" },
+    { "Key": "inkPlum2", "Hex": "#2E2A45" },
+    { "Key": "paper2", "Hex": "#F6EEDC" },
+    { "Key": "sage2", "Hex": "#8FAE8B" },
+    { "Key": "skyTeal2", "Hex": "#6FB3B8" },
+    { "Key": "apricot2", "Hex": "#F2A968" },
+    { "Key": "coolShadow", "Hex": "#7C7AAE" },
     { "Key": "plumSoft", "Hex": "#8A6A8C" },
     { "Key": "cream", "Hex": "#FFF4DF" },
     { "Key": "creamDeep", "Hex": "#F3E2C3" },
@@ -60,9 +66,9 @@
     { "Key": "poi_kinship", "Hex": "#D9668E" }
   ],
   "Panels": [
-    { "Key": "panel", "Fill": "cream", "Outline": "plum", "OutlineWidth": 5, "Radius": 28, "Shadow": "shadow" },
-    { "Key": "card", "Fill": "creamDeep", "Outline": "plumSoft", "OutlineWidth": 4, "Radius": 22, "Shadow": "" },
-    { "Key": "modal", "Fill": "cream", "Outline": "plum", "OutlineWidth": 6, "Radius": 36, "Shadow": "shadow" },
+    { "Key": "panel", "Fill": "cream", "Outline": "plum", "OutlineWidth": 5, "Radius": 28, "Shadow": "shadow", "Texture": "ui/kit/panel" },
+    { "Key": "card", "Fill": "creamDeep", "Outline": "plumSoft", "OutlineWidth": 4, "Radius": 22, "Shadow": "", "Texture": "ui/kit/card" },
+    { "Key": "modal", "Fill": "cream", "Outline": "plum", "OutlineWidth": 6, "Radius": 36, "Shadow": "shadow", "Texture": "ui/kit/panel" },
     { "Key": "toast", "Fill": "plum", "Outline": "gold", "OutlineWidth": 4, "Radius": 30, "Shadow": "shadow" },
     { "Key": "header", "Fill": "cream", "Outline": "plum", "OutlineWidth": 5, "Radius": 30, "Shadow": "shadow" },
     { "Key": "nav", "Fill": "plum", "Outline": "plumDeep", "OutlineWidth": 5, "Radius": 36, "Shadow": "shadow" },
@@ -70,12 +76,12 @@
     { "Key": "slot", "Fill": "parchment", "Outline": "plumSoft", "OutlineWidth": 4, "Radius": 20, "Shadow": "" }
   ],
   "Buttons": [
-    { "Key": "primary", "Fill": "leaf", "PressedFill": "leafDeep", "DisabledFill": "stone", "SelectedFill": "leafDeep", "Outline": "plum", "Text": "white", "DisabledText": "cream", "OutlineWidth": 5, "Radius": 34, "TextSize": 30 },
-    { "Key": "secondary", "Fill": "cream", "PressedFill": "creamDeep", "DisabledFill": "stone", "SelectedFill": "gold", "Outline": "plum", "Text": "ink", "DisabledText": "inkSoft", "OutlineWidth": 5, "Radius": 34, "TextSize": 28 },
+    { "Key": "primary", "Fill": "leaf", "PressedFill": "leafDeep", "DisabledFill": "stone", "SelectedFill": "leafDeep", "Outline": "plum", "Text": "white", "DisabledText": "cream", "OutlineWidth": 5, "Radius": 34, "TextSize": 30, "Texture": "ui/kit/button_primary", "TextureText": "inkPlum2", "TextureDisabledText": "inkPlum2" },
+    { "Key": "secondary", "Fill": "cream", "PressedFill": "creamDeep", "DisabledFill": "stone", "SelectedFill": "gold", "Outline": "plum", "Text": "ink", "DisabledText": "inkSoft", "OutlineWidth": 5, "Radius": 34, "TextSize": 28, "Texture": "ui/kit/button_secondary", "TextureText": "inkPlum2", "TextureDisabledText": "inkPlum2" },
     { "Key": "ghost", "Fill": "#FFF4DF00", "PressedFill": "#5B3A5E26", "DisabledFill": "#FFF4DF00", "SelectedFill": "#5B3A5E26", "Outline": "plumSoft", "Text": "ink", "DisabledText": "inkSoft", "OutlineWidth": 3, "Radius": 26, "TextSize": 22 },
-    { "Key": "nav", "Fill": "#5B3A5E00", "PressedFill": "plumDeep", "DisabledFill": "#5B3A5E00", "SelectedFill": "gold", "Outline": "#5B3A5E00", "Text": "cream", "DisabledText": "plumSoft", "OutlineWidth": 0, "Radius": 26, "TextSize": 17 },
-    { "Key": "chip", "Fill": "cream", "PressedFill": "creamDeep", "DisabledFill": "stone", "SelectedFill": "gold", "Outline": "plumSoft", "Text": "ink", "DisabledText": "inkSoft", "OutlineWidth": 4, "Radius": 22, "TextSize": 20 },
-    { "Key": "danger", "Fill": "berry", "PressedFill": "plum", "DisabledFill": "stone", "SelectedFill": "plum", "Outline": "plum", "Text": "white", "DisabledText": "cream", "OutlineWidth": 5, "Radius": 34, "TextSize": 28 }
+    { "Key": "nav", "Fill": "#5B3A5E00", "PressedFill": "plumDeep", "DisabledFill": "#5B3A5E00", "SelectedFill": "gold", "Outline": "#5B3A5E00", "Text": "cream", "DisabledText": "plumSoft", "OutlineWidth": 0, "Radius": 26, "TextSize": 17, "Texture": "ui/kit/tab_selected", "UnselectedTexture": "ui/kit/tab_unselected" },
+    { "Key": "chip", "Fill": "cream", "PressedFill": "creamDeep", "DisabledFill": "stone", "SelectedFill": "gold", "Outline": "plumSoft", "Text": "ink", "DisabledText": "inkSoft", "OutlineWidth": 4, "Radius": 22, "TextSize": 20, "Texture": "ui/kit/chip", "TextureText": "inkPlum2", "TextureDisabledText": "inkPlum2" },
+    { "Key": "danger", "Fill": "berry", "PressedFill": "plum", "DisabledFill": "stone", "SelectedFill": "plum", "Outline": "plum", "Text": "white", "DisabledText": "cream", "OutlineWidth": 5, "Radius": 34, "TextSize": 28, "Texture": "ui/kit/button_danger", "TextureText": "inkPlum2", "TextureDisabledText": "inkPlum2" }
   ],
   "TextSizes": { "Small": 17, "Body": 22, "Heading": 32, "Title": 64 }
 }

@@ -555,7 +555,39 @@ namespace BeastCraft.Save
             }
 
             CheckRange(issues, "Campaign.LocationsSoothed", campaign.LocationsSoothed, 0, int.MaxValue);
+            ValidateBackdrops(campaign, catalog, issues);
             ValidateRun(campaign, catalog, issues);
+        }
+
+        /// <summary>
+        /// The backdrop picker (schema 14): every reached id is a known region, not empty and listed
+        /// once, and the selected one is among the reached ids.
+        /// </summary>
+        private static void ValidateBackdrops(CampaignProgress campaign, ISaveContentCatalog catalog, List<SaveIssue> issues)
+        {
+            HashSet<string> reached = new HashSet<string>(StringComparer.Ordinal);
+            if (campaign.ReachedBackdropIds != null)
+            {
+                for (int i = 0; i < campaign.ReachedBackdropIds.Count; i++)
+                {
+                    string id = campaign.ReachedBackdropIds[i];
+                    string path = "Campaign.ReachedBackdropIds[" + i + "]";
+                    if (string.IsNullOrEmpty(id) || (catalog != null && !catalog.IsKnownRegion(id)))
+                    {
+                        issues.Add(new SaveIssue(SaveIssueKind.InvalidBackdrop, path, id, "unknown backdrop region '" + id + "'"));
+                    }
+                    else if (!reached.Add(id))
+                    {
+                        issues.Add(new SaveIssue(SaveIssueKind.InvalidBackdrop, path, id, "backdrop '" + id + "' is listed more than once"));
+                    }
+                }
+            }
+
+            if (string.IsNullOrEmpty(campaign.SelectedBackdropId) || !campaign.HasReachedBackdrop(campaign.SelectedBackdropId))
+            {
+                issues.Add(new SaveIssue(SaveIssueKind.InvalidBackdrop, "Campaign.SelectedBackdropId", campaign.SelectedBackdropId,
+                                         "the selected backdrop '" + campaign.SelectedBackdropId + "' has not been reached"));
+            }
         }
 
         /// <summary>Reports an empty or (with a catalog) unknown region id. True when the id is fine.</summary>

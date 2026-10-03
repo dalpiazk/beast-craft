@@ -51,7 +51,7 @@ namespace BeastCraft.Tests.EditMode
 
             Assert.IsTrue(loaded.Success, loaded.Error);
             Assert.IsTrue(loaded.Migrated);
-            Assert.AreEqual(13, loaded.Save.SchemaVersion);
+            Assert.AreEqual(14, loaded.Save.SchemaVersion);
             Assert.IsFalse(SeenRules.IsNewGear(loaded.Save, gear));
             Assert.IsFalse(SeenRules.IsNewGear(loaded.Save, avatarGear));
             Assert.IsFalse(SeenRules.IsNewLook(loaded.Save, CosmeticCollection.Key("hat", "crown")), "an updated save shows nothing as new");

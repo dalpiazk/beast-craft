@@ -40,6 +40,7 @@ namespace BeastCraft.Game.Screens
         private readonly CardList _garden;
         private readonly CardList _board;
         private readonly CardList _npc;
+        private readonly TabFade _tabFade = new TabFade();
 
         public GroveScreen(ScreenContext ctx) : base(ctx)
         {
@@ -77,6 +78,13 @@ namespace BeastCraft.Game.Screens
         {
             _hub.Select(tab);
             ShowTab();
+            _tabFade.Reset();
+        }
+
+        public override void Update(float elapsedMs, FrameInput input)
+        {
+            base.Update(elapsedMs, input);
+            _tabFade.Update(elapsedMs);
         }
 
         private void ShowTab()
@@ -141,7 +149,7 @@ namespace BeastCraft.Game.Screens
             _glade.Begin();
             float width = Width;
             float y = 10f;
-            AddLabel(_glade.Scroll, new Rect(Pad, y, width, Heading), Loc("ui.grove.habitats"), Heading, "plum");
+            AddLabel(_glade.Scroll, new Rect(Pad, y, width, Heading), Loc("ui.grove.habitats"), Heading, "plum", TextAlign.Left, false, true);
             y += LineH(Heading) + 16f;
 
             float x = Pad;
@@ -193,7 +201,7 @@ namespace BeastCraft.Game.Screens
                 y = BuildHabitatCanvas(y, width);
             }
 
-            AddLabel(_glade.Scroll, new Rect(Pad, y, width, Heading), Loc("ui.grove.beasts"), Heading, "plum");
+            AddLabel(_glade.Scroll, new Rect(Pad, y, width, Heading), Loc("ui.grove.beasts"), Heading, "plum", TextAlign.Left, false, true);
             y += LineH(Heading) + 16f;
             if (_hub.Glade.Beasts.Count == 0)
             {
@@ -722,9 +730,14 @@ namespace BeastCraft.Game.Screens
 
         public override void Draw()
         {
-            Gradient("cream", "creamDeep", new Rect(0, 0, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight));
+            PageBackground("cream", "creamDeep");
             base.Draw();
             _header.Paint(Ctx, Ui, Loc("ui.grove.title"));
+            float fade = _tabFade.Alpha(AnimationsEnabled);
+            if (fade > 0f)
+            {
+                Painter.Fill(new Rect(0, ContentTop, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight - ContentTop), Painter.C("cream", fade));
+            }
         }
 
         protected override void DrawCustom(Widget widget)

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using BeastCraft.Campaign;
 using BeastCraft.Localization;
 using BeastCraft.Presentation.Audio;
 using BeastCraft.Save;
@@ -512,6 +513,89 @@ namespace BeastCraft.Presentation.Screens
             settings.ConsentAsked = true;
             _session.SaveSettings();
             _session.Telemetry.Apply();
+        }
+    }
+
+    /// <summary>One row of the backdrop picker: a region's menu backdrop, reached (selectable) or still locked.</summary>
+    public sealed class BackdropRow
+    {
+        public string RegionId;
+        public string DisplayName;
+        public bool Reached;
+        public bool Selected;
+    }
+
+    /// <summary>
+    /// Settings &gt; Visuals' backdrop picker (#52 step 3, UI kit): the menu backdrop drawn behind every
+    /// out-of-combat screen (<c>Game.Screens.GameScreen.PageBackground</c>), one per region —
+    /// Hearthglen (<see cref="CampaignProgress.TutorialRegionId"/>) first, then every
+    /// <c>regions.json</c> region in campaign order — reached or still locked
+    /// (<see cref="CampaignProgress.ReachedBackdropIds"/>, unlocked the first time the player enters
+    /// that region, <c>CampaignRules.StartRun</c>) and which one is currently selected
+    /// (<see cref="CampaignProgress.SelectedBackdropId"/>). Selecting persists through the normal save
+    /// flow (<see cref="GameSession.Autosave"/>).
+    /// </summary>
+    public sealed class BackdropPickerViewModel
+    {
+        private readonly GameSession _session;
+
+        public BackdropPickerViewModel(GameSession session)
+        {
+            _session = session ?? throw new ArgumentNullException(nameof(session));
+            Refresh();
+        }
+
+        public List<BackdropRow> Rows { get; } = new List<BackdropRow>();
+
+        /// <summary>Re-reads the save and the region library (a new region was just reached, or a pick was made elsewhere).</summary>
+        public void Refresh()
+        {
+            Rows.Clear();
+            PlayerSave save = _session.Save;
+            save?.EnsureInitialized();
+            RegionLibrary library = _session.Content.Campaign;
+            CampaignProgress campaign = save?.Campaign;
+            List<RegionData> regions = new List<RegionData>();
+            if (library?.Tutorial != null)
+            {
+                regions.Add(library.Tutorial);
+            }
+
+            if (library != null)
+            {
+                regions.AddRange(library.Regions);
+            }
+
+            foreach (RegionData region in regions)
+            {
+                if (region == null || string.IsNullOrEmpty(region.RegionId))
+                {
+                    continue;
+                }
+
+                bool reached = campaign != null && campaign.HasReachedBackdrop(region.RegionId);
+                Rows.Add(new BackdropRow
+                {
+                    RegionId = region.RegionId,
+                    DisplayName = region.DisplayName,
+                    Reached = reached,
+                    Selected = reached && campaign.SelectedBackdropId == region.RegionId
+                });
+            }
+        }
+
+        /// <summary>Selects <paramref name="regionId"/>'s backdrop. False (nothing changes) when it has not been reached. Autosaves and refreshes on success.</summary>
+        public bool Select(string regionId)
+        {
+            PlayerSave save = _session.Save;
+            if (save == null || !save.Campaign.SelectBackdrop(regionId))
+            {
+                return false;
+            }
+
+            _session.Autosave(AutosaveReason.PlayerEdit);
+            Refresh();
+            return true;
         }
     }
 }

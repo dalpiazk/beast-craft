@@ -123,6 +123,20 @@ namespace BeastCraft.Vfx
                 {
                     errors.Add(at + ": Tint '" + sprite.Tint + "' is not #rrggbb.");
                 }
+
+                if (sprite.NineSlice != null)
+                {
+                    ArtNineSliceData slice = sprite.NineSlice;
+                    if (slice.Left < 0f || slice.Top < 0f || slice.Right < 0f || slice.Bottom < 0f)
+                    {
+                        errors.Add(at + ": NineSlice insets must not be negative.");
+                    }
+                    else if (slice.Left + slice.Right > sprite.FrameWidth || slice.Top + slice.Bottom > sprite.FrameHeight)
+                    {
+                        errors.Add(at + ": NineSlice insets (" + slice.Left + "," + slice.Top + "," + slice.Right + "," + slice.Bottom +
+                                   ") exceed its " + sprite.FrameWidth + "x" + sprite.FrameHeight + " frame.");
+                    }
+                }
             }
 
             foreach (ArtSpriteData sprite in sprites)

@@ -57,6 +57,19 @@ namespace BeastCraft.Presentation.Content
         /// <summary>The UI font's licence (the OFL requires it to travel with the font).</summary>
         public const string UiFontLicensePath = "fonts/OFL.txt";
 
+        /// <summary>
+        /// The UI's body typeface, content-root relative: Atkinson Hyperlegible Regular (SIL Open
+        /// Font License 1.1, Braille Institute of America, <see cref="UiBodyFontLicensePath"/>),
+        /// designed for legibility at small sizes. Long-form reading text (a paragraph, a
+        /// description, the credits) draws in it; Fredoka (<see cref="UiFontPath"/>) stays the face
+        /// for headings, buttons, tabs and chips. The viewer falls back to the heading face when it
+        /// cannot load this one (not fatal, unlike <see cref="UiFontPath"/> itself).
+        /// </summary>
+        public const string UiBodyFontPath = "fonts/AtkinsonHyperlegible-Regular.ttf";
+
+        /// <summary>The body font's licence.</summary>
+        public const string UiBodyFontLicensePath = "fonts/AtkinsonHyperlegible-OFL.txt";
+
         private GameContent()
         {
         }

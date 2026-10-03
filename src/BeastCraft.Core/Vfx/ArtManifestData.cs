@@ -282,6 +282,16 @@ namespace BeastCraft.Vfx
         /// <summary>Named clips (idle, attack, hit, ...). Optional: without one the sprite is frame 0.</summary>
         public ArtAnimationData[] Animations = new ArtAnimationData[0];
 
+        /// <summary>
+        /// Nine-slice insets (source pixels, which this painted UI art authors 1:1 with canvas
+        /// pixels): the corner size on each side that never stretches, only ever drawn or cropped at
+        /// its own native size; the edges between stretch along one axis and the centre both. Null
+        /// (the default; every non-UI sprite) draws frame 0 as a single stretched quad instead — see
+        /// <see cref="ArtSpriteKind.Sprite"/>'s callers. A UI kit piece (<c>content/art/ui/kit/</c>,
+        /// Category <c>ui_kit</c>) is the only art that sets this.
+        /// </summary>
+        public ArtNineSliceData NineSlice;
+
         /// <summary>The clip named <paramref name="name"/>, or null.</summary>
         public ArtAnimationData Animation(string name)
         {
@@ -300,6 +310,21 @@ namespace BeastCraft.Vfx
 
             return null;
         }
+    }
+
+    /// <summary>
+    /// A sprite's nine-slice insets, source pixels from each side of its frame. Each must be at most
+    /// half the frame's width (Left+Right) or height (Top+Bottom); zero on an axis (both Top and
+    /// Bottom, or both Left and Right) means that axis is never split — a 3-slice pill (a slider
+    /// rail, a toggle track) stretches only along its length, keeping its full height's rounded ends.
+    /// </summary>
+    [Serializable]
+    public class ArtNineSliceData
+    {
+        public float Left;
+        public float Top;
+        public float Right;
+        public float Bottom;
     }
 
     /// <summary>A named clip: frames of a sheet (this sprite, or another sprite's strip) played at a rate.</summary>

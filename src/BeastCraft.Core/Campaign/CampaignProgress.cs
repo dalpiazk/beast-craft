@@ -62,6 +62,61 @@ namespace BeastCraft.Campaign
         /// </summary>
         public RunDifficulty PreferredDifficulty = RunDifficulty.Normal;
 
+        /// <summary>
+        /// Region ids whose backdrop art (<c>ui/backdrop/&lt;id&gt;</c>) has been reached and is therefore
+        /// selectable in Settings &gt; Visuals (producer rule, 2026-10-01: a region's backdrop unlocks on
+        /// first entry — <see cref="CampaignRules.StartRun(BeastCraft.Save.PlayerSave, RegionLibrary, string, int, int, RunDifficulty)"/>
+        /// marks it). <see cref="TutorialRegionId"/> (Hearthglen) starts reached. Unlike region
+        /// unlocking (<see cref="Regions"/>, <see cref="Lock"/>), this is monotonic: once reached, a
+        /// backdrop stays choosable even if the region itself is later locked again (Hearthglen, once
+        /// the tutorial is cleared) — a backdrop earlier player data can't tell apart from "never
+        /// played" would otherwise need deriving from <see cref="Regions"/>, which <see cref="Lock"/>
+        /// makes unreliable for that. Added in schema 14.
+        /// </summary>
+        public List<string> ReachedBackdropIds = new List<string> { TutorialRegionId };
+
+        /// <summary>
+        /// The backdrop drawn behind out-of-combat menu screens, chosen in Settings &gt; Visuals from
+        /// <see cref="ReachedBackdropIds"/>. Hearthglen (<see cref="TutorialRegionId"/>) by default.
+        /// Added in schema 14.
+        /// </summary>
+        public string SelectedBackdropId = TutorialRegionId;
+
+        /// <summary>Whether <paramref name="regionId"/>'s backdrop has been reached (selectable in Settings &gt; Visuals).</summary>
+        public bool HasReachedBackdrop(string regionId)
+        {
+            return !string.IsNullOrEmpty(regionId) && ReachedBackdropIds != null && ReachedBackdropIds.Contains(regionId);
+        }
+
+        /// <summary>Records <paramref name="regionId"/>'s backdrop as reached. False when it already was, or the id is empty.</summary>
+        public bool MarkBackdropReached(string regionId)
+        {
+            if (string.IsNullOrEmpty(regionId) || HasReachedBackdrop(regionId))
+            {
+                return false;
+            }
+
+            if (ReachedBackdropIds == null)
+            {
+                ReachedBackdropIds = new List<string>();
+            }
+
+            ReachedBackdropIds.Add(regionId);
+            return true;
+        }
+
+        /// <summary>Selects <paramref name="regionId"/>'s backdrop. False (no change) when it has not been reached.</summary>
+        public bool SelectBackdrop(string regionId)
+        {
+            if (!HasReachedBackdrop(regionId))
+            {
+                return false;
+            }
+
+            SelectedBackdropId = regionId;
+            return true;
+        }
+
         /// <summary>Whether an expedition is in progress.</summary>
         public bool HasActiveRun
         {
@@ -185,6 +240,21 @@ namespace BeastCraft.Campaign
             if (!Enum.IsDefined(typeof(RunDifficulty), PreferredDifficulty))
             {
                 PreferredDifficulty = RunDifficulty.Normal;
+                repaired++;
+            }
+
+            if (ReachedBackdropIds == null)
+            {
+                ReachedBackdropIds = new List<string> { TutorialRegionId };
+                repaired++;
+            }
+
+            HashSet<string> seenBackdrops = new HashSet<string>(StringComparer.Ordinal);
+            repaired += ReachedBackdropIds.RemoveAll(id => string.IsNullOrEmpty(id) || !seenBackdrops.Add(id));
+
+            if (string.IsNullOrEmpty(SelectedBackdropId))
+            {
+                SelectedBackdropId = TutorialRegionId;
                 repaired++;
             }
 

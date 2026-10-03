@@ -58,7 +58,7 @@ namespace BeastCraft.Game.Screens
             float width = _cards.Width;
             float cardWidth = (width - 2f * 20f) / 3f;
             float y = 10f;
-            AddLabel(_cards.Scroll, new Rect(Pad, y, 400f, style.TextSizes.Heading - 4f), Loc("ui.compendium.beasts"), style.TextSizes.Heading - 4f, "plum");
+            AddLabel(_cards.Scroll, new Rect(Pad, y, 400f, style.TextSizes.Heading - 4f), Loc("ui.compendium.beasts"), style.TextSizes.Heading - 4f, "plum", TextAlign.Left, false, true);
             y += Ctx.Text.LineHeight(style.TextSizes.Heading - 4f) + 20f;
             for (int i = 0; i < _model.Beasts.Count; i++)
             {
@@ -70,7 +70,7 @@ namespace BeastCraft.Game.Screens
             }
 
             y += ((_model.Beasts.Count + 2) / 3) * (CardHeight + 20f) + 30f;
-            AddLabel(_cards.Scroll, new Rect(Pad, y, 400f, style.TextSizes.Heading - 4f), Loc("ui.compendium.lore"), style.TextSizes.Heading - 4f, "plum");
+            AddLabel(_cards.Scroll, new Rect(Pad, y, 400f, style.TextSizes.Heading - 4f), Loc("ui.compendium.lore"), style.TextSizes.Heading - 4f, "plum", TextAlign.Left, false, true);
             y += Ctx.Text.LineHeight(style.TextSizes.Heading - 4f) + 20f;
             foreach (CompendiumLoreRow lore in _model.Lore)
             {
@@ -84,7 +84,7 @@ namespace BeastCraft.Game.Screens
 
         public override void Draw()
         {
-            Gradient("cream", "parchment", new Rect(0, 0, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight));
+            PageBackground("cream", "parchment");
             base.Draw();
             _header.Paint(Ctx, Ui, Loc("ui.compendium.title"));
             CompendiumCompletion completion = _model.Completion;
@@ -98,7 +98,7 @@ namespace BeastCraft.Game.Screens
             string sub = Loc("ui.compendium.counts", completion.BeastsOwned, completion.BeastsTotal, completion.LoreFound, completion.LoreTotal, completion.KinshipClaimed, completion.KinshipTotal);
             // A gap of clear air above the header divider (TopBar - 5): the line used to sit right
             // against it.
-            Painter.TextIn(sub, new Rect(180f, 166f, PortraitLayout.CanvasWidth - 260f, 28f), style.TextSizes.Small + 2f, Painter.C("inkSoft"), TextAlign.Left);
+            HeaderText(sub, new Rect(180f, 166f, PortraitLayout.CanvasWidth - 260f, 28f), style.TextSizes.Small + 2f, "inkSoft");
         }
 
         private void DrawBeastCard(Rect card, CompendiumBeastRow beast)
@@ -213,7 +213,7 @@ namespace BeastCraft.Game.Screens
             UiStyle style = Ctx.Style;
             float width = _cards.Width;
             float y = 10f;
-            AddLabel(_cards.Scroll, new Rect(Pad, y, 400f, style.TextSizes.Heading - 4f), Loc("ui.achievements.titles"), style.TextSizes.Heading - 4f, "plum");
+            AddLabel(_cards.Scroll, new Rect(Pad, y, 400f, style.TextSizes.Heading - 4f), Loc("ui.achievements.titles"), style.TextSizes.Heading - 4f, "plum", TextAlign.Left, false, true);
             y += Ctx.Text.LineHeight(style.TextSizes.Heading - 4f) + 16f;
             float x = Pad;
             float chipSize = Ctx.Style.Button("chip").TextSize;
@@ -233,7 +233,7 @@ namespace BeastCraft.Game.Screens
             }
 
             y += ChipHeight + 30f;
-            AddLabel(_cards.Scroll, new Rect(Pad, y, 500f, style.TextSizes.Heading - 4f), Loc("ui.achievements.title"), style.TextSizes.Heading - 4f, "plum");
+            AddLabel(_cards.Scroll, new Rect(Pad, y, 500f, style.TextSizes.Heading - 4f), Loc("ui.achievements.title"), style.TextSizes.Heading - 4f, "plum", TextAlign.Left, false, true);
             y += Ctx.Text.LineHeight(style.TextSizes.Heading - 4f) + 16f;
             foreach (AchievementRow row in _model.Achievements)
             {
@@ -247,14 +247,12 @@ namespace BeastCraft.Game.Screens
 
         public override void Draw()
         {
-            Gradient("cream", "parchment", new Rect(0, 0, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight));
+            PageBackground("cream", "parchment");
             base.Draw();
             _header.Paint(Ctx, Ui, Loc("ui.achievements.title"));
             UiStyle style = Ctx.Style;
-            Painter.TextIn(Loc("ui.achievements.avatar_level", _model.AvatarDisplayName, _model.AvatarLevel), new Rect(180f, 116f, PortraitLayout.CanvasWidth - 260f, 34f), style.TextSizes.Body + 2f,
-                           Painter.C("ink"), TextAlign.Left);
-            Painter.TextIn(Loc("ui.achievements.earned", _model.EarnedCount, _model.Achievements.Count), new Rect(180f, 160f, PortraitLayout.CanvasWidth - 260f, 28f), style.TextSizes.Small + 2f,
-                           Painter.C("inkSoft"), TextAlign.Left);
+            HeaderText(Loc("ui.achievements.avatar_level", _model.AvatarDisplayName, _model.AvatarLevel), new Rect(180f, 116f, PortraitLayout.CanvasWidth - 260f, 34f), style.TextSizes.Body + 2f, "ink");
+            HeaderText(Loc("ui.achievements.earned", _model.EarnedCount, _model.Achievements.Count), new Rect(180f, 160f, PortraitLayout.CanvasWidth - 260f, 28f), style.TextSizes.Small + 2f, "inkSoft");
         }
 
         private void DrawAchievement(Rect box, AchievementRow row)
@@ -366,7 +364,7 @@ namespace BeastCraft.Game.Screens
 
             if (_model.Looks.Count == 0)
             {
-                AddLabel(_cards.Scroll, new Rect(Pad, y, width, 40f), Loc("ui.look_tokens.none"), Ctx.Style.TextSizes.Body, "inkSoft");
+                AddLabel(_cards.Scroll, new Rect(Pad, y, width, 40f), Loc("ui.look_tokens.none"), Ctx.Style.TextSizes.Body, "inkSoft", TextAlign.Left, false, true);
                 y += 60f;
             }
 
@@ -375,14 +373,13 @@ namespace BeastCraft.Game.Screens
 
         public override void Draw()
         {
-            Gradient("cream", "parchment", new Rect(0, 0, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight));
+            PageBackground("cream", "parchment");
             base.Draw();
             _header.Paint(Ctx, Ui, Loc("ui.look_tokens.title"));
             UiStyle style = Ctx.Style;
             Rect coin = new Rect(180f, 118f, 48f, 48f);
             Painter.Glyph("coin", coin, Painter.C("goldDeep"));
-            Painter.TextIn(Loc("ui.avatar.token_price", _model.Balance), new Rect(coin.Right + 14f, coin.Y + 4f, PortraitLayout.CanvasWidth - 260f, 40f), style.TextSizes.Body + 2f, Painter.C("ink"),
-                           TextAlign.Left);
+            HeaderText(Loc("ui.avatar.token_price", _model.Balance), new Rect(coin.Right + 14f, coin.Y + 4f, PortraitLayout.CanvasWidth - 260f, 40f), style.TextSizes.Body + 2f, "ink");
         }
 
         private void DrawLook(Rect box, LookTokenRow row)

@@ -2851,6 +2851,7 @@
     "ui.settings.on": "On",
     "ui.settings.screen_shake": "Screen shake",
     "ui.settings.section_audio": "Audio",
+    "ui.settings.section_backdrop": "Backdrop",
     "ui.settings.section_gameplay": "Gameplay",
     "ui.settings.section_privacy": "Privacy",
     "ui.settings.section_visuals": "Visuals & accessibility",

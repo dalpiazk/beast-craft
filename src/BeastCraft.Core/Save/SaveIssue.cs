@@ -70,7 +70,10 @@ namespace BeastCraft.Save
         CosmeticNotUnlocked,
 
         /// <summary>A frozen Trader visit is inconsistent (no key, a key twice, an item id missing, counts or price out of range).</summary>
-        InvalidShopVisit
+        InvalidShopVisit,
+
+        /// <summary>A reached backdrop id is empty, unknown or listed twice, or the selected backdrop has not been reached.</summary>
+        InvalidBackdrop
     }
 
     /// <summary>

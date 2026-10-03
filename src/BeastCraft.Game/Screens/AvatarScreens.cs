@@ -30,6 +30,7 @@ namespace BeastCraft.Game.Screens
         private readonly CardList _skills;
         private readonly CardList _gear;
         private readonly CardList _wardrobe;
+        private readonly TabFade _tabFade = new TabFade();
 
         public AvatarScreen(ScreenContext ctx) : base(ctx)
         {
@@ -68,6 +69,13 @@ namespace BeastCraft.Game.Screens
             _hub.Wardrobe.SaveSeen();
             _hub.Select(tab);
             ShowTab();
+            _tabFade.Reset();
+        }
+
+        public override void Update(float elapsedMs, FrameInput input)
+        {
+            base.Update(elapsedMs, input);
+            _tabFade.Update(elapsedMs);
         }
 
         private void ShowTab()
@@ -512,7 +520,7 @@ namespace BeastCraft.Game.Screens
 
         public override void Draw()
         {
-            Gradient("cream", "creamDeep", new Rect(0, 0, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight));
+            PageBackground("cream", "creamDeep");
             base.Draw();
             AvatarOverviewViewModel overview = _hub.Overview;
             _header.Paint(Ctx, Ui, Loc("ui.avatar.title"), Loc("ui.tutorial.beast_level", overview.DisplayName, overview.Level));
@@ -520,6 +528,12 @@ namespace BeastCraft.Game.Screens
             {
                 Rect wardrobeTab = _tabs.ItemBounds((int)AvatarTab.Wardrobe);
                 Painter.NewDot(new Vec2(wardrobeTab.Right - 30f, wardrobeTab.Y + 26f));
+            }
+
+            float fade = _tabFade.Alpha(AnimationsEnabled);
+            if (fade > 0f)
+            {
+                Painter.Fill(new Rect(0, ContentTop, PortraitLayout.CanvasWidth, PortraitLayout.CanvasHeight - ContentTop), Painter.C("cream", fade));
             }
         }
 

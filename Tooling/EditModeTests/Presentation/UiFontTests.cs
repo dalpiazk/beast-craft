@@ -6,10 +6,10 @@ using NUnit.Framework;
 namespace BeastCraft.Tests.EditMode
 {
     /// <summary>
-    /// The UI typeface ships correctly: the TTF and its SIL OFL licence are in the content root,
-    /// both hosts package them (desktop output and Android APK assets), and the third-party notice
-    /// names them. (The font's bytes are checked only when Git LFS has pulled them; CI checks out
-    /// without LFS.)
+    /// The UI's two typefaces ship correctly: each TTF and its SIL OFL licence are in the content
+    /// root, both hosts package them (desktop output and Android APK assets), and the third-party
+    /// notice names them. (Each font's bytes are checked only when Git LFS has pulled them; CI
+    /// checks out without LFS.)
     /// </summary>
     public class UiFontTests
     {
@@ -23,16 +23,17 @@ namespace BeastCraft.Tests.EditMode
             get { return Path.GetDirectoryName(Root); }
         }
 
-        [Test]
-        public void TheFontAndItsLicence_AreInTheContentRoot()
+        [TestCase(GameContent.UiFontPath, GameContent.UiFontLicensePath, "Fredoka")]
+        [TestCase(GameContent.UiBodyFontPath, GameContent.UiBodyFontLicensePath, "Braille Institute")]
+        public void TheFontAndItsLicence_AreInTheContentRoot(string fontPath, string licensePath, string nameInLicence)
         {
-            string font = Path.Combine(Root, GameContent.UiFontPath.Replace('/', Path.DirectorySeparatorChar));
-            string licence = Path.Combine(Root, GameContent.UiFontLicensePath.Replace('/', Path.DirectorySeparatorChar));
+            string font = Path.Combine(Root, fontPath.Replace('/', Path.DirectorySeparatorChar));
+            string licence = Path.Combine(Root, licensePath.Replace('/', Path.DirectorySeparatorChar));
 
             Assert.IsTrue(File.Exists(font), font);
             Assert.IsTrue(File.Exists(licence), licence);
             StringAssert.Contains("SIL Open Font License, Version 1.1", File.ReadAllText(licence));
-            StringAssert.Contains("Fredoka", File.ReadAllText(licence));
+            StringAssert.Contains(nameInLicence, File.ReadAllText(licence));
 
             byte[] head = new byte[4];
             using (FileStream stream = File.OpenRead(font))
@@ -54,17 +55,21 @@ namespace BeastCraft.Tests.EditMode
         {
             string text = File.ReadAllText(Path.Combine(Repo, project.Replace('/', Path.DirectorySeparatorChar)));
 
+            // *.ttf is a glob: it packs both Fredoka and Atkinson Hyperlegible without naming either
+            // file; each licence is named explicitly (and OFL.txt is also Fredoka's exact filename).
             StringAssert.Contains("content\\fonts\\*.ttf", text);
             StringAssert.Contains("content\\fonts\\OFL.txt", text);
+            StringAssert.Contains("content\\fonts\\AtkinsonHyperlegible-OFL.txt", text);
             StringAssert.Contains(destination, text);
         }
 
         [Test]
-        public void TheThirdPartyNotice_NamesTheFontAndTheRasteriser()
+        public void TheThirdPartyNotice_NamesBothFontsAndTheRasteriser()
         {
             string notice = File.ReadAllText(Path.Combine(Repo, "THIRD-PARTY-NOTICES.md"));
 
             StringAssert.Contains("Fredoka", notice);
+            StringAssert.Contains("Atkinson Hyperlegible", notice);
             StringAssert.Contains("SIL Open Font License", notice);
             StringAssert.Contains("FontStashSharp", notice);
         }

@@ -135,6 +135,16 @@ namespace BeastCraft.Presentation.Ui
 
         /// <summary>A soft drop shadow under the panel (colour), or empty for none.</summary>
         public string Shadow = string.Empty;
+
+        /// <summary>
+        /// A nine-sliced art key (<c>content/art/pixel/pixel-art-manifest.json</c>) to draw the
+        /// panel's face with instead of the flat <see cref="Fill"/>/<see cref="Outline"/> shape, when
+        /// <see cref="UiKit.Enabled"/> (the painted journal UI kit, issue #52 direction D). Empty
+        /// (every look before the kit) always draws the vector shape; <see cref="Fill"/>/
+        /// <see cref="Outline"/>/<see cref="Radius"/> still apply when the kit is off, so clearing
+        /// <see cref="UiKit.Enabled"/> compares the two looks without touching content.
+        /// </summary>
+        public string Texture = string.Empty;
     }
 
     [Serializable]
@@ -156,11 +166,34 @@ namespace BeastCraft.Presentation.Ui
 
         public string DisabledText;
 
+        /// <summary>
+        /// <see cref="Text"/>, but for when this look draws its <see cref="Texture"/> (kit-textured
+        /// faces are light parchment regardless of the look's vector <see cref="Fill"/>, so the
+        /// classic look's own <see cref="Text"/> — white, for <c>primary</c>/<c>danger</c>, legible
+        /// on their vector fills' leaf-green/berry — reads at well under 4.5:1 on parchment; empty
+        /// falls back to <see cref="Text"/>). See <see cref="UiPanelStyleData.Texture"/>.
+        /// </summary>
+        public string TextureText = string.Empty;
+
+        /// <summary>See <see cref="TextureText"/>; the disabled-state equivalent of <see cref="DisabledText"/>.</summary>
+        public string TextureDisabledText = string.Empty;
+
         public float OutlineWidth;
 
         public float Radius;
 
         public float TextSize;
+
+        /// <summary>
+        /// A nine-sliced art key to draw the button's face with (the look's selected/pressed/enabled
+        /// face), when <see cref="UiKit.Enabled"/>; see <see cref="UiPanelStyleData.Texture"/>. A
+        /// <see cref="Tabs"/> look also uses <see cref="UnselectedTexture"/> for its unselected items
+        /// (every other button ignores it: it has only the one face).
+        /// </summary>
+        public string Texture = string.Empty;
+
+        /// <summary>An unselected <see cref="Tabs"/> item's face (see <see cref="Texture"/>); unused outside Tabs.</summary>
+        public string UnselectedTexture = string.Empty;
     }
 
     [Serializable]
@@ -183,6 +216,9 @@ namespace BeastCraft.Presentation.Ui
         public float OutlineWidth;
         public float Radius;
         public UiColor? Shadow;
+
+        /// <summary>See <see cref="UiPanelStyleData.Texture"/>; empty when this look has none.</summary>
+        public string Texture = string.Empty;
     }
 
     /// <summary>A button look, resolved.</summary>
@@ -195,9 +231,22 @@ namespace BeastCraft.Presentation.Ui
         public UiColor Outline;
         public UiColor Text;
         public UiColor DisabledText;
+
+        /// <summary>See <see cref="UiButtonStyleData.TextureText"/>; always resolved (falls back to <see cref="Text"/> when unset).</summary>
+        public UiColor TextureText;
+
+        /// <summary>See <see cref="UiButtonStyleData.TextureDisabledText"/>; always resolved (falls back to <see cref="DisabledText"/> when unset).</summary>
+        public UiColor TextureDisabledText;
+
         public float OutlineWidth;
         public float Radius;
         public float TextSize;
+
+        /// <summary>See <see cref="UiButtonStyleData.Texture"/>; empty when this look has none.</summary>
+        public string Texture = string.Empty;
+
+        /// <summary>See <see cref="UiButtonStyleData.UnselectedTexture"/>.</summary>
+        public string UnselectedTexture = string.Empty;
     }
 
     /// <summary>
@@ -251,7 +300,8 @@ namespace BeastCraft.Presentation.Ui
                     Outline = style.Color(panel.Outline),
                     OutlineWidth = panel.OutlineWidth,
                     Radius = panel.Radius,
-                    Shadow = string.IsNullOrEmpty(panel.Shadow) ? (UiColor?)null : style.Color(panel.Shadow)
+                    Shadow = string.IsNullOrEmpty(panel.Shadow) ? (UiColor?)null : style.Color(panel.Shadow),
+                    Texture = panel.Texture ?? string.Empty
                 };
                 style._panels[panel.Key] = resolved;
                 style._firstPanel ??= resolved;
@@ -273,9 +323,13 @@ namespace BeastCraft.Presentation.Ui
                     Outline = style.Color(button.Outline),
                     Text = style.Color(button.Text),
                     DisabledText = style.Color(button.DisabledText),
+                    TextureText = style.Color(string.IsNullOrEmpty(button.TextureText) ? button.Text : button.TextureText),
+                    TextureDisabledText = style.Color(string.IsNullOrEmpty(button.TextureDisabledText) ? button.DisabledText : button.TextureDisabledText),
                     OutlineWidth = button.OutlineWidth,
                     Radius = button.Radius,
-                    TextSize = button.TextSize > 0f ? button.TextSize : style.TextSizes.Body
+                    TextSize = button.TextSize > 0f ? button.TextSize : style.TextSizes.Body,
+                    Texture = button.Texture ?? string.Empty,
+                    UnselectedTexture = button.UnselectedTexture ?? string.Empty
                 };
                 style._buttons[button.Key] = resolved;
                 style._firstButton ??= resolved;
@@ -434,6 +488,16 @@ namespace BeastCraft.Presentation.Ui
                 if (!string.IsNullOrEmpty(button.SelectedFill))
                 {
                     CheckRef(errors, colors, name + "selected fill", button.SelectedFill);
+                }
+
+                if (!string.IsNullOrEmpty(button.TextureText))
+                {
+                    CheckRef(errors, colors, name + "texture text", button.TextureText);
+                }
+
+                if (!string.IsNullOrEmpty(button.TextureDisabledText))
+                {
+                    CheckRef(errors, colors, name + "texture disabled text", button.TextureDisabledText);
                 }
             }
 

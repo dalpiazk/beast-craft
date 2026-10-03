@@ -382,7 +382,7 @@ namespace BeastCraft.Tests.EditMode
             string content = GameContent.FindRoot();
             string checklist = File.ReadAllText(Path.Combine(Path.GetDirectoryName(content), "docs", "art", "hollow-art-slots.md"));
             HashSet<string> listed = new HashSet<string>(StringComparer.Ordinal);
-            foreach (System.Text.RegularExpressions.Match match in System.Text.RegularExpressions.Regex.Matches(checklist, @"`content/(art/[a-z0-9_/]+\.png)`"))
+            foreach (System.Text.RegularExpressions.Match match in System.Text.RegularExpressions.Regex.Matches(checklist, @"`content/(art/[a-z0-9_/]+\.(?:png|jpg))`"))
             {
                 listed.Add(match.Groups[1].Value);
             }
@@ -399,7 +399,8 @@ namespace BeastCraft.Tests.EditMode
                 }
             }
 
-            Assert.AreEqual(24 + 6 + 59, painted, "backdrops, icon frame and rings, VFX hero frames");
+            Assert.AreEqual(24 + 6 + 59 + 14 + 11 + 12, painted,
+                            "backdrops, icon frame and rings, VFX hero frames, journal UI kit pieces, journal UI kit glyphs, journal UI kit menu backdrops");
             int icons = 0;
             foreach (string file in listed)
             {

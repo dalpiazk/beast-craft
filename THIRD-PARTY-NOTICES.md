@@ -17,6 +17,21 @@ licence texts are at the links (and, for the font, beside the file).
   under the OFL.
 - Source: https://fonts.google.com/specimen/Fredoka
 
+### Atkinson Hyperlegible (UI body typeface)
+
+- File: `content/fonts/AtkinsonHyperlegible-Regular.ttf` (the Regular static instance, as served by
+  the Google Fonts GitHub repository), copied by the hosts to `Content/fonts/` (desktop, beside the
+  executable; Android, APK assets). Long-form reading text (a paragraph, a description, the
+  credits) draws in it; Fredoka stays the face for headings, buttons, tabs and chips.
+- Copyright 2020 Braille Institute of America, Inc.
+- Licence: **SIL Open Font License, Version 1.1** — full text in
+  `content/fonts/AtkinsonHyperlegible-OFL.txt`, which ships with the font. No Reserved Font Name is
+  declared. The font may be bundled, embedded and redistributed with the game; it may not be sold
+  on its own, and any modified version must stay under the OFL.
+- Source: https://github.com/google/fonts/tree/main/ofl/atkinsonhyperlegible (mirrored from the
+  Braille Institute of America's original release); also at
+  https://fonts.google.com/specimen/Atkinson+Hyperlegible
+
 ## Libraries (NuGet)
 
 | Package | Used for | Licence |
@@ -32,10 +47,14 @@ Foundation. Build-time and test-only packages (the test SDK, NUnit) are not ship
 
 ## Tools used to make game art (not shipped)
 
-The starter trio's beast art (`content/art/beasts/`, with masters in `content/art/source/`) was made
-with the local AI-assisted pipeline in `Tooling/ArtLab/`, with the producer as art director. These
-models were used as **tools**: none of their weights or code ships with the game or is in this
-repository. How each asset was made is recorded in `Tooling/ArtLab/provenance/`.
+The starter trio's beast art (`content/art/beasts/`, with masters in `content/art/source/`), the
+other seven beasts and nine Verdant Hollow enemies, the 91 skill icons, 11 of the journal UI
+kit's painted glyphs (`content/art/ui/glyphs/`, issue #52), and the 12 journal UI kit menu backdrops
+(`content/art/ui/backdrops/`, issue #52 step 3; AI-generated, then run through a deterministic,
+model-free colour grade) were made with the local AI-assisted
+pipeline in `Tooling/ArtLab/`, with the producer as art director. These models were used as
+**tools**: none of their weights or code ships with the game or is in this repository. How each
+asset was made is recorded in `Tooling/ArtLab/provenance/`.
 
 | Model (Hugging Face) | Used for | Licence |
 | --- | --- | --- |

@@ -169,12 +169,28 @@ namespace BeastCraft.Game.Rendering
         /// </summary>
         public void DrawRegion(Texture2D texture, Rectangle source, Vector2 topLeft, Vector2 size, Color color)
         {
+            DrawRegion(texture, source, topLeft, size, color, SamplerState.LinearClamp);
+        }
+
+        /// <summary>
+        /// The same as <see cref="DrawRegion(Texture2D,Rectangle,Vector2,Vector2,Color)"/>, with
+        /// <paramref name="sampler"/> instead of the default LinearClamp: a nine-slice patch's own
+        /// cells (<see cref="BeastCraft.Game.Ui.UiPainter.NineSlice"/>) draw with mipmapping off
+        /// (<see cref="SamplerState.MaxMipLevel"/> 0) instead, because a linear sprite's texture is
+        /// mipmapped (<c>SpriteAtlas.Prepare</c>) and each of the 9 cells scales its own source
+        /// sub-rect by its own ratio — a cell minified enough that the GPU picks a coarser mip level
+        /// samples that mip's *whole-texture* box-filtered blur, which smears the art's ink/brass
+        /// trim ring (originally a crisp line near the frame's true edge, a few px from any given
+        /// cell) across a visibly larger, greyish patch inside that cell. Mip 0 only avoids it.
+        /// </summary>
+        public void DrawRegion(Texture2D texture, Rectangle source, Vector2 topLeft, Vector2 size, Color color, SamplerState sampler)
+        {
             if (size.X <= 0f || size.Y <= 0f)
             {
                 return;
             }
 
-            Ensure(SamplerState.LinearClamp);
+            Ensure(sampler ?? SamplerState.LinearClamp);
             Vector2 scale = new Vector2(size.X / source.Width, size.Y / source.Height);
             _batch.Draw(texture, topLeft, source, color, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
         }

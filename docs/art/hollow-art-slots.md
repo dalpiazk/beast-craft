@@ -19,8 +19,12 @@ colours** (the data does not tint them).
 
 Tick a box when the painted file has landed.
 
-**Status (2026-09-27).** Landed: the 91 skill icons and the frame and the five rarity rings (sections 2 and 3;
-Treatment B, Frame 1; `Tooling/ArtLab/provenance/icons.md`). Borderline but accepted ("not aiming for perfect"):
+**Status (2026-10-02).** Landed: the 91 skill icons and the frame and the five rarity rings (sections 2 and 3;
+Treatment B, Frame 1; `Tooling/ArtLab/provenance/icons.md`), the 14 journal UI kit pieces (section 5;
+procedural, `Tooling/UiKit/README.md`), 11 journal UI kit painted glyphs (section 6; AI-assisted,
+`Tooling/ArtLab/provenance/ui-glyphs.md`) and the 12 journal UI kit menu backdrops (section 7;
+AI-assisted plus a deterministic colour grade, `Tooling/ArtLab/provenance/menu-backdrops.md`).
+Borderline but accepted ("not aiming for perfect"):
 **Thorn Lash**, **Sunder** and **Great Cleave** (see `docs/art/touch-ups.md`). Still placeholders: the 24
 backdrops (section 1) and the 59 VFX hero frames (section 4). Pending outside this list: the region map art and the
 Archer's accent mask re-cut (`docs/art/touch-ups.md`).
@@ -308,6 +312,90 @@ HP bar stays). Read at a glance at unit size; a symbol plus a soft glow.
 | [ ] | `content/art/vfx/status/heal.png` | `fx_painted_status_heal` | Heal | on apply only |
 | [ ] | `content/art/vfx/status/buff.png` | `fx_painted_status_buff` | Stat buff | over the unit, faint |
 | [ ] | `content/art/vfx/status/debuff.png` | `fx_painted_status_debuff` | Stat debuff | over the unit, faint |
+
+## 5. Journal UI kit (14)
+
+The shared UI toolkit's painted-parchment look (issue #52, direction D: "painted world + storybook
+page"): a 9-slice panel, a title plaque, three button faces, two tab pills plus a ribbon accent, a
+slider rail, a slider knob, a toggle track, a toggle knob, a chip and a card. Unlike every other
+section here, these are not placeholders waiting on the art lane: **procedural, no AI**, built
+(and re-buildable) by `Tooling/UiKit/build_kit.py` from `Tooling/ArtLab/scripts/texlib.py`'s
+generators (paper grain, a watercolour wash, rounded/deckled masks, ink-line flourishes) — see
+`Tooling/UiKit/README.md`. Linear filtering, mipmapped, straight alpha, like every other slot here.
+Nine-sliced (`Tooling/PixelArt/illustrated.json`'s `NineSlice`) except the three fixed sprites
+(ribbon, slider knob, toggle knob). Drawn by `UiPainter.NineSlice` when `UiKit.Enabled` (the switch
+back to the original code-drawn style; `src/BeastCraft.Presentation/Ui/UiKit.cs`).
+
+| Done | File | ArtKey | What |
+| --- | --- | --- | --- |
+| [x] | `content/art/ui/kit/panel.png` | `ui/kit/panel` | the generic panel look's face (`UiStyle` Panel `panel`) |
+| [x] | `content/art/ui/kit/card.png` | `ui/kit/card` | the card look's face (`UiStyle` Panel `card`) |
+| [x] | `content/art/ui/kit/title_plaque.png` | `ui/kit/title_plaque` | a screen header's title plaque |
+| [x] | `content/art/ui/kit/button_primary.png` | `ui/kit/button_primary` | the primary button face |
+| [x] | `content/art/ui/kit/button_secondary.png` | `ui/kit/button_secondary` | the secondary button face |
+| [x] | `content/art/ui/kit/button_danger.png` | `ui/kit/button_danger` | the danger button face |
+| [x] | `content/art/ui/kit/tab_unselected.png` | `ui/kit/tab_unselected` | an unselected tab's pill |
+| [x] | `content/art/ui/kit/tab_selected.png` | `ui/kit/tab_selected` | the selected tab's pill |
+| [x] | `content/art/ui/kit/tab_ribbon.png` | `ui/kit/tab_ribbon` | the selected tab's ribbon accent (fixed sprite) |
+| [x] | `content/art/ui/kit/slider_rail.png` | `ui/kit/slider_rail` | a slider's background rail |
+| [x] | `content/art/ui/kit/slider_knob.png` | `ui/kit/slider_knob` | a slider's knob (fixed sprite) |
+| [x] | `content/art/ui/kit/toggle_track.png` | `ui/kit/toggle_track` | a toggle's track, on or off alike |
+| [x] | `content/art/ui/kit/toggle_knob.png` | `ui/kit/toggle_knob` | a toggle's knob (fixed sprite) |
+| [x] | `content/art/ui/kit/chip.png` | `ui/kit/chip` | a filter chip's face |
+
+## 6. Journal UI kit painted glyphs (11)
+
+Painted replacements for 11 of `UiPainter.Glyph`'s code-drawn names — the ones the tab strips
+(`SettingsScreen`, `AvatarScreens`, `InventoryScreens`, `ShopScreens`, `GroveScreens`), the bottom
+nav (`HomeScreen`) and the header back button actually use — drawn when `UiKit.Enabled`, the
+code-drawn vector glyph otherwise. 256x256, linear filtering, straight alpha, centre pivot. AI-assisted
+(Animagine XL 4.0, local, img2img over each glyph's own vector geometry as the init — see
+`Tooling/ArtLab/provenance/ui-glyphs.md` for the method, prompts and seeds; disclose per
+`docs/art/art-brief.md`, decision 10).
+
+| Done | File | ArtKey | What |
+| --- | --- | --- | --- |
+| [x] | `content/art/ui/glyphs/back.png` | `ui/glyph/back` | the header back button |
+| [x] | `content/art/ui/glyphs/gear.png` | `ui/glyph/gear` | settings (a tab, the pause menu) |
+| [x] | `content/art/ui/glyphs/map.png` | `ui/glyph/map` | bottom nav, a Grove tab |
+| [x] | `content/art/ui/glyphs/roster.png` | `ui/glyph/roster` | bottom nav, an Avatar tab |
+| [x] | `content/art/ui/glyphs/grove.png` | `ui/glyph/grove` | bottom nav, a Grove tab |
+| [x] | `content/art/ui/glyphs/avatar.png` | `ui/glyph/avatar` | bottom nav, an Avatar tab |
+| [x] | `content/art/ui/glyphs/inventory.png` | `ui/glyph/inventory` | bottom nav |
+| [x] | `content/art/ui/glyphs/battle.png` | `ui/glyph/battle` | a Settings tab (Gameplay) |
+| [x] | `content/art/ui/glyphs/star.png` | `ui/glyph/star` | a Settings tab (Visuals), an Avatar tab (Skills) |
+| [x] | `content/art/ui/glyphs/speaker.png` | `ui/glyph/speaker` | a Settings tab (Audio) |
+| [x] | `content/art/ui/glyphs/lock.png` | `ui/glyph/lock` | a Settings tab (Privacy) |
+
+## 7. Journal UI kit menu backdrops (12)
+
+One painted scene per campaign region (`regions.json`'s `r01`-`r11` plus Hearthglen, `r00`), drawn
+behind every out-of-combat menu screen (issue #52, step 3): a region's backdrop becomes selectable
+once the player first reaches it (`CampaignRules.StartRun`, `CampaignProgress.ReachedBackdropIds`),
+Hearthglen unlocked and selected by default; see `docs/design/progression-and-saves.md`, "Schema 14."
+Picked in Settings &gt; Visuals (`BackdropPicker`). AI-assisted (Animagine XL 4.0, local, txt2img, one
+prompt per region) plus a deterministic Pillow/numpy colour grade unifying all 12 under direction D's
+look — see `Tooling/ArtLab/provenance/menu-backdrops.md` for the method, prompts, seeds and grade
+parameters; disclose per `docs/art/art-brief.md`, decision 10. Unlike every other section here, these
+are shipped as **JPEG, not PNG** (quality 88, Git LFS-tracked `*.jpg`): continuous-tone painted scenes
+compress 4-6x smaller than lossless PNG at the same 1080x1920 resolution with no visible loss once
+dimmed behind the parchment UI, keeping the total well under the ~700 KB/file budget. Linear filtering,
+mipmapped, centre pivot, no nine-slice (drawn stretched to the full canvas, then dimmed).
+
+| Done | File | ArtKey | Region |
+| --- | --- | --- | --- |
+| [x] | `content/art/ui/backdrops/r00.jpg` | `ui/backdrop/r00` | Hearthglen (tutorial; unlocked from the start) |
+| [x] | `content/art/ui/backdrops/r01.jpg` | `ui/backdrop/r01` | Verdant Hollow |
+| [x] | `content/art/ui/backdrops/r02.jpg` | `ui/backdrop/r02` | Emberreach |
+| [x] | `content/art/ui/backdrops/r03.jpg` | `ui/backdrop/r03` | Tidefall |
+| [x] | `content/art/ui/backdrops/r04.jpg` | `ui/backdrop/r04` | Stormcrag |
+| [x] | `content/art/ui/backdrops/r05.jpg` | `ui/backdrop/r05` | Rustwood |
+| [x] | `content/art/ui/backdrops/r06.jpg` | `ui/backdrop/r06` | Frostmere |
+| [x] | `content/art/ui/backdrops/r07.jpg` | `ui/backdrop/r07` | Thunderspire |
+| [x] | `content/art/ui/backdrops/r08.jpg` | `ui/backdrop/r08` | Deepwild |
+| [x] | `content/art/ui/backdrops/r09.jpg` | `ui/backdrop/r09` | Cinder Throne |
+| [x] | `content/art/ui/backdrops/r10.jpg` | `ui/backdrop/r10` | Worldcrown |
+| [x] | `content/art/ui/backdrops/r11.jpg` | `ui/backdrop/r11` | Duskmeridian |
 
 ## Checks after dropping art in
 
