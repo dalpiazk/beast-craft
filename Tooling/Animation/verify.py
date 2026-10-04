@@ -90,7 +90,12 @@ if MOVE_BLEND:
     # anim/gait.py's LATERAL_SEQUENCE exactly, or this gate samples the wrong window and reads
     # swing-phase velocity as if it were stance. Falls back to the old 2-leg alternation for any
     # other leg-side naming.
-    LATERAL_SEQUENCE = {"BL": 0.0, "FL": 0.25, "BR": 0.5, "FR": 0.75}
+    #
+    # Round 11: corrected to match anim/gait.py's fix -- the old {BL:0.0,FL:0.25,BR:0.5,FR:0.75}
+    # touched feet down in diagonal-sequence order (LH,RF,RH,LF); swapping FL/FR gives the correct
+    # lateral-sequence order (LH,LF,RH,RF) -- see gait.py's LATERAL_SEQUENCE comment and this file's
+    # new check_walk_direction gate below.
+    LATERAL_SEQUENCE = {"BL": 0.0, "FL": 0.75, "BR": 0.5, "FR": 0.25}
     move_report = {"fps": fps, "legs": {}}
     for side in leg_sides:
         if set(leg_sides) == set(LATERAL_SEQUENCE):
@@ -341,6 +346,125 @@ if KEYED_BLEND:
     if attack_stretch is not None:
         report["attack_edge_stretch"] = attack_stretch
 
+# ---------------------------------------------------------------------------
+# Round 11 (producer review: "the Griffin walks backwards"): walk_direction gate. Confirms, from
+# the rig and the baked Move action themselves -- never a hard-coded axis, so this gate can never
+# pass by agreeing with the same bug it exists to catch -- that:
+#   1. each foot's STANCE phase moves it toward the TAIL relative to the pelvis (retracting, as the
+#      body passes forward over the planted foot), and its SWING phase moves it toward the HEAD
+#      (protracting, carrying the foot forward for the next step) -- the two halves of a real
+#      forward walk, checked by projecting (foot - pelvis) onto FORWARD at each sampled frame;
+#   2. the four feet touch down in the canonical lateral-sequence order LH -> LF -> RH -> RF (a
+#      real quadruped's walk, not a diagonal-sequence gait -- see this file's corrected
+#      LATERAL_SEQUENCE above and gait.py's matching fix).
+# FORWARD is re-derived here independently (normalize(head - pelvis) rest-pose bone positions,
+# ground-plane projected) rather than imported from anim/gait.py, so a regression in one file can't
+# silently go unnoticed because the other file's copy of the same (possibly wrong) value agrees.
+def check_walk_direction(blend_path, action_name="Move"):
+    arm_obj = load(blend_path)
+    action = bpy.data.actions.get(action_name)
+    if action is None:
+        return None
+    if arm_obj.animation_data is None:
+        arm_obj.animation_data_create()
+    arm_obj.animation_data.action = action
+
+    pelvis_pb = arm_obj.pose.bones.get("pelvis")
+    head_pb = arm_obj.pose.bones.get("head")
+    if pelvis_pb is None or head_pb is None:
+        print("  walk_direction: missing pelvis/head bone -> FAIL")
+        return {"pass": False, "error": "missing pelvis/head bone, cannot derive FORWARD"}
+    pelvis_rest_pos = arm_obj.matrix_world @ pelvis_pb.bone.head_local
+    head_rest_pos = arm_obj.matrix_world @ head_pb.bone.head_local
+    forward = head_rest_pos - pelvis_rest_pos
+    forward.z = 0.0
+    if forward.length < 1e-6:
+        print("  walk_direction: head/pelvis coincide on the ground plane -> FAIL")
+        return {"pass": False, "error": "head and pelvis coincide on the ground plane"}
+    forward.normalize()
+    print(f"  walk_direction FORWARD (independently re-derived): {tuple(round(c, 4) for c in forward)}")
+
+    leg_sides = sorted({n.name.split("_")[1] for n in arm_obj.data.bones if n.name.startswith("leg_")})
+    DUTY = 0.6
+
+    f0, f1 = action.frame_range
+    f0, f1 = int(f0), int(f1)
+    n_frames = f1 - f0
+
+    pelvis_positions = sample_action_bone_positions(arm_obj, action, "pelvis", "head")
+
+    leg_results = {}
+    overall_pass = True
+    for side in leg_sides:
+        phase_off = LATERAL_SEQUENCE.get(side, 0.0 if side == leg_sides[0] else 0.5)
+        positions = sample_action_bone_positions(arm_obj, action, f"leg_{side}_toe", "tail")
+        stance_fwd, swing_fwd = [], []
+        for (f, p), (_, pel) in zip(positions, pelvis_positions):
+            t = (f - f0) / n_frames
+            ph = (t + phase_off) % 1.0
+            rel_fwd = (p - pel).dot(forward)
+            if 0.05 < ph < DUTY * 0.95:
+                stance_fwd.append((ph, rel_fwd))
+            elif DUTY * 1.05 < ph < 0.95:
+                swing_fwd.append((ph, rel_fwd))
+        stance_fwd.sort()
+        swing_fwd.sort()
+        # Checked as the net trend (last sample minus first, within each phase window), not
+        # frame-to-frame monotonicity -- secondary motion (scapula swing, body bob) riding on top
+        # of the primary stride can introduce small non-monotonic wiggles without the gait actually
+        # being backwards; the net direction over the whole phase window is what distinguishes a
+        # correct walk from a reversed one.
+        stance_trend = (stance_fwd[-1][1] - stance_fwd[0][1]) if len(stance_fwd) >= 2 else 0.0
+        swing_trend = (swing_fwd[-1][1] - swing_fwd[0][1]) if len(swing_fwd) >= 2 else 0.0
+        stance_ok = stance_trend < -1e-5   # moves toward the tail (negative along FORWARD)
+        swing_ok = swing_trend > 1e-5      # moves toward the head (positive along FORWARD)
+        leg_pass = stance_ok and swing_ok
+        overall_pass = overall_pass and leg_pass
+        leg_results[side] = {
+            "stance_forward_trend": stance_trend, "stance_toward_tail": stance_ok,
+            "swing_forward_trend": swing_trend, "swing_toward_head": swing_ok,
+            "pass": leg_pass,
+        }
+        print(f"  walk_direction {side}: stance trend={stance_trend:+.4f} (toward tail? {stance_ok}), "
+              f"swing trend={swing_trend:+.4f} (toward head? {swing_ok}) -> {'PASS' if leg_pass else 'FAIL'}")
+
+    # Lateral-sequence touchdown order: touchdown (ph crosses 0, start of stance) happens at
+    # t = (-phase_offset) mod 1 for each leg -- sort legs by that touchdown time and check the
+    # result is some rotation of the canonical LH -> LF -> RH -> RF cycle (a continuous loop has no
+    # fixed "first" leg, so any cyclic rotation of the right order is correct).
+    canonical = ["BL", "FL", "BR", "FR"]  # LH, LF, RH, RF
+    touchdown_order = sorted(leg_sides, key=lambda s: (-LATERAL_SEQUENCE.get(s, 0.0)) % 1.0)
+    seq_ok = False
+    if set(touchdown_order) == set(canonical):
+        doubled = canonical + canonical
+        for start in range(4):
+            if doubled[start:start + 4] == touchdown_order:
+                seq_ok = True
+                break
+    print(f"  walk_direction sequence: touchdown order {touchdown_order} "
+          f"(a rotation of canonical LH->LF->RH->RF? {seq_ok}) -> {'PASS' if seq_ok else 'FAIL'}")
+
+    result = {"forward": list(round(c, 4) for c in forward), "legs": leg_results,
+              "touchdown_order": touchdown_order, "sequence_pass": seq_ok,
+              "pass": overall_pass and seq_ok}
+    return result
+
+
+if MOVE_BLEND:
+    walk_dir_result = check_walk_direction(MOVE_BLEND, "Move")
+    if walk_dir_result is not None:
+        report["walk_direction"] = walk_dir_result
+
 with open(os.path.join(OUT, "verify_report.json"), "w") as f:
     json.dump(report, f, indent=2)
 print("VERIFY DONE")
+
+# "Fail loudly": walk_direction is a correctness gate, not a quality-polish one -- a backwards-
+# walking Griffin is categorically broken, not just imperfect, so (unlike the other gates in this
+# file, which report pass/fail in the JSON for a human to read) this one also aborts the pipeline
+# with a non-zero exit code so it can't be silently skipped past in a batch/CI context.
+if "walk_direction" in report and not report["walk_direction"].get("pass", False):
+    print("=" * 70)
+    print("FATAL: walk_direction gate FAILED -- see verify_report.json['walk_direction'].")
+    print("=" * 70)
+    sys.exit(1)

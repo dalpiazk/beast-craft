@@ -98,6 +98,30 @@ def rest_head_tail(name):
     return b.head_local.copy(), b.tail_local.copy()
 
 
+# Lead-review walk-direction fix: FORWARD is derived strictly from the rig's own rest pose --
+# normalize(head - pelvis), projected onto the ground plane (Z zeroed) -- instead of a hard-coded
+# +Y (or -Y) axis assumption. Every place in this file that moves a foot/joint fore-aft (stride
+# sweep, swing arc, scapula fore-aft swing) is built as `rest_point + FORWARD * signed_offset`, so
+# the whole file is correct regardless of which way a given mesh's head happens to point in its own
+# native axes. This replaces an earlier version that wrote `rest.y + y_off` directly: that silently
+# assumed +Y was forward, which was backwards for this mesh (round 10's landmarks put the head at
+# -Y from the pelvis -- see rig_templates/winged_quadruped.py's detect_landmarks_handplaced
+# forward_sign fix) and produced a Griffin that walked with each foot protracting toward the TAIL
+# during swing and retracting toward the HEAD during stance -- exactly backwards (producer review,
+# round 11).
+_pelvis_head_local, _ = rest_head_tail("pelvis")
+_head_bone_head_local, _ = rest_head_tail("head")
+FORWARD = (_head_bone_head_local - _pelvis_head_local)
+FORWARD.z = 0.0  # ground-plane projection
+if FORWARD.length < 1e-6:
+    raise RuntimeError(
+        "Cannot derive a walk-forward direction: the 'head' and 'pelvis' bones are at the same "
+        "ground-plane position in the rest pose. gait.py refuses to fall back to a hard-coded "
+        "axis here (that's exactly the bug this fix removes) -- check the rig's landmarks.")
+FORWARD.normalize()
+print(f"FORWARD (ground-plane, head-pelvis, no hard-coded axis): {tuple(round(c, 4) for c in FORWARD)}")
+
+
 def solve_2bone_ik(hip, L1, L2, target, bend_dir):
     """Closed-form 2-bone IK in the hip-knee-target plane. Returns (knee_world, target_world) such
     that |hip->knee|==L1, |knee->target|==L2 (clamped to reachable range if `target` is out of
@@ -328,8 +352,17 @@ for side in leg_sides:
     # proportional fold), so there is no longer an artificially extreme bind-pose knee bend to
     # animate across.
     ground_z = 0.0
-    base_sq = (foot.x - hip.x) ** 2 + (ground_z - hip.z) ** 2
-    margin_y = foot.y - hip.y
+    # Decompose (foot_rest - hip) relative to FORWARD instead of assuming the fore-aft sweep axis
+    # is literally world Y: `fwd_offset` is the signed component already along FORWARD (what the
+    # stride sweep moves along), `base_sq` is everything perpendicular to it (sideways ground
+    # offset + the hip-to-ground vertical drop) -- the part the stride sweep does NOT change. For a
+    # rig whose FORWARD happens to be exactly (0, 1, 0) or (0, -1, 0) this reduces to the original
+    # x^2+z^2 / foot.y-hip.y formulas exactly; for any other ground-plane heading it generalizes
+    # correctly instead of silently assuming an axis.
+    diff = mathutils.Vector((foot.x - hip.x, foot.y - hip.y, ground_z - hip.z))
+    fwd_offset = diff.dot(FORWARD)
+    perp = diff - fwd_offset * FORWARD
+    base_sq = perp.length_squared
     r_sq = reach_margin ** 2 - base_sq
     if r_sq <= 0:
         safe_stride = 0.005 * H  # truly degenerate rig geometry fallback -- shouldn't trigger here
@@ -344,7 +377,7 @@ for side in leg_sides:
         # non-constant stance velocity, failing verify.py's foot-slide gate at cv=0.68 against a
         # 0.35 threshold even though the stride itself already read as "barely moves"). Respecting
         # the computed safe value even when it's smaller than the floor fixes this at the root.
-        safe_stride = max(0.005 * H, min(r - abs(margin_y), RAW_STRIDE))
+        safe_stride = max(0.005 * H, min(r - abs(fwd_offset), RAW_STRIDE))
 
     # Lift scales WITH the solved stride (not a fixed absolute height) so a geometrically-
     # constrained short stride (this Griffin's: the landmark-placed hip leaves little slack before
@@ -377,7 +410,17 @@ phase_offset = {}
 # quarter-cycle out of phase from the previous) for the confirmed 4-leg case, replacing the earlier
 # 2-beat fallback. BL/BR/FL/FR are this template's side codes for back-left/back-right/front-left/
 # front-right (see rig_templates/winged_quadruped.py) -- i.e. BL=LH, FL=LF, BR=RH, FR=RF.
-LATERAL_SEQUENCE = {"BL": 0.0, "FL": 0.25, "BR": 0.5, "FR": 0.75}
+#
+# Round 11 (producer review via the new verify.py walk_direction gate): the ORIGINAL {BL:0.0,
+# FL:0.25, BR:0.5, FR:0.75} mapping here was mislabeled -- touchdown (the moment a leg's own phase
+# `ph=(t+phase_offset)%1` crosses 0) happens at t = (-phase_offset) mod 1, which for those values
+# actually touches feet down in the order BL, FR, BR, FL (LH, RF, RH, LF) -- a DIAGONAL-sequence
+# gait (each hindfoot followed by the OPPOSITE-side forefoot), not the lateral-sequence gait
+# (hindfoot followed by the SAME-side forefoot) the comment above claims and a real walking
+# quadruped uses. Swapping FL and FR's offsets fixes the actual touchdown order to BL, FL, BR, FR
+# (LH, LF, RH, RF) -- confirmed against the new gate's touchdown-order check, which verifies this
+# independent of any hard-coded axis.
+LATERAL_SEQUENCE = {"BL": 0.0, "FL": 0.75, "BR": 0.5, "FR": 0.25}
 if set(leg_sides) == set(LATERAL_SEQUENCE):
     phase_offset = dict(LATERAL_SEQUENCE)
 elif len(leg_sides) == 2:
@@ -407,18 +450,29 @@ def foot_target(side, t):
     ph = (t + phase_offset[side]) % 1.0
     if ph < DUTY:
         u = ph / DUTY
-        y_off = stride * (1.0 - 2.0 * u)  # +stride -> -stride, LINEAR (constant velocity -- see
-        # module docstring: constant stance velocity is what cancels a constant-rate root
-        # translation with zero residual slide).
+        # fwd_off is a signed coordinate along FORWARD (not a raw world axis): +stride means "this
+        # foot's most-forward/head-ward point" (touchdown), -stride means "most-backward/tail-ward"
+        # (toe-off). Stance sweeps +stride -> -stride, LINEAR (constant velocity -- see module
+        # docstring: constant stance velocity is what cancels a constant-rate root translation with
+        # zero residual slide) -- i.e. the planted foot retracts toward the tail as the body passes
+        # over it, which is correct gait regardless of which way FORWARD actually points in this
+        # mesh's own native axes (see this file's FORWARD derivation above for why that distinction
+        # matters: an earlier version wrote `rest.y + y_off` directly, hard-coding +Y as forward,
+        # which was backwards for this mesh and made the Griffin walk with each foot protracting
+        # toward the tail and retracting toward the head -- exactly reversed).
+        fwd_off = stride * (1.0 - 2.0 * u)
         z = ground_z
         stance = True
     else:
         u = (ph - DUTY) / (1.0 - DUTY)
         ease = u * u * (3 - 2 * u)  # smootherstep: eased arc, non-linear (principle of arcs)
-        y_off = stride * (-1.0 + 2.0 * ease)
+        # Swing protracts the foot back toward the head: -stride (toe-off) -> +stride (next
+        # touchdown).
+        fwd_off = stride * (-1.0 + 2.0 * ease)
         z = ground_z + lift * math.sin(math.pi * u)
         stance = False
-    pos = mathutils.Vector((rest.x, rest.y + y_off, z))
+    pos = rest + FORWARD * fwd_off
+    pos.z = z
     return pos, stance
 
 
@@ -636,8 +690,11 @@ for i in range(FRAMES + 1):  # +1: bake the loop-closing frame identical to fram
             # own docstring: IK always places the foot at the given target when reachable).
             swing_phase = (t + phase_offset[side]) % 1.0
             scapula_amp = scapula_rest[side][3] * math.sin(math.radians(SCAPULA_SWING_DEG))
-            scapula_y = scapula_amp * math.cos(2 * math.pi * swing_phase)
-            hip_dynamic = legs[side]["hip"] + mathutils.Vector((0, scapula_y, 0))
+            scapula_fwd = scapula_amp * math.cos(2 * math.pi * swing_phase)
+            # FORWARD (not a hard-coded (0, y, 0)) -- see this file's FORWARD derivation: the
+            # shoulder socket's fore-aft excursion must swing toward the head/tail exactly like the
+            # foot's own stride does, for the same reason.
+            hip_dynamic = legs[side]["hip"] + FORWARD * scapula_fwd
             scapula_world = set_scapula_pose(side, hip_dynamic, spine02_world, spine02_rest)
             scapula_pb = arm_obj.pose.bones[f"scapula_{side}"]
             scapula_pb.keyframe_insert(data_path="rotation_quaternion", frame=i + 1)

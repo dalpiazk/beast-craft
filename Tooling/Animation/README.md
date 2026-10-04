@@ -157,6 +157,96 @@ used again, but noted here for honesty.)
   (comfortably inside the ES 3.0 256-vec4 vertex-uniform minimum this project targets -- see
   `Toon.fx`'s own header comment for the full budget math).
 
+## v11: fix the walk direction + add a walk_direction verify.py gate (producer review round 11)
+
+Producer review of the v10 MP4s: the Griffin walked backwards -- each foot protracted toward the
+TAIL during swing and retracted toward the HEAD during stance, exactly reversed from a real forward
+walk. Root cause, found in `anim/gait.py`: every place the gait moves a foot/joint fore-aft (the
+stance/swing `y_off` in `foot_target`, the per-leg reach-margin precompute, and the scapula's
+fore-aft swing offset) wrote directly to the world **+Y** axis, baking in an assumption that +Y is
+"forward." That assumption was never true in general -- it happened to match the pre-v10 mesh by
+coincidence -- and round 10's new mesh has its head at **-Y** (confirmed independently by the
+`forward_sign` fix already landed in `rig_templates/winged_quadruped.py`'s landmark detection, a
+different file that this bug was never connected to).
+
+**Fix:** `gait.py` now derives `FORWARD = normalize(ground-plane-projected(head_bone - pelvis_bone))`
+once, directly from the rigged armature's own rest pose, and uses it (not a hard-coded axis)
+everywhere a fore-aft displacement is computed: `foot_target`'s stance/swing sweep now builds
+`pos = rest + FORWARD * fwd_off` instead of `rest.y + y_off`; the per-leg safe-stride precompute
+decomposes `(foot_rest - hip)` into its component along `FORWARD` (the stride-relevant axis) and
+everything perpendicular to it (the fixed part), instead of assuming `x`/`z` are fixed and `y`
+varies; the scapula's fore-aft shoulder-socket swing uses `FORWARD * scapula_fwd` instead of
+`(0, scapula_y, 0)`. For this mesh, `FORWARD` resolved to `(0.006, -1.0, 0.0)` -- matching the
+landmark-derived `-Y` direction, as expected. Stride magnitudes are unchanged (BL/BR 23.6%, FL/FR
+42.0%, identical to round 10's numbers -- confirms the refactor only changed *direction*, not the
+per-leg reach geometry).
+
+**A second, related bug found and fixed while in here:** `LATERAL_SEQUENCE`'s phase-offset mapping
+(`{BL:0.0, FL:0.25, BR:0.5, FR:0.75}`, unchanged since the lead-review fix round) was labelled as
+the standard lateral-sequence touchdown order "LH -> LF -> RH -> RF" but actually produced
+touchdowns in the order BL, FR, BR, FL (LH, RF, RH, LF) -- a **diagonal**-sequence gait (each
+hindfoot followed by the *opposite*-side forefoot), not the lateral-sequence gait (hindfoot followed
+by the *same*-side forefoot) a real walking quadruped uses and the comment claimed. Swapping FL and
+FR's phase offsets (`{BL:0.0, FL:0.75, BR:0.5, FR:0.25}`) fixes the actual touchdown order to BL,
+FL, BR, FR (LH, LF, RH, RF) -- confirmed by the new gate below. Fixed identically in both
+`gait.py` (authoritative) and `verify.py` (its own matching copy, used by the pre-existing
+foot-slide gate's stance-window check).
+
+**New `verify.py` gate, `walk_direction`:** re-derives `FORWARD` independently (its own
+`head`/`pelvis` bone read, not imported from `gait.py`, so a regression in one file can't silently
+agree with a matching bug in the other) and checks, per leg, that the net trend of
+`(toe_pos - pelvis_pos).dot(FORWARD)` is negative across the stance window (moving toward the tail)
+and positive across the swing window (moving toward the head); separately checks the touchdown
+order (sorted by each leg's `-phase_offset mod 1`) is a cyclic rotation of the canonical
+`[BL, FL, BR, FR]` sequence. Unlike every other gate in this file (which report pass/fail in the
+JSON for a human to read), this one also calls `sys.exit(1)` on failure -- a backwards-walking
+Griffin is a correctness bug, not a polish gap, so it "fails loudly" rather than sitting quietly in
+a report a batch run could skip past.
+
+**Re-ran the full pipeline** (reusing round 10's already-correct rigged `.blend` -- the rig and
+weights are untouched by this fix, only locomotion math changed): `gait.py` -> `keyed.py` (re-run
+fresh; identical jaw/Idle/Attack output to round 10, included for a clean merge) -> `verify.py` ->
+`export_glb.py`. **All gates pass except the pre-existing edge-stretch gate** (documented as
+unresolved in round 10, untouched this round): Move 9.53x, Attack 3.31x, both still over the 1.6x
+target -- essentially unchanged from round 10's 9.63x/3.31x, confirming this round's fix didn't
+move that needle (expected: the edge-stretch issue is a weighting/topology problem, unrelated to
+which world axis the gait treats as forward). The new `walk_direction` gate itself: **PASS** for
+all four legs (stance trends all negative, swing trends all positive) and **PASS** for the
+touchdown-sequence check (`['BL', 'FL', 'BR', 'FR']`, exactly the canonical order).
+
+**Visual confirmation, as required:** two passes. First, a 10-frames-per-clip `review_v11/final/`
+set (idle/move/move_side/attack contact sheets + onion-skin + reel), matching every prior round's
+contact-sheet convention, inspected frame by frame: `contact_sheet_idle.png`, `contact_sheet_move.
+png`, `contact_sheet_attack.png` -- all clean except the same pre-existing frame-5 wing blotch from
+round 10 (untouched, still present, still not chased further); `contact_sheet_move_side.png` --
+clean, no new artefacts. Second, the actual MP4 source frames (`--frames 180/60/60/60` as specified
+below): extracted 4 consecutive frames from the `video_move_side` sequence (frames 40-43, a
+mid-swing window chosen for visible motion) and cropped to the visible leg pair -- across the 4
+frames, the leg that starts fully extended toward the tail-side (stance) visibly retracts toward
+the body as the frames advance, while the other leg (tucked, swinging) extends forward toward the
+head-side -- confirmed by eye, matching both the gate's numeric result and the producer's stated
+criterion ("planted foot moves tailward, swinging foot moves headward").
+
+**Live3D facing:** re-checked, no code change needed. `Game1.cs`'s facing math (`FacingYaw`,
+`YawTowards`) assumes every asset's bind-pose forward is local +Z after the Blender->glTF axis
+conversion -- a fixed, asset-independent convention documented in that file, not a per-rig value
+this pipeline controls. Blender's standard axis conversion maps its own -Y to glTF's +Z, and this
+mesh's head is at -Y in Blender space (same fact this round's `gait.py` fix and round 10's
+`forward_sign` fix both depend on) -- so the already-exported mesh orientation was never the bug;
+only the Move clip's internal leg-sweep direction was. No `Game1.cs`/runtime change made or needed.
+
+**MP4s regenerated** exactly as specified: frames via `--pilot-sequence` (reel `--pilot-fps 60`
+with no `--frames` -- the reel ignores that option and always captures the full crossfaded
+Idle->Move->Attack->Idle duration, see `Game1.cs`'s `TotalPilotFrames`; idle `--frames 180`; move
+`--frames 60`; move `--frames 60 --pilot-side-camera`; attack `--frames 60`), encoded with the
+specified ffmpeg binary/filter/codec settings (`-stream_loop N -framerate 60 -i frame_%04d.png -vf
+scale=720:1280:flags=lanczos,format=yuv420p -c:v libx264 -crf 20 -preset slow -movflags
++faststart`, loops reel=0/idle=1/walk=3/walk_side=3/attack=2) into
+`scratchpad/anim-pilot/video_v11/`: `griffin_reel.mp4` (294 frames, ~4.9s), `griffin_idle.mp4` (360
+frames, ~6.0s), `griffin_walk.mp4` (240 frames, ~4.0s), `griffin_walk_side.mp4` (240 frames,
+~4.0s), `griffin_attack.mp4` (180 frames, ~3.0s) -- all 720x1280 h264/yuv420p. Not committed
+(scratch deliverables, per every prior round's convention).
+
 ## v9: max-edge-stretch gate + weight/render fixes -- partial progress, honestly not fully resolved
 ## (lead-review round 9)
 
