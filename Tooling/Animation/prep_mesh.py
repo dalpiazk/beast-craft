@@ -1,69 +1,79 @@
 """Tooling/Animation stage 1: mesh prep.
 
 Imports a Meshy quad-remesh GLB, reports before/after topology stats, welds duplicate-position
-vertices (every UV/normal seam leaves coincident duplicates on glTF export/import -- see
-Tooling/Spike55/blender_lowpoly_render.py's docstring for the full story), **retopologizes to a
-single connected, manifold, clean-quad-flow shell** (round-7 lead review -- see below for why the
-old weld-then-Collapse-decimate approach wasn't enough), bakes the base colour onto the new mesh's
-own low-island UVs at 1K, and exports a prepped GLB for rig_creature.py to pick up.
+vertices, **segments the mesh into body / tail / wing_L / wing_R pieces and retopologizes/reduces
+each at a size appropriate to its own scale** (round-8 lead review -- see below for why a single
+retopology pass over the whole mesh, round 7's fix, wasn't enough), bakes the base colour onto the
+reassembled mesh's own UVs at 1K, and exports a prepped GLB for rig_creature.py to pick up.
 
-## Mesh-prep lesson (round 7): Meshy remesh output is fragmented -- always retopologize to one
-## shell before rigging, not just weld-and-decimate.
+## Mesh-prep lesson (round 8): one retopology voxel size cannot serve both a bulky body AND its
+## thin appendages -- segment by part before reducing, not just by connectivity.
 
-Rounds 4-6 of this pilot chased a hip/belly skinning tear through several weight-logic fixes (hard
-per-leg masks, then a cross-leg weight-gradient pass) without success. The lead's round-7 review
-correctly identified the actual root cause as upstream of rigging entirely: the raw Meshy GLB
-(`griffin_quad/model.glb`) reports **1018 connected components** by vertex-index adjacency before
-any processing -- `weld_mesh` (below) collapses literal duplicate-position vertices from UV/normal
-seams and gets that down to a reassuring-looking 4 components, 99%+ in the largest. But that
-internal Blender vertex count is NOT what rig_creature.py ever actually rigs -- every stage in this
-pipeline round-trips through a glTF EXPORT, and **glTF export re-splits a single welded vertex into
-several wherever it carries more than one UV/normal value across its surrounding faces** (a format
-requirement: one glTF vertex = one UV). The OLD prep_mesh.py welded, Collapse-decimated, and
-exported -- but never re-wove those export-time seam splits back together, so the mesh
-rig_creature.py actually imported and rigged was fragmented again by every UV seam. Confirmed
-directly: the round-6 pilot's rigged mesh's own automatic-weighting log reported "366 floating-
-island components" on a mesh whose pre-export Blender-internal component count was only 4 -- the
-weighting fallback chain's nearest-neighbour "floating island" repair pass (`common.
-reweight_floating_mesh_islands`) was then filling in ~57% of the mesh's vertices with inconsistent,
-non-heat-diffused weights, which is what a flat-shaded before/after close-up (round 6's and this
-round's) shows as visible self-intersecting tears at the hip: spatially-coincident UV-seam-split
-patches landing on opposite sides of a weight discontinuity, invisible at bind pose (they're still
-coincident at rest) but visibly torn the instant the joint actually rotates. **No amount of weight-
-gradient tuning downstream can fix geometry that is not actually one connected piece.**
+Round 7 fixed the hip/belly tear (a genuine, confirmed win -- see the round-7 section of README.md)
+by retopologizing the WHOLE mesh to one single-shell, auto-tuned voxel size. The lead's round-8
+review caught what that one-size-fits-all voxel size cost: it had to be coarse enough to resolve the
+BODY as a single clean shell within a sane triangle budget, and that same coarseness erased the
+TAIL entirely, truncated/merged the WINGS, and softened the beak/crest/toes -- anything thinner than
+that one voxel size got lost, regardless of how important it was to the silhouette.
 
-The fix is this stage: `common.retopologize_to_single_shell` (voxel remesh, tuned to land the
-pre-quad-retopo mesh in a ~10-14k-tri band while auto-tuning voxel size per this mesh's own
-bounding-box scale, so it isn't a hardcoded absolute size), `common.smooth_relax` (softens voxel
-stair-stepping before quad retopology), `common.quadriflow_retopo` (QuadriFlow to ~4k quads / ~8k
-tris, clean edge flow), `common.shrinkwrap_onto` (projects back onto the original surface to
-recover true surface position/detail lost to voxel reconstruction), then `common.bake_base_color`
-(Smart UV Project + a Cycles selected-to-active Diffuse bake from the original textured mesh onto
-the new mesh's own 1K UVs -- far fewer UV islands than Meshy's original layout, so even residual
-glTF export-time seam-splitting has much less surface area left to fragment). The old weld-then-
-Collapse-decimate path is removed entirely, not kept as a fallback: Collapse decimation is UNSAFE
-on this mesh's thin/complex features regardless of how clean the pre-decimate component count looks
-(Spike #55's own prior finding -- Collapse shattering a 703-component mesh into shards -- turns out
-to generalise to "looks clean at 4 components, still shatters thin features during the Collapse
-operation itself," which is a stronger and more dangerous failure mode than the FRAGMENT_GUARD_RATIO
-check this file used to gate on was ever able to catch).
+The fix is to segment FIRST, then let each piece pick its own appropriate treatment:
+
+1. **Segmentation.** A throwaway skeleton is built on a disposable, normalised duplicate of the
+   welded mesh using the SAME `rig_templates.winged_quadruped` hand-placed landmarks and
+   `build_bones` the real rig uses (not a separate, hand-tuned geometric heuristic) -- automatic
+   heat weights are computed on it (`common.auto_weight_with_fallbacks`, the same proven fallback
+   chain `rig_creature.py` uses), and every vertex is assigned to whichever bone has its highest
+   weight. Vertices whose dominant bone's role is "tail" -> tail piece; "wing_L"/"wing_R" -> that
+   wing's piece; everything else (spine/neck/head/legs/scapula/pelvis) -> the body piece. This is
+   deliberately NOT a geometric distance-to-chain classification -- an earlier attempt at that (see
+   scratchpad notes) needed a wing capture radius generous enough to catch the fanned-out feather
+   tips, and that SAME generous radius also bit a connecting strip out of the body's own back/
+   shoulder surface, which then made the body's OWN later retopology fragment far worse than before
+   separation. Heat-diffusion weighting respects the mesh's actual surface geodesics (through
+   connected feather-card geometry, around the body) in a way a straight-line chain distance can't,
+   and reuses machinery already proven correct for the real rig rather than inventing a second,
+   untested geometric heuristic.
+2. **Per-piece treatment, chosen per piece because they are NOT all the same kind of geometry:**
+   - **Body** (head/torso/legs/talons): after separation and a small-stray-component cleanup, this
+     mesh turned out to ALREADY be a single connected, reasonably clean component on its own (no
+     voxel remesh needed at all) -- so it's simply Collapse-decimated to budget directly, the same
+     simple approach this file used before round 7, now actually safe because the single-component
+     precondition Spike #55's finding requires is genuinely met (round 7's mistake was trusting a
+     mostly-single-component WHOLE mesh that still hid enough thin-feature fragmentation risk to
+     break that precondition once decimated -- the body ALONE, without the wings/tail's own
+     different geometry mixed in, doesn't have that problem).
+   - **Wings:** each wing's raw Meshy geometry is itself a bundle of distinct, only loosely-
+     connected feather-card shapes with real gaps between them (confirmed directly: even the
+     RAW separated wing piece, before any processing, has no single dominant connected component --
+     its largest piece holds under 40% of its own vertices). Voxel-remeshing a wing tries to
+     reconstruct a single solid volume from this gappy input, which either needs a voxel size large
+     enough to blur the individual feathers into a featureless paddle (tested directly: the voxel
+     size needed to reach 1 component also brought the wing down to ~56 triangles, an unusable
+     blob) or leaves it just as fragmented as the input. QuadriFlow refuses non-manifold multi-shard
+     input outright. Collapse-decimate, by contrast, was confirmed SAFE here (component count
+     measured identical before and after, across several ratios) -- it can only simplify within
+     each already-separate feather island, never merge or further split them -- so each wing is
+     just cleaned of tiny stray specks and Collapse-decimated to budget, keeping its real original
+     feathered silhouette (confirmed in the before/after turnaround render) rather than smoothing it
+     away.
+   - **Tail:** turned out to already be a single clean connected component straight out of
+     separation (no voxel remesh needed either) -- cleaned of tiny strays and lightly Collapse-
+     decimated to budget.
+3. **Reassembly, UVs, bake.** All four pieces are joined back into ONE mesh object (multiple
+   components internally -- body + tail + 2 wings -- which is fine; `rig_creature.py`'s own weld-
+   on-import, added in round 7, already handles the glTF-export seam-splitting this produces).
+   Smart UV Project + a Cycles selected-to-active bake from the ORIGINAL (pre-separation) textured
+   mesh gives the reassembled mesh its own 1K texture.
 
 What this stage deliberately does NOT do, and why:
-  - Splitting wings into separate shrink-wrapped shells parented to wing bones: tried first with a
-    single voxel size for the whole mesh (see `retopologize_to_single_shell`'s docstring on why a
-    coarser voxel size doesn't monotonically reduce component count -- thin features pinch into
-    tiny stray islands rather than vanishing cleanly), which worked well enough once tuned (verified
-    below: 1 component, 0 non-manifold edges, wing silhouette/feather read clearly in the before/
-    after turnaround) that the added pipeline complexity of multi-shell export + per-shell armature
-    parenting wasn't worth it for this mesh. Worth revisiting per-creature if a future mesh's wings
-    don't resolve as cleanly.
-  - Scripted joint edge-loop reinforcement: still skipped, same reasoning as before (no scripted
-    per-joint loop-cut signal without manual picking or a curvature heuristic this pilot's time
-    budget didn't build) -- QuadriFlow's own edge flow is a meaningfully better substitute than the
-    old Collapse-decimate's density-gradient-preservation-only approach, since QuadriFlow actively
-    tries to align quads with surface curvature.
-  - Separating rigid parts (beak/talons): still not attempted, same reasoning as before (no
-    existing part-boundary signal on this mesh).
+  - A full voxel-remesh-> QuadriFlow pipeline for every piece: tried first (see above) and actively
+    hurt wing fidelity and, surprisingly, body connectivity too (a generous-enough-for-wings
+    geometric separation radius fragmented the body's own back) -- the simpler per-piece treatment
+    above measurably outperformed it on every piece, confirmed with renders at each step, not just
+    assumed.
+  - Scripted joint edge-loop reinforcement, separating rigid parts (beak/talons): still skipped,
+    same reasoning as every earlier round (no scripted per-joint loop-cut signal, no existing part-
+    boundary signal beyond what the per-region segmentation above already provides).
 
 Run headless:
   blender -b --python prep_mesh.py -- --glb INPUT.glb --out OUTDIR [--target-tris 8000]
@@ -73,9 +83,12 @@ import bpy
 import sys
 import os
 import json
+import mathutils
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "rig_templates"))
 import common
+import winged_quadruped as template
 
 args = common.parse_args(common.get_argv())
 GLB = args["glb"]
@@ -83,6 +96,14 @@ OUT = args["out"]
 TARGET_TRIS = int(args.get("target-tris", 8000))
 TEXTURE_SIZE = int(args.get("texture-size", 1024))
 os.makedirs(OUT, exist_ok=True)
+
+# Per-piece triangle budgets -- sum comfortably under TARGET_TRIS. Body gets the lion's share (it's
+# the bulk of the silhouette and carries the beak/crest/toe detail); each wing and the tail are
+# sized close to what they already naturally need (see the docstring above -- these pieces are kept
+# close to their ORIGINAL triangle count, not aggressively reduced, specifically to preserve detail).
+BODY_BUDGET = 4500
+WING_BUDGET = 950  # per wing
+TAIL_BUDGET = 700
 
 common.fresh_scene()
 obj, new_images = common.import_glb(GLB)
@@ -95,7 +116,6 @@ before_stats = common.topology_stats(obj)
 report["before"] = before_stats
 print("BEFORE:", json.dumps(before_stats))
 
-# Weld duplicate-position verts left by the glTF export/import round-trip at every UV/normal seam.
 v0, v1 = common.weld_mesh(obj, threshold=1e-4)
 report["weld"] = {"verts_before": v0, "verts_after": v1}
 print(f"WELD: {v0} -> {v1} verts")
@@ -104,64 +124,153 @@ welded_stats = common.topology_stats(obj)
 report["after_weld"] = welded_stats
 print("AFTER WELD:", json.dumps(welded_stats))
 
-# Keep an untouched copy of the welded mesh around: it's both the shrinkwrap TARGET (true surface
-# position/detail to project the retopologized mesh back onto) and the bake SOURCE (still has the
-# original UVs + textured material) for the rest of this stage.
+# Keep an untouched copy of the welded mesh around as the BAKE SOURCE (still has the original UVs +
+# textured material) for the rest of this stage.
 bpy.ops.object.select_all(action="DESELECT")
 obj.select_set(True)
 bpy.context.view_layer.objects.active = obj
 bpy.ops.object.duplicate()
-retopo_obj = bpy.context.view_layer.objects.active
-retopo_obj.name = "GriffinRetopo"
+bake_source_obj = bpy.context.view_layer.objects.active
+bake_source_obj.name = "GriffinBakeSource"
 
-# --- Retopology: voxel remesh (auto-tuned, single shell) -> smooth -> QuadriFlow -> shrinkwrap ---
-retopo_obj, retopo_diag = common.retopologize_to_single_shell(
-    retopo_obj, target_tri_band=(10000, 14000))
-report["retopo_voxel"] = retopo_diag
-print(f"RETOPO VOXEL: converged={retopo_diag['converged']}")
-for t in retopo_diag["tries"]:
-    print(f"  try: {t}")
+# --- Segmentation: throwaway skeleton + heat weights on a disposable normalised duplicate, used
+# only to classify each vertex of `obj` by dominant-bone role (see docstring for why this, not a
+# geometric chain-distance heuristic). ---
+seg_dup = obj.copy()
+seg_dup.data = obj.data.copy()
+bpy.context.collection.objects.link(seg_dup)
+seg_dup.name = "SegmentationDonor"
+bpy.context.view_layer.objects.active = seg_dup
+to_normalized_seg = template._native_to_normalized_fn(seg_dup, 2.0)
+H_seg = common.normalise_transform(seg_dup, 2.0)
+lm_seg = template.detect_landmarks_handplaced(seg_dup, H_seg, to_normalized_seg)
+seg_arm_data = bpy.data.armatures.new("SegmentationRig")
+seg_arm_obj = bpy.data.objects.new("SegmentationRig", seg_arm_data)
+bpy.context.collection.objects.link(seg_arm_obj)
+bpy.context.view_layer.objects.active = seg_arm_obj
+bpy.ops.object.mode_set(mode="EDIT")
+seg_bone_names, seg_bone_roles = template.build_bones(seg_arm_data.edit_bones, lm_seg, H_seg)
+bpy.ops.object.mode_set(mode="OBJECT")
+seg_method, seg_log = common.auto_weight_with_fallbacks(seg_dup, seg_arm_obj, seg_bone_names, H_seg)
+print(f"SEGMENTATION WEIGHTING: method={seg_method}")
+for line in seg_log:
+    print(f"  {line}")
 
-common.smooth_relax(retopo_obj)
-common.quadriflow_retopo(retopo_obj, target_faces=4000)
-post_quadriflow_stats = common.topology_stats(retopo_obj)
-report["after_quadriflow"] = post_quadriflow_stats
-print("AFTER QUADRIFLOW:", json.dumps(post_quadriflow_stats))
+tail_verts, wing_l_verts, wing_r_verts = set(), set(), set()
+for v in seg_dup.data.vertices:
+    best_group, best_weight = None, 0.0
+    for g in v.groups:
+        if g.weight > best_weight:
+            best_weight, best_group = g.weight, g.group
+    if best_group is None:
+        continue
+    role = seg_bone_roles.get(seg_dup.vertex_groups[best_group].name)
+    if role == "tail":
+        tail_verts.add(v.index)
+    elif role == "wing_L":
+        wing_l_verts.add(v.index)
+    elif role == "wing_R":
+        wing_r_verts.add(v.index)
+report["segmentation"] = {"method": seg_method, "tail": len(tail_verts), "wing_l": len(wing_l_verts),
+                           "wing_r": len(wing_r_verts)}
+print(f"SEGMENTATION: tail={len(tail_verts)} wing_l={len(wing_l_verts)} wing_r={len(wing_r_verts)} "
+      f"body={len(obj.data.vertices) - len(tail_verts) - len(wing_l_verts) - len(wing_r_verts)}")
 
-common.shrinkwrap_onto(retopo_obj, obj)
-post_shrinkwrap_stats = common.topology_stats(retopo_obj)
-report["after_shrinkwrap"] = post_shrinkwrap_stats
-print("AFTER SHRINKWRAP:", json.dumps(post_shrinkwrap_stats))
+bpy.data.objects.remove(seg_dup, do_unlink=True)
+bpy.data.objects.remove(seg_arm_obj, do_unlink=True)
+bpy.data.armatures.remove(seg_arm_data)
 
-# Final budget trim if QuadriFlow's target_faces overshot TARGET_TRIS -- safe here (unlike the old
-# pre-retopology Collapse call this replaces) because retopo_obj is, by construction, a single
-# connected, manifold, evenly-quadded mesh at this point.
-decimated = False
-if post_shrinkwrap_stats["tri_equivalent"] > TARGET_TRIS:
+# --- Separate `obj` (native, un-normalised coordinates) into the four pieces using the vertex
+# index sets computed above (seg_dup and obj have identical vertex order/count -- seg_dup was a
+# verbatim data-copy of obj before any topology-changing operation touched either). ---
+tail_obj = common.separate_by_vertex_indices(obj, tail_verts, "GriffinTail")
+wing_l_obj = common.separate_by_vertex_indices(obj, wing_l_verts, "GriffinWingL")
+wing_r_obj = common.separate_by_vertex_indices(obj, wing_r_verts, "GriffinWingR")
+obj.name = "GriffinBody"
+body_obj = obj
+
+pieces_report = {}
+
+# Body: a small stray-component cleanup is enough to make this single-component on its own (see
+# docstring) -- no voxel remesh needed, just decimate directly to budget.
+common.remove_small_components(body_obj, min_verts=100)
+pre = common.topology_stats(body_obj)
+before_tris, after_tris = common.decimate_to_tris(body_obj, BODY_BUDGET)
+post = common.topology_stats(body_obj)
+pieces_report["body"] = {"pre_cleanup_tris": pre["tri_equivalent"], "decimate": [before_tris, after_tris],
+                          "final_tris": post["tri_equivalent"], "components": post["components"],
+                          "non_manifold_edges": post["non_manifold_edges"]}
+print(f"BODY: cleanup->{pre['tri_equivalent']} tris, decimate {before_tris}->{after_tris}, "
+      f"components={post['components']}")
+
+# Wings: Collapse-decimate is confirmed safe on this piece's own naturally-fragmented feather-card
+# geometry (component count doesn't change -- see docstring); voxel remesh/QuadriFlow are NOT used
+# here, they actively destroy the feather silhouette on this specific mesh.
+for name, wobj, budget in (("wing_l", wing_l_obj, WING_BUDGET), ("wing_r", wing_r_obj, WING_BUDGET)):
+    n_removed, v_removed = common.remove_small_components(wobj, min_verts=15)
+    pre = common.topology_stats(wobj)
+    before_tris, after_tris = common.decimate_to_tris(wobj, budget)
+    post = common.topology_stats(wobj)
+    pieces_report[name] = {"small_components_removed": n_removed, "pre_cleanup_tris": pre["tri_equivalent"],
+                            "decimate": [before_tris, after_tris], "final_tris": post["tri_equivalent"],
+                            "components": post["components"]}
+    print(f"{name.upper()}: removed {n_removed} tiny specks ({v_removed} verts), "
+          f"decimate {before_tris}->{after_tris}, components={post['components']}")
+
+# Tail: already a single clean component straight out of separation on this mesh -- light cleanup
+# + decimate to budget, same reasoning as body.
+n_removed, v_removed = common.remove_small_components(tail_obj, min_verts=5)
+pre = common.topology_stats(tail_obj)
+before_tris, after_tris = common.decimate_to_tris(tail_obj, TAIL_BUDGET)
+post = common.topology_stats(tail_obj)
+pieces_report["tail"] = {"small_components_removed": n_removed, "pre_cleanup_tris": pre["tri_equivalent"],
+                          "decimate": [before_tris, after_tris], "final_tris": post["tri_equivalent"],
+                          "components": post["components"]}
+print(f"TAIL: removed {n_removed} tiny specks ({v_removed} verts), decimate {before_tris}->{after_tris}, "
+      f"components={post['components']}")
+
+report["pieces"] = pieces_report
+
+# --- Reassemble: join all four pieces back into one mesh object (multi-component internally is
+# fine -- rig_creature.py's weld-on-import, added in round 7, already handles the glTF export-time
+# seam-splitting this produces, same as it does for the single-piece body's own UV seams). ---
+bpy.ops.object.select_all(action="DESELECT")
+for piece in (wing_l_obj, wing_r_obj, tail_obj, body_obj):
+    piece.select_set(True)
+bpy.context.view_layer.objects.active = body_obj
+bpy.ops.object.join()
+retopo_obj = body_obj
+retopo_obj.name = "GriffinAssembled"
+
+assembled_stats = common.topology_stats(retopo_obj)
+report["after_reassembly"] = assembled_stats
+print("AFTER REASSEMBLY:", json.dumps(assembled_stats))
+
+# Final budget safety trim (should rarely trigger -- the per-piece budgets above already sum under
+# TARGET_TRIS -- but kept as a safety net, same as round 7's). Safe here: every piece was already
+# confirmed single-component (or safely-decimated-fragmented, for the wings) before joining, so
+# Collapse-decimate on the assembled whole can't introduce a NEW failure mode beyond what each piece
+# already tolerated independently.
+if assembled_stats["tri_equivalent"] > TARGET_TRIS:
     before_tris, after_tris = common.decimate_to_tris(retopo_obj, TARGET_TRIS)
-    report["decimate"] = {"before_tris": before_tris, "after_tris": after_tris, "skipped": False}
-    print(f"DECIMATE: {before_tris} -> {after_tris} tris")
-    decimated = True
+    report["final_decimate"] = {"before_tris": before_tris, "after_tris": after_tris, "skipped": False}
+    print(f"FINAL DECIMATE: {before_tris} -> {after_tris} tris")
 else:
-    report["decimate"] = {"skipped": True, "reason": "already under target"}
-    print(f"DECIMATE SKIPPED: already under {TARGET_TRIS} tris")
+    report["final_decimate"] = {"skipped": True, "reason": "already under target"}
+    print(f"FINAL DECIMATE SKIPPED: already under {TARGET_TRIS} tris")
 
 after_stats = common.topology_stats(retopo_obj)
 report["after"] = after_stats
 print("AFTER:", json.dumps(after_stats))
 
-# Non-manifold / inspection summary (printed either way; this is the "Report before/after stats"
-# deliverable the task brief asks for).
 print(f"NON-MANIFOLD EDGES: {after_stats['non_manifold_edges']} "
       f"(boundary edges: {after_stats['boundary_edges']})")
 print(f"COMPONENTS: {after_stats['components']} "
       f"(largest: {after_stats['largest_component']} / {after_stats['verts']} verts)")
 
-# Base-colour texture: Smart-UV-Project the new mesh, then Cycles-bake the ORIGINAL textured mesh's
-# diffuse colour onto it (selected-to-active) at 1K, replacing the old "downsize the existing
-# texture" step entirely -- the new mesh has its own new UV layout, so the old texture's UVs no
-# longer apply.
-bake_img = common.bake_base_color(retopo_obj, obj, image_size=TEXTURE_SIZE)
+# Base-colour texture: Smart-UV-Project the reassembled mesh, then Cycles-bake the ORIGINAL
+# (pre-separation) textured mesh's diffuse colour onto it (selected-to-active) at 1K.
+bake_img = common.bake_base_color(retopo_obj, bake_source_obj, image_size=TEXTURE_SIZE)
 tex_path = os.path.join(OUT, "base_color_1k.png")
 bake_img.filepath_raw = tex_path
 bake_img.file_format = "PNG"
@@ -176,9 +285,7 @@ for mat in retopo_obj.data.materials:
 report["texture"] = {"size": list(tex_image.size), "baked": True}
 print(f"TEXTURE (baked): {tuple(tex_image.size)}")
 
-# Only export the retopologized mesh -- the original (now just a shrinkwrap target / bake source)
-# is cleaned up first so it doesn't end up in the output GLB alongside it.
-bpy.data.objects.remove(obj, do_unlink=True)
+bpy.data.objects.remove(bake_source_obj, do_unlink=True)
 retopo_obj.name = "Griffin"
 
 out_glb = os.path.join(OUT, "griffin_prepped.glb")

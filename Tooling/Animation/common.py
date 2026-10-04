@@ -388,6 +388,90 @@ def bake_base_color(retopo_obj, source_obj, image_size=1024, cage_extrusion=0.03
 
 
 # ---------------------------------------------------------------------------
+# Part segmentation (round 8): a single flat voxel size that resolves the body cleanly as one
+# shell erases anything thinner than that voxel -- confirmed directly on this mesh (round 7's
+# single-shell retopology lost the tail entirely, truncated the wings, and softened the
+# beak/crest). Segmenting thin appendages (tail, wings) out BEFORE remeshing lets each piece use
+# its own appropriately-sized voxel (coarse for the body, fine for the thin parts) instead of one
+# compromise size that's wrong for everything. These helpers are creature-agnostic (no
+# Griffin-specific assumptions); the caller supplies the chain points (e.g. from a template's own
+# HAND_LANDMARKS_NATIVE) and a radius per chain.
+# ---------------------------------------------------------------------------
+def _point_segment_dist_ratio(p, a, b, ra, rb):
+    """Distance from p to segment a->b, divided by a radius LINEARLY INTERPOLATED between ra (at a)
+    and rb (at b) using the same t the nearest-point projection lands at. Lets a chain's capture
+    radius grow along its own length (e.g. narrow at a wing's root, wide at its fanned-out tip)
+    instead of a single uniform radius for the whole chain -- round 8 finding: a uniform radius
+    generous enough to catch a wing's fanned feather tips was ALSO generous enough to bite a
+    connecting strip out of the body's own back/shoulder surface near the root, splitting the
+    separated body piece into two disconnected halves (confirmed directly: the body-only piece's
+    own voxel-remesh convergence got dramatically WORSE after a uniform wide-radius separation,
+    not better, versus the pre-separation whole mesh)."""
+    ab = b - a
+    denom = ab.dot(ab)
+    t = 0.0 if denom < 1e-9 else max(0.0, min(1.0, (p - a).dot(ab) / denom))
+    closest = a + ab * t
+    dist = (p - closest).length
+    radius = ra + (rb - ra) * t
+    return dist / max(radius, 1e-6)
+
+
+def classify_by_chains(obj, chains_with_radii):
+    """chains_with_radii: {name: (list_of_Vector_points, list_of_radii)} -- `list_of_radii` has one
+    radius per point (same length as points), linearly interpolated along each segment (see
+    `_point_segment_dist_ratio`). A single float is also accepted for `list_of_radii` (treated as a
+    uniform radius at every point, for a chain that doesn't need the taper). Returns {name:
+    set(vertex indices)} -- each vertex is claimed by the chain whose polyline it's nearest to, AS A
+    FRACTION OF THAT CHAIN'S OWN (possibly tapered) RADIUS, and only if that fraction is <=1.0.
+    Vertices claimed by no chain are left out of every set (the caller's "body"/default region --
+    whatever isn't explicitly separated out)."""
+    me = obj.data
+    result = {name: set() for name in chains_with_radii}
+    norm_chains = {}
+    for name, (pts, radii) in chains_with_radii.items():
+        if isinstance(radii, (int, float)):
+            radii = [radii] * len(pts)
+        norm_chains[name] = (pts, radii)
+    for v in me.vertices:
+        p = v.co
+        best_name, best_ratio = None, None
+        for name, (pts, radii) in norm_chains.items():
+            ratio = min(_point_segment_dist_ratio(p, pts[i], pts[i + 1], radii[i], radii[i + 1])
+                        for i in range(len(pts) - 1))
+            if ratio <= 1.0 and (best_ratio is None or ratio < best_ratio):
+                best_name, best_ratio = name, ratio
+        if best_name:
+            result[best_name].add(v.index)
+    return result
+
+
+def separate_by_vertex_indices(obj, vert_indices, new_name):
+    """Selects `vert_indices` on obj and separates them (plus any face whose vertices are ALL
+    selected) into a new object, returned; `obj` keeps the remainder. Goes through a temporary
+    named vertex group + `vertex_group_select` (rather than setting `.select` directly in object
+    mode) so the selection survives Blender's own mode-switch bookkeeping reliably."""
+    vg = obj.vertex_groups.new(name="_sep_tmp")
+    vg.add(list(vert_indices), 1.0, "REPLACE")
+    bpy.context.view_layer.objects.active = obj
+    obj.vertex_groups.active_index = vg.index
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_mode(type="VERT")
+    bpy.ops.mesh.select_all(action="DESELECT")
+    bpy.ops.object.vertex_group_select()
+    before = set(bpy.data.objects.keys())
+    bpy.ops.mesh.separate(type="SELECTED")
+    bpy.ops.object.mode_set(mode="OBJECT")
+    after = set(bpy.data.objects.keys())
+    new_names = after - before
+    new_obj = bpy.data.objects[next(iter(new_names))]
+    new_obj.name = new_name
+    for o in (obj, new_obj):
+        if "_sep_tmp" in o.vertex_groups:
+            o.vertex_groups.remove(o.vertex_groups["_sep_tmp"])
+    return new_obj
+
+
+# ---------------------------------------------------------------------------
 # Weighting: automatic weights with fallback chain + scripted cleanup
 # (ported from Tooling/Spike55/blender_export_live.py, generalised to any bone-name list)
 # ---------------------------------------------------------------------------

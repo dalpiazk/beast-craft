@@ -29,6 +29,122 @@ passes, weight-paint cleanup, Blender-5.x layered-Action F-curve walking, interp
 normalisation) live in `common.py` so every stage script imports them rather than re-deriving the
 same Blender-API gotchas five times.
 
+## v8 redo: segment before retopologizing -- one voxel size can't serve both the body and its thin
+## appendages (lead-review round 8)
+
+Round 7's whole-mesh single-voxel retopology genuinely fixed the hip tear (confirmed, not disputed
+this round either) but cost more than it first looked: the lead's round-8 review found the **tail
+missing entirely** from every Move/Idle contact-sheet frame, both **wings truncated/merged** into a
+blobbier shape than the original, and a **blobby head** (crest/beak softened, toes reduced to
+stubs, talons gone) in the flat-shaded turnaround. The single voxel size round 7 auto-tuned was
+coarse enough to resolve the BODY as one clean shell within budget -- and that same coarseness
+erased anything thinner than it, regardless of how important that thin part was to the silhouette.
+
+**Fix: segment the mesh into body / tail / wing_L / wing_R FIRST, then let each piece use whatever
+treatment actually suits its own geometry** -- not one compromise setting for everything.
+
+**1. Segmentation**, implemented in `prep_mesh.py` + new `common.py` helpers
+(`classify_by_chains`/`separate_by_vertex_indices`, used for an earlier attempt -- kept in the
+module -- superseded by the approach actually shipped, below):
+- First attempt: geometric distance-to-chain classification (how close a vertex sits to the hand-
+  placed tail/wing landmark chains). A radius generous enough to catch the wings' fanned-out
+  feather tips was ALSO generous enough to bite a connecting strip out of the body's own back/
+  shoulder surface -- confirmed directly: separating with that radius made the BODY piece's own
+  later retopology fragment far WORSE than the pre-separation whole mesh (components jumped from a
+  clean single dominant shell to no component holding even 20% of the mesh). A tapered radius
+  (narrow at the chain's root, wide at the tip) helped the body but still only captured the wing's
+  surface in scattered patches, not a clean region -- a straight-line distance test just isn't
+  enough signal for a 2D fanned membrane described by a 3-point chain.
+- **What shipped: build a throwaway skeleton + automatic heat weights on a disposable duplicate**
+  (literally the same `rig_templates.winged_quadruped.detect_landmarks_handplaced` +
+  `build_bones` + `common.auto_weight_with_fallbacks` the real rig uses -- not a second, separately-
+  tuned heuristic), then classify each vertex by its dominant bone's role: "tail" -> tail piece,
+  "wing_L"/"wing_R" -> that wing's piece, everything else -> body. Heat diffusion respects the
+  mesh's actual surface connectivity in a way a straight-line chain distance can't, and reuses
+  machinery already proven correct for the real rig. Converged in 0.2s with ZERO fallback needed
+  (heat weights succeeded on attempt 1) and gave a clean result: body piece 96%+ single dominant
+  component, tail a single clean component, wings cleanly separated from the body's own surface
+  (confirmed with a colour-coded render, not just vertex counts).
+- A key finding along the way, worth keeping on record: **each wing's raw Meshy geometry is itself a
+  bundle of separate, only loosely-connected feather-card shapes with real 3D gaps between them**,
+  confirmed directly -- even the cleanly-separated raw wing piece has no single dominant connected
+  component (its largest piece holds under 40% of its own vertices, before any processing). This
+  isn't a classification artefact; it's how the source asset was built.
+
+**2. Per-piece treatment** (the actual round-8 fix -- letting each piece's own geometry dictate the
+approach, rather than forcing everything through the same voxel-remesh-> QuadriFlow pipeline that
+worked for the WHOLE mesh in round 7):
+- **Body** (head/torso/legs/talons): after separation and a small-stray-component cleanup, this
+  piece turned out to already be a single clean connected component ON ITS OWN -- no voxel remesh
+  needed at all. Collapse-decimated directly to its 4500-tri budget (the same simple approach this
+  file used before round 7, now genuinely safe because the single-component precondition is
+  actually met once the wings/tail aren't mixed in). Preserves the beak hook, crest, eyes, and all
+  four distinct feet with talons at full original fidelity -- confirmed in `v8/body_head.png` and
+  `v8/body_foot.png`, rendered and looked at directly before proceeding.
+- **Wings:** given the inherent feather-gap fragmentation above, voxel remesh was tested directly
+  and rejected -- the voxel size needed to reach a single connected component also collapsed a wing
+  down to ~56 triangles (an unusable blob), and QuadriFlow outright refuses non-manifold multi-shard
+  input. Collapse-decimate was tested and confirmed SAFE on this specific fragmented geometry
+  (component count measured byte-identical before and after, across several decimate ratios --
+  Collapse can only simplify WITHIN an already-separate island, never merge or further split one).
+  Each wing: small-stray-speck cleanup (min 15 verts) then Collapse-decimate to a 950-tri budget,
+  keeping its real feathered silhouette intact rather than smoothing it into a paddle.
+- **Tail:** also turned out to be a single clean component straight out of separation -- same
+  treatment as the body, decimated to a 700-tri budget.
+- **Total: 7099 tris** (budget 8000) across body (4500) + wing_L (950) + wing_R (950) + tail (700,
+  slightly under after decimation) -- comfortably under budget with room to spare, unlike round 7's
+  tighter single-shell fit.
+
+**3. Reassembly, UVs, bake.** All four pieces are joined back into one mesh object (multi-component
+internally -- fine, `rig_creature.py`'s weld-on-import from round 7 already handles the resulting
+glTF export-time seam-splitting). Smart UV Project + a Cycles selected-to-active bake from the
+ORIGINAL (pre-separation) textured mesh gives the reassembled mesh its own 1K texture.
+
+**Before/after turnaround against the original textured mesh (`views_quad.png`), side by side, same
+camera, same angles -- looked at directly, not just rendered:** `v8/v8cmp_orig_{0..3}.png` vs.
+`v8/v8cmp_prepped_{0..3}.png`. The match is close to pixel-identical at every angle checked: both
+wings' feather fingers, the tail with its tuft, the beak hook, the crest, and all four feet with
+visible talons are all present and correctly shaped in the prepped mesh, matching the original's
+silhouette far more closely than round 7's retopology did.
+
+**4. Re-rigging, weighting, hip/root checks.** Same hand-placed landmarks (`HAND_LANDMARKS_NATIVE`,
+unchanged), same `rig_creature.py` weld-on-import fix from round 7. Weld-on-import: 7895 -> 4094
+verts, 5 components (largest 4064/4094 = 99.3% -- the few remaining small components are boundary
+scars at the piece-separation cuts that didn't happen to land exactly coincident after decimation,
+not a new problem). Weighting converged on attempt 1 (0/4094 unweighted) with only a small floating-
+island repair (30 verts, 0.7% of the mesh -- vs. round 6's 57%).
+- **Hip region (same worst Move frame as v6/v7, frame 7, same camera):** `v8/hip_after_v8_wide.png`
+  -- clean, continuous surface, no tears. The round-7 fix holds.
+- **Tail root at max sway** (`v8/tail_root_closeup.png`, Move frame 19): clean transition from the
+  haunch into the tail base, no gap.
+- **Wing root at max flare** (`v8/wing_root_closeup.png`, Attack strike frame): mostly clean, with a
+  small, honestly-noted residual -- a thin faceted seam near where the wing meets the shoulder/crest
+  under this specific dramatic, fully-extended pose. Far smaller and less objectionable than the
+  shard-like tearing earlier rounds showed, but not perfectly invisible; a real, if minor, open item.
+
+**5. Stride/gait unchanged in mechanism, re-measured on the new mesh.** All four legs still clear
+the lead's >=20%-of-H target on this retopologized-and-reassembled geometry: BL 29.5%, BR 28.4%, FL
+37.5%, FR 26.8%. Knee ranges: BL 25.8-136.7, BR 33.1-136.9, FL 23.6-114.4, FR 34.6-116.1 degrees.
+
+**Gate summary (`scratchpad/anim-pilot/v8/verify_v8_1.txt`):** every gate passes -- foot-slide,
+knee-angle, loop-seam, jitter, ground-interpenetration (all four feet at -0.0001). Mesh: 7099 tris
+(budget 8000), 35 bones (unchanged). GLB: 0.733 MiB (budget ~2 MiB).
+
+**Confirmed directly, per the lead's explicit instruction, not just assumed:** every frame of
+`review_v8/final/contact_sheet_idle.png`, `contact_sheet_move.png`, and `contact_sheet_move_side.png`
+was looked at and shows the tail and both wings clearly visible, with real feather-finger silhouette
+and real stride variation frame to frame -- the exact two things round 7 lost.
+
+**Honest per-clip critique, this round:** Move/Idle/Attack are now correct at both the geometry
+level (tail and wings present with the right silhouette, hip tear still fixed) and the motion level
+(stride target met on all four legs, zero foot slide). The one open item carried forward honestly:
+a small faceted seam at the wing root under Attack's most extreme pose (noted above) -- worth a
+closer look if this pipeline continues, though it reads far better than anything earlier rounds
+shipped. The `retopologize_to_single_shell`/`quadriflow_retopo`/`shrinkwrap_onto` helpers added in
+round 7 are kept in `common.py` (not deleted) since they worked well for the BODY-only case in
+isolation during this round's testing and may suit a future creature whose appendages don't have
+this mesh's specific feather-card fragmentation -- just no longer the default path for this one.
+
 ## v7 redo: retopology fixes the hip/belly tear at the source (lead-review round 7)
 
 Round 6's review confirmed the skeleton overlay was right but flagged two things: the v6 floating-
