@@ -360,7 +360,29 @@ else:
     n_removed, v_removed = common.remove_small_components(obj, min_verts=50)
     print(f"REMOVED {n_removed} tiny stray component(s) ({v_removed} verts)")
     pre = common.topology_stats(obj)
-    before_tris, after_tris = common.decimate_to_tris(obj, TARGET_TRIS)
+
+    # Round 10: protect the leg-to-body transition zones from aggressive decimation, same reasoning
+    # as round 9's belly-protect zone for the segmentation path (which this simple path skips
+    # entirely, so it never got any protection here before) -- confirmed via verify.py's edge-
+    # stretch gate that a flat decimate left an unusually large triangle spanning the leg/pelvis
+    # boundary. Built from HAND_LANDMARKS_NATIVE's own leg attachment points (fore shoulder and
+    # hind hip Y/Z), not hardcoded to this one mesh's absolute numbers.
+    try:
+        _leg_ys = [l["chain"][0][1] for l in template.HAND_LANDMARKS_NATIVE["legs"]]
+        _leg_zs = [l["chain"][0][2] for l in template.HAND_LANDMARKS_NATIVE["legs"]]
+        _y_lo, _y_hi = min(_leg_ys) - 0.20, max(_leg_ys) + 0.20
+        _z_lo, _z_hi = min(_leg_zs) - 0.15, max(_leg_zs) + 0.20
+        protect_vg = obj.vertex_groups.new(name="protect_leg_body")
+        protect_idx = [v.index for v in obj.data.vertices if _y_lo < v.co.y < _y_hi and _z_lo < v.co.z < _z_hi]
+        protect_vg.add(protect_idx, 1.0, "REPLACE")
+        print(f"LEG/BODY PROTECT ZONE: {len(protect_idx)}/{len(obj.data.vertices)} verts "
+              f"(y in [{_y_lo:.2f},{_y_hi:.2f}], z in [{_z_lo:.2f},{_z_hi:.2f}])")
+        protect_group_name = "protect_leg_body"
+    except Exception as e:
+        print(f"LEG/BODY PROTECT ZONE SKIPPED (no leg landmarks available): {e}")
+        protect_group_name = None
+
+    before_tris, after_tris = common.decimate_to_tris(obj, TARGET_TRIS, protect_vertex_group=protect_group_name)
     report["decimate"] = {"before_tris": before_tris, "after_tris": after_tris}
     print(f"DECIMATE: {before_tris} -> {after_tris} tris")
 

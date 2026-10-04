@@ -609,52 +609,73 @@ def detect_landmarks(obj, H):
 # same mesh's own pre-normalisation bounding box, not re-derived or approximated), so a hand-placed
 # point and the mesh vertex it was read off land in the same place after normalisation.
 
+# Round 10: entirely new source mesh (a producer-approved, purpose-generated text-to-3D Griffin --
+# neutral standing pose, level back, four legs straight and clearly apart, wings spread wide to the
+# sides, long tail straight out with a dark tuft, beak open -- see Tooling/ArtLab/provenance/
+# meshy-01a106b9-...md / meshy-01a106bc-...md and the README's round-10 section). These coordinates
+# are hand-placed by the lead from the calibrated `scratchpad/anim-pilot/calib_v10/{left,front,
+# bottom}.png` renders + calib.json, in the v10 PREPPED mesh's own native (pre-normalisation)
+# coordinates -- NOT the old mesh's coordinate frame, which this dict entirely replaces (the old
+# mesh's rig/animation work, rounds 4-9, is complete and superseded, not being maintained in
+# parallel). Axis convention for this mesh (corrected during round 10 -- calib.json's own
+# auto-detected forward_sign was wrong, a height-based heuristic that assumes a dramatic reared
+# pose this neutral level-back mesh doesn't have): head points along -Y, tail along +Y, +X is the
+# mesh's right side as modelled (so L=-X, R=+X as given), +Z is up, ground is at Z~=-0.63.
 HAND_LANDMARKS_NATIVE = {
     "legs": [
         {"side": "FL", "is_front": True, "chain": [
-            (0.00, -0.36, -0.40), (-0.04, -0.40, -0.64), (-0.08, -0.41, -0.83), (-0.10, -0.42, -0.94)],
-         "toe_tip": (-0.14, -0.50, -0.94)},
+            (-0.16, -0.30, -0.13), (-0.16, -0.32, -0.35), (-0.16, -0.34, -0.55), (-0.16, -0.40, -0.63)],
+         "toe_tip": (-0.16, -0.54, -0.63)},
         {"side": "FR", "is_front": True, "chain": [
-            (0.34, -0.42, -0.40), (0.40, -0.52, -0.64), (0.43, -0.58, -0.83), (0.44, -0.61, -0.94)],
-         "toe_tip": (0.48, -0.68, -0.94)},
+            (0.16, -0.30, -0.13), (0.16, -0.32, -0.35), (0.16, -0.34, -0.55), (0.16, -0.40, -0.63)],
+         "toe_tip": (0.16, -0.54, -0.63)},
+        # Hind legs (lion): round-10 lead review flagged "check the hind-leg bend against the mesh;
+        # if the actual knee is forward of the hip, use the mesh's real knee within the 0.04 snap
+        # and report it" -- the given knee (Y 0.07) sits BEHIND the hip (Y -0.03) in this mesh's
+        # head=-Y convention, not forward of it. Checked directly against the rig overlay render
+        # (see README's round-10 section for the result) rather than assumed; _snap_if_outside's
+        # normal <=0.04 budget is the only adjustment applied, same as every other point here.
         {"side": "BL", "is_front": False, "chain": [
-            (0.03, 0.00, -0.42), (0.02, -0.06, -0.66), (0.03, 0.02, -0.80), (0.03, -0.10, -0.92)],
-         "toe_tip": (0.03, -0.17, -0.94)},
+            (-0.13, -0.03, -0.22), (-0.13, 0.07, -0.36), (-0.13, 0.17, -0.46), (-0.13, 0.12, -0.62)],
+         "toe_tip": (-0.13, 0.01, -0.62)},
         {"side": "BR", "is_front": False, "chain": [
-            (0.36, 0.00, -0.42), (0.42, -0.06, -0.66), (0.45, 0.02, -0.80), (0.46, -0.13, -0.92)],
-         "toe_tip": (0.46, -0.20, -0.94)},
+            (0.13, -0.03, -0.22), (0.13, 0.07, -0.36), (0.13, 0.17, -0.46), (0.13, 0.12, -0.62)],
+         "toe_tip": (0.13, 0.01, -0.62)},
     ],
     "spine": {
-        "pelvis": (0.17, 0.09, -0.44),
-        "spine_01": (0.17, -0.14, -0.31),
-        "chest": (0.17, -0.36, -0.14),
-        "neck_base": (0.17, -0.43, 0.06),
-        "neck_mid": (0.17, -0.45, 0.21),
-        "head_tip": (0.17, -0.69, 0.27),  # beak tip
+        "pelvis": (0.0, -0.05, -0.13),
+        "spine_01": (0.0, -0.20, -0.09),
+        "chest": (0.0, -0.35, -0.05),
+        "neck_base": (0.0, -0.48, 0.06),
+        "neck_mid": (0.0, -0.57, 0.21),
+        "head": (0.0, -0.68, 0.39),       # skull centre (NEW this round -- the old mesh's chain
+                                           # went straight from neck_mid to the beak tip)
+        "head_top": (0.0, -0.63, 0.50),   # crest -- reference point only, not its own bone
+        "beak_tip": (0.0, -0.94, 0.34),   # upper beak (rigid, child of the head/skull bone)
+        # Lower mandible tip: NOT given as an explicit lead-placed coordinate (the brief asked for
+        # "a jaw bone for the open beak" without a separate jaw landmark) -- estimated as a
+        # proportional offset from beak_tip (slightly less far forward, notably lower in Z to span
+        # the open gape visible in views_t2d_tex.png), then snapped to the mesh surface like every
+        # other point. Reported honestly as an estimate, not a hand-measured landmark, same spirit
+        # as the old mesh's proportional foreleg estimate.
+        "jaw_tip": (0.0, -0.85, 0.15),
     },
-    "tail": [(0.10, 0.27, -0.44), (0.0, 0.44, -0.53), (-0.10, 0.59, -0.49), (-0.15, 0.64, -0.31),
-             (-0.17, 0.77, -0.13)],
-    "wing_l": [(-0.08, -0.17, -0.05), (-0.25, -0.02, 0.40), (-0.43, 0.14, 0.90)],
-    "wing_r": [(0.22, -0.12, 0.00), (0.17, 0.15, 0.45), (0.11, 0.42, 0.92)],
+    "tail": [(0.0, 0.08, -0.15), (0.0, 0.23, -0.24), (0.0, 0.36, -0.39), (0.0, 0.58, -0.51),
+             (0.0, 0.92, -0.45)],
+    "wing_l": [(-0.17, -0.27, 0.05), (-0.45, 0.10, 0.20), (-0.75, 0.65, 0.52)],
+    "wing_r": [(0.17, -0.27, 0.05), (0.45, 0.10, 0.20), (0.75, 0.65, 0.52)],
 }
 
-# Solver-stability nudge (NOT a landmark relocation) -- found necessary by direct experiment, not a
-# second-guess of the lead's placement: with BL's hand-placed knee as-given, Blender's automatic-
-# weight heat solver fails COMPLETELY (every vertex unweighted, including on a fresh voxel-
-# remeshed donor mesh that's supposed to "never fail") -- confirmed isolated to BL specifically
-# (FL/FR/BR all weight cleanly with their own hand-placed joints untouched) and to the knee
-# specifically (a scratchpad test perturbed each of BL's 4 joints one at a time; only moving the
-# knee fixed it, moving hip/ankle/foot individually did not) via a systematic per-joint, then a
-# per-offset-magnitude scratchpad sweep: -0.005 in X still failed, -0.01 and beyond reliably
-# succeeded. BL's knee sits almost exactly on the mesh's own X=0 centreline (native X=0.02, next to
-# BL's hip/ankle/foot which all sit on the same near-centreline side) -- apparently pathologically
-# close to some other part of the mesh/skeleton for Blender's heat kernel specifically, not an
-# "outside the mesh" problem (`_snap_if_outside`'s iterative fix made no difference here) and not a
-# visibly-wrong position in the overlay render either. -0.015 (normalised X, roughly -0.014 in the
-# native frame) is comfortably inside the confirmed-working range with margin, and small enough
-# that the overlay render (checked after this nudge, not assumed) still shows the knee sitting
-# inside the leg.
-SOLVER_STABILITY_NUDGE = {"BL": mathutils.Vector((-0.015, 0.0, 0.0))}
+# Solver-stability nudge (NOT a landmark relocation) -- round 4/5's finding (see git history),
+# specific to the OLD mesh's BL knee position (it sat almost exactly on that mesh's X=0 centreline,
+# which was pathological for Blender's heat kernel specifically). Round 10's new mesh has its own
+# hand-placed knees genuinely off-centreline for every leg (X=-0.13/+0.13, not near 0) and this
+# round's own weighting run (see README) converged on the first attempt with no solver failure, so
+# this is left EMPTY rather than ported forward blindly -- a stale per-side offset for a bug that
+# doesn't reproduce on this mesh would just be an unexplained, undocumented geometry nudge. Kept as
+# a dict (not deleted) since `detect_landmarks_handplaced` still reads it unconditionally; populate
+# it again, with a fresh per-mesh justification, if a future mesh hits the same solver failure.
+SOLVER_STABILITY_NUDGE = {}
 
 
 def _native_to_normalized_fn(obj, target_height=2.0):
@@ -747,16 +768,19 @@ def detect_landmarks_handplaced(obj, H, to_normalized):
     pelvis = pt(spine["pelvis"])
     chest = pt(spine["chest"])
 
-    # Forward axis: still read from the mesh itself (the tail-hint test from detect_landmarks),
-    # not hardcoded -- the hand-placed points are all given in this mesh's own native frame, which
-    # the calib.json axes note confirms is head-along-forward_sign*Y, but forward_sign's actual
-    # numeric value is still derived from the geometry for anything downstream that needs it
-    # (build_bones' tail-root fallback, etc.).
-    verts = [obj.matrix_world @ v.co for v in obj.data.vertices]
-    pos_extreme = max(verts, key=lambda v: v.y)
-    neg_extreme = min(verts, key=lambda v: v.y)
-    tail_hint = pos_extreme if pos_extreme.z >= neg_extreme.z else neg_extreme
-    forward_sign = -1.0 if tail_hint.y > 0 else 1.0
+    # Forward axis: round 10 finding -- the OLD approach here (and in the matching calib_render.py
+    # heuristic) inferred forward_sign from WHICH extreme vertex (max +Y vs max -Y) sits higher in Z,
+    # reasoning that a dramatically reared pose's head/chest would be clearly the taller side. This
+    # new mesh's neutral, LEVEL-BACK pose (head and tail at similar heights, by design -- see
+    # Tooling/ArtLab/provenance) defeats that assumption outright: it was confirmed wrong during
+    # round 10's calibration step (calib.json originally recorded +1, corrected to -1 after the lead
+    # read the actual pixel positions). The fix is to stop guessing from mesh geometry at all --
+    # the hand-placed landmarks THEMSELVES already encode the forward direction (head.y is further
+    # from pelvis.y, toward the head, than pelvis.y is from itself), so derive forward_sign directly
+    # from those, which is exactly as reliable as the landmarks are (verified correct, not detected).
+    _pelvis_native_y = HAND_LANDMARKS_NATIVE["spine"]["pelvis"][1]
+    _head_native_y = HAND_LANDMARKS_NATIVE["spine"].get("head", HAND_LANDMARKS_NATIVE["spine"].get("head_tip"))[1]
+    forward_sign = -1.0 if _head_native_y < _pelvis_native_y else 1.0
 
     legs = []
     for leg_spec in HAND_LANDMARKS_NATIVE["legs"]:
@@ -795,6 +819,13 @@ def detect_landmarks_handplaced(obj, H, to_normalized):
     else:
         print("HAND LANDMARKS: all points already inside the mesh, no snapping needed")
 
+    # Round 10: richer head chain -- skull centre ("head"), crest ("head_top", reference only, no
+    # bone), upper beak tip ("beak_tip"), and an estimated lower-mandible tip ("jaw_tip", see
+    # HAND_LANDMARKS_NATIVE's own comment on why this one is an estimate not a hand-placed point).
+    # "head_tip" is kept pointing at beak_tip (not skull) for any caller still reading the old key
+    # name directly.
+    head_skull = pt(spine["head"])
+    beak_tip_pt = pt(spine["beak_tip"])
     return {
         "H": H,
         "forward_sign": forward_sign,
@@ -805,7 +836,11 @@ def detect_landmarks_handplaced(obj, H, to_normalized):
         "neck_base": pt(spine["neck_base"]),
         "neck_mid": pt(spine["neck_mid"]),
         "head_base": pt(spine["neck_mid"]),  # kept for callers that still read head_base directly
-        "head_tip": pt(spine["head_tip"]),
+        "head": head_skull,
+        "head_top": pt(spine["head_top"]),
+        "beak_tip": beak_tip_pt,
+        "jaw_tip": pt(spine["jaw_tip"]),
+        "head_tip": beak_tip_pt,  # kept for callers that still read head_tip directly
         "wing_l_tip": wing_l_pts[-1],
         "wing_r_tip": wing_r_pts[-1],
         "wing_l_pts": wing_l_pts,
@@ -924,34 +959,34 @@ def fix_hip_weight_gradient(obj, H, legs, bone_roles, belly_half_width_frac=0.35
     else:
         belly_cx, belly_half_width, belly_min_z = 0.0, 0.0, 1e9
 
-    # Round 9, pass 0: the SAME hind-left/hind-right (opposite-phase) ambiguity pass 2 targets, but
-    # found just BELOW pass 2's own height cutoff -- confirmed as the single most visually dominant
-    # artefact in Move: the longest POSED edge in the whole mesh (0.92 units, nearly 3x longer than
-    # the next-longest) connects a leg_BL-dominant vertex to a leg_BR-dominant one. Widening pass
-    # 2's height threshold to catch it was tried and made OTHER pairs worse (more flagged edges
-    # overall -- see belly_min_z's own comment); this is a narrower, pair-specific version instead:
-    # any vertex carrying BOTH substantial leg_BL_* and leg_BR_* weight (the exact opposite-phase
-    # pair, regardless of its x/z position) drops all leg weight, relying on pelvis. Scoped to just
-    # this one historically-confirmed problem pair (not every leg-pair combination) specifically
-    # because widening the net further already measured worse, not better.
-    bl_group_ids = leg_group_ids.get("BL", set())
-    br_group_ids = leg_group_ids.get("BR", set())
+    # Round 9, pass 0 (generalised in round 10): started as a narrow fix for ONE confirmed worst
+    # pair (leg_BL/leg_BR, the longest posed edge in the whole mesh on round 9's old mesh). Round
+    # 10's new mesh reproduced the same class of bug on a DIFFERENT pair (leg_FR/leg_BR -- same
+    # side, front-vs-back this time, confirmed by verify.py's edge-stretch gate), which a BL/BR-only
+    # check doesn't catch. Generalised to every leg PAIR (not every leg at once, still the same
+    # pair-at-a-time mechanism round 9 confirmed safe -- a full "strip every leg" version over-fired
+    # on unrelated vertices): any vertex carrying substantial weight on TWO DIFFERENT legs' groups
+    # has just those two legs' weight stripped, relying on pelvis/scapula for the rest.
     pair_forced = 0
-    if bl_group_ids and br_group_ids:
-        for vi, v in enumerate(me.vertices):
-            bl_w = sum(g.weight for g in v.groups if g.group in bl_group_ids)
-            br_w = sum(g.weight for g in v.groups if g.group in br_group_ids)
-            if bl_w > 0.08 and br_w > 0.08:
-                # Strip ONLY the BL/BR pair itself -- an earlier version stripped every leg's
-                # weight here (reusing pass 2's "strip all legs" loop), which over-fired on a
-                # scapula_FR-dominant vertex that had picked up a few percent of BL/BR noise from
-                # cleanup_weights' own smoothing and lost its legitimate scapula_FR/FR weight too,
-                # making THAT vertex's own mismatch with its neighbours worse, not better.
-                for gi in bl_group_ids | br_group_ids:
-                    for g in list(v.groups):
-                        if g.group == gi:
-                            obj.vertex_groups[gi].remove([vi])
-                pair_forced += 1
+    for i, side_a in enumerate(leg_sides):
+        for side_b in leg_sides[i + 1:]:
+            a_ids = leg_group_ids.get(side_a, set())
+            b_ids = leg_group_ids.get(side_b, set())
+            if not a_ids or not b_ids:
+                continue
+            for vi, v in enumerate(me.vertices):
+                a_w = sum(g.weight for g in v.groups if g.group in a_ids)
+                b_w = sum(g.weight for g in v.groups if g.group in b_ids)
+                if a_w > 0.08 and b_w > 0.08:
+                    # Strip ONLY this pair's groups -- an earlier version stripped every leg's
+                    # weight here, which over-fired on an unrelated vertex that had picked up a few
+                    # percent of cross-leg noise from cleanup_weights' own smoothing and lost its
+                    # legitimate weight too, making THAT vertex's own mismatch worse, not better.
+                    for gi in a_ids | b_ids:
+                        for g in list(v.groups):
+                            if g.group == gi:
+                                obj.vertex_groups[gi].remove([vi])
+                    pair_forced += 1
 
     cross_leg_removed = 0
     belly_forced = pair_forced
@@ -1039,6 +1074,28 @@ def fix_wing_root_bleed(obj, H, lm, bone_roles, max_dist_frac=0.15):
                 if removed_any:
                     fixed += 1
             break
+
+    # Round 10: the same cross-pair mechanism as fix_hip_weight_gradient's pass 0, applied to the
+    # wing_L/wing_R pair -- confirmed by verify.py's edge-stretch gate on the new mesh: a
+    # neck-base vertex (physically close to BOTH wing roots, which sit close together near the
+    # shoulders on this mesh) picked up substantial weight on both wing_L_01 AND wing_R_01, which
+    # flap independently and in opposite directions, stretching the edge between it and its
+    # single-wing-dominant neighbours. Strip ONLY the wing_L/wing_R groups themselves when both are
+    # substantial on one vertex -- its neck/spine weight (the actual dominant influence here) is
+    # left alone, same "strip just the conflicting pair" principle as the leg fix.
+    l_ids = wing_group_ids.get("wing_L", set())
+    r_ids = wing_group_ids.get("wing_R", set())
+    if l_ids and r_ids:
+        for vi, v in enumerate(me.vertices):
+            l_w = sum(g.weight for g in v.groups if g.group in l_ids)
+            r_w = sum(g.weight for g in v.groups if g.group in r_ids)
+            if l_w > 0.08 and r_w > 0.08:
+                for gi in l_ids | r_ids:
+                    for g in list(v.groups):
+                        if g.group == gi:
+                            obj.vertex_groups[gi].remove([vi])
+                fixed += 1
+
     return fixed
 
 
@@ -1077,19 +1134,22 @@ def build_bones(eb, lm, H):
     mk("spine_01", pelvis_p, spine1_tail, "pelvis", role="spine")
     mk("spine_02", spine1_tail, chest_p, "spine_01", role="spine")
 
-    # neck_02's tail and the head bone's own head joint are the SAME point by construction (a
-    # continuous chain) -- the hand-placed path supplies neck_base/neck_mid as that chain's two
-    # intermediate waypoints, so the head bone picks up exactly where neck_02 ends (neck_mid),
-    # going out to head_tip (the beak). The lead's separate "head" (skull-centre) and "head top"
-    # (crest) reference points aren't mapped to their own bones -- this template's neck+head chain
-    # is 3 segments, not 5, and those two were given as extra nearby reference/calibration points,
-    # not additional joints to insert (confirmed reasonable: they sit within the same skull volume
-    # neck_mid/head_tip already bracket, not out along a new distinct direction).
+    # Round 10: richer head chain -- neck_01/neck_02 unchanged, but "head" now goes neck_mid ->
+    # skull-centre (not straight to the beak tip), with TWO children off the skull: "beak" (upper
+    # beak, rigid/static -- a real anatomical part, not animated independently) and "jaw" (lower
+    # mandible, the NEW bone the lead asked for so Idle can close this mesh's open-mouth bind pose).
+    # Falls back to the old 3-segment neck_mid->head_tip construction when "head" (skull) isn't in
+    # the landmark dict (the older detect_landmarks slicing path doesn't supply it).
     neck_base = lm.get("neck_base", chest_p.lerp(lm["head_base"], 1.0 / 3.0))
     neck_mid = lm.get("neck_mid", lm["head_base"])
     mk("neck_01", chest_p, neck_base, "spine_02", role="neck")
     mk("neck_02", neck_base, neck_mid, "neck_01", role="neck")
-    mk("head", neck_mid, lm["head_tip"], "neck_02", role="head")
+    if "head" in lm and "beak_tip" in lm and "jaw_tip" in lm:
+        mk("head", neck_mid, lm["head"], "neck_02", role="head")
+        mk("beak", lm["head"], lm["beak_tip"], "head", role="head")
+        mk("jaw", lm["head"], lm["jaw_tip"], "head", role="jaw")
+    else:
+        mk("head", neck_mid, lm["head_tip"], "neck_02", role="head")
 
     # Tail chain: 4 bones. Hand-placed path supplies 5 explicit points (base/t1/t2/t3/tip) --
     # 4 real segments, no lerping. Slicing-only fallback keeps the old computed-root + even-lerp

@@ -11,13 +11,15 @@ namespace BeastCraft.Spike55.Live3D
     public sealed class BeastInstance
     {
         // Anim-pilot griffin (griffin_anim.glb, Tooling/Animation): 33 deform bones for the confirmed
-        // 4-leg quadruped rig (lead-review fix round; was 25 for an earlier, wrong 2-leg conclusion --
-        // see the README). Safe for every existing model too: unused palette slots beyond a model's
-        // real joint count are just inert identity padding (see NewIdentityPalette below). 34 * 4 = 136
-        // vec4 vertex-uniform registers exceeds GLSL ES 2.0's 128 vec4 minimum but is comfortably inside
-        // ES 3.0's 256 vec4 minimum -- this project targets ES 3.0 (Galaxy A35 minimum spec) -- see
-        // Toon.fx's header comment for the full register-budget note.
-        public const int MaxBones = 34; // must match Toon.fx's MAX_BONES
+        // Round 10: bumped from 34 to 40 for the new neutral-pose text-to-3D Griffin's 37-bone rig
+        // (a jaw + upper-beak bone pair added beyond the previous mesh's 35, so Idle/Attack can
+        // close/snap this mesh's open-mouth bind pose). Safe for every existing model too: unused
+        // palette slots beyond a model's real joint count are just inert identity padding (see
+        // NewIdentityPalette below). 40 * 4 = 160 vec4 vertex-uniform registers exceeds GLSL ES
+        // 2.0's 128 vec4 minimum but is comfortably inside ES 3.0's 256 vec4 minimum -- this
+        // project targets ES 3.0 (Galaxy A35 minimum spec) -- see Toon.fx's header comment for the
+        // full register-budget note.
+        public const int MaxBones = 40; // must match Toon.fx's MAX_BONES
 
         // Anim-pilot griffin: runtime spring bones for tail tip / wing feathers (SpringBone.cs), layered
         // on top of the baked clip pose after AnimatedPose runs -- see SpringBone.cs's header comment.

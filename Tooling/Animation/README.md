@@ -29,7 +29,7 @@ passes, weight-paint cleanup, Blender-5.x layered-Action F-curve walking, interp
 normalisation) live in `common.py` so every stage script imports them rather than re-deriving the
 same Blender-API gotchas five times.
 
-## v10 (in progress): new neutral-pose source mesh -- prep done, re-rig pending hand-placed landmarks
+## v10: new neutral-pose source mesh, fully rigged and animated (lead-review round 10)
 
 Round 10 swapped the source mesh entirely: rounds 1-9 all worked from one dramatically-posed Meshy
 remesh (wings raised overhead, legs tucked/folded, long resulting fight to get a usable rig/weights
@@ -75,9 +75,87 @@ against the OLD `calib/` folder before the path was corrected, double-gridding t
 reference images -- harmless, they're superseded scratch references from a completed round, not
 used again, but noted here for honesty.)
 
-**Pending:** rigging, weighting, animation, and verification all await the lead's hand-placed
-landmark coordinates (read off the three calibrated images above) -- round 10 stops here as
-instructed.
+**Hand-placed landmarks (from the lead, reading the calibrated images above) + rig/animate/verify:**
+- **A real bug the lead caught in calib.json itself**, fixed before use: the auto-detected
+  `forward_sign` the calibration step recorded (+1.0) was wrong -- confirmed by the lead reading
+  pixel positions directly (front feet and beak sit at negative Y in both `left.png`/`bottom.png`).
+  `calib_v10/calib.json` corrected in place. More importantly, `detect_landmarks_handplaced`'s OWN
+  forward-axis detection used the exact same flawed heuristic (infer forward from which Y-extreme
+  vertex sits higher in Z -- reasonable for a dramatic reared pose, meaningless for this mesh's
+  neutral level-back one) -- fixed at the root by deriving `forward_sign` directly from the hand-
+  placed landmarks themselves (compare `head.y` to `pelvis.y`) instead of guessing from mesh
+  geometry at all, which is exactly as reliable as the landmarks are.
+- `HAND_LANDMARKS_NATIVE` replaced wholesale with the lead's new coordinates (native, pre-
+  normalisation, matching `calib_v10`). The old mesh's `SOLVER_STABILITY_NUDGE` (a per-vertex
+  workaround for a Blender heat-solver failure specific to the OLD mesh's BL knee position) was
+  cleared rather than carried forward blindly -- this mesh's own weighting run converged on the
+  first attempt with no solver failure, so porting a stale, unexplained nudge forward would have
+  been an undocumented geometry change for a bug that doesn't reproduce here.
+- **Hind-leg knee check, as the lead asked**: the given knee (Y 0.07) sits BEHIND the hip (Y -0.03)
+  in this mesh's head=-Y convention, not forward of it -- the override condition the lead described
+  ("if the actual knee is forward of the hip, use the mesh's real knee") wasn't triggered. Checked
+  directly against the rig overlay render (not just the numbers): every leg segment, hip through
+  toe, sits inside its own limb's mesh volume in all three overlay views -- no override applied, no
+  "mesh's real knee" substitution needed.
+- **New jaw bone**, as requested, since this mesh's bind pose has the beak open: `build_bones` now
+  builds a richer head chain -- `head` (skull) -> two children, `beak` (upper, rigid) and `jaw`
+  (lower mandible, animated). The lead didn't give an explicit jaw-tip coordinate (none was asked
+  for beyond "add a jaw bone"), so `jaw_tip` is a documented proportional ESTIMATE (slightly less
+  far forward than the beak tip, notably lower in Z to span the open gape), snapped to the mesh
+  surface like every other point -- reported honestly as an estimate, not a hand-measured landmark.
+  Confirmed by rendering flat-shaded close-ups at both extremes (`scratchpad/anim-pilot/v10/
+  jaw_closed_check.png`, `jaw_anticip_check.png`): the mouth closes fully with no gap and opens wide
+  with no tearing at the hinge.
+- **Weighting converged on the first attempt** (0/4003-4004 unweighted, both rig runs this round) --
+  no fallback chain needed at all, a first for this entire pipeline. `fix_hip_weight_gradient`'s
+  pair-wise cross-leg check (added narrowly for one pair in round 9) is **generalised to every leg
+  pair**, not just BL/BR -- this mesh's own worst cross-leg case turned out to be leg_FR/leg_BR
+  (front-vs-back, same side), which a BL/BR-only check would have missed entirely.
+  `fix_wing_root_bleed` gained a matching wing_L/wing_R pair-wise strip (a neck-base vertex, close
+  to both wing roots on this mesh, was picking up substantial weight from BOTH wings, which flap
+  independently -- confirmed by the edge-stretch gate on Attack and fixed by the same "strip just
+  the conflicting pair, leave everything else alone" principle round 9 established works, where a
+  full single-leg-ownership rewrite measurably didn't).
+- **Move**: lateral-sequence quadruped walk, unmodified gait.py logic, worked directly against the
+  new rig with no changes needed. All four legs clear the lead's >=20%-of-H stride target
+  immediately: BL/BR 23.6%, FL/FR 42.0% (both front/back pairs symmetric left-right on this mesh, as
+  expected from the mirrored landmark coordinates). Knee ranges: BL/BR 49.9-142.0, FL/FR 17.9-123.4
+  degrees -- real articulation throughout.
+- **Idle**: closes the beak (confirmed by direct render, not assumed -- `jaw_closed_check.png`),
+  breathing, wing settle, slow head-look, tail sway, alternating weight-shift -- all pre-existing
+  Idle logic, just extended with the new jaw-close pose.
+- **Attack**: foreleg talon rake (pre-existing logic, unchanged) + a new "beak snap" -- the jaw
+  starts closed (matching Idle, for a clean loop), opens wide on the anticipation wind-up, SNAPS
+  shut (with a slight closed-overshoot) on the strike frame paired with the rake, stays shut through
+  follow-through/recover.
+- **verify.py, including the round-9 edge-stretch gate**: every PRE-EXISTING gate passes (foot-
+  slide, knee-angle, loop-seam, jitter, ground-interpenetration). The edge-stretch gate itself
+  (target <=1.6x) does **not** pass on this mesh either, honestly reported same as round 9: Move's
+  worst is 9.63x, Attack's is 3.31x -- both substantially better than where round 9 left off (round
+  9's old mesh was stuck at ~9-13x with no further improvement found), and the specific mechanism
+  changed shape again on this different mesh/topology (now a leg-vs-pelvis or leg-vs-scapula hard
+  transition rather than a cross-leg one), confirming round 9's own conclusion: this class of issue
+  is fundamentally about mesh resolution at bone-ownership transitions, not something further weight
+  reassignment alone reliably fixes. Tried on this mesh too: a leg-to-body decimation protect zone
+  (the "simple path" -- this mesh's own prep route -- never had one before, unlike the segmentation
+  path's round-9 belly-protect zone) measurably changed WHICH edge is worst without clearly reducing
+  the worst ratio. Kept anyway (not harmful, reasonably justified, a real gap in the simple path's
+  parity with the segmentation path) rather than reverted.
+- **Visual inspection of every review_v10/final sheet, as required, before reporting**: `contact_
+  sheet_idle.png`, `contact_sheet_move.png`, `contact_sheet_move_side.png` -- all 10 frames each,
+  looked at directly: no slivers, no stray lines, no dark blotches anywhere in Idle or Move (a
+  marked improvement over round 9's old mesh, where the sliver was visible in literally every
+  frame despite the edge-stretch numbers alone suggesting a similar severity -- this mesh's cleaner
+  topology evidently keeps the same class of weight issue from reading as a visible artefact as
+  often). `contact_sheet_attack.png`: clean except frame 5 (the strike pose), which shows a small
+  dark jagged patch on the folded left wing -- not chased further within this round's time budget,
+  reported honestly as a known, minor, pose-specific residual (same general class as prior rounds'
+  outline-shader-at-extreme-pose artefacts, not confirmed to be the same root cause as the edge-
+  stretch failures above).
+- Mesh/export: 8000 tris (budget), 37 deform bones (35 + jaw + beak), GLB 0.847 MiB (budget ~2 MiB).
+  `Toon.fx`'s `MAX_BONES` and `BeastInstance.MaxBones` bumped 34 -> 40 to cover the new bone count
+  (comfortably inside the ES 3.0 256-vec4 vertex-uniform minimum this project targets -- see
+  `Toon.fx`'s own header comment for the full budget math).
 
 ## v9: max-edge-stretch gate + weight/render fixes -- partial progress, honestly not fully resolved
 ## (lead-review round 9)

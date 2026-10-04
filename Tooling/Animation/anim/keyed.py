@@ -74,6 +74,15 @@ def keyframe_pose(frame, bones):
 
 ALL_POSE_BONES = [b for b in all_bones if b not in ("root",)]
 
+# Round 10: this mesh's bind pose has the beak open (a jaw bone was added specifically so this
+# clip set could close it -- see HAND_LANDMARKS_NATIVE's jaw_tip comment in rig_templates/
+# winged_quadruped.py for why its tip position is an estimate, not a hand-measured landmark).
+# Tuned by rendering (not guessed and left untested): the jaw bone's local Y axis points from the
+# skull down to the estimated lower-mandible tip, so a NEGATIVE local-X (pitch) rotation swings
+# that tip up toward the fixed upper beak, closing the gap.
+JAW_CLOSED_DEG = -32.0
+JAW_WIDE_OPEN_DEG = 14.0  # extra beyond the open bind pose, for Attack's anticipation
+
 
 def rest_pose():
     return {b: (0, 0, 0) for b in ALL_POSE_BONES}
@@ -111,6 +120,12 @@ def idle_pose(frac):
     p["neck_01"] = (0, 3 * math.sin(frac * 2 * math.pi + 1.1), 0)   # slow head-look
     p["neck_02"] = (0, 2 * math.sin(frac * 2 * math.pi + 1.1), 0)
     p["head"] = (1.0 * settle, 2 * math.sin(frac * 2 * math.pi + 1.1), 0)
+    # Round 10: this mesh's bind pose has the beak open (see HAND_LANDMARKS_NATIVE's jaw_tip
+    # comment) -- the lead asked for Idle to close it. JAW_CLOSED_DEG (defined below, near the
+    # Attack section, since both clips share it) rotates the jaw bone from its open rest pose up to
+    # a closed one; a small settle-synced wobble on top reads as a faint idle mouth/jaw movement
+    # rather than a perfectly rigid closed beak.
+    p["jaw"] = (JAW_CLOSED_DEG + 1.5 * settle, 0, 0)
     p["wing_L_01"] = (1.5 * settle, 0, -4 - 1.5 * settle)
     p["wing_R_01"] = (1.5 * settle, 0, 4 + 1.5 * settle)
     p["tail_01"] = (0, 0, 4 * math.sin(frac * 2 * math.pi + 0.4))
@@ -154,8 +169,12 @@ ATTACK_LABELS = ["neutral", "anticipation", "strike", "follow_through", "recover
 
 def attack_pose(label):
     p = rest_pose()
+    # Round 10: "beak snap" -- the beak starts closed (matching Idle's rest state, for a clean
+    # loop in/out of Idle), opens wide on the anticipation wind-up, then SNAPS shut fast on the
+    # strike frame (paired with the foreleg talon rake) and stays shut through follow-through/
+    # recover.
     if label == "neutral":
-        pass
+        p["jaw"] = (JAW_CLOSED_DEG, 0, 0)
     elif label == "anticipation":
         # Counter-rotation opposite the strike direction: pull head/neck BACK and UP, compress
         # chest, wings pulled in tight, tail coils back -- the codeable anticipation rule. The
@@ -173,6 +192,7 @@ def attack_pose(label):
         p["tail_02"] = (14, 0, 0)
         p["leg_FR_thigh"] = (-16, 0, 6)
         p["leg_FR_shin"] = (10, 0, 0)
+        p["jaw"] = (JAW_WIDE_OPEN_DEG, 0, 0)
     elif label == "strike":
         # Fast snap forward/down -- the beak strike extreme. Wings flare for balance. Tuned down
         # from a first pass (spine+neck+head summed to ~98 degrees of forward pitch, which curled
@@ -193,6 +213,7 @@ def attack_pose(label):
         p["tail_02"] = (-18, 0, 0)
         p["leg_FR_thigh"] = (22, 0, -8)
         p["leg_FR_shin"] = (-14, 0, 0)
+        p["jaw"] = (JAW_CLOSED_DEG - 4, 0, 0)  # slight overshoot past fully-closed -- the "snap"
     elif label == "follow_through":
         # Slight overshoot past the strike extreme, wings pushing back for balance recovery.
         p["spine_02"] = (10, 0, 0)
@@ -205,8 +226,10 @@ def attack_pose(label):
         p["tail_02"] = (-10, 0, 0)
         p["leg_FR_thigh"] = (14, 0, -4)
         p["leg_FR_shin"] = (-8, 0, 0)
+        p["jaw"] = (JAW_CLOSED_DEG, 0, 0)
     elif label == "recover":
-        pass  # back to neutral (foreleg lowered back to braced rest), ready to loop into Idle
+        p["jaw"] = (JAW_CLOSED_DEG, 0, 0)  # back to neutral (foreleg lowered back to braced rest,
+        # beak shut), ready to loop into Idle
     return p
 
 

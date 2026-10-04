@@ -13,9 +13,10 @@
 // frame-time spikes at 12+ instances (see docs/spikes/055-3d-mini-spike.md's fourth-pass section for
 // the before/after numbers) and is why this version moved the blend into the vertex shader instead.
 //
-// MAX_BONES = 34 (bumped again in the lead-review fix round, from 25 to cover the confirmed 4-leg
-// quadruped rig's 33 deform bones: root/pelvis/2 spine/2 neck/head/4 tail/3+3 wing/4x4 leg -- see
-// Tooling/Animation/rig_templates/winged_quadruped.py). 34 float4x4 = 136 vec4 vertex-uniform
+// MAX_BONES = 40 (bumped again in round 10, from 34, for the new neutral-pose text-to-3D Griffin's
+// 37-bone rig -- the extra 2 bones beyond the previous mesh's 35 are a jaw + upper-beak bone pair,
+// added so Idle/Attack can close/snap this mesh's open-mouth bind pose; see Tooling/Animation/
+// rig_templates/winged_quadruped.py's build_bones). 40 float4x4 = 160 vec4 vertex-uniform
 // registers -- this now EXCEEDS GLSL ES 2.0's spec-minimum guaranteed 128 vec4, but this project
 // targets OpenGL ES 3.0 (Galaxy A35 minimum spec, per the animation methodology research), whose
 // spec-minimum guaranteed vertex-uniform-vector count is 256 vec4 -- 136 is comfortably inside that
@@ -44,7 +45,7 @@
     #define PS_SHADERMODEL ps_4_0_level_9_1
 #endif
 
-#define MAX_BONES 34
+#define MAX_BONES 40
 
 float4x4 ViewProjection;
 float4x4 Bones[MAX_BONES];
