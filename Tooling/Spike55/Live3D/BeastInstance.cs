@@ -10,7 +10,27 @@ namespace BeastCraft.Spike55.Live3D
     /// bone palette uploaded to the shader before each draw is.</summary>
     public sealed class BeastInstance
     {
-        public const int MaxBones = 16; // must match Toon.fx's MAX_BONES
+        // Anim-pilot griffin (griffin_anim.glb, Tooling/Animation): 33 deform bones for the confirmed
+        // Round 10: bumped from 34 to 40 for the new neutral-pose text-to-3D Griffin's 37-bone rig
+        // (a jaw + upper-beak bone pair added beyond the previous mesh's 35, so Idle/Attack can
+        // close/snap this mesh's open-mouth bind pose).
+        // Round 13: bumped again, 40 -> 48, for the new 41-bone rig -- a foreleg's single aggregate
+        // toe bone replaced with THREE independent toe bones (toe_in/mid/out, a real eagle foot's
+        // splayed digits, each curling around its own hinge axis) -- see Toon.fx's header comment
+        // for the full producer-review root cause and register-budget note. Safe for every existing
+        // model too: unused palette slots beyond a model's real joint count are just inert identity
+        // padding (see NewIdentityPalette below).
+        public const int MaxBones = 48; // must match Toon.fx's MAX_BONES
+
+        // Anim-pilot griffin: runtime spring bones for tail tip / wing feathers (SpringBone.cs), layered
+        // on top of the baked clip pose after AnimatedPose runs -- see SpringBone.cs's header comment.
+        // Harmless, always-present fields: a model with no matching spring-joint names (e.g.
+        // griffin_live.glb) just never gets its SpringJointConfig.NodeIndex resolved, and
+        // SpringJointConfig.IsValid guards every use site, so these states simply never update for
+        // anything but the pilot model.
+        public SpringJointState TailSpring;
+        public SpringJointState WingLSpring;
+        public SpringJointState WingRSpring;
 
         public Matrix4x4 World; // world placement (hex cell position + facing), row-vector convention
         public float ClockOffset; // seconds, randomised per instance so 24 beasts don't move in lockstep

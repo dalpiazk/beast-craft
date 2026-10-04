@@ -45,6 +45,40 @@ namespace BeastCraft.Spike55.Live3D
         // KillRandomSwarmling itself (no-ops once every Swarmling is dead).
         public int Kill = 0;
 
+        // Anim-pilot griffin (issue #68): a dedicated headless mode that loads griffin_anim.glb (not
+        // griffin_live.glb -- see Game1.LoadContent) and renders a numbered PNG sequence for the
+        // producer-review deliverables (Tooling/Animation/README.md's gate): either one clip's own loop
+        // (--pilot-clip idle|move|attack, for a contact sheet -- evenly spaced frames across exactly one
+        // clip cycle) or the full crossfaded reel (--pilot-clip reel, the default -- Idle -> Move ->
+        // Attack -> Idle with real crossfades, for the GIF). Mutually exclusive with --battle/--bench/
+        // --screenshot in practice (not enforced here; Game1 just checks PilotSequenceMode first).
+        public bool PilotSequenceMode;
+        public string PilotSequenceDir;
+        public string PilotClip = "reel";
+        public int PilotFrames = 10; // contact-sheet frame count per clip; ignored for "reel"
+        public int PilotFps = 24; // reel playback rate
+
+        // Lead-review fix round: a side-view contact sheet for Move specifically (camera
+        // perpendicular to the walk direction, not the battle camera angle) so the gait's fore-aft
+        // leg swing actually reads instead of being foreshortened by the battle camera's yaw/tilt.
+        public bool PilotSideCamera;
+
+        // Round 16 (producer review -- wing blotch diagnosis): a debug-only switch that skips the
+        // inverted-hull Outline draw call entirely, so the SAME --pilot-sequence frames can be
+        // re-captured with the outline pass off, isolating whether a visual defect comes from the
+        // outline pass or the toon fill pass underneath it. Used to confirm (not just assume) the
+        // wing-blotch hypothesis before writing a fix -- see Game1.DrawBeasts and Toon.fx's
+        // BoneOutlineMask comment for what the fix turned out to be.
+        public bool PilotNoOutline;
+
+        // Round 17 (producer review -- KO's lie-down redo): a straight-down camera, the same
+        // pattern as PilotSideCamera above, so a flat-on-the-ground pose can actually be judged
+        // from directly overhead -- the default 3/4 battle camera auto-fits its orthographic
+        // projection to the instance's current bounds every frame (see ApplyCamera), which keeps
+        // the subject nicely framed but means it never visibly "sinks" toward a ground reference
+        // as the body lowers, making a lying-down pose hard to confirm from that angle alone.
+        public bool PilotTopCamera;
+
         public static LaunchOptions Parse(string[] args)
         {
             var o = new LaunchOptions();
@@ -95,6 +129,28 @@ namespace BeastCraft.Spike55.Live3D
                         break;
                     case "--kill":
                         o.Kill = int.Parse(args[++i], CultureInfo.InvariantCulture);
+                        break;
+                    case "--pilot-sequence":
+                        o.PilotSequenceMode = true;
+                        o.PilotSequenceDir = args[++i];
+                        break;
+                    case "--pilot-clip":
+                        o.PilotClip = args[++i];
+                        break;
+                    case "--pilot-fps":
+                        o.PilotFps = int.Parse(args[++i], CultureInfo.InvariantCulture);
+                        break;
+                    case "--frames":
+                        o.PilotFrames = int.Parse(args[++i], CultureInfo.InvariantCulture);
+                        break;
+                    case "--pilot-side-camera":
+                        o.PilotSideCamera = true;
+                        break;
+                    case "--pilot-no-outline":
+                        o.PilotNoOutline = true;
+                        break;
+                    case "--pilot-top-camera":
+                        o.PilotTopCamera = true;
                         break;
                     default:
                         Console.Error.WriteLine("Unrecognised argument: " + args[i]);

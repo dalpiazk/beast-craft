@@ -43,6 +43,15 @@ namespace BeastCraft.Spike55.Live3D
         public GltfJoint[] Joints; // empty if this model has no skin (e.g. crest_alt.glb)
         public Animation IdleAnimation;
         public Animation MoveAnimation;
+        public Animation AttackAnimation; // anim-pilot griffin: griffin_anim.glb carries a third named
+                                          // clip (Tooling/Animation/anim/keyed.py); null for any model
+                                          // that doesn't export one (e.g. griffin_live.glb).
+                                          // Round 15: four new battle clips (Tooling/Animation/anim/keyed.py), same pattern as
+                                          // Attack above -- null for any model that doesn't export one.
+        public Animation CastAnimation;
+        public Animation HitAnimation;
+        public Animation KOAnimation;
+        public Animation VictoryAnimation;
 
         public static GltfSkinnedModel Load(string path)
         {
@@ -107,6 +116,11 @@ namespace BeastCraft.Spike55.Live3D
 
             model.IdleAnimation = root.LogicalAnimations.FirstOrDefault(a => string.Equals(a.Name, "Idle", StringComparison.OrdinalIgnoreCase));
             model.MoveAnimation = root.LogicalAnimations.FirstOrDefault(a => string.Equals(a.Name, "Move", StringComparison.OrdinalIgnoreCase));
+            model.AttackAnimation = root.LogicalAnimations.FirstOrDefault(a => string.Equals(a.Name, "Attack", StringComparison.OrdinalIgnoreCase));
+            model.CastAnimation = root.LogicalAnimations.FirstOrDefault(a => string.Equals(a.Name, "Cast", StringComparison.OrdinalIgnoreCase));
+            model.HitAnimation = root.LogicalAnimations.FirstOrDefault(a => string.Equals(a.Name, "Hit", StringComparison.OrdinalIgnoreCase));
+            model.KOAnimation = root.LogicalAnimations.FirstOrDefault(a => string.Equals(a.Name, "KO", StringComparison.OrdinalIgnoreCase));
+            model.VictoryAnimation = root.LogicalAnimations.FirstOrDefault(a => string.Equals(a.Name, "Victory", StringComparison.OrdinalIgnoreCase));
 
             return model;
         }
