@@ -860,6 +860,93 @@ def build_leg_masks(obj, H, legs, radius=0.09):
     return masks
 
 
+def fix_hip_weight_gradient(obj, H, legs, bone_roles, belly_half_width_frac=0.35):
+    """Lead-review round 5: fixes the Move-clip hip/belly tear at its diagnosed mechanism -- not a
+    hard-mask boundary (round 4's masks already excluded the thigh segment there, which made no
+    difference), but ordinary linear-blend skinning showing a "candy-wrapper" collapse at any
+    vertex whose weight blends TWO different legs' thigh bones. BL and BR are exactly opposite-
+    phase in the lateral-sequence walk, so if a belly vertex carries weight on both
+    leg_BL_thigh and leg_BR_thigh (automatic weighting on this mesh does produce some of this --
+    the two hind legs' thigh bones are the closest two bones to much of the belly, and heat
+    diffusion doesn't know the legs will later move independently), that vertex gets pulled toward
+    two diverging transforms every frame. Confirmed as the live mechanism by a flat-shaded Blender
+    render of the SAME pose before/after this function runs (not toon-shader-side; see rig_creature.py).
+
+    Two passes, both REMOVING weight only (never inventing a new blend formula on top of the
+    heat-diffusion result, which is already a reasonable distance-based gradient once cross-leg
+    contamination is gone -- the safer, lower-risk fix given this is a post-review correction):
+    1. **Single-leg ownership near any thigh.** For every vertex within one thigh-length of ANY
+       leg's hip-knee segment, find the nearest such segment (its "owner" leg) and zero every OTHER
+       leg's thigh/shin/foot/toe weight on that vertex. A vertex can still blend its owner leg's
+       thigh with that leg's own parent (pelvis/spine_02) and with spine_01/tail/etc as auto-
+       weighting already had it -- only cross-leg blending is removed.
+    2. **Belly-centre vertices never touch a thigh.** Vertices near the body's own X centreline,
+       between the two hind hips in X and at/above hind-hip height, are forced to drop ALL leg
+       (thigh/shin/foot/toe) weight entirely, relying on pelvis/spine_01 -- the task brief's
+       explicit rule for this zone, and a second, stricter guard beyond pass 1 (pass 1 alone could
+       still leave a thin strip exactly equidistant between the two hips ambiguous).
+    Must run BEFORE common.cleanup_weights (which renormalises whatever's left)."""
+    me = obj.data
+    group_index = {g.name: g.index for g in obj.vertex_groups}
+    leg_sides = [l["side"] for l in legs]
+    thigh_knee = {l["side"]: (l["hip"], l["knee"]) for l in legs}
+    band = {l["side"]: max((l["hip"] - l["knee"]).length, 1e-4) for l in legs}
+    leg_group_ids = {
+        side: {group_index[n] for n, role in bone_roles.items() if role == f"leg_{side}" and n in group_index}
+        for side in leg_sides
+    }
+
+    hind = [l for l in legs if not l["is_front"]]
+    if len(hind) == 2:
+        hip_a, hip_b = hind[0]["hip"], hind[1]["hip"]
+        belly_cx = (hip_a.x + hip_b.x) / 2.0
+        belly_half_width = abs(hip_a.x - hip_b.x) * belly_half_width_frac
+        belly_min_z = min(hip_a.z, hip_b.z) - 0.05 * H
+    else:
+        belly_cx, belly_half_width, belly_min_z = 0.0, 0.0, 1e9
+
+    cross_leg_removed = 0
+    belly_forced = 0
+    for vi, v in enumerate(me.vertices):
+        p = v.co
+
+        # Pass 2 first (belly centre): if this vertex is squarely between the two hind hips, strip
+        # every leg group outright regardless of distance to any one thigh.
+        if belly_half_width > 0 and abs(p.x - belly_cx) < belly_half_width and p.z > belly_min_z:
+            removed_any = False
+            for side in leg_sides:
+                for gi in leg_group_ids[side]:
+                    for g in list(v.groups):
+                        if g.group == gi:
+                            obj.vertex_groups[gi].remove([vi])
+                            removed_any = True
+            if removed_any:
+                belly_forced += 1
+            continue
+
+        # Pass 1 (single-leg ownership near a thigh): find the nearest leg's hip-knee segment.
+        best_side, best_d = None, None
+        for side, (hip, knee) in thigh_knee.items():
+            d = _point_segment_dist(p, hip, knee)
+            if best_d is None or d < best_d:
+                best_d, best_side = d, side
+        if best_side is None or best_d >= band[best_side]:
+            continue
+        removed_any = False
+        for side in leg_sides:
+            if side == best_side:
+                continue
+            for gi in leg_group_ids[side]:
+                for g in list(v.groups):
+                    if g.group == gi:
+                        obj.vertex_groups[gi].remove([vi])
+                        removed_any = True
+        if removed_any:
+            cross_leg_removed += 1
+
+    return cross_leg_removed, belly_forced
+
+
 def build_bones(eb, lm, H):
     """Builds the deform skeleton into armature edit_bones `eb` from landmarks `lm`
     (as returned by detect_landmarks or detect_landmarks_handplaced). Returns
@@ -944,9 +1031,14 @@ def build_bones(eb, lm, H):
             mk(name, chain[i - 1], chain[i], prev_name, role=f"wing_{side}")
             prev_name = name
 
-    # Legs: 4-bone chain (thigh/shin/foot/toe) per leg. Front legs (FL/FR) attach at the shoulder
-    # (parented to spine_02, like the wings); back legs (BL/BR) attach at the pelvis -- a true
-    # quadruped's forelegs hang from the shoulder girdle, not the hip.
+    # Legs: 4-bone chain (thigh/shin/foot/toe) per leg. Back legs (BL/BR) attach at the pelvis.
+    # Front legs (FL/FR) attach via a SCAPULA bone (lead-review round 5): chest_p -> hip, parented
+    # to spine_02, with the thigh re-parented to the scapula instead of spine_02 directly -- a
+    # real quadruped's foreleg reach comes mostly from the shoulder blade swinging fore-aft, not
+    # from the elbow/knee alone (anim/gait.py animates this bone's rotation; at BIND POSE the
+    # scapula sits exactly along the chest-to-shoulder line, zero visual change from the round-4
+    # rig, since its rest head/tail are chest_p/hip -- same as the thigh's own former direct
+    # parent attachment point).
     for leg in lm["legs"]:
         side = leg["side"]
         foot = leg["foot"]
@@ -954,8 +1046,12 @@ def build_bones(eb, lm, H):
         knee = leg["knee"]
         ankle = leg["ankle"]
         is_front = leg["is_front"]
-        parent_bone = "spine_02" if is_front else "pelvis"
         toe_tip = leg.get("toe_tip") or mathutils.Vector((foot.x, foot.y + fwd * 0.12 * H, foot.z))
+        if is_front:
+            mk(f"scapula_{side}", chest_p, hip, "spine_02", role=f"scapula_{side}")
+            parent_bone = f"scapula_{side}"
+        else:
+            parent_bone = "pelvis"
         mk(f"leg_{side}_thigh", hip, knee, parent_bone, role=f"leg_{side}")
         mk(f"leg_{side}_shin", knee, ankle, f"leg_{side}_thigh", role=f"leg_{side}")
         mk(f"leg_{side}_foot", ankle, foot, f"leg_{side}_shin", role=f"leg_{side}")

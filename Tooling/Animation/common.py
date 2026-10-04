@@ -430,6 +430,7 @@ def restrict_leg_weights(obj, leg_masks, bone_roles):
         allowed = {n for n, role in bone_roles.items() if role == f"leg_{leg_side}"}
         allowed.add("spine_02")
         allowed.add("pelvis")
+        allowed.add(f"scapula_{leg_side}")  # lead-review round 5: forelegs' real parent now
         allowed_by_leg[leg_side] = {group_index[n] for n in allowed if n in group_index}
     removed = 0
     for leg_side, vids in leg_masks.items():

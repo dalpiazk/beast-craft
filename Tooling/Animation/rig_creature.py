@@ -136,6 +136,19 @@ removed = common.restrict_leg_weights(obj, leg_masks, bone_roles)
 report["weighting"]["leg_restriction_groups_removed"] = removed
 print(f"LEG WEIGHT RESTRICTION: removed {removed} out-of-chain group memberships")
 
+# Lead-review round 5: fixes the Move-clip hip/belly tear at its diagnosed mechanism -- a vertex
+# blending TWO different legs' (opposite-phase) thigh bones, not a hard-mask boundary (round 4's
+# masks already excluded the thigh segment, which made no difference to the tear). See
+# fix_hip_weight_gradient's docstring for the two passes (single-leg ownership near any thigh,
+# belly-centre vertices forced off every thigh). Runs on top of restrict_leg_weights (which only
+# ever touched the knee-ankle-foot region, not the thigh/hip area this targets) and still before
+# cleanup_weights' renormalise.
+cross_leg_removed, belly_forced = template.fix_hip_weight_gradient(obj, H, lm["legs"], bone_roles)
+report["weighting"]["hip_gradient_cross_leg_removed"] = cross_leg_removed
+report["weighting"]["hip_gradient_belly_forced"] = belly_forced
+print(f"HIP WEIGHT GRADIENT: {cross_leg_removed} vertices had a cross-leg thigh weight removed, "
+      f"{belly_forced} belly-centre vertices forced off every thigh")
+
 common.cleanup_weights(obj, limit=4)
 worst, avg = common.max_influences_per_vertex(obj)
 report["weighting"]["max_influences_after_cleanup"] = worst

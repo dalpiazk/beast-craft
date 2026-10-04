@@ -217,13 +217,50 @@ RAW_STRIDE = 0.23 * H   # desired fore-aft HALF-stride excursion (foot sweeps +R
 # peak-to-peak distance, so this aims for ~30% of H unclamped, clamped down per-leg by actual IK
 # reach (see the per-leg safe_stride computation above for the real achieved numbers per leg).
 
+# Lead-review round 5: "the fix is animation, not geometry." The hand-placed rest pose is nearly
+# straight-legged (round 4 found FL/FR's rest hip-to-ground distance is 91-99.7% of their own
+# total leg length) -- a real walking quadruped crouches slightly, which is exactly what creates
+# IK slack: stride ~= 2*sqrt(L^2 - h^2), so even a modest drop in hip height h buys a large gain
+# once h is close to L. CROUCH is held constant through the whole cycle (the existing BODY_BOB
+# oscillates on TOP of it, per the task brief), applied directly to the hip position fed into the
+# IK solve (not just a cosmetic root bob -- see the per-leg precompute below and set_leg_pose's
+# docstring for why those are different things in this file's existing architecture).
+CROUCH = 0.08 * H  # ~8% of H, middle of the requested 6-10% band
+# Scapula swing (round 5): a real quadruped's foreleg reach comes mostly from the shoulder blade
+# itself swinging fore-aft, not the elbow alone. SCAPULA_SWING_DEG is the rotation amplitude;
+# the resulting fore-aft shoulder-socket excursion (scapula_len * sin(angle)) is added to each
+# foreleg's effective hip position, in phase with that leg's own swing, giving MORE apparent
+# stride than knee articulation alone would (see the per-frame loop for how this composes with
+# CROUCH's reach-margin gain).
+SCAPULA_SWING_DEG = 12.0  # middle of the requested 10-15 degree band
+# Pelvis roll/yaw (round 5): a small weight-shift motion in phase with the hind legs' own stride
+# frequency (not the 2x-per-cycle body bob) -- subtle secondary motion, not a reach mechanism.
+PELVIS_ROLL_DEG = 4.0
+PELVIS_YAW_DEG = 3.0
+
 legs = {}
+scapula_rest = {}  # side -> (head, tail, rest_matrix) for front legs only
 for side in leg_sides:
-    hip, knee = rest_head_tail(f"leg_{side}_thigh")
+    hip_rest, knee = rest_head_tail(f"leg_{side}_thigh")
     _, ankle = rest_head_tail(f"leg_{side}_shin")
     _, foot = rest_head_tail(f"leg_{side}_foot")
     _, toe = rest_head_tail(f"leg_{side}_toe")
-    L1 = (knee - hip).length
+    # CROUCH applied directly to the hip used for every reach/IK computation below -- this IS the
+    # "lower the body" mechanism for leg purposes (see CROUCH's docstring above for why a cosmetic
+    # root bob alone would not actually buy any reach margin in this file's architecture: the IK
+    # solve's hip input has always been independent of root/pelvis's own animated world position,
+    # by original design, so CROUCH must shift the hip value fed into the solve directly).
+    hip = hip_rest - mathutils.Vector((0, 0, CROUCH))
+    if side.startswith("F"):
+        scapula_head, scapula_tail = rest_head_tail(f"scapula_{side}")
+        scapula_pb_tmp = arm_obj.pose.bones.get(f"scapula_{side}")
+        scapula_rest[side] = (scapula_head, scapula_tail,
+                               scapula_pb_tmp.bone.matrix_local if scapula_pb_tmp else None,
+                               (scapula_tail - scapula_head).length)
+    # L1 is the thigh bone's own TRUE (intrinsic, rest) length -- computed from hip_rest, not the
+    # crouched hip, since crouch only shifts WHERE the 2-bone chain is anchored for IK purposes,
+    # not the chain's own physical segment lengths.
+    L1 = (knee - hip_rest).length
     shin_len = (ankle - knee).length
     foot_len = (foot - ankle).length
     L2 = shin_len + foot_len  # combined effective 2nd bone
@@ -378,11 +415,22 @@ def set_leg_pose(side, t, parent_world, parent_rest):
     # reasonable digitigrade detail -- the claws dig in slightly below the pad) -- fine at the bind
     # pose, but reproducing that offset rigidly during a full-ground-contact stance (reached.z=0)
     # pushes the toe measurably below z=0, failing verify.py's ground-interpenetration gate (BR:
-    # -0.021 against a -0.01 threshold). Clamping the offset's Z component to >=0 keeps the toe's
-    # forward (XY) reach exactly as given while stopping it from digging into the ground during the
-    # baked walk specifically -- the bind pose itself (Idle/Attack, which don't route through this
-    # gait-only code path) still shows the toe's true, lower, as-given position.
-    toe_offset.z = max(0.0, toe_offset.z)
+    # -0.021 against a -0.01 threshold). A first fix just clamped the offset's Z component to >=0,
+    # which fixed BL/BR but then broke FL/FR once the round-5 crouch/scapula changes gave them real
+    # motion: zeroing only the Z component changes the offset's LENGTH too, while the toe BONE's
+    # own rendered tail is placed along aim_matrix's direction at the bone's fixed REST length
+    # (toe_offset's original, un-clamped magnitude) -- a shorter clamped vector's direction, re-
+    # extended back out to that same rest length, overshoots past where toe_w naively suggests,
+    # which could still land below ground depending on the direction's own residual tilt (confirmed:
+    # FL/FR's toe dipped to -0.017/-0.018 even with toe_offset.z itself already clamped to 0).
+    # Fixed properly: zero the downward Z component, then RENORMALISE the result back out to the
+    # offset's original length, so the toe bone's actual rendered length always matches its true
+    # rest length and the direction's remaining XY lean is preserved undistorted.
+    toe_rest_len = toe_offset.length
+    if toe_offset.z < 0.0:
+        toe_offset.z = 0.0
+        if toe_offset.length > 1e-6:
+            toe_offset = toe_offset.normalized() * toe_rest_len
     toe_w = reached + toe_offset  # toe follows foot rigidly (no separate
     # roll target this pass -- foot roll is a nice-to-have the task brief lists; given the time
     # budget this pilot keeps the foot a single rigid segment through stance/swing, which already
@@ -422,6 +470,20 @@ def set_leg_pose(side, t, parent_world, parent_rest):
     return stance
 
 
+def set_scapula_pose(side, hip_dynamic, parent_world, parent_rest):
+    """Lead-review round 5: points the scapula bone from its rest head (near the chest) to
+    `hip_dynamic` -- this frame's fore-aft-swung shoulder-socket position (crouch Z-offset +
+    swing Y-offset, computed by the caller) -- and returns its own world matrix, for use as the
+    PARENT when this frame's leg_<side>_thigh is placed (set_leg_pose). The scapula's rest
+    head/tail/length were captured once in `scapula_rest` during the per-leg precompute above."""
+    head, tail, rest_mat, _length = scapula_rest[side]
+    pb = arm_obj.pose.bones[f"scapula_{side}"]
+    bd = legs[side]["bend_dir"]
+    axis_candidates = [mathutils.Vector((1, 0, 0)), mathutils.Vector((0, 1, 0)), mathutils.Vector((0, 0, 1))]
+    up_hint = min(axis_candidates, key=lambda ax: abs(ax.dot(bd)))
+    return set_bone_world_matrix_direct(pb, aim_matrix(head, hip_dynamic, up_hint), parent_world, parent_rest)
+
+
 def set_rot_local(bone_name, deg_x=0, deg_y=0, deg_z=0):
     pb = arm_obj.pose.bones.get(bone_name)
     if pb is None:
@@ -437,6 +499,8 @@ bpy.ops.object.mode_set(mode="POSE")
 for side in leg_sides:
     for suffix in ("thigh", "shin", "foot", "toe"):
         arm_obj.pose.bones[f"leg_{side}_{suffix}"].rotation_mode = "QUATERNION"
+    if side in scapula_rest:
+        arm_obj.pose.bones[f"scapula_{side}"].rotation_mode = "QUATERNION"
 
 FRAMES = int(round(CYCLE_SECONDS * FPS))
 move_action = bpy.data.actions.new("Move")
@@ -459,19 +523,30 @@ for i in range(FRAMES + 1):  # +1: bake the loop-closing frame identical to fram
     a = 2 * math.pi * t
     scene.frame_set(i + 1)
 
-    # Body bob: lowest when a foot is mid-stance (weight-bearing, both legs roughly under body),
-    # highest at the cross-over point between steps (classic double "M"-shaped bob over one cycle).
-    # Computed and applied to root BEFORE the legs, both because the legs' world-space IK targets
-    # must be solved against root's bob (so feet stay correctly grounded despite the body bobbing)
-    # and because set_leg_pose needs pelvis_world, which is derived from root_world here.
-    bob = BODY_BOB * abs(math.sin(2 * a))
+    # Body bob + CROUCH (round 5): CROUCH is a constant base offset held through the whole cycle
+    # (the task brief's "pelvis and chest ~6-10% of H below bind height, held through the cycle
+    # with the existing bob on top"); BODY_BOB still oscillates upward from that lowered base,
+    # lowest when a foot is mid-stance, highest at the cross-over point between steps. This moves
+    # the VISUAL pelvis/chest down (root's children), independent of the separate CROUCH shift
+    # already folded directly into each leg's own "hip" IK anchor during the per-leg precompute
+    # above -- see that section's comment for why those are two different mechanisms in this
+    # file's architecture (the IK solve's hip input was never coupled to root's animated world
+    # position to begin with).
+    bob = -CROUCH + BODY_BOB * abs(math.sin(2 * a))
     root_world = root_rest @ mathutils.Matrix.Translation((0, 0, bob))
     if root_pb:
         root_pb.location = (0, 0, bob)
         root_pb.keyframe_insert(data_path="location", frame=i + 1)
-    # pelvis is never itself animated (matrix_basis stays identity) -- its world matrix is purely
-    # root's current world matrix composed with the fixed rest offset between root and pelvis.
-    pelvis_world = root_world @ root_rest.inverted() @ pelvis_rest
+    # Pelvis roll/yaw (round 5): a small weight-shift motion in phase with the hind legs' own
+    # stride frequency (sin(a), one full cycle per full gait cycle -- not sin(2a) like the 2x-per-
+    # cycle body bob). Folded in analytically here for the same reason spine_02's pitch is below:
+    # BL/BR are this rotation's children (parented to pelvis), so their own IK solve needs the
+    # ACTUAL pelvis_world this frame was computed against, not an identity-basis approximation.
+    pelvis_local_roll = math.radians(PELVIS_ROLL_DEG * math.sin(a))
+    pelvis_local_yaw = math.radians(PELVIS_YAW_DEG * math.sin(a + 0.5))
+    pelvis_world = (root_world @ root_rest.inverted() @ pelvis_rest
+                     @ mathutils.Matrix.Rotation(pelvis_local_roll, 4, "Y")
+                     @ mathutils.Matrix.Rotation(pelvis_local_yaw, 4, "Z"))
     # spine_02 (the forelegs' real parent -- see set_leg_pose's docstring) DOES get a small
     # animated counter-rotation later this same frame (set_rot_local("spine_02", ...) below), but
     # that happens after legs are placed; approximating spine_02_world as if it were identity-basis
@@ -491,14 +566,56 @@ for i in range(FRAMES + 1):  # +1: bake the loop-closing frame identical to fram
     # by up to several mm -- the discrepancy could only be coming from the parent chain, which this
     # fixes). Computed directly from the same sinusoid set_rot_local("spine_02", ...) below applies,
     # so the two stay in sync by construction, not by re-deriving/duplicating the formula.
+    #
+    # ROUND 3 BUG FOUND AND FIXED: the formula above (root_world @ root_rest.inverted() @
+    # spine02_rest @ pitch) treats spine_02 as if ROOT were its direct parent. That was a valid
+    # shortcut ONLY as long as every bone between root and spine_02 in the real chain (root ->
+    # pelvis -> spine_01 -> spine_02) had an identity matrix_basis, which was true before this round
+    # (pelvis never rotated) -- bone.matrix_local is armature-space, so skipping identity
+    # intermediate bones' own rest matrices is mathematically exact in that case. Round 3 added
+    # PELVIS roll/yaw (pelvis_local_roll/pelvis_local_yaw just above), which is a REAL, non-identity
+    # rotation now -- so the shortcut silently went stale and spine02_world (hence scapula_world and
+    # every FL/FR leg bone hung off it) was computed against the wrong parent pose, off by a lever-
+    # arm-scaled multiple of the pelvis rotation (confirmed directly: a same-session probe comparing
+    # the old formula's spine02_world.translation, (0.159,-0.390,0.860), against Blender's own
+    # evaluated spine_02 pose at the same frame, (0.164,-0.018,0.680), showed a ~0.37-unit Y and
+    # ~0.18-unit Z discrepancy -- this is what dragged the FL/FR ground targets down through the
+    # floor, not the CROUCH/lift math itself, which three earlier fix attempts at those parameters
+    # correctly found had no effect). Fixed by routing through pelvis_world (which DOES already
+    # include the round-3 roll/yaw) instead of root_world directly; spine_01 is still skipped since
+    # it genuinely has no pose rotation of its own (only pelvis's new rotation needed restoring).
     spine02_local_pitch = math.radians(2 * math.sin(2 * a))
-    spine02_world = (root_world @ root_rest.inverted() @ spine02_rest
+    spine02_world = (pelvis_world @ pelvis_rest.inverted() @ spine02_rest
                       @ mathutils.Matrix.Rotation(spine02_local_pitch, 4, "X"))
 
     stances = []
     for side in leg_sides:
-        if side.startswith("F"):
-            stances.append(set_leg_pose(side, t, spine02_world, spine02_rest))
+        if side in scapula_rest:
+            # Scapula swing (round 5): fore-aft shoulder-socket excursion, same phase as this
+            # leg's own swing (peaks forward at the start of this leg's stance, matching the
+            # foot's own most-forward point, per the per-leg precompute's amplitude comment).
+            # A smooth cosine, not foot_target()'s piecewise stance/swing shape -- the scapula is
+            # secondary motion, not the thing verify.py's foot-slide gate measures (that gate only
+            # cares about the FOOT's own trajectory, which stays exactly as solve_2bone_ik places
+            # it regardless of how the hip anchor it's solved from moves -- see solve_2bone_ik's
+            # own docstring: IK always places the foot at the given target when reachable).
+            swing_phase = (t + phase_offset[side]) % 1.0
+            scapula_amp = scapula_rest[side][3] * math.sin(math.radians(SCAPULA_SWING_DEG))
+            scapula_y = scapula_amp * math.cos(2 * math.pi * swing_phase)
+            hip_dynamic = legs[side]["hip"] + mathutils.Vector((0, scapula_y, 0))
+            scapula_world = set_scapula_pose(side, hip_dynamic, spine02_world, spine02_rest)
+            scapula_pb = arm_obj.pose.bones[f"scapula_{side}"]
+            scapula_pb.keyframe_insert(data_path="rotation_quaternion", frame=i + 1)
+            scapula_pb.keyframe_insert(data_path="location", frame=i + 1)
+            # set_leg_pose reads L["hip"] fresh each call -- temporarily override it with this
+            # frame's swung position so the thigh's own IK solve (and its rendered position, via
+            # aim_matrix(L["hip"], ...) in set_leg_pose) matches where the scapula just placed the
+            # shoulder socket, then restore the precomputed (crouch-only) value for next frame's
+            # swing calculation above (which always starts from the same crouched base).
+            hip_static = legs[side]["hip"]
+            legs[side]["hip"] = hip_dynamic
+            stances.append(set_leg_pose(side, t, scapula_world, scapula_rest[side][2]))
+            legs[side]["hip"] = hip_static
         else:
             stances.append(set_leg_pose(side, t, pelvis_world, pelvis_rest))
 
@@ -516,7 +633,10 @@ for i in range(FRAMES + 1):  # +1: bake the loop-closing frame identical to fram
 
     # Head/neck/spine: a light counter-rotation to the body bob reads as weight/balance. spine_02's
     # rotation here MUST match spine02_local_pitch above exactly (same formula) -- it's the pose
-    # this frame's leg placement was actually computed against.
+    # this frame's leg placement was actually computed against. Same for pelvis's roll/yaw below
+    # (must match pelvis_local_roll/pelvis_local_yaw exactly -- that's the pose BL/BR's own IK
+    # solve was computed against this frame).
+    set_rot_local("pelvis", deg_x=0, deg_y=PELVIS_ROLL_DEG * math.sin(a), deg_z=PELVIS_YAW_DEG * math.sin(a + 0.5))
     set_rot_local("spine_02", deg_x=2 * math.sin(2 * a))
     set_rot_local("neck_01", deg_x=-2 * math.sin(2 * a))
     set_rot_local("head", deg_x=-1.5 * math.sin(2 * a + 0.2))
@@ -527,7 +647,7 @@ for i in range(FRAMES + 1):  # +1: bake the loop-closing frame identical to fram
             pb.keyframe_insert(data_path="rotation_quaternion", frame=i + 1)
             pb.keyframe_insert(data_path="location", frame=i + 1)
     for name in ("tail_01", "tail_02", "tail_03", "tail_04", "wing_L_01", "wing_L_02",
-                 "wing_R_01", "wing_R_02", "spine_02", "neck_01", "head"):
+                 "wing_R_01", "wing_R_02", "spine_02", "neck_01", "head", "pelvis"):
         pb = arm_obj.pose.bones.get(name)
         if pb:
             pb.keyframe_insert(data_path="rotation_euler", frame=i + 1)

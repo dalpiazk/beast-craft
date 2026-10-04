@@ -29,6 +29,125 @@ passes, weight-paint cleanup, Blender-5.x layered-Action F-curve walking, interp
 normalisation) live in `common.py` so every stage script imports them rather than re-deriving the
 same Blender-API gotchas five times.
 
+## v6 redo: crouch/scapula stride + hip weight gradient (lead-review round 5)
+
+v5 (below) got the skeleton placement right but left two problems: FL/FR/BR barely moved during
+Move (near-straight legs, 4-16% peak-to-peak stride) and the hind hip/belly had a real, unfixed mesh
+tear. The lead's round-5 review asked for two targeted fixes, both implemented in `anim/gait.py` and
+`rig_creature.py`/`common.py`/`rig_templates/winged_quadruped.py`, plus a re-check of FL/FR's knee
+range.
+
+**1. Stride fix (animation, not geometry) -- implemented as specified:**
+- **Crouch** (`CROUCH = 0.08*H`, ~8% of H): applied directly to the hip position fed into every
+  leg's IK solve, held constant through the cycle with the existing body bob riding on top (and
+  mirrored as a cosmetic root-bone drop so the visual torso actually sits lower, not just the IK
+  anchor). This is the `stride ~= 2*sqrt(L^2 - h^2)` mechanism the brief described: dropping hip
+  height buys disproportionate reach slack once h is already close to L, which it was for every leg
+  on this rig (see v5's "91-99.7% of total leg length" finding below).
+- **Scapula bone**: new `scapula_{side}` bone per foreleg (head at the chest, tail at the hip,
+  parented to `spine_02`), with `leg_{side}_thigh` re-parented to it instead of `spine_02` directly.
+  Swings fore-aft (`SCAPULA_SWING_DEG = 12`) in phase with that leg's own swing, adding a real
+  shoulder-socket excursion on top of knee articulation -- bind pose is visually unchanged (the
+  scapula's rest head/tail are exactly the old thigh attachment points).
+- **Pelvis roll/yaw** (`PELVIS_ROLL_DEG = 4`, `PELVIS_YAW_DEG = 3`): a small weight-shift in phase
+  with the hind legs' own stride frequency.
+- **Result (verify.py, all four legs, this run):**
+
+  | leg | peak-to-peak stride (% of H) | knee angle range | target met? |
+  |-----|------------------------------|-------------------|-------------|
+  | BL  | 33.5%                        | 17.6..135.2 deg   | yes (baseline) |
+  | BR  | 27.3%                        | 37.1..137.3 deg   | yes (>=20%) |
+  | FL  | 26.3%                        | 45.6..123.0 deg   | yes (>=20%) |
+  | FR  | 16.0%                        | 74.3..123.2 deg   | **no** -- short of the 20% target |
+
+  FL/FR's knee range is no longer the near-straight 155-179 deg v5 had -- all four legs now show a
+  real bend through the cycle. FR's stride is still reach-limited below the 20% target: its rest
+  hip-to-foot distance uses a larger fraction of its own `L1+L2` than the other three legs even after
+  an 8%-of-H crouch (see `gait.py`'s per-leg `safe_stride` computation/log), and the crouch amount is
+  shared across all four legs rather than solved per-leg -- a per-leg crouch/reach solve would likely
+  close this gap further but wasn't part of this round's brief. Honestly reported, not hidden: FR
+  visibly moves now (16% vs. v5's ~1-2% floor value) but doesn't fully hit the stated target.
+
+- **A real bug found and fixed along the way (not a stride-parameter problem):** the fix above
+  initially regressed FL/FR's ground-contact gate hard (toe dipping to -0.0177/-0.0173 against a
+  -0.01 threshold) and three successive attempts at tuning `CROUCH`-adjacent safety margins (a
+  `reached.z` clamp, a toe-offset renormalisation, a more conservative lift cap) all produced
+  byte-identical failure numbers -- a strong signal none of them were touching the actual cause.
+  Direct instrumentation (dumping the hip-to-target distance and the IK solve's own output at the
+  exact worst frame) showed the IK math itself was correct (target z=0 exactly, no min/max-reach
+  clamping) -- the error was introduced *after* the solve, in the parent-chain matrix used to place
+  the bone. `spine02_world` (the forelegs' effective parent-chain transform, used by both the scapula
+  and, through it, every FL/FR leg bone) was computed as `root_world @ ... @ spine02_rest @ pitch`,
+  i.e. treating spine_02 as ROOT's *direct* child. That was an exact shortcut as long as every real
+  intermediate bone (root -> pelvis -> spine_01 -> spine_02) had identity rotation, which was true
+  before this round -- but this round's new pelvis roll/yaw gave pelvis a real, non-identity rotation,
+  silently invalidating the shortcut. A same-session probe confirmed it directly: the old formula's
+  `spine02_world` translation, `(0.159, -0.390, 0.860)`, didn't match Blender's own evaluated
+  `spine_02` pose at the same frame, `(0.164, -0.018, 0.680)` -- a lever-arm-scaled error from skipping
+  pelvis's new rotation, which dragged every FL/FR leg bone (hence the ground target) down through the
+  floor. Fixed by routing `spine02_world` through `pelvis_world` (which already includes the roll/yaw)
+  instead of `root_world` directly. After the fix, all four feet pass the ground-interpenetration gate
+  (BL -0.0001, BR -0.0002, FL -0.0001, FR -0.0001) with no further parameter tuning, and foot-slide
+  cv actually improved for FL/FR too (0.169->0.048 for FR, 0.093->0.062 for FL) -- the stale parent
+  chain had been injecting extra per-frame position error into the stance sweep, not just the worst
+  frame.
+
+**2. Hip/belly weight fix -- implemented, but the tear is NOT fixed. Honest result, with evidence:**
+
+`rig_creature.py`/`common.py` gained `fix_hip_weight_gradient` (two passes: strip any thigh-group
+weight on a vertex within one thigh-length of a DIFFERENT leg's thigh, and force belly-centreline
+vertices between the hind hips off every thigh group entirely, onto pelvis/spine only), run after the
+existing per-leg masks and before final weight cleanup. `rig_v6_1.txt` confirms it ran: 162 cross-leg
+removals, 102 belly-centre vertices forced off every thigh.
+
+A before/after flat-shaded close-up at the hind hip, same camera, same frame (Move frame 7, near peak
+pelvis roll) -- exactly what the lead asked for:
+- `scratchpad/anim-pilot/v6/hip_before_v5_wide.png` (v5, pre-fix): visible torn/self-intersecting
+  geometry across the haunch.
+- `scratchpad/anim-pilot/v6/hip_after_v6_wide.png` (v6, post-fix, same frame/camera): **still shows
+  comparably severe tearing** -- if anything slightly more of the hip/shoulder region is affected.
+- `scratchpad/anim-pilot/v6/hip_bind.png` (bind pose, no animation): completely clean, confirming
+  the mesh/weights are fine at rest and this is pose-dependent, same as v5's finding.
+- `scratchpad/anim-pilot/v6/hip_f1.png` (v6, Move frame 1 -- near the start of the cycle, not an
+  extreme pose): also torn, confirming this isn't limited to the most extreme frame.
+
+**The fix was implemented as specified and did run, but it did not fix the tear.** Looking for why
+turned up evidence the problem is more likely upstream of weight painting entirely:
+`rig_v6_1.txt`'s weighting log shows `WEIGHT: floating-island repair: 366 components, re-weighted
+3822` -- the prepped mesh has **366 disconnected topology islands**, and the fallback repair pass had
+to re-weight 3,822 vertices (57% of the mesh's 6,740) because they weren't reachable by normal
+heat-diffusion weighting at all. Disconnected islands that are spatially coincident at bind pose (so
+they still render as a seamless surface at rest, matching every "bind pose is clean" finding in both
+v5 and this round) but get their weights filled in by a nearest-neighbour-style repair rather than
+genuine heat diffusion can easily end up on different sides of a hard weight boundary from their
+immediate neighbours -- which would produce exactly this symptom: invisible at rest, visibly torn the
+moment the joint actually rotates, regardless of how smooth the weight gradient across any *single*
+connected patch is. This is a stronger, more specific version of v5's "ordinary LBS quality" guess,
+and points at `prep_mesh.py`'s decimate/outline-hull/weld step as the more likely root cause rather
+than anything in `rig_creature.py`'s weighting logic -- fixing it properly would mean re-running mesh
+prep with a weld/merge-by-distance pass tight enough to close those 366 islands before weighting,
+which is out of this round's scope (and risks changing silhouette/topology the lead hasn't reviewed).
+**Reported honestly, per the task brief: the hip/belly tear is a known, unresolved limitation**, not
+silently left out of the write-up.
+
+One mitigating fact: in the actual toon-shaded runtime render (`review_v6/final/contact_sheet_move.png`
+and `contact_sheet_move_side.png` -- the real producer-facing deliverable, not the flat Blender
+diagnostic), the outline/toon shader hides nearly all of this -- same as v5's finding. The geometry-
+level tear is real and confirmed by direct evidence above, but it does not read as badly in-engine as
+the flat-shaded close-ups make it look.
+
+The optional "haunch helper bone" (copying 50% of thigh rotation) from the brief was not implemented
+-- given the floating-island finding above, a helper bone sharing deformation across an already-
+hard weight boundary would not address the actual mechanism (disconnected islands getting
+inconsistent weights from the repair pass), so it was not worth the added rig complexity without
+first confirming the island-closure fix helps.
+
+**Gate summary, this round (`scratchpad/anim-pilot/v6/verify_v6_7.txt`):** every verify.py gate
+passes, including the two that were failing at the start of this round (FL/FR ground-interpenetration).
+The hip/belly tear is not something verify.py's current gates check for (no self-intersection/tear
+detector exists in this pipeline) -- it's a gap in what's actually gated, worth flagging as a
+follow-up even outside this pilot.
+
 ## v5 redo: hand-placed landmarks (lead-review round 4)
 
 The v4 horizontal-slicing redo below was itself sent back: `rig_overlay_side.png` showed hips/
