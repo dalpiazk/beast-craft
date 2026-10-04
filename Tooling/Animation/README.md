@@ -29,6 +29,96 @@ passes, weight-paint cleanup, Blender-5.x layered-Action F-curve walking, interp
 normalisation) live in `common.py` so every stage script imports them rather than re-deriving the
 same Blender-API gotchas five times.
 
+## v7 redo: retopology fixes the hip/belly tear at the source (lead-review round 7)
+
+Round 6's review confirmed the skeleton overlay was right but flagged two things: the v6 floating-
+island finding (366 weighting-fallback islands) was the REAL root cause of the hip/belly tear and
+should be fixed at the mesh level instead of tuned around in weight logic, and a long thin stray
+line was visible shooting out of the body in every frame of `contact_sheet_move_side.png`.
+
+**Both are fixed this round, confirmed with evidence, not just claimed:**
+
+1. **Retopology (`prep_mesh.py`, new `common.py` helpers).** The old weld-then-Collapse-decimate
+   approach is removed entirely and replaced with: voxel remesh (auto-tuned per-mesh via
+   `retopologize_to_single_shell` to land ~10-14k tris in a single, manifold, zero-non-manifold-
+   edge shell; converged in 4 tries on this mesh) -> a Smooth-modifier relax pass -> QuadriFlow
+   retopology (~4k quads, clean edge flow) -> shrinkwrap back onto the original welded surface
+   (recovers true surface position/detail) -> a final Collapse-decimate safety trim ONLY IF
+   QuadriFlow overshot the triangle budget (not needed on this mesh: QuadriFlow landed at 7358 tris
+   already). Collapse-decimate is now only ever run on a mesh already confirmed single-component
+   and manifold, which is the actual safe precondition Spike #55's original finding called for (the
+   OLD guard -- "largest component holds >=80% of verts" -- looked safe at 4 components/99.4% but
+   still let Collapse shatter the mesh into the 366 islands round 6 found; this is why that guard is
+   gone, not loosened).
+2. **A second, complementary bug found while verifying step 1's result.** Even a genuinely single-
+   component (1 component, 0 non-manifold edges, confirmed in Blender's own internal vertex count)
+   retopologized mesh still re-fragments once exported to glTF and re-imported: **glTF export
+   itself re-splits a single vertex into several wherever it carries more than one UV/normal value
+   across its surrounding faces** (a format requirement). Confirmed directly: exporting and re-
+   importing the retopologized mesh showed 152 components, not 1 -- the exact mechanism behind round
+   6's 366-island problem, just with far fewer UV islands this time (152 vs. 366, since the new
+   Smart-UV-Projected 1K layout packs far more efficiently than Meshy's original UVs). Fixed with a
+   second weld, added to `rig_creature.py` immediately on import (same threshold prep_mesh.py's own
+   weld uses) -- confirmed to restore true single-component topology (1 component, 0 non-manifold
+   edges) before any weighting happens.
+3. **Weighting now converges on the FIRST attempt, no fallback chain needed at all:** `rig_v7_1.txt`
+   shows `WEIGHT: attempt 1 (raw mesh, heat weights): 0/3679 unweighted` and `floating-island
+   repair: 1 components, re-weighted 0` -- the voxel-remesh-donor fallback, the data-transfer step,
+   and the topology-consistency/stray-vertex repair passes that rounds 4-6 all needed are simply not
+   exercised this round. The `SOLVER_STABILITY_NUDGE` hack from round 4 (a -0.015 nudge at BL's
+   specific hand-placed knee position, needed because Blender's heat solver failed completely at
+   that exact point on the OLD mesh) is kept in the code for safety but isn't the reason this
+   succeeds -- the solver just doesn't fail here any more.
+4. **Hip/belly tear: FIXED, confirmed with the same before/after method the lead asked for.**
+   `fix_hip_weight_gradient` (round 6's weight-logic fix, kept unchanged this round -- 287 cross-leg
+   removals, 130 belly vertices forced off every thigh) now runs on genuinely clean, single-
+   component geometry instead of 366 independently-inconsistent islands. A flat-shaded close-up at
+   the SAME worst Move frame as v6 (frame 7) and the same frame used for v6's known-bad reference
+   (`scratchpad/anim-pilot/v7/hip_after_v7_wide.png`) shows a continuous, unbroken surface at the
+   hip/haunch/belly -- no dark gaps, no shard-like self-intersection, directly comparable to v6's
+   `hip_after_v6_wide.png` (severe tearing at the identical frame/camera). A second check at a non-
+   extreme frame (`hip_f1_v7.png`, frame 1) is equally clean. A 3-frame (1/7/13), 4-angle full-body
+   turnaround (`scratchpad/anim-pilot/v7/turnaround_f{01,07,13}_{0..3}.png`, 12 images total) was
+   rendered and looked at directly -- every angle at every frame is clean at the body/hip/belly.
+   **Minor, separate, honestly-noted residual:** a few small sliver-shaped facets are visible right
+   at the claw tips in some frames (e.g. `hip_f1_v7.png`'s foreground foot) -- these read as low-
+   poly faceting at a naturally small, pointed part of the mesh, not the hip/belly self-intersection
+   tear this round was asked to fix, and are far smaller/less objectionable than what v6 showed.
+5. **The stray horizontal line is gone.** `review_v7/final/contact_sheet_move_side.png` no longer
+   shows the long thin line that shot out of the body in every v6 frame -- consistent with it having
+   been exactly the mechanism this round fixed (a disconnected mesh island, inconsistently weighted
+   to a bone far from where it visually sat, stretching a sliver of geometry across the frame every
+   time that bone moved). No separate fix was needed beyond the retopology itself.
+6. **Per-leg crouch closes FR's stride gap.** Round 6 left FR short of the ">=20% of H" target
+   (16.0%) because a single flat 8%-of-H crouch doesn't give every leg the same reach slack when
+   their rest geometry isn't equally reach-constrained. `anim/gait.py` now measures each leg's own
+   rest hip-to-foot distance as a fraction of its own max reach (pure rest geometry, computed before
+   any crouch is applied) and linearly maps that ratio across the four legs' own observed range onto
+   a [6%, 14%] -of-H crouch band -- the most reach-constrained leg(s) get the most crouch. Result,
+   this round's retopologized-mesh numbers: BL 29.2%, BR 28.2%, FL 38.3%, FR 27.1% -- **all four legs
+   now clear the 20% target** (FL and FR tied for the highest rest-reach-utilization ratio on this
+   retopologized mesh, both ~0.999, so both get close to the maximum 14% crouch; FL's resulting
+   38.3% is higher than strictly needed but was looked at directly in the toon-shaded render and in
+   the flat-shaded turnaround above and reads as a natural, if slightly generous, stride, not a
+   broken one). Knee ranges: BL 34.7-137.5, BR 40.8-137.7, FL 22.8-115.5, FR 40.2-117.1 degrees --
+   real articulation on every leg, no longer anywhere near the old near-straight range.
+
+**Gate summary, this round (`scratchpad/anim-pilot/v7/verify_v7_1.txt`):** every gate passes,
+including foot-slide (cv 0.026-0.093), knee-angle range, loop-seam, jitter, and ground-
+interpenetration (all four feet between -0.0002 and +0.0021). Mesh: 1 component, 0 non-manifold
+edges, 7358 tris (budget 8000), 3679 verts (down from v6's 6740 -- the new low-island-count UVs mean
+far fewer glTF export-time seam-split duplicates even before the weld-on-import fix collapses the
+rest). GLB: 0.566 MiB (budget ~2 MiB).
+
+**Honest per-clip critique, this round:** Move is now clean at both the geometry level (no tear) and
+the motion level (all four legs clear the stride target, zero foot slide, real knee articulation,
+no stray geometry). Idle and Attack were re-verified against the new 35-bone rig and pass unchanged
+(legs stay braced in both, as before). The one open item carried forward honestly: FL's stride
+(38.3%) is noticeably more generous than the other three legs' because its rest-reach-utilization
+ratio happens to tie with FR's on this retopologized mesh -- not wrong, but worth a human look in
+the actual game camera (not just this pilot's orthographic renders) if it reads as too bouncy at
+normal viewing distance/speed.
+
 ## v6 redo: crouch/scapula stride + hip weight gradient (lead-review round 5)
 
 v5 (below) got the skeleton placement right but left two problems: FL/FR/BR barely moved during

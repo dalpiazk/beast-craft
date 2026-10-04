@@ -225,7 +225,41 @@ RAW_STRIDE = 0.23 * H   # desired fore-aft HALF-stride excursion (foot sweeps +R
 # oscillates on TOP of it, per the task brief), applied directly to the hip position fed into the
 # IK solve (not just a cosmetic root bob -- see the per-leg precompute below and set_leg_pose's
 # docstring for why those are different things in this file's existing architecture).
-CROUCH = 0.08 * H  # ~8% of H, middle of the requested 6-10% band
+#
+# Round 7: a single flat CROUCH left FR short of the lead's ">=20% of H like BL" stride target
+# (FR's rest geometry uses a larger fraction of its own max reach than the other three legs even
+# after an 8%-of-H crouch -- confirmed directly in round 6's numbers and unchanged in round 7's
+# retopologized-mesh re-measurement). Fixed with a PER-LEG crouch instead of one shared constant:
+# each leg's own rest reach-utilization ratio (hip-to-foot rest distance / max_reach, pure rest
+# geometry, independent of crouch) is measured in a cheap first pass below, then linearly mapped
+# across the four legs' own observed range onto a [CROUCH_MIN, CROUCH_MAX] band -- the leg closest
+# to fully extended (highest ratio, FR on this mesh) gets the most crouch, the leg with the most
+# natural slack (lowest ratio) gets the least. This widens the original "6-10% of H" band a little
+# at the top end specifically to buy FR enough IK slack to clear 20%; legs that already met the
+# target keep a crouch close to the original flat 8%.
+CROUCH_MIN = 0.06 * H
+CROUCH_MAX = 0.14 * H
+_rest_reach_ratio = {}
+for _side in leg_sides:
+    _hip_rest0, _knee0 = rest_head_tail(f"leg_{_side}_thigh")
+    _, _ankle0 = rest_head_tail(f"leg_{_side}_shin")
+    _, _foot0 = rest_head_tail(f"leg_{_side}_foot")
+    _L1_0 = (_knee0 - _hip_rest0).length
+    _L2_0 = (_ankle0 - _knee0).length + (_foot0 - _ankle0).length
+    _rest_reach_ratio[_side] = (_foot0 - _hip_rest0).length / max(_L1_0 + _L2_0, 1e-6)
+_lo_ratio, _hi_ratio = min(_rest_reach_ratio.values()), max(_rest_reach_ratio.values())
+CROUCH_BY_SIDE = {}
+for _side in leg_sides:
+    if _hi_ratio - _lo_ratio < 1e-6:
+        _frac = 0.5
+    else:
+        _frac = (_rest_reach_ratio[_side] - _lo_ratio) / (_hi_ratio - _lo_ratio)
+    CROUCH_BY_SIDE[_side] = CROUCH_MIN + _frac * (CROUCH_MAX - CROUCH_MIN)
+print(f"PER-LEG CROUCH: ratios={ {s: round(r,3) for s,r in _rest_reach_ratio.items()} } "
+      f"crouch={ {s: round(c,4) for s,c in CROUCH_BY_SIDE.items()} }")
+CROUCH = sum(CROUCH_BY_SIDE.values()) / len(CROUCH_BY_SIDE)  # cosmetic root/body bob only (a single
+# rigid global transform can't differ per leg) -- the mean of the per-leg values, not a separate
+# tuned constant, so the visual torso drop stays representative of what the legs are actually doing.
 # Scapula swing (round 5): a real quadruped's foreleg reach comes mostly from the shoulder blade
 # itself swinging fore-aft, not the elbow alone. SCAPULA_SWING_DEG is the rotation amplitude;
 # the resulting fore-aft shoulder-socket excursion (scapula_len * sin(angle)) is added to each
@@ -245,12 +279,13 @@ for side in leg_sides:
     _, ankle = rest_head_tail(f"leg_{side}_shin")
     _, foot = rest_head_tail(f"leg_{side}_foot")
     _, toe = rest_head_tail(f"leg_{side}_toe")
-    # CROUCH applied directly to the hip used for every reach/IK computation below -- this IS the
-    # "lower the body" mechanism for leg purposes (see CROUCH's docstring above for why a cosmetic
-    # root bob alone would not actually buy any reach margin in this file's architecture: the IK
-    # solve's hip input has always been independent of root/pelvis's own animated world position,
-    # by original design, so CROUCH must shift the hip value fed into the solve directly).
-    hip = hip_rest - mathutils.Vector((0, 0, CROUCH))
+    # Per-leg CROUCH applied directly to the hip used for every reach/IK computation below -- this
+    # IS the "lower the body" mechanism for leg purposes (see CROUCH_BY_SIDE's docstring above for
+    # why a cosmetic root bob alone would not actually buy any reach margin in this file's
+    # architecture: the IK solve's hip input has always been independent of root/pelvis's own
+    # animated world position, by original design, so CROUCH must shift the hip value fed into the
+    # solve directly).
+    hip = hip_rest - mathutils.Vector((0, 0, CROUCH_BY_SIDE[side]))
     if side.startswith("F"):
         scapula_head, scapula_tail = rest_head_tail(f"scapula_{side}")
         scapula_pb_tmp = arm_obj.pose.bones.get(f"scapula_{side}")

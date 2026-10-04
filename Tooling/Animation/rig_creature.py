@@ -61,6 +61,28 @@ obj, new_images = common.import_glb(GLB)
 obj.name = "Griffin"
 bpy.context.view_layer.objects.active = obj
 
+# Round-7 mesh-prep lesson: glTF EXPORT re-splits a single welded vertex into several wherever it
+# carries more than one UV/normal value across its surrounding faces (a format requirement -- see
+# prep_mesh.py's docstring for the full story). That means even prep_mesh.py's new single-shell
+# retopology round-trips back to a multi-component mesh the instant it's exported to GLB and
+# re-imported here -- confirmed directly: the retopologized, single-component (1 component, 0
+# non-manifold edges) mesh prep_mesh.py produces re-fragments to 152 components once exported and
+# re-imported, the exact glTF-export-seam-splitting mechanism that produced round 6's 366-island
+# weighting-fallback problem in the first place, just on a much cleaner starting mesh with far fewer
+# UV islands (152 vs. 366). Welding immediately on import here -- before anything else, including
+# the native-coordinate capture just below -- collapses those re-split-but-coincident vertices back
+# to the true single-component topology for every downstream step (landmark snapping, weighting),
+# the same threshold prep_mesh.py itself uses. This does not affect the landmark snapping below:
+# HAND_LANDMARKS_NATIVE positions are independent of vertex count/indices, and welding merges
+# coincident vertices without moving any geometry, so the mesh's bounding box (what
+# _native_to_normalized_fn reads) is unchanged either way.
+wv0, wv1 = common.weld_mesh(obj, threshold=1e-4)
+print(f"WELD ON IMPORT: {wv0} -> {wv1} verts")
+welded_rig_stats = common.topology_stats(obj)
+print(f"WELD ON IMPORT COMPONENTS: {welded_rig_stats['components']} "
+      f"(largest: {welded_rig_stats['largest_component']} / {welded_rig_stats['verts']} verts), "
+      f"non-manifold edges: {welded_rig_stats['non_manifold_edges']}")
+
 # Lead-review round 4: the hand-calibrated landmark path needs the native (pre-normalisation) ->
 # normalised conversion captured BEFORE common.normalise_transform runs (it reads the mesh's own
 # current bounding box; afterwards that box is already the normalised one). See

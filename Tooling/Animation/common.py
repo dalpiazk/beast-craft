@@ -200,6 +200,194 @@ def decimate_to_tris(obj, target_tris):
 
 
 # ---------------------------------------------------------------------------
+# Retopology (round-7 lead review): Meshy's quad-remesh output is severely fragmented at the
+# vertex-index level (hundreds to 1000+ "connected components" by edge adjacency, even though most
+# of that is UV-seam-induced duplicate-position vertices that `weld_mesh` collapses) -- and on top
+# of that, glTF EXPORT ITSELF re-splits a single welded vertex into several wherever it carries more
+# than one UV/normal value across its surrounding faces (a glTF requirement: one vertex = one UV).
+# That means prep_mesh.py's old weld-then-decimate approach only ever saw a clean 4-component mesh
+# INTERNALLY (Blender's own `obj.data.vertices`), but the EXPORTED, RE-IMPORTED mesh rig_creature.py
+# actually rigs is fragmented again by every UV seam -- confirmed directly: the v6 pilot's rigged
+# mesh's own weighting log reported "366 floating-island components" on a mesh whose pre-export
+# Blender-internal component count was only 4. A hard-boundary weight-gradient fix (round 6) could
+# not and did not fix the resulting hip/belly tear, because the problem isn't where weight blends
+# ACROSS a boundary -- it's that many of those UV-seam-bounded patches are getting their OWN
+# inconsistent weights from the automatic-weight fallback chain's nearest-neighbour "floating
+# island" repair rather than genuine heat diffusion, so adjacent, spatially-coincident patches can
+# land on opposite sides of a weight discontinuity even though they're visually fused at rest.
+#
+# Retopologizing to one real, single-shell, manifold mesh (voxel remesh -> smooth -> QuadriFlow ->
+# shrinkwrap back onto the original surface) and baking a fresh low-island-count UV layout fixes
+# this at the source: a genuinely single-component mesh can't produce 366 weighting-fallback
+# islands, and a Smart-UV-Projected 1K layout has far fewer seam edges than Meshy's original,
+# heavily-islanded UVs, so even the residual glTF export-time vertex splitting has far less surface
+# area to fragment. See prep_mesh.py's own docstring for the staged pipeline this feeds.
+def remove_small_components(obj, min_verts=100):
+    """Deletes connected components (vertex-index adjacency) smaller than min_verts. A voxel remesh
+    at a voxel size coarse enough to hit a reasonable triangle budget can leave a handful of tiny
+    disconnected specks even where it otherwise resolves the mesh as one clean shell (confirmed on
+    this mesh: a handful of 8-16-vertex flecks, not meaningful geometry -- likely reconstruction
+    noise from thin/degenerate slivers in the source mesh, like a double-sided eye card). Returns
+    (components_removed, verts_removed)."""
+    comps = connected_components(obj)
+    small = [c for c in comps if len(c) < min_verts]
+    if not small:
+        return 0, 0
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.mode_set(mode="EDIT")
+    bm = bmesh.from_edit_mesh(obj.data)
+    bm.verts.ensure_lookup_table()
+    to_delete = [bm.verts[vi] for c in small for vi in c]
+    bmesh.ops.delete(bm, geom=to_delete, context="VERTS")
+    bmesh.update_edit_mesh(obj.data)
+    bpy.ops.object.mode_set(mode="OBJECT")
+    return len(small), sum(len(c) for c in small)
+
+
+def retopologize_to_single_shell(obj, target_tri_band=(10000, 14000), small_component_min_verts=100,
+                                  max_tries=6):
+    """Voxel-remeshes `obj` (in place) to a single connected, manifold shell landing roughly in
+    `target_tri_band` triangles, cleaning up any tiny reconstruction-noise specks along the way.
+    Voxel size is expressed as a fraction of the mesh's own bounding-box diagonal so this
+    generalises across creatures of different scale, not just this specific Griffin -- starting
+    fraction and search direction were tuned empirically on this mesh (a coarser voxel size
+    counter-intuitively INCREASES the raw component count before cleanup, because thin features
+    like wing membranes and tail tips start pinching into separate tiny blobs rather than vanishing
+    cleanly -- `remove_small_components` handles that, but a voxel size so coarse it detaches a
+    WING-sized chunk would not be caught by a small-vertex-count filter, so the before/after
+    turnaround render this feeds into is still a required visual check, not just this function's
+    automated gates). Returns a dict of diagnostics for the caller to log."""
+    bb = [obj.matrix_world @ mathutils.Vector(c) for c in obj.bound_box]
+    diag = (mathutils.Vector((max(v.x for v in bb), max(v.y for v in bb), max(v.z for v in bb))) -
+            mathutils.Vector((min(v.x for v in bb), min(v.y for v in bb), min(v.z for v in bb)))).length
+    frac = 0.0081  # empirical starting point (~0.022 absolute on this mesh's ~2.7-unit bbox diagonal)
+    tried = []
+    lo, hi = target_tri_band
+    orig_name = obj.name
+    for attempt in range(max_tries):
+        voxel_size = frac * diag
+        dup = obj.copy()
+        dup.data = obj.data.copy()
+        bpy.context.collection.objects.link(dup)
+        mod = dup.modifiers.new("Retopo_Voxel", "REMESH")
+        mod.mode = "VOXEL"
+        mod.voxel_size = voxel_size
+        mod.use_smooth_shade = True
+        bpy.context.view_layer.objects.active = dup
+        bpy.ops.object.modifier_apply(modifier=mod.name)
+        remove_small_components(dup, min_verts=small_component_min_verts)
+        stats = topology_stats(dup)
+        tried.append({"frac": frac, "voxel_size": voxel_size, "tri_equivalent": stats["tri_equivalent"],
+                       "components": stats["components"]})
+        if stats["components"] == 1 and lo <= stats["tri_equivalent"] <= hi:
+            bpy.data.objects.remove(obj, do_unlink=True)
+            dup.name = orig_name
+            return dup, {"tries": tried, "converged": True}
+        bpy.data.objects.remove(dup, do_unlink=True)
+        if stats["tri_equivalent"] > hi:
+            frac *= 1.15  # coarser voxel -> fewer tris
+        else:
+            frac *= 0.85  # finer voxel -> more tris (also tends to reduce stray-component risk)
+    # Didn't land exactly in-band within max_tries -- use the closest-to-band attempt's fraction
+    # rather than failing outright; still require a clean single component.
+    best = min(tried, key=lambda t: 0 if lo <= t["tri_equivalent"] <= hi else
+               min(abs(t["tri_equivalent"] - lo), abs(t["tri_equivalent"] - hi)))
+    dup = obj.copy()
+    dup.data = obj.data.copy()
+    bpy.context.collection.objects.link(dup)
+    mod = dup.modifiers.new("Retopo_Voxel", "REMESH")
+    mod.mode = "VOXEL"
+    mod.voxel_size = best["voxel_size"]
+    mod.use_smooth_shade = True
+    bpy.context.view_layer.objects.active = dup
+    bpy.ops.object.modifier_apply(modifier=mod.name)
+    remove_small_components(dup, min_verts=small_component_min_verts)
+    bpy.data.objects.remove(obj, do_unlink=True)
+    dup.name = orig_name
+    return dup, {"tries": tried, "converged": False}
+
+
+def smooth_relax(obj, factor=0.5, iterations=4):
+    """A quick Laplacian-style relax pass (Blender's built-in Smooth modifier) to soften voxel
+    remesh's stair-stepped surface before QuadriFlow retopology -- QuadriFlow's quad flow follows
+    the input surface's normals, and a stair-stepped input produces visibly blocky quad flow."""
+    mod = obj.modifiers.new("Retopo_Smooth", "SMOOTH")
+    mod.factor = factor
+    mod.iterations = iterations
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.modifier_apply(modifier=mod.name)
+
+
+def quadriflow_retopo(obj, target_faces=4000):
+    """Runs Blender's QuadriFlow algorithm (bpy.ops.object.quadriflow_remesh) for clean quad edge
+    flow -- requires a manifold, single-shell input (exactly what retopologize_to_single_shell
+    produces). target_faces is QUAD faces; triangulated tri-equivalent is roughly 2x this, so
+    target_faces=4000 lands close to an 8000-tri final budget directly."""
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.select_all(action="DESELECT")
+    obj.select_set(True)
+    bpy.ops.object.quadriflow_remesh(target_faces=target_faces, use_mesh_symmetry=False,
+                                      use_preserve_sharp=False, use_preserve_boundary=False,
+                                      smooth_normals=True)
+
+
+def shrinkwrap_onto(obj, target_obj, wrap_method="NEAREST_SURFACEPOINT"):
+    """Projects obj's vertices back onto target_obj's surface (applied, in place) -- recovers true
+    surface position/fine detail lost to voxel remesh's reconstruction smoothing, using the
+    ORIGINAL (pre-retopology) mesh as the shrinkwrap target."""
+    mod = obj.modifiers.new("Retopo_Shrinkwrap", "SHRINKWRAP")
+    mod.wrap_method = wrap_method
+    mod.target = target_obj
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.modifier_apply(modifier=mod.name)
+
+
+def bake_base_color(retopo_obj, source_obj, image_size=1024, cage_extrusion=0.03, margin=8,
+                     samples=16):
+    """Smart-UV-Projects retopo_obj, then Cycles-bakes source_obj's (the original, textured mesh's)
+    diffuse base colour onto a new 1K image via selected-to-active, and wires that image into a new
+    material on retopo_obj. Returns the baked Image datablock (not yet saved to disk -- caller
+    saves it, matching downsize_image's pattern elsewhere in this module)."""
+    bpy.context.view_layer.objects.active = retopo_obj
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.uv.smart_project(angle_limit=1.1519, island_margin=0.02)  # ~66 degrees
+    bpy.ops.object.mode_set(mode="OBJECT")
+
+    bake_img = bpy.data.images.new(retopo_obj.name + "_basecolor", width=image_size,
+                                    height=image_size, alpha=False)
+    mat = bpy.data.materials.new(retopo_obj.name + "_baked")
+    mat.use_nodes = True
+    nt = mat.node_tree
+    bsdf = nt.nodes.get("Principled BSDF")
+    tex_node = nt.nodes.new("ShaderNodeTexImage")
+    tex_node.image = bake_img
+    nt.links.new(tex_node.outputs["Color"], bsdf.inputs["Base Color"])
+    retopo_obj.data.materials.clear()
+    retopo_obj.data.materials.append(mat)
+    nt.nodes.active = tex_node
+
+    scene = bpy.context.scene
+    prior_engine = scene.render.engine
+    scene.render.engine = "CYCLES"
+    scene.cycles.samples = samples
+    scene.cycles.device = "CPU"
+
+    bpy.ops.object.select_all(action="DESELECT")
+    source_obj.hide_render = False
+    source_obj.hide_set(False)
+    retopo_obj.hide_render = False
+    retopo_obj.hide_set(False)
+    source_obj.select_set(True)
+    retopo_obj.select_set(True)
+    bpy.context.view_layer.objects.active = retopo_obj
+    bpy.ops.object.bake(type="DIFFUSE", pass_filter={"COLOR"}, use_selected_to_active=True,
+                         cage_extrusion=cage_extrusion, margin=margin)
+    scene.render.engine = prior_engine
+    return bake_img
+
+
+# ---------------------------------------------------------------------------
 # Weighting: automatic weights with fallback chain + scripted cleanup
 # (ported from Tooling/Spike55/blender_export_live.py, generalised to any bone-name list)
 # ---------------------------------------------------------------------------
